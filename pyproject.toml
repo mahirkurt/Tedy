@@ -1,0 +1,8 @@
+[project]
+name = "ted"
+version = "0.1.0"
+description = "TED Project"
+requires-python = ">=3.9"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
