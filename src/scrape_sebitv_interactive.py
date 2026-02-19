@@ -401,6 +401,9 @@ def extract_question_bank(files):
     # Extract JSON object: var SkipIntroDataJSON = { ... };
     m = re.search(r'=\s*(\{[\s\S]+\})\s*;?\s*$', text)
     if not m:
+        # Try: entire file is JSON
+        m = re.search(r'(\{[\s\S]+\})', text)
+    if not m:
         return {"_raw": text[:5000], "_parse_error": True}
 
     json_str = m.group(1)
