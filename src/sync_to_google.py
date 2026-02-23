@@ -362,7 +362,7 @@ def sync_ders_programi(cal_service, data, cal_id, existing_events):
                 teacher = parts[1].strip() if len(parts) > 1 else ""
 
                 # Extract lesson name (before parenthesis)
-                lesson_name = re.sub(r"\s*\(.*\)\s*$", "", lesson_full)
+                lesson_name = normalize_course(lesson_full)
 
                 day_offset = DAYS.index(day_name)
                 day_date = week_start + timedelta(days=day_offset)
@@ -418,7 +418,7 @@ def sync_odevlerim(cal_service, tasks_service, data, cal_id, task_list_id,
         try:
             root_id = _get_or_create_folder(drive_service, "Ödevler")
             for row in rows:
-                ders = row.get("Ders Adı", "")
+                ders = normalize_course(row.get("Ders Adı", ""))
                 if ders and ders not in drive_links:
                     subj_id = _get_or_create_folder(
                         drive_service, ders, parent_id=root_id
@@ -430,7 +430,7 @@ def sync_odevlerim(cal_service, tasks_service, data, cal_id, task_list_id,
             print(f"  Drive folder link error: {e}")
 
     for row in rows:
-        ders = row.get("Ders Adı", "")
+        ders = normalize_course(row.get("Ders Adı", ""))
         baslik = row.get("Ödev Başlığı", "")
         kaynak = row.get("Ödev Kaynağı", "")
         tarih_str = row.get("Ödev Son Teslim Tarihi", "")
@@ -654,7 +654,8 @@ def sync_ders_icerikleri(tasks_service, data, task_list_id, existing_tasks):
     tasks_added = 0
     tasks_skipped = 0
 
-    for ders_name, info in ders_data.items():
+    for raw_name, info in ders_data.items():
+        ders_name = normalize_course(raw_name)
         text = info.get("text", "").strip()
         cards = info.get("cards", [])
         if not text and not cards:
@@ -738,7 +739,7 @@ def sync_gelisim_raporu(tasks_service, data, task_list_id,
     skipped = 0
 
     for row in grades:
-        ders = row.get("Ders", "")
+        ders = normalize_course(row.get("Ders", ""))
         if not ders:
             continue
 
@@ -880,7 +881,10 @@ def sync_grades_to_sheets(sheets_service, data):
     ]
     values = [headers]
     for row in grades:
-        values.append([row.get(h, "") for h in headers])
+        values.append([
+            normalize_course(row.get(h, "")) if h == "Ders" else row.get(h, "")
+            for h in headers
+        ])
 
     # Add semester info row
     values.append([])
@@ -1052,7 +1056,7 @@ def sync_attachments_to_drive(drive_service, cal_service,
         for att in detail.get("attachments", []):
             url = att.get("url", "")
             name = att.get("name", "")
-            ders = row.get("Ders Adı", "Genel")
+            ders = normalize_course(row.get("Ders Adı", "Genel"))
             if url and name:
                 attachments.append({
                     "url": url, "name": name, "ders": ders,
