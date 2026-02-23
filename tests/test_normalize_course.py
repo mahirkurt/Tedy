@@ -67,3 +67,15 @@ class TestNormalizeCourseUnknown:
 
     def test_genel(self):
         assert normalize_course("Genel") == "Genel"
+
+
+class TestTakvimKeywords:
+    """Verify takvim keyword classification covers all canonical course names."""
+
+    def test_all_canonical_names_present(self):
+        from src.sync_to_google import TAKVIM_DERS_KEYWORDS
+        for name in ["matematik", "türkçe", "fen", "sosyal",
+                      "din kültürü", "ingilizce", "français", "fransızca",
+                      "bilişim", "görsel", "müzik", "beden",
+                      "ahlak", "english", "literature"]:
+            assert name in TAKVIM_DERS_KEYWORDS, f"Missing: {name}"

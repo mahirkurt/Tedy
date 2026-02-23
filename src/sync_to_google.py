@@ -60,6 +60,13 @@ for _canonical, _aliases in COURSE_ALIASES.items():
     for _alias in _aliases:
         _ALIAS_LOOKUP[_alias] = _canonical
 
+# Keywords for takvim event color classification (substring match)
+TAKVIM_DERS_KEYWORDS = (
+    "ders", "matematik", "türkçe", "fen", "sosyal",
+    "din kültürü", "ingilizce", "english", "français", "fransızca",
+    "bilişim", "görsel", "müzik", "beden", "ahlak", "literature",
+)
+
 
 def normalize_course(name):
     """Normalize a course name to its canonical form.
@@ -598,8 +605,7 @@ def sync_takvim(cal_service, data, cal_id, existing_events):
             color = COLORS["sinav"]
         elif "ögep" in lower or "ogep" in lower:
             color = COLORS["ogep"]
-        elif any(w in lower for w in ("ders", "français", "english",
-                                       "matematik", "türkçe", "fen")):
+        elif any(w in lower for w in TAKVIM_DERS_KEYWORDS):
             color = COLORS["ders"]
         elif "gezi" in lower or "müze" in lower or "trip" in lower:
             color = COLORS["takim"]
