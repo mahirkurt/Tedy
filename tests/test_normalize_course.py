@@ -55,6 +55,18 @@ class TestNormalizeCourseParenFallback:
     def test_strip_classroom_fen(self):
         assert normalize_course("Fen Bilimleri (i-322 (Fen Lab))") == "Fen Bilimleri"
 
+    def test_double_paren_literature(self):
+        """İngilizce (Literature) with classroom suffix should resolve to İngilizce Literature."""
+        assert normalize_course("İngilizce (Literature) (i-403 (İngilizce))") == "İngilizce Literature"
+
+    def test_double_paren_language(self):
+        """İngilizce (Language) with classroom suffix should resolve to İngilizce."""
+        assert normalize_course("İngilizce (Language) (i-403 (İngilizce))") == "İngilizce"
+
+    def test_double_paren_fransizca(self):
+        """İkinci Yabancı Dil (Fransızca) with classroom suffix should resolve to Fransızca."""
+        assert normalize_course("İkinci Yabancı Dil (Fransızca) (i-326)") == "Fransızca"
+
 
 class TestNormalizeCourseUnknown:
     """Unknown names pass through unchanged."""

@@ -59,6 +59,7 @@ for _canonical, _aliases in COURSE_ALIASES.items():
     _ALIAS_LOOKUP[_canonical] = _canonical
     for _alias in _aliases:
         _ALIAS_LOOKUP[_alias] = _canonical
+_ALIAS_LONGEST_FIRST = sorted(_ALIAS_LOOKUP.keys(), key=len, reverse=True)
 
 # Keywords for takvim event color classification (substring match)
 TAKVIM_DERS_KEYWORDS = (
@@ -72,8 +73,9 @@ def normalize_course(name):
     """Normalize a course name to its canonical form.
 
     1. Exact match in alias lookup
-    2. Strip parenthesized suffix, retry
-    3. Return original if no match
+    2. Prefix match against known aliases (longest first)
+    3. Strip parenthesized suffix, retry
+    4. Return original if no match
     """
     name = name.strip()
     if not name:
@@ -82,6 +84,14 @@ def normalize_course(name):
     # Exact match
     if name in _ALIAS_LOOKUP:
         return _ALIAS_LOOKUP[name]
+
+    # Prefix match: handles "İngilizce (Literature) (i-403 (İngilizce))"
+    # by matching the known alias "İngilizce (Literature)" as a prefix
+    for alias in _ALIAS_LONGEST_FIRST:
+        if name.startswith(alias) and (
+            len(name) == len(alias) or name[len(alias)] == " "
+        ):
+            return _ALIAS_LOOKUP[alias]
 
     # Strip trailing parenthesized content and retry
     stripped = re.sub(r"\s*\(.*\)\s*$", "", name).strip()
