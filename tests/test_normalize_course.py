@@ -79,3 +79,20 @@ class TestTakvimKeywords:
                       "bilişim", "görsel", "müzik", "beden",
                       "ahlak", "english", "literature"]:
             assert name in TAKVIM_DERS_KEYWORDS, f"Missing: {name}"
+
+
+from src.sync_to_google import parse_week_range
+
+
+class TestParseWeekRange:
+    def test_basic_parse(self):
+        start, end = parse_week_range("20. Hafta 02 Şub. - 08 Şub.")
+        assert start is not None
+        assert start.month == 2
+        assert start.day == 2
+        assert end.day == 8
+
+    def test_uses_current_year(self):
+        from datetime import datetime
+        start, end = parse_week_range("20. Hafta 02 Şub. - 08 Şub.")
+        assert start.year == datetime.now().year

@@ -290,7 +290,7 @@ def parse_week_range(week_label):
         day1, mon1 = int(matches[0][0]), TR_MONTHS.get(matches[0][1])
         day2, mon2 = int(matches[1][0]), TR_MONTHS.get(matches[1][1])
         if mon1 and mon2:
-            year = 2026  # Current school year
+            year = datetime.now().year
             start = datetime(year, mon1, day1)
             end = datetime(year, mon2, day2)
             return start, end
