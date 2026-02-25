@@ -521,48 +521,15 @@ class ModelRouter:
         return 1 if self.using_ollama else 13
 
 
-def main():
-    force = "--force" in sys.argv
-
-    print("=" * 60)
-    print("Ödev AI Notu Ekleme")
-    if force:
-        print("(--force: tüm notlar yeniden oluşturulacak)")
-    print("=" * 60)
-
-    # Init services
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        print("GEMINI_API_KEY not found in environment or .env")
-        sys.exit(1)
-
-    gemini = genai.Client(api_key=api_key)
-    router = ModelRouter(gemini)
-    print(f"Model: {router.current}")
-
-    cal, _, _, _ = get_services()
-    cal_id = get_or_create_calendar(cal, "TED Rönesans")
-
+def _enrich_odev(cal, cal_id, router, force=False):
+    """Enrich ödev calendar events with AI study notes (existing logic)."""
     # Load scraped homework data
     hw_lookup = load_homework_details()
     total_hw = sum(len(v) for v in hw_lookup.values())
     print(f"Scraped homework items loaded: {total_hw}")
 
     # Fetch all ödev events from calendar
-    events = []
-    page_token = None
-    while True:
-        result = cal.events().list(
-            calendarId=cal_id,
-            privateExtendedProperty="source=ted-portal",
-            maxResults=2500,
-            pageToken=page_token,
-            singleEvents=True,
-        ).execute()
-        events.extend(result.get("items", []))
-        page_token = result.get("nextPageToken")
-        if not page_token:
-            break
+    events = _fetch_all_events(cal, cal_id)
 
     odev_events = [
         e for e in events
@@ -633,13 +600,68 @@ def main():
 
         time.sleep(router.delay)
 
-    print(f"\n{'=' * 60}")
-    print(
-        f"Enriched: {enriched}, "
-        f"Skipped: {skipped}, "
-        f"Errors: {errors}"
-    )
+    print(f"\n  Ödev: +{enriched} enriched, ={skipped} skipped, !{errors} errors")
+
+
+def enrich_all(token_file=None, force=False):
+    """Run all enrichment functions for a given account."""
+    from src.env_loader import load_env
+    load_env()
+
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        print("GEMINI_API_KEY not found, skipping enrichment")
+        return
+
+    gemini = genai.Client(api_key=api_key)
+    router = ModelRouter(gemini)
+    print(f"\n[Enrich] Model: {router.current}")
+
+    cal, tasks_svc, _, _ = get_services(token_file=token_file)
+    cal_id = get_or_create_calendar(cal, "TED Rönesans")
+
+    from src.sync_to_google import get_or_create_task_list
+    task_list_id = get_or_create_task_list(tasks_svc, "TED Ödevler")
+
+    # Load scraped data
+    with open(DATA_FILE, encoding="utf-8") as f:
+        data = json.load(f)
+
+    # 1. Ödev enrichment (existing)
+    print("\n[Enrich] Ödev notları...")
+    _enrich_odev(cal, cal_id, router, force)
+
+    # 2. Sınav enrichment
+    print("\n[Enrich] Sınav rehberleri...")
+    gelisim = data.get("gelisim_raporu", {})
+    if isinstance(gelisim, dict):
+        grades = gelisim.get("grades", [])
+    elif isinstance(gelisim, list):
+        grades = gelisim
+    else:
+        grades = []
+    enrich_sinav(cal, cal_id, router, grades)
+
+    # 3. Ders içerikleri enrichment
+    print("\n[Enrich] Ders özetleri...")
+    ders_data = data.get("ders_icerikleri", {})
+    enrich_ders_icerikleri(tasks_svc, task_list_id, router, ders_data)
+
+    # 4. Performans enrichment
+    print("\n[Enrich] Performans analizi...")
+    enrich_performans(tasks_svc, task_list_id, router, grades)
+
+
+def main():
+    force = "--force" in sys.argv
+
     print("=" * 60)
+    print("AI Enrichment (All)")
+    if force:
+        print("(--force: tüm notlar yeniden oluşturulacak)")
+    print("=" * 60)
+
+    enrich_all(force=force)
 
 
 if __name__ == "__main__":
