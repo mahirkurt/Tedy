@@ -11,6 +11,13 @@ def atomic_json_dump(data, path, **kwargs):
     kwargs.setdefault("indent", 2)
     kwargs.setdefault("ensure_ascii", False)
     tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, **kwargs)
-    os.replace(tmp, path)
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, **kwargs)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise

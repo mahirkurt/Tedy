@@ -26,3 +26,13 @@ class TestAtomicJsonDump:
         atomic_json_dump({"v": 2}, path)
         with open(path) as f:
             assert json.load(f)["v"] == 2
+
+    def test_original_preserved_on_error(self, tmp_path):
+        import pytest
+        path = str(tmp_path / "data.json")
+        atomic_json_dump({"v": 1}, path)
+        with pytest.raises(TypeError):
+            atomic_json_dump({"v": object()}, path)
+        with open(path) as f:
+            assert json.load(f)["v"] == 1
+        assert not os.path.exists(path + ".tmp")
