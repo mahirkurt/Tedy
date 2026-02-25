@@ -263,6 +263,176 @@ def enrich_sinav(cal_service, cal_id, router, grades_data):
     print(f"  Sınav: +{enriched} enriched, ={skipped} skipped")
 
 
+DERS_MARKER = "\n\n🤖 Haftalık Özet\n"
+
+
+def build_ders_icerikleri_prompt(course, raw_content):
+    """Build prompt for weekly course content summary."""
+    content = raw_content[:1500] if raw_content else "(içerik yok)"
+    return f"""Sen bir ortaokul öğrencisine yardımcı olan eğitim asistanısın.
+
+Bu haftanın ders içeriğini kısaca özetle:
+- Temel kavramlar (madde işaretleriyle)
+- Önemli noktalar
+- Varsa önceki konularla bağlantılar
+
+Ders: {course}
+İçerik: {content}
+
+KRİTİK KURALLAR:
+- Türkçe yaz
+- Kısa tut (en fazla 100 kelime)
+- Sadece özeti yaz, başka bir şey ekleme
+- Markdown kullanma, düz metin yaz
+- SADECE verilen içerikten bilgi kullan, bilgi UYDURMA"""
+
+
+def enrich_ders_icerikleri(tasks_service, task_list_id, router, ders_data):
+    """Enrich ders içerikleri tasks with AI summaries."""
+    from src.sync_to_google import normalize_course, fetch_existing_tasks
+
+    existing = fetch_existing_tasks(tasks_service, task_list_id)
+    enriched = 0
+    skipped = 0
+
+    for raw_name, info in ders_data.items():
+        course = normalize_course(raw_name)
+        text = info.get("text", "").strip() if isinstance(info, dict) else ""
+        cards = info.get("cards", []) if isinstance(info, dict) else []
+        if not text and not cards:
+            continue
+
+        content = text
+        if cards:
+            content += "\n" + "\n".join(str(c)[:300] for c in cards[:5])
+
+        task_title = f"📖 {course} - Haftalık İçerik"
+
+        # Find existing task
+        task_id = None
+        for (title, due), tid in existing.items():
+            if title == task_title:
+                task_id = tid
+                break
+
+        if not task_id:
+            skipped += 1
+            continue
+
+        # Check if already enriched
+        try:
+            task = tasks_service.tasks().get(
+                tasklist=task_list_id, task=task_id,
+            ).execute()
+        except Exception:
+            skipped += 1
+            continue
+
+        notes = task.get("notes", "") or ""
+        if DERS_MARKER in notes:
+            skipped += 1
+            continue
+
+        prompt = build_ders_icerikleri_prompt(course, content)
+        try:
+            summary = router.generate(prompt)
+            task["notes"] = notes + DERS_MARKER + summary
+            tasks_service.tasks().update(
+                tasklist=task_list_id, task=task_id, body=task,
+            ).execute()
+            enriched += 1
+            print(f"  ✓ {task_title}")
+        except Exception as e:
+            print(f"  ✗ {task_title}: {e}")
+
+        time.sleep(router.delay)
+
+    print(f"  Ders İçerikleri: +{enriched} enriched, ={skipped} skipped")
+
+
+PERFORMANS_MARKER = "\n\n🤖 Performans Analizi\n"
+
+
+def build_performans_prompt(grades):
+    """Build prompt for grade performance analysis."""
+    lines = []
+    for g in grades:
+        ders = g.get("Ders", "?")
+        scores = []
+        for k in ["1. Sınav", "2. Sınav", "3. Sınav",
+                   "DİKP/Performans-1", "DİKP/Performans-2"]:
+            v = g.get(k, "-")
+            if v and v != "-":
+                scores.append(f"{k}: {v}")
+        lines.append(f"  {ders}: {', '.join(scores) or 'not yok'}")
+
+    grades_text = "\n".join(lines)
+    return f"""Sen bir ortaokul öğrencisine yardımcı olan eğitim asistanısın.
+
+Bu öğrencinin sınav notlarını analiz et ve kısa bir performans özeti yaz:
+- En iyi 3 ders (ve neden)
+- İyileştirme gereken 2 ders (ve tavsiye)
+- Genel eğilim (yükseliyor/düşüyor/stabil)
+
+Notlar:
+{grades_text}
+
+KRİTİK KURALLAR:
+- Türkçe yaz
+- Kısa tut (en fazla 150 kelime)
+- Sadece analizi yaz, başka bir şey ekleme
+- Markdown kullanma, düz metin yaz
+- Motive edici ve yapıcı bir ton kullan"""
+
+
+def enrich_performans(tasks_service, task_list_id, router, grades):
+    """Create or update a performance analysis task."""
+    from src.sync_to_google import fetch_existing_tasks
+
+    if not grades:
+        print("  No grades data, skipping performans")
+        return
+
+    existing = fetch_existing_tasks(tasks_service, task_list_id)
+    task_title = "📊 Performans Analizi"
+
+    # Find or create the task
+    task_id = None
+    for (title, due), tid in existing.items():
+        if title == task_title:
+            task_id = tid
+            break
+
+    prompt = build_performans_prompt(grades)
+    try:
+        note = router.generate(prompt)
+    except Exception as e:
+        print(f"  ✗ Performans: {e}")
+        return
+
+    if task_id:
+        try:
+            task = tasks_service.tasks().get(
+                tasklist=task_list_id, task=task_id,
+            ).execute()
+            task["notes"] = note  # Always overwrite with latest
+            tasks_service.tasks().update(
+                tasklist=task_list_id, task=task_id, body=task,
+            ).execute()
+            print(f"  ✓ {task_title} (updated)")
+        except Exception as e:
+            print(f"  ✗ {task_title}: {e}")
+    else:
+        try:
+            tasks_service.tasks().insert(
+                tasklist=task_list_id,
+                body={"title": task_title, "notes": note},
+            ).execute()
+            print(f"  ✓ {task_title} (created)")
+        except Exception as e:
+            print(f"  ✗ {task_title}: {e}")
+
+
 def call_gemini(client, model, prompt):
     """Generate content via Gemini API. Raises on quota exhaustion."""
     response = client.models.generate_content(
