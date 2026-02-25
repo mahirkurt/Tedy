@@ -25,6 +25,12 @@ pytest tests/test_main.py # Single test file
 
 # Google OAuth setup (first-time only)
 python src/google_auth.py
+python src/google_auth.py huriye     # OAuth for secondary account
+python src/auth_finish.py huriye "<redirect_url>"  # Complete OAuth manually
+
+# AI enrichment (ödev notes, sınav guides, ders summaries, performans analysis)
+python src/enrich_gemini.py         # Enrich new events only
+python src/enrich_gemini.py --force # Regenerate all notes
 ```
 
 ## Architecture
@@ -49,6 +55,10 @@ All scrapers follow a consistent two-phase approach:
 | `src/scrape_mebi_videos.py` | MEBI video scraper with course/unit/topic hierarchy |
 | `src/scrape_sebitv.py` | SEBİTV video and PDF content |
 | `src/scrape_sebitv_interactive.py` | SEBİTV interactive resources (ZIP archives + question banks) |
+| `src/enrich_gemini.py` | AI enrichment: ödev notes, sınav study guides, ders içerikleri summaries, performans analysis (Gemini + Ollama fallback) |
+| `src/env_loader.py` | Shared .env file loader utility |
+| `src/json_utils.py` | Atomic JSON write utility (write to .tmp then rename) |
+| `src/auth_finish.py` | Manual OAuth completion for multi-account setup |
 
 The `src/discover_*.py` files (30+) are exploratory/investigative scripts used during development — not part of the production pipeline.
 
@@ -69,16 +79,24 @@ SEBİTV     → scrape_sebitv.py / scrape_sebitv_interactive.py ─────�
 - **Calendar color coding**: Events are color-coded by type — `ders` (lavender), `odev` (red), `sinav` (flamingo), `takim` (purple), `ogep` (tangerine), `etkinlik` (sage)
 - **Course name normalization**: `normalize_course()` in `sync_to_google.py` maps portal-variant names to canonical forms (e.g. "DKAB" → "Din Kültürü", "Bilişim Teknolojileri" → "Bilişim"). Always call it when a course name flows into any Google Workspace output. Aliases are defined in `COURSE_ALIASES`. Scraper output uses portal-native names — normalization happens only at sync time.
 - **Double-paren course names**: Portal schedule cells contain names like `İngilizce (Literature) (i-403 (İngilizce))`. The normalizer uses prefix-matching (longest-first) to correctly resolve these before the greedy paren-strip fallback.
+- **Multi-account sync**: `sync_to_google.py` syncs to both primary (`token.json`) and secondary (`token_huriye.json`) accounts. If the secondary token doesn't exist, it's skipped gracefully.
+- **AI enrichment**: `enrich_gemini.py` enriches 4 types of data: ödev notes (`🤖 Gemini Notu`), sınav study guides (`🤖 Sınav Rehberi`), ders içerikleri summaries (`🤖 Haftalık Özet`), and performans analysis (`🤖 Performans Analizi`). Uses `ModelRouter` to cycle through Gemini cloud models then falls back to local Ollama. Idempotent via marker strings in descriptions. Runs automatically as post-sync step in `run_sync.py`.
+- **Environment variables**: `.env` at project root (gitignored) holds `GEMINI_API_KEY`, `PORTAL_USERNAME`, `PORTAL_PASSWORD`. Loaded via `src/env_loader.py` (no python-dotenv dependency).
+- **Error isolation**: Each scraper in `run_sync.py` is wrapped in try-except. Partial data is saved and synced even if one scraper fails.
+- **API retry**: `upsert_event()`/`upsert_task()` retry transient Google API errors (429/500/503) up to 3x with exponential backoff.
+- **Health check**: `output/health.json` is written after each sync with success status, errors, and duration.
+- **Atomic JSON writes**: All critical JSON output uses `atomic_json_dump()` from `src/json_utils.py` — writes to `.tmp` then renames to prevent corruption.
 
 ## Dependencies
 
-Runtime dependencies are installed via pip but not fully listed in `requirements.txt`. Key packages: `selenium`, `beautifulsoup4`, `ddddocr`, `requests`, `google-api-python-client`, `google-auth-oauthlib`, `pillow`, `numpy`, `opencv-python-headless`.
+Runtime dependencies are installed via pip but not fully listed in `requirements.txt`. Key packages: `selenium`, `beautifulsoup4`, `ddddocr`, `requests`, `google-api-python-client`, `google-auth-oauthlib`, `google-genai`, `pillow`, `numpy`, `opencv-python-headless`. Optional: local Ollama server for AI fallback.
 
 ## Required Credentials (gitignored)
 
 - `credentials.json` — Google OAuth2 client credentials
 - `token.json` — Generated after first Google auth
-- Portal credentials are currently hardcoded in scraper scripts
+- `token_huriye.json` — OAuth token for secondary account (huriye.murzoglu@gmail.com)
+- `.env` — Contains `GEMINI_API_KEY`, `PORTAL_USERNAME`, `PORTAL_PASSWORD`
 
 ## Output
 
