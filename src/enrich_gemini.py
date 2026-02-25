@@ -236,10 +236,10 @@ def enrich_sinav(cal_service, cal_id, router, grades_data):
         # Try to match course name from title
         course = ""
         try:
-            from src.sync_to_google import normalize_course, COURSE_ALIASES
-            for alias in COURSE_ALIASES:
+            from src.sync_to_google import _ALIAS_LONGEST_FIRST, _ALIAS_LOOKUP
+            for alias in _ALIAS_LONGEST_FIRST:
                 if alias.lower() in title.lower():
-                    course = normalize_course(alias)
+                    course = _ALIAS_LOOKUP[alias]
                     break
         except ImportError:
             pass

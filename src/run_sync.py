@@ -26,7 +26,7 @@ from src.sync_to_google import (
     fetch_existing_events, fetch_existing_tasks,
     sync_ders_programi, sync_odevlerim, sync_takim_calismalari,
     sync_takvim, sync_ders_icerikleri, sync_ogep,
-    sync_duyurular,
+    sync_gelisim_raporu, sync_duyurular,
     sync_grades_to_sheets, sync_attachments_to_drive,
 )
 
@@ -108,6 +108,8 @@ def main():
         sync_ders_icerikleri(tasks_svc, data, task_list_id,
                              existing_tasks)
         sync_ogep(cal_svc, data, cal_id, existing_events)
+        sync_gelisim_raporu(tasks_svc, data, task_list_id,
+                            existing_tasks)
         sync_duyurular(cal_svc, data, cal_id, existing_events)
         sync_grades_to_sheets(sheets_svc, data)
         sync_attachments_to_drive(drive_svc, cal_svc, data, cal_id)
