@@ -115,7 +115,19 @@ def main():
         scrape_errors.append(f"google_sync: {e}")
         print(f"[ERROR] Google sync failed: {e}")
 
-    # 4. Write health check
+    # 4. AI Enrichment (post-sync)
+    print("\n--- AI Enrichment ---")
+    try:
+        from src.enrich_gemini import enrich_all
+        from src.sync_to_google import TOKEN_FILE, TOKEN_HURIYE
+        enrich_all(token_file=TOKEN_FILE)
+        if os.path.exists(TOKEN_HURIYE):
+            enrich_all(token_file=TOKEN_HURIYE)
+    except Exception as e:
+        print(f"[WARN] Enrichment failed: {e}")
+        # Non-fatal: sync succeeded even if enrichment fails
+
+    # 5. Write health check
     from src.json_utils import atomic_json_dump
     health = {
         "timestamp": datetime.now().isoformat(),
