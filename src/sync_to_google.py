@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import time
 from datetime import datetime, timedelta, timezone
 
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
@@ -12,6 +13,7 @@ from googleapiclient.discovery import build
 
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 TOKEN_FILE = os.path.join(PROJECT_ROOT, "token.json")
+TOKEN_HURIYE = os.path.join(PROJECT_ROOT, "token_huriye.json")
 DATA_FILE = os.path.join(PROJECT_ROOT, "output", "scraped_data.json")
 
 TIMEZONE = "Europe/Istanbul"
@@ -101,11 +103,13 @@ def normalize_course(name):
     return stripped if stripped != name else name
 
 
-def get_services():
-    creds = Credentials.from_authorized_user_file(TOKEN_FILE)
+def get_services(token_file=None):
+    """Build Google API service clients from token file."""
+    token_file = token_file or TOKEN_FILE
+    creds = Credentials.from_authorized_user_file(token_file)
     if not creds.valid and creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        with open(TOKEN_FILE, "w") as f:
+        with open(token_file, "w") as f:
             f.write(creds.to_json())
     cal = build("calendar", "v3", credentials=creds)
     tasks = build("tasks", "v1", credentials=creds)
@@ -218,6 +222,20 @@ def _normalize_dt(s):
         return s
 
 
+def _api_call_with_retry(fn, max_retries=3, base_delay=1):
+    """Call fn() with retry on transient HTTP errors (429, 500, 503)."""
+    for attempt in range(max_retries):
+        try:
+            return fn()
+        except Exception as e:
+            status = getattr(getattr(e, "resp", None), "status", 0)
+            if status in (429, 500, 503) and attempt < max_retries - 1:
+                time.sleep(base_delay * (2 ** attempt))
+                continue
+            return None
+    return None
+
+
 def upsert_event(cal_service, cal_id, event_body, existing_events):
     """Insert or skip a calendar event. Returns 'added', 'exists', or 'error'."""
     summary = event_body.get("summary", "")
@@ -230,11 +248,12 @@ def upsert_event(cal_service, cal_id, event_body, existing_events):
     if key in existing_events:
         return "exists"
 
-    try:
-        cal_service.events().insert(calendarId=cal_id, body=event_body).execute()
-        return "added"
-    except Exception:
-        return "error"
+    result = _api_call_with_retry(
+        lambda: cal_service.events().insert(
+            calendarId=cal_id, body=event_body,
+        ).execute()
+    )
+    return "added" if result else "error"
 
 
 def upsert_task(tasks_service, task_list_id, task_body, existing_tasks,
@@ -253,28 +272,29 @@ def upsert_task(tasks_service, task_list_id, task_body, existing_tasks,
             return "exists"
         # Check if content changed, update if so
         task_id = existing_tasks[key]
-        try:
-            existing = tasks_service.tasks().get(
+        existing = _api_call_with_retry(
+            lambda: tasks_service.tasks().get(
                 tasklist=task_list_id, task=task_id
             ).execute()
-            if existing.get("notes") != task_body.get("notes"):
-                existing.update(task_body)
-                tasks_service.tasks().update(
+        )
+        if existing and existing.get("notes") != task_body.get("notes"):
+            existing.update(task_body)
+            result = _api_call_with_retry(
+                lambda: tasks_service.tasks().update(
                     tasklist=task_list_id, task=task_id,
                     body=existing
                 ).execute()
+            )
+            if result:
                 return "updated"
-        except Exception:
-            pass
         return "exists"
 
-    try:
-        tasks_service.tasks().insert(
+    result = _api_call_with_retry(
+        lambda: tasks_service.tasks().insert(
             tasklist=task_list_id, body=task_body
         ).execute()
-        return "added"
-    except Exception:
-        return "error"
+    )
+    return "added" if result else "error"
 
 
 def parse_tr_datetime(s):
@@ -1177,13 +1197,16 @@ def _get_or_create_folder(drive_service, name, parent_id=None):
 # =============================================================================
 # MAIN (standalone usage)
 # =============================================================================
-def main():
-    print("Loading scraped data...")
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        data = json.load(f)
+def _sync_account(data, token_file, label):
+    """Run full sync for a single Google account."""
+    print(f"\n{'=' * 50}")
+    print(f"SYNC: {label}")
+    print(f"{'=' * 50}")
 
     print("Connecting to Google APIs...")
-    cal_svc, tasks_svc, sheets_svc, drive_svc = get_services()
+    cal_svc, tasks_svc, sheets_svc, drive_svc = get_services(
+        token_file=token_file,
+    )
 
     print("\nSetting up Google Calendar & Tasks...")
     cal_id = get_or_create_calendar(cal_svc, "TED Rönesans")
@@ -1193,27 +1216,62 @@ def main():
 
     print("Fetching existing events/tasks for dedup...")
     existing_events = fetch_existing_events(cal_svc, cal_id)
-    existing_tasks = fetch_existing_tasks(tasks_svc, task_list_id)
-    print(f"  Found {len(existing_events)} existing events, "
-          f"{len(existing_tasks)} existing tasks")
+    existing_tasks = fetch_existing_tasks(
+        tasks_svc, task_list_id,
+    )
+    print(
+        f"  Found {len(existing_events)} existing events, "
+        f"{len(existing_tasks)} existing tasks"
+    )
 
-    sync_ders_programi(cal_svc, data, cal_id, existing_events)
+    sync_ders_programi(
+        cal_svc, data, cal_id, existing_events,
+    )
     sync_odevlerim(
         cal_svc, tasks_svc, data, cal_id,
-        task_list_id, existing_events, existing_tasks
+        task_list_id, existing_events, existing_tasks,
+        drive_service=drive_svc,
     )
-    sync_takim_calismalari(cal_svc, data, cal_id, existing_events)
+    sync_takim_calismalari(
+        cal_svc, data, cal_id, existing_events,
+    )
     sync_takvim(cal_svc, data, cal_id, existing_events)
     sync_ders_icerikleri(
-        tasks_svc, data, task_list_id, existing_tasks
+        tasks_svc, data, task_list_id, existing_tasks,
     )
     sync_ogep(cal_svc, data, cal_id, existing_events)
     sync_gelisim_raporu(
-        tasks_svc, data, task_list_id, existing_tasks
+        tasks_svc, data, task_list_id, existing_tasks,
     )
     sync_duyurular(cal_svc, data, cal_id, existing_events)
     sync_grades_to_sheets(sheets_svc, data)
-    sync_attachments_to_drive(drive_svc, cal_svc, data, cal_id)
+    sync_attachments_to_drive(
+        drive_svc, cal_svc, data, cal_id,
+    )
+
+
+def main():
+    print("Loading scraped data...")
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    # Sync primary account
+    _sync_account(data, TOKEN_FILE, "Primary Account")
+
+    # Sync secondary account (huriye) if token exists
+    if os.path.exists(TOKEN_HURIYE):
+        _sync_account(
+            data, TOKEN_HURIYE,
+            "huriye.murzoglu@gmail.com",
+        )
+    else:
+        print(
+            f"\nSkipping huriye account "
+            f"(no token at {TOKEN_HURIYE})"
+        )
+        print(
+            "Run: python src/google_auth.py huriye"
+        )
 
     print("\n" + "=" * 50)
     print("SYNC COMPLETE!")
