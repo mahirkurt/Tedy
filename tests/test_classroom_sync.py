@@ -207,3 +207,47 @@ class TestSyncDersIcerikleri:
         state = {}
         result = sync_ders_icerikleri(svc, courses, data, state)
         assert result["added"] == 1
+
+
+class TestSyncNotlar:
+    def _mock_service(self):
+        svc = MagicMock()
+        svc.courses().courseWork().list().execute.return_value = {"courseWork": []}
+        svc.courses().courseWork().create.return_value.execute.return_value = {"id": "cw_grade1"}
+        svc.courses().courseWork().patch.return_value.execute.return_value = {"id": "cw_grade1"}
+        return svc
+
+    def test_creates_grade_coursework(self):
+        from src.sync_to_classroom import sync_notlar
+        svc = self._mock_service()
+        courses = {"Bilişim": "cb", "TED Genel": "cg"}
+        data = {
+            "gelisim_raporu": {
+                "grades": [
+                    {
+                        "Ders": "Bilişim Teknolojileri",
+                        "1. Sınav": "100",
+                        "2. Sınav": "98",
+                        "3. Sınav": "-",
+                        "DİKP/Performans-1": "100",
+                    }
+                ]
+            }
+        }
+        state = {}
+        result = sync_notlar(svc, courses, data, state)
+        assert result["added"] >= 3  # 1.Sınav=100, 2.Sınav=98, Perf-1=100
+
+    def test_skips_dash_grades(self):
+        from src.sync_to_classroom import sync_notlar
+        svc = self._mock_service()
+        courses = {"Matematik": "cm", "TED Genel": "cg"}
+        data = {
+            "gelisim_raporu": {
+                "grades": [{"Ders": "Matematik", "1. Sınav": "-"}]
+            }
+        }
+        state = {}
+        result = sync_notlar(svc, courses, data, state)
+        assert result["added"] == 0
+        assert result["skipped"] == 1

@@ -294,6 +294,96 @@ def sync_ders_icerikleri(service, courses, data, state):
     return result
 
 
+def sync_notlar(service, courses, data, state):
+    """Sync grade report as courseWork entries with maxPoints.
+
+    Each exam/performance column becomes a separate SHORT_ANSWER_QUESTION
+    courseWork with the grade recorded in the title.
+
+    Returns dict: {added, updated, skipped, errors}
+    """
+    result = {"added": 0, "updated": 0, "skipped": 0, "errors": 0}
+    grades = data.get("gelisim_raporu", {}).get("grades", [])
+
+    for entry in grades:
+        ders = entry.get("Ders", "")
+        normalized = normalize_course(ders)
+        course_id = courses.get(normalized, courses.get(GENERAL_COURSE))
+        if not course_id:
+            result["errors"] += 1
+            continue
+
+        for col, value in entry.items():
+            if col == "Ders":
+                continue
+
+            try:
+                score = float(value)
+            except (ValueError, TypeError):
+                result["skipped"] += 1
+                continue
+
+            title = f"Not: {normalized} - {col}"
+            dedup_key = f"grade:{course_id}:{col}"
+            current_hash = compute_hash({"score": score})
+
+            existing = state.get(dedup_key)
+            if existing and existing["last_hash"] == current_hash:
+                result["skipped"] += 1
+                continue
+
+            body = {
+                "title": title,
+                "description": (
+                    f"{normalized} dersi {col} notu:"
+                    f" {score:.0f}/100"
+                ),
+                "workType": "SHORT_ANSWER_QUESTION",
+                "maxPoints": 100,
+                "state": "PUBLISHED",
+            }
+
+            if existing:
+                cw_id = existing["classroom_id"]
+                updated = _api_call_with_retry(
+                    lambda cid=course_id, cwid=cw_id, b=body: (
+                        service.courses().courseWork().patch(
+                            courseId=cid, id=cwid,
+                            updateMask="title,description,maxPoints",
+                            body=b,
+                        ).execute()
+                    )
+                )
+                if updated:
+                    state[dedup_key] = {
+                        "classroom_id": cw_id,
+                        "last_hash": current_hash,
+                    }
+                    result["updated"] += 1
+                else:
+                    result["errors"] += 1
+            else:
+                created = _api_call_with_retry(
+                    lambda cid=course_id, b=body: (
+                        service.courses().courseWork().create(
+                            courseId=cid, body=b,
+                        ).execute()
+                    )
+                )
+                if created:
+                    state[dedup_key] = {
+                        "classroom_id": created["id"],
+                        "last_hash": current_hash,
+                    }
+                    result["added"] += 1
+                else:
+                    result["errors"] += 1
+
+    print(f"  Notlar: +{result['added']} ~{result['updated']} "
+          f"={result['skipped']} !{result['errors']}")
+    return result
+
+
 def _invite_student(service, course_id):
     """Invite STUDENT_EMAIL to a course. Ignores 409 (already enrolled)."""
     body = {
