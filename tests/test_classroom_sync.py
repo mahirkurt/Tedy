@@ -96,3 +96,76 @@ class TestEnsureCourses:
 
         inv_calls = svc.invitations().create.call_args_list
         assert len(inv_calls) >= 2  # Matematik + TED Genel
+
+
+class TestSyncOdevler:
+    def _mock_service(self):
+        svc = MagicMock()
+        svc.courses().courseWork().list().execute.return_value = {"courseWork": []}
+        svc.courses().courseWork().create.return_value.execute.return_value = {"id": "cw1"}
+        svc.courses().courseWork().patch.return_value.execute.return_value = {"id": "cw1"}
+        return svc
+
+    def test_creates_new_homework(self):
+        from src.sync_to_classroom import sync_odevler
+        svc = self._mock_service()
+        courses = {"Matematik": "c1", "TED Genel": "cg"}
+        data = {
+            "odevlerim": {
+                "homework": {
+                    "headers": [],
+                    "rows": [{
+                        "Ders Adı": "Matematik",
+                        "Ödev Başlığı": "Test Ödevi",
+                        "Ödev Kaynağı": "portal",
+                        "Ödev Son Teslim Tarihi": "27.02.2026 12:00",
+                        "Ödev Durumu": "Değerlendirilmemiş",
+                        "detail": {"description": "Sayfa 10-15", "attachments": []}
+                    }]
+                }
+            }
+        }
+        state = {}
+        result = sync_odevler(svc, courses, data, state)
+        assert result["added"] == 1
+        assert result["errors"] == 0
+
+    def test_skips_unchanged_homework(self):
+        from src.sync_to_classroom import sync_odevler, compute_hash
+        svc = self._mock_service()
+        courses = {"Matematik": "c1", "TED Genel": "cg"}
+        row = {
+            "Ders Adı": "Matematik",
+            "Ödev Başlığı": "Test Ödevi",
+            "Ödev Son Teslim Tarihi": "27.02.2026 12:00",
+            "Ödev Durumu": "Değerlendirilmemiş",
+            "detail": {"description": "Sayfa 10-15", "attachments": []}
+        }
+        data = {"odevlerim": {"homework": {"headers": [], "rows": [row]}}}
+        key = "cw:c1:Test Ödevi"
+        state = {key: {"classroom_id": "existing1", "last_hash": compute_hash(row)}}
+        result = sync_odevler(svc, courses, data, state)
+        assert result["added"] == 0
+        assert result["skipped"] == 1
+
+    def test_unmapped_course_goes_to_genel(self):
+        from src.sync_to_classroom import sync_odevler
+        svc = self._mock_service()
+        courses = {"TED Genel": "cg"}  # no Matematik course
+        data = {
+            "odevlerim": {
+                "homework": {
+                    "headers": [],
+                    "rows": [{
+                        "Ders Adı": "Matematik",
+                        "Ödev Başlığı": "Ödev X",
+                        "Ödev Son Teslim Tarihi": "27.02.2026 12:00",
+                        "Ödev Durumu": "",
+                        "detail": {"description": "Desc", "attachments": []}
+                    }]
+                }
+            }
+        }
+        state = {}
+        result = sync_odevler(svc, courses, data, state)
+        assert result["added"] == 1

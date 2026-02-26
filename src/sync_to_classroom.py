@@ -122,6 +122,105 @@ def ensure_courses(service, ders_listesi):
     return mapping
 
 
+def _parse_turkish_datetime(s):
+    """Parse '27.02.2026 12:00' to (date_dict, time_dict) for Classroom API."""
+    try:
+        dt = datetime.strptime(s.strip(), "%d.%m.%Y %H:%M")
+        date_dict = {"year": dt.year, "month": dt.month, "day": dt.day}
+        time_dict = {"hours": dt.hour, "minutes": dt.minute}
+        return date_dict, time_dict
+    except (ValueError, AttributeError):
+        return None, None
+
+
+def _resolve_course_id(courses, ders_adi):
+    """Map a course name to its Classroom course ID, falling back to TED Genel."""
+    normalized = normalize_course(ders_adi)
+    return courses.get(normalized, courses.get(GENERAL_COURSE))
+
+
+def sync_odevler(service, courses, data, state):
+    """Sync homework to Classroom as courseWork (ASSIGNMENT).
+
+    Returns dict: {added, updated, skipped, errors}
+    """
+    result = {"added": 0, "updated": 0, "skipped": 0, "errors": 0}
+    rows = (data.get("odevlerim", {})
+                .get("homework", {})
+                .get("rows", []))
+
+    for row in rows:
+        ders = row.get("Ders Adı", "")
+        baslik = row.get("Ödev Başlığı", "")
+        course_id = _resolve_course_id(courses, ders)
+        if not course_id:
+            result["errors"] += 1
+            continue
+
+        dedup_key = f"cw:{course_id}:{baslik}"
+        current_hash = compute_hash(row)
+
+        existing = state.get(dedup_key)
+        if existing and existing["last_hash"] == current_hash:
+            result["skipped"] += 1
+            continue
+
+        description = row.get("detail", {}).get("description", "")
+        durum = row.get("Ödev Durumu", "")
+        if durum:
+            description = f"Durum: {durum}\n\n{description}"
+
+        body = {
+            "title": baslik,
+            "description": description[:2000],
+            "workType": "ASSIGNMENT",
+            "state": "PUBLISHED",
+        }
+
+        due_str = row.get("Ödev Son Teslim Tarihi", "")
+        due_date, due_time = _parse_turkish_datetime(due_str)
+        if due_date:
+            body["dueDate"] = due_date
+            body["dueTime"] = due_time
+
+        attachments = row.get("detail", {}).get("attachments", [])
+        if attachments:
+            body["materials"] = [
+                {"link": {"url": att["url"], "title": att.get("name", "Ek")}}
+                for att in attachments if att.get("url")
+            ]
+
+        if existing:
+            cw_id = existing["classroom_id"]
+            updated = _api_call_with_retry(
+                lambda: service.courses().courseWork().patch(
+                    courseId=course_id, id=cw_id,
+                    updateMask="title,description,dueDate,dueTime,materials",
+                    body=body,
+                ).execute()
+            )
+            if updated:
+                state[dedup_key] = {"classroom_id": cw_id, "last_hash": current_hash}
+                result["updated"] += 1
+            else:
+                result["errors"] += 1
+        else:
+            created = _api_call_with_retry(
+                lambda: service.courses().courseWork().create(
+                    courseId=course_id, body=body,
+                ).execute()
+            )
+            if created:
+                state[dedup_key] = {"classroom_id": created["id"], "last_hash": current_hash}
+                result["added"] += 1
+            else:
+                result["errors"] += 1
+
+    print(f"  Ödevler: +{result['added']} ~{result['updated']} "
+          f"={result['skipped']} !{result['errors']}")
+    return result
+
+
 def _invite_student(service, course_id):
     """Invite STUDENT_EMAIL to a course. Ignores 409 (already enrolled)."""
     body = {
