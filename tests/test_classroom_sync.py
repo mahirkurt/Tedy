@@ -169,3 +169,41 @@ class TestSyncOdevler:
         state = {}
         result = sync_odevler(svc, courses, data, state)
         assert result["added"] == 1
+
+
+class TestSyncDersIcerikleri:
+    def _mock_service(self):
+        svc = MagicMock()
+        svc.courses().courseWorkMaterials().list().execute.return_value = {"courseWorkMaterial": []}
+        svc.courses().courseWorkMaterials().create.return_value.execute.return_value = {"id": "m1"}
+        svc.courses().courseWorkMaterials().patch.return_value.execute.return_value = {"id": "m1"}
+        return svc
+
+    def test_creates_material_for_course(self):
+        from src.sync_to_classroom import sync_ders_icerikleri
+        svc = self._mock_service()
+        courses = {"Türkçe": "ct", "TED Genel": "cg"}
+        data = {
+            "ders_icerikleri": {
+                "Türkçe": {
+                    "tab_id": "ders_1",
+                    "text": "23. HAFTA\nBu hafta cümle analizi yapacağız."
+                }
+            }
+        }
+        state = {}
+        result = sync_ders_icerikleri(svc, courses, data, state)
+        assert result["added"] == 1
+
+    def test_genel_goes_to_ted_genel(self):
+        from src.sync_to_classroom import sync_ders_icerikleri
+        svc = self._mock_service()
+        courses = {"TED Genel": "cg"}
+        data = {
+            "ders_icerikleri": {
+                "Genel": {"tab_id": "tab_genel", "text": "Genel duyuru metni"}
+            }
+        }
+        state = {}
+        result = sync_ders_icerikleri(svc, courses, data, state)
+        assert result["added"] == 1

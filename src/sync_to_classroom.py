@@ -221,6 +221,79 @@ def sync_odevler(service, courses, data, state):
     return result
 
 
+def sync_ders_icerikleri(service, courses, data, state):
+    """Sync course content as courseWorkMaterials.
+
+    Returns dict: {added, updated, skipped, errors}
+    """
+    result = {"added": 0, "updated": 0, "skipped": 0, "errors": 0}
+    ders_data = data.get("ders_icerikleri", {})
+
+    for ders_name, content in ders_data.items():
+        if not isinstance(content, dict) or not content.get("text"):
+            continue
+
+        text = content["text"].strip()
+        if not text:
+            continue
+
+        if ders_name == "Genel":
+            course_id = courses.get(GENERAL_COURSE)
+            title = "Genel Duyuru"
+        else:
+            normalized = normalize_course(ders_name)
+            course_id = courses.get(normalized, courses.get(GENERAL_COURSE))
+            title = f"{normalized} - Haftalık İçerik"
+
+        if not course_id:
+            result["errors"] += 1
+            continue
+
+        dedup_key = f"mat:{course_id}:{title}"
+        current_hash = compute_hash(text)
+
+        existing = state.get(dedup_key)
+        if existing and existing["last_hash"] == current_hash:
+            result["skipped"] += 1
+            continue
+
+        body = {
+            "title": title,
+            "description": text[:2000],
+            "state": "PUBLISHED",
+        }
+
+        if existing:
+            mat_id = existing["classroom_id"]
+            updated = _api_call_with_retry(
+                lambda: service.courses().courseWorkMaterials().patch(
+                    courseId=course_id, id=mat_id,
+                    updateMask="title,description",
+                    body=body,
+                ).execute()
+            )
+            if updated:
+                state[dedup_key] = {"classroom_id": mat_id, "last_hash": current_hash}
+                result["updated"] += 1
+            else:
+                result["errors"] += 1
+        else:
+            created = _api_call_with_retry(
+                lambda: service.courses().courseWorkMaterials().create(
+                    courseId=course_id, body=body,
+                ).execute()
+            )
+            if created:
+                state[dedup_key] = {"classroom_id": created["id"], "last_hash": current_hash}
+                result["added"] += 1
+            else:
+                result["errors"] += 1
+
+    print(f"  Ders içerikleri: +{result['added']} ~{result['updated']} "
+          f"={result['skipped']} !{result['errors']}")
+    return result
+
+
 def _invite_student(service, course_id):
     """Invite STUDENT_EMAIL to a course. Ignores 409 (already enrolled)."""
     body = {
