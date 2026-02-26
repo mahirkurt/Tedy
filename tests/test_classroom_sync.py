@@ -310,3 +310,91 @@ class TestSyncDuyurular:
         state = {}
         result = sync_duyurular(svc, courses, data, state)
         assert result["added"] >= 1
+
+
+class TestExtractCourseNames:
+    def test_extracts_unique_normalized_names(self):
+        from src.sync_to_classroom import _extract_course_names
+        data = {
+            "ders_programi": [{
+                "schedule": {
+                    "rows": [
+                        ["", "Pazartesi", "Salı"],
+                        ["1. Ders\n08:00 - 08:40",
+                         "Matematik\nTeacher A",
+                         "Matematik\nTeacher B"],
+                        ["2. Ders\n08:50 - 09:30",
+                         "Türkçe\nTeacher C",
+                         "İngilizce (Literature) (i-403 (İngilizce))\nGözde Enginler"],
+                    ]
+                }
+            }]
+        }
+        names = _extract_course_names(data)
+        assert "Matematik" in names
+        assert "Türkçe" in names
+        # normalize_course should handle double-paren names
+        assert len([n for n in names if "İngilizce" in n]) == 1
+        # sorted and unique
+        assert names == sorted(set(names))
+
+    def test_empty_data_returns_empty(self):
+        from src.sync_to_classroom import _extract_course_names
+        assert _extract_course_names({}) == []
+        assert _extract_course_names({"ders_programi": []}) == []
+
+    def test_skips_empty_cells(self):
+        from src.sync_to_classroom import _extract_course_names
+        data = {
+            "ders_programi": [{
+                "schedule": {
+                    "rows": [
+                        ["", "Pazartesi"],
+                        ["1. Ders\n08:00 - 08:40", ""],
+                    ]
+                }
+            }]
+        }
+        assert _extract_course_names(data) == []
+
+
+class TestMain:
+    @patch("src.sync_to_classroom.get_classroom_service")
+    @patch("src.sync_to_classroom.ensure_courses")
+    @patch("src.sync_to_classroom.sync_odevler")
+    @patch("src.sync_to_classroom.sync_ders_icerikleri")
+    @patch("src.sync_to_classroom.sync_notlar")
+    @patch("src.sync_to_classroom.sync_duyurular")
+    @patch("src.sync_to_classroom.save_sync_state")
+    def test_main_orchestrates_all_syncs(self, mock_save, mock_duyuru,
+                                          mock_notlar, mock_ders, mock_odev,
+                                          mock_ensure, mock_svc):
+        from src.sync_to_classroom import main
+        mock_svc.return_value = MagicMock()
+        mock_ensure.return_value = {"Matematik": "c1", "TED Genel": "cg"}
+        mock_odev.return_value = {"added": 1, "updated": 0, "skipped": 0, "errors": 0}
+        mock_ders.return_value = {"added": 0, "updated": 0, "skipped": 0, "errors": 0}
+        mock_notlar.return_value = {"added": 0, "updated": 0, "skipped": 0, "errors": 0}
+        mock_duyuru.return_value = {"added": 0, "updated": 0, "skipped": 0, "errors": 0}
+
+        test_data = {
+            "ders_programi": [{"schedule": {"rows": [
+                ["", "Pazartesi"], ["1. Ders", "Matematik\nTeacher"]
+            ]}}],
+            "odevlerim": {"homework": {"rows": []}},
+            "ders_icerikleri": {},
+            "gelisim_raporu": {"grades": []},
+            "duyurular": {"announcements": []},
+            "takvim": [],
+            "takim_calismalari": {"activities": {"rows": []}},
+            "ogep": {"sessions": {"rows": []}},
+        }
+
+        main(scraped_data=test_data)
+
+        mock_ensure.assert_called_once()
+        mock_odev.assert_called_once()
+        mock_ders.assert_called_once()
+        mock_notlar.assert_called_once()
+        mock_duyuru.assert_called_once()
+        mock_save.assert_called_once()

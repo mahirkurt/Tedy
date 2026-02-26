@@ -492,3 +492,74 @@ def _invite_student(service, course_id):
             pass
         else:
             print(f"    [WARN] Invite failed: {e}")
+
+
+def _extract_course_names(data):
+    """Extract unique course names from ders_programi schedule."""
+    names = set()
+    for week in data.get("ders_programi", []):
+        rows = week.get("schedule", {}).get("rows", [])
+        for row in rows[1:]:  # skip header row
+            for cell in row[1:]:  # skip time column
+                if cell and "\n" in cell:
+                    raw_name = cell.split("\n")[0].strip()
+                    if raw_name:
+                        names.add(normalize_course(raw_name))
+    return sorted(names)
+
+
+def main(scraped_data=None, token_file=None, reset_courses=False):
+    """Main entry point for Classroom sync.
+
+    Args:
+        scraped_data: Pre-loaded data dict. If None, reads from DATA_FILE.
+        token_file: OAuth token file path.
+        reset_courses: If True, archive and recreate all courses.
+    """
+    print("\n--- Classroom Sync ---")
+
+    if scraped_data is None:
+        if not os.path.exists(DATA_FILE):
+            print("  [SKIP] No scraped data found")
+            return
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            scraped_data = json.load(f)
+
+    service = get_classroom_service(token_file)
+
+    if reset_courses:
+        print("  Resetting courses...")
+        mapping = _load_courses_mapping()
+        for name, cid in mapping.items():
+            _api_call_with_retry(
+                lambda c=cid: service.courses().patch(
+                    id=c, updateMask="courseState",
+                    body={"courseState": "ARCHIVED"},
+                ).execute()
+            )
+            print(f"    Archived: {name}")
+        _save_courses_mapping({})
+
+    ders_listesi = _extract_course_names(scraped_data)
+    courses = ensure_courses(service, ders_listesi)
+
+    state = load_sync_state()
+
+    sync_odevler(service, courses, scraped_data, state)
+    sync_ders_icerikleri(service, courses, scraped_data, state)
+    sync_notlar(service, courses, scraped_data, state)
+    sync_duyurular(service, courses, scraped_data, state)
+
+    save_sync_state(state)
+    print("  Classroom sync complete.")
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Sync TED data to Google Classroom")
+    parser.add_argument("--reset-courses", action="store_true",
+                        help="Archive and recreate all courses")
+    parser.add_argument("--token", default=None,
+                        help="Path to OAuth token file")
+    args = parser.parse_args()
+    main(token_file=args.token, reset_courses=args.reset_courses)
