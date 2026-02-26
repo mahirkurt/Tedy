@@ -148,6 +148,23 @@ class TestSyncOdevler:
         assert result["added"] == 0
         assert result["skipped"] == 1
 
+    def test_updates_changed_homework(self):
+        from src.sync_to_classroom import sync_odevler, compute_hash
+        svc = self._mock_service()
+        courses = {"Matematik": "c1", "TED Genel": "cg"}
+        row = {
+            "Ders Adı": "Matematik",
+            "Ödev Başlığı": "Test Ödevi",
+            "Ödev Son Teslim Tarihi": "27.02.2026 12:00",
+            "Ödev Durumu": "Yaptı",
+            "detail": {"description": "Yeni açıklama", "attachments": []}
+        }
+        data = {"odevlerim": {"homework": {"headers": [], "rows": [row]}}}
+        key = "cw:c1:Test Ödevi"
+        state = {key: {"classroom_id": "existing1", "last_hash": "old_different_hash"}}
+        result = sync_odevler(svc, courses, data, state)
+        assert result["updated"] == 1
+
     def test_unmapped_course_goes_to_genel(self):
         from src.sync_to_classroom import sync_odevler
         svc = self._mock_service()
@@ -398,3 +415,22 @@ class TestMain:
         mock_notlar.assert_called_once()
         mock_duyuru.assert_called_once()
         mock_save.assert_called_once()
+
+
+class TestParseTurkishDatetime:
+    def test_valid_date(self):
+        from src.sync_to_classroom import _parse_turkish_datetime
+        date_dict, time_dict = _parse_turkish_datetime("27.02.2026 12:00")
+        assert date_dict == {"year": 2026, "month": 2, "day": 27}
+        assert time_dict == {"hours": 12, "minutes": 0}
+
+    def test_invalid_date(self):
+        from src.sync_to_classroom import _parse_turkish_datetime
+        date_dict, time_dict = _parse_turkish_datetime("invalid")
+        assert date_dict is None
+        assert time_dict is None
+
+    def test_empty_string(self):
+        from src.sync_to_classroom import _parse_turkish_datetime
+        date_dict, time_dict = _parse_turkish_datetime("")
+        assert date_dict is None

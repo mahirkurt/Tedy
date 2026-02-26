@@ -94,7 +94,7 @@ def ensure_courses(service, ders_listesi):
         if c.get("section") == COURSE_SECTION:
             existing[c["name"]] = c["id"]
 
-    all_courses = list(set(ders_listesi)) + [GENERAL_COURSE]
+    all_courses = sorted(set(ders_listesi) | {GENERAL_COURSE})
     mapping = {}
 
     for name in all_courses:
@@ -193,11 +193,13 @@ def sync_odevler(service, courses, data, state):
         if existing:
             cw_id = existing["classroom_id"]
             updated = _api_call_with_retry(
-                lambda: service.courses().courseWork().patch(
-                    courseId=course_id, id=cw_id,
-                    updateMask="title,description,dueDate,dueTime,materials",
-                    body=body,
-                ).execute()
+                lambda cid=course_id, cwid=cw_id, b=body: (
+                    service.courses().courseWork().patch(
+                        courseId=cid, id=cwid,
+                        updateMask="title,description,dueDate,dueTime,materials",
+                        body=b,
+                    ).execute()
+                )
             )
             if updated:
                 state[dedup_key] = {"classroom_id": cw_id, "last_hash": current_hash}
@@ -206,9 +208,11 @@ def sync_odevler(service, courses, data, state):
                 result["errors"] += 1
         else:
             created = _api_call_with_retry(
-                lambda: service.courses().courseWork().create(
-                    courseId=course_id, body=body,
-                ).execute()
+                lambda cid=course_id, b=body: (
+                    service.courses().courseWork().create(
+                        courseId=cid, body=b,
+                    ).execute()
+                )
             )
             if created:
                 state[dedup_key] = {"classroom_id": created["id"], "last_hash": current_hash}
@@ -266,11 +270,13 @@ def sync_ders_icerikleri(service, courses, data, state):
         if existing:
             mat_id = existing["classroom_id"]
             updated = _api_call_with_retry(
-                lambda: service.courses().courseWorkMaterials().patch(
-                    courseId=course_id, id=mat_id,
-                    updateMask="title,description",
-                    body=body,
-                ).execute()
+                lambda cid=course_id, mid=mat_id, b=body: (
+                    service.courses().courseWorkMaterials().patch(
+                        courseId=cid, id=mid,
+                        updateMask="title,description",
+                        body=b,
+                    ).execute()
+                )
             )
             if updated:
                 state[dedup_key] = {"classroom_id": mat_id, "last_hash": current_hash}
@@ -279,9 +285,11 @@ def sync_ders_icerikleri(service, courses, data, state):
                 result["errors"] += 1
         else:
             created = _api_call_with_retry(
-                lambda: service.courses().courseWorkMaterials().create(
-                    courseId=course_id, body=body,
-                ).execute()
+                lambda cid=course_id, b=body: (
+                    service.courses().courseWorkMaterials().create(
+                        courseId=cid, body=b,
+                    ).execute()
+                )
             )
             if created:
                 state[dedup_key] = {"classroom_id": created["id"], "last_hash": current_hash}
@@ -403,11 +411,13 @@ def _upsert_announcement(service, course_id, text, state, result):
     if existing:
         ann_id = existing["classroom_id"]
         updated = _api_call_with_retry(
-            lambda: service.courses().announcements().patch(
-                courseId=course_id, id=ann_id,
-                updateMask="text",
-                body=body,
-            ).execute()
+            lambda cid=course_id, aid=ann_id, b=body: (
+                service.courses().announcements().patch(
+                    courseId=cid, id=aid,
+                    updateMask="text",
+                    body=b,
+                ).execute()
+            )
         )
         if updated:
             state[dedup_key] = {"classroom_id": ann_id, "last_hash": current_hash}
@@ -416,9 +426,11 @@ def _upsert_announcement(service, course_id, text, state, result):
             result["errors"] += 1
     else:
         created = _api_call_with_retry(
-            lambda: service.courses().announcements().create(
-                courseId=course_id, body=body,
-            ).execute()
+            lambda cid=course_id, b=body: (
+                service.courses().announcements().create(
+                    courseId=cid, body=b,
+                ).execute()
+            )
         )
         if created:
             state[dedup_key] = {"classroom_id": created["id"], "last_hash": current_hash}
