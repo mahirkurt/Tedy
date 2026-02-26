@@ -129,7 +129,16 @@ def main():
         print(f"[WARN] Enrichment failed: {e}")
         # Non-fatal: sync succeeded even if enrichment fails
 
-    # 5. Write health check
+    # 5. Classroom sync
+    print("\n--- Classroom Sync ---")
+    try:
+        from src.sync_to_classroom import main as sync_classroom
+        sync_classroom(scraped_data=data)
+    except Exception as e:
+        scrape_errors.append(f"classroom_sync: {e}")
+        print(f"[WARN] Classroom sync failed: {e}")
+
+    # 6. Write health check
     from src.json_utils import atomic_json_dump
     health = {
         "timestamp": datetime.now().isoformat(),
