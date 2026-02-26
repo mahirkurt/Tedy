@@ -222,7 +222,7 @@ def _normalize_dt(s):
         return s
 
 
-def _api_call_with_retry(fn, max_retries=3, base_delay=1):
+def _api_call_with_retry(fn, max_retries=5, base_delay=3):
     """Call fn() with retry on transient HTTP errors (429, 500, 503)."""
     for attempt in range(max_retries):
         try:

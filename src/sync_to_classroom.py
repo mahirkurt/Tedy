@@ -23,7 +23,7 @@ from googleapiclient.discovery import build
 from src.json_utils import atomic_json_dump
 from src.sync_to_google import normalize_course, _api_call_with_retry
 
-TOKEN_FILE = os.path.join(PROJECT_ROOT, "token.json")
+TOKEN_FILE = os.path.join(PROJECT_ROOT, "token_huriye.json")
 DATA_FILE = os.path.join(PROJECT_ROOT, "output", "scraped_data.json")
 COURSES_FILE = os.path.join(PROJECT_ROOT, "output", "classroom_courses.json")
 SYNC_STATE_FILE = os.path.join(PROJECT_ROOT, "output", "classroom_sync.json")
@@ -31,6 +31,14 @@ SYNC_STATE_FILE = os.path.join(PROJECT_ROOT, "output", "classroom_sync.json")
 STUDENT_EMAIL = "isikkurtx@gmail.com"
 COURSE_SECTION = "TED Rönesans 2025-26"
 GENERAL_COURSE = "TED Genel"
+
+# Only create/sync these courses (others are ignored)
+ALLOWED_COURSES = {
+    "İngilizce Literature", "İngilizce", "Türkçe",
+    "TED Genel", "Sosyal Bilgiler", "Matematik",
+    "Fransızca", "Fen Bilimleri", "Din Kültürü",
+    "Bilişim", "Ahlak ve Yurttaşlık",
+}
 
 
 def compute_hash(item):
@@ -86,15 +94,20 @@ def ensure_courses(service, ders_listesi):
 
     Returns dict: {normalized_name: course_id}
     """
-    result = _api_call_with_retry(
-        lambda: service.courses().list(courseStates=["ACTIVE"]).execute()
-    ) or {}
     existing = {}
-    for c in result.get("courses", []):
-        if c.get("section") == COURSE_SECTION:
-            existing[c["name"]] = c["id"]
+    for state in ["ACTIVE", "PROVISIONED"]:
+        result = _api_call_with_retry(
+            lambda s=state: service.courses().list(
+                courseStates=[s],
+            ).execute()
+        ) or {}
+        for c in result.get("courses", []):
+            if c.get("section") == COURSE_SECTION:
+                existing[c["name"]] = c["id"]
 
-    all_courses = sorted(set(ders_listesi) | {GENERAL_COURSE})
+    all_courses = sorted(
+        (set(ders_listesi) | {GENERAL_COURSE}) & ALLOWED_COURSES
+    )
     mapping = {}
 
     for name in all_courses:
@@ -106,7 +119,6 @@ def ensure_courses(service, ders_listesi):
                 "name": name,
                 "section": COURSE_SECTION,
                 "ownerId": "me",
-                "courseState": "ACTIVE",
             }
             created = _api_call_with_retry(
                 lambda b=body: service.courses().create(body=b).execute()
@@ -226,7 +238,7 @@ def sync_odevler(service, courses, data, state):
 
 
 def sync_ders_icerikleri(service, courses, data, state):
-    """Sync course content as courseWorkMaterials.
+    """Sync course content as announcements (per-course).
 
     Returns dict: {added, updated, skipped, errors}
     """
@@ -246,7 +258,9 @@ def sync_ders_icerikleri(service, courses, data, state):
             title = "Genel Duyuru"
         else:
             normalized = normalize_course(ders_name)
-            course_id = courses.get(normalized, courses.get(GENERAL_COURSE))
+            course_id = courses.get(
+                normalized, courses.get(GENERAL_COURSE),
+            )
             title = f"{normalized} - Haftalık İçerik"
 
         if not course_id:
@@ -261,38 +275,41 @@ def sync_ders_icerikleri(service, courses, data, state):
             result["skipped"] += 1
             continue
 
-        body = {
-            "title": title,
-            "description": text[:2000],
-            "state": "PUBLISHED",
-        }
+        ann_text = f"📚 {title}\n\n{text[:1950]}"
 
         if existing:
-            mat_id = existing["classroom_id"]
+            ann_id = existing["classroom_id"]
             updated = _api_call_with_retry(
-                lambda cid=course_id, mid=mat_id, b=body: (
-                    service.courses().courseWorkMaterials().patch(
-                        courseId=cid, id=mid,
-                        updateMask="title,description",
-                        body=b,
+                lambda cid=course_id, aid=ann_id, t=ann_text: (
+                    service.courses().announcements().patch(
+                        courseId=cid, id=aid,
+                        updateMask="text",
+                        body={"text": t, "state": "PUBLISHED"},
                     ).execute()
                 )
             )
             if updated:
-                state[dedup_key] = {"classroom_id": mat_id, "last_hash": current_hash}
+                state[dedup_key] = {
+                    "classroom_id": ann_id,
+                    "last_hash": current_hash,
+                }
                 result["updated"] += 1
             else:
                 result["errors"] += 1
         else:
             created = _api_call_with_retry(
-                lambda cid=course_id, b=body: (
-                    service.courses().courseWorkMaterials().create(
-                        courseId=cid, body=b,
+                lambda cid=course_id, t=ann_text: (
+                    service.courses().announcements().create(
+                        courseId=cid,
+                        body={"text": t, "state": "PUBLISHED"},
                     ).execute()
                 )
             )
             if created:
-                state[dedup_key] = {"classroom_id": created["id"], "last_hash": current_hash}
+                state[dedup_key] = {
+                    "classroom_id": created["id"],
+                    "last_hash": current_hash,
+                }
                 result["added"] += 1
             else:
                 result["errors"] += 1
@@ -543,13 +560,15 @@ def main(scraped_data=None, token_file=None, reset_courses=False):
         print("  Resetting courses...")
         mapping = _load_courses_mapping()
         for name, cid in mapping.items():
-            _api_call_with_retry(
-                lambda c=cid: service.courses().patch(
-                    id=c, updateMask="courseState",
-                    body={"courseState": "ARCHIVED"},
-                ).execute()
-            )
-            print(f"    Archived: {name}")
+            try:
+                _api_call_with_retry(
+                    lambda c=cid: service.courses().delete(
+                        id=c,
+                    ).execute()
+                )
+                print(f"    Deleted: {name}")
+            except Exception:
+                print(f"    [WARN] Could not delete: {name}")
         _save_courses_mapping({})
 
     ders_listesi = _extract_course_names(scraped_data)

@@ -13,6 +13,7 @@ TOKEN_FILE = os.path.join(PROJECT_ROOT, "token.json")
 ACCOUNTS = {
     "primary": TOKEN_FILE,
     "huriye": os.path.join(PROJECT_ROOT, "token_huriye.json"),
+    "mahirkurt": os.path.join(PROJECT_ROOT, "token_mahirkurt.json"),
 }
 
 SCOPES = [
@@ -58,47 +59,13 @@ def get_credentials(scopes=None, token_file=None,
             if login_hint:
                 extra["login_hint"] = login_hint
 
-            # Determine auth method: manual for named accounts,
-            # local server for primary
-            use_manual = login_hint is not None
-            if not use_manual:
-                try:
-                    creds = flow.run_local_server(
-                        port=8090,
-                        open_browser=False,
-                        prompt="consent",
-                        access_type="offline",
-                        **extra,
-                    )
-                except Exception:
-                    use_manual = True
-
-            if use_manual and creds is None:
-                # Manual flow: user copies redirect URL
-                flow.redirect_uri = (
-                    "http://localhost:8090/"
-                )
-                auth_url, _ = flow.authorization_url(
-                    access_type="offline",
-                    prompt="consent",
-                    **extra,
-                )
-                print(f"\nVisit this URL:\n{auth_url}")
-                print(
-                    "\nAfter authorizing, your browser "
-                    "will redirect to a localhost URL."
-                )
-                print(
-                    "Copy the FULL URL from the address "
-                    "bar (even if page fails to load)."
-                )
-                redirect_url = input(
-                    "\nPaste the redirect URL here: "
-                ).strip()
-                flow.fetch_token(
-                    authorization_response=redirect_url,
-                )
-                creds = flow.credentials
+            creds = flow.run_local_server(
+                port=8090,
+                open_browser=False,
+                prompt="consent",
+                access_type="offline",
+                **extra,
+            )
 
         with open(token_file, "w") as f:
             f.write(creds.to_json())
@@ -120,11 +87,14 @@ def get_tasks_service(token_file=None):
 
 if __name__ == "__main__":
     import sys
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
     account = sys.argv[1] if len(sys.argv) > 1 else None
     token = ACCOUNTS.get(account) if account else TOKEN_FILE
     hint = None
     if account == "huriye":
         hint = "huriye.murzoglu@gmail.com"
+    elif account == "mahirkurt":
+        hint = "drmahirkurt@gmail.com"
 
     print("Authenticating with Google...")
     print(f"Token file: {token}")
