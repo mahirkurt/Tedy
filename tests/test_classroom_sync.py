@@ -4,6 +4,9 @@ import os
 import json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from unittest.mock import MagicMock, patch, call
+import time
+
 
 class TestComputeHash:
     def test_same_input_same_hash(self):
@@ -42,3 +45,54 @@ class TestSyncState:
         save_sync_state(data, path)
         loaded = load_sync_state(path)
         assert loaded == data
+
+
+class TestEnsureCourses:
+    def _mock_service(self, existing_courses=None):
+        """Build a mock Classroom service with optional existing courses."""
+        svc = MagicMock()
+        courses_list = existing_courses or []
+        svc.courses().list().execute.return_value = {
+            "courses": courses_list
+        }
+        svc.courses().create.return_value.execute.side_effect = lambda: {
+            "id": f"new_{time.time()}",
+            "name": "mock",
+            "courseState": "ACTIVE",
+        }
+        svc.invitations().create.return_value.execute.return_value = {}
+        return svc
+
+    def test_creates_missing_courses(self):
+        from src.sync_to_classroom import ensure_courses, GENERAL_COURSE
+        svc = self._mock_service(existing_courses=[])
+        ders_listesi = ["Matematik", "Türkçe"]
+
+        courses = ensure_courses(svc, ders_listesi)
+
+        assert "Matematik" in courses
+        assert "Türkçe" in courses
+        assert GENERAL_COURSE in courses
+        assert svc.courses().create.call_count == 3  # 2 courses + TED Genel
+
+    def test_reuses_existing_courses(self):
+        from src.sync_to_classroom import ensure_courses, COURSE_SECTION, GENERAL_COURSE
+        existing = [
+            {"id": "c1", "name": "Matematik", "section": COURSE_SECTION, "courseState": "ACTIVE"},
+            {"id": "c2", "name": GENERAL_COURSE, "section": COURSE_SECTION, "courseState": "ACTIVE"},
+        ]
+        svc = self._mock_service(existing_courses=existing)
+
+        courses = ensure_courses(svc, ["Matematik"])
+
+        assert courses["Matematik"] == "c1"
+        assert svc.courses().create.call_count == 0
+
+    def test_invites_student(self):
+        from src.sync_to_classroom import ensure_courses, STUDENT_EMAIL
+        svc = self._mock_service(existing_courses=[])
+
+        ensure_courses(svc, ["Matematik"])
+
+        inv_calls = svc.invitations().create.call_args_list
+        assert len(inv_calls) >= 2  # Matematik + TED Genel
