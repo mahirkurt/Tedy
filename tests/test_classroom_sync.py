@@ -251,3 +251,62 @@ class TestSyncNotlar:
         result = sync_notlar(svc, courses, data, state)
         assert result["added"] == 0
         assert result["skipped"] == 1
+
+
+class TestSyncDuyurular:
+    def _mock_service(self):
+        svc = MagicMock()
+        svc.courses().announcements().list().execute.return_value = {"announcements": []}
+        svc.courses().announcements().create.return_value.execute.return_value = {"id": "a1"}
+        svc.courses().announcements().patch.return_value.execute.return_value = {"id": "a1"}
+        return svc
+
+    def test_creates_announcement(self):
+        from src.sync_to_classroom import sync_duyurular
+        svc = self._mock_service()
+        courses = {"TED Genel": "cg", "Matematik": "cm"}
+        data = {
+            "duyurular": {
+                "announcements": [
+                    {"e-Posta Başlık": "Sınav Haftası Duyurusu", "Yayın Tarihi": "01.02.2026 19:00", "Ekleri": ""}
+                ]
+            },
+            "takvim": [],
+            "takim_calismalari": {"activities": {"rows": []}},
+            "ogep": {"sessions": {"rows": []}},
+        }
+        state = {}
+        result = sync_duyurular(svc, courses, data, state)
+        assert result["added"] >= 1
+
+    def test_creates_takvim_announcements(self):
+        from src.sync_to_classroom import sync_duyurular
+        svc = self._mock_service()
+        courses = {"TED Genel": "cg"}
+        data = {
+            "duyurular": {"announcements": []},
+            "takvim": [{"title": "Satranç Turnuvası", "start": "2026-01-19T11:00:00Z", "end": "2026-01-19T13:00:00Z"}],
+            "takim_calismalari": {"activities": {"rows": []}},
+            "ogep": {"sessions": {"rows": []}},
+        }
+        state = {}
+        result = sync_duyurular(svc, courses, data, state)
+        assert result["added"] >= 1
+
+    def test_takim_as_announcement(self):
+        from src.sync_to_classroom import sync_duyurular
+        svc = self._mock_service()
+        courses = {"TED Genel": "cg"}
+        data = {
+            "duyurular": {"announcements": []},
+            "takvim": [],
+            "takim_calismalari": {
+                "activities": {
+                    "rows": [{"Academy+": "Ortaokul-Koro", "Çalışma Başlangıç": "05.03.2026 15:50", "Çalışma Bitiş": "05.03.2026 16:40", "Katılım Durumu": "", "Teams Link": "Yüz Yüze"}]
+                }
+            },
+            "ogep": {"sessions": {"rows": []}},
+        }
+        state = {}
+        result = sync_duyurular(svc, courses, data, state)
+        assert result["added"] >= 1

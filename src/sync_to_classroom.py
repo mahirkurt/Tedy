@@ -384,6 +384,96 @@ def sync_notlar(service, courses, data, state):
     return result
 
 
+def _upsert_announcement(service, course_id, text, state, result):
+    """Create or update a single announcement."""
+    if not course_id or not text.strip():
+        result["errors"] += 1
+        return
+
+    dedup_key = f"ann:{course_id}:{text[:100]}"
+    current_hash = compute_hash(text)
+
+    existing = state.get(dedup_key)
+    if existing and existing["last_hash"] == current_hash:
+        result["skipped"] += 1
+        return
+
+    body = {"text": text[:2000], "state": "PUBLISHED"}
+
+    if existing:
+        ann_id = existing["classroom_id"]
+        updated = _api_call_with_retry(
+            lambda: service.courses().announcements().patch(
+                courseId=course_id, id=ann_id,
+                updateMask="text",
+                body=body,
+            ).execute()
+        )
+        if updated:
+            state[dedup_key] = {"classroom_id": ann_id, "last_hash": current_hash}
+            result["updated"] += 1
+        else:
+            result["errors"] += 1
+    else:
+        created = _api_call_with_retry(
+            lambda: service.courses().announcements().create(
+                courseId=course_id, body=body,
+            ).execute()
+        )
+        if created:
+            state[dedup_key] = {"classroom_id": created["id"], "last_hash": current_hash}
+            result["added"] += 1
+        else:
+            result["errors"] += 1
+
+
+def sync_duyurular(service, courses, data, state):
+    """Sync announcements, calendar events, team activities, and ÖGEP as announcements.
+
+    Returns dict: {added, updated, skipped, errors}
+    """
+    result = {"added": 0, "updated": 0, "skipped": 0, "errors": 0}
+    genel_id = courses.get(GENERAL_COURSE)
+
+    # 1. School announcements -> TED Genel
+    for ann in data.get("duyurular", {}).get("announcements", []):
+        baslik = ann.get("e-Posta Başlık", "")
+        tarih = ann.get("Yayın Tarihi", "")
+        text = f"{baslik}\n\nYayın: {tarih}"
+        _upsert_announcement(service, genel_id, text, state, result)
+
+    # 2. Calendar events -> TED Genel
+    for ev in data.get("takvim", []):
+        title = ev.get("title", "")
+        start = ev.get("start", "")
+        text = f"Takvim: {title}\nTarih: {start}"
+        _upsert_announcement(service, genel_id, text, state, result)
+
+    # 3. Team activities -> TED Genel
+    rows = (data.get("takim_calismalari", {}).get("activities", {}).get("rows", []))
+    for row in rows:
+        name = row.get("Academy+", "")
+        baslangic = row.get("Çalışma Başlangıç", "")
+        bitis = row.get("Çalışma Bitiş", "")
+        durum = row.get("Katılım Durumu", "")
+        text = f"Takım: {name}\nBaşlangıç: {baslangic}\nBitiş: {bitis}"
+        if durum:
+            text += f"\nKatılım: {durum}"
+        _upsert_announcement(service, genel_id, text, state, result)
+
+    # 4. ÖGEP sessions -> TED Genel
+    ogep_rows = (data.get("ogep", {}).get("sessions", {}).get("rows", []))
+    for row in ogep_rows:
+        name = row.get("ÖGEP (Öğrenci Gelişim Programı)", "")
+        baslangic = row.get("Çalışma Başlangıç", "")
+        text = f"ÖGEP: {name}\nTarih: {baslangic}"
+        _upsert_announcement(service, genel_id, text, state, result)
+
+    print(f"  Duyurular: +{result['added']} ~{result['updated']} "
+          f"={result['skipped']} !{result['errors']}")
+    return result
+
+
 def _invite_student(service, course_id):
     """Invite STUDENT_EMAIL to a course. Ignores 409 (already enrolled)."""
     body = {
