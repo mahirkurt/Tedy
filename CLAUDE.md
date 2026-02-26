@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TED is a Python web scraping and automation system that extracts educational data from Turkish school platforms (TED Rönesans Portal, EBA, MEBI, SEBİTV) and syncs it to Google Workspace (Calendar, Tasks, Sheets, Drive). It runs as a scheduled cron job every 15 minutes.
+TED is a Python web scraping and automation system that extracts educational data from Turkish school platforms (TED Rönesans Portal, EBA, MEBI, SEBİTV) and syncs it to Google Workspace (Calendar, Tasks, Sheets, Drive, Classroom). It runs as a scheduled cron job every 15 minutes.
 
 ## Commands
 
@@ -31,6 +31,10 @@ python src/auth_finish.py huriye "<redirect_url>"  # Complete OAuth manually
 # AI enrichment (ödev notes, sınav guides, ders summaries, performans analysis)
 python src/enrich_gemini.py         # Enrich new events only
 python src/enrich_gemini.py --force # Regenerate all notes
+
+# Google Classroom sync
+python src/sync_to_classroom.py                  # Sync to Google Classroom (standalone)
+python src/sync_to_classroom.py --reset-courses   # Archive and recreate all courses
 ```
 
 ## Architecture
@@ -58,6 +62,7 @@ All scrapers follow a consistent two-phase approach:
 | `src/enrich_gemini.py` | AI enrichment: ödev notes, sınav study guides, ders içerikleri summaries, performans analysis (Gemini + Ollama fallback) |
 | `src/env_loader.py` | Shared .env file loader utility |
 | `src/json_utils.py` | Atomic JSON write utility (write to .tmp then rename) |
+| `src/sync_to_classroom.py` | Syncs TED data to Google Classroom (courses, assignments, materials, grades, announcements) |
 | `src/auth_finish.py` | Manual OAuth completion for multi-account setup |
 
 The `src/discover_*.py` files (30+) are exploratory/investigative scripts used during development — not part of the production pipeline.
@@ -69,6 +74,7 @@ TED Portal → scrape_all.py → output/scraped_data.json → sync_to_google.py 
 EBA        → scrape_eba_textbooks.py ──────────────────────────────────────→ Google Drive
 MEBI       → scrape_mebi_videos.py ────────────────────────────────────────→ Google Drive
 SEBİTV     → scrape_sebitv.py / scrape_sebitv_interactive.py ──────────────→ Google Drive
+TED Portal → scraped_data.json → sync_to_classroom.py ────────────────────→ Google Classroom
 ```
 
 ### Key Patterns
@@ -85,6 +91,7 @@ SEBİTV     → scrape_sebitv.py / scrape_sebitv_interactive.py ─────�
 - **Error isolation**: Each scraper in `run_sync.py` is wrapped in try-except. Partial data is saved and synced even if one scraper fails.
 - **API retry**: `upsert_event()`/`upsert_task()` retry transient Google API errors (429/500/503) up to 3x with exponential backoff.
 - **Health check**: `output/health.json` is written after each sync with success status, errors, and duration.
+- **Classroom sync**: `sync_to_classroom.py` creates per-course Classroom courses, syncs homework as courseWork (ASSIGNMENT), course content as courseWorkMaterial, grades as SHORT_ANSWER courseWork with scores, and announcements/calendar/team/ÖGEP as announcements. Uses hash-based change detection in `output/classroom_sync.json` to skip unchanged items and update modified ones. Student `isikkurtx@gmail.com` is auto-invited to all courses.
 - **Atomic JSON writes**: All critical JSON output uses `atomic_json_dump()` from `src/json_utils.py` — writes to `.tmp` then renames to prevent corruption.
 
 ## Dependencies
@@ -97,6 +104,8 @@ Runtime dependencies are installed via pip but not fully listed in `requirements
 - `token.json` — Generated after first Google auth
 - `token_huriye.json` — OAuth token for secondary account (huriye.murzoglu@gmail.com)
 - `.env` — Contains `GEMINI_API_KEY`, `PORTAL_USERNAME`, `PORTAL_PASSWORD`
+
+**Note:** After adding Classroom scopes, existing tokens must be regenerated: delete `token.json` and run `python src/google_auth.py`.
 
 ## Output
 
