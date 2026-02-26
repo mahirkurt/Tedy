@@ -30,3 +30,15 @@ htmlcov/
 # Distribution
 *.tar.gz
 *.whl
+
+# Google OAuth
+credentials.json
+token.json
+token_huriye.json
+token.pickle
+
+# Output
+output/
+
+# Git worktrees
+.worktrees/
