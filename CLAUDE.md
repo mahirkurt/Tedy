@@ -89,9 +89,9 @@ TED Portal → scraped_data.json → sync_to_classroom.py ───────�
 - **AI enrichment**: `enrich_gemini.py` enriches 4 types of data: ödev notes (`🤖 Gemini Notu`), sınav study guides (`🤖 Sınav Rehberi`), ders içerikleri summaries (`🤖 Haftalık Özet`), and performans analysis (`🤖 Performans Analizi`). Uses `ModelRouter` to cycle through Gemini cloud models then falls back to local Ollama. Idempotent via marker strings in descriptions. Runs automatically as post-sync step in `run_sync.py`.
 - **Environment variables**: `.env` at project root (gitignored) holds `GEMINI_API_KEY`, `PORTAL_USERNAME`, `PORTAL_PASSWORD`. Loaded via `src/env_loader.py` (no python-dotenv dependency).
 - **Error isolation**: Each scraper in `run_sync.py` is wrapped in try-except. Partial data is saved and synced even if one scraper fails.
-- **API retry**: `upsert_event()`/`upsert_task()` retry transient Google API errors (429/500/503) up to 3x with exponential backoff.
+- **API retry**: `_api_call_with_retry()` retries transient Google API errors (429/500/503) up to 5x with exponential backoff (base_delay=3s). Used by both `sync_to_google.py` and `sync_to_classroom.py`.
 - **Health check**: `output/health.json` is written after each sync with success status, errors, and duration.
-- **Classroom sync**: `sync_to_classroom.py` creates per-course Classroom courses, syncs homework as courseWork (ASSIGNMENT), course content as courseWorkMaterial, grades as SHORT_ANSWER courseWork with scores, and announcements/calendar/team/ÖGEP as announcements. Uses hash-based change detection in `output/classroom_sync.json` to skip unchanged items and update modified ones. Student `isikkurtx@gmail.com` is auto-invited to all courses.
+- **Classroom sync**: `sync_to_classroom.py` uses `token_huriye.json` (huriye.murzoglu@gmail.com) as teacher/owner. Courses are created in PROVISIONED state (personal Gmail limitation — cannot create ACTIVE courses). Syncs homework as courseWork (ASSIGNMENT), course content as announcements (avoids needing `courseworkmaterials` scope), grades as SHORT_ANSWER courseWork with scores, and duyurular/calendar/team/ÖGEP as announcements. `ALLOWED_COURSES` whitelist restricts creation to 11 specific courses. Uses hash-based change detection in `output/classroom_sync.json`. Student `isikkurtx@gmail.com` is auto-invited to all courses.
 - **Atomic JSON writes**: All critical JSON output uses `atomic_json_dump()` from `src/json_utils.py` — writes to `.tmp` then renames to prevent corruption.
 
 ## Dependencies
@@ -101,11 +101,12 @@ Runtime dependencies are installed via pip but not fully listed in `requirements
 ## Required Credentials (gitignored)
 
 - `credentials.json` — Google OAuth2 client credentials
-- `token.json` — Generated after first Google auth
-- `token_huriye.json` — OAuth token for secondary account (huriye.murzoglu@gmail.com)
+- `token.json` — Generated after first Google auth (primary/student account)
+- `token_huriye.json` — OAuth token for huriye.murzoglu@gmail.com (Classroom teacher/owner + Calendar/Tasks secondary sync)
+- `token_mahirkurt.json` — OAuth token for drmahirkurt@gmail.com (optional)
 - `.env` — Contains `GEMINI_API_KEY`, `PORTAL_USERNAME`, `PORTAL_PASSWORD`
 
-**Note:** After adding Classroom scopes, existing tokens must be regenerated: delete `token.json` and run `python src/google_auth.py`.
+**Note:** `google_auth.py` always uses `run_local_server(port=8090)`. After adding new scopes, delete the token file and re-run auth. Classroom scopes are included by default.
 
 ## Output
 
