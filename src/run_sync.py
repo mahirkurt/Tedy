@@ -22,12 +22,10 @@ from src.scrape_all import (
     scrape_ogep, scrape_gelisim_raporu, scrape_duyurular, OUTPUT_DIR,
 )
 from src.sync_to_google import (
-    get_services, get_or_create_calendar, get_or_create_task_list,
-    fetch_existing_events, fetch_existing_tasks,
-    sync_ders_programi, sync_odevlerim, sync_takim_calismalari,
-    sync_takvim, sync_ders_icerikleri, sync_ogep,
-    sync_gelisim_raporu, sync_duyurular,
-    sync_grades_to_sheets, sync_attachments_to_drive,
+    get_services, get_or_create_calendar,
+    fetch_existing_events,
+    sync_ders_programi, sync_takvim, sync_ogep,
+    sync_attachments_to_drive,
 )
 
 
@@ -87,56 +85,64 @@ def main():
     finally:
         driver.quit()
 
-    # 3. Smart sync to Google
+    # 3. Calendar + Drive sync (isikkurtx only)
+    drive_uploads = {}
     try:
-        print("\n--- Google Sync ---")
-        cal_svc, tasks_svc, sheets_svc, drive_svc = get_services()
+        print("\n--- Google Calendar + Drive Sync ---")
+        cal_svc, drive_svc = get_services()
         cal_id = get_or_create_calendar(cal_svc, "TED Rönesans")
-        task_list_id = get_or_create_task_list(tasks_svc, "TED Ödevler")
-
         existing_events = fetch_existing_events(cal_svc, cal_id)
-        existing_tasks = fetch_existing_tasks(tasks_svc, task_list_id)
-        print(f"  Existing: {len(existing_events)} events, "
-              f"{len(existing_tasks)} tasks")
+        print(f"  Existing: {len(existing_events)} events")
 
         sync_ders_programi(cal_svc, data, cal_id, existing_events)
-        sync_odevlerim(cal_svc, tasks_svc, data, cal_id,
-                       task_list_id, existing_events, existing_tasks,
-                       drive_service=drive_svc)
-        sync_takim_calismalari(cal_svc, data, cal_id, existing_events)
         sync_takvim(cal_svc, data, cal_id, existing_events)
-        sync_ders_icerikleri(tasks_svc, data, task_list_id,
-                             existing_tasks)
         sync_ogep(cal_svc, data, cal_id, existing_events)
-        sync_gelisim_raporu(tasks_svc, data, task_list_id,
-                            existing_tasks)
-        sync_duyurular(cal_svc, data, cal_id, existing_events)
-        sync_grades_to_sheets(sheets_svc, data)
-        sync_attachments_to_drive(drive_svc, cal_svc, data, cal_id)
+        drive_uploads = sync_attachments_to_drive(drive_svc, data)
     except Exception as e:
         scrape_errors.append(f"google_sync: {e}")
         print(f"[ERROR] Google sync failed: {e}")
 
-    # 4. AI Enrichment (post-sync)
-    print("\n--- AI Enrichment ---")
+    # 3.5. English Central scrape (separate Selenium session)
     try:
-        from src.enrich_gemini import enrich_all
-        from src.sync_to_google import TOKEN_FILE, TOKEN_HURIYE
-        enrich_all(token_file=TOKEN_FILE)
-        if os.path.exists(TOKEN_HURIYE):
-            enrich_all(token_file=TOKEN_HURIYE)
+        from src.scrape_englishcentral import scrape as scrape_ec
+        scrape_ec()
     except Exception as e:
-        print(f"[WARN] Enrichment failed: {e}")
-        # Non-fatal: sync succeeded even if enrichment fails
+        scrape_errors.append(f"englishcentral: {e}")
+        print(f"[WARN] English Central scrape failed: {e}")
 
-    # 5. Classroom sync
-    print("\n--- Classroom Sync ---")
+    # 3.6. Achieve3000 scrape (separate Selenium session)
+    try:
+        from src.scrape_achieve3000 import scrape as scrape_a3k
+        scrape_a3k()
+    except Exception as e:
+        scrape_errors.append(f"achieve3000: {e}")
+        print(f"[WARN] Achieve3000 scrape failed: {e}")
+
+    # 3.7. SEBİT homework scrape (separate Selenium session)
+    try:
+        from src.scrape_sebit_homework import scrape as scrape_sebit_hw
+        scrape_sebit_hw()
+    except Exception as e:
+        scrape_errors.append(f"sebit_homework: {e}")
+        print(f"[WARN] SEBİT homework scrape failed: {e}")
+
+    # 4. Classroom sync (huriye account)
     try:
         from src.sync_to_classroom import main as sync_classroom
-        sync_classroom(scraped_data=data)
+        classroom_errors = sync_classroom(scraped_data=data, drive_uploads=drive_uploads)
+        if classroom_errors:
+            scrape_errors.extend(classroom_errors)
     except Exception as e:
         scrape_errors.append(f"classroom_sync: {e}")
         print(f"[WARN] Classroom sync failed: {e}")
+
+    # 5. AI Enrichment (will be adapted to Classroom in Task 4)
+    print("\n--- AI Enrichment ---")
+    try:
+        from src.enrich_gemini import enrich_all
+        enrich_all()
+    except Exception as e:
+        print(f"[WARN] Enrichment failed (pending Classroom adaptation): {e}")
 
     # 6. Write health check
     from src.json_utils import atomic_json_dump

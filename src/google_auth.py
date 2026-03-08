@@ -1,4 +1,4 @@
-"""Google API authentication helper for Calendar & Tasks."""
+"""Google API authentication helper for Calendar, Drive & Classroom."""
 import os
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -18,8 +18,6 @@ ACCOUNTS = {
 
 SCOPES = [
     "https://www.googleapis.com/auth/calendar",
-    "https://www.googleapis.com/auth/tasks",
-    "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.file",
     # Google Classroom scopes
     "https://www.googleapis.com/auth/classroom.courses",
@@ -79,12 +77,6 @@ def get_calendar_service(token_file=None):
     return build("calendar", "v3", credentials=creds)
 
 
-def get_tasks_service(token_file=None):
-    """Build a Tasks API service client."""
-    creds = get_credentials(token_file=token_file)
-    return build("tasks", "v1", credentials=creds)
-
-
 if __name__ == "__main__":
     import sys
     os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
@@ -117,10 +109,3 @@ if __name__ == "__main__":
     print(f"\nCalendars found: {len(items)}")
     for c in items:
         print(f"  - {c['summary']} ({c['id']})")
-
-    tasks = build("tasks", "v1", credentials=creds)
-    task_lists = tasks.tasklists().list().execute()
-    items = task_lists.get("items", [])
-    print(f"\nTask lists found: {len(items)}")
-    for t in items:
-        print(f"  - {t['title']} ({t['id']})")

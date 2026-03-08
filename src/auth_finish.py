@@ -26,8 +26,6 @@ ACCOUNTS = {
 
 SCOPES = [
     "https://www.googleapis.com/auth/calendar",
-    "https://www.googleapis.com/auth/tasks",
-    "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/classroom.courses",
     "https://www.googleapis.com/auth/classroom.coursework.students",
@@ -76,13 +74,6 @@ def main():
     print(f"\nCalendars found: {len(items)}")
     for c in items:
         print(f"  - {c['summary']}")
-
-    tasks = build("tasks", "v1", credentials=creds)
-    task_lists = tasks.tasklists().list().execute()
-    items = task_lists.get("items", [])
-    print(f"\nTask lists found: {len(items)}")
-    for t in items:
-        print(f"  - {t['title']}")
 
     print("\nAuth complete!")
 

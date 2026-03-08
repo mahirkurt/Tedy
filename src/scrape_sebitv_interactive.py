@@ -681,7 +681,7 @@ def main():
 
     # Connect to Google Drive
     print("\n[2/2] Google Drive baglantisi...")
-    _, _, _, drive_svc = get_services()
+    _, drive_svc = get_services()
 
     # Process interactive resources
     added, skipped, failed = process_interactive_resources(

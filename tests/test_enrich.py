@@ -62,3 +62,25 @@ class TestBuildPerformansPrompt:
         assert "Matematik" in p
         assert "85" in p
         assert "Fen" in p
+
+
+class TestClassroomEnrichmentTargets:
+    """Verify enrichment functions target Classroom API."""
+
+    def test_enrich_all_uses_classroom_service(self):
+        """enrich_all should build a Classroom service, not Calendar/Tasks."""
+        from unittest.mock import patch, MagicMock
+        with patch("src.enrich_gemini.get_classroom_service") as mock_cls, \
+             patch("src.enrich_gemini.load_sync_state", return_value={}), \
+             patch("src.enrich_gemini.save_sync_state"), \
+             patch("src.enrich_gemini.ModelRouter") as mock_router, \
+             patch("src.enrich_gemini.genai") as mock_genai, \
+             patch("src.env_loader.load_env"), \
+             patch.dict("os.environ", {"GEMINI_API_KEY": "test"}), \
+             patch("builtins.open", side_effect=FileNotFoundError):
+            try:
+                from src.enrich_gemini import enrich_all
+                enrich_all()
+            except Exception:
+                pass
+            mock_cls.assert_called()

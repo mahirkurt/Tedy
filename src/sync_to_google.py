@@ -1,4 +1,8 @@
-"""Classify scraped TED portal data and sync to Google Calendar & Tasks."""
+"""Sync scraped TED portal data to Google Calendar & Drive.
+
+Calendar-only sync: ders programi, takvim (timed events), OGEP.
+Homework, grades, announcements, and course content go to Classroom.
+"""
 import json
 import os
 import re
@@ -11,9 +15,10 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
+from src.json_utils import atomic_json_dump
+
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 TOKEN_FILE = os.path.join(PROJECT_ROOT, "token.json")
-TOKEN_HURIYE = os.path.join(PROJECT_ROOT, "token_huriye.json")
 DATA_FILE = os.path.join(PROJECT_ROOT, "output", "scraped_data.json")
 
 TIMEZONE = "Europe/Istanbul"
@@ -21,7 +26,6 @@ TIMEZONE = "Europe/Istanbul"
 # Color IDs for Google Calendar (1-11)
 COLORS = {
     "ders": "1",        # Lavender - regular class
-    "odev": "11",       # Red - homework due
     "takim": "3",       # Purple - team/club
     "sinav": "4",       # Flamingo - exam
     "etkinlik": "2",    # Sage - activity
@@ -46,12 +50,14 @@ COURSE_ALIASES = {
         "İngilizce (Language)",
         "İngilizce Language",
         "İngilizce (2)",
-    ],
-    "İngilizce Literature": [
+        "İngilizce Literature",
         "İngilizce (Literature)",
     ],
     "Bilişim": [
         "Bilişim Teknolojileri",
+    ],
+    "Ahlak ve Yurttaşlık": [
+        "Ahlak ve Yurttaşlık Eğitimi",
     ],
 }
 
@@ -104,7 +110,10 @@ def normalize_course(name):
 
 
 def get_services(token_file=None):
-    """Build Google API service clients from token file."""
+    """Build Google API service clients from token file.
+
+    Returns (calendar_service, drive_service).
+    """
     token_file = token_file or TOKEN_FILE
     creds = Credentials.from_authorized_user_file(token_file)
     if not creds.valid and creds.expired and creds.refresh_token:
@@ -112,10 +121,8 @@ def get_services(token_file=None):
         with open(token_file, "w") as f:
             f.write(creds.to_json())
     cal = build("calendar", "v3", credentials=creds)
-    tasks = build("tasks", "v1", credentials=creds)
-    sheets = build("sheets", "v4", credentials=creds)
     drive = build("drive", "v3", credentials=creds)
-    return cal, tasks, sheets, drive
+    return cal, drive
 
 
 def get_or_create_calendar(cal_service, summary):
@@ -129,19 +136,6 @@ def get_or_create_calendar(cal_service, summary):
     body = {"summary": summary, "timeZone": TIMEZONE}
     created = cal_service.calendars().insert(body=body).execute()
     print(f"  Calendar created: {summary} ({created['id'][:20]}...)")
-    return created["id"]
-
-
-def get_or_create_task_list(tasks_service, title):
-    """Get existing or create a task list."""
-    lists = tasks_service.tasklists().list().execute()
-    for t in lists.get("items", []):
-        if t["title"] == title:
-            print(f"  Task list exists: {title}")
-            return t["id"]
-
-    created = tasks_service.tasklists().insert(body={"title": title}).execute()
-    print(f"  Task list created: {title}")
     return created["id"]
 
 
@@ -165,31 +159,6 @@ def fetch_existing_events(cal_service, cal_id):
             start = ev.get("start", {})
             raw = start.get("dateTime", start.get("date", ""))
             existing[(summary, _normalize_dt(raw))] = ev["id"]
-        page_token = result.get("nextPageToken")
-        if not page_token:
-            break
-    return existing
-
-
-def fetch_existing_tasks(tasks_service, task_list_id):
-    """Fetch all tasks from the TED task list.
-
-    Returns dict: {(title, due): task_id}
-    """
-    existing = {}
-    page_token = None
-    while True:
-        result = tasks_service.tasks().list(
-            tasklist=task_list_id,
-            maxResults=100,
-            pageToken=page_token,
-            showCompleted=True,
-            showHidden=True,
-        ).execute()
-        for t in result.get("items", []):
-            title = t.get("title", "")
-            due = t.get("due", "")
-            existing[(title, due)] = t["id"]
         page_token = result.get("nextPageToken")
         if not page_token:
             break
@@ -223,13 +192,17 @@ def _normalize_dt(s):
 
 
 def _api_call_with_retry(fn, max_retries=5, base_delay=3):
-    """Call fn() with retry on transient HTTP errors (429, 500, 503)."""
+    """Call fn() with retry on transient HTTP errors (403, 429, 500, 503).
+
+    Note: 403 is included because Google Classroom API uses it for rate
+    limiting in addition to permission errors.
+    """
     for attempt in range(max_retries):
         try:
             return fn()
         except Exception as e:
             status = getattr(getattr(e, "resp", None), "status", 0)
-            if status in (429, 500, 503) and attempt < max_retries - 1:
+            if status in (403, 429, 500, 503) and attempt < max_retries - 1:
                 time.sleep(base_delay * (2 ** attempt))
                 continue
             return None
@@ -251,47 +224,6 @@ def upsert_event(cal_service, cal_id, event_body, existing_events):
     result = _api_call_with_retry(
         lambda: cal_service.events().insert(
             calendarId=cal_id, body=event_body,
-        ).execute()
-    )
-    return "added" if result else "error"
-
-
-def upsert_task(tasks_service, task_list_id, task_body, existing_tasks,
-                update_if_changed=False):
-    """Insert, skip, or update a task.
-
-    When update_if_changed=True, compares notes and updates if different.
-    Returns 'added', 'exists', 'updated', or 'error'.
-    """
-    title = task_body.get("title", "")
-    due = task_body.get("due", "")
-    key = (title, due)
-
-    if key in existing_tasks:
-        if not update_if_changed:
-            return "exists"
-        # Check if content changed, update if so
-        task_id = existing_tasks[key]
-        existing = _api_call_with_retry(
-            lambda: tasks_service.tasks().get(
-                tasklist=task_list_id, task=task_id
-            ).execute()
-        )
-        if existing and existing.get("notes") != task_body.get("notes"):
-            existing.update(task_body)
-            result = _api_call_with_retry(
-                lambda: tasks_service.tasks().update(
-                    tasklist=task_list_id, task=task_id,
-                    body=existing
-                ).execute()
-            )
-            if result:
-                return "updated"
-        return "exists"
-
-    result = _api_call_with_retry(
-        lambda: tasks_service.tasks().insert(
-            tasklist=task_list_id, body=task_body
         ).execute()
     )
     return "added" if result else "error"
@@ -338,7 +270,7 @@ def sync_ders_programi(cal_service, data, cal_id, existing_events):
       Row N: ['N. Ders\\n08:00 - 08:40', 'Ders (sınıf)\\nÖğretmen', ...]
       Break rows: ['08:40 - 08:55', 'Kahvaltı', ...]
     """
-    print("\n[1/8] Ders Programı -> Calendar")
+    print("\n[1/3] Ders Programı -> Calendar")
     weeks = data.get("ders_programi", [])
     events_added = 0
     events_skipped = 0
@@ -435,189 +367,31 @@ def sync_ders_programi(cal_service, data, cal_id, existing_events):
 
 
 # =============================================================================
-# SYNC: ÖDEVLERİM -> GOOGLE TASKS + CALENDAR
-# =============================================================================
-def sync_odevlerim(cal_service, tasks_service, data, cal_id, task_list_id,
-                    existing_events, existing_tasks, drive_service=None):
-    """Sync homework to Google Tasks (as tasks) and Calendar (as reminders)."""
-    print("\n[2/8] Ödevlerim -> Tasks + Calendar")
-    hw_data = data.get("odevlerim", {})
-    rows = hw_data.get("homework", {}).get("rows", [])
-    tasks_added = 0
-    tasks_skipped = 0
-    tasks_updated = 0
-    events_added = 0
-    events_skipped = 0
-
-    # Build Drive folder links per course
-    drive_links = {}  # ders -> folder web link
-    if drive_service:
-        try:
-            root_id = _get_or_create_folder(drive_service, "Ödevler")
-            for row in rows:
-                ders = normalize_course(row.get("Ders Adı", ""))
-                if ders and ders not in drive_links:
-                    subj_id = _get_or_create_folder(
-                        drive_service, ders, parent_id=root_id
-                    )
-                    drive_links[ders] = (
-                        f"https://drive.google.com/drive/folders/{subj_id}"
-                    )
-        except Exception as e:
-            print(f"  Drive folder link error: {e}")
-
-    for row in rows:
-        ders = normalize_course(row.get("Ders Adı", ""))
-        baslik = row.get("Ödev Başlığı", "")
-        kaynak = row.get("Ödev Kaynağı", "")
-        tarih_str = row.get("Ödev Son Teslim Tarihi", "")
-        durum = row.get("Ödev Durumu", "")
-
-        due_dt = parse_tr_datetime(tarih_str)
-        if not due_dt:
-            continue
-
-        # Build enriched notes from detail
-        detail = row.get("detail", {})
-        desc = detail.get("description", "")
-        attachments = detail.get("attachments", [])
-
-        notes_parts = [
-            f"Kaynak: {kaynak}",
-            f"Durum: {durum}",
-            f"Son Teslim: {tarih_str}",
-        ]
-        if desc:
-            notes_parts.append(f"\n---\n{desc}")
-        if attachments:
-            notes_parts.append("\nEkler:")
-            for att in attachments:
-                notes_parts.append(
-                    f"  - {att['name']}: {att['url']}"
-                )
-        drive_link = drive_links.get(ders, "")
-        if drive_link:
-            notes_parts.append(f"\n📁 Drive: {drive_link}")
-
-        # Create Google Task
-        task_body = {
-            "title": f"[{ders}] {baslik}",
-            "notes": "\n".join(notes_parts)[:8000],
-            "due": due_dt.strftime("%Y-%m-%dT00:00:00.000Z"),
-        }
-        if durum == "Yaptı":
-            task_body["status"] = "completed"
-
-        result = upsert_task(
-            tasks_service, task_list_id, task_body,
-            existing_tasks, update_if_changed=True
-        )
-        if result == "added":
-            tasks_added += 1
-        elif result == "updated":
-            tasks_updated += 1
-        elif result == "exists":
-            tasks_skipped += 1
-
-        # Create Calendar event for due date
-        event_desc = f"Durum: {durum}\nKaynak: {kaynak}"
-        if desc:
-            event_desc += f"\n\n{desc[:2000]}"
-        if drive_link:
-            event_desc += f"\n\n📁 Drive: {drive_link}"
-        event = {
-            "summary": f"📝 Ödev: {baslik} ({ders})",
-            "description": event_desc,
-            "start": {
-                "dateTime": due_dt.isoformat(),
-                "timeZone": TIMEZONE,
-            },
-            "end": {
-                "dateTime": (due_dt + timedelta(minutes=30)).isoformat(),
-                "timeZone": TIMEZONE,
-            },
-            "colorId": COLORS["odev"],
-            "reminders": {
-                "useDefault": False,
-                "overrides": [
-                    {"method": "popup", "minutes": 60 * 24},  # 1 day before
-                    {"method": "popup", "minutes": 60},        # 1 hour before
-                ],
-            },
-        }
-        result = upsert_event(cal_service, cal_id, event, existing_events)
-        if result == "added":
-            events_added += 1
-        elif result == "exists":
-            events_skipped += 1
-
-    print(f"  Tasks: +{tasks_added} added, ~{tasks_updated} updated, ={tasks_skipped} skipped")
-    print(f"  Events: +{events_added} added, ={events_skipped} skipped")
-    return tasks_added, events_added
-
-
-# =============================================================================
-# SYNC: TAKIM ÇALIŞMALARI -> GOOGLE CALENDAR
-# =============================================================================
-def sync_takim_calismalari(cal_service, data, cal_id, existing_events):
-    """Sync team activities to Google Calendar."""
-    print("\n[3/8] Takım Çalışmaları -> Calendar")
-    activities = data.get("takim_calismalari", {}).get("activities", {}).get("rows", [])
-    events_added = 0
-    events_skipped = 0
-
-    for row in activities:
-        name = row.get("Academy+", "")
-        start_str = row.get("Çalışma Başlangıç", "")
-        end_str = row.get("Çalışma Bitiş", "")
-        katilim = row.get("Katılım Durumu", "")
-        link = row.get("Teams Link", "")
-
-        start_dt = parse_tr_datetime(start_str)
-        end_dt = parse_tr_datetime(end_str)
-        if not start_dt or not end_dt:
-            continue
-
-        desc = f"Katılım: {katilim}\n" if katilim else ""
-        desc += f"Konum: {link}" if link else ""
-
-        event = {
-            "summary": f"🎯 {name}",
-            "description": desc,
-            "start": {
-                "dateTime": start_dt.isoformat(),
-                "timeZone": TIMEZONE,
-            },
-            "end": {
-                "dateTime": end_dt.isoformat(),
-                "timeZone": TIMEZONE,
-            },
-            "colorId": COLORS["takim"],
-            "location": link if link != "Yüz Yüze" else "TED Rönesans Koleji",
-        }
-        result = upsert_event(cal_service, cal_id, event, existing_events)
-        if result == "added":
-            events_added += 1
-        elif result == "exists":
-            events_skipped += 1
-
-    print(f"  Takim: +{events_added} added, ={events_skipped} skipped")
-    return events_added
-
-
-# =============================================================================
-# SYNC: TAKVİM EVENTS -> GOOGLE CALENDAR
+# SYNC: TAKVİM EVENTS -> GOOGLE CALENDAR (timed events only)
 # =============================================================================
 def sync_takvim(cal_service, data, cal_id, existing_events):
     """Sync academic calendar events (from FullCalendar JS API data).
 
+    Only timed events are synced to Calendar. All-day events are skipped
+    (they go to Classroom as announcements). ÖGEP sessions are skipped
+    (they are synced by sync_ogep to avoid duplicates).
+
     Each event has: title, start (ISO), end (ISO), allDay (bool),
     backgroundColor, extendedProps.
     """
-    print("\n[4/8] Akademik Takvim -> Calendar")
+    print("\n[2/3] Akademik Takvim -> Calendar")
     events = data.get("takvim", [])
     events_added = 0
     events_skipped = 0
+    all_day_skipped = 0
+    ogep_skipped = 0
+
+    # Build set of ÖGEP session titles for dedup with sync_ogep
+    ogep_titles = set()
+    for r in data.get("ogep", {}).get("sessions", {}).get("rows", []):
+        name = r.get("ÖGEP (Öğrenci Gelişim Programı)", "")
+        if name:
+            ogep_titles.add(name)
 
     for ev in events:
         title = ev.get("title", "").strip()
@@ -627,6 +401,18 @@ def sync_takvim(cal_service, data, cal_id, existing_events):
 
         if not title or not start:
             continue
+
+        # Skip all-day events (they go to Classroom announcements)
+        if all_day:
+            all_day_skipped += 1
+            continue
+
+        # Skip ÖGEP sessions (handled by sync_ogep)
+        if any(t in title for t in ogep_titles) or "ögep" in title.lower():
+            ogep_skipped += 1
+            continue
+
+        # Only timed events from here on
 
         # Determine color by keyword
         color = COLORS["etkinlik"]
@@ -640,35 +426,18 @@ def sync_takvim(cal_service, data, cal_id, existing_events):
         elif "gezi" in lower or "müze" in lower or "trip" in lower:
             color = COLORS["takim"]
 
-        if all_day:
-            # All-day event: use date format (YYYY-MM-DD)
-            start_date = start[:10]  # "2026-02-16" from ISO
-            end_date = end[:10] if end else start_date
-            # Google Calendar all-day end is exclusive, add 1 day if same
-            if end_date <= start_date:
-                dt = datetime.strptime(start_date, "%Y-%m-%d")
-                end_date = (dt + timedelta(days=1)).strftime("%Y-%m-%d")
-
-            event = {
-                "summary": title,
-                "colorId": color,
-                "start": {"date": start_date},
-                "end": {"date": end_date},
-            }
-        else:
-            # Timed event: use dateTime format
-            event = {
-                "summary": title,
-                "colorId": color,
-                "start": {
-                    "dateTime": start,
-                    "timeZone": TIMEZONE,
-                },
-                "end": {
-                    "dateTime": end if end else start,
-                    "timeZone": TIMEZONE,
-                },
-            }
+        event = {
+            "summary": title,
+            "colorId": color,
+            "start": {
+                "dateTime": start,
+                "timeZone": TIMEZONE,
+            },
+            "end": {
+                "dateTime": end if end else start,
+                "timeZone": TIMEZONE,
+            },
+        }
 
         result = upsert_event(cal_service, cal_id, event, existing_events)
         if result == "added":
@@ -676,44 +445,11 @@ def sync_takvim(cal_service, data, cal_id, existing_events):
         elif result == "exists":
             events_skipped += 1
 
-    print(f"  Takvim: +{events_added} added, ={events_skipped} skipped")
+    print(f"  Takvim: +{events_added} added, "
+          f"={events_skipped} skipped, "
+          f"~{all_day_skipped} all-day -> Classroom, "
+          f"~{ogep_skipped} ÖGEP -> sync_ogep")
     return events_added
-
-
-# =============================================================================
-# SYNC: DERS İÇERİKLERİ -> GOOGLE TASKS
-# =============================================================================
-def sync_ders_icerikleri(tasks_service, data, task_list_id, existing_tasks):
-    """Sync course content notes to Google Tasks as reference items."""
-    print("\n[5/8] Ders İçerikleri -> Tasks")
-    ders_data = data.get("ders_icerikleri", {})
-    tasks_added = 0
-    tasks_skipped = 0
-
-    for raw_name, info in ders_data.items():
-        ders_name = normalize_course(raw_name)
-        text = info.get("text", "").strip()
-        cards = info.get("cards", [])
-        if not text and not cards:
-            continue
-
-        # Create a task for each course with content
-        notes = text[:5000] if text else ""
-        if cards:
-            notes += "\n\n---\n" + "\n\n".join(c[:500] for c in cards[:5])
-
-        task_body = {
-            "title": f"📖 {ders_name} - Haftalık İçerik",
-            "notes": notes[:8000],
-        }
-        result = upsert_task(tasks_service, task_list_id, task_body, existing_tasks)
-        if result == "added":
-            tasks_added += 1
-        elif result == "exists":
-            tasks_skipped += 1
-
-    print(f"  Icerik: +{tasks_added} added, ={tasks_skipped} skipped")
-    return tasks_added
 
 
 # =============================================================================
@@ -721,7 +457,7 @@ def sync_ders_icerikleri(tasks_service, data, task_list_id, existing_tasks):
 # =============================================================================
 def sync_ogep(cal_service, data, cal_id, existing_events):
     """Sync ÖGEP sessions to Google Calendar."""
-    print("\n[6/8] ÖGEP -> Calendar")
+    print("\n[3/3] ÖGEP -> Calendar")
     rows = data.get("ogep", {}).get("sessions", {}).get("rows", [])
     added = 0
     skipped = 0
@@ -760,326 +496,17 @@ def sync_ogep(cal_service, data, cal_id, existing_events):
 
 
 # =============================================================================
-# SYNC: GELİŞİM RAPORU -> GOOGLE TASKS
-# =============================================================================
-def sync_gelisim_raporu(tasks_service, data, task_list_id,
-                        existing_tasks):
-    """Sync grade report to Google Tasks (with update support)."""
-    print("\n[7/8] Gelişim Raporu -> Tasks")
-    gr = data.get("gelisim_raporu", {})
-    semester = gr.get("semester", "")
-    grades = gr.get("grades", [])
-
-    added = 0
-    updated = 0
-    skipped = 0
-
-    for row in grades:
-        ders = normalize_course(row.get("Ders", ""))
-        if not ders:
-            continue
-
-        notes_parts = [f"Dönem: {semester}"]
-        for key in ["1. Sınav", "2. Sınav", "3. Sınav",
-                     "DİKP/Performans-1", "DİKP/Performans-2",
-                     "DİKP/Performans-3"]:
-            val = row.get(key, "-")
-            notes_parts.append(f"{key}: {val}")
-
-        task_body = {
-            "title": f"📊 Notlar: {ders}",
-            "notes": "\n".join(notes_parts),
-        }
-
-        result = upsert_task(
-            tasks_service, task_list_id, task_body,
-            existing_tasks, update_if_changed=True
-        )
-        if result == "added":
-            added += 1
-        elif result == "updated":
-            updated += 1
-        elif result == "exists":
-            skipped += 1
-
-    print(f"  Notlar: +{added} added, ~{updated} updated, "
-          f"={skipped} skipped")
-    return added
-
-
-# =============================================================================
-# SYNC: DUYURULAR -> GOOGLE CALENDAR
-# =============================================================================
-def sync_duyurular(cal_service, data, cal_id, existing_events):
-    """Sync announcements to Google Calendar as all-day events."""
-    print("\n[8/8] Duyurular -> Calendar")
-    announcements = data.get("duyurular", {}).get("announcements", [])
-    added = 0
-    skipped = 0
-
-    for row in announcements:
-        title = row.get("e-Posta Başlık", "").strip()
-        date_str = row.get("Yayın Tarihi", "").strip()
-        att_url = row.get("Ekleri_url", "")
-
-        if not title or not date_str:
-            continue
-
-        pub_dt = None
-        for fmt in ["%d.%m.%Y %H:%M", "%d.%m.%Y"]:
-            try:
-                pub_dt = datetime.strptime(date_str, fmt)
-                break
-            except ValueError:
-                continue
-        if not pub_dt:
-            continue
-
-        desc = ""
-        if att_url:
-            desc = f"Ek: {att_url}"
-
-        pub_date = pub_dt.strftime("%Y-%m-%d")
-        event = {
-            "summary": f"📢 {title}",
-            "description": desc,
-            "start": {"date": pub_date},
-            "end": {"date": pub_date},
-            "colorId": COLORS["etkinlik"],
-        }
-
-        result = upsert_event(
-            cal_service, cal_id, event, existing_events
-        )
-        if result == "added":
-            added += 1
-        elif result == "exists":
-            skipped += 1
-
-    print(f"  Duyuru: +{added} added, ={skipped} skipped")
-    return added
-
-
-# =============================================================================
-# SYNC: GRADES -> GOOGLE SHEETS
-# =============================================================================
-SHEETS_ID_FILE = os.path.join(PROJECT_ROOT, "output", "sheets_id.txt")
-
-
-def _get_or_create_spreadsheet(sheets_service):
-    """Get spreadsheet ID from cache or create new one."""
-    if os.path.exists(SHEETS_ID_FILE):
-        with open(SHEETS_ID_FILE) as f:
-            sid = f.read().strip()
-        if sid:
-            return sid
-
-    body = {
-        "properties": {"title": "TED Rönesans Notlar"},
-        "sheets": [
-            {"properties": {"title": "Notlar"}},
-            {"properties": {"title": "Geçmiş"}},
-        ],
-    }
-    result = sheets_service.spreadsheets().create(
-        body=body
-    ).execute()
-    sid = result["spreadsheetId"]
-
-    with open(SHEETS_ID_FILE, "w") as f:
-        f.write(sid)
-    print(f"  Spreadsheet created: {sid}")
-    return sid
-
-
-def sync_grades_to_sheets(sheets_service, data):
-    """Sync grade report to Google Sheets with history tracking."""
-    print("\n[Sheets] Notlar -> Google Sheets")
-    gr = data.get("gelisim_raporu", {})
-    grades = gr.get("grades", [])
-    semester = gr.get("semester", "")
-
-    if not grades:
-        print("  No grade data, skipping Sheets sync")
-        return
-
-    try:
-        sid = _get_or_create_spreadsheet(sheets_service)
-    except Exception as e:
-        print(f"  Sheets error: {e}")
-        return
-
-    # Build header + data for "Notlar" sheet
-    headers = [
-        "Ders", "1. Sınav", "2. Sınav", "3. Sınav",
-        "DİKP/Performans-1", "DİKP/Performans-2",
-        "DİKP/Performans-3",
-    ]
-    values = [headers]
-    for row in grades:
-        values.append([
-            normalize_course(row.get(h, "")) if h == "Ders" else row.get(h, "")
-            for h in headers
-        ])
-
-    # Add semester info row
-    values.append([])
-    values.append([f"Dönem: {semester}",
-                   f"Güncelleme: {datetime.now().strftime('%d.%m.%Y %H:%M')}"])
-
-    # Write to "Notlar" sheet
-    sheets_service.spreadsheets().values().update(
-        spreadsheetId=sid,
-        range="Notlar!A1",
-        valueInputOption="RAW",
-        body={"values": values},
-    ).execute()
-    print(f"  Notlar sheet updated ({len(grades)} courses)")
-
-    # Append to "Geçmiş" sheet for trend tracking
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-    history_row = [ts, semester]
-    for row in grades:
-        ders = row.get("Ders", "")
-        s1 = row.get("1. Sınav", "-")
-        s2 = row.get("2. Sınav", "-")
-        history_row.extend([ders, s1, s2])
-
-    sheets_service.spreadsheets().values().append(
-        spreadsheetId=sid,
-        range="Geçmiş!A1",
-        valueInputOption="RAW",
-        insertDataOption="INSERT_ROWS",
-        body={"values": [history_row]},
-    ).execute()
-    print("  Geçmiş sheet appended")
-
-    # Apply conditional formatting (only on first creation)
-    try:
-        sheet_meta = sheets_service.spreadsheets().get(
-            spreadsheetId=sid
-        ).execute()
-        notlar_sheet_id = None
-        for s in sheet_meta.get("sheets", []):
-            if s["properties"]["title"] == "Notlar":
-                notlar_sheet_id = s["properties"]["sheetId"]
-                break
-
-        if notlar_sheet_id is not None:
-            # Check if formatting already applied
-            existing_rules = []
-            for s in sheet_meta.get("sheets", []):
-                if s["properties"]["sheetId"] == notlar_sheet_id:
-                    existing_rules = s.get(
-                        "conditionalFormats", []
-                    )
-                    break
-
-            if not existing_rules:
-                _apply_grade_formatting(
-                    sheets_service, sid, notlar_sheet_id,
-                    len(grades)
-                )
-    except Exception:
-        pass
-
-
-def _apply_grade_formatting(sheets_svc, sid, sheet_id, num_rows):
-    """Apply red/yellow/green conditional formatting to grade cells."""
-    requests = []
-
-    # Columns B-G (indices 1-6) contain grade values
-    grade_range = {
-        "sheetId": sheet_id,
-        "startRowIndex": 1,
-        "endRowIndex": num_rows + 1,
-        "startColumnIndex": 1,
-        "endColumnIndex": 7,
-    }
-
-    # Red: < 50
-    requests.append({
-        "addConditionalFormatRule": {
-            "rule": {
-                "ranges": [grade_range],
-                "booleanRule": {
-                    "condition": {
-                        "type": "NUMBER_LESS",
-                        "values": [{"userEnteredValue": "50"}],
-                    },
-                    "format": {
-                        "backgroundColor": {
-                            "red": 0.96, "green": 0.8, "blue": 0.8,
-                        },
-                    },
-                },
-            },
-            "index": 0,
-        },
-    })
-
-    # Yellow: 50-70
-    requests.append({
-        "addConditionalFormatRule": {
-            "rule": {
-                "ranges": [grade_range],
-                "booleanRule": {
-                    "condition": {
-                        "type": "NUMBER_BETWEEN",
-                        "values": [
-                            {"userEnteredValue": "50"},
-                            {"userEnteredValue": "70"},
-                        ],
-                    },
-                    "format": {
-                        "backgroundColor": {
-                            "red": 1.0, "green": 0.95, "blue": 0.8,
-                        },
-                    },
-                },
-            },
-            "index": 1,
-        },
-    })
-
-    # Green: > 70
-    requests.append({
-        "addConditionalFormatRule": {
-            "rule": {
-                "ranges": [grade_range],
-                "booleanRule": {
-                    "condition": {
-                        "type": "NUMBER_GREATER",
-                        "values": [{"userEnteredValue": "70"}],
-                    },
-                    "format": {
-                        "backgroundColor": {
-                            "red": 0.85, "green": 0.95, "blue": 0.85,
-                        },
-                    },
-                },
-            },
-            "index": 2,
-        },
-    })
-
-    sheets_svc.spreadsheets().batchUpdate(
-        spreadsheetId=sid,
-        body={"requests": requests},
-    ).execute()
-    print("  Conditional formatting applied")
-
-
-# =============================================================================
 # SYNC: ATTACHMENTS -> GOOGLE DRIVE
 # =============================================================================
 UPLOADED_FILES = os.path.join(PROJECT_ROOT, "output",
                               "uploaded_files.json")
 
 
-def sync_attachments_to_drive(drive_service, cal_service,
-                              data, cal_id):
-    """Download homework attachments and upload to Google Drive."""
+def sync_attachments_to_drive(drive_service, data):
+    """Download homework attachments and upload to Google Drive.
+
+    Returns the uploaded dict: {url: {id, link, ders}}.
+    """
     print("\n[Drive] Attachments -> Google Drive")
 
     hw_data = data.get("odevlerim", {})
@@ -1100,7 +527,7 @@ def sync_attachments_to_drive(drive_service, cal_service,
 
     if not attachments:
         print("  No attachments found, skipping")
-        return
+        return {}
 
     # Load already-uploaded files
     uploaded = {}
@@ -1153,16 +580,17 @@ def sync_attachments_to_drive(drive_service, cal_service,
             uploaded[att["url"]] = {
                 "id": result["id"],
                 "link": result.get("webViewLink", ""),
+                "ders": att["ders"],
             }
             added += 1
         except Exception as e:
             print(f"  Error uploading {att['name']}: {e}")
 
-    # Save uploaded files tracker
-    with open(UPLOADED_FILES, "w") as f:
-        json.dump(uploaded, f, indent=2)
+    # Save uploaded files tracker (atomic)
+    atomic_json_dump(uploaded, UPLOADED_FILES)
 
     print(f"  Drive: +{added} uploaded, ={skipped} skipped")
+    return uploaded
 
 
 def _get_or_create_folder(drive_service, name, parent_id=None):
@@ -1198,56 +626,25 @@ def _get_or_create_folder(drive_service, name, parent_id=None):
 # MAIN (standalone usage)
 # =============================================================================
 def _sync_account(data, token_file, label):
-    """Run full sync for a single Google account."""
+    """Run Calendar + Drive sync for a single Google account."""
     print(f"\n{'=' * 50}")
     print(f"SYNC: {label}")
     print(f"{'=' * 50}")
 
     print("Connecting to Google APIs...")
-    cal_svc, tasks_svc, sheets_svc, drive_svc = get_services(
-        token_file=token_file,
-    )
+    cal_svc, drive_svc = get_services(token_file=token_file)
 
-    print("\nSetting up Google Calendar & Tasks...")
+    print("\nSetting up Google Calendar...")
     cal_id = get_or_create_calendar(cal_svc, "TED Rönesans")
-    task_list_id = get_or_create_task_list(
-        tasks_svc, "TED Ödevler"
-    )
 
-    print("Fetching existing events/tasks for dedup...")
+    print("Fetching existing events for dedup...")
     existing_events = fetch_existing_events(cal_svc, cal_id)
-    existing_tasks = fetch_existing_tasks(
-        tasks_svc, task_list_id,
-    )
-    print(
-        f"  Found {len(existing_events)} existing events, "
-        f"{len(existing_tasks)} existing tasks"
-    )
+    print(f"  Found {len(existing_events)} existing events")
 
-    sync_ders_programi(
-        cal_svc, data, cal_id, existing_events,
-    )
-    sync_odevlerim(
-        cal_svc, tasks_svc, data, cal_id,
-        task_list_id, existing_events, existing_tasks,
-        drive_service=drive_svc,
-    )
-    sync_takim_calismalari(
-        cal_svc, data, cal_id, existing_events,
-    )
+    sync_ders_programi(cal_svc, data, cal_id, existing_events)
     sync_takvim(cal_svc, data, cal_id, existing_events)
-    sync_ders_icerikleri(
-        tasks_svc, data, task_list_id, existing_tasks,
-    )
     sync_ogep(cal_svc, data, cal_id, existing_events)
-    sync_gelisim_raporu(
-        tasks_svc, data, task_list_id, existing_tasks,
-    )
-    sync_duyurular(cal_svc, data, cal_id, existing_events)
-    sync_grades_to_sheets(sheets_svc, data)
-    sync_attachments_to_drive(
-        drive_svc, cal_svc, data, cal_id,
-    )
+    sync_attachments_to_drive(drive_svc, data)
 
 
 def main():
@@ -1255,23 +652,8 @@ def main():
     with open(DATA_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # Sync primary account
+    # Sync primary account (Calendar + Drive)
     _sync_account(data, TOKEN_FILE, "Primary Account")
-
-    # Sync secondary account (huriye) if token exists
-    if os.path.exists(TOKEN_HURIYE):
-        _sync_account(
-            data, TOKEN_HURIYE,
-            "huriye.murzoglu@gmail.com",
-        )
-    else:
-        print(
-            f"\nSkipping huriye account "
-            f"(no token at {TOKEN_HURIYE})"
-        )
-        print(
-            "Run: python src/google_auth.py huriye"
-        )
 
     print("\n" + "=" * 50)
     print("SYNC COMPLETE!")

@@ -40,10 +40,16 @@ class TestNormalizeCourse:
         assert normalize_course("İngilizce (2)") == "İngilizce"
 
     def test_ingilizce_literature_from_parens(self):
-        assert normalize_course("İngilizce (Literature)") == "İngilizce Literature"
+        assert normalize_course("İngilizce (Literature)") == "İngilizce"
+
+    def test_ingilizce_literature_canonical(self):
+        assert normalize_course("İngilizce Literature") == "İngilizce"
 
     def test_bilisim_from_full(self):
         assert normalize_course("Bilişim Teknolojileri") == "Bilişim"
+
+    def test_ahlak_from_egitimi(self):
+        assert normalize_course("Ahlak ve Yurttaşlık Eğitimi") == "Ahlak ve Yurttaşlık"
 
 
 class TestNormalizeCourseParenFallback:
@@ -56,8 +62,8 @@ class TestNormalizeCourseParenFallback:
         assert normalize_course("Fen Bilimleri (i-322 (Fen Lab))") == "Fen Bilimleri"
 
     def test_double_paren_literature(self):
-        """İngilizce (Literature) with classroom suffix should resolve to İngilizce Literature."""
-        assert normalize_course("İngilizce (Literature) (i-403 (İngilizce))") == "İngilizce Literature"
+        """İngilizce (Literature) with classroom suffix should resolve to İngilizce."""
+        assert normalize_course("İngilizce (Literature) (i-403 (İngilizce))") == "İngilizce"
 
     def test_double_paren_language(self):
         """İngilizce (Language) with classroom suffix should resolve to İngilizce."""
@@ -66,6 +72,58 @@ class TestNormalizeCourseParenFallback:
     def test_double_paren_fransizca(self):
         """İkinci Yabancı Dil (Fransızca) with classroom suffix should resolve to Fransızca."""
         assert normalize_course("İkinci Yabancı Dil (Fransızca) (i-326)") == "Fransızca"
+
+
+class TestNormalizeCourseEbaSuffixes:
+    """EBA tracker files append '(Yeni Müfredat)' to course names."""
+
+    def test_fen_yeni_mufredat(self):
+        assert normalize_course("Fen Bilimleri (Yeni Müfredat)") == "Fen Bilimleri"
+
+    def test_matematik_yeni_mufredat(self):
+        assert normalize_course("Matematik (Yeni Müfredat)") == "Matematik"
+
+    def test_sosyal_yeni_mufredat(self):
+        assert normalize_course("Sosyal Bilgiler (Yeni Müfredat)") == "Sosyal Bilgiler"
+
+    def test_turkce_yeni_mufredat(self):
+        assert normalize_course("Türkçe (Yeni Müfredat)") == "Türkçe"
+
+
+class TestNormalizeCourseScheduleFullPaths:
+    """All course names from ders_programi (with room codes)."""
+
+    def test_ahlak_with_room(self):
+        assert normalize_course("Ahlak ve Yurttaşlık (i-435 (Türkçe))") == "Ahlak ve Yurttaşlık"
+
+    def test_beden_with_room(self):
+        assert normalize_course("Beden Eğitimi ve Spor (Büyük Spor Salonu)") == "Beden Eğitimi"
+
+    def test_bilisim_with_room(self):
+        assert normalize_course("Bilişim Teknolojileri (i-420 (PC Lab))") == "Bilişim"
+
+    def test_dkab_with_room(self):
+        assert normalize_course("Din Kültürü ve Ahlak Bilgisi (i-409 (Sosyal Bilgiler))") == "Din Kültürü"
+
+    def test_gorsel_with_room(self):
+        assert normalize_course("Görsel Sanatlar (i-422 (Görsel Sanatlar))") == "Görsel Sanatlar"
+
+    def test_muzik_with_room(self):
+        assert normalize_course("Müzik (i-110)") == "Müzik"
+
+    def test_sosyal_with_room(self):
+        assert normalize_course("Sosyal Bilgiler (i-407 (Sosyal Bilgiler))") == "Sosyal Bilgiler"
+
+    def test_turkce_with_room(self):
+        assert normalize_course("Türkçe (i-433 (Türkçe))") == "Türkçe"
+
+    def test_matematik_various_rooms(self):
+        assert normalize_course("Matematik (i-403 (İngilizce))") == "Matematik"
+        assert normalize_course("Matematik (i-405 (İngilizce))") == "Matematik"
+        assert normalize_course("Matematik (i-430 (Matemetik))") == "Matematik"
+
+    def test_ingilizce_bare_with_room(self):
+        assert normalize_course("İngilizce (i-403 (İngilizce))") == "İngilizce"
 
 
 class TestNormalizeCourseUnknown:
@@ -79,6 +137,12 @@ class TestNormalizeCourseUnknown:
 
     def test_genel(self):
         assert normalize_course("Genel") == "Genel"
+
+    def test_pdr(self):
+        assert normalize_course("PDR") == "PDR"
+
+    def test_sinif_ogretmeni(self):
+        assert normalize_course("Sınıf Öğretmeni") == "Sınıf Öğretmeni"
 
 
 class TestTakvimKeywords:
