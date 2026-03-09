@@ -57,6 +57,9 @@ fix_credentials.py
 .claude/
 .playwright-mcp/
 
+# Course material PDFs (large binaries)
+docs/dersler/
+
 # Discover scripts (exploratory, not production)
 src/discover_*.py
 
