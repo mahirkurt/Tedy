@@ -68,9 +68,25 @@ export interface Announcement {
   "Yayın Tarihi": string
 }
 
+export interface SectionHealth {
+  count: number
+  prev_count: number
+  status: 'ok' | 'warning' | 'error' | 'skipped'
+}
+
 export interface HealthData {
   timestamp: string
   success: boolean
   scrape_errors: string[]
   duration_seconds: number
+  validation_warnings?: string[]
+  login?: {
+    method: 'cached_session' | 'captcha_login' | 'failed'
+    captcha_attempts: number
+  }
+  sections?: Record<string, SectionHealth>
+  staleness?: {
+    last_successful_full_scrape: string
+    stale_sections: string[]
+  }
 }
