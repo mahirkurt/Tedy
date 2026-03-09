@@ -3,12 +3,30 @@ import { GroupPresentation } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import type { TeamActivity, OgepSession } from '../types'
 
+const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000
+
+function parseTurkishDate(s: string): Date | null {
+  const m = s.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/)
+  if (!m) return null
+  return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5])
+}
+
 export default function TeamActivities() {
   const { data } = useApi<{ activities: TeamActivity[]; ogep: OgepSession[] }>(
     '/api/teams', { activities: [], ogep: [] }
   )
 
-  if (data.activities.length === 0 && data.ogep.length === 0) return null
+  const now = Date.now()
+  const activities = data.activities.filter(a => {
+    const d = parseTurkishDate(a["Çalışma Başlangıç"])
+    return !d || d.getTime() >= now - TWO_WEEKS_MS
+  })
+  const ogep = data.ogep.filter(s => {
+    const d = parseTurkishDate(s["Çalışma Başlangıç"])
+    return !d || d.getTime() >= now - TWO_WEEKS_MS
+  })
+
+  if (activities.length === 0 && ogep.length === 0) return null
 
   return (
     <div className="dashboard-card">
@@ -17,11 +35,11 @@ export default function TeamActivities() {
         Takım Çalışmaları & ÖGEP
       </h4>
 
-      {data.activities.length > 0 && (
+      {activities.length > 0 && (
         <>
           <h5 style={{ fontSize: '0.8125rem', margin: '0 0 0.5rem', color: '#525252' }}>Academy+</h5>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', marginBottom: '1rem' }}>
-            {data.activities.map((a, i) => (
+            {activities.map((a, i) => (
               <Tile key={i} style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontWeight: 500, fontSize: '0.8125rem' }}>{a["Academy+"]}</div>
@@ -43,11 +61,11 @@ export default function TeamActivities() {
         </>
       )}
 
-      {data.ogep.length > 0 && (
+      {ogep.length > 0 && (
         <>
           <h5 style={{ fontSize: '0.8125rem', margin: '0 0 0.5rem', color: '#525252' }}>ÖGEP Oturumları</h5>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-            {data.ogep.map((s, i) => (
+            {ogep.map((s, i) => (
               <Tile key={i} style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontWeight: 500, fontSize: '0.8125rem' }}>

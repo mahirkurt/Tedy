@@ -122,6 +122,15 @@ def schedule():
     weeks = data.get("ders_programi", [])
     today = DAY_NAMES.get(datetime.now().weekday(), "")
     latest = weeks[-1] if weeks else {}
+    # Normalize course names in schedule cells
+    rows = latest.get("schedule", {}).get("rows", [])
+    for r in range(1, len(rows)):
+        for c in range(1, len(rows[r])):
+            cell = rows[r][c]
+            if cell:
+                lines = cell.split("\n")
+                lines[0] = normalize_course(lines[0])
+                rows[r][c] = "\n".join(lines)
     return jsonify({"weeks": weeks, "latest": latest, "today": today})
 
 

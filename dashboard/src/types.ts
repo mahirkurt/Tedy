@@ -32,6 +32,7 @@ export interface GradeItem {
   "DİKP/Performans-1": string
   "DİKP/Performans-2": string
   "DİKP/Performans-3": string
+  [key: string]: string
 }
 
 export interface CalendarEvent {

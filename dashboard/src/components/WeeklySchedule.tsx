@@ -96,7 +96,7 @@ export default function WeeklySchedule() {
                         {lines[0] && (
                           <>
                             <div style={{ fontWeight: 500 }}>
-                              {lines[0].replace(/\s*\(.*?\)\s*/g, '').trim()}
+                              {lines[0].trim()}
                             </div>
                             {lines[1] && (
                               <div style={{ fontSize: '0.6875rem', color: '#525252' }}>

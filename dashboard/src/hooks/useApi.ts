@@ -14,7 +14,7 @@ export function useApi<T>(endpoint: string, defaultValue: T): {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch(endpoint)
+      const res = await fetch(endpoint, { credentials: 'include' })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = await res.json()
       setData(json)
