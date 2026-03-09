@@ -14,6 +14,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait, Select
 
 from src.env_loader import load_env
+from src.scrape_helpers import wait_for, wait_for_js
 load_env()
 
 LOGIN_URL = "https://portal.tedronesans.k12.tr/login"
@@ -359,14 +360,14 @@ def scrape_takvim(driver):
     print("\n[4/8] Akademik Takvim")
     url = f"{BASE_URL}/pages/akademik_takvim/p_ogrenci"
     driver.get(url)
-    time.sleep(3)
+    wait_for(driver, (By.ID, "select-all"), timeout=15)
 
     # 1. Check "Tümünü Göster" (select-all) checkbox to enable all filters
     try:
         select_all = driver.find_element(By.ID, "select-all")
         if not select_all.is_selected():
             driver.execute_script("arguments[0].click();", select_all)
-            time.sleep(1)
+            time.sleep(0.5)
         print("  Enabled 'Tümünü Göster' filter")
     except Exception:
         # Fallback: check all individually
@@ -378,8 +379,8 @@ def scrape_takvim(driver):
                 if not cb.is_selected():
                     driver.execute_script("arguments[0].click();", cb)
                     time.sleep(0.3)
-        print(f"  Enabled filters individually")
-    time.sleep(2)
+        print("  Enabled filters individually")
+    time.sleep(1)
 
     # 2. Confirm 6. Sınıf is selected in level filter (value=60)
     try:
@@ -387,7 +388,7 @@ def scrape_takvim(driver):
         selected_val = level_select.first_selected_option.get_attribute("value")
         if selected_val != "60":
             level_select.select_by_value("60")
-            time.sleep(2)
+            time.sleep(1)
         print(f"  Level filter: 6. Sınıf (value={selected_val})")
     except Exception as e:
         print(f"  Level filter check: {e}")
@@ -396,7 +397,7 @@ def scrape_takvim(driver):
     try:
         month_btn = driver.find_element(By.CSS_SELECTOR, ".fc-dayGridMonth-button")
         month_btn.click()
-        time.sleep(2)
+        time.sleep(1)
         print("  Switched to month view")
     except Exception:
         pass
@@ -419,6 +420,13 @@ def scrape_takvim(driver):
             };
         });
     """
+
+    # Wait for FullCalendar JS API to be ready
+    JS_CALENDAR_READY = (
+        "return typeof window.calendar !== 'undefined'"
+        " && window.calendar.getEvents().length >= 0"
+    )
+    wait_for_js(driver, JS_CALENDAR_READY, timeout=15)
 
     for month_offset in range(2):  # current month + 1 previous
         # Get header (month name)
@@ -450,7 +458,9 @@ def scrape_takvim(driver):
             try:
                 prev_btn = driver.find_element(By.CSS_SELECTOR, ".fc-prev-button")
                 prev_btn.click()
-                time.sleep(2)
+                # Wait for calendar to re-render after navigation
+                wait_for_js(driver, JS_CALENDAR_READY, timeout=10)
+                time.sleep(0.5)
             except Exception:
                 break
 
