@@ -41,9 +41,12 @@ def main():
 
     scrape_errors = []
 
+    login_info = None
+
     try:
         # 1. Login
-        if not login(driver):
+        login_info = login(driver)
+        if not login_info:
             print("[ERROR] Login failed, aborting")
             scrape_errors.append("login: Login failed")
             health = {
@@ -51,6 +54,7 @@ def main():
                 "success": False,
                 "scrape_errors": scrape_errors,
                 "duration_seconds": round(time.time() - start_time),
+                "login": {"method": "failed", "captcha_attempts": 5},
             }
             from src.json_utils import atomic_json_dump
             atomic_json_dump(health, os.path.join(OUTPUT_DIR, "health.json"))
@@ -151,6 +155,7 @@ def main():
         "success": len(scrape_errors) == 0,
         "scrape_errors": scrape_errors,
         "duration_seconds": round(time.time() - start_time),
+        "login": login_info or {"method": "failed", "captcha_attempts": 0},
     }
     atomic_json_dump(health, os.path.join(OUTPUT_DIR, "health.json"))
 

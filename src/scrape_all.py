@@ -34,26 +34,54 @@ def create_driver():
 
 
 def login(driver):
+    from src.session_manager import (
+        load_cookies, save_cookies,
+        check_session_valid, apply_cookies_to_driver,
+    )
+
+    # Try cached session first
+    cached = load_cookies()
+    if cached and check_session_valid(cached):
+        print("[LOGIN] Using cached session")
+        apply_cookies_to_driver(driver, cached)
+        driver.get(f"{BASE_URL}/pages/ogrenci_istekler/p_ogrenci_bilgilerim")
+        time.sleep(2)
+        if "/login" not in driver.current_url:
+            print(f"[LOGIN] Cached session OK -> {driver.current_url}")
+            return {"method": "cached_session", "captcha_attempts": 0}
+        print("[LOGIN] Cached session expired in browser, falling back to CAPTCHA")
+
+    # CAPTCHA login
     ocr = ddddocr.DdddOcr(show_ad=False)
     for attempt in range(5):
         driver.get(LOGIN_URL)
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, "tx_kullanici_adi"))
         )
-        driver.find_element(By.ID, "tx_kullanici_adi").send_keys(os.environ.get("PORTAL_USERNAME", ""))
-        driver.find_element(By.ID, "tx_kullanici_sifre").send_keys(os.environ.get("PORTAL_PASSWORD", ""))
-        captcha_img = driver.find_element(By.CSS_SELECTOR, 'img[src*="CaptchaHandler"]')
-        captcha_text = ocr.classification(captcha_img.screenshot_as_png).strip()
-        if not captcha_text.isdigit():
+        driver.find_element(By.ID, "tx_kullanici_adi").send_keys(
+            os.environ.get("PORTAL_USERNAME", ""))
+        driver.find_element(By.ID, "tx_kullanici_sifre").send_keys(
+            os.environ.get("PORTAL_PASSWORD", ""))
+
+        # CAPTCHA with validation
+        captcha_img = driver.find_element(
+            By.CSS_SELECTOR, 'img[src*="CaptchaHandler"]')
+        captcha_text = ocr.classification(
+            captcha_img.screenshot_as_png).strip()
+        if not captcha_text or not captcha_text.isdigit() or len(captcha_text) < 4:
+            print(f"[LOGIN] OCR '{captcha_text}' invalid, refreshing...")
             continue
+
         driver.find_element(By.ID, "txtKod").send_keys(captcha_text)
         driver.find_element(By.ID, "btn_ogrenci").click()
         time.sleep(3)
         if "/login" not in driver.current_url:
             print(f"[LOGIN] OK -> {driver.current_url}")
-            return True
+            save_cookies(driver.get_cookies())
+            return {"method": "captcha_login", "captcha_attempts": attempt + 1}
+
     print("[LOGIN] FAILED after 5 attempts")
-    return False
+    return None
 
 
 def extract_table(driver, table_el):
