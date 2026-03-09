@@ -79,51 +79,22 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   }, [scriptLoaded, onLogin])
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: '#F4F4F4',
-    }}>
-      <div style={{
-        backgroundColor: '#FFFFFF',
-        padding: '3rem 2.5rem',
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
-        maxWidth: '420px',
-        width: '100%',
-        textAlign: 'center',
-      }}>
+    <div className="login-page">
+      <div className="login-page__panel">
         {/* TEDY Header Bar */}
-        <div style={{
-          backgroundColor: '#002D9C',
-          margin: '-3rem -2.5rem 2rem',
-          padding: '1.5rem 2rem',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '0.5rem',
-        }}>
-          <img src="/tedy-logo-white.svg" alt="TEDY" style={{ height: 40 }} />
-          <p style={{
-            color: 'rgba(255,255,255,0.7)',
-            fontSize: '0.8125rem',
-            margin: 0,
-          }}>
+        <div className="login-page__brand">
+          <img src="/tedy-logo-white.svg" alt="TEDY" className="login-page__brand-logo" />
+          <p className="login-page__brand-subtitle">
             Öğrenci Takip Paneli
           </p>
         </div>
 
-        <p style={{
-          fontSize: '0.875rem',
-          color: '#525252',
-          marginBottom: '1.5rem',
-        }}>
+        <p className="login-page__intro">
           Devam etmek için Google hesabınızla giriş yapın.
         </p>
 
         {/* Google Sign-In Button */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+        <div className="login-page__google-button-wrap">
           <div ref={buttonRef} />
         </div>
 
@@ -134,15 +105,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             subtitle={error}
             lowContrast
             hideCloseButton
-            style={{ marginTop: '1rem' }}
+            className="login-page__error"
           />
         )}
 
-        <p style={{
-          fontSize: '0.6875rem',
-          color: '#8D8D8D',
-          marginTop: '2rem',
-        }}>
+        <p className="login-page__footnote">
           Sadece yetkili aile üyeleri giriş yapabilir.
         </p>
       </div>

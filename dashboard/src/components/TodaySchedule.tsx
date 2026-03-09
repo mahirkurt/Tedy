@@ -144,13 +144,13 @@ export default function TodaySchedule() {
     '/api/calendar', { events: [] }
   )
 
-  if (loading) return <Tile style={{ height: '120px' }}>Yükleniyor...</Tile>
+  if (loading) return <Tile className="dashboard-loading-tile">Yükleniyor...</Tile>
 
   const agenda = buildAgenda(scheduleData, teamsData, hwData, calData)
 
   if (agenda.length === 0) return (
     <div className="dashboard-card">
-      <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <h4 className="dashboard-card__title" style={{ margin: 0 }}>
         <Time size={20} /> Bugün için ajanda öğesi yok
       </h4>
     </div>
@@ -158,34 +158,36 @@ export default function TodaySchedule() {
 
   return (
     <div className="dashboard-card">
-      <h4 style={{ margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <h4 className="dashboard-card__title">
         <Time size={20} />
         Bugünün Ajandası &mdash; {scheduleData.today}
       </h4>
-      <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+      <div className="agenda-row">
         {agenda.map((item, i) => {
           const cfg = TAG_CONFIG[item.type]
+          const agendaItemClass = [
+            'agenda-item',
+            `agenda-item--${item.type}`,
+            item.isActive ? 'agenda-item--active' : '',
+          ].filter(Boolean).join(' ')
+
           return (
             <Tile key={i}
-              className={item.isActive ? 'lesson-active' : ''}
-              style={{
-                minWidth: '160px', flex: '0 0 auto',
-                borderLeft: item.isActive ? '3px solid var(--highlight-today)'
-                  : item.type !== 'lesson' ? `3px solid var(--cds-tag-color-${cfg.type}, #525252)`
-                  : '3px solid transparent',
-                padding: '0.75rem 1rem'
-              }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--status-info)', fontWeight: 600 }}>
+              className={agendaItemClass}
+            >
+              <div className="agenda-item__time">
                 {item.time}
               </div>
-              <div style={{ fontWeight: 600, margin: '0.25rem 0' }}>
+              <div className="agenda-item__name">
                 {item.name}
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#525252' }}>
+              <div className="agenda-item__subtitle">
                 {item.subtitle}
               </div>
-              {item.isActive && <Tag type="blue" size="sm">Şimdi</Tag>}
-              {cfg.label && <Tag type={cfg.type} size="sm">{cfg.label}</Tag>}
+              <div className="agenda-item__tags">
+                {item.isActive && <Tag type="blue" size="sm">Şimdi</Tag>}
+                {cfg.label && <Tag type={cfg.type} size="sm">{cfg.label}</Tag>}
+              </div>
             </Tile>
           )
         })}

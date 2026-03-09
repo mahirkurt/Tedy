@@ -1,5 +1,5 @@
-import { Tag, Tile } from '@carbon/react'
-import { Task, Timer } from '@carbon/icons-react'
+import { Tag, Tile, ComposedModal, ModalHeader, ModalBody } from '@carbon/react'
+import { Task, Timer, Document } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import type { HomeworkItem } from '../types'
 import { parseDeadline, formatTurkishDate } from '../utils/formatters'
@@ -13,6 +13,7 @@ export default function HomeworkTracker() {
     '/api/homework', { summary: '', homework: [] }
   )
 
+  const [selectedHw, setSelectedHw] = useState<HomeworkItem | null>(null)
   const [, setTick] = useState(0)
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 60000)
@@ -34,36 +35,42 @@ export default function HomeworkTracker() {
   const summaryLines = hwData.summary.split('\n').filter(l => l.trim())
 
   return (
+    <>
     <div className="dashboard-card dashboard-card--accent">
-      <h4 style={{ margin: '0 0 0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <h4 className="dashboard-card__title dashboard-card__title--tight">
         <Task size={20} />
         Ödevler & Geri Sayım
       </h4>
       {summaryLines.length > 1 && (
-        <p style={{ fontSize: '0.8125rem', color: '#525252', margin: '0 0 1rem' }}>
+        <p className="dashboard-summary-text">
           {summaryLines.slice(1).join(' · ')}
         </p>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <div className="stack-sm">
         {sortedPortal.slice(0, 15).map((hw, i) => {
           const deadline = parseDeadline(hw["Ödev Son Teslim Tarihi"])
           const countdown = getCountdown(deadline)
+          const tileClass = [
+            'homework-item',
+            'dashboard-list-tile',
+            hw.detail ? 'homework-item--clickable' : '',
+          ].filter(Boolean).join(' ')
+
           return (
-            <Tile key={`p-${i}`} style={{ padding: '0.75rem 1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                    <span style={{ fontWeight: 600, fontSize: '0.8125rem' }}>
-                      {hw.normalized_course || hw["Ders Adı"]}
-                    </span>
+            <Tile key={`p-${i}`} onClick={() => hw.detail && setSelectedHw(hw)}
+              className={tileClass}>
+              <div className="homework-item__row">
+                <div className="homework-item__main">
+                  <div className="homework-item__course">
+                    {hw.normalized_course || hw["Ders Adı"]}
                   </div>
-                  <div style={{ fontSize: '0.8125rem' }}>{hw["Ödev Başlığı"]}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#525252', marginTop: '0.25rem' }}>
+                  <div className="homework-item__title">{hw["Ödev Başlığı"]}</div>
+                  <div className="homework-item__deadline">
                     Teslim: {formatTurkishDate(hw["Ödev Son Teslim Tarihi"])}
                   </div>
                 </div>
-                <div style={{ textAlign: 'right', minWidth: '80px' }}>
+                <div className="homework-item__countdown">
                   {countdown.urgency !== 'expired' && (
                     <div className={countdown.urgency === 'urgent' ? 'tag-urgent' : ''}>
                       <Tag type={countdown.urgency === 'urgent' ? 'red' : countdown.urgency === 'soon' ? 'warm-gray' : 'blue'} size="sm">
@@ -82,5 +89,31 @@ export default function HomeworkTracker() {
       </div>
 
     </div>
+
+    <ComposedModal open={!!selectedHw} onClose={() => setSelectedHw(null)} size="md">
+      <ModalHeader
+        title={selectedHw?.["Ödev Başlığı"] || ''}
+        label={selectedHw?.normalized_course || selectedHw?.["Ders Adı"] || ''}
+      />
+      <ModalBody>
+        {selectedHw?.detail?.description && (
+          <p className="homework-modal__description">
+            {selectedHw.detail.description}
+          </p>
+        )}
+        {(selectedHw?.detail?.attachments?.length ?? 0) > 0 && (
+          <div className="homework-modal__attachments">
+            <h5 className="homework-modal__attachments-title">Ekler</h5>
+            {selectedHw!.detail!.attachments.map((att, i) => (
+              <a key={i} href={att.url} target="_blank" rel="noopener noreferrer"
+                 className="homework-modal__attachment-link">
+                <Document size={16} /> {att.name}
+              </a>
+            ))}
+          </div>
+        )}
+      </ModalBody>
+    </ComposedModal>
+    </>
   )
 }

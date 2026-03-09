@@ -1,5 +1,11 @@
-import { Grid, Column, Content } from '@carbon/react'
+import { useState } from 'react'
+import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
+import { Content, SideNav, SideNavItems, SideNavLink } from '@carbon/react'
 import DashboardHeader from './components/DashboardHeader'
+import LoginPage from './components/LoginPage'
+import { useAuth } from './hooks/useAuth'
+import { routes } from './routes'
+
 import TodaySchedule from './components/TodaySchedule'
 import WeeklySchedule from './components/WeeklySchedule'
 import HomeworkTracker from './components/HomeworkTracker'
@@ -9,20 +15,21 @@ import CalendarEvents from './components/CalendarEvents'
 import TeamActivities from './components/TeamActivities'
 import CourseContent from './components/CourseContent'
 import Announcements from './components/Announcements'
-import LoginPage from './components/LoginPage'
-import { useAuth } from './hooks/useAuth'
+
+const COMPONENTS: Record<string, React.ComponentType> = {
+  TodaySchedule, WeeklySchedule, HomeworkTracker, GradeTable,
+  PlatformProgress, CalendarEvents, TeamActivities, CourseContent, Announcements,
+}
 
 export default function App() {
   const { user, loading, login, logout } = useAuth()
+  const [sideNavExpanded, setSideNavExpanded] = useState(false)
+  const location = useLocation()
 
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100vh', display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
-        backgroundColor: '#F4F4F4',
-      }}>
-        <p style={{ color: '#525252' }}>Yükleniyor...</p>
+      <div className="app-shell-loading">
+        <p className="app-shell-loading__text">Yükleniyor...</p>
       </div>
     )
   }
@@ -33,42 +40,42 @@ export default function App() {
 
   return (
     <>
-      <DashboardHeader user={user} onLogout={logout} />
-      <Content style={{ padding: '3.5rem 1.5rem 2rem' }}>
-        <Grid fullWidth>
-          <Column lg={16} md={8} sm={4}>
-            <TodaySchedule />
-          </Column>
-
-          <Column lg={16} md={8} sm={4}>
-            <WeeklySchedule />
-          </Column>
-
-          <Column lg={10} md={8} sm={4}>
-            <HomeworkTracker />
-          </Column>
-          <Column lg={6} md={8} sm={4}>
-            <GradeTable />
-          </Column>
-
-          <Column lg={8} md={4} sm={4}>
-            <PlatformProgress />
-          </Column>
-          <Column lg={8} md={4} sm={4}>
-            <CalendarEvents />
-          </Column>
-
-          <Column lg={8} md={4} sm={4}>
-            <TeamActivities />
-          </Column>
-          <Column lg={8} md={4} sm={4}>
-            <CourseContent />
-          </Column>
-
-          <Column lg={16} md={8} sm={4}>
-            <Announcements />
-          </Column>
-        </Grid>
+      <DashboardHeader
+        user={user}
+        onLogout={logout}
+        isSideNavExpanded={sideNavExpanded}
+        onClickSideNavExpand={() => setSideNavExpanded(p => !p)}
+      />
+      <SideNav
+        aria-label="Navigasyon"
+        isRail
+        expanded={sideNavExpanded}
+        onOverlayClick={() => setSideNavExpanded(false)}
+        onSideNavBlur={() => setSideNavExpanded(false)}
+        isChildOfHeader
+      >
+        <SideNavItems>
+          {routes.map(r => (
+            <SideNavLink
+              key={r.path}
+              as={NavLink}
+              to={r.path}
+              renderIcon={r.icon}
+              isActive={location.pathname === r.path}
+              onClick={() => setSideNavExpanded(false)}
+            >
+              {r.label}
+            </SideNavLink>
+          ))}
+        </SideNavItems>
+      </SideNav>
+      <Content className="app-shell-content">
+        <Routes>
+          {routes.map(r => {
+            const Comp = COMPONENTS[r.componentName]
+            return <Route key={r.path} path={r.path} element={<Comp />} />
+          })}
+        </Routes>
       </Content>
     </>
   )

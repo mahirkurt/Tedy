@@ -13,14 +13,14 @@ export default function Announcements() {
 
   return (
     <div className="dashboard-card">
-      <h4 style={{ margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <h4 className="dashboard-card__title">
         <Notification size={20} />
         Okul Duyuruları
       </h4>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+      <div className="stack-xs">
         {data.announcements.map((ann, i) => (
-          <Tile key={i} style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.8125rem', fontWeight: 500 }}>
+          <Tile key={i} className="dashboard-list-tile dashboard-list-tile--between">
+            <span className="dashboard-list-tile__label">
               {ann["e-Posta Başlık"]}
             </span>
             <Tag type="gray" size="sm">
