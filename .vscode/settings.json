@@ -1,10 +1,39 @@
 {
-    "workbench.colorCustomizations": {},
+    "workbench.colorCustomizations": {
+        "titleBar.activeBackground": "#af1818",
+        "titleBar.activeForeground": "#ffffff",
+        "titleBar.inactiveBackground": "#af1818",
+        "titleBar.inactiveForeground": "#ffffff90",
+        "statusBarItem.warningBackground": "#af1818",
+        "statusBarItem.warningForeground": "#ffffff",
+        "statusBarItem.warningHoverBackground": "#af1818",
+        "statusBarItem.warningHoverForeground": "#ffffff90",
+        "statusBarItem.remoteBackground": "#bc2525",
+        "statusBarItem.remoteForeground": "#ffffff",
+        "statusBarItem.remoteHoverBackground": "#c93232",
+        "statusBarItem.remoteHoverForeground": "#ffffff90",
+        "statusBar.background": "#af1818",
+        "statusBar.foreground": "#ffffff",
+        "statusBar.border": "#af1818",
+        "statusBar.debuggingBackground": "#af1818",
+        "statusBar.debuggingForeground": "#ffffff",
+        "statusBar.debuggingBorder": "#af1818",
+        "statusBar.noFolderBackground": "#af1818",
+        "statusBar.noFolderForeground": "#ffffff",
+        "statusBar.noFolderBorder": "#af1818",
+        "statusBar.prominentBackground": "#af1818",
+        "statusBar.prominentForeground": "#ffffff",
+        "statusBar.prominentHoverBackground": "#af1818",
+        "statusBar.prominentHoverForeground": "#ffffff90"
+    },
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     "python.testing.pytestEnabled": true,
-    "python.testing.pytestArgs": ["tests"],
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
     "editor.formatOnSave": true,
     "[python]": {
         "editor.defaultFormatter": "ms-python.python"
-    }
+    },
+    "window.title": "TED"
 }

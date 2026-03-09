@@ -1,0 +1,23 @@
+[Unit]
+Description=TED Dashboard (Gunicorn)
+After=network.target
+
+[Service]
+Type=notify
+User=mahirkurt
+Group=mahirkurt
+WorkingDirectory=/mnt/thunderbolt/workspaces/TED
+Environment=PATH=/mnt/thunderbolt/workspaces/TED/.venv/bin:/usr/bin:/bin
+EnvironmentFile=/mnt/thunderbolt/workspaces/TED/.env
+ExecStart=/mnt/thunderbolt/workspaces/TED/.venv/bin/gunicorn \
+    --bind 0.0.0.0:8085 \
+    --workers 2 \
+    --timeout 30 \
+    --access-logfile - \
+    --error-logfile - \
+    src.dashboard_api:app
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

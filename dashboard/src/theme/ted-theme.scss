@@ -1,0 +1,90 @@
+@use '@carbon/react';
+
+:root {
+  --ted-header-bg: #002D9C;
+  --ted-header-text: #FFFFFF;
+  --ted-accent: #DA1E28;
+
+  --ted-page-bg: #F4F4F4;
+  --ted-card-bg: #FFFFFF;
+
+  --status-success: #198038;
+  --status-warning: #F1C21B;
+  --status-error: #DA1E28;
+  --status-info: #0043CE;
+
+  --highlight-active: #D0E2FF;
+  --highlight-today: #0F62FE;
+}
+
+body {
+  background-color: var(--ted-page-bg);
+  margin: 0;
+  font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+}
+
+@keyframes pulse-urgent {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.tag-urgent {
+  animation: pulse-urgent 1.5s ease-in-out infinite;
+}
+
+.dashboard-card {
+  background: var(--ted-card-bg);
+  border-radius: 6px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  border-left: 3px solid transparent;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.dashboard-card h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin-bottom: 0.75rem;
+}
+
+.dashboard-card--accent {
+  border-left-color: var(--ted-accent);
+}
+
+.lesson-active {
+  background-color: var(--highlight-active) !important;
+  border-left: 3px solid var(--highlight-today) !important;
+}
+
+.today-column {
+  background-color: #EDF5FF;
+  font-weight: 600;
+}
+
+// TED branded header
+.cds--header {
+  background-color: var(--ted-header-bg) !important;
+}
+
+@media (max-width: 671px) {
+  .cds--content {
+    padding: 3.5rem 0.5rem 1rem !important;
+  }
+
+  .dashboard-card {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 4px;
+  }
+
+  .dashboard-card h4 {
+    font-size: 0.9375rem;
+  }
+
+  // Horizontal scroll for wide tables on mobile
+  .cds--data-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

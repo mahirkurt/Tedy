@@ -37,9 +37,28 @@ token.json
 token_huriye.json
 token_mahirkurt.json
 token.pickle
+TED_client.apps.googleusercontent.com.json
+ted-asistan-service-account-key.json
 
 # Output
 output/
+dashboard-dist/
+
+# Logs
+firebase-debug.log
+
+# One-off scripts
+fix_credentials.py
+
+# Screenshots
+*.png
+
+# Local tooling
+.claude/
+.playwright-mcp/
+
+# Discover scripts (exploratory, not production)
+src/discover_*.py
 
 # Git worktrees
 .worktrees/

@@ -20,9 +20,11 @@ from selenium.webdriver.common.by import By
 from googleapiclient.http import MediaInMemoryUpload, MediaIoBaseUpload
 
 from src.sync_to_google import get_services, _get_or_create_folder
+from src.env_loader import load_env
 
-TC_NO = "50653866492"
-PASSWORD = "mkhu7979"
+load_env()
+TC_NO = os.environ.get("EBA_TC_NO", "")
+PASSWORD = os.environ.get("EBA_PASSWORD", "")
 
 BASE = "https://www.sebitvcloud.com"
 SPA = f"{BASE}/proxy/VCollabPlayer_v0.0.1929/index.html"
