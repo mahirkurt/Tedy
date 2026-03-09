@@ -42,6 +42,8 @@ def main():
     scrape_errors = []
 
     login_info = None
+    validation = {"section_counts": {}, "errors": [], "warnings": []}
+    prev_data = {}
 
     try:
         # 1. Login
@@ -169,17 +171,51 @@ def main():
 
     # 6. Write health check
     from src.json_utils import atomic_json_dump
+    from src.data_validator import _count_section
+
+    # Build per-section status
+    sections_health = {}
+    for section, count in validation.get("section_counts", {}).items():
+        prev_count = _count_section(section, prev_data) if prev_data else 0
+
+        status = "ok"
+        if any(section in e for e in validation.get("errors", [])):
+            status = "error"
+        elif any(section in w for w in validation.get("warnings", [])):
+            status = "warning"
+        elif any(e.startswith(f"{section}:") for e in scrape_errors):
+            status = "skipped"
+
+        sections_health[section] = {
+            "count": count,
+            "prev_count": prev_count,
+            "status": status,
+        }
+
     health = {
         "timestamp": datetime.now().isoformat(),
         "success": len(scrape_errors) == 0,
         "scrape_errors": scrape_errors,
         "duration_seconds": round(time.time() - start_time),
+        "validation_warnings": validation.get("warnings", []),
         "login": login_info or {"method": "failed", "captcha_attempts": 0},
+        "sections": sections_health,
+        "staleness": {
+            "last_successful_full_scrape": (
+                datetime.now().isoformat() if not scrape_errors
+                else prev_data.get("scraped_at", "")
+            ),
+            "stale_sections": [
+                s for s, info in sections_health.items()
+                if info["status"] in ("error", "skipped")
+            ],
+        },
     }
     atomic_json_dump(health, os.path.join(OUTPUT_DIR, "health.json"))
 
     elapsed = time.time() - start_time
-    print(f"\nHealth: {'OK' if health['success'] else 'ERRORS'} ({health['duration_seconds']}s)")
+    print(f"\nHealth: {'OK' if health['success'] else 'ERRORS'} "
+          f"({health['duration_seconds']}s)")
     print(f"[DONE] Completed in {elapsed:.0f}s")
 
 
