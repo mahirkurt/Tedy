@@ -243,7 +243,12 @@ def scrape_odevlerim(driver):
     print("\n[2/8] Ödevlerim")
     url = f"{BASE_URL}/pages/ogrenci_istekler/p_odevlerim"
     driver.get(url)
-    time.sleep(3)
+    try:
+        wait_for(driver, (By.CSS_SELECTOR,
+                          "select[name='t_odevlerim_length']"),
+                 timeout=15)
+    except Exception:
+        wait_for(driver, (By.TAG_NAME, "table"), timeout=15)
 
     result = {"summary": "", "homework": []}
 
@@ -266,7 +271,13 @@ def scrape_odevlerim(driver):
             By.CSS_SELECTOR, "select[name='t_odevlerim_length']"
         )
         Select(length_select).select_by_visible_text("Tamamı")
-        time.sleep(2)
+        # Wait for table to reload with all rows
+        try:
+            wait_for(driver, (By.CSS_SELECTOR,
+                              "#tblOdevlerim tbody tr"),
+                     timeout=10)
+        except Exception:
+            time.sleep(1)
         print("  DataTables: selected 'Tamamı' (show all)")
     except Exception as e:
         print(f"  Could not select 'Tamamı': {e}")
