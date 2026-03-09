@@ -81,6 +81,25 @@ def main():
                 data[name] = [] if name in ("takvim", "ders_programi") else {}
                 print(f"[ERROR] {name} failed: {e}")
 
+        # Validate scraped data
+        from src.data_validator import validate_scraped_data
+        prev_data = {}
+        prev_path = os.path.join(OUTPUT_DIR, "scraped_data.json")
+        if os.path.exists(prev_path):
+            try:
+                import json
+                with open(prev_path) as f:
+                    prev_data = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        validation = validate_scraped_data(data, prev_data)
+        if validation["errors"]:
+            scrape_errors.extend(validation["errors"])
+        if validation["warnings"]:
+            for w in validation["warnings"]:
+                print(f"[WARN] Validation: {w}")
+
         # Save scraped data
         from src.json_utils import atomic_json_dump
         out_path = os.path.join(OUTPUT_DIR, "scraped_data.json")
