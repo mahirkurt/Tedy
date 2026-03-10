@@ -203,83 +203,419 @@ body {
   place-items: center;
 }
 
-// ─── Today's Agenda ──────────────────────────────────────────────────────────
-.agenda-row {
+// ─── Today's Schedule ────────────────────────────────────────────────────────
+
+// Animations
+@keyframes today-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.6); opacity: 0.3; }
+}
+
+@keyframes today-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes tl-stagger {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+// Loading shimmer
+.today-loading {
   display: flex;
-  gap: var(--ted-space-sm);
-  overflow-x: auto;
-  padding-bottom: var(--ted-space-xs);
-  scroll-snap-type: x mandatory;
-
-  // Hide scrollbar but keep scroll
-  scrollbar-width: thin;
-  scrollbar-color: #c6c6c6 transparent;
+  flex-direction: column;
+  gap: var(--ted-space-md);
+  padding: var(--ted-space-lg) 0;
 }
 
-.agenda-item.cds--tile {
-  min-width: 168px;
-  flex: 0 0 auto;
-  border-left: 3px solid transparent;
-  padding: var(--ted-space-sm) var(--ted-space-md);
-  border-radius: var(--ted-radius-sm);
-  scroll-snap-align: start;
-  transition: transform var(--ted-transition-fast),
-              box-shadow var(--ted-transition-fast);
+.today-loading__bar {
+  height: 56px;
+  border-radius: var(--ted-radius-card);
+  background: linear-gradient(90deg, #e8ecf2 25%, #f2f4f8 50%, #e8ecf2 75%);
+  background-size: 200% 100%;
+  animation: today-shimmer 1.5s ease-in-out infinite;
+
+  &--short { width: 60%; height: 40px; }
 }
 
-.agenda-item.cds--tile:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+// Empty state
+.today-empty {
+  text-align: center;
+  padding: 3rem var(--ted-space-lg);
+  background: var(--ted-card-bg);
+  border-radius: var(--ted-radius-card);
+  box-shadow: var(--ted-shadow-card);
 }
 
-.agenda-item--lesson.cds--tile {
-  border-left-color: var(--ted-color-brand-primary);
-  border-left-width: 2px;
+.today-empty__icon {
+  font-size: 2.5rem;
+  margin-bottom: var(--ted-space-sm);
+  line-height: 1;
 }
 
-.agenda-item--ogep.cds--tile {
-  border-left-color: #009d9a;
-}
-
-.agenda-item--deadline.cds--tile {
-  border-left-color: var(--ted-accent);
-}
-
-.agenda-item--event.cds--tile {
-  border-left-color: #8a3ffc;
-}
-
-.agenda-item--active.cds--tile {
-  background-color: var(--highlight-active);
-  border-left-color: var(--highlight-today);
-  box-shadow: 0 0 0 1px rgb(15 98 254 / 20%);
-}
-
-.agenda-item__time {
-  font-size: 0.6875rem;
-  color: var(--status-info);
+.today-empty__title {
+  font-size: 1.0625rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  margin: 0 0 var(--ted-space-xs);
+  color: var(--ted-color-text-primary);
 }
 
-.agenda-item__name {
+.today-empty__text {
+  font-size: 0.8125rem;
+  color: var(--ted-color-text-helper);
+  margin: 0;
+}
+
+// Main container
+.today {
+  animation: card-fade-in 0.3s ease-out;
+}
+
+// Date header
+.today__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--ted-space-md);
+}
+
+.today__day-name {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--ted-color-text-primary);
+  margin-right: var(--ted-space-xs);
+  letter-spacing: -0.01em;
+}
+
+.today__date-str {
+  font-size: 1rem;
+  color: var(--ted-color-text-secondary);
+  font-weight: 400;
+}
+
+.today__lesson-counter {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ted-color-text-helper);
+  background: #e8ecf2;
+  padding: 2px 10px;
+  border-radius: 10px;
+}
+
+// ── Hero card ──
+
+.today-hero {
+  border-radius: var(--ted-radius-card);
+  padding: 1.25rem var(--ted-space-lg);
+  margin-bottom: var(--ted-space-md);
+  animation: card-fade-in 0.25s ease-out;
+}
+
+.today-hero__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--ted-space-xs);
+}
+
+.today-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.today-hero__pulse {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  animation: today-pulse 2s ease-in-out infinite;
+}
+
+.today-hero__icon {
+  opacity: 0.7;
+}
+
+.today-hero__title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0 0 2px;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+}
+
+.today-hero__sub {
+  font-size: 0.8125rem;
+  margin: 0;
+  opacity: 0.75;
+}
+
+.today-hero__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--ted-space-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.today-hero__remaining {
+  font-variant-numeric: tabular-nums;
+}
+
+.today-hero__bar {
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.today-hero__bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 1s ease-out;
+}
+
+// Active hero — deep blue gradient
+.today-hero--active {
+  background: linear-gradient(135deg, #002d9c 0%, #0043ce 100%);
+  color: #fff;
+  box-shadow: 0 4px 16px rgb(0 45 156 / 20%);
+
+  .today-hero__pulse { background: #78a9ff; }
+  .today-hero__bar { background: rgb(255 255 255 / 18%); }
+  .today-hero__bar-fill { background: #fff; }
+}
+
+// Next hero — soft blue surface
+.today-hero--next {
+  background: #edf5ff;
+  border: 1px solid #d0e2ff;
+  color: var(--ted-color-text-primary);
+
+  .today-hero__badge--upcoming { color: #0043ce; }
+  .today-hero__icon { color: #0043ce; }
+  .today-hero__remaining { color: #0043ce; }
+}
+
+// Done hero — calm green
+.today-hero--done {
+  background: #defbe6;
+  border: 1px solid #a7f0ba;
+  color: var(--ted-color-text-primary);
+
+  .today-hero__badge--complete { color: #198038; }
+}
+
+// ── School day progress bar ──
+
+.today-daybar {
+  margin-bottom: var(--ted-space-lg);
+}
+
+.today-daybar__track {
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.today-daybar__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #002d9c, #0f62fe);
+  border-radius: 3px;
+  transition: width 1s ease-out;
+}
+
+.today-daybar__labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 0.6875rem;
+  color: var(--ted-color-text-helper);
+
+  span:nth-child(2) {
+    font-weight: 600;
+    color: var(--ted-color-text-secondary);
+  }
+}
+
+// ── Vertical timeline ──
+
+.today-tl {
+  position: relative;
+}
+
+.today-tl__item {
+  display: grid;
+  grid-template-columns: 48px 22px 1fr;
+  gap: 0 8px;
+  padding: 5px 0;
+  animation: tl-stagger 0.3s ease-out both;
+
+  @for $i from 1 through 20 {
+    &:nth-child(#{$i}) { animation-delay: #{$i * 40}ms; }
+  }
+}
+
+.today-tl__item--past {
+  opacity: 0.4;
+
+  .today-tl__dot {
+    background: #c6c6c6 !important;
+    box-shadow: none !important;
+  }
+}
+
+.today-tl__item--active {
+  opacity: 1;
+
+  .today-tl__card {
+    background: #edf5ff;
+    border-color: #78a9ff;
+    box-shadow: 0 0 0 1px rgb(15 98 254 / 15%),
+                0 2px 8px rgb(15 98 254 / 8%);
+  }
+
+  .today-tl__dot {
+    box-shadow: 0 0 0 3px #d0e2ff;
+  }
+}
+
+.today-tl__time {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--ted-color-text-helper);
+  text-align: right;
+  padding-top: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.today-tl__spine {
+  display: flex;
+  justify-content: center;
+  position: relative;
+
+  // Vertical connector line
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    background: #e0e0e0;
+    transform: translateX(-50%);
+  }
+}
+
+// Hide connector above first and below last
+.today-tl > div:first-child .today-tl__spine::before { top: 50%; }
+.today-tl > div:last-child .today-tl__spine::before { bottom: 50%; }
+
+.today-tl__dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--tl-color, #c6c6c6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  margin-top: 8px;
+  flex-shrink: 0;
+
+  svg { fill: #fff; }
+}
+
+.today-tl__card {
+  background: var(--ted-card-bg);
+  border: 1px solid var(--ted-color-border-subtle);
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-height: 40px;
+  transition: background-color var(--ted-transition-fast);
+}
+
+.today-tl__item:not(.today-tl__item--past) .today-tl__card:hover {
+  background-color: #f4f4f8;
+}
+
+.today-tl__card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--ted-space-xs);
+}
+
+.today-tl__card-name {
   font-weight: 600;
   font-size: 0.8125rem;
-  margin: 0.25rem 0;
-  line-height: 1.3;
+  line-height: 1.35;
+  color: var(--ted-color-text-primary);
 }
 
-.agenda-item__subtitle {
+.today-tl__card-period {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--ted-color-text-helper);
+  flex-shrink: 0;
+}
+
+.today-tl__card-sub {
   font-size: 0.6875rem;
   color: var(--ted-color-text-secondary);
   line-height: 1.4;
+  margin-top: 1px;
 }
 
-.agenda-item__tags {
+.today-tl__card-tags {
   display: flex;
-  gap: var(--ted-space-xs);
-  margin-top: var(--ted-space-xs);
+  gap: var(--ted-space-2xs);
+  margin-top: var(--ted-space-2xs);
+}
+
+// Now marker
+.today-tl__now {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 0 8px;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.today-tl__now-time {
+  text-align: right;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #0f62fe;
+  font-variant-numeric: tabular-nums;
+}
+
+.today-tl__now-line {
+  height: 2px;
+  background: #0f62fe;
+  border-radius: 1px;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #0f62fe;
+    transform: translate(-50%, -50%);
+  }
 }
 
 // ─── Calendar Events ─────────────────────────────────────────────────────────
@@ -584,8 +920,22 @@ table {
     font-size: 0.875rem;
   }
 
-  .agenda-item.cds--tile {
-    min-width: 148px;
+  .today-hero {
+    padding: var(--ted-space-md);
+  }
+
+  .today-tl__item {
+    grid-template-columns: 40px 18px 1fr;
+    gap: 0 6px;
+  }
+
+  .today-tl__now {
+    grid-template-columns: 40px 1fr;
+    gap: 0 6px;
+  }
+
+  .today__day-name {
+    font-size: 1.125rem;
   }
 
   .health-popover {
