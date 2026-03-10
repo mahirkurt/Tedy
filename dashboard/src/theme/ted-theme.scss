@@ -1,17 +1,21 @@
 @use '@carbon/react';
 
+// ─── Design Tokens ──────────────────────────────────────────────────────────
 :root {
   --ted-color-brand-primary: #002d9c;
   --ted-color-brand-accent: #da1e28;
-  --ted-color-page-bg: var(--cds-background, #f4f4f4);
-  --ted-color-layer: var(--cds-layer-01, #ffffff);
+  --ted-color-page-bg: #f2f4f8;
+  --ted-color-layer: #ffffff;
   --ted-color-border-subtle: var(--cds-border-subtle, #e0e0e0);
   --ted-color-text-primary: var(--cds-text-primary, #161616);
   --ted-color-text-secondary: var(--cds-text-secondary, #525252);
   --ted-color-text-helper: var(--cds-text-helper, #8d8d8d);
 
-  --ted-shadow-card: 0 2px 6px rgb(0 0 0 / 6%);
-  --ted-radius-card: 0.375rem;
+  --ted-shadow-card: 0 1px 3px rgb(0 0 0 / 5%), 0 1px 2px rgb(0 0 0 / 8%);
+  --ted-shadow-card-hover: 0 4px 12px rgb(0 0 0 / 8%), 0 2px 4px rgb(0 0 0 / 6%);
+  --ted-shadow-popover: 0 8px 24px rgb(0 45 156 / 12%), 0 2px 8px rgb(0 0 0 / 8%);
+  --ted-radius-card: 8px;
+  --ted-radius-sm: 4px;
 
   --ted-space-2xs: 0.25rem;
   --ted-space-xs: 0.5rem;
@@ -26,31 +30,61 @@
   --ted-page-bg: var(--ted-color-page-bg);
   --ted-card-bg: var(--ted-color-layer);
 
-  --status-success: var(--cds-support-success, #198038);
-  --status-warning: var(--cds-support-warning, #f1c21b);
-  --status-error: var(--cds-support-error, #da1e28);
-  --status-info: var(--cds-link-primary, #0f62fe);
+  --status-success: #198038;
+  --status-warning: #f1c21b;
+  --status-error: #da1e28;
+  --status-info: #0f62fe;
 
-  --highlight-active: var(--cds-highlight, #d0e2ff);
-  --highlight-today: var(--cds-link-primary, #0f62fe);
+  --highlight-active: #d0e2ff;
+  --highlight-today: #0f62fe;
+
+  --ted-transition-fast: 150ms cubic-bezier(0.2, 0, 0.38, 0.9);
+  --ted-transition-med: 240ms cubic-bezier(0.2, 0, 0.38, 0.9);
 }
 
+// ─── Base ────────────────────────────────────────────────────────────────────
 body {
   background-color: var(--ted-page-bg);
   color: var(--ted-color-text-primary);
   margin: 0;
   font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+// ─── Animations ──────────────────────────────────────────────────────────────
 @keyframes pulse-urgent {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+@keyframes popover-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes card-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .tag-urgent {
   animation: pulse-urgent 1.5s ease-in-out infinite;
 }
 
+// ─── App Shell ───────────────────────────────────────────────────────────────
 .app-shell-loading {
   min-height: 100vh;
   display: flex;
@@ -65,8 +99,10 @@ body {
 
 .app-shell-content.cds--content {
   padding: 3.5rem var(--ted-space-lg) var(--ted-space-xl);
+  max-width: 960px;
 }
 
+// ─── Layout Utilities ────────────────────────────────────────────────────────
 .stack-xs {
   display: flex;
   flex-direction: column;
@@ -79,6 +115,7 @@ body {
   gap: var(--ted-space-xs);
 }
 
+// ─── Dashboard Cards ─────────────────────────────────────────────────────────
 .dashboard-card {
   background: var(--ted-card-bg);
   border-radius: var(--ted-radius-card);
@@ -86,16 +123,29 @@ body {
   margin-bottom: var(--ted-space-lg);
   border-left: 3px solid transparent;
   box-shadow: var(--ted-shadow-card);
+  transition: box-shadow var(--ted-transition-med),
+              transform var(--ted-transition-med);
+  animation: card-fade-in 0.3s ease-out both;
+}
+
+.dashboard-card:hover {
+  box-shadow: var(--ted-shadow-card-hover);
 }
 
 .dashboard-card__title {
   display: flex;
   align-items: center;
   gap: var(--ted-space-xs);
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   margin: 0 0 var(--ted-space-md);
+  color: var(--ted-color-text-primary);
+}
+
+.dashboard-card__title svg {
+  color: var(--ted-color-brand-primary);
+  flex-shrink: 0;
 }
 
 .dashboard-card__title--tight {
@@ -106,8 +156,15 @@ body {
   border-left-color: var(--ted-accent);
 }
 
+// ─── List Tiles ──────────────────────────────────────────────────────────────
 .dashboard-list-tile.cds--tile {
   padding: var(--ted-space-xs) var(--ted-space-md);
+  border-radius: var(--ted-radius-sm);
+  transition: background-color var(--ted-transition-fast);
+}
+
+.dashboard-list-tile.cds--tile:hover {
+  background-color: #f4f4f8;
 }
 
 .dashboard-list-tile--between.cds--tile {
@@ -129,13 +186,15 @@ body {
 
 .dashboard-empty-text {
   font-size: 0.8125rem;
-  color: var(--ted-color-text-secondary);
+  color: var(--ted-color-text-helper);
+  padding: var(--ted-space-sm) 0;
 }
 
 .dashboard-summary-text {
   font-size: 0.8125rem;
   color: var(--ted-color-text-secondary);
   margin: 0 0 var(--ted-space-md);
+  line-height: 1.5;
 }
 
 .dashboard-loading-tile.cds--tile {
@@ -144,55 +203,77 @@ body {
   place-items: center;
 }
 
+// ─── Today's Agenda ──────────────────────────────────────────────────────────
 .agenda-row {
   display: flex;
   gap: var(--ted-space-sm);
   overflow-x: auto;
   padding-bottom: var(--ted-space-xs);
+  scroll-snap-type: x mandatory;
+
+  // Hide scrollbar but keep scroll
+  scrollbar-width: thin;
+  scrollbar-color: #c6c6c6 transparent;
 }
 
 .agenda-item.cds--tile {
-  min-width: 160px;
+  min-width: 168px;
   flex: 0 0 auto;
   border-left: 3px solid transparent;
   padding: var(--ted-space-sm) var(--ted-space-md);
+  border-radius: var(--ted-radius-sm);
+  scroll-snap-align: start;
+  transition: transform var(--ted-transition-fast),
+              box-shadow var(--ted-transition-fast);
+}
+
+.agenda-item.cds--tile:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
 }
 
 .agenda-item--lesson.cds--tile {
-  border-left-color: transparent;
+  border-left-color: var(--ted-color-brand-primary);
+  border-left-width: 2px;
 }
 
 .agenda-item--ogep.cds--tile {
-  border-left-color: var(--cds-tag-background-teal, #a9f0d1);
+  border-left-color: #009d9a;
 }
 
 .agenda-item--deadline.cds--tile {
-  border-left-color: var(--cds-tag-background-red, #ffd7d9);
+  border-left-color: var(--ted-accent);
 }
 
 .agenda-item--event.cds--tile {
-  border-left-color: var(--cds-tag-background-purple, #e8daff);
+  border-left-color: #8a3ffc;
 }
 
 .agenda-item--active.cds--tile {
   background-color: var(--highlight-active);
   border-left-color: var(--highlight-today);
+  box-shadow: 0 0 0 1px rgb(15 98 254 / 20%);
 }
 
 .agenda-item__time {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   color: var(--status-info);
   font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .agenda-item__name {
   font-weight: 600;
+  font-size: 0.8125rem;
   margin: 0.25rem 0;
+  line-height: 1.3;
 }
 
 .agenda-item__subtitle {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   color: var(--ted-color-text-secondary);
+  line-height: 1.4;
 }
 
 .agenda-item__tags {
@@ -201,37 +282,55 @@ body {
   margin-top: var(--ted-space-xs);
 }
 
+// ─── Calendar Events ─────────────────────────────────────────────────────────
 .dashboard-event-tile.cds--tile {
   display: flex;
   gap: var(--ted-space-md);
   align-items: center;
+  border-radius: var(--ted-radius-sm);
+  transition: background-color var(--ted-transition-fast);
+}
+
+.dashboard-event-tile.cds--tile:hover {
+  background-color: #f4f4f8;
 }
 
 .dashboard-event-date {
   text-align: center;
-  min-width: 48px;
-  padding: 0.25rem;
-  background-color: #edf5ff;
-  border-radius: 4px;
+  min-width: 52px;
+  padding: var(--ted-space-xs) var(--ted-space-xs);
+  background: linear-gradient(135deg, #edf5ff 0%, #d0e2ff 100%);
+  border-radius: var(--ted-radius-sm);
 }
 
 .dashboard-event-date__day {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--highlight-today);
+  color: var(--ted-color-brand-primary);
+  line-height: 1.2;
 }
 
 .dashboard-event-date__month {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
+  font-weight: 600;
   color: var(--ted-color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
+// ─── Homework ────────────────────────────────────────────────────────────────
 .homework-item.cds--tile {
   padding: 0.75rem var(--ted-space-md);
+  border-radius: var(--ted-radius-sm);
+  transition: background-color var(--ted-transition-fast);
 }
 
 .homework-item--clickable.cds--tile {
   cursor: pointer;
+}
+
+.homework-item--clickable.cds--tile:hover {
+  background-color: #f4f4f8;
 }
 
 .homework-item__row {
@@ -250,23 +349,27 @@ body {
   font-weight: 600;
   font-size: 0.8125rem;
   margin-bottom: var(--ted-space-2xs);
+  color: var(--ted-color-text-primary);
 }
 
 .homework-item__title {
   font-size: 0.8125rem;
+  color: var(--ted-color-text-secondary);
 }
 
 .homework-item__deadline {
-  font-size: 0.75rem;
-  color: var(--ted-color-text-secondary);
+  font-size: 0.6875rem;
+  color: var(--ted-color-text-helper);
   margin-top: var(--ted-space-2xs);
 }
 
 .homework-item__countdown {
   text-align: right;
   min-width: 80px;
+  flex-shrink: 0;
 }
 
+// ─── Homework Modal ──────────────────────────────────────────────────────────
 .homework-modal__description {
   font-size: 0.875rem;
   line-height: 1.6;
@@ -279,6 +382,7 @@ body {
 
 .homework-modal__attachments-title {
   font-size: 0.8125rem;
+  font-weight: 600;
   margin-bottom: var(--ted-space-xs);
 }
 
@@ -289,18 +393,27 @@ body {
   font-size: 0.8125rem;
   padding: var(--ted-space-2xs) 0;
   color: var(--status-info);
+  text-decoration: none;
+  transition: color var(--ted-transition-fast);
 }
 
+.homework-modal__attachment-link:hover {
+  color: var(--ted-color-brand-primary);
+}
+
+// ─── Schedule Table ──────────────────────────────────────────────────────────
 .lesson-active {
   background-color: var(--highlight-active) !important;
   border-left: 3px solid var(--highlight-today) !important;
+  position: relative;
 }
 
 .today-column {
-  background-color: #EDF5FF;
+  background-color: #edf5ff;
   font-weight: 600;
 }
 
+// ─── Header ──────────────────────────────────────────────────────────────────
 .dashboard-header__brand-logo {
   height: 28px;
   vertical-align: middle;
@@ -316,34 +429,37 @@ body {
 }
 
 .dashboard-header__avatar {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
+  border: 2px solid rgb(255 255 255 / 30%);
 }
 
+// ─── Login Page ──────────────────────────────────────────────────────────────
 .login-page {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--ted-page-bg);
+  background: linear-gradient(160deg, #f2f4f8 0%, #dde1e6 50%, #e8ecf2 100%);
   padding: var(--ted-space-md);
 }
 
 .login-page__panel {
   background-color: var(--ted-card-bg);
   padding: 3rem 2.5rem;
-  box-shadow: 0 4px 16px rgb(0 0 0 / 10%);
+  box-shadow: 0 8px 32px rgb(0 45 156 / 10%), 0 2px 8px rgb(0 0 0 / 6%);
   max-width: 420px;
   width: 100%;
   text-align: center;
-  border-radius: var(--ted-radius-card);
+  border-radius: 12px;
 }
 
 .login-page__brand {
-  background-color: var(--ted-header-bg);
+  background: linear-gradient(135deg, #002d9c 0%, #001d6e 100%);
   margin: -3rem -2.5rem 2rem;
   padding: var(--ted-space-lg) var(--ted-space-xl);
+  border-radius: 12px 12px 0 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -355,15 +471,17 @@ body {
 }
 
 .login-page__brand-subtitle {
-  color: rgb(255 255 255 / 70%);
+  color: rgb(255 255 255 / 65%);
   font-size: 0.8125rem;
   margin: 0;
+  letter-spacing: 0.02em;
 }
 
 .login-page__intro {
   font-size: 0.875rem;
   color: var(--ted-color-text-secondary);
   margin: 0 0 var(--ted-space-lg);
+  line-height: 1.5;
 }
 
 .login-page__google-button-wrap {
@@ -382,42 +500,75 @@ body {
   margin-top: var(--ted-space-xl);
 }
 
-// TED branded header
+// ─── Carbon Overrides ────────────────────────────────────────────────────────
+
+// Header
 .cds--header {
-  background-color: var(--ted-header-bg) !important;
+  background: linear-gradient(90deg, #002d9c 0%, #001d6e 100%) !important;
+  border-bottom: none !important;
 }
 
-// SideNav TED branding
+// SideNav
 .cds--side-nav {
-  border-right: 1px solid #E0E0E0;
+  border-right: 1px solid var(--ted-color-border-subtle);
 }
 
 .cds--side-nav__link--current {
-  border-left: 3px solid var(--ted-header-bg);
+  border-left: 3px solid var(--ted-color-brand-primary);
+  background-color: #edf5ff;
 }
 
-// Health popover
+.cds--side-nav__link:hover {
+  background-color: #f4f4f8;
+}
+
+// Tags — slightly softer radius
+.cds--tag {
+  border-radius: 10px;
+}
+
+// Tiles — inherit card radius
+.cds--tile {
+  border-radius: var(--ted-radius-sm);
+}
+
+// ─── Health Popover ──────────────────────────────────────────────────────────
 .health-popover {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 4px);
   right: 0;
   z-index: 9000;
   background: var(--ted-card-bg);
   border: 1px solid var(--ted-color-border-subtle);
   border-radius: var(--ted-radius-card);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
+  box-shadow: var(--ted-shadow-popover);
   padding: var(--ted-space-md);
   font-size: 0.8125rem;
-  min-width: 280px;
+  min-width: 300px;
   color: var(--ted-color-text-primary);
+  animation: popover-enter 0.2s ease-out;
 }
 
 .health-popover__row {
   display: flex;
   justify-content: space-between;
-  padding: var(--ted-space-2xs) 0;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid #f4f4f4;
 }
 
+.health-popover__row:last-child {
+  border-bottom: none;
+}
+
+// ─── Grade Table Colors ──────────────────────────────────────────────────────
+// Applied via inline styles in GradeTable component, but provide
+// base table styling
+table {
+  border-collapse: collapse;
+}
+
+// ─── Responsive ──────────────────────────────────────────────────────────────
 @media (max-width: 671px) {
   .app-shell-content.cds--content {
     padding: 3.5rem var(--ted-space-xs) var(--ted-space-md) !important;
@@ -426,25 +577,41 @@ body {
   .dashboard-card {
     margin-bottom: var(--ted-space-md);
     padding: var(--ted-space-md);
-    border-radius: 4px;
+    border-radius: var(--ted-radius-sm);
   }
 
   .dashboard-card__title {
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
+  }
+
+  .agenda-item.cds--tile {
+    min-width: 148px;
+  }
+
+  .health-popover {
+    min-width: 260px;
+    right: -0.5rem;
   }
 
   .login-page__panel {
     padding: var(--ted-space-xl) var(--ted-space-lg);
+    border-radius: var(--ted-radius-card);
   }
 
   .login-page__brand {
     margin: calc(var(--ted-space-xl) * -1) calc(var(--ted-space-lg) * -1) var(--ted-space-lg);
     padding: var(--ted-space-md) var(--ted-space-lg);
+    border-radius: var(--ted-radius-card) var(--ted-radius-card) 0 0;
   }
 
-  // Horizontal scroll for wide tables on mobile
   .cds--data-table-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (min-width: 672px) {
+  .app-shell-content.cds--content {
+    margin: 0 auto;
   }
 }
