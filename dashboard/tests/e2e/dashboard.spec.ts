@@ -72,4 +72,36 @@ test.describe('SPA serving', () => {
     await page.goto('/')
     await expect(page.locator('body')).toBeVisible()
   })
+
+  test('header shows sync tag and popover details', async ({ page }) => {
+    await page.goto('/')
+    const syncTrigger = page.getByRole('button', { name: 'Senkron durumunu göster' })
+    await expect(syncTrigger).toBeVisible()
+    await syncTrigger.click()
+    await expect(page.getByRole('dialog', { name: 'Senkron sağlık bilgisi' })).toBeVisible()
+    await expect(page.getByText('Senkron Sağlığı')).toBeVisible()
+    await expect(page.getByText('Son Sync:')).toBeVisible()
+    await expect(page.getByText('Son Başarılı Tam Sync:')).toBeVisible()
+  })
+
+  test('header remains usable on mobile viewport', async ({ browser }) => {
+    const context = await browser.newContext({
+      viewport: { width: 375, height: 812 },
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+      isMobile: true,
+      hasTouch: true,
+      deviceScaleFactor: 3,
+    })
+    const page = await context.newPage()
+    await page.goto('/')
+
+    await expect(page.getByRole('banner')).toBeVisible()
+    await expect(page.getByAltText('TEDY')).toBeVisible()
+    await expect(page.getByLabel('Senkron durumunu göster')).toBeVisible()
+
+    await page.getByLabel('Senkron durumunu göster').click()
+    await expect(page.getByRole('dialog', { name: 'Senkron sağlık bilgisi' })).toBeVisible()
+
+    await context.close()
+  })
 })
