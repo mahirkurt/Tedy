@@ -1178,7 +1178,7 @@ body {
   border-color: rgb(210 210 210 / 35%);
 }
 
-.cds--header__action svg { fill: #fff; }
+.cds--header__action svg { fill: #fff !important; }
 .cds--header__action:hover { background-color: rgb(255 255 255 / 18%); }
 .cds--header__action:focus-visible {
   outline: 2px solid #fff;
@@ -2300,6 +2300,14 @@ body {
     height: 24px;
   }
 
+  .dashboard-header__health-wrap {
+    display: none;
+  }
+
+  .dashboard-header__focus-toggle {
+    display: none;
+  }
+
   .login-page {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
@@ -2342,9 +2350,7 @@ body {
     text-overflow: ellipsis;
   }
 
-  .dashboard-header__focus-toggle .cds--toggle__label-text {
-    display: none;
-  }
+  // Focus toggle fully hidden on mobile (see .dashboard-header__focus-toggle above)
 
   .grade-detail__row {
     grid-template-columns: 100px 1fr 32px;
