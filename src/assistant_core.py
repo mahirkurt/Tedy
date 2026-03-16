@@ -119,7 +119,7 @@ class AssistantConfig:
         index_dir.mkdir(parents=True, exist_ok=True)
 
         max_file_size_mb = int(os.environ.get("ASSISTANT_MAX_FILE_SIZE_MB", "20"))
-        max_chunks = int(os.environ.get("ASSISTANT_MAX_CHUNKS", "5000"))
+        max_chunks = int(os.environ.get("ASSISTANT_MAX_CHUNKS", "2000"))
 
         excluded = set(DEFAULT_EXCLUDED_DIRS)
         custom_excluded = os.environ.get("ASSISTANT_EXCLUDED_DIRS", "").strip()
@@ -140,10 +140,10 @@ class AssistantConfig:
             meta_path=index_dir / "meta.json",
             metrics_path=output_dir / "assistant_metrics.jsonl",
             ollama_base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"),
-            ollama_chat_model=os.environ.get("ASSISTANT_CHAT_MODEL", "qwen2.5:14b"),
-            ollama_chat_fallback_model=os.environ.get("ASSISTANT_CHAT_FALLBACK_MODEL", "qwen2.5:7b"),
+            ollama_chat_model=os.environ.get("ASSISTANT_CHAT_MODEL", "qwen2.5-coder:7b"),
+            ollama_chat_fallback_model=os.environ.get("ASSISTANT_CHAT_FALLBACK_MODEL", "qwen2.5:14b"),
             ollama_embed_model=os.environ.get("ASSISTANT_EMBED_MODEL", "mxbai-embed-large"),
-            ollama_chat_timeout_seconds=int(os.environ.get("ASSISTANT_OLLAMA_CHAT_TIMEOUT_SECONDS", "25")),
+            ollama_chat_timeout_seconds=int(os.environ.get("ASSISTANT_OLLAMA_CHAT_TIMEOUT_SECONDS", "90")),
             ollama_embed_timeout_seconds=int(os.environ.get("ASSISTANT_OLLAMA_EMBED_TIMEOUT_SECONDS", "60")),
             ollama_embed_max_chars=int(os.environ.get("ASSISTANT_EMBED_MAX_CHARS", "1200")),
             ollama_keep_alive=os.environ.get("ASSISTANT_OLLAMA_KEEP_ALIVE", "30m").strip(),
@@ -291,7 +291,7 @@ class OllamaClient:
         return "\n".join(sanitized)
 
     def chat(self, messages: list[dict[str, str]], temperature: float = 0.2) -> str:
-        num_predict = max(64, min(1200, int(os.environ.get("ASSISTANT_OLLAMA_CHAT_NUM_PREDICT", "320"))))
+        num_predict = max(64, min(2000, int(os.environ.get("ASSISTANT_OLLAMA_CHAT_NUM_PREDICT", "800"))))
         base_payload = {
             "messages": messages,
             "stream": False,
@@ -1224,12 +1224,12 @@ class AssistantRuntime:
         messages: list[dict[str, Any]],
         temperature: float,
     ) -> str:
-        prompt_citations = citations[:4]
+        prompt_citations = citations[:6]
         context_blocks = []
         for i, c in enumerate(prompt_citations, start=1):
             snippet = str(c.get("snippet", "")).replace("\n", " ").strip()
-            if len(snippet) > 180:
-                snippet = snippet[:177] + "..."
+            if len(snippet) > 400:
+                snippet = snippet[:397] + "..."
             context_blocks.append(
                 f"[S{i}] path={c.get('path','')} confidence={c.get('confidence',0.0)} snippet={snippet}"
             )
@@ -1237,19 +1237,34 @@ class AssistantRuntime:
         context_text = "\n".join(context_blocks) if context_blocks else "[Kaynak bulunamadı]"
 
         system_prompt = (
-            "Sen TEDY Yerel Eğitim Asistanısın.\n"
-            "Hedef kitle: öğrenci + veli. Varsayılan dil Türkçe.\n"
-            "Kural: Kaynak dışı kesin iddia kurma. Kaynak varsa metin içinde [S1], [S2] gibi atıf ver.\n"
-            "Kural: Klinik tanı/tedavi önerme. Riskli psikolojik durumda profesyonel destek yönlendirmesi yap.\n"
-            "Kural: Cevap net, kısa, uygulanabilir olsun."
+            "Sen TEDY Eğitim Asistanısın — ortaokul öğrencisi Işık ve ailesi için kişisel eğitim danışmanısın.\n\n"
+            "## Kimlik\n"
+            "- Hedef kitle: 7. sınıf öğrencisi + veliler. Varsayılan dil Türkçe.\n"
+            "- Işık'ın ders programı, ödevleri, sınav sonuçları, takvimi ve ders içerikleri sana kaynak olarak verilir.\n\n"
+            "## Yanıt Formatı\n"
+            "- Kısa ve öz başla: İlk cümlede sorunun doğrudan cevabını ver.\n"
+            "- Madde işaretleri kullan, uzun paragraflardan kaçın.\n"
+            "- Somut ve uygulanabilir öneriler sun (ne yapılacak, ne zaman, nasıl).\n"
+            "- Ödev/sınav sorularında: öncelik sırası belirt, tahmini süre ver, çalışma stratejisi öner.\n"
+            "- Not analizi sorularında: güçlü/zayıf alanları belirle, iyileştirme adımları sun.\n\n"
+            "## Pedagojik İlkeler\n"
+            "- Bloom taksonomisine göre bilgi → anlama → uygulama basamaklarını kullan.\n"
+            "- Aralıklı tekrar (spaced repetition) ve aktif öğrenme stratejilerini öner.\n"
+            "- Motivasyonu destekle: başarıları vurgula, yapıcı geri bildirim ver.\n"
+            "- Veli sorularında: eyleme dönüştürülebilir somut adımlar ver, jargondan kaçın.\n\n"
+            "## Kurallar\n"
+            "- Kaynak dışı kesin iddia kurma. Kaynak varsa metin içinde [S1], [S2] gibi atıf ver.\n"
+            "- Kaynak referanslarını satır içinde doğal biçimde kullan, ayrı liste yapma.\n"
+            "- Klinik tanı/tedavi önerme. Riskli psikolojik durumda profesyonel destek yönlendirmesi yap.\n"
+            "- Yanıtı asla 'Kaynaklar:' listesiyle bitirme — atıflar zaten metin içinde."
         )
 
         user_payload = (
-            f"Intent: {intent}\n"
-            f"Güvenlik bayrakları: {', '.join(safety_flags) if safety_flags else 'yok'}\n"
+            f"Soru türü: {intent}\n"
+            f"Güvenlik: {', '.join(safety_flags) if safety_flags else 'yok'}\n\n"
             f"Soru: {user_query}\n\n"
-            f"Yerel kaynaklar:\n{context_text}\n\n"
-            "Yukarıdaki kaynakları kullanarak yanıt ver."
+            f"Işık'ın verileri:\n{context_text}\n\n"
+            "Bu verileri kullanarak Işık'a özel, somut ve pedagojik bir yanıt ver."
         )
 
         convo = [
@@ -1300,9 +1315,15 @@ class AssistantRuntime:
         )
 
         prompt = (
-            "Aşağıdaki plan bloklarını öğrenci+veli için sade bir haftalık çalışma planı özetine dönüştür.\n"
-            "4 bölüm kullan: Öncelikler, Günlük Akış, Ölçme-Değerlendirme, Veli Kontrol Listesi.\n"
-            "Kaynak varsa [S1] formatında atıf ver.\n\n"
+            "Aşağıdaki plan bloklarını Işık (7. sınıf) ve ailesi için haftalık çalışma planına dönüştür.\n\n"
+            "## Format Kuralları\n"
+            "- 4 bölüm kullan: **Öncelikler**, **Günlük Akış**, **Ölçme-Değerlendirme**, **Veli Kontrol Listesi**\n"
+            "- Her gün için somut adımlar ve tahmini süreler yaz.\n"
+            "- Yakın tarihli ödevleri/sınavları acil olarak işaretle.\n"
+            "- Bloom taksonomisine göre: önce hatırla/anla, sonra uygula/analiz et basamaklarını öner.\n"
+            "- Aralıklı tekrar: önceki haftanın konularını kısa tekrar blokları olarak ekle.\n"
+            "- Motivasyon: 'Bunu başarabilirsin' gibi destekleyici ifadeler ekle.\n"
+            "- Kaynak varsa [S1] formatında atıf ver. Ayrı kaynak listesi yapma.\n\n"
             f"Soru: {user_query}\n\n"
             f"Plan blokları:\n{blocks_text}\n\n"
             f"Kaynaklar:\n{cites_text if cites_text else '[yok]'}"
@@ -1311,7 +1332,11 @@ class AssistantRuntime:
         try:
             out = self.ollama.chat(
                 messages=[
-                    {"role": "system", "content": "Sen pedagojik planlama asistanısın."},
+                    {"role": "system", "content": (
+                        "Sen Işık'ın kişisel pedagojik planlama asistanısın. "
+                        "Öğrencinin güncel ödev, sınav ve ders verilerini kullanarak "
+                        "uygulanabilir, motive edici çalışma planları oluşturursun."
+                    )},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.15,
