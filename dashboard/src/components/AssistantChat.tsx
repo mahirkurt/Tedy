@@ -1,5 +1,25 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import {
+  AILabel,
+  Button,
+  IconButton,
+  InlineLoading,
+  SkeletonText,
+  Tag,
+  TextArea,
+  Tile,
+} from '@carbon/react'
+import {
+  Send,
+  CalendarHeatMap,
+  Chemistry,
+  TaskComplete,
+  ParentChild,
+  Renew,
+  DocumentView,
+  Time,
+} from '@carbon/icons-react'
 import type { AssistantCitation, AssistantPlanBlock, AssistantResponse } from '../types'
 
 type ChatRole = 'user' | 'assistant'
@@ -14,10 +34,17 @@ interface ChatMessage {
 }
 
 const QUICK_PROMPTS = [
-  'Bu hafta ödev ve sınavlara göre çalışma planı hazırla.',
-  'Fen Bilimleri için veriye dayalı eksik konularımı özetle.',
-  'Ödev teslim tarihine göre bugün neye öncelik vermeliyim?',
-  'Veli için 5 maddelik akşam kontrol listesi üret.',
+  { text: 'Çalışma planı hazırla', icon: CalendarHeatMap, mode: 'plan' as const },
+  { text: 'Eksik konularımı özetle', icon: Chemistry, mode: 'chat' as const },
+  { text: 'Bugün neye öncelik vermeliyim?', icon: TaskComplete, mode: 'chat' as const },
+  { text: 'Veli kontrol listesi üret', icon: ParentChild, mode: 'chat' as const },
+]
+
+const WAITING_MESSAGES = [
+  'Veriler analiz ediliyor...',
+  'Kaynaklar taranıyor...',
+  'Yanıt hazırlanıyor...',
+  'Neredeyse bitti...',
 ]
 
 function toApiMessages(messages: ChatMessage[]) {
@@ -38,12 +65,50 @@ async function parseJsonSafe(res: Response): Promise<AssistantResponse | { error
   return { error: `Sunucu JSON dönmedi (HTTP ${res.status}): ${preview || 'boş yanıt'}` }
 }
 
+function ThinkingIndicator() {
+  const [msgIdx, setMsgIdx] = useState(0)
+  const [elapsed, setElapsed] = useState(0)
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsed(prev => prev + 1)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    if (elapsed > 0 && elapsed % 6 === 0) {
+      setMsgIdx(prev => Math.min(prev + 1, WAITING_MESSAGES.length - 1))
+    }
+  }, [elapsed])
+
+  return (
+    <article className="ac-msg ac-msg--assistant ac-msg--thinking">
+      <div className="ac-msg__avatar ac-msg__avatar--ai">
+        <AILabel size="mini" />
+      </div>
+      <div className="ac-msg__body">
+        <div className="ac-msg__thinking-row">
+          <InlineLoading description={WAITING_MESSAGES[msgIdx]} />
+          {elapsed > 2 && (
+            <span className="ac-msg__elapsed">{elapsed}s</span>
+          )}
+        </div>
+        <SkeletonText paragraph lineCount={3} />
+      </div>
+    </article>
+  )
+}
+
 export default function AssistantChat() {
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'Merhaba, TEDY Asistan hazır. Soru sorabilir veya çalışma planı isteyebilirsin.',
+      content: 'Merhaba! TEDY Asistan olarak sana yardımcı olabilirim. Ödevlerin, sınavların ve derslerin hakkında sorular sorabilir veya kişisel çalışma planı isteyebilirsin.',
     },
   ])
   const [draft, setDraft] = useState('')
@@ -56,6 +121,10 @@ export default function AssistantChat() {
     }
     return null
   }, [messages])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading])
 
   async function submit(mode: 'chat' | 'plan', forcedPrompt?: string) {
     const content = (forcedPrompt ?? draft).trim()
@@ -113,114 +182,177 @@ export default function AssistantChat() {
     void submit('chat')
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      void submit('chat')
+    }
+  }
+
+  const hasCitations = latestAssistant?.citations && latestAssistant.citations.length > 0
+  const hasPlanBlocks = latestAssistant?.planBlocks && latestAssistant.planBlocks.length > 0
+
   return (
-    <section className="assistant-page">
-      <header className="assistant-page__header">
-        <h2 className="assistant-page__title">Asistan</h2>
-        <p className="assistant-page__subtitle">
-          Kaynaklı soru-cevap ve kişiselleştirilmiş çalışma planı
-        </p>
+    <section className="ac">
+      {/* Header */}
+      <header className="ac__header">
+        <div className="ac__header-left">
+          <AILabel size="xl" />
+          <div>
+            <h2 className="ac__title">TEDY Asistan</h2>
+            <p className="ac__subtitle">Kaynaklı soru-cevap ve kişisel çalışma planı</p>
+          </div>
+        </div>
       </header>
 
-      <div className="assistant-page__quick-prompts" aria-label="Hızlı sorular">
-        {QUICK_PROMPTS.map(prompt => (
+      {/* Quick prompts */}
+      <div className="ac__prompts">
+        {QUICK_PROMPTS.map(qp => (
           <button
-            key={prompt}
+            key={qp.text}
             type="button"
-            className="assistant-page__quick-btn"
-            onClick={() => {
-              void submit('chat', prompt)
-            }}
+            className="ac__prompt-chip"
+            onClick={() => void submit(qp.mode, qp.text)}
             disabled={loading}
           >
-            {prompt}
+            <qp.icon size={16} />
+            {qp.text}
           </button>
         ))}
       </div>
 
-      <div className="assistant-page__layout">
-        <div className="assistant-page__chat">
-          <div className="assistant-page__messages">
+      <div className="ac__layout">
+        {/* Chat panel */}
+        <div className="ac__chat">
+          <div className="ac__messages">
             {messages.map(msg => (
-              <article
-                key={msg.id}
-                className={`assistant-page__msg assistant-page__msg--${msg.role}`}
-              >
-                <p className="assistant-page__msg-role">
-                  {msg.role === 'user' ? 'Sen' : 'Asistan'}
-                </p>
-                <p className="assistant-page__msg-content">{msg.content}</p>
-                {msg.safetyFlags && msg.safetyFlags.length > 0 && (
-                  <p className="assistant-page__msg-flags">
-                    Güvenlik: {msg.safetyFlags.join(', ')}
-                  </p>
-                )}
+              <article key={msg.id} className={`ac-msg ac-msg--${msg.role}`}>
+                <div className={`ac-msg__avatar ${msg.role === 'assistant' ? 'ac-msg__avatar--ai' : 'ac-msg__avatar--user'}`}>
+                  {msg.role === 'assistant' ? <AILabel size="mini" /> : <span>I</span>}
+                </div>
+                <div className="ac-msg__body">
+                  <span className="ac-msg__role">
+                    {msg.role === 'user' ? 'Işık' : 'Asistan'}
+                  </span>
+                  <p className="ac-msg__content">{msg.content}</p>
+                  {msg.safetyFlags && msg.safetyFlags.length > 0 && (
+                    <div className="ac-msg__flags">
+                      {msg.safetyFlags.map(f => (
+                        <Tag key={f} type="red" size="sm">{f}</Tag>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </article>
             ))}
+
+            {loading && <ThinkingIndicator />}
+            <div ref={messagesEndRef} />
           </div>
 
-          <form className="assistant-page__composer" onSubmit={onSubmit}>
-            <textarea
-              value={draft}
-              onChange={e => setDraft(e.target.value)}
-              rows={4}
-              placeholder="Sorunu yaz..."
-              className="assistant-page__input"
-              disabled={loading}
-            />
-            <div className="assistant-page__actions">
-              <button type="submit" disabled={loading || !draft.trim()} className="assistant-page__action-btn">
-                {loading ? 'Yanıtlanıyor...' : 'Sor'}
-              </button>
-              <button
-                type="button"
-                disabled={loading || !draft.trim()}
-                className="assistant-page__action-btn assistant-page__action-btn--secondary"
-                onClick={() => {
-                  void submit('plan')
-                }}
-              >
-                Çalışma Planı Oluştur
-              </button>
+          {/* Composer */}
+          <form className="ac__composer" onSubmit={onSubmit}>
+            <div className="ac__input-row">
+              <TextArea
+                ref={textareaRef}
+                id="ac-input"
+                labelText=""
+                hideLabel
+                value={draft}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDraft(e.target.value)}
+                onKeyDown={handleKeyDown}
+                rows={2}
+                placeholder={loading ? 'Yanıt bekleniyor...' : 'Bir soru sor veya çalışma planı iste...'}
+                disabled={loading}
+                className="ac__textarea"
+              />
+              <div className="ac__send-group">
+                <IconButton
+                  kind="primary"
+                  label="Gönder"
+                  size="lg"
+                  disabled={loading || !draft.trim()}
+                  type="submit"
+                >
+                  <Send />
+                </IconButton>
+                <IconButton
+                  kind="ghost"
+                  label="Çalışma Planı"
+                  size="lg"
+                  disabled={loading || !draft.trim()}
+                  onClick={() => void submit('plan')}
+                >
+                  <CalendarHeatMap />
+                </IconButton>
+              </div>
             </div>
-            {error && <p className="assistant-page__error">{error}</p>}
+            {error && (
+              <div className="ac__error">
+                <Tag type="red" size="sm">{error}</Tag>
+                <Button
+                  kind="ghost"
+                  size="sm"
+                  renderIcon={Renew}
+                  onClick={() => {
+                    setError(null)
+                    const lastUser = [...messages].reverse().find(m => m.role === 'user')
+                    if (lastUser) void submit('chat', lastUser.content)
+                  }}
+                >
+                  Tekrar dene
+                </Button>
+              </div>
+            )}
           </form>
         </div>
 
-        <aside className="assistant-page__side">
-          <section className="assistant-page__panel">
-            <h3>Kaynaklar</h3>
-            {latestAssistant?.citations && latestAssistant.citations.length > 0 ? (
-              <ul className="assistant-page__list">
-                {latestAssistant.citations.map(c => (
-                  <li key={c.id}>
-                    <p className="assistant-page__list-title">{c.id} • {c.path}</p>
-                    <p className="assistant-page__list-snippet">{c.snippet}</p>
+        {/* Side panels */}
+        <aside className="ac__side">
+          <Tile className="ac__panel">
+            <h4 className="ac__panel-title">
+              <DocumentView size={16} /> Kaynaklar
+            </h4>
+            {hasCitations ? (
+              <ul className="ac__ref-list">
+                {latestAssistant!.citations!.map(c => (
+                  <li key={c.id} className="ac__ref-item">
+                    <span className="ac__ref-path">{c.path}</span>
+                    <p className="ac__ref-snippet">{c.snippet}</p>
+                    {c.confidence > 0 && (
+                      <Tag type={c.confidence >= 0.7 ? 'green' : c.confidence >= 0.4 ? 'blue' : 'gray'} size="sm">
+                        {Math.round(c.confidence * 100)}%
+                      </Tag>
+                    )}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="assistant-page__muted">Henüz kaynak bulunmuyor.</p>
+              <p className="ac__muted">Soru sorduğunda kaynaklar burada görünecek.</p>
             )}
-          </section>
+          </Tile>
 
-          <section className="assistant-page__panel">
-            <h3>Plan Blokları</h3>
-            {latestAssistant?.planBlocks && latestAssistant.planBlocks.length > 0 ? (
-              <ul className="assistant-page__list">
-                {latestAssistant.planBlocks.map((b, idx) => (
-                  <li key={`${b.day}-${idx}`}>
-                    <p className="assistant-page__list-title">{b.day} • {b.title}</p>
-                    <p className="assistant-page__list-snippet">
-                      {b.estimated_minutes} dk • {b.actions.join(' | ')}
-                    </p>
+          <Tile className="ac__panel">
+            <h4 className="ac__panel-title">
+              <Time size={16} /> Plan Blokları
+            </h4>
+            {hasPlanBlocks ? (
+              <ul className="ac__ref-list">
+                {latestAssistant!.planBlocks!.map((b, idx) => (
+                  <li key={`${b.day}-${idx}`} className="ac__plan-item">
+                    <div className="ac__plan-header">
+                      <Tag type="blue" size="sm">{b.day}</Tag>
+                      <span className="ac__plan-time">{b.estimated_minutes} dk</span>
+                    </div>
+                    <span className="ac__plan-title">{b.title}</span>
+                    <p className="ac__plan-actions">{b.actions.join(' \u2022 ')}</p>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="assistant-page__muted">Plan oluşturulduğunda burada görünecek.</p>
+              <p className="ac__muted">Çalışma planı oluşturulduğunda burada görünecek.</p>
             )}
-          </section>
+          </Tile>
         </aside>
       </div>
     </section>
