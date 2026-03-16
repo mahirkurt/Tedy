@@ -30,6 +30,7 @@ python src/dashboard_api.py   # Start dashboard server on port 8085
 cd dashboard && npm run dev   # Dev mode with hot reload on port 3000
 cd dashboard && npm run build # Build production bundle to dashboard-dist/
 cd dashboard && npm run lint  # ESLint check (TypeScript + React hooks)
+python src/dashboard_api.py --generate-key  # Generate a new API key for third-party access
 
 # Google OAuth setup (first-time only)
 python src/google_auth.py
@@ -166,7 +167,7 @@ Runtime dependencies are installed via pip but not fully listed in `requirements
 - `token.json` — Generated after first Google auth (primary/student account)
 - `token_huriye.json` — OAuth token for huriye.murzoglu@gmail.com (Classroom teacher/owner + AI enrichment target)
 - `token_mahirkurt.json` — OAuth token for drmahirkurt@gmail.com (optional)
-- `.env` — Contains `GEMINI_API_KEY`, `PORTAL_USERNAME`, `PORTAL_PASSWORD`
+- `.env` — Contains `GEMINI_API_KEY`, `PORTAL_USERNAME`, `PORTAL_PASSWORD`, `API_KEYS` (third-party API keys, format: `label:tdyK_...`). Generate with `python src/dashboard_api.py --generate-key`
 
 **Note:** `google_auth.py` always uses `run_local_server(port=8090)`. After adding new scopes, delete the token file and re-run auth. Classroom scopes are included by default.
 

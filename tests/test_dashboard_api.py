@@ -526,3 +526,56 @@ class TestStaticServing:
         resp = client.get("/")
         # Either serves SPA (200) or returns "not built" message (404)
         assert resp.status_code in (200, 404)
+
+
+class TestApiKeyAuth:
+    """Tests for API key authentication (header and query param)."""
+
+    @pytest.fixture(autouse=True)
+    def _disable_test_bypass(self, monkeypatch):
+        """Disable TEST_AUTH_BYPASS so we can test real auth paths."""
+        monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS", False)
+
+    @pytest.fixture
+    def valid_key(self, monkeypatch):
+        key = "tdyK_test-valid-key-for-unit-tests"
+        monkeypatch.setattr(dashboard_api, "API_KEYS", [("test", key)])
+        return key
+
+    def test_bearer_header_grants_access(self, client, valid_key):
+        resp = client.get(
+            "/api/schedule",
+            headers={"Authorization": f"Bearer {valid_key}"},
+        )
+        assert resp.status_code == 200
+
+    def test_query_param_grants_access(self, client, valid_key):
+        resp = client.get(f"/api/schedule?api_key={valid_key}")
+        assert resp.status_code == 200
+
+    def test_invalid_key_returns_401(self, client, valid_key):
+        resp = client.get(
+            "/api/schedule",
+            headers={"Authorization": "Bearer tdyK_wrong-key"},
+        )
+        assert resp.status_code == 401
+
+    def test_no_auth_returns_401(self, client, monkeypatch):
+        monkeypatch.setattr(dashboard_api, "API_KEYS", [])
+        resp = client.get("/api/schedule")
+        assert resp.status_code == 401
+
+    def test_non_tdyk_prefix_rejected(self, client, valid_key):
+        resp = client.get(
+            "/api/schedule",
+            headers={"Authorization": "Bearer not-a-valid-prefix-key"},
+        )
+        assert resp.status_code == 401
+
+    def test_empty_api_keys_disables_key_auth(self, client, monkeypatch):
+        monkeypatch.setattr(dashboard_api, "API_KEYS", [])
+        resp = client.get(
+            "/api/schedule",
+            headers={"Authorization": "Bearer tdyK_anything"},
+        )
+        assert resp.status_code == 401

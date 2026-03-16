@@ -1,6 +1,7 @@
 """Dashboard API server — serves TED data as JSON endpoints."""
 import base64
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -59,6 +60,37 @@ ASSISTANT_ADMIN_EMAILS = {
 
 _ASSISTANT_RUNTIME: AssistantRuntime | None = None
 
+
+def _load_api_keys() -> list[tuple[str, str]]:
+    """Load API keys from env. Format: 'label:key,label2:key2' or 'key1,key2'."""
+    raw = os.environ.get("API_KEYS", "").strip()
+    if not raw:
+        return []
+    keys = []
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        if ":" in entry:
+            label, key = entry.split(":", 1)
+            keys.append((label.strip(), key.strip()))
+        else:
+            keys.append(("default", entry))
+    return keys
+
+
+API_KEYS = _load_api_keys()
+
+
+def _validate_api_key(provided: str) -> str | None:
+    """Return label if key is valid, None otherwise. Timing-safe."""
+    if not provided or not provided.startswith("tdyK_"):
+        return None
+    for label, stored_key in API_KEYS:
+        if hmac.compare_digest(provided, stored_key):
+            return label
+    return None
+
 DAY_NAMES = {
     0: "Pazartesi", 1: "Salı", 2: "Çarşamba",
     3: "Perşembe", 4: "Cuma", 5: "Cumartesi", 6: "Pazar"
@@ -94,9 +126,21 @@ def require_auth(f):
     def decorated(*args, **kwargs):
         if TEST_AUTH_BYPASS:
             return f(*args, **kwargs)
-        if not session.get("user_email"):
-            return jsonify({"error": "Unauthorized"}), 401
-        return f(*args, **kwargs)
+        if session.get("user_email"):
+            return f(*args, **kwargs)
+        # API key: Authorization header
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            label = _validate_api_key(auth_header[7:])
+            if label is not None:
+                return f(*args, **kwargs)
+        # API key: query parameter
+        query_key = request.args.get("api_key", "")
+        if query_key:
+            label = _validate_api_key(query_key)
+            if label is not None:
+                return f(*args, **kwargs)
+        return jsonify({"error": "Unauthorized"}), 401
     return decorated
 
 
@@ -1517,4 +1561,14 @@ def serve_spa(path=""):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8085, debug=True)
+    import argparse
+    parser = argparse.ArgumentParser(description="TED Dashboard API")
+    parser.add_argument("--generate-key", action="store_true", help="Generate a new API key")
+    args = parser.parse_args()
+    if args.generate_key:
+        key = f"tdyK_{secrets.token_urlsafe(32)}"
+        print(f"\nNew API key: {key}\n")
+        print("Add to .env:  API_KEYS=myapp:" + key)
+        print("Or append:    API_KEYS=...existing...,myapp:" + key)
+    else:
+        app.run(host="0.0.0.0", port=8085, debug=True)
