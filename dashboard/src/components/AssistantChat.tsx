@@ -51,6 +51,15 @@ function toApiMessages(messages: ChatMessage[]) {
   return messages.map(m => ({ role: m.role, content: m.content }))
 }
 
+/** Strip inline citation references like "Kaynaklar: [1] path, [2] path..." from answer text. */
+function stripInlineCitations(text: string): string {
+  return text
+    .replace(/\n?Kaynaklar?:?\s*(\[\d+\][^\n]*\n?)+/gi, '')
+    .replace(/\s*\[\d+\]\s*[^\s,\]]+/g, '')
+    .replace(/Model yanıtı üretilemediği için özet modunda döndüm\.\s*/g, '')
+    .trim()
+}
+
 async function parseJsonSafe(res: Response): Promise<AssistantResponse | { error?: string }> {
   const raw = await res.text()
   const ct = res.headers.get('content-type') || ''
@@ -161,10 +170,11 @@ export default function AssistantChat() {
       }
 
       const out = payload as AssistantResponse
+      const cleanAnswer = stripInlineCitations(out.answer || '') || 'Yanıt üretilemedi.'
       const assistantMsg: ChatMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
-        content: out.answer || 'Yanıt üretilemedi.',
+        content: cleanAnswer,
         citations: out.citations || [],
         safetyFlags: out.safety_flags || [],
         planBlocks: out.plan_blocks || [],

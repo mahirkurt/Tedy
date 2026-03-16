@@ -55,6 +55,8 @@ DEFAULT_EXCLUDED_DIRS = {
     ".playwright-mcp",
     ".worktrees",
     "dashboard/node_modules",
+    "dashboard/src",
+    "dashboard/tests",
     "dashboard-dist",
     "__pycache__",
 }

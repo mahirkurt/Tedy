@@ -2773,6 +2773,18 @@ body {
   flex-shrink: 0;
 }
 
+.ac__send-group .cds--btn--primary {
+  background-color: var(--ted-color-brand-primary);
+}
+
+.ac__send-group .cds--btn--primary:hover {
+  background-color: #001d6c;
+}
+
+.ac__send-group .cds--btn--ghost svg {
+  fill: var(--ted-color-brand-primary);
+}
+
 .ac__error {
   display: flex;
   align-items: center;
