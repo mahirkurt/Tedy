@@ -2,27 +2,32 @@ import { useState } from 'react'
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import { Content, SideNav, SideNavItems, SideNavLink } from '@carbon/react'
 import DashboardHeader from './components/DashboardHeader'
+import DashboardFooter from './components/DashboardFooter'
 import LoginPage from './components/LoginPage'
 import { useAuth } from './hooks/useAuth'
+import { useFocusMode } from './contexts/FocusModeContext'
 import { routes } from './routes'
 
 import TodaySchedule from './components/TodaySchedule'
 import WeeklySchedule from './components/WeeklySchedule'
 import HomeworkTracker from './components/HomeworkTracker'
+import AssistantChat from './components/AssistantChat'
 import GradeTable from './components/GradeTable'
 import PlatformProgress from './components/PlatformProgress'
 import CalendarEvents from './components/CalendarEvents'
 import TeamActivities from './components/TeamActivities'
 import CourseContent from './components/CourseContent'
 import Announcements from './components/Announcements'
+import StudentProfile from './components/StudentProfile'
 
 const COMPONENTS: Record<string, React.ComponentType> = {
-  TodaySchedule, WeeklySchedule, HomeworkTracker, GradeTable,
-  PlatformProgress, CalendarEvents, TeamActivities, CourseContent, Announcements,
+  TodaySchedule, WeeklySchedule, HomeworkTracker, AssistantChat, GradeTable,
+  PlatformProgress, CalendarEvents, TeamActivities, CourseContent, Announcements, StudentProfile,
 }
 
 export default function App() {
   const { user, loading, login, logout } = useAuth()
+  const { focusMode } = useFocusMode()
   const [sideNavExpanded, setSideNavExpanded] = useState(false)
   const location = useLocation()
 
@@ -69,7 +74,7 @@ export default function App() {
           ))}
         </SideNavItems>
       </SideNav>
-      <Content className="app-shell-content">
+      <Content className={`app-shell-content${focusMode ? ' app-shell-content--focus' : ''}`}>
         <Routes>
           {routes.map(r => {
             const Comp = COMPONENTS[r.componentName]
@@ -77,6 +82,7 @@ export default function App() {
           })}
         </Routes>
       </Content>
+      <DashboardFooter />
     </>
   )
 }

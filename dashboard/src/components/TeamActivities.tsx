@@ -1,6 +1,10 @@
-import { Tag, Tile } from '@carbon/react'
+import { Tag,
+  StructuredListWrapper, StructuredListHead, StructuredListRow,
+  StructuredListCell, StructuredListBody,
+} from '@carbon/react'
 import { GroupPresentation } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
+import { useFocusMode } from '../contexts/FocusModeContext'
 import type { TeamActivity, OgepSession } from '../types'
 
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000
@@ -11,76 +15,118 @@ function parseTurkishDate(s: string): Date | null {
   return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5])
 }
 
+function formatShortDate(s: string): string {
+  const m = s.match(/(\d{2})\.(\d{2})\.\d{4}\s+(\d{2}):(\d{2})/)
+  if (!m) return s
+  return `${m[1]}.${m[2]} ${m[3]}:${m[4]}`
+}
+
 export default function TeamActivities() {
   const { data } = useApi<{ activities: TeamActivity[]; ogep: OgepSession[] }>(
     '/api/teams', { activities: [], ogep: [] }
   )
+  const { focusMode } = useFocusMode()
 
   const now = Date.now()
-  const activities = data.activities.filter(a => {
+  let activities = data.activities.filter(a => {
     const d = parseTurkishDate(a["Çalışma Başlangıç"])
     return !d || d.getTime() >= now - TWO_WEEKS_MS
   })
-  const ogep = data.ogep.filter(s => {
+  let ogep = data.ogep.filter(s => {
     const d = parseTurkishDate(s["Çalışma Başlangıç"])
     return !d || d.getTime() >= now - TWO_WEEKS_MS
   })
+
+  // Focus mode: show only upcoming
+  if (focusMode) {
+    activities = activities.filter(a => {
+      const d = parseTurkishDate(a["Çalışma Başlangıç"])
+      return !d || d.getTime() >= now
+    })
+    ogep = ogep.filter(s => {
+      const d = parseTurkishDate(s["Çalışma Başlangıç"])
+      return !d || d.getTime() >= now
+    })
+  }
 
   if (activities.length === 0 && ogep.length === 0) return null
 
   return (
     <div className="dashboard-card">
-      <h4 style={{ margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <h4 className="dashboard-card__title">
         <GroupPresentation size={20} />
         Takım Çalışmaları & ÖGEP
       </h4>
 
       {activities.length > 0 && (
         <>
-          <h5 style={{ fontSize: '0.8125rem', margin: '0 0 0.5rem', color: '#525252' }}>Academy+</h5>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', marginBottom: '1rem' }}>
-            {activities.map((a, i) => (
-              <Tile key={i} style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontWeight: 500, fontSize: '0.8125rem' }}>{a["Academy+"]}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#525252' }}>
-                    {a["Çalışma Başlangıç"]} &mdash; {a["Çalışma Bitiş"]}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <Tag type={a["Katılım Durumu"] === "Katıldı" ? 'green' : 'gray'} size="sm">
-                    {a["Katılım Durumu"] || 'Bekliyor'}
-                  </Tag>
-                  <Tag type={a["Teams Link"] === "Yüz Yüze" ? 'blue' : 'teal'} size="sm">
-                    {a["Teams Link"]}
-                  </Tag>
-                </div>
-              </Tile>
-            ))}
-          </div>
+          <h5 className="team-section-label">Academy+</h5>
+          <StructuredListWrapper isCondensed>
+            <StructuredListHead>
+              <StructuredListRow head>
+                <StructuredListCell head>Etkinlik</StructuredListCell>
+                <StructuredListCell head>Tarih</StructuredListCell>
+                <StructuredListCell head>Durum</StructuredListCell>
+                {!focusMode && <StructuredListCell head>Konum</StructuredListCell>}
+              </StructuredListRow>
+            </StructuredListHead>
+            <StructuredListBody>
+              {activities.map((a, i) => (
+                <StructuredListRow key={i}>
+                  <StructuredListCell className="team-cell-name">
+                    {a["Academy+"]}
+                  </StructuredListCell>
+                  <StructuredListCell className="team-cell-date">
+                    {formatShortDate(a["Çalışma Başlangıç"])}
+                  </StructuredListCell>
+                  <StructuredListCell>
+                    <Tag type={a["Katılım Durumu"] === "Katıldı" ? 'green' : 'gray'} size="sm">
+                      {a["Katılım Durumu"] || 'Bekliyor'}
+                    </Tag>
+                  </StructuredListCell>
+                  {!focusMode && (
+                    <StructuredListCell>
+                      <Tag type={a["Teams Link"] === "Yüz Yüze" ? 'blue' : 'teal'} size="sm">
+                        {a["Teams Link"]}
+                      </Tag>
+                    </StructuredListCell>
+                  )}
+                </StructuredListRow>
+              ))}
+            </StructuredListBody>
+          </StructuredListWrapper>
         </>
       )}
 
       {ogep.length > 0 && (
         <>
-          <h5 style={{ fontSize: '0.8125rem', margin: '0 0 0.5rem', color: '#525252' }}>ÖGEP Oturumları</h5>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-            {ogep.map((s, i) => (
-              <Tile key={i} style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontWeight: 500, fontSize: '0.8125rem' }}>
+          <h5 className="team-section-label">ÖGEP Oturumları</h5>
+          <StructuredListWrapper isCondensed>
+            <StructuredListHead>
+              <StructuredListRow head>
+                <StructuredListCell head>Oturum</StructuredListCell>
+                <StructuredListCell head>Tarih</StructuredListCell>
+                <StructuredListCell head>Katılım</StructuredListCell>
+              </StructuredListRow>
+            </StructuredListHead>
+            <StructuredListBody>
+              {ogep.map((s, i) => (
+                <StructuredListRow key={i}>
+                  <StructuredListCell className="team-cell-name">
                     {s["ÖGEP (Öğrenci Gelişim Programı)"]}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#525252' }}>
-                    {s["Çalışma Başlangıç"]} &mdash; {s["Çalışma Bitiş"]}
-                  </div>
-                </div>
-                <Tag type={s["Katılım Durumu"] === "Katıldı" ? 'green' : 'gray'} size="sm">
-                  {s["Katılım Durumu"] || 'Bekliyor'}
-                </Tag>
-              </Tile>
-            ))}
-          </div>
+                  </StructuredListCell>
+                  <StructuredListCell className="team-cell-date">
+                    {formatShortDate(s["Çalışma Başlangıç"])}
+                  </StructuredListCell>
+                  <StructuredListCell>
+                    <Tag type={s["Katılım Durumu"] === "Katıldı" ? 'green' : 'gray'} size="sm">
+                      {s["Katılım Durumu"] || 'Bekliyor'}
+                    </Tag>
+                  </StructuredListCell>
+                </StructuredListRow>
+              ))}
+            </StructuredListBody>
+          </StructuredListWrapper>
         </>
       )}
     </div>

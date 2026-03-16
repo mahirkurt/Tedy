@@ -1,42 +1,177 @@
-import { Tag, Tile, ComposedModal, ModalHeader, ModalBody } from '@carbon/react'
-import { Task, Timer, Document } from '@carbon/icons-react'
+import { useState, useEffect, useMemo } from 'react'
+import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, Button, InlineLoading } from '@carbon/react'
+import { Task, Timer, Document, CheckmarkFilled, CloseFilled, ChevronDown, ChevronUp } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import type { HomeworkItem } from '../types'
-import { parseDeadline, formatTurkishDate } from '../utils/formatters'
+import { parseDeadline, formatTurkishDate, getHomeworkStatus } from '../utils/formatters'
 import { getCountdown } from '../utils/countdown'
-import { useState, useEffect } from 'react'
 
-const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000
+type HomeworkGroupKey = 'aktif' | 'yapilan' | 'tamamlanan' | 'yapilmayan'
+
+function normalizeStatus(value: string): 'Yaptı' | 'Yapmadı' | 'Eksik' | 'Değerlendirilmemiş' | string {
+  const raw = (value || '').trim().toLocaleLowerCase('tr-TR')
+  if (['yaptı', 'yapti', 'tamamlandı', 'tamamlandi', 'done'].includes(raw)) return 'Yaptı'
+  if (['yapmadı', 'yapmadi', 'missing', 'incomplete'].includes(raw)) return 'Yapmadı'
+  if (raw === 'eksik') return 'Eksik'
+  if (['değerlendirilmemiş', 'degerlendirilmemis', 'bekliyor', 'pending'].includes(raw)) return 'Değerlendirilmemiş'
+  return value
+}
+
+function isTeacherResolvedStatus(status: string): boolean {
+  const n = normalizeStatus(status)
+  return n === 'Yaptı' || n === 'Yapmadı' || n === 'Eksik'
+}
 
 export default function HomeworkTracker() {
-  const { data: hwData } = useApi<{ summary: string; homework: HomeworkItem[] }>(
+  const { data: hwData, refresh: refreshHomework } = useApi<{ summary: string; homework: HomeworkItem[] }>(
     '/api/homework', { summary: '', homework: [] }
+  )
+  const { data: enrichmentData } = useApi<Record<string, { course: string; title: string; note: string; type: string }>>(
+    '/api/enrichment', {}
   )
 
   const [selectedHw, setSelectedHw] = useState<HomeworkItem | null>(null)
   const [, setTick] = useState(0)
+  const [collapsed, setCollapsed] = useState<Record<HomeworkGroupKey, boolean>>({
+    aktif: false,
+    yapilan: false,
+    tamamlanan: true,
+    yapilmayan: true,
+  })
+  const [markingKey, setMarkingKey] = useState<string | null>(null)
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 60000)
     return () => clearInterval(t)
   }, [])
 
-  const now = Date.now()
-  const portalHw = (hwData.homework || []).filter(hw => {
-    const d = parseDeadline(hw["Ödev Son Teslim Tarihi"])
-    return !d || d.getTime() >= now - TWO_WEEKS_MS
-  })
-
-  const sortedPortal = [...portalHw].sort((a, b) => {
+  // Sort by deadline descending (furthest first)
+  const sorted = [...(hwData.homework || [])].sort((a, b) => {
     const aDate = parseDeadline(a["Ödev Son Teslim Tarihi"])
     const bDate = parseDeadline(b["Ödev Son Teslim Tarihi"])
-    return (aDate?.getTime() || 0) - (bDate?.getTime() || 0)
+    return (bDate?.getTime() || 0) - (aDate?.getTime() || 0)
   })
+
+  const grouped = useMemo(() => {
+    const aktif: HomeworkItem[] = []
+    const yapilan: HomeworkItem[] = []
+    const tamamlanan: HomeworkItem[] = []
+    const yapilmayan: HomeworkItem[] = []
+
+    for (const hw of sorted) {
+      const normalized = normalizeStatus(hw["Ödev Durumu"])
+      const teacherResolved = isTeacherResolvedStatus(normalized)
+
+      if (normalized === 'Yaptı') {
+        tamamlanan.push(hw)
+        continue
+      }
+
+      if (normalized === 'Yapmadı' || normalized === 'Eksik') {
+        yapilmayan.push(hw)
+        continue
+      }
+
+      if (hw.student_marked_done && !teacherResolved) {
+        yapilan.push(hw)
+        continue
+      }
+
+      const deadline = parseDeadline(hw["Ödev Son Teslim Tarihi"])
+      const countdown = getCountdown(deadline)
+      if (countdown.urgency !== 'expired') {
+        aktif.push(hw)
+      } else {
+        yapilmayan.push(hw)
+      }
+    }
+
+    return { aktif, yapilan, tamamlanan, yapilmayan }
+  }, [sorted])
+
+  const { aktif, yapilan, tamamlanan, yapilmayan } = grouped
 
   const summaryLines = hwData.summary.split('\n').filter(l => l.trim())
 
+  const toggleSection = (key: HomeworkGroupKey) => {
+    setCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const handleMarkDone = async (hw: HomeworkItem) => {
+    const fallbackKey = `${hw["Ders Adı"]}|${hw["Ödev Başlığı"]}|${hw["Ödev Son Teslim Tarihi"]}`
+    const key = hw.homework_key || fallbackKey
+    setMarkingKey(key)
+    try {
+      const res = await fetch('/api/homework/mark-done', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          homework_key: hw.homework_key,
+          "Ders Adı": hw["Ders Adı"],
+          "Ödev Başlığı": hw["Ödev Başlığı"],
+          "Ödev Son Teslim Tarihi": hw["Ödev Son Teslim Tarihi"],
+        }),
+      })
+      if (res.ok) {
+        refreshHomework()
+        window.dispatchEvent(new Event('tedy:homework-updated'))
+      }
+    } finally {
+      setMarkingKey(null)
+    }
+  }
+
+  const renderAccordionSection = ({
+    keyName,
+    title,
+    labelClass,
+    items,
+    showDoneAction,
+  }: {
+    keyName: HomeworkGroupKey
+    title: string
+    labelClass?: string
+    items: HomeworkItem[]
+    showDoneAction?: boolean
+  }) => {
+    if (items.length === 0) return null
+    return (
+      <div className="hw-section" key={keyName}>
+        <button
+          className="hw-section__header hw-section__header--toggle"
+          onClick={() => toggleSection(keyName)}
+          aria-expanded={!collapsed[keyName]}
+          type="button"
+        >
+          <span className={["hw-section__label", labelClass].filter(Boolean).join(' ')}>{title}</span>
+          <span className="hw-section__count">{items.length}</span>
+          {collapsed[keyName] ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+        </button>
+        {!collapsed[keyName] && (
+          <div className="stack-sm">
+            {items.map((hw, i) => {
+              const actionKey = hw.homework_key || `${hw["Ders Adı"]}|${hw["Ödev Başlığı"]}|${hw["Ödev Son Teslim Tarihi"]}`
+              const isMarking = markingKey === actionKey
+              return (
+                <HomeworkCard
+                  key={`${keyName}-${i}`}
+                  hw={hw}
+                  onOpen={setSelectedHw}
+                  showDoneAction={showDoneAction}
+                  onDone={showDoneAction ? handleMarkDone : undefined}
+                  doneLoading={isMarking}
+                />
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <>
-    <div className="dashboard-card dashboard-card--accent">
+    <div className="dashboard-card">
       <h4 className="dashboard-card__title dashboard-card__title--tight">
         <Task size={20} />
         Ödevler & Geri Sayım
@@ -47,47 +182,37 @@ export default function HomeworkTracker() {
         </p>
       )}
 
-      <div className="stack-sm">
-        {sortedPortal.slice(0, 15).map((hw, i) => {
-          const deadline = parseDeadline(hw["Ödev Son Teslim Tarihi"])
-          const countdown = getCountdown(deadline)
-          const tileClass = [
-            'homework-item',
-            'dashboard-list-tile',
-            hw.detail ? 'homework-item--clickable' : '',
-          ].filter(Boolean).join(' ')
+      {renderAccordionSection({
+        keyName: 'aktif',
+        title: 'Aktif Ödevler',
+        items: aktif,
+        showDoneAction: true,
+      })}
 
-          return (
-            <Tile key={`p-${i}`} onClick={() => hw.detail && setSelectedHw(hw)}
-              className={tileClass}>
-              <div className="homework-item__row">
-                <div className="homework-item__main">
-                  <div className="homework-item__course">
-                    {hw.normalized_course || hw["Ders Adı"]}
-                  </div>
-                  <div className="homework-item__title">{hw["Ödev Başlığı"]}</div>
-                  <div className="homework-item__deadline">
-                    Teslim: {formatTurkishDate(hw["Ödev Son Teslim Tarihi"])}
-                  </div>
-                </div>
-                <div className="homework-item__countdown">
-                  {countdown.urgency !== 'expired' && (
-                    <div className={countdown.urgency === 'urgent' ? 'tag-urgent' : ''}>
-                      <Tag type={countdown.urgency === 'urgent' ? 'red' : countdown.urgency === 'soon' ? 'warm-gray' : 'blue'} size="sm">
-                        <Timer size={12} /> {countdown.text}
-                      </Tag>
-                    </div>
-                  )}
-                  {countdown.urgency === 'expired' && (
-                    <Tag type="warm-gray" size="sm">Süresi doldu</Tag>
-                  )}
-                </div>
-              </div>
-            </Tile>
-          )
-        })}
-      </div>
+      {renderAccordionSection({
+        keyName: 'yapilan',
+        title: 'YAPILAN',
+        labelClass: 'hw-section__label--info',
+        items: yapilan,
+      })}
 
+      {renderAccordionSection({
+        keyName: 'tamamlanan',
+        title: 'Tamamlandı',
+        labelClass: 'hw-section__label--success',
+        items: tamamlanan,
+      })}
+
+      {renderAccordionSection({
+        keyName: 'yapilmayan',
+        title: 'Yapılmayan',
+        labelClass: 'hw-section__label--error',
+        items: yapilmayan,
+      })}
+
+      {aktif.length === 0 && yapilan.length === 0 && tamamlanan.length === 0 && yapilmayan.length === 0 && (
+        <p className="dashboard-empty-text">Ödev bulunamadı.</p>
+      )}
     </div>
 
     <ComposedModal open={!!selectedHw} onClose={() => setSelectedHw(null)} size="md">
@@ -96,24 +221,207 @@ export default function HomeworkTracker() {
         label={selectedHw?.normalized_course || selectedHw?.["Ders Adı"] || ''}
       />
       <ModalBody>
-        {selectedHw?.detail?.description && (
-          <p className="homework-modal__description">
-            {selectedHw.detail.description}
-          </p>
-        )}
-        {(selectedHw?.detail?.attachments?.length ?? 0) > 0 && (
-          <div className="homework-modal__attachments">
-            <h5 className="homework-modal__attachments-title">Ekler</h5>
-            {selectedHw!.detail!.attachments.map((att, i) => (
-              <a key={i} href={att.url} target="_blank" rel="noopener noreferrer"
-                 className="homework-modal__attachment-link">
-                <Document size={16} /> {att.name}
-              </a>
-            ))}
-          </div>
-        )}
+        {selectedHw && <HomeworkModalBody hw={selectedHw} enrichmentData={enrichmentData} />}
       </ModalBody>
     </ComposedModal>
     </>
+  )
+}
+
+/* ── HomeworkCard ────────────────────────────────────────────────────────── */
+
+function HomeworkCard({
+  hw,
+  onOpen,
+  showDoneAction,
+  onDone,
+  doneLoading,
+}: {
+  hw: HomeworkItem
+  onOpen: (hw: HomeworkItem) => void
+  showDoneAction?: boolean
+  onDone?: (hw: HomeworkItem) => void
+  doneLoading?: boolean
+}) {
+  const deadline = parseDeadline(hw["Ödev Son Teslim Tarihi"])
+  const countdown = getCountdown(deadline)
+
+  const status = hw.student_marked_done
+    ? { label: 'YAPILAN', type: 'blue' as const }
+    : getHomeworkStatus(hw["Ödev Durumu"])
+
+  // Determine left border class
+  let borderClass = ''
+  if (hw.student_marked_done) borderClass = 'homework-item--border-info'
+  else if (hw["Ödev Durumu"] === 'Yaptı') borderClass = 'homework-item--border-success'
+  else if (hw["Ödev Durumu"] === 'Yapmadı' || hw["Ödev Durumu"] === 'Eksik') borderClass = 'homework-item--border-error'
+  else if (countdown.urgency === 'expired') borderClass = 'homework-item--border-gray'
+  else borderClass = 'homework-item--border-info'
+
+  return (
+    <Tile
+      onClick={() => onOpen(hw)}
+      className={['homework-item', 'dashboard-list-tile', 'homework-item--clickable', borderClass].join(' ')}
+    >
+      <div className="homework-item__row">
+        <div className="homework-item__main">
+          <div className="homework-item__course">
+            {hw.normalized_course || hw["Ders Adı"]}
+            {(hw.student_marked_done || (hw["Ödev Durumu"] && hw["Ödev Durumu"] !== 'Değerlendirilmemiş')) && (
+              <Tag
+                type={status.type}
+                size="sm"
+                className="homework-item__status-badge"
+              >
+                {status.type === 'green'
+                  ? <CheckmarkFilled size={12} />
+                  : status.type === 'red'
+                    ? <CloseFilled size={12} />
+                    : null}
+                {' '}{status.label}
+              </Tag>
+            )}
+          </div>
+          <div className="homework-item__title">{hw["Ödev Başlığı"]}</div>
+          <div className="homework-item__deadline">
+            Teslim: {formatTurkishDate(hw["Ödev Son Teslim Tarihi"])}
+          </div>
+          {hw.first_seen && (
+            <div className="homework-item__first-seen" style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary, #525252)', marginTop: '2px' }}>
+              İlk görülme: {formatTurkishDate(hw.first_seen)}
+            </div>
+          )}
+        </div>
+        <div className="homework-item__countdown">
+          {countdown.urgency !== 'expired' && (
+            <div className={countdown.urgency === 'critical' || countdown.urgency === 'urgent' ? 'tag-urgent' : ''}>
+              <Tag type={countdown.urgency === 'critical' ? 'red' : countdown.urgency === 'urgent' ? 'red' : countdown.urgency === 'soon' ? 'warm-gray' : 'blue'} size="sm">
+                <Timer size={12} /> {countdown.text}
+              </Tag>
+            </div>
+          )}
+          {countdown.urgency === 'expired' && (
+            <Tag type="warm-gray" size="sm">Süresi doldu</Tag>
+          )}
+
+          {showDoneAction && onDone && (
+            <div
+              className="homework-item__action"
+              onClick={(e) => {
+                e.stopPropagation()
+              }}
+            >
+              {doneLoading ? (
+                <InlineLoading description="Kaydediliyor" status="active" />
+              ) : (
+                <Button
+                  size="sm"
+                  kind="primary"
+                  onClick={() => onDone(hw)}
+                >
+                  Yaptım
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="hw-countdown-bar">
+        <div
+          className={`hw-countdown-bar__fill hw-countdown-bar__fill--${countdown.urgency}`}
+          style={{ width: `${countdown.fraction * 100}%` }}
+        />
+      </div>
+    </Tile>
+  )
+}
+
+/* ── HomeworkModalBody ───────────────────────────────────────────────────── */
+
+function HomeworkModalBody({ hw, enrichmentData }: { hw: HomeworkItem; enrichmentData: Record<string, { course: string; title: string; note: string; type: string }> }) {
+  const deadline = parseDeadline(hw["Ödev Son Teslim Tarihi"])
+  const countdown = getCountdown(deadline)
+  const status = hw.student_marked_done
+    ? { label: 'YAPILAN', type: 'blue' as const }
+    : getHomeworkStatus(hw["Ödev Durumu"])
+
+  const enrichKey = `${hw.normalized_course || hw["Ders Adı"]}|${hw["Ödev Başlığı"]}`
+  const enrichNote = enrichmentData?.[enrichKey]?.note
+
+  const descParagraphs = hw.detail?.description
+    ? hw.detail.description.split('\n').filter(l => l.trim())
+    : []
+
+  return (
+    <div className="homework-modal__body">
+      {/* Status + Meta row */}
+      <div className="homework-modal__meta">
+        <Tag type={status.type} size="md">
+          {status.type === 'green' && <CheckmarkFilled size={14} />}
+          {status.type === 'red' && <CloseFilled size={14} />}
+          {' '}{status.label}
+        </Tag>
+        {hw["Ödev Kaynağı"] && (
+          <span className="homework-modal__source">{hw["Ödev Kaynağı"]}</span>
+        )}
+      </div>
+
+      {/* Deadline */}
+      <div className="homework-modal__deadline-row">
+        <span className="homework-modal__deadline-label">Son teslim:</span>
+        <span className="homework-modal__deadline-value">
+          {formatTurkishDate(hw["Ödev Son Teslim Tarihi"])}
+        </span>
+        {countdown.urgency !== 'expired' ? (
+          <Tag
+            type={countdown.urgency === 'critical' || countdown.urgency === 'urgent' ? 'red' : countdown.urgency === 'soon' ? 'warm-gray' : 'blue'}
+            size="sm"
+          >
+            <Timer size={12} /> {countdown.text}
+          </Tag>
+        ) : (
+          <Tag type="warm-gray" size="sm">Süresi doldu</Tag>
+        )}
+      </div>
+
+      {/* First seen */}
+      {hw.first_seen && (
+        <div className="homework-modal__deadline-row" style={{ marginTop: '0.25rem' }}>
+          <span className="homework-modal__deadline-label">İlk görülme:</span>
+          <span className="homework-modal__deadline-value">
+            {formatTurkishDate(hw.first_seen)}
+          </span>
+        </div>
+      )}
+
+      {/* Description */}
+      {descParagraphs.length > 0 && (
+        <div className="homework-modal__description">
+          {descParagraphs.map((para, i) => (
+            <p key={i} className="homework-modal__description-para">{para}</p>
+          ))}
+        </div>
+      )}
+
+      {/* Attachments */}
+      {(hw.detail?.attachments?.length ?? 0) > 0 && (
+        <div className="homework-modal__attachments">
+          <h5 className="homework-modal__attachments-title">Ekler</h5>
+          {hw.detail!.attachments.map((att, i) => (
+            <a key={i} href={att.url} target="_blank" rel="noopener noreferrer"
+               className="homework-modal__attachment-link">
+              <Document size={16} /> {att.name}
+            </a>
+          ))}
+        </div>
+      )}
+
+      {enrichNote && (
+        <div className="homework-modal__enrichment">
+          <h5 className="homework-modal__enrichment-title">🤖 Gemini Notu</h5>
+          <p className="homework-modal__enrichment-text">{enrichNote}</p>
+        </div>
+      )}
+    </div>
   )
 }

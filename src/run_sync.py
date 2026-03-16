@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TED Portal auto-sync: scrape all data and smart-sync to Google.
+"""TED Portal auto-sync: scrape all data and write local outputs.
 
 Designed to run via crontab every 15 minutes.
 """
@@ -12,24 +12,27 @@ from datetime import datetime
 # Ensure project root for imports
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, PROJECT_ROOT)
-os.chdir(PROJECT_ROOT)
 
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
-
-from src.scrape_all import (
-    create_driver, login, scrape_ders_programi, scrape_odevlerim,
-    scrape_takim_calismalari, scrape_takvim, scrape_ders_icerikleri,
-    scrape_ogep, scrape_gelisim_raporu, scrape_duyurular, OUTPUT_DIR,
+from src.scrape_all import (  # noqa: E402
+    OUTPUT_DIR,
+    create_driver,
+    login,
+    scrape_ders_icerikleri,
+    scrape_ders_programi,
+    scrape_duyurular,
+    scrape_gelisim_raporu,
+    scrape_odevlerim,
+    scrape_ogep,
+    scrape_ogrenci_profili,
+    scrape_takim_calismalari,
+    scrape_takvim,
 )
-from src.sync_to_google import (
-    get_services, get_or_create_calendar,
-    fetch_existing_events,
-    sync_ders_programi, sync_takvim, sync_ogep,
-    sync_attachments_to_drive,
-)
+from src.assistant_core import perform_incremental_reindex  # noqa: E402
 
 
 def main():
+    os.chdir(PROJECT_ROOT)
+
     start_time = time.time()
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"\n{'='*60}")
@@ -66,6 +69,7 @@ def main():
         # 2. Scrape all sources
         data = {"scraped_at": datetime.now().isoformat()}
         scrapers = [
+            ("ogrenci_profili", lambda d: scrape_ogrenci_profili(d)),
             ("ders_programi", lambda d: scrape_ders_programi(d)),
             ("odevlerim", lambda d: scrape_odevlerim(d)),
             ("takim_calismalari", lambda d: scrape_takim_calismalari(d)),
@@ -110,24 +114,7 @@ def main():
     finally:
         driver.quit()
 
-    # 3. Calendar + Drive sync (isikkurtx only)
-    drive_uploads = {}
-    try:
-        print("\n--- Google Calendar + Drive Sync ---")
-        cal_svc, drive_svc = get_services()
-        cal_id = get_or_create_calendar(cal_svc, "TED Rönesans")
-        existing_events = fetch_existing_events(cal_svc, cal_id)
-        print(f"  Existing: {len(existing_events)} events")
-
-        sync_ders_programi(cal_svc, data, cal_id, existing_events)
-        sync_takvim(cal_svc, data, cal_id, existing_events)
-        sync_ogep(cal_svc, data, cal_id, existing_events)
-        drive_uploads = sync_attachments_to_drive(drive_svc, data)
-    except Exception as e:
-        scrape_errors.append(f"google_sync: {e}")
-        print(f"[ERROR] Google sync failed: {e}")
-
-    # 3.5. English Central scrape (separate Selenium session)
+    # 3. English Central scrape (separate Selenium session)
     try:
         from src.scrape_englishcentral import scrape as scrape_ec
         scrape_ec()
@@ -135,7 +122,7 @@ def main():
         scrape_errors.append(f"englishcentral: {e}")
         print(f"[WARN] English Central scrape failed: {e}")
 
-    # 3.6. Achieve3000 scrape (separate Selenium session)
+    # 4. Achieve3000 scrape (separate Selenium session)
     try:
         from src.scrape_achieve3000 import scrape as scrape_a3k
         scrape_a3k()
@@ -143,31 +130,13 @@ def main():
         scrape_errors.append(f"achieve3000: {e}")
         print(f"[WARN] Achieve3000 scrape failed: {e}")
 
-    # 3.7. SEBİT homework scrape (separate Selenium session)
+    # 5. SEBİT homework scrape (separate Selenium session)
     try:
         from src.scrape_sebit_homework import scrape as scrape_sebit_hw
         scrape_sebit_hw()
     except Exception as e:
         scrape_errors.append(f"sebit_homework: {e}")
         print(f"[WARN] SEBİT homework scrape failed: {e}")
-
-    # 4. Classroom sync (huriye account)
-    try:
-        from src.sync_to_classroom import main as sync_classroom
-        classroom_errors = sync_classroom(scraped_data=data, drive_uploads=drive_uploads)
-        if classroom_errors:
-            scrape_errors.extend(classroom_errors)
-    except Exception as e:
-        scrape_errors.append(f"classroom_sync: {e}")
-        print(f"[WARN] Classroom sync failed: {e}")
-
-    # 5. AI Enrichment (will be adapted to Classroom in Task 4)
-    print("\n--- AI Enrichment ---")
-    try:
-        from src.enrich_gemini import enrich_all
-        enrich_all()
-    except Exception as e:
-        print(f"[WARN] Enrichment failed (pending Classroom adaptation): {e}")
 
     # 6. Write health check
     from src.json_utils import atomic_json_dump
@@ -212,6 +181,20 @@ def main():
         },
     }
     atomic_json_dump(health, os.path.join(OUTPUT_DIR, "health.json"))
+
+    # 7. Incremental assistant index refresh (best-effort)
+    if os.environ.get("ASSISTANT_AUTO_REINDEX", "1") == "1":
+        try:
+            idx_stats = perform_incremental_reindex(PROJECT_ROOT)
+            print(
+                "[Assistant] Reindex:"
+                f" files={idx_stats.get('files_indexed', 0)}"
+                f" chunks={idx_stats.get('chunks_indexed', 0)}"
+                f" changed={idx_stats.get('changed_files', 0)}"
+                f" unchanged={idx_stats.get('unchanged_files', 0)}"
+            )
+        except Exception as e:
+            print(f"[WARN] Assistant reindex failed: {e}")
 
     elapsed = time.time() - start_time
     print(f"\nHealth: {'OK' if health['success'] else 'ERRORS'} "

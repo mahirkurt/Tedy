@@ -1,6 +1,11 @@
 import { Calendar } from '@carbon/icons-react'
+import {
+  DataTable, Table, TableHead, TableRow, TableHeader,
+  TableBody, TableCell, TableContainer,
+} from '@carbon/react'
 import { useApi } from '../hooks/useApi'
-import type { CSSProperties } from 'react'
+import { useFocusMode } from '../contexts/FocusModeContext'
+import { cleanTeacherNames, normalizeCourseDisplayName } from '../utils/formatters'
 
 interface ScheduleData {
   latest: {
@@ -24,19 +29,14 @@ function formatTime(cell: string): string {
   return justTime ? justTime[1] : cell
 }
 
-const thStyle: CSSProperties = {
-  padding: '0.5rem 0.75rem',
-  textAlign: 'left',
-  borderBottom: '2px solid #E0E0E0',
-  backgroundColor: '#F4F4F4',
-  fontSize: '0.75rem'
-}
-
-const tdStyle: CSSProperties = {
-  padding: '0.5rem 0.75rem',
-  borderBottom: '1px solid #E0E0E0',
-  verticalAlign: 'top',
-  fontSize: '0.8125rem'
+function isCurrentPeriod(timeCell: string): boolean {
+  const timeMatch = timeCell.match(/(\d{2}):(\d{2})\s*-\s*(\d{2}):(\d{2})/)
+  if (!timeMatch) return false
+  const now = new Date()
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const startMin = +timeMatch[1] * 60 + +timeMatch[2]
+  const endMin = +timeMatch[3] * 60 + +timeMatch[4]
+  return nowMin >= startMin && nowMin < endMin
 }
 
 export default function WeeklySchedule() {
@@ -44,6 +44,7 @@ export default function WeeklySchedule() {
     '/api/schedule',
     { latest: {}, today: '' }
   )
+  const { focusMode } = useFocusMode()
 
   if (loading) return <div className="dashboard-card">Yükleniyor...</div>
 
@@ -53,66 +54,104 @@ export default function WeeklySchedule() {
   const dayHeaders = rows[0] || []
   const dayIndices = DAYS.map(d => dayHeaders.indexOf(d)).filter(i => i >= 0)
 
+  const headers = [
+    { key: 'time', header: 'Saat' },
+    ...DAYS.filter((_, i) => dayIndices[i] !== undefined && dayIndices[i] >= 0)
+      .map(d => ({ key: d, header: d })),
+  ]
+
+  const tableRows = rows.slice(1)
+    .map((row, ri) => {
+      const timeCell = row[0] || ''
+      if (!timeCell) return null
+      const isBreak = row.some(c => SKIP_CONTENT.has(c))
+      if (isBreak || timeCell.includes('Çıkış') || SKIP_CONTENT.has(timeCell)) return null
+
+      const rowData: { id: string; [key: string]: string } = {
+        id: String(ri),
+        time: formatTime(timeCell),
+        _timeRaw: timeCell,
+      }
+      DAYS.forEach((day, ci) => {
+        if (dayIndices[ci] >= 0) {
+          rowData[day] = row[dayIndices[ci]] || ''
+        }
+      })
+      return rowData
+    })
+    .filter(Boolean) as { id: string; [key: string]: string }[]
+
   return (
     <div className="dashboard-card">
-      <h4 style={{ margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <Calendar size={20} />
-        Haftalık Program &mdash; {data.latest.week_label || ''}
-      </h4>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={thStyle}>Saat</th>
-              {DAYS.map((day, i) => (
-                <th key={day}
-                    className={day === data.today ? 'today-column' : ''}
-                    style={{ ...thStyle, ...(dayIndices[i] < 0 ? { display: 'none' } : {}) }}>
-                  {day}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.slice(1).map((row, ri) => {
-              const timeCell = row[0] || ''
-              if (!timeCell) return null
-              // Skip break/meal rows
-              const isBreak = row.some(c => SKIP_CONTENT.has(c))
-              if (isBreak || timeCell.includes('Çıkış') || SKIP_CONTENT.has(timeCell)) return null
-              return (
-                <tr key={ri}>
-                  <td style={{ ...tdStyle, fontWeight: 600, whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
-                    {formatTime(timeCell)}
-                  </td>
-                  {dayIndices.map((di, ci) => {
-                    const cell = row[di] || ''
-                    const lines = cell.split('\n')
-                    const isToday = DAYS[ci] === data.today
-                    return (
-                      <td key={ci}
-                          className={isToday ? 'today-column' : ''}
-                          style={{ ...tdStyle, ...(isToday ? { backgroundColor: '#EDF5FF' } : {}) }}>
-                        {lines[0] && (
-                          <>
-                            <div style={{ fontWeight: 500 }}>
-                              {lines[0].trim()}
-                            </div>
-                            {lines[1] && (
-                              <div style={{ fontSize: '0.6875rem', color: '#525252' }}>
-                                {lines.slice(1).join(', ').trim()}
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </td>
-                    )
-                  })}
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      <div className="schedule-table">
+      <TableContainer
+        title={
+          <span className="dashboard-card__title dashboard-card__title--tight">
+            <Calendar size={20} />
+            Haftalık Program &mdash; {data.latest.week_label || ''}
+          </span>
+        }
+      >
+        <DataTable rows={tableRows} headers={headers} size="xs">
+          {({ rows: dtRows, headers: dtHeaders, getTableProps, getHeaderProps, getRowProps }) => (
+            <Table {...getTableProps()}>
+              <TableHead>
+                <TableRow>
+                  {dtHeaders.map(header => (
+                    <TableHeader
+                      {...getHeaderProps({ header })}
+                      key={header.key}
+                      className={header.key === data.today ? 'today-column' : ''}
+                    >
+                      {header.header}
+                    </TableHeader>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {dtRows.map(row => {
+                  const rawTime = tableRows.find(r => r.id === row.id)?._timeRaw || ''
+                  const active = isCurrentPeriod(rawTime)
+                  return (
+                    <TableRow
+                      {...getRowProps({ row })}
+                      key={row.id}
+                      className={active ? 'lesson-active' : ''}
+                    >
+                      {row.cells.map(cell => {
+                        const isToday = cell.info.header === data.today
+                        const isTime = cell.info.header === 'time'
+                        const cellValue = String(cell.value || '')
+                        const lines = cellValue.split('\n')
+
+                        return (
+                          <TableCell
+                            key={cell.id}
+                            className={isToday ? 'today-column' : ''}
+                          >
+                            {isTime ? (
+                              <span className="schedule-time">{cellValue}</span>
+                            ) : lines[0] ? (
+                              <>
+                                <span className="schedule-lesson">{normalizeCourseDisplayName(lines[0].trim())}</span>
+                                {!focusMode && lines[1] && (
+                                  <span className="schedule-detail">
+                                    {cleanTeacherNames(lines.slice(1).join('\n'))}
+                                  </span>
+                                )}
+                              </>
+                            ) : null}
+                          </TableCell>
+                        )
+                      })}
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </DataTable>
+      </TableContainer>
       </div>
     </div>
   )

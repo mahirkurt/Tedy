@@ -58,6 +58,27 @@ test.describe('API smoke tests', () => {
     expect(data).toHaveProperty('timestamp')
     expect(data).toHaveProperty('success')
   })
+
+  test('private-lessons has expected structure', async ({ request }) => {
+    const resp = await request.get('/api/private-lessons')
+    const data = await resp.json()
+    expect(data).toHaveProperty('lessons')
+    expect(Array.isArray(data.lessons)).toBe(true)
+  })
+
+  test('calendar unified has events array', async ({ request }) => {
+    const resp = await request.get('/api/calendar/unified')
+    const data = await resp.json()
+    expect(data).toHaveProperty('events')
+    expect(Array.isArray(data.events)).toBe(true)
+  })
+
+  test('/api/auth/me returns bypass test user in e2e env', async ({ request }) => {
+    const resp = await request.get('/api/auth/me')
+    expect(resp.status()).toBe(200)
+    const data = await resp.json()
+    expect(data.email).toBe('test@tedy.online')
+  })
 })
 
 test.describe('SPA serving', () => {
@@ -103,5 +124,62 @@ test.describe('SPA serving', () => {
     await expect(page.getByRole('dialog', { name: 'Senkron sağlık bilgisi' })).toBeVisible()
 
     await context.close()
+  })
+
+  test('all side nav routes are reachable and render main content', async ({ page }) => {
+    const routes = [
+      '/',
+      '/program',
+      '/odevler',
+      '/notlar',
+      '/takvim',
+      '/takimlar',
+      '/dersler',
+      '/ilerleme',
+      '/duyurular',
+      '/profil',
+    ]
+
+    for (const route of routes) {
+      const resp = await page.goto(route)
+      expect(resp?.ok()).toBeTruthy()
+      await expect(page.getByRole('banner')).toBeVisible()
+      await expect(page.locator('.app-shell-content')).toBeVisible()
+    }
+  })
+
+  test('health popover opens and closes with Escape', async ({ page }) => {
+    await page.goto('/')
+    const trigger = page.getByRole('button', { name: 'Senkron durumunu göster' })
+    await trigger.click()
+    await expect(page.getByRole('dialog', { name: 'Senkron sağlık bilgisi' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog', { name: 'Senkron sağlık bilgisi' })).toBeHidden()
+  })
+
+  test('focus mode toggle is visible and operable via keyboard', async ({ page }) => {
+    await page.goto('/')
+    const content = page.locator('.app-shell-content')
+    const beforeClass = await content.getAttribute('class')
+    const focusSwitch = page
+      .locator('.dashboard-header__focus-toggle .cds--toggle__switch')
+      .first()
+
+    await expect(focusSwitch).toBeVisible()
+    await focusSwitch.click()
+
+    await expect
+      .poll(async () => content.getAttribute('class'))
+      .not.toBe(beforeClass)
+  })
+
+  test('photo homework modal opens and can be closed without upload', async ({ page }) => {
+    await page.goto('/')
+    const trigger = page.getByRole('button', { name: 'Ödev fotoğrafı ekle' })
+    await trigger.click()
+    const modal = page.locator('.cds--modal').filter({ hasText: 'Ödev Fotoğrafı Ekle' })
+    await expect(modal).toBeVisible()
+    await page.getByRole('button', { name: 'İptal' }).click()
+    await expect(modal).toBeHidden()
   })
 })

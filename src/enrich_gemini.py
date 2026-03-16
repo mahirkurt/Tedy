@@ -29,6 +29,9 @@ sys.path.insert(0, PROJECT_ROOT)
 os.chdir(PROJECT_ROOT)
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
+ENRICHMENT_CACHE = os.path.join(PROJECT_ROOT, "output", "enrichment_cache.json")
+
+from src.json_utils import atomic_json_dump
 from src.env_loader import load_env
 load_env()
 
@@ -199,6 +202,13 @@ def enrich_sinav(classroom_service, sync_state, router, grades_data):
                 grade_lookup[course] = val
                 break
 
+    cache_path = ENRICHMENT_CACHE
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            cache = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        cache = {}
+
     enriched = 0
     skipped = 0
 
@@ -268,6 +278,8 @@ def enrich_sinav(classroom_service, sync_state, router, grades_data):
                 )
             )
             enriched += 1
+            cache[f"{course}|{title}"] = {"course": course, "title": title, "note": note, "type": "sinav"}
+            atomic_json_dump(cache, cache_path)
             print(f"  ✓ {title}")
         except Exception as e:
             print(f"  ✗ {title}: {e}")
@@ -595,6 +607,13 @@ def _enrich_odev(classroom_service, sync_state, router, force=False):
     total_hw = sum(len(v) for v in hw_lookup.values())
     print(f"Scraped homework items loaded: {total_hw}")
 
+    cache_path = ENRICHMENT_CACHE
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            cache = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        cache = {}
+
     enriched = 0
     skipped = 0
     errors = 0
@@ -686,6 +705,14 @@ def _enrich_odev(classroom_service, sync_state, router, force=False):
                 )
             )
             enriched += 1
+            cache_key = f"{ders}|{baslik}"
+            cache[cache_key] = {
+                "course": ders,
+                "title": baslik,
+                "note": note,
+                "type": "odev",
+            }
+            atomic_json_dump(cache, cache_path)
             print(f"  ✓ {baslik}")
         except Exception as e:
             print(f"  ✗ Update failed for {baslik}: {e}")

@@ -11,8 +11,8 @@ Environment=PATH=/mnt/thunderbolt/workspaces/TED/.venv/bin:/usr/bin:/bin
 EnvironmentFile=/mnt/thunderbolt/workspaces/TED/.env
 ExecStart=/mnt/thunderbolt/workspaces/TED/.venv/bin/gunicorn \
     --bind 0.0.0.0:8085 \
-    --workers 2 \
-    --timeout 30 \
+    --workers 1 \
+    --timeout 360 \
     --access-logfile - \
     --error-logfile - \
     src.dashboard_api:app

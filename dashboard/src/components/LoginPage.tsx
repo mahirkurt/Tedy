@@ -80,38 +80,43 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   return (
     <div className="login-page">
+      {/* Left Hero Panel */}
+      <div className="login-page__hero">
+        <div className="login-page__hero-geo" aria-hidden="true" />
+        <div className="login-page__hero-content">
+          <img src="/tedy-logo-white.svg" alt="TEDY" className="login-page__hero-logo" />
+          <p className="login-page__hero-school">TED Rönesans Koleji</p>
+          <p className="login-page__hero-subtitle">Öğrenci Takip Paneli</p>
+        </div>
+      </div>
+
+      {/* Right Form Panel */}
       <div className="login-page__panel">
-        {/* TEDY Header Bar */}
-        <div className="login-page__brand">
-          <img src="/tedy-logo-white.svg" alt="TEDY" className="login-page__brand-logo" />
-          <p className="login-page__brand-subtitle">
-            Öğrenci Takip Paneli
+        <div className="login-page__panel-inner">
+          <h1 className="login-page__heading">Hoş geldiniz</h1>
+          <p className="login-page__intro">
+            Devam etmek için Google hesabınızla giriş yapın.
+          </p>
+
+          <div className="login-page__google-button-wrap">
+            <div ref={buttonRef} />
+          </div>
+
+          {error && (
+            <InlineNotification
+              kind="error"
+              title="Hata"
+              subtitle={error}
+              lowContrast
+              hideCloseButton
+              className="login-page__error"
+            />
+          )}
+
+          <p className="login-page__footnote">
+            Sadece yetkili aile üyeleri giriş yapabilir.
           </p>
         </div>
-
-        <p className="login-page__intro">
-          Devam etmek için Google hesabınızla giriş yapın.
-        </p>
-
-        {/* Google Sign-In Button */}
-        <div className="login-page__google-button-wrap">
-          <div ref={buttonRef} />
-        </div>
-
-        {error && (
-          <InlineNotification
-            kind="error"
-            title="Hata"
-            subtitle={error}
-            lowContrast
-            hideCloseButton
-            className="login-page__error"
-          />
-        )}
-
-        <p className="login-page__footnote">
-          Sadece yetkili aile üyeleri giriş yapabilir.
-        </p>
       </div>
     </div>
   )

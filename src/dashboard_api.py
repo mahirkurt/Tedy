@@ -14,6 +14,7 @@ from flask import Flask, jsonify, request, send_from_directory, session
 from flask_cors import CORS
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
+from werkzeug.exceptions import HTTPException
 
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, PROJECT_ROOT)
@@ -22,6 +23,7 @@ os.chdir(PROJECT_ROOT)
 from src.env_loader import load_env
 from src.json_utils import atomic_json_dump
 from src.sync_to_google import normalize_course
+from src.assistant_core import AssistantRuntime
 
 load_env()
 
@@ -48,10 +50,41 @@ ALLOWED_EMAILS = {
     "huriye.murzoglu@gmail.com",
 }
 
+ASSISTANT_API_KEY = os.environ.get("ASSISTANT_API_KEY", "").strip()
+ASSISTANT_ADMIN_EMAILS = {
+    x.strip().lower()
+    for x in os.environ.get("ASSISTANT_ADMIN_EMAILS", ",".join(ALLOWED_EMAILS)).split(",")
+    if x.strip()
+}
+
+_ASSISTANT_RUNTIME: AssistantRuntime | None = None
+
 DAY_NAMES = {
     0: "Pazartesi", 1: "Salı", 2: "Çarşamba",
     3: "Perşembe", 4: "Cuma", 5: "Cumartesi", 6: "Pazar"
 }
+
+
+def _is_json_api_request() -> bool:
+    path = str(getattr(request, "path", "") or "")
+    return path.startswith("/api/") or path.startswith("/v1/")
+
+
+@app.errorhandler(HTTPException)
+def _handle_http_exception(err: HTTPException):
+    if _is_json_api_request():
+        msg = str(getattr(err, "description", "") or getattr(err, "name", "HTTP error")).strip()
+        return jsonify({"error": msg, "status": err.code}), int(err.code or 500)
+    return err
+
+
+@app.errorhandler(Exception)
+def _handle_unexpected_exception(err: Exception):
+    if _is_json_api_request():
+        app.logger.exception("Unhandled API exception: %s", err)
+        return jsonify({"error": "internal_server_error"}), 500
+    app.logger.exception("Unhandled exception: %s", err)
+    return ("Internal Server Error", 500)
 
 
 # --- Auth ---
@@ -113,6 +146,47 @@ def auth_me():
             "picture": session.get("user_picture", ""),
         })
     return jsonify({"error": "Not authenticated"}), 401
+
+
+def _assistant_runtime() -> AssistantRuntime:
+    global _ASSISTANT_RUNTIME
+    if _ASSISTANT_RUNTIME is None:
+        _ASSISTANT_RUNTIME = AssistantRuntime(PROJECT_ROOT)
+    return _ASSISTANT_RUNTIME
+
+
+def _has_valid_assistant_api_key() -> bool:
+    if not ASSISTANT_API_KEY:
+        return False
+    auth = request.headers.get("Authorization", "")
+    if not auth.lower().startswith("bearer "):
+        return False
+    provided = auth.split(" ", 1)[1].strip()
+    return bool(provided) and secrets.compare_digest(provided, ASSISTANT_API_KEY)
+
+
+def _require_assistant_access(api_key_only=False):
+    """Allow access to assistant routes.
+
+    - External OpenAI-compatible routes should use api_key_only=True.
+    - Internal dashboard routes can reuse session auth.
+    """
+    if TEST_AUTH_BYPASS:
+        return None
+    if _has_valid_assistant_api_key():
+        return None
+    if not api_key_only and session.get("user_email"):
+        return None
+    return jsonify({"error": "Unauthorized"}), 401
+
+
+def _is_assistant_admin() -> bool:
+    if TEST_AUTH_BYPASS:
+        return True
+    if _has_valid_assistant_api_key():
+        return True
+    email = str(session.get("user_email", "")).lower().strip()
+    return bool(email) and email in ASSISTANT_ADMIN_EMAILS
 
 
 # --- Data helpers ---
@@ -1108,6 +1182,111 @@ def health():
     return jsonify(payload)
 
 
+@app.route("/api/assistant/chat", methods=["POST"])
+@require_auth
+def assistant_chat():
+    payload = request.get_json(silent=True) or {}
+    messages = payload.get("messages", [])
+    if not isinstance(messages, list):
+        return jsonify({"error": "messages list olmalı"}), 400
+
+    context_filters = payload.get("context_filters", {})
+    if not isinstance(context_filters, dict):
+        return jsonify({"error": "context_filters dict olmalı"}), 400
+
+    session_id = str(payload.get("session_id", "")).strip()
+    temperature = payload.get("temperature", 0.2)
+    try:
+        temperature = float(temperature)
+    except (TypeError, ValueError):
+        temperature = 0.2
+
+    try:
+        runtime = _assistant_runtime()
+        out = runtime.chat(
+            messages=messages,
+            session_id=session_id,
+            context_filters=context_filters,
+            temperature=temperature,
+        )
+        return jsonify(out)
+    except Exception as e:
+        return jsonify({"error": f"assistant chat failed: {e}"}), 500
+
+
+@app.route("/api/assistant/plan", methods=["POST"])
+@require_auth
+def assistant_plan():
+    payload = request.get_json(silent=True) or {}
+    messages = payload.get("messages", [])
+    if not isinstance(messages, list):
+        return jsonify({"error": "messages list olmalı"}), 400
+
+    context_filters = payload.get("context_filters", {})
+    if not isinstance(context_filters, dict):
+        return jsonify({"error": "context_filters dict olmalı"}), 400
+
+    session_id = str(payload.get("session_id", "")).strip()
+
+    try:
+        runtime = _assistant_runtime()
+        out = runtime.study_plan(
+            messages=messages,
+            session_id=session_id,
+            context_filters=context_filters,
+        )
+        return jsonify(out)
+    except Exception as e:
+        return jsonify({"error": f"assistant plan failed: {e}"}), 500
+
+
+@app.route("/api/assistant/reindex", methods=["POST"])
+@require_auth
+def assistant_reindex():
+    if not _is_assistant_admin():
+        return jsonify({"error": "Forbidden"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    full = bool(payload.get("full", False))
+
+    try:
+        runtime = _assistant_runtime()
+        stats = runtime.reindex(incremental=not full)
+        return jsonify({"ok": True, "stats": stats})
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"reindex failed: {e}"}), 500
+
+
+@app.route("/v1/models")
+def openai_models():
+    access = _require_assistant_access(api_key_only=True)
+    if access is not None:
+        return access
+
+    try:
+        runtime = _assistant_runtime()
+        return jsonify({"object": "list", "data": runtime.models()})
+    except Exception as e:
+        return jsonify({"error": f"models unavailable: {e}"}), 500
+
+
+@app.route("/v1/chat/completions", methods=["POST"])
+def openai_chat_completions():
+    access = _require_assistant_access(api_key_only=True)
+    if access is not None:
+        return access
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        runtime = _assistant_runtime()
+        out = runtime.openai_chat_completion(payload)
+        return jsonify(out)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"chat completion failed: {e}"}), 500
+
+
 # --- Color constants for unified calendar ---
 _UNIFIED_COLORS = {
     "lesson": "#002d9c",
@@ -1320,8 +1499,17 @@ def calendar_unified():
 @app.route("/")
 @app.route("/<path:path>")
 def serve_spa(path=""):
-    if path and os.path.exists(os.path.join(DIST_DIR, path)):
-        return send_from_directory(DIST_DIR, path)
+    normalized = str(path or "").lstrip("/")
+    if normalized.startswith("api/") or normalized.startswith("v1/"):
+        return jsonify({"error": "Not found"}), 404
+
+    if normalized and os.path.exists(os.path.join(DIST_DIR, normalized)):
+        return send_from_directory(DIST_DIR, normalized)
+
+    # Missing static assets (fonts/js/css/images) should be hard 404, not index.html.
+    if normalized and "." in os.path.basename(normalized):
+        return ("Not Found", 404)
+
     index = os.path.join(DIST_DIR, "index.html")
     if os.path.exists(index):
         return send_from_directory(DIST_DIR, "index.html")

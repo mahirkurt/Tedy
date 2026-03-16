@@ -1,11 +1,14 @@
 """Scrape all relevant data from TED portal for the last 4 weeks."""
+import base64
 import json
 import os
 import re
 import time
 from datetime import datetime, timedelta
+from urllib.parse import urljoin
 
 import ddddocr
+import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -102,6 +105,150 @@ def extract_table(driver, table_el):
         else:
             rows.append([c.text.strip() for c in cells])
     return {"headers": headers, "rows": rows}
+
+
+# =============================================================================
+# 0. ÖĞRENCİ PROFİLİ
+# =============================================================================
+def _download_profile_image_data_url(driver, img_src):
+    """Download profile image with current portal cookies and return data URL."""
+    if not img_src:
+        return ""
+    if img_src.startswith("data:image/"):
+        return img_src
+
+    image_url = urljoin(BASE_URL, img_src)
+    sess = requests.Session()
+    for c in driver.get_cookies():
+        try:
+            sess.cookies.set(c["name"], c["value"], domain=c.get("domain", ""))
+        except Exception:
+            pass
+
+    try:
+        r = sess.get(image_url, timeout=15)
+        r.raise_for_status()
+    except requests.RequestException:
+        return ""
+
+    content_type = r.headers.get("Content-Type", "").split(";")[0].strip().lower()
+    if not content_type.startswith("image/"):
+        return ""
+    b64 = base64.b64encode(r.content).decode("ascii")
+    return f"data:{content_type};base64,{b64}"
+
+
+def scrape_ogrenci_profili(driver):
+    """Scrape student profile info (including photo) from TED Connect."""
+    print("\n[0/9] Öğrenci Profili")
+    url = f"{BASE_URL}/pages/ogrenci_istekler/p_ogrenci_bilgilerim"
+    driver.get(url)
+    time.sleep(3)
+
+    fields = {}
+
+    # 1) Label + input/select/textarea based fields
+    for label_el in driver.find_elements(By.TAG_NAME, "label"):
+        label = (label_el.text or "").strip().rstrip(":")
+        if len(label) < 2:
+            continue
+        value = ""
+        for_id = label_el.get_attribute("for")
+        if for_id:
+            try:
+                target = driver.find_element(By.ID, for_id)
+                value = (
+                    target.get_attribute("value")
+                    or target.text
+                    or ""
+                ).strip()
+            except Exception:
+                value = ""
+        if not value:
+            try:
+                parent = label_el.find_element(By.XPATH, "./..")
+                value_el = parent.find_element(
+                    By.XPATH, ".//input|.//textarea|.//select|.//span|.//div"
+                )
+                value = (
+                    value_el.get_attribute("value")
+                    or value_el.text
+                    or ""
+                ).strip()
+            except Exception:
+                value = ""
+        if value and value.lower() != label.lower():
+            fields.setdefault(label, value)
+
+    # 2) Table-like fields
+    for tr in driver.find_elements(By.CSS_SELECTOR, "tr"):
+        ths = tr.find_elements(By.CSS_SELECTOR, "th, td")
+        if len(ths) < 2:
+            continue
+        key = (ths[0].text or "").strip().rstrip(":")
+        val = (ths[1].text or "").strip()
+        if len(key) >= 2 and val:
+            fields.setdefault(key, val)
+
+    # 3) Profile image candidates
+    photo_data_url = ""
+    for img in driver.find_elements(By.TAG_NAME, "img"):
+        try:
+            if not img.is_displayed():
+                continue
+        except Exception:
+            continue
+        src = (img.get_attribute("src") or "").strip()
+        alt = (img.get_attribute("alt") or "").lower()
+        klass = (img.get_attribute("class") or "").lower()
+        if not src:
+            continue
+        lowered_src = src.lower()
+        if any(x in lowered_src for x in ("captcha", "logo", "favicon", "icon")):
+            continue
+        likely = any(x in (alt + " " + klass + " " + lowered_src) for x in (
+            "profil", "profile", "ogrenci", "öğrenci", "avatar"
+        ))
+        size = img.size or {}
+        if not likely and (size.get("width", 0) < 80 or size.get("height", 0) < 80):
+            continue
+        photo_data_url = _download_profile_image_data_url(driver, src)
+        if photo_data_url:
+            break
+
+    # 4) Canonical summary fields (best-effort)
+    lowered = {k.lower(): v for k, v in fields.items()}
+    full_name = ""
+    student_no = ""
+    class_name = ""
+    branch = ""
+    for k, v in lowered.items():
+        if not full_name and ("ad soyad" in k or k == "adı soyadı" or "ogrenci adı" in k):
+            full_name = v
+        if not student_no and ("öğrenci no" in k or "ogrenci no" in k or "numara" in k):
+            student_no = v
+        if not class_name and ("sınıf" in k or "sinif" in k):
+            class_name = v
+        if not branch and ("şube" in k or "sube" in k):
+            branch = v
+
+    result = {
+        "name": full_name,
+        "student_no": student_no,
+        "class_name": class_name,
+        "branch": branch,
+        "fields": fields,
+        "photo_data_url": photo_data_url,
+        "profile_url": url,
+        "scraped_at": datetime.now().isoformat(),
+    }
+
+    driver.save_screenshot(os.path.join(OUTPUT_DIR, "ogrenci_profili.png"))
+    print(
+        f"  Fields: {len(fields)} | "
+        f"Photo: {'OK' if bool(photo_data_url) else 'YOK'}"
+    )
+    return result
 
 
 # =============================================================================
@@ -732,6 +879,7 @@ def main():
 
         data = {}
         data["scraped_at"] = datetime.now().isoformat()
+        data["ogrenci_profili"] = scrape_ogrenci_profili(driver)
         data["ders_programi"] = scrape_ders_programi(driver)
         data["odevlerim"] = scrape_odevlerim(driver)
         data["takim_calismalari"] = scrape_takim_calismalari(driver)
