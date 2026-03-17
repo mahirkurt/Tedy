@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 import os
 import re
@@ -26,6 +27,9 @@ from typing import Any
 import requests as http_requests
 
 from src.json_utils import atomic_json_dump
+
+
+logger = logging.getLogger(__name__)
 
 
 def _utcnow_naive() -> datetime:
@@ -1284,8 +1288,9 @@ class AssistantRuntime:
             out = self.ollama.chat(convo, temperature=temperature)
             if out:
                 return out
-        except Exception:
-            pass
+            logger.warning("Ollama returned empty response for chat")
+        except Exception as exc:
+            logger.error("Ollama chat failed: %s", exc)
 
         # Fail-safe fallback.
         if citations:
