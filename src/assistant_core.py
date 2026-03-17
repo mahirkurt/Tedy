@@ -429,16 +429,32 @@ class GeminiClient:
 
 
 class HybridChatRouter:
-    """Routes chat to Gemini (fast) with Ollama fallback (local)."""
+    """Routes chat: Gemini (fast) → Pi Ollama (reliable) → HP Ollama (last resort)."""
 
     def __init__(self, gemini: GeminiClient, ollama: OllamaClient):
         self.gemini = gemini
-        self.ollama = ollama
+        self.ollama = ollama  # local HP Ollama
+        self.pi_ollama = self._make_pi_ollama()
         self.last_provider = ""
         self.last_model_used = ""
 
+    @staticmethod
+    def _make_pi_ollama() -> OllamaClient | None:
+        pi_url = os.environ.get("PI_OLLAMA_URL", "").strip()
+        if not pi_url:
+            return None
+        pi_model = os.environ.get("PI_OLLAMA_MODEL", "llama3.1:8b").strip()
+        return OllamaClient(
+            base_url=pi_url,
+            chat_model=pi_model,
+            fallback_chat_model=pi_model,
+            embed_model="nomic-embed-text",
+            chat_timeout_seconds=90,
+            keep_alive="30m",
+        )
+
     def chat(self, messages: list[dict[str, str]], temperature: float = 0.2) -> str:
-        # Try Gemini first
+        # 1. Try Gemini first (fastest, 2-6s)
         if self.gemini.available:
             try:
                 result = self.gemini.chat(messages, temperature=temperature)
@@ -446,16 +462,26 @@ class HybridChatRouter:
                 self.last_model_used = self.gemini.last_model_used
                 return result
             except Exception as e:
-                logger.warning("Gemini failed, falling back to Ollama: %s", e)
+                logger.warning("Gemini failed, trying Pi Ollama: %s", e)
 
-        # Fallback to Ollama
+        # 2. Try Pi Ollama (reliable, 30-50s)
+        if self.pi_ollama:
+            try:
+                result = self.pi_ollama.chat(messages, temperature=temperature)
+                self.last_provider = "pi-ollama"
+                self.last_model_used = self.pi_ollama.last_model_used
+                return result
+            except Exception as e:
+                logger.warning("Pi Ollama failed, trying local Ollama: %s", e)
+
+        # 3. Local HP Ollama (last resort, slow under memory pressure)
         try:
             result = self.ollama.chat(messages, temperature=temperature)
             self.last_provider = "ollama"
             self.last_model_used = self.ollama.last_model_used
             return result
         except Exception as e:
-            logger.error("Both Gemini and Ollama failed: %s", e)
+            logger.error("All providers failed (gemini+pi+local): %s", e)
             raise
 
 
