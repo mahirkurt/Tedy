@@ -342,6 +342,123 @@ class OllamaClient:
         raise RuntimeError(last_error or "chat_failed")
 
 
+class GeminiClient:
+    """Gemini API chat client — fast cloud inference, no local memory cost."""
+
+    MODELS = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+    ]
+
+    def __init__(self, api_key: str = ""):
+        self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "").strip()
+        self._client: Any = None
+        self.last_model_used = ""
+        self._exhausted: set[str] = set()
+
+    @property
+    def available(self) -> bool:
+        return bool(self.api_key)
+
+    def _get_client(self) -> Any:
+        if self._client is None:
+            from google import genai  # lazy import
+            self._client = genai.Client(api_key=self.api_key)
+        return self._client
+
+    def chat(self, messages: list[dict[str, str]], temperature: float = 0.2) -> str:
+        if not self.available:
+            raise RuntimeError("gemini_no_api_key")
+
+        client = self._get_client()
+        from google.genai import errors as genai_errors
+
+        # Build Gemini-compatible prompt from messages
+        system_parts = []
+        contents = []
+        for m in messages:
+            role = m.get("role", "user")
+            content = m.get("content", "")
+            if role == "system":
+                system_parts.append(content)
+            else:
+                contents.append(content)
+
+        prompt = ""
+        if system_parts:
+            prompt = "\n".join(system_parts) + "\n\n"
+        prompt += "\n\n".join(contents)
+
+        models_to_try = [m for m in self.MODELS if m not in self._exhausted]
+        if not models_to_try:
+            self._exhausted.clear()
+            models_to_try = list(self.MODELS)
+
+        last_error = ""
+        for model in models_to_try:
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config={
+                        "temperature": temperature,
+                        "max_output_tokens": 1200,
+                    },
+                )
+                text = (response.text or "").strip()
+                if text:
+                    self.last_model_used = model
+                    return text
+                last_error = "empty_gemini_response"
+            except genai_errors.ClientError as e:
+                err_str = str(e)
+                if "RESOURCE_EXHAUSTED" in err_str:
+                    self._exhausted.add(model)
+                    logger.warning("Gemini model %s quota exhausted", model)
+                    last_error = f"quota_exhausted:{model}"
+                    continue
+                last_error = err_str
+                logger.error("Gemini ClientError (%s): %s", model, err_str)
+            except Exception as e:
+                last_error = str(e)
+                logger.error("Gemini error (%s): %s", model, e)
+                continue
+
+        raise RuntimeError(last_error or "gemini_all_models_failed")
+
+
+class HybridChatRouter:
+    """Routes chat to Gemini (fast) with Ollama fallback (local)."""
+
+    def __init__(self, gemini: GeminiClient, ollama: OllamaClient):
+        self.gemini = gemini
+        self.ollama = ollama
+        self.last_provider = ""
+        self.last_model_used = ""
+
+    def chat(self, messages: list[dict[str, str]], temperature: float = 0.2) -> str:
+        # Try Gemini first
+        if self.gemini.available:
+            try:
+                result = self.gemini.chat(messages, temperature=temperature)
+                self.last_provider = "gemini"
+                self.last_model_used = self.gemini.last_model_used
+                return result
+            except Exception as e:
+                logger.warning("Gemini failed, falling back to Ollama: %s", e)
+
+        # Fallback to Ollama
+        try:
+            result = self.ollama.chat(messages, temperature=temperature)
+            self.last_provider = "ollama"
+            self.last_model_used = self.ollama.last_model_used
+            return result
+        except Exception as e:
+            logger.error("Both Gemini and Ollama failed: %s", e)
+            raise
+
+
 class FileAdapters:
     def __init__(self, config: AssistantConfig):
         self.config = config
@@ -1019,6 +1136,8 @@ class AssistantRuntime:
             embed_max_chars=self.config.ollama_embed_max_chars,
             keep_alive=self.config.ollama_keep_alive,
         )
+        self.gemini = GeminiClient()
+        self.router = HybridChatRouter(self.gemini, self.ollama)
         self.indexer = AssistantIndexer(self.config, self.ollama)
         self.policy = SafetyPolicy()
 
@@ -1078,7 +1197,8 @@ class AssistantRuntime:
             "intent": intent,
             "session_id": session_id,
             "meta": {
-                "model": getattr(self.ollama, "last_model_used", self.config.ollama_chat_model),
+                "model": self.router.last_model_used or self.config.ollama_chat_model,
+                    "provider": self.router.last_provider or "unknown",
                 "retrieval_count": len(results),
                 "latency_ms": latency_ms,
                 "index_generated_at": self._meta_generated_at(),
@@ -1124,7 +1244,8 @@ class AssistantRuntime:
             "intent": "study_plan",
             "session_id": session_id,
             "meta": {
-                "model": getattr(self.ollama, "last_model_used", self.config.ollama_chat_model),
+                "model": self.router.last_model_used or self.config.ollama_chat_model,
+                    "provider": self.router.last_provider or "unknown",
                 "latency_ms": latency_ms,
                 "retrieval_count": len(results),
                 "index_generated_at": self._meta_generated_at(),
@@ -1285,12 +1406,12 @@ class AssistantRuntime:
         ]
 
         try:
-            out = self.ollama.chat(convo, temperature=temperature)
+            out = self.router.chat(convo, temperature=temperature)
             if out:
                 return out
-            logger.warning("Ollama returned empty response for chat")
+            logger.warning("Chat router returned empty response")
         except Exception as exc:
-            logger.error("Ollama chat failed: %s", exc)
+            logger.error("Chat router failed (gemini+ollama): %s", exc)
 
         # Fail-safe fallback.
         if citations:
@@ -1335,7 +1456,7 @@ class AssistantRuntime:
         )
 
         try:
-            out = self.ollama.chat(
+            out = self.router.chat(
                 messages=[
                     {"role": "system", "content": (
                         "Sen Işık'ın kişisel pedagojik planlama asistanısın. "
