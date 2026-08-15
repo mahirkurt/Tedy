@@ -2317,7 +2317,7 @@ body {
   }
 
   .dashboard-header__meta {
-    padding: 0 0.25rem;
+    padding: 0;
     gap: 0.35rem;
   }
 
@@ -2337,7 +2337,7 @@ body {
   }
 
   .dashboard-header__health-wrap {
-    display: none;
+    display: inline-flex;
   }
 
   .dashboard-header__focus-toggle {
@@ -2432,6 +2432,13 @@ body {
   .platform-a3k-score {
     grid-template-columns: 1fr auto;
     .platform-a3k-score__label { grid-column: 1 / -1; }
+  }
+}
+
+@media (max-width: 420px) {
+  .dashboard-header__avatar,
+  .dashboard-header__identity {
+    display: none;
   }
 }
 
