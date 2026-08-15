@@ -38,6 +38,7 @@ COURSE_ALIASES = {
         "İkinci Yabancı Dil",
         "İkinci Yabancı Dil (Fransızca)",
         "2. Yabancı Dil (F)",
+        "2. Yabancı Diller",
     ],
     "Din Kültürü": [
         "Din Kültürü ve Ahlak Bilgisi",

@@ -1,10 +1,11 @@
+import { useState } from 'react'
 import { Tag,
   StructuredListWrapper, StructuredListHead, StructuredListRow,
   StructuredListCell, StructuredListBody,
 } from '@carbon/react'
 import { GroupPresentation } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
-import { useFocusMode } from '../contexts/FocusModeContext'
+import { useFocusMode } from '../contexts/focusMode'
 import type { TeamActivity, OgepSession } from '../types'
 
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000
@@ -27,7 +28,9 @@ export default function TeamActivities() {
   )
   const { focusMode } = useFocusMode()
 
-  const now = Date.now()
+  // Pinned when the view opens: the two-week window must not shift underfoot
+  // while the list is on screen.
+  const [now] = useState(() => Date.now())
   let activities = data.activities.filter(a => {
     const d = parseTurkishDate(a["Çalışma Başlangıç"])
     return !d || d.getTime() >= now - TWO_WEEKS_MS

@@ -203,3 +203,91 @@ export interface AssistantResponse {
     index_generated_at?: string
   }
 }
+
+export interface ExamItem {
+  id: string
+  course: string
+  title: string
+  rawTitle: string
+  courseColor: string
+  examNumber: number | null
+  date: string | null
+  endDate: string | null
+  allDay: boolean
+  status: 'upcoming' | 'past'
+  grade: string | null
+  studyGuide: string | null
+  aiSummary: string | null
+  relatedHomework: { title: string; deadline: string; status: string }[]
+  relatedContent: { title: string; type: string }[]
+}
+
+export interface ExamsApiResponse {
+  exams: ExamItem[]
+  stats: { upcoming: number; past: number; averageGrade: number | null }
+}
+
+/* ── Tedy Books ─────────────────────────────────────────────────────────── */
+
+export interface BookCover {
+  palette?: string
+  monogram?: string
+}
+
+export interface BookSummary {
+  slug: string
+  title: string
+  subtitle: string
+  author: string
+  translator: string
+  publisher: string
+  edition: string
+  year: string
+  language: string
+  description: string
+  epigraph: string
+  cover: BookCover
+  totalChapters: number
+  availableChapters: number
+  availableWords: number
+  totalSourceWords: number
+  readingMinutes: number
+}
+
+export interface BookChapter {
+  id: string
+  order: number
+  volume: string
+  part: string
+  numeral: string
+  label: string
+  title: string
+  sourceWords: number
+  available: boolean
+  words: number
+  readingMinutes: number
+}
+
+export interface BookDetail extends BookSummary {
+  chapters: BookChapter[]
+}
+
+export interface BookChapterNav {
+  id: string
+  title: string
+  label: string
+}
+
+export interface BookChapterContent extends BookChapter {
+  content: string
+  credit: string
+  partHeading: string
+}
+
+export interface BookChapterResponse {
+  book: BookSummary
+  chapter: BookChapterContent
+  prev: BookChapterNav | null
+  next: BookChapterNav | null
+  position: { index: number; total: number }
+}

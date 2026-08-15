@@ -1,7 +1,7 @@
 import { Tabs, TabList, Tab, TabPanels, TabPanel, Accordion, AccordionItem, Tag } from '@carbon/react'
 import { Education } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
-import { useFocusMode } from '../contexts/FocusModeContext'
+import { useFocusMode } from '../contexts/focusMode'
 import { COURSE_CONTENT_ORDER, normalizeCourseDisplayName } from '../utils/formatters'
 
 interface CourseData {

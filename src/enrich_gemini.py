@@ -44,6 +44,7 @@ from src.sync_to_google import normalize_course, _api_call_with_retry, _ALIAS_LO
 
 # Models to try in order: Gemini cloud first, then local Ollama
 GEMINI_MODELS = [
+    "gemini-2.5-pro",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
     "gemini-2.0-flash",
@@ -520,84 +521,45 @@ def call_gemini(client, model, prompt):
     return response.text.strip()
 
 
-def call_ollama(model, prompt):
-    """Generate content via local Ollama. Returns None on failure."""
-    try:
-        r = http_requests.post(OLLAMA_URL, json={
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0.3, "num_predict": 512},
-        }, timeout=300)
-        r.raise_for_status()
-        return r.json().get("response", "").strip()
-    except Exception as e:
-        raise RuntimeError(f"Ollama ({model}): {e}")
-
-
 class ModelRouter:
-    """Routes generation requests through available models with fallback."""
+    """Routes generation through Gemini models with quota fallback."""
 
     def __init__(self, gemini_client):
         self.gemini_client = gemini_client
         self.exhausted = set()
         self.current = None
-        self.using_ollama = False
         self._pick_model()
 
     def _pick_model(self):
-        """Pick next available model."""
-        # Try Gemini models first
         for m in GEMINI_MODELS:
             if m not in self.exhausted:
                 self.current = m
-                self.using_ollama = False
-                return True
-        # Fall back to Ollama
-        for m in OLLAMA_MODELS:
-            if m not in self.exhausted:
-                self.current = m
-                self.using_ollama = True
                 return True
         return False
 
     def generate(self, prompt):
-        """Generate text, auto-falling back on quota exhaustion."""
+        """Generate text with auto-fallback on quota."""
         while True:
             if self.current is None:
-                raise RuntimeError("Tüm modeller tükendi!")
-
+                raise RuntimeError("Tüm modellerin kotası doldu!")
             try:
-                if self.using_ollama:
-                    return call_ollama(self.current, prompt)
-                else:
-                    return call_gemini(
-                        self.gemini_client, self.current, prompt,
-                    )
+                return call_gemini(
+                    self.gemini_client, self.current, prompt)
             except genai_errors.ClientError as e:
                 if "RESOURCE_EXHAUSTED" in str(e):
                     self.exhausted.add(self.current)
                     if self._pick_model():
-                        print(
-                            f"  ⟳ Kota doldu, geçiş: {self.current}"
-                            f"{' (Ollama)' if self.using_ollama else ''}"
-                        )
+                        print(f"  ⟳ Kota doldu, geçiş: "
+                              f"{self.current}")
                         time.sleep(2)
                         continue
-                    raise RuntimeError("Tüm modellerin kotası doldu!")
+                    raise RuntimeError(
+                        "Tüm modellerin kotası doldu!")
                 raise
-            except RuntimeError:
-                # Ollama failure — mark and try next
-                self.exhausted.add(self.current)
-                if self._pick_model():
-                    print(f"  ⟳ Model hatası, geçiş: {self.current}")
-                    continue
-                raise RuntimeError("Tüm modeller tükendi!")
 
     @property
     def delay(self):
-        """Rate limiting delay: 13s for Gemini free tier, 1s for Ollama."""
-        return 1 if self.using_ollama else 13
+        return 13
 
 
 def _enrich_odev(classroom_service, sync_state, router, force=False):
@@ -764,6 +726,161 @@ def enrich_all(token_file=None, force=False):
     # 4. Performans enrichment -> Classroom announcement
     print("\n[Enrich] Performans analizi...")
     enrich_performans(classroom_service, courses_mapping, router, grades)
+
+    # 5. Sınav içerik eşleştirmesi -> local JSON (no Classroom API needed)
+    print("\n[Enrich] Sınav içerik eşleştirmesi...")
+    enrich_exam_content_map(router, data, force)
+
+
+# ---------------------------------------------------------------------------
+# Exam content mapping — AI-powered exam↔content matching
+# ---------------------------------------------------------------------------
+
+EXAM_CONTENT_MAP_FILE = os.path.join(PROJECT_ROOT, "output", "exam_content_map.json")
+_SINAV_KEYWORDS_ENRICH = ("sınav", "yazılı", "test", "exam")
+
+
+def _load_exam_content_map():
+    if os.path.exists(EXAM_CONTENT_MAP_FILE):
+        with open(EXAM_CONTENT_MAP_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def _save_exam_content_map(data):
+    atomic_json_dump(data, EXAM_CONTENT_MAP_FILE)
+
+
+def _build_exam_content_prompt(course, exam_title, exam_date, homework_titles, content_topics):
+    hw_text = "\n".join(f"- {t}" for t in homework_titles[:10]) if homework_titles else "(ödev yok)"
+    content_text = content_topics[:1500] if content_topics else "(içerik yok)"
+
+    return f"""Sen bir ortaokul öğrencisine yardımcı olan eğitim asistanısın.
+
+Aşağıdaki sınav için bir çalışma özeti hazırla. Sınav öncesi yapılan ödevler ve derste işlenen konuları analiz ederek hangi konulara odaklanılması gerektiğini belirle.
+
+Sınav: {exam_title}
+Ders: {course}
+Tarih: {exam_date}
+
+Son ödevler:
+{hw_text}
+
+Ders içerikleri:
+{content_text}
+
+Çıktı formatı:
+- Sınavda çıkabilecek ana konular (3-5 madde)
+- Ödevlerden sınava yansıyacak konular (2-3 madde)
+- Çalışma stratejisi (2-3 madde)
+
+KRİTİK KURALLAR:
+- Türkçe yaz
+- Kısa tut (en fazla 180 kelime)
+- Sadece özeti yaz, başka bir şey ekleme
+- Markdown kullanma, düz metin yaz
+- SADECE verilen bilgilerden çıkarım yap, bilgi UYDURMA
+- Eğer yeterli bilgi yoksa, genel çalışma önerileri ver"""
+
+
+def enrich_exam_content_map(router, data, force=False):
+    """For each upcoming exam, generate AI study summary linking to homework & content."""
+    from datetime import datetime, timedelta
+
+    now = datetime.now()
+    content_map = _load_exam_content_map()
+
+    takvim = data.get("takvim", [])
+    if not isinstance(takvim, list):
+        takvim = []
+
+    hw_rows = data.get("odevlerim", {}).get("homework", {}).get("rows", [])
+    ders_icerikleri = data.get("ders_icerikleri", {})
+
+    count = 0
+    for evt in takvim:
+        if not isinstance(evt, dict):
+            continue
+        title = evt.get("title", "")
+        lower_title = title.lower()
+        if not any(kw in lower_title for kw in _SINAV_KEYWORDS_ENRICH):
+            continue
+
+        date_str = evt.get("start", "")
+        try:
+            evt_dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            continue
+
+        # Only enrich upcoming exams (or within 1 week past for recently passed exams)
+        if evt_dt < now - timedelta(weeks=1):
+            continue
+
+        # Extract course name
+        import re
+        course_match = re.match(r"^(.+?)\s+\d\.\s*(?:Yazılı|Sınav)", title, re.IGNORECASE)
+        raw_course = course_match.group(1).strip() if course_match else title
+        course = normalize_course(raw_course)
+
+        map_key = f"{course}|{title}|{date_str[:10] if date_str else ''}"
+        if not force and map_key in content_map:
+            continue
+
+        # Collect related homework titles
+        hw_titles = []
+        window_start = evt_dt - timedelta(weeks=4)
+        for row in hw_rows:
+            if not isinstance(row, dict):
+                continue
+            hw_course = normalize_course(row.get("Ders Adı", ""))
+            if hw_course != course:
+                continue
+            deadline_str = row.get("Ödev Son Teslim Tarihi", "")
+            try:
+                hw_dt = datetime.strptime(deadline_str, "%d.%m.%Y %H:%M")
+            except (ValueError, TypeError):
+                try:
+                    hw_dt = datetime.fromisoformat(deadline_str.replace("Z", "+00:00"))
+                except (ValueError, TypeError):
+                    continue
+            if window_start <= hw_dt <= evt_dt:
+                hw_titles.append(row.get("Ödev Başlığı", ""))
+
+        # Collect course content topics
+        content_topics = ""
+        if isinstance(ders_icerikleri, dict):
+            for cname, items in ders_icerikleri.items():
+                if normalize_course(cname) == course and isinstance(items, list):
+                    topics = []
+                    for item in items[:10]:
+                        if isinstance(item, dict):
+                            topics.append(item.get("title", item.get("konu", str(item))))
+                        elif isinstance(item, str):
+                            topics.append(item)
+                    content_topics = "\n".join(f"- {t}" for t in topics)
+                    break
+
+        prompt = _build_exam_content_prompt(
+            course, title, date_str[:10], hw_titles, content_topics
+        )
+
+        try:
+            summary = router.generate(prompt)
+            content_map[map_key] = {
+                "course": course,
+                "title": title,
+                "date": date_str[:10] if date_str else "",
+                "summary": summary,
+                "generated_at": now.isoformat(),
+            }
+            _save_exam_content_map(content_map)
+            count += 1
+            print(f"  ✓ {title}")
+            time.sleep(1)
+        except Exception as e:
+            print(f"  ✗ {title}: {e}")
+
+    print(f"  Toplam {count} sınav içerik eşleştirmesi yapıldı")
 
 
 def main():

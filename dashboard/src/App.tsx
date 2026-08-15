@@ -5,8 +5,8 @@ import DashboardHeader from './components/DashboardHeader'
 import DashboardFooter from './components/DashboardFooter'
 import LoginPage from './components/LoginPage'
 import { useAuth } from './hooks/useAuth'
-import { useFocusMode } from './contexts/FocusModeContext'
-import { routes } from './routes'
+import { useFocusMode } from './contexts/focusMode'
+import { routes, navRoutes } from './routes'
 
 import TodaySchedule from './components/TodaySchedule'
 import WeeklySchedule from './components/WeeklySchedule'
@@ -19,10 +19,14 @@ import TeamActivities from './components/TeamActivities'
 import CourseContent from './components/CourseContent'
 import Announcements from './components/Announcements'
 import StudentProfile from './components/StudentProfile'
+import ExamTimeline from './components/ExamTimeline'
+import TedyBooks, { BookDetail } from './components/TedyBooks'
+import BookReader from './components/BookReader'
 
 const COMPONENTS: Record<string, React.ComponentType> = {
-  TodaySchedule, WeeklySchedule, HomeworkTracker, AssistantChat, GradeTable,
+  TodaySchedule, WeeklySchedule, HomeworkTracker, AssistantChat, GradeTable, ExamTimeline,
   PlatformProgress, CalendarEvents, TeamActivities, CourseContent, Announcements, StudentProfile,
+  TedyBooks, BookDetail, BookReader,
 }
 
 export default function App() {
@@ -60,7 +64,7 @@ export default function App() {
         isChildOfHeader
       >
         <SideNavItems>
-          {routes.map(r => (
+          {navRoutes.map(r => (
             <SideNavLink
               key={r.path}
               as={NavLink}
@@ -74,6 +78,14 @@ export default function App() {
           ))}
         </SideNavItems>
       </SideNav>
+      {sideNavExpanded && (
+        <button
+          type="button"
+          className="app-shell-nav-scrim"
+          aria-label="Menüyü kapat"
+          onClick={() => setSideNavExpanded(false)}
+        />
+      )}
       <Content className={`app-shell-content${focusMode ? ' app-shell-content--focus' : ''}`}>
         <Routes>
           {routes.map(r => {

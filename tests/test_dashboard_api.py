@@ -2,7 +2,7 @@
 import os
 import sys
 from io import BytesIO
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 import requests as http_requests
@@ -579,3 +579,348 @@ class TestApiKeyAuth:
             headers={"Authorization": "Bearer tdyK_anything"},
         )
         assert resp.status_code == 401
+
+
+class TestBooksApi:
+    """Tedy Books — the shelf is driven purely by what is on disk."""
+
+    @pytest.fixture
+    def shelf(self, tmp_path, monkeypatch):
+        """A two-chapter book whose second chapter is declared but not written."""
+        import json
+
+        book = tmp_path / "ornek-kitap"
+        book.mkdir()
+        (book / "book.json").write_text(
+            json.dumps({
+                "slug": "ornek-kitap",
+                "title": "Örnek Kitap",
+                "author": "Bir Yazar",
+                "language": "en",
+                "chapters": [
+                    {"id": "B01", "order": 1, "volume": "BİRİNCİ CİLT",
+                     "part": "BİRİNCİ KİTAP", "numeral": "I",
+                     "label": "Bölüm I", "title": "İlk Bölüm"},
+                    {"id": "B02", "order": 2, "volume": "BİRİNCİ CİLT",
+                     "part": "BİRİNCİ KİTAP", "numeral": "II",
+                     "label": "Bölüm II", "title": "İkinci Bölüm"},
+                ],
+            }, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        (book / "B01_Ilk_Bolum.md").write_text(
+            "# BİRİNCİ KİTAP\n\n## BÖLÜM I — İLK BÖLÜM\n\n*künye satırı*\n\n---\n\nGövde metni.\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(dashboard_api, "BOOKS_DIR", str(tmp_path))
+        return book
+
+    def test_list_reports_available_vs_declared(self, client, shelf):
+        resp = client.get("/api/books")
+        assert resp.status_code == 200
+        books = resp.get_json()["books"]
+        assert len(books) == 1
+        assert books[0]["slug"] == "ornek-kitap"
+        assert books[0]["language"] == "en"
+        assert books[0]["totalChapters"] == 2
+        assert books[0]["availableChapters"] == 1
+
+    def test_detail_marks_missing_chapter_unavailable(self, client, shelf):
+        resp = client.get("/api/books/ornek-kitap")
+        assert resp.status_code == 200
+        chapters = resp.get_json()["chapters"]
+        assert [c["available"] for c in chapters] == [True, False]
+        assert chapters[0]["words"] > 0
+
+    def test_chapter_strips_front_matter(self, client, shelf):
+        resp = client.get("/api/books/ornek-kitap/chapters/B01")
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload["chapter"]["content"].strip() == "Gövde metni."
+        assert payload["chapter"]["credit"] == "künye satırı"
+        assert payload["chapter"]["partHeading"] == "BİRİNCİ KİTAP"
+        assert payload["prev"] is None
+        assert payload["next"] is None
+
+    def test_declared_but_unwritten_chapter_is_404(self, client, shelf):
+        assert client.get("/api/books/ornek-kitap/chapters/B02").status_code == 404
+
+    def test_dropping_a_file_publishes_the_chapter(self, client, shelf):
+        (shelf / "B02_Ikinci_Bolum.md").write_text("İkinci gövde.\n", encoding="utf-8")
+
+        assert client.get("/api/books/ornek-kitap").get_json()["availableChapters"] == 2
+
+        first = client.get("/api/books/ornek-kitap/chapters/B01").get_json()
+        assert first["next"]["id"] == "B02"
+        assert first["position"] == {"index": 1, "total": 2}
+
+        second = client.get("/api/books/ornek-kitap/chapters/B02").get_json()
+        assert second["prev"]["id"] == "B01"
+        assert second["chapter"]["title"] == "İkinci Bölüm"
+
+    def test_unlisted_markdown_still_shows_up(self, client, shelf):
+        (shelf / "Ek_Notlar.md").write_text("Ek metin.\n", encoding="utf-8")
+        chapters = client.get("/api/books/ornek-kitap").get_json()["chapters"]
+        extra = [c for c in chapters if c["id"] == "Ek_Notlar"]
+        assert len(extra) == 1
+        assert extra[0]["available"] is True
+
+    def test_unknown_book_is_404(self, client, shelf):
+        assert client.get("/api/books/olmayan-kitap").status_code == 404
+
+    @pytest.mark.parametrize("slug", ["..", "../etc", "Ornek-Kitap", "ornek_kitap"])
+    def test_slug_traversal_and_case_rejected(self, client, shelf, slug):
+        assert client.get(f"/api/books/{slug}").status_code == 404
+
+    def test_chapter_id_cannot_escape_book_dir(self, client, shelf, tmp_path):
+        (tmp_path / "gizli.md").write_text("sır", encoding="utf-8")
+        assert client.get("/api/books/ornek-kitap/chapters/..%2Fgizli").status_code == 404
+
+    def test_ruleless_front_matter_is_stripped(self, client, shelf):
+        """`### BÖLÜM III` + a bare shouted title, no rule — the other house style."""
+        (shelf / "B02_Ikinci_Bolum.md").write_text(
+            "### BÖLÜM II\n\nİKİNCİ BÖLÜM\n\n\"Gövde burada başlar,\" dedi Gandalf.\n",
+            encoding="utf-8",
+        )
+        chapter = client.get("/api/books/ornek-kitap/chapters/B02").get_json()["chapter"]
+        assert chapter["content"].strip() == '"Gövde burada başlar," dedi Gandalf.'
+
+    def test_part_heading_falls_back_to_manifest(self, client, shelf):
+        (shelf / "B02_Ikinci_Bolum.md").write_text(
+            "### BÖLÜM II\n\nGövde.\n", encoding="utf-8"
+        )
+        chapter = client.get("/api/books/ornek-kitap/chapters/B02").get_json()["chapter"]
+        assert chapter["partHeading"] == "BİRİNCİ KİTAP"
+
+    def test_prose_opening_is_never_stripped(self, client, shelf):
+        """A chapter that dives straight into prose must survive intact."""
+        body = "Söylentiler ne dokuz, ne de doksan dokuz günde dindi.\n\nİkinci paragraf.\n"
+        (shelf / "B02_Ikinci_Bolum.md").write_text(body, encoding="utf-8")
+        chapter = client.get("/api/books/ornek-kitap/chapters/B02").get_json()["chapter"]
+        assert chapter["content"] == body
+
+    def test_shouted_opening_line_without_heading_is_body(self, client, shelf):
+        """All-caps only counts as a title when a heading introduced it."""
+        body = "HAYIR\n\ndiye bağırdı Frodo.\n"
+        (shelf / "B02_Ikinci_Bolum.md").write_text(body, encoding="utf-8")
+        chapter = client.get("/api/books/ornek-kitap/chapters/B02").get_json()["chapter"]
+        assert chapter["content"] == body
+
+    def test_book_without_manifest_is_still_readable(self, client, tmp_path, monkeypatch):
+        bare = tmp_path / "sade-kitap"
+        bare.mkdir()
+        (bare / "B01_Giris.md").write_text("Sade gövde.\n", encoding="utf-8")
+        monkeypatch.setattr(dashboard_api, "BOOKS_DIR", str(tmp_path))
+
+        listing = client.get("/api/books").get_json()["books"]
+        assert listing[0]["slug"] == "sade-kitap"
+        assert listing[0]["availableChapters"] == 1
+
+        chapter = client.get("/api/books/sade-kitap/chapters/B01_Giris").get_json()
+        assert chapter["chapter"]["content"].strip() == "Sade gövde."
+
+
+class TestBookTranslationApi:
+    def test_uses_deepl_with_sentence_context_first(
+        self, client, monkeypatch
+    ):
+        monkeypatch.setenv("DEEPL_API_KEY", "test-key:fx")
+        monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
+        provider_response = Mock()
+        provider_response.json.return_value = {
+            "translations": [
+                {"detected_source_language": "EN", "text": "tünel"}
+            ]
+        }
+
+        with patch(
+            "src.dashboard_api.http_requests.post",
+            return_value=provider_response,
+        ) as provider_post, patch(
+            "src.dashboard_api.http_requests.get"
+        ) as provider_get:
+            response = client.post(
+                "/api/books/translate",
+                json={
+                    "text": "tunnel",
+                    "context": "The hall was like a tunnel.",
+                },
+            )
+
+        assert response.status_code == 200
+        assert response.get_json() == {
+            "sourceText": "tunnel",
+            "translatedText": "tünel",
+            "sourceLanguage": "en",
+            "targetLanguage": "tr",
+            "provider": "DeepL",
+        }
+        provider_post.assert_called_once_with(
+            "https://api-free.deepl.com/v2/translate",
+            headers={"Authorization": "DeepL-Auth-Key test-key:fx"},
+            json={
+                "text": ["tunnel"],
+                "source_lang": "EN",
+                "target_lang": "TR",
+                "context": "The hall was like a tunnel.",
+            },
+            timeout=8,
+        )
+        provider_get.assert_not_called()
+
+    def test_falls_back_to_gemini_when_deepl_fails(
+        self, client, monkeypatch
+    ):
+        monkeypatch.setenv("DEEPL_API_KEY", "test-key:fx")
+        monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
+        def provider_post(url, **kwargs):
+            if "deepl.com" in url:
+                raise http_requests.RequestException("deepl unavailable")
+            prompt = kwargs["json"]["contents"][0]["parts"][0]["text"]
+            translated = (
+                "tünel"
+                if "dictionary headword" in prompt
+                else "tünel gibiydi"
+            )
+            gemini_response = Mock()
+            gemini_response.json.return_value = {
+                "candidates": [
+                    {"content": {"parts": [{"text": translated}]}}
+                ]
+            }
+            return gemini_response
+
+        with patch(
+            "src.dashboard_api.http_requests.post",
+            side_effect=provider_post,
+        ) as post_request, patch(
+            "src.dashboard_api.http_requests.get"
+        ) as provider_get:
+            response = client.post(
+                "/api/books/translate",
+                json={
+                    "text": "tunnel",
+                    "context": "The hall was like a tunnel.",
+                },
+            )
+
+        assert response.status_code == 200
+        assert response.get_json()["translatedText"] == "tünel"
+        assert response.get_json()["provider"] == "Gemini 2.5 Flash"
+        assert post_request.call_count == 2
+        gemini_call = post_request.call_args_list[1]
+        assert gemini_call.args[0].endswith(
+            "/models/gemini-2.5-flash:generateContent"
+        )
+        assert gemini_call.kwargs["headers"] == {
+            "x-goog-api-key": "test-gemini-key"
+        }
+        prompt = gemini_call.kwargs["json"]["contents"][0]["parts"][0]["text"]
+        assert '"tunnel"' in prompt
+        assert '"The hall was like a tunnel."' in prompt
+        provider_get.assert_not_called()
+
+    def test_falls_back_to_contextual_mymemory_after_deepl_and_gemini(
+        self, client, monkeypatch
+    ):
+        monkeypatch.setenv("DEEPL_API_KEY", "test-key:fx")
+        monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
+        provider_payload = {
+            "responseData": {
+                "translatedText": "Salon bir tünel gibiydi."
+            }
+        }
+
+        with patch(
+            "src.dashboard_api.http_requests.post",
+            side_effect=http_requests.RequestException("provider unavailable"),
+        ) as provider_post, patch(
+            "src.dashboard_api.http_requests.get"
+        ) as provider_get:
+            provider_get.return_value.json.return_value = provider_payload
+            response = client.post(
+                "/api/books/translate",
+                json={
+                    "text": "tunnel",
+                    "context": "The hall was like a tunnel.",
+                },
+            )
+
+        assert response.status_code == 200
+        assert response.get_json()["translatedText"] == "Salon bir tünel gibiydi."
+        assert response.get_json()["provider"] == "MyMemory"
+        assert provider_post.call_count == 2
+        provider_get.assert_called_once_with(
+            "https://api.mymemory.translated.net/get",
+            params={
+                "q": "The hall was like a tunnel.",
+                "langpair": "en|tr",
+                "mt": "1",
+            },
+            timeout=8,
+        )
+
+    def test_rejects_selection_larger_than_provider_limit(self, client):
+        with patch("src.dashboard_api.http_requests.post") as provider_post, patch(
+            "src.dashboard_api.http_requests.get"
+        ) as provider_get:
+            response = client.post(
+                "/api/books/translate",
+                json={"text": "a" * 501},
+            )
+
+        assert response.status_code == 413
+        assert response.get_json() == {"error": "selection_too_long", "maxBytes": 500}
+        provider_post.assert_not_called()
+        provider_get.assert_not_called()
+
+    def test_rejects_context_larger_than_context_limit(self, client):
+        with patch("src.dashboard_api.http_requests.post") as provider_post, patch(
+            "src.dashboard_api.http_requests.get"
+        ) as provider_get:
+            response = client.post(
+                "/api/books/translate",
+                json={"text": "tunnel", "context": "a" * 1501},
+            )
+
+        assert response.status_code == 413
+        assert response.get_json() == {
+            "error": "context_too_long",
+            "maxBytes": 1500,
+        }
+        provider_post.assert_not_called()
+        provider_get.assert_not_called()
+
+    def test_rejects_empty_selection_without_calling_provider(self, client):
+        with patch("src.dashboard_api.http_requests.post") as provider_post, patch(
+            "src.dashboard_api.http_requests.get"
+        ) as provider_get:
+            response = client.post("/api/books/translate", json={"text": "  "})
+
+        assert response.status_code == 400
+        assert response.get_json() == {"error": "selection_required"}
+        provider_post.assert_not_called()
+        provider_get.assert_not_called()
+
+    def test_reports_all_provider_failures_without_leaking_details(
+        self, client, monkeypatch
+    ):
+        monkeypatch.setenv("DEEPL_API_KEY", "test-key:fx")
+        monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
+        with patch(
+            "src.dashboard_api.http_requests.post",
+            side_effect=http_requests.RequestException("private upstream detail"),
+        ), patch(
+            "src.dashboard_api.http_requests.get",
+            side_effect=http_requests.RequestException("private upstream detail"),
+        ):
+            response = client.post(
+                "/api/books/translate",
+                json={
+                    "text": "tunnel",
+                    "context": "The hall was like a tunnel.",
+                },
+            )
+
+        assert response.status_code == 502
+        assert response.get_json() == {"error": "translation_provider_unavailable"}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { InlineNotification } from '@carbon/react'
 
 const GOOGLE_CLIENT_ID = '343043757928-mivqip09orvrf73m7kj9b0atohgin2ho.apps.googleusercontent.com'
@@ -34,24 +34,39 @@ declare global {
   }
 }
 
+const GSI_SCRIPT_ID = 'google-gsi-script'
+
+/** Insert the Google Identity Services tag once, returning the existing one after that. */
+function ensureGsiScript(): HTMLScriptElement {
+  const existing = document.getElementById(GSI_SCRIPT_ID)
+  if (existing) return existing as HTMLScriptElement
+  const script = document.createElement('script')
+  script.id = GSI_SCRIPT_ID
+  script.src = 'https://accounts.google.com/gsi/client'
+  script.async = true
+  document.head.appendChild(script)
+  return script
+}
+
+function subscribeGsi(onChange: () => void) {
+  const script = ensureGsiScript()
+  script.addEventListener('load', onChange)
+  return () => script.removeEventListener('load', onChange)
+}
+
+/**
+ * Readiness is whether the API object exists, not whether a <script> tag does.
+ * A tag that is still downloading used to read as "loaded", after which the
+ * init effect bailed on `!window.google` and never ran again.
+ */
+function gsiReady() {
+  return Boolean(window.google?.accounts?.id)
+}
+
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const buttonRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
-  const [scriptLoaded, setScriptLoaded] = useState(false)
-
-  // Load Google Identity Services script
-  useEffect(() => {
-    if (document.getElementById('google-gsi-script')) {
-      setScriptLoaded(true)
-      return
-    }
-    const script = document.createElement('script')
-    script.id = 'google-gsi-script'
-    script.src = 'https://accounts.google.com/gsi/client'
-    script.async = true
-    script.onload = () => setScriptLoaded(true)
-    document.head.appendChild(script)
-  }, [])
+  const scriptLoaded = useSyncExternalStore(subscribeGsi, gsiReady, () => false)
 
   // Initialize Google Sign-In button
   useEffect(() => {

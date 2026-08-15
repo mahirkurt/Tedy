@@ -11,12 +11,21 @@ OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "output")
 
 
 def load_json(filename):
-    """Load a JSON file from the output directory, skip test if not found."""
+    """Load a tracker file from output/, skipping when there is nothing to check.
+
+    These validate the shape of live scraper output, so they only mean anything
+    once a scraper has run. A missing file and an empty one are the same state:
+    `purge_google_data.py` resets trackers to `{}` rather than deleting them, so
+    both must skip instead of failing.
+    """
     path = os.path.join(OUTPUT_DIR, filename)
     if not os.path.exists(path):
-        pytest.skip(f"{filename} not found")
+        pytest.skip(f"{filename} not found — scraper has not run yet")
     with open(path) as f:
-        return json.load(f)
+        data = json.load(f)
+    if not data:
+        pytest.skip(f"{filename} is empty — no scraped data to validate (post-purge?)")
+    return data
 
 
 class TestEbaTextbooks:

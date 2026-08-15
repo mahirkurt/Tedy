@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react'
 import { useApi } from '../hooks/useApi'
 import { Certificate } from '@carbon/icons-react'
 import {
@@ -7,7 +8,15 @@ import {
 } from '@carbon/react'
 import type { GradeItem } from '../types'
 import { gradeColor } from '../utils/formatters'
-import { useFocusMode } from '../contexts/FocusModeContext'
+import { useFocusMode } from '../contexts/focusMode'
+
+/* Row and prop-getter shapes come from Carbon's own render-prop signature, so
+   the expanded-row helper stays in step with the library instead of guessing. */
+type DataTableRenderArgs = Parameters<
+  NonNullable<ComponentProps<typeof DataTable>['children']>
+>[0]
+type GradeDataTableRow = DataTableRenderArgs['rows'][number]
+type GetRowProps = DataTableRenderArgs['getRowProps']
 
 const COLS = ['1. Sınav', '2. Sınav', '3. Sınav', 'DİKP/Performans-1', 'DİKP/Performans-2', 'DİKP/Performans-3'] as const
 const COL_SHORT = ['S1', 'S2', 'S3', 'P1', 'P2', 'P3']
@@ -97,14 +106,14 @@ export default function GradeTable() {
 }
 
 function GradeExpandRow({ row, rawGrade, getRowProps }: {
-  row: any
+  row: GradeDataTableRow
   rawGrade: GradeItem | undefined
-  getRowProps: (opts: { row: any }) => any
+  getRowProps: GetRowProps
 }) {
   return (
     <>
       <TableExpandRow {...getRowProps({ row })}>
-        {row.cells.map((cell: any) => {
+        {row.cells.map(cell => {
           const isGrade = cell.info.header !== 'ders'
           const val = String(cell.value || '')
           const color = isGrade ? gradeColor(val) : ''

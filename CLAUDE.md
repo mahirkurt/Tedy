@@ -152,10 +152,21 @@ SEBİTV     → scrape_sebitv.py / scrape_sebitv_interactive.py → output/sebit
 #### Dashboard
 
 - **Authentication**: Google Sign-In (GSI) with a hardcoded client_id. `LoginPage` sends the JWT credential to the API, which validates the `sub` claim against an allowlist. Auth token stored in localStorage.
-- **Multi-page routing**: `react-router-dom` with routes defined in `dashboard/src/routes.ts`. Pages: Bugün (today), Program, Ödevler, Notlar, Takvim, Takımlar, Dersler, İlerleme, Duyurular, Profil. Carbon `SideNav` for navigation.
+- **Multi-page routing**: `react-router-dom` with routes defined in `dashboard/src/routes.ts`. Pages: Bugün (today), Program, Ödevler, Notlar, Takvim, Takımlar, Dersler, Tedy Books, İlerleme, Duyurular, Profil. Carbon `SideNav` for navigation, built from `navRoutes` — routes flagged `showInNav: false` (the book/reader detail routes) are routable but hidden.
 - **Focus mode**: `FocusModeContext` toggles a distraction-free view. State persisted to localStorage (`tedy-focus-mode` key).
 - **Homework tracker policy**: Shows all homework (no time filter), sorted by deadline descending (furthest first). Teacher-assigned statuses (Yaptı/Yapmadı) are shown as colored badges. Expired deadlines show a neutral "Süresi doldu" tag. Countdown bars visualize time remaining.
 - **Data fetching**: `useApi<T>` hook polls the Flask API every 5 minutes. Custom event `tedy:homework-updated` triggers cross-component refresh.
+
+#### Tedy Books
+
+- **Content source**: `books/<slug>/` holds one Markdown file per chapter plus an optional `book.json` manifest declaring the full table of contents (including unwritten chapters, shown as "Yakında"). See `books/README.md` for the chapter-file naming rule and manifest schema.
+- **Publishing a chapter**: drop the `.md` file into the book directory — nothing else. `python src/check_books.py [slug]` walks the shelf through the API's own functions and exits non-zero on an unmatched filename, an unrecognised title preamble, or an empty body. `_book_chapters()` in `dashboard_api.py` re-scans on every request and matches files to manifest entries by id prefix, so no rebuild or restart is needed. Files matching no manifest entry are appended rather than dropped.
+- **API**: `/api/books`, `/api/books/<slug>`, `/api/books/<slug>/chapters/<id>` — all `@require_auth`. Slugs and chapter ids are regex-validated and the resolved path is checked against `BOOKS_DIR` to block traversal.
+- **Front matter**: `_book_split_front_matter()` strips a chapter's title preamble so the reader can typeset its own title page from manifest metadata instead of repeating the source headings. Chapter files disagree on the shape (`# Part / ## Chapter / *credit* / ---` in B01–B02, `### BÖLÜM III` plus a bare shouted title and no rule from B03 on), so it consumes the leading run of heading-like lines and stops at the first line of prose; a horizontal rule still terminates it explicitly. `partHeading` falls back to the manifest's `part` when the file does not name its volume.
+- **Reader**: `BookReader.tsx` is a fixed full-viewport overlay (z-index above the Carbon header). Markdown is rendered to React elements by `utils/markdown.tsx` (no HTML injection); `>` blockquotes render as verse with line breaks preserved.
+- **Loose verse**: chapter files often write songs and inscriptions as plain blank-line-separated lines instead of `>` blocks. `foldLooseVerse()` in `utils/markdown.tsx` folds runs of 2+ short (<80 char) single-line paragraphs that do not open with a quote or dash into a verse block, so they do not set as indented prose. An explicit `>` block always wins.
+- **Reader state**: theme/font/size/line-height/measure in localStorage `tedy-books-settings`; reading position in `tedy-books-progress`, read via `useSyncExternalStore` so open screens stay in sync. Device-local by design — nothing is written server-side.
+- **Typography**: Cormorant Garamond (display) + Literata (body) loaded from Google Fonts in `index.html`. Ornaments are inline SVG (`Ornament.tsx`), not ❦ characters, which fall back to the colour-emoji font.
 
 ## Dependencies
 

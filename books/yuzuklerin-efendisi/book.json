@@ -1,0 +1,692 @@
+{
+  "slug": "yuzuklerin-efendisi",
+  "title": "Yüzüklerin Efendisi",
+  "subtitle": "Üç cilt bir arada",
+  "author": "J.R.R. Tolkien",
+  "translator": "Çiğdem Erkal İpek",
+  "publisher": "Metis Yayıncılık",
+  "isbn": "9789753423472",
+  "edition": "14 yaş uyarlaması",
+  "year": "2026",
+  "language": "tr",
+  "cover": {
+    "palette": "forest",
+    "monogram": "YE"
+  },
+  "description": "Bilbo Baggins'in yüz on birinci yaş günü davetiyle başlayan yolculuk, Frodo'yu Shire'dan Hüküm Dağı'na taşır. Üç cilt — Yüzük Kardeşliği, İki Kule ve Kralın Dönüşü — burada tek bir okuma akışında birleşiyor.",
+  "epigraph": "Gezgin olan herkes yolunu kaybetmiş değildir.",
+  "totalSourceWords": 366073,
+  "wordsPerMinute": 180,
+  "chapters": [
+    {
+      "id": "B01",
+      "order": 1,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "BİRİNCİ KİTAP",
+      "numeral": "I",
+      "label": "Bölüm I",
+      "title": "Dört Gözle Beklenen Davet",
+      "sourceWords": 8055
+    },
+    {
+      "id": "B02",
+      "order": 2,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "BİRİNCİ KİTAP",
+      "numeral": "II",
+      "label": "Bölüm II",
+      "title": "Geçmişin Gölgesi",
+      "sourceWords": 8811
+    },
+    {
+      "id": "B03",
+      "order": 3,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "BİRİNCİ KİTAP",
+      "numeral": "III",
+      "label": "Bölüm III",
+      "title": "Üç Kafadar",
+      "sourceWords": 7205
+    },
+    {
+      "id": "B04",
+      "order": 4,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "BİRİNCİ KİTAP",
+      "numeral": "IV",
+      "label": "Bölüm IV",
+      "title": "Mantarlara Çıkan Kestirme Yol",
+      "sourceWords": 4241
+    },
+    {
+      "id": "B05",
+      "order": 5,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "BİRİNCİ KİTAP",
+      "numeral": "V",
+      "label": "Bölüm V",
+      "title": "Suç Ortakları Ortaya Çıkıyor",
+      "sourceWords": 3876
+    },
+    {
+      "id": "B06",
+      "order": 6,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "BİRİNCİ KİTAP",
+      "numeral": "VI",
+      "label": "Bölüm VI",
+      "title": "Yaşlı Orman",
+      "sourceWords": 4922
+    },
+    {
+      "id": "B07",
+      "order": 7,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "BİRİNCİ KİTAP",
+      "numeral": "VII",
+      "label": "Bölüm VII",
+      "title": "Tom Bombadil'in Evinde",
+      "sourceWords": 4133
+    },
+    {
+      "id": "B08",
+      "order": 8,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "BİRİNCİ KİTAP",
+      "numeral": "VIII",
+      "label": "Bölüm VIII",
+      "title": "Höyük Yaylalarında Sis",
+      "sourceWords": 5018
+    },
+    {
+      "id": "B09",
+      "order": 9,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "BİRİNCİ KİTAP",
+      "numeral": "IX",
+      "label": "Bölüm IX",
+      "title": "Sıçrayan Midilli Hanında",
+      "sourceWords": 4643
+    },
+    {
+      "id": "B10",
+      "order": 10,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "BİRİNCİ KİTAP",
+      "numeral": "X",
+      "label": "Bölüm X",
+      "title": "Yolgezer",
+      "sourceWords": 4355
+    },
+    {
+      "id": "B11",
+      "order": 11,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "BİRİNCİ KİTAP",
+      "numeral": "XI",
+      "label": "Bölüm XI",
+      "title": "Karanlıkta Bir Bıçak",
+      "sourceWords": 7083
+    },
+    {
+      "id": "B12",
+      "order": 12,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "BİRİNCİ KİTAP",
+      "numeral": "XII",
+      "label": "Bölüm XII",
+      "title": "Nehir Geçidine Kaçış",
+      "sourceWords": 6300
+    },
+    {
+      "id": "B13",
+      "order": 13,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "İKİNCİ KİTAP",
+      "numeral": "I",
+      "label": "Bölüm I",
+      "title": "Nice Buluşmalar",
+      "sourceWords": 6658
+    },
+    {
+      "id": "B14",
+      "order": 14,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "İKİNCİ KİTAP",
+      "numeral": "II",
+      "label": "Bölüm II",
+      "title": "Elrond'un Divanı",
+      "sourceWords": 11958
+    },
+    {
+      "id": "B15",
+      "order": 15,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "İKİNCİ KİTAP",
+      "numeral": "III",
+      "label": "Bölüm III",
+      "title": "Yüzük Güneye Gidiyor",
+      "sourceWords": 7713
+    },
+    {
+      "id": "B16",
+      "order": 16,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "İKİNCİ KİTAP",
+      "numeral": "IV",
+      "label": "Bölüm IV",
+      "title": "Karanlıkta Yolculuk",
+      "sourceWords": 8454
+    },
+    {
+      "id": "B17",
+      "order": 17,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "İKİNCİ KİTAP",
+      "numeral": "V",
+      "label": "Bölüm V",
+      "title": "Khazad-dûm Köprüsü",
+      "sourceWords": 4046
+    },
+    {
+      "id": "B18",
+      "order": 18,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "İKİNCİ KİTAP",
+      "numeral": "VI",
+      "label": "Bölüm VI",
+      "title": "Lothlórien",
+      "sourceWords": 6866
+    },
+    {
+      "id": "B19",
+      "order": 19,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "İKİNCİ KİTAP",
+      "numeral": "VII",
+      "label": "Bölüm VII",
+      "title": "Galadriel'in Aynası",
+      "sourceWords": 4992
+    },
+    {
+      "id": "B20",
+      "order": 20,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "İKİNCİ KİTAP",
+      "numeral": "VIII",
+      "label": "Bölüm VIII",
+      "title": "Lórien'e Veda",
+      "sourceWords": 4555
+    },
+    {
+      "id": "B21",
+      "order": 21,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "İKİNCİ KİTAP",
+      "numeral": "IX",
+      "label": "Bölüm IX",
+      "title": "Ulu Nehir",
+      "sourceWords": 5281
+    },
+    {
+      "id": "B22",
+      "order": 22,
+      "volume": "I — Yüzük Kardeşliği",
+      "part": "İKİNCİ KİTAP",
+      "numeral": "X",
+      "label": "Bölüm X",
+      "title": "Kardeşlik Dağılıyor",
+      "sourceWords": 4582
+    },
+    {
+      "id": "B23",
+      "order": 23,
+      "volume": "II — İki Kule",
+      "part": "ÜÇÜNCÜ KİTAP",
+      "numeral": "I",
+      "label": "Bölüm I",
+      "title": "Boromir'in Ayrılışı",
+      "sourceWords": 2482
+    },
+    {
+      "id": "B24",
+      "order": 24,
+      "volume": "II — İki Kule",
+      "part": "ÜÇÜNCÜ KİTAP",
+      "numeral": "II",
+      "label": "Bölüm II",
+      "title": "Rohan Süvarileri",
+      "sourceWords": 8384
+    },
+    {
+      "id": "B25",
+      "order": 25,
+      "volume": "II — İki Kule",
+      "part": "ÜÇÜNCÜ KİTAP",
+      "numeral": "III",
+      "label": "Bölüm III",
+      "title": "Uruk-hai",
+      "sourceWords": 5915
+    },
+    {
+      "id": "B26",
+      "order": 26,
+      "volume": "II — İki Kule",
+      "part": "ÜÇÜNCÜ KİTAP",
+      "numeral": "IV",
+      "label": "Bölüm IV",
+      "title": "Ağaçsakal",
+      "sourceWords": 9603
+    },
+    {
+      "id": "B27",
+      "order": 27,
+      "volume": "II — İki Kule",
+      "part": "ÜÇÜNCÜ KİTAP",
+      "numeral": "V",
+      "label": "Bölüm V",
+      "title": "Ak Süvari",
+      "sourceWords": 6544
+    },
+    {
+      "id": "B28",
+      "order": 28,
+      "volume": "II — İki Kule",
+      "part": "ÜÇÜNCÜ KİTAP",
+      "numeral": "VI",
+      "label": "Bölüm VI",
+      "title": "Altın Konak'ın Kralı",
+      "sourceWords": 6997
+    },
+    {
+      "id": "B29",
+      "order": 29,
+      "volume": "II — İki Kule",
+      "part": "ÜÇÜNCÜ KİTAP",
+      "numeral": "VII",
+      "label": "Bölüm VII",
+      "title": "Miğfer Dibi",
+      "sourceWords": 5695
+    },
+    {
+      "id": "B30",
+      "order": 30,
+      "volume": "II — İki Kule",
+      "part": "ÜÇÜNCÜ KİTAP",
+      "numeral": "VIII",
+      "label": "Bölüm VIII",
+      "title": "İsengard'a Giden Yol",
+      "sourceWords": 5882
+    },
+    {
+      "id": "B31",
+      "order": 31,
+      "volume": "II — İki Kule",
+      "part": "ÜÇÜNCÜ KİTAP",
+      "numeral": "IX",
+      "label": "Bölüm IX",
+      "title": "Kıyıya Vuran Enkaz",
+      "sourceWords": 5687
+    },
+    {
+      "id": "B32",
+      "order": 32,
+      "volume": "II — İki Kule",
+      "part": "ÜÇÜNCÜ KİTAP",
+      "numeral": "X",
+      "label": "Bölüm X",
+      "title": "Saruman'ın Sesi",
+      "sourceWords": 4350
+    },
+    {
+      "id": "B33",
+      "order": 33,
+      "volume": "II — İki Kule",
+      "part": "ÜÇÜNCÜ KİTAP",
+      "numeral": "XI",
+      "label": "Bölüm XI",
+      "title": "Palantír",
+      "sourceWords": 4877
+    },
+    {
+      "id": "B34",
+      "order": 34,
+      "volume": "II — İki Kule",
+      "part": "DÖRDÜNCÜ KİTAP",
+      "numeral": "I",
+      "label": "Bölüm I",
+      "title": "Sméagol'ün Ehlileştirilmesi",
+      "sourceWords": 6485
+    },
+    {
+      "id": "B35",
+      "order": 35,
+      "volume": "II — İki Kule",
+      "part": "DÖRDÜNCÜ KİTAP",
+      "numeral": "II",
+      "label": "Bölüm II",
+      "title": "Bataklıklardan Geçiş",
+      "sourceWords": 5824
+    },
+    {
+      "id": "B36",
+      "order": 36,
+      "volume": "II — İki Kule",
+      "part": "DÖRDÜNCÜ KİTAP",
+      "numeral": "III",
+      "label": "Bölüm III",
+      "title": "Kara Kapı Kapalı",
+      "sourceWords": 4520
+    },
+    {
+      "id": "B37",
+      "order": 37,
+      "volume": "II — İki Kule",
+      "part": "DÖRDÜNCÜ KİTAP",
+      "numeral": "IV",
+      "label": "Bölüm IV",
+      "title": "Baharatlar ve Tavşan Yahnisi",
+      "sourceWords": 5313
+    },
+    {
+      "id": "B38",
+      "order": 38,
+      "volume": "II — İki Kule",
+      "part": "DÖRDÜNCÜ KİTAP",
+      "numeral": "V",
+      "label": "Bölüm V",
+      "title": "Batı'daki Pencere",
+      "sourceWords": 7766
+    },
+    {
+      "id": "B39",
+      "order": 39,
+      "volume": "II — İki Kule",
+      "part": "DÖRDÜNCÜ KİTAP",
+      "numeral": "VI",
+      "label": "Bölüm VI",
+      "title": "Yasak Havuz",
+      "sourceWords": 4052
+    },
+    {
+      "id": "B40",
+      "order": 40,
+      "volume": "II — İki Kule",
+      "part": "DÖRDÜNCÜ KİTAP",
+      "numeral": "VII",
+      "label": "Bölüm VII",
+      "title": "Kavşağa Yolculuk",
+      "sourceWords": 3216
+    },
+    {
+      "id": "B41",
+      "order": 41,
+      "volume": "II — İki Kule",
+      "part": "DÖRDÜNCÜ KİTAP",
+      "numeral": "VIII",
+      "label": "Bölüm VIII",
+      "title": "Cirith Ungol'un Merdivenleri",
+      "sourceWords": 5107
+    },
+    {
+      "id": "B42",
+      "order": 42,
+      "volume": "II — İki Kule",
+      "part": "DÖRDÜNCÜ KİTAP",
+      "numeral": "IX",
+      "label": "Bölüm IX",
+      "title": "Shelob'un İni",
+      "sourceWords": 4002
+    },
+    {
+      "id": "B43",
+      "order": 43,
+      "volume": "II — İki Kule",
+      "part": "DÖRDÜNCÜ KİTAP",
+      "numeral": "X",
+      "label": "Bölüm X",
+      "title": "Efendi Samwise'ın Seçimi",
+      "sourceWords": 5385
+    },
+    {
+      "id": "B44",
+      "order": 44,
+      "volume": "III — Kralın Dönüşü",
+      "part": "BEŞİNCİ KİTAP",
+      "numeral": "I",
+      "label": "Bölüm I",
+      "title": "Minas Tirith",
+      "sourceWords": 9806
+    },
+    {
+      "id": "B45",
+      "order": 45,
+      "volume": "III — Kralın Dönüşü",
+      "part": "BEŞİNCİ KİTAP",
+      "numeral": "II",
+      "label": "Bölüm II",
+      "title": "Gri Bölüğün Geçişi",
+      "sourceWords": 6305
+    },
+    {
+      "id": "B46",
+      "order": 46,
+      "volume": "III — Kralın Dönüşü",
+      "part": "BEŞİNCİ KİTAP",
+      "numeral": "III",
+      "label": "Bölüm III",
+      "title": "Rohan'ın Toplanışı",
+      "sourceWords": 5163
+    },
+    {
+      "id": "B47",
+      "order": 47,
+      "volume": "III — Kralın Dönüşü",
+      "part": "BEŞİNCİ KİTAP",
+      "numeral": "IV",
+      "label": "Bölüm IV",
+      "title": "Gondor Kuşatması",
+      "sourceWords": 8947
+    },
+    {
+      "id": "B48",
+      "order": 48,
+      "volume": "III — Kralın Dönüşü",
+      "part": "BEŞİNCİ KİTAP",
+      "numeral": "V",
+      "label": "Bölüm V",
+      "title": "Rohirrim'in Gelişi",
+      "sourceWords": 3348
+    },
+    {
+      "id": "B49",
+      "order": 49,
+      "volume": "III — Kralın Dönüşü",
+      "part": "BEŞİNCİ KİTAP",
+      "numeral": "VI",
+      "label": "Bölüm VI",
+      "title": "Pelennor Çayırları Savaşı",
+      "sourceWords": 3880
+    },
+    {
+      "id": "B50",
+      "order": 50,
+      "volume": "III — Kralın Dönüşü",
+      "part": "BEŞİNCİ KİTAP",
+      "numeral": "VII",
+      "label": "Bölüm VII",
+      "title": "Denethor'u Yakmak İçin Çatılan Odunlar",
+      "sourceWords": 2642
+    },
+    {
+      "id": "B51",
+      "order": 51,
+      "volume": "III — Kralın Dönüşü",
+      "part": "BEŞİNCİ KİTAP",
+      "numeral": "VIII",
+      "label": "Bölüm VIII",
+      "title": "Şifa Evleri",
+      "sourceWords": 4934
+    },
+    {
+      "id": "B52",
+      "order": 52,
+      "volume": "III — Kralın Dönüşü",
+      "part": "BEŞİNCİ KİTAP",
+      "numeral": "IX",
+      "label": "Bölüm IX",
+      "title": "Son Müzakere",
+      "sourceWords": 4036
+    },
+    {
+      "id": "B53",
+      "order": 53,
+      "volume": "III — Kralın Dönüşü",
+      "part": "BEŞİNCİ KİTAP",
+      "numeral": "X",
+      "label": "Bölüm X",
+      "title": "Kara Kapı Açılıyor",
+      "sourceWords": 3822
+    },
+    {
+      "id": "B54",
+      "order": 54,
+      "volume": "III — Kralın Dönüşü",
+      "part": "ALTINCI KİTAP",
+      "numeral": "I",
+      "label": "Bölüm I",
+      "title": "Cirith Ungol Kulesi",
+      "sourceWords": 7294
+    },
+    {
+      "id": "B55",
+      "order": 55,
+      "volume": "III — Kralın Dönüşü",
+      "part": "ALTINCI KİTAP",
+      "numeral": "II",
+      "label": "Bölüm II",
+      "title": "Gölge Diyarı",
+      "sourceWords": 6225
+    },
+    {
+      "id": "B56",
+      "order": 56,
+      "volume": "III — Kralın Dönüşü",
+      "part": "ALTINCI KİTAP",
+      "numeral": "III",
+      "label": "Bölüm III",
+      "title": "Hüküm Dağı",
+      "sourceWords": 5877
+    },
+    {
+      "id": "B57",
+      "order": 57,
+      "volume": "III — Kralın Dönüşü",
+      "part": "ALTINCI KİTAP",
+      "numeral": "IV",
+      "label": "Bölüm IV",
+      "title": "Cormallen Kırları",
+      "sourceWords": 3393
+    },
+    {
+      "id": "B58",
+      "order": 58,
+      "volume": "III — Kralın Dönüşü",
+      "part": "ALTINCI KİTAP",
+      "numeral": "V",
+      "label": "Bölüm V",
+      "title": "Vekilharç ile Kral",
+      "sourceWords": 5402
+    },
+    {
+      "id": "B59",
+      "order": 59,
+      "volume": "III — Kralın Dönüşü",
+      "part": "ALTINCI KİTAP",
+      "numeral": "VI",
+      "label": "Bölüm VI",
+      "title": "Nice Ayrılıklar",
+      "sourceWords": 5388
+    },
+    {
+      "id": "B60",
+      "order": 60,
+      "volume": "III — Kralın Dönüşü",
+      "part": "ALTINCI KİTAP",
+      "numeral": "VII",
+      "label": "Bölüm VII",
+      "title": "Memleket Yolu",
+      "sourceWords": 2919
+    },
+    {
+      "id": "B61",
+      "order": 61,
+      "volume": "III — Kralın Dönüşü",
+      "part": "ALTINCI KİTAP",
+      "numeral": "VIII",
+      "label": "Bölüm VIII",
+      "title": "Shire Temizliği",
+      "sourceWords": 8360
+    },
+    {
+      "id": "B62",
+      "order": 62,
+      "volume": "III — Kralın Dönüşü",
+      "part": "ALTINCI KİTAP",
+      "numeral": "IX",
+      "label": "Bölüm IX",
+      "title": "Gri Limanlar",
+      "sourceWords": 3537
+    },
+    {
+      "id": "EK-A",
+      "order": 63,
+      "volume": "EKLER",
+      "part": "EKLER",
+      "numeral": "",
+      "label": "EK A",
+      "title": "Aragorn ile Arwen'in Öyküsü",
+      "sourceWords": 2878
+    },
+    {
+      "id": "EK-B",
+      "order": 64,
+      "volume": "EKLER",
+      "part": "EKLER",
+      "numeral": "",
+      "label": "EK B",
+      "title": "Yılların Öyküsü (Kronoloji)",
+      "sourceWords": 1890
+    },
+    {
+      "id": "EK-E",
+      "order": 65,
+      "volume": "EKLER",
+      "part": "EKLER",
+      "numeral": "",
+      "label": "EK E",
+      "title": "Yazım ve Telaffuz Kuralları",
+      "sourceWords": 4594
+    },
+    {
+      "id": "EK-F",
+      "order": 66,
+      "volume": "EKLER",
+      "part": "EKLER",
+      "numeral": "",
+      "label": "EK F",
+      "title": "Üçüncü Çağ Dilleri ve Halkları",
+      "sourceWords": 2606
+    },
+    {
+      "id": "DIPNOTLAR",
+      "order": 67,
+      "volume": "EKLER",
+      "part": "EKLER",
+      "numeral": "",
+      "label": "Dipnotlar",
+      "title": "Dipnotlar",
+      "sourceWords": 994
+    }
+  ]
+}

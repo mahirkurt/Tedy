@@ -75,7 +75,6 @@ async function parseJsonSafe(res: Response): Promise<AssistantResponse | { error
 }
 
 function ThinkingIndicator() {
-  const [msgIdx, setMsgIdx] = useState(0)
   const [elapsed, setElapsed] = useState(0)
 
   useEffect(() => {
@@ -85,11 +84,9 @@ function ThinkingIndicator() {
     return () => clearInterval(timer)
   }, [])
 
-  useEffect(() => {
-    if (elapsed > 0 && elapsed % 6 === 0) {
-      setMsgIdx(prev => Math.min(prev + 1, WAITING_MESSAGES.length - 1))
-    }
-  }, [elapsed])
+  // Advance one message every six seconds — derived from elapsed, not mirrored
+  // into a second piece of state.
+  const msgIdx = Math.min(Math.floor(elapsed / 6), WAITING_MESSAGES.length - 1)
 
   return (
     <article className="ac-msg ac-msg--assistant ac-msg--thinking">

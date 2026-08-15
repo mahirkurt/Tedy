@@ -7,6 +7,7 @@ and the Flask dashboard (dashboard_api).
 import sys
 import os
 import json
+import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -16,6 +17,7 @@ from src.sync_to_google import normalize_course
 
 # Set up test auth bypass before importing dashboard_api
 os.environ["TEST_AUTH_BYPASS"] = "1"
+import src.dashboard_api as dashboard_api
 from src.dashboard_api import app
 
 
@@ -31,11 +33,24 @@ def _mock_service():
 
 
 def _get_dashboard_response(endpoint, scraped_data):
-    """Hit a dashboard endpoint with mocked scraped data and return JSON."""
+    """Hit a dashboard endpoint with mocked scraped data and return JSON.
+
+    Patching `_scraped` alone is not enough: several endpoints also merge
+    filesystem-backed state (photo homework, student done marks) and write
+    back to `output/`. Without redirecting those paths the assertions would
+    see real data and the run would mutate the live output directory.
+    """
     app.config["TESTING"] = True
-    with patch("src.dashboard_api._scraped", return_value=scraped_data):
-        with app.test_client() as client:
-            return client.get(endpoint).get_json()
+    with tempfile.TemporaryDirectory() as tmp:
+        with patch.multiple(
+            dashboard_api,
+            OUTPUT_DIR=tmp,
+            PHOTO_HOMEWORK_FILE=os.path.join(tmp, "photo_homework.json"),
+            STUDENT_DONE_FILE=os.path.join(tmp, "homework_student_done.json"),
+            PRIVATE_LESSON_FILE=os.path.join(tmp, "private_lessons.json"),
+        ), patch.object(dashboard_api, "_scraped", return_value=scraped_data):
+            with app.test_client() as client:
+                return client.get(endpoint).get_json()
 
 
 # ---------------------------------------------------------------------------

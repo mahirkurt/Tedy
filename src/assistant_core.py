@@ -3,7 +3,7 @@
 This module provides:
 - Incremental repository indexing (full repo + output artefacts)
 - File adapters (json/html/md/txt/code/pdf/image)
-- Hybrid retrieval (BM25 + Ollama embeddings)
+- Hybrid retrieval over indexed course content
 - Safety policy for educational psychology answers
 - Chat + study plan generation
 """
@@ -46,42 +46,44 @@ PDF_EXTENSIONS = {".pdf"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".gif"}
 EMBED_TARGET_EXTENSIONS = {".md", ".txt", ".json", ".csv", ".html", ".htm", ".pdf"}
 
+# Whitelist: scrape data + downloaded educational content
+DEFAULT_INCLUDE_DIRS = {"output", "content"}
+
 DEFAULT_EXCLUDED_DIRS = {
-    ".git",
-    ".claude",
-    ".roo",
-    ".superpowers",
-    ".vscode",
-    ".venv",
-    ".ollama-models",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".playwright-mcp",
-    ".worktrees",
-    "dashboard/node_modules",
-    "dashboard/src",
-    "dashboard/tests",
-    "dashboard-dist",
     "__pycache__",
+    "assistant_index",
 }
 
 DEFAULT_EXCLUDED_FILE_PATTERNS = {
-    ".env",
-    ".env.*",
-    "package-lock.json",
-    "pnpm-lock.yaml",
-    "yarn.lock",
-    "poetry.lock",
-    "Pipfile.lock",
-    "*.pem",
-    "*.key",
-    "*.p12",
-    "*.map",
-    "*service-account*.json",
-    "credentials.json",
-    "token.json",
-    "token_*.json",
-    "output/*.jsonl",
+    "*.png",
+    "*.html",
+    "*.jsonl",
+    "*.log",
+    "sync.log",
+    "classroom_sync.json",
+    "homework_student_done.json",
+    "health.json",
+    "photo_homework.json",
+    "private_lessons.json",
+    # Discovery/metadata JSONs — too noisy for BM25
+    "*_discovered.json",
+    "sebitv_*.json",
+    "sebit_*.json",
+    "eba_*.json",
+    "a3k_*.json",
+    "ec_*.json",
+    "mebi_*.json",
+}
+
+# Files with structured student data — get semantic chunking
+_SEMANTIC_JSON_FILES = {
+    "scraped_data.json",
+    "enrichment_cache.json",
+    "eba_textbooks_uploaded.json",
+    "mebi_videos_uploaded.json",
+    "sebitv_uploaded.json",
+    "sebitv_interactive_uploaded.json",
+    "exam_content_map.json",
 }
 
 
@@ -95,23 +97,14 @@ class AssistantConfig:
     embeddings_path: Path
     meta_path: Path
     metrics_path: Path
-    ollama_base_url: str
-    ollama_chat_model: str
-    ollama_chat_fallback_model: str
-    ollama_embed_model: str
-    ollama_chat_timeout_seconds: int
-    ollama_embed_timeout_seconds: int
-    ollama_embed_max_chars: int
-    ollama_keep_alive: str
-    enable_embeddings: bool
     enable_ocr: bool
     max_file_size_mb: int
     max_chunks: int
     chunk_size: int
     chunk_overlap: int
     retrieval_k: int
-    vector_weight: float
     stale_after_minutes: int
+    include_dirs: set[str]
     excluded_dirs: set[str]
     excluded_file_patterns: set[str]
 
@@ -122,17 +115,31 @@ class AssistantConfig:
         index_dir = output_dir / "assistant_index"
         index_dir.mkdir(parents=True, exist_ok=True)
 
-        max_file_size_mb = int(os.environ.get("ASSISTANT_MAX_FILE_SIZE_MB", "20"))
-        max_chunks = int(os.environ.get("ASSISTANT_MAX_CHUNKS", "2000"))
+        max_file_size_mb = int(os.environ.get(
+            "ASSISTANT_MAX_FILE_SIZE_MB", "250"))
+        max_chunks = int(os.environ.get(
+            "ASSISTANT_MAX_CHUNKS", "15000"))
 
+        includes = set(DEFAULT_INCLUDE_DIRS)
+        custom_includes = os.environ.get(
+            "ASSISTANT_INCLUDE_DIRS", "").strip()
+        if custom_includes:
+            includes = {x.strip() for x in
+                        custom_includes.split(",") if x.strip()}
         excluded = set(DEFAULT_EXCLUDED_DIRS)
-        custom_excluded = os.environ.get("ASSISTANT_EXCLUDED_DIRS", "").strip()
+        custom_excluded = os.environ.get(
+            "ASSISTANT_EXCLUDED_DIRS", "").strip()
         if custom_excluded:
-            excluded.update(x.strip() for x in custom_excluded.split(",") if x.strip())
+            excluded.update(
+                x.strip() for x in
+                custom_excluded.split(",") if x.strip())
         excluded_files = set(DEFAULT_EXCLUDED_FILE_PATTERNS)
-        custom_excluded_files = os.environ.get("ASSISTANT_EXCLUDED_FILES", "").strip()
+        custom_excluded_files = os.environ.get(
+            "ASSISTANT_EXCLUDED_FILES", "").strip()
         if custom_excluded_files:
-            excluded_files.update(x.strip() for x in custom_excluded_files.split(",") if x.strip())
+            excluded_files.update(
+                x.strip() for x in
+                custom_excluded_files.split(",") if x.strip())
 
         return cls(
             project_root=root,
@@ -143,203 +150,19 @@ class AssistantConfig:
             embeddings_path=index_dir / "embeddings.json",
             meta_path=index_dir / "meta.json",
             metrics_path=output_dir / "assistant_metrics.jsonl",
-            ollama_base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"),
-            ollama_chat_model=os.environ.get("ASSISTANT_CHAT_MODEL", "qwen2.5-coder:7b"),
-            ollama_chat_fallback_model=os.environ.get("ASSISTANT_CHAT_FALLBACK_MODEL", "qwen2.5:14b"),
-            ollama_embed_model=os.environ.get("ASSISTANT_EMBED_MODEL", "mxbai-embed-large"),
-            ollama_chat_timeout_seconds=int(os.environ.get("ASSISTANT_OLLAMA_CHAT_TIMEOUT_SECONDS", "90")),
-            ollama_embed_timeout_seconds=int(os.environ.get("ASSISTANT_OLLAMA_EMBED_TIMEOUT_SECONDS", "60")),
-            ollama_embed_max_chars=int(os.environ.get("ASSISTANT_EMBED_MAX_CHARS", "1200")),
-            ollama_keep_alive=os.environ.get("ASSISTANT_OLLAMA_KEEP_ALIVE", "30m").strip(),
-            enable_embeddings=os.environ.get("ASSISTANT_ENABLE_EMBEDDINGS", "1") == "1",
-            enable_ocr=os.environ.get("ASSISTANT_ENABLE_OCR", "0") == "1",
+            enable_ocr=os.environ.get(
+                "ASSISTANT_ENABLE_OCR", "0") == "1",
             max_file_size_mb=max_file_size_mb,
             max_chunks=max_chunks,
             chunk_size=int(os.environ.get("ASSISTANT_CHUNK_SIZE", "1400")),
             chunk_overlap=int(os.environ.get("ASSISTANT_CHUNK_OVERLAP", "220")),
             retrieval_k=int(os.environ.get("ASSISTANT_RETRIEVAL_K", "8")),
-            vector_weight=float(os.environ.get("ASSISTANT_VECTOR_WEIGHT", "0.55")),
-            stale_after_minutes=int(os.environ.get("ASSISTANT_STALE_AFTER_MINUTES", "90")),
+            stale_after_minutes=int(os.environ.get(
+                "ASSISTANT_STALE_AFTER_MINUTES", "90")),
+            include_dirs=includes,
             excluded_dirs=excluded,
             excluded_file_patterns=excluded_files,
         )
-
-
-class OllamaClient:
-    """Thin Ollama client with graceful failures."""
-
-    def __init__(
-        self,
-        base_url: str,
-        chat_model: str,
-        fallback_chat_model: str,
-        embed_model: str,
-        chat_timeout_seconds: int = 25,
-        embed_timeout_seconds: int = 60,
-        embed_max_chars: int = 1200,
-        keep_alive: str = "30m",
-    ):
-        self.base_url = base_url.rstrip("/")
-        self.chat_model = chat_model
-        self.fallback_chat_model = fallback_chat_model.strip()
-        self.embed_model = embed_model
-        self.chat_timeout_seconds = max(5, int(chat_timeout_seconds))
-        self.embed_timeout_seconds = max(5, int(embed_timeout_seconds))
-        self.embed_max_chars = max(300, int(embed_max_chars))
-        self.keep_alive = keep_alive.strip()
-        self.last_model_used = chat_model
-
-    def available_models(self) -> list[str]:
-        try:
-            r = http_requests.get(f"{self.base_url}/api/tags", timeout=10)
-            r.raise_for_status()
-            payload = r.json()
-            return [m.get("name", "") for m in payload.get("models", []) if m.get("name")]
-        except Exception:
-            models = [self.chat_model]
-            if self.fallback_chat_model and self.fallback_chat_model != self.chat_model:
-                models.append(self.fallback_chat_model)
-            models.append(self.embed_model)
-            return models
-
-    def embed(self, text: str) -> list[float] | None:
-        if not text.strip():
-            return None
-        text = self._sanitize_embedding_text(text)
-        # mxbai-embed-large has limited context; keep payload bounded and retry shorter once.
-        prompt = re.sub(r"\s+", " ", text).strip()[: self.embed_max_chars]
-        for _attempt in range(2):
-            payload = {"model": self.embed_model, "input": prompt, "truncate": True}
-            try:
-                proc = subprocess.run(
-                    [
-                        "curl",
-                        "-sS",
-                        "--max-time",
-                        str(self.embed_timeout_seconds),
-                        "-H",
-                        "Content-Type: application/json",
-                        "-d",
-                        json.dumps(payload, ensure_ascii=False),
-                        f"{self.base_url}/api/embed",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=self.embed_timeout_seconds + 2,
-                )
-                if proc.returncode != 0:
-                    raise RuntimeError(proc.stderr.strip() or f"curl_exit_{proc.returncode}")
-                data = json.loads(proc.stdout) if proc.stdout else {}
-                emb = None
-                embs = data.get("embeddings")
-                if isinstance(embs, list) and embs and isinstance(embs[0], list):
-                    emb = embs[0]
-                if emb is None:
-                    emb = data.get("embedding")
-                if isinstance(emb, list) and emb:
-                    return [float(x) for x in emb]
-                err = str(data.get("error", "")).lower()
-                if "input length exceeds the context length" in err and len(prompt) > 400:
-                    prompt = prompt[: max(400, int(len(prompt) * 0.6))]
-                    continue
-            except Exception:
-                # Backward compatibility with old Ollama endpoints.
-                try:
-                    proc = subprocess.run(
-                        [
-                            "curl",
-                            "-sS",
-                            "--max-time",
-                            str(self.embed_timeout_seconds),
-                            "-H",
-                            "Content-Type: application/json",
-                            "-d",
-                            json.dumps({"model": self.embed_model, "prompt": prompt}, ensure_ascii=False),
-                            f"{self.base_url}/api/embeddings",
-                        ],
-                        capture_output=True,
-                        text=True,
-                        timeout=self.embed_timeout_seconds + 2,
-                    )
-                    if proc.returncode != 0:
-                        return None
-                    data = json.loads(proc.stdout) if proc.stdout else {}
-                    emb = data.get("embedding")
-                    if isinstance(emb, list) and emb:
-                        return [float(x) for x in emb]
-                    err = str(data.get("error", "")).lower()
-                    if "input length exceeds the context length" in err and len(prompt) > 400:
-                        prompt = prompt[: max(400, int(len(prompt) * 0.6))]
-                        continue
-                except Exception:
-                    return None
-            break
-        return None
-
-    def _sanitize_embedding_text(self, text: str) -> str:
-        secret_line = re.compile(
-            r"(password|pass|api[_-]?key|secret|token|private[_-]?key|client[_-]?secret|bearer)",
-            re.IGNORECASE,
-        )
-        sanitized: list[str] = []
-        for line in text.splitlines():
-            if secret_line.search(line) and ("=" in line or ":" in line):
-                if "=" in line:
-                    key = line.split("=", 1)[0].strip()
-                    sanitized.append(f"{key}=[REDACTED]")
-                else:
-                    key = line.split(":", 1)[0].strip()
-                    sanitized.append(f"{key}: [REDACTED]")
-            else:
-                sanitized.append(line)
-        return "\n".join(sanitized)
-
-    def chat(self, messages: list[dict[str, str]], temperature: float = 0.2) -> str:
-        num_predict = max(64, min(2000, int(os.environ.get("ASSISTANT_OLLAMA_CHAT_NUM_PREDICT", "800"))))
-        base_payload = {
-            "messages": messages,
-            "stream": False,
-            "options": {
-                "temperature": temperature,
-                "num_predict": num_predict,
-            },
-        }
-        if self.keep_alive:
-            base_payload["keep_alive"] = self.keep_alive
-        models = [self.chat_model]
-        if self.fallback_chat_model and self.fallback_chat_model != self.chat_model:
-            models.append(self.fallback_chat_model)
-
-        last_error = ""
-        for model in models:
-            payload = dict(base_payload)
-            payload["model"] = model
-            self.last_model_used = model
-            try:
-                r = http_requests.post(
-                    f"{self.base_url}/api/chat",
-                    json=payload,
-                    timeout=self.chat_timeout_seconds,
-                )
-                r.raise_for_status()
-                data = r.json()
-            except Exception as e:
-                last_error = str(e)
-                continue
-
-            err = str(data.get("error", "")).strip()
-            if err:
-                last_error = err
-                continue
-
-            msg = data.get("message", {})
-            content = msg.get("content", "")
-            if isinstance(content, str) and content.strip():
-                self.last_model_used = model
-                return content.strip()
-            last_error = "empty_model_response"
-
-        raise RuntimeError(last_error or "chat_failed")
 
 
 class GeminiClient:
@@ -428,61 +251,204 @@ class GeminiClient:
         raise RuntimeError(last_error or "gemini_all_models_failed")
 
 
-class HybridChatRouter:
-    """Routes chat: Gemini (fast) → Pi Ollama (reliable) → HP Ollama (last resort)."""
+HybridChatRouter = None  # Removed — Gemini-only
 
-    def __init__(self, gemini: GeminiClient, ollama: OllamaClient):
-        self.gemini = gemini
-        self.ollama = ollama  # local HP Ollama
-        self.pi_ollama = self._make_pi_ollama()
-        self.last_provider = ""
-        self.last_model_used = ""
 
-    @staticmethod
-    def _make_pi_ollama() -> OllamaClient | None:
-        pi_url = os.environ.get("PI_OLLAMA_URL", "").strip()
-        if not pi_url:
-            return None
-        pi_model = os.environ.get("PI_OLLAMA_MODEL", "llama3.1:8b").strip()
-        return OllamaClient(
-            base_url=pi_url,
-            chat_model=pi_model,
-            fallback_chat_model=pi_model,
-            embed_model="nomic-embed-text",
-            chat_timeout_seconds=90,
-            keep_alive="30m",
-        )
+# ── Semantic JSON → readable text ──────────────────────────
 
-    def chat(self, messages: list[dict[str, str]], temperature: float = 0.2) -> str:
-        # 1. Try Gemini first (fastest, 2-6s)
-        if self.gemini.available:
-            try:
-                result = self.gemini.chat(messages, temperature=temperature)
-                self.last_provider = "gemini"
-                self.last_model_used = self.gemini.last_model_used
-                return result
-            except Exception as e:
-                logger.warning("Gemini failed, trying Pi Ollama: %s", e)
+def _semantic_json_text(path: Path, basename: str) -> str:
+    """Convert known student-data JSON files into
+    human-readable, search-friendly text blocks."""
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return ""
+    if not isinstance(data, (dict, list)):
+        return ""
 
-        # 2. Try Pi Ollama (reliable, 30-50s)
-        if self.pi_ollama:
-            try:
-                result = self.pi_ollama.chat(messages, temperature=temperature)
-                self.last_provider = "pi-ollama"
-                self.last_model_used = self.pi_ollama.last_model_used
-                return result
-            except Exception as e:
-                logger.warning("Pi Ollama failed, trying local Ollama: %s", e)
+    if basename == "scraped_data.json":
+        return _fmt_scraped_data(data)
+    if basename == "enrichment_cache.json":
+        return _fmt_enrichment(data)
+    if basename in ("eba_textbooks_uploaded.json",
+                     "mebi_videos_uploaded.json",
+                     "sebitv_uploaded.json",
+                     "sebitv_interactive_uploaded.json"):
+        return _fmt_uploaded_tracker(data, basename)
+    if basename == "exam_content_map.json":
+        return _fmt_exam_map(data)
+    # Fallback: pretty-print
+    return json.dumps(data, ensure_ascii=False, indent=1)
 
-        # 3. Local HP Ollama (last resort, slow under memory pressure)
-        try:
-            result = self.ollama.chat(messages, temperature=temperature)
-            self.last_provider = "ollama"
-            self.last_model_used = self.ollama.last_model_used
-            return result
-        except Exception as e:
-            logger.error("All providers failed (gemini+pi+local): %s", e)
-            raise
+
+def _fmt_scraped_data(data: dict) -> str:
+    parts: list[str] = []
+
+    # Ödevler
+    hw_rows = (data.get("odevlerim", {})
+               .get("homework", {})
+               .get("rows", []))
+    if hw_rows:
+        parts.append("=== ÖDEVLER ===")
+        for r in hw_rows:
+            if not isinstance(r, dict):
+                continue
+            ders = r.get("Ders Adı", "")
+            baslik = r.get("Ödev Başlığı", "")
+            tarih = r.get("Ödev Son Teslim Tarihi", "")
+            durum = r.get("Ödev Durumu", "")
+            desc = ""
+            detail = r.get("detail")
+            if isinstance(detail, dict):
+                desc = detail.get("description", "")
+            line = f"{ders} | {baslik}"
+            if tarih:
+                line += f" | Son teslim: {tarih}"
+            if durum:
+                line += f" | Durum: {durum}"
+            if desc:
+                line += f" | {desc[:200]}"
+            parts.append(line)
+
+    # Ders programı
+    prog = data.get("ders_programi", [])
+    if isinstance(prog, list) and prog:
+        parts.append("\n=== DERS PROGRAMI ===")
+        for week in prog:
+            if not isinstance(week, dict):
+                continue
+            label = week.get("week_label", "")
+            sched = week.get("schedule", {})
+            if not isinstance(sched, dict):
+                continue
+            parts.append(f"Hafta: {label}")
+            for day, slots in sched.items():
+                if isinstance(slots, list):
+                    for s in slots:
+                        if isinstance(s, dict):
+                            parts.append(
+                                f"  {day} {s.get('saat','')} "
+                                f"{s.get('ders','')}")
+
+    # Takvim etkinlikleri
+    takvim = data.get("takvim", [])
+    if isinstance(takvim, list) and takvim:
+        parts.append("\n=== TAKVİM ===")
+        for ev in takvim:
+            if not isinstance(ev, dict):
+                continue
+            t = ev.get("title", "")
+            s = ev.get("start", "")[:16]
+            parts.append(f"{s} | {t}")
+
+    # Notlar
+    gelisim = data.get("gelisim_raporu", {})
+    grades = (gelisim.get("grades", [])
+              if isinstance(gelisim, dict) else [])
+    if grades:
+        parts.append("\n=== NOTLAR ===")
+        semester = gelisim.get("semester", "")
+        if semester:
+            parts.append(f"Dönem: {semester}")
+        for g in grades:
+            if not isinstance(g, dict):
+                continue
+            ders = g.get("Ders", "")
+            cols = []
+            for k, v in g.items():
+                if k != "Ders" and v and v != "-":
+                    cols.append(f"{k}: {v}")
+            if cols:
+                parts.append(f"{ders} | {' | '.join(cols)}")
+
+    # Ders içerikleri
+    ders_ic = data.get("ders_icerikleri", {})
+    if isinstance(ders_ic, dict) and ders_ic:
+        parts.append("\n=== DERS İÇERİKLERİ ===")
+        for course, items in ders_ic.items():
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if isinstance(item, dict):
+                    title = item.get(
+                        "title", item.get("konu", ""))
+                    parts.append(f"{course} | {title}")
+                elif isinstance(item, str):
+                    parts.append(f"{course} | {item}")
+
+    # ÖGEP
+    ogep = data.get("ogep", {})
+    sessions = (ogep.get("sessions", [])
+                if isinstance(ogep, dict) else [])
+    if sessions:
+        parts.append("\n=== ÖGEP ===")
+        for s in sessions:
+            if isinstance(s, dict):
+                name = s.get("ÖGEP Adı", "")
+                date = s.get("Başlangıç", "")
+                parts.append(f"{name} | {date}")
+
+    # Takım çalışmaları
+    takim = data.get("takim_calismalari", {})
+    activities = (takim.get("activities", [])
+                  if isinstance(takim, dict) else [])
+    if activities:
+        parts.append("\n=== TAKIM ÇALIŞMALARI ===")
+        for a in activities:
+            if isinstance(a, dict):
+                name = a.get("Takım Adı", "")
+                parts.append(name)
+
+    # Duyurular
+    duyuru = data.get("duyurular", {})
+    items = (duyuru.get("announcements", [])
+             if isinstance(duyuru, dict) else [])
+    if items:
+        parts.append("\n=== DUYURULAR ===")
+        for d in items:
+            if isinstance(d, dict):
+                title = d.get("title", d.get("başlık", ""))
+                date = d.get("date", d.get("tarih", ""))
+                parts.append(f"{date} | {title}")
+
+    return "\n".join(parts)
+
+
+def _fmt_enrichment(data: dict) -> str:
+    parts = ["=== AI ZENGİNLEŞTİRME NOTLARI ==="]
+    for key, val in data.items():
+        if not isinstance(val, dict):
+            continue
+        note_type = val.get("type", "")
+        note = val.get("note", "")
+        if note:
+            parts.append(f"{note_type} | {key} | {note[:300]}")
+    return "\n".join(parts)
+
+
+def _fmt_uploaded_tracker(data: dict, basename: str) -> str:
+    prefix = basename.replace("_uploaded.json", "").upper()
+    parts = [f"=== {prefix} KAYNAKLAR ==="]
+    for key, val in data.items():
+        if isinstance(val, dict):
+            title = val.get("title", val.get("name", key))
+            course = val.get("course", "")
+            line = f"{prefix}: {course} | {title}" if course \
+                else f"{prefix}: {title}"
+            parts.append(line)
+        elif isinstance(val, str):
+            parts.append(f"{prefix}: {key}")
+    return "\n".join(parts)
+
+
+def _fmt_exam_map(data: dict) -> str:
+    parts = ["=== SINAV İÇERİK EŞLEŞTİRMELERİ ==="]
+    for key, val in data.items():
+        if isinstance(val, dict):
+            summary = val.get("summary", "")
+            parts.append(f"Sınav: {key} | {summary[:200]}")
+    return "\n".join(parts)
 
 
 class FileAdapters:
@@ -491,23 +457,31 @@ class FileAdapters:
 
     def extract(self, file_path: Path, rel_path: str) -> dict[str, Any]:
         ext = file_path.suffix.lower()
-        result = {
-            "text": "",
-            "source_kind": "text",
-            "confidence": 0.7,
-            "warnings": [],
-        }
 
         size_bytes = file_path.stat().st_size
         max_bytes = self.config.max_file_size_mb * 1024 * 1024
 
         if size_bytes > max_bytes:
             return {
-                "text": self._metadata_only_text(rel_path, file_path, reason=f"file_too_large>{self.config.max_file_size_mb}MB"),
+                "text": self._metadata_only_text(
+                    rel_path, file_path,
+                    reason="file_too_large"),
                 "source_kind": "metadata",
                 "confidence": 0.2,
                 "warnings": ["too_large"],
             }
+
+        # Semantic chunking for known student data files
+        basename = file_path.name
+        if basename in _SEMANTIC_JSON_FILES:
+            text = _semantic_json_text(file_path, basename)
+            if text:
+                return {
+                    "text": text,
+                    "source_kind": "text",
+                    "confidence": 0.95,
+                    "warnings": [],
+                }
 
         if ext in TEXT_EXTENSIONS:
             text = self._extract_text_like(file_path, ext)
@@ -640,9 +614,8 @@ class FileAdapters:
 
 
 class AssistantIndexer:
-    def __init__(self, config: AssistantConfig, ollama: OllamaClient):
+    def __init__(self, config: AssistantConfig):
         self.config = config
-        self.ollama = ollama
         self.adapters = FileAdapters(config)
 
     def reindex(self, incremental: bool = True) -> dict[str, Any]:
@@ -747,21 +720,8 @@ class AssistantIndexer:
                 }
                 new_chunks.append(chunk_obj)
 
-                should_embed = (
-                    self.config.enable_embeddings
-                    and source_kind != "metadata"
-                    and len(chunk_text.strip()) >= 40
-                    and self._is_embedding_target(rel_path, ext)
-                )
-                if should_embed:
-                    emb = self.ollama.embed(chunk_text)
-                    if emb:
-                        new_embeddings[chunk_id] = emb
-                        embedded += 1
-                    else:
-                        skipped_embeddings += 1
-                else:
-                    skipped_embeddings += 1
+                # Embeddings disabled (Gemini-only, BM25 search)
+                skipped_embeddings += 1
 
             if len(new_chunks) >= max_chunks:
                 break
@@ -785,10 +745,10 @@ class AssistantIndexer:
             "embedded_chunks": total_embedded,
             "embedded_chunks_new": embedded,
             "skipped_embeddings": skipped_embeddings,
-            "embeddings_enabled": self.config.enable_embeddings,
-            "chat_model": self.config.ollama_chat_model,
-            "chat_fallback_model": self.config.ollama_chat_fallback_model or None,
-            "embed_model": self.config.ollama_embed_model if self.config.enable_embeddings else None,
+            "embeddings_enabled": False,
+            "chat_model": "gemini",
+            "chat_fallback_model": None,
+            "embed_model": None,
             "duration_ms": int((time.perf_counter() - start) * 1000),
         }
 
@@ -810,38 +770,46 @@ class AssistantIndexer:
         return meta
 
     def _discover_files(self) -> list[Path]:
+        """Discover files from whitelisted directories only."""
         files: list[Path] = []
         root = self.config.project_root
         idx_dir = self.config.index_dir.resolve()
 
-        for dirpath, dirnames, filenames in os.walk(root):
-            dir_path = Path(dirpath)
-            rel_dir = dir_path.relative_to(root).as_posix() if dir_path != root else ""
+        for inc_dir in sorted(self.config.include_dirs):
+            scan_root = root / inc_dir
+            if not scan_root.is_dir():
+                continue
+            for dirpath, dirnames, filenames in os.walk(
+                    scan_root):
+                dir_path = Path(dirpath)
+                rel_dir = dir_path.relative_to(
+                    root).as_posix()
 
-            filtered_dirs: list[str] = []
-            for d in dirnames:
-                rel = f"{rel_dir}/{d}".strip("/")
-                if self._is_excluded_dir(rel):
-                    continue
-                full = (dir_path / d).resolve()
-                if full == idx_dir:
-                    continue
-                filtered_dirs.append(d)
-            dirnames[:] = filtered_dirs
-
-            for name in filenames:
-                file_path = dir_path / name
-                rel_file = f"{rel_dir}/{name}".strip("/")
-                if self._is_excluded_file(rel_file):
-                    continue
-                try:
-                    if not file_path.is_file():
+                filtered_dirs: list[str] = []
+                for d in dirnames:
+                    rel = f"{rel_dir}/{d}".strip("/")
+                    if self._is_excluded_dir(rel):
                         continue
-                    files.append(file_path)
-                except Exception:
-                    continue
+                    full = (dir_path / d).resolve()
+                    if full == idx_dir:
+                        continue
+                    filtered_dirs.append(d)
+                dirnames[:] = filtered_dirs
 
-        files.sort(key=lambda p: p.relative_to(root).as_posix())
+                for name in filenames:
+                    file_path = dir_path / name
+                    rel_file = f"{rel_dir}/{name}"
+                    if self._is_excluded_file(rel_file):
+                        continue
+                    try:
+                        if not file_path.is_file():
+                            continue
+                        files.append(file_path)
+                    except Exception:
+                        continue
+
+        files.sort(
+            key=lambda p: p.relative_to(root).as_posix())
         return files
 
     def _is_excluded_dir(self, rel_dir: str) -> bool:
@@ -859,6 +827,12 @@ class AssistantIndexer:
         if not normalized:
             return False
         base = Path(normalized).name
+        # The noise filters below are broad globs (eba_*.json, mebi_*.json,
+        # sebitv_*.json) aimed at discovery dumps. They would also swallow the
+        # upload trackers, which have purpose-built semantic chunkers — an
+        # explicit allow-list entry outranks a pattern.
+        if base in _SEMANTIC_JSON_FILES:
+            return False
         for pat in self.config.excluded_file_patterns:
             p = pat.strip()
             if not p:
@@ -956,11 +930,13 @@ class AssistantIndexer:
 
 
 class HybridRetriever:
-    def __init__(self, chunks: list[dict[str, Any]], embeddings: dict[str, list[float]], ollama: OllamaClient, vector_weight: float = 0.55):
+    def __init__(self, chunks: list[dict[str, Any]],
+                 embeddings: dict[str, list[float]] | None = None,
+                 ollama: Any = None,
+                 vector_weight: float = 0.0):
         self.chunks = chunks
-        self.embeddings = embeddings
-        self.ollama = ollama
-        self.vector_weight = max(0.0, min(1.0, vector_weight))
+        self.embeddings = embeddings or {}
+        self.vector_weight = 0.0  # BM25 only
 
         self._tokens_per_doc: list[list[str]] = []
         self._doc_freq: dict[str, int] = {}
@@ -994,35 +970,17 @@ class HybridRetriever:
         if not query_tokens:
             query_tokens = [query.lower()]
 
-        bm25_scores = self._bm25_scores(query_tokens, path_prefixes)
+        bm25_scores = self._bm25_scores(
+            query_tokens, path_prefixes)
 
-        vector_scores: dict[int, float] = {}
-        q_emb = self.ollama.embed(query)
-        if q_emb:
-            q_norm = self._norm(q_emb)
-            for i, ch in enumerate(self.chunks):
-                if path_prefixes and not self._path_allowed(str(ch.get("path", "")), path_prefixes):
-                    continue
-                cid = str(ch.get("chunk_id", ""))
-                emb = self.embeddings.get(cid)
-                if not emb:
-                    continue
-                den = q_norm * self._norm(emb)
-                if den == 0:
-                    continue
-                vector_scores[i] = self._dot(q_emb, emb) / den
-
-        max_bm25 = max(bm25_scores.values()) if bm25_scores else 0.0
+        max_bm25 = max(bm25_scores.values()) if bm25_scores else 1.0
         if max_bm25 <= 0:
             max_bm25 = 1.0
 
         combined: list[tuple[int, float, float, float]] = []
-        all_idxs = set(bm25_scores.keys()) | set(vector_scores.keys())
-        for idx in all_idxs:
-            b = bm25_scores.get(idx, 0.0) / max_bm25
-            v = max(0.0, vector_scores.get(idx, 0.0))
-            score = (1.0 - self.vector_weight) * b + self.vector_weight * v
-            combined.append((idx, score, b, v))
+        for idx, raw in bm25_scores.items():
+            b = raw / max_bm25
+            combined.append((idx, b, b, 0.0))
 
         combined.sort(key=lambda x: x[1], reverse=True)
 
@@ -1151,20 +1109,11 @@ class AssistantRuntime:
     """High-level assistant runtime used by API endpoints and sync hooks."""
 
     def __init__(self, project_root: str | os.PathLike[str]):
-        self.config = AssistantConfig.from_project_root(project_root)
-        self.ollama = OllamaClient(
-            base_url=self.config.ollama_base_url,
-            chat_model=self.config.ollama_chat_model,
-            fallback_chat_model=self.config.ollama_chat_fallback_model,
-            embed_model=self.config.ollama_embed_model,
-            chat_timeout_seconds=self.config.ollama_chat_timeout_seconds,
-            embed_timeout_seconds=self.config.ollama_embed_timeout_seconds,
-            embed_max_chars=self.config.ollama_embed_max_chars,
-            keep_alive=self.config.ollama_keep_alive,
-        )
+        self.config = AssistantConfig.from_project_root(
+            project_root)
         self.gemini = GeminiClient()
-        self.router = HybridChatRouter(self.gemini, self.ollama)
-        self.indexer = AssistantIndexer(self.config, self.ollama)
+        self.router = self.gemini  # Direct Gemini, no fallback
+        self.indexer = AssistantIndexer(self.config)
         self.policy = SafetyPolicy()
 
         self._retriever: HybridRetriever | None = None
@@ -1223,8 +1172,8 @@ class AssistantRuntime:
             "intent": intent,
             "session_id": session_id,
             "meta": {
-                "model": self.router.last_model_used or self.config.ollama_chat_model,
-                    "provider": self.router.last_provider or "unknown",
+                "model": getattr(self.router, 'last_model_used', 'gemini'),
+                    "provider": "gemini",
                 "retrieval_count": len(results),
                 "latency_ms": latency_ms,
                 "index_generated_at": self._meta_generated_at(),
@@ -1270,8 +1219,8 @@ class AssistantRuntime:
             "intent": "study_plan",
             "session_id": session_id,
             "meta": {
-                "model": self.router.last_model_used or self.config.ollama_chat_model,
-                    "provider": self.router.last_provider or "unknown",
+                "model": getattr(self.router, 'last_model_used', 'gemini'),
+                    "provider": "gemini",
                 "latency_ms": latency_ms,
                 "retrieval_count": len(results),
                 "index_generated_at": self._meta_generated_at(),
@@ -1290,20 +1239,15 @@ class AssistantRuntime:
         return payload
 
     def models(self) -> list[dict[str, Any]]:
-        names = self.ollama.available_models()
-        uniq = []
-        seen = set()
-        for n in names:
-            if n in seen:
-                continue
-            seen.add(n)
-            uniq.append({
-                "id": n,
+        return [
+            {
+                "id": name,
                 "object": "model",
-                "created": int(time.time()),
-                "owned_by": "ollama-local",
-            })
-        return uniq
+                "created": 0,
+                "owned_by": "google",
+            }
+            for name in self.gemini.MODELS
+        ]
 
     def openai_chat_completion(
         self,
@@ -1338,7 +1282,9 @@ class AssistantRuntime:
         prompt_tokens = self._estimate_tokens(str(messages))
         completion_tokens = self._estimate_tokens(answer)
 
-        used_model = str(out.get("meta", {}).get("model") or self.config.ollama_chat_model)
+        used_model = str(
+            out.get("meta", {}).get("model") or self.gemini.MODELS[0]
+        )
         return {
             "id": f"chatcmpl-{hashlib.md5((session_id + str(time.time())).encode()).hexdigest()[:16]}",
             "object": "chat.completion",
@@ -1382,7 +1328,7 @@ class AssistantRuntime:
             if len(snippet) > 400:
                 snippet = snippet[:397] + "..."
             context_blocks.append(
-                f"[S{i}] path={c.get('path','')} confidence={c.get('confidence',0.0)} snippet={snippet}"
+                f"[S{i}] {snippet}"
             )
 
         context_text = "\n".join(context_blocks) if context_blocks else "[Kaynak bulunamadı]"
@@ -1390,8 +1336,9 @@ class AssistantRuntime:
         system_prompt = (
             "Sen TEDY Eğitim Asistanısın — ortaokul öğrencisi Işık ve ailesi için kişisel eğitim danışmanısın.\n\n"
             "## Kimlik\n"
-            "- Hedef kitle: 7. sınıf öğrencisi + veliler. Varsayılan dil Türkçe.\n"
-            "- Işık'ın ders programı, ödevleri, sınav sonuçları, takvimi ve ders içerikleri sana kaynak olarak verilir.\n\n"
+            "- Hedef kitle: 6. sınıf öğrencisi + veliler. Varsayılan dil Türkçe.\n"
+            "- Kaynaklarda yalnızca Işık'ın okul verileri bulunur: ödevler, sınavlar, ders programı, notlar, ders içerikleri, duyurular, EBA/MEBI/SEBİTV kaynakları.\n"
+            "- Bu veriler dışında bilgi sorulursa bunu belirt ve genel bilgiyle yanıtla.\n\n"
             "## Yanıt Formatı\n"
             "- Kısa ve öz başla: İlk cümlede sorunun doğrudan cevabını ver.\n"
             "- Madde işaretleri kullan, uzun paragraflardan kaçın.\n"
@@ -1437,7 +1384,7 @@ class AssistantRuntime:
                 return out
             logger.warning("Chat router returned empty response")
         except Exception as exc:
-            logger.error("Chat router failed (gemini+ollama): %s", exc)
+            logger.error("Chat router failed (gemini): %s", exc)
 
         # Fail-safe fallback.
         if citations:
@@ -1757,9 +1704,6 @@ class AssistantRuntime:
 
         self._retriever = HybridRetriever(
             chunks=chunks,
-            embeddings=embeddings,
-            ollama=self.ollama,
-            vector_weight=self.config.vector_weight,
         )
         self._retriever_cache_mtime = chunks_mtime
         return self._retriever

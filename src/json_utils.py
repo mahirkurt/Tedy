@@ -10,6 +10,9 @@ def atomic_json_dump(data, path, **kwargs):
     """
     kwargs.setdefault("indent", 2)
     kwargs.setdefault("ensure_ascii", False)
+    parent = os.path.dirname(os.fspath(path))
+    if parent:
+        os.makedirs(parent, exist_ok=True)
     tmp = path + ".tmp"
     try:
         with open(tmp, "w", encoding="utf-8") as f:
