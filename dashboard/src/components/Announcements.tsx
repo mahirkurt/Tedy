@@ -1,7 +1,7 @@
 import { Accordion, AccordionItem, Tag } from '@carbon/react'
 import { Notification } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
-import { useFocusMode } from '../contexts/FocusModeContext'
+import { useFocusMode } from '../contexts/focusMode'
 import type { Announcement } from '../types'
 import { formatTurkishDate, MONTHS_SHORT } from '../utils/formatters'
 

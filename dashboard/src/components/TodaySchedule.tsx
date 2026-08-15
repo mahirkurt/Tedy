@@ -12,9 +12,10 @@ import {
   UserAvatar,
 } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
-import { parseDeadline, cleanTeacherNames, toTitleCase, formatTurkishDate } from '../utils/formatters'
-import { getCountdown } from '../utils/countdown'
-import type { HomeworkItem, CalendarEvent, OgepSession } from '../types'
+import { parseDeadline, cleanTeacherNames, toTitleCase, formatTurkishDate, MONTHS_SHORT } from '../utils/formatters'
+import { getCountdown, getExamCountdown } from '../utils/countdown'
+import { BooksCallout } from './TedyBooks'
+import type { HomeworkItem, CalendarEvent, OgepSession, ExamsApiResponse } from '../types'
 
 interface ScheduleData {
   latest: { schedule?: { rows: string[][] } }
@@ -88,9 +89,10 @@ function buildAgenda(
   hwData: { homework: HomeworkItem[] },
   calData: { events: CalendarEvent[] },
   targetDate: Date,
+  nowMs: number,
 ): AgendaItem[] {
   const items: AgendaItem[] = []
-  const now = new Date()
+  const now = new Date(nowMs)
   const nowMin = toMinutes(now.getHours(), now.getMinutes())
   const selectedDayName = DAYS_TR[targetDate.getDay()]
   const dayRelation = compareCalendarDay(targetDate, now)
@@ -215,6 +217,9 @@ export default function TodaySchedule() {
   const { data: calData } = useApi<{ events: CalendarEvent[] }>(
     '/api/calendar', { events: [] }
   )
+  const { data: examData } = useApi<ExamsApiResponse>(
+    '/api/exams', { exams: [], stats: { upcoming: 0, past: 0, averageGrade: null } }
+  )
   const [dayOffset, setDayOffset] = useState(0)
 
   const selectedDate = useMemo(() => {
@@ -224,20 +229,20 @@ export default function TodaySchedule() {
     return d
   }, [dayOffset])
 
-  // Re-render every 60s so countdowns stay fresh
-  const [tick, setTick] = useState(0)
+  // Reference time for every countdown on this page, refreshed each minute.
+  const [nowMs, setNowMs] = useState(() => Date.now())
   useEffect(() => {
-    const t = setInterval(() => setTick(n => n + 1), 60_000)
+    const t = setInterval(() => setNowMs(Date.now()), 60_000)
     return () => clearInterval(t)
   }, [])
 
   const agenda = useMemo(
-    () => buildAgenda(scheduleData, teamsData, hwData, calData, selectedDate),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scheduleData, teamsData, hwData, calData, selectedDate, tick]
+    () => buildAgenda(scheduleData, teamsData, hwData, calData, selectedDate, nowMs),
+    [scheduleData, teamsData, hwData, calData, selectedDate, nowMs]
   )
 
   const activeHomework = useMemo<ActiveHomeworkItem[]>(() => {
+    // Recompute countdown labels whenever the minute ticker advances.
     const urgencyOrder: Record<ReturnType<typeof getCountdown>['urgency'], number> = {
       critical: 0,
       urgent: 1,
@@ -252,7 +257,7 @@ export default function TodaySchedule() {
         return {
           hw,
           deadline,
-          countdown: getCountdown(deadline),
+          countdown: getCountdown(deadline, nowMs),
         }
       })
       .filter(({ hw, countdown }) =>
@@ -265,7 +270,7 @@ export default function TodaySchedule() {
         const bTime = b.deadline?.getTime() ?? Number.MAX_SAFE_INTEGER
         return aTime - bTime
       })
-  }, [hwData, tick])
+  }, [hwData, nowMs])
 
   const topHomework = activeHomework.slice(0, 3)
   const extraHomeworkCount = Math.max(0, activeHomework.length - topHomework.length)
@@ -276,7 +281,7 @@ export default function TodaySchedule() {
     return 'blue'
   }
 
-  const now = new Date()
+  const now = new Date(nowMs)
   const nowMin = toMinutes(now.getHours(), now.getMinutes())
   const selectedIsToday = compareCalendarDay(selectedDate, now) === 0
   const dayName = DAYS_TR[selectedDate.getDay()]
@@ -353,6 +358,54 @@ export default function TodaySchedule() {
           )}
         </div>
       </div>
+
+      <BooksCallout />
+
+      {examData.exams.filter(e => e.status === 'upcoming').length > 0 && (
+        <div className="today-exams">
+          <div className="today-exams__header">
+            <span className="today-exams__title">Yaklaşan Sınavlar</span>
+            <button
+              type="button"
+              className="today-exams__all-btn"
+              onClick={() => navigate('/sinavlar')}
+            >
+              Tümünü gör
+            </button>
+          </div>
+          <div className="today-exams__list">
+            {examData.exams
+              .filter(e => e.status === 'upcoming')
+              .slice(0, 3)
+              .map(exam => {
+                const cd = exam.date ? getExamCountdown(new Date(exam.date), nowMs) : null
+                const tagType = cd?.urgency === 'critical' || cd?.urgency === 'urgent' ? 'red' as const
+                  : cd?.urgency === 'soon' ? 'magenta' as const : 'cool-gray' as const
+                const dateLabel = exam.date ? (() => {
+                  try {
+                    const d = new Date(exam.date)
+                    return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`
+                  } catch { return '' }
+                })() : ''
+                return (
+                  <button
+                    key={exam.id}
+                    type="button"
+                    className="today-exams__item"
+                    onClick={() => navigate('/sinavlar')}
+                  >
+                    <div className="today-exams__item-main">
+                      <span className="today-exams__item-course" style={{ color: exam.courseColor || undefined }}>{exam.course}</span>
+                      <span className="today-exams__item-title">{exam.title || exam.rawTitle}</span>
+                      {dateLabel && <span className="today-exams__item-date">{dateLabel}</span>}
+                    </div>
+                    {cd && <Tag type={tagType} size="sm">{cd.text}</Tag>}
+                  </button>
+                )
+              })}
+          </div>
+        </div>
+      )}
 
       {activeHomework.length > 0 && (
         <div className="today-homework">

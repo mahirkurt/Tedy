@@ -1,21 +1,10 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
-
-interface FocusModeState {
-  focusMode: boolean
-  toggleFocusMode: () => void
-}
-
-const FocusModeContext = createContext<FocusModeState>({
-  focusMode: false,
-  toggleFocusMode: () => {},
-})
-
-const STORAGE_KEY = 'tedy-focus-mode'
+import { useState, useEffect, type ReactNode } from 'react'
+import { FocusModeContext, FOCUS_MODE_STORAGE_KEY } from './focusMode'
 
 export function FocusModeProvider({ children }: { children: ReactNode }) {
   const [focusMode, setFocusMode] = useState(() => {
     try {
-      return localStorage.getItem(STORAGE_KEY) === 'true'
+      return localStorage.getItem(FOCUS_MODE_STORAGE_KEY) === 'true'
     } catch {
       return false
     }
@@ -23,7 +12,7 @@ export function FocusModeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, String(focusMode))
+      localStorage.setItem(FOCUS_MODE_STORAGE_KEY, String(focusMode))
     } catch {
       // localStorage unavailable
     }
@@ -36,8 +25,4 @@ export function FocusModeProvider({ children }: { children: ReactNode }) {
       {children}
     </FocusModeContext.Provider>
   )
-}
-
-export function useFocusMode() {
-  return useContext(FocusModeContext)
 }

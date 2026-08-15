@@ -4,7 +4,7 @@ import {
   TableBody, TableCell, TableContainer,
 } from '@carbon/react'
 import { useApi } from '../hooks/useApi'
-import { useFocusMode } from '../contexts/FocusModeContext'
+import { useFocusMode } from '../contexts/focusMode'
 import { cleanTeacherNames, normalizeCourseDisplayName } from '../utils/formatters'
 
 interface ScheduleData {

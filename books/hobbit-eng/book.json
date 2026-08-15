@@ -1,0 +1,153 @@
+{
+  "slug": "hobbit-eng",
+  "title": "The Hobbit",
+  "subtitle": "English Reader",
+  "author": "J.R.R. Tolkien",
+  "publisher": "",
+  "edition": "Enhanced Edition (2011)",
+  "year": "2011",
+  "language": "en",
+  "description": "Bilbo Baggins'in macerasını İngilizce okuma pratiğiyle birlikte keşfet.",
+  "cover": {
+    "palette": "midnight",
+    "monogram": "H"
+  },
+  "wordsPerMinute": 180,
+  "chapters": [
+    {
+      "id": "B01",
+      "order": 1,
+      "numeral": "I",
+      "label": "Chapter I",
+      "title": "An Unexpected Party",
+      "sourceWords": 3718
+    },
+    {
+      "id": "B02",
+      "order": 2,
+      "numeral": "II",
+      "label": "Chapter II",
+      "title": "Roast Mutton",
+      "sourceWords": 1689
+    },
+    {
+      "id": "B03",
+      "order": 3,
+      "numeral": "III",
+      "label": "Chapter III",
+      "title": "A Short Rest"
+    },
+    {
+      "id": "B04",
+      "order": 4,
+      "numeral": "IV",
+      "label": "Chapter IV",
+      "title": "Over Hill and Under Hill"
+    },
+    {
+      "id": "B05",
+      "order": 5,
+      "numeral": "V",
+      "label": "Chapter V",
+      "title": "Riddles in the Dark"
+    },
+    {
+      "id": "B06",
+      "order": 6,
+      "numeral": "VI",
+      "label": "Chapter VI",
+      "title": "Out of the Frying-Pan into the Fire"
+    },
+    {
+      "id": "B07",
+      "order": 7,
+      "numeral": "VII",
+      "label": "Chapter VII",
+      "title": "Queer Lodgings"
+    },
+    {
+      "id": "B08",
+      "order": 8,
+      "numeral": "VIII",
+      "label": "Chapter VIII",
+      "title": "Flies and Spiders"
+    },
+    {
+      "id": "B09",
+      "order": 9,
+      "numeral": "IX",
+      "label": "Chapter IX",
+      "title": "Barrels Out of Bond"
+    },
+    {
+      "id": "B10",
+      "order": 10,
+      "numeral": "X",
+      "label": "Chapter X",
+      "title": "A Warm Welcome"
+    },
+    {
+      "id": "B11",
+      "order": 11,
+      "numeral": "XI",
+      "label": "Chapter XI",
+      "title": "On the Doorstep"
+    },
+    {
+      "id": "B12",
+      "order": 12,
+      "numeral": "XII",
+      "label": "Chapter XII",
+      "title": "Inside Information"
+    },
+    {
+      "id": "B13",
+      "order": 13,
+      "numeral": "XIII",
+      "label": "Chapter XIII",
+      "title": "Not at Home"
+    },
+    {
+      "id": "B14",
+      "order": 14,
+      "numeral": "XIV",
+      "label": "Chapter XIV",
+      "title": "Fire and Water"
+    },
+    {
+      "id": "B15",
+      "order": 15,
+      "numeral": "XV",
+      "label": "Chapter XV",
+      "title": "The Gathering of the Clouds"
+    },
+    {
+      "id": "B16",
+      "order": 16,
+      "numeral": "XVI",
+      "label": "Chapter XVI",
+      "title": "A Thief in the Night"
+    },
+    {
+      "id": "B17",
+      "order": 17,
+      "numeral": "XVII",
+      "label": "Chapter XVII",
+      "title": "The Clouds Burst"
+    },
+    {
+      "id": "B18",
+      "order": 18,
+      "numeral": "XVIII",
+      "label": "Chapter XVIII",
+      "title": "The Return Journey"
+    },
+    {
+      "id": "B19",
+      "order": 19,
+      "numeral": "XIX",
+      "label": "Chapter XIX",
+      "title": "The Last Stage"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import { ProgressBar, Tag, InlineNotification, Accordion, AccordionItem, Link } from '@carbon/react'
 import { ChartBar, CheckmarkFilled, CloseFilled, Launch } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
-import { useFocusMode } from '../contexts/FocusModeContext'
+import { useFocusMode } from '../contexts/focusMode'
 import type { ECVideo, A3KLesson, SebitHomework } from '../types'
 
 interface ECData {

@@ -9,7 +9,7 @@ import {
   CheckmarkFilled, WarningFilled, ErrorFilled, SkipForwardFilled
 } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
-import { useFocusMode } from '../contexts/FocusModeContext'
+import { useFocusMode } from '../contexts/focusMode'
 import type { HealthData, SectionHealth, PrivateLesson } from '../types'
 import type { User } from '../hooks/useAuth'
 import { COURSE_CONTENT_ORDER } from '../utils/formatters'
@@ -109,7 +109,12 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
     : health.success ? (warningCount > 0 ? 'warm-gray' : 'green')
     : 'red'
   const tagText = warningCount > 0 ? `${syncAgo} · ${warningCount} uyarı` : syncAgo
-  const privateLessons = privateLessonData.lessons || []
+  // Memoised so the `|| []` fallback does not mint a new array on every render
+  // and invalidate the hooks below.
+  const privateLessons = useMemo(
+    () => privateLessonData.lessons || [],
+    [privateLessonData]
+  )
   const displayName = (user.name || '').trim() || user.email
   const shortDisplayName = displayName.split(/\s+/)[0] || displayName
 

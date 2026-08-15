@@ -56,6 +56,18 @@ fix_credentials.py
 # Local tooling
 .claude/
 .playwright-mcp/
+.playwright-cli/
+.ollama-models/
+.roo/
+.superpowers/
+.vscode/mcp.json
+
+# Downloaded course/content payloads
+content/**/*.pdf
+
+# Book source packages and indexes
+books/**/*.zip
+books/**/*.xlsx
 
 # Course material PDFs (large binaries)
 docs/dersler/

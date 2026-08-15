@@ -2,11 +2,13 @@
 import base64
 import hashlib
 import hmac
+import html
 import json
 import os
 import re
 import secrets
 import sys
+import unicodedata
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -24,7 +26,6 @@ os.chdir(PROJECT_ROOT)
 from src.env_loader import load_env
 from src.json_utils import atomic_json_dump
 from src.sync_to_google import normalize_course
-from src.assistant_core import AssistantRuntime
 
 load_env()
 
@@ -58,7 +59,11 @@ ASSISTANT_ADMIN_EMAILS = {
     if x.strip()
 }
 
-_ASSISTANT_RUNTIME: AssistantRuntime | None = None
+_ASSISTANT_RUNTIME = None
+
+
+class AssistantUnavailableError(RuntimeError):
+    """Raised when the optional assistant subsystem cannot be loaded."""
 
 
 def _load_api_keys() -> list[tuple[str, str]]:
@@ -192,10 +197,19 @@ def auth_me():
     return jsonify({"error": "Not authenticated"}), 401
 
 
-def _assistant_runtime() -> AssistantRuntime:
+def _assistant_runtime():
     global _ASSISTANT_RUNTIME
     if _ASSISTANT_RUNTIME is None:
-        _ASSISTANT_RUNTIME = AssistantRuntime(PROJECT_ROOT)
+        try:
+            from src.assistant_core import AssistantRuntime
+
+            _ASSISTANT_RUNTIME = AssistantRuntime(PROJECT_ROOT)
+        except Exception as exc:
+            app.logger.error(
+                "Assistant subsystem unavailable (%s)", type(exc).__name__
+            )
+            raise AssistantUnavailableError("assistant_unavailable") from exc
+
     return _ASSISTANT_RUNTIME
 
 
@@ -1186,6 +1200,403 @@ def enrichment():
     return jsonify(_load_json("enrichment_cache.json"))
 
 
+# ---------------------------------------------------------------------------
+# Exams API — unified exam data (takvim events + grades + related content)
+# ---------------------------------------------------------------------------
+
+def _turkish_lower(s):
+    """Turkish-aware lowercase (İ→i, I→ı)."""
+    return unicodedata.normalize(
+        'NFC', s.replace('İ', 'i').replace('I', 'ı')
+    ).lower()
+
+
+def _turkish_title(s):
+    """Turkish-aware title case for all-caps strings."""
+    words = _turkish_lower(s).split()
+    _MINOR = {"ve", "ile", "da", "de", "mi", "mu"}
+
+    def _cap(c):
+        if c == 'i':
+            return 'İ'
+        if c == 'ı':
+            return 'I'
+        return c.upper()
+
+    result = []
+    for i, w in enumerate(words):
+        if i > 0 and w in _MINOR:
+            result.append(w)
+        else:
+            result.append(_cap(w[0]) + w[1:] if w else w)
+    return " ".join(result)
+
+
+_SINAV_KEYWORDS = ("sınav", "yazılı", "exam")
+_SINAV_WORD_RE = re.compile(r"\btest\b", re.IGNORECASE)
+_SINAV_NUMBER_RE = re.compile(
+    r"(\d)\.\s*(?:Yazılı|Sınav)", re.IGNORECASE)
+_COURSE_FROM_TITLE_RE = re.compile(
+    r"^(?:\d+-)*\d+\.\s*S[Iİıi]n[Iİıi]flar\s+(.+?)\s*[-–]",
+    re.IGNORECASE
+)
+
+
+_SINAV_EXCLUDE = (
+    "başlangıcı", "beginning of",
+    "bitişi", "end of",
+    "not girişleri", "grades entries",
+)
+
+# Stable course → color mapping (hue-shifted, WCAG-friendly)
+_COURSE_COLORS = {
+    "Türkçe":             "#0f62fe",  # blue
+    "Matematik":          "#8a3ffc",  # purple
+    "Fen Bilimleri":      "#009d9a",  # teal
+    "Sosyal Bilgiler":    "#a56eff",  # violet
+    "İngilizce":          "#1192e8",  # cyan
+    "Din Kültürü":        "#005d5d",  # dark teal
+    "Fransızca":          "#fa4d56",  # red
+    "Görsel Sanatlar":    "#d4bbff",  # lavender
+    "Müzik":              "#ee5396",  # magenta
+    "Beden Eğitimi":      "#24a148",  # green
+    "Bilişim":            "#0072c3",  # dark blue
+    "Ahlak ve Yurttaşlık": "#b28600",  # gold
+    "PDR":                "#007d79",  # dark cyan
+}
+_FALLBACK_COLORS = [
+    "#6929c4", "#002d9c", "#a56eff", "#005d5d",
+    "#9f1853", "#198038", "#b28600",
+]
+
+
+def _course_color(course_name):
+    """Return a stable hex color for a course name."""
+    if course_name in _COURSE_COLORS:
+        return _COURSE_COLORS[course_name]
+    # Stable hash-based fallback
+    idx = sum(ord(c) for c in course_name) % len(_FALLBACK_COLORS)
+    return _FALLBACK_COLORS[idx]
+
+
+_DONEM_RE = re.compile(
+    r"(\d)\.\s*(?:DÖNEM|Dönem|dönem)", re.IGNORECASE)
+
+
+def _clean_exam_title(course, exam_number, raw_title):
+    """Build a short, readable exam title."""
+    lower = _turkish_lower(raw_title)
+
+    # Extract dönem (term) number
+    dm = _DONEM_RE.search(raw_title)
+    donem = f"{dm.group(1)}. Dönem " if dm else ""
+
+    # Determine exam type
+    if "dinleme" in lower or "listening" in lower:
+        suffix = f"{donem}Dinleme Sınavı"
+    elif "izleme" in lower or "monitoring" in lower:
+        suffix = f"{donem}İzleme Sınavı"
+    elif exam_number:
+        suffix = f"{donem}{exam_number}. Yazılı"
+    elif "yazılı" in lower:
+        suffix = f"{donem}Yazılı"
+    else:
+        suffix = f"{donem}Sınav" if donem else "Sınav"
+    return f"{course} · {suffix}"
+
+
+def _is_exam_event(title):
+    lower = _turkish_lower(title)
+    if any(ex in lower for ex in _SINAV_EXCLUDE):
+        return False
+    if any(kw in lower for kw in _SINAV_KEYWORDS):
+        return True
+    return bool(_SINAV_WORD_RE.search(title))
+
+
+def _extract_exam_info(title):
+    """Extract (normalized_course, raw_course, exam_number) from event title."""
+    num_match = _SINAV_NUMBER_RE.search(title)
+    exam_number = int(num_match.group(1)) if num_match else None
+
+    course_match = _COURSE_FROM_TITLE_RE.match(title)
+    if course_match:
+        raw_course = course_match.group(1).strip()
+        # Strip bilingual suffix and scope tags
+        if " / " in raw_course:
+            raw_course = raw_course.split(" / ")[0].strip()
+        raw_course = re.sub(
+            r'\s*\([^)]*[Gg]enel[^)]*\)\s*$',
+            '', raw_course).strip()
+    else:
+        # Strip "X-Y. Sınıflar " prefix
+        raw_course = re.sub(
+            r'^(?:\d+-)*\d+\.\s*'
+            r'S[Iİıi]n[Iİıi]flar\s+',
+            '', title, flags=re.IGNORECASE)
+        # Strip bilingual " / English..." suffix
+        if " / " in raw_course:
+            raw_course = raw_course.split(" / ")[0].strip()
+        # Strip "(TED Geneli)" / "(Türkiye Geneli)" scope
+        raw_course = re.sub(
+            r'\s*\([^)]*[Gg]enel[^)]*\)\s*$',
+            '', raw_course).strip()
+    # Normalize via aliases
+    normalized = normalize_course(raw_course)
+    if normalized == raw_course and raw_course.upper() == raw_course:
+        tc = _turkish_title(raw_course)
+        normalized = normalize_course(tc)
+    return normalized, raw_course, exam_number
+
+
+def _build_grade_lookup(grades_list):
+    """Build {normalized_course: {"1": score, "2": score, "3": score}} from gelisim_raporu grades."""
+    lookup = {}
+    for row in grades_list:
+        if not isinstance(row, dict):
+            continue
+        course = normalize_course(row.get("Ders", ""))
+        if not course:
+            continue
+        entry = {}
+        for col_num in ("1", "2", "3"):
+            val = row.get(f"{col_num}. Sınav", "-")
+            if val and val != "-":
+                entry[col_num] = val
+        lookup[course] = entry
+    return lookup
+
+
+def _find_related_homework(exam_course, exam_date_str, homework_rows):
+    """Find homework from same course within 4 weeks before exam date."""
+    related = []
+    if not exam_date_str:
+        return related
+    try:
+        exam_dt = datetime.fromisoformat(
+            exam_date_str.replace("Z", "+00:00"))
+        # Strip tz for comparison with naive hw dates
+        exam_dt = exam_dt.replace(tzinfo=None)
+    except (ValueError, TypeError):
+        return related
+
+    window_start = exam_dt - timedelta(weeks=4)
+    exam_lower = _turkish_lower(exam_course)
+
+    for row in homework_rows:
+        if not isinstance(row, dict):
+            continue
+        hw_course = row.get("normalized_course", "")
+        if not hw_course:
+            hw_course = normalize_course(
+                row.get("Ders Adı", ""))
+        if _turkish_lower(hw_course) != exam_lower:
+            continue
+
+        deadline_str = row.get("Ödev Son Teslim Tarihi", "")
+        try:
+            # Try DD.MM.YYYY HH:MM format first
+            hw_dt = datetime.strptime(deadline_str, "%d.%m.%Y %H:%M")
+        except (ValueError, TypeError):
+            try:
+                hw_dt = datetime.fromisoformat(deadline_str.replace("Z", "+00:00"))
+            except (ValueError, TypeError):
+                continue
+
+        if window_start <= hw_dt <= exam_dt:
+            related.append({
+                "title": row.get("Ödev Başlığı", ""),
+                "deadline": deadline_str,
+                "status": row.get("Ödev Durumu", ""),
+            })
+
+    return related[:5]
+
+
+def _find_related_content(exam_course, ders_icerikleri):
+    """Find course content from same course."""
+    related = []
+    if not isinstance(ders_icerikleri, dict):
+        return related
+
+    exam_lower = _turkish_lower(exam_course)
+    for course_name, items in ders_icerikleri.items():
+        nc = normalize_course(course_name)
+        if _turkish_lower(nc) != exam_lower:
+            continue
+        if isinstance(items, list):
+            for item in items[:5]:
+                if isinstance(item, dict):
+                    related.append({
+                        "title": item.get("title", item.get("konu", str(item))),
+                        "type": "ders_icerikleri",
+                    })
+                elif isinstance(item, str):
+                    related.append({"title": item, "type": "ders_icerikleri"})
+
+    return related[:10]
+
+
+@app.route("/api/exams")
+@require_auth
+def exams():
+    data = _scraped()
+    now = datetime.now()
+
+    # --- Takvim exam events ---
+    takvim = data.get("takvim", [])
+    if not isinstance(takvim, list):
+        takvim = []
+
+    # --- Grades lookup ---
+    gelisim = data.get("gelisim_raporu", {})
+    grades_list = gelisim.get("grades", []) if isinstance(gelisim, dict) else []
+    grade_lookup = _build_grade_lookup(grades_list)
+
+    # --- Homework rows ---
+    hw_rows = _combined_homework_rows(data)
+
+    # --- Course content ---
+    ders_icerikleri = data.get("ders_icerikleri", {})
+
+    # --- AI content map ---
+    content_map = _load_json("exam_content_map.json")
+    if not isinstance(content_map, dict):
+        content_map = {}
+
+    # --- Enrichment cache for study guides ---
+    enrichment = _load_json("enrichment_cache.json")
+    if not isinstance(enrichment, dict):
+        enrichment = {}
+
+    exams_list = []
+    seen_course_nums = set()  # track which course+examNumber combos we've seen from takvim
+
+    for evt in takvim:
+        if not isinstance(evt, dict):
+            continue
+        title = evt.get("title", "")
+        if not _is_exam_event(title):
+            continue
+
+        course, raw_course, exam_number = _extract_exam_info(title)
+        date_str = evt.get("start", "")
+
+        # Determine status
+        try:
+            evt_dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            status = "upcoming" if evt_dt > now else "past"
+        except (ValueError, TypeError):
+            status = "past"
+
+        # Match grade
+        grade = None
+        if exam_number and course in grade_lookup:
+            grade = grade_lookup[course].get(str(exam_number))
+
+        # Related content
+        related_hw = _find_related_homework(course, date_str, hw_rows)
+        related_content = _find_related_content(course, ders_icerikleri)
+
+        # AI content map
+        map_key = f"{course}|{title}|{date_str[:10] if date_str else ''}"
+        ai_summary = None
+        map_entry = content_map.get(map_key)
+        if isinstance(map_entry, dict):
+            ai_summary = map_entry.get("summary")
+
+        # Study guide from enrichment cache
+        study_guide = None
+        for ek, ev in enrichment.items():
+            if isinstance(ev, dict) and ev.get("type") == "sinav":
+                if course in ek or title in ek:
+                    study_guide = ev.get("note")
+                    break
+
+        exam_id = hashlib.md5(f"{course}|{title}|{date_str}".encode()).hexdigest()[:12]
+
+        if exam_number:
+            seen_course_nums.add((course, str(exam_number)))
+
+        exams_list.append({
+            "id": exam_id,
+            "course": course,
+            "title": _clean_exam_title(
+                course, exam_number, title),
+            "rawTitle": title,
+            "courseColor": _course_color(course),
+            "examNumber": exam_number,
+            "date": date_str or None,
+            "endDate": evt.get("end") or None,
+            "allDay": evt.get("allDay", False),
+            "status": status,
+            "grade": grade,
+            "studyGuide": study_guide,
+            "aiSummary": ai_summary,
+            "relatedHomework": related_hw,
+            "relatedContent": related_content,
+        })
+
+    # --- Synthetic exams from grades without takvim events ---
+    for row in grades_list:
+        if not isinstance(row, dict):
+            continue
+        course = normalize_course(row.get("Ders", ""))
+        if not course:
+            continue
+        for col_num in ("1", "2", "3"):
+            val = row.get(f"{col_num}. Sınav", "-")
+            if val and val != "-" and (course, col_num) not in seen_course_nums:
+                exam_id = hashlib.md5(
+                    f"{course}|{col_num}. Sınav|synthetic".encode()
+                ).hexdigest()[:12]
+                raw = f"{course} {col_num}. Sınav"
+                exams_list.append({
+                    "id": exam_id,
+                    "course": course,
+                    "title": _clean_exam_title(
+                        course, int(col_num), raw),
+                    "rawTitle": raw,
+                    "courseColor": _course_color(course),
+                    "examNumber": int(col_num),
+                    "date": None,
+                    "endDate": None,
+                    "allDay": False,
+                    "status": "past",
+                    "grade": val,
+                    "studyGuide": None,
+                    "aiSummary": None,
+                    "relatedHomework": [],
+                    "relatedContent": [],
+                })
+
+    # --- Sort: upcoming by date asc, past by date desc ---
+    upcoming = sorted(
+        [e for e in exams_list if e["status"] == "upcoming"],
+        key=lambda e: e["date"] or "",
+    )
+    past = sorted(
+        [e for e in exams_list if e["status"] == "past"],
+        key=lambda e: e["date"] or "",
+        reverse=True,
+    )
+
+    all_exams = upcoming + past
+
+    # --- Stats ---
+    grade_vals = [int(e["grade"]) for e in exams_list if e["grade"] and e["grade"].isdigit()]
+    avg_grade = round(sum(grade_vals) / len(grade_vals), 1) if grade_vals else None
+
+    return jsonify({
+        "exams": all_exams,
+        "stats": {
+            "upcoming": len(upcoming),
+            "past": len(past),
+            "averageGrade": avg_grade,
+        },
+    })
+
+
 @app.route("/api/health")
 @require_auth
 def health():
@@ -1254,6 +1665,8 @@ def assistant_chat():
             temperature=temperature,
         )
         return jsonify(out)
+    except AssistantUnavailableError:
+        return jsonify({"error": "assistant_unavailable"}), 503
     except Exception as e:
         return jsonify({"error": f"assistant chat failed: {e}"}), 500
 
@@ -1280,6 +1693,8 @@ def assistant_plan():
             context_filters=context_filters,
         )
         return jsonify(out)
+    except AssistantUnavailableError:
+        return jsonify({"error": "assistant_unavailable"}), 503
     except Exception as e:
         return jsonify({"error": f"assistant plan failed: {e}"}), 500
 
@@ -1297,6 +1712,8 @@ def assistant_reindex():
         runtime = _assistant_runtime()
         stats = runtime.reindex(incremental=not full)
         return jsonify({"ok": True, "stats": stats})
+    except AssistantUnavailableError:
+        return jsonify({"ok": False, "error": "assistant_unavailable"}), 503
     except Exception as e:
         return jsonify({"ok": False, "error": f"reindex failed: {e}"}), 500
 
@@ -1310,6 +1727,8 @@ def openai_models():
     try:
         runtime = _assistant_runtime()
         return jsonify({"object": "list", "data": runtime.models()})
+    except AssistantUnavailableError:
+        return jsonify({"error": "assistant_unavailable"}), 503
     except Exception as e:
         return jsonify({"error": f"models unavailable: {e}"}), 500
 
@@ -1325,6 +1744,8 @@ def openai_chat_completions():
         runtime = _assistant_runtime()
         out = runtime.openai_chat_completion(payload)
         return jsonify(out)
+    except AssistantUnavailableError:
+        return jsonify({"error": "assistant_unavailable"}), 503
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
@@ -1537,6 +1958,523 @@ def calendar_unified():
         })
 
     return jsonify({"events": events})
+
+
+# --- Tedy Books ---
+#
+# A book is a directory under books/<slug>/ holding one Markdown file per
+# chapter plus an optional book.json manifest. The manifest declares the full
+# table of contents up front (including chapters not written yet); the scanner
+# decides which of them are actually readable by looking for a matching .md
+# file. Dropping a new chapter file into the directory is the only step needed
+# to publish it — no code change, no restart.
+
+BOOKS_DIR = os.path.join(PROJECT_ROOT, "books")
+BOOK_SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+BOOK_CHAPTER_ID_RE = re.compile(r"^[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)*$")
+BOOK_DEFAULT_WPM = 180
+BOOK_TRANSLATION_MYMEMORY_API_URL = "https://api.mymemory.translated.net/get"
+BOOK_TRANSLATION_GEMINI_API_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models"
+)
+BOOK_TRANSLATION_GEMINI_MODEL = os.environ.get(
+    "BOOK_TRANSLATION_GEMINI_MODEL", "gemini-2.5-flash"
+).strip()
+BOOK_TRANSLATION_MAX_BYTES = 500
+BOOK_TRANSLATION_CONTEXT_MAX_BYTES = 1500
+
+
+class BookTranslationProviderError(RuntimeError):
+    """Raised when one translation provider cannot produce a usable result."""
+
+
+def _book_translate_deepl(source_text, context):
+    api_key = os.environ.get("DEEPL_API_KEY", "").strip()
+    if not api_key:
+        raise BookTranslationProviderError("deepl_not_configured")
+
+    api_url = os.environ.get("DEEPL_API_URL", "").strip()
+    if not api_url:
+        api_url = (
+            "https://api-free.deepl.com/v2/translate"
+            if api_key.endswith(":fx")
+            else "https://api.deepl.com/v2/translate"
+        )
+
+    provider_request = {
+        "text": [source_text],
+        "source_lang": "EN",
+        "target_lang": "TR",
+    }
+    if context:
+        provider_request["context"] = context
+
+    response = http_requests.post(
+        api_url,
+        headers={"Authorization": f"DeepL-Auth-Key {api_key}"},
+        json=provider_request,
+        timeout=8,
+    )
+    response.raise_for_status()
+    provider_payload = response.json()
+    if not isinstance(provider_payload, dict):
+        raise BookTranslationProviderError("deepl_invalid_response")
+    translations = provider_payload.get("translations")
+    if not isinstance(translations, list) or not translations:
+        raise BookTranslationProviderError("deepl_empty_response")
+    first = translations[0]
+    if not isinstance(first, dict):
+        raise BookTranslationProviderError("deepl_invalid_translation")
+    translated = html.unescape(str(first.get("text") or "")).strip()
+    if not translated:
+        raise BookTranslationProviderError("deepl_empty_translation")
+    return translated
+
+
+def _book_translate_gemini(source_text, context):
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        raise BookTranslationProviderError("gemini_not_configured")
+
+    prompt = (
+        "Translate the selected English text into natural Turkish for a "
+        "literary reader. Use the context only to resolve meaning and tone; "
+        "do not translate or summarize the context. Return only the Turkish "
+        "translation, with no alternatives, labels, or explanation. If the "
+        "selected text is a single word, return only its Turkish dictionary "
+        "headword (lemma); never add neighboring context words or inflect it "
+        "as part of the surrounding sentence.\n"
+        f"Selected text: {json.dumps(source_text, ensure_ascii=False)}\n"
+        f"Context: {json.dumps(context or source_text, ensure_ascii=False)}"
+    )
+    provider_request = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0,
+            "maxOutputTokens": 200,
+            "thinkingConfig": {"thinkingBudget": 0},
+        },
+    }
+    api_url = (
+        f"{BOOK_TRANSLATION_GEMINI_API_URL}/"
+        f"{BOOK_TRANSLATION_GEMINI_MODEL}:generateContent"
+    )
+    response = http_requests.post(
+        api_url,
+        headers={"x-goog-api-key": api_key},
+        json=provider_request,
+        timeout=12,
+    )
+    response.raise_for_status()
+    provider_payload = response.json()
+    if not isinstance(provider_payload, dict):
+        raise BookTranslationProviderError("gemini_invalid_response")
+    candidates = provider_payload.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        raise BookTranslationProviderError("gemini_empty_response")
+    first = candidates[0]
+    if not isinstance(first, dict):
+        raise BookTranslationProviderError("gemini_invalid_candidate")
+    content = first.get("content")
+    parts = content.get("parts") if isinstance(content, dict) else None
+    if not isinstance(parts, list):
+        raise BookTranslationProviderError("gemini_invalid_content")
+    translated = "".join(
+        str(part.get("text") or "")
+        for part in parts
+        if isinstance(part, dict)
+    ).strip()
+    if translated.startswith("```"):
+        translated = re.sub(
+            r"^```(?:text)?\s*|\s*```$", "", translated, flags=re.IGNORECASE
+        ).strip()
+    if not translated:
+        raise BookTranslationProviderError("gemini_empty_translation")
+    return translated
+
+
+def _book_translate_mymemory(source_text, context):
+    # MyMemory has no separate context field. A short surrounding sentence is
+    # safer than an isolated ambiguous word (for example, literary "tunnel").
+    query_text = context or source_text
+    if len(query_text.encode("utf-8")) > BOOK_TRANSLATION_MAX_BYTES:
+        query_text = source_text
+
+    response = http_requests.get(
+        BOOK_TRANSLATION_MYMEMORY_API_URL,
+        params={"q": query_text, "langpair": "en|tr", "mt": "1"},
+        timeout=8,
+    )
+    response.raise_for_status()
+    provider_payload = response.json()
+    if not isinstance(provider_payload, dict):
+        raise BookTranslationProviderError("mymemory_invalid_response")
+    response_data = provider_payload.get("responseData")
+    if not isinstance(response_data, dict):
+        raise BookTranslationProviderError("mymemory_invalid_translation")
+    translated = html.unescape(str(
+        response_data.get("translatedText") or ""
+    )).strip()
+    if not translated:
+        raise BookTranslationProviderError("mymemory_empty_translation")
+    return translated
+
+# word counts are expensive relative to a directory listing, so memoise them
+# against (mtime_ns, size) and recompute only when a file actually changes
+_BOOK_WORD_CACHE: dict[str, tuple[int, int, int]] = {}
+
+
+def _book_dir(slug):
+    """Resolve a book slug to its directory, refusing anything outside books/."""
+    if not slug or not BOOK_SLUG_RE.match(slug):
+        return None
+    path = os.path.realpath(os.path.join(BOOKS_DIR, slug))
+    if os.path.commonpath([path, os.path.realpath(BOOKS_DIR)]) != os.path.realpath(BOOKS_DIR):
+        return None
+    return path if os.path.isdir(path) else None
+
+
+def _book_word_count(path):
+    try:
+        st = os.stat(path)
+    except OSError:
+        return 0
+    cached = _BOOK_WORD_CACHE.get(path)
+    if cached and cached[0] == st.st_mtime_ns and cached[1] == st.st_size:
+        return cached[2]
+    try:
+        with open(path, encoding="utf-8") as f:
+            count = len(f.read().split())
+    except OSError:
+        return 0
+    _BOOK_WORD_CACHE[path] = (st.st_mtime_ns, st.st_size, count)
+    return count
+
+
+def _book_reading_minutes(words, wpm=BOOK_DEFAULT_WPM):
+    if not words:
+        return 0
+    return max(1, round(words / max(1, wpm)))
+
+
+def _book_chapter_file_pattern(chapter_id):
+    """`B01` matches `B01_Title.md`; `EK-A` also matches `EK_A_Title.md`."""
+    parts = [re.escape(p) for p in re.split(r"[-_\s]+", chapter_id) if p]
+    if not parts:
+        return None
+    return re.compile(r"^" + r"[-_.\s]".join(parts) + r"(?:[-_.\s].*)?$", re.IGNORECASE)
+
+
+def _book_markdown_files(book_dir):
+    files = []
+    try:
+        for entry in os.scandir(book_dir):
+            if entry.is_file() and entry.name.lower().endswith(".md"):
+                files.append(entry.name)
+    except OSError:
+        return []
+    return sorted(files)
+
+
+def _book_manifest(slug, book_dir):
+    """Manifest is optional — a bare directory of .md files is still a book."""
+    manifest_path = os.path.join(book_dir, "book.json")
+    manifest = {}
+    if os.path.exists(manifest_path):
+        try:
+            with open(manifest_path, encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                manifest = loaded
+        except (OSError, json.JSONDecodeError):
+            app.logger.warning("books: %s/book.json okunamadı", slug)
+    manifest.setdefault("slug", slug)
+    manifest.setdefault("title", slug.replace("-", " ").title())
+    manifest.setdefault("chapters", [])
+    return manifest
+
+
+_BOOK_RULES = ("---", "***", "___")
+_BOOK_FRONT_MATTER_MAX_LINES = 8
+
+
+def _book_is_shouted_title(line):
+    """A bare title line such as `ÜÇ KAFADAR` — capitals, no sentence punctuation."""
+    if len(line) > 80 or not any(ch.isalpha() for ch in line):
+        return False
+    if line.rstrip()[-1:] in ".!?:;,":
+        return False
+    return line == line.upper()
+
+
+def _book_split_front_matter(text):
+    """Peel a chapter's title preamble off the body.
+
+    The reader typesets its own title page from manifest metadata, so leaving
+    the source's headings in place would print the chapter title twice. Chapter
+    files do not agree on one preamble shape — some use
+    `# Part / ## Chapter / *credit* / ---`, others `### BÖLÜM III` followed by a
+    bare shouted title and no rule — so consume whatever leading run is clearly
+    title matter and stop at the first line of real prose.
+    """
+    lines = text.split("\n")
+    front = {}
+    consumed = -1
+    seen = 0
+
+    for i, raw in enumerate(lines):
+        line = raw.strip()
+        if not line:
+            continue
+        if seen >= _BOOK_FRONT_MATTER_MAX_LINES:
+            break
+
+        if line in _BOOK_RULES:
+            consumed = i          # an explicit rule terminates the preamble
+            break
+
+        if line.startswith("#"):
+            level = len(line) - len(line.lstrip("#"))
+            heading = line[level:].strip()
+            if not heading:
+                break
+            if level == 1:
+                front.setdefault("partHeading", heading)
+            else:
+                front.setdefault("chapterHeading", heading)
+        elif line.startswith("*") and line.endswith("*") and not line.startswith("**"):
+            front.setdefault("credit", line.strip("*").strip())
+        elif _book_is_shouted_title(line) and front:
+            # Only after a heading — otherwise a shouted line is body text.
+            front.setdefault("chapterHeading", line)
+        else:
+            break                 # first line of prose: stop before it
+
+        consumed = i
+        seen += 1
+
+    if consumed < 0 or not front:
+        return {}, text
+    return front, "\n".join(lines[consumed + 1:]).lstrip("\n")
+
+
+def _book_chapters(slug, book_dir, manifest):
+    """Merge the declared table of contents with the .md files actually present."""
+    files = _book_markdown_files(book_dir)
+    used = set()
+    chapters = []
+
+    for idx, entry in enumerate(manifest.get("chapters") or []):
+        if not isinstance(entry, dict):
+            continue
+        chapter_id = str(entry.get("id") or "").strip()
+        if not chapter_id or not BOOK_CHAPTER_ID_RE.match(chapter_id):
+            continue
+        pattern = _book_chapter_file_pattern(chapter_id)
+        filename = None
+        if pattern:
+            for name in files:
+                if name in used:
+                    continue
+                if pattern.match(os.path.splitext(name)[0]):
+                    filename = name
+                    used.add(name)
+                    break
+        words = _book_word_count(os.path.join(book_dir, filename)) if filename else 0
+        chapters.append({
+            "id": chapter_id,
+            "order": int(entry.get("order") or idx + 1),
+            "volume": str(entry.get("volume") or ""),
+            "part": str(entry.get("part") or ""),
+            "numeral": str(entry.get("numeral") or ""),
+            "label": str(entry.get("label") or ""),
+            "title": str(entry.get("title") or chapter_id),
+            "sourceWords": int(entry.get("sourceWords") or 0),
+            "available": filename is not None,
+            "words": words,
+            "readingMinutes": _book_reading_minutes(
+                words, int(manifest.get("wordsPerMinute") or BOOK_DEFAULT_WPM)
+            ),
+            "_file": filename,
+        })
+
+    # Files that match no manifest entry still deserve to be readable.
+    next_order = max((c["order"] for c in chapters), default=0)
+    for name in files:
+        if name in used:
+            continue
+        stem = os.path.splitext(name)[0]
+        chapter_id = re.sub(r"[^A-Za-z0-9_-]+", "-", stem).strip("-") or "bolum"
+        if not BOOK_CHAPTER_ID_RE.match(chapter_id):
+            continue
+        next_order += 1
+        words = _book_word_count(os.path.join(book_dir, name))
+        chapters.append({
+            "id": chapter_id,
+            "order": next_order,
+            "volume": "", "part": "", "numeral": "", "label": "",
+            "title": stem.replace("_", " ").replace("-", " ").strip(),
+            "sourceWords": 0,
+            "available": True,
+            "words": words,
+            "readingMinutes": _book_reading_minutes(
+                words, int(manifest.get("wordsPerMinute") or BOOK_DEFAULT_WPM)
+            ),
+            "_file": name,
+        })
+
+    chapters.sort(key=lambda c: c["order"])
+    return chapters
+
+
+def _book_summary(manifest, chapters):
+    available = [c for c in chapters if c["available"]]
+    return {
+        "slug": manifest.get("slug"),
+        "title": manifest.get("title"),
+        "subtitle": manifest.get("subtitle", ""),
+        "author": manifest.get("author", ""),
+        "translator": manifest.get("translator", ""),
+        "publisher": manifest.get("publisher", ""),
+        "edition": manifest.get("edition", ""),
+        "year": manifest.get("year", ""),
+        "language": manifest.get("language", ""),
+        "description": manifest.get("description", ""),
+        "epigraph": manifest.get("epigraph", ""),
+        "cover": manifest.get("cover", {}),
+        "totalChapters": len(chapters),
+        "availableChapters": len(available),
+        "availableWords": sum(c["words"] for c in available),
+        "totalSourceWords": int(manifest.get("totalSourceWords") or 0),
+        "readingMinutes": _book_reading_minutes(
+            sum(c["words"] for c in available),
+            int(manifest.get("wordsPerMinute") or BOOK_DEFAULT_WPM),
+        ),
+    }
+
+
+def _book_load(slug):
+    book_dir = _book_dir(slug)
+    if not book_dir:
+        return None, None, None
+    manifest = _book_manifest(slug, book_dir)
+    return book_dir, manifest, _book_chapters(slug, book_dir, manifest)
+
+
+def _public_chapter(chapter):
+    return {k: v for k, v in chapter.items() if not k.startswith("_")}
+
+
+@app.route("/api/books")
+@require_auth
+def books_list():
+    books = []
+    if os.path.isdir(BOOKS_DIR):
+        for name in sorted(os.listdir(BOOKS_DIR)):
+            book_dir, manifest, chapters = _book_load(name)
+            if not book_dir or not chapters:
+                continue
+            books.append(_book_summary(manifest, chapters))
+    return jsonify({"books": books})
+
+
+@app.route("/api/books/translate", methods=["POST"])
+@require_auth
+def book_translate():
+    payload = request.get_json(silent=True) or {}
+    source_text = re.sub(
+        r"\s+", " ", str(payload.get("text") or "")
+    ).strip()
+    context = re.sub(
+        r"\s+", " ", str(payload.get("context") or "")
+    ).strip()
+    if not source_text:
+        return jsonify({"error": "selection_required"}), 400
+    if len(source_text.encode("utf-8")) > BOOK_TRANSLATION_MAX_BYTES:
+        return jsonify({
+            "error": "selection_too_long",
+            "maxBytes": BOOK_TRANSLATION_MAX_BYTES,
+        }), 413
+    if len(context.encode("utf-8")) > BOOK_TRANSLATION_CONTEXT_MAX_BYTES:
+        return jsonify({
+            "error": "context_too_long",
+            "maxBytes": BOOK_TRANSLATION_CONTEXT_MAX_BYTES,
+        }), 413
+
+    providers = (
+        ("DeepL", _book_translate_deepl),
+        ("Gemini 2.5 Flash", _book_translate_gemini),
+        ("MyMemory", _book_translate_mymemory),
+    )
+    for provider_name, translate in providers:
+        try:
+            translated = translate(source_text, context)
+        except (
+            BookTranslationProviderError,
+            http_requests.RequestException,
+            ValueError,
+        ):
+            continue
+        return jsonify({
+            "sourceText": source_text,
+            "translatedText": translated,
+            "sourceLanguage": "en",
+            "targetLanguage": "tr",
+            "provider": provider_name,
+        })
+
+    return jsonify({"error": "translation_provider_unavailable"}), 502
+
+
+@app.route("/api/books/<slug>")
+@require_auth
+def book_detail(slug):
+    book_dir, manifest, chapters = _book_load(slug)
+    if not book_dir:
+        return jsonify({"error": "Kitap bulunamadı"}), 404
+    payload = _book_summary(manifest, chapters)
+    payload["chapters"] = [_public_chapter(c) for c in chapters]
+    return jsonify(payload)
+
+
+@app.route("/api/books/<slug>/chapters/<chapter_id>")
+@require_auth
+def book_chapter(slug, chapter_id):
+    book_dir, manifest, chapters = _book_load(slug)
+    if not book_dir:
+        return jsonify({"error": "Kitap bulunamadı"}), 404
+
+    readable = [c for c in chapters if c["available"]]
+    idx = next((i for i, c in enumerate(readable) if c["id"] == chapter_id), -1)
+    if idx < 0:
+        return jsonify({"error": "Bölüm bulunamadı"}), 404
+
+    chapter = readable[idx]
+    try:
+        with open(os.path.join(book_dir, chapter["_file"]), encoding="utf-8") as f:
+            raw = f.read()
+    except OSError:
+        return jsonify({"error": "Bölüm okunamadı"}), 500
+
+    front, body = _book_split_front_matter(raw)
+    payload = _public_chapter(chapter)
+    payload["content"] = body
+    payload["credit"] = front.get("credit", "")
+    # Not every chapter file names its volume; the manifest always does.
+    payload["partHeading"] = front.get("partHeading") or chapter["part"]
+
+    def nav(target):
+        if target is None:
+            return None
+        return {"id": target["id"], "title": target["title"], "label": target["label"]}
+
+    return jsonify({
+        "book": _book_summary(manifest, chapters),
+        "chapter": payload,
+        "prev": nav(readable[idx - 1] if idx > 0 else None),
+        "next": nav(readable[idx + 1] if idx + 1 < len(readable) else None),
+        "position": {"index": idx + 1, "total": len(readable)},
+    })
 
 
 # --- SPA static serving (production build) ---

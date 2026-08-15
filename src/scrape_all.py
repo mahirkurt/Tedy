@@ -520,54 +520,45 @@ def scrape_takvim(driver):
     driver.get(url)
     wait_for(driver, (By.ID, "select-all"), timeout=15)
 
-    # 1. Check "Tümünü Göster" (select-all) checkbox to enable all filters
-    try:
-        select_all = driver.find_element(By.ID, "select-all")
-        if not select_all.is_selected():
-            driver.execute_script("arguments[0].click();", select_all)
-            time.sleep(0.5)
-        print("  Enabled 'Tümünü Göster' filter")
-    except Exception:
-        # Fallback: check all individually
-        checkboxes = driver.find_elements(By.CSS_SELECTOR, "input[type='checkbox']")
-        for cb in checkboxes:
-            cb_id = cb.get_attribute("id") or ""
-            if cb_id in ("select-all", "etkinlik", "sinav", "gezi", "diger",
-                         "ders", "ogep", "veli_toplantisi", "kisisel"):
-                if not cb.is_selected():
-                    driver.execute_script("arguments[0].click();", cb)
-                    time.sleep(0.3)
-        print("  Enabled filters individually")
-    time.sleep(1)
+    # 1. Enable all filter checkboxes
+    filter_ids = ("etkinlik", "sinav", "gezi", "diger",
+                  "ders", "ogep", "veli_toplantisi", "kisisel")
+    enabled = []
+    for cb_id in filter_ids:
+        try:
+            cb = driver.find_element(By.ID, cb_id)
+            if not cb.is_selected():
+                driver.execute_script(
+                    "arguments[0].click();", cb)
+                enabled.append(cb_id)
+                time.sleep(0.3)
+        except Exception:
+            pass
+    if enabled:
+        time.sleep(3)
+    print(f"  Enabled filters: "
+          f"{', '.join(enabled) or '(all already on)'}")
 
-    # 2. Confirm 6. Sınıf is selected in level filter (value=60)
+    # 2. Confirm 6. Sınıf level filter
     try:
-        level_select = Select(driver.find_element(By.ID, "filter-select-level"))
-        selected_val = level_select.first_selected_option.get_attribute("value")
-        if selected_val != "60":
+        level_select = Select(driver.find_element(
+            By.ID, "filter-select-level"))
+        if level_select.first_selected_option \
+                .get_attribute("value") != "60":
             level_select.select_by_value("60")
             time.sleep(1)
-        print(f"  Level filter: 6. Sınıf (value={selected_val})")
-    except Exception as e:
-        print(f"  Level filter check: {e}")
-
-    # 3. Switch to month view for broader coverage
-    try:
-        month_btn = driver.find_element(By.CSS_SELECTOR, ".fc-dayGridMonth-button")
-        month_btn.click()
-        time.sleep(1)
-        print("  Switched to month view")
     except Exception:
         pass
 
-    # 4. Extract events via FullCalendar JS API for current + previous month
+    # 3. Extract events via FullCalendar JS API
+    # FullCalendar lazy-loads per month — reload page for each.
+    # Scan: 2 previous + current + 4 forward = 7 months
     all_events = []
-    seen = set()  # deduplicate by (title, start)
+    seen = set()
 
     JS_GET_EVENTS = """
         if (!window.calendar) return [];
-        var events = window.calendar.getEvents();
-        return events.map(function(e) {
+        return window.calendar.getEvents().map(function(e) {
             return {
                 title: e.title || '',
                 start: e.startStr || '',
@@ -578,51 +569,74 @@ def scrape_takvim(driver):
             };
         });
     """
-
-    # Wait for FullCalendar JS API to be ready
     JS_CALENDAR_READY = (
         "return typeof window.calendar !== 'undefined'"
         " && window.calendar.getEvents().length >= 0"
     )
-    wait_for_js(driver, JS_CALENDAR_READY, timeout=15)
 
-    for month_offset in range(2):  # current month + 1 previous
-        # Get header (month name)
+    def _collect():
         header = ""
         try:
-            h = driver.find_element(By.CSS_SELECTOR, ".fc-toolbar-title")
+            h = driver.find_element(
+                By.CSS_SELECTOR, ".fc-toolbar-title")
             header = h.text.strip()
         except Exception:
             pass
-
-        events = driver.execute_script(JS_GET_EVENTS)
-        if not events:
-            events = []
-
+        events = driver.execute_script(
+            JS_GET_EVENTS) or []
         new_count = 0
         for ev in events:
-            key = (ev.get("title", ""), ev.get("start", ""))
+            key = (ev.get("title", ""),
+                   ev.get("start", ""))
             if key not in seen and ev.get("title"):
                 seen.add(key)
                 all_events.append(ev)
                 new_count += 1
+        print(f"  {header}: {new_count} new"
+              f" (total {len(all_events)})")
 
-        ss_name = f"takvim_month_{month_offset}.png"
-        driver.save_screenshot(os.path.join(OUTPUT_DIR, ss_name))
-        print(f"  {header}: {new_count} new events (total {len(all_events)})")
-
-        # Navigate to previous month
-        if month_offset < 1:
+    def _nav(sel, count=1):
+        for _ in range(count):
+            before = driver.execute_script(
+                "return window.calendar"
+                " ? window.calendar.getEvents().length"
+                " : 0")
             try:
-                prev_btn = driver.find_element(By.CSS_SELECTOR, ".fc-prev-button")
-                prev_btn.click()
-                # Wait for calendar to re-render after navigation
-                wait_for_js(driver, JS_CALENDAR_READY, timeout=10)
-                time.sleep(0.5)
+                driver.find_element(
+                    By.CSS_SELECTOR, sel).click()
             except Exception:
                 break
+            # Wait for event count to change or stabilize
+            for _w in range(8):
+                time.sleep(0.5)
+                after = driver.execute_script(
+                    "return window.calendar"
+                    " ? window.calendar.getEvents()"
+                    ".length : 0")
+                if after != before:
+                    time.sleep(0.5)
+                    break
+            else:
+                time.sleep(1)
 
-    print(f"  Total unique events scraped: {len(all_events)}")
+    wait_for_js(driver, JS_CALENDAR_READY, timeout=15)
+
+    # Current month
+    _collect()
+    # Forward 4 months
+    for _ in range(4):
+        _nav(".fc-next-button")
+        _collect()
+    # Back to current, then 2 months back
+    _nav(".fc-prev-button", 4)
+    for _ in range(2):
+        _nav(".fc-prev-button")
+        _collect()
+
+    driver.save_screenshot(
+        os.path.join(OUTPUT_DIR, "takvim_final.png"))
+    print(f"  Total unique events scraped:"
+          f" {len(all_events)}")
     return all_events
 
 
