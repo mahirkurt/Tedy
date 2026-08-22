@@ -4,6 +4,7 @@
 Designed to run via crontab every 15 minutes.
 """
 import os
+import re
 import sys
 import time
 import traceback
@@ -14,6 +15,7 @@ PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, PROJECT_ROOT)
 
 from src.scrape_all import (  # noqa: E402
+    BASE_URL,
     OUTPUT_DIR,
     create_driver,
     login,
@@ -29,6 +31,56 @@ from src.scrape_all import (  # noqa: E402
     scrape_takvim,
 )
 from src.assistant_core import perform_incremental_reindex  # noqa: E402
+from src.academic_year import (  # noqa: E402
+    STATE_FILENAME,
+    detect_academic_year,
+    load_year_state,
+    resolve_year,
+    save_year_state,
+)
+from src.archive_year import archive_year_drive  # noqa: E402
+
+_YEAR_RE = re.compile(r"^\d{4}-\d{4}$")
+
+
+def run_year_rollover(driver, output_dir, base_url, drive_factory):
+    """Resolve the academic year and archive the previous one if it changed.
+
+    MUST run before any scraper: archiving afterwards would snapshot
+    new-year data under the old year's name and lose the old year.
+    """
+    state_path = os.path.join(output_dir, STATE_FILENAME)
+    stored = load_year_state(state_path).get("year")
+    detected, source = detect_academic_year(driver, base_url)
+    resolution = resolve_year(detected, stored)
+
+    result = {"year": resolution.year, "status": resolution.status,
+              "source": source, "archived": False, "manifest": None}
+    print(f"[YEAR] {resolution.status}: {stored or '-'} -> {resolution.year} "
+          f"(source: {source})")
+
+    if resolution.status == "rollover":
+        if not _YEAR_RE.match(stored or ""):
+            print(f"  [ARCHIVE] Skipped: stored year {stored!r} is not a "
+                  f"valid YYYY-YYYY academic year")
+            return result
+        try:
+            drive_service = drive_factory()
+        except Exception as e:
+            print(f"  [ARCHIVE] Drive unavailable: {type(e).__name__}: {e}")
+            drive_service = None
+        result["manifest"] = archive_year_drive(stored, output_dir, drive_service)
+        result["archived"] = True
+        print(f"  [ARCHIVE] {stored} sealed "
+              f"({result['manifest'].get('counts', {})})")
+
+    if resolution.year and resolution.status in (
+            "initialized", "rollover", "current"):
+        save_year_state(state_path, resolution.year,
+                        stored if resolution.status == "rollover" else
+                        load_year_state(state_path).get("previous"),
+                        source)
+    return result
 
 
 def main():
@@ -45,6 +97,8 @@ def main():
 
     scrape_errors = []
     unavailable = {}
+    year_info = {"year": None, "status": "unknown",
+                 "source": "none", "archived": False, "manifest": None}
 
     login_info = None
     validation = {"section_counts": {}, "errors": [], "warnings": []}
@@ -67,6 +121,13 @@ def main():
             atomic_json_dump(health, os.path.join(OUTPUT_DIR, "health.json"))
             print(f"\nHealth: ERRORS ({health['duration_seconds']}s)")
             return
+
+        def _drive_factory():
+            from src.sync_to_google import get_services
+            return get_services()[1]
+
+        year_info = run_year_rollover(
+            driver, OUTPUT_DIR, BASE_URL, _drive_factory)
 
         # 2. Scrape all sources
         data = {"scraped_at": datetime.now().isoformat()}
@@ -178,6 +239,9 @@ def main():
         "duration_seconds": round(time.time() - start_time),
         "validation_warnings": validation.get("warnings", []),
         "unavailable": unavailable,
+        "academic_year": year_info["year"],
+        "year_detection": year_info["status"],
+        "year_archived": year_info["archived"],
         "login": login_info or {"method": "failed", "captcha_attempts": 0},
         "sections": sections_health,
         "staleness": {
