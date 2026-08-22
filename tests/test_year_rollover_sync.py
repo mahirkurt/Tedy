@@ -100,16 +100,25 @@ def test_drive_unavailable_still_archives_locally(tmp_path, monkeypatch):
 def test_malformed_stored_year_skips_archive_and_state_write(tmp_path, monkeypatch):
     """A stored year that is not YYYY-YYYY must never be turned into a
     filesystem path or Drive folder name - skip the archive, leave the
-    state file untouched, and warn."""
+    state file untouched, and warn.
+
+    "2025" (truncated, missing the second half) still sorts lexicographically
+    before "2026-2027", so resolve_year still classifies this as a rollover
+    (unlike e.g. "not-a-year", which would sort after and hit the unrelated
+    ignored_regression path instead) - this is what actually exercises the
+    new format-validation branch rather than the pre-existing regression
+    guard.
+    """
     out = str(tmp_path); _seed(out)
     with open(os.path.join(out, "academic_year.json"), "w", encoding="utf-8") as f:
-        json.dump({"year": "not-a-year"}, f)
+        json.dump({"year": "2025"}, f)
     _patch_detect(monkeypatch, "2026-2027")
 
     r = run_year_rollover(StubDriver("x"), out, BASE, lambda: None)
+    assert r["status"] == "rollover"
     assert r["archived"] is False
     assert not os.path.exists(os.path.join(out, "archive"))
     # state file must be left exactly as it was - not overwritten with the
     # new detected year, since we never completed the archive of the old one
     with open(os.path.join(out, "academic_year.json"), encoding="utf-8") as f:
-        assert json.load(f)["year"] == "not-a-year"
+        assert json.load(f)["year"] == "2025"
