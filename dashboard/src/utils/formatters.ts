@@ -63,7 +63,7 @@ export function normalizeCourseDisplayName(name: string): string {
   return raw
 }
 
-export function formatTurkishDate(dateStr: string): string {
+export function formatTurkishDate(dateStr?: string | null): string {
   if (!dateStr) return ''
   const match = dateStr.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/)
   if (match) {
@@ -73,7 +73,8 @@ export function formatTurkishDate(dateStr: string): string {
   return dateStr
 }
 
-export function parseDeadline(dateStr: string): Date | null {
+export function parseDeadline(dateStr?: string | null): Date | null {
+  if (!dateStr) return null
   const match = dateStr.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/)
   if (!match) return null
   const [, day, month, year, hour, min] = match

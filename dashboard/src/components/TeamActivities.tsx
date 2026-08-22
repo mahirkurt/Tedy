@@ -10,13 +10,15 @@ import type { TeamActivity, OgepSession } from '../types'
 
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000
 
-function parseTurkishDate(s: string): Date | null {
+function parseTurkishDate(s?: string | null): Date | null {
+  if (!s) return null
   const m = s.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/)
   if (!m) return null
   return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5])
 }
 
-function formatShortDate(s: string): string {
+function formatShortDate(s?: string | null): string {
+  if (!s) return ''
   const m = s.match(/(\d{2})\.(\d{2})\.\d{4}\s+(\d{2}):(\d{2})/)
   if (!m) return s
   return `${m[1]}.${m[2]} ${m[3]}:${m[4]}`

@@ -18,6 +18,7 @@ from src.scrape_all import (  # noqa: E402
     create_driver,
     login,
     scrape_ders_icerikleri,
+    PortalUnavailable,
     scrape_ders_programi,
     scrape_duyurular,
     scrape_gelisim_raporu,
@@ -43,6 +44,7 @@ def main():
     driver = create_driver()
 
     scrape_errors = []
+    unavailable = {}
 
     login_info = None
     validation = {"section_counts": {}, "errors": [], "warnings": []}
@@ -82,6 +84,12 @@ def main():
         for name, fn in scrapers:
             try:
                 data[name] = fn(driver)
+            except PortalUnavailable as e:
+                # The portal explained the absence - record it, don't
+                # report it as a scrape failure.
+                unavailable[name] = {"reason": e.reason, "detail": str(e)}
+                data[name] = [] if name in ("takvim", "ders_programi") else {}
+                print(f"[UNAVAILABLE] {name}: {e}")
             except Exception as e:
                 scrape_errors.append(f"{name}: {e}")
                 data[name] = [] if name in ("takvim", "ders_programi") else {}
@@ -99,7 +107,7 @@ def main():
             except (json.JSONDecodeError, OSError):
                 pass
 
-        validation = validate_scraped_data(data, prev_data)
+        validation = validate_scraped_data(data, prev_data, unavailable)
         if validation["errors"]:
             scrape_errors.extend(validation["errors"])
         if validation["warnings"]:
@@ -148,7 +156,9 @@ def main():
         prev_count = _count_section(section, prev_data) if prev_data else 0
 
         status = "ok"
-        if any(section in e for e in validation.get("errors", [])):
+        if section in unavailable:
+            status = "unavailable"
+        elif any(section in e for e in validation.get("errors", [])):
             status = "error"
         elif any(section in w for w in validation.get("warnings", [])):
             status = "warning"
@@ -167,6 +177,7 @@ def main():
         "scrape_errors": scrape_errors,
         "duration_seconds": round(time.time() - start_time),
         "validation_warnings": validation.get("warnings", []),
+        "unavailable": unavailable,
         "login": login_info or {"method": "failed", "captcha_attempts": 0},
         "sections": sections_health,
         "staleness": {

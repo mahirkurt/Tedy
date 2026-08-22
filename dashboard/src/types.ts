@@ -150,7 +150,7 @@ export interface A3KLesson {
 export interface SectionHealth {
   count: number
   prev_count: number
-  status: 'ok' | 'warning' | 'error' | 'skipped'
+  status: 'ok' | 'warning' | 'error' | 'skipped' | 'unavailable'
 }
 
 export interface HealthData {

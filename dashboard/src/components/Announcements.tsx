@@ -21,7 +21,8 @@ function getAnnouncementDetail(ann: Announcement): string {
   return 'Detay bulunamadı.'
 }
 
-function getWeekLabel(dateStr: string): string {
+function getWeekLabel(dateStr?: string | null): string {
+  if (!dateStr) return ''
   const m = dateStr.match(/(\d{2})\.(\d{2})\.(\d{4})/)
   if (!m) return ''
   const d = new Date(+m[3], +m[2] - 1, +m[1])

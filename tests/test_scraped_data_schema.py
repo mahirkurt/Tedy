@@ -23,6 +23,22 @@ REQUIRED_TOP_LEVEL_KEYS = [
 ]
 
 
+HEALTH_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "output", "health.json"
+)
+
+
+def _portal_unavailable(section):
+    """Return the portal's own reason a section has no data, if it gave one."""
+    try:
+        with open(HEALTH_PATH, encoding="utf-8") as f:
+            health = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    entry = health.get("unavailable", {}).get(section)
+    return entry.get("detail") if entry else None
+
+
 @pytest.fixture(scope="module")
 def scraped_data():
     if not os.path.exists(DATA_PATH):
@@ -58,7 +74,12 @@ class TestDersProgrami:
         assert isinstance(scraped_data["ders_programi"], list)
 
     def test_non_empty(self, scraped_data):
-        assert len(scraped_data["ders_programi"]) > 0
+        """Empty is a failure only when the portal did not explain it."""
+        if len(scraped_data["ders_programi"]) > 0:
+            return
+        blocked = _portal_unavailable("ders_programi")
+        assert blocked, "ders_programi is empty and the portal gave no reason"
+        pytest.skip(f"portal reports ders_programi unavailable: {blocked}")
 
     def test_each_entry_has_week_label(self, scraped_data):
         for i, entry in enumerate(scraped_data["ders_programi"]):
@@ -189,3 +210,34 @@ class TestDuyurular:
 
     def test_announcements_is_list(self, scraped_data):
         assert isinstance(scraped_data["duyurular"]["announcements"], list)
+
+
+class TestNoEmptyStatePlaceholders:
+    """An empty portal table must yield no rows at all.
+
+    DataTables renders "Tabloda herhangi bir veri mevcut değil" in a single
+    spanning cell. Captured as a row it becomes an object whose real fields
+    are all missing, which crashes every consumer that reads them.
+    """
+
+    PLACEHOLDER = "Tabloda herhangi bir veri mevcut değil"
+
+    def test_no_placeholder_anywhere(self, scraped_data):
+        hits = []
+
+        def walk(node, trail):
+            if isinstance(node, dict):
+                for k, v in node.items():
+                    if isinstance(v, str) and self.PLACEHOLDER in v:
+                        hits.append(f"{trail}/{k}")
+                    else:
+                        walk(v, f"{trail}/{k}")
+            elif isinstance(node, list):
+                for i, v in enumerate(node):
+                    if isinstance(v, str) and self.PLACEHOLDER in v:
+                        hits.append(f"{trail}[{i}]")
+                    else:
+                        walk(v, f"{trail}[{i}]")
+
+        walk(scraped_data, "")
+        assert hits == [], f"empty-state placeholder captured as data: {hits}"

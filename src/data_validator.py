@@ -13,7 +13,7 @@ def _count_section(key, data):
     if key == "takvim":
         return len(val) if isinstance(val, list) else 0
     if key == "gelisim_raporu":
-        return len(val.get("grades", []))
+        return len(val.get("grades", [])) + len(val.get("rubrics", []))
     if key == "ders_icerikleri":
         if isinstance(val, dict):
             return sum(
@@ -22,7 +22,11 @@ def _count_section(key, data):
             )
         return 0
     if key == "takim_calismalari":
-        return len(val.get("activities", []))
+        activities = val.get("activities", [])
+        # extract_table returns {"headers", "rows", ...}; older shape is a list
+        if isinstance(activities, dict):
+            return len(activities.get("rows", []))
+        return len(activities)
     if key == "ogep":
         return len(val.get("sessions", {}).get("rows", []))
     if key == "duyurular":
@@ -45,7 +49,32 @@ SECTION_RULES = {
 DROP_THRESHOLD = 0.5  # Warn if count drops by more than 50%
 
 
-def validate_scraped_data(new_data: dict, previous_data: dict | None) -> dict:
+def _has_empty_state(val, depth=2):
+    """True when a scraper recorded that the portal rendered an empty table."""
+    if not isinstance(val, dict) or depth < 0:
+        return False
+    if val.get("empty_state"):
+        return True
+    return any(_has_empty_state(v, depth - 1) for v in val.values())
+
+
+def _explained_absence(section, data, unavailable):
+    """Return why a section is empty, when the portal itself told us.
+
+    An absence the portal explained - no permission, a closed module, or a
+    table's own empty state - is not a scrape failure and must not be
+    reported as one.
+    """
+    blocked = (unavailable or {}).get(section)
+    if blocked:
+        return f"{blocked.get('reason', 'erisilemez')}: {blocked.get('detail', '')}".strip(": ")
+    if _has_empty_state(data.get(section)):
+        return "portalda kayıt yok (boş tablo)"
+    return None
+
+
+def validate_scraped_data(new_data: dict, previous_data: dict | None,
+                          unavailable: dict | None = None) -> dict:
     """
     Validate scraped data. Returns:
     {
@@ -62,6 +91,14 @@ def validate_scraped_data(new_data: dict, previous_data: dict | None) -> dict:
     for section, rules in SECTION_RULES.items():
         count = _count_section(section, new_data)
         section_counts[section] = count
+
+        # An absence the portal explained is not a failure - say why, once,
+        # and skip both the minimum and the drop check.
+        reason = _explained_absence(section, new_data, unavailable) \
+            if count < rules["min"] else None
+        if reason:
+            warnings.append(f"{section}: veri yok - {reason}")
+            continue
 
         # Check minimum threshold
         if count < rules["min"] and rules["critical"]:
