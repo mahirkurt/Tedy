@@ -538,7 +538,8 @@ def sync_attachments_to_drive(drive_service, data):
 
     # Get or create root folder
     folder_id = _get_or_create_folder(
-        drive_service, "Ödevler"
+        drive_service, "Ödevler",
+        parent_id=get_year_root(drive_service)
     )
 
     added = 0

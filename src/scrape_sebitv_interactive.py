@@ -19,7 +19,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from googleapiclient.http import MediaInMemoryUpload, MediaIoBaseUpload
 
-from src.sync_to_google import get_services, _get_or_create_folder
+from src.sync_to_google import get_services, _get_or_create_folder, get_year_root
 from src.env_loader import load_env
 
 load_env()
@@ -445,13 +445,14 @@ def process_interactive_resources(resources, s, drive, tracker):
     """Process all interactive resources: crawl, archive, upload."""
     print(f"\n[İŞLEM] {len(resources)} etkileşimli kaynak işleniyor...")
 
+    year_root = get_year_root(drive)
     # Drive folders for archives
     archive_root_id = _get_or_create_folder(
-        drive, "SEBİTV Etkileşimli"
+        drive, "SEBİTV Etkileşimli", parent_id=year_root
     )
     # Drive folders for question banks
     qbank_root_id = _get_or_create_folder(
-        drive, "SEBİTV Soru Bankaları"
+        drive, "SEBİTV Soru Bankaları", parent_id=year_root
     )
 
     course_folders = {}       # course -> folder_id (for archives)

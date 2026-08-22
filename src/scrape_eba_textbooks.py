@@ -16,7 +16,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from googleapiclient.http import MediaInMemoryUpload
 
-from src.sync_to_google import get_services, _get_or_create_folder
+from src.sync_to_google import get_services, _get_or_create_folder, get_year_root
 from src.env_loader import load_env
 
 load_env()
@@ -351,7 +351,9 @@ def download_and_upload(driver, books, drive_service):
             uploaded = json.load(f)
 
     # Create Drive folder structure
-    root_id = _get_or_create_folder(drive_service, "Ders Kitapları")
+    root_id = _get_or_create_folder(
+        drive_service, "Ders Kitapları",
+        parent_id=get_year_root(drive_service))
 
     added = 0
     skipped = 0

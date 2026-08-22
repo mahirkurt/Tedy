@@ -164,3 +164,31 @@ def test_drive_failure_still_leaves_a_local_archive(tmp_path):
     manifest = archive_year_drive("2025-2026", out, Broken())
     assert manifest["year"] == "2025-2026"
     assert manifest["drive_folder"] is None
+
+
+def test_no_content_root_is_created_at_drive_root():
+    """Every content root must hang off TEDY/<year>/, never Drive root."""
+    import inspect
+
+    import src.scrape_eba_textbooks as eba
+    import src.scrape_mebi_videos as mebi
+    import src.scrape_sebitv as sebitv
+    import src.scrape_sebitv_interactive as sebitv_i
+    import src.sync_to_google as stg
+
+    roots = [
+        (stg, '"Ödevler"'),
+        (eba, '"Ders Kitapları"'),
+        (mebi, '"MEBI Videolar"'),
+        (sebitv, '"SEBİTV Videolar"'),
+        (sebitv_i, '"SEBİTV Etkileşimli"'),
+        (sebitv_i, '"SEBİTV Soru Bankaları"'),
+    ]
+    for module, literal in roots:
+        src = inspect.getsource(module)
+        idx = src.find(literal)
+        assert idx != -1, f"{module.__name__}: {literal} not found"
+        window = src[max(0, idx - 300): idx + 200]
+        assert ("parent_id" in window and
+                ("get_year_root" in window or "year_root" in window)), (
+            f"{module.__name__}: {literal} root folder is not year-scoped")
