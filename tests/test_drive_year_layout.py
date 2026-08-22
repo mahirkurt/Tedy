@@ -16,6 +16,7 @@ class FakeFiles:
     def __init__(self, existing=None):
         self.store = dict(existing or {})   # id -> {name, parents}
         self._next = 100
+        self.update_calls = 0
 
     class _Req:
         def __init__(self, result):
@@ -28,11 +29,14 @@ class FakeFiles:
         name = q.split("name='", 1)[1].split("'", 1)[0] if "name='" in q else None
         parent = q.split("and '", 1)[1].split("' in parents", 1)[0] \
             if "' in parents" in q else None
+        # Real Drive only filters by parent when the query names one. A
+        # parent-agnostic query (as move_root_folders deliberately issues)
+        # must match a folder by name Drive-wide, regardless of its current
+        # parents - not just folders that happen to have none.
         hits = [{"id": i, "parents": v.get("parents", [])}
                 for i, v in self.store.items()
                 if v["name"] == name
-                and (parent in v.get("parents", []) if parent else
-                     not v.get("parents"))]
+                and (parent in (v.get("parents") or []) if parent else True)]
         return self._Req({"files": hits})
 
     def create(self, body=None, **kw):
@@ -43,8 +47,17 @@ class FakeFiles:
         return self._Req({"id": fid})
 
     def update(self, fileId=None, addParents=None, removeParents=None, **kw):
-        self.store[fileId]["parents"] = [addParents]
-        return self._Req({"id": fileId, "parents": [addParents]})
+        # Real Drive's addParents/removeParents are comma-separated id lists
+        # applied as a union/subtract against the existing parents - not a
+        # wholesale replacement. Modelling that is what lets a missing or
+        # wrong removeParents show up as a folder left with two parents.
+        self.update_calls += 1
+        parents = set(self.store[fileId].get("parents") or [])
+        remove = {p for p in (removeParents or "").split(",") if p}
+        add = {p for p in (addParents or "").split(",") if p}
+        parents = sorted((parents - remove) | add)
+        self.store[fileId]["parents"] = parents
+        return self._Req({"id": fileId, "parents": parents})
 
 
 class FakeDrive:
@@ -95,6 +108,37 @@ def test_move_reparents_existing_root_folders():
     assert sorted(moved) == ["a", "b"]
     assert drive._files.store["a"]["parents"] == [parent]
     assert drive._files.store["b"]["parents"] == [parent]
+
+
+def test_move_removes_the_old_parent_not_just_adds_the_new_one():
+    """Two years must never share a folder: moving a folder that already
+    belongs to a different parent (e.g. last year's TEDY/<year>/) must drop
+    that old parent, not just add the new one alongside it."""
+    drive = FakeDrive({
+        "a": {"name": "Ödevler", "parents": ["last_years_parent"]},
+    })
+    parent = get_year_root(drive, "2026-2027")
+    moved = move_root_folders(drive, ["Ödevler"], parent)
+    assert moved == ["a"]
+    assert drive._files.store["a"]["parents"] == [parent]
+
+
+def test_move_is_idempotent_no_redundant_update_on_second_call():
+    """Once a folder already sits under parent_id, a second pass must
+    recognize that (via the parent-agnostic lookup) and skip it - not
+    reissue an update() call."""
+    drive = FakeDrive({
+        "a": {"name": "Ödevler", "parents": []},
+    })
+    parent = get_year_root(drive, "2025-2026")
+
+    first = move_root_folders(drive, ["Ödevler"], parent)
+    assert first == ["a"]
+    assert drive._files.update_calls == 1
+
+    second = move_root_folders(drive, ["Ödevler"], parent)
+    assert second == []
+    assert drive._files.update_calls == 1
 
 
 def test_drive_archive_records_the_folder_id(tmp_path):
