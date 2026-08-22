@@ -97,7 +97,7 @@ WEEK_SELECT_ID = "dp_icerik_secili_hafta"
 DONEM_SELECT_ID = "genel_icerik_dp_ilgili_donem"
 
 
-def _option_values(driver, element_id):
+def _option_values(driver, element_id: str) -> list[str]:
     try:
         els = driver.find_elements(By.ID, element_id)
     except Exception:
@@ -114,7 +114,7 @@ def _option_values(driver, element_id):
     return values
 
 
-def detect_academic_year(driver, base_url: str):
+def detect_academic_year(driver, base_url: str) -> tuple[str | None, str]:
     """Ask the portal which year it is serving.
 
     Returns (year, source). Never raises - an undetectable year is reported

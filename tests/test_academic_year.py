@@ -129,11 +129,20 @@ BASE = "https://portal.tedronesans.k12.tr"
 HOME = f"{BASE}/pages/ogrenci/"
 GELISIM = f"{BASE}/pages/ogrenci_istekler/p_gelisim_raporum"
 
-WEEKS = FakeSelect("dp_icerik_secili_hafta", [
+# Fixture spanning two academic years: July 2026 (2025-2026) and Sept 2026 (2026-2027)
+WEEKS_TWO_YEARS = FakeSelect("dp_icerik_secili_hafta", [
+    FakeOption("21.09.2026 00:00:00"),   # 2026-2027
+    FakeOption("15.07.2026 00:00:00"),   # earliest, maps to 2025-2026
+    FakeOption("28.09.2026 00:00:00"),   # 2026-2027
+])
+
+# Fixture with all weeks in the same year (all Sept 2026 = 2026-2027)
+WEEKS_SAME_YEAR = FakeSelect("dp_icerik_secili_hafta", [
     FakeOption("21.09.2026 00:00:00"),
-    FakeOption("14.09.2026 00:00:00"),   # earliest, deliberately not first
+    FakeOption("14.09.2026 00:00:00"),   # earliest within same year, not first
     FakeOption("28.09.2026 00:00:00"),
 ])
+
 DONEMS = FakeSelect("genel_icerik_dp_ilgili_donem", [
     FakeOption("202401"), FakeOption("202504"), FakeOption("202502"),
 ])
@@ -141,11 +150,18 @@ DONEMS = FakeSelect("genel_icerik_dp_ilgili_donem", [
 
 class TestDetectAcademicYear:
     def test_week_selector_wins(self):
-        d = FakeDriver({HOME: [WEEKS], GELISIM: [DONEMS]})
-        assert detect_academic_year(d, BASE) == ("2026-2027", "week_selector")
+        d = FakeDriver({HOME: [WEEKS_TWO_YEARS], GELISIM: [DONEMS]})
+        assert detect_academic_year(d, BASE) == ("2025-2026", "week_selector")
 
     def test_earliest_week_defines_the_year_regardless_of_order(self):
-        d = FakeDriver({HOME: [WEEKS]})
+        """min() is load-bearing: picks the earliest date (2025-2026 over 2026-2027)."""
+        d = FakeDriver({HOME: [WEEKS_TWO_YEARS]})
+        year, _ = detect_academic_year(d, BASE)
+        assert year == "2025-2026"
+
+    def test_earliest_within_same_year_regardless_of_order(self):
+        """When all weeks are in the same year, earliest within that year wins."""
+        d = FakeDriver({HOME: [WEEKS_SAME_YEAR]})
         year, _ = detect_academic_year(d, BASE)
         assert year == "2026-2027"
 
@@ -159,12 +175,20 @@ class TestDetectAcademicYear:
 
     def test_does_not_visit_gelisim_when_home_answers(self):
         """Detection runs every sync; don't load a page we don't need."""
-        d = FakeDriver({HOME: [WEEKS], GELISIM: [DONEMS]})
+        d = FakeDriver({HOME: [WEEKS_TWO_YEARS], GELISIM: [DONEMS]})
         detect_academic_year(d, BASE)
         assert GELISIM not in d.visited
 
-    def test_a_thrown_driver_error_is_not_fatal(self):
+    def test_find_elements_error_is_not_fatal(self):
+        """find_elements exceptions on the element are caught."""
         class Boom(FakeDriver):
             def find_elements(self, _by, value):
                 raise RuntimeError("stale element")
         assert detect_academic_year(Boom({}), BASE) == (None, "none")
+
+    def test_driver_get_error_is_not_fatal(self):
+        """driver.get() exceptions (redirect, 404, etc.) are caught."""
+        class BoomOnGet(FakeDriver):
+            def get(self, url):
+                raise RuntimeError("page not found")
+        assert detect_academic_year(BoomOnGet({}), BASE) == (None, "none")
