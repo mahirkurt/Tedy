@@ -9,6 +9,7 @@ from src.academic_year import (
     save_year_state,
     year_from_donem_code,
     year_from_week_option,
+    detect_academic_year,
 )
 
 
@@ -89,3 +90,81 @@ class TestYearState:
         p = tmp_path / "academic_year.json"
         p.write_text("{not json", encoding="utf-8")
         assert load_year_state(str(p)) == {}
+
+
+class FakeOption:
+    def __init__(self, value, text=""):
+        self._value, self.text = value, text
+
+    def get_attribute(self, name):
+        return self._value if name == "value" else None
+
+
+class FakeSelect:
+    def __init__(self, el_id, options):
+        self.el_id, self._options = el_id, options
+
+    def find_elements(self, _by, tag):
+        return self._options if tag == "option" else []
+
+
+class FakeDriver:
+    """Serves selects per URL, the way the portal serves pages."""
+
+    def __init__(self, pages):
+        self.pages, self.current_url, self.visited = pages, "", []
+
+    def get(self, url):
+        self.current_url = url
+        self.visited.append(url)
+
+    def find_elements(self, _by, value):
+        for sel in self.pages.get(self.current_url, []):
+            if sel.el_id == value:
+                return [sel]
+        return []
+
+
+BASE = "https://portal.tedronesans.k12.tr"
+HOME = f"{BASE}/pages/ogrenci/"
+GELISIM = f"{BASE}/pages/ogrenci_istekler/p_gelisim_raporum"
+
+WEEKS = FakeSelect("dp_icerik_secili_hafta", [
+    FakeOption("21.09.2026 00:00:00"),
+    FakeOption("14.09.2026 00:00:00"),   # earliest, deliberately not first
+    FakeOption("28.09.2026 00:00:00"),
+])
+DONEMS = FakeSelect("genel_icerik_dp_ilgili_donem", [
+    FakeOption("202401"), FakeOption("202504"), FakeOption("202502"),
+])
+
+
+class TestDetectAcademicYear:
+    def test_week_selector_wins(self):
+        d = FakeDriver({HOME: [WEEKS], GELISIM: [DONEMS]})
+        assert detect_academic_year(d, BASE) == ("2026-2027", "week_selector")
+
+    def test_earliest_week_defines_the_year_regardless_of_order(self):
+        d = FakeDriver({HOME: [WEEKS]})
+        year, _ = detect_academic_year(d, BASE)
+        assert year == "2026-2027"
+
+    def test_falls_back_to_highest_donem_code(self):
+        d = FakeDriver({HOME: [], GELISIM: [DONEMS]})
+        assert detect_academic_year(d, BASE) == ("2025-2026", "donem_selector")
+
+    def test_no_signal_returns_none(self):
+        d = FakeDriver({HOME: [], GELISIM: []})
+        assert detect_academic_year(d, BASE) == (None, "none")
+
+    def test_does_not_visit_gelisim_when_home_answers(self):
+        """Detection runs every sync; don't load a page we don't need."""
+        d = FakeDriver({HOME: [WEEKS], GELISIM: [DONEMS]})
+        detect_academic_year(d, BASE)
+        assert GELISIM not in d.visited
+
+    def test_a_thrown_driver_error_is_not_fatal(self):
+        class Boom(FakeDriver):
+            def find_elements(self, _by, value):
+                raise RuntimeError("stale element")
+        assert detect_academic_year(Boom({}), BASE) == (None, "none")

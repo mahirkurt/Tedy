@@ -10,6 +10,8 @@ import re
 from datetime import datetime
 from typing import NamedTuple
 
+from selenium.webdriver.common.by import By
+
 from src.json_utils import atomic_json_dump
 
 STATE_FILENAME = "academic_year.json"
@@ -89,3 +91,49 @@ def save_year_state(path: str, year: str, previous: str | None,
     }
     atomic_json_dump(state, path)
     return state
+
+
+WEEK_SELECT_ID = "dp_icerik_secili_hafta"
+DONEM_SELECT_ID = "genel_icerik_dp_ilgili_donem"
+
+
+def _option_values(driver, element_id):
+    try:
+        els = driver.find_elements(By.ID, element_id)
+    except Exception:
+        return []
+    values = []
+    for el in els:
+        try:
+            for opt in el.find_elements(By.TAG_NAME, "option"):
+                v = opt.get_attribute("value")
+                if v:
+                    values.append(v)
+        except Exception:
+            continue
+    return values
+
+
+def detect_academic_year(driver, base_url: str):
+    """Ask the portal which year it is serving.
+
+    Returns (year, source). Never raises - an undetectable year is reported
+    as None so the caller can hold the last known value.
+    """
+    try:
+        driver.get(f"{base_url}/pages/ogrenci/")
+        weeks = [year_from_week_option(v)
+                 for v in _option_values(driver, WEEK_SELECT_ID)]
+        weeks = [w for w in weeks if w]
+        if weeks:
+            return min(weeks), "week_selector"
+
+        driver.get(f"{base_url}/pages/ogrenci_istekler/p_gelisim_raporum")
+        donems = [year_from_donem_code(v)
+                  for v in _option_values(driver, DONEM_SELECT_ID)]
+        donems = [d for d in donems if d]
+        if donems:
+            return max(donems), "donem_selector"
+    except Exception:
+        pass
+    return None, "none"
