@@ -168,6 +168,14 @@ export interface HealthData {
     last_successful_full_scrape: string
     stale_sections: string[]
   }
+  /** Academic year the sync resolved, e.g. "2026-2027". */
+  academic_year?: string | null
+  /** How that year was resolved: current | rollover | held | initialized | ignored_regression | unknown */
+  year_detection?: string
+  /** True when this run sealed the previous year's archive. */
+  year_archived?: boolean
+  /** Sections the portal itself refused, keyed by section name. */
+  unavailable?: Record<string, { reason: string; detail: string }>
 }
 
 export interface AssistantCitation {

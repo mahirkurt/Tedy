@@ -29,6 +29,10 @@ function StatusIcon({ status }: { status: SectionHealth['status'] }) {
   if (status === 'ok') return <CheckmarkFilled size={14} style={{ color: 'var(--status-success)' }} />
   if (status === 'warning') return <WarningFilled size={14} style={{ color: 'var(--status-warning)' }} />
   if (status === 'error') return <ErrorFilled size={14} style={{ color: 'var(--status-error)' }} />
+  // 'unavailable' means the portal itself refused the page — not our failure,
+  // but distinct from a skip, so it gets its own colour rather than falling
+  // through to the grey skip icon.
+  if (status === 'unavailable') return <WarningFilled size={14} style={{ color: '#8A3FFC' }} />
   return <SkipForwardFilled size={14} style={{ color: '#A8A8A8' }} />
 }
 
@@ -287,7 +291,11 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
                   )}
                   {health.sections && Object.entries(health.sections).map(([key, sec]) => (
                     <div key={key} className="health-popover__row">
-                      <span>{SECTION_LABELS[key] || key}</span>
+                      <span
+                        title={health.unavailable?.[key]?.detail || undefined}
+                      >
+                        {SECTION_LABELS[key] || key}
+                      </span>
                       <span className="health-popover__value">
                         {sec.count} öğe
                         <StatusIcon status={sec.status} />
