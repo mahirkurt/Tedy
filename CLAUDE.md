@@ -92,7 +92,9 @@ All scrapers follow a consistent two-phase approach:
 | `src/scrape_sebitv.py` | SEBİTV video and PDF content |
 | `src/scrape_sebitv_interactive.py` | SEBİTV interactive resources (ZIP archives + question banks) |
 | `src/enrich_gemini.py` | AI enrichment targeting Classroom: ödev courseWork notes, sınav study guides, ders announcement summaries, performans analysis (Gemini + Ollama fallback) |
-| `src/env_loader.py` | Shared .env file loader utility |
+| `src/env_loader.py` | Shared .env file loader utility (fills gaps only — the real environment wins) |
+| `src/academic_year.py` | Detects the academic year from the portal; hold-last-known + forward-only guards |
+| `src/archive_year.py` | Seals a finished year locally and moves its Drive folders under `TEDY/<year>/` |
 | `src/json_utils.py` | Atomic JSON write utility (write to .tmp then rename) |
 | `src/sync_to_classroom.py` | Syncs TED data to Google Classroom (courses, assignments, materials, grades, announcements, EBA/MEBI/SEBİTV content) |
 | `src/auth_finish.py` | Manual OAuth completion for multi-account setup |
@@ -129,7 +131,8 @@ SEBİTV     → scrape_sebitv.py / scrape_sebitv_interactive.py → output/sebit
 - **Cookie transfer**: Selenium authenticates, then cookies are transferred to `requests.Session` for efficient downloading
 - **Idempotent uploads**: JSON tracker files (`*_uploaded.json`) prevent re-uploading already-processed content
 - **Atomic JSON writes**: All critical JSON output uses `atomic_json_dump()` from `src/json_utils.py` — writes to `.tmp` then renames to prevent corruption
-- **Environment variables**: `.env` at project root (gitignored) holds `GEMINI_API_KEY`, `PORTAL_USERNAME`, `PORTAL_PASSWORD`. Loaded via `src/env_loader.py` (no python-dotenv dependency)
+- **Environment variables**: `.env` at project root (gitignored, mode 600) holds `GEMINI_API_KEY`, `PORTAL_USERNAME`, `PORTAL_PASSWORD`, `DASHBOARD_SECRET_KEY`. Loaded via `src/env_loader.py` (no python-dotenv dependency), which uses `setdefault` — a real environment variable always beats the `.env` value, so `FOO=x python …` and systemd `Environment=` work as expected
+- **Required secrets**: `DASHBOARD_SECRET_KEY` is mandatory. The API raises at import when it is missing rather than generating a per-process random key, because with 2 gunicorn workers that silently signs sessions with two different keys and logs users out at random. OAuth token files (`token*.json`, `credentials.json`) are mode 600
 - **Error isolation**: Each scraper in `run_sync.py` is wrapped in try-except. Partial data is saved and synced even if one scraper fails
 - **Health check**: `output/health.json` is written after each sync with success status, errors, and duration
 
@@ -142,6 +145,16 @@ SEBİTV     → scrape_sebitv.py / scrape_sebitv_interactive.py → output/sebit
 - **ÖGEP dedup in Calendar**: `sync_takvim()` builds a set of ÖGEP session titles and skips any takvim events that match, to avoid duplication with `sync_ogep()`. Both functions sync to Calendar — takvim handles general calendar events, ogep handles ÖGEP-specific sessions.
 - **Calendar retention**: Events older than 2 weeks are cleaned up except sınav (exam) records, which are kept permanently as grade references.
 - **API retry**: `_api_call_with_retry()` retries transient Google API errors (429/500/503) up to 5x with exponential backoff (base_delay=3s). Used by both `sync_to_google.py` and `sync_to_classroom.py`.
+- **Drive is namespaced by academic year**: every content root resolves under `TEDY/<year>/` via `get_year_root()`, so 2025-2026 and 2026-2027 files never share a folder. All six root-level `_get_or_create_folder` calls (Ödevler, Ders Kitapları, MEBI Videolar, SEBİTV Videolar, SEBİTV Etkileşimli, SEBİTV Soru Bankaları) pass it as `parent_id`; subject/unit folders already carry their own parent. Root lookups are scoped with `'root' in parents` — without that, a later rollover would find the previous year's folder by name and drag it into the new year.
+- **Unknown year refuses to upload**: `get_year_root()` raises `UnknownAcademicYear` rather than guessing. Skipping an upload is harmless (uploads are idempotent and retried every 15 min); filing content under the wrong year is permanent and silent.
+
+#### Academic year rollover
+
+- **Detection is automatic**, with no human step: `detect_academic_year()` reads the portal's home week selector (`#dp_icerik_secili_hafta`) and takes `max()` of the years its option dates fall in; the gelişim dönem selector (`YYYY0Q` codes) is a fallback because it lags during the school's preparation phase. `max()` rather than the earliest date, because a single stale previous-year option would otherwise peg detection to last year forever and no rollover would ever fire.
+- **Two safety properties** make automatic detection safe, both in `resolve_year()`: *hold-last-known* (an undetected year never overwrites the stored one — a blocked page cannot reset the year) and *forward-only* (a detected year earlier than the stored one is ignored — a year cannot un-happen). State lives in `output/academic_year.json`.
+- **Ordering is the whole point**: `run_year_rollover()` runs immediately after login and archives **before any scraper executes**. Archiving afterwards would snapshot new-year data under the old year's name and lose the old year permanently.
+- **The archive is sealed**: once `output/archive/<year>/manifest.json` exists the year is immutable, and the manifest is written last so an interrupted archive is retried rather than half-trusted. Upload trackers are reset on a genuine seal so the new year re-uploads into its own Drive folder.
+- **Deferred Drive moves are repaired**: if Drive is unreachable during the flip, the local archive still seals with `drive_folder: null`, and later `current` runs scan `output/archive/*/manifest.json` and complete the move. Health reports `academic_year`, `year_detection` and `year_archived`.
 
 #### Classroom
 
