@@ -2101,13 +2101,23 @@ this component."
 
 **Files:**
 - Create: `dashboard/src/components/CitationChip.tsx`
+- Modify: `dashboard/src/utils/markdown.tsx` (`renderInline`, `RenderOptions`, `renderMarkdown`)
 - Modify: `dashboard/src/components/AssistantChat.tsx`
 - Modify: `dashboard/src/types.ts`
 - Modify: `dashboard/src/components/AssistantChat.scss`
+- Test: `dashboard/tests/assistant-chat.spec.ts`, `dashboard/tests/books-reader.spec.ts` (regresyon)
 
 **Interfaces:**
 - Consumes: `renderMarkdown(markdown, options)` — `dashboard/src/utils/markdown.tsx:190`; Task 5 atıf şeması
-- Produces: `CitationChip({ id, citation, onActivate })`, `AssistantCitation` genişletilmiş tipi
+- Produces: `CitationChip({ citation, onActivate })`, `AssistantCitation` genişletilmiş tipi, `RenderOptions.renderToken?: (token: string, key: string) => ReactNode`
+
+**Ön-uçuş kararı (BULGU B).** Metni `[S1]` sınırlarında bölüp her parçayı ayrı
+`renderMarkdown`'dan geçirmek blok düzeyi markdown'ı kırar: `- madde [S1]` bölününce
+çip `<li>`'nin dışına düşer. Bunun yerine metin **bir kez** render edilir ve
+`renderMarkdown` satır-içi bir jeton kancası kabul eder. Kanca `[S\d+]` desenini
+düz metin akışlarında yakalar, dolayısıyla çip hangi blok içindeyse orada durur.
+Tedy Books `[S1]` üretmediği ve `renderToken` opsiyonel olduğu için okuyucu etkilenmez —
+ama bu paylaşılan bir util olduğundan Adım 6'da bir okuyucu regresyon testi koşulur.
 
 - [ ] **Step 1: Update the types**
 
@@ -2190,31 +2200,135 @@ export default function CitationChip({ citation, onActivate }: Props) {
 }
 ```
 
-- [ ] **Step 3: Render markdown and splice in the chips**
+- [ ] **Step 3a: Give the markdown renderer an inline token hook**
 
-`AssistantChat.tsx`: `stripInlineCitations()` fonksiyonunu **tamamen sil** ve çağrısını kaldır. Yerine:
+`dashboard/src/utils/markdown.tsx`. `renderInline` bugün düz metin akışlarını doğrudan
+`nodes.push(...)` ile ekliyor; kanca oraya girer.
+
+```tsx
+export type TokenRenderer = (token: string, key: string) => ReactNode
+
+const CITATION_RE = /\[S\d+\]/g
+
+/**
+ * Push a plain-text run, handing any [S1] markers to the caller's renderer.
+ *
+ * Doing this inside renderInline rather than by splitting the source keeps a
+ * citation in whatever block it was written in — a marker at the end of a list
+ * item stays inside the <li> instead of landing after the list.
+ */
+function pushText(
+  nodes: ReactNode[],
+  text: string,
+  key: string,
+  renderToken?: TokenRenderer,
+): void {
+  if (!renderToken) {
+    nodes.push(text)
+    return
+  }
+  let last = 0
+  let m: RegExpExecArray | null
+  CITATION_RE.lastIndex = 0
+  while ((m = CITATION_RE.exec(text)) !== null) {
+    if (m.index > last) nodes.push(text.slice(last, m.index))
+    nodes.push(renderToken(m[0], `${key}-c${m.index}`))
+    last = m.index + m[0].length
+  }
+  if (last < text.length) nodes.push(text.slice(last))
+}
+```
+
+`renderInline` imzasına üçüncü parametreyi ekle ve iki `nodes.push(text.slice(...))`
+çağrısını `pushText`'e çevir:
+
+```tsx
+function renderInline(
+  text: string,
+  keyPrefix: string,
+  renderToken?: TokenRenderer,
+): ReactNode[] {
+  const nodes: ReactNode[] = []
+  let last = 0
+  let match: RegExpExecArray | null
+  INLINE_RE.lastIndex = 0
+
+  while ((match = INLINE_RE.exec(text)) !== null) {
+    if (match.index > last) {
+      pushText(nodes, text.slice(last, match.index), `${keyPrefix}-${last}`, renderToken)
+    }
+    const token = match[0]
+    const key = `${keyPrefix}-${match.index}`
+    if (token.startsWith('**') || token.startsWith('__')) {
+      nodes.push(<strong key={key}>{token.slice(2, -2)}</strong>)
+    } else if (token.startsWith('`')) {
+      nodes.push(<code key={key}>{token.slice(1, -1)}</code>)
+    } else {
+      nodes.push(<em key={key}>{token.slice(1, -1)}</em>)
+    }
+    last = match.index + token.length
+  }
+
+  if (last < text.length) {
+    pushText(nodes, text.slice(last), `${keyPrefix}-${last}`, renderToken)
+  }
+  return nodes
+}
+```
+
+`RenderOptions`'a ekle:
+
+```tsx
+interface RenderOptions {
+  /** Enlarge the opening letter of the first paragraph, as a printed book does. */
+  dropCap?: boolean
+  /** Replace inline [S1]-style markers — used by the assistant for citations. */
+  renderToken?: TokenRenderer
+}
+```
+
+`renderMarkdown` gövdesindeki **her** `renderInline(...)` çağrısına üçüncü argüman
+olarak `options.renderToken` geçir. Çağrı yerlerini bul ve hiçbirini atlama:
+
+```bash
+grep -n "renderInline(" dashboard/src/utils/markdown.tsx
+```
+
+- [ ] **Step 3b: Render the answer once, with chips inline**
+
+`AssistantChat.tsx`: `stripInlineCitations()` fonksiyonunu **tamamen sil** ve çağrısını kaldır.
 
 ```tsx
 import { renderMarkdown } from '../utils/markdown'
 import CitationChip from './CitationChip'
 
-/** Split rendered text on [S1] markers and replace each with its chip. */
-function withCitations(
-  text: string,
-  citations: AssistantCitation[],
-  onActivate: (id: string) => void,
-): ReactNode {
-  const byId = new Map(citations.map(c => [c.id, c]))
-  const parts = text.split(/(\[S\d+\])/g)
+function AnswerBody({
+  text,
+  citations,
+  onActivate,
+}: {
+  text: string
+  citations: AssistantCitation[]
+  onActivate: (id: string) => void
+}) {
+  const byId = useMemo(
+    () => new Map(citations.map(c => [c.id, c])),
+    [citations],
+  )
 
-  return parts.map((part, i) => {
-    const match = /^\[(S\d+)\]$/.exec(part)
-    const citation = match ? byId.get(match[1]) : undefined
-    if (citation) {
-      return <CitationChip key={`c-${i}`} citation={citation} onActivate={onActivate} />
-    }
-    return <span key={`t-${i}`}>{renderMarkdown(part)}</span>
-  })
+  return (
+    <>
+      {renderMarkdown(text, {
+        renderToken: (token, key) => {
+          const citation = byId.get(token.slice(1, -1))
+          // A marker the backend could not resolve should not have survived,
+          // but if one does, show its text rather than swallowing it.
+          if (!citation) return <span key={key}>{token}</span>
+          return <CitationChip key={key} citation={citation} onActivate={onActivate} />
+        },
+      })}
+    </>
+  )
 }
 ```
 
@@ -2223,7 +2337,7 @@ Mesaj gövdesindeki `<p className="ac-msg__content">{msg.content}</p>` satırın
 ```tsx
 <div className="ac-msg__content">
   {msg.role === 'assistant'
-    ? withCitations(msg.content, msg.citations ?? [], setActiveCitation)
+    ? <AnswerBody text={msg.content} citations={msg.citations ?? []} onActivate={setActiveCitation} />
     : msg.content}
 </div>
 ```
@@ -2305,15 +2419,23 @@ test('assistant answers render markdown rather than raw syntax', async ({ page }
 })
 ```
 
-- [ ] **Step 6: Run the tests**
+- [ ] **Step 6: Run the tests, including the reader regression**
 
-Run: `cd dashboard && npm run build && npx playwright test assistant-chat`
-Expected: PASS
+`markdown.tsx` Tedy Books okuyucusuyla paylaşılıyor. `renderToken` opsiyonel olduğu için
+davranış değişmemeli — bunu iddia etme, koş:
+
+```bash
+cd dashboard && npm run build && npm run lint
+npx playwright test assistant-chat
+npx playwright test books        # okuyucu regresyonu; mevcut spec'ler geçmeli
+```
+Expected: hepsi PASS. `books` spec'i yoksa bunun yerine okuyucuyu elle aç ve bir bölümün
+başlık/paragraf/verse render'ının bozulmadığını doğrula.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add dashboard/src/components/CitationChip.tsx dashboard/src/components/AssistantChat.tsx dashboard/src/components/AssistantChat.scss dashboard/src/types.ts dashboard/tests/assistant-chat.spec.ts
+git add dashboard/src/utils/markdown.tsx dashboard/src/components/CitationChip.tsx dashboard/src/components/AssistantChat.tsx dashboard/src/components/AssistantChat.scss dashboard/src/types.ts dashboard/tests/assistant-chat.spec.ts
 git commit -m "feat: render assistant answers as markdown with live citations
 
 Answers were printed into a <p>, so the bullets and headings the prompt asked
@@ -2412,7 +2534,41 @@ export default function SourcePanel({ citations, activeId }: Props) {
 
 - [ ] **Step 2: Add message actions and the degradation badge**
 
-`AssistantChat.tsx` mesaj gövdesinin altına:
+**Ön-uçuş kararı (BULGU C).** `regenerate()` ve `lastUserContent()` ne planda ne de
+`AssistantChat.tsx`'te tanımlıydı. Önce ikisini yaz — mesaj listesinde verilen asistan
+mesajından geriye doğru en yakın kullanıcı mesajını bulan tek bir yardımcı yeter:
+
+```tsx
+/** The user turn that produced a given assistant message, if any. */
+function promptBehind(msgs: ChatMessage[], assistantId: string): string | null {
+  const idx = msgs.findIndex(m => m.id === assistantId)
+  if (idx < 0) return null
+  for (let i = idx - 1; i >= 0; i -= 1) {
+    if (msgs[i].role === 'user') return msgs[i].content
+  }
+  return null
+}
+```
+
+Bileşen içinde:
+
+```tsx
+  function regenerate(assistantId: string) {
+    const prompt = promptBehind(messages, assistantId)
+    if (!prompt) return
+    // Drop the answer being replaced so the new one does not read as a second
+    // reply to the same question.
+    setMessages(prev => prev.filter(m => m.id !== assistantId))
+    void submit('chat', prompt)
+  }
+
+  function deepen(assistantId: string) {
+    const prompt = promptBehind(messages, assistantId)
+    if (prompt) void submit('chat', prompt, { deep: true })
+  }
+```
+
+Sonra mesaj gövdesinin altına:
 
 ```tsx
 {msg.role === 'assistant' && msg.id !== 'welcome' && (
@@ -2426,7 +2582,7 @@ export default function SourcePanel({ citations, activeId }: Props) {
       <Renew />
     </IconButton>
     <Button kind="ghost" size="sm" renderIcon={Search}
-      onClick={() => void submit('chat', lastUserContent(msg.id), { deep: true })}>
+      onClick={() => deepen(msg.id)}>
       Daha derine in
     </Button>
   </div>
@@ -2765,6 +2921,12 @@ async function readEventStream(
 }
 ```
 
+**Ön-uçuş kararı (BULGU D).** Mevcut `submit()` `credentials: 'include'` gönderiyor —
+oturum çerezi oradan geçiyor. Akış `fetch`'i onsuz yazılırsa `/api/assistant/stream`
+401 döner, her istek sessizce yedek yola düşer ve özellik ölü doğduğu halde çalışıyor
+görünür. Ayrıca `sessionId` diye bir değişken yok; kod bugün literal
+`'dashboard-default'` gönderiyor. Aşağıdaki gövde ikisini de doğru yapar.
+
 `submit()` içinde, mevcut `fetch('/api/assistant/chat', …)` çağrısını şununla sar:
 
 ```tsx
@@ -2772,10 +2934,12 @@ async function readEventStream(
     try {
       const res = await fetch('/api/assistant/stream', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          session_id: 'dashboard-default',
+          context_filters: {},
           messages: toApiMessages([...messages, userMsg]),
-          session_id: sessionId,
           force_deep: opts?.deep ?? false,
         }),
       })
@@ -2800,10 +2964,12 @@ async function readEventStream(
       const endpoint = mode === 'plan' ? '/api/assistant/plan' : '/api/assistant/chat'
       const res = await fetch(endpoint, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          session_id: 'dashboard-default',
+          context_filters: {},
           messages: toApiMessages([...messages, userMsg]),
-          session_id: sessionId,
           force_deep: opts?.deep ?? false,
         }),
       })
@@ -2837,10 +3003,25 @@ const TOOL_LABEL: Record<string, string> = {
 
 Akış başarısız olursa mevcut `/api/assistant/chat` ucuna düş — o uç kaldırılmıyor.
 
-- [ ] **Step 7: Verify end to end**
+- [ ] **Step 7: Verify the stream is actually the path taken**
 
-Run: `cd dashboard && npm run build && npx playwright test assistant-chat`
-Expected: PASS (mevcut testler `/api/assistant/chat` yedek yolunu kullanmayı sürdürür)
+Yedek yol her hatayı yuttuğu için "çalışıyor görünmek" ile "çalışmak" burada ayrılmıyor.
+Akışın gerçekten kullanıldığını kanıtla:
+
+```bash
+cd dashboard && npm run build && npx playwright test assistant-chat
+```
+Expected: PASS (bu spec'ler `/api/assistant/chat` yedeğini kullanmayı sürdürür).
+
+Sonra tarayıcıda, oturum açıkken bir soru sor ve sunucu günlüğünde akış ucunun
+vurulduğunu doğrula:
+
+```bash
+journalctl --user -u ted-dashboard -n 50 --no-pager | grep "assistant/stream"
+```
+Expected: en az bir `POST /api/assistant/stream` **200** satırı. `401` görürsen
+`credentials: 'include'` eksiktir; hiç satır yoksa istemci akış yolunu hiç denemiyordur.
+İkisi de bu task'ın başarısızlığıdır — yedek yolun cevap üretiyor olması yeterli değildir.
 
 - [ ] **Step 8: Commit**
 
