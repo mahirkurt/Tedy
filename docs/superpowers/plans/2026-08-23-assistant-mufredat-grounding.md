@@ -18,6 +18,13 @@
 - **Sessiz arıza yok.** Her degradasyon `meta.degraded` dizisine yazılır ve kullanıcıya rozetle gösterilir.
 - **Araç açıklamaları birebir korunur.** MCP `inputSchema`'daki `description` alanları Gemini'ye değiştirilmeden geçirilir — kanonik biçimi (`grade: "5.Sınıf"`) modele öğreten şey odur.
 - **Dal:** `feat/assistant-mufredat-grounding`. Her task kendi commit'ini atar.
+- **Dal bağımlılığı — Task 8 öncesi ZORUNLU.** Carbon `--cds-*` köprüsü düzeltmesi
+  (`bf86329 fix: make the Carbon token bridge actually bridge`) **bu dalda değil**,
+  `feat/carbon-token-fidelity` dalında. `:root`'a `@include theme.theme(themes.$g10)`
+  gömen o commit olmadan `--cds-ai-*` token'ları `:root` altında çözülmez ve
+  Task 8–10'un tamamı sessizce fallback renklere düşer. Task 8'e başlamadan önce:
+  `git merge feat/carbon-token-fidelity`. Task 1–7 (backend) bu bağımlılıktan
+  etkilenmez, önce koşabilir.
 - **Test komutu:** `python -m pytest tests/<dosya> -v` (repo kökünden). **Otomatik testlerin hiçbiri ağa çıkmaz** — MCP ve Gemini sahte nesnelerle taklit edilir. Canlı doğrulama yalnız elle çalıştırılan "duman testi" adımlarındadır (Task 2 Adım 5, Task 6 Adım 5); bunlar CI'da koşmaz.
 - **Çalışma ağacı uyarısı:** `ted-theme.scss`, `CalendarEvents.tsx`, `DashboardHeader.tsx`, `GradeTable.tsx`, `TodaySchedule.tsx` üzerinde kullanıcının commit edilmemiş değişiklikleri var. **`git add .` veya `git commit -a` KULLANMA** — her commit'te yalnız o task'ın dosyalarını açıkça stage et.
 
@@ -1959,14 +1966,23 @@ that suits the reader this assistant was built for."
 - Consumes: `@carbon/themes` AI token'ları, `@carbon/styles` `ai-gradient` mixin'leri
 - Produces: `.ac`, `.ac-msg`, `.ac__*` sınıfları (aynı adlar korunur), yeni `.ac-msg--assistant` AI yüzeyi
 
-**Ön koşul:** `ted-theme.scss`'teki `:root { @include theme.theme(themes.$g10); }` düzeltmesi commit edilmiş olmalı — o olmadan `--cds-ai-*` `:root` altında çözülmez.
+**Ön koşul:** `feat/carbon-token-fidelity` dalı bu dala merge edilmiş olmalı. Aradığımız düzeltme orada: `:root { @include theme.theme(themes.$g10); }`. O olmadan `--cds-ai-*` `:root` altında çözülmez ve bu task'ın tüm görsel etkisi sessizce kaybolur — build geçer, renkler yanlış olur.
 
 - [ ] **Step 1: Ön koşulu doğrula**
 
 ```bash
 grep -n "theme.theme(themes" dashboard/src/theme/ted-theme.scss
 ```
-Expected: `:root` bloğu içinde bir eşleşme. Yoksa DUR ve kullanıcıya bildir; bu task'ın tamamı ona bağımlı.
+Expected: `:root` bloğu içinde bir eşleşme.
+
+Eşleşme yoksa önce merge et, sonra tekrar doğrula:
+
+```bash
+git merge feat/carbon-token-fidelity
+grep -n "theme.theme(themes" dashboard/src/theme/ted-theme.scss
+```
+
+Hâlâ yoksa DUR ve kullanıcıya bildir — bu task'ın tamamı ona bağımlıdır.
 
 - [ ] **Step 2: Mevcut `.ac` bloğunu yeni dosyaya taşı**
 
