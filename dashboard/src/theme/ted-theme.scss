@@ -233,8 +233,15 @@ body {
   animation: card-fade-in 0.3s ease-out both;
 }
 
-.dashboard-card:hover {
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.06);
+// Carbon 1.113 moved its own ui-shell and pagination hover styles behind
+// `any-hover` (#22694, #22672). Our overrides sat outside that guard, so on a
+// phone they re-introduced exactly what the upstream fix removed: tap a card,
+// and it keeps the hover background until you tap something else. `any-hover`
+// still matches a touchscreen laptop, so pointer users lose nothing.
+@media (any-hover: hover) {
+  .dashboard-card:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.06);
+  }
 }
 
 .dashboard-card__title {
@@ -268,8 +275,10 @@ body {
   transition: background-color var(--ted-transition-fast);
 }
 
-.dashboard-list-tile.cds--tile:hover {
-  background-color: #f4f4f8;
+@media (any-hover: hover) {
+  .dashboard-list-tile.cds--tile:hover {
+    background-color: var(--ted-color-page-bg);
+  }
 }
 
 .dashboard-list-tile--between.cds--tile {
@@ -802,7 +811,7 @@ body {
 }
 
 .today-tl__item:not(.today-tl__item--past) .today-tl__card:hover {
-  background-color: #f4f4f8;
+  background-color: var(--ted-color-page-bg);
 }
 
 .today-tl__card-top {
@@ -884,8 +893,10 @@ body {
   transition: background-color var(--ted-transition-fast);
 }
 
-.dashboard-event-tile.cds--tile:hover {
-  background-color: #f4f4f8;
+@media (any-hover: hover) {
+  .dashboard-event-tile.cds--tile:hover {
+    background-color: var(--ted-color-page-bg);
+  }
 }
 
 .dashboard-event-date {
@@ -922,8 +933,10 @@ body {
   cursor: pointer;
 }
 
-.homework-item--clickable.cds--tile:hover {
-  background-color: #f4f4f8;
+@media (any-hover: hover) {
+  .homework-item--clickable.cds--tile:hover {
+    background-color: var(--ted-color-page-bg);
+  }
 }
 
 .homework-item__row {
@@ -1067,7 +1080,7 @@ body {
   padding: var(--ted-space-2xs) 0;
   border-radius: var(--ted-radius-sm);
 
-  &:hover { background-color: #f4f4f8; }
+  &:hover { background-color: var(--ted-color-page-bg); }
   &:hover { .hw-section__label { color: var(--ted-color-text-primary); } }
 }
 
@@ -1286,7 +1299,9 @@ body {
 }
 
 .cds--header__action svg { fill: #fff !important; }
-.cds--header__action:hover { background-color: rgb(255 255 255 / 18%); }
+@media (any-hover: hover) {
+  .cds--header__action:hover { background-color: rgb(255 255 255 / 18%); }
+}
 .cds--header__action:focus-visible {
   outline: 2px solid #fff;
   outline-offset: -2px;
@@ -1512,8 +1527,10 @@ body {
   background-color: #edf5ff;
 }
 
-.cds--side-nav__link:hover {
-  background-color: #f4f4f8;
+@media (any-hover: hover) {
+  .cds--side-nav__link:hover {
+    background-color: var(--ted-color-page-bg);
+  }
 }
 
 // Tags — slightly softer radius
@@ -1682,7 +1699,7 @@ body {
   transition: opacity var(--ted-transition-fast), background-color var(--ted-transition-fast);
 
   &:hover {
-    background-color: #f4f4f8;
+    background-color: var(--ted-color-page-bg);
   }
 }
 
@@ -1752,9 +1769,11 @@ body {
   white-space: nowrap;
 }
 
-.calendar-event:hover {
-  opacity: 0.85;
-  filter: brightness(1.1);
+@media (any-hover: hover) {
+  .calendar-event:hover {
+    opacity: 0.85;
+    filter: brightness(1.1);
+  }
 }
 
 .calendar-event--homework {
