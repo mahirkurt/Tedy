@@ -33,3 +33,23 @@ class TestLoadEnv:
 
     def test_missing_file_no_error(self):
         load_env("/nonexistent/.env")  # should not raise
+
+    def test_real_environment_wins_over_dotenv(self, tmp_path, monkeypatch):
+        """A key already in os.environ must not be overwritten by .env (H1).
+
+        `FOO=x python ...` and systemd `Environment=` must be able to
+        override .env; a plain assignment in load_env silently defeats that.
+        """
+        monkeypatch.setenv("SHARED_KEY", "from-real-environment")
+        env_file = tmp_path / ".env"
+        env_file.write_text("SHARED_KEY=from-dotenv\n")
+        load_env(str(env_file))
+        assert os.environ["SHARED_KEY"] == "from-real-environment"
+
+    def test_dotenv_only_key_is_still_loaded(self, tmp_path, monkeypatch):
+        """A key with no real-environment counterpart still fills the gap."""
+        monkeypatch.delenv("DOTENV_ONLY_KEY", raising=False)
+        env_file = tmp_path / ".env"
+        env_file.write_text("DOTENV_ONLY_KEY=from-dotenv\n")
+        load_env(str(env_file))
+        assert os.environ["DOTENV_ONLY_KEY"] == "from-dotenv"

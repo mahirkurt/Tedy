@@ -127,8 +127,46 @@ def run_year_rollover(driver, output_dir, base_url, drive_factory):
     return result
 
 
+SYNC_LOG_MAX_BYTES = 20 * 1024 * 1024  # 20 MB (H6): ~3.3 KB/run * 96 runs/day
+
+
+def rotate_sync_log(log_path=None, max_bytes=SYNC_LOG_MAX_BYTES):
+    """Rotate output/sync.log to sync.log.1 once it exceeds max_bytes.
+
+    No logrotate config exists for this file (cron appends to it forever),
+    so left alone it grows unbounded (~108 MB/year at current run size).
+    This keeps exactly one previous generation: an existing sync.log.1 is
+    replaced, not appended to.
+
+    Subtlety: cron invokes this script as `>> output/sync.log`, so the
+    shell already holds an open, append-mode file descriptor for the
+    *whole* run before this function ever runs. Renaming the file here
+    does not redirect that descriptor — it points at the underlying inode,
+    not the path — so the rest of *this* run's output keeps landing in the
+    newly-renamed sync.log.1, and only the *next* cron invocation's fresh
+    `>>` open sees an empty sync.log. That is expected and harmless (the
+    rotation boundary just lands one run later than the byte count alone
+    suggests); do not try to defeat it, e.g. by reopening stdout here.
+
+    log_path defaults to the module-level OUTPUT_DIR at *call* time (not
+    baked into the signature), so tests and callers can point it elsewhere
+    without touching the real output/ directory.
+    """
+    if log_path is None:
+        log_path = os.path.join(OUTPUT_DIR, "sync.log")
+    if not os.path.exists(log_path):
+        return
+    if os.path.getsize(log_path) <= max_bytes:
+        return
+    rotated_path = log_path + ".1"
+    if os.path.exists(rotated_path):
+        os.remove(rotated_path)
+    os.rename(log_path, rotated_path)
+
+
 def main():
     os.chdir(PROJECT_ROOT)
+    rotate_sync_log()
 
     start_time = time.time()
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
