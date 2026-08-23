@@ -38,7 +38,7 @@ from src.academic_year import (  # noqa: E402
     resolve_year,
     save_year_state,
 )
-from src.archive_year import archive_year_drive  # noqa: E402
+from src.archive_year import archive_dir, archive_year_drive  # noqa: E402
 
 _YEAR_RE = re.compile(r"^\d{4}-\d{4}$")
 
@@ -73,6 +73,32 @@ def run_year_rollover(driver, output_dir, base_url, drive_factory):
         result["archived"] = True
         print(f"  [ARCHIVE] {stored} sealed "
               f"({result['manifest'].get('counts', {})})")
+
+    elif resolution.status == "current":
+        # The local half of a previous rollover may have sealed while the
+        # Drive half deferred (e.g. an expired token during the one sync
+        # that flipped the year). Once resolved to "current" the rollover
+        # branch above is never reached again for that year, so this is the
+        # only remaining place that can retry the deferred Drive move.
+        manifest_path = os.path.join(
+            archive_dir(output_dir, resolution.year), "manifest.json")
+        if os.path.exists(manifest_path):
+            import json
+            with open(manifest_path, encoding="utf-8") as f:
+                manifest = json.load(f)
+            if not manifest.get("drive_folder"):
+                try:
+                    drive_service = drive_factory()
+                except Exception as e:
+                    print(f"  [ARCHIVE] Drive unavailable: "
+                          f"{type(e).__name__}: {e}")
+                    drive_service = None
+                result["manifest"] = archive_year_drive(
+                    resolution.year, output_dir, drive_service)
+                result["archived"] = True
+                print(f"  [ARCHIVE] {resolution.year} Drive repair retried "
+                      f"(drive_folder="
+                      f"{result['manifest'].get('drive_folder')})")
 
     if resolution.year and resolution.status in (
             "initialized", "rollover", "current"):
@@ -126,8 +152,17 @@ def main():
             from src.sync_to_google import get_services
             return get_services()[1]
 
-        year_info = run_year_rollover(
-            driver, OUTPUT_DIR, BASE_URL, _drive_factory)
+        try:
+            year_info = run_year_rollover(
+                driver, OUTPUT_DIR, BASE_URL, _drive_factory)
+        except Exception as e:
+            # A failure here (e.g. an OSError from shutil.copy2 mid-archive)
+            # must not kill the whole run: year_info stays at its safe
+            # default (set above), so no state advances and no scraper
+            # data below gets trusted as belonging to a new year - but the
+            # run continues and still writes health.json.
+            scrape_errors.append(f"year_rollover: {e}")
+            print(f"[ERROR] Year rollover failed: {e}")
 
         # 2. Scrape all sources
         data = {"scraped_at": datetime.now().isoformat()}
