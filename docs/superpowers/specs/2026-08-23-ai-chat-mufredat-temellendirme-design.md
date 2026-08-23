@@ -85,9 +85,10 @@ Bunlar spec yazılmadan önce canlı ölçüldü.
 | Erişilebilir modeller | 3.7/3.6/3.5-flash, `gemini-pro-latest`, `flash-lite-latest`; **2.0-* yok** |
 | `--cds-*` köprüsü | `ted-theme.scss` çalışma ağacındaki düzeltmeyle `:root`'ta çözülüyor |
 
-**Ölçülmemiş varsayım:** `gemini-3.5-flash` ve `gemini-flash-lite-latest`
-üzerinde function calling test edilmedi. Implementasyon planının ilk adımı bu
-ikisini doğrulamak olmalı; desteklemeyen model yedek zincirinden çıkarılır.
+**Kapandı (2026-08-23 ölçümü):** `gemini-3.5-flash`, `gemini-flash-lite-latest`,
+`gemini-3.6-flash` ve `gemini-pro-latest` üzerinde function calling ayrıca test
+edildi — dördü de doğru araç çağrısı üretti. Yedek zincirinden model çıkarmaya
+gerek yok.
 
 **`--cds-*` köprüsü notu:** Carbon `--cds-*` özel özelliklerini yalnız ürettiği
 tema kapsamlarında yayar. `--ted-*` takma adları `:root`'ta tanımlıydı, yani
@@ -164,10 +165,19 @@ class McpToolResult:
 **Ne yapar:** MCP araç şemalarını Gemini fonksiyon tanımlarına çevirir ve yerel
 araçları aynı sözleşmeye sokar.
 
-**Neden otomatik çeviri, elle değil:** Ölçüldü — `search_learning_outcomes`
-parametresi `query` değil `q`, ve `grade` tamsayı değil **string**. Elle yazılan
-tanımlar bu sınıf hatayı üretir ve model turlarını boşa harcar. Tanımlar
-`tools/list` çıktısındaki `inputSchema`'dan üretilir.
+**Neden şemayı okumak, elle yazmak değil:** Ölçüldü — `search_learning_outcomes`
+parametresi `query` değil `q`, ve `grade` tamsayı değil **string**. Dahası
+kanonik biçim `"6"` değil `"5.Sınıf"`, ve bu yalnız parametrenin `description`
+alanında yazıyor. Elle yazılmış bir tanımla model `grade:"6"` üretti; şemanın
+kendisi (açıklamalar dahil) geçildiğinde `grade:"5.Sınıf"` üretti. **Açıklamaların
+birebir korunması, doğru çağrıyı üreten şeydir.**
+
+**Çevirici ince kalır (2026-08-23 ölçümü):** MCP şemaları Pydantic tarzı
+`anyOf: [{type:string},{type:null}]` kullanıyor ve kurulu `google-genai` bunu
+olduğu gibi **kabul ediyor** — ham `inputSchema` doğrudan `FunctionDeclaration`
+parametresi olarak geçirilebiliyor. Bu yüzden katman bir yeniden yazıcı değil,
+bir **sanitizer**'dır: `title` gürültüsünü atar, `description`'ı birebir korur,
+ve SDK ileride katılaşırsa `anyOf` daraltmasını tek yerde yapar.
 
 **Arayüz:**
 
