@@ -168,17 +168,26 @@ class AssistantConfig:
 class GeminiClient:
     """Gemini API chat client — fast cloud inference, no local memory cost."""
 
-    MODELS = [
+    # Measured 2026-08-23 against the live key: every model here answers and
+    # supports function calling. gemini-2.0-* were removed because the API now
+    # returns 404 "no longer available" for them — the old chain only looked
+    # redundant, so the first quota hit took the assistant down entirely.
+    FAST_MODELS = [
+        "gemini-3.7-flash",
+        "gemini-3.5-flash",
         "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
+        "gemini-flash-lite-latest",
     ]
+    DEEP_MODELS = ["gemini-pro-latest"]
+
+    MODELS = FAST_MODELS  # backwards compatibility for models() endpoint
 
     def __init__(self, api_key: str = ""):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "").strip()
         self._client: Any = None
         self.last_model_used = ""
-        self._exhausted: set[str] = set()
+        self._exhausted: set[str] = set()   # quota — clears when all are spent
+        self._unavailable: set[str] = set()  # 404 — never retried this process
 
     @property
     def available(self) -> bool:
@@ -190,14 +199,13 @@ class GeminiClient:
             self._client = genai.Client(api_key=self.api_key)
         return self._client
 
-    def chat(self, messages: list[dict[str, str]], temperature: float = 0.2) -> str:
-        if not self.available:
-            raise RuntimeError("gemini_no_api_key")
+    def _build_prompt(self, messages: list[dict[str, str]]) -> str:
+        """Build a Gemini-compatible prompt from chat messages.
 
-        client = self._get_client()
-        from google.genai import errors as genai_errors
-
-        # Build Gemini-compatible prompt from messages
+        System-role messages are collected and joined with newlines, placed
+        first, followed by a blank line, then the remaining message contents
+        joined with two newlines.
+        """
         system_parts = []
         contents = []
         for m in messages:
@@ -212,21 +220,30 @@ class GeminiClient:
         if system_parts:
             prompt = "\n".join(system_parts) + "\n\n"
         prompt += "\n\n".join(contents)
+        return prompt
 
-        models_to_try = [m for m in self.MODELS if m not in self._exhausted]
-        if not models_to_try:
-            self._exhausted.clear()
-            models_to_try = list(self.MODELS)
+    def chat(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float = 0.2,
+        tier: str = "fast",
+        max_output_tokens: int = 2048,
+    ) -> str:
+        if not self.available:
+            raise RuntimeError("gemini_no_api_key")
+
+        client = self._get_client()
+        prompt = self._build_prompt(messages)
 
         last_error = ""
-        for model in models_to_try:
+        for model in self._chain(tier):
             try:
                 response = client.models.generate_content(
                     model=model,
                     contents=prompt,
                     config={
                         "temperature": temperature,
-                        "max_output_tokens": 1200,
+                        "max_output_tokens": max_output_tokens,
                     },
                 )
                 text = (response.text or "").strip()
@@ -234,21 +251,37 @@ class GeminiClient:
                     self.last_model_used = model
                     return text
                 last_error = "empty_gemini_response"
-            except genai_errors.ClientError as e:
-                err_str = str(e)
-                if "RESOURCE_EXHAUSTED" in err_str:
-                    self._exhausted.add(model)
-                    logger.warning("Gemini model %s quota exhausted", model)
-                    last_error = f"quota_exhausted:{model}"
-                    continue
-                last_error = err_str
-                logger.error("Gemini ClientError (%s): %s", model, err_str)
             except Exception as e:
-                last_error = str(e)
-                logger.error("Gemini error (%s): %s", model, e)
-                continue
+                last_error = self._classify_failure(model, e)
 
         raise RuntimeError(last_error or "gemini_all_models_failed")
+
+    def _chain(self, tier: str) -> list[str]:
+        """Candidate models for a tier, skipping known-dead and spent ones."""
+        base = list(self.DEEP_MODELS) + list(self.FAST_MODELS) \
+            if tier == "deep" else list(self.FAST_MODELS)
+        base = [m for m in base if m not in self._unavailable]
+        live = [m for m in base if m not in self._exhausted]
+        if live:
+            return live
+        # Every candidate is quota-spent; the window may have rolled over.
+        self._exhausted.clear()
+        return base
+
+    def _classify_failure(self, model: str, exc: Exception) -> str:
+        err = str(exc)
+        if "404" in err or "no longer available" in err:
+            # Permanent: the model was retired. Retrying it every request
+            # burns a round-trip and hides the real error behind a dead one.
+            self._unavailable.add(model)
+            logger.error("Gemini model %s is retired (404); disabling", model)
+            return f"model_retired:{model}"
+        if "RESOURCE_EXHAUSTED" in err or "429" in err:
+            self._exhausted.add(model)
+            logger.warning("Gemini model %s quota exhausted", model)
+            return f"quota_exhausted:{model}"
+        logger.error("Gemini error (%s): %s", model, err)
+        return err
 
 
 HybridChatRouter = None  # Removed — Gemini-only
