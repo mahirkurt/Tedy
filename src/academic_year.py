@@ -126,7 +126,18 @@ def detect_academic_year(driver, base_url: str) -> tuple[str | None, str]:
                  for v in _option_values(driver, WEEK_SELECT_ID)]
         weeks = [w for w in weeks if w]
         if weeks:
-            return min(weeks), "week_selector"
+            # Spec says "earliest option date", which is equivalent to
+            # min() while the selector lists a single academic year (the
+            # normal case). max() is used instead because it degrades
+            # safely if a stale option from the previous year leaks into
+            # the list: min() would then report last year - which equals
+            # the stored year on every run, so resolve_year() classifies
+            # it as "current" forever and a real rollover can never fire,
+            # indistinguishably from normal operation. max() still picks
+            # the same answer in the normal single-year case, and
+            # forward-only (see resolve_year) already blocks a spurious
+            # jump backwards, so nothing is lost by preferring it.
+            return max(weeks), "week_selector"
 
         driver.get(f"{base_url}/pages/ogrenci_istekler/p_gelisim_raporum")
         donems = [year_from_donem_code(v)

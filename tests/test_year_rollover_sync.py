@@ -45,6 +45,9 @@ class FakeFiles:
         name = q.split("name='", 1)[1].split("'", 1)[0] if "name='" in q else None
         parent = q.split("and '", 1)[1].split("' in parents", 1)[0] \
             if "' in parents" in q else None
+        # "root" is just another parent token as far as this double is
+        # concerned - get_year_root and move_root_folders both now pass it
+        # explicitly to scope their lookups to Drive's top level.
         hits = [{"id": i, "parents": v.get("parents", [])}
                 for i, v in self.store.items()
                 if v["name"] == name
@@ -154,6 +157,39 @@ def test_regression_is_ignored_and_never_archives(tmp_path, monkeypatch):
     assert not os.path.exists(os.path.join(out, "archive"))
 
 
+def test_second_rollover_does_not_empty_the_first_years_archived_folder(
+        tmp_path, monkeypatch):
+    """Finding-1 regression, full flow: after the first rollover moves a
+    legacy Drive-root folder into TEDY/2025-2026/, a second rollover
+    (detecting a later year again) must not find that same-named folder
+    nested inside the first year's archive and re-parent it into the new
+    year - that would empty 2025-2026's archive and merge two years'
+    content into 2027-2028, the exact mixing year-namespacing exists to
+    prevent."""
+    out = str(tmp_path); _seed(out)
+    with open(os.path.join(out, "academic_year.json"), "w", encoding="utf-8") as f:
+        json.dump({"year": "2025-2026"}, f)
+
+    drive = FakeDrive()
+    # A legacy pre-namespacing folder, living at Drive root.
+    drive._files.store["legacy"] = {"name": "Ödevler", "parents": ["root"]}
+
+    _patch_detect(monkeypatch, "2026-2027")
+    first = run_year_rollover(StubDriver("x"), out, BASE, lambda: drive)
+    assert first["status"] == "rollover"
+    year1_folder = first["manifest"]["drive_folder"]
+    assert year1_folder is not None
+    assert drive._files.store["legacy"]["parents"] == [year1_folder]
+
+    _patch_detect(monkeypatch, "2027-2028")
+    second = run_year_rollover(StubDriver("x"), out, BASE, lambda: drive)
+    assert second["status"] == "rollover"
+
+    # Still exactly where the first rollover put it - the second rollover's
+    # move_root_folders call must not have found or touched it.
+    assert drive._files.store["legacy"]["parents"] == [year1_folder]
+
+
 def test_drive_unavailable_still_archives_locally(tmp_path, monkeypatch):
     out = str(tmp_path); _seed(out)
     with open(os.path.join(out, "academic_year.json"), "w", encoding="utf-8") as f:
@@ -193,6 +229,31 @@ def test_malformed_stored_year_skips_archive_and_state_write(tmp_path, monkeypat
     # new detected year, since we never completed the archive of the old one
     with open(os.path.join(out, "academic_year.json"), encoding="utf-8") as f:
         assert json.load(f)["year"] == "2025"
+
+
+def test_a_corrupt_pending_manifest_is_skipped_with_a_warning(
+        tmp_path, monkeypatch, capsys):
+    """Finding 6a: a corrupt/unreadable archive manifest used to be
+    `continue`d with no log at all - that year's deferred Drive move would
+    then never be repaired, and nothing would say why. It must now at
+    least warn."""
+    out = str(tmp_path); _seed(out)
+    with open(os.path.join(out, "academic_year.json"), "w", encoding="utf-8") as f:
+        json.dump({"year": "2026-2027"}, f)
+
+    corrupt_dir = os.path.join(out, "archive", "2024-2025")
+    os.makedirs(corrupt_dir, exist_ok=True)
+    manifest_path = os.path.join(corrupt_dir, "manifest.json")
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        f.write("{not json")
+
+    _patch_detect(monkeypatch, "2026-2027")   # same as stored -> "current"
+    r = run_year_rollover(StubDriver("x"), out, BASE, lambda: FakeDrive())
+
+    assert r["status"] == "current"   # must not crash on the corrupt file
+    printed = capsys.readouterr().out
+    assert manifest_path in printed
+    assert "unreadable" in printed.lower() or "corrupt" in printed.lower()
 
 
 def test_current_run_repairs_a_pending_drive_archive(tmp_path, monkeypatch):

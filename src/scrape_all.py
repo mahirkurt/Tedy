@@ -117,16 +117,44 @@ def detect_portal_block(current_url, body_text):
     return None
 
 
-def _require_portal_access(driver, label):
-    """Fail fast with a named reason instead of timing out on a missing element."""
+def _anchor_present(driver, anchor):
+    """True if any of the given CSS selectors matches an element on the page."""
+    selectors = [anchor] if isinstance(anchor, str) else list(anchor)
+    for sel in selectors:
+        try:
+            if driver.find_elements(By.CSS_SELECTOR, sel):
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def _require_portal_access(driver, label, anchor=None):
+    """Fail fast with a named reason instead of timing out on a missing element.
+
+    A "module closed" banner can be a sitewide maintenance notice rather
+    than a per-page block - it has been observed naming a module other
+    than the page it appeared on (health.json once marked ders_programi
+    unavailable on the strength of a banner reading "Akademi Modülü kısa
+    bir süre erişime kapalıdır", which names a different module). The
+    banner text alone is therefore not proof this page is blocked: pass
+    `anchor` (a CSS selector, or a list of them) naming an element this
+    page always renders when it is genuinely serving content. If the
+    anchor IS present, the banner is incidental and access is not
+    suppressed. The unauthorized-redirect reason is unambiguous on its
+    own and needs no anchor.
+    """
     try:
         body_text = driver.find_element(By.TAG_NAME, "body").text
     except Exception:
         body_text = ""
     block = detect_portal_block(driver.current_url, body_text)
-    if block:
-        reason, detail = block
-        raise PortalUnavailable(reason, f"{label}: {detail}")
+    if not block:
+        return
+    reason, detail = block
+    if reason == "modul_kapali" and anchor and _anchor_present(driver, anchor):
+        return
+    raise PortalUnavailable(reason, f"{label}: {detail}")
 
 
 def parse_gelisim_rubrics(html):
@@ -352,7 +380,7 @@ def scrape_ders_programi(driver):
     url = f"{BASE_URL}/pages/ogrenci_istekler/p_haftalik_ders_hazirlik_programim"
     driver.get(url)
     time.sleep(3)
-    _require_portal_access(driver, "Haftalık Ders Programı")
+    _require_portal_access(driver, "Haftalık Ders Programı", anchor="select")
 
     all_weeks = []
 
@@ -617,7 +645,7 @@ def scrape_takvim(driver):
     print("\n[4/8] Akademik Takvim")
     url = f"{BASE_URL}/pages/akademik_takvim/p_ogrenci"
     driver.get(url)
-    _require_portal_access(driver, "Akademik Takvim")
+    _require_portal_access(driver, "Akademik Takvim", anchor="#select-all")
     wait_for(driver, (By.ID, "select-all"), timeout=15)
 
     # 1. Enable all filter checkboxes
@@ -871,7 +899,8 @@ def scrape_gelisim_raporu(driver):
     url = f"{BASE_URL}/pages/ogrenci_istekler/p_gelisim_raporum"
     driver.get(url)
     time.sleep(3)
-    _require_portal_access(driver, "Gelişim Raporu")
+    _require_portal_access(
+        driver, "Gelişim Raporu", anchor="#genel_icerik_dp_ilgili_donem")
 
     result = {"semester": "", "grades": [], "physical": {}, "rubrics": []}
 

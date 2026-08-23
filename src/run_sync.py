@@ -96,7 +96,9 @@ def run_year_rollover(driver, output_dir, base_url, drive_factory):
             try:
                 with open(manifest_path, encoding="utf-8") as f:
                     manifest = json.load(f)
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"  [ARCHIVE] Skipped unreadable manifest "
+                      f"{manifest_path}: {type(e).__name__}: {e}")
                 continue
             if not manifest.get("drive_folder"):
                 pending_years.append(year)

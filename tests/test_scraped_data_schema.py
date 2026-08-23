@@ -23,20 +23,30 @@ REQUIRED_TOP_LEVEL_KEYS = [
 ]
 
 
-HEALTH_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "output", "health.json"
+KNOWN_UNAVAILABILITY_PATH = os.path.join(
+    os.path.dirname(__file__), "fixtures", "known_portal_unavailability.json"
 )
 
 
 def _portal_unavailable(section):
-    """Return the portal's own reason a section has no data, if it gave one."""
+    """Return a maintainer-accepted reason a section has no data, if any.
+
+    This deliberately does NOT read output/health.json. That file is
+    (re)written by the very sync run whose output this test is checking,
+    via the same _require_portal_access() call that decided to skip
+    scraping the section in the first place - so a stray "module closed"
+    banner elsewhere on a page could excuse itself in both places at once
+    (the health check goes quiet AND this test goes quiet, from one bad
+    judgment). The excuse instead comes from a small, git-committed
+    fixture that a human edits deliberately, so a live misdetection can no
+    longer silently satisfy this test too.
+    """
     try:
-        with open(HEALTH_PATH, encoding="utf-8") as f:
-            health = json.load(f)
+        with open(KNOWN_UNAVAILABILITY_PATH, encoding="utf-8") as f:
+            known = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return None
-    entry = health.get("unavailable", {}).get(section)
-    return entry.get("detail") if entry else None
+    return known.get(section)
 
 
 @pytest.fixture(scope="module")
@@ -74,12 +84,15 @@ class TestDersProgrami:
         assert isinstance(scraped_data["ders_programi"], list)
 
     def test_non_empty(self, scraped_data):
-        """Empty is a failure only when the portal did not explain it."""
+        """Empty is a failure unless a human has deliberately accepted why."""
         if len(scraped_data["ders_programi"]) > 0:
             return
         blocked = _portal_unavailable("ders_programi")
-        assert blocked, "ders_programi is empty and the portal gave no reason"
-        pytest.skip(f"portal reports ders_programi unavailable: {blocked}")
+        assert blocked, (
+            "ders_programi is empty and there is no accepted portal "
+            "limitation on record in tests/fixtures/known_portal_unavailability.json"
+        )
+        pytest.skip(f"accepted portal limitation: {blocked}")
 
     def test_each_entry_has_week_label(self, scraped_data):
         for i, entry in enumerate(scraped_data["ders_programi"]):
@@ -241,3 +254,32 @@ class TestNoEmptyStatePlaceholders:
 
         walk(scraped_data, "")
         assert hits == [], f"empty-state placeholder captured as data: {hits}"
+
+
+class TestPortalUnavailableIsDecoupledFromLiveHealth:
+    """_portal_unavailable() must not be satisfiable by a live health.json.
+
+    Otherwise the same _require_portal_access() call that suppressed the
+    health.json error would also excuse this schema test - one stray
+    "module closed" banner disabling both defences at once.
+    """
+
+    def test_ignores_the_live_health_json_entirely(self, tmp_path, monkeypatch):
+        # As of this writing, the real output/health.json on disk *does*
+        # carry an unavailable.ders_programi entry (see
+        # MEMORY.md: takvim-portal-yetki-blocked.md). Point the function at
+        # an empty committed fixture instead and prove the live health.json
+        # is never consulted: with nothing in the fixture, there is no
+        # excuse, regardless of what output/health.json says.
+        empty_fixture = tmp_path / "known_portal_unavailability.json"
+        empty_fixture.write_text("{}", encoding="utf-8")
+        import tests.test_scraped_data_schema as mod
+        monkeypatch.setattr(mod, "KNOWN_UNAVAILABILITY_PATH", str(empty_fixture))
+
+        assert _portal_unavailable("ders_programi") is None
+
+    def test_fixture_entries_are_the_only_source_of_an_excuse(self):
+        # The one section this repo currently has a human-reviewed excuse
+        # for - see tests/fixtures/known_portal_unavailability.json.
+        assert _portal_unavailable("ders_programi") is not None
+        assert _portal_unavailable("takim_calismalari") is None

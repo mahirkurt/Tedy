@@ -10,6 +10,7 @@ from src.scrape_all import (
     PortalUnavailable,
     detect_portal_block,
     parse_gelisim_rubrics,
+    _require_portal_access,
 )
 from src.data_validator import validate_scraped_data
 
@@ -45,6 +46,81 @@ class TestDetectPortalBlock:
         err = PortalUnavailable("yetkisiz", "Akademik Takvim: yetki yok")
         assert err.reason == "yetkisiz"
         assert "Akademik Takvim" in str(err)
+
+
+class FakeElement:
+    def __init__(self, text=""):
+        self.text = text
+
+
+class FakeDriver:
+    """Serves body text and (optionally) some CSS-selector anchors, the
+    way a real page does - enough to drive _require_portal_access()."""
+
+    def __init__(self, current_url, body_text, anchors=()):
+        self.current_url = current_url
+        self._body_text = body_text
+        self._anchors = set(anchors)
+
+    def find_element(self, by, value):
+        if value == "body":
+            return FakeElement(self._body_text)
+        raise Exception(f"no such element: {value}")
+
+    def find_elements(self, by, value):
+        return [FakeElement()] if value in self._anchors else []
+
+
+class TestRequirePortalAccessAnchorCorroboration:
+    """Finding 3: a 'module closed' banner can be a sitewide notice, not
+    proof this specific page is blocked. A live example: health.json has
+    marked ders_programi unavailable on the strength of a banner reading
+    "Akademi Modülü kısa bir süre erişime kapalıdır" - a name that isn't
+    even this module. Corroboration (the page's own anchor element must
+    ALSO be missing) is what tells the two cases apart."""
+
+    DERS_URL = f"{BASE}/pages/ogrenci_istekler/p_haftalik_ders_hazirlik_programim"
+    BANNER_BODY = ("Portal > Öğrenci İşlemleri\nAkademi Modülü kısa bir süre "
+                   "erişime kapalıdır.\nV 1.3.7")
+
+    def test_banner_with_missing_anchor_is_blocked(self):
+        driver = FakeDriver(self.DERS_URL, self.BANNER_BODY, anchors=())
+        with pytest.raises(PortalUnavailable) as exc:
+            _require_portal_access(driver, "Haftalık Ders Programı", anchor="select")
+        assert exc.value.reason == "modul_kapali"
+
+    def test_banner_with_present_anchor_is_not_blocked(self):
+        """The anchor renders despite the banner -> the banner is
+        incidental (sitewide), and this page is genuinely serving
+        content, so access must not be suppressed."""
+        driver = FakeDriver(self.DERS_URL, self.BANNER_BODY, anchors={"select"})
+        _require_portal_access(driver, "Haftalık Ders Programı", anchor="select")
+        # no exception raised - that IS the assertion
+
+    def test_no_anchor_argument_still_blocks_on_a_banner(self):
+        """A call site that passes no anchor keeps the old strict
+        behaviour - corroboration is opt-in per call site, not a change
+        to the default."""
+        driver = FakeDriver(self.DERS_URL, self.BANNER_BODY)
+        with pytest.raises(PortalUnavailable):
+            _require_portal_access(driver, "Haftalık Ders Programı")
+
+    def test_unauthorized_redirect_blocks_even_with_the_anchor_present(self):
+        """The yetkisiz redirect is unambiguous on its own and needs no
+        corroboration - a present anchor must not override it."""
+        driver = FakeDriver(f"{BASE}/hata/yetkisiz_giris",
+                            "Yetkiniz bulunmamaktadır!",
+                            anchors={"#select-all"})
+        with pytest.raises(PortalUnavailable) as exc:
+            _require_portal_access(driver, "Akademik Takvim", anchor="#select-all")
+        assert exc.value.reason == "yetkisiz"
+
+    def test_healthy_page_passes_regardless_of_anchor(self):
+        driver = FakeDriver(
+            f"{BASE}/pages/ogrenci_istekler/p_gelisim_raporum",
+            "Gelişim Raporları Hakkında ... Beden Eğitimi ve Spor")
+        _require_portal_access(driver, "Gelişim Raporu",
+                               anchor="#genel_icerik_dp_ilgili_donem")
 
 
 RUBRIC_HTML = """

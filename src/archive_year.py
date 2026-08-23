@@ -12,6 +12,18 @@ from src.json_utils import atomic_json_dump
 ARCHIVED_FILES = ("scraped_data.json", "health.json", "classroom_sync.json")
 ARCHIVED_GLOBS = ("*_uploaded.json",)
 
+# Idempotent-upload tracker files: {key: {...}} dicts every uploader
+# consults as `if key in uploaded: skip`. They are per-year state, not
+# permanent history - once a year's archive is sealed they must reset to
+# {}, or every key that repeats across years (e.g. the same EBA textbook,
+# the same MEBI video) is silently never (re-)uploaded into the new year's
+# Drive folder, leaving TEDY/<new year>/ quietly incomplete.
+# uploaded_files.json (the homework-attachments tracker) doesn't match the
+# *_uploaded.json glob - it's the plural "uploaded_files", not a
+# "<thing>_uploaded" name - so it is listed explicitly. purge_google_data.py
+# already treats it as one of the upload trackers.
+UPLOAD_TRACKER_FILES = ("uploaded_files.json",)
+
 
 def archive_dir(output_dir: str, year: str) -> str:
     return os.path.join(output_dir, "archive", year)
@@ -32,10 +44,12 @@ def archive_year_local(year: str, output_dir: str) -> dict:
 
     os.makedirs(target, exist_ok=True)
 
-    names = list(ARCHIVED_FILES)
+    tracker_names = list(UPLOAD_TRACKER_FILES)
     for pattern in ARCHIVED_GLOBS:
-        names += [os.path.basename(p)
-                  for p in glob.glob(os.path.join(output_dir, pattern))]
+        tracker_names += [os.path.basename(p)
+                          for p in glob.glob(os.path.join(output_dir, pattern))]
+
+    names = list(ARCHIVED_FILES) + tracker_names
 
     for name in names:
         src_path = os.path.join(output_dir, name)
@@ -61,6 +75,14 @@ def archive_year_local(year: str, output_dir: str) -> dict:
     }
     # written last: an interrupted archive is retried, never half-trusted
     atomic_json_dump(manifest, manifest_path)
+
+    # Seal complete - only reached once, never on the idempotent
+    # early-return above. Reset the live trackers so the new year
+    # re-uploads its own content instead of skipping keys that repeat
+    # across years.
+    for name in tracker_names:
+        atomic_json_dump({}, os.path.join(output_dir, name))
+
     return manifest
 
 

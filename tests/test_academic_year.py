@@ -151,18 +151,37 @@ DONEMS = FakeSelect("genel_icerik_dp_ilgili_donem", [
 class TestDetectAcademicYear:
     def test_week_selector_wins(self):
         d = FakeDriver({HOME: [WEEKS_TWO_YEARS], GELISIM: [DONEMS]})
-        assert detect_academic_year(d, BASE) == ("2025-2026", "week_selector")
+        assert detect_academic_year(d, BASE) == ("2026-2027", "week_selector")
 
-    def test_earliest_week_defines_the_year_regardless_of_order(self):
-        """min() is load-bearing: picks the earliest date (2025-2026 over 2026-2027)."""
+    def test_latest_week_defines_the_year_regardless_of_order(self):
+        """max() is load-bearing: picks the latest span (2026-2027 over 2025-2026).
+
+        See the comment at the max(weeks) call site: this is a deliberate
+        divergence from the spec's literal "earliest option" wording,
+        chosen because it degrades safely when a stale prior-year option
+        leaks into the selector (see
+        test_stale_previous_year_option_does_not_suppress_detection below).
+        """
         d = FakeDriver({HOME: [WEEKS_TWO_YEARS]})
         year, _ = detect_academic_year(d, BASE)
-        assert year == "2025-2026"
+        assert year == "2026-2027"
 
-    def test_earliest_within_same_year_regardless_of_order(self):
-        """When all weeks are in the same year, earliest within that year wins."""
+    def test_latest_within_same_year_regardless_of_order(self):
+        """When all weeks are in the same year, the result is unambiguous
+        regardless of which one happens to be earliest/latest/first."""
         d = FakeDriver({HOME: [WEEKS_SAME_YEAR]})
         year, _ = detect_academic_year(d, BASE)
+        assert year == "2026-2027"
+
+    def test_stale_previous_year_option_does_not_suppress_detection(self):
+        """A leaked prior-year option in the week selector must not make
+        detection report the OLD year - that would equal the stored year
+        on every run (resolve_year -> "current"), permanently and silently
+        hiding a real rollover. This is exactly what min() would do here;
+        max() reports the new year instead."""
+        d = FakeDriver({HOME: [WEEKS_TWO_YEARS]})
+        year, _ = detect_academic_year(d, BASE)
+        assert year != "2025-2026"
         assert year == "2026-2027"
 
     def test_falls_back_to_highest_donem_code(self):

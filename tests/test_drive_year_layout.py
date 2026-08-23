@@ -29,10 +29,12 @@ class FakeFiles:
         name = q.split("name='", 1)[1].split("'", 1)[0] if "name='" in q else None
         parent = q.split("and '", 1)[1].split("' in parents", 1)[0] \
             if "' in parents" in q else None
-        # Real Drive only filters by parent when the query names one. A
-        # parent-agnostic query (as move_root_folders deliberately issues)
-        # must match a folder by name Drive-wide, regardless of its current
-        # parents - not just folders that happen to have none.
+        # Real Drive only filters by parent when the query names one -
+        # including the "root" alias, which move_root_folders and the
+        # TEDY-root lookup both now pass deliberately so a folder of the
+        # right name is matched only at Drive's top level, never at any
+        # depth (e.g. nested inside a previous year's archive, or shared
+        # in from another user under an unrelated parent).
         hits = [{"id": i, "parents": v.get("parents", [])}
                 for i, v in self.store.items()
                 if v["name"] == name
@@ -82,11 +84,43 @@ def test_year_root_is_reused_not_duplicated():
     assert len(drive._files.store) == 2
 
 
+def test_tedy_root_ignores_a_same_named_folder_elsewhere():
+    """A folder named TEDY living anywhere other than Drive root - shared
+    in from another user, or nested under some unrelated parent - must not
+    be mistaken for the real TEDY root. Finding-1's second half: the
+    unparented _get_or_create_folder(drive, DRIVE_ROOT_NAME) lookup used to
+    match a folder of that name at ANY depth in the account."""
+    drive = FakeDrive({
+        "decoy": {"name": "TEDY", "parents": ["someone_elses_folder"]},
+    })
+    root = get_year_root(drive, "2026-2027")
+
+    tedy_entries = {i: v for i, v in drive._files.store.items()
+                    if v["name"] == "TEDY"}
+    assert "decoy" in tedy_entries
+    # a second, genuine TEDY was created at Drive root - the decoy was
+    # never reused as the root
+    assert len(tedy_entries) == 2
+    real_tedy_id = next(i for i in tedy_entries if i != "decoy")
+    assert tedy_entries[real_tedy_id]["parents"] == ["root"]
+    assert drive._files.store[root]["parents"] == [real_tedy_id]
+
+
 def test_unknown_year_refuses_rather_than_misfiling(tmp_path, monkeypatch):
     """Better to skip an upload than to file it under the wrong year."""
     monkeypatch.setattr("src.sync_to_google.OUTPUT_DIR", str(tmp_path))
     with pytest.raises(UnknownAcademicYear):
         get_year_root(FakeDrive(), None)
+
+
+@pytest.mark.parametrize("bad_year", ["2025", "2025-2026-2027", "not-a-year", ""])
+def test_malformed_year_refuses_rather_than_becoming_a_folder_name(bad_year):
+    """run_sync.py already refuses to build a filesystem path from a stored
+    year that isn't YYYY-YYYY (see _YEAR_RE there) - get_year_root must
+    apply the same guard before a malformed value becomes a Drive folder
+    name."""
+    with pytest.raises(UnknownAcademicYear):
+        get_year_root(FakeDrive(), bad_year)
 
 
 def test_year_root_reads_stored_state_when_year_omitted(tmp_path, monkeypatch):
@@ -100,8 +134,8 @@ def test_year_root_reads_stored_state_when_year_omitted(tmp_path, monkeypatch):
 
 def test_move_reparents_existing_root_folders():
     drive = FakeDrive({
-        "a": {"name": "Ödevler", "parents": []},
-        "b": {"name": "Ders Kitapları", "parents": []},
+        "a": {"name": "Ödevler", "parents": ["root"]},
+        "b": {"name": "Ders Kitapları", "parents": ["root"]},
     })
     parent = get_year_root(drive, "2025-2026")
     moved = move_root_folders(drive, ["Ödevler", "Ders Kitapları", "Yok"], parent)
@@ -110,12 +144,11 @@ def test_move_reparents_existing_root_folders():
     assert drive._files.store["b"]["parents"] == [parent]
 
 
-def test_move_removes_the_old_parent_not_just_adds_the_new_one():
-    """Two years must never share a folder: moving a folder that already
-    belongs to a different parent (e.g. last year's TEDY/<year>/) must drop
-    that old parent, not just add the new one alongside it."""
+def test_move_removes_the_root_parent_not_just_adds_the_new_one():
+    """A moved folder must end up ONLY under its new year parent - the
+    root parent must be dropped, not left alongside the new one."""
     drive = FakeDrive({
-        "a": {"name": "Ödevler", "parents": ["last_years_parent"]},
+        "a": {"name": "Ödevler", "parents": ["root"]},
     })
     parent = get_year_root(drive, "2026-2027")
     moved = move_root_folders(drive, ["Ödevler"], parent)
@@ -123,12 +156,42 @@ def test_move_removes_the_old_parent_not_just_adds_the_new_one():
     assert drive._files.store["a"]["parents"] == [parent]
 
 
+def test_folder_nested_inside_a_previous_years_archive_is_not_moved():
+    """Finding-1 regression: without root-scoping in the query, this exact
+    lookup matches a folder of this name at ANY depth - including one that
+    already lives inside a previous year's archive. A second rollover would
+    then find last year's already-migrated 'Ödevler' folder and re-parent
+    it straight into the new year, emptying the old archive and merging two
+    years' content: the exact mixing year-namespacing exists to prevent.
+    Once a folder is nested under TEDY/<year>/ (not Drive root), it must
+    never be matched by move_root_folders again."""
+    drive = FakeDrive({
+        "a": {"name": "Ödevler", "parents": ["last_years_TEDY_2025-2026_id"]},
+    })
+    parent = get_year_root(drive, "2026-2027")
+    moved = move_root_folders(drive, ["Ödevler"], parent)
+    assert moved == []
+    assert drive._files.store["a"]["parents"] == ["last_years_TEDY_2025-2026_id"]
+
+
+def test_move_ignores_an_unrelated_folder_of_the_same_name():
+    """A same-named folder that lives anywhere other than Drive root (e.g.
+    one a colleague shared in) must not be swept up either."""
+    drive = FakeDrive({
+        "a": {"name": "Ödevler", "parents": ["someone_elses_folder"]},
+    })
+    parent = get_year_root(drive, "2026-2027")
+    moved = move_root_folders(drive, ["Ödevler"], parent)
+    assert moved == []
+    assert drive._files.store["a"]["parents"] == ["someone_elses_folder"]
+
+
 def test_move_is_idempotent_no_redundant_update_on_second_call():
     """Once a folder already sits under parent_id, a second pass must
-    recognize that (via the parent-agnostic lookup) and skip it - not
-    reissue an update() call."""
+    recognize that (via the root-scoped lookup no longer finding it there)
+    and skip it - not reissue an update() call."""
     drive = FakeDrive({
-        "a": {"name": "Ödevler", "parents": []},
+        "a": {"name": "Ödevler", "parents": ["root"]},
     })
     parent = get_year_root(drive, "2025-2026")
 
@@ -146,7 +209,7 @@ def test_drive_archive_records_the_folder_id(tmp_path):
     os.makedirs(out)
     with open(os.path.join(out, "scraped_data.json"), "w", encoding="utf-8") as f:
         json.dump({"scraped_at": "x"}, f)
-    drive = FakeDrive({"a": {"name": "Ödevler", "parents": []}})
+    drive = FakeDrive({"a": {"name": "Ödevler", "parents": ["root"]}})
     manifest = archive_year_drive("2025-2026", out, drive)
     assert manifest["drive_folder"] is not None
     assert drive._files.store["a"]["parents"] == [manifest["drive_folder"]]
