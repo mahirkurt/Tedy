@@ -23,6 +23,62 @@ def _patch_detect(monkeypatch, year, source="week_selector"):
                         lambda d, b: (year, source))
 
 
+class FakeFiles:
+    """Minimal stand-in for drive.files() - just enough to let the real
+    get_year_root/move_root_folders (called by the real archive_year_drive)
+    run end-to-end with no live Google API call, mirroring the query/create
+    contract in src.sync_to_google._get_or_create_folder and
+    move_root_folders exactly."""
+
+    def __init__(self):
+        self.store = {}   # id -> {name, parents}
+        self._next = 100
+
+    class _Req:
+        def __init__(self, result):
+            self._result = result
+
+        def execute(self):
+            return self._result
+
+    def list(self, q="", **kw):
+        name = q.split("name='", 1)[1].split("'", 1)[0] if "name='" in q else None
+        parent = q.split("and '", 1)[1].split("' in parents", 1)[0] \
+            if "' in parents" in q else None
+        hits = [{"id": i, "parents": v.get("parents", [])}
+                for i, v in self.store.items()
+                if v["name"] == name
+                and (parent in (v.get("parents") or []) if parent else True)]
+        return self._Req({"files": hits})
+
+    def create(self, body=None, **kw):
+        self._next += 1
+        fid = f"f{self._next}"
+        self.store[fid] = {"name": body["name"],
+                           "parents": body.get("parents", [])}
+        return self._Req({"id": fid})
+
+    def update(self, fileId=None, addParents=None, removeParents=None, **kw):
+        parents = set(self.store[fileId].get("parents") or [])
+        remove = {p for p in (removeParents or "").split(",") if p}
+        add = {p for p in (addParents or "").split(",") if p}
+        parents = sorted((parents - remove) | add)
+        self.store[fileId]["parents"] = parents
+        return self._Req({"id": fileId, "parents": parents})
+
+
+class FakeDrive:
+    """A working Drive service double - lets a test exercise the real
+    archive_year_drive -> get_year_root -> move_root_folders chain without
+    ever touching the live Google API."""
+
+    def __init__(self):
+        self._files = FakeFiles()
+
+    def files(self):
+        return self._files
+
+
 def _seed(out, scraped_at="2026-08-22T10:00:08"):
     os.makedirs(out, exist_ok=True)
     with open(os.path.join(out, "scraped_data.json"), "w", encoding="utf-8") as f:
@@ -142,56 +198,77 @@ def test_malformed_stored_year_skips_archive_and_state_write(tmp_path, monkeypat
 def test_current_run_repairs_a_pending_drive_archive(tmp_path, monkeypatch):
     """The rollover branch runs exactly once, the sync after it. If the
     Drive half of that one rollover deferred (e.g. an expired token), the
-    manifest is left with drive_folder=None and nothing will ever call
-    archive_year_drive again unless a later "current" run retries it."""
+    manifest is left with drive_folder=None *under the previous year's
+    archive directory* - "2025-2026", not "2026-2027". A later "current"
+    run's resolution.year is the newly-active year, 2026-2027, which is
+    never the pending manifest's directory - so the repair must find it by
+    scanning output/archive/*/manifest.json, not by looking up
+    resolution.year directly. Driving this through two real calls to
+    run_year_rollover (not hand-seeding an archive/2026-2027/ directory
+    that the real rollover flow could never produce) is what actually
+    proves the scan works."""
     out = str(tmp_path); _seed(out)
     with open(os.path.join(out, "academic_year.json"), "w", encoding="utf-8") as f:
-        json.dump({"year": "2026-2027"}, f)
-    archive_dir = os.path.join(out, "archive", "2026-2027")
-    os.makedirs(archive_dir)
-    with open(os.path.join(archive_dir, "manifest.json"), "w", encoding="utf-8") as f:
-        json.dump({"year": "2026-2027", "drive_folder": None}, f)
+        json.dump({"year": "2025-2026"}, f)
     _patch_detect(monkeypatch, "2026-2027")
 
-    calls = []
+    def boom():
+        raise RuntimeError("no credentials")
 
-    def fake_archive_year_drive(year, output_dir, drive_service):
-        calls.append((year, output_dir, drive_service))
-        return {"year": year, "drive_folder": "folder123", "counts": {}}
+    # Sync #1: a genuine rollover. Drive is down, so the local half seals
+    # but the Drive half defers - real archive_year_local/archive_year_drive,
+    # not mocked.
+    first = run_year_rollover(StubDriver("x"), out, BASE, boom)
+    assert first["status"] == "rollover"
+    assert first["archived"] is True
+    assert first["manifest"]["drive_folder"] is None
+    manifest_path = os.path.join(out, "archive", "2025-2026", "manifest.json")
+    with open(manifest_path, encoding="utf-8") as f:
+        assert json.load(f)["drive_folder"] is None
 
-    monkeypatch.setattr("src.run_sync.archive_year_drive", fake_archive_year_drive)
-    sentinel = object()
+    # Sync #2: same detected year as the now-stored one -> "current".
+    # Drive is back up this time.
+    drive = FakeDrive()
+    second = run_year_rollover(StubDriver("x"), out, BASE, lambda: drive)
 
-    r = run_year_rollover(StubDriver("x"), out, BASE, lambda: sentinel)
-
-    assert r["status"] == "current"
-    assert r["archived"] is True
-    assert r["manifest"]["drive_folder"] == "folder123"
-    assert calls == [("2026-2027", out, sentinel)]
+    assert second["status"] == "current"
+    assert second["archived"] is True
+    assert second["manifest"]["drive_folder"] is not None
+    with open(manifest_path, encoding="utf-8") as f:
+        assert json.load(f)["drive_folder"] is not None
 
 
 def test_current_run_does_not_repeat_a_completed_drive_archive(tmp_path, monkeypatch):
-    """Once drive_folder is recorded, a "current" run must not re-call
-    archive_year_drive on every sync - that would re-run the Drive move
-    every 15 minutes forever."""
+    """Once a pending manifest's drive_folder has been filled in by a
+    repair, a later "current" run must not call archive_year_drive for it
+    again - that would re-run the Drive move every 15 minutes forever."""
     out = str(tmp_path); _seed(out)
     with open(os.path.join(out, "academic_year.json"), "w", encoding="utf-8") as f:
-        json.dump({"year": "2026-2027"}, f)
-    archive_dir = os.path.join(out, "archive", "2026-2027")
-    os.makedirs(archive_dir)
-    with open(os.path.join(archive_dir, "manifest.json"), "w", encoding="utf-8") as f:
-        json.dump({"year": "2026-2027", "drive_folder": "already_set"}, f)
+        json.dump({"year": "2025-2026"}, f)
     _patch_detect(monkeypatch, "2026-2027")
 
+    def boom():
+        raise RuntimeError("no credentials")
+
+    first = run_year_rollover(StubDriver("x"), out, BASE, boom)
+    assert first["archived"] is True
+    assert first["manifest"]["drive_folder"] is None
+
+    # Repair it for real, via the second "current" sync.
+    drive = FakeDrive()
+    second = run_year_rollover(StubDriver("x"), out, BASE, lambda: drive)
+    assert second["archived"] is True
+    assert second["manifest"]["drive_folder"] is not None
+
+    # A third "current" sync must not touch archive_year_drive again.
     def fail_if_called(*a, **kw):
         raise AssertionError("archive_year_drive must not be re-called")
 
     monkeypatch.setattr("src.run_sync.archive_year_drive", fail_if_called)
 
-    r = run_year_rollover(StubDriver("x"), out, BASE, lambda: None)
-
-    assert r["status"] == "current"
-    assert r["archived"] is False
+    third = run_year_rollover(StubDriver("x"), out, BASE, lambda: drive)
+    assert third["status"] == "current"
+    assert third["archived"] is False
 
 
 def test_archive_failure_in_main_does_not_abort_the_sync(tmp_path, monkeypatch):

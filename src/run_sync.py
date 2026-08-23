@@ -38,7 +38,7 @@ from src.academic_year import (  # noqa: E402
     resolve_year,
     save_year_state,
 )
-from src.archive_year import archive_dir, archive_year_drive  # noqa: E402
+from src.archive_year import archive_year_drive  # noqa: E402
 
 _YEAR_RE = re.compile(r"^\d{4}-\d{4}$")
 
@@ -75,28 +75,44 @@ def run_year_rollover(driver, output_dir, base_url, drive_factory):
               f"({result['manifest'].get('counts', {})})")
 
     elif resolution.status == "current":
-        # The local half of a previous rollover may have sealed while the
-        # Drive half deferred (e.g. an expired token during the one sync
-        # that flipped the year). Once resolved to "current" the rollover
-        # branch above is never reached again for that year, so this is the
-        # only remaining place that can retry the deferred Drive move.
-        manifest_path = os.path.join(
-            archive_dir(output_dir, resolution.year), "manifest.json")
-        if os.path.exists(manifest_path):
-            import json
-            with open(manifest_path, encoding="utf-8") as f:
-                manifest = json.load(f)
+        # The Drive half of a rollover may defer while the local half
+        # seals (e.g. an expired token during the one sync that flips the
+        # year). That deferred manifest lives under the *previous* year's
+        # archive directory - the rollover branch above archives `stored`,
+        # then the state advances - never under resolution.year, which is
+        # the currently active year. So this cannot look up a single
+        # guessed year; it must scan for any manifest still missing its
+        # drive_folder. That's also self-healing if `previous` was ever
+        # lost, and correct no matter how many syncs back the deferred
+        # repair is.
+        import glob
+        import json
+        pending_years = []
+        for manifest_path in sorted(glob.glob(os.path.join(
+                output_dir, "archive", "*", "manifest.json"))):
+            year = os.path.basename(os.path.dirname(manifest_path))
+            if not _YEAR_RE.match(year):
+                continue
+            try:
+                with open(manifest_path, encoding="utf-8") as f:
+                    manifest = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
             if not manifest.get("drive_folder"):
-                try:
-                    drive_service = drive_factory()
-                except Exception as e:
-                    print(f"  [ARCHIVE] Drive unavailable: "
-                          f"{type(e).__name__}: {e}")
-                    drive_service = None
+                pending_years.append(year)
+
+        if pending_years:
+            try:
+                drive_service = drive_factory()
+            except Exception as e:
+                print(f"  [ARCHIVE] Drive unavailable: "
+                      f"{type(e).__name__}: {e}")
+                drive_service = None
+            for year in pending_years:
                 result["manifest"] = archive_year_drive(
-                    resolution.year, output_dir, drive_service)
+                    year, output_dir, drive_service)
                 result["archived"] = True
-                print(f"  [ARCHIVE] {resolution.year} Drive repair retried "
+                print(f"  [ARCHIVE] {year} Drive repair retried "
                       f"(drive_folder="
                       f"{result['manifest'].get('drive_folder')})")
 
