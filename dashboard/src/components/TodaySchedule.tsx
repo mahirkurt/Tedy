@@ -48,11 +48,11 @@ const TYPE_CONFIG: Record<AgendaItem['type'], {
   label: string
   icon: IconComponent
 }> = {
-  lesson:         { color: '#002d9c', tagType: 'blue',      label: '',           icon: Education },
-  ogep:           { color: '#009d9a', tagType: 'teal',      label: 'ÖGEP',       icon: Bookmark },
-  deadline:       { color: '#da1e28', tagType: 'red',       label: 'Teslim',     icon: TaskIcon },
-  private_lesson: { color: '#ff832b', tagType: 'warm-gray', label: 'Özel Ders',  icon: UserAvatar },
-  event:          { color: '#8a3ffc', tagType: 'purple',    label: 'Etkinlik',   icon: EventSchedule },
+  lesson:         { color: 'var(--ted-cat-lesson)', tagType: 'blue',      label: '',           icon: Education },
+  ogep:           { color: 'var(--ted-cat-ogep)', tagType: 'teal',      label: 'ÖGEP',       icon: Bookmark },
+  deadline:       { color: 'var(--ted-cat-homework)', tagType: 'red',       label: 'Teslim',     icon: TaskIcon },
+  private_lesson: { color: 'var(--ted-cat-private-lesson)', tagType: 'warm-gray', label: 'Özel Ders',  icon: UserAvatar },
+  event:          { color: 'var(--ted-cat-team)', tagType: 'purple',    label: 'Etkinlik',   icon: EventSchedule },
 }
 
 const DAYS_TR = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']

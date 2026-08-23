@@ -4,51 +4,135 @@
 // self-hosted block is dead weight: dropping it removes the failed requests
 // and most of the stylesheet's bulk.
 @use '@carbon/react' with ($css--font-face: false);
+@use '@carbon/react/scss/theme' as theme;
+@use '@carbon/react/scss/themes' as themes;
+@use '@carbon/react/scss/spacing' as spacing;
+@use '@carbon/react/scss/motion' as motion;
+@use '@carbon/colors' as colors;
 
 // ─── Design Tokens ──────────────────────────────────────────────────────────
+// Carbon emits its --cds-* custom properties ONLY inside the theme scopes it
+// generates (.cds--g10, .cds--layer-one, …). <Theme theme="g10"> in main.tsx
+// creates one such scope, but every --ted-* alias below is declared on :root,
+// which sits ABOVE it — and a custom property is substituted in the scope that
+// DECLARES it, not the scope that uses it. So `var(--cds-text-helper, #8d8d8d)`
+// written at :root never saw the token and froze at its fallback for the whole
+// document. Measured on production before this change: --cds-text-helper read
+// #6f6f6f on the very element where --ted-color-text-helper read #8d8d8d.
+//
+// Emitting the same theme at :root puts the tokens above the aliases, which is
+// what makes the bridge actually bridge. The <Theme> wrapper then re-emits the
+// identical g10 values one level down — harmless, and it keeps the React-side
+// theme switch authoritative if this app ever offers one.
 :root {
-  --ted-color-brand-primary: #002d9c;
-  --ted-color-brand-accent: #da1e28;
-  --ted-color-page-bg: #f2f4f8;
-  --ted-color-layer: #ffffff;
-  --ted-color-border-subtle: var(--cds-border-subtle, #e0e0e0);
-  --ted-color-text-primary: var(--cds-text-primary, #161616);
-  --ted-color-text-secondary: var(--cds-text-secondary, #525252);
-  --ted-color-text-helper: var(--cds-text-helper, #8d8d8d);
+  @include theme.theme(themes.$g10);
+
+  // ── Brand ─────────────────────────────────────────────────────────────────
+  // TEDY's own identity, and the only colours here that do not defer to a role
+  // token. All three are Carbon palette members, so they are named rather than
+  // magic hex and stay inside the system's colour space.
+  --ted-color-brand-primary: #{colors.$blue-80};
+  --ted-color-brand-accent: #{colors.$red-60};
+  // Cool grey rather than Carbon's neutral $gray-10. The faint blue cast is the
+  // one deliberate deviation from g10's ground: it reads as "school" against
+  // the white cards, and neutral grey made the dashboard look unfinished.
+  --ted-color-page-bg: #{colors.$cool-gray-10};
+
+  // ── Roles ─────────────────────────────────────────────────────────────────
+  // Everything below defers to Carbon, so a theme swap or a Carbon upgrade
+  // reaches the custom chrome instead of stopping at its edge.
+  --ted-color-layer: var(--cds-layer-01);
+  --ted-color-layer-hover: var(--cds-layer-hover-01);
+  --ted-color-layer-accent: var(--cds-layer-accent-01);
+  --ted-color-border-subtle: var(--cds-border-subtle-01);
+  --ted-color-border-strong: var(--cds-border-strong-01);
+  --ted-color-text-primary: var(--cds-text-primary);
+  --ted-color-text-secondary: var(--cds-text-secondary);
+  // Was frozen at #8d8d8d (gray-50) — 3.32:1 on a card, below WCAG AA. Carbon
+  // puts gray-60 here in light themes for exactly that reason: 5.02:1.
+  --ted-color-text-helper: var(--cds-text-helper);
+  --ted-color-text-on-color: var(--cds-text-on-color);
+  --ted-color-focus: var(--cds-focus);
 
   --ted-shadow-card: 0 1px 3px rgb(0 0 0 / 5%), 0 1px 2px rgb(0 0 0 / 8%);
   --ted-shadow-card-hover: 0 4px 12px rgb(0 0 0 / 8%), 0 2px 4px rgb(0 0 0 / 6%);
   --ted-shadow-popover: 0 8px 24px rgb(0 45 156 / 12%), 0 2px 8px rgb(0 0 0 / 8%);
+  // Carbon is square by default. The softened corner is intentional TEDY
+  // character — this is a child's dashboard, not a console — and it is the
+  // second and last deliberate deviation.
   --ted-radius-card: 10px;
   --ted-radius-sm: 4px;
 
-  --ted-space-2xs: 0.25rem;
-  --ted-space-xs: 0.5rem;
-  --ted-space-sm: 0.75rem;
-  --ted-space-md: 1rem;
-  --ted-space-lg: 1.5rem;
-  --ted-space-xl: 2rem;
+  // ── Spacing ───────────────────────────────────────────────────────────────
+  // These six values were already Carbon's scale, written out by hand. Naming
+  // them keeps the same rendering and makes the relationship checkable.
+  --ted-space-2xs: #{spacing.$spacing-02};  // 0.25rem
+  --ted-space-xs: #{spacing.$spacing-03};   // 0.5rem
+  --ted-space-sm: #{spacing.$spacing-04};   // 0.75rem
+  --ted-space-md: #{spacing.$spacing-05};   // 1rem
+  --ted-space-lg: #{spacing.$spacing-06};   // 1.5rem
+  --ted-space-xl: #{spacing.$spacing-07};   // 2rem
 
   --ted-header-bg: var(--ted-color-brand-primary);
-  --ted-header-text: #fff;
+  --ted-header-text: var(--ted-color-text-on-color);
   --ted-accent: var(--ted-color-brand-accent);
   --ted-page-bg: var(--ted-color-page-bg);
   --ted-card-bg: var(--ted-color-layer);
 
-  --ted-color-accent-teal: #009d9a;
-  --ted-color-accent-purple: #8a3ffc;
-  --ted-color-accent-cyan: #0072c3;
+  --ted-color-accent-teal: #{colors.$teal-50};
+  --ted-color-accent-purple: #{colors.$purple-60};
+  --ted-color-accent-cyan: #{colors.$cyan-60};
 
-  --status-success: #198038;
-  --status-warning: #f1c21b;
-  --status-error: #da1e28;
-  --status-info: #0f62fe;
+  // ── Status ────────────────────────────────────────────────────────────────
+  // Carbon splits these by contrast duty and so do we. The support-* tokens are
+  // built for icons, bars and borders (3:1 non-text minimum); using them as
+  // body text is a real regression — g10's support-success is green-50 at
+  // 3.35:1 on white, which fails AA. The text-* aliases below stay one step
+  // darker so a status word remains readable.
+  --ted-support-success: var(--cds-support-success);
+  --ted-support-error: var(--cds-support-error);
+  --ted-support-warning: var(--cds-support-warning);
+  --ted-support-info: var(--cds-support-info);
 
-  --highlight-active: #d0e2ff;
-  --highlight-today: #0f62fe;
+  --ted-text-success: #{colors.$green-60};   // 5.02:1 on layer-01
+  --ted-text-error: var(--cds-text-error);   // red-60, 4.83:1
+  --ted-text-info: #{colors.$blue-60};       // 4.51:1
 
-  --ted-transition-fast: 150ms cubic-bezier(0.2, 0, 0.38, 0.9);
-  --ted-transition-med: 240ms cubic-bezier(0.2, 0, 0.38, 0.9);
+  // Legacy aliases — SCSS rules and the health popover's inline styles both read
+  // these names. They now resolve through the split above rather than through
+  // four frozen literals. --status-warning has no SCSS call site but is used by
+  // StatusIcon in DashboardHeader.tsx, so it stays declared: dropping it would
+  // silently fall back to inherited colour and lose the warning signal.
+  --status-success: var(--ted-text-success);
+  --status-error: var(--ted-text-error);
+  --status-info: var(--ted-text-info);
+  --status-warning: var(--ted-support-warning);
+
+  // ── Event categories ──────────────────────────────────────────────────────
+  // The schedule and calendar each declared this palette independently in TSX
+  // and had already drifted apart. One declaration, read from both.
+  --ted-cat-lesson: var(--ted-color-brand-primary);
+  --ted-cat-homework: var(--ted-color-brand-accent);
+  --ted-cat-ogep: var(--ted-color-accent-teal);
+  --ted-cat-team: var(--ted-color-accent-purple);
+  --ted-cat-event: var(--ted-color-accent-cyan);
+  --ted-cat-private-lesson: var(--cds-support-caution-major);
+  --ted-cat-sebit: var(--cds-text-helper);
+
+  --highlight-active: #{colors.$blue-20};
+  --highlight-today: #{colors.$blue-60};
+
+  // ── Motion ────────────────────────────────────────────────────────────────
+  // Both durations and the curve were already Carbon's productive values,
+  // copied by hand. motion.motion(standard, productive) is that curve.
+  --ted-duration-fast: #{motion.$duration-moderate-01};   // 150ms
+  --ted-duration-med: #{motion.$duration-moderate-02};    // 240ms
+  --ted-ease-standard: #{motion.motion(standard, productive)};
+  --ted-ease-entrance: #{motion.motion(entrance, productive)};
+  --ted-ease-exit: #{motion.motion(exit, productive)};
+
+  --ted-transition-fast: var(--ted-duration-fast) var(--ted-ease-standard);
+  --ted-transition-med: var(--ted-duration-med) var(--ted-ease-standard);
 }
 
 // ─── Base ────────────────────────────────────────────────────────────────────
@@ -582,7 +666,7 @@ body {
   border: 1px solid #a7f0ba;
   color: var(--ted-color-text-primary);
 
-  .today-hero__badge--complete { color: #198038; }
+  .today-hero__badge--complete { color: var(--ted-text-success); }
 }
 
 // ── School day progress bar ──
@@ -593,7 +677,7 @@ body {
 
 .today-daybar__track {
   height: 6px;
-  background: #e0e0e0;
+  background: var(--cds-layer-accent-01);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -640,7 +724,7 @@ body {
   opacity: 0.4;
 
   .today-tl__dot {
-    background: #c6c6c6 !important;
+    background: var(--cds-layer-active-01) !important;
     box-shadow: none !important;
   }
 }
@@ -683,7 +767,7 @@ body {
     bottom: 0;
     left: 50%;
     width: 2px;
-    background: #e0e0e0;
+    background: var(--cds-layer-accent-01);
     transform: translateX(-50%);
   }
 }
@@ -696,7 +780,7 @@ body {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--tl-color, #c6c6c6);
+  background: var(--tl-color, var(--cds-layer-active-01));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -904,13 +988,13 @@ body {
   transition: width 1s ease-out;
 
   &--normal { background: var(--status-info); }
-  &--soon { background: #8d8d8d; }
+  &--soon { background: var(--cds-border-strong-01); }
   &--urgent { background: var(--status-error); }
   &--critical {
     background: var(--status-error);
     animation: pulse-urgent 1.5s ease-in-out infinite;
   }
-  &--expired { background: #c6c6c6; }
+  &--expired { background: var(--cds-layer-active-01); }
 }
 
 // ─── Homework Modal ──────────────────────────────────────────────────────────
@@ -1023,7 +1107,7 @@ body {
 }
 
 .homework-item--border-gray.cds--tile {
-  border-left: 3px solid #c6c6c6;
+  border-left: 3px solid var(--cds-border-subtle-00);
 }
 
 // ─── Homework Modal Enhanced ──────────────────────────────────────────────────
@@ -1147,7 +1231,18 @@ body {
 
 .dashboard-header__health-wrap {
   position: relative;
+  min-width: 0;
 }
+
+// The two sync labels mirror the --full/--short pattern already used for the
+// user name. Wide screens read the elapsed time and the warning count; below
+// Carbon's md breakpoint only the count survives, which is what keeps the
+// header's action buttons on a 390px screen.
+.dashboard-header__sync-label--short { display: none; }
+
+// A header action is a fixed 3rem target. Letting flex shrink it was how the
+// last button ended up past the viewport edge once the sync tag grew.
+.cds--header__global .cds--header__action { flex-shrink: 0; }
 
 .dashboard-header__health-trigger {
   background: none;
@@ -1606,7 +1701,7 @@ body {
   display: grid;
   grid-template-columns: 50px repeat(5, 1fr);
   gap: 1px;
-  background: #e0e0e0;
+  background: var(--cds-layer-accent-01);
   border-radius: var(--ted-radius-card);
   overflow: hidden;
 }
@@ -1625,7 +1720,7 @@ body {
 }
 
 .calendar-grid__time {
-  background: #f4f4f4;
+  background: var(--cds-layer-02);
   padding: 0.25rem;
   text-align: right;
   font-size: 0.6875rem;
@@ -1726,7 +1821,7 @@ body {
   border-radius: 4px;
 
   &:hover {
-    background: #f4f4f4;
+    background: var(--cds-layer-02);
     color: var(--ted-color-text-primary);
   }
 }
@@ -1812,12 +1907,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c6c6c6;
+  background: var(--cds-layer-active-01);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: var(--cds-layer-accent-active-01);
 }
 
 // ─── Staggered card animations ──────────────────────────────────────────
@@ -2326,7 +2421,11 @@ body {
   .dashboard-header__meta {
     padding: 0;
     gap: 0.35rem;
+    min-width: 0;
   }
+
+  .dashboard-header__sync-label--full { display: none; }
+  .dashboard-header__sync-label--short { display: inline; }
 
   .dashboard-header__user-name--full,
   .dashboard-header__user-email {
@@ -2740,7 +2839,7 @@ body {
 }
 
 .ac-msg--assistant .ac-msg__body {
-  background: #f4f4f4;
+  background: var(--cds-layer-02);
   border-top-left-radius: 4px;
 }
 
@@ -3111,7 +3210,7 @@ body {
 .exam-card__countdown-bar {
   margin-top: var(--ted-space-xs);
   height: 3px;
-  background: #e0e0e0;
+  background: var(--cds-layer-accent-01);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -5139,4 +5238,39 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   .resume-band__meter-fill { transition: none; }
 
   .resume-band:hover .resume-band__cover { transform: rotate(-2.5deg); }
+}
+
+// ─── Reduced motion ──────────────────────────────────────────────────────────
+// The reader surfaces already honoured this preference; the dashboard did not,
+// leaving six animations running for people whose OS asked them to stop. The
+// split is deliberate rather than a blanket `animation: none`:
+//
+//   * Decorative motion goes. Nothing it carried is lost — a critical countdown
+//     bar is still red and still labelled, the hero is still highlighted.
+//   * Loading and in-flight indicators stay. The header spinner, the assistant's
+//     typing dots and the skeleton shimmers are the only signal that work is
+//     happening; removing them takes away information instead of restoring
+//     comfort. All are opacity or small-rotation, not the large-area parallax
+//     this preference exists to guard against.
+//   * Entrances collapse to their resting state rather than being cancelled,
+//     because `both`/`forwards` fills would otherwise strand an element at
+//     opacity 0 and blank the card entirely.
+@media (prefers-reduced-motion: reduce) {
+  .tag-urgent,
+  .today-hero__pulse,
+  .hw-countdown-bar__fill--critical,
+  .login-page__hero {
+    animation: none;
+  }
+
+  .dashboard-card,
+  .today,
+  .today-hero,
+  .today-tl__item,
+  .health-popover,
+  .calendar-popover,
+  .ac-msg {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
 }

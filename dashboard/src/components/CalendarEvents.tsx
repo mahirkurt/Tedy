@@ -23,13 +23,13 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  lesson: '#002d9c',
-  homework: '#da1e28',
-  private_lesson: '#ff832b',
-  ogep: '#009d9a',
-  team: '#8a3ffc',
-  sebit: '#6f6f6f',
-  event: '#0072c3',
+  lesson: 'var(--ted-cat-lesson)',
+  homework: 'var(--ted-cat-homework)',
+  private_lesson: 'var(--ted-cat-private-lesson)',
+  ogep: 'var(--ted-cat-ogep)',
+  team: 'var(--ted-cat-team)',
+  sebit: 'var(--ted-cat-sebit)',
+  event: 'var(--ted-cat-event)',
 }
 
 const MONTHS_LONG = [
