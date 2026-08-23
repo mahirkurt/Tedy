@@ -29,11 +29,76 @@ from src.sync_to_google import normalize_course
 
 load_env()
 
+# H3: fail loudly instead of silently generating a random per-process key.
+# With 2 gunicorn workers, a missing key means each worker mints its own
+# random secret at startup, so a session cookie signed by one worker is
+# rejected by the other — users get logged out at random with no error
+# anywhere. A dead service with a clear reason beats a live service that
+# randomly logs people out.
+_DASHBOARD_SECRET_KEY = os.environ.get("DASHBOARD_SECRET_KEY", "").strip()
+if not _DASHBOARD_SECRET_KEY:
+    raise RuntimeError(
+        "DASHBOARD_SECRET_KEY is not set. Set it in .env (or the process "
+        "environment) before starting the dashboard — see CLAUDE.md's "
+        "Required Credentials section. Do not fall back to a random key: "
+        "with multiple gunicorn workers each worker would mint a different "
+        "one, silently invalidating sessions signed by the other worker."
+    )
+
 app = Flask(__name__)
-app.secret_key = os.environ.get("DASHBOARD_SECRET_KEY", secrets.token_hex(32))
+app.secret_key = _DASHBOARD_SECRET_KEY
 CORS(app, supports_credentials=True)
 
+
+def _dashboard_cookie_secure_default() -> bool:
+    """Whether the session cookie should require HTTPS (H4).
+
+    Defaults to True — the site is served over HTTPS in production.
+    Override with DASHBOARD_COOKIE_SECURE=0 for local/plain-HTTP runs: a
+    `Secure` cookie is never sent back by the browser over `http://`.
+    Compatibility note (checked against dashboard/playwright.config.ts):
+    the Playwright e2e suite serves the app at http://localhost:8086 and
+    local dev/manual testing hits http://127.0.0.1:8085, both plain HTTP.
+    Today's e2e specs run entirely under TEST_AUTH_BYPASS and never call
+    /api/auth/login (the only route that sets session["user_email"]), so
+    they do not currently exercise a session-cookie flow and are not known
+    to break with SESSION_COOKIE_SECURE=True. If a future e2e spec adds a
+    real login flow, run it with DASHBOARD_COOKIE_SECURE=0.
+    """
+    return os.environ.get("DASHBOARD_COOKIE_SECURE", "1") != "0"
+
+
+def _apply_cookie_config(flask_app: Flask) -> None:
+    """Apply session cookie hardening (H4) to `flask_app`.
+
+    Factored out (rather than inlined at module scope) so tests can flip
+    DASHBOARD_COOKIE_SECURE and re-apply without re-importing the module.
+    """
+    flask_app.config["SESSION_COOKIE_HTTPONLY"] = True
+    flask_app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    flask_app.config["SESSION_COOKIE_SECURE"] = _dashboard_cookie_secure_default()
+
+
+_apply_cookie_config(app)
+
 TEST_AUTH_BYPASS = os.environ.get("TEST_AUTH_BYPASS") == "1"
+
+if TEST_AUTH_BYPASS:
+    # H5: TEST_AUTH_BYPASS disables five separate auth gates at once
+    # (_current_user_email, require_auth, _require_assistant_access x2,
+    # auth_me). It is a documented test workflow (see CLAUDE.md), so it
+    # must keep working — but if it were ever set in production (e.g. the
+    # systemd unit's EnvironmentFile=.env picked it up), every gate would
+    # go dark with no other signal. Make it impossible to miss instead.
+    print(
+        "\n" + "!" * 70 +
+        "\n!! AUTH BYPASS ACTIVE — all authentication disabled"
+        "\n!! TEST_AUTH_BYPASS=1 is set in this process's environment."
+        "\n!! Every session/API-key check is being skipped."
+        "\n!! This must NEVER be set in production (.env on the live host)."
+        "\n" + "!" * 70 + "\n",
+        file=sys.stderr,
+    )
 
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 DIST_DIR = os.path.join(PROJECT_ROOT, "dashboard-dist")
@@ -45,17 +110,41 @@ GEMINI_VISION_MODEL = os.environ.get("HOMEWORK_VISION_MODEL", "gemini-2.5-flash"
 
 GOOGLE_CLIENT_ID = "343043757928-mivqip09orvrf73m7kj9b0atohgin2ho.apps.googleusercontent.com"
 
-ALLOWED_EMAILS = {
-    "isikkurtx@gmail.com",
-    "drmahirkurt@gmail.com",
-    "ozlem.murzoglu@gmail.com",
-    "huriye.murzoglu@gmail.com",
+# --- Roles ---
+# "full"   — the household dashboard: every page and every endpoint.
+# "reader" — Tedy Books only. Nothing else about Işık's school life is visible.
+ROLE_FULL = "full"
+ROLE_READER = "reader"
+
+USER_ROLES = {
+    "isikkurtx@gmail.com": ROLE_FULL,
+    "drmahirkurt@gmail.com": ROLE_FULL,
+    "ozlem.murzoglu@gmail.com": ROLE_FULL,
+    "huriye.murzoglu@gmail.com": ROLE_FULL,
+    "murzogluhulya@gmail.com": ROLE_READER,
+    "mahirkurtmd@gmail.com": ROLE_READER,
+}
+
+ALLOWED_EMAILS = set(USER_ROLES)
+FULL_ACCESS_EMAILS = {e for e, r in USER_ROLES.items() if r == ROLE_FULL}
+
+# Endpoints a reader may reach. Default-deny: a route that is not named here is
+# refused for readers, so adding an endpoint never leaks data by omission.
+READER_ENDPOINTS = {
+    "books_list",
+    "book_detail",
+    "book_chapter",
+    "book_translate",
+    "book_progress_get",
+    "book_progress_save",
 }
 
 ASSISTANT_API_KEY = os.environ.get("ASSISTANT_API_KEY", "").strip()
 ASSISTANT_ADMIN_EMAILS = {
     x.strip().lower()
-    for x in os.environ.get("ASSISTANT_ADMIN_EMAILS", ",".join(ALLOWED_EMAILS)).split(",")
+    for x in os.environ.get(
+        "ASSISTANT_ADMIN_EMAILS", ",".join(sorted(FULL_ACCESS_EMAILS))
+    ).split(",")
     if x.strip()
 }
 
@@ -126,12 +215,43 @@ def _handle_unexpected_exception(err: Exception):
 
 # --- Auth ---
 
+def _current_user_email():
+    """Email of the signed-in session user, or None for key/bypass callers."""
+    email = str(session.get("user_email", "") or "").lower().strip()
+    if email:
+        return email
+    if TEST_AUTH_BYPASS:
+        return "test@tedy.online"
+    return None
+
+
+def _current_user_role():
+    """Role derived from the roster, never from the session.
+
+    Deriving on every request means a role change takes effect immediately
+    instead of waiting for old sessions to expire, and an email that has been
+    dropped from the roster falls back to the least privilege.
+
+    No session email also falls back to the least privilege (ROLE_READER),
+    not ROLE_FULL: every current call site already sits behind a
+    `session.get("user_email")` check, so this branch is unreached today —
+    but a future caller outside that guard must not silently receive full
+    access by default.
+    """
+    email = str(session.get("user_email", "") or "").lower().strip()
+    if not email:
+        return ROLE_READER
+    return USER_ROLES.get(email, ROLE_READER)
+
+
 def require_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if TEST_AUTH_BYPASS:
             return f(*args, **kwargs)
         if session.get("user_email"):
+            if _current_user_role() != ROLE_FULL and request.endpoint not in READER_ENDPOINTS:
+                return jsonify({"error": "forbidden", "role": _current_user_role()}), 403
             return f(*args, **kwargs)
         # API key: Authorization header
         auth_header = request.headers.get("Authorization", "")
@@ -169,6 +289,7 @@ def auth_login():
             "email": email,
             "name": session["user_name"],
             "picture": session["user_picture"],
+            "role": USER_ROLES.get(email, ROLE_READER),
         })
     except ValueError as e:
         return jsonify({"error": f"Invalid token: {e}"}), 401
@@ -182,17 +303,19 @@ def auth_logout():
 
 @app.route("/api/auth/me")
 def auth_me():
-    if TEST_AUTH_BYPASS:
-        return jsonify({
-            "email": "test@tedy.online",
-            "name": "Test User",
-            "picture": "",
-        })
     if session.get("user_email"):
         return jsonify({
             "email": session["user_email"],
             "name": session.get("user_name", ""),
             "picture": session.get("user_picture", ""),
+            "role": _current_user_role(),
+        })
+    if TEST_AUTH_BYPASS:
+        return jsonify({
+            "email": "test@tedy.online",
+            "name": "Test User",
+            "picture": "",
+            "role": ROLE_FULL,
         })
     return jsonify({"error": "Not authenticated"}), 401
 
@@ -234,6 +357,8 @@ def _require_assistant_access(api_key_only=False):
     if _has_valid_assistant_api_key():
         return None
     if not api_key_only and session.get("user_email"):
+        if _current_user_role() != ROLE_FULL:
+            return jsonify({"error": "forbidden", "role": _current_user_role()}), 403
         return None
     return jsonify({"error": "Unauthorized"}), 401
 
@@ -2475,6 +2600,134 @@ def book_chapter(slug, chapter_id):
         "next": nav(readable[idx + 1] if idx + 1 < len(readable) else None),
         "position": {"index": idx + 1, "total": len(readable)},
     })
+
+
+# --- Reading position (per profile) ---
+#
+# Reader settings stay device-local, but the bookmark belongs to the person, not
+# to the browser: a profile that opens Tedy Books anywhere resumes where it left
+# off, and two profiles sharing a device never see each other's position.
+
+BOOK_PROGRESS_FILE = os.path.join(OUTPUT_DIR, "book_progress.json")
+BOOK_PROGRESS_MAX_BOOKS = 200
+BOOK_PROGRESS_MAX_CHAPTERS = 1000
+
+
+def _load_book_progress_store():
+    if not os.path.exists(BOOK_PROGRESS_FILE):
+        return {}
+    try:
+        with open(BOOK_PROGRESS_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _normalize_progress_chapter(value):
+    if not isinstance(value, dict):
+        return None
+    try:
+        ratio = float(value.get("ratio") or 0)
+    except (TypeError, ValueError):
+        ratio = 0.0
+    if ratio != ratio:  # NaN
+        ratio = 0.0
+    return {"ratio": round(min(1.0, max(0.0, ratio)), 4), "done": bool(value.get("done"))}
+
+
+def _normalize_progress_books(raw):
+    """Coerce a stored or client-supplied map into the persisted shape.
+
+    The client payload is untrusted, so slugs and chapter ids go through the
+    same regexes the book routes use and anything unrecognised is dropped
+    rather than stored.
+    """
+    books = {}
+    if not isinstance(raw, dict):
+        return books
+    for slug, entry in list(raw.items())[:BOOK_PROGRESS_MAX_BOOKS]:
+        if not isinstance(slug, str) or not BOOK_SLUG_RE.match(slug):
+            continue
+        if not isinstance(entry, dict):
+            continue
+        chapters = {}
+        raw_chapters = entry.get("chapters")
+        if isinstance(raw_chapters, dict):
+            for chapter_id, chapter in list(raw_chapters.items())[:BOOK_PROGRESS_MAX_CHAPTERS]:
+                if not isinstance(chapter_id, str) or not BOOK_CHAPTER_ID_RE.match(chapter_id):
+                    continue
+                normalized = _normalize_progress_chapter(chapter)
+                if normalized:
+                    chapters[chapter_id] = normalized
+        last = entry.get("lastChapterId")
+        updated = entry.get("updatedAt")
+        books[slug] = {
+            "lastChapterId": (
+                last if isinstance(last, str) and BOOK_CHAPTER_ID_RE.match(last) else None
+            ),
+            "updatedAt": (
+                updated if isinstance(updated, str) and 0 < len(updated) <= 40 else None
+            ),
+            "chapters": chapters,
+        }
+    return books
+
+
+def _progress_is_newer(candidate, current):
+    a = _parse_iso_datetime(candidate.get("updatedAt"))
+    b = _parse_iso_datetime(current.get("updatedAt"))
+    if a is None:
+        return False
+    if b is None:
+        return True
+    try:
+        return a >= b
+    except TypeError:  # one side carried a timezone and the other did not
+        return str(candidate.get("updatedAt")) >= str(current.get("updatedAt"))
+
+
+def _merge_book_progress(stored, incoming):
+    """Per book, the more recently touched copy wins; new books are added."""
+    merged = dict(stored)
+    for slug, entry in incoming.items():
+        current = merged.get(slug)
+        if not isinstance(current, dict) or _progress_is_newer(entry, current):
+            merged[slug] = entry
+    return merged
+
+
+def _book_progress_for(email):
+    return _normalize_progress_books(_load_book_progress_store().get(email) or {})
+
+
+@app.route("/api/books/progress")
+@require_auth
+def book_progress_get():
+    email = _current_user_email()
+    if not email:
+        return jsonify({"error": "session_required"}), 403
+    return jsonify({"books": _book_progress_for(email)})
+
+
+@app.route("/api/books/progress", methods=["POST"])
+@require_auth
+def book_progress_save():
+    email = _current_user_email()
+    if not email:
+        return jsonify({"error": "session_required"}), 403
+    payload = request.get_json(silent=True) or {}
+    incoming = _normalize_progress_books(payload.get("books"))
+    store = _load_book_progress_store()
+    merged = _merge_book_progress(
+        _normalize_progress_books(store.get(email) or {}), incoming
+    )
+    store[email] = merged
+    try:
+        atomic_json_dump(store, BOOK_PROGRESS_FILE)
+    except OSError:
+        return jsonify({"error": "progress_write_failed"}), 500
+    return jsonify({"books": merged})
 
 
 # --- SPA static serving (production build) ---

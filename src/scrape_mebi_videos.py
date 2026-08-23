@@ -18,7 +18,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from googleapiclient.http import MediaInMemoryUpload, MediaIoBaseUpload
 
-from src.sync_to_google import get_services, _get_or_create_folder
+from src.sync_to_google import get_services, _get_or_create_folder, get_year_root
 from src.env_loader import load_env
 
 load_env()
@@ -258,7 +258,9 @@ def sanitize_filename(name):
 def download_and_upload_videos(videos, drive_service, tracker):
     print(f"\n[Drive] {len(videos)} video yükleniyor...")
 
-    root_id = _get_or_create_folder(drive_service, "MEBI Videolar")
+    root_id = _get_or_create_folder(
+        drive_service, "MEBI Videolar",
+        parent_id=get_year_root(drive_service))
     course_folders = {}
     unit_folders = {}
 

@@ -7,7 +7,7 @@ import {
 import { useApi } from '../hooks/useApi'
 import {
   useReaderSettings, useProgressWriter, readBookProgress,
-  READER_FONT_SIZES, READER_LINE_HEIGHTS, READER_MEASURES,
+  READER_FONT_SIZES, READER_LINE_HEIGHTS, READER_MEASURES, READER_GUTTERS,
   type ReaderTheme, type ReaderFont,
 } from '../hooks/useBookReader'
 import { renderMarkdown } from '../utils/markdown'
@@ -304,6 +304,8 @@ export default function BookReader() {
     '--reader-font-size': READER_FONT_SIZES[settings.fontSize],
     '--reader-line-height': READER_LINE_HEIGHTS[settings.lineHeight],
     '--reader-measure': READER_MEASURES[settings.measure],
+    // Narrow viewports cannot honour a max-width; there the same step is a margin.
+    '--reader-gutter': READER_GUTTERS[settings.measure],
   } as React.CSSProperties
 
   if (error) {

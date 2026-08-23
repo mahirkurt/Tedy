@@ -18,7 +18,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from googleapiclient.http import MediaInMemoryUpload, MediaIoBaseUpload
 
-from src.sync_to_google import get_services, _get_or_create_folder
+from src.sync_to_google import get_services, _get_or_create_folder, get_year_root
 from src.env_loader import load_env
 
 load_env()
@@ -406,7 +406,8 @@ def download_and_upload(resources, s, drive, tracker):
     print(f"\n[İNDİRME] {len(resources)} kaynak işleniyor...")
 
     root_id = _get_or_create_folder(
-        drive, "SEBİTV Videolar"
+        drive, "SEBİTV Videolar",
+        parent_id=get_year_root(drive)
     )
     course_folders = {}
     unit_folders = {}

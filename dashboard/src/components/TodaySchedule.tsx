@@ -77,7 +77,8 @@ function compareCalendarDay(target: Date, reference: Date): -1 | 0 | 1 {
   return t < r ? -1 : 1
 }
 
-function parseTurkishDate(s: string): Date | null {
+function parseTurkishDate(s?: string | null): Date | null {
+  if (!s) return null
   const m = s.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/)
   if (!m) return null
   return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5])

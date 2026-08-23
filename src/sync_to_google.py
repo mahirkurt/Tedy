@@ -538,7 +538,8 @@ def sync_attachments_to_drive(drive_service, data):
 
     # Get or create root folder
     folder_id = _get_or_create_folder(
-        drive_service, "Ödevler"
+        drive_service, "Ödevler",
+        parent_id=get_year_root(drive_service)
     )
 
     added = 0
@@ -621,6 +622,65 @@ def _get_or_create_folder(drive_service, name, parent_id=None):
         body=meta, fields="id",
     ).execute()
     return folder["id"]
+
+
+DRIVE_ROOT_NAME = "TEDY"
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
+
+# Same shape run_sync.py already requires before it will turn a stored year
+# into a filesystem path (see _YEAR_RE there) - a malformed value must not
+# be allowed to become a Drive folder name either.
+_YEAR_RE = re.compile(r"^\d{4}-\d{4}$")
+
+
+class UnknownAcademicYear(RuntimeError):
+    """Refuse to upload rather than file content under the wrong year."""
+
+
+def get_year_root(drive_service, year=None):
+    """Return the id of TEDY/<year>/, creating it if needed."""
+    if year is None:
+        from src.academic_year import STATE_FILENAME, load_year_state
+        year = load_year_state(
+            os.path.join(OUTPUT_DIR, STATE_FILENAME)).get("year")
+    if not year:
+        raise UnknownAcademicYear(
+            "academic year unknown - refusing to upload to Drive")
+    if not _YEAR_RE.match(year):
+        raise UnknownAcademicYear(
+            f"malformed academic year {year!r} - refusing to upload to Drive")
+    # parent_id="root" scopes this to Drive's top level, not just any
+    # folder named TEDY anywhere in the account (see move_root_folders).
+    tedy = _get_or_create_folder(drive_service, DRIVE_ROOT_NAME, parent_id="root")
+    return _get_or_create_folder(drive_service, year, parent_id=tedy)
+
+
+def move_root_folders(drive_service, names, parent_id):
+    """Re-parent existing Drive-root folders under parent_id. Returns moved ids.
+
+    Scoped to 'root' in parents: without it this matches a folder of that
+    name at ANY depth, including one already nested inside a previous
+    year's archive (which a second rollover would then empty right back
+    out) or an unrelated folder shared in from another user.
+    """
+    moved = []
+    for name in names:
+        q = (f"name='{name}' and "
+             f"mimeType='application/vnd.google-apps.folder' and "
+             f"trashed=false and 'root' in parents")
+        found = drive_service.files().list(
+            q=q, spaces="drive", fields="files(id,parents)",
+        ).execute().get("files", [])
+        for f in found:
+            if parent_id in (f.get("parents") or []):
+                continue
+            drive_service.files().update(
+                fileId=f["id"], addParents=parent_id,
+                removeParents=",".join(f.get("parents") or []),
+                fields="id,parents",
+            ).execute()
+            moved.append(f["id"])
+    return moved
 
 
 # =============================================================================

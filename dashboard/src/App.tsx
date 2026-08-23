@@ -1,12 +1,15 @@
-import { useState } from 'react'
-import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom'
 import { Content, SideNav, SideNavItems, SideNavLink } from '@carbon/react'
 import DashboardHeader from './components/DashboardHeader'
+import ReaderHeader, { ReaderFooter } from './components/ReaderChrome'
 import DashboardFooter from './components/DashboardFooter'
 import LoginPage from './components/LoginPage'
+import { SessionContext } from './contexts/session'
 import { useAuth } from './hooks/useAuth'
 import { useFocusMode } from './contexts/focusMode'
-import { routes, navRoutes } from './routes'
+import { activateReaderProfile, useBookProgressSync } from './hooks/useBookReader'
+import { routesFor, navRoutesFor, ROLE_HOME } from './routes'
 
 import TodaySchedule from './components/TodaySchedule'
 import WeeklySchedule from './components/WeeklySchedule'
@@ -35,6 +38,20 @@ export default function App() {
   const [sideNavExpanded, setSideNavExpanded] = useState(false)
   const location = useLocation()
 
+  // Before any reader screen renders, so the first read already hits this
+  // profile's storage rather than the previous occupant's.
+  activateReaderProfile(user?.email, { inheritLegacy: user?.role === 'full' })
+  useBookProgressSync(user?.email)
+
+  // The reader's ground is paper, not Carbon grey — and that has to reach the
+  // body, which sits above this component.
+  useEffect(() => {
+    const root = document.documentElement
+    if (user) root.dataset.role = user.role
+    else delete root.dataset.role
+    return () => { delete root.dataset.role }
+  }, [user])
+
   if (loading) {
     return (
       <div className="app-shell-loading">
@@ -47,14 +64,24 @@ export default function App() {
     return <LoginPage onLogin={login} />
   }
 
+  const visibleRoutes = routesFor(user.role)
+  const navItems = navRoutesFor(user.role)
+  const home = ROLE_HOME[user.role]
+  const isReader = user.role === 'reader'
+
   return (
-    <>
-      <DashboardHeader
-        user={user}
-        onLogout={logout}
-        isSideNavExpanded={sideNavExpanded}
-        onClickSideNavExpand={() => setSideNavExpanded(p => !p)}
-      />
+    <SessionContext.Provider value={user}>
+      {isReader ? (
+        <ReaderHeader user={user} onLogout={logout} />
+      ) : (
+        <DashboardHeader
+          user={user}
+          onLogout={logout}
+          isSideNavExpanded={sideNavExpanded}
+          onClickSideNavExpand={() => setSideNavExpanded(p => !p)}
+        />
+      )}
+      {navItems.length > 1 && (
       <SideNav
         aria-label="Navigasyon"
         isRail
@@ -64,7 +91,7 @@ export default function App() {
         isChildOfHeader
       >
         <SideNavItems>
-          {navRoutes.map(r => (
+          {navItems.map(r => (
             <SideNavLink
               key={r.path}
               as={NavLink}
@@ -78,6 +105,7 @@ export default function App() {
           ))}
         </SideNavItems>
       </SideNav>
+      )}
       {sideNavExpanded && (
         <button
           type="button"
@@ -86,15 +114,23 @@ export default function App() {
           onClick={() => setSideNavExpanded(false)}
         />
       )}
-      <Content className={`app-shell-content${focusMode ? ' app-shell-content--focus' : ''}`}>
+      <Content
+        className={[
+          'app-shell-content',
+          focusMode ? 'app-shell-content--focus' : '',
+          isReader ? 'app-shell-content--reader' : '',
+        ].filter(Boolean).join(' ')}
+      >
         <Routes>
-          {routes.map(r => {
+          {visibleRoutes.map(r => {
             const Comp = COMPONENTS[r.componentName]
             return <Route key={r.path} path={r.path} element={<Comp />} />
           })}
+          {/* Anything this role cannot see resolves to its own home. */}
+          <Route path="*" element={<Navigate to={home} replace />} />
         </Routes>
       </Content>
-      <DashboardFooter />
-    </>
+      {isReader ? <ReaderFooter /> : <DashboardFooter />}
+    </SessionContext.Provider>
   )
 }

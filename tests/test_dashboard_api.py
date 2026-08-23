@@ -76,6 +76,54 @@ class TestAuthBypass:
         assert data["name"] == "Test User"
 
 
+class TestCurrentUserRoleFailsClosed:
+    """H2: no session email must yield least privilege, not full access.
+
+    Every call site today sits behind a `session.get("user_email")` check,
+    so this default is currently unreached in practice — but a future
+    caller outside that guard must not silently get ROLE_FULL.
+    """
+
+    def test_no_session_email_defaults_to_reader(self):
+        with app.test_request_context():
+            assert dashboard_api._current_user_role() == dashboard_api.ROLE_READER
+
+    def test_known_full_access_email_is_unaffected(self):
+        with app.test_request_context():
+            from flask import session as flask_session
+
+            flask_session["user_email"] = "drmahirkurt@gmail.com"
+            assert dashboard_api._current_user_role() == dashboard_api.ROLE_FULL
+
+    def test_off_roster_email_is_still_reader(self):
+        with app.test_request_context():
+            from flask import session as flask_session
+
+            flask_session["user_email"] = "stranger@example.com"
+            assert dashboard_api._current_user_role() == dashboard_api.ROLE_READER
+
+
+class TestSessionCookieHardening:
+    """H4: session cookie flags. The site is served over HTTPS."""
+
+    def test_defaults(self):
+        assert app.config["SESSION_COOKIE_HTTPONLY"] is True
+        assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
+        assert app.config["SESSION_COOKIE_SECURE"] is True
+
+    def test_dashboard_cookie_secure_env_var_flips_only_that_flag(self, monkeypatch):
+        monkeypatch.setenv("DASHBOARD_COOKIE_SECURE", "0")
+        dashboard_api._apply_cookie_config(app)
+        try:
+            assert app.config["SESSION_COOKIE_SECURE"] is False
+            # The other two flags are not driven by this variable at all.
+            assert app.config["SESSION_COOKIE_HTTPONLY"] is True
+            assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
+        finally:
+            monkeypatch.delenv("DASHBOARD_COOKIE_SECURE", raising=False)
+            dashboard_api._apply_cookie_config(app)  # restore the default
+
+
 class TestScheduleEndpoint:
     def test_returns_200(self, client):
         resp = client.get("/api/schedule")

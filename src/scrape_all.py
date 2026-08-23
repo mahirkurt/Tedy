@@ -88,13 +88,132 @@ def login(driver):
     return None
 
 
+class PortalUnavailable(Exception):
+    """The portal declined to serve a page, and said why.
+
+    Raised when the absence of data is explained by the portal itself -
+    no permission, or a module its administrators have closed. That is
+    not a scrape failure and must not be reported as one.
+    """
+
+    def __init__(self, reason, message):
+        self.reason = reason
+        super().__init__(message)
+
+
+UNAUTHORIZED_PATH = "/hata/yetkisiz_giris"
+MODULE_CLOSED_MARKER = "erişime kapalı"
+
+
+def detect_portal_block(current_url, body_text):
+    """Return (reason, detail) when the portal is refusing this page."""
+    if UNAUTHORIZED_PATH in (current_url or ""):
+        return ("yetkisiz", "portal yetkisi yok (yetkisiz_giris)")
+    if MODULE_CLOSED_MARKER in (body_text or ""):
+        for line in body_text.splitlines():
+            if MODULE_CLOSED_MARKER in line:
+                return ("modul_kapali", line.strip())
+        return ("modul_kapali", "modül erişime kapalı")
+    return None
+
+
+def _anchor_present(driver, anchor):
+    """True if any of the given CSS selectors matches an element on the page."""
+    selectors = [anchor] if isinstance(anchor, str) else list(anchor)
+    for sel in selectors:
+        try:
+            if driver.find_elements(By.CSS_SELECTOR, sel):
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def _require_portal_access(driver, label, anchor=None):
+    """Fail fast with a named reason instead of timing out on a missing element.
+
+    A "module closed" banner can be a sitewide maintenance notice rather
+    than a per-page block - it has been observed naming a module other
+    than the page it appeared on (health.json once marked ders_programi
+    unavailable on the strength of a banner reading "Akademi Modülü kısa
+    bir süre erişime kapalıdır", which names a different module). The
+    banner text alone is therefore not proof this page is blocked: pass
+    `anchor` (a CSS selector, or a list of them) naming an element this
+    page always renders when it is genuinely serving content. If the
+    anchor IS present, the banner is incidental and access is not
+    suppressed. The unauthorized-redirect reason is unambiguous on its
+    own and needs no anchor.
+    """
+    try:
+        body_text = driver.find_element(By.TAG_NAME, "body").text
+    except Exception:
+        body_text = ""
+    block = detect_portal_block(driver.current_url, body_text)
+    if not block:
+        return
+    reason, detail = block
+    if reason == "modul_kapali" and anchor and _anchor_present(driver, anchor):
+        return
+    raise PortalUnavailable(reason, f"{label}: {detail}")
+
+
+def parse_gelisim_rubrics(html):
+    """Extract per-course rubric assessments from the gelişim raporu page.
+
+    Each course card holds a two-column table: the assessment text and the
+    level reached. Rows whose second cell is empty are group headings
+    ("OYUN VE HÜCUM OYUNLARI"), which scope the rows that follow.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    rubrics = []
+    for card in soup.select("div.card.mobil_gelisim_raporu_dersler"):
+        header = card.select_one(".card-header, .card-title, h4, h5")
+        ders = header.get_text(" ", strip=True) if header else ""
+        for table in card.find_all("table"):
+            alan = ""
+            for tr in table.find_all("tr"):
+                cells = tr.find_all(["td", "th"])
+                if len(cells) != 2:
+                    continue
+                if all(c.name == "th" for c in cells):
+                    continue  # column labels, not an assessment
+                left = cells[0].get_text(" ", strip=True)
+                right = cells[1].get_text(" ", strip=True)
+                if not left:
+                    continue
+                if not right:
+                    alan = left
+                    continue
+                rubrics.append({"ders": ders, "alan": alan,
+                                "kazanim": left, "duzey": right})
+    return rubrics
+
+
+def _is_empty_state_row(cells, headers):
+    """True for the single spanning cell DataTables renders for an empty table.
+
+    Such a row carries no record - keeping it would hand every consumer an
+    object whose real fields are all missing.
+    """
+    if len(cells) != 1:
+        return False
+    colspan = cells[0].get_attribute("colspan")
+    if colspan and colspan.strip().isdigit() and int(colspan) > 1:
+        return True
+    return len(headers) > 1
+
+
 def extract_table(driver, table_el):
     """Extract a table into a list of dicts (header->value)."""
     headers = [th.text.strip() for th in table_el.find_elements(By.TAG_NAME, "th")]
     rows = []
+    empty_state = False
     for tr in table_el.find_elements(By.TAG_NAME, "tr"):
         cells = tr.find_elements(By.TAG_NAME, "td")
         if not cells:
+            continue
+        if _is_empty_state_row(cells, headers):
+            empty_state = True
             continue
         if headers:
             row = {}
@@ -104,7 +223,8 @@ def extract_table(driver, table_el):
             rows.append(row)
         else:
             rows.append([c.text.strip() for c in cells])
-    return {"headers": headers, "rows": rows}
+    return {"headers": headers, "rows": rows,
+            "empty_state": empty_state and not rows}
 
 
 # =============================================================================
@@ -260,6 +380,7 @@ def scrape_ders_programi(driver):
     url = f"{BASE_URL}/pages/ogrenci_istekler/p_haftalik_ders_hazirlik_programim"
     driver.get(url)
     time.sleep(3)
+    _require_portal_access(driver, "Haftalık Ders Programı", anchor="select")
 
     all_weeks = []
 
@@ -431,6 +552,7 @@ def scrape_odevlerim(driver):
 
     # Extract homework table + detail span IDs
     hw_rows = []
+    hw_empty_state = False
     tables = driver.find_elements(By.TAG_NAME, "table")
     for tbl in tables:
         headers = [
@@ -443,6 +565,9 @@ def scrape_odevlerim(driver):
         for tr in tbl.find_elements(By.TAG_NAME, "tr"):
             cells = tr.find_elements(By.TAG_NAME, "td")
             if not cells:
+                continue
+            if _is_empty_state_row(cells, headers):
+                hw_empty_state = True
                 continue
             row = {}
             for j, cell in enumerate(cells):
@@ -458,7 +583,9 @@ def scrape_odevlerim(driver):
             hw_rows.append(row)
         break
 
-    result["homework"] = {"headers": headers if hw_rows else [], "rows": hw_rows}
+    result["homework"] = {"headers": headers if hw_rows else [],
+                          "rows": hw_rows,
+                          "empty_state": hw_empty_state and not hw_rows}
 
     driver.save_screenshot(os.path.join(OUTPUT_DIR, "odevlerim.png"))
     print(f"  Found {len(hw_rows)} homework items")
@@ -518,6 +645,7 @@ def scrape_takvim(driver):
     print("\n[4/8] Akademik Takvim")
     url = f"{BASE_URL}/pages/akademik_takvim/p_ogrenci"
     driver.get(url)
+    _require_portal_access(driver, "Akademik Takvim", anchor="#select-all")
     wait_for(driver, (By.ID, "select-all"), timeout=15)
 
     # 1. Enable all filter checkboxes
@@ -771,8 +899,10 @@ def scrape_gelisim_raporu(driver):
     url = f"{BASE_URL}/pages/ogrenci_istekler/p_gelisim_raporum"
     driver.get(url)
     time.sleep(3)
+    _require_portal_access(
+        driver, "Gelişim Raporu", anchor="#genel_icerik_dp_ilgili_donem")
 
-    result = {"semester": "", "grades": [], "physical": {}}
+    result = {"semester": "", "grades": [], "physical": {}, "rubrics": []}
 
     # Get current semester from selector
     try:
@@ -794,7 +924,7 @@ def scrape_gelisim_raporu(driver):
         if any("Sınav" in h for h in headers):
             for tr in tbl.find_elements(By.TAG_NAME, "tr"):
                 cells = tr.find_elements(By.TAG_NAME, "td")
-                if not cells:
+                if not cells or _is_empty_state_row(cells, headers):
                     continue
                 row = {}
                 for j, cell in enumerate(cells):
@@ -814,13 +944,21 @@ def scrape_gelisim_raporu(driver):
             trs = tbl.find_elements(By.TAG_NAME, "tr")
             for tr in trs:
                 cells = tr.find_elements(By.TAG_NAME, "td")
-                if cells:
+                if cells and not _is_empty_state_row(cells, headers):
                     for j, cell in enumerate(cells):
                         if j < len(headers):
                             val = cell.text.strip()
                             if val:
                                 result["physical"][headers[j]] = val
             break
+
+    # Rubric assessments (kazanım/beceri levels) live outside the grades
+    # table and are the whole report in terms without exams.
+    try:
+        result["rubrics"] = parse_gelisim_rubrics(driver.page_source)
+        print(f"  Found {len(result['rubrics'])} rubric assessments")
+    except Exception as e:
+        print(f"  Rubric parse error: {e}")
 
     driver.save_screenshot(
         os.path.join(OUTPUT_DIR, "gelisim_raporum.png")
@@ -863,6 +1001,9 @@ def scrape_duyurular(driver):
             cells = tr.find_elements(By.TAG_NAME, "td")
             if not cells:
                 continue
+            if _is_empty_state_row(cells, headers):
+                result["empty_state"] = True
+                continue
             row = {}
             for j, cell in enumerate(cells):
                 key = headers[j] if j < len(headers) else f"col_{j}"
@@ -875,6 +1016,8 @@ def scrape_duyurular(driver):
                         row[f"{key}_url"] = href
             result["announcements"].append(row)
 
+    if result["announcements"]:
+        result.pop("empty_state", None)
     driver.save_screenshot(os.path.join(OUTPUT_DIR, "duyurular.png"))
     print(f"  Found {len(result['announcements'])} announcements")
     return result
