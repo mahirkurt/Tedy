@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { Tag } from '@carbon/react'
 import { ArrowRight, ArrowLeft, CheckmarkFilled, Time, Book as BookIcon } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
-import { useBookProgress } from '../hooks/useBookReader'
+import { useBookProgress, useAllBookProgress } from '../hooks/useBookReader'
+import { useSession } from '../contexts/session'
 import Ornament from './Ornament'
 import type { BookSummary, BookDetail as BookDetailType, BookChapter } from '../types'
 
@@ -81,10 +82,93 @@ export function BooksCallout() {
   )
 }
 
+/* ── Resume band ───────────────────────────────────────────────────────────── */
+
+/**
+ * "Where you left off", pulled from this profile's own bookmark.
+ *
+ * The shelf's job is to show what exists; this band's job is to get the reader
+ * back into the text in one click, so it sits above the shelf, wears the book's
+ * own cloth, and names the exact chapter rather than just the book.
+ */
+function ResumeBand({ books }: { books: BookSummary[] }) {
+  const progress = useAllBookProgress()
+  const [detail, setDetail] = useState<BookDetailType | null>(null)
+
+  // Most recently touched book that is still on the shelf.
+  const latest = useMemo(() => {
+    const shelved = new Set(books.map(b => b.slug))
+    return Object.entries(progress)
+      .filter(([slug, entry]) => shelved.has(slug) && entry.lastChapterId && entry.updatedAt)
+      .sort((a, b) => (b[1].updatedAt || '').localeCompare(a[1].updatedAt || ''))[0]
+  }, [books, progress])
+
+  const slug = latest?.[0]
+  const lastChapterId = latest?.[1].lastChapterId ?? null
+
+  useEffect(() => {
+    if (!slug) return
+    let cancelled = false
+    fetch(`/api/books/${slug}`, { credentials: 'include' })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => { if (!cancelled) setDetail(data) })
+      .catch(() => { if (!cancelled) setDetail(null) })
+    return () => { cancelled = true }
+  }, [slug])
+
+  // Detail lags the bookmark by one fetch; rendering it against a different
+  // book would show the wrong chapter for a frame.
+  if (!slug || !lastChapterId || detail?.slug !== slug) return null
+
+  const readable = detail.chapters.filter(c => c.available)
+  const index = readable.findIndex(c => c.id === lastChapterId)
+  if (index < 0) return null
+
+  const chapter = readable[index]
+  const ratio = latest[1].chapters[lastChapterId]?.ratio ?? 0
+  const pct = Math.max(1, Math.round(ratio * 100))
+  const finished = readable.filter(c => latest[1].chapters[c.id]?.done).length
+
+  return (
+    <section className="resume-band" data-palette={detail.cover?.palette || 'forest'}>
+      <div className="resume-band__cover">
+        <BookCover book={detail} size="sm" />
+      </div>
+
+      <div className="resume-band__text">
+        <p className="resume-band__eyebrow">
+          Kaldığın yer
+          <span className="resume-band__rule" aria-hidden />
+        </p>
+        <h2 className="resume-band__chapter">
+          {chapter.label && <span className="resume-band__label">{chapter.label} · </span>}
+          {chapter.title}
+        </h2>
+        <p className="resume-band__book">{detail.title} · {detail.author}</p>
+
+        <div className="resume-band__meter" aria-hidden>
+          <div className="resume-band__meter-fill" style={{ width: `${pct}%` }} />
+        </div>
+        <p className="resume-band__meta">
+          Bu bölümde %{pct} okudun · {index + 1}. bölüm / {readable.length}
+          {finished > 0 && <> · {finished} bölüm tamamlandı</>}
+        </p>
+      </div>
+
+      <Link to={`/kitaplar/${slug}/${lastChapterId}`} className="resume-band__cta">
+        Devam et
+        <ArrowRight size={16} />
+      </Link>
+    </section>
+  )
+}
+
 /* ── Shelf: /kitaplar ──────────────────────────────────────────────────────── */
 
 export default function TedyBooks() {
   const { data, loading } = useApi<{ books: BookSummary[] }>('/api/books', { books: [] })
+  const user = useSession()
+  const isReader = user?.role === 'reader'
 
   if (loading) {
     return (
@@ -98,14 +182,24 @@ export default function TedyBooks() {
   }
 
   return (
-    <div className="books">
+    <div className={`books${isReader ? ' books--reader' : ''}`}>
       <header className="books__masthead">
+        {isReader && (
+          <p className="books__exlibris">
+            <span className="books__exlibris-label">Ex libris</span>
+            <span className="books__exlibris-name">{user?.name || user?.email}</span>
+          </p>
+        )}
         <p className="books__eyebrow">Tedy Books</p>
         <h1 className="books__wordmark">Kitaplık</h1>
         <p className="books__tagline">
-          Rafındaki kitapları buradan, kendi okuma düzeninde okuyabilirsin.
+          {isReader
+            ? 'Bu raf yalnızca sana ait. Okuduğun yer hesabına kayıtlı; hangi cihazdan girersen gir kaldığın yerden devam edersin.'
+            : 'Rafındaki kitapları buradan, kendi okuma düzeninde okuyabilirsin.'}
         </p>
       </header>
+
+      {data.books.length > 0 && <ResumeBand books={data.books} />}
 
       {data.books.length === 0 ? (
         <div className="books-empty">
@@ -172,7 +266,7 @@ function ShelfCard({ book }: { book: BookSummary }) {
             <div className="shelf-card__meter-fill" style={{ width: `${readyPct}%` }} />
           </div>
           <span className="shelf-card__meter-label">
-            Kitabın %{readyPct}’i yayında · yeni bölümler eklendikçe burada belirir
+            Kitabın %{readyPct} kadarı yayında · yeni bölümler eklendikçe burada belirir
           </span>
         </div>
 

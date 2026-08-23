@@ -52,6 +52,13 @@
 }
 
 // ─── Base ────────────────────────────────────────────────────────────────────
+html {
+  // Without this, Chrome on Android auto-scales body text by container width
+  // and quietly overrides the reader's own font-size choice.
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background-color: var(--ted-page-bg);
   color: var(--ted-color-text-primary);
@@ -4683,12 +4690,37 @@ body {
     font-size: 0.8125rem;
   }
 
-  .reader__scroll { padding: 5.5rem var(--ted-space-md) 4rem; }
+  .reader__scroll {
+    padding: 5.5rem max(var(--reader-gutter, 6%), 0.75rem) 4rem;
+  }
   .reader__end-nav { flex-direction: column; }
   .reader__end-btn { max-width: none; min-height: 2.75rem; }
   .reader__end-btn--next { margin-left: 0; }
   .reader__end-note { text-align: left; margin-left: 0; }
   .bookmd { text-align: left; }
+}
+
+/* On a phone the type panel is a bottom sheet: anchored at the top it covered
+   the very text whose size was being adjusted, so every change looked like no
+   change at all. */
+@media (width <= 34rem) {
+  .reader-panel--type {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    border-width: 1px 0 0;
+    border-radius: var(--ted-radius-card) var(--ted-radius-card) 0 0;
+    padding-bottom: calc(var(--ted-space-md) + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -18px 46px -18px rgb(0 0 0 / 55%);
+    animation: reader-sheet-up var(--ted-transition-med) both;
+  }
+}
+
+@keyframes reader-sheet-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4698,4 +4730,413 @@ body {
   .books-callout,
   .reader__scrim,
   .reader-panel { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Reader profile
+   A "reader" account has no dashboard behind it, so the whole app becomes the
+   reading room: paper ground instead of Carbon grey, a cloth masthead, and the
+   reader's own bookmark raised above the shelf.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+html[data-role='reader'] {
+  --paper-ground: #ece5d6;
+  --paper-raised: #fbf8f1;
+  --paper-ink: #241f19;
+  --paper-ink-soft: #5b5147;
+  --paper-rule: rgb(36 31 25 / 14%);
+
+  --ted-page-bg: var(--paper-ground);
+  --ted-card-bg: var(--paper-raised);
+  --ted-color-text-primary: var(--paper-ink);
+  --ted-color-text-secondary: var(--paper-ink-soft);
+  --ted-color-text-helper: #8a7d6d;
+  --ted-color-border-subtle: var(--paper-rule);
+  --ted-shadow-card: 0 1px 2px rgb(36 31 25 / 6%), 0 8px 24px rgb(36 31 25 / 6%);
+  --ted-shadow-card-hover: 0 2px 4px rgb(36 31 25 / 8%), 0 16px 40px rgb(36 31 25 / 10%);
+}
+
+/* Laid-paper ground: a warm wash, a press-bed vignette, and a fine grain.
+   The grain is a background layer rather than an overlay element so it never
+   sits between the reader and the type. */
+html[data-role='reader'] body {
+  background-color: var(--paper-ground);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)' opacity='0.05'/%3E%3C/svg%3E"),
+    radial-gradient(130% 70% at 50% -12%, rgb(255 252 244 / 85%), transparent 62%),
+    radial-gradient(120% 55% at 50% 112%, rgb(22 38 31 / 8%), transparent 68%);
+  background-attachment: fixed, fixed, fixed;
+}
+
+html[data-role='reader'] .app-shell-content--reader.cds--content {
+  background: transparent;
+  max-width: 66rem;
+  padding-bottom: var(--ted-space-xl);
+}
+
+/* ─── Cloth masthead ────────────────────────────────────────────────────── */
+
+.reader-header {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 8000;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ted-space-md);
+  padding: 0 var(--ted-space-lg);
+  color: #f5f1e6;
+  background:
+    linear-gradient(103deg, var(--book-cloth-3) 0%, var(--book-cloth-1) 46%, var(--book-cloth-2) 100%);
+  box-shadow: 0 1px 0 var(--book-gold-dim), 0 10px 28px rgb(16 27 22 / 26%);
+}
+
+.reader-header__brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+
+  &:focus-visible {
+    outline: 2px solid var(--book-gold-bright);
+    outline-offset: 4px;
+    border-radius: 2px;
+  }
+}
+
+.reader-header__ornament {
+  color: var(--book-gold);
+  line-height: 0;
+  transform: translateY(-1px);
+
+  .ornament--mark { width: 0.42rem; height: 0.42rem; }
+}
+
+.reader-header__wordmark {
+  font-family: var(--book-display);
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--book-gold-bright);
+  white-space: nowrap;
+}
+
+.reader-header__side {
+  display: flex;
+  align-items: center;
+  gap: var(--ted-space-sm);
+  min-width: 0;
+}
+
+.reader-header__role {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--book-gold);
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--book-gold-dim);
+  border-radius: 2px;
+}
+
+.reader-header__avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--book-gold-dim);
+  flex-shrink: 0;
+}
+
+.reader-header__identity {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  min-width: 0;
+}
+
+.reader-header__name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  max-width: 13rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader-header__email {
+  font-size: 0.6875rem;
+  color: rgb(245 241 230 / 62%);
+  max-width: 13rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader-header__logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: none;
+  color: rgb(245 241 230 / 80%);
+  cursor: pointer;
+  transition: color var(--ted-transition-fast), border-color var(--ted-transition-fast);
+
+  &:hover { color: var(--book-gold-bright); border-color: var(--book-gold-dim); }
+
+  &:focus-visible {
+    outline: 2px solid var(--book-gold-bright);
+    outline-offset: 2px;
+  }
+}
+
+/* ─── Ex libris plate ───────────────────────────────────────────────────── */
+
+.books--reader .books__masthead {
+  border-bottom-color: var(--paper-rule);
+}
+
+.books__exlibris {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 var(--ted-space-sm);
+  color: var(--book-cloth-1);
+
+  &::after {
+    content: '';
+    flex: 1 1 auto;
+    height: 1px;
+    background: linear-gradient(90deg, var(--book-gold-dim), transparent);
+  }
+}
+
+.books__exlibris-label {
+  font-family: var(--book-display);
+  font-style: italic;
+  font-size: 0.9375rem;
+  color: #97845a;
+}
+
+.books__exlibris-name {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.books--reader .books__eyebrow { color: #97845a; }
+
+/* ─── Resume band ───────────────────────────────────────────────────────── */
+
+.resume-band {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--ted-space-lg);
+  margin-bottom: var(--ted-space-xl);
+  padding: var(--ted-space-lg);
+  border-radius: var(--ted-radius-card);
+  overflow: hidden;
+  color: #f3efe4;
+  background:
+    linear-gradient(122deg, var(--book-cloth-3) 0%, var(--book-cloth-1) 52%, var(--book-cloth-2) 100%);
+  box-shadow: 0 14px 34px rgb(16 27 22 / 22%);
+}
+
+/* Gold rule across the head, the way a bound cover is stamped. */
+.resume-band::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--book-gold), transparent);
+}
+
+.resume-band__cover {
+  flex: 0 0 auto;
+  display: block;
+  transform: rotate(-2.5deg);
+  transition: transform var(--ted-transition-med);
+}
+
+/* A bound book earns more presence than the callout's thumbnail. */
+.resume-band__cover .book-cover--sm {
+  width: 88px;
+  font-size: 26px;
+}
+
+.resume-band:hover .resume-band__cover { transform: rotate(-1deg) translateY(-2px); }
+
+.resume-band__text { flex: 1 1 auto; min-width: 0; }
+
+.resume-band__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.35rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--book-gold);
+}
+
+.resume-band__rule {
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(90deg, var(--book-gold-dim), transparent);
+}
+
+.resume-band__chapter {
+  margin: 0;
+  font-family: var(--book-display);
+  font-size: clamp(1.5rem, 3.4vw, 2rem);
+  font-weight: 600;
+  line-height: 1.12;
+  color: #fbf7ec;
+}
+
+.resume-band__label {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--book-gold);
+}
+
+.resume-band__book {
+  margin: 0.3rem 0 0;
+  font-size: 0.8125rem;
+  letter-spacing: 0.03em;
+  color: rgb(243 239 228 / 72%);
+}
+
+.resume-band__meter {
+  height: 2px;
+  margin-top: var(--ted-space-md);
+  border-radius: 999px;
+  background: rgb(245 241 230 / 18%);
+  overflow: hidden;
+}
+
+.resume-band__meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--book-gold-dim), var(--book-gold-bright));
+  transition: width var(--ted-transition-med);
+}
+
+.resume-band__meta {
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  color: rgb(243 239 228 / 66%);
+}
+
+.resume-band__cta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.1rem;
+  border: 1px solid var(--book-gold);
+  border-radius: 2px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  color: var(--book-gold-bright);
+  background: transparent;
+  transition:
+    background-color var(--ted-transition-fast),
+    color var(--ted-transition-fast),
+    transform var(--ted-transition-fast);
+
+  &:hover {
+    background: var(--book-gold);
+    color: var(--book-cloth-3);
+    transform: translateX(2px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--book-gold-bright);
+    outline-offset: 3px;
+  }
+}
+
+/* ─── Colophon ──────────────────────────────────────────────────────────── */
+
+.reader-footer {
+  max-width: 66rem;
+  margin: 0 auto;
+  padding: var(--ted-space-xl) var(--ted-space-lg) var(--ted-space-xl);
+  text-align: center;
+  color: #8a7d6d;
+}
+
+.reader-footer__ornament {
+  display: block;
+  color: var(--book-gold-dim);
+  line-height: 0;
+  margin-bottom: var(--ted-space-sm);
+
+  .ornament { width: 4.5rem; height: 0.75rem; }
+}
+
+.reader-footer__line {
+  margin: 0;
+  font-family: var(--book-display);
+  font-style: italic;
+  font-size: 1rem;
+  color: #6f6355;
+}
+
+/* ─── Entrance ──────────────────────────────────────────────────────────── */
+
+.books--reader .books__masthead,
+.books--reader .resume-band,
+.books--reader .books__shelf > * {
+  animation: reader-rise 520ms cubic-bezier(0.2, 0, 0.2, 1) both;
+}
+
+.books--reader .resume-band { animation-delay: 70ms; }
+.books--reader .books__shelf > * { animation-delay: 140ms; }
+
+@keyframes reader-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (width <= 46rem) {
+  .reader-header { padding: 0 var(--ted-space-md); }
+  .reader-header__role,
+  .reader-header__email { display: none; }
+  .reader-header__name { max-width: 8rem; }
+
+  .resume-band {
+    flex-wrap: wrap;
+    padding: var(--ted-space-md);
+    gap: var(--ted-space-md);
+  }
+
+  .resume-band__cover .book-cover--sm { width: 66px; font-size: 19px; }
+
+  .resume-band__cta { width: 100%; justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .books--reader .books__masthead,
+  .books--reader .resume-band,
+  .books--reader .books__shelf > * { animation: none; }
+
+  .resume-band__cover,
+  .resume-band__cta,
+  .resume-band__meter-fill { transition: none; }
+
+  .resume-band:hover .resume-band__cover { transform: rotate(-2.5deg); }
 }

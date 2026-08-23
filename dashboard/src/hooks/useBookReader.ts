@@ -1,15 +1,70 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 
 /**
- * Reader preferences and reading position, both persisted to localStorage.
+ * Reader preferences and reading position.
  *
- * Position is deliberately device-local: it is a "where was I on this screen"
- * bookmark, not shared state, so it needs no server round-trip and survives
- * offline reading.
+ * Both are written to localStorage under a key namespaced by the signed-in
+ * profile, so two people sharing a device never see each other's bookmarks or
+ * type settings. The position is additionally mirrored to the server (see
+ * `useBookProgressSync`) because a bookmark belongs to the reader rather than
+ * to the browser; localStorage stays the working copy so reading survives a
+ * dropped connection.
  */
 
 const SETTINGS_KEY = 'tedy-books-settings'
 const PROGRESS_KEY = 'tedy-books-progress'
+
+/* ── Profile namespacing ───────────────────────────────────────────────────── */
+
+/** Fired on every local write so open screens re-read without polling. */
+const PROGRESS_EVENT = 'tedy:books-progress'
+
+let profileKey = 'anon'
+
+function settingsKey(): string {
+  return `${SETTINGS_KEY}::${profileKey}`
+}
+
+function progressKey(): string {
+  return `${PROGRESS_KEY}::${profileKey}`
+}
+
+/**
+ * Point the reader's storage at one profile.
+ *
+ * Called during render (before any reader screen mounts) so the very first read
+ * already hits the right key; the change notification is deferred to a
+ * microtask to keep the render phase free of side effects.
+ *
+ * `inheritLegacy` hands the pre-namespacing bookmarks to this profile. Only
+ * full-access accounts may inherit them — those bookmarks were necessarily
+ * written by one of them, and letting a reader adopt them would be exactly the
+ * cross-profile bleed the namespacing exists to prevent.
+ */
+export function activateReaderProfile(
+  email: string | null | undefined,
+  { inheritLegacy = false }: { inheritLegacy?: boolean } = {},
+) {
+  const next = email ? email.toLowerCase() : 'anon'
+  if (next === profileKey) return
+  profileKey = next
+  if (inheritLegacy) adoptLegacyKeys()
+  queueMicrotask(() => window.dispatchEvent(new Event(PROGRESS_EVENT)))
+}
+
+function adoptLegacyKeys() {
+  try {
+    for (const [legacy, scoped] of [
+      [PROGRESS_KEY, progressKey()],
+      [SETTINGS_KEY, settingsKey()],
+    ]) {
+      const value = localStorage.getItem(legacy)
+      if (value !== null && localStorage.getItem(scoped) === null) {
+        localStorage.setItem(scoped, value)
+      }
+    }
+  } catch { /* storage blocked — nothing to inherit, nothing to lose */ }
+}
 
 export const READER_THEMES = ['paper', 'sepia', 'night'] as const
 export const READER_FONTS = ['serif', 'sans'] as const
@@ -30,6 +85,15 @@ export const READER_FONT_SIZES = ['1rem', '1.0625rem', '1.1875rem', '1.3125rem',
 export const READER_LINE_HEIGHTS = ['1.6', '1.75', '1.9', '2.05']
 export const READER_MEASURES = ['32rem', '38rem', '44rem']
 
+/**
+ * Column width expressed as a side margin instead of a maximum.
+ *
+ * On a phone the viewport is always narrower than the narrowest measure, so
+ * `max-width` never binds and the control is dead. The same three steps read as
+ * gutters there: a narrow column is one with wide margins.
+ */
+export const READER_GUTTERS = ['10%', '6%', '2.5%']
+
 export const DEFAULT_READER_SETTINGS: ReaderSettings = {
   theme: 'paper',
   font: 'serif',
@@ -45,7 +109,7 @@ function clampIndex(value: unknown, length: number, fallback: number): number {
 
 function readSettings(): ReaderSettings {
   try {
-    const raw = localStorage.getItem(SETTINGS_KEY)
+    const raw = localStorage.getItem(settingsKey())
     if (!raw) return DEFAULT_READER_SETTINGS
     const parsed = JSON.parse(raw) as Partial<ReaderSettings>
     return {
@@ -69,7 +133,7 @@ export function useReaderSettings() {
     setSettings(prev => {
       const next = { ...prev, ...patch }
       try {
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(next))
+        localStorage.setItem(settingsKey(), JSON.stringify(next))
       } catch { /* storage full or blocked — preferences simply won't persist */ }
       return next
     })
@@ -93,14 +157,11 @@ export interface BookProgress {
 
 const EMPTY_PROGRESS: BookProgress = { lastChapterId: null, updatedAt: null, chapters: {} }
 
-type ProgressStore = Record<string, BookProgress>
-
-/** Fired on every local write so open screens re-read without polling. */
-const PROGRESS_EVENT = 'tedy:books-progress'
+export type ProgressStore = Record<string, BookProgress>
 
 function readRawStore(): string {
   try {
-    return localStorage.getItem(PROGRESS_KEY) ?? ''
+    return localStorage.getItem(progressKey()) ?? ''
   } catch {
     return ''
   }
@@ -119,7 +180,7 @@ function readStore(): ProgressStore {
 
 function writeStore(store: ProgressStore) {
   try {
-    localStorage.setItem(PROGRESS_KEY, JSON.stringify(store))
+    localStorage.setItem(progressKey(), JSON.stringify(store))
   } catch { /* storage full or blocked — the bookmark just won't persist */ }
   window.dispatchEvent(new Event(PROGRESS_EVENT))
 }
@@ -144,6 +205,24 @@ function subscribeProgress(onChange: () => void) {
     window.removeEventListener('storage', onChange)
     window.removeEventListener(PROGRESS_EVENT, onChange)
   }
+}
+
+/** The whole profile's shelf state, for "where was I last?" across books. */
+export function useAllBookProgress(): ProgressStore {
+  const raw = useSyncExternalStore(subscribeProgress, readRawStore, () => '')
+
+  return useMemo(() => {
+    if (!raw) return {}
+    try {
+      const store = JSON.parse(raw) as ProgressStore
+      if (!store || typeof store !== 'object') return {}
+      return Object.fromEntries(
+        Object.entries(store).map(([slug, entry]) => [slug, normalize(entry)]),
+      )
+    } catch {
+      return {}
+    }
+  }, [raw])
 }
 
 /**
@@ -211,4 +290,97 @@ export function useProgressWriter(slug: string | undefined, chapterId: string | 
   useEffect(() => flush, [flush])
 
   return { save, flush }
+}
+
+/* ── Server mirror ────────────────────────────────────────────────────────── */
+
+const SYNC_DEBOUNCE_MS = 4000
+
+function newerThan(a: BookProgress | undefined, b: BookProgress | undefined): boolean {
+  if (!a?.updatedAt) return false
+  if (!b?.updatedAt) return true
+  return a.updatedAt >= b.updatedAt
+}
+
+/** Union of both copies; per book the more recently touched one wins. */
+function mergeStores(local: ProgressStore, remote: ProgressStore): ProgressStore {
+  const merged: ProgressStore = { ...local }
+  for (const [slug, entry] of Object.entries(remote)) {
+    if (!merged[slug] || newerThan(entry, merged[slug])) merged[slug] = normalize(entry)
+  }
+  return merged
+}
+
+/**
+ * Keep this profile's reading position in step with the server: pull once on
+ * sign-in, then push local movement on a lazy timer. Mounted once, at the app
+ * shell — the reader screens stay unaware of it and keep reading from
+ * localStorage whether or not the network cooperates.
+ */
+export function useBookProgressSync(email: string | null | undefined) {
+  useEffect(() => {
+    if (!email) return
+
+    let cancelled = false
+    let applyingRemote = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    /** Remote writes must not look like user activity, or push/apply ping-pong. */
+    const applyRemote = (store: ProgressStore) => {
+      applyingRemote = true
+      try {
+        writeStore(store)
+      } finally {
+        applyingRemote = false
+      }
+    }
+
+    const push = async () => {
+      const local = readStore()
+      if (!Object.keys(local).length) return
+      try {
+        const res = await fetch('/api/books/progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ books: local }),
+        })
+        if (!res.ok || cancelled) return
+        const data = await res.json()
+        applyRemote(mergeStores(readStore(), (data?.books ?? {}) as ProgressStore))
+      } catch { /* offline — the local copy is still authoritative here */ }
+    }
+
+    const schedule = () => {
+      if (applyingRemote || timer) return
+      timer = setTimeout(() => {
+        timer = null
+        void push()
+      }, SYNC_DEBOUNCE_MS)
+    }
+
+    const hydrate = async () => {
+      try {
+        const res = await fetch('/api/books/progress', { credentials: 'include' })
+        if (!res.ok || cancelled) return
+        const data = await res.json()
+        applyRemote(mergeStores(readStore(), (data?.books ?? {}) as ProgressStore))
+      } catch { /* offline — carry on with what this device remembers */ }
+      if (!cancelled) void push()
+    }
+
+    void hydrate()
+    window.addEventListener(PROGRESS_EVENT, schedule)
+
+    return () => {
+      window.removeEventListener(PROGRESS_EVENT, schedule)
+      // A pending push still goes out: the response is ignored, the write isn't.
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+        void push()
+      }
+      cancelled = true
+    }
+  }, [email])
 }

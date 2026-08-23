@@ -1,9 +1,23 @@
 import { useState, useEffect, useCallback } from 'react'
 
+export type UserRole = 'full' | 'reader'
+
 export interface User {
   email: string
   name: string
   picture: string
+  /** "reader" accounts see Tedy Books and nothing else. */
+  role: UserRole
+}
+
+/** Anything the API does not label explicitly is treated as least privilege. */
+function toUser(data: Partial<User> | null | undefined): User {
+  return {
+    email: String(data?.email ?? ''),
+    name: String(data?.name ?? ''),
+    picture: String(data?.picture ?? ''),
+    role: data?.role === 'full' ? 'full' : 'reader',
+  }
 }
 
 export function useAuth() {
@@ -15,7 +29,7 @@ export function useAuth() {
       const res = await fetch('/api/auth/me', { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
-        setUser(data)
+        setUser(toUser(data))
       } else {
         setUser(null)
       }
@@ -40,7 +54,7 @@ export function useAuth() {
       })
       const data = await res.json()
       if (res.ok) {
-        setUser(data)
+        setUser(toUser(data))
         return { ok: true }
       }
       return { ok: false, error: data.error || 'Giris basarisiz' }

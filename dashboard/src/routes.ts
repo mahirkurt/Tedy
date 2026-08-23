@@ -1,6 +1,7 @@
 import { Time, Calendar, Task, Certificate, EventSchedule, ExamMode,
          GroupPresentation, Book, Catalog, ChartBar, Notification, UserAvatar } from '@carbon/icons-react'
 import type { ComponentType } from 'react'
+import type { UserRole } from './hooks/useAuth'
 
 export interface RouteConfig {
   path: string
@@ -9,6 +10,11 @@ export interface RouteConfig {
   componentName: string
   /** Nested/detail routes are routable but stay out of the side navigation. */
   showInNav?: boolean
+  /**
+   * Reachable by "reader" accounts. Default-deny: a route without this flag is
+   * for full-access accounts only, so a new page never leaks by omission.
+   */
+  readerAccess?: boolean
 }
 
 export const routes: RouteConfig[] = [
@@ -21,13 +27,27 @@ export const routes: RouteConfig[] = [
   { path: '/takvim',    label: 'Takvim',     icon: EventSchedule,     componentName: 'CalendarEvents' },
   { path: '/takimlar',  label: 'Takımlar',   icon: GroupPresentation, componentName: 'TeamActivities' },
   { path: '/dersler',   label: 'Dersler',    icon: Catalog,           componentName: 'CourseContent' },
-  { path: '/kitaplar',  label: 'Tedy Books', icon: Book,              componentName: 'TedyBooks' },
+  { path: '/kitaplar',  label: 'Tedy Books', icon: Book,              componentName: 'TedyBooks', readerAccess: true },
   { path: '/ilerleme',  label: 'İlerleme',   icon: ChartBar,          componentName: 'PlatformProgress' },
   { path: '/duyurular', label: 'Duyurular',  icon: Notification,      componentName: 'Announcements' },
   { path: '/profil',    label: 'Profil',     icon: UserAvatar,        componentName: 'StudentProfile' },
 
-  { path: '/kitaplar/:slug',             label: 'Kitap',  icon: Book, componentName: 'BookDetail', showInNav: false },
-  { path: '/kitaplar/:slug/:chapterId',  icon: Book, label: 'Okuma', componentName: 'BookReader', showInNav: false },
+  { path: '/kitaplar/:slug',             label: 'Kitap',  icon: Book, componentName: 'BookDetail', showInNav: false, readerAccess: true },
+  { path: '/kitaplar/:slug/:chapterId',  icon: Book, label: 'Okuma', componentName: 'BookReader', showInNav: false, readerAccess: true },
 ]
 
 export const navRoutes = routes.filter(r => r.showInNav !== false)
+
+/** Where a role lands when it opens the app or asks for a page it cannot see. */
+export const ROLE_HOME: Record<UserRole, string> = {
+  full: '/',
+  reader: '/kitaplar',
+}
+
+export function routesFor(role: UserRole): RouteConfig[] {
+  return role === 'full' ? routes : routes.filter(r => r.readerAccess)
+}
+
+export function navRoutesFor(role: UserRole): RouteConfig[] {
+  return routesFor(role).filter(r => r.showInNav !== false)
+}
