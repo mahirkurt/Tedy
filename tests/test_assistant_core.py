@@ -2,7 +2,7 @@ import json
 import os
 from pathlib import Path
 
-from src.assistant_core import AssistantRuntime
+from src.assistant_core import AssistantRuntime, GeminiClient
 
 
 class _DummyOllama:
@@ -191,15 +191,13 @@ def test_gemini_only_no_ollama(tmp_path: Path):
     runtime = AssistantRuntime(tmp_path)
     assert not hasattr(runtime, "ollama")
     assert not hasattr(runtime.config, "ollama_base_url")
-    assert [model["id"] for model in runtime.models()] == [
-        "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
-    ]
+    assert [model["id"] for model in runtime.models()] == GeminiClient.FAST_MODELS
     assert all(model["owned_by"] == "google" for model in runtime.models())
 
 
 def test_openai_completion_uses_gemini_default_model(tmp_path: Path):
+    """When chat() reports no explicit model, the OpenAI-compatible endpoint
+    must still report a real, current model — not a stale/retired literal."""
     runtime = AssistantRuntime(tmp_path)
     runtime.chat = lambda **_kwargs: {"answer": "ok"}
 
@@ -207,4 +205,4 @@ def test_openai_completion_uses_gemini_default_model(tmp_path: Path):
         "messages": [{"role": "user", "content": "test"}],
     })
 
-    assert completion["model"] == "gemini-2.5-flash"
+    assert completion["model"] == GeminiClient.FAST_MODELS[0]
