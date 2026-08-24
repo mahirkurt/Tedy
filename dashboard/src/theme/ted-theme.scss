@@ -8,6 +8,7 @@
 @use '@carbon/react/scss/themes' as themes;
 @use '@carbon/react/scss/spacing' as spacing;
 @use '@carbon/react/scss/motion' as motion;
+@use '@carbon/react/scss/type' as type;
 @use '@carbon/colors' as colors;
 
 // ─── Design Tokens ──────────────────────────────────────────────────────────
@@ -248,8 +249,7 @@ body {
   display: flex;
   align-items: center;
   gap: var(--ted-space-xs);
-  font-size: 0.9375rem;
-  font-weight: 600;
+  @include type.type-style('heading-compact-01');
   letter-spacing: -0.01em;
   margin: 0 0 var(--ted-space-md);
   color: var(--ted-color-text-primary);
@@ -289,12 +289,12 @@ body {
 }
 
 .dashboard-list-tile__label {
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   font-weight: 500;
 }
 
 .dashboard-list-tile__meta {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
 }
 
@@ -303,14 +303,13 @@ body {
   color: var(--ted-color-text-helper);
   padding: var(--ted-space-lg);
   font-style: italic;
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
 }
 
 .dashboard-summary-text {
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-secondary);
   margin: 0 0 var(--ted-space-md);
-  line-height: 1.5;
 }
 
 .dashboard-loading-tile.cds--tile {
@@ -371,14 +370,13 @@ body {
 }
 
 .today-empty__title {
-  font-size: 1.0625rem;
-  font-weight: 600;
+  @include type.type-style('heading-02');
   margin: 0 0 var(--ted-space-xs);
   color: var(--ted-color-text-primary);
 }
 
 .today-empty__text {
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-helper);
   margin: 0;
 }
@@ -439,7 +437,7 @@ body {
 .today__today-btn {
   height: 1.75rem;
   padding: 0 0.625rem;
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -453,21 +451,20 @@ body {
 }
 
 .today__day-name {
-  font-size: 1.375rem;
-  font-weight: 700;
+  @include type.type-style('heading-03');
+  font-weight: 600;
   color: var(--ted-color-text-primary);
   margin-right: var(--ted-space-xs);
   letter-spacing: -0.01em;
 }
 
 .today__date-str {
-  font-size: 1rem;
+  @include type.type-style('body-02');
   color: var(--ted-color-text-secondary);
-  font-weight: 400;
 }
 
 .today__lesson-counter {
-  font-size: 0.8125rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   color: var(--ted-color-text-helper);
   background: #e8ecf2;
@@ -492,8 +489,8 @@ body {
 }
 
 .today-homework__title {
-  font-size: 0.75rem;
-  font-weight: 700;
+  @include type.type-style('label-01');
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #0043ce;
@@ -503,7 +500,7 @@ body {
   border: none;
   background: none;
   color: #0043ce;
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   cursor: pointer;
   padding: 0;
@@ -546,26 +543,24 @@ body {
 }
 
 .today-homework__item-course {
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   color: var(--ted-color-text-helper);
 }
 
 .today-homework__item-title {
-  font-size: 0.8125rem;
-  font-weight: 600;
+  @include type.type-style('heading-compact-01');
   color: var(--ted-color-text-primary);
-  line-height: 1.35;
 }
 
 .today-homework__item-deadline {
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
 }
 
 .today-homework__more {
   margin: var(--ted-space-xs) 0 0;
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-helper);
 }
 
@@ -589,8 +584,8 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.6875rem;
-  font-weight: 700;
+  @include type.type-style('label-01');
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -608,15 +603,13 @@ body {
 }
 
 .today-hero__title {
-  font-size: 1.125rem;
-  font-weight: 700;
+  @include type.type-style('heading-02');
   margin: 0 0 2px;
-  line-height: 1.3;
   letter-spacing: -0.005em;
 }
 
 .today-hero__sub {
-  font-size: 0.8125rem;
+  @include type.type-style('label-01');
   margin: 0;
   opacity: 0.75;
 }
@@ -626,7 +619,7 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-top: var(--ted-space-sm);
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   font-weight: 600;
 }
 
@@ -702,7 +695,7 @@ body {
   display: flex;
   justify-content: space-between;
   margin-top: 4px;
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-helper);
 
   span:nth-child(2) {
@@ -754,13 +747,12 @@ body {
 }
 
 .today-tl__time {
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   color: var(--ted-color-text-helper);
   text-align: right;
   padding-top: 10px;
   font-variant-numeric: tabular-nums;
-  line-height: 1;
 }
 
 .today-tl__spine {
@@ -822,23 +814,20 @@ body {
 }
 
 .today-tl__card-name {
-  font-weight: 600;
-  font-size: 0.8125rem;
-  line-height: 1.35;
+  @include type.type-style('heading-compact-01');
   color: var(--ted-color-text-primary);
 }
 
 .today-tl__card-period {
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   color: var(--ted-color-text-helper);
   flex-shrink: 0;
 }
 
 .today-tl__card-sub {
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
-  line-height: 1.4;
   margin-top: 1px;
 }
 
@@ -859,8 +848,8 @@ body {
 
 .today-tl__now-time {
   text-align: right;
-  font-size: 0.6875rem;
-  font-weight: 700;
+  @include type.type-style('label-01');
+  font-weight: 600;
   color: #0f62fe;
   font-variant-numeric: tabular-nums;
 }
@@ -908,14 +897,13 @@ body {
 }
 
 .dashboard-event-date__day {
-  font-size: 1.25rem;
-  font-weight: 700;
+  @include type.type-style('heading-03');
+  font-weight: 600;
   color: var(--ted-color-brand-primary);
-  line-height: 1.2;
 }
 
 .dashboard-event-date__month {
-  font-size: 0.625rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   color: var(--ted-color-text-secondary);
   text-transform: uppercase;
@@ -952,19 +940,18 @@ body {
 }
 
 .homework-item__course {
-  font-weight: 600;
-  font-size: 0.8125rem;
+  @include type.type-style('heading-compact-01');
   margin-bottom: var(--ted-space-2xs);
   color: var(--ted-color-text-primary);
 }
 
 .homework-item__title {
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-secondary);
 }
 
 .homework-item__deadline {
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-helper);
   margin-top: var(--ted-space-2xs);
 }
@@ -1012,8 +999,7 @@ body {
 
 // ─── Homework Modal ──────────────────────────────────────────────────────────
 .homework-modal__description {
-  font-size: 0.875rem;
-  line-height: 1.6;
+  @include type.type-style('body-01');
   white-space: pre-wrap;
 }
 
@@ -1022,8 +1008,7 @@ body {
 }
 
 .homework-modal__attachments-title {
-  font-size: 0.8125rem;
-  font-weight: 600;
+  @include type.type-style('heading-compact-01');
   margin-bottom: var(--ted-space-xs);
 }
 
@@ -1031,7 +1016,7 @@ body {
   display: flex;
   align-items: center;
   gap: var(--ted-space-xs);
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   padding: var(--ted-space-2xs) 0;
   color: var(--status-info);
   text-decoration: none;
@@ -1085,8 +1070,8 @@ body {
 }
 
 .hw-section__label {
-  font-size: 0.6875rem;
-  font-weight: 700;
+  @include type.type-style('label-01');
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--ted-color-text-helper);
@@ -1098,7 +1083,7 @@ body {
 }
 
 .hw-section__count {
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   color: var(--ted-color-text-helper);
   background: #e8ecf2;
@@ -1138,7 +1123,7 @@ body {
 }
 
 .homework-modal__source {
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-secondary);
   font-style: italic;
 }
@@ -1151,13 +1136,12 @@ body {
 }
 
 .homework-modal__deadline-label {
-  font-size: 0.8125rem;
-  font-weight: 600;
+  @include type.type-style('heading-compact-01');
   color: var(--ted-color-text-secondary);
 }
 
 .homework-modal__deadline-value {
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-primary);
   font-variant-numeric: tabular-nums;
 }
@@ -1169,8 +1153,7 @@ body {
 }
 
 .homework-modal__description-para {
-  font-size: 0.875rem;
-  line-height: 1.6;
+  @include type.type-style('body-01');
   margin: 0 0 var(--ted-space-xs);
   color: var(--ted-color-text-primary);
 
@@ -1201,7 +1184,7 @@ body {
   display: flex;
   align-items: center;
   gap: var(--ted-space-xs);
-  font-size: 0.875rem;
+  @include type.type-style('label-01');
 }
 
 .dashboard-header__avatar {
@@ -1234,7 +1217,7 @@ body {
 }
 
 .dashboard-header__user-email {
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   color: rgb(255 255 255 / 78%);
   max-width: 15.5rem;
   overflow: hidden;
@@ -1313,7 +1296,7 @@ body {
 
 .photo-intake-select__text {
   margin: 0 0 var(--ted-space-sm);
-  font-size: 0.875rem;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-secondary);
 }
 
@@ -1331,7 +1314,7 @@ body {
 
 .photo-intake-form__file {
   margin: 0;
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-secondary);
 }
 
@@ -1339,8 +1322,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  @include type.type-style('heading-compact-01');
   color: var(--ted-color-text-primary);
 }
 
@@ -1348,12 +1330,12 @@ body {
   border: 1px solid var(--ted-color-border-subtle);
   border-radius: var(--ted-radius-sm);
   padding: 0.5rem 0.625rem;
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
 }
 
 .photo-intake-form__hint {
   margin: 0;
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-helper);
 }
 
@@ -1428,15 +1410,14 @@ body {
 }
 
 .login-page__hero-school {
-  font-size: 1.125rem;
-  font-weight: 600;
+  @include type.type-style('heading-02');
   margin: 0;
   letter-spacing: 0.01em;
   color: #fff;
 }
 
 .login-page__hero-subtitle {
-  font-size: 0.875rem;
+  @include type.type-style('body-01');
   color: rgba(255, 255, 255, 0.65);
   margin: 0;
   letter-spacing: 0.02em;
@@ -1457,7 +1438,7 @@ body {
 }
 
 .login-page__heading {
-  font-size: 1.75rem;
+  @include type.type-style('heading-04');
   font-weight: 600;
   color: var(--ted-color-text-primary);
   margin: 0 0 var(--ted-space-sm);
@@ -1465,10 +1446,9 @@ body {
 }
 
 .login-page__intro {
-  font-size: 0.875rem;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-secondary);
   margin: 0 0 var(--ted-space-lg);
-  line-height: 1.5;
 }
 
 .login-page__google-button-wrap {
@@ -1482,7 +1462,7 @@ body {
 }
 
 .login-page__footnote {
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-helper);
   margin-top: var(--ted-space-xl);
   text-align: center;
@@ -1492,7 +1472,7 @@ body {
 .dashboard-footer {
   padding: var(--ted-space-md) var(--ted-space-lg);
   text-align: center;
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-helper);
   border-top: 1px solid var(--ted-color-border-subtle);
   margin-top: var(--ted-space-xl);
@@ -1554,7 +1534,7 @@ body {
   border-radius: var(--ted-radius-card);
   box-shadow: var(--ted-shadow-popover);
   padding: var(--ted-space-sm) var(--ted-space-md);
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   min-width: 320px;
   max-width: min(92vw, 380px);
   color: var(--ted-color-text-primary);
@@ -1563,8 +1543,7 @@ body {
 
 .health-popover__title {
   margin: 0 0 var(--ted-space-xs);
-  font-size: 0.8125rem;
-  font-weight: 700;
+  @include type.type-style('heading-compact-01');
   color: var(--ted-color-text-primary);
 }
 
@@ -1592,7 +1571,7 @@ body {
   border-radius: 6px;
   background: #fff8e1;
   color: #8e5400;
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   font-weight: 600;
 }
 
@@ -1622,8 +1601,8 @@ body {
 }
 
 .announcements-week-group__label {
-  font-size: 0.6875rem;
-  font-weight: 700;
+  @include type.type-style('label-01');
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--ted-color-text-helper);
@@ -1639,20 +1618,19 @@ body {
 
 .announcements-detail__text {
   margin: 0;
-  font-size: 0.8125rem;
-  line-height: 1.55;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-primary);
   white-space: pre-wrap;
 }
 
 .announcements-detail__attach {
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-secondary);
   margin: 0;
 }
 
 .announcements-detail__link {
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   font-weight: 600;
   color: var(--ted-color-brand-primary);
   text-decoration: none;
@@ -1672,8 +1650,7 @@ body {
 }
 
 .calendar-nav__label {
-  font-size: 1rem;
-  font-weight: 600;
+  @include type.type-style('heading-02');
   min-width: 180px;
   text-align: center;
 }
@@ -1693,7 +1670,7 @@ body {
   border-radius: 12px;
   border: 1px solid var(--ted-color-border-subtle);
   background: var(--ted-card-bg);
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   cursor: pointer;
   transition: opacity var(--ted-transition-fast), background-color var(--ted-transition-fast);
@@ -1728,7 +1705,7 @@ body {
   color: #fff;
   padding: 0.5rem;
   text-align: center;
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   font-weight: 600;
 }
 
@@ -1740,7 +1717,7 @@ body {
   background: var(--cds-layer-02);
   padding: 0.25rem;
   text-align: right;
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-helper);
   font-variant-numeric: tabular-nums;
 }
@@ -1757,13 +1734,12 @@ body {
 }
 
 .calendar-event {
-  font-size: 0.625rem;
+  @include type.type-style('label-01');
   padding: 2px 4px;
   border-radius: 3px;
   margin-bottom: 1px;
   cursor: pointer;
   color: #fff;
-  line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1822,8 +1798,8 @@ body {
 }
 
 .calendar-popover__type {
-  font-size: 0.6875rem;
-  font-weight: 700;
+  @include type.type-style('label-01');
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #fff;
@@ -1846,14 +1822,13 @@ body {
 }
 
 .calendar-popover__title {
-  font-size: 0.9375rem;
-  font-weight: 600;
+  @include type.type-style('heading-compact-01');
   margin: 0 0 var(--ted-space-2xs);
   color: var(--ted-color-text-primary);
 }
 
 .calendar-popover__time {
-  font-size: 0.8125rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   color: var(--ted-color-text-secondary);
   margin: 0 0 var(--ted-space-2xs);
@@ -1861,10 +1836,9 @@ body {
 }
 
 .calendar-popover__meta {
-  font-size: 0.8125rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
   margin: 0 0 2px;
-  line-height: 1.4;
 }
 
 // ─── Calendar Date Groups (legacy) ──────────────────────────────────────
@@ -1882,7 +1856,7 @@ body {
 }
 
 .calendar-date-group__label {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   color: var(--ted-color-text-secondary);
 }
@@ -1901,20 +1875,19 @@ body {
 }
 
 .calendar-event-detail__time {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   color: var(--ted-color-text-helper);
   font-variant-numeric: tabular-nums;
 }
 
 .calendar-event-detail__location {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
 }
 
 .calendar-event-detail__desc {
-  font-size: 0.8125rem;
-  line-height: 1.5;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-primary);
   margin: var(--ted-space-2xs) 0 0;
   white-space: pre-wrap;
@@ -1952,8 +1925,7 @@ body {
 
 // ─── Course Content ─────────────────────────────────────────────────────
 .course-content-text {
-  font-size: 0.8125rem;
-  line-height: 1.6;
+  @include type.type-style('body-01');
   white-space: pre-wrap;
   color: var(--ted-color-text-primary);
 }
@@ -1976,14 +1948,12 @@ body {
 }
 
 .course-content__week-label {
-  font-weight: 600;
-  font-size: 0.875rem;
+  @include type.type-style('heading-compact-01');
 }
 
 .course-content__week-date {
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-secondary);
-  font-weight: 400;
 }
 
 .course-content__week-count {
@@ -2018,13 +1988,13 @@ body {
 }
 
 .course-content__card-teacher {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   color: var(--ted-color-brand-primary);
 }
 
 .course-content__card-date {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-helper);
   font-variant-numeric: tabular-nums;
 }
@@ -2037,7 +2007,7 @@ body {
 
   .cds--toggle__label-text {
     color: var(--ted-header-text);
-    font-size: 0.75rem;
+    @include type.type-style('label-01');
     font-weight: 500;
   }
 }
@@ -2074,8 +2044,8 @@ body {
 
 // ─── Schedule DataTable ─────────────────────────────────────────────────
 .schedule-time {
+  @include type.type-style('label-01');
   font-weight: 600;
-  font-size: 0.75rem;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -2087,7 +2057,7 @@ body {
 
 .schedule-detail {
   display: block;
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
   margin-top: 1px;
 }
@@ -2112,7 +2082,7 @@ body {
 }
 
 .grade-detail__label {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
 }
 
@@ -2130,16 +2100,14 @@ body {
 }
 
 .grade-detail__value {
-  font-size: 0.8125rem;
-  font-weight: 600;
+  @include type.type-style('heading-compact-01');
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
 // ─── Team Activities StructuredList ─────────────────────────────────────
 .team-section-label {
-  font-size: 0.8125rem;
-  font-weight: 600;
+  @include type.type-style('heading-compact-01');
   margin: var(--ted-space-sm) 0 var(--ted-space-xs);
   color: var(--ted-color-text-secondary);
 
@@ -2147,12 +2115,12 @@ body {
 }
 
 .team-cell-name {
+  @include type.type-style('body-01');
   font-weight: 500;
-  font-size: 0.8125rem;
 }
 
 .team-cell-date {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   font-variant-numeric: tabular-nums;
   color: var(--ted-color-text-secondary);
 }
@@ -2176,8 +2144,8 @@ body {
 }
 
 .platform-item__name {
+  @include type.type-style('body-01');
   font-weight: 500;
-  font-size: 0.8125rem;
 }
 
 .platform-a3k-score {
@@ -2191,7 +2159,7 @@ body {
 }
 
 .platform-a3k-score__label {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
 }
 
@@ -2210,8 +2178,7 @@ body {
 }
 
 .platform-a3k-score__value {
-  font-size: 0.875rem;
-  font-weight: 700;
+  @include type.type-style('heading-compact-01');
   color: var(--ted-color-brand-primary);
   font-variant-numeric: tabular-nums;
 }
@@ -2230,8 +2197,7 @@ body {
 }
 
 .platform-accordion__name {
-  font-weight: 600;
-  font-size: 0.875rem;
+  @include type.type-style('heading-compact-01');
 }
 
 .platform-accordion__progress {
@@ -2252,7 +2218,7 @@ body {
   gap: var(--ted-space-xs);
   padding: var(--ted-space-2xs) var(--ted-space-xs);
   border-radius: var(--ted-radius-sm);
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   transition: background var(--ted-transition-fast);
 
   &:hover {
@@ -2268,7 +2234,7 @@ body {
     grid-column: 2 / -1;
     display: flex;
     gap: var(--ted-space-sm);
-    font-size: 0.75rem;
+    @include type.type-style('label-01');
     color: var(--ted-color-text-helper);
   }
 }
@@ -2292,10 +2258,10 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
 
   .cds--link {
-    font-size: 0.8125rem;
+    @include type.type-style('body-01');
   }
 }
 
@@ -2309,7 +2275,7 @@ body {
 .platform-detail-row__duration,
 .platform-detail-row__steps,
 .platform-detail-row__score {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -2332,13 +2298,13 @@ body {
 .schedule-table .cds--data-table { table-layout: fixed; }
 .schedule-table .cds--data-table td {
   vertical-align: middle;
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   padding: 0.25rem 0.375rem;
   height: 3.25rem;
 }
 .schedule-table .cds--data-table th {
   text-align: center;
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   height: 2.5rem;
 }
 .schedule-table .cds--data-table th:first-child,
@@ -2410,7 +2376,7 @@ body {
   }
 
   .dashboard-card__title {
-    font-size: 0.875rem;
+    @include type.type-style('body-01');
   }
 
   .today-hero {
@@ -2428,7 +2394,7 @@ body {
   }
 
   .today__day-name {
-    font-size: 1.125rem;
+    @include type.type-style('body-02');
   }
 
   .health-popover {
@@ -2485,7 +2451,7 @@ body {
   }
 
   .login-page__hero-school {
-    font-size: 0.9375rem;
+    @include type.type-style('body-01');
   }
 
   .login-page__panel {
@@ -2502,7 +2468,7 @@ body {
   .cds--data-table td,
   .cds--data-table th {
     padding: 0.375rem 0.5rem;
-    font-size: 0.75rem;
+    @include type.type-style('label-01');
   }
 
   .cds--accordion__title {
@@ -2526,12 +2492,12 @@ body {
   }
 
   .calendar-grid__header {
-    font-size: 0.625rem;
+    @include type.type-style('label-01');
     padding: 0.375rem 2px;
   }
 
   .calendar-grid__time {
-    font-size: 0.5625rem;
+    @include type.type-style('label-01');
     padding: 0.25rem 2px;
   }
 
@@ -2540,12 +2506,12 @@ body {
   }
 
   .calendar-event {
-    font-size: 0.5rem;
+    @include type.type-style('label-01');
     padding: 1px 2px;
   }
 
   .calendar-nav__label {
-    font-size: 0.8125rem;
+    @include type.type-style('body-01');
     min-width: 140px;
   }
 
@@ -2587,14 +2553,12 @@ body {
   border-radius: 0 6px 6px 0;
 }
 .homework-modal__enrichment-title {
-  font-size: 0.8125rem;
-  font-weight: 600;
+  @include type.type-style('heading-compact-01');
   margin-bottom: 0.375rem;
   color: var(--ted-color-primary, #002d9c);
 }
 .homework-modal__enrichment-text {
-  font-size: 0.8125rem;
-  line-height: 1.5;
+  @include type.type-style('body-01');
   white-space: pre-wrap;
   color: var(--cds-text-secondary, #525252);
 }
@@ -2631,8 +2595,7 @@ body {
 
 .student-profile__name {
   margin: 0 0 var(--ted-space-xs);
-  font-size: 1.0625rem;
-  font-weight: 700;
+  @include type.type-style('heading-02');
 }
 
 .student-profile__meta {
@@ -2643,7 +2606,7 @@ body {
 
 .student-profile__sync {
   margin: var(--ted-space-sm) 0 var(--ted-space-xs);
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
 }
 
@@ -2663,12 +2626,12 @@ body {
 }
 
 .student-profile__field-key {
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-helper);
 }
 
 .student-profile__field-val {
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-primary);
 }
 
@@ -2682,22 +2645,21 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  @include type.type-style('heading-compact-01');
 }
 
 .private-lesson-form__input {
   border: 1px solid var(--ted-color-border-subtle);
   border-radius: var(--ted-radius-sm);
   padding: 0.5rem 0.625rem;
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
 }
 
 .private-lesson-form__checkbox {
   display: inline-flex;
   align-items: center;
   gap: var(--ted-space-xs);
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
 }
 
 .private-lesson-form__time-row {
@@ -2715,7 +2677,7 @@ body {
 
 .student-private-lesson-item__meta {
   margin-top: 0.25rem;
-  font-size: 0.8125rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
 }
 
@@ -3109,21 +3071,20 @@ body {
 }
 
 .exam-stats__value {
-  font-size: 1.5rem;
-  font-weight: 700;
+  @include type.type-style('heading-04');
+  font-weight: 600;
   color: var(--ted-color-text-primary);
 }
 
 .exam-stats__label {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-helper);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .exam-section__title {
-  font-size: 0.875rem;
-  font-weight: 700;
+  @include type.type-style('heading-compact-01');
   color: var(--ted-color-brand-primary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -3151,7 +3112,7 @@ body {
   }
 
   span {
-    font-size: 0.75rem;
+    @include type.type-style('label-01');
     font-weight: 600;
     color: var(--ted-color-text-helper);
     text-transform: uppercase;
@@ -3194,22 +3155,20 @@ body {
 }
 
 .exam-card__course {
-  font-size: 0.6875rem;
-  font-weight: 700;
+  @include type.type-style('label-01');
+  font-weight: 600;
   color: var(--ted-color-brand-primary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .exam-card__title {
-  font-size: 0.9375rem;
-  font-weight: 600;
+  @include type.type-style('heading-compact-01');
   color: var(--ted-color-text-primary);
-  line-height: 1.35;
 }
 
 .exam-card__date {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
 }
 
@@ -3221,9 +3180,8 @@ body {
 }
 
 .exam-card__grade {
-  font-size: 1.5rem;
-  font-weight: 800;
-  line-height: 1;
+  @include type.type-style('heading-04');
+  font-weight: 600;
 }
 
 .exam-card__countdown-bar {
@@ -3246,7 +3204,7 @@ body {
 
 .exam-card__expand-btn {
   margin-top: var(--ted-space-xs);
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   min-height: 2rem;
 }
 
@@ -3260,8 +3218,8 @@ body {
 }
 
 .exam-card__section-title {
-  font-size: 0.75rem;
-  font-weight: 700;
+  @include type.type-style('label-01');
+  font-weight: 600;
   color: var(--ted-color-text-secondary);
   margin-bottom: 4px;
   display: flex;
@@ -3270,9 +3228,8 @@ body {
 }
 
 .exam-card__section-text {
-  font-size: 0.8125rem;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-primary);
-  line-height: 1.5;
   white-space: pre-wrap;
 }
 
@@ -3285,7 +3242,7 @@ body {
   gap: 4px;
 
   li {
-    font-size: 0.8125rem;
+    @include type.type-style('body-01');
     color: var(--ted-color-text-primary);
     display: flex;
     justify-content: space-between;
@@ -3306,14 +3263,13 @@ body {
 }
 
 .exam-empty__title {
-  font-size: 1rem;
-  font-weight: 600;
+  @include type.type-style('heading-02');
   color: var(--ted-color-text-primary);
   margin-bottom: var(--ted-space-2xs);
 }
 
 .exam-empty__text {
-  font-size: 0.875rem;
+  @include type.type-style('body-01');
   color: var(--ted-color-text-helper);
 }
 
@@ -3336,8 +3292,8 @@ body {
 }
 
 .today-exams__title {
-  font-size: 0.75rem;
-  font-weight: 700;
+  @include type.type-style('label-01');
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #a2191f;
@@ -3347,7 +3303,7 @@ body {
   border: none;
   background: none;
   color: #a2191f;
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   cursor: pointer;
   padding: 2px 4px;
@@ -3402,20 +3358,18 @@ body {
 }
 
 .today-exams__item-course {
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   color: var(--ted-color-text-helper);
 }
 
 .today-exams__item-title {
-  font-size: 0.8125rem;
-  font-weight: 600;
+  @include type.type-style('heading-compact-01');
   color: var(--ted-color-text-primary);
-  line-height: 1.35;
 }
 
 .today-exams__item-date {
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
 }
 
@@ -3434,7 +3388,7 @@ body {
   }
 
   .exam-stats__value {
-    font-size: 1.25rem;
+    @include type.type-style('heading-03');
   }
 
   .exam-card {
@@ -3451,15 +3405,15 @@ body {
   }
 
   .exam-card__grade {
-    font-size: 1.25rem;
+    @include type.type-style('heading-03');
   }
 
   .exam-card__title {
-    font-size: 0.875rem;
+    @include type.type-style('body-01');
   }
 
   .exam-section__title {
-    font-size: 0.8125rem;
+    @include type.type-style('body-01');
   }
 
   .today-exams {
