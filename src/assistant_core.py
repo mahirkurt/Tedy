@@ -1354,7 +1354,7 @@ class AssistantRuntime:
         "- Kazanım kodu, ders kitabı adı ve sayfa numarası YALNIZ araç "
         "çıktısından gelir. Hiçbirini hatırlayarak veya tahmin ederek yazma.\n"
         "- Araç sonuç döndürmediyse eksikliği açıkça söyle. Boşluğu doldurma.\n"
-        "- Kaynağı çürüten veya kaynakta olmayan bir olgu ekleme.\n\n"
+        "- Bir araca dayandırdığın cümlede, o kaynağı çürüten veya kaynakta olmayan bir olgu ekleme. Bu madde araç çıktısına dayanan cümleler içindir; kapsam dışı genel bilgi sorusunu yanıtlamanı yasaklamaz (bkz. Atıf).\n\n"
 
         "## Atıf\n"
         "- Araçtan gelen her bilgiyi kullandığın cümlede [S1], [S2] biçiminde "

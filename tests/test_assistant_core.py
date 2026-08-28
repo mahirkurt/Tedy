@@ -319,3 +319,12 @@ def test_system_prompt_allows_general_knowledge_without_fabricated_citation():
     p = AssistantRuntime.SYSTEM_PROMPT
     assert "genel bilgi sorulursa yanıtla" in p
     assert "o cümleye [S] atıfı ekleme" in p
+
+
+def test_no_fabrication_rule_does_not_forbid_general_knowledge():
+    """The fabrication ban and the general-knowledge permission sit in different
+    sections, and read together the ban can cancel the permission — leaving a
+    child's ordinary question refused. The ban is scoped to tool-backed claims."""
+    p = AssistantRuntime.SYSTEM_PROMPT
+    assert "Bu madde araç çıktısına dayanan cümleler içindir" in p
+    assert "genel bilgi" in p
