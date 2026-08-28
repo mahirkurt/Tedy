@@ -111,11 +111,7 @@ class McpClient:
                 "clientInfo": {"name": "tedy-assistant", "version": "1.0"},
             },
         })
-        # Spec-wise a client SHOULD also send notifications/initialized as a
-        # second round trip, but both target servers accept the very next
-        # request once the session id from the initialize response is
-        # attached — so that second trip is skipped rather than spent on a
-        # fire-and-forget notification with no observable effect.
+        self._post({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
     @staticmethod
     def _is_session_error(rpc: dict[str, Any]) -> bool:

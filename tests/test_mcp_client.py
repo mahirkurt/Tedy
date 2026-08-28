@@ -23,11 +23,17 @@ class _FakeSession:
         self.requests = []
 
     def post(self, url, headers=None, data=None, timeout=None):
+        body = json.loads(data) if data else None
         self.requests.append({
             "url": url,
             "headers": dict(headers or {}),
-            "body": json.loads(data) if data else None,
+            "body": body,
         })
+        # A notification is fire-and-forget: the real transport answers with no
+        # body, so consuming a scripted response here would model it wrongly —
+        # and would silently shift every later response by one.
+        if str((body or {}).get("method", "")).startswith("notifications/"):
+            return _Resp("", headers={})
         return self.responses.pop(0)
 
 
