@@ -132,15 +132,16 @@ def test_chat_returns_citations_and_answer(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("ASSISTANT_ENABLE_EMBEDDINGS", "0")
 
     runtime = AssistantRuntime(tmp_path)
-    # Mock the chat router to avoid network calls
-    runtime.router = type(
-        "MockRouter", (), {
-            "chat": lambda self, msgs, **kw: (
-                "TEST_ANSWER::" + msgs[-1].get(
-                    "content", "")[:40]),
-            "last_provider": "mock",
-            "last_model_used": "mock-model",
-        })()
+    # runtime.router IS runtime.gemini (same object) — patching a fresh object
+    # onto runtime.router leaves runtime.gemini untouched and chat() would hit
+    # the real Gemini API over the network. Patch the method on the real
+    # object instead.
+    monkeypatch.setattr(
+        runtime.gemini, "chat_with_tools",
+        lambda *a, **k: ToolLoopResult(
+            text="TEST_ANSWER::kesir çalışması [S1]",
+            citations=[{"kind": "ogrenci", "label": "scraped_data.json",
+                        "locator": {}, "snippet": "s", "confidence": 0.9}]))
 
     runtime.reindex(incremental=False)
 
@@ -157,21 +158,26 @@ def test_chat_returns_citations_and_answer(tmp_path: Path, monkeypatch):
     assert response["answer"].startswith(
         "TEST_ANSWER::")
     assert isinstance(response.get("citations"), list)
+    assert len(response["citations"]) == 1
     assert response.get("intent") in {
         "data_query", "general",
         "expert_guidance", "study_plan"}
 
 
 def test_chat_marks_limited_confidence_when_retrieval_weak(tmp_path: Path, monkeypatch):
+    """The flag's source changed in Task 6: chat() no longer runs retrieval
+    ahead of the prompt, so "weak retrieval" no longer exists as a signal.
+    Its honest replacement is an empty *resolved* citation list — the model
+    answered but nothing it said was backed by a tool-returned source. The
+    flag must still fire; only the mechanism producing an empty citation
+    list changed (here: the model emits no [S] markers at all)."""
     _prepare_project(tmp_path)
     monkeypatch.setenv("ASSISTANT_ENABLE_EMBEDDINGS", "0")
 
     runtime = AssistantRuntime(tmp_path)
-    runtime.router = type(
-        "MockRouter", (), {
-            "chat": lambda self, msgs, **kw: "TEST",
-            "last_model_used": "mock",
-        })()
+    monkeypatch.setattr(
+        runtime.gemini, "chat_with_tools",
+        lambda *a, **k: ToolLoopResult(text="TEST", citations=[]))
 
     runtime.reindex(incremental=False)
 
@@ -206,3 +212,70 @@ def test_openai_completion_uses_gemini_default_model(tmp_path: Path):
     })
 
     assert completion["model"] == GeminiClient.FAST_MODELS[0]
+
+
+from src.assistant_core import AssistantRuntime, ToolLoopResult
+
+
+DEEP_INTENTS = ("study_plan", "grade_analysis", "exam_solving")
+
+
+def test_deep_tier_is_chosen_by_intent_not_by_the_model():
+    """Tier selection is deterministic so cost and latency stay predictable."""
+    for intent in DEEP_INTENTS:
+        assert AssistantRuntime._tier_for(intent, force_deep=False) == "deep"
+    assert AssistantRuntime._tier_for("qa", force_deep=False) == "fast"
+
+
+def test_explicit_user_request_forces_the_deep_tier():
+    assert AssistantRuntime._tier_for("qa", force_deep=True) == "deep"
+
+
+def test_chat_reports_degraded_servers_in_meta(tmp_path, monkeypatch):
+    (tmp_path / "output").mkdir()
+    rt = AssistantRuntime(tmp_path)
+
+    monkeypatch.setattr(rt.registry, "degraded", lambda: ["maarif-mufredat"])
+    monkeypatch.setattr(rt.registry, "declarations", lambda: [])
+    monkeypatch.setattr(
+        rt.gemini, "chat_with_tools",
+        lambda *a, **k: ToolLoopResult(text="cevap", citations=[]))
+
+    out = rt.chat([{"role": "user", "content": "merhaba"}])
+    assert out["meta"]["degraded"] == ["maarif-mufredat"]
+
+
+def test_empty_model_output_becomes_an_honest_message_not_a_blank_reply(tmp_path, monkeypatch):
+    """A budget-exhausted loop can return text="" — measured in Task 4. The
+    reader must never receive a blank answer."""
+    (tmp_path / "output").mkdir()
+    rt = AssistantRuntime(tmp_path)
+
+    monkeypatch.setattr(rt.registry, "declarations", lambda: [])
+    monkeypatch.setattr(rt.registry, "degraded", lambda: [])
+    monkeypatch.setattr(rt.gemini, "chat_with_tools",
+                        lambda *a, **k: ToolLoopResult(text="   ", budget_exhausted=True))
+
+    out = rt.chat([{"role": "user", "content": "kesir nedir"}])
+    assert out["answer"].strip()
+    assert "kesir nedir" in out["answer"]
+
+
+def test_chat_meta_carries_the_tool_ledger_and_dropped_count(tmp_path, monkeypatch):
+    (tmp_path / "output").mkdir()
+    rt = AssistantRuntime(tmp_path)
+
+    monkeypatch.setattr(rt.registry, "declarations", lambda: [])
+    monkeypatch.setattr(rt.registry, "degraded", lambda: [])
+    monkeypatch.setattr(rt.gemini, "chat_with_tools", lambda *a, **k: ToolLoopResult(
+        text="Kaynaklı [S1] ve uydurma [S5].",
+        citations=[{"kind": "mufredat", "label": "MEB", "locator": {},
+                    "snippet": "s", "confidence": 0.9}],
+        tool_calls=[{"name": "kazanim_ara", "ms": 40, "ok": True}]))
+
+    out = rt.chat([{"role": "user", "content": "kesir"}])
+
+    assert out["meta"]["dropped_citations"] == 1
+    assert out["meta"]["tool_calls"][0]["name"] == "kazanim_ara"
+    assert "[S5]" not in out["answer"]
+    assert len(out["citations"]) == 1

@@ -293,6 +293,31 @@ def test_generate_raises_only_once_every_model_is_truly_exhausted():
         c.chat([{"role": "user", "content": "x"}])
 
 
+def test_the_model_is_shown_which_number_each_source_will_get():
+    """Numbering is assigned by _finalize_citations in accumulation order. If the
+    model never sees those numbers it cites by guesswork, and a wrong-but-real
+    source is worse than a dropped marker: it looks verified."""
+    c = _tool_client([
+        _ToolResp([_Part(function_call=_FC("kazanim_ara", {"q": "kesir"}))]),
+        _ToolResp([_Part(text="bitti")], text="bitti"),
+    ])
+
+    def dispatch(name, args):
+        return ToolOutcome(ok=True, text="gövde", citations=[
+            {"kind": "mufredat", "label": "kazanım A", "locator": {},
+             "snippet": "s", "confidence": 0.9},
+            {"kind": "mufredat", "label": "kazanım B", "locator": {},
+             "snippet": "s", "confidence": 0.9},
+        ])
+
+    out = c.chat_with_tools([{"role": "user", "content": "x"}], DECLS, dispatch)
+    shown = c._client.models.contents[-1]
+    assert "[S1] kazanım A" in shown
+    assert "[S2] kazanım B" in shown
+    # Ve gösterilen numaralar finalize'ın atayacağıyla aynı olmalı.
+    assert [x["label"] for x in out.citations] == ["kazanım A", "kazanım B"]
+
+
 def test_a_tool_only_response_with_no_text_is_not_treated_as_empty():
     """A response carrying function calls but no text is the normal
     tool-calling case and must not be skipped as an empty response."""

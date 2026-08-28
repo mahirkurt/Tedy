@@ -379,8 +379,16 @@ class GeminiClient:
                     "name": call.name, "ms": elapsed, "ok": bool(outcome.ok),
                 })
                 if outcome.ok:
+                    first = len(out.citations) + 1
                     out.citations.extend(outcome.citations)
-                    body = outcome.text
+                    # Modelin gördüğü numaralar ile _finalize_citations'ın atadığı
+                    # numaralar AYNI sayaçtan gelmeli; yoksa model doğru cümleye
+                    # yanlış kaynağı bağlar ve bu panelde doğrulanmış görünür.
+                    marks = "\n".join(
+                        f"[S{first + j}] {c.get('label', '')}"
+                        for j, c in enumerate(outcome.citations)
+                    )
+                    body = f"{marks}\n{outcome.text}" if marks else outcome.text
                 else:
                     # Hand the failure back verbatim. The schemas are strict and
                     # the message names the offending field, so the model can
@@ -1307,6 +1315,46 @@ class AssistantRuntime:
         self._retriever: HybridRetriever | None = None
         self._retriever_cache_mtime: float = 0.0
 
+        from src.assistant_tools import build_registry
+        self.registry = build_registry(self._local_search)
+
+    def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
+        """The retriever, shaped as a tool the model can choose to call."""
+        return self._load_retriever().search(query, top_k=top_k)
+
+    DEEP_INTENTS = frozenset({"study_plan", "grade_analysis", "exam_solving"})
+
+    @classmethod
+    def _tier_for(cls, intent: str, force_deep: bool) -> str:
+        # Deterministic on purpose: the same question must pick the same tier,
+        # so latency and quota use stay predictable.
+        return "deep" if (force_deep or intent in cls.DEEP_INTENTS) else "fast"
+
+    SYSTEM_PROMPT = (
+        # _generate_answer'dan birebir taşındı. İçeriği Task 7 yeniden yazar.
+        "Sen TEDY Eğitim Asistanısın — ortaokul öğrencisi Işık ve ailesi için kişisel eğitim danışmanısın.\n\n"
+        "## Kimlik\n"
+        "- Hedef kitle: 6. sınıf öğrencisi + veliler. Varsayılan dil Türkçe.\n"
+        "- Kaynaklarda yalnızca Işık'ın okul verileri bulunur: ödevler, sınavlar, ders programı, notlar, ders içerikleri, duyurular, EBA/MEBI/SEBİTV kaynakları.\n"
+        "- Bu veriler dışında bilgi sorulursa bunu belirt ve genel bilgiyle yanıtla.\n\n"
+        "## Yanıt Formatı\n"
+        "- Kısa ve öz başla: İlk cümlede sorunun doğrudan cevabını ver.\n"
+        "- Madde işaretleri kullan, uzun paragraflardan kaçın.\n"
+        "- Somut ve uygulanabilir öneriler sun (ne yapılacak, ne zaman, nasıl).\n"
+        "- Ödev/sınav sorularında: öncelik sırası belirt, tahmini süre ver, çalışma stratejisi öner.\n"
+        "- Not analizi sorularında: güçlü/zayıf alanları belirle, iyileştirme adımları sun.\n\n"
+        "## Pedagojik İlkeler\n"
+        "- Bloom taksonomisine göre bilgi → anlama → uygulama basamaklarını kullan.\n"
+        "- Aralıklı tekrar (spaced repetition) ve aktif öğrenme stratejilerini öner.\n"
+        "- Motivasyonu destekle: başarıları vurgula, yapıcı geri bildirim ver.\n"
+        "- Veli sorularında: eyleme dönüştürülebilir somut adımlar ver, jargondan kaçın.\n\n"
+        "## Kurallar\n"
+        "- Kaynak dışı kesin iddia kurma. Kaynak varsa metin içinde [S1], [S2] gibi atıf ver.\n"
+        "- Kaynak referanslarını satır içinde doğal biçimde kullan, ayrı liste yapma.\n"
+        "- Klinik tanı/tedavi önerme. Riskli psikolojik durumda profesyonel destek yönlendirmesi yap.\n"
+        "- Yanıtı asla 'Kaynaklar:' listesiyle bitirme — atıflar zaten metin içinde."
+    )
+
     def reindex(self, incremental: bool = True) -> dict[str, Any]:
         return self.indexer.reindex(incremental=incremental)
 
@@ -1316,38 +1364,51 @@ class AssistantRuntime:
         session_id: str = "",
         context_filters: dict[str, Any] | None = None,
         temperature: float = 0.2,
+        force_deep: bool = False,
     ) -> dict[str, Any]:
         start = time.perf_counter()
 
         user_query = self._latest_user_message(messages)
         safety_flags = self.policy.evaluate(user_query)
         intent = self._classify_intent(user_query)
+        tier = self._tier_for(intent, force_deep)
 
-        retriever = self._load_retriever()
-        top_k = self.config.retrieval_k
-        results = retriever.search(user_query, top_k=top_k, context_filters=context_filters)
-
-        strong_support = self._has_strong_retrieval_support(results)
-        citations = self._citations_from_results(results) if strong_support else []
-        stale = self._is_context_stale()
-        if stale:
+        if self._is_context_stale():
             safety_flags.append("warning:stale_context")
 
-        answer = self._generate_answer(
-            user_query=user_query,
-            intent=intent,
-            citations=citations,
-            safety_flags=safety_flags,
-            messages=messages,
-            temperature=temperature,
-        )
+        convo = self._build_conversation(messages, user_query, intent, safety_flags)
 
-        if not strong_support:
-            safety_flags.append("warning:limited_confidence")
-            answer = (
-                "Sınırlı güven: Yerel kaynaklarda bu soruyu güçlü biçimde destekleyen kayıt bulamadım. "
-                "Genel pedagojik çerçevede yanıtlıyorum.\n\n" + answer
+        try:
+            loop = self.gemini.chat_with_tools(
+                messages=convo,
+                declarations=self.registry.declarations(),
+                dispatch=self.registry.dispatch,
+                tier=tier,
+                max_output_tokens=8192 if tier == "deep" else 2048,
+                temperature=temperature,
             )
+        except Exception as exc:
+            logger.error("Assistant tool loop failed: %s", exc)
+            loop = ToolLoopResult(text=self._fallback_answer(user_query))
+
+        if not loop.text.strip():
+            # The loop can legitimately return empty text — a model asked with
+            # its tools withdrawn is not obliged to say anything. Without this
+            # the reader gets a blank reply, which is worse than an honest one:
+            # measured during Task 4, a budget-exhausted loop yields text="".
+            logger.warning("Assistant produced no text (budget_exhausted=%s)",
+                           loop.budget_exhausted)
+            loop.text = self._fallback_answer(user_query)
+
+        answer, citations, dropped = self._finalize_citations(
+            loop.text, loop.citations)
+
+        # Eski chat() bu bayrağı zayıf retrieval'dan set ediyordu. Retrieval ön
+        # adımı kalkıyor ama bayrağın anlamı kalkmıyor: cevabın arkasında kaynak
+        # yoksa okur bunu bilmeli. Yeni mimarideki karşılığı, çözülmüş atıf
+        # listesinin boş olmasıdır.
+        if not citations:
+            safety_flags.append("warning:limited_confidence")
 
         answer += self.policy.guidance_suffix(safety_flags)
 
@@ -1360,25 +1421,62 @@ class AssistantRuntime:
             "intent": intent,
             "session_id": session_id,
             "meta": {
-                "model": getattr(self.router, 'last_model_used', 'gemini'),
-                    "provider": "gemini",
-                "retrieval_count": len(results),
+                "model": self.gemini.last_model_used or "gemini",
+                "provider": "gemini",
+                "tier": tier,
+                "tool_calls": loop.tool_calls,
+                "dropped_citations": dropped,
+                "degraded": self.registry.degraded(),
+                "budget_exhausted": loop.budget_exhausted,
+                "retrieval_count": len(citations),
                 "latency_ms": latency_ms,
                 "index_generated_at": self._meta_generated_at(),
             },
         }
 
         self._write_metric({
-            "type": "chat",
-            "session_id": session_id,
-            "intent": intent,
-            "latency_ms": latency_ms,
-            "citations": len(citations),
+            "type": "chat", "session_id": session_id, "intent": intent,
+            "tier": tier, "latency_ms": latency_ms, "citations": len(citations),
+            "tool_calls": len(loop.tool_calls),
             "safety_flags": payload["safety_flags"],
-                "timestamp": _utcnow_naive().isoformat() + "Z",
+            "timestamp": _utcnow_naive().isoformat() + "Z",
         })
-
         return payload
+
+    def _build_conversation(
+        self,
+        messages: list[dict[str, Any]],
+        user_query: str,
+        intent: str,
+        safety_flags: list[str],
+    ) -> list[dict[str, str]]:
+        """System prompt plus recent turns.
+
+        Retrieved context is deliberately absent: it used to be pasted in here
+        whether or not the question called for it, which is how raw EBA OCR
+        ended up under every answer. Evidence now enters through the tools.
+        """
+        return [
+            {"role": "system", "content": self.SYSTEM_PROMPT},
+            *[
+                {"role": str(m.get("role", "user")),
+                 "content": str(m.get("content", ""))[:2000]}
+                for m in messages[-3:] if isinstance(m, dict)
+            ],
+            {"role": "user", "content": (
+                f"Soru türü: {intent}\n"
+                f"Güvenlik: {', '.join(safety_flags) if safety_flags else 'yok'}\n\n"
+                f"Soru: {user_query}"
+            )},
+        ]
+
+    @staticmethod
+    def _fallback_answer(user_query: str) -> str:
+        return (
+            "Şu anda bu soruya cevap üretemedim. Soruyu biraz daha belirgin "
+            f"(ders/konu/tarih) biçimde tekrar gönderir misin?\n\n"
+            f"Sorduğun: {user_query}"
+        )
 
     def study_plan(
         self,
@@ -1386,45 +1484,16 @@ class AssistantRuntime:
         session_id: str = "",
         context_filters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        start = time.perf_counter()
-        user_query = self._latest_user_message(messages)
-
-        retriever = self._load_retriever()
-        results = retriever.search(user_query, top_k=max(10, self.config.retrieval_k), context_filters=context_filters)
-        citations = self._citations_from_results(results)
-
-        plan_blocks = self._build_rule_based_plan(user_query)
-
-        # If Ollama is available, ask model to refine the plan text with context.
-        llm_summary = self._generate_plan_summary(user_query, plan_blocks, citations)
-
-        latency_ms = int((time.perf_counter() - start) * 1000)
-        payload = {
-            "answer": llm_summary,
-            "citations": citations,
-            "safety_flags": [],
-            "plan_blocks": plan_blocks,
-            "intent": "study_plan",
-            "session_id": session_id,
-            "meta": {
-                "model": getattr(self.router, 'last_model_used', 'gemini'),
-                    "provider": "gemini",
-                "latency_ms": latency_ms,
-                "retrieval_count": len(results),
-                "index_generated_at": self._meta_generated_at(),
-            },
-        }
-
-        self._write_metric({
-            "type": "plan",
-            "session_id": session_id,
-            "latency_ms": latency_ms,
-            "citations": len(citations),
-            "blocks": len(plan_blocks),
-                "timestamp": _utcnow_naive().isoformat() + "Z",
-        })
-
-        return payload
+        out = self.chat(
+            messages=messages,
+            session_id=session_id,
+            context_filters=context_filters,
+            force_deep=True,
+        )
+        out["intent"] = "study_plan"
+        out["plan_blocks"] = self._build_rule_based_plan(
+            self._latest_user_message(messages))
+        return out
 
     def models(self) -> list[dict[str, Any]]:
         return [
@@ -1499,93 +1568,6 @@ class AssistantRuntime:
             "intent": out.get("intent", "qa"),
             "meta": out.get("meta", {}),
         }
-
-    def _generate_answer(
-        self,
-        user_query: str,
-        intent: str,
-        citations: list[dict[str, Any]],
-        safety_flags: list[str],
-        messages: list[dict[str, Any]],
-        temperature: float,
-    ) -> str:
-        prompt_citations = citations[:6]
-        context_blocks = []
-        for i, c in enumerate(prompt_citations, start=1):
-            snippet = str(c.get("snippet", "")).replace("\n", " ").strip()
-            if len(snippet) > 400:
-                snippet = snippet[:397] + "..."
-            context_blocks.append(
-                f"[S{i}] {snippet}"
-            )
-
-        context_text = "\n".join(context_blocks) if context_blocks else "[Kaynak bulunamadı]"
-
-        system_prompt = (
-            "Sen TEDY Eğitim Asistanısın — ortaokul öğrencisi Işık ve ailesi için kişisel eğitim danışmanısın.\n\n"
-            "## Kimlik\n"
-            "- Hedef kitle: 6. sınıf öğrencisi + veliler. Varsayılan dil Türkçe.\n"
-            "- Kaynaklarda yalnızca Işık'ın okul verileri bulunur: ödevler, sınavlar, ders programı, notlar, ders içerikleri, duyurular, EBA/MEBI/SEBİTV kaynakları.\n"
-            "- Bu veriler dışında bilgi sorulursa bunu belirt ve genel bilgiyle yanıtla.\n\n"
-            "## Yanıt Formatı\n"
-            "- Kısa ve öz başla: İlk cümlede sorunun doğrudan cevabını ver.\n"
-            "- Madde işaretleri kullan, uzun paragraflardan kaçın.\n"
-            "- Somut ve uygulanabilir öneriler sun (ne yapılacak, ne zaman, nasıl).\n"
-            "- Ödev/sınav sorularında: öncelik sırası belirt, tahmini süre ver, çalışma stratejisi öner.\n"
-            "- Not analizi sorularında: güçlü/zayıf alanları belirle, iyileştirme adımları sun.\n\n"
-            "## Pedagojik İlkeler\n"
-            "- Bloom taksonomisine göre bilgi → anlama → uygulama basamaklarını kullan.\n"
-            "- Aralıklı tekrar (spaced repetition) ve aktif öğrenme stratejilerini öner.\n"
-            "- Motivasyonu destekle: başarıları vurgula, yapıcı geri bildirim ver.\n"
-            "- Veli sorularında: eyleme dönüştürülebilir somut adımlar ver, jargondan kaçın.\n\n"
-            "## Kurallar\n"
-            "- Kaynak dışı kesin iddia kurma. Kaynak varsa metin içinde [S1], [S2] gibi atıf ver.\n"
-            "- Kaynak referanslarını satır içinde doğal biçimde kullan, ayrı liste yapma.\n"
-            "- Klinik tanı/tedavi önerme. Riskli psikolojik durumda profesyonel destek yönlendirmesi yap.\n"
-            "- Yanıtı asla 'Kaynaklar:' listesiyle bitirme — atıflar zaten metin içinde."
-        )
-
-        user_payload = (
-            f"Soru türü: {intent}\n"
-            f"Güvenlik: {', '.join(safety_flags) if safety_flags else 'yok'}\n\n"
-            f"Soru: {user_query}\n\n"
-            f"Işık'ın verileri:\n{context_text}\n\n"
-            "Bu verileri kullanarak Işık'a özel, somut ve pedagojik bir yanıt ver."
-        )
-
-        convo = [
-            {"role": "system", "content": system_prompt},
-            *[
-                {
-                    "role": str(m.get("role", "user")),
-                    "content": str(m.get("content", ""))[:2000],
-                }
-                for m in messages[-3:]
-                if isinstance(m, dict)
-            ],
-            {"role": "user", "content": user_payload},
-        ]
-
-        try:
-            out = self.router.chat(convo, temperature=temperature)
-            if out:
-                return out
-            logger.warning("Chat router returned empty response")
-        except Exception as exc:
-            logger.error("Chat router failed (gemini): %s", exc)
-
-        # Fail-safe fallback.
-        if citations:
-            refs = ", ".join(f"[{i+1}] {c['path']}" for i, c in enumerate(citations[:3]))
-            return (
-                f"Yerel kaynaklara göre kısa değerlendirme: {user_query}\n"
-                f"Kaynaklar: {refs}.\n"
-                "Model yanıtı üretilemediği için özet modunda döndüm."
-            )
-        return (
-            "Model şu anda erişilebilir değil ve yeterli kaynak eşleşmesi bulunamadı. "
-            "Lütfen soruyu daha spesifik (ders/konu/tarih) biçimde tekrar gönderin."
-        )
 
     def _generate_plan_summary(
         self,
