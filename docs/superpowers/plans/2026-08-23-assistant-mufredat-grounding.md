@@ -2244,7 +2244,7 @@ this component."
 - Modify: `dashboard/src/components/AssistantChat.tsx`
 - Modify: `dashboard/src/types.ts`
 - Modify: `dashboard/src/components/AssistantChat.scss`
-- Test: `dashboard/tests/assistant-chat.spec.ts`, `dashboard/tests/books-reader.spec.ts` (regresyon)
+- Test: `dashboard/tests/e2e/assistant-chat.spec.ts`, `dashboard/tests/e2e/books.spec.ts` (regresyon)
 
 **Interfaces:**
 - Consumes: `renderMarkdown(markdown, options)` — `dashboard/src/utils/markdown.tsx:190`; Task 5 atıf şeması
@@ -2529,7 +2529,7 @@ Mesaj gövdesindeki `<p className="ac-msg__content">{msg.content}</p>` satırın
 
 - [ ] **Step 5: Playwright test**
 
-`dashboard/tests/assistant-chat.spec.ts` oluştur:
+`dashboard/tests/e2e/assistant-chat.spec.ts` oluştur:
 
 ```ts
 import { test, expect } from '@playwright/test'
@@ -2574,7 +2574,7 @@ başlık/paragraf/verse render'ının bozulmadığını doğrula.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add dashboard/src/utils/markdown.tsx dashboard/src/components/CitationChip.tsx dashboard/src/components/AssistantChat.tsx dashboard/src/components/AssistantChat.scss dashboard/src/types.ts dashboard/tests/assistant-chat.spec.ts
+git add dashboard/src/utils/markdown.tsx dashboard/src/components/CitationChip.tsx dashboard/src/components/AssistantChat.tsx dashboard/src/components/AssistantChat.scss dashboard/src/types.ts dashboard/tests/e2e/assistant-chat.spec.ts
 git commit -m "feat: render assistant answers as markdown with live citations
 
 Answers were printed into a <p>, so the bullets and headings the prompt asked
@@ -2894,7 +2894,7 @@ Expected: hepsi PASS
 - [ ] **Step 6: Commit**
 
 ```bash
-git add dashboard/src/components/SourcePanel.tsx dashboard/src/components/AssistantChat.tsx dashboard/src/components/AssistantChat.scss dashboard/tests/assistant-chat.spec.ts
+git add dashboard/src/components/SourcePanel.tsx dashboard/src/components/AssistantChat.tsx dashboard/src/components/AssistantChat.scss dashboard/tests/e2e/assistant-chat.spec.ts
 git commit -m "feat: group assistant sources by kind and say when one is missing
 
 Every source card looked identical at a uniform 80%, whether it came from
