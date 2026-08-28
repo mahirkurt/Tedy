@@ -77,3 +77,7 @@ src/discover_*.py
 
 # Git worktrees
 .worktrees/
+
+# Playwright çıktıları (koşum artefaktı, izlenmez)
+dashboard/test-results/
+dashboard/playwright-report/
