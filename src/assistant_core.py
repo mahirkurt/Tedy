@@ -1916,6 +1916,43 @@ class AssistantRuntime:
         except Exception:
             pass
 
+    _MARKER_RE = re.compile(r"\[S(\d+)\]")
+
+    def _finalize_citations(
+        self,
+        text: str,
+        citations: list[dict[str, Any]],
+    ) -> tuple[str, list[dict[str, Any]], int]:
+        """Resolve the model's [S1] markers against the sources tools returned.
+
+        Markers are assigned in tool-return order. A marker pointing at nothing
+        is removed from the prose and counted, rather than left to imply
+        evidence that does not exist — and rather than being stripped wholesale
+        in the frontend, which is what previously severed text from sources.
+        """
+        indexed = {i: dict(c) for i, c in enumerate(citations, start=1)}
+        for i, c in indexed.items():
+            c["id"] = f"S{i}"
+
+        used: list[int] = []
+        dropped = 0
+
+        def replace(match: "re.Match[str]") -> str:
+            nonlocal dropped
+            n = int(match.group(1))
+            if n in indexed:
+                if n not in used:
+                    used.append(n)
+                return match.group(0)
+            dropped += 1
+            return ""
+
+        cleaned = self._MARKER_RE.sub(replace, text)
+        cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+        cleaned = re.sub(r" +([,.;:!?])", r"\1", cleaned).strip()
+
+        return cleaned, [indexed[n] for n in used], dropped
+
 
 def perform_incremental_reindex(project_root: str | os.PathLike[str]) -> dict[str, Any]:
     """Convenience function for sync pipeline hooks."""
