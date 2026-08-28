@@ -1596,69 +1596,6 @@ class AssistantRuntime:
             "meta": out.get("meta", {}),
         }
 
-    def _generate_plan_summary(
-        self,
-        user_query: str,
-        plan_blocks: list[dict[str, Any]],
-        citations: list[dict[str, Any]],
-    ) -> str:
-        if os.environ.get("ASSISTANT_ENABLE_LLM_PLAN_SUMMARY", "0") != "1":
-            return self._deterministic_plan_summary(plan_blocks, citations)
-
-        blocks_text = json.dumps(plan_blocks, ensure_ascii=False, indent=2)
-        cites_text = "\n".join(
-            f"[S{i+1}] {c['path']} :: {c['snippet']}" for i, c in enumerate(citations[:5])
-        )
-
-        prompt = (
-            "Aşağıdaki plan bloklarını Işık (7. sınıf) ve ailesi için haftalık çalışma planına dönüştür.\n\n"
-            "## Format Kuralları\n"
-            "- 4 bölüm kullan: **Öncelikler**, **Günlük Akış**, **Ölçme-Değerlendirme**, **Veli Kontrol Listesi**\n"
-            "- Her gün için somut adımlar ve tahmini süreler yaz.\n"
-            "- Yakın tarihli ödevleri/sınavları acil olarak işaretle.\n"
-            "- Bloom taksonomisine göre: önce hatırla/anla, sonra uygula/analiz et basamaklarını öner.\n"
-            "- Aralıklı tekrar: önceki haftanın konularını kısa tekrar blokları olarak ekle.\n"
-            "- Motivasyon: 'Bunu başarabilirsin' gibi destekleyici ifadeler ekle.\n"
-            "- Kaynak varsa [S1] formatında atıf ver. Ayrı kaynak listesi yapma.\n\n"
-            f"Soru: {user_query}\n\n"
-            f"Plan blokları:\n{blocks_text}\n\n"
-            f"Kaynaklar:\n{cites_text if cites_text else '[yok]'}"
-        )
-
-        try:
-            out = self.router.chat(
-                messages=[
-                    {"role": "system", "content": (
-                        "Sen Işık'ın kişisel pedagojik planlama asistanısın. "
-                        "Öğrencinin güncel ödev, sınav ve ders verilerini kullanarak "
-                        "uygulanabilir, motive edici çalışma planları oluşturursun."
-                    )},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.15,
-            )
-            if out:
-                return out
-        except Exception:
-            pass
-
-        return self._deterministic_plan_summary(plan_blocks, citations)
-
-    def _deterministic_plan_summary(
-        self,
-        plan_blocks: list[dict[str, Any]],
-        citations: list[dict[str, Any]],
-    ) -> str:
-        lines = ["Haftalık Çalışma Planı (Özet)"]
-        for block in plan_blocks[:7]:
-            title = block.get("title", "Görev")
-            day = block.get("day", "")
-            mins = block.get("estimated_minutes", 40)
-            lines.append(f"- {day}: {title} ({mins} dk)")
-        if citations:
-            lines.append("Kaynaklar: " + ", ".join(f"[S{i+1}]" for i in range(min(3, len(citations)))))
-        return "\n".join(lines)
-
     def _build_rule_based_plan(self, user_query: str) -> list[dict[str, Any]]:
         scraped = self._load_scraped_data()
         homework_rows = (
@@ -1785,22 +1722,6 @@ class AssistantRuntime:
         if any(k in q for k in ("pedagoji", "öğrenme psikolojisi", "motivasyon", "ölçme", "değerlendirme")):
             return "expert_guidance"
         return "general"
-
-    def _citations_from_results(self, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        cites: list[dict[str, Any]] = []
-        for i, r in enumerate(results[:8], start=1):
-            cites.append({
-                "id": f"S{i}",
-                "path": r.get("path", ""),
-                "chunk_index": r.get("chunk_index", 0),
-                "score": r.get("score", 0.0),
-                "bm25": r.get("bm25", 0.0),
-                "vector": r.get("vector", 0.0),
-                "confidence": r.get("confidence", 0.0),
-                "snippet": r.get("snippet", ""),
-                "source_kind": r.get("source_kind", "text"),
-            })
-        return cites
 
     def _has_strong_retrieval_support(self, results: list[dict[str, Any]]) -> bool:
         if not results:
