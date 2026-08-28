@@ -2210,7 +2210,7 @@ cd dashboard/src/components
 grep -nE "#edf5ff|#0f62fe" AssistantChat.scss && echo "BAŞARISIZ: sabit hex kaldı" || echo "TAMAM: sabit hex yok"
 grep -oE "ai-[a-z0-9-]+" AssistantChat.scss | sort -u | wc -l
 ```
-Expected: "TAMAM", ve sayım ≥ 12 (popover token'ları Task 9'da eklenecek, 16'ya orada ulaşılır).
+Expected: "TAMAM", ve sayım **≥ 11**. (Eşik ölçülerek 12'den 11'e indirildi: `ai-gradient` bir mixin'dir, kendi içinde token kullanır ama bu kullanım bizim dosyamıza grep atınca görünmez. 12 rakamı bunu sayabileceğini varsayıyordu; sayamıyor. Eşiği tutturmak için var olmayan bir UI durumuna token uydurma — sayım 11 ise geç. Popover token'ları Task 9'da eklenecek.)
 
 - [ ] **Step 6: Build + görsel kontrol**
 
