@@ -207,11 +207,23 @@ function renderInline(
     const token = match[0]
     const key = `${keyPrefix}-${match.index}`
     if (token.startsWith('**') || token.startsWith('__')) {
-      nodes.push(<strong key={key}>{token.slice(2, -2)}</strong>)
+      // The emphasised text is itself a plain-text run, so a [S1] marker
+      // written inside "**...**" gets the same renderToken treatment as one
+      // outside it — otherwise "**a warning [S1]**" (ordinary model prose)
+      // would carry a citation into a <strong> that never became a chip.
+      const inner: ReactNode[] = []
+      pushText(inner, token.slice(2, -2), key, renderToken)
+      nodes.push(<strong key={key}>{inner}</strong>)
     } else if (token.startsWith('`')) {
+      // Code spans are verbatim by design: a "[S1]"-shaped string inside
+      // `code` is example text, not a citation marker, so it deliberately
+      // does NOT go through pushText/renderToken. Do not "fix" this to match
+      // the bold/italic branches — that would turn code samples into chips.
       nodes.push(<code key={key}>{token.slice(1, -1)}</code>)
     } else {
-      nodes.push(<em key={key}>{token.slice(1, -1)}</em>)
+      const inner: ReactNode[] = []
+      pushText(inner, token.slice(1, -1), key, renderToken)
+      nodes.push(<em key={key}>{inner}</em>)
     }
     last = match.index + token.length
   }
