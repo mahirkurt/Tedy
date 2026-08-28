@@ -1672,6 +1672,23 @@ Ve yardımcıyı ekle:
         return "deep" if (force_deep or intent in cls.DEEP_INTENTS) else "fast"
 ```
 
+**`SYSTEM_PROMPT`'u sınıf sabitine çıkar (Task 6'nın kendi ön koşulu).**
+`_build_conversation` `self.SYSTEM_PROMPT` okuyor ama o sabit henüz yok — Task 7 üretiyor.
+`_build_conversation` `chat()` içinde `try` bloğunun DIŞINDA çağrıldığı için, sabit olmadan
+`chat()`'e giren her test `AttributeError` ile düşer. Çözüm bir yer tutucu değil, **birebir
+çıkarma**: `_generate_answer` içindeki mevcut `system_prompt` yerel değişkeninin metnini
+(`src/assistant_core.py:1524-1548`) karakteri karakterine `AssistantRuntime.SYSTEM_PROMPT`
+sınıf sabitine taşı. `_generate_answer` zaten bu task'ta siliniyor; metin kaybolmasın diye
+taşınıyor. Davranış değişmiyor — yeniden yazımı Task 7 yapacak.
+
+```python
+    SYSTEM_PROMPT = (
+        # _generate_answer'dan birebir taşındı. İçeriği Task 7 yeniden yazar.
+        "Sen TEDY Eğitim Asistanısın — ortaokul öğrencisi Işık ve ailesi için kişisel eğitim danışmanısın.\n\n"
+        ...  # mevcut metnin TAMAMI, tek karakter değiştirmeden
+    )
+```
+
 `chat()` gövdesini değiştir — retrieval-öncesi arama kaldırılır, yerine döngü gelir:
 
 ```python
@@ -1719,6 +1736,14 @@ Ve yardımcıyı ekle:
 
         answer, citations, dropped = self._finalize_citations(
             loop.text, loop.citations)
+
+        # Eski chat() bu bayrağı zayıf retrieval'dan set ediyordu. Retrieval ön
+        # adımı kalkıyor ama bayrağın anlamı kalkmıyor: cevabın arkasında kaynak
+        # yoksa okur bunu bilmeli. Yeni mimarideki karşılığı, çözülmüş atıf
+        # listesinin boş olmasıdır.
+        if not citations:
+            safety_flags.append("warning:limited_confidence")
+
         answer += self.policy.guidance_suffix(safety_flags)
 
         latency_ms = int((time.perf_counter() - start) * 1000)
@@ -1818,7 +1843,23 @@ Kural tabanlı `_build_rule_based_plan()` bugünkü gibi kalır; artık yanına 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest tests/test_assistant_core.py tests/test_assistant_api.py -v`
-Expected: PASS
+
+**Expected: dört yeni test PASS, ama MEVCUT İKİ TEST KIRILIR — ikisi de bu değişimin
+gerçek sonucudur, önceden var olan arıza değildir. İkisini de güncelle:**
+
+1. `test_chat_returns_citations_and_answer` — `runtime.router`'ı sahte bir nesneyle
+   değiştiriyor. Ama `__init__` içinde `self.router = self.gemini` (AYNI nesne), ve yeni
+   `chat()` `self.gemini.chat_with_tools()` çağırıyor. `runtime.router`'a yeni bir nesne
+   atamak `runtime.gemini`'yi değiştirmez → test **gerçek Gemini'ye ağdan çıkar**. Bu,
+   "hiçbir otomatik test ağa çıkmaz" kısıtının ihlalidir. Düzelt: sahteyi
+   `monkeypatch.setattr(runtime.gemini, "chat_with_tools", lambda *a, **k: ToolLoopResult(...))`
+   biçiminde kur ve assertion'ı yeni cevap şekline göre güncelle.
+2. `test_chat_marks_limited_confidence_when_retrieval_weak` — bayrağın kaynağı değişti
+   (zayıf retrieval → boş atıf listesi). Testin adı ve kurgusu yeni sebebi anlatacak biçimde
+   güncellenmeli; **iddiası zayıflatılmamalı** — bayrak hâlâ set edilmeli.
+
+Bu iki testi güncellemek bu task'ın kapsamındadır, ayrı bir task değildir. Tam süit
+(`python -m pytest -q`) task sonunda yeşil olmalı.
 
 - [ ] **Step 5: Uçtan uca elle doğrulama**
 
@@ -1912,7 +1953,14 @@ def test_system_prompt_no_longer_bans_citation_markers():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_assistant_core.py -v -k system_prompt`
-Expected: FAIL — `AttributeError: … 'SYSTEM_PROMPT'`
+
+Expected: **3 FAIL, 1 PASS** — `AttributeError` DEĞİL. Task 6 `SYSTEM_PROMPT`'u mevcut
+prompttan birebir çıkarıp sınıf sabiti yaptı, yani sabit artık var.
+`test_system_prompt_keeps_the_citation_contract` baştan yeşildir — eski prompt da
+`[S1]` atıf sözleşmesini zaten taşıyor, ve bunun korunması istenen davranıştır.
+Diğer üçü kırmızıdır: eski promptta "uydurma" yok, araç adları (`kazanim_ara`,
+`ogrenci_verisi_ara`) yok, ve yasaklanması istenen `"Kaynaklar:' listesiyle bitirme"`
+cümlesi hâlâ içinde. Adım 3 bu üçünü yeşile çevirir.
 
 - [ ] **Step 3: Write the prompt**
 
