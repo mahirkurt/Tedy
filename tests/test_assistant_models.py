@@ -300,8 +300,20 @@ def test_a_tool_only_response_with_no_text_is_not_treated_as_empty():
         _ToolResp([_Part(function_call=_FC("kazanim_ara", {"q": "kesir"}))]),
         _ToolResp([_Part(text="bitti")], text="bitti"),
     ])
-    out = c.chat_with_tools([{"role": "user", "content": "x"}], DECLS,
-                            lambda n, a: ToolOutcome(ok=True, text="t"))
+    dispatched = []
+
+    def dispatch(name, args):
+        dispatched.append(name)
+        return ToolOutcome(ok=True, text="t")
+
+    out = c.chat_with_tools([{"role": "user", "content": "x"}], DECLS, dispatch)
+
+    # The load-bearing assertion: the tool-only round was actually acted on.
+    # Without it this test passes even when _generate stops treating a
+    # function-call-only response as usable, because the scripted models
+    # happen to yield the same call count and final text either way.
+    assert dispatched == ["kazanim_ara"]
+    assert len(out.tool_calls) == 1
     # Only two generate_content calls total — the tool-only round was not
     # skipped and retried against a second model.
     assert len(c._client.models.contents) == 2
