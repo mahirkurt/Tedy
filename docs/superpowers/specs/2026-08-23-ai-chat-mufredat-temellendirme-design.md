@@ -166,11 +166,17 @@ class McpToolResult:
 araçları aynı sözleşmeye sokar.
 
 **Neden şemayı okumak, elle yazmak değil:** Ölçüldü — `search_learning_outcomes`
-parametresi `query` değil `q`, ve `grade` tamsayı değil **string**. Dahası
-kanonik biçim `"6"` değil `"5.Sınıf"`, ve bu yalnız parametrenin `description`
-alanında yazıyor. Elle yazılmış bir tanımla model `grade:"6"` üretti; şemanın
-kendisi (açıklamalar dahil) geçildiğinde `grade:"5.Sınıf"` üretti. **Açıklamaların
-birebir korunması, doğru çağrıyı üreten şeydir.**
+parametresi `query` değil `q`, ve `grade` tamsayı değil **string**. Bunlar sert
+hatalardır: yanlış ad ile çağrı reddedilir.
+
+**Düzeltme (2026-08-24 ölçümü).** Bu spec ilk yazıldığında `grade`'in kanonik
+biçiminin `"5.Sınıf"` olduğu ve bunun yalnız `description` alanında yazdığı
+iddia edilmişti. Canlı doğrulama bunu zayıflattı: o örnek yalnız
+`list_learning_outcomes`'un açıklamasında var, `search_learning_outcomes`'ta yok,
+ve sunucu `"6"` ile `"6.Sınıf"` için **bayt bayt aynı** sonucu döndürüyor — yani
+biçim normalleştiriliyor ve sessiz boş-sonuç riski yok. Açıklamaları birebir
+korumak yine doğru tasarımdır (kaynak şema tek doğruluk kaynağıdır ve `q`/`query`
+hatası gerçektir), ama `grade` örneği bu gerekçenin kanıtı değildi.
 
 **Çevirici ince kalır (2026-08-23 ölçümü):** MCP şemaları Pydantic tarzı
 `anyOf: [{type:string},{type:null}]` kullanıyor ve kurulu `google-genai` bunu
