@@ -1689,6 +1689,67 @@ taşınıyor. Davranış değişmiyor — yeniden yazımı Task 7 yapacak.
     )
 ```
 
+**Atıf numarası sözleşmesini modele GÖSTER (bu task'ın en kritik parçası).**
+
+Ölçülen kusur: `chat_with_tools` araç sonucunu modele
+`[araç:{ad} girdi={...}]\n{gövde}` olarak besliyor — **içinde hiç `[S]` numarası yok.**
+Ama sistem promptu modelden `[S1]`, `[S2]` yazmasını istiyor ve `_finalize_citations`
+numaraları `out.citations`'a eklenme sırasına göre atıyor. Model hangi kaynağın kaç
+numara olduğunu bilmiyor; bir araç çağrısı birden çok kaynak döndürebildiği için
+çağrıları sayarak da bilemez.
+
+Sonucu düşen bir işaretleyici DEĞİL: model `[S2]` yazarsa `_finalize_citations` onu
+mevcut ikinci kaynağa memnuniyetle bağlar ve panele **gerçek ama iddiayı desteklemeyen**
+bir kaynak girer. Bu, uydurma yasağının en tehlikeli biçimidir — sessiz, kendinden emin,
+yanlış. Hiçbir mevcut test yakalamaz, çünkü hepsi atıf listesini elle kuruyor.
+
+Düzeltme `chat_with_tools`'un transkript kurgusunda (`src/assistant_core.py`, `outcome.ok`
+dalı). Kaynaklar eklenirken atanacak numaralar modele bildirilir:
+
+```python
+                if outcome.ok:
+                    first = len(out.citations) + 1
+                    out.citations.extend(outcome.citations)
+                    # Modelin gördüğü numaralar ile _finalize_citations'ın atadığı
+                    # numaralar AYNI sayaçtan gelmeli; yoksa model doğru cümleye
+                    # yanlış kaynağı bağlar ve bu panelde doğrulanmış görünür.
+                    marks = "\n".join(
+                        f"[S{first + j}] {c.get('label', '')}"
+                        for j, c in enumerate(outcome.citations)
+                    )
+                    body = f"{marks}\n{outcome.text}" if marks else outcome.text
+                else:
+                    body = f"HATA: {outcome.error}"
+```
+
+**Gereken test** (`tests/test_assistant_models.py`'a ekle):
+
+```python
+def test_the_model_is_shown_which_number_each_source_will_get():
+    """Numbering is assigned by _finalize_citations in accumulation order. If the
+    model never sees those numbers it cites by guesswork, and a wrong-but-real
+    source is worse than a dropped marker: it looks verified."""
+    c = _tool_client([
+        _ToolResp([_Part(function_call=_FC("kazanim_ara", {"q": "kesir"}))]),
+        _ToolResp([_Part(text="bitti")], text="bitti"),
+    ])
+
+    def dispatch(name, args):
+        return ToolOutcome(ok=True, text="gövde", citations=[
+            {"kind": "mufredat", "label": "kazanım A", "locator": {},
+             "snippet": "s", "confidence": 0.9},
+            {"kind": "mufredat", "label": "kazanım B", "locator": {},
+             "snippet": "s", "confidence": 0.9},
+        ])
+
+    out = c.chat_with_tools([{"role": "user", "content": "x"}], DECLS, dispatch)
+    shown = c._client.models.contents[-1]
+    assert "[S1] kazanım A" in shown
+    assert "[S2] kazanım B" in shown
+    # Ve gösterilen numaralar finalize'ın atayacağıyla aynı olmalı.
+    assert [x["label"] for x in out.citations] == ["kazanım A", "kazanım B"]
+```
+
 `chat()` gövdesini değiştir — retrieval-öncesi arama kaldırılır, yerine döngü gelir:
 
 ```python
@@ -1961,6 +2022,11 @@ prompttan birebir çıkarıp sınıf sabiti yaptı, yani sabit artık var.
 Diğer üçü kırmızıdır: eski promptta "uydurma" yok, araç adları (`kazanim_ara`,
 `ogrenci_verisi_ara`) yok, ve yasaklanması istenen `"Kaynaklar:' listesiyle bitirme"`
 cümlesi hâlâ içinde. Adım 3 bu üçünü yeşile çevirir.
+
+**Prompt'ta ZORUNLU madde (Task 6'nın atıf sözleşmesiyle eşleşir):** araç sonuçlarında
+modele `[S1] <etiket>` biçiminde numaralar gösteriliyor. Prompt açıkça şunu demeli:
+*yalnız araç sonuçlarında sana gösterilen `[S]` numaralarını kullan; numara uydurma,
+kendin saymaya çalışma.* Bu cümle olmadan Task 6'nın numaralandırma düzeltmesi yarım kalır.
 
 - [ ] **Step 3: Write the prompt**
 
