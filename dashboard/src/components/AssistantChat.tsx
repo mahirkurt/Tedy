@@ -22,6 +22,8 @@ import {
   Time,
 } from '@carbon/icons-react'
 import type { AssistantCitation, AssistantPlanBlock, AssistantResponse } from '../types'
+import { renderMarkdown } from '../utils/markdown'
+import CitationChip from './CitationChip'
 
 type ChatRole = 'user' | 'assistant'
 
@@ -50,15 +52,6 @@ const WAITING_MESSAGES = [
 
 function toApiMessages(messages: ChatMessage[]) {
   return messages.map(m => ({ role: m.role, content: m.content }))
-}
-
-/** Strip inline citation references like "Kaynaklar: [1] path, [2] path..." from answer text. */
-function stripInlineCitations(text: string): string {
-  return text
-    .replace(/\n?Kaynaklar?:?\s*(\[\d+\][^\n]*\n?)+/gi, '')
-    .replace(/\s*\[\d+\]\s*[^\s,\]]+/g, '')
-    .replace(/Model yanıtı üretilemediği için özet modunda döndüm\.\s*/g, '')
-    .trim()
 }
 
 async function parseJsonSafe(res: Response): Promise<AssistantResponse | { error?: string }> {
@@ -107,6 +100,35 @@ function ThinkingIndicator() {
   )
 }
 
+function AnswerBody({
+  text,
+  citations,
+  onActivate,
+}: {
+  text: string
+  citations: AssistantCitation[]
+  onActivate: (id: string) => void
+}) {
+  const byId = useMemo(
+    () => new Map(citations.map(c => [c.id, c])),
+    [citations],
+  )
+
+  return (
+    <>
+      {renderMarkdown(text, {
+        renderToken: (token, key) => {
+          const citation = byId.get(token.slice(1, -1))
+          // A marker the backend could not resolve should not have survived,
+          // but if one does, show its text rather than swallowing it.
+          if (!citation) return <span key={key}>{token}</span>
+          return <CitationChip key={key} citation={citation} onActivate={onActivate} />
+        },
+      })}
+    </>
+  )
+}
+
 export default function AssistantChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -121,6 +143,7 @@ export default function AssistantChat() {
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [activeCitation, setActiveCitation] = useState<string | null>(null)
 
   const latestAssistant = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -168,11 +191,11 @@ export default function AssistantChat() {
       }
 
       const out = payload as AssistantResponse
-      const cleanAnswer = stripInlineCitations(out.answer || '') || 'Yanıt üretilemedi.'
+      const answer = (out.answer || '').trim() || 'Yanıt üretilemedi.'
       const assistantMsg: ChatMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
-        content: cleanAnswer,
+        content: answer,
         citations: out.citations || [],
         safetyFlags: out.safety_flags || [],
         planBlocks: out.plan_blocks || [],
@@ -183,6 +206,11 @@ export default function AssistantChat() {
     } finally {
       setLoading(false)
     }
+  }
+
+  function activateCitation(id: string) {
+    setActiveCitation(id)
+    document.getElementById(`ac-cite-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -242,7 +270,11 @@ export default function AssistantChat() {
                   <span className="ac-msg__role">
                     {msg.role === 'user' ? 'Işık' : 'Asistan'}
                   </span>
-                  <p className="ac-msg__content">{msg.content}</p>
+                  <div className="ac-msg__content">
+                    {msg.role === 'assistant'
+                      ? <AnswerBody text={msg.content} citations={msg.citations ?? []} onActivate={activateCitation} />
+                      : msg.content}
+                  </div>
                   {msg.safetyFlags && msg.safetyFlags.length > 0 && (
                     <div className="ac-msg__flags">
                       {msg.safetyFlags.map(f => (
@@ -324,8 +356,12 @@ export default function AssistantChat() {
             {hasCitations ? (
               <ul className="ac__ref-list">
                 {latestAssistant!.citations!.map(c => (
-                  <li key={c.id} className="ac__ref-item">
-                    <span className="ac__ref-path">{c.path}</span>
+                  <li
+                    key={c.id}
+                    id={`ac-cite-${c.id}`}
+                    className={`ac__ref-item${activeCitation === c.id ? ' ac__ref-item--active' : ''}`}
+                  >
+                    <span className="ac__ref-path">{c.label}</span>
                     <p className="ac__ref-snippet">{c.snippet}</p>
                     {c.confidence > 0 && (
                       <Tag type={c.confidence >= 0.7 ? 'green' : c.confidence >= 0.4 ? 'blue' : 'gray'} size="sm">

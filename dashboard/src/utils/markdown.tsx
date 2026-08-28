@@ -157,15 +157,53 @@ function foldLooseVerse(blocks: Block[]): Block[] {
 
 const INLINE_RE = /(\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_|`[^`]+`)/g
 
+export type TokenRenderer = (token: string, key: string) => ReactNode
+
+const CITATION_RE = /\[S\d+\]/g
+
+/**
+ * Push a plain-text run, handing any [S1] markers to the caller's renderer.
+ *
+ * Doing this inside renderInline rather than by splitting the source keeps a
+ * citation in whatever block it was written in — a marker at the end of a list
+ * item stays inside the <li> instead of landing after the list.
+ */
+function pushText(
+  nodes: ReactNode[],
+  text: string,
+  key: string,
+  renderToken?: TokenRenderer,
+): void {
+  if (!renderToken) {
+    nodes.push(text)
+    return
+  }
+  let last = 0
+  let m: RegExpExecArray | null
+  CITATION_RE.lastIndex = 0
+  while ((m = CITATION_RE.exec(text)) !== null) {
+    if (m.index > last) nodes.push(text.slice(last, m.index))
+    nodes.push(renderToken(m[0], `${key}-c${m.index}`))
+    last = m.index + m[0].length
+  }
+  if (last < text.length) nodes.push(text.slice(last))
+}
+
 /** Renders `**bold**`, `*italic*`, `_italic_` and `` `code` ``. */
-function renderInline(text: string, keyPrefix: string): ReactNode[] {
+function renderInline(
+  text: string,
+  keyPrefix: string,
+  renderToken?: TokenRenderer,
+): ReactNode[] {
   const nodes: ReactNode[] = []
   let last = 0
   let match: RegExpExecArray | null
   INLINE_RE.lastIndex = 0
 
   while ((match = INLINE_RE.exec(text)) !== null) {
-    if (match.index > last) nodes.push(text.slice(last, match.index))
+    if (match.index > last) {
+      pushText(nodes, text.slice(last, match.index), `${keyPrefix}-${last}`, renderToken)
+    }
     const token = match[0]
     const key = `${keyPrefix}-${match.index}`
     if (token.startsWith('**') || token.startsWith('__')) {
@@ -178,13 +216,17 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
     last = match.index + token.length
   }
 
-  if (last < text.length) nodes.push(text.slice(last))
+  if (last < text.length) {
+    pushText(nodes, text.slice(last), `${keyPrefix}-${last}`, renderToken)
+  }
   return nodes
 }
 
 interface RenderOptions {
   /** Enlarge the opening letter of the first paragraph, as a printed book does. */
   dropCap?: boolean
+  /** Replace inline [S1]-style markers — used by the assistant for citations. */
+  renderToken?: TokenRenderer
 }
 
 export function renderMarkdown(markdown: string, options: RenderOptions = {}): ReactNode[] {
@@ -202,7 +244,7 @@ export function renderMarkdown(markdown: string, options: RenderOptions = {}): R
         const Tag = `h${block.level}` as 'h2' | 'h3' | 'h4'
         return (
           <Tag key={key} className={`bookmd__heading bookmd__heading--${block.level}`}>
-            {renderInline(block.text, key)}
+            {renderInline(block.text, key, options.renderToken)}
           </Tag>
         )
       }
@@ -213,7 +255,7 @@ export function renderMarkdown(markdown: string, options: RenderOptions = {}): R
             {block.lines.map((line, j) =>
               line.trim() === ''
                 ? <span key={j} className="bookmd__verse-gap" />
-                : <span key={j} className="bookmd__verse-line">{renderInline(line, `${key}-${j}`)}</span>
+                : <span key={j} className="bookmd__verse-line">{renderInline(line, `${key}-${j}`, options.renderToken)}</span>
             )}
           </div>
         )
@@ -223,7 +265,7 @@ export function renderMarkdown(markdown: string, options: RenderOptions = {}): R
         return (
           <Tag key={key} className="bookmd__list">
             {block.items.map((item, j) => (
-              <li key={j}>{renderInline(item, `${key}-${j}`)}</li>
+              <li key={j}>{renderInline(item, `${key}-${j}`, options.renderToken)}</li>
             ))}
           </Tag>
         )
@@ -238,7 +280,7 @@ export function renderMarkdown(markdown: string, options: RenderOptions = {}): R
         ].filter(Boolean).join(' ')
         return (
           <p key={key} className={className}>
-            {renderInline(block.text, key)}
+            {renderInline(block.text, key, options.renderToken)}
           </p>
         )
       }

@@ -178,14 +178,21 @@ export interface HealthData {
   unavailable?: Record<string, { reason: string; detail: string }>
 }
 
+export type CitationKind = 'ogrenci' | 'mufredat' | 'kitap' | 'oer'
+
 export interface AssistantCitation {
   id: string
-  path: string
-  chunk_index: number
-  score: number
-  confidence: number
+  kind: CitationKind
+  label: string
+  locator: Record<string, unknown>
   snippet: string
-  source_kind: string
+  confidence: number
+}
+
+export interface AssistantToolCall {
+  name: string
+  ms: number
+  ok: boolean
 }
 
 export interface AssistantPlanBlock {
@@ -209,6 +216,11 @@ export interface AssistantResponse {
     retrieval_count?: number
     latency_ms?: number
     index_generated_at?: string
+    tier?: 'fast' | 'deep'
+    tool_calls?: AssistantToolCall[]
+    dropped_citations?: number
+    degraded?: string[]
+    budget_exhausted?: boolean
   }
 }
 

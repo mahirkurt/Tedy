@@ -385,6 +385,67 @@
   font-style: italic;
 }
 
+// Inline citation chips — the [S1] markers the assistant writes into the
+// answer text render as these rather than being stripped by the frontend.
+.ac-cite {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 1.15rem;
+  block-size: 1.15rem;
+  margin-inline: 0.15rem;
+  padding: 0 0.3rem;
+  border: 1px solid theme.$ai-border-strong;
+  border-radius: 999px;
+  background: theme.$ai-aura-hover-background;
+  color: theme.$text-primary;
+  font-size: 0.6875rem;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: super;
+
+  &:hover { background: theme.$ai-aura-hover-start; }
+  &:focus-visible { outline: 2px solid theme.$ai-border-strong; }
+}
+
+.ac-cite__pop {
+  @include ai.ai-popover-gradient();
+  max-inline-size: 22rem;
+  padding: var(--ted-space-sm);
+  box-shadow:
+    0 4px 12px theme.$ai-popover-shadow-outer-01,
+    0 2px 4px theme.$ai-popover-shadow-outer-02;
+}
+
+.ac-cite__kind {
+  display: block;
+  font-size: 0.6875rem;
+  color: theme.$text-secondary;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.ac-cite__label {
+  display: block;
+  font-size: 0.8125rem;
+  margin-top: 2px;
+}
+
+.ac-cite__snippet {
+  margin: var(--ted-space-2xs) 0 0;
+  font-size: 0.8125rem;
+  color: theme.$text-secondary;
+  line-height: 1.4;
+}
+
+// Sidebar reference the chip's onActivate scrolls to and highlights.
+.ac__ref-item--active {
+  background:
+    linear-gradient(to right, theme.$ai-aura-hover-start 0%, theme.$ai-aura-hover-end 50%),
+    theme.$ai-aura-hover-background;
+  border-radius: var(--ted-radius-sm);
+}
+
 @media (max-width: 1100px) {
   .ac__layout {
     grid-template-columns: 1fr;
