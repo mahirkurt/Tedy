@@ -1,0 +1,398 @@
+/* Assistant page */
+// ── Assistant Chat (Carbon AI style) ─────────────────────────────────────────
+@use '@carbon/react/scss/theme' as theme;
+@use '@carbon/react/scss/utilities/ai-gradient' as ai;
+
+.ac {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ted-space-md);
+}
+
+.ac__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ac__header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--ted-space-sm);
+}
+
+.ac__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ted-color-text-primary);
+}
+
+.ac__subtitle {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--ted-color-text-helper);
+}
+
+// Quick prompt chips
+.ac__prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ted-space-xs);
+}
+
+.ac__prompt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--ted-color-border-subtle);
+  background: var(--ted-color-layer);
+  color: var(--ted-color-text-primary);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+// Previously hard-coded a light-blue fill and Blue-60 border/text, imitating
+// Carbon's AI aura-hover treatment instead of using it.
+.ac__prompt-chip:hover:not(:disabled) {
+  background: theme.$ai-aura-hover-background;
+  border-color: theme.$ai-border-strong;
+  color: theme.$text-primary;
+}
+
+.ac__prompt-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+// Layout
+.ac__layout {
+  display: grid;
+  gap: var(--ted-space-md);
+  grid-template-columns: 1.6fr 1fr;
+}
+
+// Chat panel
+.ac__chat {
+  border: 1px solid var(--ted-color-border-subtle);
+  border-radius: var(--ted-radius-card);
+  background: var(--ted-color-layer);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ac__messages {
+  min-height: 340px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding: var(--ted-space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ted-space-sm);
+  scroll-behavior: smooth;
+}
+
+// Message bubbles
+.ac-msg {
+  display: flex;
+  gap: var(--ted-space-xs);
+  max-width: 92%;
+  animation: ac-fade-in 0.3s ease;
+}
+
+@keyframes ac-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ac-msg--user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.ac-msg__avatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.ac-msg__avatar--ai {
+  background: transparent;
+}
+
+.ac-msg__avatar--user {
+  background: var(--ted-color-brand-primary);
+  color: #fff;
+}
+
+.ac-msg__body {
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  line-height: 1.5;
+}
+
+// Carbon's AI surface language, not an imitation of it. Values come from the
+// installed @carbon/themes; the Figma copies carry no subscribed library and
+// are not the token-value authority in any case.
+.ac-msg--assistant .ac-msg__body {
+  @include ai.ai-gradient('left', 40%);
+  border-top-left-radius: 4px;
+}
+
+// Exact same light-blue the code already rendered here — that hex is g10's
+// ai-aura-hover-background, so this is a value-for-value token swap, not a
+// redesign. (Carbon's plain highlight token is close but not identical —
+// a shade darker.)
+.ac-msg--user .ac-msg__body {
+  background: theme.$ai-aura-hover-background;
+  border-top-right-radius: 4px;
+}
+
+.ac-msg__role {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--ted-color-text-helper);
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ac-msg__content {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 0.875rem;
+}
+
+.ac-msg__flags {
+  margin-top: var(--ted-space-2xs);
+  display: flex;
+  gap: 4px;
+}
+
+// Thinking / loading indicator
+.ac-msg--thinking .ac-msg__body {
+  min-width: 260px;
+}
+
+.ac-msg__thinking-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ted-space-xs);
+  margin-bottom: var(--ted-space-xs);
+}
+
+.ac-msg__elapsed {
+  font-size: 0.75rem;
+  color: var(--ted-color-text-helper);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes ac-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.ac-msg--thinking .cds--skeleton {
+  animation: ac-pulse 1.8s ease-in-out infinite;
+}
+
+.ac-msg--thinking .cds--skeleton__text {
+  background: theme.$ai-skeleton-background;
+
+  &::before {
+    background: theme.$ai-skeleton-element-background;
+  }
+}
+
+// Composer
+.ac__composer {
+  border-top: 1px solid var(--ted-color-border-subtle);
+  padding: var(--ted-space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ted-space-xs);
+}
+
+.ac__input-row {
+  display: flex;
+  gap: var(--ted-space-xs);
+  align-items: flex-end;
+}
+
+.ac__textarea {
+  flex: 1;
+}
+
+.ac__textarea .cds--text-area {
+  min-height: 48px;
+  resize: none;
+  box-shadow: inset 0 1px 3px theme.$ai-inner-shadow;
+
+  &:focus {
+    outline-color: theme.$ai-border-strong;
+  }
+}
+
+.ac__send-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.ac__send-group .cds--btn--primary {
+  background-color: var(--ted-color-brand-primary);
+}
+
+.ac__send-group .cds--btn--primary:hover {
+  background-color: #001d6c;
+}
+
+.ac__send-group .cds--btn--ghost svg {
+  fill: var(--ted-color-brand-primary);
+}
+
+.ac__error {
+  display: flex;
+  align-items: center;
+  gap: var(--ted-space-xs);
+}
+
+// Side panels
+.ac__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ted-space-md);
+}
+
+.ac__panel {
+  border-radius: var(--ted-radius-card) !important;
+  padding: var(--ted-space-md) !important;
+  background:
+    linear-gradient(to top, theme.$layer, theme.$layer) padding-box,
+    linear-gradient(to bottom, theme.$ai-border-start, theme.$ai-border-end) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 2px 6px theme.$ai-drop-shadow;
+}
+
+.ac__panel-title {
+  margin: 0 0 var(--ted-space-sm) 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ted-color-text-primary);
+}
+
+.ac__ref-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ted-space-sm);
+}
+
+.ac__ref-item {
+  padding-bottom: var(--ted-space-xs);
+  border-bottom: 1px solid var(--ted-color-border-subtle);
+}
+
+.ac__ref-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.ac__ref-item:hover {
+  background:
+    linear-gradient(to right, theme.$ai-aura-hover-start 0%, theme.$ai-aura-hover-end 50%),
+    theme.$ai-aura-hover-background;
+}
+
+.ac__ref-path {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: theme.$link-primary;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.ac__ref-snippet {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--ted-color-text-secondary);
+  line-height: 1.4;
+}
+
+// Plan blocks
+.ac__plan-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: var(--ted-space-xs);
+  border-bottom: 1px solid var(--ted-color-border-subtle);
+}
+
+.ac__plan-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.ac__plan-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ted-space-xs);
+}
+
+.ac__plan-time {
+  font-size: 0.75rem;
+  color: var(--ted-color-text-helper);
+  font-variant-numeric: tabular-nums;
+}
+
+.ac__plan-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.ac__plan-actions {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--ted-color-text-secondary);
+}
+
+.ac__muted {
+  margin: 0;
+  color: var(--ted-color-text-helper);
+  font-size: 0.8125rem;
+  font-style: italic;
+}
+
+@media (max-width: 1100px) {
+  .ac__layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 671px) {
+  .ac__prompts {
+    gap: 4px;
+  }
+
+  .ac__prompt-chip {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.65rem;
+  }
+}
