@@ -32,8 +32,10 @@ function StatusIcon({ status }: { status: SectionHealth['status'] }) {
   // 'unavailable' means the portal itself refused the page — not our failure,
   // but distinct from a skip, so it gets its own colour rather than falling
   // through to the grey skip icon.
-  if (status === 'unavailable') return <WarningFilled size={14} style={{ color: '#8A3FFC' }} />
-  return <SkipForwardFilled size={14} style={{ color: '#A8A8A8' }} />
+  if (status === 'unavailable') return <WarningFilled size={14} style={{ color: 'var(--cds-support-caution-undefined)' }} />
+  // Muted rather than near-invisible: the old #A8A8A8 sat at 2.2:1 on the
+  // popover's white ground, under the 3:1 floor for a glyph that carries state.
+  return <SkipForwardFilled size={14} style={{ color: 'var(--cds-text-helper)' }} />
 }
 
 function getTimeAgo(timestamp: string): string {
@@ -113,6 +115,11 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
     : health.success ? (warningCount > 0 ? 'warm-gray' : 'green')
     : 'red'
   const tagText = warningCount > 0 ? `${syncAgo} · ${warningCount} uyarı` : syncAgo
+  // Below Carbon's md breakpoint the full label grows with the warning count
+  // and pushes the header's action buttons off a 390px screen. The count is
+  // the part worth keeping — exact times are in the popover — so the phone
+  // label drops the elapsed prefix rather than truncating to an ellipsis.
+  const shortTagText = warningCount > 0 ? `${warningCount} uyarı` : syncAgo
   // Memoised so the `|| []` fallback does not mint a new array on every render
   // and invalidate the hooks below.
   const privateLessons = useMemo(
@@ -256,7 +263,10 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
                     type={tagType}
                     size="sm"
                     title={formatSyncDateTime(effectiveSyncTimestamp)}
-                  >{tagText}</Tag>
+                  >
+                    <span className="dashboard-header__sync-label dashboard-header__sync-label--full">{tagText}</span>
+                    <span className="dashboard-header__sync-label dashboard-header__sync-label--short">{shortTagText}</span>
+                  </Tag>
                 )}
               </button>
               {healthOpen && !loading && (

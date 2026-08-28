@@ -147,7 +147,7 @@ function GradeExpandRow({ row, rawGrade, getRowProps }: {
                     className="grade-detail__bar-fill"
                     style={{
                       width: `${barWidth}%`,
-                      backgroundColor: color || '#c6c6c6',
+                      backgroundColor: color || 'var(--cds-border-subtle-01)',
                     }}
                   />
                 </div>
