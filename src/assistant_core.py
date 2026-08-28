@@ -19,7 +19,7 @@ import re
 import subprocess
 import time
 import fnmatch
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -165,6 +165,14 @@ class AssistantConfig:
         )
 
 
+@dataclass
+class ToolLoopResult:
+    text: str = ""
+    citations: list[dict[str, Any]] = field(default_factory=list)
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    budget_exhausted: bool = False
+
+
 class GeminiClient:
     """Gemini API chat client — fast cloud inference, no local memory cost."""
 
@@ -282,6 +290,120 @@ class GeminiClient:
             return f"quota_exhausted:{model}"
         logger.error("Gemini error (%s): %s", model, err)
         return err
+
+    def chat_with_tools(
+        self,
+        messages: list[dict[str, str]],
+        declarations: list[dict[str, Any]],
+        dispatch: Any,
+        tier: str = "fast",
+        max_rounds: int = 4,
+        max_output_tokens: int = 2048,
+        temperature: float = 0.2,
+    ) -> ToolLoopResult:
+        """Run the model until it answers, dispatching tools it asks for.
+
+        The round budget is a hard stop: a model that keeps calling tools would
+        otherwise hold a worker open indefinitely. When it trips, the model is
+        asked once more with tools withdrawn, so the user gets an answer from
+        the evidence already gathered instead of an error.
+        """
+        from google.genai import types
+
+        if not self.available:
+            raise RuntimeError("gemini_no_api_key")
+        client = self._get_client()
+
+        tools = [types.Tool(function_declarations=[
+            types.FunctionDeclaration(
+                name=d["name"],
+                description=d.get("description", ""),
+                parameters=d.get("parameters") or {"type": "object", "properties": {}},
+            ) for d in declarations])]
+
+        transcript = self._build_prompt(messages)
+        out = ToolLoopResult()
+
+        for round_no in range(max_rounds + 1):
+            offer_tools = round_no < max_rounds
+            config: dict[str, Any] = {
+                "temperature": temperature,
+                "max_output_tokens": max_output_tokens,
+            }
+            if offer_tools:
+                config["tools"] = tools
+
+            response = self._generate(client, transcript, config, tier)
+            calls = self._function_calls(response)
+
+            if not calls:
+                out.text = (getattr(response, "text", "") or "").strip()
+                return out
+
+            if not offer_tools:
+                # Budget spent and the model still wants tools; the loop above
+                # already withdrew them, so this branch cannot recurse.
+                out.budget_exhausted = True
+                out.text = (getattr(response, "text", "") or "").strip()
+                return out
+
+            for call in calls:
+                args = dict(call.args or {})
+                started = time.perf_counter()
+                outcome = dispatch(call.name, args)
+                elapsed = int((time.perf_counter() - started) * 1000)
+                out.tool_calls.append({
+                    "name": call.name, "ms": elapsed, "ok": bool(outcome.ok),
+                })
+                if outcome.ok:
+                    out.citations.extend(outcome.citations)
+                    body = outcome.text
+                else:
+                    # Hand the failure back verbatim. The schemas are strict and
+                    # the message names the offending field, so the model can
+                    # usually fix its own call on the next round.
+                    body = f"HATA: {outcome.error}"
+                transcript += (
+                    f"\n\n[araç:{call.name} girdi={json.dumps(args, ensure_ascii=False)}]\n"
+                    f"{body[:4000]}"
+                )
+                if len(out.tool_calls) >= max_rounds:
+                    break
+
+            if len(out.tool_calls) >= max_rounds:
+                out.budget_exhausted = True
+                final = self._generate(
+                    client, transcript,
+                    {"temperature": temperature,
+                     "max_output_tokens": max_output_tokens}, tier)
+                out.text = (getattr(final, "text", "") or "").strip()
+                return out
+
+        return out
+
+    def _generate(self, client: Any, contents: str,
+                  config: dict[str, Any], tier: str) -> Any:
+        last_error = ""
+        for model in self._chain(tier):
+            try:
+                resp = client.models.generate_content(
+                    model=model, contents=contents, config=config)
+                self.last_model_used = model
+                return resp
+            except Exception as e:
+                last_error = self._classify_failure(model, e)
+        raise RuntimeError(last_error or "gemini_all_models_failed")
+
+    @staticmethod
+    def _function_calls(response: Any) -> list[Any]:
+        calls = []
+        for cand in getattr(response, "candidates", None) or []:
+            content = getattr(cand, "content", None)
+            for part in (getattr(content, "parts", None) or []):
+                fc = getattr(part, "function_call", None)
+                if fc is not None:
+                    calls.append(fc)
+        return calls
 
 
 HybridChatRouter = None  # Removed — Gemini-only
