@@ -3054,6 +3054,28 @@ dashboard."
 `docs/assistant-go-live.md` şu an Ollama dönemini anlatıyor: `ollama pull mxbai-embed-large`, `ASSISTANT_CHAT_MODEL=qwen2.5-coder:7b`. Kod Gemini'ye geçtiğinde güncellenmemiş. Şunları içerecek şekilde yeniden yaz:
 
 - **Önkoşullar:** `GEMINI_API_KEY`, `MUFREDAT_MCP_API_KEY`, `EGITIM_KAYNAK_MCP_API_KEY`, `DASHBOARD_SECRET_KEY`, `ASSISTANT_API_KEY`. Ollama yalnız gömme (embedding) indeksi için gerekli; sohbet yolu onu kullanmıyor.
+
+- **DAĞITIM TUZAĞI — bu adım atlanırsa özellik sessizce ölür.** Servis
+  (`~/.config/systemd/user/ted-dashboard.service`) ortamını `EnvironmentFile=.env`'den
+  alıyor. İki MCP anahtarı geliştirme makinesinde **interaktif kabuk ortamında** duruyor
+  ama **`.env` içinde değil**. Bu haliyle gunicorn onları göremez: kayıt defteri sıfır
+  müfredat aracıyla açılır, asistan yalnız yerel dosyalardan cevap verir ve **sağlıklı
+  görünür**. Task 3'ün düzeltmesinden sonra `degraded()` bunu bildirir ve arayüzde rozet
+  yanar, ama rozet arızayı görünür kılar — gidermez.
+
+  Dağıtımdan önce iki anahtarı `.env`'e ekle (dosya zaten mod 600 ve gitignore'lu) ve
+  doğrula:
+
+  ```bash
+  systemctl --user restart ted-dashboard
+  python -c "
+  from src.assistant_tools import build_registry
+  reg = build_registry(lambda q,k: [])
+  print('araçlar:', len(reg.declarations()), '| degraded:', reg.degraded())
+  "
+  ```
+  Beklenen: `araçlar: 10 | degraded: []`. `degraded` boş değilse veya araç sayısı 1
+  (yalnız `ogrenci_verisi_ara`) ise anahtarlar servise ulaşmıyordur.
 - **MCP sağlık kontrolü:**
   ```bash
   python -c "
