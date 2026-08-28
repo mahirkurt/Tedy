@@ -279,3 +279,26 @@ def test_chat_meta_carries_the_tool_ledger_and_dropped_count(tmp_path, monkeypat
     assert out["meta"]["tool_calls"][0]["name"] == "kazanim_ara"
     assert "[S5]" not in out["answer"]
     assert len(out["citations"]) == 1
+
+
+def test_system_prompt_forbids_inventing_locators():
+    p = AssistantRuntime.SYSTEM_PROMPT
+    assert "uydurma" in p.lower()
+    for token in ("kazanım kodu", "sayfa numarası"):
+        assert token in p.lower()
+
+
+def test_system_prompt_names_the_authority_split():
+    p = AssistantRuntime.SYSTEM_PROMPT
+    assert "ogrenci_verisi_ara" in p
+    assert "kazanim_ara" in p
+
+
+def test_system_prompt_keeps_the_citation_contract():
+    assert "[S1]" in AssistantRuntime.SYSTEM_PROMPT
+
+
+def test_system_prompt_no_longer_bans_citation_markers():
+    """The old prompt ended with 'never finish with a Kaynaklar list' AND the
+    frontend stripped markers — together they made citation impossible."""
+    assert "Kaynaklar:' listesiyle bitirme" not in AssistantRuntime.SYSTEM_PROMPT
