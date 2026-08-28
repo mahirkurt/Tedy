@@ -92,12 +92,19 @@ def sanitize_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 class McpRegistry:
     def __init__(self, clients: dict[str, McpClient],
-                 local_search: Callable[[str, int], list[dict[str, Any]]]) -> None:
+                 local_search: Callable[[str, int], list[dict[str, Any]]],
+                 unconfigured: list[str] | None = None) -> None:
         self.clients = clients
         self.local_search = local_search
+        # Servers that were configured (named in MCP_SERVERS) but had no API
+        # key. They are not in `clients` — there is nothing to call — but
+        # they must still be reportable, or an unset env var looks exactly
+        # like a healthy system with nothing to say.
+        self.unconfigured = list(unconfigured or [])
 
     def degraded(self) -> list[str]:
-        return sorted(n for n, c in self.clients.items() if not c.healthy)
+        unhealthy = (n for n, c in self.clients.items() if not c.healthy)
+        return sorted(set(unhealthy) | set(self.unconfigured))
 
     def declarations(self) -> list[dict[str, Any]]:
         decls: list[dict[str, Any]] = [{
@@ -161,15 +168,31 @@ class McpRegistry:
 
     def _dispatch_local(self, args: dict[str, Any]) -> ToolOutcome:
         query = str(args.get("query", "")).strip()
-        rows = self.local_search(query, 8)
-        citations = [{
-            "kind": "ogrenci",
-            "label": os.path.basename(str(r.get("path", ""))) or "okul verisi",
-            "locator": {"path": r.get("path", ""),
-                        "chunk_index": r.get("chunk_index", 0)},
-            "snippet": str(r.get("snippet", ""))[:400],
-            "confidence": float(r.get("confidence", 0.0) or 0.0),
-        } for r in rows]
+        try:
+            rows = self.local_search(query, 8)
+        except Exception as exc:
+            # local_search is caller-supplied and, unlike the MCP path,
+            # carries no contract against raising. A failure here must not
+            # take the whole dispatch() call down with it — and must not be
+            # swallowed either, per "sessiz arıza yok".
+            logger.error("local_search failed for %r: %s", query, exc)
+            return ToolOutcome(ok=False, error=f"yerel arama hatası: {exc}")
+
+        rows = [r for r in rows if isinstance(r, dict)]
+        citations = []
+        for r in rows:
+            try:
+                confidence = float(r.get("confidence", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                confidence = 0.0
+            citations.append({
+                "kind": "ogrenci",
+                "label": os.path.basename(str(r.get("path", ""))) or "okul verisi",
+                "locator": {"path": r.get("path", ""),
+                            "chunk_index": r.get("chunk_index", 0)},
+                "snippet": str(r.get("snippet", ""))[:400],
+                "confidence": confidence,
+            })
         text = "\n\n".join(str(r.get("snippet", "")) for r in rows) or "(kayıt yok)"
         return ToolOutcome(ok=True, text=text, citations=citations)
 
@@ -190,12 +213,16 @@ class McpRegistry:
 def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]]
                    ) -> McpRegistry:
     """Wire the configured servers. A server with no key is simply absent —
-    its tools are not declared and the loop degrades instead of failing."""
+    its tools are not declared — but it is still named by degraded(), so an
+    unset env var never looks like a healthy system with nothing to say."""
     clients: dict[str, McpClient] = {}
+    unconfigured: list[str] = []
     for name, (url, env_key) in MCP_SERVERS.items():
         key = os.environ.get(env_key, "").strip()
         if not key:
             logger.warning("MCP %s disabled: %s not set", name, env_key)
+            unconfigured.append(name)
             continue
         clients[name] = McpClient(name=name, url=url, api_key=key)
-    return McpRegistry(clients=clients, local_search=local_search)
+    return McpRegistry(clients=clients, local_search=local_search,
+                       unconfigured=unconfigured)

@@ -1,7 +1,7 @@
 """Tool registry: schema sanitisation, allowlist, dispatch, degradation."""
 import pytest
 from src.assistant_tools import (
-    TOOL_ALLOWLIST, McpRegistry, sanitize_schema,
+    MCP_SERVERS, TOOL_ALLOWLIST, McpRegistry, build_registry, sanitize_schema,
 )
 from src.mcp_client import McpToolResult
 
@@ -125,6 +125,7 @@ def test_unhealthy_server_is_reported_as_degraded():
     assert "egitim-kaynak" in reg.degraded()
 
 
+
 def test_tool_error_text_is_passed_back_for_the_model_to_correct():
     tools = [{"name": "search_learning_outcomes", "description": "d",
               "inputSchema": REAL_SCHEMA}]
@@ -135,3 +136,48 @@ def test_tool_error_text_is_passed_back_for_the_model_to_correct():
 
     assert out.ok is False
     assert "Field required: q" in (out.error or "")
+
+
+def test_missing_api_key_makes_the_server_absent_and_degraded(monkeypatch):
+    """Regression: a keyless server used to vanish from clients() and stay
+    silent in degraded() too, so a dropped .env var looked healthy. Now
+    build_registry() must still name it."""
+    for _, (_, env_key) in MCP_SERVERS.items():
+        monkeypatch.delenv(env_key, raising=False)
+
+    reg = build_registry(local_search=lambda q, k: [])
+
+    assert reg.clients == {}
+    assert set(MCP_SERVERS) <= set(reg.degraded())
+
+
+def test_local_search_exception_is_reported_not_raised():
+    def boom(q, k):
+        raise RuntimeError("index is down")
+
+    reg = _registry(local_search=boom)
+    out = reg.dispatch("ogrenci_verisi_ara", {"query": "ödev"})
+
+    assert out.ok is False
+    assert "index is down" in (out.error or "")
+
+
+def test_non_numeric_confidence_does_not_raise():
+    rows = [{"path": "output/scraped_data.json", "snippet": "Ödev: kesirler",
+             "chunk_index": 3, "confidence": "yuksek"}]
+    reg = _registry(local_search=lambda q, k: rows)
+    out = reg.dispatch("ogrenci_verisi_ara", {"query": "ödev"})
+
+    assert out.ok is True
+    assert out.citations[0]["confidence"] == 0.0
+
+
+def test_non_dict_row_is_skipped_not_raised():
+    rows = [None, {"path": "output/scraped_data.json", "snippet": "Ödev: kesirler",
+                    "chunk_index": 3, "confidence": 0.5}]
+    reg = _registry(local_search=lambda q, k: rows)
+    out = reg.dispatch("ogrenci_verisi_ara", {"query": "ödev"})
+
+    assert out.ok is True
+    assert len(out.citations) == 1
+    assert out.citations[0]["locator"]["path"] == "output/scraped_data.json"
