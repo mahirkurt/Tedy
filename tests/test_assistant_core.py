@@ -302,3 +302,20 @@ def test_system_prompt_no_longer_bans_citation_markers():
     """The old prompt ended with 'never finish with a Kaynaklar list' AND the
     frontend stripped markers — together they made citation impossible."""
     assert "Kaynaklar:' listesiyle bitirme" not in AssistantRuntime.SYSTEM_PROMPT
+
+
+def test_system_prompt_calls_both_tools_for_hybrid_questions():
+    """A question like 'ödevimdeki kesir konusunu anlat' touches both Işık's
+    own record and a curriculum topic — the prompt must say to call both
+    tools in sequence, not silently pick one bucket."""
+    p = AssistantRuntime.SYSTEM_PROMPT
+    assert "iki aracı da çağır" in p
+    assert "kaynakların karışmaması demektir, aracın tekliği değil" in p
+
+
+def test_system_prompt_allows_general_knowledge_without_fabricated_citation():
+    """Out-of-scope general-knowledge questions must be answerable, but the
+    answer must not carry a [S] marker implying it came from a tool."""
+    p = AssistantRuntime.SYSTEM_PROMPT
+    assert "genel bilgi sorulursa yanıtla" in p
+    assert "o cümleye [S] atıfı ekleme" in p
