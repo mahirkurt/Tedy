@@ -1606,6 +1606,22 @@ def test_chat_reports_degraded_servers_in_meta(tmp_path, monkeypatch):
     assert out["meta"]["degraded"] == ["maarif-mufredat"]
 
 
+def test_empty_model_output_becomes_an_honest_message_not_a_blank_reply(tmp_path, monkeypatch):
+    """A budget-exhausted loop can return text="" — measured in Task 4. The
+    reader must never receive a blank answer."""
+    (tmp_path / "output").mkdir()
+    rt = AssistantRuntime(tmp_path)
+
+    monkeypatch.setattr(rt.registry, "declarations", lambda: [])
+    monkeypatch.setattr(rt.registry, "degraded", lambda: [])
+    monkeypatch.setattr(rt.gemini, "chat_with_tools",
+                        lambda *a, **k: ToolLoopResult(text="   ", budget_exhausted=True))
+
+    out = rt.chat([{"role": "user", "content": "kesir nedir"}])
+    assert out["answer"].strip()
+    assert "kesir nedir" in out["answer"]
+
+
 def test_chat_meta_carries_the_tool_ledger_and_dropped_count(tmp_path, monkeypatch):
     (tmp_path / "output").mkdir()
     rt = AssistantRuntime(tmp_path)
@@ -1692,6 +1708,15 @@ Ve yardımcıyı ekle:
             logger.error("Assistant tool loop failed: %s", exc)
             loop = ToolLoopResult(text=self._fallback_answer(user_query))
 
+        if not loop.text.strip():
+            # The loop can legitimately return empty text — a model asked with
+            # its tools withdrawn is not obliged to say anything. Without this
+            # the reader gets a blank reply, which is worse than an honest one:
+            # measured during Task 4, a budget-exhausted loop yields text="".
+            logger.warning("Assistant produced no text (budget_exhausted=%s)",
+                           loop.budget_exhausted)
+            loop.text = self._fallback_answer(user_query)
+
         answer, citations, dropped = self._finalize_citations(
             loop.text, loop.citations)
         answer += self.policy.guidance_suffix(safety_flags)
@@ -1761,7 +1786,7 @@ Ve yardımcıyı ekle:
     @staticmethod
     def _fallback_answer(user_query: str) -> str:
         return (
-            "Şu anda modele ulaşamadım. Soruyu biraz daha belirgin "
+            "Şu anda bu soruya cevap üretemedim. Soruyu biraz daha belirgin "
             f"(ders/konu/tarih) biçimde tekrar gönderir misin?\n\n"
             f"Sorduğun: {user_query}"
         )
