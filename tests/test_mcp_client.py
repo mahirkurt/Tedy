@@ -165,3 +165,32 @@ def test_transport_exception_is_contained():
     out = c.call_tool("t", {})
 
     assert out.ok is False and c.healthy is False
+
+
+def test_call_tool_rejects_a_truthy_non_dict_result():
+    """A JSON-RPC response with no error but a non-dict result (e.g. a gateway
+    that returns HTTP 200 with a JSON-shaped error envelope) must not be
+    treated as an empty success — that would hide a broken server behind a
+    tool call that looks like it simply found nothing."""
+    c = _client([
+        _init_resp(),
+        _Resp(json.dumps({"jsonrpc": "2.0", "id": 3,
+                          "result": "unexpected string"})),
+    ])
+    out = c.call_tool("t", {})
+
+    assert out.ok is False
+    assert out.text == ""
+    assert out.error
+    assert c.healthy is False
+
+
+def test_list_tools_rejects_a_truthy_non_dict_result():
+    c = _client([
+        _init_resp(),
+        _Resp(json.dumps({"jsonrpc": "2.0", "id": 3, "result": 7})),
+    ])
+    tools = c.list_tools()
+
+    assert tools == []
+    assert c.healthy is False

@@ -148,9 +148,16 @@ class McpClient:
             self._healthy = False
             logger.error("MCP %s tools/list failed: %s", self.name, exc)
             return []
-        tools = (rpc.get("result") or {}).get("tools")
-        if tools is None:
+        # `or {}` only substitutes on a falsy result; a truthy non-dict
+        # (str/int/list) would otherwise sail through to `.get("tools")`
+        # and raise. Treat any non-dict result as equivalent to a missing one.
+        result = rpc.get("result")
+        result = result if isinstance(result, dict) else {}
+        tools = result.get("tools")
+        if not isinstance(tools, list):
             self._healthy = False
+            logger.error("MCP %s tools/list returned a malformed result: %r",
+                          self.name, rpc.get("result"))
             return []
         self._tools = tools
         self._healthy = True
@@ -169,7 +176,18 @@ class McpClient:
             msg = str(rpc["error"].get("message", "rpc_error"))
             return McpToolResult(ok=False, error=msg)
 
-        result = rpc.get("result") or {}
+        # A JSON-RPC response with no error but a truthy non-dict result (a
+        # gateway that returns HTTP 200 with a JSON-shaped error envelope
+        # produces exactly this) must not be treated as an empty success —
+        # that would let a broken server masquerade as a tool that simply
+        # found nothing.
+        result = rpc.get("result")
+        if not isinstance(result, dict):
+            self._healthy = False
+            logger.error("MCP %s call %s returned a malformed result: %r",
+                          self.name, name, result)
+            return McpToolResult(ok=False, error=f"malformed_result: {result!r}")
+
         texts, images = [], []
         for block in result.get("content") or []:
             if block.get("type") == "text":
