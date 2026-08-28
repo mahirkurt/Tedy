@@ -145,6 +145,11 @@
 // installed @carbon/themes; the Figma copies carry no subscribed library and
 // are not the token-value authority in any case.
 .ac-msg--assistant .ac-msg__body {
+  // The plan also called for `border-radius: var(--ted-radius-card)` and
+  // `padding: var(--ted-space-sm)` here. Deliberately not applied: it would
+  // have set all four corners equal on the assistant bubble while leaving
+  // .ac-msg--user untouched, breaking the matched asymmetry the two bubbles
+  // rely on — each flattens only the corner facing its own avatar.
   @include ai.ai-gradient('left', 40%);
   border-top-left-radius: 4px;
 }
