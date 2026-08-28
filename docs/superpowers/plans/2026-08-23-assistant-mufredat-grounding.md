@@ -2742,6 +2742,43 @@ Mesaj gövdesinin **üstüne**, degradasyon uyarısı:
 )}
 ```
 
+**Güvenlik bayraklarının şiddetini ayır (Task 6'nın ölçülen sonucu).**
+
+Bugün `AssistantChat.tsx:248` her bayrağı ayrımsız `<Tag type="red">{f}</Tag>` olarak basıyor.
+İki sorun var ve ikincisi Task 6 ile büyüdü:
+
+1. **Ham token okura gösteriliyor.** Rozetin metni tam olarak `warning:limited_confidence`.
+   Bu bir 6. sınıf öğrencisinin ekranında iç değişken adı demek.
+2. **Şiddet ayrımı yok.** `warning:limited_confidence` ile `risk:mental_health_crisis`
+   aynı kırmızı. Task 6 `limited_confidence`'ı "çözülmüş atıf listesi boş" koşuluna bağladı,
+   yani araç çağırmayı gerektirmeyen her sade cevap ("merhaba") artık bu bayrağı taşıyor.
+   Kırmızı kriz rozetiyle aynı görünen bir "bilgi" rozeti, sık göründükçe gerçek kriz
+   rozetini de değersizleştirir — bu, sessiz arıza yasağının okur tarafındaki karşılığıdır.
+
+Bayrağın kendisi doğru ve kalmalı (cevabın arkasında gerçekten kaynak yok). Değişecek olan
+sunumu:
+
+```tsx
+const FLAG_LABELS: Record<string, string> = {
+  'warning:limited_confidence': 'Kaynaksız cevap',
+  'warning:stale_context': 'Veriler güncel olmayabilir',
+}
+
+function flagTone(f: string): 'red' | 'gray' {
+  return f.startsWith('risk:') ? 'red' : 'gray'
+}
+
+// render:
+<Tag key={f} type={flagTone(f)} size="sm">{FLAG_LABELS[f] ?? f}</Tag>
+```
+
+`risk:*` kırmızı kalır — o ayrım yük taşıyor. `warning:*` gri olur. Sözlükte karşılığı
+olmayan bayrak ham hâliyle basılır (sessizce yutulmaz).
+
+**Gereken Playwright testi:** bir cevap hem `risk:` hem `warning:` bayrağı taşıdığında
+ikisinin FARKLI `Tag` tipiyle render edildiğini doğrula; ve `warning:limited_confidence`
+rozetinin metninin ham token OLMADIĞINI.
+
 `ChatMessage` arayüzüne `degraded?: string[]` ekle ve API yanıtından doldur. `submit()` imzasına `opts?: { deep?: boolean }` ekle; `deep` ise gövdeye `force_deep: true` koy.
 
 Yan paneli `SourcePanel`'e devret:
