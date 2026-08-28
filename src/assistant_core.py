@@ -242,27 +242,12 @@ class GeminiClient:
 
         client = self._get_client()
         prompt = self._build_prompt(messages)
-
-        last_error = ""
-        for model in self._chain(tier):
-            try:
-                response = client.models.generate_content(
-                    model=model,
-                    contents=prompt,
-                    config={
-                        "temperature": temperature,
-                        "max_output_tokens": max_output_tokens,
-                    },
-                )
-                text = (response.text or "").strip()
-                if text:
-                    self.last_model_used = model
-                    return text
-                last_error = "empty_gemini_response"
-            except Exception as e:
-                last_error = self._classify_failure(model, e)
-
-        raise RuntimeError(last_error or "gemini_all_models_failed")
+        config = {
+            "temperature": temperature,
+            "max_output_tokens": max_output_tokens,
+        }
+        response = self._generate(client, prompt, config, tier)
+        return (getattr(response, "text", "") or "").strip()
 
     def _chain(self, tier: str) -> list[str]:
         """Candidate models for a tier, skipping known-dead and spent ones."""
@@ -304,11 +289,16 @@ class GeminiClient:
         """Run the model until it answers, dispatching tools it asks for.
 
         The round budget is a hard stop: a model that keeps calling tools would
-        otherwise hold a worker open indefinitely. When it trips, the model is
-        asked once more with tools withdrawn, so the user gets an answer from
-        the evidence already gathered instead of an error.
+        otherwise hold a worker open indefinitely. The budget is checked before
+        each dispatch, not after — a single turn can return more calls than the
+        remaining budget, and a call past the limit is never dispatched, but it
+        is still named in the transcript rather than vanishing silently, so the
+        model knows what did not happen. Once the budget is spent, the model is
+        asked once more with tools withdrawn, so the user gets an answer built
+        from the evidence already gathered instead of an error.
         """
         from google.genai import types
+        from src.assistant_tools import ToolOutcome
 
         if not self.available:
             raise RuntimeError("gemini_no_api_key")
@@ -324,15 +314,20 @@ class GeminiClient:
         transcript = self._build_prompt(messages)
         out = ToolLoopResult()
 
-        for round_no in range(max_rounds + 1):
-            offer_tools = round_no < max_rounds
+        if max_rounds <= 0:
+            response = self._generate(
+                client, transcript,
+                {"temperature": temperature,
+                 "max_output_tokens": max_output_tokens}, tier)
+            out.text = (getattr(response, "text", "") or "").strip()
+            return out
+
+        for _round in range(max_rounds):
             config: dict[str, Any] = {
                 "temperature": temperature,
                 "max_output_tokens": max_output_tokens,
+                "tools": tools,
             }
-            if offer_tools:
-                config["tools"] = tools
-
             response = self._generate(client, transcript, config, tier)
             calls = self._function_calls(response)
 
@@ -340,18 +335,46 @@ class GeminiClient:
                 out.text = (getattr(response, "text", "") or "").strip()
                 return out
 
-            if not offer_tools:
-                # Budget spent and the model still wants tools; the loop above
-                # already withdrew them, so this branch cannot recurse.
-                out.budget_exhausted = True
-                out.text = (getattr(response, "text", "") or "").strip()
-                return out
-
             for call in calls:
-                args = dict(call.args or {})
-                started = time.perf_counter()
-                outcome = dispatch(call.name, args)
-                elapsed = int((time.perf_counter() - started) * 1000)
+                if len(out.tool_calls) >= max_rounds:
+                    # Budget spent mid-turn: this call is never dispatched, but
+                    # it must not disappear without a trace — the model needs
+                    # to know it asked for something that never happened.
+                    out.budget_exhausted = True
+                    transcript += (
+                        f"\n\n[araç:{call.name} çalıştırılmadı — tur bütçesi doldu]"
+                    )
+                    continue
+
+                raw_args = call.args
+                if isinstance(raw_args, dict):
+                    args = dict(raw_args)
+                    dispatchable = True
+                elif not raw_args:
+                    # Falsy (None, "", []): the SDK's normal way of saying "no
+                    # arguments" for a zero-argument call — not malformed.
+                    args = {}
+                    dispatchable = True
+                else:
+                    # call.args comes from the model, which sits outside our
+                    # tested contracts — a truthy non-mapping is genuinely
+                    # unusable input. Do not silently coerce it to {} and
+                    # dispatch as if the model made a normal call; that would
+                    # invent a call it never actually made.
+                    args = {}
+                    dispatchable = False
+
+                if dispatchable:
+                    started = time.perf_counter()
+                    outcome = dispatch(call.name, args)
+                    elapsed = int((time.perf_counter() - started) * 1000)
+                else:
+                    elapsed = 0
+                    outcome = ToolOutcome(
+                        ok=False,
+                        error=f"Model geçersiz argüman gönderdi (sözlük bekleniyor): {raw_args!r}",
+                    )
+
                 out.tool_calls.append({
                     "name": call.name, "ms": elapsed, "ok": bool(outcome.ok),
                 })
@@ -367,8 +390,6 @@ class GeminiClient:
                     f"\n\n[araç:{call.name} girdi={json.dumps(args, ensure_ascii=False)}]\n"
                     f"{body[:4000]}"
                 )
-                if len(out.tool_calls) >= max_rounds:
-                    break
 
             if len(out.tool_calls) >= max_rounds:
                 out.budget_exhausted = True
@@ -383,13 +404,25 @@ class GeminiClient:
 
     def _generate(self, client: Any, contents: str,
                   config: dict[str, Any], tier: str) -> Any:
+        """Walk the model chain, skipping a response that is not a real answer.
+
+        A response counts as usable if it carries non-empty text OR at least
+        one function call — a tool-calling turn legitimately has no text at
+        all. Anything else (blocked, filtered, truncated to nothing) is
+        recorded as empty_gemini_response and the chain moves on, so a bad
+        first-round response cannot masquerade as a successful empty answer;
+        the chain Task 1 built is only skipped when it is truly exhausted.
+        """
         last_error = ""
         for model in self._chain(tier):
             try:
                 resp = client.models.generate_content(
                     model=model, contents=contents, config=config)
-                self.last_model_used = model
-                return resp
+                text = (getattr(resp, "text", "") or "").strip()
+                if text or self._function_calls(resp):
+                    self.last_model_used = model
+                    return resp
+                last_error = "empty_gemini_response"
             except Exception as e:
                 last_error = self._classify_failure(model, e)
         raise RuntimeError(last_error or "gemini_all_models_failed")

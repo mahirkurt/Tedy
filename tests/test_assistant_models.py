@@ -116,9 +116,11 @@ class _ScriptedModels:
     def __init__(self, responses):
         self.responses = list(responses)
         self.configs = []
+        self.contents = []
 
     def generate_content(self, *, model, contents, config):
         self.configs.append(config)
+        self.contents.append(contents)
         return self.responses.pop(0)
 
 
@@ -202,3 +204,105 @@ def test_tools_are_actually_offered_to_the_model():
     c.chat_with_tools([{"role": "user", "content": "q"}], DECLS,
                       lambda n, a: ToolOutcome(ok=True))
     assert "tools" in c._client.models.configs[0]
+
+
+def test_calls_beyond_the_round_budget_are_skipped_not_dropped():
+    """Finding 2: one turn returning more calls than the remaining budget
+    must not dispatch the excess, and must not drop them silently either."""
+    c = _tool_client([
+        _ToolResp([
+            _Part(function_call=_FC("kazanim_ara", {"q": "a"})),
+            _Part(function_call=_FC("kitap_listele", {"q": "b"})),
+        ]),
+        _ToolResp([_Part(text="bitti")], text="bitti"),
+    ])
+    dispatched = []
+
+    def dispatch(name, args):
+        dispatched.append(name)
+        return ToolOutcome(ok=True, text="ok")
+
+    out = c.chat_with_tools([{"role": "user", "content": "x"}], DECLS, dispatch,
+                            max_rounds=1)
+
+    assert dispatched == ["kazanim_ara"]
+    assert len(out.tool_calls) == 1
+    assert out.tool_calls[0]["name"] == "kazanim_ara"
+    assert out.budget_exhausted is True
+    # The skipped call must still be named in what the model sees next.
+    final_contents = c._client.models.contents[-1]
+    assert "kitap_listele" in final_contents
+
+
+def test_non_mapping_args_from_the_model_are_rejected_not_dispatched():
+    """Finding 1: call.args is model-supplied, untrusted input. A truthy
+    non-mapping value must not be dispatched or silently coerced to {}."""
+    c = _tool_client([
+        _ToolResp([_Part(function_call=_FC("kazanim_ara", ["not", "a", "dict"]))]),
+        _ToolResp([_Part(text="bitti")], text="bitti"),
+    ])
+    calls = []
+
+    def dispatch(name, args):
+        calls.append(args)
+        return ToolOutcome(ok=True, text="ok")
+
+    out = c.chat_with_tools([{"role": "user", "content": "x"}], DECLS, dispatch)
+
+    assert calls == []  # never dispatched
+    assert out.tool_calls[0]["name"] == "kazanim_ara"
+    assert out.tool_calls[0]["ok"] is False
+    assert out.text == "bitti"
+
+
+def test_none_args_from_the_model_still_dispatch_as_a_normal_empty_call():
+    """The SDK's ordinary way of saying "no arguments" (args=None) is not
+    the malformed case Finding 1 targets, and must keep working as before."""
+    c = _tool_client([
+        _ToolResp([_Part(function_call=_FC("kazanim_ara", None))]),
+        _ToolResp([_Part(text="bitti")], text="bitti"),
+    ])
+    calls = []
+
+    def dispatch(name, args):
+        calls.append(args)
+        return ToolOutcome(ok=True, text="ok")
+
+    out = c.chat_with_tools([{"role": "user", "content": "x"}], DECLS, dispatch)
+
+    assert calls == [{}]
+    assert out.tool_calls[0]["ok"] is True
+
+
+def test_generate_falls_through_an_empty_response_to_the_next_model():
+    """Finding 3: an empty-text, no-function-call response must not be
+    handed back as a successful blank answer — the chain must move on."""
+    first = GeminiClient.FAST_MODELS[0]
+    second = GeminiClient.FAST_MODELS[1]
+    c = _client({first: ""})
+
+    assert c.chat([{"role": "user", "content": "x"}]) == "ok"
+    assert c.last_model_used == second
+
+
+def test_generate_raises_only_once_every_model_is_truly_exhausted():
+    script = {m: "" for m in GeminiClient.FAST_MODELS}
+    c = _client(script)
+
+    with pytest.raises(RuntimeError):
+        c.chat([{"role": "user", "content": "x"}])
+
+
+def test_a_tool_only_response_with_no_text_is_not_treated_as_empty():
+    """A response carrying function calls but no text is the normal
+    tool-calling case and must not be skipped as an empty response."""
+    c = _tool_client([
+        _ToolResp([_Part(function_call=_FC("kazanim_ara", {"q": "kesir"}))]),
+        _ToolResp([_Part(text="bitti")], text="bitti"),
+    ])
+    out = c.chat_with_tools([{"role": "user", "content": "x"}], DECLS,
+                            lambda n, a: ToolOutcome(ok=True, text="t"))
+    # Only two generate_content calls total — the tool-only round was not
+    # skipped and retried against a second model.
+    assert len(c._client.models.contents) == 2
+    assert out.text == "bitti"
