@@ -10,7 +10,7 @@ Servis ortamında (`.env` veya systemd `Environment=`) şu değişkenler tanıml
 
 | Değişken | Amaç |
 |---|---|
-| `GEMINI_API_KEY` | Sohbet modeli (Gemini). Yoksa `/v1/chat/completions` `assistant_unavailable` döner. |
+| `GEMINI_API_KEY` | Sohbet modeli (Gemini). Yoksa `/v1/chat/completions` **çökmez** — `200` döner, jenerik bir yedek cevap ve `warning:limited_confidence` bayrağıyla (bkz. §10). |
 | `MUFREDAT_MCP_API_KEY` | `maarif-mufredat` MCP sunucusu (müfredat/kazanım/ders kitabı araçları). |
 | `EGITIM_KAYNAK_MCP_API_KEY` | `egitim-kaynak` MCP sunucusu (OER arama araçları). |
 | `DASHBOARD_SECRET_KEY` | Flask session imzası; eksikse API import'ta patlar (bkz. `dashboard_api.py`). |
@@ -32,24 +32,58 @@ görmez. `degraded()` bu durumu bildirir ve arayüzde rozet yanar, ama **rozet a
 görünür kılar — gidermez.**
 
 Dağıtımdan önce iki anahtarı `.env`'e ekle (dosya zaten mod 600 ve gitignore'lu), servisi
-yeniden başlat ve doğrula:
+yeniden başlat ve doğrula.
+
+### Doğrulama — asıl kanıt servise sormaktır
+
+Servisi yeniden başlat, sonra **çalışan servise gerçek bir istek at** ve yanıtın
+`meta.degraded` alanına bak. Bu, servisin fiilen gördüğü ortamı ölçer — hangi kabuktan
+çalıştırdığın önemli değildir:
 
 ```bash
+systemctl --user daemon-reload
 systemctl --user restart ted-dashboard
-python -c "
+curl -s -H "Authorization: Bearer $ASSISTANT_API_KEY" -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"merhaba"}],"session_id":"deploy-check"}' \
+  http://127.0.0.1:8085/v1/chat/completions \
+  | python -c "import json,sys; print('degraded:', json.load(sys.stdin)['meta']['degraded'])"
+```
+
+Beklenen: `degraded: []`. Boş değilse `.env`'i kontrol et, tekrar başlat, tekrar dene.
+
+**⚠️ Bir yerel `python -c "from src.assistant_tools import build_registry; ..."` çağrısı
+bunun yerine geçmez — tuzağın kendisine düşer.** `src/assistant_tools.py` hiçbir yerde
+`.env`'i yüklemiyor (`load_env()` çağrısı orada yok — yalnız `dashboard_api.py`,
+`reindex_assistant.py` ve scraper script'lerinde var). Bu yüzden `build_registry()`'yi
+çıplak çalıştırdığında yalnız komutu çalıştıran kabuğun ortamına bakar, `.env`'e değil.
+Ölçüldü: bu repoda `.env`'de iki MCP anahtarı da **yok**, ama normal bir interaktif
+kabukta (kendi kabuğunda kalıcı export edilmişse) bu komut yine de `araçlar: 10 |
+degraded: []` basar — tam olarak, bu dokümanın az yukarıda uyardığı "kendi kabuğundan
+miras aldığın anahtarlarla test etme" hatasının kendisini doğrulama adımı sanıp geçersin.
+
+Yerel bir ön-kontrol istiyorsan (örn. deploy'dan önce, servise erişemeden), kabuktan miras
+alınan değerleri **açıkça temizleyerek** çalıştır — aksi hâlde kontrol kabuğun ortamını
+ölçer, `.env`'i değil:
+
+```bash
+env -u MUFREDAT_MCP_API_KEY -u EGITIM_KAYNAK_MCP_API_KEY python -c "
 from src.assistant_tools import build_registry
 reg = build_registry(lambda q, k: [])
 print('araçlar:', len(reg.declarations()), '| degraded:', reg.degraded())
 "
 ```
 
-Beklenen: `araçlar: 10 | degraded: []`. `degraded` boş değilse veya araç sayısı 1 (yalnız
-`ogrenci_verisi_ara`) ise anahtarlar servise ulaşmıyordur — `.env`'i kontrol et.
+Bu, sistemin `.env` dosyasının kendisinde ne olduğuna en yakın yerel tahmindir, ama yine
+de bir tahmindir — asıl kanıt yukarıdaki HTTP kontrolüdür.
 
-## 2) MCP sağlık kontrolü
+## 2) MCP sağlık kontrolü (araç adları)
+
+`/v1/chat/completions` yalnız `degraded` listesini döner, hangi araçların yüklendiğini
+değil. Araç adlarını görmek istersen aynı `env -u` uyarısı burada da geçerlidir — bu komut
+da `.env`'i değil, çalıştırıldığı kabuğun ortamını okur:
 
 ```bash
-python -c "
+env -u MUFREDAT_MCP_API_KEY -u EGITIM_KAYNAK_MCP_API_KEY python -c "
 from src.assistant_tools import build_registry
 reg = build_registry(lambda q, k: [])
 print('araçlar:', [d['name'] for d in reg.declarations()])
@@ -57,7 +91,9 @@ print('degraded:', reg.degraded())
 "
 ```
 
-Beklenen: 10 araç adı (`ogrenci_verisi_ara` + 9 MCP aracı), boş `degraded`.
+Beklenen (iki anahtar da gerçekten mevcutsa): 10 araç adı (`ogrenci_verisi_ara` + 9 MCP
+aracı), boş `degraded`. Go-live kararı için §1'deki HTTP kontrolüne güven; bu komut yalnız
+hangi araçların tanımlandığını incelemek için bir geliştirici aracıdır.
 
 ## 3) Model zinciri kontrolü
 
@@ -108,6 +144,26 @@ systemctl --user daemon-reload
 systemctl --user restart ted-dashboard
 journalctl --user -u ted-dashboard -f
 ```
+
+### Geri alma
+
+`.env`'e yanlış bir anahtar girildiyse veya `gthread` restart'ı sorun çıkardıysa (servis
+ayağa kalkmıyor, sürekli crash-loop):
+
+```bash
+# 1) .env'i önceki hâline döndür (yedeğin yoksa eklediğin satırları elle çıkar)
+# 2) unit dosyasını eski (thread'siz) hâline döndür:
+#    --workers 2 --worker-class gthread --threads 4  ->  --workers 2
+# 3) uygula:
+systemctl --user daemon-reload
+systemctl --user restart ted-dashboard
+systemctl --user status ted-dashboard
+journalctl --user -u ted-dashboard -n 50 --no-pager
+```
+
+`gthread`'e geri dönmek zorunlu değil — `sync` worker ile servis yine çalışır, yalnız §5'in
+başındaki eşzamanlılık kazanımını kaybedersin (uzun bir SSE isteği sırasında diğer istekler
+yeniden bloklanır).
 
 ## 6) API smoke test
 
@@ -202,11 +258,25 @@ Rapor `output/assistant_eval_<tag>.json` altına yazılır.
   İlki `401`, ikincisi `200` dönmeli. İkincisi de `401`/`403` dönüyorsa `ASSISTANT_API_KEY`
   servis ortamında `.env`'deki değerle eşleşmiyordur.
 
-- **Sohbet çalışmıyor / `assistant_unavailable`:** `GEMINI_API_KEY` servis ortamında eksik
-  veya geçersizdir — §0.
+- **`GEMINI_API_KEY` eksik/geçersiz — gerçek belirti (ölçüldü):** `/v1/chat/completions`
+  **çökmez**, `200 OK` döner; içerik jenerik bir yedek metindir ("Şu anda bu soruya cevap
+  üretemedim. Soruyu biraz daha belirgin (ders/konu/tarih) biçimde tekrar gönderir misin?")
+  ve `safety_flags` içinde `warning:limited_confidence` bulunur, `meta.model` `"gemini"`
+  (gerçek bir model adı değil) olarak kalır. Sebep: `GeminiClient.chat_with_tools`
+  `RuntimeError("gemini_no_api_key")` fırlatır, `AssistantRuntime.chat` bunu geniş bir
+  `except Exception` ile yakalayıp yedek cevaba düşer (`assistant_core.py`, `chat()` —
+  `except Exception as exc:` bloğu). Bu belirtiyi "sorun yok" sanma — "cevap üretemedim"
+  jenerik metni + `warning:limited_confidence` bayrağı görüyorsan `GEMINI_API_KEY`'i
+  kontrol et.
+
+  `assistant_unavailable` (`503`) **ayrı ve çok daha nadir bir durumdur**: yalnız
+  `AssistantRuntime`'ın kendisi kurulamazsa (ör. import hatası) oluşur — eksik
+  `GEMINI_API_KEY` runtime kurulumunu bozmaz, yalnızca `GeminiClient.available`'ı
+  `False` yapar.
 
 - **Müfredat/OER araçları yok:** §1'deki dağıtım tuzağı — `.env`'de MCP anahtarlarını
-  kontrol et.
+  kontrol et (HTTP tabanlı doğrulamayı kullan, kabuktan çalıştırılan çıplak `build_registry`
+  kontrolünü değil).
 
 - **İndeks bozulması / bayat indeks:**
 
@@ -227,7 +297,7 @@ Request:
 
 ```json
 {
-  "model": "gemini-flash-lite-latest",
+  "model": "bu-alan-göz-ardı-edilir",
   "messages": [
     {"role": "user", "content": "Bu hafta ödev önceliğim ne?"}
   ],
@@ -238,9 +308,14 @@ Request:
 }
 ```
 
-`model` alanı yalnız yanıtta yansıtılır (§3) — sunucu tarafında model seçimini etkilemez.
+**`model` alanı sunucu tarafında hiç okunmaz** (§3) — `openai_chat_completion` içinde
+`request_data.get("model")` çağrısı yoktur. Ölçüldü: `"model": "totally-bogus-model-xyz"`
+gönderildiğinde yanıt `gemini-3.7-flash` ile geldi; istekteki değerle hiçbir ilişkisi yok.
+Yanıttaki `model`/`meta.model` isteğin *kopyası* değil, `GeminiClient`'ın o çağrı için
+**gerçekten seçtiği** modeldir (§3'teki sabit `FAST_MODELS`/`DEEP_MODELS` zincirinden).
 
-Response (özet):
+Response (özet — `meta.model` gerçek seçim, yukarıdaki istekteki `model` değeriyle
+karıştırılmamalı):
 
 ```json
 {
@@ -249,6 +324,6 @@ Response (özet):
   "citations": [{"id": "S1", "path": "..."}],
   "safety_flags": [],
   "plan_blocks": [],
-  "meta": {"model": "gemini-flash-lite-latest", "latency_ms": 1234}
+  "meta": {"model": "gemini-3.7-flash", "latency_ms": 1234}
 }
 ```
