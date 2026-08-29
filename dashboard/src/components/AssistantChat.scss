@@ -310,11 +310,6 @@
   gap: var(--ted-space-sm);
 }
 
-.ac__ref-item {
-  padding-bottom: var(--ted-space-xs);
-  border-bottom: 1px solid var(--ted-color-border-subtle);
-}
-
 .ac__ref-item:last-child {
   border-bottom: none;
   padding-bottom: 0;
@@ -438,14 +433,6 @@
   line-height: 1.4;
 }
 
-// Sidebar reference the chip's onActivate scrolls to and highlights.
-.ac__ref-item--active {
-  background:
-    linear-gradient(to right, theme.$ai-aura-hover-start 0%, theme.$ai-aura-hover-end 50%),
-    theme.$ai-aura-hover-background;
-  border-radius: var(--ted-radius-sm);
-}
-
 .ac__ref-group-title {
   margin: var(--ted-space-sm) 0 0.25rem;
   font-size: 0.75rem;
@@ -455,14 +442,25 @@
   letter-spacing: 0.02em;
 }
 
+// `.ac__ref-item` and `.ac__ref-item--active` were each defined twice
+// (Task 10's SourcePanel additions duplicated the pre-existing rules of the
+// same name, rather than replacing them). At equal specificity the later
+// declaration silently won per property, which happened to still look
+// correct — but only by accident of declaration order, and would have
+// silently changed the moment either block was edited or reordered.
+// Consolidated into one definition per selector, keeping the border-bottom
+// list-divider from the original rule (still applies — nothing here
+// overrides it) alongside the flex/index-circle layout SourcePanel needs.
 .ac__ref-item {
   display: flex;
   gap: 0.5rem;
   padding: 0.5rem;
   border-radius: 4px;
+  border-bottom: 1px solid var(--ted-color-border-subtle);
   transition: background 0.15s ease;
 }
 
+// Sidebar reference the chip's onActivate scrolls to and highlights.
 .ac__ref-item--active {
   background:
     linear-gradient(to right, theme.$ai-aura-start 0%, theme.$ai-aura-end 60%),
@@ -493,7 +491,15 @@
 .ac-msg:hover .ac-msg__actions,
 .ac-msg:focus-within .ac-msg__actions { opacity: 1; }
 
-.ac-msg__degraded { margin-block-end: 0.35rem; }
+// Holds one Tag per degraded server (Bulgu 1 fix) — flex-wrap so a second
+// or third failed source gets its own visible badge instead of being
+// clipped or forced onto the first one's line.
+.ac-msg__degraded {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-block-end: 0.35rem;
+}
 
 @media (max-width: 1100px) {
   .ac__layout {

@@ -14,15 +14,22 @@ const KIND_LABEL: Record<AssistantCitation['kind'], string> = {
   oer: 'Açık kaynak',
 }
 
+// `citation.kind` is a closed union at compile time but an unchecked string
+// off the wire at runtime — a backend value outside the four known kinds
+// must not turn into the literal word "undefined" leaking into the
+// accessible name or the popover body.
+const UNKNOWN_KIND_LABEL = 'Kaynak'
+
 export default function CitationChip({ citation, onActivate }: Props) {
   const [open, setOpen] = useState(false)
+  const kindLabel = KIND_LABEL[citation.kind] ?? UNKNOWN_KIND_LABEL
 
   return (
     <Popover open={open} align="bottom" autoAlign caret dropShadow={false}>
       <button
         type="button"
         className="ac-cite"
-        aria-label={`${KIND_LABEL[citation.kind]}: ${citation.label}`}
+        aria-label={`${kindLabel}: ${citation.label}`}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
@@ -32,7 +39,7 @@ export default function CitationChip({ citation, onActivate }: Props) {
         {citation.id.replace('S', '')}
       </button>
       <PopoverContent className="ac-cite__pop">
-        <span className="ac-cite__kind">{KIND_LABEL[citation.kind]}</span>
+        <span className="ac-cite__kind">{kindLabel}</span>
         <strong className="ac-cite__label">{citation.label}</strong>
         <p className="ac-cite__snippet">{citation.snippet}</p>
       </PopoverContent>

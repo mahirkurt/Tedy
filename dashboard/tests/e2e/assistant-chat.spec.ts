@@ -215,3 +215,89 @@ test('risk and warning safety flags render with different severity, not as raw t
   // The raw token must never reach the reader.
   await expect(page.locator('.ac-msg--assistant').last()).not.toContainText('warning:limited_confidence')
 })
+
+// Fix round 1, Bulgu 1: `meta.degraded` is a list, and the UI was treating it
+// like a boolean by rendering a single Tag. When two servers failed
+// independently, the second one's name and existence had no trace on
+// screen. Every degraded server must surface — the known one with its
+// friendly Turkish label, the unrecognised one by its own raw name rather
+// than being silently dropped or folded into the known message.
+test('every degraded source surfaces, not just the first', async ({ page }) => {
+  await page.route('**/api/assistant/chat', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({
+      answer: 'Kısmi yanıt.', citations: [],
+      safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
+      meta: {
+        model: 'gemini-3.7-flash',
+        degraded: ['maarif-mufredat', 'some-other-server'],
+        dropped_citations: 0,
+      },
+    }),
+  }))
+
+  await page.goto('/asistan')
+  await page.fill('#ac-input', 'kesir')
+  await page.getByLabel('Gönder').click()
+
+  const degraded = page.locator('.ac-msg--assistant').last().locator('.ac-msg__degraded')
+  await expect(degraded.locator('.cds--tag')).toHaveCount(2)
+  await expect(degraded).toContainText('Müfredat kaynağına ulaşılamadı')
+  // The unmapped server is not swallowed by the known one's badge — it gets
+  // its own badge, named.
+  await expect(degraded).toContainText('some-other-server')
+})
+
+// Fix round 1, Bulgu 2: an unrecognised `kind` used to vanish from the
+// source panel entirely (GROUP_ORDER.map + filter dropped anything outside
+// the four known kinds) while its inline [S#] chip kept rendering in the
+// answer — a dead click with zero signal. It must now get its own,
+// separately labelled group (never folded into `ogrenci` or `mufredat`,
+// since that authority split is load-bearing), and clicking its chip must
+// still highlight the matching card. CitationChip's popover/aria-label must
+// not leak the literal string "undefined" for the same unrecognised kind.
+test('citations with an unknown kind get their own group, not folded into ogrenci or mufredat, and their chip still highlights', async ({ page }) => {
+  await page.route('**/api/assistant/chat', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({
+      answer: 'Bilinen kaynak [S1] ve tanınmayan kaynak [S2].',
+      citations: [
+        { id: 'S1', kind: 'ogrenci', label: 'scraped_data.json', locator: {}, snippet: 'ödev', confidence: 0.8 },
+        { id: 'S2', kind: 'harici', label: 'Bilinmeyen kaynak', locator: {}, snippet: 'harici parça', confidence: 0.5 },
+      ],
+      safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
+      meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+    }),
+  }))
+
+  await page.goto('/asistan')
+  await page.fill('#ac-input', 'karışık kaynaklar')
+  await page.getByLabel('Gönder').click()
+
+  // Two groups: the known `ogrenci` group and a separate unclassified group.
+  await expect(page.locator('.ac__ref-group')).toHaveCount(2)
+  const groupTitles = page.locator('.ac__ref-group-title')
+  await expect(groupTitles.first()).toContainText('okul verisi')
+  await expect(groupTitles.last()).toContainText('Sınıflandırılmamış')
+
+  // The unknown-kind citation must not be listed under the known group.
+  const knownGroup = page.locator('.ac__ref-group').first()
+  await expect(knownGroup).not.toContainText('Bilinmeyen kaynak')
+
+  // Clicking its chip is not a dead click — the matching card highlights.
+  await page.locator('.ac-cite').nth(1).click()
+  await expect(page.locator('.ac__ref-item--active')).toHaveCount(1)
+  await expect(page.locator('.ac__ref-item--active')).toContainText('Bilinmeyen kaynak')
+
+  // CitationChip must never leak the literal "undefined" string for an
+  // unrecognised kind, in the accessible name or the popover body.
+  const unknownChip = page.locator('.ac-cite').nth(1)
+  const ariaLabel = await unknownChip.getAttribute('aria-label')
+  expect(ariaLabel).not.toContain('undefined')
+  await unknownChip.hover()
+  // Both citations' popovers exist in the DOM (Carbon's Popover keeps its
+  // content mounted and toggles visibility), so scope to the one the hover
+  // just opened rather than an unscoped locator that matches both.
+  await expect(page.locator('.ac-cite__pop').getByText('Bilinmeyen kaynak')).toBeVisible()
+  await expect(page.locator('.ac-cite__pop').last()).not.toContainText('undefined')
+})

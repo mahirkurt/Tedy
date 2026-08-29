@@ -82,6 +82,21 @@ function flagTone(f: string): 'red' | 'gray' {
   return f.startsWith('risk:') ? 'red' : 'gray'
 }
 
+// `meta.degraded` is a list, not a flag — every server named in it failed
+// independently and each one is a separate fact the reader is owed. Folding
+// the list into a single badge (as Task 10 shipped it) silently drops every
+// server past the first. Known servers get a friendly Turkish label; an
+// unrecognised server id surfaces by its own name rather than vanishing
+// behind the known one's message.
+const DEGRADED_LABELS: Record<string, string> = {
+  'maarif-mufredat': 'Müfredat kaynağına ulaşılamadı',
+  'egitim-kaynak': 'Açık eğitim kaynağına ulaşılamadı',
+}
+
+function degradedLabel(server: string): string {
+  return DEGRADED_LABELS[server] ?? `Kaynağa ulaşılamadı: ${server}`
+}
+
 async function parseJsonSafe(res: Response): Promise<AssistantResponse | { error?: string }> {
   const raw = await res.text()
   const ct = res.headers.get('content-type') || ''
@@ -311,11 +326,11 @@ export default function AssistantChat() {
                 <div className="ac-msg__body">
                   {msg.degraded && msg.degraded.length > 0 && (
                     <div className="ac-msg__degraded">
-                      <Tag type="gray" size="sm">
-                        {msg.degraded.includes('maarif-mufredat')
-                          ? 'Müfredat kaynağına ulaşılamadı — yalnız okul verisiyle yanıtlandı'
-                          : 'Bazı kaynaklara ulaşılamadı'}
-                      </Tag>
+                      {msg.degraded.map(server => (
+                        <Tag key={server} type="gray" size="sm">
+                          {degradedLabel(server)}
+                        </Tag>
+                      ))}
                     </div>
                   )}
                   <span className="ac-msg__role">
