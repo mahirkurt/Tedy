@@ -1,257 +1,233 @@
 # TEDY Assistant Go-Live Runbook
 
-Bu döküman yerel assistant için güvenli canlıya alma akışını standartlaştırır.
+Bu doküman, dashboard'un gömülü asistanını (`/v1/chat/completions`, `/v1/models`) güvenle
+canlıya almak ve doğrulamak için izlenecek tek yazılı yolu tarif eder. Sohbet yolu Gemini
+API üzerinden çalışır; yerel bir LLM sunucusuna ihtiyaç duymaz.
 
 ## 0) Önkoşullar
 
-- Ollama çalışıyor olmalı (`OLLAMA_BASE_URL`, varsayılan `http://localhost:11434`)
-- Dashboard API servisi ayağa kalkabiliyor olmalı (`src/dashboard_api.py`)
-- Repo kökünde sanal ortam ve bağımlılıklar hazır olmalı
+Servis ortamında (`.env` veya systemd `Environment=`) şu değişkenler tanımlı olmalı:
 
-## 1) Security & Preflight
+| Değişken | Amaç |
+|---|---|
+| `GEMINI_API_KEY` | Sohbet modeli (Gemini). Yoksa `/v1/chat/completions` `assistant_unavailable` döner. |
+| `MUFREDAT_MCP_API_KEY` | `maarif-mufredat` MCP sunucusu (müfredat/kazanım/ders kitabı araçları). |
+| `EGITIM_KAYNAK_MCP_API_KEY` | `egitim-kaynak` MCP sunucusu (OER arama araçları). |
+| `DASHBOARD_SECRET_KEY` | Flask session imzası; eksikse API import'ta patlar (bkz. `dashboard_api.py`). |
+| `ASSISTANT_API_KEY` | `/v1/models` ve `/v1/chat/completions` için Bearer auth. |
 
-### 1.1 API key üret
+Not: Ollama'ya ihtiyaç **yoktur**. Sohbet yolu (`GeminiClient`) yalnızca Gemini bulut
+modellerini çağırır; gömme (embedding) tabanlı vektör arama da şu an devre dışıdır (bkz.
+§4) — yani bu iki anahtar dışında yerel bir model sunucusu ayağa kaldırmaya gerek yok.
 
-```bash
-python src/assistant_ops.py generate-key --bytes 48 --env-line
-```
+## 1) ⛔ DAĞITIM TUZAĞI — bu adım atlanırsa özellik sessizce ölür
 
-Örnek çıktı:
+Servis (`~/.config/systemd/user/ted-dashboard.service`) ortamını `EnvironmentFile=.env`'den
+alıyor. `MUFREDAT_MCP_API_KEY` ve `EGITIM_KAYNAK_MCP_API_KEY` geliştirme makinesinde
+**interaktif kabuk ortamında** duruyor olabilir ama **`.env` içinde değilse** gunicorn onları
+hiç göremez: kayıt defteri sıfır müfredat aracıyla açılır, asistan yalnız yerel okul
+verisinden (`ogrenci_verisi_ara`) cevap verir ve arayüzü test eden kişiye **sağlıklı
+görünür** — çünkü kendi kabuğundan miras aldığı anahtarlarla test etmiştir, üretim onları
+görmez. `degraded()` bu durumu bildirir ve arayüzde rozet yanar, ama **rozet arızayı
+görünür kılar — gidermez.**
 
-```bash
-ASSISTANT_API_KEY=<generated-secret>
-```
-
-### 1.2 Env ayarları (server)
-
-Aşağıdaki değişkenleri server environment'ına ekle:
-
-```bash
-ASSISTANT_API_KEY=<strong-secret>
-ASSISTANT_CHAT_MODEL=qwen2.5-coder:7b
-ASSISTANT_CHAT_FALLBACK_MODEL=qwen2.5:14b
-ASSISTANT_EMBED_MODEL=mxbai-embed-large
-ASSISTANT_AUTO_REINDEX=1
-ASSISTANT_ENABLE_EMBEDDINGS=1
-ASSISTANT_ENABLE_LLM_PLAN_SUMMARY=0
-ASSISTANT_ENABLE_OCR=0
-ASSISTANT_OLLAMA_CHAT_TIMEOUT_SECONDS=70
-ASSISTANT_OLLAMA_EMBED_TIMEOUT_SECONDS=60
-ASSISTANT_OLLAMA_CHAT_NUM_PREDICT=96
-ASSISTANT_OLLAMA_KEEP_ALIVE=30m
-```
-
-Not: Secret değerlerini repo dosyalarına commit etme.
-
-### 1.3 Embedding modellerini indir
+Dağıtımdan önce iki anahtarı `.env`'e ekle (dosya zaten mod 600 ve gitignore'lu), servisi
+yeniden başlat ve doğrula:
 
 ```bash
-ollama pull mxbai-embed-large
-ollama pull nomic-embed-text
+systemctl --user restart ted-dashboard
+python -c "
+from src.assistant_tools import build_registry
+reg = build_registry(lambda q, k: [])
+print('araçlar:', len(reg.declarations()), '| degraded:', reg.degraded())
+"
 ```
 
-## 2) First Full Index Bootstrap
+Beklenen: `araçlar: 10 | degraded: []`. `degraded` boş değilse veya araç sayısı 1 (yalnız
+`ogrenci_verisi_ara`) ise anahtarlar servise ulaşmıyordur — `.env`'i kontrol et.
+
+## 2) MCP sağlık kontrolü
+
+```bash
+python -c "
+from src.assistant_tools import build_registry
+reg = build_registry(lambda q, k: [])
+print('araçlar:', [d['name'] for d in reg.declarations()])
+print('degraded:', reg.degraded())
+"
+```
+
+Beklenen: 10 araç adı (`ogrenci_verisi_ara` + 9 MCP aracı), boş `degraded`.
+
+## 3) Model zinciri kontrolü
+
+```bash
+python -c "from src.assistant_core import GeminiClient; print(GeminiClient.FAST_MODELS, GeminiClient.DEEP_MODELS)"
+```
+
+`FAST_MODELS` genel sohbet için kullanılan zincir, `DEEP_MODELS` plan modu ve zor sorular
+için önce denenen model. Bir model kota/404 hatası verirse `GeminiClient` otomatik olarak
+zincirdeki bir sonrakine geçer; `gemini-2.0-*` aileleri API'nin artık 404 döndürmesi
+nedeniyle zincirden çıkarıldı (bkz. `assistant_core.py` içindeki yorum). İstek gövdesindeki
+`model` alanı **kozmetiktir** — `/v1/chat/completions` onu okumaz, her zaman bu sabit
+zincirden seçer; `/v1/models` de yalnız `FAST_MODELS`'i listeler.
+
+## 4) Bilgi tabanı indeksi (reindex)
 
 ```bash
 python src/reindex_assistant.py --full
-python src/assistant_ops.py verify-index --max-age-minutes 180 --require-embeddings
+python src/assistant_ops.py verify-index --max-age-minutes 180
 ```
 
-Beklenen:
+Beklenen çıktı dosyaları: `output/assistant_index/manifest.json`, `chunks.json`,
+`meta.json`. `files_indexed > 0` ve `chunks_indexed > 0` olmalı.
 
-- `output/assistant_index/manifest.json`
-- `output/assistant_index/chunks.json`
-- `output/assistant_index/meta.json`
-- `files_indexed > 0`, `chunks_indexed > 0`
-- `embedded_chunks > 0`
+**Ölçülen gerçek:** bu koddaki gömme (embedding) tabanlı vektör arama şu an tamamen devre
+dışı — `reindex()` her chunk için `embedded_chunks_new`'i artırmadan geçer ve meta dosyasına
+`"embeddings_enabled": false`, `"embed_model": null` yazar; retrieval salt BM25 (anahtar
+kelime) üzerinden çalışır. Hiçbir adımda Ollama çağrılmaz. Bu yüzden
+`assistant_ops.py verify-index --require-embeddings` bu haliyle **her zaman başarısız olur**
+(`embedded_chunks<=0`) — go-live gate'i olarak kullanma; yukarıdaki `--require-embeddings`'siz
+komut yeterli doğrulamadır.
 
-## 3) API Bring-up & Contract Smoke
+## 5) Servis: neden `gthread`
 
-Servisi başlat/restart et (systemd user service veya local run).
-CPU-only ortamda Gunicorn worker timeout değerini `>=360` tut.
-Not: CPU-only canlıda `qwen2.5-coder:7b` varsayılan tutulur; `ASSISTANT_CHAT_FALLBACK_MODEL=qwen2.5:14b` challenger olarak kalır.
+Servis dosyası `--workers 2 --worker-class gthread --threads 4` kullanıyor (varsayılan
+senkron worker değil). Gerekçe ölçüldü: sync worker'da uzun süren bir SSE isteği tek worker'ı
+tamamen bloklar — eşzamanlı bir `/api/health` isteği ~4.5s beklerdi. `gthread` + 4 thread ile
+eşzamanlı slot sayısı 2'den 8'e çıkıyor; aynı senaryoda `/api/health` **0.015s**'de dönüyor.
+8'den fazla eşzamanlı uzun istek hâlâ kuyruğa girer, ama bu ailenin trafiği için kabul
+edilebilir.
+
+Servis dosyası zaten bu haliyle düzenli (`~/.config/systemd/user/ted-dashboard.service`),
+ama henüz **uygulanmadı** — şu an çalışan gunicorn süreçleri hâlâ eski `--workers 2` (thread'siz)
+komut satırıyla ayakta. Değişikliği devreye almak için:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user restart ted-dashboard
+journalctl --user -u ted-dashboard -f
+```
+
+## 6) API smoke test
 
 ```bash
 python src/assistant_ops.py smoke \
   --base-url http://127.0.0.1:8085 \
   --api-key "$ASSISTANT_API_KEY" \
-  --model qwen2.5:14b \
   --timeout 240
 ```
 
-Bu komut şunları doğrular:
+Doğrular:
 
 - `/v1/models` keysiz `401`
 - `/v1/models` key ile `200`
 - `/v1/chat/completions` minimal payload `200`
 - `plan=true` çağrısında `plan_blocks` dolu
 
-## 4) CureoHub Integration Validation
+`--model` bayrağı isteğe eklenen etikettir, backend model seçimini etkilemez (§3).
 
-CureoHub connector:
-
-- Base URL: `https://<host>` veya `http://127.0.0.1:8085`
-- Endpoint: `/v1/chat/completions`
-- Auth: `Authorization: Bearer <ASSISTANT_API_KEY>`
-
-Senaryo doğrulama:
+## 7) CureoHub senaryo doğrulaması
 
 ```bash
 python src/assistant_ops.py validate-cureohub \
   --base-url http://127.0.0.1:8085 \
   --api-key "$ASSISTANT_API_KEY" \
-  --model qwen2.5:14b \
   --timeout 90 \
   --output output/cureohub_validation.json
 ```
 
 Kontrol edilenler:
 
-- Veri sorusunda citation
+- Okul verisi sorusunda citation (`ogrenci_verisi_ara` çağrılmış olmalı — bu kontrolün
+  anlamlı geçmesi için `output/scraped_data.json`'da gerçek veri olması gerekir; boş/taze
+  olmayan bir ortamda bu senaryo yanlış-negatif verebilir, bu bir dağıtım arızası değildir)
 - Plan modunda plan blocks
 - Kaynak-yok durumda limited-confidence sinyali
 - Riskli içerikte safety flag
 
-## 5) Traffic Observation & Tuning Loop
+## 8) Degradasyon beklentisi
 
-### 5.1 Metrik özet
+MCP anahtarlarından biri veya ikisi de servise ulaşmıyorsa asistan çökmez: çalışmaya devam
+eder, yalnız yerel okul verisiyle (`ogrenci_verisi_ara`) yanıt verir ve arayüzde rozet
+gösterir. Ölçülen log çıktısı (iki anahtar da kapalıyken):
+
+```
+MCP maarif-mufredat disabled: MUFREDAT_MCP_API_KEY not set
+MCP egitim-kaynak disabled: EGITIM_KAYNAK_MCP_API_KEY not set
+araçlar: ['ogrenci_verisi_ara']
+degraded: ['egitim-kaynak', 'maarif-mufredat']
+```
+
+Bu bir arıza değil, tasarlanmış davranıştır — sistem sağlıklı numarası yapmaz, her sunucuyu
+adıyla degraded ilan eder. Ama **rozet arızayı görünür kılar, gidermez**: §1'deki kontrolü
+her dağıtımdan sonra çalıştır.
+
+## 9) Metrikler ve prompt replay
 
 ```bash
 python src/assistant_ops.py metrics \
   --metrics-path output/assistant_metrics.jsonl \
-  --output output/assistant_metrics_report_day1.json \
+  --output output/assistant_metrics_report.json \
   --balanced-gate
 ```
 
-İzlenen metrikler:
+`--balanced-gate` şu eşikleri kontrol eder: p95 gecikme ≤10s, citation coverage ≥%75,
+kritik (`risk:*`) safety flag sayısı 0. Az sayıda/sentetik kayıtla (ör. taze bir ortamda
+birkaç smoke-test isteği) bu kapı beklenen şekilde başarısız olabilir — gerçek trafik
+biriktikçe anlamlı hale gelir.
 
-- `latency` p50/p95
-- citation coverage ratio
-- safety flag dağılımı
-- intent dağılımı
-
-### 5.2 A/B prompt replay
-
-Prompt set: `docs/assistant_prompt_set.json`
-
-Profil A (hız):
+Bir prompt setini tekrar oynatıp regresyon karşılaştırması için:
 
 ```bash
-ASSISTANT_CHAT_MODEL=qwen2.5:7b \
-ASSISTANT_EMBED_MODEL=mxbai-embed-large \
 python src/assistant_ops.py replay \
   --base-url http://127.0.0.1:8085 \
   --api-key "$ASSISTANT_API_KEY" \
-  --model qwen2.5:7b \
   --prompt-set docs/assistant_prompt_set.json \
-  --tag profile_a_7b_mxbai \
+  --tag <deney-etiketi> \
   --timeout 90
 ```
 
-Profil B (denge):
+Rapor `output/assistant_eval_<tag>.json` altına yazılır.
 
-```bash
-ASSISTANT_CHAT_MODEL=qwen2.5:14b \
-ASSISTANT_EMBED_MODEL=mxbai-embed-large \
-python src/assistant_ops.py replay \
-  --base-url http://127.0.0.1:8085 \
-  --api-key "$ASSISTANT_API_KEY" \
-  --model qwen2.5:14b \
-  --prompt-set docs/assistant_prompt_set.json \
-  --tag profile_b_14b_mxbai \
-  --timeout 90
-```
+## 10) Sorun giderme
 
-Embed challenger (nomic) için indeks değiştir:
+- **Auth sorunu:**
 
-```bash
-ASSISTANT_EMBED_MODEL=nomic-embed-text python src/reindex_assistant.py --full
-python src/assistant_ops.py verify-index --max-age-minutes 180 --require-embeddings
-```
+  ```bash
+  curl -i http://127.0.0.1:8085/v1/models
+  curl -i -H "Authorization: Bearer $ASSISTANT_API_KEY" http://127.0.0.1:8085/v1/models
+  ```
 
-Profil C (hız, nomic):
+  İlki `401`, ikincisi `200` dönmeli. İkincisi de `401`/`403` dönüyorsa `ASSISTANT_API_KEY`
+  servis ortamında `.env`'deki değerle eşleşmiyordur.
 
-```bash
-ASSISTANT_CHAT_MODEL=qwen2.5:7b \
-ASSISTANT_EMBED_MODEL=nomic-embed-text \
-python src/assistant_ops.py replay \
-  --base-url http://127.0.0.1:8085 \
-  --api-key "$ASSISTANT_API_KEY" \
-  --model qwen2.5:7b \
-  --prompt-set docs/assistant_prompt_set.json \
-  --tag profile_c_7b_nomic \
-  --timeout 90
-```
+- **Sohbet çalışmıyor / `assistant_unavailable`:** `GEMINI_API_KEY` servis ortamında eksik
+  veya geçersizdir — §0.
 
-Profil D (denge, nomic):
+- **Müfredat/OER araçları yok:** §1'deki dağıtım tuzağı — `.env`'de MCP anahtarlarını
+  kontrol et.
 
-```bash
-ASSISTANT_CHAT_MODEL=qwen2.5:14b \
-ASSISTANT_EMBED_MODEL=nomic-embed-text \
-python src/assistant_ops.py replay \
-  --base-url http://127.0.0.1:8085 \
-  --api-key "$ASSISTANT_API_KEY" \
-  --model qwen2.5:14b \
-  --prompt-set docs/assistant_prompt_set.json \
-  --tag profile_d_14b_nomic \
-  --timeout 90
-```
+- **İndeks bozulması / bayat indeks:**
 
-Dört profil için `output/assistant_eval_*.json` dosyalarını karşılaştır.
+  ```bash
+  python src/reindex_assistant.py --full
+  python src/assistant_ops.py verify-index
+  ```
 
-Karar sırası:
+- **Servis logları:**
 
-1. Kritik safety ihlali = 0
-2. Yüksek citation coverage
-3. Düşük p95 latency
-4. TR öğrenci+veli okunabilirliği
+  ```bash
+  journalctl --user -u ted-dashboard -f
+  ```
 
-## 6) Rollback & Failure Playbook
-
-- Chat model sorunu:
-
-```bash
-export ASSISTANT_CHAT_MODEL=qwen2.5:7b
-# service restart
-```
-
-- Embed sorunu:
-
-```bash
-export ASSISTANT_EMBED_MODEL=nomic-embed-text
-python src/reindex_assistant.py --full
-# service restart
-```
-
-- Kritik arıza (geçici BM25-only):
-
-```bash
-export ASSISTANT_ENABLE_EMBEDDINGS=0
-python src/reindex_assistant.py --full
-# service restart
-```
-
-- İndeks bozulması:
-
-```bash
-python src/reindex_assistant.py --full
-python src/assistant_ops.py verify-index
-```
-
-- Auth sorunu:
-
-```bash
-curl -i http://127.0.0.1:8085/v1/models
-curl -i -H "Authorization: Bearer $ASSISTANT_API_KEY" http://127.0.0.1:8085/v1/models
-```
-
-## 7) OpenAI-Compatible Request/Response örneği
+## 11) OpenAI-uyumlu istek/yanıt örneği
 
 Request:
 
 ```json
 {
-  "model": "qwen2.5:14b",
+  "model": "gemini-flash-lite-latest",
   "messages": [
     {"role": "user", "content": "Bu hafta ödev önceliğim ne?"}
   ],
@@ -262,6 +238,8 @@ Request:
 }
 ```
 
+`model` alanı yalnız yanıtta yansıtılır (§3) — sunucu tarafında model seçimini etkilemez.
+
 Response (özet):
 
 ```json
@@ -271,6 +249,6 @@ Response (özet):
   "citations": [{"id": "S1", "path": "..."}],
   "safety_flags": [],
   "plan_blocks": [],
-  "meta": {"model": "qwen2.5:14b", "latency_ms": 1234}
+  "meta": {"model": "gemini-flash-lite-latest", "latency_ms": 1234}
 }
 ```
