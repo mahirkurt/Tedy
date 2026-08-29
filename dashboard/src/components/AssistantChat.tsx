@@ -18,12 +18,14 @@ import {
   TaskComplete,
   ParentChild,
   Renew,
-  DocumentView,
+  Copy,
+  Search,
   Time,
 } from '@carbon/icons-react'
 import type { AssistantCitation, AssistantPlanBlock, AssistantResponse } from '../types'
 import { renderMarkdown } from '../utils/markdown'
 import CitationChip from './CitationChip'
+import SourcePanel from './SourcePanel'
 
 type ChatRole = 'user' | 'assistant'
 
@@ -34,6 +36,7 @@ interface ChatMessage {
   citations?: AssistantCitation[]
   safetyFlags?: string[]
   planBlocks?: AssistantPlanBlock[]
+  degraded?: string[]
 }
 
 const QUICK_PROMPTS = [
@@ -52,6 +55,31 @@ const WAITING_MESSAGES = [
 
 function toApiMessages(messages: ChatMessage[]) {
   return messages.map(m => ({ role: m.role, content: m.content }))
+}
+
+/** The user turn that produced a given assistant message, if any. */
+function promptBehind(msgs: ChatMessage[], assistantId: string): string | null {
+  const idx = msgs.findIndex(m => m.id === assistantId)
+  if (idx < 0) return null
+  for (let i = idx - 1; i >= 0; i -= 1) {
+    if (msgs[i].role === 'user') return msgs[i].content
+  }
+  return null
+}
+
+// Severity split for safety_flags (Task 6's measured outcome): `risk:*` is a
+// genuine escalation and stays red; `warning:*` is informational (e.g. the
+// tool-free, source-free "merhaba" case) and must not compete visually with
+// a real crisis flag. Only the two known warning tokens get a friendly
+// Turkish label — an unrecognised flag prints raw rather than being
+// silently swallowed.
+const FLAG_LABELS: Record<string, string> = {
+  'warning:limited_confidence': 'Kaynaksız cevap',
+  'warning:stale_context': 'Veriler güncel olmayabilir',
+}
+
+function flagTone(f: string): 'red' | 'gray' {
+  return f.startsWith('risk:') ? 'red' : 'gray'
 }
 
 async function parseJsonSafe(res: Response): Promise<AssistantResponse | { error?: string }> {
@@ -156,7 +184,7 @@ export default function AssistantChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  async function submit(mode: 'chat' | 'plan', forcedPrompt?: string) {
+  async function submit(mode: 'chat' | 'plan', forcedPrompt?: string, opts?: { deep?: boolean }) {
     const content = (forcedPrompt ?? draft).trim()
     if (!content || loading) return
 
@@ -182,6 +210,7 @@ export default function AssistantChat() {
           session_id: 'dashboard-default',
           context_filters: {},
           messages: toApiMessages(nextMessages),
+          ...(opts?.deep ? { force_deep: true } : {}),
         }),
       })
 
@@ -199,6 +228,7 @@ export default function AssistantChat() {
         citations: out.citations || [],
         safetyFlags: out.safety_flags || [],
         planBlocks: out.plan_blocks || [],
+        degraded: out.meta?.degraded || [],
       }
       setMessages(prev => [...prev, assistantMsg])
     } catch (e) {
@@ -208,9 +238,22 @@ export default function AssistantChat() {
     }
   }
 
+  function regenerate(assistantId: string) {
+    const prompt = promptBehind(messages, assistantId)
+    if (!prompt) return
+    // Drop the answer being replaced so the new one does not read as a second
+    // reply to the same question.
+    setMessages(prev => prev.filter(m => m.id !== assistantId))
+    void submit('chat', prompt)
+  }
+
+  function deepen(assistantId: string) {
+    const prompt = promptBehind(messages, assistantId)
+    if (prompt) void submit('chat', prompt, { deep: true })
+  }
+
   function activateCitation(id: string) {
     setActiveCitation(id)
-    document.getElementById(`ac-cite-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -225,7 +268,6 @@ export default function AssistantChat() {
     }
   }
 
-  const hasCitations = latestAssistant?.citations && latestAssistant.citations.length > 0
   const hasPlanBlocks = latestAssistant?.planBlocks && latestAssistant.planBlocks.length > 0
 
   return (
@@ -267,6 +309,15 @@ export default function AssistantChat() {
                   {msg.role === 'assistant' ? <AILabel size="mini" /> : <span>I</span>}
                 </div>
                 <div className="ac-msg__body">
+                  {msg.degraded && msg.degraded.length > 0 && (
+                    <div className="ac-msg__degraded">
+                      <Tag type="gray" size="sm">
+                        {msg.degraded.includes('maarif-mufredat')
+                          ? 'Müfredat kaynağına ulaşılamadı — yalnız okul verisiyle yanıtlandı'
+                          : 'Bazı kaynaklara ulaşılamadı'}
+                      </Tag>
+                    </div>
+                  )}
                   <span className="ac-msg__role">
                     {msg.role === 'user' ? 'Işık' : 'Asistan'}
                   </span>
@@ -278,8 +329,24 @@ export default function AssistantChat() {
                   {msg.safetyFlags && msg.safetyFlags.length > 0 && (
                     <div className="ac-msg__flags">
                       {msg.safetyFlags.map(f => (
-                        <Tag key={f} type="red" size="sm">{f}</Tag>
+                        <Tag key={f} type={flagTone(f)} size="sm">{FLAG_LABELS[f] ?? f}</Tag>
                       ))}
+                    </div>
+                  )}
+                  {msg.role === 'assistant' && msg.id !== 'welcome' && (
+                    <div className="ac-msg__actions">
+                      <IconButton kind="ghost" size="sm" label="Kopyala"
+                        onClick={() => void navigator.clipboard.writeText(msg.content)}>
+                        <Copy />
+                      </IconButton>
+                      <IconButton kind="ghost" size="sm" label="Yeniden üret"
+                        onClick={() => void regenerate(msg.id)}>
+                        <Renew />
+                      </IconButton>
+                      <Button kind="ghost" size="sm" renderIcon={Search}
+                        onClick={() => deepen(msg.id)}>
+                        Daha derine in
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -349,32 +416,7 @@ export default function AssistantChat() {
 
         {/* Side panels */}
         <aside className="ac__side">
-          <Tile className="ac__panel">
-            <h4 className="ac__panel-title">
-              <DocumentView size={16} /> Kaynaklar
-            </h4>
-            {hasCitations ? (
-              <ul className="ac__ref-list">
-                {latestAssistant!.citations!.map(c => (
-                  <li
-                    key={c.id}
-                    id={`ac-cite-${c.id}`}
-                    className={`ac__ref-item${activeCitation === c.id ? ' ac__ref-item--active' : ''}`}
-                  >
-                    <span className="ac__ref-path">{c.label}</span>
-                    <p className="ac__ref-snippet">{c.snippet}</p>
-                    {c.confidence > 0 && (
-                      <Tag type={c.confidence >= 0.7 ? 'green' : c.confidence >= 0.4 ? 'blue' : 'gray'} size="sm">
-                        {Math.round(c.confidence * 100)}%
-                      </Tag>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="ac__muted">Soru sorduğunda kaynaklar burada görünecek.</p>
-            )}
-          </Tile>
+          <SourcePanel citations={latestAssistant?.citations ?? []} activeId={activeCitation} />
 
           <Tile className="ac__panel">
             <h4 className="ac__panel-title">

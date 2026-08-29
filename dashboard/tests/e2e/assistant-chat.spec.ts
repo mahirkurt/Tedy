@@ -134,3 +134,84 @@ test('citation chips render inside bold and italic emphasis, but not inside code
   await expect(answerBody).not.toContainText('[S1]')
   await expect(answerBody).not.toContainText('[S2]')
 })
+
+test('sources are grouped by kind and the cited one highlights', async ({ page }) => {
+  await page.route('**/api/assistant/chat', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({
+      answer: 'Ödevin [S1] ve kazanım [S2].',
+      citations: [
+        { id: 'S1', kind: 'ogrenci', label: 'scraped_data.json', locator: {}, snippet: 'ödev', confidence: 0.8 },
+        { id: 'S2', kind: 'mufredat', label: 'MEB · kesir', locator: {}, snippet: 'kazanım', confidence: 0.9 },
+      ],
+      safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
+      meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+    }),
+  }))
+
+  await page.goto('/asistan')
+  await page.fill('#ac-input', 'ödevim ne')
+  await page.getByLabel('Gönder').click()
+
+  await expect(page.locator('.ac__ref-group')).toHaveCount(2)
+  await expect(page.locator('.ac__ref-group-title').first()).toContainText('okul verisi')
+
+  await page.locator('.ac-cite').first().click()
+  await expect(page.locator('.ac__ref-item--active')).toHaveCount(1)
+})
+
+test('a degraded answer says so', async ({ page }) => {
+  await page.route('**/api/assistant/chat', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({
+      answer: 'Yalnız okul verisiyle yanıt.', citations: [],
+      safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
+      meta: { model: 'gemini-3.7-flash', degraded: ['maarif-mufredat'], dropped_citations: 0 },
+    }),
+  }))
+
+  await page.goto('/asistan')
+  await page.fill('#ac-input', 'kesir')
+  await page.getByLabel('Gönder').click()
+
+  await expect(page.locator('.ac-msg__degraded')).toContainText('Müfredat kaynağına ulaşılamadı')
+})
+
+// The load-bearing assertion for this task: a risk:* flag (genuine crisis
+// escalation) must render visibly distinct from a warning:* flag (routine,
+// tool-free "no sources" note) — same red Tag for both would let a common,
+// harmless warning desensitise readers to the rare, serious one. Also pins
+// that the warning's label is the friendly Turkish string, not the raw
+// "warning:limited_confidence" token a 6th-grader would otherwise see.
+test('risk and warning safety flags render with different severity, not as raw tokens', async ({ page }) => {
+  await page.route('**/api/assistant/chat', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({
+      answer: 'Bu konuda dikkatli olmalıyız.',
+      citations: [],
+      safety_flags: ['risk:mental_health_crisis', 'warning:limited_confidence'],
+      plan_blocks: [], intent: 'qa', session_id: '',
+      meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+    }),
+  }))
+
+  await page.goto('/asistan')
+  await page.fill('#ac-input', 'zor bir gün geçiriyorum')
+  await page.getByLabel('Gönder').click()
+
+  const flags = page.locator('.ac-msg--assistant').last().locator('.ac-msg__flags .cds--tag')
+  await expect(flags).toHaveCount(2)
+
+  const riskTag = flags.filter({ hasText: 'mental_health_crisis' })
+  const warningTag = flags.filter({ hasText: 'Kaynaksız cevap' })
+  await expect(riskTag).toHaveCount(1)
+  await expect(warningTag).toHaveCount(1)
+
+  // Different severity → different Carbon Tag `type` → different modifier class.
+  await expect(riskTag).toHaveClass(/cds--tag--red/)
+  await expect(warningTag).not.toHaveClass(/cds--tag--red/)
+  await expect(warningTag).toHaveClass(/cds--tag--gray/)
+
+  // The raw token must never reach the reader.
+  await expect(page.locator('.ac-msg--assistant').last()).not.toContainText('warning:limited_confidence')
+})
