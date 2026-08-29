@@ -23,6 +23,21 @@ def client():
 
 
 @pytest.fixture
+def client_no_auth(monkeypatch):
+    """A client with TEST_AUTH_BYPASS disabled, for exercising real auth gates.
+
+    Mirrors the inline `monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS",
+    False)` pattern already used ad hoc in this file and in
+    test_assistant_api.py, as a reusable fixture — request has no session and
+    no API key, so anything behind @require_auth must refuse it.
+    """
+    monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS", False)
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        yield client
+
+
+@pytest.fixture
 def isolated_output(tmp_path, monkeypatch):
     """Isolate filesystem writes for API write-flow tests."""
     monkeypatch.setattr(dashboard_api, "OUTPUT_DIR", str(tmp_path))
@@ -972,3 +987,33 @@ class TestBookTranslationApi:
 
         assert response.status_code == 502
         assert response.get_json() == {"error": "translation_provider_unavailable"}
+
+
+def test_assistant_stream_emits_tool_events_then_the_answer(client, monkeypatch):
+    import src.dashboard_api as api
+
+    class _Rt:
+        def chat_events(self, **kwargs):
+            yield {"event": "tool_start", "name": "kazanim_ara"}
+            yield {"event": "tool_end", "name": "kazanim_ara", "ok": True, "ms": 40}
+            yield {"event": "answer", "payload": {
+                "answer": "cevap", "citations": [], "safety_flags": [],
+                "plan_blocks": [], "intent": "qa", "session_id": "",
+                "meta": {"model": "gemini-3.7-flash", "degraded": []}}}
+
+    monkeypatch.setattr(api, "_assistant_runtime", lambda: _Rt())
+
+    res = client.post("/api/assistant/stream", json={"messages": [
+        {"role": "user", "content": "kesir"}]})
+
+    assert res.status_code == 200
+    assert res.headers["Content-Type"].startswith("text/event-stream")
+    body = res.get_data(as_text=True)
+    assert "event: tool_start" in body
+    assert "event: answer" in body
+    assert body.rstrip().endswith("event: done\ndata: {}")
+
+
+def test_assistant_stream_requires_auth(client_no_auth):
+    res = client_no_auth.post("/api/assistant/stream", json={"messages": []})
+    assert res.status_code in (401, 403)

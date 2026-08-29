@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 import requests as http_requests
-from flask import Flask, jsonify, request, send_from_directory, session
+from flask import Flask, Response, jsonify, request, send_from_directory, session
 from flask_cors import CORS
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
@@ -1794,6 +1794,50 @@ def assistant_chat():
         return jsonify({"error": "assistant_unavailable"}), 503
     except Exception as e:
         return jsonify({"error": f"assistant chat failed: {e}"}), 500
+
+
+@app.route("/api/assistant/stream", methods=["POST"])
+@require_auth
+def assistant_stream():
+    access = _require_assistant_access()
+    if access is not None:
+        return access
+
+    data = request.get_json(silent=True) or {}
+    messages = data.get("messages") or []
+    session_id = str(data.get("session_id", ""))
+    force_deep = bool(data.get("force_deep", False))
+
+    def generate():
+        try:
+            runtime = _assistant_runtime()
+            # A runtime with no Gemini key configured at all cannot narrate a
+            # tool loop — chat() degrades gracefully to a generic "couldn't
+            # answer" text instead of raising, which would otherwise stream
+            # as if the assistant tried and came up empty. Treat that as
+            # unavailable here so the client's existing fallback path (the
+            # classic, non-streaming endpoint) handles it the same way it
+            # already handles a missing assistant subsystem. `getattr` twice
+            # over, defensively: a stub runtime (as used in tests) need not
+            # carry a `.gemini` attribute at all.
+            gemini = getattr(runtime, "gemini", None)
+            if gemini is not None and not getattr(gemini, "available", True):
+                raise AssistantUnavailableError("assistant_unavailable")
+            for event in runtime.chat_events(
+                messages=messages, session_id=session_id, force_deep=force_deep
+            ):
+                name = event.pop("event")
+                yield f"event: {name}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except AssistantUnavailableError:
+            yield 'event: error\ndata: {"error":"assistant_unavailable"}\n\n'
+        except Exception as exc:  # noqa: BLE001 — the stream must always close
+            app.logger.error("assistant stream failed: %s", exc)
+            yield f'event: error\ndata: {json.dumps({"error": str(exc)})}\n\n'
+        yield "event: done\ndata: {}\n\n"
+
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache",
+                             "X-Accel-Buffering": "no"})
 
 
 @app.route("/api/assistant/plan", methods=["POST"])

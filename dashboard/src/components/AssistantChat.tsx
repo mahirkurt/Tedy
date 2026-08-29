@@ -46,12 +46,59 @@ const QUICK_PROMPTS = [
   { text: 'Veli kontrol listesi üret', icon: ParentChild, mode: 'chat' as const },
 ]
 
-const WAITING_MESSAGES = [
-  'Veriler analiz ediliyor...',
-  'Kaynaklar taranıyor...',
-  'Yanıt hazırlanıyor...',
-  'Neredeyse bitti...',
-]
+// Shown in the composer while a tool is running, keyed by the tool name the
+// stream endpoint reports in its `tool_start` event. Anything not in this map
+// (a tool added on the backend without a matching label here) still shows a
+// generic fallback rather than a blank or raw tool id.
+const TOOL_LABEL: Record<string, string> = {
+  ogrenci_verisi_ara: 'Okul verilerin taranıyor',
+  kazanim_ara: 'MEB kazanımları aranıyor',
+  kazanim_listele: 'Kazanım listesi alınıyor',
+  mufredat_ara: 'Müfredat aranıyor',
+  kitap_listele: 'Ders kitapları listeleniyor',
+  kitap_sayfa: 'Ders kitabı sayfası okunuyor',
+  figur_ara: 'Görsel aranıyor',
+  figur_getir: 'Görsel getiriliyor',
+  oer_ara: 'Açık kaynaklar taranıyor',
+  oer_kazanima_gore: 'Kazanıma bağlı kaynaklar alınıyor',
+}
+
+const DEFAULT_THINKING_MESSAGE = 'Yanıt hazırlanıyor...'
+
+/** Read an SSE body and hand each event to the caller. */
+async function readEventStream(
+  res: Response,
+  onEvent: (name: string, data: Record<string, unknown>) => void,
+): Promise<void> {
+  const reader = res.body?.getReader()
+  if (!reader) throw new Error('akış gövdesi yok')
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+
+    // Frames are separated by a blank line; keep the trailing partial frame.
+    const frames = buffer.split('\n\n')
+    buffer = frames.pop() ?? ''
+
+    for (const frame of frames) {
+      let name = 'message'
+      let payload = '{}'
+      for (const line of frame.split('\n')) {
+        if (line.startsWith('event: ')) name = line.slice(7).trim()
+        else if (line.startsWith('data: ')) payload = line.slice(6)
+      }
+      try {
+        onEvent(name, JSON.parse(payload))
+      } catch {
+        // A malformed frame must not kill the stream.
+      }
+    }
+  }
+}
 
 function toApiMessages(messages: ChatMessage[]) {
   return messages.map(m => ({ role: m.role, content: m.content }))
@@ -111,7 +158,7 @@ async function parseJsonSafe(res: Response): Promise<AssistantResponse | { error
   return { error: `Sunucu JSON dönmedi (HTTP ${res.status}): ${preview || 'boş yanıt'}` }
 }
 
-function ThinkingIndicator() {
+function ThinkingIndicator({ stage }: { stage: string | null }) {
   const [elapsed, setElapsed] = useState(0)
 
   useEffect(() => {
@@ -121,10 +168,6 @@ function ThinkingIndicator() {
     return () => clearInterval(timer)
   }, [])
 
-  // Advance one message every six seconds — derived from elapsed, not mirrored
-  // into a second piece of state.
-  const msgIdx = Math.min(Math.floor(elapsed / 6), WAITING_MESSAGES.length - 1)
-
   return (
     <article className="ac-msg ac-msg--assistant ac-msg--thinking">
       <div className="ac-msg__avatar ac-msg__avatar--ai">
@@ -132,7 +175,7 @@ function ThinkingIndicator() {
       </div>
       <div className="ac-msg__body">
         <div className="ac-msg__thinking-row">
-          <InlineLoading description={WAITING_MESSAGES[msgIdx]} />
+          <InlineLoading description={stage ?? DEFAULT_THINKING_MESSAGE} />
           {elapsed > 2 && (
             <span className="ac-msg__elapsed">{elapsed}s</span>
           )}
@@ -187,6 +230,7 @@ export default function AssistantChat() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeCitation, setActiveCitation] = useState<string | null>(null)
+  const [stage, setStage] = useState<string | null>(null)
 
   const latestAssistant = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -198,6 +242,24 @@ export default function AssistantChat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  /** Appends one assistant turn to the transcript from an AssistantResponse
+   * payload, whether it arrived via the stream's `answer` event or a classic
+   * JSON response — both endpoints return the same shape, so this is the one
+   * place that turns it into a ChatMessage. */
+  function appendAssistantMessage(payload: AssistantResponse) {
+    const answer = (payload.answer || '').trim() || 'Yanıt üretilemedi.'
+    const assistantMsg: ChatMessage = {
+      id: `assistant-${Date.now()}`,
+      role: 'assistant',
+      content: answer,
+      citations: payload.citations || [],
+      safetyFlags: payload.safety_flags || [],
+      planBlocks: payload.plan_blocks || [],
+      degraded: payload.meta?.degraded || [],
+    }
+    setMessages(prev => [...prev, assistantMsg])
+  }
 
   async function submit(mode: 'chat' | 'plan', forcedPrompt?: string, opts?: { deep?: boolean }) {
     const content = (forcedPrompt ?? draft).trim()
@@ -214,41 +276,89 @@ export default function AssistantChat() {
     setDraft('')
     setLoading(true)
     setError(null)
+    setStage(null)
+
+    const requestBody = {
+      session_id: 'dashboard-default',
+      context_filters: {},
+      messages: toApiMessages(nextMessages),
+      ...(opts?.deep ? { force_deep: true } : {}),
+    }
+
+    // The streaming endpoint only narrates AssistantRuntime.chat() — a study
+    // plan needs study_plan()'s own plan_blocks, which chat() never
+    // produces, so a 'plan' submission goes straight to the classic
+    // endpoint rather than through the stream-then-fallback path below.
+    // Routing it through the stream would return HTTP 200 with a real
+    // answer and an empty plan, which is a silent failure of the plan
+    // feature — status green, feature dead.
+    if (mode === 'plan') {
+      try {
+        const res = await fetch('/api/assistant/plan', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        })
+        const payload = await parseJsonSafe(res)
+        if (!res.ok || 'error' in payload) {
+          throw new Error((payload as { error?: string }).error || `HTTP ${res.status}`)
+        }
+        appendAssistantMessage(payload as AssistantResponse)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Asistan hatası')
+      } finally {
+        setStage(null)
+        setLoading(false)
+      }
+      return
+    }
 
     try {
-      const endpoint = mode === 'plan' ? '/api/assistant/plan' : '/api/assistant/chat'
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/assistant/stream', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: 'dashboard-default',
-          context_filters: {},
-          messages: toApiMessages(nextMessages),
-          ...(opts?.deep ? { force_deep: true } : {}),
-        }),
+        body: JSON.stringify(requestBody),
       })
+      if (!res.ok || !res.body) throw new Error(`akış açılamadı (${res.status})`)
 
-      const payload = await parseJsonSafe(res)
-      if (!res.ok) {
-        throw new Error((payload as { error?: string }).error || `HTTP ${res.status}`)
+      let answered = false
+      await readEventStream(res, (name, data) => {
+        if (name === 'tool_start') {
+          setStage(TOOL_LABEL[String(data.name)] ?? 'Kaynaklar taranıyor')
+        } else if (name === 'answer') {
+          answered = true
+          appendAssistantMessage(data.payload as AssistantResponse)
+        } else if (name === 'error') {
+          throw new Error(String(data.error ?? 'akış hatası'))
+        }
+      })
+      if (!answered) throw new Error('akış yanıtsız kapandı')
+    } catch (streamErr) {
+      // The non-streaming endpoint stays in place precisely for this: a proxy
+      // that buffers SSE, an older worker, or the stream failing mid-flight
+      // must not cost the user an answer. This is reported to the console,
+      // not surfaced via setError — the reader gets an answer either way, so
+      // it is not an error from where they sit.
+      console.warn('akış başarısız, klasik uca düşülüyor:', streamErr)
+      try {
+        const res = await fetch('/api/assistant/chat', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        })
+        const payload = await parseJsonSafe(res)
+        if (!res.ok || 'error' in payload) {
+          throw new Error((payload as { error?: string }).error || `HTTP ${res.status}`)
+        }
+        appendAssistantMessage(payload as AssistantResponse)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Asistan hatası')
       }
-
-      const out = payload as AssistantResponse
-      const answer = (out.answer || '').trim() || 'Yanıt üretilemedi.'
-      const assistantMsg: ChatMessage = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: answer,
-        citations: out.citations || [],
-        safetyFlags: out.safety_flags || [],
-        planBlocks: out.plan_blocks || [],
-        degraded: out.meta?.degraded || [],
-      }
-      setMessages(prev => [...prev, assistantMsg])
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Asistan hatası')
     } finally {
+      setStage(null)
       setLoading(false)
     }
   }
@@ -368,7 +478,7 @@ export default function AssistantChat() {
               </article>
             ))}
 
-            {loading && <ThinkingIndicator />}
+            {loading && <ThinkingIndicator stage={stage} />}
             <div ref={messagesEndRef} />
           </div>
 

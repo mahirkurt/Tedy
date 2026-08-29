@@ -19,6 +19,7 @@ import re
 import subprocess
 import time
 import fnmatch
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1469,6 +1470,40 @@ class AssistantRuntime:
             "timestamp": _utcnow_naive().isoformat() + "Z",
         })
         return payload
+
+    def chat_events(self, **kwargs: Any) -> Iterator[dict[str, Any]]:
+        """chat(), but announcing each tool as it runs.
+
+        The tool loop can hold the request open for several seconds. Saying
+        which source is being consulted is both a trust signal and, for this
+        reader, the visible-time cue the interface is meant to provide.
+
+        Note: this version emits the tool events *after* the answer is
+        already computed (chat() runs to completion first, then the recorded
+        events are replayed); real-time interleaving would need chat() to run
+        on a queue.Queue-fed worker thread. First delivery keeps the event
+        order correct and lets the interface show stages — real-time
+        emission is a later change if a measured need shows up for it.
+        """
+        events: list[dict[str, Any]] = []
+
+        original = self.registry.dispatch
+
+        def announcing(name: str, args: dict[str, Any]) -> Any:
+            events.append({"event": "tool_start", "name": name})
+            outcome = original(name, args)
+            events.append({"event": "tool_end", "name": name,
+                           "ok": bool(outcome.ok)})
+            return outcome
+
+        self.registry.dispatch = announcing  # type: ignore[method-assign]
+        try:
+            payload = self.chat(**kwargs)
+        finally:
+            self.registry.dispatch = original  # type: ignore[method-assign]
+
+        yield from events
+        yield {"event": "answer", "payload": payload}
 
     def _build_conversation(
         self,
