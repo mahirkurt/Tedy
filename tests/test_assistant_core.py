@@ -1,5 +1,7 @@
 import json
 import os
+import threading
+import time
 from pathlib import Path
 
 from src.assistant_core import AssistantRuntime, GeminiClient
@@ -328,3 +330,153 @@ def test_no_fabrication_rule_does_not_forbid_general_knowledge():
     p = AssistantRuntime.SYSTEM_PROMPT
     assert "Bu madde araç çıktısına dayanan cümleler içindir" in p
     assert "genel bilgi" in p
+
+
+def test_chat_events_streams_tool_progress_in_real_time(tmp_path, monkeypatch):
+    """Fix round 3, Bulgu 1. Measured before this fix: five events for two
+    dispatch() calls 0.3s apart all landed within 0.9s of each other — i.e.
+    chat_events() buffered every event until chat() had already returned
+    and replayed them in one burst. That makes the commit's own claim
+    ("stream the assistant's progress while it consults sources") false in
+    production: the reader sees a flicker right before the answer, not
+    live progress.
+
+    This pins the fix: the first tool_start event must arrive almost
+    immediately (long before the two 0.3s sleeps have elapsed), and the
+    final answer must trail it by roughly the full elapsed delay — proof
+    the generator is actually being fed through the worker-thread queue as
+    chat() runs, not replaying a list assembled after the fact.
+    """
+    (tmp_path / "output").mkdir()
+    runtime = AssistantRuntime(tmp_path)
+
+    SLEEP = 0.3
+
+    def slow_chat_with_tools(*, dispatch, **kwargs):
+        dispatch("kazanim_ara", {"q": "kesir"})
+        time.sleep(SLEEP)
+        dispatch("mufredat_ara", {"q": "kesir"})
+        time.sleep(SLEEP)
+        return ToolLoopResult(text="TEST_ANSWER [S1]", citations=[])
+
+    monkeypatch.setattr(runtime.registry, "declarations", lambda: [])
+    monkeypatch.setattr(runtime.registry, "degraded", lambda: [])
+    monkeypatch.setattr(runtime.gemini, "chat_with_tools", slow_chat_with_tools)
+
+    start = time.perf_counter()
+    timestamps: list[tuple[str, float]] = []
+    for event in runtime.chat_events(
+        messages=[{"role": "user", "content": "kesir"}],
+        session_id="s1",
+    ):
+        timestamps.append((event["event"], time.perf_counter() - start))
+
+    names = [t[0] for t in timestamps]
+    assert names == ["tool_start", "tool_end", "tool_start", "tool_end", "answer"]
+
+    first_tool_start_t = timestamps[0][1]
+    answer_t = timestamps[-1][1]
+
+    # A buffered implementation would deliver every event clustered near
+    # answer_t, all at once, after both sleeps have already elapsed. A
+    # genuinely streamed one delivers the first tool_start almost
+    # immediately — well under one sleep interval.
+    assert first_tool_start_t < SLEEP / 2, (
+        f"first tool_start arrived at {first_tool_start_t:.3f}s — "
+        "events are still being buffered, not streamed"
+    )
+    # And the final answer must trail the first event by roughly the full
+    # dispatched delay (two 0.3s sleeps), not land in the same instant.
+    assert answer_t - first_tool_start_t >= SLEEP * 1.5, (
+        f"answer arrived only {answer_t - first_tool_start_t:.3f}s after "
+        "the first tool_start — events were not actually interleaved with "
+        "chat() running"
+    )
+
+
+def test_concurrent_chat_events_do_not_leak_dispatch_between_calls(tmp_path, monkeypatch):
+    """Fix round 3, Bulgu 2. chat_events() used to monkey-patch the shared
+    self.registry.dispatch — safe only if calls never overlap. gthread
+    workers (this task) make real concurrency possible for the first time,
+    and the reviewer measured the leak directly: with threading.Event used
+    to force interleaving, thread A's own event stream showed thread B's
+    tool name.
+
+    This test forces the same interleaving deterministically (one shared
+    AssistantRuntime — the same shape as the process-wide singleton in
+    production — with two concurrent chat_events() calls, coordinated so
+    the second call's dispatch runs strictly inside the window where the
+    first call's chat() is still executing) and asserts each call's stream
+    contains only its own tool name, never the other's.
+    """
+    (tmp_path / "output").mkdir()
+    runtime = AssistantRuntime(tmp_path)
+    monkeypatch.setattr(runtime.registry, "declarations", lambda: [])
+    monkeypatch.setattr(runtime.registry, "degraded", lambda: [])
+
+    first_dispatched = threading.Event()
+    second_done = threading.Event()
+    call_order_lock = threading.Lock()
+    call_counter = {"n": 0}
+
+    def shared_chat_with_tools(*, dispatch, **kwargs):
+        with call_order_lock:
+            call_counter["n"] += 1
+            is_first = call_counter["n"] == 1
+        if is_first:
+            dispatch("TOOL_FIRST", {})
+            first_dispatched.set()
+            # Hold this call's chat() open until the second call has also
+            # dispatched its own tool — exactly the window in which a
+            # shared self.registry.dispatch mutation would let the second
+            # call's tool name leak into this stream (or vice versa).
+            assert second_done.wait(timeout=5), "second call never dispatched"
+            return ToolLoopResult(text="ANSWER_FIRST", citations=[])
+        else:
+            assert first_dispatched.wait(timeout=5), "first call never dispatched"
+            dispatch("TOOL_SECOND", {})
+            second_done.set()
+            return ToolLoopResult(text="ANSWER_SECOND", citations=[])
+
+    monkeypatch.setattr(runtime.gemini, "chat_with_tools", shared_chat_with_tools)
+
+    events_by_thread: dict[str, list[dict]] = {}
+    errors: list[BaseException] = []
+
+    def worker(key: str) -> None:
+        try:
+            events_by_thread[key] = list(runtime.chat_events(
+                messages=[{"role": "user", "content": key}], session_id=key))
+        except BaseException as exc:  # noqa: BLE001 - surfaced via `errors`
+            errors.append(exc)
+
+    t1 = threading.Thread(target=worker, args=("thread1",))
+    t2 = threading.Thread(target=worker, args=("thread2",))
+    t1.start()
+    # Give thread1 a head start so it deterministically becomes "first" in
+    # shared_chat_with_tools — not load-bearing for the assertion itself,
+    # only for which key maps to which tool name below.
+    time.sleep(0.05)
+    t2.start()
+    t1.join(timeout=10)
+    t2.join(timeout=10)
+
+    assert not errors, f"worker thread raised: {errors}"
+    assert set(events_by_thread) == {"thread1", "thread2"}
+
+    # The load-bearing assertion: whichever call ran "first" vs "second"
+    # internally, each thread's own event stream must contain only the one
+    # tool name it dispatched — never the other thread's — even though
+    # both calls shared one AssistantRuntime/one McpRegistry instance.
+    for key, events in events_by_thread.items():
+        tool_names = {e["name"] for e in events if e["event"] in ("tool_start", "tool_end")}
+        assert len(tool_names) == 1, (
+            f"{key}'s stream saw {tool_names} — a shared-registry mutation "
+            "leaked another call's tool name into this one"
+        )
+
+    seen_tools = {
+        next(iter({e["name"] for e in events if e["event"] in ("tool_start", "tool_end")}))
+        for events in events_by_thread.values()
+    }
+    assert seen_tools == {"TOOL_FIRST", "TOOL_SECOND"}

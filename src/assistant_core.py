@@ -15,11 +15,13 @@ import json
 import logging
 import math
 import os
+import queue
 import re
 import subprocess
+import threading
 import time
 import fnmatch
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1393,7 +1395,16 @@ class AssistantRuntime:
         context_filters: dict[str, Any] | None = None,
         temperature: float = 0.2,
         force_deep: bool = False,
+        dispatch: Callable[[str, dict[str, Any]], Any] | None = None,
     ) -> dict[str, Any]:
+        # `dispatch`, if given, replaces self.registry.dispatch for this
+        # call only. chat_events() (below) uses this to wrap tool calls
+        # with per-call progress narration WITHOUT mutating shared state:
+        # the registry is a per-process singleton, and gthread workers
+        # (this task) mean two chat() calls can now genuinely overlap.
+        # Passing the wrapper in as an argument keeps each call's
+        # narration local to its own stack frame instead of racing
+        # another call's over one shared attribute.
         start = time.perf_counter()
 
         user_query = self._latest_user_message(messages)
@@ -1410,7 +1421,7 @@ class AssistantRuntime:
             loop = self.gemini.chat_with_tools(
                 messages=convo,
                 declarations=self.registry.declarations(),
-                dispatch=self.registry.dispatch,
+                dispatch=dispatch or self.registry.dispatch,
                 tier=tier,
                 max_output_tokens=8192 if tier == "deep" else 2048,
                 temperature=temperature,
@@ -1472,38 +1483,74 @@ class AssistantRuntime:
         return payload
 
     def chat_events(self, **kwargs: Any) -> Iterator[dict[str, Any]]:
-        """chat(), but announcing each tool as it runs.
+        """chat(), but announcing each tool as it runs, in real time.
 
         The tool loop can hold the request open for several seconds. Saying
         which source is being consulted is both a trust signal and, for this
-        reader, the visible-time cue the interface is meant to provide.
+        reader, the visible-time cue the interface is meant to provide — and
+        that only holds if the event actually reaches the reader while the
+        tool is running, not after chat() has already returned and the
+        answer is sitting there waiting to be replayed alongside it.
 
-        Note: this version emits the tool events *after* the answer is
-        already computed (chat() runs to completion first, then the recorded
-        events are replayed); real-time interleaving would need chat() to run
-        on a queue.Queue-fed worker thread. First delivery keeps the event
-        order correct and lets the interface show stages — real-time
-        emission is a later change if a measured need shows up for it.
+        chat() is synchronous by design (it has other callers outside the
+        stream), so it runs here on a dedicated worker thread. Its dispatch
+        wrapper puts a {"event": ...} dict on a queue.Queue immediately
+        before and after each real tool call; this generator drains that
+        queue and yields each item the moment it arrives, `queue.Queue.get`
+        blocking (without holding the GIL) between them. That is the whole
+        mechanism — no polling, no fixed delay.
+
+        Per-call, not shared: the dispatch wrapper is passed to chat() as an
+        argument (see chat()'s `dispatch` parameter) rather than assigned
+        onto self.registry.dispatch. AssistantRuntime is a per-process
+        singleton and gthread workers (this task) make concurrent
+        chat_events() calls genuinely possible; a shared, mutated
+        self.registry.dispatch would let one caller's tool names leak into
+        another caller's stream, or leave the registry permanently wrapped
+        in a stale closure if two calls' try/finally blocks interleave.
+        Passing the wrapper as a plain local closure, read from
+        self.registry.dispatch but never written back to it, means every
+        concurrent call gets its own — nothing shared, nothing to race.
         """
-        events: list[dict[str, Any]] = []
+        events: "queue.Queue[dict[str, Any] | object]" = queue.Queue()
+        _DONE = object()
 
-        original = self.registry.dispatch
+        # Read once, per call — never assigned back onto the registry.
+        real_dispatch = self.registry.dispatch
 
         def announcing(name: str, args: dict[str, Any]) -> Any:
-            events.append({"event": "tool_start", "name": name})
-            outcome = original(name, args)
-            events.append({"event": "tool_end", "name": name,
-                           "ok": bool(outcome.ok)})
+            events.put({"event": "tool_start", "name": name})
+            outcome = real_dispatch(name, args)
+            events.put({"event": "tool_end", "name": name,
+                        "ok": bool(outcome.ok)})
             return outcome
 
-        self.registry.dispatch = announcing  # type: ignore[method-assign]
-        try:
-            payload = self.chat(**kwargs)
-        finally:
-            self.registry.dispatch = original  # type: ignore[method-assign]
+        outcome_box: dict[str, Any] = {}
 
-        yield from events
-        yield {"event": "answer", "payload": payload}
+        def run() -> None:
+            try:
+                outcome_box["payload"] = self.chat(dispatch=announcing, **kwargs)
+            except BaseException as exc:  # noqa: BLE001 — re-raised on the caller's thread below
+                outcome_box["error"] = exc
+            finally:
+                events.put(_DONE)
+
+        worker = threading.Thread(
+            target=run, name="assistant-chat-events", daemon=True)
+        worker.start()
+
+        while True:
+            item = events.get()
+            if item is _DONE:
+                break
+            yield item
+
+        worker.join()
+
+        if "error" in outcome_box:
+            raise outcome_box["error"]
+
+        yield {"event": "answer", "payload": outcome_box["payload"]}
 
     def _build_conversation(
         self,
