@@ -1811,18 +1811,6 @@ def assistant_stream():
     def generate():
         try:
             runtime = _assistant_runtime()
-            # A runtime with no Gemini key configured at all cannot narrate a
-            # tool loop — chat() degrades gracefully to a generic "couldn't
-            # answer" text instead of raising, which would otherwise stream
-            # as if the assistant tried and came up empty. Treat that as
-            # unavailable here so the client's existing fallback path (the
-            # classic, non-streaming endpoint) handles it the same way it
-            # already handles a missing assistant subsystem. `getattr` twice
-            # over, defensively: a stub runtime (as used in tests) need not
-            # carry a `.gemini` attribute at all.
-            gemini = getattr(runtime, "gemini", None)
-            if gemini is not None and not getattr(gemini, "available", True):
-                raise AssistantUnavailableError("assistant_unavailable")
             for event in runtime.chat_events(
                 messages=messages, session_id=session_id, force_deep=force_deep
             ):

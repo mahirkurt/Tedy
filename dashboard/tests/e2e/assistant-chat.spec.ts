@@ -10,6 +10,15 @@ function lastAnswerBody(page: Page) {
 }
 
 test('assistant answers render markdown rather than raw syntax', async ({ page }) => {
+  // The stream endpoint is real backend code, not mocked here — a bare
+  // page.route on '**/api/assistant/chat' does not intercept it, so an
+  // unmocked stream call would reach the actual dashboard server (and, in
+  // this worktree, its real GEMINI_API_KEY) on every one of these tests.
+  // Aborting it in-browser keeps the suite network-free and deterministic;
+  // AssistantChat.tsx's own catch block sends the request on to the
+  // classic endpoint mocked immediately below, which is what every
+  // assertion in this file is actually pinned to.
+  await page.route('**/api/assistant/stream', route => route.abort())
   await page.route('**/api/assistant/chat', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -58,6 +67,15 @@ test('citation chips render inside every markdown block type, not just one', asy
     '> ikinci mısra',
   ].join('\n')
 
+  // The stream endpoint is real backend code, not mocked here — a bare
+  // page.route on '**/api/assistant/chat' does not intercept it, so an
+  // unmocked stream call would reach the actual dashboard server (and, in
+  // this worktree, its real GEMINI_API_KEY) on every one of these tests.
+  // Aborting it in-browser keeps the suite network-free and deterministic;
+  // AssistantChat.tsx's own catch block sends the request on to the
+  // classic endpoint mocked immediately below, which is what every
+  // assertion in this file is actually pinned to.
+  await page.route('**/api/assistant/stream', route => route.abort())
   await page.route('**/api/assistant/chat', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -106,6 +124,15 @@ test('citation chips render inside bold and italic emphasis, but not inside code
     'Bu satırda kod aralığı içeren bir metin de epeyce uzun tutuldu ki mısra olarak katlanmasın `örnek kod [S3]` böyle görünür.',
   ].join('\n')
 
+  // The stream endpoint is real backend code, not mocked here — a bare
+  // page.route on '**/api/assistant/chat' does not intercept it, so an
+  // unmocked stream call would reach the actual dashboard server (and, in
+  // this worktree, its real GEMINI_API_KEY) on every one of these tests.
+  // Aborting it in-browser keeps the suite network-free and deterministic;
+  // AssistantChat.tsx's own catch block sends the request on to the
+  // classic endpoint mocked immediately below, which is what every
+  // assertion in this file is actually pinned to.
+  await page.route('**/api/assistant/stream', route => route.abort())
   await page.route('**/api/assistant/chat', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -136,6 +163,15 @@ test('citation chips render inside bold and italic emphasis, but not inside code
 })
 
 test('sources are grouped by kind and the cited one highlights', async ({ page }) => {
+  // The stream endpoint is real backend code, not mocked here — a bare
+  // page.route on '**/api/assistant/chat' does not intercept it, so an
+  // unmocked stream call would reach the actual dashboard server (and, in
+  // this worktree, its real GEMINI_API_KEY) on every one of these tests.
+  // Aborting it in-browser keeps the suite network-free and deterministic;
+  // AssistantChat.tsx's own catch block sends the request on to the
+  // classic endpoint mocked immediately below, which is what every
+  // assertion in this file is actually pinned to.
+  await page.route('**/api/assistant/stream', route => route.abort())
   await page.route('**/api/assistant/chat', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({
@@ -161,6 +197,15 @@ test('sources are grouped by kind and the cited one highlights', async ({ page }
 })
 
 test('a degraded answer says so', async ({ page }) => {
+  // The stream endpoint is real backend code, not mocked here — a bare
+  // page.route on '**/api/assistant/chat' does not intercept it, so an
+  // unmocked stream call would reach the actual dashboard server (and, in
+  // this worktree, its real GEMINI_API_KEY) on every one of these tests.
+  // Aborting it in-browser keeps the suite network-free and deterministic;
+  // AssistantChat.tsx's own catch block sends the request on to the
+  // classic endpoint mocked immediately below, which is what every
+  // assertion in this file is actually pinned to.
+  await page.route('**/api/assistant/stream', route => route.abort())
   await page.route('**/api/assistant/chat', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({
@@ -184,6 +229,15 @@ test('a degraded answer says so', async ({ page }) => {
 // that the warning's label is the friendly Turkish string, not the raw
 // "warning:limited_confidence" token a 6th-grader would otherwise see.
 test('risk and warning safety flags render with different severity, not as raw tokens', async ({ page }) => {
+  // The stream endpoint is real backend code, not mocked here — a bare
+  // page.route on '**/api/assistant/chat' does not intercept it, so an
+  // unmocked stream call would reach the actual dashboard server (and, in
+  // this worktree, its real GEMINI_API_KEY) on every one of these tests.
+  // Aborting it in-browser keeps the suite network-free and deterministic;
+  // AssistantChat.tsx's own catch block sends the request on to the
+  // classic endpoint mocked immediately below, which is what every
+  // assertion in this file is actually pinned to.
+  await page.route('**/api/assistant/stream', route => route.abort())
   await page.route('**/api/assistant/chat', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({
@@ -223,6 +277,15 @@ test('risk and warning safety flags render with different severity, not as raw t
 // friendly Turkish label, the unrecognised one by its own raw name rather
 // than being silently dropped or folded into the known message.
 test('every degraded source surfaces, not just the first', async ({ page }) => {
+  // The stream endpoint is real backend code, not mocked here — a bare
+  // page.route on '**/api/assistant/chat' does not intercept it, so an
+  // unmocked stream call would reach the actual dashboard server (and, in
+  // this worktree, its real GEMINI_API_KEY) on every one of these tests.
+  // Aborting it in-browser keeps the suite network-free and deterministic;
+  // AssistantChat.tsx's own catch block sends the request on to the
+  // classic endpoint mocked immediately below, which is what every
+  // assertion in this file is actually pinned to.
+  await page.route('**/api/assistant/stream', route => route.abort())
   await page.route('**/api/assistant/chat', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({
@@ -257,6 +320,15 @@ test('every degraded source surfaces, not just the first', async ({ page }) => {
 // still highlight the matching card. CitationChip's popover/aria-label must
 // not leak the literal string "undefined" for the same unrecognised kind.
 test('citations with an unknown kind get their own group, not folded into ogrenci or mufredat, and their chip still highlights', async ({ page }) => {
+  // The stream endpoint is real backend code, not mocked here — a bare
+  // page.route on '**/api/assistant/chat' does not intercept it, so an
+  // unmocked stream call would reach the actual dashboard server (and, in
+  // this worktree, its real GEMINI_API_KEY) on every one of these tests.
+  // Aborting it in-browser keeps the suite network-free and deterministic;
+  // AssistantChat.tsx's own catch block sends the request on to the
+  // classic endpoint mocked immediately below, which is what every
+  // assertion in this file is actually pinned to.
+  await page.route('**/api/assistant/stream', route => route.abort())
   await page.route('**/api/assistant/chat', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({
