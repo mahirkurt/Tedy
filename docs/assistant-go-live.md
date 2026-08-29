@@ -37,7 +37,7 @@ yaşıyor. Ana checkout şu an `feat/carbon-token-fidelity` dalında duruyor ve 
 
 ```
 git -C /mnt/thunderbolt/workspaces/TED cat-file -e feat/carbon-token-fidelity:src/assistant_tools.py
-# -> "fatal: path 'src/assistant_tools.py' exists on disk, but not in 'feat/carbon-token-fidelity'"
+# -> "fatal: path 'src/assistant_tools.py' does not exist in 'feat/carbon-token-fidelity'" (exit 128)
 git -C /mnt/thunderbolt/workspaces/TED show feat/carbon-token-fidelity:src/dashboard_api.py | grep -c degraded
 # -> 0
 ```
@@ -187,9 +187,16 @@ eşzamanlı slot sayısı 2'den 8'e çıkıyor; aynı senaryoda `/api/health` **
 8'den fazla eşzamanlı uzun istek hâlâ kuyruğa girer, ama bu ailenin trafiği için kabul
 edilebilir.
 
-Servis dosyası zaten bu haliyle düzenli (`~/.config/systemd/user/ted-dashboard.service`),
-ama henüz **uygulanmadı** — şu an çalışan gunicorn süreçleri hâlâ eski `--workers 2` (thread'siz)
-komut satırıyla ayakta. Değişikliği devreye almak için:
+Servis dosyası zaten bu haliyle düzenli (`~/.config/systemd/user/ted-dashboard.service`);
+bu koşum onu yazdı ama uygulamadı. **§2'yi sırayla izlediysen zaten uyguladın** — oradaki
+`daemon-reload` + `restart` unit dosyasındaki bu değişikliği de devreye alır. Doğrula:
+
+```bash
+ps -o args= -p "$(systemctl --user show ted-dashboard -p MainPID --value)"
+```
+
+Çıktıda `--worker-class gthread --threads 4` görünüyorsa devrededir. Görünmüyorsa (ya da §2'yi
+atladıysan) uygulamak için:
 
 ```bash
 systemctl --user daemon-reload
