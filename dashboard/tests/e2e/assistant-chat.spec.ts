@@ -1,3 +1,5 @@
+import { createServer } from 'node:http'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
@@ -7,6 +9,65 @@ import type { Page } from '@playwright/test'
 // N elements" error rather than the assertion under test.
 function lastAnswerBody(page: Page) {
   return page.locator('.ac-msg--assistant').last().locator('.ac-msg__content')
+}
+
+// A real, incrementally-delivered SSE responder. Unlike `page.route(...).fulfill()`
+// — which hands the browser a single complete body — this is an actual local
+// HTTP server that writes one frame, waits, writes the next, and so on. That
+// difference is the whole point of the test that uses it: a fulfilled body
+// arrives to the page as one chunk, so every event in it lands in the same
+// synchronous pass and a test can never observe an *intermediate* render (the
+// tool-progress label appearing before the answer). A genuinely staggered
+// response can, because the frontend's `reader.read()` loop really does await
+// between frames — the same way it would against the real backend.
+//
+// CORS is hand-rolled because this server listens on its own ephemeral port,
+// which makes every request to it cross-origin from the page's perspective;
+// AssistantChat.tsx always sends `credentials: 'include'`, so a wildcard
+// `Access-Control-Allow-Origin` will not do — the browser requires the exact
+// requesting origin plus `Access-Control-Allow-Credentials: true`, and a
+// JSON POST triggers a real preflight this server must also answer.
+function startStaggeredSseServer(frames: string[], delayMs = 120) {
+  const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+    const origin = req.headers.origin
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin)
+      res.setHeader('Access-Control-Allow-Credentials', 'true')
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204)
+      res.end()
+      return
+    }
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    })
+    let i = 0
+    const sendNext = () => {
+      if (i >= frames.length) {
+        res.end()
+        return
+      }
+      res.write(frames[i])
+      i += 1
+      setTimeout(sendNext, delayMs)
+    }
+    sendNext()
+  })
+  return new Promise<{ port: number; close: () => Promise<void> }>((resolve, reject) => {
+    server.on('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address()
+      const port = typeof address === 'object' && address ? address.port : 0
+      resolve({
+        port,
+        close: () => new Promise<void>(r => server.close(() => r())),
+      })
+    })
+  })
 }
 
 test('assistant answers render markdown rather than raw syntax', async ({ page }) => {
@@ -372,4 +433,129 @@ test('citations with an unknown kind get their own group, not folded into ogrenc
   // just opened rather than an unscoped locator that matches both.
   await expect(page.locator('.ac-cite__pop').getByText('Bilinmeyen kaynak')).toBeVisible()
   await expect(page.locator('.ac-cite__pop').last()).not.toContainText('undefined')
+})
+
+// The eight tests above all abort '**/api/assistant/stream', which proves the
+// suite is network-free but proves nothing about the stream *consumer* —
+// AssistantChat.tsx's own SSE parsing, its progress indicator, and its
+// "did the stream actually answer" check never run in any of them. This test
+// closes that gap: it answers the stream request for real (via a genuinely
+// staggered local server, not a single fulfilled body — see
+// startStaggeredSseServer's comment for why that distinction matters) and
+// asserts the reader saw the tool progress *and* the streamed answer, not the
+// classic endpoint's mocked one.
+test('the stream is genuinely consumed: tool progress renders, the streamed answer lands, and the classic endpoint is never called', async ({ page }) => {
+  let classicCalls = 0
+  await page.route('**/api/assistant/chat', route => {
+    classicCalls += 1
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        answer: 'YEDEK YOLDAN GELEN CEVAP — bu görünüyorsa akış tüketilmedi demektir.',
+        citations: [], safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
+        meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+      }),
+    })
+  })
+
+  const streamPayload = {
+    answer: 'STREAMMARKERXYZ9K2: kesir çizgisi bir bölme işlemidir [S1].',
+    citations: [{ id: 'S1', kind: 'mufredat', label: 'MEB · kesir', locator: {},
+                  snippet: 'akıştan gelen kaynak', confidence: 0.9 }],
+    safety_flags: [], plan_blocks: [], intent: 'qa', session_id: 'dashboard-default',
+    meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+  }
+  const frames = [
+    'event: tool_start\ndata: {"name":"kazanim_ara"}\n\n',
+    'event: tool_end\ndata: {"name":"kazanim_ara","ok":true,"ms":40}\n\n',
+    `event: answer\ndata: ${JSON.stringify({ payload: streamPayload })}\n\n`,
+    'event: done\ndata: {}\n\n',
+  ]
+  const sse = await startStaggeredSseServer(frames, 150)
+  try {
+    await page.route('**/api/assistant/stream', route =>
+      route.continue({ url: `http://127.0.0.1:${sse.port}/` }))
+
+    await page.goto('/asistan')
+    await page.fill('#ac-input', 'kesirler nasıl anlatılır')
+    await page.getByLabel('Gönder').click()
+
+    // Intermediate proof: the tool_start event was parsed and rendered as
+    // visible progress *before* the answer arrived — only possible if the
+    // frontend is genuinely reading frames as they come in, not just
+    // reacting to one fully-buffered response.
+    await expect(page.getByText('MEB kazanımları aranıyor')).toBeVisible()
+
+    // Final proof: the rendered answer is the stream's, not the classic
+    // endpoint's — and the classic endpoint was never hit.
+    const answerBody = lastAnswerBody(page)
+    await expect(answerBody).toContainText('STREAMMARKERXYZ9K2')
+    await expect(answerBody).not.toContainText('YEDEK YOLDAN GELEN')
+    expect(classicCalls).toBe(0)
+
+    // Settled correctly after `done`: no lingering thinking indicator, no
+    // error banner (a successful stream is not an error path at all).
+    await expect(page.locator('.ac-msg--thinking')).toHaveCount(0)
+    await expect(page.locator('.ac__error')).toHaveCount(0)
+  } finally {
+    await sse.close()
+  }
+})
+
+// The fallback-on-failure behavior is exercised incidentally by every other
+// test in this file (all eight abort the stream) but none of them *asserts*
+// it — they only assert the end state, which would look identical if the
+// fallback logic silently broke and simply happened to render something.
+// This test pins the fallback path directly: a stream that starts, narrates
+// a tool, and then closes without ever emitting `answer` must still leave
+// the reader with a real answer, sourced from the classic endpoint, with no
+// error banner shown (per AssistantChat.tsx's own contract: a successful
+// fallback is not a user-facing error) and a console warning left as the
+// only trace.
+test('a stream that closes mid-flight without an answer falls back to the classic endpoint and still answers the reader', async ({ page }) => {
+  const consoleWarnings: string[] = []
+  page.on('console', msg => {
+    if (msg.type() === 'warning') consoleWarnings.push(msg.text())
+  })
+
+  // Truncated on purpose: tool_start and tool_end arrive, then the response
+  // ends — no `answer`, no `done`. AssistantChat.tsx's `answered` flag stays
+  // false and it must treat this exactly like a network failure.
+  await page.route('**/api/assistant/stream', route => route.fulfill({
+    status: 200,
+    contentType: 'text/event-stream',
+    body: 'event: tool_start\ndata: {"name":"kazanim_ara"}\n\n'
+        + 'event: tool_end\ndata: {"name":"kazanim_ara","ok":true,"ms":40}\n\n',
+  }))
+
+  let classicCalls = 0
+  await page.route('**/api/assistant/chat', route => {
+    classicCalls += 1
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        answer: 'FALLBACKMARKERABC7Q: yedek uçtan gelen cevap.',
+        citations: [], safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
+        meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+      }),
+    })
+  })
+
+  await page.goto('/asistan')
+  await page.fill('#ac-input', 'yarıda kesilen akış')
+  await page.getByLabel('Gönder').click()
+
+  const answerBody = lastAnswerBody(page)
+  await expect(answerBody).toContainText('FALLBACKMARKERABC7Q')
+  expect(classicCalls).toBe(1)
+
+  // A successful fallback is not a user-facing error — no error banner.
+  await expect(page.locator('.ac__error')).toHaveCount(0)
+  await expect(page.locator('.ac-msg--thinking')).toHaveCount(0)
+
+  // But it must not be silent either: a console warning is the one trace
+  // this took the fallback path rather than the primary one.
+  await expect.poll(() => consoleWarnings.some(w => w.includes('akış başarısız'))).toBe(true)
 })
