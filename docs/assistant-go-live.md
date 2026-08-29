@@ -10,7 +10,7 @@ Servis ortamında (`.env` veya systemd `Environment=`) şu değişkenler tanıml
 
 | Değişken | Amaç |
 |---|---|
-| `GEMINI_API_KEY` | Sohbet modeli (Gemini). Yoksa `/v1/chat/completions` **çökmez** — `200` döner, jenerik bir yedek cevap ve `warning:limited_confidence` bayrağıyla (bkz. §10). |
+| `GEMINI_API_KEY` | Sohbet modeli (Gemini). Yoksa `/v1/chat/completions` **çökmez** — `200` döner, jenerik bir yedek cevap ve `warning:limited_confidence` bayrağıyla (bkz. §11). |
 | `MUFREDAT_MCP_API_KEY` | `maarif-mufredat` MCP sunucusu (müfredat/kazanım/ders kitabı araçları). |
 | `EGITIM_KAYNAK_MCP_API_KEY` | `egitim-kaynak` MCP sunucusu (OER arama araçları). |
 | `DASHBOARD_SECRET_KEY` | Flask session imzası; eksikse API import'ta patlar (bkz. `dashboard_api.py`). |
@@ -18,9 +18,56 @@ Servis ortamında (`.env` veya systemd `Environment=`) şu değişkenler tanıml
 
 Not: Ollama'ya ihtiyaç **yoktur**. Sohbet yolu (`GeminiClient`) yalnızca Gemini bulut
 modellerini çağırır; gömme (embedding) tabanlı vektör arama da şu an devre dışıdır (bkz.
-§4) — yani bu iki anahtar dışında yerel bir model sunucusu ayağa kaldırmaya gerek yok.
+§5) — yani bu iki anahtar dışında yerel bir model sunucusu ayağa kaldırmaya gerek yok.
 
-## 1) ⛔ DAĞITIM TUZAĞI — bu adım atlanırsa özellik sessizce ölür
+## 1) Dağıtım: kodu ve arayüzü ana checkout'a al
+
+Servisi besleyen kod ve statik dosyalar bu worktree'de **değil**, ana checkout'ta
+(`/mnt/thunderbolt/workspaces/TED`) yaşar:
+
+- `ExecStart=/mnt/thunderbolt/workspaces/TED/.venv/bin/gunicorn ... src.dashboard_api:app`
+  — Python kodu `WorkingDirectory=/mnt/thunderbolt/workspaces/TED`'den yüklenir.
+- SPA, aynı checkout'un `dashboard-dist/` dizininden sunulur (`dashboard_api.py`'deki
+  `DIST_DIR = PROJECT_ROOT / "dashboard-dist"`).
+
+**Ölçülen gerçek:** bu dokümanın anlattığı asistan (Gemini sohbet yolu, MCP araç kaydı,
+`meta.degraded`, atıf çipleri, SSE akışı) `feat/assistant-mufredat-grounding` dalında
+yaşıyor. Ana checkout şu an `feat/carbon-token-fidelity` dalında duruyor ve bu özelliği
+**içermiyor**:
+
+```
+git -C /mnt/thunderbolt/workspaces/TED cat-file -e feat/carbon-token-fidelity:src/assistant_tools.py
+# -> "fatal: path 'src/assistant_tools.py' exists on disk, but not in 'feat/carbon-token-fidelity'"
+git -C /mnt/thunderbolt/workspaces/TED show feat/carbon-token-fidelity:src/dashboard_api.py | grep -c degraded
+# -> 0
+```
+
+Yani `.env`'e anahtar eklemek ve servisi restart etmek **tek başına yeterli değil**: ana
+checkout'taki kod hâlâ eskiyse, §2'deki `curl` doğrulaması `meta.degraded` alanı
+bulunmadığı için hata verir (ya da bir ara sürümde alan `None` döner) — ikisi de "sorun
+yok, degradasyon yok" anlamına **gelmez**; "yeni kod henüz dağıtılmadı" anlamına gelir
+(bkz. §2'nin doğrulama notu). Her şey "başarılı" görünse bile kod eskiyse ortada yeni
+asistan yoktur — MCP araçları, atıf çipleri, kaynak paneli, SSE akışının hiçbiri o kodda
+yok.
+
+Bu dalın ana checkout'a hangi yolla (`git merge`, rebase, cherry-pick) ve hangi hedef
+dala alınacağı — `feat/carbon-token-fidelity` mi, `main` mı — **kullanıcının kararıdır**;
+bu doküman karar vermez. Adımlar (yaz, çalıştırma — ana checkout'a girmek ve
+`npm run build` çalıştırmak bu runbook'un yetkisinde değil):
+
+```bash
+cd /mnt/thunderbolt/workspaces/TED
+git merge feat/assistant-mufredat-grounding
+cd dashboard && npm run build
+cd ..
+```
+
+`npm run build` (`tsc -b && vite build`) `dashboard-dist/`'i günceller; SPA statik
+dosyaları oradan sunulur — derlenmezse arayüz eski kalır, backend'in kabul ettiği yeni
+uç noktalar (ör. `/v1/chat/completions`'ın SSE varyantı) olsa bile arayüz onları hiç
+çağırmaz. Ancak bundan sonra §2'deki `.env` anahtarları + restart + doğrulama adımına geç.
+
+## 2) ⛔ DAĞITIM TUZAĞI — bu adım atlanırsa özellik sessizce ölür
 
 Servis (`~/.config/systemd/user/ted-dashboard.service`) ortamını `EnvironmentFile=.env`'den
 alıyor. `MUFREDAT_MCP_API_KEY` ve `EGITIM_KAYNAK_MCP_API_KEY` geliştirme makinesinde
@@ -51,6 +98,11 @@ curl -s -H "Authorization: Bearer $ASSISTANT_API_KEY" -H "Content-Type: applicat
 
 Beklenen: `degraded: []`. Boş değilse `.env`'i kontrol et, tekrar başlat, tekrar dene.
 
+**`meta.degraded` alanı hiç yoksa** (yukarıdaki `python -c` `KeyError` ile patlarsa) **veya
+`degraded: None` dönerse, bu "degradasyon yok, her şey sağlıklı" demek DEĞİLDİR** —
+çalışan kodun bu alanı henüz üretmediği, yani §1'deki gibi ana checkout'un hâlâ eski
+(bu özelliği içermeyen) bir dalda olduğu anlamına gelir. Önce §1'i tekrar kontrol et.
+
 **⚠️ Bir yerel `python -c "from src.assistant_tools import build_registry; ..."` çağrısı
 bunun yerine geçmez — tuzağın kendisine düşer.** `src/assistant_tools.py` hiçbir yerde
 `.env`'i yüklemiyor (`load_env()` çağrısı orada yok — yalnız `dashboard_api.py`,
@@ -76,7 +128,7 @@ print('araçlar:', len(reg.declarations()), '| degraded:', reg.degraded())
 Bu, sistemin `.env` dosyasının kendisinde ne olduğuna en yakın yerel tahmindir, ama yine
 de bir tahmindir — asıl kanıt yukarıdaki HTTP kontrolüdür.
 
-## 2) MCP sağlık kontrolü (araç adları)
+## 3) MCP sağlık kontrolü (araç adları)
 
 `/v1/chat/completions` yalnız `degraded` listesini döner, hangi araçların yüklendiğini
 değil. Araç adlarını görmek istersen aynı `env -u` uyarısı burada da geçerlidir — bu komut
@@ -92,10 +144,10 @@ print('degraded:', reg.degraded())
 ```
 
 Beklenen (iki anahtar da gerçekten mevcutsa): 10 araç adı (`ogrenci_verisi_ara` + 9 MCP
-aracı), boş `degraded`. Go-live kararı için §1'deki HTTP kontrolüne güven; bu komut yalnız
+aracı), boş `degraded`. Go-live kararı için §2'deki HTTP kontrolüne güven; bu komut yalnız
 hangi araçların tanımlandığını incelemek için bir geliştirici aracıdır.
 
-## 3) Model zinciri kontrolü
+## 4) Model zinciri kontrolü
 
 ```bash
 python -c "from src.assistant_core import GeminiClient; print(GeminiClient.FAST_MODELS, GeminiClient.DEEP_MODELS)"
@@ -108,7 +160,7 @@ nedeniyle zincirden çıkarıldı (bkz. `assistant_core.py` içindeki yorum). İ
 `model` alanı **kozmetiktir** — `/v1/chat/completions` onu okumaz, her zaman bu sabit
 zincirden seçer; `/v1/models` de yalnız `FAST_MODELS`'i listeler.
 
-## 4) Bilgi tabanı indeksi (reindex)
+## 5) Bilgi tabanı indeksi (reindex)
 
 ```bash
 python src/reindex_assistant.py --full
@@ -126,7 +178,7 @@ kelime) üzerinden çalışır. Hiçbir adımda Ollama çağrılmaz. Bu yüzden
 (`embedded_chunks<=0`) — go-live gate'i olarak kullanma; yukarıdaki `--require-embeddings`'siz
 komut yeterli doğrulamadır.
 
-## 5) Servis: neden `gthread`
+## 6) Servis: neden `gthread`
 
 Servis dosyası `--workers 2 --worker-class gthread --threads 4` kullanıyor (varsayılan
 senkron worker değil). Gerekçe ölçüldü: sync worker'da uzun süren bir SSE isteği tek worker'ı
@@ -161,11 +213,11 @@ systemctl --user status ted-dashboard
 journalctl --user -u ted-dashboard -n 50 --no-pager
 ```
 
-`gthread`'e geri dönmek zorunlu değil — `sync` worker ile servis yine çalışır, yalnız §5'in
+`gthread`'e geri dönmek zorunlu değil — `sync` worker ile servis yine çalışır, yalnız §6'nın
 başındaki eşzamanlılık kazanımını kaybedersin (uzun bir SSE isteği sırasında diğer istekler
 yeniden bloklanır).
 
-## 6) API smoke test
+## 7) API smoke test
 
 ```bash
 python src/assistant_ops.py smoke \
@@ -181,9 +233,9 @@ Doğrular:
 - `/v1/chat/completions` minimal payload `200`
 - `plan=true` çağrısında `plan_blocks` dolu
 
-`--model` bayrağı isteğe eklenen etikettir, backend model seçimini etkilemez (§3).
+`--model` bayrağı isteğe eklenen etikettir, backend model seçimini etkilemez (§4).
 
-## 7) CureoHub senaryo doğrulaması
+## 8) CureoHub senaryo doğrulaması
 
 ```bash
 python src/assistant_ops.py validate-cureohub \
@@ -202,7 +254,7 @@ Kontrol edilenler:
 - Kaynak-yok durumda limited-confidence sinyali
 - Riskli içerikte safety flag
 
-## 8) Degradasyon beklentisi
+## 9) Degradasyon beklentisi
 
 MCP anahtarlarından biri veya ikisi de servise ulaşmıyorsa asistan çökmez: çalışmaya devam
 eder, yalnız yerel okul verisiyle (`ogrenci_verisi_ara`) yanıt verir ve arayüzde rozet
@@ -216,10 +268,10 @@ degraded: ['egitim-kaynak', 'maarif-mufredat']
 ```
 
 Bu bir arıza değil, tasarlanmış davranıştır — sistem sağlıklı numarası yapmaz, her sunucuyu
-adıyla degraded ilan eder. Ama **rozet arızayı görünür kılar, gidermez**: §1'deki kontrolü
+adıyla degraded ilan eder. Ama **rozet arızayı görünür kılar, gidermez**: §2'deki kontrolü
 her dağıtımdan sonra çalıştır.
 
-## 9) Metrikler ve prompt replay
+## 10) Metrikler ve prompt replay
 
 ```bash
 python src/assistant_ops.py metrics \
@@ -246,7 +298,7 @@ python src/assistant_ops.py replay \
 
 Rapor `output/assistant_eval_<tag>.json` altına yazılır.
 
-## 10) Sorun giderme
+## 11) Sorun giderme
 
 - **Auth sorunu:**
 
@@ -274,7 +326,7 @@ Rapor `output/assistant_eval_<tag>.json` altına yazılır.
   `GEMINI_API_KEY` runtime kurulumunu bozmaz, yalnızca `GeminiClient.available`'ı
   `False` yapar.
 
-- **Müfredat/OER araçları yok:** §1'deki dağıtım tuzağı — `.env`'de MCP anahtarlarını
+- **Müfredat/OER araçları yok:** §2'deki dağıtım tuzağı — `.env`'de MCP anahtarlarını
   kontrol et (HTTP tabanlı doğrulamayı kullan, kabuktan çalıştırılan çıplak `build_registry`
   kontrolünü değil).
 
@@ -291,7 +343,7 @@ Rapor `output/assistant_eval_<tag>.json` altına yazılır.
   journalctl --user -u ted-dashboard -f
   ```
 
-## 11) OpenAI-uyumlu istek/yanıt örneği
+## 12) OpenAI-uyumlu istek/yanıt örneği
 
 Request:
 
@@ -308,11 +360,11 @@ Request:
 }
 ```
 
-**`model` alanı sunucu tarafında hiç okunmaz** (§3) — `openai_chat_completion` içinde
+**`model` alanı sunucu tarafında hiç okunmaz** (§4) — `openai_chat_completion` içinde
 `request_data.get("model")` çağrısı yoktur. Ölçüldü: `"model": "totally-bogus-model-xyz"`
 gönderildiğinde yanıt `gemini-3.7-flash` ile geldi; istekteki değerle hiçbir ilişkisi yok.
 Yanıttaki `model`/`meta.model` isteğin *kopyası* değil, `GeminiClient`'ın o çağrı için
-**gerçekten seçtiği** modeldir (§3'teki sabit `FAST_MODELS`/`DEEP_MODELS` zincirinden).
+**gerçekten seçtiği** modeldir (§4'teki sabit `FAST_MODELS`/`DEEP_MODELS` zincirinden).
 
 Response (özet — `meta.model` gerçek seçim, yukarıdaki istekteki `model` değeriyle
 karıştırılmamalı):
