@@ -55,20 +55,13 @@ export default function HomeworkTracker() {
     return () => clearInterval(t)
   }, [])
 
-  // Sort by deadline descending (furthest first)
-  const sorted = [...(hwData.homework || [])].sort((a, b) => {
-    const aDate = parseDeadline(a["Ödev Son Teslim Tarihi"])
-    const bDate = parseDeadline(b["Ödev Son Teslim Tarihi"])
-    return (bDate?.getTime() || 0) - (aDate?.getTime() || 0)
-  })
-
   const grouped = useMemo(() => {
     const aktif: HomeworkItem[] = []
     const yapilan: HomeworkItem[] = []
     const tamamlanan: HomeworkItem[] = []
     const yapilmayan: HomeworkItem[] = []
 
-    for (const hw of sorted) {
+    for (const hw of (hwData.homework || [])) {
       const normalized = normalizeStatus(hw["Ödev Durumu"])
       const teacherResolved = isTeacherResolvedStatus(normalized)
 
@@ -96,22 +89,33 @@ export default function HomeworkTracker() {
       }
     }
 
+    // Two orders, because the groups answer two different questions.
+    // Work still to do is sorted nearest-deadline-first: the thing due
+    // tomorrow has to be reachable without scrolling past four things due
+    // next month (İ2, İ3). Everything settled is history, and history reads
+    // newest-first.
+    const byDeadline = (dir: 1 | -1) => (a: HomeworkItem, b: HomeworkItem) => {
+      const at = parseDeadline(a["Ödev Son Teslim Tarihi"])?.getTime()
+      const bt = parseDeadline(b["Ödev Son Teslim Tarihi"])?.getTime()
+      // A row with no readable deadline sinks in both orders rather than
+      // sorting as 1970 (nearest) or as the far future (least urgent).
+      if (at === undefined && bt === undefined) return 0
+      if (at === undefined) return 1
+      if (bt === undefined) return -1
+      return (at - bt) * dir
+    }
+    aktif.sort(byDeadline(1))
+    for (const past of [yapilan, tamamlanan, yapilmayan]) past.sort(byDeadline(-1))
+
     return { aktif, yapilan, tamamlanan, yapilmayan }
-  }, [sorted])
+  }, [hwData.homework])
 
   const { aktif, yapilan, tamamlanan, yapilmayan } = grouped
 
-  // The list is ordered furthest-deadline-first on purpose, so its head is the
-  // least urgent item. The one named step has to pick the nearest itself (İ1).
-  const nextHw = useMemo(() => {
-    let best: HomeworkItem | null = null
-    let bestTime = Number.MAX_SAFE_INTEGER
-    for (const hw of aktif) {
-      const t = parseDeadline(hw["Ödev Son Teslim Tarihi"])?.getTime() ?? Number.MAX_SAFE_INTEGER
-      if (t < bestTime) { bestTime = t; best = hw }
-    }
-    return best
-  }, [aktif])
+  // The list now leads with the nearest deadline, so its head is the one
+  // named step (İ1). This used to scan for the minimum because the list was
+  // ordered the other way round.
+  const nextHw = aktif[0] ?? null
 
   // Exams share this surface because they are the same thing to Işık: work she
   // owes with a date on it. Only the ones still ahead — the settled ones are

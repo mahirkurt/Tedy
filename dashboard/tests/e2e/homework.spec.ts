@@ -107,3 +107,23 @@ test('the next step is the nearest deadline, not the first row', async ({ page }
   await expect(page.locator('.next-thing')).toContainText('Fen Bilimleri')
   await expect(page.locator('.next-thing')).not.toContainText('Türkçe')
 })
+
+test('the work due soonest is at the top of the list, not the bottom', async ({ page }) => {
+  // The list used to be ordered furthest-deadline-first, so the most urgent
+  // item sat at the bottom of the screen. For a reader who overestimates how
+  // long things take, the thing due tomorrow is the thing that has to be
+  // visible without scrolling (İ2, İ3).
+  await open(page, [
+    pending({ 'Ders Adı': 'Türkçe', 'Ödev Başlığı': 'Okuma',
+              'Ödev Son Teslim Tarihi': '25.09.2026 23:59' }),
+    pending({ 'Ders Adı': 'Fen Bilimleri', 'Ödev Başlığı': '3 soru',
+              'Ödev Son Teslim Tarihi': '16.09.2026 23:59' }),
+    pending({ 'Ders Adı': 'Matematik', 'Ödev Başlığı': 'Sayfa 165',
+              'Ödev Son Teslim Tarihi': '20.09.2026 23:59' }),
+  ])
+
+  const courses = await page.locator('.homework-item__course, .homework-item strong')
+    .allInnerTexts()
+  const seen = courses.map(c => c.trim()).filter(Boolean)
+  expect(seen.slice(0, 3)).toEqual(['Fen Bilimleri', 'Matematik', 'Türkçe'])
+})

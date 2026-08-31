@@ -429,8 +429,25 @@ birleştirmesinden önce yapılırsa Program evsiz kalıyor; birleştirme önce 
 | Odak kipi ödev adını ve teslimini gizliyor — "Türkçe [Yaptım]" | İşler |
 | `formatTurkishDate` tanımadığı girdiyi **olduğu gibi döndürüyor** | tüm tarihler |
 | Sonraki adım listenin başını alıyor, liste ise en uzak-önce sıralı | İşler |
+| Liste **tamamen** en uzak-önce sıralı — en acil iş en altta | İşler |
 | Profil alanları 12'de sessizce kırpılıyor | Profil |
 | Ray kalkınca kapalı nav'ın kenarlığı 1px ekranda kalıyor | kabuk |
+
+**Sıralama kararı (2026-08-31).** İlk düzeltme yalnız *kartı* en yakın teslime
+bağlamıştı; liste hâlâ en uzak-önce sıralıydı, çünkü bu CLAUDE.md'de belgelenmiş
+bir ürün tercihiydi. Tek taraflı çevirmedim, kullanıcıya sordum — ve onay
+geldi. Şimdi sıralama **grup başına**:
+
+| Grup | Sıra | Gerekçe |
+|---|---|---|
+| `aktif` | en yakın teslim önce | Yarın teslim edilecek iş, gelecek ay teslim edilecek dördünü kaydırmadan görünmeli (İ2, İ3) |
+| `yapilan` · `tamamlanan` · `yapilmayan` | en yeni önce | Bunlar geçmiştir; geçmiş en yeniden okunur |
+
+Okunamayan teslim tarihi taşıyan satır iki sırada da **dibe iner** — 1970 (en
+yakın) ya da uzak gelecek (en az acil) gibi sıralanmaz. `nextHw` artık
+`aktif[0]`; en küçüğü arayan tarama gerekmiyor. Yan etki: sıralama memo'nun
+içine girdi — dışarıdayken her render'da yeni dizi ürettiği için `useMemo`
+hiçbir zaman bellemiyordu.
 
 **Doğrulama notu:** tam süit çıktısı `tail -1` ile okunmamalı — Playwright
 başarısızlığı geçenlerin **üstüne** yazar. Çıkış koduna bakılır.
