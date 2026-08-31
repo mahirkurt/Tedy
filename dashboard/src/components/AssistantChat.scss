@@ -203,14 +203,12 @@
   font-variant-numeric: tabular-nums;
 }
 
-@keyframes ac-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.ac-msg--thinking .cds--skeleton {
-  animation: ac-pulse 1.8s ease-in-out infinite;
-}
+// No pulse override here on purpose. Carbon's SkeletonText emits
+// `cds--skeleton__text`, never a bare `cds--skeleton`, so the rule that used
+// to live here matched nothing — and reviving it against the real class would
+// have put a third animation (opacity pulse) on a row that already has
+// Carbon's own shimmer and a spinning InlineLoading beside it. Stimulus is a
+// budget (İ6); the shimmer alone already says "working".
 
 .ac-msg--thinking .cds--skeleton__text {
   background: theme.$ai-skeleton-background;
@@ -431,6 +429,25 @@
   font-size: 0.8125rem;
   color: theme.$text-secondary;
   line-height: 1.4;
+}
+
+// Every group carries a left rule so the unclassified one differs by colour
+// rather than by suddenly gaining a border nobody else has — the shape stays
+// constant, only the state changes (İ8).
+.ac__ref-group {
+  border-inline-start: 2px solid transparent;
+  padding-inline-start: var(--ted-space-xs);
+}
+
+// An authority we could not identify. Carbon's warning support colour, not a
+// bespoke hex (D1), and it reads before the heading does — which is the
+// point: the header is what an inattentive reader skips.
+.ac__ref-group--unclassified {
+  border-inline-start-color: var(--ted-support-warning);
+}
+
+.ac__ref-group--unclassified .ac__ref-group-title {
+  color: theme.$text-primary;
 }
 
 .ac__ref-group-title {

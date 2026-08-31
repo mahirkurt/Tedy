@@ -35,14 +35,18 @@ function RefGroup({
   items,
   activeId,
   activeRef,
+  unclassified = false,
 }: {
   title: string
   items: AssistantCitation[]
   activeId: string | null
   activeRef: RefObject<HTMLLIElement | null>
+  /** Marks the group as an authority we could not identify (İ8: the colour
+   *  encodes that state, not another taxonomy entry). */
+  unclassified?: boolean
 }) {
   return (
-    <section className="ac__ref-group">
+    <section className={`ac__ref-group${unclassified ? ' ac__ref-group--unclassified' : ''}`}>
       <h5 className="ac__ref-group-title">{title}</h5>
       <ul className="ac__ref-list">
         {items.map(c => (
@@ -116,6 +120,7 @@ export default function SourcePanel({ citations, activeId }: Props) {
           items={unclassified}
           activeId={activeId}
           activeRef={activeRef}
+          unclassified
         />
       )}
     </Tile>

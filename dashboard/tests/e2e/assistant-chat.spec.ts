@@ -559,3 +559,84 @@ test('a stream that closes mid-flight without an answer falls back to the classi
   // this took the fallback path rather than the primary one.
   await expect.poll(() => consoleWarnings.some(w => w.includes('akış başarısız'))).toBe(true)
 })
+
+// D2, the accessibility floor. The chip's accessible name carries the source
+// kind and label, but what the source actually SAYS lives only in the hover
+// popover — so a screen-reader user reaching the citation hears which book
+// was cited and never a word of what it claimed. The snippet has to be
+// associated with the control, not merely positioned next to it.
+test('a citation chip is described by the snippet, not just named by its label', async ({ page }) => {
+  await page.route('**/api/assistant/stream', route => route.abort())
+  await page.route('**/api/assistant/chat', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      answer: 'Kesirler böyle çalışır [S1].',
+      citations: [{
+        id: 'S1', kind: 'mufredat', label: 'MEB · kesirler',
+        locator: {}, snippet: 'Payda eşitlenerek toplanır.', confidence: 0.9,
+      }],
+      safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
+      meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+    }),
+  }))
+
+  await page.goto('/asistan')
+  await page.fill('#ac-input', 'kesirler')
+  await page.getByLabel('Gönder').click()
+
+  const chip = lastAnswerBody(page).locator('.ac-cite')
+  await expect(chip).toHaveAttribute('aria-label', 'MEB müfredatı: MEB · kesirler')
+
+  // Resolve the description the way an assistive technology would: follow
+  // aria-describedby to the element it names and read that element's text.
+  const describedBy = await chip.getAttribute('aria-describedby')
+  expect(describedBy, 'chip has no aria-describedby').toBeTruthy()
+  const description = page.locator(`#${describedBy}`)
+  await expect(description).toHaveText('Payda eşitlenerek toplanır.')
+})
+
+// İ8: colour encodes state, not taxonomy. A citation whose kind the frontend
+// does not recognise already gets its own labelled group, but it was styled
+// exactly like a verified authority — so "MEB says so" and "we do not know
+// where this came from" were distinguishable only by reading the group
+// header, which is the first thing an inattentive reader skips.
+test('an unrecognised source group looks different from a verified one', async ({ page }) => {
+  await page.route('**/api/assistant/stream', route => route.abort())
+  await page.route('**/api/assistant/chat', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      answer: 'Bilinen [S1] ve bilinmeyen [S2].',
+      citations: [
+        { id: 'S1', kind: 'mufredat', label: 'MEB · kesirler',
+          locator: {}, snippet: 'kazanım', confidence: 0.9 },
+        { id: 'S2', kind: 'yepyeni_kaynak', label: 'Bilinmeyen',
+          locator: {}, snippet: 'içerik', confidence: 0.5 },
+      ],
+      safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
+      meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+    }),
+  }))
+
+  await page.goto('/asistan')
+  await page.fill('#ac-input', 'kesirler')
+  await page.getByLabel('Gönder').click()
+
+  const panel = page.locator('.ac__panel')
+  await expect(panel.getByText('Sınıflandırılmamış kaynak')).toBeVisible()
+
+  // Both groups render, and the unclassified one carries a distinct marker
+  // rather than relying on its heading text alone.
+  await expect(panel.locator('.ac__ref-group')).toHaveCount(2)
+  const unknown = panel.locator('.ac__ref-group--unclassified')
+  await expect(unknown).toHaveCount(1)
+  await expect(unknown).toContainText('Bilinmeyen')
+
+  // The difference has to be visible, not merely present in the class list.
+  const knownBorder = await panel.locator('.ac__ref-group').first()
+    .evaluate(el => getComputedStyle(el).borderLeftColor)
+  const unknownBorder = await unknown
+    .evaluate(el => getComputedStyle(el).borderLeftColor)
+  expect(unknownBorder).not.toBe(knownBorder)
+})
