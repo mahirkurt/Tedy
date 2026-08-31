@@ -119,20 +119,27 @@ export default function StudentProfile() {
               {profile.class_name && <Tag type="teal">Sınıf: {profile.class_name}</Tag>}
               {profile.branch && <Tag type="purple">Şube: {profile.branch}</Tag>}
             </div>
-            {!!profile.scraped_at && (
-              <p className="student-profile__sync">
-                TED Connect sync: {new Date(profile.scraped_at).toLocaleString('tr-TR')}
-              </p>
-            )}
-            {Object.entries(profile.fields || {}).length > 0 && (
+            {/* The sync timestamp lived here in English as "TED Connect sync".
+                It is operator detail on the one page that is about Işık rather
+                than about her work, and the header's health popover already
+                carries it. */}
+            {Object.entries(profile.fields || {}).length > 0 ? (
               <div className="student-profile__fields">
-                {Object.entries(profile.fields).slice(0, 12).map(([k, v]) => (
+                {/* Every field, not the first twelve: the old cap dropped the
+                    rest without saying so, and a profile that quietly omits
+                    part of itself is the shape of defect this dashboard keeps
+                    turning up (D3). */}
+                {Object.entries(profile.fields).map(([k, v]) => (
                   <div key={k} className="student-profile__field">
                     <span className="student-profile__field-key">{k}</span>
                     <span className="student-profile__field-val">{v}</span>
                   </div>
                 ))}
               </div>
+            ) : (
+              <EmptyLine>
+                Portaldan öğrenci bilgisi gelmedi.
+              </EmptyLine>
             )}
           </div>
         </div>
