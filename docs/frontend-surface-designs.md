@@ -406,16 +406,34 @@ Odak, gürültüyü azaltan bir tercih değil, **bir çalışma kipidir**.
 
 Sıra, en çok kazandırandan başlar ve her adım tek başına sevk edilebilir:
 
-| # | İş | Neden önce |
+| # | İş | Durum |
 |---|---|---|
-| 1 | Bugün'ün boş durum kartı → §2.3 | Uygulanan ekranı bitirir |
-| 2 | **İşler** birleştirme + ham damga temizliği | En çok ölçülmüş kusur burada, D4 ihlali dahil |
-| 3 | Ortak kalıplar (§2) bileşen olarak | Sonraki her yüzeyi ucuzlatır |
-| 4 | Nav 13 → 5 + etiketler | Her sayfaya dokunur, kalıplar oturduktan sonra |
-| 5 | Dersler birleştirme | İkinci büyük birleştirme |
-| 6 | Notlar · Takvim · Takımlar · İlerleme · Duyurular | Kalıplar hazırken hızlı |
-| 7 | Odak kipi | Diğerleri oturmadan anlamsız |
-| 8 | Profil | En az kusurlu |
+| 1 | Bugün'ün boş durum kartı → §2.3 | ✅ |
+| 2 | **İşler** birleştirme + ham damga temizliği | ✅ |
+| 3 | Ortak kalıplar (§2) bileşen olarak | ✅ zaman + boş durum; bölüm başlığı ikinci tüketici çıkınca |
+| 4 | Dersler birleştirme | ✅ |
+| 5 | Nav 13 → 5 + görünür etiketler | ✅ |
+| 6 | Notlar · Takvim · Takımlar · İlerleme · Duyurular | ✅ |
+| 7 | Odak kipi | ✅ |
+| 8 | Profil | ✅ |
+
+**Sıra değişikliği:** 4 ve 5 yer değiştirdi. Nav indirgemesi Dersler
+birleştirmesinden önce yapılırsa Program evsiz kalıyor; birleştirme önce gelmeli.
+
+**Uygulama sırasında ölçülen, dokümanda olmayan kusurlar** — hepsi düzeltildi:
+
+| Bulgu | Yüzey |
+|---|---|
+| Dört yüzey boşken `null` döndürüyor, sayfa bomboş açılıyor (D3) | Takımlar · Duyurular · Dersler×2 |
+| "…yükleniyor" metni **boş dalı** — kalıcı boş liste sonsuza dek "bekle" diyor | İlerleme |
+| Odak kipi ödev adını ve teslimini gizliyor — "Türkçe [Yaptım]" | İşler |
+| `formatTurkishDate` tanımadığı girdiyi **olduğu gibi döndürüyor** | tüm tarihler |
+| Sonraki adım listenin başını alıyor, liste ise en uzak-önce sıralı | İşler |
+| Profil alanları 12'de sessizce kırpılıyor | Profil |
+| Ray kalkınca kapalı nav'ın kenarlığı 1px ekranda kalıyor | kabuk |
+
+**Doğrulama notu:** tam süit çıktısı `tail -1` ile okunmamalı — Playwright
+başarısızlığı geçenlerin **üstüne** yazar. Çıkış koduna bakılır.
 
 **Her adımın sonunda** ilkeler dokümanının §10 kapıları koşulur ve ekran
 görüntüsüyle doğrulanır.
