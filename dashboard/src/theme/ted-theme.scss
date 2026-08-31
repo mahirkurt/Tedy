@@ -226,6 +226,16 @@ body {
   }
 }
 
+// Below that width the nav is summoned rather than resident, and Carbon
+// collapses it to zero width — but its right border stays, leaving a one-pixel
+// sliver of navigation on screen. Measured at 320px: x 0, width 1px, all
+// border. Nothing should be visible when the menu is closed.
+@media (max-width: 65.98rem) {
+  .cds--side-nav:not(.cds--side-nav--expanded) {
+    border-inline-end: 0;
+  }
+}
+
 // ─── Layout Utilities ────────────────────────────────────────────────────────
 .stack-xs {
   display: flex;
