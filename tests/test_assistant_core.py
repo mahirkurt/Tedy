@@ -2,6 +2,7 @@ import json
 import os
 import threading
 import time
+from types import SimpleNamespace
 from pathlib import Path
 
 from src.assistant_core import AssistantRuntime, GeminiClient
@@ -480,3 +481,60 @@ def test_concurrent_chat_events_do_not_leak_dispatch_between_calls(tmp_path, mon
         for events in events_by_thread.values()
     }
     assert seen_tools == {"TOOL_FIRST", "TOOL_SECOND"}
+
+
+def test_abandoned_stream_stops_the_worker_at_the_next_tool_boundary(tmp_path, monkeypatch):
+    """A reader who thinks the assistant is stuck presses "yeniden üret" or
+    navigates away. The SSE response is torn down, but the worker thread
+    running chat() is a daemon that nobody was telling to stop — so it kept
+    going through the whole remaining tool loop, spending Gemini turns and
+    MCP calls on an answer no one would ever see. With four gthread workers
+    and an impatient reader that compounds into several abandoned loops at
+    once.
+
+    Cancellation is cooperative and checked at tool boundaries, which is the
+    only hook chat_events() actually has: an HTTP call already in flight
+    still finishes. This pins the bound — after the consumer stops reading,
+    at most the in-flight tool completes and no further tool runs.
+    """
+    (tmp_path / "output").mkdir()
+    runtime = AssistantRuntime(tmp_path)
+
+    dispatched: list[str] = []
+    reached_end = threading.Event()
+
+    def many_tools(*, dispatch, **kwargs):
+        for i in range(6):
+            dispatch(f"tool_{i}", {})
+            time.sleep(0.05)
+        reached_end.set()
+        return ToolLoopResult(text="TEST_ANSWER", citations=[])
+
+    def counting_dispatch(name, args):
+        dispatched.append(name)
+        return SimpleNamespace(ok=True, payload={}, error=None)
+
+    monkeypatch.setattr(runtime.registry, "declarations", lambda: [])
+    monkeypatch.setattr(runtime.registry, "degraded", lambda: [])
+    monkeypatch.setattr(runtime.registry, "dispatch", counting_dispatch)
+    monkeypatch.setattr(runtime.gemini, "chat_with_tools", many_tools)
+
+    stream = runtime.chat_events(
+        messages=[{"role": "user", "content": "kesir"}], session_id="s1")
+
+    # Consume just the first event, then abandon the generator the way a
+    # disconnected SSE client does.
+    first = next(stream)
+    assert first["event"] == "tool_start"
+    stream.close()
+
+    # Give the worker more than enough time to have run the remaining five
+    # tools had nothing stopped it.
+    time.sleep(0.6)
+
+    assert not reached_end.is_set(), (
+        "chat() ran to completion after the client went away — "
+        "the abandoned stream is still spending model turns")
+    assert len(dispatched) <= 2, (
+        f"{len(dispatched)} tools ran after the client disconnected "
+        f"({dispatched}); cancellation should stop at the next boundary")

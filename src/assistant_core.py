@@ -90,6 +90,16 @@ _SEMANTIC_JSON_FILES = {
 }
 
 
+class _StreamAbandoned(Exception):
+    """Raised inside a chat_events() worker when the consumer has gone away.
+
+    Cancellation is cooperative and can only be checked where chat_events()
+    has a hook: the dispatch wrapper, i.e. at tool boundaries. A model or
+    tool call already in flight still runs to completion — the bound is one
+    in-flight operation, not zero.
+    """
+
+
 @dataclass
 class AssistantConfig:
     project_root: Path
@@ -1515,14 +1525,23 @@ class AssistantRuntime:
         events: "queue.Queue[dict[str, Any] | object]" = queue.Queue()
         _DONE = object()
 
+        # Set when the consumer stops reading — either normally, or because
+        # the SSE client went away and the generator was closed. See the
+        # try/finally around the drain loop below.
+        cancelled = threading.Event()
+
         # Read once, per call — never assigned back onto the registry.
         real_dispatch = self.registry.dispatch
 
         def announcing(name: str, args: dict[str, Any]) -> Any:
+            if cancelled.is_set():
+                raise _StreamAbandoned()
             events.put({"event": "tool_start", "name": name})
             outcome = real_dispatch(name, args)
             events.put({"event": "tool_end", "name": name,
                         "ok": bool(outcome.ok)})
+            if cancelled.is_set():
+                raise _StreamAbandoned()
             return outcome
 
         outcome_box: dict[str, Any] = {}
@@ -1530,6 +1549,11 @@ class AssistantRuntime:
         def run() -> None:
             try:
                 outcome_box["payload"] = self.chat(dispatch=announcing, **kwargs)
+            except _StreamAbandoned:
+                # Nobody is listening. Not an error, and deliberately not
+                # recorded in outcome_box — there is no caller left to
+                # re-raise it to.
+                pass
             except BaseException as exc:  # noqa: BLE001 — re-raised on the caller's thread below
                 outcome_box["error"] = exc
             finally:
@@ -1539,11 +1563,19 @@ class AssistantRuntime:
             target=run, name="assistant-chat-events", daemon=True)
         worker.start()
 
-        while True:
-            item = events.get()
-            if item is _DONE:
-                break
-            yield item
+        try:
+            while True:
+                item = events.get()
+                if item is _DONE:
+                    break
+                yield item
+        finally:
+            # Runs on the normal path (where the worker has already
+            # finished and this is a no-op) and on GeneratorExit, which is
+            # what a disconnected SSE client raises at the yield above.
+            # Without it the worker kept running the whole remaining tool
+            # loop for an answer nobody would read.
+            cancelled.set()
 
         worker.join()
 
