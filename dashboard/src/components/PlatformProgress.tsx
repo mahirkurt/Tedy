@@ -1,8 +1,9 @@
-import { ProgressBar, Tag, InlineNotification, Accordion, AccordionItem, Link } from '@carbon/react'
+import { ProgressBar, Tag, InlineNotification, Accordion, AccordionItem, Link, SkeletonText } from '@carbon/react'
 import { ChartBar, CheckmarkFilled, CloseFilled, Launch } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import type { ECVideo, A3KLesson, SebitHomework } from '../types'
+import { EmptyLine } from './patterns/EmptyLine'
 
 interface ECData {
   total_videos?: number
@@ -28,10 +29,11 @@ function DifficultyTag({ level }: { level: number }) {
   return <Tag type={type} size="sm">Seviye {level}</Tag>
 }
 
+
 export default function PlatformProgress() {
-  const { data: ec } = useApi<ECData>('/api/progress/ec', {})
-  const { data: a3k } = useApi<A3KData>('/api/progress/a3k', {})
-  const { data: sebit } = useApi<SebitData>('/api/sebit', {})
+  const { data: ec, loading: ecLoading } = useApi<ECData>('/api/progress/ec', {})
+  const { data: a3k, loading: a3kLoading } = useApi<A3KData>('/api/progress/a3k', {})
+  const { data: sebit, loading: sebitLoading } = useApi<SebitData>('/api/sebit', {})
   const { focusMode } = useFocusMode()
 
   const platforms = [
@@ -106,7 +108,11 @@ export default function PlatformProgress() {
                   ))}
                 </div>
               ) : (
-                <p className="dashboard-empty-text">Video listesi yükleniyor…</p>
+                ecLoading ? (
+                  <SkeletonText paragraph lineCount={3} />
+                ) : (
+                  <EmptyLine>Henüz izlenmiş video yok.</EmptyLine>
+                )
               )}
             </AccordionItem>
           )
@@ -159,7 +165,11 @@ export default function PlatformProgress() {
                   ))}
                 </div>
               ) : (
-                <p className="dashboard-empty-text">Ders listesi yükleniyor…</p>
+                a3kLoading ? (
+                  <SkeletonText paragraph lineCount={3} />
+                ) : (
+                  <EmptyLine>Henüz tamamlanmış ders yok.</EmptyLine>
+                )
               )}
               {a3k.dashboard_stats?.firstTryScore != null && (
                 <div className="platform-a3k-score">
@@ -220,7 +230,11 @@ export default function PlatformProgress() {
                   ))}
                 </div>
               ) : (
-                <p className="dashboard-empty-text">Ödev listesi yükleniyor…</p>
+                sebitLoading ? (
+                  <SkeletonText paragraph lineCount={3} />
+                ) : (
+                  <EmptyLine>Henüz ödev yok.</EmptyLine>
+                )
               )}
             </AccordionItem>
           )

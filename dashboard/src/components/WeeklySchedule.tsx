@@ -6,6 +6,7 @@ import {
 import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import { cleanTeacherNames, normalizeCourseDisplayName } from '../utils/formatters'
+import { EmptyLine } from './patterns/EmptyLine'
 
 interface ScheduleData {
   latest: {
@@ -49,7 +50,9 @@ export default function WeeklySchedule() {
   if (loading) return <div className="dashboard-card">Yükleniyor...</div>
 
   const rows = data.latest?.schedule?.rows || []
-  if (rows.length === 0) return null
+  if (rows.length === 0) {
+    return <EmptyLine>Bu hafta için ders programı yok.</EmptyLine>
+  }
 
   const dayHeaders = rows[0] || []
   const dayIndices = DAYS.map(d => dayHeaders.indexOf(d)).filter(i => i >= 0)

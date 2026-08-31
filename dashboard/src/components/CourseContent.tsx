@@ -3,6 +3,7 @@ import { Education } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import { COURSE_CONTENT_ORDER, normalizeCourseDisplayName } from '../utils/formatters'
+import { EmptyLine } from './patterns/EmptyLine'
 
 interface CourseData {
   [course: string]: {
@@ -127,7 +128,9 @@ export default function CourseContent() {
     v && (v.text || (v.cards && v.cards.length > 0))
   )
 
-  if (courses.length === 0) return null
+  if (courses.length === 0) {
+    return <EmptyLine>Derslere ait içerik henüz yok.</EmptyLine>
+  }
 
   return (
     <div className="dashboard-card">

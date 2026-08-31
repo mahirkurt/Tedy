@@ -7,6 +7,7 @@ import { GroupPresentation } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import type { TeamActivity, OgepSession } from '../types'
+import { EmptyLine } from './patterns/EmptyLine'
 
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000
 
@@ -54,7 +55,11 @@ export default function TeamActivities() {
     })
   }
 
-  if (activities.length === 0 && ogep.length === 0) return null
+  // Returning null left the page blank, which reads the same as a page that
+  // failed to load (D3).
+  if (activities.length === 0 && ogep.length === 0) {
+    return <EmptyLine>Kayıtlı takım etkinliği veya ÖGEP oturumu yok.</EmptyLine>
+  }
 
   return (
     <div className="dashboard-card">

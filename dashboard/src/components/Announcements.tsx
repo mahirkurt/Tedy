@@ -4,6 +4,7 @@ import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import type { Announcement } from '../types'
 import { formatTurkishDate, MONTHS_SHORT } from '../utils/formatters'
+import { EmptyLine } from './patterns/EmptyLine'
 
 const DETAIL_FIELDS = [
   'e-Posta İçerik',
@@ -48,7 +49,9 @@ export default function Announcements() {
   )
   const { focusMode } = useFocusMode()
 
-  if (data.announcements.length === 0) return null
+  if (data.announcements.length === 0) {
+    return <EmptyLine>Okuldan yeni bir duyuru yok.</EmptyLine>
+  }
 
   const weekGroups = groupByWeek(data.announcements)
   const weeks = Array.from(weekGroups.entries())
