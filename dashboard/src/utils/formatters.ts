@@ -121,3 +121,17 @@ export function cleanTeacherNames(text: string): string {
 export function toTitleCase(str: string): string {
   return str.replace(/\S+/g, word => word.charAt(0).toUpperCase() + word.slice(1))
 }
+
+/** Turkish names for the scrape sections health.json reports on. Shared so the
+ *  header popover and the portal-status banner cannot drift apart. */
+export const SECTION_LABELS: Record<string, string> = {
+  ogrenci_profili: 'Öğrenci Profili',
+  odevlerim: 'Ödevler',
+  ders_programi: 'Ders Programı',
+  takvim: 'Takvim',
+  gelisim_raporu: 'Notlar',
+  ders_icerikleri: 'Ders İçerikleri',
+  takim_calismalari: 'Takımlar',
+  ogep: 'ÖGEP',
+  duyurular: 'Duyurular',
+}

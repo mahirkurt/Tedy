@@ -10,6 +10,7 @@ import { useAuth } from './hooks/useAuth'
 import { useFocusMode } from './contexts/focusMode'
 import { activateReaderProfile, useBookProgressSync } from './hooks/useBookReader'
 import { routesFor, navRoutesFor, ROLE_HOME } from './routes'
+import { PortalStatusBanner } from './components/PortalStatusBanner'
 
 import TodaySchedule from './components/TodaySchedule'
 import WeeklySchedule from './components/WeeklySchedule'
@@ -121,6 +122,8 @@ export default function App() {
           isReader ? 'app-shell-content--reader' : '',
         ].filter(Boolean).join(' ')}
       >
+        {/* Readers are refused /api/health, so the banner is not theirs to fetch. */}
+        {!isReader && <PortalStatusBanner />}
         <Routes>
           {visibleRoutes.map(r => {
             const Comp = COMPONENTS[r.componentName]

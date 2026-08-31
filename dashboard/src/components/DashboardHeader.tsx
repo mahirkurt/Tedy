@@ -12,19 +12,7 @@ import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import type { HealthData, SectionHealth, PrivateLesson } from '../types'
 import type { User } from '../hooks/useAuth'
-import { COURSE_CONTENT_ORDER } from '../utils/formatters'
-
-const SECTION_LABELS: Record<string, string> = {
-  ogrenci_profili: 'Öğrenci Profili',
-  odevlerim: 'Ödevler',
-  ders_programi: 'Ders Programı',
-  takvim: 'Takvim',
-  gelisim_raporu: 'Notlar',
-  ders_icerikleri: 'Ders İçerikleri',
-  takim_calismalari: 'Takımlar',
-  ogep: 'ÖGEP',
-  duyurular: 'Duyurular',
-}
+import { COURSE_CONTENT_ORDER, SECTION_LABELS } from '../utils/formatters'
 
 function StatusIcon({ status }: { status: SectionHealth['status'] }) {
   if (status === 'ok') return <CheckmarkFilled size={14} style={{ color: 'var(--status-success)' }} />

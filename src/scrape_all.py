@@ -108,7 +108,10 @@ MODULE_CLOSED_MARKER = "erişime kapalı"
 def detect_portal_block(current_url, body_text):
     """Return (reason, detail) when the portal is refusing this page."""
     if UNAUTHORIZED_PATH in (current_url or ""):
-        return ("yetkisiz", "portal yetkisi yok (yetkisiz_giris)")
+        # The reason code below stays machine-readable; the detail is shown to
+        # a family in the dashboard banner, so it does not echo the portal's
+        # internal error path.
+        return ("yetkisiz", "portal bu sayfaya yetki vermiyor")
     if MODULE_CLOSED_MARKER in (body_text or ""):
         for line in body_text.splitlines():
             if MODULE_CLOSED_MARKER in line:
