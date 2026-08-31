@@ -1781,6 +1781,16 @@ body {
   position: relative;
 }
 
+// Spent hours recede rather than disappear: still readable if she looks, never
+// competing with what is still ahead (İ7).
+.calendar-grid__cell--past {
+  opacity: 0.45;
+}
+
+.calendar-grid__cell--past .calendar-event {
+  filter: grayscale(0.5);
+}
+
 .calendar-grid__cell--today {
   background: #f8fbff;
 }

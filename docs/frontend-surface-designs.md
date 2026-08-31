@@ -260,7 +260,15 @@ gösterir, kart değil.
 
 **Ne için var:** "Nerede iyiyim, nerede değilim?"
 
-**Tasarım:** ders bazlı tablo değil, **ders bazlı özet + istendiğinde detay**.
+**İncelendi (2026-08-31) — kusur bulunamadı.** `GradeTable` zaten Carbon
+`DataTable` + genişletilebilir satır kullanıyor: detay istendiğinde açılıyor,
+ok yok, renk kodlaması yok, kutlama yok, sıralama yok. Yani aşağıdaki tasarım
+bir **düzeltme değil, iyileştirme** — ve eğilim hesaplamak için gereken not
+verisi henüz yok. Çalışan bir tabloyu doküman öyle diyor diye değiştirmiyoruz;
+not verisi geldiğinde yeniden değerlendirilir.
+
+**Önerilen (ertelendi):** ders bazlı tablo değil, **ders bazlı özet +
+istendiğinde detay**.
 
 - Her ders bir satır: ders adı · dönem ortalaması (mono) · eğilim.
 - Eğilim **ok değil, kelime**: `yükseliyor` / `sabit` / `düşüyor`. Ok, renkle
@@ -275,14 +283,19 @@ gösterir, kart değil.
 
 **Ne için var:** "Bu ay ne var?"
 
-**Tasarım:** ay ızgarası kalır. Değişenler:
+**Düzeltme (2026-08-31):** bu bölüm ay ızgarası varsayılarak yazılmıştı.
+Takvim aslında **hafta görünümü** (saat × gün). Ölçmeden yazmanın sonucu;
+aşağısı gerçek yapıya göre düzeltildi.
 
-- **Geçmiş günler soluk** (İ7).
-- Bir güne birden çok etkinlik düşerse nokta yığını değil, **sayı**: `3`.
-- Popover yerine seçilen gün ızgaranın **altında** açılır — popover, kaybolan
-  ve yeniden bulunması gereken bir yüzeydir (İ5).
-- Renk türü değil **durumu** kodlar (İ8): geçmiş nötr, bugün vurgulu, sınav
-  günü işaretli.
+**Uygulandı:** **geçmiş saatler geriye çekilir** (İ7) — bu haftanın geçmiş
+günleri ve bugünün geçmiş saatleri soluklaşır, etkinlikleri doygunluğunu
+yitirir. Bugün zaten vurguluydu; eksik olan, harcanmış olanın ayırt
+edilmesiydi.
+
+**Değerlendirildi, uygulanmadı:** popover'ı satır içi panele çevirmek. Gerekçe
+"kaybolan yüzey"di (İ5), ama popover yalnız dışarı tıklandığında kapanıyor —
+standart davranış, ve okurun yeniden bulmak zorunda kalacağı bir durum
+üretmiyor. Gerçek bir zarar ölçülmeden değiştirilmeyecek.
 
 ---
 

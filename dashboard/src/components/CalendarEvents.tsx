@@ -261,10 +261,20 @@ export default function CalendarEvents() {
             {days.map((d, di) => {
               const cellEvts = getCellEvents(hour, di)
               const isToday = isSameDay(d, today)
+              // Hours already spent cannot be acted on, so they stop competing
+              // for attention (İ7). Today marks the boundary; earlier days in
+              // this week, and earlier hours today, are behind it.
+              const isPast = d < today && !isToday
+                ? true
+                : isToday && hour < today.getHours()
               return (
                 <div
                   key={`c-${hour}-${di}`}
-                  className={`calendar-grid__cell${isToday ? ' calendar-grid__cell--today' : ''}`}
+                  className={
+                    'calendar-grid__cell'
+                    + (isToday ? ' calendar-grid__cell--today' : '')
+                    + (isPast ? ' calendar-grid__cell--past' : '')
+                  }
                 >
                   {cellEvts.map(ev => {
                     const isHw = ev.type === 'homework'
