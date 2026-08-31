@@ -6,6 +6,18 @@ def _count_section(key, data):
     val = data.get(key)
     if val is None:
         return 0
+    if key == "ogrenci_profili":
+        # Count populated identity, not dict keys: scrape_ogrenci_profili
+        # always returns its eight keys, so a key count reads a 404 page as
+        # a full profile.
+        if not isinstance(val, dict):
+            return 0
+        named = sum(
+            1 for f in ("name", "student_no", "class_name", "branch")
+            if str(val.get(f, "") or "").strip()
+        )
+        extra = val.get("fields")
+        return named + (len(extra) if isinstance(extra, dict) else 0)
     if key == "odevlerim":
         return len(val.get("homework", {}).get("rows", []))
     if key == "ders_programi":
@@ -36,6 +48,11 @@ def _count_section(key, data):
 
 # Minimum thresholds (0 = no minimum, section can be empty)
 SECTION_RULES = {
+    # The dashboard is about one child; if their name, number and class come
+    # back blank while we are logged in, the page we read is not the page we
+    # think it is. Critical, so it reddens health rather than sitting in a
+    # warning list nobody opens.
+    "ogrenci_profili":   {"min": 1,  "critical": True},
     "odevlerim":         {"min": 5,  "critical": True},
     "ders_programi":     {"min": 1,  "critical": True},
     "takvim":            {"min": 1,  "critical": False},

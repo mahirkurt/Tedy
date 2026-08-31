@@ -15,6 +15,7 @@ import type { User } from '../hooks/useAuth'
 import { COURSE_CONTENT_ORDER } from '../utils/formatters'
 
 const SECTION_LABELS: Record<string, string> = {
+  ogrenci_profili: 'Öğrenci Profili',
   odevlerim: 'Ödevler',
   ders_programi: 'Ders Programı',
   takvim: 'Takvim',
