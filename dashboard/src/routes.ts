@@ -17,6 +17,13 @@ export interface RouteConfig {
    */
   secondary?: boolean
   /**
+   * Set on surfaces that show none of the portal's own sections. The banner
+   * explaining which portal sections are unavailable is noise above a
+   * bookshelf or a chat — and those two are exactly the surfaces meant to
+   * hold attention (İ6).
+   */
+  offPortal?: boolean
+  /**
    * Reachable by "reader" accounts. Default-deny: a route without this flag is
    * for full-access accounts only, so a new page never leaks by omission.
    */
@@ -26,13 +33,13 @@ export interface RouteConfig {
 export const routes: RouteConfig[] = [
   { path: '/',          label: 'Bugün',      icon: Time,              componentName: 'TodaySchedule' },
   { path: '/isler',     label: 'İşler',      icon: Task,              componentName: 'HomeworkTracker' },
-  { path: '/asistan',   label: 'Asistan',    icon: Notification,      componentName: 'AssistantChat' },
+  { path: '/asistan',   label: 'Asistan',    icon: Notification,      componentName: 'AssistantChat' , offPortal: true },
   { path: '/notlar',    label: 'Notlar',     icon: Certificate,       componentName: 'GradeTable' , secondary: true },
 
   { path: '/takvim',    label: 'Takvim',     icon: EventSchedule,     componentName: 'CalendarEvents' , secondary: true },
   { path: '/takimlar',  label: 'Takımlar',   icon: GroupPresentation, componentName: 'TeamActivities' , secondary: true },
   { path: '/dersler',   label: 'Dersler',    icon: Catalog,           componentName: 'Lessons' },
-  { path: '/kitaplar',  label: 'Tedy Books', icon: Book,              componentName: 'TedyBooks', readerAccess: true },
+  { path: '/kitaplar',  label: 'Tedy Books', icon: Book,              componentName: 'TedyBooks', readerAccess: true , offPortal: true },
   { path: '/ilerleme',  label: 'İlerleme',   icon: ChartBar,          componentName: 'PlatformProgress' , secondary: true },
   { path: '/duyurular', label: 'Duyurular',  icon: Notification,      componentName: 'Announcements' , secondary: true },
   { path: '/profil',    label: 'Profil',     icon: UserAvatar,        componentName: 'StudentProfile' , secondary: true },
@@ -43,8 +50,8 @@ export const routes: RouteConfig[] = [
   // inside İşler, which is where Işık goes to see what she owes.
   { path: '/sinavlar',  label: 'Sınavlar',   icon: ExamMode, componentName: 'ExamTimeline', showInNav: false },
 
-  { path: '/kitaplar/:slug',             label: 'Kitap',  icon: Book, componentName: 'BookDetail', showInNav: false, readerAccess: true },
-  { path: '/kitaplar/:slug/:chapterId',  icon: Book, label: 'Okuma', componentName: 'BookReader', showInNav: false, readerAccess: true },
+  { path: '/kitaplar/:slug',             label: 'Kitap',  icon: Book, componentName: 'BookDetail', showInNav: false, readerAccess: true , offPortal: true },
+  { path: '/kitaplar/:slug/:chapterId',  icon: Book, label: 'Okuma', componentName: 'BookReader', showInNav: false, readerAccess: true , offPortal: true },
 ]
 
 export const navRoutes = routes.filter(r => r.showInNav !== false)

@@ -469,6 +469,26 @@ Sekiz bulgu; hepsi `tests/e2e/audit.spec.ts` ile çivilendi.
 ailedir**: Carbon'un ürettiği sınıf adı varsayıldı, ölçülmedi. Carbon
 seçicisi yazarken DOM'a bakılır.
 
+**Estetik turu (2026-08-31).** Aynı yakalama düzeni, bu kez **gerçek API
+verisiyle** koşuldu (yalnız ödev/sınav mocklandı) — mock şekli tutmayınca sayfa
+yanlış render oluyor ve yanlış render edilmiş bir sayfanın estetiğini incelemek
+boşa emek. Yedi düzeltme:
+
+| Bulgu | Karar |
+|---|---|
+| "Haftalik Takvim", "Bugun", "goster" | Türkçe harfleri düşmüş dizgeler — hepsi `CalendarEvents.tsx` içinde |
+| Asistan yanıtlarında madde işareti yok | Carbon reset'i `list-style: none` koyuyor; `.bookmd__list` kendi işaretini geri alır |
+| Dersler'de **iki adsız cümle** yan yana | `EmptyLine` sessiz bir `label` aldı — panel değil, etiket (§2.3 korundu) |
+| Boş not tablosu yalnız **başlık satırı** gösteriyordu | satırsız başlık, yüklenememiş veri gibi okunuyor → boş satır |
+| `Notlar —` boşlukta biten ayraç | ikinci işlenen yoksa ayraç da yok |
+| Portal banner'ı **Kitaplık ve Asistan**'ın üstünde | portal bölümü göstermeyen yüzeyde bilgi değil gürültü (İ6) → `offPortal` |
+| Takvim göstergesi haftada olmayan türleri de listeliyordu | yalnız o haftadakiler + kullanıcının gizledikleri |
+
+**İki kez ölçüm beni yanlış "düzeltmeden" kurtardı.** Asistan'ın `fullPage`
+görüntüsünde içerik sabit başlığın altında kalmış görünüyordu — görüntü alanı
+çekiminde sorun yoktu, dikiş artefaktıymış. Odak kipinde başlık ile düğme
+bitişik görünüyordu — ölçülen boşluk 16px (`$spacing-05`), kırpma yok.
+
 **Ölçüm notu:** `page.evaluate()`'e dize olarak verilen `() => {...}` *ifade*
 olarak değerlendirilir ve fonksiyonun kendisi döner — `{}` olarak serileşir ve
 denetim sessizce boş geçer. IIFE olmalı. Ayrıca arka planı ararken yalnız

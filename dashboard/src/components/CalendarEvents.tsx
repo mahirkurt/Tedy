@@ -133,6 +133,21 @@ export default function CalendarEvents() {
       })
   }, [data.events, monday, hiddenTypes])
 
+  // Which kinds this week actually holds. Derived from the date filter only —
+  // not from eventsInWeek, which has already dropped the hidden kinds, so a
+  // kind the reader hid would vanish from the legend and could never be
+  // brought back.
+  const typesInWeek = useMemo(() => {
+    const friday = addDays(monday, 4)
+    friday.setHours(23, 59, 59)
+    const kinds = new Set<string>()
+    for (const ev of data.events) {
+      const start = parseEventDate(ev.start)
+      if (start && start >= monday && start <= friday) kinds.add(ev.type)
+    }
+    return kinds
+  }, [data.events, monday])
+
   // Group events by day column index
   const eventsByDay = useMemo(() => {
     const map: Record<number, typeof eventsInWeek> = {}
@@ -180,7 +195,7 @@ export default function CalendarEvents() {
       <div className="dashboard-card">
         <h2 className="dashboard-card__title">
           <EventSchedule size={20} />
-          Haftalik Takvim
+          Haftalık Takvim
         </h2>
         <div className="today-loading">
           <div className="today-loading__bar" />
@@ -194,7 +209,7 @@ export default function CalendarEvents() {
     <div className="dashboard-card" style={{ position: 'relative' }}>
       <h2 className="dashboard-card__title">
         <EventSchedule size={20} />
-        Haftalik Takvim
+        Haftalık Takvim
       </h2>
 
       {/* Navigation */}
@@ -218,19 +233,24 @@ export default function CalendarEvents() {
         />
         {weekOffset !== 0 && (
           <Button kind="ghost" size="sm" onClick={() => setWeekOffset(0)}>
-            Bugun
+            Bugün
           </Button>
         )}
       </div>
 
       {/* Legend */}
       <div className="calendar-legend">
-        {Object.entries(TYPE_LABELS).map(([type, label]) => (
+        {Object.entries(TYPE_LABELS)
+          // A legend for kinds that are not on screen is seven colours to
+          // read past before reaching the week itself (İ6). A kind the
+          // reader has hidden stays listed, or there would be no way back.
+          .filter(([type]) => typesInWeek.has(type) || hiddenTypes.has(type))
+          .map(([type, label]) => (
           <button
             key={type}
             className={`calendar-legend__chip${hiddenTypes.has(type) ? ' calendar-legend__chip--hidden' : ''}`}
             onClick={() => toggleType(type)}
-            title={`${label} ${hiddenTypes.has(type) ? 'goster' : 'gizle'}`}
+            title={`${label} ${hiddenTypes.has(type) ? 'göster' : 'gizle'}`}
           >
             <span className="calendar-legend__dot" style={{ background: TYPE_COLORS[type] }} />
             {label}

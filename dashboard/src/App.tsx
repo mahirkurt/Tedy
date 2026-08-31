@@ -77,6 +77,9 @@ export default function App() {
   // rather than inventing a second vocabulary for the same place.
   const pageTitle =
     visibleRoutes.find(r => r.path === location.pathname)?.label ?? 'TEDY'
+  const onPortalFreeSurface = visibleRoutes.some(
+    r => r.offPortal && (r.path === location.pathname
+      || (r.path.includes(':') && location.pathname.startsWith(r.path.split('/:')[0] + '/'))))
 
   return (
     <SessionContext.Provider value={user}>
@@ -151,8 +154,10 @@ export default function App() {
           isReader ? 'app-shell-content--reader' : '',
         ].filter(Boolean).join(' ')}
       >
-        {/* Readers are refused /api/health, so the banner is not theirs to fetch. */}
-        {!isReader && <PortalStatusBanner />}
+        {/* Readers are refused /api/health, so the banner is not theirs to
+            fetch; and it says nothing to a surface that shows no portal
+            section (see `offPortal` in routes.ts). */}
+        {!isReader && !onPortalFreeSurface && <PortalStatusBanner />}
         {/* Named for assistive technology, which otherwise finds no page
             title at all: every surface used to open its heading outline
             with a card title, or with a closed modal's heading. It stays

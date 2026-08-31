@@ -51,7 +51,7 @@ export default function WeeklySchedule() {
 
   const rows = data.latest?.schedule?.rows || []
   if (rows.length === 0) {
-    return <EmptyLine>Bu hafta için ders programı yok.</EmptyLine>
+    return <EmptyLine label="Haftalık Program">Bu hafta için ders programı yok.</EmptyLine>
   }
 
   const dayHeaders = rows[0] || []

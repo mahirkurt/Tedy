@@ -4152,9 +4152,29 @@ body {
   padding-left: 1.6em;
   text-align: left;
   text-indent: 0;
+  // Carbon's reset sets `list-style: none` on every ul/ol, so an assistant
+  // answer's steps rendered as unmarked lines — a list that did not look
+  // like one. Restored here rather than globally: the reset is right for
+  // Carbon's own nav and tab lists.
+  list-style: disc;
 }
 
+ol.bookmd__list { list-style: decimal; }
+
 .bookmd__list li { margin-bottom: 0.45em; }
+
+// A surface whose whole content is empty still has to say what is empty.
+// Quiet — a label, not a panel heading — because §2.3 keeps an empty state a
+// line rather than a card.
+.tedy-empty__label {
+  display: block;
+  margin-bottom: 0.125rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ted-color-text-secondary);
+}
 
 .bookmd code {
   font-size: 0.88em;

@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react'
 import { useApi } from '../hooks/useApi'
+import { EmptyLine } from './patterns/EmptyLine'
 import { Certificate } from '@carbon/icons-react'
 import {
   DataTable, Table, TableHead, TableRow, TableHeader,
@@ -34,6 +35,18 @@ export default function GradeTable() {
 
   const grades = data.grades || []
 
+  // A header row with nothing under it looks like a table whose rows failed
+  // to load. Say the thing instead (D3).
+  if (grades.length === 0) {
+    return (
+      <EmptyLine label="Notlar">
+        {data.semester
+          ? `${data.semester} döneminde henüz not girilmemiş.`
+          : 'Henüz not girilmemiş.'}
+      </EmptyLine>
+    )
+  }
+
   const tableRows = grades.map((g, i) => ({
     id: String(i),
     ders: g.Ders,
@@ -47,7 +60,7 @@ export default function GradeTable() {
         title={
           <span className="dashboard-card__title dashboard-card__title--tight">
             <Certificate size={20} />
-            Notlar &mdash; {data.semester || ''}
+            {data.semester ? `Notlar — ${data.semester}` : 'Notlar'}
           </span>
         }
       >

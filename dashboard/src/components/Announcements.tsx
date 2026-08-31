@@ -50,7 +50,7 @@ export default function Announcements() {
   const { focusMode } = useFocusMode()
 
   if (data.announcements.length === 0) {
-    return <EmptyLine>Okuldan yeni bir duyuru yok.</EmptyLine>
+    return <EmptyLine label="Okul Duyuruları">Okuldan yeni bir duyuru yok.</EmptyLine>
   }
 
   const weekGroups = groupByWeek(data.announcements)

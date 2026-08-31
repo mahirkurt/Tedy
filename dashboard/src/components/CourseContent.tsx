@@ -129,7 +129,7 @@ export default function CourseContent() {
   )
 
   if (courses.length === 0) {
-    return <EmptyLine>Derslere ait içerik henüz yok.</EmptyLine>
+    return <EmptyLine label="Ders İçerikleri">Derslere ait içerik henüz yok.</EmptyLine>
   }
 
   return (

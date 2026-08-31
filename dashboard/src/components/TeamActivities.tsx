@@ -58,7 +58,7 @@ export default function TeamActivities() {
   // Returning null left the page blank, which reads the same as a page that
   // failed to load (D3).
   if (activities.length === 0 && ogep.length === 0) {
-    return <EmptyLine>Kayıtlı takım etkinliği veya ÖGEP oturumu yok.</EmptyLine>
+    return <EmptyLine label="Takım Çalışmaları &amp; ÖGEP">Kayıtlı takım etkinliği veya ÖGEP oturumu yok.</EmptyLine>
   }
 
   return (
