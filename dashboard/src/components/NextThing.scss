@@ -1,0 +1,73 @@
+@use '@carbon/react/scss/theme' as theme;
+@use '@carbon/react/scss/type' as type;
+@use '@carbon/react/scss/spacing' as *;
+
+// The one thing. Everything else on the page is quieter than this by design:
+// a reader who wants direction and stalls in front of choices needs exactly one
+// named next step (principle İ1), and the entry to it has to look small enough
+// to begin (İ3).
+
+.next-thing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-05;
+  padding: $spacing-05 $spacing-06;
+  background: theme.$layer-01;
+  border-inline-start: 3px solid theme.$interactive;
+  border-radius: 2px;
+  margin-block-end: $spacing-06;
+}
+
+.next-thing__body {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.next-thing__eyebrow {
+  display: block;
+  @include type.type-style('label-01');
+  color: theme.$text-secondary;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-block-end: $spacing-02;
+}
+
+.next-thing__title {
+  @include type.type-style('heading-03');
+  color: theme.$text-primary;
+  margin: 0;
+}
+
+// The proposal, not an estimate: we do not know how long the work takes, and
+// saying we do would be an invention. Offering a box to start inside is honest
+// and is the part that makes starting possible.
+.next-thing__step {
+  display: block;
+  @include type.type-style('body-compact-01');
+  color: theme.$text-secondary;
+  margin-block-start: $spacing-03;
+}
+
+.next-thing__step-time {
+  font-family: 'IBM Plex Mono', 'Menlo', monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: theme.$text-primary;
+}
+
+.next-thing__action {
+  flex: 0 0 auto;
+}
+
+// The reading variant. Books is not louder than school work — it becomes the
+// one thing only when nothing is owed, and wears the same shape when it does.
+.next-thing--reading {
+  border-inline-start-color: theme.$support-info;
+}
+
+@media (max-width: 42rem) {
+  .next-thing { padding: $spacing-05; }
+  .next-thing__action { flex: 1 1 100%; }
+  .next-thing__action .cds--btn { width: 100%; }
+}

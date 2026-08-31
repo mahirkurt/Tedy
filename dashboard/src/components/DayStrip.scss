@@ -1,0 +1,137 @@
+@use '@carbon/react/scss/theme' as theme;
+@use '@carbon/react/scss/type' as type;
+@use '@carbon/react/scss/spacing' as *;
+
+// The Day Strip shows the part of today that is still spendable, to scale.
+// Spent hours are never drawn: they are not actionable, and drawing them costs
+// the reader attention for nothing (principle İ7). Because the track always
+// starts at "now", it shortens through the day on its own — the shape of the
+// component carries the time signal, so no countdown has to shout it (İ2).
+
+.day-strip {
+  margin-block-end: $spacing-05;
+}
+
+.day-strip__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: $spacing-04;
+  margin-block-end: $spacing-03;
+}
+
+// Time is set in Plex Mono with tabular figures: a timetable is an instrument,
+// and two durations should line up so they can be compared without reading.
+.day-strip__now-label,
+.day-strip__end-label,
+.day-strip__tick,
+.day-strip__boundary {
+  font-family: 'IBM Plex Mono', 'Menlo', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-strip__now-label {
+  @include type.type-style('label-01');
+  color: theme.$text-primary;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.day-strip__left {
+  @include type.type-style('body-compact-01');
+  color: theme.$text-secondary;
+}
+
+.day-strip__end-label {
+  @include type.type-style('label-01');
+  color: theme.$text-helper;
+}
+
+.day-strip__track {
+  position: relative;
+  height: 1.75rem;
+  background: theme.$layer-01;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+// The focus window is a calm warm field, not an alarm. It says "there is fuel
+// here", so it must never read as urgency — urgency has its own colour and
+// there is only one attention-grabbing field per screen (İ6).
+.day-strip__window {
+  position: absolute;
+  inset-block: 0;
+  background: var(--ted-day-window);
+  border-inline-end: 2px solid var(--ted-day-window-edge);
+}
+
+// "Now" is the only thing on the page allowed to move.
+.day-strip__now {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 3px;
+  background: theme.$interactive;
+}
+
+// Where the next thing sits. Tied to the card below, so work is anchored to
+// when it happens rather than to a date.
+.day-strip__anchor {
+  position: absolute;
+  inset-block: 0;
+  width: 2px;
+  background: theme.$interactive;
+  opacity: 0.5;
+}
+
+// Labels live below the track, never on top of the window fill.
+.day-strip__scale {
+  position: relative;
+  height: 1.25rem;
+  margin-block-start: $spacing-02;
+}
+
+.day-strip__tick,
+.day-strip__boundary {
+  position: absolute;
+  inset-block-start: 0;
+  transform: translateX(-50%);
+  @include type.type-style('label-01');
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+
+.day-strip__tick { color: theme.$text-helper; }
+
+.day-strip__boundary {
+  color: var(--ted-day-window-text);
+  font-weight: 600;
+}
+
+.day-strip__boundary--start {
+  transform: none;
+  margin-inline-start: $spacing-02;
+}
+
+.day-strip__anchor-line {
+  position: relative;
+  height: $spacing-05;
+}
+
+.day-strip__anchor-line::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: var(--anchor-pos, 0%);
+  width: 2px;
+  background: theme.$interactive;
+  opacity: 0.5;
+  transform: translateX(-50%);
+}
+
+@media (max-width: 42rem) {
+  .day-strip__head { flex-wrap: wrap; }
+  // On a narrow screen the hour marks become texture; the boundary is the one
+  // that carries a decision, so it is the one that stays.
+  .day-strip__tick { display: none; }
+}

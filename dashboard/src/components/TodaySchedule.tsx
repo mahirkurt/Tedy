@@ -14,7 +14,10 @@ import {
 import { useApi } from '../hooks/useApi'
 import { parseDeadline, cleanTeacherNames, toTitleCase, formatTurkishDate, MONTHS_SHORT } from '../utils/formatters'
 import { getCountdown, getExamCountdown } from '../utils/countdown'
-import { BooksCallout } from './TedyBooks'
+import { DayStrip } from './DayStrip'
+import { NextThing } from './NextThing'
+import { useBookProgress } from '../hooks/useBookReader'
+import type { BookSummary } from '../types'
 import type { HomeworkItem, CalendarEvent, OgepSession, ExamsApiResponse } from '../types'
 
 interface ScheduleData {
@@ -61,6 +64,12 @@ const MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
 
 const SCHOOL_START = 8 * 60
 const SCHOOL_END = 15 * 60 + 45
+// Işık's sustained-attention window closes before homework hours begin, so the
+// stretch between the last bell and the window's edge is the most valuable time
+// in the day and the interface spends it on one demanding thing. See §2 of
+// docs/frontend-design-principles.md — this is a parameter, not a fact of life.
+const FOCUS_END = 16 * 60
+const BEDTIME = 22 * 60 + 30
 
 function toMinutes(h: number, m: number) { return h * 60 + m }
 
@@ -273,6 +282,13 @@ export default function TodaySchedule() {
       })
   }, [hwData, nowMs])
 
+  const { data: booksData } = useApi<{ books: BookSummary[] }>(
+    '/api/books', { books: [] })
+  const firstBook = booksData.books[0]
+  const bookProgress = useBookProgress(firstBook?.slug)
+
+
+
   const topHomework = activeHomework.slice(0, 3)
   const extraHomeworkCount = Math.max(0, activeHomework.length - topHomework.length)
 
@@ -284,6 +300,55 @@ export default function TodaySchedule() {
 
   const now = new Date(nowMs)
   const nowMin = toMinutes(now.getHours(), now.getMinutes())
+
+  // Exactly one named next step (İ1), offered as a box to start inside rather
+  // than an estimate we do not have (İ3).
+  const nextThing = useMemo(() => {
+    // Derived from nowMs inside the memo rather than taken as a dependency:
+    // the compiler cannot prove a value computed in the render body stays put.
+    const d = new Date(nowMs)
+    const minutes = toMinutes(d.getHours(), d.getMinutes())
+    const top = activeHomework[0]
+    if (top) {
+      const course = String(top.hw['Ders Adı'] || '').trim()
+      const title = String(top.hw['Ödev Başlığı'] || '').trim()
+      // While school is still running, the proposal is a slot rather than
+      // "now": the stretch between the last bell and the window's edge is the
+      // scarcest attention in the day and this is what it is for (İ4).
+      const beforeLastBell = minutes < SCHOOL_END
+      const afterWindow = minutes >= FOCUS_END
+      return {
+        anchorMin: beforeLastBell ? SCHOOL_END : undefined,
+        props: {
+          eyebrow: beforeLastBell ? 'OKULDAN SONRA' : afterWindow ? 'BU AKŞAM' : 'ŞİMDİ',
+          title: [course, title].filter(Boolean).join(' — ') || 'Ödev',
+          stepMinutes: 10,
+          actionLabel: 'Başla',
+          onAction: () => navigate('/odevler'),
+          variant: 'work' as const,
+        },
+      }
+    }
+    // Nothing is owed, so reading takes the slot. It is not louder than school
+    // work any more; it is what remains when there is none.
+    const resumeId = bookProgress.lastChapterId
+    const target = firstBook
+      ? (resumeId ? `/kitaplar/${firstBook.slug}/${resumeId}` : `/kitaplar/${firstBook.slug}`)
+      : '/kitaplar'
+    return {
+      anchorMin: undefined,
+      props: {
+        eyebrow: minutes >= FOCUS_END ? 'BU AKŞAM' : 'ŞİMDİ',
+        title: firstBook ? `Tedy Books — ${firstBook.title}` : 'Tedy Books',
+        stepMinutes: 15,
+        stepSuffix: 'oku',
+        actionLabel: 'Okumaya başla',
+        onAction: () => navigate(target),
+        variant: 'reading' as const,
+      },
+    }
+  }, [activeHomework, nowMs, firstBook, bookProgress.lastChapterId, navigate])
+
   const selectedIsToday = compareCalendarDay(selectedDate, now) === 0
   const dayName = DAYS_TR[selectedDate.getDay()]
   const dateStr = `${selectedDate.getDate()} ${MONTHS_TR[selectedDate.getMonth()]}`
@@ -360,7 +425,14 @@ export default function TodaySchedule() {
         </div>
       </div>
 
-      <BooksCallout />
+      <DayStrip
+        nowMin={nowMin}
+        bedtimeMin={BEDTIME}
+        focusEndMin={FOCUS_END}
+        anchorMin={nextThing.anchorMin}
+      />
+
+      <NextThing {...nextThing.props} />
 
       {examData.exams.filter(e => e.status === 'upcoming').length > 0 && (
         <div className="today-exams">

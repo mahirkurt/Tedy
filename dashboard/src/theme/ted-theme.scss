@@ -61,6 +61,14 @@
   // Carbon is square by default. The softened corner is intentional TEDY
   // character — this is a child's dashboard, not a console — and it is the
   // second and last deliberate deviation.
+  // Day Strip — the focus window is a calm warm field, deliberately not an
+  // alarm: it says "there is fuel here", and only one attention-grabbing
+  // colour is allowed per screen (principle İ6). Derived from Carbon's yellow
+  // so it stays inside the palette rather than being an invented hex.
+  --ted-day-window: #{rgba(colors.$yellow-30, 0.22)};
+  --ted-day-window-edge: #{rgba(colors.$yellow-60, 0.45)};
+  --ted-day-window-text: #{colors.$yellow-80};
+
   --ted-radius-card: 10px;
   --ted-radius-sm: 4px;
 
