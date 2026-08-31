@@ -779,7 +779,12 @@ class TestSyncEbaTextbooks:
         return svc
 
     @patch("src.sync_to_classroom._load_upload_tracker")
-    def test_creates_announcement_per_course(self, mock_load):
+    # sync_eba_textbooks calls _ensure_materials_accessible, which builds a real
+    # Drive client and reaches oauth2.googleapis.com. These tests are about the
+    # announcement it writes, not about Drive permissions, so the trip out is
+    # both irrelevant and the only reason the suite could not run offline.
+    @patch("src.sync_to_classroom._ensure_materials_accessible")
+    def test_creates_announcement_per_course(self, mock_ensure, mock_load):
         from src.sync_to_classroom import sync_eba_textbooks
         mock_load.return_value = {
             "book1": {
@@ -803,7 +808,12 @@ class TestSyncEbaTextbooks:
         assert "eba:cf:textbooks" in state
 
     @patch("src.sync_to_classroom._load_upload_tracker")
-    def test_normalizes_course_names(self, mock_load):
+    # sync_eba_textbooks calls _ensure_materials_accessible, which builds a real
+    # Drive client and reaches oauth2.googleapis.com. These tests are about the
+    # announcement it writes, not about Drive permissions, so the trip out is
+    # both irrelevant and the only reason the suite could not run offline.
+    @patch("src.sync_to_classroom._ensure_materials_accessible")
+    def test_normalizes_course_names(self, mock_ensure, mock_load):
         from src.sync_to_classroom import sync_eba_textbooks
         mock_load.return_value = {
             "b1": {
@@ -821,7 +831,12 @@ class TestSyncEbaTextbooks:
         assert "eba:cm:textbooks" in state
 
     @patch("src.sync_to_classroom._load_upload_tracker")
-    def test_unknown_course_falls_back_to_genel(self, mock_load):
+    # sync_eba_textbooks calls _ensure_materials_accessible, which builds a real
+    # Drive client and reaches oauth2.googleapis.com. These tests are about the
+    # announcement it writes, not about Drive permissions, so the trip out is
+    # both irrelevant and the only reason the suite could not run offline.
+    @patch("src.sync_to_classroom._ensure_materials_accessible")
+    def test_unknown_course_falls_back_to_genel(self, mock_ensure, mock_load):
         from src.sync_to_classroom import sync_eba_textbooks
         mock_load.return_value = {
             "b1": {
