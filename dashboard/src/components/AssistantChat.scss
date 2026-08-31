@@ -132,7 +132,7 @@
 
 .ac-msg__avatar--user {
   background: var(--ted-color-brand-primary);
-  color: #fff;
+  color: var(--ted-color-text-on-color);
 }
 
 .ac-msg__body {
@@ -154,12 +154,16 @@
   border-top-left-radius: 4px;
 }
 
-// Exact same light-blue the code already rendered here — that hex is g10's
-// ai-aura-hover-background, so this is a value-for-value token swap, not a
-// redesign. (Carbon's plain highlight token is close but not identical —
-// a shade darker.)
+// Işık's own words, in a neutral layer.
+//
+// This used to be ai-aura-hover-background — chosen because it matched the
+// hex already there, so the swap kept the colour and lost the meaning. In
+// Carbon for AI that palette is a claim about provenance, and painting the
+// child's own message with it says a machine wrote what she typed. The
+// distinction between "the assistant said" and "I said" is the whole point
+// of a sourced assistant.
 .ac-msg--user .ac-msg__body {
-  background: theme.$ai-aura-hover-background;
+  background: theme.$layer-02;
   border-top-right-radius: 4px;
 }
 
@@ -259,7 +263,7 @@
 }
 
 .ac__send-group .cds--btn--primary:hover {
-  background-color: #001d6c;
+  background-color: var(--ted-color-brand-primary-hover);
 }
 
 .ac__send-group .cds--btn--ghost svg {
@@ -478,11 +482,13 @@
 }
 
 // Sidebar reference the chip's onActivate scrolls to and highlights.
+//
+// Neutral selection, not the AI aura. A citation is a line lifted from the
+// MEB curriculum or a textbook — the one thing on this surface no model
+// wrote. Marking it as AI output would undo the reason it is shown.
 .ac__ref-item--active {
-  background:
-    linear-gradient(to right, theme.$ai-aura-start 0%, theme.$ai-aura-end 60%),
-    theme.$ai-aura-hover-background;
-  outline: 1px solid theme.$ai-border-strong;
+  background: theme.$layer-selected;
+  outline: 1px solid theme.$border-interactive;
 }
 
 .ac__ref-index {
@@ -533,4 +539,28 @@
     font-size: 0.75rem;
     padding: 0.3rem 0.65rem;
   }
+}
+
+// ─── AI label explanation ────────────────────────────────────────────────────
+// Carbon paints the popover itself; these only set the rhythm of the words
+// inside it.
+.ac__ai-pop-title {
+  margin: 0 0 var(--ted-space-2xs);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: theme.$text-primary;
+}
+
+.ac__ai-pop-body {
+  margin: 0 0 var(--ted-space-2xs);
+  max-width: 34ch;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: theme.$text-secondary;
+}
+
+.ac__ai-pop-meta {
+  margin: var(--ted-space-2xs) 0 0;
+  font-size: 0.75rem;
+  color: theme.$text-helper;
 }

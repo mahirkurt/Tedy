@@ -33,6 +33,9 @@
   // token. All three are Carbon palette members, so they are named rather than
   // magic hex and stay inside the system's colour space.
   --ted-color-brand-primary: #{colors.$blue-80};
+  // The hover shade was written as a literal #001d6c in AssistantChat.scss;
+  // it is Carbon's blue-90.
+  --ted-color-brand-primary-hover: #{colors.$blue-90};
   --ted-color-brand-accent: #{colors.$red-60};
   // Cool grey rather than Carbon's neutral $gray-10. The faint blue cast is the
   // one deliberate deviation from g10's ground: it reads as "school" against

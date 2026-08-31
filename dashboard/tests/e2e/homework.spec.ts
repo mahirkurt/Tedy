@@ -47,7 +47,14 @@ async function open(page: Page, homework: Row[], summary = '') {
   })))
   await page.clock.setFixedTime(new Date('2026-09-15T18:00:00'))
   await page.goto('/odevler')
-  await page.waitForTimeout(600)
+  // '/odevler' redirects to '/isler', so this is navigate → redirect → fetch
+  // → render. A blind 600ms covered that on an idle machine and lost the
+  // race under parallel load — the assertions then read an empty list.
+  // Wait for the surface to have settled into one of its two states instead.
+  await page.waitForURL('**/isler')
+  await page.locator('.homework-item, .tedy-empty, .hw-section').first()
+    .waitFor({ state: 'attached', timeout: 15000 })
+  await page.waitForTimeout(150)
 }
 
 test('no machine timestamp reaches the reader', async ({ page }) => {

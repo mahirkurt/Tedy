@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   AILabel,
+  AILabelContent,
   Button,
   IconButton,
   InlineLoading,
@@ -37,6 +38,10 @@ interface ChatMessage {
   safetyFlags?: string[]
   planBlocks?: AssistantPlanBlock[]
   degraded?: string[]
+  /** Which model produced this answer. The backend cycles through a chain,
+   *  so this is not a constant and Carbon's AI guidance asks that it be
+   *  disclosed rather than implied. */
+  model?: string
 }
 
 const QUICK_PROMPTS = [
@@ -257,6 +262,7 @@ export default function AssistantChat() {
       safetyFlags: payload.safety_flags || [],
       planBlocks: payload.plan_blocks || [],
       degraded: payload.meta?.degraded || [],
+      model: payload.meta?.model,
     }
     setMessages(prev => [...prev, assistantMsg])
   }
@@ -394,13 +400,39 @@ export default function AssistantChat() {
   }
 
   const hasPlanBlocks = latestAssistant?.planBlocks && latestAssistant.planBlocks.length > 0
+  const latestModel = latestAssistant?.model
 
   return (
     <section className="ac">
       {/* Header */}
       <header className="ac__header">
         <div className="ac__header-left">
-          <AILabel size="xl" />
+          {/* Carbon for AI treats the mark as a claim that has to be
+              explainable. This used to be a bare <AILabel/>: a badge saying
+              "AI" that answered no question about what the AI was, which
+              model wrote the answer, or why its claims can be checked. */}
+          <AILabel
+            size="xl"
+            autoAlign
+            aiText="AI"
+            aiTextLabel="TEDY Asistan"
+            align="bottom-left"
+          >
+            <AILabelContent>
+              <h4 className="ac__ai-pop-title">Bu yanıtları bir yapay zekâ yazıyor</h4>
+              <p className="ac__ai-pop-body">
+                Her iddianın yanındaki numara, o cümlenin nereden geldiğini
+                gösterir — MEB müfredatı, ders kitabın veya kendi okul verin.
+                Numaraya dokunup kaynağı okuyabilirsin.
+              </p>
+              <p className="ac__ai-pop-body">
+                Yapay zekâ yanılabilir. Bir şey tuhaf geldiyse kaynağa bak.
+              </p>
+              <p className="ac__ai-pop-meta">
+                {latestModel ? `Son yanıtı ${latestModel} yazdı.` : 'Henüz yanıt yok.'}
+              </p>
+            </AILabelContent>
+          </AILabel>
           <div>
             <h2 className="ac__title">TEDY Asistan</h2>
             <p className="ac__subtitle">Kaynaklı soru-cevap ve kişisel çalışma planı</p>

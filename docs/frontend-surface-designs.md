@@ -489,6 +489,31 @@ görüntüsünde içerik sabit başlığın altında kalmış görünüyordu —
 çekiminde sorun yoktu, dikiş artefaktıymış. Odak kipinde başlık ile düğme
 bitişik görünüyordu — ölçülen boşluk 16px (`$spacing-05`), kırpma yok.
 
+**Asistan — Carbon for AI turu (2026-08-31).** Yüzey Carbon'un AI token'larını
+zaten kullanıyordu (`ai-gradient`, `ai-aura-*`, `ai-border-*`, `AILabel`).
+Eksik olan token değil, **anlamdı**.
+
+*Kural: AI aurası bir köken işaretidir, süs değil.* Modelin yazdığına konur;
+müfredatın söylediğine konmaz. Bu ürün için sıradan bir tercih değil — asistanın
+tüm değeri "bunun nereden geldiğini kontrol edebilirsin" olduğuna göre, "asistan
+dedi" ile "kitap dedi" ayrımı tasarımın kendisidir (D4, İ9).
+
+| Bulgu | Karar |
+|---|---|
+| `<AILabel/>` hiçbir şey açıklamıyordu | `AILabelContent`: ne olduğu, kaynakların denetlenebilirliği, yanılabilirliği |
+| `meta.model` her yanıtta geliyor, kimseye gösterilmiyordu | AILabel açıklamasında; ekranda sürekli değil (İ6) |
+| Işık'ın **kendi mesajı** `ai-aura-hover-background` ile boyalıydı | nötr `$layer-02` — çocuğun sözleri makine çıktısı gibi işaretlenemez |
+| Aktif kaynak satırı AI aurasıyla vurgulanıyordu | nötr `$layer-selected` — alıntı, modelin yazdığı şey değil |
+| İki değişmez renk (`#fff`, `#001d6c`) | token; `--ted-color-brand-primary-hover` eklendi |
+
+Kullanıcı balonundaki auranın gerekçesi kayıtlıydı: "değer-değer token takası,
+yeniden tasarım değil". Doğruydu — hex korunmuş, **anlam kaybolmuştu**. Token
+uyumu için seçilen bir renk, o token'ın taşıdığı iddiayı da beraberinde getirir.
+
+**Ölçüm iddiamı bir kez çürüttü:** alıntı popover'ının metnin üstüne gölgesiz
+bindiğini yazmıştım; ölçülen gölge var (mavi tonlu, z-index 6000). Ayrım zayıf
+ama yok değil — iddiayı kurtarmak için değişiklik yapmadım, testi sildim.
+
 **Ölçüm notu:** `page.evaluate()`'e dize olarak verilen `() => {...}` *ifade*
 olarak değerlendirilir ve fonksiyonun kendisi döner — `{}` olarak serileşir ve
 denetim sessizce boş geçer. IIFE olmalı. Ayrıca arka planı ararken yalnız
