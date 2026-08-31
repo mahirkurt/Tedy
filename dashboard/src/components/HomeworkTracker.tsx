@@ -11,6 +11,7 @@ import './patterns/patterns.scss'
 import { useNavigate } from 'react-router-dom'
 import type { ExamItem } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
+import { useFocusMode } from '../contexts/focusMode'
 
 type HomeworkGroupKey = 'aktif' | 'yapilan' | 'tamamlanan' | 'yapilmayan'
 
@@ -38,6 +39,7 @@ export default function HomeworkTracker() {
 
   const [selectedHw, setSelectedHw] = useState<HomeworkItem | null>(null)
   const [, setTick] = useState(0)
+  const { focusMode } = useFocusMode()
   const [collapsed, setCollapsed] = useState<Record<HomeworkGroupKey, boolean>>({
     aktif: false,
     // Sections that need action open; everything settled starts closed (İ7).
@@ -121,6 +123,10 @@ export default function HomeworkTracker() {
   const navigate = useNavigate()
 
 
+  // A working state, not a dimmer: focus closes the lists and leaves the one
+  // named thing, with the counts still visible so nothing feels lost (§5).
+  const isCollapsed = (key: HomeworkGroupKey) => focusMode || collapsed[key]
+
   const toggleSection = (key: HomeworkGroupKey) => {
     setCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
   }
@@ -169,14 +175,14 @@ export default function HomeworkTracker() {
         <button
           className="hw-section__header hw-section__header--toggle"
           onClick={() => toggleSection(keyName)}
-          aria-expanded={!collapsed[keyName]}
+          aria-expanded={!isCollapsed(keyName)}
           type="button"
         >
           <span className={["hw-section__label", labelClass].filter(Boolean).join(' ')}>{title}</span>
           <span className="hw-section__count">{items.length}</span>
-          {collapsed[keyName] ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          {isCollapsed(keyName) ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
         </button>
-        {!collapsed[keyName] && (
+        {!isCollapsed(keyName) && (
           <div className="stack-sm">
             {items.map((hw, i) => {
               const actionKey = hw.homework_key || `${hw["Ders Adı"]}|${hw["Ödev Başlığı"]}|${hw["Ödev Son Teslim Tarihi"]}`
@@ -234,7 +240,7 @@ export default function HomeworkTracker() {
             <span className="hw-section__label">Yaklaşan Sınavlar</span>
             <span className="hw-section__count">{upcomingExams.length}</span>
           </div>
-          <ul className="exams-ahead__list">
+          {!focusMode && <ul className="exams-ahead__list">
             {upcomingExams.map(e => {
               const when = e.date ? new Date(e.date) : null
               return (
@@ -249,10 +255,12 @@ export default function HomeworkTracker() {
                 </li>
               )
             })}
-          </ul>
-          <Button kind="ghost" size="sm" onClick={() => navigate('/sinavlar')}>
-            Tüm sınavlar
-          </Button>
+          </ul>}
+          {!focusMode && (
+            <Button kind="ghost" size="sm" onClick={() => navigate('/sinavlar')}>
+              Tüm sınavlar
+            </Button>
+          )}
         </div>
       )}
 

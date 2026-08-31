@@ -2082,12 +2082,15 @@ body {
     transition-duration: 50ms !important;
   }
 
-  // Hide secondary info across all components
+  // Hide secondary info across all components.
+  //
+  // homework-item__title and __deadline used to be in this list, which left a
+  // row reading "Türkçe" with a Yaptım button beside it — asking the reader to
+  // confirm work whose name she could not see. Focus closes the lists instead
+  // of gutting the rows inside them.
   .dashboard-list-tile__meta,
   .today-tl__card-sub,
   .today-tl__card-tags,
-  .homework-item__title,
-  .homework-item__deadline,
   .dashboard-summary-text {
     display: none;
   }
