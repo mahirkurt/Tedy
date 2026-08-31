@@ -5,7 +5,7 @@ import os
 import requests
 
 PORTAL_BASE = "https://portal.tedronesans.k12.tr"
-PROFILE_URL = f"{PORTAL_BASE}/pages/ogrenci_istekler/p_ogrenci_bilgilerim"
+PROFILE_URL = f"{PORTAL_BASE}/pages/ogrenci_istekler/p_temel_bilgiler"
 DEFAULT_COOKIE_PATH = os.path.join(os.path.dirname(__file__), "..", "output", "portal_cookies.json")
 
 

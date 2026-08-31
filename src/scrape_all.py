@@ -48,7 +48,7 @@ def login(driver):
     if cached and check_session_valid(cached):
         print("[LOGIN] Using cached session")
         apply_cookies_to_driver(driver, cached)
-        driver.get(f"{BASE_URL}/pages/ogrenci_istekler/p_ogrenci_bilgilerim")
+        driver.get(f"{BASE_URL}/pages/ogrenci_istekler/p_temel_bilgiler")
         time.sleep(2)
         if "/login" not in driver.current_url:
             print(f"[LOGIN] Cached session OK -> {driver.current_url}")
@@ -261,7 +261,7 @@ def _download_profile_image_data_url(driver, img_src):
 def scrape_ogrenci_profili(driver):
     """Scrape student profile info (including photo) from TED Connect."""
     print("\n[0/9] Öğrenci Profili")
-    url = f"{BASE_URL}/pages/ogrenci_istekler/p_ogrenci_bilgilerim"
+    url = f"{BASE_URL}/pages/ogrenci_istekler/p_temel_bilgiler"
     driver.get(url)
     time.sleep(3)
 
@@ -310,6 +310,26 @@ def scrape_ogrenci_profili(driver):
         if len(key) >= 2 and val:
             fields.setdefault(key, val)
 
+    # 2b) The card-profile layout: <h6> label followed by its <h5> value.
+    # p_temel_bilgiler carries no <label> elements at all and only one table,
+    # so strategies 1 and 2 come back with nothing but chrome. Scoped to the
+    # card rather than the page: an unscoped sweep is what collected the
+    # navigation item "ÖGEP: Teams" as if it were profile data.
+    for card in driver.find_elements(By.CSS_SELECTOR, ".card-profile"):
+        for h6 in card.find_elements(By.TAG_NAME, "h6"):
+            key = (h6.text or "").strip().rstrip(":")
+            if len(key) < 2:
+                continue
+            try:
+                val = (h6.find_element(
+                    By.XPATH, "./following-sibling::h5[1]").text or "").strip()
+            except Exception:
+                continue
+            # The portal repeats the label as a placeholder when a field is
+            # unset (E-Posta / E-Posta); that is absence, not a value.
+            if val and val.lower() != key.lower():
+                fields.setdefault(key, val)
+
     # 3) Profile image candidates
     photo_data_url = ""
     for img in driver.find_elements(By.TAG_NAME, "img"):
@@ -338,14 +358,30 @@ def scrape_ogrenci_profili(driver):
 
     # 4) Canonical summary fields (best-effort)
     lowered = {k.lower(): v for k, v in fields.items()}
-    full_name = ""
+
+    # The name is the profile card's own heading, not a label/value pair, so
+    # no amount of field matching finds it.
+    card_name = ""
+    for card in driver.find_elements(By.CSS_SELECTOR, ".card-profile"):
+        try:
+            candidate = (card.find_element(By.TAG_NAME, "h3").text or "").strip()
+        except Exception:
+            continue
+        # A heading, not a paragraph: guards against a layout change turning
+        # this into a block of text we would file as someone's name.
+        if candidate and len(candidate) <= 60 and "\n" not in candidate:
+            card_name = candidate
+            break
+
+    full_name = card_name
     student_no = ""
     class_name = ""
     branch = ""
     for k, v in lowered.items():
         if not full_name and ("ad soyad" in k or k == "adı soyadı" or "ogrenci adı" in k):
             full_name = v
-        if not student_no and ("öğrenci no" in k or "ogrenci no" in k or "numara" in k):
+        if not student_no and ("öğrenci no" in k or "ogrenci no" in k
+                               or "okul no" in k or "numara" in k):
             student_no = v
         if not class_name and ("sınıf" in k or "sinif" in k):
             class_name = v
