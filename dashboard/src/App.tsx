@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom'
-import { Content, SideNav, SideNavItems, SideNavLink } from '@carbon/react'
+import { Content, SideNav, SideNavItems, SideNavMenu, SideNavMenuItem, SideNavLink } from '@carbon/react'
+import { OverflowMenuHorizontal } from '@carbon/icons-react'
 import DashboardHeader from './components/DashboardHeader'
 import ReaderHeader, { ReaderFooter } from './components/ReaderChrome'
 import DashboardFooter from './components/DashboardFooter'
@@ -21,6 +22,7 @@ import PlatformProgress from './components/PlatformProgress'
 import CalendarEvents from './components/CalendarEvents'
 import TeamActivities from './components/TeamActivities'
 import CourseContent from './components/CourseContent'
+import Lessons from './components/Lessons'
 import Announcements from './components/Announcements'
 import StudentProfile from './components/StudentProfile'
 import ExamTimeline from './components/ExamTimeline'
@@ -28,6 +30,7 @@ import TedyBooks, { BookDetail } from './components/TedyBooks'
 import BookReader from './components/BookReader'
 
 const COMPONENTS: Record<string, React.ComponentType> = {
+  Lessons,
   TodaySchedule, WeeklySchedule, HomeworkTracker, AssistantChat, GradeTable, ExamTimeline,
   PlatformProgress, CalendarEvents, TeamActivities, CourseContent, Announcements, StudentProfile,
   TedyBooks, BookDetail, BookReader,
@@ -85,14 +88,13 @@ export default function App() {
       {navItems.length > 1 && (
       <SideNav
         aria-label="Navigasyon"
-        isRail
         expanded={sideNavExpanded}
         onOverlayClick={() => setSideNavExpanded(false)}
         onSideNavBlur={() => setSideNavExpanded(false)}
         isChildOfHeader
       >
         <SideNavItems>
-          {navItems.map(r => (
+          {navItems.filter(r => !r.secondary).map(r => (
             <SideNavLink
               key={r.path}
               as={NavLink}
@@ -104,6 +106,28 @@ export default function App() {
               {r.label}
             </SideNavLink>
           ))}
+          {/* Everything reachable but not worth a decision before doing
+              anything sits one level down (İ1). */}
+          {navItems.some(r => r.secondary) && (
+            <SideNavMenu
+              title="Daha fazla"
+              renderIcon={OverflowMenuHorizontal}
+              defaultExpanded={navItems.some(
+                r => r.secondary && location.pathname === r.path)}
+            >
+              {navItems.filter(r => r.secondary).map(r => (
+                <SideNavMenuItem
+                  key={r.path}
+                  as={NavLink}
+                  to={r.path}
+                  isActive={location.pathname === r.path}
+                  onClick={() => setSideNavExpanded(false)}
+                >
+                  {r.label}
+                </SideNavMenuItem>
+              ))}
+            </SideNavMenu>
+          )}
         </SideNavItems>
       </SideNav>
       )}

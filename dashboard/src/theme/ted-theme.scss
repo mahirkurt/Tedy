@@ -216,6 +216,16 @@ body {
   max-width: 960px;
 }
 
+// The navigation carries its labels rather than hiding them behind a hover on
+// a rail of glyphs: reading an icon from memory is a tax on exactly the thing
+// this reader has least of. An always-open nav is 16rem wide, so the content
+// has to start after it instead of underneath it.
+@media (min-width: 66rem) {
+  .app-shell-content.cds--content:not(.app-shell-content--reader) {
+    margin-inline-start: 16rem;
+  }
+}
+
 // ─── Layout Utilities ────────────────────────────────────────────────────────
 .stack-xs {
   display: flex;

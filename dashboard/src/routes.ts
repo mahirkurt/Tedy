@@ -1,4 +1,4 @@
-import { Time, Calendar, Task, Certificate, EventSchedule, ExamMode,
+import { Time, Task, Certificate, EventSchedule, ExamMode,
          GroupPresentation, Book, Catalog, ChartBar, Notification, UserAvatar } from '@carbon/icons-react'
 import type { ComponentType } from 'react'
 import type { UserRole } from './hooks/useAuth'
@@ -11,6 +11,12 @@ export interface RouteConfig {
   /** Nested/detail routes are routable but stay out of the side navigation. */
   showInNav?: boolean
   /**
+   * Reachable, but not one of the five things worth deciding between before
+   * doing anything. Grouped under "Daha fazla" rather than competing for the
+   * same glance (design principles İ1).
+   */
+  secondary?: boolean
+  /**
    * Reachable by "reader" accounts. Default-deny: a route without this flag is
    * for full-access accounts only, so a new page never leaks by omission.
    */
@@ -19,18 +25,17 @@ export interface RouteConfig {
 
 export const routes: RouteConfig[] = [
   { path: '/',          label: 'Bugün',      icon: Time,              componentName: 'TodaySchedule' },
-  { path: '/program',   label: 'Program',    icon: Calendar,          componentName: 'WeeklySchedule' },
   { path: '/isler',     label: 'İşler',      icon: Task,              componentName: 'HomeworkTracker' },
   { path: '/asistan',   label: 'Asistan',    icon: Notification,      componentName: 'AssistantChat' },
-  { path: '/notlar',    label: 'Notlar',     icon: Certificate,       componentName: 'GradeTable' },
+  { path: '/notlar',    label: 'Notlar',     icon: Certificate,       componentName: 'GradeTable' , secondary: true },
 
-  { path: '/takvim',    label: 'Takvim',     icon: EventSchedule,     componentName: 'CalendarEvents' },
-  { path: '/takimlar',  label: 'Takımlar',   icon: GroupPresentation, componentName: 'TeamActivities' },
-  { path: '/dersler',   label: 'Dersler',    icon: Catalog,           componentName: 'CourseContent' },
+  { path: '/takvim',    label: 'Takvim',     icon: EventSchedule,     componentName: 'CalendarEvents' , secondary: true },
+  { path: '/takimlar',  label: 'Takımlar',   icon: GroupPresentation, componentName: 'TeamActivities' , secondary: true },
+  { path: '/dersler',   label: 'Dersler',    icon: Catalog,           componentName: 'Lessons' },
   { path: '/kitaplar',  label: 'Tedy Books', icon: Book,              componentName: 'TedyBooks', readerAccess: true },
-  { path: '/ilerleme',  label: 'İlerleme',   icon: ChartBar,          componentName: 'PlatformProgress' },
-  { path: '/duyurular', label: 'Duyurular',  icon: Notification,      componentName: 'Announcements' },
-  { path: '/profil',    label: 'Profil',     icon: UserAvatar,        componentName: 'StudentProfile' },
+  { path: '/ilerleme',  label: 'İlerleme',   icon: ChartBar,          componentName: 'PlatformProgress' , secondary: true },
+  { path: '/duyurular', label: 'Duyurular',  icon: Notification,      componentName: 'Announcements' , secondary: true },
+  { path: '/profil',    label: 'Profil',     icon: UserAvatar,        componentName: 'StudentProfile' , secondary: true },
 
   // Exams keep a page of their own: grades, past papers and study guides are
   // real content, and folding them into a section would lose them. What they
@@ -61,4 +66,5 @@ export function navRoutesFor(role: UserRole): RouteConfig[] {
 /** Paths that moved. Bookmarks and old links redirect rather than 404. */
 export const redirects: Record<string, string> = {
   '/odevler': '/isler',
+  '/program': '/dersler',
 }

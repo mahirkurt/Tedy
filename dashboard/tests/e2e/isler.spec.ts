@@ -69,11 +69,11 @@ test('the navigation lost a decision', async ({ page }) => {
   await page.waitForTimeout(600)
 
   const nav = page.locator('nav').first()
-  // Presence, not visibility: in the collapsed rail Carbon keeps the label in
-  // the DOM for screen readers and hides it from sight, which is why the rail
-  // reads as thirteen unlabelled glyphs. Making them visible is its own step
-  // (§6 item 4); this one is about there being one fewer of them.
-  await expect(nav.getByText('İşler', { exact: true })).toHaveCount(1)
+  // Visible, not merely present. On the rail Carbon kept each label in the DOM
+  // for screen readers and hid it from sight, so the navigation read as a
+  // column of unlabelled glyphs — a memory tax on the reader who has least to
+  // spare. The rail is gone.
+  await expect(nav.getByText('İşler', { exact: true })).toBeVisible()
   await expect(nav.getByText('Sınavlar', { exact: true })).toHaveCount(0)
   await expect(nav.getByText('Ödevler', { exact: true })).toHaveCount(0)
 })
