@@ -20,10 +20,10 @@ export interface RouteConfig {
 export const routes: RouteConfig[] = [
   { path: '/',          label: 'Bugün',      icon: Time,              componentName: 'TodaySchedule' },
   { path: '/program',   label: 'Program',    icon: Calendar,          componentName: 'WeeklySchedule' },
-  { path: '/odevler',   label: 'Ödevler',    icon: Task,              componentName: 'HomeworkTracker' },
+  { path: '/isler',     label: 'İşler',      icon: Task,              componentName: 'HomeworkTracker' },
   { path: '/asistan',   label: 'Asistan',    icon: Notification,      componentName: 'AssistantChat' },
   { path: '/notlar',    label: 'Notlar',     icon: Certificate,       componentName: 'GradeTable' },
-  { path: '/sinavlar',  label: 'Sınavlar',   icon: ExamMode,          componentName: 'ExamTimeline' },
+
   { path: '/takvim',    label: 'Takvim',     icon: EventSchedule,     componentName: 'CalendarEvents' },
   { path: '/takimlar',  label: 'Takımlar',   icon: GroupPresentation, componentName: 'TeamActivities' },
   { path: '/dersler',   label: 'Dersler',    icon: Catalog,           componentName: 'CourseContent' },
@@ -31,6 +31,12 @@ export const routes: RouteConfig[] = [
   { path: '/ilerleme',  label: 'İlerleme',   icon: ChartBar,          componentName: 'PlatformProgress' },
   { path: '/duyurular', label: 'Duyurular',  icon: Notification,      componentName: 'Announcements' },
   { path: '/profil',    label: 'Profil',     icon: UserAvatar,        componentName: 'StudentProfile' },
+
+  // Exams keep a page of their own: grades, past papers and study guides are
+  // real content, and folding them into a section would lose them. What they
+  // give up is a slot in the primary navigation — the work ahead is surfaced
+  // inside İşler, which is where Işık goes to see what she owes.
+  { path: '/sinavlar',  label: 'Sınavlar',   icon: ExamMode, componentName: 'ExamTimeline', showInNav: false },
 
   { path: '/kitaplar/:slug',             label: 'Kitap',  icon: Book, componentName: 'BookDetail', showInNav: false, readerAccess: true },
   { path: '/kitaplar/:slug/:chapterId',  icon: Book, label: 'Okuma', componentName: 'BookReader', showInNav: false, readerAccess: true },
@@ -50,4 +56,9 @@ export function routesFor(role: UserRole): RouteConfig[] {
 
 export function navRoutesFor(role: UserRole): RouteConfig[] {
   return routesFor(role).filter(r => r.showInNav !== false)
+}
+
+/** Paths that moved. Bookmarks and old links redirect rather than 404. */
+export const redirects: Record<string, string> = {
+  '/odevler': '/isler',
 }

@@ -9,7 +9,7 @@ import { SessionContext } from './contexts/session'
 import { useAuth } from './hooks/useAuth'
 import { useFocusMode } from './contexts/focusMode'
 import { activateReaderProfile, useBookProgressSync } from './hooks/useBookReader'
-import { routesFor, navRoutesFor, ROLE_HOME } from './routes'
+import { routesFor, navRoutesFor, ROLE_HOME, redirects } from './routes'
 import { PortalStatusBanner } from './components/PortalStatusBanner'
 
 import TodaySchedule from './components/TodaySchedule'
@@ -129,6 +129,10 @@ export default function App() {
             const Comp = COMPONENTS[r.componentName]
             return <Route key={r.path} path={r.path} element={<Comp />} />
           })}
+          {/* Paths that moved keep working. */}
+          {Object.entries(redirects).map(([from, to]) => (
+            <Route key={from} path={from} element={<Navigate to={to} replace />} />
+          ))}
           {/* Anything this role cannot see resolves to its own home. */}
           <Route path="*" element={<Navigate to={home} replace />} />
         </Routes>

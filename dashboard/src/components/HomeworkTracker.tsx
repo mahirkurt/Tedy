@@ -6,6 +6,8 @@ import type { HomeworkItem } from '../types'
 import { parseDeadline, formatTurkishDate, getHomeworkStatus } from '../utils/formatters'
 import { getCountdown } from '../utils/countdown'
 import { NextThing } from './NextThing'
+import { useNavigate } from 'react-router-dom'
+import type { ExamItem } from '../types'
 
 type HomeworkGroupKey = 'aktif' | 'yapilan' | 'tamamlanan' | 'yapilmayan'
 
@@ -106,6 +108,15 @@ export default function HomeworkTracker() {
     return best
   }, [aktif])
 
+  // Exams share this surface because they are the same thing to Işık: work she
+  // owes with a date on it. Only the ones still ahead — the settled ones are
+  // history and belong on the exam page (İ7).
+  const { data: examData } = useApi<{ exams: ExamItem[] }>('/api/exams', { exams: [] })
+  const upcomingExams = useMemo(
+    () => examData.exams.filter(e => e.status === 'upcoming'),
+    [examData.exams])
+  const navigate = useNavigate()
+
 
   const toggleSection = (key: HomeworkGroupKey) => {
     setCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
@@ -189,7 +200,7 @@ export default function HomeworkTracker() {
     <div className="dashboard-card">
       <h4 className="dashboard-card__title dashboard-card__title--tight">
         <Task size={20} />
-        Ödevler & Geri Sayım
+        İşler
       </h4>
 
       {/* The page names one step before it lists anything (İ1). "Başla" opens
@@ -213,6 +224,37 @@ export default function HomeworkTracker() {
         items: aktif,
         showDoneAction: true,
       })}
+
+      {upcomingExams.length > 0 && (
+        <div className="hw-section exams-ahead">
+          <div className="hw-section__header">
+            <span className="hw-section__label">Yaklaşan Sınavlar</span>
+            <span className="hw-section__count">{upcomingExams.length}</span>
+          </div>
+          <ul className="exams-ahead__list">
+            {upcomingExams.map(e => {
+              const when = e.date ? new Date(e.date) : null
+              const days = when
+                ? Math.ceil((when.getTime() - Date.now()) / 86400000)
+                : null
+              return (
+                <li key={e.id} className="exams-ahead__row">
+                  <span className="exams-ahead__course">{e.course}</span>
+                  <span className="exams-ahead__title">{e.title}</span>
+                  {days !== null && (
+                    <span className="exams-ahead__when">
+                      {days <= 0 ? 'bugün' : `${days} gün sonra`}
+                    </span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+          <Button kind="ghost" size="sm" onClick={() => navigate('/sinavlar')}>
+            Tüm sınavlar
+          </Button>
+        </div>
+      )}
 
       {renderAccordionSection({
         keyName: 'yapilan',

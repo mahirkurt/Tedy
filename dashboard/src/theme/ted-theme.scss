@@ -1043,6 +1043,40 @@ body {
 }
 
 // ─── Homework Sections ───────────────────────────────────────────────────────
+// Exams ahead, on the İşler surface. Same row rhythm as a homework item so the
+// two kinds of owed work read as one list rather than two systems.
+.exams-ahead__list { list-style: none; margin: 0; padding: 0; }
+
+.exams-ahead__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ted-space-sm, 0.5rem);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--ted-color-border-subtle);
+}
+
+.exams-ahead__row:last-child { border-bottom: 0; }
+
+.exams-ahead__course { font-weight: 600; color: var(--ted-color-text-primary); }
+
+.exams-ahead__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--ted-color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Time in mono with tabular figures, like every other duration here.
+.exams-ahead__when {
+  flex: 0 0 auto;
+  font-family: 'IBM Plex Mono', 'Menlo', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  color: var(--ted-color-text-secondary);
+}
+
 .hw-section {
   margin-top: var(--ted-space-md);
 

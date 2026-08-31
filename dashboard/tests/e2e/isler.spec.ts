@@ -1,0 +1,79 @@
+import { test, expect } from '@playwright/test'
+import type { Page } from '@playwright/test'
+
+// docs/frontend-surface-designs.md §1 and §4.2: homework and exams are one
+// thing in Işık's head — work she owes — and two only in ours. They live on one
+// surface now, and the old paths keep working.
+
+const json = (b: unknown) => ({
+  status: 200, contentType: 'application/json', body: JSON.stringify(b),
+})
+
+const HW = {
+  'Ders Adı': 'Fen Bilimleri', 'Ödev Başlığı': '3 soru',
+  'Ödev Durumu': 'Değerlendirilmemiş', 'Ödev Son Teslim Tarihi': '16.09.2026 23:59',
+}
+
+const EXAM = {
+  id: 'e1', course: 'Matematik', title: 'Matematik 1. yazılı', rawTitle: '',
+  courseColor: '', examNumber: 1, date: '2026-09-25T09:00:00', endDate: null,
+  allDay: false, status: 'upcoming', grade: null, studyGuide: null,
+}
+
+async function mock(page: Page) {
+  await page.route('**/api/homework', r => r.fulfill(json({ summary: '', homework: [HW] })))
+  await page.route('**/api/enrichment', r => r.fulfill(json({})))
+  await page.route('**/api/exams', r => r.fulfill(json({ exams: [EXAM] })))
+  await page.route('**/api/health', r => r.fulfill(json({
+    timestamp: '', success: true, scrape_errors: [], duration_seconds: 1,
+  })))
+  await page.clock.setFixedTime(new Date('2026-09-15T18:00:00'))
+}
+
+test('work owed lives on one surface: homework and the exams ahead', async ({ page }) => {
+  await mock(page)
+  await page.goto('/isler')
+  await page.waitForTimeout(600)
+
+  // Assert the surface, not just the strings: Bugün also lists homework and
+  // upcoming exams, so an unrouted /isler falling back to it would pass a test
+  // that only looked for the text.
+  expect(new URL(page.url()).pathname).toBe('/isler')
+  // The label is title case in the DOM; the shouting is CSS.
+  await expect(page.getByText('Aktif Ödevler', { exact: false })).toBeVisible()
+
+  await expect(page.getByText('3 soru', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('Matematik 1. yazılı', { exact: false }).first()).toBeVisible()
+})
+
+test('the old paths still land somewhere sensible', async ({ page }) => {
+  await mock(page)
+
+  // Nothing that was bookmarked breaks; it redirects rather than 404s.
+  await page.goto('/odevler')
+  // Wait on the condition, not on a guess about how long the redirect takes.
+  await page.waitForURL('**/isler')
+  expect(new URL(page.url()).pathname).toBe('/isler')
+
+  await page.goto('/sinavlar')
+  await page.waitForLoadState('networkidle')
+  // The exam detail keeps its own page — grades, past papers and study guides
+  // are real content and compressing them into a section would lose them. It
+  // just stops taking a slot in the primary navigation.
+  expect(new URL(page.url()).pathname).toBe('/sinavlar')
+})
+
+test('the navigation lost a decision', async ({ page }) => {
+  await mock(page)
+  await page.goto('/isler')
+  await page.waitForTimeout(600)
+
+  const nav = page.locator('nav').first()
+  // Presence, not visibility: in the collapsed rail Carbon keeps the label in
+  // the DOM for screen readers and hides it from sight, which is why the rail
+  // reads as thirteen unlabelled glyphs. Making them visible is its own step
+  // (§6 item 4); this one is about there being one fewer of them.
+  await expect(nav.getByText('İşler', { exact: true })).toHaveCount(1)
+  await expect(nav.getByText('Sınavlar', { exact: true })).toHaveCount(0)
+  await expect(nav.getByText('Ödevler', { exact: true })).toHaveCount(0)
+})
