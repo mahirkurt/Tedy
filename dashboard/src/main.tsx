@@ -8,7 +8,7 @@ import './theme/ted-theme.scss'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <Theme theme="g10">
+    <Theme theme="g10" className="app-root">
       <FocusModeProvider>
         <BrowserRouter>
           <App />

@@ -61,13 +61,13 @@ export default function Announcements() {
 
   return (
     <div className="dashboard-card">
-      <h4 className="dashboard-card__title">
+      <h2 className="dashboard-card__title">
         <Notification size={20} />
         Okul Duyuruları
-      </h4>
+      </h2>
       {visibleWeeks.map(([weekLabel, anns]) => (
         <div key={weekLabel} className="announcements-week-group">
-          <h5 className="announcements-week-group__label">{weekLabel}</h5>
+          <h3 className="announcements-week-group__label">{weekLabel}</h3>
           <Accordion>
             {anns.map((ann, i) => (
               <AccordionItem

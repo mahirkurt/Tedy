@@ -134,10 +134,10 @@ export default function CourseContent() {
 
   return (
     <div className="dashboard-card">
-      <h4 className="dashboard-card__title">
+      <h2 className="dashboard-card__title">
         <Education size={20} />
         Ders İçerikleri
-      </h4>
+      </h2>
       <Tabs>
         <TabList aria-label="Ders içerikleri" contained>
           {courses.map(([name]) => (

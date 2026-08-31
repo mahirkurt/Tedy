@@ -449,6 +449,32 @@ yakın) ya da uzak gelecek (en az acil) gibi sıralanmaz. `nextHw` artık
 içine girdi — dışarıdayken her render'da yeni dizi ürettiği için `useMemo`
 hiçbir zaman bellemiyordu.
 
+**Playwright denetimi (2026-08-31).** Yayınlanan paket 11 yüzey × 2 görüntü
+alanı × 2 veri durumu (dolu / bugün gerçekten sunulan boş) olarak yakalandı ve
+kontrast, odak halkası, dokunma hedefi, başlık sırası ve yatay taşma ölçüldü.
+Sekiz bulgu; hepsi `tests/e2e/audit.spec.ts` ile çivilendi.
+
+| Bulgu | Kök neden | Etki |
+|---|---|---|
+| Bozuk tek bir API yanıtı **tüm panoyu** beyaz ekrana düşürüyordu | `ErrorBoundary` yok | her yüzey |
+| "Odak" etiketi koyu mavi başlıkta **1,6:1** | kural `.cds--toggle__label-text`'i hedefliyordu; Carbon v11 `.cds--toggle__text` üretiyor | her sayfa |
+| Hiçbir sayfada `h1` yok | kabuk sayfayı adlandırmıyordu | her sayfa |
+| Başlık listesi **kapalı bir kipin** iki başlığıyla açılıyordu | kapalı `ComposedModal` `ModalHeader`'ını DOM'da tutuyor | her sayfa |
+| h2 → h4 atlaması | kart başlıkları h4 | 8 yüzey |
+| Profil ızgarası telefonda ikinci sütunu ekran dışına taşıyordu | sabit `1fr 1fr` | Profil |
+| Sağlık düğmesi 82×20 | WCAG 2.2 asgari 24×24 | başlık |
+| Altbilgi sayfa ortasında, altında 212px ölü boşluk | kabuk görüntü alanını doldurmuyordu | boş günler |
+
+`.cds--toggle__label-text` ile daha önce silinen `.cds--skeleton` **aynı
+ailedir**: Carbon'un ürettiği sınıf adı varsayıldı, ölçülmedi. Carbon
+seçicisi yazarken DOM'a bakılır.
+
+**Ölçüm notu:** `page.evaluate()`'e dize olarak verilen `() => {...}` *ifade*
+olarak değerlendirilir ve fonksiyonun kendisi döner — `{}` olarak serileşir ve
+denetim sessizce boş geçer. IIFE olmalı. Ayrıca arka planı ararken yalnız
+`background-color`'a bakan bir sonda gradient'li başlığı kaçırır ve beyaz
+metni "görünmez" diye raporlar (ölçülen yanlış pozitif).
+
 **Doğrulama notu:** tam süit çıktısı `tail -1` ile okunmamalı — Playwright
 başarısızlığı geçenlerin **üstüne** yazar. Çıkış koduna bakılır.
 

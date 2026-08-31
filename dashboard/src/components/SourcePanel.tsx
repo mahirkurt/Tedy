@@ -47,7 +47,7 @@ function RefGroup({
 }) {
   return (
     <section className={`ac__ref-group${unclassified ? ' ac__ref-group--unclassified' : ''}`}>
-      <h5 className="ac__ref-group-title">{title}</h5>
+      <h3 className="ac__ref-group-title">{title}</h3>
       <ul className="ac__ref-list">
         {items.map(c => (
           <li
@@ -91,7 +91,7 @@ export default function SourcePanel({ citations, activeId }: Props) {
   if (citations.length === 0) {
     return (
       <Tile className="ac__panel">
-        <h4 className="ac__panel-title"><DocumentView size={16} /> Kaynaklar</h4>
+        <h2 className="ac__panel-title"><DocumentView size={16} /> Kaynaklar</h2>
         <p className="ac__muted">Soru sorduğunda kaynaklar burada görünecek.</p>
       </Tile>
     )
@@ -99,7 +99,7 @@ export default function SourcePanel({ citations, activeId }: Props) {
 
   return (
     <Tile className="ac__panel">
-      <h4 className="ac__panel-title"><DocumentView size={16} /> Kaynaklar</h4>
+      <h2 className="ac__panel-title"><DocumentView size={16} /> Kaynaklar</h2>
       {GROUP_ORDER.map(kind => {
         const group = citations.filter(c => c.kind === kind)
         if (group.length === 0) return null

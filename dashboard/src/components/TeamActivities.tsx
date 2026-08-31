@@ -63,14 +63,14 @@ export default function TeamActivities() {
 
   return (
     <div className="dashboard-card">
-      <h4 className="dashboard-card__title">
+      <h2 className="dashboard-card__title">
         <GroupPresentation size={20} />
         Takım Çalışmaları & ÖGEP
-      </h4>
+      </h2>
 
       {activities.length > 0 && (
         <>
-          <h5 className="team-section-label">Academy+</h5>
+          <h3 className="team-section-label">Academy+</h3>
           <StructuredListWrapper isCondensed>
             <StructuredListHead>
               <StructuredListRow head>
@@ -110,7 +110,7 @@ export default function TeamActivities() {
 
       {ogep.length > 0 && (
         <>
-          <h5 className="team-section-label">ÖGEP Oturumları</h5>
+          <h3 className="team-section-label">ÖGEP Oturumları</h3>
           <StructuredListWrapper isCondensed>
             <StructuredListHead>
               <StructuredListRow head>

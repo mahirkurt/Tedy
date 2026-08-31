@@ -50,10 +50,10 @@ export default function PlatformProgress() {
 
   return (
     <div className="dashboard-card">
-      <h4 className="dashboard-card__title">
+      <h2 className="dashboard-card__title">
         <ChartBar size={20} />
         Platform İlerleme
-      </h4>
+      </h2>
 
       {allComplete && (
         <InlineNotification

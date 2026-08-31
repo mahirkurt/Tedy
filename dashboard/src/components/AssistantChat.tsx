@@ -544,9 +544,9 @@ export default function AssistantChat() {
           <SourcePanel citations={latestAssistant?.citations ?? []} activeId={activeCitation} />
 
           <Tile className="ac__panel">
-            <h4 className="ac__panel-title">
+            <h2 className="ac__panel-title">
               <Time size={16} /> Plan Blokları
-            </h4>
+            </h2>
             {hasPlanBlocks ? (
               <ul className="ac__ref-list">
                 {latestAssistant!.planBlocks!.map((b, idx) => (

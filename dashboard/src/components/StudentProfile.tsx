@@ -98,10 +98,10 @@ export default function StudentProfile() {
   return (
     <>
       <div className="dashboard-card student-profile-card">
-        <h4 className="dashboard-card__title">
+        <h2 className="dashboard-card__title">
           <UserProfile size={20} />
           Öğrenci Profili
-        </h4>
+        </h2>
         <div className="student-profile">
           <div className="student-profile__photo-wrap">
             {displayPhoto ? (
@@ -146,10 +146,10 @@ export default function StudentProfile() {
       </div>
 
       <div className="dashboard-card">
-        <h4 className="dashboard-card__title">
+        <h2 className="dashboard-card__title">
           <AddAlt size={20} />
           Özel Ders Ekle
-        </h4>
+        </h2>
         <form className="private-lesson-form" onSubmit={handleAddLesson}>
           <label className="private-lesson-form__label">
             Ders
@@ -230,7 +230,7 @@ export default function StudentProfile() {
       </div>
 
       <div className="dashboard-card">
-        <h4 className="dashboard-card__title">Tanımlı Özel Dersler</h4>
+        <h2 className="dashboard-card__title">Tanımlı Özel Dersler</h2>
         {(lessonData.lessons || []).length === 0 ? (
           <EmptyLine>Tanımlı özel ders yok.</EmptyLine>
         ) : (

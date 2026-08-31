@@ -211,10 +211,10 @@ export default function HomeworkTracker() {
   return (
     <>
     <div className="dashboard-card">
-      <h4 className="dashboard-card__title dashboard-card__title--tight">
+      <h2 className="dashboard-card__title dashboard-card__title--tight">
         <Task size={20} />
         İşler
-      </h4>
+      </h2>
 
       {/* The page names one step before it lists anything (İ1). "Başla" opens
           the work itself, so the verb keeps its meaning through the flow. */}
@@ -294,15 +294,19 @@ export default function HomeworkTracker() {
       )}
     </div>
 
-    <ComposedModal open={!!selectedHw} onClose={() => setSelectedHw(null)} size="md">
-      <ModalHeader
-        title={selectedHw?.["Ödev Başlığı"] || ''}
-        label={selectedHw?.normalized_course || selectedHw?.["Ders Adı"] || ''}
-      />
-      <ModalBody>
-        {selectedHw && <HomeworkModalBody hw={selectedHw} enrichmentData={enrichmentData} />}
-      </ModalBody>
-    </ComposedModal>
+    {/* Mounted only while open: a closed ComposedModal keeps its
+        ModalHeader in the document outline. */}
+    {selectedHw && (
+      <ComposedModal open onClose={() => setSelectedHw(null)} size="md">
+        <ModalHeader
+          title={selectedHw["Ödev Başlığı"] || ''}
+          label={selectedHw.normalized_course || selectedHw["Ders Adı"] || ''}
+        />
+        <ModalBody>
+          <HomeworkModalBody hw={selectedHw} enrichmentData={enrichmentData} />
+        </ModalBody>
+      </ComposedModal>
+    )}
     </>
   )
 }

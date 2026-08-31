@@ -349,8 +349,12 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
         </HeaderGlobalBar>
       </Header>
 
+      {/* Mounted only while open. A closed ComposedModal keeps its
+          ModalHeader in the DOM, and those two headings led the heading
+          outline of every page in the app. */}
+      {photoModalOpen && (
       <ComposedModal
-        open={photoModalOpen}
+        open
         onClose={resetPhotoFlow}
         size="md"
       >
@@ -464,6 +468,7 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
           </Button>
         </ModalFooter>
       </ComposedModal>
+      )}
     </>
   )
 }

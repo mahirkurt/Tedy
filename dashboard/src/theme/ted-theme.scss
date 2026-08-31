@@ -214,6 +214,13 @@ body {
 .app-shell-content.cds--content {
   padding: 3.5rem var(--ted-space-lg) var(--ted-space-xl);
   max-width: 960px;
+  // On a mostly-empty day the content ran out around 500px and the footer
+  // sat halfway down the window with 200px of nothing under it, which reads
+  // as a page that failed to finish loading. The shell is a column and the
+  // content takes the slack, so this holds whatever height the footer ends
+  // up being — a subtracted constant would not (the footer is 81px on a
+  // desktop and taller once it wraps on a phone).
+  flex: 1 0 auto;
 }
 
 // The navigation carries its labels rather than hiding them behind a hover on
@@ -1296,7 +1303,12 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0;
+  // Measured 82x20 — under the 24px WCAG 2.2 minimum. The pill inside keeps
+  // its own size; this only grows the hit area around it.
+  padding: 0.25rem 0;
+  min-height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
 
   &:focus-visible {
     outline: 2px solid #fff;
@@ -2067,7 +2079,11 @@ body {
   align-items: center;
   padding: 0 var(--ted-space-xs);
 
-  .cds--toggle__label-text {
+  // Carbon v11 emits `.cds--toggle__text`, not `.cds--toggle__label-text`.
+  // The old selector matched nothing, so this label — the one control the
+  // product is named around — fell back to Carbon's near-black body colour
+  // on a dark blue header and measured 1.6:1 (D2).
+  .cds--toggle__text {
     color: var(--ted-header-text);
     @include type.type-style('label-01');
     font-weight: 500;
@@ -2677,7 +2693,10 @@ body {
 
 .student-profile__fields {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  // Was a hard `1fr 1fr`, which on a 390px phone pushed the second column
+  // past the viewport and clipped its values mid-word. auto-fit lets the
+  // grid drop to one column when two will not fit.
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
   gap: var(--ted-space-xs);
 }
 
@@ -4956,4 +4975,46 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   margin: 0 0 var(--ted-space-md, 1rem);
   color: var(--ted-color-text-secondary);
   font-size: 0.875rem;
+}
+
+// ─── Route boundary ──────────────────────────────────────────────────────────
+// Shown in place of one crashed surface. Deliberately quiet: it is an
+// explanation, not an alarm, and the navigation beside it is the real way out.
+.route-boundary {
+  padding: var(--ted-space-lg);
+  background-color: var(--cds-layer);
+  border-inline-start: 3px solid var(--ted-support-warning);
+}
+
+.route-boundary__title {
+  margin: 0 0 var(--ted-space-2xs);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ted-color-text-primary);
+}
+
+.route-boundary__body {
+  margin: 0 0 var(--ted-space-sm);
+  max-width: 46ch;
+  color: var(--ted-color-text-secondary);
+}
+
+
+// The app shell is a column: header and nav are fixed and out of flow, while
+// the routed content grows to take whatever height is left and the footer is
+// pushed to the bottom rather than floating wherever the content stopped.
+//
+// The column has to reach `.app-root` — Carbon's Theme renders a wrapper div
+// between #root and the shell, and a column applied only to #root stops at
+// that wrapper. `.app-root` is our own class on it rather than `.cds--g10`,
+// which names the theme and would stop matching if the theme ever changed.
+#root,
+.app-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-root {
+  flex: 1 0 auto;
 }

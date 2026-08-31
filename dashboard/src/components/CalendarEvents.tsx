@@ -178,10 +178,10 @@ export default function CalendarEvents() {
   if (loading) {
     return (
       <div className="dashboard-card">
-        <h4 className="dashboard-card__title">
+        <h2 className="dashboard-card__title">
           <EventSchedule size={20} />
           Haftalik Takvim
-        </h4>
+        </h2>
         <div className="today-loading">
           <div className="today-loading__bar" />
           <div className="today-loading__bar today-loading__bar--short" />
@@ -192,10 +192,10 @@ export default function CalendarEvents() {
 
   return (
     <div className="dashboard-card" style={{ position: 'relative' }}>
-      <h4 className="dashboard-card__title">
+      <h2 className="dashboard-card__title">
         <EventSchedule size={20} />
         Haftalik Takvim
-      </h4>
+      </h2>
 
       {/* Navigation */}
       <div className="calendar-nav">

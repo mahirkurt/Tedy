@@ -23,7 +23,11 @@ test.describe('Tedy Books mobile experience', () => {
 
     await page.getByRole('button', { name: 'Menü' }).click()
     await expect(page.getByRole('button', { name: 'Menüyü kapat' })).toBeVisible()
-    await expect.poll(async () => (await navigation.boundingBox())?.x).toBe(0)
+    // Carbon animates the nav open with `inline-size` over 0.11s, and its x
+    // is 0 from the first frame — so polling x returns instantly and the
+    // width below was read mid-transition (measured 1.0 → 86.9 → 217.5 →
+    // 256). Wait for the property this test actually asserts.
+    await expect.poll(async () => (await navigation.boundingBox())?.width).toBe(256)
 
     const openContentBox = await content.boundingBox()
     const openNavBox = await navigation.boundingBox()

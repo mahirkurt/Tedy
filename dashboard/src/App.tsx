@@ -11,6 +11,7 @@ import { useAuth } from './hooks/useAuth'
 import { useFocusMode } from './contexts/focusMode'
 import { activateReaderProfile, useBookProgressSync } from './hooks/useBookReader'
 import { routesFor, navRoutesFor, ROLE_HOME, redirects } from './routes'
+import RouteBoundary from './components/RouteBoundary'
 import { PortalStatusBanner } from './components/PortalStatusBanner'
 
 import TodaySchedule from './components/TodaySchedule'
@@ -72,6 +73,10 @@ export default function App() {
   const navItems = navRoutesFor(user.role)
   const home = ROLE_HOME[user.role]
   const isReader = user.role === 'reader'
+  // The nav already names every route; the page heading reuses that name
+  // rather than inventing a second vocabulary for the same place.
+  const pageTitle =
+    visibleRoutes.find(r => r.path === location.pathname)?.label ?? 'TEDY'
 
   return (
     <SessionContext.Provider value={user}>
@@ -148,6 +153,12 @@ export default function App() {
       >
         {/* Readers are refused /api/health, so the banner is not theirs to fetch. */}
         {!isReader && <PortalStatusBanner />}
+        {/* Named for assistive technology, which otherwise finds no page
+            title at all: every surface used to open its heading outline
+            with a card title, or with a closed modal's heading. It stays
+            invisible because the surface below already announces itself. */}
+        <h1 className="cds--visually-hidden">{pageTitle}</h1>
+        <RouteBoundary resetKey={location.pathname}>
         <Routes>
           {visibleRoutes.map(r => {
             const Comp = COMPONENTS[r.componentName]
@@ -160,6 +171,7 @@ export default function App() {
           {/* Anything this role cannot see resolves to its own home. */}
           <Route path="*" element={<Navigate to={home} replace />} />
         </Routes>
+        </RouteBoundary>
       </Content>
       {isReader ? <ReaderFooter /> : <DashboardFooter />}
     </SessionContext.Provider>
