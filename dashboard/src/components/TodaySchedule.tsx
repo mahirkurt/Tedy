@@ -520,13 +520,12 @@ export default function TodaySchedule() {
       )}
 
       {agenda.length === 0 ? (
-        <div className="today-empty">
-          <div className="today-empty__icon" aria-hidden>&#9728;</div>
-          <h3 className="today-empty__title">{dayName} ajandası boş</h3>
-          <p className="today-empty__text">
-            Seçili gün için planlı ders, ödev teslimi veya etkinlik yok.
-          </p>
-        </div>
+        // One line, not a card. The old empty state spent a large decorative
+        // sun and ~200px competing with the one thing above it, which is the
+        // attention budget spent on the absence of news (İ6, §2.3).
+        <p className="today-empty">
+          {dayName} için planlı ders, ödev teslimi veya etkinlik yok.
+        </p>
       ) : (
         <>
           {/* ── Hero card ── */}

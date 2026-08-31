@@ -363,13 +363,6 @@ body {
 }
 
 // Empty state
-.today-empty {
-  text-align: center;
-  padding: 3rem var(--ted-space-lg);
-  background: var(--ted-card-bg);
-  border-radius: var(--ted-radius-card);
-  box-shadow: var(--ted-shadow-card);
-}
 
 .today-empty__icon {
   font-size: 2.5rem;
@@ -4891,4 +4884,12 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
     animation-duration: 1ms;
     animation-delay: 0ms;
   }
+}
+
+// Empty state is a sentence, not a card (§2.3). A decorative icon and a
+// 200px panel announce the absence of news louder than the news itself.
+.today-empty {
+  margin: 0 0 var(--ted-space-md, 1rem);
+  color: var(--ted-color-text-secondary);
+  font-size: 0.875rem;
 }
