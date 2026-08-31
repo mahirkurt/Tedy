@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Tag, Tile, Button } from '@carbon/react'
-import { ChevronDown, ChevronUp, ExamMode, Document, Task as TaskIcon } from '@carbon/icons-react'
+import { ChevronDown, ChevronUp, Document, Task as TaskIcon } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import type { ExamItem, ExamsApiResponse } from '../types'
 import { getExamCountdown } from '../utils/countdown'
 import { MONTHS_SHORT, gradeColor } from '../utils/formatters'
+import { EmptyLine } from './patterns/EmptyLine'
 
 const EMPTY_RESPONSE: ExamsApiResponse = { exams: [], stats: { upcoming: 0, past: 0, averageGrade: null } }
 
@@ -180,11 +181,7 @@ export default function ExamTimeline() {
 
   if (data.exams.length === 0) {
     return (
-      <div className="exam-empty">
-        <ExamMode size={48} className="exam-empty__icon" />
-        <h3 className="exam-empty__title">Sınav bulunamadı</h3>
-        <p className="exam-empty__text">Takvimde henüz sınav etkinliği yok.</p>
-      </div>
+      <EmptyLine>Takvimde henüz sınav yok.</EmptyLine>
     )
   }
 

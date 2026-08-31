@@ -1068,11 +1068,8 @@ body {
   white-space: nowrap;
 }
 
-// Time in mono with tabular figures, like every other duration here.
 .exams-ahead__when {
   flex: 0 0 auto;
-  font-family: 'IBM Plex Mono', 'Menlo', monospace;
-  font-variant-numeric: tabular-nums;
   font-size: 0.8125rem;
   color: var(--ted-color-text-secondary);
 }

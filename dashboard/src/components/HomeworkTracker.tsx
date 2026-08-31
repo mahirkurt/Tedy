@@ -6,8 +6,11 @@ import type { HomeworkItem } from '../types'
 import { parseDeadline, formatTurkishDate, getHomeworkStatus } from '../utils/formatters'
 import { getCountdown } from '../utils/countdown'
 import { NextThing } from './NextThing'
+import { describeDaysAhead } from './patterns/time'
+import './patterns/patterns.scss'
 import { useNavigate } from 'react-router-dom'
 import type { ExamItem } from '../types'
+import { EmptyLine } from './patterns/EmptyLine'
 
 type HomeworkGroupKey = 'aktif' | 'yapilan' | 'tamamlanan' | 'yapilmayan'
 
@@ -234,16 +237,13 @@ export default function HomeworkTracker() {
           <ul className="exams-ahead__list">
             {upcomingExams.map(e => {
               const when = e.date ? new Date(e.date) : null
-              const days = when
-                ? Math.ceil((when.getTime() - Date.now()) / 86400000)
-                : null
               return (
                 <li key={e.id} className="exams-ahead__row">
                   <span className="exams-ahead__course">{e.course}</span>
                   <span className="exams-ahead__title">{e.title}</span>
-                  {days !== null && (
-                    <span className="exams-ahead__when">
-                      {days <= 0 ? 'bugün' : `${days} gün sonra`}
+                  {when && (
+                    <span className="exams-ahead__when tedy-time">
+                      {describeDaysAhead(when)}
                     </span>
                   )}
                 </li>
@@ -278,7 +278,7 @@ export default function HomeworkTracker() {
       })}
 
       {aktif.length === 0 && yapilan.length === 0 && tamamlanan.length === 0 && yapilmayan.length === 0 && (
-        <p className="dashboard-empty-text">Ödev bulunamadı.</p>
+        <EmptyLine>Bu bölümde iş yok.</EmptyLine>
       )}
     </div>
 

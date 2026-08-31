@@ -1,3 +1,5 @@
+import { clock, describeRemaining } from './patterns/time'
+import './patterns/patterns.scss'
 import './DayStrip.scss'
 
 export interface DayStripProps {
@@ -11,18 +13,6 @@ export interface DayStripProps {
   anchorMin?: number
 }
 
-const pad = (n: number) => String(n).padStart(2, '0')
-const clock = (min: number) => `${pad(Math.floor(min / 60))}:${pad(min % 60)}`
-
-/** "3 saat 20 dakikan var" — a resource, never a countdown to a deadline. */
-function describeRemaining(minutes: number): string {
-  if (minutes <= 0) return 'Bugünlük bu kadar'
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  if (h === 0) return `${m} dakikan var`
-  if (m === 0) return `${h} saatin var`
-  return `${h} saat ${m} dakikan var`
-}
 
 /**
  * Today, from now until bedtime, drawn to scale.
@@ -68,9 +58,9 @@ export function DayStrip({ nowMin, bedtimeMin, focusEndMin, anchorMin }: DayStri
       }
     >
       <div className="day-strip__head">
-        <span className="day-strip__now-label">ŞİMDİ {clock(nowMin)}</span>
+        <span className="day-strip__now-label tedy-time">ŞİMDİ {clock(nowMin)}</span>
         <span className="day-strip__left">{remaining}</span>
-        <span className="day-strip__end-label">yatma {clock(bedtimeMin)}</span>
+        <span className="day-strip__end-label tedy-time">yatma {clock(bedtimeMin)}</span>
       </div>
 
       <div className="day-strip__track">
@@ -92,7 +82,7 @@ export function DayStrip({ nowMin, bedtimeMin, focusEndMin, anchorMin }: DayStri
             // label would hang off the start of the strip, so it starts there
             // and runs right instead of being clipped.
             className={
-              'day-strip__boundary' +
+              'day-strip__boundary tedy-time' +
               (windowWidth < 24 ? ' day-strip__boundary--start' : '')
             }
             style={{ insetInlineStart: `${windowWidth}%` }}
@@ -101,7 +91,7 @@ export function DayStrip({ nowMin, bedtimeMin, focusEndMin, anchorMin }: DayStri
           </span>
         )}
         {ticks.map(m => (
-          <span key={m} className="day-strip__tick" style={{ insetInlineStart: `${pct(m)}%` }}>
+          <span key={m} className="day-strip__tick tedy-time" style={{ insetInlineStart: `${pct(m)}%` }}>
             {clock(m)}
           </span>
         ))}

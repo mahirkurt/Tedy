@@ -19,6 +19,7 @@ import { NextThing } from './NextThing'
 import { useBookProgress } from '../hooks/useBookReader'
 import type { BookSummary } from '../types'
 import type { HomeworkItem, CalendarEvent, OgepSession, ExamsApiResponse } from '../types'
+import { EmptyLine } from './patterns/EmptyLine'
 
 interface ScheduleData {
   latest: { schedule?: { rows: string[][] } }
@@ -523,9 +524,9 @@ export default function TodaySchedule() {
         // One line, not a card. The old empty state spent a large decorative
         // sun and ~200px competing with the one thing above it, which is the
         // attention budget spent on the absence of news (İ6, §2.3).
-        <p className="today-empty">
+        <EmptyLine>
           {dayName} için planlı ders, ödev teslimi veya etkinlik yok.
-        </p>
+        </EmptyLine>
       ) : (
         <>
           {/* ── Hero card ── */}

@@ -20,15 +20,6 @@
   margin-block-end: $spacing-03;
 }
 
-// Time is set in Plex Mono with tabular figures: a timetable is an instrument,
-// and two durations should line up so they can be compared without reading.
-.day-strip__now-label,
-.day-strip__end-label,
-.day-strip__tick,
-.day-strip__boundary {
-  font-family: 'IBM Plex Mono', 'Menlo', monospace;
-  font-variant-numeric: tabular-nums;
-}
 
 .day-strip__now-label {
   @include type.type-style('label-01');

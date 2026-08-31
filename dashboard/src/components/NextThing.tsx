@@ -1,5 +1,6 @@
 import { Button } from '@carbon/react'
 import { ArrowRight } from '@carbon/icons-react'
+import './patterns/patterns.scss'
 import './NextThing.scss'
 
 export interface NextThingProps {
@@ -33,7 +34,7 @@ export function NextThing({
         <span className="next-thing__eyebrow">{eyebrow}</span>
         <h2 className="next-thing__title">{title}</h2>
         <span className="next-thing__step">
-          <span className="next-thing__step-time">{stepMinutes} dakikayla</span> {stepSuffix}
+          <span className="next-thing__step-time tedy-time">{stepMinutes} dakikayla</span> {stepSuffix}
         </span>
       </div>
       <div className="next-thing__action">

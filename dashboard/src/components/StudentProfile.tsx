@@ -4,6 +4,7 @@ import { UserAvatar, UserProfile, AddAlt } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import { COURSE_CONTENT_ORDER } from '../utils/formatters'
 import type { PrivateLesson, StudentProfileData } from '../types'
+import { EmptyLine } from './patterns/EmptyLine'
 
 const DEFAULT_PROFILE: StudentProfileData = {
   name: '',
@@ -224,7 +225,7 @@ export default function StudentProfile() {
       <div className="dashboard-card">
         <h4 className="dashboard-card__title">Tanımlı Özel Dersler</h4>
         {(lessonData.lessons || []).length === 0 ? (
-          <p className="dashboard-empty-text">Henüz özel ders tanımlı değil.</p>
+          <EmptyLine>Tanımlı özel ders yok.</EmptyLine>
         ) : (
           <div className="stack-sm">
             {lessonData.lessons.map(lesson => (

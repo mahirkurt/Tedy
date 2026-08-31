@@ -305,6 +305,13 @@ neredeyim?"
 ("Video listesi yükleniyor…", "Ders listesi yükleniyor…", "Ödev listesi
 yükleniyor…") — üç eşzamanlı yükleme göstergesi (İ6 ihlali).
 
+**Ölçüldü (2026-08-31):** bu üç metin `dashboard-empty-text` sınıfıyla, yani
+**boş durum kılığında** basılıyor. Yükleniyor olmakla boş olmak iki ayrı şey;
+aynı görünümü paylaşmaları, veri gelmediğinde okurun hangisiyle karşı karşıya
+olduğunu ayırt edememesi demek. §2.4'e göre iskelete geçerler ve boş-durum
+sınıfını bırakırlar. (Bu yüzden §2.3 çıkarımında dokunulmadılar — `EmptyLine`'a
+çevirmek karışıklığı kalıcılaştırırdı.)
+
 **Tasarım:**
 
 - Üç platform **tek listede**, her biri bir satır: platform · ilerleme ·

@@ -1,0 +1,20 @@
+@use '@carbon/react/scss/theme' as theme;
+@use '@carbon/react/scss/type' as type;
+@use '@carbon/react/scss/spacing' as *;
+
+// Time is set in Plex Mono with tabular figures wherever it appears (§2.1). A
+// timetable is an instrument, and two durations should line up so they can be
+// compared without being read. One class, so the treatment cannot drift apart
+// across surfaces the way it had already started to.
+.tedy-time {
+  font-family: 'IBM Plex Mono', 'Menlo', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+// An empty state is a sentence, not a panel (§2.3). It says what is missing
+// and, when we know it, why — and then stops.
+.tedy-empty {
+  margin: $spacing-03 0;
+  @include type.type-style('body-compact-01');
+  color: theme.$text-secondary;
+}
