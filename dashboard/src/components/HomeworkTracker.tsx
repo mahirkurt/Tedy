@@ -5,6 +5,7 @@ import { useApi } from '../hooks/useApi'
 import type { HomeworkItem } from '../types'
 import { parseDeadline, formatTurkishDate, getHomeworkStatus } from '../utils/formatters'
 import { getCountdown } from '../utils/countdown'
+import { NextThing } from './NextThing'
 
 type HomeworkGroupKey = 'aktif' | 'yapilan' | 'tamamlanan' | 'yapilmayan'
 
@@ -34,7 +35,10 @@ export default function HomeworkTracker() {
   const [, setTick] = useState(0)
   const [collapsed, setCollapsed] = useState<Record<HomeworkGroupKey, boolean>>({
     aktif: false,
-    yapilan: false,
+    // Sections that need action open; everything settled starts closed (İ7).
+    // With this open, twelve finished items filled the screen while nothing
+    // was due.
+    yapilan: true,
     tamamlanan: true,
     yapilmayan: true,
   })
@@ -90,7 +94,18 @@ export default function HomeworkTracker() {
 
   const { aktif, yapilan, tamamlanan, yapilmayan } = grouped
 
-  const summaryLines = hwData.summary.split('\n').filter(l => l.trim())
+  // The list is ordered furthest-deadline-first on purpose, so its head is the
+  // least urgent item. The one named step has to pick the nearest itself (İ1).
+  const nextHw = useMemo(() => {
+    let best: HomeworkItem | null = null
+    let bestTime = Number.MAX_SAFE_INTEGER
+    for (const hw of aktif) {
+      const t = parseDeadline(hw["Ödev Son Teslim Tarihi"])?.getTime() ?? Number.MAX_SAFE_INTEGER
+      if (t < bestTime) { bestTime = t; best = hw }
+    }
+    return best
+  }, [aktif])
+
 
   const toggleSection = (key: HomeworkGroupKey) => {
     setCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
@@ -176,10 +191,20 @@ export default function HomeworkTracker() {
         <Task size={20} />
         Ödevler & Geri Sayım
       </h4>
-      {summaryLines.length > 1 && (
-        <p className="dashboard-summary-text">
-          {summaryLines.slice(1).join(' · ')}
-        </p>
+
+      {/* The page names one step before it lists anything (İ1). "Başla" opens
+          the work itself, so the verb keeps its meaning through the flow. */}
+      {nextHw && (
+        <NextThing
+          eyebrow="SIRADAKİ"
+          title={[
+            String(nextHw["Ders Adı"] || '').trim(),
+            String(nextHw["Ödev Başlığı"] || '').trim(),
+          ].filter(Boolean).join(' — ') || 'Ödev'}
+          stepMinutes={10}
+          actionLabel="Başla"
+          onAction={() => setSelectedHw(nextHw)}
+        />
       )}
 
       {renderAccordionSection({
@@ -286,7 +311,7 @@ function HomeworkCard({
           <div className="homework-item__deadline">
             Teslim: {formatTurkishDate(hw["Ödev Son Teslim Tarihi"])}
           </div>
-          {hw.first_seen && (
+          {formatTurkishDate(hw.first_seen) && (
             <div className="homework-item__first-seen" style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary, #525252)', marginTop: '2px' }}>
               İlk görülme: {formatTurkishDate(hw.first_seen)}
             </div>
@@ -300,7 +325,7 @@ function HomeworkCard({
               </Tag>
             </div>
           )}
-          {countdown.urgency === 'expired' && (
+          {countdown.urgency === 'expired' && !hw.student_marked_done && (
             <Tag type="warm-gray" size="sm">Süresi doldu</Tag>
           )}
 
@@ -316,7 +341,10 @@ function HomeworkCard({
               ) : (
                 <Button
                   size="sm"
-                  kind="primary"
+                  // Tertiary, not primary: the page already has one primary
+                  // action in the card at the top, and a screen with several
+                  // equally loud buttons is a screen with several decisions (İ1).
+                  kind="tertiary"
                   onClick={() => onDone(hw)}
                 >
                   Yaptım

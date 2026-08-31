@@ -65,12 +65,27 @@ export function normalizeCourseDisplayName(name: string): string {
 
 export function formatTurkishDate(dateStr?: string | null): string {
   if (!dateStr) return ''
-  const match = dateStr.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/)
-  if (match) {
-    const [, day, month, year, hour, min] = match
+
+  // The portal's own format.
+  const dotted = dateStr.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/)
+  if (dotted) {
+    const [, day, month, year, hour, min] = dotted
     return `${parseInt(day)} ${MONTHS_SHORT[parseInt(month) - 1]} ${year} ${hour}:${min}`
   }
-  return dateStr
+
+  // ISO, which is what first_seen carries. Without this branch the function
+  // fell through to the line below and handed the caller its own input, so
+  // "2026-03-11T23:29:16.752613" printed on screen — microseconds and all.
+  const iso = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+  if (iso) {
+    const [, year, month, day, hour, min] = iso
+    return `${parseInt(day)} ${MONTHS_SHORT[parseInt(month) - 1]} ${year} ${hour}:${min}`
+  }
+
+  // Returning the input on failure is how internal text reaches a reader
+  // (D4). An empty string is the honest answer: we could not read it, so we
+  // have nothing to say. Callers must render on the RESULT, not the source.
+  return ''
 }
 
 export function parseDeadline(dateStr?: string | null): Date | null {
