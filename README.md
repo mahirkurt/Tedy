@@ -1,61 +1,61 @@
-# TED
+# TEDY
 
-A Python project.
+Işık'ın okul portallarından (TED Rönesans, EBA, MEBI, SEBİTV, Achieve3000,
+EnglishCentral) veri toplayan ve `tedy.online` panelinde sunan yerel otomasyon.
 
-## Setup
+Google Classroom, Calendar ve Drive yazma yolu yoktur. Panel kimliği Google
+Sign-In ile doğrulanır; sohbet asistanı Gemini + BM25 + müfredat/OER MCP
+kullanır.
+
+## Çalıştırma
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+# Portal taraması (cron her 15 dakikada bir)
+python src/run_sync.py
+
+# Panel
+python src/dashboard_api.py          # :8085
+cd dashboard && npm run dev          # :3000, /api → :8085
 ```
 
-## Run
-
-```bash
-python -m src.main
-```
+`python -m src.main` üretim girişi değildir.
 
 ## Test
 
 ```bash
 pytest
+TEST_AUTH_BYPASS=1 pytest tests/test_dashboard_api.py
+cd dashboard && npm run lint
+cd dashboard && npm run build
+cd dashboard && npx playwright test   # :8286, TEDY_E2E_PORT ile değişir
+python src/check_books.py
 ```
 
-## Assistant
+## Asistan
 
-The chat path runs on the Gemini API and needs no local model server. The
-knowledge index is BM25 only — `reindex_assistant.py` writes
-`embeddings_enabled: false`, so no embedding model is pulled or called.
+Sohbet Gemini API üzerindendir; yerel model sunucusu gerekmez. Bilgi indeksi
+BM25'tir.
 
 ```bash
-# Incremental knowledge reindex
 python src/reindex_assistant.py
-
-# Full rebuild
-python src/reindex_assistant.py --full
-
-# Verify index (omit --require-embeddings: embedded_chunks is always 0 here)
 python src/assistant_ops.py verify-index --max-age-minutes 180
-```
-
-```bash
-# Generate strong assistant API key
 python src/assistant_ops.py generate-key --bytes 48 --env-line
-
-# Smoke-test OpenAI-compatible endpoints
-python src/assistant_ops.py smoke --base-url http://127.0.0.1:8085 --api-key "$ASSISTANT_API_KEY" --timeout 240
-
-# CureoHub scenario validation
-python src/assistant_ops.py validate-cureohub --base-url http://127.0.0.1:8085 --api-key "$ASSISTANT_API_KEY"
-
-# Metrics summary + balanced SLO gate (p95<=10s, citation>=75%, critical safety=0)
-python src/assistant_ops.py metrics --metrics-path output/assistant_metrics.jsonl --balanced-gate
 ```
 
-MCP curriculum tools need `MUFREDAT_MCP_API_KEY` and `EGITIM_KAYNAK_MCP_API_KEY`
-**in `.env`** — the service reads `EnvironmentFile=.env` and never sees your
-shell. Without them the assistant still answers, from local records only, and
-reports both servers as degraded.
+MCP müfredat araçları `.env` içindeki `MUFREDAT_MCP_API_KEY` ve
+`EGITIM_KAYNAK_MCP_API_KEY` ister — servis `EnvironmentFile=.env` okur,
+kabuğu görmez. Anahtar yoksa asistan yerel kayıtlardan cevap verir.
 
-Go-live runbook: `docs/assistant-go-live.md`
+Go-live: `docs/assistant-go-live.md`
+
+## Belgeler
+
+- `AGENTS.md` / `CLAUDE.md` — çalışma sözleşmesi ve mimari (kod çelişirse kod)
+- `docs/frontend-design-principles.md` / `docs/frontend-surface-designs.md`
+- `books/README.md` — Tedy Books yayın sözleşmesi
+- `docs/api-guide.md` — üçüncü taraf REST (oturum veya `tdyK_` anahtarı)
+- `docs/plans/*` — tarihli tasarımlar; mevcut durum kanıtı değildir

@@ -30,42 +30,18 @@ Servisi besleyen kod ve statik dosyalar bu worktree'de **değil**, ana checkout'
 - SPA, aynı checkout'un `dashboard-dist/` dizininden sunulur (`dashboard_api.py`'deki
   `DIST_DIR = PROJECT_ROOT / "dashboard-dist"`).
 
-**Ölçülen gerçek:** bu dokümanın anlattığı asistan (Gemini sohbet yolu, MCP araç kaydı,
-`meta.degraded`, atıf çipleri, SSE akışı) `feat/assistant-mufredat-grounding` dalında
-yaşıyor. Ana checkout şu an `feat/carbon-token-fidelity` dalında duruyor ve bu özelliği
-**içermiyor**:
-
-```
-git -C /mnt/thunderbolt/workspaces/TED cat-file -e feat/carbon-token-fidelity:src/assistant_tools.py
-# -> "fatal: path 'src/assistant_tools.py' does not exist in 'feat/carbon-token-fidelity'" (exit 128)
-git -C /mnt/thunderbolt/workspaces/TED show feat/carbon-token-fidelity:src/dashboard_api.py | grep -c degraded
-# -> 0
-```
-
-Yani `.env`'e anahtar eklemek ve servisi restart etmek **tek başına yeterli değil**: ana
-checkout'taki kod hâlâ eskiyse, §2'deki `curl` doğrulaması `meta.degraded` alanı
-bulunmadığı için hata verir (ya da bir ara sürümde alan `None` döner) — ikisi de "sorun
-yok, degradasyon yok" anlamına **gelmez**; "yeni kod henüz dağıtılmadı" anlamına gelir
-(bkz. §2'nin doğrulama notu). Her şey "başarılı" görünse bile kod eskiyse ortada yeni
-asistan yoktur — MCP araçları, atıf çipleri, kaynak paneli, SSE akışının hiçbiri o kodda
-yok.
-
-Bu dalın ana checkout'a hangi yolla (`git merge`, rebase, cherry-pick) ve hangi hedef
-dala alınacağı — `feat/carbon-token-fidelity` mi, `main` mı — **kullanıcının kararıdır**;
-bu doküman karar vermez. Adımlar (yaz, çalıştırma — ana checkout'a girmek ve
-`npm run build` çalıştırmak bu runbook'un yetkisinde değil):
+Asistan (Gemini sohbet yolu, MCP araç kaydı, `meta.degraded`, atıf çipleri, SSE)
+`main` üzerindedir (`src/assistant_tools.py`). Dağıtım, çalışan checkout'un
+`dashboard-dist/` paketini de yenilemektir:
 
 ```bash
 cd /mnt/thunderbolt/workspaces/TED
-git merge feat/assistant-mufredat-grounding
 cd dashboard && npm run build
-cd ..
 ```
 
-`npm run build` (`tsc -b && vite build`) `dashboard-dist/`'i günceller; SPA statik
-dosyaları oradan sunulur — derlenmezse arayüz eski kalır, backend'in kabul ettiği yeni
-uç noktalar (ör. `/v1/chat/completions`'ın SSE varyantı) olsa bile arayüz onları hiç
-çağırmaz. Ancak bundan sonra §2'deki `.env` anahtarları + restart + doğrulama adımına geç.
+`npm run build` (`tsc -b && vite build`) `dashboard-dist/`'i günceller; SPA
+statik dosyaları oradan sunulur — derlenmezse arayüz eski kalır. Bundan sonra
+§2'deki `.env` anahtarları + restart + doğrulama.
 
 ## 2) ⛔ DAĞITIM TUZAĞI — bu adım atlanırsa özellik sessizce ölür
 

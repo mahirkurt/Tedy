@@ -8,12 +8,12 @@ Tum isteklerde API key gereklidir. Iki yontemle gonderebilirsiniz:
 
 **Header (onerilen):**
 ```
-Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI
+Authorization: Bearer tdyK_YOUR_KEY
 ```
 
 **Query parameter:**
 ```
-?api_key=tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI
+?api_key=tdyK_YOUR_KEY
 ```
 
 Base URL: `https://tedy.online`
@@ -31,7 +31,7 @@ GET /api/schedule
 Haftalik ders programini dondurur.
 
 ```bash
-curl -H "Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI" \
+curl -H "Authorization: Bearer tdyK_YOUR_KEY" \
   https://tedy.online/api/schedule
 ```
 
@@ -46,7 +46,7 @@ GET /api/homework
 Tum odevleri (portal + foto + ozel ders) dondurur.
 
 ```bash
-curl -H "Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI" \
+curl -H "Authorization: Bearer tdyK_YOUR_KEY" \
   https://tedy.online/api/homework
 ```
 
@@ -61,7 +61,7 @@ GET /api/grades
 Sinav sonuclari ve notlari dondurur.
 
 ```bash
-curl -H "Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI" \
+curl -H "Authorization: Bearer tdyK_YOUR_KEY" \
   https://tedy.online/api/grades
 ```
 
@@ -76,7 +76,7 @@ GET /api/calendar
 Okul takvim etkinliklerini dondurur.
 
 ```bash
-curl -H "Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI" \
+curl -H "Authorization: Bearer tdyK_YOUR_KEY" \
   https://tedy.online/api/calendar
 ```
 
@@ -91,7 +91,7 @@ GET /api/calendar/unified
 Tum etkinlikleri (ders, sinav, odev, takim, takvim) tek bir timeline'da birlestirir.
 
 ```bash
-curl -H "Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI" \
+curl -H "Authorization: Bearer tdyK_YOUR_KEY" \
   https://tedy.online/api/calendar/unified
 ```
 
@@ -106,7 +106,7 @@ GET /api/teams
 Takim aktivitelerini dondurur.
 
 ```bash
-curl -H "Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI" \
+curl -H "Authorization: Bearer tdyK_YOUR_KEY" \
   https://tedy.online/api/teams
 ```
 
@@ -121,7 +121,7 @@ GET /api/content
 Ders icerikleri ve materyallerini dondurur.
 
 ```bash
-curl -H "Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI" \
+curl -H "Authorization: Bearer tdyK_YOUR_KEY" \
   https://tedy.online/api/content
 ```
 
@@ -136,7 +136,7 @@ GET /api/announcements
 Okul duyurularini dondurur.
 
 ```bash
-curl -H "Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI" \
+curl -H "Authorization: Bearer tdyK_YOUR_KEY" \
   https://tedy.online/api/announcements
 ```
 
@@ -151,7 +151,7 @@ GET /api/student/profile
 Ogrenci bilgilerini dondurur.
 
 ```bash
-curl -H "Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI" \
+curl -H "Authorization: Bearer tdyK_YOUR_KEY" \
   https://tedy.online/api/student/profile
 ```
 
@@ -165,7 +165,7 @@ GET /api/progress/a3k   # Achieve3000 ilerleme
 ```
 
 ```bash
-curl -H "Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI" \
+curl -H "Authorization: Bearer tdyK_YOUR_KEY" \
   https://tedy.online/api/progress/ec
 ```
 
@@ -180,7 +180,7 @@ GET /api/sebit
 SEBIT odev verilerini dondurur.
 
 ```bash
-curl -H "Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI" \
+curl -H "Authorization: Bearer tdyK_YOUR_KEY" \
   https://tedy.online/api/sebit
 ```
 
@@ -192,10 +192,11 @@ curl -H "Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI"
 GET /api/enrichment
 ```
 
-Gemini AI tarafindan uretilen odev notlari ve sinav rehberlerini dondurur.
+Eski `enrichment_cache.json` kaydini dondurur (varsa). Classroom yazan
+zenginlestirme yolu kaldirildi; yeni not uretilmez.
 
 ```bash
-curl -H "Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI" \
+curl -H "Authorization: Bearer tdyK_YOUR_KEY" \
   https://tedy.online/api/enrichment
 ```
 
@@ -210,7 +211,7 @@ GET /api/health
 Son senkronizasyon durumu, hata sayisi ve sure bilgisi.
 
 ```bash
-curl -H "Authorization: Bearer tdyK_R8b10xe9Q1daw7oUS39ljB47mS5euMcL8nBkGUfwoLI" \
+curl -H "Authorization: Bearer tdyK_YOUR_KEY" \
   https://tedy.online/api/health
 ```
 
@@ -256,5 +257,8 @@ Tum hatalar JSON formatinda dondurulur:
 
 - Tum response'lar JSON formatindadir
 - Veriler her 15 dakikada otomatik guncellenir (cron sync)
+- Google Classroom, Calendar veya Drive yazma yolu yoktur
 - Rate limit yoktur, makul kullanim beklenir
-- API key'i guvenli tutun, paylasmayin
+- API key'i guvenli tutun, paylasmayin. Orneklerdeki `tdyK_YOUR_KEY`
+  yer tutucusunu kendi anahtarinizla degistirin
+  (`python src/dashboard_api.py --generate-key`)

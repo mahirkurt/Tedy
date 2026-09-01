@@ -25,7 +25,7 @@ os.chdir(PROJECT_ROOT)
 
 from src.env_loader import load_env
 from src.json_utils import atomic_json_dump
-from src.sync_to_google import normalize_course
+from src.course_names import normalize_course
 
 load_env()
 

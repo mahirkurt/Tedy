@@ -6,30 +6,27 @@ bir `AGENTS.md` varsa kendi kapsamı için bu rehberi geçersiz kılar.
 ## Projenin Amacı ve Gerçek Giriş Noktaları
 
 TEDY; okul portalları ile eğitim platformlarından veri toplayan, üretilen JSON
-durumunu Google Workspace akışları ve öğrenci paneli için kullanan bir Python
-otomasyon uygulamasıdır. Flask API aynı zamanda React panelini ve yerel/hibrit
-eğitim asistanını sunar.
+durumunu öğrenci paneli ve asistan için kullanan bir Python otomasyon
+uygulamasıdır. Flask API aynı zamanda React panelini ve yerel/hibrit eğitim
+asistanını sunar. Google Classroom, Calendar ve Drive yazma yolu yoktur.
 
 - `src/run_sync.py`: güncel tarama orkestratörü; portal bölümlerini ve ayrı
   platform tarayıcılarını çalıştırır, `output/health.json` yazar ve asistan
-  indeksini best-effort yeniler. Google senkronizasyon modüllerini otomatik
-  çalıştırdığını varsayma; çağrı zincirini koddan doğrula.
+  indeksini best-effort yeniler. Dış Workspace yazması yoktur.
 - `src/dashboard_api.py`: Flask API, auth, JSON veri erişimi, asistan uçları,
   Tedy Books ve `dashboard-dist/` içindeki SPA için üretim giriş noktasıdır.
 - `dashboard/src/main.tsx`, `dashboard/src/App.tsx`, `dashboard/src/routes.ts`:
   React 19 + Vite + Carbon Design System panelinin bootstrap, kabuk ve rota
   kaynaklarıdır.
 - `src/main.py`: yalnız iskelet/smoke girişidir; üretim uygulaması değildir.
-- `src/sync_to_google.py`, `src/sync_to_classroom.py` ve
-  `src/enrich_gemini.py`: dış sistemlerde yazma yapan ayrı operasyonlardır.
 
-`README.md` halen temel iskelet düzeyindedir. Önce bu dosyayı ve `CLAUDE.md`yi
-oku; önemli bir iddiayı manifest, giriş noktası ve testlerle doğrula. Kod ile
-dokümantasyon çelişirse çalıştırılabilir kodu esas al ve sapmayı bildir.
+Önce `README.md`, bu dosyayı ve `CLAUDE.md`yi oku; önemli bir iddiayı
+manifest, giriş noktası ve testlerle doğrula. Kod ile dokümantasyon çelişirse
+çalıştırılabilir kodu esas al ve sapmayı bildir.
 
 ## Dizin Haritası
 
-- `src/`: tarayıcılar, doğrulama, Google senkronizasyonu, Flask API ve asistan.
+- `src/`: tarayıcılar, doğrulama, Flask API ve asistan.
 - `dashboard/src/`: TypeScript/React bileşenleri, hook'lar, context ve tema.
 - `tests/`: Python birim, şema, idempotency, auth ve API testleri.
 - `dashboard/tests/e2e/`: Playwright API ve gerçek tarayıcı akışları.
@@ -58,7 +55,7 @@ cd dashboard && npm run build     # çıktı: dashboard-dist/
 
 # E2E; önce güncel üretim bundle'ını oluştur
 cd dashboard && npm run build
-cd dashboard && npx playwright test  # test Flask sunucusu: :8086
+cd dashboard && npx playwright test  # test Flask sunucusu: :8286 (TEDY_E2E_PORT)
 
 # Tedy Books sözleşmesi
 python src/check_books.py
@@ -82,8 +79,8 @@ olduğunu canlı işlem öncesinde ayrıca doğrula.
 - Kritik JSON tracker/durum yazımlarında `src/json_utils.py` içindeki atomik
   yazma yolunu kullan. Mevcut idempotency ve hash tabanlı değişiklik takibini
   bozma.
-- Ders adları Google çıktısına giderken `normalize_course()` kullan; portalın
-  ham adlarını toplama katmanında gereksiz yere dönüştürme.
+- Ders adları panele giderken `normalize_course()` (`src/course_names.py`)
+  kullan; portalın ham adlarını toplama katmanında gereksiz yere dönüştürme.
 - Orkestratör seviyesinde bağımsız scraper hataları izole edilebilir; iç
   fonksiyonlara kanıtsız geniş `try/except` katmanları ekleme.
 - `src/discover_*.py` dosyaları araştırma aracıdır, üretim akışına kendiliğinden
@@ -99,9 +96,8 @@ sunucu tarafında koru; yalnız UI gizlemesine güvenme.
 
 - `TEST_AUTH_BYPASS=1` yalnız otomatik yerel test içindir; üretim komutuna veya
   kalıcı yapılandırmaya koyma.
-- `.env`, `credentials.json`, `token*.json`, servis hesabı anahtarları, portal
-  çerezleri ve API anahtarlarını okuma gerekmiyorsa açma; değerlerini hiçbir
-  çıktı, test fixture'ı, doküman veya commit'e taşıma.
+- `.env`, portal çerezleri ve API anahtarlarını okuma gerekmiyorsa açma;
+  değerlerini hiçbir çıktı, test fixture'ı, doküman veya commit'e taşıma.
 - `output/` öğrenci profili, not, ödev, program, oturum ve aktivite verisi
   içerebilir. Sorunu mümkünse şema, sayaç ve redakte edilmiş örneklerle incele;
   ham kayıtları veya kişisel tanımlayıcıları yanıtta gösterme.
@@ -115,10 +111,8 @@ bitlerinden kaynaklanan geniş mode-only diff gösterebilir; içerik farkı ile
 izin farkını ayır ve kullanıcı istemedikçe bunları normalize etme. İlgisiz
 değişiklikleri koru; `git add .`, reset veya toplu temizlik kullanma.
 
-Dış sistemde yazma, OAuth yenileme, cron/systemd değişikliği, servis yeniden
-başlatma, paket ekleme/kaldırma ve üretim deploy'u için açık onay al. Özellikle
-`src/purge_google_data.py`, `sync_to_classroom.py --reset-courses` ve benzeri
-silme/yeniden oluşturma yollarını keşif veya test amacıyla çalıştırma.
+Cron/systemd değişikliği, servis yeniden başlatma, paket ekleme/kaldırma ve
+üretim deploy'u için açık onay al.
 
 Değişiklikten sonra riske uygun en dar testi, ardından ilgili lint/build/test
 kapısını çalıştır. UI değişikliklerinde Playwright veya gerçek tarayıcıyla

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scrape EBA textbook PDFs and upload to Google Drive."""
+"""Scrape EBA textbook PDFs and save them under content/eba/."""
 import json
 import os
 import sys
@@ -9,14 +9,10 @@ import requests as req
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.chdir(os.path.join(os.path.dirname(__file__), ".."))
 
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
-
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from googleapiclient.http import MediaInMemoryUpload
 
-from src.sync_to_google import get_services, _get_or_create_folder, get_year_root
 from src.env_loader import load_env
 
 load_env()
@@ -25,6 +21,7 @@ PASSWORD = os.environ.get("EBA_PASSWORD", "")
 
 DOWNLOAD_BASE = "https://iys.eba.gov.tr/ders/ContentSystem/"
 TRACKER_FILE = os.path.join("output", "eba_textbooks_uploaded.json")
+CONTENT_DIR = os.path.join("content", "eba")
 
 
 def create_driver():
@@ -337,23 +334,20 @@ def get_all_textbooks(driver):
     return unique_books
 
 
-def download_and_upload(driver, books, drive_service):
-    """Download PDFs from EBA CDN and upload to Google Drive."""
-    print("\n[Drive] Uploading textbooks...")
+def _safe_name(name):
+    return "".join(c for c in name if c not in '<>:"/\\|?*').strip(". ")[:200]
 
-    # Create a requests session with browser cookies
+
+def download_textbooks(driver, books):
+    """Download PDFs from EBA CDN into content/eba/<course>/."""
+    print("\n[Local] Saving textbooks...")
+
     session = get_session_from_driver(driver)
 
-    # Load tracker
     uploaded = {}
     if os.path.exists(TRACKER_FILE):
         with open(TRACKER_FILE) as f:
             uploaded = json.load(f)
-
-    # Create Drive folder structure
-    root_id = _get_or_create_folder(
-        drive_service, "Ders Kitapları",
-        parent_id=get_year_root(drive_service))
 
     added = 0
     skipped = 0
@@ -369,15 +363,13 @@ def download_and_upload(driver, books, drive_service):
 
         print(f"\n  Downloading: {title}...")
 
-        # Get CDN URL (tries requests first, falls back to Selenium)
         cdn_url = get_cdn_url(driver, book["downloadUrl"], session)
         if not cdn_url:
-            print(f"    Failed to get CDN URL")
+            print("    Failed to get CDN URL")
             continue
 
         print(f"    CDN: {cdn_url[:80]}...")
 
-        # Download PDF
         try:
             resp = req.get(cdn_url, timeout=120)
             if resp.status_code != 200:
@@ -388,51 +380,35 @@ def download_and_upload(driver, books, drive_service):
             print(f"    Downloaded: {pdf_size / 1024 / 1024:.1f} MB")
 
             if pdf_size < 1000:
-                print(f"    Too small, skipping")
+                print("    Too small, skipping")
                 continue
 
-            # Get/create course subfolder
             course = book.get("course", "Genel")
-            # Simplify course name
             course_short = (course.replace(" (Yeni Müfredat)", "")
-                           .replace("(Yeni Müfredat)", "").strip())
-            subfolder_id = _get_or_create_folder(
-                drive_service, course_short, parent_id=root_id
-            )
-
-            # Upload to Drive
-            filename = f"{title}.pdf"
-            media = MediaInMemoryUpload(
-                resp.content,
-                mimetype="application/pdf",
-            )
-            file_meta = {
-                "name": filename,
-                "parents": [subfolder_id],
-            }
-            result = drive_service.files().create(
-                body=file_meta, media_body=media,
-                fields="id,webViewLink",
-            ).execute()
+                            .replace("(Yeni Müfredat)", "").strip())
+            dest_dir = os.path.join(CONTENT_DIR, _safe_name(course_short))
+            os.makedirs(dest_dir, exist_ok=True)
+            dest_path = os.path.join(dest_dir, f"{_safe_name(title)}.pdf")
+            with open(dest_path, "wb") as fh:
+                fh.write(resp.content)
 
             uploaded[book_id] = {
                 "title": title,
                 "course": course,
-                "driveId": result["id"],
-                "link": result.get("webViewLink", ""),
+                "path": dest_path,
                 "size": pdf_size,
             }
             added += 1
-            print(f"    Uploaded: {result.get('webViewLink', '')}")
+            print(f"    Saved: {dest_path}")
 
         except Exception as e:
             print(f"    Error: {e}")
 
-    # Save tracker
+    os.makedirs(os.path.dirname(TRACKER_FILE), exist_ok=True)
     with open(TRACKER_FILE, "w") as f:
         json.dump(uploaded, f, indent=2, ensure_ascii=False)
 
-    print(f"\n  Drive: +{added} uploaded, ={skipped} skipped")
+    print(f"\n  Local: +{added} saved, ={skipped} skipped")
     return uploaded
 
 
@@ -478,14 +454,13 @@ def main():
                          for v in fb.values() if v.get("downloadUrl")]
                 print(f"  Loaded {len(books)} fallback books")
 
-        print(f"\n[2/3] Downloading + uploading {len(books)} books...")
-        _, _, _, drive_svc = get_services()
-        uploaded = download_and_upload(driver, books, drive_svc)
+        print(f"\n[2/3] Downloading {len(books)} books...")
+        uploaded = download_textbooks(driver, books)
 
         print(f"\n[3/3] Summary")
         for book_id, info in uploaded.items():
             print(f"  {info['title']} ({info.get('course', '?')}) "
-                  f"-> {info.get('link', 'N/A')}")
+                  f"-> {info.get('path', 'N/A')}")
 
     finally:
         driver.quit()

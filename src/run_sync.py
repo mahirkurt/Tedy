@@ -38,12 +38,12 @@ from src.academic_year import (  # noqa: E402
     resolve_year,
     save_year_state,
 )
-from src.archive_year import archive_year_drive  # noqa: E402
+from src.archive_year import archive_year_local  # noqa: E402
 
 _YEAR_RE = re.compile(r"^\d{4}-\d{4}$")
 
 
-def run_year_rollover(driver, output_dir, base_url, drive_factory):
+def run_year_rollover(driver, output_dir, base_url):
     """Resolve the academic year and archive the previous one if it changed.
 
     MUST run before any scraper: archiving afterwards would snapshot
@@ -64,59 +64,10 @@ def run_year_rollover(driver, output_dir, base_url, drive_factory):
             print(f"  [ARCHIVE] Skipped: stored year {stored!r} is not a "
                   f"valid YYYY-YYYY academic year")
             return result
-        try:
-            drive_service = drive_factory()
-        except Exception as e:
-            print(f"  [ARCHIVE] Drive unavailable: {type(e).__name__}: {e}")
-            drive_service = None
-        result["manifest"] = archive_year_drive(stored, output_dir, drive_service)
+        result["manifest"] = archive_year_local(stored, output_dir)
         result["archived"] = True
         print(f"  [ARCHIVE] {stored} sealed "
               f"({result['manifest'].get('counts', {})})")
-
-    elif resolution.status == "current":
-        # The Drive half of a rollover may defer while the local half
-        # seals (e.g. an expired token during the one sync that flips the
-        # year). That deferred manifest lives under the *previous* year's
-        # archive directory - the rollover branch above archives `stored`,
-        # then the state advances - never under resolution.year, which is
-        # the currently active year. So this cannot look up a single
-        # guessed year; it must scan for any manifest still missing its
-        # drive_folder. That's also self-healing if `previous` was ever
-        # lost, and correct no matter how many syncs back the deferred
-        # repair is.
-        import glob
-        import json
-        pending_years = []
-        for manifest_path in sorted(glob.glob(os.path.join(
-                output_dir, "archive", "*", "manifest.json"))):
-            year = os.path.basename(os.path.dirname(manifest_path))
-            if not _YEAR_RE.match(year):
-                continue
-            try:
-                with open(manifest_path, encoding="utf-8") as f:
-                    manifest = json.load(f)
-            except (json.JSONDecodeError, OSError) as e:
-                print(f"  [ARCHIVE] Skipped unreadable manifest "
-                      f"{manifest_path}: {type(e).__name__}: {e}")
-                continue
-            if not manifest.get("drive_folder"):
-                pending_years.append(year)
-
-        if pending_years:
-            try:
-                drive_service = drive_factory()
-            except Exception as e:
-                print(f"  [ARCHIVE] Drive unavailable: "
-                      f"{type(e).__name__}: {e}")
-                drive_service = None
-            for year in pending_years:
-                result["manifest"] = archive_year_drive(
-                    year, output_dir, drive_service)
-                result["archived"] = True
-                print(f"  [ARCHIVE] {year} Drive repair retried "
-                      f"(drive_folder="
-                      f"{result['manifest'].get('drive_folder')})")
 
     if resolution.year and resolution.status in (
             "initialized", "rollover", "current"):
@@ -204,13 +155,8 @@ def main():
             print(f"\nHealth: ERRORS ({health['duration_seconds']}s)")
             return
 
-        def _drive_factory():
-            from src.sync_to_google import get_services
-            return get_services()[1]
-
         try:
-            year_info = run_year_rollover(
-                driver, OUTPUT_DIR, BASE_URL, _drive_factory)
+            year_info = run_year_rollover(driver, OUTPUT_DIR, BASE_URL)
         except Exception as e:
             # A failure here (e.g. an OSError from shutil.copy2 mid-archive)
             # must not kill the whole run: year_info stays at its safe

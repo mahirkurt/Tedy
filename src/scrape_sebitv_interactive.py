@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scrape SEBİTV Cloud interactive resources, archive as ZIP, and upload to Google Drive."""
+"""Scrape SEBİTV Cloud interactive resources and archive them as local ZIPs."""
 import io
 import json
 import os
@@ -10,16 +10,13 @@ import zipfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.chdir(os.path.join(os.path.dirname(__file__), ".."))
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 import requests as req
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from googleapiclient.http import MediaInMemoryUpload, MediaIoBaseUpload
 
-from src.sync_to_google import get_services, _get_or_create_folder, get_year_root
 from src.env_loader import load_env
 
 load_env()
@@ -32,8 +29,8 @@ API = "https://uygulama.sebitvcloud.com/VCloudFrontEndService"
 
 TRACKER_FILE = os.path.join("output", "sebitv_interactive_uploaded.json")
 DISCOVERY_FILE = os.path.join("output", "sebitv_discovered.json")
-
-MAX_INMEMORY = 100 * 1024 * 1024  # 100 MB
+CONTENT_DIR = os.path.join("content", "sebitv-interactive")
+QBANK_DIR = os.path.join("content", "sebitv-qbank")
 
 KNOWN_PATHS = [
     "dataLevel.html",
@@ -175,34 +172,6 @@ def load_tracker():
 def save_tracker(tracker):
     with open(TRACKER_FILE, "w") as f:
         json.dump(tracker, f, indent=2, ensure_ascii=False)
-
-
-def upload_to_drive(
-    drive, content, filename, mimetype, folder_id
-):
-    """Upload file to Google Drive."""
-    size = len(content)
-    if size <= MAX_INMEMORY:
-        media = MediaInMemoryUpload(
-            content, mimetype=mimetype
-        )
-    else:
-        media = MediaIoBaseUpload(
-            io.BytesIO(content),
-            mimetype=mimetype,
-            chunksize=50 * 1024 * 1024,
-            resumable=True,
-        )
-
-    result = drive.files().create(
-        body={
-            "name": filename,
-            "parents": [folder_id],
-        },
-        media_body=media,
-        fields="id,webViewLink",
-    ).execute()
-    return result
 
 
 # =========================================================================
@@ -441,24 +410,9 @@ def create_zip_archive(files):
 # Main processing
 # =========================================================================
 
-def process_interactive_resources(resources, s, drive, tracker):
-    """Process all interactive resources: crawl, archive, upload."""
+def process_interactive_resources(resources, s, tracker):
+    """Process all interactive resources: crawl and archive locally."""
     print(f"\n[İŞLEM] {len(resources)} etkileşimli kaynak işleniyor...")
-
-    year_root = get_year_root(drive)
-    # Drive folders for archives
-    archive_root_id = _get_or_create_folder(
-        drive, "SEBİTV Etkileşimli", parent_id=year_root
-    )
-    # Drive folders for question banks
-    qbank_root_id = _get_or_create_folder(
-        drive, "SEBİTV Soru Bankaları", parent_id=year_root
-    )
-
-    course_folders = {}       # course -> folder_id (for archives)
-    unit_folders = {}         # "course/unit" -> folder_id (for archives)
-    qbank_course_folders = {} # course -> folder_id (for qbanks)
-    qbank_unit_folders = {}   # "course/unit" -> folder_id (for qbanks)
 
     added = 0
     skipped = 0
@@ -515,8 +469,7 @@ def process_interactive_resources(resources, s, drive, tracker):
 
             # Extract question bank
             qbank = extract_question_bank(files)
-            qbank_drive_id = None
-            qbank_link = ""
+            qbank_path = ""
 
             if qbank is not None:
                 questions_found += 1
@@ -524,37 +477,17 @@ def process_interactive_resources(resources, s, drive, tracker):
                 status_str = "raw" if is_parse_error else "parsed"
                 print(f"    Soru bankasi bulundu ({status_str})")
 
-                # Upload question bank JSON to Drive
                 qbank_json = json.dumps(
                     qbank, indent=2, ensure_ascii=False
                 ).encode("utf-8")
-
-                # Create course/unit folders for qbank
-                if course not in qbank_course_folders:
-                    qbank_course_folders[course] = (
-                        _get_or_create_folder(
-                            drive, sanitize(course),
-                            parent_id=qbank_root_id,
-                        )
-                    )
-                qkey = f"{course}/{unit}"
-                if qkey not in qbank_unit_folders:
-                    qbank_unit_folders[qkey] = (
-                        _get_or_create_folder(
-                            drive, sanitize(unit),
-                            parent_id=qbank_course_folders[course],
-                        )
-                    )
-
-                qbank_filename = f"{sanitize(title)}.json"
-                qbank_result = upload_to_drive(
-                    drive, qbank_json, qbank_filename,
-                    "application/json",
-                    qbank_unit_folders[qkey],
+                qbank_dir = os.path.join(
+                    QBANK_DIR, sanitize(course), sanitize(unit)
                 )
-                qbank_drive_id = qbank_result["id"]
-                qbank_link = qbank_result.get("webViewLink", "")
-                print(f"    Soru bankasi yuklendi: {qbank_link}")
+                os.makedirs(qbank_dir, exist_ok=True)
+                qbank_path = os.path.join(qbank_dir, f"{sanitize(title)}.json")
+                with open(qbank_path, "wb") as fh:
+                    fh.write(qbank_json)
+                print(f"    Soru bankasi kaydedildi: {qbank_path}")
 
             # Create ZIP archive
             zip_bytes = create_zip_archive(files)
@@ -572,54 +505,31 @@ def process_interactive_resources(resources, s, drive, tracker):
                 failed += 1
                 continue
 
-            # Create course/unit folders for archive
-            if course not in course_folders:
-                course_folders[course] = (
-                    _get_or_create_folder(
-                        drive, sanitize(course),
-                        parent_id=archive_root_id,
-                    )
-                )
-
-            ukey = f"{course}/{unit}"
-            if ukey not in unit_folders:
-                unit_folders[ukey] = (
-                    _get_or_create_folder(
-                        drive, sanitize(unit),
-                        parent_id=course_folders[course],
-                    )
-                )
-
-            # Upload ZIP to Drive
-            zip_filename = f"{sanitize(title)}.zip"
-            result = upload_to_drive(
-                drive, zip_bytes, zip_filename,
-                "application/zip",
-                unit_folders[ukey],
+            dest_dir = os.path.join(
+                CONTENT_DIR, sanitize(course), sanitize(unit)
             )
+            os.makedirs(dest_dir, exist_ok=True)
+            dest_path = os.path.join(dest_dir, f"{sanitize(title)}.zip")
+            with open(dest_path, "wb") as fh:
+                fh.write(zip_bytes)
 
             tracker[key] = {
                 "course": course,
                 "unit": unit,
                 "title": title,
                 "type": res["type"],
-                "driveId": result["id"],
-                "link": result.get("webViewLink", ""),
+                "path": dest_path,
                 "zipSize": zip_size,
                 "fileCount": len(files),
                 "repoType": repo_type,
             }
-            if qbank_drive_id:
-                tracker[key]["qbankDriveId"] = qbank_drive_id
-                tracker[key]["qbankLink"] = qbank_link
+            if qbank_path:
+                tracker[key]["qbankPath"] = qbank_path
                 tracker[key]["hasQuestions"] = True
 
             save_tracker(tracker)
             added += 1
-            print(
-                f"    Yuklendi: "
-                f"{result.get('webViewLink', '')}"
-            )
+            print(f"    Kaydedildi: {dest_path}")
 
         except req.exceptions.Timeout:
             print("    Zaman asimi")
@@ -632,7 +542,7 @@ def process_interactive_resources(resources, s, drive, tracker):
             failed += 1
 
     print(
-        f"\n  Sonuc: +{added} yuklendi, "
+        f"\n  Sonuc: +{added} kaydedildi, "
         f"={skipped} atlandi, "
         f"x{failed} basarisiz, "
         f"?{questions_found} soru bankasi"
@@ -682,20 +592,16 @@ def main():
     finally:
         driver.quit()
 
-    # Connect to Google Drive
-    print("\n[2/2] Google Drive baglantisi...")
-    _, drive_svc = get_services()
-
-    # Process interactive resources
+    print("\n[2/2] Etkilesimli kaynaklar arsivleniyor...")
     added, skipped, failed = process_interactive_resources(
-        interactive, s, drive_svc, tracker,
+        interactive, s, tracker,
     )
 
     print(f"\n{'=' * 60}")
     print("  SEBITV ETKILESIMLI TAMAMLANDI")
     print(f"  Toplam kaynak: {len(resources)}")
     print(f"  Etkilesimli: {len(interactive)}")
-    print(f"  Yuklenen: {added}")
+    print(f"  Kaydedilen: {added}")
     print(f"  Atlanan: {skipped}")
     print(f"  Basarisiz: {failed}")
     print("=" * 60)
