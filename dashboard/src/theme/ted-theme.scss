@@ -1530,7 +1530,7 @@ body {
 
 .login-page__footnote {
   @include type.type-style('label-01');
-  color: var(--ted-color-text-helper);
+  color: var(--ted-color-text-secondary);
   margin-top: var(--ted-space-xl);
   text-align: center;
 }
@@ -1540,16 +1540,11 @@ body {
   padding: var(--ted-space-md) var(--ted-space-lg);
   text-align: center;
   @include type.type-style('label-01');
-  color: var(--ted-color-text-helper);
+  color: var(--ted-color-text-secondary);
   border-top: 1px solid var(--ted-color-border-subtle);
   margin-top: var(--ted-space-xl);
 
   p { margin: 0; }
-}
-
-.dashboard-footer__brand {
-  font-weight: 600;
-  margin-bottom: var(--ted-space-2xs);
 }
 
 // ─── Carbon Overrides ────────────────────────────────────────────────────────
@@ -2110,7 +2105,13 @@ body {
   .dashboard-list-tile__meta,
   .today-tl__card-sub,
   .today-tl__card-tags,
-  .dashboard-summary-text {
+  .dashboard-summary-text,
+  .today-exams,
+  .today-homework,
+  .today-hero,
+  .today-daybar,
+  .today-tl,
+  .today__lesson-counter {
     display: none;
   }
 
@@ -2282,6 +2283,12 @@ body {
 
 .platform-accordion__name {
   @include type.type-style('heading-compact-01');
+}
+
+.platform-accordion__count {
+  @include type.type-style('label-01');
+  color: var(--ted-color-text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
 .platform-accordion__progress {
@@ -2488,9 +2495,7 @@ body {
   }
 
   .dashboard-header__meta {
-    padding: 0;
-    gap: 0.35rem;
-    min-width: 0;
+    display: none;
   }
 
   .dashboard-header__sync-label--full { display: none; }
@@ -2501,22 +2506,57 @@ body {
     display: none;
   }
 
+  .dashboard-header__identity {
+    display: none;
+  }
+
   .dashboard-header__user-name--short {
     display: block;
     max-width: 6.5rem;
   }
 
-  .dashboard-header__avatar {
-    width: 24px;
-    height: 24px;
-  }
-
+  // Last sync lives on the footer now. Dropping the pill here is what
+  // makes room for Odak on a 320px header without pushing Çıkış off-screen.
   .dashboard-header__health-wrap {
-    display: inline-flex;
+    display: none;
   }
 
   .dashboard-header__focus-toggle {
+    display: flex;
+    padding: 0 var(--ted-space-2xs);
+  }
+
+  // The switch stays; the word is what pushed Çıkış 16px past a 320px
+  // header. The control still has an accessible name via labelA/labelB.
+  .dashboard-header__focus-toggle .cds--toggle__text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .dashboard-header__avatar {
     display: none;
+  }
+
+  @media (max-width: 22rem) {
+    .dashboard-header__brand-logo {
+      height: 22px;
+    }
+
+    .cds--header .cds--header__name {
+      padding-inline: 0.5rem;
+    }
+
+    .cds--header__global .cds--header__action {
+      width: 2.5rem;
+      min-width: 2.5rem;
+    }
   }
 
   .login-page {
@@ -2561,7 +2601,7 @@ body {
     text-overflow: ellipsis;
   }
 
-  // Focus toggle fully hidden on mobile (see .dashboard-header__focus-toggle above)
+  // Odak stays reachable on a phone: identity text yields the room.
 
   .grade-detail__row {
     grid-template-columns: 100px 1fr 32px;
@@ -2747,6 +2787,14 @@ body {
   align-items: center;
   gap: var(--ted-space-xs);
   @include type.type-style('body-01');
+
+  input[type='checkbox'] {
+    width: 1.5rem;
+    height: 1.5rem;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+    flex-shrink: 0;
+  }
 }
 
 .private-lesson-form__time-row {
@@ -3572,7 +3620,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: var(--ted-space-lg);
-  margin: 0;
+  margin: var(--ted-space-md) 0 0;
 }
 
 .shelf-card__stats dt {

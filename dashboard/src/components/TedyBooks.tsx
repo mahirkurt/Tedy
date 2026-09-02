@@ -244,6 +244,25 @@ function ShelfCard({ book }: { book: BookSummary }) {
 
         {book.description && <p className="shelf-card__desc">{book.description}</p>}
 
+        <div className="shelf-card__actions">
+          <button
+            type="button"
+            className="book-btn book-btn--primary"
+            onClick={() => navigate(
+              resumeId
+                ? `/kitaplar/${book.slug}/${resumeId}`
+                : `/kitaplar/${book.slug}`
+            )}
+            disabled={book.availableChapters === 0}
+          >
+            {resumeId ? 'Kaldığın yerden devam et' : 'Okumaya başla'}
+            <ArrowRight size={16} />
+          </button>
+          <Link to={`/kitaplar/${book.slug}`} className="book-btn book-btn--ghost">
+            İçindekiler
+          </Link>
+        </div>
+
         <dl className="shelf-card__stats">
           <div>
             <dt>Hazır bölüm</dt>
@@ -268,25 +287,6 @@ function ShelfCard({ book }: { book: BookSummary }) {
           <span className="shelf-card__meter-label">
             Kitabın %{readyPct} kadarı yayında · yeni bölümler eklendikçe burada belirir
           </span>
-        </div>
-
-        <div className="shelf-card__actions">
-          <button
-            type="button"
-            className="book-btn book-btn--primary"
-            onClick={() => navigate(
-              resumeId
-                ? `/kitaplar/${book.slug}/${resumeId}`
-                : `/kitaplar/${book.slug}`
-            )}
-            disabled={book.availableChapters === 0}
-          >
-            {resumeId ? 'Kaldığın yerden devam et' : 'Okumaya başla'}
-            <ArrowRight size={16} />
-          </button>
-          <Link to={`/kitaplar/${book.slug}`} className="book-btn book-btn--ghost">
-            İçindekiler
-          </Link>
         </div>
       </div>
     </article>

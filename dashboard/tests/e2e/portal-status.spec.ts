@@ -34,7 +34,7 @@ test('a section the portal closed is named in a banner, with the portal\'s own w
       detail: 'Akademik Takvim: portal bu sayfaya yetki vermiyor',
     },
   })
-  await page.goto('/')
+  await page.goto('/dersler')
 
   const banner = page.locator('.portal-status')
   await expect(banner).toBeVisible()
@@ -49,6 +49,23 @@ test('a section the portal closed is named in a banner, with the portal\'s own w
 
 test('nothing is shown when the portal is serving every section', async ({ page }) => {
   await mockHealth(page, {})
-  await page.goto('/')
+  await page.goto('/dersler')
   await expect(page.locator('.portal-status')).toHaveCount(0)
+})
+
+test('the banner stays off pages that do not show those sections', async ({ page }) => {
+  await mockHealth(page, {
+    ders_programi: {
+      reason: 'modul_kapali',
+      detail: 'Haftalık Ders Programı: Akademi Modülü kısa bir süre erişime kapalıdır.',
+    },
+    takvim: {
+      reason: 'yetkisiz',
+      detail: 'Akademik Takvim: portal bu sayfaya yetki vermiyor',
+    },
+  })
+  for (const path of ['/', '/isler', '/notlar']) {
+    await page.goto(path)
+    await expect(page.locator('.portal-status'), `${path} üzerinde banner`).toHaveCount(0)
+  }
 })

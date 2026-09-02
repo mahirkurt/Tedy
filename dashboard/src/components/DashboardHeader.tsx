@@ -100,15 +100,16 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
   const warningCount = (health.validation_warnings?.length || 0)
     + (health.scrape_errors?.length || 0)
     + staleSections.length
-  const tagType: 'gray' | 'warm-gray' | 'green' | 'red' = !effectiveSyncTimestamp ? 'gray'
-    : health.success ? (warningCount > 0 ? 'warm-gray' : 'green')
+  // A constant "4 uyarı" is an alarm that never resolves (İ6). Name the
+  // sync, and only mention warnings when there are some and we are not in
+  // focus — focus silences badges (§5). Gray, not warm-gray: the count is
+  // information, not a yellow emergency.
+  const showWarningCount = warningCount > 0 && !focusMode
+  const tagType: 'gray' | 'red' = !effectiveSyncTimestamp || health.success
+    ? 'gray'
     : 'red'
-  const tagText = warningCount > 0 ? `${syncAgo} · ${warningCount} uyarı` : syncAgo
-  // Below Carbon's md breakpoint the full label grows with the warning count
-  // and pushes the header's action buttons off a 390px screen. The count is
-  // the part worth keeping — exact times are in the popover — so the phone
-  // label drops the elapsed prefix rather than truncating to an ellipsis.
-  const shortTagText = warningCount > 0 ? `${warningCount} uyarı` : syncAgo
+  const tagText = showWarningCount ? `${syncAgo} · ${warningCount} uyarı` : syncAgo
+  const shortTagText = showWarningCount ? `${warningCount} uyarı` : syncAgo
   // Memoised so the `|| []` fallback does not mint a new array on every render
   // and invalidate the hooks below.
   const privateLessons = useMemo(
@@ -311,6 +312,7 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
               size="sm"
               labelA="Odak"
               labelB="Odak"
+              aria-label="Odak"
               toggled={focusMode}
               onToggle={toggleFocusMode}
             />

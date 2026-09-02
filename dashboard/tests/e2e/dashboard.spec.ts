@@ -118,10 +118,10 @@ test.describe('SPA serving', () => {
 
     await expect(page.getByRole('banner')).toBeVisible()
     await expect(page.getByAltText('TEDY')).toBeVisible()
-    await expect(page.getByLabel('Senkron durumunu göster')).toBeVisible()
-
-    await page.getByLabel('Senkron durumunu göster').click()
-    await expect(page.getByRole('dialog', { name: 'Senkron sağlık bilgisi' })).toBeVisible()
+    // Sync status moved to the footer on a phone so Odak can stay in the
+    // header. The header's job here is the working-state switch.
+    await expect(page.getByRole('switch', { name: 'Odak' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Çıkış' })).toBeVisible()
 
     await context.close()
   })

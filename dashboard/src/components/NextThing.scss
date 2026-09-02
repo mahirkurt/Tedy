@@ -54,6 +54,12 @@
   color: theme.$text-primary;
 }
 
+.next-thing__hint {
+  @include type.type-style('helper-text-01');
+  color: theme.$text-secondary;
+  margin: $spacing-03 0 0;
+}
+
 .next-thing__action {
   flex: 0 0 auto;
 }

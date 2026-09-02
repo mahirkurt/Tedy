@@ -223,7 +223,7 @@ export default function StudentProfile() {
             </label>
           </div>
 
-          <Button kind="primary" size="sm" type="submit" disabled={saving}>
+          <Button kind="tertiary" size="sm" type="submit" disabled={saving}>
             {saving ? 'Ekleniyor...' : 'Özel Ders Ekle'}
           </Button>
         </form>

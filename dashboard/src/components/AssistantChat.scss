@@ -63,6 +63,19 @@
   color: theme.$text-primary;
 }
 
+.ac__prompt-chip--primary {
+  background: var(--ted-color-brand-primary);
+  border-color: var(--ted-color-brand-primary);
+  color: var(--ted-color-text-on-color);
+  font-weight: 600;
+}
+
+.ac__prompt-chip--primary:hover:not(:disabled) {
+  background: var(--ted-color-brand-primary-hover);
+  border-color: var(--ted-color-brand-primary-hover);
+  color: var(--ted-color-text-on-color);
+}
+
 .ac__prompt-chip:disabled {
   opacity: 0.5;
   cursor: not-allowed;
