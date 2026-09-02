@@ -1,9 +1,11 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Button } from '@carbon/react'
 import { ChevronLeft, ChevronRight, EventSchedule, Close } from '@carbon/icons-react'
+import { useNavigate } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import type { UnifiedEvent } from '../types'
+import type { HealthData, UnifiedEvent } from '../types'
 import { MONTHS_SHORT } from '../utils/formatters'
+import { EmptyLine } from './patterns/EmptyLine'
 
 // ── Constants ──
 
@@ -90,7 +92,11 @@ function formatTime(d: Date): string {
 // ── Component ──
 
 export default function CalendarEvents() {
+  const navigate = useNavigate()
   const { data, loading } = useApi<{ events: UnifiedEvent[] }>('/api/calendar/unified', { events: [] })
+  const { data: health } = useApi<HealthData | null>('/api/health', null)
+  const calendarClosed = Boolean(health?.unavailable?.takvim)
+  const calendarClosedDetail = health?.unavailable?.takvim?.detail?.trim()
   const [weekOffset, setWeekOffset] = useState(0)
   const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set())
   const [selectedEvent, setSelectedEvent] = useState<UnifiedEvent | null>(null)
@@ -201,6 +207,23 @@ export default function CalendarEvents() {
           <div className="today-loading__bar" />
           <div className="today-loading__bar today-loading__bar--short" />
         </div>
+      </div>
+    )
+  }
+
+  if (calendarClosed) {
+    return (
+      <div className="dashboard-card">
+        <h2 className="dashboard-card__title">
+          <EventSchedule size={20} />
+          Haftalık Takvim
+        </h2>
+        <EmptyLine>
+          {calendarClosedDetail || 'Portal şu an takvimi sunmuyor.'}
+        </EmptyLine>
+        <Button kind="ghost" size="sm" onClick={() => navigate('/')}>
+          Bugün&apos;e dön
+        </Button>
       </div>
     )
   }

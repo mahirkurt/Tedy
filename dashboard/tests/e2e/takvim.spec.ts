@@ -7,6 +7,22 @@ const json = (b: unknown) => ({
   status: 200, contentType: 'application/json', body: JSON.stringify(b),
 })
 
+test('a closed calendar does not draw an empty week', async ({ page }) => {
+  await page.route('**/api/calendar/unified', r => r.fulfill(json({ events: [] })))
+  await page.route('**/api/health', r => r.fulfill(json({
+    timestamp: '', success: true, scrape_errors: [], duration_seconds: 1,
+    unavailable: {
+      takvim: { reason: 'yetkisiz', detail: 'Akademik Takvim: portal bu sayfaya yetki vermiyor' },
+    },
+  })))
+  await page.goto('/takvim')
+  await page.waitForLoadState('networkidle')
+
+  await expect(page.locator('.calendar-grid')).toHaveCount(0)
+  await expect(page.getByText('portal bu sayfaya yetki vermiyor', { exact: false })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Bugün/ })).toBeVisible()
+})
+
 test('spent hours recede in the week grid', async ({ page }) => {
   await page.route('**/api/calendar/unified', r => r.fulfill(json({ events: [] })))
   await page.route('**/api/health', r => r.fulfill(json({

@@ -1530,7 +1530,7 @@ body {
 
 .login-page__footnote {
   @include type.type-style('label-01');
-  color: var(--ted-color-text-helper);
+  color: var(--ted-color-text-secondary);
   margin-top: var(--ted-space-xl);
   text-align: center;
 }
@@ -1540,16 +1540,11 @@ body {
   padding: var(--ted-space-md) var(--ted-space-lg);
   text-align: center;
   @include type.type-style('label-01');
-  color: var(--ted-color-text-helper);
+  color: var(--ted-color-text-secondary);
   border-top: 1px solid var(--ted-color-border-subtle);
   margin-top: var(--ted-space-xl);
 
   p { margin: 0; }
-}
-
-.dashboard-footer__brand {
-  font-weight: 600;
-  margin-bottom: var(--ted-space-2xs);
 }
 
 // ─── Carbon Overrides ────────────────────────────────────────────────────────
@@ -2110,7 +2105,13 @@ body {
   .dashboard-list-tile__meta,
   .today-tl__card-sub,
   .today-tl__card-tags,
-  .dashboard-summary-text {
+  .dashboard-summary-text,
+  .today-exams,
+  .today-homework,
+  .today-hero,
+  .today-daybar,
+  .today-tl,
+  .today__lesson-counter {
     display: none;
   }
 
@@ -2282,6 +2283,12 @@ body {
 
 .platform-accordion__name {
   @include type.type-style('heading-compact-01');
+}
+
+.platform-accordion__count {
+  @include type.type-style('label-01');
+  color: var(--ted-color-text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
 .platform-accordion__progress {
@@ -2501,6 +2508,10 @@ body {
     display: none;
   }
 
+  .dashboard-header__identity {
+    display: none;
+  }
+
   .dashboard-header__user-name--short {
     display: block;
     max-width: 6.5rem;
@@ -2516,7 +2527,8 @@ body {
   }
 
   .dashboard-header__focus-toggle {
-    display: none;
+    display: flex;
+    padding: 0 var(--ted-space-2xs);
   }
 
   .login-page {
@@ -2561,7 +2573,7 @@ body {
     text-overflow: ellipsis;
   }
 
-  // Focus toggle fully hidden on mobile (see .dashboard-header__focus-toggle above)
+  // Odak stays reachable on a phone: identity text yields the room.
 
   .grade-detail__row {
     grid-template-columns: 100px 1fr 32px;
@@ -2747,6 +2759,14 @@ body {
   align-items: center;
   gap: var(--ted-space-xs);
   @include type.type-style('body-01');
+
+  input[type='checkbox'] {
+    width: 1.5rem;
+    height: 1.5rem;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+    flex-shrink: 0;
+  }
 }
 
 .private-lesson-form__time-row {
@@ -3572,7 +3592,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: var(--ted-space-lg);
-  margin: 0;
+  margin: var(--ted-space-md) 0 0;
 }
 
 .shelf-card__stats dt {

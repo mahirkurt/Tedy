@@ -63,6 +63,19 @@
   color: theme.$text-primary;
 }
 
+.ac__prompt-chip--primary {
+  background: theme.$button-primary;
+  border-color: theme.$button-primary;
+  color: theme.$text-on-color;
+  font-weight: 600;
+}
+
+.ac__prompt-chip--primary:hover:not(:disabled) {
+  background: theme.$button-primary-hover;
+  border-color: theme.$button-primary-hover;
+  color: theme.$text-on-color;
+}
+
 .ac__prompt-chip:disabled {
   opacity: 0.5;
   cursor: not-allowed;

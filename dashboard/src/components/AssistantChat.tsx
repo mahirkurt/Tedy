@@ -17,7 +17,6 @@ import {
   CalendarHeatMap,
   Chemistry,
   TaskComplete,
-  ParentChild,
   Renew,
   Copy,
   Search,
@@ -45,10 +44,9 @@ interface ChatMessage {
 }
 
 const QUICK_PROMPTS = [
+  { text: 'Bugün neye öncelik vermeliyim?', icon: TaskComplete, mode: 'chat' as const, primary: true },
   { text: 'Çalışma planı hazırla', icon: CalendarHeatMap, mode: 'plan' as const },
   { text: 'Eksik konularımı özetle', icon: Chemistry, mode: 'chat' as const },
-  { text: 'Bugün neye öncelik vermeliyim?', icon: TaskComplete, mode: 'chat' as const },
-  { text: 'Veli kontrol listesi üret', icon: ParentChild, mode: 'chat' as const },
 ]
 
 // Shown in the composer while a tool is running, keyed by the tool name the
@@ -176,7 +174,7 @@ function ThinkingIndicator({ stage }: { stage: string | null }) {
   return (
     <article className="ac-msg ac-msg--assistant ac-msg--thinking">
       <div className="ac-msg__avatar ac-msg__avatar--ai">
-        <AILabel size="mini" />
+        <AILabel size="mini" slugLabel="yanıtı" aria-label="Yapay zekâ yanıtı" />
       </div>
       <div className="ac-msg__body">
         <div className="ac-msg__thinking-row">
@@ -415,7 +413,8 @@ export default function AssistantChat() {
             size="xl"
             autoAlign
             aiText="AI"
-            aiTextLabel="TEDY Asistan"
+            slugLabel="bilgisi"
+            aria-label="Yapay zekâ hakkında bilgi"
             align="bottom-left"
           >
             <AILabelContent>
@@ -446,7 +445,7 @@ export default function AssistantChat() {
           <button
             key={qp.text}
             type="button"
-            className="ac__prompt-chip"
+            className={qp.primary ? 'ac__prompt-chip ac__prompt-chip--primary' : 'ac__prompt-chip'}
             onClick={() => void submit(qp.mode, qp.text)}
             disabled={loading}
           >
@@ -463,7 +462,9 @@ export default function AssistantChat() {
             {messages.map(msg => (
               <article key={msg.id} className={`ac-msg ac-msg--${msg.role}`}>
                 <div className={`ac-msg__avatar ${msg.role === 'assistant' ? 'ac-msg__avatar--ai' : 'ac-msg__avatar--user'}`}>
-                  {msg.role === 'assistant' ? <AILabel size="mini" /> : <span>I</span>}
+                  {msg.role === 'assistant' ? (
+                    <AILabel size="mini" slugLabel="yanıtı" aria-label="Yapay zekâ yanıtı" />
+                  ) : <span>I</span>}
                 </div>
                 <div className="ac-msg__body">
                   {msg.degraded && msg.degraded.length > 0 && (

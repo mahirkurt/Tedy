@@ -83,6 +83,20 @@ test('the total workload is never the loudest number', async ({ page }) => {
   await expect(next.locator('.next-thing__step')).toHaveCount(1)
 })
 
+test('before the window opens, ŞİMDİ is not the voice', async ({ page }) => {
+  // İ4: the window is 08:00–16:00. At 03:15 the next work is still named,
+  // but pretending the next ten minutes are the slot is a lie.
+  await mockDay(page, { homework: [hw()] })
+  await page.clock.setFixedTime(new Date('2026-09-02T03:15:00'))
+  await page.goto('/')
+
+  const next = page.locator('.next-thing')
+  await expect(next).toBeVisible()
+  await expect(next).toContainText('Matematik')
+  await expect(next.locator('.next-thing__eyebrow')).not.toHaveText('ŞİMDİ')
+  await expect(next).toContainText('okuldan sonra')
+})
+
 test('with no school work, reading takes the slot instead of shouting above it', async ({ page }) => {
   await mockDay(page, { homework: [] })
   await page.goto('/')

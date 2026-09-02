@@ -14,6 +14,8 @@ export interface NextThingProps {
   actionLabel: string
   onAction: () => void
   variant?: 'work' | 'reading'
+  /** When the window is closed, a quieter reason — not a second action. */
+  hint?: string
 }
 
 /**
@@ -26,7 +28,7 @@ export interface NextThingProps {
  */
 export function NextThing({
   eyebrow, title, stepMinutes, stepSuffix = 'başla',
-  actionLabel, onAction, variant = 'work',
+  actionLabel, onAction, variant = 'work', hint,
 }: NextThingProps) {
   return (
     <section className={`next-thing${variant === 'reading' ? ' next-thing--reading' : ''}`}>
@@ -36,6 +38,7 @@ export function NextThing({
         <span className="next-thing__step">
           <span className="next-thing__step-time tedy-time">{stepMinutes} dakikayla</span> {stepSuffix}
         </span>
+        {hint && <p className="next-thing__hint">{hint}</p>}
       </div>
       <div className="next-thing__action">
         <Button kind="primary" size="lg" renderIcon={ArrowRight} onClick={onAction}>

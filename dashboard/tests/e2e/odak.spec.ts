@@ -68,3 +68,24 @@ test('focus keeps the counts so nothing feels lost', async ({ page }) => {
   await expect(page.getByText('Aktif Ödevler', { exact: false })).toBeVisible()
   await expect(page.locator('.hw-section__count').first()).toBeVisible()
 })
+
+test('focus hides finished work rather than leading with it', async ({ page }) => {
+  await page.route('**/api/homework', r => r.fulfill(json({
+    summary: '', homework: [
+      { ...HW('Fen Bilimleri', '3 soru', '16.09.2026 23:59'), 'Ödev Durumu': 'Yaptı' },
+    ],
+  })))
+  await page.route('**/api/enrichment', r => r.fulfill(json({})))
+  await page.route('**/api/exams', r => r.fulfill(json({ exams: [] })))
+  await page.route('**/api/health', r => r.fulfill(json({
+    timestamp: '', success: true, scrape_errors: [], duration_seconds: 1,
+  })))
+  await page.addInitScript(() => localStorage.setItem('tedy-focus-mode', 'true'))
+
+  await page.goto('/isler')
+  await page.waitForLoadState('networkidle')
+
+  await expect(page.getByText('Şu an teslim bekleyen bir işin yok.')).toBeVisible()
+  await expect(page.getByText('Tamamlandı', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Yapılan', { exact: true })).toHaveCount(0)
+})

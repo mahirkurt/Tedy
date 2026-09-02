@@ -1,7 +1,24 @@
+import { useState } from 'react'
 import { InlineNotification } from '@carbon/react'
 import { useApi } from '../hooks/useApi'
 import { SECTION_LABELS } from '../utils/formatters'
 import type { HealthData } from '../types'
+
+const DISMISS_KEY = 'tedy-portal-banner-dismissed'
+
+function todayKey(): string {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function wasDismissedToday(): boolean {
+  try {
+    return sessionStorage.getItem(DISMISS_KEY) === todayKey()
+  } catch {
+    return false
+  }
+}
 
 /**
  * Says, once and in the open, which parts of the dashboard are empty because
@@ -15,10 +32,11 @@ import type { HealthData } from '../types'
  */
 export function PortalStatusBanner() {
   const { data: health } = useApi<HealthData | null>('/api/health', null)
+  const [dismissed, setDismissed] = useState(wasDismissedToday)
 
   const unavailable = health?.unavailable
   const keys = unavailable ? Object.keys(unavailable) : []
-  if (keys.length === 0) return null
+  if (keys.length === 0 || dismissed) return null
 
   const names = keys.map(k => SECTION_LABELS[k] || k)
   const details = keys
@@ -30,7 +48,10 @@ export function PortalStatusBanner() {
       className="portal-status"
       kind="info"
       lowContrast
-      hideCloseButton
+      onClose={() => {
+        try { sessionStorage.setItem(DISMISS_KEY, todayKey()) } catch { /* ignore */ }
+        setDismissed(true)
+      }}
       title={
         names.length > 1
           ? `Portal şu an ${names.join(' ve ')} bölümlerini sunmuyor`

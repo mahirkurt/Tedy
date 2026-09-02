@@ -1,5 +1,5 @@
 import { Time, Task, Certificate, EventSchedule, ExamMode,
-         GroupPresentation, Book, Catalog, ChartBar, Notification, UserAvatar } from '@carbon/icons-react'
+         GroupPresentation, Book, Catalog, ChartBar, Notification, Chat, UserAvatar } from '@carbon/icons-react'
 import type { ComponentType } from 'react'
 import type { UserRole } from './hooks/useAuth'
 
@@ -17,10 +17,9 @@ export interface RouteConfig {
    */
   secondary?: boolean
   /**
-   * Set on surfaces that show none of the portal's own sections. The banner
-   * explaining which portal sections are unavailable is noise above a
-   * bookshelf or a chat — and those two are exactly the surfaces meant to
-   * hold attention (İ6).
+   * Surfaces that show none of the portal's own sections. The closed-module
+   * banner is scoped to /dersler and /takvim in App; this flag documents
+   * the same boundary so a new off-portal page is not mistaken for one.
    */
   offPortal?: boolean
   /**
@@ -33,7 +32,7 @@ export interface RouteConfig {
 export const routes: RouteConfig[] = [
   { path: '/',          label: 'Bugün',      icon: Time,              componentName: 'TodaySchedule' },
   { path: '/isler',     label: 'İşler',      icon: Task,              componentName: 'HomeworkTracker' },
-  { path: '/asistan',   label: 'Asistan',    icon: Notification,      componentName: 'AssistantChat' , offPortal: true },
+  { path: '/asistan',   label: 'Asistan',    icon: Chat,              componentName: 'AssistantChat' , offPortal: true },
   { path: '/notlar',    label: 'Notlar',     icon: Certificate,       componentName: 'GradeTable' , secondary: true },
 
   { path: '/takvim',    label: 'Takvim',     icon: EventSchedule,     componentName: 'CalendarEvents' , secondary: true },

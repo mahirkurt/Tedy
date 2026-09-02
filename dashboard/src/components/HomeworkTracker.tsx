@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, Button, InlineLoading } from '@carbon/react'
-import { Task, Timer, Document, CheckmarkFilled, CloseFilled, ChevronDown, ChevronUp } from '@carbon/icons-react'
+import { Timer, Document, CheckmarkFilled, CloseFilled, ChevronDown, ChevronUp } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import type { HomeworkItem } from '../types'
 import { parseDeadline, formatTurkishDate, getHomeworkStatus } from '../utils/formatters'
@@ -211,10 +211,8 @@ export default function HomeworkTracker() {
   return (
     <>
     <div className="dashboard-card">
-      <h2 className="dashboard-card__title dashboard-card__title--tight">
-        <Task size={20} />
-        İşler
-      </h2>
+      {/* The page heading lives on the shell. A second visible "İşler" here
+          was the same word twice in the outline. */}
 
       {/* The page names one step before it lists anything (İ1). "Başla" opens
           the work itself, so the verb keeps its meaning through the flow. */}
@@ -231,6 +229,10 @@ export default function HomeworkTracker() {
         />
       )}
 
+      {aktif.length === 0 && (
+        <EmptyLine>Şu an teslim bekleyen bir işin yok.</EmptyLine>
+      )}
+
       {renderAccordionSection({
         keyName: 'aktif',
         title: 'Aktif Ödevler',
@@ -238,7 +240,7 @@ export default function HomeworkTracker() {
         showDoneAction: true,
       })}
 
-      {upcomingExams.length > 0 && (
+      {!focusMode && upcomingExams.length > 0 && (
         <div className="hw-section exams-ahead">
           <div className="hw-section__header">
             <span className="hw-section__label">Yaklaşan Sınavlar</span>
@@ -268,30 +270,26 @@ export default function HomeworkTracker() {
         </div>
       )}
 
-      {renderAccordionSection({
+      {!focusMode && renderAccordionSection({
         keyName: 'yapilan',
-        title: 'YAPILAN',
+        title: 'Yapılan',
         labelClass: 'hw-section__label--info',
         items: yapilan,
       })}
 
-      {renderAccordionSection({
+      {!focusMode && renderAccordionSection({
         keyName: 'tamamlanan',
         title: 'Tamamlandı',
         labelClass: 'hw-section__label--success',
         items: tamamlanan,
       })}
 
-      {renderAccordionSection({
+      {!focusMode && renderAccordionSection({
         keyName: 'yapilmayan',
         title: 'Yapılmayan',
         labelClass: 'hw-section__label--error',
         items: yapilmayan,
       })}
-
-      {aktif.length === 0 && yapilan.length === 0 && tamamlanan.length === 0 && yapilmayan.length === 0 && (
-        <EmptyLine>Bu bölümde iş yok.</EmptyLine>
-      )}
     </div>
 
     {/* Mounted only while open: a closed ComposedModal keeps its

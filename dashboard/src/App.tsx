@@ -30,6 +30,18 @@ import ExamTimeline from './components/ExamTimeline'
 import TedyBooks, { BookDetail } from './components/TedyBooks'
 import BookReader from './components/BookReader'
 
+function matchRoute(pathname: string, list: ReturnType<typeof routesFor>) {
+  const exact = list.find(r => r.path === pathname)
+  if (exact) return exact
+  return [...list]
+    .filter(r => r.path.includes(':'))
+    .sort((a, b) => b.path.length - a.path.length)
+    .find(r => {
+      const prefix = r.path.split('/:')[0]
+      return pathname === prefix || pathname.startsWith(`${prefix}/`)
+    })
+}
+
 const COMPONENTS: Record<string, React.ComponentType> = {
   Lessons,
   TodaySchedule, WeeklySchedule, HomeworkTracker, AssistantChat, GradeTable, ExamTimeline,
@@ -57,6 +69,13 @@ export default function App() {
     return () => { delete root.dataset.role }
   }, [user])
 
+  useEffect(() => {
+    const root = document.documentElement
+    if (focusMode) root.dataset.focus = 'on'
+    else delete root.dataset.focus
+    return () => { delete root.dataset.focus }
+  }, [focusMode])
+
   if (loading) {
     return (
       <div className="app-shell-loading">
@@ -75,11 +94,17 @@ export default function App() {
   const isReader = user.role === 'reader'
   // The nav already names every route; the page heading reuses that name
   // rather than inventing a second vocabulary for the same place.
-  const pageTitle =
-    visibleRoutes.find(r => r.path === location.pathname)?.label ?? 'TEDY'
-  const onPortalFreeSurface = visibleRoutes.some(
-    r => r.offPortal && (r.path === location.pathname
-      || (r.path.includes(':') && location.pathname.startsWith(r.path.split('/:')[0] + '/'))))
+  const matchedRoute = matchRoute(location.pathname, visibleRoutes)
+  const pageTitle = matchedRoute?.label ?? 'TEDY'
+  // Book surfaces already typeset their own visible h1 (Kitaplık / title /
+  // chapter). A second, hidden one made the outline read "Tedy Books" then
+  // "Kitaplık", or fell back to "TEDY" on /kitaplar/:slug.
+  const isBookSurface = location.pathname === '/kitaplar'
+    || location.pathname.startsWith('/kitaplar/')
+  // The portal-closed banner names Ders Programı and Takvim. Anywhere else
+  // it is the same sentence on a page that does not show those sections (İ6).
+  const showPortalBanner = !isReader && !focusMode
+    && (location.pathname === '/dersler' || location.pathname === '/takvim')
 
   return (
     <SessionContext.Provider value={user}>
@@ -116,7 +141,7 @@ export default function App() {
           ))}
           {/* Everything reachable but not worth a decision before doing
               anything sits one level down (İ1). */}
-          {navItems.some(r => r.secondary) && (
+          {!focusMode && navItems.some(r => r.secondary) && (
             <SideNavMenu
               title="Daha fazla"
               renderIcon={OverflowMenuHorizontal}
@@ -154,15 +179,16 @@ export default function App() {
           isReader ? 'app-shell-content--reader' : '',
         ].filter(Boolean).join(' ')}
       >
-        {/* Readers are refused /api/health, so the banner is not theirs to
-            fetch; and it says nothing to a surface that shows no portal
-            section (see `offPortal` in routes.ts). */}
-        {!isReader && !onPortalFreeSurface && <PortalStatusBanner />}
+        {/* Readers are refused /api/health. Everyone else only sees this
+            on the two pages that actually render those portal sections. */}
+        {showPortalBanner && <PortalStatusBanner />}
         {/* Named for assistive technology, which otherwise finds no page
             title at all: every surface used to open its heading outline
             with a card title, or with a closed modal's heading. It stays
             invisible because the surface below already announces itself. */}
-        <h1 className="cds--visually-hidden">{pageTitle}</h1>
+        {!isBookSurface && (
+          <h1 className="cds--visually-hidden">{pageTitle}</h1>
+        )}
         <RouteBoundary resetKey={location.pathname}>
         <Routes>
           {visibleRoutes.map(r => {

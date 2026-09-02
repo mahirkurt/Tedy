@@ -74,6 +74,50 @@ const BEDTIME = 22 * 60 + 30
 
 function toMinutes(h: number, m: number) { return h * 60 + m }
 
+/**
+ * The focus window is 08:00–16:00. "ŞİMDİ" only belongs inside it.
+ * Before the first bell and after bedtime the work is still named, but
+ * the voice stops pretending the next ten minutes are the slot (İ4).
+ */
+function windowVoice(minutes: number, kind: 'work' | 'reading'): {
+  eyebrow: string
+  hint?: string
+  anchorMin?: number
+} {
+  const afterBedtime = minutes >= BEDTIME
+  const afterWindow = minutes >= FOCUS_END
+  const beforeSchool = minutes < SCHOOL_START
+  const beforeLastBell = !beforeSchool && minutes < SCHOOL_END
+
+  if (kind === 'work') {
+    if (afterBedtime) {
+      return { eyebrow: 'YARIN', hint: 'Bunu yarın okuldan sonra yapmak daha kolay' }
+    }
+    if (afterWindow) {
+      return { eyebrow: 'BU AKŞAM' }
+    }
+    if (beforeSchool || beforeLastBell) {
+      return {
+        eyebrow: 'OKULDAN SONRA',
+        hint: 'Bunu okuldan sonra yapmak daha kolay',
+        anchorMin: SCHOOL_END,
+      }
+    }
+    return { eyebrow: 'ŞİMDİ' }
+  }
+
+  if (afterBedtime) {
+    return { eyebrow: 'YARIN', hint: 'Yarın okuldan sonra daha kolay' }
+  }
+  if (afterWindow) {
+    return { eyebrow: 'BU AKŞAM' }
+  }
+  if (beforeSchool) {
+    return { eyebrow: 'BUGÜN', hint: 'Bunu okuldan sonra yapmak daha kolay' }
+  }
+  return { eyebrow: 'ŞİMDİ' }
+}
+
 function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear()
     && a.getMonth() === b.getMonth()
@@ -313,20 +357,17 @@ export default function TodaySchedule() {
     if (top) {
       const course = String(top.hw['Ders Adı'] || '').trim()
       const title = String(top.hw['Ödev Başlığı'] || '').trim()
-      // While school is still running, the proposal is a slot rather than
-      // "now": the stretch between the last bell and the window's edge is the
-      // scarcest attention in the day and this is what it is for (İ4).
-      const beforeLastBell = minutes < SCHOOL_END
-      const afterWindow = minutes >= FOCUS_END
+      const voice = windowVoice(minutes, 'work')
       return {
-        anchorMin: beforeLastBell ? SCHOOL_END : undefined,
+        anchorMin: voice.anchorMin,
         props: {
-          eyebrow: beforeLastBell ? 'OKULDAN SONRA' : afterWindow ? 'BU AKŞAM' : 'ŞİMDİ',
+          eyebrow: voice.eyebrow,
           title: [course, title].filter(Boolean).join(' — ') || 'Ödev',
           stepMinutes: 10,
           actionLabel: 'Başla',
-          onAction: () => navigate('/odevler'),
+          onAction: () => navigate('/isler'),
           variant: 'work' as const,
+          hint: voice.hint,
         },
       }
     }
@@ -336,16 +377,18 @@ export default function TodaySchedule() {
     const target = firstBook
       ? (resumeId ? `/kitaplar/${firstBook.slug}/${resumeId}` : `/kitaplar/${firstBook.slug}`)
       : '/kitaplar'
+    const voice = windowVoice(minutes, 'reading')
     return {
-      anchorMin: undefined,
+      anchorMin: voice.anchorMin,
       props: {
-        eyebrow: minutes >= FOCUS_END ? 'BU AKŞAM' : 'ŞİMDİ',
+        eyebrow: voice.eyebrow,
         title: firstBook ? `Tedy Books — ${firstBook.title}` : 'Tedy Books',
         stepMinutes: 15,
         stepSuffix: 'oku',
         actionLabel: 'Okumaya başla',
         onAction: () => navigate(target),
         variant: 'reading' as const,
+        hint: voice.hint,
       },
     }
   }, [activeHomework, nowMs, firstBook, bookProgress.lastChapterId, navigate])
@@ -488,7 +531,7 @@ export default function TodaySchedule() {
             <button
               type="button"
               className="today-homework__all-btn"
-              onClick={() => navigate('/odevler')}
+              onClick={() => navigate('/isler')}
             >
               Tümünü gör
             </button>
@@ -499,7 +542,7 @@ export default function TodaySchedule() {
                 key={`${hw["Ödev Başlığı"]}-${i}`}
                 type="button"
                 className="today-homework__item"
-                onClick={() => navigate('/odevler')}
+                onClick={() => navigate('/isler')}
               >
                 <div className="today-homework__item-main">
                   <span className="today-homework__item-course">{hw.normalized_course || hw["Ders Adı"]}</span>
@@ -575,7 +618,7 @@ export default function TodaySchedule() {
                       item.type === 'deadline' && 'today-tl__item--deadline',
                     ].filter(Boolean).join(' ')}
                     style={{ '--tl-color': cfg.color } as React.CSSProperties}
-                    onClick={item.type === 'deadline' ? () => navigate('/odevler') : undefined}
+                    onClick={item.type === 'deadline' ? () => navigate('/isler') : undefined}
                   >
                     <div className="today-tl__time">
                       {item.time.split('\u2013')[0]}

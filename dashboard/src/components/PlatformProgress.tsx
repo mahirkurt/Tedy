@@ -75,9 +75,7 @@ export default function PlatformProgress() {
               title={
                 <span className="platform-accordion__header">
                   <span className="platform-accordion__name">{p.name}</span>
-                  <Tag type={pct === 100 ? 'green' : pct > 50 ? 'blue' : 'warm-gray'} size="sm">
-                    {p.done}/{p.total}
-                  </Tag>
+                  <span className="platform-accordion__count">{p.done}/{p.total}</span>
                 </span> as unknown as string
               }
             >
@@ -127,9 +125,7 @@ export default function PlatformProgress() {
               title={
                 <span className="platform-accordion__header">
                   <span className="platform-accordion__name">{p.name}</span>
-                  <Tag type={pct === 100 ? 'green' : pct > 50 ? 'blue' : 'warm-gray'} size="sm">
-                    {p.done}/{p.total}
-                  </Tag>
+                  <span className="platform-accordion__count">{p.done}/{p.total}</span>
                 </span> as unknown as string
               }
             >
@@ -196,9 +192,7 @@ export default function PlatformProgress() {
               title={
                 <span className="platform-accordion__header">
                   <span className="platform-accordion__name">{p.name}</span>
-                  <Tag type={pct === 100 ? 'green' : pct > 50 ? 'blue' : 'warm-gray'} size="sm">
-                    {p.done}/{p.total}
-                  </Tag>
+                  <span className="platform-accordion__count">{p.done}/{p.total}</span>
                 </span> as unknown as string
               }
             >
