@@ -64,16 +64,16 @@
 }
 
 .ac__prompt-chip--primary {
-  background: theme.$button-primary;
-  border-color: theme.$button-primary;
-  color: theme.$text-on-color;
+  background: var(--ted-color-brand-primary);
+  border-color: var(--ted-color-brand-primary);
+  color: var(--ted-color-text-on-color);
   font-weight: 600;
 }
 
 .ac__prompt-chip--primary:hover:not(:disabled) {
-  background: theme.$button-primary-hover;
-  border-color: theme.$button-primary-hover;
-  color: theme.$text-on-color;
+  background: var(--ted-color-brand-primary-hover);
+  border-color: var(--ted-color-brand-primary-hover);
+  color: var(--ted-color-text-on-color);
 }
 
 .ac__prompt-chip:disabled {
