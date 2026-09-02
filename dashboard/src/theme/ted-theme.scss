@@ -2495,9 +2495,7 @@ body {
   }
 
   .dashboard-header__meta {
-    padding: 0;
-    gap: 0.35rem;
-    min-width: 0;
+    display: none;
   }
 
   .dashboard-header__sync-label--full { display: none; }
@@ -2517,11 +2515,6 @@ body {
     max-width: 6.5rem;
   }
 
-  .dashboard-header__avatar {
-    width: 24px;
-    height: 24px;
-  }
-
   // Last sync lives on the footer now. Dropping the pill here is what
   // makes room for Odak on a 320px header without pushing Çıkış off-screen.
   .dashboard-header__health-wrap {
@@ -2531,6 +2524,39 @@ body {
   .dashboard-header__focus-toggle {
     display: flex;
     padding: 0 var(--ted-space-2xs);
+  }
+
+  // The switch stays; the word is what pushed Çıkış 16px past a 320px
+  // header. The control still has an accessible name via labelA/labelB.
+  .dashboard-header__focus-toggle .cds--toggle__text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .dashboard-header__avatar {
+    display: none;
+  }
+
+  @media (max-width: 22rem) {
+    .dashboard-header__brand-logo {
+      height: 22px;
+    }
+
+    .cds--header .cds--header__name {
+      padding-inline: 0.5rem;
+    }
+
+    .cds--header__global .cds--header__action {
+      width: 2.5rem;
+      min-width: 2.5rem;
+    }
   }
 
   .login-page {

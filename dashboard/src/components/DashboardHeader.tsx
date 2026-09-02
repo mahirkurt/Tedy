@@ -312,6 +312,7 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
               size="sm"
               labelA="Odak"
               labelB="Odak"
+              aria-label="Odak"
               toggled={focusMode}
               onToggle={toggleFocusMode}
             />
