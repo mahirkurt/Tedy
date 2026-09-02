@@ -19,7 +19,7 @@ test('a closed calendar does not draw an empty week', async ({ page }) => {
   await page.waitForLoadState('networkidle')
 
   await expect(page.locator('.calendar-grid')).toHaveCount(0)
-  await expect(page.getByText('portal bu sayfaya yetki vermiyor', { exact: false })).toBeVisible()
+  await expect(page.locator('.tedy-empty')).toContainText('portal bu sayfaya yetki vermiyor')
   await expect(page.getByRole('button', { name: /Bugün/ })).toBeVisible()
 })
 

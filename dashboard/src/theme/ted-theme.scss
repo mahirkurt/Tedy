@@ -2522,8 +2522,10 @@ body {
     height: 24px;
   }
 
+  // Last sync lives on the footer now. Dropping the pill here is what
+  // makes room for Odak on a 320px header without pushing Çıkış off-screen.
   .dashboard-header__health-wrap {
-    display: inline-flex;
+    display: none;
   }
 
   .dashboard-header__focus-toggle {
