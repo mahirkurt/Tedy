@@ -147,5 +147,11 @@ Hepsi panelin normal oturum kimlik doğrulamasına tabidir.
 ## Okuma konumu
 
 Kaldığı yer, tema, punto, satır aralığı ve sütun genişliği tarayıcının
-`localStorage`'ında tutulur (`tedy-books-progress`, `tedy-books-settings`).
-Sunucuya yazılmaz; yani cihaz başına ayrıdır.
+`localStorage`'ında tutulur (`tedy-books-progress::<email>`,
+`tedy-books-settings::<email>`). `localStorage` çalışma kopyasıdır — çevrimdışı
+okuma yaşar. `useBookProgressSync()` girişte bir kez çeker ve yerel hareketi
+tembel bir zamanlayıcıyla `GET`/`POST /api/books/progress`'e yazar; yer imi
+hesabı cihazlar arasında takip eder. Sunucu kaydı `output/book_progress.json`
+içinde e-posta başına durur ve kitapları `updatedAt` ile birleştirir — eski bir
+cihaz okuyucuyu geri saramaz. API anahtarı çağrıları 403 alır: ilerleme kişiye
+aittir, entegrasyona değil.

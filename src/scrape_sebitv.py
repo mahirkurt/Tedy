@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Scrape SEBİTV Cloud videos/PDFs and upload to Google Drive."""
-import io
+"""Scrape SEBİTV Cloud videos/PDFs and save them under content/sebitv/."""
 import json
 import os
 import re
@@ -9,16 +8,13 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.chdir(os.path.join(os.path.dirname(__file__), ".."))
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 import requests as req
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from googleapiclient.http import MediaInMemoryUpload, MediaIoBaseUpload
 
-from src.sync_to_google import get_services, _get_or_create_folder, get_year_root
 from src.env_loader import load_env
 
 load_env()
@@ -32,14 +28,12 @@ KAPI = "https://kapi.sebitvcloud.com"
 
 TRACKER_FILE = os.path.join("output", "sebitv_uploaded.json")
 DISCOVERY_FILE = os.path.join("output", "sebitv_discovered.json")
+CONTENT_DIR = os.path.join("content", "sebitv")
 
 # Video URL pattern:
 # {BASE}/BASE_URL/LEARNING_OBJECT/REPOSITORY/0/{resourceId}/{version}/{code}/
 #   sco1/resources/video/{code}.mp4
 # Redirects to signed CDN URL at cdn1.sebitvcloud.com
-
-MAX_INMEMORY = 100 * 1024 * 1024  # 100 MB
-
 
 def create_driver():
     opts = Options()
@@ -373,44 +367,9 @@ def save_tracker(tracker):
         json.dump(tracker, f, indent=2, ensure_ascii=False)
 
 
-def upload_to_drive(
-    drive, content, filename, mimetype, folder_id
-):
-    """Upload file to Google Drive."""
-    size = len(content)
-    if size <= MAX_INMEMORY:
-        media = MediaInMemoryUpload(
-            content, mimetype=mimetype
-        )
-    else:
-        media = MediaIoBaseUpload(
-            io.BytesIO(content),
-            mimetype=mimetype,
-            chunksize=50 * 1024 * 1024,
-            resumable=True,
-        )
-
-    result = drive.files().create(
-        body={
-            "name": filename,
-            "parents": [folder_id],
-        },
-        media_body=media,
-        fields="id,webViewLink",
-    ).execute()
-    return result
-
-
-def download_and_upload(resources, s, drive, tracker):
-    """Download all videos/PDFs and upload to Drive."""
+def download_resources(resources, s, tracker):
+    """Download all videos/PDFs into content/sebitv/<course>/<unit>/."""
     print(f"\n[İNDİRME] {len(resources)} kaynak işleniyor...")
-
-    root_id = _get_or_create_folder(
-        drive, "SEBİTV Videolar",
-        parent_id=get_year_root(drive)
-    )
-    course_folders = {}
-    unit_folders = {}
 
     added = 0
     skipped = 0
@@ -472,10 +431,6 @@ def download_and_upload(resources, s, drive, tracker):
                 continue
 
             ext = ".pdf" if is_pdf else ".mp4"
-            mime = (
-                "application/pdf" if is_pdf
-                else "video/mp4"
-            )
 
             size = len(content)
             print(f"    İndirildi: {size / 1024 / 1024:.1f} MB")
@@ -485,46 +440,25 @@ def download_and_upload(resources, s, drive, tracker):
                 failed += 1
                 continue
 
-            # Create folders
-            if course not in course_folders:
-                course_folders[course] = (
-                    _get_or_create_folder(
-                        drive, sanitize(course),
-                        parent_id=root_id,
-                    )
-                )
-
-            ukey = f"{course}/{unit}"
-            if ukey not in unit_folders:
-                unit_folders[ukey] = (
-                    _get_or_create_folder(
-                        drive, sanitize(unit),
-                        parent_id=course_folders[course],
-                    )
-                )
-
-            # Upload
-            filename = f"{sanitize(title)}{ext}"
-            result = upload_to_drive(
-                drive, content, filename,
-                mime, unit_folders[ukey],
+            dest_dir = os.path.join(
+                CONTENT_DIR, sanitize(course), sanitize(unit)
             )
+            os.makedirs(dest_dir, exist_ok=True)
+            dest_path = os.path.join(dest_dir, f"{sanitize(title)}{ext}")
+            with open(dest_path, "wb") as fh:
+                fh.write(content)
 
             tracker[key] = {
                 "course": course,
                 "unit": unit,
                 "title": title,
                 "type": res["type"],
-                "driveId": result["id"],
-                "link": result.get("webViewLink", ""),
+                "path": dest_path,
                 "size": size,
             }
             save_tracker(tracker)
             added += 1
-            print(
-                f"    Yüklendi: "
-                f"{result.get('webViewLink', '')}"
-            )
+            print(f"    Kaydedildi: {dest_path}")
 
         except req.exceptions.Timeout:
             print("    Zaman aşımı")
@@ -537,7 +471,7 @@ def download_and_upload(resources, s, drive, tracker):
             failed += 1
 
     print(
-        f"\n  Sonuç: +{added} yüklendi, "
+        f"\n  Sonuç: +{added} kaydedildi, "
         f"={skipped} atlandı, "
         f"x{failed} başarısız, "
         f"~{no_video} video yok (interaktif)"
@@ -598,8 +532,7 @@ def main():
         f"(video + PDF) / {len(resources)} toplam"
     )
 
-    # Phase 2: Download + Upload
-    print("\n[2/2] İndirme ve yükleme başlıyor...")
+    print("\n[2/2] İndirme başlıyor...")
     driver = create_driver()
     try:
         ok = sebitv_login(driver)
@@ -610,16 +543,15 @@ def main():
     finally:
         driver.quit()
 
-    _, _, _, drive_svc = get_services()
-    added, skipped, failed = download_and_upload(
-        downloadable, s, drive_svc, tracker,
+    added, skipped, failed = download_resources(
+        downloadable, s, tracker,
     )
 
     print(f"\n{'=' * 60}")
     print("  SEBİTV TAMAMLANDI")
     print(f"  Toplam kaynak: {len(resources)}")
     print(f"  İndirilebilir: {len(downloadable)}")
-    print(f"  Yüklenen: {added}")
+    print(f"  Kaydedilen: {added}")
     print(f"  Atlanan: {skipped}")
     print(f"  Başarısız: {failed}")
     print("=" * 60)

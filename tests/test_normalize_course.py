@@ -3,7 +3,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.sync_to_google import normalize_course
+from src.course_names import normalize_course
 
 
 class TestNormalizeCourse:
@@ -145,30 +145,3 @@ class TestNormalizeCourseUnknown:
         assert normalize_course("Sınıf Öğretmeni") == "Sınıf Öğretmeni"
 
 
-class TestTakvimKeywords:
-    """Verify takvim keyword classification covers all canonical course names."""
-
-    def test_all_canonical_names_present(self):
-        from src.sync_to_google import TAKVIM_DERS_KEYWORDS
-        for name in ["matematik", "türkçe", "fen", "sosyal",
-                      "din kültürü", "ingilizce", "français", "fransızca",
-                      "bilişim", "görsel", "müzik", "beden",
-                      "ahlak", "english", "literature"]:
-            assert name in TAKVIM_DERS_KEYWORDS, f"Missing: {name}"
-
-
-from src.sync_to_google import parse_week_range
-
-
-class TestParseWeekRange:
-    def test_basic_parse(self):
-        start, end = parse_week_range("20. Hafta 02 Şub. - 08 Şub.")
-        assert start is not None
-        assert start.month == 2
-        assert start.day == 2
-        assert end.day == 8
-
-    def test_uses_current_year(self):
-        from datetime import datetime
-        start, end = parse_week_range("20. Hafta 02 Şub. - 08 Şub.")
-        assert start.year == datetime.now().year

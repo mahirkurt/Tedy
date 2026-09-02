@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Scrape ALL MEBI videos and upload to Google Drive, organized by course folders."""
-import io
+"""Scrape ALL MEBI videos and save them under content/mebi/."""
 import json
 import os
 import re
@@ -11,14 +10,11 @@ import requests as req
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.chdir(os.path.join(os.path.dirname(__file__), ".."))
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from googleapiclient.http import MediaInMemoryUpload, MediaIoBaseUpload
 
-from src.sync_to_google import get_services, _get_or_create_folder, get_year_root
 from src.env_loader import load_env
 
 load_env()
@@ -27,6 +23,7 @@ PASSWORD = os.environ.get("EBA_PASSWORD", "")
 
 TRACKER_FILE = os.path.join("output", "mebi_videos_uploaded.json")
 DISCOVERY_FILE = os.path.join("output", "mebi_videos_discovered.json")
+CONTENT_DIR = os.path.join("content", "mebi")
 
 COURSES = {
     "Din Kültürü": "66ed9e38-25bf-4800-0877-08ddc2afb3ce",
@@ -41,9 +38,6 @@ MEBI_BASE = "https://mebi.eba.gov.tr"
 CDN_PATTERN = re.compile(
     r"https://ogm-large-cdn\.eba\.gov\.tr/mebi/video/[a-z0-9]+\.mp4"
 )
-
-MAX_INMEMORY_SIZE = 100 * 1024 * 1024  # 100 MB
-
 
 def create_driver():
     opts = Options()
@@ -255,14 +249,8 @@ def sanitize_filename(name):
     return name.strip(". ")[:200]
 
 
-def download_and_upload_videos(videos, drive_service, tracker):
-    print(f"\n[Drive] {len(videos)} video yükleniyor...")
-
-    root_id = _get_or_create_folder(
-        drive_service, "MEBI Videolar",
-        parent_id=get_year_root(drive_service))
-    course_folders = {}
-    unit_folders = {}
+def download_videos(videos, tracker):
+    print(f"\n[Local] {len(videos)} video kaydediliyor...")
 
     added = 0
     skipped = 0
@@ -298,64 +286,38 @@ def download_and_upload_videos(videos, drive_service, tracker):
                 failed += 1
                 continue
 
-            # Course folder
-            if course not in course_folders:
-                course_folders[course] = _get_or_create_folder(
-                    drive_service, sanitize_filename(course), parent_id=root_id
-                )
-
-            # Unit folder
-            unit_key = f"{course}/{unit}"
-            if unit_key not in unit_folders:
-                unit_folders[unit_key] = _get_or_create_folder(
-                    drive_service,
-                    sanitize_filename(unit),
-                    parent_id=course_folders[course],
-                )
-
-            # Upload
-            filename = f"{sanitize_filename(topic)}.mp4"
-            if size <= MAX_INMEMORY_SIZE:
-                media = MediaInMemoryUpload(content, mimetype="video/mp4")
-            else:
-                media = MediaIoBaseUpload(
-                    io.BytesIO(content),
-                    mimetype="video/mp4",
-                    chunksize=50 * 1024 * 1024,
-                    resumable=True,
-                )
-
-            result = drive_service.files().create(
-                body={"name": filename, "parents": [unit_folders[unit_key]]},
-                media_body=media,
-                fields="id,webViewLink",
-            ).execute()
+            dest_dir = os.path.join(
+                CONTENT_DIR, sanitize_filename(course), sanitize_filename(unit)
+            )
+            os.makedirs(dest_dir, exist_ok=True)
+            dest_path = os.path.join(dest_dir, f"{sanitize_filename(topic)}.mp4")
+            with open(dest_path, "wb") as fh:
+                fh.write(content)
 
             tracker[uuid] = {
                 "course": course,
                 "unit": unit,
                 "topic": topic,
                 "cdnUrl": cdn_url,
-                "driveId": result["id"],
-                "link": result.get("webViewLink", ""),
+                "path": dest_path,
                 "size": size,
             }
             save_tracker(tracker)
             added += 1
-            print(f"    Yüklendi: {result.get('webViewLink', '')}")
+            print(f"    Kaydedildi: {dest_path}")
 
         except req.exceptions.Timeout:
-            print(f"    Zaman aşımı")
+            print("    Zaman aşımı")
             failed += 1
         except req.exceptions.ConnectionError:
-            print(f"    Bağlantı hatası")
+            print("    Bağlantı hatası")
             failed += 1
         except Exception as e:
             print(f"    Hata: {e}")
             failed += 1
 
     print(
-        f"\n  Sonuç: +{added} yüklendi, ={skipped} atlandı, x{failed} başarısız"
+        f"\n  Sonuç: +{added} kaydedildi, ={skipped} atlandı, x{failed} başarısız"
     )
     return added, skipped, failed
 
@@ -363,7 +325,7 @@ def download_and_upload_videos(videos, drive_service, tracker):
 def main():
     os.makedirs("output", exist_ok=True)
     tracker = load_tracker()
-    print(f"[Tracker] {len(tracker)} video zaten yüklenmiş")
+    print(f"[Tracker] {len(tracker)} video zaten kaydedilmiş")
 
     # Phase 1: Discovery
     print("\n[1/2] Tüm MEBI videoları keşfediliyor...")
@@ -382,17 +344,13 @@ def main():
         print("Hiç video bulunamadı!")
         return
 
-    # Phase 2: Download + Upload
-    print(f"\n[2/2] {len(videos)} video indiriliyor ve yükleniyor...")
-    _, _, _, drive_svc = get_services()
-    added, skipped, failed = download_and_upload_videos(
-        videos, drive_svc, tracker
-    )
+    print(f"\n[2/2] {len(videos)} video indiriliyor...")
+    added, skipped, failed = download_videos(videos, tracker)
 
     print(f"\n{'=' * 60}")
-    print(f"  MEBI VIDEO TAMAMLANDI")
+    print("  MEBI VIDEO TAMAMLANDI")
     print(f"  Toplam keşfedilen: {len(videos)}")
-    print(f"  Yüklenen: {added}")
+    print(f"  Kaydedilen: {added}")
     print(f"  Atlanan: {skipped}")
     print(f"  Başarısız: {failed}")
     print(f"{'=' * 60}")

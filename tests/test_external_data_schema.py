@@ -15,7 +15,7 @@ def load_json(filename):
 
     These validate the shape of live scraper output, so they only mean anything
     once a scraper has run. A missing file and an empty one are the same state:
-    `purge_google_data.py` resets trackers to `{}` rather than deleting them, so
+    a year-seal resets trackers to `{}` rather than deleting them, so
     both must skip instead of failing.
     """
     path = os.path.join(OUTPUT_DIR, filename)
@@ -24,7 +24,7 @@ def load_json(filename):
     with open(path) as f:
         data = json.load(f)
     if not data:
-        pytest.skip(f"{filename} is empty — no scraped data to validate (post-purge?)")
+        pytest.skip(f"{filename} is empty — no scraped data to validate")
     return data
 
 
@@ -39,18 +39,19 @@ class TestEbaTextbooks:
 
     def test_values_have_required_keys(self):
         data = load_json("eba_textbooks_uploaded.json")
-        required = {"title", "course", "driveId", "link"}
+        required = {"title", "course"}
         for key, entry in data.items():
             missing = required - set(entry.keys())
             assert not missing, f"Entry {key!r} missing keys: {missing}"
+            assert "path" in entry or "driveId" in entry, (
+                f"Entry {key!r} needs a local path (or a leftover Drive id)"
+            )
 
     def test_values_are_strings(self):
         data = load_json("eba_textbooks_uploaded.json")
         for key, entry in data.items():
             assert isinstance(entry["title"], str), f"Entry {key!r}: title not str"
             assert isinstance(entry["course"], str), f"Entry {key!r}: course not str"
-            assert isinstance(entry["driveId"], str), f"Entry {key!r}: driveId not str"
-            assert isinstance(entry["link"], str), f"Entry {key!r}: link not str"
 
 
 class TestMebiVideos:
@@ -64,15 +65,18 @@ class TestMebiVideos:
 
     def test_values_have_required_keys(self):
         data = load_json("mebi_videos_uploaded.json")
-        required = {"course", "unit", "topic", "driveId", "link"}
+        required = {"course", "unit", "topic"}
         for key, entry in data.items():
             missing = required - set(entry.keys())
             assert not missing, f"Entry {key!r} missing keys: {missing}"
+            assert "path" in entry or "driveId" in entry, (
+                f"Entry {key!r} needs a local path (or a leftover Drive id)"
+            )
 
     def test_values_are_strings(self):
         data = load_json("mebi_videos_uploaded.json")
         for key, entry in data.items():
-            for field in ("course", "unit", "topic", "driveId", "link"):
+            for field in ("course", "unit", "topic"):
                 assert isinstance(entry[field], str), (
                     f"Entry {key!r}: {field} not str"
                 )
@@ -89,15 +93,20 @@ class TestSebitvUploaded:
 
     def test_values_have_required_keys(self):
         data = load_json("sebitv_uploaded.json")
-        required = {"course", "unit", "title", "type", "driveId", "link"}
+        required = {"course", "unit", "title", "type"}
         for key, entry in data.items():
             missing = required - set(entry.keys())
             assert not missing, f"Entry {key!r} missing keys: {missing}"
+            assert "path" in entry or "driveId" in entry or "status" in entry, (
+                f"Entry {key!r} needs a local path, leftover Drive id, or status"
+            )
 
     def test_values_are_strings(self):
         data = load_json("sebitv_uploaded.json")
         for key, entry in data.items():
-            for field in ("course", "unit", "title", "type", "driveId", "link"):
+            for field in ("course", "unit", "title", "type"):
+                if field not in entry:
+                    continue
                 assert isinstance(entry[field], str), (
                     f"Entry {key!r}: {field} not str"
                 )

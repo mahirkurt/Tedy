@@ -22,7 +22,6 @@ def _seed(out):
     for name, payload in (
         ("scraped_data.json", SCRAPED),
         ("health.json", {"success": True}),
-        ("classroom_sync.json", {"cw:1": {"last_hash": "abc"}}),
         ("eba_textbooks_uploaded.json", {"a": 1}),
         ("mebi_videos_uploaded.json", {}),
         ("uploaded_files.json", {"https://x/y.pdf": {"id": "f1"}}),
@@ -37,7 +36,7 @@ def test_archive_copies_the_year_and_writes_a_manifest(tmp_path):
     manifest = archive_year_local("2025-2026", out)
 
     d = archive_dir(out, "2025-2026")
-    for name in ("scraped_data.json", "health.json", "classroom_sync.json",
+    for name in ("scraped_data.json", "health.json",
                  "eba_textbooks_uploaded.json", "mebi_videos_uploaded.json",
                  "uploaded_files.json", "manifest.json"):
         assert os.path.exists(os.path.join(d, name)), name
@@ -45,7 +44,6 @@ def test_archive_copies_the_year_and_writes_a_manifest(tmp_path):
     assert manifest["year"] == "2025-2026"
     assert manifest["grade"] is None
     assert manifest["source_scraped_at"] == "2026-08-22T10:00:08"
-    assert manifest["drive_folder"] is None
     assert "archived_at" in manifest
 
 
@@ -94,9 +92,9 @@ def test_missing_optional_files_are_skipped_not_fatal(tmp_path):
 
 def test_sealing_resets_the_live_upload_trackers(tmp_path):
     """Trackers are per-year state, not permanent history. Once sealed,
-    every uploader's `if key in uploaded: skip` must start clean, or a
+    every downloader's `if key in uploaded: skip` must start clean, or a
     key that repeats across years (e.g. the same EBA textbook) is never
-    (re-)uploaded into the new year's Drive folder."""
+    re-downloaded."""
     out = str(tmp_path / "output")
     _seed(out)
 
@@ -141,8 +139,8 @@ def test_repeated_call_does_not_reset_trackers_again(tmp_path):
         assert json.load(f) == new_content
 
 
-def test_upload_tracker_files_constant_matches_purge_google_data():
-    """purge_google_data.py enumerates uploaded_files.json alongside the
-    four *_uploaded.json trackers - the *_uploaded.json glob alone would
-    miss it (see ARCHIVED_GLOBS)."""
+def test_upload_tracker_files_includes_homework_attachments():
+    """uploaded_files.json does not match *_uploaded.json, so it must be
+    listed explicitly or a seal would leave last year's homework
+    attachments in the live tracker."""
     assert "uploaded_files.json" in UPLOAD_TRACKER_FILES

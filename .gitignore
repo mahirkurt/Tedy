@@ -64,6 +64,8 @@ fix_credentials.py
 
 # Downloaded course/content payloads
 content/**/*.pdf
+content/**/*.mp4
+content/**/*.zip
 
 # Book source packages and indexes
 books/**/*.zip
