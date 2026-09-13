@@ -169,3 +169,21 @@ def test_google_identity_checks_nonce_and_verified_email(monkeypatch):
     with pytest.raises(google_identity.IdentityError) as exc:
         google_identity.verify_google_credential("n1", "n1")
     assert exc.value.reason == "invalid_token"
+
+
+def test_google_identity_maps_google_auth_errors(monkeypatch):
+    def transport_error(t, r, a):
+        raise google_identity.google_exceptions.TransportError("certs unreachable")
+
+    monkeypatch.setattr(google_identity.id_token, "verify_oauth2_token", transport_error)
+    with pytest.raises(google_identity.IdentityError) as exc:
+        google_identity.verify_google_credential("n1", "n1")
+    assert exc.value.reason == "google_unreachable"
+
+    def auth_error(t, r, a):
+        raise google_identity.google_exceptions.GoogleAuthError("wrong issuer")
+
+    monkeypatch.setattr(google_identity.id_token, "verify_oauth2_token", auth_error)
+    with pytest.raises(google_identity.IdentityError) as exc:
+        google_identity.verify_google_credential("n1", "n1")
+    assert exc.value.reason == "invalid_token"

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Callable
 
+from google.auth import exceptions as google_exceptions
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 
@@ -21,7 +22,9 @@ def verify_google_credential(credential: str, expected_nonce: str) -> str:
     """Return the verified, lower-cased email or raise IdentityError."""
     try:
         info = id_token.verify_oauth2_token(credential, google_requests.Request(), roles.GOOGLE_CLIENT_ID)
-    except ValueError as exc:
+    except google_exceptions.TransportError as exc:
+        raise IdentityError("google_unreachable") from exc
+    except (ValueError, google_exceptions.GoogleAuthError) as exc:
         raise IdentityError("invalid_token") from exc
     if not info.get("email_verified"):
         raise IdentityError("email_not_verified")
