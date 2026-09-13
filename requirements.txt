@@ -9,3 +9,11 @@ Pillow>=10.0
 pytest>=7.0
 requests>=2.31
 selenium>=4.18
+
+# MCP orchestrator (src/mcp_server) — pins match the fleet's proven egitim-kaynak lock.
+mcp==1.28.1
+starlette==1.3.1
+sse-starlette==3.4.5
+uvicorn==0.51.0
+python-multipart==0.0.32
+httpx==0.28.1

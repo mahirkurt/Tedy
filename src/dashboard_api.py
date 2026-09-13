@@ -26,6 +26,14 @@ os.chdir(PROJECT_ROOT)
 from src.env_loader import load_env
 from src.json_utils import atomic_json_dump
 from src.course_names import normalize_course
+from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.USER_ROLES etc.)
+    ALLOWED_EMAILS,
+    FULL_ACCESS_EMAILS,
+    GOOGLE_CLIENT_ID,
+    ROLE_FULL,
+    ROLE_READER,
+    USER_ROLES,
+)
 
 load_env()
 
@@ -108,25 +116,7 @@ STUDENT_DONE_FILE = os.path.join(OUTPUT_DIR, "homework_student_done.json")
 MAX_PHOTO_SIZE_BYTES = 12 * 1024 * 1024
 GEMINI_VISION_MODEL = os.environ.get("HOMEWORK_VISION_MODEL", "gemini-2.5-flash")
 
-GOOGLE_CLIENT_ID = "343043757928-mivqip09orvrf73m7kj9b0atohgin2ho.apps.googleusercontent.com"
-
-# --- Roles ---
-# "full"   — the household dashboard: every page and every endpoint.
-# "reader" — Tedy Books only. Nothing else about Işık's school life is visible.
-ROLE_FULL = "full"
-ROLE_READER = "reader"
-
-USER_ROLES = {
-    "isikkurtx@gmail.com": ROLE_FULL,
-    "drmahirkurt@gmail.com": ROLE_FULL,
-    "ozlem.murzoglu@gmail.com": ROLE_FULL,
-    "huriye.murzoglu@gmail.com": ROLE_FULL,
-    "murzogluhulya@gmail.com": ROLE_READER,
-    "mahirkurtmd@gmail.com": ROLE_READER,
-}
-
-ALLOWED_EMAILS = set(USER_ROLES)
-FULL_ACCESS_EMAILS = {e for e, r in USER_ROLES.items() if r == ROLE_FULL}
+# --- Roles: defined in src/roles.py (shared with the ted-mcp orchestrator) ---
 
 # Endpoints a reader may reach. Default-deny: a route that is not named here is
 # refused for readers, so adding an endpoint never leaks data by omission.
