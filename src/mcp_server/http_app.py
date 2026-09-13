@@ -1,9 +1,14 @@
 """Starlette app for ted-mcp: OAuth 2.1 discovery, DCR, CORS, host guard, bearer gate, MCP."""
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import html
 import json
 import time
 from typing import Any, Callable
+from urllib.parse import urlencode, urlparse, urlunparse, parse_qsl
 
 from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
@@ -18,10 +23,80 @@ from src.mcp_server.config import Settings
 from src.mcp_server.google_identity import IdentityVerifier, verify_google_credential
 from src.mcp_server.oauth_redirect import is_allowed_cors_origin, is_allowed_redirect
 from src.mcp_server.oauth_store import OAuthStore
+from src import roles
+from src.mcp_server.google_identity import IdentityError
+from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
 CLIENT_ID = "ted-mcp-public"
 REALM = "ted-mcp"
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+FORM_TTL_SECONDS = 600
+_FORM_KEYS = ("client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method", "scope", "resource")
+
+
+def _b64u(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def _b64u_decode(text: str) -> bytes:
+    return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
+
+
+def sign_form_state(params: dict[str, str], secret: bytes, now: float) -> str:
+    payload = _b64u(json.dumps({"p": params, "exp": int(now) + FORM_TTL_SECONDS}, sort_keys=True).encode())
+    sig = hmac.new(secret, payload.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"{payload}.{sig}"
+
+
+def read_form_state(token: str, secret: bytes, now: float) -> dict[str, str]:
+    try:
+        payload, sig = token.split(".", 1)
+        expected = hmac.new(secret, payload.encode("ascii"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig.encode("utf-8"), expected.encode("ascii")):
+            raise ValueError("form_state_invalid")
+        data = json.loads(_b64u_decode(payload))
+    except (ValueError, UnicodeEncodeError) as exc:
+        if str(exc) == "form_state_invalid":
+            raise
+        raise ValueError("form_state_invalid") from exc
+    if int(data.get("exp", 0)) < int(now):
+        raise ValueError("form_state_expired")
+    return {k: str(v) for k, v in (data.get("p") or {}).items()}
+
+
+def nonce_for(form_state: str) -> str:
+    return hashlib.sha256(form_state.encode("ascii")).hexdigest()
+
+
+def _with_query(uri: str, extra: dict[str, str]) -> str:
+    parts = urlparse(uri)
+    query = parse_qsl(parts.query, keep_blank_values=True) + list(extra.items())
+    return urlunparse(parts._replace(query=urlencode(query)))
+
+
+_CONSENT_PAGE = """<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TEDY edupedia bağlantısı</title>
+<style>
+body{{font-family:"IBM Plex Sans",system-ui,sans-serif;background:#f4f4f4;color:#161616;margin:0;padding:48px 16px}}
+main{{max-width:480px;margin:auto;background:#fff;padding:32px;border-top:4px solid #0f62fe}}
+h1{{font-size:1.5rem;font-weight:400;margin:0 0 16px}} p{{line-height:1.5}} code{{background:#e0e0e0;padding:2px 4px}}
+</style>
+<script src="https://accounts.google.com/gsi/client" async></script></head>
+<body><main>
+<h1>edupedia'yı TEDY hesabına bağla</h1>
+<p><code>{origin}</code> uygulaması, Google hesabınızla TEDY edupedia araçlarını kullanmak için izin istiyor.
+Yalnız TEDY aile listesindeki tam yetkili hesaplar onay verebilir.</p>
+<form id="consent" method="post" action="/oauth/authorize">
+<input type="hidden" name="form_state" value="{form_state}">
+<input type="hidden" name="credential" id="credential" value="">
+</form>
+<div id="g_id_onload" data-client_id="{client_id}" data-nonce="{nonce}" data-callback="tedyConsent"
+     data-auto_prompt="false"></div>
+<div class="g_id_signin" data-type="standard" data-text="continue_with" data-locale="tr"></div>
+<script>function tedyConsent(r){{document.getElementById("credential").value=r.credential;document.getElementById("consent").submit();}}</script>
+</main></body></html>"""
 
 
 def _header(scope: Scope, name: bytes) -> str:
@@ -118,8 +193,9 @@ def build_app(
     form_secret: bytes = b"",
     clock: Callable[[], float] = time.time,
 ) -> Starlette:
-    # verify_identity, form_secret and clock are used by the consent/token routes (Task 6).
     base = settings.public_base_url
+    if len(form_secret) < 32:
+        raise ValueError("form_secret must be at least 32 bytes")
 
     async def health(request: Request) -> Response:
         return JSONResponse({"status": "ok", "version": __version__})
@@ -161,6 +237,81 @@ def build_app(
             "response_types": ["code"],
         }, status_code=201)
 
+    def _bad(reason: str) -> Response:
+        return PlainTextResponse(f"Geçersiz yetkilendirme isteği: {reason}", status_code=400)
+
+    async def authorize(request: Request) -> Response:
+        if request.method == "GET":
+            q = request.query_params
+            if q.get("response_type") != "code":
+                return _bad("response_type")
+            if q.get("client_id") != CLIENT_ID:
+                return _bad("client_id")
+            redirect_uri = q.get("redirect_uri", "")
+            if not is_allowed_redirect(redirect_uri):
+                return _bad("redirect_uri")
+            if not q.get("code_challenge"):
+                return _bad("code_challenge")
+            if (q.get("code_challenge_method") or "").upper() != "S256":
+                return _bad("code_challenge_method must be S256")
+            params = {k: q.get(k, "") for k in _FORM_KEYS}
+            form_state = sign_form_state(params, form_secret, clock())
+            parsed = urlparse(redirect_uri)
+            page = _CONSENT_PAGE.format(
+                origin=html.escape(f"{parsed.scheme}://{parsed.netloc}"),
+                form_state=html.escape(form_state),
+                client_id=html.escape(roles.GOOGLE_CLIENT_ID),
+                nonce=html.escape(nonce_for(form_state)),
+            )
+            return HTMLResponse(page, headers={"cache-control": "no-store", "x-frame-options": "DENY"})
+
+        form = await request.form()
+        form_state = str(form.get("form_state", ""))
+        try:
+            params = read_form_state(form_state, form_secret, clock())
+        except ValueError as exc:
+            return PlainTextResponse(str(exc), status_code=400)
+        try:
+            email = verify_identity(str(form.get("credential", "")), nonce_for(form_state))
+        except IdentityError as exc:
+            return PlainTextResponse(f"Google kimliği doğrulanamadı: {exc.reason}", status_code=401)
+        if not roles.is_full(email):
+            return PlainTextResponse("Bu hesap TEDY edupedia bağlantısını onaylayamaz.", status_code=403)
+        code = store.issue_code(email, params["client_id"], params["redirect_uri"],
+                                params["code_challenge"], params["code_challenge_method"])
+        extra = {"code": code}
+        if params.get("state"):
+            extra["state"] = params["state"]
+        return RedirectResponse(_with_query(params["redirect_uri"], extra), status_code=302)
+
+    def _token_response(pair: Any) -> Response:
+        return JSONResponse(
+            {"access_token": pair.access_token, "token_type": "Bearer", "expires_in": pair.expires_in,
+             "refresh_token": pair.refresh_token, "scope": "edupedia"},
+            headers={"cache-control": "no-store", "pragma": "no-cache"},
+        )
+
+    def _grant_error(error: str) -> Response:
+        return JSONResponse({"error": error}, status_code=400, headers={"cache-control": "no-store"})
+
+    async def token(request: Request) -> Response:
+        form = await request.form()
+        grant = form.get("grant_type")
+        client_id = str(form.get("client_id", ""))
+        if grant == "authorization_code":
+            redirect_uri = str(form.get("redirect_uri", ""))
+            if client_id != CLIENT_ID or not is_allowed_redirect(redirect_uri):
+                return _grant_error("invalid_grant")
+            pair = store.redeem_code(str(form.get("code", "")), client_id, redirect_uri,
+                                     str(form.get("code_verifier", "")))
+            return _token_response(pair) if pair else _grant_error("invalid_grant")
+        if grant == "refresh_token":
+            if client_id != CLIENT_ID:
+                return _grant_error("invalid_grant")
+            pair = store.refresh(str(form.get("refresh_token", "")), client_id)
+            return _token_response(pair) if pair else _grant_error("invalid_grant")
+        return _grant_error("unsupported_grant_type")
+
     streamable = mcp.streamable_http_app()
     routes = [
         Route("/health", health),
@@ -168,6 +319,8 @@ def build_app(
         Route("/.well-known/oauth-protected-resource/mcp", protected_resource),
         Route("/.well-known/oauth-authorization-server", authorization_server),
         Route("/oauth/register", register, methods=["POST"]),
+        Route("/oauth/authorize", authorize, methods=["GET", "POST"]),
+        Route("/oauth/token", token, methods=["POST"]),
         Mount("/", app=streamable),
     ]
     # Middleware order: first entry is outermost. Pure ASGI classes keep SSE unbuffered and
