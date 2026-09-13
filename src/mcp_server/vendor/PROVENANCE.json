@@ -1,0 +1,27 @@
+{
+  "files": {
+    "SKILL.md": "11dc8b6b94be0ae56242f2eeb137fe46117d898d0967b6f92b0a089299c2a433",
+    "assets/module-template.html": "529d8c342aacc501c2fb6b8c4b8d48ae2606cb08c642427e26dc3a2cbb403c98",
+    "references/adhd-pedagogy.md": "33ddba2449dd81440c219b5d9353b65e714a899143da3205f5116c8547bac5db",
+    "references/audio-system.md": "34525988f5b5d96d9e68d98eb9bb0f788dae502bc6bfb2acee41556efe81b312",
+    "references/carbon-child-system.md": "05d81fef073ba4b1cb7665325d479a056ac15ff296e401d039d36aae3bb7f0b3",
+    "references/carbon-excellence.md": "5ca48ab08dbaf045ea25db8e1d7a00062777a28d89b20c036411aefcd937bf16",
+    "references/carbon-sources.md": "159265c8e68a0c67e4937b6195c0dce28255d289cdf3c66e361ab54e2a91925e",
+    "references/color-system.md": "7c7cda0bf023624f8c56b155b7d0157037f63813c289159514f05d59a5927d7e",
+    "references/content-enrichment.md": "c0f3455a87cf71f7cf7e6dc6149c23ac1d65b901053ed43ee090cf77049739b0",
+    "references/curriculum-integration.md": "a56eae62960dec161819da66e0ef6af6cc83f1b85a15982e962fe5931443e977",
+    "references/exam-solving.md": "80b0334d866c8bc553c53cd584d390cb38039bf902d8cc4efe6aab46f667efde",
+    "references/figma-carbon-interop.md": "38dfe864238ba964b3dcf5c5569e038e75a3bcbaed2a39c16f5321a4c8a83463",
+    "references/gamified-flows.md": "912e07b5e074e59d72f9abe65b9f6b7209f820db0f4fc2a5ea76e8b9afeda20e",
+    "references/icon-pictogram-svg.md": "81013bf11da83e88fc6c55deafb20bf3c62d4e108107652a814ea95667826564",
+    "references/interaction-patterns.md": "34cc7c2efc4b2823f81010964028ab4259dd335ffe40a87b13d6c7729e12db35",
+    "references/module-architecture.md": "70a88fc8f518262b0c810f1de081a3adcecf98d9bfd00cc1165060bc3fce51c0",
+    "references/newgen-question-design.md": "068243dfe11d052d7570f0201eb79744616072e7d8b2e8ca1bf3848d72db28ba",
+    "references/subject-packs.md": "0741c1fcf210b66bf10985a9cf07f09da7b47c5b06e22bf2b41802bd0e5e89a1",
+    "references/svg-authoring.md": "5a6cbb73bebc202ed11a059cb0ebd97dcaf4f202f3d85c09f092af6751080ae5",
+    "scripts/validate_module.py": "4b0c7de6e97b97807498e7b9829beb7e41e7db23006d4c7662066e6bc23f065b"
+  },
+  "source_commit": "3ef6a26ef415ed9765377d225be04b33834db428",
+  "source_root": "/mnt/thunderbolt/workspaces/CureoPrivate/plugins/edupedia/skills/carbon-edupedia",
+  "synced_at": "2026-09-13T19:35:15+00:00"
+}
