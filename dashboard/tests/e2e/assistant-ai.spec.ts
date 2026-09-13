@@ -20,7 +20,10 @@ async function ask(page: import('@playwright/test').Page) {
   await page.waitForLoadState('networkidle')
   await page.fill('#ac-input', 'kesirler')
   await page.getByLabel('Gönder').click()
-  await page.waitForTimeout(700)
+  // The answer carries [S1], so its chip existing is the proof the reply has
+  // rendered. Callers read computed styles straight after this, and
+  // evaluate() does not retry.
+  await page.locator('.ac-cite').first().waitFor()
 }
 
 test('the AI label explains itself instead of just marking', async ({ page }) => {
@@ -33,8 +36,8 @@ test('the AI label explains itself instead of just marking', async ({ page }) =>
   const slug = page.locator('.ac__header .cds--ai-label__button').first()
   await expect(slug).toBeVisible()
   await slug.click()
-  await page.waitForTimeout(300)
 
+  // Both expects below retry until the popover has opened.
   const pop = page.locator('.ac__header .cds--ai-label-content')
   await expect(pop).toBeVisible()
   // It has to say what the thing is and that its answers are checkable.
@@ -51,7 +54,6 @@ test('the model that answered is disclosed', async ({ page }) => {
   // all times — the model name is something to be able to find, not
   // something to read past on every answer (İ6).
   await page.locator('.ac__header .cds--ai-label__button').click()
-  await page.waitForTimeout(300)
   await expect(page.locator('.ac__header .cds--ai-label-content'))
     .toContainText('gemini-3.7-flash')
 })
@@ -71,9 +73,9 @@ test('the AI aura stays off the sources, which are quotes', async ({ page }) => 
   // AI aura on it is a false claim about where the words came from.
   await ask(page)
   await page.locator('.ac-cite').first().click()
-  await page.waitForTimeout(400)
   // Assert the state exists before asserting anything about it — otherwise
-  // a citation that never activates makes this pass by absence.
+  // a citation that never activates makes this pass by absence. This expect
+  // retries, so it is also the wait for the click to take effect.
   const active = page.locator('.ac__ref-item--active')
   await expect(active).toHaveCount(1)
   const bg = await active.evaluate(el => getComputedStyle(el).backgroundImage)

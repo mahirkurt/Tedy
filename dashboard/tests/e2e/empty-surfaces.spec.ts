@@ -39,13 +39,14 @@ for (const [path, name] of surfaces) {
     await everythingEmpty(page)
     await page.goto(path)
     await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(400)
 
-    // The page's own region, not the shell around it: the header and footer
-    // always have text, so asserting on the whole body would pass on a
-    // completely blank surface.
+    // The surface's own words, not the region's text. This used to read the
+    // innerText of .app-shell-content and require it to be non-empty — which
+    // stopped proving anything once the shell gained a visually hidden page
+    // <h1>: innerText includes it, so the region always has text and a
+    // completely blank surface would pass. The empty line is what the surface
+    // says; waiting on it is also the condition that replaces the fixed wait.
     const main = page.locator('.app-shell-content')
-    const text = (await main.innerText()).trim()
-    expect(text.length).toBeGreaterThan(0)
+    await expect(main.locator('.tedy-empty').first()).toBeVisible()
   })
 }

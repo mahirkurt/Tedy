@@ -32,9 +32,9 @@ test('focus mode never shows work it will not name', async ({ page }) => {
 
   await page.goto('/isler')
   await page.waitForLoadState('networkidle')
-  await page.waitForTimeout(400)
 
-  // The one thing is still named in full.
+  // The one thing is still named in full. This expect retries, and it has to
+  // pass before the row loop below calls count(), which does not.
   await expect(page.locator('.next-thing')).toContainText('Fen Bilimleri — 3 soru')
 
   // Every homework row on screen carries the name of its work. A row that

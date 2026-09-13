@@ -22,18 +22,20 @@ test('an empty platform says it is empty, not that it is loading', async ({ page
   await mock(page)
   await page.goto('/ilerleme')
   await page.waitForLoadState('networkidle')
-  // Give the panels time to settle past any genuine loading state.
-  await page.waitForTimeout(800)
 
   // The message lives inside the panels, which start collapsed — a test that
   // only reads the page as it lands passes without touching the defect.
   const panels = page.locator('.cds--accordion__heading')
+  // count() does not retry: read early it returns 0. Wait for the panels to
+  // exist instead of for a duration.
+  await expect(panels).not.toHaveCount(0)
   const count = await panels.count()
-  expect(count).toBeGreaterThan(0)
   for (let i = 0; i < count; i++) {
     await panels.nth(i).click()
   }
-  await page.waitForTimeout(300)
+  // "Not loading" is an absence, and an absence is true of panels that have
+  // not opened yet. Prove every panel opened before reading what they say.
+  await expect(page.locator('.cds--accordion__item--active')).toHaveCount(count)
 
   const body = await page.locator('body').innerText()
   expect(body).not.toContain('yükleniyor')

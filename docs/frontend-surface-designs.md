@@ -523,6 +523,25 @@ metni "görünmez" diye raporlar (ölçülen yanlış pozitif).
 **Doğrulama notu:** tam süit çıktısı `tail -1` ile okunmamalı — Playwright
 başarısızlığı geçenlerin **üstüne** yazar. Çıkış koduna bakılır.
 
+**Bekleme kuralı (2026-09-13).** Süitte sabit süreli bekleme yok:
+`suite-hygiene.spec.ts` yorum dışındaki her `waitForTimeout`'u reddeder. 21
+bekleme koşula çevrildi; `homework.spec.ts` paralel yük altında iki kez tam da
+böyle oynamıştı. İki kural:
+
+- Sonraki satır **yeniden denemeyen** bir okumaysa (`count`, `innerText`,
+  `evaluate`, `allInnerTexts`), okunacak duruma göre beklenir. Sonraki satır
+  yeniden deneyen bir `expect(locator)` ise bekleme zaten gereksizdir.
+- Bir **yokluk** iddiasından önce — banner yok, taşma yok, başlık atlaması yok,
+  "en fazla N çip" — o şeyin içinde yok olduğu yüzeyin render olduğu kanıtlanır.
+  Her yokluk boş bir sayfada da doğrudur.
+
+Çeviri iki sahte geçmeyi ortaya çıkardı. `empty-surfaces` testi, kabuğa eklenen
+gizli `h1` yüzünden **tamamen boşaltılmış** bir yüzeyde de geçiyordu — ölçüldü:
+bölgenin metni "Takımlar" kalıyor. Takvim gösterge testinin fixture'ı yanlış
+alan adlarıyla (`baslik/tarih/tur`) ızgaraya hiç olay koymuyordu; test sıfır
+çipi sayarak geçiyor, hata mesajı da bileşende hiç olmamış
+`.calendar-grid__event` sınıfını sayıyordu.
+
 **Her adımın sonunda** ilkeler dokümanının §10 kapıları koşulur ve ekran
 görüntüsüyle doğrulanır.
 

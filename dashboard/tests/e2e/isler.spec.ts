@@ -33,14 +33,16 @@ async function mock(page: Page) {
 test('work owed lives on one surface: homework and the exams ahead', async ({ page }) => {
   await mock(page)
   await page.goto('/isler')
-  await page.waitForTimeout(600)
 
   // Assert the surface, not just the strings: Bugün also lists homework and
   // upcoming exams, so an unrouted /isler falling back to it would pass a test
   // that only looked for the text.
-  expect(new URL(page.url()).pathname).toBe('/isler')
-  // The label is title case in the DOM; the shouting is CSS.
+  // The label is title case in the DOM; the shouting is CSS. Waiting on it
+  // first is also what makes the URL read meaningful: the fallback would be a
+  // client-side redirect, which happens only after the app has mounted — and
+  // page.url() does not retry.
   await expect(page.getByText('Aktif Ödevler', { exact: false })).toBeVisible()
+  expect(new URL(page.url()).pathname).toBe('/isler')
 
   await expect(page.getByText('3 soru', { exact: false }).first()).toBeVisible()
   await expect(page.getByText('Matematik 1. yazılı', { exact: false }).first()).toBeVisible()
@@ -66,13 +68,14 @@ test('the old paths still land somewhere sensible', async ({ page }) => {
 test('the navigation lost a decision', async ({ page }) => {
   await mock(page)
   await page.goto('/isler')
-  await page.waitForTimeout(600)
 
   const nav = page.locator('nav').first()
   // Visible, not merely present. On the rail Carbon kept each label in the DOM
   // for screen readers and hid it from sight, so the navigation read as a
   // column of unlabelled glyphs — a memory tax on the reader who has least to
   // spare. The rail is gone.
+  // The positive expect comes first and retries, so the two absences after it
+  // are read from a mounted navigation rather than from an empty page.
   await expect(nav.getByText('İşler', { exact: true })).toBeVisible()
   await expect(nav.getByText('Sınavlar', { exact: true })).toHaveCount(0)
   await expect(nav.getByText('Ödevler', { exact: true })).toHaveCount(0)

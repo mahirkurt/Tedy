@@ -54,7 +54,6 @@ async function open(page: Page, homework: Row[], summary = '') {
   await page.waitForURL('**/isler')
   await page.locator('.homework-item, .tedy-empty, .hw-section').first()
     .waitFor({ state: 'attached', timeout: 15000 })
-  await page.waitForTimeout(150)
 }
 
 test('no machine timestamp reaches the reader', async ({ page }) => {

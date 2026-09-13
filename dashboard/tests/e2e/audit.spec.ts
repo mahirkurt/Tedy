@@ -16,11 +16,11 @@ test('a component crash leaves the shell standing and says what happened', async
   }
   await page.goto('/isler')
   await page.waitForLoadState('networkidle')
-  await page.waitForTimeout(500)
 
-  const body = (await page.locator('body').innerText()).trim()
-  expect(body.length, 'sayfa tamamen boş').toBeGreaterThan(0)
-  // The navigation survives, so there is somewhere to go.
+  // The navigation survives, so there is somewhere to go. This is also the
+  // white-screen check: a crash that unmounts the tree takes the navigation
+  // with it, so this expect fails on a blank page — and because it retries,
+  // it replaces the fixed wait that used to precede a one-shot body read.
   await expect(page.locator('nav').first().getByText('Bugün', { exact: true })).toBeVisible()
   await expect(page.getByText('Bu bölüm açılamadı', { exact: false })).toBeVisible()
 })
@@ -60,7 +60,12 @@ for (const path of PAGES) {
     await mock(page, FULL)
     await page.goto(path)
     await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(300)
+    // The skip check passes on a page that has rendered only its shell — one
+    // h1 and nothing after it to skip to. Wait until the surface itself is on
+    // screen, in whichever shape it takes, before reading the outline once.
+    await page.locator('.app-shell-content')
+      .locator('.dashboard-card, .tedy-empty, .next-thing, .day-strip, .route-boundary')
+      .first().waitFor()
 
     const hs = await page.evaluate(() =>
       [...document.querySelectorAll('h1,h2,h3,h4,h5,h6')]
@@ -84,7 +89,9 @@ test('the profile fields fit the phone', async ({ page }) => {
   await mock(page, FULL)
   await page.goto('/profil')
   await page.waitForLoadState('networkidle')
-  await page.waitForTimeout(400)
+  // Both reads below are absences — no overflow, no clipped field — and an
+  // unrendered profile has neither. Wait until there are fields to measure.
+  await expect(page.locator('.student-profile__field').first()).toBeVisible()
 
   const overflow = await page.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth)
@@ -102,7 +109,8 @@ test('the footer sits at the bottom, not halfway down an empty page', async ({ p
   await mock(page, LIVE)
   await page.goto('/')
   await page.waitForLoadState('networkidle')
-  await page.waitForTimeout(400)
+  // The evaluate below dereferences the footer without a guard.
+  await page.locator('.dashboard-footer, footer').first().waitFor()
 
   const gap = await page.evaluate(() => {
     const f = document.querySelector('.dashboard-footer, footer') as HTMLElement
