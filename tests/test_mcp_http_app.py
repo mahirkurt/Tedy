@@ -99,7 +99,7 @@ def test_mcp_without_bearer_is_401_with_resource_metadata(client):
 
 @pytest.mark.parametrize("bearer", ["tdyK_" + "a" * 40, "garbage", "ünicode"])
 def test_unknown_bearers_are_401_not_500(client, bearer):
-    r = client.post("/mcp", json=_rpc("initialize"), headers={**MCP_HEADERS, "authorization": f"Bearer {bearer}".encode("utf-8").decode("latin-1")})
+    r = client.post("/mcp", json=_rpc("initialize"), headers={**MCP_HEADERS, "authorization": f"Bearer {bearer}".encode("utf-8")})
     assert r.status_code == 401
 
 

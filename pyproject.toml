@@ -8,4 +8,5 @@ requires-python = ">=3.9"
 testpaths = ["tests"]
 filterwarnings = [
     "ignore:Field 'lifespan' has an incomplete definition:pydantic_settings.exceptions.IncompleteFieldDefinitionWarning",
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
 ]
