@@ -72,7 +72,7 @@ Onaylanan tasarım bölümleri: §4 mimari, §5 sözleşmeler, §6–§8 kimlik/
             ▼
  mcp.tedy.online ──► ted-mcp (TED deposu, ayrı ASGI süreci, 127.0.0.1:8087)
             │            ├─ rehber (vendored referanslar)
-            │            ├─ bağlam (TED output/*.json — doğrudan okuma)
+            │            ├─ bağlam (TED dashboard API'si, yalnız 127.0.0.1, `ted-mcp` etiketli tdyK_ anahtar)
             │            ├─ federasyon istemcileri (src/mcp_client.py) ──► mufredat · egitim-kaynak ·
             │            │                                                anamnesis · pexels · literatur ·
             │            │                                                openalex · minimax · comfyui · ERIC API
@@ -109,7 +109,7 @@ Onaylanan tasarım bölümleri: §4 mimari, §5 sözleşmeler, §6–§8 kimlik/
 | `output/modules/index.json`, `output/modules/<slug>/…` | ted-mcp | dashboard, Asistan |
 | `output/module_progress.json` | dashboard (Flask) | ted-mcp (`edupedia_ilerleme`), Asistan |
 | `output/edupedia_media_ledger.json` | ted-mcp | — |
-| `output/mcp_tokens.json` | ted-mcp | — |
+| `output/ted_mcp_oauth.sqlite3` (istemci/kod/token, yalnız hash) | ted-mcp | — |
 
 İki süreç aynı dosyaya yazmaz; okumalar atomik yazılmış dosyayı görür.
 
@@ -229,7 +229,8 @@ ve yalnız `window.parent`'a gönderdiğini denetler. (Kapı sayısı: mevcut 16
   e-posta `USER_ROLES`'ta **ve** rol `full` değilse reddedilir.
 - Yalnız PKCE **S256**. Kodlar tek kullanımlık, 5 dk.
 - Erişim token'ı opak, 1 saat; yenileme token'ı 30 gün, her kullanımda döner; tekrar kullanımda aile iptal edilir.
-  Saklama `output/mcp_tokens.json`'da yalnız hash.
+  Saklama `output/ted_mcp_oauth.sqlite3`'te yalnız hash (tek kullanımlık kod ve yenileme tüketimi atomik
+  `UPDATE … WHERE used_at IS NULL` ile; egitim-kaynak `oauth_store.py` kalıbı, `principal` e-postaya bağlı).
 - **OAuth desteklemeyen istemci yedeği:** kişi başı statik anahtar `tdyM_…` (yalnız `full` rol, CLI ile üretilir,
   hash saklanır, iptal edilebilir). `tdyK_` dashboard anahtarları MCP'de **geçmez**.
 
@@ -365,6 +366,18 @@ planında yer alır.
 - Ses klonlama / ses tasarımı.
 - `CureoHub/services/edupedia_site`'ın yeniden canlandırılması (yalnız kapı kodu referans).
 - TED'in mevcut tarama ve dashboard işlevlerinde, bu entegrasyonun gerektirmediği değişiklikler.
+
+## 12b. Plan aşamasında yapılan spec güncellemeleri (2026-09-13)
+
+- **`edupedia_baglam` veri yolu:** `src/dashboard_api.py` import edilemez (import sırasında `os.chdir`,
+  `load_env`, `DASHBOARD_SECRET_KEY` yoksa `RuntimeError`, Flask `app` kurulumu). Sınav listesi `/api/exams` içinde
+  takvim + not tablosu + içerik haritası + zenginleştirme önbelleğinden türetildiği için çoğaltmak ~200 satırlık
+  ikinci bir kaynak yaratır. **Karar:** `ted-mcp`, dashboard'un kendi `/api/exams`, `/api/homework`,
+  `/api/student/profile` uçlarını yalnız `http://127.0.0.1:8085` üzerinden `ted-mcp` etiketli bir `tdyK_` anahtarla
+  (`TED_DASHBOARD_API_KEY`) okur. Dashboard düşerse `baglam` → `degraded:dashboard_unreachable`; akışın geri kalanı
+  etkilenmez. Anahtar yalnız `.env`'de, yalnız loopback'te kullanılır.
+- **Token deposu:** JSON yerine SQLite (`output/ted_mcp_oauth.sqlite3`) — tek kullanımlık kod ve yenileme
+  tüketimi JSON'da atomik yapılamaz.
 
 ## 13. Varsayımlar ve riskler
 
