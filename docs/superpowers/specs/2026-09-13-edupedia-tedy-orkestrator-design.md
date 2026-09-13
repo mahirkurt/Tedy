@@ -1,7 +1,7 @@
 # edupedia × TEDY — MCP orkestratörü ve kalıcı modül kataloğu (çatı tasarım)
 
 - **Tarih:** 2026-09-13
-- **Durum:** Taslak — kullanıcı incelemesi bekliyor
+- **Durum:** Onaylandı (kullanıcı, 2026-09-13) — alt proje planları bu spec'ten türetilir
 - **Kapsam türü:** Çatı spec. Üç depoyu ve altı alt projeyi bağlayan sözleşmeleri sabitler; her alt proje
   kendi uygulama planıyla ilerler (bkz. §10).
 - **Depolar:** `TED` (orkestratör + katalog + görüntüleyici + Asistan), `CureoPrivate`
