@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from src import roles
-from src.mcp_server import __version__, gates, vendor_sync
+from src.mcp_server import __version__, gates, rehber, vendor_sync
 from src.mcp_server.config import Settings
 from src.mcp_server.coverage import Coverage
 from src.mcp_server.federation import ANAMNESIS, EGITIM_KAYNAK, MUFREDAT, Federation, FederationError
@@ -72,3 +72,8 @@ class Tools:
                     cov.degraded(name, exc.reason)
             body["coverage"] = cov.as_dict()
         return body
+
+    def rehber(self, bolum: str | None = None, parca: int = 1, ara: str | None = None) -> dict[str, Any]:
+        if ara:
+            return rehber.search(ara)
+        return rehber.guide(bolum or "akis", parca=parca)

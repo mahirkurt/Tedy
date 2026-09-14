@@ -47,4 +47,12 @@ def build_server(tools: Tools) -> FastMCP:
         """Sunucu sürümü, kullanıcı, kapı sayısı ve filo yapılandırması. canli=true filo sağlığını yoklar."""
         return tools.durum(caller_email(ctx), canli=canli)
 
+    @mcp.tool(annotations=_RO)
+    def edupedia_rehber(ctx: Context, bolum: str | None = None, parca: int = 1, ara: str | None = None) -> dict[str, Any]:
+        """edupedia üretim rehberi. bolum: akis, modlar, segmentler, etkilesim, pedagoji, carbon, svg, ses,
+        mufredat, soru, sinav, zenginlestirme, kalite. Uzun bölümler parca ile gezilir; ara serbest metin arar.
+        Her üretime edupedia_rehber('akis') ile başla."""
+        caller_email(ctx)
+        return tools.rehber(bolum=bolum, parca=parca, ara=ara)
+
     return mcp

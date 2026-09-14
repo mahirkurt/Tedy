@@ -114,3 +114,14 @@ def test_create_app_from_env_requires_form_secret(tmp_path):
     app = http_app.create_app_from_env({"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_PROJECT_ROOT": str(tmp_path),
                                         "TED_MCP_FORM_SECRET": "f" * 40})
     assert app is not None
+
+
+def test_rehber_tool_is_registered_and_returns_akis(tmp_path):
+    store = OAuthStore(tmp_path / "o.sqlite3")
+    key = store.create_static_key("t", FULL)
+    with _client(tmp_path, store) as c:
+        r = _sse_json(c.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                                           "params": {"name": "edupedia_rehber", "arguments": {"bolum": "akis"}}},
+                             headers={**MCP_HEADERS, "authorization": f"Bearer {key}"}))
+    body = json.loads(r["result"]["content"][0]["text"])
+    assert body["bolum"] == "akis" and body["status"] == "ok"
