@@ -330,9 +330,17 @@ def test_missing_credential_is_invalid_token_without_calling_the_verifier(ctx):
 
 # -- S1a / F1 + S1b / T1: blocking auth work runs off the event loop --------------------
 
-@pytest.mark.parametrize("blocked", ["verify_identity", "issue_code", "redeem_code", "refresh", "principal",
-                                     "register_client", "get_client", "consume_form_state"])
-def test_blocked_auth_work_leaves_the_event_loop_free(tmp_path, blocked):
+@pytest.mark.parametrize("blocked,expected_status", [
+    ("verify_identity", 302),     # sign-in, then Onayla
+    ("issue_code", 302),
+    ("redeem_code", 400),         # unknown code: invalid_grant
+    ("refresh", 400),             # unknown refresh token: invalid_grant
+    ("principal", 401),
+    ("register_client", 201),
+    ("get_client", 200),          # the sign-in page
+    ("consume_form_state", 302),  # sign-in, then Onayla
+])
+def test_blocked_auth_work_leaves_the_event_loop_free(tmp_path, blocked, expected_status):
     armed, entered, release = threading.Event(), threading.Event(), threading.Event()
 
     def park(name):
@@ -383,7 +391,7 @@ def test_blocked_auth_work_leaves_the_event_loop_free(tmp_path, blocked):
                 probe.join(10)
     assert not worker.is_alive()
     assert not isinstance(outcome.get("blocked"), Exception), outcome.get("blocked")
-    assert outcome["blocked"].status_code in {200, 201, 302, 400, 401}
+    assert outcome["blocked"].status_code == expected_status
 
 
 # -- S1b / T4: an unexpected cert-fetch failure is 401 google_unreachable, not 500 ------------
