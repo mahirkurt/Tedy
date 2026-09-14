@@ -62,3 +62,24 @@ def test_search_finds_mcq_segment_and_folds_turkish_case():
 
 def test_search_empty_query():
     assert rehber.search("  ")["status"] == "gecersiz_sorgu"
+
+
+def test_whole_file_sections_include_preamble():
+    text = (vendor_sync.VENDOR_DIR / "references/audio-system.md").read_text(encoding="utf-8")
+    pre = rehber.preamble(text)
+    assert pre
+    first_part = rehber.guide("ses")
+    assert first_part["metin"].startswith(pre.splitlines()[0])
+    assert "references/audio-system.md (giriş)" in first_part["kaynaklar"]
+
+
+def test_search_reaches_preamble_text():
+    text = (vendor_sync.VENDOR_DIR / "references/carbon-sources.md").read_text(encoding="utf-8")
+    pre = rehber.preamble(text)
+    line = next(l for l in pre.splitlines() if l.strip() and not l.strip().startswith("#"))
+    query = " ".join(line.split()[:5])
+    hits = rehber.search(query, limit=50)
+    assert any(
+        h["kaynak"] == "references/carbon-sources.md" and h["baslik"] == "(giriş)"
+        for h in hits["sonuclar"]
+    )

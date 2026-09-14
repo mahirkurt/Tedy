@@ -55,6 +55,12 @@ def split_sections(text: str) -> list[tuple[str, str]]:
     return out
 
 
+def preamble(text: str) -> str:
+    """Text before the first `## ` heading (the whole text when there is none), stripped."""
+    first = _HEADING.search(text)
+    return (text[: first.start()] if first else text).strip()
+
+
 def _matches(heading: str, numbers: tuple[str, ...]) -> bool:
     if not numbers:
         return True
@@ -69,6 +75,10 @@ def _blocks(bolum: str, vendor: Path) -> list[tuple[str, str]]:
     blocks: list[tuple[str, str]] = []
     for filename, numbers in SECTIONS[bolum]:
         text = (vendor / filename).read_text(encoding="utf-8")
+        if numbers == ():
+            pre = preamble(text)
+            if pre:
+                blocks.append((f"{filename} (giriş)", f"{pre}\n"))
         for heading, body in split_sections(text):
             if _matches(heading, numbers):
                 blocks.append((f"{filename} {heading}", f"{heading}\n\n{body}\n"))
@@ -140,7 +150,12 @@ def search(q: str, limit: int = 5, vendor: Path = VENDOR_DIR) -> dict[str, Any]:
     scored = []
     files = ["SKILL.md", *sorted(str(p.relative_to(vendor)) for p in (vendor / "references").glob("*.md"))]
     for filename in files:
-        for heading, body in split_sections((vendor / filename).read_text(encoding="utf-8")):
+        file_text = (vendor / filename).read_text(encoding="utf-8")
+        sections = list(split_sections(file_text))
+        pre = preamble(file_text)
+        if pre:
+            sections.insert(0, ("(giriş)", pre))
+        for heading, body in sections:
             h, b = _fold(heading), _fold(body)
             score = sum(3 * h.count(t) + b.count(t) for t in terms)
             if score:
