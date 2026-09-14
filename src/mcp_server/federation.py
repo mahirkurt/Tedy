@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+import unicodedata
 from typing import Any, Callable, Literal
 
 from src.mcp_client import McpClient
@@ -21,6 +22,10 @@ CALL_TIMEOUT_SECONDS = 25.0
 TOOL_BUDGET_SECONDS = 60.0
 MIN_CALL_SECONDS = 1.0
 ZAMAN_ASIMI = "zaman_asimi"
+# Fleet-supplied error text is never returned to the model (spec §6.3): reasons are closed codes and the
+# upstream text is logged once, as a single bounded line.
+UPSTREAM_LOG_MAX_CHARS = 300
+_LINE_BREAKING_CATEGORIES = frozenset({"Cc", "Zl", "Zp"})
 
 _DECODER = json.JSONDecoder()
 
@@ -31,6 +36,21 @@ class FederationError(Exception):
         self.server = server
         self.tool = tool
         self.reason = reason
+
+
+def upstream_log_text(text: object) -> str:
+    """Fleet text for a log line: at most UPSTREAM_LOG_MAX_CHARS, control characters and line breaks as spaces."""
+    return "".join(" " if unicodedata.category(c) in _LINE_BREAKING_CATEGORIES else c
+                   for c in str(text)[:UPSTREAM_LOG_MAX_CHARS])
+
+
+def _failure_code(error: str | None) -> str:
+    """Closed code for a failed client call; the client's own error text never becomes the reason."""
+    if error == "timeout":
+        return "timeout"
+    if (error or "").startswith("malformed_result"):
+        return "malformed_result"
+    return "tool_error"
 
 
 def decode_json_stream(text: str) -> list[Any]:
@@ -76,11 +96,12 @@ class Federation:
                 raise FederationError(server, tool, ZAMAN_ASIMI)
             result = self._client(server).call_tool(tool, args, timeout=min(CALL_TIMEOUT_SECONDS, remaining))
         if not result.ok:
+            logger.warning("%s.%s failed: %s", server, tool, upstream_log_text(result.error))
             if deadline is not None and deadline - self._monotonic() < MIN_CALL_SECONDS:
                 # Cut off by the budget-capped timeout (or failed with no budget left for anything
                 # else): the honest reason is the tool budget, not whatever the transport said.
                 raise FederationError(server, tool, ZAMAN_ASIMI)
-            raise FederationError(server, tool, f"tool_error: {result.error}")
+            raise FederationError(server, tool, _failure_code(result.error))
         try:
             values = decode_json_stream(result.text)
         except ValueError as exc:

@@ -6,6 +6,7 @@ anamnesis ingestion on top of this verification layer.
 """
 from __future__ import annotations
 
+import logging
 import re
 import time
 from datetime import datetime, timezone
@@ -13,10 +14,16 @@ from typing import Any, Callable
 
 from src.mcp_server.coverage import Coverage
 from src.mcp_server.federation import (ANAMNESIS, EGITIM_KAYNAK, MUFREDAT, TOOL_BUDGET_SECONDS, ZAMAN_ASIMI,
-                                       Federation, FederationError)
+                                       Federation, FederationError, upstream_log_text)
 from src.mcp_server.runs import RunStore
 
+logger = logging.getLogger(__name__)
+
 OUTCOME_TEXT_MAX = 400
+# egitim-kaynak kb_for_outcome vocabulary (egitim_kaynak/tools.py, 2026-09-13). kazanim_eslesmesi is a
+# top-level field, so a status or reason outside it is reported as unexpected_shape, never passed on (§6.3).
+ESLESME_STATUSES = frozenset({"ok", "degraded"})
+ESLESME_REASONS = frozenset({"interim_low_relevance", "outcome_code_unknown", "outcome_text_unavailable"})
 
 
 class KapsamError(Exception):
@@ -273,7 +280,8 @@ class KapsamBuilder:
         text = _mufredat(self.federation, "get_document_text",
                          {"document_id": doc_id, "page_range": f"{first}-{last}", "max_chars": 60000}, "nesne", deadline)
         if text.get("error"):
-            cerceve["not"] = f"Sayfa metni alınamadı: {text.get('error')}"
+            logger.warning("%s.get_document_text error: %s", MUFREDAT, upstream_log_text(text.get("error")))
+            cerceve["not"] = "Sayfa metni alınamadı."
             return cerceve, [], figures
         pages = [p for p in text.get("pages") or [] if isinstance(p, dict)]
         for p in pages:
@@ -339,8 +347,13 @@ class KapsamBuilder:
             try:
                 match = self.federation.call(EGITIM_KAYNAK, "kb_for_outcome",
                                              {"outcome_code": kazanim_kodu, "top_k": 3}, beklenen="nesne", deadline=deadline)
-                eslesme = {"status": match.get("status"), "reason": match.get("reason"),
-                           "sonuc_sayisi": len(match.get("results") or [])}
+                status, reason = match.get("status"), match.get("reason")
+                if not (isinstance(status, str) and status in ESLESME_STATUSES
+                        and (reason is None or (isinstance(reason, str) and reason in ESLESME_REASONS))):
+                    logger.warning("%s.kb_for_outcome unexpected status/reason: %s", EGITIM_KAYNAK,
+                                   upstream_log_text(f"{status!r} {reason!r}"))
+                    status, reason = "degraded", "unexpected_shape"
+                eslesme = {"status": status, "reason": reason, "sonuc_sayisi": len(match.get("results") or [])}
             except FederationError as exc:
                 eslesme = {"status": "degraded", "reason": exc.reason, "sonuc_sayisi": 0}
                 if exc.reason == ZAMAN_ASIMI:

@@ -91,6 +91,20 @@ def local_passages(pages: list[dict[str, Any]], soru: str, top_k: int) -> list[d
     return hits
 
 
+def anamnesis_skip_code(run: Any) -> str | None:
+    """None when the run record says its anamnesis ingest was a complete hit; otherwise the code to report
+    as skipped:<code>. A partial ingest (degraded:kismi_alim) holds only part of the source, while the run's
+    own pages hold all of it, so kaynak_oku reads those instead (SP2 final review M-2). Only the code part
+    of the recorded row is kept, and a record with no anamnesis row is unexpected_shape."""
+    coverage = run.get("coverage") if isinstance(run, dict) else None
+    recorded = coverage.get("anamnesis") if isinstance(coverage, dict) else None
+    if recorded == "hit":
+        return None
+    parts = recorded.split(":") if isinstance(recorded, str) else []
+    code = parts[1].strip() if len(parts) > 1 else ""
+    return code or "unexpected_shape"
+
+
 def wrap_kaynak_verisi(body: dict[str, Any]) -> dict[str, Any]:
     """Move a successful oku() response's ``pasajlar`` under one ``kaynak_verisi`` object (spec
     §6.3): federation- or page-sourced passage text must never sit at the top level next to
@@ -115,13 +129,17 @@ class KaynakOkuyucu:
     def oku(self, run_id: str, soru: str, top_k: int = 5) -> dict[str, Any]:
         deadline = self.monotonic() + TOOL_BUDGET_SECONDS
         base: dict[str, Any] = {"run_id": run_id, "soru": soru, "caveat": CAVEAT, "mcp_verified": False}
-        if not RUN_ID_RE.match(run_id or "") or self.runs.load(run_id) is None:
+        run = self.runs.load(run_id) if RUN_ID_RE.match(run_id or "") else None
+        if run is None:
             return {**base, "status": "run_bulunamadi"}
         if not (soru or "").strip():
             return {**base, "status": "gecersiz_sorgu"}
         top_k = max(1, min(int(top_k), 8))
         cov = Coverage()
-        if self.federation.configured(ANAMNESIS):
+        skip_code = anamnesis_skip_code(run)
+        if skip_code is not None:
+            cov.skipped(ANAMNESIS, skip_code)
+        elif self.federation.configured(ANAMNESIS):
             try:
                 found = self.federation.call(ANAMNESIS, "hybrid_query", {
                     "query": soru, "collection": f"edupedia:run:{run_id}", "k": top_k,
