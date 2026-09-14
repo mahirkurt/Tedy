@@ -58,6 +58,11 @@ class McpClient:
         # this lock serializes only the cold-start/expiry _initialize race between them, never
         # the tools/call post itself.
         self._lock = threading.Lock()
+        # Fix round 1 Important #2: a stateless_http fleet server (egitim-kaynak convention)
+        # never returns mcp-session-id, so _session_expired() is permanently True and every call
+        # needs its own private handshake anyway — once discovered, that handshake runs WITHOUT
+        # the lock, per thread, in parallel, instead of serializing behind other tool threads.
+        self._sessionless = False
 
     @property
     def healthy(self) -> bool:
@@ -65,15 +70,18 @@ class McpClient:
 
     # ── transport ────────────────────────────────────────────────────────
 
-    def _headers(self) -> dict[str, str]:
+    def _headers(self, sid: str | None) -> dict[str, str]:
+        """`sid` is the explicit session id THIS request carries (fix round 1 Minor M1): the
+        caller captures it once and passes it in, rather than this reading self._sid fresh —
+        which could observe a value a concurrent thread changed in between the two reads."""
         h = {
             "Content-Type": "application/json",
             "Accept": "application/json, text/event-stream",
         }
         if self.api_key:
             h["Authorization"] = f"Bearer {self.api_key}"
-        if self._sid:
-            h["mcp-session-id"] = self._sid
+        if sid:
+            h["mcp-session-id"] = sid
         return h
 
     @staticmethod
@@ -89,7 +97,15 @@ class McpClient:
             raise ValueError("sse_no_data_frame")
         return json.loads(body)
 
-    def _post(self, payload: dict[str, Any], deadline: float | None = None) -> dict[str, Any]:
+    def _post(self, payload: dict[str, Any], deadline: float | None = None,
+              sid: str | None = None) -> tuple[dict[str, Any], str | None]:
+        """POSTs one JSON-RPC message; returns (decoded_body, session_id_from_response_headers).
+
+        `sid` is the explicit id this request's own headers carry (fix round 1 Minor M1). This
+        method never touches self._sid/self._sid_at itself any more — publishing a session id is
+        entirely the caller's job, so the handshake in _initialize can defer it until
+        notifications/initialized has actually been sent.
+        """
         timeout = self.timeout
         if deadline is not None:
             remaining = deadline - _monotonic()
@@ -98,24 +114,40 @@ class McpClient:
             timeout = min(self.timeout, remaining)
         resp = self._session.post(
             self.url,
-            headers=self._headers(),
+            headers=self._headers(sid),
             data=json.dumps(payload),
             timeout=timeout,
         )
-        sid = (resp.headers or {}).get("mcp-session-id")
-        if sid:
-            self._sid = sid
-            self._sid_at = time.time()
+        resp_sid = (resp.headers or {}).get("mcp-session-id")
         if not str(payload.get("method", "")).startswith("notifications/"):
-            return self._decode(resp)
-        return {}
+            return self._decode(resp), resp_sid
+        return {}, resp_sid
 
-    def _next_id(self) -> int:
-        """Thread-safe RPC id counter (Ruling B): every public call path acquires the lock
-        itself. _initialize does not — it always runs already inside _ensure_session's critical
-        section, and self._lock is a plain (non-reentrant) Lock — so it uses _next_id_locked."""
-        with self._lock:
+    def _acquire(self, deadline: float | None) -> None:
+        """Acquire self._lock, respecting an optional call budget. EVERY lock acquisition in
+        this class goes through this one helper (fix round 1 Important #1) — _next_id, the
+        session-error reset in _rpc, and _ensure_session's own critical section — so a thread
+        blocked behind another thread's re-initialize can no longer overrun its own budget by
+        waiting unboundedly. With no deadline (the dashboard's single-threaded default path) this
+        blocks exactly as an unsynchronized attribute write would have; with a deadline, failing
+        to acquire before it elapses is the same budget exhaustion `_post` already raises for a
+        slow HTTP round trip."""
+        if deadline is None:
+            self._lock.acquire()
+            return
+        remaining = deadline - _monotonic()
+        if not self._lock.acquire(timeout=max(0.0, remaining)):
+            raise _BudgetExhausted()
+
+    def _next_id(self, deadline: float | None = None) -> int:
+        """Thread-safe RPC id counter: acquires (and respects the deadline of) the shared lock
+        itself. _initialize does not call this when it already holds the lock (self._lock is not
+        reentrant) — it uses _next_id_locked instead; see _initialize."""
+        self._acquire(deadline)
+        try:
             return self._next_id_locked()
+        finally:
+            self._lock.release()
 
     def _next_id_locked(self) -> int:
         """Same counter for a caller that already holds self._lock; see _next_id."""
@@ -128,43 +160,64 @@ class McpClient:
         return (not self._sid) or (time.time() - self._sid_at > SESSION_TTL_SECONDS)
 
     def _ensure_session(self, deadline: float | None) -> None:
-        """Double-checked critical section (Ruling B): concurrent tool threads sharing this
-        client serialize only the cold-start/expiry _initialize race through this lock — never
-        the tools/call post itself, which always runs unlocked. A deadline bounds the wait for
-        the lock exactly like it already bounds every HTTP round trip in _post: failing to
-        acquire it in time is the same budget exhaustion a slow response would raise.
+        """Double-checked critical section for a STATEFUL (or not-yet-classified) server: only
+        the cold-start/expiry _initialize race is serialized, never the tools/call post itself,
+        which always runs unlocked.
+
+        A known-sessionless server (fix round 1 Important #2 — e.g. egitim-kaynak's
+        stateless_http fleet convention: the SDK never sends mcp-session-id, so _sid stays None
+        and _session_expired() is permanently True) skips the lock entirely instead: every call
+        needs its own private handshake regardless, so serializing it behind other tool threads
+        would only add unbounded latency for no correctness benefit. If a later handshake
+        surprises us with an actual session id, we stop treating the server as sessionless.
         """
         if not self._session_expired():
             return
-        if deadline is None:
-            self._lock.acquire()
-        else:
-            remaining = deadline - _monotonic()
-            if not self._lock.acquire(timeout=max(0.0, remaining)):
-                raise _BudgetExhausted()
+        if self._sessionless:
+            self._initialize(deadline, already_locked=False)
+            if self._sid is not None:
+                self._sessionless = False
+            return
+        self._acquire(deadline)
         try:
             if self._session_expired():
-                self._initialize(deadline)
+                self._initialize(deadline, already_locked=True)
+                if self._sid is None:
+                    self._sessionless = True
         finally:
             self._lock.release()
 
-    def _initialize(self, deadline: float | None = None) -> None:
-        """Always invoked with self._lock already held (_ensure_session)."""
+    def _initialize(self, deadline: float | None, already_locked: bool) -> None:
+        """Runs the initialize + notifications/initialized handshake.
+
+        already_locked=True: the caller (_ensure_session's not-yet-classified-server branch)
+        already holds self._lock, so the id is fetched via _next_id_locked (self._lock is not
+        reentrant). already_locked=False: a known-sessionless server's handshake (fix round 1
+        Important #2) runs with no lock held at all, so the id still goes through the
+        thread-safe _next_id — the shared rpc id counter needs its own protection regardless of
+        whether the session part is locked.
+
+        The new session id (if any) is captured locally and is not published to
+        self._sid/self._sid_at until AFTER notifications/initialized has been sent successfully
+        (fix round 1 Minor M1) — that notification carries the new id explicitly via `sid=`,
+        even though it is not yet "self._sid". If it raises _BudgetExhausted, self._sid is simply
+        left at None (set at the top of this method): the server never having seen the
+        notification means that id must not be reused.
+        """
         self._sid = None
-        self._post({
-            "jsonrpc": "2.0", "id": self._next_id_locked(), "method": "initialize",
+        init_id = self._next_id_locked() if already_locked else self._next_id(deadline)
+        _, new_sid = self._post({
+            "jsonrpc": "2.0", "id": init_id, "method": "initialize",
             "params": {
                 "protocolVersion": self.PROTOCOL_VERSION,
                 "capabilities": {},
                 "clientInfo": {"name": "tedy-assistant", "version": "1.0"},
             },
-        }, deadline)
-        try:
-            self._post({"jsonrpc": "2.0", "method": "notifications/initialized"}, deadline)
-        except _BudgetExhausted:
-            # The server never saw notifications/initialized: do not reuse that session id.
-            self._sid = None
-            raise
+        }, deadline, sid=None)
+        self._post({"jsonrpc": "2.0", "method": "notifications/initialized"}, deadline, sid=new_sid)
+        if new_sid:
+            self._sid = new_sid
+            self._sid_at = time.time()
 
     @staticmethod
     def _is_session_error(rpc: dict[str, Any]) -> bool:
@@ -181,19 +234,27 @@ class McpClient:
         for attempt in (1, 2):
             self._ensure_session(deadline)
             sid_used = self._sid
-            rpc = self._post({
-                "jsonrpc": "2.0", "id": self._next_id(),
+            rpc, resp_sid = self._post({
+                "jsonrpc": "2.0", "id": self._next_id(deadline),
                 "method": method, "params": params,
-            }, deadline)
+            }, deadline, sid=sid_used)
+            if resp_sid:
+                self._sid = resp_sid
+                self._sid_at = time.time()
             if not self._is_session_error(rpc):
                 return rpc
             # Server forgot us. Re-initialise and replay — but only once, so a server that
             # always rejects cannot spin here. Only clear the session id THIS call actually
             # used: another thread may already have re-established (and be using) a newer one
             # by the time we get here, and wiping that out from under it would be its own race.
-            with self._lock:
+            # This lock acquisition takes the deadline too (fix round 1 Important #1): a thread
+            # blocked here past its budget must time out, not wait unboundedly.
+            self._acquire(deadline)
+            try:
                 if self._sid == sid_used:
                     self._sid = None
+            finally:
+                self._lock.release()
             if attempt == 2:
                 self._healthy = False
                 return rpc

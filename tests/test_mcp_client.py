@@ -299,6 +299,26 @@ def test_without_timeout_every_post_uses_the_client_timeout_and_no_clock(monkeyp
 # -- SP2 residual B: the shared session-bootstrap critical section is synchronized --------------
 
 import threading  # noqa: E402
+import time  # noqa: E402
+
+
+class _ObservableLock:
+    """Wraps a real lock so a test can PROVE a second thread is genuinely contending for it
+    (fix round 1 Minor M2), instead of inferring that from timing: a contended acquire (the
+    non-blocking probe fails) sets `waiting_event` before really blocking."""
+
+    def __init__(self, waiting_event: threading.Event) -> None:
+        self._real = threading.Lock()
+        self._waiting_event = waiting_event
+
+    def acquire(self, timeout: float = -1) -> bool:
+        if self._real.acquire(timeout=0):
+            return True
+        self._waiting_event.set()
+        return self._real.acquire(timeout=timeout)
+
+    def release(self) -> None:
+        self._real.release()
 
 
 def test_concurrent_cold_start_initializes_exactly_once():
@@ -308,6 +328,7 @@ def test_concurrent_cold_start_initializes_exactly_once():
     going out under another thread's half-initialized session."""
     entered_init = threading.Event()
     release_init = threading.Event()
+    t2_waiting = threading.Event()
     calls_lock = threading.Lock()
     calls: list[tuple[str, str | None]] = []  # (method, session-id header)
 
@@ -327,6 +348,10 @@ def test_concurrent_cold_start_initializes_exactly_once():
                                      "result": {"content": [{"type": "text", "text": f"ok-{body.get('id')}"}]}}))
 
     c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=_GatedSession())
+    # M2: prove thread 2 actually contends for the SAME lock thread 1 holds, rather than just
+    # asserting a release that happened to come after — without this wrapper the fix round 1
+    # reviewer found the test could pass even with the lock removed.
+    c._lock = _ObservableLock(t2_waiting)
     results = {}
 
     def call(slot):
@@ -341,6 +366,8 @@ def test_concurrent_cold_start_initializes_exactly_once():
     # cold session too and must contend for the same lock, exercising the race this fix closes.
     t2 = threading.Thread(target=call, args=(2,))
     t2.start()
+
+    assert t2_waiting.wait(5), "thread 2 never contended for the session lock"
 
     release_init.set()
     t1.join(5)
@@ -384,6 +411,167 @@ def test_deadline_expiring_while_waiting_for_the_session_lock_times_out_without_
     holder_release.set()
     holder.join(5)
     assert not holder.is_alive()
+
+
+def _hold_lock_then_release_on(lock: threading.Lock, grabbed: threading.Event, release: threading.Event) -> threading.Thread:
+    def run():
+        lock.acquire()
+        grabbed.set()
+        release.wait(5)
+        lock.release()
+
+    t = threading.Thread(target=run)
+    t.start()
+    assert grabbed.wait(5), "holder thread never grabbed the lock"
+    return t
+
+
+def test_lock_timeout_at_the_next_id_step_returns_timeout_without_posting(monkeypatch):
+    """fix round 1 Important #1: _next_id's own lock acquisition takes the deadline too. With an
+    already-warm session, _ensure_session never touches the lock at all — only building the
+    request id does — so a thread blocked there past its deadline must time out rather than wait
+    unboundedly behind another thread holding the lock (e.g. mid re-initialize elsewhere)."""
+    monkeypatch.setattr(mcp_client, "_monotonic", lambda: 0.0)
+    session = _FakeSession([])
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=session)
+    c._sid, c._sid_at = "sid-warm", time.time()
+    grabbed, release = threading.Event(), threading.Event()
+    holder = _hold_lock_then_release_on(c._lock, grabbed, release)
+
+    out = c.call_tool("t", {}, timeout=0.1)
+
+    assert out.ok is False and out.error == "timeout"
+    assert session.requests == []
+
+    release.set()
+    holder.join(5)
+    assert not holder.is_alive()
+
+
+def test_lock_timeout_at_the_session_error_reset_step_returns_timeout(monkeypatch):
+    """fix round 1 Important #1: the session-error reset's lock acquisition takes the deadline
+    too. With an already-warm session, _ensure_session skips the lock and the post itself
+    succeeds in getting a (session-error) response; only the reset that follows needs the lock —
+    held elsewhere the whole time — so it must time out rather than block unboundedly.
+
+    The holder must not grab the lock before the failing post returns (that would also starve
+    _next_id's own lock acquisition earlier in the same call, testing the wrong step) — a
+    two-event handshake makes the ordering exact instead of timing-dependent."""
+    monkeypatch.setattr(mcp_client, "_monotonic", lambda: 0.0)
+    about_to_return_error = threading.Event()
+    holder_ready = threading.Event()
+    holder_release = threading.Event()
+
+    class _StallingSession(_FakeSession):
+        def post(self, url, headers=None, data=None, timeout=None):
+            method = (json.loads(data) if data else {}).get("method")
+            if method == "tools/call":
+                about_to_return_error.set()
+                assert holder_ready.wait(5), "holder never grabbed the lock before the error returned"
+            return super().post(url, headers=headers, data=data, timeout=timeout)
+
+    session = _StallingSession([
+        _Resp(json.dumps({"jsonrpc": "2.0", "id": 1, "error": {"code": -32001, "message": "session not found"}})),
+    ])
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=session)
+    c._sid, c._sid_at = "sid-warm", time.time()
+
+    def hold_after_signal():
+        assert about_to_return_error.wait(5), "the tools/call post never happened"
+        c._lock.acquire()
+        holder_ready.set()
+        holder_release.wait(5)
+        c._lock.release()
+
+    holder = threading.Thread(target=hold_after_signal)
+    holder.start()
+
+    out = c.call_tool("t", {}, timeout=0.1)
+
+    assert out.ok is False and out.error == "timeout"
+    assert len(session.requests) == 1  # the one failing tools/call post; no replay was ever sent
+
+    holder_release.set()
+    holder.join(5)
+    assert not holder.is_alive()
+
+
+def test_sessionless_server_runs_concurrent_handshakes_unlocked():
+    """fix round 1 Important #2: a stateless_http fleet server (egitim-kaynak convention) never
+    returns mcp-session-id, so every call needs its own private handshake — once the client has
+    recognized this (the steady-state case; see the transition test below for discovery), that
+    handshake must run WITHOUT the lock, so concurrent tool threads' initialize posts are in
+    flight at the same time instead of serializing behind each other."""
+    both_entered = threading.Event()
+    release_all = threading.Event()
+    entered = {"n": 0}
+    entered_lock = threading.Lock()
+
+    class _StatelessSession:
+        def post(self, url, headers=None, data=None, timeout=None):
+            body = json.loads(data)
+            method = body.get("method")
+            if method == "initialize":
+                with entered_lock:
+                    entered["n"] += 1
+                    if entered["n"] == 2:
+                        both_entered.set()
+                release_all.wait(5)
+                # Never returns mcp-session-id: this server is stateless_http.
+                return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"), "result": {
+                    "protocolVersion": "2025-06-18", "serverInfo": {"name": "fake", "version": "1"}}}))
+            if method == "notifications/initialized":
+                return _Resp("", headers={})
+            return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
+                                     "result": {"content": [{"type": "text", "text": "ok"}]}}))
+
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=_StatelessSession())
+    # Steady-state precondition: a prior call already discovered this server is sessionless.
+    c._sessionless = True
+    results = {}
+
+    def call(slot):
+        results[slot] = c.call_tool("t", {})
+
+    t1 = threading.Thread(target=call, args=(1,))
+    t2 = threading.Thread(target=call, args=(2,))
+    t1.start()
+    t2.start()
+
+    assert both_entered.wait(5), "both threads' initialize posts were never simultaneously in flight"
+
+    release_all.set()
+    t1.join(5)
+    t2.join(5)
+    assert not t1.is_alive() and not t2.is_alive()
+    assert results[1].ok and results[2].ok
+    assert c._sid is None
+    assert c._sessionless is True
+
+
+def test_sessionless_client_returns_to_the_locked_path_if_a_session_id_appears():
+    """If a server previously discovered sessionless suddenly returns a session id, the client
+    must stop treating it as sessionless and use the locked double-checked path again."""
+
+    class _FlipSession:
+        def post(self, url, headers=None, data=None, timeout=None):
+            body = json.loads(data)
+            method = body.get("method")
+            if method == "initialize":
+                return _init_resp("sid-appeared")
+            if method == "notifications/initialized":
+                return _Resp("", headers={})
+            return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
+                                     "result": {"content": [{"type": "text", "text": "ok"}]}}))
+
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=_FlipSession())
+    c._sessionless = True
+
+    out = c.call_tool("t", {})
+
+    assert out.ok is True
+    assert c._sessionless is False
+    assert c._sid == "sid-appeared"
 
 
 def test_stale_session_error_reset_does_not_clear_a_newer_session_id():
