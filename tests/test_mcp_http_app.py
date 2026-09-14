@@ -75,11 +75,76 @@ def test_authorization_server_metadata_is_s256_only(client):
     assert body["grant_types_supported"] == ["authorization_code", "refresh_token"]
 
 
-def test_register_echoes_allowed_redirect_uris(client):
-    r = client.post("/oauth/register", json={"redirect_uris": ["https://claude.ai/api/mcp/auth_callback"]})
+REDIRECT = "https://claude.ai/api/mcp/auth_callback"
+
+
+def test_register_persists_a_random_client_per_registration(client, store):
+    first = client.post("/oauth/register", json={"redirect_uris": [REDIRECT], "client_name": "Claude"})
+    second = client.post("/oauth/register", json={"redirect_uris": [REDIRECT, "http://127.0.0.1/callback"]})
+    assert first.status_code == 201 and second.status_code == 201
+    body = first.json()
+    assert body["redirect_uris"] == [REDIRECT]
+    assert body["client_name"] == "Claude"
+    assert body["token_endpoint_auth_method"] == "none"
+    assert isinstance(body["client_id_issued_at"], int)
+    ids = {first.json()["client_id"], second.json()["client_id"]}
+    assert len(ids) == 2 and "ted-mcp-public" not in ids
+    assert all(isinstance(i, str) and len(i) >= 20 for i in ids)
+    stored = store.get_client(body["client_id"])
+    assert (stored.client_name, stored.redirect_uris) == ("Claude", (REDIRECT,))
+    other = store.get_client(second.json()["client_id"])
+    assert (other.client_name, other.redirect_uris) == ("", (REDIRECT, "http://127.0.0.1/callback"))
+    assert store.get_client("ted-mcp-public") is None
+
+
+@pytest.mark.parametrize("uris", [[], [REDIRECT] * 6, REDIRECT, [REDIRECT, 7], None])
+def test_register_needs_one_to_five_redirect_uris(client, store, uris):
+    body = {"client_name": "x"} if uris is None else {"redirect_uris": uris}
+    r = client.post("/oauth/register", json=body)
+    assert r.status_code == 400
+    assert r.json() == {"error": "invalid_redirect_uri"}
+
+
+def test_register_accepts_five_redirect_uris(client):
+    uris = [REDIRECT, "http://127.0.0.1/a", "http://127.0.0.1/b", "http://localhost/c", "http://[::1]/d"]
+    r = client.post("/oauth/register", json={"redirect_uris": uris})
     assert r.status_code == 201
-    assert r.json()["client_id"] == "ted-mcp-public"
-    assert r.json()["redirect_uris"] == ["https://claude.ai/api/mcp/auth_callback"]
+    assert r.json()["redirect_uris"] == uris
+
+
+@pytest.mark.parametrize("name", ["x" * 101, "a\x00b", "a\nb", "a\tb", "\x7f", "\x85", "\u202eClaude", "a\u2028b", 7, ["x"]])
+def test_register_refuses_unsafe_client_names(client, name):
+    r = client.post("/oauth/register", json={"redirect_uris": [REDIRECT], "client_name": name})
+    assert r.status_code == 400
+    assert r.json() == {"error": "invalid_client_metadata"}
+
+
+@pytest.mark.parametrize("name", ["x" * 100, "Işık'ın Claude'u <b>", ""])
+def test_register_accepts_plain_client_names(client, store, name):
+    r = client.post("/oauth/register", json={"redirect_uris": [REDIRECT], "client_name": name})
+    assert r.status_code == 201
+    assert store.get_client(r.json()["client_id"]).client_name == name
+
+
+@pytest.mark.parametrize("body", [b"[]", b"not json", b'"x"'])
+def test_register_refuses_non_object_metadata(client, body):
+    r = client.post("/oauth/register", content=body, headers={"content-type": "application/json"})
+    assert r.status_code == 400
+    assert r.json()["error"] in {"invalid_client_metadata"}
+
+
+def test_register_is_refused_when_the_client_table_is_full_of_fresh_clients(client, store, tmp_path):
+    import sqlite3
+    import time as _time
+
+    now = int(_time.time())
+    with sqlite3.connect(tmp_path / "oauth.sqlite3") as conn:
+        conn.executemany(
+            "INSERT INTO oauth_client (client_id, client_name, redirect_uris, created_at) VALUES (?, '', ?, ?)",
+            [(f"prefill-{i}", json.dumps([REDIRECT]), now) for i in range(500)])
+    r = client.post("/oauth/register", json={"redirect_uris": [REDIRECT]})
+    assert r.status_code == 400
+    assert r.json() == {"error": "invalid_client_metadata"}
 
 
 @pytest.mark.parametrize("uri", [
@@ -270,12 +335,13 @@ def test_body_limit_counts_streamed_bytes_when_content_length_understates():
     assert seen["bytes"] <= 16_384
 
 
-def test_register_json_under_the_limit_is_served(client):
-    body = {"redirect_uris": ["https://claude.ai/api/mcp/auth_callback"] * 100, "client_name": "x" * 8000}
-    assert 10_000 < len(json.dumps(body)) < 16_384
-    r = client.post("/oauth/register", json=body)
+def test_register_json_under_the_limit_is_served(client, store):
+    compact = json.dumps({"redirect_uris": ["https://claude.ai/api/mcp/auth_callback"], "client_name": "x"})
+    body = compact[:-1] + " " * 12_000 + "}"  # insignificant whitespace pads a valid document
+    assert 10_000 < len(body) < 16_384
+    r = client.post("/oauth/register", content=body.encode(), headers={"content-type": "application/json"})
     assert r.status_code == 201
-    assert r.json()["client_id"] == "ted-mcp-public"
+    assert store.get_client(r.json()["client_id"]).redirect_uris == ("https://claude.ai/api/mcp/auth_callback",)
 
 
 def test_413_carries_cors_headers_for_an_allowed_origin(client):

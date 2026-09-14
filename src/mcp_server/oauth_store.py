@@ -9,6 +9,7 @@ import base64
 import contextlib
 import hashlib
 import hmac
+import json
 import os
 import re
 import secrets
@@ -16,14 +17,19 @@ import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import Callable, Iterator, Sequence
 
 from src import roles
+from src.mcp_server.oauth_redirect import redirect_matches
 
 CODE_TTL_SECONDS = 300
 ACCESS_TTL_SECONDS = 3600
 REFRESH_TTL_SECONDS = 30 * 24 * 3600
 STATIC_KEY_PREFIX = "tdyM_"
+# Dynamic client registration is open to anyone, so the table is capped. When it is full, clients
+# that never produced a code and are more than a day old make room; otherwise registration is refused.
+MAX_CLIENTS = 500
+STALE_CLIENT_SECONDS = 24 * 3600
 BUSY_TIMEOUT_MS = 5000
 
 # RFC 7636 §4.1-4.2: an S256 challenge is 43 base64url characters; a verifier 43-128 unreserved ones.
@@ -58,6 +64,13 @@ CREATE TABLE IF NOT EXISTS oauth_refresh (
     used_at INTEGER,
     revoked_at INTEGER
 );
+CREATE TABLE IF NOT EXISTS oauth_client (
+    client_id TEXT PRIMARY KEY,
+    client_name TEXT NOT NULL,
+    redirect_uris TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    code_issued_at INTEGER
+);
 CREATE TABLE IF NOT EXISTS static_key (
     value_hash TEXT PRIMARY KEY,
     label TEXT NOT NULL UNIQUE,
@@ -78,6 +91,18 @@ def is_valid_code_challenge(code_challenge: str, code_challenge_method: str) -> 
     """Exactly S256 (case-sensitive) with a 43-character base64url challenge."""
     return (code_challenge_method == "S256" and isinstance(code_challenge, str)
             and _CODE_CHALLENGE.fullmatch(code_challenge) is not None)
+
+
+class ClientLimitReached(Exception):
+    """The client table is full and none of its clients may be purged yet."""
+
+
+@dataclass(frozen=True)
+class Client:
+    client_id: str
+    client_name: str
+    redirect_uris: tuple[str, ...]
+    created_at: int
 
 
 @dataclass(frozen=True)
@@ -148,6 +173,46 @@ class OAuthStore:
     def _now(self) -> int:
         return int(self._clock())
 
+    # -- registered clients (RFC 7591) ---------------------------------------------
+    def register_client(self, client_name: str, redirect_uris: Sequence[str]) -> Client:
+        """Persist a validated registration under a fresh random client_id."""
+        client = Client(secrets.token_urlsafe(24), client_name, tuple(redirect_uris), self._now())
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                if self._client_count(conn) >= MAX_CLIENTS:
+                    conn.execute(
+                        "DELETE FROM oauth_client WHERE code_issued_at IS NULL AND created_at < ?",
+                        (client.created_at - STALE_CLIENT_SECONDS,),
+                    )
+                    if self._client_count(conn) >= MAX_CLIENTS:
+                        raise ClientLimitReached(f"{MAX_CLIENTS} registered clients and none is purgeable")
+                conn.execute(
+                    "INSERT INTO oauth_client (client_id, client_name, redirect_uris, created_at) VALUES (?, ?, ?, ?)",
+                    (client.client_id, client.client_name, json.dumps(list(client.redirect_uris)), client.created_at),
+                )
+                conn.execute("COMMIT")
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
+        return client
+
+    @staticmethod
+    def _client_count(conn: sqlite3.Connection) -> int:
+        return int(conn.execute("SELECT COUNT(*) FROM oauth_client").fetchone()[0])
+
+    def get_client(self, client_id: str) -> Client | None:
+        if not client_id or not client_id.isascii():
+            return None
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT client_id, client_name, redirect_uris, created_at FROM oauth_client WHERE client_id = ?",
+                (client_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return Client(row["client_id"], row["client_name"], tuple(json.loads(row["redirect_uris"])), row["created_at"])
+
     # -- authorization codes -------------------------------------------------------
     def issue_code(self, email: str, client_id: str, redirect_uri: str,
                    code_challenge: str, code_challenge_method: str) -> str:
@@ -156,13 +221,22 @@ class OAuthStore:
         if not roles.is_full(email):
             raise ValueError("email is not a full-role roster member")
         code = secrets.token_urlsafe(32)
+        now = self._now()
         with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT redirect_uris FROM oauth_client WHERE client_id = ?", (client_id,)).fetchone()
+            if row is None or not any(redirect_matches(r, redirect_uri) for r in json.loads(row["redirect_uris"])):
+                conn.execute("ROLLBACK")
+                raise ValueError("client_id is not registered for this redirect_uri")
+            # A client that has produced a code is never purged to make room for new registrations.
+            conn.execute("UPDATE oauth_client SET code_issued_at = ? WHERE client_id = ?", (now, client_id))
             conn.execute(
                 "INSERT INTO oauth_code (value_hash, email, client_id, redirect_uri, challenge,"
                 " challenge_method, expires_at) VALUES (?, ?, ?, ?, ?, 'S256', ?)",
                 (_hash(code), email.strip().lower(), client_id, redirect_uri, code_challenge,
-                 self._now() + CODE_TTL_SECONDS),
+                 now + CODE_TTL_SECONDS),
             )
+            conn.execute("COMMIT")
         return code
 
     def redeem_code(self, code: str, client_id: str, redirect_uri: str,

@@ -1,5 +1,6 @@
-"""End-to-end OAuth: consent page -> Google identity -> code -> tokens -> MCP tool with identity."""
+"""End-to-end OAuth: DCR -> consent page -> Google identity -> code -> tokens -> MCP tool with identity."""
 import base64
+import functools
 import hashlib
 import json
 import re
@@ -12,7 +13,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.testclient import TestClient
 
-from src.mcp_server import http_app
+from src.mcp_server import google_identity, http_app
 from src.mcp_server.config import load_settings
 from src.mcp_server.google_identity import IdentityError
 from src.mcp_server.oauth_store import OAuthStore
@@ -21,8 +22,10 @@ BASE = "https://mcp.tedy.online"
 FULL = "drmahirkurt@gmail.com"
 READER = "murzogluhulya@gmail.com"
 REDIRECT = "https://claude.ai/api/mcp/auth_callback"
+LOOPBACK = "http://127.0.0.1/callback"
 VERIFIER = "v" * 64
 MCP_HEADERS = {"accept": "application/json, text/event-stream", "content-type": "application/json"}
+LOOP_FREE_WITHIN_SECONDS = 2.0
 
 
 def _challenge(v: str) -> str:
@@ -102,37 +105,76 @@ class ParkingStore(OAuthStore):
         self.park("refresh")
         return super().refresh(*args, **kwargs)
 
+    def register_client(self, *args, **kwargs):
+        self.park("register_client")
+        return super().register_client(*args, **kwargs)
+
+    def get_client(self, *args, **kwargs):
+        self.park("get_client")
+        return super().get_client(*args, **kwargs)
+
+
+def _app(tmp_path, store, verifier, clock, **settings_env):
+    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE, **settings_env}, project_root=tmp_path)
+    return http_app.build_app(settings, store, _test_mcp(), verify_identity=verifier,
+                              form_secret=b"s" * 32, clock=clock)
+
+
+def _register(client, uris=(REDIRECT, LOOPBACK), name="Claude") -> str:
+    r = client.post("/oauth/register", json={"redirect_uris": list(uris), "client_name": name})
+    assert r.status_code == 201, r.text
+    return r.json()["client_id"]
+
 
 @pytest.fixture
 def ctx(tmp_path):
     clock, verifier = Clock(), Verifier()
     store = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
-    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
-    app = http_app.build_app(settings, store, _test_mcp(), verify_identity=verifier,
-                             form_secret=b"s" * 32, clock=clock)
-    with TestClient(app, base_url=BASE, follow_redirects=False) as client:
-        yield client, verifier, clock, store
+    with TestClient(_app(tmp_path, store, verifier, clock), base_url=BASE, follow_redirects=False) as client:
+        yield client, verifier, clock, store, _register(client)
 
 
-def _authorize_params(**over):
-    params = {"response_type": "code", "client_id": http_app.CLIENT_ID, "redirect_uri": REDIRECT,
+def _authorize_params(registered_id, **over):
+    params = {"response_type": "code", "client_id": registered_id, "redirect_uri": REDIRECT,
               "state": "st-123", "code_challenge": _challenge(VERIFIER), "code_challenge_method": "S256"}
     params.update(over)
     return params
 
 
-def _start(client, verifier, **over):
-    r = client.get("/oauth/authorize", params=_authorize_params(**over))
-    assert r.status_code == 200
+def _start(client, verifier, registered_id, **over):
+    r = client.get("/oauth/authorize", params=_authorize_params(registered_id, **over))
+    assert r.status_code == 200, r.text
     form_state = re.search(r'name="form_state" value="([^"]+)"', r.text).group(1)
     verifier.expected_nonce = http_app.nonce_for(form_state)
     return form_state
 
 
+def _approve(client, form_state, credential):
+    """Complete the consent for a started authorization; returns the response carrying the code."""
+    return client.post("/oauth/authorize", data={"form_state": form_state, "credential": credential})
+
+
+def _code_from(response) -> str:
+    assert response.status_code == 302, response.text
+    return parse_qs(urlparse(response.headers["location"]).query)["code"][0]
+
+
+def _redeem(client, client_id, code, redirect_uri=REDIRECT, code_verifier=VERIFIER, **extra):
+    return client.post("/oauth/token", data={"grant_type": "authorization_code", "code": code,
+                                             "redirect_uri": redirect_uri, "client_id": client_id,
+                                             "code_verifier": code_verifier, **extra})
+
+
+def _tool_call(client, access_token):
+    return client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                                     "params": {"name": "kimim", "arguments": {}}},
+                       headers={**MCP_HEADERS, "authorization": f"Bearer {access_token}"})
+
+
 def test_consent_page_embeds_google_signin_and_nonce(ctx):
-    client, verifier, _, _ = ctx
-    form_state = _start(client, verifier)
-    page = client.get("/oauth/authorize", params=_authorize_params()).text
+    client, verifier, _, _, client_id = ctx
+    form_state = _start(client, verifier, client_id)
+    page = client.get("/oauth/authorize", params=_authorize_params(client_id)).text
     assert "accounts.google.com/gsi/client" in page
     assert http_app.roles.GOOGLE_CLIENT_ID in page
     assert "claude.ai" in page
@@ -144,7 +186,7 @@ def test_consent_page_embeds_google_signin_and_nonce(ctx):
     ({"code_challenge_method": "plain"}, "S256"),
     ({"code_challenge": ""}, "code_challenge"),
     ({"response_type": "token"}, "response_type"),
-    ({"client_id": "someone-else"}, "client_id"),
+    ({"client_id": "someone-else"}, "invalid_client"),
     # S1b / F2.1: only the exact callback, never another path on the same origin
     ({"redirect_uri": "https://claude.ai/any/other/path?x=1"}, "redirect_uri"),
     # S1b / F9: non-canonical forms (the consent page used to echo the fake "origin")
@@ -155,8 +197,8 @@ def test_consent_page_embeds_google_signin_and_nonce(ctx):
     ({"redirect_uri": "https://claude.ai/api/mcp/auth_callback?code=ATTACKER&state=ATTACKER"}, "redirect_uri"),
 ])
 def test_authorize_get_rejects_bad_requests(ctx, over, reason):
-    client, _, _, _ = ctx
-    r = client.get("/oauth/authorize", params=_authorize_params(**over))
+    client, _, _, _, client_id = ctx
+    r = client.get("/oauth/authorize", params=_authorize_params(client_id, **over))
     assert r.status_code == 400
     assert reason in r.text
     assert "location" not in r.headers
@@ -164,54 +206,50 @@ def test_authorize_get_rejects_bad_requests(ctx, over, reason):
 
 
 def test_full_round_trip_to_mcp_and_refresh(ctx):
-    client, verifier, _, _ = ctx
-    form_state = _start(client, verifier)
-    r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)})
+    client, verifier, _, _, client_id = ctx
+    form_state = _start(client, verifier, client_id)
+    r = _approve(client, form_state, _credential(FULL))
     assert r.status_code == 302
     loc = urlparse(r.headers["location"])
     assert f"{loc.scheme}://{loc.netloc}{loc.path}" == REDIRECT
     query = parse_qs(loc.query)
     assert query["state"] == ["st-123"]
 
-    tok = client.post("/oauth/token", data={
-        "grant_type": "authorization_code", "code": query["code"][0], "redirect_uri": REDIRECT,
-        "client_id": http_app.CLIENT_ID, "code_verifier": VERIFIER})
+    tok = _redeem(client, client_id, query["code"][0])
     assert tok.status_code == 200
     assert tok.headers["cache-control"] == "no-store"
     body = tok.json()
     assert body["token_type"] == "Bearer" and body["expires_in"] == 3600 and body["refresh_token"]
 
-    call = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-                                     "params": {"name": "kimim", "arguments": {}}},
-                       headers={**MCP_HEADERS, "authorization": f"Bearer {body['access_token']}"})
+    call = _tool_call(client, body["access_token"])
     assert call.status_code == 200
     assert json.loads(call.json()["result"]["content"][0]["text"]) == {"email": FULL}
 
     again = client.post("/oauth/token", data={"grant_type": "refresh_token", "refresh_token": body["refresh_token"],
-                                              "client_id": http_app.CLIENT_ID})
+                                              "client_id": client_id})
     assert again.status_code == 200
     assert again.json()["access_token"] != body["access_token"]
 
 
 def test_reader_role_is_refused_without_code(ctx):
-    client, verifier, _, _ = ctx
-    form_state = _start(client, verifier)
+    client, verifier, _, _, client_id = ctx
+    form_state = _start(client, verifier, client_id)
     r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(READER)})
     assert r.status_code == 403
     assert "location" not in r.headers
 
 
 def test_identity_failure_is_401(ctx):
-    client, verifier, _, _ = ctx
-    form_state = _start(client, verifier)
+    client, verifier, _, _, client_id = ctx
+    form_state = _start(client, verifier, client_id)
     verifier.error = "nonce_mismatch"
     r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)})
     assert r.status_code == 401
 
 
 def test_tampered_and_expired_form_state(ctx):
-    client, verifier, clock, _ = ctx
-    form_state = _start(client, verifier)
+    client, verifier, clock, _, client_id = ctx
+    form_state = _start(client, verifier, client_id)
     payload, sig = form_state.split(".")
     tampered = payload[:-2] + ("AA" if payload[-2:] != "AA" else "BB") + "." + sig
     assert client.post("/oauth/authorize", data={"form_state": tampered, "credential": _credential(FULL)}).status_code == 400
@@ -222,21 +260,18 @@ def test_tampered_and_expired_form_state(ctx):
 
 
 def test_token_endpoint_errors(ctx):
-    client, _, _, _ = ctx
-    bad = client.post("/oauth/token", data={"grant_type": "authorization_code", "code": "nope", "redirect_uri": REDIRECT,
-                                            "client_id": http_app.CLIENT_ID, "code_verifier": VERIFIER})
+    client, _, _, _, client_id = ctx
+    bad = _redeem(client, client_id, "nope")
     assert bad.status_code == 400 and bad.json()["error"] == "invalid_grant"
-    evil = client.post("/oauth/token", data={"grant_type": "authorization_code", "code": "x",
-                                             "redirect_uri": "https://evil.example/cb",
-                                             "client_id": http_app.CLIENT_ID, "code_verifier": VERIFIER})
+    evil = _redeem(client, client_id, "x", redirect_uri="https://evil.example/cb")
     assert evil.status_code == 400 and evil.json()["error"] == "invalid_grant"
     other = client.post("/oauth/token", data={"grant_type": "client_credentials"})
     assert other.status_code == 400 and other.json()["error"] == "unsupported_grant_type"
 
 
 def test_state_is_escaped_on_the_consent_page(ctx):
-    client, _, _, _ = ctx
-    r = client.get("/oauth/authorize", params=_authorize_params(state='"><script>alert(1)</script>'))
+    client, _, _, _, client_id = ctx
+    r = client.get("/oauth/authorize", params=_authorize_params(client_id, state='"><script>alert(1)</script>'))
     assert r.status_code == 200
     assert "<script>alert(1)</script>" not in r.text
 
@@ -264,8 +299,8 @@ def test_build_app_requires_form_secret(tmp_path):
     "not-a-jwt", "a.b.c.d", pytest.param("a" * 4093 + ".b.c", id="4097-bytes"), "a.b+c.d", "a..c", "",
 ])
 def test_malformed_credential_is_invalid_token_without_calling_the_verifier(ctx, credential):
-    client, verifier, _, _ = ctx
-    form_state = _start(client, verifier)
+    client, verifier, _, _, client_id = ctx
+    form_state = _start(client, verifier, client_id)
     r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": credential})
     assert r.status_code == 401
     assert r.text == "Google kimliği doğrulanamadı: invalid_token"
@@ -274,47 +309,42 @@ def test_malformed_credential_is_invalid_token_without_calling_the_verifier(ctx,
 
 
 def test_missing_credential_is_invalid_token_without_calling_the_verifier(ctx):
-    client, verifier, _, _ = ctx
-    form_state = _start(client, verifier)
+    client, verifier, _, _, client_id = ctx
+    form_state = _start(client, verifier, client_id)
     r = client.post("/oauth/authorize", data={"form_state": form_state})
     assert r.status_code == 401
     assert r.text == "Google kimliği doğrulanamadı: invalid_token"
     assert verifier.calls == 0
 
 
-# -- S1a / F1: blocking auth work runs off the event loop -------------------------------
+# -- S1a / F1 + S1b / T1: blocking auth work runs off the event loop --------------------
 
-LOOP_FREE_WITHIN_SECONDS = 2.0
-
-
-@pytest.mark.parametrize("blocked", ["verify_identity", "issue_code", "redeem_code", "refresh", "principal"])
+@pytest.mark.parametrize("blocked", ["verify_identity", "issue_code", "redeem_code", "refresh", "principal",
+                                     "register_client", "get_client"])
 def test_blocked_auth_work_leaves_the_event_loop_free(tmp_path, blocked):
-    entered, release = threading.Event(), threading.Event()
+    armed, entered, release = threading.Event(), threading.Event(), threading.Event()
 
     def park(name):
-        if name == blocked:
+        if name == blocked and armed.is_set():
             entered.set()
             release.wait(10)
 
     clock = Clock()
     store = ParkingStore(tmp_path / "oauth.sqlite3", clock, park)
     verifier = Verifier(park=park)
-    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
-    app = http_app.build_app(settings, store, _test_mcp(), verify_identity=verifier,
-                             form_secret=b"s" * 32, clock=clock)
-    with TestClient(app, base_url=BASE, follow_redirects=False) as client:
-        form_state = _start(client, verifier)
-        consent = {"form_state": form_state, "credential": _credential(FULL)}
+    with TestClient(_app(tmp_path, store, verifier, clock), base_url=BASE, follow_redirects=False) as client:
+        client_id = _register(client)
+        form_state = _start(client, verifier, client_id)
         calls = {
-            "verify_identity": lambda: client.post("/oauth/authorize", data=consent),
-            "issue_code": lambda: client.post("/oauth/authorize", data=consent),
-            "redeem_code": lambda: client.post("/oauth/token", data={
-                "grant_type": "authorization_code", "code": "nope", "redirect_uri": REDIRECT,
-                "client_id": http_app.CLIENT_ID, "code_verifier": VERIFIER}),
+            "verify_identity": lambda: _approve(client, form_state, _credential(FULL)),
+            "issue_code": lambda: _approve(client, form_state, _credential(FULL)),
+            "redeem_code": lambda: _redeem(client, client_id, "nope"),
             "refresh": lambda: client.post("/oauth/token", data={
-                "grant_type": "refresh_token", "refresh_token": "nope", "client_id": http_app.CLIENT_ID}),
+                "grant_type": "refresh_token", "refresh_token": "nope", "client_id": client_id}),
             "principal": lambda: client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "initialize"},
                                              headers={**MCP_HEADERS, "authorization": "Bearer nope"}),
+            "register_client": lambda: client.post("/oauth/register", json={"redirect_uris": [REDIRECT]}),
+            "get_client": lambda: client.get("/oauth/authorize", params=_authorize_params(client_id)),
         }
         outcome = {}
 
@@ -326,6 +356,7 @@ def test_blocked_auth_work_leaves_the_event_loop_free(tmp_path, blocked):
 
         worker = threading.Thread(target=run, args=("blocked", calls[blocked]))
         probe = threading.Thread(target=run, args=("health", lambda: client.get("/health")))
+        armed.set()
         worker.start()
         try:
             assert entered.wait(5), f"{blocked} was never reached"
@@ -340,16 +371,12 @@ def test_blocked_auth_work_leaves_the_event_loop_free(tmp_path, blocked):
                 probe.join(10)
     assert not worker.is_alive()
     assert not isinstance(outcome.get("blocked"), Exception), outcome.get("blocked")
-    assert outcome["blocked"].status_code in {302, 400, 401}
+    assert outcome["blocked"].status_code in {200, 201, 302, 400, 401}
 
 
 # -- S1b / T4: an unexpected cert-fetch failure is 401 google_unreachable, not 500 ------------
 
 def test_unexpected_cert_fetch_error_is_401_google_unreachable_with_backoff(tmp_path):
-    import functools
-
-    from src.mcp_server import google_identity
-
     fetch_calls = []
 
     def broken_fetch():
@@ -360,12 +387,11 @@ def test_unexpected_cert_fetch_error_is_401_google_unreachable_with_backoff(tmp_
     cache = google_identity.GoogleCertCache(fetch=broken_fetch, clock=clock)
     verify = functools.partial(google_identity.verify_google_credential, cert_cache=cache)
     store = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
-    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
-    app = http_app.build_app(settings, store, _test_mcp(), verify_identity=verify,
-                             form_secret=b"s" * 32, clock=clock)
-    with TestClient(app, base_url=BASE, follow_redirects=False, raise_server_exceptions=False) as client:
+    with TestClient(_app(tmp_path, store, verify, clock), base_url=BASE, follow_redirects=False,
+                    raise_server_exceptions=False) as client:
+        client_id = _register(client)
         for _ in range(2):
-            form_state = _start(client, Verifier())
+            form_state = _start(client, Verifier(), client_id)
             r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)})
             assert r.status_code == 401
             assert r.text == "Google kimliği doğrulanamadı: google_unreachable"
@@ -391,17 +417,14 @@ def test_full_verification_limiter_does_not_delay_the_bearer_gate(tmp_path):
     clock = Clock()
     store = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
     key = store.create_static_key("gate", FULL)
-    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
-    app = http_app.build_app(settings, store, _test_mcp(), verify_identity=parking_verifier,
-                             form_secret=b"s" * 32, clock=clock)
-    with TestClient(app, base_url=BASE, follow_redirects=False) as client:
+    with TestClient(_app(tmp_path, store, parking_verifier, clock), base_url=BASE, follow_redirects=False) as client:
         async def shrink_default_thread_limiter():
             # As many worker threads as parked verifications: if verification borrowed from the
             # default limiter, the bearer gate's principal() lookup would have no thread left.
             anyio.to_thread.current_default_thread_limiter().total_tokens = parked_count
 
+        form_state = _start(client, Verifier(), _register(client))
         client.portal.call(shrink_default_thread_limiter)
-        form_state = _start(client, Verifier())
         consent = {"form_state": form_state, "credential": _credential(FULL)}
         outcome = {}
 
@@ -413,10 +436,7 @@ def test_full_verification_limiter_does_not_delay_the_bearer_gate(tmp_path):
 
         workers = [threading.Thread(target=run, args=(i, lambda: client.post("/oauth/authorize", data=consent)))
                    for i in range(parked_count)]
-        probe = threading.Thread(target=run, args=("gate", lambda: client.post(
-            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-                          "params": {"name": "kimim", "arguments": {}}},
-            headers={**MCP_HEADERS, "authorization": f"Bearer {key}"})))
+        probe = threading.Thread(target=run, args=("gate", lambda: _tool_call(client, key)))
         for w in workers:
             w.start()
         try:
@@ -447,26 +467,22 @@ def test_full_verification_limiter_does_not_delay_the_bearer_gate(tmp_path):
     {"code_challenge": _challenge(VERIFIER)[:42] + "="},
 ])
 def test_authorize_get_enforces_pkce_bounds(ctx, over):
-    client, _, _, _ = ctx
-    r = client.get("/oauth/authorize", params=_authorize_params(**over))
+    client, _, _, _, client_id = ctx
+    r = client.get("/oauth/authorize", params=_authorize_params(client_id, **over))
     assert r.status_code == 400
     assert "code_challenge" in r.text
     assert "form_state" not in r.text
 
 
-def _code_for(client, verifier, pkce_verifier):
-    form_state = _start(client, verifier, code_challenge=_challenge(pkce_verifier))
-    r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)})
-    assert r.status_code == 302
-    return parse_qs(urlparse(r.headers["location"]).query)["code"][0]
+def _code_for(client, verifier, client_id, pkce_verifier=VERIFIER, **over):
+    form_state = _start(client, verifier, client_id, code_challenge=_challenge(pkce_verifier), **over)
+    return _code_from(_approve(client, form_state, _credential(FULL)))
 
 
 def test_one_character_code_verifier_is_refused_at_the_token_endpoint(ctx):
-    client, verifier, _, _ = ctx
-    code = _code_for(client, verifier, "a")  # S256("a") is a well-formed 43-character challenge
-    tok = client.post("/oauth/token", data={"grant_type": "authorization_code", "code": code,
-                                            "redirect_uri": REDIRECT, "client_id": http_app.CLIENT_ID,
-                                            "code_verifier": "a"})
+    client, verifier, _, _, client_id = ctx
+    code = _code_for(client, verifier, client_id, "a")  # S256("a") is a well-formed 43-character challenge
+    tok = _redeem(client, client_id, code, code_verifier="a")
     assert tok.status_code == 400
     assert tok.json() == {"error": "invalid_grant"}
 
@@ -474,19 +490,79 @@ def test_one_character_code_verifier_is_refused_at_the_token_endpoint(ctx):
 # -- S1b / F6: a replayed code revokes the access token from its first redemption ----------------
 
 def test_code_replay_revokes_the_first_access_token(ctx):
-    client, verifier, _, _ = ctx
-    code = _code_for(client, verifier, VERIFIER)
-    redeem = {"grant_type": "authorization_code", "code": code, "redirect_uri": REDIRECT,
-              "client_id": http_app.CLIENT_ID, "code_verifier": VERIFIER}
-    first = client.post("/oauth/token", data=redeem)
+    client, verifier, _, _, client_id = ctx
+    code = _code_for(client, verifier, client_id)
+    first = _redeem(client, client_id, code)
     assert first.status_code == 200
-    call = {"json": {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "kimim", "arguments": {}}},
-            "headers": {**MCP_HEADERS, "authorization": f"Bearer {first.json()['access_token']}"}}
-    assert client.post("/mcp", **call).status_code == 200
-    replay = client.post("/oauth/token", data=redeem)
+    assert _tool_call(client, first.json()["access_token"]).status_code == 200
+    replay = _redeem(client, client_id, code)
     assert replay.status_code == 400
     assert replay.json() == {"error": "invalid_grant"}
-    assert client.post("/mcp", **call).status_code == 401
-    refreshed = client.post("/oauth/token", data={"grant_type": "refresh_token", "client_id": http_app.CLIENT_ID,
+    assert _tool_call(client, first.json()["access_token"]).status_code == 401
+    refreshed = client.post("/oauth/token", data={"grant_type": "refresh_token", "client_id": client_id,
                                                   "refresh_token": first.json()["refresh_token"]})
     assert refreshed.status_code == 400
+
+
+# -- S1b / F2.3: registered client and exact registered redirect_uri ------------------------------
+
+def test_unregistered_client_id_is_invalid_client_at_authorize_and_token(ctx):
+    client, verifier, _, _, client_id = ctx
+    page = client.get("/oauth/authorize", params=_authorize_params("ted-mcp-public"))
+    assert page.status_code == 400
+    assert "invalid_client" in page.text
+    assert "location" not in page.headers and "form_state" not in page.text
+    code = _code_for(client, verifier, client_id)
+    refused = _redeem(client, "ted-mcp-public", code)
+    assert refused.status_code == 400
+    assert refused.json() == {"error": "invalid_client"}
+    good = _redeem(client, client_id, code)  # the refused request did not consume the code
+    assert good.status_code == 200
+    refresh = client.post("/oauth/token", data={"grant_type": "refresh_token", "client_id": "ted-mcp-public",
+                                                "refresh_token": good.json()["refresh_token"]})
+    assert refresh.status_code == 400
+    assert refresh.json() == {"error": "invalid_client"}
+
+
+def test_authorize_needs_a_redirect_uri_registered_by_that_client(ctx):
+    client, _, _, _, _ = ctx
+    only_claude = _register(client, uris=(REDIRECT,))
+    for uri in ["https://claude.com/api/mcp/auth_callback", LOOPBACK, "http://127.0.0.1:5000/callback"]:
+        r = client.get("/oauth/authorize", params=_authorize_params(only_claude, redirect_uri=uri))
+        assert r.status_code == 400, uri
+        assert "redirect_uri" in r.text and "location" not in r.headers
+    missing = _authorize_params(only_claude)
+    del missing["redirect_uri"]
+    assert client.get("/oauth/authorize", params=missing).status_code == 400
+
+
+@pytest.mark.parametrize("requested,allowed", [
+    ("http://127.0.0.1:53712/callback", True),
+    ("http://127.0.0.1/callback", True),
+    ("http://127.0.0.1:53712/callback2", False),
+    ("http://localhost:53712/callback", False),
+    ("http://127.0.0.1:53712/callback?x=1", False),
+    ("http://127.0.0.1:notaport/callback", False),
+    ("http://127.0.0.1:0/callback", False),
+])
+def test_loopback_redirect_matches_its_registration_on_any_port(ctx, requested, allowed):
+    client, _, _, _, client_id = ctx
+    r = client.get("/oauth/authorize", params=_authorize_params(client_id, redirect_uri=requested))
+    assert r.status_code == (200 if allowed else 400)
+
+
+def test_token_redirect_uri_must_equal_the_one_the_code_is_bound_to(ctx):
+    client, verifier, _, _, client_id = ctx
+    bound = "http://127.0.0.1:53712/callback"
+    code = _code_for(client, verifier, client_id, redirect_uri=bound)
+    for other in ["http://127.0.0.1:1111/callback", LOOPBACK]:
+        assert _redeem(client, client_id, code, redirect_uri=other).json() == {"error": "invalid_grant"}
+    assert _redeem(client, client_id, code, redirect_uri=bound).status_code == 200
+
+
+def test_code_is_bound_to_the_client_that_requested_it(ctx):
+    client, verifier, _, _, client_id = ctx
+    other = _register(client)
+    code = _code_for(client, verifier, client_id)
+    assert _redeem(client, other, code).json() == {"error": "invalid_grant"}
+    assert _redeem(client, client_id, code).status_code == 200

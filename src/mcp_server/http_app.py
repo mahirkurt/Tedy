@@ -7,6 +7,7 @@ import hmac
 import html
 import json
 import time
+import unicodedata
 from typing import Any, Callable, Mapping
 from urllib.parse import urlencode, urlparse, urlsplit, urlunparse, parse_qsl
 
@@ -23,13 +24,12 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from src.mcp_server import __version__
 from src.mcp_server.config import Settings
 from src.mcp_server.google_identity import IdentityVerifier, is_well_formed_credential, verify_google_credential
-from src.mcp_server.oauth_redirect import RedirectPolicy, is_allowed_cors_origin
-from src.mcp_server.oauth_store import OAuthStore, is_valid_code_challenge
+from src.mcp_server.oauth_redirect import RedirectPolicy, is_allowed_cors_origin, redirect_matches
+from src.mcp_server.oauth_store import Client, ClientLimitReached, OAuthStore, is_valid_code_challenge
 from src import roles
 from src.mcp_server.google_identity import IdentityError
 from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
-CLIENT_ID = "ted-mcp-public"
 REALM = "ted-mcp"
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
@@ -39,6 +39,11 @@ OAUTH_MAX_BODY_BYTES = 16_384
 # fetch) can never take the threads the bearer gate and the token endpoint need.
 VERIFY_LIMITER_TOKENS = 4
 _VERIFY_LIMITER = anyio.CapacityLimiter(VERIFY_LIMITER_TOKENS)
+MAX_REDIRECT_URIS = 5
+MAX_CLIENT_NAME_CHARS = 100
+# Controls, format characters (bidi overrides, zero-width joiners), lone surrogates and line/paragraph
+# separators: none belong in a name shown to a family member deciding whether to grant access.
+_UNSAFE_NAME_CATEGORIES = frozenset({"Cc", "Cf", "Cs", "Zl", "Zp"})
 _FORM_KEYS = ("client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method", "scope", "resource")
 
 
@@ -104,6 +109,11 @@ Yalnız TEDY aile listesindeki tam yetkili hesaplar onay verebilir.</p>
 <div class="g_id_signin" data-type="standard" data-text="continue_with" data-locale="tr"></div>
 <script>function tedyConsent(r){{document.getElementById("credential").value=r.credential;document.getElementById("consent").submit();}}</script>
 </main></body></html>"""
+
+
+def is_acceptable_client_name(name: object) -> bool:
+    return (isinstance(name, str) and len(name) <= MAX_CLIENT_NAME_CHARS
+            and not any(unicodedata.category(c) in _UNSAFE_NAME_CATEGORIES for c in name))
 
 
 def _header(scope: Scope, name: bytes) -> str:
@@ -321,21 +331,46 @@ def build_app(
             "scopes_supported": ["edupedia"],
         })
 
+    def _registration_error(error: str) -> Response:
+        return JSONResponse({"error": error}, status_code=400)
+
     async def register(request: Request) -> Response:
         try:
             body = await request.json()
         except ValueError:
-            return JSONResponse({"error": "invalid_client_metadata"}, status_code=400)
-        uris = body.get("redirect_uris") if isinstance(body, dict) else None
-        if not isinstance(uris, list) or not uris or not all(isinstance(u, str) and redirect_policy.allows(u) for u in uris):
-            return JSONResponse({"error": "invalid_redirect_uri"}, status_code=400)
-        return JSONResponse({
-            "client_id": CLIENT_ID,
-            "redirect_uris": uris,
+            return _registration_error("invalid_client_metadata")
+        if not isinstance(body, dict):
+            return _registration_error("invalid_client_metadata")
+        uris = body.get("redirect_uris")
+        if (not isinstance(uris, list) or not 1 <= len(uris) <= MAX_REDIRECT_URIS
+                or not all(isinstance(u, str) and redirect_policy.allows(u) for u in uris)):
+            return _registration_error("invalid_redirect_uri")
+        name = "" if body.get("client_name") is None else body["client_name"]
+        if not is_acceptable_client_name(name):
+            return _registration_error("invalid_client_metadata")
+        try:
+            client = await anyio.to_thread.run_sync(store.register_client, name, uris)
+        except ClientLimitReached:
+            return _registration_error("invalid_client_metadata")
+        registered: dict[str, Any] = {
+            "client_id": client.client_id,
+            "client_id_issued_at": client.created_at,
+            "redirect_uris": list(client.redirect_uris),
             "token_endpoint_auth_method": "none",
             "grant_types": ["authorization_code", "refresh_token"],
             "response_types": ["code"],
-        }, status_code=201)
+        }
+        if client.client_name:
+            registered["client_name"] = client.client_name
+        return JSONResponse(registered, status_code=201)
+
+    async def _registered_client(client_id: str) -> Client | None:
+        return await anyio.to_thread.run_sync(store.get_client, client_id) if client_id else None
+
+    def _is_registered_redirect(client: Client, redirect_uri: str) -> bool:
+        # Still inside today's policy (canonical, allowlisted) and equal to one the client registered.
+        return redirect_policy.allows(redirect_uri) and any(
+            redirect_matches(registered, redirect_uri) for registered in client.redirect_uris)
 
     def _bad(reason: str) -> Response:
         return PlainTextResponse(f"Geçersiz yetkilendirme isteği: {reason}", status_code=400)
@@ -343,13 +378,15 @@ def build_app(
     async def authorize(request: Request) -> Response:
         if request.method == "GET":
             q = request.query_params
+            # An unknown client or redirect gets an error page here, never a redirect (RFC 6749 §4.1.2.1).
+            client = await _registered_client(q.get("client_id", ""))
+            if client is None:
+                return _bad("invalid_client")
+            redirect_uri = q.get("redirect_uri", "")
+            if not _is_registered_redirect(client, redirect_uri):
+                return _bad("redirect_uri")
             if q.get("response_type") != "code":
                 return _bad("response_type")
-            if q.get("client_id") != CLIENT_ID:
-                return _bad("client_id")
-            redirect_uri = q.get("redirect_uri", "")
-            if not redirect_policy.allows(redirect_uri):
-                return _bad("redirect_uri")
             # RFC 7636: exactly "S256" and a 43-character base64url challenge; "s256" is refused.
             if not is_valid_code_challenge(q.get("code_challenge", ""), q.get("code_challenge_method", "")):
                 return _bad("code_challenge / code_challenge_method must be S256")
@@ -382,8 +419,11 @@ def build_app(
             return PlainTextResponse(f"Google kimliği doğrulanamadı: {exc.reason}", status_code=401)
         if not roles.is_full(email):
             return PlainTextResponse("Bu hesap TEDY edupedia bağlantısını onaylayamaz.", status_code=403)
-        code = await anyio.to_thread.run_sync(store.issue_code, email, params["client_id"], params["redirect_uri"],
-                                              params["code_challenge"], params["code_challenge_method"])
+        try:
+            code = await anyio.to_thread.run_sync(store.issue_code, email, params["client_id"], params["redirect_uri"],
+                                                  params["code_challenge"], params["code_challenge_method"])
+        except ValueError:
+            return _bad("invalid_client")  # the registration is gone (purged) since the page was shown
         extra = {"code": code}
         if params.get("state"):
             extra["state"] = params["state"]
@@ -402,20 +442,21 @@ def build_app(
     async def token(request: Request) -> Response:
         form = await _limited_form(request)
         grant = form.get("grant_type")
+        if grant not in ("authorization_code", "refresh_token"):
+            return _grant_error("unsupported_grant_type")
         client_id = str(form.get("client_id", ""))
+        if await _registered_client(client_id) is None:
+            return _grant_error("invalid_client")
         if grant == "authorization_code":
+            # Must equal the redirect_uri the code is bound to (compared in the store).
             redirect_uri = str(form.get("redirect_uri", ""))
-            if client_id != CLIENT_ID or not redirect_policy.allows(redirect_uri):
+            if not redirect_policy.allows(redirect_uri):
                 return _grant_error("invalid_grant")
             pair = await anyio.to_thread.run_sync(store.redeem_code, str(form.get("code", "")), client_id,
                                                   redirect_uri, str(form.get("code_verifier", "")))
             return _token_response(pair) if pair else _grant_error("invalid_grant")
-        if grant == "refresh_token":
-            if client_id != CLIENT_ID:
-                return _grant_error("invalid_grant")
-            pair = await anyio.to_thread.run_sync(store.refresh, str(form.get("refresh_token", "")), client_id)
-            return _token_response(pair) if pair else _grant_error("invalid_grant")
-        return _grant_error("unsupported_grant_type")
+        pair = await anyio.to_thread.run_sync(store.refresh, str(form.get("refresh_token", "")), client_id)
+        return _token_response(pair) if pair else _grant_error("invalid_grant")
 
     streamable = mcp.streamable_http_app()
     routes = [

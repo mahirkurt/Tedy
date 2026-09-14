@@ -11,8 +11,8 @@ from src.mcp_server.oauth_store import OAuthStore
 
 FULL = "drmahirkurt@gmail.com"
 READER = "murzogluhulya@gmail.com"
-CLIENT = "ted-mcp-public"
 REDIRECT = "https://claude.ai/api/mcp/auth_callback"
+LOOPBACK = "http://127.0.0.1/callback"
 VERIFIER = "v" * 64
 
 
@@ -38,80 +38,85 @@ def store(tmp_path, clock):
     return OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
 
 
-def _pair(store):
-    code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")
-    return store.redeem_code(code, CLIENT, REDIRECT, VERIFIER)
+@pytest.fixture
+def client_id(store):
+    return store.register_client("Claude", [REDIRECT, LOOPBACK]).client_id
 
 
-def test_code_round_trip_binds_email(store):
-    pair = _pair(store)
+def _pair(store, client_id):
+    code = store.issue_code(FULL, client_id, REDIRECT, _challenge(VERIFIER), "S256")
+    return store.redeem_code(code, client_id, REDIRECT, VERIFIER)
+
+
+def test_code_round_trip_binds_email(store, client_id):
+    pair = _pair(store, client_id)
     assert pair is not None
     assert pair.email == FULL
     assert pair.expires_in == oauth_store.ACCESS_TTL_SECONDS
     assert store.principal(pair.access_token) == FULL
 
 
-def test_code_is_single_use(store):
-    code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")
-    assert store.redeem_code(code, CLIENT, REDIRECT, VERIFIER) is not None
-    assert store.redeem_code(code, CLIENT, REDIRECT, VERIFIER) is None
+def test_code_is_single_use(store, client_id):
+    code = store.issue_code(FULL, client_id, REDIRECT, _challenge(VERIFIER), "S256")
+    assert store.redeem_code(code, client_id, REDIRECT, VERIFIER) is not None
+    assert store.redeem_code(code, client_id, REDIRECT, VERIFIER) is None
 
 
 @pytest.mark.parametrize("client,redirect,verifier", [
     ("other-client", REDIRECT, VERIFIER),
-    (CLIENT, "https://grok.com/cb", VERIFIER),
-    (CLIENT, REDIRECT, "w" * 64),
+    (None, "https://grok.com/cb", VERIFIER),
+    (None, REDIRECT, "w" * 64),
 ])
-def test_code_redeem_rejects_mismatch(store, client, redirect, verifier):
-    code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")
-    assert store.redeem_code(code, client, redirect, verifier) is None
+def test_code_redeem_rejects_mismatch(store, client_id, client, redirect, verifier):
+    code = store.issue_code(FULL, client_id, REDIRECT, _challenge(VERIFIER), "S256")
+    assert store.redeem_code(code, client or client_id, redirect, verifier) is None
 
 
-def test_code_expires_after_five_minutes(store, clock):
-    code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")
+def test_code_expires_after_five_minutes(store, client_id, clock):
+    code = store.issue_code(FULL, client_id, REDIRECT, _challenge(VERIFIER), "S256")
     clock.now += oauth_store.CODE_TTL_SECONDS + 1
-    assert store.redeem_code(code, CLIENT, REDIRECT, VERIFIER) is None
+    assert store.redeem_code(code, client_id, REDIRECT, VERIFIER) is None
 
 
-def test_issue_code_rejects_plain_pkce_and_non_full_email(store):
+def test_issue_code_rejects_plain_pkce_and_non_full_email(store, client_id):
     with pytest.raises(ValueError):
-        store.issue_code(FULL, CLIENT, REDIRECT, VERIFIER, "plain")
+        store.issue_code(FULL, client_id, REDIRECT, VERIFIER, "plain")
     with pytest.raises(ValueError):
-        store.issue_code(READER, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")
+        store.issue_code(READER, client_id, REDIRECT, _challenge(VERIFIER), "S256")
 
 
-def test_access_token_expires(store, clock):
-    pair = _pair(store)
+def test_access_token_expires(store, client_id, clock):
+    pair = _pair(store, client_id)
     clock.now += oauth_store.ACCESS_TTL_SECONDS + 1
     assert store.principal(pair.access_token) is None
 
 
-def test_refresh_rotates_and_old_refresh_is_single_use(store):
-    first = _pair(store)
-    second = store.refresh(first.refresh_token, CLIENT)
+def test_refresh_rotates_and_old_refresh_is_single_use(store, client_id):
+    first = _pair(store, client_id)
+    second = store.refresh(first.refresh_token, client_id)
     assert second is not None
     assert second.refresh_token != first.refresh_token
     assert store.principal(second.access_token) == FULL
 
 
-def test_refresh_reuse_revokes_the_whole_family(store):
-    first = _pair(store)
-    second = store.refresh(first.refresh_token, CLIENT)
-    assert store.refresh(first.refresh_token, CLIENT) is None  # replay
+def test_refresh_reuse_revokes_the_whole_family(store, client_id):
+    first = _pair(store, client_id)
+    second = store.refresh(first.refresh_token, client_id)
+    assert store.refresh(first.refresh_token, client_id) is None  # replay
     assert store.principal(second.access_token) is None
-    assert store.refresh(second.refresh_token, CLIENT) is None
+    assert store.refresh(second.refresh_token, client_id) is None
 
 
-def test_refresh_rejects_other_client_and_expiry(store, clock):
-    first = _pair(store)
+def test_refresh_rejects_other_client_and_expiry(store, client_id, clock):
+    first = _pair(store, client_id)
     assert store.refresh(first.refresh_token, "other-client") is None
-    other = _pair(store)
+    other = _pair(store, client_id)
     clock.now += oauth_store.REFRESH_TTL_SECONDS + 1
-    assert store.refresh(other.refresh_token, CLIENT) is None
+    assert store.refresh(other.refresh_token, client_id) is None
 
 
-def test_roster_change_invalidates_existing_tokens(store, monkeypatch):
-    pair = _pair(store)
+def test_roster_change_invalidates_existing_tokens(store, client_id, monkeypatch):
+    pair = _pair(store, client_id)
     monkeypatch.setattr(oauth_store.roles, "is_full", lambda email: False)
     assert store.principal(pair.access_token) is None
 
@@ -166,21 +171,21 @@ def test_connections_use_wal_and_a_five_second_busy_timeout(store):
         assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
 
 
-def test_writer_commits_while_another_connection_holds_a_read_transaction(tmp_path, store):
+def test_writer_commits_while_another_connection_holds_a_read_transaction(tmp_path, store, client_id):
     reader = sqlite3.connect(tmp_path / "oauth.sqlite3", isolation_level=None, timeout=0)
     try:
         reader.execute("BEGIN")
         assert reader.execute("SELECT COUNT(*) FROM oauth_code").fetchone()[0] == 0
-        code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")  # must not wait
+        code = store.issue_code(FULL, client_id, REDIRECT, _challenge(VERIFIER), "S256")  # must not wait
         assert reader.execute("SELECT COUNT(*) FROM oauth_code").fetchone()[0] == 0  # reader keeps its snapshot
         reader.execute("COMMIT")
     finally:
         reader.close()
-    assert store.redeem_code(code, CLIENT, REDIRECT, VERIFIER) is not None
+    assert store.redeem_code(code, client_id, REDIRECT, VERIFIER) is not None
 
 
-def test_reader_is_not_blocked_by_an_open_write_transaction(tmp_path, store):
-    pair = _pair(store)
+def test_reader_is_not_blocked_by_an_open_write_transaction(tmp_path, store, client_id):
+    pair = _pair(store, client_id)
     writer = sqlite3.connect(tmp_path / "oauth.sqlite3", isolation_level=None, timeout=0)
     try:
         writer.execute("BEGIN IMMEDIATE")
@@ -192,11 +197,11 @@ def test_reader_is_not_blocked_by_an_open_write_transaction(tmp_path, store):
     assert store.principal(pair.access_token) == FULL
 
 
-def test_wal_side_files_are_private(tmp_path, store):
+def test_wal_side_files_are_private(tmp_path, store, client_id):
     path = tmp_path / "oauth.sqlite3"
     with store._connect() as held:  # WAL and SHM exist only while a connection is open
         held.execute("SELECT COUNT(*) FROM oauth_code").fetchone()
-        store.issue_code(FULL, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")
+        store.issue_code(FULL, client_id, REDIRECT, _challenge(VERIFIER), "S256")
         for suffix in ("-wal", "-shm"):
             side = path.with_name(path.name + suffix)
             assert stat.S_IMODE(side.stat().st_mode) == 0o600, suffix
@@ -244,39 +249,39 @@ def test_store_accepts_wal_case_insensitively(tmp_path, monkeypatch):
     (_challenge(VERIFIER)[:42] + "=", "S256"),
     (_challenge(VERIFIER)[:42] + "+", "S256"),
 ])
-def test_issue_code_requires_exact_s256_and_a_43_character_challenge(store, challenge, method):
+def test_issue_code_requires_exact_s256_and_a_43_character_challenge(store, client_id, challenge, method):
     with pytest.raises(ValueError):
-        store.issue_code(FULL, CLIENT, REDIRECT, challenge, method)
+        store.issue_code(FULL, client_id, REDIRECT, challenge, method)
 
 
 @pytest.mark.parametrize("verifier", ["a", "v" * 42, "v" * 129, "v" * 42 + "+", "v" * 42 + "=", "v" * 42 + "ü"])
-def test_redeem_refuses_verifiers_outside_rfc7636_bounds(store, verifier):
-    code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(verifier), "S256")
-    assert store.redeem_code(code, CLIENT, REDIRECT, verifier) is None
+def test_redeem_refuses_verifiers_outside_rfc7636_bounds(store, client_id, verifier):
+    code = store.issue_code(FULL, client_id, REDIRECT, _challenge(verifier), "S256")
+    assert store.redeem_code(code, client_id, REDIRECT, verifier) is None
 
 
-def test_verifier_bounds_and_alphabet_edges_are_accepted(store):
+def test_verifier_bounds_and_alphabet_edges_are_accepted(store, client_id):
     for verifier in ["v" * 43, "v" * 128, "Az09-._~" * 6]:
-        code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(verifier), "S256")
-        assert store.redeem_code(code, CLIENT, REDIRECT, verifier) is not None
+        code = store.issue_code(FULL, client_id, REDIRECT, _challenge(verifier), "S256")
+        assert store.redeem_code(code, client_id, REDIRECT, verifier) is not None
 
 
-def test_malformed_verifier_does_not_consume_the_code(store):
-    code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")
-    assert store.redeem_code(code, CLIENT, REDIRECT, "short") is None
-    assert store.redeem_code(code, CLIENT, REDIRECT, VERIFIER) is not None
+def test_malformed_verifier_does_not_consume_the_code(store, client_id):
+    code = store.issue_code(FULL, client_id, REDIRECT, _challenge(VERIFIER), "S256")
+    assert store.redeem_code(code, client_id, REDIRECT, "short") is None
+    assert store.redeem_code(code, client_id, REDIRECT, VERIFIER) is not None
 
 
 # -- S1b / F6: replaying a redeemed code revokes the family it issued -------------------------
 
-def test_code_replay_revokes_the_tokens_it_issued(tmp_path, store):
-    code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")
-    pair = store.redeem_code(code, CLIENT, REDIRECT, VERIFIER)
+def test_code_replay_revokes_the_tokens_it_issued(tmp_path, store, client_id):
+    code = store.issue_code(FULL, client_id, REDIRECT, _challenge(VERIFIER), "S256")
+    pair = store.redeem_code(code, client_id, REDIRECT, VERIFIER)
     assert store.principal(pair.access_token) == FULL
-    other = _pair(store)  # a different grant for the same person must survive
-    assert store.redeem_code(code, CLIENT, REDIRECT, VERIFIER) is None
+    other = _pair(store, client_id)  # a different grant for the same person must survive
+    assert store.redeem_code(code, client_id, REDIRECT, VERIFIER) is None
     assert store.principal(pair.access_token) is None
-    assert store.refresh(pair.refresh_token, CLIENT) is None
+    assert store.refresh(pair.refresh_token, client_id) is None
     assert store.principal(other.access_token) == FULL
     with sqlite3.connect(tmp_path / "oauth.sqlite3") as conn:
         family = conn.execute("SELECT family_id FROM oauth_code WHERE used_at IS NOT NULL LIMIT 1").fetchone()[0]
@@ -286,13 +291,13 @@ def test_code_replay_revokes_the_tokens_it_issued(tmp_path, store):
     assert revoked == 1
 
 
-def test_replay_revokes_the_family_even_after_it_refreshed(store):
-    code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")
-    first = store.redeem_code(code, CLIENT, REDIRECT, VERIFIER)
-    second = store.refresh(first.refresh_token, CLIENT)
-    assert store.redeem_code(code, CLIENT, REDIRECT, VERIFIER) is None
+def test_replay_revokes_the_family_even_after_it_refreshed(store, client_id):
+    code = store.issue_code(FULL, client_id, REDIRECT, _challenge(VERIFIER), "S256")
+    first = store.redeem_code(code, client_id, REDIRECT, VERIFIER)
+    second = store.refresh(first.refresh_token, client_id)
+    assert store.redeem_code(code, client_id, REDIRECT, VERIFIER) is None
     assert store.principal(second.access_token) is None
-    assert store.refresh(second.refresh_token, CLIENT) is None
+    assert store.refresh(second.refresh_token, client_id) is None
 
 
 # -- S1b: a store file created by the pre-S1b schema still opens ------------------------------
@@ -359,4 +364,66 @@ def test_store_created_by_the_pre_s1b_schema_opens_and_migrates(tmp_path, clock)
     for table in tables:  # the migrated file ends up with exactly the columns of a fresh store
         assert _columns(path, table) == _columns(fresh, table), table
     assert "family_id" in _columns(path, "oauth_code")
-    assert _pair(reopened) is not None
+    assert _pair(reopened, reopened.register_client("x", [REDIRECT]).client_id) is not None
+
+
+# -- S1b / F2.2: persistent dynamic client registration ---------------------------------------
+
+def test_register_client_persists_name_and_redirect_uris(tmp_path, store, clock):
+    client = store.register_client("Claude", [REDIRECT, LOOPBACK])
+    assert len(client.client_id) >= 20
+    assert (client.client_name, client.redirect_uris, client.created_at) == ("Claude", (REDIRECT, LOOPBACK), int(clock.now))
+    restarted = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
+    assert restarted.get_client(client.client_id) == client
+    assert store.register_client("Claude", [REDIRECT]).client_id != client.client_id
+    assert store.get_client("ted-mcp-public") is None
+    assert store.get_client("") is None
+
+
+def test_issue_code_requires_a_registered_client_and_one_of_its_redirects(store, client_id):
+    challenge = _challenge(VERIFIER)
+    with pytest.raises(ValueError):
+        store.issue_code(FULL, "ted-mcp-public", REDIRECT, challenge, "S256")
+    with pytest.raises(ValueError):
+        store.issue_code(FULL, client_id, "https://claude.com/api/mcp/auth_callback", challenge, "S256")
+    with pytest.raises(ValueError):
+        store.issue_code(FULL, client_id, "http://127.0.0.1:53712/other", challenge, "S256")
+    code = store.issue_code(FULL, client_id, "http://127.0.0.1:53712/callback", challenge, "S256")  # loopback: any port
+    assert store.redeem_code(code, client_id, "http://127.0.0.1:53712/callback", VERIFIER) is not None
+
+
+def _fill_clients(path, count, created_at, code_issued_at=None):
+    with sqlite3.connect(path) as conn:
+        conn.executemany(
+            "INSERT INTO oauth_client (client_id, client_name, redirect_uris, created_at, code_issued_at)"
+            " VALUES (?, '', ?, ?, ?)",
+            [(f"filler-{created_at}-{i}", f'["{REDIRECT}"]', created_at, code_issued_at) for i in range(count)])
+
+
+def _client_ids(path):
+    with sqlite3.connect(path) as conn:
+        return {row[0] for row in conn.execute("SELECT client_id FROM oauth_client")}
+
+
+def test_client_cap_purges_only_clients_older_than_a_day_that_never_issued_a_code(tmp_path, store, clock):
+    path = tmp_path / "oauth.sqlite3"
+    used = store.register_client("used", [REDIRECT])
+    store.issue_code(FULL, used.client_id, REDIRECT, _challenge(VERIFIER), "S256")
+    _fill_clients(path, oauth_store.MAX_CLIENTS - 1, int(clock.now))
+    clock.now += oauth_store.STALE_CLIENT_SECONDS  # exactly a day old: not stale yet
+    with pytest.raises(oauth_store.ClientLimitReached):
+        store.register_client("new", [REDIRECT])
+    assert len(_client_ids(path)) == oauth_store.MAX_CLIENTS
+    clock.now += 1
+    fresh = store.register_client("new", [REDIRECT])
+    assert _client_ids(path) == {used.client_id, fresh.client_id}
+
+
+def test_client_cap_refuses_when_no_client_is_purgeable(tmp_path, store, clock):
+    path = tmp_path / "oauth.sqlite3"
+    old = int(clock.now) - 7 * 24 * 3600
+    _fill_clients(path, oauth_store.MAX_CLIENTS // 2, old, code_issued_at=old)       # old but used
+    _fill_clients(path, oauth_store.MAX_CLIENTS // 2, int(clock.now) - 60)            # unused but fresh
+    with pytest.raises(oauth_store.ClientLimitReached):
+        store.register_client("new", [REDIRECT])
+    assert len(_client_ids(path)) == oauth_store.MAX_CLIENTS
