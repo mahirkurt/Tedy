@@ -7,7 +7,7 @@ import hmac
 import html
 import json
 import time
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 from urllib.parse import urlencode, urlparse, urlunparse, parse_qsl
 
 from mcp.server.fastmcp import FastMCP
@@ -334,3 +334,41 @@ def build_app(
             Middleware(BearerGateMiddleware, store=store, base_url=base),
         ],
     )
+
+
+def create_app_from_env(env: Mapping[str, str] | None = None) -> Starlette:
+    """Wire settings, store, federation, tools and server from the environment."""
+    import os
+    from pathlib import Path
+
+    from src.mcp_server.config import load_settings
+    from src.mcp_server.federation import Federation
+    from src.mcp_server.server import build_server
+    from src.mcp_server.tools import Tools
+
+    env = os.environ if env is None else env
+    secret = (env.get("TED_MCP_FORM_SECRET") or "").encode("utf-8")
+    if len(secret) < 32:
+        raise ValueError("TED_MCP_FORM_SECRET must be set to at least 32 bytes")
+    root = Path(env["TED_MCP_PROJECT_ROOT"]) if env.get("TED_MCP_PROJECT_ROOT") else None
+    settings = load_settings(env, project_root=root)
+    store = OAuthStore(settings.oauth_db_path)
+    tools = Tools(settings, Federation(settings))
+    return build_app(settings, store, build_server(tools), form_secret=secret)
+
+
+def main() -> None:
+    import os
+
+    import uvicorn
+
+    from src.env_loader import load_env
+
+    load_env()
+    app = create_app_from_env()
+    uvicorn.run(app, host=os.environ.get("TED_MCP_HOST", "127.0.0.1"),
+                port=int(os.environ.get("TED_MCP_PORT", "8087")), log_level="info")
+
+
+if __name__ == "__main__":
+    main()
