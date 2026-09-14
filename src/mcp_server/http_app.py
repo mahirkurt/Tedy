@@ -342,6 +342,7 @@ def create_app_from_env(env: Mapping[str, str] | None = None) -> Starlette:
     from pathlib import Path
 
     from src.mcp_server.config import load_settings
+    from src.mcp_server.dashboard_context import DashboardContext
     from src.mcp_server.federation import Federation
     from src.mcp_server.server import build_server
     from src.mcp_server.tools import Tools
@@ -353,7 +354,8 @@ def create_app_from_env(env: Mapping[str, str] | None = None) -> Starlette:
     root = Path(env["TED_MCP_PROJECT_ROOT"]) if env.get("TED_MCP_PROJECT_ROOT") else None
     settings = load_settings(env, project_root=root)
     store = OAuthStore(settings.oauth_db_path)
-    tools = Tools(settings, Federation(settings))
+    dashboard = DashboardContext(settings.dashboard_api_url, settings.dashboard_api_key)
+    tools = Tools(settings, Federation(settings), dashboard=dashboard)
     return build_app(settings, store, build_server(tools), form_secret=secret)
 
 

@@ -9,6 +9,7 @@ from src import roles
 from src.mcp_server import __version__, gates, rehber, vendor_sync
 from src.mcp_server.config import Settings
 from src.mcp_server.coverage import Coverage
+from src.mcp_server.dashboard_context import DashboardContext, DashboardUnavailable
 from src.mcp_server.federation import ANAMNESIS, EGITIM_KAYNAK, MUFREDAT, Federation, FederationError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -31,10 +32,12 @@ def app_revision(root: Path = PROJECT_ROOT) -> str | None:
 
 
 class Tools:
-    def __init__(self, settings: Settings, federation: Federation, clock: Callable[[], float] = time.time) -> None:
+    def __init__(self, settings: Settings, federation: Federation, clock: Callable[[], float] = time.time,
+                 dashboard: DashboardContext | None = None) -> None:
         self.settings = settings
         self.federation = federation
         self.clock = clock
+        self.dashboard = dashboard
 
     def durum(self, email: str, canli: bool = False) -> dict[str, Any]:
         provenance = vendor_sync.load_provenance()
@@ -77,3 +80,26 @@ class Tools:
         if ara:
             return rehber.search(ara)
         return rehber.guide(bolum or "akis", parca=parca)
+
+    def baglam(self, email: str, gun: int = 7) -> dict[str, Any]:
+        gun = max(1, min(int(gun), 60))
+        base: dict[str, Any] = {
+            "gun": gun,
+            "caveat": "Veriler okul portalından 15 dakikada bir çekilir; yeni duyurulan sınav veya ödev eksik olabilir.",
+            "mcp_verified": False,
+        }
+        if self.dashboard is None or not self.settings.dashboard_api_key:
+            cov = Coverage()
+            cov.skipped("tedy-dashboard", "anahtar yok")
+            return {**base, "status": "degraded", "coverage": cov.as_dict()}
+        cov = Coverage()
+        try:
+            data = self.dashboard.upcoming(gun)
+        except DashboardUnavailable as exc:
+            cov.degraded("tedy-dashboard", exc.reason)
+            return {**base, "status": "degraded", "coverage": cov.as_dict()}
+        if data["sinavlar"] or data["odevler"]:
+            cov.hit("tedy-dashboard")
+        else:
+            cov.empty("tedy-dashboard")
+        return {**base, "status": "ok", **data, "coverage": cov.as_dict()}

@@ -55,4 +55,10 @@ def build_server(tools: Tools) -> FastMCP:
         caller_email(ctx)
         return tools.rehber(bolum=bolum, parca=parca, ara=ara)
 
+    @mcp.tool(annotations=_RO)
+    def edupedia_baglam(ctx: Context, gun: int = 7) -> dict[str, Any]:
+        """TEDY'den önümüzdeki gün sayısı (1-60) içindeki sınav ve ödevleri, sınıf düzeyini döner.
+        Öğrenci adı ve kişisel alanlar dönmez. Konu seçerken bu listeyi kullan."""
+        return tools.baglam(caller_email(ctx), gun=gun)
+
     return mcp
