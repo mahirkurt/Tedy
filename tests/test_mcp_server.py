@@ -367,3 +367,36 @@ def test_durum_live_probe_applies_tool_budget_and_shares_one_deadline(tmp_path):
         "egitim-kaynak": "degraded:zaman_asimi",
         "anamnesis": "degraded:zaman_asimi",
     }
+
+
+class _DeadlineRecordingFederation:
+    """Fake at the Federation boundary itself (fix round 1 Minor M6): records the `deadline`
+    kwarg durum() passes to every fleet call directly, so "every call receives the same
+    deadline" is asserted head-on instead of only inferred from a budget-cutoff outcome."""
+
+    def __init__(self, configured):
+        self._configured = set(configured)
+        self.deadlines: list[float | None] = []
+
+    def configured(self, server: str) -> bool:
+        return server in self._configured
+
+    def call(self, server, tool, args, beklenen, deadline=None):
+        self.deadlines.append(deadline)
+        return {"status": "ok"}
+
+
+def test_durum_live_probe_uses_the_same_deadline_for_every_fleet_call(tmp_path):
+    """fix round 1 Minor M6: every fleet health call in one edupedia_durum(canli=True)
+    invocation must share the SAME fixed deadline — not one freshly recomputed per server, which
+    would silently re-grant each server its own full budget instead of enforcing one shared §7
+    tool budget across the whole live probe."""
+    fed = _DeadlineRecordingFederation(configured=("maarif-mufredat", "egitim-kaynak", "anamnesis"))
+    settings = _settings(tmp_path, EGITIM_KAYNAK_MCP_API_KEY="k2", ANAMNESIS_MCP_API_KEY="k3")
+    t = tools.Tools(settings, fed)
+
+    t.durum(FULL, canli=True)
+
+    assert len(fed.deadlines) == 3
+    assert len(set(fed.deadlines)) == 1
+    assert fed.deadlines[0] is not None
