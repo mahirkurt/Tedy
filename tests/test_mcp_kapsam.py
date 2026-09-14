@@ -542,21 +542,80 @@ def test_malformed_candidate_page_count_excludes_only_that_row_valid_book_still_
     _assert_no_fleet_text(body)
 
 
-def test_malformed_figure_page_no_is_excluded_not_a_crash(tmp_path):
-    """fix round 1 Minor M5: search_figures' page_no used to go unguarded into the sort key and
-    figs[0]['page_no'] - 1 — a non-numeric value raised an uncaught TypeError out of build(). It
-    must instead be excluded like a malformed textbook candidate, leaving the valid figure(s)."""
+def test_malformed_figure_page_no_is_excluded_and_degrades_mufredat_coverage(tmp_path):
+    """fix round 1 Minor M5 / fix round 2 Ruling R2-2: search_figures' page_no used to go
+    unguarded into the sort key and figs[0]['page_no'] - 1 — a non-numeric value raised an
+    uncaught TypeError out of build(). It must instead be excluded like a malformed textbook
+    candidate, leaving the valid figure(s) — but (per the scoped re-review of round 1: dropping
+    it silently with coverage still "hit" was itself a finding) this build's own
+    maarif-mufredat coverage must show the honest degraded:unexpected_shape, not "hit"."""
     found = {"query": "x", "count": 2, "figures": [
         {"figure_id": 11, "document_id": 197, "page_no": INJECTION, "label": "bozuk", "caption": "x"},
+        {"figure_id": 10, "document_id": 197, "page_no": 112, "label": "Görsel 4.1", "caption": "Katı sıvı gaz"},
+    ]}
+    fed = FakeFed(_responses({("maarif-mufredat", "search_figures"): found}))
+    body, runs = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    assert body["cerceve"]["kind"] == "textbook"
+    assert [f["figure_id"] for f in body["kaynak_verisi"]["figur_adaylari"]] == [10]
+    assert body["coverage"]["maarif-mufredat"] == "degraded:unexpected_shape"
+    assert runs.load(body["run_id"])["coverage"]["maarif-mufredat"] == "degraded:unexpected_shape"
+    _assert_no_fleet_text(body)
+
+
+def test_figure_missing_figure_id_is_dropped_and_degrades_mufredat_coverage(tmp_path):
+    """fix round 2 O-4/R2-2: a figure row with no figure_id at all used to raise KeyError from
+    the sort key. It must be dropped like any other malformed figure, leaving the valid one."""
+    found = {"query": "x", "count": 2, "figures": [
+        {"document_id": 197, "page_no": 112, "label": "figure_id eksik", "caption": "x"},
+        {"figure_id": 10, "document_id": 197, "page_no": 115, "label": "Görsel 4.1", "caption": "Katı sıvı gaz"},
+    ]}
+    fed = FakeFed(_responses({("maarif-mufredat", "search_figures"): found}))
+    body, _ = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    assert [f["figure_id"] for f in body["kaynak_verisi"]["figur_adaylari"]] == [10]
+    assert body["coverage"]["maarif-mufredat"] == "degraded:unexpected_shape"
+
+
+def test_mixed_type_figure_ids_at_the_same_page_no_do_not_crash_the_sort(tmp_path):
+    """fix round 2 O-4/R2-2: two figures sharing the same page_no with differently-typed
+    figure_id (int vs a non-numeric string) used to raise a TypeError once Python's sort needed
+    to break the tie by comparing them. The unsortable one is dropped; the well-formed one
+    survives, and both page_no AND figure_id are normalized the same way (fix round 1 Ruling C
+    style), so no two surviving figures can ever have incomparable key types again."""
+    found = {"query": "x", "count": 2, "figures": [
+        {"figure_id": "not-a-number", "document_id": 197, "page_no": 112, "label": "bozuk id", "caption": "x"},
         {"figure_id": 10, "document_id": 197, "page_no": 112, "label": "Görsel 4.1", "caption": "Katı sıvı gaz"},
     ]}
     fed = FakeFed(_responses({("maarif-mufredat", "search_figures"): found}))
     body, _ = _build(tmp_path, fed, konu="maddenin halleri")
 
     assert body["status"] == "ok"
-    assert body["cerceve"]["kind"] == "textbook"
     assert [f["figure_id"] for f in body["kaynak_verisi"]["figur_adaylari"]] == [10]
-    _assert_no_fleet_text(body)
+    assert body["coverage"]["maarif-mufredat"] == "degraded:unexpected_shape"
+
+
+def test_page_no_string_is_reported_as_int_in_kitap_sayfalari_and_ingest(tmp_path):
+    """fix round 2 O-5: get_document_text's page_no was converted to int for save_page, but the
+    RAW (possibly string) value still leaked into kitap_sayfalari and the anamnesis ingest's
+    text/doc_id, unconverted. A page_no arriving as the string "111" must be reported as the int
+    111 everywhere downstream — this is the ordinary successful-conversion case, not a malformed
+    one, so coverage stays "hit"."""
+    text = {"document": {"document_id": 197}, "total_pages": 240, "returned": 1, "truncated": False,
+            "pages": [{"page_no": "111", "text": "sayfa metni"}]}
+    fed = FakeFed(_responses({("maarif-mufredat", "get_document_text"): text}))
+    body, runs = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    assert body["coverage"]["maarif-mufredat"] == "hit"
+    assert body["kaynak_verisi"]["kitap_sayfalari"] == [{"page_no": 111, "ozet": "sayfa metni"}]
+    ingest_args = fed.called("anamnesis", "ingest_document")[0][2]
+    assert "=== Sayfa 111 ===" in ingest_args["text"]
+    assert ingest_args["doc_id"] == f"edupedia:{body['run_id']}:kitap/197/111-111"
+    saved_pages = runs.pages(body["run_id"])
+    assert saved_pages[0]["page_no"] == 111 and isinstance(saved_pages[0]["page_no"], int)
 
 
 @pytest.mark.parametrize("bad_value", [INJECTION, float("inf")])
