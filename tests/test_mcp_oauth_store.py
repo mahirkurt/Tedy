@@ -231,3 +231,132 @@ def test_store_accepts_wal_case_insensitively(tmp_path, monkeypatch):
     monkeypatch.setattr(oauth_store.sqlite3, "connect",
                         lambda *args, **kwargs: real_connect(*args, factory=UpperCaseWal, **kwargs))
     OAuthStore(tmp_path / "oauth.sqlite3")
+
+
+# -- S1b / F5: PKCE bounds (RFC 7636 §4.1) -------------------------------------------------
+
+@pytest.mark.parametrize("challenge,method", [
+    (_challenge(VERIFIER), "s256"),
+    (_challenge(VERIFIER), "S256 "),
+    ("x", "S256"),
+    (_challenge(VERIFIER)[:42], "S256"),
+    (_challenge(VERIFIER) + "A", "S256"),
+    (_challenge(VERIFIER)[:42] + "=", "S256"),
+    (_challenge(VERIFIER)[:42] + "+", "S256"),
+])
+def test_issue_code_requires_exact_s256_and_a_43_character_challenge(store, challenge, method):
+    with pytest.raises(ValueError):
+        store.issue_code(FULL, CLIENT, REDIRECT, challenge, method)
+
+
+@pytest.mark.parametrize("verifier", ["a", "v" * 42, "v" * 129, "v" * 42 + "+", "v" * 42 + "=", "v" * 42 + "ü"])
+def test_redeem_refuses_verifiers_outside_rfc7636_bounds(store, verifier):
+    code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(verifier), "S256")
+    assert store.redeem_code(code, CLIENT, REDIRECT, verifier) is None
+
+
+def test_verifier_bounds_and_alphabet_edges_are_accepted(store):
+    for verifier in ["v" * 43, "v" * 128, "Az09-._~" * 6]:
+        code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(verifier), "S256")
+        assert store.redeem_code(code, CLIENT, REDIRECT, verifier) is not None
+
+
+def test_malformed_verifier_does_not_consume_the_code(store):
+    code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")
+    assert store.redeem_code(code, CLIENT, REDIRECT, "short") is None
+    assert store.redeem_code(code, CLIENT, REDIRECT, VERIFIER) is not None
+
+
+# -- S1b / F6: replaying a redeemed code revokes the family it issued -------------------------
+
+def test_code_replay_revokes_the_tokens_it_issued(tmp_path, store):
+    code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")
+    pair = store.redeem_code(code, CLIENT, REDIRECT, VERIFIER)
+    assert store.principal(pair.access_token) == FULL
+    other = _pair(store)  # a different grant for the same person must survive
+    assert store.redeem_code(code, CLIENT, REDIRECT, VERIFIER) is None
+    assert store.principal(pair.access_token) is None
+    assert store.refresh(pair.refresh_token, CLIENT) is None
+    assert store.principal(other.access_token) == FULL
+    with sqlite3.connect(tmp_path / "oauth.sqlite3") as conn:
+        family = conn.execute("SELECT family_id FROM oauth_code WHERE used_at IS NOT NULL LIMIT 1").fetchone()[0]
+        assert family
+        revoked = conn.execute("SELECT COUNT(*) FROM oauth_refresh WHERE family_id = ? AND revoked_at IS NOT NULL",
+                               (family,)).fetchone()[0]
+    assert revoked == 1
+
+
+def test_replay_revokes_the_family_even_after_it_refreshed(store):
+    code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")
+    first = store.redeem_code(code, CLIENT, REDIRECT, VERIFIER)
+    second = store.refresh(first.refresh_token, CLIENT)
+    assert store.redeem_code(code, CLIENT, REDIRECT, VERIFIER) is None
+    assert store.principal(second.access_token) is None
+    assert store.refresh(second.refresh_token, CLIENT) is None
+
+
+# -- S1b: a store file created by the pre-S1b schema still opens ------------------------------
+
+PRE_S1B_SCHEMA = """
+CREATE TABLE IF NOT EXISTS oauth_code (
+    value_hash TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    client_id TEXT NOT NULL,
+    redirect_uri TEXT NOT NULL,
+    challenge TEXT NOT NULL,
+    challenge_method TEXT NOT NULL CHECK (challenge_method = 'S256'),
+    expires_at INTEGER NOT NULL,
+    used_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS oauth_access (
+    value_hash TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    family_id TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    revoked_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS oauth_refresh (
+    value_hash TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    family_id TEXT NOT NULL,
+    client_id TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    used_at INTEGER,
+    revoked_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS static_key (
+    value_hash TEXT PRIMARY KEY,
+    label TEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    revoked_at INTEGER
+);
+"""
+
+
+def _columns(path, table):
+    with sqlite3.connect(path) as conn:
+        return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+
+
+def test_store_created_by_the_pre_s1b_schema_opens_and_migrates(tmp_path, clock):
+    path = tmp_path / "oauth.sqlite3"
+    old_key = "tdyM_" + "k" * 43
+    conn = sqlite3.connect(path)
+    conn.executescript(PRE_S1B_SCHEMA)
+    conn.execute("INSERT INTO static_key (value_hash, label, email, created_at) VALUES (?, 'eski', ?, 1)",
+                 (hashlib.sha256(old_key.encode()).hexdigest(), FULL))
+    conn.commit()
+    conn.close()
+
+    store = OAuthStore(path, clock=clock)
+    assert store.principal(old_key) == FULL  # existing rows survive the migration
+    reopened = OAuthStore(path, clock=clock)  # idempotent: a second open adds nothing and does not fail
+    fresh = tmp_path / "fresh.sqlite3"
+    OAuthStore(fresh, clock=clock)
+    with sqlite3.connect(fresh) as conn:
+        tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")]
+    for table in tables:  # the migrated file ends up with exactly the columns of a fresh store
+        assert _columns(path, table) == _columns(fresh, table), table
+    assert "family_id" in _columns(path, "oauth_code")
+    assert _pair(reopened) is not None

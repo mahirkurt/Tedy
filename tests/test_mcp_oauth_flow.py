@@ -435,3 +435,58 @@ def test_full_verification_limiter_does_not_delay_the_bearer_gate(tmp_path):
     for i in range(parked_count):
         assert not isinstance(outcome[i], Exception), outcome[i]
         assert outcome[i].status_code == 401
+
+
+# -- S1b / F5: PKCE bounds at the HTTP surface -----------------------------------------------
+
+@pytest.mark.parametrize("over", [
+    {"code_challenge_method": "s256"},
+    {"code_challenge": "x"},
+    {"code_challenge": _challenge(VERIFIER)[:42]},
+    {"code_challenge": _challenge(VERIFIER) + "A"},
+    {"code_challenge": _challenge(VERIFIER)[:42] + "="},
+])
+def test_authorize_get_enforces_pkce_bounds(ctx, over):
+    client, _, _, _ = ctx
+    r = client.get("/oauth/authorize", params=_authorize_params(**over))
+    assert r.status_code == 400
+    assert "code_challenge" in r.text
+    assert "form_state" not in r.text
+
+
+def _code_for(client, verifier, pkce_verifier):
+    form_state = _start(client, verifier, code_challenge=_challenge(pkce_verifier))
+    r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)})
+    assert r.status_code == 302
+    return parse_qs(urlparse(r.headers["location"]).query)["code"][0]
+
+
+def test_one_character_code_verifier_is_refused_at_the_token_endpoint(ctx):
+    client, verifier, _, _ = ctx
+    code = _code_for(client, verifier, "a")  # S256("a") is a well-formed 43-character challenge
+    tok = client.post("/oauth/token", data={"grant_type": "authorization_code", "code": code,
+                                            "redirect_uri": REDIRECT, "client_id": http_app.CLIENT_ID,
+                                            "code_verifier": "a"})
+    assert tok.status_code == 400
+    assert tok.json() == {"error": "invalid_grant"}
+
+
+# -- S1b / F6: a replayed code revokes the access token from its first redemption ----------------
+
+def test_code_replay_revokes_the_first_access_token(ctx):
+    client, verifier, _, _ = ctx
+    code = _code_for(client, verifier, VERIFIER)
+    redeem = {"grant_type": "authorization_code", "code": code, "redirect_uri": REDIRECT,
+              "client_id": http_app.CLIENT_ID, "code_verifier": VERIFIER}
+    first = client.post("/oauth/token", data=redeem)
+    assert first.status_code == 200
+    call = {"json": {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "kimim", "arguments": {}}},
+            "headers": {**MCP_HEADERS, "authorization": f"Bearer {first.json()['access_token']}"}}
+    assert client.post("/mcp", **call).status_code == 200
+    replay = client.post("/oauth/token", data=redeem)
+    assert replay.status_code == 400
+    assert replay.json() == {"error": "invalid_grant"}
+    assert client.post("/mcp", **call).status_code == 401
+    refreshed = client.post("/oauth/token", data={"grant_type": "refresh_token", "client_id": http_app.CLIENT_ID,
+                                                  "refresh_token": first.json()["refresh_token"]})
+    assert refreshed.status_code == 400

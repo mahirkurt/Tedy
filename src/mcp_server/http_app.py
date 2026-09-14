@@ -24,7 +24,7 @@ from src.mcp_server import __version__
 from src.mcp_server.config import Settings
 from src.mcp_server.google_identity import IdentityVerifier, is_well_formed_credential, verify_google_credential
 from src.mcp_server.oauth_redirect import RedirectPolicy, is_allowed_cors_origin
-from src.mcp_server.oauth_store import OAuthStore
+from src.mcp_server.oauth_store import OAuthStore, is_valid_code_challenge
 from src import roles
 from src.mcp_server.google_identity import IdentityError
 from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse
@@ -350,10 +350,9 @@ def build_app(
             redirect_uri = q.get("redirect_uri", "")
             if not redirect_policy.allows(redirect_uri):
                 return _bad("redirect_uri")
-            if not q.get("code_challenge"):
-                return _bad("code_challenge")
-            if (q.get("code_challenge_method") or "").upper() != "S256":
-                return _bad("code_challenge_method must be S256")
+            # RFC 7636: exactly "S256" and a 43-character base64url challenge; "s256" is refused.
+            if not is_valid_code_challenge(q.get("code_challenge", ""), q.get("code_challenge_method", "")):
+                return _bad("code_challenge / code_challenge_method must be S256")
             params = {k: q.get(k, "") for k in _FORM_KEYS}
             form_state = sign_form_state(params, form_secret, clock())
             parsed = urlparse(redirect_uri)

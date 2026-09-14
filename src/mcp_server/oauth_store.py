@@ -8,7 +8,9 @@ from __future__ import annotations
 import base64
 import contextlib
 import hashlib
+import hmac
 import os
+import re
 import secrets
 import sqlite3
 import time
@@ -24,6 +26,10 @@ REFRESH_TTL_SECONDS = 30 * 24 * 3600
 STATIC_KEY_PREFIX = "tdyM_"
 BUSY_TIMEOUT_MS = 5000
 
+# RFC 7636 §4.1-4.2: an S256 challenge is 43 base64url characters; a verifier 43-128 unreserved ones.
+_CODE_CHALLENGE = re.compile(r"[A-Za-z0-9_-]{43}")
+_CODE_VERIFIER = re.compile(r"[A-Za-z0-9._~-]{43,128}")
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS oauth_code (
     value_hash TEXT PRIMARY KEY,
@@ -33,7 +39,8 @@ CREATE TABLE IF NOT EXISTS oauth_code (
     challenge TEXT NOT NULL,
     challenge_method TEXT NOT NULL CHECK (challenge_method = 'S256'),
     expires_at INTEGER NOT NULL,
-    used_at INTEGER
+    used_at INTEGER,
+    family_id TEXT
 );
 CREATE TABLE IF NOT EXISTS oauth_access (
     value_hash TEXT PRIMARY KEY,
@@ -59,6 +66,18 @@ CREATE TABLE IF NOT EXISTS static_key (
     revoked_at INTEGER
 );
 """
+
+# Columns added after the first schema. CREATE TABLE IF NOT EXISTS leaves an existing file alone, so
+# these are added one by one (only when missing) for a store created by an earlier version.
+_ADDED_COLUMNS: dict[str, tuple[tuple[str, str], ...]] = {
+    "oauth_code": (("family_id", "TEXT"),),
+}
+
+
+def is_valid_code_challenge(code_challenge: str, code_challenge_method: str) -> bool:
+    """Exactly S256 (case-sensitive) with a 43-character base64url challenge."""
+    return (code_challenge_method == "S256" and isinstance(code_challenge, str)
+            and _CODE_CHALLENGE.fullmatch(code_challenge) is not None)
 
 
 @dataclass(frozen=True)
@@ -95,6 +114,23 @@ class OAuthStore:
             if mode != "wal" and not (mode == "memory" and str(self._path) == ":memory:"):
                 raise RuntimeError(f"OAuth store could not enable WAL: journal_mode={mode!r}")
             conn.executescript(_SCHEMA)
+            self._add_missing_columns(conn)
+
+    @staticmethod
+    def _add_missing_columns(conn: sqlite3.Connection) -> None:
+        # Under the write lock, so a server and the keys CLI opening an old file at once cannot both
+        # try to add the same column.
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            for table, columns in _ADDED_COLUMNS.items():
+                present = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+                for name, declaration in columns:
+                    if name not in present:
+                        conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+            conn.execute("COMMIT")
+        except BaseException:
+            conn.execute("ROLLBACK")
+            raise
 
     @contextlib.contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -115,8 +151,8 @@ class OAuthStore:
     # -- authorization codes -------------------------------------------------------
     def issue_code(self, email: str, client_id: str, redirect_uri: str,
                    code_challenge: str, code_challenge_method: str) -> str:
-        if (code_challenge_method or "").upper() != "S256" or not code_challenge:
-            raise ValueError("only PKCE S256 is accepted")
+        if not is_valid_code_challenge(code_challenge, code_challenge_method):
+            raise ValueError("only PKCE S256 with a 43-character challenge is accepted")
         if not roles.is_full(email):
             raise ValueError("email is not a full-role roster member")
         code = secrets.token_urlsafe(32)
@@ -131,29 +167,47 @@ class OAuthStore:
 
     def redeem_code(self, code: str, client_id: str, redirect_uri: str,
                     code_verifier: str) -> TokenPair | None:
-        if not (code and client_id and redirect_uri and code_verifier):
-            return None
-        try:
-            challenge = _s256(code_verifier)
-        except UnicodeEncodeError:
+        if not (code and client_id and redirect_uri):
             return None
         now = self._now()
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
-                "SELECT email FROM oauth_code WHERE value_hash = ? AND client_id = ? AND redirect_uri = ?"
-                " AND challenge = ? AND expires_at > ? AND used_at IS NULL",
-                (_hash(code), client_id, redirect_uri, challenge, now),
+                "SELECT email, client_id, redirect_uri, challenge, expires_at, used_at, family_id"
+                " FROM oauth_code WHERE value_hash = ?",
+                (_hash(code),),
             ).fetchone()
             if row is None:
                 conn.execute("ROLLBACK")
                 return None
-            conn.execute("UPDATE oauth_code SET used_at = ? WHERE value_hash = ?", (now, _hash(code)))
-            pair = self._issue_pair(conn, row["email"], client_id, secrets.token_hex(8), now)
+            if row["used_at"] is not None:
+                # A redeemed code came back: it leaked. Revoke what it issued (OAuth 2.1 §4.1.3).
+                if row["family_id"] is not None:
+                    self._revoke_family(conn, row["family_id"], now)
+                conn.execute("COMMIT")
+                return None
+            # The verifier is checked before it is hashed; a malformed one does not consume the code.
+            if (_CODE_VERIFIER.fullmatch(code_verifier or "") is None
+                    or not hmac.compare_digest(row["challenge"], _s256(code_verifier))
+                    or row["client_id"] != client_id or row["redirect_uri"] != redirect_uri
+                    or row["expires_at"] <= now):
+                conn.execute("ROLLBACK")
+                return None
+            family_id = secrets.token_hex(8)
+            conn.execute("UPDATE oauth_code SET used_at = ?, family_id = ? WHERE value_hash = ?",
+                         (now, family_id, _hash(code)))
+            pair = self._issue_pair(conn, row["email"], client_id, family_id, now)
             conn.execute("COMMIT")
         return pair
 
     # -- tokens --------------------------------------------------------------------
+    @staticmethod
+    def _revoke_family(conn: sqlite3.Connection, family_id: str, now: int) -> None:
+        conn.execute("UPDATE oauth_access SET revoked_at = ? WHERE family_id = ? AND revoked_at IS NULL",
+                     (now, family_id))
+        conn.execute("UPDATE oauth_refresh SET revoked_at = ? WHERE family_id = ? AND revoked_at IS NULL",
+                     (now, family_id))
+
     def _issue_pair(self, conn: sqlite3.Connection, email: str, client_id: str,
                     family_id: str, now: int) -> TokenPair:
         access = secrets.token_urlsafe(32)
@@ -185,8 +239,7 @@ class OAuthStore:
                 return None
             if row["used_at"] is not None:
                 # Replay of a rotated refresh token: treat the family as stolen.
-                conn.execute("UPDATE oauth_access SET revoked_at = ? WHERE family_id = ?", (now, row["family_id"]))
-                conn.execute("UPDATE oauth_refresh SET revoked_at = ? WHERE family_id = ?", (now, row["family_id"]))
+                self._revoke_family(conn, row["family_id"], now)
                 conn.execute("COMMIT")
                 return None
             if row["expires_at"] <= now or not roles.is_full(row["email"]):
