@@ -25,6 +25,10 @@ from src.mcp_server.oauth_redirect import redirect_matches
 CODE_TTL_SECONDS = 300
 ACCESS_TTL_SECONDS = 3600
 REFRESH_TTL_SECONDS = 30 * 24 * 3600
+# Rotation would otherwise keep a family alive forever; after this, the person consents again.
+FAMILY_MAX_AGE_SECONDS = 90 * 24 * 3600
+# Expired codes, tokens and consumed form states are deleted at startup once this long past expiry.
+PURGE_GRACE_SECONDS = 24 * 3600
 STATIC_KEY_PREFIX = "tdyM_"
 # Dynamic client registration is open to anyone, so the table is capped. When it is full, clients
 # that never produced a code and are more than a day old make room; otherwise registration is refused.
@@ -62,7 +66,8 @@ CREATE TABLE IF NOT EXISTS oauth_refresh (
     client_id TEXT NOT NULL,
     expires_at INTEGER NOT NULL,
     used_at INTEGER,
-    revoked_at INTEGER
+    revoked_at INTEGER,
+    family_created_at INTEGER
 );
 CREATE TABLE IF NOT EXISTS oauth_client (
     client_id TEXT PRIMARY KEY,
@@ -70,6 +75,10 @@ CREATE TABLE IF NOT EXISTS oauth_client (
     redirect_uris TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     code_issued_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS consumed_form_state (
+    nonce_hash TEXT PRIMARY KEY,
+    expires_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS static_key (
     value_hash TEXT PRIMARY KEY,
@@ -84,6 +93,7 @@ CREATE TABLE IF NOT EXISTS static_key (
 # these are added one by one (only when missing) for a store created by an earlier version.
 _ADDED_COLUMNS: dict[str, tuple[tuple[str, str], ...]] = {
     "oauth_code": (("family_id", "TEXT"),),
+    "oauth_refresh": (("family_created_at", "INTEGER"),),
 }
 
 
@@ -213,6 +223,20 @@ class OAuthStore:
             return None
         return Client(row["client_id"], row["client_name"], tuple(json.loads(row["redirect_uris"])), row["created_at"])
 
+    # -- single-use consent form states ---------------------------------------------
+    def consume_form_state(self, nonce_hash: str, expires_at: int) -> bool:
+        """Mark a signed consent form state as used; False when it was already used.
+
+        One INSERT is atomic, so of two concurrent posts of the same state exactly one wins.
+        """
+        with self._connect() as conn:
+            cur = conn.execute(
+                "INSERT INTO consumed_form_state (nonce_hash, expires_at) VALUES (?, ?)"
+                " ON CONFLICT(nonce_hash) DO NOTHING",
+                (nonce_hash, int(expires_at)),
+            )
+            return cur.rowcount == 1
+
     # -- authorization codes -------------------------------------------------------
     def issue_code(self, email: str, client_id: str, redirect_uri: str,
                    code_challenge: str, code_challenge_method: str) -> str:
@@ -270,7 +294,7 @@ class OAuthStore:
             family_id = secrets.token_hex(8)
             conn.execute("UPDATE oauth_code SET used_at = ?, family_id = ? WHERE value_hash = ?",
                          (now, family_id, _hash(code)))
-            pair = self._issue_pair(conn, row["email"], client_id, family_id, now)
+            pair = self._issue_pair(conn, row["email"], client_id, family_id, now, family_created_at=now)
             conn.execute("COMMIT")
         return pair
 
@@ -283,7 +307,7 @@ class OAuthStore:
                      (now, family_id))
 
     def _issue_pair(self, conn: sqlite3.Connection, email: str, client_id: str,
-                    family_id: str, now: int) -> TokenPair:
+                    family_id: str, now: int, family_created_at: int) -> TokenPair:
         access = secrets.token_urlsafe(32)
         refresh = secrets.token_urlsafe(32)
         conn.execute(
@@ -291,9 +315,9 @@ class OAuthStore:
             (_hash(access), email, family_id, now + ACCESS_TTL_SECONDS),
         )
         conn.execute(
-            "INSERT INTO oauth_refresh (value_hash, email, family_id, client_id, expires_at)"
-            " VALUES (?, ?, ?, ?, ?)",
-            (_hash(refresh), email, family_id, client_id, now + REFRESH_TTL_SECONDS),
+            "INSERT INTO oauth_refresh (value_hash, email, family_id, client_id, expires_at, family_created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (_hash(refresh), email, family_id, client_id, now + REFRESH_TTL_SECONDS, family_created_at),
         )
         return TokenPair(access, refresh, ACCESS_TTL_SECONDS, email)
 
@@ -304,7 +328,7 @@ class OAuthStore:
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
-                "SELECT email, family_id, client_id, expires_at, used_at, revoked_at"
+                "SELECT email, family_id, client_id, expires_at, used_at, revoked_at, family_created_at"
                 " FROM oauth_refresh WHERE value_hash = ?",
                 (_hash(refresh_token),),
             ).fetchone()
@@ -316,13 +340,42 @@ class OAuthStore:
                 self._revoke_family(conn, row["family_id"], now)
                 conn.execute("COMMIT")
                 return None
-            if row["expires_at"] <= now or not roles.is_full(row["email"]):
+            # A row without family_created_at (written before S1b) has no known age: fail closed.
+            family_created_at = row["family_created_at"]
+            if (row["expires_at"] <= now or family_created_at is None
+                    or now >= family_created_at + FAMILY_MAX_AGE_SECONDS or not roles.is_full(row["email"])):
                 conn.execute("ROLLBACK")
                 return None
             conn.execute("UPDATE oauth_refresh SET used_at = ? WHERE value_hash = ?", (now, _hash(refresh_token)))
-            pair = self._issue_pair(conn, row["email"], client_id, row["family_id"], now)
+            pair = self._issue_pair(conn, row["email"], client_id, row["family_id"], now, family_created_at)
             conn.execute("COMMIT")
         return pair
+
+    def revoke_email(self, email: str) -> dict[str, int]:
+        """Kill switch for one person: revoke every access and refresh row, expire their pending codes."""
+        address = (email or "").strip().lower()
+        now = self._now()
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            access = conn.execute("UPDATE oauth_access SET revoked_at = ? WHERE email = ? AND revoked_at IS NULL",
+                                  (now, address)).rowcount
+            refresh = conn.execute("UPDATE oauth_refresh SET revoked_at = ? WHERE email = ? AND revoked_at IS NULL",
+                                   (now, address)).rowcount
+            # A code minted moments before the kill switch must not start a new family afterwards.
+            codes = conn.execute("UPDATE oauth_code SET expires_at = ? WHERE email = ? AND used_at IS NULL"
+                                 " AND expires_at > ?", (now, address, now)).rowcount
+            conn.execute("COMMIT")
+        return {"access": access, "refresh": refresh, "codes": codes}
+
+    def purge_expired(self) -> int:
+        """Delete codes, tokens and consumed form states more than a day past expiry (clients excepted)."""
+        cutoff = self._now() - PURGE_GRACE_SECONDS
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            deleted = sum(conn.execute(f"DELETE FROM {table} WHERE expires_at < ?", (cutoff,)).rowcount
+                          for table in ("oauth_code", "oauth_access", "oauth_refresh", "consumed_form_state"))
+            conn.execute("COMMIT")
+        return deleted
 
     def principal(self, bearer: str) -> str | None:
         if not bearer or not bearer.isascii():

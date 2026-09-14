@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import html
 import json
+import secrets
 import time
 import unicodedata
 from typing import Any, Callable, Mapping
@@ -55,13 +56,22 @@ def _b64u_decode(text: str) -> bytes:
     return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
 
 
-def sign_form_state(params: dict[str, str], secret: bytes, now: float) -> str:
-    payload = _b64u(json.dumps({"p": params, "exp": int(now) + FORM_TTL_SECONDS}, sort_keys=True).encode())
+# A signed state names its step, so the sign-in state can never be posted as the decision state
+# (which carries a verified email) or the other way round.
+PURPOSE_SIGN_IN = "authorize"
+PURPOSE_DECISION = "consent"
+
+
+def sign_form_state(params: dict[str, str], secret: bytes, now: float, purpose: str = PURPOSE_SIGN_IN) -> str:
+    # "n" makes every issued state unique: single use is keyed on the state, so two identical
+    # requests in the same second (a retry, a reloaded page) must not share one.
+    body = {"p": params, "exp": int(now) + FORM_TTL_SECONDS, "u": purpose, "n": secrets.token_urlsafe(16)}
+    payload = _b64u(json.dumps(body, sort_keys=True).encode())
     sig = hmac.new(secret, payload.encode("ascii"), hashlib.sha256).hexdigest()
     return f"{payload}.{sig}"
 
 
-def read_form_state(token: str, secret: bytes, now: float) -> dict[str, str]:
+def read_form_state(token: str, secret: bytes, now: float, purpose: str = PURPOSE_SIGN_IN) -> dict[str, str]:
     try:
         payload, sig = token.split(".", 1)
         expected = hmac.new(secret, payload.encode("ascii"), hashlib.sha256).hexdigest()
@@ -72,6 +82,8 @@ def read_form_state(token: str, secret: bytes, now: float) -> dict[str, str]:
         if str(exc) == "form_state_invalid":
             raise
         raise ValueError("form_state_invalid") from exc
+    if not isinstance(data, dict) or data.get("u") != purpose:
+        raise ValueError("form_state_invalid")
     if int(data.get("exp", 0)) < int(now):
         raise ValueError("form_state_expired")
     return {k: str(v) for k, v in (data.get("p") or {}).items()}
@@ -87,28 +99,95 @@ def _with_query(uri: str, extra: dict[str, str]) -> str:
     return urlunparse(parts._replace(query=urlencode(query)))
 
 
+_PAGE_STYLE = (
+    'body{font-family:"IBM Plex Sans",system-ui,sans-serif;background:#f4f4f4;color:#161616;margin:0;padding:48px 16px}'
+    "main{max-width:480px;margin:auto;background:#fff;padding:32px;border-top:4px solid #0f62fe}"
+    "h1{font-size:1.5rem;font-weight:400;margin:0 0 16px} p{line-height:1.5}"
+    "code{background:#e0e0e0;padding:2px 4px;word-break:break-all}"
+    "button{font:inherit;padding:12px 24px;margin:8px 8px 0 0;border:0;cursor:pointer}"
+    "button[value=onayla]{background:#0f62fe;color:#fff} button[value=reddet]{background:#e0e0e0;color:#161616}"
+)
+# The only inline script. Its hash goes into script-src, so it must stay byte-for-byte static.
+_CONSENT_SCRIPT = ('function tedyConsent(r){document.getElementById("credential").value=r.credential;'
+                   'document.getElementById("consent").submit();}')
+_CONSENT_SCRIPT_HASH = "'sha256-" + base64.b64encode(hashlib.sha256(_CONSENT_SCRIPT.encode("utf-8")).digest()).decode() + "'"
+_UNNAMED_CLIENT = "Adı belirtilmemiş bir uygulama"
+
 _CONSENT_PAGE = """<!doctype html>
 <html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TEDY edupedia bağlantısı</title>
-<style>
-body{{font-family:"IBM Plex Sans",system-ui,sans-serif;background:#f4f4f4;color:#161616;margin:0;padding:48px 16px}}
-main{{max-width:480px;margin:auto;background:#fff;padding:32px;border-top:4px solid #0f62fe}}
-h1{{font-size:1.5rem;font-weight:400;margin:0 0 16px}} p{{line-height:1.5}} code{{background:#e0e0e0;padding:2px 4px}}
-</style>
+<style>{style}</style>
 <script src="https://accounts.google.com/gsi/client" async></script></head>
 <body><main>
 <h1>edupedia'yı TEDY hesabına bağla</h1>
-<p><code>{origin}</code> uygulaması, Google hesabınızla TEDY edupedia araçlarını kullanmak için izin istiyor.
-Yalnız TEDY aile listesindeki tam yetkili hesaplar onay verebilir.</p>
+<p><strong>{client_name}</strong> uygulaması, Google hesabınızla TEDY edupedia araçlarını kullanmak için izin istiyor.</p>
+<p>Onay verilirse yetki yalnız şu adrese gönderilir:<br><code>{redirect_uri}</code></p>
+<p>Yalnız TEDY aile listesindeki tam yetkili hesaplar onay verebilir. Google ile giriş yaptıktan sonra
+ayrıca Onayla ya da Reddet seçmeniz istenir.</p>
 <form id="consent" method="post" action="/oauth/authorize">
 <input type="hidden" name="form_state" value="{form_state}">
 <input type="hidden" name="credential" id="credential" value="">
 </form>
-<div id="g_id_onload" data-client_id="{client_id}" data-nonce="{nonce}" data-callback="tedyConsent"
+<div id="g_id_onload" data-client_id="{google_client_id}" data-nonce="{nonce}" data-callback="tedyConsent"
      data-auto_prompt="false"></div>
 <div class="g_id_signin" data-type="standard" data-text="continue_with" data-locale="tr"></div>
-<script>function tedyConsent(r){{document.getElementById("credential").value=r.credential;document.getElementById("consent").submit();}}</script>
+<script>{script}</script>
 </main></body></html>"""
+
+_DECISION_PAGE = """<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TEDY edupedia bağlantısı</title>
+<style>{style}</style></head>
+<body><main>
+<h1>Bağlantıyı onaylıyor musunuz?</h1>
+<p><strong>{client_name}</strong> uygulaması, <strong>{email}</strong> hesabıyla TEDY edupedia araçlarını
+kullanmak istiyor.</p>
+<p>Onaylarsanız yetki yalnız şu adrese gönderilir:<br><code>{redirect_uri}</code></p>
+<form method="post" action="/oauth/authorize">
+<input type="hidden" name="consent_state" value="{consent_state}">
+<button type="submit" name="karar" value="onayla">Onayla</button>
+<button type="submit" name="karar" value="reddet">Reddet</button>
+</form>
+</main></body></html>"""
+
+
+def _csp_origin(uri: str) -> str:
+    """CSP source for the origin of an already validated URI.
+
+    An IPv6 literal is not a valid CSP host-source, so [::1] falls back to its scheme; the redirect
+    target itself is still the exact, server-validated URI.
+    """
+    parts = urlsplit(uri)
+    if ":" in (parts.hostname or ""):
+        return f"{parts.scheme}:"
+    return f"{parts.scheme}://{parts.netloc}"
+
+
+def _consent_page_headers(issuer: str, redirect_uri: str, google_sign_in: bool) -> dict[str, str]:
+    directives = ["default-src 'none'"]
+    if google_sign_in:
+        directives += [
+            f"script-src https://accounts.google.com/gsi/client {_CONSENT_SCRIPT_HASH}",
+            "frame-src https://accounts.google.com/gsi/",
+            "connect-src https://accounts.google.com/gsi/",
+            "style-src 'unsafe-inline' https://accounts.google.com/gsi/style",
+        ]
+    else:
+        directives.append("style-src 'unsafe-inline'")
+    # 'self' alone is not enough (measured in a sibling server): the page may sit in an opaque origin,
+    # and Chrome applies form-action along the redirect chain, so both origins are named explicitly.
+    directives += [
+        f"form-action 'self' {_csp_origin(issuer)} {_csp_origin(redirect_uri)}",
+        "frame-ancestors 'none'",
+        "base-uri 'none'",
+    ]
+    return {
+        "content-security-policy": "; ".join(directives),
+        "x-frame-options": "DENY",
+        "referrer-policy": "no-referrer",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+    }
 
 
 def is_acceptable_client_name(name: object) -> bool:
@@ -392,19 +471,23 @@ def build_app(
                 return _bad("code_challenge / code_challenge_method must be S256")
             params = {k: q.get(k, "") for k in _FORM_KEYS}
             form_state = sign_form_state(params, form_secret, clock())
-            parsed = urlparse(redirect_uri)
             page = _CONSENT_PAGE.format(
-                origin=html.escape(f"{parsed.scheme}://{parsed.netloc}"),
+                style=_PAGE_STYLE,
+                client_name=html.escape(client.client_name or _UNNAMED_CLIENT),
+                redirect_uri=html.escape(redirect_uri),
                 form_state=html.escape(form_state),
-                client_id=html.escape(roles.GOOGLE_CLIENT_ID),
+                google_client_id=html.escape(roles.GOOGLE_CLIENT_ID),
                 nonce=html.escape(nonce_for(form_state)),
+                script=_CONSENT_SCRIPT,
             )
-            return HTMLResponse(page, headers={"cache-control": "no-store", "x-frame-options": "DENY"})
+            return HTMLResponse(page, headers=_consent_page_headers(base, redirect_uri, google_sign_in=True))
 
         form = await _limited_form(request)
+        if "consent_state" in form:
+            return await decide(form)
         form_state = str(form.get("form_state", ""))
         try:
-            params = read_form_state(form_state, form_secret, clock())
+            params = read_form_state(form_state, form_secret, clock(), PURPOSE_SIGN_IN)
         except ValueError as exc:
             return PlainTextResponse(str(exc), status_code=400)
         credential = str(form.get("credential", ""))
@@ -419,15 +502,57 @@ def build_app(
             return PlainTextResponse(f"Google kimliği doğrulanamadı: {exc.reason}", status_code=401)
         if not roles.is_full(email):
             return PlainTextResponse("Bu hesap TEDY edupedia bağlantısını onaylayamaz.", status_code=403)
+        client = await _registered_client(params.get("client_id", ""))
+        if client is None or not _is_registered_redirect(client, params.get("redirect_uri", "")):
+            return _bad("invalid_client")
+        # Single use, and only once the sign-in succeeded: a transient Google failure does not burn it.
+        if not await anyio.to_thread.run_sync(store.consume_form_state, nonce_for(form_state),
+                                              int(clock()) + FORM_TTL_SECONDS):
+            return _bad("form_state_used")
+        consent_state = sign_form_state({**params, "email": email}, form_secret, clock(), PURPOSE_DECISION)
+        page = _DECISION_PAGE.format(
+            style=_PAGE_STYLE,
+            client_name=html.escape(client.client_name or _UNNAMED_CLIENT),
+            email=html.escape(email),
+            redirect_uri=html.escape(params["redirect_uri"]),
+            consent_state=html.escape(consent_state),
+        )
+        return HTMLResponse(page, headers=_consent_page_headers(base, params["redirect_uri"], google_sign_in=False))
+
+    async def decide(form: FormData) -> Response:
+        """Onayla issues the code; Reddet sends access_denied. Either way the state is spent."""
+        consent_state = str(form.get("consent_state", ""))
         try:
-            code = await anyio.to_thread.run_sync(store.issue_code, email, params["client_id"], params["redirect_uri"],
-                                                  params["code_challenge"], params["code_challenge_method"])
-        except ValueError:
-            return _bad("invalid_client")  # the registration is gone (purged) since the page was shown
-        extra = {"code": code}
+            params = read_form_state(consent_state, form_secret, clock(), PURPOSE_DECISION)
+        except ValueError as exc:
+            return PlainTextResponse(str(exc), status_code=400)
+        karar = str(form.get("karar", ""))
+        if karar not in ("onayla", "reddet"):
+            return _bad("karar")
+        redirect_uri = params.get("redirect_uri", "")
+        client = await _registered_client(params.get("client_id", ""))
+        if client is None or not _is_registered_redirect(client, redirect_uri):
+            return _bad("invalid_client")
+        email = params.get("email", "")
+        if karar == "onayla" and not roles.is_full(email):
+            # The roster may have changed since sign-in.
+            return PlainTextResponse("Bu hesap TEDY edupedia bağlantısını onaylayamaz.", status_code=403)
+        if not await anyio.to_thread.run_sync(store.consume_form_state, nonce_for(consent_state),
+                                              int(clock()) + FORM_TTL_SECONDS):
+            return _bad("consent_state_used")
+        if karar == "reddet":
+            extra = {"error": "access_denied"}
+        else:
+            try:
+                code = await anyio.to_thread.run_sync(store.issue_code, email, params["client_id"], redirect_uri,
+                                                      params["code_challenge"], params["code_challenge_method"])
+            except ValueError:
+                return _bad("invalid_client")  # the registration is gone (purged) since the page was shown
+            extra = {"code": code}
         if params.get("state"):
             extra["state"] = params["state"]
-        return RedirectResponse(_with_query(params["redirect_uri"], extra), status_code=302)
+        return RedirectResponse(_with_query(redirect_uri, extra), status_code=302,
+                                headers={"cache-control": "no-store", "referrer-policy": "no-referrer"})
 
     def _token_response(pair: Any) -> Response:
         return JSONResponse(

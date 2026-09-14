@@ -113,6 +113,10 @@ class ParkingStore(OAuthStore):
         self.park("get_client")
         return super().get_client(*args, **kwargs)
 
+    def consume_form_state(self, *args, **kwargs):
+        self.park("consume_form_state")
+        return super().consume_form_state(*args, **kwargs)
+
 
 def _app(tmp_path, store, verifier, clock, **settings_env):
     settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE, **settings_env}, project_root=tmp_path)
@@ -149,9 +153,16 @@ def _start(client, verifier, registered_id, **over):
     return form_state
 
 
-def _approve(client, form_state, credential):
-    """Complete the consent for a started authorization; returns the response carrying the code."""
-    return client.post("/oauth/authorize", data={"form_state": form_state, "credential": credential})
+def _consent_state(page) -> str:
+    return re.search(r'name="consent_state" value="([^"]+)"', page.text).group(1)
+
+
+def _approve(client, form_state, credential, karar="onayla"):
+    """Google sign-in, then the explicit decision; returns the response carrying the code (or error)."""
+    login = client.post("/oauth/authorize", data={"form_state": form_state, "credential": credential})
+    if login.status_code != 200:
+        return login
+    return client.post("/oauth/authorize", data={"consent_state": _consent_state(login), "karar": karar})
 
 
 def _code_from(response) -> str:
@@ -320,7 +331,7 @@ def test_missing_credential_is_invalid_token_without_calling_the_verifier(ctx):
 # -- S1a / F1 + S1b / T1: blocking auth work runs off the event loop --------------------
 
 @pytest.mark.parametrize("blocked", ["verify_identity", "issue_code", "redeem_code", "refresh", "principal",
-                                     "register_client", "get_client"])
+                                     "register_client", "get_client", "consume_form_state"])
 def test_blocked_auth_work_leaves_the_event_loop_free(tmp_path, blocked):
     armed, entered, release = threading.Event(), threading.Event(), threading.Event()
 
@@ -345,6 +356,7 @@ def test_blocked_auth_work_leaves_the_event_loop_free(tmp_path, blocked):
                                              headers={**MCP_HEADERS, "authorization": "Bearer nope"}),
             "register_client": lambda: client.post("/oauth/register", json={"redirect_uris": [REDIRECT]}),
             "get_client": lambda: client.get("/oauth/authorize", params=_authorize_params(client_id)),
+            "consume_form_state": lambda: _approve(client, form_state, _credential(FULL)),
         }
         outcome = {}
 
@@ -566,3 +578,203 @@ def test_code_is_bound_to_the_client_that_requested_it(ctx):
     code = _code_for(client, verifier, client_id)
     assert _redeem(client, other, code).json() == {"error": "invalid_grant"}
     assert _redeem(client, client_id, code).status_code == 200
+
+
+# -- S1b / F2.4: Google sign-in leads to an explicit Onayla / Reddet step ------------------------
+
+def _login(client, verifier, client_id, **over):
+    form_state = _start(client, verifier, client_id, **over)
+    return client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)})
+
+
+def test_sign_in_shows_a_decision_page_instead_of_issuing_a_code(ctx, tmp_path):
+    client, verifier, _, _, client_id = ctx
+    page = _login(client, verifier, client_id)
+    assert page.status_code == 200
+    assert "location" not in page.headers
+    assert "Claude" in page.text
+    assert REDIRECT in page.text
+    assert FULL in page.text
+    assert re.search(r'<button[^>]*name="karar"[^>]*value="onayla"', page.text)
+    assert re.search(r'<button[^>]*name="karar"[^>]*value="reddet"', page.text)
+    import sqlite3
+    with sqlite3.connect(tmp_path / "oauth.sqlite3") as conn:
+        assert conn.execute("SELECT COUNT(*) FROM oauth_code").fetchone()[0] == 0
+
+
+def test_onayla_issues_the_code_and_reddet_returns_access_denied(ctx):
+    client, verifier, _, _, client_id = ctx
+    approved = client.post("/oauth/authorize", data={"consent_state": _consent_state(_login(client, verifier, client_id)),
+                                                     "karar": "onayla"})
+    loc = urlparse(approved.headers["location"])
+    assert approved.status_code == 302
+    assert f"{loc.scheme}://{loc.netloc}{loc.path}" == REDIRECT
+    assert set(parse_qs(loc.query)) == {"code", "state"}
+    assert approved.headers["cache-control"] == "no-store"
+    assert approved.headers["referrer-policy"] == "no-referrer"
+
+    denied = client.post("/oauth/authorize", data={"consent_state": _consent_state(_login(client, verifier, client_id)),
+                                                   "karar": "reddet"})
+    loc = urlparse(denied.headers["location"])
+    assert denied.status_code == 302
+    assert f"{loc.scheme}://{loc.netloc}{loc.path}" == REDIRECT
+    assert parse_qs(loc.query) == {"error": ["access_denied"], "state": ["st-123"]}
+
+
+def test_reddet_without_state_carries_only_the_error(ctx):
+    client, verifier, _, _, client_id = ctx
+    page = _login(client, verifier, client_id, state="")
+    denied = client.post("/oauth/authorize", data={"consent_state": _consent_state(page), "karar": "reddet"})
+    assert parse_qs(urlparse(denied.headers["location"]).query) == {"error": ["access_denied"]}
+
+
+def test_role_is_checked_again_at_onayla(ctx, monkeypatch):
+    client, verifier, _, _, client_id = ctx
+    page = _login(client, verifier, client_id)
+    monkeypatch.setattr(http_app.roles, "is_full", lambda email: False)  # demoted between the two steps
+    r = client.post("/oauth/authorize", data={"consent_state": _consent_state(page), "karar": "onayla"})
+    assert r.status_code == 403
+    assert "location" not in r.headers
+
+
+@pytest.mark.parametrize("karar", ["", "ONAYLA", "evet", "onayla "])
+def test_unknown_decision_is_refused_without_consuming_the_consent(ctx, karar):
+    client, verifier, _, _, client_id = ctx
+    state = _consent_state(_login(client, verifier, client_id))
+    r = client.post("/oauth/authorize", data={"consent_state": state, "karar": karar})
+    assert r.status_code == 400
+    assert "location" not in r.headers
+    assert client.post("/oauth/authorize", data={"consent_state": state, "karar": "onayla"}).status_code == 302
+
+
+def test_client_name_is_escaped_on_both_pages(ctx):
+    client, verifier, _, _, _ = ctx
+    hostile = _register(client, name='<img src=x onerror=alert(1)>"')
+    first = client.get("/oauth/authorize", params=_authorize_params(hostile))
+    assert first.status_code == 200
+    second = _login(client, verifier, hostile)
+    assert second.status_code == 200
+    for page in (first, second):
+        assert "<img src=x" not in page.text
+        assert "&lt;img src=x onerror=alert(1)&gt;&quot;" in page.text
+
+
+def test_first_page_names_the_client_and_shows_the_full_redirect_uri(ctx):
+    client, _, _, _, client_id = ctx
+    loopback = "http://127.0.0.1:53712/callback"
+    page = client.get("/oauth/authorize", params=_authorize_params(client_id, redirect_uri=loopback))
+    assert page.status_code == 200
+    assert "Claude" in page.text
+    assert loopback in page.text
+
+
+# -- S1b / F7: both consent POSTs are single use ------------------------------------------------
+
+def test_the_same_sign_in_post_is_refused_the_second_time(ctx):
+    client, verifier, _, _, client_id = ctx
+    form_state = _start(client, verifier, client_id)
+    consent = {"form_state": form_state, "credential": _credential(FULL)}
+    assert client.post("/oauth/authorize", data=consent).status_code == 200
+    again = client.post("/oauth/authorize", data=consent)
+    assert again.status_code == 400
+    assert "consent_state" not in again.text and "location" not in again.headers
+
+
+def test_the_same_decision_post_is_refused_the_second_time(ctx):
+    client, verifier, _, _, client_id = ctx
+    decision = {"consent_state": _consent_state(_login(client, verifier, client_id)), "karar": "onayla"}
+    assert client.post("/oauth/authorize", data=decision).status_code == 302
+    again = client.post("/oauth/authorize", data=decision)
+    assert again.status_code == 400
+    assert "location" not in again.headers
+    denied = client.post("/oauth/authorize", data={**decision, "karar": "reddet"})
+    assert denied.status_code == 400 and "location" not in denied.headers
+
+
+def test_a_failed_sign_in_does_not_burn_the_form_state(ctx):
+    client, verifier, _, _, client_id = ctx
+    form_state = _start(client, verifier, client_id)
+    verifier.error = "google_unreachable"
+    assert client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)}).status_code == 401
+    verifier.error = None
+    assert client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)}).status_code == 200
+
+
+def test_form_state_and_consent_state_are_not_interchangeable(ctx):
+    client, verifier, _, _, client_id = ctx
+    form_state = _start(client, verifier, client_id)
+    as_decision = client.post("/oauth/authorize", data={"consent_state": form_state, "karar": "onayla"})
+    assert as_decision.status_code == 400 and "location" not in as_decision.headers
+    state = _consent_state(_login(client, verifier, client_id))
+    verifier.expected_nonce = http_app.nonce_for(state)
+    as_sign_in = client.post("/oauth/authorize", data={"form_state": state, "credential": _credential(FULL)})
+    assert as_sign_in.status_code == 400 and "consent_state" not in as_sign_in.text
+
+
+# -- S1b / R2: consent page security headers ------------------------------------------------------
+
+def _csp(response) -> dict[str, list[str]]:
+    directives = {}
+    for part in response.headers["content-security-policy"].split(";"):
+        tokens = part.split()
+        if tokens:
+            directives[tokens[0]] = tokens[1:]
+    return directives
+
+
+def _assert_page_headers(response):
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["cache-control"] == "no-store"
+    csp = _csp(response)
+    assert csp["default-src"] == ["'none'"]
+    assert csp["frame-ancestors"] == ["'none'"]
+    hosts = {t for values in csp.values() for t in values if t.startswith(("http:", "https:"))}
+    return csp, hosts
+
+
+@pytest.mark.parametrize("redirect_uri,redirect_origin", [
+    (REDIRECT, "https://claude.ai"),
+    ("http://127.0.0.1:53712/callback", "http://127.0.0.1:53712"),
+])
+def test_consent_pages_send_a_per_request_csp(ctx, redirect_uri, redirect_origin):
+    client, verifier, _, _, client_id = ctx
+    first = client.get("/oauth/authorize", params=_authorize_params(client_id, redirect_uri=redirect_uri))
+    second = _login(client, verifier, client_id, redirect_uri=redirect_uri)
+    for page in (first, second):
+        assert page.status_code == 200
+        csp, hosts = _assert_page_headers(page)
+        # Measured pitfall: 'self' alone breaks when the page is in an opaque origin and Chrome applies
+        # form-action along the redirect chain, so the issuer and the validated redirect origin are named.
+        assert csp["form-action"] == ["'self'", BASE, redirect_origin]
+        assert hosts <= {BASE, redirect_origin} | {h for h in hosts if h.startswith("https://accounts.google.com/")}
+    csp = _csp(first)
+    inline = re.search(r"<script>(.*?)</script>", first.text, re.S).group(1)
+    digest = base64.b64encode(hashlib.sha256(inline.encode()).digest()).decode()
+    assert f"'sha256-{digest}'" in csp["script-src"]
+    assert "https://accounts.google.com/gsi/client" in csp["script-src"]
+    assert csp["frame-src"] == ["https://accounts.google.com/gsi/"]
+    assert csp["connect-src"] == ["https://accounts.google.com/gsi/"]
+    assert "script-src" not in _csp(second)  # the decision page runs no script at all
+
+
+def test_ipv6_loopback_form_action_falls_back_to_the_http_scheme(ctx):
+    client, _, _, _, _ = ctx
+    v6 = _register(client, uris=("http://[::1]/cb",))
+    page = client.get("/oauth/authorize", params=_authorize_params(v6, redirect_uri="http://[::1]:8080/cb"))
+    assert page.status_code == 200
+    assert _csp(page)["form-action"] == ["'self'", BASE, "http:"]
+
+
+def test_identical_authorizations_in_the_same_second_are_independent(ctx):
+    # A signed state must be unique per issue: single use is keyed on it, so two identical requests
+    # (a client retry, a reloaded page) must not collide and refuse each other.
+    client, verifier, _, _, client_id = ctx
+    first = _start(client, verifier, client_id)
+    second = _start(client, verifier, client_id)
+    assert first != second
+    for form_state in (first, second):
+        verifier.expected_nonce = http_app.nonce_for(form_state)
+        page = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)})
+        assert page.status_code == 200, page.text
+        assert _consent_state(page)

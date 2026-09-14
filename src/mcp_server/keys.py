@@ -1,10 +1,12 @@
-"""Manage tdyM_ static keys for MCP clients that cannot do OAuth.
+"""Manage tdyM_ static keys for MCP clients that cannot do OAuth, and revoke OAuth grants.
 
     .venv/bin/python -m src.mcp_server.keys olustur --etiket codex-mahir --email drmahirkurt@gmail.com
     .venv/bin/python -m src.mcp_server.keys listele
     .venv/bin/python -m src.mcp_server.keys iptal --etiket codex-mahir
+    .venv/bin/python -m src.mcp_server.keys oauth-iptal --email drmahirkurt@gmail.com
 
-The key is printed once and never stored in clear text.
+The key is printed once and never stored in clear text. oauth-iptal revokes every OAuth access and
+refresh token of one person (all families) and expires their pending codes; static keys are untouched.
 """
 from __future__ import annotations
 
@@ -31,6 +33,8 @@ def main(argv: list[str] | None = None, store: OAuthStore | None = None) -> int:
     sub.add_parser("listele")
     revoke = sub.add_parser("iptal")
     revoke.add_argument("--etiket", required=True)
+    revoke_oauth = sub.add_parser("oauth-iptal")
+    revoke_oauth.add_argument("--email", required=True)
     args = parser.parse_args(argv)
     store = store or _default_store()
 
@@ -47,6 +51,12 @@ def main(argv: list[str] | None = None, store: OAuthStore | None = None) -> int:
         for row in store.list_static_keys():
             state = "iptal" if row["revoked"] else "aktif"
             print(f"{row['label']}\t{row['email']}\t{row['created_at']}\t{state}")
+        return 0
+    if args.komut == "oauth-iptal":
+        counts = store.revoke_email(args.email)
+        print(f"iptal edilen satır: {counts['access'] + counts['refresh']} "
+              f"(erişim {counts['access']}, yenileme {counts['refresh']}); "
+              f"süresi bitirilen bekleyen kod: {counts['codes']}")
         return 0
     if store.revoke_static_key(args.etiket):
         print(f"iptal edildi: {args.etiket}")

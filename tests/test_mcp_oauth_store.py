@@ -427,3 +427,109 @@ def test_client_cap_refuses_when_no_client_is_purgeable(tmp_path, store, clock):
     with pytest.raises(oauth_store.ClientLimitReached):
         store.register_client("new", [REDIRECT])
     assert len(_client_ids(path)) == oauth_store.MAX_CLIENTS
+
+
+# -- S1b / F7: single-use form states --------------------------------------------------------
+
+def test_form_state_is_consumed_exactly_once(store, clock):
+    nonce = hashlib.sha256(b"form-state").hexdigest()
+    expires = int(clock.now) + 600
+    assert store.consume_form_state(nonce, expires) is True
+    assert store.consume_form_state(nonce, expires) is False
+    assert store.consume_form_state(hashlib.sha256(b"other").hexdigest(), expires) is True
+
+
+def test_concurrent_consumption_has_one_winner(store, clock):
+    import threading
+
+    nonce = hashlib.sha256(b"raced").hexdigest()
+    barrier, results = threading.Barrier(8), []
+
+    def consume():
+        barrier.wait()
+        results.append(store.consume_form_state(nonce, int(clock.now) + 600))
+
+    threads = [threading.Thread(target=consume) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(10)
+    assert sorted(results) == [False] * 7 + [True]
+
+
+# -- S1b / F8: absolute family lifetime, revocation by email, startup purge ----------------------
+
+DAY = 24 * 3600
+
+
+def test_refresh_family_has_an_absolute_ninety_day_lifetime(store, client_id, clock):
+    pair = _pair(store, client_id)
+    for _ in range(3):  # keep refreshing inside each 30-day refresh window
+        clock.now += 29 * DAY
+        pair = store.refresh(pair.refresh_token, client_id)
+        assert pair is not None
+    clock.now += 3 * DAY - 1  # 90 days minus one second after the family was created
+    pair = store.refresh(pair.refresh_token, client_id)
+    assert pair is not None
+    clock.now += 1  # exactly 90 days: refused although this refresh token is fresh
+    assert store.refresh(pair.refresh_token, client_id) is None
+    assert store.principal(pair.access_token) == FULL  # the last access token lives out its hour
+
+
+def _revoked_rows(path, email):
+    with sqlite3.connect(path) as conn:
+        return sum(conn.execute(f"SELECT COUNT(*) FROM {table} WHERE email = ? AND revoked_at IS NOT NULL",
+                                (email,)).fetchone()[0] for table in ("oauth_access", "oauth_refresh"))
+
+
+def test_oauth_iptal_revokes_every_family_of_one_person(tmp_path, store, client_id, clock, capsys):
+    other = "isikkurtx@gmail.com"
+    first = _pair(store, client_id)
+    second = store.refresh(_pair(store, client_id).refresh_token, client_id)
+    code = store.issue_code(other, client_id, REDIRECT, _challenge(VERIFIER), "S256")
+    theirs = store.redeem_code(code, client_id, REDIRECT, VERIFIER)
+    pending = store.issue_code(FULL, client_id, REDIRECT, _challenge(VERIFIER), "S256")
+
+    assert keys.main(["oauth-iptal", "--email", " DrMahirKurt@gmail.com "], store=store) == 0
+    out = capsys.readouterr().out
+    assert f"iptal edilen satır: {_revoked_rows(tmp_path / 'oauth.sqlite3', FULL)}" in out
+    assert _revoked_rows(tmp_path / "oauth.sqlite3", FULL) >= 5
+    for token in (first, second):
+        assert store.principal(token.access_token) is None
+        assert store.refresh(token.refresh_token, client_id) is None
+    assert store.redeem_code(pending, client_id, REDIRECT, VERIFIER) is None  # a code minted before the kill switch
+    assert store.principal(theirs.access_token) == other  # nobody else is touched
+
+    assert keys.main(["oauth-iptal", "--email", FULL], store=store) == 0
+    assert "iptal edilen satır: 0" in capsys.readouterr().out
+
+
+def _count(path, table):
+    with sqlite3.connect(path) as conn:
+        return conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+
+
+def test_startup_purge_removes_rows_expired_for_more_than_a_day(tmp_path, store, client_id, clock):
+    path = tmp_path / "oauth.sqlite3"
+    t0 = int(clock.now)
+    store.issue_code(FULL, client_id, REDIRECT, _challenge(VERIFIER), "S256")       # expires t0 + 300
+    _pair(store, client_id)                                                         # access t0+3600, refresh t0+30d
+    store.consume_form_state(hashlib.sha256(b"s").hexdigest(), t0 + 600)
+    store.create_static_key("kalici", FULL)
+
+    clock.now = t0 + oauth_store.CODE_TTL_SECONDS + DAY  # exactly a day past the code's expiry: kept
+    store.purge_expired()
+    assert _count(path, "oauth_code") == 2
+    clock.now += 1
+    store.purge_expired()
+    assert _count(path, "oauth_code") == 0
+    assert (_count(path, "oauth_access"), _count(path, "consumed_form_state")) == (1, 1)
+
+    clock.now = t0 + oauth_store.ACCESS_TTL_SECONDS + DAY + 1
+    store.purge_expired()
+    assert (_count(path, "oauth_access"), _count(path, "consumed_form_state"), _count(path, "oauth_refresh")) == (0, 0, 1)
+
+    clock.now = t0 + oauth_store.REFRESH_TTL_SECONDS + DAY + 1
+    store.purge_expired()
+    assert _count(path, "oauth_refresh") == 0
+    assert (_count(path, "oauth_client"), _count(path, "static_key")) == (1, 1)  # never purged here
