@@ -55,6 +55,12 @@ DEFAULT_INCLUDE_DIRS = {"output", "content"}
 DEFAULT_EXCLUDED_DIRS = {
     "__pycache__",
     "assistant_index",
+    # edupedia (spec §4.2): ted-mcp's catalog, immutable drafts and run pages. Published modules
+    # reach the model only through modul_ara (src/assistant_modules.py); run pages carry
+    # third-party textbook and OER text that must not enter a prompt without kaynak_verisi.
+    "output/modules",
+    "output/edupedia_drafts",
+    "output/edupedia_runs",
 }
 
 DEFAULT_EXCLUDED_FILE_PATTERNS = {
@@ -68,6 +74,12 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     "health.json",
     "photo_homework.json",
     "private_lessons.json",
+    # Per-person module progress (spec §6.4), lock sidecars, the media ledger and the ted-mcp
+    # OAuth store: none of it is school data, and raw progress must never reach a prompt.
+    "module_progress.json",
+    "*.lock",
+    "edupedia_media_ledger.json",
+    "ted_mcp_oauth.sqlite3*",
     # Discovery/metadata JSONs — too noisy for BM25
     "*_discovered.json",
     "sebitv_*.json",
