@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import hmac
 import html
@@ -584,6 +585,15 @@ def build_app(
         return _token_response(pair) if pair else _grant_error("invalid_grant")
 
     streamable = mcp.streamable_http_app()
+
+    @contextlib.asynccontextmanager
+    async def lifespan(app: Starlette) -> Any:
+        # Startup housekeeping, in a worker thread like every other store call: expired codes, tokens
+        # and consumed form states go; registered clients follow their own cap policy.
+        await anyio.to_thread.run_sync(store.purge_expired)
+        async with streamable.router.lifespan_context(app) as state:
+            yield state
+
     routes = [
         Route("/health", health),
         Route("/.well-known/oauth-protected-resource", protected_resource),
@@ -600,7 +610,7 @@ def build_app(
     # nothing above it reads the body, and an unauthenticated /mcp call still gets its 401 challenge.
     return Starlette(
         routes=routes,
-        lifespan=streamable.router.lifespan_context,
+        lifespan=lifespan,
         middleware=[
             Middleware(CorsMiddleware),
             Middleware(HostGuardMiddleware, allowed_hosts=settings.allowed_hosts),

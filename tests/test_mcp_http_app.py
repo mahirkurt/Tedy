@@ -454,3 +454,47 @@ def test_host_guard_compares_configured_hosts_case_insensitively(tmp_path, store
     with TestClient(build_app(settings, store, _test_mcp(), form_secret=b"s" * 32), base_url=BASE) as c:
         r = c.post("/mcp", json=_rpc("initialize"), headers=MCP_HEADERS)
     assert r.status_code == 401  # passed the host guard, stopped at the bearer gate
+
+
+# -- S1b / F8 + T1: expired rows are purged at startup, off the event loop -----------------------
+
+def test_startup_purges_expired_rows_in_a_worker_thread(tmp_path):
+    import base64
+    import hashlib
+    import sqlite3
+    import threading
+
+    class Clock:
+        now = 1_800_000_000.0
+
+        def __call__(self):
+            return self.now
+
+    purge_threads = []
+
+    class RecordingStore(OAuthStore):
+        def purge_expired(self):
+            purge_threads.append(threading.get_ident())
+            return super().purge_expired()
+
+    clock = Clock()
+    store = RecordingStore(tmp_path / "oauth.sqlite3", clock=clock)
+    client_id = store.register_client("Claude", ["https://claude.ai/api/mcp/auth_callback"]).client_id
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(b"v" * 64).digest()).rstrip(b"=").decode()
+    store.issue_code(FULL, client_id, "https://claude.ai/api/mcp/auth_callback", challenge, "S256")
+    clock.now += 2 * 24 * 3600  # the code expired well over a day ago
+
+    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
+    app = build_app(settings, store, _test_mcp(), form_secret=b"s" * 32)
+    assert purge_threads == []  # building the app does not touch the database
+    with TestClient(app, base_url=BASE) as c:
+        async def loop_thread():
+            return threading.get_ident()
+
+        loop_ident = c.portal.call(loop_thread)
+        assert c.get("/health").status_code == 200
+    assert len(purge_threads) == 1, "startup did not purge expired rows"
+    assert purge_threads[0] not in {threading.get_ident(), loop_ident}, "purge ran on the event loop"
+    with sqlite3.connect(tmp_path / "oauth.sqlite3") as conn:
+        assert conn.execute("SELECT COUNT(*) FROM oauth_code").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM oauth_client").fetchone()[0] == 1
