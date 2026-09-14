@@ -188,10 +188,18 @@ class McpClient:
         self._post({"jsonrpc": "2.0", "method": "notifications/initialized"}, deadline, sid=new_sid)
         return init_ok, new_sid
 
-    def _ensure_session(self, deadline: float | None) -> None:
+    def _ensure_session(self, deadline: float | None) -> str | None:
         """Double-checked critical section for a STATEFUL (or not-yet-classified) server: only
         the cold-start/expiry handshake is serialized, never the tools/call post itself, which
         always runs unlocked.
+
+        Returns the session id (or None) THIS call must use — fix round 3 Ruling R3-1 (corrects
+        round 2's R2-1(d), which discarded the unlocked handshake's own captured id entirely
+        instead of merely deferring/guarding its publish). The caller (_rpc) uses this return
+        value directly as `sid_used` for its own tools/call and its one replay; it never
+        re-reads self._sid afterward for a call whose handshake this method ran — a concurrent
+        thread's own session activity must not substitute a different id into a call whose own
+        handshake already determined something else.
 
         A known-sessionless server (e.g. egitim-kaynak's stateless_http fleet convention: the
         SDK never sends mcp-session-id, so _sid stays None and _session_expired() is permanently
@@ -202,18 +210,22 @@ class McpClient:
         only re-checked _session_expired(), so a whole discovery burst of queued threads each
         ran their own redundant LOCKED handshake even after the first one had already discovered
         the server was sessionless): if the flag is now set, this thread releases immediately
-        and takes the fast unlocked path too, instead of serializing behind the others.
+        and takes the fast unlocked path too (getting its own captured id from that), instead of
+        serializing behind the others.
         """
         if not self._session_expired():
-            return
+            return self._sid
         if self._sessionless:
-            self._run_sessionless_handshake(deadline)
-            return
+            return self._run_sessionless_handshake(deadline)
         self._acquire(deadline, self._lock)
-        became_sessionless = False
+        queued_behind_discovery = False
+        sid_for_this_call: str | None = None
         try:
             if self._sessionless:
-                became_sessionless = True
+                # Another thread already discovered sessionless while we waited for the lock —
+                # we never got to run our OWN handshake, so we still need one (unlocked) to get
+                # an id for this call.
+                queued_behind_discovery = True
             elif self._session_expired():
                 self._sid = None
                 init_ok, new_sid = self._perform_handshake(deadline)
@@ -225,33 +237,46 @@ class McpClient:
                     # session id marks the server sessionless — an error never does, so a
                     # rate-limited or otherwise failed initialize just tries again next time.
                     self._sessionless = True
+                sid_for_this_call = new_sid
+            else:
+                # Another thread already re-established a valid session while we waited.
+                sid_for_this_call = self._sid
         finally:
             self._lock.release()
-        if became_sessionless:
-            self._run_sessionless_handshake(deadline)
+        if queued_behind_discovery:
+            return self._run_sessionless_handshake(deadline)
+        return sid_for_this_call
 
-    def _run_sessionless_handshake(self, deadline: float | None) -> None:
-        """A known-sessionless server's handshake (fix round 2 Ruling R2-1(d)): runs with
-        self._lock never held, so concurrent tool threads' handshakes are genuinely in flight at
-        the same time. Never touches self._sid/self._sid_at — not even to null it at the start:
-        a concurrent LOCKED handshake elsewhere could be publishing a freshly-established
-        session id at the exact same moment, and writing here (even transiently to None) would
-        race and wipe it. This call's own captured id is used only for this call — via the
-        explicit `sid=` parameters _perform_handshake and _rpc already carry it through; it is
-        never published to self._sid.
+    def _run_sessionless_handshake(self, deadline: float | None) -> str | None:
+        """A known-sessionless server's handshake: runs with self._lock never held, so
+        concurrent tool threads' handshakes are genuinely in flight at the same time. Returns
+        the session id (or None) THIS call's own handshake received (fix round 3 Ruling R3-1 —
+        round 2's R2-1(d) discarded it entirely, which forced an unnecessary header-less
+        tools/call, a session error, and a redundant second handshake whenever a "sessionless"
+        server actually issues an id).
 
-        If the server surprises us with an actual session id, we stop treating it as sessionless
-        — through the properly-synchronized _acquire, since we hold no lock here — so future
-        calls take the locked path and re-discover a session properly. We still do not publish
-        THIS id: that would itself be an unsynchronized write to self._sid.
+        Never NULLS self._sid at the start: a concurrent LOCKED handshake elsewhere could be
+        publishing a freshly-established session id at the exact same moment, and writing here
+        (even transiently to None) would race and wipe it out (fix round 2 Ruling R2-1(d)).
+
+        If the server hands back an actual session id, this clears the sessionless flag (through
+        the properly-synchronized _acquire, since we hold no lock here) and publishes the id —
+        but ONLY if self._sid is still None; it never overwrites a non-None value someone else
+        (a concurrent locked or unlocked handshake) already published. The handshake already
+        sent notifications/initialized for this id, so publishing here still satisfies "publish
+        only after initialized" (fix round 1 Minor M1).
         """
         init_ok, new_sid = self._perform_handshake(deadline)
-        if new_sid:
+        if new_sid is not None:
             self._acquire(deadline, self._lock)
             try:
+                if self._sid is None:
+                    self._sid = new_sid
+                    self._sid_at = time.time()
                 self._sessionless = False
             finally:
                 self._lock.release()
+        return new_sid
 
     @staticmethod
     def _is_session_error(rpc: dict[str, Any]) -> bool:
@@ -263,11 +288,14 @@ class McpClient:
 
         _ensure_session serializes only session bootstrap between tool threads sharing this
         client (Ruling B); the post below and its response decoding always run unlocked, so
-        calls on an already-live session are never serialized against each other.
+        calls on an already-live session are never serialized against each other. sid_used is
+        exactly _ensure_session's return value (fix round 3 Ruling R3-1) — never a separate read
+        of self._sid — so a call whose own (possibly unlocked) handshake captured an id actually
+        uses that id, instead of going out header-less and forcing an unnecessary session error
+        and replay against a server that expected it.
         """
         for attempt in (1, 2):
-            self._ensure_session(deadline)
-            sid_used = self._sid
+            sid_used = self._ensure_session(deadline)
             rpc, resp_sid = self._post({
                 "jsonrpc": "2.0", "id": self._next_id(deadline),
                 "method": method, "params": params,

@@ -556,31 +556,39 @@ def test_sessionless_server_runs_concurrent_handshakes_unlocked():
 
 def test_sessionless_client_returns_to_the_locked_path_if_a_session_id_appears():
     """If a server previously discovered sessionless suddenly returns a session id, the client
-    must stop treating it as sessionless — but per fix round 2 Ruling R2-1(d), the unlocked
-    handshake that saw the surprise id must NOT publish it to self._sid itself (that would be an
-    unsynchronized write, racing a concurrent locked handshake elsewhere); it only flips the
-    flag, through the properly-synchronized _acquire, so future calls take the locked path and
-    establish a session there instead."""
+    must stop treating it as sessionless — and (fix round 3 Ruling R3-1, correcting round 2's
+    R2-1(d): the captured id must not simply be discarded) this call's own tools/call must carry
+    that id, and it is published to self._sid (self._sid was None here, so there is nothing to
+    protect against overwriting)."""
 
-    class _FlipSession:
+    class _FlipSession(_FakeSession):
+        def __init__(self):
+            super().__init__([])
+
         def post(self, url, headers=None, data=None, timeout=None):
             body = json.loads(data)
             method = body.get("method")
             if method == "initialize":
-                return _init_resp("sid-appeared")
-            if method == "notifications/initialized":
-                return _Resp("", headers={})
-            return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
-                                     "result": {"content": [{"type": "text", "text": "ok"}]}}))
+                resp = _init_resp("sid-appeared")
+            elif method == "notifications/initialized":
+                resp = _Resp("", headers={})
+            else:
+                resp = _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
+                                         "result": {"content": [{"type": "text", "text": "ok"}]}}))
+            self.requests.append({"url": url, "headers": dict(headers or {}), "body": body})
+            return resp
 
-    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=_FlipSession())
+    session = _FlipSession()
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=session)
     c._sessionless = True
 
     out = c.call_tool("t", {})
 
     assert out.ok is True
     assert c._sessionless is False
-    assert c._sid is None  # the surprise id is discarded, never published from the unlocked path
+    assert c._sid == "sid-appeared"
+    tool_call = next(r for r in session.requests if r["body"]["method"] == "tools/call")
+    assert tool_call["headers"].get("mcp-session-id") == "sid-appeared"
 
 
 def test_stale_session_error_reset_does_not_clear_a_newer_session_id():
@@ -750,11 +758,11 @@ def test_error_initialize_without_session_header_leaves_sessionless_flag_unset()
 
 
 def test_unlocked_handshake_never_touches_a_published_session_id():
-    """R2-1 test 4 (Ruling R2-1(d)): the unlocked (sessionless) handshake must never write
-    self._sid — not even to null it at the start, and not even with its own discovered id if the
-    server surprises it with one. A concurrent locked handshake elsewhere could be publishing a
-    fresh id at the exact same moment; writing from here (even transiently to None) would race
-    and wipe it."""
+    """R2-1 test 4 (Ruling R2-1(d)), refined by fix round 3 Ruling R3-1: the unlocked
+    (sessionless) handshake must never NULL self._sid at the start, and must never OVERWRITE an
+    already-published (non-None) id even with its own discovered one — a concurrent locked
+    handshake elsewhere could be publishing a fresh id at the exact same moment. (It DOES
+    publish its own id when self._sid is still None — see the R3-1 tests below.)"""
 
     class _SurpriseSession:
         def post(self, url, headers=None, data=None, timeout=None):
@@ -776,3 +784,204 @@ def test_unlocked_handshake_never_touches_a_published_session_id():
 
     assert c._sid == "sid-from-a-locked-handshake"  # untouched despite a session id appearing
     assert c._sessionless is False  # the flag still flips so future calls take the locked path
+
+
+# -- SP2 residual fix round 3: R3-1/R3-2 — the unlocked handshake's captured id is actually used --
+
+class _StrictStatefulThenStatelessSession:
+    """Mirrors a real stateful MCP server closely enough to catch R3-1 regressions: starts
+    issuing no session id at all (stateless), then — from the point `start_issuing_sessions()`
+    is called — issues one on the next `initialize` and, from then on, REJECTS any `tools/call`
+    arriving without the matching header with a session error. That is exactly what a genuinely
+    stateful server does once it starts tracking sessions; a client that discards the id its own
+    handshake just received (fix round 2's bug) sends its very next tools/call header-less and
+    gets rejected."""
+
+    def __init__(self):
+        self.posts: list[tuple[str, int | None, str | None]] = []  # (method, id, sid header)
+        self._issue_from_now = False
+        self._active_session: str | None = None
+        self._next_session_id = 1
+
+    def start_issuing_sessions(self) -> None:
+        self._issue_from_now = True
+
+    def post(self, url, headers=None, data=None, timeout=None):
+        body = json.loads(data)
+        method = body.get("method")
+        sid_header = (headers or {}).get("mcp-session-id")
+        self.posts.append((method, body.get("id"), sid_header))
+        if method == "initialize":
+            if self._issue_from_now and self._active_session is None:
+                self._active_session = f"s{self._next_session_id}"
+                self._next_session_id += 1
+                return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"), "result": {
+                    "protocolVersion": "2025-06-18", "serverInfo": {"name": "fake", "version": "1"}}}),
+                    headers={"content-type": "application/json", "mcp-session-id": self._active_session})
+            return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"), "result": {
+                "protocolVersion": "2025-06-18", "serverInfo": {"name": "fake", "version": "1"}}}))
+        if method == "notifications/initialized":
+            return _Resp("", headers={})
+        # tools/call: a strict stateful server rejects a header-less request once it has a
+        # session of its own to enforce.
+        if self._active_session is not None and sid_header != self._active_session:
+            return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
+                                     "error": {"code": -32001, "message": "session required"}}))
+        return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
+                                 "result": {"content": [{"type": "text", "text": "ok"}]}}))
+
+
+def test_stateless_then_stateful_matches_8eb51e4_single_threaded():
+    """R3-2(i): a STRICT fake server starts stateless (call A), then starts issuing real session
+    ids and rejecting header-less tools/call (call B), then stays warm (call C). The
+    single-threaded POST sequence must match 8eb51e4's own behaviour in this exact scenario
+    byte-for-byte: 7 POSTs total, one session ever established, both later tools/call posts
+    carry it, and the same 1..5 JSON-RPC id sequence 8eb51e4 would produce (notifications carry
+    no id). Mutation: reverting _run_sessionless_handshake to discard its captured id (fix round
+    2's behaviour) makes this red — the strict fake's rejection of call B's now-header-less
+    tools/call forces a second, redundant handshake and a different post/id/session count."""
+    session = _StrictStatefulThenStatelessSession()
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=session)
+
+    out_a = c.call_tool("t", {})           # call A: still stateless
+    session.start_issuing_sessions()
+    out_b = c.call_tool("t", {})           # call B: server starts issuing/enforcing session ids
+    out_c = c.call_tool("t", {})           # call C: warm session reused
+
+    assert out_a.ok and out_b.ok and out_c.ok
+    assert session.posts == [
+        ("initialize", 1, None),
+        ("notifications/initialized", None, None),
+        ("tools/call", 2, None),
+        ("initialize", 3, None),
+        ("notifications/initialized", None, "s1"),
+        ("tools/call", 4, "s1"),
+        ("tools/call", 5, "s1"),
+    ]
+    assert c._sid == "s1"
+
+
+def test_published_sid_survives_a_concurrent_sessionless_call():
+    """R3-2(ii), end-to-end through call_tool (not the helper directly): once a session id has
+    been published, a second sessionless-path call must not wipe it out even though its own
+    handshake receives a DIFFERENT id.
+
+    Why this is sequential rather than thread-interleaved: _run_sessionless_handshake's
+    (hypothetical, mutated) null-out would execute at the very start of a call's own handshake —
+    before any network I/O — and the real publish + sessionless-flag-clear happen atomically
+    under the lock (verified deadlock/race-free in the round 2/3 reviews). So the ONLY way a
+    second call's entry can observe an ALREADY-published id from a prior one is for that prior
+    call to have completed first; genuine thread overlap cannot make a single one-shot null-out
+    fire after a publish it raced with, since _sessionless would already read False by the time
+    such a race could resolve. This test reproduces the state a real race could leave behind
+    directly (call A completes and publishes; the second call's precondition — expired-looking
+    session, still sessionless — is then forced, exactly as an actual race could leave it) and
+    drives the outcome through two REAL call_tool() invocations, never the private helper.
+
+    Mutation M-D: inserting `self._sid = None` at the very start of the unlocked branch (as if
+    fix round 1's unconditional null-out were still there) makes this red — call B would wipe
+    "sid-A" and then publish its own "sid-B" over it."""
+
+    class _TwoIdSession:
+        def __init__(self):
+            self._calls = 0
+
+        def post(self, url, headers=None, data=None, timeout=None):
+            body = json.loads(data)
+            method = body.get("method")
+            if method == "initialize":
+                self._calls += 1
+                sid = "sid-A" if self._calls == 1 else "sid-B"
+                return _init_resp(sid)
+            if method == "notifications/initialized":
+                return _Resp("", headers={})
+            return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
+                                     "result": {"content": [{"type": "text", "text": "ok"}]}}))
+
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=_TwoIdSession())
+    c._sessionless = True
+
+    out_a = c.call_tool("t", {})
+    assert out_a.ok
+    assert c._sid == "sid-A"
+
+    # Force exactly the precondition a real race could leave: the session looks expired again
+    # (TTL lapsed) but self._sid itself is still the published value, and the client is (for
+    # whatever reason) still treating the server as sessionless — so the next call_tool() takes
+    # the unlocked branch again instead of the warm fast path.
+    c._sid_at = time.time() - (mcp_client.SESSION_TTL_SECONDS + 1)
+    c._sessionless = True
+
+    out_b = c.call_tool("t", {})
+
+    assert out_b.ok
+    assert c._sid == "sid-A"  # B's own handshake got "sid-B" but must not have overwritten this
+
+
+def test_two_sessionless_threads_against_an_id_issuing_server_all_succeed():
+    """R3-2(iii): two threads both take the (already-known) sessionless path against a server
+    that, this time, issues a real session id on every initialize — the concurrent extreme of
+    R3-1's scenario. Each thread's OWN captured id must be used for its OWN tools/call (a strict
+    server would reject a header-less one), both calls must succeed, and the client ends up
+    publishing exactly one of the two captured ids (whichever thread's own conditional
+    publish-check won)."""
+    both_entered = threading.Event()
+    release_all = threading.Event()
+    entered = {"n": 0}
+    entered_lock = threading.Lock()
+    tools_call_headers: list[str | None] = []
+    headers_lock = threading.Lock()
+
+    class _IdIssuingStrictSession:
+        def __init__(self):
+            self._next_id = 1
+            self.issued: list[str] = []
+            self._issued_lock = threading.Lock()
+
+        def post(self, url, headers=None, data=None, timeout=None):
+            body = json.loads(data)
+            method = body.get("method")
+            if method == "initialize":
+                with self._issued_lock:
+                    sid = f"sid-{self._next_id}"
+                    self._next_id += 1
+                    self.issued.append(sid)
+                with entered_lock:
+                    entered["n"] += 1
+                    if entered["n"] == 2:
+                        both_entered.set()
+                release_all.wait(5)
+                return _init_resp(sid)
+            if method == "notifications/initialized":
+                return _Resp("", headers={})
+            sid_header = (headers or {}).get("mcp-session-id")
+            with headers_lock:
+                tools_call_headers.append(sid_header)
+            if not sid_header:
+                return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
+                                         "error": {"code": -32001, "message": "session required"}}))
+            return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
+                                     "result": {"content": [{"type": "text", "text": "ok"}]}}))
+
+    session = _IdIssuingStrictSession()
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=session)
+    c._sessionless = True
+    results = {}
+
+    def call(slot):
+        results[slot] = c.call_tool("t", {})
+
+    t1 = threading.Thread(target=call, args=(1,))
+    t2 = threading.Thread(target=call, args=(2,))
+    t1.start()
+    t2.start()
+
+    assert both_entered.wait(5), "both threads' initialize posts were never simultaneously in flight"
+    release_all.set()
+    t1.join(5)
+    t2.join(5)
+    assert not t1.is_alive() and not t2.is_alive()
+
+    assert results[1].ok and results[2].ok
+    assert None not in tools_call_headers  # no tools/call ever went out header-less
+    assert c._sid in session.issued
