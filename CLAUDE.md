@@ -174,9 +174,9 @@ Spec: `docs/superpowers/specs/2026-09-13-edupedia-tedy-orkestrator-design.md`. A
 (`src/mcp_server/`); Flask dashboard'u import etmez. Roller tek kaynak `src/roles.py`.
 
 ```bash
-# Yerel çalıştırma (canlı birim ve tünel alt proje 3'te)
+# Yerel çalıştırma (canlı birim: Deployment → ted-mcp)
 TED_MCP_FORM_SECRET=$(python3 -c 'import secrets;print(secrets.token_hex(32))') \
-  .venv/bin/python -m src.mcp_server.http_app          # 127.0.0.1:8087
+  .venv/bin/python -m src.mcp_server.http_app          # 127.0.0.1:8090
 
 .venv/bin/python -m src.mcp_server.keys olustur --etiket <etiket> --email <full-rol-eposta>   # tdyM_ anahtarı üretir
 .venv/bin/python -m src.mcp_server.keys listele                                               # statik anahtarları listeler

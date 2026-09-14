@@ -42,7 +42,7 @@ Onaylanan tasarım bölümleri: §4 mimari, §5 sözleşmeler, §6–§8 kimlik/
 
 ## 3. Mevcut durumdan ölçülmüş olgular
 
-- **TED/tedy.online** tek öğrenci (Işık) için özel bir aile panosudur: Flask + Gunicorn (1 işçi) systemd **user**
+- **TED/tedy.online** tek öğrenci (Işık) için özel bir aile panosudur: Flask + Gunicorn (2 gthread işçisi × 4 iş parçacığı; §12b düzeltmesi) systemd **user**
   servisi, `0.0.0.0:8085`, HP (`hp-ai-node`), uzaktan yönetilen Cloudflare tüneli. Önyüz React 19 + Carbon,
   veri `output/` altında düz JSON. Giriş yalnız Google Sign-In; `USER_ROLES` 6 e-posta (`full` / `reader`).
   Tam yetkili `tdyK_` API anahtarları var. CSP / X-Frame-Options yok; modül bazlı ACL yok. Python 3.12;
@@ -70,7 +70,7 @@ Onaylanan tasarım bölümleri: §4 mimari, §5 sözleşmeler, §6–§8 kimlik/
  claude.ai · Codex · Grok · Gemini Spark · Claude Code
             │  OAuth 2.1 (Google girişi, aile listesi)
             ▼
- mcp.tedy.online ──► ted-mcp (TED deposu, ayrı ASGI süreci, 127.0.0.1:8087)
+ mcp.tedy.online ──► ted-mcp (TED deposu, ayrı ASGI süreci, 127.0.0.1:8090)
             │            ├─ rehber (vendored referanslar)
             │            ├─ bağlam (TED dashboard API'si, yalnız 127.0.0.1, `ted-mcp` etiketli tdyK_ anahtar)
             │            ├─ federasyon istemcileri (src/mcp_client.py) ──► mufredat · egitim-kaynak ·
@@ -85,7 +85,7 @@ Onaylanan tasarım bölümleri: §4 mimari, §5 sözleşmeler, §6–§8 kimlik/
 ### 4.1 Bileşenler
 
 1. **`ted-mcp` (orkestratör).** TED deposunda `src/mcp_server/`. Ayrı systemd user birimi `ted-mcp.service`
-   (uvicorn, `127.0.0.1:8087`). Genel adlar `mcp.tedy.online` (`/mcp`, `/oauth/*`, `/.well-known/*`) ve
+   (uvicorn, `127.0.0.1:8090`; port kararı §12b). Genel adlar `mcp.tedy.online` (`/mcp`, `/oauth/*`, `/.well-known/*`) ve
    `modul.tedy.online` (`/m/*`, `/taslak/*`) aynı sürece host yönlendirmesiyle gelir. TED'in veri dizinini,
    `USER_ROLES`'u (tek kaynak — `dashboard_api.py`'den yeni `src/roles.py` modülüne taşınır ve iki süreç de
    oradan import eder; `dashboard_api.py` import edilmez, çünkü Flask uygulamasını ve gizli anahtar denetimini
@@ -433,14 +433,41 @@ planında yer alır.
   sınırlayıcıda çalışır; kimlik doğrulama, token ve depo yolları böylece her zaman iş parçacığı bulur. Her araç
   60 sn'lik bir son tarih hesaplar ve her federasyon çağrısının zaman aşımı kalan bütçeyle sınırlanır (en çok
   25 sn); bütçenin karşılayamadığı çağrı yapılmaz ve `degraded:zaman_asimi` olarak bildirilir.
+- **Port (alt proje 3, 2026-09-14):** §4.1'deki `127.0.0.1:8087` hp-ai-node'da Docker `climax-sabnzbd` kapsayıcısı
+  (`climax-acquisition`) tarafından tutuluyor (ölçüm 2026-09-14); 8090–8095 boş. **Karar:** `ted-mcp`
+  `127.0.0.1:8090`'a bağlanır. Kod varsayılanı (`http_app.DEFAULT_PORT`) ile izlenen birim dosyası
+  (`ted-mcp.service`, `Environment=TED_MCP_PORT=8090`) aynı değeri taşır; `tests/test_deploy_units.py` ikisini eşitler.
+- **Topoloji ile sırların ayrımı (alt proje 3):** Gizli olmayan değerler (`TED_MCP_HOST`, `TED_MCP_PORT`,
+  `TED_MCP_PUBLIC_BASE_URL`, `TED_MCP_ALLOWED_HOSTS`, `TED_DASHBOARD_API_URL`) izlenen birimin `Environment=`
+  satırlarındadır; `.env` yalnız sırları taşır (`TED_MCP_FORM_SECRET`, `TED_DASHBOARD_API_KEY` ve `API_KEYS`'teki
+  `ted-mcp:` girdisi, filo anahtarları). systemd'de `EnvironmentFile=` aynı adı `Environment=`'ın üstüne yazdığından
+  topoloji adları `.env`'de bulunmaz; `python -m src.mcp_server.env_prep durum` bunu denetler. `TED_MCP_PROJECT_ROOT`
+  üretimde tanımsızdır, çünkü `keys` CLI'si kökü kodun konumundan alır ve servis aynı kökü kullanmalıdır.
+- **Cloudflare (alt proje 3):** `.env`'deki `CLOUDFLARE_ZONE_ID` ve `CLOUDFLARE_TUNNEL_ID` `cureonics.com` bölgesine
+  ve eski `pi-dashboard` tüneline aittir (ölçüm 2026-09-14). `mcp.tedy.online` rotası `src/mcp_server/tunnel_route.py`
+  ile eklenir: bölge ve tünel adla çözülür; ingress birleştirilir (yeni kural catch-all'dan hemen önce, mevcut kurallar
+  düşmez); yazmadan önce kuru çalıştırma farkı, kural sayısı kilidi ve "tam bir eklenen, sıfır silinen" kilidi; tüm
+  yapılandırmanın yedeği; DNS `mcp.tedy.online` → `<tünel-id>.cfargotunnel.com` proxied CNAME. CureoHub
+  `scripts/sync_hp_tunnel_ingress.py` yeniden kullanılmadı: kaldırma kipi yok, DNS hatasında çıkış kodu 0, bölgeyi adla
+  çözmüyor, üç yabancı env dosyasını yüklüyor.
+- **Google origin (alt proje 3):** Onay sayfası GSI'yı JavaScript geri çağrı kipinde kullanır (`data-callback`;
+  `data-login_uri` yok). Google Cloud konsolunda yalnız **Authorized JavaScript origin** `https://mcp.tedy.online`
+  eklenir; yönlendirme URI'si gerekmez. Canlı kabul bu insan adımına bağlı değildir: CLI'yle `full` rol için üretilmiş
+  gerçek bir `tdyM_` anahtarıyla (§6.1 yedeği) yapılır.
+- **Tek-yazar notu (alt proje 3):** `keys` CLI'si servisle aynı SQLite dosyasına yazar; SQLite işlemleriyle güvenlidir
+  ve §4.2'nin JSON dosyaları için koyduğu kuralı değiştirmez (CLI `ted-mcp`'nin parçasıdır).
+- **Güvenlik kapısı (alt proje 3):** Otomatik güvenlik incelemesi kullanılamadığından kimlik yüzeyinin ayrı bir gözden
+  geçirenle incelenmesi temiz çıkmadan hiçbir genel DNS kaydı ya da ingress kuralı oluşturulmaz.
+- **Ölçüm düzeltmesi (alt proje 3):** §3'teki "Gunicorn (1 işçi)" yanlıştı; kurulu birim `--workers 2 --worker-class
+  gthread --threads 4` (ölçüm 2026-09-14). Depodaki izlenen `ted-dashboard.service` kopyası da kurulu birimle eşitlenir.
 
 ## 13. Varsayımlar ve riskler
 
 | Risk / varsayım | Etki | Azaltma |
 |---|---|---|
-| TED tek Gunicorn işçisi | Dashboard'da ilerleme/bilet çağrıları hafif; ağır iş ted-mcp'de | Ağır işler dashboard'a girmez |
-| Cloudflare tüneli uzaktan yönetiliyor | Yeni hostname'ler yerel config'le eklenemez | `.env`'deki `CLOUDFLARE_API_TOKEN`/`TUNNEL_ID` ile API üzerinden ingress + DNS (alt proje 3) |
-| Google OAuth istemcisi yeni origin ister | `mcp.tedy.online` girişi çalışmaz | Google Cloud konsolunda yetkili origin ekleme — insan adımı, alt proje 3'te |
+| TED dashboard'u 2 gthread işçisi × 4 iş parçacığı (8 eşzamanlı yuva) | Dashboard'da ilerleme/bilet çağrıları hafif; ağır iş ted-mcp'de | Ağır işler dashboard'a girmez |
+| Cloudflare tüneli uzaktan yönetiliyor | Yeni hostname'ler yerel config'le eklenemez | `CLOUDFLARE_API_TOKEN` ile API üzerinden, bölge (`tedy.online`) ve tünel (`hp-ai-node`) **adla** çözülerek birleştirici ingress + DNS (`src/mcp_server/tunnel_route.py`; alt proje 3, §12b) |
+| Google OAuth istemcisi yeni origin ister | `mcp.tedy.online` girişi çalışmaz | Google Cloud konsolunda yetkili **JavaScript** origin ekleme (yönlendirme URI'si gerekmez) — insan adımı, alt proje 3'te |
 | Grok özel connector ücretli plan | Grok yüzeyi plan gerektirir | Kurulum belgesinde açıkça yazılır |
 | Medya fiyatları tahmini | Bütçe gerçek faturadan sapabilir | `pricing.json` elle; `edupedia_durum`'da "tahmin" etiketi |
 | anamnesis `STRICT_COLLECTION` | Kapsamsız çağrı reddedilir | Her çağrı `edupedia:run:<run_id>` koleksiyonuyla |

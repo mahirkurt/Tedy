@@ -34,6 +34,9 @@ from src.mcp_server.google_identity import IdentityError
 from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
 REALM = "ted-mcp"
+DEFAULT_HOST = "127.0.0.1"
+# 8087 (spec's first choice) is held by another service on hp-ai-node; spec §4.1 and §12b.
+DEFAULT_PORT = 8090
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 OAUTH_MAX_BODY_BYTES = 16_384
@@ -667,8 +670,8 @@ def main() -> None:
 
     load_env()
     app = create_app_from_env()
-    uvicorn.run(app, host=os.environ.get("TED_MCP_HOST", "127.0.0.1"),
-                port=int(os.environ.get("TED_MCP_PORT", "8087")), log_level="info")
+    uvicorn.run(app, host=os.environ.get("TED_MCP_HOST", DEFAULT_HOST),
+                port=int(os.environ.get("TED_MCP_PORT", str(DEFAULT_PORT))), log_level="info")
 
 
 if __name__ == "__main__":

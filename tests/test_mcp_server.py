@@ -400,3 +400,28 @@ def test_durum_live_probe_uses_the_same_deadline_for_every_fleet_call(tmp_path):
     assert len(fed.deadlines) == 3
     assert len(set(fed.deadlines)) == 1
     assert fed.deadlines[0] is not None
+
+
+@pytest.mark.parametrize("env,expected", [
+    ({}, ("127.0.0.1", 8090)),
+    ({"TED_MCP_HOST": "127.0.0.1", "TED_MCP_PORT": "8093"}, ("127.0.0.1", 8093)),
+])
+def test_main_binds_loopback_on_spec_port(monkeypatch, env, expected):
+    """8087 is taken on hp-ai-node (spec §12b); the process default must be the spec port."""
+    import uvicorn
+
+    from src import env_loader
+
+    for name in ("TED_MCP_HOST", "TED_MCP_PORT"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(env_loader, "load_env", lambda *a, **k: None)
+    sentinel = object()
+    monkeypatch.setattr(http_app, "create_app_from_env", lambda: sentinel)
+    seen = {}
+    monkeypatch.setattr(uvicorn, "run", lambda app, host, port, log_level: seen.update(app=app, host=host, port=port))
+    http_app.main()
+    assert (seen["host"], seen["port"]) == expected
+    assert seen["app"] is sentinel
+    assert (http_app.DEFAULT_HOST, http_app.DEFAULT_PORT) == ("127.0.0.1", 8090)
