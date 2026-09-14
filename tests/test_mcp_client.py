@@ -320,6 +320,9 @@ class _ObservableLock:
     def release(self) -> None:
         self._real.release()
 
+    def locked(self) -> bool:
+        return self._real.locked()
+
 
 def test_concurrent_cold_start_initializes_exactly_once():
     """Two tool threads racing a cold client must not both run _initialize: only one
@@ -427,16 +430,18 @@ def _hold_lock_then_release_on(lock: threading.Lock, grabbed: threading.Event, r
 
 
 def test_lock_timeout_at_the_next_id_step_returns_timeout_without_posting(monkeypatch):
-    """fix round 1 Important #1: _next_id's own lock acquisition takes the deadline too. With an
-    already-warm session, _ensure_session never touches the lock at all — only building the
-    request id does — so a thread blocked there past its deadline must time out rather than wait
-    unboundedly behind another thread holding the lock (e.g. mid re-initialize elsewhere)."""
+    """fix round 1 Important #1 (updated for fix round 2 Ruling R2-1(c)): _next_id's own lock
+    acquisition takes the deadline too. With an already-warm session, _ensure_session never
+    touches any lock at all — only building the request id does, on self._id_lock (its own
+    dedicated lock since round 2, independent of the session lock) — so a thread blocked there
+    past its deadline must time out rather than wait unboundedly behind another thread holding
+    that lock (e.g. mid id-build elsewhere)."""
     monkeypatch.setattr(mcp_client, "_monotonic", lambda: 0.0)
     session = _FakeSession([])
     c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=session)
     c._sid, c._sid_at = "sid-warm", time.time()
     grabbed, release = threading.Event(), threading.Event()
-    holder = _hold_lock_then_release_on(c._lock, grabbed, release)
+    holder = _hold_lock_then_release_on(c._id_lock, grabbed, release)
 
     out = c.call_tool("t", {}, timeout=0.1)
 
@@ -551,7 +556,11 @@ def test_sessionless_server_runs_concurrent_handshakes_unlocked():
 
 def test_sessionless_client_returns_to_the_locked_path_if_a_session_id_appears():
     """If a server previously discovered sessionless suddenly returns a session id, the client
-    must stop treating it as sessionless and use the locked double-checked path again."""
+    must stop treating it as sessionless — but per fix round 2 Ruling R2-1(d), the unlocked
+    handshake that saw the surprise id must NOT publish it to self._sid itself (that would be an
+    unsynchronized write, racing a concurrent locked handshake elsewhere); it only flips the
+    flag, through the properly-synchronized _acquire, so future calls take the locked path and
+    establish a session there instead."""
 
     class _FlipSession:
         def post(self, url, headers=None, data=None, timeout=None):
@@ -571,7 +580,7 @@ def test_sessionless_client_returns_to_the_locked_path_if_a_session_id_appears()
 
     assert out.ok is True
     assert c._sessionless is False
-    assert c._sid == "sid-appeared"
+    assert c._sid is None  # the surprise id is discarded, never published from the unlocked path
 
 
 def test_stale_session_error_reset_does_not_clear_a_newer_session_id():
@@ -612,3 +621,158 @@ def test_stale_session_error_reset_does_not_clear_a_newer_session_id():
     tool_call_requests = [r for r in session.requests if r["body"]["method"] == "tools/call"]
     assert [r["headers"].get("mcp-session-id") for r in tool_call_requests] == \
         ["sid-old", "sid-new-from-another-thread"]
+
+
+# -- SP2 residual fix round 2: R2-1 — discovery-burst unlocking; sessionless misclassification --
+
+def test_discovery_burst_unlocks_after_first_thread_learns_sessionless():
+    """R2-1 test 1: a discovery burst — multiple threads racing a cold, stateless client — must
+    not all serialize behind the lock. Thread 1 wins the lock and discovers sessionless (its
+    initialize deliberately blocks so we can control timing); thread 2 queues behind the SAME
+    lock (proven via the observable-lock pattern, not timing). Once thread 1 discovers
+    sessionless and releases, thread 2 must re-check the flag (Ruling R2-1(b)), release, and
+    post its OWN initialize with the lock NOT held — never running its own redundant locked
+    handshake.
+
+    Mutation guard: removing the `self._sessionless = True` write in _ensure_session's locked
+    branch makes this red — thread 2 then never sees the flag and runs its own handshake WHILE
+    still holding the lock, so `second_init_lock_state` observes `True` instead of `False`."""
+    first_entered = threading.Event()
+    release_first = threading.Event()
+    t2_waiting = threading.Event()
+    second_init_lock_state = []
+    c_holder: dict[str, McpClient] = {}
+
+    class _StatelessBurstSession:
+        def __init__(self):
+            self._first = True
+
+        def post(self, url, headers=None, data=None, timeout=None):
+            body = json.loads(data)
+            method = body.get("method")
+            if method == "initialize":
+                if self._first:
+                    self._first = False
+                    first_entered.set()
+                    release_first.wait(5)
+                else:
+                    second_init_lock_state.append(c_holder["c"]._lock.locked())
+                return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"), "result": {
+                    "protocolVersion": "2025-06-18", "serverInfo": {"name": "fake", "version": "1"}}}))
+            if method == "notifications/initialized":
+                return _Resp("", headers={})
+            return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
+                                     "result": {"content": [{"type": "text", "text": "ok"}]}}))
+
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=_StatelessBurstSession())
+    c._lock = _ObservableLock(t2_waiting)
+    c_holder["c"] = c
+    results = {}
+
+    def call(slot):
+        results[slot] = c.call_tool("t", {})
+
+    t1 = threading.Thread(target=call, args=(1,))
+    t1.start()
+    assert first_entered.wait(5), "thread 1 never reached its initialize"
+
+    t2 = threading.Thread(target=call, args=(2,))
+    t2.start()
+    assert t2_waiting.wait(5), "thread 2 never contended for the session lock"
+
+    release_first.set()
+    t1.join(5)
+    t2.join(5)
+    assert not t1.is_alive() and not t2.is_alive()
+
+    assert results[1].ok and results[2].ok
+    assert c._sessionless is True
+    # Thread 2's own initialize posted with the session lock free — it took the fast unlocked
+    # path instead of running its own redundant locked handshake.
+    assert second_init_lock_state == [False]
+
+
+def test_next_id_does_not_wait_behind_an_in_flight_handshake(monkeypatch):
+    """R2-1 test 2 (Ruling R2-1(c)): the id counter has its own lock, independent of the session
+    lock — a thread building an id must not wait behind another thread's in-flight handshake
+    (simulated here directly by holding self._lock, whether that lock would otherwise be held by
+    a locked or an unlocked handshake makes no difference to _next_id)."""
+    monkeypatch.setattr(mcp_client, "_monotonic", lambda: 0.0)
+    session = _FakeSession([])
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=session)
+    c._sid, c._sid_at = "sid-warm", time.time()  # _ensure_session will be a no-op
+
+    grabbed = threading.Event()
+    release = threading.Event()
+    holder = _hold_lock_then_release_on(c._lock, grabbed, release)
+
+    completed = threading.Event()
+    got_id = {}
+
+    def build_id():
+        got_id["value"] = c._next_id(None)
+        completed.set()
+
+    worker = threading.Thread(target=build_id)
+    worker.start()
+    assert completed.wait(2), "_next_id waited behind the session lock instead of its own"
+
+    release.set()
+    holder.join(5)
+    worker.join(5)
+    assert got_id["value"] == 1
+
+
+def test_error_initialize_without_session_header_leaves_sessionless_flag_unset():
+    """R2-1 test 3 (Ruling R2-1(a)): only a genuine successful JSON-RPC result (has "result", no
+    "error") with no session id marks the server sessionless. An error response — e.g. a proxy
+    rate-limit page returned as JSON — must never flip the flag; a mutation removing the
+    `init_ok` check (treating any header-less initialize as sessionless) would make this red."""
+
+    class _RateLimitedSession:
+        def post(self, url, headers=None, data=None, timeout=None):
+            body = json.loads(data)
+            method = body.get("method")
+            if method == "initialize":
+                return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
+                                         "error": {"code": -32000, "message": "rate limited"}}))
+            if method == "notifications/initialized":
+                return _Resp("", headers={})
+            return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
+                                     "result": {"content": [{"type": "text", "text": "ok"}]}}))
+
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=_RateLimitedSession())
+
+    out = c.call_tool("t", {})
+
+    assert out.ok is True  # the tools/call itself still went through on our fake, unrelated
+    assert c._sessionless is False
+
+
+def test_unlocked_handshake_never_touches_a_published_session_id():
+    """R2-1 test 4 (Ruling R2-1(d)): the unlocked (sessionless) handshake must never write
+    self._sid — not even to null it at the start, and not even with its own discovered id if the
+    server surprises it with one. A concurrent locked handshake elsewhere could be publishing a
+    fresh id at the exact same moment; writing from here (even transiently to None) would race
+    and wipe it."""
+
+    class _SurpriseSession:
+        def post(self, url, headers=None, data=None, timeout=None):
+            body = json.loads(data)
+            method = body.get("method")
+            if method == "initialize":
+                # Surprises the unlocked path with an actual session id.
+                return _init_resp("sid-surprise")
+            if method == "notifications/initialized":
+                return _Resp("", headers={})
+            return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
+                                     "result": {"content": [{"type": "text", "text": "ok"}]}}))
+
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=_SurpriseSession())
+    c._sessionless = True
+    c._sid = "sid-from-a-locked-handshake"  # simulates a fresh publish by another thread
+
+    c._run_sessionless_handshake(None)
+
+    assert c._sid == "sid-from-a-locked-handshake"  # untouched despite a session id appearing
+    assert c._sessionless is False  # the flag still flips so future calls take the locked path
