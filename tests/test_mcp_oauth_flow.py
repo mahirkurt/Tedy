@@ -3,6 +3,7 @@ import base64
 import hashlib
 import json
 import re
+import threading
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -46,18 +47,59 @@ class Clock:
         return self.now
 
 
-class Verifier:
-    """Test double: the 'credential' is the email; asserts the nonce binds to form_state."""
+def _b64u(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
-    def __init__(self):
+
+def _credential(email: str) -> str:
+    """JWT-shaped stand-in for a Google credential that carries the email in its middle segment."""
+    return f"{_b64u(b'{}')}.{_b64u(email.encode())}.{_b64u(b'sig')}"
+
+
+class Verifier:
+    """Test double: the credential carries the email; asserts the nonce binds to form_state."""
+
+    def __init__(self, park=None):
         self.expected_nonce = None
         self.error = None
+        self.calls = 0
+        self.park = park or (lambda name: None)
 
     def __call__(self, credential, nonce):
+        self.calls += 1
+        self.park("verify_identity")
         assert nonce == self.expected_nonce
         if self.error:
             raise IdentityError(self.error)
-        return credential
+        try:
+            middle = credential.split(".")[1]
+            return base64.urlsafe_b64decode(middle + "=" * (-len(middle) % 4)).decode()
+        except (IndexError, ValueError):
+            return credential
+
+
+class ParkingStore(OAuthStore):
+    """OAuthStore whose methods can park their worker until the test releases it."""
+
+    def __init__(self, path, clock, park):
+        super().__init__(path, clock=clock)
+        self.park = park
+
+    def principal(self, bearer):
+        self.park("principal")
+        return super().principal(bearer)
+
+    def issue_code(self, *args, **kwargs):
+        self.park("issue_code")
+        return super().issue_code(*args, **kwargs)
+
+    def redeem_code(self, *args, **kwargs):
+        self.park("redeem_code")
+        return super().redeem_code(*args, **kwargs)
+
+    def refresh(self, *args, **kwargs):
+        self.park("refresh")
+        return super().refresh(*args, **kwargs)
 
 
 @pytest.fixture
@@ -113,7 +155,7 @@ def test_authorize_get_rejects_bad_requests(ctx, over, reason):
 def test_full_round_trip_to_mcp_and_refresh(ctx):
     client, verifier, _, _ = ctx
     form_state = _start(client, verifier)
-    r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": FULL})
+    r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)})
     assert r.status_code == 302
     loc = urlparse(r.headers["location"])
     assert f"{loc.scheme}://{loc.netloc}{loc.path}" == REDIRECT
@@ -143,7 +185,7 @@ def test_full_round_trip_to_mcp_and_refresh(ctx):
 def test_reader_role_is_refused_without_code(ctx):
     client, verifier, _, _ = ctx
     form_state = _start(client, verifier)
-    r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": READER})
+    r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(READER)})
     assert r.status_code == 403
     assert "location" not in r.headers
 
@@ -152,7 +194,7 @@ def test_identity_failure_is_401(ctx):
     client, verifier, _, _ = ctx
     form_state = _start(client, verifier)
     verifier.error = "nonce_mismatch"
-    r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": FULL})
+    r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)})
     assert r.status_code == 401
 
 
@@ -161,9 +203,9 @@ def test_tampered_and_expired_form_state(ctx):
     form_state = _start(client, verifier)
     payload, sig = form_state.split(".")
     tampered = payload[:-2] + ("AA" if payload[-2:] != "AA" else "BB") + "." + sig
-    assert client.post("/oauth/authorize", data={"form_state": tampered, "credential": FULL}).status_code == 400
+    assert client.post("/oauth/authorize", data={"form_state": tampered, "credential": _credential(FULL)}).status_code == 400
     clock.now += http_app.FORM_TTL_SECONDS + 1
-    r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": FULL})
+    r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)})
     assert r.status_code == 400
     assert "form_state_expired" in r.text
 
@@ -203,3 +245,88 @@ def test_build_app_requires_form_secret(tmp_path):
     settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
     with pytest.raises(ValueError):
         http_app.build_app(settings, OAuthStore(tmp_path / "o.sqlite3"), _test_mcp(), form_secret=b"short")
+
+
+# -- S1a / F1: malformed credentials never reach the verifier ---------------------------
+
+@pytest.mark.parametrize("credential", [
+    "not-a-jwt", "a.b.c.d", pytest.param("a" * 4093 + ".b.c", id="4097-bytes"), "a.b+c.d", "a..c", "",
+])
+def test_malformed_credential_is_invalid_token_without_calling_the_verifier(ctx, credential):
+    client, verifier, _, _ = ctx
+    form_state = _start(client, verifier)
+    r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": credential})
+    assert r.status_code == 401
+    assert r.text == "Google kimliği doğrulanamadı: invalid_token"
+    assert "location" not in r.headers
+    assert verifier.calls == 0
+
+
+def test_missing_credential_is_invalid_token_without_calling_the_verifier(ctx):
+    client, verifier, _, _ = ctx
+    form_state = _start(client, verifier)
+    r = client.post("/oauth/authorize", data={"form_state": form_state})
+    assert r.status_code == 401
+    assert r.text == "Google kimliği doğrulanamadı: invalid_token"
+    assert verifier.calls == 0
+
+
+# -- S1a / F1: blocking auth work runs off the event loop -------------------------------
+
+LOOP_FREE_WITHIN_SECONDS = 2.0
+
+
+@pytest.mark.parametrize("blocked", ["verify_identity", "issue_code", "redeem_code", "refresh", "principal"])
+def test_blocked_auth_work_leaves_the_event_loop_free(tmp_path, blocked):
+    entered, release = threading.Event(), threading.Event()
+
+    def park(name):
+        if name == blocked:
+            entered.set()
+            release.wait(10)
+
+    clock = Clock()
+    store = ParkingStore(tmp_path / "oauth.sqlite3", clock, park)
+    verifier = Verifier(park=park)
+    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
+    app = http_app.build_app(settings, store, _test_mcp(), verify_identity=verifier,
+                             form_secret=b"s" * 32, clock=clock)
+    with TestClient(app, base_url=BASE, follow_redirects=False) as client:
+        form_state = _start(client, verifier)
+        consent = {"form_state": form_state, "credential": _credential(FULL)}
+        calls = {
+            "verify_identity": lambda: client.post("/oauth/authorize", data=consent),
+            "issue_code": lambda: client.post("/oauth/authorize", data=consent),
+            "redeem_code": lambda: client.post("/oauth/token", data={
+                "grant_type": "authorization_code", "code": "nope", "redirect_uri": REDIRECT,
+                "client_id": http_app.CLIENT_ID, "code_verifier": VERIFIER}),
+            "refresh": lambda: client.post("/oauth/token", data={
+                "grant_type": "refresh_token", "refresh_token": "nope", "client_id": http_app.CLIENT_ID}),
+            "principal": lambda: client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "initialize"},
+                                             headers={**MCP_HEADERS, "authorization": "Bearer nope"}),
+        }
+        outcome = {}
+
+        def run(key, call):
+            try:
+                outcome[key] = call()
+            except Exception as exc:  # surfaced by the assertions below
+                outcome[key] = exc
+
+        worker = threading.Thread(target=run, args=("blocked", calls[blocked]))
+        probe = threading.Thread(target=run, args=("health", lambda: client.get("/health")))
+        worker.start()
+        try:
+            assert entered.wait(5), f"{blocked} was never reached"
+            probe.start()
+            probe.join(LOOP_FREE_WITHIN_SECONDS)
+            assert not probe.is_alive(), f"/health stalled while {blocked} was blocked: it runs on the event loop"
+            assert outcome["health"].status_code == 200
+        finally:
+            release.set()
+            worker.join(10)
+            if probe.ident is not None:
+                probe.join(10)
+    assert not worker.is_alive()
+    assert not isinstance(outcome.get("blocked"), Exception), outcome.get("blocked")
+    assert outcome["blocked"].status_code in {302, 400, 401}

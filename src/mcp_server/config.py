@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Mapping
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_MCP_MAX_BODY_BYTES = 2_097_152
 
 # Canonical fleet endpoints and the env var that carries each key (spec §7).
 SERVER_DEFAULTS: dict[str, tuple[str, str]] = {
@@ -32,6 +33,16 @@ class Settings:
     dashboard_api_url: str
     dashboard_api_key: str
     servers: dict[str, ServerConfig] = field(default_factory=dict)
+    mcp_max_body_bytes: int = DEFAULT_MCP_MAX_BODY_BYTES
+
+
+def _positive_int(env: Mapping[str, str], name: str, default: int) -> int:
+    raw = (env.get(name) or "").strip()
+    if not raw:
+        return default
+    if not (raw.isascii() and raw.isdigit()) or int(raw) <= 0:
+        raise ValueError(f"{name} must be a positive integer number of bytes, got {raw!r}")
+    return int(raw)
 
 
 def load_settings(env: Mapping[str, str] | None = None, project_root: Path | None = None) -> Settings:
@@ -53,4 +64,5 @@ def load_settings(env: Mapping[str, str] | None = None, project_root: Path | Non
         dashboard_api_url=(env.get("TED_DASHBOARD_API_URL") or "http://127.0.0.1:8085").rstrip("/"),
         dashboard_api_key=(env.get("TED_DASHBOARD_API_KEY") or "").strip(),
         servers=servers,
+        mcp_max_body_bytes=_positive_int(env, "TED_MCP_MAX_BODY_BYTES", DEFAULT_MCP_MAX_BODY_BYTES),
     )

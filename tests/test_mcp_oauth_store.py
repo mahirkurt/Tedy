@@ -1,6 +1,7 @@
 """OAuth store: single-use S256 codes, rotating refresh with reuse revocation, tdyM_ keys."""
 import base64
 import hashlib
+import sqlite3
 import stat
 
 import pytest
@@ -155,3 +156,47 @@ def test_keys_cli_create_list_revoke(store, capsys):
     assert keys.main(["iptal", "--etiket", "grok"], store=store) == 0
     assert store.principal(created) is None
     assert keys.main(["olustur", "--etiket", "x", "--email", READER], store=store) == 2
+
+
+# -- S1a / R4: WAL and busy_timeout -------------------------------------------------------
+
+def test_connections_use_wal_and_a_five_second_busy_timeout(store):
+    with store._connect() as conn:
+        assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+        assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
+
+
+def test_writer_commits_while_another_connection_holds_a_read_transaction(tmp_path, store):
+    reader = sqlite3.connect(tmp_path / "oauth.sqlite3", isolation_level=None, timeout=0)
+    try:
+        reader.execute("BEGIN")
+        assert reader.execute("SELECT COUNT(*) FROM oauth_code").fetchone()[0] == 0
+        code = store.issue_code(FULL, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")  # must not wait
+        assert reader.execute("SELECT COUNT(*) FROM oauth_code").fetchone()[0] == 0  # reader keeps its snapshot
+        reader.execute("COMMIT")
+    finally:
+        reader.close()
+    assert store.redeem_code(code, CLIENT, REDIRECT, VERIFIER) is not None
+
+
+def test_reader_is_not_blocked_by_an_open_write_transaction(tmp_path, store):
+    pair = _pair(store)
+    writer = sqlite3.connect(tmp_path / "oauth.sqlite3", isolation_level=None, timeout=0)
+    try:
+        writer.execute("BEGIN IMMEDIATE")
+        writer.execute("UPDATE oauth_access SET revoked_at = 1")  # uncommitted
+        assert store.principal(pair.access_token) == FULL
+        writer.execute("ROLLBACK")
+    finally:
+        writer.close()
+    assert store.principal(pair.access_token) == FULL
+
+
+def test_wal_side_files_are_private(tmp_path, store):
+    path = tmp_path / "oauth.sqlite3"
+    with store._connect() as held:  # WAL and SHM exist only while a connection is open
+        held.execute("SELECT COUNT(*) FROM oauth_code").fetchone()
+        store.issue_code(FULL, CLIENT, REDIRECT, _challenge(VERIFIER), "S256")
+        for suffix in ("-wal", "-shm"):
+            side = path.with_name(path.name + suffix)
+            assert stat.S_IMODE(side.stat().st_mode) == 0o600, suffix

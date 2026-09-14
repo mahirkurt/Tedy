@@ -8,10 +8,12 @@ import html
 import json
 import time
 from typing import Any, Callable, Mapping
-from urllib.parse import urlencode, urlparse, urlunparse, parse_qsl
+from urllib.parse import urlencode, urlparse, urlsplit, urlunparse, parse_qsl
 
+import anyio
 from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
+from starlette.datastructures import FormData
 from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -20,7 +22,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from src.mcp_server import __version__
 from src.mcp_server.config import Settings
-from src.mcp_server.google_identity import IdentityVerifier, verify_google_credential
+from src.mcp_server.google_identity import IdentityVerifier, is_well_formed_credential, verify_google_credential
 from src.mcp_server.oauth_redirect import is_allowed_cors_origin, is_allowed_redirect
 from src.mcp_server.oauth_store import OAuthStore
 from src import roles
@@ -32,6 +34,7 @@ REALM = "ted-mcp"
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 FORM_TTL_SECONDS = 600
+OAUTH_MAX_BODY_BYTES = 16_384
 _FORM_KEYS = ("client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method", "scope", "resource")
 
 
@@ -148,17 +151,36 @@ class CorsMiddleware:
         await self.app(scope, receive, send_with_cors)
 
 
+def _host_name(host_header: str) -> str | None:
+    """Lower-cased host of a Host header that is exactly host[:port] with port 1-65535, else None."""
+    if not host_header or not host_header.isascii() or host_header.endswith(":"):
+        return None
+    # urlsplit silently drops tabs and newlines, so refuse whitespace and control bytes first.
+    if any(c.isspace() or not c.isprintable() for c in host_header):
+        return None
+    try:
+        parts = urlsplit("//" + host_header)
+        port = parts.port  # ValueError for a non-numeric or out-of-range port
+    except ValueError:
+        return None
+    if parts.hostname is None or "@" in parts.netloc or parts.path or parts.query or parts.fragment:
+        return None
+    if port is not None and not 1 <= port <= 65535:
+        return None
+    return parts.hostname
+
+
 class HostGuardMiddleware:
     """DNS-rebinding guard for /mcp: only the public host(s) and loopback."""
 
     def __init__(self, app: ASGIApp, allowed_hosts: tuple[str, ...]) -> None:
         self.app = app
-        self.allowed = set(allowed_hosts) | _LOOPBACK_HOSTS
+        self.allowed = {h.lower() for h in allowed_hosts} | _LOOPBACK_HOSTS
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "http" and scope["path"].startswith("/mcp"):
-            host = _header(scope, b"host").rsplit(":", 1)[0].strip("[]").lower()
-            if host not in self.allowed:
+            host = _host_name(_header(scope, b"host"))
+            if host is None or host not in self.allowed:
                 await _send_json(send, 400, {"error": "host_not_allowed"})
                 return
         await self.app(scope, receive, send)
@@ -176,13 +198,86 @@ class BearerGateMiddleware:
         if scope["type"] == "http" and scope["path"].startswith("/mcp"):
             auth = _header(scope, b"authorization")
             token = auth[7:].strip() if auth[:7].lower() == "bearer " else ""
-            email = self.store.principal(token) if token else None
+            # SQLite lookup off the event loop: a lock held elsewhere must not stall every request.
+            email = await anyio.to_thread.run_sync(self.store.principal, token) if token else None
             if email is None:
                 await _send_json(send, 401, {"error": "unauthorized"},
                                  [(b"www-authenticate", self.challenge.encode("latin-1"))])
                 return
             scope.setdefault("state", {})["ted_email"] = email
         await self.app(scope, receive, send)
+
+
+class BodyLimitMiddleware:
+    """Caps request bodies before anything buffers them: 16 KiB on /oauth/*, a setting on /mcp.
+
+    A declared Content-Length over the cap is refused without calling the app. Streamed bytes are
+    counted too, so a missing or understated Content-Length cannot slip past: once the cap is
+    crossed the client gets 413 and the app sees a disconnect; anything the app still tries to
+    send, or raises because its body was cut off, is dropped because the 413 owns the response.
+    """
+
+    def __init__(self, app: ASGIApp, mcp_max_body_bytes: int) -> None:
+        self.app = app
+        self.mcp_max_body_bytes = mcp_max_body_bytes
+
+    def _limit_for(self, path: str) -> int | None:
+        if path == "/oauth" or path.startswith("/oauth/"):
+            return OAUTH_MAX_BODY_BYTES
+        if path.startswith("/mcp"):
+            return self.mcp_max_body_bytes
+        return None
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        limit = self._limit_for(scope["path"]) if scope["type"] == "http" else None
+        if limit is None:
+            await self.app(scope, receive, send)
+            return
+        declared = _header(scope, b"content-length")
+        if declared.isascii() and declared.isdigit() and int(declared) > limit:
+            await _send_too_large(send)
+            return
+
+        received = 0
+        rejected = False
+        response_started = False
+
+        async def limited_receive() -> dict[str, Any]:
+            nonlocal received, rejected
+            if rejected:
+                return {"type": "http.disconnect"}
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > limit:
+                    rejected = True
+                    if not response_started:
+                        await _send_too_large(send)
+                    return {"type": "http.disconnect"}
+            return message
+
+        async def guarded_send(message: dict[str, Any]) -> None:
+            nonlocal response_started
+            if rejected:
+                return
+            if message["type"] == "http.response.start":
+                response_started = True
+            await send(message)
+
+        try:
+            await self.app(scope, limited_receive, guarded_send)
+        except Exception:
+            if not rejected:
+                raise
+
+
+async def _send_too_large(send: Send) -> None:
+    # The unread remainder of the body is never consumed, so the connection is not reusable.
+    await _send_json(send, 413, {"error": "payload_too_large"}, [(b"connection", b"close")])
+
+
+async def _limited_form(request: Request) -> FormData:
+    return await request.form(max_files=0, max_fields=20, max_part_size=8192)
 
 
 def build_app(
@@ -265,20 +360,25 @@ def build_app(
             )
             return HTMLResponse(page, headers={"cache-control": "no-store", "x-frame-options": "DENY"})
 
-        form = await request.form()
+        form = await _limited_form(request)
         form_state = str(form.get("form_state", ""))
         try:
             params = read_form_state(form_state, form_secret, clock())
         except ValueError as exc:
             return PlainTextResponse(str(exc), status_code=400)
+        credential = str(form.get("credential", ""))
         try:
-            email = verify_identity(str(form.get("credential", "")), nonce_for(form_state))
+            # Garbage never reaches the verifier (or Google); a real credential is verified in a
+            # worker thread because the default verifier may block on a cert fetch.
+            if not is_well_formed_credential(credential):
+                raise IdentityError("invalid_token")
+            email = await anyio.to_thread.run_sync(verify_identity, credential, nonce_for(form_state))
         except IdentityError as exc:
             return PlainTextResponse(f"Google kimliği doğrulanamadı: {exc.reason}", status_code=401)
         if not roles.is_full(email):
             return PlainTextResponse("Bu hesap TEDY edupedia bağlantısını onaylayamaz.", status_code=403)
-        code = store.issue_code(email, params["client_id"], params["redirect_uri"],
-                                params["code_challenge"], params["code_challenge_method"])
+        code = await anyio.to_thread.run_sync(store.issue_code, email, params["client_id"], params["redirect_uri"],
+                                              params["code_challenge"], params["code_challenge_method"])
         extra = {"code": code}
         if params.get("state"):
             extra["state"] = params["state"]
@@ -295,20 +395,20 @@ def build_app(
         return JSONResponse({"error": error}, status_code=400, headers={"cache-control": "no-store"})
 
     async def token(request: Request) -> Response:
-        form = await request.form()
+        form = await _limited_form(request)
         grant = form.get("grant_type")
         client_id = str(form.get("client_id", ""))
         if grant == "authorization_code":
             redirect_uri = str(form.get("redirect_uri", ""))
             if client_id != CLIENT_ID or not is_allowed_redirect(redirect_uri):
                 return _grant_error("invalid_grant")
-            pair = store.redeem_code(str(form.get("code", "")), client_id, redirect_uri,
-                                     str(form.get("code_verifier", "")))
+            pair = await anyio.to_thread.run_sync(store.redeem_code, str(form.get("code", "")), client_id,
+                                                  redirect_uri, str(form.get("code_verifier", "")))
             return _token_response(pair) if pair else _grant_error("invalid_grant")
         if grant == "refresh_token":
             if client_id != CLIENT_ID:
                 return _grant_error("invalid_grant")
-            pair = store.refresh(str(form.get("refresh_token", "")), client_id)
+            pair = await anyio.to_thread.run_sync(store.refresh, str(form.get("refresh_token", "")), client_id)
             return _token_response(pair) if pair else _grant_error("invalid_grant")
         return _grant_error("unsupported_grant_type")
 
@@ -325,6 +425,8 @@ def build_app(
     ]
     # Middleware order: first entry is outermost. Pure ASGI classes keep SSE unbuffered and
     # share scope["state"] with the streamable transport's Request (identity contract).
+    # CORS stays outermost so 400/401/413 all carry CORS headers. The body limit sits innermost:
+    # nothing above it reads the body, and an unauthenticated /mcp call still gets its 401 challenge.
     return Starlette(
         routes=routes,
         lifespan=streamable.router.lifespan_context,
@@ -332,6 +434,7 @@ def build_app(
             Middleware(CorsMiddleware),
             Middleware(HostGuardMiddleware, allowed_hosts=settings.allowed_hosts),
             Middleware(BearerGateMiddleware, store=store, base_url=base),
+            Middleware(BodyLimitMiddleware, mcp_max_body_bytes=settings.mcp_max_body_bytes),
         ],
     )
 

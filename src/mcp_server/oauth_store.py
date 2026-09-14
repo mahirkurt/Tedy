@@ -22,6 +22,7 @@ CODE_TTL_SECONDS = 300
 ACCESS_TTL_SECONDS = 3600
 REFRESH_TTL_SECONDS = 30 * 24 * 3600
 STATIC_KEY_PREFIX = "tdyM_"
+BUSY_TIMEOUT_MS = 5000
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS oauth_code (
@@ -86,6 +87,9 @@ class OAuthStore:
         os.close(fd)
         os.chmod(self._path, 0o600)
         with self._connect() as conn:
+            # WAL is a property of the database file: set once, every later connection inherits it.
+            # Readers then never block the writer (or the reverse), e.g. the keys CLI vs the server.
+            conn.execute("PRAGMA journal_mode=WAL")
             conn.executescript(_SCHEMA)
 
     @contextlib.contextmanager
@@ -93,7 +97,8 @@ class OAuthStore:
         # A plain sqlite3.Connection's own context manager only commits/rolls back a
         # transaction on exit — it never closes the connection. Wrap it ourselves so
         # every `with self._connect() as conn:` call site closes its connection too.
-        conn = sqlite3.connect(self._path, timeout=5.0, isolation_level=None)
+        conn = sqlite3.connect(self._path, timeout=BUSY_TIMEOUT_MS / 1000, isolation_level=None)
+        conn.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
         conn.row_factory = sqlite3.Row
         try:
             yield conn

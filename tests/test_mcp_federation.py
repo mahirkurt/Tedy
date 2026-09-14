@@ -129,3 +129,16 @@ def test_clients_are_reused_per_server(tmp_path):
     fed.call("maarif-mufredat", "list_subjects", {}, beklenen="liste")
     fed.call("maarif-mufredat", "list_subjects", {}, beklenen="liste")
     assert fed._client("maarif-mufredat") is fed._client("maarif-mufredat")
+
+
+def test_mcp_max_body_bytes_defaults_to_2_mib_and_reads_the_environment(tmp_path):
+    assert config.load_settings(_env(), project_root=tmp_path).mcp_max_body_bytes == 2_097_152
+    assert config.load_settings(_env(TED_MCP_MAX_BODY_BYTES=""), project_root=tmp_path).mcp_max_body_bytes == 2_097_152
+    got = config.load_settings(_env(TED_MCP_MAX_BODY_BYTES=" 65536 "), project_root=tmp_path)
+    assert got.mcp_max_body_bytes == 65_536
+
+
+@pytest.mark.parametrize("raw", ["abc", "0", "-1", "1.5", "2MB"])
+def test_mcp_max_body_bytes_rejects_anything_but_a_positive_integer(tmp_path, raw):
+    with pytest.raises(ValueError, match="TED_MCP_MAX_BODY_BYTES"):
+        config.load_settings(_env(TED_MCP_MAX_BODY_BYTES=raw), project_root=tmp_path)
