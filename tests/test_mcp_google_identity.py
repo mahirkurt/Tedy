@@ -279,3 +279,86 @@ def test_cert_fetch_honours_max_age_or_defaults_to_an_hour(headers, max_age):
 def test_unusable_cert_responses_fail_closed_as_transport_errors(response):
     with pytest.raises(google_exceptions.TransportError):
         google_identity.fetch_google_certs(FakeTransport(response))
+
+
+# -- S1b / T3: max-age is clamped to [60, 86400] ------------------------------------------
+
+@pytest.mark.parametrize("cache_control,max_age", [
+    ("max-age=0", 60),
+    ("max-age=59", 60),
+    ("max-age=60", 60),
+    ("max-age=86400", 86400),
+    ("max-age=86401", 86400),
+    ("max-age=" + "9" * 30, 86400),
+    ("max-age=-1", 3600),
+    ("max-age=", 3600),
+    (None, 3600),
+])
+def test_cache_max_age_is_clamped_between_a_minute_and_a_day(cache_control, max_age):
+    assert google_identity.cache_max_age(cache_control) == max_age
+    headers = {} if cache_control is None else {"Cache-Control": cache_control}
+    fake = FakeTransport(FakeResponse(200, headers, b'{"k1": "-----BEGIN CERTIFICATE-----"}'))
+    assert google_identity.fetch_google_certs(fake)[1] == max_age
+
+
+# -- S1b / T4: any fetch failure is a TransportError with backoff ---------------------------
+
+def test_unexpected_fetch_exception_becomes_transport_error_with_backoff(google_keys):
+    signer, _, certs = google_keys
+    clock = Clock()
+    fetch = CountingFetch(certs, error=RuntimeError("bug in the fetcher"))
+    cache = GoogleCertCache(fetch=fetch, clock=clock)
+    token = _id_token(signer)
+    for _ in range(2):
+        with pytest.raises(IdentityError) as exc:
+            verify_google_credential(token, NONCE, cert_cache=cache)
+        assert exc.value.reason == "google_unreachable"
+    assert fetch.calls == 1  # the second caller is inside the backoff window
+    with pytest.raises(google_exceptions.TransportError):
+        cache.certs()
+    assert fetch.calls == 1
+    clock.now += google_identity.CERT_FETCH_RETRY_AFTER_SECONDS
+    fetch.error = None
+    assert verify_google_credential(token, NONCE, cert_cache=cache) == FULL
+    assert fetch.calls == 2
+
+
+# -- S1b / T2: the cert lock is taken with a timeout ----------------------------------------
+
+CERT_LOCK_THRESHOLD_SECONDS = 2.0
+
+
+def test_cert_lock_wait_times_out_as_transport_error(google_keys, monkeypatch):
+    signer, _, certs = google_keys
+    monkeypatch.setattr(google_identity, "CERT_FETCH_TIMEOUT_SECONDS", 0.05)
+    fetch = CountingFetch(certs)
+    cache = GoogleCertCache(fetch=fetch, clock=Clock())
+    held, release = threading.Event(), threading.Event()
+
+    def hold_the_lock():
+        with cache._lock:  # stands in for a fetch that never returns
+            held.set()
+            release.wait(10)
+
+    holder = threading.Thread(target=hold_the_lock)
+    outcome = {}
+
+    def verify():
+        try:
+            outcome["email"] = verify_google_credential(_id_token(signer), NONCE, cert_cache=cache)
+        except IdentityError as exc:
+            outcome["reason"] = exc.reason
+
+    waiter = threading.Thread(target=verify)
+    holder.start()
+    try:
+        assert held.wait(5)
+        waiter.start()
+        waiter.join(CERT_LOCK_THRESHOLD_SECONDS)
+        assert not waiter.is_alive(), "waited on the cert lock without a timeout"
+    finally:
+        release.set()
+        holder.join(10)
+        waiter.join(10)
+    assert outcome == {"reason": "google_unreachable"}
+    assert fetch.calls == 0

@@ -6,6 +6,7 @@ import re
 import threading
 from urllib.parse import parse_qs, urlparse
 
+import anyio
 import pytest
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
@@ -330,3 +331,97 @@ def test_blocked_auth_work_leaves_the_event_loop_free(tmp_path, blocked):
     assert not worker.is_alive()
     assert not isinstance(outcome.get("blocked"), Exception), outcome.get("blocked")
     assert outcome["blocked"].status_code in {302, 400, 401}
+
+
+# -- S1b / T4: an unexpected cert-fetch failure is 401 google_unreachable, not 500 ------------
+
+def test_unexpected_cert_fetch_error_is_401_google_unreachable_with_backoff(tmp_path):
+    import functools
+
+    from src.mcp_server import google_identity
+
+    fetch_calls = []
+
+    def broken_fetch():
+        fetch_calls.append(1)
+        raise RuntimeError("bug in the fetcher")
+
+    clock = Clock()
+    cache = google_identity.GoogleCertCache(fetch=broken_fetch, clock=clock)
+    verify = functools.partial(google_identity.verify_google_credential, cert_cache=cache)
+    store = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
+    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
+    app = http_app.build_app(settings, store, _test_mcp(), verify_identity=verify,
+                             form_secret=b"s" * 32, clock=clock)
+    with TestClient(app, base_url=BASE, follow_redirects=False, raise_server_exceptions=False) as client:
+        for _ in range(2):
+            form_state = _start(client, Verifier())
+            r = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)})
+            assert r.status_code == 401
+            assert r.text == "Google kimliği doğrulanamadı: google_unreachable"
+            assert "location" not in r.headers
+    assert len(fetch_calls) == 1  # the second consent is inside the backoff window
+
+
+# -- S1b / T2: verification has its own limiter; a full one never starves the bearer gate ------
+
+def test_full_verification_limiter_does_not_delay_the_bearer_gate(tmp_path):
+    parked_count = http_app.VERIFY_LIMITER_TOKENS + 1
+    lock, entered_all, release = threading.Lock(), threading.Event(), threading.Event()
+    entered = []
+
+    def parking_verifier(credential, nonce):
+        with lock:
+            entered.append(1)
+            if len(entered) >= http_app.VERIFY_LIMITER_TOKENS:
+                entered_all.set()
+        release.wait(10)
+        raise IdentityError("invalid_token")
+
+    clock = Clock()
+    store = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
+    key = store.create_static_key("gate", FULL)
+    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
+    app = http_app.build_app(settings, store, _test_mcp(), verify_identity=parking_verifier,
+                             form_secret=b"s" * 32, clock=clock)
+    with TestClient(app, base_url=BASE, follow_redirects=False) as client:
+        async def shrink_default_thread_limiter():
+            # As many worker threads as parked verifications: if verification borrowed from the
+            # default limiter, the bearer gate's principal() lookup would have no thread left.
+            anyio.to_thread.current_default_thread_limiter().total_tokens = parked_count
+
+        client.portal.call(shrink_default_thread_limiter)
+        form_state = _start(client, Verifier())
+        consent = {"form_state": form_state, "credential": _credential(FULL)}
+        outcome = {}
+
+        def run(key_, call):
+            try:
+                outcome[key_] = call()
+            except Exception as exc:  # surfaced by the assertions below
+                outcome[key_] = exc
+
+        workers = [threading.Thread(target=run, args=(i, lambda: client.post("/oauth/authorize", data=consent)))
+                   for i in range(parked_count)]
+        probe = threading.Thread(target=run, args=("gate", lambda: client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                          "params": {"name": "kimim", "arguments": {}}},
+            headers={**MCP_HEADERS, "authorization": f"Bearer {key}"})))
+        for w in workers:
+            w.start()
+        try:
+            assert entered_all.wait(5), "verification limiter never filled"
+            probe.start()
+            probe.join(LOOP_FREE_WITHIN_SECONDS)
+            assert not probe.is_alive(), "bearer gate waited behind blocked verifications"
+            assert outcome["gate"].status_code == 200
+        finally:
+            release.set()
+            for w in workers:
+                w.join(10)
+            if probe.ident is not None:
+                probe.join(10)
+    assert not any(w.is_alive() for w in workers)
+    for i in range(parked_count):
+        assert not isinstance(outcome[i], Exception), outcome[i]
+        assert outcome[i].status_code == 401

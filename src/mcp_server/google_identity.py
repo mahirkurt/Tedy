@@ -25,6 +25,8 @@ GOOGLE_CERTS_URL = "https://www.googleapis.com/oauth2/v1/certs"
 MAX_CREDENTIAL_BYTES = 4096
 CERT_FETCH_TIMEOUT_SECONDS = 5.0
 DEFAULT_CERT_MAX_AGE_SECONDS = 3600
+MIN_CERT_MAX_AGE_SECONDS = 60
+MAX_CERT_MAX_AGE_SECONDS = 86400
 # A failed fetch is reported to every caller queued behind it instead of being retried by each.
 CERT_FETCH_RETRY_AFTER_SECONDS = 5.0
 
@@ -43,12 +45,14 @@ def is_well_formed_credential(credential: str) -> bool:
 
 
 def cache_max_age(cache_control: str | None) -> int:
+    """max-age clamped to [60, 86400] seconds; missing, malformed or negative means an hour."""
     for directive in (cache_control or "").split(","):
         name, _, value = directive.partition("=")
         if name.strip().lower() == "max-age":
             value = value.strip().strip('"')
             if value.isascii() and value.isdigit():
-                return int(value)
+                # 0 would refetch on every consent; a huge value would pin rotated-out keys.
+                return min(max(int(value), MIN_CERT_MAX_AGE_SECONDS), MAX_CERT_MAX_AGE_SECONDS)
     return DEFAULT_CERT_MAX_AGE_SECONDS
 
 
@@ -93,7 +97,10 @@ class GoogleCertCache:
         self._retry_after = 0.0
 
     def certs(self) -> Mapping[str, str]:
-        with self._lock:
+        # A fetch stuck past its own timeout must not queue every later verification behind it.
+        if not self._lock.acquire(timeout=CERT_FETCH_TIMEOUT_SECONDS):
+            raise google_exceptions.TransportError("Google certs fetch is still in flight")
+        try:
             now = self._clock()
             if self._certs is not None and now < self._fresh_until:
                 return self._certs
@@ -101,11 +108,17 @@ class GoogleCertCache:
                 raise google_exceptions.TransportError("Google certs fetch failed moments ago")
             try:
                 certs, max_age = self._fetch()
-            except google_exceptions.TransportError:
+            except Exception as exc:
+                # Any failure (not only a transport one) backs off and fails closed as unreachable.
                 self._retry_after = self._clock() + CERT_FETCH_RETRY_AFTER_SECONDS
-                raise
+                if isinstance(exc, google_exceptions.TransportError):
+                    raise
+                raise google_exceptions.TransportError(
+                    f"Google certs fetch failed unexpectedly: {type(exc).__name__}") from exc
             self._certs, self._fresh_until = certs, now + max_age
             return certs
+        finally:
+            self._lock.release()
 
 
 class _CertsResponse(transport.Response):

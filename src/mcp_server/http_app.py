@@ -35,6 +35,10 @@ _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 FORM_TTL_SECONDS = 600
 OAUTH_MAX_BODY_BYTES = 16_384
+# Google verification gets its own worker-thread budget, so a burst of consents (or a slow cert
+# fetch) can never take the threads the bearer gate and the token endpoint need.
+VERIFY_LIMITER_TOKENS = 4
+_VERIFY_LIMITER = anyio.CapacityLimiter(VERIFY_LIMITER_TOKENS)
 _FORM_KEYS = ("client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method", "scope", "resource")
 
 
@@ -372,7 +376,8 @@ def build_app(
             # worker thread because the default verifier may block on a cert fetch.
             if not is_well_formed_credential(credential):
                 raise IdentityError("invalid_token")
-            email = await anyio.to_thread.run_sync(verify_identity, credential, nonce_for(form_state))
+            email = await anyio.to_thread.run_sync(verify_identity, credential, nonce_for(form_state),
+                                                   limiter=_VERIFY_LIMITER)
         except IdentityError as exc:
             return PlainTextResponse(f"Google kimliği doğrulanamadı: {exc.reason}", status_code=401)
         if not roles.is_full(email):
