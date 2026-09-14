@@ -145,12 +145,22 @@ def test_consent_page_embeds_google_signin_and_nonce(ctx):
     ({"code_challenge": ""}, "code_challenge"),
     ({"response_type": "token"}, "response_type"),
     ({"client_id": "someone-else"}, "client_id"),
+    # S1b / F2.1: only the exact callback, never another path on the same origin
+    ({"redirect_uri": "https://claude.ai/any/other/path?x=1"}, "redirect_uri"),
+    # S1b / F9: non-canonical forms (the consent page used to echo the fake "origin")
+    ({"redirect_uri": "http://localhost:claude.ai-resmi-baglayici/cb"}, "redirect_uri"),
+    ({"redirect_uri": " https://claude.ai/api/mcp/auth_callback"}, "redirect_uri"),
+    ({"redirect_uri": "HTTPS://claude.ai/api/mcp/auth_callback"}, "redirect_uri"),
+    # S1b / F10: a redirect_uri that already carries code/state
+    ({"redirect_uri": "https://claude.ai/api/mcp/auth_callback?code=ATTACKER&state=ATTACKER"}, "redirect_uri"),
 ])
 def test_authorize_get_rejects_bad_requests(ctx, over, reason):
     client, _, _, _ = ctx
     r = client.get("/oauth/authorize", params=_authorize_params(**over))
     assert r.status_code == 400
     assert reason in r.text
+    assert "location" not in r.headers
+    assert "form_state" not in r.text
 
 
 def test_full_round_trip_to_mcp_and_refresh(ctx):

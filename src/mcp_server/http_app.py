@@ -23,7 +23,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from src.mcp_server import __version__
 from src.mcp_server.config import Settings
 from src.mcp_server.google_identity import IdentityVerifier, is_well_formed_credential, verify_google_credential
-from src.mcp_server.oauth_redirect import is_allowed_cors_origin, is_allowed_redirect
+from src.mcp_server.oauth_redirect import RedirectPolicy, is_allowed_cors_origin
 from src.mcp_server.oauth_store import OAuthStore
 from src import roles
 from src.mcp_server.google_identity import IdentityError
@@ -295,6 +295,7 @@ def build_app(
     base = settings.public_base_url
     if len(form_secret) < 32:
         raise ValueError("form_secret must be at least 32 bytes")
+    redirect_policy = RedirectPolicy(base, settings.extra_redirect_uris)
 
     async def health(request: Request) -> Response:
         return JSONResponse({"status": "ok", "version": __version__})
@@ -326,7 +327,7 @@ def build_app(
         except ValueError:
             return JSONResponse({"error": "invalid_client_metadata"}, status_code=400)
         uris = body.get("redirect_uris") if isinstance(body, dict) else None
-        if not isinstance(uris, list) or not uris or not all(isinstance(u, str) and is_allowed_redirect(u) for u in uris):
+        if not isinstance(uris, list) or not uris or not all(isinstance(u, str) and redirect_policy.allows(u) for u in uris):
             return JSONResponse({"error": "invalid_redirect_uri"}, status_code=400)
         return JSONResponse({
             "client_id": CLIENT_ID,
@@ -347,7 +348,7 @@ def build_app(
             if q.get("client_id") != CLIENT_ID:
                 return _bad("client_id")
             redirect_uri = q.get("redirect_uri", "")
-            if not is_allowed_redirect(redirect_uri):
+            if not redirect_policy.allows(redirect_uri):
                 return _bad("redirect_uri")
             if not q.get("code_challenge"):
                 return _bad("code_challenge")
@@ -405,7 +406,7 @@ def build_app(
         client_id = str(form.get("client_id", ""))
         if grant == "authorization_code":
             redirect_uri = str(form.get("redirect_uri", ""))
-            if client_id != CLIENT_ID or not is_allowed_redirect(redirect_uri):
+            if client_id != CLIENT_ID or not redirect_policy.allows(redirect_uri):
                 return _grant_error("invalid_grant")
             pair = await anyio.to_thread.run_sync(store.redeem_code, str(form.get("code", "")), client_id,
                                                   redirect_uri, str(form.get("code_verifier", "")))

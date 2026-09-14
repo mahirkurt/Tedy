@@ -1,14 +1,38 @@
-"""redirect_uri and CORS origin policy for the four web surfaces (fleet pattern).
+"""redirect_uri and CORS origin policy for the four web surfaces.
 
-Whole-origin match (scheme + netloc) against a fixed allowlist, so lookalikes such as
-https://claude.ai.evil.com and scheme downgrades such as http://claude.ai are rejected.
-Loopback is accepted on any port (RFC 8252): the code lands on the user's own machine.
+A redirect_uri is accepted only when it is canonical (no whitespace, controls, userinfo, fragment,
+upper-case scheme or host, or odd port; it re-serializes to itself), carries none of the
+authorization response's own query keys, and is one of:
+
+- an exact callback URL: DEFAULT_REDIRECT_URIS or TED_MCP_EXTRA_REDIRECT_URIS;
+- Gemini's per-connector callback, whose last segment is this server's own public host;
+- http loopback (localhost, 127.0.0.1, [::1]) on any port and path (RFC 8252): the code lands on
+  the user's own machine.
+
+Whole origins are never trusted: any other path on claude.ai, chatgpt.com, vscode.dev, … could
+hand the query string (and the code in it) to someone else.
 """
 from __future__ import annotations
 
-from urllib.parse import urlparse
+import re
+from typing import Iterable
+from urllib.parse import parse_qsl, urlsplit, urlunsplit
 
-ALLOWED_ORIGINS = (
+# Callback URLs measured from real connection attempts or taken from vendor documentation, 2026-09-14.
+DEFAULT_REDIRECT_URIS = (
+    "https://claude.ai/api/mcp/auth_callback",
+    "https://claude.com/api/mcp/auth_callback",
+    "https://chatgpt.com/connector_platform_oauth_redirect",
+    # Grok: from xAI's documentation only, not yet confirmed by a live connection (checked in sub-project 6).
+    "https://grok.com/connectors/oauth/callback",
+    "https://vscode.dev/redirect",
+    "https://insiders.vscode.dev/redirect",
+)
+# Gemini: .../r/user_bound_custom-mcp-<digits>-<public host with dots as underscores>.
+GEMINI_REDIRECT_PREFIX = "https://oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-"
+
+# Browser origins allowed to call /mcp directly (CORS). This says nothing about where codes may go.
+CORS_ORIGINS = (
     "https://claude.ai",
     "https://claude.com",
     "https://chatgpt.com",
@@ -17,22 +41,106 @@ ALLOWED_ORIGINS = (
     "https://vscode.dev",
     "https://insiders.vscode.dev",
 )
-_LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "::1")
+LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+# Keys the authorization response itself appends; a redirect_uri already carrying one could make a
+# client read the attacker's value instead of ours.
+RESERVED_QUERY_KEYS = frozenset({"code", "state", "iss", "error", "error_description", "error_uri"})
+EXTRA_REDIRECT_URIS_ENV = "TED_MCP_EXTRA_REDIRECT_URIS"
 
 
-def is_allowed_redirect(redirect_uri: str) -> bool:
+def redirect_uri_problem(uri: str) -> str | None:
+    """Why uri is not a canonical, collision-free redirect_uri, or None when it is."""
+    if not isinstance(uri, str) or not uri:
+        return "empty"
+    if uri != uri.strip():
+        return "surrounding_whitespace"
+    if not uri.isascii() or any(c.isspace() or ord(c) < 0x20 or ord(c) == 0x7F for c in uri):
+        return "control_or_whitespace"
     try:
-        parsed = urlparse(redirect_uri)
+        parts = urlsplit(uri)
+        port = parts.port  # ValueError for a non-numeric or out-of-range port
+    except ValueError:
+        return "unparseable"
+    if parts.scheme not in ("http", "https") or not uri.startswith(parts.scheme + "://"):
+        return "scheme"  # urlsplit lower-cases the scheme, so HTTPS:// is caught by the prefix check
+    if "@" in parts.netloc:
+        return "userinfo"
+    if parts.fragment or "#" in uri:
+        return "fragment"
+    host = parts.hostname
+    if not host:
+        return "host"
+    if host in LOOPBACK_HOSTS:
+        if port is not None and not 1 <= port <= 65535:
+            return "port"
+    elif port is not None:
+        return "port"
+    # Rebuilt from the parsed pieces: refuses upper-case hosts, "host:" and "host:+80"-style ports.
+    if parts.netloc != (f"[{host}]" if ":" in host else host) + ("" if port is None else f":{port}"):
+        return "host"
+    if urlunsplit(parts) != uri:
+        return "not_canonical"
+    if {key for key, _ in parse_qsl(parts.query, keep_blank_values=True)} & RESERVED_QUERY_KEYS:
+        return "reserved_query_key"
+    return None
+
+
+def is_loopback(uri: str) -> bool:
+    try:
+        return urlsplit(uri).hostname in LOOPBACK_HOSTS
     except ValueError:
         return False
-    if parsed.scheme not in ("http", "https") or not parsed.netloc or parsed.fragment:
-        return False
-    if parsed.username or parsed.password:
-        return False
-    if parsed.hostname in _LOOPBACK_HOSTS:
+
+
+def _scheme_problem(uri: str) -> str | None:
+    scheme = urlsplit(uri).scheme
+    if is_loopback(uri):
+        return None if scheme == "http" else "loopback_requires_http"
+    return None if scheme == "https" else "https_required"
+
+
+def parse_extra_redirect_uris(raw: str | None) -> tuple[str, ...]:
+    """Comma-separated exact callbacks; any invalid entry stops startup with a ValueError."""
+    uris: list[str] = []
+    for entry in (raw or "").split(","):
+        uri = entry.strip()
+        if not uri:
+            continue
+        problem = redirect_uri_problem(uri) or _scheme_problem(uri)
+        if problem:
+            raise ValueError(f"{EXTRA_REDIRECT_URIS_ENV}: {uri!r} is not an acceptable redirect_uri ({problem})")
+        uris.append(uri)
+    return tuple(dict.fromkeys(uris))
+
+
+class RedirectPolicy:
+    """The redirect_uri allowlist for one deployment (its public host and extra callbacks)."""
+
+    def __init__(self, public_base_url: str, extra_uris: Iterable[str] = ()) -> None:
+        self._exact = frozenset(DEFAULT_REDIRECT_URIS) | frozenset(extra_uris)
+        host = (urlsplit(public_base_url).hostname or "").replace(".", "_")
+        self._gemini = re.compile(re.escape(GEMINI_REDIRECT_PREFIX) + "[0-9]+-" + re.escape(host)) if host else None
+
+    def allows(self, uri: str) -> bool:
+        if redirect_uri_problem(uri) is not None or _scheme_problem(uri) is not None:
+            return False
+        if is_loopback(uri) or uri in self._exact:
+            return True
+        return self._gemini is not None and self._gemini.fullmatch(uri) is not None
+
+
+def redirect_matches(registered: str, requested: str) -> bool:
+    """Exact string equality, except that a loopback redirect may use any port (RFC 8252 §7.3)."""
+    if registered == requested:
         return True
-    return f"{parsed.scheme}://{parsed.netloc}" in ALLOWED_ORIGINS
+    try:
+        a, b = urlsplit(registered), urlsplit(requested)
+    except ValueError:
+        return False
+    if a.hostname not in LOOPBACK_HOSTS or a.fragment or b.fragment:
+        return False
+    return (a.scheme, a.hostname, a.path, a.query) == (b.scheme, b.hostname, b.path, b.query)
 
 
 def is_allowed_cors_origin(origin: str) -> bool:
-    return origin in ALLOWED_ORIGINS
+    return origin in CORS_ORIGINS

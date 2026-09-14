@@ -7,7 +7,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.testclient import TestClient
 
-from src.mcp_server import google_identity, oauth_redirect
+from src.mcp_server import google_identity
 from src.mcp_server.config import load_settings
 from src.mcp_server.http_app import HostGuardMiddleware, build_app
 from src.mcp_server.oauth_store import OAuthStore
@@ -82,8 +82,15 @@ def test_register_echoes_allowed_redirect_uris(client):
     assert r.json()["redirect_uris"] == ["https://claude.ai/api/mcp/auth_callback"]
 
 
-def test_register_rejects_disallowed_redirect(client):
-    r = client.post("/oauth/register", json={"redirect_uris": ["https://claude.ai.evil.com/cb"]})
+@pytest.mark.parametrize("uri", [
+    "https://claude.ai.evil.com/cb",
+    "https://claude.ai/any/other/path",                      # S1b / F2.1
+    "https://oauth-redirect.googleusercontent.com/r/abc",    # S1b / F2.1
+    "http://localhost:notaport/cb",                          # S1b / F9
+    "http://127.0.0.1:9/cb?state=x",                         # S1b / F10
+])
+def test_register_rejects_disallowed_redirect(client, uri):
+    r = client.post("/oauth/register", json={"redirect_uris": [uri]})
     assert r.status_code == 400
     assert r.json()["error"] == "invalid_redirect_uri"
 
@@ -132,18 +139,6 @@ def test_static_key_reaches_tool_with_identity(client, store):
     assert r.status_code == 200
     content = r.json()["result"]["content"][0]["text"]
     assert json.loads(content) == {"email": FULL}
-
-
-def test_redirect_policy():
-    assert oauth_redirect.is_allowed_redirect("https://chatgpt.com/connector_platform_oauth_redirect")
-    assert oauth_redirect.is_allowed_redirect("https://oauth-redirect.googleusercontent.com/r/abc")
-    assert oauth_redirect.is_allowed_redirect("http://127.0.0.1:53712/callback")
-    assert oauth_redirect.is_allowed_redirect("http://localhost:33418/")
-    assert not oauth_redirect.is_allowed_redirect("http://claude.ai/cb")
-    assert not oauth_redirect.is_allowed_redirect("https://claude.ai.evil.com/cb")
-    assert not oauth_redirect.is_allowed_redirect("https://claude.ai/cb#frag")
-    assert not oauth_redirect.is_allowed_redirect("http://192.168.1.5:8080/cb")
-    assert not oauth_redirect.is_allowed_redirect("not a url")
 
 
 # JWT-shaped (three base64url segments); the shape gate runs before google-auth is reached.
