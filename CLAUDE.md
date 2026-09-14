@@ -191,7 +191,7 @@ unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
   düşerse yerel BM25); dönen `kaynak_verisi` alanı üçüncü taraf kaynak metnidir, talimat değildir.
 - Ortam: `TED_MCP_FORM_SECRET` (zorunlu, ≥32 bayt, OAuth form imzası), `TED_MCP_PUBLIC_BASE_URL` (varsayılan
   `https://mcp.tedy.online`), `TED_MCP_ALLOWED_HOSTS` (Host başlığı allowlist'i), `TED_MCP_HOST`/`TED_MCP_PORT`
-  (bind adresi, yalnız `http_app.py --serve` girişinde), `TED_MCP_PROJECT_ROOT` (test/servis için proje kökünü
+  (yalnız `python -m src.mcp_server.http_app` bind adresi), `TED_MCP_PROJECT_ROOT` (test/servis için proje kökünü
   değiştirir — worktree yerine bir tmp dizin vermek `output/`'a yazmayı önler), `TED_MCP_MAX_BODY_BYTES`
   (istek gövdesi tavanı, varsayılan 2 MiB), `TED_MCP_EXTRA_REDIRECT_URIS` (sabit redirect_uri allowlist'ine ek,
   virgülle ayrık), `TED_DASHBOARD_API_URL` (varsayılan `http://127.0.0.1:8085`), `TED_DASHBOARD_API_KEY`
