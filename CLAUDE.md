@@ -198,7 +198,8 @@ unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
   virgülle ayrık), `TED_DASHBOARD_API_URL` (varsayılan `http://127.0.0.1:8085`), `TED_DASHBOARD_API_KEY`
   (`ted-mcp` etiketli `tdyK_` anahtar), `MUFREDAT_MCP_API_KEY`, `EGITIM_KAYNAK_MCP_API_KEY`, `ANAMNESIS_MCP_API_KEY`.
 - OAuth: Google girişiyle, yalnız `full` rol; giriş sonrası **Onayla/Reddet** açıkça sorulur (kod otomatik
-  üretilmez). PKCE yalnız tam **S256**. DCR kalıcıdır (istemci kayıtları silinmez, tavanlıdır). Sabit
+  üretilmez). PKCE yalnız tam **S256**. DCR kayıtları kalıcı ve tavanlıdır (50 000); tavana ulaşıldığında hiç
+  kod üretmemiş ve 20 dakikadan (2 × `FORM_TTL_SECONDS`) eski istemciler tahliye edilir. Sabit
   `redirect_uri` allowlist'i (`src/mcp_server/oauth_redirect.py:DEFAULT_REDIRECT_URIS`): Claude
   (`claude.ai`/`claude.com` `/api/mcp/auth_callback`), ChatGPT (`chatgpt.com/connector_platform_oauth_redirect`),
   Grok (`grok.com/connectors/oauth/callback`); ayrıca Gemini'nin `oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-…`

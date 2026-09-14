@@ -425,6 +425,14 @@ planında yer alır.
   eski" temizliği yerine `2 × FORM_TTL_SECONDS` (20 dakika; iki onay adımının tamamı) taban yaşını aşmış kodsuz en
   eski kayıtların tahliyesi getirildi (ölçüm: 499 anonim kayıt 4,5 sn'de tavanı doldurup yeni bağlayıcı kurulumunu
   24 saat engelliyordu; kenar hız sınırıyla tek bir IP taban içinde en çok ~7200 kayıt yapabilir).
+- **`edupedia_baglam` okul portalı başlıkları (SP2 son inceleme, 2026-09-14):** `edupedia_baglam`, sınav ve
+  ödev başlıklarını TED'in kendi okul portalı verisinden üst düzeyde döner. Bu, §6.3 kapsamındaki federasyon
+  metni değil TED verisidir ve bilinçli olarak `kaynak_verisi` içine sarılmaz (kabul edilen artık risk:
+  öğretmenin yazdığı bir başlık düşük risklidir).
+- **§7 zaman bütçesinin uygulanışı (SP2 son inceleme, 2026-09-14):** araç gövdeleri 16 iş parçacıklı ayrı bir
+  sınırlayıcıda çalışır; kimlik doğrulama, token ve depo yolları böylece her zaman iş parçacığı bulur. Her araç
+  60 sn'lik bir son tarih hesaplar ve her federasyon çağrısının zaman aşımı kalan bütçeyle sınırlanır (en çok
+  25 sn); bütçenin karşılayamadığı çağrı yapılmaz ve `degraded:zaman_asimi` olarak bildirilir.
 
 ## 13. Varsayımlar ve riskler
 
