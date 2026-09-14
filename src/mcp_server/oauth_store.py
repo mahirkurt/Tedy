@@ -23,6 +23,8 @@ from src import roles
 from src.mcp_server.oauth_redirect import redirect_matches
 
 CODE_TTL_SECONDS = 300
+# Lifetime of a signed consent form state (sign-in and decision): http_app signs them, this store consumes them.
+FORM_TTL_SECONDS = 600
 ACCESS_TTL_SECONDS = 3600
 REFRESH_TTL_SECONDS = 30 * 24 * 3600
 # Rotation would otherwise keep a family alive forever; after this, the person consents again.
@@ -30,10 +32,12 @@ FAMILY_MAX_AGE_SECONDS = 90 * 24 * 3600
 # Expired codes, tokens and consumed form states are deleted at startup once this long past expiry.
 PURGE_GRACE_SECONDS = 24 * 3600
 STATIC_KEY_PREFIX = "tdyM_"
-# Dynamic client registration is open to anyone, so the table is capped. When it is full, clients
-# that never produced a code and are more than a day old make room; otherwise registration is refused.
-MAX_CLIENTS = 500
-STALE_CLIENT_SECONDS = 24 * 3600
+# Dynamic client registration is open to anyone, so the table is capped; the edge rate limit is the primary
+# defence against a registration flood. At the cap, the oldest clients that never produced a code and are
+# older than one sign-in form plus one code lifetime make just enough room. A client that issued a code is
+# never evicted; if nothing is evictable, registration is refused.
+MAX_CLIENTS = 5000
+CLIENT_EVICTION_FLOOR_SECONDS = FORM_TTL_SECONDS + CODE_TTL_SECONDS
 BUSY_TIMEOUT_MS = 5000
 
 # RFC 7636 §4.1-4.2: an S256 challenge is 43 base64url characters; a verifier 43-128 unreserved ones.
@@ -194,13 +198,17 @@ class OAuthStore:
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
-                if self._client_count(conn) >= MAX_CLIENTS:
+                count = self._client_count(conn)
+                if count >= MAX_CLIENTS:
                     conn.execute(
-                        "DELETE FROM oauth_client WHERE code_issued_at IS NULL AND created_at < ?",
-                        (client.created_at - STALE_CLIENT_SECONDS,),
+                        "DELETE FROM oauth_client WHERE client_id IN ("
+                        " SELECT client_id FROM oauth_client WHERE code_issued_at IS NULL AND created_at < ?"
+                        " ORDER BY created_at, client_id LIMIT ?)",
+                        (client.created_at - CLIENT_EVICTION_FLOOR_SECONDS, count - MAX_CLIENTS + 1),
                     )
                     if self._client_count(conn) >= MAX_CLIENTS:
-                        raise ClientLimitReached(f"{MAX_CLIENTS} registered clients and none is purgeable")
+                        # Rolled back below: evictions that could not make room are undone.
+                        raise ClientLimitReached(f"{MAX_CLIENTS} registered clients and none is evictable")
                 conn.execute(
                     "INSERT INTO oauth_client (client_id, client_name, redirect_uris, created_at) VALUES (?, ?, ?, ?)",
                     (client.client_id, client.client_name, json.dumps(list(client.redirect_uris)), client.created_at),

@@ -28,7 +28,7 @@ from src.mcp_server import __version__
 from src.mcp_server.config import Settings
 from src.mcp_server.google_identity import IdentityVerifier, is_well_formed_credential, verify_google_credential
 from src.mcp_server.oauth_redirect import RedirectPolicy, is_allowed_cors_origin, redirect_matches
-from src.mcp_server.oauth_store import Client, ClientLimitReached, OAuthStore, is_valid_code_challenge
+from src.mcp_server.oauth_store import FORM_TTL_SECONDS, Client, ClientLimitReached, OAuthStore, is_valid_code_challenge
 from src import roles
 from src.mcp_server.google_identity import IdentityError
 from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse
@@ -36,7 +36,6 @@ from starlette.responses import HTMLResponse, PlainTextResponse, RedirectRespons
 REALM = "ted-mcp"
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
-FORM_TTL_SECONDS = 600
 OAUTH_MAX_BODY_BYTES = 16_384
 # Google verification gets its own worker-thread budget, so a burst of consents (or a slow cert
 # fetch) can never take the threads the bearer gate and the token endpoint need.

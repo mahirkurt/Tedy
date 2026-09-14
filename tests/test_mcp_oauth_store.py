@@ -6,7 +6,7 @@ import stat
 
 import pytest
 
-from src.mcp_server import keys, oauth_store
+from src.mcp_server import http_app, keys, oauth_store
 from src.mcp_server.oauth_store import OAuthStore
 
 FULL = "drmahirkurt@gmail.com"
@@ -392,12 +392,13 @@ def test_issue_code_requires_a_registered_client_and_one_of_its_redirects(store,
     assert store.redeem_code(code, client_id, "http://127.0.0.1:53712/callback", VERIFIER) is not None
 
 
-def _fill_clients(path, count, created_at, code_issued_at=None):
+def _fill_clients(path, rows):
+    """rows: (client_id, created_at, code_issued_at) inserted in one transaction."""
     with sqlite3.connect(path) as conn:
         conn.executemany(
             "INSERT INTO oauth_client (client_id, client_name, redirect_uris, created_at, code_issued_at)"
             " VALUES (?, '', ?, ?, ?)",
-            [(f"filler-{created_at}-{i}", f'["{REDIRECT}"]', created_at, code_issued_at) for i in range(count)])
+            [(cid, f'["{REDIRECT}"]', created, issued) for cid, created, issued in rows])
 
 
 def _client_ids(path):
@@ -405,28 +406,63 @@ def _client_ids(path):
         return {row[0] for row in conn.execute("SELECT client_id FROM oauth_client")}
 
 
-def test_client_cap_purges_only_clients_older_than_a_day_that_never_issued_a_code(tmp_path, store, clock):
+# S1b fix round 1 / R-2: the floor is one sign-in form plus one code lifetime.
+EVICTION_FLOOR = http_app.FORM_TTL_SECONDS + oauth_store.CODE_TTL_SECONDS
+
+
+def test_client_cap_is_five_thousand_with_a_consent_long_eviction_floor():
+    assert oauth_store.MAX_CLIENTS == 5000
+    assert oauth_store.CLIENT_EVICTION_FLOOR_SECONDS == EVICTION_FLOOR
+    assert oauth_store.FORM_TTL_SECONDS == http_app.FORM_TTL_SECONDS  # one source for the form lifetime
+
+
+def test_full_table_evicts_the_oldest_codeless_client_older_than_the_floor(tmp_path, store, clock):
     path = tmp_path / "oauth.sqlite3"
-    used = store.register_client("used", [REDIRECT])
+    t0 = int(clock.now)
+    _fill_clients(path, [("oldest", t0 - 10, None)] + [(f"c{i}", t0, None) for i in range(oauth_store.MAX_CLIENTS - 1)])
+    clock.now = t0 + EVICTION_FLOOR + 1  # everyone is past the floor; far less than a day
+    fresh = store.register_client("Claude", [REDIRECT])
+    ids = _client_ids(path)
+    assert fresh.client_id in ids
+    assert "oldest" not in ids
+    assert len(ids) == oauth_store.MAX_CLIENTS  # exactly enough room was made
+
+
+def test_a_client_that_issued_a_code_is_never_evicted(tmp_path, store, clock):
+    path = tmp_path / "oauth.sqlite3"
+    t0 = int(clock.now)
+    used = store.register_client("used", [REDIRECT])  # the oldest client of all
     store.issue_code(FULL, used.client_id, REDIRECT, _challenge(VERIFIER), "S256")
-    _fill_clients(path, oauth_store.MAX_CLIENTS - 1, int(clock.now))
-    clock.now += oauth_store.STALE_CLIENT_SECONDS  # exactly a day old: not stale yet
+    _fill_clients(path, [("next-oldest", t0 + 1, None)]
+                  + [(f"c{i}", t0 + 2, None) for i in range(oauth_store.MAX_CLIENTS - 2)])
+    clock.now = t0 + 2 + EVICTION_FLOOR + 1
+    fresh = store.register_client("Claude", [REDIRECT])
+    ids = _client_ids(path)
+    assert used.client_id in ids and fresh.client_id in ids
+    assert "next-oldest" not in ids
+    assert len(ids) == oauth_store.MAX_CLIENTS
+
+
+def test_registration_is_refused_when_only_clients_with_codes_are_old_enough(tmp_path, store, clock):
+    path = tmp_path / "oauth.sqlite3"
+    t0 = int(clock.now)
+    _fill_clients(path, [(f"used{i}", t0, t0) for i in range(oauth_store.MAX_CLIENTS)])
+    clock.now = t0 + 30 * 24 * 3600
     with pytest.raises(oauth_store.ClientLimitReached):
-        store.register_client("new", [REDIRECT])
+        store.register_client("Claude", [REDIRECT])
+    assert len(_client_ids(path)) == oauth_store.MAX_CLIENTS
+
+
+def test_registration_is_refused_while_every_codeless_client_is_younger_than_the_floor(tmp_path, store, clock):
+    path = tmp_path / "oauth.sqlite3"
+    t0 = int(clock.now)
+    _fill_clients(path, [(f"c{i}", t0, None) for i in range(oauth_store.MAX_CLIENTS)])
+    clock.now = t0 + EVICTION_FLOOR  # exactly at the floor: not older than it
+    with pytest.raises(oauth_store.ClientLimitReached):
+        store.register_client("Claude", [REDIRECT])
     assert len(_client_ids(path)) == oauth_store.MAX_CLIENTS
     clock.now += 1
-    fresh = store.register_client("new", [REDIRECT])
-    assert _client_ids(path) == {used.client_id, fresh.client_id}
-
-
-def test_client_cap_refuses_when_no_client_is_purgeable(tmp_path, store, clock):
-    path = tmp_path / "oauth.sqlite3"
-    old = int(clock.now) - 7 * 24 * 3600
-    _fill_clients(path, oauth_store.MAX_CLIENTS // 2, old, code_issued_at=old)       # old but used
-    _fill_clients(path, oauth_store.MAX_CLIENTS // 2, int(clock.now) - 60)            # unused but fresh
-    with pytest.raises(oauth_store.ClientLimitReached):
-        store.register_client("new", [REDIRECT])
-    assert len(_client_ids(path)) == oauth_store.MAX_CLIENTS
+    assert store.register_client("Claude", [REDIRECT]).client_id in _client_ids(path)
 
 
 # -- S1b / F7: single-use form states --------------------------------------------------------

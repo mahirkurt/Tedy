@@ -21,8 +21,6 @@ def policy():
     "https://claude.com/api/mcp/auth_callback",
     "https://chatgpt.com/connector_platform_oauth_redirect",
     "https://grok.com/connectors/oauth/callback",
-    "https://vscode.dev/redirect",
-    "https://insiders.vscode.dev/redirect",
     GEMINI.format("123456789"),
     GEMINI.format("0"),
     "http://127.0.0.1:53712/callback",
@@ -37,6 +35,9 @@ def test_exact_callbacks_and_loopback_are_allowed(policy, uri):
 
 
 @pytest.mark.parametrize("uri", [
+    # vscode.dev forwards the code to a host chosen by `state` (measured 2026-09-14): never by default
+    "https://vscode.dev/redirect",
+    "https://insiders.vscode.dev/redirect",
     # every other path on a trusted origin (probe_inproc.py §1)
     "https://claude.ai/any/other/path?x=1",
     "https://chatgpt.com/share/anything",
@@ -182,3 +183,17 @@ def test_cors_origins_are_unchanged():
     assert oauth_redirect.is_allowed_cors_origin("https://claude.ai")
     assert oauth_redirect.is_allowed_cors_origin("https://grok.com")
     assert not oauth_redirect.is_allowed_cors_origin("https://claude.ai.evil.com")
+
+
+# -- S1b fix round 1 / R-1: vscode.dev is opt-in only ----------------------------------------------
+
+def test_vscode_web_redirects_are_not_default_but_can_be_added_explicitly():
+    vscode = ("https://vscode.dev/redirect", "https://insiders.vscode.dev/redirect")
+    assert RedirectPolicy(BASE).allows("https://claude.ai/api/mcp/auth_callback")  # the policy does accept defaults
+    for uri in vscode:
+        assert uri not in oauth_redirect.DEFAULT_REDIRECT_URIS
+        assert not RedirectPolicy(BASE).allows(uri)
+    policy = RedirectPolicy(BASE, parse_extra_redirect_uris(",".join(vscode)))
+    for uri in vscode:
+        assert policy.allows(uri)
+    assert not policy.allows("https://vscode.dev/redirect/x")

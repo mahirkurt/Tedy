@@ -7,7 +7,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.testclient import TestClient
 
-from src.mcp_server import google_identity
+from src.mcp_server import google_identity, http_app, oauth_store
 from src.mcp_server.config import load_settings
 from src.mcp_server.http_app import HostGuardMiddleware, build_app
 from src.mcp_server.oauth_store import OAuthStore
@@ -141,7 +141,7 @@ def test_register_is_refused_when_the_client_table_is_full_of_fresh_clients(clie
     with sqlite3.connect(tmp_path / "oauth.sqlite3") as conn:
         conn.executemany(
             "INSERT INTO oauth_client (client_id, client_name, redirect_uris, created_at) VALUES (?, '', ?, ?)",
-            [(f"prefill-{i}", json.dumps([REDIRECT]), now) for i in range(500)])
+            [(f"prefill-{i}", json.dumps([REDIRECT]), now) for i in range(oauth_store.MAX_CLIENTS)])
     r = client.post("/oauth/register", json={"redirect_uris": [REDIRECT]})
     assert r.status_code == 400
     assert r.json() == {"error": "invalid_client_metadata"}
@@ -498,3 +498,58 @@ def test_startup_purges_expired_rows_in_a_worker_thread(tmp_path):
     with sqlite3.connect(tmp_path / "oauth.sqlite3") as conn:
         assert conn.execute("SELECT COUNT(*) FROM oauth_code").fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM oauth_client").fetchone()[0] == 1
+
+
+# -- S1b fix round 1 / R-1: vscode.dev web redirects are refused unless explicitly listed --------------
+
+@pytest.mark.parametrize("uri", ["https://vscode.dev/redirect", "https://insiders.vscode.dev/redirect"])
+def test_vscode_web_redirect_is_refused_at_registration_by_default(client, uri):
+    assert client.post("/oauth/register", json={"redirect_uris": [REDIRECT]}).status_code == 201
+    r = client.post("/oauth/register", json={"redirect_uris": [uri], "client_name": "Visual Studio Code"})
+    assert r.status_code == 400
+    assert r.json() == {"error": "invalid_redirect_uri"}
+
+
+def test_vscode_web_redirect_is_accepted_when_listed_in_extra_redirect_uris(tmp_path, store):
+    extra = ("https://vscode.dev/redirect", "https://insiders.vscode.dev/redirect")
+    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_EXTRA_REDIRECT_URIS": ",".join(extra)},
+                             project_root=tmp_path)
+    with TestClient(build_app(settings, store, _test_mcp(), form_secret=b"s" * 32), base_url=BASE) as c:
+        for uri in extra:
+            r = c.post("/oauth/register", json={"redirect_uris": [uri], "client_name": "Visual Studio Code"})
+            assert r.status_code == 201, r.text
+            page = c.get("/oauth/authorize", params={
+                "response_type": "code", "client_id": r.json()["client_id"], "redirect_uri": uri,
+                "code_challenge": "A" * 43, "code_challenge_method": "S256"})
+            assert page.status_code == 200
+
+
+# -- S1b fix round 1 / R-2: a registration burst no longer blocks new connectors for a day -------------
+
+def test_a_registration_burst_stops_blocking_new_connectors_after_the_eviction_floor(tmp_path):
+    import sqlite3
+
+    class Clock:
+        now = 1_800_000_000.0
+
+        def __call__(self):
+            return self.now
+
+    clock = Clock()
+    store = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
+    t0 = int(clock.now)
+    with sqlite3.connect(tmp_path / "oauth.sqlite3") as conn:  # an anonymous burst filled the table at t0
+        conn.executemany(
+            "INSERT INTO oauth_client (client_id, client_name, redirect_uris, created_at) VALUES (?, '', ?, ?)",
+            [(f"burst-{i}", json.dumps(["http://127.0.0.1/x"]), t0) for i in range(oauth_store.MAX_CLIENTS)])
+    floor = http_app.FORM_TTL_SECONDS + oauth_store.CODE_TTL_SECONDS
+    body = {"redirect_uris": [REDIRECT], "client_name": "Claude"}
+    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
+    with TestClient(build_app(settings, store, _test_mcp(), form_secret=b"s" * 32), base_url=BASE) as c:
+        refused = c.post("/oauth/register", json=body)  # every burst client is still younger than one consent
+        assert refused.status_code == 400
+        assert refused.json() == {"error": "invalid_client_metadata"}
+        clock.now = t0 + floor + 1
+        r = c.post("/oauth/register", json=body)
+        assert r.status_code == 201, r.text
+        assert store.get_client(r.json()["client_id"]).client_name == "Claude"

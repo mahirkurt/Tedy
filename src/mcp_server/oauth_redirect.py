@@ -9,8 +9,8 @@ authorization response's own query keys, and is one of:
 - http loopback (localhost, 127.0.0.1, [::1]) on any port and path (RFC 8252): the code lands on
   the user's own machine.
 
-Whole origins are never trusted: any other path on claude.ai, chatgpt.com, vscode.dev, … could
-hand the query string (and the code in it) to someone else.
+Whole origins are never trusted: any other path on claude.ai, chatgpt.com, … could hand the query
+string (and the code in it) to someone else. Neither is an exact URL whose page forwards the code on.
 """
 from __future__ import annotations
 
@@ -25,8 +25,10 @@ DEFAULT_REDIRECT_URIS = (
     "https://chatgpt.com/connector_platform_oauth_redirect",
     # Grok: from xAI's documentation only, not yet confirmed by a live connection (checked in sub-project 6).
     "https://grok.com/connectors/oauth/callback",
-    "https://vscode.dev/redirect",
-    "https://insiders.vscode.dev/redirect",
+    # Deliberately absent: https://vscode.dev/redirect and https://insiders.vscode.dev/redirect. Measured
+    # 2026-09-14, both forward the code to a destination taken from `state` (a *.github.dev host, for
+    # instance), so with open DCR anyone could show a genuine Microsoft URL on the consent page. They can
+    # still be added through TED_MCP_EXTRA_REDIRECT_URIS; VS Code desktop uses loopback.
 )
 # Gemini: .../r/user_bound_custom-mcp-<digits>-<public host with dots as underscores>.
 GEMINI_REDIRECT_PREFIX = "https://oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-"
