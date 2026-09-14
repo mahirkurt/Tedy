@@ -142,3 +142,79 @@ def test_mcp_max_body_bytes_defaults_to_2_mib_and_reads_the_environment(tmp_path
 def test_mcp_max_body_bytes_rejects_anything_but_a_positive_integer(tmp_path, raw):
     with pytest.raises(ValueError, match="TED_MCP_MAX_BODY_BYTES"):
         config.load_settings(_env(TED_MCP_MAX_BODY_BYTES=raw), project_root=tmp_path)
+
+
+# -- SP2 final review F1: spec §7 time budget (25 s per call, 60 s per tool) ---------------------
+
+class _Clock:
+    def __init__(self, now=1000.0):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+
+def _timed_fed(tmp_path, clock, took=0.0, result=None):
+    """Real Federation over a fake client that records the timeout it was given and takes `took`
+    seconds on the shared fake monotonic clock."""
+    calls = []
+
+    class Client:
+        def __init__(self, name, url, api_key, **kw):
+            self.name = name
+
+        def call_tool(self, name, arguments, timeout=None):
+            calls.append({"tool": name, "timeout": timeout, "at": clock.now})
+            clock.now += took
+            return result or McpToolResult(ok=True, text="{}")
+
+    settings = config.load_settings(_env(), project_root=tmp_path)
+    return federation.Federation(settings, client_factory=Client, monotonic=clock), calls
+
+
+def test_budget_constants_match_spec_section_7():
+    assert federation.CALL_TIMEOUT_SECONDS == 25.0
+    assert federation.TOOL_BUDGET_SECONDS == 60.0
+    assert federation.MIN_CALL_SECONDS == 1.0
+
+
+def test_deadline_caps_the_client_timeout_at_the_remaining_budget(tmp_path):
+    clock = _Clock()
+    fed, calls = _timed_fed(tmp_path, clock)
+    fed.call("maarif-mufredat", "server_info", {}, beklenen="nesne", deadline=clock.now + 60.0)
+    fed.call("maarif-mufredat", "server_info", {}, beklenen="nesne", deadline=clock.now + 10.0)
+    assert [c["timeout"] for c in calls] == [25.0, 10.0]
+
+
+def test_no_deadline_passes_no_client_timeout(tmp_path):
+    fed, calls = _timed_fed(tmp_path, _Clock())
+    fed.call("maarif-mufredat", "server_info", {}, beklenen="nesne")
+    assert calls == [{"tool": "server_info", "timeout": None, "at": 1000.0}]
+
+
+@pytest.mark.parametrize("left", [0.99, 0.0, -5.0])
+def test_a_call_the_budget_cannot_cover_is_zaman_asimi_without_calling(tmp_path, left):
+    clock = _Clock()
+    fed, calls = _timed_fed(tmp_path, clock)
+    with pytest.raises(federation.FederationError) as exc:
+        fed.call("egitim-kaynak", "kb_search", {"q": "x"}, beklenen="nesne", deadline=clock.now + left)
+    assert exc.value.reason == "zaman_asimi"
+    assert calls == []
+
+
+def test_a_failure_that_spent_the_budget_is_zaman_asimi(tmp_path):
+    clock = _Clock()
+    fed, calls = _timed_fed(tmp_path, clock, took=10.0,
+                            result=McpToolResult(ok=False, error="Read timed out. (read timeout=10.0)"))
+    with pytest.raises(federation.FederationError) as exc:
+        fed.call("egitim-kaynak", "kb_search", {}, beklenen="nesne", deadline=clock.now + 10.0)
+    assert calls[0]["timeout"] == 10.0
+    assert exc.value.reason == "zaman_asimi"
+
+
+def test_a_failure_with_budget_left_is_not_blamed_on_the_budget(tmp_path):
+    clock = _Clock()
+    fed, _ = _timed_fed(tmp_path, clock, took=2.0, result=McpToolResult(ok=False, error="boom"))
+    with pytest.raises(federation.FederationError) as exc:
+        fed.call("egitim-kaynak", "kb_search", {}, beklenen="nesne", deadline=clock.now + 60.0)
+    assert exc.value.reason.startswith("tool_error")

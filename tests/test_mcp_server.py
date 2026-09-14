@@ -3,6 +3,7 @@ import json
 import threading
 import time
 
+import anyio
 import pytest
 from starlette.testclient import TestClient
 
@@ -193,3 +194,107 @@ def test_slow_tool_does_not_block_concurrent_requests(tmp_path):
 
     durum_body = json.loads(durum_result["body"]["result"]["content"][0]["text"])
     assert durum_body["status"] == "ok"
+
+
+# -- SP2 final review F1: tool bodies run on their own thread limiter ---------------------------
+
+TOOL_ARGUMENTS = {
+    "edupedia_durum": {},
+    "edupedia_rehber": {"bolum": "akis"},
+    "edupedia_baglam": {"gun": 7},
+    "edupedia_kapsam": {"ders": "Fen Bilimleri", "sinif": "5", "konu": "madde"},
+    "edupedia_kaynak_oku": {"run_id": "abcdef012345", "soru": "buharlaşma"},
+}
+PROBE_WITHIN_SECONDS = 1.0
+
+
+@pytest.mark.parametrize("tool_name", sorted(TOOL_ARGUMENTS))
+def test_parked_tool_bodies_never_take_the_threads_auth_and_store_calls_need(tmp_path, tool_name):
+    lock, all_parked, release = threading.Lock(), threading.Event(), threading.Event()
+    parked = []
+
+    def park():
+        with lock:
+            parked.append(threading.get_ident())
+            if len(parked) == server.TOOL_THREAD_LIMIT:
+                all_parked.set()
+        release.wait(10)  # safety net only; the test sets `release` itself
+        return {"status": "ok", "mcp_verified": False}
+
+    class ParkingTools(tools.Tools):
+        def durum(self, email, canli=False):
+            return park()
+
+        def rehber(self, bolum=None, parca=1, ara=None):
+            return park()
+
+        def baglam(self, email, gun=7):
+            return park()
+
+        def kapsam(self, email, ders, sinif, konu=None, kazanim_kodu=None):
+            return park()
+
+        def kaynak_oku(self, email, run_id, soru, top_k=5):
+            return park()
+
+    settings = _settings(tmp_path)
+    store = OAuthStore(tmp_path / "o.sqlite3")
+    key = store.create_static_key("t", FULL)
+    app = http_app.build_app(settings, store, server.build_server(ParkingTools(settings, FakeFederation())),
+                             form_secret=b"s" * 32)
+    auth = {**MCP_HEADERS, "authorization": f"Bearer {key}"}
+    outcome = {}
+
+    def run(slot, call):
+        try:
+            outcome[slot] = call()
+        except Exception as exc:  # surfaced by the assertions below
+            outcome[slot] = exc
+
+    with TestClient(app, base_url=BASE) as c:
+        async def shrink_default_thread_limiter():
+            # As many default-limiter threads as parked tool bodies: if tool bodies borrowed from the
+            # default limiter, the bearer gate and the store lookups below would have none left.
+            anyio.to_thread.current_default_thread_limiter().total_tokens = server.TOOL_THREAD_LIMIT
+
+        c.portal.call(shrink_default_thread_limiter)
+
+        def call_tool():
+            return c.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                                        "params": {"name": tool_name, "arguments": TOOL_ARGUMENTS[tool_name]}},
+                          headers=auth)
+
+        workers = [threading.Thread(target=run, args=(i, call_tool)) for i in range(server.TOOL_THREAD_LIMIT)]
+        probes = {
+            "unknown_bearer": lambda: c.post("/mcp", json={"jsonrpc": "2.0", "id": 9, "method": "tools/list"},
+                                             headers={**MCP_HEADERS, "authorization": "Bearer tdyM_unknown"}),
+            "unknown_client": lambda: c.post("/oauth/token", data={
+                "grant_type": "authorization_code", "client_id": "nobody", "code": "x",
+                "redirect_uri": "http://127.0.0.1/cb", "code_verifier": "v" * 43}),
+            "tools_list": lambda: c.post("/mcp", json={"jsonrpc": "2.0", "id": 8, "method": "tools/list"},
+                                         headers=auth),
+        }
+        for w in workers:
+            w.start()
+        try:
+            assert all_parked.wait(10), f"only {len(parked)} tool bodies parked"
+            for name, call in probes.items():
+                probe = threading.Thread(target=run, args=(name, call))
+                probe.start()
+                probe.join(PROBE_WITHIN_SECONDS)
+                assert not probe.is_alive(), f"{name} waited behind parked tool bodies"
+            assert not release.is_set() and len(parked) == server.TOOL_THREAD_LIMIT
+            assert outcome["unknown_bearer"].status_code == 401
+            assert outcome["unknown_client"].status_code == 400
+            assert outcome["unknown_client"].json() == {"error": "invalid_client"}
+            assert outcome["tools_list"].status_code == 200
+            assert {t["name"] for t in _sse_json(outcome["tools_list"])["result"]["tools"]} == set(TOOL_ARGUMENTS)
+        finally:
+            release.set()
+            for w in workers:
+                w.join(10)
+    assert not any(w.is_alive() for w in workers), "parked tool calls did not finish after release"
+    for i in range(server.TOOL_THREAD_LIMIT):
+        assert not isinstance(outcome[i], Exception), outcome[i]
+        assert outcome[i].status_code == 200
+        assert json.loads(_sse_json(outcome[i])["result"]["content"][0]["text"]) == {"status": "ok", "mcp_verified": False}

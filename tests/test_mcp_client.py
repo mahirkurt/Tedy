@@ -194,3 +194,103 @@ def test_list_tools_rejects_a_truthy_non_dict_result():
 
     assert tools == []
     assert c.healthy is False
+
+
+# -- SP2 final review F1: opt-in per-call total budget (`timeout=`) -----------------------------
+
+from src import mcp_client  # noqa: E402
+
+
+class _Clock:
+    def __init__(self, now=100.0):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+
+class _TimedSession(_FakeSession):
+    """_FakeSession on a fake monotonic clock: every post takes `took` seconds and records the
+    timeout it was given and the moment it started."""
+
+    def __init__(self, responses, clock, took):
+        super().__init__(responses)
+        self.clock, self.took, self.posts = clock, took, []
+
+    def post(self, url, headers=None, data=None, timeout=None):
+        self.posts.append({"method": json.loads(data).get("method"), "timeout": timeout, "at": self.clock.now})
+        resp = super().post(url, headers=headers, data=data, timeout=timeout)
+        self.clock.now += self.took
+        return resp
+
+
+def _session_error(rpc_id):
+    return _Resp(json.dumps({"jsonrpc": "2.0", "id": rpc_id, "error": {"code": -32001, "message": "session not found"}}))
+
+
+def _ok(rpc_id, text="ok"):
+    return _Resp(json.dumps({"jsonrpc": "2.0", "id": rpc_id, "result": {"content": [{"type": "text", "text": text}]}}))
+
+
+def test_call_timeout_caps_every_post_at_the_remaining_budget(monkeypatch):
+    clock = _Clock()
+    monkeypatch.setattr(mcp_client, "_monotonic", clock)
+    session = _TimedSession([_init_resp("sid-1"), _session_error(2), _init_resp("sid-2"), _ok(4)], clock, took=3.0)
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=session)
+
+    out = c.call_tool("t", {}, timeout=20.0)
+
+    assert out.ok is True and out.text == "ok"
+    assert [p["method"] for p in session.posts] == [
+        "initialize", "notifications/initialized", "tools/call",
+        "initialize", "notifications/initialized", "tools/call"]
+    deadline = 100.0 + 20.0
+    for post in session.posts:
+        remaining = deadline - post["at"]
+        assert 0 < post["timeout"] <= remaining and post["timeout"] <= c.timeout
+        assert post["timeout"] == min(c.timeout, remaining)
+
+
+def test_budget_running_out_mid_call_returns_timeout_without_posting_again(monkeypatch):
+    clock = _Clock()
+    monkeypatch.setattr(mcp_client, "_monotonic", clock)
+    session = _TimedSession([_init_resp("sid-1"), _session_error(2), _init_resp("sid-2"),
+                             _init_resp("sid-3"), _ok(6)], clock, took=5.0)
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=session)
+
+    out = c.call_tool("t", {}, timeout=20.0)
+
+    assert out.ok is False and out.error == "timeout"
+    # initialize@0, initialized@5, call@10 (session error), re-initialize@15; at 20 nothing is left
+    # for notifications/initialized, so it is never posted.
+    assert [p["method"] for p in session.posts] == [
+        "initialize", "notifications/initialized", "tools/call", "initialize"]
+    assert all(p["timeout"] <= 120.0 - p["at"] for p in session.posts)
+    # A session the server never saw initialized is not reused: the next call starts over.
+    assert c._sid is None
+    assert c.call_tool("t", {}).ok is True
+    assert session.posts[4]["method"] == "initialize"
+
+
+def test_exhausted_budget_returns_timeout_without_posting(monkeypatch):
+    monkeypatch.setattr(mcp_client, "_monotonic", _Clock())
+    session = _TimedSession([_init_resp(), _ok(2)], _Clock(), took=0.0)
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=session)
+
+    out = c.call_tool("t", {}, timeout=0.0)
+
+    assert out.ok is False and out.error == "timeout"
+    assert session.posts == [] and session.requests == []
+
+
+def test_without_timeout_every_post_uses_the_client_timeout_and_no_clock(monkeypatch):
+    def no_clock():
+        raise AssertionError("the default path must not consult the budget clock")
+
+    monkeypatch.setattr(mcp_client, "_monotonic", no_clock)
+    session = _TimedSession([_init_resp("sid-1"), _session_error(2), _init_resp("sid-2"), _ok(4)], _Clock(), took=1.0)
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=session)
+
+    assert c.call_tool("t", {}).ok is True
+    assert len(session.posts) == 6
+    assert {p["timeout"] for p in session.posts} == {25.0}

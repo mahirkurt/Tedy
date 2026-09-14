@@ -21,6 +21,13 @@ import requests
 logger = logging.getLogger(__name__)
 
 SESSION_TTL_SECONDS = 600
+# Clock for the optional per-call budget of call_tool(timeout=...); a module attribute so tests can
+# substitute it. The default path (no timeout) never reads it.
+_monotonic = time.monotonic
+
+
+class _BudgetExhausted(Exception):
+    """A call_tool(timeout=...) budget ran out before the next HTTP post."""
 
 
 @dataclass
@@ -77,12 +84,18 @@ class McpClient:
             raise ValueError("sse_no_data_frame")
         return json.loads(body)
 
-    def _post(self, payload: dict[str, Any]) -> dict[str, Any]:
+    def _post(self, payload: dict[str, Any], deadline: float | None = None) -> dict[str, Any]:
+        timeout = self.timeout
+        if deadline is not None:
+            remaining = deadline - _monotonic()
+            if remaining <= 0:
+                raise _BudgetExhausted()
+            timeout = min(self.timeout, remaining)
         resp = self._session.post(
             self.url,
             headers=self._headers(),
             data=json.dumps(payload),
-            timeout=self.timeout,
+            timeout=timeout,
         )
         sid = (resp.headers or {}).get("mcp-session-id")
         if sid:
@@ -101,7 +114,7 @@ class McpClient:
     def _session_expired(self) -> bool:
         return (not self._sid) or (time.time() - self._sid_at > SESSION_TTL_SECONDS)
 
-    def _initialize(self) -> None:
+    def _initialize(self, deadline: float | None = None) -> None:
         self._sid = None
         self._post({
             "jsonrpc": "2.0", "id": self._next_id(), "method": "initialize",
@@ -110,23 +123,28 @@ class McpClient:
                 "capabilities": {},
                 "clientInfo": {"name": "tedy-assistant", "version": "1.0"},
             },
-        })
-        self._post({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        }, deadline)
+        try:
+            self._post({"jsonrpc": "2.0", "method": "notifications/initialized"}, deadline)
+        except _BudgetExhausted:
+            # The server never saw notifications/initialized: do not reuse that session id.
+            self._sid = None
+            raise
 
     @staticmethod
     def _is_session_error(rpc: dict[str, Any]) -> bool:
         err = rpc.get("error") or {}
         return "session" in str(err.get("message", "")).lower()
 
-    def _rpc(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+    def _rpc(self, method: str, params: dict[str, Any], deadline: float | None = None) -> dict[str, Any]:
         """One JSON-RPC round trip, re-initialising once if the session died."""
         for attempt in (1, 2):
             if self._session_expired():
-                self._initialize()
+                self._initialize(deadline)
             rpc = self._post({
                 "jsonrpc": "2.0", "id": self._next_id(),
                 "method": method, "params": params,
-            })
+            }, deadline)
             if not self._is_session_error(rpc):
                 return rpc
             # Server forgot us. Re-initialise and replay — but only once, so a
@@ -163,10 +181,17 @@ class McpClient:
         self._healthy = True
         return tools
 
-    def call_tool(self, name: str, arguments: dict[str, Any]) -> McpToolResult:
+    def call_tool(self, name: str, arguments: dict[str, Any],
+                  timeout: float | None = None) -> McpToolResult:
+        """timeout, when given, is a total budget for this call: every post inside it (re-initialise,
+        notifications/initialized, the call, the one replay) is capped at what is left, and a post the
+        budget can no longer cover is not sent. Without it every post uses self.timeout, as before."""
+        deadline = None if timeout is None else _monotonic() + timeout
         try:
             rpc = self._rpc("tools/call",
-                            {"name": name, "arguments": arguments})
+                            {"name": name, "arguments": arguments}, deadline)
+        except _BudgetExhausted:
+            return McpToolResult(ok=False, error="timeout")
         except Exception as exc:
             self._healthy = False
             logger.error("MCP %s call %s failed: %s", self.name, name, exc)

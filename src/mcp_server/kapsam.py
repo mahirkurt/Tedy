@@ -12,7 +12,8 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 from src.mcp_server.coverage import Coverage
-from src.mcp_server.federation import ANAMNESIS, EGITIM_KAYNAK, MUFREDAT, Federation, FederationError
+from src.mcp_server.federation import (ANAMNESIS, EGITIM_KAYNAK, MUFREDAT, TOOL_BUDGET_SECONDS, ZAMAN_ASIMI,
+                                       Federation, FederationError)
 from src.mcp_server.runs import RunStore
 
 OUTCOME_TEXT_MAX = 400
@@ -37,9 +38,10 @@ def normalize_grade(sinif: str | int) -> str | None:
     return f"{n}.Sınıf" if 1 <= n <= 12 else None
 
 
-def _mufredat(federation: Federation, tool: str, args: dict[str, Any], beklenen: str) -> Any:
+def _mufredat(federation: Federation, tool: str, args: dict[str, Any], beklenen: str,
+              deadline: float | None = None) -> Any:
     try:
-        return federation.call(MUFREDAT, tool, args, beklenen=beklenen)
+        return federation.call(MUFREDAT, tool, args, beklenen=beklenen, deadline=deadline)
     except FederationError as exc:
         raise KapsamError("manual_required", sunucu=MUFREDAT, arac=tool, neden=exc.reason) from exc
 
@@ -55,8 +57,8 @@ def _related(wanted: str, candidate: dict[str, Any]) -> bool:
     return bool(wanted) and (wanted in cand_slug or cand_slug in wanted)
 
 
-def resolve_subject(federation: Federation, ders: str) -> dict[str, str]:
-    subjects = _mufredat(federation, "list_subjects", {"q": ders}, "liste")
+def resolve_subject(federation: Federation, ders: str, deadline: float | None = None) -> dict[str, str]:
+    subjects = _mufredat(federation, "list_subjects", {"q": ders}, "liste", deadline)
     wanted = _fold(ders)
     for s in subjects:
         if s.get("slug") == ders.strip():
@@ -79,7 +81,7 @@ def _outcome(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def verify_outcomes(federation: Federation, slug: str, grade: str, konu: str | None,
-                    kazanim_kodu: str | None) -> dict[str, Any]:
+                    kazanim_kodu: str | None, deadline: float | None = None) -> dict[str, Any]:
     if kazanim_kodu:
         # R1: no subject or grade filter here. Per the maarif-mufredat contract, "subject" and
         # "grade" scope the server-side search — filtering on the caller's own claim would make
@@ -87,7 +89,7 @@ def verify_outcomes(federation: Federation, slug: str, grade: str, konu: str | N
         # returned in the first place. The exact code match below is what narrows the result.
         code = kazanim_kodu.strip()
         body = _mufredat(federation, "search_learning_outcomes",
-                         {"q": kazanim_kodu, "limit": 10, "distinct_codes": True}, "nesne")
+                         {"q": kazanim_kodu, "limit": 10, "distinct_codes": True}, "nesne", deadline)
         rows = [r for r in body.get("results") or [] if r.get("code") == code]
         if not rows:
             raise KapsamError("kazanim_dogrulanamadi", kazanim_kodu=kazanim_kodu, ders=slug)
@@ -103,7 +105,7 @@ def verify_outcomes(federation: Federation, slug: str, grade: str, konu: str | N
         # filter — otherwise a topic that only exists at another grade is indistinguishable from
         # one that does not exist at all.
         body = _mufredat(federation, "search_learning_outcomes",
-                         {"q": konu, "subject": slug, "limit": 8, "distinct_codes": True}, "nesne")
+                         {"q": konu, "subject": slug, "limit": 8, "distinct_codes": True}, "nesne", deadline)
         rows = body.get("results") or []
         at_grade = [r for r in rows if r.get("grade") == grade]
         kazanimlar = [_outcome(r) for r in at_grade]
@@ -167,20 +169,23 @@ def _part_doc_id(base_doc_id: str, part: int) -> str:
 
 
 class KapsamBuilder:
-    def __init__(self, federation: Federation, runs: RunStore, clock: Callable[[], float] = time.time) -> None:
+    def __init__(self, federation: Federation, runs: RunStore, clock: Callable[[], float] = time.time,
+                 monotonic: Callable[[], float] = time.monotonic) -> None:
         self.federation = federation
         self.runs = runs
-        self.clock = clock
+        self.clock = clock  # wall time, for the run record
+        self.monotonic = monotonic  # spec §7 budget
 
     def build(self, email: str, ders: str, sinif: str | int, konu: str | None = None,
               kazanim_kodu: str | None = None) -> dict[str, Any]:
+        deadline = self.monotonic() + TOOL_BUDGET_SECONDS
         cov = Coverage()
         grade = normalize_grade(sinif)
         if grade is None:
             return {"status": "gecersiz_sinif", "sinif": str(sinif), "mcp_verified": False}
         try:
-            subject = resolve_subject(self.federation, ders)
-            verified = verify_outcomes(self.federation, subject["slug"], grade, konu, kazanim_kodu)
+            subject = resolve_subject(self.federation, ders, deadline)
+            verified = verify_outcomes(self.federation, subject["slug"], grade, konu, kazanim_kodu, deadline)
             for row in verified["uyusmazlik"]:
                 if row["alan"] == "sinif":
                     # A code pins exactly one grade, so the verified grade replaces the caller's.
@@ -191,7 +196,7 @@ class KapsamBuilder:
                     # branch, since row["mufredat"] is already a curriculum slug) so the textbook/
                     # figure/OER framing below uses the CORRECT subject. uyusmazlik itself still
                     # reports the mismatch unchanged, for transparency.
-                    subject = resolve_subject(self.federation, row["mufredat"])
+                    subject = resolve_subject(self.federation, row["mufredat"], deadline)
                 # "konu_sinifi" (Task 11 Ruling 3): the topic exists only at OTHER grades. Unlike
                 # a code match this does not pin one authoritative grade, so it is only carried
                 # in the response — correcting `grade` here would silently swap the user's
@@ -207,14 +212,15 @@ class KapsamBuilder:
         query = konu or (verified["kazanimlar"][0]["text"][:120] if verified["kazanimlar"] else subject["name"])
 
         try:
-            cerceve, pages, figures = self._frame(run_id, subject["slug"], grade, query, verified["kazanimlar"])
+            cerceve, pages, figures = self._frame(run_id, subject["slug"], grade, query, verified["kazanimlar"],
+                                                  deadline)
         except KapsamError as exc:
             cov.degraded(MUFREDAT, exc.detay.get("neden", "hata"))
             cerceve = {"kind": None, "document_id": None, "title": None, "sayfalar": None,
                        "not": f"Ders kitabı çerçevesi alınamadı ({exc.detay.get('arac')}); kazanımlar doğrulandı."}
             pages, figures = [], []
-        self._ingest(cov, run_id, cerceve, pages)
-        oer, eslesme = self._oer(cov, konu or query, kazanim_kodu)
+        self._ingest(cov, run_id, cerceve, pages, deadline)
+        oer, eslesme = self._oer(cov, konu or query, kazanim_kodu, deadline)
 
         body: dict[str, Any] = {
             "status": "ok", "run_id": run_id, "ders": subject, "sinif": grade,
@@ -241,9 +247,10 @@ class KapsamBuilder:
         })
         return body
 
-    def _frame(self, run_id: str, slug: str, grade: str, query: str,
-               kazanimlar: list[dict[str, Any]]) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
-        books = [b for b in _mufredat(self.federation, "list_textbooks", {"subject": slug, "grade": grade, "limit": 20}, "liste")
+    def _frame(self, run_id: str, slug: str, grade: str, query: str, kazanimlar: list[dict[str, Any]],
+               deadline: float) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+        books = [b for b in _mufredat(self.federation, "list_textbooks", {"subject": slug, "grade": grade, "limit": 20},
+                                      "liste", deadline)
                  if int(b.get("page_count") or 0) > 0]
         if not books:
             doc = kazanimlar[0]["document_id"] if kazanimlar else None
@@ -252,7 +259,8 @@ class KapsamBuilder:
         book = books[0]
         doc_id = int(book["document_id"])
         found = _mufredat(self.federation, "search_figures",
-                          {"query": query, "subject": slug, "grade": grade, "document_id": doc_id, "limit": 12}, "nesne")
+                          {"query": query, "subject": slug, "grade": grade, "document_id": doc_id, "limit": 12},
+                          "nesne", deadline)
         figs = sorted((f for f in found.get("figures") or [] if f.get("page_no")), key=lambda f: (f["page_no"], f["figure_id"]))
         figures = [{"figure_id": f["figure_id"], "page_no": f["page_no"], "etiket": f.get("label") or "",
                     "aciklama": (f.get("caption") or f.get("snippet") or "")[:200]} for f in figs[:FIGURE_MAX]]
@@ -263,7 +271,7 @@ class KapsamBuilder:
         first = max(1, figs[0]["page_no"] - 1)
         last = min(int(book["page_count"]), first + PAGE_WINDOW - 1)
         text = _mufredat(self.federation, "get_document_text",
-                         {"document_id": doc_id, "page_range": f"{first}-{last}", "max_chars": 60000}, "nesne")
+                         {"document_id": doc_id, "page_range": f"{first}-{last}", "max_chars": 60000}, "nesne", deadline)
         if text.get("error"):
             cerceve["not"] = f"Sayfa metni alınamadı: {text.get('error')}"
             return cerceve, [], figures
@@ -273,7 +281,8 @@ class KapsamBuilder:
         cerceve["sayfalar"] = f"{first}-{last}"
         return cerceve, pages, figures
 
-    def _ingest(self, cov: Coverage, run_id: str, cerceve: dict[str, Any], pages: list[dict[str, Any]]) -> None:
+    def _ingest(self, cov: Coverage, run_id: str, cerceve: dict[str, Any], pages: list[dict[str, Any]],
+                deadline: float) -> None:
         if not self.federation.configured(ANAMNESIS):
             cov.skipped(ANAMNESIS, "anahtar yok")
             return
@@ -297,7 +306,7 @@ class KapsamBuilder:
         # until next_offset comes back null or we hit INGEST_MAX_PARTS.
         try:
             for part in range(1, INGEST_MAX_PARTS + 1):
-                result = self.federation.call(ANAMNESIS, "ingest_document", args, beklenen="nesne")
+                result = self.federation.call(ANAMNESIS, "ingest_document", args, beklenen="nesne", deadline=deadline)
                 next_offset = result.get("next_offset")
                 if next_offset is None:
                     cov.hit(ANAMNESIS)
@@ -307,12 +316,14 @@ class KapsamBuilder:
         except FederationError as exc:
             cov.degraded(ANAMNESIS, exc.reason)
 
-    def _oer(self, cov: Coverage, query: str, kazanim_kodu: str | None) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    def _oer(self, cov: Coverage, query: str, kazanim_kodu: str | None,
+             deadline: float) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
         if not self.federation.configured(EGITIM_KAYNAK):
             cov.skipped(EGITIM_KAYNAK, "anahtar yok")
             return [], None
         try:
-            found = self.federation.call(EGITIM_KAYNAK, "kb_search", {"q": query, "top_k": OER_MAX}, beklenen="nesne")
+            found = self.federation.call(EGITIM_KAYNAK, "kb_search", {"q": query, "top_k": OER_MAX}, beklenen="nesne",
+                                         deadline=deadline)
         except FederationError as exc:
             cov.degraded(EGITIM_KAYNAK, exc.reason)
             return [], None
@@ -327,9 +338,12 @@ class KapsamBuilder:
         if kazanim_kodu:
             try:
                 match = self.federation.call(EGITIM_KAYNAK, "kb_for_outcome",
-                                             {"outcome_code": kazanim_kodu, "top_k": 3}, beklenen="nesne")
+                                             {"outcome_code": kazanim_kodu, "top_k": 3}, beklenen="nesne", deadline=deadline)
                 eslesme = {"status": match.get("status"), "reason": match.get("reason"),
                            "sonuc_sayisi": len(match.get("results") or [])}
             except FederationError as exc:
                 eslesme = {"status": "degraded", "reason": exc.reason, "sonuc_sayisi": 0}
+                if exc.reason == ZAMAN_ASIMI:
+                    # A step the budget skipped or cut marks its server's coverage, not only this row.
+                    cov.degraded(EGITIM_KAYNAK, exc.reason)
         return oer, eslesme

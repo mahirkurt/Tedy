@@ -16,7 +16,7 @@ class FakeFed:
     def configured(self, server):
         return server in self._configured
 
-    def call(self, server, tool, args, beklenen):
+    def call(self, server, tool, args, beklenen, deadline=None):
         self.calls.append((server, tool, args, beklenen))
         if (server, tool) in self.fail:
             raise FederationError(server, tool, "timeout")
@@ -39,11 +39,11 @@ class SequencedIngestFed(FakeFed):
         super().__init__(responses, **kw)
         self._ingest_queue = list(ingest_queue)
 
-    def call(self, server, tool, args, beklenen):
+    def call(self, server, tool, args, beklenen, deadline=None):
         if (server, tool) == ("anamnesis", "ingest_document"):
             self.calls.append((server, tool, args, beklenen))
             return self._ingest_queue.pop(0)
-        return super().call(server, tool, args, beklenen)
+        return super().call(server, tool, args, beklenen, deadline=deadline)
 
 
 OUTCOME = {"code": "FB.5.4.1.1", "text": "Maddenin hâllerini açıklar.", "subject": SLUG, "grade": "5.Sınıf",
@@ -279,3 +279,123 @@ def test_ingest_gives_up_after_max_parts_and_degrades(tmp_path):
     calls = fed.called("anamnesis", "ingest_document")
     assert len(calls) == kapsam.INGEST_MAX_PARTS == 8
     assert body["coverage"]["anamnesis"] == "degraded:kismi_alim"
+
+
+# --- SP2 final review F1: spec §7 per-tool budget (60 s) over a real Federation ---------------
+
+import json  # noqa: E402
+
+from src.mcp_client import McpToolResult  # noqa: E402
+from src.mcp_server import federation  # noqa: E402
+from src.mcp_server.config import load_settings  # noqa: E402
+
+START = 5000.0
+
+
+class Clock:
+    def __init__(self, now=START):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+
+def _timed_build(tmp_path, took, responses=None, ingest_queue=None, **kw):
+    """KapsamBuilder over a real Federation whose fake fleet clients run on one fake monotonic
+    clock. took(tool, args) is how long the server needs; a server slower than the timeout it was
+    given is cut off at that timeout and fails, like a requests read timeout."""
+    clock, log = Clock(), []
+    responses = responses or _responses()
+    queue = list(ingest_queue or [])
+
+    class Client:
+        def __init__(self, name, url, api_key, **_):
+            self.server = name
+
+        def call_tool(self, tool, arguments, timeout=None):
+            remaining = START + federation.TOOL_BUDGET_SECONDS - clock.now
+            log.append({"server": self.server, "tool": tool, "timeout": timeout, "remaining": remaining})
+            need = took(tool, arguments)
+            if timeout is not None and need > timeout:
+                clock.now += timeout
+                return McpToolResult(ok=False, error=f"Read timed out. (read timeout={timeout})")
+            clock.now += need
+            if (self.server, tool) == ("anamnesis", "ingest_document") and queue:
+                value = queue.pop(0)
+            else:
+                value = responses[(self.server, tool)]
+                value = value(arguments) if callable(value) else value
+            return McpToolResult(ok=True, text=json.dumps(value))
+
+    env = {"TED_MCP_PUBLIC_BASE_URL": "https://mcp.tedy.online", "MUFREDAT_MCP_API_KEY": "k",
+           "EGITIM_KAYNAK_MCP_API_KEY": "k", "ANAMNESIS_MCP_API_KEY": "k"}
+    fed = federation.Federation(load_settings(env, project_root=tmp_path), client_factory=Client, monotonic=clock)
+    runs = RunStore(tmp_path)
+    builder = kapsam.KapsamBuilder(fed, runs, clock=lambda: 1_800_000_000.0, monotonic=clock)
+    return builder.build(FULL, kw.pop("ders", "Fen Bilimleri"), "5", **kw), runs, log
+
+
+def _assert_timeouts_within_budget(log):
+    assert log, "no fleet call was made"
+    for call in log:
+        assert call["remaining"] >= federation.MIN_CALL_SECONDS, call
+        assert call["timeout"] == min(federation.CALL_TIMEOUT_SECONDS, call["remaining"]), call
+
+
+def test_budget_stops_the_builder_and_marks_cut_servers_zaman_asimi(tmp_path):
+    partial = [{"doc_id": "x", "collection": "y", "n_chunks": 1, "next_offset": 100 * n} for n in range(1, 9)]
+    body, runs, log = _timed_build(tmp_path, lambda tool, args: 9.0, ingest_queue=partial, konu="maddenin halleri")
+    # 9 s per call: the second ingest part ends at 63 s, so part three and kb_search are never sent.
+    assert [c["tool"] for c in log] == ["list_subjects", "search_learning_outcomes", "list_textbooks",
+                                        "search_figures", "get_document_text", "ingest_document", "ingest_document"]
+    _assert_timeouts_within_budget(log)
+    assert [c["timeout"] for c in log][-3:] == [24.0, 15.0, 6.0]
+    assert body["status"] == "ok"
+    expected = {"maarif-mufredat": "hit", "anamnesis": "degraded:zaman_asimi", "egitim-kaynak": "degraded:zaman_asimi"}
+    assert body["coverage"] == expected
+    assert body["kaynak_verisi"]["oer"] == []
+    assert runs.load(body["run_id"])["coverage"] == expected
+
+
+def test_budget_cutting_the_textbook_step_uses_the_core_failure_path(tmp_path):
+    body, _, log = _timed_build(tmp_path, lambda tool, args: 20.0, konu="maddenin halleri")
+    assert [c["tool"] for c in log] == ["list_subjects", "search_learning_outcomes", "list_textbooks"]
+    _assert_timeouts_within_budget(log)
+    assert body["status"] == "ok" and body["kazanimlar"][0]["code"] == "FB.5.4.1.1"
+    assert body["cerceve"]["kind"] is None and "search_figures" in body["cerceve"]["not"]
+    assert body["coverage"] == {"maarif-mufredat": "degraded:zaman_asimi",
+                                "anamnesis": "skipped:alınacak sayfa yok",
+                                "egitim-kaynak": "degraded:zaman_asimi"}
+
+
+def test_budget_cutting_verification_is_manual_required_zaman_asimi(tmp_path):
+    math_slug = "matematik-dersi"
+
+    def list_subjects(args):
+        if args.get("q") == "Matematik":
+            return [{"slug": math_slug, "name": "Matematik Dersi", "level": "temel-egitim", "grade_count": 8}]
+        return [{"slug": SLUG, "name": "Fen Bilimleri Dersi", "level": "temel-egitim", "grade_count": 6}]
+
+    def took(tool, args):
+        # 25 s + 25 s, then the re-resolve of the corrected subject hangs past its 10 s cap.
+        return 30.0 if tool == "list_subjects" and args.get("q") == SLUG else 25.0
+
+    body, runs, log = _timed_build(tmp_path, took, _responses({("maarif-mufredat", "list_subjects"): list_subjects}),
+                                   ders="Matematik", kazanim_kodu="FB.5.4.1.1")
+    assert [c["tool"] for c in log] == ["list_subjects", "search_learning_outcomes", "list_subjects"]
+    _assert_timeouts_within_budget(log)
+    assert log[-1]["timeout"] == 10.0
+    assert body["status"] == "manual_required"
+    assert body["neden"] == "zaman_asimi" and body["arac"] == "list_subjects"
+    assert body["coverage"] == {"maarif-mufredat": "degraded:zaman_asimi"}
+    assert "run_id" not in body and not (tmp_path / "edupedia_runs").exists()
+
+
+def test_budget_skipping_kb_for_outcome_degrades_egitim_kaynak(tmp_path):
+    body, _, log = _timed_build(tmp_path, lambda tool, args: 5.5 if tool == "kb_search" else 9.0,
+                                kazanim_kodu="FB.5.4.1.1")
+    assert [c["tool"] for c in log][-2:] == ["ingest_document", "kb_search"]
+    assert "kb_for_outcome" not in [c["tool"] for c in log]
+    _assert_timeouts_within_budget(log)
+    assert body["kazanim_eslesmesi"] == {"status": "degraded", "reason": "zaman_asimi", "sonuc_sayisi": 0}
+    assert body["coverage"] == {"maarif-mufredat": "hit", "anamnesis": "hit", "egitim-kaynak": "degraded:zaman_asimi"}

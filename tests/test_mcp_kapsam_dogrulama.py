@@ -17,7 +17,7 @@ class FakeFed:
     def configured(self, server):
         return True
 
-    def call(self, server, tool, args, beklenen):
+    def call(self, server, tool, args, beklenen, deadline=None):
         self.calls.append((server, tool, args, beklenen))
         if (server, tool) in self.fail:
             raise FederationError(server, tool, "timeout")
@@ -39,7 +39,7 @@ class FilteringFakeFed:
     def configured(self, server):
         return True
 
-    def call(self, server, tool, args, beklenen):
+    def call(self, server, tool, args, beklenen, deadline=None):
         self.calls.append((server, tool, args, beklenen))
         assert tool == "search_learning_outcomes"
         rows = self.outcomes

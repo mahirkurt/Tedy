@@ -18,7 +18,7 @@ class FakeFed:
     def configured(self, server):
         return self._configured
 
-    def call(self, server, tool, args, beklenen):
+    def call(self, server, tool, args, beklenen, deadline=None):
         self.calls.append((server, tool, args, beklenen))
         if self.fail:
             raise FederationError(server, tool, "timeout")
@@ -28,7 +28,9 @@ class FakeFed:
 @pytest.fixture
 def runs(tmp_path):
     store = RunStore(tmp_path)
-    store.save("abcdef012345", {"run_id": "abcdef012345", "created_by": "drmahirkurt@gmail.com"})
+    # A run record as KapsamBuilder writes it: its coverage always names anamnesis.
+    store.save("abcdef012345", {"run_id": "abcdef012345", "created_by": "drmahirkurt@gmail.com",
+                                "coverage": {"maarif-mufredat": "hit", "anamnesis": "hit"}})
     store.save_page("abcdef012345", 197, 112, "Katı maddelerin tanecikleri düzenlidir.\n\nSıvılar akışkandır.")
     store.save_page("abcdef012345", 197, 113, "Buharlaşma sıvının gaza dönüşmesidir.\n\nYoğuşma tersidir.")
     return store
@@ -189,3 +191,62 @@ def test_anamnesis_and_local_passages_share_the_same_passage_keys(runs):
     assert anamnesis_body["yontem"] == "anamnesis" and local_body["yontem"] == "yerel"
     assert set(anamnesis_body["pasajlar"][0]) == set(local_body["pasajlar"][0])
     assert set(anamnesis_body["pasajlar"][0]) == {"ref", "sayfa", "metin", "kesildi", "skor"}
+
+
+# --- SP2 final review F1: spec §7 per-tool budget over a real Federation ----------------------
+
+import json  # noqa: E402
+
+from src.mcp_client import McpToolResult  # noqa: E402
+from src.mcp_server import federation  # noqa: E402
+
+
+class Clock:
+    def __init__(self, now=7000.0):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+
+def _timed_reader(tmp_path, runs, clock):
+    log = []
+
+    class Client:
+        def __init__(self, name, url, api_key, **_):
+            pass
+
+        def call_tool(self, tool, arguments, timeout=None):
+            log.append({"tool": tool, "timeout": timeout})
+            return McpToolResult(ok=True, text=json.dumps(CHUNKS))
+
+    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": "https://mcp.tedy.online", "ANAMNESIS_MCP_API_KEY": "k"},
+                             project_root=tmp_path)
+    fed = federation.Federation(settings, client_factory=Client, monotonic=clock)
+    return KaynakOkuyucu(fed, runs, monotonic=clock), log
+
+
+def test_anamnesis_query_timeout_is_capped_by_the_tool_budget(tmp_path, runs):
+    reader, log = _timed_reader(tmp_path, runs, Clock())
+    body = reader.oku("abcdef012345", "buharlaşma nedir")
+    assert body["yontem"] == "anamnesis"
+    assert log == [{"tool": "hybrid_query", "timeout": federation.CALL_TIMEOUT_SECONDS}]
+
+
+def test_budget_cut_anamnesis_still_returns_local_passages(tmp_path, runs):
+    clock = Clock()
+
+    class SlowRuns(RunStore):
+        def load(self, run_id):
+            clock.now += 59.5  # a stalled disk read eats the budget before the fleet call
+            return runs.load(run_id)
+
+        def pages(self, run_id):
+            return runs.pages(run_id)
+
+    reader, log = _timed_reader(tmp_path, SlowRuns(tmp_path), clock)
+    body = reader.oku("abcdef012345", "buharlaşma")
+    assert log == []
+    assert body["status"] == "ok" and body["yontem"] == "yerel"
+    assert body["coverage"] == {"anamnesis": "degraded:zaman_asimi"}
+    assert body["pasajlar"][0]["ref"] == "local:197/113#0"

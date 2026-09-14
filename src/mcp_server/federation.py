@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any, Callable, Literal
 
 from src.mcp_client import McpClient
@@ -13,6 +14,13 @@ logger = logging.getLogger(__name__)
 MUFREDAT = "maarif-mufredat"
 EGITIM_KAYNAK = "egitim-kaynak"
 ANAMNESIS = "anamnesis"
+
+# Spec §7 time budget: 25 s per call, 60 s per tool. A tool fixes its deadline (monotonic seconds) once
+# at entry and passes it to every call; a call the remaining budget cannot cover is not made.
+CALL_TIMEOUT_SECONDS = 25.0
+TOOL_BUDGET_SECONDS = 60.0
+MIN_CALL_SECONDS = 1.0
+ZAMAN_ASIMI = "zaman_asimi"
 
 _DECODER = json.JSONDecoder()
 
@@ -39,9 +47,11 @@ def decode_json_stream(text: str) -> list[Any]:
 
 
 class Federation:
-    def __init__(self, settings: Settings, client_factory: Callable[..., Any] = McpClient) -> None:
+    def __init__(self, settings: Settings, client_factory: Callable[..., Any] = McpClient,
+                 monotonic: Callable[[], float] = time.monotonic) -> None:
         self._settings = settings
         self._factory = client_factory
+        self._monotonic = monotonic
         self._clients: dict[str, Any] = {}
 
     def configured(self, server: str) -> bool:
@@ -54,11 +64,22 @@ class Federation:
             self._clients[server] = self._factory(name=cfg.name, url=cfg.url, api_key=cfg.api_key)
         return self._clients[server]
 
-    def call(self, server: str, tool: str, args: dict[str, Any], beklenen: Literal["liste", "nesne"]) -> Any:
+    def call(self, server: str, tool: str, args: dict[str, Any], beklenen: Literal["liste", "nesne"],
+             deadline: float | None = None) -> Any:
         if not self.configured(server):
             raise FederationError(server, tool, "not_configured")
-        result = self._client(server).call_tool(tool, args)
+        if deadline is None:
+            result = self._client(server).call_tool(tool, args)
+        else:
+            remaining = deadline - self._monotonic()
+            if remaining < MIN_CALL_SECONDS:
+                raise FederationError(server, tool, ZAMAN_ASIMI)
+            result = self._client(server).call_tool(tool, args, timeout=min(CALL_TIMEOUT_SECONDS, remaining))
         if not result.ok:
+            if deadline is not None and deadline - self._monotonic() < MIN_CALL_SECONDS:
+                # Cut off by the budget-capped timeout (or failed with no budget left for anything
+                # else): the honest reason is the tool budget, not whatever the transport said.
+                raise FederationError(server, tool, ZAMAN_ASIMI)
             raise FederationError(server, tool, f"tool_error: {result.error}")
         try:
             values = decode_json_stream(result.text)

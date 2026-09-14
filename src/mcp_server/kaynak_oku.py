@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Any
+import time
+from typing import Any, Callable
 
 from src.mcp_server.coverage import Coverage
-from src.mcp_server.federation import ANAMNESIS, Federation, FederationError
+from src.mcp_server.federation import ANAMNESIS, TOOL_BUDGET_SECONDS, Federation, FederationError
 from src.mcp_server.kapsam import KAYNAK_VERISI_NOT
 from src.mcp_server.runs import RUN_ID_RE, RunStore
 
@@ -105,11 +106,14 @@ def wrap_kaynak_verisi(body: dict[str, Any]) -> dict[str, Any]:
 
 
 class KaynakOkuyucu:
-    def __init__(self, federation: Federation, runs: RunStore) -> None:
+    def __init__(self, federation: Federation, runs: RunStore,
+                 monotonic: Callable[[], float] = time.monotonic) -> None:
         self.federation = federation
         self.runs = runs
+        self.monotonic = monotonic  # spec §7 budget
 
     def oku(self, run_id: str, soru: str, top_k: int = 5) -> dict[str, Any]:
+        deadline = self.monotonic() + TOOL_BUDGET_SECONDS
         base: dict[str, Any] = {"run_id": run_id, "soru": soru, "caveat": CAVEAT, "mcp_verified": False}
         if not RUN_ID_RE.match(run_id or "") or self.runs.load(run_id) is None:
             return {**base, "status": "run_bulunamadi"}
@@ -122,7 +126,7 @@ class KaynakOkuyucu:
                 found = self.federation.call(ANAMNESIS, "hybrid_query", {
                     "query": soru, "collection": f"edupedia:run:{run_id}", "k": top_k,
                     "per_chunk_chars": PASSAGE_MAX, "max_edges": 0,
-                }, beklenen="nesne")
+                }, beklenen="nesne", deadline=deadline)
                 chunks = found.get("chunks") or []
                 if chunks:
                     degraded = bool((found.get("retrieval") or {}).get("degraded"))
