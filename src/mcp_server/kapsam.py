@@ -33,22 +33,51 @@ class KapsamError(Exception):
         self.detay = detay
 
 
-def _fleet_int(value: Any, *, server: str | None = None, tool: str | None = None) -> int | None:
-    """int() a fleet-supplied field without ever letting a bad value reach an exception's own
-    message (§6.3: fleet text must never carry instructions back to the model). Without
-    server/tool the caller treats a bad value as absent (returns None); with them, a bad value
-    raises the same KapsamError('manual_required', neden='unexpected_shape') a genuine
-    FederationError('unexpected_shape') from that step would produce.
+_FLEET_INT_STRING_RE = re.compile(r"^[0-9]+$")
 
-    OverflowError is caught alongside TypeError/ValueError (fix round 1 Important #3): the
-    federation JSON decoder accepts the `Infinity` literal, and int(float('inf')) raises
-    OverflowError rather than ValueError."""
-    try:
-        return int(value)
-    except (TypeError, ValueError, OverflowError):
+
+def _fleet_int(value: Any, *, server: str | None = None, tool: str | None = None) -> int | None:
+    """Strictly parses a fleet-supplied field as an integer (fix round 3 Ruling R3-3). Only
+    three shapes ever convert: a plain `int` (bool excluded — True/False are never a page number
+    or an id, even though bool is an int subclass), a `float` whose `is_integer()` is True (10.0
+    is accepted as 10; 10.9, inf and nan are not — is_integer() is False for all three), or a
+    `str` matching `^[0-9]+$` (so "7" converts but " 7", "-1" and "10.5" do not). Everything else
+    is malformed. This is deliberately stricter than int()'s own truncating conversion: 10.9
+    silently becoming 10 could collide with, and be indistinguishable from, a genuine id 10.
+
+    Without server/tool a malformed value is simply absent (returns None) — the fleet's own text
+    never reaches an exception's own message this way either (§6.3). With server/tool, a
+    malformed value raises the same KapsamError('manual_required', neden='unexpected_shape') a
+    genuine FederationError('unexpected_shape') from that step would produce."""
+    result: int | None = None
+    if isinstance(value, bool):
+        result = None
+    elif isinstance(value, int):
+        result = value
+    elif isinstance(value, float) and value.is_integer():
+        result = int(value)
+    elif isinstance(value, str) and _FLEET_INT_STRING_RE.match(value):
+        result = int(value)
+    if result is None:
         if server is None:
             return None
         raise KapsamError("manual_required", sunucu=server, arac=tool, neden="unexpected_shape") from None
+    return result
+
+
+def _fleet_rows(value: Any) -> tuple[list[dict[str, Any]], bool]:
+    """Normalizes a fleet-supplied list field (fix round 3 Ruling R3-4): every list
+    KapsamBuilder.build iterates (books, figures, pages) might not actually be a list, and an
+    individual row might not be a dict — either is malformed and dropped rather than raising
+    AttributeError/TypeError out of build(). A missing/null value (the ordinary "nothing here"
+    shape) is empty and NOT malformed; a present value of the wrong type is empty AND malformed.
+    Returns (only the dict rows, whether anything was dropped for shape reasons)."""
+    if value is None:
+        return [], False
+    if not isinstance(value, list):
+        return [], True
+    rows = [v for v in value if isinstance(v, dict)]
+    return rows, len(rows) < len(value)
 
 
 def _fold(text: str) -> str:
@@ -236,9 +265,9 @@ class KapsamBuilder:
         run_id = self.runs.new_id()
         query = konu or (verified["kazanimlar"][0]["text"][:120] if verified["kazanimlar"] else subject["name"])
 
-        figure_shape_degraded = False
+        shape_degraded = False
         try:
-            cerceve, pages, figures, figure_shape_degraded = self._frame(
+            cerceve, pages, figures, shape_degraded = self._frame(
                 run_id, subject["slug"], grade, query, verified["kazanimlar"], deadline)
         except KapsamError as exc:
             cov.degraded(MUFREDAT, exc.detay.get("neden", "hata"))
@@ -263,13 +292,15 @@ class KapsamBuilder:
         }
         if eslesme is not None:
             body["kazanim_eslesmesi"] = eslesme
-        if figure_shape_degraded:
-            # Fix round 2 Ruling R2-2: a malformed figure row was silently dropped (page_no or
-            # figure_id unusable) rather than failing the whole build — the framing itself is
-            # still usable and returned normally, but this build's own maarif-mufredat coverage
-            # must show the honest degraded code. Applied last, here, so no earlier cov.hit
-            # (MUFREDAT) call above can mask it — Coverage's own last-write-wins semantics are
-            # untouched; only this call's placement at the end of build makes it the final word.
+        if shape_degraded:
+            # Fix round 2 Ruling R2-2, generalized by fix round 3 Ruling R3-4: a malformed
+            # books/figures/pages row (or an unusable page_no/figure_id, or a fleet list that was
+            # not actually a list) was silently dropped rather than failing the whole build — the
+            # framing itself is still usable and returned normally, but this build's own
+            # maarif-mufredat coverage must show the honest degraded code. Applied last, here, so
+            # no earlier cov.hit(MUFREDAT) call above can mask it — Coverage's own
+            # last-write-wins semantics are untouched; only this call's placement at the end of
+            # build makes it the final word.
             cov.degraded(MUFREDAT, "unexpected_shape")
         body.update({"coverage": cov.as_dict(), "caveat": CAVEAT, "sonraki_adim": NEXT_STEP, "mcp_verified": False})
         self.runs.save(run_id, {
@@ -283,13 +314,16 @@ class KapsamBuilder:
 
     def _frame(self, run_id: str, slug: str, grade: str, query: str, kazanimlar: list[dict[str, Any]],
                deadline: float) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], bool]:
-        """Returns (cerceve, pages, figures, figure_shape_degraded). The last element (fix round
-        2 Ruling R2-2) tells the caller (build) whether a malformed figure row was silently
-        dropped for this build — build applies the resulting degraded:unexpected_shape coverage
-        itself, at the very end, so it cannot be masked by an earlier cov.hit(MUFREDAT)."""
+        """Returns (cerceve, pages, figures, shape_degraded). shape_degraded (fix round 2 Ruling
+        R2-2, generalized by fix round 3 Ruling R3-4 to books/pages too) tells the caller (build)
+        whether any fleet row across books/figures/pages was dropped for shape reasons this
+        build — build applies the resulting degraded:unexpected_shape coverage itself, at the
+        very end, so it cannot be masked by an earlier cov.hit(MUFREDAT)."""
+        raw_books = _mufredat(self.federation, "list_textbooks", {"subject": slug, "grade": grade, "limit": 20},
+                             "liste", deadline)
+        book_rows, books_shape_degraded = _fleet_rows(raw_books)
         candidates = []
-        for b in _mufredat(self.federation, "list_textbooks", {"subject": slug, "grade": grade, "limit": 20},
-                           "liste", deadline):
+        for b in book_rows:
             # A row whose page_count is not an integer-convertible value is not eligible, never
             # raises (§6.3 Ruling C). The survivor carries its OWN already-validated int
             # page_count forward (fix round 1 Minor M4): re-deriving it again below from the
@@ -301,34 +335,35 @@ class KapsamBuilder:
             doc = kazanimlar[0]["document_id"] if kazanimlar else None
             return ({"kind": "program", "document_id": doc, "title": None, "sayfalar": None,
                      "not": "Bu ders ve sınıf için tam metinli ders kitabı yok; çerçeve öğretim programıdır."},
-                    [], [], False)
+                    [], [], books_shape_degraded)
         book, page_count = candidates[0]
         doc_id = _fleet_int(book.get("document_id"), server=MUFREDAT, tool="list_textbooks")
         found = _mufredat(self.federation, "search_figures",
                           {"query": query, "subject": slug, "grade": grade, "document_id": doc_id, "limit": 12},
                           "nesne", deadline)
-        # A figure whose page_no is not an integer-convertible value, or whose figure_id is
-        # missing or not int-convertible (so it cannot be compared against another figure's id
-        # in the sort key below), is excluded the same way a malformed candidate textbook is
-        # above (fix round 1 Minor M5, fix round 2 Ruling R2-2) — never a crash. Both page_no
-        # AND figure_id are normalized to int here, so the sort key below can never raise
-        # KeyError (missing figure_id) or TypeError (e.g. int vs str figure_id at a tied
-        # page_no) — every surviving row's key fields are guaranteed homogeneous ints.
-        raw_figures = found.get("figures") or []
+        # The "figures" field itself might not be a list, or a row might not be a dict (fix
+        # round 3 Ruling R3-4); a figure whose page_no is not an integer-convertible value, or
+        # whose figure_id is missing or not int-convertible (so it cannot be compared against
+        # another figure's id in the sort key below), is excluded the same way (fix round 1
+        # Minor M5, fix round 2 Ruling R2-2) — never a crash. Both page_no AND figure_id are
+        # normalized to int here, so the sort key below can never raise KeyError (missing
+        # figure_id) or TypeError (e.g. int vs str figure_id at a tied page_no) — every
+        # surviving row's key fields are guaranteed homogeneous ints.
+        figure_rows, figures_container_degraded = _fleet_rows(found.get("figures"))
         figs = []
-        for f in raw_figures:
+        for f in figure_rows:
             page_no = _fleet_int(f.get("page_no"))
             figure_id = _fleet_int(f.get("figure_id"))
             if page_no and figure_id is not None:
                 figs.append({**f, "page_no": page_no, "figure_id": figure_id})
         figs.sort(key=lambda f: (f["page_no"], f["figure_id"]))
-        figure_shape_degraded = len(figs) < len(raw_figures)
+        shape_degraded = books_shape_degraded or figures_container_degraded or len(figs) < len(figure_rows)
         figures = [{"figure_id": f["figure_id"], "page_no": f["page_no"], "etiket": f.get("label") or "",
                     "aciklama": (f.get("caption") or f.get("snippet") or "")[:200]} for f in figs[:FIGURE_MAX]]
         cerceve: dict[str, Any] = {"kind": "textbook", "document_id": doc_id, "title": book.get("title"), "sayfalar": None}
         if not figs:
             cerceve["not"] = "Figür aramasında sayfa isabeti yok; sayfa penceresi seçilmedi, kitapta konuyu elle doğrula."
-            return cerceve, [], figures, figure_shape_degraded
+            return cerceve, [], figures, shape_degraded
         first = max(1, figs[0]["page_no"] - 1)
         last = min(page_count, first + PAGE_WINDOW - 1)
         text = _mufredat(self.federation, "get_document_text",
@@ -336,21 +371,24 @@ class KapsamBuilder:
         if text.get("error"):
             logger.warning("%s.get_document_text error: %s", MUFREDAT, upstream_log_text(text.get("error")))
             cerceve["not"] = "Sayfa metni alınamadı."
-            return cerceve, [], figures, figure_shape_degraded
-        raw_pages = [p for p in text.get("pages") or [] if isinstance(p, dict)]
+            return cerceve, [], figures, shape_degraded
+        # The "pages" field itself might not be a list, or a row might not be a dict (fix round 3
+        # Ruling R3-4) — both dropped, matching the pattern above.
+        page_rows, pages_container_degraded = _fleet_rows(text.get("pages"))
+        shape_degraded = shape_degraded or pages_container_degraded
         # Convert every page_no BEFORE saving any page (fix round 1 Minor M3): a malformed value
         # partway through the list must not leave a partially-saved run whose files disagree
         # with the cerceve/coverage the caller ends up reporting for this same failure. The
         # converted int is also carried forward into the returned page dicts themselves (fix
         # round 2 O-5) — kitap_sayfalari and _ingest used to read the RAW (possibly string)
         # page_no straight from these dicts, so e.g. "111" was reported as a string, not int 111.
-        page_nos = [_fleet_int(p.get("page_no"), server=MUFREDAT, tool="get_document_text") for p in raw_pages]
+        page_nos = [_fleet_int(p.get("page_no"), server=MUFREDAT, tool="get_document_text") for p in page_rows]
         pages = []
-        for p, page_no in zip(raw_pages, page_nos):
+        for p, page_no in zip(page_rows, page_nos):
             self.runs.save_page(run_id, doc_id, page_no, p.get("text") or "")
             pages.append({**p, "page_no": page_no})
         cerceve["sayfalar"] = f"{first}-{last}"
-        return cerceve, pages, figures, figure_shape_degraded
+        return cerceve, pages, figures, shape_degraded
 
     def _ingest(self, cov: Coverage, run_id: str, cerceve: dict[str, Any], pages: list[dict[str, Any]],
                 deadline: float) -> None:

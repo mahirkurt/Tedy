@@ -628,3 +628,97 @@ def test_fleet_int_raises_manual_required_unexpected_shape_for_a_bad_value(bad_v
     assert exc_info.value.status == "manual_required"
     assert exc_info.value.detay == {"sunucu": "maarif-mufredat", "arac": "list_textbooks", "neden": "unexpected_shape"}
     assert INJECTION not in str(exc_info.value.detay)
+
+
+# --- SP2 residual fix round 3: R3-3 — strict integer conversion (no silent truncation) ---------
+
+@pytest.mark.parametrize("bad_figure_id", [10.9, True])
+def test_fractional_or_bool_figure_id_is_malformed_and_degrades_coverage(tmp_path, bad_figure_id):
+    """fix round 3 Ruling R3-3: _fleet_int used to truncate via plain int() — a figure_id of 10.9
+    silently became 10 (colliding with, and indistinguishable from, a genuine id 10), and True
+    became 1. Both must now be treated as malformed (dropped), never silently coerced."""
+    found = {"query": "x", "count": 2, "figures": [
+        {"figure_id": bad_figure_id, "document_id": 197, "page_no": 112, "label": "bozuk", "caption": "x"},
+        {"figure_id": 10, "document_id": 197, "page_no": 115, "label": "Görsel 4.1", "caption": "Katı sıvı gaz"},
+    ]}
+    fed = FakeFed(_responses({("maarif-mufredat", "search_figures"): found}))
+    body, _ = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    assert [f["figure_id"] for f in body["kaynak_verisi"]["figur_adaylari"]] == [10]
+    assert body["coverage"]["maarif-mufredat"] == "degraded:unexpected_shape"
+
+
+def test_float_figure_id_with_integer_value_is_accepted_as_int(tmp_path):
+    """fix round 3 Ruling R3-3: 10.0 (a float whose is_integer() is True) is accepted as the int
+    10 — only a genuinely fractional float like 10.9 is malformed. Ordinary successful
+    conversion, so coverage stays "hit"."""
+    found = {"query": "x", "count": 1, "figures": [
+        {"figure_id": 10.0, "document_id": 197, "page_no": 112, "label": "Görsel 4.1", "caption": "x"},
+    ]}
+    fed = FakeFed(_responses({("maarif-mufredat", "search_figures"): found}))
+    body, _ = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    figs = body["kaynak_verisi"]["figur_adaylari"]
+    assert figs == [{"figure_id": 10, "page_no": 112, "etiket": "Görsel 4.1", "aciklama": "x"}]
+    assert isinstance(figs[0]["figure_id"], int) and not isinstance(figs[0]["figure_id"], bool)
+    assert body["coverage"]["maarif-mufredat"] == "hit"
+
+
+@pytest.mark.parametrize("value,expected", [(10, 10), (10.0, 10), ("7", 7)])
+def test_fleet_int_accepts_int_integer_float_and_digit_string(value, expected):
+    assert kapsam._fleet_int(value) == expected
+
+
+@pytest.mark.parametrize("value", [10.9, True, "10.5", " 7", "-1"])
+def test_fleet_int_rejects_fractional_bool_and_non_digit_strings(value):
+    """fix round 3 Ruling R3-3's exact list of malformed examples."""
+    assert kapsam._fleet_int(value) is None
+
+
+# --- SP2 residual fix round 3: R3-4 — fleet row shapes never crash build() ----------------------
+
+def test_non_list_figures_field_is_treated_as_malformed_not_a_crash(tmp_path):
+    """fix round 3 Ruling R3-4: found["figures"] arriving as a bare string (not a list at all)
+    used to raise AttributeError once iterated ('x'.get(...) does not exist on str). It must
+    instead be treated as an empty, malformed set of figures."""
+    found = {"query": "x", "count": 0, "figures": "x"}
+    fed = FakeFed(_responses({("maarif-mufredat", "search_figures"): found}))
+    body, _ = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    assert body["kaynak_verisi"]["figur_adaylari"] == []
+    assert body["coverage"]["maarif-mufredat"] == "degraded:unexpected_shape"
+
+
+def test_non_dict_figure_row_is_dropped_not_a_crash(tmp_path):
+    """fix round 3 Ruling R3-4: a figure row of None (not a dict) used to raise AttributeError
+    once .get() was called on it (None.get(...)). It must be dropped, leaving the valid figure."""
+    found = {"query": "x", "count": 2, "figures": [
+        None,
+        {"figure_id": 10, "document_id": 197, "page_no": 112, "label": "Görsel 4.1", "caption": "x"},
+    ]}
+    fed = FakeFed(_responses({("maarif-mufredat", "search_figures"): found}))
+    body, _ = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    assert [f["figure_id"] for f in body["kaynak_verisi"]["figur_adaylari"]] == [10]
+    assert body["coverage"]["maarif-mufredat"] == "degraded:unexpected_shape"
+
+
+def test_non_dict_book_row_is_dropped_not_a_crash(tmp_path):
+    """fix round 3 Ruling R3-4: a list_textbooks row of None (not a dict) used to raise
+    AttributeError once .get() was called on it. It must be dropped; a valid book among the
+    malformed ones is still chosen normally."""
+    books = [
+        None,
+        {"document_id": 197, "title": "Fen Bilimleri 5", "page_count": 240},
+    ]
+    fed = FakeFed(_responses({("maarif-mufredat", "list_textbooks"): books}))
+    body, _ = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    assert body["cerceve"]["kind"] == "textbook"
+    assert body["cerceve"]["document_id"] == 197
+    assert body["coverage"]["maarif-mufredat"] == "degraded:unexpected_shape"
