@@ -362,3 +362,15 @@ def test_cert_lock_wait_times_out_as_transport_error(google_keys, monkeypatch):
         waiter.join(10)
     assert outcome == {"reason": "google_unreachable"}
     assert fetch.calls == 0
+
+
+# -- SP2 final review F8: email_verified must be exactly True -------------------------------------
+
+@pytest.mark.parametrize("flag", ["true", False])
+def test_email_verified_other_than_true_is_refused(google_keys, flag):
+    signer, _, certs = google_keys
+    cache = GoogleCertCache(fetch=CountingFetch(certs), clock=Clock())
+    assert verify_google_credential(_id_token(signer), NONCE, cert_cache=cache) == FULL  # the claim set verifies
+    with pytest.raises(IdentityError) as exc:
+        verify_google_credential(_id_token(signer, email_verified=flag), NONCE, cert_cache=cache)
+    assert exc.value.reason == "email_not_verified"

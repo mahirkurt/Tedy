@@ -166,7 +166,8 @@ def verify_google_credential(credential: str, expected_nonce: str,
         raise IdentityError("google_unreachable") from exc
     except (ValueError, google_exceptions.GoogleAuthError) as exc:
         raise IdentityError("invalid_token") from exc
-    if not info.get("email_verified"):
+    # Exactly True: a string such as "true" is not Google's boolean claim and is refused like False.
+    if info.get("email_verified") is not True:
         raise IdentityError("email_not_verified")
     if not expected_nonce or info.get("nonce") != expected_nonce:
         raise IdentityError("nonce_mismatch")

@@ -841,3 +841,41 @@ def test_token_endpoint_refuses_a_foreign_resource_without_consuming_anything(ct
     assert foreign.status_code == 400
     assert foreign.json() == {"error": "invalid_target"}
     assert client.post("/oauth/token", data={**refresh, "resource": CANONICAL_RESOURCE}).status_code == 200
+
+
+# -- SP2 final review F4: the registered redirect's own query survives (RFC 6749 §3.1.2) ----------
+
+QUERY_LOOPBACK = "http://127.0.0.1:53712/cb?a=b%20c&x"
+
+
+@pytest.mark.parametrize("karar,expected", [("onayla", {"code", "state"}), ("reddet", {"error", "state"})])
+def test_redirect_keeps_the_registered_query_byte_for_byte(ctx, karar, expected):
+    client, verifier, _, _, _ = ctx
+    client_id = _register(client, uris=(QUERY_LOOPBACK,))
+    page = _login(client, verifier, client_id, redirect_uri=QUERY_LOOPBACK)
+    assert page.status_code == 200, page.text
+    r = client.post("/oauth/authorize", data={"consent_state": _consent_state(page), "karar": karar})
+    assert r.status_code == 302
+    location = r.headers["location"]
+    prefix = QUERY_LOOPBACK + "&"
+    assert location.startswith(prefix), location
+    added = parse_qs(location[len(prefix):])
+    assert set(added) == expected and added["state"] == ["st-123"]
+    if karar == "reddet":
+        assert added["error"] == ["access_denied"]
+    else:
+        assert _redeem(client, client_id, added["code"][0], redirect_uri=QUERY_LOOPBACK).status_code == 200
+
+
+# -- SP2 final review F7: the decision page tells a user who did not start it to refuse -----------
+
+CONSENT_WARNING = "Bu bağlantıyı az önce siz başlatmadıysanız Reddet'e basın."
+
+
+def test_decision_page_warns_above_the_buttons(ctx):
+    client, verifier, _, _, client_id = ctx
+    page = _login(client, verifier, client_id)
+    assert page.status_code == 200
+    assert re.search(r'<button[^>]*name="karar"[^>]*value="reddet"', page.text)
+    assert f"<p>{CONSENT_WARNING}</p>" in page.text
+    assert page.text.index(CONSENT_WARNING) < page.text.index('name="karar"')

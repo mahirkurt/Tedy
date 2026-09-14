@@ -12,7 +12,7 @@ import secrets
 import time
 import unicodedata
 from typing import Any, Callable, Mapping
-from urllib.parse import urlencode, urlparse, urlsplit, urlunparse, parse_qsl
+from urllib.parse import urlencode, urlsplit
 
 import anyio
 from mcp.server.fastmcp import FastMCP
@@ -95,9 +95,9 @@ def nonce_for(form_state: str) -> str:
 
 
 def _with_query(uri: str, extra: dict[str, str]) -> str:
-    parts = urlparse(uri)
-    query = parse_qsl(parts.query, keep_blank_values=True) + list(extra.items())
-    return urlunparse(parts._replace(query=urlencode(query)))
+    """Append the response parameters to the registered redirect_uri, keeping its own query byte for byte
+    (RFC 6749 §3.1.2). The URI is already canonical and fragment-free (oauth_redirect), so appending is exact."""
+    return f"{uri}{'&' if urlsplit(uri).query else '?'}{urlencode(extra)}"
 
 
 _PAGE_STYLE = (
@@ -144,6 +144,7 @@ _DECISION_PAGE = """<!doctype html>
 <p><strong>{client_name}</strong> uygulaması, <strong>{email}</strong> hesabıyla TEDY edupedia araçlarını
 kullanmak istiyor.</p>
 <p>Onaylarsanız yetki yalnız şu adrese gönderilir:<br><code>{redirect_uri}</code></p>
+<p>Bu bağlantıyı az önce siz başlatmadıysanız Reddet'e basın.</p>
 <form method="post" action="/oauth/authorize">
 <input type="hidden" name="consent_state" value="{consent_state}">
 <button type="submit" name="karar" value="onayla">Onayla</button>
