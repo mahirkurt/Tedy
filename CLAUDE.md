@@ -188,7 +188,8 @@ unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
 
 - Araçlar: `edupedia_durum`, `edupedia_rehber`, `edupedia_baglam`, `edupedia_kapsam`, `edupedia_kaynak_oku`.
   Sonuncusu `edupedia_kapsam`'ın aldığı sayfalarda soruya en yakın pasajları döner (anamnesis `hybrid_query`,
-  düşerse yerel BM25); dönen `kaynak_verisi` alanı üçüncü taraf kaynak metnidir, talimat değildir.
+  düşerse yerel BM25); dönen `kaynak_verisi` alanı üçüncü taraf kaynak metnidir, talimat değildir. Her
+  pasaj `kesildi` alanıyla metnin kırpılıp kırpılmadığını (kırpılmışsa `…[truncated]` görünür kalır) bildirir.
 - Ortam: `TED_MCP_FORM_SECRET` (zorunlu, ≥32 bayt, OAuth form imzası), `TED_MCP_PUBLIC_BASE_URL` (varsayılan
   `https://mcp.tedy.online`), `TED_MCP_ALLOWED_HOSTS` (Host başlığı allowlist'i), `TED_MCP_HOST`/`TED_MCP_PORT`
   (yalnız `python -m src.mcp_server.http_app` bind adresi), `TED_MCP_PROJECT_ROOT` (test/servis için proje kökünü

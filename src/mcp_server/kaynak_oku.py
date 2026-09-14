@@ -12,6 +12,10 @@ from src.mcp_server.runs import RUN_ID_RE, RunStore
 
 PASSAGE_MAX = 800
 CAVEAT = "Pasajlar yalnız bu çalıştırmada alınan kaynaklardan gelir; boş sonuç yokluk kanıtı değildir."
+# anamnesis appends this exact suffix (rag.ts/server.ts) after slicing a chunk's text to the
+# requested per_chunk_chars. Defined once and reused on both the anamnesis and local paths so a
+# truncated passage always carries the same, visible signal instead of silently looking complete.
+TRUNCATION_MARKER = " …[truncated]"
 
 
 def _fold(text: str) -> str:
@@ -20,6 +24,31 @@ def _fold(text: str) -> str:
 
 def _terms(text: str) -> list[str]:
     return [t for t in re.findall(r"\w+", _fold(text)) if len(t) >= 3]
+
+
+def _local_metin(para: str) -> tuple[str, bool]:
+    """Local BM25 path (Ruling): truncate only when the stripped paragraph overflows
+    PASSAGE_MAX, and when it does, append TRUNCATION_MARKER ourselves and report kesildi=True —
+    there is no upstream marker to inherit here, unlike the anamnesis path."""
+    if len(para) > PASSAGE_MAX:
+        return para[:PASSAGE_MAX] + TRUNCATION_MARKER, True
+    return para, False
+
+
+def _anamnesis_metin(text: str) -> tuple[str, bool]:
+    """Anamnesis path (Ruling): anamnesis itself appends TRUNCATION_MARKER after slicing a
+    chunk's text to the requested per_chunk_chars (PASSAGE_MAX). Re-slicing `[:PASSAGE_MAX]`
+    would land exactly on the marker's first character and silently remove it, so a genuinely
+    truncated passage would look complete. Instead: if the marker is already present, keep the
+    text (and the marker) exactly as received and report kesildi=True. If anamnesis ever returns
+    text longer than PASSAGE_MAX without the marker (a contract violation we defend against
+    rather than trust), truncate here and append the same marker so the signal is never lost.
+    Otherwise the text is short enough as received: kesildi=False, unchanged."""
+    if text.endswith(TRUNCATION_MARKER):
+        return text, True
+    if len(text) > PASSAGE_MAX:
+        return text[:PASSAGE_MAX] + TRUNCATION_MARKER, True
+    return text, False
 
 
 def local_passages(pages: list[dict[str, Any]], soru: str, top_k: int) -> list[dict[str, Any]]:
@@ -53,8 +82,12 @@ def local_passages(pages: list[dict[str, Any]], soru: str, top_k: int) -> list[d
     # falls back to a stable (document_id, page_no, paragraph index) order so equal-score,
     # equal-frequency rows are still deterministic rather than depending on insertion order.
     scored.sort(key=lambda row: (-round(row[0], 9), -row[1], row[2]["document_id"], row[2]["page_no"], row[3]))
-    return [{"ref": f"local:{p['document_id']}/{p['page_no']}#{i}", "sayfa": p["page_no"],
-             "metin": para.strip()[:PASSAGE_MAX], "skor": round(s, 4)} for s, _tf, p, i, para in scored[:top_k]]
+    hits = []
+    for s, _tf, p, i, para in scored[:top_k]:
+        metin, kesildi = _local_metin(para.strip())
+        hits.append({"ref": f"local:{p['document_id']}/{p['page_no']}#{i}", "sayfa": p["page_no"],
+                     "metin": metin, "kesildi": kesildi, "skor": round(s, 4)})
+    return hits
 
 
 def wrap_kaynak_verisi(body: dict[str, Any]) -> dict[str, Any]:
@@ -94,9 +127,11 @@ class KaynakOkuyucu:
                 if chunks:
                     degraded = bool((found.get("retrieval") or {}).get("degraded"))
                     cov.degraded(ANAMNESIS, "anamnesis_degraded") if degraded else cov.hit(ANAMNESIS)
-                    pasajlar = [{"ref": f"{c.get('doc_id')}::{c.get('idx')}", "sayfa": None,
-                                 "metin": (c.get("text") or "")[:PASSAGE_MAX], "skor": c.get("score")}
-                                for c in chunks[:top_k]]
+                    pasajlar = []
+                    for c in chunks[:top_k]:
+                        metin, kesildi = _anamnesis_metin(c.get("text") or "")
+                        pasajlar.append({"ref": f"{c.get('doc_id')}::{c.get('idx')}", "sayfa": None,
+                                          "metin": metin, "kesildi": kesildi, "skor": c.get("score")})
                     return {**base, "status": "ok", "yontem": "anamnesis", "pasajlar": pasajlar,
                             "coverage": cov.as_dict()}
                 cov.empty(ANAMNESIS)

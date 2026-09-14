@@ -6,7 +6,7 @@ import pytest
 from src.mcp_server.config import load_settings
 from src.mcp_server.federation import FederationError
 from src.mcp_server.kapsam import KAYNAK_VERISI_NOT
-from src.mcp_server.kaynak_oku import KaynakOkuyucu, local_passages
+from src.mcp_server.kaynak_oku import PASSAGE_MAX, TRUNCATION_MARKER, KaynakOkuyucu, local_passages
 from src.mcp_server.runs import RunStore
 from src.mcp_server.tools import Tools
 
@@ -34,9 +34,13 @@ def runs(tmp_path):
     return store
 
 
+# A short, un-truncated chunk text: this fixture is shared by tests that are not about truncation
+# at all (collection scoping, degraded-but-used, doc_id::idx attribution, kaynak_verisi wrapping).
+# Truncation/kesildi behavior gets its own dedicated fixtures below, so this one no longer needs
+# padding to exceed PASSAGE_MAX.
 CHUNKS = {"query": "q", "collection": "edupedia:run:abcdef012345", "retrieval": {"degraded": False},
           "chunks": [{"doc_id": "edupedia:abcdef012345:kitap/197/112-113", "idx": 2, "score": 0.91,
-                      "text": "Buharlaşma sıvının gaza dönüşmesidir." + " x" * 600}]}
+                      "text": "Buharlaşma sıvının gaza dönüşmesidir."}]}
 
 
 def test_anamnesis_query_is_collection_scoped(runs):
@@ -49,6 +53,7 @@ def test_anamnesis_query_is_collection_scoped(runs):
     assert body["status"] == "ok" and body["yontem"] == "anamnesis"
     assert body["pasajlar"][0]["ref"] == "edupedia:abcdef012345:kitap/197/112-113::2"
     assert len(body["pasajlar"][0]["metin"]) <= 800
+    assert body["pasajlar"][0]["kesildi"] is False
     assert body["coverage"] == {"anamnesis": "hit"}
     assert body["mcp_verified"] is False
 
@@ -118,3 +123,69 @@ def test_tool_passthrough_for_error_status_has_no_kaynak_verisi(tmp_path, runs):
     body = t.kaynak_oku("drmahirkurt@gmail.com", "ffffffffffff", "x")
     assert body["status"] == "run_bulunamadi"
     assert "kaynak_verisi" not in body and "pasajlar" not in body
+
+
+# --- Fix round 1: truncation marker must survive onto the passage (kesildi signal) -----------
+
+
+def test_anamnesis_marker_present_sets_kesildi_true(runs):
+    """anamnesis itself appends TRUNCATION_MARKER after slicing a chunk's text to the requested
+    per_chunk_chars (PASSAGE_MAX) — this simulates that real response shape directly, rather than
+    re-deriving it, so the marker's exact position (right after the PASSAGE_MAX-th character) is
+    pinned down regardless of how the fake source text was built."""
+    already_truncated = ("Buharlaşma sıvının gaza dönüşmesidir." + " x" * 600)[:PASSAGE_MAX] + TRUNCATION_MARKER
+    fed = FakeFed({"chunks": [{"doc_id": "edupedia:abcdef012345:kitap/197/112-113", "idx": 4,
+                               "score": 0.4, "text": already_truncated}],
+                   "retrieval": {"degraded": False}})
+    body = KaynakOkuyucu(fed, runs).oku("abcdef012345", "buharlaşma")
+    pasaj = body["pasajlar"][0]
+    assert pasaj["kesildi"] is True
+    assert pasaj["metin"] == already_truncated
+    assert pasaj["metin"].endswith(TRUNCATION_MARKER)
+
+
+def test_anamnesis_short_chunk_sets_kesildi_false(runs):
+    fed = FakeFed({"chunks": [{"doc_id": "edupedia:abcdef012345:kitap/197/112-113", "idx": 1,
+                               "score": 0.5, "text": "Kısa pasaj."}],
+                   "retrieval": {"degraded": False}})
+    body = KaynakOkuyucu(fed, runs).oku("abcdef012345", "buharlaşma")
+    pasaj = body["pasajlar"][0]
+    assert pasaj["kesildi"] is False
+    assert pasaj["metin"] == "Kısa pasaj."
+
+
+def test_anamnesis_overlong_chunk_without_marker_is_capped_defensively(runs):
+    """Contract-violation defense: if anamnesis ever returned text longer than PASSAGE_MAX without
+    its own marker, we truncate here ourselves and still surface kesildi=True rather than let an
+    oversized, unmarked blob look like a complete, untruncated passage."""
+    unmarked_overlong = "Buharlaşma sıvının gaza dönüşmesidir." + " x" * 600
+    fed = FakeFed({"chunks": [{"doc_id": "edupedia:abcdef012345:kitap/197/112-113", "idx": 5,
+                               "score": 0.3, "text": unmarked_overlong}],
+                   "retrieval": {"degraded": False}})
+    body = KaynakOkuyucu(fed, runs).oku("abcdef012345", "buharlaşma")
+    pasaj = body["pasajlar"][0]
+    assert pasaj["kesildi"] is True
+    assert pasaj["metin"] == unmarked_overlong[:PASSAGE_MAX] + TRUNCATION_MARKER
+
+
+def test_local_long_paragraph_sets_kesildi_true_with_marker():
+    long_para = "kelime " * 200  # far longer than PASSAGE_MAX
+    pages = [{"document_id": 1, "page_no": 9, "text": long_para}]
+    hits = local_passages(pages, "kelime", top_k=1)
+    assert hits[0]["kesildi"] is True
+    assert hits[0]["metin"] == long_para.strip()[:PASSAGE_MAX] + TRUNCATION_MARKER
+
+
+def test_local_short_paragraph_sets_kesildi_false():
+    pages = [{"document_id": 1, "page_no": 9, "text": "Kısa paragraf kelime."}]
+    hits = local_passages(pages, "kelime", top_k=1)
+    assert hits[0]["kesildi"] is False
+    assert hits[0]["metin"] == "Kısa paragraf kelime."
+
+
+def test_anamnesis_and_local_passages_share_the_same_passage_keys(runs):
+    anamnesis_body = KaynakOkuyucu(FakeFed(CHUNKS), runs).oku("abcdef012345", "buharlaşma nedir")
+    local_body = KaynakOkuyucu(FakeFed(fail=True), runs).oku("abcdef012345", "buharlaşma")
+    assert anamnesis_body["yontem"] == "anamnesis" and local_body["yontem"] == "yerel"
+    assert set(anamnesis_body["pasajlar"][0]) == set(local_body["pasajlar"][0])
+    assert set(anamnesis_body["pasajlar"][0]) == {"ref", "sayfa", "metin", "kesildi", "skor"}
