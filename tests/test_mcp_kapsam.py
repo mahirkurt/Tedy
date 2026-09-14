@@ -466,12 +466,16 @@ def test_fleet_error_text_never_reaches_manual_required_neden(tmp_path):
 
 
 # --- SP2 residual C: fleet-supplied int() fields never leak through exception text (§6.3) ------
+# (fix round 1: OverflowError from float('inf') added to Important #3; M4 removed the dead
+# page_count re-conversion at the old ~297 by having the filter carry its validated value
+# forward, so that site no longer has (or needs) its own test.)
 
-@pytest.mark.parametrize("value", [INJECTION, None])
+@pytest.mark.parametrize("value", [INJECTION, None, float("inf")])
 def test_malformed_document_id_becomes_unexpected_shape_not_an_exception(tmp_path, value):
     """document_id (~267) is read straight from the chosen book, unprotected by any earlier
-    filter: a fleet value int() cannot parse — or an absent one (the required-field None case)
-    — must degrade the maarif-mufredat step honestly, never raise an exception carrying it."""
+    filter: a fleet value int() cannot parse — an absent one (the required-field None case), or
+    one json's Infinity literal decodes to a float int() cannot convert (OverflowError) — must
+    degrade the maarif-mufredat step honestly, never raise an exception carrying it."""
     books = [{"document_id": value, "title": "Fen Bilimleri 5", "page_count": 240}]
     fed = FakeFed(_responses({("maarif-mufredat", "list_textbooks"): books}))
     body, runs = _build(tmp_path, fed, konu="maddenin halleri")
@@ -503,11 +507,29 @@ def test_malformed_page_no_becomes_unexpected_shape_not_an_exception(tmp_path):
     _assert_no_fleet_text(body)
 
 
-def test_malformed_candidate_page_count_excludes_only_that_row_valid_book_still_chosen(tmp_path):
-    """The candidate filter (~261) excludes a row whose page_count int() cannot parse instead of
-    raising; a valid row among the malformed ones is still framed normally (coverage: hit)."""
+def test_page_no_conversion_failure_partway_through_saves_no_pages_at_all(tmp_path):
+    """fix round 1 Minor M3: page_no values are converted BEFORE any page is saved — a valid
+    page earlier in the list must not survive on disk when a later one in the same response is
+    malformed and the whole frame step degrades."""
+    text = {"document": {"document_id": 197}, "total_pages": 240, "returned": 2, "truncated": False,
+            "pages": [{"page_no": 111, "text": "iyi sayfa"}, {"page_no": INJECTION, "text": "bozuk sayfa"}]}
+    fed = FakeFed(_responses({("maarif-mufredat", "get_document_text"): text}))
+    body, runs = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    assert body["cerceve"]["kind"] is None
+    assert body["kaynak_verisi"]["kitap_sayfalari"] == []
+    assert runs.pages(body["run_id"]) == []
+
+
+@pytest.mark.parametrize("bad_page_count", [INJECTION, float("inf")])
+def test_malformed_candidate_page_count_excludes_only_that_row_valid_book_still_chosen(tmp_path, bad_page_count):
+    """The candidate filter (~261) excludes a row whose page_count int() cannot parse (or
+    overflows, e.g. json's Infinity literal) instead of raising; a valid row among the malformed
+    ones is still framed normally (coverage: hit), and the chosen row's own already-validated
+    page_count reaches the page-window computation without a second, redundant conversion."""
     books = [
-        {"document_id": 196, "title": "bozuk", "page_count": INJECTION},
+        {"document_id": 196, "title": "bozuk", "page_count": bad_page_count},
         {"document_id": 197, "title": "Fen Bilimleri 5", "page_count": 240},
     ]
     fed = FakeFed(_responses({("maarif-mufredat", "list_textbooks"): books}))
@@ -520,15 +542,30 @@ def test_malformed_candidate_page_count_excludes_only_that_row_valid_book_still_
     _assert_no_fleet_text(body)
 
 
-def test_fleet_int_raises_manual_required_unexpected_shape_for_a_bad_value():
-    """Direct unit test of the conversion helper's raising branch. document_id and page_no reach
-    this branch live through build() (tests above); page_count at the ~279 'chosen book' site
-    cannot in practice reach it, because the candidate filter (~261) already excludes any row
-    whose page_count fails this exact same conversion before that row can become the chosen book
-    — this direct call proves the ~279 call site still degrades safely (never an uncaught
-    exception carrying the fleet value), independent of that filter."""
+def test_malformed_figure_page_no_is_excluded_not_a_crash(tmp_path):
+    """fix round 1 Minor M5: search_figures' page_no used to go unguarded into the sort key and
+    figs[0]['page_no'] - 1 — a non-numeric value raised an uncaught TypeError out of build(). It
+    must instead be excluded like a malformed textbook candidate, leaving the valid figure(s)."""
+    found = {"query": "x", "count": 2, "figures": [
+        {"figure_id": 11, "document_id": 197, "page_no": INJECTION, "label": "bozuk", "caption": "x"},
+        {"figure_id": 10, "document_id": 197, "page_no": 112, "label": "Görsel 4.1", "caption": "Katı sıvı gaz"},
+    ]}
+    fed = FakeFed(_responses({("maarif-mufredat", "search_figures"): found}))
+    body, _ = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    assert body["cerceve"]["kind"] == "textbook"
+    assert [f["figure_id"] for f in body["kaynak_verisi"]["figur_adaylari"]] == [10]
+    _assert_no_fleet_text(body)
+
+
+@pytest.mark.parametrize("bad_value", [INJECTION, float("inf")])
+def test_fleet_int_raises_manual_required_unexpected_shape_for_a_bad_value(bad_value):
+    """Direct unit test of the conversion helper's raising branch (used at every 'chosen value'
+    fleet-int site: document_id and get_document_text's page_no, exercised live through build()
+    in the tests above)."""
     with pytest.raises(kapsam.KapsamError) as exc_info:
-        kapsam._fleet_int(INJECTION, server="maarif-mufredat", tool="list_textbooks")
+        kapsam._fleet_int(bad_value, server="maarif-mufredat", tool="list_textbooks")
     assert exc_info.value.status == "manual_required"
     assert exc_info.value.detay == {"sunucu": "maarif-mufredat", "arac": "list_textbooks", "neden": "unexpected_shape"}
     assert INJECTION not in str(exc_info.value.detay)
