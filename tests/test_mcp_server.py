@@ -129,6 +129,16 @@ def test_rehber_tool_is_registered_and_returns_akis(tmp_path):
     assert body["bolum"] == "akis" and body["status"] == "ok"
 
 
+def test_all_five_core_tools_are_listed(tmp_path):
+    store = OAuthStore(tmp_path / "o.sqlite3")
+    key = store.create_static_key("t", FULL)
+    with _client(tmp_path, store) as c:
+        listed = _sse_json(c.post("/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+                                  headers={**MCP_HEADERS, "authorization": f"Bearer {key}"}))
+    names = {t["name"] for t in listed["result"]["tools"]}
+    assert names == {"edupedia_durum", "edupedia_rehber", "edupedia_baglam", "edupedia_kapsam", "edupedia_kaynak_oku"}
+
+
 def test_slow_tool_does_not_block_concurrent_requests(tmp_path):
     """One slow tool call must not freeze the event loop for other concurrent requests.
 

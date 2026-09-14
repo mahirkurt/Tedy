@@ -12,6 +12,7 @@ from src.mcp_server.coverage import Coverage
 from src.mcp_server.dashboard_context import DashboardContext, DashboardUnavailable
 from src.mcp_server.federation import ANAMNESIS, EGITIM_KAYNAK, MUFREDAT, Federation, FederationError
 from src.mcp_server.kapsam import KapsamBuilder
+from src.mcp_server.kaynak_oku import KaynakOkuyucu, wrap_kaynak_verisi
 from src.mcp_server.runs import RunStore
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -110,3 +111,7 @@ class Tools:
     def kapsam(self, email: str, ders: str, sinif: str, konu: str | None = None,
                kazanim_kodu: str | None = None) -> dict[str, Any]:
         return KapsamBuilder(self.federation, self.runs, self.clock).build(email, ders, sinif, konu, kazanim_kodu)
+
+    def kaynak_oku(self, email: str, run_id: str, soru: str, top_k: int = 5) -> dict[str, Any]:
+        body = KaynakOkuyucu(self.federation, self.runs).oku(run_id, soru, top_k=top_k)
+        return wrap_kaynak_verisi(body)

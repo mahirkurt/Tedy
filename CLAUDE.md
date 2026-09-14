@@ -167,3 +167,43 @@ Google Sign-In uses a hardcoded OAuth client id in `LoginPage.tsx` and `dashboar
 ## Output
 
 All runtime output goes to `output/` (gitignored): screenshots, HTML dumps, JSON data files, and download trackers. Large scraped binaries go to `content/` (also gitignored by type).
+
+## ted-mcp — edupedia orkestratörü (alt proje 2)
+
+Spec: `docs/superpowers/specs/2026-09-13-edupedia-tedy-orkestrator-design.md`. Ayrı bir ASGI süreci
+(`src/mcp_server/`); Flask dashboard'u import etmez. Roller tek kaynak `src/roles.py`.
+
+```bash
+# Yerel çalıştırma (canlı birim ve tünel alt proje 3'te)
+TED_MCP_FORM_SECRET=$(python3 -c 'import secrets;print(secrets.token_hex(32))') \
+  .venv/bin/python -m src.mcp_server.http_app          # 127.0.0.1:8087
+
+.venv/bin/python -m src.mcp_server.keys olustur --etiket <etiket> --email <full-rol-eposta>   # tdyM_ anahtarı üretir
+.venv/bin/python -m src.mcp_server.keys listele                                               # statik anahtarları listeler
+.venv/bin/python -m src.mcp_server.keys iptal --etiket <etiket>                                # statik anahtarı iptal eder
+.venv/bin/python -m src.mcp_server.keys oauth-iptal --email <e-posta>                          # o kişinin tüm OAuth ailelerini + bekleyen kodlarını iptal eder
+.venv/bin/python -m src.mcp_server.vendor_sync --check  # vendored edupedia varlıkları kaynağıyla eşit mi
+unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
+```
+
+- Araçlar: `edupedia_durum`, `edupedia_rehber`, `edupedia_baglam`, `edupedia_kapsam`, `edupedia_kaynak_oku`.
+  Sonuncusu `edupedia_kapsam`'ın aldığı sayfalarda soruya en yakın pasajları döner (anamnesis `hybrid_query`,
+  düşerse yerel BM25); dönen `kaynak_verisi` alanı üçüncü taraf kaynak metnidir, talimat değildir.
+- Ortam: `TED_MCP_FORM_SECRET` (zorunlu, ≥32 bayt, OAuth form imzası), `TED_MCP_PUBLIC_BASE_URL` (varsayılan
+  `https://mcp.tedy.online`), `TED_MCP_ALLOWED_HOSTS` (Host başlığı allowlist'i), `TED_MCP_HOST`/`TED_MCP_PORT`
+  (bind adresi, yalnız `http_app.py --serve` girişinde), `TED_MCP_PROJECT_ROOT` (test/servis için proje kökünü
+  değiştirir — worktree yerine bir tmp dizin vermek `output/`'a yazmayı önler), `TED_MCP_MAX_BODY_BYTES`
+  (istek gövdesi tavanı, varsayılan 2 MiB), `TED_MCP_EXTRA_REDIRECT_URIS` (sabit redirect_uri allowlist'ine ek,
+  virgülle ayrık), `TED_DASHBOARD_API_URL` (varsayılan `http://127.0.0.1:8085`), `TED_DASHBOARD_API_KEY`
+  (`ted-mcp` etiketli `tdyK_` anahtar), `MUFREDAT_MCP_API_KEY`, `EGITIM_KAYNAK_MCP_API_KEY`, `ANAMNESIS_MCP_API_KEY`.
+- OAuth: Google girişiyle, yalnız `full` rol; giriş sonrası **Onayla/Reddet** açıkça sorulur (kod otomatik
+  üretilmez). PKCE yalnız tam **S256**. DCR kalıcıdır (istemci kayıtları silinmez, tavanlıdır). Sabit
+  `redirect_uri` allowlist'i (`src/mcp_server/oauth_redirect.py:DEFAULT_REDIRECT_URIS`): Claude
+  (`claude.ai`/`claude.com` `/api/mcp/auth_callback`), ChatGPT (`chatgpt.com/connector_platform_oauth_redirect`),
+  Grok (`grok.com/connectors/oauth/callback`); ayrıca Gemini'nin `oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-…`
+  deseni ve loopback (`127.0.0.1`/`localhost`/`[::1]`, her port) her zaman kabul. `vscode.dev`/`insiders.vscode.dev`
+  varsayılanda **yok** (kod iletimi ölçüldü); ek sabit URI yalnız `TED_MCP_EXTRA_REDIRECT_URIS` ile. Token deposu
+  `output/ted_mcp_oauth.sqlite3` (yalnız hash); OAuth desteklemeyen istemciler için `tdyM_` statik anahtar yedeği
+  (bkz. `keys` komutları yukarıda).
+- Vendored dosyaları (`src/mcp_server/vendor/`) elle düzenleme; `vendor_sync` ile güncelle, `PROVENANCE.json` testle sabitli.
+- Tuzak: `.venv/bin/pip` shebang'i eski yola işaret eder → `.venv/bin/python -m pip` kullan.
