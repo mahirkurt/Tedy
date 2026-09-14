@@ -406,62 +406,73 @@ def _client_ids(path):
         return {row[0] for row in conn.execute("SELECT client_id FROM oauth_client")}
 
 
-# S1b fix round 1 / R-2: the floor is one sign-in form plus one code lifetime.
-EVICTION_FLOOR = http_app.FORM_TTL_SECONDS + oauth_store.CODE_TTL_SECONDS
+# S1b fix round 1 / R-2 (revised): the floor covers a whole two-step consent (sign-in state, then decision
+# state); once a code is issued the client is never evictable. The cap is large, so behaviour tests
+# monkeypatch a small one instead of writing 50000 rows.
+EVICTION_FLOOR = 2 * http_app.FORM_TTL_SECONDS
+OLD_FLOOR = http_app.FORM_TTL_SECONDS + oauth_store.CODE_TTL_SECONDS  # the floor before this correction
+SMALL_CAP = 10
 
 
-def test_client_cap_is_five_thousand_with_a_consent_long_eviction_floor():
-    assert oauth_store.MAX_CLIENTS == 5000
+@pytest.fixture
+def small_cap(monkeypatch):
+    monkeypatch.setattr(oauth_store, "MAX_CLIENTS", SMALL_CAP)
+    return SMALL_CAP
+
+
+def test_client_cap_is_fifty_thousand_with_a_two_step_consent_eviction_floor():
+    assert oauth_store.MAX_CLIENTS == 50000
     assert oauth_store.CLIENT_EVICTION_FLOOR_SECONDS == EVICTION_FLOOR
     assert oauth_store.FORM_TTL_SECONDS == http_app.FORM_TTL_SECONDS  # one source for the form lifetime
 
 
-def test_full_table_evicts_the_oldest_codeless_client_older_than_the_floor(tmp_path, store, clock):
+def test_full_table_evicts_the_oldest_codeless_client_older_than_the_floor(tmp_path, store, clock, small_cap):
     path = tmp_path / "oauth.sqlite3"
     t0 = int(clock.now)
-    _fill_clients(path, [("oldest", t0 - 10, None)] + [(f"c{i}", t0, None) for i in range(oauth_store.MAX_CLIENTS - 1)])
+    _fill_clients(path, [("oldest", t0 - 10, None)] + [(f"c{i}", t0, None) for i in range(small_cap - 1)])
     clock.now = t0 + EVICTION_FLOOR + 1  # everyone is past the floor; far less than a day
     fresh = store.register_client("Claude", [REDIRECT])
     ids = _client_ids(path)
     assert fresh.client_id in ids
     assert "oldest" not in ids
-    assert len(ids) == oauth_store.MAX_CLIENTS  # exactly enough room was made
+    assert len(ids) == small_cap  # exactly enough room was made
 
 
-def test_a_client_that_issued_a_code_is_never_evicted(tmp_path, store, clock):
+def test_a_client_that_issued_a_code_is_never_evicted(tmp_path, store, clock, small_cap):
     path = tmp_path / "oauth.sqlite3"
     t0 = int(clock.now)
     used = store.register_client("used", [REDIRECT])  # the oldest client of all
     store.issue_code(FULL, used.client_id, REDIRECT, _challenge(VERIFIER), "S256")
-    _fill_clients(path, [("next-oldest", t0 + 1, None)]
-                  + [(f"c{i}", t0 + 2, None) for i in range(oauth_store.MAX_CLIENTS - 2)])
+    _fill_clients(path, [("next-oldest", t0 + 1, None)] + [(f"c{i}", t0 + 2, None) for i in range(small_cap - 2)])
     clock.now = t0 + 2 + EVICTION_FLOOR + 1
     fresh = store.register_client("Claude", [REDIRECT])
     ids = _client_ids(path)
     assert used.client_id in ids and fresh.client_id in ids
     assert "next-oldest" not in ids
-    assert len(ids) == oauth_store.MAX_CLIENTS
+    assert len(ids) == small_cap
 
 
-def test_registration_is_refused_when_only_clients_with_codes_are_old_enough(tmp_path, store, clock):
+def test_registration_is_refused_when_only_clients_with_codes_are_old_enough(tmp_path, store, clock, small_cap):
     path = tmp_path / "oauth.sqlite3"
     t0 = int(clock.now)
-    _fill_clients(path, [(f"used{i}", t0, t0) for i in range(oauth_store.MAX_CLIENTS)])
+    _fill_clients(path, [(f"used{i}", t0, t0) for i in range(small_cap)])
     clock.now = t0 + 30 * 24 * 3600
     with pytest.raises(oauth_store.ClientLimitReached):
         store.register_client("Claude", [REDIRECT])
-    assert len(_client_ids(path)) == oauth_store.MAX_CLIENTS
+    assert len(_client_ids(path)) == small_cap
 
 
-def test_registration_is_refused_while_every_codeless_client_is_younger_than_the_floor(tmp_path, store, clock):
+def test_codeless_clients_are_kept_for_a_whole_two_step_consent(tmp_path, store, clock, small_cap):
     path = tmp_path / "oauth.sqlite3"
     t0 = int(clock.now)
-    _fill_clients(path, [(f"c{i}", t0, None) for i in range(oauth_store.MAX_CLIENTS)])
-    clock.now = t0 + EVICTION_FLOOR  # exactly at the floor: not older than it
-    with pytest.raises(oauth_store.ClientLimitReached):
-        store.register_client("Claude", [REDIRECT])
-    assert len(_client_ids(path)) == oauth_store.MAX_CLIENTS
-    clock.now += 1
+    _fill_clients(path, [(f"c{i}", t0, None) for i in range(small_cap)])
+    # Past sign-in form + code lifetime, but a slow user may still be on the decision page.
+    for now in (t0 + OLD_FLOOR + 1, t0 + EVICTION_FLOOR):  # the second: exactly at the floor, not older than it
+        clock.now = now
+        with pytest.raises(oauth_store.ClientLimitReached):
+            store.register_client("Claude", [REDIRECT])
+        assert len(_client_ids(path)) == small_cap
+    clock.now = t0 + EVICTION_FLOOR + 1
     assert store.register_client("Claude", [REDIRECT]).client_id in _client_ids(path)
 
 

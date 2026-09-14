@@ -236,10 +236,13 @@ ve yalnız `window.parent`'a gönderdiğini denetler. (Kapı sayısı: mevcut 16
   userinfo, fragment, büyük harf şema/host, loopback dışı açık port yok; yeniden serileştirince kendisi) ve sorgusunda `code`, `state`, `iss`, `error`, `error_description`, `error_uri` bulunamaz.
 - DCR açık ve **kalıcıdır**: her kayıt rastgele bir `client_id` alır; `redirect_uris` (1–5) ve `client_name`
   (≤ 100 karakter; kontrol, biçim (ör. bidi yön denetimi, sıfır genişlikli birleştirici), vekil ve satır/paragraf
-  ayırıcı karakter içeremez) saklanır. Tavan **5000** kayıt: tavanda yeni kayıt gelince önce hiç kod üretmemiş ve
-  yaşı `FORM_TTL_SECONDS + CODE_TTL_SECONDS`'ı (15 dk) aşan **en eski** kayıtlar yer açacak kadar silinir; kod
-  üretmiş istemci asla silinmez; silinebilecek kayıt yoksa kayıt `400 invalid_client_metadata` ile reddedilir.
-  Kayıt selinde asıl savunma kenardaki hız sınırıdır (alt proje 3).
+  ayırıcı karakter içeremez) saklanır. Tavan **50000** kayıt: tavanda yeni kayıt gelince önce hiç kod üretmemiş
+  ve yaşı `2 × FORM_TTL_SECONDS`'ı (20 dk; giriş ve karar adımlarının ikisini de kapsar) aşan **en eski** kayıtlar
+  yer açacak kadar silinir; kod üretmiş istemci asla silinmez; silinebilecek kayıt yoksa kayıt
+  `400 invalid_client_metadata` ile reddedilir. Kayıt selinde asıl savunma kenardaki hız sınırıdır (alt proje 3:
+  IP başına 10 sn'de 60 istek ≈ dakikada 360): tek bir IP 20 dakikalık taban içinde en çok ~7200 istemci
+  kaydedebilir, bu tavanın çok altındadır, dolayısıyla tek kaynaklı kilitlenme mümkün değildir; depolama maliyeti
+  önemsizdir.
   `/oauth/authorize` ve `/oauth/token` yalnız kayıtlı `client_id` kabul eder (aksi `invalid_client`);
   `redirect_uri` kayıtlı URI'lerden biriyle tam eşit olmalıdır (loopback'te port hariç), aksi hata sayfası —
   yönlendirme yapılmaz.
@@ -418,9 +421,10 @@ planında yer alır.
   `https://attacker-probe-7q9x.github.dev/steal` olan bir `state` ile iki sayfa da `302` ile kodu o host'a iletti
   (`vscode://` ve loopback'e de iletir); açık DCR ile herkes bu URI'yi "Visual Studio Code" adıyla kaydedip gerçek
   bir Microsoft adresi gösteren onay sayfası üretebildiği için Onayla adımı korumaz. Yalnız
-  `TED_MCP_EXTRA_REDIRECT_URIS` ile eklenebilir. Aynı incelemede DCR tavanı 500'den 5000'e çıkarıldı ve "24 saatten
-  eski" temizliği yerine 15 dakikalık taban yaşını aşmış kodsuz en eski kayıtların tahliyesi getirildi (ölçüm: 499
-  anonim kayıt 4,5 sn'de tavanı doldurup yeni bağlayıcı kurulumunu 24 saat engelliyordu).
+  `TED_MCP_EXTRA_REDIRECT_URIS` ile eklenebilir. Aynı incelemede DCR tavanı 500'den 50000'e çıkarıldı ve "24 saatten
+  eski" temizliği yerine `2 × FORM_TTL_SECONDS` (20 dakika; iki onay adımının tamamı) taban yaşını aşmış kodsuz en
+  eski kayıtların tahliyesi getirildi (ölçüm: 499 anonim kayıt 4,5 sn'de tavanı doldurup yeni bağlayıcı kurulumunu
+  24 saat engelliyordu; kenar hız sınırıyla tek bir IP taban içinde en çok ~7200 kayıt yapabilir).
 
 ## 13. Varsayımlar ve riskler
 

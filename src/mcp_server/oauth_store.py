@@ -34,10 +34,11 @@ PURGE_GRACE_SECONDS = 24 * 3600
 STATIC_KEY_PREFIX = "tdyM_"
 # Dynamic client registration is open to anyone, so the table is capped; the edge rate limit is the primary
 # defence against a registration flood. At the cap, the oldest clients that never produced a code and are
-# older than one sign-in form plus one code lifetime make just enough room. A client that issued a code is
-# never evicted; if nothing is evictable, registration is refused.
-MAX_CLIENTS = 5000
-CLIENT_EVICTION_FLOOR_SECONDS = FORM_TTL_SECONDS + CODE_TTL_SECONDS
+# older than a whole two-step consent (sign-in state, then decision state) make just enough room. A client
+# that issued a code is never evicted; if nothing is evictable, registration is refused. At the edge limit
+# (60 requests / 10 s per IP) one IP registers at most ~7200 clients inside the floor, far below the cap.
+MAX_CLIENTS = 50000
+CLIENT_EVICTION_FLOOR_SECONDS = 2 * FORM_TTL_SECONDS
 BUSY_TIMEOUT_MS = 5000
 
 # RFC 7636 §4.1-4.2: an S256 challenge is 43 base64url characters; a verifier 43-128 unreserved ones.

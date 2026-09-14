@@ -133,10 +133,11 @@ def test_register_refuses_non_object_metadata(client, body):
     assert r.json()["error"] in {"invalid_client_metadata"}
 
 
-def test_register_is_refused_when_the_client_table_is_full_of_fresh_clients(client, store, tmp_path):
+def test_register_is_refused_when_the_client_table_is_full_of_fresh_clients(client, store, tmp_path, monkeypatch):
     import sqlite3
     import time as _time
 
+    monkeypatch.setattr(oauth_store, "MAX_CLIENTS", 10)  # the real cap is asserted in the store tests
     now = int(_time.time())
     with sqlite3.connect(tmp_path / "oauth.sqlite3") as conn:
         conn.executemany(
@@ -524,9 +525,9 @@ def test_vscode_web_redirect_is_accepted_when_listed_in_extra_redirect_uris(tmp_
             assert page.status_code == 200
 
 
-# -- S1b fix round 1 / R-2: a registration burst no longer blocks new connectors for a day -------------
+# -- S1b fix round 1 / R-2 (revised): a registration burst no longer blocks new connectors for a day -----
 
-def test_a_registration_burst_stops_blocking_new_connectors_after_the_eviction_floor(tmp_path):
+def test_a_registration_burst_stops_blocking_new_connectors_after_the_eviction_floor(tmp_path, monkeypatch):
     import sqlite3
 
     class Clock:
@@ -535,6 +536,7 @@ def test_a_registration_burst_stops_blocking_new_connectors_after_the_eviction_f
         def __call__(self):
             return self.now
 
+    monkeypatch.setattr(oauth_store, "MAX_CLIENTS", 10)  # the real cap (50000) is asserted in the store tests
     clock = Clock()
     store = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
     t0 = int(clock.now)
@@ -542,13 +544,16 @@ def test_a_registration_burst_stops_blocking_new_connectors_after_the_eviction_f
         conn.executemany(
             "INSERT INTO oauth_client (client_id, client_name, redirect_uris, created_at) VALUES (?, '', ?, ?)",
             [(f"burst-{i}", json.dumps(["http://127.0.0.1/x"]), t0) for i in range(oauth_store.MAX_CLIENTS)])
-    floor = http_app.FORM_TTL_SECONDS + oauth_store.CODE_TTL_SECONDS
+    floor = 2 * http_app.FORM_TTL_SECONDS  # a whole two-step consent
     body = {"redirect_uris": [REDIRECT], "client_name": "Claude"}
     settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
     with TestClient(build_app(settings, store, _test_mcp(), form_secret=b"s" * 32), base_url=BASE) as c:
-        refused = c.post("/oauth/register", json=body)  # every burst client is still younger than one consent
-        assert refused.status_code == 400
-        assert refused.json() == {"error": "invalid_client_metadata"}
+        # Inside the floor, including past sign-in form + code lifetime: those clients may still be mid-consent.
+        for now in (t0, t0 + http_app.FORM_TTL_SECONDS + oauth_store.CODE_TTL_SECONDS + 1, t0 + floor):
+            clock.now = now
+            refused = c.post("/oauth/register", json=body)
+            assert refused.status_code == 400, now - t0
+            assert refused.json() == {"error": "invalid_client_metadata"}
         clock.now = t0 + floor + 1
         r = c.post("/oauth/register", json=body)
         assert r.status_code == 201, r.text
