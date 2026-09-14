@@ -222,15 +222,40 @@ ve yalnız `window.parent`'a gönderdiğini denetler. (Kapı sayısı: mevcut 16
 
 - RFC 8414 AS metadata, RFC 9728 PRM (`/.well-known/oauth-protected-resource` + `/mcp` yol ekli varyant),
   401'de `WWW-Authenticate: Bearer resource_metadata=…`.
-- DCR açık; `redirect_uri` izin listesi: `https://claude.ai`, `https://chatgpt.com`, `https://grok.com`,
-  `https://oauth-redirect.googleusercontent.com`, `https://vscode.dev`, `https://insiders.vscode.dev`, loopback
-  (herhangi port; RFC 8252).
+- `redirect_uri` güveni origin düzeyinde değil, **kesin geri-çağırma URI'si** düzeyindedir (bir origin'in başka
+  bir yolu sorgu dizesini, dolayısıyla kodu, başkasına verebilir). Varsayılan liste:
+  `https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback`,
+  `https://chatgpt.com/connector_platform_oauth_redirect`, `https://grok.com/connectors/oauth/callback`
+  (belgeden alındı, canlı bağlantıyla doğrulanmadı — alt proje 6'da doğrulanır), `https://vscode.dev/redirect`,
+  `https://insiders.vscode.dev/redirect`; Gemini için yalnız
+  `https://oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-<rakamlar>-<genel host, noktalar _>`;
+  loopback `http://127.0.0.1`, `http://localhost`, `http://[::1]` (her port, her yol; RFC 8252). Ek kesin URI'ler
+  `TED_MCP_EXTRA_REDIRECT_URIS` (virgülle ayrılmış; loopback dışında yalnız `https`). Her URI kanonik olmalıdır
+  (boşluk/kontrol karakteri, userinfo, fragment, büyük harf şema/host, loopback dışı açık port yok; yeniden
+  serileştirince kendisi) ve sorgusunda `code`, `state`, `iss`, `error`, `error_description`, `error_uri` bulunamaz.
+- DCR açık ve **kalıcıdır**: her kayıt rastgele bir `client_id` alır; `redirect_uris` (1–5) ve `client_name`
+  (≤ 100 karakter) saklanır. Tavan 500 kayıt; taşmada hiç kod üretmemiş ve 24 saatten eski kayıtlar silinir.
+  `/oauth/authorize` ve `/oauth/token` yalnız kayıtlı `client_id` kabul eder (aksi `invalid_client`);
+  `redirect_uri` kayıtlı URI'lerden biriyle tam eşit olmalıdır (loopback'te port hariç), aksi hata sayfası —
+  yönlendirme yapılmaz.
 - `/oauth/authorize`: TED'in `GOOGLE_CLIENT_ID`'si ile Google Sign-In; `id_token` sunucuda doğrulanır;
-  e-posta `USER_ROLES`'ta **ve** rol `full` değilse reddedilir.
-- Yalnız PKCE **S256**. Kodlar tek kullanımlık, 5 dk.
-- Erişim token'ı opak, 1 saat; yenileme token'ı 30 gün, her kullanımda döner; tekrar kullanımda aile iptal edilir.
+  e-posta `USER_ROLES`'ta **ve** rol `full` değilse reddedilir. Girişten sonra kod **otomatik üretilmez**: ikinci
+  sayfa istemci adını, doğrulanmış tam `redirect_uri`'yi ve e-postayı gösterir; kod yalnız **Onayla** ile üretilir
+  (rol burada yeniden denetlenir), **Reddet** kayıtlı adrese `error=access_denied` gönderir. Giriş ve karar
+  formlarının imzalı durumları tek kullanımlıktır. Onay sayfaları istek başına CSP taşır
+  (`default-src 'none'`; Google Identity Services için yalnız `accounts.google.com`; `form-action 'self'
+  <issuer origin> <doğrulanmış redirect origin>`; `frame-ancestors 'none'`) ve `X-Frame-Options: DENY`,
+  `Referrer-Policy: no-referrer`, `Cache-Control: no-store`.
+- `resource` verilirse PRM'nin ilan ettiği kanonik değere (`<base>/mcp`) tam eşit olmalıdır (aksi
+  `invalid_target`); kaynak koda ve token'a bağlanır.
+- Yalnız PKCE **S256** (tam yazım; `code_challenge` 43 base64url karakter, `code_verifier` 43–128 RFC 7636
+  karakteri). Kodlar tek kullanımlık, 5 dk; kullanılmış kod yeniden gelirse o koddan çıkan aile iptal edilir.
+- Erişim token'ı opak, 1 saat; yenileme token'ı 30 gün, her kullanımda döner; tekrar kullanımda aile iptal edilir;
+  aile oluşturulmasından **90 gün** sonra yenileme reddedilir. `keys oauth-iptal --email <e-posta>` bir kişinin
+  tüm OAuth ailelerini iptal eder. Sunucu başlangıcında süresi bir günden fazla geçmiş kod, token ve tüketilmiş
+  form durumu satırları silinir (istemci kayıtları tavan politikasına tabidir).
   Saklama `output/ted_mcp_oauth.sqlite3`'te yalnız hash (tek kullanımlık kod ve yenileme tüketimi atomik
-  `UPDATE … WHERE used_at IS NULL` ile; egitim-kaynak `oauth_store.py` kalıbı, `principal` e-postaya bağlı).
+  `BEGIN IMMEDIATE` işlemleriyle; egitim-kaynak `oauth_store.py` kalıbı, `principal` e-postaya bağlı).
 - **OAuth desteklemeyen istemci yedeği:** kişi başı statik anahtar `tdyM_…` (yalnız `full` rol, CLI ile üretilir,
   hash saklanır, iptal edilebilir). `tdyK_` dashboard anahtarları MCP'de **geçmez**.
 
@@ -378,6 +403,11 @@ planında yer alır.
   etkilenmez. Anahtar yalnız `.env`'de, yalnız loopback'te kullanılır.
 - **Token deposu:** JSON yerine SQLite (`output/ted_mcp_oauth.sqlite3`) — tek kullanımlık kod ve yenileme
   tüketimi JSON'da atomik yapılamaz.
+- **OAuth yönlendirme güveni ve açık onay (2026-09-14, kimlik yüzeyi güvenlik incelemesi, S1b):** §6.1'deki origin
+  izin listesi kesin geri-çağırma URI listesiyle değiştirildi (Grok URI'si canlı doğrulanana dek belgeye dayanır);
+  DCR kalıcı ve istemci başına `client_id`'li oldu; Google girişinden sonra açık Onayla/Reddet adımı, tek
+  kullanımlık form durumları, onay sayfası CSP'si, PKCE sınırları, kod yeniden kullanımında aile iptali,
+  `resource` bağlama, 90 günlük aile ömrü, `keys oauth-iptal` ve başlangıç temizliği eklendi.
 
 ## 13. Varsayımlar ve riskler
 
