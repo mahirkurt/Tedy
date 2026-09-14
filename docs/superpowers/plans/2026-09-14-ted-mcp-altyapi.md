@@ -14,7 +14,7 @@
 
 - Spec §14.2: sözleşme değişikliği gerekirse **önce spec** güncellenir, sonra kod. Bu plan §4.1 portunu değiştirir (Task 1).
 - **Sıralama kuralı:** Hiçbir genel DNS kaydı ya da ingress kuralı şu üçü sağlanmadan oluşturulmaz: (1) S1 güvenlik düzeltme dalgası (S1a + S1b) dalda birleşmiş ve kapsamlı yeniden incelemesi temiz; (2) AP2'nin son, tüm-dal incelemesi temiz; (3) Task 9 Bölüm A ve Bölüm B `TEMİZ` (dağıtılan `HEAD` kapının incelediği **H**'dir; sonrasında kimlik yüzeyinde incelenmemiş değişiklik yok). `main`'e ileri alma ve `origin/main` push'u (Task 6) ile dashboard yeniden başlatması (Task 7) Bölüm A'dan sonra gelir. Kenar hız sınırı (Task 10) DNS kaydından **önce** uygulanır; açık pencere oluşmaz. Güvenlik incelemesi raporu: `/mnt/thunderbolt/workspaces/TED/.superpowers/sdd/2026-09-13-ted-mcp-orkestrator-cekirdegi/security-review-auth.md`. Otomatik güvenlik incelemesi eklentisi kullanılamaz; kapı atlanamaz, "geçti" varsayılamaz.
-- **Yürütme sırası:** Task 1 → 2 → 3 → 4 → 5 → **9 Bölüm A** → 6 → 7 → 8 → **9 Bölüm B** → 10 → 11 → 12 → 13 → 14. Task 9 belgede numarasının yerinde durur; iki bölümü bu sırayla koşulur. Task 6 ve Task 7'deki üretim adımları **denetleyici onaylı; kapıya bağlıdır**.
+- **Yürütme sırası:** Task 1 → 2 → 3 → 4 → 5 → 5a → **9 Bölüm A** → 6 → 7 → 8 → **9 Bölüm B** → 10 → 11 → 12 → 13 → 14. Task 9 belgede numarasının yerinde durur; iki bölümü bu sırayla koşulur. Task 6 ve Task 7'deki üretim adımları **denetleyici onaylı; kapıya bağlıdır**.
 
 **Ek ön koşul (controller ruling, 2026-09-14):** alt proje 5 planının Görev 2'si (`docs/superpowers/plans/2026-09-14-ted-asistan-modul-entegrasyonu.md` — Asistan genel dizininin modül/taslak/run/ilerleme dosyalarını hariç tutması) Görev 6'dan ÖNCE bu dalda commit'lenmiş olmalıdır; aksi hâlde canlı ted-mcp'nin `output/edupedia_runs/` altına yazdığı ders kitabı sayfa metni 15 dakikalık cron yeniden dizinlemesiyle Gemini'ye taşınır. Görev 6 başlamadan `git log --oneline --grep 'Asistan'` ile doğrulanır.
 - `ted-mcp` yalnız `127.0.0.1:8090`'a bağlanır; `0.0.0.0` asla. `127.0.0.1:8087` başka bir servise aittir, dokunulmaz.
@@ -22,7 +22,7 @@
 - Gizli olmayan dağıtım topolojisi (`TED_MCP_HOST`, `TED_MCP_PORT`, `TED_MCP_PUBLIC_BASE_URL`, `TED_MCP_ALLOWED_HOSTS`, `TED_DASHBOARD_API_URL`) izlenen `ted-mcp.service` `Environment=` satırlarında; `.env` yalnız sırları taşır. `TED_MCP_PROJECT_ROOT` üretimde tanımsızdır.
 - `.env` elle düzenlenmez; yalnız `python -m src.mcp_server.env_prep` ile.
 - Cloudflare: bölge `tedy.online` ve tünel `hp-ai-node` **adla** çözülür; `.env`'deki `CLOUDFLARE_ZONE_ID`/`CLOUDFLARE_TUNNEL_ID` kullanılmaz (başka kaynaklara ait). Ingress yalnız birleştirilir; hız sınırı bölgedeki tek kurala (Free plan) birleştirilir, ikinci kural açılmaz; her yazımdan önce salt okuma listesi, kuru çalıştırma, `--beklenen-kural` kilidi ve yedek.
-- Servis ana checkout'tan çalışır (`/mnt/thunderbolt/workspaces/TED`). Kod görevleri (1–5) worktree'de (`/mnt/thunderbolt/workspaces/TED/.worktrees/ted-mcp-cekirdek`, dal `feat/ted-mcp-cekirdek`) commit'lenir. `keys` CLI'si daima ana checkout'tan çalıştırılır (SQLite'ı çalıştığı checkout'un `output/`'una yazar).
+- Servis ana checkout'tan çalışır (`/mnt/thunderbolt/workspaces/TED`). Kod görevleri (1–5 ve 5a) worktree'de (`/mnt/thunderbolt/workspaces/TED/.worktrees/ted-mcp-cekirdek`, dal `feat/ted-mcp-cekirdek`) commit'lenir. `keys` CLI'si daima ana checkout'tan çalıştırılır (SQLite'ı çalıştığı checkout'un `output/`'una yazar).
 - Her komut bloğu açık bir `cd` ile başlar (ajan kabuğunda çalışma dizini korunmaz).
 - Kod yorumları **İngilizce**; kullanıcıya dönen metin ve alan adları **Türkçe** (TED konvansiyonu).
 - Tüm testler ağsız geçer: `unshare -rn .venv/bin/python -m pytest -q -p no:cacheprovider`. Paket kurulumu gerekirse yalnız `.venv/bin/python -m pip` (bu plan yeni paket gerektirmez).
@@ -58,8 +58,10 @@
 | `tests/test_deploy_units.py` (yeni) | İzlenen birim dosyaları testleri |
 | `tests/test_mcp_tunnel_route.py` (yeni) | tunnel_route testleri |
 | `tests/test_mcp_edge_ratelimit.py` (yeni) | edge_ratelimit testleri |
+| `src/mcp_server/oauth_redirect.py`, `src/mcp_server/config.py`, `src/mcp_server/http_app.py` (değişir, Task 5a) | `TED_MCP_EXTRA_FORM_ACTION_ORIGINS`: doğrulama, ayar, onay sayfası CSP `form-action` eki (varsayılan CSP aynı) |
+| `tests/test_mcp_oauth_redirect.py`, `tests/test_mcp_oauth_flow.py` (değişir, Task 5a) | Ek origin doğrulaması, başlatma reddi, iki onay sayfasının CSP'si |
 
-Yeni test sayısı: Task 1 **+2**, Task 2 **+19**, Task 3 **+5**, Task 4 **+11**, Task 5 **+10** = **+47**.
+Yeni test sayısı: Task 1 **+2**, Task 2 **+19**, Task 3 **+5**, Task 4 **+11**, Task 5 **+10**, Task 5a **+15** = **+62**.
 
 ---
 
@@ -1433,6 +1435,8 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 F4 uygulamaya eklenmedi (uvicorn `X-Forwarded-For`'a loopback'ten güvenir; tek süreç durumu tutar); doğru katman Cloudflare'dir. Bölgenin `http_ratelimit` aşamasında **tek** kural: `/oauth/register`, `/oauth/authorize`, `/oauth/token`, `/mcp`, `/mcp/` yollarına IP başına 10 sn'de 60 istek; aşımda `block` (429), 10 sn. Free planda (bölge başına tek hız sınırı kuralı, ifadelerde yalnız yol alanı, dönem ve ceza 10 sn) varsayılan ifade yalnız yola dayanır; bu yollar bölgede yalnız ted-mcp'de anlamlıdır. `--host-kosulu` bayrağı ücretli planlarda ifadeye `http.host` ekleyebilir; bu plan onu kullanmaz (denetleyici kararı: yalnız yol). Bölgede zaten bir kural varsa ve plan Free ise yeni koşul o kurala `or` ile **birleştirilir**. Mevcut kuralın eylemi, eşiği ve dönemi korunur. MCP istemcileri meydan okuma çözemediği için eylem `block` değilse, kural kapalıysa ya da 10 sn'lik eşik 30'un altındaysa araç otomatik olarak durur ve karar denetleyiciye kalır. Ağsızdır; canlı çağrılar Task 10'dadır.
 
+**Not (DCR tavanı iddiası):** spec §6.1/§12b'deki "tek bir kaynak 20 dakikalık tabanda (`2 × FORM_TTL_SECONDS`) DCR tavanını (50000) dolduramaz — IP başına 10 sn'de 60 istek ≈ 7200 kayıt" hesabı, bu kuralın IPv6 istemcilerini önek (/64) düzeyinde saydığını varsayar. Kural tam IPv6 adresini (`ip.src`) sayıyorsa bir /64 sahibi "tek kaynak" değildir; adres döndürerek sınırı aşar. Kuralın gerçekte neyi anahtar aldığı yürütmede Task 10 Step 4b'de kaydedilir: bölge planı, kuralın sayım özellikleri ve Cloudflare belgesinin IPv6 gruplama ifadesi. Dağıtık (çok adresli) kayıt seli **denetleyici kararıyla kabul edilmiştir** ve SDD defterinde `Ruling:` satırı olarak bulunur.
+
 **Files:**
 - Create: `src/mcp_server/edge_ratelimit.py`
 - Modify: `CLAUDE.md` (ted-mcp alt bölümüne Cloudflare maddesi)
@@ -1819,6 +1823,311 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ---
 
+### Task 5a: `TED_MCP_EXTRA_FORM_ACTION_ORIGINS` — onay sayfası CSP `form-action` ek origin'leri
+
+**Gerekçe (kayıt):** alt proje 6'nın canlı yüzey kabulünde bir geri-çağırma sayfası kodu, onay sayfası CSP'sinin `form-action` yönergesinde adı geçmeyen başka bir origin'e yeniden yönlendirebilir. Chrome `form-action`'ı yönlendirme zinciri boyunca uyguladığı için Onayla/Reddet gönderimi o zaman engellenir. Bu ayar, sorunun canlı oturumda kod değişikliği ve yeni inceleme turu beklemeden yapılandırmayla giderilmesini sağlar. Varsayılan boştur ve varsayılan CSP bugünküyle **bayt bayt aynıdır**. Kurallar `TED_MCP_EXTRA_REDIRECT_URIS` ile aynı kapalı-başarısızlık kalıbındadır. Ek origin yalnız formun yönlendirme zincirini açar; kodun gideceği adres kesin `redirect_uri` listesiyle sınırlı kalır. Ayar gizli değildir: gerekirse yalnız `ted-mcp.service` `Environment=` satırına yazılır (`env_prep` `.env`'de reddeder). Bu görev Task 9 Bölüm A'nın inceleme kapsamındadır.
+
+Ölçülen bugünkü varsayılanlar (`HEAD`, 2026-09-14; `_consent_page_headers("https://mcp.tedy.online", "https://claude.ai/api/mcp/auth_callback", …)`):
+- Google giriş sayfası: `default-src 'none'; script-src https://accounts.google.com/gsi/client 'sha256-b0M06TfQ/Ot7VvesS/bp0h2uK01U7C5uiJD1xf0oeVw='; frame-src https://accounts.google.com/gsi/; connect-src https://accounts.google.com/gsi/; style-src 'unsafe-inline' https://accounts.google.com/gsi/style; form-action 'self' https://mcp.tedy.online https://claude.ai; frame-ancestors 'none'; base-uri 'none'`
+- Onayla/Reddet sayfası: `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://mcp.tedy.online https://claude.ai; frame-ancestors 'none'; base-uri 'none'`
+
+**Files:**
+- Modify: `docs/superpowers/specs/2026-09-13-edupedia-tedy-orkestrator-design.md` (§6.1 cümlesi, §12b tarihli satır)
+- Modify: `src/mcp_server/oauth_redirect.py` (sabit + iki işlev)
+- Modify: `src/mcp_server/config.py` (`Settings.extra_form_action_origins`, `load_settings`)
+- Modify: `src/mcp_server/http_app.py` (`_consent_page_headers` parametresi ve `authorize` içindeki iki çağrı yeri)
+- Modify: `src/mcp_server/env_prep.py` (`UNIT_ONLY`)
+- Modify: `CLAUDE.md` ("Ortam" satırı 13 → 14 ad; Deployment → ted-mcp maddesi)
+- Test: `tests/test_mcp_oauth_redirect.py`, `tests/test_mcp_oauth_flow.py`
+
+**Interfaces:**
+- Consumes: `HEAD`'deki S1b sözleşmesi — `oauth_redirect.parse_extra_redirect_uris`, `config.load_settings`, `http_app._consent_page_headers(issuer, redirect_uri, google_sign_in)`, `http_app._CONSENT_SCRIPT_HASH`; testlerde `tests/test_mcp_oauth_flow.py`'nin `ctx`, `Clock`, `Verifier`, `_credential`, `_app`, `_register`, `_authorize_params`, `FULL`, `BASE`; Task 2 `env_prep.UNIT_ONLY`.
+- Produces:
+  - `oauth_redirect.EXTRA_FORM_ACTION_ORIGINS_ENV = "TED_MCP_EXTRA_FORM_ACTION_ORIGINS"`, `form_action_origin_problem(origin: str) -> str | None` (`"https_required"`, `"loopback"`, `"path"`, `"trailing_slash"`, `"query"`, `"fragment"`, `"userinfo"`, `"wildcard"`, `"uppercase"`, `"default_port"`, `"port"`, `"ip_literal"`, `"host"`, `"empty"`, `"control_or_whitespace"`), `parse_extra_form_action_origins(raw: str | None) -> tuple[str, ...]` (geçersiz giriş → `ValueError`, mesajda ortam adı).
+  - `config.Settings.extra_form_action_origins: tuple[str, ...] = ()`.
+  - `http_app._consent_page_headers(issuer, redirect_uri, google_sign_in, extra_form_action_origins: tuple[str, ...] = ())` — ek origin'ler `form-action` satırının sonuna, verildikleri sırayla, tek boşlukla eklenir.
+
+- [ ] **Step 1: Spec önce (§14.2)**
+
+§6.1'de `` `Referrer-Policy: no-referrer`, `Cache-Control: no-store`. `` cümlesinin hemen sonuna (aynı madde içinde) ekle:
+
+```markdown
+  `TED_MCP_EXTRA_FORM_ACTION_ORIGINS` (virgülle ayrılmış, varsayılan boş) `form-action` yönergesinin sonuna ek kesin
+  `https` origin'ler ekler: her giriş kanonik bir origin olmalıdır (küçük harf `https://host[:port]`; yol, sorgu,
+  fragment, userinfo, joker, sondaki `/` ve açık `:443` yok; loopback ve `http` yok) ve geçersiz tek bir giriş
+  sunucunun başlamasını durdurur. Ayar yalnız formun yönlendirme zincirini açar; kodun gideceği adres kesin
+  `redirect_uri` listesiyle sınırlı kalır.
+```
+
+§12b'nin son maddesinin (`… kenar hız sınırıyla tek bir IP taban içinde en çok ~7200 kayıt yapabilir).`) arkasına ekle:
+
+```markdown
+- **Onay sayfası `form-action` ek origin'leri (alt proje 3, 2026-09-14):** `TED_MCP_EXTRA_FORM_ACTION_ORIGINS`
+  eklendi (varsayılan boş; varsayılan CSP bayt bayt aynı). Gerekçe: alt proje 6'nın canlı yüzey kabulünde bir
+  geri-çağırma sayfası kodu `form-action`'da adı geçmeyen başka bir origin'e yeniden yönlendirebilir (Chrome
+  `form-action`'ı yönlendirme zinciri boyunca uygular) ve onay gönderimi engellenir; ayar bunun canlı oturumda
+  yapılandırmayla giderilmesini sağlar. Girişler `TED_MCP_EXTRA_REDIRECT_URIS` gibi kapalı-başarısızlıkla doğrulanır;
+  ayar gizli değildir ve `.env`'e değil birim dosyasına yazılır.
+```
+
+Run: `cd /mnt/thunderbolt/workspaces/TED/.worktrees/ted-mcp-cekirdek && grep -c 'TED_MCP_EXTRA_FORM_ACTION_ORIGINS' docs/superpowers/specs/2026-09-13-edupedia-tedy-orkestrator-design.md`
+Expected: `2`.
+
+- [ ] **Step 2: Write the failing tests**
+
+`tests/test_mcp_oauth_redirect.py` — import bloğuna ekle:
+
+```python
+from src.mcp_server import http_app
+from src.mcp_server.oauth_redirect import (EXTRA_FORM_ACTION_ORIGINS_ENV, form_action_origin_problem,
+                                           parse_extra_form_action_origins)
+```
+
+ve `test_settings_carry_extra_redirect_uris`'in hemen arkasına ekle:
+
+```python
+# -- TED_MCP_EXTRA_FORM_ACTION_ORIGINS (alt proje 3, Task 5a) ------------------------------------
+
+def test_extra_form_action_origins_are_exact_https_origins(tmp_path):
+    raw = " https://auth.example.org ,https://login.example.net:8443,, https://auth.example.org"
+    assert parse_extra_form_action_origins(raw) == ("https://auth.example.org", "https://login.example.net:8443")
+    assert parse_extra_form_action_origins("") == () and parse_extra_form_action_origins(None) == ()
+    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE, EXTRA_FORM_ACTION_ORIGINS_ENV: raw}, project_root=tmp_path)
+    assert settings.extra_form_action_origins == ("https://auth.example.org", "https://login.example.net:8443")
+    assert load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path).extra_form_action_origins == ()
+
+
+@pytest.mark.parametrize("value,problem", [
+    ("http://auth.example.org", "https_required"),
+    ("https://127.0.0.1", "loopback"),
+    ("https://localhost:8443", "loopback"),
+    ("https://auth.example.org/callback", "path"),
+    ("https://auth.example.org?x=1", "query"),
+    ("https://*.example.org", "wildcard"),
+    ("https://auth.example.org/", "trailing_slash"),
+    ("https://Auth.example.org", "uppercase"),
+    ("https://user@auth.example.org", "userinfo"),
+    ("https://auth.example.org#x", "fragment"),
+    ("https://auth.example.org:443", "default_port"),
+])
+def test_invalid_extra_form_action_origin_stops_startup(tmp_path, value, problem):
+    assert form_action_origin_problem(value) == problem
+    raw = f"https://ok.example.org,{value}"
+    with pytest.raises(ValueError, match=EXTRA_FORM_ACTION_ORIGINS_ENV):
+        parse_extra_form_action_origins(raw)
+    with pytest.raises(ValueError, match=EXTRA_FORM_ACTION_ORIGINS_ENV):
+        http_app.create_app_from_env({"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_FORM_SECRET": "f" * 40,
+                                      "TED_MCP_PROJECT_ROOT": str(tmp_path), EXTRA_FORM_ACTION_ORIGINS_ENV: raw})
+```
+
+`tests/test_mcp_oauth_flow.py` — `_tool_call` işlevinin hemen arkasına ekle:
+
+```python
+SIGN_IN_CSP = (
+    "default-src 'none'; script-src https://accounts.google.com/gsi/client {script_hash}; "
+    "frame-src https://accounts.google.com/gsi/; connect-src https://accounts.google.com/gsi/; "
+    "style-src 'unsafe-inline' https://accounts.google.com/gsi/style; "
+    "form-action 'self' https://mcp.tedy.online https://claude.ai{extra}; frame-ancestors 'none'; base-uri 'none'"
+)
+DECISION_CSP = (
+    "default-src 'none'; style-src 'unsafe-inline'; "
+    "form-action 'self' https://mcp.tedy.online https://claude.ai{extra}; frame-ancestors 'none'; base-uri 'none'"
+)
+
+
+def _consent_pages(client, verifier, registered_id):
+    """The Google sign-in page and the Onayla/Reddet page for one authorization request."""
+    sign_in = client.get("/oauth/authorize", params=_authorize_params(registered_id))
+    assert sign_in.status_code == 200, sign_in.text
+    form_state = re.search(r'name="form_state" value="([^"]+)"', sign_in.text).group(1)
+    verifier.expected_nonce = http_app.nonce_for(form_state)
+    decision = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)})
+    assert decision.status_code == 200, decision.text
+    return sign_in, decision
+
+
+def test_default_consent_csp_is_byte_identical(ctx):
+    client, verifier, _, _, client_id = ctx
+    sign_in, decision = _consent_pages(client, verifier, client_id)
+    assert sign_in.headers["content-security-policy"] == SIGN_IN_CSP.format(
+        script_hash=http_app._CONSENT_SCRIPT_HASH, extra="")
+    assert decision.headers["content-security-policy"] == DECISION_CSP.format(extra="")
+
+
+def test_extra_form_action_origins_are_named_on_both_consent_pages(tmp_path):
+    clock, verifier = Clock(), Verifier()
+    store = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
+    app = _app(tmp_path, store, verifier, clock,
+               TED_MCP_EXTRA_FORM_ACTION_ORIGINS="https://auth.example.org,https://login.example.net:8443")
+    with TestClient(app, base_url=BASE, follow_redirects=False) as client:
+        sign_in, decision = _consent_pages(client, verifier, _register(client))
+    extra = " https://auth.example.org https://login.example.net:8443"
+    assert sign_in.headers["content-security-policy"] == SIGN_IN_CSP.format(
+        script_hash=http_app._CONSENT_SCRIPT_HASH, extra=extra)
+    assert decision.headers["content-security-policy"] == DECISION_CSP.format(extra=extra)
+```
+
+- [ ] **Step 3: Run tests to verify they fail**
+
+Run: `cd /mnt/thunderbolt/workspaces/TED/.worktrees/ted-mcp-cekirdek && .venv/bin/python -m pytest tests/test_mcp_oauth_redirect.py tests/test_mcp_oauth_flow.py -k "form_action or consent_csp" -v`
+Expected: `tests/test_mcp_oauth_redirect.py` toplama hatası — `ImportError: cannot import name 'EXTRA_FORM_ACTION_ORIGINS_ENV'`. (Yalnız akış dosyasını koşarsan `test_default_consent_csp_is_byte_identical` bugünkü davranışı sabitlediği için şimdiden PASS, `test_extra_form_action_origins_are_named_on_both_consent_pages` FAIL — CSP'de ek origin yok.)
+
+- [ ] **Step 4: Minimal implementation**
+
+`src/mcp_server/oauth_redirect.py` — import bloğuna `import ipaddress` ekle (`import re`'nin yanına); `parse_extra_redirect_uris` işlevinin hemen arkasına ekle:
+
+```python
+EXTRA_FORM_ACTION_ORIGINS_ENV = "TED_MCP_EXTRA_FORM_ACTION_ORIGINS"
+_DNS_HOST_RE = re.compile(r"^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$")
+
+
+def form_action_origin_problem(origin: str) -> str | None:
+    """Why origin is not an exact, canonical https origin for the consent pages' CSP form-action, or None."""
+    if not isinstance(origin, str) or not origin:
+        return "empty"
+    if not origin.isascii() or any(c.isspace() or ord(c) < 0x20 or ord(c) == 0x7F for c in origin):
+        return "control_or_whitespace"
+    if "*" in origin:
+        return "wildcard"
+    if not origin.startswith("https://"):
+        return "https_required"  # http://, HTTPS:// and every other scheme
+    rest = origin[len("https://"):]
+    if "@" in rest:
+        return "userinfo"
+    if "#" in rest:
+        return "fragment"
+    if "?" in rest:
+        return "query"
+    if "/" in rest:
+        return "trailing_slash" if rest.index("/") == len(rest) - 1 else "path"
+    if rest.startswith("["):
+        return "loopback" if rest.split("]", 1)[0] == "[::1" else "ip_literal"
+    host, sep, port = rest.partition(":")
+    if sep:
+        if not (port.isdigit() and port == str(int(port)) and 1 <= int(port) <= 65535):
+            return "port"
+        if int(port) == 443:
+            return "default_port"  # https://host:443 is https://host; only the short form is canonical
+    if host != host.lower():
+        return "uppercase"
+    if host == "localhost" or host.endswith(".localhost"):
+        return "loopback"
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        address = None
+    if address is not None:
+        return "loopback" if address.is_loopback else "ip_literal"
+    if not _DNS_HOST_RE.match(host):
+        return "host"
+    return None
+
+
+def parse_extra_form_action_origins(raw: str | None) -> tuple[str, ...]:
+    """Comma-separated exact https origins appended to the consent pages' CSP form-action.
+
+    Any invalid entry stops startup with a ValueError (same fail-closed style as
+    TED_MCP_EXTRA_REDIRECT_URIS). An extra origin only widens the form's redirect chain;
+    where the code may go is still the exact redirect_uri allowlist.
+    """
+    origins: list[str] = []
+    for entry in (raw or "").split(","):
+        origin = entry.strip()
+        if not origin:
+            continue
+        problem = form_action_origin_problem(origin)
+        if problem:
+            raise ValueError(f"{EXTRA_FORM_ACTION_ORIGINS_ENV}: {origin!r} is not an exact canonical https origin ({problem})")
+        origins.append(origin)
+    return tuple(dict.fromkeys(origins))
+```
+
+`src/mcp_server/config.py` — import satırını değiştir:
+
+```python
+from src.mcp_server.oauth_redirect import (EXTRA_FORM_ACTION_ORIGINS_ENV, EXTRA_REDIRECT_URIS_ENV,
+                                           parse_extra_form_action_origins, parse_extra_redirect_uris)
+```
+
+`Settings`'te `extra_redirect_uris: tuple[str, ...] = ()` satırının arkasına `extra_form_action_origins: tuple[str, ...] = ()` ekle; `load_settings`'in `return Settings(...)` çağrısında `extra_redirect_uris=…` satırının arkasına ekle:
+
+```python
+        extra_form_action_origins=parse_extra_form_action_origins(env.get(EXTRA_FORM_ACTION_ORIGINS_ENV)),
+```
+
+`src/mcp_server/http_app.py` — `_consent_page_headers` imzası ve `form-action` satırı:
+
+```python
+def _consent_page_headers(issuer: str, redirect_uri: str, google_sign_in: bool,
+                          extra_form_action_origins: tuple[str, ...] = ()) -> dict[str, str]:
+```
+
+```python
+    # 'self' alone is not enough (measured in a sibling server): the page may sit in an opaque origin,
+    # and Chrome applies form-action along the redirect chain, so both origins are named explicitly.
+    # TED_MCP_EXTRA_FORM_ACTION_ORIGINS appends vetted origins for callback pages that redirect again.
+    directives += [
+        f"form-action 'self' {_csp_origin(issuer)} {_csp_origin(redirect_uri)}"
+        + "".join(f" {origin}" for origin in extra_form_action_origins),
+        "frame-ancestors 'none'",
+        "base-uri 'none'",
+    ]
+```
+
+`build_app` içinde `redirect_policy = RedirectPolicy(base, settings.extra_redirect_uris)` satırının arkasına `form_action_extra = settings.extra_form_action_origins` ekle ve `authorize` içindeki iki çağrıyı değiştir:
+
+```python
+            return HTMLResponse(page, headers=_consent_page_headers(
+                base, redirect_uri, google_sign_in=True, extra_form_action_origins=form_action_extra))
+```
+
+```python
+        return HTMLResponse(page, headers=_consent_page_headers(
+            base, params["redirect_uri"], google_sign_in=False, extra_form_action_origins=form_action_extra))
+```
+
+`src/mcp_server/env_prep.py` — gizli olmayan ayar birim dosyasına aittir:
+
+```python
+UNIT_ONLY = TOPOLOGY + ("TED_MCP_PROJECT_ROOT", "TED_MCP_MAX_BODY_BYTES", "TED_MCP_EXTRA_REDIRECT_URIS",
+                        "TED_MCP_EXTRA_FORM_ACTION_ORIGINS")
+```
+
+- [ ] **Step 5: Run tests to verify they pass**
+
+Run: `cd /mnt/thunderbolt/workspaces/TED/.worktrees/ted-mcp-cekirdek && .venv/bin/python -m pytest tests/test_mcp_oauth_redirect.py tests/test_mcp_oauth_flow.py tests/test_mcp_http_app.py tests/test_mcp_env_prep.py tests/test_deploy_units.py -v`
+Expected: tümü PASS — yeni 14 test (1 + 11 + 2) ve `test_unit_only_names_are_refused[TED_MCP_EXTRA_FORM_ACTION_ORIGINS]` dahil; mevcut CSP/onay testleri değişmeden geçer.
+
+- [ ] **Step 6: CLAUDE.md**
+
+"Ortam" maddesinde birebir değiştir (13 → 14 ad):
+``virgülle ayrık), `TED_DASHBOARD_API_URL` (varsayılan`` → ``virgülle ayrık), `TED_MCP_EXTRA_FORM_ACTION_ORIGINS` (onay sayfası CSP `form-action` yönergesine ek kesin `https` origin'ler, virgülle ayrık; varsayılan boş, geçersiz giriş başlatmayı durdurur), `TED_DASHBOARD_API_URL` (varsayılan``
+
+Deployment → ted-mcp "Bind" maddesinde birebir değiştir:
+``  `TED_MCP_MAX_BODY_BYTES` / `TED_MCP_EXTRA_REDIRECT_URIS`) live in the unit's`` → ``  `TED_MCP_MAX_BODY_BYTES` / `TED_MCP_EXTRA_REDIRECT_URIS` / `TED_MCP_EXTRA_FORM_ACTION_ORIGINS`) live in the unit's``
+
+Run: `cd /mnt/thunderbolt/workspaces/TED/.worktrees/ted-mcp-cekirdek && grep -c 'TED_MCP_EXTRA_FORM_ACTION_ORIGINS' CLAUDE.md`
+Expected: `2`.
+
+- [ ] **Step 7: Full offline gate**
+
+Run: `cd /mnt/thunderbolt/workspaces/TED/.worktrees/ted-mcp-cekirdek && unshare -rn .venv/bin/python -m pytest -q -p no:cacheprovider 2>&1 | tail -n 1`
+Expected: `B+62 passed, S skipped` — `failed`/`error` yok.
+
+- [ ] **Step 8: Commit**
+
+```bash
+cd /mnt/thunderbolt/workspaces/TED/.worktrees/ted-mcp-cekirdek
+git add docs/superpowers/specs/2026-09-13-edupedia-tedy-orkestrator-design.md src/mcp_server/oauth_redirect.py \
+  src/mcp_server/config.py src/mcp_server/http_app.py src/mcp_server/env_prep.py \
+  tests/test_mcp_oauth_redirect.py tests/test_mcp_oauth_flow.py CLAUDE.md
+git commit -m "feat(ted-mcp): TED_MCP_EXTRA_FORM_ACTION_ORIGINS — onay sayfası CSP form-action ek origin'leri (varsayılan CSP aynı, geçersiz giriş başlatmayı durdurur)
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+```
+
+---
+
 ### Task 6: [OPERASYON] Kodu yerel `main`'e al ve `origin/main`'e gönder (denetleyici onaylı; kapıya bağlı)
 
 Servis ana checkout'tan çalışır; AP2 + S1 + AP3 kodu orada olmadan Task 7–14 yapılamaz. Bu görev **denetleyici onaylıdır ve kapıya bağlıdır**: yalnız Task 9 Bölüm A `TEMİZ` kaydedildikten sonra koşulur (kullanıcının "kalan tüm aşamaları tamamla" ve "TED'i push et" yetkisi). Yalnız hızlı ileri alma ve normal push; force-push asla.
@@ -1826,7 +2135,7 @@ Servis ana checkout'tan çalışır; AP2 + S1 + AP3 kodu orada olmadan Task 7–
 **Files:** yok (git durumu).
 
 **Interfaces:**
-- Consumes: Task 1–5 commit'leri; Task 1 Step 1 **B**, **S**; Task 9 Bölüm A kararı ve kapının incelediği dal ucu **H**.
+- Consumes: Task 1–5 ve 5a commit'leri; Task 1 Step 1 **B**, **S**; Task 9 Bölüm A kararı ve kapının incelediği dal ucu **H**.
 - Produces: `/mnt/thunderbolt/workspaces/TED` ve `origin/main` @ **H**; önceki yerel `main` SHA'sı **M0** ve önceki `origin/main` SHA'sı **O0** (Task 7 geri alması **M0**'ı kullanır); ana checkout test sayıları **BM/SM**.
 
 - [ ] **Step 1: Kapı ve dal hazır**
@@ -1839,7 +2148,7 @@ git rev-parse HEAD
 unshare -rn .venv/bin/python -m pytest -q -p no:cacheprovider 2>&1 | tail -n 1
 .venv/bin/python -m src.mcp_server.vendor_sync --check; echo "rc=$?"
 ```
-Expected: boş; SHA Task 9 Bölüm A'da kaydedilen **H** ile aynı; `B+47 passed, S skipped`; `rc=0`. Denetleyici kaydında Task 9 Bölüm A `TEMİZ` yoksa ya da SHA ≠ **H** ise DUR.
+Expected: boş; SHA Task 9 Bölüm A'da kaydedilen **H** ile aynı; `B+62 passed, S skipped`; `rc=0`. Denetleyici kaydında Task 9 Bölüm A `TEMİZ` yoksa ya da SHA ≠ **H** ise DUR.
 
 - [ ] **Step 2: Ön koşul — yerel ve uzak `main` hızlı ileri alınabilir**
 
@@ -2279,7 +2588,7 @@ Kimlik yüzeyinin bağımsız incelemesi yapıldı: `/mnt/thunderbolt/workspaces
 - Consumes: Task 1 Step 1 **R**; SDD defteri `/mnt/thunderbolt/workspaces/TED/.superpowers/sdd/2026-09-13-ted-mcp-orkestrator-cekirdegi/progress.md`; S1a/S1b raporları ve kapsamlı yeniden inceleme sonuçları; Bölüm B için Task 7–8 kanıtları ve Task 8 Step 13 **D**.
 - Produces: Bölüm A kararı ve incelenen dal ucu **H** (Task 6–8 kullanır); Bölüm B kararı (Task 10–11 kullanır).
 
-#### Bölüm A — kod kapısı (Task 5 bittikten sonra, Task 6'dan önce)
+#### Bölüm A — kod kapısı (Task 5 ve Task 5a bittikten sonra, Task 6'dan önce; kapsam Task 5a'yı içerir)
 
 - [ ] **Step 1: Düzeltme dalgası ve son inceleme temiz**
 
@@ -2297,7 +2606,7 @@ git diff --stat <R> HEAD -- src/mcp_server/http_app.py src/mcp_server/oauth_stor
   src/mcp_server/google_identity.py src/mcp_server/keys.py src/mcp_server/server.py src/mcp_server/config.py src/roles.py
 git diff <R> HEAD -- src/mcp_server/http_app.py | grep -E '^[+-][^+-]'
 ```
-Expected: boş; SHA (**H** olarak kaydet); `icerir`; `--stat` yalnız `src/mcp_server/http_app.py`'yi gösterir; değişen satırlar yalnız Task 1'in `DEFAULT_HOST`/`DEFAULT_PORT` sabitleri, yorumu ve `main()` içindeki `uvicorn.run(...)` iki satırıdır. Başka herhangi bir kimlik yüzeyi değişikliği → o fark için kapsamlı yeniden inceleme, sonra bu adım yeniden.
+Expected: boş; SHA (**H** olarak kaydet); `icerir`. `--stat` yalnız `src/mcp_server/http_app.py`, `src/mcp_server/config.py` ve `src/mcp_server/oauth_redirect.py`'yi gösterir. `http_app.py`'de değişen satırlar yalnız iki kaynaklıdır: Task 1'in `DEFAULT_HOST`/`DEFAULT_PORT` sabitleri, yorumu ve `main()` içindeki `uvicorn.run(...)` iki satırı; Task 5a'nın `_consent_page_headers(..., extra_form_action_origins=())` parametresi, `form-action` satırı, `form_action_extra` ataması ve iki çağrı yeri. `config.py` ile `oauth_redirect.py`'deki değişiklikler yalnız Task 5a'nındır. **Task 5a bu bölümün inceleme kapsamındadır**: gözden geçiren Task 5a commit'ini (`git log --oneline --grep TED_MCP_EXTRA_FORM_ACTION_ORIGINS` → `git show <SHA>`) baştan sona okur ve Step 3'teki Task 5a satırını doldurur. Başka herhangi bir kimlik yüzeyi değişikliği → o fark için kapsamlı yeniden inceleme, sonra bu adım yeniden.
 
 - [ ] **Step 3: Bulgu kapanış tablosu ve ertelenen düşük bulgular**
 
@@ -2313,6 +2622,7 @@ Gözden geçiren her satırı kapatan commit ve testle (S1 raporlarından) doldu
 | F8 kısmi (`oauth-iptal`, 90 gün aile ömrü, temizlik) | Kapalı | S1b testi |
 | R4 SQLite WAL / token deposu izinleri | Kapalı: WAL (S1a); `output/ted_mcp_oauth.sqlite3` ve `-wal`/`-shm` 600; `output/` dizin modu denetleyici kararıyla korunur | S1a testi (canlı: Task 8 Step 4 ve 12) |
 | R5 HostGuard ayrıştırma | Kapalı | S1a testi (canlı: Task 8 Step 9) |
+| Task 5a `TED_MCP_EXTRA_FORM_ACTION_ORIGINS` (yeni kimlik yüzeyi ayarı) | Varsayılan onay CSP'si bayt bayt aynı; yalnız kanonik `https` origin; `http`, loopback, yol, sorgu, fragment, userinfo, joker, sondaki `/`, büyük harf ve açık `:443` reddi; geçersiz giriş başlatmayı durdurur; ek origin yalnız `form-action`'a eklenir, kodun hedefi kesin `redirect_uri` listesiyle sınırlı kalır; `.env`'de reddedilir (birime aittir) | Task 5a testleri + commit'in tam okunması |
 | Ertelenen: RFC 7009 `/oauth/revoke`, `tdyM_` son kullanma, R3 Unicode kök liste katlaması, R6 eşzamanlı yenilemede aile iptali | SDD defterinde denetleyici `Ruling:` satırı | Aşağıdaki komut |
 
 Run:
@@ -2324,7 +2634,7 @@ Expected: dört satırın her birinde sayı ≥ 1 (ölçüm 2026-09-14: `3`, `3`
 
 - [ ] **Step 4: Bölüm A kararı**
 
-`TEMİZ` yalnız şu durumda: Step 1–2 tutar; Step 3'te F1, F2 ve tüm "Kapalı" satırları kanıtlı; dört ertelenen düşük bulgunun defterde denetleyici `Ruling:` satırı var; hiçbir incelemede açık Critical/High/Medium yok; kalan her Low ya düzeltilmiş ya da defterde denetleyici `Ruling:` satırıyla ertelenmiş.
+`TEMİZ` yalnız şu durumda: Step 1–2 tutar; Step 3'te F1, F2, tüm "Kapalı" satırları ve Task 5a satırı kanıtlı; dört ertelenen düşük bulgunun defterde denetleyici `Ruling:` satırı var; hiçbir incelemede açık Critical/High/Medium yok; kalan her Low ya düzeltilmiş ya da defterde denetleyici `Ruling:` satırıyla ertelenmiş.
 
 Kaydet (denetleyici kaydı): gözden geçiren, tarih, **R**, **H**, karar.
 
@@ -2342,7 +2652,7 @@ Kapsam: `ted-mcp.service`, `src/mcp_server/env_prep.py`, `src/mcp_server/tunnel_
 - D1: Süreç yalnız `127.0.0.1:8090`'ı dinler; LAN adresinden bağlantı reddedilir (Task 8 Step 4). Birimde `0.0.0.0` yok (R7).
 - D2: `TED_MCP_FORM_SECRET` `secrets.token_hex(32)` ile üretildi (64 hex = 32 rastgele bayt, R7); git dışı.
 - D3: Sır hiçbir yerde yazdırılmadı/loglanmadı: `.env` 600; yedek 700/600 depo dışında; `$XDG_RUNTIME_DIR/ted-mcp-sp3/` 700/600; journal taraması `0` (Task 8 Step 12); üç CLI'nin testleri değer/token yazdırmadığını sabitler.
-- D4: Topoloji birimde, `.env`'de yok (`env_prep durum` rc 0); `TED_MCP_PROJECT_ROOT` tanımsız; `keys` CLI ana checkout'tan çalıştı.
+- D4: Topoloji birimde, `.env`'de yok (`env_prep durum` rc 0); `TED_MCP_PROJECT_ROOT` tanımsız; `keys` CLI ana checkout'tan çalıştı; `TED_MCP_EXTRA_FORM_ACTION_ORIGINS` üretimde tanımsız (gerekirse yalnız birimin `Environment=` satırına eklenir).
 - D5: `output/ted_mcp_oauth.sqlite3` ve var olan `-wal`/`-shm` dosyaları 600 (Task 8 Step 4 ve 12); `output/` `775` bilinçli olarak korunur (denetleyici kararı; R4'ün etki alanı token deposuna daraltıldı).
 - D6: Metadata yapılandırılmış taban URL'den gelir, `Host` başlığından değil (Task 8 Step 6).
 - D7: Canlı sözleşmeler: 413 (Step 7), kesin DCR listesi (Step 8), HostGuard 400 (Step 9), `tdyK_` MCP'de geçmez (AP2 testi).
@@ -2404,6 +2714,21 @@ Expected: Step 2'deki plan satırları, ardından `yedek: /home/mahirkurt/.local
 
 Run: `cd /mnt/thunderbolt/workspaces/TED && .venv/bin/python -m src.mcp_server.edge_ratelimit --bolge tedy.online dogrula; echo "rc=$?"`
 Expected: `http_ratelimit kuralı: 1`, `mevcut:` satırı Step 2'deki `sonra:` ile aynı, `ted-mcp kuralı: ayrı` (A/C) ya da `birleşik` (B), `DOĞRULANDI`, `rc=0`.
+
+- [ ] **Step 4b: Sayım anahtarının kaydı ve dağıtık kayıt seli kararı (spec §6.1 DCR tavanı)**
+
+Spec §6.1/§12b'deki "tek bir kaynak 20 dakikalık taban içinde DCR tavanını dolduramaz (≈ 7200 kayıt)" iddiası kuralın IPv6 istemcilerini önek düzeyinde saydığını varsayar; tam IPv6 adresi (`ip.src`) sayılıyorsa bir /64 sahibi tek kaynak değildir.
+
+Run (değer yazdırmaz; yalnız plan ve kural alanları):
+```bash
+cd /mnt/thunderbolt/workspaces/TED
+.venv/bin/python -c 'from src.mcp_server import tunnel_route as t, edge_ratelimit as e; a = t.default_api(); z, _ = a.zone("tedy.online"); plan = ((a.call("GET", f"/zones/{z}") or {}).get("plan") or {}).get("legacy_id"); rules = (a.call("GET", f"/zones/{z}/rulesets/phases/http_ratelimit/entrypoint", missing_ok=True) or {}).get("rules") or []; hit = e.find_ours(rules); rl = (rules[hit[0]].get("ratelimit") or {}) if hit else {}; print("plan:", plan); print("sayim_ozellikleri:", sorted(rl.get("characteristics") or [])); print("donem_esik:", rl.get("period"), rl.get("requests_per_period"))'
+L=/mnt/thunderbolt/workspaces/TED/.superpowers/sdd/2026-09-13-ted-mcp-orkestrator-cekirdegi/progress.md
+grep '^Ruling:' "$L" | grep -F 'DCR' | grep -ciE 'dağıtık|IPv6|/64'
+```
+Expected: `plan: free` (ya da Step 2'deki plan); `sayim_ozellikleri: ['cf.colo.id', 'ip.src']`; `donem_esik: 10 60` (dal B'de mevcut kuralın değerleri); son satır `1` ya da fazlası.
+
+Kaydet (**RL_SAYIM**): plan, sayım özellikleri, dönem/eşik ve Cloudflare'in güncel rate limiting belgesinin `ip.src` sayımında IPv6'yı önekle (/64) gruplayıp gruplamadığına dair ifadesi (belge adresi + okuma tarihi; belge açıkça söylemiyorsa "belirsiz"). /64 gruplaması belgelenmemişse ya da tam adres sayılıyorsa, tek kaynak iddiası yalnız IPv4 ve önek gruplamalı IPv6 için geçerlidir. Dağıtık (çok adresli ya da /64 içinden adres döndüren) kayıt seli bu planın savunma kapsamı dışındadır ve **denetleyici kararıyla kabul edilmiştir**; son `grep` `0` verirse DUR: denetleyici bu kabulün `Ruling:` satırını SDD defterine yazar, sonra adım yeniden koşulur. **RL_SAYIM** Task 14'teki §12b kaydına girer.
 
 - [ ] **Step 5: İşlevsel kanıt (ifade yola dayandığı için `tedy.online` üzerinden, DNS'ten önce; tüm dallar)**
 
@@ -2634,7 +2959,7 @@ curl "${C[@]}" -o /dev/null -w '%{http_code}\n' "$B/oauth/authorize?$Q&code_chal
 curl "${C[@]}" -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' \
   --data '{"redirect_uris":["https://claude.ai/any/other/path"]}' "$B/oauth/register"
 ```
-Expected: `201`; `200`; `data-client_id="343043757928-mivqip09orvrf73m7kj9b0atohgin2ho.apps.googleusercontent.com"`; `1` ya da fazlası; `1` ya da fazlası; `x-frame-options: DENY` ve `content-security-policy: … frame-ancestors 'none' …`; `400` (küçük harf `s256`); `400` (listede olmayan yol). Bu adım bir DCR kaydı bırakır (kod üretmediği için 24 saat sonra temizlenebilir).
+Expected: `201`; `200`; `data-client_id="343043757928-mivqip09orvrf73m7kj9b0atohgin2ho.apps.googleusercontent.com"`; `1` ya da fazlası; `1` ya da fazlası; `x-frame-options: DENY` ve `content-security-policy: … frame-ancestors 'none' …`; `400` (küçük harf `s256`); `400` (listede olmayan yol). Bu adım kalıcı bir DCR kaydı bırakır; kod üretmediği için yalnız tavana ulaşıldığında ve `2 × FORM_TTL_SECONDS` (20 dk) tabanından eskiyse tahliye edilebilir (spec §6.1).
 
 - [ ] **Step 7: Kenar hız sınırı işlevsel kanıtı (`mcp.tedy.online` üzerinden)**
 
@@ -2718,7 +3043,8 @@ Worktree'de, §12b'nin son maddesinden sonra:
   dağıtılan <D kısa SHA>; ertelenen düşük bulgular (RFC 7009 `/oauth/revoke`, `tdyM_` son kullanma, R3, R6) SDD defterinde
   denetleyici `Ruling:` satırlarıyla kayıtlı. anamnesis: <anahtar yapılandırıldı, `hit` | anahtar yok, `skipped:anahtar yok` — ekleme bekliyor>.
   Kenar hız sınırı dal <A|B|C>
-  (`/oauth/register|authorize|token`, `/mcp`; IP başına 10 sn'de <eşik>; yedek `<RL_YEDEK dosya adı>`).
+  (`/oauth/register|authorize|token`, `/mcp`; IP başına 10 sn'de <eşik>; sayım <RL_SAYIM: özellikler, IPv6 gruplama /64 | tam adres | belirsiz>, dağıtık kayıt seli
+  denetleyici `Ruling:` satırıyla kabul; yedek `<RL_YEDEK dosya adı>`).
   `hp-ai-node` ingress 52 → 53 kural, `mcp.tedy.online` → `http://127.0.0.1:8090`, proxied CNAME (yedek
   `<TR_YEDEK dosya adı>`). Genel uçta: PRM 200, `/mcp` kimliksiz 401 + `WWW-Authenticate`, `/oauth/token` 16 385 bayt
   → 413, CORS `https://claude.ai` 204, `tdyM_` anahtarıyla `initialize` (`2025-06-18`, `TEDY edupedia` `0.1.0`) +
@@ -2771,7 +3097,7 @@ Sıra önemlidir: önce genel erişim kapanır, sonra kimlik, sonra süreç, son
 
 ## Plan sonu — alt proje 3 kabul ölçütleri
 
-1. Kod görevleri (1–5) worktree'de ağsız testlerle yeşil: `B+47 passed, S skipped`, `failed`/`error` yok; spec §4.1 portu `8090` ve §12b AP3 kayıtları mevcut.
+1. Kod görevleri (1–5 ve 5a) worktree'de ağsız testlerle yeşil: `B+62 passed, S skipped`; varsayılan onay sayfası CSP'si Task 5a sonrasında bayt bayt aynı, `failed`/`error` yok; spec §4.1 portu `8090` ve §12b AP3 kayıtları mevcut.
 2. `ted-mcp` systemd user servisi etkin, yalnız `127.0.0.1:8090`'da; `.env` `env_prep durum` rc 0; journal'da sır yok; token deposu dosyaları 600 (`output/` 775 korunur); anamnesis ya `hit` ya da dürüst `skipped:anahtar yok` (Task 8 Step 10b).
 3. Güvenlik kapısı: Bölüm A `TEMİZ` (S1a + S1b kapsamlı yeniden incelemeleri ve AP2 son tüm-dal incelemesi temiz; ertelenen dört düşük bulgunun SDD defterinde denetleyici `Ruling:` satırı var) `main` ileri alma/push ve dashboard yeniden başlatmasından **önce**; Bölüm B `TEMİZ` (D1–D10 evet) hiçbir genel DNS/ingress kaydından **önce**.
 4. Kenar hız sınırı `DOĞRULANDI` ve işlevsel olarak 429 üretti; DNS kaydından **önce** uygulandı.
