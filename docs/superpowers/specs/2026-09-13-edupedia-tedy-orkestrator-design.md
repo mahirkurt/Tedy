@@ -226,15 +226,20 @@ ve yalnız `window.parent`'a gönderdiğini denetler. (Kapı sayısı: mevcut 16
   bir yolu sorgu dizesini, dolayısıyla kodu, başkasına verebilir). Varsayılan liste:
   `https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback`,
   `https://chatgpt.com/connector_platform_oauth_redirect`, `https://grok.com/connectors/oauth/callback`
-  (belgeden alındı, canlı bağlantıyla doğrulanmadı — alt proje 6'da doğrulanır), `https://vscode.dev/redirect`,
-  `https://insiders.vscode.dev/redirect`; Gemini için yalnız
+  (belgeden alındı, canlı bağlantıyla doğrulanmadı — alt proje 6'da doğrulanır); Gemini için yalnız
   `https://oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-<rakamlar>-<genel host, noktalar _>`;
   loopback `http://127.0.0.1`, `http://localhost`, `http://[::1]` (her port, her yol; RFC 8252). Ek kesin URI'ler
-  `TED_MCP_EXTRA_REDIRECT_URIS` (virgülle ayrılmış; loopback dışında yalnız `https`). Her URI kanonik olmalıdır
-  (boşluk/kontrol karakteri, userinfo, fragment, büyük harf şema/host, loopback dışı açık port yok; yeniden
-  serileştirince kendisi) ve sorgusunda `code`, `state`, `iss`, `error`, `error_description`, `error_uri` bulunamaz.
+  `TED_MCP_EXTRA_REDIRECT_URIS` (virgülle ayrılmış; loopback dışında yalnız `https`). `https://vscode.dev/redirect`
+  ve `https://insiders.vscode.dev/redirect` varsayılan listede **yoktur**: kodu `state`'in seçtiği başka bir host'a
+  (ör. `*.github.dev`) iletirler (ölçüldü, 2026-09-14); gerekirse yalnız `TED_MCP_EXTRA_REDIRECT_URIS` ile eklenir
+  (VS Code masaüstü loopback kullanır). Her URI kanonik olmalıdır (yalnız ASCII; boşluk/kontrol karakteri,
+  userinfo, fragment, büyük harf şema/host, loopback dışı açık port yok; yeniden serileştirince kendisi) ve sorgusunda `code`, `state`, `iss`, `error`, `error_description`, `error_uri` bulunamaz.
 - DCR açık ve **kalıcıdır**: her kayıt rastgele bir `client_id` alır; `redirect_uris` (1–5) ve `client_name`
-  (≤ 100 karakter) saklanır. Tavan 500 kayıt; taşmada hiç kod üretmemiş ve 24 saatten eski kayıtlar silinir.
+  (≤ 100 karakter; kontrol, biçim (ör. bidi yön denetimi, sıfır genişlikli birleştirici), vekil ve satır/paragraf
+  ayırıcı karakter içeremez) saklanır. Tavan **5000** kayıt: tavanda yeni kayıt gelince önce hiç kod üretmemiş ve
+  yaşı `FORM_TTL_SECONDS + CODE_TTL_SECONDS`'ı (15 dk) aşan **en eski** kayıtlar yer açacak kadar silinir; kod
+  üretmiş istemci asla silinmez; silinebilecek kayıt yoksa kayıt `400 invalid_client_metadata` ile reddedilir.
+  Kayıt selinde asıl savunma kenardaki hız sınırıdır (alt proje 3).
   `/oauth/authorize` ve `/oauth/token` yalnız kayıtlı `client_id` kabul eder (aksi `invalid_client`);
   `redirect_uri` kayıtlı URI'lerden biriyle tam eşit olmalıdır (loopback'te port hariç), aksi hata sayfası —
   yönlendirme yapılmaz.
@@ -252,7 +257,7 @@ ve yalnız `window.parent`'a gönderdiğini denetler. (Kapı sayısı: mevcut 16
   karakteri). Kodlar tek kullanımlık, 5 dk; kullanılmış kod yeniden gelirse o koddan çıkan aile iptal edilir.
 - Erişim token'ı opak, 1 saat; yenileme token'ı 30 gün, her kullanımda döner; tekrar kullanımda aile iptal edilir;
   aile oluşturulmasından **90 gün** sonra yenileme reddedilir. `keys oauth-iptal --email <e-posta>` bir kişinin
-  tüm OAuth ailelerini iptal eder. Sunucu başlangıcında süresi bir günden fazla geçmiş kod, token ve tüketilmiş
+  tüm OAuth ailelerini iptal eder ve bekleyen (kullanılmamış) kodlarının süresini bitirir. Sunucu başlangıcında süresi bir günden fazla geçmiş kod, token ve tüketilmiş
   form durumu satırları silinir (istemci kayıtları tavan politikasına tabidir).
   Saklama `output/ted_mcp_oauth.sqlite3`'te yalnız hash (tek kullanımlık kod ve yenileme tüketimi atomik
   `BEGIN IMMEDIATE` işlemleriyle; egitim-kaynak `oauth_store.py` kalıbı, `principal` e-postaya bağlı).
@@ -408,6 +413,14 @@ planında yer alır.
   DCR kalıcı ve istemci başına `client_id`'li oldu; Google girişinden sonra açık Onayla/Reddet adımı, tek
   kullanımlık form durumları, onay sayfası CSP'si, PKCE sınırları, kod yeniden kullanımında aile iptali,
   `resource` bağlama, 90 günlük aile ömrü, `keys oauth-iptal` ve başlangıç temizliği eklendi.
+- **S1b inceleme düzeltmesi (2026-09-14):** `https://vscode.dev/redirect` ve `https://insiders.vscode.dev/redirect`
+  varsayılan geri-çağırma listesinden çıkarıldı. Canlı ölçüm: `code=probe123` ve hedefi
+  `https://attacker-probe-7q9x.github.dev/steal` olan bir `state` ile iki sayfa da `302` ile kodu o host'a iletti
+  (`vscode://` ve loopback'e de iletir); açık DCR ile herkes bu URI'yi "Visual Studio Code" adıyla kaydedip gerçek
+  bir Microsoft adresi gösteren onay sayfası üretebildiği için Onayla adımı korumaz. Yalnız
+  `TED_MCP_EXTRA_REDIRECT_URIS` ile eklenebilir. Aynı incelemede DCR tavanı 500'den 5000'e çıkarıldı ve "24 saatten
+  eski" temizliği yerine 15 dakikalık taban yaşını aşmış kodsuz en eski kayıtların tahliyesi getirildi (ölçüm: 499
+  anonim kayıt 4,5 sn'de tavanı doldurup yeni bağlayıcı kurulumunu 24 saat engelliyordu).
 
 ## 13. Varsayımlar ve riskler
 
