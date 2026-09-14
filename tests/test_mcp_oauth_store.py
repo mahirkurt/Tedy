@@ -533,3 +533,19 @@ def test_startup_purge_removes_rows_expired_for_more_than_a_day(tmp_path, store,
     store.purge_expired()
     assert _count(path, "oauth_refresh") == 0
     assert (_count(path, "oauth_client"), _count(path, "static_key")) == (1, 1)  # never purged here
+
+
+# -- S1b / R1: the resource travels from the code to every token of the family -------------------
+
+RESOURCE = "https://mcp.tedy.online/mcp"
+
+
+def test_resource_is_bound_to_the_code_and_every_token_of_its_family(store, client_id):
+    code = store.issue_code(FULL, client_id, REDIRECT, _challenge(VERIFIER), "S256", resource=RESOURCE)
+    assert store.redeem_code(code, client_id, REDIRECT, VERIFIER, resource="https://evil.example/rs") is None
+    pair = store.redeem_code(code, client_id, REDIRECT, VERIFIER, resource=RESOURCE)  # not consumed above
+    assert pair is not None
+    assert store.refresh(pair.refresh_token, client_id, resource="https://evil.example/rs") is None
+    second = store.refresh(pair.refresh_token, client_id, resource=RESOURCE)
+    assert second is not None
+    assert store.refresh(second.refresh_token, client_id) is not None  # omitted: the family's binding applies

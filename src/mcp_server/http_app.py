@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import functools
 import hashlib
 import hmac
 import html
@@ -386,13 +387,15 @@ def build_app(
     if len(form_secret) < 32:
         raise ValueError("form_secret must be at least 32 bytes")
     redirect_policy = RedirectPolicy(base, settings.extra_redirect_uris)
+    # The one resource (audience) this server protects: exactly what its protected-resource metadata says.
+    resource_uri = f"{base}/mcp"
 
     async def health(request: Request) -> Response:
         return JSONResponse({"status": "ok", "version": __version__})
 
     async def protected_resource(request: Request) -> Response:
         return JSONResponse({
-            "resource": f"{base}/mcp",
+            "resource": resource_uri,
             "authorization_servers": [base],
             "bearer_methods_supported": ["header"],
             "scopes_supported": ["edupedia"],
@@ -470,6 +473,9 @@ def build_app(
             # RFC 7636: exactly "S256" and a 43-character base64url challenge; "s256" is refused.
             if not is_valid_code_challenge(q.get("code_challenge", ""), q.get("code_challenge_method", "")):
                 return _bad("code_challenge / code_challenge_method must be S256")
+            # RFC 8707: a resource indicator, when given (even empty or repeated), must name this server.
+            if any(value != resource_uri for value in q.getlist("resource")):
+                return _bad("invalid_target")
             params = {k: q.get(k, "") for k in _FORM_KEYS}
             form_state = sign_form_state(params, form_secret, clock())
             page = _CONSENT_PAGE.format(
@@ -545,8 +551,10 @@ def build_app(
             extra = {"error": "access_denied"}
         else:
             try:
-                code = await anyio.to_thread.run_sync(store.issue_code, email, params["client_id"], redirect_uri,
-                                                      params["code_challenge"], params["code_challenge_method"])
+                # Every code is bound to this server's resource, whether or not the client named it.
+                code = await anyio.to_thread.run_sync(
+                    functools.partial(store.issue_code, resource=resource_uri), email, params["client_id"],
+                    redirect_uri, params["code_challenge"], params["code_challenge_method"])
             except ValueError:
                 return _bad("invalid_client")  # the registration is gone (purged) since the page was shown
             extra = {"code": code}
@@ -573,15 +581,22 @@ def build_app(
         client_id = str(form.get("client_id", ""))
         if await _registered_client(client_id) is None:
             return _grant_error("invalid_client")
+        resources = form.getlist("resource")
+        if any(value != resource_uri for value in resources):
+            return _grant_error("invalid_target")
+        # Omitted: the grant's own binding applies. Given: it must match what the code or family carries.
+        resource = resource_uri if resources else None
         if grant == "authorization_code":
             # Must equal the redirect_uri the code is bound to (compared in the store).
             redirect_uri = str(form.get("redirect_uri", ""))
             if not redirect_policy.allows(redirect_uri):
                 return _grant_error("invalid_grant")
-            pair = await anyio.to_thread.run_sync(store.redeem_code, str(form.get("code", "")), client_id,
+            pair = await anyio.to_thread.run_sync(functools.partial(store.redeem_code, resource=resource),
+                                                  str(form.get("code", "")), client_id,
                                                   redirect_uri, str(form.get("code_verifier", "")))
             return _token_response(pair) if pair else _grant_error("invalid_grant")
-        pair = await anyio.to_thread.run_sync(store.refresh, str(form.get("refresh_token", "")), client_id)
+        pair = await anyio.to_thread.run_sync(functools.partial(store.refresh, resource=resource),
+                                              str(form.get("refresh_token", "")), client_id)
         return _token_response(pair) if pair else _grant_error("invalid_grant")
 
     streamable = mcp.streamable_http_app()

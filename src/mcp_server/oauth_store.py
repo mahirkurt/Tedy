@@ -50,14 +50,16 @@ CREATE TABLE IF NOT EXISTS oauth_code (
     challenge_method TEXT NOT NULL CHECK (challenge_method = 'S256'),
     expires_at INTEGER NOT NULL,
     used_at INTEGER,
-    family_id TEXT
+    family_id TEXT,
+    resource TEXT
 );
 CREATE TABLE IF NOT EXISTS oauth_access (
     value_hash TEXT PRIMARY KEY,
     email TEXT NOT NULL,
     family_id TEXT NOT NULL,
     expires_at INTEGER NOT NULL,
-    revoked_at INTEGER
+    revoked_at INTEGER,
+    resource TEXT
 );
 CREATE TABLE IF NOT EXISTS oauth_refresh (
     value_hash TEXT PRIMARY KEY,
@@ -67,7 +69,8 @@ CREATE TABLE IF NOT EXISTS oauth_refresh (
     expires_at INTEGER NOT NULL,
     used_at INTEGER,
     revoked_at INTEGER,
-    family_created_at INTEGER
+    family_created_at INTEGER,
+    resource TEXT
 );
 CREATE TABLE IF NOT EXISTS oauth_client (
     client_id TEXT PRIMARY KEY,
@@ -92,8 +95,9 @@ CREATE TABLE IF NOT EXISTS static_key (
 # Columns added after the first schema. CREATE TABLE IF NOT EXISTS leaves an existing file alone, so
 # these are added one by one (only when missing) for a store created by an earlier version.
 _ADDED_COLUMNS: dict[str, tuple[tuple[str, str], ...]] = {
-    "oauth_code": (("family_id", "TEXT"),),
-    "oauth_refresh": (("family_created_at", "INTEGER"),),
+    "oauth_code": (("family_id", "TEXT"), ("resource", "TEXT")),
+    "oauth_access": (("resource", "TEXT"),),
+    "oauth_refresh": (("family_created_at", "INTEGER"), ("resource", "TEXT")),
 }
 
 
@@ -239,7 +243,7 @@ class OAuthStore:
 
     # -- authorization codes -------------------------------------------------------
     def issue_code(self, email: str, client_id: str, redirect_uri: str,
-                   code_challenge: str, code_challenge_method: str) -> str:
+                   code_challenge: str, code_challenge_method: str, resource: str | None = None) -> str:
         if not is_valid_code_challenge(code_challenge, code_challenge_method):
             raise ValueError("only PKCE S256 with a 43-character challenge is accepted")
         if not roles.is_full(email):
@@ -256,22 +260,22 @@ class OAuthStore:
             conn.execute("UPDATE oauth_client SET code_issued_at = ? WHERE client_id = ?", (now, client_id))
             conn.execute(
                 "INSERT INTO oauth_code (value_hash, email, client_id, redirect_uri, challenge,"
-                " challenge_method, expires_at) VALUES (?, ?, ?, ?, ?, 'S256', ?)",
+                " challenge_method, expires_at, resource) VALUES (?, ?, ?, ?, ?, 'S256', ?, ?)",
                 (_hash(code), email.strip().lower(), client_id, redirect_uri, code_challenge,
-                 now + CODE_TTL_SECONDS),
+                 now + CODE_TTL_SECONDS, resource),
             )
             conn.execute("COMMIT")
         return code
 
     def redeem_code(self, code: str, client_id: str, redirect_uri: str,
-                    code_verifier: str) -> TokenPair | None:
+                    code_verifier: str, resource: str | None = None) -> TokenPair | None:
         if not (code and client_id and redirect_uri):
             return None
         now = self._now()
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
-                "SELECT email, client_id, redirect_uri, challenge, expires_at, used_at, family_id"
+                "SELECT email, client_id, redirect_uri, challenge, expires_at, used_at, family_id, resource"
                 " FROM oauth_code WHERE value_hash = ?",
                 (_hash(code),),
             ).fetchone()
@@ -288,13 +292,15 @@ class OAuthStore:
             if (_CODE_VERIFIER.fullmatch(code_verifier or "") is None
                     or not hmac.compare_digest(row["challenge"], _s256(code_verifier))
                     or row["client_id"] != client_id or row["redirect_uri"] != redirect_uri
+                    or (resource is not None and row["resource"] != resource)
                     or row["expires_at"] <= now):
                 conn.execute("ROLLBACK")
                 return None
             family_id = secrets.token_hex(8)
             conn.execute("UPDATE oauth_code SET used_at = ?, family_id = ? WHERE value_hash = ?",
                          (now, family_id, _hash(code)))
-            pair = self._issue_pair(conn, row["email"], client_id, family_id, now, family_created_at=now)
+            pair = self._issue_pair(conn, row["email"], client_id, family_id, now, family_created_at=now,
+                                    resource=row["resource"])
             conn.execute("COMMIT")
         return pair
 
@@ -307,28 +313,29 @@ class OAuthStore:
                      (now, family_id))
 
     def _issue_pair(self, conn: sqlite3.Connection, email: str, client_id: str,
-                    family_id: str, now: int, family_created_at: int) -> TokenPair:
+                    family_id: str, now: int, family_created_at: int, resource: str | None) -> TokenPair:
+        # The resource (audience) of the grant travels with every token of its family.
         access = secrets.token_urlsafe(32)
         refresh = secrets.token_urlsafe(32)
         conn.execute(
-            "INSERT INTO oauth_access (value_hash, email, family_id, expires_at) VALUES (?, ?, ?, ?)",
-            (_hash(access), email, family_id, now + ACCESS_TTL_SECONDS),
+            "INSERT INTO oauth_access (value_hash, email, family_id, expires_at, resource) VALUES (?, ?, ?, ?, ?)",
+            (_hash(access), email, family_id, now + ACCESS_TTL_SECONDS, resource),
         )
         conn.execute(
-            "INSERT INTO oauth_refresh (value_hash, email, family_id, client_id, expires_at, family_created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            (_hash(refresh), email, family_id, client_id, now + REFRESH_TTL_SECONDS, family_created_at),
+            "INSERT INTO oauth_refresh (value_hash, email, family_id, client_id, expires_at, family_created_at,"
+            " resource) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (_hash(refresh), email, family_id, client_id, now + REFRESH_TTL_SECONDS, family_created_at, resource),
         )
         return TokenPair(access, refresh, ACCESS_TTL_SECONDS, email)
 
-    def refresh(self, refresh_token: str, client_id: str) -> TokenPair | None:
+    def refresh(self, refresh_token: str, client_id: str, resource: str | None = None) -> TokenPair | None:
         if not (refresh_token and client_id):
             return None
         now = self._now()
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
-                "SELECT email, family_id, client_id, expires_at, used_at, revoked_at, family_created_at"
+                "SELECT email, family_id, client_id, expires_at, used_at, revoked_at, family_created_at, resource"
                 " FROM oauth_refresh WHERE value_hash = ?",
                 (_hash(refresh_token),),
             ).fetchone()
@@ -343,11 +350,13 @@ class OAuthStore:
             # A row without family_created_at (written before S1b) has no known age: fail closed.
             family_created_at = row["family_created_at"]
             if (row["expires_at"] <= now or family_created_at is None
-                    or now >= family_created_at + FAMILY_MAX_AGE_SECONDS or not roles.is_full(row["email"])):
+                    or now >= family_created_at + FAMILY_MAX_AGE_SECONDS
+                    or (resource is not None and row["resource"] != resource) or not roles.is_full(row["email"])):
                 conn.execute("ROLLBACK")
                 return None
             conn.execute("UPDATE oauth_refresh SET used_at = ? WHERE value_hash = ?", (now, _hash(refresh_token)))
-            pair = self._issue_pair(conn, row["email"], client_id, row["family_id"], now, family_created_at)
+            pair = self._issue_pair(conn, row["email"], client_id, row["family_id"], now, family_created_at,
+                                    resource=row["resource"])
             conn.execute("COMMIT")
         return pair
 

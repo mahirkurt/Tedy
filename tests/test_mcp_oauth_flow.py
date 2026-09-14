@@ -778,3 +778,58 @@ def test_identical_authorizations_in_the_same_second_are_independent(ctx):
         page = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)})
         assert page.status_code == 200, page.text
         assert _consent_state(page)
+
+
+# -- S1b / R1: audience binding to this server's canonical resource ------------------------------
+
+CANONICAL_RESOURCE = f"{BASE}/mcp"
+
+
+def _db_values(tmp_path, sql):
+    import sqlite3
+
+    with sqlite3.connect(tmp_path / "oauth.sqlite3") as conn:
+        return {row[0] for row in conn.execute(sql)}
+
+
+@pytest.mark.parametrize("resource", ["https://evil.example/other-rs", BASE, f"{BASE}/mcp/", f"{BASE}/MCP", ""])
+def test_authorize_refuses_a_resource_other_than_the_one_prm_advertises(ctx, resource):
+    client, _, _, _, client_id = ctx
+    r = client.get("/oauth/authorize", params=_authorize_params(client_id, resource=resource))
+    assert r.status_code == 400
+    assert "invalid_target" in r.text
+    assert "location" not in r.headers and "form_state" not in r.text
+
+
+def test_canonical_resource_is_bound_to_the_code_and_the_tokens(ctx, tmp_path):
+    client, verifier, _, _, client_id = ctx
+    assert client.get("/.well-known/oauth-protected-resource").json()["resource"] == CANONICAL_RESOURCE
+    code = _code_for(client, verifier, client_id, resource=CANONICAL_RESOURCE)
+    assert _db_values(tmp_path, "SELECT resource FROM oauth_code") == {CANONICAL_RESOURCE}
+    tok = _redeem(client, client_id, code, resource=CANONICAL_RESOURCE)
+    assert tok.status_code == 200
+    assert _db_values(tmp_path, "SELECT resource FROM oauth_access") == {CANONICAL_RESOURCE}
+    assert _db_values(tmp_path, "SELECT resource FROM oauth_refresh") == {CANONICAL_RESOURCE}
+
+
+def test_a_code_requested_without_resource_is_still_bound_to_this_server(ctx, tmp_path):
+    client, verifier, _, _, client_id = ctx
+    code = _code_for(client, verifier, client_id)
+    assert _db_values(tmp_path, "SELECT resource FROM oauth_code") == {CANONICAL_RESOURCE}
+    assert _redeem(client, client_id, code, resource=CANONICAL_RESOURCE).status_code == 200
+
+
+def test_token_endpoint_refuses_a_foreign_resource_without_consuming_anything(ctx):
+    client, verifier, _, _, client_id = ctx
+    code = _code_for(client, verifier, client_id, resource=CANONICAL_RESOURCE)
+    for foreign in ["https://evil.example/other-rs", ""]:
+        bad = _redeem(client, client_id, code, resource=foreign)
+        assert bad.status_code == 400
+        assert bad.json() == {"error": "invalid_target"}
+    good = _redeem(client, client_id, code)  # the code's own binding applies when resource is omitted
+    assert good.status_code == 200
+    refresh = {"grant_type": "refresh_token", "client_id": client_id, "refresh_token": good.json()["refresh_token"]}
+    foreign = client.post("/oauth/token", data={**refresh, "resource": "https://evil.example/other-rs"})
+    assert foreign.status_code == 400
+    assert foreign.json() == {"error": "invalid_target"}
+    assert client.post("/oauth/token", data={**refresh, "resource": CANONICAL_RESOURCE}).status_code == 200
