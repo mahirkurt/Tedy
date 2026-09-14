@@ -294,3 +294,133 @@ def test_without_timeout_every_post_uses_the_client_timeout_and_no_clock(monkeyp
     assert c.call_tool("t", {}).ok is True
     assert len(session.posts) == 6
     assert {p["timeout"] for p in session.posts} == {25.0}
+
+
+# -- SP2 residual B: the shared session-bootstrap critical section is synchronized --------------
+
+import threading  # noqa: E402
+
+
+def test_concurrent_cold_start_initializes_exactly_once():
+    """Two tool threads racing a cold client must not both run _initialize: only one
+    'initialize' and one 'notifications/initialized' reach the transport, and both callers'
+    tools/call posts carry the single session id that one initialize established — never a call
+    going out under another thread's half-initialized session."""
+    entered_init = threading.Event()
+    release_init = threading.Event()
+    calls_lock = threading.Lock()
+    calls: list[tuple[str, str | None]] = []  # (method, session-id header)
+
+    class _GatedSession:
+        def post(self, url, headers=None, data=None, timeout=None):
+            body = json.loads(data)
+            method = body.get("method")
+            with calls_lock:
+                calls.append((method, (headers or {}).get("mcp-session-id")))
+            if method == "initialize":
+                entered_init.set()
+                release_init.wait(5)  # generous safety timeout; the test below sets this itself
+                return _init_resp("sid-shared")
+            if method == "notifications/initialized":
+                return _Resp("", headers={})
+            return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
+                                     "result": {"content": [{"type": "text", "text": f"ok-{body.get('id')}"}]}}))
+
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=_GatedSession())
+    results = {}
+
+    def call(slot):
+        results[slot] = c.call_tool("t", {})
+
+    t1 = threading.Thread(target=call, args=(1,))
+    t1.start()
+    assert entered_init.wait(5), "thread 1 never reached initialize"
+
+    # Guaranteed at this point: thread 1 is blocked *inside* the transport's "initialize" post
+    # (release_init is still unset), so c._sid is still None — thread 2 necessarily observes a
+    # cold session too and must contend for the same lock, exercising the race this fix closes.
+    t2 = threading.Thread(target=call, args=(2,))
+    t2.start()
+
+    release_init.set()
+    t1.join(5)
+    t2.join(5)
+    assert not t1.is_alive() and not t2.is_alive()
+
+    methods = [m for m, _ in calls]
+    assert methods.count("initialize") == 1
+    assert methods.count("notifications/initialized") == 1
+    tool_call_sids = [sid for m, sid in calls if m == "tools/call"]
+    assert tool_call_sids == ["sid-shared", "sid-shared"]
+    assert results[1].ok and results[2].ok
+    assert c._sid == "sid-shared"
+
+
+def test_deadline_expiring_while_waiting_for_the_session_lock_times_out_without_posting(monkeypatch):
+    """A call whose deadline elapses while blocked on the session lock — held elsewhere by a
+    slow cold-start init — must fail the same way an exhausted budget already does for a slow
+    HTTP round trip: ok=False, error='timeout', with no post of its own."""
+    monkeypatch.setattr(mcp_client, "_monotonic", lambda: 0.0)
+    session = _FakeSession([])
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=session)
+    holder_grabbed = threading.Event()
+    holder_release = threading.Event()
+
+    def hold_lock():
+        c._lock.acquire()
+        holder_grabbed.set()
+        holder_release.wait(5)
+        c._lock.release()
+
+    holder = threading.Thread(target=hold_lock)
+    holder.start()
+    assert holder_grabbed.wait(5), "holder thread never grabbed the session lock"
+
+    out = c.call_tool("t", {}, timeout=0.1)
+
+    assert out.ok is False and out.error == "timeout"
+    assert session.requests == []  # the deadline elapsed waiting for the lock itself; no post at all
+
+    holder_release.set()
+    holder.join(5)
+    assert not holder.is_alive()
+
+
+def test_stale_session_error_reset_does_not_clear_a_newer_session_id():
+    """A session-error reply for the OLD session id — arriving after another thread has already
+    re-established a NEWER one — must not wipe that newer session out from under it (Ruling B):
+    the reset only clears self._sid when it still equals the id THIS call actually used."""
+
+    class _RaceSession(_FakeSession):
+        def __init__(self, responses, client):
+            super().__init__(responses)
+            self._client = client
+            self._raced = False
+
+        def post(self, url, headers=None, data=None, timeout=None):
+            resp = super().post(url, headers=headers, data=data, timeout=timeout)
+            body = json.loads(data)
+            if not self._raced and body.get("method") == "tools/call":
+                # Simulate another thread concurrently finishing its own re-initialize right
+                # after this call's request went out under the old (about to fail) session.
+                self._raced = True
+                self._client._sid = "sid-new-from-another-thread"
+            return resp
+
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=None)
+    session = _RaceSession([
+        _init_resp("sid-old"),
+        _Resp(json.dumps({"jsonrpc": "2.0", "id": 3, "error": {"code": -32001, "message": "session not found"}})),
+        _Resp(json.dumps({"jsonrpc": "2.0", "id": 4, "result": {"content": [{"type": "text", "text": "ok"}]}})),
+    ], c)
+    c._session = session
+
+    out = c.call_tool("t", {})
+
+    assert out.ok is True and out.text == "ok"
+    # The stale reset never fired: the session id preserved through the whole retry is the NEWER
+    # one another thread established while this call's error was in flight, not None.
+    assert c._sid == "sid-new-from-another-thread"
+    tool_call_requests = [r for r in session.requests if r["body"]["method"] == "tools/call"]
+    assert [r["headers"].get("mcp-session-id") for r in tool_call_requests] == \
+        ["sid-old", "sid-new-from-another-thread"]

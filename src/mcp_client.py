@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -53,6 +54,10 @@ class McpClient:
         self._tools: list[dict[str, Any]] | None = None
         self._healthy = True
         self._rpc_id = 0
+        # One client per fleet server is shared by up to 16 concurrent tool threads (Ruling B):
+        # this lock serializes only the cold-start/expiry _initialize race between them, never
+        # the tools/call post itself.
+        self._lock = threading.Lock()
 
     @property
     def healthy(self) -> bool:
@@ -106,6 +111,14 @@ class McpClient:
         return {}
 
     def _next_id(self) -> int:
+        """Thread-safe RPC id counter (Ruling B): every public call path acquires the lock
+        itself. _initialize does not — it always runs already inside _ensure_session's critical
+        section, and self._lock is a plain (non-reentrant) Lock — so it uses _next_id_locked."""
+        with self._lock:
+            return self._next_id_locked()
+
+    def _next_id_locked(self) -> int:
+        """Same counter for a caller that already holds self._lock; see _next_id."""
         self._rpc_id += 1
         return self._rpc_id
 
@@ -114,10 +127,32 @@ class McpClient:
     def _session_expired(self) -> bool:
         return (not self._sid) or (time.time() - self._sid_at > SESSION_TTL_SECONDS)
 
+    def _ensure_session(self, deadline: float | None) -> None:
+        """Double-checked critical section (Ruling B): concurrent tool threads sharing this
+        client serialize only the cold-start/expiry _initialize race through this lock — never
+        the tools/call post itself, which always runs unlocked. A deadline bounds the wait for
+        the lock exactly like it already bounds every HTTP round trip in _post: failing to
+        acquire it in time is the same budget exhaustion a slow response would raise.
+        """
+        if not self._session_expired():
+            return
+        if deadline is None:
+            self._lock.acquire()
+        else:
+            remaining = deadline - _monotonic()
+            if not self._lock.acquire(timeout=max(0.0, remaining)):
+                raise _BudgetExhausted()
+        try:
+            if self._session_expired():
+                self._initialize(deadline)
+        finally:
+            self._lock.release()
+
     def _initialize(self, deadline: float | None = None) -> None:
+        """Always invoked with self._lock already held (_ensure_session)."""
         self._sid = None
         self._post({
-            "jsonrpc": "2.0", "id": self._next_id(), "method": "initialize",
+            "jsonrpc": "2.0", "id": self._next_id_locked(), "method": "initialize",
             "params": {
                 "protocolVersion": self.PROTOCOL_VERSION,
                 "capabilities": {},
@@ -137,19 +172,28 @@ class McpClient:
         return "session" in str(err.get("message", "")).lower()
 
     def _rpc(self, method: str, params: dict[str, Any], deadline: float | None = None) -> dict[str, Any]:
-        """One JSON-RPC round trip, re-initialising once if the session died."""
+        """One JSON-RPC round trip, re-initialising once if the session died.
+
+        _ensure_session serializes only session bootstrap between tool threads sharing this
+        client (Ruling B); the post below and its response decoding always run unlocked, so
+        calls on an already-live session are never serialized against each other.
+        """
         for attempt in (1, 2):
-            if self._session_expired():
-                self._initialize(deadline)
+            self._ensure_session(deadline)
+            sid_used = self._sid
             rpc = self._post({
                 "jsonrpc": "2.0", "id": self._next_id(),
                 "method": method, "params": params,
             }, deadline)
             if not self._is_session_error(rpc):
                 return rpc
-            # Server forgot us. Re-initialise and replay — but only once, so a
-            # server that always rejects cannot spin here.
-            self._sid = None
+            # Server forgot us. Re-initialise and replay — but only once, so a server that
+            # always rejects cannot spin here. Only clear the session id THIS call actually
+            # used: another thread may already have re-established (and be using) a newer one
+            # by the time we get here, and wiping that out from under it would be its own race.
+            with self._lock:
+                if self._sid == sid_used:
+                    self._sid = None
             if attempt == 2:
                 self._healthy = False
                 return rpc
