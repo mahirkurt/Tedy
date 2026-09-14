@@ -1,5 +1,7 @@
 """FastMCP server wiring: identity-aware edupedia_durum, version single source, env entry."""
 import json
+import threading
+import time
 
 import pytest
 from starlette.testclient import TestClient
@@ -125,3 +127,59 @@ def test_rehber_tool_is_registered_and_returns_akis(tmp_path):
                              headers={**MCP_HEADERS, "authorization": f"Bearer {key}"}))
     body = json.loads(r["result"]["content"][0]["text"])
     assert body["bolum"] == "akis" and body["status"] == "ok"
+
+
+def test_slow_tool_does_not_block_concurrent_requests(tmp_path):
+    """One slow tool call must not freeze the event loop for other concurrent requests.
+
+    Regression guard for the fix that runs each tool body in a worker thread
+    (anyio.to_thread.run_sync) instead of calling it directly on the event loop.
+    """
+    entered = threading.Event()
+    release = threading.Event()
+
+    class BlockingTools(tools.Tools):
+        def durum(self, email, canli=False):
+            entered.set()
+            release.wait(10)  # generous safety timeout; normally cleared by the main thread below
+            return super().durum(email, canli=canli)
+
+    settings = _settings(tmp_path)
+    store = OAuthStore(tmp_path / "o.sqlite3")
+    key = store.create_static_key("t", FULL)
+    mcp = server.build_server(BlockingTools(settings, FakeFederation()))
+    app = http_app.build_app(settings, store, mcp, form_secret=b"s" * 32)
+    auth = {**MCP_HEADERS, "authorization": f"Bearer {key}"}
+
+    durum_result: dict = {}
+
+    with TestClient(app, base_url=BASE) as c:
+
+        def call_durum():
+            durum_result["body"] = _sse_json(c.post("/mcp", json={
+                "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": "edupedia_durum", "arguments": {}}}, headers=auth))
+
+        thread = threading.Thread(target=call_durum, daemon=True)
+        thread.start()
+        assert entered.wait(5), "durum call never entered its blocking section"
+
+        start = time.monotonic()
+        rehber_raw = _sse_json(c.post("/mcp", json={
+            "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+            "params": {"name": "edupedia_rehber", "arguments": {"bolum": "akis"}}}, headers=auth))
+        elapsed = time.monotonic() - start
+
+        rehber_body = json.loads(rehber_raw["result"]["content"][0]["text"])
+        # The durum call must still be blocked (release not yet set) when rehber returns,
+        # and it must have returned fast rather than waiting out durum's 10s safety timeout.
+        assert not release.is_set()
+        assert elapsed < 5, f"edupedia_rehber took {elapsed:.1f}s — event loop was blocked by edupedia_durum"
+        assert rehber_body["status"] == "ok"
+
+        release.set()
+        thread.join(timeout=10)
+        assert not thread.is_alive(), "durum call thread did not finish after release"
+
+    durum_body = json.loads(durum_result["body"]["result"]["content"][0]["text"])
+    assert durum_body["status"] == "ok"

@@ -1,8 +1,10 @@
 """FastMCP registration for ted-mcp. Tool bodies live in tools.Tools."""
 from __future__ import annotations
 
+import functools
 from typing import Any
 
+import anyio
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
@@ -43,22 +45,24 @@ def build_server(tools: Tools) -> FastMCP:
     mcp._mcp_server.version = __version__
 
     @mcp.tool(annotations=_RO)
-    def edupedia_durum(ctx: Context, canli: bool = False) -> dict[str, Any]:
+    async def edupedia_durum(ctx: Context, canli: bool = False) -> dict[str, Any]:
         """Sunucu sürümü, kullanıcı, kapı sayısı ve filo yapılandırması. canli=true filo sağlığını yoklar."""
-        return tools.durum(caller_email(ctx), canli=canli)
+        email = caller_email(ctx)
+        return await anyio.to_thread.run_sync(functools.partial(tools.durum, email, canli=canli))
 
     @mcp.tool(annotations=_RO)
-    def edupedia_rehber(ctx: Context, bolum: str | None = None, parca: int = 1, ara: str | None = None) -> dict[str, Any]:
+    async def edupedia_rehber(ctx: Context, bolum: str | None = None, parca: int = 1, ara: str | None = None) -> dict[str, Any]:
         """edupedia üretim rehberi. bolum: akis, modlar, segmentler, etkilesim, pedagoji, carbon, svg, ses,
         mufredat, soru, sinav, zenginlestirme, kalite. Uzun bölümler parca ile gezilir; ara serbest metin arar.
         Her üretime edupedia_rehber('akis') ile başla."""
         caller_email(ctx)
-        return tools.rehber(bolum=bolum, parca=parca, ara=ara)
+        return await anyio.to_thread.run_sync(functools.partial(tools.rehber, bolum=bolum, parca=parca, ara=ara))
 
     @mcp.tool(annotations=_RO)
-    def edupedia_baglam(ctx: Context, gun: int = 7) -> dict[str, Any]:
+    async def edupedia_baglam(ctx: Context, gun: int = 7) -> dict[str, Any]:
         """TEDY'den önümüzdeki gün sayısı (1-60) içindeki sınav ve ödevleri, sınıf düzeyini döner.
         Öğrenci adı ve kişisel alanlar dönmez. Konu seçerken bu listeyi kullan."""
-        return tools.baglam(caller_email(ctx), gun=gun)
+        email = caller_email(ctx)
+        return await anyio.to_thread.run_sync(functools.partial(tools.baglam, email, gun=gun))
 
     return mcp
