@@ -463,3 +463,72 @@ def test_fleet_error_text_never_reaches_manual_required_neden(tmp_path):
     assert body["status"] == "manual_required"
     assert body["neden"] == "tool_error" and body["coverage"] == {"maarif-mufredat": "degraded:tool_error"}
     _assert_no_fleet_text(body)
+
+
+# --- SP2 residual C: fleet-supplied int() fields never leak through exception text (§6.3) ------
+
+@pytest.mark.parametrize("value", [INJECTION, None])
+def test_malformed_document_id_becomes_unexpected_shape_not_an_exception(tmp_path, value):
+    """document_id (~267) is read straight from the chosen book, unprotected by any earlier
+    filter: a fleet value int() cannot parse — or an absent one (the required-field None case)
+    — must degrade the maarif-mufredat step honestly, never raise an exception carrying it."""
+    books = [{"document_id": value, "title": "Fen Bilimleri 5", "page_count": 240}]
+    fed = FakeFed(_responses({("maarif-mufredat", "list_textbooks"): books}))
+    body, runs = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    # Presence check first (surface rendered): the malformed-shape fallback actually fired —
+    # only then check the fleet text never leaked anywhere in the output.
+    assert body["cerceve"]["kind"] is None
+    assert "list_textbooks" in body["cerceve"]["not"]
+    assert body["coverage"]["maarif-mufredat"] == "degraded:unexpected_shape"
+    assert not fed.called("maarif-mufredat", "search_figures")
+    assert not fed.called("maarif-mufredat", "get_document_text")
+    _assert_no_fleet_text(body)
+    _assert_no_fleet_text(runs.load(body["run_id"]))
+
+
+def test_malformed_page_no_becomes_unexpected_shape_not_an_exception(tmp_path):
+    """page_no (~288) comes from a later, separate get_document_text call — independent of the
+    list_textbooks candidate filter — so a malformed value there must degrade the same way."""
+    text = {"document": {"document_id": 197}, "total_pages": 240, "returned": 1, "truncated": False,
+            "pages": [{"page_no": INJECTION, "text": "sayfa metni"}]}
+    fed = FakeFed(_responses({("maarif-mufredat", "get_document_text"): text}))
+    body, _ = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    assert body["cerceve"]["kind"] is None
+    assert "get_document_text" in body["cerceve"]["not"]
+    assert body["coverage"]["maarif-mufredat"] == "degraded:unexpected_shape"
+    _assert_no_fleet_text(body)
+
+
+def test_malformed_candidate_page_count_excludes_only_that_row_valid_book_still_chosen(tmp_path):
+    """The candidate filter (~261) excludes a row whose page_count int() cannot parse instead of
+    raising; a valid row among the malformed ones is still framed normally (coverage: hit)."""
+    books = [
+        {"document_id": 196, "title": "bozuk", "page_count": INJECTION},
+        {"document_id": 197, "title": "Fen Bilimleri 5", "page_count": 240},
+    ]
+    fed = FakeFed(_responses({("maarif-mufredat", "list_textbooks"): books}))
+    body, _ = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    assert body["cerceve"]["kind"] == "textbook"
+    assert body["cerceve"]["document_id"] == 197
+    assert body["coverage"]["maarif-mufredat"] == "hit"
+    _assert_no_fleet_text(body)
+
+
+def test_fleet_int_raises_manual_required_unexpected_shape_for_a_bad_value():
+    """Direct unit test of the conversion helper's raising branch. document_id and page_no reach
+    this branch live through build() (tests above); page_count at the ~279 'chosen book' site
+    cannot in practice reach it, because the candidate filter (~261) already excludes any row
+    whose page_count fails this exact same conversion before that row can become the chosen book
+    — this direct call proves the ~279 call site still degrades safely (never an uncaught
+    exception carrying the fleet value), independent of that filter."""
+    with pytest.raises(kapsam.KapsamError) as exc_info:
+        kapsam._fleet_int(INJECTION, server="maarif-mufredat", tool="list_textbooks")
+    assert exc_info.value.status == "manual_required"
+    assert exc_info.value.detay == {"sunucu": "maarif-mufredat", "arac": "list_textbooks", "neden": "unexpected_shape"}
+    assert INJECTION not in str(exc_info.value.detay)

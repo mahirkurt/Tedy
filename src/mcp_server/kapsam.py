@@ -33,6 +33,20 @@ class KapsamError(Exception):
         self.detay = detay
 
 
+def _fleet_int(value: Any, *, server: str | None = None, tool: str | None = None) -> int | None:
+    """int() a fleet-supplied field without ever letting a bad value reach an exception's own
+    message (§6.3: fleet text must never carry instructions back to the model). Without
+    server/tool the caller treats a bad value as absent (returns None); with them, a bad value
+    raises the same KapsamError('manual_required', neden='unexpected_shape') a genuine
+    FederationError('unexpected_shape') from that step would produce."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        if server is None:
+            return None
+        raise KapsamError("manual_required", sunucu=server, arac=tool, neden="unexpected_shape") from None
+
+
 def _fold(text: str) -> str:
     return text.replace("I", "ı").replace("İ", "i").lower().strip()
 
@@ -258,13 +272,17 @@ class KapsamBuilder:
                deadline: float) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
         books = [b for b in _mufredat(self.federation, "list_textbooks", {"subject": slug, "grade": grade, "limit": 20},
                                       "liste", deadline)
-                 if int(b.get("page_count") or 0) > 0]
+                 # A row whose page_count is not an integer-convertible value is not eligible,
+                 # never raises (§6.3 Ruling C): _fleet_int(...) or 0 keeps None/0/negative
+                 # values excluded exactly like the original `int(... or 0) > 0` did for a
+                 # genuinely missing or zero page_count.
+                 if (_fleet_int(b.get("page_count")) or 0) > 0]
         if not books:
             doc = kazanimlar[0]["document_id"] if kazanimlar else None
             return ({"kind": "program", "document_id": doc, "title": None, "sayfalar": None,
                      "not": "Bu ders ve sınıf için tam metinli ders kitabı yok; çerçeve öğretim programıdır."}, [], [])
         book = books[0]
-        doc_id = int(book["document_id"])
+        doc_id = _fleet_int(book.get("document_id"), server=MUFREDAT, tool="list_textbooks")
         found = _mufredat(self.federation, "search_figures",
                           {"query": query, "subject": slug, "grade": grade, "document_id": doc_id, "limit": 12},
                           "nesne", deadline)
@@ -276,7 +294,8 @@ class KapsamBuilder:
             cerceve["not"] = "Figür aramasında sayfa isabeti yok; sayfa penceresi seçilmedi, kitapta konuyu elle doğrula."
             return cerceve, [], figures
         first = max(1, figs[0]["page_no"] - 1)
-        last = min(int(book["page_count"]), first + PAGE_WINDOW - 1)
+        page_count = _fleet_int(book.get("page_count"), server=MUFREDAT, tool="list_textbooks")
+        last = min(page_count, first + PAGE_WINDOW - 1)
         text = _mufredat(self.federation, "get_document_text",
                          {"document_id": doc_id, "page_range": f"{first}-{last}", "max_chars": 60000}, "nesne", deadline)
         if text.get("error"):
@@ -285,7 +304,8 @@ class KapsamBuilder:
             return cerceve, [], figures
         pages = [p for p in text.get("pages") or [] if isinstance(p, dict)]
         for p in pages:
-            self.runs.save_page(run_id, doc_id, int(p["page_no"]), p.get("text") or "")
+            page_no = _fleet_int(p.get("page_no"), server=MUFREDAT, tool="get_document_text")
+            self.runs.save_page(run_id, doc_id, page_no, p.get("text") or "")
         cerceve["sayfalar"] = f"{first}-{last}"
         return cerceve, pages, figures
 

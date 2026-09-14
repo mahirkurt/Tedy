@@ -10,7 +10,8 @@ from src.mcp_server import __version__, gates, rehber, vendor_sync
 from src.mcp_server.config import Settings
 from src.mcp_server.coverage import Coverage
 from src.mcp_server.dashboard_context import DashboardContext, DashboardUnavailable
-from src.mcp_server.federation import ANAMNESIS, EGITIM_KAYNAK, MUFREDAT, Federation, FederationError
+from src.mcp_server.federation import (ANAMNESIS, EGITIM_KAYNAK, MUFREDAT, TOOL_BUDGET_SECONDS, Federation,
+                                       FederationError)
 from src.mcp_server.kapsam import KapsamBuilder
 from src.mcp_server.kaynak_oku import KaynakOkuyucu, wrap_kaynak_verisi
 from src.mcp_server.runs import RunStore
@@ -36,12 +37,14 @@ def app_revision(root: Path = PROJECT_ROOT) -> str | None:
 
 class Tools:
     def __init__(self, settings: Settings, federation: Federation, clock: Callable[[], float] = time.time,
-                 dashboard: DashboardContext | None = None, runs: RunStore | None = None) -> None:
+                 dashboard: DashboardContext | None = None, runs: RunStore | None = None,
+                 monotonic: Callable[[], float] = time.monotonic) -> None:
         self.settings = settings
         self.federation = federation
         self.clock = clock
         self.dashboard = dashboard
         self.runs = runs if runs is not None else RunStore(settings.data_dir)
+        self.monotonic = monotonic  # spec §7 budget for the canli=True live probe
 
     def durum(self, email: str, canli: bool = False) -> dict[str, Any]:
         provenance = vendor_sync.load_provenance()
@@ -67,13 +70,18 @@ class Tools:
         }
         if canli:
             cov = Coverage()
+            # Spec §7: one 60s tool budget fixed once at entry and shared by every fleet health
+            # call, same as KapsamBuilder/KaynakOkuyucu — a server the remaining budget can no
+            # longer cover is never called at all and reports degraded:zaman_asimi via the same
+            # FederationError handling below (Federation.call raises it, nothing new here).
+            deadline = self.monotonic() + TOOL_BUDGET_SECONDS
             for name in self.settings.servers:
                 if not self.federation.configured(name):
                     cov.skipped(name, "anahtar yok")
                     continue
                 tool, args = _HEALTH_CALLS[name]
                 try:
-                    self.federation.call(name, tool, args, beklenen="nesne")
+                    self.federation.call(name, tool, args, beklenen="nesne", deadline=deadline)
                     cov.hit(name)
                 except FederationError as exc:
                     cov.degraded(name, exc.reason)

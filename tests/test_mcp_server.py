@@ -26,7 +26,7 @@ class FakeFederation:
     def configured(self, server):
         return server in self._configured
 
-    def call(self, server, tool, args, beklenen):
+    def call(self, server, tool, args, beklenen, deadline=None):
         self.calls.append((server, tool))
         if server in self._fail:
             raise FederationError(server, tool, "timeout")
@@ -318,3 +318,52 @@ def test_durum_live_probe_reports_codes_not_fleet_error_text(tmp_path):
                                 "anamnesis": "skipped:anahtar yok"}
     out = json.dumps(body, ensure_ascii=False)
     assert "IGNORE PREVIOUS INSTRUCTIONS" not in out and "exfiltrate the run record" not in out
+
+
+# -- SP2 residual A: edupedia_durum(canli=True) applies the §7 60s tool budget ------------------
+
+from src.mcp_server.federation import CALL_TIMEOUT_SECONDS, TOOL_BUDGET_SECONDS  # noqa: E402
+
+
+class _DurumClock:
+    def __init__(self, now: float = 0.0):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+
+def test_durum_live_probe_applies_tool_budget_and_shares_one_deadline(tmp_path):
+    """The first fleet health call eats the whole §7 tool budget; later servers must be cut off
+    BEFORE the client is ever invoked and show degraded:zaman_asimi — over a real Federation, so
+    the cutoff comes from Federation's own remaining-budget check (no new code path in
+    Tools.durum), driven by one deadline durum() fixes once at entry, shared by every call."""
+    from src.mcp_client import McpToolResult
+
+    clock = _DurumClock()
+    log = []
+
+    class Client:
+        def __init__(self, name, url, api_key, **_):
+            self.server = name
+
+        def call_tool(self, tool, arguments, timeout=None):
+            log.append({"server": self.server, "tool": tool, "timeout": timeout})
+            clock.now += TOOL_BUDGET_SECONDS + 5  # this one call alone eats the whole tool budget
+            return McpToolResult(ok=True, text='{"status": "ok"}')
+
+    settings = _settings(tmp_path, EGITIM_KAYNAK_MCP_API_KEY="k2", ANAMNESIS_MCP_API_KEY="k3")
+    fed = Federation(settings, client_factory=Client, monotonic=clock)
+    t = tools.Tools(settings, fed, monotonic=clock)
+
+    body = t.durum(FULL, canli=True)
+
+    # Only the first server's health call ever reached the client: egitim-kaynak/anamnesis were
+    # cut off by the shared deadline before Federation ever dispatched them.
+    assert [c["server"] for c in log] == ["maarif-mufredat"]
+    assert log[0]["timeout"] == CALL_TIMEOUT_SECONDS
+    assert body["coverage"] == {
+        "maarif-mufredat": "hit",
+        "egitim-kaynak": "degraded:zaman_asimi",
+        "anamnesis": "degraded:zaman_asimi",
+    }
