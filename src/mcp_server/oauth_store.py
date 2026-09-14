@@ -89,7 +89,11 @@ class OAuthStore:
         with self._connect() as conn:
             # WAL is a property of the database file: set once, every later connection inherits it.
             # Readers then never block the writer (or the reverse), e.g. the keys CLI vs the server.
-            conn.execute("PRAGMA journal_mode=WAL")
+            mode = str(conn.execute("PRAGMA journal_mode=WAL").fetchone()[0]).lower()
+            # SQLite answers with the mode it actually kept (e.g. "delete" on a filesystem without
+            # shared memory); silently staying in rollback mode would bring back reader/writer stalls.
+            if mode != "wal" and not (mode == "memory" and str(self._path) == ":memory:"):
+                raise RuntimeError(f"OAuth store could not enable WAL: journal_mode={mode!r}")
             conn.executescript(_SCHEMA)
 
     @contextlib.contextmanager

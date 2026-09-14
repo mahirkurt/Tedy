@@ -200,3 +200,34 @@ def test_wal_side_files_are_private(tmp_path, store):
         for suffix in ("-wal", "-shm"):
             side = path.with_name(path.name + suffix)
             assert stat.S_IMODE(side.stat().st_mode) == 0o600, suffix
+
+
+# -- S1b / T5: the store refuses to run outside WAL ------------------------------------------
+
+@pytest.mark.parametrize("reported", ["delete", "memory", "truncate"])
+def test_store_refuses_to_open_when_wal_cannot_be_enabled(tmp_path, monkeypatch, reported):
+    class JournalModeStuck(sqlite3.Connection):
+        def execute(self, sql, *args):
+            if sql.replace(" ", "").upper() == "PRAGMAJOURNAL_MODE=WAL":
+                return super().execute("SELECT ?", (reported,))
+            return super().execute(sql, *args)
+
+    real_connect = sqlite3.connect
+    monkeypatch.setattr(oauth_store.sqlite3, "connect",
+                        lambda *args, **kwargs: real_connect(*args, factory=JournalModeStuck, **kwargs))
+    with pytest.raises(RuntimeError, match="journal_mode"):
+        OAuthStore(tmp_path / "oauth.sqlite3")
+
+
+def test_store_accepts_wal_case_insensitively(tmp_path, monkeypatch):
+    class UpperCaseWal(sqlite3.Connection):
+        def execute(self, sql, *args):
+            if sql.replace(" ", "").upper() == "PRAGMAJOURNAL_MODE=WAL":
+                super().execute(sql, *args)
+                return super().execute("SELECT 'WAL'")
+            return super().execute(sql, *args)
+
+    real_connect = sqlite3.connect
+    monkeypatch.setattr(oauth_store.sqlite3, "connect",
+                        lambda *args, **kwargs: real_connect(*args, factory=UpperCaseWal, **kwargs))
+    OAuthStore(tmp_path / "oauth.sqlite3")
