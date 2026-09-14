@@ -65,4 +65,14 @@ def build_server(tools: Tools) -> FastMCP:
         email = caller_email(ctx)
         return await anyio.to_thread.run_sync(functools.partial(tools.baglam, email, gun=gun))
 
+    @mcp.tool(annotations=_RO)
+    async def edupedia_kapsam(ctx: Context, ders: str, sinif: str, konu: str | None = None,
+                              kazanim_kodu: str | None = None) -> dict[str, Any]:
+        """Ders + sınıf + (konu veya kazanım kodu) için müfredatı doğrular; ders kitabı çerçevesini, sayfa özetlerini,
+        figür adaylarını ve açık kaynak özetini döner. Sınıf ve ders koddan tahmin edilmez; otorite müfredattır.
+        Modül üretiminden önce ZORUNLU; dönen run_id sonraki araçlara verilir."""
+        email = caller_email(ctx)
+        return await anyio.to_thread.run_sync(
+            functools.partial(tools.kapsam, email, ders=ders, sinif=sinif, konu=konu, kazanim_kodu=kazanim_kodu))
+
     return mcp

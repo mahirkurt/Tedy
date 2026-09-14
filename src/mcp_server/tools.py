@@ -11,6 +11,8 @@ from src.mcp_server.config import Settings
 from src.mcp_server.coverage import Coverage
 from src.mcp_server.dashboard_context import DashboardContext, DashboardUnavailable
 from src.mcp_server.federation import ANAMNESIS, EGITIM_KAYNAK, MUFREDAT, Federation, FederationError
+from src.mcp_server.kapsam import KapsamBuilder
+from src.mcp_server.runs import RunStore
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -33,11 +35,12 @@ def app_revision(root: Path = PROJECT_ROOT) -> str | None:
 
 class Tools:
     def __init__(self, settings: Settings, federation: Federation, clock: Callable[[], float] = time.time,
-                 dashboard: DashboardContext | None = None) -> None:
+                 dashboard: DashboardContext | None = None, runs: RunStore | None = None) -> None:
         self.settings = settings
         self.federation = federation
         self.clock = clock
         self.dashboard = dashboard
+        self.runs = runs if runs is not None else RunStore(settings.data_dir)
 
     def durum(self, email: str, canli: bool = False) -> dict[str, Any]:
         provenance = vendor_sync.load_provenance()
@@ -103,3 +106,7 @@ class Tools:
         else:
             cov.empty("tedy-dashboard")
         return {**base, "status": "ok", **data, "coverage": cov.as_dict()}
+
+    def kapsam(self, email: str, ders: str, sinif: str, konu: str | None = None,
+               kazanim_kodu: str | None = None) -> dict[str, Any]:
+        return KapsamBuilder(self.federation, self.runs, self.clock).build(email, ders, sinif, konu, kazanim_kodu)
