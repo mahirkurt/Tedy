@@ -1,0 +1,461 @@
+{
+  "meta": {
+    "id": "maddenin-halleri-su-dongusu-demo",
+    "title": "Maddenin Hâlleri ve Su Döngüsü",
+    "subject": "Fen Bilimleri",
+    "gradeLevel": "5. Sınıf",
+    "mode": "MODULE",
+    "accent": "#009d9a",
+    "estimatedMinutes": 24,
+    "coverPictogram": "pic-microscope",
+    "sourceCitation": "carbon-edupedia sentetik şablon verisi — dış kaynak kullanılmadı"
+  },
+  "learner": {
+    "name": "",
+    "showTimer": false,
+    "breakReminderMin": 20,
+    "pacingDisk": false
+  },
+  "objectives": [
+    "Maddenin üç hâlini (katı, sıvı, gaz) tanıyacaksın.",
+    "Hâl değişimlerini doğru adlarıyla eşleştireceksin.",
+    "Su döngüsünün aşamalarını sırayla açıklayacaksın."
+  ],
+  "rewards": {
+    "xpPerCorrect": 10,
+    "firstTryBonus": 5,
+    "badges": [
+      {
+        "id": "explorer",
+        "label": "Madde Kâşifi",
+        "icon": "ic-compass",
+        "condition": "module-complete"
+      },
+      {
+        "id": "sharp",
+        "label": "Keskin Göz",
+        "pictogram": "pic-trophy",
+        "condition": "flawless-mcq"
+      }
+    ]
+  },
+  "segments": [
+    {
+      "type": "hook",
+      "id": "h1",
+      "title": "Merak Anı",
+      "pictogram": "pic-idea",
+      "question": "Bir buz küpü güneşte bir süre kalırsa ne olur dersin?",
+      "predict": {
+        "options": [
+          "Katı kalır",
+          "Suya döner (erir)",
+          "Doğrudan gaza dönüşür"
+        ]
+      },
+      "resolvesIn": "t2"
+    },
+    {
+      "type": "teach",
+      "id": "t1",
+      "title": "Maddenin Üç Hâli",
+      "pictogram": "pic-idea",
+      "lead": "Çevremizdeki her şey maddeden oluşur — ve madde üç farklı hâlde karşımıza çıkar.",
+      "body": [
+        "<ul><li><b>Katı:</b> Belirli bir şekli ve hacmi vardır. Tanecikler birbirine çok yakın ve düzenlidir.</li><li><b>Sıvı:</b> Belirli hacmi vardır ama şekli bulunduğu kabı alır. Tanecikler biraz daha gevşektir.</li><li><b>Gaz:</b> Belirli bir şekli ve hacmi yoktur; her yere yayılır. Tanecikler birbirinden uzaktır.</li></ul>"
+      ],
+      "keyTerms": [
+        {
+          "term": "katı",
+          "def": "Şekli ve hacmi belli olan madde hâli."
+        },
+        {
+          "term": "sıvı",
+          "def": "Hacmi belli, şekli bulunduğu kaba göre değişen hâl."
+        },
+        {
+          "term": "gaz",
+          "def": "Şekli ve hacmi belli olmayan, her yere yayılan hâl."
+        }
+      ],
+      "visual": {
+        "kind": "svg",
+        "caption": "Şekil 1 — Maddenin üç hâlinde tanecik düzeni: katıda sıkı ve düzenli, sıvıda gevşek, gazda dağınık.",
+        "ref": "\n<svg viewBox=\"0 0 480 200\" role=\"img\" aria-labelledby=\"v1t v1d\">\n  <title id=\"v1t\">Maddenin üç hâlinde tanecik düzeni</title>\n  <desc id=\"v1d\">Katıda tanecikler sıkı ve düzenli, sıvıda gevşek, gazda dağınıktır.</desc>\n  <g>\n    <rect x=\"20\" y=\"30\" width=\"120\" height=\"120\" rx=\"12\" fill=\"var(--accent-tint)\" stroke=\"var(--accent)\" stroke-width=\"2\"/>\n    <text x=\"80\" y=\"178\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"600\">Katı</text>\n    <circle cx=\"44\" cy=\"54\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"72\" cy=\"54\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"100\" cy=\"54\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"128\" cy=\"54\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"44\" cy=\"82\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"72\" cy=\"82\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"100\" cy=\"82\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"128\" cy=\"82\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"44\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"72\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"100\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"128\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"44\" cy=\"138\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"72\" cy=\"138\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"100\" cy=\"138\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"128\" cy=\"138\" r=\"9\" fill=\"var(--accent)\"/>\n  </g>\n  <g>\n    <rect x=\"180\" y=\"30\" width=\"120\" height=\"120\" rx=\"12\" fill=\"var(--accent-tint)\" stroke=\"var(--accent)\" stroke-width=\"2\"/>\n    <text x=\"240\" y=\"178\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"600\">Sıvı</text>\n    <circle cx=\"200\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"230\" cy=\"120\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"262\" cy=\"108\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"212\" cy=\"80\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"248\" cy=\"86\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"280\" cy=\"118\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"224\" cy=\"98\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"266\" cy=\"76\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"284\" cy=\"90\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"206\" cy=\"134\" r=\"9\" fill=\"var(--accent)\"/>\n  </g>\n  <g>\n    <rect x=\"340\" y=\"30\" width=\"120\" height=\"120\" rx=\"12\" fill=\"var(--accent-tint)\" stroke=\"var(--accent)\" stroke-width=\"2\"/>\n    <text x=\"400\" y=\"178\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"600\">Gaz</text>\n    <circle cx=\"360\" cy=\"60\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"420\" cy=\"52\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"386\" cy=\"96\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"440\" cy=\"90\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"366\" cy=\"130\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"410\" cy=\"128\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"396\" cy=\"72\" r=\"9\" fill=\"var(--accent)\"/>\n  </g>\n</svg>"
+      }
+    },
+    {
+      "type": "flashcards",
+      "id": "fc1",
+      "title": "Kavram Kartları",
+      "pictogram": "pic-idea",
+      "instructions": "Kartı çevir; bildiysen «Biliyorum», emin değilsen «Tekrar et» de.",
+      "cards": [
+        {
+          "front": "Katı",
+          "back": "Şekli ve hacmi belli olan madde hâli.",
+          "hint": "örnek: buz, taş, tahta"
+        },
+        {
+          "front": "Sıvı",
+          "back": "Hacmi belli; şekli bulunduğu kabı alan hâl.",
+          "hint": "örnek: su, süt"
+        },
+        {
+          "front": "Gaz",
+          "back": "Şekli ve hacmi belli olmayan, her yere yayılan hâl.",
+          "hint": "örnek: hava, su buharı"
+        }
+      ]
+    },
+    {
+      "type": "mcq",
+      "id": "q1",
+      "title": "Mini Yarışma",
+      "pictogram": "pic-rocket",
+      "instructions": "Doğru seçeneği işaretle. Yanlışta tekrar deneyebilirsin.",
+      "questions": [
+        {
+          "stem": "Hangi madde hâlinin belirli bir şekli vardır?",
+          "options": [
+            "Katı",
+            "Sıvı",
+            "Gaz"
+          ],
+          "correctIndex": 0,
+          "explanation": "Katıda tanecikler düzenli ve sıkıdır; bu yüzden şekli sabittir.",
+          "sourceRef": "t1"
+        },
+        {
+          "stem": "Bir bardağa konulan suyun şekli neye göre belirlenir?",
+          "options": [
+            "Kendi sabit şekline göre",
+            "Bardağın şekline göre",
+            "Hiçbir şeye göre"
+          ],
+          "correctIndex": 1,
+          "explanation": "Sıvılar bulundukları kabın şeklini alır; hacimleri ise sabittir.",
+          "sourceRef": "t1"
+        }
+      ]
+    },
+    {
+      "type": "teach",
+      "id": "t2",
+      "title": "Hâl Değişimleri",
+      "pictogram": "pic-idea",
+      "lead": "Madde ısı alıp verdikçe bir hâlden başka bir hâle geçer.",
+      "body": [
+        "<ul><li><b>Erime:</b> katı &#8594; sıvı (buz su olur)</li><li><b>Donma:</b> sıvı &#8594; katı (su buz olur)</li><li><b>Buharlaşma:</b> sıvı &#8594; gaz (su buhar olur)</li><li><b>Yoğuşma:</b> gaz &#8594; sıvı (buhar su olur)</li></ul>",
+        "<div class=\"callout callout--info\"><svg class=\"cds-icon\" aria-hidden=\"true\"><use href=\"#ic-info\"></use></svg><div><span class=\"callout__t\">Hatırla</span>Isı <b>alındığında</b> tanecikler hızlanır; ısı <b>verildiğinde</b> yavaşlar.</div></div>"
+      ],
+      "keyTerms": [
+        {
+          "term": "erime",
+          "def": "Katının ısı alarak sıvıya dönüşmesi."
+        },
+        {
+          "term": "yoğuşma",
+          "def": "Gazın ısı vererek sıvıya dönüşmesi."
+        }
+      ]
+    },
+    {
+      "type": "selfExplain",
+      "id": "se1",
+      "title": "Neden Böyle?",
+      "pictogram": "pic-idea",
+      "prompt": "Maddenin katıdan sıvıya, sıvıdan gaza geçmesi için ısı gerekir. Sence ısı taneciklere tam olarak ne yapıyor da hâl değişiyor? Kendi cümlelerinle açıkla.",
+      "modelExplanation": "<p>Isı alındığında tanecikler hızlanır ve birbirinden uzaklaşır; katıdaki sıkı düzen önce sıvının gevşek düzenine, sonra da gazın dağınık düzenine döner. Isı verildiğinde ise tanecikler yavaşlayıp birbirine yaklaşır.</p>"
+    },
+    {
+      "type": "brainbreak",
+      "id": "b1",
+      "title": "Hareket Molası",
+      "pictogram": "ic-pause",
+      "prompt": "Yaklaşık iki dakika ayağa kalk: esne, biraz yürü ya da zıpla, sonra su iç. Hazır olduğunda devam et.",
+      "durationSec": 120
+    },
+    {
+      "type": "match",
+      "id": "m1",
+      "title": "Hâl Değişimi Eşleştirme",
+      "pictogram": "pic-puzzle",
+      "mode": "text",
+      "instructions": "Soldaki değişimi sağdaki doğru tanımıyla eşleştir.",
+      "pairs": [
+        {
+          "a": "Erime",
+          "b": "katıdan sıvıya"
+        },
+        {
+          "a": "Donma",
+          "b": "sıvıdan katıya"
+        },
+        {
+          "a": "Buharlaşma",
+          "b": "sıvıdan gaza"
+        },
+        {
+          "a": "Yoğuşma",
+          "b": "gazdan sıvıya"
+        }
+      ]
+    },
+    {
+      "type": "teach",
+      "id": "t3",
+      "title": "Su Döngüsü",
+      "pictogram": "pic-microscope",
+      "lead": "Sudaki hâl değişimleri doğada hiç durmayan bir döngü oluşturur.",
+      "body": [
+        "<ul><li><b>Buharlaşma:</b> Güneş, deniz ve göllerdeki suyu ısıtır; su buhar olup yükselir.</li><li><b>Yoğuşma:</b> Yükselen buhar soğuyup bulutları oluşturur.</li><li><b>Yağış:</b> Bulutlardan yağmur ya da kar düşer.</li><li><b>Toplanma:</b> Sular tekrar deniz, göl ve yeraltına döner. Döngü baştan başlar.</li></ul>"
+      ],
+      "keyTerms": [
+        {
+          "term": "su döngüsü",
+          "def": "Suyun buharlaşma, yoğuşma ve yağışla sürekli dolaşması.",
+          "icon": "pic-idea",
+          "example": "Denizden buharlaşan su, bulutta yoğuşup yağmur olarak geri döner."
+        }
+      ],
+      "visual": {
+        "kind": "svg",
+        "caption": "Şekil 2 — Su döngüsü: buharlaşma, yoğuşma (bulut), yağış ve toplanma.",
+        "ref": "\n<svg viewBox=\"0 0 480 300\" role=\"img\" aria-labelledby=\"v3t v3d\">\n  <title id=\"v3t\">Su döngüsü şeması</title>\n  <desc id=\"v3d\">Güneş suyu buharlaştırır, buhar bulut olur, yağış düşer, su toplanır.</desc>\n  <circle cx=\"70\" cy=\"55\" r=\"26\" fill=\"var(--viz-sun)\" stroke=\"var(--viz-axis)\" stroke-width=\"2\"/>\n  <text x=\"70\" y=\"60\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"600\">Güneş</text>\n  <path d=\"M300 70 q18 -16 40 0 q22 -6 30 14 q18 4 6 22 h-92 q-14 -16 16 -36 z\" fill=\"var(--viz-cloud)\" stroke=\"var(--viz-axis)\" stroke-width=\"2\"/>\n  <text x=\"330\" y=\"100\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"600\">Bulut</text>\n  <path d=\"M40 250 q120 -28 400 0 v40 h-400 z\" fill=\"var(--accent-tint)\" stroke=\"var(--accent)\" stroke-width=\"2\"/>\n  <text x=\"110\" y=\"278\" font-size=\"14\" font-weight=\"600\">Deniz / Göl</text>\n  <path d=\"M140 240 C150 170 170 150 250 130\" fill=\"none\" stroke=\"var(--accent)\" stroke-width=\"2.4\" stroke-dasharray=\"2 6\" stroke-linecap=\"round\" marker-end=\"url(#vz-arrow)\"/>\n  <text class=\"viz-muted\" x=\"150\" y=\"200\" font-size=\"13\" font-weight=\"600\">buharlaşma</text>\n  <g stroke=\"var(--viz-water)\" stroke-width=\"2.4\" stroke-linecap=\"round\">\n    <line x1=\"320\" y1=\"135\" x2=\"312\" y2=\"160\"/><line x1=\"340\" y1=\"135\" x2=\"332\" y2=\"162\"/><line x1=\"360\" y1=\"135\" x2=\"352\" y2=\"158\"/>\n  </g>\n  <text class=\"viz-muted\" x=\"372\" y=\"150\" font-size=\"13\" font-weight=\"600\">yağış</text>\n  <path d=\"M395 165 C405 200 400 225 360 245\" fill=\"none\" stroke=\"var(--accent)\" stroke-width=\"2.4\" stroke-linecap=\"round\" marker-end=\"url(#vz-arrow)\"/>\n  <text class=\"viz-muted\" x=\"402\" y=\"210\" font-size=\"13\" font-weight=\"600\">toplanma</text>\n</svg>"
+      }
+    },
+    {
+      "type": "conceptMap",
+      "id": "cm1",
+      "title": "Su Döngüsü İlişkileri",
+      "pictogram": "pic-puzzle",
+      "instructions": "Bir düğüm seç, sonra bağlamak istediğin ikinci düğümü seç; su döngüsündeki doğru eşleşmeleri kur.",
+      "nodes": [
+        {
+          "id": "n1",
+          "label": "Buharlaşma"
+        },
+        {
+          "id": "n2",
+          "label": "Güneş suyu ısıtır, su buhar olur"
+        },
+        {
+          "id": "n3",
+          "label": "Yoğuşma"
+        },
+        {
+          "id": "n4",
+          "label": "Yükselen buhar soğuyup bulut olur"
+        },
+        {
+          "id": "n5",
+          "label": "Yağış"
+        },
+        {
+          "id": "n6",
+          "label": "Bulutlardan yağmur ya da kar düşer"
+        }
+      ],
+      "targetEdges": [
+        [
+          "n1",
+          "n2"
+        ],
+        [
+          "n3",
+          "n4"
+        ],
+        [
+          "n5",
+          "n6"
+        ]
+      ]
+    },
+    {
+      "type": "chart",
+      "id": "c1",
+      "title": "Erime Sıcaklıkları",
+      "pictogram": "pic-microscope",
+      "prompt": "Farklı katılar farklı sıcaklıklarda erir. Aşağıdaki çubuk grafik bunu karşılaştırır.",
+      "chart": {
+        "kind": "bar",
+        "title": "Bazı katıların erime sıcaklığı (°C)",
+        "desc": "Çikolata 34, tereyağı 32, bal mumu 62, naftalin 80 ve kükürt 115 santigrat derecede erir.",
+        "data": [
+          {
+            "label": "Çikolata",
+            "value": 34
+          },
+          {
+            "label": "Tereyağı",
+            "value": 32
+          },
+          {
+            "label": "Bal mumu",
+            "value": 62
+          },
+          {
+            "label": "Naftalin",
+            "value": 80
+          },
+          {
+            "label": "Kükürt",
+            "value": 115
+          }
+        ],
+        "caption": "Şekil 3 — Maddeye göre erime sıcaklığı değişir."
+      },
+      "takeaway": "Erime sıcaklığı maddenin türüne bağlıdır; her katı aynı sıcaklıkta erimez."
+    },
+    {
+      "type": "worked",
+      "id": "w1",
+      "title": "Sıcaklık Farkını Hesapla",
+      "pictogram": "pic-microscope",
+      "instructions": "Önce çözülmüş adımları oku, sonra boş adımı doldur.",
+      "steps": [
+        {
+          "text": "Bal mumunun erime sıcaklığı 62°C'dir (bkz. grafik)."
+        },
+        {
+          "text": "Odanın sıcaklığı 20°C'dir."
+        },
+        {
+          "text": "Bal mumunun erimesi için kaç derece daha ısınması gerekir? 62 − 20 = ?",
+          "answer": [
+            "42"
+          ]
+        }
+      ],
+      "fadeFrom": 2
+    },
+    {
+      "type": "sim",
+      "id": "s1",
+      "title": "Sıcaklık Ölçeği",
+      "pictogram": "pic-microscope",
+      "instructions": "Kaydırıcıyı hareket ettir ve farklı sıcaklık değerlerinin sayı doğrusunda nereye düştüğünü gözlemle.",
+      "simType": "numberScale",
+      "params": [
+        {
+          "key": "value",
+          "label": "Sıcaklık (°C)",
+          "min": -10,
+          "max": 120,
+          "step": 5,
+          "default": 20
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "id": "tb1",
+      "title": "Hâllerin Karşılaştırması",
+      "pictogram": "pic-microscope",
+      "prompt": "Üç hâli temel özellikleriyle karşılaştıralım.",
+      "table": {
+        "caption": "Tablo 1 — Maddenin üç hâlinin karşılaştırması",
+        "rowHeader": true,
+        "columns": [
+          {
+            "label": "Hâl"
+          },
+          {
+            "label": "Şekil"
+          },
+          {
+            "label": "Hacim"
+          },
+          {
+            "label": "Tanecik düzeni"
+          }
+        ],
+        "rows": [
+          [
+            "Katı",
+            "Belirli",
+            "Belirli",
+            "Sıkı ve düzenli"
+          ],
+          [
+            "Sıvı",
+            "Kabın şekli",
+            "Belirli",
+            "Gevşek"
+          ],
+          [
+            "Gaz",
+            "Belirsiz",
+            "Belirsiz",
+            "Dağınık"
+          ]
+        ]
+      },
+      "takeaway": "Hacim katı ve sıvıda belirli; şekil yalnızca katıda belirlidir."
+    },
+    {
+      "type": "fillblank",
+      "id": "f1",
+      "title": "Boşlukları Doldur",
+      "pictogram": "pic-education",
+      "instructions": "Aşağıdaki havuzdan doğru kelimeyi seçerek boşluğu doldur.",
+      "inputStyle": "choice",
+      "items": [
+        {
+          "text": "Güneş suyu ısıtınca su buhar olur; bu olaya ___ denir.",
+          "answer": [
+            "buharlaşma"
+          ],
+          "hint": "sıvıdan gaza geçiş",
+          "choices": [
+            "buharlaşma",
+            "yoğuşma",
+            "donma"
+          ]
+        },
+        {
+          "text": "Yükselen su buharı soğuyup ___ oluşturur.",
+          "answer": [
+            "bulut",
+            "bulutları"
+          ],
+          "hint": "gökyüzünde görünür",
+          "choices": [
+            "bulut",
+            "yağmur",
+            "buz"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "checkpoint",
+      "id": "cp1",
+      "title": "Kontrol Noktası",
+      "pictogram": "pic-trophy",
+      "recap": [
+        "Madde üç hâlde bulunur: katı, sıvı, gaz.",
+        "Hâl değişimleri: erime, donma, buharlaşma, yoğuşma.",
+        "Su döngüsü: buharlaşma → yoğuşma → yağış → toplanma."
+      ],
+      "mixedQuestions": [
+        {
+          "stem": "Su döngüsünde bulutlardan suyun düşmesine ne denir?",
+          "options": [
+            "Buharlaşma",
+            "Yağış",
+            "Donma"
+          ],
+          "correctIndex": 1,
+          "explanation": "Bulutlardan yağmur/kar olarak düşen suya yağış denir.",
+          "sourceRef": "t3"
+        }
+      ],
+      "selfAssess": [
+        "Bu konuyu öğrendim",
+        "Biraz daha tekrar etmeliyim"
+      ]
+    }
+  ]
+}
