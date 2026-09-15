@@ -209,7 +209,8 @@ def _http_env(tmp_path, **extra):
     (tmp_path / "output").mkdir(exist_ok=True)
     RunStore(tmp_path / "output").save(RUN_ID, RUN_RECORD)
     key = OAuthStore(tmp_path / "output" / "ted_mcp_oauth.sqlite3").create_static_key("t", FULL)
-    env = {"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_PROJECT_ROOT": str(tmp_path), "TED_MCP_FORM_SECRET": "f" * 40}
+    env = {"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_PROJECT_ROOT": str(tmp_path), "TED_MCP_FORM_SECRET": "f" * 40,
+           "EDUPEDIA_TICKET_SECRET": "t" * 40}
     env.update(extra)
     return env, {**MCP_HEADERS, "authorization": f"Bearer {key}"}
 

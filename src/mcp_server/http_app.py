@@ -391,7 +391,10 @@ def build_app(
     verify_identity: IdentityVerifier = verify_google_credential,
     form_secret: bytes = b"",
     clock: Callable[[], float] = time.time,
+    viewer: ASGIApp | None = None,
 ) -> Starlette:
+    from src.mcp_server.goruntuleyici import ViewerHostRouter
+
     base = settings.public_base_url
     if len(form_secret) < 32:
         raise ValueError("form_secret must be at least 32 bytes")
@@ -639,6 +642,7 @@ def build_app(
         routes=routes,
         lifespan=lifespan,
         middleware=[
+            Middleware(ViewerHostRouter, viewer=viewer, hosts=settings.viewer_hosts),
             Middleware(CorsMiddleware),
             Middleware(HostGuardMiddleware, allowed_hosts=settings.allowed_hosts),
             Middleware(BearerGateMiddleware, store=store, base_url=base),
@@ -664,10 +668,15 @@ def create_app_from_env(env: Mapping[str, str] | None = None) -> Starlette:
         raise ValueError("TED_MCP_FORM_SECRET must be set to at least 32 bytes")
     root = Path(env["TED_MCP_PROJECT_ROOT"]) if env.get("TED_MCP_PROJECT_ROOT") else None
     settings = load_settings(env, project_root=root)
+    if len(settings.ticket_secret) < 32:
+        raise ValueError("EDUPEDIA_TICKET_SECRET must be set to at least 32 bytes")
+    from src.mcp_server.goruntuleyici import build_viewer
+
+    viewer = build_viewer(settings.data_dir, settings.ticket_secret)
     store = OAuthStore(settings.oauth_db_path)
     dashboard = DashboardContext(settings.dashboard_api_url, settings.dashboard_api_key)
     tools = Tools(settings, Federation(settings), dashboard=dashboard)
-    return build_app(settings, store, build_server(tools), form_secret=secret)
+    return build_app(settings, store, build_server(tools), form_secret=secret, viewer=viewer)
 
 
 def main() -> None:

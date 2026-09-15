@@ -115,7 +115,7 @@ def test_create_app_from_env_requires_form_secret(tmp_path):
     with pytest.raises(ValueError):
         http_app.create_app_from_env({"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_PROJECT_ROOT": str(tmp_path)})
     app = http_app.create_app_from_env({"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_PROJECT_ROOT": str(tmp_path),
-                                        "TED_MCP_FORM_SECRET": "f" * 40})
+                                        "TED_MCP_FORM_SECRET": "f" * 40, "EDUPEDIA_TICKET_SECRET": "t" * 40})
     assert app is not None
 
 
