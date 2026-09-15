@@ -50,7 +50,18 @@ _SCAN_STRIP_RE = re.compile(r"[\t\n\r\x00]")
 # last-'<'/last-'>' position, advanced once per match over the text *since the previous match*
 # (never re-scanning from the string's start) — linear in len(text) regardless of how many '<',
 # '>' or on-handler-shaped substrings it contains.
-_ON_HANDLER_RE = re.compile(r"\son[a-z]+\s*=", re.I)
+#
+# F12 (fix round 4, re-review Critical): the earlier `\son…=` required *whitespace* immediately
+# before `on`, but an HTML tokeniser in its "before attribute name" state also starts a new
+# attribute after `/` (`<img/onerror=…>`, `<svg/onload=…>`, `<img src=x/onerror=…>`) and — proven
+# live in Chromium — immediately after a closing attribute-value quote with no whitespace
+# (`<img src="x"onerror=…>`). So `/`, `"` and `'` (and `=`, `<`, `>`, string start) are all
+# attribute boundaries the whitespace rule missed, and those handlers compiled through and fired.
+# The negative lookbehind below refuses `on…=` unless the preceding character *continues an
+# attribute name* — `[A-Za-z0-9:_-]` are the name characters (`data-onx`, `xlink:on…`), so a match
+# following one of those is inside a longer name and correctly ignored; every other preceding
+# character is a boundary, so the handler is caught. Over-refusal is acceptable here; a miss is not.
+_ON_HANDLER_RE = re.compile(r"(?<![A-Za-z0-9:_-])on[a-z]+\s*=", re.I)
 
 # F11 (fix round 3, re-review Important #2): an HTML tokeniser only enters its tag-open state at
 # '<' immediately followed by an ASCII letter or '/' (a start or end tag). A '<' followed by

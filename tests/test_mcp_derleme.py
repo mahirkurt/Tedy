@@ -3,6 +3,7 @@ import json
 import shutil
 import signal
 import subprocess
+import time
 
 import pytest
 
@@ -529,3 +530,96 @@ def test_demo_fixture_is_the_vendored_demo():
     out = subprocess.run(["node", "-e", ornekler.DEMO_EXTRACT_JS, str(sablon.TEMPLATE_PATH)],
                          capture_output=True, text=True, check=True).stdout
     assert json.loads(out) == ornekler.demo()
+
+
+# ---------------------------------------------------------------------------
+# F12 (fix round 4, re-review Critical): the on-handler scan required WHITESPACE
+# immediately before `on` (`\son…=`), so a handler separated from the previous
+# attribute by `/` (`<img/onerror=…>`, `<svg/onload=…>`, `<img src=x/onerror=…>`)
+# or by a closing attribute-value quote with no whitespace (`<img src="x"onerror=…>`
+# — proven live in Chromium by the re-review) compiled through guvenlik_tara with
+# ZERO refusals and produced real, firing DOM event handlers. The negative
+# lookbehind `(?<![A-Za-z0-9:_-])` refuses `on…=` on every attribute boundary while
+# still ignoring a name continuation (`data-onx`). Over-refusal is acceptable; a
+# miss is a live XSS.
+# ---------------------------------------------------------------------------
+
+_F12_PREVIOUSLY_BYPASSED = [
+    ['<img/onerror=alert(1)>'],
+    ['<svg/onload=alert(1)>'],
+    ['<img src="x"onerror=alert(1)>'],
+    ['<img src=x/onerror=alert(1)>'],
+    ['<img src="x"onmouseover="alert(1)">'],
+    ['<a href=x /onclick=alert(1)>'],
+    # Split across two adjacent body elements: neither element carries the handler
+    # inside a still-open tag on its own, so only the F6 list-join scan catches it.
+    ['<img src=x', '/onerror=alert(1)>'],
+]
+
+
+@pytest.mark.parametrize("body", _F12_PREVIOUSLY_BYPASSED)
+def test_f12_slash_and_quote_separated_on_handlers_are_refused(body):
+    data = ornekler.ornek("MODULE")
+    _teach(data)["body"] = body
+    with pytest.raises(DerlemeHatasi) as exc:
+        derleme.derle(data, {}, ORIGIN)
+    assert exc.value.status == "sema_hatasi"
+    assert any("satır içi olay işleyicisi" in h for h in exc.value.detay["hatalar"])
+
+
+@pytest.mark.parametrize("payload", [
+    '<img src=x onerror=alert(1)>',
+    '<img alt="a<b" onerror=alert(1)>',
+    '<a href="x" onclick = "y">',
+    '<img' + chr(9) + 'onerror=alert(1)>',  # tab-separated handler (chr(9))
+])
+def test_f12_whitespace_separated_on_handlers_still_refused(payload):
+    # No regression: every handler the old whitespace rule already caught must stay caught.
+    data = ornekler.ornek("MODULE")
+    _teach(data)["body"] = [payload]
+    with pytest.raises(DerlemeHatasi) as exc:
+        derleme.derle(data, {}, ORIGIN)
+    assert exc.value.status == "sema_hatasi"
+    assert any("satır içi olay işleyicisi" in h for h in exc.value.detay["hatalar"])
+
+
+@pytest.mark.parametrize("body,needle", [
+    (["<p>x < 3 ise onun = 5</p>"], "onun"),          # comparison text, not a tag
+    (["<p>ışık = yol, onun = 2</p>"], "onun"),        # comparison text, not a tag
+    (['<div data-onx="v">alt</div>'], "data-onx"),    # a data-* attribute name, `on` follows '-'
+])
+def test_f12_boundary_does_not_refuse_non_handlers(body, needle):
+    # The lookbehind class `[A-Za-z0-9:_-]` are attribute-name-continuation characters, so
+    # `data-onx` is ignored; and F11's tag-context walk keeps the comparison text (no still-open
+    # tag before `onun`) from being refused. Neither must become a new false positive.
+    data = ornekler.ornek("MODULE")
+    _teach(data)["body"] = body
+    html = derleme.derle(data, {}, ORIGIN)
+    assert needle in html
+
+
+@pytest.mark.parametrize("s", ["<a" * 400_000, "< on=" * 400_000])
+def test_f12_on_handler_scan_stays_linear(s):
+    # The negative-lookbehind pattern is still non-backtracking and the tag-context walk is
+    # unchanged, so guvenlik_tara stays linear. Neither input puts a handler inside a still-open
+    # tag, so the correct result is no refusal.
+    #
+    # The brief's target is "under 2 s". The retired quadratic `<[^>]*\son…=` pattern took >40 s
+    # on 40k chars, so on these inputs (up to 2 M chars) it would never return — the 8 s wall-clock
+    # SIGALRM below aborts such a regression and fails fast. The linear cost is then asserted
+    # against CPU time, which is load-independent: the 2 M-char `"< on="` case measures ~1.2 s of
+    # CPU isolated, comfortably under 2 s, but its *wall-clock* time flakes past a 2 s deadline
+    # under concurrent load on this shared runner, so a bare wall-clock guard would be flaky.
+    t0 = time.process_time()
+    result = _guvenlik_tara_within({"x": s}, seconds=8.0)
+    cpu = time.process_time() - t0
+    assert result == []
+    assert cpu < 2.0, f"guvenlik_tara used {cpu:.2f}s CPU (>2 s) — possible quadratic regression"
+
+
+@pytest.mark.parametrize("mode", ornekler.MODES)
+def test_f12_golden_sweep_stays_fail_free_with_g_svg_pass(mode):
+    # F12 must not regress any golden mode: all nine still compile FAIL-free with G-SVG PASS.
+    report = gates.run_gates(derleme.derle(ornekler.ornek(mode), {}, ORIGIN))
+    assert _fails(report) == []
+    assert report["G-SVG"]["status"] == "PASS"
