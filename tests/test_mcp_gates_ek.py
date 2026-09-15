@@ -1,7 +1,11 @@
 """G-BRIDGE and G-ATTRIB: detect a missing, loosened or foreign bridge; missing attributions."""
 import html as html_lib
 import json
+import random
+import shutil
 import signal
+import string
+import subprocess
 import time
 
 import pytest
@@ -9,6 +13,7 @@ import pytest
 from src.mcp_server import gates, gates_ek, sablon
 
 ENGINE = sablon.engine_template("https://tedy.online")
+BACKSLASH = chr(92)
 
 
 def _run(fn, html):
@@ -298,3 +303,137 @@ def test_gate_bridge_is_fast_on_the_real_engine_template_with_a_long_embedded_ru
     report, elapsed = _bounded_seconds(10, lambda: _run(gates_ek.gate_bridge, html))
     assert elapsed < 2.0, f"gate_bridge took {elapsed:.2f}s"
     assert report["G-BRIDGE"]["status"] == "PASS"
+
+
+# ---------------------------------------------------------------------------
+# Fix round 2 (controller review-r2, finding "New-Important"): F5 — the strict JS string
+# decoder must handle \xHH hex escapes and legacy octal escapes (\1-\9, \0<digit>) like a real
+# JS engine, or fail closed — not silently mis-decode them as generic identity escapes. Every
+# backslash below is built with chr(92) (BACKSLASH) rather than typed literally.
+# ---------------------------------------------------------------------------
+
+def test_hex_escape_decodes_like_javascript():
+    escape = BACKSLASH + "x41"  # \x41 -> the code point 0x41, i.e. 'A'
+    for quote in ('"', "'", "`"):
+        body = quote + escape + quote
+        decoded, end = gates_ek._decode_js_string(body, 0)
+        assert decoded == "A" and end == len(body)
+
+    grounding = '{source: "PhET' + escape + '", license: "CC BY 4.0"}'
+    html = _compose(None, ["Kaynak: PhETA — CC BY 4.0"], grounding)
+    assert gates.run_gates(html)["G-ATTRIB"]["status"] == "PASS"
+
+
+def test_truncated_hex_escape_is_undecodable():
+    escape = BACKSLASH + "x4"  # only one hex digit before the closing quote
+    body = '"' + escape + '"'
+    decoded, end = gates_ek._decode_js_string(body, 0)
+    assert decoded is None and end is None
+
+    grounding = '{source: "PhET' + escape + '", license: "CC BY 4.0"}'
+    html = _compose(None, [], grounding)
+    report = gates.run_gates(html)["G-ATTRIB"]
+    assert report["status"] == "FAIL" and "lisanslı kaynak çözümlenemedi" in report["detail"]
+
+
+@pytest.mark.parametrize("digits", ["1", "7", "01"])
+def test_legacy_octal_escapes_are_undecodable(digits):
+    escape = BACKSLASH + digits
+    body = '"' + escape + '"'
+    decoded, end = gates_ek._decode_js_string(body, 0)
+    assert decoded is None and end is None
+
+    grounding = '{source: "PhET' + escape + '", license: "CC BY 4.0"}'
+    html = _compose(None, [], grounding)
+    report = gates.run_gates(html)["G-ATTRIB"]
+    assert report["status"] == "FAIL" and "lisanslı kaynak çözümlenemedi" in report["detail"]
+
+
+def test_lone_zero_escape_still_decodes_to_nul():
+    escape = BACKSLASH + "0"  # not followed by a digit — unchanged behaviour
+    body = '"' + escape + '"'
+    decoded, end = gates_ek._decode_js_string(body, 0)
+    assert decoded == "\0" and end == len(body)
+
+
+_NODE_EVAL_SCRIPT = '"use strict"; process.stdout.write(JSON.stringify(eval(process.argv[1])));'
+_NAMED_ESCAPE_CHARS = [BACKSLASH, '"', "'", "`", "/", "$", "b", "f", "n", "r", "t", "v"]
+_HEX_DIGITS = "0123456789abcdefABCDEF"
+
+
+def _node_eval(literal):
+    # Safe by construction, not just by intent: `literal` is one of our own locally-generated
+    # quote-terminated string/template literals (see _random_js_literals), never external input,
+    # passed as a real argv element (never interpolated into a shell string). node's `eval` here
+    # only ever evaluates a single JS string/template-literal expression built from a small fixed
+    # alphabet (letters, digits, '{}', backslash escapes) — this is a network-free differential
+    # oracle against real JS semantics per the fix brief, not a code-execution surface.
+    proc = subprocess.run(["node", "-e", _NODE_EVAL_SCRIPT, literal],
+                          capture_output=True, text=True, timeout=5)
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+def _biased_escape(rng):
+    kind = rng.choice(["hex_ok", "hex_short1", "hex_short0", "u_ok", "u_short", "u_brace_ok",
+                        "u_brace_unterminated", "octal_1_9", "octal_0d", "zero", "named"])
+    if kind == "hex_ok":
+        return BACKSLASH + "x" + rng.choice(_HEX_DIGITS) + rng.choice(_HEX_DIGITS)
+    if kind == "hex_short1":
+        return BACKSLASH + "x" + rng.choice(_HEX_DIGITS)
+    if kind == "hex_short0":
+        return BACKSLASH + "x"
+    if kind == "u_ok":
+        return BACKSLASH + "u" + "".join(rng.choice(_HEX_DIGITS) for _ in range(4))
+    if kind == "u_short":
+        return BACKSLASH + "u" + "".join(rng.choice(_HEX_DIGITS) for _ in range(rng.randint(0, 3)))
+    if kind == "u_brace_ok":
+        return BACKSLASH + "u{" + "".join(rng.choice(_HEX_DIGITS) for _ in range(rng.randint(1, 5))) + "}"
+    if kind == "u_brace_unterminated":
+        return BACKSLASH + "u{" + "".join(rng.choice(_HEX_DIGITS) for _ in range(rng.randint(1, 5)))
+    if kind == "octal_1_9":
+        return BACKSLASH + rng.choice("123456789")
+    if kind == "octal_0d":
+        return BACKSLASH + "0" + rng.choice("0123456789")
+    if kind == "zero":
+        return BACKSLASH + "0"
+    return BACKSLASH + rng.choice(_NAMED_ESCAPE_CHARS)
+
+
+def _random_js_literals(count, seed):
+    # No '$' and no raw quote characters in the plain-filler alphabet: without '$' a template
+    # literal can never form an unescaped "${" (out of scope here — F1/parked M3 territory), and
+    # without raw quotes every generated literal is guaranteed a single, cleanly-terminated
+    # string/template expression that eval(literal) and _decode_js_string(literal, 0) can be
+    # compared on 1:1.
+    rng = random.Random(seed)
+    plain_alphabet = string.ascii_letters + string.digits + "{}"
+    literals = []
+    for _ in range(count):
+        quote = rng.choice(('"', "'", "`"))
+        pieces = []
+        for _ in range(rng.randint(1, 4)):
+            if rng.random() < 0.6:
+                pieces.append(_biased_escape(rng))
+            else:
+                pieces.append("".join(rng.choice(plain_alphabet) for _ in range(rng.randint(1, 3))))
+        literals.append(quote + "".join(pieces) + quote)
+    return literals
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node yok")
+def test_decoder_matches_node_semantics_differentially():
+    literals = _random_js_literals(200, seed=20260915)
+    accepted = rejected = 0
+    for literal in literals:
+        returncode, stdout, stderr = _node_eval(literal)
+        decoded, end = gates_ek._decode_js_string(literal, 0)
+        if returncode == 0:
+            accepted += 1
+            node_value = json.loads(stdout)
+            assert decoded == node_value and end == len(literal), (literal, decoded, node_value)
+        else:
+            rejected += 1
+            assert "SyntaxError" in stderr, (literal, stderr)
+            assert decoded is None and end is None, (literal, decoded)
+    assert accepted + rejected == len(literals)
+    print(f"node differential: {accepted} accepted, {rejected} rejected, {len(literals)} total")

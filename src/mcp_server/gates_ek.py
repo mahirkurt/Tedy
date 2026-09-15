@@ -145,7 +145,8 @@ def _decode_js_string(body: str, start: int) -> tuple[str, int] | tuple[None, No
 
     Returns (decoded_text, index_after_closing_quote), or (None, None) if the literal is
     unterminated, contains a raw line break inside a `"`/`'` literal, contains an unescaped `${`
-    inside a template literal, or contains a `\\u` escape that does not decode. Never raises.
+    inside a template literal, contains a `\\u`/`\\x` escape that does not decode, or contains a
+    legacy octal escape (`\\1`-`\\9`, or `\\0` followed by a digit). Never raises.
     """
     quote = body[start]
     i = start + 1
@@ -188,12 +189,27 @@ def _decode_js_string(body: str, start: int) -> tuple[str, int] | tuple[None, No
                 out.append(chr(int(hexpart, 16)))
                 i += 6
                 continue
+            if nc == "x":
+                # Fix F5 (review "New-Important"): \xHH is a real, fixed-length JS escape (the
+                # code point of the two hex digits), not a generic identity escape — it must not
+                # fall through to the "any other \x" bucket below, which used to decode it to the
+                # literal letter 'x' followed by the two digits as plain text.
+                hexpart = body[i + 2:i + 4]
+                if len(hexpart) != 2 or not re.fullmatch(r"[0-9a-fA-F]{2}", hexpart):
+                    return None, None  # truncated \xH or \x at end of literal
+                out.append(chr(int(hexpart, 16)))
+                i += 4
+                continue
             if nc == "0":
                 if body[i + 2:i + 3].isdigit():
-                    return None, None  # legacy octal escape — not in our accepted set
+                    return None, None  # \0<digit> — legacy octal escape, not in our accepted set
                 out.append("\0")
                 i += 2
                 continue
+            if nc in "123456789":
+                # Fix F5: \1-\9 are legacy octal escapes (sloppy-mode only; strict mode and
+                # template literals always throw) — undecodable, fail closed, never identity.
+                return None, None
             if nc in _ESCAPE_MAP:
                 out.append(_ESCAPE_MAP[nc])
                 i += 2
