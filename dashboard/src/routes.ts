@@ -1,5 +1,5 @@
 import { Time, Task, Certificate, EventSchedule, ExamMode,
-         GroupPresentation, Book, Catalog, ChartBar, Notification, Chat, UserAvatar } from '@carbon/icons-react'
+         GroupPresentation, Book, Catalog, ChartBar, Notification, Chat, UserAvatar, Education } from '@carbon/icons-react'
 import type { ComponentType } from 'react'
 import type { UserRole } from './hooks/useAuth'
 
@@ -42,6 +42,10 @@ export const routes: RouteConfig[] = [
   { path: '/ilerleme',  label: 'İlerleme',   icon: ChartBar,          componentName: 'PlatformProgress' , secondary: true },
   { path: '/duyurular', label: 'Duyurular',  icon: Notification,      componentName: 'Announcements' , secondary: true },
   { path: '/profil',    label: 'Profil',     icon: UserAvatar,        componentName: 'StudentProfile' , secondary: true },
+
+  { path: '/moduller',  label: 'Modüller',   icon: Education, componentName: 'Modules', secondary: true, offPortal: true },
+  { path: '/moduller/taslak/:taslakId', label: 'Taslak', icon: Education, componentName: 'DraftViewerRoute', showInNav: false, offPortal: true },
+  { path: '/moduller/:slug/:version',   label: 'Modül',  icon: Education, componentName: 'ModuleViewerRoute', showInNav: false, offPortal: true },
 
   // Exams keep a page of their own: grades, past papers and study guides are
   // real content, and folding them into a section would lose them. What they

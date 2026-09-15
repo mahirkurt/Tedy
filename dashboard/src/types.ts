@@ -311,3 +311,21 @@ export interface BookChapterResponse {
   next: BookChapterNav | null
   position: { index: number; total: number }
 }
+
+export interface ModuleCard {
+  slug: string
+  version: number
+  title: string | null
+  subject: string | null
+  gradeLevel: string | null
+  mode: string | null
+  outcomes: string[]
+  ted_link: { kind: 'exam' | 'homework'; id: string } | null
+  created_at: string | null
+  gates: { pass: number; warn: number; fail: number }
+}
+
+export interface ModuleTicket {
+  url: string
+  exp: number
+}

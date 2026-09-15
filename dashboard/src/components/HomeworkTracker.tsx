@@ -9,7 +9,7 @@ import { NextThing } from './NextThing'
 import { describeDaysAhead } from './patterns/time'
 import './patterns/patterns.scss'
 import { useNavigate } from 'react-router-dom'
-import type { ExamItem } from '../types'
+import type { ExamItem, ModuleCard } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
 import { useFocusMode } from '../contexts/focusMode'
 
@@ -125,6 +125,13 @@ export default function HomeworkTracker() {
     () => examData.exams.filter(e => e.status === 'upcoming'),
     [examData.exams])
   const navigate = useNavigate()
+
+  // A published module linked to an exam is offered where the exam already is (spec §4.3 step 9).
+  const { data: moduleData } = useApi<{ moduller: ModuleCard[] }>('/api/modules', { moduller: [] })
+  const moduleByExam = useMemo(() => {
+    const rows = Array.isArray(moduleData.moduller) ? moduleData.moduller : []
+    return new Map(rows.filter(m => m.ted_link?.kind === 'exam').map(m => [m.ted_link!.id, m]))
+  }, [moduleData.moduller])
 
 
   // A working state, not a dimmer: focus closes the lists and leaves the one
@@ -257,6 +264,15 @@ export default function HomeworkTracker() {
                     <span className="exams-ahead__when tedy-time">
                       {describeDaysAhead(when)}
                     </span>
+                  )}
+                  {moduleByExam.has(e.id) && (
+                    <Button kind="ghost" size="sm" className="exams-ahead__module"
+                      onClick={() => {
+                        const m = moduleByExam.get(e.id)!
+                        navigate(`/moduller/${m.slug}/v${m.version}`)
+                      }}>
+                      Modülü aç
+                    </Button>
                   )}
                 </li>
               )

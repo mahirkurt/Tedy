@@ -29,6 +29,7 @@ import StudentProfile from './components/StudentProfile'
 import ExamTimeline from './components/ExamTimeline'
 import TedyBooks, { BookDetail } from './components/TedyBooks'
 import BookReader from './components/BookReader'
+import Modules, { ModuleViewerRoute, DraftViewerRoute } from './components/Modules'
 
 function matchRoute(pathname: string, list: ReturnType<typeof routesFor>) {
   const exact = list.find(r => r.path === pathname)
@@ -47,6 +48,7 @@ const COMPONENTS: Record<string, React.ComponentType> = {
   TodaySchedule, WeeklySchedule, HomeworkTracker, AssistantChat, GradeTable, ExamTimeline,
   PlatformProgress, CalendarEvents, TeamActivities, CourseContent, Announcements, StudentProfile,
   TedyBooks, BookDetail, BookReader,
+  Modules, ModuleViewerRoute, DraftViewerRoute,
 }
 
 export default function App() {
