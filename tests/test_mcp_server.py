@@ -60,7 +60,7 @@ def test_durum_reports_identity_fleet_and_gates(tmp_path):
     assert body["status"] == "ok"
     assert body["surum"] == __version__
     assert body["kullanici"] == {"email": FULL, "rol": "full"}
-    assert body["kapi_sayisi"] == 16
+    assert body["kapi_sayisi"] == 18
     assert body["filo"]["maarif-mufredat"] == "yapılandırılmış"
     assert body["filo"]["anamnesis"] == "anahtar yok"
     assert body["dashboard_anahtari"] is True

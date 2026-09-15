@@ -2,12 +2,17 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 from typing import Any
 
 VENDOR_DIR = Path(__file__).resolve().parent / "vendor"
+
+from src.mcp_server import gates_ek
+
+EXTRA_GATES = ("G-BRIDGE", "G-ATTRIB")
 
 # Order mirrors the retired edupedia_site runner (_GATE_FUNCS), 16 gates.
 GATE_FUNCTION_NAMES = (
@@ -42,13 +47,20 @@ def validator() -> ModuleType:
 
 
 def gate_count() -> int:
-    return len(GATE_FUNCTION_NAMES)
+    return len(GATE_FUNCTION_NAMES) + len(EXTRA_GATES)
 
 
 def run_gates(html: str) -> dict[str, dict[str, Any]]:
-    """Run every gate; return {gate_id: {"status": PASS|WARN|FAIL|SKIPPED, ...}}."""
+    """Run the 16 vendored gates and ted-mcp's G-BRIDGE and G-ATTRIB; {gate_id: {"status", ...}}."""
     vm = validator()
     result = vm.Result()
     for name in GATE_FUNCTION_NAMES:
         getattr(vm, name)(html, result)
+    gates_ek.gate_bridge(html, result)
+    gates_ek.gate_attrib(html, result)
     return result.to_json_gates()
+
+
+def voice_pattern() -> re.Pattern[str]:
+    """The vendored G-VOICE deixis pattern; the compiler refuses attribution lines that match it."""
+    return validator().VOICE_DEIXIS_RE

@@ -46,19 +46,26 @@ def test_template_carries_module_data_placeholder():
     assert "const MODULE_DATA = {" in html
 
 
-def test_gate_loader_exposes_sixteen_gates():
-    assert gates.gate_count() == 16
+def test_gate_loader_exposes_sixteen_vendored_and_two_ted_mcp_gates():
+    assert len(gates.GATE_FUNCTION_NAMES) == 16
+    assert gates.gate_count() == 18
     vm = gates.validator()
     for name in gates.GATE_FUNCTION_NAMES:
         assert callable(getattr(vm, name)), name
 
 
-def test_vendored_template_demo_has_no_failing_gate():
+def test_ted_mcp_engine_demo_has_no_failing_gate():
+    from src.mcp_server import sablon
+
+    report = gates.run_gates(sablon.engine_template("https://tedy.online"))
+    assert len(report) == 18
+    assert not [g for g, v in report.items() if v["status"] == "FAIL"]
+
+
+def test_raw_vendored_template_fails_only_the_bridge_gate():
     html = (vendor_sync.VENDOR_DIR / "assets" / "module-template.html").read_text(encoding="utf-8")
     report = gates.run_gates(html)
-    assert len(report) == 16
-    assert not [g for g, v in report.items() if v["status"] == "FAIL"]
-    assert sum(1 for v in report.values() if v["status"] == "PASS") >= 13
+    assert sorted(g for g, v in report.items() if v["status"] == "FAIL") == ["G-BRIDGE"]
 
 
 def test_run_gates_reports_failures_on_broken_html():
