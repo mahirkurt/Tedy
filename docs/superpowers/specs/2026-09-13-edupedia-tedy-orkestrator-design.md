@@ -471,6 +471,17 @@ planında yer alır.
   `form-action`'ı yönlendirme zinciri boyunca uygular) ve onay gönderimi engellenir; ayar bunun canlı oturumda
   yapılandırmayla giderilmesini sağlar. Girişler `TED_MCP_EXTRA_REDIRECT_URIS` gibi kapalı-başarısızlıkla doğrulanır;
   ayar gizli değildir ve `.env`'e değil birim dosyasına yazılır.
+- **Canlı kabul (alt proje 3, 2026-09-15):** Güvenlik kapısı TEMİZ — implementer olmayan bağımsız gözden geçiren
+  (Bölüm A kod, Bölüm B dağıtım), son inceleme `8eb51e4`, dağıtılan `40cf244`; ertelenen düşük bulgular (RFC 7009
+  `/oauth/revoke`, `tdyM_` son kullanma, R3, R6) SDD defterinde denetleyici `Ruling:` satırlarıyla kayıtlı. anamnesis:
+  anahtar yapılandırıldı, `hit`. Kenar hız sınırı dal A (`/oauth/register|authorize|token`, `/mcp`; IP başına 10 sn'de
+  60; sayım `cf.colo.id` + `ip.src`, IPv6 /64 gruplaması Cloudflare belgesinde belirtilmiyor — belirsiz, tek kaynak
+  iddiası yalnız IPv4 için; dağıtık kayıt seli denetleyici `Ruling:` satırıyla kabul; yedek
+  `tedy.online-ratelimit-20260915T073956Z-0028.json`). `hp-ai-node` ingress 52 → 53 kural, `mcp.tedy.online` →
+  `http://127.0.0.1:8090`, proxied CNAME (yedek `hp-ai-node-config-20260915T074557Z-2faa.json`). Genel uçta: PRM 200,
+  `/mcp` kimliksiz 401 + `WWW-Authenticate`, `/oauth/token` 16 385 bayt → 413, CORS `https://claude.ai` 204, kenar hız
+  sınırı 429, `tdyM_` anahtarıyla `initialize` (`2025-06-18`, `TEDY edupedia` `0.1.0`) + `tools/list` beş araç; test
+  anahtarı `sp3-kabul-20260914` iptal edildi. Google JavaScript origin: bekliyor (insan adımı).
 
 ## 13. Varsayımlar ve riskler
 
