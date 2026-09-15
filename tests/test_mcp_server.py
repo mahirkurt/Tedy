@@ -138,7 +138,8 @@ def test_core_tools_are_listed(tmp_path):
                                   headers={**MCP_HEADERS, "authorization": f"Bearer {key}"}))
     names = {t["name"] for t in listed["result"]["tools"]}
     assert names == {"edupedia_durum", "edupedia_rehber", "edupedia_baglam", "edupedia_kapsam", "edupedia_kaynak_oku",
-                     "edupedia_derle", "edupedia_onizle", "edupedia_yayinla", "edupedia_katalog", "edupedia_kaldir"}
+                     "edupedia_derle", "edupedia_onizle", "edupedia_yayinla", "edupedia_katalog", "edupedia_kaldir",
+                     "edupedia_gorsel"}
 
 
 def test_slow_tool_does_not_block_concurrent_requests(tmp_path):
@@ -210,6 +211,7 @@ TOOL_ARGUMENTS = {
     "edupedia_yayinla": {"taslak_id": "ffffffffffffffff"},
     "edupedia_katalog": {},
     "edupedia_kaldir": {"slug": "fen5-su"},
+    "edupedia_gorsel": {"run_id": "abcdef012345", "istek": "su döngüsü"},
 }
 PROBE_WITHIN_SECONDS = 1.0
 
@@ -256,6 +258,9 @@ def test_parked_tool_bodies_never_take_the_threads_auth_and_store_calls_need(tmp
             return park()
 
         def kaldir(self, email, slug):
+            return park()
+
+        def gorsel(self, email, run_id, istek, tercih=None):
             return park()
 
     settings = _settings(tmp_path)

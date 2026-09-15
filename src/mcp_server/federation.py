@@ -119,3 +119,29 @@ class Federation:
         if len(values) == 1 and isinstance(values[0], dict):
             return values[0]
         raise FederationError(server, tool, "unexpected_shape")
+
+    def call_raw(self, server: str, tool: str, args: dict[str, Any], deadline: float | None = None) -> Any:
+        """Tool result with text and image blocks untouched (textbook figures carry ImageContent).
+
+        Mirrors call()'s budget and failure contract exactly, minus the JSON-envelope decode:
+        with no deadline the client's own timeout applies; with one, a call the remaining budget
+        can no longer cover is never made at all (ZAMAN_ASIMI, no client call); a failure is
+        logged once as a single bounded line and re-raised as a closed code — ZAMAN_ASIMI if the
+        budget is spent by the time the client returns, else _failure_code(result.error). The
+        fleet's own error text never becomes the reason.
+        """
+        if not self.configured(server):
+            raise FederationError(server, tool, "not_configured")
+        if deadline is None:
+            result = self._client(server).call_tool(tool, args)
+        else:
+            remaining = deadline - self._monotonic()
+            if remaining < MIN_CALL_SECONDS:
+                raise FederationError(server, tool, ZAMAN_ASIMI)
+            result = self._client(server).call_tool(tool, args, timeout=min(CALL_TIMEOUT_SECONDS, remaining))
+        if not result.ok:
+            logger.warning("%s.%s failed: %s", server, tool, upstream_log_text(result.error))
+            if deadline is not None and deadline - self._monotonic() < MIN_CALL_SECONDS:
+                raise FederationError(server, tool, ZAMAN_ASIMI)
+            raise FederationError(server, tool, _failure_code(result.error))
+        return result

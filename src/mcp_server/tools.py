@@ -7,12 +7,14 @@ from typing import Any, Callable
 
 from src import roles
 from src.mcp_server import __version__, gates, rehber, vendor_sync
+from src.mcp_server.butce import Butce
 from src.mcp_server.config import Settings
 from src.mcp_server.coverage import Coverage
 from src.mcp_server.dashboard_context import DashboardContext, DashboardUnavailable
 from src.mcp_server.derle_araci import Derleyici
 from src.mcp_server.federation import (ANAMNESIS, EGITIM_KAYNAK, MINIMAX, MUFREDAT, TOOL_BUDGET_SECONDS,
                                        TR_LITERATUR, Federation, FederationError)
+from src.mcp_server.gorsel import GorselUretici
 from src.mcp_server.kapsam import KapsamBuilder
 from src.mcp_server.katalog import CatalogWriter, Yayinci
 from src.mcp_server.kaynak_oku import KaynakOkuyucu, wrap_kaynak_verisi
@@ -46,7 +48,7 @@ class Tools:
                  dashboard: DashboardContext | None = None, runs: RunStore | None = None,
                  drafts: DraftStore | None = None, catalog: CatalogWriter | None = None,
                  assets: AssetStore | None = None, downloader: GuvenliIndirici | None = None,
-                 monotonic: Callable[[], float] = time.monotonic) -> None:
+                 butce: Butce | None = None, monotonic: Callable[[], float] = time.monotonic) -> None:
         self.settings = settings
         self.federation = federation
         self.clock = clock
@@ -56,6 +58,7 @@ class Tools:
         self.downloader = downloader if downloader is not None else GuvenliIndirici()
         self.drafts = drafts if drafts is not None else DraftStore(settings.data_dir)
         self.catalog = catalog if catalog is not None else CatalogWriter(settings.data_dir, clock)
+        self.butce = butce
         self.monotonic = monotonic  # spec §7 budget for the canli=True live probe
 
     def durum(self, email: str, canli: bool = False) -> dict[str, Any]:
@@ -163,3 +166,7 @@ class Tools:
 
     def kaldir(self, email: str, slug: str) -> dict[str, Any]:
         return self._yayinci().kaldir(email, slug)
+
+    def gorsel(self, email: str, run_id: str, istek: str, tercih: str | None = None) -> dict[str, Any]:
+        return GorselUretici(self.federation, self.runs, self.assets, self.butce, self.downloader).uret(
+            email, run_id, istek, tercih=tercih)
