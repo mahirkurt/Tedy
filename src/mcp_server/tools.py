@@ -10,11 +10,13 @@ from src.mcp_server import __version__, gates, rehber, vendor_sync
 from src.mcp_server.config import Settings
 from src.mcp_server.coverage import Coverage
 from src.mcp_server.dashboard_context import DashboardContext, DashboardUnavailable
-from src.mcp_server.federation import (ANAMNESIS, EGITIM_KAYNAK, MUFREDAT, TOOL_BUDGET_SECONDS, Federation,
-                                       FederationError)
+from src.mcp_server.derle_araci import Derleyici
+from src.mcp_server.federation import (ANAMNESIS, EGITIM_KAYNAK, MINIMAX, MUFREDAT, TOOL_BUDGET_SECONDS,
+                                       TR_LITERATUR, Federation, FederationError)
 from src.mcp_server.kapsam import KapsamBuilder
 from src.mcp_server.kaynak_oku import KaynakOkuyucu, wrap_kaynak_verisi
 from src.mcp_server.runs import RunStore
+from src.mcp_server.taslak import DraftStore
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -23,6 +25,8 @@ _HEALTH_CALLS: dict[str, tuple[str, dict[str, Any]]] = {
     MUFREDAT: ("server_info", {}),
     EGITIM_KAYNAK: ("kb_server_info", {}),
     ANAMNESIS: ("corpus_stats", {"collection": "edupedia:run:000000000000"}),
+    MINIMAX: ("list_voices", {"voice_type": "system"}),
+    TR_LITERATUR: ("tr_literatur_server_info", {}),
 }
 
 
@@ -38,12 +42,13 @@ def app_revision(root: Path = PROJECT_ROOT) -> str | None:
 class Tools:
     def __init__(self, settings: Settings, federation: Federation, clock: Callable[[], float] = time.time,
                  dashboard: DashboardContext | None = None, runs: RunStore | None = None,
-                 monotonic: Callable[[], float] = time.monotonic) -> None:
+                 drafts: DraftStore | None = None, monotonic: Callable[[], float] = time.monotonic) -> None:
         self.settings = settings
         self.federation = federation
         self.clock = clock
         self.dashboard = dashboard
         self.runs = runs if runs is not None else RunStore(settings.data_dir)
+        self.drafts = drafts if drafts is not None else DraftStore(settings.data_dir)
         self.monotonic = monotonic  # spec §7 budget for the canli=True live probe
 
     def durum(self, email: str, canli: bool = False) -> dict[str, Any]:
@@ -79,7 +84,11 @@ class Tools:
                 if not self.federation.configured(name):
                     cov.skipped(name, "anahtar yok")
                     continue
-                tool, args = _HEALTH_CALLS[name]
+                call = _HEALTH_CALLS.get(name)
+                if call is None:
+                    cov.skipped(name, "saglik_cagrisi_yok")
+                    continue
+                tool, args = call
                 try:
                     self.federation.call(name, tool, args, beklenen="nesne", deadline=deadline)
                     cov.hit(name)
@@ -123,3 +132,13 @@ class Tools:
     def kaynak_oku(self, email: str, run_id: str, soru: str, top_k: int = 5) -> dict[str, Any]:
         body = KaynakOkuyucu(self.federation, self.runs).oku(run_id, soru, top_k=top_k)
         return wrap_kaynak_verisi(body)
+
+    def _derleyici(self) -> Derleyici:
+        return Derleyici(self.runs, self.drafts, self.settings.parent_origin, self.settings.dashboard_public_url,
+                         clock=self.clock)
+
+    def derle(self, email: str, run_id: str, module_data: Any) -> dict[str, Any]:
+        return self._derleyici().derle(email, run_id, module_data)
+
+    def onizle(self, email: str, taslak_id: str) -> dict[str, Any]:
+        return self._derleyici().onizle(email, taslak_id)

@@ -15,6 +15,7 @@ from src.mcp_server import __version__
 from src.mcp_server.tools import Tools
 
 _RO = ToolAnnotations(readOnlyHint=True, openWorldHint=True)
+_WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
 # Tool bodies get their own worker-thread budget (like http_app._VERIFY_LIMITER): slow fleet calls can
 # fill these threads, never the default limiter the bearer gate, OAuth endpoints and store calls use.
 TOOL_THREAD_LIMIT = 16
@@ -92,5 +93,22 @@ def build_server(tools: Tools) -> FastMCP:
         email = caller_email(ctx)
         return await anyio.to_thread.run_sync(
             functools.partial(tools.kaynak_oku, email, run_id=run_id, soru=soru, top_k=top_k), limiter=_TOOL_LIMITER)
+
+    @mcp.tool(annotations=_WRITE)
+    async def edupedia_derle(ctx: Context, run_id: str, module_data: dict[str, Any] | str) -> dict[str, Any]:
+        """MODULE_DATA'yı (nesne veya JSON metni, en fazla 400.000 bayt) edupedia_kapsam run_id'sine bağlı olarak
+        derler, 18 kalite kapısını koşar ve değişmez bir taslak kaydeder. curriculum ve verification blokları
+        zorunludur. Görsel/ses baytı gönderme; meta.assets'te yalnız asset_id kullan. HTML dönmez; taslak_id,
+        kapı özeti ve FAIL/WARN ayrıntıları döner."""
+        email = caller_email(ctx)
+        return await anyio.to_thread.run_sync(
+            functools.partial(tools.derle, email, run_id=run_id, module_data=module_data), limiter=_TOOL_LIMITER)
+
+    @mcp.tool(annotations=_RO)
+    async def edupedia_onizle(ctx: Context, taslak_id: str) -> dict[str, Any]:
+        """Taslağın tedy.online önizleme bağlantısını döner (aile girişi ister, 10 dakikalık bilet)."""
+        email = caller_email(ctx)
+        return await anyio.to_thread.run_sync(
+            functools.partial(tools.onizle, email, taslak_id=taslak_id), limiter=_TOOL_LIMITER)
 
     return mcp

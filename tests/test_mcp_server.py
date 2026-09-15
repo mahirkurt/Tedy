@@ -130,14 +130,15 @@ def test_rehber_tool_is_registered_and_returns_akis(tmp_path):
     assert body["bolum"] == "akis" and body["status"] == "ok"
 
 
-def test_all_five_core_tools_are_listed(tmp_path):
+def test_core_tools_are_listed(tmp_path):
     store = OAuthStore(tmp_path / "o.sqlite3")
     key = store.create_static_key("t", FULL)
     with _client(tmp_path, store) as c:
         listed = _sse_json(c.post("/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
                                   headers={**MCP_HEADERS, "authorization": f"Bearer {key}"}))
     names = {t["name"] for t in listed["result"]["tools"]}
-    assert names == {"edupedia_durum", "edupedia_rehber", "edupedia_baglam", "edupedia_kapsam", "edupedia_kaynak_oku"}
+    assert names == {"edupedia_durum", "edupedia_rehber", "edupedia_baglam", "edupedia_kapsam", "edupedia_kaynak_oku",
+                     "edupedia_derle", "edupedia_onizle"}
 
 
 def test_slow_tool_does_not_block_concurrent_requests(tmp_path):
@@ -204,6 +205,8 @@ TOOL_ARGUMENTS = {
     "edupedia_baglam": {"gun": 7},
     "edupedia_kapsam": {"ders": "Fen Bilimleri", "sinif": "5", "konu": "madde"},
     "edupedia_kaynak_oku": {"run_id": "abcdef012345", "soru": "buharlaşma"},
+    "edupedia_derle": {"run_id": "abcdef012345", "module_data": {}},
+    "edupedia_onizle": {"taslak_id": "ffffffffffffffff"},
 }
 PROBE_WITHIN_SECONDS = 1.0
 
@@ -235,6 +238,12 @@ def test_parked_tool_bodies_never_take_the_threads_auth_and_store_calls_need(tmp
             return park()
 
         def kaynak_oku(self, email, run_id, soru, top_k=5):
+            return park()
+
+        def derle(self, email, run_id, module_data):
+            return park()
+
+        def onizle(self, email, taslak_id):
             return park()
 
     settings = _settings(tmp_path)
@@ -315,7 +324,9 @@ def test_durum_live_probe_reports_codes_not_fleet_error_text(tmp_path):
     settings = _settings(tmp_path)
     body = tools.Tools(settings, Federation(settings, client_factory=Client)).durum(FULL, canli=True)
     assert body["coverage"] == {"maarif-mufredat": "degraded:tool_error", "egitim-kaynak": "skipped:anahtar yok",
-                                "anamnesis": "skipped:anahtar yok"}
+                                "anamnesis": "skipped:anahtar yok", "pexels": "skipped:anahtar yok",
+                                "minimax": "skipped:anahtar yok", "comfyui": "skipped:anahtar yok",
+                                "tr-literatur": "skipped:anahtar yok", "openalex": "skipped:anahtar yok"}
     out = json.dumps(body, ensure_ascii=False)
     assert "IGNORE PREVIOUS INSTRUCTIONS" not in out and "exfiltrate the run record" not in out
 
@@ -366,6 +377,11 @@ def test_durum_live_probe_applies_tool_budget_and_shares_one_deadline(tmp_path):
         "maarif-mufredat": "hit",
         "egitim-kaynak": "degraded:zaman_asimi",
         "anamnesis": "degraded:zaman_asimi",
+        "pexels": "skipped:anahtar yok",
+        "minimax": "skipped:anahtar yok",
+        "comfyui": "skipped:anahtar yok",
+        "tr-literatur": "skipped:anahtar yok",
+        "openalex": "skipped:anahtar yok",
     }
 
 

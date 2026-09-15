@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 MUFREDAT = "maarif-mufredat"
 EGITIM_KAYNAK = "egitim-kaynak"
 ANAMNESIS = "anamnesis"
+PEXELS = "pexels"
+MINIMAX = "minimax"
+COMFYUI = "comfyui"
+TR_LITERATUR = "tr-literatur"
+OPENALEX = "openalex"
 
 # Spec §7 time budget: 25 s per call, 60 s per tool. A tool fixes its deadline (monotonic seconds) once
 # at entry and passes it to every call; a call the remaining budget cannot cover is not made.
