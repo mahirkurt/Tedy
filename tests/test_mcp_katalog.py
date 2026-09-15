@@ -1,11 +1,13 @@
 """Catalog writer and publish tools: immutable versions, EXAM/FAIL refusal, soft removal, concurrency."""
 import hashlib
+import json
 from concurrent.futures import ThreadPoolExecutor
 
 import anyio
 import pytest
 
 from src import module_store as ms
+from src.json_utils import atomic_json_dump
 from src.mcp_server import ornekler, server, tools
 from src.mcp_server.config import load_settings
 from src.mcp_server.derle_araci import Derleyici
@@ -129,6 +131,121 @@ def test_katalog_and_soft_removal(env):
     assert row["removed_by"] == FULL and row["removed_at"]
     assert yayinci.kaldir(FULL, "fen5-su")["status"] == "bulunamadi"
     assert yayinci.kaldir(FULL, "../x")["status"] == "gecersiz_slug"
+
+
+# -- Fix round 1 -----------------------------------------------------------------------------
+
+def test_next_version_ignores_malformed_catalog_rows(env):
+    """F1: a corrupted `version` field (e.g. a disk edit gone wrong) must not crash version
+    selection via an unguarded int() coercion; it is simply invisible to it."""
+    tmp_path, derleyici, yayinci = env
+    taslak_id = _taslak(derleyici)
+    first = yayinci.yayinla(FULL, taslak_id, slug="fen5-su")
+    assert first["status"] == "ok" and first["version"] == 1
+
+    catalog_path = ms.catalog_path(tmp_path)
+    data = json.loads(catalog_path.read_text(encoding="utf-8"))
+    data["moduller"].append({**data["moduller"][0], "version": "x"})
+    atomic_json_dump(data, str(catalog_path))
+
+    body = yayinci.yayinla(FULL, taslak_id, slug="fen5-su")
+    assert body["status"] == "ok" and body["version"] == 2
+
+    assert yayinci.katalog(durum="hepsi")["status"] == "ok"
+    assert yayinci.kaldir(FULL, "fen5-su")["status"] == "ok"
+
+
+def test_version_limit_returns_a_closed_status_carrying_the_limit(env, monkeypatch):
+    """F2/F3: exceeding VERSION_MAX must not raise a raw ValueError out of Yayinci.yayinla."""
+    tmp_path, derleyici, yayinci = env
+    monkeypatch.setattr(ms, "VERSION_MAX", 2)
+    taslak_id = _taslak(derleyici)
+    assert yayinci.yayinla(FULL, taslak_id, slug="fen5-su")["version"] == 1
+    assert yayinci.yayinla(FULL, taslak_id, slug="fen5-su")["version"] == 2
+    body = yayinci.yayinla(FULL, taslak_id, slug="fen5-su")
+    assert body["status"] == "surum_siniri" and body["sinir"] == 2 and body["taslak_id"] == taslak_id
+
+
+def test_symlinked_slug_directory_is_rejected_and_nothing_is_written(env, tmp_path_factory):
+    """F2/F3: module_html_path's containment rejection (e.g. a symlinked slug dir) must surface
+    as its own status, not a mislabeled surum_siniri, and must never write outside the root."""
+    tmp_path, derleyici, yayinci = env
+    outside = tmp_path_factory.mktemp("outside")
+    modules_root = ms.modules_root(tmp_path)
+    modules_root.mkdir(parents=True, exist_ok=True)
+    (modules_root / "fen5-su").symlink_to(outside, target_is_directory=True)
+    taslak_id = _taslak(derleyici)
+
+    body = yayinci.yayinla(FULL, taslak_id, slug="fen5-su")
+
+    assert body["status"] == "yol_reddedildi"
+    assert list(outside.iterdir()) == []
+
+
+def test_unexpected_exception_from_catalog_write_becomes_closed_sunucu_hatasi(env, monkeypatch):
+    """F3: an unrelated failure (e.g. ENOSPC) inside CatalogWriter.yayinla must reach the tool
+    caller as a closed status, never as the exception's own text or type name."""
+    _, derleyici, yayinci = env
+    taslak_id = _taslak(derleyici)
+
+    def boom(*args, **kwargs):
+        raise OSError("disk dolu /home/x")
+
+    monkeypatch.setattr(yayinci.catalog, "yayinla", boom)
+    body = yayinci.yayinla(FULL, taslak_id, slug="fen5-su")
+    assert body["status"] == "sunucu_hatasi" and body["taslak_id"] == taslak_id
+    dumped = json.dumps(body, ensure_ascii=False)
+    assert "disk dolu" not in dumped and "OSError" not in dumped
+
+
+def test_catalog_read_failure_becomes_closed_sunucu_hatasi_for_katalog_and_kaldir(env, monkeypatch):
+    """F3: katalog() and kaldir() must close off any exception from the catalog read, too."""
+    _, derleyici, yayinci = env
+    taslak_id = _taslak(derleyici)
+    yayinci.yayinla(FULL, taslak_id, slug="fen5-su")
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("iç ayrıntı")
+
+    monkeypatch.setattr(ms, "read_catalog", boom)
+
+    body_katalog = yayinci.katalog()
+    assert body_katalog["status"] == "sunucu_hatasi"
+    assert "iç ayrıntı" not in json.dumps(body_katalog, ensure_ascii=False)
+
+    body_kaldir = yayinci.kaldir(FULL, "fen5-su")
+    assert body_kaldir["status"] == "sunucu_hatasi" and body_kaldir["slug"] == "fen5-su"
+    assert "iç ayrıntı" not in json.dumps(body_kaldir, ensure_ascii=False)
+
+
+def test_fail_check_is_derived_from_kapilar_not_just_the_summary_count(env):
+    """F4: a tampered draft record (gates.fail=0 but a FAIL entry still in kapilar) must still
+    refuse — the FAIL check is fail-closed against the per-gate report, not the summary field."""
+    tmp_path, derleyici, yayinci = env
+    taslak_id = _taslak(derleyici)
+    record_path = ms.draft_dir(tmp_path, taslak_id) / ms.DRAFT_RECORD
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    assert record["gates"]["fail"] == 0
+    record["kapilar"] = {"G-VERIFY": {"status": "FAIL"}}
+    atomic_json_dump(record, str(record_path))
+
+    body = yayinci.yayinla(FULL, taslak_id)
+
+    assert body["status"] == "kapi_fail" and "G-VERIFY" in body["fail_kapilari"]
+
+
+def test_fail_check_refuses_when_kapilar_is_missing(env):
+    """F4: a record with no kapilar at all is malformed, not proof of a clean gate report."""
+    tmp_path, derleyici, yayinci = env
+    taslak_id = _taslak(derleyici)
+    record_path = ms.draft_dir(tmp_path, taslak_id) / ms.DRAFT_RECORD
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    del record["kapilar"]
+    atomic_json_dump(record, str(record_path))
+
+    body = yayinci.yayinla(FULL, taslak_id)
+
+    assert body["status"] == "kapi_fail" and body["fail_kapilari"] == []
 
 
 class _Fed:
