@@ -21,12 +21,19 @@ def _teach(data):
 
 @pytest.mark.parametrize("mode", ornekler.MODES)
 def test_golden_every_mode_compiles_with_no_failing_gate(mode):
-    report = gates.run_gates(derleme.derle(ornekler.ornek(mode), {}, ORIGIN))
+    data = ornekler.ornek(mode)
+    report = gates.run_gates(derleme.derle(data, {}, ORIGIN))
     assert len(report) == 18
     assert _fails(report) == []
     assert report["G-BRIDGE"]["status"] == "PASS"
     assert report["G-VERIFY"]["status"] in ("PASS", "WARN")
     assert report["G-CURRICULUM"]["status"] in ("PASS", "WARN")
+    if mode == "MODULE":
+        # Fix round 1, F3: the SVG->pictogram golden-example workaround is gone; the demo's
+        # inline-SVG teach visual must compile through and G-SVG must genuinely check it, not
+        # skip it because there is nothing left to check.
+        assert report["G-SVG"]["status"] != "FAIL"
+        assert _teach(data)["visual"]["kind"] == "svg"
 
 
 def test_golden_exam_applies_the_exam_gate():
@@ -123,32 +130,73 @@ def test_asset_block_escapes_lt_so_a_credit_cannot_swallow_the_engine_script():
     assert report["G-ATTRIB"]["status"] == "PASS"
 
 
-def test_js_string_is_also_valid_json_for_grounding_source_literals():
-    # Ruling T7-3: gates_ek.gate_attrib json.loads-parses `grounding: {source: "…"}` string
-    # literals. "<\!--" is valid JS but not valid JSON, so a source containing "<!--" would
-    # make json.loads (and therefore run_gates) raise. "\u003c!--" is valid in both.
+def test_js_string_is_also_valid_json_when_it_stays_double_quoted():
+    # Ruling T7-3 (still true for any string F3's new template-literal branch does not claim,
+    # i.e. one that does not contain both '"' and '<' -- this one has no '"' at all):
+    # gates_ek.gate_attrib json.loads-parses grounding/credit string literals straight out of
+    # the compiled HTML. "<\!--" is valid JS but not valid JSON, so a source containing "<!--"
+    # would make json.loads (and therefore run_gates) raise. "\u003c!--" is valid in both.
     assert json.loads(derleme.js_literal("a<!--b</script>c d")) == "a<!--b</script>c d"
 
 
-def test_licensed_grounding_source_with_html_comment_open_survives_the_gate():
-    # Ruling T7-3: with the brief's original "<\!--" escaping this raises inside
-    # gates.run_gates (json.loads on the grounding literal, invalid JSON escape); with
-    # \u003c!-- it does not, and the source text still reaches the footer line (HTML-escaped
-    # as content, but present once unescaped) that G-ATTRIB checks for.
-    import html as html_lib
+def test_grounding_source_containing_angle_bracket_is_now_refused_by_f4():
+    # Fix round 1, F4 supersedes part of ruling T7-3's original scenario: a grounding
+    # source/license may no longer contain "<" at all (new schema-level ban below), precisely
+    # so `_js_string` can never route a grounding source/license through F3's new
+    # template-literal branch (which triggers on both a quote and "<") -- gates_ek's grounding
+    # parser only understands double-quoted JSON strings, not backtick template literals (see F4
+    # in derleme.sema_dogrula). A source containing "<!--", which used to compile and PASS
+    # G-ATTRIB before this fix round, is therefore now a sema_hatasi instead.
     data = ornekler.ornek("MODULE")
     data["verification"]["claims"].append({
         "claim": "Su döngüsü güneş enerjisiyle sürer.",
         "grounding": {"source": "<!--Açık Ders Notları", "url": "https://example.org/notlar",
                       "license": "CC BY 4.0"},
         "verdict": "supported_by_source"})
-    html = derleme.derle(data, {}, ORIGIN)
-    report = gates.run_gates(html)
-    assert report["G-ATTRIB"]["status"] == "PASS"
-    footer_start = html.index('<footer id="edupedia-atif"')
-    footer_end = html.index("</footer>", footer_start)
-    footer_text = html_lib.unescape(html[footer_start:footer_end])
-    assert "Kaynak: <!--Açık Ders Notları — CC BY 4.0" in footer_text
+    with pytest.raises(DerlemeHatasi) as exc:
+        derleme.derle(data, {}, ORIGIN)
+    assert exc.value.status == "sema_hatasi"
+    assert any("grounding" in h for h in exc.value.detay["hatalar"])
+
+
+def test_grounding_source_with_braces_is_refused_by_schema():
+    # F4: gates_ek's `grounding: {…}` capture is brace-balance-blind ([^{}]*), so a source or
+    # license containing '{'/'}' would never be seen by it (a silent false SKIPPED, per the
+    # review's Important-2 finding) -- refuse it at the schema boundary instead.
+    data = ornekler.ornek("MODULE")
+    data["verification"]["claims"].append({
+        "claim": "Test iddiası.",
+        "grounding": {"source": "PhET {Maddenin Hâlleri}", "url": "https://phet.colorado.edu/x",
+                      "license": "CC BY 4.0"},
+        "verdict": "supported_by_source"})
+    with pytest.raises(DerlemeHatasi) as exc:
+        derleme.derle(data, {}, ORIGIN)
+    assert exc.value.status == "sema_hatasi"
+    assert any("grounding" in h for h in exc.value.detay["hatalar"])
+
+
+def test_js_string_keeps_double_quoted_json_when_there_is_no_angle_bracket():
+    # F3: only strings containing BOTH '"' and '<' become template literals; plain prose with
+    # a quote and no markup (e.g. an exam stem) keeps today's double-quoted JSON encoding, so
+    # the vendored G-EXAM free-text regexes (hardcoded ["\']...["\'] delimiters) still see a
+    # quote-delimited string.
+    out = derleme.js_literal('Diyor ki "hızlı" olmalı')
+    assert out.startswith('"')
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node yok")
+def test_template_literal_html_fragment_round_trips_through_node():
+    # F3: `_js_string` emits a backtick template literal only for a value containing both '"'
+    # and '<' (e.g. inline SVG/HTML with double-quoted attributes), so the vendored gates' raw-
+    # text scans (G-SVG's role="img" substring match) see real, unescaped double quotes. This
+    # proves the emitted literal is valid JS *and* round-trips to the exact original text.
+    text = ('<svg role="img"><title>a' + chr(96) + 'b ${x} ' + chr(92)
+            + ' </script><!--' + chr(0x2028) + ' </title></svg>')
+    literal = derleme.js_literal(text)
+    assert literal.startswith("`") and literal.endswith("`")
+    out = subprocess.run(["node", "-e", "process.stdout.write(JSON.stringify(" + literal + "))"],
+                         capture_output=True, text=True, check=True).stdout
+    assert json.loads(out) == text
 
 
 @pytest.mark.parametrize("mutate,fragment", [
@@ -181,6 +229,21 @@ def test_schema_errors(mutate, fragment):
     ('<img src="https://evil.example/p.png" alt="">', "dış kaynak"),
     ('<div style="background:url(//evil.example/p.png)">x</div>', "CSS"),
     ('<iframe src="data:text/html,x"></iframe>', "yasak etiket"),
+    # F1 (fix round 1): the raw text alone hides these — the URL parser strips ASCII
+    # tab/CR/LF before scheme-sniffing, and the HTML parser decodes character references in
+    # attribute values assigned through .innerHTML; guvenlik_tara now also scans a normalised
+    # (html.unescape'd, tab/CR/LF/NUL-stripped) copy of every string.
+    ('<a href="java\tscript:alert(1)">x</a>', "javascript"),
+    ('<a href="java\nscript:alert(1)">x</a>', "javascript"),
+    ('<a href="&#106;avascript:alert(1)">x</a>', "javascript"),
+    ('<a href="javascript&colon;alert(1)">x</a>', "javascript"),
+    ('<a href="vbscript:msgbox(1)">x</a>', "javascript"),
+    ('<div style="width:expression(alert(1))">x</div>', "CSS"),
+    ('<div style="background:url(data:text/html;base64,PHNjcmlwdD4=)">x</div>', "CSS"),
+    # F2 (fix round 1): a srcset candidate list can smuggle a remote URL anywhere after the
+    # first (lowest-DPI) candidate, not only right after `=`.
+    ('<img src="data:image/gif;base64,AA==" '
+     'srcset="data:image/gif;base64,AA== 1x, https://evil.example/t.png 2x" alt="">', "dış kaynak"),
 ])
 def test_content_security_rejects_active_or_remote_html(payload, label):
     data = ornekler.ornek("MODULE")
@@ -189,6 +252,16 @@ def test_content_security_rejects_active_or_remote_html(payload, label):
         derleme.derle(data, {}, ORIGIN)
     assert exc.value.status == "sema_hatasi"
     assert any(label in h for h in exc.value.detay["hatalar"])
+
+
+def test_content_security_still_allows_data_image_css_background():
+    # F1's negative case: `url(data:image/...)` (a legitimate inline CSS image) must not be
+    # refused by the new `url(data:(?!image/))` pattern.
+    data = ornekler.ornek("MODULE")
+    payload = '<div style="background:url(data:image/png;base64,QQ==)">x</div>'
+    _teach(data)["body"] = [payload]
+    html = derleme.derle(data, {}, ORIGIN)
+    assert "background:url(data:image/png;base64,QQ==)" in html
 
 
 def test_module_data_at_the_budget_compiles():

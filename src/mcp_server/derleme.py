@@ -30,11 +30,20 @@ _FORBIDDEN = (
     (re.compile(r"<\s*(?:iframe|object|embed|form|base|meta|link)\b", re.I), "yasak etiket"),
     (re.compile(r"<[^>]*\son[a-z]+\s*=", re.I), "satır içi olay işleyicisi"),
     (re.compile(r"javascript\s*:", re.I), "javascript: adresi"),
+    (re.compile(r"vbscript\s*:", re.I), "javascript: adresi"),
+    # F2 (fix round 1): a `srcset` candidate list can smuggle a remote URL anywhere after the
+    # first candidate ("data:...low-res 1x, https://evil.example/x.png 2x"); this pattern scans
+    # the whole quoted/unquoted attribute value, not just the text immediately after `=`.
+    (re.compile(r"\bsrcset\s*=\s*(?:\"[^\"]*|'[^']*|[^\s>]*)(?:https?:|//)", re.I), "dış kaynak bağlantısı"),
     (re.compile(r"\b(?:src|href|xlink:href|action|formaction|poster|srcset)\s*=\s*[\"']?\s*(?:https?:|//)", re.I),
      "dış kaynak bağlantısı"),
     (re.compile(r"url\(\s*[\"']?\s*(?:https?:|//)", re.I), "CSS dış kaynağı"),
+    # F1: `url(data:text/html,...)` etc. — only `data:image/...` is allowed (legitimate inline images).
+    (re.compile(r"url\(\s*[\"']?\s*data:(?!image/)", re.I), "CSS dış kaynağı"),
     (re.compile(r"@import", re.I), "CSS @import"),
+    (re.compile(r"expression\s*\(", re.I), "CSS expression"),
 )
+_SCAN_STRIP_RE = re.compile(r"[\t\n\r\x00]")
 
 
 class DerlemeHatasi(Exception):
@@ -57,20 +66,57 @@ class GomuluVarlik:
     kaynak: str
 
 
-def _js_string(text: str) -> str:
+def _double_quoted_string(text: str) -> str:
+    """Ruling T7-3's double-quoted JS string literal: valid JS *and* valid JSON.
+
+    gates_ek.gate_attrib json.loads-parses grounding source/credit literals straight out of the
+    compiled HTML, so every escape here must be legal in both languages. "<\\!--" (T7-3's
+    starting point) is legal JS but not legal JSON; "\\u003c!--" is legal in both.
+    """
     out = json.dumps(text, ensure_ascii=False)
     out = out.replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
     out = re.sub(r"</(script)", r"<\\/\1", out, flags=re.I)
-    # Ruling T7-3: "<!--" must become a valid *JSON* escape too, not only a valid JS one.
-    # "<\\!--" (the brief's original) is legal JS but not legal JSON, and gates_ek.gate_attrib
-    # json.loads-parses grounding source/credit literals straight out of the compiled HTML; a
-    # source containing "<!--" would make that json.loads (and so run_gates) raise. "\u003c!--"
-    # is a valid escape in both languages.
     return out.replace("<!--", "\\u003c!--")
 
 
+def _template_literal_string(text: str) -> str:
+    """F3 (fix round 1): backtick JS template literal for HTML/SVG fragments.
+
+    Used only for values containing both '"' and '<' (see `_js_string`) — e.g. an inline SVG
+    diagram authored with double-quoted attributes (`<svg role="img" ...>`). A JSON-double-quoted
+    string necessarily backslash-escapes every embedded '"', which defeats the vendored gates'
+    raw-text scans for a literal, unescaped `role="img"` (G-SVG's `_svg_accessible`). A template
+    literal never needs to escape '"', so it survives that scan unescaped, exactly like the
+    vendored template's own authoring convention for the same content
+    (`module-template.html`'s `ref:` fields use backtick strings for this reason).
+
+    Escaping order matters: the backslash escape must run first, so the backslashes the later
+    escapes introduce (`\\``, `\\${`, `<\\/script`, `\\u003c!--`, `\\u2028`, `\\u2029`) are never
+    themselves re-escaped by it.
+    """
+    out = text.replace("\\", "\\\\")
+    out = out.replace("`", "\\`")
+    out = out.replace("${", "\\${")
+    out = re.sub(r"</(script)", r"<\\/\1", out, flags=re.I)
+    out = out.replace("<!--", "\\u003c!--")
+    out = out.replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+    return f"`{out}`"
+
+
+def _js_string(text: str) -> str:
+    """Bare-key JS literal's string encoding: template literal for HTML/SVG fragments (F3), the
+    T7-3 double-quoted JSON form for everything else (so free text like `sourceCitation` and the
+    vendored G-EXAM regexes' `["\\']`-delimited extraction keep seeing quote-delimited strings)."""
+    if '"' in text and "<" in text:
+        return _template_literal_string(text)
+    return _double_quoted_string(text)
+
+
 def _js_key(key: str) -> str:
-    return key if _IDENT_RE.fullmatch(key) else _js_string(key)
+    # A template literal is not valid JS object-key syntax on its own (`` `foo`: 1 `` is a syntax
+    # error without a computed-property `[...]` wrapper this compiler doesn't emit), so a
+    # non-identifier key always uses the double-quoted form regardless of its content.
+    return key if _IDENT_RE.fullmatch(key) else _double_quoted_string(key)
 
 
 def js_literal(value: Any, depth: int = 0) -> str:
@@ -121,11 +167,25 @@ def _walk_strings(value: Any, path: str = "MODULE_DATA"):
             yield from _walk_strings(item, f"{path}[{index}]")
 
 
+def _normalize_for_scan(text: str) -> str:
+    """F1 (fix round 1): undo what the raw text alone hides from the scan.
+
+    The vendored engine assigns `teach.body` etc. through `.innerHTML`, so the browser's HTML
+    parser decodes character references (`&#106;`, `&colon;`, ...) in attribute values before the
+    URL parser ever sees the string; and the WHATWG URL parser strips ASCII tab/CR/LF (and a
+    stray NUL) from a URL string before scheme-sniffing. So `java&#9;script:` and
+    `&#106;avascript:` are both live `javascript:` URLs even though neither contains the literal
+    substring "javascript:" — scanning only the raw text misses them.
+    """
+    return _SCAN_STRIP_RE.sub("", html_lib.unescape(text))
+
+
 def guvenlik_tara(data: Any) -> list[str]:
     errors = []
     for path, text in _walk_strings(data):
+        normalized = _normalize_for_scan(text)
         for pattern, label in _FORBIDDEN:
-            if pattern.search(text):
+            if pattern.search(text) or pattern.search(normalized):
                 errors.append(f"{path}: {label}")
                 break
     return errors[:50]
@@ -168,8 +228,27 @@ def sema_dogrula(data: Any) -> list[str]:
             seen.add(sid)
     if not isinstance(data.get("curriculum"), dict):
         errors.append("curriculum bloğu zorunlu (müfredat dayanağı; spec §5.1 hibrit kuralı)")
-    if not isinstance(data.get("verification"), dict):
+    verification = data.get("verification")
+    if not isinstance(verification, dict):
         errors.append("verification bloğu zorunlu (G-VERIFY)")
+    else:
+        # F4 (fix round 1): gates_ek captures `grounding: {…}` bodies with a brace-balance-blind
+        # `[^{}]*`, and (per F3) `_js_string` only ever emits a template literal — which
+        # gates_ek's double-quote-only string regex cannot read — for a value containing both
+        # '"' and '<'. Forbidding braces, '<' and backtick in grounding source/license closes
+        # both gaps at the schema boundary, before either regex ever sees the text.
+        claims = verification.get("claims")
+        if isinstance(claims, list):
+            for index, claim in enumerate(claims):
+                grounding = claim.get("grounding") if isinstance(claim, dict) else None
+                if isinstance(grounding, dict) and isinstance(grounding.get("license"), str):
+                    texts = [grounding["license"]]
+                    source = grounding.get("source")
+                    if isinstance(source, str):
+                        texts.append(source)
+                    if any(ch in t for t in texts for ch in "{}<`"):
+                        errors.append("verification.claims[" + str(index) + "].grounding: "
+                                      "source/license içinde { } < ` kullanılamaz")
     ted = meta.get("tedLink")
     if ted is not None and not (isinstance(ted, dict) and ted.get("kind") in ("exam", "homework")
                                 and isinstance(ted.get("id"), str) and 0 < len(ted["id"]) <= 128):

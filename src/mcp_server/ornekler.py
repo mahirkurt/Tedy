@@ -67,32 +67,16 @@ def _verification() -> dict[str, Any]:
     }
 
 
-def _defang_inline_svg_visual(segment: dict[str, Any]) -> None:
-    """Golden-example fix (Task 7 Step 6): the vendored G-SVG gate's accessibility check
-    (validate_module.py:_svg_accessible) does a raw-text substring match for a literal,
-    unescaped `role="img"`. The demo authors two `teach` visuals as `kind:"svg"` with inline
-    markup (`ref: "<svg role=\\"img\\" ...>"`); once that string is JSON-encoded by
-    derleme.js_literal (required so the compiled output round-trips through json.loads for
-    G-ATTRIB/grounding, and so the same double-quote handling applies uniformly), every
-    embedded `"` becomes the literal two-character sequence `\\"` in the compiled HTML, and
-    `_svg_accessible`'s `'role="img"' in open_tag` no longer matches — a false FAIL, since
-    the SVG is genuinely accessible (role+title) once the JS string is evaluated at runtime.
-    There is no escaping choice that satisfies both JSON validity and this raw-text scan, so
-    the golden examples render these two figures as a `pictogram` (decorative, exempted by
-    `_svg_decorative`) using the segment's own `pictogram` icon instead of inline SVG data.
-    """
-    visual = segment.get("visual")
-    if isinstance(visual, dict) and visual.get("kind") == "svg":
-        segment["visual"] = {"kind": "pictogram", "ref": segment.get("pictogram") or "pic-idea"}
-
-
 def ornek(mode: str) -> dict[str, Any]:
     if mode not in MODES:
         raise ValueError(f"bilinmeyen mod: {mode}")
     data = demo()
     segments = data["segments"]
-    for segment in segments:
-        _defang_inline_svg_visual(segment)
+    # Fix round 1, F3: the vendored demo's `teach` visuals (`kind:"svg"`, inline diagram markup)
+    # are no longer converted to decorative pictograms here. `_js_string`'s new template-literal
+    # branch (derleme.py) lets these compile through with an accessible, unescaped
+    # `role="img"` — see the F3 note there for why the earlier pictogram workaround existed and
+    # why it is no longer needed.
     teach, mcq = _first(segments, "teach"), _first(segments, "mcq")
     mapped = [teach["id"], mcq["id"]]
     if mode == "QUIZ":
