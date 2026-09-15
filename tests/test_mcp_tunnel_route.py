@@ -1,6 +1,7 @@
 """tunnel_route: merge-only ingress edits with a one-rule interlock, DNS never clobbered, token never printed."""
 import io
 import json
+import os
 
 import pytest
 
@@ -289,7 +290,7 @@ def test_write_snapshot_refuses_loose_directory_perms(tmp_path):
 
 # Fix round 1: M-3 — rule reordering detection in verify
 def test_verify_reordering_message(tmp_path):
-    """When fazla=0 and eksik=0 but lists differ, message says rule order differs."""
+    """When fazla=0 and eksik=0 but lists differ, message says 'kural sırası farklı' (exact phrase)."""
     api = FakeApi(_ingress())
     _run(api, "ekle", "--servis", SERVICE, "--beklenen-kural", "52", "--uygula", "--yedek-dizini", str(tmp_path / "add"))
     # Reorder a rule (swap two middle rules) but don't add/remove
@@ -298,7 +299,10 @@ def test_verify_reordering_message(tmp_path):
     snapshot.write_text(json.dumps({"ingress": _ingress()}))
 
     rc, out = _run(api, "dogrula", "--servis", SERVICE, "--durum", "var", "--yedek", str(snapshot))
-    assert rc == 1 and ("kural sırası" in out or "sıra" in out), f"Should mention rule order. Output: {out}"
+    assert rc == 1, f"Should fail verification. Output: {out}"
+    # R2-1: Assert exact phrase and absence of "fazla 0, eksik 0"
+    assert "kural sırası farklı" in out, f"Should mention 'kural sırası farklı' (exact). Output: {out}"
+    assert "fazla 0, eksik 0" not in out, f"Should NOT say 'fazla 0, eksik 0' for reordering. Output: {out}"
 
 
 # Fix round 1: M-4 — config changed in between PUT
@@ -341,4 +345,77 @@ def test_reread_before_put_detects_concurrent_change(tmp_path):
     assert rc == 2, f"Should abort with rc 2 on concurrent change. RC: {rc}"
     # The error message goes to stderr, but we check it was rejected
     assert api.read_count == 2, "Should have done the second read before detecting change"
+
+
+# Fix round 2: R2-2 — kaldir partial failure message with cause, captured from stderr
+def test_kaldir_partial_failure_message_with_cause(tmp_path, capsys):
+    """Partial kaldir failure message includes DNS state, instruction, and cause."""
+    api = FakeApi(_ingress())
+    _run(api, "ekle", "--servis", SERVICE, "--beklenen-kural", "52", "--uygula", "--yedek-dizini", str(tmp_path / "a"))
+
+    class FailingPutApi:
+        def __init__(self, base_api):
+            self.base_api = base_api
+            self.put_attempted = False
+        def zone(self, name):
+            return self.base_api.zone(name)
+        def tunnel_id(self, account_id, name):
+            return self.base_api.tunnel_id(account_id, name)
+        def tunnel_config(self, account_id, tunnel_id):
+            return self.base_api.tunnel_config(account_id, tunnel_id)
+        def put_tunnel_config(self, account_id, tunnel_id, config):
+            self.put_attempted = True
+            raise tr.RouteError("test PUT failure")
+        def dns_records(self, zone_id, name):
+            return self.base_api.dns_records(zone_id, name)
+        def create_cname(self, zone_id, name, target):
+            return self.base_api.create_cname(zone_id, name, target)
+        def delete_dns_record(self, zone_id, record_id):
+            return self.base_api.delete_dns_record(zone_id, record_id)
+
+    failing_api = FailingPutApi(api)
+    rc, out = _run(failing_api, "kaldir", "--beklenen-kural", "53", "--uygula", "--yedek-dizini", str(tmp_path / "b"))
+    captured = capsys.readouterr()
+    assert rc == 2, f"Should fail. RC: {rc}"
+    error_msg = captured.err
+    # R2-2: Check message contains the required parts and the cause
+    assert "DNS kaydı silindi" in error_msg, f"Should mention DNS deleted. Stderr: {error_msg}"
+    assert "ingress kuralı hâlâ var" in error_msg, f"Should mention ingress still present. Stderr: {error_msg}"
+    assert "aynı kaldir komutunu tekrar çalıştırın" in error_msg, f"Should mention retry. Stderr: {error_msg}"
+    assert "test PUT failure" in error_msg, f"Should include cause. Stderr: {error_msg}"
+
+
+# Fix round 2: R2-3 — OSError on file write converted to RouteError
+def test_write_snapshot_oserror_conversion(tmp_path, monkeypatch):
+    """write_snapshot converts file-write OSError to RouteError with Turkish message."""
+    import errno
+
+    # Monkeypatch os.open to raise EACCES
+    original_open = os.open
+    def failing_open(*args, **kw):
+        if "json" in str(args[0]):  # Only fail for .json files
+            raise OSError(errno.EACCES, "Permission denied")
+        return original_open(*args, **kw)
+
+    monkeypatch.setattr(os, "open", failing_open)
+
+    with pytest.raises(tr.RouteError) as exc:
+        tr.write_snapshot(tmp_path, "test", {"data": 1}, 1789430400.0)
+
+    error_msg = str(exc.value)
+    assert "yedek dosyası yazılamadı" in error_msg, f"Should mention file write. Error: {error_msg}"
+    assert "Permission denied" in error_msg or "Izin" in error_msg, f"Should include OS error. Error: {error_msg}"
+    assert "secret" not in error_msg and "token" not in error_msg, f"Should not expose tokens. Error: {error_msg}"
+
+
+# Fix round 2: R2-4 — all created directory components get mode 0700
+def test_write_snapshot_parent_permissions(tmp_path):
+    """write_snapshot ensures all created directory components (including parents) have mode 0700."""
+    nested_dir = tmp_path / "a" / "b" / "c"
+    path = tr.write_snapshot(nested_dir, "test", {"data": 1}, 1789430400.0)
+
+    # Check that all directories are 0700
+    assert (nested_dir.stat().st_mode & 0o777) == 0o700, f"Leaf dir should be 0700"
+    assert ((tmp_path / "a" / "b").stat().st_mode & 0o777) == 0o700, f"Parent 'b' should be 0700"
+    assert ((tmp_path / "a").stat().st_mode & 0o777) == 0o700, f"Parent 'a' should be 0700"
 

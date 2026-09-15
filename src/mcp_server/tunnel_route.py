@@ -178,11 +178,21 @@ def write_snapshot(directory: Path, stem: str, payload: Any, now: float) -> Path
             if mode & 0o077:
                 raise RouteError(f"yedek dizinin izinleri çok açık (mode {oct(mode)}); elle denetleyin")
         else:
+            # R2-4: Ensure all directory components (including missing parents) get 0700
             directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+            # chmod all parent directories to 0700 that were just created
+            current = directory
+            while current != current.parent:
+                try:
+                    st_mode = current.stat().st_mode & 0o777
+                    if st_mode != 0o700:
+                        current.chmod(0o700)
+                except OSError:
+                    pass
+                current = current.parent
     except OSError as exc:
-        if not isinstance(exc, RouteError):
-            raise RouteError(f"yedek dizini oluşturulamadı: {exc.strerror if hasattr(exc, 'strerror') else str(exc)}")
-        raise
+        # R2-5: Removed dead isinstance check; RouteError is never caught by except OSError
+        raise RouteError(f"yedek dizini oluşturulamadı: {exc.strerror if hasattr(exc, 'strerror') else str(exc)}")
 
     # M-1: Avoid same-second filename collisions with random suffix
     timestamp = time.strftime('%Y%m%dT%H%M%SZ', time.gmtime(now))
@@ -334,10 +344,10 @@ def main(argv: list[str] | None = None, api: CloudflareApi | None = None, out: T
                 dns_deleted = dns == "doğru"
                 _put_and_confirm(api, account_id, tunnel_id, config, new)
             except RouteError as exc:
-                # I-2(b): If DNS was deleted but PUT failed, tell operator explicitly
+                # I-2(b)/R2-2: If DNS was deleted but PUT failed, tell operator explicitly with cause
                 if dns_deleted:
                     raise RouteError(f"kısmi başarısızlık: DNS kaydı silindi ama ingress kuralı hâlâ var; "
-                                   f"aynı kaldir komutunu tekrar çalıştırın") from None
+                                   f"aynı kaldir komutunu tekrar çalıştırın; neden: {exc}") from None
                 raise
             print("ingress: yazıldı ve yeniden okunarak doğrulandı", file=out)
         final = dns_state(api.dns_records(zone_id, args.host), args.host, target)
