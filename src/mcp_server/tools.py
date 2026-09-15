@@ -19,6 +19,7 @@ from src.mcp_server.kapsam import KapsamBuilder
 from src.mcp_server.katalog import CatalogWriter, Yayinci
 from src.mcp_server.kaynak_oku import KaynakOkuyucu, wrap_kaynak_verisi
 from src.mcp_server.medya import MedyaUretici
+from src.mcp_server.pedagoji import PedagojiKaniti
 from src.mcp_server.runs import RunStore
 from src.mcp_server.taslak import DraftStore
 from src.mcp_server.varliklar import AssetStore, GuvenliIndirici
@@ -176,3 +177,6 @@ class Tools:
               onay_belirteci: str | None = None, is_kimligi: str | None = None) -> dict[str, Any]:
         return MedyaUretici(self.federation, self.runs, self.assets, self.butce, self.downloader).uret(
             email, run_id, tur, istek, tahmin=tahmin, onay_belirteci=onay_belirteci, is_kimligi=is_kimligi)
+
+    def pedagoji_kaniti(self, email: str, konu: str, dil: str | None = None) -> dict[str, Any]:
+        return PedagojiKaniti(self.federation, self.settings.eric_api_url).ara(konu, dil=dil)

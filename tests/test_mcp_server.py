@@ -139,7 +139,7 @@ def test_core_tools_are_listed(tmp_path):
     names = {t["name"] for t in listed["result"]["tools"]}
     assert names == {"edupedia_durum", "edupedia_rehber", "edupedia_baglam", "edupedia_kapsam", "edupedia_kaynak_oku",
                      "edupedia_derle", "edupedia_onizle", "edupedia_yayinla", "edupedia_katalog", "edupedia_kaldir",
-                     "edupedia_gorsel", "edupedia_medya"}
+                     "edupedia_gorsel", "edupedia_medya", "edupedia_pedagoji_kaniti"}
 
 
 def test_slow_tool_does_not_block_concurrent_requests(tmp_path):
@@ -213,6 +213,7 @@ TOOL_ARGUMENTS = {
     "edupedia_kaldir": {"slug": "fen5-su"},
     "edupedia_gorsel": {"run_id": "abcdef012345", "istek": "su döngüsü"},
     "edupedia_medya": {"run_id": "abcdef012345", "tur": "ses", "istek": "metin"},
+    "edupedia_pedagoji_kaniti": {"konu": "geri getirme pratiği"},
 }
 PROBE_WITHIN_SECONDS = 1.0
 
@@ -265,6 +266,9 @@ def test_parked_tool_bodies_never_take_the_threads_auth_and_store_calls_need(tmp
             return park()
 
         def medya(self, email, run_id, tur, istek, tahmin=False, onay_belirteci=None, is_kimligi=None):
+            return park()
+
+        def pedagoji_kaniti(self, email, konu, dil=None):
             return park()
 
     settings = _settings(tmp_path)
