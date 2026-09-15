@@ -342,3 +342,10 @@ class Butce:
         if not hmac.compare_digest(self._mac(email, run_id, tur, anahtar, istek, cents, exp), sig):
             return None
         return cents / 10000
+
+    def is_kaydi(self, run_id: str, email: str, is_kimligi: str) -> dict[str, Any] | None:
+        """The caller's own started async job for this run, or None."""
+        for row in self._read()["kayitlar"]:
+            if (row.get("is_kimligi") == is_kimligi and row.get("run_id") == run_id and row.get("user") == email):
+                return row
+        return None

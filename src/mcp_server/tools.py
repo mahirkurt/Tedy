@@ -18,6 +18,7 @@ from src.mcp_server.gorsel import GorselUretici
 from src.mcp_server.kapsam import KapsamBuilder
 from src.mcp_server.katalog import CatalogWriter, Yayinci
 from src.mcp_server.kaynak_oku import KaynakOkuyucu, wrap_kaynak_verisi
+from src.mcp_server.medya import MedyaUretici
 from src.mcp_server.runs import RunStore
 from src.mcp_server.taslak import DraftStore
 from src.mcp_server.varliklar import AssetStore, GuvenliIndirici
@@ -170,3 +171,8 @@ class Tools:
     def gorsel(self, email: str, run_id: str, istek: str, tercih: str | None = None) -> dict[str, Any]:
         return GorselUretici(self.federation, self.runs, self.assets, self.butce, self.downloader).uret(
             email, run_id, istek, tercih=tercih)
+
+    def medya(self, email: str, run_id: str, tur: str, istek: str, tahmin: bool = False,
+              onay_belirteci: str | None = None, is_kimligi: str | None = None) -> dict[str, Any]:
+        return MedyaUretici(self.federation, self.runs, self.assets, self.butce, self.downloader).uret(
+            email, run_id, tur, istek, tahmin=tahmin, onay_belirteci=onay_belirteci, is_kimligi=is_kimligi)

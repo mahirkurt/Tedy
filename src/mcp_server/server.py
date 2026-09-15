@@ -150,4 +150,16 @@ def build_server(tools: Tools) -> FastMCP:
         return await anyio.to_thread.run_sync(functools.partial(tools.gorsel, email, run_id=run_id, istek=istek,
                                                                 tercih=tercih), limiter=_TOOL_LIMITER)
 
+    @mcp.tool(annotations=_OPEN_WRITE)
+    async def edupedia_medya(ctx: Context, run_id: str, tur: str, istek: str, tahmin: bool = False,
+                             onay_belirteci: str | None = None, is_kimligi: str | None = None) -> dict[str, Any]:
+        """Medya varlığı: tur ses (seslendirme metni), muzik (ilk satır stil, kalan satırlar söz) veya video.
+        Seslendirme bütçe içinde ve modül başına 3.000 karaktere kadar otomatiktir; müzik ve video her zaman
+        onay ister: önce tahmin=true ile tahmini tutarı ve onay_belirteci'ni al, kullanıcıya göster, açık onaydan
+        sonra aynı istekle onay_belirteci ver. Video asenkrondur; dönen is_kimligi ile yokla. Tutarlar tahmindir."""
+        email = caller_email(ctx)
+        return await anyio.to_thread.run_sync(functools.partial(
+            tools.medya, email, run_id=run_id, tur=tur, istek=istek, tahmin=tahmin,
+            onay_belirteci=onay_belirteci, is_kimligi=is_kimligi), limiter=_TOOL_LIMITER)
+
     return mcp
