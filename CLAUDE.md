@@ -77,6 +77,14 @@ curl -s http://127.0.0.1:8090/health                   # {"status": "ok", "versi
   with `env_prep`, never by hand; it follows the worktree's `.env` symlink.
 - **Trap**: the `keys` CLI writes `output/ted_mcp_oauth.sqlite3` under the checkout it runs from. Run it from
   `/mnt/thunderbolt/workspaces/TED`, the service's working directory, and leave `TED_MCP_PROJECT_ROOT` unset.
+- **Cloudflare** (all dry-run unless `--uygula`; zone and tunnel resolved by name — `.env`'s `CLOUDFLARE_ZONE_ID` /
+  `CLOUDFLARE_TUNNEL_ID` belong to other resources):
+
+  ```bash
+  .venv/bin/python -m src.mcp_server.tunnel_route --bolge tedy.online --tunel hp-ai-node --host mcp.tedy.online \
+    dogrula --servis http://127.0.0.1:8090 --durum var      # ingress rule + proxied CNAME
+  .venv/bin/python -m src.mcp_server.edge_ratelimit --bolge tedy.online dogrula   # per-IP edge limit on /oauth/* and /mcp
+  ```
 
 ## Architecture
 
