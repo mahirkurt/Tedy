@@ -8,13 +8,18 @@
 One block rule on the zone's http_ratelimit phase. A Free zone allows a single rate-limiting rule,
 so an existing rule gets our condition OR-ed into its expression instead of a second rule. Its
 action, threshold and period stay as they are. The merge is refused when the result would break MCP
-clients (challenge actions, disabled rule, a threshold below MIN_MERGE_PER_10S). Dry run by default;
+clients (challenge actions, disabled rule, a threshold below MIN_MERGE_PER_10S, or counting by
+something other than ip.src+cf.colo.id — a merge that kept a foreign characteristics set would give
+no per-IP protection at all). `--host-kosulu` requires a paid plan and is checked before anything
+else; an existing ted-mcp contribution scoped to a different host argument than this invocation
+(or the reverse) refuses rather than silently widening or losing the limit. Dry run by default;
 --uygula snapshots the phase, re-reads it immediately before PUT to catch a concurrent edit, writes
 with PUT and re-reads what it wrote.
 """
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import time
 from pathlib import Path
@@ -31,12 +36,16 @@ PERIOD = 10
 TIMEOUT = 10
 MIN_MERGE_PER_10S = 30
 WRITABLE = ("id", "ref", "action", "action_parameters", "expression", "description", "enabled", "ratelimit", "logging")
+REQUIRED_CHARACTERISTICS = ["cf.colo.id", "ip.src"]
+
+# The fixed part of our expression (independent of --host-kosulu), used both to build our_expression()
+# and — via _MERGED_SUFFIX_RE — to recognise an existing ted-mcp contribution under ANY host (M-3).
+_CONDITION_CORE = "http.request.uri.path in {" + " ".join(f'"{p}"' for p in PATHS) + "}"
+_MERGED_SUFFIX_RE = re.compile(r'\) or \((?:http\.host eq "[^"]*" and )?' + re.escape(_CONDITION_CORE) + r"\)$")
 
 
 def our_expression(host: str | None = None) -> str:
-    paths = " ".join(f'"{p}"' for p in PATHS)
-    condition = f"http.request.uri.path in {{{paths}}}"
-    return f'(http.host eq "{host}" and {condition})' if host else f"({condition})"
+    return f'(http.host eq "{host}" and {_CONDITION_CORE})' if host else f"({_CONDITION_CORE})"
 
 
 def new_rule(threshold: int, host: str | None = None) -> dict[str, Any]:
@@ -65,6 +74,36 @@ def find_ours(rules: list[dict[str, Any]], host: str | None = None) -> tuple[int
     return None
 
 
+def _any_ted_mcp_contribution(rules: list[dict[str, Any]]) -> int | None:
+    """Index of a ted-mcp contribution under ANY host (or none) — unlike `find_ours`, this ignores
+    which `--host-kosulu` (if any) it was scoped to. Used only to detect a host mismatch (M-3):
+    a wholly-ours rule (`ref == REF`) is host-independent by construction, so it is always also
+    found by `find_ours(rules, host)` regardless of `host` and is not a mismatch case. A *merged*
+    rule keeps the foreign rule's own fields (no `ref`), so only its expression tail identifies it,
+    and that tail encodes the specific host — this catches it under any host value."""
+    for i, rule in enumerate(rules):
+        if rule.get("ref") == REF:
+            return i
+        expression = rule.get("expression") or ""
+        if expression.startswith("(") and _MERGED_SUFFIX_RE.search(expression):
+            return i
+    return None
+
+
+def _check_host_consistency(rules: list[dict[str, Any]], host: str | None) -> None:
+    """M-3: refuse before any merge, add or removal if a ted-mcp contribution already exists but
+    was scoped to a different --host-kosulu (or lack of one) than this invocation's. Merging under
+    the wrong host would add a second, wider OR-branch instead of recognising the existing one;
+    removing under the wrong host would silently no-op on the real limit."""
+    if _any_ted_mcp_contribution(rules) is not None and find_ours(rules, host) is None:
+        raise RouteError("ted-mcp hız sınırı farklı bir host koşuluyla mevcut")
+
+
+def _characteristics_ok(rule: dict[str, Any]) -> bool:
+    limit = rule.get("ratelimit") or {}
+    return sorted(limit.get("characteristics") or []) == REQUIRED_CHARACTERISTICS
+
+
 def essence(rule: dict[str, Any]) -> tuple:
     limit = rule.get("ratelimit") or {}
     return (rule.get("ref"), rule.get("description"), rule.get("expression"), rule.get("action"),
@@ -82,6 +121,7 @@ def describe(rule: dict[str, Any]) -> str:
 def add_limit(rules: list[dict[str, Any]], plan: str, threshold: int,
               host: str | None = None) -> tuple[list[dict[str, Any]], str]:
     rules = [writable(r) for r in rules]
+    _check_host_consistency(rules, host)
     if find_ours(rules, host) is not None:
         raise RouteError("ted-mcp hız sınırı zaten var; dogrula kullanın")
     if not rules:
@@ -91,6 +131,9 @@ def add_limit(rules: list[dict[str, Any]], plan: str, threshold: int,
     rule = rules[0]
     limit = rule.get("ratelimit") or {}
     per_10s = limit.get("requests_per_period", 0) * 10 / max(int(limit.get("period") or 10), 1)
+    if not _characteristics_ok(rule):
+        raise RouteError("mevcut kuralın sayım özellikleri ip.src + cf.colo.id değil; "
+                          "IP başına koruma sağlamaz — elle karar")
     if rule.get("action") != "block":
         raise RouteError(f"mevcut kuralın eylemi '{rule.get('action')}'; MCP istemcileri meydan okuma çözemez — elle karar")
     if rule.get("enabled") is False:
@@ -102,6 +145,7 @@ def add_limit(rules: list[dict[str, Any]], plan: str, threshold: int,
 
 def remove_limit(rules: list[dict[str, Any]], host: str | None = None) -> list[dict[str, Any]]:
     rules = [writable(r) for r in rules]
+    _check_host_consistency(rules, host)
     found = find_ours(rules, host)
     if found is None:
         raise RouteError("ted-mcp hız sınırı yok")
@@ -129,13 +173,12 @@ def _verify(args: argparse.Namespace, out: TextIO, rules: list[dict[str, Any]]) 
     else:
         i, kind = found
         rule = rules[i]
-        limit = rule.get("ratelimit") or {}
         print(f"ted-mcp kuralı: {kind}", file=out)
         if rule.get("action") != "block":
             problems.append(f"eylem '{rule.get('action')}', block bekleniyordu")
         if rule.get("enabled") is False:
             problems.append("kural kapalı")
-        if sorted(limit.get("characteristics") or []) != ["cf.colo.id", "ip.src"]:
+        if not _characteristics_ok(rule):
             problems.append("sayım özellikleri ip.src + cf.colo.id değil")
     for problem in problems:
         print(f"SORUN {problem}", file=out)
@@ -164,6 +207,10 @@ def main(argv: list[str] | None = None, api: CloudflareApi | None = None, out: T
         api = api if api is not None else tunnel_route.default_api()
         zone_id, _ = api.zone(args.bolge)
         plan = str(((api.call("GET", f"/zones/{zone_id}") or {}).get("plan") or {}).get("legacy_id") or "bilinmiyor")
+        # M-2: checked before the count lock and the backup — a host condition needs a paid plan,
+        # and failing only at PUT would mean a wasted snapshot and a confusing late refusal.
+        if args.host_kosulu and plan in ("free", "bilinmiyor"):
+            raise RouteError(f"--host-kosulu yalnız ücretli planda kullanılabilir; bu bölgenin planı '{plan}'")
         rules = _read_rules(api, zone_id)
         print(f"bölge: {args.bolge} ({zone_id}), plan: {plan}", file=out)
         print(f"http_ratelimit kuralı: {len(rules)}", file=out)

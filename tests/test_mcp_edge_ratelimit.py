@@ -100,6 +100,7 @@ def test_free_plan_single_rule_is_merged_and_unmerge_restores_it():
     {"action": "managed_challenge"},
     {"enabled": False},
     {"ratelimit": {**EXISTING["ratelimit"], "requests_per_period": 20}},
+    {"ratelimit": {**EXISTING["ratelimit"], "characteristics": ["cf.colo.id"]}},
 ])
 def test_merge_refuses_rules_that_would_break_mcp_clients(change):
     with pytest.raises(RouteError):
@@ -206,3 +207,104 @@ def test_put_readback_mismatch_is_refused(tmp_path):
     assert rc == 2
     assert api.puts == [[edge.new_rule(60)]]
     assert "UYGULANDI" not in out
+
+
+# --- Fix round 1 ---
+
+
+def test_main_ekle_reports_bad_characteristics_as_rc2(tmp_path, capsys):
+    """I-1: a merge candidate that doesn't count by ip.src must be refused before any write — a
+    merge that kept a foreign characteristics set would report UYGULANDI with no per-IP protection
+    at all. Reached through the CLI, with --uygula and a --yedek-dizini present, to prove no backup
+    and no PUT happen either."""
+    bad = {**EXISTING, "ratelimit": {**EXISTING["ratelimit"], "characteristics": ["cf.colo.id"]}}
+    api = FakeApi(rules=[bad])
+    rc, out = _run(api, "ekle", "--beklenen-kural", "1", "--uygula", "--yedek-dizini", str(tmp_path))
+    assert rc == 2
+    assert api.puts == []
+    assert list(tmp_path.glob("tedy.online-ratelimit-*.json")) == []
+    assert "sayım özellikleri" in capsys.readouterr().err
+
+
+def test_main_kaldir_reports_no_existing_limit_as_rc2_empty_phase(capsys):
+    """I-2: remove_limit()'s 'ted-mcp hız sınırı yok' refusal, exercised through the CLI against an
+    empty http_ratelimit phase — the raise site that was never reached by any test before."""
+    api = FakeApi(rules=[])
+    rc, out = _run(api, "kaldir", "--beklenen-kural", "0")
+    assert rc == 2
+    assert api.puts == []
+    assert "ted-mcp hız sınırı yok" in capsys.readouterr().err
+
+
+def test_main_kaldir_reports_no_existing_limit_as_rc2_foreign_rule(capsys):
+    """I-2, second reaching case: same refusal, this time with a phase that holds only a foreign
+    (non-ted-mcp) rule rather than being empty."""
+    api = FakeApi(rules=[EXISTING])
+    rc, out = _run(api, "kaldir", "--beklenen-kural", "1")
+    assert rc == 2
+    assert api.puts == []
+    assert "ted-mcp hız sınırı yok" in capsys.readouterr().err
+
+
+def test_main_ekle_reports_disabled_rule_merge_refusal_as_rc2(capsys):
+    """M-1: the 'disabled rule' merge refusal, exercised through the CLI (previously function-level
+    only)."""
+    api = FakeApi(rules=[{**EXISTING, "enabled": False}])
+    rc, out = _run(api, "ekle", "--beklenen-kural", "1")
+    assert rc == 2
+    assert api.puts == []
+    assert "kural kapalı" in capsys.readouterr().err
+
+
+def test_main_ekle_reports_low_threshold_merge_refusal_as_rc2(capsys):
+    """M-1: the 'threshold too low to merge safely' refusal, exercised through the CLI (previously
+    function-level only)."""
+    api = FakeApi(rules=[{**EXISTING, "ratelimit": {**EXISTING["ratelimit"], "requests_per_period": 20}}])
+    rc, out = _run(api, "ekle", "--beklenen-kural", "1")
+    assert rc == 2
+    assert api.puts == []
+    assert "MCP patlamalarını keser" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("plan", ["free", "bilinmiyor"])
+def test_host_kosulu_requires_paid_plan(plan, capsys):
+    """M-2: --host-kosulu is refused before the count lock and the backup when the zone plan is
+    free or unknown — checked as soon as the plan is known, before even reading the phase."""
+    api = FakeApi(plan=plan)
+    rc, out = _run(api, "--host-kosulu", "mcp.tedy.online", "ekle", "--beklenen-kural", "0")
+    assert rc == 2
+    assert api.puts == []
+    assert "ücretli plan" in capsys.readouterr().err
+
+
+def test_ekle_without_host_refuses_when_existing_merge_is_host_scoped(capsys):
+    """M-3: a merge done with --host-kosulu must not be silently widened to all hosts by a later
+    `ekle` that omits the flag — that would add a second, host-less OR branch."""
+    merged = edge.add_limit([EXISTING], "free", 60, "mcp.tedy.online")[0]
+    api = FakeApi(plan="business", rules=merged)
+    rc, out = _run(api, "ekle", "--beklenen-kural", "1")
+    assert rc == 2
+    assert api.puts == []
+    assert "farklı bir host koşuluyla mevcut" in capsys.readouterr().err
+
+
+def test_ekle_with_host_refuses_when_existing_merge_is_host_less(capsys):
+    """M-3, reverse direction: a host-less merge must not silently gain a host-scoped OR branch
+    when a later `ekle` supplies --host-kosulu."""
+    merged = edge.add_limit([EXISTING], "free", 60, None)[0]
+    api = FakeApi(plan="business", rules=merged)
+    rc, out = _run(api, "--host-kosulu", "mcp.tedy.online", "ekle", "--beklenen-kural", "1")
+    assert rc == 2
+    assert api.puts == []
+    assert "farklı bir host koşuluyla mevcut" in capsys.readouterr().err
+
+
+def test_kaldir_with_mismatched_host_is_refused(capsys):
+    """M-3: `kaldir` against a host-scoped merge, invoked without the matching --host-kosulu, must
+    refuse rather than silently no-op on the wrong branch."""
+    merged = edge.add_limit([EXISTING], "free", 60, "mcp.tedy.online")[0]
+    api = FakeApi(plan="business", rules=merged)
+    rc, out = _run(api, "kaldir", "--beklenen-kural", "1")
+    assert rc == 2
+    assert api.puts == []
+    assert "farklı bir host koşuluyla mevcut" in capsys.readouterr().err
