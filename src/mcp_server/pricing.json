@@ -1,0 +1,12 @@
+{
+  "surum": 1,
+  "not": "Muhafazakâr ön tahminlerdir. Her kalem sağlayıcının fiyat sayfasından elle doğrulanıp dogrulandi=true yapılana kadar otomatik kullanılamaz (plan K-P13, Task 21 Step 8).",
+  "kalemler": {
+    "minimax.ses":    {"sunucu": "minimax", "arac": "text_to_audio",    "birim": "karakter", "birim_usd": 0.0001, "dogrulandi": false, "otomatik": true},
+    "minimax.gorsel": {"sunucu": "minimax", "arac": "text_to_image",    "birim": "adet",     "birim_usd": 0.01,   "dogrulandi": false, "otomatik": true},
+    "minimax.muzik":  {"sunucu": "minimax", "arac": "music_generation", "birim": "adet",     "birim_usd": 0.15,   "dogrulandi": false, "otomatik": false},
+    "minimax.video":  {"sunucu": "minimax", "arac": "generate_video",   "birim": "adet",     "birim_usd": 0.60,   "dogrulandi": false, "otomatik": false},
+    "comfyui.muzik":  {"sunucu": "comfyui", "arac": "generate_song",    "birim": "adet",     "birim_usd": 0.10,   "dogrulandi": false, "otomatik": false},
+    "comfyui.video":  {"sunucu": "comfyui", "arac": "wan_i2v",          "birim": "adet",     "birim_usd": 0.60,   "dogrulandi": false, "otomatik": false}
+  }
+}
