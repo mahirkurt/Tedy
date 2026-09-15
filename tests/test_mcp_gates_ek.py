@@ -117,3 +117,116 @@ def test_gate_runner_reports_eighteen_gates():
     assert gates.gate_count() == 18 and len(report) == 18
     assert set(gates.EXTRA_GATES) <= set(report)
     assert gates.voice_pattern().search("ders kitabında geçen")
+
+
+# ---------------------------------------------------------------------------
+# Fix round 1 (controller review): F1 — licensed grounding parsing never raises
+# and never silently skips (C1 + I1); F2 — only a real type="application/json"
+# script is excluded from the bridge scan (I2); F3 — every missing-credit asset
+# is reported (M4); F4 — asset-block shape tests (M6).
+# ---------------------------------------------------------------------------
+
+def test_escaped_apostrophe_source_decodes_and_matches_footer():
+    grounding = r'{source: "MEB\'nin ders kitabı", url: "https://example.gov.tr", license: "CC BY-NC 4.0"}'
+    with_footer = _compose(None, ["Kaynak: MEB'nin ders kitabı — CC BY-NC 4.0"], grounding)
+    assert gates.run_gates(with_footer)["G-ATTRIB"]["status"] == "PASS"
+
+    without_footer = _compose(None, [], grounding)
+    report = gates.run_gates(without_footer)["G-ATTRIB"]
+    assert report["status"] == "FAIL"
+
+
+def test_single_quoted_grounding_values_decode_and_are_enforced():
+    grounding = "{source: 'PhET: Fotosentez', url: 'https://phet.colorado.edu', license: 'CC BY-NC 4.0'}"
+    with_footer = _compose(None, ["Kaynak: PhET: Fotosentez — CC BY-NC 4.0"], grounding)
+    assert _run(gates_ek.gate_attrib, with_footer)["G-ATTRIB"]["status"] == "PASS"
+
+    without_footer = _compose(None, [], grounding)
+    report = _run(gates_ek.gate_attrib, without_footer)["G-ATTRIB"]
+    assert report["status"] == "FAIL" and "PhET" in report["detail"]
+
+
+def test_template_literal_source_decodes_and_matches_html_escaped_footer():
+    grounding = '{source: `PhET "Hâller" <b>`, license: "CC BY 4.0"}'
+    with_footer = _compose(None, ['PhET "Hâller" <b> — CC BY 4.0'], grounding)
+    assert _run(gates_ek.gate_attrib, with_footer)["G-ATTRIB"]["status"] == "PASS"
+
+    without_footer = _compose(None, [], grounding)
+    report = _run(gates_ek.gate_attrib, without_footer)["G-ATTRIB"]
+    assert report["status"] == "FAIL"
+
+
+def test_undecodable_source_fails_closed_without_raising():
+    grounding = r'{source: "PhET \u12", license: "CC BY 4.0"}'
+    html = _compose(None, [], grounding)
+    report = gates.run_gates(html)["G-ATTRIB"]
+    assert report["status"] == "FAIL" and "lisanslı kaynak çözümlenemedi" in report["detail"]
+
+
+def test_unescaped_template_placeholder_is_undecodable():
+    # A template literal containing an unescaped ${ is undecodable (F1). Tested at the
+    # _decode_value level rather than end-to-end through engine_template: _GROUNDING_RE's
+    # brace-balance limitation (review M3, explicitly parked for this fix round) means a
+    # grounding body containing literal '{'/'}' characters — which "${x}" necessarily has —
+    # can never be captured by _GROUNDING_RE in the first place, so gate_attrib can never
+    # actually observe this shape end-to-end today; asserting FAIL through the full pipeline
+    # here would be a false-pass test that doesn't exercise the decoder at all (it would in
+    # fact currently come back SKIPPED, not FAIL, because no grounding body is found).
+    body = 'source: `PhET ${x}`, license: "CC BY 4.0"'
+    found, decoded = gates_ek._decode_value(body, gates_ek._SOURCE_START_RE)
+    assert found and decoded is None
+
+
+def test_decoder_unit_cases():
+    decoded, end = gates_ek._decode_js_string(r'"\u{1F600}"', 0)
+    assert decoded == chr(0x1F600) and end == len(r'"\u{1F600}"')
+
+    decoded, end = gates_ek._decode_js_string(r'"\0"', 0)
+    assert decoded == "\0" and end == len(r'"\0"')
+
+    # line continuation: backslash followed by a real newline vanishes entirely
+    body = '"ab\\\ncd"'
+    decoded, end = gates_ek._decode_js_string(body, 0)
+    assert decoded == "abcd" and end == len(body)
+
+    # \$ inside a template literal decodes to a literal '$' and does not trip the
+    # unescaped-${ check for the '{' that (coincidentally) is not present here
+    decoded, end = gates_ek._decode_js_string("`\\$100`", 0)
+    assert decoded == "$100" and end == len("`\\$100`")
+
+
+def test_decoy_attribute_containing_the_text_is_not_excluded_from_bridge_scan():
+    decoy = '<script data-note="see application/json">window.top.postMessage({a:1}, "*");</script>'
+    report = _run(gates_ek.gate_bridge, ENGINE + decoy)["G-BRIDGE"]
+    assert report["status"] == "FAIL" and "window.top" in report["detail"]
+
+
+def test_single_quoted_json_type_is_still_excluded_from_bridge_scan():
+    block = ('<script type=\'application/json\' id="edupedia-varliklar">'
+             '{"x": "window.top.postMessage(1)"}</script>')
+    assert _run(gates_ek.gate_bridge, ENGINE.replace(sablon.ASSETS_SLOT, block))["G-BRIDGE"]["status"] == "PASS"
+
+
+def test_attrib_reports_every_asset_missing_a_credit():
+    assets = {
+        "a1b2c3d4e5f60718": {"uri": "data:image/png;base64,QQ==", "tur": "image"},
+        "1122334455667788": {"uri": "data:image/png;base64,Qg==", "tur": "image", "credit": "   "},
+    }
+    report = _run(gates_ek.gate_attrib, _compose(assets, ["x"]))["G-ATTRIB"]
+    assert report["status"] == "FAIL"
+    assert "a1b2c3d4e5f60718" in report["detail"] and "1122334455667788" in report["detail"]
+
+
+def test_attrib_fails_when_asset_block_is_not_an_object():
+    html = ENGINE.replace(sablon.ASSETS_SLOT,
+                          '<script type="application/json" id="edupedia-varliklar">[1]</script>', 1)
+    report = _run(gates_ek.gate_attrib, html)["G-ATTRIB"]
+    assert report["status"] == "FAIL" and "nesne değil" in report["detail"]
+
+
+def test_attrib_fails_when_asset_record_is_not_an_object():
+    html = ENGINE.replace(sablon.ASSETS_SLOT,
+                          '<script type="application/json" id="edupedia-varliklar">'
+                          '{"a1b2c3d4e5f60718": "x"}</script>', 1)
+    report = _run(gates_ek.gate_attrib, html)["G-ATTRIB"]
+    assert report["status"] == "FAIL" and "atıf metni yok" in report["detail"]
