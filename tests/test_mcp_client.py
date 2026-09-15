@@ -985,3 +985,125 @@ def test_two_sessionless_threads_against_an_id_issuing_server_all_succeed():
     assert results[1].ok and results[2].ok
     assert None not in tools_call_headers  # no tools/call ever went out header-less
     assert c._sid in session.issued
+
+
+# -- SP4 Task 18b Item 5: _ensure_session's fast path reads self._sid ONCE (SP2 park 5) ----------
+
+def test_ensure_session_fast_path_reads_sid_once(monkeypatch):
+    """A concurrent reset landing between _session_expired()'s own read of _sid and a SEPARATE
+    later read of self._sid used to return None from the fast path — costing an extra session
+    error plus a replay. Simulated here by monkeypatching _session_expired itself to clear _sid as
+    a side effect (mimicking the race) and return False — exactly the value the OLD fast path's
+    `if not self._session_expired(): return self._sid` needed to take the branch and then observe
+    the now-cleared self._sid."""
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=_FakeSession([]))
+    c._sid, c._sid_at = "warm-sid", time.time()
+
+    def racy_session_expired():
+        c._sid = None
+        return False
+
+    monkeypatch.setattr(c, "_session_expired", racy_session_expired)
+
+    result = c._ensure_session(None)
+
+    assert result == "warm-sid"
+
+
+# -- SP4 Task 18b Item 4: response-header sid published under the lock with CAS (SP2 park 4) -----
+
+def _warm_client(session_responses, sid="sid-1"):
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=_FakeSession(session_responses))
+    c._sid, c._sid_at = sid, time.time()
+    return c
+
+
+def test_same_session_id_echoed_never_acquires_the_session_lock(monkeypatch):
+    """(i): a response echoing the same session id this call used must never take self._lock —
+    only self._id_lock (via _next_id) may be acquired."""
+    c = _warm_client([
+        _Resp(json.dumps({"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text", "text": "ok"}]}}),
+              headers={"content-type": "application/json", "mcp-session-id": "sid-1"}),
+    ], sid="sid-1")
+    calls = []
+    orig_acquire = c._acquire
+
+    def spy_acquire(deadline, lock):
+        calls.append(lock)
+        return orig_acquire(deadline, lock)
+
+    monkeypatch.setattr(c, "_acquire", spy_acquire)
+
+    out = c.call_tool("t", {})
+
+    assert out.ok is True
+    assert c._lock not in calls  # the session lock itself was never acquired
+    assert c._sid == "sid-1"
+
+
+def test_rotated_id_never_overwrites_a_newer_id_another_thread_already_set():
+    """(ii): a rotated id arriving while another thread has already set _sid = "newer" (simulated
+    inside the fake session's post, before it returns) must not resurrect the old/rotated id over
+    it — the CAS only publishes when self._sid is still None or still equal to sid_used."""
+
+    class _RotateThenRaceSession(_FakeSession):
+        def __init__(self, client):
+            super().__init__([])
+            self._client = client
+
+        def post(self, url, headers=None, data=None, timeout=None):
+            body = json.loads(data) if data else {}
+            self.requests.append({"url": url, "headers": dict(headers or {}), "body": body})
+            if body.get("method") == "tools/call":
+                # Another thread rotates the session out from under this call, between the post
+                # being sent and this response being read.
+                self._client._sid = "newer"
+                return _Resp(json.dumps({"jsonrpc": "2.0", "id": body.get("id"),
+                                         "result": {"content": [{"type": "text", "text": "ok"}]}}),
+                             headers={"content-type": "application/json", "mcp-session-id": "sid-rotated"})
+            return _Resp("", headers={})
+
+    c = McpClient(name="fake", url="https://x/mcp", api_key="k", session=None)
+    c._session = _RotateThenRaceSession(c)
+    c._sid, c._sid_at = "sid-old", time.time()
+
+    out = c.call_tool("t", {})
+
+    assert out.ok is True
+    assert c._sid == "newer"  # the rotated response id must NOT resurrect over the newer one
+
+
+def test_rotated_id_is_published_when_sid_still_matches_what_this_call_used():
+    """(iii): a rotated id while self._sid is still exactly sid_used (no other thread touched it)
+    must be published."""
+    c = _warm_client([
+        _Resp(json.dumps({"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text", "text": "ok"}]}}),
+              headers={"content-type": "application/json", "mcp-session-id": "sid-new"}),
+    ], sid="sid-old")
+
+    out = c.call_tool("t", {})
+
+    assert out.ok is True
+    assert c._sid == "sid-new"
+
+
+def test_lock_budget_exhausted_during_rotation_still_returns_ok(monkeypatch):
+    """(iv): _acquire raising the budget-exhausted exception while publishing a rotated id must
+    not fail the call — publishing is best effort, the successful rpc is still returned."""
+    c = _warm_client([
+        _Resp(json.dumps({"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text", "text": "ok"}]}}),
+              headers={"content-type": "application/json", "mcp-session-id": "sid-rotated"}),
+    ], sid="sid-old")
+    orig_acquire = c._acquire
+
+    def flaky_acquire(deadline, lock):
+        if lock is c._lock:
+            raise mcp_client._BudgetExhausted()
+        return orig_acquire(deadline, lock)
+
+    monkeypatch.setattr(c, "_acquire", flaky_acquire)
+
+    out = c.call_tool("t", {})
+
+    assert out.ok is True
+    assert c._sid == "sid-old"  # publish skipped (best effort); old value untouched

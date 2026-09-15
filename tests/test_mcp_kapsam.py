@@ -722,3 +722,138 @@ def test_non_dict_book_row_is_dropped_not_a_crash(tmp_path):
     assert body["cerceve"]["kind"] == "textbook"
     assert body["cerceve"]["document_id"] == 197
     assert body["coverage"]["maarif-mufredat"] == "degraded:unexpected_shape"
+
+
+# --- SP4 Task 18b Item 1: _fleet_int rejects a trailing newline (SP2 park 1) --------------------
+
+def test_fleet_int_rejects_trailing_newline():
+    """`^[0-9]+$` used with .match() lets a trailing "\n" slip through ($ matches just before a
+    final newline). "7\n" must be malformed, exactly like the other non-digit strings above."""
+    assert kapsam._fleet_int("7\n") is None
+
+
+def test_fleet_int_with_trailing_newline_raises_manual_required_unexpected_shape():
+    with pytest.raises(kapsam.KapsamError) as exc_info:
+        kapsam._fleet_int("7\n", server="maarif-mufredat", tool="get_document_text")
+    assert exc_info.value.status == "manual_required"
+    assert exc_info.value.detay == {"sunucu": "maarif-mufredat", "arac": "get_document_text",
+                                    "neden": "unexpected_shape"}
+
+
+# --- SP4 Task 18b Item 2: page numbers must be >= 1 (SP2 park 7) --------------------------------
+
+def test_negative_figure_page_no_is_dropped_like_other_malformed_figure_rows(tmp_path):
+    """A page_no of -3 used to be kept (it is truthy and int-convertible); it must be dropped the
+    same way a non-numeric page_no already is."""
+    found = {"query": "x", "count": 2, "figures": [
+        {"figure_id": 11, "document_id": 197, "page_no": -3, "label": "bozuk", "caption": "x"},
+        {"figure_id": 10, "document_id": 197, "page_no": 112, "label": "Görsel 4.1", "caption": "Katı sıvı gaz"},
+    ]}
+    fed = FakeFed(_responses({("maarif-mufredat", "search_figures"): found}))
+    body, _ = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    assert [f["figure_id"] for f in body["kaynak_verisi"]["figur_adaylari"]] == [10]
+    assert body["coverage"]["maarif-mufredat"] == "degraded:unexpected_shape"
+
+
+def test_zero_document_page_no_becomes_unexpected_shape_and_saves_nothing(tmp_path):
+    """A document page_no of 0 used to be saved through RunStore.save_page, whose reader regex
+    `^(\\d+)-(\\d+)\\.txt\\Z` can never read a non-positive page number back."""
+    text = {"document": {"document_id": 197}, "total_pages": 240, "returned": 1, "truncated": False,
+            "pages": [{"page_no": 0, "text": "sayfa metni"}]}
+    fed = FakeFed(_responses({("maarif-mufredat", "get_document_text"): text}))
+    body, runs = _build(tmp_path, fed, konu="maddenin halleri")
+
+    assert body["status"] == "ok"
+    assert body["cerceve"]["kind"] is None
+    assert "get_document_text" in body["cerceve"]["not"]
+    assert body["coverage"]["maarif-mufredat"] == "degraded:unexpected_shape"
+    assert runs.pages(body["run_id"]) == []
+
+
+# --- SP4 Task 18b Item 3: malformed list rows / non-string text never raise out of build() (SP2 park 6) --
+
+def test_list_subjects_all_rows_malformed_raises_manual_required_unexpected_shape(tmp_path):
+    fed = FakeFed(_responses({("maarif-mufredat", "list_subjects"): ["x", {"slug": 5, "name": None}]}))
+    runs = RunStore(tmp_path)
+    body = kapsam.KapsamBuilder(fed, runs, clock=lambda: 1_800_000_000.0).build(FULL, "Fen Bilimleri", "5", konu="x")
+    assert body["status"] == "manual_required"
+    assert body["neden"] == "unexpected_shape"
+    assert body["sunucu"] == "maarif-mufredat" and body["arac"] == "list_subjects"
+
+
+def test_list_subjects_with_one_dropped_row_still_resolves(tmp_path):
+    fed = FakeFed(_responses({("maarif-mufredat", "list_subjects"):
+                             ["x", {"slug": SLUG, "name": "Fen Bilimleri Dersi"}]}))
+    body, _ = _build(tmp_path, fed, konu="maddenin halleri")
+    assert body["status"] == "ok"
+    assert body["ders"] == {"slug": SLUG, "name": "Fen Bilimleri Dersi"}
+
+
+def test_search_learning_outcomes_non_string_text_becomes_empty_string(tmp_path):
+    row = {"code": "FB.5.4.1.1", "text": 12345, "grade": "5.Sınıf", "subject": SLUG}
+    fed = FakeFed(_responses({("maarif-mufredat", "search_learning_outcomes"): {"results": [row]}}))
+    body, _ = _build(tmp_path, fed, kazanim_kodu="FB.5.4.1.1")
+    assert body["status"] == "ok"
+    assert body["kazanimlar"][0]["text"] == ""
+
+
+def test_search_learning_outcomes_non_list_results_raises_manual_required_by_code(tmp_path):
+    fed = FakeFed(_responses({("maarif-mufredat", "search_learning_outcomes"): {"results": "x"}}))
+    runs = RunStore(tmp_path)
+    body = kapsam.KapsamBuilder(fed, runs, clock=lambda: 1_800_000_000.0).build(
+        FULL, "Fen Bilimleri", "5", kazanim_kodu="FB.5.4.1.1")
+    assert body["status"] == "manual_required"
+    assert body["neden"] == "unexpected_shape"
+    assert body["arac"] == "search_learning_outcomes"
+
+
+def test_search_learning_outcomes_non_list_results_raises_manual_required_by_topic(tmp_path):
+    """Item 3 explicitly covers both verify_outcomes branches — the by-topic (konu) path must
+    harden the same way the by-code path above does."""
+    fed = FakeFed(_responses({("maarif-mufredat", "search_learning_outcomes"): {"results": "x"}}))
+    runs = RunStore(tmp_path)
+    body = kapsam.KapsamBuilder(fed, runs, clock=lambda: 1_800_000_000.0).build(
+        FULL, "Fen Bilimleri", "5", konu="maddenin halleri")
+    assert body["status"] == "manual_required"
+    assert body["neden"] == "unexpected_shape"
+    assert body["arac"] == "search_learning_outcomes"
+
+
+def test_kb_search_dropped_row_becomes_empty_passage_and_none_title(tmp_path):
+    results = [1, {"doc_id": "d", "passage": 42, "title": ["x"]}]
+    fed = FakeFed(_responses({("egitim-kaynak", "kb_search"): {"status": "ok", "results": results}}))
+    body, _ = _build(tmp_path, fed, konu="maddenin halleri")
+    assert body["status"] == "ok"
+    oer = body["kaynak_verisi"]["oer"]
+    assert len(oer) == 1
+    assert oer[0]["pasaj"] == "" and oer[0]["baslik"] is None
+
+
+def test_kb_search_all_rows_malformed_degrades_egitim_kaynak(tmp_path):
+    fed = FakeFed(_responses({("egitim-kaynak", "kb_search"): {"status": "ok", "results": [1]}}))
+    body, _ = _build(tmp_path, fed, konu="maddenin halleri")
+    assert body["status"] == "ok"
+    assert body["kaynak_verisi"]["oer"] == []
+    assert body["coverage"]["egitim-kaynak"] == "degraded:unexpected_shape"
+
+
+def test_item3_malformed_rows_never_leak_fleet_text_into_the_body(tmp_path):
+    """Leak check (item 3, spec §6.3): a wrongly-typed fleet field is dropped/replaced, never
+    serialized as-is — so injected text living inside a non-string value can never reach the
+    returned body or the saved run record."""
+    responses = _responses({
+        ("maarif-mufredat", "search_learning_outcomes"): {"results": [
+            {"code": "FB.5.4.1.1", "text": [INJECTION], "grade": "5.Sınıf", "subject": SLUG}]},
+        ("egitim-kaynak", "kb_search"): {"status": "ok", "results": [
+            {"doc_id": "d", "passage": [INJECTION], "title": [INJECTION]}]},
+    })
+    fed = FakeFed(responses)
+    body, runs = _build(tmp_path, fed, kazanim_kodu="FB.5.4.1.1")
+    assert body["status"] == "ok"
+    assert body["kazanimlar"][0]["text"] == ""
+    oer = body["kaynak_verisi"]["oer"]
+    assert oer[0]["pasaj"] == "" and oer[0]["baslik"] is None
+    _assert_no_fleet_text(body)
+    _assert_no_fleet_text(runs.load(body["run_id"]))

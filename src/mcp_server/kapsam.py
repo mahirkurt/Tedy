@@ -36,14 +36,21 @@ class KapsamError(Exception):
 _FLEET_INT_STRING_RE = re.compile(r"^[0-9]+$")
 
 
-def _fleet_int(value: Any, *, server: str | None = None, tool: str | None = None) -> int | None:
+def _fleet_int(value: Any, *, server: str | None = None, tool: str | None = None,
+               minimum: int | None = None) -> int | None:
     """Strictly parses a fleet-supplied field as an integer (fix round 3 Ruling R3-3). Only
     three shapes ever convert: a plain `int` (bool excluded — True/False are never a page number
     or an id, even though bool is an int subclass), a `float` whose `is_integer()` is True (10.0
     is accepted as 10; 10.9, inf and nan are not — is_integer() is False for all three), or a
-    `str` matching `^[0-9]+$` (so "7" converts but " 7", "-1" and "10.5" do not). Everything else
-    is malformed. This is deliberately stricter than int()'s own truncating conversion: 10.9
-    silently becoming 10 could collide with, and be indistinguishable from, a genuine id 10.
+    `str` fully matching `^[0-9]+$` (so "7" converts but "7\\n", " 7", "-1" and "10.5" do not —
+    `.fullmatch()`, not `.match()`, since `$` alone still allows a trailing newline through).
+    Everything else is malformed. This is deliberately stricter than int()'s own truncating
+    conversion: 10.9 silently becoming 10 could collide with, and be indistinguishable from, a
+    genuine id 10.
+
+    `minimum`, when given (e.g. minimum=1 for a page number), additionally rejects an otherwise
+    well-formed conversion below it — SP2 park 7: a page number of 0 or negative is exactly as
+    malformed as a value that could not convert at all, with the same consequences either way.
 
     Without server/tool a malformed value is simply absent (returns None) — the fleet's own text
     never reaches an exception's own message this way either (§6.3). With server/tool, a
@@ -56,8 +63,10 @@ def _fleet_int(value: Any, *, server: str | None = None, tool: str | None = None
         result = value
     elif isinstance(value, float) and value.is_integer():
         result = int(value)
-    elif isinstance(value, str) and _FLEET_INT_STRING_RE.match(value):
+    elif isinstance(value, str) and _FLEET_INT_STRING_RE.fullmatch(value):
         result = int(value)
+    if result is not None and minimum is not None and result < minimum:
+        result = None
     if result is None:
         if server is None:
             return None
@@ -78,6 +87,20 @@ def _fleet_rows(value: Any) -> tuple[list[dict[str, Any]], bool]:
         return [], True
     rows = [v for v in value if isinstance(v, dict)]
     return rows, len(rows) < len(value)
+
+
+def _fleet_text(value: Any) -> str:
+    """A fleet-supplied string field (SP2 park 6): returns the value only when it actually is a
+    `str`, so a caller that slices or folds it (e.g. `[:OUTCOME_TEXT_MAX]`) can never raise
+    TypeError on some other JSON type (int, list, None, ...) — those become the ordinary empty
+    string instead, never surfacing the fleet's own value."""
+    return value if isinstance(value, str) else ""
+
+
+def _fleet_optional_text(value: Any) -> str | None:
+    """Like `_fleet_text`, but for a field whose absent/malformed shape is `None` rather than an
+    empty string (`_oer`'s baslik/lisans/kaynak_url/eslesme)."""
+    return value if isinstance(value, str) else None
 
 
 def _fold(text: str) -> str:
@@ -112,7 +135,15 @@ def _related(wanted: str, candidate: dict[str, Any]) -> bool:
 
 
 def resolve_subject(federation: Federation, ders: str, deadline: float | None = None) -> dict[str, str]:
-    subjects = _mufredat(federation, "list_subjects", {"q": ders}, "liste", deadline)
+    raw_subjects = _mufredat(federation, "list_subjects", {"q": ders}, "liste", deadline)
+    # SP2 park 6: a row that is not a dict (AttributeError from .get()) or a dict missing a
+    # string slug/name (KeyError/AttributeError further down in _fold) used to raise straight out
+    # of build(). Keep only dict rows with a string slug AND name; if the raw list was non-empty
+    # (or not a list at all) and nothing survives, this step is unusable, not merely "no results".
+    rows, container_degraded = _fleet_rows(raw_subjects)
+    subjects = [s for s in rows if isinstance(s.get("slug"), str) and isinstance(s.get("name"), str)]
+    if not subjects and (raw_subjects or container_degraded):
+        raise KapsamError("manual_required", sunucu=MUFREDAT, arac="list_subjects", neden="unexpected_shape")
     wanted = _fold(ders)
     for s in subjects:
         if s.get("slug") == ders.strip():
@@ -129,9 +160,23 @@ def resolve_subject(federation: Federation, ders: str, deadline: float | None = 
 
 
 def _outcome(row: dict[str, Any]) -> dict[str, Any]:
-    return {"code": row.get("code"), "text": (row.get("text") or "")[:OUTCOME_TEXT_MAX],
+    return {"code": row.get("code"), "text": _fleet_text(row.get("text"))[:OUTCOME_TEXT_MAX],
             "subject": row.get("subject"), "grade": row.get("grade"),
             "document_id": row.get("document_id"), "page_no": row.get("page_no")}
+
+
+def _outcome_rows(body: dict[str, Any]) -> list[dict[str, Any]]:
+    """SP2 park 6: `body.get("results")` may itself not be a list, or contain non-dict rows —
+    either used to raise AttributeError/TypeError further down (the code filter's `.get()`, or
+    `_outcome`'s text slice) instead of failing the whole build() honestly. Keep only dict rows;
+    if the raw container was non-empty (or not a list at all) and nothing survives, raise the
+    same 'manual_required'/'unexpected_shape' a genuine FederationError from this step would."""
+    raw_results = body.get("results")
+    rows, container_degraded = _fleet_rows(raw_results)
+    if not rows and (raw_results or container_degraded):
+        raise KapsamError("manual_required", sunucu=MUFREDAT, arac="search_learning_outcomes",
+                          neden="unexpected_shape")
+    return rows
 
 
 def verify_outcomes(federation: Federation, slug: str, grade: str, konu: str | None,
@@ -144,7 +189,7 @@ def verify_outcomes(federation: Federation, slug: str, grade: str, konu: str | N
         code = kazanim_kodu.strip()
         body = _mufredat(federation, "search_learning_outcomes",
                          {"q": kazanim_kodu, "limit": 10, "distinct_codes": True}, "nesne", deadline)
-        rows = [r for r in body.get("results") or [] if r.get("code") == code]
+        rows = [r for r in _outcome_rows(body) if r.get("code") == code]
         if not rows:
             raise KapsamError("kazanim_dogrulanamadi", kazanim_kodu=kazanim_kodu, ders=slug)
         kazanimlar = [_outcome(r) for r in rows]
@@ -160,7 +205,7 @@ def verify_outcomes(federation: Federation, slug: str, grade: str, konu: str | N
         # one that does not exist at all.
         body = _mufredat(federation, "search_learning_outcomes",
                          {"q": konu, "subject": slug, "limit": 8, "distinct_codes": True}, "nesne", deadline)
-        rows = body.get("results") or []
+        rows = _outcome_rows(body)
         at_grade = [r for r in rows if r.get("grade") == grade]
         kazanimlar = [_outcome(r) for r in at_grade]
         uyusmazlik = []
@@ -352,7 +397,7 @@ class KapsamBuilder:
         figure_rows, figures_container_degraded = _fleet_rows(found.get("figures"))
         figs = []
         for f in figure_rows:
-            page_no = _fleet_int(f.get("page_no"))
+            page_no = _fleet_int(f.get("page_no"), minimum=1)
             figure_id = _fleet_int(f.get("figure_id"))
             if page_no and figure_id is not None:
                 figs.append({**f, "page_no": page_no, "figure_id": figure_id})
@@ -382,7 +427,8 @@ class KapsamBuilder:
         # converted int is also carried forward into the returned page dicts themselves (fix
         # round 2 O-5) — kitap_sayfalari and _ingest used to read the RAW (possibly string)
         # page_no straight from these dicts, so e.g. "111" was reported as a string, not int 111.
-        page_nos = [_fleet_int(p.get("page_no"), server=MUFREDAT, tool="get_document_text") for p in page_rows]
+        page_nos = [_fleet_int(p.get("page_no"), server=MUFREDAT, tool="get_document_text", minimum=1)
+                    for p in page_rows]
         pages = []
         for p, page_no in zip(page_rows, page_nos):
             self.runs.save_page(run_id, doc_id, page_no, p.get("text") or "")
@@ -436,13 +482,27 @@ class KapsamBuilder:
         except FederationError as exc:
             cov.degraded(EGITIM_KAYNAK, exc.reason)
             return [], None
+        # SP2 park 6: found.get("results") may itself not be a list, or contain non-dict rows
+        # (a bare int/str element) — either used to raise AttributeError once .get() was called
+        # on it, and a non-string "passage" raised TypeError once sliced. Drop malformed rows
+        # instead; a non-string baslik/lisans/kaynak_url/eslesme becomes None (their ordinary
+        # "missing" shape), a non-string passage becomes "" (pasaj's ordinary "missing" shape).
+        raw_results = found.get("results")
+        result_rows, container_degraded = _fleet_rows(raw_results)
         oer = [{
-            "doc_id": r.get("doc_id"), "baslik": r.get("title"),
-            "pasaj": (r.get("passage") or "")[: 300 if r.get("quote_allowed") else 160],
-            "lisans": r.get("license"), "alinti_izni": bool(r.get("quote_allowed")),
-            "kaynak_url": r.get("source_url"), "eslesme": r.get("match_kind"),
-        } for r in (found.get("results") or [])[:OER_MAX]]
-        cov.hit(EGITIM_KAYNAK) if oer else cov.empty(EGITIM_KAYNAK)
+            "doc_id": r.get("doc_id"), "baslik": _fleet_optional_text(r.get("title")),
+            "pasaj": _fleet_text(r.get("passage"))[: 300 if r.get("quote_allowed") else 160],
+            "lisans": _fleet_optional_text(r.get("license")), "alinti_izni": bool(r.get("quote_allowed")),
+            "kaynak_url": _fleet_optional_text(r.get("source_url")), "eslesme": _fleet_optional_text(r.get("match_kind")),
+        } for r in result_rows[:OER_MAX]]
+        if oer:
+            cov.hit(EGITIM_KAYNAK)
+        elif raw_results or container_degraded:
+            # Every row was dropped, but the raw container was non-empty or malformed outright —
+            # honestly degraded, not silently reported as an ordinary empty result (§6.3).
+            cov.degraded(EGITIM_KAYNAK, "unexpected_shape")
+        else:
+            cov.empty(EGITIM_KAYNAK)
         eslesme = None
         if kazanim_kodu:
             try:

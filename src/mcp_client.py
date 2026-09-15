@@ -213,8 +213,14 @@ class McpClient:
         and takes the fast unlocked path too (getting its own captured id from that), instead of
         serializing behind the others.
         """
-        if not self._session_expired():
-            return self._sid
+        # SP2 park 5: capture _sid/_sid_at ONCE rather than calling _session_expired() (which
+        # reads them itself) and then separately re-reading self._sid to return it — a concurrent
+        # reset landing between those two reads used to return None from a call that should have
+        # reused a perfectly live session, costing a header-less post, a session error and a
+        # replay. _session_expired() itself is unchanged for its other callers.
+        sid, at = self._sid, self._sid_at
+        if sid and time.time() - at <= SESSION_TTL_SECONDS:
+            return sid
         if self._sessionless:
             return self._run_sessionless_handshake(deadline)
         self._acquire(deadline, self._lock)
@@ -301,8 +307,29 @@ class McpClient:
                 "method": method, "params": params,
             }, deadline, sid=sid_used)
             if resp_sid:
-                self._sid = resp_sid
-                self._sid_at = time.time()
+                if resp_sid == sid_used:
+                    # SP2 park 4(a): the same id echoed back changes nothing about the shared
+                    # session's identity, so this never takes the lock and never writes _sid —
+                    # only a TTL refresh, and only if this id is still the published one (a
+                    # concurrent reset could have cleared it in the meantime).
+                    if self._sid == sid_used:
+                        self._sid_at = time.time()
+                else:
+                    # SP2 park 4(b): a rotated id is published under the lock with a
+                    # compare-and-set, so this can neither resurrect an id another thread just
+                    # reset (self._sid is None) nor overwrite one it already rotated to something
+                    # newer than what THIS call used.
+                    try:
+                        self._acquire(deadline, self._lock)
+                    except _BudgetExhausted:
+                        pass  # SP2 park 4(c): publishing is best effort; the rpc below still counts.
+                    else:
+                        try:
+                            if self._sid is None or self._sid == sid_used:
+                                self._sid = resp_sid
+                                self._sid_at = time.time()
+                        finally:
+                            self._lock.release()
             if not self._is_session_error(rpc):
                 return rpc
             # Server forgot us. Re-initialise and replay — but only once, so a server that
