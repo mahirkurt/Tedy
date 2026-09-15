@@ -19,6 +19,7 @@ import argparse
 import difflib
 import json
 import os
+import secrets
 import sys
 import time
 from pathlib import Path
@@ -170,17 +171,42 @@ def default_api() -> CloudflareApi:
 
 def write_snapshot(directory: Path, stem: str, payload: Any, now: float) -> Path:
     directory = directory.expanduser()
-    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-    path = directory / f"{stem}-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime(now))}.json"
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        json.dump(payload, handle, indent=2, sort_keys=True, ensure_ascii=False)
-        handle.write("\n")
-    return path
+    try:
+        # M-2: Check existing directory permissions before creating
+        if directory.exists():
+            mode = directory.stat().st_mode & 0o777
+            if mode & 0o077:
+                raise RouteError(f"yedek dizinin izinleri çok açık (mode {oct(mode)}); elle denetleyin")
+        else:
+            directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    except OSError as exc:
+        if not isinstance(exc, RouteError):
+            raise RouteError(f"yedek dizini oluşturulamadı: {exc.strerror if hasattr(exc, 'strerror') else str(exc)}")
+        raise
+
+    # M-1: Avoid same-second filename collisions with random suffix
+    timestamp = time.strftime('%Y%m%dT%H%M%SZ', time.gmtime(now))
+    suffix_str = secrets.token_hex(2)  # 4 hex chars = 2 bytes
+    path = directory / f"{stem}-{timestamp}-{suffix_str}.json"
+
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2, sort_keys=True, ensure_ascii=False)
+            handle.write("\n")
+        return path
+    except OSError as exc:
+        raise RouteError(f"yedek dosyası yazılamadı: {exc.strerror if hasattr(exc, 'strerror') else str(exc)}")
 
 
 def _put_and_confirm(api: CloudflareApi, account_id: str, tunnel_id: str, config: dict[str, Any],
                      ingress: list[Rule]) -> None:
+    # M-4: Re-read config before PUT to detect concurrent changes
+    current_config = api.tunnel_config(account_id, tunnel_id)
+    current_ingress = current_config.get("ingress", [])
+    if [_norm(r) for r in current_ingress] != [_norm(r) for r in config.get("ingress", [])]:
+        raise RouteError("tünel yapılandırması arasında değişmiş; tekrar deneyin")
+
     api.put_tunnel_config(account_id, tunnel_id, {**config, "ingress": ingress})
     reread = api.tunnel_config(account_id, tunnel_id)["ingress"]
     if [_norm(r) for r in reread] != [_norm(r) for r in ingress]:
@@ -231,7 +257,11 @@ def _verify(args: argparse.Namespace, out: TextIO, current: list[Rule], records:
             expected = snapshot
         if [_norm(r) for r in current] != [_norm(r) for r in expected]:
             extra, missing = change_summary(expected, current)
-            problems.append(f"yedeğe göre sapma: fazla {len(extra)}, eksik {len(missing)} kural (sıra da karşılaştırılır)")
+            # M-3: Detect rule reordering (fazla=0, eksik=0 but lists differ)
+            if len(extra) == 0 and len(missing) == 0:
+                problems.append("yedeğe göre sapma: kural sırası farklı")
+            else:
+                problems.append(f"yedeğe göre sapma: fazla {len(extra)}, eksik {len(missing)} kural (sıra da karşılaştırılır)")
     print(f"ingress: {len(current)} kural", file=out)
     print(f"{args.host}: {'var' if mine else 'yok'}", file=out)
     print(f"dns: {dns}", file=out)
@@ -296,9 +326,19 @@ def main(argv: list[str] | None = None, api: CloudflareApi | None = None, out: T
             if dns == "yok":
                 api.create_cname(zone_id, args.host, target)
         else:
-            for record in records if dns == "doğru" else []:
-                api.delete_dns_record(zone_id, record["id"])
-            _put_and_confirm(api, account_id, tunnel_id, config, new)
+            # I-2: kaldir order: DNS first for security, then ingress
+            dns_deleted = False
+            try:
+                for record in records if dns == "doğru" else []:
+                    api.delete_dns_record(zone_id, record["id"])
+                dns_deleted = dns == "doğru"
+                _put_and_confirm(api, account_id, tunnel_id, config, new)
+            except RouteError as exc:
+                # I-2(b): If DNS was deleted but PUT failed, tell operator explicitly
+                if dns_deleted:
+                    raise RouteError(f"kısmi başarısızlık: DNS kaydı silindi ama ingress kuralı hâlâ var; "
+                                   f"aynı kaldir komutunu tekrar çalıştırın") from None
+                raise
             print("ingress: yazıldı ve yeniden okunarak doğrulandı", file=out)
         final = dns_state(api.dns_records(zone_id, args.host), args.host, target)
         wanted = "doğru" if adding else "yok"

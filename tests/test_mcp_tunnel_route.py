@@ -189,3 +189,156 @@ def test_api_resolves_by_name_handles_missing_and_hides_the_token():
     assert missing.call("GET", "/zones/z1/rulesets/phases/http_ratelimit/entrypoint", missing_ok=True) is None
     with pytest.raises(tr.RouteError):
         tr.CloudflareApi("")
+
+
+# Fix round 1: I-1 — test the "exactly one change" lock
+def test_change_lock_refuses_multiple_rules_removed(tmp_path):
+    """The ingress has the target hostname twice; remove_rule removes both, violating the lock."""
+    base = _ingress()
+    # Add the target hostname once (as if it was added before)
+    ingress_with_rule = list(base[:-1]) + [{"hostname": HOST, "service": SERVICE}, base[-1]]
+    # Add it again to create a duplicate
+    double_rule = list(ingress_with_rule[:-1]) + [{"hostname": HOST, "service": SERVICE}, ingress_with_rule[-1]]
+    # Now we have 2 rules with hostname=HOST in the ingress, and 54 total rules
+    assert sum(1 for r in double_rule if r.get("hostname") == HOST) == 2
+    api = FakeApi(double_rule)
+    rc, out = _run(api, "kaldir", "--beklenen-kural", "54", "--uygula", "--yedek-dizini", str(tmp_path))
+    assert rc == 2, f"Expected rc 2 (lock error), got rc {rc}. Output: {out}"
+    assert api.writes() == [], "Should not write anything when lock fails"
+
+
+# Fix round 1: I-2(a) — recovery test for partial kaldir failure
+def test_kaldir_partial_failure_recovery(tmp_path):
+    """After DNS delete succeeds and ingress PUT fails, re-running completes."""
+    api = FakeApi(_ingress())
+    # First, add a rule successfully
+    _run(api, "ekle", "--servis", SERVICE, "--beklenen-kural", "52", "--uygula", "--yedek-dizini", str(tmp_path / "a"))
+    api.calls.clear()
+
+    # Now simulate a partial kaldir: DNS delete succeeds, but PUT will fail
+    class FailingPutApi:
+        def __init__(self, base_api):
+            self.base_api = base_api
+            self.put_attempted = False
+
+        def zone(self, name):
+            return self.base_api.zone(name)
+
+        def tunnel_id(self, account_id, name):
+            return self.base_api.tunnel_id(account_id, name)
+
+        def tunnel_config(self, account_id, tunnel_id):
+            return self.base_api.tunnel_config(account_id, tunnel_id)
+
+        def put_tunnel_config(self, account_id, tunnel_id, config):
+            self.put_attempted = True
+            raise tr.RouteError("simulated PUT failure")
+
+        def dns_records(self, zone_id, name):
+            return self.base_api.dns_records(zone_id, name)
+
+        def create_cname(self, zone_id, name, target):
+            return self.base_api.create_cname(zone_id, name, target)
+
+        def delete_dns_record(self, zone_id, record_id):
+            return self.base_api.delete_dns_record(zone_id, record_id)
+
+    failing_api = FailingPutApi(api)
+    rc, _ = _run(failing_api, "kaldir", "--beklenen-kural", "53", "--uygula", "--yedek-dizini", str(tmp_path / "b"))
+    assert rc == 2 and failing_api.put_attempted, "PUT should have failed"
+    assert api.records == [], "DNS should have been deleted before PUT failure"
+
+    # Re-run the same kaldir on the original api — now DNS is gone, so it should complete
+    rc, out = _run(api, "kaldir", "--beklenen-kural", "53", "--uygula", "--yedek-dizini", str(tmp_path / "c"))
+    assert rc == 0 and "UYGULANDI" in out, f"Recovery should succeed. Output: {out}"
+    assert api.config["ingress"] == _ingress(), "Ingress should be restored to original state"
+
+
+# Fix round 1: M-1 — snapshot filename collision and OSError handling
+def test_write_snapshot_handles_collision_suffix(tmp_path):
+    """write_snapshot avoids same-second collisions with random suffix."""
+    # Test successful write with collision suffix
+    payload = {"test": "data"}
+    # Use 1789430400.0 (2026-09-15T00:00:00Z) - same as the test's clock
+    now = 1789430400.0
+    path1 = tr.write_snapshot(tmp_path, "test", payload, now)
+    path2 = tr.write_snapshot(tmp_path, "test", payload, now)  # Same second
+    assert path1 != path2, "Collision suffix should make filenames different"
+    assert json.loads(path1.read_text()) == payload
+    assert json.loads(path2.read_text()) == payload
+    # Both filenames should have the timestamp
+    assert "20260915T000000Z" in str(path1)
+    assert "20260915T000000Z" in str(path2)
+
+
+# Fix round 1: M-2 — backup directory permission check
+def test_write_snapshot_refuses_loose_directory_perms(tmp_path):
+    """If backup directory exists with loose perms, refuse before writing."""
+    existing_dir = tmp_path / "existing"
+    existing_dir.mkdir(mode=0o777)  # Loose permissions
+
+    with pytest.raises(tr.RouteError) as exc:
+        tr.write_snapshot(existing_dir, "test", {"data": 1}, 1000.0)
+    assert "izin" in str(exc.value).lower() or "permission" in str(exc.value).lower()
+
+    # Newly created directory should stay 0700
+    new_dir = tmp_path / "new"
+    tr.write_snapshot(new_dir, "test", {"data": 1}, 1000.0)
+    assert (new_dir.stat().st_mode & 0o777) == 0o700
+
+
+# Fix round 1: M-3 — rule reordering detection in verify
+def test_verify_reordering_message(tmp_path):
+    """When fazla=0 and eksik=0 but lists differ, message says rule order differs."""
+    api = FakeApi(_ingress())
+    _run(api, "ekle", "--servis", SERVICE, "--beklenen-kural", "52", "--uygula", "--yedek-dizini", str(tmp_path / "add"))
+    # Reorder a rule (swap two middle rules) but don't add/remove
+    api.config["ingress"][1], api.config["ingress"][2] = api.config["ingress"][2], api.config["ingress"][1]
+    snapshot = tmp_path / "snapshot.json"
+    snapshot.write_text(json.dumps({"ingress": _ingress()}))
+
+    rc, out = _run(api, "dogrula", "--servis", SERVICE, "--durum", "var", "--yedek", str(snapshot))
+    assert rc == 1 and ("kural sırası" in out or "sıra" in out), f"Should mention rule order. Output: {out}"
+
+
+# Fix round 1: M-4 — config changed in between PUT
+def test_reread_before_put_detects_concurrent_change(tmp_path):
+    """If tunnel config changes between first read and PUT, abort with rc 2."""
+    class ChangingApi:
+        def __init__(self):
+            self.config = {"ingress": _ingress(), "warp-routing": {"enabled": False}}
+            self.read_count = 0
+
+        def zone(self, name):
+            return "zone-tedy", "acct-1"
+
+        def tunnel_id(self, account_id, name):
+            return TUNNEL
+
+        def tunnel_config(self, account_id, tunnel_id):
+            self.read_count += 1
+            if self.read_count == 2:
+                # Second read (before PUT) returns a different ingress
+                changed = _ingress()
+                changed[0]["service"] = "http://localhost:9999"  # Someone else changed it
+                return {"ingress": changed, "warp-routing": {"enabled": False}}
+            return json.loads(json.dumps(self.config))
+
+        def put_tunnel_config(self, account_id, tunnel_id, config):
+            raise RuntimeError("PUT should not be called")
+
+        def dns_records(self, zone_id, name):
+            return []
+
+        def create_cname(self, zone_id, name, target):
+            pass
+
+        def delete_dns_record(self, zone_id, record_id):
+            pass
+
+    api = ChangingApi()
+    rc, out = _run(api, "ekle", "--servis", SERVICE, "--beklenen-kural", "52", "--uygula", "--yedek-dizini", str(tmp_path))
+    assert rc == 2, f"Should abort with rc 2 on concurrent change. RC: {rc}"
+    # The error message goes to stderr, but we check it was rejected
+    assert api.read_count == 2, "Should have done the second read before detecting change"
+
