@@ -119,6 +119,17 @@ def test_create_app_from_env_requires_form_secret(tmp_path):
     assert app is not None
 
 
+def test_medya_onay_anahtari_is_derived_not_the_raw_form_secret():
+    """T16-2: the media-approval HMAC key must never equal the raw form secret — a leak or
+    rotation of one must not compromise the other. 32 bytes (sha256 digest), deterministic."""
+    secret = b"f" * 40
+    derived = http_app._medya_onay_anahtari(secret)
+    assert len(derived) == 32
+    assert derived != secret
+    assert http_app._medya_onay_anahtari(secret) == derived
+    assert http_app._medya_onay_anahtari(b"g" * 40) != derived
+
+
 def test_rehber_tool_is_registered_and_returns_akis(tmp_path):
     store = OAuthStore(tmp_path / "o.sqlite3")
     key = store.create_static_key("t", FULL)
@@ -130,7 +141,7 @@ def test_rehber_tool_is_registered_and_returns_akis(tmp_path):
     assert body["bolum"] == "akis" and body["status"] == "ok"
 
 
-def test_core_tools_are_listed(tmp_path):
+def test_all_fourteen_tools_are_listed(tmp_path):
     store = OAuthStore(tmp_path / "o.sqlite3")
     key = store.create_static_key("t", FULL)
     with _client(tmp_path, store) as c:
@@ -139,7 +150,7 @@ def test_core_tools_are_listed(tmp_path):
     names = {t["name"] for t in listed["result"]["tools"]}
     assert names == {"edupedia_durum", "edupedia_rehber", "edupedia_baglam", "edupedia_kapsam", "edupedia_kaynak_oku",
                      "edupedia_derle", "edupedia_onizle", "edupedia_yayinla", "edupedia_katalog", "edupedia_kaldir",
-                     "edupedia_gorsel", "edupedia_medya", "edupedia_pedagoji_kaniti"}
+                     "edupedia_gorsel", "edupedia_medya", "edupedia_pedagoji_kaniti", "edupedia_ilerleme"}
 
 
 def test_slow_tool_does_not_block_concurrent_requests(tmp_path):
@@ -214,6 +225,7 @@ TOOL_ARGUMENTS = {
     "edupedia_gorsel": {"run_id": "abcdef012345", "istek": "su döngüsü"},
     "edupedia_medya": {"run_id": "abcdef012345", "tur": "ses", "istek": "metin"},
     "edupedia_pedagoji_kaniti": {"konu": "geri getirme pratiği"},
+    "edupedia_ilerleme": {"slug": "fen5-su"},
 }
 PROBE_WITHIN_SECONDS = 1.0
 
@@ -269,6 +281,9 @@ def test_parked_tool_bodies_never_take_the_threads_auth_and_store_calls_need(tmp
             return park()
 
         def pedagoji_kaniti(self, email, konu, dil=None):
+            return park()
+
+        def ilerleme(self, email, slug, version=None):
             return park()
 
     settings = _settings(tmp_path)

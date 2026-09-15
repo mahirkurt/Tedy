@@ -651,11 +651,18 @@ def build_app(
     )
 
 
+def _medya_onay_anahtari(form_secret: bytes) -> bytes:
+    """Derives the media-approval HMAC key from the form secret rather than reusing it directly:
+    a leaked/rotated approval key must never also compromise OAuth form signing, and vice versa."""
+    return hmac.new(form_secret, b"edupedia-medya-onay-v1", hashlib.sha256).digest()
+
+
 def create_app_from_env(env: Mapping[str, str] | None = None) -> Starlette:
     """Wire settings, store, federation, tools and server from the environment."""
     import os
     from pathlib import Path
 
+    from src.mcp_server.butce import LEDGER_NAME, Butce, load_pricing
     from src.mcp_server.config import load_settings
     from src.mcp_server.dashboard_context import DashboardContext
     from src.mcp_server.federation import Federation
@@ -675,7 +682,9 @@ def create_app_from_env(env: Mapping[str, str] | None = None) -> Starlette:
     viewer = build_viewer(settings.data_dir, settings.ticket_secret)
     store = OAuthStore(settings.oauth_db_path)
     dashboard = DashboardContext(settings.dashboard_api_url, settings.dashboard_api_key)
-    tools = Tools(settings, Federation(settings), dashboard=dashboard)
+    butce = Butce(settings.data_dir / LEDGER_NAME, load_pricing(), settings.media_monthly_usd,
+                  _medya_onay_anahtari(secret))
+    tools = Tools(settings, Federation(settings), dashboard=dashboard, butce=butce)
     return build_app(settings, store, build_server(tools), form_secret=secret, viewer=viewer)
 
 
