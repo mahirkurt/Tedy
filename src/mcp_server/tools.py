@@ -18,6 +18,7 @@ from src.mcp_server.katalog import CatalogWriter, Yayinci
 from src.mcp_server.kaynak_oku import KaynakOkuyucu, wrap_kaynak_verisi
 from src.mcp_server.runs import RunStore
 from src.mcp_server.taslak import DraftStore
+from src.mcp_server.varliklar import AssetStore, GuvenliIndirici
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -44,12 +45,15 @@ class Tools:
     def __init__(self, settings: Settings, federation: Federation, clock: Callable[[], float] = time.time,
                  dashboard: DashboardContext | None = None, runs: RunStore | None = None,
                  drafts: DraftStore | None = None, catalog: CatalogWriter | None = None,
+                 assets: AssetStore | None = None, downloader: GuvenliIndirici | None = None,
                  monotonic: Callable[[], float] = time.monotonic) -> None:
         self.settings = settings
         self.federation = federation
         self.clock = clock
         self.dashboard = dashboard
         self.runs = runs if runs is not None else RunStore(settings.data_dir)
+        self.assets = assets if assets is not None else AssetStore(self.runs, clock)
+        self.downloader = downloader if downloader is not None else GuvenliIndirici()
         self.drafts = drafts if drafts is not None else DraftStore(settings.data_dir)
         self.catalog = catalog if catalog is not None else CatalogWriter(settings.data_dir, clock)
         self.monotonic = monotonic  # spec §7 budget for the canli=True live probe
@@ -138,7 +142,7 @@ class Tools:
 
     def _derleyici(self) -> Derleyici:
         return Derleyici(self.runs, self.drafts, self.settings.parent_origin, self.settings.dashboard_public_url,
-                         clock=self.clock)
+                         assets=self.assets.gomulu, clock=self.clock)
 
     def derle(self, email: str, run_id: str, module_data: Any) -> dict[str, Any]:
         return self._derleyici().derle(email, run_id, module_data)
