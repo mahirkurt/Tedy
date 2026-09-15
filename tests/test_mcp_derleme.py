@@ -247,8 +247,11 @@ def test_schema_errors(mutate, fragment):
      'srcset="data:image/gif;base64,AA== 1x, https://evil.example/t.png 2x" alt="">', "dış kaynak"),
     # F7 (fix round 2) regression: a '<' inside a quoted attribute value must not confuse the
     # linear-time "inside a tag" check into missing the on-handler that follows it in the same,
-    # still-open tag. Explicitly named in the fix-round-2 brief as a required regression.
+    # still-open tag. Explicitly named in the fix-round-2/3 briefs as a required regression (the
+    # inner '<b' is itself letter-led, so F11's narrower tag-opening rule still counts it).
     ('<img alt="a<b" onerror=alert(1)>', "olay"),
+    ('<img src=x onerror=alert(1)>', "olay"),
+    ('<a href="x" onclick = "y">', "olay"),
     # F8 (fix round 2) true positives for the new srcset candidate parser.
     ('<img src="data:image/gif;base64,AA==" srcset="//evil.example/t.png" alt="">', "dış kaynak"),
     ('<img src="data:image/gif;base64,AA==" srcset=https://evil.example/t.png alt="">', "dış kaynak"),
@@ -359,6 +362,30 @@ def test_array_join_scan_does_not_false_positive_on_a_normal_multi_paragraph_bod
     assert "Birinci paragraf" in html and "İkinci paragraf" in html
 
 
+@pytest.mark.parametrize("body", [
+    ["<p>x < 3 ise onun = 5</p>"],
+    ["<p>a <", " onun = 2</p>"],
+])
+def test_on_handler_check_does_not_refuse_ordinary_comparison_text(body):
+    # F11 (re-review Important #2): an HTML tokeniser only enters its tag-open state at '<'
+    # immediately followed by an ASCII letter or '/'; a '<' followed by a space or digit is
+    # literal text (a comparison, as in "x < 3"), not a tag opening. Before this fix, math/
+    # comparison content like this was refused outright, and F6's list-join scan multiplied the
+    # false refusal across every per-item-wrapped field.
+    data = ornekler.ornek("MODULE")
+    _teach(data)["body"] = body
+    html = derleme.derle(data, {}, ORIGIN)
+    assert "onun" in html
+
+
+def test_on_handler_check_does_not_refuse_comparison_text_in_mcq_options():
+    data = ornekler.ornek("MODULE")
+    mcq = next(s for s in data["segments"] if s["type"] == "mcq")
+    mcq["questions"][0]["options"] = ["3 < 5", " onda = doğru"]
+    html = derleme.derle(data, {}, ORIGIN)
+    assert "onda" in html
+
+
 def test_exam_stem_with_quote_and_angle_bracket_stays_double_quoted():
     # F9 (re-review Important + PARTIAL): gate_exam extracts stem/source/integrityNote with
     # hardcoded ["\']-only delimiters. Without F9, an ordinary exam.stem containing both '"'
@@ -371,6 +398,26 @@ def test_exam_stem_with_quote_and_angle_bracket_stays_double_quoted():
     assert report["G-EXAM"]["status"] != "FAIL"
     tail = html[html.index("stem:") + len("stem:"):].lstrip()
     assert tail.startswith('"')
+
+
+def test_exams_plural_stem_with_quote_and_angle_bracket_stays_double_quoted():
+    # F10 (re-review PARTIAL, completing F9): the vendored template documents `exam:{}` as
+    # "legacy" and `exams[]` (a list of per-item exam objects) as the current multi-item path;
+    # `_exam_collect` extracts stem/source/integrityNote with the same ["\']-only regex for both
+    # forms. F9 only special-cased the singular top-level key "exam"; a top-level "exams" list
+    # was untouched and reproduced the identical spurious-FAIL bug.
+    data = ornekler.ornek("MODULE")
+    data["exams"] = [{"stem": '<b>"Buz"</b> güneşte ne olur?', "source": "golden test sorusu",
+                       "integrity": "sound", "integrityNote": ""}]
+    html = derleme.derle(data, {}, ORIGIN)
+    vm = gates.validator()
+    inner = vm._array_inner(html, "exams")
+    assert inner is not None
+    item_block = next(vm._iter_balanced_objects(inner))
+    stem_tail = item_block[item_block.index("stem:") + len("stem:"):].lstrip()
+    assert stem_tail.startswith('"')
+    signals = vm._exam_collect(item_block, html)
+    assert signals["stem_ok"] is True
 
 
 def test_module_data_at_the_budget_compiles():

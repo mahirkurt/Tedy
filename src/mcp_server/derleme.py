@@ -52,19 +52,36 @@ _SCAN_STRIP_RE = re.compile(r"[\t\n\r\x00]")
 # '>' or on-handler-shaped substrings it contains.
 _ON_HANDLER_RE = re.compile(r"\son[a-z]+\s*=", re.I)
 
+# F11 (fix round 3, re-review Important #2): an HTML tokeniser only enters its tag-open state at
+# '<' immediately followed by an ASCII letter or '/' (a start or end tag). A '<' followed by
+# anything else — a space, a digit, ... — is literal text: `x < 3` is a comparison, not a tag.
+# Without this, ordinary math/comparison text like "x < 3 ise onun = 5" was refused outright, and
+# F6's list-join scan multiplied the false refusals across every per-item-wrapped field.
+_TAG_OPEN_RE = re.compile(r"<[A-Za-z/]")
+
+
+def _last_tag_open(segment: str) -> int:
+    """Index of the last real tag-opening '<' in `segment` (see `_TAG_OPEN_RE`), or -1."""
+    last = -1
+    for m in _TAG_OPEN_RE.finditer(segment):
+        last = m.start()
+    return last
+
 
 def _has_on_handler(text: str) -> bool:
-    """An on-handler counts only when the last '<' before it is after the last '>' before it —
-    i.e. it sits inside a still-open tag. Deliberately not narrowed to scanning only `[^<>]`
-    between them: browsers accept a literal '<' inside a quoted attribute value
+    """An on-handler counts only when the last tag-opening '<' before it is after the last '>'
+    before it — i.e. it sits inside a still-open tag. Deliberately not narrowed to scanning only
+    `[^<>]` between them: browsers accept a literal '<' inside a quoted attribute value
     (`<img alt="a<b" onerror=alert(1)>`), so a same-tag on-handler must still be caught even
-    when an unrelated '<' appears earlier in the same (still-open) tag."""
+    when an unrelated '<' appears earlier in the same (still-open) tag — here that inner '<' is
+    itself letter-led (`<b`), so it still counts as a tag opening too; either way the handler is
+    correctly refused."""
     last_lt = last_gt = -1
     pos = 0
     for m in _ON_HANDLER_RE.finditer(text):
         start = m.start()
         segment = text[pos:start]
-        i = segment.rfind("<")
+        i = _last_tag_open(segment)
         if i != -1:
             last_lt = pos + i
         j = segment.rfind(">")
@@ -206,13 +223,16 @@ def js_literal(value: Any, depth: int = 0, *, force_double_quoted: bool = False)
 
     Objects at depth 0-1 and arrays at depth 0-2 are multi-line; deeper values stay on one line.
 
-    F9 (fix round 2): every string anywhere under MODULE_DATA's top-level `exam` object is always
-    emitted double-quoted (never as an F3 template literal), because the vendored `gate_exam`
-    extracts `stem`/`source`/`integrityNote` with hardcoded `["\\']`-only delimiters — a template
-    literal there is invisible to it and produces a spurious FAIL on an ordinary exam question
-    that happens to quote something and contain markup. `force_double_quoted` starts False and
-    only ever turns on (never back off) as it's threaded down through nested dicts/lists, and it
-    turns on exactly once: when a depth-0 dict key is literally "exam".
+    F9 (fix round 2) / F10 (fix round 3): every string anywhere under MODULE_DATA's top-level
+    `exam` object, or its plural, current-form sibling `exams` (a list of per-item exam objects —
+    `validate_module.py` calls the singular `exam:{}` form "legacy" and documents `exams[]` as the
+    preferred multi-item path), is always emitted double-quoted (never as an F3 template literal),
+    because the vendored `gate_exam` extracts `stem`/`source`/`integrityNote` with hardcoded
+    `["\\']`-only delimiters for both forms — a template literal there is invisible to it and
+    produces a spurious FAIL on an ordinary exam question that happens to quote something and
+    contain markup. `force_double_quoted` starts False and only ever turns on (never back off) as
+    it's threaded down through nested dicts/lists, and it turns on exactly once: when a depth-0
+    dict key is literally "exam" or "exams".
     """
     pad, inner = "  " * depth, "  " * (depth + 1)
     if value is None:
@@ -232,7 +252,7 @@ def js_literal(value: Any, depth: int = 0, *, force_double_quoted: bool = False)
     if isinstance(value, dict):
         items = []
         for k, v in value.items():
-            child_force = force_double_quoted or (depth == 0 and k == "exam")
+            child_force = force_double_quoted or (depth == 0 and k in ("exam", "exams"))
             items.append(f"{_js_key(str(k))}: {js_literal(v, depth + 1, force_double_quoted=child_force)}")
         if not items:
             return "{}"
