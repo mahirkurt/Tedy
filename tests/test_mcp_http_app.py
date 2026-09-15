@@ -632,3 +632,32 @@ def test_a_request_with_no_query_string_is_left_unchanged():
 ])
 def test_an_unrecognised_record_shape_passes_through_with_no_exception(record):
     assert http_app._AccessLogQueryRedactor().filter(record) is True
+
+
+# -- SP4 Task 20 fix round 2 / two Low residuals from the round-1 re-review -------------------
+
+def test_absolute_form_request_target_query_string_is_redacted():
+    # RFC 7230 §5.3.2 absolute-form target: uvicorn's full_path does not start with "/", so the
+    # round-1 leading-"/" shape check let the ticket through. The broadened "?"-only check redacts it.
+    record = _access_record("http://modul.tedy.online/m/fen5-su/v1?t=SECRETTICKET&e=999&u=EMAILHASH")
+    assert http_app._AccessLogQueryRedactor().filter(record) is True
+    message = record.getMessage()
+    assert "http://modul.tedy.online/m/fen5-su/v1" in message
+    for leaked in ("t=SECRETTICKET", "e=999", "u=EMAILHASH", "?t="):
+        assert leaked not in message
+
+
+def test_install_access_log_redactor_wires_exactly_one_filter_onto_the_target_logger():
+    # Low 2: assert main()'s wiring helper actually attaches the redactor, so a future refactor
+    # that drops the install turns a test red instead of silently regressing X1.
+    logger = logging.getLogger("test.uvicorn.access.wiring")
+    logger.filters = []
+    returned = http_app._install_access_log_redactor(logger)
+    installed = [f for f in logger.filters if isinstance(f, http_app._AccessLogQueryRedactor)]
+    assert len(installed) == 1
+    assert returned is installed[0]
+    # and the wired filter actually redacts a ticket end-to-end through the logger's filter chain
+    record = _access_record("/m/fen5-su/v1?t=aaaa&e=1&u=bbbb")
+    assert all(f.filter(record) for f in logger.filters)
+    assert "t=aaaa" not in record.getMessage()
+    logger.filters = []

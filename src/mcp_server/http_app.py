@@ -696,8 +696,9 @@ class _AccessLogQueryRedactor(logging.Filter):
     ``record.args = (client_addr, method, full_path, http_version, status_code)``. A viewer
     ticket (``?t=...&e=...&u=...``) lives in ``full_path``, so left alone every module open
     would write a live, reusable ticket plus a family member's stable pseudonym to the
-    systemd journal. This filter rewrites the request-target element (the one that is a str,
-    starts with "/" and contains "?") to drop everything from the first "?" onward, and never
+    systemd journal. This filter rewrites any str element containing "?" (only the request-target ever does —
+    an origin-form "/path?q", or the RFC 7230 §5.3.2 absolute-form "http://host/path?q" that
+    the leading-"/" check used to miss) to drop everything from the first "?" onward, and never
     raises: an unrecognised record shape passes through completely unchanged.
     """
 
@@ -708,7 +709,7 @@ class _AccessLogQueryRedactor(logging.Filter):
                 redacted = list(args)
                 changed = False
                 for i, value in enumerate(redacted):
-                    if isinstance(value, str) and value.startswith("/") and "?" in value:
+                    if isinstance(value, str) and "?" in value:
                         redacted[i] = value.split("?", 1)[0] + "?<gizli>"
                         changed = True
                 if changed:
@@ -716,6 +717,19 @@ class _AccessLogQueryRedactor(logging.Filter):
         except Exception:
             pass
         return True
+
+
+def _install_access_log_redactor(logger: logging.Logger | None = None) -> _AccessLogQueryRedactor:
+    """Attaches the query-redacting filter to uvicorn's access logger and returns it.
+
+    Factored out of ``main()`` so the X1 wiring itself is testable: a future refactor that
+    dropped or moved the install would otherwise regress the ticket-leak fix silently, since
+    the filter's ``filter()`` body can pass every unit test while nothing asserts it is wired.
+    """
+    target = logger if logger is not None else logging.getLogger("uvicorn.access")
+    redactor = _AccessLogQueryRedactor()
+    target.addFilter(redactor)
+    return redactor
 
 
 def main() -> None:
@@ -729,7 +743,7 @@ def main() -> None:
     app = create_app_from_env()
     # X1 (SP4 Task 20 gate): the viewer ticket's query string must never reach the journal.
     # access_log=False is not used here — it would also drop /mcp and /health request lines.
-    logging.getLogger("uvicorn.access").addFilter(_AccessLogQueryRedactor())
+    _install_access_log_redactor()
     uvicorn.run(app, host=os.environ.get("TED_MCP_HOST", DEFAULT_HOST),
                 port=int(os.environ.get("TED_MCP_PORT", str(DEFAULT_PORT))), log_level="info")
 
