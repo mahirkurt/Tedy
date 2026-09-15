@@ -408,14 +408,119 @@ def test_write_snapshot_oserror_conversion(tmp_path, monkeypatch):
     assert "secret" not in error_msg and "token" not in error_msg, f"Should not expose tokens. Error: {error_msg}"
 
 
-# Fix round 2: R2-4 — all created directory components get mode 0700
-def test_write_snapshot_parent_permissions(tmp_path):
-    """write_snapshot ensures all created directory components (including parents) have mode 0700."""
-    nested_dir = tmp_path / "a" / "b" / "c"
-    path = tr.write_snapshot(nested_dir, "test", {"data": 1}, 1789430400.0)
+# Fix round 3: R3-1(f)1 — a pre-existing 0o755 parent is left untouched; only the leaf is created.
+def test_write_snapshot_preserves_preexisting_parent_mode(tmp_path):
+    """write_snapshot never chmods an ancestor: a 0o755 parent stays 0o755, the new leaf is 0700."""
+    parent = tmp_path / "existing_parent"
+    parent.mkdir(mode=0o755)
+    before = parent.stat().st_mode & 0o777
+    assert before == 0o755
+    leaf = parent / "leaf"
 
-    # Check that all directories are 0700
-    assert (nested_dir.stat().st_mode & 0o777) == 0o700, f"Leaf dir should be 0700"
-    assert ((tmp_path / "a" / "b").stat().st_mode & 0o777) == 0o700, f"Parent 'b' should be 0700"
-    assert ((tmp_path / "a").stat().st_mode & 0o777) == 0o700, f"Parent 'a' should be 0700"
+    tr.write_snapshot(leaf, "test", {"data": 1}, 1789430400.0)
+
+    assert (leaf.stat().st_mode & 0o777) == 0o700
+    after = parent.stat().st_mode & 0o777
+    assert after == before == 0o755, "the pre-existing ancestor must never be chmodded"
+
+
+# Fix round 3: R3-1(f)2 — a missing parent raises RouteError and nothing is created (replaces the
+# old nested a/b/c test, which relied on parents=True — now forbidden).
+def test_write_snapshot_missing_parent_raises_and_creates_nothing(tmp_path):
+    """write_snapshot must not use parents=True: a missing grandparent/parent is refused outright."""
+    directory = tmp_path / "missing_parent" / "leaf"
+    with pytest.raises(tr.RouteError):
+        tr.write_snapshot(directory, "test", {"data": 1}, 1789430400.0)
+    assert not (tmp_path / "missing_parent").exists(), "nothing should be created on this path"
+
+
+# Fix round 3: R3-1(f)3 — a symlink leaf is refused via os.lstat, and the symlink's target is
+# never touched (this is exactly the C-1 regression: round 2 chmodded through symlinks).
+def test_write_snapshot_symlink_leaf_refused_and_target_untouched(tmp_path):
+    target = tmp_path / "real_target"
+    target.mkdir(mode=0o700)
+    marker = target / "marker.txt"
+    marker.write_text("keep me")
+    link = tmp_path / "link_leaf"
+    link.symlink_to(target)
+
+    with pytest.raises(tr.RouteError):
+        tr.write_snapshot(link, "test", {"data": 1}, 1789430400.0)
+
+    assert (target.stat().st_mode & 0o777) == 0o700, "the symlink target's mode must be unchanged"
+    assert marker.read_text() == "keep me", "the symlink target's content must be unchanged"
+    assert list(target.glob("*.json")) == [], "nothing should have been written through the symlink"
+
+
+# Fix round 3: R3-1(f)4 — an existing leaf with loose permissions is refused, never repaired.
+def test_write_snapshot_existing_leaf_loose_perms_refused_and_unchanged(tmp_path):
+    directory = tmp_path / "loose_leaf"
+    directory.mkdir(mode=0o750)
+    before = directory.stat().st_mode & 0o777
+    assert before == 0o750
+
+    with pytest.raises(tr.RouteError):
+        tr.write_snapshot(directory, "test", {"data": 1}, 1789430400.0)
+
+    after = directory.stat().st_mode & 0o777
+    assert after == before == 0o750, "an existing leaf's mode must never be repaired"
+    assert list(directory.glob("*.json")) == []
+
+
+# Fix round 3: O-2/R3-2 — kaldir --uygula variant where the DNS delete succeeds and the M-4
+# re-read abort (a concurrent external edit) fires before the PUT; no PUT must happen and the
+# stderr message must carry both the partial-failure text and the M-4 cause.
+def test_kaldir_dns_deleted_then_m4_abort_reports_cause(tmp_path, capsys):
+    api = FakeApi(_ingress())
+    _run(api, "ekle", "--servis", SERVICE, "--beklenen-kural", "52", "--uygula", "--yedek-dizini", str(tmp_path / "a"))
+    api.calls.clear()
+
+    class ConcurrentChangeApi:
+        """Wraps FakeApi; the second tunnel_config read (inside _put_and_confirm) reports a
+        different ingress, simulating a concurrent external edit (the M-4 abort)."""
+
+        def __init__(self, base_api):
+            self.base_api = base_api
+            self.read_count = 0
+            self.put_called = False
+
+        def zone(self, name):
+            return self.base_api.zone(name)
+
+        def tunnel_id(self, account_id, name):
+            return self.base_api.tunnel_id(account_id, name)
+
+        def tunnel_config(self, account_id, tunnel_id):
+            self.read_count += 1
+            config = self.base_api.tunnel_config(account_id, tunnel_id)
+            if self.read_count == 2:
+                config["ingress"][0]["service"] = "http://localhost:9999"
+            return config
+
+        def put_tunnel_config(self, account_id, tunnel_id, config):
+            self.put_called = True
+            self.base_api.put_tunnel_config(account_id, tunnel_id, config)
+
+        def dns_records(self, zone_id, name):
+            return self.base_api.dns_records(zone_id, name)
+
+        def create_cname(self, zone_id, name, target):
+            return self.base_api.create_cname(zone_id, name, target)
+
+        def delete_dns_record(self, zone_id, record_id):
+            return self.base_api.delete_dns_record(zone_id, record_id)
+
+    concurrent_api = ConcurrentChangeApi(api)
+    rc, out = _run(concurrent_api, "kaldir", "--beklenen-kural", "53", "--uygula",
+                   "--yedek-dizini", str(tmp_path / "b"))
+    captured = capsys.readouterr()
+
+    assert rc == 2, f"Expected rc 2. Output: {out} Stderr: {captured.err}"
+    assert concurrent_api.put_called is False, "no PUT must happen when the M-4 abort fires"
+    assert api.records == [], "the DNS delete must have succeeded before the abort"
+    error_msg = captured.err
+    assert "DNS kaydı silindi" in error_msg, error_msg
+    assert "ingress kuralı hâlâ var" in error_msg, error_msg
+    assert "aynı kaldir komutunu tekrar çalıştırın" in error_msg, error_msg
+    assert "tünel yapılandırması arasında değişmiş" in error_msg, "the M-4 cause must be present: " + error_msg
 

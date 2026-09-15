@@ -20,6 +20,7 @@ import difflib
 import json
 import os
 import secrets
+import stat
 import sys
 import time
 from pathlib import Path
@@ -170,34 +171,41 @@ def default_api() -> CloudflareApi:
 
 
 def write_snapshot(directory: Path, stem: str, payload: Any, now: float) -> Path:
-    directory = directory.expanduser()
-    try:
-        # M-2: Check existing directory permissions before creating
-        if directory.exists():
-            mode = directory.stat().st_mode & 0o777
-            if mode & 0o077:
-                raise RouteError(f"yedek dizinin izinleri çok açık (mode {oct(mode)}); elle denetleyin")
-        else:
-            # R2-4: Ensure all directory components (including missing parents) get 0700
-            directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-            # chmod all parent directories to 0700 that were just created
-            current = directory
-            while current != current.parent:
-                try:
-                    st_mode = current.stat().st_mode & 0o777
-                    if st_mode != 0o700:
-                        current.chmod(0o700)
-                except OSError:
-                    pass
-                current = current.parent
-    except OSError as exc:
-        # R2-5: Removed dead isinstance check; RouteError is never caught by except OSError
-        raise RouteError(f"yedek dizini oluşturulamadı: {exc.strerror if hasattr(exc, 'strerror') else str(exc)}")
+    """Write a JSON snapshot into `directory`.
 
-    # M-1: Avoid same-second filename collisions with random suffix
+    Never chmods anything and never creates missing parents (R3-1): the operator's backup path
+    (e.g. ~/.local/share/ted-backups or $XDG_RUNTIME_DIR/ted-mcp-sp3) is expected to already have
+    an existing parent, and a change gated for a production tunnel must not rewrite modes on
+    ancestor directories it does not own. Only a missing leaf is created, at 0700. The leaf is
+    then validated with os.lstat — real directory, not a symlink, owned by the current uid, no
+    group/other permission bits — and refused outright rather than repaired if it fails any of
+    those checks.
+    """
+    directory = directory.expanduser()
+    if not directory.parent.exists():
+        raise RouteError(f"yedek dizininin üst dizini yok: {directory.parent}; önce onu oluşturun")
+    if not directory.exists():
+        try:
+            os.mkdir(directory, 0o700)
+        except FileExistsError:
+            pass
+        except OSError as exc:
+            raise RouteError(f"yedek dizini oluşturulamadı: {exc.strerror if hasattr(exc, 'strerror') else str(exc)}")
+
+    try:
+        leaf = os.lstat(directory)
+    except OSError as exc:
+        raise RouteError(f"yedek dizini denetlenemedi: {exc.strerror if hasattr(exc, 'strerror') else str(exc)}")
+    if stat.S_ISLNK(leaf.st_mode) or not stat.S_ISDIR(leaf.st_mode):
+        raise RouteError(f"yedek dizini gerçek bir dizin değil (sembolik bağ olabilir): {directory}")
+    if leaf.st_uid != os.getuid():
+        raise RouteError(f"yedek dizini başka bir kullanıcıya ait: {directory}")
+    if leaf.st_mode & 0o077:
+        raise RouteError(f"yedek dizinin izinleri çok açık (mode {oct(leaf.st_mode & 0o777)}); elle denetleyin")
+
+    # M-1: avoid same-second filename collisions with a random suffix; O_EXCL still guards it.
     timestamp = time.strftime('%Y%m%dT%H%M%SZ', time.gmtime(now))
-    suffix_str = secrets.token_hex(2)  # 4 hex chars = 2 bytes
-    path = directory / f"{stem}-{timestamp}-{suffix_str}.json"
+    path = directory / f"{stem}-{timestamp}-{secrets.token_hex(2)}.json"
 
     try:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
