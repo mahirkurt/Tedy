@@ -12,7 +12,7 @@ import time
 from typing import Any, Callable
 
 from src.mcp_server.butce import (BELIRSIZ_NEDENLER, ONAY_TTL_SECONDS, TAHMIN_NOTU, Butce, ButceAsildi,
-                                  OnayKullanildi)
+                                  DefterBozuk, OnayKullanildi)
 from src.mcp_server.coverage import Coverage
 from src.mcp_server.federation import COMFYUI, MINIMAX, TOOL_BUDGET_SECONDS, Federation, FederationError
 from src.mcp_server.runs import RUN_ID_RE, RunStore
@@ -81,50 +81,67 @@ class MedyaUretici:
         # T14-5 / spec §7: one tool budget fixed once at entry and shared by every fleet call this
         # request makes, whether that is starting a job (_run) or polling one (_poll).
         deadline = self.monotonic() + TOOL_BUDGET_SECONDS
-        if is_kimligi:
-            return self._poll(base, email, run_id, tur, is_kimligi, deadline)
-        key = self._provider_key(tur)
-        if key is None:
-            cov = Coverage()
-            cov.skipped(MINIMAX, "anahtar yok")
-            if tur != "ses":
-                cov.skipped(COMFYUI, "anahtar yok")
-            return {**base, "status": "atlandi", "coverage": cov.as_dict()}
-        if key == "minimax.muzik" and _song_parts(istek) is None:
-            return {**base, "status": "gecersiz_istek",
-                    "kural": "ilk satır stil (10-300 karakter), kalan satırlar söz (10-600 karakter)"}
-        amount = len(istek) if tur == "ses" else 1
-        if tur == "ses":
-            used = self.butce.modul_kullanimi(run_id, key)
-            if used + amount > SES_MODUL_SINIRI:
-                return {**base, "status": "modul_siniri", "sinir": SES_MODUL_SINIRI, "kullanilan": int(used)}
-        estimate = self.butce.tahmin(key, amount)
-        automatic = self.butce.otomatik_mi(key)
-        provider = key.split(".", 1)[0]
-        approval = {"onay_gerekli": True, "saglayici": provider, "gecerlilik_sn": ONAY_TTL_SECONDS,
-                    "onay_belirteci": self.butce.onay_belirteci(email, run_id, tur, key, istek, estimate)}
-        if tahmin:
-            return {**base, "status": "tahmin", "tahmini_usd": estimate, "kalan_usd": self.butce.kalan(),
-                    "otomatik": automatic, **({} if automatic else approval), "not": TAHMIN_NOTU}
-        if not automatic:
-            if onay_belirteci is None:
-                return {**base, "status": "onay_gerekli", "tahmini_usd": estimate, "kalan_usd": self.butce.kalan(),
-                        **approval, "not": ONAY_NOTU}
-            approved = self.butce.onay_dogrula(onay_belirteci, email, run_id, tur, key, istek)
-            if approved is None:
-                return {**base, "status": "onay_gecersiz", "not": "Belirteç bu kullanıcı, run, tür ve istekle eşleşmiyor "
-                                                                   "ya da 15 dakikası doldu; yeniden tahmin iste."}
-            estimate = approved
         try:
+            # F1: every Butce call below can touch a corrupted on-disk ledger and raise
+            # DefterBozuk (a ButceAsildi subclass) — is_kaydi() (poll path, via _poll()) and
+            # rezerve() (generate path) never swallow it themselves, so without this guard it
+            # would escape edupedia_medya's closed-status contract as a bare exception. harcanan()
+            # is called first specifically because it propagates DefterBozuk (unlike
+            # modul_kullanimi()/kalan(), which already fail closed into math.inf/0.0 internally):
+            # this catches a corrupt ledger before the ses module-limit check below would
+            # otherwise try int(math.inf) and crash with an unrelated OverflowError.
+            self.butce.harcanan()
+            if is_kimligi:
+                return self._poll(base, email, run_id, tur, is_kimligi, deadline)
+            key = self._provider_key(tur)
+            if key is None:
+                cov = Coverage()
+                cov.skipped(MINIMAX, "anahtar yok")
+                if tur != "ses":
+                    cov.skipped(COMFYUI, "anahtar yok")
+                return {**base, "status": "atlandi", "coverage": cov.as_dict()}
+            if key == "minimax.muzik" and _song_parts(istek) is None:
+                return {**base, "status": "gecersiz_istek",
+                        "kural": "ilk satır stil (10-300 karakter), kalan satırlar söz (10-600 karakter)"}
+            amount = len(istek) if tur == "ses" else 1
+            if tur == "ses":
+                used = self.butce.modul_kullanimi(run_id, key)
+                if used + amount > SES_MODUL_SINIRI:
+                    return {**base, "status": "modul_siniri", "sinir": SES_MODUL_SINIRI, "kullanilan": int(used)}
+            estimate = self.butce.tahmin(key, amount)
+            automatic = self.butce.otomatik_mi(key)
+            provider = key.split(".", 1)[0]
+            approval = {"onay_gerekli": True, "saglayici": provider, "gecerlilik_sn": ONAY_TTL_SECONDS,
+                        "onay_belirteci": self.butce.onay_belirteci(email, run_id, tur, key, istek, estimate)}
+            if tahmin:
+                return {**base, "status": "tahmin", "tahmini_usd": estimate, "kalan_usd": self.butce.kalan(),
+                        "otomatik": automatic, **({} if automatic else approval), "not": TAHMIN_NOTU}
+            if not automatic:
+                if onay_belirteci is None:
+                    return {**base, "status": "onay_gerekli", "tahmini_usd": estimate,
+                            "kalan_usd": self.butce.kalan(), **approval, "not": ONAY_NOTU}
+                approved = self.butce.onay_dogrula(onay_belirteci, email, run_id, tur, key, istek)
+                if approved is None:
+                    return {**base, "status": "onay_gecersiz",
+                            "not": "Belirteç bu kullanıcı, run, tür ve istekle eşleşmiyor "
+                                   "ya da 15 dakikası doldu; yeniden tahmin iste."}
+                estimate = approved
             # T14-2: the approval token is single-use — rezerve() enforces this itself (locked,
             # keyed by the token digest), so a replayed token never reaches the provider.
             entry = self.butce.rezerve(email, run_id, key, tur, amount, estimate, onay_belirteci=onay_belirteci)
+            return self._run(base, email, run_id, tur, key, istek, entry, estimate, deadline)
+        except DefterBozuk:
+            # F1: closed status, no exception text/type in the body — checked first because
+            # DefterBozuk subclasses ButceAsildi, so a genuine cap-exceeded below still reaches
+            # its own "budget_exceeded" status untouched.
+            return {**base, "status": "butce_bozuk",
+                    "not": "Medya defteri bozuk; ücretli üretim durduruldu, yöneticiye bildir.",
+                    "mcp_verified": False}
         except ButceAsildi as exc:
             return {**base, "status": "budget_exceeded", "kalan_usd": exc.kalan_usd, "tahmini_usd": exc.tahmini_usd}
         except OnayKullanildi:
             return {**base, "status": "onay_kullanildi",
                     "not": "Bu onay zaten kullanıldı; yeni tahmin ve açık onay iste."}
-        return self._run(base, email, run_id, tur, key, istek, entry, estimate, deadline)
 
     def _run(self, base: dict[str, Any], email: str, run_id: str, tur: str, key: str, istek: str, entry: str,
              estimate: float, deadline: float) -> dict[str, Any]:
@@ -222,9 +239,21 @@ class MedyaUretici:
             else:
                 found = self.federation.call(COMFYUI, "get_job", {"prompt_id": job}, beklenen="nesne",
                                              deadline=deadline)
+                # T14-4/F2: dict-guard `outputs` the same way minimax's `query` is guarded above —
+                # a present-but-wrong-shaped `outputs` (not a list, or a non-dict first item) is a
+                # shape surprise independent of whatever `status` says, so it fails immediately
+                # rather than falling through to "is_suruyor"/"bilinmiyor" with a fabricated read.
+                # A missing/None `outputs` (still processing, nothing produced yet) is not a
+                # surprise and falls through normally.
+                outputs_field = found.get("outputs")
+                if outputs_field is not None and not isinstance(outputs_field, list):
+                    cov.degraded(provider, "unexpected_shape")
+                    return {**base, "status": "saglayici_hatasi", "is_kimligi": job, "coverage": cov.as_dict()}
+                outputs = outputs_field if isinstance(outputs_field, list) else []
+                if outputs and not isinstance(outputs[0], dict):
+                    cov.degraded(provider, "unexpected_shape")
+                    return {**base, "status": "saglayici_hatasi", "is_kimligi": job, "coverage": cov.as_dict()}
                 state = str(found.get("status") or "")
-                outputs = found.get("outputs")
-                outputs = outputs if isinstance(outputs, list) else []
                 first = outputs[0] if outputs else None
                 url = first.get("url") if isinstance(first, dict) else None
                 success, failed = state == "completed", state in ("failed", "error", "cancelled")

@@ -67,6 +67,16 @@ def _uretici(tmp_path, fed, verified=True, cap=10.0, payloads=None):
 AUDIO = {"data": {"audio": "https://cdn/a.mp3"}, "base_resp": {"status_msg": PROVIDER_TEXT}}
 
 
+def _write_corrupt_ledger(tmp_path):
+    # Fix round 1 / F1: reuses Task 11's corrupt shape (tahmini_usd not a genuine number) — the
+    # same trigger tests/test_mcp_butce.py::test_corrupt_ledger_fails_closed already exercises for
+    # rezerve/harcanan/kalan/durum/modul_kullanimi/sonuclandir.
+    row = {"id": "corrupt-1", "ts": "2026-01-01T00:00:00+00:00", "user": FULL, "run_id": RUN,
+           "server": "minimax", "kalem": "minimax.ses", "tur": "ses", "miktar": 1, "tahmini_usd": "x",
+           "sonuc": "ok", "is_kimligi": None, "onay": None}
+    (tmp_path / "ledger.json").write_text(json.dumps({"surum": 1, "kayitlar": [row]}), encoding="utf-8")
+
+
 def test_narration_is_automatic_within_the_module_limit(tmp_path):
     fed = FakeFed({("minimax", "text_to_audio"): AUDIO})
     uretici, butce = _uretici(tmp_path, fed)
@@ -240,6 +250,102 @@ def test_non_dict_query_payload_never_raises(tmp_path):
     uretici.uret(FULL, RUN, "video", "buz eriyor, yakın plan", onay_belirteci=token)
     body = uretici.uret(FULL, RUN, "video", "buz eriyor, yakın plan", is_kimligi="t-1")
     assert body["status"] == "saglayici_hatasi" and body["coverage"]["minimax"] == "degraded:unexpected_shape"
+
+
+# --- Fix round 1 / F1: a corrupt media ledger returns a closed status, never a raw exception ----
+
+def test_corrupt_ledger_returns_butce_bozuk_on_generate(tmp_path):
+    fed = FakeFed({("minimax", "text_to_audio"): AUDIO})
+    uretici, _ = _uretici(tmp_path, fed)
+    _write_corrupt_ledger(tmp_path)
+    body = uretici.uret(FULL, RUN, "ses", "metin")
+    dumped = json.dumps(body, ensure_ascii=False)
+    assert body["status"] == "butce_bozuk"
+    assert "DefterBozuk" not in dumped and "Traceback" not in dumped and "Exception" not in dumped
+    assert fed.calls == []
+
+
+def test_corrupt_ledger_returns_butce_bozuk_on_poll(tmp_path):
+    fed = FakeFed({("minimax", "query_video_generation"):
+                   {"query": {"status": "Success"}, "file": {"file": {"download_url": "https://cdn/v.mp4"}}}})
+    uretici, _ = _uretici(tmp_path, fed)
+    _write_corrupt_ledger(tmp_path)
+    body = uretici.uret(FULL, RUN, "video", "buz eriyor, yakın plan", is_kimligi="t-77")
+    dumped = json.dumps(body, ensure_ascii=False)
+    assert body["status"] == "butce_bozuk"
+    assert "DefterBozuk" not in dumped and "Traceback" not in dumped and "Exception" not in dumped
+    assert fed.calls == []
+
+
+def test_healthy_ledger_with_missing_job_id_still_yields_is_bulunamadi(tmp_path):
+    # F1: only a genuine DefterBozuk becomes butce_bozuk — a healthy ledger with no matching row
+    # for this job id is unchanged, still "is_bulunamadi".
+    uretici, _ = _uretici(tmp_path, FakeFed({}))
+    body = uretici.uret(FULL, RUN, "video", "x", is_kimligi="t-000")
+    assert body["status"] == "is_bulunamadi"
+
+
+# --- Fix round 1 / F2: comfyui's _poll branch (get_job / outputs[0]) is polled to completion -----
+
+def test_comfyui_poll_is_processed_to_completion(tmp_path):
+    states = iter([{"status": "queued", "outputs": None, "base_resp": {"status_msg": PROVIDER_TEXT}},
+                   {"status": "completed", "outputs": [{"url": "https://cdn/a.mp3"}],
+                    "base_resp": {"status_msg": PROVIDER_TEXT}}])
+    fed = FakeFed({("comfyui", "generate_song"): {"prompt_id": "p-9"},
+                   ("comfyui", "get_job"): lambda: next(states)}, configured=("comfyui",))
+    uretici, butce = _uretici(tmp_path, fed)
+    token = uretici.uret(FULL, RUN, "muzik", SONG)["onay_belirteci"]
+    started = uretici.uret(FULL, RUN, "muzik", SONG, onay_belirteci=token)
+    assert started["status"] == "is_basladi" and started["is_kimligi"] == "p-9"
+    waiting = uretici.uret(FULL, RUN, "muzik", SONG, is_kimligi="p-9")
+    assert waiting["status"] == "is_suruyor" and waiting["durum"] == "queued"
+    done = uretici.uret(FULL, RUN, "muzik", SONG, is_kimligi="p-9")
+    assert done["status"] == "ok" and done["varlik"]["tur"] == "muzik"
+    assert butce.harcanan() == 0.1
+    assert PROVIDER_TEXT not in json.dumps(done, ensure_ascii=False)
+    assert PROVIDER_TEXT not in json.dumps(waiting, ensure_ascii=False)
+
+
+def test_comfyui_poll_reports_failure_and_settles_hata(tmp_path):
+    fed = FakeFed({("comfyui", "generate_song"): {"prompt_id": "p-8"},
+                   ("comfyui", "get_job"): {"status": "failed", "outputs": None,
+                                            "base_resp": {"status_msg": PROVIDER_TEXT}}},
+                  configured=("comfyui",))
+    uretici, butce = _uretici(tmp_path, fed)
+    token = uretici.uret(FULL, RUN, "muzik", SONG)["onay_belirteci"]
+    uretici.uret(FULL, RUN, "muzik", SONG, onay_belirteci=token)
+    body = uretici.uret(FULL, RUN, "muzik", SONG, is_kimligi="p-8")
+    assert body["status"] == "is_basarisiz" and body["is_kimligi"] == "p-8"
+    assert butce.harcanan() == 0.0
+    assert PROVIDER_TEXT not in json.dumps(body, ensure_ascii=False)
+
+
+def test_comfyui_poll_guards_a_non_list_outputs_field(tmp_path):
+    fed = FakeFed({("comfyui", "generate_song"): {"prompt_id": "p-7"},
+                   ("comfyui", "get_job"): {"status": "processing", "outputs": "x",
+                                            "base_resp": {"status_msg": PROVIDER_TEXT}}},
+                  configured=("comfyui",))
+    uretici, _ = _uretici(tmp_path, fed)
+    token = uretici.uret(FULL, RUN, "muzik", SONG)["onay_belirteci"]
+    uretici.uret(FULL, RUN, "muzik", SONG, onay_belirteci=token)
+    body = uretici.uret(FULL, RUN, "muzik", SONG, is_kimligi="p-7")
+    dumped = json.dumps(body, ensure_ascii=False)
+    assert body["status"] == "saglayici_hatasi" and body["coverage"]["comfyui"] == "degraded:unexpected_shape"
+    assert "processing" not in dumped and PROVIDER_TEXT not in dumped
+
+
+def test_comfyui_poll_guards_a_non_dict_output_item(tmp_path):
+    fed = FakeFed({("comfyui", "generate_song"): {"prompt_id": "p-6"},
+                   ("comfyui", "get_job"): {"status": "processing", "outputs": [1],
+                                            "base_resp": {"status_msg": PROVIDER_TEXT}}},
+                  configured=("comfyui",))
+    uretici, _ = _uretici(tmp_path, fed)
+    token = uretici.uret(FULL, RUN, "muzik", SONG)["onay_belirteci"]
+    uretici.uret(FULL, RUN, "muzik", SONG, onay_belirteci=token)
+    body = uretici.uret(FULL, RUN, "muzik", SONG, is_kimligi="p-6")
+    dumped = json.dumps(body, ensure_ascii=False)
+    assert body["status"] == "saglayici_hatasi" and body["coverage"]["comfyui"] == "degraded:unexpected_shape"
+    assert "processing" not in dumped and PROVIDER_TEXT not in dumped
 
 
 def test_validation_and_missing_configuration(tmp_path):
