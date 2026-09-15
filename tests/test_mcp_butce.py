@@ -1,11 +1,14 @@
 """Media budget: pricing table, estimate-only ledger, cap with reservations, approval tokens."""
 import json
+import math
+import os
+import stat
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
 from src.mcp_server import butce
-from src.mcp_server.butce import Butce, ButceAsildi, Kalem, OnayKullanildi
+from src.mcp_server.butce import Butce, ButceAsildi, DefterBozuk, Kalem, OnayKullanildi
 
 SECRET = b"f" * 40
 EMAIL = "drmahirkurt@gmail.com"
@@ -226,3 +229,163 @@ def test_ledger_never_contains_the_raw_approval_token(tmp_path):
     b.rezerve(EMAIL, RUN, "minimax.muzik", "muzik", 1, 0.15, onay_belirteci=token)
     raw = (tmp_path / "ledger.json").read_text(encoding="utf-8")
     assert token not in raw
+
+
+# --- F1: a corrupted/wrong-shaped ledger fails closed (DefterBozuk), never silently resets spend
+# to empty. Only a genuinely missing file is treated as "no ledger yet". ------------------------
+
+def _corrupt_row(tahmini_usd):
+    return {"id": "abc", "ts": "2026-09-01T00:00:00+00:00", "user": EMAIL, "run_id": RUN,
+            "server": "minimax", "kalem": "minimax.gorsel", "tur": "gorsel", "miktar": 1,
+            "tahmini_usd": tahmini_usd, "sonuc": "ok", "is_kimligi": None, "onay": None}
+
+
+CORRUPT_LEDGERS = [
+    ("non_json_text", "not valid json {{{"),
+    ("top_level_not_dict", json.dumps([1, 2, 3])),
+    ("kayitlar_not_list", json.dumps({"surum": 1, "kayitlar": "x"})),
+    ("row_tahmini_usd_null", json.dumps({"surum": 1, "kayitlar": [_corrupt_row(None)]})),
+    ("row_tahmini_usd_string", json.dumps({"surum": 1, "kayitlar": [_corrupt_row("0.5")]})),
+    ("row_tahmini_usd_negative", json.dumps({"surum": 1, "kayitlar": [_corrupt_row(-1)]})),
+]
+
+
+@pytest.mark.parametrize("label,content", CORRUPT_LEDGERS, ids=[c[0] for c in CORRUPT_LEDGERS])
+def test_corrupt_ledger_fails_closed(tmp_path, label, content):
+    ledger_path = tmp_path / "ledger.json"
+    ledger_path.write_text(content, encoding="utf-8")
+    original_bytes = ledger_path.read_bytes()
+    b = _butce(tmp_path, cap=1.0)
+
+    with pytest.raises(DefterBozuk) as exc:
+        b.rezerve(EMAIL, RUN, "minimax.gorsel", "gorsel", 1, 0.1)
+    assert isinstance(exc.value, ButceAsildi)
+    assert ledger_path.read_bytes() == original_bytes  # rezerve raised before any write
+
+    with pytest.raises(DefterBozuk):
+        b.harcanan()
+
+    assert b.kalan() == 0.0
+
+    durum = b.durum()
+    assert durum["defter_bozuk"] is True
+    assert durum["harcanan_tahmini_usd"] is None
+    assert durum["kalan_usd"] == 0.0
+
+    assert b.modul_kullanimi(RUN, "minimax.gorsel") == math.inf
+
+    b.sonuclandir("some-id", "ok")  # logs, does not raise, does not write
+    assert ledger_path.read_bytes() == original_bytes
+
+
+def test_missing_ledger_file_still_starts_empty(tmp_path):
+    b = _butce(tmp_path, cap=1.0)
+    assert b.harcanan() == 0.0
+    assert b.kalan() == 1.0
+    durum = b.durum()
+    assert durum["defter_bozuk"] is False
+    assert durum["harcanan_tahmini_usd"] == 0.0
+    assert b.modul_kullanimi(RUN, "minimax.gorsel") == 0
+
+
+# --- F2: the pricing table is typed strictly — no truthy-JSON-value coercion into a real bool,
+# no bare KeyError/TypeError escaping for a missing/wrong-typed field. ---------------------------
+
+def _pricing_row(**overrides):
+    row = {"sunucu": "minimax", "arac": "text_to_audio", "birim": "karakter", "birim_usd": 0.0001,
+           "dogrulandi": False, "otomatik": True}
+    row.update(overrides)
+    return row
+
+
+def _write_pricing(tmp_path, row):
+    path = tmp_path / "pricing.json"
+    path.write_text(json.dumps({"surum": 1, "kalemler": {"minimax.ses": row}}), encoding="utf-8")
+    return path
+
+
+def test_load_pricing_rejects_string_dogrulandi(tmp_path):
+    path = _write_pricing(tmp_path, _pricing_row(dogrulandi="false"))
+    with pytest.raises(ValueError):
+        butce.load_pricing(path)
+
+
+def test_load_pricing_rejects_non_bool_otomatik(tmp_path):
+    path = _write_pricing(tmp_path, _pricing_row(otomatik=1))
+    with pytest.raises(ValueError):
+        butce.load_pricing(path)
+
+
+def test_load_pricing_rejects_missing_arac_key_with_value_error_not_key_error(tmp_path):
+    row = _pricing_row()
+    del row["arac"]
+    path = _write_pricing(tmp_path, row)
+    with pytest.raises(ValueError):
+        butce.load_pricing(path)
+
+
+def test_load_pricing_rejects_non_string_arac(tmp_path):
+    path = _write_pricing(tmp_path, _pricing_row(arac={"x": 1}))
+    with pytest.raises(ValueError):
+        butce.load_pricing(path)
+
+
+def test_load_pricing_rejects_a_row_that_is_a_string(tmp_path):
+    path = tmp_path / "pricing.json"
+    path.write_text(json.dumps({"surum": 1, "kalemler": {"minimax.ses": "not-a-dict"}}), encoding="utf-8")
+    with pytest.raises(ValueError):
+        butce.load_pricing(path)
+
+
+def test_shipped_pricing_still_loads_under_strict_typing():
+    table = butce.load_pricing()
+    assert len(table) >= 6
+
+
+# --- F3: rezerve() reads the clock exactly once and reuses it for both the cap-check month and
+# the row's ts, so the two cannot straddle a month boundary. -------------------------------------
+
+def test_rezerve_reads_the_clock_only_once_per_reservation(tmp_path):
+    calls = []
+
+    def clock():
+        t = SEPT if not calls else OCT
+        calls.append(t)
+        return t
+
+    b = Butce(tmp_path / "ledger.json", _pricing(), 1.0, SECRET, clock=clock)
+    b.rezerve(EMAIL, RUN, "minimax.gorsel", "gorsel", 1, 0.1)
+    assert len(calls) == 1
+    entry = json.loads((tmp_path / "ledger.json").read_text(encoding="utf-8"))["kayitlar"][0]
+    assert entry["ts"].startswith("2026-09")
+
+
+# --- F4: the ledger file is chmod 600 after every write, regardless of the process umask. -------
+
+def test_ledger_file_is_chmod_600_after_a_write(tmp_path):
+    old_umask = os.umask(0o002)
+    try:
+        b = _butce(tmp_path, cap=10.0)
+        b.rezerve(EMAIL, RUN, "minimax.gorsel", "gorsel", 1, 0.1)
+        mode = stat.S_IMODE(os.stat(tmp_path / "ledger.json").st_mode)
+        assert mode == 0o600
+    finally:
+        os.umask(old_umask)
+
+
+# --- F5: a bool monthly cap is refused, like every other quantity reaching the cap arithmetic. --
+
+def test_bool_monthly_cap_is_refused(tmp_path):
+    with pytest.raises(ValueError):
+        Butce(tmp_path / "ledger.json", _pricing(), True, SECRET)
+
+
+# --- F6: an approval token backing a "belirsiz" (ambiguous) outcome is still single-use. --------
+
+def test_approval_token_reuse_after_belirsiz_outcome_is_refused(tmp_path):
+    b = _butce(tmp_path, cap=10.0)
+    token = b.onay_belirteci(EMAIL, RUN, "muzik", "minimax.muzik", "neşeli bir şarkı", 0.15)
+    first = b.rezerve(EMAIL, RUN, "minimax.muzik", "muzik", 1, 0.15, onay_belirteci=token)
+    b.sonuclandir(first, "belirsiz")
+    with pytest.raises(OnayKullanildi):
+        b.rezerve(EMAIL, RUN, "minimax.muzik", "muzik", 1, 0.15, onay_belirteci=token)
