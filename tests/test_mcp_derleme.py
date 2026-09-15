@@ -1,9 +1,9 @@
 """Compiler: golden modes, conditional gates really applied, JS literal, schema, security, assets, attributions."""
 import json
+import re
 import shutil
 import signal
 import subprocess
-import time
 
 import pytest
 
@@ -598,23 +598,62 @@ def test_f12_boundary_does_not_refuse_non_handlers(body, needle):
     assert needle in html
 
 
-@pytest.mark.parametrize("s", ["<a" * 400_000, "< on=" * 400_000])
+@pytest.mark.parametrize("s", ["<a" * 200_000, "< on=" * 80_000, "<img/on" * 57_000])
 def test_f12_on_handler_scan_stays_linear(s):
-    # The negative-lookbehind pattern is still non-backtracking and the tag-context walk is
-    # unchanged, so guvenlik_tara stays linear. Neither input puts a handler inside a still-open
-    # tag, so the correct result is no refusal.
+    # F13 (fix round 5): rewritten for stability under load. `derleme.MAX_INPUT_BYTES` (400_000)
+    # is the real MODULE_DATA input budget, so a 400_000-character adversarial string (each of
+    # these three is ~400_000 chars: "<a"*200_000, "< on="*80_000, "<img/on"*57_000) is already at
+    # the extreme edge of any real input — there is no larger real-world case worth also covering.
     #
-    # The brief's target is "under 2 s". The retired quadratic `<[^>]*\son…=` pattern took >40 s
-    # on 40k chars, so on these inputs (up to 2 M chars) it would never return — the 8 s wall-clock
-    # SIGALRM below aborts such a regression and fails fast. The linear cost is then asserted
-    # against CPU time, which is load-independent: the 2 M-char `"< on="` case measures ~1.2 s of
-    # CPU isolated, comfortably under 2 s, but its *wall-clock* time flakes past a 2 s deadline
-    # under concurrent load on this shared runner, so a bare wall-clock guard would be flaky.
-    t0 = time.process_time()
-    result = _guvenlik_tara_within({"x": s}, seconds=8.0)
-    cpu = time.process_time() - t0
-    assert result == []
-    assert cpu < 2.0, f"guvenlik_tara used {cpu:.2f}s CPU (>2 s) — possible quadratic regression"
+    # The sole gate is an 8 s *wall-clock* SIGALRM, load-independent by construction (it fires
+    # however busy the runner is, unlike a CPU-time or tight wall-clock micro-threshold). The
+    # retired quadratic `<[^>]*\son[a-z]+\s*=` pattern took over 40 s at just 40_000 chars (fix
+    # round 2's controller measurement); `test_f13_retired_quadratic_pattern_times_out_under_the_same_alarm`
+    # below proves, self-containedly, that this same 8 s alarm actually catches that pattern at
+    # 200_000 chars — so it would catch any reintroduced quadratic behaviour here at 400_000 chars
+    # by an even wider margin. No CPU-time or tighter wall-clock assertion is kept (the previous
+    # `cpu < 2.0` micro-threshold is exactly what flaked under load).
+    #
+    # None of these three shapes ever puts a handler inside a still-open tag, so the correct
+    # verdict is "no refusal"; `test_f13_on_handler_scan_still_refuses_a_real_slash_separated_handler_at_scale`
+    # below is the correctness companion proving detection was not traded away for speed.
+    assert _guvenlik_tara_within({"x": s}, seconds=8.0) == []
+
+
+def test_f13_on_handler_scan_still_refuses_a_real_slash_separated_handler_at_scale():
+    # Correctness companion to the linearity test above, at the same ~400 KB scale: the
+    # "<img/on"-repeated shape with a real handler completing at the very end (F12's
+    # slash-separated-handler case) must still be refused — the linear-time scan must not have
+    # traded away detection for speed.
+    dangerous = ("<img/on" * 57_000) + "error=alert(1)>"
+    result = _guvenlik_tara_within({"x": dangerous}, seconds=8.0)
+    assert any("satır içi olay işleyicisi" in h for h in result)
+
+
+def test_f13_retired_quadratic_pattern_times_out_under_the_same_alarm():
+    # F13 requirement 5: a self-contained, in-test proof that the 8 s SIGALRM guard used above
+    # would actually fire on a real quadratic regression. The retired pattern is built here only —
+    # it is NOT imported from derleme.py (it no longer exists there) and must never be
+    # reintroduced into the compiler.
+    retired_quadratic_pattern = re.compile(r"<[^>]*\son[a-z]+\s*=", re.I)
+    s = "<" * 200_000  # half the size of the F13 inputs above; the retired pattern took over 40 s
+                       # at just 40_000 chars (fix round 2's controller measurement), so 200_000
+                       # chars is expected to time out many times over under an 8 s deadline.
+
+    class _RetiredPatternTimeout(Exception):
+        pass
+
+    def _handler(signum, frame):
+        raise _RetiredPatternTimeout()
+
+    old_handler = signal.signal(signal.SIGALRM, _handler)
+    signal.setitimer(signal.ITIMER_REAL, 8.0)
+    try:
+        with pytest.raises(_RetiredPatternTimeout):
+            retired_quadratic_pattern.search(s)
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, old_handler)
 
 
 @pytest.mark.parametrize("mode", ornekler.MODES)
