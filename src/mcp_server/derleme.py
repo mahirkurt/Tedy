@@ -28,14 +28,11 @@ _IDENT_RE = re.compile(r"^[A-Za-z_$][A-Za-z0-9_$]*$")
 _FORBIDDEN = (
     (re.compile(r"<\s*/?\s*script", re.I), "script etiketi"),
     (re.compile(r"<\s*(?:iframe|object|embed|form|base|meta|link)\b", re.I), "yasak etiket"),
-    (re.compile(r"<[^>]*\son[a-z]+\s*=", re.I), "satır içi olay işleyicisi"),
     (re.compile(r"javascript\s*:", re.I), "javascript: adresi"),
     (re.compile(r"vbscript\s*:", re.I), "javascript: adresi"),
-    # F2 (fix round 1): a `srcset` candidate list can smuggle a remote URL anywhere after the
-    # first candidate ("data:...low-res 1x, https://evil.example/x.png 2x"); this pattern scans
-    # the whole quoted/unquoted attribute value, not just the text immediately after `=`.
-    (re.compile(r"\bsrcset\s*=\s*(?:\"[^\"]*|'[^']*|[^\s>]*)(?:https?:|//)", re.I), "dış kaynak bağlantısı"),
-    (re.compile(r"\b(?:src|href|xlink:href|action|formaction|poster|srcset)\s*=\s*[\"']?\s*(?:https?:|//)", re.I),
+    # F8 (fix round 2) took `srcset` out of this alternation — it now has its own candidate
+    # parser (`_has_remote_srcset_candidate`) that understands `data:` payloads.
+    (re.compile(r"\b(?:src|href|xlink:href|action|formaction|poster)\s*=\s*[\"']?\s*(?:https?:|//)", re.I),
      "dış kaynak bağlantısı"),
     (re.compile(r"url\(\s*[\"']?\s*(?:https?:|//)", re.I), "CSS dış kaynağı"),
     # F1: `url(data:text/html,...)` etc. — only `data:image/...` is allowed (legitimate inline images).
@@ -44,6 +41,91 @@ _FORBIDDEN = (
     (re.compile(r"expression\s*\(", re.I), "CSS expression"),
 )
 _SCAN_STRIP_RE = re.compile(r"[\t\n\r\x00]")
+
+# F7 (fix round 2, controller measurement): the retired on-handler pattern
+# `<[^>]*\son[a-z]+\s*=` retried its greedy `[^>]*` from every '<' in the string and scanned to
+# the end each time — quadratic ("<" * 20_000 took 11 s; "<" * 40_000 took over 40 s). The
+# replacement below finds on-handler-*shaped* text with a simple, non-backtracking pattern (no
+# unbounded quantifier anchored on '<') and separately determines "inside a tag" with a running
+# last-'<'/last-'>' position, advanced once per match over the text *since the previous match*
+# (never re-scanning from the string's start) — linear in len(text) regardless of how many '<',
+# '>' or on-handler-shaped substrings it contains.
+_ON_HANDLER_RE = re.compile(r"\son[a-z]+\s*=", re.I)
+
+
+def _has_on_handler(text: str) -> bool:
+    """An on-handler counts only when the last '<' before it is after the last '>' before it —
+    i.e. it sits inside a still-open tag. Deliberately not narrowed to scanning only `[^<>]`
+    between them: browsers accept a literal '<' inside a quoted attribute value
+    (`<img alt="a<b" onerror=alert(1)>`), so a same-tag on-handler must still be caught even
+    when an unrelated '<' appears earlier in the same (still-open) tag."""
+    last_lt = last_gt = -1
+    pos = 0
+    for m in _ON_HANDLER_RE.finditer(text):
+        start = m.start()
+        segment = text[pos:start]
+        i = segment.rfind("<")
+        if i != -1:
+            last_lt = pos + i
+        j = segment.rfind(">")
+        if j != -1:
+            last_gt = pos + j
+        pos = start
+        if last_lt > last_gt:
+            return True
+    return False
+
+
+# F8 (fix round 2, re-review Important): the previous "scan the whole srcset value for // or
+# http(s): anywhere" pattern false-positived on any data: URI whose base64 payload happened to
+# contain "//" (measured ~55% of realistic small inline images). This candidate parser follows
+# the HTML `srcset` micro-syntax (simplified): whitespace/commas separate candidates, a
+# candidate's URL is the run up to the next whitespace, a URL ending in ',' has no descriptor and
+# the comma both terminates it and separates it from the next candidate, otherwise the descriptor
+# runs to the next comma. Only the URL's own scheme is checked, so a `//` or `http(s):` occurring
+# inside a data: payload is inert.
+_SRCSET_ATTR_RE = re.compile(r"\bsrcset\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|(\S+))", re.I)
+
+
+def _srcset_candidate_is_remote(value: str) -> bool:
+    n = len(value)
+    i = 0
+    while i < n:
+        while i < n and (value[i].isspace() or value[i] == ","):
+            i += 1
+        if i >= n:
+            break
+        start = i
+        while i < n and not value[i].isspace():
+            i += 1
+        url = value[start:i]
+        stripped = url.rstrip(",")
+        if stripped == url:
+            # No trailing comma: a descriptor (if any) follows, up to the next comma.
+            while i < n and value[i] != ",":
+                i += 1
+            if i < n:
+                i += 1
+        else:
+            url = stripped
+        low = url.lower()
+        if low.startswith("http:") or low.startswith("https:") or low.startswith("//"):
+            return True
+    return False
+
+
+def _has_remote_srcset_candidate(text: str) -> bool:
+    for m in _SRCSET_ATTR_RE.finditer(text):
+        value = m.group(1) if m.group(1) is not None else (m.group(2) if m.group(2) is not None else m.group(3))
+        if value and _srcset_candidate_is_remote(value):
+            return True
+    return False
+
+
+_CUSTOM_CHECKS = (
+    (_has_on_handler, "satır içi olay işleyicisi"),
+    (_has_remote_srcset_candidate, "dış kaynak bağlantısı"),
+)
 
 
 class DerlemeHatasi(Exception):
@@ -119,10 +201,18 @@ def _js_key(key: str) -> str:
     return key if _IDENT_RE.fullmatch(key) else _double_quoted_string(key)
 
 
-def js_literal(value: Any, depth: int = 0) -> str:
+def js_literal(value: Any, depth: int = 0, *, force_double_quoted: bool = False) -> str:
     """Bare-key JS literal in the authoring shape the vendored regex gates expect.
 
     Objects at depth 0-1 and arrays at depth 0-2 are multi-line; deeper values stay on one line.
+
+    F9 (fix round 2): every string anywhere under MODULE_DATA's top-level `exam` object is always
+    emitted double-quoted (never as an F3 template literal), because the vendored `gate_exam`
+    extracts `stem`/`source`/`integrityNote` with hardcoded `["\\']`-only delimiters — a template
+    literal there is invisible to it and produces a spurious FAIL on an ordinary exam question
+    that happens to quote something and contain markup. `force_double_quoted` starts False and
+    only ever turns on (never back off) as it's threaded down through nested dicts/lists, and it
+    turns on exactly once: when a depth-0 dict key is literally "exam".
     """
     pad, inner = "  " * depth, "  " * (depth + 1)
     if value is None:
@@ -138,16 +228,19 @@ def js_literal(value: Any, depth: int = 0) -> str:
             raise ValueError("sayı sonlu olmalı")
         return json.dumps(value)
     if isinstance(value, str):
-        return _js_string(value)
+        return _double_quoted_string(value) if force_double_quoted else _js_string(value)
     if isinstance(value, dict):
-        items = [f"{_js_key(str(k))}: {js_literal(v, depth + 1)}" for k, v in value.items()]
+        items = []
+        for k, v in value.items():
+            child_force = force_double_quoted or (depth == 0 and k == "exam")
+            items.append(f"{_js_key(str(k))}: {js_literal(v, depth + 1, force_double_quoted=child_force)}")
         if not items:
             return "{}"
         if depth <= 1:
             return "{\n" + ",\n".join(inner + item for item in items) + "\n" + pad + "}"
         return "{" + ", ".join(items) + "}"
     if isinstance(value, list):
-        items = [js_literal(v, depth + 1) for v in value]
+        items = [js_literal(v, depth + 1, force_double_quoted=force_double_quoted) for v in value]
         if not items:
             return "[]"
         if depth <= 2:
@@ -167,6 +260,27 @@ def _walk_strings(value: Any, path: str = "MODULE_DATA"):
             yield from _walk_strings(item, f"{path}[{index}]")
 
 
+def _walk_string_lists(value: Any, path: str = "MODULE_DATA"):
+    """F6 (fix round 2, re-review Critical): every list all of whose items are strings, as the
+    joined text the vendored engine actually renders.
+
+    The engine assigns `(s.body||[]).join("")` straight to `.innerHTML` — a forbidden pattern
+    split across two adjacent array elements (`['<a href="java', 'script:alert(1)">x</a>']`) is
+    invisible to `_walk_strings`, which only ever sees each element as an independent, complete
+    string, because the dangerous substring never exists in any single string it scans. Proven
+    live in Chromium (re-review). Only all-string lists are joined: a list containing a segment
+    dict (e.g. `segments`) is not itself meaningful `.innerHTML` content.
+    """
+    if isinstance(value, dict):
+        for key, item in value.items():
+            yield from _walk_string_lists(item, f"{path}.{key}")
+    elif isinstance(value, list):
+        if value and all(isinstance(item, str) for item in value):
+            yield path, "".join(value)
+        for index, item in enumerate(value):
+            yield from _walk_string_lists(item, f"{path}[{index}]")
+
+
 def _normalize_for_scan(text: str) -> str:
     """F1 (fix round 1): undo what the raw text alone hides from the scan.
 
@@ -180,14 +294,27 @@ def _normalize_for_scan(text: str) -> str:
     return _SCAN_STRIP_RE.sub("", html_lib.unescape(text))
 
 
+def _scan_label(text: str) -> str | None:
+    """The first `_FORBIDDEN`/`_CUSTOM_CHECKS` label that matches `text`, or None."""
+    for pattern, label in _FORBIDDEN:
+        if pattern.search(text):
+            return label
+    for check, label in _CUSTOM_CHECKS:
+        if check(text):
+            return label
+    return None
+
+
 def guvenlik_tara(data: Any) -> list[str]:
     errors = []
     for path, text in _walk_strings(data):
-        normalized = _normalize_for_scan(text)
-        for pattern, label in _FORBIDDEN:
-            if pattern.search(text) or pattern.search(normalized):
-                errors.append(f"{path}: {label}")
-                break
+        label = _scan_label(text) or _scan_label(_normalize_for_scan(text))
+        if label:
+            errors.append(f"{path}: {label}")
+    for path, joined in _walk_string_lists(data):
+        label = _scan_label(joined) or _scan_label(_normalize_for_scan(joined))
+        if label:
+            errors.append(f"{path}[*]: {label}")
     return errors[:50]
 
 

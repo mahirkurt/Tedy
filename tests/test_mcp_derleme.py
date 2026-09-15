@@ -1,6 +1,7 @@
 """Compiler: golden modes, conditional gates really applied, JS literal, schema, security, assets, attributions."""
 import json
 import shutil
+import signal
 import subprocess
 
 import pytest
@@ -244,6 +245,13 @@ def test_schema_errors(mutate, fragment):
     # first (lowest-DPI) candidate, not only right after `=`.
     ('<img src="data:image/gif;base64,AA==" '
      'srcset="data:image/gif;base64,AA== 1x, https://evil.example/t.png 2x" alt="">', "dış kaynak"),
+    # F7 (fix round 2) regression: a '<' inside a quoted attribute value must not confuse the
+    # linear-time "inside a tag" check into missing the on-handler that follows it in the same,
+    # still-open tag. Explicitly named in the fix-round-2 brief as a required regression.
+    ('<img alt="a<b" onerror=alert(1)>', "olay"),
+    # F8 (fix round 2) true positives for the new srcset candidate parser.
+    ('<img src="data:image/gif;base64,AA==" srcset="//evil.example/t.png" alt="">', "dış kaynak"),
+    ('<img src="data:image/gif;base64,AA==" srcset=https://evil.example/t.png alt="">', "dış kaynak"),
 ])
 def test_content_security_rejects_active_or_remote_html(payload, label):
     data = ornekler.ornek("MODULE")
@@ -262,6 +270,107 @@ def test_content_security_still_allows_data_image_css_background():
     _teach(data)["body"] = [payload]
     html = derleme.derle(data, {}, ORIGIN)
     assert "background:url(data:image/png;base64,QQ==)" in html
+
+
+def test_srcset_data_uri_with_slashes_in_payload_is_not_a_false_positive():
+    # F8 (re-review Important): the fix-round-1 "scan the whole value for // anywhere" pattern
+    # false-positived on any data: URI whose base64 payload happened to contain "//" (measured
+    # ~55% of realistic small inline images). The new candidate parser only checks each
+    # candidate's own URL scheme, so a "//" inside the base64 payload is inert.
+    data = ornekler.ornek("MODULE")
+    payload = '<img src="data:image/gif;base64,AA==" srcset="data:image/png;base64,AAAA//AAAA 1x" alt="">'
+    _teach(data)["body"] = [payload]
+    html = derleme.derle(data, {}, ORIGIN)
+    assert "AAAA//AAAA" in html
+
+
+def _guvenlik_tara_within(data, seconds=2.0):
+    """Runs `derleme.guvenlik_tara` under a hard wall-clock deadline (SIGALRM), so a performance
+    regression fails fast with a clear timeout instead of hanging the test process."""
+    class _PerfTimeout(Exception):
+        pass
+
+    def _handler(signum, frame):
+        raise _PerfTimeout(f"guvenlik_tara did not finish within {seconds}s")
+
+    old_handler = signal.signal(signal.SIGALRM, _handler)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        return derleme.guvenlik_tara(data)
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, old_handler)
+
+
+@pytest.mark.parametrize("name,data", [
+    ("lt_400k", {"x": "<" * 400_000}),
+    ("la_130k", {"x": "<a " * 130_000}),
+    ("onclick_40k", {"x": " onclick=" * 40_000}),
+    ("srcset_a_400k", {"x": '<img srcset="' + "a" * 400_000}),
+    ("url_100k", {"x": "url(" * 100_000}),
+    ("entity_200k", {"x": "&#" * 200_000}),
+    ("java_100k", {"x": "java" * 100_000}),
+    ("f6_list_50k_lt", {"x": ["<"] * 50_000}),
+])
+def test_content_scan_is_linear_time_not_quadratic(name, data):
+    # F7 (controller measurement at 9551455, network-free): guvenlik_tara({"x": "<" * 20_000})
+    # took 11.08s; "<" * 40_000 took more than 40s. The retired `<[^>]*\son[a-z]+\s*=` pattern
+    # retried its greedy scan from every '<' in the string. None of these 8 adversarial inputs is
+    # itself dangerous (no scheme/handler ever sits inside a still-open tag), so the correctness
+    # assertion is "no false positive" — the point of the test is that it completes at all.
+    assert _guvenlik_tara_within(data) == []
+
+
+@pytest.mark.parametrize("body,label", [
+    (['<a href="java', 'script:alert(1)">x</a>'], "javascript"),
+    (['<a href="&#106;ava', 'script:alert(1)">x</a>'], "javascript"),
+    (['<img src=x o', 'nerror=alert(1)>'], "olay"),
+])
+def test_array_join_bypass_is_caught_across_body_elements(body, label):
+    # F6 (re-review Critical): the vendored engine renders `teach.body` as
+    # `(s.body||[]).join("")` straight into innerHTML — proven live in a real Chromium tab by
+    # the re-review. Neither element contains the forbidden substring on its own, so per-string
+    # scanning alone (`_walk_strings`) sees nothing; `guvenlik_tara` must also scan the joined
+    # text of every all-string list.
+    data = ornekler.ornek("MODULE")
+    _teach(data)["body"] = body
+    with pytest.raises(DerlemeHatasi) as exc:
+        derleme.derle(data, {}, ORIGIN)
+    assert exc.value.status == "sema_hatasi"
+    assert any(label in h and "[*]" in h for h in exc.value.detay["hatalar"])
+
+
+def test_array_join_bypass_error_path_has_the_star_suffix():
+    # F6: "The error path is <list path>[*], for example MODULE_DATA.segments[0].body[*]."
+    data = ornekler.ornek("MODULE")
+    teach = _teach(data)
+    segment_index = data["segments"].index(teach)
+    teach["body"] = ['<a href="java', 'script:alert(1)">x</a>']
+    with pytest.raises(DerlemeHatasi) as exc:
+        derleme.derle(data, {}, ORIGIN)
+    expected_prefix = f"MODULE_DATA.segments[{segment_index}].body[*]:"
+    assert any(h.startswith(expected_prefix) for h in exc.value.detay["hatalar"])
+
+
+def test_array_join_scan_does_not_false_positive_on_a_normal_multi_paragraph_body():
+    data = ornekler.ornek("MODULE")
+    _teach(data)["body"] = ["<p>Birinci paragraf.</p>", "<p>İkinci paragraf.</p>"]
+    html = derleme.derle(data, {}, ORIGIN)
+    assert "Birinci paragraf" in html and "İkinci paragraf" in html
+
+
+def test_exam_stem_with_quote_and_angle_bracket_stays_double_quoted():
+    # F9 (re-review Important + PARTIAL): gate_exam extracts stem/source/integrityNote with
+    # hardcoded ["\']-only delimiters. Without F9, an ordinary exam.stem containing both '"'
+    # and '<' would route through F3's template-literal branch and become invisible to that
+    # regex, producing a spurious G-EXAM FAIL on well-formed content.
+    data = ornekler.ornek("EXAM")
+    data["exam"]["stem"] = '<b>"Buz"</b> güneşte ne olur?'
+    html = derleme.derle(data, {}, ORIGIN)
+    report = gates.run_gates(html)
+    assert report["G-EXAM"]["status"] != "FAIL"
+    tail = html[html.index("stem:") + len("stem:"):].lstrip()
+    assert tail.startswith('"')
 
 
 def test_module_data_at_the_budget_compiles():
