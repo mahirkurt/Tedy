@@ -115,19 +115,27 @@ def _validate_amount(value: Any, name: str) -> float:
 _KALEM_REQUIRED_FIELDS = ("sunucu", "arac", "birim", "birim_usd", "dogrulandi", "otomatik")
 
 
+def _is_valid_ledger_amount(value: Any) -> bool:
+    """Same rule as _validate_amount: a genuine, finite, non-negative int or float — bool
+    excluded (True/False are not quantities, even though Python coerces them to 1.0/0.0)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return math.isfinite(value) and value >= 0
+
+
 def _ledger_row_ok(row: Any) -> bool:
-    """A row read back from disk is well-formed: a dict with string ts/sonuc and a tahmini_usd
-    that is a genuine, finite, non-negative int or float (bool excluded, same reasoning as
-    _validate_amount). Used only to validate what comes off disk in _read() — rows this process
-    itself appends are always built to satisfy this by construction."""
+    """A row read back from disk is well-formed: a dict with string ts/sonuc, and tahmini_usd and
+    miktar each a genuine, finite, non-negative int or float (bool excluded). miktar is checked
+    the same way as tahmini_usd because modul_kullanimi() sums it directly — a corrupt miktar must
+    fail the same DefterBozuk-closed way a corrupt tahmini_usd already does, not crash with a raw
+    ValueError or silently under-count via an `or 0` fallback on a falsy `miktar: false`. Used
+    only to validate what comes off disk in _read() — rows this process itself appends are always
+    built to satisfy this by construction."""
     if not isinstance(row, dict):
         return False
     if not isinstance(row.get("ts"), str) or not isinstance(row.get("sonuc"), str):
         return False
-    tahmini_usd = row.get("tahmini_usd")
-    if isinstance(tahmini_usd, bool) or not isinstance(tahmini_usd, (int, float)):
-        return False
-    return math.isfinite(tahmini_usd) and tahmini_usd >= 0
+    return _is_valid_ledger_amount(row.get("tahmini_usd")) and _is_valid_ledger_amount(row.get("miktar"))
 
 
 def load_pricing(path: Path = PRICING_PATH) -> dict[str, Kalem]:

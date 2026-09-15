@@ -234,19 +234,32 @@ def test_ledger_never_contains_the_raw_approval_token(tmp_path):
 # --- F1: a corrupted/wrong-shaped ledger fails closed (DefterBozuk), never silently resets spend
 # to empty. Only a genuinely missing file is treated as "no ledger yet". ------------------------
 
-def _corrupt_row(tahmini_usd):
+def _corrupt_row(tahmini_usd=0.1, miktar=1):
     return {"id": "abc", "ts": "2026-09-01T00:00:00+00:00", "user": EMAIL, "run_id": RUN,
-            "server": "minimax", "kalem": "minimax.gorsel", "tur": "gorsel", "miktar": 1,
+            "server": "minimax", "kalem": "minimax.gorsel", "tur": "gorsel", "miktar": miktar,
             "tahmini_usd": tahmini_usd, "sonuc": "ok", "is_kimligi": None, "onay": None}
+
+
+def _row_missing_miktar():
+    row = _corrupt_row()
+    del row["miktar"]
+    return row
 
 
 CORRUPT_LEDGERS = [
     ("non_json_text", "not valid json {{{"),
     ("top_level_not_dict", json.dumps([1, 2, 3])),
     ("kayitlar_not_list", json.dumps({"surum": 1, "kayitlar": "x"})),
-    ("row_tahmini_usd_null", json.dumps({"surum": 1, "kayitlar": [_corrupt_row(None)]})),
-    ("row_tahmini_usd_string", json.dumps({"surum": 1, "kayitlar": [_corrupt_row("0.5")]})),
-    ("row_tahmini_usd_negative", json.dumps({"surum": 1, "kayitlar": [_corrupt_row(-1)]})),
+    ("row_tahmini_usd_null", json.dumps({"surum": 1, "kayitlar": [_corrupt_row(tahmini_usd=None)]})),
+    ("row_tahmini_usd_string", json.dumps({"surum": 1, "kayitlar": [_corrupt_row(tahmini_usd="0.5")]})),
+    ("row_tahmini_usd_negative", json.dumps({"surum": 1, "kayitlar": [_corrupt_row(tahmini_usd=-1)]})),
+    # F7: miktar is validated with the same fail-closed rule as tahmini_usd/ts/sonuc.
+    ("row_miktar_string", json.dumps({"surum": 1, "kayitlar": [_corrupt_row(miktar="3")]})),
+    ("row_miktar_bool", json.dumps({"surum": 1, "kayitlar": [_corrupt_row(miktar=False)]})),
+    ("row_miktar_negative", json.dumps({"surum": 1, "kayitlar": [_corrupt_row(miktar=-1)]})),
+    ("row_miktar_nan", json.dumps({"surum": 1, "kayitlar": [_corrupt_row(miktar=float("nan"))]})),
+    ("row_miktar_inf", json.dumps({"surum": 1, "kayitlar": [_corrupt_row(miktar=float("inf"))]})),
+    ("row_miktar_missing", json.dumps({"surum": 1, "kayitlar": [_row_missing_miktar()]})),
 ]
 
 
@@ -389,3 +402,19 @@ def test_approval_token_reuse_after_belirsiz_outcome_is_refused(tmp_path):
     b.sonuclandir(first, "belirsiz")
     with pytest.raises(OnayKullanildi):
         b.rezerve(EMAIL, RUN, "minimax.muzik", "muzik", 1, 0.15, onay_belirteci=token)
+
+
+# --- F7: modul_kullanimi()'s miktar is validated with the same fail-closed rule as the other
+# numeric fields — a corrupt miktar must raise DefterBozuk (-> modul_kullanimi returns math.inf),
+# never crash with a raw ValueError, and never silently under-count a falsy `miktar: false` to 0.
+# (The corrupt-miktar shapes themselves are folded into CORRUPT_LEDGERS/test_corrupt_ledger_fails_
+# closed above — every one of that test's assertions, including modul_kullanimi()==math.inf, runs
+# against them too.) ------------------------------------------------------------------------------
+
+def test_modul_kullanimi_sums_valid_rows_correctly_on_a_healthy_ledger(tmp_path):
+    b = _butce(tmp_path, cap=10.0)
+    first = b.rezerve(EMAIL, RUN, "minimax.ses", "ses", 100, 0.01)
+    b.sonuclandir(first, "ok")
+    second = b.rezerve(EMAIL, RUN, "minimax.ses", "ses", 50, 0.005)
+    b.sonuclandir(second, "ok")
+    assert b.modul_kullanimi(RUN, "minimax.ses") == 150
