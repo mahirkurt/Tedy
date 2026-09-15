@@ -131,6 +131,20 @@ def test_figure_from_another_book_falls_through_to_pexels(ortam):
     assert_kaynak_verisi(body, [INJECTION, "Fotoğraf: Jane Doe / Pexels"])
 
 
+def test_undecodable_figure_response_degrades_and_falls_through_to_pexels(ortam):
+    """Fix round 1 F1 (review Minor 1): a get_figure text that does not even parse as JSON is a
+    shape problem, not "nothing found" — it must degrade, not report empty, and the chain still
+    falls through to Pexels."""
+    garbage = McpToolResult(ok=True, text="<html>err", images=FIGURE_RAW.images)
+    fed = FakeFed(responses={("maarif-mufredat", "search_figures"): {"figures": [{"figure_id": 11, "document_id": 197}]},
+                             ("pexels", "search_photos"): PHOTOS},
+                  raw={("maarif-mufredat", "get_figure"): garbage}, configured={"maarif-mufredat", "pexels"})
+    uretici, _ = _uretici(ortam, fed)
+    body = uretici.uret(FULL, RUN, "su döngüsü")
+    assert body["status"] == "ok" and body["varlik"]["kaynak"] == "pexels"
+    assert body["coverage"] == {"maarif-mufredat": "degraded:unexpected_shape", "pexels": "hit"}
+
+
 def test_generated_image_is_automatic_only_within_limits(ortam):
     fed = FakeFed(responses={("minimax", "text_to_image"): MINIMAX_IMAGE}, configured={"minimax"})
     uretici, butce = _uretici(ortam, fed)

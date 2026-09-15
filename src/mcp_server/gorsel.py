@@ -116,7 +116,10 @@ class GorselUretici:
         try:
             meta = next((v for v in decode_json_stream(result.text or "") if isinstance(v, dict)), {})
         except ValueError:
-            meta = {}
+            # Fix round 1 F1: the provider's text did not even parse as JSON — a shape problem,
+            # not "nothing found" (a genuinely empty/other-book figure below is still `empty`).
+            cov.degraded(MUFREDAT, "unexpected_shape")
+            return None
         if str(meta.get("document_id")) != str(document_id) or not result.images:
             cov.empty(MUFREDAT)
             return None
