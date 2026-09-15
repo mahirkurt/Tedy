@@ -195,6 +195,31 @@ def test_host_guard_rejects_foreign_host(tmp_path, store):
     assert r.json()["error"] == "host_not_allowed"
 
 
+def test_well_known_metadata_ignores_the_host_header(tmp_path, store):
+    """SP3 deployment-gate followup, gap L3: HostGuardMiddleware only guards paths starting with
+    /mcp (by design — see HostGuardMiddleware), so /.well-known/* answers any Host at all. The
+    metadata those endpoints emit must still be built from the configured public base URL, never
+    from whatever Host header a client happens to send — otherwise a spoofed or DNS-rebound Host
+    could forge the issuer/endpoint URLs a client's authorization flow trusts."""
+    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
+    # Two separate build_app() calls: each FastMCP session manager may only be .run() once, so the
+    # same app instance cannot be entered by two TestClient `with` blocks.
+    evil_app = build_app(settings, store, _test_mcp(), form_secret=b"s" * 32)
+    with TestClient(evil_app, base_url="https://evil.example") as evil:
+        auth_meta = evil.get("/.well-known/oauth-authorization-server").json()
+        res_meta = evil.get("/.well-known/oauth-protected-resource").json()
+    assert auth_meta["issuer"] == BASE
+    assert auth_meta["authorization_endpoint"] == f"{BASE}/oauth/authorize"
+    assert auth_meta["token_endpoint"] == f"{BASE}/oauth/token"
+    assert auth_meta["registration_endpoint"] == f"{BASE}/oauth/register"
+    assert res_meta["resource"] == f"{BASE}/mcp"
+    assert res_meta["authorization_servers"] == [BASE]
+    allowed_app = build_app(settings, store, _test_mcp(), form_secret=b"s" * 32)
+    with TestClient(allowed_app, base_url=BASE) as allowed:
+        r = allowed.post("/mcp", json=_rpc("initialize"), headers=MCP_HEADERS)
+    assert f'resource_metadata="{BASE}/.well-known/oauth-protected-resource"' in r.headers["www-authenticate"]
+
+
 def test_static_key_reaches_tool_with_identity(client, store):
     key = store.create_static_key("test", FULL)
     r = client.post(

@@ -4,6 +4,7 @@ import json
 import os
 
 import pytest
+import requests
 
 from src.mcp_server import tunnel_route as tr
 
@@ -523,4 +524,148 @@ def test_kaldir_dns_deleted_then_m4_abort_reports_cause(tmp_path, capsys):
     assert "ingress kuralı hâlâ var" in error_msg, error_msg
     assert "aynı kaldir komutunu tekrar çalıştırın" in error_msg, error_msg
     assert "tünel yapılandırması arasında değişmiş" in error_msg, "the M-4 cause must be present: " + error_msg
+
+
+# SP3 deployment-gate followup, gap L1: the *post*-PUT re-read (tunnel_route.py:229-231) had no
+# test at all — only the *pre*-PUT re-read (M-4, test_reread_before_put_detects_concurrent_change
+# above) was covered, and that one aborts BEFORE put_tunnel_config is ever called. This test drives
+# the case where the PUT itself succeeds but the config Cloudflare hands back immediately
+# afterwards differs from what was written (e.g. Cloudflare silently coerced or dropped something).
+class FakeApiPutSucceedsButReadbackMismatches:
+    """Wraps a real FakeApi. The 1st tunnel_config read (main()'s own) and the 2nd (the M-4
+    pre-PUT re-read) both return the true, unchanged config, so the pre-PUT check passes and PUT
+    is actually attempted. Only the 3rd read — the post-PUT re-read inside _put_and_confirm — is
+    swapped for a mismatched ingress, simulating Cloudflare storing something other than what was
+    sent."""
+
+    def __init__(self, base_api):
+        self.base_api = base_api
+        self.read_count = 0
+        self.put_called = False
+
+    def zone(self, name):
+        return self.base_api.zone(name)
+
+    def tunnel_id(self, account_id, name):
+        return self.base_api.tunnel_id(account_id, name)
+
+    def tunnel_config(self, account_id, tunnel_id):
+        self.read_count += 1
+        config = self.base_api.tunnel_config(account_id, tunnel_id)
+        if self.read_count == 3:
+            config["ingress"][0]["service"] = "http://localhost:9999"  # not what was written
+        return config
+
+    def put_tunnel_config(self, account_id, tunnel_id, config):
+        self.put_called = True
+        self.base_api.put_tunnel_config(account_id, tunnel_id, config)
+
+    def dns_records(self, zone_id, name):
+        return self.base_api.dns_records(zone_id, name)
+
+    def create_cname(self, zone_id, name, target):
+        return self.base_api.create_cname(zone_id, name, target)
+
+    def delete_dns_record(self, zone_id, record_id):
+        return self.base_api.delete_dns_record(zone_id, record_id)
+
+
+def test_apply_refuses_when_post_put_readback_mismatches(tmp_path):
+    """L1: PUT succeeds, but the ingress read back immediately afterwards differs from what was
+    written. `ekle --uygula` must refuse (not report the success line) and must not go on to touch
+    DNS. Distinct from test_reread_before_put_detects_concurrent_change (M-4), which aborts BEFORE
+    put_tunnel_config is ever called; here the PUT itself is called and only the readback fails."""
+    base = FakeApi(_ingress())
+    api = FakeApiPutSucceedsButReadbackMismatches(base)
+    rc, out = _run(api, "ekle", "--servis", SERVICE, "--beklenen-kural", "52", "--uygula", "--yedek-dizini", str(tmp_path))
+    assert rc == 2
+    assert api.put_called is True, "the PUT must actually have been attempted"
+    assert "doğrulandı" not in out, "the success line must not print when the readback mismatches"
+    assert base.writes() == ["put_tunnel_config"], "DNS must never be touched after a bad readback"
+
+
+# SP3 deployment-gate followup, gap L2(a)/(b): only the non-success HTTP error path (call()'s
+# ":128", covered by test_api_resolves_by_name_handles_missing_and_hides_the_token above) was
+# pinned against leaking the token. The network-exception path (:118) and the non-JSON-response
+# path (:124) were free to grow a token/Authorization-header leak without any test noticing.
+def test_network_exception_error_never_includes_the_token():
+    """L2(a): a requests exception raised while calling Cloudflare must not leak the token or the
+    Authorization header into the RouteError message."""
+
+    class RaisingSession:
+        def request(self, method, url, **kw):
+            raise requests.ConnectionError("boom")
+
+    token = "sekret-cf-token-for-network-exception-test"
+    api = tr.CloudflareApi(token, session=RaisingSession())
+    with pytest.raises(tr.RouteError) as excinfo:
+        api.call("GET", "/zones")
+    message = str(excinfo.value)
+    assert token not in message
+    assert "ConnectionError" in message
+
+
+def test_non_json_response_error_never_includes_the_token():
+    """L2(b): a non-JSON Cloudflare response must not leak the token or the Authorization header
+    into the RouteError message."""
+
+    class NonJsonResponse:
+        def __init__(self, status_code):
+            self.status_code = status_code
+
+        def json(self):
+            raise ValueError("no JSON object could be decoded")
+
+    class NonJsonSession:
+        def request(self, method, url, **kw):
+            return NonJsonResponse(502)
+
+    token = "sekret-cf-token-for-non-json-test"
+    api = tr.CloudflareApi(token, session=NonJsonSession())
+    with pytest.raises(tr.RouteError) as excinfo:
+        api.call("GET", "/zones")
+    message = str(excinfo.value)
+    assert token not in message
+    assert "502" in message
+
+
+# SP3 deployment-gate followup, gap L2(c): the plan-printing path (_print_plan, reached through a
+# dry run of main()) was never exercised with a real CloudflareApi carrying a real token — every
+# other test in this file drives main() with a FakeApi test double that never holds a token at
+# all, so a future line that interpolated the token or the Authorization header into the plan
+# output would have gone unnoticed. This drives main() end-to-end through the real CloudflareApi.
+class _MultiEndpointSession:
+    """Answers exactly the Cloudflare API calls a dry-run `ekle` issues: zone, tunnel_id,
+    tunnel_config, dns_records — in that order, with no PUT."""
+
+    def __init__(self, ingress, account_id="acct-1", zone_id="zone-tedy"):
+        self.ingress = ingress
+        self.account_id = account_id
+        self.zone_id = zone_id
+
+    def request(self, method, url, headers=None, params=None, json=None, timeout=None, **kw):
+        base = tr.API_BASE
+        if (method, url) == ("GET", f"{base}/zones"):
+            return FakeResponse(200, {"success": True,
+                                       "result": [{"id": self.zone_id, "account": {"id": self.account_id}}]})
+        if (method, url) == ("GET", f"{base}/accounts/{self.account_id}/cfd_tunnel"):
+            return FakeResponse(200, {"success": True, "result": [{"id": TUNNEL, "name": params["name"]}]})
+        if (method, url) == ("GET", f"{base}/accounts/{self.account_id}/cfd_tunnel/{TUNNEL}/configurations"):
+            return FakeResponse(200, {"success": True, "result": {"config": {"ingress": self.ingress}}})
+        if (method, url) == ("GET", f"{base}/zones/{self.zone_id}/dns_records"):
+            return FakeResponse(200, {"success": True, "result": []})
+        raise AssertionError(f"unexpected request in dry-run test: {method} {url}")
+
+
+def test_cli_dry_run_plan_output_never_includes_the_token():
+    """L2(c): main()'s dry-run plan output must never include the Cloudflare API token, however it
+    got there. Driven with a real CloudflareApi (real Authorization header) instead of the usual
+    FakeApi double, precisely because no FakeApi in this file ever holds a token — a leak in the
+    plan-printing path itself would be invisible to every other test here."""
+    token = "sekret-cf-token-for-plan-output-test"
+    api = tr.CloudflareApi(token, session=_MultiEndpointSession(_ingress()))
+    out = io.StringIO()
+    rc = tr.main([*ARGS, "ekle", "--servis", SERVICE, "--beklenen-kural", "52"], api=api, out=out)
+    assert rc == 0
+    assert token not in out.getvalue()
 

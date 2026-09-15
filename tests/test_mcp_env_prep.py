@@ -55,6 +55,21 @@ def test_stdin_value_is_validated(tmp_path):
     assert "MINIMAX_MCP_API_KEY" not in path.read_text()
 
 
+def test_rejected_stdin_value_is_never_echoed_in_the_error_message(tmp_path, capsys):
+    """SP3 deployment-gate followup, gap L2: a --stdin value env_prep rejects must never be echoed
+    back in its own refusal message — only the name and a generic reason may appear, never the
+    value itself. Uses a distinctive marker so any future echo of `value` is unambiguous, and
+    checks both stdout and stderr since the CLI's error path prints to stderr."""
+    path = _env(tmp_path, "")
+    marker = "MARKER-do-not-print-me!"
+    rc, out = _run(path, "ayarla", "SOME_TEST_SECRET", "--stdin", stdin=marker + "\n")
+    err = capsys.readouterr().err
+    assert rc == 2
+    assert marker not in out
+    assert marker not in err
+    assert "SOME_TEST_SECRET" not in path.read_text()
+
+
 @pytest.mark.parametrize("name", env_prep.UNIT_ONLY)
 def test_unit_only_names_are_refused(tmp_path, name):
     path = _env(tmp_path, "")
