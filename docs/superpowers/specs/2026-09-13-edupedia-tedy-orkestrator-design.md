@@ -483,6 +483,53 @@ planında yer alır.
   sınırı 429, `tdyM_` anahtarıyla `initialize` (`2025-06-18`, `TEDY edupedia` `0.1.0`) + `tools/list` beş araç; test
   anahtarı `sp3-kabul-20260914` iptal edildi. Google JavaScript origin: bekliyor (insan adımı).
 
+### Alt proje 4 plan güncellemeleri (2026-09-14)
+
+Kaynak: `docs/superpowers/plans/2026-09-14-ted-mcp-derleme-yayin-katalog.md` → "Plan kararları". §14.2 gereği
+bu maddeler uygulanmadan önce denetleyici tarafından onaylanır (kullanıcı süreç yönetimini denetleyiciye devretti).
+
+- **§3 / §4.2 / §13 — dashboard süreçleri:** `ted-dashboard` 2 gunicorn işçi süreci × 4 iş parçacığıdır. Tek-yazar
+  (dashboard) `output/module_progress.json`'ı iki süreçten yazar; oku-değiştir-yaz `fcntl.flock` yan kilidiyle
+  (`output/module_progress.json.lock`) sıralanır, dosya atomik değiştirilir.
+- **§4.1 — port:** `ted-mcp` loopback portu `8090`'dır (8087 ilgisiz bir Docker konteynerinde; alt proje 3 taşır).
+- **§5.1 — araç imzaları:** `edupedia_medya(run_id, tur, istek, tahmin=false, onay_belirteci?, is_kimligi?)` —
+  `is_kimligi` asenkron video yoklamasıdır; araç sayısı 14 kalır. `edupedia_derle` `module_data`'yı nesne veya JSON
+  metni olarak kabul eder; UTF-8 JSON olarak **≤ 400.000 bayt**, üstü `cok_buyuk`. İkili içerik araç çağrısıyla
+  gelmez; varlıklara yalnız `asset_id` ile başvurulur. `/mcp` istek gövdesi sınırı (`TED_MCP_MAX_BODY_BYTES`, S1a) ≥ 2.097.152 bayttır.
+- **§5.1 — hibrit kuralı:** `edupedia_derle` `curriculum` ve `verification` bloklarını zorunlu tutar;
+  `verification.frame_source.document_id` çalıştırmanın `textbook` çerçevesiyle, `curriculum.outcomes[].code`
+  çalıştırmanın doğrulanmış kazanımlarıyla eşleşir. Koşullu kapılar hiçbir zaman sessizce atlanmaz.
+- **§5.2 — motor ve varlıklar:** vendored şablon değişmez; motor farkları `src/mcp_server/sablon.py` çapa
+  yamalarıdır (ilerleme köprüsü, `visual.kind: image|video`, segment `audio`, varlık bloğu, atıf altbilgisi).
+  `meta.assets[].slot` = `<teachSegmentId>.visual` | `<teachSegmentId>.audio`. Veriler motor script'inden önce
+  `<script type="application/json" id="edupedia-varliklar">` bloğunda `data:` URI olarak gömülür; gömülü ham toplam
+  ≤ 2.400.000 bayt, görsel başına ≤ 400.000 bayt (en uzun kenar 1280 px JPEG). `MODULE_DATA` derlemede çıplak
+  anahtarlı JS nesne literali olarak yazılır.
+- **§5.3 — katalog:** `output/modules/index.json` = `{"surum": 1, "moduller": [kayıt, …]}`; kayda `taslak_id`,
+  `sha256`, `removed_at`, `removed_by` eklenir. `edupedia_yayinla`'nın `url`'si
+  `https://tedy.online/moduller/<slug>/v<N>`'dir. `EXAM` modu yayınlanmaz (telif). `taslak` slug'ı ayrılmıştır;
+  slug ≤ 60 karakter, sürüm 1–9999.
+- **§5.4 — bilet:** doğrulayıcı e-postayı görmediği için MAC `u = sha256(küçük_harf(email))[:32]` üzerinden kurulur:
+  modül `HMAC-SHA256(EDUPEDIA_TICKET_SECRET, "m|<slug>|v<N>|<u>|<exp>")`, taslak
+  `HMAC-SHA256(EDUPEDIA_TICKET_SECRET, "t|<taslak_id>|<u>|<exp>")`. ted-mcp `u`'nun güncel `full` roster üyesine ait
+  olduğunu da denetler; TTL içinde yeniden kullanım kabul edilir. Doğrulama sırası: yol biçimi → bilet → kayıt.
+  Kaldırılmış veya bulunmayan modül 404.
+- **§5.5 — köprü:** `answer` olayına `item` (0–999) eklenir; v1'de `answer` yalnız soru setlerinden (mcq,
+  checkpoint karma soruları) gelir, diğer etkileşimler `segment_complete` üretir. `edupedia:restore.state` =
+  `{"answers": ["<segmentId>#<item>", …], "done": ["<segmentId>", …], "xp": <int>}`; motor ilk tamamlanmamış
+  segmente konumlanır. Modül `slug`/`version`'ı kendi URL yolundan (`/m/<slug>/v<N>`) okur; `postMessage` hedef
+  origin'i derleme sabiti `EDUPEDIA_PARENT_ORIGIN` (varsayılan `https://tedy.online`); modül `restore`'u yalnız
+  `event.source === window.parent` ve `event.origin === EDUPEDIA_PARENT_ORIGIN` iken uygular. Dashboard ayrıca
+  `event.origin === "null"` ister. İlerleme kişi başına saklanır; MCP'ye yalnız toplamlar döner.
+- **§6.3 — dashboard CSP:** `Content-Security-Policy: frame-src https://modul.tedy.online https://accounts.google.com`.
+- **§7 — atıf ve filo:** MEB kitap/sayfa atfı öğrenci yüzeyine değil `sourceCitation`/`verification`'a yazılır
+  (G-VOICE öğrenci yüzeyinde `ders kitab…` ve `sayfa <n>` kalıplarını yasaklar); `G-ATTRIB` gömülü her varlığın
+  atfını ve `license` taşıyan her `grounding` kaynağını altbilgide arar. tr-literatur'un genel adı yoktur; ted-mcp
+  `TR_LITERATUR_MCP_URL` (varsayılan `http://127.0.0.1:8327/mcp`) kullanır. comfyui yalnız minimax yapılandırılmamışken
+  onaylı yedektir.
+- **§8 — bütçe:** defter kaydına `miktar` eklenir (modül başı ses karakteri ve görsel sayısı sınırı); fiyat kalemi
+  `dogrulandi: false` ise otomatik yol kapalıdır ve onay istenir.
+
 ## 13. Varsayımlar ve riskler
 
 | Risk / varsayım | Etki | Azaltma |
