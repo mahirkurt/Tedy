@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping
@@ -11,6 +12,8 @@ from src.mcp_server import derleme, gates
 from src.mcp_server.derleme import DerlemeHatasi, GomuluVarlik
 from src.mcp_server.runs import RUN_ID_RE, RunStore
 from src.mcp_server.taslak import DraftStore
+
+logger = logging.getLogger(__name__)
 
 DETAIL_MAX = 300
 NEXT_OK = "Önizleme için edupedia_onizle(taslak_id); yayın için edupedia_yayinla(taslak_id, ted_link?)."
@@ -56,35 +59,48 @@ class Derleyici:
             except ValueError:
                 return {**base, "status": "sema_hatasi", "hatalar": ["module_data geçerli JSON değil"]}
         try:
-            size = derleme.girdi_boyutu(module_data)
-            if size > derleme.MAX_INPUT_BYTES:
-                raise DerlemeHatasi("cok_buyuk", bayt=size, sinir=derleme.MAX_INPUT_BYTES)
-            errors = derleme.sema_dogrula(module_data) + (derleme.guvenlik_tara(module_data)
-                                                          if isinstance(module_data, dict) else [])
-            if errors:
-                raise DerlemeHatasi("sema_hatasi", hatalar=errors)
-            mismatch = _run_mismatch(run, module_data)
-            if mismatch:
-                return {**base, **mismatch}
-            varliklar = self.assets(run_id) if self.assets else {}
-            html = derleme.derle(module_data, varliklar, self.parent_origin)
-        except DerlemeHatasi as exc:
-            return {**base, "status": exc.status, **exc.detay}
-        report = gates.run_gates(html)
-        summary = derleme.kapi_ozeti(report)
-        meta = module_data["meta"]
-        taslak_id = self.drafts.new_id()
-        record = self.drafts.save(taslak_id, html, {
-            "run_id": run_id, "created_by": email,
-            "created_at": datetime.fromtimestamp(self.clock(), timezone.utc).isoformat(timespec="seconds"),
-            "meta": {key: meta.get(key) for key in ("id", "title", "subject", "gradeLevel", "mode")},
-            "ted_link": meta.get("tedLink"),
-            "outcomes": [o.get("code") for o in module_data["curriculum"].get("outcomes") or [] if isinstance(o, dict)],
-            "frame_source": module_data["verification"].get("frame_source"),
-            "coverage": run.get("coverage") or {},
-            "assets": [ref["asset_id"] for ref in meta.get("assets") or []],
-            "gates": summary, "kapilar": report, "parent_origin": self.parent_origin,
-        })
+            try:
+                size = derleme.girdi_boyutu(module_data)
+                if size > derleme.MAX_INPUT_BYTES:
+                    raise DerlemeHatasi("cok_buyuk", bayt=size, sinir=derleme.MAX_INPUT_BYTES)
+                errors = derleme.sema_dogrula(module_data) + (derleme.guvenlik_tara(module_data)
+                                                              if isinstance(module_data, dict) else [])
+                if errors:
+                    raise DerlemeHatasi("sema_hatasi", hatalar=errors)
+                mismatch = _run_mismatch(run, module_data)
+                if mismatch:
+                    return {**base, **mismatch}
+                varliklar = self.assets(run_id) if self.assets else {}
+                html = derleme.derle(module_data, varliklar, self.parent_origin)
+            except DerlemeHatasi as exc:
+                return {**base, "status": exc.status, **exc.detay}
+            # Second, outer boundary (review 1a/1b): derleme.derle() above can also raise a bare
+            # ValueError/RuntimeError from sablon.engine_template() for a malformed parent_origin
+            # or a drifted vendored template — neither is a DerlemeHatasi, so the inner except
+            # above never sees it. gates.run_gates() and drafts.save() have no per-call guard of
+            # their own either. Anything that reaches here is closed to a non-leaking status
+            # instead of an uncaught exception reaching FastMCP's generic error handler (which
+            # would return the raw Python exception text as the tool's error message).
+            report = gates.run_gates(html)
+            summary = derleme.kapi_ozeti(report)
+            meta = module_data["meta"]
+            taslak_id = self.drafts.new_id()
+            record = self.drafts.save(taslak_id, html, {
+                "run_id": run_id, "created_by": email,
+                "created_at": datetime.fromtimestamp(self.clock(), timezone.utc).isoformat(timespec="seconds"),
+                "meta": {key: meta.get(key) for key in ("id", "title", "subject", "gradeLevel", "mode")},
+                "ted_link": meta.get("tedLink"),
+                "outcomes": [o.get("code") for o in module_data["curriculum"].get("outcomes") or [] if isinstance(o, dict)],
+                "frame_source": module_data["verification"].get("frame_source"),
+                "coverage": run.get("coverage") or {},
+                "assets": [ref["asset_id"] for ref in meta.get("assets") or []],
+                "gates": summary, "kapilar": report, "parent_origin": self.parent_origin,
+            })
+        except Exception:
+            logger.exception("edupedia_derle iç hatası (run_id=%s)", run_id)
+            return {**base, "status": "sunucu_hatasi",
+                    "not": "Derleme sunucu tarafında tamamlanamadı; yöneticiye bildir. "
+                           "MODULE_DATA'yı değiştirmek bu hatayı çözmez."}
         kapilar = {}
         for gate, row in report.items():
             entry = {"status": row["status"]}

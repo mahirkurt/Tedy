@@ -9,6 +9,7 @@ from typing import Mapping
 
 from src.mcp_server.oauth_redirect import (EXTRA_FORM_ACTION_ORIGINS_ENV, EXTRA_REDIRECT_URIS_ENV,
                                            parse_extra_form_action_origins, parse_extra_redirect_uris)
+from src.mcp_server.sablon import PARENT_ORIGIN_RE
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MCP_MAX_BODY_BYTES = 2_097_152
@@ -64,6 +65,29 @@ def _positive_int(env: Mapping[str, str], name: str, default: int) -> int:
     return int(raw)
 
 
+def _parent_origin(env: Mapping[str, str]) -> str:
+    """EDUPEDIA_PARENT_ORIGIN, validated at boot the same way TED_MCP_MAX_BODY_BYTES is: a bad
+    value stops startup with a ValueError naming the variable, instead of surfacing later as a
+    raw, unclosed exception out of sablon.engine_template() on the first real compile call.
+
+    Only `.rstrip("/")` is applied before validation (tolerating an incidental trailing slash) —
+    deliberately not a full `.strip()`, which would silently discard a trailing control character
+    (e.g. a stray newline) before the regex ever saw it, defeating exactly the check this
+    function exists to make.
+    """
+    candidate = (env.get("EDUPEDIA_PARENT_ORIGIN") or "https://tedy.online").rstrip("/")
+    if not PARENT_ORIGIN_RE.fullmatch(candidate):
+        # No example origin in this message: an example built from a real accepted value could
+        # collide, as a substring, with an unrelated malformed value under test (e.g. a bare
+        # hostname with no scheme) — the invariant is "never echo the configured value", and an
+        # example is close enough to the value to risk exactly that.
+        raise ValueError(
+            "EDUPEDIA_PARENT_ORIGIN must be an http(s) origin with no path, query string, or "
+            "surrounding whitespace — nothing after the optional port."
+        )
+    return candidate
+
+
 def _money(raw: str | None, default: float) -> float:
     try:
         value = float(raw) if raw not in (None, "") else default
@@ -99,7 +123,7 @@ def load_settings(env: Mapping[str, str] | None = None, project_root: Path | Non
         extra_redirect_uris=parse_extra_redirect_uris(env.get(EXTRA_REDIRECT_URIS_ENV)),
         extra_form_action_origins=parse_extra_form_action_origins(env.get(EXTRA_FORM_ACTION_ORIGINS_ENV)),
         dashboard_public_url=(env.get("TED_DASHBOARD_PUBLIC_URL") or "https://tedy.online").strip().rstrip("/"),
-        parent_origin=(env.get("EDUPEDIA_PARENT_ORIGIN") or "https://tedy.online").strip().rstrip("/"),
+        parent_origin=_parent_origin(env),
         viewer_hosts=tuple(h.strip().lower() for h in viewer_raw.split(",") if h.strip()),
         ticket_secret=(env.get("EDUPEDIA_TICKET_SECRET") or "").encode("utf-8"),
         media_monthly_usd=_money(env.get("EDUPEDIA_MEDIA_MONTHLY_USD"), 10.0),

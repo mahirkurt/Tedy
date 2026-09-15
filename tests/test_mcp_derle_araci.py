@@ -6,7 +6,8 @@ import anyio
 import pytest
 from starlette.testclient import TestClient
 
-from src.mcp_server import derleme, http_app, ornekler, server, tools
+from src import module_store
+from src.mcp_server import derleme, gates, http_app, ornekler, server, tools
 from src.mcp_server.config import SERVER_DEFAULTS, load_settings
 from src.mcp_server.derle_araci import NEXT_FAIL, NEXT_OK, Derleyici
 from src.mcp_server.oauth_store import OAuthStore
@@ -76,6 +77,24 @@ def test_sp4_fleet_and_settings(tmp_path):
     assert load_settings({"EDUPEDIA_MEDIA_MONTHLY_USD": "nan"}, project_root=tmp_path).media_monthly_usd == 10.0
 
 
+@pytest.mark.parametrize("value", [
+    "https://tedy.online/x",
+    "ftp://tedy.online",
+    "tedy.online",
+    "https://tedy.online" + chr(10),
+])
+def test_parent_origin_fails_fast_on_a_malformed_value(tmp_path, value):
+    with pytest.raises(ValueError, match="EDUPEDIA_PARENT_ORIGIN") as excinfo:
+        load_settings({"EDUPEDIA_PARENT_ORIGIN": value}, project_root=tmp_path)
+    assert value not in str(excinfo.value)
+
+
+def test_parent_origin_accepts_loopback_and_the_default(tmp_path):
+    assert load_settings({"EDUPEDIA_PARENT_ORIGIN": "http://127.0.0.1:8286"},
+                         project_root=tmp_path).parent_origin == "http://127.0.0.1:8286"
+    assert load_settings({}, project_root=tmp_path).parent_origin == "https://tedy.online"
+
+
 def test_durum_skips_servers_without_a_health_call(tmp_path):
     body = tools.Tools(load_settings({}, project_root=tmp_path), _Fed()).durum(FULL, canli=True)
     assert body["coverage"]["pexels"] == "skipped:saglik_cagrisi_yok"
@@ -105,6 +124,8 @@ def test_failing_gates_still_produce_a_draft_with_repair_guidance(derleyici):
     assert body["status"] == "ok" and body["kapi_ozeti"]["fail"] >= 1
     assert body["kapilar"]["G-VERIFY"]["status"] == "FAIL" and body["kapilar"]["G-VERIFY"]["detay"]
     assert body["sonraki_adim"] == NEXT_FAIL
+    dumped = json.dumps(body, ensure_ascii=False)
+    assert "<html" not in dumped and "data:" not in dumped and "const MODULE_DATA" not in dumped
 
 
 def test_module_data_may_arrive_as_json_text(derleyici):
@@ -146,6 +167,35 @@ def test_onizle(derleyici):
     assert body["status"] == "ok" and body["url"] == f"https://tedy.online/moduller/taslak/{taslak_id}"
     assert derleyici.onizle(FULL, "ffffffffffffffff")["status"] == "taslak_bulunamadi"
     assert derleyici.onizle(FULL, "../x")["status"] == "taslak_bulunamadi"
+
+
+def test_gate_crash_returns_a_closed_status_and_creates_no_draft(tmp_path, derleyici, monkeypatch):
+    def _boom(html):
+        raise RuntimeError("secret internal detail /home/x")
+
+    monkeypatch.setattr(gates, "run_gates", _boom)
+    body = derleyici.derle(FULL, RUN_ID, ornekler.ornek("QUIZ"))
+    assert body["status"] == "sunucu_hatasi"
+    dumped = json.dumps(body, ensure_ascii=False)
+    assert "secret internal detail" not in dumped and "RuntimeError" not in dumped
+    assert not module_store.drafts_root(tmp_path).exists()
+
+
+def test_derle_closes_a_bad_parent_origin_set_directly_bypassing_load_settings(tmp_path):
+    runs = RunStore(tmp_path)
+    runs.save(RUN_ID, RUN_RECORD)
+    bad = Derleyici(runs, DraftStore(tmp_path), "https://tedy.online/x", "https://tedy.online",
+                    clock=lambda: 1_800_000_000.0)
+    assert bad.derle(FULL, RUN_ID, ornekler.ornek("QUIZ"))["status"] == "sunucu_hatasi"
+
+
+def test_draft_save_crash_returns_a_closed_status(derleyici, monkeypatch):
+    def _boom(self, taslak_id, html, record):
+        raise FileExistsError("taslak zaten var")
+
+    monkeypatch.setattr(DraftStore, "save", _boom)
+    body = derleyici.derle(FULL, RUN_ID, ornekler.ornek("QUIZ"))
+    assert body["status"] == "sunucu_hatasi"
 
 
 def test_derle_and_onizle_are_registered(tmp_path):
