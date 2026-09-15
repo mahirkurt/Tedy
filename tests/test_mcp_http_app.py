@@ -1,6 +1,7 @@
 """HTTP surface: metadata, DCR, CORS, host guard, bearer gate and identity passthrough."""
 import asyncio
 import json
+import logging
 
 import pytest
 from mcp.server.fastmcp import Context, FastMCP
@@ -583,3 +584,51 @@ def test_a_registration_burst_stops_blocking_new_connectors_after_the_eviction_f
         r = c.post("/oauth/register", json=body)
         assert r.status_code == 201, r.text
         assert store.get_client(r.json()["client_id"]).client_name == "Claude"
+
+
+# -- SP4 Task 20 fix round 1 / X1 (Medium): viewer ticket must never reach the access log -----
+
+# Uvicorn's default AccessFormatter: record.args = (client_addr, method, full_path, http_version, status_code).
+_UVICORN_ACCESS_FMT = '%s - "%s %s HTTP/%s" %d'
+
+
+def _access_record(full_path, *, args=None):
+    if args is None:
+        args = ("127.0.0.1:12345", "GET", full_path, "1.1", 200)
+    return logging.LogRecord("uvicorn.access", logging.INFO, "h11_impl.py", 1, _UVICORN_ACCESS_FMT, args, None)
+
+
+def test_module_ticket_query_string_is_redacted_from_the_access_log():
+    record = _access_record("/m/fen5-su/v1?t=aaaa&e=1&u=bbbb")
+    assert http_app._AccessLogQueryRedactor().filter(record) is True
+    message = record.getMessage()
+    assert "/m/fen5-su/v1" in message
+    for leaked in ("t=aaaa", "e=1", "u=bbbb", "?t="):
+        assert leaked not in message
+
+
+def test_draft_ticket_query_string_is_redacted_the_same_way():
+    record = _access_record("/taslak/0123456789abcdef?t=cccc&e=2&u=dddd")
+    assert http_app._AccessLogQueryRedactor().filter(record) is True
+    message = record.getMessage()
+    assert "/taslak/0123456789abcdef" in message
+    for leaked in ("t=cccc", "e=2", "u=dddd", "?t="):
+        assert leaked not in message
+
+
+def test_a_request_with_no_query_string_is_left_unchanged():
+    record = _access_record("/health")
+    original_args = tuple(record.args)
+    assert http_app._AccessLogQueryRedactor().filter(record) is True
+    assert record.args == original_args
+    assert record.getMessage() == _UVICORN_ACCESS_FMT % original_args
+
+
+@pytest.mark.parametrize("record", [
+    logging.LogRecord("uvicorn.access", logging.INFO, "x", 1, "plain message, no args", None, None),
+    _access_record("/m/x/v1", args=("only", "two")),
+    _access_record("/m/x/v1", args=(1, 2, 3, 4, 5)),
+    _access_record("/m/x/v1", args="not-a-tuple-or-list"),
+])
+def test_an_unrecognised_record_shape_passes_through_with_no_exception(record):
+    assert http_app._AccessLogQueryRedactor().filter(record) is True

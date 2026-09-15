@@ -122,7 +122,9 @@ class ViewerHostRouter:
             host = ""
             for key, value in scope.get("headers") or []:
                 if key == b"host":
-                    host = value.decode("latin-1").rsplit(":", 1)[0].strip().lower()
+                    # X2 (SP4 Task 20 gate): a legal absolute FQDN (trailing dot) must still
+                    # match self.hosts, or it falls through to the main app's CSP-less 404.
+                    host = value.decode("latin-1").rsplit(":", 1)[0].strip().lower().rstrip(".")
                     break
             if host in self.hosts:
                 await self.viewer(scope, receive, send)

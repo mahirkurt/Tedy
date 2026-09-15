@@ -138,3 +138,16 @@ def test_create_app_from_env_requires_ticket_secret(tmp_path):
     with pytest.raises(ValueError, match="EDUPEDIA_TICKET_SECRET"):
         http_app.create_app_from_env(env)
     assert http_app.create_app_from_env({**env, "EDUPEDIA_TICKET_SECRET": "t" * 40}) is not None
+
+
+# -- SP4 Task 20 fix round 1 / X2 (Low): a trailing-dot viewer host still reaches the viewer -----
+
+def test_trailing_dot_viewer_host_still_reaches_the_viewer(root):
+    r = _request(root, "GET", _module_path(), base="https://modul.tedy.online.")
+    assert r.status_code == 200 and r.content == HTML
+    assert r.headers["content-security-policy"] == SPEC_CSP
+
+
+def test_trailing_dot_mcp_host_still_does_not_reach_the_viewer(root):
+    r = _request(root, "GET", _module_path(), base="https://mcp.tedy.online.")
+    assert r.status_code == 404 and "content-security-policy" not in r.headers

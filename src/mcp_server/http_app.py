@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import html
 import json
+import logging
 import secrets
 import time
 import unicodedata
@@ -688,6 +689,35 @@ def create_app_from_env(env: Mapping[str, str] | None = None) -> Starlette:
     return build_app(settings, store, build_server(tools), form_secret=secret, viewer=viewer)
 
 
+class _AccessLogQueryRedactor(logging.Filter):
+    """Drops the query string from uvicorn.access records before they reach the journal.
+
+    Uvicorn's default access formatter logs ``'%s - "%s %s HTTP/%s" %d'`` with
+    ``record.args = (client_addr, method, full_path, http_version, status_code)``. A viewer
+    ticket (``?t=...&e=...&u=...``) lives in ``full_path``, so left alone every module open
+    would write a live, reusable ticket plus a family member's stable pseudonym to the
+    systemd journal. This filter rewrites the request-target element (the one that is a str,
+    starts with "/" and contains "?") to drop everything from the first "?" onward, and never
+    raises: an unrecognised record shape passes through completely unchanged.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            args = record.args
+            if isinstance(args, (tuple, list)):
+                redacted = list(args)
+                changed = False
+                for i, value in enumerate(redacted):
+                    if isinstance(value, str) and value.startswith("/") and "?" in value:
+                        redacted[i] = value.split("?", 1)[0] + "?<gizli>"
+                        changed = True
+                if changed:
+                    record.args = tuple(redacted) if isinstance(args, tuple) else redacted
+        except Exception:
+            pass
+        return True
+
+
 def main() -> None:
     import os
 
@@ -697,6 +727,9 @@ def main() -> None:
 
     load_env()
     app = create_app_from_env()
+    # X1 (SP4 Task 20 gate): the viewer ticket's query string must never reach the journal.
+    # access_log=False is not used here — it would also drop /mcp and /health request lines.
+    logging.getLogger("uvicorn.access").addFilter(_AccessLogQueryRedactor())
     uvicorn.run(app, host=os.environ.get("TED_MCP_HOST", DEFAULT_HOST),
                 port=int(os.environ.get("TED_MCP_PORT", str(DEFAULT_PORT))), log_level="info")
 
