@@ -226,6 +226,36 @@ def test_extra_form_action_origins_are_named_on_both_consent_pages(tmp_path):
     assert decision.headers["content-security-policy"] == DECISION_CSP.format(extra=extra)
 
 
+def test_extra_form_action_origins_duplicating_issuer_or_redirect_stay_byte_identical(tmp_path):
+    """Fix round 1, M-1: an extra equal to the issuer origin and one equal to the redirect origin are
+    both already named by the un-conditional 'self'/issuer/redirect sources, so they must not be
+    repeated — with nothing genuinely new, the directive is exactly the no-extras default."""
+    clock, verifier = Clock(), Verifier()
+    store = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
+    app = _app(tmp_path, store, verifier, clock,
+               # https://mcp.tedy.online is the issuer origin (BASE); https://claude.ai is _csp_origin(REDIRECT).
+               TED_MCP_EXTRA_FORM_ACTION_ORIGINS="https://mcp.tedy.online,https://claude.ai")
+    with TestClient(app, base_url=BASE, follow_redirects=False) as client:
+        sign_in, decision = _consent_pages(client, verifier, _register(client))
+    assert sign_in.headers["content-security-policy"] == SIGN_IN_CSP.format(
+        script_hash=http_app._CONSENT_SCRIPT_HASH, extra="")
+    assert decision.headers["content-security-policy"] == DECISION_CSP.format(extra="")
+
+
+def test_extra_form_action_origins_drop_only_the_duplicates_and_keep_the_new_one(tmp_path):
+    """Fix round 1, M-1: a mix of duplicate and genuinely new extras keeps only the new one, once."""
+    clock, verifier = Clock(), Verifier()
+    store = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
+    app = _app(tmp_path, store, verifier, clock,
+               TED_MCP_EXTRA_FORM_ACTION_ORIGINS="https://mcp.tedy.online,https://new.example.org,https://claude.ai")
+    with TestClient(app, base_url=BASE, follow_redirects=False) as client:
+        sign_in, decision = _consent_pages(client, verifier, _register(client))
+    extra = " https://new.example.org"
+    assert sign_in.headers["content-security-policy"] == SIGN_IN_CSP.format(
+        script_hash=http_app._CONSENT_SCRIPT_HASH, extra=extra)
+    assert decision.headers["content-security-policy"] == DECISION_CSP.format(extra=extra)
+
+
 def test_consent_page_embeds_google_signin_and_nonce(ctx):
     client, verifier, _, _, client_id = ctx
     form_state = _start(client, verifier, client_id)

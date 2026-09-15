@@ -182,10 +182,13 @@ def _consent_page_headers(issuer: str, redirect_uri: str, google_sign_in: bool,
         directives.append("style-src 'unsafe-inline'")
     # 'self' alone is not enough (measured in a sibling server): the page may sit in an opaque origin,
     # and Chrome applies form-action along the redirect chain, so both origins are named explicitly.
-    # TED_MCP_EXTRA_FORM_ACTION_ORIGINS appends vetted origins for callback pages that redirect again.
+    # TED_MCP_EXTRA_FORM_ACTION_ORIGINS appends vetted origins for callback pages that redirect again;
+    # one already named as the issuer or the redirect origin is skipped so no token is repeated, and
+    # with no extras (or only duplicates) the directive is byte-identical to the no-extras form.
+    form_action_sources = ["'self'", _csp_origin(issuer), _csp_origin(redirect_uri)]
+    new_extras = [origin for origin in extra_form_action_origins if origin not in form_action_sources]
     directives += [
-        f"form-action 'self' {_csp_origin(issuer)} {_csp_origin(redirect_uri)}"
-        + "".join(f" {origin}" for origin in extra_form_action_origins),
+        "form-action " + " ".join(form_action_sources) + "".join(f" {origin}" for origin in new_extras),
         "frame-ancestors 'none'",
         "base-uri 'none'",
     ]

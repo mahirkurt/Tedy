@@ -185,6 +185,29 @@ def test_extra_form_action_origins_are_exact_https_origins(tmp_path):
     ("https://user@auth.example.org", "userinfo"),
     ("https://auth.example.org#x", "fragment"),
     ("https://auth.example.org:443", "default_port"),
+    # -- Fix round 1, I-1: ipaddress.ip_address only parses the canonical dotted-quad form, so a
+    # numeric or hex-like last label (what browsers still resolve as an IP literal) must be caught
+    # explicitly before the general DNS-host shape check.
+    ("https://127.1", "ip_literal"),
+    ("https://0x7f000001", "ip_literal"),
+    ("https://2130706433", "ip_literal"),
+    ("https://0177.0.0.1", "ip_literal"),
+    ("https://1.2.3.4.5", "ip_literal"),
+    # -- Fix round 1, I-2: coverage for the codes a CSP-directive-injection attempt could hit, so a
+    # mutation that disables the DNS-host check or the control/whitespace check turns a test red.
+    ("https://a.com; script-src 'unsafe-inline'", "control_or_whitespace"),
+    ("https://a.com;sandbox", "host"),
+    ("https://a.com\r\nX: y", "control_or_whitespace"),
+    ("https://a.com:0443", "port"),
+    ("https://10.0.0.1", "ip_literal"),
+    ("https://[::1]", "loopback"),
+    # -- Fix round 1, M-2: a distinct code for non-ASCII input, and a structural host problem (a
+    # stray "%" from percent-encoding) no longer misreported as a case-only "uppercase" mismatch.
+    ("https://bücher.example", "non_ascii"),
+    ("https://a.com%2F", "host"),
+    # Caught only by the DNS-host shape check (every character is in [a-z0-9.-], so the char-class
+    # check above lets it through): a leading hyphen is not a valid label start.
+    ("https://-a.com", "host"),
 ])
 def test_invalid_extra_form_action_origin_stops_startup(tmp_path, value, problem):
     assert form_action_origin_problem(value) == problem
@@ -194,6 +217,27 @@ def test_invalid_extra_form_action_origin_stops_startup(tmp_path, value, problem
     with pytest.raises(ValueError, match=EXTRA_FORM_ACTION_ORIGINS_ENV):
         http_app.create_app_from_env({"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_FORM_SECRET": "f" * 40,
                                       "TED_MCP_PROJECT_ROOT": str(tmp_path), EXTRA_FORM_ACTION_ORIGINS_ENV: raw})
+
+
+def test_empty_extra_form_action_origin_reports_empty():
+    """Not folded into the parametrized case above: a trailing comma is a skippable empty split (see
+    test_extra_form_action_origins_are_exact_https_origins), not an invalid entry, so "" never reaches
+    parse_extra_form_action_origins as a standalone item to raise on."""
+    assert form_action_origin_problem("") == "empty"
+
+
+def test_ip_literal_last_label_check_does_not_reject_ordinary_hostnames_with_digits(tmp_path):
+    """Fix round 1, I-1: a real hostname may have a digit in a non-last label (or an alphanumeric,
+    non-numeric TLD); only an all-digit or hex-like *last* label is treated as an IP literal."""
+    assert form_action_origin_problem("https://a1.example") is None
+    assert parse_extra_form_action_origins("https://a1.example") == ("https://a1.example",)
+
+
+def test_load_settings_refuses_a_csp_directive_injection_attempt(tmp_path):
+    """Fix round 1, I-2: end-to-end (not just the unit-level parser) for a realistic injection payload."""
+    with pytest.raises(ValueError, match=EXTRA_FORM_ACTION_ORIGINS_ENV):
+        load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE,
+                       EXTRA_FORM_ACTION_ORIGINS_ENV: "https://a.com; script-src *"}, project_root=tmp_path)
 
 
 # -- F2.3 registered-URI matching --------------------------------------------------------------

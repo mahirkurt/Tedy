@@ -118,13 +118,20 @@ def parse_extra_redirect_uris(raw: str | None) -> tuple[str, ...]:
 
 EXTRA_FORM_ACTION_ORIGINS_ENV = "TED_MCP_EXTRA_FORM_ACTION_ORIGINS"
 _DNS_HOST_RE = re.compile(r"^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$")
+_HEX_LABEL_RE = re.compile(r"0x[0-9a-f]*")
+# A validated host is ASCII-only by this point (non-ASCII input returns "non_ascii" earlier), so any
+# character outside this set — other than an uppercase ASCII letter, handled by the next check — is a
+# structural problem with the host, not a case-only one (e.g. "a.com%2F" is "host", not "uppercase").
+_HOST_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789.-")
 
 
 def form_action_origin_problem(origin: str) -> str | None:
     """Why origin is not an exact, canonical https origin for the consent pages' CSP form-action, or None."""
     if not isinstance(origin, str) or not origin:
         return "empty"
-    if not origin.isascii() or any(c.isspace() or ord(c) < 0x20 or ord(c) == 0x7F for c in origin):
+    if not origin.isascii():
+        return "non_ascii"
+    if any(c.isspace() or ord(c) < 0x20 or ord(c) == 0x7F for c in origin):
         return "control_or_whitespace"
     if "*" in origin:
         return "wildcard"
@@ -147,6 +154,8 @@ def form_action_origin_problem(origin: str) -> str | None:
             return "port"
         if int(port) == 443:
             return "default_port"  # https://host:443 is https://host; only the short form is canonical
+    if any(c not in _HOST_CHARS and not c.isupper() for c in host):
+        return "host"  # a structural problem (e.g. a stray "%" or ";"), not a case-only mismatch
     if host != host.lower():
         return "uppercase"
     if host == "localhost" or host.endswith(".localhost"):
@@ -157,6 +166,13 @@ def form_action_origin_problem(origin: str) -> str | None:
         address = None
     if address is not None:
         return "loopback" if address.is_loopback else "ip_literal"
+    # ipaddress.ip_address only parses the canonical dotted-quad/hextet forms, so "127.1", "0x7f000001",
+    # "2130706433", "0177.0.0.1" and "1.2.3.4.5" all reach here — yet browsers still resolve the first
+    # four of those to 127.0.0.1. A real TLD is never all-digits or hex-like, so reject on the last label
+    # before the general DNS-host shape check.
+    last_label = host.rsplit(".", 1)[-1]
+    if last_label.isdigit() or _HEX_LABEL_RE.fullmatch(last_label):
+        return "ip_literal"
     if not _DNS_HOST_RE.match(host):
         return "host"
     return None
