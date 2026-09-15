@@ -3,6 +3,7 @@ import io
 import socket
 
 import pytest
+import requests
 from PIL import Image
 
 from src.mcp_server import derleme, gates, ornekler, varliklar
@@ -227,3 +228,132 @@ def test_downloader_timeout_mid_chunk_raises_zaman_asimi():
     with pytest.raises(VarlikHatasi) as exc:
         downloader.indir("https://cdn.example/p.jpg")
     assert exc.value.reason == "zaman_asimi"
+
+
+# --- Fix round 1 (controller task-12-fix-1-brief.md) ---
+
+
+def test_downloader_mid_stream_chunked_encoding_error_is_ag_hatasi():
+    """F1: a drop *during* body streaming (not just at connect time) must close-reason, not leak."""
+    class _FlakyResp(_Resp):
+        def iter_content(self, chunk_size):
+            yield self._body[:1]
+            raise requests.exceptions.ChunkedEncodingError("Connection broken: peer reset")
+
+    downloader = GuvenliIndirici(session=_Session(_FlakyResp(body=b"xy")), resolver=_resolver("93.184.216.34"))
+    with pytest.raises(VarlikHatasi) as exc:
+        downloader.indir("https://cdn.example/p.jpg")
+    assert exc.value.reason == "ag_hatasi"
+
+
+def test_downloader_mid_stream_connection_error_is_ag_hatasi():
+    """F1: a reset mid-transfer is ordinary for third-party CDNs and must also close-reason."""
+    class _FlakyResp(_Resp):
+        def iter_content(self, chunk_size):
+            yield self._body[:1]
+            raise requests.exceptions.ConnectionError("reset by peer")
+
+    downloader = GuvenliIndirici(session=_Session(_FlakyResp(body=b"xy")), resolver=_resolver("93.184.216.34"))
+    with pytest.raises(VarlikHatasi) as exc:
+        downloader.indir("https://cdn.example/p.jpg")
+    assert exc.value.reason == "ag_hatasi"
+
+
+def test_downloader_zaman_asimi_and_cok_buyuk_still_propagate_unchanged_by_f1():
+    """F1 must not reclassify the loop's own VarlikHatasi raises (cok_buyuk / zaman_asimi) as
+    ag_hatasi — the fix wraps requests.RequestException only, and VarlikHatasi does not subclass
+    it (VarlikHatasi < ValueError; requests.RequestException < OSError), but this is asserted
+    directly so a future refactor that merges the except clauses trips a red test immediately."""
+    downloader = GuvenliIndirici(session=_Session(_Resp(body=b"x" * 101)), resolver=_resolver("93.184.216.34"),
+                                 max_bytes=100)
+    with pytest.raises(VarlikHatasi) as exc:
+        downloader.indir("https://cdn.example/p.jpg")
+    assert exc.value.reason == "cok_buyuk"
+
+    clock = {"t": 0.0}
+
+    def fake_monotonic():
+        clock["t"] += 100.0
+        return clock["t"]
+
+    class _SlowResp(_Resp):
+        def iter_content(self, chunk_size):
+            yield self._body[:1]
+            yield self._body[1:]
+
+    downloader = GuvenliIndirici(session=_Session(_SlowResp(body=b"xy")), resolver=_resolver("93.184.216.34"),
+                                 timeout=1.0, monotonic=fake_monotonic)
+    with pytest.raises(VarlikHatasi) as exc:
+        downloader.indir("https://cdn.example/p.jpg")
+    assert exc.value.reason == "zaman_asimi"
+
+
+def _oriented_jpeg():
+    """A portrait 40x100 JPEG whose EXIF Orientation=6 says "rotate 90 CW to display" — i.e. the
+    intended, upright display is 100x40 landscape. Matches the review's Finding-2 repro exactly."""
+    img = Image.new("RGB", (40, 100), (10, 200, 10))
+    buf = io.BytesIO()
+    exif = img.getexif()
+    exif[0x0112] = 6  # Orientation tag
+    img.save(buf, format="JPEG", exif=exif)
+    return buf.getvalue()
+
+
+def test_normalize_image_applies_exif_orientation_before_reencoding():
+    """F2: the stored JPEG carries no EXIF, so the orientation must be baked into the pixels."""
+    data = _oriented_jpeg()
+    with Image.open(io.BytesIO(data)) as probe:
+        assert probe.getexif().get(0x0112) == 6
+        assert probe.size == (40, 100)
+    out = varliklar.normalize_image(data)
+    with Image.open(io.BytesIO(out)) as result:
+        assert result.format == "JPEG"
+        # exif_transpose actually ran: dimensions are swapped relative to the un-transposed decode.
+        assert result.size == (100, 40)
+
+
+def test_normalize_image_with_no_exif_does_not_crash():
+    """F2: getexif() empty must not make exif_transpose raise."""
+    data = _png((300, 200))
+    with Image.open(io.BytesIO(data)) as probe:
+        assert dict(probe.getexif()) == {}
+    out = varliklar.normalize_image(data)
+    with Image.open(io.BytesIO(out)) as result:
+        assert result.size == (300, 200)
+
+
+def _rgba_half_transparent(size=(100, 100)):
+    image = Image.new("RGBA", size, (200, 30, 30, 255))
+    w, h = size
+    for x in range(w // 2, w):
+        for y in range(h):
+            image.putpixel((x, y), (0, 0, 0, 0))
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _p_mode_with_transparent_index(size=(100, 100)):
+    image = Image.new("P", size, 0)
+    image.putpalette([200, 30, 30] + [0, 0, 0] * 255)
+    image.info["transparency"] = 1
+    w, h = size
+    for x in range(w // 2, w):
+        for y in range(h):
+            image.putpixel((x, y), 1)
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+@pytest.mark.parametrize("builder", [_rgba_half_transparent, _p_mode_with_transparent_index])
+def test_normalize_image_flattens_alpha_to_white(builder):
+    """F3 (review Minor 3): RGBA and P-mode-with-transparent-index both flatten alpha to a plain
+    RGB JPEG — opaque region keeps its colour, transparent region becomes white."""
+    out = varliklar.normalize_image(builder())
+    with Image.open(io.BytesIO(out)) as img:
+        assert img.format == "JPEG" and img.mode == "RGB"
+        opaque = img.getpixel((10, 10))
+        transparent = img.getpixel((90, 90))
+    assert opaque[0] > 150 and opaque[1] < 100 and opaque[2] < 100
+    assert all(c > 240 for c in transparent)

@@ -21,7 +21,7 @@ from typing import Any, Callable
 from urllib.parse import urlparse
 
 import requests
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from src.json_utils import atomic_json_dump
 from src.mcp_server import derleme
@@ -48,9 +48,17 @@ def normalize_image(data: bytes) -> bytes:
         with Image.open(io.BytesIO(data)) as probe:
             probe.verify()
         with Image.open(io.BytesIO(data)) as image:
+            # F2: bake EXIF orientation into the pixels before any resize/convert — the stored
+            # JPEG carries no EXIF, so a camera photo's Orientation tag (e.g. a portrait phone
+            # photo saved with Orientation=6) would otherwise be silently dropped and the asset
+            # stored rotated/flipped from how it was meant to display. Safe with no EXIF at all:
+            # exif_transpose() is a no-op (still returns a new Image) when getexif() is empty.
+            image = ImageOps.exif_transpose(image)
             # T12-3: Pillow's own MAX_IMAGE_PIXELS guard only *warns* (DecompressionBombWarning)
             # between N and 2N pixels and still decodes; it only raises above 2N. A pixel bound
             # must therefore be checked explicitly, before convert/thumbnail ever touch the data.
+            # (width * height is unaffected by exif_transpose's rotate/flip, so checking here,
+            # after the transpose, is equivalent to checking pre-transpose.)
             if image.width * image.height > IMAGE_MAX_PIXELS:
                 raise VarlikHatasi("gorsel_cok_buyuk")
             if image.mode in ("RGBA", "LA", "P"):
@@ -226,5 +234,13 @@ class GuvenliIndirici:
                     raise VarlikHatasi("zaman_asimi")
             mime = ((response.headers or {}).get("content-type") or "").split(";", 1)[0].strip().lower()
             return b"".join(chunks), mime
+        except requests.RequestException as exc:
+            # F1: a drop/reset *during* body streaming (ChunkedEncodingError, ConnectionError, a
+            # read timeout, …) is an ordinary production event for third-party CDN downloads, not
+            # just at connect time. VarlikHatasi is a ValueError and requests.RequestException is
+            # an OSError — the two hierarchies never overlap — so none of this function's own
+            # VarlikHatasi raises (yonlendirme/http_.../cok_buyuk/zaman_asimi, all above) are ever
+            # caught or reclassified here; only a genuine requests exception reaches this clause.
+            raise VarlikHatasi("ag_hatasi") from exc
         finally:
             response.close()
