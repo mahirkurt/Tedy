@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
 
-from src.mcp_server.oauth_redirect import EXTRA_REDIRECT_URIS_ENV, parse_extra_redirect_uris
+from src.mcp_server.oauth_redirect import (EXTRA_FORM_ACTION_ORIGINS_ENV, EXTRA_REDIRECT_URIS_ENV,
+                                           parse_extra_form_action_origins, parse_extra_redirect_uris)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MCP_MAX_BODY_BYTES = 2_097_152
@@ -37,6 +38,7 @@ class Settings:
     servers: dict[str, ServerConfig] = field(default_factory=dict)
     mcp_max_body_bytes: int = DEFAULT_MCP_MAX_BODY_BYTES
     extra_redirect_uris: tuple[str, ...] = ()
+    extra_form_action_origins: tuple[str, ...] = ()
 
 
 def _positive_int(env: Mapping[str, str], name: str, default: int) -> int:
@@ -69,4 +71,5 @@ def load_settings(env: Mapping[str, str] | None = None, project_root: Path | Non
         servers=servers,
         mcp_max_body_bytes=_positive_int(env, "TED_MCP_MAX_BODY_BYTES", DEFAULT_MCP_MAX_BODY_BYTES),
         extra_redirect_uris=parse_extra_redirect_uris(env.get(EXTRA_REDIRECT_URIS_ENV)),
+        extra_form_action_origins=parse_extra_form_action_origins(env.get(EXTRA_FORM_ACTION_ORIGINS_ENV)),
     )

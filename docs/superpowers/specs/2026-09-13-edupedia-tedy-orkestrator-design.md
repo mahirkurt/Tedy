@@ -254,6 +254,11 @@ ve yalnız `window.parent`'a gönderdiğini denetler. (Kapı sayısı: mevcut 16
   (`default-src 'none'`; Google Identity Services için yalnız `accounts.google.com`; `form-action 'self'
   <issuer origin> <doğrulanmış redirect origin>`; `frame-ancestors 'none'`) ve `X-Frame-Options: DENY`,
   `Referrer-Policy: no-referrer`, `Cache-Control: no-store`.
+  `TED_MCP_EXTRA_FORM_ACTION_ORIGINS` (virgülle ayrılmış, varsayılan boş) `form-action` yönergesinin sonuna ek kesin
+  `https` origin'ler ekler: her giriş kanonik bir origin olmalıdır (küçük harf `https://host[:port]`; yol, sorgu,
+  fragment, userinfo, joker, sondaki `/` ve açık `:443` yok; loopback ve `http` yok) ve geçersiz tek bir giriş
+  sunucunun başlamasını durdurur. Ayar yalnız formun yönlendirme zincirini açar; kodun gideceği adres kesin
+  `redirect_uri` listesiyle sınırlı kalır.
 - `resource` verilirse PRM'nin ilan ettiği kanonik değere (`<base>/mcp`) tam eşit olmalıdır (aksi
   `invalid_target`); kaynak koda ve token'a bağlanır.
 - Yalnız PKCE **S256** (tam yazım; `code_challenge` 43 base64url karakter, `code_verifier` 43–128 RFC 7636
@@ -460,6 +465,12 @@ planında yer alır.
   geçirenle incelenmesi temiz çıkmadan hiçbir genel DNS kaydı ya da ingress kuralı oluşturulmaz.
 - **Ölçüm düzeltmesi (alt proje 3):** §3'teki "Gunicorn (1 işçi)" yanlıştı; kurulu birim `--workers 2 --worker-class
   gthread --threads 4` (ölçüm 2026-09-14). Depodaki izlenen `ted-dashboard.service` kopyası da kurulu birimle eşitlenir.
+- **Onay sayfası `form-action` ek origin'leri (alt proje 3, 2026-09-14):** `TED_MCP_EXTRA_FORM_ACTION_ORIGINS`
+  eklendi (varsayılan boş; varsayılan CSP bayt bayt aynı). Gerekçe: alt proje 6'nın canlı yüzey kabulünde bir
+  geri-çağırma sayfası kodu `form-action`'da adı geçmeyen başka bir origin'e yeniden yönlendirebilir (Chrome
+  `form-action`'ı yönlendirme zinciri boyunca uygular) ve onay gönderimi engellenir; ayar bunun canlı oturumda
+  yapılandırmayla giderilmesini sağlar. Girişler `TED_MCP_EXTRA_REDIRECT_URIS` gibi kapalı-başarısızlıkla doğrulanır;
+  ayar gizli değildir ve `.env`'e değil birim dosyasına yazılır.
 
 ## 13. Varsayımlar ve riskler
 

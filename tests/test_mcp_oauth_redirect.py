@@ -1,9 +1,12 @@
 """redirect_uri policy (S1b / F2.1, F9, F10): exact callbacks, canonical form, no reserved query keys."""
 import pytest
 
+from src.mcp_server import http_app
 from src.mcp_server import oauth_redirect
 from src.mcp_server.config import load_settings
 from src.mcp_server.oauth_redirect import RedirectPolicy, parse_extra_redirect_uris, redirect_matches
+from src.mcp_server.oauth_redirect import (EXTRA_FORM_ACTION_ORIGINS_ENV, form_action_origin_problem,
+                                           parse_extra_form_action_origins)
 
 BASE = "https://mcp.tedy.online"
 GEMINI = "https://oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-{}-mcp_tedy_online"
@@ -157,6 +160,40 @@ def test_settings_carry_extra_redirect_uris(tmp_path):
                               "TED_MCP_EXTRA_REDIRECT_URIS": "https://agent.example.org/cb"}, project_root=tmp_path)
     assert settings.extra_redirect_uris == ("https://agent.example.org/cb",)
     assert load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path).extra_redirect_uris == ()
+
+
+# -- TED_MCP_EXTRA_FORM_ACTION_ORIGINS (alt proje 3, Task 5a) ------------------------------------
+
+def test_extra_form_action_origins_are_exact_https_origins(tmp_path):
+    raw = " https://auth.example.org ,https://login.example.net:8443,, https://auth.example.org"
+    assert parse_extra_form_action_origins(raw) == ("https://auth.example.org", "https://login.example.net:8443")
+    assert parse_extra_form_action_origins("") == () and parse_extra_form_action_origins(None) == ()
+    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE, EXTRA_FORM_ACTION_ORIGINS_ENV: raw}, project_root=tmp_path)
+    assert settings.extra_form_action_origins == ("https://auth.example.org", "https://login.example.net:8443")
+    assert load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path).extra_form_action_origins == ()
+
+
+@pytest.mark.parametrize("value,problem", [
+    ("http://auth.example.org", "https_required"),
+    ("https://127.0.0.1", "loopback"),
+    ("https://localhost:8443", "loopback"),
+    ("https://auth.example.org/callback", "path"),
+    ("https://auth.example.org?x=1", "query"),
+    ("https://*.example.org", "wildcard"),
+    ("https://auth.example.org/", "trailing_slash"),
+    ("https://Auth.example.org", "uppercase"),
+    ("https://user@auth.example.org", "userinfo"),
+    ("https://auth.example.org#x", "fragment"),
+    ("https://auth.example.org:443", "default_port"),
+])
+def test_invalid_extra_form_action_origin_stops_startup(tmp_path, value, problem):
+    assert form_action_origin_problem(value) == problem
+    raw = f"https://ok.example.org,{value}"
+    with pytest.raises(ValueError, match=EXTRA_FORM_ACTION_ORIGINS_ENV):
+        parse_extra_form_action_origins(raw)
+    with pytest.raises(ValueError, match=EXTRA_FORM_ACTION_ORIGINS_ENV):
+        http_app.create_app_from_env({"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_FORM_SECRET": "f" * 40,
+                                      "TED_MCP_PROJECT_ROOT": str(tmp_path), EXTRA_FORM_ACTION_ORIGINS_ENV: raw})
 
 
 # -- F2.3 registered-URI matching --------------------------------------------------------------

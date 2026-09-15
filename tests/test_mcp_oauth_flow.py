@@ -182,6 +182,50 @@ def _tool_call(client, access_token):
                        headers={**MCP_HEADERS, "authorization": f"Bearer {access_token}"})
 
 
+SIGN_IN_CSP = (
+    "default-src 'none'; script-src https://accounts.google.com/gsi/client {script_hash}; "
+    "frame-src https://accounts.google.com/gsi/; connect-src https://accounts.google.com/gsi/; "
+    "style-src 'unsafe-inline' https://accounts.google.com/gsi/style; "
+    "form-action 'self' https://mcp.tedy.online https://claude.ai{extra}; frame-ancestors 'none'; base-uri 'none'"
+)
+DECISION_CSP = (
+    "default-src 'none'; style-src 'unsafe-inline'; "
+    "form-action 'self' https://mcp.tedy.online https://claude.ai{extra}; frame-ancestors 'none'; base-uri 'none'"
+)
+
+
+def _consent_pages(client, verifier, registered_id):
+    """The Google sign-in page and the Onayla/Reddet page for one authorization request."""
+    sign_in = client.get("/oauth/authorize", params=_authorize_params(registered_id))
+    assert sign_in.status_code == 200, sign_in.text
+    form_state = re.search(r'name="form_state" value="([^"]+)"', sign_in.text).group(1)
+    verifier.expected_nonce = http_app.nonce_for(form_state)
+    decision = client.post("/oauth/authorize", data={"form_state": form_state, "credential": _credential(FULL)})
+    assert decision.status_code == 200, decision.text
+    return sign_in, decision
+
+
+def test_default_consent_csp_is_byte_identical(ctx):
+    client, verifier, _, _, client_id = ctx
+    sign_in, decision = _consent_pages(client, verifier, client_id)
+    assert sign_in.headers["content-security-policy"] == SIGN_IN_CSP.format(
+        script_hash=http_app._CONSENT_SCRIPT_HASH, extra="")
+    assert decision.headers["content-security-policy"] == DECISION_CSP.format(extra="")
+
+
+def test_extra_form_action_origins_are_named_on_both_consent_pages(tmp_path):
+    clock, verifier = Clock(), Verifier()
+    store = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
+    app = _app(tmp_path, store, verifier, clock,
+               TED_MCP_EXTRA_FORM_ACTION_ORIGINS="https://auth.example.org,https://login.example.net:8443")
+    with TestClient(app, base_url=BASE, follow_redirects=False) as client:
+        sign_in, decision = _consent_pages(client, verifier, _register(client))
+    extra = " https://auth.example.org https://login.example.net:8443"
+    assert sign_in.headers["content-security-policy"] == SIGN_IN_CSP.format(
+        script_hash=http_app._CONSENT_SCRIPT_HASH, extra=extra)
+    assert decision.headers["content-security-policy"] == DECISION_CSP.format(extra=extra)
+
+
 def test_consent_page_embeds_google_signin_and_nonce(ctx):
     client, verifier, _, _, client_id = ctx
     form_state = _start(client, verifier, client_id)

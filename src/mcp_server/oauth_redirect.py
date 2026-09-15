@@ -14,6 +14,7 @@ string (and the code in it) to someone else. Neither is an exact URL whose page 
 """
 from __future__ import annotations
 
+import ipaddress
 import re
 from typing import Iterable
 from urllib.parse import parse_qsl, urlsplit, urlunsplit
@@ -113,6 +114,71 @@ def parse_extra_redirect_uris(raw: str | None) -> tuple[str, ...]:
             raise ValueError(f"{EXTRA_REDIRECT_URIS_ENV}: {uri!r} is not an acceptable redirect_uri ({problem})")
         uris.append(uri)
     return tuple(dict.fromkeys(uris))
+
+
+EXTRA_FORM_ACTION_ORIGINS_ENV = "TED_MCP_EXTRA_FORM_ACTION_ORIGINS"
+_DNS_HOST_RE = re.compile(r"^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$")
+
+
+def form_action_origin_problem(origin: str) -> str | None:
+    """Why origin is not an exact, canonical https origin for the consent pages' CSP form-action, or None."""
+    if not isinstance(origin, str) or not origin:
+        return "empty"
+    if not origin.isascii() or any(c.isspace() or ord(c) < 0x20 or ord(c) == 0x7F for c in origin):
+        return "control_or_whitespace"
+    if "*" in origin:
+        return "wildcard"
+    if not origin.startswith("https://"):
+        return "https_required"  # http://, HTTPS:// and every other scheme
+    rest = origin[len("https://"):]
+    if "@" in rest:
+        return "userinfo"
+    if "#" in rest:
+        return "fragment"
+    if "?" in rest:
+        return "query"
+    if "/" in rest:
+        return "trailing_slash" if rest.index("/") == len(rest) - 1 else "path"
+    if rest.startswith("["):
+        return "loopback" if rest.split("]", 1)[0] == "[::1" else "ip_literal"
+    host, sep, port = rest.partition(":")
+    if sep:
+        if not (port.isdigit() and port == str(int(port)) and 1 <= int(port) <= 65535):
+            return "port"
+        if int(port) == 443:
+            return "default_port"  # https://host:443 is https://host; only the short form is canonical
+    if host != host.lower():
+        return "uppercase"
+    if host == "localhost" or host.endswith(".localhost"):
+        return "loopback"
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        address = None
+    if address is not None:
+        return "loopback" if address.is_loopback else "ip_literal"
+    if not _DNS_HOST_RE.match(host):
+        return "host"
+    return None
+
+
+def parse_extra_form_action_origins(raw: str | None) -> tuple[str, ...]:
+    """Comma-separated exact https origins appended to the consent pages' CSP form-action.
+
+    Any invalid entry stops startup with a ValueError (same fail-closed style as
+    TED_MCP_EXTRA_REDIRECT_URIS). An extra origin only widens the form's redirect chain;
+    where the code may go is still the exact redirect_uri allowlist.
+    """
+    origins: list[str] = []
+    for entry in (raw or "").split(","):
+        origin = entry.strip()
+        if not origin:
+            continue
+        problem = form_action_origin_problem(origin)
+        if problem:
+            raise ValueError(f"{EXTRA_FORM_ACTION_ORIGINS_ENV}: {origin!r} is not an exact canonical https origin ({problem})")
+        origins.append(origin)
+    return tuple(dict.fromkeys(origins))
 
 
 class RedirectPolicy:

@@ -168,7 +168,8 @@ def _csp_origin(uri: str) -> str:
     return f"{parts.scheme}://{parts.netloc}"
 
 
-def _consent_page_headers(issuer: str, redirect_uri: str, google_sign_in: bool) -> dict[str, str]:
+def _consent_page_headers(issuer: str, redirect_uri: str, google_sign_in: bool,
+                          extra_form_action_origins: tuple[str, ...] = ()) -> dict[str, str]:
     directives = ["default-src 'none'"]
     if google_sign_in:
         directives += [
@@ -181,8 +182,10 @@ def _consent_page_headers(issuer: str, redirect_uri: str, google_sign_in: bool) 
         directives.append("style-src 'unsafe-inline'")
     # 'self' alone is not enough (measured in a sibling server): the page may sit in an opaque origin,
     # and Chrome applies form-action along the redirect chain, so both origins are named explicitly.
+    # TED_MCP_EXTRA_FORM_ACTION_ORIGINS appends vetted origins for callback pages that redirect again.
     directives += [
-        f"form-action 'self' {_csp_origin(issuer)} {_csp_origin(redirect_uri)}",
+        f"form-action 'self' {_csp_origin(issuer)} {_csp_origin(redirect_uri)}"
+        + "".join(f" {origin}" for origin in extra_form_action_origins),
         "frame-ancestors 'none'",
         "base-uri 'none'",
     ]
@@ -390,6 +393,7 @@ def build_app(
     if len(form_secret) < 32:
         raise ValueError("form_secret must be at least 32 bytes")
     redirect_policy = RedirectPolicy(base, settings.extra_redirect_uris)
+    form_action_extra = settings.extra_form_action_origins
     # The one resource (audience) this server protects: exactly what its protected-resource metadata says.
     resource_uri = f"{base}/mcp"
 
@@ -490,7 +494,8 @@ def build_app(
                 nonce=html.escape(nonce_for(form_state)),
                 script=_CONSENT_SCRIPT,
             )
-            return HTMLResponse(page, headers=_consent_page_headers(base, redirect_uri, google_sign_in=True))
+            return HTMLResponse(page, headers=_consent_page_headers(
+                base, redirect_uri, google_sign_in=True, extra_form_action_origins=form_action_extra))
 
         form = await _limited_form(request)
         if "consent_state" in form:
@@ -527,7 +532,8 @@ def build_app(
             redirect_uri=html.escape(params["redirect_uri"]),
             consent_state=html.escape(consent_state),
         )
-        return HTMLResponse(page, headers=_consent_page_headers(base, params["redirect_uri"], google_sign_in=False))
+        return HTMLResponse(page, headers=_consent_page_headers(
+            base, params["redirect_uri"], google_sign_in=False, extra_form_action_origins=form_action_extra))
 
     async def decide(form: FormData) -> Response:
         """Onayla issues the code; Reddet sends access_denied. Either way the state is spent."""

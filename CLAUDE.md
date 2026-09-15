@@ -70,8 +70,8 @@ curl -s http://127.0.0.1:8090/health                   # {"status": "ok", "versi
 
 - **Bind**: `127.0.0.1:8090` (8087 is taken on hp-ai-node). Non-secret settings (`TED_MCP_HOST`, `TED_MCP_PORT`,
   `TED_MCP_PUBLIC_BASE_URL`, `TED_MCP_ALLOWED_HOSTS`, `TED_DASHBOARD_API_URL`, and if ever needed
-  `TED_MCP_MAX_BODY_BYTES` / `TED_MCP_EXTRA_REDIRECT_URIS`) live in the unit's `Environment=` lines and must never
-  appear in `.env`: systemd lets `EnvironmentFile=` override `Environment=`.
+  `TED_MCP_MAX_BODY_BYTES` / `TED_MCP_EXTRA_REDIRECT_URIS` / `TED_MCP_EXTRA_FORM_ACTION_ORIGINS`) live in the unit's
+  `Environment=` lines and must never appear in `.env`: systemd lets `EnvironmentFile=` override `Environment=`.
 - **Secrets in `.env`**: `TED_MCP_FORM_SECRET`, `TED_DASHBOARD_API_KEY` plus its `ted-mcp:` entry in `API_KEYS`
   (the dashboard reads `API_KEYS` only at start — restart it after a change), `ANAMNESIS_MCP_API_KEY`. Change them
   with `env_prep`, never by hand; it follows the worktree's `.env` symlink.
@@ -230,7 +230,9 @@ unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
   (yalnız `python -m src.mcp_server.http_app` bind adresi), `TED_MCP_PROJECT_ROOT` (test/servis için proje kökünü
   değiştirir — worktree yerine bir tmp dizin vermek `output/`'a yazmayı önler), `TED_MCP_MAX_BODY_BYTES`
   (istek gövdesi tavanı, varsayılan 2 MiB), `TED_MCP_EXTRA_REDIRECT_URIS` (sabit redirect_uri allowlist'ine ek,
-  virgülle ayrık), `TED_DASHBOARD_API_URL` (varsayılan `http://127.0.0.1:8085`), `TED_DASHBOARD_API_KEY`
+  virgülle ayrık), `TED_MCP_EXTRA_FORM_ACTION_ORIGINS` (onay sayfası CSP `form-action` yönergesine ek kesin
+  `https` origin'ler, virgülle ayrık; varsayılan boş, geçersiz giriş başlatmayı durdurur), `TED_DASHBOARD_API_URL`
+  (varsayılan `http://127.0.0.1:8085`), `TED_DASHBOARD_API_KEY`
   (`ted-mcp` etiketli `tdyK_` anahtar), `MUFREDAT_MCP_API_KEY`, `EGITIM_KAYNAK_MCP_API_KEY`, `ANAMNESIS_MCP_API_KEY`.
 - OAuth: Google girişiyle, yalnız `full` rol; giriş sonrası **Onayla/Reddet** açıkça sorulur (kod otomatik
   üretilmez). PKCE yalnız tam **S256**. DCR kayıtları kalıcı ve tavanlıdır (50 000); tavana ulaşıldığında hiç
