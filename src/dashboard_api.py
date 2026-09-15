@@ -8,6 +8,7 @@ import os
 import re
 import secrets
 import sys
+import time
 import unicodedata
 from datetime import datetime, timedelta
 from functools import wraps
@@ -34,6 +35,7 @@ from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.US
     ROLE_READER,
     USER_ROLES,
 )
+from src import module_progress, module_store, module_ticket
 
 load_env()
 
@@ -2750,6 +2752,136 @@ def book_progress_save():
     except OSError:
         return jsonify({"error": "progress_write_failed"}), 500
     return jsonify({"books": merged})
+
+
+# --- Modules: edupedia catalog, viewing tickets and the progress bridge (spec §5.3-§5.5) ---
+# ted-mcp writes output/modules/ and output/edupedia_drafts/; the dashboard only reads them.
+# output/module_progress.json has one writer (this app) but two gunicorn worker processes,
+# so module_progress.ProgressStore serialises every read-modify-write with fcntl.flock.
+
+MODULE_VIEWER_BASE_URL = os.environ.get("EDUPEDIA_VIEWER_BASE_URL", "https://modul.tedy.online").rstrip("/")
+MODULE_PROGRESS_MAX_BYTES = 4096
+MODULE_FRAME_CSP = "frame-src https://modul.tedy.online https://accounts.google.com"
+_MODULE_CARD_FIELDS = ("slug", "version", "title", "subject", "gradeLevel", "mode", "outcomes", "ted_link",
+                       "created_at", "gates")
+
+
+def _module_person():
+    """Session email of a full-role member. API keys and the test bypass are not people."""
+    email = str(session.get("user_email", "") or "").lower().strip()
+    return email if email and USER_ROLES.get(email) == ROLE_FULL else None
+
+
+def _module_active_record(slug, version):
+    if not module_store.valid_slug(slug) or not module_store.valid_version(version):
+        return None
+    record = module_store.find_record(OUTPUT_DIR, slug, version)
+    return record if record and record.get("status") == "active" else None
+
+
+def _module_ticket_secret():
+    return os.environ.get("EDUPEDIA_TICKET_SECRET", "").encode("utf-8")
+
+
+def _module_progress_store():
+    return module_progress.ProgressStore(os.path.join(OUTPUT_DIR, "module_progress.json"))
+
+
+def _no_store(payload, status=200):
+    response = jsonify(payload)
+    response.status_code = status
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/api/modules")
+@require_auth
+def modules_list():
+    rows = module_store.latest_active(module_store.read_catalog(OUTPUT_DIR))
+    return jsonify({"moduller": [{key: row.get(key) for key in _MODULE_CARD_FIELDS} for row in rows]})
+
+
+@app.route("/api/modules/<slug>/v<int:version>/ticket")
+@require_auth
+def module_ticket_issue(slug, version):
+    email = _module_person()
+    if not email:
+        return jsonify({"error": "session_required"}), 403
+    if _module_active_record(slug, version) is None:
+        return jsonify({"error": "not_found"}), 404
+    try:
+        ticket = module_ticket.issue_module(_module_ticket_secret(), MODULE_VIEWER_BASE_URL, email, slug, version,
+                                            time.time())
+    except module_ticket.TicketConfigError:
+        return jsonify({"error": "ticket_unconfigured"}), 503
+    return _no_store(ticket)
+
+
+@app.route("/api/modules/taslak/<taslak_id>/ticket")
+@require_auth
+def module_draft_ticket_issue(taslak_id):
+    email = _module_person()
+    if not email:
+        return jsonify({"error": "session_required"}), 403
+    if module_store.read_draft(OUTPUT_DIR, taslak_id) is None:
+        return jsonify({"error": "not_found"}), 404
+    try:
+        ticket = module_ticket.issue_draft(_module_ticket_secret(), MODULE_VIEWER_BASE_URL, email, taslak_id, time.time())
+    except module_ticket.TicketConfigError:
+        return jsonify({"error": "ticket_unconfigured"}), 503
+    return _no_store(ticket)
+
+
+@app.route("/api/modules/<slug>/progress")
+@require_auth
+def module_progress_get(slug):
+    email = _module_person()
+    if not email:
+        return jsonify({"error": "session_required"}), 403
+    version = request.args.get("version", type=int)
+    if not module_store.valid_slug(slug) or not module_store.valid_version(version):
+        return jsonify({"error": "gecersiz_olay:modul"}), 400
+    if _module_active_record(slug, version) is None:
+        return jsonify({"error": "not_found"}), 404
+    state = _module_progress_store().state_for(module_ticket.email_hash(email), slug, version)
+    return _no_store({"state": state})
+
+
+@app.route("/api/modules/<slug>/progress", methods=["POST"])
+@require_auth
+def module_progress_save(slug):
+    email = _module_person()
+    if not email:
+        return jsonify({"error": "session_required"}), 403
+    if (request.content_length or 0) > MODULE_PROGRESS_MAX_BYTES:
+        return jsonify({"error": "cok_buyuk"}), 413
+    raw = request.get_data(cache=True)
+    if len(raw) > MODULE_PROGRESS_MAX_BYTES:
+        return jsonify({"error": "cok_buyuk"}), 413
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "gecersiz_olay:json"}), 400
+    version = payload.get("version")
+    if not module_store.valid_slug(slug) or not module_store.valid_version(version):
+        return jsonify({"error": "gecersiz_olay:modul"}), 400
+    if _module_active_record(slug, version) is None:
+        return jsonify({"error": "not_found"}), 404
+    try:
+        event = module_progress.validate_event(payload, slug, version)
+    except module_progress.ProgressEventError as exc:
+        return jsonify({"error": f"gecersiz_olay:{exc.reason}"}), 400
+    try:
+        state = _module_progress_store().record(module_ticket.email_hash(email), slug, version, event, time.time())
+    except OSError:
+        return jsonify({"error": "progress_write_failed"}), 500
+    return _no_store({"ok": True, "state": state})
+
+
+@app.after_request
+def _module_frame_policy(response):
+    # Only frame-src: the dashboard keeps its existing font and Google Sign-In loading (plan K-P15).
+    response.headers.setdefault("Content-Security-Policy", MODULE_FRAME_CSP)
+    return response
 
 
 # --- SPA static serving (production build) ---
