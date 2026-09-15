@@ -1,6 +1,8 @@
 """G-BRIDGE and G-ATTRIB: detect a missing, loosened or foreign bridge; missing attributions."""
 import html as html_lib
 import json
+import signal
+import time
 
 import pytest
 
@@ -230,3 +232,69 @@ def test_attrib_fails_when_asset_record_is_not_an_object():
                           '{"a1b2c3d4e5f60718": "x"}</script>', 1)
     report = _run(gates_ek.gate_attrib, html)["G-ATTRIB"]
     assert report["status"] == "FAIL" and "atıf metni yok" in report["detail"]
+
+
+# ---------------------------------------------------------------------------
+# perf fix (controller ruling, SP4 Task 8): G-BRIDGE's receiver and '*' scans must be linear in
+# the script length. The old `_POST_RE` captured the whole dotted receiver chain via an
+# unanchored finditer over the entire script body, so a single long run of word characters
+# anywhere in that body (e.g. a compiled MODULE_DATA string literal) made its backtracking group
+# retry at every position of that run — quadratic. The old `_STAR_RE`'s unbounded `[^;]*?` had
+# the same shape: many `postMessage(` occurrences with no ';' to stop the scan made each one
+# rescan an unbounded amount of remaining text. Each scenario below is bounded by a hard
+# wall-clock SIGALRM (not just an assertion) so a reintroduced ReDoS fails fast here instead of
+# hanging the whole run — before the fix, scenarios 1, 3 and 4 hang past the alarm; scenario 2
+# stays under the alarm but is still ~6-10x slower than the fixed code (see task-8-report.md).
+# ---------------------------------------------------------------------------
+
+class _PerfTimeout(Exception):
+    pass
+
+
+def _bounded_seconds(seconds, fn):
+    def _handler(signum, frame):
+        raise _PerfTimeout(f"exceeded {seconds}s — G-BRIDGE perf regression")
+    old_handler = signal.signal(signal.SIGALRM, _handler)
+    signal.alarm(seconds)
+    start = time.monotonic()
+    try:
+        result = fn()
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
+    return result, time.monotonic() - start
+
+
+def test_gate_bridge_is_fast_next_to_a_long_unrelated_identifier_run():
+    """Reproduces the SP4 Task 8 hang: a compiled MODULE_DATA string can contain a very long run
+    of plain word characters with no postMessage call anywhere near it."""
+    html = "<script>var " + "a" * 400_000 + ";</script>"
+    report, elapsed = _bounded_seconds(10, lambda: _run(gates_ek.gate_bridge, html))
+    assert elapsed < 2.0, f"gate_bridge took {elapsed:.2f}s"
+    assert report["G-BRIDGE"]["status"] == "FAIL" and "köprüsü yok" in report["G-BRIDGE"]["detail"]
+
+
+def test_gate_bridge_is_fast_with_many_legitimate_calls_and_still_names_the_receiver():
+    html = "<script>" + "a.postMessage(x, EDUPEDIA_PARENT_ORIGIN);" * 20_000 + "</script>"
+    report, elapsed = _bounded_seconds(10, lambda: _run(gates_ek.gate_bridge, html))
+    assert elapsed < 2.0, f"gate_bridge took {elapsed:.2f}s"
+    assert report["G-BRIDGE"]["status"] == "FAIL" and "bulunan: a" in report["G-BRIDGE"]["detail"]
+
+
+def test_gate_bridge_is_fast_scanning_for_a_star_target_with_no_semicolons():
+    # One legitimate call first so the scan does not short-circuit on "no bridge"; then 50,000
+    # bare `postMessage(` occurrences with no ';' anywhere — the shape that made the old
+    # `_STAR_RE`'s unbounded `[^;]*?` scan quadratic.
+    html = ("<script>window.parent.postMessage(x, EDUPEDIA_PARENT_ORIGIN);"
+           + "postMessage(" * 50_000 + "</script>")
+    report, elapsed = _bounded_seconds(10, lambda: _run(gates_ek.gate_bridge, html))
+    assert elapsed < 2.0, f"gate_bridge took {elapsed:.2f}s"
+    assert report["G-BRIDGE"]["status"] == "FAIL"
+
+
+def test_gate_bridge_is_fast_on_the_real_engine_template_with_a_long_embedded_run():
+    engine = sablon.engine_template("https://tedy.online")
+    html = engine.replace("const MODULE_DATA = {", 'const MODULE_DATA = { x: "' + "a" * 400_000 + '", ', 1)
+    report, elapsed = _bounded_seconds(10, lambda: _run(gates_ek.gate_bridge, html))
+    assert elapsed < 2.0, f"gate_bridge took {elapsed:.2f}s"
+    assert report["G-BRIDGE"]["status"] == "PASS"

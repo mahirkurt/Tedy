@@ -15,8 +15,22 @@ BRIDGE_TYPES = frozenset({"edupedia:progress", "edupedia:restore"})
 # The vendored template's THEME_STORE_KEY localStorage key (not a bridge message type).
 STORAGE_KEYS = frozenset({"edupedia:theme"})
 _SCRIPT_RE = re.compile(r"<script(?P<attrs>[^>]*)>(?P<body>.*?)</script>", re.S | re.I)
-_POST_RE = re.compile(r"([A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*)\s*\.\s*postMessage\s*\(")
-_STAR_RE = re.compile(r"postMessage\s*\([^;]*?,\s*[\"']\*[\"']\s*\)")
+# perf fix (controller ruling): the original _POST_RE captured the whole dotted receiver chain
+# via an unanchored finditer over the ENTIRE script body — a single long run of word characters
+# anywhere in that body (e.g. a compiled MODULE_DATA string literal) makes the receiver group's
+# backtracking retry at every position of that run, which is quadratic in the script length.
+# `_POST_CALL_RE` only ever looks for the literal ".postMessage(" (no backtracking group), and
+# `_receiver_before` then reads the receiver by a plain backward character scan bounded to
+# `_RECEIVER_WINDOW` chars — bounded work per occurrence, however large the rest of the script is.
+_POST_CALL_RE = re.compile(r"\.\s*postMessage\s*\(")
+_RECEIVER_WINDOW = 256
+_RECEIVER_UNREADABLE = "<okunamayan-alici>"
+# Same shape of bug for the '*' target check: the old _STAR_RE's `[^;]*?` had to scan forward,
+# per `postMessage(` occurrence, over an unbounded amount of text with no ';' to stop it (e.g.
+# many `postMessage(` calls in a row). `_POSTMESSAGE_CALL_RE` is a plain literal match; the
+# bounded `{0,512}?` after it caps the forward scan to a small constant per occurrence.
+_POSTMESSAGE_CALL_RE = re.compile(r"postMessage\s*\(")
+_STAR_ARG_RE = re.compile(r"[^;]{0,512}?,\s*[\"']\*[\"']\s*\)")
 _TYPE_RE = re.compile(r"[\"'](edupedia:[a-z_]+)[\"']")
 # Fix F2 (review I2): only a *real* `type="application/json"` attribute excludes a <script> from
 # the bridge scan — not any attribute (e.g. `data-note="..."`) that merely contains the text. The
@@ -52,9 +66,52 @@ def _inline_js(html: str) -> str:
                      if not _JSON_TYPE_RE.search(m.group("attrs")))
 
 
+def _receiver_before(js: str, dot_pos: int, window: int = _RECEIVER_WINDOW) -> str | None:
+    """The dotted identifier chain immediately ending at `dot_pos` (the '.' before `postMessage`),
+    read by a plain backward character scan — no regex group is retried across the chain, so the
+    cost is O(chain length), never O(script length). Returns None when the text immediately
+    before `dot_pos` is not such a chain, or the chain may extend past `window` characters (the
+    caller treats this the same as a foreign receiver — FAIL, never a silent "no bridge" pass).
+    """
+    limit = max(0, dot_pos - window)
+    i = dot_pos
+    chain_start = dot_pos
+    while True:
+        j = i
+        while j > limit and js[j - 1] in " \t\r\n":
+            j -= 1
+        k = j
+        while k > limit and (js[k - 1].isalnum() or js[k - 1] in "_$"):
+            k -= 1
+        if k == j:
+            return None  # no identifier where the chain (or its start) was expected
+        if k == limit and limit > 0:
+            return None  # identifier may continue past the window — unreadable
+        if not (js[k].isalpha() or js[k] in "_$"):
+            return None  # cannot start with a digit
+        chain_start = k
+        i = k
+        m = i
+        while m > limit and js[m - 1] in " \t\r\n":
+            m -= 1
+        if m > limit and js[m - 1] == ".":
+            i = m - 1
+            continue
+        break
+    return re.sub(r"\s+", "", js[chain_start:dot_pos])
+
+
+def _receivers(js: str) -> list[str]:
+    return [_receiver_before(js, m.start()) or _RECEIVER_UNREADABLE for m in _POST_CALL_RE.finditer(js)]
+
+
+def _has_star_target(js: str) -> bool:
+    return any(_STAR_ARG_RE.match(js, m.end()) for m in _POSTMESSAGE_CALL_RE.finditer(js))
+
+
 def gate_bridge(html: str, R: Any) -> None:
     js = _inline_js(html)
-    receivers = [re.sub(r"\s+", "", m.group(1)) for m in _POST_RE.finditer(js)]
+    receivers = _receivers(js)
     if not receivers:
         R.add("G-BRIDGE", "FAIL", "İlerleme köprüsü yok: modül window.parent'a edupedia:progress göndermiyor.")
         return
@@ -62,7 +119,7 @@ def gate_bridge(html: str, R: Any) -> None:
     wrong = sorted({r for r in receivers if r != "window.parent"})
     if wrong:
         issues.append("postMessage yalnız window.parent'a gönderilir (bulunan: " + ", ".join(wrong) + ")")
-    if _STAR_RE.search(js):
+    if _has_star_target(js):
         issues.append("postMessage hedef origin'i '*' olamaz")
     types = set(_TYPE_RE.findall(js))
     foreign = types - BRIDGE_TYPES - STORAGE_KEYS
