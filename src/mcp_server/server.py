@@ -16,6 +16,7 @@ from src.mcp_server.tools import Tools
 
 _RO = ToolAnnotations(readOnlyHint=True, openWorldHint=True)
 _WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+_DESTRUCTIVE = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
 # Tool bodies get their own worker-thread budget (like http_app._VERIFY_LIMITER): slow fleet calls can
 # fill these threads, never the default limiter the bearer gate, OAuth endpoints and store calls use.
 TOOL_THREAD_LIMIT = 16
@@ -110,5 +111,30 @@ def build_server(tools: Tools) -> FastMCP:
         email = caller_email(ctx)
         return await anyio.to_thread.run_sync(
             functools.partial(tools.onizle, email, taslak_id=taslak_id), limiter=_TOOL_LIMITER)
+
+    @mcp.tool(annotations=_WRITE)
+    async def edupedia_yayinla(ctx: Context, taslak_id: str, ted_link: dict[str, str] | None = None,
+                               slug: str | None = None) -> dict[str, Any]:
+        """FAIL'siz bir taslağı tedy.online kataloğunda değişmez yeni sürüm olarak yayınlar. ted_link
+        {kind: exam|homework, id} edupedia_baglam'dan gelir. EXAM modu yayınlanmaz. Bu aracın sonucu olmadan
+        'yayınlandı' deme."""
+        email = caller_email(ctx)
+        return await anyio.to_thread.run_sync(functools.partial(tools.yayinla, email, taslak_id=taslak_id,
+                                                                ted_link=ted_link, slug=slug), limiter=_TOOL_LIMITER)
+
+    @mcp.tool(annotations=_RO)
+    async def edupedia_katalog(ctx: Context, ders: str | None = None, sinif: str | None = None,
+                               durum: str | None = None) -> dict[str, Any]:
+        """Yayınlanmış modüllerin künyesi. durum: active (varsayılan), removed, hepsi."""
+        email = caller_email(ctx)
+        return await anyio.to_thread.run_sync(functools.partial(tools.katalog, email, ders=ders, sinif=sinif,
+                                                                durum=durum), limiter=_TOOL_LIMITER)
+
+    @mcp.tool(annotations=_DESTRUCTIVE)
+    async def edupedia_kaldir(ctx: Context, slug: str) -> dict[str, Any]:
+        """Bir modülün tüm sürümlerini yumuşak kaldırır (dosya silinmez, katalogdan düşer)."""
+        email = caller_email(ctx)
+        return await anyio.to_thread.run_sync(functools.partial(tools.kaldir, email, slug=slug),
+                                              limiter=_TOOL_LIMITER)
 
     return mcp

@@ -14,6 +14,7 @@ from src.mcp_server.derle_araci import Derleyici
 from src.mcp_server.federation import (ANAMNESIS, EGITIM_KAYNAK, MINIMAX, MUFREDAT, TOOL_BUDGET_SECONDS,
                                        TR_LITERATUR, Federation, FederationError)
 from src.mcp_server.kapsam import KapsamBuilder
+from src.mcp_server.katalog import CatalogWriter, Yayinci
 from src.mcp_server.kaynak_oku import KaynakOkuyucu, wrap_kaynak_verisi
 from src.mcp_server.runs import RunStore
 from src.mcp_server.taslak import DraftStore
@@ -42,13 +43,15 @@ def app_revision(root: Path = PROJECT_ROOT) -> str | None:
 class Tools:
     def __init__(self, settings: Settings, federation: Federation, clock: Callable[[], float] = time.time,
                  dashboard: DashboardContext | None = None, runs: RunStore | None = None,
-                 drafts: DraftStore | None = None, monotonic: Callable[[], float] = time.monotonic) -> None:
+                 drafts: DraftStore | None = None, catalog: CatalogWriter | None = None,
+                 monotonic: Callable[[], float] = time.monotonic) -> None:
         self.settings = settings
         self.federation = federation
         self.clock = clock
         self.dashboard = dashboard
         self.runs = runs if runs is not None else RunStore(settings.data_dir)
         self.drafts = drafts if drafts is not None else DraftStore(settings.data_dir)
+        self.catalog = catalog if catalog is not None else CatalogWriter(settings.data_dir, clock)
         self.monotonic = monotonic  # spec §7 budget for the canli=True live probe
 
     def durum(self, email: str, canli: bool = False) -> dict[str, Any]:
@@ -142,3 +145,17 @@ class Tools:
 
     def onizle(self, email: str, taslak_id: str) -> dict[str, Any]:
         return self._derleyici().onizle(email, taslak_id)
+
+    def _yayinci(self) -> Yayinci:
+        return Yayinci(self.drafts, self.catalog, self.settings.dashboard_public_url)
+
+    def yayinla(self, email: str, taslak_id: str, ted_link: dict[str, str] | None = None,
+                slug: str | None = None) -> dict[str, Any]:
+        return self._yayinci().yayinla(email, taslak_id, ted_link=ted_link, slug=slug)
+
+    def katalog(self, email: str, ders: str | None = None, sinif: str | None = None,
+                durum: str | None = None) -> dict[str, Any]:
+        return self._yayinci().katalog(ders=ders, sinif=sinif, durum=durum)
+
+    def kaldir(self, email: str, slug: str) -> dict[str, Any]:
+        return self._yayinci().kaldir(email, slug)
