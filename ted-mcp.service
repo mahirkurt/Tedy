@@ -1,0 +1,24 @@
+[Unit]
+Description=TED MCP orchestrator (edupedia, uvicorn, loopback only)
+After=network.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/mnt/thunderbolt/workspaces/TED
+Environment=PATH=/mnt/thunderbolt/workspaces/TED/.venv/bin:/usr/bin:/bin
+Environment=PYTHONUNBUFFERED=1
+Environment=TED_MCP_HOST=127.0.0.1
+Environment=TED_MCP_PORT=8090
+Environment=TED_MCP_PUBLIC_BASE_URL=https://mcp.tedy.online
+Environment=TED_MCP_ALLOWED_HOSTS=mcp.tedy.online
+Environment=TED_DASHBOARD_API_URL=http://127.0.0.1:8085
+EnvironmentFile=/mnt/thunderbolt/workspaces/TED/.env
+ExecStart=/mnt/thunderbolt/workspaces/TED/.venv/bin/python -m src.mcp_server.http_app
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=default.target

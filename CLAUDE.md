@@ -50,9 +50,33 @@ systemctl --user restart ted-dashboard   # Pick up new static files
 ```
 
 - **Service file**: `~/.config/systemd/user/ted-dashboard.service`
-- **Gunicorn**: binds `0.0.0.0:8085`, 1 worker (see `ted-dashboard.service`), WSGI entry `src.dashboard_api:app`
+- **Gunicorn**: binds `0.0.0.0:8085`, 2 `gthread` workers × 4 threads (see `ted-dashboard.service`), WSGI entry `src.dashboard_api:app`
 - **Public URL**: `tedy.online` via Cloudflare Tunnel (`hp-ai-node` tunnel)
 - **Cron**: `*/15 * * * *` runs `run_sync.py` with 600s timeout, logs to `output/sync.log`
+- **Tracked unit files**: `ted-dashboard.service` and `ted-mcp.service` at the repo root are the source of truth; after editing one, `install -m 644 <file> ~/.config/systemd/user/` and `systemctl --user daemon-reload`.
+
+### ted-mcp (edupedia orchestrator)
+
+A second systemd user service, loopback only, published as `mcp.tedy.online` on the same `hp-ai-node` tunnel.
+Runbook and rollback: `docs/superpowers/plans/2026-09-14-ted-mcp-altyapi.md`.
+
+```bash
+systemctl --user status ted-mcp
+journalctl --user -u ted-mcp -f
+curl -s http://127.0.0.1:8090/health                   # {"status": "ok", "version": "0.1.0"}
+.venv/bin/python -m src.mcp_server.env_prep durum      # .env readiness — names and verdicts only
+.venv/bin/python -m src.mcp_server.keys oauth-iptal --email <e-posta>   # kill switch for one person's OAuth grants
+```
+
+- **Bind**: `127.0.0.1:8090` (8087 is taken on hp-ai-node). Non-secret settings (`TED_MCP_HOST`, `TED_MCP_PORT`,
+  `TED_MCP_PUBLIC_BASE_URL`, `TED_MCP_ALLOWED_HOSTS`, `TED_DASHBOARD_API_URL`, and if ever needed
+  `TED_MCP_MAX_BODY_BYTES` / `TED_MCP_EXTRA_REDIRECT_URIS`) live in the unit's `Environment=` lines and must never
+  appear in `.env`: systemd lets `EnvironmentFile=` override `Environment=`.
+- **Secrets in `.env`**: `TED_MCP_FORM_SECRET`, `TED_DASHBOARD_API_KEY` plus its `ted-mcp:` entry in `API_KEYS`
+  (the dashboard reads `API_KEYS` only at start — restart it after a change), `ANAMNESIS_MCP_API_KEY`. Change them
+  with `env_prep`, never by hand; it follows the worktree's `.env` symlink.
+- **Trap**: the `keys` CLI writes `output/ted_mcp_oauth.sqlite3` under the checkout it runs from. Run it from
+  `/mnt/thunderbolt/workspaces/TED`, the service's working directory, and leave `TED_MCP_PROJECT_ROOT` unset.
 
 ## Architecture
 
@@ -160,7 +184,7 @@ Runtime dependencies are installed via pip but not fully listed in `requirements
 
 ## Required Credentials (gitignored)
 
-- `.env` — `DASHBOARD_SECRET_KEY` (mandatory), `PORTAL_USERNAME`, `PORTAL_PASSWORD`, `GEMINI_API_KEY`, `API_KEYS` (`label:tdyK_...`), `ASSISTANT_API_KEY`, optional `MUFREDAT_MCP_API_KEY` / `EGITIM_KAYNAK_MCP_API_KEY`. Generate a third-party key with `python src/dashboard_api.py --generate-key`.
+- `.env` — `DASHBOARD_SECRET_KEY` (mandatory), `PORTAL_USERNAME`, `PORTAL_PASSWORD`, `GEMINI_API_KEY`, `API_KEYS` (`label:tdyK_...`), `ASSISTANT_API_KEY`, optional `MUFREDAT_MCP_API_KEY` / `EGITIM_KAYNAK_MCP_API_KEY`; for ted-mcp `TED_MCP_FORM_SECRET`, `TED_DASHBOARD_API_KEY`, `ANAMNESIS_MCP_API_KEY` (see Deployment → ted-mcp). Generate a third-party key with `python src/dashboard_api.py --generate-key`.
 
 Google Sign-In uses a hardcoded OAuth client id in `LoginPage.tsx` and `dashboard_api.py`. There is no Workspace OAuth token file.
 
