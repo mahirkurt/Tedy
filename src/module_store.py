@@ -24,7 +24,7 @@ DRAFT_RECORD = "taslak.json"
 
 
 def valid_slug(slug: Any) -> bool:
-    return isinstance(slug, str) and len(slug) <= SLUG_MAX and bool(SLUG_RE.match(slug))
+    return isinstance(slug, str) and len(slug) <= SLUG_MAX and bool(SLUG_RE.fullmatch(slug))
 
 
 def publishable_slug(slug: Any) -> bool:
@@ -36,12 +36,12 @@ def valid_version(version: Any) -> bool:
 
 
 def parse_version_segment(segment: str) -> int | None:
-    match = VERSION_SEGMENT_RE.match(segment or "")
+    match = VERSION_SEGMENT_RE.fullmatch(segment or "")
     return int(match.group(1)) if match else None
 
 
 def valid_taslak_id(taslak_id: Any) -> bool:
-    return isinstance(taslak_id, str) and bool(TASLAK_ID_RE.match(taslak_id))
+    return isinstance(taslak_id, str) and bool(TASLAK_ID_RE.fullmatch(taslak_id))
 
 
 def modules_root(data_dir: Path | str) -> Path:

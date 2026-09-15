@@ -97,3 +97,47 @@ def test_draft_read_and_html_path(tmp_path):
     assert ms.read_draft(tmp_path, "ffffffffffffffff") is None
     assert ms.draft_html_path(tmp_path, "0123456789abcdef").name == "index.html"
     assert ms.draft_html_path(tmp_path, "../x") is None
+
+
+def test_fullmatch_rejects_newline_suffixed_slug():
+    """Regression: regex $ matches before newline; fullmatch prevents it."""
+    assert not ms.valid_slug("abc\n")
+
+
+def test_fullmatch_rejects_newline_suffixed_taslak_id():
+    """Regression: regex $ matches before newline; fullmatch prevents it."""
+    assert not ms.valid_taslak_id("0123456789abcdef\n")
+
+
+def test_fullmatch_rejects_newline_suffixed_version_segment():
+    """Regression: regex $ matches before newline; fullmatch prevents it."""
+    assert ms.parse_version_segment("v12\n") is None
+
+
+def test_read_catalog_with_json_list(tmp_path):
+    """MINOR: JSON is a list, not dict with 'moduller' key."""
+    ms.catalog_path(tmp_path).parent.mkdir(parents=True)
+    ms.catalog_path(tmp_path).write_text(json.dumps([{"slug": "a"}]), encoding="utf-8")
+    assert ms.read_catalog(tmp_path) == []
+
+
+def test_read_catalog_missing_moduller_key(tmp_path):
+    """MINOR: dict without 'moduller' key."""
+    ms.catalog_path(tmp_path).parent.mkdir(parents=True)
+    ms.catalog_path(tmp_path).write_text(json.dumps({"other": "value"}), encoding="utf-8")
+    assert ms.read_catalog(tmp_path) == []
+
+
+def test_read_catalog_moduller_as_dict(tmp_path):
+    """MINOR: 'moduller' is dict instead of list."""
+    ms.catalog_path(tmp_path).parent.mkdir(parents=True)
+    ms.catalog_path(tmp_path).write_text(json.dumps({"moduller": {"slug": "a"}}), encoding="utf-8")
+    assert ms.read_catalog(tmp_path) == []
+
+
+def test_read_catalog_moduller_as_non_dict(tmp_path):
+    """MINOR: 'moduller' is list but contains non-dict items."""
+    ms.catalog_path(tmp_path).parent.mkdir(parents=True)
+    ms.catalog_path(tmp_path).write_text(
+        json.dumps({"moduller": ["string", {"slug": "a"}, 42]}), encoding="utf-8")
+    assert ms.read_catalog(tmp_path) == [{"slug": "a"}]
