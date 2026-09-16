@@ -304,6 +304,7 @@ def main():
                 f" chunks={idx_stats.get('chunks_indexed', 0)}"
                 f" changed={idx_stats.get('changed_files', 0)}"
                 f" unchanged={idx_stats.get('unchanged_files', 0)}"
+                f" moduller={(idx_stats.get('moduller') or {}).get('aktif_modul', 0)}"
             )
         except Exception as e:
             print(f"[WARN] Assistant reindex failed: {e}")

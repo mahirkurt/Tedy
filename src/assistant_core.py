@@ -21,6 +21,7 @@ import subprocess
 import threading
 import time
 import fnmatch
+import functools
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -1340,8 +1341,11 @@ class AssistantRuntime:
         self._retriever: HybridRetriever | None = None
         self._retriever_cache_mtime: float = 0.0
 
+        from src.assistant_modules import ModuleIndex
         from src.assistant_tools import build_registry
-        self.registry = build_registry(self._local_search)
+        # Published edupedia modules (plan SP5 K-S1): read-only, per process, no index file.
+        self.modules = ModuleIndex(self.config.output_dir)
+        self.registry = build_registry(self._local_search, module_index=self.modules)
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """The retriever, shaped as a tool the model can choose to call."""
@@ -1366,6 +1370,10 @@ class AssistantRuntime:
         "`mufredat_ara`, `kitap_listele` + `kitap_sayfa`. MEB korpusu bu "
         "konularda tek otoritedir.\n"
         "- Görsel/şema açıklaman gerekiyorsa → `figur_ara`, sonra `figur_getir`.\n"
+        "- Etkileşimli çalışma, yayınlanmış modül ya da 'bu konu/sınav için modül var mı' sorusu → "
+        "`modul_ara`. Modül adı ve künyesi YALNIZ bu aracın sonucundan gelir; araç modül bulamadıysa "
+        "bunu söyle, modül ya da bağlantı uydurma. Modülü önerdiğin cümleye aracın [S] numarasını koy; "
+        "bağlantıyı kendin yazma — okur modülü Kaynaklar panelinden açar.\n"
         "- Soru hem Işık'ın kaydına hem bir konuya dokunuyorsa (örn. "
         "'ödevimdeki kesir konusunu anlat') iki aracı da çağır: önce "
         "`ogrenci_verisi_ara` ile somut kaydı al (hangi ödev, hangi konu, "
@@ -1403,12 +1411,20 @@ class AssistantRuntime:
         "- Uzun paragraf yazma; madde işareti ve kısa cümle kullan.\n\n"
 
         "## Sınırlar\n"
+        "- Modül ilerleme özetini yalnız soran kişiye aktar; ilerleme bilgisini (cevaplanan soru, "
+        "doğru oranı, tamamlanma, son erişim) hiçbir zaman başka bir araca argüman olarak verme.\n"
         "- Klinik tanı koyma, tedavi önerme.\n"
         "- Riskli psikolojik durumda profesyonel destek yönlendirmesi yap."
     )
 
     def reindex(self, incremental: bool = True) -> dict[str, Any]:
-        return self.indexer.reindex(incremental=incremental)
+        stats = self.indexer.reindex(incremental=incremental)
+        try:
+            moduller = self.modules.durum(yenile=True)
+        except Exception as exc:  # noqa: BLE001 — the file index already succeeded; say what failed
+            logger.error("module index rebuild failed: %s", type(exc).__name__)
+            moduller = {"katalog": "hata", "hata": type(exc).__name__}
+        return {**stats, "moduller": moduller}
 
     def chat(
         self,
@@ -1418,6 +1434,7 @@ class AssistantRuntime:
         temperature: float = 0.2,
         force_deep: bool = False,
         dispatch: Callable[[str, dict[str, Any]], Any] | None = None,
+        ilerleme_izni: bool = False,
     ) -> dict[str, Any]:
         # `dispatch`, if given, replaces self.registry.dispatch for this
         # call only. chat_events() (below) uses this to wrap tool calls
@@ -1443,7 +1460,10 @@ class AssistantRuntime:
             loop = self.gemini.chat_with_tools(
                 messages=convo,
                 declarations=self.registry.declarations(),
-                dispatch=dispatch or self.registry.dispatch,
+                # Module progress enters the model context only for a signed-in person (plan K-S6);
+                # the caller decides, and only an exact True counts.
+                dispatch=dispatch or functools.partial(
+                    self.registry.dispatch, ilerleme_izni=ilerleme_izni is True),
                 tier=tier,
                 max_output_tokens=8192 if tier == "deep" else 2048,
                 temperature=temperature,
@@ -1543,7 +1563,8 @@ class AssistantRuntime:
         cancelled = threading.Event()
 
         # Read once, per call — never assigned back onto the registry.
-        real_dispatch = self.registry.dispatch
+        real_dispatch = functools.partial(
+            self.registry.dispatch, ilerleme_izni=kwargs.get("ilerleme_izni") is True)
 
         def announcing(name: str, args: dict[str, Any]) -> Any:
             if cancelled.is_set():
@@ -1636,12 +1657,14 @@ class AssistantRuntime:
         messages: list[dict[str, Any]],
         session_id: str = "",
         context_filters: dict[str, Any] | None = None,
+        ilerleme_izni: bool = False,
     ) -> dict[str, Any]:
         out = self.chat(
             messages=messages,
             session_id=session_id,
             context_filters=context_filters,
             force_deep=True,
+            ilerleme_izni=ilerleme_izni,
         )
         out["intent"] = "study_plan"
         out["plan_blocks"] = self._build_rule_based_plan(
@@ -1677,6 +1700,8 @@ class AssistantRuntime:
         if stream:
             raise ValueError("stream=true desteklenmiyor")
 
+        # API-key callers are integrations, not people: this path never passes ilerleme_izni,
+        # so module progress never reaches it, whatever the request body says (plan K-S6).
         plan_mode = bool(request_data.get("plan", False))
         if plan_mode:
             out = self.study_plan(messages=messages, session_id=session_id, context_filters=context_filters)

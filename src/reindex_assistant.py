@@ -31,6 +31,7 @@ def main():
         "deleted_files",
         "embedded_chunks",
         "duration_ms",
+        "moduller",
     ):
         print(f"  {k}: {stats.get(k)}")
 

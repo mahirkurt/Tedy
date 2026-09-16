@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from src.mcp_client import McpClient, McpToolResult
+from src import assistant_modules
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,8 @@ def sanitize_schema(schema: dict[str, Any]) -> dict[str, Any]:
 class McpRegistry:
     def __init__(self, clients: dict[str, McpClient],
                  local_search: Callable[[str, int], list[dict[str, Any]]],
-                 unconfigured: list[str] | None = None) -> None:
+                 unconfigured: list[str] | None = None,
+                 module_index: Any = None) -> None:
         self.clients = clients
         self.local_search = local_search
         # Servers that were configured (named in MCP_SERVERS) but had no API
@@ -101,10 +103,14 @@ class McpRegistry:
         # they must still be reportable, or an unset env var looks exactly
         # like a healthy system with nothing to say.
         self.unconfigured = list(unconfigured or [])
+        # Published edupedia modules (src/assistant_modules.py). Local and read-only; None keeps
+        # the registry usable in tests and tools that have no catalog.
+        self.module_index = module_index
 
     def degraded(self) -> list[str]:
-        unhealthy = (n for n, c in self.clients.items() if not c.healthy)
-        return sorted(set(unhealthy) | set(self.unconfigured))
+        unhealthy = {n for n, c in self.clients.items() if not c.healthy}
+        modules = set(self.module_index.degraded()) if self.module_index is not None else set()
+        return sorted(unhealthy | set(self.unconfigured) | modules)
 
     def declarations(self) -> list[dict[str, Any]]:
         decls: list[dict[str, Any]] = [{
@@ -122,6 +128,8 @@ class McpRegistry:
                 "required": ["query"],
             },
         }]
+        if self.module_index is not None:
+            decls.append(dict(assistant_modules.DECLARATION))
         for local_name, (server, mcp_name) in TOOL_ALLOWLIST.items():
             client = self.clients.get(server)
             if client is None:
@@ -138,11 +146,18 @@ class McpRegistry:
             })
         return decls
 
-    def dispatch(self, name: str, args: dict[str, Any]) -> ToolOutcome:
+    def dispatch(self, name: str, args: dict[str, Any], ilerleme_izni: bool = False) -> ToolOutcome:
         if name == LOCAL_TOOL:
             return self._dispatch_local(args)
+        if name == assistant_modules.TOOL_NAME:
+            return self._dispatch_modules(args, ilerleme_izni is True)
         if name not in TOOL_ALLOWLIST:
             return ToolOutcome(ok=False, error=f"bilinmeyen araç: {name}")
+        if assistant_modules.contains_progress(args):
+            # Spec §6.4: module progress never leaves TED. This catches keys copied verbatim from
+            # modul_ara's output; a paraphrase is not caught (plan K-S6, accepted residual risk).
+            return ToolOutcome(ok=False, error=(
+                "ilerleme verisi yan filo sunucularına gönderilmez; bu alanları argümandan çıkar"))
 
         server, mcp_name = TOOL_ALLOWLIST[name]
         client = self.clients.get(server)
@@ -196,6 +211,18 @@ class McpRegistry:
         text = "\n\n".join(str(r.get("snippet", "")) for r in rows) or "(kayıt yok)"
         return ToolOutcome(ok=True, text=text, citations=citations)
 
+    def _dispatch_modules(self, args: dict[str, Any], ilerleme_izni: bool) -> ToolOutcome:
+        if self.module_index is None:
+            return ToolOutcome(ok=False, error="modül kataloğu bağlanmadı")
+        try:
+            text, citations = self.module_index.ara(
+                sorgu=args.get("sorgu", ""), ders=args.get("ders"), sinif=args.get("sinif"),
+                ilerleme_izni=ilerleme_izni)
+        except Exception as exc:  # noqa: BLE001 — reported to the model, never raised through the loop
+            logger.error("modul_ara failed: %s", type(exc).__name__)
+            return ToolOutcome(ok=False, error=f"modül araması hatası: {type(exc).__name__}")
+        return ToolOutcome(ok=True, text=text, citations=citations)
+
     @staticmethod
     def _label(kind: str, tool: str, args: dict[str, Any]) -> str:
         if kind == "kitap":
@@ -210,8 +237,8 @@ class McpRegistry:
         return f"MEB müfredatı · {subject}" if subject else "MEB müfredatı"
 
 
-def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]]
-                   ) -> McpRegistry:
+def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
+                   module_index: Any = None) -> McpRegistry:
     """Wire the configured servers. A server with no key is simply absent —
     its tools are not declared — but it is still named by degraded(), so an
     unset env var never looks like a healthy system with nothing to say."""
@@ -225,4 +252,4 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]]
             continue
         clients[name] = McpClient(name=name, url=url, api_key=key)
     return McpRegistry(clients=clients, local_search=local_search,
-                       unconfigured=unconfigured)
+                       unconfigured=unconfigured, module_index=module_index)
