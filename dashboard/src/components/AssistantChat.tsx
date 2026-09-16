@@ -64,6 +64,7 @@ const TOOL_LABEL: Record<string, string> = {
   figur_getir: 'Görsel getiriliyor',
   oer_ara: 'Açık kaynaklar taranıyor',
   oer_kazanima_gore: 'Kazanıma bağlı kaynaklar alınıyor',
+  modul_ara: 'Yayınlanmış modüller aranıyor',
 }
 
 const DEFAULT_THINKING_MESSAGE = 'Yanıt hazırlanıyor...'
@@ -141,6 +142,7 @@ function flagTone(f: string): 'red' | 'gray' {
 const DEGRADED_LABELS: Record<string, string> = {
   'maarif-mufredat': 'Müfredat kaynağına ulaşılamadı',
   'egitim-kaynak': 'Açık eğitim kaynağına ulaşılamadı',
+  'modul-katalogu': 'Modül kataloğu okunamadı',
 }
 
 function degradedLabel(server: string): string {

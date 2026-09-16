@@ -577,3 +577,27 @@
   font-size: 0.75rem;
   color: theme.$text-helper;
 }
+
+// Published module citations (sub-project 5): the link is the only way from an answer to a module.
+.ac__ref-group--modul {
+  border-inline-start-color: theme.$support-info;
+}
+
+.ac__ref-open {
+  display: inline-block;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: theme.$link-primary;
+}
+
+.ac__ref-open:focus-visible {
+  outline: 2px solid theme.$focus;
+  outline-offset: 2px;
+}
+
+.ac__ref-unlinked {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: theme.$text-secondary;
+}

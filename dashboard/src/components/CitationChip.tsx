@@ -12,6 +12,7 @@ const KIND_LABEL: Record<AssistantCitation['kind'], string> = {
   mufredat: 'MEB müfredatı',
   kitap: 'Ders kitabı',
   oer: 'Açık kaynak',
+  modul: 'Yayınlanmış modül',
 }
 
 // `citation.kind` is a closed union at compile time but an unchecked string

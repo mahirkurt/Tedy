@@ -178,7 +178,7 @@ export interface HealthData {
   unavailable?: Record<string, { reason: string; detail: string }>
 }
 
-export type CitationKind = 'ogrenci' | 'mufredat' | 'kitap' | 'oer'
+export type CitationKind = 'ogrenci' | 'mufredat' | 'kitap' | 'oer' | 'modul'
 
 export interface AssistantCitation {
   id: string
