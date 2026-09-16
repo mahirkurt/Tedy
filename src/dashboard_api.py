@@ -364,6 +364,13 @@ def _is_assistant_admin() -> bool:
     return bool(email) and email in ASSISTANT_ADMIN_EMAILS
 
 
+def _assistant_progress_allowed() -> bool:
+    """Module progress may enter the Assistant's model context only for a signed-in full-role
+    person (plan SP5 K-S6). API keys — tdyK_ integrations and ASSISTANT_API_KEY on /v1/* — and the
+    test bypass are not people, so their answers never carry progress."""
+    return _module_person() is not None
+
+
 # --- Data helpers ---
 
 def _load_json(filename):
@@ -1780,6 +1787,7 @@ def assistant_chat():
             session_id=session_id,
             context_filters=context_filters,
             temperature=temperature,
+            ilerleme_izni=_assistant_progress_allowed(),
         )
         return jsonify(out)
     except AssistantUnavailableError:
@@ -1799,12 +1807,16 @@ def assistant_stream():
     messages = data.get("messages") or []
     session_id = str(data.get("session_id", ""))
     force_deep = bool(data.get("force_deep", False))
+    # Decided here, inside the request: generate() runs after this view has returned, where the
+    # session is no longer reachable.
+    ilerleme_izni = _assistant_progress_allowed()
 
     def generate():
         try:
             runtime = _assistant_runtime()
             for event in runtime.chat_events(
-                messages=messages, session_id=session_id, force_deep=force_deep
+                messages=messages, session_id=session_id, force_deep=force_deep,
+                ilerleme_izni=ilerleme_izni,
             ):
                 name = event.pop("event")
                 yield f"event: {name}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
@@ -1840,6 +1852,7 @@ def assistant_plan():
             messages=messages,
             session_id=session_id,
             context_filters=context_filters,
+            ilerleme_izni=_assistant_progress_allowed(),
         )
         return jsonify(out)
     except AssistantUnavailableError:
