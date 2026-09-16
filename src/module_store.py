@@ -86,15 +86,35 @@ def draft_html_path(data_dir: Path | str, taslak_id: Any) -> Path | None:
     return _contained(drafts_root(data_dir), folder / MODULE_HTML)
 
 
-def read_catalog(data_dir: Path | str) -> list[dict[str, Any]]:
+CATALOG_OK = "ok"
+CATALOG_MISSING = "yok"
+CATALOG_UNREADABLE = "okunamadi"
+
+
+def read_catalog_with_status(data_dir: Path | str) -> tuple[str, list[dict[str, Any]]]:
+    """Catalog rows plus whether the file was absent or unreadable.
+
+    A reader that must not present a corrupt catalog as an empty one (the TED Assistant:
+    "empty is never blank", plan SP5 K-S8) reads the status; everyone else calls read_catalog.
+    """
     try:
-        data = json.loads(catalog_path(data_dir).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return []
+        raw = catalog_path(data_dir).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return CATALOG_MISSING, []
+    except OSError:
+        return CATALOG_UNREADABLE, []
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return CATALOG_UNREADABLE, []
     rows = data.get("moduller") if isinstance(data, dict) else None
     if not isinstance(rows, list):
-        return []
-    return [row for row in rows if isinstance(row, dict)]
+        return CATALOG_UNREADABLE, []
+    return CATALOG_OK, [row for row in rows if isinstance(row, dict)]
+
+
+def read_catalog(data_dir: Path | str) -> list[dict[str, Any]]:
+    return read_catalog_with_status(data_dir)[1]
 
 
 def find_record(data_dir: Path | str, slug: Any, version: Any) -> dict[str, Any] | None:

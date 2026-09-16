@@ -141,3 +141,14 @@ def test_read_catalog_moduller_as_non_dict(tmp_path):
     ms.catalog_path(tmp_path).write_text(
         json.dumps({"moduller": ["string", {"slug": "a"}, 42]}), encoding="utf-8")
     assert ms.read_catalog(tmp_path) == [{"slug": "a"}]
+
+
+def test_read_catalog_with_status_distinguishes_missing_from_unreadable(tmp_path):
+    assert ms.read_catalog_with_status(tmp_path) == (ms.CATALOG_MISSING, [])
+    ms.catalog_path(tmp_path).parent.mkdir(parents=True)
+    for bad in ("{bozuk", json.dumps([1, 2]), json.dumps({"surum": 1})):
+        ms.catalog_path(tmp_path).write_text(bad, encoding="utf-8")
+        assert ms.read_catalog_with_status(tmp_path) == (ms.CATALOG_UNREADABLE, [])
+        assert ms.read_catalog(tmp_path) == []
+    ms.catalog_path(tmp_path).write_text(json.dumps({"surum": 1, "moduller": [{"slug": "a"}, 3]}), encoding="utf-8")
+    assert ms.read_catalog_with_status(tmp_path) == (ms.CATALOG_OK, [{"slug": "a"}])
