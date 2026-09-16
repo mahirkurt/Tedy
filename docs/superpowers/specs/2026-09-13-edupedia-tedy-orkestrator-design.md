@@ -530,6 +530,42 @@ bu maddeler uygulanmadan önce denetleyici tarafından onaylanır (kullanıcı s
 - **§8 — bütçe:** defter kaydına `miktar` eklenir (modül başı ses karakteri ve görsel sayısı sınırı); fiyat kalemi
   `dogrulandi: false` ise otomatik yol kapalıdır ve onay istenir.
 
+### Alt proje 5 plan güncellemeleri (2026-09-14)
+
+Kaynak: `docs/superpowers/plans/2026-09-14-ted-asistan-modul-entegrasyonu.md` → "Plan kararları". §14.2 gereği
+bu maddeler uygulanmadan önce denetleyici tarafından onaylanır (kullanıcı süreç yönetimini denetleyiciye devretti).
+
+- **§4.1 madde 5 / §10 satır 5 — modül indeksi:** Asistan'ın modül indeksi dosyasız ve süreç içidir
+  (`src/assistant_modules.py`). Belgeler `output/modules/index.json` künyesi, taslak kaydındaki `dogrulama` özeti
+  ve `ProgressStore.summary` toplamlarından kurulur; `index.json` ve `output/module_progress.json`'ın stat imzası
+  (`st_ino`, `st_size`, `st_mtime_ns`) değişince ya da anlık görüntü 60 sn'yi aşınca yeniden kurulur. Yayın,
+  kaldırma ve ilerleme yazımı böylece süreç yeniden başlatılmadan görünür; `AssistantRuntime.reindex()` indeksi
+  zorla yeniler. Asistan'ın genel dosya indeksi `output/modules/**`, `output/edupedia_drafts/**`,
+  `output/edupedia_runs/**`, `module_progress.json`, `*.lock`, `edupedia_media_ledger.json` ve
+  `ted_mcp_oauth.sqlite3*`'ü okumaz.
+- **§4.2 — okurlar:** Asistan ayrıca `output/edupedia_drafts/<taslak_id>/taslak.json`'ın okurudur. Asistan hiçbir
+  modül, ilerleme ya da indeks dosyası yazmaz; iki gunicorn süreci arasında kilit gerekmez.
+- **§5.1 / §5.3 — iddia özeti:** `edupedia_derle` taslak kaydına
+  `dogrulama: {"surum": 1, "iddialar": [{"iddia", "karar", "dayanak": {"document_id", "page"} | {"kaynak", "lisans"}}]}`
+  (≤ 20 iddia, iddia ≤ 300 karakter) yazar. Katalog kaydı değişmez. Asistan özeti yalnız taslak `sha256`'sı
+  katalog kaydınınkiyle eşitken kullanır; aksi hâlde `iddia_durumu: "uyusmazlik"`, özet yoksa `"kayit_yok"`.
+- **§5 — `modul_ara` ve modül atfı:** `modul_ara(sorgu?, ders?, sinif?)` durumları `ok`, `eslesme_yok`,
+  `modul_yok`, `katalog_yok`, `katalog_okunamadi`; yalnız etkin kayıtların slug başına en yüksek sürümü; taslak ve
+  kaldırılmış sürüm dönmez; modele gösterilen gövde (atıf işaret satırları + JSON) ≤ 3.900 karakter. Atıf `{"kind": "modul", "label", "locator": {"slug",
+  "version"}, "snippet", "confidence"}`; arayüz bağlantıyı yalnız doğrulanmış `/moduller/<slug>/v<N>` rotasına
+  kurar ve bilet o rota açılırken alınır (§5.4). Asistan bilet ya da `modul.tedy.online` URL'si üretmez.
+- **§6.3 — içerik güvenliği:** `modul_ara`'da iddia dayanaklarının `kaynak` ve `lisans` metinleri tek üst düzey
+  `kaynak_verisi` nesnesinde döner; künye, iddia cümleleri, kitap dayanağı ve ilerleme toplamları TED içeriğidir.
+  Gömülü varlık atıfları Asistan'a verilmez. Model metnine giren serbest metinde `[S<n>]` → `(S<n>)`.
+- **§6.4 — gizlilik ve LLM bağlamı:** ilerleme Asistan'ın LLM bağlamına yalnız sürüm başı toplam
+  (`cevaplanan_soru`, `dogru_orani`, `tamamlandi_mi`, `son_erisim_gunu`) olarak ve yalnız oturumlu `full` rollü kişi
+  soruyorsa girer; `tdyK_` API anahtarı, `ASSISTANT_API_KEY` ile `/v1/*` ve test atlatması ilerleme almaz. Atıflar
+  ilerleme taşımaz. Yan filo aracına ilerleme alan adlarını taşıyan argümanla çağrı yapılmaz; başka sözcüklerle
+  yeniden yazılmış ilerleme bu denetimle yakalanmaz (kabul edilen kalan risk, sistem istemi kuralıyla azaltılır).
+- **§11 — alt proje 5 testleri:** ağsız modül indeksi, dürüst durumlar, geçersizleşme (gerçek `CatalogWriter` ile),
+  gizlilik ve içerik güvenliği; Playwright: modül atfı → `/moduller/<slug>/v<N>` → bilet yalnız açılışta; canlı:
+  Asistan alt proje 4'te yayınlanan modülü bulur ve biletle açar.
+
 ## 13. Varsayımlar ve riskler
 
 | Risk / varsayım | Etki | Azaltma |
