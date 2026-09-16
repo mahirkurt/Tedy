@@ -469,6 +469,53 @@ def varlik_bagla(data: dict[str, Any], varliklar: Mapping[str, GomuluVarlik]) ->
     return out, used
 
 
+DOGRULAMA_MAX_IDDIA = 20
+DOGRULAMA_MAX_METIN = 300
+
+
+def _dogrulama_metni(value: Any, limit: int) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = " ".join(value.split())
+    return text[:limit] if text else None
+
+
+def _pozitif_tamsayi(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def dogrulama_ozeti(data: dict[str, Any]) -> dict[str, Any]:
+    """Bounded, JSON-native copy of verification.claims for taslak.json (plan SP5 K-S4).
+
+    The TED Assistant runs in the dashboard, which cannot evaluate the compiled JS literal, so
+    the compiler — the only writer of drafts — keeps the claims it gated in plain JSON.
+    """
+    claims = ((data.get("verification") or {}) if isinstance(data, dict) else {}).get("claims")
+    rows: list[dict[str, Any]] = []
+    for claim in claims if isinstance(claims, list) else []:
+        if not isinstance(claim, dict):
+            continue
+        text = _dogrulama_metni(claim.get("claim"), DOGRULAMA_MAX_METIN)
+        if text is None:
+            continue
+        grounding = claim.get("grounding") if isinstance(claim.get("grounding"), dict) else {}
+        dayanak: dict[str, Any] = {}
+        if _pozitif_tamsayi(grounding.get("document_id")):
+            dayanak["document_id"] = grounding["document_id"]
+            if _pozitif_tamsayi(grounding.get("page")):
+                dayanak["page"] = grounding["page"]
+        kaynak = _dogrulama_metni(grounding.get("source"), 160)
+        lisans = _dogrulama_metni(grounding.get("license"), 80)
+        if kaynak:
+            dayanak["kaynak"] = kaynak
+        if lisans:
+            dayanak["lisans"] = lisans
+        rows.append({"iddia": text, "karar": _dogrulama_metni(claim.get("verdict"), 40), "dayanak": dayanak})
+        if len(rows) == DOGRULAMA_MAX_IDDIA:
+            break
+    return {"surum": 1, "iddialar": rows}
+
+
 def atiflar(data: dict[str, Any], used: list[GomuluVarlik]) -> list[dict[str, str]]:
     rows = [{"metin": r.credit, "lisans": r.lisans, "kaynak": r.kaynak, "asset_id": r.asset_id} for r in used]
     seen = {row["metin"] for row in rows}

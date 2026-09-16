@@ -92,6 +92,7 @@ class Derleyici:
                 "ted_link": meta.get("tedLink"),
                 "outcomes": [o.get("code") for o in module_data["curriculum"].get("outcomes") or [] if isinstance(o, dict)],
                 "frame_source": module_data["verification"].get("frame_source"),
+                "dogrulama": derleme.dogrulama_ozeti(module_data),
                 "coverage": run.get("coverage") or {},
                 "assets": [ref["asset_id"] for ref in meta.get("assets") or []],
                 "gates": summary, "kapilar": report, "parent_origin": self.parent_origin,
