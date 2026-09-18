@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>SelfExplain Segment Pass Fixture</title>
+<style>@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}</style>
+</head>
+<body>
+  <!-- Task 12: renderSelfExplain() öğesinin gerçek çıktısını taklit eder — düşük-baskı
+       öz-açıklama (self-explanation): istem + serbest/notsuz <textarea aria-label> +
+       "Modeli gör" aç/kapa düğmesi (aria-expanded, klavye-erişilebilir). PUANLAMA YOK
+       (no addXP/mastery/streak dokunuşu); G-WELLBEING/G-A11Y elle sınamak için
+       lang/title/reduced-motion/aria-live/aria-hidden bilerek eklendi. -->
+  <div data-seg="selfExplain">
+    <div class="seg-head">
+      <span class="seg-ic"><svg class="pic" aria-hidden="true"><use href="#pic-idea"></use></svg></span>
+      <div><div class="kicker">Öz-Açıklama</div><h2>Neden Böyle?</h2></div>
+    </div>
+    <p class="se-prompt">
+      <svg class="cds-icon" aria-hidden="true"><use href="#ic-help"></use></svg>
+      <span>3x + 2 = 14 denkleminde neden önce 2'yi çıkarıyoruz? Kendi cümlelerinle açıkla.</span>
+    </p>
+    <div class="se-field">
+      <p class="se-field__lbl">Kendi açıklaman <span class="se-optional">(opsiyonel, notlandırılmaz)</span></p>
+      <textarea class="se-textarea" aria-label="Kendi açıklaman (opsiyonel, notlandırılmaz)" rows="5" placeholder="Kendi cümlelerinle açıklamayı burada dene..."></textarea>
+    </div>
+    <button class="btn btn--ghost se-reveal" type="button" aria-expanded="false" aria-controls="seModel">
+      <svg class="cds-icon" aria-hidden="true"><use href="#ic-view"></use></svg>
+      <span>Modeli gör</span>
+    </button>
+    <div class="se-model" id="seModel" hidden aria-live="polite">
+      <p class="se-model__lbl">
+        <svg class="cds-icon" aria-hidden="true"><use href="#pic-idea"></use></svg>
+        <span>Model açıklama</span>
+      </p>
+      <div class="se-model__body"><p>Denklemi çözmek için x'i yalnız bırakmalıyız; bu yüzden önce her iki taraftan da 2 çıkarılır.</p></div>
+    </div>
+  </div>
+</body>
+</html>

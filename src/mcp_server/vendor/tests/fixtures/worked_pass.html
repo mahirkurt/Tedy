@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Worked Segment Pass Fixture</title>
+<style>@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}</style>
+</head>
+<body>
+  <!-- Task 11: renderWorked() öğesinin gerçek çıktısını taklit eder — soluk-çözümlü örnek:
+       fadeFrom (=2) öncesi adımlar salt-görünür (worked-step--solved), sonrası <input
+       aria-label> ile doldurulan boşluk (worked-step--blank). G-INTERACT/G-A11Y kapılarını
+       elle sınamak için lang/title/reduced-motion/aria-live/aria-hidden bilerek eklendi. -->
+  <div data-seg="worked">
+    <div class="seg-head">
+      <span class="seg-ic"><svg class="pic" aria-hidden="true"><use href="#pic-idea"></use></svg></span>
+      <div><div class="kicker">Çözümlü Örnek</div><h2>Denklemi Çöz</h2></div>
+    </div>
+    <ol class="worked-steps">
+      <li class="worked-step worked-step--solved" data-i="0">
+        <span class="worked-step__num">1</span>
+        <span class="worked-step__text">3x + 2 = 14</span>
+      </li>
+      <li class="worked-step worked-step--solved" data-i="1">
+        <span class="worked-step__num">2</span>
+        <span class="worked-step__text">3x = 12</span>
+      </li>
+      <li class="worked-step worked-step--blank" data-i="2">
+        <span class="worked-step__num">3</span>
+        <span class="worked-step__text">x = ?</span>
+        <span class="worked-step__field">
+          <input class="worked-input" type="text" autocomplete="off" spellcheck="false" aria-label="Adım 3 cevabı">
+          <span class="worked-mark" aria-hidden="true"></span>
+        </span>
+      </li>
+    </ol>
+    <button class="btn btn--primary worked-check" type="button">Kontrol et</button>
+    <div id="wfb" aria-live="polite"></div>
+  </div>
+</body>
+</html>

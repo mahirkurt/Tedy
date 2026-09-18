@@ -1,6 +1,10 @@
 {
+  "authority": "ted-mcp",
   "files": {
     "SKILL.md": "11dc8b6b94be0ae56242f2eeb137fe46117d898d0967b6f92b0a089299c2a433",
+    "assets/carbon-v11-authority.json": "4d4dd1ffc72a90008f21b8534f94c2d988b8929e05718af9731495767e8828b9",
+    "assets/fonts-manifest.json": "23153bf47b3c0b1859eca6ffccae83ff0365e673b2e4f1ad7eb32353af47a7e0",
+    "assets/ibm-plex-OFL.txt": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f",
     "assets/module-template.html": "529d8c342aacc501c2fb6b8c4b8d48ae2606cb08c642427e26dc3a2cbb403c98",
     "references/adhd-pedagogy.md": "33ddba2449dd81440c219b5d9353b65e714a899143da3205f5116c8547bac5db",
     "references/audio-system.md": "34525988f5b5d96d9e68d98eb9bb0f788dae502bc6bfb2acee41556efe81b312",
@@ -19,9 +23,37 @@
     "references/newgen-question-design.md": "068243dfe11d052d7570f0201eb79744616072e7d8b2e8ca1bf3848d72db28ba",
     "references/subject-packs.md": "0741c1fcf210b66bf10985a9cf07f09da7b47c5b06e22bf2b41802bd0e5e89a1",
     "references/svg-authoring.md": "5a6cbb73bebc202ed11a059cb0ebd97dcaf4f202f3d85c09f092af6751080ae5",
-    "scripts/validate_module.py": "4b0c7de6e97b97807498e7b9829beb7e41e7db23006d4c7662066e6bc23f065b"
+    "scripts/embed_ibm_plex_fonts.py": "40330439feafc64792460062111b4aefe88c7a79af5f73fd11498f005036f0f0",
+    "scripts/sync_carbon_tokens.py": "b887b048640dac6b9a12b02b455e4c19fe0a13c50e503cd9799b3b11d7fcfaee",
+    "scripts/validate_module.py": "4b0c7de6e97b97807498e7b9829beb7e41e7db23006d4c7662066e6bc23f065b",
+    "tests/conftest.py": "1ddc913ac540a0a9430819d8fb02445f6faf7f8fd77729f461dad500eaab7a6d",
+    "tests/fixtures/adaptive_pass.html": "2dcce115024e7bd9bd69cb93805e8bfab5fd82a1ef1ac60aa50af40f08efbe24",
+    "tests/fixtures/conceptmap_pass.html": "2393d1614b39a2340eaefb57642b66fb3aea533d930e8bb66de004d8b01c6123",
+    "tests/fixtures/flow_fail_lossstreak.html": "3b73909c6cbc59568bcfdcca15ce0ef8e17e68c149effecf9d08c851d9a524f4",
+    "tests/fixtures/flow_fail_openhook.html": "69981c6a41c4cdf3de1f7f9ce9c19278002cf2143111de7fff009289cf57ea5b",
+    "tests/fixtures/flow_pass.html": "25c5157043088fc3196209d3a84d3f7f37be9b86755a2a44ba295d1c2fcc7ead",
+    "tests/fixtures/flow_skip_nogami.html": "a112828bc85855f4c142e0ec20d0d5b560ee6e5e2a435e85122a8e5d2bff5a1d",
+    "tests/fixtures/grid_fail_shadow.html": "618d32e78a0a1dbe9b310beb9a0c0ff01c417fdc9e533c193d2296e3974d716d",
+    "tests/fixtures/grid_pass.html": "a18b820db053b79c5ad9a536326b9b55dc6a920b6bc10ca4fd83439f0cc5ac6b",
+    "tests/fixtures/hook_pass.html": "dd66b2bf0ab989e8b847c6ae758910ecdd8af074358baa0d3465670d826136f5",
+    "tests/fixtures/mathml_pass.html": "69f3389f84a5ab8e425a93477e34c5bf68562d0b405a41c650d5a62567f043b8",
+    "tests/fixtures/minimal_pass.html": "87283dd09c54745eacc60c59335b024162dce494e6d32e19d7e93af018c2cd24",
+    "tests/fixtures/numberline_interactive_pass.html": "b45c9efed8275aa03e69324374ade6031ad59f9d1a6a16db7398f97ebe72f5a0",
+    "tests/fixtures/pacing_fail_countdown.html": "0a76277669c12533db442566d8a886509a820f0ac4f794ac2ed5d4d340baea34",
+    "tests/fixtures/pacing_pass.html": "d0493538e4ae9046bbb80c99dbdf3b62b3896183659b71f0646d1661d6b14bd0",
+    "tests/fixtures/selfexplain_pass.html": "97f14839ee454c73c9fe4c0ff936194c88353cdc20f608bcd96e920fc0498e5f",
+    "tests/fixtures/sim_pass.html": "e352690c2126f4ab75c296f8cb977ca0c7b3f46d181e1f9babd76f188531e246",
+    "tests/fixtures/streak_gainonly.html": "e5bd831e0918bbbdf1aee25f6ad2558436e7c409d1ba071484786095484eff7c",
+    "tests/fixtures/worked_pass.html": "786a0b71caef541f3f8bfd0e95e5d034a8bf8857e521e5fe6bd84c7ea07bbda8",
+    "tests/test_gates.py": "2faf91d16580e48e1cde6c86bd5210e1700f52f88bc37cf27c76e47ab8b88978"
   },
-  "source_commit": "3ef6a26ef415ed9765377d225be04b33834db428",
-  "source_root": "/mnt/thunderbolt/workspaces/CureoPrivate/plugins/edupedia/skills/carbon-edupedia",
-  "synced_at": "2026-09-13T19:35:15+00:00"
+  "origin": {
+    "last_commit": "3ef6a26ef415ed9765377d225be04b33834db428",
+    "path": "plugins/edupedia/skills/carbon-edupedia",
+    "repo": "https://github.com/mahirkurt/CureoPrivate",
+    "retired_in": "edupedia 1.0.0"
+  },
+  "pinned_at": "2026-09-18T10:44:21+00:00",
+  "source_commit": "1aee3845efffb103a0e4e5b489f4477c0b3017b0",
+  "synced_at": "2026-09-18T10:43:35+00:00"
 }

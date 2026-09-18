@@ -1,0 +1,238 @@
+{
+  "schema_version": 1,
+  "source": {
+    "package": "@ibm/plex",
+    "version": "6.4.1",
+    "tarball": "https://registry.npmjs.org/@ibm/plex/-/plex-6.4.1.tgz",
+    "npm_integrity": "sha512-fnsipQywHt3zWvsnlyYKMikcVI7E2fEwpiPnIHFqlbByXVfQfANAAeJk1IV4mNnxhppUIDlhU0TzwYwL++Rn2g==",
+    "archive_sha256": "542c93c307ad2a66903c465e5562bb43611cb79e64741a297666b80eed1d096f",
+    "license": "SIL Open Font License 1.1",
+    "license_sha256": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f"
+  },
+  "subsets": [
+    "Latin1",
+    "Latin2"
+  ],
+  "fonts": [
+    {
+      "id": "sans-normal-400-latin1",
+      "family": "IBM Plex Sans",
+      "style": "normal",
+      "weight": 400,
+      "subset": "Latin1",
+      "unicode_range": "U+0000, U+000D, U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+20AC, U+2122, U+2212, U+FB01-FB02",
+      "source_member": "package/IBM-Plex-Sans/fonts/split/woff2/IBMPlexSans-Regular-Latin1.woff2",
+      "bytes": 20984,
+      "sha256": "b5ad7bd39f996144915f0ad9849a90183b27d8c28ad97ed98af5b1bebc51f6b1"
+    },
+    {
+      "id": "sans-normal-400-latin2",
+      "family": "IBM Plex Sans",
+      "style": "normal",
+      "weight": 400,
+      "subset": "Latin2",
+      "unicode_range": "U+0100-0101, U+0104-0130, U+0132-0151, U+0154-017F, U+018F, U+0192, U+01A0-01A1, U+01AF-01B0, U+01FA-01FF, U+0218-021B, U+0237, U+0259, U+1E80-1E85, U+1E9E, U+20A1, U+20A4, U+20A6, U+20A8-20AA, U+20AD-20AE, U+20B1-20B2, U+20B4-20B5, U+20B8-20BA, U+20BD, U+20BF",
+      "source_member": "package/IBM-Plex-Sans/fonts/split/woff2/IBMPlexSans-Regular-Latin2.woff2",
+      "bytes": 15212,
+      "sha256": "fcfa82e0d46ed01a8df38610b451860ca7e7518770c52fdd2a1d136247c40f28"
+    },
+    {
+      "id": "sans-normal-500-latin1",
+      "family": "IBM Plex Sans",
+      "style": "normal",
+      "weight": 500,
+      "subset": "Latin1",
+      "unicode_range": "U+0000, U+000D, U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+20AC, U+2122, U+2212, U+FB01-FB02",
+      "source_member": "package/IBM-Plex-Sans/fonts/split/woff2/IBMPlexSans-Medium-Latin1.woff2",
+      "bytes": 21960,
+      "sha256": "b5610af04d0d4b5a14a621d96d974b993e945a065db1a8861918f69ef9321934"
+    },
+    {
+      "id": "sans-normal-500-latin2",
+      "family": "IBM Plex Sans",
+      "style": "normal",
+      "weight": 500,
+      "subset": "Latin2",
+      "unicode_range": "U+0100-0101, U+0104-0130, U+0132-0151, U+0154-017F, U+018F, U+0192, U+01A0-01A1, U+01AF-01B0, U+01FA-01FF, U+0218-021B, U+0237, U+0259, U+1E80-1E85, U+1E9E, U+20A1, U+20A4, U+20A6, U+20A8-20AA, U+20AD-20AE, U+20B1-20B2, U+20B4-20B5, U+20B8-20BA, U+20BD, U+20BF",
+      "source_member": "package/IBM-Plex-Sans/fonts/split/woff2/IBMPlexSans-Medium-Latin2.woff2",
+      "bytes": 15372,
+      "sha256": "46fbe4f398e7ff3cc7773a1156b1efef0f81e4d034f682369c221de587f443ca"
+    },
+    {
+      "id": "sans-normal-600-latin1",
+      "family": "IBM Plex Sans",
+      "style": "normal",
+      "weight": 600,
+      "subset": "Latin1",
+      "unicode_range": "U+0000, U+000D, U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+20AC, U+2122, U+2212, U+FB01-FB02",
+      "source_member": "package/IBM-Plex-Sans/fonts/split/woff2/IBMPlexSans-SemiBold-Latin1.woff2",
+      "bytes": 22260,
+      "sha256": "fff0ab3a88b0b4aa0b693e4f0201359a15183b08e3fa5696d1918d8f0ade8ad5"
+    },
+    {
+      "id": "sans-normal-600-latin2",
+      "family": "IBM Plex Sans",
+      "style": "normal",
+      "weight": 600,
+      "subset": "Latin2",
+      "unicode_range": "U+0100-0101, U+0104-0130, U+0132-0151, U+0154-017F, U+018F, U+0192, U+01A0-01A1, U+01AF-01B0, U+01FA-01FF, U+0218-021B, U+0237, U+0259, U+1E80-1E85, U+1E9E, U+20A1, U+20A4, U+20A6, U+20A8-20AA, U+20AD-20AE, U+20B1-20B2, U+20B4-20B5, U+20B8-20BA, U+20BD, U+20BF",
+      "source_member": "package/IBM-Plex-Sans/fonts/split/woff2/IBMPlexSans-SemiBold-Latin2.woff2",
+      "bytes": 15624,
+      "sha256": "2bc85a8e53540c4c211f7af36e806bb045ba7da8946bb221d87144c12c83d577"
+    },
+    {
+      "id": "sans-normal-700-latin1",
+      "family": "IBM Plex Sans",
+      "style": "normal",
+      "weight": 700,
+      "subset": "Latin1",
+      "unicode_range": "U+0000, U+000D, U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+20AC, U+2122, U+2212, U+FB01-FB02",
+      "source_member": "package/IBM-Plex-Sans/fonts/split/woff2/IBMPlexSans-Bold-Latin1.woff2",
+      "bytes": 21256,
+      "sha256": "914f1400f363e636b6f9cc7965aa807ff01e93586e1437617525cba0a62aa78d"
+    },
+    {
+      "id": "sans-normal-700-latin2",
+      "family": "IBM Plex Sans",
+      "style": "normal",
+      "weight": 700,
+      "subset": "Latin2",
+      "unicode_range": "U+0100-0101, U+0104-0130, U+0132-0151, U+0154-017F, U+018F, U+0192, U+01A0-01A1, U+01AF-01B0, U+01FA-01FF, U+0218-021B, U+0237, U+0259, U+1E80-1E85, U+1E9E, U+20A1, U+20A4, U+20A6, U+20A8-20AA, U+20AD-20AE, U+20B1-20B2, U+20B4-20B5, U+20B8-20BA, U+20BD, U+20BF",
+      "source_member": "package/IBM-Plex-Sans/fonts/split/woff2/IBMPlexSans-Bold-Latin2.woff2",
+      "bytes": 15376,
+      "sha256": "56e3282a5068bfabb5c71cb19400695a707e710e03393a67d3bd059156b60933"
+    },
+    {
+      "id": "serif-normal-400-latin1",
+      "family": "IBM Plex Serif",
+      "style": "normal",
+      "weight": 400,
+      "subset": "Latin1",
+      "unicode_range": "U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+20AC, U+2122, U+2212, U+FB01-FB02",
+      "source_member": "package/IBM-Plex-Serif/fonts/split/woff2/IBMPlexSerif-Regular-Latin1.woff2",
+      "bytes": 22680,
+      "sha256": "6ebe5b7a2bbe864712e0d87a785a77ebde8a58d940d6163c1f03c6ffab1cd9a9"
+    },
+    {
+      "id": "serif-normal-400-latin2",
+      "family": "IBM Plex Serif",
+      "style": "normal",
+      "weight": 400,
+      "subset": "Latin2",
+      "unicode_range": "U+0100-0101, U+0104-0130, U+0132-0151, U+0154-017F, U+018F, U+0192, U+01A0-01A1, U+01AF-01B0, U+01FA-01FF, U+0218-021B, U+0237, U+0259, U+1E80-1E85, U+1E9E, U+20A1, U+20A4, U+20A6, U+20A8-20AA, U+20AD-20AE, U+20B1-20B2, U+20B4-20B5, U+20B8-20BA, U+20BD, U+20BF",
+      "source_member": "package/IBM-Plex-Serif/fonts/split/woff2/IBMPlexSerif-Regular-Latin2.woff2",
+      "bytes": 16380,
+      "sha256": "b78a132ca15fb981b0f16bb1d6484208bc93b1eea7aadd2d7bfa4ce80692e092"
+    },
+    {
+      "id": "serif-normal-600-latin1",
+      "family": "IBM Plex Serif",
+      "style": "normal",
+      "weight": 600,
+      "subset": "Latin1",
+      "unicode_range": "U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+20AC, U+2122, U+2212, U+FB01-FB02",
+      "source_member": "package/IBM-Plex-Serif/fonts/split/woff2/IBMPlexSerif-SemiBold-Latin1.woff2",
+      "bytes": 23756,
+      "sha256": "1d34d4612be8d2f06a25858a8bc3c3c3b5c4ec0ee1285501c3a4df2ddace7afa"
+    },
+    {
+      "id": "serif-normal-600-latin2",
+      "family": "IBM Plex Serif",
+      "style": "normal",
+      "weight": 600,
+      "subset": "Latin2",
+      "unicode_range": "U+0100-0101, U+0104-0130, U+0132-0151, U+0154-017F, U+018F, U+0192, U+01A0-01A1, U+01AF-01B0, U+01FA-01FF, U+0218-021B, U+0237, U+0259, U+1E80-1E85, U+1E9E, U+20A1, U+20A4, U+20A6, U+20A8-20AA, U+20AD-20AE, U+20B1-20B2, U+20B4-20B5, U+20B8-20BA, U+20BD, U+20BF",
+      "source_member": "package/IBM-Plex-Serif/fonts/split/woff2/IBMPlexSerif-SemiBold-Latin2.woff2",
+      "bytes": 16332,
+      "sha256": "858c9b353a7312d623daff5593c4c635cf6c25d2fb7e405ea9ebdfb0b594e39a"
+    },
+    {
+      "id": "serif-italic-400-latin1",
+      "family": "IBM Plex Serif",
+      "style": "italic",
+      "weight": 400,
+      "subset": "Latin1",
+      "unicode_range": "U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+20AC, U+2122, U+2212, U+FB01-FB02",
+      "source_member": "package/IBM-Plex-Serif/fonts/split/woff2/IBMPlexSerif-Italic-Latin1.woff2",
+      "bytes": 24132,
+      "sha256": "5467a099b96573c0d382e3bea2f9f38c3c1a115dc3890c96d598bdde790b6622"
+    },
+    {
+      "id": "serif-italic-400-latin2",
+      "family": "IBM Plex Serif",
+      "style": "italic",
+      "weight": 400,
+      "subset": "Latin2",
+      "unicode_range": "U+0100-0101, U+0104-0130, U+0132-0151, U+0154-017F, U+018F, U+0192, U+01A0-01A1, U+01AF-01B0, U+01FA-01FF, U+0218-021B, U+0237, U+0259, U+1E80-1E85, U+1E9E, U+20A1, U+20A4, U+20A6, U+20A8-20AA, U+20AD-20AE, U+20B1-20B2, U+20B4-20B5, U+20B8-20BA, U+20BD, U+20BF",
+      "source_member": "package/IBM-Plex-Serif/fonts/split/woff2/IBMPlexSerif-Italic-Latin2.woff2",
+      "bytes": 17092,
+      "sha256": "c8548ee8fb524dfba4718184f07db77cfb7cf2a6e4320f487a43c976db3a66f0"
+    },
+    {
+      "id": "mono-normal-400-latin1",
+      "family": "IBM Plex Mono",
+      "style": "normal",
+      "weight": 400,
+      "subset": "Latin1",
+      "unicode_range": "U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+20AC, U+2122, U+2212, U+FB01-FB02",
+      "source_member": "package/IBM-Plex-Mono/fonts/split/woff2/IBMPlexMono-Regular-Latin1.woff2",
+      "bytes": 17268,
+      "sha256": "10d3c7fa7eaf48e78db24f317b64f008a75e00f63a68bb3c2afc6ef51e58674f"
+    },
+    {
+      "id": "mono-normal-400-latin2",
+      "family": "IBM Plex Mono",
+      "style": "normal",
+      "weight": 400,
+      "subset": "Latin2",
+      "unicode_range": "U+0100-0101, U+0104-0130, U+0132-0151, U+0154-017F, U+018F, U+0192, U+01A0-01A1, U+01AF-01B0, U+01FA-01FF, U+0218-021B, U+0237, U+0259, U+1E80-1E85, U+1E9E, U+20A1, U+20A4, U+20A6, U+20A8-20AA, U+20AD-20AE, U+20B1-20B2, U+20B4-20B5, U+20B8-20BA, U+20BD, U+20BF",
+      "source_member": "package/IBM-Plex-Mono/fonts/split/woff2/IBMPlexMono-Regular-Latin2.woff2",
+      "bytes": 13312,
+      "sha256": "151a2b0dfb8271b5273f71da83e9e68c85e1939e4f016f6ab2dfac98ea9f117e"
+    },
+    {
+      "id": "mono-normal-600-latin1",
+      "family": "IBM Plex Mono",
+      "style": "normal",
+      "weight": 600,
+      "subset": "Latin1",
+      "unicode_range": "U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+20AC, U+2122, U+2212, U+FB01-FB02",
+      "source_member": "package/IBM-Plex-Mono/fonts/split/woff2/IBMPlexMono-SemiBold-Latin1.woff2",
+      "bytes": 17712,
+      "sha256": "1ce95cff1c5056cb0fed049c2912823293b158b816e193a6f937f2d92b1e0f39"
+    },
+    {
+      "id": "mono-normal-600-latin2",
+      "family": "IBM Plex Mono",
+      "style": "normal",
+      "weight": 600,
+      "subset": "Latin2",
+      "unicode_range": "U+0100-0101, U+0104-0130, U+0132-0151, U+0154-017F, U+018F, U+0192, U+01A0-01A1, U+01AF-01B0, U+01FA-01FF, U+0218-021B, U+0237, U+0259, U+1E80-1E85, U+1E9E, U+20A1, U+20A4, U+20A6, U+20A8-20AA, U+20AD-20AE, U+20B1-20B2, U+20B4-20B5, U+20B8-20BA, U+20BD, U+20BF",
+      "source_member": "package/IBM-Plex-Mono/fonts/split/woff2/IBMPlexMono-SemiBold-Latin2.woff2",
+      "bytes": 13536,
+      "sha256": "c27c77e14d3da7aafa7ff9c6356c9a10d8724ade09c81f5873a3832796a64b1f"
+    },
+    {
+      "id": "mono-normal-700-latin1",
+      "family": "IBM Plex Mono",
+      "style": "normal",
+      "weight": 700,
+      "subset": "Latin1",
+      "unicode_range": "U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+20AC, U+2122, U+2212, U+FB01-FB02",
+      "source_member": "package/IBM-Plex-Mono/fonts/split/woff2/IBMPlexMono-Bold-Latin1.woff2",
+      "bytes": 17728,
+      "sha256": "c05474d5449e92495e5ca6cb9601d697f9a41cb45ac9929e91b25296efe30b62"
+    },
+    {
+      "id": "mono-normal-700-latin2",
+      "family": "IBM Plex Mono",
+      "style": "normal",
+      "weight": 700,
+      "subset": "Latin2",
+      "unicode_range": "U+0100-0101, U+0104-0130, U+0132-0151, U+0154-017F, U+018F, U+0192, U+01A0-01A1, U+01AF-01B0, U+01FA-01FF, U+0218-021B, U+0237, U+0259, U+1E80-1E85, U+1E9E, U+20A1, U+20A4, U+20A6, U+20A8-20AA, U+20AD-20AE, U+20B1-20B2, U+20B4-20B5, U+20B8-20BA, U+20BD, U+20BF",
+      "source_member": "package/IBM-Plex-Mono/fonts/split/woff2/IBMPlexMono-Bold-Latin2.woff2",
+      "bytes": 13288,
+      "sha256": "73d351c5cadb159ce7768c527c488f8d4ff78a86f07b85a944e21ac525b7f16d"
+    }
+  ]
+}

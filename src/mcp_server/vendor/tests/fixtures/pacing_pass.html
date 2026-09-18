@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="UTF-8"><title>G-FLOW Pacing Disk Pass Fixture</title></head>
+<body>
+  <!-- Task 10: renderPacingDisk() öğesinin gerçek çıktısını taklit eder — sayısız/kesintisiz
+       SVG yay (stroke-dasharray/dashoffset), hiçbir data-countdown attribute'u YOK. -->
+  <div class="pacing-disk" id="pacingDisk" aria-label="Tempo diski — temponu görmen için, baskı yok">
+    <svg class="pacing-disk__ring" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+      <circle class="pacing-disk__track" cx="14" cy="14" r="11"></circle>
+      <circle class="pacing-disk__arc" cx="14" cy="14" r="11" stroke-dasharray="69.12" stroke-dashoffset="20.00"></circle>
+    </svg>
+    <button class="pacing-disk__dismiss" id="pacingDiskDismiss" type="button" aria-label="Tempo diskini gizle">Gizle</button>
+  </div>
+</body>
+</html>

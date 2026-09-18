@@ -1,111 +1,83 @@
-"""Copy edupedia authoring assets into src/mcp_server/vendor/ and pin their provenance.
+"""Pin the edupedia authoring assets that ted-mcp owns and report drift from those pins.
 
-ted-mcp is the runtime authority for the module template, the MODULE_DATA schema
-reference and the quality gates (spec §5.2). This tool is the only way those files
-change: it copies them from the CureoPrivate edupedia skill and writes PROVENANCE.json
-(source commit + sha256 per file). tests/test_mcp_vendor.py pins the result.
+Until edupedia 1.0.0 these files were copied from the CureoPrivate plugin. Since then this
+directory is their single source (spec §5.2, §9.1): edit a file here, run --pin, and commit the
+file together with PROVENANCE.json. PROVENANCE.json keeps where the files came from ("origin")
+and the last copy ("source_commit", "synced_at") as history. The repository is private:
+external readers (for example the egitim-kaynak pattern indexer) receive a pinned export of these files.
 
 Usage:
-    .venv/bin/python -m src.mcp_server.vendor_sync            # sync from the default source
-    .venv/bin/python -m src.mcp_server.vendor_sync --check    # exit 1 on drift
+    .venv/bin/python -m src.mcp_server.vendor_sync --check    # exit 1 when a file differs from its pin
+    .venv/bin/python -m src.mcp_server.vendor_sync --pin      # re-pin after an intentional edit
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import shutil
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 VENDOR_DIR = Path(__file__).resolve().parent / "vendor"
-DEFAULT_SOURCE = Path("/mnt/thunderbolt/workspaces/CureoPrivate/plugins/edupedia/skills/carbon-edupedia")
-FIXED_FILES = ("SKILL.md", "assets/module-template.html", "scripts/validate_module.py")
 PROVENANCE_NAME = "PROVENANCE.json"
+AUTHORITY = "ted-mcp"
+_SKIPPED_PARTS = frozenset({"__pycache__", ".pytest_cache"})
 
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _source_files(source: Path) -> list[str]:
-    refs = sorted(str(p.relative_to(source)) for p in (source / "references").glob("*.md"))
-    rels = [*FIXED_FILES, *refs]
-    missing = [rel for rel in rels if not (source / rel).is_file()]
-    if missing:
-        raise FileNotFoundError(f"missing in source {source}: {', '.join(missing)}")
-    return rels
-
-
-def _git_commit(source: Path) -> str | None:
-    try:
-        out = subprocess.run(
-            ["git", "-C", str(source), "rev-parse", "HEAD"],
-            capture_output=True, text=True, check=True,
-        )
-    except (OSError, subprocess.CalledProcessError):
-        return None
-    return out.stdout.strip() or None
-
-
 def load_provenance(vendor: Path = VENDOR_DIR) -> dict:
     return json.loads((vendor / PROVENANCE_NAME).read_text(encoding="utf-8"))
 
 
-def sync(source: Path, vendor: Path = VENDOR_DIR) -> dict:
-    """Copy every source file, drop vendored files no longer in the source, write provenance."""
-    rels = _source_files(source)
-    wanted = set(rels)
-    if vendor.is_dir():
-        for path in sorted(vendor.rglob("*")):
-            if not path.is_file() or path.name == PROVENANCE_NAME or "__pycache__" in path.parts:
-                continue
-            if str(path.relative_to(vendor)) not in wanted:
-                path.unlink()
-    files: dict[str, str] = {}
-    for rel in rels:
-        dst = vendor / rel
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source / rel, dst)
-        files[rel] = _sha256(dst)
-    provenance = {
-        "source_root": str(source),
-        "source_commit": _git_commit(source),
-        "synced_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "files": files,
-    }
+def files_on_disk(vendor: Path = VENDOR_DIR) -> list[str]:
+    """Every pinned-worthy file under vendor as sorted POSIX paths (no PROVENANCE.json, no caches)."""
+    return sorted(
+        path.relative_to(vendor).as_posix()
+        for path in vendor.rglob("*")
+        if path.is_file() and path.name != PROVENANCE_NAME and not _SKIPPED_PARTS & set(path.parts)
+    )
+
+
+def pin(vendor: Path = VENDOR_DIR, now: datetime | None = None) -> dict:
+    """Rewrite the sha256 pins from the files on disk; every other field is kept as history."""
+    provenance = load_provenance(vendor)
+    if provenance.get("authority") != AUTHORITY:
+        raise ValueError(f"{PROVENANCE_NAME}: authority must be {AUTHORITY!r} before pinning")
+    provenance["files"] = {rel: _sha256(vendor / rel) for rel in files_on_disk(vendor)}
+    provenance["pinned_at"] = (now or datetime.now(timezone.utc)).isoformat(timespec="seconds")
     (vendor / PROVENANCE_NAME).write_text(
         json.dumps(provenance, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     return provenance
 
 
-def check(source: Path, vendor: Path = VENDOR_DIR) -> list[str]:
-    """Drift messages between source and vendor; an empty list means identical."""
+def check(vendor: Path = VENDOR_DIR) -> list[str]:
+    """Drift between the files on disk and their pins; an empty list means identical."""
     pinned = load_provenance(vendor)["files"]
-    rels = _source_files(source)
-    problems = [f"missing in vendor: {rel}" for rel in rels if rel not in pinned]
-    problems += [f"removed upstream: {rel}" for rel in pinned if rel not in rels]
-    problems += [
-        f"drift: {rel}" for rel in rels if rel in pinned and _sha256(source / rel) != pinned[rel]
-    ]
+    on_disk = files_on_disk(vendor)
+    problems = [f"missing: {rel}" for rel in sorted(set(pinned) - set(on_disk))]
+    problems += [f"unpinned: {rel}" for rel in on_disk if rel not in pinned]
+    problems += [f"drift: {rel}" for rel in on_disk if rel in pinned and _sha256(vendor / rel) != pinned[rel]]
     return problems
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
-    parser.add_argument("--check", action="store_true", help="report drift, do not copy")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--check", action="store_true", help="report drift from the pins, change nothing")
+    mode.add_argument("--pin", action="store_true", help="re-pin every file after an intentional edit")
     args = parser.parse_args(argv)
     if args.check:
-        problems = check(args.source)
+        problems = check()
         for line in problems:
             print(line)
         return 1 if problems else 0
-    provenance = sync(args.source)
-    print(f"vendored {len(provenance['files'])} files from {provenance['source_commit']}")
+    provenance = pin()
+    print(f"pinned {len(provenance['files'])} files")
     return 0
 
 

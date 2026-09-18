@@ -7,8 +7,6 @@ import pytest
 
 from src.mcp_server import gates, vendor_sync
 
-SOURCE = Path("/mnt/thunderbolt/workspaces/CureoPrivate/plugins/edupedia/skills/carbon-edupedia")
-
 
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -20,7 +18,6 @@ def test_provenance_lists_required_files():
         assert rel in prov["files"]
     refs = [r for r in prov["files"] if r.startswith("references/")]
     assert len(refs) == 17
-    assert prov["source_root"]
 
 
 def test_every_vendored_file_matches_its_pinned_sha256():
@@ -71,26 +68,3 @@ def test_raw_vendored_template_fails_only_the_bridge_gate():
 def test_run_gates_reports_failures_on_broken_html():
     report = gates.run_gates("<html><body><p>emoji 🎉</p></body></html>")
     assert any(v["status"] == "FAIL" for v in report.values())
-
-
-def test_sync_then_check_round_trip(tmp_path):
-    src = tmp_path / "src"
-    for rel in ("SKILL.md", "assets/module-template.html", "scripts/validate_module.py", "references/a.md"):
-        (src / rel).parent.mkdir(parents=True, exist_ok=True)
-        (src / rel).write_text(f"content of {rel}\n", encoding="utf-8")
-    vendor = tmp_path / "vendor"
-    (vendor / "references").mkdir(parents=True)
-    (vendor / "references" / "stale.md").write_text("old\n", encoding="utf-8")
-
-    prov = vendor_sync.sync(src, vendor)
-
-    assert set(prov["files"]) == {"SKILL.md", "assets/module-template.html", "scripts/validate_module.py", "references/a.md"}
-    assert not (vendor / "references" / "stale.md").exists()
-    assert vendor_sync.check(src, vendor) == []
-    (src / "references" / "a.md").write_text("changed\n", encoding="utf-8")
-    assert vendor_sync.check(src, vendor) == ["drift: references/a.md"]
-
-
-@pytest.mark.skipif(not SOURCE.is_dir(), reason="CureoPrivate checkout not present")
-def test_vendor_matches_live_plugin_source():
-    assert vendor_sync.check(SOURCE) == []

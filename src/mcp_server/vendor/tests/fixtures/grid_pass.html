@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="UTF-8"><title>G-CARBON-GRID Pass Fixture</title>
+<style>
+  .cds--grid{display:grid;grid-template-columns:repeat(16,1fr);gap:1rem;}
+  /* statik kart: derinlik layer token'ıyla, sıfır gölge (inset ring bir sınır simülasyonu olsa da
+     burada hiç kullanılmıyor — üstelik olsa bile non-drop-shadow sayılırdı) */
+  .card{background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle-00);box-shadow:none;}
+  .figure{aspect-ratio:16/9;background:var(--cds-layer-01);}
+  /* floating/geçici yüzey: gerçek drop-shadow burada uygun (item 3/4 istisnası) */
+  .tooltip{position:absolute;box-shadow:0 4px 12px rgba(0,0,0,.3);}
+  .chip{transition:transform 240ms var(--cds-easing-standard-productive);}
+</style>
+</head>
+<body>
+  <div class="cds--grid">
+    <div class="card">Layer token'ıyla katmanlanmış statik kart, gölgesiz.</div>
+  </div>
+  <img class="figure" alt="Diyagram" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7">
+  <div class="tooltip" role="tooltip">Geçici/floating ipucu — gölge burada uygun.</div>
+  <button class="chip">150ms altı koreografi</button>
+</body>
+</html>

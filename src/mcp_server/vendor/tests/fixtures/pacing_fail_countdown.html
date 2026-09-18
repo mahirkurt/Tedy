@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="UTF-8"><title>G-FLOW Pacing Disk Fail Fixture (data-countdown)</title></head>
+<body>
+  <!-- Değişmez kanıtı (task-10-brief.md): pacing-disk öğesi data-countdown taşırsa G-FLOW FAIL
+       vermeli — sayısız/kesintisiz disk kuralının ihlali (gamified-flows.md §3.4/§5 kural 3). -->
+  <div class="pacing-disk" id="pacingDisk" data-countdown="true">
+    <svg class="pacing-disk__ring" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+      <circle class="pacing-disk__track" cx="14" cy="14" r="11"></circle>
+      <circle class="pacing-disk__arc" cx="14" cy="14" r="11"></circle>
+    </svg>
+  </div>
+</body>
+</html>

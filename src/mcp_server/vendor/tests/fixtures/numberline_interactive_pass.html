@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Numberline Interactive Segment Pass Fixture</title>
+<style>@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}</style>
+</head>
+<body>
+  <!-- Task 19: renderNumberline()+numberLine({...,interactive:true}) öğesinin gerçek
+       çıktısını taklit eder — mevcut STATİK sayı doğrusu (eksen/tick/işaretli nokta)
+       değişmeden korunur, yalnız `interactive:true` iken EK olarak bir sürüklenebilir/
+       klavye-adımlı nokta (role="slider" tabindex="0" aria-valuemin/max/now +
+       aria-label) + görünür bir aria-live okuma satırı render edilir. Klavye
+       ArrowLeft/ArrowRight (+ Home/End) BİRİNCİL/ZORUNLU yoldur — pointer sürükle
+       (wireNumberlineInteractive'te) yalnız isteğe bağlı bir zenginleştirmedir, bu
+       fixture kasıtlı olarak hiçbir draggable/dragstart işareti taşımaz. G-A11Y/
+       G-SVG'yi elle sınamak için lang/title/reduced-motion/aria-live/role=img
+       bilerek eklendi. -->
+  <div data-seg="numberline">
+    <div class="seg-head">
+      <span class="seg-ic"><svg class="pic" aria-hidden="true"><use href="#pic-idea"></use></svg></span>
+      <div><div class="kicker">Sayı Doğrusu</div><h2>Tam Sayılarla Sıralama</h2></div>
+    </div>
+    <p class="instructions">
+      <svg class="cds-icon" aria-hidden="true"><use href="#ic-info"></use></svg>
+      <span>Noktayı ok tuşlarıyla hareket ettirerek değeri değiştir.</span>
+    </p>
+    <p class="lead">Noktayı 7'ye taşı.</p>
+    <figure class="viz">
+      <svg class="viz" viewBox="0 0 480 110" role="img" aria-labelledby="v1a2b3t v1a2b3d" data-nl-handle="v1a2b3h" data-nl-min="0" data-nl-max="10" data-nl-step="1">
+        <title id="v1a2b3t">Sayı doğrusu: 0-10</title>
+        <desc id="v1a2b3d">Ok tuşlarıyla noktayı hareket ettir.</desc>
+        <line class="viz-axis" x1="28" y1="64" x2="452" y2="64" stroke-width="2" marker-end="url(#vz-arrow)"></line>
+        <line class="viz-axis" x1="28.0" y1="58" x2="28.0" y2="70" stroke-width="1.5"></line>
+        <text class="viz-muted" x="28.0" y="90" text-anchor="middle" font-size="12">0</text>
+        <line class="viz-axis" x1="240.0" y1="58" x2="240.0" y2="70" stroke-width="1.5"></line>
+        <text class="viz-muted" x="240.0" y="90" text-anchor="middle" font-size="12">5</text>
+        <line class="viz-axis" x1="452.0" y1="58" x2="452.0" y2="70" stroke-width="1.5"></line>
+        <text class="viz-muted" x="452.0" y="90" text-anchor="middle" font-size="12">10</text>
+        <circle class="nl-handle" id="v1a2b3h" cx="240.0" cy="64" r="9" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="10" aria-valuenow="5" aria-label="Değer"></circle>
+      </svg>
+      <figcaption>Noktayı sürükle ya da ok tuşlarıyla taşı.</figcaption>
+    </figure>
+    <div class="nl-readout" id="v1a2b3hout" aria-live="polite">Değer: <span class="nl-readout__val">5</span></div>
+  </div>
+</body>
+</html>

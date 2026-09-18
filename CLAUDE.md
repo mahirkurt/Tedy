@@ -216,7 +216,7 @@ TED_MCP_FORM_SECRET=$(python3 -c 'import secrets;print(secrets.token_hex(32))') 
 .venv/bin/python -m src.mcp_server.keys listele                                               # statik anahtarları listeler
 .venv/bin/python -m src.mcp_server.keys iptal --etiket <etiket>                                # statik anahtarı iptal eder
 .venv/bin/python -m src.mcp_server.keys oauth-iptal --email <e-posta>                          # o kişinin tüm OAuth ailelerini + bekleyen kodlarını iptal eder
-.venv/bin/python -m src.mcp_server.vendor_sync --check  # vendored edupedia varlıkları kaynağıyla eşit mi
+.venv/bin/python -m src.mcp_server.vendor_sync --check  # edupedia varlıkları PROVENANCE sabitleriyle eşit mi (tek kaynak burası)
 unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
 ```
 
@@ -246,7 +246,7 @@ unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
   varsayılanda **yok** (kod iletimi ölçüldü); ek sabit URI yalnız `TED_MCP_EXTRA_REDIRECT_URIS` ile. Token deposu
   `output/ted_mcp_oauth.sqlite3` (yalnız hash); OAuth desteklemeyen istemciler için `tdyM_` statik anahtar yedeği
   (bkz. `keys` komutları yukarıda).
-- Vendored dosyaları (`src/mcp_server/vendor/`) elle düzenleme; `vendor_sync` ile güncelle, `PROVENANCE.json` testle sabitli.
+- edupedia yazım varlıklarının TEK KAYNAĞI `src/mcp_server/vendor/`'dır (edupedia 1.0.0'dan beri; CureoPrivate kopyaları kaldırıldı). Dosyayı burada düzenle → `.venv/bin/python -m src.mcp_server.vendor_sync --pin` → dosya ve `PROVENANCE.json` aynı commit'te. `assets/module-template.html` değişirse `sablon.py` çapaları (`TemplateDriftError`) ve 18 kapı yeniden doğrulanır; doğrulayıcının regresyon süiti `vendor/tests/` (pytest `testpaths`'te). Depo özeldir: harici okuyucular (egitim-kaynak `edupedia-patterns`) `references/*.md`'yi kendi dağıtım yollarının taşıdığı sabitli dışa aktarım paketinden (`PROVENANCE.json` ile) alır; `source_url` `https://github.com/mahirkurt/TED/blob/<commit>/src/mcp_server/vendor/references/<dosya>.md` yetkili erişim gerektirir.
 - Tuzak: `.venv/bin/pip` shebang'i eski yola işaret eder → `.venv/bin/python -m pip` kullan.
 
 ## ted-mcp — derleme, yayın, katalog, görüntüleyici (alt proje 4)

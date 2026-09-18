@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Sim Segment Pass Fixture</title>
+<style>@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}</style>
+</head>
+<body>
+  <!-- Task 17: renderSim() öğesinin gerçek çıktısını taklit eder — parametrik
+       simülasyon (sanal manipülatif): segHead + instructions + ttsRow, ardından
+       her biri klavye-erişilebilir <input type="range" aria-label> + canlı
+       <output aria-live="polite"> değer okuması taşıyan 1-2 kaydırıcı, ve son
+       olarak role="img" + <title>/<desc> taşıyan tek bir SVG kanvası (gerçek
+       motorda SIM_PRESETS[simType] tarafından svg.innerHTML tam-değişimiyle
+       çizilir — bkz. renderSim yorumu, module-template.html). Puanlama/XP/ceza
+       YOK (keşfedici, setNav next hep etkin); G-A11Y/G-SVG'yi elle sınamak için
+       lang/title/reduced-motion/aria-live/role=img/aria-hidden bilerek eklendi. -->
+  <div data-seg="sim">
+    <div class="seg-head">
+      <span class="seg-ic"><svg class="pic" aria-hidden="true"><use href="#pic-idea"></use></svg></span>
+      <div><div class="kicker">Simülasyon</div><h2>Sarkaç Uzunluğu</h2></div>
+    </div>
+    <p class="instructions">
+      <svg class="cds-icon" aria-hidden="true"><use href="#ic-info"></use></svg>
+      <span>Kaydırıcıları hareket ettir ve sarkacın nasıl değiştiğini gözlemle.</span>
+    </p>
+    <div class="tts-row">
+      <button class="tts-oku" type="button" data-speak="Kayd%C4%B1r%C4%B1c%C4%B1lar%C4%B1%20hareket%20ettir" data-lang="tr-TR" aria-pressed="false">
+        <svg class="cds-icon" aria-hidden="true"><use href="#ic-headphones"></use></svg><span>Oku</span>
+      </button>
+    </div>
+    <div class="sim-controls" role="group" aria-label="Simülasyon kontrolleri">
+      <div class="sim-param">
+        <span class="sim-param__lbl" id="simRange0Lbl">Uzunluk (m)</span>
+        <input type="range" id="simRange0" data-key="length" min="0.2" max="2.2" step="0.1" value="1" aria-label="Uzunluk (m)">
+        <output class="sim-val" for="simRange0" aria-live="polite">1</output>
+      </div>
+      <div class="sim-param">
+        <span class="sim-param__lbl" id="simRange1Lbl">Açı (derece)</span>
+        <input type="range" id="simRange1" data-key="angle" min="-60" max="60" step="5" value="20" aria-label="Açı (derece)">
+        <output class="sim-val" for="simRange1" aria-live="polite">20</output>
+      </div>
+    </div>
+    <div class="visual sim-canvas">
+      <svg class="viz" id="simSvg" viewBox="0 0 480 240" role="img" aria-labelledby="simSvgTitle simSvgDesc">
+        <title id="simSvgTitle">Sarkaç: uzunluk 1.00 m, açı 20°</title>
+        <desc id="simSvgDesc">Kaydırıcıyı hareket ettirerek sarkacın uzunluğunu ve açısını değiştir.</desc>
+        <line x1="240" y1="26" x2="240" y2="98.0" class="viz-axis" stroke-width="1.5" stroke-dasharray="3 5"></line>
+        <line x1="240" y1="26" x2="264.6" y2="93.7" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"></line>
+        <circle cx="240" cy="26" r="5" fill="var(--viz-axis)"></circle>
+        <circle cx="264.6" cy="93.7" r="14" fill="var(--accent)"></circle>
+        <text class="viz-muted" x="240" y="16" text-anchor="middle" font-size="12">Sabit nokta</text>
+        <text x="264.6" y="119.7" text-anchor="middle" font-size="13" font-weight="600">L = 1.00 m</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="UTF-8"><title>G-FLOW Gain-Only Streak Fixture</title></head>
+<body>
+  <div class="streak-chip" id="streakChip" role="status" aria-live="polite">
+    <span class="streak-chip__n">5</span>
+  </div>
+  <script>
+  // v3.0.0 — gain-only (G-FLOW): seri hiçbir zaman 0'a inmez; yalnız nötr "korundu"
+  // işaretine alınır (sayı yerinde kalır). Ceza/kaybetme dili YOK.
+  function resetStreak(){
+    const chip=document.querySelector("#streakChip");
+    if(chip) chip.setAttribute("data-held","true");
+  }
+  function renderStreak(){
+    const chip=document.querySelector("#streakChip"); if(!chip) return;
+    chip.removeAttribute("data-held");
+  }
+  </script>
+</body>
+</html>

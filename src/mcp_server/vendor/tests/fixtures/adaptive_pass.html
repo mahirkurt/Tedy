@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Adaptive Difficulty Pass Fixture</title>
+<style>@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}</style>
+</head>
+<body>
+  <!-- Task 13: runQuestionSet()/renderFillblank()'ın tier-uyarlamalı çıktısını taklit eder.
+       2 ardışık yanlıştan-sonra-doğru → ipucu-önce (data-adaptive="hint"; nötr "İpucu" başlığı,
+       mevcut explanation/hint erken gösterilir — soru zorlaşmaz, destek artar; taban tier:1'e
+       kilitli). 2 ardışık ilk-denemede-doğru → opsiyonel "Meydan Oku" (data-adaptive="challenge";
+       öğrencinin kendi seçtiği, dayatılmayan, atlanabilir ghost buton — yalnızca ignore edip
+       "Sonraki soru"ya tıklamak da geçerli bir atlama yoludur). HİÇBİR yerde kullanıcıyı
+       etiketleyen/yargılayan ikinci-tekil sıfat/yargı dili YOK — geçiş tamamen görünmez
+       (gamified-flows.md §3.3, G-FLOW kural 4). streakChip imzası kasıtlı eklendi ki gate_flow
+       "imza yok → uygulanmaz" atlama dalına değil, gerçek FLOW_LABEL_RE/FLOW_LOSS_RE taramasına
+       düşsün. -->
+  <div class="streak-chip" id="streakChip" role="status" aria-live="polite">
+    <svg class="cds-icon" aria-hidden="true"><use href="#ic-flash"></use></svg>
+    <span class="streak-chip__n">3</span>
+  </div>
+
+  <div data-seg="mcq">
+    <div class="seg-head">
+      <span class="seg-ic"><svg class="pic" aria-hidden="true"><use href="#pic-rocket"></use></svg></span>
+      <div><div class="kicker">Mini Yarışma</div><h2>Uyarlanır Antrenman</h2></div>
+    </div>
+    <div class="streak">Soru <b>3</b> / <b>5</b></div>
+    <p class="q-stem">7 x 6 kaçtır?</p>
+
+    <!-- 2 ardışık yanlıştan-sonra-doğru sinyali: ipucu-önce (destek artar, soru zorlaşmaz) -->
+    <div class="callout callout--info" data-adaptive="hint" aria-live="polite">
+      <svg class="cds-icon" aria-hidden="true"><use href="#ic-info"></use></svg>
+      <div><span class="callout__t">İpucu</span>7 x 6, 7 x 5 + 7 olarak da düşünülebilir.</div>
+    </div>
+
+    <div class="opt-list" role="group" aria-label="Seçenekler">
+      <button class="opt opt--correct" type="button" data-i="0" disabled>
+        <span class="opt__mark"><svg class="cds-icon" aria-hidden="true"><use href="#ic-check"></use></svg></span>
+        <span>42</span>
+      </button>
+      <button class="opt" type="button" data-i="1" disabled><span class="opt__mark"></span><span>36</span></button>
+      <button class="opt" type="button" data-i="2" disabled><span class="opt__mark"></span><span>48</span></button>
+    </div>
+    <div id="qfb" class="feedback feedback--ok" aria-live="polite">
+      <svg class="cds-icon" aria-hidden="true"><use href="#ic-check"></use></svg>
+      <div><b>Doğru!</b> 7 x 6, 7 x 5 + 7 olarak da düşünülebilir.</div>
+    </div>
+
+    <button class="btn btn--primary" type="button">Sonraki soru
+      <svg class="cds-icon" aria-hidden="true"><use href="#ic-arrow-right"></use></svg>
+    </button>
+
+    <!-- 2 ardışık ilk-denemede-doğru sinyali: opsiyonel, atlanabilir meydan okuma -->
+    <button class="btn btn--ghost" type="button" data-adaptive="challenge" aria-label="Opsiyonel ek soru">
+      <svg class="cds-icon" aria-hidden="true"><use href="#ic-target"></use></svg>
+      Meydan Oku
+    </button>
+  </div>
+</body>
+</html>

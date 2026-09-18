@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>ConceptMap Segment Pass Fixture</title>
+<style>@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}</style>
+</head>
+<body>
+  <!-- Task 18: renderConceptMap() öğesinin gerçek çıktısını taklit eder — kavram
+       haritası kurucu: segHead + instructions + ttsRow, ardından her düğüm gerçek
+       bir <button aria-label> (klavye-erişilebilir; Enter/Space native "click"
+       üretir, ayrı bir keydown işleyici YOK, ayrı bir sürükle-bırak da YOK — bu
+       fixture KASITLI olarak hiçbir draggable/dragstart/drop işareti taşımaz,
+       yalnız tıkla/Enter/Space kaynak-seç → hedef-seç modeli). Kenarlar hem
+       yalnız-görsel bir SVG çizgi katmanında (aria-hidden — erişilebilir kayıt
+       aşağıdaki metin listesidir) hem de her satırda klavye-erişilebilir bir
+       "kaldır" düğmesi taşıyan bir metin listesinde gösterilir. "Kontrol et"
+       sonrası dual-channel durum: doğru kenar yeşil+onay ikonu, hedef-dışı
+       ("fazla") kenar nötr bilgi rengi+ikonu — cezasız/nazik metin.
+       G-A11Y'yi elle sınamak için lang/title/reduced-motion/aria-live/role=img
+       (segHead ikonu aria-hidden) bilerek eklendi. -->
+  <div data-seg="conceptMap">
+    <div class="seg-head">
+      <span class="seg-ic"><svg class="pic" aria-hidden="true"><use href="#pic-idea"></use></svg></span>
+      <div><div class="kicker">Kavram Haritası</div><h2>Hücre İlişkileri</h2></div>
+    </div>
+    <p class="instructions">
+      <svg class="cds-icon" aria-hidden="true"><use href="#ic-info"></use></svg>
+      <span>Bir düğüm seç, sonra bağlamak istediğin ikinci düğümü seç.</span>
+    </p>
+    <div class="tts-row">
+      <button class="tts-oku" type="button" data-speak="Bir%20d%C3%BC%C4%9F%C3%BCm%20se%C3%A7" data-lang="tr-TR" aria-pressed="false">
+        <svg class="cds-icon" aria-hidden="true"><use href="#ic-headphones"></use></svg><span>Oku</span>
+      </button>
+    </div>
+    <div class="cmap-field" role="group" aria-label="Kavram düğümleri">
+      <svg class="cmap-lines" viewBox="0 0 600 400" aria-hidden="true">
+        <line x1="300.0" y1="70.0" x2="521.4" y2="265.0" class="cmap-line cmap-line--correct"></line>
+        <line x1="300.0" y1="330.0" x2="78.6" y2="265.0" class="cmap-line cmap-line--extra"></line>
+      </svg>
+      <button type="button" class="cmap-node" data-id="n1" style="left:50.00%;top:17.50%" aria-pressed="false" aria-label="Mitokondri — bağlantı için seç">Mitokondri</button>
+      <button type="button" class="cmap-node" data-id="n2" style="left:86.90%;top:66.25%" aria-pressed="false" aria-label="Enerji üretir — bağlantı için seç">Enerji üretir</button>
+      <button type="button" class="cmap-node" data-id="n3" style="left:50.00%;top:82.50%" aria-pressed="false" aria-label="Çekirdek — bağlantı için seç">Çekirdek</button>
+      <button type="button" class="cmap-node cmap-node--sel" data-id="n4" style="left:13.10%;top:66.25%" aria-pressed="true" aria-label="Yönetir — bağlantı için seç">Yönetir</button>
+    </div>
+    <div class="cmap-edges">
+      <h3 class="cmap-edges__lbl">Bağlantılarım</h3>
+      <p class="cmap-edges__empty" id="cmapEmpty" hidden>Henüz bağlantı yok. Bir düğüm seç, sonra bağlamak istediğin ikinci düğümü seç.</p>
+      <ul class="cmap-edges__list" id="cmapEdgeList" aria-live="polite">
+        <li class="cmap-edge cmap-edge--correct">
+          <span class="cmap-edge__mark"><svg class="cds-icon" aria-hidden="true"><use href="#ic-check"></use></svg></span>
+          <span class="cmap-edge__text">Mitokondri &#8596; Enerji üretir</span>
+          <button type="button" class="cmap-edge__remove" data-i="0" aria-label="Mitokondri - Enerji üretir bağlantısını kaldır">
+            <svg class="cds-icon" aria-hidden="true"><use href="#ic-close"></use></svg>
+          </button>
+        </li>
+        <li class="cmap-edge cmap-edge--extra">
+          <span class="cmap-edge__mark"><svg class="cds-icon" aria-hidden="true"><use href="#ic-info"></use></svg></span>
+          <span class="cmap-edge__text">Çekirdek &#8596; Yönetir</span>
+          <button type="button" class="cmap-edge__remove" data-i="1" aria-label="Çekirdek - Yönetir bağlantısını kaldır">
+            <svg class="cds-icon" aria-hidden="true"><use href="#ic-close"></use></svg>
+          </button>
+        </li>
+      </ul>
+    </div>
+    <button type="button" class="btn btn--ghost cmap-check" id="cmapCheckBtn">
+      <svg class="cds-icon" aria-hidden="true"><use href="#ic-check"></use></svg><span>Kontrol et</span>
+    </button>
+    <div id="cmfb" aria-live="polite" class="feedback feedback--info">
+      <svg class="cds-icon" aria-hidden="true"><use href="#ic-info"></use></svg>
+      <div><b>Neredeyse!</b> Henüz eklenmedi: Çekirdek &#8596; Enerji üretir. Hedef yapıda olmayan bağlantı(lar): Çekirdek &#8596; Yönetir. Listeden düzenleyip tekrar kontrol edebilirsin.</div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="UTF-8"><title>Hook Segment Pass Fixture</title></head>
+<body>
+  <!-- Runtime not: bu iki işaret (data-seg="hook" + data-hook-resolved) motor tarafından
+       ayrı render turlarında #stage'e yazılır (renderHook, sonra hedef teach'te renderTeach).
+       Statik dosyada asla aynı anda var olmazlar; bu fixture G-FLOW kapısını sınamak için
+       elle her ikisini birden içerir (bkz. task-8 raporu). -->
+  <section data-seg="hook">
+    <p class="hook-q">Sence hücrenin enerji santrali hangisi?</p>
+    <div class="hook-predict" role="group" aria-label="Tahmin">
+      <button class="hook-opt" type="button" aria-pressed="false">Çekirdek</button>
+      <button class="hook-opt" type="button" aria-pressed="false">Mitokondri</button>
+      <button class="hook-opt" type="button" aria-pressed="false">Hücre zarı</button>
+    </div>
+    <p class="hook-note">Tahminini seç — az sonra öğreneceğiz.</p>
+  </section>
+
+  <div data-seg="teach" data-hook-resolved="h1">
+    <p>Mitokondri, hücrenin enerji santralidir — solunumla enerji üretir.</p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>MathML Teach Segment Pass Fixture</title>
+<style>@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}</style>
+</head>
+<body>
+  <!-- Task 16: renderTeach() öğesinin gerçek çıktısını taklit eder. Motor `s.body` dizisini
+       ham (esc()'siz) innerHTML olarak yazar (interaction-patterns.md §1 "sade HTML" —
+       yazar-güvenilir model); bu yüzden inline native MathML (`math` elemanı) HİÇBİR
+       whitelist/sanitizer değişikliği olmadan zaten render edilir (motor kaynağında `.body`
+       yalnız renderTeach'in ham join'inde ve TTS stripTags çağrısında geçer — ayrı bir
+       sanitize adımı yoktur). Bu fixture iki kullanım biçimini gösterir:
+         1) seg-body içine doğrudan gömülü satır-içi `math` elemanı (kök formülü) — bugün
+            hiçbir motor değişikliği olmadan çalışan birincil yol.
+         2) Task 16'nın eklediği mathmlFigure()/visual:{kind:"mathml"} yardımcısının ürettiği
+            figure.viz sarmalayıcı — mathExpr'in kapsamadığı ileri notasyon (2x2 matris)
+            için tamamlayıcı, isteğe bağlı blok-figür yolu.
+       mathExpr() bu fixture'da HİÇ kullanılmıyor ve motor kaynağında değişmedi — varsayılan
+       davranışı birebir korunuyor (bkz. tests/test_gates.py
+       ::test_engine_mathml_helper_wired_and_mathexpr_default_unchanged). MathML içeriği
+       kasıtlı olarak SALT YAPISAL etiketlerdir (mrow/mi/mo/mn/msup/msqrt/mfrac/mtable/mtr/
+       mtd) — olay-tutucu attribute'lar veya link attribute'ları YOK; body zaten ham-HTML/
+       yazar-güvenilir olduğundan bu disiplin yeni bir XSS yüzeyi açılmadığının kanıtıdır.
+       G-A11Y'yi elle sınamak için lang/title/reduced-motion/aria-hidden bilerek eklendi;
+       aria-live burada gerçek stage kabuğunun (motor kaynağı satır ~734, id="stage"
+       role="main" aria-live="polite") taşıdığı öznitelik yerine geçer — renderTeach'in
+       kendisi ayrı bir aria-live üretmez, kalıcı stage kabuğu üretir. G-SELFCONTAINED:
+       MathML hiçbir kaynak/link attribute'u taşımaz (yalnızca `#` içi ikon referansları
+       var) → sıfır harici bağımlılık. -->
+  <main class="stage" id="stage" role="main" aria-live="polite" tabindex="-1" data-seg="teach">
+    <div class="seg-head">
+      <span class="seg-ic"><svg class="pic" aria-hidden="true"><use href="#pic-idea"></use></svg></span>
+      <div><div class="kicker">Öğreniyorum</div><h2>İkinci Dereceden Denklem Kökü</h2></div>
+    </div>
+    <p class="lead">Kök formülü, bir ikinci dereceden denklemin çözümünü verir.</p>
+    <div class="seg-body">
+      <p>Aşağıdaki kök ifadesi native MathML ile satır içinde yazılmıştır (mathExpr çağrılmadı):</p>
+      <p><math><mrow><mi>x</mi><mo>=</mo><mfrac><mrow><mo>-</mo><mi>b</mi><mo>&#177;</mo><msqrt><mrow><msup><mi>b</mi><mn>2</mn></msup><mo>-</mo><mn>4</mn><mi>a</mi><mi>c</mi></mrow></msqrt></mrow><mrow><mn>2</mn><mi>a</mi></mrow></mfrac></mrow></math></p>
+    </div>
+    <figure class="viz">
+      <math display="block">
+        <mrow>
+          <mo>[</mo>
+          <mtable>
+            <mtr><mtd><mn>1</mn></mtd><mtd><mn>2</mn></mtd></mtr>
+            <mtr><mtd><mn>3</mn></mtd><mtd><mn>4</mn></mtd></mtr>
+          </mtable>
+          <mo>]</mo>
+        </mrow>
+      </math>
+      <figcaption>2x2 matris — mathExpr'in kapsam dışı bıraktığı ileri notasyon (visual:{kind:&quot;mathml&quot;} &#8594; mathmlFigure())</figcaption>
+    </figure>
+    <div class="tts-row">
+      <button class="tts-oku" type="button" data-speak="x%20e%C5%9Fittir..." data-lang="tr-TR" aria-pressed="false">
+        <svg class="cds-icon" aria-hidden="true"><use href="#ic-headphones"></use></svg><span>Oku</span>
+      </button>
+    </div>
+  </main>
+</body>
+</html>

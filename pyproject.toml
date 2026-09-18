@@ -5,7 +5,7 @@ description = "TED Project"
 requires-python = ">=3.9"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "src/mcp_server/vendor/tests"]
 filterwarnings = [
     "ignore:Field 'lifespan' has an incomplete definition:pydantic_settings.exceptions.IncompleteFieldDefinitionWarning",
     "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
