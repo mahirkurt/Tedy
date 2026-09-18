@@ -278,3 +278,26 @@ def test_vscode_web_redirects_are_not_default_but_can_be_added_explicitly():
     for uri in vscode:
         assert policy.allows(uri)
     assert not policy.allows("https://vscode.dev/redirect/x")
+
+
+# -- sub-project 6: rejected callbacks are measurable from the journal ----------------------------
+
+def test_log_rejected_redirects_writes_one_escaped_line_per_rejected_uri(policy, caplog):
+    caplog.set_level("WARNING", logger="ted_mcp.oauth")
+    good = "https://claude.ai/api/mcp/auth_callback"
+    bad = "https://grok.com/connectors/oauth/callback2"
+    forged = "https://evil.example/cb\nFAKE LOG LINE" + "x" * 400
+    written = oauth_redirect.log_rejected_redirects("Grok", [good, bad, forged, 7], policy)
+    lines = [r.getMessage() for r in caplog.records if r.name == "ted_mcp.oauth"]
+    assert written == 3 and len(lines) == 3
+    assert lines[0] == f"oauth_redirect_reddedildi client_name='Grok' uri={bad!r}"
+    assert "\n" not in lines[1] and "\\n" in lines[1] and len(lines[1]) < 400
+    assert lines[2] == "oauth_redirect_reddedildi client_name='Grok' uri='<int>'"
+
+
+def test_log_rejected_redirects_caps_lines_and_ignores_a_non_list(policy, caplog):
+    caplog.set_level("WARNING", logger="ted_mcp.oauth")
+    assert oauth_redirect.log_rejected_redirects(None, [f"https://evil.example/{i}" for i in range(9)], policy) == 5
+    assert oauth_redirect.log_rejected_redirects("x", "https://evil.example/", policy) == 0
+    lines = [r.getMessage() for r in caplog.records if r.name == "ted_mcp.oauth"]
+    assert len(lines) == 5 and all(line.startswith("oauth_redirect_reddedildi client_name='' uri=") for line in lines)

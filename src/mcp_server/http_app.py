@@ -28,7 +28,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from src.mcp_server import __version__
 from src.mcp_server.config import Settings
 from src.mcp_server.google_identity import IdentityVerifier, is_well_formed_credential, verify_google_credential
-from src.mcp_server.oauth_redirect import RedirectPolicy, is_allowed_cors_origin, redirect_matches
+from src.mcp_server.oauth_redirect import (RedirectPolicy, is_allowed_cors_origin, log_rejected_redirects,
+                                            redirect_matches)
 from src.mcp_server.oauth_store import FORM_TTL_SECONDS, Client, ClientLimitReached, OAuthStore, is_valid_code_challenge
 from src import roles
 from src.mcp_server.google_identity import IdentityError
@@ -441,6 +442,7 @@ def build_app(
         uris = body.get("redirect_uris")
         if (not isinstance(uris, list) or not 1 <= len(uris) <= MAX_REDIRECT_URIS
                 or not all(isinstance(u, str) and redirect_policy.allows(u) for u in uris)):
+            log_rejected_redirects(body.get("client_name") if isinstance(body, dict) else None, uris, redirect_policy)
             return _registration_error("invalid_redirect_uri")
         name = "" if body.get("client_name") is None else body["client_name"]
         if not is_acceptable_client_name(name):

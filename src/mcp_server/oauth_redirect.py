@@ -15,6 +15,7 @@ string (and the code in it) to someone else. Neither is an exact URL whose page 
 from __future__ import annotations
 
 import ipaddress
+import logging
 import re
 from typing import Iterable
 from urllib.parse import parse_qsl, urlsplit, urlunsplit
@@ -228,3 +229,24 @@ def redirect_matches(registered: str, requested: str) -> bool:
 
 def is_allowed_cors_origin(origin: str) -> bool:
     return origin in CORS_ORIGINS
+
+
+OAUTH_LOG = logging.getLogger("ted_mcp.oauth")
+REJECTED_URI_LOG_CHARS = 300
+REJECTED_URI_LOG_MAX = 5
+
+
+def log_rejected_redirects(client_name: object, uris: object, policy: RedirectPolicy) -> int:
+    """Write one WARNING per rejected redirect_uri so an unverified surface callback can be read from the journal.
+
+    Redirect URIs and client names are not secrets. repr() escapes control characters, so a crafted value
+    cannot forge a journal line; each URI is cut to REJECTED_URI_LOG_CHARS and one request writes at most
+    REJECTED_URI_LOG_MAX lines. Returns the number of lines written.
+    """
+    name = client_name[:100] if isinstance(client_name, str) else ""
+    items = uris if isinstance(uris, list) else []
+    rejected = [uri for uri in items if not (isinstance(uri, str) and policy.allows(uri))]
+    for uri in rejected[:REJECTED_URI_LOG_MAX]:
+        shown = uri[:REJECTED_URI_LOG_CHARS] if isinstance(uri, str) else f"<{type(uri).__name__}>"
+        OAUTH_LOG.warning("oauth_redirect_reddedildi client_name=%r uri=%r", name, shown)
+    return min(len(rejected), REJECTED_URI_LOG_MAX)

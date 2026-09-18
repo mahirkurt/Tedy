@@ -661,3 +661,26 @@ def test_install_access_log_redactor_wires_exactly_one_filter_onto_the_target_lo
     assert all(f.filter(record) for f in logger.filters)
     assert "t=aaaa" not in record.getMessage()
     logger.filters = []
+
+
+def test_register_logs_the_rejected_redirect_uri_for_callback_measurement(client, caplog):
+    """Sub-project 6 reads an unverified surface callback (Grok) from this journal line."""
+    caplog.set_level("WARNING", logger="ted_mcp.oauth")
+    bad = "https://grok.com/connectors/oauth/callback2"
+    r = client.post("/oauth/register", json={
+        "redirect_uris": ["https://claude.ai/api/mcp/auth_callback", bad], "client_name": "Grok",
+    })
+    assert r.status_code == 400
+    assert [x.getMessage() for x in caplog.records if x.name == "ted_mcp.oauth"] == [
+        f"oauth_redirect_reddedildi client_name='Grok' uri={bad!r}"
+    ]
+
+
+def test_successful_register_writes_no_rejection_line(client, caplog):
+    caplog.set_level("WARNING", logger="ted_mcp.oauth")
+    r = client.post("/oauth/register", json={
+        "redirect_uris": ["https://claude.ai/api/mcp/auth_callback"], "client_name": "Claude",
+    })
+    assert r.status_code == 201
+    assert r.json()["client_id"]  # the surface under test answered before the absence claim
+    assert not [x for x in caplog.records if x.name == "ted_mcp.oauth"]
