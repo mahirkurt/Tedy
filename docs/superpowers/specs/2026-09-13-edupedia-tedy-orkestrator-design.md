@@ -614,6 +614,8 @@ Kaynak: `docs/superpowers/plans/2026-09-14-edupedia-1-0-yuzey-paketleri.md` → 
 - **§6.1 / §11:** Grok geri-çağırması AP6'da ölçülür (`TED_MCP_EXTRA_REDIRECT_URIS` birim dosyasında), red tanı logu, zincirleme yönlendirme CSP denetimi;
   yüzey kabulü slug sonekleriyle kanıtlanır.
 
+- **Google JavaScript origin: eklendi ve doğrulandı** (2026-09-18): OAuth istemcisi `343043757928-mivqip09orvrf73m7kj9b0atohgin2ho.apps.googleusercontent.com` için Yetkili JavaScript origin'i `https://mcp.tedy.online` Google Cloud Console'a eklendi; `/oauth/authorize` onay sayfası GSI istemcisini bu client_id ile canlı sunuyor (sunucu doğrulaması). OAuth-akışlı connector'lar (claude.ai/Codex/Grok/Gemini) kimlik doğrulayabilir.
+
 ## 13. Varsayımlar ve riskler
 
 | Risk / varsayım | Etki | Azaltma |
