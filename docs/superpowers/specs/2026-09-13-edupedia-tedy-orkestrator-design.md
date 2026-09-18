@@ -49,7 +49,7 @@ Onaylanan tasarım bölümleri: §4 mimari, §5 sözleşmeler, §6–§8 kimlik/
   `mcp`, `fastmcp`, `uvicorn` kurulu değil.
 - TED Asistanı zaten senkron bir MCP istemcisiyle (`src/mcp_client.py`) maarif-mufredat ve egitim-kaynak'ı kullanır
   (`src/assistant_tools.py` `TOOL_ALLOWLIST`).
-- **edupedia 0.10.1:** 9 mod, 16 kapı (`validate_module.py`, 2.337 satır, yalnız stdlib), 17 referans (4.870 satır),
+- **edupedia 0.10.2** (2026-09-14 yalnız belge yaması; bu spec yazılırken 0.10.1): 9 mod, 16 kapı (`validate_module.py`, 2.337 satır, yalnız stdlib), 17 referans (4.870 satır),
   `module-template.html` 693 KB (471 KB gömülü font, 131 KB motor). Şablonda `MODULE_DATA` yer tutucusu var;
   motor depolamayı `try/catch` ile degrade-safe kullanır; `postMessage` yok.
 - Emekli `CureoHub/services/edupedia_site/app/gates/` 16 kapının sunucu tarafı kopyasını ve `run_gates(html)` →
@@ -155,10 +155,11 @@ Büyük içerik (HTML, görsel baytı, tam kitap sayfası) **asla** araç yanıt
 
 ### 5.2 MODULE_DATA
 
-- **Şema otoritesi:** `CureoPrivate/plugins/edupedia/skills/carbon-edupedia/references/module-architecture.md §2`
-  ve `assets/module-template.html` motoru. İkisi `ted-mcp`'ye **birebir** kopyalanır; kaynağı gösteren
-  `PROVENANCE.md` + sha256 ve bir eşitlik testi eşlik eder. Kopyalandıktan sonra **otorite ted-mcp'dir**;
-  CureoPrivate'teki referanslar kaldırılır (§9.3).
+- **Şema otoritesi:** TED `src/mcp_server/vendor/references/module-architecture.md §2` ve
+  `src/mcp_server/vendor/assets/module-template.html` motoru. edupedia 1.0.0'a dek kaynakları
+  `CureoPrivate/plugins/edupedia/skills/carbon-edupedia/` idi; ted-mcp'ye **birebir** kopyalandı, köken ve
+  sha256 `PROVENANCE.json`'da, eşitlik testiyle. Otorite ted-mcp'dir (§9.1); CureoPrivate kopyaları 1.0.0'da
+  kaldırılır (§9.3).
 - **Eklenen alanlar:**
   - `meta.assets: [{asset_id, slot}]` — derlemede `data:` URI olarak gömülür.
   - `meta.tedLink: {kind: "exam" | "homework", id}` — isteğe bağlı.
@@ -272,6 +273,13 @@ ve yalnız `window.parent`'a gönderdiğini denetler. (Kapı sayısı: mevcut 16
 - **OAuth desteklemeyen istemci yedeği:** kişi başı statik anahtar `tdyM_…` (yalnız `full` rol, CLI ile üretilir,
   hash saklanır, iptal edilebilir). `tdyK_` dashboard anahtarları MCP'de **geçmez**.
 
+- **Alt proje 6 ölçümü:** Grok geri-çağırması ilk canlı bağlantıda ölçülür; belgelenmiş adresten farklıysa gerçek
+  adres izlenen `ted-mcp.service` `Environment=TED_MCP_EXTRA_REDIRECT_URIS=…` satırıyla eklenir. `/oauth/register`'da
+  reddedilen her `redirect_uri` `ted_mcp.oauth` WARNING satırıyla (`oauth_redirect_reddedildi`, repr-kaçışlı,
+  ≤ 300 karakter) journal'a yazılır. Codex CLI loopback (RFC 8252) kullanır; VS Code web desteklenen yol değildir.
+  Her web yüzeyinin ilk bağlantısında geri-çağırma sayfasının başka origin'e zincirleme yönlendirmesi ölçülür; onay
+  sayfası `form-action` CSP'si bağlantıyı bu yüzden engellerse gözlenen origin `TED_MCP_EXTRA_FORM_ACTION_ORIGINS` ile eklenir.
+
 ### 6.2 Yetkilendirme
 
 - Her araç çağrısı çözülmüş `user_email` taşır; `created_by` ve bütçe defteri buna yazılır.
@@ -336,7 +344,16 @@ Her getirim yanıtı ve katalog kaydı `coverage` taşır: sunucu başına `hit`
 
 ### 9.1 Tek kaynak
 
-- Derin rehberin tek kaynağı `ted-mcp` (`src/mcp_server/rehber/`, vendored referanslardan).
+- Derin rehberin ve bütün edupedia yazım varlıklarının tek kaynağı `ted-mcp`'dir: TED `src/mcp_server/vendor/`
+  (şablon, doğrulayıcı ve regresyon süiti `tests/`, 17 referans, `SKILL.md`, IBM Plex OFL metni, font ve Carbon
+  token otorite kayıtları, iki şablon bakım betiği). `PROVENANCE.json` `authority: "ted-mcp"` ve `origin`
+  (son CureoPrivate commit'i) taşır; `python -m src.mcp_server.vendor_sync --check` sabitlere karşı sapmayı,
+  `--pin` bilinçli düzenlemeden sonra yeni sabitleri yazar. `rehber.py` bu dizinden okur.
+- Harici okuyucular (ör. egitim-kaynak `edupedia-patterns` indeksleyicisi) kanonik konum olarak bu yolu, içerik kimliği
+  olarak `PROVENANCE.json` sha256'sını ve `source_url` olarak commit'e sabitli
+  `https://github.com/mahirkurt/TED/blob/<commit>/src/mcp_server/vendor/references/<dosya>.md` adresini kaydeder —
+  yetkili erişim gerektirir (özel depo). Dosyaları anonim GitHub'dan değil, kendi dağıtım yollarının (HP → Pi) taşıdığı,
+  `PROVENANCE.json` içeren sabitlenmiş bir dışa aktarım paketinden alırlar; aktarımın tasarımı eğitim üçlüsü Görev 3.2'ye aittir.
 - Her yüzey yalnız **başlangıç talimatı** taşır: `CureoPrivate/plugins/edupedia/surfaces/bootstrap.md`,
   ≤ 3.500 karakter. İçerik: `edupedia_rehber('akis')` ile başla; araç sırasını izle; HTML'i kendin yazma;
   `edupedia_yayinla` sonucu olmadan "yayınlandı" deme; kapsam manifestosunu ve kapı raporunu kullanıcıya bildir;
@@ -344,24 +361,38 @@ Her getirim yanıtı ve katalog kaydı `coverage` taşır: sunucu başına `hit`
 
 ### 9.2 Yüzeyler
 
-| Yüzey | Türetilen paket (`surfaces/<yüzey>/`) | Kurulum |
+| Yüzey | Türetilen paket (`plugins/edupedia/`) | Kurulum |
 |---|---|---|
-| claude.ai | skill zip (`SKILL.md` = bootstrap) | Skill yükle + custom connector `https://mcp.tedy.online/mcp` |
-| Codex | `.codex-plugin/plugin.json` + `skills/edupedia/SKILL.md` + `mcp.json` | plugin kur; OAuth |
-| Grok | `grok-workspace.md` (bootstrap) | Workspace talimatı + grok.com/connectors → Custom |
-| Gemini Spark | `gemini-gem.md` (bootstrap) | Gem talimatı + Spark Connected Apps → custom app |
-| Claude Code | ince plugin | `/plugin install edupedia@cureonics-marketplace` |
+| claude.ai | `surfaces/claude-ai/edupedia/SKILL.md`; zip `dist/edupedia-claude-ai.zip` (`build_surfaces.py --zip`, izlenmez) | Skill yükle + custom connector `https://mcp.tedy.online/mcp` |
+| Codex | `surfaces/codex/.codex-plugin/plugin.json` (satır içi `mcpServers`) + `surfaces/codex/skills/edupedia/SKILL.md` + `surfaces/codex/mcp.json` | skill + `tedy` MCP; OAuth (loopback) |
+| Grok | `surfaces/grok/grok-workspace.md` | Workspace talimatı + grok.com/connectors → Custom (ücretli plan) |
+| Gemini Spark | `surfaces/gemini/gemini-gem.md` | Gem talimatı + Spark Connected Apps → custom app |
+| Claude Code | ince plugin; `skills/edupedia/SKILL.md` aynı talimattan | `/plugin install edupedia@cureonics-marketplace` → `/mcp` → `tedy` |
 
-Paketler bir üretim betiğiyle `bootstrap.md`'den türetilir; `check_drift` bayatlığı yakalar.
+Paketler `scripts/build_surfaces.py` ile `surfaces/bootstrap.md` + `fleet.lock.json`'dan (sürüm, `tedy` ucu) türetilir;
+talimat gövdesi her yüzeyde aynıdır (≤ 3.500 karakter; Grok sınırı 4.000), kurulum adımları talimata değil
+`KURULUM.md`'ye girer. `build_claude_ai_skill.py` bu betiğe devreder. `check_drift [7]` bayat ve beklenmeyen paket
+dosyasını yakalar; CI mutasyon testi kapının dekoratif olmadığını kanıtlar.
 
 ### 9.3 CureoPrivate edupedia 1.0.0
 
-- `fleet.yaml`: `tedy` (`https://mcp.tedy.online/mcp`, interaktif OAuth, `auth_env: null`) + isteğe bağlı doğrudan
-  `maarif-mufredat` ve `egitim-kaynak`.
-- **Kaldırılır:** yerel `validate_module.py` kopyası ve testleri, `module-auditor` ajanı, PostToolUse doğrulama
-  hook'u, 17 referansın plugin kopyası, `build_claude_ai_skill.py`'nin eski gövdesi (yeni üretim betiğiyle değişir).
-- **Kalır:** SessionStart preflight (yalnız `tedy` sağlığı), 5 komut (orkestratör akışına işaret eden kısa metinler).
-- Sürüm **0.10.1 → 1.0.0** (kırıcı: yayın yolu ve connector'lar değişti). Sürüm üç yerde senkron.
+- `fleet.yaml`: ilk sırada `tedy` (`https://mcp.tedy.online/mcp`, interaktif OAuth, `auth_env: null`, açıklaması
+  `extra._auth`) + değişmeden doğrudan `maarif-mufredat` ve `egitim-kaynak` (anahtar yoksa `auth_missing` meşru degrade;
+  `edupedia_derle` yine `edupedia_kapsam` `run_id`'si ister).
+- **Kaldırılır:** `skills/carbon-edupedia/` bütünüyle (yerel `validate_module.py` ve testleri, 17 referans, şablon ve
+  font/token varlıkları, `fetch_figure.py`, bakım betikleri, evals, CHANGELOG'lar — kanonik olanlar TED'e taşındı),
+  `agents/module-auditor.md`, PostToolUse doğrulama hook'u ve betikleri (Claude + Cursor), `shared/`,
+  `docs/mcp-introspection-2026-07-06.json`, `skills/start/skill-manifest.yaml`, `tests/test_run_manifest_schema.py`,
+  `tools/fleetkit/tests/test_module_auditor_claims.py`, `build_claude_ai_skill.py`'nin eski gövdesi.
+- **Eklenir:** `surfaces/` (§9.2), `scripts/build_surfaces.py`, üretilmiş `skills/edupedia/SKILL.md`.
+- **Kalır:** SessionStart preflight — yalnız `tedy` raporlanır: vendor'lı `fleet_probe`'un kimliksiz `initialize`'ına
+  401 sağlıklı (sessiz), 200 güvenlik uyarısı, 403 erişim reddi, diğer her şey erişilemedi; 5 komut (orkestratör
+  akışına işaret eden kısa metinler); `start` skill'i.
+- Sürüm **0.10.2 → 1.0.0** (kırıcı: yayın yolu ve connector'lar değişti). Zincir: `fleet.yaml` `plugin_version` →
+  `gen_fleet.py` (`.codex-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `fleet.lock.json`) + elle
+  `.claude-plugin/plugin.json`, kök `marketplace.json`, kök README katalog hücresi; `check_drift [2]` denetler.
+- **Sıralama:** CureoPrivate kopyalarını silen yayın, TED `main`'de otorite devri (`authority: ted-mcp`, 17 referans
+  sabitli, `vendor_sync` dış kaynak okumuyor) canlı olmadan birleşmez.
 - CureoHub `CLAUDE.md` `edupedia_site` maddesindeki "plugin yayınlamaz" ifadesi yeni duruma göre güncellenir.
 
 ## 10. Alt projeler ve sıra
@@ -385,7 +416,7 @@ planında yer alır.
   rol ve şema denetimi; bütçe defteri ve onay belirteci; degrade kuralları (her sunucu için `coverage`); tek-yazar
   kuralı; slug/yol-taşma.
 - **Golden derleme testleri:** her mod için bir `MODULE_DATA` fixture'ı → derlenen HTML 18 kapıdan geçer;
-  vendored motor/şema sha256'sı `PROVENANCE.md` ile eşit.
+  vendored motor/şema sha256'sı `PROVENANCE.json` ile eşit.
 - **Playwright:** Modüller sayfası render; iframe biletle açılır; `postMessage` ilerleme olayı kaydedilir;
   `edupedia:restore` önceki cevabı geri getirir; yabancı kaynaklı mesaj yok sayılır. TEDY tuzaklarına karşı:
   her mutasyon kontrolünden önce `npm run build` ve çıkış kodu (boru olmadan) okunur; her yokluk iddiasından önce
@@ -393,8 +424,10 @@ planında yer alır.
 - **Canlı uçtan uca (alt proje 4 sonu):** gerçek OAuth token'ıyla `initialize` + `tools/list`; gerçek bir sınavdan
   QUIZ modülü üret → yayınla → biletle aç → bir cevap ver → `module_progress.json`'da gör → (alt proje 5) Asistan
   bulur.
-- **Yüzey kabulü (alt proje 6):** claude.ai, Codex, Grok, Gemini Spark'ın her birinde connector ekle, bir modül üret,
-  yayın bağlantısını aç.
+- **Yüzey kabulü (alt proje 6):** claude.ai, Codex (yerel Codex CLI: skill + `tedy` MCP + OAuth), Grok, Gemini Spark'ın
+  her birinde connector ekle, QUIZ modunda bir modül üret, yüzeye özgü slug'la yayınla
+  (`fen5-maddenin-halleri-claudeai` | `-codex` | `-grok` | `-gemini`) ve tedy.online Modüller sayfasında aç. Kanıt:
+  katalog kaydı (`active`, `fail: 0`), OAuth journal satırları, dashboard erişim logunda o slug'ın bilet isteği.
 
 ## 12. Kapsam dışı
 
@@ -566,6 +599,21 @@ bu maddeler uygulanmadan önce denetleyici tarafından onaylanır (kullanıcı s
   gizlilik ve içerik güvenliği; Playwright: modül atfı → `/moduller/<slug>/v<N>` → bilet yalnız açılışta; canlı:
   Asistan alt proje 4'te yayınlanan modülü bulur ve biletle açar.
 
+### Alt proje 6 plan güncellemeleri (2026-09-14)
+
+Kaynak: `docs/superpowers/plans/2026-09-14-edupedia-1-0-yuzey-paketleri.md` → "Plan kararları" (K6-P1–K6-P17) ve "Denetleyici kararları".
+
+- **§3 sürüm:** edupedia bu tarihte 0.10.2'dir (0.10.1 bayattı); 1.0.0 kırıcı sürüm 0.10.2'den çıkar.
+- **§5.2 / §9.1 tek kaynak:** yol `src/mcp_server/vendor/` (`rehber/` uygulanmadı); `PROVENANCE.json` (`.md` değil)
+  `authority` + `origin` taşır; `vendor_sync` dış kaynak okumaz (`--check` / `--pin`); doğrulayıcı süiti, OFL metni ve
+  şablon bakım araçları kanonik kümeye girer; harici okuyucu `source_url`'i commit'e sabitli GitHub blob URL'sidir ve
+  yetkili erişim gerektirir (özel depo); eğitim üçlüsü Görev 3.2 dosyaları sabitli dışa aktarım paketiyle alır.
+- **§9.2 paketler:** yedi türetilmiş dosya, zip izlenmez, `check_drift [7]` + CI mutasyonu.
+- **§9.3 plugin:** `carbon-edupedia` skill'i bütünüyle kalkar, yerine üretilmiş `edupedia` skill'i gelir; preflight
+  401'i sağlıklı sayar; silme yayını TED otorite devrinden sonra birleşir.
+- **§6.1 / §11:** Grok geri-çağırması AP6'da ölçülür (`TED_MCP_EXTRA_REDIRECT_URIS` birim dosyasında), red tanı logu, zincirleme yönlendirme CSP denetimi;
+  yüzey kabulü slug sonekleriyle kanıtlanır.
+
 ## 13. Varsayımlar ve riskler
 
 | Risk / varsayım | Etki | Azaltma |
@@ -576,7 +624,7 @@ bu maddeler uygulanmadan önce denetleyici tarafından onaylanır (kullanıcı s
 | Grok özel connector ücretli plan | Grok yüzeyi plan gerektirir | Kurulum belgesinde açıkça yazılır |
 | Medya fiyatları tahmini | Bütçe gerçek faturadan sapabilir | `pricing.json` elle; `edupedia_durum`'da "tahmin" etiketi |
 | anamnesis `STRICT_COLLECTION` | Kapsamsız çağrı reddedilir | Her çağrı `edupedia:run:<run_id>` koleksiyonuyla |
-| Vendored şablon/kapılar sapar | Kapılar ile motor uyuşmaz | sha256 eşitlik testi + `PROVENANCE.md`; güncelleme tek yönlü ted-mcp'ye |
+| Vendored şablon/kapılar sapar | Kapılar ile motor uyuşmaz | sha256 eşitlik testi + `PROVENANCE.json` (`vendor_sync --check`); 1.0.0'dan beri kaynak ted-mcp, düzenleme `--pin` ile |
 | TED'in amacı genişliyor | Aile panosu artık bir üretim hattı da taşır | Tek-yazar kuralı, ayrı süreç, ayrı hostname'ler; `USER_ROLES` tek kaynak |
 | TED `main` origin'den 1 commit önde | — | Bu spec yerel commit; push kullanıcı kararı |
 
