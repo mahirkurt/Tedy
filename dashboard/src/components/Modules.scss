@@ -30,14 +30,29 @@
   color: var(--cds-text-secondary);
 }
 
+.module-page {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 8rem);
+}
+
+.module-page__back {
+  align-self: flex-start;
+  margin-bottom: var(--cds-spacing-03);
+}
+
 .module-viewer {
-  margin-top: var(--cds-spacing-05);
+  flex: 1;
+  display: flex;
+  min-height: 0;
 }
 
 .module-frame {
   display: block;
   width: 100%;
-  height: min(80vh, 56rem);
+  flex: 1;
+  min-height: min(85vh, 60rem);
   border: 0;
-  background: var(--cds-layer-01);
+  // Full-bleed: the module owns the page, so no competing card/box chrome.
+  background: transparent;
 }

@@ -59,8 +59,8 @@ export function ModuleViewerRoute() {
   }
   const n = Number(match[1])
   return (
-    <div className="dashboard-card modules">
-      <Button kind="ghost" size="sm" onClick={() => navigate('/moduller')}>Modüllere dön</Button>
+    <div className="module-page">
+      <Button className="module-page__back" kind="ghost" size="sm" onClick={() => navigate('/moduller')}>Modüllere dön</Button>
       <ModuleViewer ticketPath={`/api/modules/${slug}/v${n}/ticket`} title="Öğrenme modülü" progress={{ slug, version: n }} />
     </div>
   )
@@ -72,8 +72,8 @@ export function DraftViewerRoute() {
     return <div className="dashboard-card modules"><EmptyLine>Bu taslak bağlantısı geçersiz.</EmptyLine></div>
   }
   return (
-    <div className="dashboard-card modules">
-      <Tag type="warm-gray" size="sm">Taslak önizleme — ilerleme kaydedilmez</Tag>
+    <div className="module-page">
+      <Tag className="module-page__back" type="warm-gray" size="sm">Taslak önizleme — ilerleme kaydedilmez</Tag>
       <ModuleViewer ticketPath={`/api/modules/taslak/${taslakId}/ticket`} title="Taslak modül önizlemesi" />
     </div>
   )
