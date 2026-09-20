@@ -391,6 +391,25 @@ def scrape_ogrenci_profili(driver):
         if not branch and ("şube" in k or "sube" in k):
             branch = v
 
+    # The profile page never lists the class, so class_name came back empty
+    # while the portal printed "Işık Kurt 7-D" in the header of every page —
+    # measured 2026-09-20. That header is where a family reads it, so read it
+    # from there rather than leaving the dashboard with a blank field.
+    if not class_name:
+        try:
+            govde = driver.find_element(By.TAG_NAME, "body").text
+        except Exception:
+            govde = ""
+        kalip = (
+            rf"{re.escape(full_name)}\s+(\d{{1,2}})\s*-\s*([A-ZÇĞİÖŞÜ])\b"
+            if full_name
+            else r"\b(\d{1,2})\s*-\s*([A-ZÇĞİÖŞÜ])\b"
+        )
+        eslesme = re.search(kalip, govde)
+        if eslesme:
+            class_name = f"{eslesme.group(1)}-{eslesme.group(2)}"
+            branch = branch or eslesme.group(2)
+
     result = {
         "name": full_name,
         "student_no": student_no,
@@ -413,8 +432,48 @@ def scrape_ogrenci_profili(driver):
 # =============================================================================
 # 1. HAFTALIK DERS PROGRAMI
 # =============================================================================
-def scrape_ders_programi(driver):
-    """Scrape weekly class schedule for the last 4 weeks."""
+HAFTA_KAPSAMI_ENV = "TEDY_HAFTA_KAPSAMI"
+ILERI_HAFTA = 2
+
+
+def hafta_kapsami():
+    """'tum' for a one-off backfill, 'guncel' for the every-15-minutes run."""
+    return (os.environ.get(HAFTA_KAPSAMI_ENV) or "guncel").strip().lower()
+
+
+def hafta_indeksleri(option_count, current_idx, kapsam=None):
+    """Which week options to visit.
+
+    The portal publishes the whole school year up front — 36 weeks were on
+    offer on 2026-09-20. Visiting all of them on every cron run multiplies a
+    job that already takes two minutes; visiting only the open week, which is
+    what this did, means a week the school has already published stays
+    invisible until it arrives. So: one backfill pass over everything, then
+    the current week and the two ahead of it.
+    """
+    kapsam = kapsam or hafta_kapsami()
+    if option_count <= 0:
+        return []
+    if kapsam == "tum":
+        return list(range(option_count))
+    current_idx = max(0, min(current_idx, option_count - 1))
+    son = min(option_count - 1, current_idx + ILERI_HAFTA)
+    return list(range(current_idx, son + 1))
+
+
+def scrape_ders_programi(driver, kapsam=None):
+    """Scrape the weekly class schedule — the open week, and only that.
+
+    The portal offers 36 weeks in this selector, but measured on 2026-09-20
+    every one renders the identical grid: all four tables on the page were
+    byte-identical for weeks 1, 21 and 31 while the selector genuinely moved.
+    A school timetable repeats, so there is nothing to walk. What does vary
+    week to week is the course content, and that lives on the dashboard —
+    see scrape_ders_icerikleri.
+
+    `kapsam` is accepted and ignored so run_sync can pass it uniformly.
+    """
+    del kapsam
     print("\n[1/8] Haftalık Ders Programı")
     url = f"{BASE_URL}/pages/ogrenci_istekler/p_haftalik_ders_hazirlik_programim"
     driver.get(url)
@@ -423,10 +482,17 @@ def scrape_ders_programi(driver):
 
     all_weeks = []
 
+    def _hafta_select():
+        # By id: this page carries three selects and the first in DOM order is
+        # not guaranteed to be the week one.
+        try:
+            return Select(driver.find_element(By.ID, "dp_secili_hafta"))
+        except Exception:
+            return Select(driver.find_element(By.CSS_SELECTOR, "select"))
+
     # Find week selector dropdown
     try:
-        select_el = driver.find_element(By.CSS_SELECTOR, "select")
-        select = Select(select_el)
+        select = _hafta_select()
         options = select.options
         print(f"  Week options found: {len(options)}")
 
@@ -437,22 +503,31 @@ def scrape_ders_programi(driver):
                 current_idx = i
                 break
         if current_idx is None:
-            current_idx = len(options) - 1
+            # The first week, not the last: in September the portal's own
+            # selection is week 1, and falling back to the end of the list
+            # would file June's empty grid as "this week".
+            current_idx = 0
 
-        # Scrape last 4 weeks (current + 3 previous)
-        start_idx = max(0, current_idx - 3)
-        target_weeks = list(range(start_idx, current_idx + 1))
+        # The open week and nothing else: every other option renders the same
+        # grid (see the docstring).
+        target_weeks = [current_idx]
+        print(f"  Current week index: {current_idx} of {len(options)}")
 
         for week_idx in target_weeks:
-            select_el = driver.find_element(By.CSS_SELECTOR, "select")
-            select = Select(select_el)
+            select = _hafta_select()
             opt_text = select.options[week_idx].text.strip()
             print(f"  Selecting week: {opt_text}")
             select.select_by_index(week_idx)
             time.sleep(2)
 
             # Extract the schedule grid
-            week_data = {"week_label": opt_text, "schedule": [], "screenshot": None}
+            week_data = {
+                "week_label": opt_text,
+                "week_index": week_idx,
+                "is_current": week_idx == current_idx,
+                "schedule": [],
+                "screenshot": None,
+            }
 
             # Try to find the schedule table/grid
             tables = driver.find_elements(By.TAG_NAME, "table")
@@ -473,10 +548,12 @@ def scrape_ders_programi(driver):
                 if schedule_items:
                     week_data["schedule_cells"] = schedule_items
 
-            # Screenshot
-            ss_name = f"schedule_week_{week_idx}.png"
-            driver.save_screenshot(os.path.join(OUTPUT_DIR, ss_name))
-            week_data["screenshot"] = ss_name
+            # One screenshot, of the week someone might actually open. A
+            # backfill would otherwise leave 36 PNGs nobody looks at.
+            if week_data["is_current"]:
+                ss_name = f"schedule_week_{week_idx}.png"
+                driver.save_screenshot(os.path.join(OUTPUT_DIR, ss_name))
+                week_data["screenshot"] = ss_name
 
             all_weeks.append(week_data)
 
@@ -487,6 +564,7 @@ def scrape_ders_programi(driver):
         if tables:
             all_weeks.append({
                 "week_label": "current",
+                "is_current": True,
                 "schedule": extract_table(driver, tables[0]),
             })
 
@@ -810,12 +888,16 @@ def scrape_takvim(driver):
 # =============================================================================
 # 5. DERS İÇERİKLERİ (dashboard tabları)
 # =============================================================================
-def scrape_ders_icerikleri(driver):
-    """Scrape course content from dashboard tabs."""
-    print("\n[5/8] Ders İçerikleri (Dashboard)")
-    url = f"{BASE_URL}/pages/ogrenci/"
-    driver.get(url)
-    time.sleep(3)
+def _icerik_acik_hafta(driver, git=True):
+    """Extract the dashboard's course tabs for whichever week is open.
+
+    `git=False` when the caller has already selected a week: navigating again
+    would reset the selector back to the current week and every week would
+    come back with the same content.
+    """
+    if git:
+        driver.get(f"{BASE_URL}/pages/ogrenci/")
+        time.sleep(3)
 
     ders_tabs = {
         "Genel": "tab_genel",
@@ -882,17 +964,70 @@ def scrape_ders_icerikleri(driver):
             print(f"    Error: {e}")
             all_content[ders_name] = {"tab_id": tab_id, "error": str(e)}
 
-    # Also handle week navigation on dashboard if present
-    # Check for week selector on dashboard
-    try:
-        week_selectors = driver.find_elements(By.CSS_SELECTOR, "select, .week-selector")
-        if week_selectors:
-            print(f"  Found {len(week_selectors)} week selector(s) on dashboard")
-    except Exception:
-        pass
-
     print(f"  Scraped {len(all_content)} course tabs")
     return all_content
+
+
+def scrape_ders_icerikleri(driver, kapsam=None):
+    """Scrape course content for every week in scope.
+
+    Returns both shapes. `guncel` is the open week keyed by course — the
+    contract /api/content and the assistant index already read — and
+    `haftalar` maps each visited week's label to that same structure. The
+    portal fills the whole year in; reading only the open week meant a week
+    the school had already published stayed invisible until it arrived.
+    """
+    kapsam = kapsam or hafta_kapsami()
+    print(f"\n[5/8] Ders İçerikleri (Dashboard) (kapsam: {kapsam})")
+    driver.get(f"{BASE_URL}/pages/ogrenci/")
+    time.sleep(3)
+
+    def _hafta_select():
+        try:
+            return Select(driver.find_element(By.ID, "dp_icerik_secili_hafta"))
+        except Exception:
+            return None
+
+    select = _hafta_select()
+    if select is None:
+        # No week selector on the page: one week is all there is to read.
+        guncel = _icerik_acik_hafta(driver, git=False)
+        return {"guncel": guncel, "guncel_hafta": "", "haftalar": {}}
+
+    options = select.options
+    current_idx = 0
+    for i, opt in enumerate(options):
+        if opt.is_selected():
+            current_idx = i
+            break
+
+    hedef = hafta_indeksleri(len(options), current_idx, kapsam)
+    print(f"  Week options: {len(options)} | in scope: {len(hedef)}"
+          f" (current index {current_idx})")
+
+    haftalar = {}
+    guncel, guncel_hafta = {}, ""
+    for idx in hedef:
+        select = _hafta_select()
+        if select is None:
+            print("  Week selector disappeared, stopping")
+            break
+        etiket = select.options[idx].text.strip()
+        print(f"  Week: {etiket}")
+        select.select_by_index(idx)
+        time.sleep(2)
+        icerik = _icerik_acik_hafta(driver, git=False)
+        haftalar[etiket] = icerik
+        if idx == current_idx:
+            guncel, guncel_hafta = icerik, etiket
+
+    # A backfill starts at week 1 and the open week is in the list, so this
+    # only binds if the selector never reported a selection.
+    if not guncel and haftalar:
+        guncel_hafta, guncel = next(iter(haftalar.items()))
+
+    print(f"  Scraped {len(haftalar)} week(s) of course content")
+    return {"guncel": guncel, "guncel_hafta": guncel_hafta, "haftalar": haftalar}
 
 
 # =============================================================================
@@ -1080,7 +1215,9 @@ def main():
         data["odevlerim"] = scrape_odevlerim(driver)
         data["takim_calismalari"] = scrape_takim_calismalari(driver)
         data["takvim"] = scrape_takvim(driver)
-        data["ders_icerikleri"] = scrape_ders_icerikleri(driver)
+        icerik = scrape_ders_icerikleri(driver)
+        data["ders_icerikleri"] = icerik.get("guncel") or {}
+        data["ders_icerikleri_haftalar"] = icerik.get("haftalar") or {}
         data["ogep"] = scrape_ogep(driver)
         data["gelisim_raporu"] = scrape_gelisim_raporu(driver)
         data["duyurular"] = scrape_duyurular(driver)

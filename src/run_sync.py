@@ -167,14 +167,31 @@ def main():
             print(f"[ERROR] Year rollover failed: {e}")
 
         # 2. Scrape all sources
+        from src.scrape_all import hafta_kapsami
+
         data = {"scraped_at": datetime.now().isoformat()}
+        kapsam = hafta_kapsami()
+
+        # What the previous run collected. A narrow run replaces the week
+        # lists wholesale, so without this the first cron run after a
+        # backfill would throw away every week it did not visit.
+        onceki = {}
+        try:
+            import json as _json
+            _prev = os.path.join(OUTPUT_DIR, "scraped_data.json")
+            if os.path.exists(_prev):
+                with open(_prev) as f:
+                    onceki = _json.load(f) or {}
+        except Exception as e:
+            print(f"[WARN] önceki scraped_data okunamadı: {e}")
+
         scrapers = [
             ("ogrenci_profili", lambda d: scrape_ogrenci_profili(d)),
-            ("ders_programi", lambda d: scrape_ders_programi(d)),
+            ("ders_programi", lambda d: scrape_ders_programi(d, kapsam)),
             ("odevlerim", lambda d: scrape_odevlerim(d)),
             ("takim_calismalari", lambda d: scrape_takim_calismalari(d)),
             ("takvim", lambda d: scrape_takvim(d)),
-            ("ders_icerikleri", lambda d: scrape_ders_icerikleri(d)),
+            ("ders_icerikleri", lambda d: scrape_ders_icerikleri(d, kapsam)),
             ("ogep", lambda d: scrape_ogep(d)),
             ("gelisim_raporu", lambda d: scrape_gelisim_raporu(d)),
             ("duyurular", lambda d: scrape_duyurular(d)),
@@ -192,6 +209,25 @@ def main():
                 scrape_errors.append(f"{name}: {e}")
                 data[name] = [] if name in ("takvim", "ders_programi") else {}
                 print(f"[ERROR] {name} failed: {e}")
+
+        # `ders_programi` is not merged: it holds the open week only, because
+        # every week the portal offers renders the same grid.
+        #
+        # scrape_ders_icerikleri returns both shapes: the open week keyed by
+        # course (what /api/content and the assistant index already read) and
+        # every visited week beside it. Splitting here keeps that contract.
+        icerik = data.get("ders_icerikleri")
+        if isinstance(icerik, dict) and "haftalar" in icerik:
+            data["ders_icerikleri"] = icerik.get("guncel") or {}
+            data["ders_icerikleri_haftalar"] = {
+                **(onceki.get("ders_icerikleri_haftalar") or {}),
+                **(icerik.get("haftalar") or {}),
+            }
+        elif onceki.get("ders_icerikleri_haftalar"):
+            data["ders_icerikleri_haftalar"] = onceki["ders_icerikleri_haftalar"]
+        print(f"[HAFTA] program={len(data['ders_programi'])} hafta,"
+              f" içerik={len(data.get('ders_icerikleri_haftalar') or {})} hafta"
+              f" (kapsam: {kapsam})")
 
         # Validate scraped data
         from src.data_validator import validate_scraped_data

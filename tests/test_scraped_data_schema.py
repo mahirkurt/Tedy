@@ -116,10 +116,25 @@ class TestDersProgrami:
             assert "headers" in schedule, f"ders_programi[{i}].schedule missing headers"
             assert isinstance(schedule["headers"], list)
 
-    def test_each_entry_has_screenshot(self, scraped_data):
-        for i, entry in enumerate(scraped_data["ders_programi"]):
+    def test_only_the_open_week_is_photographed(self, scraped_data):
+        """Every entry carries the field; only the open week carries a file.
+
+        The scraper now stores every week the portal publishes — 36 of them —
+        and the screenshot is a debugging artefact no consumer reads: not
+        /api/schedule, not the SPA, not the assistant index. Writing 36 PNGs
+        on a backfill to satisfy a shape nobody uses is waste, so the field
+        stays on every entry and is None for the weeks not photographed.
+        """
+        weeks = scraped_data["ders_programi"]
+        for i, entry in enumerate(weeks):
             assert "screenshot" in entry, f"ders_programi[{i}] missing screenshot"
-            assert isinstance(entry["screenshot"], str)
+            assert entry["screenshot"] is None or isinstance(entry["screenshot"], str), (
+                f"ders_programi[{i}].screenshot is neither a filename nor None"
+            )
+        for entry in [w for w in weeks if w.get("is_current")]:
+            assert isinstance(entry.get("screenshot"), str), (
+                "the week marked current must still be photographed"
+            )
 
     def test_rows_are_lists(self, scraped_data):
         for i, entry in enumerate(scraped_data["ders_programi"]):

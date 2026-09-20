@@ -8,11 +8,14 @@ import { useFocusMode } from '../contexts/focusMode'
 import { cleanTeacherNames, normalizeCourseDisplayName } from '../utils/formatters'
 import { EmptyLine } from './patterns/EmptyLine'
 
+interface ScheduleWeek {
+  week_label?: string
+  is_current?: boolean
+  schedule?: { rows: string[][] }
+}
+
 interface ScheduleData {
-  latest: {
-    week_label?: string
-    schedule?: { rows: string[][] }
-  }
+  latest: ScheduleWeek
   today: string
 }
 
@@ -49,18 +52,33 @@ export default function WeeklySchedule() {
 
   if (loading) return <div className="dashboard-card">Yükleniyor...</div>
 
-  const rows = data.latest?.schedule?.rows || []
+  // No week picker. The portal offers 36 weeks and every one of them renders
+  // the identical grid — a school timetable repeats — so the API's `latest`
+  // (the week the scraper saw selected) is the only week there is to show.
+  // Week-to-week variation lives in the course content below.
+  const week = data.latest || {}
+  const rows = week.schedule?.rows || []
   if (rows.length === 0) {
     return <EmptyLine label="Haftalık Program">Bu hafta için ders programı yok.</EmptyLine>
   }
 
   const dayHeaders = rows[0] || []
-  const dayIndices = DAYS.map(d => dayHeaders.indexOf(d)).filter(i => i >= 0)
+  // The portal writes the days in caps ("PAZARTESI"), and this matched them
+  // with `indexOf('Pazartesi')` — so no column ever matched and the timetable
+  // rendered as a column of times with no lessons beside it. Not a Turkish
+  // locale uppercase either: that maps "Pazartesi" to "PAZARTESİ" with a
+  // dotted İ while the portal writes a dotless one, so Monday — the one day
+  // with an i — still failed and every lesson shifted a column left. Pairing
+  // the day with its column index also fixes the alignment: the old code
+  // filtered the index list, so one missing day shifted every day after it.
+  const norm = (s: string) => (s || '').trim().toUpperCase().replace(/İ/g, 'I')
+  const dayCols = DAYS
+    .map(day => ({ day, idx: dayHeaders.findIndex(h => norm(h) === norm(day)) }))
+    .filter(d => d.idx >= 0)
 
   const headers = [
     { key: 'time', header: 'Saat' },
-    ...DAYS.filter((_, i) => dayIndices[i] !== undefined && dayIndices[i] >= 0)
-      .map(d => ({ key: d, header: d })),
+    ...dayCols.map(d => ({ key: d.day, header: d.day })),
   ]
 
   const tableRows = rows.slice(1)
@@ -75,10 +93,8 @@ export default function WeeklySchedule() {
         time: formatTime(timeCell),
         _timeRaw: timeCell,
       }
-      DAYS.forEach((day, ci) => {
-        if (dayIndices[ci] >= 0) {
-          rowData[day] = row[dayIndices[ci]] || ''
-        }
+      dayCols.forEach(({ day, idx }) => {
+        rowData[day] = row[idx] || ''
       })
       return rowData
     })
@@ -91,7 +107,7 @@ export default function WeeklySchedule() {
         title={
           <span className="dashboard-card__title dashboard-card__title--tight">
             <Calendar size={20} />
-            Haftalık Program &mdash; {data.latest.week_label || ''}
+            Haftalık Program &mdash; {week.week_label || ''}
           </span>
         }
       >

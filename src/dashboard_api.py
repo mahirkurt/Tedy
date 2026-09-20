@@ -948,7 +948,13 @@ def schedule():
     data = _scraped()
     weeks = data.get("ders_programi", [])
     today = DAY_NAMES.get(datetime.now().weekday(), "")
-    latest = weeks[-1] if weeks else {}
+    # The scraper now keeps the whole published year, so the last element is a
+    # week in June. The week the scraper saw selected carries `is_current`;
+    # weeks[-1] stays the fallback for data written before that mark existed.
+    latest = next(
+        (w for w in weeks if isinstance(w, dict) and w.get("is_current")),
+        weeks[-1] if weeks else {},
+    )
     # Normalize course names in schedule cells
     rows = latest.get("schedule", {}).get("rows", [])
     for r in range(1, len(rows)):
@@ -1296,6 +1302,32 @@ def teams():
 def content():
     data = _scraped()
     return jsonify(data.get("ders_icerikleri", {}))
+
+
+@app.route("/api/content/weeks")
+@require_auth
+def content_weeks():
+    """Course content for every week the scraper has collected.
+
+    The portal fills the year in ahead of time and the cards genuinely differ
+    week to week — measured 2026-09-20: 12 of 17 courses carried different
+    cards in week 2 than in week 1. /api/content stays the open week so the
+    surfaces that read it do not change shape.
+    """
+    data = _scraped()
+    haftalar = data.get("ders_icerikleri_haftalar") or {}
+    if not isinstance(haftalar, dict):
+        haftalar = {}
+    guncel = ""
+    for w in data.get("ders_programi") or []:
+        if isinstance(w, dict) and w.get("is_current"):
+            guncel = w.get("week_label") or ""
+            break
+    # Fall back to the week /api/content is serving, so a caller always has
+    # somewhere to start even on data written before the weeks existed.
+    if guncel not in haftalar:
+        guncel = next(iter(haftalar), "")
+    return jsonify({"weeks": haftalar, "current": guncel})
 
 
 @app.route("/api/announcements")
