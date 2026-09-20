@@ -5089,3 +5089,20 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 .app-root {
   flex: 1 0 auto;
 }
+
+// ─── Ders İçerikleri: hafta seçici ───────────────────────────────────────────
+// The portal publishes the year ahead and the cards differ week to week, so
+// the card header carries one control to move between them. Only rendered
+// when there is more than one week.
+.course-content__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ted-space-sm);
+  flex-wrap: wrap;
+}
+
+.course-content__week-picker {
+  inline-size: 17rem;
+  max-inline-size: 100%;
+}

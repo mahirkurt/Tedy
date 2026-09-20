@@ -1,4 +1,5 @@
-import { Tabs, TabList, Tab, TabPanels, TabPanel, Accordion, AccordionItem, Tag } from '@carbon/react'
+import { useMemo, useState } from 'react'
+import { Tabs, TabList, Tab, TabPanels, TabPanel, Accordion, AccordionItem, Tag, Dropdown } from '@carbon/react'
 import { Education } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
@@ -91,13 +92,42 @@ function groupByWeek(cards: ParsedCard[]): WeekGroup[] {
   return groups.slice(0, 4)
 }
 
+interface WeeksData {
+  weeks: Record<string, CourseData>
+  current: string
+}
+
+/** "12. Hafta 25 Oca. - 31 Oca." → 12, so the list reads in school order. */
+function weekNo(label: string): number {
+  const m = label.match(/^\s*(\d+)\s*\./)
+  return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER
+}
+
 export default function CourseContent() {
   const { data } = useApi<CourseData>('/api/content', {})
+  // The portal fills the year in ahead of time and the cards genuinely differ
+  // week to week, so the open week is not all there is to read. They cannot
+  // simply be poured into one list: only 10 of 84 cards carried a "N. HAFTA"
+  // marker, so grouping would drop most of them into "Diğer". A week is
+  // chosen instead.
+  const { data: haftalik } = useApi<WeeksData>('/api/content/weeks', { weeks: {}, current: '' })
   const { focusMode } = useFocusMode()
+  const [secilenHafta, setSecilenHafta] = useState<string | null>(null)
+
+  const haftaAdlari = useMemo(
+    () => Object.keys(haftalik.weeks || {}).sort((a, b) => weekNo(a) - weekNo(b)),
+    [haftalik.weeks],
+  )
+  const aktifHafta = secilenHafta && haftalik.weeks?.[secilenHafta]
+    ? secilenHafta
+    : (haftalik.weeks?.[haftalik.current] ? haftalik.current : '')
+  // /api/content is still the open week, and stays the fallback for data
+  // written before the weeks existed.
+  const kaynak: CourseData = (aktifHafta && haftalik.weeks?.[aktifHafta]) || data
 
   const mergedCourses = new Map<string, CourseData[string]>()
 
-  for (const [rawName, content] of Object.entries(data)) {
+  for (const [rawName, content] of Object.entries(kaynak)) {
     if (!content) continue
     const normalized = normalizeCourseDisplayName(rawName)
     const existing = mergedCourses.get(normalized)
@@ -134,10 +164,26 @@ export default function CourseContent() {
 
   return (
     <div className="dashboard-card">
-      <h2 className="dashboard-card__title">
-        <Education size={20} />
-        Ders İçerikleri
-      </h2>
+      <div className="course-content__header">
+        <h2 className="dashboard-card__title">
+          <Education size={20} />
+          Ders İçerikleri
+        </h2>
+        {/* One control, and only when there is more than one week to choose
+            between. Hidden in focus mode, where the page holds one thing. */}
+        {haftaAdlari.length > 1 && !focusMode && (
+          <Dropdown
+            id="ders-icerik-hafta"
+            className="course-content__week-picker"
+            titleText=""
+            label="Hafta"
+            size="sm"
+            items={haftaAdlari}
+            selectedItem={aktifHafta || haftaAdlari[0]}
+            onChange={({ selectedItem }) => setSecilenHafta(selectedItem ?? null)}
+          />
+        )}
+      </div>
       <Tabs>
         <TabList aria-label="Ders içerikleri" contained>
           {courses.map(([name]) => (

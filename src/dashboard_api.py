@@ -1304,6 +1304,33 @@ def content():
     return jsonify(data.get("ders_icerikleri", {}))
 
 
+@app.route("/api/pages")
+@require_auth
+def portal_pages():
+    """The portal pages that carry documents and forms rather than a feed.
+
+    Only the ones with something in them: measured 2026-09-20 all five were
+    empty — no project listed, "toplam 0 kayıt" on the forms, no club options
+    yet — and a surface that lists five empty pages is five things to read
+    past. `empty` is the scraper's own verdict; pages the portal refused keep
+    their `unavailable` reason so the absence can be explained.
+    """
+    data = _scraped()
+    sayfalar = data.get("ek_sayfalar") or {}
+    if not isinstance(sayfalar, dict):
+        sayfalar = {}
+    dolu = {
+        k: v for k, v in sayfalar.items()
+        if isinstance(v, dict) and not v.get("empty")
+    }
+    engelli = {
+        k: v.get("unavailable") for k, v in sayfalar.items()
+        if isinstance(v, dict) and v.get("unavailable")
+    }
+    return jsonify({"pages": dolu, "unavailable": engelli,
+                    "known": sorted(sayfalar)})
+
+
 @app.route("/api/content/weeks")
 @require_auth
 def content_weeks():

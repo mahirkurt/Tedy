@@ -74,6 +74,10 @@ export const FULL: Record<string, unknown> = {
   enrichment: {},
   'progress/ec': {}, 'progress/a3k': {}, sebit: {},
   'private-lessons': { lessons: [] },
+  // Ders İçerikleri reads this too. Without it an unrouted request reaches
+  // the real server, and a test that empties /api/content still sees the
+  // portal's 36 weeks of cards.
+  'content/weeks': { weeks: {}, current: '' },
 }
 
 export async function mock(page: Page, data: Record<string, unknown>) {
@@ -102,4 +106,8 @@ export const LIVE: Record<string, unknown> = {
   enrichment: {},
   'progress/ec': {}, 'progress/a3k': {}, sebit: {},
   'private-lessons': { lessons: [] },
+  // Ders İçerikleri reads this too. Without it an unrouted request reaches
+  // the real server, and a test that empties /api/content still sees the
+  // portal's 36 weeks of cards.
+  'content/weeks': { weeks: {}, current: '' },
 }

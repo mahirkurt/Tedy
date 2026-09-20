@@ -20,6 +20,7 @@ from src.scrape_all import (  # noqa: E402
     create_driver,
     login,
     scrape_ders_icerikleri,
+    scrape_ek_sayfalar,
     PortalUnavailable,
     scrape_ders_programi,
     scrape_duyurular,
@@ -190,11 +191,16 @@ def main():
             ("ders_programi", lambda d: scrape_ders_programi(d, kapsam)),
             ("odevlerim", lambda d: scrape_odevlerim(d)),
             ("takim_calismalari", lambda d: scrape_takim_calismalari(d)),
-            ("takvim", lambda d: scrape_takvim(d)),
+            # The level filter follows the student's own year group; the
+            # profile is scraped first, so it is in `data` by the time this
+            # lambda runs.
+            ("takvim", lambda d: scrape_takvim(
+                d, (data.get("ogrenci_profili") or {}).get("class_name"))),
             ("ders_icerikleri", lambda d: scrape_ders_icerikleri(d, kapsam)),
             ("ogep", lambda d: scrape_ogep(d)),
             ("gelisim_raporu", lambda d: scrape_gelisim_raporu(d)),
             ("duyurular", lambda d: scrape_duyurular(d)),
+            ("ek_sayfalar", lambda d: scrape_ek_sayfalar(d)),
         ]
         for name, fn in scrapers:
             try:

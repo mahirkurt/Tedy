@@ -441,6 +441,23 @@ def hafta_kapsami():
     return (os.environ.get(HAFTA_KAPSAMI_ENV) or "guncel").strip().lower()
 
 
+def seviye_kodu(sinif):
+    """The calendar's level-filter value for a class like "7-D" → "70".
+
+    The filter was hardcoded to "60" (6. Sınıf) from the day it was written.
+    Işık is in 7-D, so the page — if it ever opens — would have answered for
+    the wrong year group. Unverified against the live page on purpose: the
+    portal refuses `/pages/akademik_takvim/p_ogrenci` for this account (0
+    successes and 1057 refusals in output/sync.log), so `<grade>0` is a
+    pattern read off the one value we have ever seen, not a measurement.
+    scrape_takvim falls back to matching the option's text.
+    """
+    m = re.match(r"\s*(\d{1,2})", str(sinif or ""))
+    if not m:
+        return None
+    return f"{int(m.group(1))}0"
+
+
 def hafta_indeksleri(option_count, current_idx, kapsam=None):
     """Which week options to visit.
 
@@ -753,7 +770,7 @@ def scrape_takim_calismalari(driver):
 # =============================================================================
 # 4. TAKVİM (tüm filtreler seçili)
 # =============================================================================
-def scrape_takvim(driver):
+def scrape_takvim(driver, sinif=None):
     """Scrape calendar events via FullCalendar JS API for last 4+ weeks.
 
     Uses month view + prev navigation to cover ~8 weeks.
@@ -784,14 +801,28 @@ def scrape_takvim(driver):
     print(f"  Enabled filters: "
           f"{', '.join(enabled) or '(all already on)'}")
 
-    # 2. Confirm 6. Sınıf level filter
+    # 2. Level filter: the student's own year group, not a hardcoded one.
+    # This read "60" (6. Sınıf) from the day it was written; Işık is in 7-D.
+    hedef = seviye_kodu(sinif) or "70"
+    sinif_no = hedef[:-1]
     try:
         level_select = Select(driver.find_element(
             By.ID, "filter-select-level"))
-        if level_select.first_selected_option \
-                .get_attribute("value") != "60":
-            level_select.select_by_value("60")
+        secili = level_select.first_selected_option.get_attribute("value")
+        if secili != hedef:
+            try:
+                level_select.select_by_value(hedef)
+            except Exception:
+                # `<grade>0` is a pattern read off the single value we have
+                # ever seen, and the page has never opened for this account,
+                # so fall back to whichever option names the year group.
+                for o in level_select.options:
+                    if re.search(rf"\b{sinif_no}\s*\.?\s*s[ıi]n[ıi]f",
+                                 o.text or "", re.I):
+                        level_select.select_by_visible_text(o.text)
+                        break
             time.sleep(1)
+        print(f"  Level filter: {sinif or '(sınıf bilinmiyor)'} -> {hedef}")
     except Exception:
         pass
 
@@ -1198,6 +1229,136 @@ def scrape_duyurular(driver):
 
 
 # =============================================================================
+# 9. EK SAYFALAR (proje, rehberlik, kulüp, politika belgeleri)
+# =============================================================================
+EK_SAYFALAR = [
+    ("ders_projeleri", "Ders Projeleri",
+     "/pages/proje_istekler/p_ders_projeler"),
+    ("rehberlik_formlari", "Rehberlik Formları",
+     "/pages/ogrenci_istekler/p_ogrenci_rehberlik_formlari"),
+    ("kulup_secimi", "Kulüp Seçimi",
+     "/pages/kulup_istekler/p_kulup_secimi"),
+    ("akademik_durustluk", "Akademik Dürüstlük Politikası",
+     "/pages/proje_istekler/p_akademik_durustluk_politikasi"),
+    ("mla_kaynakca", "MLA Kaynakça Hazırlama Rehberi",
+     "/pages/proje_istekler/p_kaynakca_hazirlama_rehberi"),
+]
+
+_EK_SAYFA_JS = """
+  const kok = document.querySelector('.content-wrapper, main, #content')
+            || document.body;
+  return {
+    metin: (kok.innerText || '').replace(/[ \\t]+/g, ' ').trim().slice(0, 4000),
+    belgeler: [...document.querySelectorAll('iframe, embed, object')]
+      .map(e => e.getAttribute('src') || e.getAttribute('data') || '')
+      .filter(Boolean),
+    secenekler: [...document.querySelectorAll('select')]
+      .map(s => ({
+        ad: s.id || s.name || '',
+        degerler: [...s.options].map(o => (o.text || '').trim())
+                   .filter(t => t && !/seçiniz/i.test(t)),
+      }))
+      // Drop DataTables' page-size select (10/20/30/40/50): an all-numeric
+      // list is the table's own chrome, not a choice the school is offering.
+      .filter(s => s.degerler.length
+                   && !s.degerler.every(v => /^\\d+$/.test(v))),
+  };
+"""
+
+
+_SAYFALAMA = re.compile(
+    r"(sayfa\b|gösteriliyor|toplam\s+\d+\s+kayıt|kayıt bulunamadı|^/\s*\d+$)",
+    re.I,
+)
+
+
+def _tablo_kayit_tasiyor(cikti):
+    """True only when a table holds a record, not its own scaffolding.
+
+    Measured on the guidance-forms page, 2026-09-20, while it reported
+    "toplam 0 kayıt": one table was its column names rendered into the body
+    with `headers` empty, and another was the pager ("10 20 30 40 50",
+    "Sayfa", "/ 0"). How many of them exist varies between runs — four on
+    one run, none a minute later — so the rule cannot be "has rows".
+    """
+    veri = cikti or {}
+    basliklar = [str(h).strip() for h in (veri.get("headers") or [])]
+    adaylar = []
+    for satir in (veri.get("rows") or []):
+        hucreler = [str(c).strip() for c in satir]
+        dolu = [c for c in hucreler if c]
+        if len(dolu) < 2:
+            continue                      # an empty-state spans one cell
+        if basliklar and hucreler[:len(basliklar)] == basliklar:
+            continue                      # the header echoed into the body
+        if _SAYFALAMA.search(" ".join(dolu)):
+            continue                      # DataTables' own pager
+        adaylar.append(dolu)
+    if not adaylar:
+        return False
+    # A table that declares no headers puts its column names in the first
+    # body row, so one qualifying row there is a header, not a record.
+    return len(adaylar) >= (1 if basliklar else 2)
+
+
+def scrape_ek_sayfalar(driver):
+    """Scrape the five portal pages nothing was reading yet.
+
+    Measured 2026-09-20, all five are all but empty: Ders Projeleri lists no
+    project (selection opens 1 November), Rehberlik Formları reports "toplam
+    0 kayıt", Kulüp Seçimi's dropdowns have no options yet, and the two
+    policy pages are Google Drive previews with no text of their own. So this
+    stores what is there — the portal's own announcement text, any table that
+    has rows, the document URLs — and records emptiness rather than inventing
+    a section. Nothing surfaces a page whose `empty` is true.
+    """
+    print("\n[9/9] Ek Sayfalar")
+    sonuc = {}
+    for anahtar, baslik, yol in EK_SAYFALAR:
+        kayit = {"title": baslik, "url": f"{BASE_URL}{yol}"}
+        try:
+            driver.get(f"{BASE_URL}{yol}")
+            time.sleep(2.5)
+            _require_portal_access(driver, baslik)
+
+            veri = driver.execute_script(_EK_SAYFA_JS) or {}
+            tablolar = []
+            for tbl in driver.find_elements(By.TAG_NAME, "table"):
+                try:
+                    if not tbl.find_elements(By.CSS_SELECTOR, "tbody tr"):
+                        continue
+                    cikti = extract_table(driver, tbl)
+                    if _tablo_kayit_tasiyor(cikti):
+                        tablolar.append(cikti)
+                except Exception:
+                    continue
+
+            kayit.update({
+                "text": veri.get("metin", ""),
+                "tables": tablolar,
+                "documents": veri.get("belgeler", []),
+                "options": veri.get("secenekler", []),
+            })
+            kayit["empty"] = not (
+                tablolar or kayit["documents"] or kayit["options"])
+            print(f"  {baslik}: tablo={len(tablolar)}"
+                  f" belge={len(kayit['documents'])}"
+                  f" seçenek={len(kayit['options'])}"
+                  f"{' (boş)' if kayit['empty'] else ''}")
+        except PortalUnavailable as e:
+            # The portal explaining itself is not a scrape failure; keep its
+            # words so the dashboard can say why rather than showing nothing.
+            kayit.update({"unavailable": {"reason": e.reason,
+                                          "detail": str(e)}, "empty": True})
+            print(f"  {baslik}: KULLANILAMAZ ({e.reason})")
+        except Exception as e:
+            kayit.update({"error": str(e)[:200], "empty": True})
+            print(f"  {baslik}: HATA {str(e)[:80]}")
+        sonuc[anahtar] = kayit
+    return sonuc
+
+
+# =============================================================================
 # MAIN
 # =============================================================================
 def main():
@@ -1221,6 +1382,7 @@ def main():
         data["ogep"] = scrape_ogep(driver)
         data["gelisim_raporu"] = scrape_gelisim_raporu(driver)
         data["duyurular"] = scrape_duyurular(driver)
+        data["ek_sayfalar"] = scrape_ek_sayfalar(driver)
 
         # Save all data
         out_path = os.path.join(OUTPUT_DIR, "scraped_data.json")
