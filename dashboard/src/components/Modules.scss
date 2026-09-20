@@ -34,6 +34,19 @@
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 8rem);
+  // The viewer's <iframe> has the replaced-element intrinsic width of 300px, and
+  // the content column (.app-shell-content) is shrink-to-fit — so a plain width:100%
+  // iframe would collapse the whole column to 300px. Give the page a definite,
+  // viewport-derived width; the shrink-to-fit column then sizes to the module.
+  width: min(58rem, calc(100vw - 3rem));
+  max-width: 100%;
+}
+
+@media (min-width: 66rem) {
+  // The resident side nav is 16rem and the content has that as margin-inline-start.
+  .module-page {
+    width: min(58rem, calc(100vw - 19rem));
+  }
 }
 
 .module-page__back {
@@ -43,8 +56,9 @@
 
 .module-viewer {
   flex: 1;
+  width: 100%;
+  min-width: 0;
   display: flex;
-  min-height: 0;
 }
 
 .module-frame {
