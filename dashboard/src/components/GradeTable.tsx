@@ -94,11 +94,9 @@ export default function GradeTable() {
                           <TableCell
                             key={cell.id}
                             className={isGrade ? 'grade-col-center' : ''}
-                            style={isGrade && color ? {
-                              fontWeight: 600,
-                              color,
-                              backgroundColor: val !== '-' ? `${color}11` : undefined,
-                            } : isGrade ? { fontWeight: 600 } : { fontWeight: 500 }}
+                            style={isGrade && color
+                              ? { fontWeight: 600, color }
+                              : isGrade ? { fontWeight: 600 } : { fontWeight: 500 }}
                           >
                             {val}
                           </TableCell>
@@ -134,11 +132,14 @@ function GradeExpandRow({ row, rawGrade, getRowProps }: {
             <TableCell
               key={cell.id}
               className={isGrade ? 'grade-col-center' : ''}
-              style={isGrade && color ? {
-                fontWeight: 600,
-                color,
-                backgroundColor: val !== '-' ? `${color}11` : undefined,
-              } : isGrade ? { fontWeight: 600 } : { fontWeight: 500 }}
+              // No background tint: `${color}11` appended two hex digits to a
+              // `var(--status-success)` string, which is not a colour, so the
+              // declaration was dropped and the tint has never rendered.
+              // Measured 2026-09-21. The number's own colour carries the band;
+              // a second coat behind it would only spend stimulus (İ6).
+              style={isGrade && color
+                ? { fontWeight: 600, color }
+                : isGrade ? { fontWeight: 600 } : { fontWeight: 500 }}
             >
               {val}
             </TableCell>

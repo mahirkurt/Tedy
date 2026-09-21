@@ -99,26 +99,41 @@
   // Carbon splits these by contrast duty and so do we. The support-* tokens are
   // built for icons, bars and borders (3:1 non-text minimum); using them as
   // body text is a real regression — g10's support-success is green-50 at
-  // 3.35:1 on white, which fails AA. The text-* aliases below stay one step
-  // darker so a status word remains readable.
+  // 3.35:1 on white, which fails AA. The text-* aliases below are darker still
+  // so a status word remains readable on every surface it lands on.
   --ted-support-success: var(--cds-support-success);
   --ted-support-error: var(--cds-support-error);
   --ted-support-warning: var(--cds-support-warning);
   --ted-support-info: var(--cds-support-info);
 
-  --ted-text-success: #{colors.$green-60};   // 5.02:1 on layer-01
-  --ted-text-error: var(--cds-text-error);   // red-60, 4.83:1
-  --ted-text-info: #{colors.$blue-60};       // 4.51:1
+  // The -70 step, not -60. Measured 2026-09-21 on /notlar: a grade inside an
+  // expanded Carbon row sits on layer-hover-01 (#e8e8e8), not on layer-01, and
+  // the whole -60 family lands at 4.08-4.09 there — green-60's documented
+  // 5.02:1 was true and irrelevant, because it was measured against a surface
+  // these numbers never touch. The -70 step clears AA on every ground this
+  // dashboard actually uses: 7.7 on layer-01, 7.0 on background, 6.3 on
+  // layer-hover. Literals rather than --cds-text-error because the theme is
+  // fixed at g10; a dark theme would have to revisit all four together.
+  --ted-text-success: #{colors.$green-70};   // 7.72 / 7.02 / 6.30
+  --ted-text-error: #{colors.$red-70};       // 7.79 / 7.08 / 6.36
+  --ted-text-info: #{colors.$blue-70};       // 7.79 / 7.09 / 6.36
+  // Carbon's yellow has no text-safe step — yellow-50 measures 1.68 on white,
+  // and every darker yellow reads as olive. Orange-70 is the palette's own
+  // answer for a caution that has to be read rather than glanced at.
+  --ted-text-warning: #{colors.$orange-70};  // 7.94 / 7.21 / 6.48
 
   // Legacy aliases — SCSS rules and the health popover's inline styles both read
   // these names. They now resolve through the split above rather than through
   // four frozen literals. --status-warning has no SCSS call site but is used by
   // StatusIcon in DashboardHeader.tsx, so it stays declared: dropping it would
   // silently fall back to inherited colour and lose the warning signal.
+  // It was the only one still pointing at a support colour, which is why a
+  // grade in the 50-69 band measured 1.37:1 — an indicator colour doing a
+  // reader's job. Every name here now resolves to a text-duty colour.
   --status-success: var(--ted-text-success);
   --status-error: var(--ted-text-error);
   --status-info: var(--ted-text-info);
-  --status-warning: var(--ted-support-warning);
+  --status-warning: var(--ted-text-warning);
 
   // ── Event categories ──────────────────────────────────────────────────────
   // The schedule and calendar each declared this palette independently in TSX
@@ -1147,8 +1162,11 @@ body {
 .hw-section__count {
   @include type.type-style('label-01');
   font-weight: 600;
-  color: var(--ted-color-text-helper);
-  background: #e8ecf2;
+  // Helper grey (gray-60) measured 4.24:1 here on 2026-09-21 — label-01 is
+  // 12px, so it needs 4.5. The secondary text token clears it at 5.92 on
+  // Carbon's own accent layer, which also retires a raw hex (D1).
+  color: var(--cds-text-secondary);
+  background: var(--cds-layer-accent-01);
   padding: 1px 7px;
   border-radius: 8px;
 }
