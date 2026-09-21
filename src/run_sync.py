@@ -119,6 +119,20 @@ def rotate_sync_log(log_path=None, max_bytes=SYNC_LOG_MAX_BYTES):
 SYNC_LOCK_PATH = os.path.join(PROJECT_ROOT, "output", ".sync.lock")
 
 
+def _kisa_hata(e):
+    """One line a family can read, not a Selenium stacktrace.
+
+    A WebDriver timeout stringifies to "Message: \\nStacktrace:\\n#0 0x..."
+    — eighteen lines of hex that say nothing to anyone, and the first line
+    is empty. The full text still goes to scrape_errors for the log.
+    """
+    satirlar = [s.strip() for s in str(e).splitlines() if s.strip()]
+    ilk = satirlar[0] if satirlar else ""
+    if not ilk or ilk.lower().startswith(("message", "stacktrace", "#")):
+        return "sayfa beklenen içeriği vermedi"
+    return ilk[:160]
+
+
 def _tek_kosu_kilidi():
     """Refuse to start while another sync is running, and say so.
 
@@ -168,6 +182,13 @@ def main():
 
     scrape_errors = []
     unavailable = {}
+    # Sections whose scrape threw. Kept apart from `unavailable`, which is the
+    # portal explaining itself: "the school closed this module" and "we could
+    # not read it" are different sentences and the second one was being told
+    # as the first. Measured 2026-09-21: for nearly two hours every run failed
+    # the ogrenci_istekler pages, the dashboard wrote those sections empty,
+    # and each surface said "portalda kayıt yok" — which was false.
+    okunamadi = {}
     year_info = {"year": None, "status": "unknown",
                  "source": "none", "archived": False, "manifest": None}
 
@@ -251,6 +272,7 @@ def main():
             except Exception as e:
                 scrape_errors.append(f"{name}: {e}")
                 data[name] = [] if name in ("takvim", "ders_programi") else {}
+                okunamadi[name] = {"detail": _kisa_hata(e)}
                 print(f"[ERROR] {name} failed: {e}")
 
         # `ders_programi` is not merged: it holds the open week only, because
@@ -355,6 +377,7 @@ def main():
         "duration_seconds": round(time.time() - start_time),
         "validation_warnings": validation.get("warnings", []),
         "unavailable": unavailable,
+        "okunamadi": okunamadi,
         "academic_year": year_info["year"],
         "year_detection": year_info["status"],
         "year_archived": year_info["archived"],

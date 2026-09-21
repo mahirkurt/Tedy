@@ -176,6 +176,14 @@ export interface HealthData {
   year_archived?: boolean
   /** Sections the portal itself refused, keyed by section name. */
   unavailable?: Record<string, { reason: string; detail: string }>
+  /**
+   * Sections whose scrape failed this run — distinct from `unavailable`,
+   * which is the portal explaining itself. Measured 2026-09-21: for nearly
+   * two hours the dashboard showed Işık no homework, no timetable and no
+   * grades, and every surface said "portalda kayıt yok" — which was not
+   * true. It could not be read; that is a different sentence.
+   */
+  okunamadi?: Record<string, { detail?: string }>
 }
 
 export type CitationKind = 'ogrenci' | 'mufredat' | 'kitap' | 'oer' | 'modul'

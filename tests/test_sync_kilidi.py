@@ -49,3 +49,27 @@ def test_kilit_dosyasi_pid_yazar(tmp_path, monkeypatch):
     icerik = yol.read_text()
     assert str(os.getpid()) in icerik
     kilit.close()
+
+
+class TestKisaHata:
+    """A family reads this string; a Selenium stacktrace is not for them.
+
+    `TimeoutException` stringifies to "Message: \\nStacktrace:\\n#0 0x..." —
+    eighteen lines of hex whose first line is empty. The full text still
+    goes to scrape_errors for the log.
+    """
+
+    def test_selenium_yigin_izi_cumleye_iner(self):
+        from selenium.common.exceptions import TimeoutException
+        metin = run_sync._kisa_hata(
+            TimeoutException("Message: \nStacktrace:\n#0 0x58c8 <unknown>"))
+        assert metin == "sayfa beklenen içeriği vermedi"
+        assert "0x" not in metin
+
+    def test_anlamli_hata_korunur(self):
+        metin = run_sync._kisa_hata(
+            AttributeError("'list' object has no attribute 'get'"))
+        assert metin == "'list' object has no attribute 'get'"
+
+    def test_bos_hata_da_bir_sey_soyler(self):
+        assert run_sync._kisa_hata(Exception("")) == "sayfa beklenen içeriği vermedi"

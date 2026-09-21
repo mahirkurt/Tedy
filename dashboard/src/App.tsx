@@ -105,8 +105,11 @@ export default function App() {
     || location.pathname.startsWith('/kitaplar/')
   // The portal-closed banner names Ders Programı and Takvim. Anywhere else
   // it is the same sentence on a page that does not show those sections (İ6).
+  // The closed-portal sentence still belongs only to the two pages that show
+  // those sections; the banner decides that for itself now, because it also
+  // carries the "could not be read" warning, which belongs on whichever page
+  // the unread section would have filled.
   const showPortalBanner = !isReader && !focusMode
-    && (location.pathname === '/dersler' || location.pathname === '/takvim')
 
   return (
     <SessionContext.Provider value={user}>
@@ -183,7 +186,7 @@ export default function App() {
       >
         {/* Readers are refused /api/health. Everyone else only sees this
             on the two pages that actually render those portal sections. */}
-        {showPortalBanner && <PortalStatusBanner />}
+        {showPortalBanner && <PortalStatusBanner pathname={location.pathname} />}
         {/* Named for assistive technology, which otherwise finds no page
             title at all: every surface used to open its heading outline
             with a card title, or with a closed modal's heading. It stays
