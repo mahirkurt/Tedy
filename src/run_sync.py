@@ -116,9 +116,46 @@ def rotate_sync_log(log_path=None, max_bytes=SYNC_LOG_MAX_BYTES):
     os.rename(log_path, rotated_path)
 
 
+SYNC_LOCK_PATH = os.path.join(PROJECT_ROOT, "output", ".sync.lock")
+
+
+def _tek_kosu_kilidi():
+    """Refuse to start while another sync is running, and say so.
+
+    Measured 2026-09-21 03:19: six run_sync processes and 22 Chrome
+    processes were alive at once. Runs take 190-550s and cron fires every
+    900s, so they should never meet — but `timeout 600` does not reliably
+    kill a process blocked in Selenium, and each tick started another one
+    on top. Six sessions sharing one portal account read each other's
+    pages: different URLs came back with byte-identical text, the Drive
+    previews vanished, and scrapers that were never touched failed with
+    'list' object has no attribute 'get'.
+
+    Returns the held file object — closing it, or the process dying,
+    releases the lock.
+    """
+    import fcntl
+    os.makedirs(os.path.dirname(SYNC_LOCK_PATH), exist_ok=True)
+    kilit = open(SYNC_LOCK_PATH, "w")
+    try:
+        fcntl.flock(kilit, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        kilit.close()
+        return None
+    kilit.write(f"{os.getpid()} {datetime.now().isoformat()}\n")
+    kilit.flush()
+    return kilit
+
+
 def main():
     os.chdir(PROJECT_ROOT)
     rotate_sync_log()
+
+    kilit = _tek_kosu_kilidi()
+    if kilit is None:
+        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] "
+              "Başka bir senkron koşuyor, bu tur atlandı.")
+        return
 
     start_time = time.time()
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

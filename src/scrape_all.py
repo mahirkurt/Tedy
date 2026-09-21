@@ -1301,6 +1301,31 @@ def _tablo_kayit_tasiyor(cikti):
     return len(adaylar) >= (1 if basliklar else 2)
 
 
+def _sayfa_yerlesti(driver, saniye=10):
+    """Wait for the page to settle rather than guessing how long it takes.
+
+    A fixed 2.5s sleep read three of these pages before they had rendered:
+    measured 2026-09-20 19:30, two Google Drive previews that had been
+    captured minutes earlier came back as zero documents, and the text
+    lengths across different URLs were byte-identical — the mark of reading
+    a page that had not arrived. Waits for readyState plus any of the things
+    worth reading, and gives up quietly, because some of these pages really
+    are empty.
+    """
+    son = time.time() + saniye
+    while time.time() < son:
+        try:
+            if driver.execute_script("return document.readyState") == "complete" \
+               and driver.execute_script(
+                   "return !!document.querySelector("
+                   "'iframe, embed, object, table tbody tr, select option')"):
+                return True
+        except Exception:
+            pass
+        time.sleep(0.4)
+    return False
+
+
 def scrape_ek_sayfalar(driver):
     """Scrape the five portal pages nothing was reading yet.
 
@@ -1318,7 +1343,7 @@ def scrape_ek_sayfalar(driver):
         kayit = {"title": baslik, "url": f"{BASE_URL}{yol}"}
         try:
             driver.get(f"{BASE_URL}{yol}")
-            time.sleep(2.5)
+            _sayfa_yerlesti(driver)
             _require_portal_access(driver, baslik)
 
             veri = driver.execute_script(_EK_SAYFA_JS) or {}

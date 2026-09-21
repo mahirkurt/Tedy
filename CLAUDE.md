@@ -52,7 +52,8 @@ systemctl --user restart ted-dashboard   # Pick up new static files
 - **Service file**: `~/.config/systemd/user/ted-dashboard.service`
 - **Gunicorn**: binds `0.0.0.0:8085`, 2 `gthread` workers × 4 threads (see `ted-dashboard.service`), WSGI entry `src.dashboard_api:app`
 - **Public URL**: `tedy.online` via Cloudflare Tunnel (`hp-ai-node` tunnel)
-- **Cron**: `*/15 * * * *` runs `run_sync.py` with 600s timeout, logs to `output/sync.log`
+- **Cron**: `*/15 * * * *` runs `run_sync.py` under `timeout -k 30 600`, logs to `output/sync.log`
+- **One sync at a time**: `main()` takes an exclusive `fcntl.flock` on `output/.sync.lock` and skips the tick if another run holds it. Measured 2026-09-21: six `run_sync` processes and 22 Chrome processes were alive together — runs take 190–550s against a 900s tick, but `timeout 600` does not reliably kill a process blocked in Selenium, so each tick stacked another session onto the same portal account. Concurrent sessions read each other's pages: different URLs returned byte-identical text, Drive previews scraped as zero documents, `ders_programi` fell to 0 weeks, and untouched scrapers failed with `'list' object has no attribute 'get'`. **Identical text across different portal pages means concurrency, not a portal change** — check `pgrep -cf '[r]un_sync.py'` (note the bracket: an unbracketed `-f` pattern matches the invoking shell).
 - **Tracked unit files**: `ted-dashboard.service` and `ted-mcp.service` at the repo root are the source of truth; after editing one, `install -m 644 <file> ~/.config/systemd/user/` and `systemctl --user daemon-reload`.
 
 ### ted-mcp (edupedia orchestrator)

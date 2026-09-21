@@ -2,7 +2,24 @@
 import json
 import os
 
+import pytest
+
+import src.run_sync as run_sync
 from src.run_sync import run_year_rollover
+
+
+@pytest.fixture(autouse=True)
+def _kendi_kilidi(tmp_path, monkeypatch):
+    """Keep these tests off the machine's live sync lock.
+
+    `main()` now refuses to start while another sync holds
+    `output/.sync.lock`, so a cron run firing mid-suite made
+    test_archive_failure_in_main_does_not_abort_the_sync return before it did
+    anything — green alone, red in the suite, for a reason that had nothing
+    to do with rollover.
+    """
+    monkeypatch.setattr(run_sync, "SYNC_LOCK_PATH",
+                        str(tmp_path / ".sync.lock"))
 
 BASE = "https://portal.tedronesans.k12.tr"
 
