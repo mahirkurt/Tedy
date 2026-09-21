@@ -53,7 +53,15 @@ SECTION_RULES = {
     # think it is. Critical, so it reddens health rather than sitting in a
     # warning list nobody opens.
     "ogrenci_profili":   {"min": 1,  "critical": True},
-    "odevlerim":         {"min": 5,  "critical": True},
+    # 1, not 5: an absolute floor is the wrong tool for "did the scrape
+    # break". Measured 2026-09-21 — the portal held exactly 2 homework items
+    # and every other section was complete, yet six consecutive syncs were
+    # marked failed and the family's dashboard read "Senkron: Başarısız".
+    # A school assigning two pieces of homework is not a fault. Data loss is
+    # caught by the drop check below (DROP_THRESHOLD), which compares against
+    # what the previous run saw; critical stays on so a scrape that returns
+    # nothing, with no word from the portal explaining it, still fails.
+    "odevlerim":         {"min": 1,  "critical": True},
     "ders_programi":     {"min": 1,  "critical": True},
     "takvim":            {"min": 1,  "critical": False},
     "gelisim_raporu":    {"min": 5,  "critical": True},
