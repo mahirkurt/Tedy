@@ -30,6 +30,26 @@ test('an unread section says it was unread, not that there is nothing', async ({
   await expect(uyari).toContainText('veri olmadığı anlamına gelmiyor')
 })
 
+test('a held reading says from when it is, not that the page is blank', async ({ page }) => {
+  // Since 2026-09-23 an unread section keeps its last reading. Measured that
+  // evening: the 18:45 run wrote the timetable empty over the 18:30 one, and
+  // Dersler said there was no timetable this week. Now the old reading stays
+  // and the banner dates it — a different sentence for a different fact.
+  await mock(page, {
+    ...LIVE,
+    health: health({ okunamadi: { ders_programi: {
+      detail: 'ders programı tablosu sayfada yok', son_okuma: '2026-09-23T18:30:15',
+    } } }),
+  })
+  await page.goto('/dersler')
+  await page.waitForLoadState('networkidle')
+
+  const uyari = page.locator('.portal-unread')
+  await expect(uyari).toContainText('Ders Programı bu turda okunamadı')
+  await expect(uyari).toContainText('Son başarılı okuma gösteriliyor (23.09 18:30)')
+  await expect(uyari).not.toContainText('veri olmadığı anlamına gelmiyor')
+})
+
 test('several unread sections are named together where both belong', async ({ page }) => {
   // Bugün shows homework and the timetable, so both names belong there.
   await mock(page, {

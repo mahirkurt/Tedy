@@ -585,6 +585,13 @@ def scrape_ders_programi(driver, kapsam=None):
                 "schedule": extract_table(driver, tables[0]),
             })
 
+    # No selector and no table is not an empty timetable, it is the wrong
+    # page. Returning [] here let the 2026-09-23 18:45 run overwrite a good
+    # reading with nothing while health.json reported the section as fine;
+    # raising puts it in `okunamadi`, where run_sync keeps the last reading.
+    if not all_weeks:
+        raise RuntimeError("ders programı tablosu sayfada yok")
+
     print(f"  Scraped {len(all_weeks)} weeks")
     return all_weeks
 

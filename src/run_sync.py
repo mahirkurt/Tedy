@@ -133,6 +133,35 @@ def _kisa_hata(e):
     return ilk[:160]
 
 
+# Sections whose empty value is a list rather than a dict.
+_LISTE_BOLUMLER = ("takvim", "ders_programi")
+
+
+def _son_okuma(name, onceki):
+    """What an unread section shows: the previous run's reading, not nothing.
+
+    Measured 2026-09-23: the 18:30 run read the full timetable, the 18:45 run
+    could not read the page and wrote `ders_programi: []` over it, and the
+    dashboard said "Bu hafta için ders programı yok" until a later run
+    succeeded. A school does not delete its timetable between two ticks of a
+    fifteen-minute cron; an empty read is a failed read, and a fifteen-minute
+    old timetable is the timetable. The portal *refusing* a page is different
+    and still writes empty — that branch never calls this.
+    """
+    if onceki.get(name):
+        return onceki[name]
+    return [] if name in _LISTE_BOLUMLER else {}
+
+
+def _okunamadi_kaydi(name, e, onceki):
+    """The health entry for an unread section: why, and — when the dashboard
+    is showing an earlier reading in its place — from when."""
+    kayit = {"detail": _kisa_hata(e)}
+    if onceki.get(name) and onceki.get("scraped_at"):
+        kayit["son_okuma"] = onceki["scraped_at"]
+    return kayit
+
+
 def _tek_kosu_kilidi():
     """Refuse to start while another sync is running, and say so.
 
@@ -271,8 +300,10 @@ def main():
                 print(f"[UNAVAILABLE] {name}: {e}")
             except Exception as e:
                 scrape_errors.append(f"{name}: {e}")
-                data[name] = [] if name in ("takvim", "ders_programi") else {}
-                okunamadi[name] = {"detail": _kisa_hata(e)}
+                # Hold the last reading rather than write the section empty;
+                # the banner names it as unread either way.
+                data[name] = _son_okuma(name, onceki)
+                okunamadi[name] = _okunamadi_kaydi(name, e, onceki)
                 print(f"[ERROR] {name} failed: {e}")
 
         # `ders_programi` is not merged: it holds the open week only, because

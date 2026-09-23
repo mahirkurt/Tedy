@@ -2153,6 +2153,16 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+// Shown only on a day that runs on its own bell, so the shared Saat column
+// never misstates it. Quiet on purpose: it is a correction, not a second
+// heading, and it appears on one column of five (İ6).
+.schedule-own-time {
+  display: block;
+  @include type.type-style('label-01');
+  color: var(--ted-color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
 .schedule-lesson {
   display: block;
   font-weight: 500;

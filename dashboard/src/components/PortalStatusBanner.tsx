@@ -12,6 +12,15 @@ function todayKey(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
+/** "23.09 18:34" from an ISO timestamp; '' when it will not parse, because
+ *  echoing the raw string is how internal text reaches a reader (D4). */
+function kisaZaman(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
 function wasDismissedToday(): boolean {
   try {
     return sessionStorage.getItem(DISMISS_KEY) === todayKey()
@@ -73,6 +82,15 @@ export function PortalStatusBanner({ pathname = '' }: { pathname?: string }) {
     .map(k => unavailable?.[k]?.detail)
     .filter((d): d is string => Boolean(d && d.trim()))
   const unreadNames = unreadKeys.map(k => SECTION_LABELS[k] || k)
+  // Since 2026-09-23 an unread section keeps its previous reading instead
+  // of going empty, and health says from when. The sentence changes with
+  // it: "what you see is fifteen minutes old" is a different fact from
+  // "what you see is nothing". Only when every unread section here has an
+  // earlier reading — otherwise some of them really are blank.
+  const sonOkumalar = unreadKeys.map(k => okunamadi?.[k]?.son_okuma)
+  const tutulan = sonOkumalar.length > 0 && sonOkumalar.every(Boolean)
+    ? kisaZaman(sonOkumalar.map(String).sort()[0])
+    : ''
 
   return (
     <>
@@ -114,7 +132,9 @@ export function PortalStatusBanner({ pathname = '' }: { pathname?: string }) {
               ? `${unreadNames.join(', ')} bu turda okunamadı`
               : `${unreadNames[0]} bu turda okunamadı`
           }
-          subtitle="Boş görünmeleri veri olmadığı anlamına gelmiyor — bir sonraki senkronda yeniden denenecek."
+          subtitle={tutulan
+            ? `Son başarılı okuma gösteriliyor (${tutulan}) — bir sonraki senkronda yeniden denenecek.`
+            : 'Boş görünmeleri veri olmadığı anlamına gelmiyor — bir sonraki senkronda yeniden denenecek.'}
         />
       )}
     </>

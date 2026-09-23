@@ -183,7 +183,9 @@ export interface HealthData {
    * grades, and every surface said "portalda kayıt yok" — which was not
    * true. It could not be read; that is a different sentence.
    */
-  okunamadi?: Record<string, { detail?: string }>
+  /** Sections this run could not read. `son_okuma` is the ISO time of the
+   *  earlier reading the dashboard is showing in its place, when there is one. */
+  okunamadi?: Record<string, { detail?: string; son_okuma?: string }>
 }
 
 export type CitationKind = 'ogrenci' | 'mufredat' | 'kitap' | 'oer' | 'modul'

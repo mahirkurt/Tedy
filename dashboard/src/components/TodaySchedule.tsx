@@ -14,6 +14,7 @@ import {
 import { useApi } from '../hooks/useApi'
 import { parseDeadline, cleanTeacherNames, toTitleCase, formatTurkishDate, MONTHS_SHORT } from '../utils/formatters'
 import { getCountdown, getExamCountdown } from '../utils/countdown'
+import { dayColumns } from '../utils/schedule'
 import { DayStrip } from './DayStrip'
 import { NextThing } from './NextThing'
 import { useBookProgress } from '../hooks/useBookReader'
@@ -162,12 +163,16 @@ function buildAgenda(
   }
 
   const rows = scheduleData.latest?.schedule?.rows || []
-  const dayHeaders = rows[0] || []
-  const todayIdx = dayHeaders.indexOf(selectedDayName)
-  if (todayIdx >= 0) {
+  // The portal writes the days in caps ("ÇARŞAMBA") and this matched them with
+  // `indexOf('Çarşamba')`, so no day ever matched and the day's agenda showed
+  // no lessons at all — measured 2026-09-23: every one of the seven days
+  // returned -1. The time column has to come from the day's own block too,
+  // because Friday runs on a later bell than Monday through Thursday.
+  const gun = dayColumns(rows[0] || [], [selectedDayName])[0]
+  if (gun) {
     for (let r = 1; r < rows.length; r++) {
-      const timeCell = rows[r][0] || ''
-      const content = rows[r][todayIdx] || ''
+      const timeCell = rows[r][gun.timeIdx] || ''
+      const content = rows[r][gun.idx] || ''
       if (!content) continue
       if (['Kahvaltı', 'Öğle yemeği', 'İkindi Kahvaltısı', 'Çıkış'].includes(content)) continue
       const periodMatch = timeCell.match(/(\d+)\. Ders/)

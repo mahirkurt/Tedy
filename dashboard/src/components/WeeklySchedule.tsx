@@ -6,6 +6,7 @@ import {
 import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import { cleanTeacherNames, normalizeCourseDisplayName } from '../utils/formatters'
+import { dayColumns } from '../utils/schedule'
 import { EmptyLine } from './patterns/EmptyLine'
 
 interface ScheduleWeek {
@@ -63,18 +64,10 @@ export default function WeeklySchedule() {
   }
 
   const dayHeaders = rows[0] || []
-  // The portal writes the days in caps ("PAZARTESI"), and this matched them
-  // with `indexOf('Pazartesi')` — so no column ever matched and the timetable
-  // rendered as a column of times with no lessons beside it. Not a Turkish
-  // locale uppercase either: that maps "Pazartesi" to "PAZARTESİ" with a
-  // dotted İ while the portal writes a dotless one, so Monday — the one day
-  // with an i — still failed and every lesson shifted a column left. Pairing
-  // the day with its column index also fixes the alignment: the old code
-  // filtered the index list, so one missing day shifted every day after it.
-  const norm = (s: string) => (s || '').trim().toUpperCase().replace(/İ/g, 'I')
-  const dayCols = DAYS
-    .map(day => ({ day, idx: dayHeaders.findIndex(h => norm(h) === norm(day)) }))
-    .filter(d => d.idx >= 0)
+  // Matching the caps the portal writes, and pairing each day with its own
+  // time column — see utils/schedule.ts for what both cost when they are
+  // assumed instead.
+  const dayCols = dayColumns(dayHeaders, DAYS)
 
   const headers = [
     { key: 'time', header: 'Saat' },
@@ -93,8 +86,16 @@ export default function WeeklySchedule() {
         time: formatTime(timeCell),
         _timeRaw: timeCell,
       }
-      dayCols.forEach(({ day, idx }) => {
+      dayCols.forEach(({ day, idx, timeIdx }) => {
         rowData[day] = row[idx] || ''
+        // One Saat column cannot speak for two bell schedules. Where a day
+        // runs on its own — Friday, five to ten minutes later than Monday
+        // through Thursday — the cell carries its own start time, so the
+        // shared column never quietly misstates it.
+        const ownCell = row[timeIdx] || ''
+        rowData[`${day}__saat`] = formatTime(ownCell) === rowData.time
+          ? ''
+          : ownCell.match(/(\d{2}:\d{2})/)?.[1] || ''
       })
       return rowData
     })
@@ -129,7 +130,8 @@ export default function WeeklySchedule() {
               </TableHead>
               <TableBody>
                 {dtRows.map(row => {
-                  const rawTime = tableRows.find(r => r.id === row.id)?._timeRaw || ''
+                  const kaynak = tableRows.find(r => r.id === row.id)
+                  const rawTime = kaynak?._timeRaw || ''
                   const active = isCurrentPeriod(rawTime)
                   return (
                     <TableRow
@@ -152,6 +154,11 @@ export default function WeeklySchedule() {
                               <span className="schedule-time">{cellValue}</span>
                             ) : lines[0] ? (
                               <>
+                                {kaynak?.[`${cell.info.header}__saat`] && (
+                                  <span className="schedule-own-time">
+                                    {kaynak[`${cell.info.header}__saat`]}
+                                  </span>
+                                )}
                                 <span className="schedule-lesson">{normalizeCourseDisplayName(lines[0].trim())}</span>
                                 {!focusMode && lines[1] && (
                                   <span className="schedule-detail">
