@@ -85,6 +85,14 @@ def set_value(lines: list[str], name: str, value: str, replace: bool = False) ->
         raise EnvPrepError(f"{name} .env'e yazılmaz; ted-mcp.service Environment= satırında durur")
     if not _VALUE_RE.match(value):
         raise EnvPrepError(f"{name}: değer boş ya da izin verilmeyen karakter içeriyor")
+    if name == "ANTHROPIC_API_KEY" and not value.startswith("sk-ant-"):
+        # 2026-09-24: the Console's key ID ("apikey_…") went in instead of the
+        # secret; every assistant call would have failed with 401.
+        raise EnvPrepError(
+            "ANTHROPIC_API_KEY: bu bir Anthropic API anahtarı değil (sk-ant- ile başlamalı). "
+            "Console'daki 'apikey_…' kimliği değil, anahtar oluşturulurken bir kez gösterilen sır gerekir")
+    if name == "ANTHROPIC_WORKSPACE_ID" and not value.startswith("wrkspc_"):
+        raise EnvPrepError("ANTHROPIC_WORKSPACE_ID: workspace kimliği wrkspc_ ile başlar (Console → Settings → Workspaces)")
     indexes = [i for i, line in enumerate(lines) if _name_of(line) == name]
     if len(indexes) > 1:
         raise EnvPrepError(f"{name} birden fazla kez tanımlı; önce elle tekilleştirin")

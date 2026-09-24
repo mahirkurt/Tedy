@@ -581,3 +581,34 @@ def test_bos_cevapta_eski_nazik_istek_kalir(tmp_path, monkeypatch):
     out = rt.chat([{"role": "user", "content": "kesir nedir"}])
     assert "kesir nedir" in out["answer"]
     assert "error:model_unavailable" not in out["safety_flags"]
+
+
+def test_guncellik_saat_dilimi_karistirmaz(tmp_path, monkeypatch):
+    # 2026-09-24: once TEDY ran on Istanbul time, health.json's naive stamp was
+    # local while the index stamp stayed UTC with a "Z" — compared with the
+    # "Z" stripped, the index always looked three hours older than the sync,
+    # and every answer carried "Veriler güncel olmayabilir".
+    import json as _json
+    import time as _time
+    from datetime import datetime, timedelta, timezone
+    monkeypatch.setenv("TZ", "Europe/Istanbul")
+    _time.tzset()
+    try:
+        (tmp_path / "output").mkdir()
+        rt = AssistantRuntime(tmp_path)
+        simdi_utc = datetime.now(timezone.utc)
+        # The sync finished a minute ago (local, naive); the index was rebuilt after it.
+        (tmp_path / "output" / "health.json").write_text(_json.dumps(
+            {"timestamp": (datetime.now() - timedelta(minutes=1)).isoformat()}), encoding="utf-8")
+        rt.config.meta_path.parent.mkdir(parents=True, exist_ok=True)
+        rt.config.meta_path.write_text(_json.dumps(
+            {"generated_at": simdi_utc.replace(tzinfo=None).isoformat() + "Z"}), encoding="utf-8")
+        assert rt._is_context_stale() is False
+
+        # And a sync newer than the index still counts as stale.
+        (tmp_path / "output" / "health.json").write_text(_json.dumps(
+            {"timestamp": (datetime.now() + timedelta(minutes=5)).isoformat()}), encoding="utf-8")
+        assert rt._is_context_stale() is True
+    finally:
+        monkeypatch.undo()
+        _time.tzset()

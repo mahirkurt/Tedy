@@ -129,3 +129,39 @@ def test_foto_reddetme_bos_liste_sayilmaz(sahte_claude):
 def test_foto_anahtar_yoksa_acik_hata():
     with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
         api._extract_homework_candidates_from_photo(_gorsel(100, 100), "image/png")
+
+
+# ── workspace header ──────────────────────────────────────────────────────────
+# 2026-09-24, first live call: 400 "This API key is not scoped to a workspace,
+# so this request must include the anthropic-workspace-id header". Both
+# clients send it when ANTHROPIC_WORKSPACE_ID is set, and not otherwise.
+
+def _yakala(monkeypatch):
+    import anthropic
+    kurulan = {}
+    monkeypatch.setattr(anthropic, "Anthropic", lambda **kw: kurulan.update(kw) or NS(messages=None))
+    return kurulan
+
+
+def test_workspace_basligi_tek_cagri_istemcisinde(monkeypatch):
+    kurulan = _yakala(monkeypatch)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-api03-test")
+    monkeypatch.setenv("ANTHROPIC_WORKSPACE_ID", "wrkspc_test")
+    api.claude_api.istemci(timeout=5.0)
+    assert kurulan["default_headers"] == {"anthropic-workspace-id": "wrkspc_test"}
+
+
+def test_workspace_yoksa_baslik_yok(monkeypatch):
+    kurulan = _yakala(monkeypatch)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-api03-test")
+    monkeypatch.delenv("ANTHROPIC_WORKSPACE_ID", raising=False)
+    api.claude_api.istemci(timeout=5.0)
+    assert "default_headers" not in kurulan
+
+
+def test_workspace_basligi_asistan_istemcisinde(monkeypatch):
+    from src.assistant_core import ClaudeClient
+    kurulan = _yakala(monkeypatch)
+    monkeypatch.setenv("ANTHROPIC_WORKSPACE_ID", "wrkspc_test")
+    ClaudeClient(api_key="sk-ant-api03-test")._get_client()
+    assert kurulan["default_headers"] == {"anthropic-workspace-id": "wrkspc_test"}

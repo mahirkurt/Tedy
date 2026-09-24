@@ -29,12 +29,24 @@ def model_kimligi(ortam_degiskeni: str = "") -> str:
     return VARSAYILAN_MODEL
 
 
+def basliklar() -> dict[str, Any]:
+    """Client construction extras: the workspace header, when one is set.
+
+    First live call, 2026-09-24: 400 "This API key is not scoped to a
+    workspace, so this request must include the anthropic-workspace-id
+    header". A key created inside a workspace needs nothing; an
+    organisation-level key needs ANTHROPIC_WORKSPACE_ID (wrkspc_…)."""
+    ws = os.environ.get("ANTHROPIC_WORKSPACE_ID", "").strip()
+    return {"default_headers": {"anthropic-workspace-id": ws}} if ws else {}
+
+
 def istemci(timeout: float, max_retries: int = 1) -> Any:
     anahtar = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if not anahtar:
         raise ClaudeYapilandirilmamis("ANTHROPIC_API_KEY ayarlı değil")
     import anthropic  # lazy: most requests never need it
-    return anthropic.Anthropic(api_key=anahtar, timeout=timeout, max_retries=max_retries)
+    return anthropic.Anthropic(api_key=anahtar, timeout=timeout, max_retries=max_retries,
+                               **basliklar())
 
 
 def okunur_ad(model: str) -> str:

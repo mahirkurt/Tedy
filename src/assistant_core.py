@@ -243,7 +243,8 @@ class ClaudeClient:
         if self._client is None:
             import anthropic  # lazy: tests and tools that never chat don't need it
             self._client = anthropic.Anthropic(
-                api_key=self.api_key, timeout=self.TIMEOUT_S, max_retries=1)
+                api_key=self.api_key, timeout=self.TIMEOUT_S, max_retries=1,
+                **claude_api.basliklar())
         return self._client
 
     @staticmethod
@@ -1915,8 +1916,14 @@ class AssistantRuntime:
             health_ts = str(health.get("timestamp", "")).strip()
         if health_ts:
             try:
-                ref = datetime.fromisoformat(health_ts.replace("Z", "+00:00").replace("+00:00", ""))
-                if idx_dt < ref:
+                # Compare instants, not wall clocks. The index stamp is UTC
+                # ("…Z"); health.json's is naive local time, which since
+                # 2026-09-24 is Istanbul (src/env_loader.py). Stripping the zone
+                # off both made every index look three hours older than the
+                # sync, and every answer said "Veriler güncel olmayabilir".
+                ref = datetime.fromisoformat(health_ts.replace("Z", "+00:00"))
+                ref = ref.astimezone(timezone.utc) if ref.tzinfo else ref.astimezone().astimezone(timezone.utc)
+                if idx_dt.replace(tzinfo=timezone.utc) < ref:
                     return True
             except ValueError:
                 pass

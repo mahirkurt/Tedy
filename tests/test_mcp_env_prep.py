@@ -133,3 +133,21 @@ def test_symlinked_env_is_updated_through_the_link(tmp_path):
     assert _run(link, "ayarla", "TED_MCP_FORM_SECRET", "--uret")[0] == 0
     assert link.is_symlink()
     assert "TED_MCP_FORM_SECRET=" in real.read_text()
+
+
+def test_anthropic_anahtari_kimlik_degil_sir_olmali(tmp_path):
+    # 2026-09-24: the Console's key ID ("apikey_…", 31 characters) went into
+    # .env instead of the secret, which is shown once at creation. Every call
+    # would have failed with 401 and the assistant would only have said it
+    # cannot answer.
+    path = _env(tmp_path, "")
+    kimlik = "apikey_" + "0" * 24
+    assert _run(path, "ayarla", "ANTHROPIC_API_KEY", "--stdin", stdin=kimlik + "\n")[0] == 2
+    assert path.read_text() == ""
+
+
+def test_anthropic_anahtari_dogru_bicimde_yazilir(tmp_path):
+    path = _env(tmp_path, "")
+    sir = "sk-ant-api03-" + "a" * 40
+    assert _run(path, "ayarla", "ANTHROPIC_API_KEY", "--stdin", stdin=sir + "\n")[0] == 0
+    assert _values(path)["ANTHROPIC_API_KEY"] == [sir]
