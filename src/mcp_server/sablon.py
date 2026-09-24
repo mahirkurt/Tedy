@@ -1,7 +1,8 @@
 """ted-mcp's module engine: the vendored edupedia template plus anchored patches.
 
 The vendored file stays byte-identical to its source (vendor_sync --check, PROVENANCE.json).
-Everything ted-mcp adds — the progress bridge (spec §5.5), image/video/audio rendering from the
+Everything ted-mcp adds — the progress bridge (spec §5.5) and its appearance message (the
+dashboard's Carbon theme, adopted through the template's adoptHostTheme), image/video/audio rendering from the
 embedded asset block, and the asset/attribution slots — is inserted at an anchor that must occur
 exactly once. A drifted template raises TemplateDriftError instead of silently compiling a
 module without its bridge.
@@ -22,6 +23,9 @@ ATTRIB_SLOT = "<!--edupedia:atif-->"
 MODULE_DATA_START = "const MODULE_DATA = {"
 ENGINE_MARKER = ("\n/* ==========================================================================\n"
                  "   MOTOR (ENGINE)")
+# The bridge's appearance handler calls this template function; a template without it would
+# compile a bridge that throws on the dashboard's first message.
+HOST_THEME_HOOK = "function adoptHostTheme(theme){"
 
 BRIDGE_JS = r"""  /* ---- edupedia köprüsü ve varlıklar (ted-mcp sablon.py yaması; spec §5.5) ---- */
   const EDUPEDIA_PARENT_ORIGIN = __EDUPEDIA_PARENT_ORIGIN__;
@@ -75,12 +79,15 @@ BRIDGE_JS = r"""  /* ---- edupedia köprüsü ve varlıklar (ted-mcp sablon.py y
       const xpNode = $("#xpValue"); if(xpNode) xpNode.textContent = state.xp;
       render();
     }
-    if(active){
+    if(embedded){
       window.addEventListener("message", function(e){
         if(e.source!==window.parent) return;
         if(e.origin!==EDUPEDIA_PARENT_ORIGIN) return;
         const d = e.data;
-        if(!d || d.type !== "edupedia:restore" || d.v !== 1) return;
+        if(!d || d.v !== 1) return;
+        // Görünüm: pano kendi Carbon temasını bildirir (taslak önizleme dahil); ilerleme yazmaz.
+        if(d.type === "edupedia:appearance"){ adoptHostTheme(d.theme); return; }
+        if(!active || d.type !== "edupedia:restore") return;
         applyRestore(d.state);
       });
     }
@@ -128,7 +135,7 @@ def _patched_with_token() -> str:
         replacement = insertion + anchor if position == "before" else anchor + insertion
         text = text.replace(anchor, replacement, 1)
     for label, marker in (("MODULE_DATA_START", MODULE_DATA_START), ("ENGINE_MARKER", ENGINE_MARKER),
-                          ("ORIGIN_TOKEN", ORIGIN_TOKEN)):
+                          ("ORIGIN_TOKEN", ORIGIN_TOKEN), ("HOST_THEME_HOOK", HOST_THEME_HOOK)):
         if text.count(marker) != 1:
             raise TemplateDriftError(f"{label}: occurs {text.count(marker)} times")
     return text

@@ -39,7 +39,7 @@ const CARD = {
   created_at: '2026-09-14T10:00:00+00:00', gates: { pass: 17, warn: 1, fail: 0 },
 }
 
-async function serveModule(page: Page, framePath = '/m/fen5-su/v1') {
+async function serveModule(page: Page, framePath = '/m/fen5-su/v1', body = moduleHtml) {
   await page.route('**/api/modules', r => r.fulfill(json({ moduller: [CARD] })))
   await page.route('**/api/modules/fen5-su/v1/ticket', r => r.fulfill(json({
     url: `https://modul.tedy.online${framePath}?t=${'a'.repeat(64)}&e=1&u=${'b'.repeat(32)}`, exp: 1,
@@ -48,7 +48,7 @@ async function serveModule(page: Page, framePath = '/m/fen5-su/v1') {
     url: `https://modul.tedy.online/taslak/0123456789abcdef?t=${'a'.repeat(64)}&e=1&u=${'b'.repeat(32)}`, exp: 1,
   })))
   await page.route('https://modul.tedy.online/**', r => r.fulfill({
-    status: 200, contentType: 'text/html; charset=utf-8', body: moduleHtml,
+    status: 200, contentType: 'text/html; charset=utf-8', body,
     headers: {
       'content-security-policy': SPEC_CSP.replace('frame-ancestors https://tedy.online', `frame-ancestors ${ORIGIN}`),
       'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'private, no-store',
@@ -163,6 +163,36 @@ test('a draft preview opens without writing progress', async ({ page }) => {
   await frame.locator('#nextBtn').click()
   await expect(frame.locator('.q-stem')).toBeVisible()
   expect(progress.posts).toEqual([])
+})
+
+test('the module takes on the dashboard theme, drafts included', async ({ page }) => {
+  // Serve the frame starting in the dark theme so that adopting the dashboard's g10 is observable.
+  const dark = moduleHtml.replace('<html lang="tr" data-theme="g10">', '<html lang="tr" data-theme="g100">')
+  expect(dark).not.toBe(moduleHtml)
+  await recordProgress(page)
+  await serveModule(page, '/m/fen5-su/v1', dark)
+  await page.goto('/moduller/taslak/0123456789abcdef')
+  const frame = page.frameLocator('iframe.module-frame')
+  await expect(frame.locator('#titleText')).toHaveText(quiz.meta.title)
+  await expect(frame.locator('html')).toHaveAttribute('data-theme', 'g10')
+  await expect(frame.locator('#themeBtn')).toHaveAttribute('aria-label', 'Koyu temaya geç')
+})
+
+test('a theme the student picks in the module is not overridden', async ({ page }) => {
+  await recordProgress(page)
+  await serveModule(page)
+  await page.goto('/moduller/fen5-su/v1')
+  const frame = page.frameLocator('iframe.module-frame')
+  await expect(frame.locator('html')).toHaveAttribute('data-theme', 'g10')
+  await frame.locator('#themeBtn').click()
+  await expect(frame.locator('html')).toHaveAttribute('data-theme', 'g100')
+  // Re-send the dashboard's theme the way the viewer does on load; the student's choice stands.
+  await page.evaluate(() => {
+    const f = document.querySelector('iframe.module-frame') as HTMLIFrameElement
+    f.contentWindow!.postMessage({ type: 'edupedia:appearance', v: 1, theme: 'g10' }, '*')
+  })
+  await frame.locator('#nextBtn').click()
+  await expect(frame.locator('html')).toHaveAttribute('data-theme', 'g100')
 })
 
 test('a refused ticket is explained, not blank', async ({ page }) => {

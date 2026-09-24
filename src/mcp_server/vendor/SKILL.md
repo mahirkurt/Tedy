@@ -6,8 +6,8 @@ description: >-
   flashcard üretir.
 license: MIT
 metadata:
-  version: 3.11.0
-  last_updated: 2026-08-18
+  version: 3.12.0
+  last_updated: 2026-09-24
   manifest: ./skill-manifest.yaml
 ---
 
@@ -137,6 +137,7 @@ hatalardır. İlgili referansı **emisyondan önce** okuyun.
 | `references/icon-pictogram-svg.md` | İkon/piktogram seçer veya özgün SVG çizim üretirken. |
 | `references/svg-authoring.md` | Tema-duyarlı/erişilebilir SVG figür ve grafik (`vizChart`, `svgFigure`) üretirken; SVG arketipleri. |
 | `references/color-system.md` | İşlevsel renk rolleri, wayfinding aksanı, kontrast/CVD kuralları. |
+| `references/tedy-integration.md` | **Her modülde geçerli (şablon v1.9.0):** modül Tedy panosunun içinde açılır — g10 varsayılan tema ve pano teması devri (`edupedia:appearance`), `tedy-*` katmanı, lacivert kimlik bandı + Tedy işareti, ders aksanının yalnız odak çapalarında kalması, köşe kuralı (kart 08 · eylem 00 · etiket max), yumuşatılmış oyunlaştırma. |
 | `references/subject-packs.md` | Derse-özel güçler: kimlik aksanı + Matematik / Fen / Sosyal / Dil paketleri (etiketli diyagram, ilişki akışı, kavram kartları, satır-arası çözümleme, çekim tablosu). |
 | `references/audio-system.md` | İşitsel geri bildirim (earcon) tasarımı, kanıt ve sorumlu kullanım; ses + görsel oyunlaştırma. |
 | `references/curriculum-integration.md` | **Müfredat MCP entegrasyonu — CURRICULUM modunda ZORUNLU, §3 akışının TAMAMI** (kullanıcı sözleşmesi, 2026-07-17): 21 aracın orkestrasyonu; **Adım 0 sınıf+ders KAPISI** (koddan çıkarma — doğrula), kazanım çekme, **Adım 3 ÇERÇEVE: ders kitabını AÇ** (105'in 103'ü tam metin — çerçeve üretimin sınırıdır), **beceri (KB2.x) → etkileşim deseni haritalama tablosu**, `curriculum` şeması, **§2.1 görsel önceliği: kitabın figürü birincil / yazar-SVG yedek**, **Adım 5.5 + §6.1 `verification` bloğu** (kapsam + doğruluk dayanağı → G-VERIFY), **Adım 5.6 öğrenci yüzeyi nihai dil (G-VOICE)** — kitaba/sayfaya meta-atıf yok, provenans + G-CURRICULUM, hata/geri-dönüş. |
@@ -329,7 +330,9 @@ Tam token tablosu ve çocuk-dostu uyarlama için `references/carbon-child-system
   `font-variant-numeric:tabular-nums` ile hizalanır, çevreleyen sözcükler Sans
   kalır. Ağ fontu/CDN kullanılmaz; gerekli font dosyası varsa `data:` URI olarak
   gömülür. Letter-spacing (`--ls-label:.32px`) `@carbon/type` ile birebir.
-- **Renk:** Carbon v11 **White + Gray-100** tema token'ları CSS değişkeni olarak —
+- **Renk:** Carbon v11 **G10 (varsayılan; Tedy panosunun teması) + Gray-100** tema token'ları
+  CSS değişkeni olarak (White yalnız eski kayıtlı tercih için); üstüne yalnız `tedy-*` katmanı
+  eklenir (`references/tedy-integration.md`) —
   yüzey/metin/kenar çekirdeği **artı** etkileşim-durumu katmanı
   (`--cds-layer-hover/active/selected-01`, `--cds-background-hover/active`,
   `--cds-border-tile/interactive`, `--cds-highlight`, `--cds-skeleton-*` vb.).
@@ -341,15 +344,17 @@ Tam token tablosu ve çocuk-dostu uyarlama için `references/carbon-child-system
 - **İlerleme/durum çipleri nötr ve kompakt:** sayaç ve ilerleme göstergeleri
   (örn. "Soru 1/5", "Öğrenilen 0/4 · Destede 4 kart") **gri** Carbon
   token'larıyla yazılır (`layer-01` zemin · `border-subtle` kenar ·
-  `text-secondary` metin) ve küçük tutulur. **Aksan rengi yalnız
-  ödül/oyunlaştırma** öğelerine ayrılır (XP çipi, seri çipi, kazanılan rozet).
-  Böylece dikkat içerikte kalır; nötr durum göstergesi aksan-yük dağıtmaz.
+  `text-secondary` metin) ve küçük tutulur. Ders aksanı yalnız **odak
+  çapalarında** kalır (bölüm ikonu, başlık çizgisi, seçili seçenek); XP ve seri
+  çipleri Tedy bandında Carbon Tag, kazanılan rozet nötr seçili çiptir. Böylece
+  dikkat içerikte kalır; nötr durum göstergesi aksan-yük dağıtmaz.
 - **Hareket:** `@carbon/motion` tam matrisi — 6 süre (`fast-01..slow-02`) ×
   6 easing (standard/entrance/exit × productive/expressive); her hareket
   `prefers-reduced-motion` ile geçersiz kılınabilir.
-- **Çocuk uyarlaması:** Carbon'un dikdörtgensel dilini korurken hafif köşe
-  yarıçapı (`--cds-radius`), büyük dokunma hedefleri ve canlı aksanlar — gerekçe
-  referansta (düşük yük + uyarılma dengesi).
+- **Çocuk uyarlaması:** Carbon'un dikdörtgensel dilini korurken Tedy köşe kuralı
+  (kart ve bant `border-radius-08`; düğme, seçenek, alan, tablo `border-radius-00`;
+  etiket `border-radius-max`), büyük dokunma hedefleri ve odak çapalarında ders
+  aksanı — gerekçe referansta (düşük yük + uyarılma dengesi).
 
 ### 10.1 Token otorite zinciri + Figma doğrulama (v2.0.0)
 
@@ -426,7 +431,8 @@ orkestre giriş animasyonu (`prefers-reduced-motion` ile kapalı); öngörüleme
   düşük sesli olay-earcon'ları — `correct` (doğru/XP), `retry` (yanlış; nazik, **cezasız**),
   `reward` (modül tamamlama), `notify` (mola/onay). Sürekli arka plan müziği/gürültüsü **yoktur**.
 - **Daima görselle eşli**: ses tek başına bilgi taşımaz; sessizde/işitme engelinde tam işlevsellik.
-  Doğru cevapta **XP patlaması** (+N XP çipi + sayaç nabzı), yeni rozette **kutlama** (`badge--new`).
+  Doğru cevapta **XP onayı** (kısa yükselen "+N XP" + sayaçta opaklık nabzı), yeni rozet `badge--new`
+  ile sessizce belirir — ölçek sıçraması ve konfeti yok (Tedy "kutlama yok").
 - **Opsiyonel & güvenli**: üst çubukta hoparlör düğmesi; `prefers-reduced-motion: reduce` ise ses
   **varsayılan kapalı**; düşük ses; ilk etkileşimde `AudioContext` devreye alınır. Tüm animasyonlar
   reduced-motion duyarlı.
@@ -447,7 +453,7 @@ orkestre giriş animasyonu (`prefers-reduced-motion` ile kapalı); öngörüleme
   yapısal görsel yalnızca dikkatli öğretimle işe yarar).
 - **Seri / combo göstergesi** — ardışık doğru yanıtlarda üst çubukta CVD-güvenli bir **seri çipi**
   (`--reward-bg` zemin + metin-birincil sayı + `ic-flash`); kilometre taşlarında (3·5·8·13·21·34)
-  **mütevazı** sessiz XP bonusu + kutlama earcon'u + görsel kutlama. Yanlışta seri **sıfırlanır**
+  **mütevazı** sessiz XP bonusu + kutlama earcon'u + sessiz görsel onay ("Seri 3"; ünlem yok). Yanlışta seri **sıfırlanır**
   (cezalandırıcı dil **yok**; flashcard "tekrar et" seriyi düşürmez). Tüm kutlama animasyonları
   `prefers-reduced-motion` duyarlıdır. Kanıt: oyunlaştırma öğesi olarak ilerleme/seri geri bildirimi
   motivasyonu destekler (Sailer 2019, `adhd-pedagogy.md` §13).
@@ -479,7 +485,7 @@ asla jenerik veya tek-tip değil:
     tamamlanır) · `"flawless-mcq"` (tüm çoktan seçmeli ilk denemede doğru).
 - **Görünüm (motor otomatik):** kilitli rozet **kendi ikonunu** gri tonda +
   küçük bir kilit rozetiyle gösterir (jenerik yıldız **değil**); kazanılınca
-  ders aksanına döner ve `badge--new` kutlamasıyla belirir. Her rozetin kendi
+  nötr seçili çipe (`layer-selected-01`) döner ve `badge--new` ile sessizce belirir. Her rozetin kendi
   ikonu olduğundan kasa **görsel olarak çeşitlidir** — çocuk "hangi rozetler
   var, hangisini kazandım"ı bir bakışta ayırt eder.
 - **Gerekçe:** görünür, ulaşılabilir ve **çeşitlendirilmiş** hedef-temsilleri
@@ -551,9 +557,9 @@ doğrudan gömülebilir biçimde (bkz. §3 madde 7, Adım 5-6). `status` yalnız
   ve insan denetimine tabidir.** Kapının değeri şudur: iddiayı yazmak, dayanağını yazmayı
   zorunlu kılar — "kontrol ettim" tiyatrosu yapısal olarak imkânsızlaşır.
   Tam kural: `references/curriculum-integration.md` §6.1.
-- **G-TOKEN (v2.0.0):** Tema bloklarındaki `--cds-*` değerleri gömülü
-  `@carbon/themes@11.75.0` otorite haritasına (≈19 token × White/G100) karşı
-  denetlenir. Sapma = **WARN**; White temada `--cds-support-info:#4589ff` =
+- **G-TOKEN (v2.0.0; g10 v3.12.0):** Tema bloklarındaki `--cds-*` değerleri gömülü
+  `@carbon/themes@11.75.0` otorite haritasına (≈19 token × G10/White/G100) karşı
+  denetlenir. Sapma = **WARN**; açık temalarda `--cds-support-info:#4589ff` =
   **FAIL** (bilinen AA kontrast regresyonu — doğrusu #0043ce). Otorite kaynağı
   ve tazeleme: `scripts/sync_carbon_tokens.py` + `assets/carbon-v11-authority.json`.
 - **G-FLOW (v3.0.0, koşullu):** Yalnız gamification imzası (`hook`/streak/

@@ -33,9 +33,10 @@ bilinçli olarak alçak ve kısa — başarısızlığı vurgulamaz, yeniden den
 
 ## 3. Görsel oyunlaştırma geri bildirimi (ses ile eşli)
 
-- **XP patlaması** — doğru cevapta XP sayacının yanında yükselip sönen "+N XP" çipi + sayaç
-  nabzı (`pulseEl`). Reduced-motion'da yalnız sayı güncellenir (animasyon yok).
-- **Rozet kutlaması** — yeni kazanılan rozet `badge--new` ile ölçeklenerek belirir.
+- **XP onayı** — doğru cevapta XP sayacının yanında kısa yükselip sönen "+N XP" etiketi + sayaçta
+  kısa opaklık nabzı (`pulseEl`; ölçek sıçraması yok). Reduced-motion'da yalnız sayı güncellenir.
+- **Yeni rozet** — `badge--new` ile yalnız belirir (opaklık; ölçeklenme yok). Tedy dili: kutlama
+  yok, sessiz onay (`tedy-integration.md` §5).
 - **Doğru/yanlış işaretleri** — mevcut `feedback--ok/--no` + seçenek vurguları (renk DAİMA
   ikon/metinle birlikte; CVD-güvenli).
 - Tüm animasyonlar `@media (prefers-reduced-motion: no-preference)` altında; aksi hâlde statik.

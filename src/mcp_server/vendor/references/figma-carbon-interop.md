@@ -115,8 +115,8 @@ Carbon Figma kütüphanesi değişkenleri **grup/ad** hiyerarşisi kullanır; CS
 | `field/field-01` / `field-hover-01` | `--cds-field-*` |
 | `background/background-hover` / `-active` | `--cds-background-hover/active` |
 | `border/border-subtle-00` / `-01` | `--cds-border-subtle-00/01` |
-| `border/border-strong-01` | `--cds-border-strong` |
-| `border/border-tile-01` | `--cds-border-tile` |
+| `border/border-strong-01` | `--cds-border-strong-01` (eski takma ad `--cds-border-strong`) |
+| `border/border-tile-01` | `--cds-border-tile-01` (eski takma ad `--cds-border-tile`) |
 | `border/border-interactive` | `--cds-border-interactive` |
 | `text/text-primary` / `-secondary` / `-helper` / `-placeholder` / `-on-color` | `--cds-text-*` |
 | `icon/icon-primary` / `-secondary` / `-on-color` | `--cds-icon-*` |
@@ -124,7 +124,7 @@ Carbon Figma kütüphanesi değişkenleri **grup/ad** hiyerarşisi kullanır; CS
 | `button/button-primary` / `-hover` / `-active` | `--cds-button-primary-*` |
 | `focus/focus` / `focus-inset` | `--cds-focus(-inset)` |
 | `support/support-success` / `-error` / `-warning` / `-info` | `--cds-support-*` |
-| `notification/notification-background-*` | `--cds-notif-*-bg` |
+| `notification/notification-background-*` | `--cds-notification-background-*` (eski takma ad `--cds-notif-*-bg`) |
 | `misc/highlight` / `overlay` / `skeleton-*` | `--cds-highlight` vb. |
 | `tag/tag-background-X` / `tag-color-X` | motor `ACCENT_STRONG` çiftleri |
 

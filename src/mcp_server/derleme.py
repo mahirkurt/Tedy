@@ -13,10 +13,12 @@ import math
 import re
 import sys
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Mapping
 
 from src.mcp_server import gates, ornekler, sablon
+from src.mcp_server.vendor_sync import VENDOR_DIR
 
 MODES = ornekler.MODES
 MAX_INPUT_BYTES = 400_000
@@ -353,6 +355,18 @@ def _text(value: Any) -> bool:
     return isinstance(value, str) and value.strip() != ""
 
 
+@lru_cache(maxsize=1)
+def izinli_aksanlar() -> dict[str, str]:
+    """meta.accent için izinli ders aksanları (hex → Carbon palet adımı).
+
+    Tek kaynak vendor otorite dosyasının `tedyLayer.subjectAccents` bölümüdür: Tedy tasarım
+    dilinde kırmızı (red-60 = support-error) yalnız aciliyettir, ders aksanı olamaz; aksan
+    verilmezse şablon onu konudan türetir (vendor/references/tedy-integration.md §3).
+    """
+    authority = json.loads((VENDOR_DIR / "assets" / "carbon-v11-authority.json").read_text(encoding="utf-8"))
+    return dict(authority["tedyLayer"]["subjectAccents"]["allowed"])
+
+
 def sema_dogrula(data: Any) -> list[str]:
     if not isinstance(data, dict):
         return ["MODULE_DATA bir nesne olmalı"]
@@ -365,6 +379,12 @@ def sema_dogrula(data: Any) -> list[str]:
         errors.append("meta.mode geçersiz; izinli: " + ", ".join(MODES))
     if "attributions" in meta:
         errors.append("meta.attributions derleyici tarafından üretilir; MODULE_DATA'da yazılmaz")
+    if "accent" in meta:
+        accent = meta["accent"]
+        allowed = izinli_aksanlar()
+        if not (isinstance(accent, str) and accent.lower() in allowed):
+            errors.append("meta.accent Tedy ders aksanlarından biri olmalı (" + ", ".join(sorted(allowed))
+                          + ") ya da hiç yazılmamalı — aksan konudan türetilir; kırmızı aciliyete ayrılmıştır")
     if not isinstance(data.get("rewards"), dict):
         errors.append("rewards nesnesi zorunlu")
     segments = data.get("segments")

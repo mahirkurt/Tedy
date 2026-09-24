@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { InlineNotification, SkeletonText } from '@carbon/react'
 import type { ModuleTicket } from '../types'
-import { acceptProgressMessage, restoreMessage, type RestoreState } from '../utils/moduleBridge'
+import {
+  acceptProgressMessage, appearanceMessage, DASHBOARD_THEME, restoreMessage, type RestoreState,
+} from '../utils/moduleBridge'
 import './Modules.scss'
 
 type TicketState = { status: 'loading' } | { status: 'ready'; url: string } | { status: 'error'; message: string }
@@ -80,6 +82,13 @@ export default function ModuleViewer({ ticketPath, title, progress }: ModuleView
     return () => window.removeEventListener('message', onMessage)
   }, [onMessage])
 
+  // On load (drafts included — they send no 'ready'), tell the module which Carbon theme the
+  // dashboard renders in so the two read as one surface. As with restore, '*' is the only target
+  // that reaches the opaque-origin frame; the contentWindow reference addresses it.
+  const onFrameLoad = useCallback(() => {
+    frameRef.current?.contentWindow?.postMessage(appearanceMessage(DASHBOARD_THEME), '*')
+  }, [])
+
   if (ticket.status === 'loading') {
     return <div className="module-viewer"><SkeletonText paragraph lineCount={3} /></div>
   }
@@ -97,7 +106,7 @@ export default function ModuleViewer({ ticketPath, title, progress }: ModuleView
           subtitle="Modül çalışmaya devam ediyor; sayfayı yenileyince kayıt yeniden denenir." />
       )}
       <iframe ref={frameRef} className="module-frame" title={title} src={ticket.url}
-        sandbox="allow-scripts" referrerPolicy="no-referrer" />
+        sandbox="allow-scripts" referrerPolicy="no-referrer" onLoad={onFrameLoad} />
     </div>
   )
 }

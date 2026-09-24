@@ -6,7 +6,8 @@ Tek doğruluk kaynağı carbon-design-system/carbon monorepo'sudur (npm @carbon/
 Bu araç iki iş yapar:
 
   --check    (varsayılan) assets/carbon-v11-authority.json içindeki otorite
-             değerlerini assets/module-template.html tema bloklarıyla karşılaştırır;
+             değerlerini assets/module-template.html tema bloklarıyla (g10 · white · g100)
+             ve Tedy katmanını (`tedyLayer`, tedy-* token'ları) karşılaştırır;
              sapma tablosu basar. Çevrimdışı çalışır.
   --refresh  Ağ + npm varsa @carbon/{themes,type,motion,layout,colors} paketlerini
              geçici dizine kurar, token'ları yeniden çıkarır ve
@@ -34,8 +35,8 @@ CORE = {
     "--cds-layer-active-01": "layerActive01", "--cds-layer-selected-01": "layerSelected01",
     "--cds-layer-accent-01": "layerAccent01", "--cds-field-01": "field01",
     "--cds-field-hover-01": "fieldHover01", "--cds-border-subtle-00": "borderSubtle00",
-    "--cds-border-subtle-01": "borderSubtle01", "--cds-border-strong": "borderStrong01",
-    "--cds-border-tile": "borderTile01", "--cds-border-interactive": "borderInteractive",
+    "--cds-border-subtle-01": "borderSubtle01", "--cds-border-strong-01": "borderStrong01",
+    "--cds-border-tile-01": "borderTile01", "--cds-border-interactive": "borderInteractive",
     "--cds-text-primary": "textPrimary", "--cds-text-secondary": "textSecondary",
     "--cds-text-helper": "textHelper", "--cds-text-placeholder": "textPlaceholder",
     "--cds-text-on-color": "textOnColor", "--cds-icon-primary": "iconPrimary",
@@ -52,10 +53,18 @@ COMPONENT = {  # @carbon/themes generated component-token haritaları
     "--cds-button-primary": ("componentTokens", "buttonPrimary"),
     "--cds-button-primary-hover": ("componentTokens", "buttonPrimaryHover"),
     "--cds-button-primary-active": ("componentTokens", "buttonPrimaryActive"),
-    "--cds-notif-success-bg": ("notification", "success"),
-    "--cds-notif-info-bg": ("notification", "info"),
-    "--cds-notif-warning-bg": ("notification", "warning"),
-    "--cds-notif-error-bg": ("notification", "error"),
+    "--cds-notification-background-success": ("notification", "success"),
+    "--cds-notification-background-info": ("notification", "info"),
+    "--cds-notification-background-warning": ("notification", "warning"),
+    "--cds-notification-background-error": ("notification", "error"),
+}
+# Kanonik adın şablonda yokluğunda (eski modül) denetlenen kısa adlar.
+LEGACY = {
+    "--cds-border-strong-01": "--cds-border-strong", "--cds-border-tile-01": "--cds-border-tile",
+    "--cds-notification-background-success": "--cds-notif-success-bg",
+    "--cds-notification-background-info": "--cds-notif-info-bg",
+    "--cds-notification-background-warning": "--cds-notif-warning-bg",
+    "--cds-notification-background-error": "--cds-notif-error-bg",
 }
 
 NODE_EXTRACT = r"""
@@ -127,12 +136,45 @@ def _block_drift(block: str, theme: str, auth: dict) -> int:
     drift = 0
     for var in list(CORE) + list(COMPONENT):
         got = read_var(block, var)
+        if got is None and var in LEGACY:
+            got = read_var(block, LEGACY[var])
         want = authority_value(auth, theme, var)
         if got is None or want is None or norm(got).startswith("var("):
             continue
         if norm(got) != norm(want):
             drift += 1
             print(f"SAPMA [{theme}] {var}: şablon={got}  otorite={want}")
+    return drift
+
+
+def _tedy_drift(html: str, auth: dict) -> int:
+    """Tedy katmanı (tedy-*) değerlerini otorite JSON'undaki `tedyLayer` ile karşılaştırır.
+
+    Katmanı taşımayan (v1.9.0 öncesi) şablonlar denetlenmez. `scope: all` token'lar tema-bağımsız
+    `:root,[data-theme]` bloğunda, diğerleri her temanın kendi bloğunda aranır.
+    """
+    layer = auth.get("tedyLayer", {}).get("tokens", {})
+    if not layer or "--tedy-" not in html:
+        return 0
+    common = theme_block(html, ":root,[data-theme]")
+    blocks = {"g10": theme_block(html, '[data-theme="g10"]'),
+              "white": theme_block(html, '[data-theme="white"]'),
+              "g100": theme_block(html, '[data-theme="g100"]')}
+    drift = checked = 0
+    for token, spec in layer.items():
+        themes = ("g10",) if spec.get("scope") == "all" else ("g10", "white", "g100")
+        for theme in themes:
+            block = common if spec.get("scope") == "all" else blocks[theme]
+            if not block:
+                continue
+            want = spec[theme][1]
+            got = read_var(block, "--" + token)
+            checked += 1
+            if got is None or norm(got) != norm(want):
+                drift += 1
+                where = "ortak" if spec.get("scope") == "all" else theme
+                print(f"SAPMA [tedy/{where}] --{token}: şablon={got}  otorite={want} ({spec[theme][0]})")
+    print(f"Tedy katmanı: {checked} değer denetlendi.")
     return drift
 
 
@@ -146,12 +188,16 @@ def check(template: Path) -> int:
     pkgs = auth.get("_provenance", {}).get("packages", {})
     print(f"Otorite: @carbon/themes {pkgs.get('@carbon/themes','?')} "
           f"(çıkarım {auth.get('_provenance',{}).get('extracted','?')})\n")
-    blocks = {"white": theme_block(html, '[data-theme="white"]') or theme_block(html, ":root"),
+    has_g10 = '[data-theme="g10"]' in html
+    blocks = {"g10":   theme_block(html, '[data-theme="g10"]'),
+              "white": theme_block(html, '[data-theme="white"]') or
+                       ("" if has_g10 else theme_block(html, ":root")),
               "g100":  theme_block(html, '[data-theme="g100"]')}
     drift = sum(
-        _block_drift(block, theme, auth) if block else _missing(theme)
+        _block_drift(block, theme, auth) if block else (0 if theme == "g10" and not has_g10 else _missing(theme))
         for theme, block in blocks.items()
     )
+    drift += _tedy_drift(html, auth)
     print("\nSonuç: " + ("sapma yok — şablon otoriteyle birebir." if drift == 0
                           else f"{drift} token sapıyor."))
     return 0 if drift == 0 else 1

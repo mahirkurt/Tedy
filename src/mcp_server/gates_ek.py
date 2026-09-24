@@ -12,6 +12,9 @@ import re
 from typing import Any
 
 BRIDGE_TYPES = frozenset({"edupedia:progress", "edupedia:restore"})
+# Allowed but not required: the dashboard's appearance message (parent → module, the Carbon theme
+# the module adopts). Modules compiled before it existed stay valid without it.
+OPTIONAL_BRIDGE_TYPES = frozenset({"edupedia:appearance"})
 # The vendored template's THEME_STORE_KEY localStorage key (not a bridge message type).
 STORAGE_KEYS = frozenset({"edupedia:theme"})
 _SCRIPT_RE = re.compile(r"<script(?P<attrs>[^>]*)>(?P<body>.*?)</script>", re.S | re.I)
@@ -122,22 +125,22 @@ def gate_bridge(html: str, R: Any) -> None:
     if _has_star_target(js):
         issues.append("postMessage hedef origin'i '*' olamaz")
     types = set(_TYPE_RE.findall(js))
-    foreign = types - BRIDGE_TYPES - STORAGE_KEYS
+    foreign = types - BRIDGE_TYPES - OPTIONAL_BRIDGE_TYPES - STORAGE_KEYS
     if foreign:
         issues.append("izinsiz mesaj tipi: " + ", ".join(sorted(foreign)))
     if not BRIDGE_TYPES <= types:
         issues.append("köprü edupedia:progress ve edupedia:restore tiplerinin ikisini de taşımalı")
     if not re.search(r"\.source\s*!==\s*window\.parent", js):
-        issues.append("geri yükleme dinleyicisi mesaj kaynağını denetlemiyor")
+        issues.append("ebeveyn dinleyicisi (geri yükleme/görünüm) mesaj kaynağını denetlemiyor")
     if not re.search(r"\.origin\s*!==\s*EDUPEDIA_PARENT_ORIGIN", js):
-        issues.append("geri yükleme dinleyicisi origin'i denetlemiyor")
+        issues.append("ebeveyn dinleyicisi (geri yükleme/görünüm) origin'i denetlemiyor")
     if not re.search(r"window\.parent\s*!==\s*window", js):
         issues.append("bağımsız açılışta köprü kapanmıyor")
     if issues:
         R.add("G-BRIDGE", "FAIL", "; ".join(issues))
     else:
-        R.add("G-BRIDGE", "PASS", "Köprü yalnız window.parent'a, sabit origin'e ve iki mesaj tipiyle konuşuyor; "
-                                  "geri yükleme kaynak ve origin denetimli.")
+        R.add("G-BRIDGE", "PASS", "Köprü yalnız window.parent'a, sabit origin'e ve izinli mesaj tipleriyle "
+                                  "konuşuyor; ebeveyn mesajları (geri yükleme, görünüm) kaynak ve origin denetimli.")
 
 
 def _decode_js_string(body: str, start: int) -> tuple[str, int] | tuple[None, None]:

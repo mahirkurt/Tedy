@@ -206,6 +206,12 @@ Sürümler değişmez (immutable); yeni yayın `version+1` üretir. `removed` ka
 
 **Ebeveyn → modül:** `{"type": "edupedia:restore", "v": 1, "state": {...}}` (yalnız `ready` alındıktan sonra).
 
+**Ebeveyn → modül (görünüm, 2026-09-24):** `{"type": "edupedia:appearance", "v": 1, "theme": "g10"}` — çerçevenin
+`load` olayında (taslak dahil) panonun Carbon teması bildirilir; modül yalnız `event.source === window.parent` ve
+`event.origin === EDUPEDIA_PARENT_ORIGIN` iken `adoptHostTheme()` ile uygular (`g10 | g100 | white`; öğrencinin
+modül içindeki kendi seçimi önceliklidir). İlerleme taşımaz, saklanmaz. `G-BRIDGE` bu tipi izinli ama zorunlu
+değil sayar. Ayrıntı: `src/mcp_server/vendor/references/tedy-integration.md`.
+
 **Doğrulama (dashboard):** iframe `sandbox="allow-scripts"` ve `allow-same-origin` **olmadan** yüklenir; bu yüzden
 `event.origin === "null"` görünür. Kabul koşulu: `event.source === iframe.contentWindow` **ve** `slug`/`version`
 iframe'in açtığı modülle eşleşir **ve** şema geçerli. Diğer her mesaj yok sayılır.

@@ -17,7 +17,8 @@ def test_provenance_lists_required_files():
     for rel in ("SKILL.md", "assets/module-template.html", "scripts/validate_module.py"):
         assert rel in prov["files"]
     refs = [r for r in prov["files"] if r.startswith("references/")]
-    assert len(refs) == 17
+    assert len(refs) == 18
+    assert "references/tedy-integration.md" in refs
 
 
 def test_every_vendored_file_matches_its_pinned_sha256():

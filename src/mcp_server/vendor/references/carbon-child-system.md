@@ -1,11 +1,13 @@
-# Carbon v11 Çocuk-Dostu Tasarım Sistemi — Token Referansı (v2)
+# Carbon v11 Çocuk-Dostu Tasarım Sistemi — Token Referansı (v3 · Tedy uyumu)
 
 > `carbon-edupedia` çıktısının görsel dilini tanımlar. Tüm token değerleri
 > **`@carbon/*` npm paketlerinden programatik olarak çıkarılmış** ve şablonla
 > birebir hizalanmıştır. Çocuk-dostu uyarlamalar gerekçeleriyle işaretlenmiştir
 > (§7). Token'lar `assets/module-template.html` içindeki `:root` /
 > `[data-theme]` bloklarında uygulanır; **şablonu kullanın, yeniden
-> tanımlamayın** — yalnız aksan/temayı derse göre ayarlayın.
+> tanımlamayın** — yalnız aksan/temayı derse göre ayarlayın. v3 (şablon v1.9.0):
+> varsayılan tema **g10** (Tedy panosu), Tedy katmanı (`tedy-*`) ve Tedy köşe/bant/
+> oyunlaştırma kuralları — ayrıntı `tedy-integration.md`.
 
 **Provenans (otorite çıkarımı):**
 `@carbon/themes@11.75.0` · `@carbon/type@11.61.0` · `@carbon/motion@11.46.0` ·
@@ -14,7 +16,7 @@
 
 ## İçindekiler
 1. Otorite zinciri ve token altyapısı
-2. Renk token'ları — White teması (çekirdek + etkileşim durumları + status)
+2. Renk token'ları — White teması (çekirdek + etkileşim durumları + status; g10 farkları §1.2)
 3. Ders kategorisi aksan paleti (motor tablosu + resmî tag çiftleri)
 4. Tipografi (IBM Plex + tip otoritesi + çocuk ölçeği)
 5. Spacing ölçeği (tam 01–13) ve boyutlar
@@ -41,12 +43,12 @@
 ### 1.1 Token altyapısı araçları
 
 - **`scripts/sync_carbon_tokens.py`** — `--check` (varsayılan, çevrimdışı):
-  şablon tema bloklarını otorite JSON'a karşı diff'ler (~44 token × 2 tema);
+  şablon tema bloklarını otorite JSON'a karşı diff'ler (~44 token × 3 tema: g10 · white · g100);
   `--refresh`: npm'den taze çıkarım yapıp JSON'u günceller. Carbon yeni minor
   sürüm yayınladığında `--refresh` + `--check` çalıştırın.
 - **`scripts/validate_module.py` → `G-TOKEN` kapısı** — üretilen her modülün
-  tema bloklarını gömülü otorite haritasına karşı denetler. Sapma = WARN;
-  White temada `--cds-support-info:#4589ff` = **FAIL** (bilinen AA kontrast
+  tema bloklarını (g10 · white · g100) gömülü otorite haritasına karşı denetler. Sapma = WARN;
+  açık temalarda (white/g10) `--cds-support-info:#4589ff` = **FAIL** (bilinen AA kontrast
   regresyonu, bkz. §2 durum tablosu).
 
 ### 1.2 Kanonik tema blokları (şablona gömülü — buradan kopyalanır)
@@ -55,18 +57,18 @@ Aşağıdaki bloklar `assets/module-template.html` `<style>` içindeki tema
 bildirimlerinin kanonik kaynağıdır; `@carbon/themes@11.75.0` ile birebirdir:
 
 ```css
-/* ===== IBM Carbon v11 — WHITE teması (varsayılan) ===== */
-:root,[data-theme="white"]{
-  /* yüzeyler */
-  --cds-background:#ffffff; --cds-layer-01:#f4f4f4; --cds-layer-02:#ffffff; --cds-layer-03:#f4f4f4;
+/* ===== IBM Carbon v11 — G10 teması (varsayılan; Tedy panosunun teması) ===== */
+:root,[data-theme="g10"]{
+  /* yüzeyler (@carbon/themes g10) */
+  --cds-background:#f4f4f4; --cds-layer-01:#ffffff; --cds-layer-02:#f4f4f4; --cds-layer-03:#ffffff;
   --cds-layer-hover-01:#e8e8e8; --cds-layer-active-01:#c6c6c6; --cds-layer-selected-01:#e0e0e0;
   --cds-layer-accent-01:#e0e0e0; --cds-layer-accent-hover-01:#d1d1d1;
-  --cds-field-01:#f4f4f4; --cds-field-hover-01:#e8e8e8;
+  --cds-field-01:#ffffff; --cds-field-hover-01:#e8e8e8;
   --cds-background-hover:rgba(141,141,141,.12); --cds-background-active:rgba(141,141,141,.5);
+  --cds-background-inverse:#393939; --cds-text-inverse:#ffffff;
   /* kenarlar — iki kademeli border-subtle: 00 zemin üstü, 01 layer-01 üstü */
-  --cds-border-subtle-00:#e0e0e0; --cds-border-subtle-01:#c6c6c6;
-  --cds-border-subtle:var(--cds-border-subtle-00);
-  --cds-border-strong:#8d8d8d; --cds-border-tile:#c6c6c6; --cds-border-interactive:#0f62fe;
+  --cds-border-subtle-00:#c6c6c6; --cds-border-subtle-01:#e0e0e0;
+  --cds-border-strong-01:#8d8d8d; --cds-border-tile-01:#a8a8a8; --cds-border-interactive:#0f62fe;
   /* metin + ikon */
   --cds-text-primary:#161616; --cds-text-secondary:#525252; --cds-text-helper:#6f6f6f;
   --cds-text-placeholder:rgba(22,22,22,.4); --cds-text-on-color:#ffffff;
@@ -80,11 +82,35 @@ bildirimlerinin kanonik kaynağıdır; `@carbon/themes@11.75.0` ile birebirdir:
   /* durum (status-token: info açık temada Blue 70) */
   --cds-support-success:#24a148; --cds-support-error:#da1e28;
   --cds-support-warning:#f1c21b; --cds-support-info:#0043ce;
-  --cds-notif-success-bg:#defbe6; --cds-notif-info-bg:#edf5ff;
-  --cds-notif-warning-bg:#fcf4d6; --cds-notif-error-bg:#fff1f1;
-  --reward:#d2a106; --reward-bg:#fcf4d6;
+  --cds-notification-background-success:#defbe6; --cds-notification-background-info:#edf5ff;
+  --cds-notification-background-warning:#fcf4d6; --cds-notification-background-error:#fff1f1;
+  /* Tedy katmanı — sayfa zemini cool-gray-10 ("okul"), okunur durum metni -70 adımı */
+  --tedy-page-background:#f2f4f8;
+  --tedy-text-success:#0e6027; --tedy-text-error:#a2191f;
+  --tedy-text-info:#0043ce; --tedy-text-warning:#8a3800;
+  --tedy-shadow-card:0 1px 3px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.08);
+}
+/* tema-bağımsız: kanonik adların eski kısa adları + Tedy marka/ödül */
+:root,[data-theme]{
+  --cds-border-subtle:var(--cds-border-subtle-00);
+  --cds-border-strong:var(--cds-border-strong-01); --cds-border-tile:var(--cds-border-tile-01);
+  --cds-notif-success-bg:var(--cds-notification-background-success);
+  --cds-notif-info-bg:var(--cds-notification-background-info);
+  --cds-notif-warning-bg:var(--cds-notification-background-warning);
+  --cds-notif-error-bg:var(--cds-notification-background-error);
+  /* Tedy kimliği: laciverti yalnız üst banttaki marka yüzeyidir, eylem rengi değildir */
+  --tedy-brand:#002d9c; --tedy-brand-hover:#001d6c;
+  --tedy-accent-urgent:var(--cds-support-error);
+  /* ödül (XP, seri): ayrı altın ham-hex yok — Carbon'un metin-güvenli sıcak adımı */
+  --reward:var(--tedy-text-warning); --reward-bg:var(--cds-notification-background-warning);
 }
 ```
+
+`[data-theme="white"]` bloğu aynı token kümesini `@carbon/themes` white değerleriyle taşır
+(yalnız eski kayıtlı tercih için; §2 tablosu). g10 ile white arasındaki tek farklar:
+`background #f4f4f4`, `layer-01 #ffffff`, `layer-02 #f4f4f4`, `layer-03 #ffffff`, `field-01 #ffffff`,
+`border-subtle-00 #c6c6c6`, `border-subtle-01 #e0e0e0`, `border-tile-01 #a8a8a8` — diğer tüm
+çekirdek değerler aynıdır. `tedy-*` katmanının gerekçesi: `tedy-integration.md`.
 
 (Gray-100 bloğu için §10; spacing/tip/hareket ortak `:root` bloğu için §5–6.)
 
@@ -168,8 +194,10 @@ bildirimlerinin kanonik kaynağıdır; `@carbon/themes@11.75.0` ile birebirdir:
 
 ## 3. Ders kategorisi aksan paleti
 
-Her ders bir aksan token'ı alır; modül başlığı, ilerleme rayı, segment
-ikon karoları bu aksanı kullanır. Aksan **anlam taşır** (kategori kodlama),
+Her ders bir aksan token'ı alır; aksan yalnız **odak çapalarında** görünür:
+bölüm ikon karosu, `kicker` ve bölüm başlığı çizgisi, seçili/hover seçenek,
+anlatım kutularının sol çizgisi. Üst bant Tedy laciverdidir; ilerleme göstergesi
+Carbon `interactive`'dir (v1.9.0). Aksan **anlam taşır** (kategori kodlama),
 dekor değil. Seçim önceliği: `MODULE_DATA.meta.accent` (hex) →
 `meta.subject`/`meta.subjectKey` üzerinden motor `SUBJECT_ACCENT` tablosu →
 varsayılan Blue 60.
@@ -185,7 +213,7 @@ varsayılan Blue 60.
 | `religion` | Green 60 | `#198038` | `#a7f0ba` / `#0e6027` | `#0e6027` / `#a7f0ba` |
 | `history` | Purple 50 | `#a56eff` | `#e8daff` / `#6929c4` | `#6929c4` / `#e8daff` |
 | `geography` | Teal 70 | `#005d5d` | `#9ef0f0` / `#005d5d` | `#005d5d` / `#9ef0f0` |
-| `turkish` | Red 60 | `#da1e28` | `#ffd7d9` / `#a2191f` | `#a2191f` / `#ffd7d9` |
+| `turkish` | Magenta 60 | `#d02670` | `#ffd6e8` / `#9f1853` | `#9f1853` / `#ffd6e8` |
 | `english` / `language` | Blue 60 | `#0f62fe` | `#d0e2ff` / `#0043ce` | `#0043ce` / `#d0e2ff` |
 | `french` | Purple 70 | `#6929c4` | `#e8daff` / `#6929c4` | `#6929c4` / `#e8daff` |
 | *(varsayılan)* | Blue 60 | `#0f62fe` | `#d0e2ff` / `#0043ce` | `#0043ce` / `#d0e2ff` |
@@ -316,12 +344,12 @@ sapmalar** çocuk + DEHB için yapılır ve `adhd-pedagogy.md`'ye dayanır:
 
 | Uyarlama | Carbon varsayılan | Edupedia değeri | Gerekçe |
 |---|---|---|---|
-| Köşe yarıçapı | ~0–2px (dikdörtgensel) | `--cds-radius: 8px` (kart), 6px (buton) | Yumuşak köşeler çocukta "dostça"; Carbon'un expressive ucu yarıçapı tolere eder |
+| Köşe yarıçapı | 0 (keskin) | Tedy kuralı: kart, panel ve üst bant `border-radius-08` (`--cds-radius`); düğme, seçenek kutusu, alan ve tablo `border-radius-00` (`--radius-btn`, `--radius-field`); etiket/çip `border-radius-max` (`--radius-tag`) | Panoyla aynı köşe dili; Carbon keskinliği eylem öğelerinde korunur, yumuşatma yalnız kartta |
 | Gövde boyutu | body-02 = 16px | 18px | Okunabilirlik + disleksi (ped §5) |
 | Başlık ağırlığı | heading 400 | 600 | Hiyerarşi belirginliği (yürütücü işlev desteği) |
 | Dokunma hedefi | size Medium 40px | ≥48px (= Carbon size **Large**) | Motor + dürtüsellik (WCAG 2.5.5; ped §5) |
-| Aksan yoğunluğu | Ölçülü | Kategori-renk belirgin | Uyarılma (ped İlke 5) |
-| Hareket | Productive ağırlıklı | Expressive ödül anları | Ödül belirginliği (ped İlke 3) |
+| Aksan yoğunluğu | Ölçülü | Kategori-renk yalnız odak çapalarında (ikon, çizgi, seçim) | Uyarılma (ped İlke 5) + Tedy İ6 "uyaran bir bütçedir" |
+| Hareket | Productive ağırlıklı | Productive; ödül anı sessiz onaydır (kısa opaklık nabzı, 10px yükselen "+N XP"; ölçek sıçraması yok) | Ödül belirginliği earcon + görsel eşle korunur (ped İlke 3); Tedy "kutlama yok" |
 | Piktogram | Seçici | Bol (her segment) | İkili kodlama (ped İlke 7) |
 
 > Bu sapmalar Carbon'un **token disiplinini bozmaz** — yalnız değerleri çocuk
@@ -357,13 +385,14 @@ HTML/CSS karşılıkları) sadık biçimde uygular. Eşleme:
 
 | Carbon bileşeni | edupedia karşılığı | Token bağı |
 |---|---|---|
-| **ProgressIndicator** (stepper) | `.stepper` — tamamlanan (yeşil + onay), mevcut (aksan halka), bekleyen (nötr); tamamlanana tıklanıp geri dönülür | `support-success`, `--accent`, `border-strong` |
-| **Selectable Tile** | `.opt` — 1px `border-tile` → hover/seçili 2px `border-interactive`; köşe işaret yuvası; doğru/yanlış durumları | `border-tile`, `border-interactive`, `layer-hover-01` |
-| **Inline notification** | `.feedback--ok/no/info` — 3px sol durum çubuğu + durum ikonu; koyu temada 1px `border-subtle-01` çerçeve | `support-*`, `notif-*-bg` |
-| **Tag** | `.def-term`, `.badge` — pill, resmî tag çifti zemin/metin | `ACCENT_STRONG` tag-tokens |
-| **Definition tooltip** | `.def-term:hover/focus::after` — koyu (#393939) popover | — |
-| **Button (primary/ghost)** | `.btn--primary` (Blue 60), `.btn--ghost` (1px kenar); hover/active `background-hover/active` | `button-primary-*`, `background-*` |
-| **Icon button (ghost)** | `.icon-btn`; hover `background-hover`, basılı `background-active` | `background-*` |
+| **Header (Tedy bandı)** | `.topbar__hero` — düz `tedy-brand` + Tedy işareti + `text-on-color` başlık; Tag çipleri `tedy-brand-hover` | `tedy-brand`, `text-on-color` |
+| **ProgressIndicator** (stepper) | `.stepper` — tamamlanan (`button-primary` dolgu + onay), mevcut (`interactive` halka), bekleyen (nötr); tamamlanana tıklanıp geri dönülür | `button-primary`, `interactive`, `border-strong-01` |
+| **Selectable Tile** | `.opt` — kare (`border-radius-00`); 1px `border-tile-01` → hover/seçili 2px aksan; köşe işaret yuvası; doğru/yanlış durumları | `border-tile-01`, `--accent`, `layer-hover-01` |
+| **Inline notification** | `.feedback--ok/no/info` — 3px sol durum çubuğu + durum ikonu; koyu temada 1px `border-subtle-01` çerçeve | `support-*`, `notification-background-*` |
+| **Tag** | `.def-term` (aksan tag çifti), `.badge` (kilitli nötr, kazanılan `layer-selected-01`) — `border-radius-max` | `ACCENT_STRONG` tag-tokens, `layer-selected-01` |
+| **Definition tooltip** | `.def-pop` — Carbon ters yüzey popover, `shadow-menu` | `background-inverse`, `text-inverse`, `shadow` |
+| **Button (primary/ghost)** | `.btn--primary` (Blue 60), `.btn--ghost` (1px kenar); kare; hover/active `background-hover/active` | `button-primary-*`, `background-*` |
+| **Icon button (ghost)** | `.icon-btn` — kare; bantta hover `tedy-brand-hover`, açık durum beyaz zemin + lacivert ikon | `tedy-brand-hover`, `text-on-color` |
 | **Data-viz donut** | `donutSvg()` — Carbon Charts paletiyle uyumlu SVG halka | `--viz-*` |
 | **Skeleton** | (rezerve) yüklenme iskeleti | `skeleton-*` |
 
@@ -373,10 +402,12 @@ gömülür, `currentColor` ile tema/aksan rengini alır.
 
 ## 10. Gray-100 (dark) teması token'ları
 
-Tema **token-tabanlıdır**: `<html data-theme="white|g100">` özniteliği tema
-bloğunu seçer; tüm bileşenler değişken okuduğu için yeniden render gerekmez.
-Üst çubuktaki ikon-buton (`ic-moon`/`ic-light`) geçişi yapar. Kanonik blok
-(`@carbon/themes@11.75.0` g100 ile birebir):
+Tema **token-tabanlıdır**: `<html data-theme="g10|g100">` özniteliği tema
+bloğunu seçer (`white` yalnız eski kayıt); tüm bileşenler değişken okuduğu için yeniden
+render gerekmez. Üst çubuktaki ikon-buton (`ic-moon`/`ic-light`) g10 ↔ g100 geçişi yapar;
+pano temayı `edupedia:appearance` mesajıyla bildirir (öğrencinin kendi seçimi önceliklidir,
+`tedy-integration.md` §2). Kanonik blok (`@carbon/themes@11.75.0` g100 ile birebir; `tedy-*`
+satırları Tedy katmanıdır):
 
 ```css
 [data-theme="g100"]{
@@ -385,9 +416,9 @@ bloğunu seçer; tüm bileşenler değişken okuduğu için yeniden render gerek
   --cds-layer-accent-01:#393939; --cds-layer-accent-hover-01:#474747;
   --cds-field-01:#262626; --cds-field-hover-01:#333333;
   --cds-background-hover:rgba(141,141,141,.16); --cds-background-active:rgba(141,141,141,.4);
+  --cds-background-inverse:#f4f4f4; --cds-text-inverse:#161616;
   --cds-border-subtle-00:#393939; --cds-border-subtle-01:#525252;
-  --cds-border-subtle:var(--cds-border-subtle-00);
-  --cds-border-strong:#6f6f6f; --cds-border-tile:#525252; --cds-border-interactive:#4589ff;
+  --cds-border-strong-01:#6f6f6f; --cds-border-tile-01:#525252; --cds-border-interactive:#4589ff;
   --cds-text-primary:#f4f4f4; --cds-text-secondary:#c6c6c6; --cds-text-helper:#a8a8a8;
   --cds-text-placeholder:rgba(244,244,244,.4); --cds-text-on-color:#ffffff;
   --cds-icon-primary:#f4f4f4; --cds-icon-secondary:#c6c6c6; --cds-icon-on-color:#ffffff;
@@ -398,9 +429,17 @@ bloğunu seçer; tüm bileşenler değişken okuduğu için yeniden render gerek
   --cds-skeleton-background:#292929; --cds-skeleton-element:#393939;
   --cds-support-success:#42be65; --cds-support-error:#fa4d56;
   --cds-support-warning:#f1c21b; --cds-support-info:#4589ff;
-  /* Carbon koyu bildirim: zemin layer-01-eşdeğeri #262626; anlamı 3px durum çubuğu + ikon taşır */
-  --cds-notif-success-bg:#262626; --cds-notif-info-bg:#262626;
-  --cds-notif-warning-bg:#262626; --cds-notif-error-bg:#262626;
+  --viz-1:#be95ff; --viz-2:#78a9ff; --viz-3:#33b1ff; --viz-4:#08bdba; --viz-5:#ff7eb6;
+  --viz-grid:#393939; --viz-axis:#8d8d8d; --viz-track:#393939;
+  --viz-sun:#fddc69; --viz-water:#33b1ff; --viz-cloud:#a8a8a8;
+  /* Carbon koyu bildirim: zemin layer-01, anlamı 3px durum çubuğu + ikon taşır */
+  --cds-notification-background-success:#262626; --cds-notification-background-info:#262626;
+  --cds-notification-background-warning:#262626; --cds-notification-background-error:#262626;
+  /* Tedy katmanı — koyu zemin cool-gray-100; okunur durum metni -30 adımı; kart gölgesi yok */
+  --tedy-page-background:#121619;
+  --tedy-text-success:#6fdc8c; --tedy-text-error:#ffb3b8;
+  --tedy-text-info:#a6c8ff; --tedy-text-warning:#ffb784;
+  --tedy-shadow-card:none;
 }
 ```
 
@@ -410,7 +449,7 @@ bildirim zeminleri özel koyu tintler → dördü de **`#262626`** (Carbon koyu
 bildirim deseni: nötr katman zemini, anlam durum çubuğu + ikonda).
 
 `setAccent(hex)` **tema-duyarlıdır**: `--accent-tint` aksanı tema zemini ile
-karıştırır (white'ta açık, g100'de koyu tint); `--accent-strong` resmî tag
+karıştırır (g10/white'ta açık, g100'de koyu tint); `--accent-strong` resmî tag
 çiftinden gelir — açık temada koyu, g100'de açık değer (bkz. §3).
 
 ## 11. Kontrast düzeltmesi — birincil eylem rengi
@@ -421,8 +460,9 @@ kontrastı ~2.9:1 — **AA başarısız**.
 
 **Carbon-doğru çözüm:** birincil eylemler **her zaman Blue 60**
 (`--cds-button-primary`, beyaz metinle ~4.6:1 ✓) kullanır; kategori aksanı yalnız
-**metin-taşımayan yapısal/dekoratif** öğelerde kullanılır: ilerleme dolgusu,
-stepper, tile seçimi, tag zemini, üst çubuk üst-kenarı, piktogramlar. Aksan-renkli
+**metin-taşımayan yapısal/dekoratif** öğelerde kullanılır: tile seçimi, bölüm ikon
+karosu, başlık ve anlatım kutusu çizgileri, tag zemini, piktogramlar (v1.9.0: stepper
+Carbon `interactive`, üst bant `tedy-brand` taşır). Aksan-renkli
 **metin** her zaman `--accent-strong` (resmî tag çifti — kontrast-güvenli) ile
 yazılır; tamamlandı/doğru göstergeleri `--cds-support-success` (yeşil) kullanır.
 Bu, hem Carbon'un eylem-rengi tutarlılığını hem WCAG AA'yı sağlar.
@@ -437,16 +477,17 @@ ritmi kurmak. DEHB için bu, dikkat-dağıtıcı süs değil; segment türünü 
 | Öğe | Yüzey | Token |
 |---|---|---|
 | Sahne (varsayılan) | nötr kart | `--cds-layer-01` |
-| Segment ikon karosu (`.seg-ic`) | aksan-tint yuvarlatılmış kare, içinde piktogram | `--accent-tint` + `--accent-strong` |
-| Çekme-alıntı (`.lead`) | aksan-tint **çağrı kutusu** + 4px sol bar, serif, **metin `--text-primary`** (her iki temada AA) | `--accent-tint` |
+| Segment ikon karosu (`.seg-ic`) | aksan-tint kare (`border-radius-08`), içinde piktogram | `--accent-tint` + `--accent-strong` |
+| Çekme-alıntı (`.lead`) | nötr **çağrı kutusu** + 4px aksan sol çizgi, serif, **metin `--text-primary`** (her temada AA) | `--cds-layer-02` + `--accent` |
 | Görsel (`.visual`) / Kavramlar (`.terms`) | yükseltilmiş çerçeveli yüzey | `--cds-layer-02` + `--border-subtle` |
-| Çağrı kutusu (`.callout`, `--info`/`--success`) | tint + durum bar + ikon; teach gövdesinde kullanılır | `--accent-tint` / `color-mix(support)` |
-| **brainbreak** sahnesi | tamamı aksan-tint (sakinleştirici "mola" sinyali) | `.stage[data-seg="brainbreak"]` |
+| Çağrı kutusu (`.callout`, `--info`/`--success`/`--warning`) | varsayılan nötr + aksan çizgi; varyantlar Carbon bildirim zemini + durum bar + ikon | `--cds-layer-02` / `notification-background-*` |
+| **brainbreak** sahnesi | nötr kart; "mola" sinyalini büyük piktogram + başlık taşır (v1.9.0: tint dolgu kaldırıldı) | `.stage[data-seg="brainbreak"]` → `--seg-accent` = success |
 | **checkpoint** sahnesi | üst 4px aksan kenarı (kilometre taşı) | `.stage[data-seg="checkpoint"]` |
-| **summary** sahnesi | üstten aksan-tint → layer-01 yumuşak geçiş (kutlama) | `.stage[data-seg="summary"]` |
+| **summary** sahnesi | nötr kart (v1.9.0: gradyan kaldırıldı — Tedy "kutlama yok") | `.stage[data-seg="summary"]` |
 
-**Kontrast güvencesi:** Tüm tint zeminler `--accent-tint` (temaya göre çok açık/çok
-koyu) olduğundan üzerine **`--text-primary`** yazılır → White ve Gray-100'de AA.
+**Kontrast güvencesi:** Anlatım kutuları nötr Carbon katmanıdır, kalan tint zeminler
+(`.seg-ic`, seçili seçenek, tanım etiketi) `--accent-tint`'tir (temaya göre çok açık/çok
+koyu); üzerine **`--text-primary`** ya da resmî tag metni yazılır → g10, White ve Gray-100'de AA.
 Aksan yalnız bar/ikon/karo gibi **dekoratif** yüzeylerde; metin asla düşük-kontrast
 aksan renginde değil. `data-seg` özniteliği motor tarafından her segmentte sahneye
 yazılır; renk paleti **tek kategori aksanı + nötr katmanlar** ile sınırlı kalır

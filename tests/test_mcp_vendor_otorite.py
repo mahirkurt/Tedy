@@ -44,8 +44,8 @@ def test_canonical_set_carries_font_license_template_tooling_and_gate_suite():
     for rel in CANONICAL_EXTRAS:
         assert rel in files, rel
     assert len([r for r in files if r.startswith("tests/fixtures/") and r.endswith(".html")]) == 18
-    assert len([r for r in files if r.startswith("references/")]) == 17
-    assert len(files) == 45
+    assert len([r for r in files if r.startswith("references/")]) == 18
+    assert len(files) == 46
 
 
 def test_vendor_sync_reads_no_external_source():

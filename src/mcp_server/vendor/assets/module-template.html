@@ -1,17 +1,21 @@
 <!DOCTYPE html>
-<html lang="tr" data-theme="white">
+<html lang="tr" data-theme="g10">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Carbon Edupedia — Etkileşimli Öğrenim Modülü</title>
 <!--
   ============================================================================
-  CARBON EDUPEDIA · ETKİLEŞİMLİ ÖĞRENİM MODÜLÜ ŞABLONU (v1.8.0)
+  CARBON EDUPEDIA · ETKİLEŞİMLİ ÖĞRENİM MODÜLÜ ŞABLONU (v1.9.0 · Tedy uyumu)
   - IBM Carbon Design System v11 · IBM Plex tipografisi
   - GERÇEK Carbon ikonları (@carbon/icons) + piktogramları (@carbon/pictograms)
   - Carbon bileşen desenleri: ProgressIndicator · selectable Tile ·
     inline notification · Tag · definition tooltip · data-viz donut
-  - White + Gray-100 (dark) tema sistemi (token-tabanlı)
+  - G10 (varsayılan, Tedy panosu) + Gray-100 (dark) tema sistemi (token-tabanlı);
+    White yalnız eski kayıtlı tercih için. Pano teması edupedia:appearance ile devralınır.
+  - Tedy katmanı (tedy-*): lacivert kimlik bandı + Tedy işareti, cool-gray sayfa
+    zemini, okunur durum metni; Carbon token'larının hiçbiri değiştirilmez
+    (references/tedy-integration.md)
   - EMOJİSİZ · WCAG 2.1 AA · DEHB-dostu
   - Yeni modül: yalnız MODULE_DATA nesnesini değiştirin. MOTORU değiştirmeyin.
   ============================================================================
@@ -205,18 +209,20 @@
   unicode-range:U+0100-0101, U+0104-0130, U+0132-0151, U+0154-017F, U+018F, U+0192, U+01A0-01A1, U+01AF-01B0, U+01FA-01FF, U+0218-021B, U+0237, U+0259, U+1E80-1E85, U+1E9E, U+20A1, U+20A4, U+20A6, U+20A8-20AA, U+20AD-20AE, U+20B1-20B2, U+20B4-20B5, U+20B8-20BA, U+20BD, U+20BF;
 }
 /* IBM_PLEX_INLINE_END */
-/* ===== IBM Carbon v11 — WHITE teması (varsayılan) ===== */
-:root,[data-theme="white"]{
-  /* yüzeyler (@carbon/themes white) */
-  --cds-background:#ffffff; --cds-layer-01:#f4f4f4; --cds-layer-02:#ffffff; --cds-layer-03:#f4f4f4;
+/* ===== IBM Carbon v11 — G10 teması (varsayılan; Tedy panosunun teması) =====
+   Değerler @carbon/themes g10 ile birebir (G-TOKEN). Tedy katmanı (tedy-*) Carbon
+   token'larının hiçbirini değiştirmez; yalnızca üstüne eklenir (references/tedy-integration.md). */
+:root,[data-theme="g10"]{
+  /* yüzeyler (@carbon/themes g10) */
+  --cds-background:#f4f4f4; --cds-layer-01:#ffffff; --cds-layer-02:#f4f4f4; --cds-layer-03:#ffffff;
   --cds-layer-hover-01:#e8e8e8; --cds-layer-active-01:#c6c6c6; --cds-layer-selected-01:#e0e0e0;
   --cds-layer-accent-01:#e0e0e0; --cds-layer-accent-hover-01:#d1d1d1;
-  --cds-field-01:#f4f4f4; --cds-field-hover-01:#e8e8e8;
+  --cds-field-01:#ffffff; --cds-field-hover-01:#e8e8e8;
   --cds-background-hover:rgba(141,141,141,.12); --cds-background-active:rgba(141,141,141,.5);
+  --cds-background-inverse:#393939; --cds-text-inverse:#ffffff;
   /* kenarlar — iki kademeli border-subtle: 00 zemin üstü, 01 layer-01 üstü */
-  --cds-border-subtle-00:#e0e0e0; --cds-border-subtle-01:#c6c6c6;
-  --cds-border-subtle:var(--cds-border-subtle-00);
-  --cds-border-strong:#8d8d8d; --cds-border-tile:#c6c6c6; --cds-border-interactive:#0f62fe;
+  --cds-border-subtle-00:#c6c6c6; --cds-border-subtle-01:#e0e0e0;
+  --cds-border-strong-01:#8d8d8d; --cds-border-tile-01:#a8a8a8; --cds-border-interactive:#0f62fe;
   /* metin + ikon */
   --cds-text-primary:#161616; --cds-text-secondary:#525252; --cds-text-helper:#6f6f6f;
   --cds-text-placeholder:rgba(22,22,22,.4); --cds-text-on-color:#ffffff;
@@ -230,9 +236,41 @@
   /* durum (status-token: info açık temada Blue 70) */
   --cds-support-success:#24a148; --cds-support-error:#da1e28;
   --cds-support-warning:#f1c21b; --cds-support-info:#0043ce;
-  --cds-notif-success-bg:#defbe6; --cds-notif-info-bg:#edf5ff;
-  --cds-notif-warning-bg:#fcf4d6; --cds-notif-error-bg:#fff1f1;
-  --reward:#d2a106; --reward-bg:#fcf4d6;
+  --cds-notification-background-success:#defbe6; --cds-notification-background-info:#edf5ff;
+  --cds-notification-background-warning:#fcf4d6; --cds-notification-background-error:#fff1f1;
+  /* Tedy katmanı — sayfa zemini cool-gray-10 ("okul"), okunur durum metni -70 adımı */
+  --tedy-page-background:#f2f4f8;
+  --tedy-text-success:#0e6027; --tedy-text-error:#a2191f;
+  --tedy-text-info:#0043ce; --tedy-text-warning:#8a3800;
+  --tedy-shadow-card:0 1px 3px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.08);
+}
+/* ===== IBM Carbon v11 — WHITE teması (geriye uyum: eski kayıtlı tercih) ===== */
+[data-theme="white"]{
+  /* yüzeyler (@carbon/themes white) */
+  --cds-background:#ffffff; --cds-layer-01:#f4f4f4; --cds-layer-02:#ffffff; --cds-layer-03:#f4f4f4;
+  --cds-layer-hover-01:#e8e8e8; --cds-layer-active-01:#c6c6c6; --cds-layer-selected-01:#e0e0e0;
+  --cds-layer-accent-01:#e0e0e0; --cds-layer-accent-hover-01:#d1d1d1;
+  --cds-field-01:#f4f4f4; --cds-field-hover-01:#e8e8e8;
+  --cds-background-hover:rgba(141,141,141,.12); --cds-background-active:rgba(141,141,141,.5);
+  --cds-background-inverse:#393939; --cds-text-inverse:#ffffff;
+  --cds-border-subtle-00:#e0e0e0; --cds-border-subtle-01:#c6c6c6;
+  --cds-border-strong-01:#8d8d8d; --cds-border-tile-01:#c6c6c6; --cds-border-interactive:#0f62fe;
+  --cds-text-primary:#161616; --cds-text-secondary:#525252; --cds-text-helper:#6f6f6f;
+  --cds-text-placeholder:rgba(22,22,22,.4); --cds-text-on-color:#ffffff;
+  --cds-icon-primary:#161616; --cds-icon-secondary:#525252; --cds-icon-on-color:#ffffff;
+  --cds-interactive:#0f62fe; --cds-link-primary:#0f62fe; --cds-link-primary-hover:#0043ce;
+  --cds-button-primary:#0f62fe; --cds-button-primary-hover:#0050e6; --cds-button-primary-active:#002d9c;
+  --cds-focus:#0f62fe; --cds-focus-inset:#ffffff;
+  --cds-highlight:#d0e2ff; --cds-overlay:rgba(0,0,0,.6); --cds-shadow:rgba(0,0,0,.3);
+  --cds-skeleton-background:#e8e8e8; --cds-skeleton-element:#c6c6c6;
+  --cds-support-success:#24a148; --cds-support-error:#da1e28;
+  --cds-support-warning:#f1c21b; --cds-support-info:#0043ce;
+  --cds-notification-background-success:#defbe6; --cds-notification-background-info:#edf5ff;
+  --cds-notification-background-warning:#fcf4d6; --cds-notification-background-error:#fff1f1;
+  --tedy-page-background:#ffffff;
+  --tedy-text-success:#0e6027; --tedy-text-error:#a2191f;
+  --tedy-text-info:#0043ce; --tedy-text-warning:#8a3800;
+  --tedy-shadow-card:0 1px 3px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.08);
 }
 /* ===== IBM Carbon v11 — GRAY-100 (dark) teması ===== */
 [data-theme="g100"]{
@@ -241,9 +279,9 @@
   --cds-layer-accent-01:#393939; --cds-layer-accent-hover-01:#474747;
   --cds-field-01:#262626; --cds-field-hover-01:#333333;
   --cds-background-hover:rgba(141,141,141,.16); --cds-background-active:rgba(141,141,141,.4);
+  --cds-background-inverse:#f4f4f4; --cds-text-inverse:#161616;
   --cds-border-subtle-00:#393939; --cds-border-subtle-01:#525252;
-  --cds-border-subtle:var(--cds-border-subtle-00);
-  --cds-border-strong:#6f6f6f; --cds-border-tile:#525252; --cds-border-interactive:#4589ff;
+  --cds-border-strong-01:#6f6f6f; --cds-border-tile-01:#525252; --cds-border-interactive:#4589ff;
   --cds-text-primary:#f4f4f4; --cds-text-secondary:#c6c6c6; --cds-text-helper:#a8a8a8;
   --cds-text-placeholder:rgba(244,244,244,.4); --cds-text-on-color:#ffffff;
   --cds-icon-primary:#f4f4f4; --cds-icon-secondary:#c6c6c6; --cds-icon-on-color:#ffffff;
@@ -258,9 +296,29 @@
   --viz-grid:#393939; --viz-axis:#8d8d8d; --viz-track:#393939;
   --viz-sun:#fddc69; --viz-water:#33b1ff; --viz-cloud:#a8a8a8;
   /* Carbon koyu bildirim: zemin layer-01, anlamı 3px durum çubuğu + ikon taşır */
-  --cds-notif-success-bg:#262626; --cds-notif-info-bg:#262626;
-  --cds-notif-warning-bg:#262626; --cds-notif-error-bg:#262626;
-  --reward:#f1c21b; --reward-bg:#2c2613;
+  --cds-notification-background-success:#262626; --cds-notification-background-info:#262626;
+  --cds-notification-background-warning:#262626; --cds-notification-background-error:#262626;
+  /* Tedy katmanı — koyu zemin cool-gray-100; okunur durum metni -30 adımı; kart gölgesi yok */
+  --tedy-page-background:#121619;
+  --tedy-text-success:#6fdc8c; --tedy-text-error:#ffb3b8;
+  --tedy-text-info:#a6c8ff; --tedy-text-warning:#ffb784;
+  --tedy-shadow-card:none;
+}
+/* Tema-bağımsız katman: kanonik Carbon adlarının eski kısa adları (geriye uyum; yeni kodda
+   kanonik adı kullanın) + Tedy marka/aciliyet + ödül vurgusu. Takma adlar her tema öğesinde
+   yeniden çözülür, bu yüzden [data-theme] seçicisinde durur. */
+:root,[data-theme]{
+  --cds-border-subtle:var(--cds-border-subtle-00);
+  --cds-border-strong:var(--cds-border-strong-01); --cds-border-tile:var(--cds-border-tile-01);
+  --cds-notif-success-bg:var(--cds-notification-background-success);
+  --cds-notif-info-bg:var(--cds-notification-background-info);
+  --cds-notif-warning-bg:var(--cds-notification-background-warning);
+  --cds-notif-error-bg:var(--cds-notification-background-error);
+  /* Tedy kimliği: laciverti yalnız üst banttaki marka yüzeyidir, eylem rengi değildir */
+  --tedy-brand:#002d9c; --tedy-brand-hover:#001d6c;
+  --tedy-accent-urgent:var(--cds-support-error);
+  /* ödül (XP, seri): ayrı altın ham-hex yok — Carbon'un metin-güvenli sıcak adımı */
+  --reward:var(--tedy-text-warning); --reward-bg:var(--cds-notification-background-warning);
 }
 :root{
   /* Carbon spacing ölçeği — @carbon/layout (2px mini-unit) */
@@ -291,7 +349,13 @@
   --ease-expr:var(--cds-easing-standard-expressive);
   --ease-entrance:var(--cds-easing-entrance-expressive);
   --ease-exit:var(--cds-easing-exit-expressive);
-  --cds-radius:8px; --radius-btn:6px; --tap:48px; /* tap = Carbon size Large (3rem) */
+  /* köşe — @carbon/layout border-radius ölçeği. Carbon keskindir: düğme, alan, tablo
+     border-radius-00. Tedy'nin tek yumuşatması kart ve üst banttır (08); etiket/çip max. */
+  --cds-border-radius-00:0; --cds-border-radius-02:.125rem; --cds-border-radius-04:.25rem;
+  --cds-border-radius-08:.5rem; --cds-border-radius-max:999999px;
+  --cds-radius:var(--cds-border-radius-08); --radius-btn:var(--cds-border-radius-00);
+  --radius-field:var(--cds-border-radius-00); --radius-tag:var(--cds-border-radius-max);
+  --tap:48px; /* tap = Carbon size Large (3rem) */
   --font-sans:'IBM Plex Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
   --font-serif:'IBM Plex Serif',Georgia,Times,serif;
   --font-mono:'IBM Plex Mono',Menlo,'DejaVu Sans Mono',ui-monospace,monospace;
@@ -304,86 +368,92 @@
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;width:100%;max-width:100%}
 body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
-  color:var(--cds-text-primary);background:var(--cds-background);-webkit-font-smoothing:antialiased;
+  color:var(--cds-text-primary);background:var(--tedy-page-background,var(--cds-background));-webkit-font-smoothing:antialiased;
   overflow-wrap:anywhere;
   transition:background var(--dur-mod) var(--ease-std),color var(--dur-mod) var(--ease-std)}
 .wrap{width:100%;max-width:880px;min-width:0;margin:0 auto;padding:var(--sp-05);min-height:100vh;display:flex;flex-direction:column}
 .cds-icon{display:inline-block;width:1.25rem;height:1.25rem;fill:currentColor;vertical-align:middle;flex:none}
 .pic{display:inline-block;fill:currentColor;color:var(--accent-strong)}
 /* ============================================================
-   ÜST ÇUBUK — İKİ KATMANLI CARBON HEADER
-   Carbon katmanlama (layering) ilkesi: renkli KİMLİK bandı (ders
-   aksanı + açık içerik) ile nötr DURUM şeridi (ProgressIndicator +
-   Tag rozetleri) ayrı yüzeylerde. Tek kapsayıcı; overflow:hidden ile
-   köşeler kırpılır. Boşluklar Carbon 2x-grid ölçeğinden (--sp-0X).
+   ÜST ÇUBUK — İKİ KATMANLI CARBON HEADER (Tedy bandı)
+   Carbon katmanlama (layering) ilkesi: KİMLİK bandı ile nötr DURUM
+   şeridi (ProgressIndicator + Tag rozetleri) ayrı yüzeylerde. Kimlik
+   bandı Tedy panosunun üst bilgisiyle aynı dildedir: düz tedy-brand
+   (Carbon blue-80) + Tedy işareti, üzerinde text-on-color (11,3:1).
+   Ders aksanı bantta DEĞİL; yalnız odak çapalarında yaşar (bölüm
+   ikonu, bölüm başlığı çizgisi, seçili seçenek). Gradyan, ham hex ve
+   cam (rgba) yüzey yok. Köşe border-radius-08 (Tedy kart kuralı).
    Motor sınıfları korunur (step--done/current, badge--earned,
    icon-btn--on, streak-chip); ".topbar X" override'ları temel
    tanımları geçersiz kılar.
    ============================================================ */
-.topbar{position:relative;margin-bottom:var(--sp-06);border-radius:12px;overflow:hidden;
-  border:1px solid var(--cds-border-subtle);box-shadow:0 6px 20px -16px rgba(0,0,0,.55)}
+.topbar{position:relative;margin-bottom:var(--sp-06);border-radius:var(--cds-radius);overflow:hidden;
+  border:1px solid var(--cds-border-subtle);box-shadow:var(--tedy-shadow-card)}
 
-/* --- KATMAN 1 · Kimlik bandı (ders aksanı, açık içerik) --- */
-.topbar__hero{position:relative;color:#fff;padding:var(--sp-05) var(--sp-06);
-  background:linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 78%, #000) 100%)}
-.topbar__hero::after{content:"";position:absolute;inset:0;pointer-events:none;
-  background:radial-gradient(120% 150% at 100% 0%, rgba(255,255,255,.16), transparent 60%)}
+/* --- KATMAN 1 · Kimlik bandı (Tedy laciverti, açık içerik) --- */
+.topbar__hero{position:relative;color:var(--cds-text-on-color);padding:var(--sp-05) var(--sp-06);
+  background:var(--tedy-brand)}
 .topbar__row{position:relative;display:flex;align-items:center;justify-content:space-between;
   gap:var(--sp-04) var(--sp-05);flex-wrap:wrap}
 .topbar__l{display:flex;align-items:center;gap:var(--sp-05);min-width:0;max-width:100%;flex:1 1 260px}
 .topbar__l>div{min-width:0}
-.topbar #coverPic{width:26px;height:26px;box-sizing:content-box;padding:9px;flex:none;color:#fff;
-  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:10px}
-.topbar__title{font-size:1.5rem;line-height:1.2;font-weight:600;letter-spacing:-.01em;margin:0;color:#fff;overflow-wrap:anywhere}
-.meta-line{font-size:.8125rem;line-height:1.25;color:rgba(255,255,255,.85);margin-top:var(--sp-02);
-  font-weight:400;letter-spacing:.01em;overflow-wrap:anywhere}
+/* Tedy işareti (on-brand): beyaz disk, yarı saydam beyaz hilal, lacivert onay; renkler token */
+.tedy-mark{flex:none;width:32px;height:32px;display:block}
+.tedy-mark__disc{fill:var(--cds-text-on-color)}
+.tedy-mark__moon{fill:var(--cds-text-on-color);fill-opacity:.5}
+.tedy-mark__check{fill:none;stroke:var(--tedy-brand);stroke-width:8.2;stroke-linecap:round;stroke-linejoin:round}
+.topbar__title{font-size:1.5rem;line-height:1.2;font-weight:600;letter-spacing:-.01em;margin:0;
+  color:var(--cds-text-on-color);overflow-wrap:anywhere}
+.meta-line{font-size:.8125rem;line-height:1.25;margin-top:var(--sp-02);font-weight:400;letter-spacing:.01em;
+  color:color-mix(in srgb,var(--cds-text-on-color) 82%,var(--tedy-brand));overflow-wrap:anywhere}
 .topbar__r{display:flex;align-items:center;justify-content:flex-end;gap:var(--sp-04);
   flex:1 1 auto;flex-wrap:wrap;min-width:0;max-width:100%}
-/* XP / seri — Carbon Tag (cam) */
+/* XP / seri — Carbon Tag (bant üstünde: brand-hover zemin, text-on-color) */
 .xp{font-family:var(--font-sans);font-weight:600;font-size:.8125rem;display:inline-flex;align-items:center;
-  gap:6px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25);
-  border-radius:99px;padding:var(--sp-02) var(--sp-04);white-space:nowrap}
-.xp .cds-icon{color:#ffd56b;width:1rem;height:1rem}
+  gap:6px;background:var(--tedy-brand-hover);color:var(--cds-text-on-color);
+  border-radius:var(--radius-tag);padding:var(--sp-02) var(--sp-04);white-space:nowrap}
+.xp .cds-icon{width:1rem;height:1rem}
 .xp #xpValue{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-weight:700}
-.topbar .xp-float{color:#ffe9a8}
+/* bant üstünde ödül yıldızı Carbon support-warning (yellow-30; lacivert üstünde 7,3:1) */
+.topbar .xp .cds-icon{color:var(--cds-support-warning)}
+.topbar .xp-float{color:var(--cds-text-on-color)}
 .topbar .streak-chip{font-family:var(--font-sans);font-weight:600;font-size:.8125rem;display:inline-flex;
-  align-items:center;gap:5px;background:rgba(255,255,255,.15);color:#fff;
-  border:1px solid rgba(255,255,255,.25);border-radius:99px;padding:var(--sp-02) var(--sp-04)}
-.topbar .streak-chip .cds-icon{color:#ffd56b;width:1rem;height:1rem}
-.topbar .streak-float{color:#ffe9a8}
+  align-items:center;gap:5px;background:var(--tedy-brand-hover);color:var(--cds-text-on-color);
+  border-radius:var(--radius-tag);padding:var(--sp-02) var(--sp-04)}
+.topbar .streak-chip .cds-icon{color:var(--cds-text-on-color);width:1rem;height:1rem}
+.topbar .streak-float{color:var(--cds-text-on-color)}
 /* v3.0.0 — Task 10: kaygısız tempo diski (opsiyonel/varsayılan KAPALI; gamified-flows.md §3.4).
    Sayısız + kesintisiz: yalnız bir SVG yay, hiçbir sayısal metin/geri-sayım yok. */
 .pacing-disk{display:inline-flex;align-items:center;gap:var(--sp-02);
-  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);
-  border-radius:99px;padding:2px 2px 2px var(--sp-03)}
+  background:var(--tedy-brand-hover);border-radius:var(--radius-tag);padding:2px 2px 2px var(--sp-03)}
 .pacing-disk[hidden]{display:none}
 .pacing-disk__ring{flex:none}
-.pacing-disk__track{fill:none;stroke:rgba(255,255,255,.32);stroke-width:3}
-.pacing-disk__arc{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round}
-.pacing-disk__dismiss{width:22px;height:22px;border:none;background:transparent;color:#fff;
-  cursor:pointer;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;opacity:.85}
-.pacing-disk__dismiss:hover{background:rgba(255,255,255,.18);opacity:1}
-.pacing-disk__dismiss:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.pacing-disk__track{fill:none;stroke:color-mix(in srgb,var(--cds-text-on-color) 32%,var(--tedy-brand-hover));stroke-width:3}
+.pacing-disk__arc{fill:none;stroke:var(--cds-text-on-color);stroke-width:3;stroke-linecap:round}
+.pacing-disk__dismiss{width:22px;height:22px;border:none;background:transparent;color:var(--cds-text-on-color);
+  cursor:pointer;display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius-btn)}
+.pacing-disk__dismiss:hover{background:var(--tedy-brand)}
+.pacing-disk__dismiss:focus-visible{outline:2px solid var(--cds-text-on-color);outline-offset:2px}
 .pacing-disk__dismiss .cds-icon{width:.8rem;height:.8rem}
-/* yardımcı düğmeler — Carbon ghost ikon düğme dili, ince ayraçla */
+/* yardımcı düğmeler — Carbon ghost ikon düğme dili (kare), ince ayraçla */
 .topbar__tools{display:inline-flex;align-items:center;gap:var(--sp-02);max-width:100%;flex-wrap:wrap;
-  padding-left:var(--sp-03);border-left:1px solid rgba(255,255,255,.22)}
-.icon-btn{width:40px;height:40px;border:none;background:transparent;cursor:pointer;color:#fff;
-  display:inline-flex;align-items:center;justify-content:center;border-radius:8px;
+  padding-left:var(--sp-03);border-left:1px solid color-mix(in srgb,var(--cds-text-on-color) 24%,var(--tedy-brand))}
+.icon-btn{width:40px;height:40px;border:none;background:transparent;cursor:pointer;color:var(--cds-text-on-color);
+  display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius-btn);
   transition:background var(--dur-fast) var(--ease-std)}
-.icon-btn:hover{background:rgba(255,255,255,.18)}
-.icon-btn:active{background:rgba(255,255,255,.28)}
-.icon-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.icon-btn:hover,.icon-btn:active{background:var(--tedy-brand-hover)}
+.icon-btn:focus-visible{outline:2px solid var(--cds-text-on-color);outline-offset:-2px}
 .icon-btn .cds-icon{width:1.25rem;height:1.25rem}
-.topbar .icon-btn--on{background:rgba(255,255,255,.92);color:var(--accent)}
-.topbar .icon-btn--on .cds-icon{color:var(--accent)}
+.topbar .icon-btn--on{background:var(--cds-text-on-color);color:var(--tedy-brand)}
+.topbar .icon-btn--on .cds-icon{color:var(--tedy-brand)}
 
 /* --- KATMAN 2 · Durum şeridi (nötr Carbon layer-01) --- */
 .topbar__status{background:var(--cds-layer-01);padding:var(--sp-05) var(--sp-06);
   display:flex;flex-direction:column;gap:var(--sp-05)}
 .topbar__progress{display:flex;align-items:center;justify-content:space-between;
   gap:var(--sp-04) var(--sp-05);flex-wrap:wrap}
-/* Carbon ProgressIndicator — numaralı; tamamlanan=aksan+tik, aktif=aksan halka, bekleyen=içi boş */
+/* Carbon ProgressIndicator — numaralı; tamamlanan=interactive dolgu+tik, aktif=interactive halka,
+   bekleyen=içi boş. İlerleme arayüz kabuğudur: ders aksanı değil Carbon eylem rengi taşır. */
 .stepper{display:flex;align-items:center;gap:0;overflow-x:auto;scrollbar-width:thin;
   flex:1 1 auto;min-width:0;padding-bottom:2px}
 .step{display:flex;align-items:center;flex:none}
@@ -394,47 +464,49 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
   transition:background var(--dur-fast) var(--ease-std),box-shadow var(--dur-fast),color var(--dur-fast)}
 .step__btn:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
 .step__btn .cds-icon{width:1rem;height:1rem}
-.step--done .step__btn{background:var(--accent-strong);color:var(--cds-background);box-shadow:none;cursor:pointer}
-.step--current .step__btn{background:transparent;color:var(--accent-strong);box-shadow:inset 0 0 0 2px var(--accent-strong)}
+.step--done .step__btn{background:var(--cds-button-primary);color:var(--cds-text-on-color);box-shadow:none;cursor:pointer}
+.step--current .step__btn{background:transparent;color:var(--cds-link-primary);box-shadow:inset 0 0 0 2px var(--cds-interactive)}
 .step__line{width:20px;height:1.5px;background:var(--cds-border-subtle);flex:none}
-.step--done .step__line{background:var(--accent-strong)}
+.step--done .step__line{background:var(--cds-interactive)}
 /* v3.0.0 — kilometre taşı (milestone) işareti: aksan nokta, gölgesiz (G-CARBON-GRID) */
 .step--milestone .step__btn{position:relative}
 .step--milestone .step__btn::after{content:"";position:absolute;left:50%;bottom:-5px;
-  transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--accent-strong)}
+  transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--cds-interactive)}
 .rail-label{font-size:.8125rem;color:var(--cds-text-secondary);display:flex;align-items:center;
   gap:var(--sp-03);flex:none;white-space:nowrap}
 .rail-label #railText{color:var(--cds-text-primary);font-weight:600}
 /* v3.0.0 — hedef-gradyanı: "son N durak" etiketi, yalnız dolu iken görünür */
-.rail-label #railGoal{color:var(--accent-strong);font-weight:600}
+.rail-label #railGoal{color:var(--cds-link-primary);font-weight:600}
 .rail-label #railGoal:empty{display:none}
-/* Carbon Tag rozetleri — kilitli=nötr çip, kazanılan=aksan çip */
+/* Carbon Tag rozetleri — kilitli=soluk nötr çip + kilit, kazanılan=layer-selected çip (sessiz;
+   Tedy İ7 "bitmiş iş öne çıkmaz" — rozet avına dönüşmez) */
 .badges{display:flex;gap:var(--sp-03);flex-wrap:wrap}
 .badges:empty{display:none}
 .badge{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;font-weight:500;
-  border:1px solid var(--cds-border-subtle);border-radius:99px;padding:var(--sp-02) var(--sp-04);
+  border:1px solid var(--cds-border-subtle);border-radius:var(--radius-tag);padding:var(--sp-02) var(--sp-04);
   color:var(--cds-text-secondary);background:var(--cds-layer-02)}
 .badge .pic,.badge .cds-icon{width:.95rem;height:.95rem;color:var(--cds-icon-secondary)}
 .badge__lock{width:.8rem;height:.8rem;fill:currentColor;color:var(--cds-icon-secondary);opacity:.6;margin-left:1px;flex:none}
 .badge--locked{opacity:.78}
-.badge--earned{border-color:transparent;color:var(--accent-strong);background:var(--accent-tint);font-weight:600}
-.badge--earned .pic,.badge--earned .cds-icon{color:var(--accent-strong)}
+.badge--earned{border-color:transparent;color:var(--cds-text-primary);background:var(--cds-layer-selected-01);font-weight:600}
+.badge--earned .pic,.badge--earned .cds-icon{color:var(--cds-icon-primary)}
 /* v3.0.0 — Task 10: Sefer mini-haritası (opsiyonel; meta.quest.stations, üst-çubuk altında şerit).
    İlk istasyon completed:true ile bahşedilmiş ilerleme (gamified-flows.md §3.2); gölgesiz düğümler. */
 .quest-map{margin:0 0 var(--sp-06)}
 .quest-map[hidden]{display:none}
 .quest-map__svg{display:block;width:100%;height:auto;max-width:280px;margin:0 auto}
 .quest-map__line{stroke:var(--cds-border-strong);stroke-width:2}
-.quest-map__line--done{stroke:var(--accent-strong)}
+.quest-map__line--done{stroke:var(--cds-interactive)}
 .quest-map__node{fill:var(--cds-layer-02);stroke:var(--cds-border-strong);stroke-width:2}
-.quest-map__node--done{fill:var(--accent-strong);stroke:var(--accent-strong)}
+.quest-map__node--done{fill:var(--cds-interactive);stroke:var(--cds-interactive)}
 .quest-map__label{font-family:var(--font-sans);font-size:10px;fill:var(--cds-text-secondary)}
-/* sahne */
-.stage{background:var(--cds-layer-01);border:1px solid var(--cds-border-subtle);
+/* sahne — sayfa düzeyindeki tek içerik kartı: Tedy pano kartı kuralı (border-radius-08 +
+   tedy-shadow-card; koyu temada gölge yok). İçindeki kutular gölgesiz kalır (G-CARBON-GRID). */
+.stage{background:var(--cds-layer-01);border:1px solid var(--cds-border-subtle);box-shadow:var(--tedy-shadow-card);
   border-radius:var(--cds-radius);padding:var(--sp-07);flex:1;min-width:0;max-width:100%}
 .seg-head{display:flex;align-items:center;gap:var(--sp-05);margin-bottom:var(--sp-06);padding-bottom:var(--sp-05);border-bottom:1px solid var(--cds-border-subtle)}
 .seg-head>div{min-width:0}
-.seg-ic{flex:none;width:56px;height:56px;border-radius:14px;background:var(--accent-tint);display:inline-flex;align-items:center;justify-content:center}
+.seg-ic{flex:none;width:56px;height:56px;border-radius:var(--cds-radius);background:var(--accent-tint);display:inline-flex;align-items:center;justify-content:center}
 .seg-ic .pic{color:var(--accent-strong);width:32px;height:32px}
 .seg-head h2{font-size:var(--fs-h-seg);font-weight:600;margin:0;line-height:1.25}
 .kicker{font-size:var(--fs-label);font-weight:600;color:var(--accent-strong);
@@ -443,7 +515,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .seg-body ul,.seg-body ol{margin:0 0 var(--sp-05);padding-left:1.4em}
 .seg-body li{margin-bottom:var(--sp-03)}
 .lead{font-family:var(--font-serif);font-size:1.25rem;line-height:1.55;color:var(--cds-text-primary);
-  background:var(--accent-tint);border-left:4px solid var(--accent);border-radius:var(--cds-radius);
+  background:var(--cds-layer-02);border-left:4px solid var(--accent);border-radius:var(--cds-radius);
   padding:var(--sp-05) var(--sp-06);margin:0 0 var(--sp-06)}
 mark.term{background:var(--accent-tint);color:var(--accent-strong);padding:0 .25em;border-radius:4px;font-weight:600}
 /* Anahtar kavramlar — Carbon DefinitionTooltip tetikleyicileri */
@@ -453,20 +525,19 @@ mark.term{background:var(--accent-tint);color:var(--accent-strong);padding:0 .25
 .terms__lbl{font-size:.8125rem;color:var(--cds-text-secondary);font-weight:500;letter-spacing:.02em}
 .terms__list{display:flex;flex-wrap:wrap;gap:var(--sp-03);align-items:center}
 .def-term{font-family:var(--font-sans);font-size:var(--fs-compact);font-weight:600;
-  background:var(--accent-tint);color:var(--accent-strong);border-radius:99px;
+  background:var(--accent-tint);color:var(--accent-strong);border-radius:var(--radius-tag);
   border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
   padding:var(--sp-02) var(--sp-05);cursor:help;display:inline-flex;align-items:center;gap:6px;
   transition:background var(--dur-fast) var(--ease-std),box-shadow var(--dur-fast) var(--ease-std)}
-.def-term:hover{background:color-mix(in srgb,var(--accent) 16%,var(--cds-layer-02));
-  box-shadow:0 2px 9px -3px color-mix(in srgb,var(--accent) 70%,transparent)}
+.def-term:hover{background:color-mix(in srgb,var(--accent) 16%,var(--cds-layer-02))}
 .def-term:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
 .def-term .cds-icon{width:.9rem;height:.9rem;color:var(--accent-strong);opacity:.85;flex:none}
 .def-term[aria-describedby] .cds-icon{opacity:1}
 /* tanım popover — tema-duyarlı, oklu kart; ekran kenarına flip+clamp (JS konumlu) */
 .def-pop{position:fixed;z-index:9999;width:max-content;max-width:300px;
-  padding:var(--sp-04) var(--sp-05);border-radius:8px;font-family:var(--font-sans);
+  padding:var(--sp-04) var(--sp-05);border-radius:var(--cds-border-radius-04);font-family:var(--font-sans);
   background:var(--def-pop-bg);color:var(--def-pop-fg);
-  box-shadow:0 8px 24px -8px rgba(0,0,0,.45);pointer-events:none;
+  box-shadow:0 2px 6px var(--cds-shadow);pointer-events:none;
   opacity:0;transform:translateY(3px);
   transition:opacity var(--dur-fast) var(--ease-std),transform var(--dur-fast) var(--ease-std)}
 .def-pop:not([hidden]){opacity:1;transform:none}
@@ -487,8 +558,10 @@ mark.term{background:var(--accent-tint);color:var(--accent-strong);padding:0 .25
 .def-pop[data-place="top"] .def-pop__arrow{bottom:-5px}
 .def-pop[data-place="bottom"] .def-pop__arrow{top:-5px}
 @media (prefers-reduced-motion: reduce){.def-pop{transition:none}}
-[data-theme="white"]{--def-pop-bg:#393939;--def-pop-fg:#f4f4f4;--def-pop-accent:color-mix(in srgb,var(--accent) 50%,#ffffff);--def-pop-rule:rgba(255,255,255,.20)}
-[data-theme="g100"]{--def-pop-bg:#f4f4f4;--def-pop-fg:#262626;--def-pop-accent:color-mix(in srgb,var(--accent) 82%,#000000);--def-pop-rule:rgba(22,22,22,.14)}
+/* tanım popover'ı Carbon ters (inverse) yüzeydir: background-inverse + text-inverse */
+[data-theme]{--def-pop-bg:var(--cds-background-inverse);--def-pop-fg:var(--cds-text-inverse)}
+[data-theme="g10"],[data-theme="white"]{--def-pop-accent:color-mix(in srgb,var(--accent) 50%,#ffffff);--def-pop-rule:rgba(255,255,255,.20)}
+[data-theme="g100"]{--def-pop-accent:color-mix(in srgb,var(--accent) 82%,#000000);--def-pop-rule:rgba(22,22,22,.14)}
 .visual{margin:var(--sp-06) 0;text-align:center;background:var(--cds-layer-02);
   border:1px solid var(--cds-border-subtle);border-radius:var(--cds-radius);padding:var(--sp-06)}
 .visual svg{max-width:100%;height:auto}
@@ -524,10 +597,10 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 }
 .instructions{font-size:var(--fs-compact);color:var(--cds-text-secondary);margin-bottom:var(--sp-05);
   display:flex;align-items:flex-start;gap:var(--sp-04);padding:var(--sp-04) var(--sp-05);
-  border-radius:var(--cds-radius);background:var(--accent-tint);border-left:4px solid var(--accent)}
-.instructions .cds-icon{color:var(--accent-strong);flex:none;margin-top:2px;width:1.15rem;height:1.15rem}
+  border-radius:var(--cds-radius);background:var(--cds-layer-02);border-left:4px solid var(--cds-border-strong-01)}
+.instructions .cds-icon{color:var(--cds-icon-secondary);flex:none;margin-top:2px;width:1.15rem;height:1.15rem}
 .instructions span{line-height:1.45}
-/* butonlar — birincil = Blue 60 (kontrast garantili) */
+/* butonlar — birincil = Blue 60 (kontrast garantili); Carbon keskin köşe (border-radius-00) */
 .btn{font-family:var(--font-sans);font-size:var(--fs-compact);font-weight:500;min-height:var(--tap);
   padding:0 var(--sp-06);border:none;border-radius:var(--radius-btn);cursor:pointer;display:inline-flex;
   align-items:center;justify-content:space-between;gap:var(--sp-05);transition:background var(--dur-fast) var(--ease-std)}
@@ -543,9 +616,9 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .btn--center{justify-content:center}
 /* Carbon selectable Tile */
 .opt-list{display:flex;flex-direction:column;gap:var(--sp-04);margin:var(--sp-05) 0}
-.opt{font-family:var(--font-sans);font-size:var(--fs-body);text-align:left;min-height:var(--tap);
-  padding:var(--sp-05) var(--sp-06);border-radius:var(--cds-radius);cursor:pointer;background:var(--cds-layer-02);
-  box-shadow:inset 0 0 0 1px var(--cds-border-tile);display:flex;align-items:center;gap:var(--sp-05);
+.opt{font-family:var(--font-sans);font-size:var(--fs-body);text-align:left;min-height:var(--tap);border:0;
+  padding:var(--sp-05) var(--sp-06);border-radius:var(--radius-btn);cursor:pointer;background:var(--cds-layer-02);
+  box-shadow:inset 0 0 0 1px var(--cds-border-tile-01);display:flex;align-items:center;gap:var(--sp-05);
   width:100%;min-width:0;max-width:100%;color:var(--cds-text-primary);position:relative;
   transition:box-shadow var(--dur-fast) var(--ease-std),background var(--dur-fast)}
 .opt>span:last-child{min-width:0;overflow-wrap:anywhere}
@@ -578,15 +651,15 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .match__col h3{font-size:var(--fs-label);color:var(--cds-text-secondary);margin:0 0 var(--sp-02);text-transform:uppercase;letter-spacing:.03em}
 /* flashcard */
 .flash{display:flex;flex-direction:column;align-items:center;gap:var(--sp-05);margin:var(--sp-06) 0}
-.card{width:100%;max-width:540px;min-height:180px;border-radius:var(--cds-radius);background:var(--accent-tint);
+.card{width:100%;max-width:540px;min-height:180px;border-radius:var(--cds-radius);background:var(--cds-layer-02);
   box-shadow:inset 0 0 0 2px var(--accent);display:flex;align-items:center;justify-content:center;text-align:center;
-  padding:var(--sp-07);font-size:var(--fs-h-sub);font-weight:600;color:var(--accent-strong)}
+  padding:var(--sp-07);font-size:var(--fs-h-sub);font-weight:600;color:var(--cds-text-primary)}
 .card--back{background:var(--cds-layer-02);box-shadow:inset 0 0 0 1px var(--cds-border-subtle);color:var(--cds-text-primary);font-weight:400;font-size:var(--fs-body)}
 /* boşluk doldurma */
 .cloze{font-size:var(--fs-body);line-height:2;margin:var(--sp-05) 0}
 .blank{display:inline-block;min-width:96px;border-bottom:2px solid var(--accent);text-align:center;font-weight:600;color:var(--accent-strong);padding:0 var(--sp-03)}
 .pool{display:flex;flex-wrap:wrap;gap:var(--sp-04);margin:var(--sp-05) 0}
-.chip-btn{font-family:var(--font-sans);font-size:var(--fs-compact);min-height:var(--tap);padding:0 var(--sp-05);
+.chip-btn{font-family:var(--font-sans);font-size:var(--fs-compact);min-height:var(--tap);padding:0 var(--sp-05);border:0;
   border-radius:var(--radius-btn);cursor:pointer;background:var(--cds-layer-02);box-shadow:inset 0 0 0 1px var(--cds-border-strong);color:var(--cds-text-primary)}
 .chip-btn:hover:not([disabled]){background:var(--accent-tint);box-shadow:inset 0 0 0 2px var(--accent)}
 .chip-btn:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
@@ -605,8 +678,8 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .worked-step__text{flex:1 1 160px;font-size:var(--fs-body);color:var(--cds-text-primary)}
 .worked-step--solved .worked-step__text{color:var(--cds-text-secondary)}
 .worked-step__field{display:flex;align-items:center;gap:var(--sp-03);flex:none}
-.worked-input{font-family:var(--font-sans);font-size:var(--fs-body);font-variant-numeric:tabular-nums;
-  min-height:var(--tap);width:140px;padding:0 var(--sp-05);border-radius:var(--radius-btn);
+.worked-input{font-family:var(--font-sans);font-size:var(--fs-body);font-variant-numeric:tabular-nums;border:0;
+  min-height:var(--tap);width:140px;padding:0 var(--sp-05);border-radius:var(--radius-field);
   background:var(--cds-field-01);color:var(--cds-text-primary);
   box-shadow:inset 0 0 0 1px var(--cds-border-strong);
   transition:box-shadow var(--dur-fast) var(--ease-std)}
@@ -621,13 +694,13 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .worked-check{margin-top:var(--sp-05)}
 /* merak-boşluğu (hook) — segment içinde kapanan kanca; katman+kenarlık, gölge yok */
 .hook-card{margin:var(--sp-06) 0;padding:var(--sp-06) var(--sp-07);border-radius:var(--cds-radius);
-  background:var(--accent-tint);border-left:4px solid var(--accent)}
+  background:var(--cds-layer-02);border-left:4px solid var(--accent)}
 .hook-q{display:flex;align-items:flex-start;gap:var(--sp-04);margin:0 0 var(--sp-04);
   font-size:var(--fs-h-sub);font-weight:600;color:var(--cds-text-primary);line-height:1.35}
 .hook-q .cds-icon{color:var(--accent-strong);flex:none;margin-top:2px;width:1.3rem;height:1.3rem}
 .hook-predict{display:flex;flex-wrap:wrap;gap:var(--sp-04);margin:var(--sp-05) 0}
-.hook-opt{font-family:var(--font-sans);font-size:var(--fs-compact);font-weight:500;min-height:var(--tap);
-  padding:0 var(--sp-06);border-radius:99px;cursor:pointer;background:var(--cds-layer-01);
+.hook-opt{font-family:var(--font-sans);font-size:var(--fs-compact);font-weight:500;min-height:var(--tap);border:0;
+  padding:0 var(--sp-06);border-radius:var(--radius-btn);cursor:pointer;background:var(--cds-layer-01);
   box-shadow:inset 0 0 0 1px var(--cds-border-strong);color:var(--cds-text-primary);
   transition:box-shadow var(--dur-fast) var(--ease-std),background var(--dur-fast) var(--ease-std)}
 .hook-opt:hover{box-shadow:inset 0 0 0 2px var(--accent);background:var(--cds-layer-02)}
@@ -649,8 +722,8 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .se-field{margin:var(--sp-05) 0}
 .se-field__lbl{font-size:var(--fs-label);color:var(--cds-text-secondary);margin:0 0 var(--sp-03)}
 .se-optional{color:var(--cds-text-helper)}
-.se-textarea{display:block;width:100%;font-family:var(--font-sans);font-size:var(--fs-body);
-  color:var(--cds-text-primary);background:var(--cds-field-01);border-radius:var(--cds-radius);
+.se-textarea{display:block;width:100%;font-family:var(--font-sans);font-size:var(--fs-body);border:0;
+  color:var(--cds-text-primary);background:var(--cds-field-01);border-radius:var(--radius-field);
   padding:var(--sp-05);resize:vertical;min-height:7.5rem;box-shadow:inset 0 0 0 1px var(--cds-border-strong);
   transition:box-shadow var(--dur-fast) var(--ease-std)}
 .se-textarea:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
@@ -658,7 +731,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .se-reveal{margin:var(--sp-05) 0}
 .se-reveal[aria-expanded="true"]{background:var(--accent-tint);color:var(--accent-strong)}
 .se-model{margin-top:var(--sp-05);padding:var(--sp-06) var(--sp-07);border-radius:var(--cds-radius);
-  background:var(--accent-tint);border-left:4px solid var(--accent)}
+  background:var(--cds-layer-02);border-left:4px solid var(--accent)}
 .se-model[hidden]{display:none}
 .se-model__lbl{display:flex;align-items:center;gap:var(--sp-03);margin:0 0 var(--sp-04);
   font-size:var(--fs-label);font-weight:600;color:var(--accent-strong)}
@@ -692,7 +765,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .stat .pic,.stat .cds-icon{color:var(--accent-strong);width:1.6rem;height:1.6rem}
 .stat__num{font-family:var(--font-mono);font-size:1.5rem;font-weight:600;color:var(--cds-text-primary)}
 .stat__lbl{font-size:var(--fs-label);color:var(--cds-text-secondary)}
-.self-assess{text-align:left;max-width:540px;margin:var(--sp-06) auto;background:var(--accent-tint);border-radius:var(--cds-radius);padding:var(--sp-06)}
+.self-assess{text-align:left;max-width:540px;margin:var(--sp-06) auto;background:var(--cds-layer-02);border-radius:var(--cds-radius);padding:var(--sp-06)}
 .self-assess h3{font-size:var(--fs-h-sub);margin:0 0 var(--sp-05);color:var(--cds-text-primary)}
 .check-row{display:flex;align-items:center;gap:var(--sp-04);margin-bottom:var(--sp-04);font-size:var(--fs-compact);cursor:pointer;color:var(--cds-text-primary)}
 .check-row input{width:22px;height:22px;accent-color:var(--accent);cursor:pointer}
@@ -704,7 +777,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
   font-family:var(--font-sans);font-size:.8125rem;font-weight:500;
   color:var(--cds-text-secondary);background:var(--cds-layer-01);
   border:1px solid var(--cds-border-subtle);
-  border-radius:99px;padding:3px var(--sp-04);margin-bottom:var(--sp-05)}
+  border-radius:var(--radius-tag);padding:3px var(--sp-04);margin-bottom:var(--sp-05)}
 .streak b{font-family:var(--font-mono);color:var(--cds-text-primary);font-weight:600;font-variant-numeric:tabular-nums}
 .q-stem{font-size:var(--fs-h-sub);font-weight:600;margin:0 0 var(--sp-05);color:var(--cds-text-primary);line-height:1.3}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
@@ -725,14 +798,14 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .flash .btn{min-width:160px}
 /* yeniden kullanılabilir çağrı kutusu (Carbon aside/notification deseni) */
 .callout{margin:var(--sp-05) 0;padding:var(--sp-05) var(--sp-06);border-radius:var(--cds-radius);
-  border-left:4px solid var(--accent);background:var(--accent-tint);display:flex;gap:var(--sp-04);align-items:flex-start}
+  border-left:4px solid var(--accent);background:var(--cds-layer-02);display:flex;gap:var(--sp-04);align-items:flex-start}
 .callout .cds-icon{color:var(--accent-strong);flex:none;margin-top:3px;width:1.3rem;height:1.3rem}
 .callout--info{border-color:var(--cds-support-info);background:var(--cds-notif-info-bg)}
 .callout--info .cds-icon{color:var(--cds-support-info)}
 .callout--success{border-color:var(--cds-support-success);background:var(--cds-notif-success-bg)}
 .callout--success .cds-icon{color:var(--cds-support-success)}
 .callout--warning{border-color:var(--cds-support-warning);background:var(--cds-notif-warning-bg)}
-.callout--warning .cds-icon{color:var(--reward)}
+.callout--warning .cds-icon{color:var(--tedy-text-warning)}
 .callout__t{font-weight:600;display:block;margin-bottom:2px}
 .callout p{margin:0}
 /* v3.0.0 — Task 17: parametrik simülasyon (sanal manipülatif). Kaydırıcı satırları
@@ -763,9 +836,9 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .cmap-line{stroke:var(--cds-border-strong);stroke-width:2.5}
 .cmap-line--correct{stroke:var(--cds-support-success)}
 .cmap-line--extra{stroke:var(--cds-support-info)}
-.cmap-node{position:absolute;transform:translate(-50%,-50%);max-width:136px;
+.cmap-node{position:absolute;transform:translate(-50%,-50%);max-width:136px;border:0;
   font-family:var(--font-sans);font-size:var(--fs-label);font-weight:600;text-align:center;
-  min-height:var(--tap);padding:var(--sp-03) var(--sp-05);border-radius:var(--cds-radius);
+  min-height:var(--tap);padding:var(--sp-03) var(--sp-05);border-radius:var(--radius-btn);
   cursor:pointer;background:var(--cds-layer-01);color:var(--cds-text-primary);
   box-shadow:inset 0 0 0 1.5px var(--cds-border-strong);
   transition:box-shadow var(--dur-fast) var(--ease-std),background var(--dur-fast) var(--ease-std)}
@@ -790,7 +863,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .cmap-edge--extra .cmap-edge__mark{color:var(--cds-support-info)}
 .cmap-edge__text{flex:1;font-size:var(--fs-compact);color:var(--cds-text-primary)}
 .cmap-edge__remove{flex:none;width:40px;height:40px;border:none;background:transparent;cursor:pointer;
-  color:var(--cds-icon-secondary);display:inline-flex;align-items:center;justify-content:center;border-radius:8px;
+  color:var(--cds-icon-secondary);display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius-btn);
   transition:background var(--dur-fast) var(--ease-std)}
 .cmap-edge__remove:hover:not([disabled]){background:var(--cds-background-hover);color:var(--cds-support-error)}
 .cmap-edge__remove:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
@@ -807,12 +880,13 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .seg-ic .pic{color:var(--seg-accent,var(--accent-strong))}
 .kicker{color:var(--seg-accent,var(--accent-strong))}
 .seg-head{border-bottom-color:color-mix(in srgb,var(--seg-accent,var(--cds-border-subtle)) 38%,var(--cds-border-subtle))}
-/* ===== ödül/ilerleme: pozitif sıcak vurgu (XP, yıldız) ===== */
+/* ===== ödül/ilerleme: sakin sıcak vurgu (XP, yıldız) — --reward = tedy-text-warning (Carbon
+   sarısının metin-güvenli karşılığı, orange-70/30); ham altın hex yok ===== */
 .xp .cds-icon{color:var(--reward)}
 .stat--xp .stat__num{color:var(--reward)}
 .stat--xp .cds-icon{color:var(--reward)}
 /* ===== Carbon DataTable (anlamsal tablo) ===== */
-.viz-table-wrap{margin:var(--sp-06) 0;overflow-x:auto;border:1px solid var(--cds-border-subtle);border-radius:var(--cds-radius)}
+.viz-table-wrap{margin:var(--sp-06) 0;overflow-x:auto;border:1px solid var(--cds-border-subtle);border-radius:var(--cds-border-radius-00)}
 table.viz-table{border-collapse:collapse;width:100%;font-size:var(--fs-compact);background:var(--cds-layer-02)}
 table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-label);color:var(--cds-text-secondary);padding:var(--sp-05) var(--sp-05) var(--sp-04)}
 .viz-table thead th{background:var(--cds-layer-accent-01);color:var(--cds-text-primary);font-weight:600;text-align:left;
@@ -880,25 +954,25 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .turn--b{align-self:flex-end;text-align:right}
 .turn__sp{font-size:var(--fs-label);font-weight:600;color:var(--cds-text-secondary)}
 .turn__b{background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);border-radius:var(--cds-radius);padding:var(--sp-04) var(--sp-05)}
-.turn--b .turn__b{background:var(--accent-tint);border-color:transparent}
+.turn--b .turn__b{background:var(--cds-layer-accent-01);border-color:transparent}
 .turn__g{display:block;margin-top:3px;font-size:var(--fs-label);color:var(--cds-text-secondary)}
-/* oyunlaştırma görsel geri bildirimi (earcon ile eşli; hareket-açık modda) */
+/* oyunlaştırma görsel geri bildirimi (earcon ile eşli; hareket-açık modda). Tedy dili: kutlama
+   yok, yalnız sessiz onay — küçük yükselme, ölçek sıçraması yok; süreler Carbon productive
+   (moderate-02 / slow-01), eğriler productive. Aynı anda tek öğe hareket eder. */
 .xp{position:relative}
-.xp-float{position:absolute;right:0;top:-2px;font-size:var(--fs-label);font-weight:700;color:var(--reward);pointer-events:none;white-space:nowrap}
+.xp-float{position:absolute;right:0;top:-2px;font-size:var(--fs-label);font-weight:600;color:var(--reward);pointer-events:none;white-space:nowrap}
 @media (prefers-reduced-motion:no-preference){
-  @keyframes xpRise{0%{opacity:0;transform:translateY(4px)}20%{opacity:1}100%{opacity:0;transform:translateY(-20px)}}
-  .xp-float{animation:xpRise 1.05s var(--ease-exit) forwards}
-  @keyframes xpPulse{0%,100%{transform:scale(1)}40%{transform:scale(1.14)}}
-  .xp.pulse{animation:xpPulse var(--cds-duration-slow-01) var(--ease-expr)}
-  @keyframes badgePop{0%{transform:scale(.6);opacity:.2}60%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
-  .badge--new{animation:badgePop .45s var(--ease-entrance)}
+  @keyframes xpRise{0%{opacity:0;transform:translateY(2px)}25%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
+  .xp-float{animation:xpRise var(--cds-duration-slow-02) var(--cds-easing-exit-productive) forwards}
+  @keyframes xpPulse{0%,100%{opacity:1}40%{opacity:.72}}
+  .xp.pulse{animation:xpPulse var(--cds-duration-moderate-02) var(--ease-std)}
+  @keyframes badgePop{from{opacity:.35}to{opacity:1}}
+  .badge--new{animation:badgePop var(--cds-duration-moderate-02) var(--cds-easing-entrance-productive)}
 }
 #wellbeing:empty{display:none}
 #wellbeing{margin:0 0 var(--sp-05)}
 /* segment türüne göre yüzey ritmi — tek-düzeliği kıran anlamlı mod ipuçları */
-.stage[data-seg="brainbreak"]{background:var(--accent-tint)}
 .stage[data-seg="checkpoint"]{border-top:4px solid var(--accent)}
-.stage[data-seg="summary"]{background:linear-gradient(180deg,var(--accent-tint) 0,var(--cds-layer-01) 160px)}
 @media (max-width:560px){
   .stage{padding:var(--sp-06) var(--sp-05)}
   .match{grid-template-columns:1fr}
@@ -912,7 +986,7 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
   .topbar__tools{margin-left:auto;padding-left:var(--sp-02)}
   .stage{padding:var(--sp-05) var(--sp-04)}
   .seg-head{align-items:flex-start;gap:var(--sp-04)}
-  .seg-ic{width:48px;height:48px;border-radius:12px}
+  .seg-ic{width:48px;height:48px}
   .opt,.worked-step,.sim-param{padding:var(--sp-04)}
   .worked-step__field,.worked-input{width:100%;min-width:0}
   .nav .btn{flex:1 1 100%;padding-inline:var(--sp-04)}
@@ -921,8 +995,8 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .fc-back{display:flex;flex-direction:column;align-items:center;gap:var(--sp-05);width:100%}
 .fc-back__def{font-size:var(--fs-body);text-align:center;color:var(--cds-text-primary)}
 .fc-hint{display:inline-flex;align-items:flex-start;gap:var(--sp-03);justify-content:center;text-align:left;
-  font-size:var(--fs-label);color:var(--cds-text-secondary);background:var(--accent-tint);
-  border:1px solid color-mix(in srgb,var(--accent) 24%,transparent);border-radius:var(--cds-radius);
+  font-size:var(--fs-label);color:var(--cds-text-secondary);background:var(--cds-layer-02);
+  border:1px solid var(--cds-border-subtle);border-radius:var(--cds-radius);
   padding:var(--sp-03) var(--sp-05);max-width:92%}
 .fc-hint .cds-icon{color:var(--accent-strong);flex:none;margin-top:2px;width:1.1rem;height:1.1rem}
 .fc-hint b{color:var(--cds-text-primary);font-weight:600}
@@ -933,7 +1007,7 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .fraction-bar .fb-cap{fill:var(--cds-text-secondary);font-family:var(--font-sans)}
 /* ===== v1.8.0 — seri/combo göstergesi (üst çubuk çipi) ===== */
 .streak-chip{position:relative;font-family:var(--font-sans);font-weight:600;display:inline-flex;align-items:center;
-  gap:var(--sp-03);background:var(--reward-bg);color:var(--cds-text-primary);border-radius:99px;
+  gap:var(--sp-03);background:var(--reward-bg);color:var(--cds-text-primary);border-radius:var(--radius-tag);
   padding:var(--sp-03) var(--sp-05);white-space:nowrap}
 .streak-chip[hidden]{display:none}
 /* v3.0.0 — gain-only: yanlış cevaptan sonra sıfırlanmaz, yalnız nötr "korundu" görünümü (opacity; ceza dili yok) */
@@ -941,25 +1015,25 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .streak-chip .cds-icon{color:var(--reward);width:1.1rem;height:1.1rem}
 .streak-chip__n{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 .streak-float{position:absolute;left:50%;top:-6px;transform:translateX(-50%);font-family:var(--font-sans);
-  font-size:var(--fs-label);font-weight:700;color:var(--reward);white-space:nowrap;pointer-events:none}
+  font-size:var(--fs-label);font-weight:600;color:var(--reward);white-space:nowrap;pointer-events:none}
 @media (prefers-reduced-motion:no-preference){
-  @keyframes streakHit{0%,100%{transform:scale(1)}35%{transform:scale(1.18)}}
-  .streak-chip--hit{animation:streakHit .6s var(--ease-expr)}
-  .streak-float{animation:xpRise 1.15s var(--ease-exit) forwards}
+  @keyframes streakHit{0%,100%{opacity:1}40%{opacity:.72}}
+  .streak-chip--hit{animation:streakHit var(--cds-duration-moderate-02) var(--ease-std)}
+  .streak-float{animation:xpRise var(--cds-duration-slow-02) var(--cds-easing-exit-productive) forwards}
 }
 /* ===== v1.8.0 — sesli oku (TTS) kontrolleri ===== */
-.icon-btn--on{background:var(--accent-tint);color:var(--accent-strong)}
-.icon-btn--on .cds-icon{color:var(--accent-strong)}
+.icon-btn--on{background:var(--cds-layer-selected-01);color:var(--cds-icon-primary)}
+.icon-btn--on .cds-icon{color:var(--cds-icon-primary)}
 .tts-row{margin:var(--sp-04) 0 0}
 [data-tts="off"] .tts-row{display:none}
 .tts-oku{display:none;align-items:center;gap:var(--sp-03);font-family:var(--font-sans);font-size:var(--fs-label);
   min-height:36px;padding:0 var(--sp-05);border:none;border-radius:var(--radius-btn);cursor:pointer;
   background:var(--cds-layer-02);box-shadow:inset 0 0 0 1px var(--cds-border-strong);color:var(--cds-text-primary)}
 [data-tts="on"] .tts-oku{display:inline-flex}
-.tts-oku:hover{background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent)}
+.tts-oku:hover{background:var(--cds-layer-hover-01);box-shadow:inset 0 0 0 1px var(--cds-border-strong-01)}
 .tts-oku:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
-.tts-oku .cds-icon{width:1.05rem;height:1.05rem;color:var(--accent-strong)}
-.tts-oku--on{background:var(--accent-tint);box-shadow:inset 0 0 0 2px var(--accent);color:var(--accent-strong)}
+.tts-oku .cds-icon{width:1.05rem;height:1.05rem;color:var(--cds-icon-primary)}
+.tts-oku--on{background:var(--cds-layer-selected-01);box-shadow:inset 0 0 0 2px var(--cds-border-interactive);color:var(--cds-text-primary)}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none !important;transition:none !important}}
 </style>
 </head>
@@ -971,7 +1045,7 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
     <div class="topbar__hero">
       <div class="topbar__row">
         <div class="topbar__l">
-          <svg class="pic" id="coverPic" width="40" height="40" aria-hidden="true"><use href="#pic-education"></use></svg>
+          <svg class="tedy-mark" viewBox="0 0 64 64" width="32" height="32" aria-hidden="true" focusable="false"><defs><clipPath id="tedyMarkO"><circle cx="32" cy="32" r="32"/></clipPath><clipPath id="tedyMarkH"><path d="M-2 70 L-2 -2 L56 -2 L42 28 L25 48 L25 70 Z"/></clipPath></defs><circle class="tedy-mark__disc" cx="32" cy="32" r="32"/><g clip-path="url(#tedyMarkO)"><g clip-path="url(#tedyMarkH)"><path class="tedy-mark__moon" fill-rule="evenodd" d="M0 32 A32 32 0 1 0 64 32 A32 32 0 1 0 0 32 Z M11.5 29 A20 20 0 1 0 51.5 29 A20 20 0 1 0 11.5 29 Z"/></g><circle class="tedy-mark__moon" cx="25" cy="55.6" r="7.65"/></g><path class="tedy-mark__check" d="M20.3 32.9 L31 45 L60 7" clip-path="url(#tedyMarkO)"/></svg>
           <div>
             <h1 class="topbar__title" id="titleText">Modül</h1>
             <div class="meta-line" id="metaLine"></div>
@@ -1300,7 +1374,9 @@ const MODULE_DATA = {
   // Derse-özel kimlik aksanı: meta.accent öncelikli, yoksa konudan türetilir.
   const SUBJECT_ACCENT={math:"#8a3ffc",science:"#007d79",social:"#ee5396",
     civics:"#0072c3",religion:"#198038",history:"#a56eff",geography:"#005d5d",
-    turkish:"#da1e28",english:"#0f62fe",french:"#6929c4",language:"#0f62fe"};
+    turkish:"#d02670",english:"#0f62fe",french:"#6929c4",language:"#0f62fe"};
+  // Not: kırmızı (red-60 = support-error = Tedy aciliyet rengi) ders aksanı olarak kullanılmaz;
+  // Türkçe magenta-60 taşır (Tedy İ6/İ8: kırmızı yalnız gerçek aciliyettir).
   function subjectKey(){
     const raw=((D.meta&&(D.meta.subjectKey||D.meta.subject))||"").toLowerCase();
     if(/mat|math|geometri|cebir/.test(raw)) return "math";
@@ -1444,14 +1520,15 @@ const MODULE_DATA = {
 
   /* ---- başlat ---- */
   function init(){
+    // Tema önceliği: öğrencinin kendi seçimi > panonun teması (edupedia:appearance) > g10.
+    // Eski kayıtlı "white" tercihi geriye uyum için korunur.
     const savedTheme=lsGet(THEME_STORE_KEY);
-    if(savedTheme==="white"||savedTheme==="g100"){
-      document.documentElement.setAttribute("data-theme",savedTheme);
-    }
+    if(THEMES.indexOf(savedTheme)>=0){ document.documentElement.setAttribute("data-theme",savedTheme); themeChosenHere=true; }
     setAccent(accentColor());
     document.documentElement.setAttribute("data-subject", subjectKey());
     $("#titleText").textContent = D.meta.title || "Modül";
-    $("#coverPic").querySelector("use").setAttribute("href","#"+(D.meta.coverPictogram||"pic-education"));
+    // Kapak piktogramı bantta değil (orada Tedy işareti durur); özet segmentinde yaşar.
+    const coverPic=$("#coverPic"); if(coverPic){ const u=coverPic.querySelector("use"); if(u) u.setAttribute("href","#"+(D.meta.coverPictogram||"pic-education")); }
     const m=D.meta;
     $("#metaLine").textContent =
       [m.subject,m.gradeLevel,(m.estimatedMinutes?`~${m.estimatedMinutes} dk`:null)]
@@ -1461,11 +1538,8 @@ const MODULE_DATA = {
     renderBadges();
     $("#backBtn").addEventListener("click", goBack);
     $("#nextBtn").addEventListener("click", goNext);
-    const themeBtn=$("#themeBtn");
-    themeBtn.addEventListener("click", toggleTheme);
-    const dark=document.documentElement.getAttribute("data-theme")==="g100";
-    themeBtn.setAttribute("aria-label",dark?"Açık temaya geç":"Koyu temaya geç");
-    themeBtn.querySelector("use").setAttribute("href",dark?"#ic-light":"#ic-moon");
+    $("#themeBtn").addEventListener("click", toggleTheme);
+    syncThemeButton();
     const sb=$("#soundBtn"); if(sb){ sb.addEventListener("click", toggleSound); const u=sb.querySelector("use"); if(u) u.setAttribute("href", state.sound?"#ic-volume":"#ic-volume-off"); sb.setAttribute("aria-label", state.sound?"Sesi kapat":"Sesi aç"); }
     // v1.8.0 — sesli oku (TTS): varsayılan KAPALI, otomatik-okuma yok; tek delegasyonlu dinleyici
     document.documentElement.setAttribute("data-tts","off");
@@ -1545,15 +1619,33 @@ const MODULE_DATA = {
     anchor.appendChild(f);
     sectionTimeout(function(){ if(f.parentNode) f.parentNode.removeChild(f); },1100);
   }
+  /* ---- tema: g10 (açık, Tedy panosu) ↔ g100 (koyu); "white" yalnız eski kayıt ---- */
+  const THEMES=["g10","g100","white"];
+  let themeChosenHere=false;
+  function syncThemeButton(){
+    const btn=$("#themeBtn"); if(!btn) return;
+    const dark=document.documentElement.getAttribute("data-theme")==="g100";
+    btn.setAttribute("aria-label", dark?"Açık temaya geç":"Koyu temaya geç");
+    const u=btn.querySelector("use"); if(u) u.setAttribute("href", dark?"#ic-light":"#ic-moon");
+  }
+  function applyTheme(next){
+    if(THEMES.indexOf(next)<0) return false;
+    document.documentElement.setAttribute("data-theme", next);
+    syncThemeButton();
+    setAccent(accentColor());
+    return true;
+  }
   function toggleTheme(){
     const dark = document.documentElement.getAttribute("data-theme")==="g100";
-    const next = dark? "white":"g100";
-    document.documentElement.setAttribute("data-theme", next);
-    const btn=$("#themeBtn");
-    btn.setAttribute("aria-label", next==="g100"?"Açık temaya geç":"Koyu temaya geç");
-    btn.querySelector("use").setAttribute("href", next==="g100"?"#ic-light":"#ic-moon");
-    setAccent(accentColor());
+    const next = dark? "g10":"g100";
+    applyTheme(next);
+    themeChosenHere=true;
     lsSet(THEME_STORE_KEY,next);
+  }
+  // Barındıran pano temasını bildirir; öğrenci bu modülde kendisi seçtiyse onun seçimi kalır.
+  function adoptHostTheme(theme){
+    if(themeChosenHere || typeof theme!=="string") return false;
+    return applyTheme(theme);
   }
 
   let justEarnedBadge=null;
@@ -1586,7 +1678,7 @@ const MODULE_DATA = {
   }
   function streakFloat(n){
     const chip=$("#streakChip"); if(!chip||reduceMotion()) return;
-    const f=document.createElement("span"); f.className="streak-float"; f.textContent="Seri "+n+"!";
+    const f=document.createElement("span"); f.className="streak-float"; f.textContent="Seri "+n;
     chip.appendChild(f); sectionTimeout(function(){ if(f.parentNode) f.parentNode.removeChild(f); },1250);
   }
   function bumpStreak(){

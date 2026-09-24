@@ -17,7 +17,7 @@ Etkinleştirme `meta.subject` (veya `meta.subjectKey`) ile olur; motor bundan ik
 | `religion` | din kültürü, ahlak, İslam, ibadet | `#198038` (yeşil) |
 | `history` | tarih, inkılap, history | `#a56eff` (eflatun) |
 | `geography` | coğrafya, geography | `#005d5d` (koyu teal) |
-| `turkish` | Türkçe, edebiyat | `#da1e28` (kırmızı) |
+| `turkish` | Türkçe, edebiyat | `#d02670` (magenta; kırmızı Tedy'de yalnız aciliyettir) |
 | `french` | Fransızca, français, french | `#6929c4` (koyu mor) |
 | `english` | İngilizce, dil, language | `#0f62fe` (mavi) |
 

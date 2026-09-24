@@ -33,7 +33,8 @@ Kapılar:
                     yazar katmanıdır, taranmaz.
     G-SVG           (FAIL) — figür SVG'leri role="img"+başlık; (WARN) ham-hex yerine token renk
     G-AUDIO         (FAIL) — ses varsa: susturulabilir + reduced-motion + otomatik-oynatma/döngü yok
-    G-TOKEN         (WARN) — çekirdek --cds-* değerleri @carbon/themes otoritesiyle birebir; white support-info regresyonu FAIL
+    G-TOKEN         (WARN) — çekirdek --cds-* değerleri @carbon/themes otoritesiyle birebir (g10/white/g100);
+                    white support-info regresyonu FAIL
     G-CURRICULUM    (FAIL) — koşullu: CURRICULUM modu/curriculum bloğu varsa kazanım→segment izlenebilirliği
     G-VERIFY        (FAIL) — koşullu: müfredat-temelli modülde kapsam+doğruluk denetiminin KAYDI
                     (her iddia dayanağıyla). Yargı modelin; kapı yalnız dayanağın GÖSTERİLDİĞİNİ
@@ -1077,12 +1078,23 @@ def _curriculum_eval(codes, n_texts, mapped_ids, missing, cite_ok):
 
 
 _CARBON_AUTHORITY = {
-    # @carbon/themes 11.75.0 — çekirdek token otorite haritası (white | g100).
+    # @carbon/themes 11.75.0 — çekirdek token otorite haritası (g10 | white | g100).
     # Kaynak: assets/carbon-v11-authority.json (scripts/sync_carbon_tokens.py üretir).
+    # Kenar token'ları kanonik adlarıyla (-01) denetlenir; kısa adlar (--cds-border-strong)
+    # şablonda takma addır (var(...)) ve alias olarak kabul edilir.
+    "g10": {
+        "--cds-background":"#f4f4f4","--cds-layer-01":"#ffffff","--cds-layer-02":"#f4f4f4",
+        "--cds-layer-03":"#ffffff","--cds-border-subtle-00":"#c6c6c6","--cds-border-subtle-01":"#e0e0e0",
+        "--cds-border-strong-01":"#8d8d8d","--cds-text-primary":"#161616","--cds-text-secondary":"#525252",
+        "--cds-interactive":"#0f62fe","--cds-link-primary":"#0f62fe","--cds-focus":"#0f62fe",
+        "--cds-button-primary":"#0f62fe","--cds-button-primary-hover":"#0050e6",
+        "--cds-button-primary-active":"#002d9c","--cds-support-success":"#24a148",
+        "--cds-support-error":"#da1e28","--cds-support-warning":"#f1c21b","--cds-support-info":"#0043ce",
+    },
     "white": {
         "--cds-background":"#ffffff","--cds-layer-01":"#f4f4f4","--cds-layer-02":"#ffffff",
         "--cds-layer-03":"#f4f4f4","--cds-border-subtle-00":"#e0e0e0","--cds-border-subtle-01":"#c6c6c6",
-        "--cds-border-strong":"#8d8d8d","--cds-text-primary":"#161616","--cds-text-secondary":"#525252",
+        "--cds-border-strong-01":"#8d8d8d","--cds-text-primary":"#161616","--cds-text-secondary":"#525252",
         "--cds-interactive":"#0f62fe","--cds-link-primary":"#0f62fe","--cds-focus":"#0f62fe",
         "--cds-button-primary":"#0f62fe","--cds-button-primary-hover":"#0050e6",
         "--cds-button-primary-active":"#002d9c","--cds-support-success":"#24a148",
@@ -1091,13 +1103,16 @@ _CARBON_AUTHORITY = {
     "g100": {
         "--cds-background":"#161616","--cds-layer-01":"#262626","--cds-layer-02":"#393939",
         "--cds-layer-03":"#525252","--cds-border-subtle-00":"#393939","--cds-border-subtle-01":"#525252",
-        "--cds-border-strong":"#6f6f6f","--cds-text-primary":"#f4f4f4","--cds-text-secondary":"#c6c6c6",
+        "--cds-border-strong-01":"#6f6f6f","--cds-text-primary":"#f4f4f4","--cds-text-secondary":"#c6c6c6",
         "--cds-interactive":"#4589ff","--cds-link-primary":"#78a9ff","--cds-focus":"#ffffff",
         "--cds-button-primary":"#0f62fe","--cds-button-primary-hover":"#0050e6",
         "--cds-button-primary-active":"#002d9c","--cds-support-success":"#42be65",
         "--cds-support-error":"#fa4d56","--cds-support-warning":"#f1c21b","--cds-support-info":"#4589ff",
     },
 }
+# Eski (v1.8.0 ve öncesi) modüller kenar token'ını kısa adla ve ham değerle tanımlar; bu ad
+# yalnız kanonik ad blokta YOKSA denetlenir (geriye uyum — eski modüller sahte sapma üretmez).
+_LEGACY_TOKEN_NAMES = {"--cds-border-strong-01": "--cds-border-strong"}
 
 def _theme_block(html, selector):
     """Verilen tema seçicisinin ilk CSS bloğunu döndürür (yoksa '')."""
@@ -1110,10 +1125,12 @@ def _classify_token(theme, tok, val, block, norm):
     """Tek bir --cds-* token'ını otoriteyle karşılaştırır.
 
     Döndürür: (drift_item, fail_item). Token tanımsız, alias (var(...)) veya
-    otoriteyle birebirse her ikisi de None'dur. white/support-info #4589ff
+    otoriteyle birebirse her ikisi de None'dur. açık temada (white/g10) support-info #4589ff
     bilinen AA-kontrast regresyonu fail_item olarak işaretlenir.
     """
     m = re.search(re.escape(tok) + r"\s*:\s*([^;}]+)", block)
+    if not m and tok in _LEGACY_TOKEN_NAMES:
+        m = re.search(re.escape(_LEGACY_TOKEN_NAMES[tok]) + r"\s*:\s*([^;}]+)", block)
     if not m:
         return None, None  # tanımsız token denetlenmez (eksiklik G-CARBON'un işi)
     got = norm(m.group(1))
@@ -1122,7 +1139,7 @@ def _classify_token(theme, tok, val, block, norm):
     if got == norm(val):
         return None, None
     item = f"{theme} {tok}: {m.group(1).strip()} (otorite: {val})"
-    if theme == "white" and tok == "--cds-support-info" and got == "#4589ff":
+    if theme in ("white", "g10") and tok == "--cds-support-info" and got == "#4589ff":
         return None, item + " — AA kontrast regresyonu"
     return item, None
 
@@ -1132,7 +1149,11 @@ def gate_token_authority(html, R):
     değerleriyle eşleştiğini denetler. Sapma = WARN (eski modüllerle geriye uyum);
     bilinen AA regresyonu (white'ta support-info #4589ff) = FAIL."""
     drift, fail = [], []
-    blocks = {"white": _theme_block(html, '[data-theme="white"]') or _theme_block(html, ":root"),
+    # v1.9.0+: varsayılan tema g10 (":root,[data-theme=g10]"); eski modüllerde varsayılan white
+    # ":root" bloğundadır. Yalnız bulunan bloklar denetlenir.
+    blocks = {"g10":   _theme_block(html, '[data-theme="g10"]'),
+              "white": _theme_block(html, '[data-theme="white"]') or
+                       ("" if '[data-theme="g10"]' in html else _theme_block(html, ":root")),
               "g100":  _theme_block(html, '[data-theme="g100"]')}
     norm = lambda v: re.sub(r"\s+", "", v).lower().replace("0.", ".")
     for theme, expect in _CARBON_AUTHORITY.items():
@@ -1148,7 +1169,8 @@ def gate_token_authority(html, R):
         R.add("G-TOKEN","WARN", f"{len(drift)} token otoriteden sapıyor: " + "; ".join(drift[:4]) +
               (" …" if len(drift) > 4 else "") + " — scripts/sync_carbon_tokens.py --check ile ayrıntı.")
     else:
-        R.add("G-TOKEN","PASS","Çekirdek --cds-* token'ları @carbon/themes 11.75.0 ile birebir.")
+        R.add("G-TOKEN","PASS","Çekirdek --cds-* token'ları @carbon/themes 11.75.0 ile birebir "
+              "(" + "/".join(t for t in ("g10", "white", "g100") if blocks.get(t)) + ").")
 
 def gate_curriculum(html, R):
     """G-CURRICULUM (koşullu): Müfredat-temelli modüllerde kazanım izlenebilirliği.

@@ -70,6 +70,26 @@ def test_drifted_template_fails_loudly(tmp_path, monkeypatch):
         sablon.engine_template(ORIGIN)
 
 
+def test_template_without_host_theme_hook_fails_loudly(tmp_path, monkeypatch):
+    text = sablon.TEMPLATE_PATH.read_text(encoding="utf-8")
+    drifted = tmp_path / "module-template.html"
+    drifted.write_text(text.replace(sablon.HOST_THEME_HOOK, "function adoptTheme(theme){", 1), encoding="utf-8")
+    monkeypatch.setattr(sablon, "TEMPLATE_PATH", drifted)
+    with pytest.raises(sablon.TemplateDriftError, match="HOST_THEME_HOOK"):
+        sablon.engine_template(ORIGIN)
+
+
+def test_appearance_listener_is_gated_on_the_parent_and_never_restores():
+    html = sablon.engine_template(ORIGIN)
+    listener = html[html.index('window.addEventListener("message"'):]
+    listener = listener[:listener.index("});") + 3]
+    # source and origin checks precede both message kinds; restore still needs an active (slug) frame
+    assert listener.index("e.source!==window.parent") < listener.index('"edupedia:appearance"')
+    assert listener.index("e.origin!==EDUPEDIA_PARENT_ORIGIN") < listener.index('"edupedia:appearance"')
+    assert 'if(d.type === "edupedia:appearance"){ adoptHostTheme(d.theme); return; }' in listener
+    assert 'if(!active || d.type !== "edupedia:restore") return;' in listener
+
+
 def test_patched_demo_has_no_failing_gate():
     report = gates.run_gates(sablon.engine_template(ORIGIN))
     assert not [g for g, v in report.items() if v["status"] == "FAIL"]

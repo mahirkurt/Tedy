@@ -55,3 +55,18 @@ export function acceptProgressMessage(
 export function restoreMessage(state: RestoreState) {
   return { type: 'edupedia:restore', v: 1, state } as const
 }
+
+/** Carbon themes a module can render in (the vendored template's theme blocks). */
+export type ModuleTheme = 'g10' | 'g100' | 'white'
+
+/**
+ * The dashboard renders under Carbon g10 (`<Theme theme="g10">` in main.tsx, ted-theme.scss).
+ * The module adopts it — same layers, same cool-gray page ground — unless the student picked a
+ * theme inside the module. A dashboard dark mode would change this one value.
+ */
+export const DASHBOARD_THEME: ModuleTheme = 'g10'
+
+/** Parent → module: which Carbon theme to render in. Carries no progress and is never stored. */
+export function appearanceMessage(theme: ModuleTheme) {
+  return { type: 'edupedia:appearance', v: 1, theme } as const
+}

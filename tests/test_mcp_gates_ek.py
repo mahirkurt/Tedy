@@ -58,6 +58,16 @@ def test_vendored_storage_key_is_not_a_message_type():
     assert _run(gates_ek.gate_bridge, ENGINE)["G-BRIDGE"]["status"] == "PASS"
 
 
+def test_appearance_message_is_allowed_but_not_required():
+    # The dashboard's theme message (parent → module) is an allowed bridge type; modules compiled
+    # before it existed carry only progress/restore and must still pass.
+    assert '"edupedia:appearance"' in ENGINE
+    assert _run(gates_ek.gate_bridge, ENGINE)["G-BRIDGE"]["status"] == "PASS"
+    line = 'if(d.type === "edupedia:appearance"){ adoptHostTheme(d.theme); return; }'
+    assert line in ENGINE
+    assert _run(gates_ek.gate_bridge, ENGINE.replace(line, "", 1))["G-BRIDGE"]["status"] == "PASS"
+
+
 def test_foreign_quoted_string_in_script_fails_as_unauthorized_message_type():
     old = "const EDUPEDIA_ASSETS"
     new = 'const EDUPEDIA_X = "edupedia:komut"; const EDUPEDIA_ASSETS'

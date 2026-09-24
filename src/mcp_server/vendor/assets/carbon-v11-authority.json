@@ -8,7 +8,8 @@
    "@carbon/layout": "11.53.0",
    "@carbon/colors": "11.52.0"
   },
-  "extracted": "2026-06-12"
+  "extracted": "2026-06-12",
+  "notes": "componentTokens.notificationBackground.g10 ve statusInfoBlue.g10 elle eklendi (edupedia v1.9.0 g10 varsayılanı); değerler @carbon/themes 11.82.0 notificationTokens/g10 ile doğrulandı, 2026-09-24."
  },
  "themes": {
   "white": {
@@ -857,6 +858,12 @@
     "warning": "#fcf4d6",
     "error": "#fff1f1"
    },
+   "g10": {
+    "success": "#defbe6",
+    "info": "#edf5ff",
+    "warning": "#fcf4d6",
+    "error": "#fff1f1"
+   },
    "g100": {
     "success": "#262626",
     "info": "#262626",
@@ -866,7 +873,150 @@
   },
   "statusInfoBlue": {
    "white": "#0043ce",
-   "g100": "#4589ff"
+   "g100": "#4589ff",
+   "g10": "#0043ce"
+  }
+ },
+ "tedyLayer": {
+  "_note": "Tedy Tasarım Sistemi v3 katmanı — Carbon token'larının anlamını değiştirmez, üstüne eklenir. Her değer [Carbon palet adımı, hex]; hex'ler @carbon/colors 11.x ile doğrulandı (2026-09-24). 'dashboard' alanı panonun (dashboard/src/theme/ted-theme.scss, tema g10) aynı rolü taşıyan değişkenidir. Modül şablonu bu değerleri --<token> olarak taşır; scripts/sync_carbon_tokens.py --check denetler.",
+  "dashboardTheme": "g10",
+  "tokens": {
+   "tedy-brand": {
+    "dashboard": "--ted-color-brand-primary",
+    "scope": "all",
+    "g10": [
+     "blue-80",
+     "#002d9c"
+    ],
+    "white": [
+     "blue-80",
+     "#002d9c"
+    ],
+    "g100": [
+     "blue-80",
+     "#002d9c"
+    ]
+   },
+   "tedy-brand-hover": {
+    "dashboard": "--ted-color-brand-primary-hover",
+    "scope": "all",
+    "g10": [
+     "blue-90",
+     "#001d6c"
+    ],
+    "white": [
+     "blue-90",
+     "#001d6c"
+    ],
+    "g100": [
+     "blue-90",
+     "#001d6c"
+    ]
+   },
+   "tedy-page-background": {
+    "dashboard": "--ted-color-page-bg",
+    "scope": "theme",
+    "g10": [
+     "cool-gray-10",
+     "#f2f4f8"
+    ],
+    "white": [
+     "white-0",
+     "#ffffff"
+    ],
+    "g100": [
+     "cool-gray-100",
+     "#121619"
+    ]
+   },
+   "tedy-text-success": {
+    "dashboard": "--ted-text-success",
+    "scope": "theme",
+    "g10": [
+     "green-70",
+     "#0e6027"
+    ],
+    "white": [
+     "green-70",
+     "#0e6027"
+    ],
+    "g100": [
+     "green-30",
+     "#6fdc8c"
+    ]
+   },
+   "tedy-text-error": {
+    "dashboard": "--ted-text-error",
+    "scope": "theme",
+    "g10": [
+     "red-70",
+     "#a2191f"
+    ],
+    "white": [
+     "red-70",
+     "#a2191f"
+    ],
+    "g100": [
+     "red-30",
+     "#ffb3b8"
+    ]
+   },
+   "tedy-text-info": {
+    "dashboard": "--ted-text-info",
+    "scope": "theme",
+    "g10": [
+     "blue-70",
+     "#0043ce"
+    ],
+    "white": [
+     "blue-70",
+     "#0043ce"
+    ],
+    "g100": [
+     "blue-30",
+     "#a6c8ff"
+    ]
+   },
+   "tedy-text-warning": {
+    "dashboard": "--ted-text-warning",
+    "scope": "theme",
+    "g10": [
+     "orange-70",
+     "#8a3800"
+    ],
+    "white": [
+     "orange-70",
+     "#8a3800"
+    ],
+    "g100": [
+     "orange-30",
+     "#ffb784"
+    ]
+   }
+  },
+  "subjectAccents": {
+   "_note": "meta.accent için izinli ders aksanları (şablonun ACCENT_STRONG aileleri; kırmızı yok — red-60 = support-error = Tedy aciliyet rengi). Boş bırakılırsa aksan konudan türetilir.",
+   "allowed": {
+    "#0f62fe": "blue-60",
+    "#4589ff": "blue-50",
+    "#0072c3": "cyan-60",
+    "#1192e8": "cyan-50",
+    "#007d79": "teal-60",
+    "#009d9a": "teal-50",
+    "#005d5d": "teal-70",
+    "#198038": "green-60",
+    "#24a148": "green-50",
+    "#ee5396": "magenta-50",
+    "#d02670": "magenta-60",
+    "#9f1853": "magenta-70",
+    "#8a3ffc": "purple-60",
+    "#a56eff": "purple-50",
+    "#6929c4": "purple-70",
+    "#525252": "gray-70"
+   },
+   "reserved": {
+    "#da1e28": "red-60 — tedy-accent-urgent / support-error"
+   }
   }
  }
 }
