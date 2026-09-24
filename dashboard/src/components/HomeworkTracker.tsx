@@ -4,7 +4,8 @@ import { Timer, Document, CheckmarkFilled, CloseFilled, ChevronDown, ChevronUp }
 import { useApi } from '../hooks/useApi'
 import type { HomeworkItem } from '../types'
 import { parseDeadline, formatTurkishDate, getHomeworkStatus } from '../utils/formatters'
-import { getCountdown } from '../utils/countdown'
+import { countdownTagType, getCountdown } from '../utils/countdown'
+import SubjectLabel from './SubjectLabel'
 import { NextThing } from './NextThing'
 import { describeDaysAhead } from './patterns/time'
 import './patterns/patterns.scss'
@@ -364,7 +365,7 @@ function HomeworkCard({
       <div className="homework-item__row">
         <div className="homework-item__main">
           <div className="homework-item__course">
-            {hw.normalized_course || hw["Ders Adı"]}
+            <SubjectLabel course={hw.normalized_course || hw["Ders Adı"]} />
             {(hw.student_marked_done || (hw["Ödev Durumu"] && hw["Ödev Durumu"] !== 'Değerlendirilmemiş')) && (
               <Tag
                 type={status.type}
@@ -393,7 +394,7 @@ function HomeworkCard({
         <div className="homework-item__countdown">
           {countdown.urgency !== 'expired' && (
             <div className={countdown.urgency === 'critical' || countdown.urgency === 'urgent' ? 'tag-urgent' : ''}>
-              <Tag type={countdown.urgency === 'critical' ? 'red' : countdown.urgency === 'urgent' ? 'red' : countdown.urgency === 'soon' ? 'warm-gray' : 'blue'} size="sm">
+              <Tag type={countdownTagType(countdown.urgency)} size="sm">
                 <Timer size={12} /> {countdown.text}
               </Tag>
             </div>
@@ -480,7 +481,7 @@ function HomeworkModalBody({ hw, enrichmentData }: { hw: HomeworkItem; enrichmen
         </span>
         {countdown.urgency !== 'expired' ? (
           <Tag
-            type={countdown.urgency === 'critical' || countdown.urgency === 'urgent' ? 'red' : countdown.urgency === 'soon' ? 'warm-gray' : 'blue'}
+            type={countdownTagType(countdown.urgency)}
             size="sm"
           >
             <Timer size={12} /> {countdown.text}

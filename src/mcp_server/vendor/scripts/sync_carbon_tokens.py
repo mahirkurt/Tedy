@@ -33,6 +33,7 @@ CORE = {
     "--cds-background": "background", "--cds-layer-01": "layer01", "--cds-layer-02": "layer02",
     "--cds-layer-03": "layer03", "--cds-layer-hover-01": "layerHover01",
     "--cds-layer-active-01": "layerActive01", "--cds-layer-selected-01": "layerSelected01",
+    "--cds-layer-hover-02": "layerHover02", "--cds-layer-selected-02": "layerSelected02",
     "--cds-layer-accent-01": "layerAccent01", "--cds-field-01": "field01",
     "--cds-field-hover-01": "fieldHover01", "--cds-border-subtle-00": "borderSubtle00",
     "--cds-border-subtle-01": "borderSubtle01", "--cds-border-strong-01": "borderStrong01",
@@ -178,6 +179,96 @@ def _tedy_drift(html: str, auth: dict) -> int:
     return drift
 
 
+# ---- Tedy ders renk sistemi (tedyLayer.subjectThemes) → şablonun üretilmiş iki bölgesi ----
+CSS_MARK = ("/* tedy:ders-renkleri */", "/* /tedy:ders-renkleri */")
+JS_MARK = ("/* tedy:ders-alanlari */", "/* /tedy:ders-alanlari */")
+ROLE_VARS = (("accent", "--subject-accent"), ("text", "--subject-text"), ("surface", "--subject-surface"),
+             ("onSurface", "--subject-on-surface"), ("surfaceHover", "--subject-surface-hover"),
+             ("border", "--subject-border"), ("onAccent", "--subject-on-accent"))
+_FOLD = str.maketrans({"ç": "c", "ğ": "g", "ı": "i", "ö": "o", "ş": "s", "ü": "u", "â": "a", "î": "i", "û": "u"})
+
+
+def fold(text: str) -> str:
+    """src/subject_themes.py ve şablondaki foldTr() ile aynı katlama."""
+    lowered = str(text).replace("İ", "i").replace("I", "ı").lower()
+    return re.sub(r"\s+", " ", lowered.translate(_FOLD)).strip()
+
+
+def _roles(modes: dict, mode: str) -> str:
+    other = "dark" if mode == "light" else "light"
+    decl = [f"{var}:{modes[mode][role][1]}" for role, var in ROLE_VARS]
+    decl.append(f"--subject-text-inverse:{modes[other]['text'][1]}")
+    return ";".join(decl)
+
+
+def subject_css(auth: dict) -> str:
+    """Aile başına açık (white, g10) ve koyu (g100) rol blokları; varsayılan `fallback` ailesidir."""
+    st = auth["tedyLayer"]["subjectThemes"]
+    fams, default = st["families"], st["fallback"]["family"]
+    lines = [CSS_MARK[0],
+             "/* Üretilir: scripts/sync_carbon_tokens.py --write-subjects — elle düzenlemeyin. Kaynak:",
+             "   carbon-v11-authority.json → tedyLayer.subjectThemes (Carbon tagTokens + @carbon/colors).",
+             "   Açık rol değerleri white ve g10'da, koyu değerler g100'de geçerlidir. */",
+             f":root{{{_roles(fams[default], 'light')}}}"]
+    lines += [f':root[data-subject-family="{f}"]{{{_roles(m, "light")}}}' for f, m in fams.items()]
+    lines.append(f':root[data-theme="g100"]{{{_roles(fams[default], "dark")}}}')
+    lines += [f':root[data-theme="g100"][data-subject-family="{f}"]{{{_roles(m, "dark")}}}'
+              for f, m in fams.items()]
+    lines.append(CSS_MARK[1])
+    return "\n".join(lines)
+
+
+def subject_js(auth: dict) -> str:
+    st = auth["tedyLayer"]["subjectThemes"]
+    rows = [[d["id"], d["family"], [fold(x) for x in d["stems"]]] for d in st["domains"]]
+    fb = [st["fallback"]["id"], st["fallback"]["family"]]
+    return (JS_MARK[0] + "\n"
+            + "  const SUBJECT_DOMAINS=" + json.dumps(rows, ensure_ascii=False, separators=(",", ":")) + ";\n"
+            + "  const SUBJECT_FALLBACK=" + json.dumps(fb, separators=(",", ":")) + ";\n"
+            + "  const SUBJECT_FAMILIES=" + json.dumps(list(st["families"]), separators=(",", ":")) + ";\n"
+            + "  " + JS_MARK[1])
+
+
+def _region(html: str, marks: tuple[str, str]) -> tuple[int, int] | None:
+    i = html.find(marks[0])
+    j = html.find(marks[1], i + 1) if i >= 0 else -1
+    return (i, j + len(marks[1])) if i >= 0 and j >= 0 else None
+
+
+def write_subjects(template: Path) -> int:
+    auth = json.loads(AUTH.read_text(encoding="utf-8"))
+    html = template.read_text(encoding="utf-8")
+    for marks, body in ((CSS_MARK, subject_css(auth)), (JS_MARK, subject_js(auth))):
+        span = _region(html, marks)
+        if span is None:
+            print(f"HATA: {marks[0]} bölgesi şablonda yok."); return 2
+        html = html[:span[0]] + body + html[span[1]:]
+    template.write_text(html, encoding="utf-8")
+    print(f"Ders renk sistemi yazıldı: {template.name}")
+    return 0
+
+
+def _subject_drift(html: str, auth: dict) -> int:
+    """Şablonun üretilmiş ders bölgelerini otoriteden yeniden üretilenle karşılaştırır.
+
+    Bölgeleri taşımayan (ders renk sistemi öncesi) şablonlar denetlenmez.
+    """
+    st = auth.get("tedyLayer", {}).get("subjectThemes")
+    if not st or CSS_MARK[0] not in html:
+        return 0
+    drift = 0
+    for marks, want in ((CSS_MARK, subject_css(auth)), (JS_MARK, subject_js(auth))):
+        span = _region(html, marks)
+        if span is None or html[span[0]:span[1]] != want:
+            drift += 1
+            print(f"SAPMA [ders-renkleri] {marks[0]} bölgesi otoriteden farklı "
+                  "(düzeltmek için: --write-subjects)")
+    values = len(st["families"]) * 2 * len(ROLE_VARS)
+    print(f"Ders renk sistemi: {len(st['families'])} aile × 2 mod × {len(ROLE_VARS)} rol = {values} değer, "
+          f"{len(st['domains'])} alan denetlendi.")
+    return drift
+
+
 def check(template: Path) -> int:
     """Şablon tema bloklarını otorite JSON ile karşılaştırır; sapma sayısını çıkış koduna çevirir."""
     try:
@@ -198,6 +289,7 @@ def check(template: Path) -> int:
         for theme, block in blocks.items()
     )
     drift += _tedy_drift(html, auth)
+    drift += _subject_drift(html, auth)
     print("\nSonuç: " + ("sapma yok — şablon otoriteyle birebir." if drift == 0
                           else f"{drift} token sapıyor."))
     return 0 if drift == 0 else 1
@@ -260,7 +352,12 @@ def main() -> None:
     ap.add_argument("--check", action="store_true",
                      help="sapma denetimi (varsayılan davranış; bayrak açıkça da verilebilir, no-op)")
     ap.add_argument("--template", type=Path, default=TPL, help="denetlenecek şablon/modül HTML")
+    ap.add_argument("--write-subjects", action="store_true",
+                    help="ders renk sistemi bölgelerini (CSS + JS) otoriteden yeniden yaz")
     args = ap.parse_args()
+    if args.write_subjects:
+        rc = write_subjects(args.template)
+        if rc != 0: sys.exit(rc)
     if args.refresh:
         rc = refresh()
         if rc != 0: sys.exit(rc)

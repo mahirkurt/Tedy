@@ -4,6 +4,7 @@ import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import type { ECVideo, A3KLesson, SebitHomework } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
+import SubjectLabel from './SubjectLabel'
 
 interface ECData {
   total_videos?: number
@@ -149,7 +150,7 @@ export default function PlatformProgress() {
                         }
                       </span>
                       <span className="platform-detail-row__tags">
-                        {l.category && <Tag type="teal" size="sm">{l.category}</Tag>}
+                        {l.category && <Tag type="cool-gray" size="sm">{l.category}</Tag>}
                         <span className="platform-detail-row__steps">
                           {l.completed_steps}/{l.total_steps} adım
                         </span>
@@ -211,7 +212,7 @@ export default function PlatformProgress() {
                       </span>
                       <span className="platform-detail-row__title">{s.title}</span>
                       <span className="platform-detail-row__tags">
-                        {s.course && <Tag type="purple" size="sm">{s.course}</Tag>}
+                        {s.course && <SubjectLabel className="platform-detail-row__course" course={s.course} />}
                         <span className="platform-detail-row__steps">{s.progress}%</span>
                       </span>
                       <div className="platform-detail-row__sebit-meta">

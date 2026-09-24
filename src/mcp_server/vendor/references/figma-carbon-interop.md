@@ -126,7 +126,7 @@ Carbon Figma kütüphanesi değişkenleri **grup/ad** hiyerarşisi kullanır; CS
 | `support/support-success` / `-error` / `-warning` / `-info` | `--cds-support-*` |
 | `notification/notification-background-*` | `--cds-notification-background-*` (eski takma ad `--cds-notif-*-bg`) |
 | `misc/highlight` / `overlay` / `skeleton-*` | `--cds-highlight` vb. |
-| `tag/tag-background-X` / `tag-color-X` | motor `ACCENT_STRONG` çiftleri |
+| `tag/tag-background-X` / `tag-color-X` / `tag-hover-X` / `tag-border-X` | `--subject-surface` / `--subject-on-surface` / `--subject-surface-hover` / `--subject-border` (ders renk ailesi) |
 
 Tip stilleri (`Heading 04`, `Body 02`, `Label 01`, `Code 02`) `@carbon/type`
 adlarıyla aynıdır; spacing değişkenleri (`spacing/spacing-01..13`)

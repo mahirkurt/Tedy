@@ -9,7 +9,7 @@ import type { User } from '../hooks/useAuth'
  * A reader account has no dashboard behind it — no sync health, no ödev camera,
  * no focus toggle — so it gets its own bar rather than the Carbon utility
  * header with most of its controls removed. Cloth ground, gold hairline and a
- * Cormorant wordmark put the reading room's own binding on the top of the page.
+ * Plex Serif wordmark put the reading room's own binding on the top of the page.
  */
 export default function ReaderHeader({ user, onLogout }: { user: User; onLogout: () => void }) {
   return (
@@ -56,7 +56,7 @@ export function ReaderFooter() {
     <footer className="reader-footer">
       <span className="reader-footer__ornament" aria-hidden><Ornament /></span>
       <p className="reader-footer__line">
-        Tedy Books · Cormorant Garamond ve Literata ile dizildi
+        Tedy Books · IBM Plex Serif ile dizildi
       </p>
     </footer>
   )

@@ -216,6 +216,7 @@
   /* yüzeyler (@carbon/themes g10) */
   --cds-background:#f4f4f4; --cds-layer-01:#ffffff; --cds-layer-02:#f4f4f4; --cds-layer-03:#ffffff;
   --cds-layer-hover-01:#e8e8e8; --cds-layer-active-01:#c6c6c6; --cds-layer-selected-01:#e0e0e0;
+  --cds-layer-hover-02:#e8e8e8; --cds-layer-selected-02:#e0e0e0;
   --cds-layer-accent-01:#e0e0e0; --cds-layer-accent-hover-01:#d1d1d1;
   --cds-field-01:#ffffff; --cds-field-hover-01:#e8e8e8;
   --cds-background-hover:rgba(141,141,141,.12); --cds-background-active:rgba(141,141,141,.5);
@@ -249,6 +250,7 @@
   /* yüzeyler (@carbon/themes white) */
   --cds-background:#ffffff; --cds-layer-01:#f4f4f4; --cds-layer-02:#ffffff; --cds-layer-03:#f4f4f4;
   --cds-layer-hover-01:#e8e8e8; --cds-layer-active-01:#c6c6c6; --cds-layer-selected-01:#e0e0e0;
+  --cds-layer-hover-02:#e8e8e8; --cds-layer-selected-02:#e0e0e0;
   --cds-layer-accent-01:#e0e0e0; --cds-layer-accent-hover-01:#d1d1d1;
   --cds-field-01:#f4f4f4; --cds-field-hover-01:#e8e8e8;
   --cds-background-hover:rgba(141,141,141,.12); --cds-background-active:rgba(141,141,141,.5);
@@ -276,6 +278,7 @@
 [data-theme="g100"]{
   --cds-background:#161616; --cds-layer-01:#262626; --cds-layer-02:#393939; --cds-layer-03:#525252;
   --cds-layer-hover-01:#333333; --cds-layer-active-01:#525252; --cds-layer-selected-01:#393939;
+  --cds-layer-hover-02:#474747; --cds-layer-selected-02:#525252;
   --cds-layer-accent-01:#393939; --cds-layer-accent-hover-01:#474747;
   --cds-field-01:#262626; --cds-field-hover-01:#333333;
   --cds-background-hover:rgba(141,141,141,.16); --cds-background-active:rgba(141,141,141,.4);
@@ -316,6 +319,8 @@
   --cds-notif-error-bg:var(--cds-notification-background-error);
   /* Tedy kimliği: laciverti yalnız üst banttaki marka yüzeyidir, eylem rengi değildir */
   --tedy-brand:#002d9c; --tedy-brand-hover:#001d6c;
+  /* bant üstü ikincil metin (blue-20, lacivert üstünde 9,3:1) ve ince ayraç/iz (blue-60) */
+  --tedy-brand-text-secondary:#d0e2ff; --tedy-brand-rule:#0f62fe;
   --tedy-accent-urgent:var(--cds-support-error);
   /* ödül (XP, seri): ayrı altın ham-hex yok — Carbon'un metin-güvenli sıcak adımı */
   --reward:var(--tedy-text-warning); --reward-bg:var(--cds-notification-background-warning);
@@ -359,11 +364,36 @@
   --font-sans:'IBM Plex Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
   --font-serif:'IBM Plex Serif',Georgia,Times,serif;
   --font-mono:'IBM Plex Mono',Menlo,'DejaVu Sans Mono',ui-monospace,monospace;
-  --accent:#0f62fe; --accent-strong:#0043ce; --accent-tint:#edf5ff;
+  /* ders aksanı: rolleri aşağıdaki üretilmiş tedy:ders-renkleri bloğundan gelir (data-subject-family) */
+  --accent:var(--subject-accent); --accent-strong:var(--subject-text);
+  --accent-tint:var(--subject-surface); --accent-on:var(--subject-on-surface);
   --viz-1:#6929c4; --viz-2:#002d9c; --viz-3:#1192e8; --viz-4:#007d79; --viz-5:#9f1853;
   --viz-grid:#e0e0e0; --viz-axis:#8d8d8d; --viz-track:#e0e0e0;
   --viz-sun:#f1c21b; --viz-water:#1192e8; --viz-cloud:#c1c7cd;
 }
+/* tedy:ders-renkleri */
+/* Üretilir: scripts/sync_carbon_tokens.py --write-subjects — elle düzenlemeyin. Kaynak:
+   carbon-v11-authority.json → tedyLayer.subjectThemes (Carbon tagTokens + @carbon/colors).
+   Açık rol değerleri white ve g10'da, koyu değerler g100'de geçerlidir. */
+:root{--subject-accent:#6f6f6f;--subject-text:#525252;--subject-surface:#e0e0e0;--subject-on-surface:#161616;--subject-surface-hover:#d1d1d1;--subject-border:#a8a8a8;--subject-on-accent:#ffffff;--subject-text-inverse:#c6c6c6}
+:root[data-subject-family="magenta"]{--subject-accent:#d02670;--subject-text:#9f1853;--subject-surface:#ffd6e8;--subject-on-surface:#9f1853;--subject-surface-hover:#ffbdda;--subject-border:#ff7eb6;--subject-on-accent:#ffffff;--subject-text-inverse:#ffafd2}
+:root[data-subject-family="purple"]{--subject-accent:#8a3ffc;--subject-text:#6929c4;--subject-surface:#e8daff;--subject-on-surface:#6929c4;--subject-surface-hover:#dcc7ff;--subject-border:#be95ff;--subject-on-accent:#ffffff;--subject-text-inverse:#d4bbff}
+:root[data-subject-family="teal"]{--subject-accent:#007d79;--subject-text:#005d5d;--subject-surface:#9ef0f0;--subject-on-surface:#005d5d;--subject-surface-hover:#57e5e5;--subject-border:#08bdba;--subject-on-accent:#ffffff;--subject-text-inverse:#3ddbd9}
+:root[data-subject-family="cyan"]{--subject-accent:#0072c3;--subject-text:#00539a;--subject-surface:#bae6ff;--subject-on-surface:#00539a;--subject-surface-hover:#99daff;--subject-border:#33b1ff;--subject-on-accent:#ffffff;--subject-text-inverse:#82cfff}
+:root[data-subject-family="blue"]{--subject-accent:#0f62fe;--subject-text:#0043ce;--subject-surface:#d0e2ff;--subject-on-surface:#0043ce;--subject-surface-hover:#b8d3ff;--subject-border:#78a9ff;--subject-on-accent:#ffffff;--subject-text-inverse:#a6c8ff}
+:root[data-subject-family="warm-gray"]{--subject-accent:#726e6e;--subject-text:#565151;--subject-surface:#e5e0df;--subject-on-surface:#171414;--subject-surface-hover:#d8d0cf;--subject-border:#ada8a8;--subject-on-accent:#ffffff;--subject-text-inverse:#cac5c4}
+:root[data-subject-family="cool-gray"]{--subject-accent:#697077;--subject-text:#4d5358;--subject-surface:#dde1e6;--subject-on-surface:#121619;--subject-surface-hover:#cdd3da;--subject-border:#a2a9b0;--subject-on-accent:#ffffff;--subject-text-inverse:#c1c7cd}
+:root[data-subject-family="gray"]{--subject-accent:#6f6f6f;--subject-text:#525252;--subject-surface:#e0e0e0;--subject-on-surface:#161616;--subject-surface-hover:#d1d1d1;--subject-border:#a8a8a8;--subject-on-accent:#ffffff;--subject-text-inverse:#c6c6c6}
+:root[data-theme="g100"]{--subject-accent:#a8a8a8;--subject-text:#c6c6c6;--subject-surface:#525252;--subject-on-surface:#f4f4f4;--subject-surface-hover:#636363;--subject-border:#8d8d8d;--subject-on-accent:#161616;--subject-text-inverse:#525252}
+:root[data-theme="g100"][data-subject-family="magenta"]{--subject-accent:#ff7eb6;--subject-text:#ffafd2;--subject-surface:#9f1853;--subject-on-surface:#ffd6e8;--subject-surface-hover:#bf1d63;--subject-border:#ee5396;--subject-on-accent:#161616;--subject-text-inverse:#9f1853}
+:root[data-theme="g100"][data-subject-family="purple"]{--subject-accent:#be95ff;--subject-text:#d4bbff;--subject-surface:#6929c4;--subject-on-surface:#e8daff;--subject-surface-hover:#7c3dd6;--subject-border:#a56eff;--subject-on-accent:#161616;--subject-text-inverse:#6929c4}
+:root[data-theme="g100"][data-subject-family="teal"]{--subject-accent:#08bdba;--subject-text:#3ddbd9;--subject-surface:#005d5d;--subject-on-surface:#9ef0f0;--subject-surface-hover:#007070;--subject-border:#009d9a;--subject-on-accent:#161616;--subject-text-inverse:#005d5d}
+:root[data-theme="g100"][data-subject-family="cyan"]{--subject-accent:#33b1ff;--subject-text:#82cfff;--subject-surface:#00539a;--subject-on-surface:#bae6ff;--subject-surface-hover:#0066bd;--subject-border:#1192e8;--subject-on-accent:#161616;--subject-text-inverse:#00539a}
+:root[data-theme="g100"][data-subject-family="blue"]{--subject-accent:#78a9ff;--subject-text:#a6c8ff;--subject-surface:#0043ce;--subject-on-surface:#d0e2ff;--subject-surface-hover:#0053ff;--subject-border:#4589ff;--subject-on-accent:#161616;--subject-text-inverse:#0043ce}
+:root[data-theme="g100"][data-subject-family="warm-gray"]{--subject-accent:#ada8a8;--subject-text:#cac5c4;--subject-surface:#565151;--subject-on-surface:#f7f3f2;--subject-surface-hover:#696363;--subject-border:#8f8b8b;--subject-on-accent:#161616;--subject-text-inverse:#565151}
+:root[data-theme="g100"][data-subject-family="cool-gray"]{--subject-accent:#a2a9b0;--subject-text:#c1c7cd;--subject-surface:#4d5358;--subject-on-surface:#f2f4f8;--subject-surface-hover:#5d646a;--subject-border:#878d96;--subject-on-accent:#161616;--subject-text-inverse:#4d5358}
+:root[data-theme="g100"][data-subject-family="gray"]{--subject-accent:#a8a8a8;--subject-text:#c6c6c6;--subject-surface:#525252;--subject-on-surface:#f4f4f4;--subject-surface-hover:#636363;--subject-border:#8d8d8d;--subject-on-accent:#161616;--subject-text-inverse:#525252}
+/* /tedy:ders-renkleri */
 ::selection{background:var(--cds-highlight);color:var(--cds-text-primary)}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;width:100%;max-width:100%}
@@ -405,7 +435,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .topbar__title{font-size:1.5rem;line-height:1.2;font-weight:600;letter-spacing:-.01em;margin:0;
   color:var(--cds-text-on-color);overflow-wrap:anywhere}
 .meta-line{font-size:.8125rem;line-height:1.25;margin-top:var(--sp-02);font-weight:400;letter-spacing:.01em;
-  color:color-mix(in srgb,var(--cds-text-on-color) 82%,var(--tedy-brand));overflow-wrap:anywhere}
+  color:var(--tedy-brand-text-secondary);overflow-wrap:anywhere}
 .topbar__r{display:flex;align-items:center;justify-content:flex-end;gap:var(--sp-04);
   flex:1 1 auto;flex-wrap:wrap;min-width:0;max-width:100%}
 /* XP / seri — Carbon Tag (bant üstünde: brand-hover zemin, text-on-color) */
@@ -428,7 +458,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
   background:var(--tedy-brand-hover);border-radius:var(--radius-tag);padding:2px 2px 2px var(--sp-03)}
 .pacing-disk[hidden]{display:none}
 .pacing-disk__ring{flex:none}
-.pacing-disk__track{fill:none;stroke:color-mix(in srgb,var(--cds-text-on-color) 32%,var(--tedy-brand-hover));stroke-width:3}
+.pacing-disk__track{fill:none;stroke:var(--tedy-brand-rule);stroke-width:3}
 .pacing-disk__arc{fill:none;stroke:var(--cds-text-on-color);stroke-width:3;stroke-linecap:round}
 .pacing-disk__dismiss{width:22px;height:22px;border:none;background:transparent;color:var(--cds-text-on-color);
   cursor:pointer;display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius-btn)}
@@ -437,7 +467,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .pacing-disk__dismiss .cds-icon{width:.8rem;height:.8rem}
 /* yardımcı düğmeler — Carbon ghost ikon düğme dili (kare), ince ayraçla */
 .topbar__tools{display:inline-flex;align-items:center;gap:var(--sp-02);max-width:100%;flex-wrap:wrap;
-  padding-left:var(--sp-03);border-left:1px solid color-mix(in srgb,var(--cds-text-on-color) 24%,var(--tedy-brand))}
+  padding-left:var(--sp-03);border-left:1px solid var(--tedy-brand-rule)}
 .icon-btn{width:40px;height:40px;border:none;background:transparent;cursor:pointer;color:var(--cds-text-on-color);
   display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius-btn);
   transition:background var(--dur-fast) var(--ease-std)}
@@ -507,7 +537,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .seg-head{display:flex;align-items:center;gap:var(--sp-05);margin-bottom:var(--sp-06);padding-bottom:var(--sp-05);border-bottom:1px solid var(--cds-border-subtle)}
 .seg-head>div{min-width:0}
 .seg-ic{flex:none;width:56px;height:56px;border-radius:var(--cds-radius);background:var(--accent-tint);display:inline-flex;align-items:center;justify-content:center}
-.seg-ic .pic{color:var(--accent-strong);width:32px;height:32px}
+.seg-ic .pic{color:var(--accent-on);width:32px;height:32px}
 .seg-head h2{font-size:var(--fs-h-seg);font-weight:600;margin:0;line-height:1.25}
 .kicker{font-size:var(--fs-label);font-weight:600;color:var(--accent-strong);
   text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
@@ -517,7 +547,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .lead{font-family:var(--font-serif);font-size:1.25rem;line-height:1.55;color:var(--cds-text-primary);
   background:var(--cds-layer-02);border-left:4px solid var(--accent);border-radius:var(--cds-radius);
   padding:var(--sp-05) var(--sp-06);margin:0 0 var(--sp-06)}
-mark.term{background:var(--accent-tint);color:var(--accent-strong);padding:0 .25em;border-radius:4px;font-weight:600}
+mark.term{background:var(--accent-tint);color:var(--accent-on);padding:0 .25em;border-radius:4px;font-weight:600}
 /* Anahtar kavramlar — Carbon DefinitionTooltip tetikleyicileri */
 .terms{display:flex;flex-direction:column;gap:var(--sp-04);margin:var(--sp-06) 0;
   background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);
@@ -525,13 +555,13 @@ mark.term{background:var(--accent-tint);color:var(--accent-strong);padding:0 .25
 .terms__lbl{font-size:.8125rem;color:var(--cds-text-secondary);font-weight:500;letter-spacing:.02em}
 .terms__list{display:flex;flex-wrap:wrap;gap:var(--sp-03);align-items:center}
 .def-term{font-family:var(--font-sans);font-size:var(--fs-compact);font-weight:600;
-  background:var(--accent-tint);color:var(--accent-strong);border-radius:var(--radius-tag);
-  border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
+  background:var(--accent-tint);color:var(--accent-on);border-radius:var(--radius-tag);
+  border:1px solid var(--subject-border);
   padding:var(--sp-02) var(--sp-05);cursor:help;display:inline-flex;align-items:center;gap:6px;
   transition:background var(--dur-fast) var(--ease-std),box-shadow var(--dur-fast) var(--ease-std)}
-.def-term:hover{background:color-mix(in srgb,var(--accent) 16%,var(--cds-layer-02))}
+.def-term:hover{background:var(--subject-surface-hover)}
 .def-term:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
-.def-term .cds-icon{width:.9rem;height:.9rem;color:var(--accent-strong);opacity:.85;flex:none}
+.def-term .cds-icon{width:.9rem;height:.9rem;color:var(--accent-on);opacity:.85;flex:none}
 .def-term[aria-describedby] .cds-icon{opacity:1}
 /* tanım popover — tema-duyarlı, oklu kart; ekran kenarına flip+clamp (JS konumlu) */
 .def-pop{position:fixed;z-index:9999;width:max-content;max-width:300px;
@@ -560,8 +590,11 @@ mark.term{background:var(--accent-tint);color:var(--accent-strong);padding:0 .25
 @media (prefers-reduced-motion: reduce){.def-pop{transition:none}}
 /* tanım popover'ı Carbon ters (inverse) yüzeydir: background-inverse + text-inverse */
 [data-theme]{--def-pop-bg:var(--cds-background-inverse);--def-pop-fg:var(--cds-text-inverse)}
-[data-theme="g10"],[data-theme="white"]{--def-pop-accent:color-mix(in srgb,var(--accent) 50%,#ffffff);--def-pop-rule:rgba(255,255,255,.20)}
-[data-theme="g100"]{--def-pop-accent:color-mix(in srgb,var(--accent) 82%,#000000);--def-pop-rule:rgba(22,22,22,.14)}
+/* ters yüzeyde aksan metni karşı modun text rolüdür (--subject-text-inverse); ayraç karşı temanın
+   border-subtle-02 değeri (g100: gray-60, g10: gray-30) */
+[data-theme]{--def-pop-accent:var(--subject-text-inverse)}
+[data-theme="g10"],[data-theme="white"]{--def-pop-rule:#6f6f6f}
+:root[data-theme="g100"]{--def-pop-rule:#c6c6c6}
 .visual{margin:var(--sp-06) 0;text-align:center;background:var(--cds-layer-02);
   border:1px solid var(--cds-border-subtle);border-radius:var(--cds-radius);padding:var(--sp-06)}
 .visual svg{max-width:100%;height:auto}
@@ -622,17 +655,17 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
   width:100%;min-width:0;max-width:100%;color:var(--cds-text-primary);position:relative;
   transition:box-shadow var(--dur-fast) var(--ease-std),background var(--dur-fast)}
 .opt>span:last-child{min-width:0;overflow-wrap:anywhere}
-.opt:hover:not([disabled]){box-shadow:inset 0 0 0 2px var(--accent);background:var(--accent-tint)}
+.opt:hover:not([disabled]){box-shadow:inset 0 0 0 2px var(--accent);background:var(--cds-layer-hover-02)}
 .opt:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
 .opt[disabled]{cursor:default}
 .opt__mark{flex:none;width:1.5rem;height:1.5rem;display:inline-flex;align-items:center;justify-content:center}
 .opt--correct{box-shadow:inset 0 0 0 2px var(--cds-support-success);
-  background:color-mix(in srgb,var(--cds-support-success) 14%,var(--cds-layer-02))}
+  background:var(--cds-notification-background-success)}
 .opt--correct .opt__mark{color:var(--cds-support-success)}
 .opt--wrong{box-shadow:inset 0 0 0 2px var(--cds-support-error);
-  background:color-mix(in srgb,var(--cds-support-error) 12%,var(--cds-layer-02))}
+  background:var(--cds-notification-background-error)}
 .opt--wrong .opt__mark{color:var(--cds-support-error)}
-.opt--sel{box-shadow:inset 0 0 0 2px var(--accent);background:var(--accent-tint)}
+.opt--sel{box-shadow:inset 0 0 0 2px var(--accent);background:var(--accent-tint);color:var(--accent-on)}
 /* Carbon inline notification */
 [data-theme="g100"] .feedback{box-shadow:inset 0 0 0 1px var(--cds-border-subtle-01)}
 .feedback{margin:var(--sp-05) 0;padding:var(--sp-05) var(--sp-06);border-radius:var(--cds-radius);
@@ -661,7 +694,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .pool{display:flex;flex-wrap:wrap;gap:var(--sp-04);margin:var(--sp-05) 0}
 .chip-btn{font-family:var(--font-sans);font-size:var(--fs-compact);min-height:var(--tap);padding:0 var(--sp-05);border:0;
   border-radius:var(--radius-btn);cursor:pointer;background:var(--cds-layer-02);box-shadow:inset 0 0 0 1px var(--cds-border-strong);color:var(--cds-text-primary)}
-.chip-btn:hover:not([disabled]){background:var(--accent-tint);box-shadow:inset 0 0 0 2px var(--accent)}
+.chip-btn:hover:not([disabled]){background:var(--cds-layer-hover-02);box-shadow:inset 0 0 0 2px var(--accent)}
 .chip-btn:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
 .chip-btn[disabled]{opacity:.4;cursor:default}
 /* soluk-çözümlü örnek (worked, fading worked example) — math g=0.48, fading en güçlü
@@ -672,7 +705,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
   box-shadow:inset 0 0 0 1px var(--cds-border-tile)}
 .worked-step__num{flex:none;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;
   justify-content:center;font-family:var(--font-mono);font-weight:600;font-size:.8rem;
-  background:var(--accent-tint);color:var(--accent-strong)}
+  background:var(--accent-tint);color:var(--accent-on)}
 .worked-step--solved .worked-step__num{background:transparent;color:var(--cds-text-secondary);
   box-shadow:inset 0 0 0 1.5px var(--cds-border-strong)}
 .worked-step__text{flex:1 1 160px;font-size:var(--fs-body);color:var(--cds-text-primary)}
@@ -687,7 +720,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .worked-input[disabled]{opacity:.75;cursor:default}
 .worked-mark{flex:none;width:1.4rem;height:1.4rem;display:inline-flex;align-items:center;justify-content:center;color:var(--cds-text-secondary)}
 .worked-step--correct{box-shadow:inset 0 0 0 2px var(--cds-support-success);
-  background:color-mix(in srgb,var(--cds-support-success) 14%,var(--cds-layer-02))}
+  background:var(--cds-notification-background-success)}
 .worked-step--correct .worked-mark{color:var(--cds-support-success)}
 .worked-step--wrong .worked-input{box-shadow:inset 0 0 0 2px var(--cds-support-error)}
 .worked-step--wrong .worked-mark{color:var(--cds-support-error)}
@@ -729,7 +762,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .se-textarea:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
 .se-textarea::placeholder{color:var(--cds-text-placeholder)}
 .se-reveal{margin:var(--sp-05) 0}
-.se-reveal[aria-expanded="true"]{background:var(--accent-tint);color:var(--accent-strong)}
+.se-reveal[aria-expanded="true"]{background:var(--accent-tint);color:var(--accent-on)}
 .se-model{margin-top:var(--sp-05);padding:var(--sp-06) var(--sp-07);border-radius:var(--cds-radius);
   background:var(--cds-layer-02);border-left:4px solid var(--accent)}
 .se-model[hidden]{display:none}
@@ -785,7 +818,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .timeline{list-style:none;margin:var(--sp-05) 0;padding:0;position:relative}
 .tl-item{display:flex;gap:var(--sp-05);padding-bottom:var(--sp-06);position:relative}
 .tl-item:not(:last-child)::before{content:"";position:absolute;left:15px;top:34px;bottom:0;width:2px;background:var(--cds-border-subtle)}
-.tl-node{flex:none;width:32px;height:32px;border-radius:50%;background:var(--accent-tint);color:var(--accent-strong);
+.tl-node{flex:none;width:32px;height:32px;border-radius:50%;background:var(--accent-tint);color:var(--accent-on);
   display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:600;
   box-shadow:inset 0 0 0 2px var(--accent);z-index:1}
 .tl-card{background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);border-radius:var(--cds-radius);padding:var(--sp-05) var(--sp-06);flex:1}
@@ -842,9 +875,9 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
   cursor:pointer;background:var(--cds-layer-01);color:var(--cds-text-primary);
   box-shadow:inset 0 0 0 1.5px var(--cds-border-strong);
   transition:box-shadow var(--dur-fast) var(--ease-std),background var(--dur-fast) var(--ease-std)}
-.cmap-node:hover:not([disabled]){box-shadow:inset 0 0 0 2px var(--accent);background:var(--accent-tint)}
+.cmap-node:hover:not([disabled]){box-shadow:inset 0 0 0 2px var(--accent);background:var(--cds-layer-hover-01)}
 .cmap-node:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
-.cmap-node--sel{box-shadow:inset 0 0 0 2.5px var(--accent);background:var(--accent-tint);color:var(--accent-strong)}
+.cmap-node--sel{box-shadow:inset 0 0 0 2.5px var(--accent);background:var(--accent-tint);color:var(--accent-on)}
 .cmap-node[disabled]{cursor:default;opacity:.85}
 .cmap-edges{margin:var(--sp-05) 0}
 .cmap-edges__lbl{font-size:var(--fs-label);color:var(--cds-text-secondary);font-weight:600;
@@ -870,16 +903,15 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .cmap-edge__remove[disabled]{opacity:.4;cursor:default}
 .cmap-edge__remove .cds-icon{width:1rem;height:1rem}
 .cmap-check{margin:var(--sp-05) 0}
-/* ===== işlevsel renk: etkinlik-tipine göre wayfinding aksanı (signaling) ===== */
-.stage[data-seg="teach"]{--seg-accent:var(--cds-support-info)}
-.stage[data-seg="mcq"],.stage[data-seg="checkpoint"],.stage[data-seg="fillblank"],.stage[data-seg="match"],.stage[data-seg="order"],.stage[data-seg="sorting"],.stage[data-seg="hotspot"],.stage[data-seg="conceptMap"]{--seg-accent:var(--accent)}
-.stage[data-seg="brainbreak"]{--seg-accent:var(--cds-support-success)}
-.stage[data-seg="chart"],.stage[data-seg="table"]{--seg-accent:var(--viz-2)}
-.stage[data-seg="flashcards"]{--seg-accent:var(--accent)}
-.seg-ic{background:color-mix(in srgb,var(--seg-accent,var(--accent)) 16%,transparent)}
-.seg-ic .pic{color:var(--seg-accent,var(--accent-strong))}
-.kicker{color:var(--seg-accent,var(--accent-strong))}
-.seg-head{border-bottom-color:color-mix(in srgb,var(--seg-accent,var(--cds-border-subtle)) 38%,var(--cds-border-subtle))}
+/* ===== işlevsel renk: etkinlik-tipine göre wayfinding (signaling) — tek modül, tek renk =====
+   Etkinlik tipini renk ailesi değil, aynı ders ailesinin TONU imler: "senin sıran" segmentleri
+   dolu aksan karo (accent + onAccent), anlatım/veri segmentleri tag karosu (surface + onSurface),
+   mola nötr karo. Anlam renkleri (support-info/success) kategori olarak kullanılmaz (İ8). */
+.stage[data-seg="mcq"],.stage[data-seg="checkpoint"],.stage[data-seg="fillblank"],.stage[data-seg="match"],.stage[data-seg="order"],.stage[data-seg="sorting"],.stage[data-seg="hotspot"],.stage[data-seg="conceptMap"],.stage[data-seg="flashcards"]{--seg-ic-bg:var(--subject-accent);--seg-ic-fg:var(--subject-on-accent)}
+.stage[data-seg="brainbreak"]{--seg-ic-bg:var(--cds-layer-accent-01);--seg-ic-fg:var(--cds-icon-secondary);--seg-kicker:var(--cds-text-secondary)}
+.seg-ic{background:var(--seg-ic-bg,var(--accent-tint))}
+.seg-ic .pic{color:var(--seg-ic-fg,var(--accent-on))}
+.kicker{color:var(--seg-kicker,var(--accent-strong))}
 /* ===== ödül/ilerleme: sakin sıcak vurgu (XP, yıldız) — --reward = tedy-text-warning (Carbon
    sarısının metin-güvenli karşılığı, orange-70/30); ham altın hex yok ===== */
 .xp .cds-icon{color:var(--reward)}
@@ -896,7 +928,7 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .viz-table tbody tr:nth-child(odd){background:var(--cds-layer-01)}
 .viz-table tbody tr:last-child td,.viz-table tbody tr:last-child th{border-bottom:none}
 .viz-table .num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
-.viz-table .hi{color:var(--seg-accent,var(--accent-strong));font-weight:600}
+.viz-table .hi{color:var(--accent-strong);font-weight:600}
 /* ===== matematik dizgisi (sayı/sembol mükemmelliği) ===== */
 .math{font-family:var(--font-serif);font-variant-numeric:lining-nums tabular-nums;line-height:1.5}
 .math.block{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.06em .16em;font-size:1.4rem;line-height:1.2;margin:var(--sp-05) 0}
@@ -919,11 +951,11 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 /* ilişki akışı: sebep-sonuç / kavram zinciri (Sosyal/Yurttaşlık) */
 .flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:var(--sp-04)}
 .flow-node{flex:1 1 140px;min-width:120px;background:var(--cds-layer-02);
-  border:1px solid var(--cds-border-subtle);border-left:4px solid var(--seg-accent,var(--accent));
+  border:1px solid var(--cds-border-subtle);border-left:4px solid var(--accent);
   border-radius:var(--cds-radius);padding:var(--sp-05)}
 .flow-node__t{font-weight:600}
 .flow-node__s{font-size:var(--fs-label);color:var(--cds-text-secondary);margin-top:2px}
-.flow-arrow{display:flex;align-items:center;color:var(--seg-accent,var(--accent));flex:none}
+.flow-arrow{display:flex;align-items:center;color:var(--accent);flex:none}
 .flow-arrow .cds-icon{width:1.4rem;height:1.4rem}
 @media (max-width:560px){ .flow{flex-direction:column} .flow-arrow{transform:rotate(90deg);align-self:center} }
 /* kavram/değer kartları (Din/Yurttaşlık/genel) */
@@ -931,8 +963,8 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .cards--2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
 .cards--4{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
 .card{background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);
-  border-top:3px solid var(--seg-accent,var(--accent));border-radius:var(--cds-radius);padding:var(--sp-06)}
-.card .pic{width:30px;height:30px;color:var(--seg-accent,var(--accent-strong));margin-bottom:var(--sp-04)}
+  border-top:3px solid var(--accent);border-radius:var(--cds-radius);padding:var(--sp-06)}
+.card .pic{width:30px;height:30px;color:var(--accent-strong);margin-bottom:var(--sp-04)}
 .card__t{font-size:var(--fs-h-sub);font-weight:600;margin:0 0 var(--sp-03)}
 .card__d{margin:0;color:var(--cds-text-secondary);font-size:var(--fs-compact)}
 /* dil: satır-arası çözümleme; rol/cinsiyet renk-kodu DAİMA etiketle birlikte (CVD-güvenli) */
@@ -1122,7 +1154,7 @@ const MODULE_DATA = {
     id:"maddenin-halleri-su-dongusu-demo",
     title:"Maddenin Hâlleri ve Su Döngüsü",
     subject:"Fen Bilimleri", gradeLevel:"5. Sınıf", mode:"MODULE",
-    accent:"#009d9a", estimatedMinutes:24, coverPictogram:"pic-microscope",
+    estimatedMinutes:24, coverPictogram:"pic-microscope",
     sourceCitation:"carbon-edupedia sentetik şablon verisi — dış kaynak kullanılmadı"
   },
   learner:{ name:"", showTimer:false, breakReminderMin:20, pacingDisk:false },  // pacingDisk: v3.0.0 opsiyonel tempo diski, varsayılan KAPALI
@@ -1341,42 +1373,29 @@ const MODULE_DATA = {
   const norm = s => String(s).toLocaleLowerCase("tr").replace(/\s+/g," ").trim();
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
 
-  /* ---- tema-duyarlı aksan türetme ---- */
-  function hx(h){h=h.replace("#","");return [0,2,4].map(i=>parseInt(h.substr(i,2),16));}
-  function mix(a,b,wb){const pa=hx(a),pb=hx(b);
-    return "#"+pa.map((v,i)=>Math.round(v*(1-wb)+pb[i]*wb).toString(16).padStart(2,"0")).join("");}
-  /* Resmî Carbon tag çiftleri (@carbon/themes generated/_tag-tokens.scss):
-     aksan ailesi -> [açık-tema strong, koyu-tema strong]. Bu değerler Carbon'un
-     AA-doğrulanmış tag-metin renkleridir (tint zemin + layer üstünde >=4.5:1). */
-  const ACCENT_STRONG={
-    "#0f62fe":["#0043ce","#d0e2ff"], "#4589ff":["#0043ce","#d0e2ff"],   /* blue   */
-    "#0072c3":["#00539a","#bae6ff"], "#1192e8":["#00539a","#bae6ff"],   /* cyan   */
-    "#007d79":["#005d5d","#9ef0f0"], "#009d9a":["#005d5d","#9ef0f0"],
-    "#005d5d":["#005d5d","#9ef0f0"],                                    /* teal   */
-    "#198038":["#0e6027","#a7f0ba"], "#24a148":["#0e6027","#a7f0ba"],   /* green  */
-    "#ee5396":["#9f1853","#ffd6e8"], "#d02670":["#9f1853","#ffd6e8"],
-    "#9f1853":["#9f1853","#ffd6e8"],                                    /* magenta*/
-    "#8a3ffc":["#6929c4","#e8daff"], "#a56eff":["#6929c4","#e8daff"],
-    "#6929c4":["#6929c4","#e8daff"],                                    /* purple */
-    "#da1e28":["#a2191f","#ffd7d9"],                                    /* red    */
-    "#525252":["#161616","#f4f4f4"]                                     /* gray   */
-  };
-  function setAccent(hex){
-    const dark = document.documentElement.getAttribute("data-theme")==="g100";
-    const bg = dark? "#161616":"#ffffff";
-    const r=document.documentElement.style, key=String(hex).toLowerCase();
-    r.setProperty("--accent",hex);
-    const pair=ACCENT_STRONG[key];
-    r.setProperty("--accent-strong", pair ? pair[dark?1:0]
-      : (dark? mix(hex,"#ffffff",0.42) : mix(hex,"#000000",0.42)));
-    r.setProperty("--accent-tint", mix(hex,bg, dark?0.86:0.90));
+  /* ---- ders renk ailesi (Tedy ders renk sistemi) ----
+     Ders adı katlanır ve alan tablosunda sözcük başı kökle aranır; alanın Carbon Tag ailesi
+     <html data-subject-family> olur, renk rollerini CSS (tedy:ders-renkleri) tema-duyarlı verir.
+     meta.accent yalnız bir aile adıyla alanı ezebilir (derleyici başka değeri reddeder).
+     Tablo üretilir: scripts/sync_carbon_tokens.py --write-subjects (kaynak: tedyLayer.subjectThemes). */
+  /* tedy:ders-alanlari */
+  const SUBJECT_DOMAINS=[["yabanci-dil","blue",["ingilizce","english","fransizca","french","francais","almanca","german","deutsch","arapca","arabic","ispanyolca","spanish","italyanca","rusca","cince","japonca","yabanci dil","foreign language"]],["dil","magenta",["turkce","turk dili","edebiyat","turkish","dil ve anlatim","okuma yazma","ilk okuma","masal"]],["matematik","purple",["matematik","math","geometri","cebir","istatistik"]],["fen","teal",["fen","fizik","kimya","biyoloji","physics","chemistry","biology","science","astronomi","bilim uygulama"]],["degerler","warm-gray",["din kultur","din bilgi","temel dini","ahlak","degerler","kur'an","kuran","peygamber","siyer","religion","ethics"]],["sosyal","cyan",["sosyal","social","hayat bilgisi","tarih","history","inkilap","cografya","geography","felsefe","philosophy","sosyoloji","psikoloji","mantik","vatandaslik","yurttaslik","insan haklari","demokrasi","civics"]],["teknoloji","cool-gray",["bilisim","teknoloji","yazilim","kodlama","robotik","informatics","computer","coding"]],["sanat-spor","gray",["gorsel sanat","sanat","resim","muzik","music","beden egitimi","spor","physical education","fiziki etkinlik","drama","dans"]]];
+  const SUBJECT_FALLBACK=["genel","gray"];
+  const SUBJECT_FAMILIES=["magenta","purple","teal","cyan","blue","warm-gray","cool-gray","gray"];
+  /* /tedy:ders-alanlari */
+  const FOLD_MAP={"ç":"c","ğ":"g","ı":"i","ö":"o","ş":"s","ü":"u","â":"a","î":"i","û":"u"};
+  function foldTr(v){ return String(v==null?"":v).toLocaleLowerCase("tr").replace(/[çğıöşüâîû]/g,c=>FOLD_MAP[c]).replace(/\s+/g," ").trim(); }
+  const SUBJECT_RE=SUBJECT_DOMAINS.map(d=>[d[0],d[1],new RegExp("(?:^|[^a-z0-9])(?:"+d[2].map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")+")")]);
+  function subjectDomain(){
+    const raw=foldTr((D.meta&&(D.meta.subjectKey||D.meta.subject))||"");
+    for(const d of SUBJECT_RE){ if(d[2].test(raw)) return {id:d[0],family:d[1]}; }
+    return {id:SUBJECT_FALLBACK[0],family:SUBJECT_FALLBACK[1]};
   }
-  // Derse-özel kimlik aksanı: meta.accent öncelikli, yoksa konudan türetilir.
-  const SUBJECT_ACCENT={math:"#8a3ffc",science:"#007d79",social:"#ee5396",
-    civics:"#0072c3",religion:"#198038",history:"#a56eff",geography:"#005d5d",
-    turkish:"#d02670",english:"#0f62fe",french:"#6929c4",language:"#0f62fe"};
-  // Not: kırmızı (red-60 = support-error = Tedy aciliyet rengi) ders aksanı olarak kullanılmaz;
-  // Türkçe magenta-60 taşır (Tedy İ6/İ8: kırmızı yalnız gerçek aciliyettir).
+  function subjectFamily(){
+    const a=D.meta&&D.meta.accent;
+    return (typeof a==="string" && SUBJECT_FAMILIES.indexOf(a)>=0) ? a : subjectDomain().family;
+  }
+  // Dil/konu anahtarı (sesli okuma dili, sayı biçimi); renkten bağımsızdır.
   function subjectKey(){
     const raw=((D.meta&&(D.meta.subjectKey||D.meta.subject))||"").toLowerCase();
     if(/mat|math|geometri|cebir/.test(raw)) return "math";
@@ -1391,7 +1410,6 @@ const MODULE_DATA = {
     if(/ingiliz|english|german|alman|\bdil\b|language|lang/.test(raw)) return "english";
     return "";
   }
-  function accentColor(){ return (D.meta&&D.meta.accent) || SUBJECT_ACCENT[subjectKey()] || "#0f62fe"; }
 
   /* ---- durum ---- */
   const segs = D.segments;
@@ -1524,7 +1542,9 @@ const MODULE_DATA = {
     // Eski kayıtlı "white" tercihi geriye uyum için korunur.
     const savedTheme=lsGet(THEME_STORE_KEY);
     if(THEMES.indexOf(savedTheme)>=0){ document.documentElement.setAttribute("data-theme",savedTheme); themeChosenHere=true; }
-    setAccent(accentColor());
+    const dom=subjectDomain();
+    document.documentElement.setAttribute("data-subject-family", subjectFamily());
+    document.documentElement.setAttribute("data-subject-domain", dom.id);
     document.documentElement.setAttribute("data-subject", subjectKey());
     $("#titleText").textContent = D.meta.title || "Modül";
     // Kapak piktogramı bantta değil (orada Tedy işareti durur); özet segmentinde yaşar.
@@ -1632,7 +1652,6 @@ const MODULE_DATA = {
     if(THEMES.indexOf(next)<0) return false;
     document.documentElement.setAttribute("data-theme", next);
     syncThemeButton();
-    setAccent(accentColor());
     return true;
   }
   function toggleTheme(){

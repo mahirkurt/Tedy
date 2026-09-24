@@ -10,6 +10,7 @@
 @use '@carbon/react/scss/motion' as motion;
 @use '@carbon/react/scss/type' as type;
 @use '@carbon/colors' as colors;
+@use 'subjects';
 
 // ─── Design Tokens ──────────────────────────────────────────────────────────
 // Carbon emits its --cds-* custom properties ONLY inside the theme scopes it
@@ -36,6 +37,12 @@
   // The hover shade was written as a literal #001d6c in AssistantChat.scss;
   // it is Carbon's blue-90.
   --ted-color-brand-primary-hover: #{colors.$blue-90};
+  // On the brand band: secondary text (blue-20, 8.6:1 on blue-80) and the thin
+  // rule/track (blue-60). They replace white-at-65% and gradient washes, which
+  // produced colours outside the palette. The module template carries the same
+  // pair as --tedy-brand-text-secondary / --tedy-brand-rule.
+  --ted-color-brand-text-secondary: #{colors.$blue-20};
+  --ted-color-brand-rule: #{colors.$blue-60};
   --ted-color-brand-accent: #{colors.$red-60};
   // Cool grey rather than Carbon's neutral $gray-10. The faint blue cast is the
   // one deliberate deviation from g10's ground: it reads as "school" against
@@ -72,7 +79,9 @@
   --ted-day-window-edge: #{rgba(colors.$yellow-60, 0.45)};
   --ted-day-window-text: #{colors.$yellow-80};
 
-  --ted-radius-card: 10px;
+  // 8px = the module template's --cds-border-radius-08, so a card in the
+  // dashboard and a card inside a module turn the same corner.
+  --ted-radius-card: 8px;
   --ted-radius-sm: 4px;
 
   // ── Spacing ───────────────────────────────────────────────────────────────
@@ -395,7 +404,7 @@ body {
 .today-loading__bar {
   height: 56px;
   border-radius: var(--ted-radius-card);
-  background: linear-gradient(90deg, #e8ecf2 25%, #f2f4f8 50%, #e8ecf2 75%);
+  background: linear-gradient(90deg, var(--cds-skeleton-background) 25%, var(--cds-layer-01) 50%, var(--cds-skeleton-background) 75%);
   background-size: 200% 100%;
   animation: today-shimmer 1.5s ease-in-out infinite;
 
@@ -879,7 +888,7 @@ body {
   text-align: center;
   min-width: 52px;
   padding: var(--ted-space-xs) var(--ted-space-xs);
-  background: linear-gradient(135deg, #edf5ff 0%, #d0e2ff 100%);
+  background: #{colors.$blue-10};
   border-radius: var(--ted-radius-sm);
 }
 
@@ -963,7 +972,7 @@ body {
 // ─── Homework Countdown Bar ─────────────────────────────────────────────
 .hw-countdown-bar {
   height: 4px;
-  background: #e8ecf2;
+  background: var(--cds-layer-accent-01);
   border-radius: 2px;
   overflow: hidden;
   margin-top: var(--ted-space-xs);
@@ -1168,7 +1177,7 @@ body {
 }
 
 .homework-modal__description {
-  background: #f4f4f8;
+  background: var(--cds-layer-02);
   border-radius: var(--ted-radius-sm);
   padding: var(--ted-space-sm) var(--ted-space-md);
 }
@@ -1281,35 +1290,23 @@ body {
 
 // ─── Header Tag & Action Overrides ───────────────────────────────────────────
 .dashboard-header__meta .cds--tag {
-  background-color: rgb(255 255 255 / 22%);
-  color: #fff;
-  border: 1px solid rgb(255 255 255 / 30%);
+  // On the brand band a tag is the module band's chip: blue-90 ground, white
+  // text. Status reads from the border, in the dark-theme support colours
+  // that stay above 3:1 on blue-90 — no translucent overlays.
+  background-color: var(--ted-color-brand-primary-hover);
+  color: var(--ted-color-text-on-color);
+  border: 1px solid var(--ted-color-brand-rule);
   font-weight: 600;
 }
 
-.dashboard-header__meta .cds--tag--green {
-  background-color: rgb(25 128 56 / 55%);
-  border-color: rgb(190 242 206 / 42%);
-}
-
-.dashboard-header__meta .cds--tag--red {
-  background-color: rgb(218 30 40 / 58%);
-  border-color: rgb(255 214 219 / 40%);
-}
-
-.dashboard-header__meta .cds--tag--warm-gray {
-  background-color: rgb(109 75 0 / 52%);
-  border-color: rgb(255 235 154 / 42%);
-}
-
-.dashboard-header__meta .cds--tag--gray {
-  background-color: rgb(82 82 82 / 64%);
-  border-color: rgb(210 210 210 / 35%);
-}
+.dashboard-header__meta .cds--tag--green { border-color: #{colors.$green-40}; }
+.dashboard-header__meta .cds--tag--red { border-color: #{colors.$red-50}; }
+.dashboard-header__meta .cds--tag--warm-gray { border-color: #{colors.$yellow-30}; }
+.dashboard-header__meta .cds--tag--gray { border-color: #{colors.$gray-50}; }
 
 .cds--header__action svg { fill: #fff !important; }
 @media (any-hover: hover) {
-  .cds--header__action:hover { background-color: rgb(255 255 255 / 18%); }
+  .cds--header__action:hover { background-color: var(--ted-color-brand-primary-hover); }
 }
 .cds--header__action:focus-visible {
   outline: 2px solid #fff;
@@ -1382,9 +1379,7 @@ body {
 .login-page__hero {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #002d9c 0%, #001d6e 50%, #001141 100%);
-  background-size: 200% 200%;
-  animation: login-hero-shift 12s ease infinite;
+  background: var(--ted-color-brand-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1444,7 +1439,7 @@ body {
 
 .login-page__hero-subtitle {
   @include type.type-style('body-01');
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--ted-color-brand-text-secondary);
   margin: 0;
   letter-spacing: 0.02em;
 }
@@ -1510,7 +1505,7 @@ body {
 
 // Header
 .cds--header {
-  background: linear-gradient(90deg, #002d9c 0%, #001d6e 100%) !important;
+  background: var(--ted-color-brand-primary) !important;
   border-bottom: none !important;
 }
 
@@ -1534,10 +1529,7 @@ body {
   }
 }
 
-// Tags — slightly softer radius
-.cds--tag {
-  border-radius: 10px;
-}
+// Tags keep Carbon's own pill radius (the module template's --radius-tag).
 
 // Tiles — inherit card radius
 .cds--tile {
@@ -1589,9 +1581,9 @@ body {
 .health-popover__warning {
   margin: 0 0 var(--ted-space-xs);
   padding: 0.375rem 0.5rem;
-  border-radius: 6px;
-  background: #fff8e1;
-  color: #8e5400;
+  border-radius: var(--ted-radius-sm);
+  background: var(--cds-notification-background-warning);
+  color: var(--ted-text-warning);
   @include type.type-style('label-01');
   font-weight: 600;
 }
@@ -1761,7 +1753,7 @@ body {
 }
 
 .calendar-grid__cell--today {
-  background: #f8fbff;
+  background: #{colors.$blue-10};
 }
 
 .calendar-event {
@@ -1784,15 +1776,15 @@ body {
 }
 
 .calendar-event--homework {
-  border-left: 3px solid #da1e28;
-  background: rgba(218, 30, 40, 0.12);
-  color: #da1e28;
+  border-left: 3px solid var(--cds-support-error);
+  background: var(--cds-notification-background-error);
+  color: var(--ted-text-error);
 }
 
 .calendar-event--private {
-  border-left: 3px solid #ff832b;
-  background: rgba(255, 131, 43, 0.2);
-  color: #8e5400;
+  border-left: 3px solid #{colors.$orange-40};
+  background: #{colors.$orange-10};
+  color: var(--ted-text-warning);
 }
 
 .calendar-event--continuation {
@@ -1966,7 +1958,7 @@ body {
     border-bottom: 1px solid var(--ted-color-border-subtle);
 
     &:nth-child(even) .cds--accordion__content {
-      background: #fafafa;
+      background: var(--cds-layer-02);
     }
   }
 }
@@ -2142,7 +2134,7 @@ body {
 
 .grade-detail__bar-track {
   height: 8px;
-  background: #e8ecf2;
+  background: var(--cds-layer-accent-01);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -2219,14 +2211,14 @@ body {
 
 .platform-a3k-score__gauge {
   height: 8px;
-  background: #e8ecf2;
+  background: var(--cds-layer-accent-01);
   border-radius: 4px;
   overflow: hidden;
 }
 
 .platform-a3k-score__gauge-fill {
   height: 100%;
-  background: linear-gradient(90deg, #002d9c, #0f62fe);
+  background: var(--cds-interactive);
   border-radius: 4px;
   transition: width 0.6s ease-out;
 }
@@ -2282,7 +2274,7 @@ body {
   transition: background var(--ted-transition-fast);
 
   &:hover {
-    background: #f4f4f8;
+    background: var(--cds-layer-hover-01);
   }
 }
 
@@ -2641,14 +2633,14 @@ body {
 .homework-modal__enrichment {
   margin-top: 1rem;
   padding: 0.75rem 1rem;
-  background: rgba(0, 45, 156, 0.04);
-  border-left: 3px solid var(--ted-color-primary, #002d9c);
-  border-radius: 0 6px 6px 0;
+  background: #{colors.$blue-10};
+  border-left: 3px solid var(--ted-color-brand-primary);
+  border-radius: 0 var(--ted-radius-sm) var(--ted-radius-sm) 0;
 }
 .homework-modal__enrichment-title {
   @include type.type-style('heading-compact-01');
   margin-bottom: 0.375rem;
-  color: var(--ted-color-primary, #002d9c);
+  color: var(--ted-color-brand-primary);
 }
 .homework-modal__enrichment-text {
   @include type.type-style('body-01');
@@ -2874,11 +2866,10 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   }
 
-  &--critical { border-left-color: var(--status-error); }
-  &--urgent   { border-left-color: var(--ted-color-accent-purple); }
-  &--soon     { border-left-color: var(--status-info); }
-  &--normal   { border-left-color: var(--ted-color-border-subtle); }
-  &--graded   { border-left-color: var(--status-success); }
+  // The left edge is the subject mark (ted-subject--<family>, see _subjects.scss).
+  // Urgency is not repeated here: the countdown tag and bar carry it, so one
+  // card never shows two competing colours on the same edge (İ6, İ8).
+  &.ted-subject { border-left-color: var(--ted-subject-accent); }
 }
 
 .exam-card__header {
@@ -2895,10 +2886,38 @@ body {
   min-width: 0;
 }
 
+// ─── Subject identity (Tedy ders renk sistemi) ──────────────────────────────
+// One mark wherever a course name appears: a small swatch in the subject
+// family's accent before a neutral name. The swatch is the colour a module uses
+// for its rings and rules; the name keeps the subject readable without colour
+// (İ8). Family roles come from _subjects.scss (generated from the authority).
+.ted-subject-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  vertical-align: middle;
+}
+
+.ted-subject-label__mark {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 2px;
+  background: var(--ted-subject-accent);
+}
+
+.ted-subject-label__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .exam-card__course {
   @include type.type-style('label-01');
   font-weight: 600;
-  color: var(--ted-color-brand-primary);
+  // The subject's text role (Carbon -70 step, >= 7:1) — the same colour a module
+  // gives its kicker, so an exam card and its study module read as one subject.
+  color: var(--ted-subject-text, var(--ted-color-brand-primary));
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -2940,7 +2959,7 @@ body {
   background-color: var(--status-info);
 
   .exam-card--critical & { background-color: var(--status-error); }
-  .exam-card--urgent &   { background-color: var(--ted-color-accent-purple); }
+  .exam-card--urgent &   { background-color: var(--cds-support-caution-major); }
 }
 
 .exam-card__expand-btn {
@@ -3088,31 +3107,36 @@ body {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  --book-display: 'Cormorant Garamond', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
-  --book-serif: 'Literata', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+  // IBM Plex Serif is Carbon's reading face; it replaces Cormorant Garamond and
+  // Literata so the reading room stays inside the type system.
+  --book-display: 'IBM Plex Serif', Georgia, 'Times New Roman', serif;
+  --book-serif: 'IBM Plex Serif', Georgia, 'Times New Roman', serif;
   --book-sans: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
 
-  --book-gold: #c8a45c;
-  --book-gold-bright: #e3c789;
-  --book-gold-dim: rgb(200 164 92 / 42%);
+  // Foil and cloth are Carbon palette steps: gold = yellow (the reward colour),
+  // forest = green 80-100. Covers are illustrations, so gradients stay here.
+  --book-gold: #{colors.$yellow-40};
+  --book-gold-bright: #{colors.$yellow-30};
+  --book-gold-dim: #{rgba(colors.$yellow-40, 0.42)};
 
-  --book-cloth-1: #16261f;
-  --book-cloth-2: #27402f;
-  --book-cloth-3: #101b16;
+  --book-cloth-1: #{colors.$green-90};
+  --book-cloth-2: #{colors.$green-80};
+  --book-cloth-3: #{colors.$green-100};
 }
 
 .book-cover[data-palette='oxblood'],
 .books-callout[data-palette='oxblood'] {
-  --book-cloth-1: #2c1114;
-  --book-cloth-2: #47191d;
-  --book-cloth-3: #1c0a0c;
+  // Wine, not red: red stays reserved for urgency even on a book cover.
+  --book-cloth-1: #{colors.$magenta-90};
+  --book-cloth-2: #{colors.$magenta-80};
+  --book-cloth-3: #{colors.$magenta-100};
 }
 
 .book-cover[data-palette='midnight'],
 .books-callout[data-palette='midnight'] {
-  --book-cloth-1: #141a2e;
-  --book-cloth-2: #232d4a;
-  --book-cloth-3: #0d111f;
+  --book-cloth-1: #{colors.$blue-90};
+  --book-cloth-2: #{colors.$blue-80};
+  --book-cloth-3: #{colors.$blue-100};
 }
 
 /* ─── Cloth-bound cover ─────────────────────────────────────────────────── */
@@ -3274,7 +3298,7 @@ body {
   background: var(--book-cloth-1);
   color: var(--book-gold-bright);
   border-color: var(--book-cloth-1);
-  box-shadow: 0 2px 10px -4px rgb(22 38 31 / 70%);
+  box-shadow: 0 2px 10px -4px #{rgba(colors.$green-100, 0.7)};
 }
 
 .book-btn--primary:hover:not(:disabled) {
@@ -3304,7 +3328,7 @@ body {
   background:
     radial-gradient(120% 160% at 0% 0%, rgb(255 255 255 / 7%) 0%, transparent 55%),
     linear-gradient(112deg, var(--book-cloth-2) 0%, var(--book-cloth-1) 58%, var(--book-cloth-3) 100%);
-  box-shadow: 0 6px 20px -10px rgb(16 27 22 / 80%);
+  box-shadow: 0 6px 20px -10px #{rgba(colors.$green-100, 0.8)};
   position: relative;
   overflow: hidden;
   animation: card-fade-in var(--ted-transition-med) both;
@@ -3337,13 +3361,13 @@ body {
   font-size: 1.6rem;
   font-weight: 600;
   line-height: 1.1;
-  color: #f5f1e6;
+  color: #{colors.$warm-gray-10};
 }
 
 .books-callout__meta {
   margin: 0;
   font-size: 0.8125rem;
-  color: rgb(245 241 230 / 68%);
+  color: #{rgba(colors.$warm-gray-10, 0.68)};
 }
 
 .books-callout__actions {
@@ -3374,9 +3398,9 @@ body {
 
 .books-callout__link {
   font-size: 0.75rem;
-  color: rgb(245 241 230 / 62%);
+  color: #{rgba(colors.$warm-gray-10, 0.62)};
   text-decoration: none;
-  border-bottom: 1px solid rgb(245 241 230 / 24%);
+  border-bottom: 1px solid #{rgba(colors.$warm-gray-10, 0.24)};
 }
 
 .books-callout__link:hover { color: var(--book-gold-bright); }
@@ -3775,7 +3799,7 @@ body {
   transition: background var(--ted-transition-fast), padding-left var(--ted-transition-fast);
 }
 
-.book-toc__link:hover { background: rgb(22 38 31 / 5%); padding-left: 0.9rem; }
+.book-toc__link:hover { background: #{rgba(colors.$green-100, 0.05)}; padding-left: 0.9rem; }
 
 .book-toc__num {
   flex: none;
@@ -3846,32 +3870,35 @@ body {
   font-family: var(--reader-body-font);
 
   --reader-body-font: var(--book-serif);
-  --reader-bg: #faf8f4;
-  --reader-fg: #1d1b17;
-  --reader-muted: #7b7468;
-  --reader-accent: #8a6a2f;
-  --reader-hairline: rgb(29 27 23 / 12%);
-  --reader-chrome-bg: rgb(250 248 244 / 92%);
+  // Paper: warm-gray 10/100. Muted text measured 4.57:1 (was 4.36).
+  --reader-bg: #{colors.$warm-gray-10};
+  --reader-fg: #{colors.$warm-gray-100};
+  --reader-muted: #{colors.$warm-gray-60};
+  --reader-accent: #{colors.$yellow-60};
+  --reader-hairline: #{rgba(colors.$warm-gray-100, 0.12)};
+  --reader-chrome-bg: #{rgba(colors.$warm-gray-10, 0.92)};
 }
 
 .reader[data-font='sans'] { --reader-body-font: var(--book-sans); }
 
 .reader[data-theme='sepia'] {
-  --reader-bg: #f3e7d3;
-  --reader-fg: #3a2e20;
-  --reader-muted: #8a765a;
-  --reader-accent: #96702c;
-  --reader-hairline: rgb(58 46 32 / 14%);
-  --reader-chrome-bg: rgb(243 231 211 / 93%);
+  // Sepia: yellow-10 ground, orange-90 ink. Muted 7.11:1 (was 3.56, below AA).
+  --reader-bg: #{colors.$yellow-10};
+  --reader-fg: #{colors.$orange-90};
+  --reader-muted: #{colors.$yellow-70};
+  --reader-accent: #{colors.$yellow-60};
+  --reader-hairline: #{rgba(colors.$orange-90, 0.14)};
+  --reader-chrome-bg: #{rgba(colors.$yellow-10, 0.93)};
 }
 
 .reader[data-theme='night'] {
-  --reader-bg: #14161a;
-  --reader-fg: #cdc8bf;
-  --reader-muted: #7f7a72;
+  // Night: cool-gray-100 ground (the dashboard's dark page), warm-gray-30 ink.
+  --reader-bg: #{colors.$cool-gray-100};
+  --reader-fg: #{colors.$warm-gray-30};
+  --reader-muted: #{colors.$warm-gray-50};
   --reader-accent: var(--book-gold);
-  --reader-hairline: rgb(205 200 191 / 14%);
-  --reader-chrome-bg: rgb(20 22 26 / 93%);
+  --reader-hairline: #{rgba(colors.$warm-gray-30, 0.14)};
+  --reader-chrome-bg: #{rgba(colors.$cool-gray-100, 0.93)};
 }
 
 /* chrome */
@@ -4283,9 +4310,9 @@ ol.bookmd__list { list-style: decimal; }
   border: 1px solid rgb(0 0 0 / 22%);
 }
 
-.reader-panel__swatch--paper { background: #faf8f4; }
-.reader-panel__swatch--sepia { background: #f3e7d3; }
-.reader-panel__swatch--night { background: #14161a; }
+.reader-panel__swatch--paper { background: #{colors.$warm-gray-10}; }
+.reader-panel__swatch--sepia { background: #{colors.$yellow-10}; }
+.reader-panel__swatch--night { background: #{colors.$cool-gray-100}; }
 
 .reader-panel__stepper { display: flex; align-items: center; gap: 0.5rem; }
 
@@ -4472,20 +4499,21 @@ ol.bookmd__list { list-style: decimal; }
    ═══════════════════════════════════════════════════════════════════════════ */
 
 html[data-role='reader'] {
-  --paper-ground: #ece5d6;
-  --paper-raised: #fbf8f1;
-  --paper-ink: #241f19;
-  --paper-ink-soft: #5b5147;
-  --paper-rule: rgb(36 31 25 / 14%);
+  --paper-ground: #{colors.$warm-gray-20};
+  --paper-raised: #{colors.$warm-gray-10};
+  --paper-ink: #{colors.$warm-gray-100};
+  --paper-ink-soft: #{colors.$warm-gray-70};
+  --paper-rule: #{rgba(colors.$warm-gray-100, 0.14)};
 
   --ted-page-bg: var(--paper-ground);
   --ted-card-bg: var(--paper-raised);
   --ted-color-text-primary: var(--paper-ink);
   --ted-color-text-secondary: var(--paper-ink-soft);
-  --ted-color-text-helper: #8a7d6d;
+  // warm-gray-70: 5.97:1 on the paper ground (warm-gray-60 would be 3.85).
+  --ted-color-text-helper: #{colors.$warm-gray-70};
   --ted-color-border-subtle: var(--paper-rule);
-  --ted-shadow-card: 0 1px 2px rgb(36 31 25 / 6%), 0 8px 24px rgb(36 31 25 / 6%);
-  --ted-shadow-card-hover: 0 2px 4px rgb(36 31 25 / 8%), 0 16px 40px rgb(36 31 25 / 10%);
+  --ted-shadow-card: 0 1px 2px #{rgba(colors.$warm-gray-100, 0.06)}, 0 8px 24px #{rgba(colors.$warm-gray-100, 0.06)};
+  --ted-shadow-card-hover: 0 2px 4px #{rgba(colors.$warm-gray-100, 0.08)}, 0 16px 40px #{rgba(colors.$warm-gray-100, 0.1)};
 }
 
 /* Laid-paper ground: a warm wash, a press-bed vignette, and a fine grain.
@@ -4495,8 +4523,8 @@ html[data-role='reader'] body {
   background-color: var(--paper-ground);
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)' opacity='0.05'/%3E%3C/svg%3E"),
-    radial-gradient(130% 70% at 50% -12%, rgb(255 252 244 / 85%), transparent 62%),
-    radial-gradient(120% 55% at 50% 112%, rgb(22 38 31 / 8%), transparent 68%);
+    radial-gradient(130% 70% at 50% -12%, #{rgba(colors.$warm-gray-10, 0.85)}, transparent 62%),
+    radial-gradient(120% 55% at 50% 112%, #{rgba(colors.$green-100, 0.08)}, transparent 68%);
   background-attachment: fixed, fixed, fixed;
 }
 
@@ -4518,10 +4546,10 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   justify-content: space-between;
   gap: var(--ted-space-md);
   padding: 0 var(--ted-space-lg);
-  color: #f5f1e6;
+  color: #{colors.$warm-gray-10};
   background:
     linear-gradient(103deg, var(--book-cloth-3) 0%, var(--book-cloth-1) 46%, var(--book-cloth-2) 100%);
-  box-shadow: 0 1px 0 var(--book-gold-dim), 0 10px 28px rgb(16 27 22 / 26%);
+  box-shadow: 0 1px 0 var(--book-gold-dim), 0 10px 28px #{rgba(colors.$green-100, 0.26)};
 }
 
 .reader-header__brand {
@@ -4600,7 +4628,7 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 
 .reader-header__email {
   font-size: 0.6875rem;
-  color: rgb(245 241 230 / 62%);
+  color: #{rgba(colors.$warm-gray-10, 0.62)};
   max-width: 13rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4617,7 +4645,7 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   border: 1px solid transparent;
   border-radius: 2px;
   background: none;
-  color: rgb(245 241 230 / 80%);
+  color: #{rgba(colors.$warm-gray-10, 0.8)};
   cursor: pointer;
   transition: color var(--ted-transition-fast), border-color var(--ted-transition-fast);
 
@@ -4654,7 +4682,7 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   font-family: var(--book-display);
   font-style: italic;
   font-size: 0.9375rem;
-  color: #97845a;
+  color: #{colors.$yellow-70};
 }
 
 .books__exlibris-name {
@@ -4664,7 +4692,7 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   text-transform: uppercase;
 }
 
-.books--reader .books__eyebrow { color: #97845a; }
+.books--reader .books__eyebrow { color: #{colors.$yellow-70}; }
 
 /* ─── Resume band ───────────────────────────────────────────────────────── */
 
@@ -4677,10 +4705,10 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   padding: var(--ted-space-lg);
   border-radius: var(--ted-radius-card);
   overflow: hidden;
-  color: #f3efe4;
+  color: #{colors.$warm-gray-10};
   background:
     linear-gradient(122deg, var(--book-cloth-3) 0%, var(--book-cloth-1) 52%, var(--book-cloth-2) 100%);
-  box-shadow: 0 14px 34px rgb(16 27 22 / 22%);
+  box-shadow: 0 14px 34px #{rgba(colors.$green-100, 0.22)};
 }
 
 /* Gold rule across the head, the way a bound cover is stamped. */
@@ -4733,7 +4761,7 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   font-size: clamp(1.5rem, 3.4vw, 2rem);
   font-weight: 600;
   line-height: 1.12;
-  color: #fbf7ec;
+  color: #{colors.$warm-gray-10};
 }
 
 .resume-band__label {
@@ -4746,14 +4774,14 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   margin: 0.3rem 0 0;
   font-size: 0.8125rem;
   letter-spacing: 0.03em;
-  color: rgb(243 239 228 / 72%);
+  color: #{rgba(colors.$warm-gray-10, 0.72)};
 }
 
 .resume-band__meter {
   height: 2px;
   margin-top: var(--ted-space-md);
   border-radius: 999px;
-  background: rgb(245 241 230 / 18%);
+  background: #{rgba(colors.$warm-gray-10, 0.18)};
   overflow: hidden;
 }
 
@@ -4767,7 +4795,7 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 .resume-band__meta {
   margin: 0.45rem 0 0;
   font-size: 0.75rem;
-  color: rgb(243 239 228 / 66%);
+  color: #{rgba(colors.$warm-gray-10, 0.66)};
 }
 
 .resume-band__cta {
@@ -4808,7 +4836,7 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   margin: 0 auto;
   padding: var(--ted-space-xl) var(--ted-space-lg) var(--ted-space-xl);
   text-align: center;
-  color: #8a7d6d;
+  color: #{colors.$warm-gray-70};
 }
 
 .reader-footer__ornament {
@@ -4825,7 +4853,7 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   font-family: var(--book-display);
   font-style: italic;
   font-size: 1rem;
-  color: #6f6355;
+  color: #{colors.$warm-gray-70};
 }
 
 /* ─── Entrance ──────────────────────────────────────────────────────────── */

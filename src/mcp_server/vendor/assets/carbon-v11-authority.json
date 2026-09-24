@@ -6,10 +6,10 @@
    "@carbon/type": "11.61.0",
    "@carbon/motion": "11.46.0",
    "@carbon/layout": "11.53.0",
-   "@carbon/colors": "11.52.0"
+   "@carbon/colors": "11.59.0"
   },
   "extracted": "2026-06-12",
-  "notes": "componentTokens.notificationBackground.g10 ve statusInfoBlue.g10 elle eklendi (edupedia v1.9.0 g10 varsayılanı); değerler @carbon/themes 11.82.0 notificationTokens/g10 ile doğrulandı, 2026-09-24."
+  "notes": "componentTokens.notificationBackground.g10 ve statusInfoBlue.g10 elle eklendi (edupedia v1.9.0 g10 varsayılanı); değerler @carbon/themes 11.82.0 notificationTokens/g10 ile doğrulandı, 2026-09-24. palette ve paletteHover @carbon/colors 11.59.0 ile tüm ailelere genişletildi; tedyLayer.subjectThemes @carbon/themes 11.82.0 tagTokens'tan üretildi, 2026-09-24. themes.*.layerSelected02 @carbon/themes 11.82.0'dan eklendi (şablon layer-02 seçili yüzeyi), 2026-09-24."
  },
  "themes": {
   "white": {
@@ -77,7 +77,8 @@
    "supportErrorInverse": "#fa4d56",
    "supportWarningInverse": "#f1c21b",
    "supportInfoInverse": "#4589ff",
-   "shadow": "rgba(0, 0, 0, 0.3)"
+   "shadow": "rgba(0, 0, 0, 0.3)",
+   "layerSelected02": "#e0e0e0"
   },
   "g10": {
    "background": "#f4f4f4",
@@ -144,7 +145,8 @@
    "supportErrorInverse": "#fa4d56",
    "supportWarningInverse": "#f1c21b",
    "supportInfoInverse": "#4589ff",
-   "shadow": "rgba(0, 0, 0, 0.3)"
+   "shadow": "rgba(0, 0, 0, 0.3)",
+   "layerSelected02": "#e0e0e0"
   },
   "g90": {
    "background": "#262626",
@@ -211,7 +213,8 @@
    "supportErrorInverse": "#da1e28",
    "supportWarningInverse": "#f1c21b",
    "supportInfoInverse": "#0043ce",
-   "shadow": "rgba(0, 0, 0, 0.8)"
+   "shadow": "rgba(0, 0, 0, 0.8)",
+   "layerSelected02": "#6f6f6f"
   },
   "g100": {
    "background": "#161616",
@@ -278,7 +281,8 @@
    "supportErrorInverse": "#da1e28",
    "supportWarningInverse": "#f1c21b",
    "supportInfoInverse": "#0043ce",
-   "shadow": "rgba(0, 0, 0, 0.8)"
+   "shadow": "rgba(0, 0, 0, 0.8)",
+   "layerSelected02": "#525252"
   }
  },
  "type": {
@@ -662,6 +666,18 @@
    "90": "#001d6c",
    "100": "#001141"
   },
+  "cool-gray": {
+   "10": "#f2f4f8",
+   "20": "#dde1e6",
+   "30": "#c1c7cd",
+   "40": "#a2a9b0",
+   "50": "#878d96",
+   "60": "#697077",
+   "70": "#4d5358",
+   "80": "#343a3f",
+   "90": "#21272a",
+   "100": "#121619"
+  },
   "cyan": {
    "10": "#e5f6ff",
    "20": "#bae6ff",
@@ -674,17 +690,17 @@
    "90": "#012749",
    "100": "#061727"
   },
-  "teal": {
-   "10": "#d9fbfb",
-   "20": "#9ef0f0",
-   "30": "#3ddbd9",
-   "40": "#08bdba",
-   "50": "#009d9a",
-   "60": "#007d79",
-   "70": "#005d5d",
-   "80": "#004144",
-   "90": "#022b30",
-   "100": "#081a1c"
+  "gray": {
+   "10": "#f4f4f4",
+   "20": "#e0e0e0",
+   "30": "#c6c6c6",
+   "40": "#a8a8a8",
+   "50": "#8d8d8d",
+   "60": "#6f6f6f",
+   "70": "#525252",
+   "80": "#393939",
+   "90": "#262626",
+   "100": "#161616"
   },
   "green": {
    "10": "#defbe6",
@@ -710,6 +726,18 @@
    "90": "#510224",
    "100": "#2a0a18"
   },
+  "orange": {
+   "10": "#fff2e8",
+   "20": "#ffd9be",
+   "30": "#ffb784",
+   "40": "#ff832b",
+   "50": "#eb6200",
+   "60": "#ba4e00",
+   "70": "#8a3800",
+   "80": "#5e2900",
+   "90": "#3e1a00",
+   "100": "#231000"
+  },
   "purple": {
    "10": "#f6f2ff",
    "20": "#e8daff",
@@ -734,6 +762,30 @@
    "90": "#520408",
    "100": "#2d0709"
   },
+  "teal": {
+   "10": "#d9fbfb",
+   "20": "#9ef0f0",
+   "30": "#3ddbd9",
+   "40": "#08bdba",
+   "50": "#009d9a",
+   "60": "#007d79",
+   "70": "#005d5d",
+   "80": "#004144",
+   "90": "#022b30",
+   "100": "#081a1c"
+  },
+  "warm-gray": {
+   "10": "#f7f3f2",
+   "20": "#e5e0df",
+   "30": "#cac5c4",
+   "40": "#ada8a8",
+   "50": "#8f8b8b",
+   "60": "#726e6e",
+   "70": "#565151",
+   "80": "#3c3838",
+   "90": "#272525",
+   "100": "#171414"
+  },
   "yellow": {
    "10": "#fcf4d6",
    "20": "#fddc69",
@@ -745,18 +797,6 @@
    "80": "#483700",
    "90": "#302400",
    "100": "#1c1500"
-  },
-  "gray": {
-   "10": "#f4f4f4",
-   "20": "#e0e0e0",
-   "30": "#c6c6c6",
-   "40": "#a8a8a8",
-   "50": "#8d8d8d",
-   "60": "#6f6f6f",
-   "70": "#525252",
-   "80": "#393939",
-   "90": "#262626",
-   "100": "#161616"
   }
  },
  "tagPairs": {
@@ -913,6 +953,38 @@
      "#001d6c"
     ]
    },
+   "tedy-brand-text-secondary": {
+    "dashboard": "--ted-color-brand-text-secondary",
+    "scope": "all",
+    "g10": [
+     "blue-20",
+     "#d0e2ff"
+    ],
+    "white": [
+     "blue-20",
+     "#d0e2ff"
+    ],
+    "g100": [
+     "blue-20",
+     "#d0e2ff"
+    ]
+   },
+   "tedy-brand-rule": {
+    "dashboard": "--ted-color-brand-rule",
+    "scope": "all",
+    "g10": [
+     "blue-60",
+     "#0f62fe"
+    ],
+    "white": [
+     "blue-60",
+     "#0f62fe"
+    ],
+    "g100": [
+     "blue-60",
+     "#0f62fe"
+    ]
+   },
    "tedy-page-background": {
     "dashboard": "--ted-color-page-bg",
     "scope": "theme",
@@ -994,29 +1066,850 @@
     ]
    }
   },
-  "subjectAccents": {
-   "_note": "meta.accent için izinli ders aksanları (şablonun ACCENT_STRONG aileleri; kırmızı yok — red-60 = support-error = Tedy aciliyet rengi). Boş bırakılırsa aksan konudan türetilir.",
-   "allowed": {
-    "#0f62fe": "blue-60",
-    "#4589ff": "blue-50",
-    "#0072c3": "cyan-60",
-    "#1192e8": "cyan-50",
-    "#007d79": "teal-60",
-    "#009d9a": "teal-50",
-    "#005d5d": "teal-70",
-    "#198038": "green-60",
-    "#24a148": "green-50",
-    "#ee5396": "magenta-50",
-    "#d02670": "magenta-60",
-    "#9f1853": "magenta-70",
-    "#8a3ffc": "purple-60",
-    "#a56eff": "purple-50",
-    "#6929c4": "purple-70",
-    "#525252": "gray-70"
+  "subjectThemes": {
+   "_note": "Tedy ders renk sistemi — tek kaynak. Ders adı (meta.subject / panodaki ders) katlanır (Türkçe küçük harf, ç ğ ı ö ş ü â î û → c g i o s u a i u) ve 'domains' sırasıyla aranır: bir kök sözcük başında geçerse o alan seçilir, hiçbiri geçmezse 'fallback'. Her alan bir Carbon Tag ailesine bağlanır; aile rolleri @carbon/themes tagTokens (surface/onSurface/surfaceHover/border) ve @carbon/colors palet adımlarıdır (accent: açık 60 / koyu 40, text: açık 70 / koyu 30). 'light' white + g10, 'dark' g90 + g100 temalarında geçerlidir. Tüketiciler: modül şablonu (data-subject-family), derleyici (meta.accent), pano (dashboard/src/theme/subjects.*), CureoHub edupedia_site. Anlam renkleri ders rengi olamaz: bkz. 'reserved'.",
+   "roles": {
+    "accent": "grafik vurgu: çizgi, halka, tutamaç, düğüm; açık zeminlerde >= 4,5:1, koyu zeminlerde >= 4,8:1",
+    "text": "renkli metin ve ikon (kicker, tarih, sayaç); açık zeminlerde >= 6,9:1, koyu zeminlerde >= 6,7:1",
+    "surface": "Carbon tag zemini (tag-background-*): ikon karosu, terim, seçili seçenek",
+    "onSurface": "surface üstündeki metin/ikon (tag-color-*); >= 5,8:1",
+    "surfaceHover": "surface'in hover hâli (tag-hover-*)",
+    "border": "surface çerçevesi (tag-border-*)",
+    "onAccent": "accent dolgu üstündeki ikon (açık: white-0, koyu: gray-100)"
+   },
+   "families": {
+    "magenta": {
+     "light": {
+      "accent": [
+       "magenta-60",
+       "#d02670"
+      ],
+      "text": [
+       "magenta-70",
+       "#9f1853"
+      ],
+      "surface": [
+       "magenta-20",
+       "#ffd6e8"
+      ],
+      "onSurface": [
+       "magenta-70",
+       "#9f1853"
+      ],
+      "surfaceHover": [
+       "magenta-20-hover",
+       "#ffbdda"
+      ],
+      "border": [
+       "magenta-40",
+       "#ff7eb6"
+      ],
+      "onAccent": [
+       "white-0",
+       "#ffffff"
+      ]
+     },
+     "dark": {
+      "accent": [
+       "magenta-40",
+       "#ff7eb6"
+      ],
+      "text": [
+       "magenta-30",
+       "#ffafd2"
+      ],
+      "surface": [
+       "magenta-70",
+       "#9f1853"
+      ],
+      "onSurface": [
+       "magenta-20",
+       "#ffd6e8"
+      ],
+      "surfaceHover": [
+       "magenta-70-hover",
+       "#bf1d63"
+      ],
+      "border": [
+       "magenta-50",
+       "#ee5396"
+      ],
+      "onAccent": [
+       "gray-100",
+       "#161616"
+      ]
+     }
+    },
+    "purple": {
+     "light": {
+      "accent": [
+       "purple-60",
+       "#8a3ffc"
+      ],
+      "text": [
+       "purple-70",
+       "#6929c4"
+      ],
+      "surface": [
+       "purple-20",
+       "#e8daff"
+      ],
+      "onSurface": [
+       "purple-70",
+       "#6929c4"
+      ],
+      "surfaceHover": [
+       "purple-20-hover",
+       "#dcc7ff"
+      ],
+      "border": [
+       "purple-40",
+       "#be95ff"
+      ],
+      "onAccent": [
+       "white-0",
+       "#ffffff"
+      ]
+     },
+     "dark": {
+      "accent": [
+       "purple-40",
+       "#be95ff"
+      ],
+      "text": [
+       "purple-30",
+       "#d4bbff"
+      ],
+      "surface": [
+       "purple-70",
+       "#6929c4"
+      ],
+      "onSurface": [
+       "purple-20",
+       "#e8daff"
+      ],
+      "surfaceHover": [
+       "purple-70-hover",
+       "#7c3dd6"
+      ],
+      "border": [
+       "purple-50",
+       "#a56eff"
+      ],
+      "onAccent": [
+       "gray-100",
+       "#161616"
+      ]
+     }
+    },
+    "teal": {
+     "light": {
+      "accent": [
+       "teal-60",
+       "#007d79"
+      ],
+      "text": [
+       "teal-70",
+       "#005d5d"
+      ],
+      "surface": [
+       "teal-20",
+       "#9ef0f0"
+      ],
+      "onSurface": [
+       "teal-70",
+       "#005d5d"
+      ],
+      "surfaceHover": [
+       "teal-20-hover",
+       "#57e5e5"
+      ],
+      "border": [
+       "teal-40",
+       "#08bdba"
+      ],
+      "onAccent": [
+       "white-0",
+       "#ffffff"
+      ]
+     },
+     "dark": {
+      "accent": [
+       "teal-40",
+       "#08bdba"
+      ],
+      "text": [
+       "teal-30",
+       "#3ddbd9"
+      ],
+      "surface": [
+       "teal-70",
+       "#005d5d"
+      ],
+      "onSurface": [
+       "teal-20",
+       "#9ef0f0"
+      ],
+      "surfaceHover": [
+       "teal-70-hover",
+       "#007070"
+      ],
+      "border": [
+       "teal-50",
+       "#009d9a"
+      ],
+      "onAccent": [
+       "gray-100",
+       "#161616"
+      ]
+     }
+    },
+    "cyan": {
+     "light": {
+      "accent": [
+       "cyan-60",
+       "#0072c3"
+      ],
+      "text": [
+       "cyan-70",
+       "#00539a"
+      ],
+      "surface": [
+       "cyan-20",
+       "#bae6ff"
+      ],
+      "onSurface": [
+       "cyan-70",
+       "#00539a"
+      ],
+      "surfaceHover": [
+       "cyan-20-hover",
+       "#99daff"
+      ],
+      "border": [
+       "cyan-40",
+       "#33b1ff"
+      ],
+      "onAccent": [
+       "white-0",
+       "#ffffff"
+      ]
+     },
+     "dark": {
+      "accent": [
+       "cyan-40",
+       "#33b1ff"
+      ],
+      "text": [
+       "cyan-30",
+       "#82cfff"
+      ],
+      "surface": [
+       "cyan-70",
+       "#00539a"
+      ],
+      "onSurface": [
+       "cyan-20",
+       "#bae6ff"
+      ],
+      "surfaceHover": [
+       "cyan-70-hover",
+       "#0066bd"
+      ],
+      "border": [
+       "cyan-50",
+       "#1192e8"
+      ],
+      "onAccent": [
+       "gray-100",
+       "#161616"
+      ]
+     }
+    },
+    "blue": {
+     "light": {
+      "accent": [
+       "blue-60",
+       "#0f62fe"
+      ],
+      "text": [
+       "blue-70",
+       "#0043ce"
+      ],
+      "surface": [
+       "blue-20",
+       "#d0e2ff"
+      ],
+      "onSurface": [
+       "blue-70",
+       "#0043ce"
+      ],
+      "surfaceHover": [
+       "blue-20-hover",
+       "#b8d3ff"
+      ],
+      "border": [
+       "blue-40",
+       "#78a9ff"
+      ],
+      "onAccent": [
+       "white-0",
+       "#ffffff"
+      ]
+     },
+     "dark": {
+      "accent": [
+       "blue-40",
+       "#78a9ff"
+      ],
+      "text": [
+       "blue-30",
+       "#a6c8ff"
+      ],
+      "surface": [
+       "blue-70",
+       "#0043ce"
+      ],
+      "onSurface": [
+       "blue-20",
+       "#d0e2ff"
+      ],
+      "surfaceHover": [
+       "blue-70-hover",
+       "#0053ff"
+      ],
+      "border": [
+       "blue-50",
+       "#4589ff"
+      ],
+      "onAccent": [
+       "gray-100",
+       "#161616"
+      ]
+     }
+    },
+    "warm-gray": {
+     "light": {
+      "accent": [
+       "warm-gray-60",
+       "#726e6e"
+      ],
+      "text": [
+       "warm-gray-70",
+       "#565151"
+      ],
+      "surface": [
+       "warm-gray-20",
+       "#e5e0df"
+      ],
+      "onSurface": [
+       "warm-gray-100",
+       "#171414"
+      ],
+      "surfaceHover": [
+       "warm-gray-20-hover",
+       "#d8d0cf"
+      ],
+      "border": [
+       "warm-gray-40",
+       "#ada8a8"
+      ],
+      "onAccent": [
+       "white-0",
+       "#ffffff"
+      ]
+     },
+     "dark": {
+      "accent": [
+       "warm-gray-40",
+       "#ada8a8"
+      ],
+      "text": [
+       "warm-gray-30",
+       "#cac5c4"
+      ],
+      "surface": [
+       "warm-gray-70",
+       "#565151"
+      ],
+      "onSurface": [
+       "warm-gray-10",
+       "#f7f3f2"
+      ],
+      "surfaceHover": [
+       "warm-gray-70-hover",
+       "#696363"
+      ],
+      "border": [
+       "warm-gray-50",
+       "#8f8b8b"
+      ],
+      "onAccent": [
+       "gray-100",
+       "#161616"
+      ]
+     }
+    },
+    "cool-gray": {
+     "light": {
+      "accent": [
+       "cool-gray-60",
+       "#697077"
+      ],
+      "text": [
+       "cool-gray-70",
+       "#4d5358"
+      ],
+      "surface": [
+       "cool-gray-20",
+       "#dde1e6"
+      ],
+      "onSurface": [
+       "cool-gray-100",
+       "#121619"
+      ],
+      "surfaceHover": [
+       "cool-gray-20-hover",
+       "#cdd3da"
+      ],
+      "border": [
+       "cool-gray-40",
+       "#a2a9b0"
+      ],
+      "onAccent": [
+       "white-0",
+       "#ffffff"
+      ]
+     },
+     "dark": {
+      "accent": [
+       "cool-gray-40",
+       "#a2a9b0"
+      ],
+      "text": [
+       "cool-gray-30",
+       "#c1c7cd"
+      ],
+      "surface": [
+       "cool-gray-70",
+       "#4d5358"
+      ],
+      "onSurface": [
+       "cool-gray-10",
+       "#f2f4f8"
+      ],
+      "surfaceHover": [
+       "cool-gray-70-hover",
+       "#5d646a"
+      ],
+      "border": [
+       "cool-gray-50",
+       "#878d96"
+      ],
+      "onAccent": [
+       "gray-100",
+       "#161616"
+      ]
+     }
+    },
+    "gray": {
+     "light": {
+      "accent": [
+       "gray-60",
+       "#6f6f6f"
+      ],
+      "text": [
+       "gray-70",
+       "#525252"
+      ],
+      "surface": [
+       "gray-20",
+       "#e0e0e0"
+      ],
+      "onSurface": [
+       "gray-100",
+       "#161616"
+      ],
+      "surfaceHover": [
+       "gray-20-hover",
+       "#d1d1d1"
+      ],
+      "border": [
+       "gray-40",
+       "#a8a8a8"
+      ],
+      "onAccent": [
+       "white-0",
+       "#ffffff"
+      ]
+     },
+     "dark": {
+      "accent": [
+       "gray-40",
+       "#a8a8a8"
+      ],
+      "text": [
+       "gray-30",
+       "#c6c6c6"
+      ],
+      "surface": [
+       "gray-70",
+       "#525252"
+      ],
+      "onSurface": [
+       "gray-10",
+       "#f4f4f4"
+      ],
+      "surfaceHover": [
+       "gray-70-hover",
+       "#636363"
+      ],
+      "border": [
+       "gray-50",
+       "#8d8d8d"
+      ],
+      "onAccent": [
+       "gray-100",
+       "#161616"
+      ]
+     }
+    }
+   },
+   "domains": [
+    {
+     "id": "yabanci-dil",
+     "label": "Yabancı diller",
+     "family": "blue",
+     "stems": [
+      "ingilizce",
+      "english",
+      "fransızca",
+      "french",
+      "français",
+      "almanca",
+      "german",
+      "deutsch",
+      "arapça",
+      "arabic",
+      "ispanyolca",
+      "spanish",
+      "italyanca",
+      "rusça",
+      "çince",
+      "japonca",
+      "yabancı dil",
+      "foreign language"
+     ]
+    },
+    {
+     "id": "dil",
+     "label": "Türkçe ve edebiyat",
+     "family": "magenta",
+     "stems": [
+      "türkçe",
+      "türk dili",
+      "edebiyat",
+      "turkish",
+      "dil ve anlatım",
+      "okuma yazma",
+      "ilk okuma",
+      "masal"
+     ]
+    },
+    {
+     "id": "matematik",
+     "label": "Matematik",
+     "family": "purple",
+     "stems": [
+      "matematik",
+      "math",
+      "geometri",
+      "cebir",
+      "istatistik"
+     ]
+    },
+    {
+     "id": "fen",
+     "label": "Fen bilimleri",
+     "family": "teal",
+     "stems": [
+      "fen",
+      "fizik",
+      "kimya",
+      "biyoloji",
+      "physics",
+      "chemistry",
+      "biology",
+      "science",
+      "astronomi",
+      "bilim uygulama"
+     ]
+    },
+    {
+     "id": "degerler",
+     "label": "Din ve değerler",
+     "family": "warm-gray",
+     "stems": [
+      "din kültür",
+      "din bilgi",
+      "temel dini",
+      "ahlak",
+      "değerler",
+      "kur'an",
+      "kuran",
+      "peygamber",
+      "siyer",
+      "religion",
+      "ethics"
+     ]
+    },
+    {
+     "id": "sosyal",
+     "label": "Sosyal bilimler",
+     "family": "cyan",
+     "stems": [
+      "sosyal",
+      "social",
+      "hayat bilgisi",
+      "tarih",
+      "history",
+      "inkılap",
+      "coğrafya",
+      "geography",
+      "felsefe",
+      "philosophy",
+      "sosyoloji",
+      "psikoloji",
+      "mantık",
+      "vatandaşlık",
+      "yurttaşlık",
+      "insan hakları",
+      "demokrasi",
+      "civics"
+     ]
+    },
+    {
+     "id": "teknoloji",
+     "label": "Bilişim ve teknoloji",
+     "family": "cool-gray",
+     "stems": [
+      "bilişim",
+      "teknoloji",
+      "yazılım",
+      "kodlama",
+      "robotik",
+      "informatics",
+      "computer",
+      "coding"
+     ]
+    },
+    {
+     "id": "sanat-spor",
+     "label": "Sanat ve spor",
+     "family": "gray",
+     "stems": [
+      "görsel sanat",
+      "sanat",
+      "resim",
+      "müzik",
+      "music",
+      "beden eğitimi",
+      "spor",
+      "physical education",
+      "fiziki etkinlik",
+      "drama",
+      "dans"
+     ]
+    }
+   ],
+   "fallback": {
+    "id": "genel",
+    "label": "Genel",
+    "family": "gray"
    },
    "reserved": {
-    "#da1e28": "red-60 — tedy-accent-urgent / support-error"
+    "red": "aciliyet — tedy-accent-urgent / support-error (İ6)",
+    "green": "doğru / tamamlandı — support-success, tedy-text-success",
+    "yellow": "uyarı ve ödül — support-warning, --reward",
+    "orange": "uyarı — tedy-text-warning, support-caution-major"
+   },
+   "examples": {
+    "Türkçe": "dil",
+    "Turkce": "dil",
+    "Türk Dili ve Edebiyatı": "dil",
+    "Matematik": "matematik",
+    "MATEMATİK": "matematik",
+    "Fen Bilimleri": "fen",
+    "Fen ve Teknoloji": "fen",
+    "Sosyal Bilgiler": "sosyal",
+    "T.C. İnkılap Tarihi ve Atatürkçülük": "sosyal",
+    "Hayat Bilgisi": "sosyal",
+    "İnsan Hakları, Yurttaşlık ve Demokrasi": "sosyal",
+    "İngilizce": "yabanci-dil",
+    "İngilizce (Language)": "yabanci-dil",
+    "ENGLISH": "yabanci-dil",
+    "Fransızca": "yabanci-dil",
+    "2. Yabancı Dil (F)": "yabanci-dil",
+    "Din Kültürü": "degerler",
+    "Din Kültürü ve Ahlak Bilgisi": "degerler",
+    "Ahlak ve Yurttaşlık": "degerler",
+    "Peygamberimizin Hayatı": "degerler",
+    "Bilişim": "teknoloji",
+    "Bilişim Teknolojileri ve Yazılım": "teknoloji",
+    "Görsel Sanatlar": "sanat-spor",
+    "Müzik": "sanat-spor",
+    "Beden Eğitimi": "sanat-spor",
+    "PDR": "genel",
+    "Genel": "genel",
+    "": "genel",
+    "Dinleme ve Konuşma": "genel"
    }
+  }
+ },
+ "paletteHover": {
+  "blue": {
+   "10": "#dbebff",
+   "20": "#b8d3ff",
+   "30": "#8ab6ff",
+   "40": "#5c97ff",
+   "50": "#1f70ff",
+   "60": "#0050e6",
+   "70": "#0053ff",
+   "80": "#0039c7",
+   "90": "#00258a",
+   "100": "#001f75"
+  },
+  "cool-gray": {
+   "10": "#e4e9f1",
+   "20": "#cdd3da",
+   "30": "#adb5bd",
+   "40": "#9199a1",
+   "50": "#757b85",
+   "60": "#585e64",
+   "70": "#5d646a",
+   "80": "#434a51",
+   "90": "#2b3236",
+   "100": "#222a2f"
+  },
+  "cyan": {
+   "10": "#cceeff",
+   "20": "#99daff",
+   "30": "#57beff",
+   "40": "#059fff",
+   "50": "#0f7ec8",
+   "60": "#005fa3",
+   "70": "#0066bd",
+   "80": "#00498a",
+   "90": "#013360",
+   "100": "#0b2947"
+  },
+  "gray": {
+   "10": "#e8e8e8",
+   "20": "#d1d1d1",
+   "30": "#b5b5b5",
+   "40": "#999999",
+   "50": "#7a7a7a",
+   "60": "#5e5e5e",
+   "70": "#636363",
+   "80": "#474747",
+   "90": "#333333",
+   "100": "#292929"
+  },
+  "green": {
+   "10": "#b6f6c8",
+   "20": "#74e792",
+   "30": "#36ce5e",
+   "40": "#3bab5a",
+   "50": "#208e3f",
+   "60": "#166f31",
+   "70": "#11742f",
+   "80": "#05521c",
+   "90": "#033b11",
+   "100": "#0d300f"
+  },
+  "magenta": {
+   "10": "#ffe0ef",
+   "20": "#ffbdda",
+   "30": "#ff94c3",
+   "40": "#ff57a0",
+   "50": "#e3176f",
+   "60": "#b0215f",
+   "70": "#bf1d63",
+   "80": "#8e0b43",
+   "90": "#68032e",
+   "100": "#53142f"
+  },
+  "orange": {
+   "10": "#ffe2cc",
+   "20": "#ffc69e",
+   "30": "#ff9d57",
+   "40": "#fa6800",
+   "50": "#cc5500",
+   "60": "#9e4200",
+   "70": "#a84400",
+   "80": "#753300",
+   "90": "#522200",
+   "100": "#421e00"
+  },
+  "purple": {
+   "10": "#ede5ff",
+   "20": "#dcc7ff",
+   "30": "#c5a3ff",
+   "40": "#ae7aff",
+   "50": "#9352ff",
+   "60": "#7822fb",
+   "70": "#7c3dd6",
+   "80": "#5b24ad",
+   "90": "#40197b",
+   "100": "#341c59"
+  },
+  "red": {
+   "10": "#ffe0e0",
+   "20": "#ffc2c5",
+   "30": "#ff99a0",
+   "40": "#ff6168",
+   "50": "#ee0713",
+   "60": "#b81922",
+   "70": "#c21e25",
+   "80": "#921118",
+   "90": "#66050a",
+   "100": "#540d11"
+  },
+  "teal": {
+   "10": "#acf6f6",
+   "20": "#57e5e5",
+   "30": "#25cac8",
+   "40": "#07aba9",
+   "50": "#008a87",
+   "60": "#006b68",
+   "70": "#007070",
+   "80": "#005357",
+   "90": "#033940",
+   "100": "#0f3034"
+  },
+  "warm-gray": {
+   "10": "#f0e8e6",
+   "20": "#d8d0cf",
+   "30": "#b9b3b1",
+   "40": "#9c9696",
+   "50": "#7f7b7b",
+   "60": "#605d5d",
+   "70": "#696363",
+   "80": "#4c4848",
+   "90": "#343232",
+   "100": "#2c2626"
+  },
+  "yellow": {
+   "10": "#f8e6a0",
+   "20": "#fccd27",
+   "30": "#ddb00e",
+   "40": "#bc9005",
+   "50": "#9e7700",
+   "60": "#755800",
+   "70": "#806000",
+   "80": "#5c4600",
+   "90": "#3d2e00",
+   "100": "#332600"
   }
  }
 }

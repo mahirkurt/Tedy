@@ -509,7 +509,7 @@ def test_conceptmap_css_no_raw_hex_colors():
     # Token yetkesi: .cmap-* kuralları yalnız var(--...) kullanır, ham hex renk yok.
     src = open("assets/module-template.html", encoding="utf-8").read()
     i = src.index(".cmap-field{")
-    j = src.index(".stage[data-seg=\"teach\"]", i)
+    j = src.index("/* ===== işlevsel renk: etkinlik-tipine göre wayfinding", i)
     block = src[i:j]
     assert not re.search(r':\s*#[0-9a-fA-F]{3,6}\b', block)
 
@@ -518,16 +518,17 @@ def test_conceptmap_css_no_static_card_shadow():
     # kartta gerçek drop-shadow yok — layer-elevation ihlali olmaz).
     src = open("assets/module-template.html", encoding="utf-8").read()
     i = src.index(".cmap-field{")
-    j = src.index(".stage[data-seg=\"teach\"]", i)
+    j = src.index("/* ===== işlevsel renk: etkinlik-tipine göre wayfinding", i)
     block = src[i:j]
     for m in re.finditer(r'box-shadow\s*:\s*([^;]+);', block):
         assert m.group(1).strip().startswith("inset"), f"non-inset box-shadow: {m.group(1)}"
 
 def test_conceptmap_wayfinding_accent_added():
-    # Yeni etkileşim tipi mevcut "işlevsel renk" wayfinding aksan grubuna eklendi
-    # (match/order/sorting/hotspot ile aynı görsel dil — tutarlılık).
+    # conceptMap, "senin sıran" wayfinding grubundadır (match/order/sorting/hotspot ile aynı
+    # görsel dil): ikon karosu ders ailesinin dolu aksanı, ikon onAccent (color-system.md §3).
     src = open("assets/module-template.html", encoding="utf-8").read()
-    assert '.stage[data-seg="hotspot"],.stage[data-seg="conceptMap"]{--seg-accent:var(--accent)}' in src
+    assert ('.stage[data-seg="hotspot"],.stage[data-seg="conceptMap"],.stage[data-seg="flashcards"]'
+            '{--seg-ic-bg:var(--subject-accent);--seg-ic-fg:var(--subject-on-accent)}') in src
 
 def test_validate_module_conceptmap_aspect_ratio_flips_warning_to_pass():
     # Yan-etki: .cmap-field{aspect-ratio:3/2} eklenmesiyle G-CARBON-GRID'in

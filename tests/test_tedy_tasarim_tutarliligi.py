@@ -3,7 +3,8 @@
 Kaynak vendor otorite dosyasının `tedyLayer` bölümüdür (vendor/assets/carbon-v11-authority.json):
 her Tedy token'ı için Carbon palet adımı + hex ve panoda aynı rolü taşıyan `--ted-*` değişkeni.
 Bu testler üç yüzeyin o kaynaktan kopmadığını denetler — pano (dashboard/src/theme/ted-theme.scss),
-modül şablonu (vendor/assets/module-template.html) ve derleyicinin `meta.accent` kuralı.
+modül şablonu (vendor/assets/module-template.html) ve derleyicinin `meta.accent` kuralı. Ders renk
+sistemi (`subjectThemes`) tests/test_ders_renkleri.py'dedir.
 """
 import copy
 import json
@@ -66,7 +67,7 @@ def test_hex_values_agree_with_the_carbon_palette_where_the_snapshot_has_the_fam
             if family in palette:
                 checked += 1
                 assert palette[family][grade] == hex_value, (token, theme, step)
-    assert checked >= 10  # blue/green/red families are in the snapshot; cool-gray/orange are not
+    assert checked >= 16  # every family is in the snapshot since the subject system; white-0 is not
 
 
 def test_dashboard_theme_is_one_value_everywhere():
@@ -79,22 +80,12 @@ def test_dashboard_theme_is_one_value_everywhere():
     assert f"@include theme.theme(themes.${theme});" in SCSS
 
 
-def test_subject_accents_match_the_template_and_keep_red_for_urgency():
-    strong = re.search(r"const ACCENT_STRONG=\{(.*?)\};", TEMPLATE, re.S).group(1)
-    keys = set(re.findall(r'"(#[0-9a-f]{6})":\[', strong))
-    allowed = set(LAYER["subjectAccents"]["allowed"])
-    reserved = set(LAYER["subjectAccents"]["reserved"])
-    assert allowed == keys - reserved
-    assert reserved == {"#da1e28"}
-    subject = re.search(r"const SUBJECT_ACCENT=\{(.*?)\};", TEMPLATE, re.S).group(1)
-    assert set(re.findall(r'"(#[0-9a-f]{6})"', subject)) <= allowed
-
-
 @pytest.mark.parametrize("accent,accepted", [
-    ("#d02670", True), ("#009d9a", True), ("#0F62FE", True),
-    ("#da1e28", False), ("#DA1E28", False), ("#123456", False), (" #009d9a", False), (7, False), ("", False),
+    ("magenta", True), ("teal", True), ("warm-gray", True), ("gray", True),
+    ("Magenta", False), ("red", False), ("green", False), ("yellow", False), ("orange", False),
+    ("#d02670", False), ("#009d9a", False), ("#da1e28", False), (7, False), ("", False),
 ])
-def test_compiler_accepts_only_tedy_subject_accents(accent, accepted):
+def test_compiler_accepts_only_tedy_subject_families(accent, accepted):
     data = copy.deepcopy(ornekler.ornek("QUIZ"))
     data["meta"]["accent"] = accent
     errors = [e for e in derleme.sema_dogrula(data) if e.startswith("meta.accent")]
@@ -111,4 +102,5 @@ def test_token_sync_script_checks_the_tedy_layer():
     script = VENDOR_DIR / "scripts" / "sync_carbon_tokens.py"
     result = subprocess.run([sys.executable, str(script), "--check"], capture_output=True, text=True)
     assert result.returncode == 0, result.stdout
-    assert "Tedy katmanı: 17 değer denetlendi." in result.stdout
+    assert "Tedy katmanı: 19 değer denetlendi." in result.stdout
+    assert "Ders renk sistemi: 8 aile × 2 mod × 7 rol = 112 değer, 8 alan denetlendi." in result.stdout

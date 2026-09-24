@@ -4,21 +4,12 @@ import { ChevronDown, ChevronUp, Document, Task as TaskIcon } from '@carbon/icon
 import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import type { ExamItem, ExamsApiResponse } from '../types'
-import { getExamCountdown } from '../utils/countdown'
+import { countdownTagType, getExamCountdown } from '../utils/countdown'
+import { subjectClass } from '../utils/subject'
 import { MONTHS_SHORT, gradeColor } from '../utils/formatters'
 import { EmptyLine } from './patterns/EmptyLine'
 
 const EMPTY_RESPONSE: ExamsApiResponse = { exams: [], stats: { upcoming: 0, past: 0, averageGrade: null } }
-
-function urgencyTagType(urgency: string): 'red' | 'magenta' | 'teal' | 'cool-gray' | 'gray' {
-  switch (urgency) {
-    case 'critical': return 'red'
-    case 'urgent': return 'magenta'
-    case 'soon': return 'teal'
-    case 'expired': return 'gray'
-    default: return 'cool-gray'
-  }
-}
 
 function urgencyModifier(urgency: string): string {
   switch (urgency) {
@@ -72,16 +63,16 @@ function ExamCard({ exam, showCountdown, focusMode }: {
   const detailsId = `exam-details-${exam.id}`
 
   return (
-    <Tile className={cardClass} style={{ borderLeftColor: exam.courseColor || undefined }}>
+    <Tile className={`${cardClass} ${subjectClass(exam.course, exam.courseFamily)}`}>
       <div className="exam-card__header">
         <div className="exam-card__info">
-          <span className="exam-card__course" style={{ color: exam.courseColor || undefined }}>{exam.course}</span>
+          <span className="exam-card__course">{exam.course}</span>
           <span className="exam-card__title">{exam.title || exam.rawTitle}</span>
           <span className="exam-card__date">{formatExamDate(exam.date)}</span>
         </div>
         <div className="exam-card__badges">
           {showCountdown && countdown && (
-            <Tag type={urgencyTagType(countdown.urgency)} size="sm">
+            <Tag type={countdownTagType(countdown.urgency)} size="sm">
               {countdown.text}
             </Tag>
           )}

@@ -26,21 +26,33 @@ Carbon tuvali üzerinde. Amaç, DEHB-sakin sınırını korurken renkle **odak, 
 2. **Nötr tuval.** Büyük doygun alan yok; sayfa `--tedy-page-background`, kartlar Carbon layer'ı.
    Tek doygun alan üst bandın Tedy laciverdidir.
 3. **Artıklık + CVD.** Renk tek ayırt edici olamaz; metin/ikon/şekil ile birlikte.
-4. **Wayfinding aksanı.** Etkinlik türü (anlatım=bilgi, quiz/etkileşim=aksan, mola=başarı,
-   grafik/tablo=kategori) segment başlığında `--seg-accent` ile imlenir.
+4. **Wayfinding tonu.** Etkinlik türü renk ailesiyle değil, dersin kendi ailesinin tonuyla
+   imlenir: "senin sıran" segmentleri dolu aksan karo, anlatım/veri tag karosu, mola nötr.
 5. **Sakinlik.** Tek, `prefers-reduced-motion` ile kapalı giriş; doygunluk ölçülü; WCAG AA.
 
-## 3. Wayfinding aksanı (`--seg-accent`)
-Motor, `.stage[data-seg="…"]` üzerinde `--seg-accent` tanımlar; `seg-ic`, `kicker` ve
-başlık alt-çizgisi bunu kullanır. Eşleme: `teach`→info, etkileşim türleri→accent,
-`brainbreak`→success, `chart`/`table`→`--viz-2`. Böylece çocuk etkinlik türünü renkten de okur.
+## 3. Wayfinding tonu (tek modül, tek renk)
+Motor, `.stage[data-seg="…"]` üzerinde bölüm ikon karosunun tonunu seçer; renk ailesi her
+segmentte dersin ailesidir:
 
-## 4. Derse göre kimlik aksanı
-`meta.accent` verilmemişse aksan **konudan** türetilir (bkz. `subject-packs.md`): matematik
-mor, fen teal, sosyal/tarih mor-pembe, Türkçe magenta, dil mavi. Aksan yalnız odak çapalarını
-etkiler; üst bant Tedy laciverdidir, **butonlar ve ilerleme göstergesi mavi kalır** (kontrast
-güvenliği). Kırmızı (`support-error` = Tedy aciliyet rengi) ders aksanı olarak kullanılmaz.
-Tema değişiminde `setAccent` tonu yeniden hesaplar (açık/koyu uyumu).
+| Segment | `.seg-ic` karo | İkon | `kicker` |
+|---|---|---|---|
+| Etkileşim ("senin sıran": `mcq`, `checkpoint`, `fillblank`, `match`, `order`, `sorting`, `hotspot`, `conceptMap`, `flashcards`) | `--subject-accent` (dolu) | `--subject-on-accent` | `--subject-text` |
+| Anlatım ve veri (`teach`, `chart`, `table`, diğerleri) | `--subject-surface` (Carbon tag zemini) | `--subject-on-surface` | `--subject-text` |
+| Mola (`brainbreak`) | `--cds-layer-accent-01` (nötr) | `--cds-icon-secondary` | `--cds-text-secondary` |
+
+Eski `--seg-accent` eşlemesi (anlatım=info mavisi, mola=başarı yeşili) kaldırıldı: anlam renkleri
+kategori olarak kullanılınca "doğru" ve "bilgi" sinyalleri sulanıyordu, açık temada yeşil kicker
+3,3:1 ile AA'nın altındaydı. Etkinlik tipi artık ton + ikon + kicker metniyle okunur.
+
+## 4. Derse göre kimlik (Tedy ders renk sistemi)
+Ders rengi `meta.subject`'ten türetilir ve Tedy'nin tüm yüzeylerinde (modül, pano, katalog) aynıdır.
+Tek kaynak `assets/carbon-v11-authority.json` → `tedyLayer.subjectThemes`; kurallar ve tablo
+`tedy-integration.md` §3'tedir. Özet: Türkçe ve edebiyat **magenta**, matematik **mor**, fen **teal**,
+sosyal bilimler **camgöbeği**, yabancı diller **mavi**, din ve değerler **sıcak gri**, bilişim
+**soğuk gri**, sanat-spor ve genel **gri**. Rolleri Carbon Tag token'ları ve palet adımları verir;
+tema değişince CSS kendiliğinden geçer (JavaScript renk hesabı yok). Kırmızı, yeşil, sarı ve
+turuncu anlam renkleridir, ders rengi olamaz. Üst bant Tedy laciverdidir; **butonlar ve ilerleme
+göstergesi Carbon mavisi kalır**.
 
 ## 5. Kontrast ve doğrulama
 - Küçük metin daima `--cds-text-primary`/`secondary`; aksan büyük/dolgu/çizgi öğelerinde.

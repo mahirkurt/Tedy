@@ -192,46 +192,42 @@ bildirimlerinin kanonik kaynağıdır; `@carbon/themes@11.75.0` ile birebirdir:
 `success #defbe6 · info #edf5ff · warning #fcf4d6 · error #fff1f1`
 (Carbon notification-token; her biri 3px durum çubuğu + durum ikonu ile.)
 
-## 3. Ders kategorisi aksan paleti
+## 3. Ders renk sistemi (Tedy, v2.1)
 
-Her ders bir aksan token'ı alır; aksan yalnız **odak çapalarında** görünür:
-bölüm ikon karosu, `kicker` ve bölüm başlığı çizgisi, seçili/hover seçenek,
-anlatım kutularının sol çizgisi. Üst bant Tedy laciverdidir; ilerleme göstergesi
-Carbon `interactive`'dir (v1.9.0). Aksan **anlam taşır** (kategori kodlama),
-dekor değil. Seçim önceliği: `MODULE_DATA.meta.accent` (hex) →
-`meta.subject`/`meta.subjectKey` üzerinden motor `SUBJECT_ACCENT` tablosu →
-varsayılan Blue 60.
+Her ders bir **alana**, her alan bir **Carbon Tag ailesine** bağlanır; renk yalnız
+**odak çapalarında** görünür: bölüm ikon karosu, `kicker`, seçili seçenek halkası, anlatım
+kutularının sol çizgisi, tanım etiketi, zaman çizelgesi düğümü. Üst bant Tedy laciverdidir;
+ilerleme göstergesi Carbon `interactive`'dir. Seçim önceliği: `meta.accent` (yalnız bir aile
+adı: `magenta`, `purple`, `teal`, `cyan`, `blue`, `warm-gray`, `cool-gray`, `gray`) →
+`meta.subjectKey`/`meta.subject` üzerinden alan tablosu → `genel` (gri).
 
-**Motor tablosu (`SUBJECT_ACCENT`) — şablonla birebir:**
+| Alan | Aile | Örnek dersler |
+|---|---|---|
+| Türkçe ve edebiyat | `magenta` | Türkçe, Türk Dili ve Edebiyatı |
+| Matematik | `purple` | Matematik, Geometri |
+| Fen bilimleri | `teal` | Fen Bilimleri, Fizik, Kimya, Biyoloji |
+| Sosyal bilimler | `cyan` | Sosyal Bilgiler, İnkılap Tarihi, Coğrafya, Hayat Bilgisi |
+| Yabancı diller | `blue` | İngilizce, Fransızca, Almanca |
+| Din ve değerler | `warm-gray` | Din Kültürü ve Ahlak Bilgisi, Ahlak ve Yurttaşlık |
+| Bilişim ve teknoloji | `cool-gray` | Bilişim Teknolojileri ve Yazılım |
+| Sanat ve spor | `gray` | Görsel Sanatlar, Müzik, Beden Eğitimi |
+| Genel (yedek) | `gray` | PDR, tanınmayan adlar |
 
-| Ders anahtarı | Aksan | Hex | Resmî tag çifti (açık tema: zemin / metin) | Tag çifti (g100: zemin / metin) |
-|---|---|---|---|---|
-| `math` | Purple 60 | `#8a3ffc` | `#e8daff` / `#6929c4` | `#6929c4` / `#e8daff` |
-| `science` | Teal 60 | `#007d79` | `#9ef0f0` / `#005d5d` | `#005d5d` / `#9ef0f0` |
-| `social` | Magenta 50 | `#ee5396` | `#ffd6e8` / `#9f1853` | `#9f1853` / `#ffd6e8` |
-| `civics` | Cyan 60 | `#0072c3` | `#bae6ff` / `#00539a` | `#00539a` / `#bae6ff` |
-| `religion` | Green 60 | `#198038` | `#a7f0ba` / `#0e6027` | `#0e6027` / `#a7f0ba` |
-| `history` | Purple 50 | `#a56eff` | `#e8daff` / `#6929c4` | `#6929c4` / `#e8daff` |
-| `geography` | Teal 70 | `#005d5d` | `#9ef0f0` / `#005d5d` | `#005d5d` / `#9ef0f0` |
-| `turkish` | Magenta 60 | `#d02670` | `#ffd6e8` / `#9f1853` | `#9f1853` / `#ffd6e8` |
-| `english` / `language` | Blue 60 | `#0f62fe` | `#d0e2ff` / `#0043ce` | `#0043ce` / `#d0e2ff` |
-| `french` | Purple 70 | `#6929c4` | `#e8daff` / `#6929c4` | `#6929c4` / `#e8daff` |
-| *(varsayılan)* | Blue 60 | `#0f62fe` | `#d0e2ff` / `#0043ce` | `#0043ce` / `#d0e2ff` |
+**Roller (her aile, iki mod):** `accent` = palet 60 (açık) / 40 (koyu), `text` = 70 / 30,
+`surface` / `onSurface` / `surfaceHover` / `border` = `@carbon/themes` tag token'ları
+(`tag-background-X`, `tag-color-X`, `tag-hover-X`, `tag-border-X`), `onAccent` = white-0 /
+gray-100. CSS değişkenleri `--subject-*`; şablondaki `--accent`, `--accent-strong`,
+`--accent-tint`, `--accent-on` bunların takma adıdır. Değerler şablonun
+`tedy:ders-renkleri` bölgesinde üretilir (`scripts/sync_carbon_tokens.py --write-subjects`),
+`--check` otoriteyle birebirliği denetler. Carbon paleti adım başına algısal olarak eşit
+olduğundan sekiz aile aynı kontrast profilini taşır: `accent` açık zeminlerde ≥ 4,5:1, koyu
+zeminlerde ≥ 4,8:1; `text` ≥ 6,7:1; tag çifti ≥ 5,8:1. Hiçbir ders diğerinden "yüksek sesle"
+konuşmaz.
 
-**Tag-çifti motoru (`ACCENT_STRONG`, v2.0.0):** `setAccent(hex)` artık bilinen
-aksan ailelerinde **resmî Carbon tag token çiftini** kullanır
-(`@carbon/themes` tag-tokens: `tag-background-X` / `tag-color-X`): açık temada
-`--accent-strong` = koyu tag-color, koyu temada açık tag-color; `--accent-tint`
-zemini `color-mix` ile temaya göre türetilir. Bilinmeyen hex'lerde önceki
-`color-mix` karartma/açma yedeği devrededir. Böylece `.def-term`, `.badge`,
-`.seg-ic` üzerindeki aksan-renkli metin her iki temada da **AA-garantili resmî
-çiftlerle** yazılır.
-
-> **Doc-motor uzlaşması (v2.0.0):** v1.x dokümanındaki §3 tablosu motor
-> tablosuyla çelişiyordu (ör. matematik için Blue 60, kimya için Purple 60
-> listeliyordu; motor matematiğe Purple 60, fene Teal 60 atar). Bu sürümde
-> tablo **motor `SUBJECT_ACCENT` kaynak alınarak** yeniden yazıldı; tüm hex'ler
-> `@carbon/colors@11.52.0` paletiyle doğrulandı.
+> **v2.1 değişikliği:** `SUBJECT_ACCENT` (hex) tablosu, `ACCENT_STRONG` çiftleri ve
+> `setAccent()`'in `color-mix`/`mix()` türetmesi kaldırıldı. Yeşil (Din) ve kırmızı artık ders
+> rengi değildir; Türkçe magenta, sosyal camgöbeği, yabancı diller mavidir. Derleyici hex
+> `meta.accent`'i reddeder.
 
 ## 4. Tipografi — IBM Plex + tip otoritesi
 
@@ -387,9 +383,9 @@ HTML/CSS karşılıkları) sadık biçimde uygular. Eşleme:
 |---|---|---|
 | **Header (Tedy bandı)** | `.topbar__hero` — düz `tedy-brand` + Tedy işareti + `text-on-color` başlık; Tag çipleri `tedy-brand-hover` | `tedy-brand`, `text-on-color` |
 | **ProgressIndicator** (stepper) | `.stepper` — tamamlanan (`button-primary` dolgu + onay), mevcut (`interactive` halka), bekleyen (nötr); tamamlanana tıklanıp geri dönülür | `button-primary`, `interactive`, `border-strong-01` |
-| **Selectable Tile** | `.opt` — kare (`border-radius-00`); 1px `border-tile-01` → hover/seçili 2px aksan; köşe işaret yuvası; doğru/yanlış durumları | `border-tile-01`, `--accent`, `layer-hover-01` |
+| **Selectable Tile** | `.opt` — kare (`border-radius-00`); 1px `border-tile-01` → hover: nötr `layer-hover-02` + 2px aksan halka; seçili: ders tag zemini + halka; doğru/yanlış: `notification-background-success/error` + durum halkası | `border-tile-01`, `--accent`, `layer-hover-02`, `--subject-surface` |
 | **Inline notification** | `.feedback--ok/no/info` — 3px sol durum çubuğu + durum ikonu; koyu temada 1px `border-subtle-01` çerçeve | `support-*`, `notification-background-*` |
-| **Tag** | `.def-term` (aksan tag çifti), `.badge` (kilitli nötr, kazanılan `layer-selected-01`) — `border-radius-max` | `ACCENT_STRONG` tag-tokens, `layer-selected-01` |
+| **Tag** | `.def-term` (ders ailesinin tag çifti + `tag-border`, hover `tag-hover`), `.badge` (kilitli nötr, kazanılan `layer-selected-01`) — `border-radius-max` | `--subject-surface/on-surface/border`, `layer-selected-01` |
 | **Definition tooltip** | `.def-pop` — Carbon ters yüzey popover, `shadow-menu` | `background-inverse`, `text-inverse`, `shadow` |
 | **Button (primary/ghost)** | `.btn--primary` (Blue 60), `.btn--ghost` (1px kenar); kare; hover/active `background-hover/active` | `button-primary-*`, `background-*` |
 | **Icon button (ghost)** | `.icon-btn` — kare; bantta hover `tedy-brand-hover`, açık durum beyaz zemin + lacivert ikon | `tedy-brand-hover`, `text-on-color` |
@@ -448,9 +444,9 @@ satırları Tedy katmanıdır):
 bildirim zeminleri özel koyu tintler → dördü de **`#262626`** (Carbon koyu
 bildirim deseni: nötr katman zemini, anlam durum çubuğu + ikonda).
 
-`setAccent(hex)` **tema-duyarlıdır**: `--accent-tint` aksanı tema zemini ile
-karıştırır (g10/white'ta açık, g100'de koyu tint); `--accent-strong` resmî tag
-çiftinden gelir — açık temada koyu, g100'de açık değer (bkz. §3).
+Ders renkleri **tema-duyarlıdır** ve hesaplanmaz: `tedy:ders-renkleri` bölgesi her aile için
+açık (white, g10) ve koyu (g100) rol bloklarını taşır; `data-theme` değişince CSS kendiliğinden
+geçer (bkz. §3).
 
 ## 11. Kontrast düzeltmesi — birincil eylem rengi
 
@@ -477,11 +473,11 @@ ritmi kurmak. DEHB için bu, dikkat-dağıtıcı süs değil; segment türünü 
 | Öğe | Yüzey | Token |
 |---|---|---|
 | Sahne (varsayılan) | nötr kart | `--cds-layer-01` |
-| Segment ikon karosu (`.seg-ic`) | aksan-tint kare (`border-radius-08`), içinde piktogram | `--accent-tint` + `--accent-strong` |
+| Segment ikon karosu (`.seg-ic`) | kare (`border-radius-08`), içinde piktogram; etkileşimde dolu aksan, anlatımda tag zemini, molada nötr (bkz. color-system.md §3) | `--subject-accent`/`--subject-surface` + `--subject-on-*` |
 | Çekme-alıntı (`.lead`) | nötr **çağrı kutusu** + 4px aksan sol çizgi, serif, **metin `--text-primary`** (her temada AA) | `--cds-layer-02` + `--accent` |
 | Görsel (`.visual`) / Kavramlar (`.terms`) | yükseltilmiş çerçeveli yüzey | `--cds-layer-02` + `--border-subtle` |
 | Çağrı kutusu (`.callout`, `--info`/`--success`/`--warning`) | varsayılan nötr + aksan çizgi; varyantlar Carbon bildirim zemini + durum bar + ikon | `--cds-layer-02` / `notification-background-*` |
-| **brainbreak** sahnesi | nötr kart; "mola" sinyalini büyük piktogram + başlık taşır (v1.9.0: tint dolgu kaldırıldı) | `.stage[data-seg="brainbreak"]` → `--seg-accent` = success |
+| **brainbreak** sahnesi | nötr kart; "mola" sinyalini büyük piktogram + başlık taşır; ikon karosu da nötr (v2.1) | `.stage[data-seg="brainbreak"]` → `layer-accent-01` + `icon-secondary` |
 | **checkpoint** sahnesi | üst 4px aksan kenarı (kilometre taşı) | `.stage[data-seg="checkpoint"]` |
 | **summary** sahnesi | nötr kart (v1.9.0: gradyan kaldırıldı — Tedy "kutlama yok") | `.stage[data-seg="summary"]` |
 

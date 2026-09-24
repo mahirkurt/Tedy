@@ -1,3 +1,5 @@
+import type { SubjectFamily } from './theme/subjects'
+
 export interface HomeworkItem {
   "Ders Adı": string
   "Ödev Başlığı": string
@@ -239,7 +241,10 @@ export interface ExamItem {
   course: string
   title: string
   rawTitle: string
+  /** Subject mark colour (light-theme accent of the subject family). */
   courseColor: string
+  /** Tedy ders renk ailesi (Carbon Tag family) — see theme/subjects.ts. */
+  courseFamily?: SubjectFamily
   examNumber: number | null
   date: string | null
   endDate: string | null

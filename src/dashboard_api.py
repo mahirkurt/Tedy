@@ -37,7 +37,7 @@ from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.US
     ROLE_READER,
     USER_ROLES,
 )
-from src import module_progress, module_store, module_ticket
+from src import module_progress, module_store, module_ticket, subject_themes
 from src import claude_api
 
 load_env()
@@ -1547,35 +1547,14 @@ _SINAV_EXCLUDE = (
     "not girişleri", "grades entries",
 )
 
-# Stable course → color mapping (hue-shifted, WCAG-friendly)
-_COURSE_COLORS = {
-    "Türkçe":             "#0f62fe",  # blue
-    "Matematik":          "#8a3ffc",  # purple
-    "Fen Bilimleri":      "#009d9a",  # teal
-    "Sosyal Bilgiler":    "#a56eff",  # violet
-    "İngilizce":          "#1192e8",  # cyan
-    "Din Kültürü":        "#005d5d",  # dark teal
-    "Fransızca":          "#fa4d56",  # red
-    "Görsel Sanatlar":    "#d4bbff",  # lavender
-    "Müzik":              "#ee5396",  # magenta
-    "Beden Eğitimi":      "#24a148",  # green
-    "Bilişim":            "#0072c3",  # dark blue
-    "Ahlak ve Yurttaşlık": "#b28600",  # gold
-    "PDR":                "#007d79",  # dark cyan
-}
-_FALLBACK_COLORS = [
-    "#6929c4", "#002d9c", "#a56eff", "#005d5d",
-    "#9f1853", "#198038", "#b28600",
-]
-
-
 def _course_color(course_name):
-    """Return a stable hex color for a course name."""
-    if course_name in _COURSE_COLORS:
-        return _COURSE_COLORS[course_name]
-    # Stable hash-based fallback
-    idx = sum(ord(c) for c in course_name) % len(_FALLBACK_COLORS)
-    return _FALLBACK_COLORS[idx]
+    """Dersin ders-işareti rengi: Tedy ders renk ailesinin açık tema accent rolü (Carbon 60 adımı).
+
+    Tek kaynak tedyLayer.subjectThemes (src/subject_themes.py). Bu renk yalnız işaret, çubuk ve
+    kenar içindir; ders adı metni nötr kalır (Tedy İ8). Pano temayı ve yüzeyi `courseFamily`
+    üzerinden ted-subject--<aile> sınıfıyla çözer.
+    """
+    return subject_themes.role(subject_themes.family_of(course_name), "accent")
 
 
 _DONEM_RE = re.compile(
@@ -1822,6 +1801,7 @@ def exams():
                 course, exam_number, title),
             "rawTitle": title,
             "courseColor": _course_color(course),
+            "courseFamily": subject_themes.family_of(course),
             "examNumber": exam_number,
             "date": _portal_yerel(date_str) or None,
             "endDate": _portal_yerel(evt.get("end")) or None,
@@ -1855,6 +1835,7 @@ def exams():
                         course, int(col_num), raw),
                     "rawTitle": raw,
                     "courseColor": _course_color(course),
+                    "courseFamily": subject_themes.family_of(course),
                     "examNumber": int(col_num),
                     "date": None,
                     "endDate": None,

@@ -337,8 +337,8 @@ Tam token tablosu ve çocuk-dostu uyarlama için `references/carbon-child-system
   (`--cds-layer-hover/active/selected-01`, `--cds-background-hover/active`,
   `--cds-border-tile/interactive`, `--cds-highlight`, `--cds-skeleton-*` vb.).
   Durum: `--cds-support-info` açık temada **#0043ce** (Blue 70 — AA-doğru),
-  g100'de #4589ff. Ders aksanı tam Carbon paletinden; aksan-renkli metin **resmî
-  tag token çiftleriyle** (`ACCENT_STRONG`) yazılır.
+  g100'de #4589ff. Ders rengi Tedy ders renk sisteminden (Carbon Tag aileleri; bkz.
+  `references/tedy-integration.md` §3); renkli metin ve yüzeyler **resmî tag token'larıyla** yazılır.
 - **Spacing:** 2px tabanlı **tam** Carbon ölçeği (`--cds-spacing-01..13`);
   `--tap:48px` = Carbon size **Large**.
 - **İlerleme/durum çipleri nötr ve kompakt:** sayaç ve ilerleme göstergeleri
@@ -409,7 +409,8 @@ orkestre giriş animasyonu (`prefers-reduced-motion` ile kapalı); öngörüleme
 - **İşlevsel renk** (`references/color-system.md`): renk **işlevle** atanır (eylem=mavi buton,
   durum=Carbon support, kategori=`--viz-1..5`, ödül=`--reward`, **odak çıpası**=aksan), nötr
   Carbon tuvali üzerinde, daima metin/ikon ile **artıklı** ve CVD-güvenli. Etkinlik türü
-  başlıkta `--seg-accent` ile imlenir (wayfinding/sinyalleme). Kanıt: `adhd-pedagogy.md` §12.
+  ikon karosunun tonuyla imlenir — etkileşim dolu aksan, anlatım tag zemini, mola nötr
+  (wayfinding/sinyalleme; renk ailesi her segmentte dersin ailesidir). Kanıt: `adhd-pedagogy.md` §12.
 - **Derse-özel güçler** (`references/subject-packs.md`): `meta.subject`/`meta.subjectKey` →
   derse-özel **kimlik aksanı** + `data-subject`. Paketler:
   - **Matematik:** `mathExpr` (üs/alt indis, kesir, kök, operatör glifleri; Plex Serif + tabular),

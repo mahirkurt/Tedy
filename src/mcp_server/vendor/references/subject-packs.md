@@ -1,29 +1,35 @@
 # Derse-Özel Frontend Güçleri (subject-packs.md)
 
 Bir ders seçildiğinde `carbon-edupedia`, o derse uygun **görsel/etkileşim güçlerini** etkinleştirir.
-Etkinleştirme `meta.subject` (veya `meta.subjectKey`) ile olur; motor bundan iki şey türetir:
-(1) **derse-özel kimlik aksanı**, (2) kök öğede `data-subject` (derse-özel tipografi/biçim).
+Etkinleştirme `meta.subject` (veya `meta.subjectKey`) ile olur; motor bundan üç şey türetir:
+(1) **ders renk ailesi** (`data-subject-family`), (2) alan (`data-subject-domain`), (3) dil/konu
+anahtarı `data-subject` (derse-özel tipografi, sesli okuma dili).
 
-## 1. Konu anahtarı ve aksan
-`meta.subjectKey` verilirse o kullanılır; yoksa `meta.subject` metninden anahtar çıkarılır
-(TR+EN sezgileri). `meta.accent` verilmişse o her şeye üstün gelir.
+## 1. Ders renk ailesi ve konu anahtarı
+Renk, Tedy ders renk sisteminden gelir (tek kaynak `tedyLayer.subjectThemes`, kurallar
+`tedy-integration.md` §3): ders adı katlanır ve alan tablosunda sözcük başı kökle aranır.
 
-| Anahtar | Tetikleyiciler (örnek) | Aksan |
+| Alan (`data-subject-domain`) | Aile (`data-subject-family`) | Tetikleyiciler (örnek) |
 | --- | --- | --- |
-| `math` | matematik, geometri, cebir, math | `#8a3ffc` (mor) |
-| `science` | fen, fizik, kimya, biyoloji, science | `#007d79` (teal) |
-| `social` | sosyal bilgiler, social | `#ee5396` (macenta) |
-| `civics` | yurttaşlık, vatandaşlık, insan hakları, demokrasi | `#0072c3` (camgöbeği) |
-| `religion` | din kültürü, ahlak, İslam, ibadet | `#198038` (yeşil) |
-| `history` | tarih, inkılap, history | `#a56eff` (eflatun) |
-| `geography` | coğrafya, geography | `#005d5d` (koyu teal) |
-| `turkish` | Türkçe, edebiyat | `#d02670` (magenta; kırmızı Tedy'de yalnız aciliyettir) |
-| `french` | Fransızca, français, french | `#6929c4` (koyu mor) |
-| `english` | İngilizce, dil, language | `#0f62fe` (mavi) |
+| `yabanci-dil` | `blue` | İngilizce, Fransızca, Almanca, english, french |
+| `dil` | `magenta` | Türkçe, Türk dili, edebiyat |
+| `matematik` | `purple` | matematik, geometri, cebir, math |
+| `fen` | `teal` | fen, fizik, kimya, biyoloji, science |
+| `degerler` | `warm-gray` | din kültürü, ahlak, değerler, peygamber |
+| `sosyal` | `cyan` | sosyal, tarih, inkılap, coğrafya, hayat bilgisi, yurttaşlık |
+| `teknoloji` | `cool-gray` | bilişim, teknoloji, yazılım, kodlama |
+| `sanat-spor` | `gray` | görsel sanatlar, müzik, beden eğitimi |
+| `genel` (yedek) | `gray` | tanınmayan ad |
 
-Aksan yalnız **odak çıpası / başlık / yapı** tonunu etkiler; butonlar erişilebilirlik için
-Blue 60 kalır (bkz. `color-system.md`). Anahtar çözümleme sırası özeldir (örn. `french`,
-`english`'ten; `civics`/`religion`, `social`'dan önce denetlenir).
+Sıra önemlidir: yabancı diller Türkçe'den, değerler sosyalden önce denetlenir ("Ahlak ve
+Yurttaşlık" → değerler; "İnsan Hakları, Yurttaşlık ve Demokrasi" → sosyal). `meta.accent`
+yalnız bir aile adıyla alanı ezebilir; en iyisi hiç yazmamak ve `meta.subject`'e dersin resmî
+adını yazmaktır. Renk yalnız **odak çıpası / başlık / yapı** tonunu etkiler; butonlar
+erişilebilirlik için Carbon mavisi kalır (bkz. `color-system.md`).
+
+Konu anahtarı (`data-subject`: `math`, `science`, `religion`, `civics`, `history`, `geography`,
+`social`, `turkish`, `french`, `english`) renkten bağımsızdır; derse-özel biçim (ör. matematikte
+tablo rakamları) ve sesli okuma dili (Fransızca/İngilizce) onu kullanır.
 
 ## 2. Matematik paketi — sayı, sembol, geometri mükemmelliği
 Motor üç araç sunar:
@@ -234,7 +240,8 @@ birlikte** verilir (CVD-güvenliği + sistematik tutarlılık).
 - **`vizTable`** — çekim tablosu (örn. *être* présent); **`flashcards`** — kelime tekrarı.
 
 ## 6. Genişletme deseni
-Yeni bir ders için: (1) `subjectKey` eşlemesine ve `SUBJECT_ACCENT`'e satır ekle; (2) gerekiyorsa
+Yeni bir ders için: (1) rengi gerekiyorsa `tedyLayer.subjectThemes.domains`'e kök ekle ve
+`scripts/sync_carbon_tokens.py --write-subjects` çalıştır; konu anahtarı gerekiyorsa `subjectKey`'e satır ekle; (2) gerekiyorsa
 `data-subject="…"` altında tipografi/biçim kuralı tanımla; (3) ilgili yapıcıyı
 (`labeledFigure`/`relationFlow`/`infoCards`/`glossSentence`/`dialogue`) ya da `svg-authoring.md`
 arketipini kullan.

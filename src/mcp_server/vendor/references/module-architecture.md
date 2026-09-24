@@ -42,7 +42,8 @@ const MODULE_DATA = {
     subject: "Fen Bilimleri",            // ders
     gradeLevel: "7. Sınıf",              // sınıf düzeyi
     mode: "MODULE",                      // MODULE|QUIZ|FLASHCARDS|GAME|EXPLAINER|ASSESSMENT|SERIES
-    accent: "#009d9a",                   // ders aksanı (carbon-child-system §3)
+    // accent: "teal",                 // İSTEĞE BAĞLI, genelde yazılmaz: renk subject'ten türetilir;
+                                         // yalnız ders renk ailesi adı (tedy-integration §3.1)
     estimatedMinutes: 18,                // tahmini süre (üst çubukta gösterilir)
     coverPictogram: "ic-idea",           // kapak piktogram/ikon anahtarı
     sourceCitation: "MEB Fen 7, Ünite 1 / kullanıcı ders notu" // KAYNAK (SKILL.md §7)

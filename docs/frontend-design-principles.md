@@ -214,6 +214,19 @@ düşük doygunlukta kullanılır.
 *Test:* Ekranı gri tonlamaya çevir. Neyin acil olduğu hâlâ anlaşılıyor mu?
 Anlaşılmıyorsa renk tek taşıyıcı olmuş demektir (D2 ihlali de sayılır).
 
+*Ders rengi (2026-09-24):* taksonominin renk alabilen tek biçimi **ders
+kimliğidir** ve bu ilkenin koşullarını yapısal olarak sağlar. Her ders bir alana,
+her alan bir Carbon Tag ailesine bağlanır (Türkçe magenta, matematik mor, fen
+teal, sosyal camgöbeği, yabancı diller mavi, değerler sıcak gri, bilişim soğuk
+gri, sanat-spor ve genel gri); tek kaynak `tedyLayer.subjectThemes`
+(`src/subject_themes.py`, `dashboard/src/theme/subjects.ts`). Eylem ve durum
+renkleri — kırmızı, yeşil, sarı, turuncu — hiçbir derse verilmez. Panoda ders
+rengi yalnız küçük işarettir (`SubjectLabel` karesi), kart kenarıdır ya da ders
+adının yanındaki kicker'dır; ders asla durum etiketi (`Tag`) biçiminde görünmez ve
+geri sayım etiketleri yalnız kırmızı + nötr kullanır, bu yüzden ders rengiyle
+durum rengi aynı biçimde karşılaşmaz. Modül, pano ve katalog aynı dersi aynı
+renkle gösterir.
+
 ---
 
 ### İ9 — Arayüz tek bir sesle konuşur

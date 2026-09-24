@@ -115,9 +115,9 @@ export default function StudentProfile() {
           <div className="student-profile__main">
             <h3 className="student-profile__name">{displayName}</h3>
             <div className="student-profile__meta">
-              {profile.student_no && <Tag type="blue">No: {profile.student_no}</Tag>}
-              {profile.class_name && <Tag type="teal">Sınıf: {profile.class_name}</Tag>}
-              {profile.branch && <Tag type="purple">Şube: {profile.branch}</Tag>}
+              {profile.student_no && <Tag type="cool-gray">No: {profile.student_no}</Tag>}
+              {profile.class_name && <Tag type="cool-gray">Sınıf: {profile.class_name}</Tag>}
+              {profile.branch && <Tag type="cool-gray">Şube: {profile.branch}</Tag>}
             </div>
             {/* The sync timestamp lived here in English as "TED Connect sync".
                 It is operator detail on the one page that is about Işık rather

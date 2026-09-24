@@ -13,10 +13,10 @@ import math
 import re
 import sys
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, Mapping
 
+from src import subject_themes
 from src.mcp_server import gates, ornekler, sablon
 from src.mcp_server.vendor_sync import VENDOR_DIR
 
@@ -355,16 +355,15 @@ def _text(value: Any) -> bool:
     return isinstance(value, str) and value.strip() != ""
 
 
-@lru_cache(maxsize=1)
-def izinli_aksanlar() -> dict[str, str]:
-    """meta.accent için izinli ders aksanları (hex → Carbon palet adımı).
+def izinli_aksanlar() -> tuple[str, ...]:
+    """meta.accent için izinli değerler: Tedy ders renk ailesi adları (Carbon Tag aileleri).
 
-    Tek kaynak vendor otorite dosyasının `tedyLayer.subjectAccents` bölümüdür: Tedy tasarım
-    dilinde kırmızı (red-60 = support-error) yalnız aciliyettir, ders aksanı olamaz; aksan
-    verilmezse şablon onu konudan türetir (vendor/references/tedy-integration.md §3).
+    Tek kaynak vendor otorite dosyasının `tedyLayer.subjectThemes` bölümüdür. Aile, ders adından
+    (`meta.subject`) türetilir; meta.accent yalnız bu türetmeyi bir aile adıyla ezebilir. Hex, kırmızı,
+    yeşil, sarı ve turuncu kabul edilmez — anlam renkleri ders rengi olamaz
+    (vendor/references/tedy-integration.md §3).
     """
-    authority = json.loads((VENDOR_DIR / "assets" / "carbon-v11-authority.json").read_text(encoding="utf-8"))
-    return dict(authority["tedyLayer"]["subjectAccents"]["allowed"])
+    return subject_themes.families()
 
 
 def sema_dogrula(data: Any) -> list[str]:
@@ -382,9 +381,10 @@ def sema_dogrula(data: Any) -> list[str]:
     if "accent" in meta:
         accent = meta["accent"]
         allowed = izinli_aksanlar()
-        if not (isinstance(accent, str) and accent.lower() in allowed):
-            errors.append("meta.accent Tedy ders aksanlarından biri olmalı (" + ", ".join(sorted(allowed))
-                          + ") ya da hiç yazılmamalı — aksan konudan türetilir; kırmızı aciliyete ayrılmıştır")
+        if not (isinstance(accent, str) and accent in allowed):
+            errors.append("meta.accent yalnız bir Tedy ders renk ailesi adı olabilir (" + ", ".join(allowed)
+                          + ") ya da hiç yazılmamalı — renk meta.subject'ten türetilir; hex ve anlam renkleri "
+                          "(kırmızı, yeşil, sarı, turuncu) ders rengi olamaz")
     if not isinstance(data.get("rewards"), dict):
         errors.append("rewards nesnesi zorunlu")
     segments = data.get("segments")

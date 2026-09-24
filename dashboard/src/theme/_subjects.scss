@@ -1,0 +1,79 @@
+// Üretilir: scripts/gen_subject_themes.py — elle düzenlemeyin. Kaynak:
+// src/mcp_server/vendor/assets/carbon-v11-authority.json → tedyLayer.subjectThemes.
+//
+// Ders kimliği (Tedy İ8): renk yalnız işarette, çubukta ve kenarda yaşar; ders adı metni nötr
+// kalır. Değerler Carbon Tag token'larının g10 karşılıkları ve @carbon/colors adımlarıdır.
+@use '@carbon/colors' as colors;
+
+.ted-subject {
+  --ted-subject-accent: #{colors.$gray-60};
+  --ted-subject-text: #{colors.$gray-70};
+  --ted-subject-surface: #{colors.$gray-20};
+  --ted-subject-on-surface: #{colors.$gray-100};
+  --ted-subject-surface-hover: #{colors.$gray-20-hover};
+  --ted-subject-border: #{colors.$gray-40};
+}
+.ted-subject--magenta {
+  --ted-subject-accent: #{colors.$magenta-60};
+  --ted-subject-text: #{colors.$magenta-70};
+  --ted-subject-surface: #{colors.$magenta-20};
+  --ted-subject-on-surface: #{colors.$magenta-70};
+  --ted-subject-surface-hover: #{colors.$magenta-20-hover};
+  --ted-subject-border: #{colors.$magenta-40};
+}
+.ted-subject--purple {
+  --ted-subject-accent: #{colors.$purple-60};
+  --ted-subject-text: #{colors.$purple-70};
+  --ted-subject-surface: #{colors.$purple-20};
+  --ted-subject-on-surface: #{colors.$purple-70};
+  --ted-subject-surface-hover: #{colors.$purple-20-hover};
+  --ted-subject-border: #{colors.$purple-40};
+}
+.ted-subject--teal {
+  --ted-subject-accent: #{colors.$teal-60};
+  --ted-subject-text: #{colors.$teal-70};
+  --ted-subject-surface: #{colors.$teal-20};
+  --ted-subject-on-surface: #{colors.$teal-70};
+  --ted-subject-surface-hover: #{colors.$teal-20-hover};
+  --ted-subject-border: #{colors.$teal-40};
+}
+.ted-subject--cyan {
+  --ted-subject-accent: #{colors.$cyan-60};
+  --ted-subject-text: #{colors.$cyan-70};
+  --ted-subject-surface: #{colors.$cyan-20};
+  --ted-subject-on-surface: #{colors.$cyan-70};
+  --ted-subject-surface-hover: #{colors.$cyan-20-hover};
+  --ted-subject-border: #{colors.$cyan-40};
+}
+.ted-subject--blue {
+  --ted-subject-accent: #{colors.$blue-60};
+  --ted-subject-text: #{colors.$blue-70};
+  --ted-subject-surface: #{colors.$blue-20};
+  --ted-subject-on-surface: #{colors.$blue-70};
+  --ted-subject-surface-hover: #{colors.$blue-20-hover};
+  --ted-subject-border: #{colors.$blue-40};
+}
+.ted-subject--warm-gray {
+  --ted-subject-accent: #{colors.$warm-gray-60};
+  --ted-subject-text: #{colors.$warm-gray-70};
+  --ted-subject-surface: #{colors.$warm-gray-20};
+  --ted-subject-on-surface: #{colors.$warm-gray-100};
+  --ted-subject-surface-hover: #{colors.$warm-gray-20-hover};
+  --ted-subject-border: #{colors.$warm-gray-40};
+}
+.ted-subject--cool-gray {
+  --ted-subject-accent: #{colors.$cool-gray-60};
+  --ted-subject-text: #{colors.$cool-gray-70};
+  --ted-subject-surface: #{colors.$cool-gray-20};
+  --ted-subject-on-surface: #{colors.$cool-gray-100};
+  --ted-subject-surface-hover: #{colors.$cool-gray-20-hover};
+  --ted-subject-border: #{colors.$cool-gray-40};
+}
+.ted-subject--gray {
+  --ted-subject-accent: #{colors.$gray-60};
+  --ted-subject-text: #{colors.$gray-70};
+  --ted-subject-surface: #{colors.$gray-20};
+  --ted-subject-on-surface: #{colors.$gray-100};
+  --ted-subject-surface-hover: #{colors.$gray-20-hover};
+  --ted-subject-border: #{colors.$gray-40};
+}

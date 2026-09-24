@@ -72,3 +72,18 @@ export function getExamCountdown(examDate: Date | null, nowMs: number = Date.now
 
   return { days, hours, minutes, text, urgency, fraction }
 }
+
+/**
+ * One urgency scale for every countdown tag (exams and homework alike).
+ * Only red signals: critical and urgent share it (İ6). The rest are Carbon's
+ * neutral tag families, so no countdown borrows a subject colour — magenta,
+ * purple, teal, cyan and blue belong to the ders renk sistemi (İ8).
+ */
+export type CountdownTagType = 'red' | 'warm-gray' | 'cool-gray' | 'gray'
+
+export function countdownTagType(urgency: CountdownResult['urgency']): CountdownTagType {
+  if (urgency === 'critical' || urgency === 'urgent') return 'red'
+  if (urgency === 'soon') return 'warm-gray'
+  if (urgency === 'expired') return 'gray'
+  return 'cool-gray'
+}
