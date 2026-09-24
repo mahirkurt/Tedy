@@ -14,7 +14,8 @@ app = dashboard_api.app
 
 
 class _FakeRuntime:
-    def chat(self, messages, session_id="", context_filters=None, temperature=0.2, ilerleme_izni=False):
+    def chat(self, messages, session_id="", context_filters=None, temperature=0.2, ilerleme_izni=False,
+             okur="bilinmiyor"):
         return {
             "answer": "chat ok",
             "citations": [{"id": "S1", "path": "output/scraped_data.json", "snippet": "..."}],
@@ -25,7 +26,8 @@ class _FakeRuntime:
             "meta": {"model": "fake", "latency_ms": 5},
         }
 
-    def study_plan(self, messages, session_id="", context_filters=None, ilerleme_izni=False):
+    def study_plan(self, messages, session_id="", context_filters=None, ilerleme_izni=False,
+                   okur="bilinmiyor"):
         return {
             "answer": "plan ok",
             "citations": [],

@@ -609,3 +609,4 @@ görüntüsüyle doğrulanır.
 | 1.2 | 2026-09-24 | Bugün: akşam için "Yarın", kutu içinde "Yaptım"; öğrencinin işaretlediği iş artık sıradaki iş olmaz. |
 | 1.3 | 2026-09-24 | Sınavlar sessiz liste; yarınki sınav Yarın'ın başında. İşler: "Yaptım" hatası görünür, ders adı tek. Portal saatleri yerel okunur. |
 | 1.4 | 2026-09-24 | Asistan: cevap yazılırken görünür, taslakta çıplak atıf yok; ödev soruları Bugün'ün listesinden, "Yaptım" işaretleriyle. |
+| 1.5 | 2026-09-24 | Asistan tek sesle konuşur: Işık'a "sen", aileye "siz" (sayfa metinleri de); kaynak numaraları okuma sırasıyla. |

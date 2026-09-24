@@ -61,3 +61,20 @@ def test_every_surviving_citation_carries_its_kind(runtime):
     _, cites, _ = runtime._finalize_citations(
         "[S1] [S2]", [_cite(kind="ogrenci"), _cite(kind="kitap")])
     assert [c["kind"] for c in cites] == ["ogrenci", "kitap"]
+
+
+def test_numbers_follow_the_answer_not_the_tools(runtime):
+    """Live 2026-09-24: three tools returned sources, the answer cited only the
+    third, and the reader saw a lone chip reading "3". Chips are numbered in
+    the order the reader meets them."""
+    text, cites, _ = runtime._finalize_citations(
+        "Yalnız bu [S3].", [_cite(label="A"), _cite(label="B"), _cite(label="C")])
+    assert text == "Yalnız bu [S1]."
+    assert [(c["id"], c["label"]) for c in cites] == [("S1", "C")]
+
+
+def test_renumbering_keeps_each_marker_on_its_source(runtime):
+    text, cites, _ = runtime._finalize_citations(
+        "Önce [S2], sonra [S1], yine [S2].", [_cite(label="A"), _cite(label="B")])
+    assert text == "Önce [S1], sonra [S2], yine [S1]."
+    assert [(c["id"], c["label"]) for c in cites] == [("S1", "B"), ("S2", "A")]

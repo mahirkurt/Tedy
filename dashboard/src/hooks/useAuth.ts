@@ -8,6 +8,9 @@ export interface User {
   picture: string
   /** "reader" accounts see Tedy Books and nothing else. */
   role: UserRole
+  /** Işık's own account. The assistant says "sen" to this account only and
+   *  addresses everyone else as family. */
+  student: boolean
 }
 
 /** Anything the API does not label explicitly is treated as least privilege. */
@@ -17,6 +20,7 @@ function toUser(data: Partial<User> | null | undefined): User {
     name: String(data?.name ?? ''),
     picture: String(data?.picture ?? ''),
     role: data?.role === 'full' ? 'full' : 'reader',
+    student: data?.student === true,
   }
 }
 

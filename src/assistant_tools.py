@@ -149,8 +149,9 @@ def odev_listesi_metni(rows: list[dict[str, Any]], simdi: datetime) -> str:
         parcalar.append(f"ÖĞRETMEN DEĞERLENDİRDİ — son {_GECMIS_GUN} gün: {len(cozulmus)} ödev ("
                         + ", ".join(f"{k} {v}" for k, v in sorted(dagilim.items())) + ")")
     if eski:
-        parcalar.append(f"Listeye alınmadı: teslimi {_GECMIS_GUN} günden eski {eski} ödev. "
-                        "Onlar sorulursa `ogrenci_verisi_ara` kullan.")
+        parcalar.append(f"Not (okura aktarma): teslimi {_GECMIS_GUN} günden eski {eski} ödev "
+                        "bu listede yok. Yalnız eski ödevler sorulursa `ogrenci_verisi_ara` "
+                        "ile bak.")
     return "\n\n".join(parcalar)
 
 MCP_SERVERS = {

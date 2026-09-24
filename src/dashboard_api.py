@@ -36,6 +36,7 @@ from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.US
     ROLE_FULL,
     ROLE_READER,
     USER_ROLES,
+    okur_turu,
 )
 from src import module_progress, module_store, module_ticket, subject_themes
 from src import claude_api
@@ -307,6 +308,9 @@ def auth_me():
             "name": session.get("user_name", ""),
             "picture": session.get("user_picture", ""),
             "role": _current_user_role(),
+            # The assistant's chrome says "sen" to Işık and addresses anyone
+            # else as family; the model is told the same (see _assistant_okur).
+            "student": okur_turu(session["user_email"]) == "ogrenci",
         })
     if TEST_AUTH_BYPASS:
         return jsonify({
@@ -314,6 +318,7 @@ def auth_me():
             "name": "Test User",
             "picture": "",
             "role": ROLE_FULL,
+            "student": False,
         })
     return jsonify({"error": "Not authenticated"}), 401
 
@@ -368,6 +373,12 @@ def _is_assistant_admin() -> bool:
         return True
     email = str(session.get("user_email", "")).lower().strip()
     return bool(email) and email in ASSISTANT_ADMIN_EMAILS
+
+
+def _assistant_okur() -> str:
+    """Who is asking, for the assistant's form of address. Read inside the
+    request, like the progress permission: the stream generator outlives it."""
+    return okur_turu(_module_person())
 
 
 def _assistant_progress_allowed() -> bool:
@@ -1942,6 +1953,7 @@ def assistant_chat():
             context_filters=context_filters,
             temperature=temperature,
             ilerleme_izni=_assistant_progress_allowed(),
+            okur=_assistant_okur(),
         )
         return jsonify(out)
     except AssistantUnavailableError:
@@ -1964,13 +1976,14 @@ def assistant_stream():
     # Decided here, inside the request: generate() runs after this view has returned, where the
     # session is no longer reachable.
     ilerleme_izni = _assistant_progress_allowed()
+    okur = _assistant_okur()
 
     def generate():
         try:
             runtime = _assistant_runtime()
             for event in runtime.chat_events(
                 messages=messages, session_id=session_id, force_deep=force_deep,
-                ilerleme_izni=ilerleme_izni,
+                ilerleme_izni=ilerleme_izni, okur=okur,
             ):
                 name = event.pop("event")
                 yield f"event: {name}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
@@ -2007,6 +2020,7 @@ def assistant_plan():
             session_id=session_id,
             context_filters=context_filters,
             ilerleme_izni=_assistant_progress_allowed(),
+            okur=_assistant_okur(),
         )
         return jsonify(out)
     except AssistantUnavailableError:

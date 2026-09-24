@@ -749,3 +749,41 @@ test('the answer appears while it is written, and the final answer replaces the 
     await sse.close()
   }
 })
+
+// One voice per reader (İ9). The assistant is used by Işık and by the family;
+// until 2026-09-24 every question was labelled "Işık" under a greeting written
+// to Işık, whoever had asked it. The page now speaks as the model is told to:
+// "sen" to Işık's own account, "siz" to anyone else, with Işık in the third person.
+test('the page addresses Işık as "sen" and the family as "siz"', async ({ page }) => {
+  await page.route('**/api/assistant/stream', route => route.abort())
+  await page.route('**/api/assistant/chat', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      answer: 'Tamam.', citations: [], safety_flags: [], plan_blocks: [], intent: 'qa',
+      session_id: '', meta: { model: 'claude-sonnet-5', degraded: [], dropped_citations: 0 },
+    }),
+  }))
+
+  // The e2e server's bypass user is not Işık: family voice.
+  await page.goto('/asistan')
+  await expect(page.locator('.ac-msg--assistant').first()).toContainText("Işık'ın ödevleri")
+  await expect(page.getByRole('button', { name: 'Işık bugün neye öncelik vermeli?' })).toBeVisible()
+  await expect(page.locator('#ac-input')).toHaveAttribute('placeholder', /sorun/)
+  await page.fill('#ac-input', 'ödevler')
+  await page.getByLabel('Gönder').click()
+  await expect(page.locator('.ac-msg--user .ac-msg__role')).toHaveText('Test')
+
+  await page.route('**/api/auth/me', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ email: 'isikkurtx@gmail.com', name: 'Işık Kurt', picture: '',
+                           role: 'full', student: true }),
+  }))
+  await page.goto('/asistan')
+  await expect(page.locator('.ac-msg--assistant').first()).toContainText('sana yardımcı')
+  await expect(page.getByRole('button', { name: 'Bugün neye öncelik vermeliyim?' })).toBeVisible()
+  await page.fill('#ac-input', 'ödevlerim')
+  await page.getByLabel('Gönder').click()
+  await expect(page.locator('.ac-msg--user .ac-msg__role')).toHaveText('Işık')
+})

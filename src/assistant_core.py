@@ -418,7 +418,8 @@ class ClaudeClient:
                     first = len(out.citations) + 1
                     out.citations.extend(outcome.citations)
                     # The numbers the model sees and the ones
-                    # _finalize_citations assigns come from the same counter;
+                    # _finalize_citations resolves come from the same counter
+                    # (it renumbers only afterwards, in reading order);
                     # otherwise the right sentence cites the wrong source and it
                     # looks verified in the panel.
                     marks = "\n".join(f"[S{first + j}] {c.get('label', '')}"
@@ -1374,19 +1375,44 @@ class AssistantRuntime:
         "işaretle. Bu numaralar araç sonucunda sana zaten gösterilir — yalnız "
         "gösterilen numarayı kullan, numara uydurma, kendin saymaya çalışma.\n"
         "- İşaretler kullanıcıya tıklanabilir kaynak olarak gösterilir.\n"
+        "- Bir liste ya da ardışık cümleler aynı kaynaktan geliyorsa işareti bir "
+        "kez, girişine koy; her maddeye tekrar etme. Art arda aynı numara okur "
+        "için gürültüdür.\n"
         "- Yanıtın sonuna ayrı kaynak listesi ekleme; atıf satır içindedir.\n"
-        "- Işık'ın kaydı veya müfredat dışında genel bilgi sorulursa yanıtla, "
-        "ama bunun Işık'ın kaydından veya müfredat kaynağından gelmediğini "
-        "belirt ve o cümleye [S] atıfı ekleme; atıf yalnız araç çıktısına "
-        "aittir.\n\n"
+        "- Işık'ın kaydı veya müfredat dışında genel bilgi sorulursa yanıtla ve "
+        "o cümleye [S] atıfı ekleme; atıf yalnız araç çıktısına aittir. Kaynaksız "
+        "anlattığını bir kez, sade ve hitaba uygun bir cümleyle söyle (örn. "
+        "'Tanımı ders kitabından değil, genel bilgiden veriyorum.'). Resmî kalıp "
+        "('… alınmamıştır', 'kaynak satırı') kullanma; bu cümleyi kaynaklı bir "
+        "cümlenin hemen önüne koyup onunla çeliştirme.\n\n"
+
+        "## Hitap\n"
+        "Sorunun başındaki 'Soran:' satırı kiminle konuştuğunu söyler. Bir cevap "
+        "boyunca hitabı değiştirme.\n"
+        "- Soran Işık ise ona 'sen' diye doğrudan konuş ('yaptın', 'ödevin', "
+        "'başlayabilirsin'). Kendisinden üçüncü şahısla söz etme: 'Işık yaptı', "
+        "'Işık'ın ödevi' yazma. Adıyla seslenmen gerekmez.\n"
+        "- Soran Işık'ın ailesinden biriyse ona 'siz' diye konuş ve Işık'tan "
+        "adıyla, üçüncü şahısla söz et ('Işık Yaptım demiş', 'Işık'ın ödevi'). "
+        "Işık'a seslenme; öneriyi soran kişiye yönelt ('Işık'la birlikte "
+        "bakabilirsiniz').\n"
+        "- Soran bilinmiyorsa aileye konuşur gibi konuş: okura 'siz', Işık'a "
+        "üçüncü şahıs.\n"
+        "- Araç çıktıları Işık'tan üçüncü şahısla söz eder. Onları olduğu gibi "
+        "aktarma, hitaba çevir.\n\n"
 
         "## Nasıl anlatırsın (DEHB-dostu)\n"
         "- İlk cümlede doğrudan cevabı ver.\n"
         "- Anlatımı 3–6 dakikada tüketilebilir parçalara böl; her parçanın "
         "kendi başlığı olsun.\n"
-        "- Adımları numaralandır ve her adıma tahmini süre yaz — 'neredeyim' "
-        "sorusunun cevabı görünür olsun.\n"
-        "- Somut ol: ne yapılacak, ne zaman, ne kadar sürede.\n"
+        "- Adımları numaralandır — 'neredeyim' sorusunun cevabı görünür olsun.\n"
+        "- Bir ödevin ya da çalışmanın ne kadar süreceğini tahmin etme: portal "
+        "bunu söylemez, tahmin uydurma olur, ve süreyi fazla tahmin eden bir "
+        "okurda '3 ödev, 2 saat' başlamayı engelleyen bir duvardır. Süre yerine "
+        "küçük bir başlangıç öner ('10 dakikayla başla', 'önce ilk sayfa'). "
+        "'Matematiğe 10 dakika ayır' bir kutudur, 'matematik 30 dakika sürer' "
+        "bir tahmindir.\n"
+        "- Somut ol: ne yapılacak, ne zaman.\n"
         "- Başarıyı önce söyle, eksiği sonra ve yapıcı biçimde.\n"
         "- Uzun paragraf yazma; madde işareti ve kısa cümle kullan.\n\n"
 
@@ -1443,6 +1469,7 @@ class AssistantRuntime:
         ilerleme_izni: bool = False,
         on_delta: Callable[[str], None] | None = None,
         on_reset: Callable[[], None] | None = None,
+        okur: str = "bilinmiyor",
     ) -> dict[str, Any]:
         # `dispatch`, if given, replaces self.registry.dispatch for this
         # call only. chat_events() (below) uses this to wrap tool calls
@@ -1462,7 +1489,8 @@ class AssistantRuntime:
         if self._is_context_stale():
             safety_flags.append("warning:stale_context")
 
-        convo = self._build_conversation(messages, user_query, intent, safety_flags)
+        convo = self._build_conversation(messages, user_query, intent, safety_flags,
+                                         okur=okur)
 
         try:
             # `temperature` stays in chat()'s signature for /v1 callers but is
@@ -1656,6 +1684,7 @@ class AssistantRuntime:
         user_query: str,
         intent: str,
         safety_flags: list[str],
+        okur: str = "bilinmiyor",
     ) -> list[dict[str, str]]:
         """System prompt plus recent turns.
 
@@ -1676,11 +1705,20 @@ class AssistantRuntime:
             ],
             {"role": "user", "content": (
                 f"{bugun_satiri(datetime.now())}\n"
+                f"Soran: {self._SORAN.get(okur, self._SORAN['bilinmiyor'])}\n"
                 f"Soru türü: {intent}\n"
                 f"Güvenlik: {', '.join(safety_flags) if safety_flags else 'yok'}\n\n"
                 f"Soru: {user_query}"
             )},
         ]
+
+    # The "Soran:" line of the user turn; the prompt's "## Hitap" reads it.
+    # In the user turn rather than the system prompt, which is cached.
+    _SORAN = {
+        "ogrenci": "Işık",
+        "aile": "Işık'ın ailesinden biri",
+        "bilinmiyor": "bilinmiyor",
+    }
 
     @staticmethod
     def _model_hata_cevabi() -> str:
@@ -1704,6 +1742,7 @@ class AssistantRuntime:
         session_id: str = "",
         context_filters: dict[str, Any] | None = None,
         ilerleme_izni: bool = False,
+        okur: str = "bilinmiyor",
     ) -> dict[str, Any]:
         out = self.chat(
             messages=messages,
@@ -1711,6 +1750,7 @@ class AssistantRuntime:
             context_filters=context_filters,
             force_deep=True,
             ilerleme_izni=ilerleme_izni,
+            okur=okur,
         )
         out["intent"] = "study_plan"
         out["plan_blocks"] = self._build_rule_based_plan(
@@ -2058,25 +2098,26 @@ class AssistantRuntime:
     ) -> tuple[str, list[dict[str, Any]], int]:
         """Resolve the model's [S1] markers against the sources tools returned.
 
-        Markers are assigned in tool-return order. A marker pointing at nothing
-        is removed from the prose and counted, rather than left to imply
-        evidence that does not exist — and rather than being stripped wholesale
-        in the frontend, which is what previously severed text from sources.
+        The model's markers are resolved in tool-return order — the numbers it
+        was shown — and then renumbered in the order the reader meets them.
+        Live 2026-09-24: three tools returned sources, the answer cited only
+        the third, and the reader saw a lone chip reading "3". A marker
+        pointing at nothing is removed from the prose and counted, rather than
+        left to imply evidence that does not exist — and rather than being
+        stripped wholesale in the frontend, which is what previously severed
+        text from sources.
         """
         indexed = {i: dict(c) for i, c in enumerate(citations, start=1)}
-        for i, c in indexed.items():
-            c["id"] = f"S{i}"
-
-        used: list[int] = []
+        renumbered: dict[int, int] = {}
         dropped = 0
 
         def replace(match: "re.Match[str]") -> str:
             nonlocal dropped
             n = int(match.group(1))
             if n in indexed:
-                if n not in used:
-                    used.append(n)
-                return match.group(0)
+                if n not in renumbered:
+                    renumbered[n] = len(renumbered) + 1
+                return f"[S{renumbered[n]}]"
             dropped += 1
             return ""
 
@@ -2084,7 +2125,11 @@ class AssistantRuntime:
         cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
         cleaned = re.sub(r" +([,.;:!?])", r"\1", cleaned).strip()
 
-        return cleaned, [indexed[n] for n in used], dropped
+        kept = []
+        for n, k in renumbered.items():
+            indexed[n]["id"] = f"S{k}"
+            kept.append(indexed[n])
+        return cleaned, kept, dropped
 
 
 def perform_incremental_reindex(project_root: str | os.PathLike[str]) -> dict[str, Any]:

@@ -23,6 +23,10 @@ USER_ROLES = {
     "mahirkurtmd@gmail.com": ROLE_READER,
 }
 
+# Whose school life TEDY is. The assistant says "sen" to this account and speaks
+# to every other full-role member about Işık (assistant_core, "## Hitap").
+OGRENCI_EMAILS = frozenset({"isikkurtx@gmail.com"})
+
 ALLOWED_EMAILS = set(USER_ROLES)
 FULL_ACCESS_EMAILS = {e for e, r in USER_ROLES.items() if r == ROLE_FULL}
 
@@ -32,6 +36,15 @@ def role_of(email: str | None) -> str | None:
     if not email:
         return None
     return USER_ROLES.get(email.strip().lower())
+
+
+def okur_turu(email: str | None) -> str:
+    """Who is asking the assistant: "ogrenci" (Işık), "aile" (another full-role
+    member) or "bilinmiyor" (an API key, the test bypass, anyone else)."""
+    e = (email or "").strip().lower()
+    if e in OGRENCI_EMAILS:
+        return "ogrenci"
+    return "aile" if USER_ROLES.get(e) == ROLE_FULL else "bilinmiyor"
 
 
 def is_full(email: str | None) -> bool:

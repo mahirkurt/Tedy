@@ -25,6 +25,7 @@ import {
 import type { AssistantCitation, AssistantPlanBlock, AssistantResponse } from '../types'
 import { renderMarkdown } from '../utils/markdown'
 import { modelAdi } from '../utils/formatters'
+import { firstName, useSession } from '../contexts/session'
 import CitationChip from './CitationChip'
 import SourcePanel from './SourcePanel'
 
@@ -44,11 +45,34 @@ interface ChatMessage {
   model?: string
 }
 
-const QUICK_PROMPTS = [
-  { text: 'Bugün neye öncelik vermeliyim?', icon: TaskComplete, mode: 'chat' as const, primary: true },
-  { text: 'Çalışma planı hazırla', icon: CalendarHeatMap, mode: 'plan' as const },
-  { text: 'Eksik konularımı özetle', icon: Chemistry, mode: 'chat' as const },
-]
+// The page speaks to whoever is signed in, as the model does (the prompt's
+// "## Hitap"): "sen" to Işık, "siz" to the family, who hear about Işık in the
+// third person. One voice per reader (İ9) — a parent's question labelled
+// "Işık", under a greeting written to Işık, was two voices at once.
+const VOICE = {
+  student: {
+    welcome: 'Merhaba! TEDY Asistan olarak sana yardımcı olabilirim. Ödevlerin, sınavların ve derslerin hakkında sorular sorabilir veya kişisel çalışma planı isteyebilirsin.',
+    prompts: [
+      { text: 'Bugün neye öncelik vermeliyim?', icon: TaskComplete, mode: 'chat' as const, primary: true },
+      { text: 'Çalışma planı hazırla', icon: CalendarHeatMap, mode: 'plan' as const },
+      { text: 'Eksik konularımı özetle', icon: Chemistry, mode: 'chat' as const },
+    ],
+    placeholder: 'Bir soru sor veya çalışma planı iste...',
+    sources: 'Her iddianın yanındaki numara, o cümlenin nereden geldiğini gösterir — MEB müfredatı, ders kitabın veya kendi okul verin. Numaraya dokunup kaynağı okuyabilirsin.',
+    caution: 'Yapay zekâ yanılabilir. Bir şey tuhaf geldiyse kaynağa bak.',
+  },
+  family: {
+    welcome: "Merhaba! TEDY Asistan olarak size yardımcı olabilirim. Işık'ın ödevleri, sınavları ve dersleri hakkında soru sorabilir veya onun için çalışma planı isteyebilirsiniz.",
+    prompts: [
+      { text: 'Işık bugün neye öncelik vermeli?', icon: TaskComplete, mode: 'chat' as const, primary: true },
+      { text: 'Işık için çalışma planı hazırla', icon: CalendarHeatMap, mode: 'plan' as const },
+      { text: "Işık'ın eksik konularını özetle", icon: Chemistry, mode: 'chat' as const },
+    ],
+    placeholder: 'Bir soru sorun veya çalışma planı isteyin...',
+    sources: "Her iddianın yanındaki numara, o cümlenin nereden geldiğini gösterir — MEB müfredatı, ders kitabı veya Işık'ın okul verisi. Numaraya dokunup kaynağı okuyabilirsiniz.",
+    caution: 'Yapay zekâ yanılabilir. Bir şey tuhaf geldiyse kaynağa bakın.',
+  },
+}
 
 // Shown in the composer while a tool is running, keyed by the tool name the
 // stream endpoint reports in its `tool_start` event. Anything not in this map
@@ -249,15 +273,17 @@ function AnswerBody({
 }
 
 export default function AssistantChat() {
+  const user = useSession()
+  const isStudent = user?.student === true
+  const voice = isStudent ? VOICE.student : VOICE.family
+  const askerName = isStudent ? 'Işık' : (firstName(user) || 'Siz')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: 'Merhaba! TEDY Asistan olarak sana yardımcı olabilirim. Ödevlerin, sınavların ve derslerin hakkında sorular sorabilir veya kişisel çalışma planı isteyebilirsin.',
-    },
+    // Its text comes from `voice` at render time: the session can settle
+    // after this state is created.
+    { id: 'welcome', role: 'assistant', content: '' },
   ])
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(false)
@@ -465,14 +491,8 @@ export default function AssistantChat() {
           >
             <AILabelContent>
               <h4 className="ac__ai-pop-title">Bu yanıtları bir yapay zekâ yazıyor</h4>
-              <p className="ac__ai-pop-body">
-                Her iddianın yanındaki numara, o cümlenin nereden geldiğini
-                gösterir — MEB müfredatı, ders kitabın veya kendi okul verin.
-                Numaraya dokunup kaynağı okuyabilirsin.
-              </p>
-              <p className="ac__ai-pop-body">
-                Yapay zekâ yanılabilir. Bir şey tuhaf geldiyse kaynağa bak.
-              </p>
+              <p className="ac__ai-pop-body">{voice.sources}</p>
+              <p className="ac__ai-pop-body">{voice.caution}</p>
               <p className="ac__ai-pop-meta">
                 {latestModel ? `Son yanıtı ${modelAdi(latestModel)} yazdı.` : 'Henüz yanıt yok.'}
               </p>
@@ -487,7 +507,7 @@ export default function AssistantChat() {
 
       {/* Quick prompts */}
       <div className="ac__prompts">
-        {QUICK_PROMPTS.map(qp => (
+        {voice.prompts.map(qp => (
           <button
             key={qp.text}
             type="button"
@@ -510,7 +530,7 @@ export default function AssistantChat() {
                 <div className={`ac-msg__avatar ${msg.role === 'assistant' ? 'ac-msg__avatar--ai' : 'ac-msg__avatar--user'}`}>
                   {msg.role === 'assistant' ? (
                     <AILabel size="mini" slugLabel="yanıtı" aria-label="Yapay zekâ yanıtı" />
-                  ) : <span>I</span>}
+                  ) : <span>{askerName.charAt(0).toLocaleUpperCase('tr-TR')}</span>}
                 </div>
                 <div className="ac-msg__body">
                   {msg.degraded && msg.degraded.length > 0 && (
@@ -523,11 +543,12 @@ export default function AssistantChat() {
                     </div>
                   )}
                   <span className="ac-msg__role">
-                    {msg.role === 'user' ? 'Işık' : 'Asistan'}
+                    {msg.role === 'user' ? askerName : 'Asistan'}
                   </span>
                   <div className="ac-msg__content">
                     {msg.role === 'assistant'
-                      ? <AnswerBody text={msg.content} citations={msg.citations ?? []} onActivate={activateCitation} />
+                      ? <AnswerBody text={msg.id === 'welcome' ? voice.welcome : msg.content}
+                          citations={msg.citations ?? []} onActivate={activateCitation} />
                       : msg.content}
                   </div>
                   {msg.safetyFlags && msg.safetyFlags.length > 0 && (
@@ -575,7 +596,7 @@ export default function AssistantChat() {
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDraft(e.target.value)}
                 onKeyDown={handleKeyDown}
                 rows={2}
-                placeholder={loading ? 'Yanıt bekleniyor...' : 'Bir soru sor veya çalışma planı iste...'}
+                placeholder={loading ? 'Yanıt bekleniyor...' : voice.placeholder}
                 disabled={loading}
                 className="ac__textarea"
               />
