@@ -10,7 +10,7 @@ const ANSWER = {
   citations: [{ id: 'S1', kind: 'mufredat', label: 'MEB · kesirler',
                 locator: {}, snippet: 'Payda eşitlenir.', confidence: 0.9 }],
   safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
-  meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+  meta: { model: 'claude-sonnet-5', degraded: [], dropped_citations: 0 },
 }
 
 async function ask(page: import('@playwright/test').Page) {
@@ -54,8 +54,10 @@ test('the model that answered is disclosed', async ({ page }) => {
   // all times — the model name is something to be able to find, not
   // something to read past on every answer (İ6).
   await page.locator('.ac__header .cds--ai-label__button').click()
-  await expect(page.locator('.ac__header .cds--ai-label-content'))
-    .toContainText('gemini-3.7-flash')
+  const pop = page.locator('.ac__header .cds--ai-label-content')
+  // Named the way a person would say it, not as an API identifier (D4).
+  await expect(pop).toContainText('Son yanıtı Claude Sonnet 5 yazdı.')
+  await expect(pop).not.toContainText('claude-sonnet-5')
 })
 
 test('the AI aura marks what the model wrote, not what Işık wrote', async ({ page }) => {

@@ -181,3 +181,19 @@ def test_non_dict_row_is_skipped_not_raised():
     assert out.ok is True
     assert len(out.citations) == 1
     assert out.citations[0]["locator"]["path"] == "output/scraped_data.json"
+
+
+def test_dizi_parametresi_eleman_tipini_korur():
+    # Live, 2026-09-22 17:27: every model returned 400 INVALID_ARGUMENT
+    # "…[include_fragments].items: missing field" and the reader got the
+    # fallback answer — the sanitiser dropped `items` from array parameters.
+    out = sanitize_schema({"type": "object", "properties": {
+        "include_fragments": {"type": "array", "items": {"type": "string", "enum": ["a", "b"]},
+                              "description": "parçalar"},
+        "etiketler": {"anyOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "null"}]},
+        "ciplak": {"type": "array"},
+    }})
+    props = out["properties"]
+    assert props["include_fragments"]["items"] == {"type": "string", "enum": ["a", "b"]}
+    assert props["etiketler"]["items"] == {"type": "integer"}
+    assert props["ciplak"]["items"] == {"type": "string"}

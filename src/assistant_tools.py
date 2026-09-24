@@ -66,10 +66,11 @@ class ToolOutcome:
 def sanitize_schema(schema: dict[str, Any]) -> dict[str, Any]:
     """MCP inputSchema -> a declaration parameter block.
 
-    The installed google-genai accepts the raw Pydantic schema today, so this
-    is a sanitiser rather than a rewriter: it drops `title` noise and collapses
-    anyOf[T, null] to T, keeping every description byte-for-byte. Doing it in
-    one place also means a future SDK that stops accepting anyOf needs one fix.
+    Becomes the tool's `input_schema` on the Messages API (Claude, since
+    2026-09-24). A sanitiser rather than a rewriter: it drops `title` noise and
+    collapses anyOf[T, null] to T, keeping every description byte-for-byte and
+    the element type of every array. Doing it in one place means a model that
+    stops accepting some construct needs one fix.
     """
     props: dict[str, Any] = {}
     for key, spec in (schema.get("properties") or {}).items():
@@ -83,6 +84,16 @@ def sanitize_schema(schema: dict[str, Any]) -> dict[str, Any]:
             clean["description"] = spec["description"]
         if spec.get("enum"):
             clean["enum"] = spec["enum"]
+        if clean["type"] == "array":
+            # An array without `items` is what took the assistant down: from
+            # 2026-09-22 every model answered 400 INVALID_ARGUMENT
+            # "…[include_fragments].items: missing field", because this kept
+            # only type/description/enum and dropped the element type.
+            items = base.get("items") or spec.get("items") or {}
+            item = {"type": items.get("type", "string")} if isinstance(items, dict) else {"type": "string"}
+            if isinstance(items, dict) and items.get("enum"):
+                item["enum"] = items["enum"]
+            clean["items"] = item
         props[key] = clean
     return {
         "type": "object",

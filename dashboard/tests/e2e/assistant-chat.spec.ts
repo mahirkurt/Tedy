@@ -88,7 +88,7 @@ test('assistant answers render markdown rather than raw syntax', async ({ page }
       citations: [{ id: 'S1', kind: 'mufredat', label: 'MEB · kesir',
                     locator: {}, snippet: 'kazanım metni', confidence: 0.9 }],
       safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
-      meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+      meta: { model: 'claude-sonnet-5', degraded: [], dropped_citations: 0 },
     }),
   }))
 
@@ -149,7 +149,7 @@ test('citation chips render inside every markdown block type, not just one', asy
         { id: 'S4', kind: 'mufredat', label: 'MEB · başlık', locator: {}, snippet: 'başlık kaynağı', confidence: 0.6 },
       ],
       safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
-      meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+      meta: { model: 'claude-sonnet-5', degraded: [], dropped_citations: 0 },
     }),
   }))
 
@@ -205,7 +205,7 @@ test('citation chips render inside bold and italic emphasis, but not inside code
         { id: 'S3', kind: 'mufredat', label: 'MEB · kod', locator: {}, snippet: 'kod kaynağı', confidence: 0.7 },
       ],
       safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
-      meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+      meta: { model: 'claude-sonnet-5', degraded: [], dropped_citations: 0 },
     }),
   }))
 
@@ -242,7 +242,7 @@ test('sources are grouped by kind and the cited one highlights', async ({ page }
         { id: 'S2', kind: 'mufredat', label: 'MEB · kesir', locator: {}, snippet: 'kazanım', confidence: 0.9 },
       ],
       safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
-      meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+      meta: { model: 'claude-sonnet-5', degraded: [], dropped_citations: 0 },
     }),
   }))
 
@@ -272,7 +272,7 @@ test('a degraded answer says so', async ({ page }) => {
     body: JSON.stringify({
       answer: 'Yalnız okul verisiyle yanıt.', citations: [],
       safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
-      meta: { model: 'gemini-3.7-flash', degraded: ['maarif-mufredat'], dropped_citations: 0 },
+      meta: { model: 'claude-sonnet-5', degraded: ['maarif-mufredat'], dropped_citations: 0 },
     }),
   }))
 
@@ -306,7 +306,7 @@ test('risk and warning safety flags render with different severity, not as raw t
       citations: [],
       safety_flags: ['risk:mental_health_crisis', 'warning:limited_confidence'],
       plan_blocks: [], intent: 'qa', session_id: '',
-      meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+      meta: { model: 'claude-sonnet-5', degraded: [], dropped_citations: 0 },
     }),
   }))
 
@@ -353,7 +353,7 @@ test('every degraded source surfaces, not just the first', async ({ page }) => {
       answer: 'Kısmi yanıt.', citations: [],
       safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
       meta: {
-        model: 'gemini-3.7-flash',
+        model: 'claude-sonnet-5',
         degraded: ['maarif-mufredat', 'some-other-server'],
         dropped_citations: 0,
       },
@@ -399,7 +399,7 @@ test('citations with an unknown kind get their own group, not folded into ogrenc
         { id: 'S2', kind: 'harici', label: 'Bilinmeyen kaynak', locator: {}, snippet: 'harici parça', confidence: 0.5 },
       ],
       safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
-      meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+      meta: { model: 'claude-sonnet-5', degraded: [], dropped_citations: 0 },
     }),
   }))
 
@@ -454,7 +454,7 @@ test('the stream is genuinely consumed: tool progress renders, the streamed answ
       body: JSON.stringify({
         answer: 'YEDEK YOLDAN GELEN CEVAP — bu görünüyorsa akış tüketilmedi demektir.',
         citations: [], safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
-        meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+        meta: { model: 'claude-sonnet-5', degraded: [], dropped_citations: 0 },
       }),
     })
   })
@@ -464,7 +464,7 @@ test('the stream is genuinely consumed: tool progress renders, the streamed answ
     citations: [{ id: 'S1', kind: 'mufredat', label: 'MEB · kesir', locator: {},
                   snippet: 'akıştan gelen kaynak', confidence: 0.9 }],
     safety_flags: [], plan_blocks: [], intent: 'qa', session_id: 'dashboard-default',
-    meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+    meta: { model: 'claude-sonnet-5', degraded: [], dropped_citations: 0 },
   }
   const frames = [
     'event: tool_start\ndata: {"name":"kazanim_ara"}\n\n',
@@ -538,7 +538,7 @@ test('a stream that closes mid-flight without an answer falls back to the classi
       body: JSON.stringify({
         answer: 'FALLBACKMARKERABC7Q: yedek uçtan gelen cevap.',
         citations: [], safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
-        meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+        meta: { model: 'claude-sonnet-5', degraded: [], dropped_citations: 0 },
       }),
     })
   })
@@ -577,7 +577,7 @@ test('a citation chip is described by the snippet, not just named by its label',
         locator: {}, snippet: 'Payda eşitlenerek toplanır.', confidence: 0.9,
       }],
       safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
-      meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+      meta: { model: 'claude-sonnet-5', degraded: [], dropped_citations: 0 },
     }),
   }))
 
@@ -615,7 +615,7 @@ test('an unrecognised source group looks different from a verified one', async (
           locator: {}, snippet: 'içerik', confidence: 0.5 },
       ],
       safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
-      meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
+      meta: { model: 'claude-sonnet-5', degraded: [], dropped_citations: 0 },
     }),
   }))
 

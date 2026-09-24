@@ -60,8 +60,67 @@
   margin: $spacing-03 0 0;
 }
 
+// When it is owed, as a day ("yarın 12:00"). It used to live only in the
+// list under the card, which repeated the card's own item to say it (İ1).
+.next-thing__due {
+  display: block;
+  @include type.type-style('body-compact-01');
+  color: theme.$text-secondary;
+  margin-block-start: $spacing-02;
+}
+
+// The teacher's words while the box runs: what to do for these minutes.
+.next-thing__instruction {
+  @include type.type-style('body-01');
+  color: theme.$text-primary;
+  max-width: 60ch;
+  margin-block-start: $spacing-04;
+
+  p { margin: 0 0 $spacing-02; }
+}
+
+.next-thing__attachments {
+  list-style: none;
+  margin: $spacing-03 0 0;
+  padding: 0;
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    gap: $spacing-02;
+    min-block-size: $spacing-07;
+    @include type.type-style('body-compact-01');
+    color: theme.$link-primary;
+  }
+}
+
+// A failed "Yaptım" says so on the card it was pressed on, and the box stays
+// open: nothing the reader did is lost to a network error (D3).
+.next-thing__error {
+  @include type.type-style('helper-text-01');
+  color: theme.$text-error;
+  margin: $spacing-03 0 0;
+}
+
 .next-thing__action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-03;
   flex: 0 0 auto;
+}
+
+// Before the last bell the homework is a preview under the lesson — named and
+// dated on one quiet line, not a second hero competing with it (İ1, İ6).
+.next-thing--quiet {
+  padding: $spacing-03 0;
+  background: transparent;
+  border-inline-start: none;
+  margin-block-end: $spacing-05;
+
+  .next-thing__title {
+    @include type.type-style('body-compact-01');
+    font-weight: 600;
+  }
 }
 
 // The reading variant. Books is not louder than school work — it becomes the
@@ -73,5 +132,5 @@
 @media (max-width: 42rem) {
   .next-thing { padding: $spacing-05; }
   .next-thing__action { flex: 1 1 100%; }
-  .next-thing__action .cds--btn { width: 100%; }
+  .next-thing__action .cds--btn--primary { width: 100%; }
 }

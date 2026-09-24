@@ -24,6 +24,7 @@ import {
 } from '@carbon/icons-react'
 import type { AssistantCitation, AssistantPlanBlock, AssistantResponse } from '../types'
 import { renderMarkdown } from '../utils/markdown'
+import { modelAdi } from '../utils/formatters'
 import CitationChip from './CitationChip'
 import SourcePanel from './SourcePanel'
 
@@ -127,6 +128,7 @@ function promptBehind(msgs: ChatMessage[], assistantId: string): string | null {
 const FLAG_LABELS: Record<string, string> = {
   'warning:limited_confidence': 'Kaynaksız cevap',
   'warning:stale_context': 'Veriler güncel olmayabilir',
+  'error:model_unavailable': 'Asistana ulaşılamadı',
 }
 
 function flagTone(f: string): 'red' | 'gray' {
@@ -430,7 +432,7 @@ export default function AssistantChat() {
                 Yapay zekâ yanılabilir. Bir şey tuhaf geldiyse kaynağa bak.
               </p>
               <p className="ac__ai-pop-meta">
-                {latestModel ? `Son yanıtı ${latestModel} yazdı.` : 'Henüz yanıt yok.'}
+                {latestModel ? `Son yanıtı ${modelAdi(latestModel)} yazdı.` : 'Henüz yanıt yok.'}
               </p>
             </AILabelContent>
           </AILabel>

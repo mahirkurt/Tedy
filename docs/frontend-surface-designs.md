@@ -188,7 +188,46 @@ iner**, ve son senkron zamanını taşır — o, bakılabilir bir bilgidir.
 ve sınır `odak sonu 16:00` etiketini taşır; okul sürerken iş son zilden sonraki
 dilime çapalanır.
 
-**Kalan iş:** alttaki "ajanda boş" kartı §2.3'e indirilecek.
+**Tek şey günün saatine göre değişir** (2026-09-24):
+
+| Ne zaman | Tek ana kart | Altında, sessiz |
+|---|---|---|
+| Son zilden önce | Şu anki ya da sıradaki ders (`.today-now`): öğretmen, "Sonra: …", "N ders kaldı" | Ödev tek satır önizleme (`next-thing--quiet`): ad + teslim günü, düğmesiz |
+| Son zilden sonra | Ödev (`NextThing`), "Teslim yarın 12:00" ile | "Ayrıca": kalan işler ad + gün olarak, en çok iki satır |
+
+- **"Başla" başlatır.** Kartta 10 dakikalık bir kutu açar: "BAŞLADIN · N dk kaldı",
+  öğretmenin talimatı ve ekler kartın içinde. Kutu `localStorage`'da işin
+  kimliğiyle tutulur; yenilemede ya da dönüşte kaybolmaz (İ5). Süre dolunca
+  "10 dakika daha" önerir, yapılanla ilgili hüküm vermez.
+- **Biten öğeler katlanır** (İ7): bugünün geçmişi tek satır, "7 ders, 1 etkinlik
+  bitti · Göster". Başka bir gün bilerek açıldığı için bütün görünür.
+- **Kaldırılanlar ve nedenleri:** degrade "ŞU AN" kartı (nabız animasyonu +
+  kendi ilerleme çubuğu), ikinci gün çubuğu, ham `3/7` sayacı, yeşil "program
+  bitti" kartı, üç renkli geri sayım etiketli ödev kutusu. Ölçüm 2026-09-24:
+  aynı ekranda üç zaman çubuğu vardı, sıradaki ödev iki kez yazılıyordu ve
+  10:15'te telefonda o anki ders ilk ekranın dışındaydı.
+- **"Yaptım" Bugün'de de var** (kutu açıkken ve süre dolduğunda). İşler ile
+  aynı kaydı gönderir (`utils/odevYaptim.ts`). Başarılı olursa kart sıradaki işe
+  geçer ve altında sessiz bir "Yaptın: …" satırı çıkar. Başarısız olursa kart
+  "Kaydedilemedi" der ve kutu açık kalır (D3).
+- **Öğrencinin "Yaptım"ı işi aktif listeden çıkarır**; İşler'de de böyle.
+  Ölçüm 2026-09-22 17:26: Işık haftanın Matematik ödevini işaretledi, ama Bugün
+  yalnız öğretmen durumuna baktığı için iki gün boyunca aynı işe "Başla" dedi.
+- **Yarın** (son zilden sonra; okul olmayan günde 15:45'ten sonra): sıradaki
+  okul günü, yani ilk ders, o günün dersleri ve etkinlikler. Çanta akşamdan
+  hazırlansın diye. Cuma akşamı "PAZARTESİ" der. Teslimleri tekrar etmez; onlar
+  kartta ve "Ayrıca"da gün adıyla zaten yazıyor.
+- **Sınavlar** "Ayrıca"nın sessiz satırlarıyla gösterilir: ad ve gün. Renkli
+  geri sayım etiketi ve ders rengi yok (İ6, İ8). Blok "Ayrıca"nın altında durur,
+  çünkü haftalar sonraki bir sınav dört gün sonraki ödevin üstünde durmamalı.
+  Ertesi okul günündeki sınav akşam **Yarın'ın ilk satırı** olur ("SINAV · 09:00
+  · …") ve listeden çıkar. Ana karta **çıkmaz**: İ4'ün kendi testi, 20:00'de
+  "sınav hazırlığına başla" demeyi ihlal sayar. Bu blok 2026-09-24'e kadar
+  hiç görünmemişti; API takvimdeki her sınavı "geçmiş" sayıyordu.
+- **Önerilmeyen ve nedeni:** "teslim yarından sonraysa işi yarının penceresine
+  ertele" kuralı. §2'ye göre ev ödevi zaten büyük ölçüde pencere dışında
+  yapılıyor. Her işi 15:45–16:00 arasındaki 15 dakikalık dilime itmek dürüst olmaz.
+  Pencere dışında kart yalnız kısa ve tek adımlı kalır ("10 dakikayla").
 
 ---
 
@@ -552,3 +591,6 @@ görüntüsüyle doğrulanır.
 | Sürüm | Tarih | Not |
 |---|---|---|
 | 1.0 | 2026-08-31 | İlk sürüm. Bugün uygulandı; diğer yüzeyler tasarlandı. |
+| 1.1 | 2026-09-24 | Bugün: saate göre tek ana kart, yerinde zaman kutusu, katlanan geçmiş; ham HTML ve `3/7` kaldırıldı. |
+| 1.2 | 2026-09-24 | Bugün: akşam için "Yarın", kutu içinde "Yaptım"; öğrencinin işaretlediği iş artık sıradaki iş olmaz. |
+| 1.3 | 2026-09-24 | Sınavlar sessiz liste; yarınki sınav Yarın'ın başında. İşler: "Yaptım" hatası görünür, ders adı tek. Portal saatleri yerel okunur. |

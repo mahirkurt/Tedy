@@ -12,12 +12,16 @@ import {
   UserAvatar,
 } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
-import { parseDeadline, cleanTeacherNames, toTitleCase, formatTurkishDate, MONTHS_SHORT } from '../utils/formatters'
-import { getCountdown, getExamCountdown } from '../utils/countdown'
+import {
+  parseDeadline, cleanTeacherNames, normalizeCourseDisplayName, htmlToText, kisaTeslim,
+} from '../utils/formatters'
+import { getCountdown } from '../utils/countdown'
 import { dayColumns } from '../utils/schedule'
 import { DayStrip } from './DayStrip'
 import { NextThing } from './NextThing'
 import { useBookProgress } from '../hooks/useBookReader'
+import { useZamanKutusu } from '../hooks/useZamanKutusu'
+import { yaptimIsaretle } from '../utils/odevYaptim'
 import type { BookSummary } from '../types'
 import type { HomeworkItem, CalendarEvent, OgepSession, ExamsApiResponse } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
@@ -116,7 +120,22 @@ function windowVoice(minutes: number, kind: 'work' | 'reading'): {
   if (beforeSchool) {
     return { eyebrow: 'BUGÜN', hint: 'Bunu okuldan sonra yapmak daha kolay' }
   }
+  // During lessons the card is a preview under the lesson; "ŞİMDİ" there
+  // would contradict the lesson card above it.
+  if (beforeLastBell) {
+    return { eyebrow: 'OKULDAN SONRA' }
+  }
   return { eyebrow: 'ŞİMDİ' }
+}
+
+/** An event's second line: its description as text, unless that only says
+ *  the title again, in which case the location, or nothing. */
+function altBaslik(baslik: string, aciklama?: string, yer?: string): string {
+  const esit = (a: string, b: string) =>
+    a.replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr') === b.replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr')
+  const metin = htmlToText(aciklama)
+  if (metin && !esit(metin, baslik || '')) return metin
+  return htmlToText(yer)
 }
 
 function isSameDay(a: Date, b: Date): boolean {
@@ -186,7 +205,10 @@ function buildAgenda(
       items.push({
         time: `${timeMatch[1]}:${timeMatch[2]}\u2013${timeMatch[3]}:${timeMatch[4]}`,
         startMin, endMin,
-        name: toTitleCase(lines[0]?.trim() || ''),
+        // The API has already normalised the name ("Kültür ve Medeniyetimize
+        // Yön Verenler"); title-casing it again capitalised the "ve". Same
+        // function Dersler uses, so a lesson has one name everywhere (İ9).
+        name: normalizeCourseDisplayName(lines[0]?.trim() || ''),
         subtitle: cleanTeacherNames(teacherRaw),
         type: 'lesson',
         isActive: timeState.isActive,
@@ -253,7 +275,9 @@ function buildAgenda(
       time: `${hh}:${mm}\u2013${ehh}:${emm}`,
       startMin, endMin,
       name: ev.title,
-      subtitle: ev.extendedProps?.description || ev.extendedProps?.location || '',
+      // The portal sends the description as HTML, and it usually repeats the
+      // title; printed as-is it read "<p>…</p>" under the event (D4).
+      subtitle: altBaslik(ev.title, ev.extendedProps?.description, ev.extendedProps?.location),
       type: eventType,
       isActive: timeState.isActive,
       isPast: timeState.isPast,
@@ -281,6 +305,9 @@ export default function TodaySchedule() {
     '/api/exams', { exams: [], stats: { upcoming: 0, past: 0, averageGrade: null } }
   )
   const [dayOffset, setDayOffset] = useState(0)
+  const [gecmisAcik, setGecmisAcik] = useState(false)
+  const [kayitDurumu, setKayitDurumu] = useState<'bos' | 'kaydediliyor' | 'hata'>('bos')
+  const [sonYapilan, setSonYapilan] = useState('')
 
   const selectedDate = useMemo(() => {
     const d = new Date()
@@ -320,8 +347,13 @@ export default function TodaySchedule() {
           countdown: getCountdown(deadline, nowMs),
         }
       })
+      // "Yaptım" takes work off this list exactly as it does on İşler. Bugün
+      // used to check the teacher's status only, so work Işık had already
+      // marked done kept coming back as the next thing.
       .filter(({ hw, countdown }) =>
-        hw["Ödev Durumu"] === 'Değerlendirilmemiş' && countdown.urgency !== 'expired'
+        hw["Ödev Durumu"] === 'Değerlendirilmemiş'
+        && !hw.student_marked_done
+        && countdown.urgency !== 'expired'
       )
       .sort((a, b) => {
         const urgencyDiff = urgencyOrder[a.countdown.urgency] - urgencyOrder[b.countdown.urgency]
@@ -339,17 +371,25 @@ export default function TodaySchedule() {
 
 
 
-  const topHomework = activeHomework.slice(0, 3)
-  const extraHomeworkCount = Math.max(0, activeHomework.length - topHomework.length)
-
-  const getCountdownTagType = (urgency: ReturnType<typeof getCountdown>['urgency']): 'red' | 'warm-gray' | 'blue' => {
-    if (urgency === 'critical' || urgency === 'urgent') return 'red'
-    if (urgency === 'soon') return 'warm-gray'
-    return 'blue'
-  }
+  // The card names the most urgent work; the list under it is the rest, so the
+  // same item is never said twice (İ1). It used to be the top three, which put
+  // the card's own homework straight back underneath it.
+  const top = activeHomework[0]
+  const digerOdevler = activeHomework.slice(1)
+  const ayricaGoster = digerOdevler.slice(0, 2)
+  const ayricaFazla = digerOdevler.length - ayricaGoster.length
 
   const now = new Date(nowMs)
   const nowMin = toMinutes(now.getHours(), now.getMinutes())
+
+  // The ten minutes behind "10 dakikayla başla", kept on this card and across
+  // a reload. Keyed by the work, so a different top item finds no box.
+  const isAnahtari = top
+    ? top.hw.homework_key
+      || [top.hw['Ders Adı'], top.hw['Ödev Başlığı'], top.hw['Ödev Son Teslim Tarihi']].join('|')
+    : ''
+  const kutu = useZamanKutusu(isAnahtari, 10, nowMs)
+  const baslat = kutu.baslat
 
   // Exactly one named next step (İ1), offered as a box to start inside rather
   // than an estimate we do not have (İ3).
@@ -358,9 +398,11 @@ export default function TodaySchedule() {
     // the compiler cannot prove a value computed in the render body stays put.
     const d = new Date(nowMs)
     const minutes = toMinutes(d.getHours(), d.getMinutes())
-    const top = activeHomework[0]
     if (top) {
-      const course = String(top.hw['Ders Adı'] || '').trim()
+      // The normalised name, as "Ayrıca" and İşler print it: the raw portal
+      // name put "İkinci Yabancı Dil (Fransızca)" on the card and "Fransızca"
+      // one line below it (İ9).
+      const course = String(top.hw.normalized_course || top.hw['Ders Adı'] || '').trim()
       const title = String(top.hw['Ödev Başlığı'] || '').trim()
       const voice = windowVoice(minutes, 'work')
       return {
@@ -370,9 +412,12 @@ export default function TodaySchedule() {
           title: [course, title].filter(Boolean).join(' — ') || 'Ödev',
           stepMinutes: 10,
           actionLabel: 'Başla',
-          onAction: () => navigate('/isler'),
+          // Opens the box here. It used to navigate to İşler, so "Başla"
+          // started nothing and the work had to be found again (İ5).
+          onAction: baslat,
           variant: 'work' as const,
           hint: voice.hint,
+          due: top.deadline ? `Teslim ${kisaTeslim(top.deadline, d)}` : undefined,
         },
       }
     }
@@ -394,27 +439,104 @@ export default function TodaySchedule() {
         onAction: () => navigate(target),
         variant: 'reading' as const,
         hint: voice.hint,
+        due: undefined,
       },
     }
-  }, [activeHomework, nowMs, firstBook, bookProgress.lastChapterId, navigate])
+  }, [top, nowMs, firstBook, bookProgress.lastChapterId, navigate, baslat])
+
+  // "Yaptım" from inside the box. On success the homework reloads everywhere
+  // (tedy:homework-updated), the card steps to the next work, and a quiet line
+  // says what was recorded; on failure the box stays open and the card says so.
+  const yaptim = async () => {
+    if (!top) return
+    const ad = [top.hw.normalized_course || top.hw['Ders Adı'], top.hw['Ödev Başlığı']]
+      .filter(Boolean).join(' — ')
+    setKayitDurumu('kaydediliyor')
+    if (await yaptimIsaretle(top.hw)) {
+      kutu.birak()
+      setSonYapilan(ad)
+      setKayitDurumu('bos')
+    } else {
+      setKayitDurumu('hata')
+    }
+  }
+
+  // The next school day, for the evening: where to be, not what is owed —
+  // the card and "Ayrıca" already name the work with its day. The timetable
+  // repeats week to week (measured 2026-09-20), so next Monday reads from
+  // this week's grid.
+  const sonrakiGun = useMemo(() => {
+    const bugun = new Date(nowMs)
+    bugun.setHours(0, 0, 0, 0)
+    for (let k = 1; k <= 7; k++) {
+      const gun = new Date(bugun)
+      gun.setDate(bugun.getDate() + k)
+      const ajanda = buildAgenda(scheduleData, teamsData, hwData, calData, gun, nowMs)
+      const dersleri = ajanda.filter(a => a.type === 'lesson')
+      if (dersleri.length === 0) continue
+      return {
+        k,
+        tarih: gun,
+        gunAdi: DAYS_TR[gun.getDay()].toLocaleUpperCase('tr'),
+        dersleri,
+        etkinlikler: ajanda.filter(a => a.type !== 'lesson' && a.type !== 'deadline'),
+      }
+    }
+    return null
+  }, [scheduleData, teamsData, hwData, calData, nowMs])
+
+  // The teacher's own words for the work in the box, one paragraph per line.
+  const talimat = (top?.hw.detail?.description || '')
+    .split('\n').map(l => l.trim()).filter(Boolean)
 
   const selectedIsToday = compareCalendarDay(selectedDate, now) === 0
   const dayName = DAYS_TR[selectedDate.getDay()]
   const dateStr = `${selectedDate.getDate()} ${MONTHS_TR[selectedDate.getMonth()]}`
 
+  // Where to be. Deadlines are points in time, not places, so they never
+  // take this slot.
+  const yerler = agenda.filter(a => a.type !== 'deadline')
+  const dersler = agenda.filter(a => a.type === 'lesson')
+  const sonZil = dersler.reduce((m, a) => Math.max(m, a.endMin), 0)
+  const simdikiYer = yerler.find(a => a.isActive) ?? yerler.find(a => !a.isPast)
+  // Until the last bell the lesson is the one thing and the homework waits
+  // under it as a preview; after it, the homework is the one thing (İ1).
+  // Measured 2026-09-24 at 10:15: the page led with "OKULDAN SONRA: Matematik"
+  // while Işık sat in İngilizce, and on a phone the lesson was below the fold.
+  const okulModu = selectedIsToday && dersler.length > 0 && nowMin < sonZil && simdikiYer != null
+  const kalanDers = dersler.filter(a => !a.isPast && !a.isActive).length
+  const sonraki = simdikiYer ? yerler.find(a => a.startMin > simdikiYer.startMin) : undefined
+  const ilkMi = simdikiYer != null && !yerler.some(a => a.isPast || a.isActive)
+
+  // Finished items fold to one line on today's page (İ7): at 16:40 they were
+  // a green "program bitti" card over 550px of grey ticks. Another day is
+  // being looked at on purpose, so it shows whole.
+  const gecmis = selectedIsToday ? agenda.filter(a => a.isPast) : []
+  const gorunen = selectedIsToday && !gecmisAcik ? agenda.filter(a => !a.isPast) : agenda
+
+  // Once today's last bell has gone — or, on a day without school, from the
+  // usual end of the day — the evening turns to tomorrow's bag.
+  const yarinGoster = selectedIsToday && !okulModu && sonrakiGun != null
+    && nowMin >= (dersler.length > 0 ? sonZil : SCHOOL_END)
+
+  // Upcoming exams, soonest first. One that falls on the next school day leads
+  // the evening's "Yarın" and leaves the list, so it is said once; it never
+  // takes the card — at 20:00 the page must not say "start revising" (İ4).
+  const yaklasanSinavlar = (examData.exams || [])
+    .filter(e => e.status === 'upcoming' && e.date)
+    .map(e => ({ e, d: new Date(e.date as string) }))
+    .filter(x => !isNaN(x.d.getTime()))
+    .sort((a, b) => a.d.getTime() - b.d.getTime())
+  const yarinSinavlari = yarinGoster && sonrakiGun
+    ? yaklasanSinavlar.filter(x => isSameDay(x.d, sonrakiGun.tarih))
+    : []
+  const listeSinavlari = yaklasanSinavlar.filter(x => !yarinSinavlari.includes(x)).slice(0, 3)
+  const saatDk = (d: Date) =>
+    `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+
   const activeItem = agenda.find(a => a.isActive)
-  const nextItem = agenda.find(a => !a.isPast && !a.isActive)
-  const lessonsTotal = agenda.filter(a => a.type === 'lesson').length
-  const lessonsDone = agenda.filter(a => a.type === 'lesson' && a.isPast).length
-  const lessonsInProgress = selectedIsToday && activeItem?.type === 'lesson' ? 1 : 0
-  const lessonsRemaining = lessonsTotal - lessonsDone - lessonsInProgress
-
-  const progress = Math.min(100, Math.max(0,
-    ((nowMin - SCHOOL_START) / (SCHOOL_END - SCHOOL_START)) * 100
-  ))
   const schoolDayActive = selectedIsToday && nowMin >= SCHOOL_START && nowMin <= SCHOOL_END
-
-  const nowInsertIdx = agenda.findIndex(a => a.startMin > nowMin)
+  const nowInsertIdx = gorunen.findIndex(a => a.startMin > nowMin)
   const showNowMarker = selectedIsToday && !activeItem && schoolDayActive
 
   const nowTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
@@ -429,6 +551,8 @@ export default function TodaySchedule() {
       </div>
     )
   }
+
+  const isKarti = nextThing.props.variant === 'work'
 
   return (
     <div className="today">
@@ -456,8 +580,10 @@ export default function TodaySchedule() {
             <ChevronRight size={16} />
           </button>
         </div>
-        <div className="today__header-meta">
-          {dayOffset !== 0 && (
+        {/* The bare "3/7" that sat here said nothing a reader could decode;
+            the lesson card now says "4 ders kaldı" in words. */}
+        {dayOffset !== 0 && (
+          <div className="today__header-meta">
             <button
               type="button"
               className="today__today-btn"
@@ -465,13 +591,8 @@ export default function TodaySchedule() {
             >
               Bugüne dön
             </button>
-          )}
-          {lessonsTotal > 0 && (
-            <span className="today__lesson-counter">
-              {lessonsDone + lessonsInProgress}/{lessonsTotal}
-            </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <DayStrip
@@ -481,91 +602,114 @@ export default function TodaySchedule() {
         anchorMin={nextThing.anchorMin}
       />
 
-      <NextThing {...nextThing.props} />
-
-      {examData.exams.filter(e => e.status === 'upcoming').length > 0 && (
-        <div className="today-exams">
-          <div className="today-exams__header">
-            <span className="today-exams__title">Yaklaşan Sınavlar</span>
-            <button
-              type="button"
-              className="today-exams__all-btn"
-              onClick={() => navigate('/sinavlar')}
-            >
-              Tümünü gör
-            </button>
-          </div>
-          <div className="today-exams__list">
-            {examData.exams
-              .filter(e => e.status === 'upcoming')
-              .slice(0, 3)
-              .map(exam => {
-                const cd = exam.date ? getExamCountdown(new Date(exam.date), nowMs) : null
-                const tagType = cd?.urgency === 'critical' || cd?.urgency === 'urgent' ? 'red' as const
-                  : cd?.urgency === 'soon' ? 'magenta' as const : 'cool-gray' as const
-                const dateLabel = exam.date ? (() => {
-                  try {
-                    const d = new Date(exam.date)
-                    return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`
-                  } catch { return '' }
-                })() : ''
-                return (
-                  <button
-                    key={exam.id}
-                    type="button"
-                    className="today-exams__item"
-                    onClick={() => navigate('/sinavlar')}
-                  >
-                    <div className="today-exams__item-main">
-                      <span className="today-exams__item-course" style={{ color: exam.courseColor || undefined }}>{exam.course}</span>
-                      <span className="today-exams__item-title">{exam.title || exam.rawTitle}</span>
-                      {dateLabel && <span className="today-exams__item-date">{dateLabel}</span>}
-                    </div>
-                    {cd && <Tag type={tagType} size="sm">{cd.text}</Tag>}
-                  </button>
-                )
-              })}
-          </div>
-        </div>
+      {okulModu && simdikiYer && (
+        <SimdiKarti
+          yer={simdikiYer}
+          sonraki={sonraki}
+          kalanDers={kalanDers}
+          nowMin={nowMin}
+          ilk={ilkMi}
+        />
       )}
 
-      {activeHomework.length > 0 && (
-        <div className="today-homework">
-          <div className="today-homework__header">
-            <span className="today-homework__title">Aktif Ödevler</span>
-            <button
-              type="button"
-              className="today-homework__all-btn"
-              onClick={() => navigate('/isler')}
-            >
-              Tümünü gör
-            </button>
-          </div>
-          <div className="today-homework__list">
-            {topHomework.map(({ hw, countdown }, i) => (
+      <NextThing
+        {...nextThing.props}
+        quiet={okulModu}
+        box={isKarti && kutu.durum !== 'bos' ? kutu : undefined}
+        instruction={isKarti ? talimat : undefined}
+        attachments={isKarti ? top?.hw.detail?.attachments : undefined}
+        onMore={kutu.baslat}
+        onStop={() => { kutu.birak(); setKayitDurumu('bos') }}
+        onDone={isKarti ? yaptim : undefined}
+        doneState={kayitDurumu}
+      />
+
+      {sonYapilan && (
+        <p className="today-done-note" role="status">
+          <Checkmark size={16} />
+          <span>Yaptın: {sonYapilan}</span>
+        </p>
+      )}
+
+      {/* The rest of what is owed, said quietly: names and days, no coloured
+          countdown chips competing with the card above (İ6). */}
+      {ayricaGoster.length > 0 && (
+        <section className="today-also" aria-label="Ayrıca">
+          <div className="today-also__head">
+            <span className="today-also__title">AYRICA</span>
+            {ayricaFazla > 0 && (
               <button
-                key={`${hw["Ödev Başlığı"]}-${i}`}
                 type="button"
-                className="today-homework__item"
+                className="today-also__all"
                 onClick={() => navigate('/isler')}
               >
-                <div className="today-homework__item-main">
-                  <span className="today-homework__item-course">{hw.normalized_course || hw["Ders Adı"]}</span>
-                  <span className="today-homework__item-title">{hw["Ödev Başlığı"]}</span>
-                  <span className="today-homework__item-deadline">
-                    Teslim: {formatTurkishDate(hw["Ödev Son Teslim Tarihi"])}
-                  </span>
-                </div>
-                <Tag type={getCountdownTagType(countdown.urgency)} size="sm">
-                  {countdown.text}
-                </Tag>
+                +{ayricaFazla} iş daha
               </button>
-            ))}
+            )}
           </div>
-          {extraHomeworkCount > 0 && (
-            <p className="today-homework__more">+{extraHomeworkCount} aktif ödev daha var</p>
-          )}
-        </div>
+          {ayricaGoster.map(({ hw, deadline }) => (
+            <button
+              key={`${hw['Ders Adı']}|${hw['Ödev Başlığı']}|${hw['Ödev Son Teslim Tarihi']}`}
+              type="button"
+              className="today-also__item"
+              onClick={() => navigate('/isler')}
+            >
+              <span className="today-also__name">
+                {[hw.normalized_course || hw['Ders Adı'], hw['Ödev Başlığı']].filter(Boolean).join(' — ')}
+              </span>
+              {deadline && <span className="today-also__due">{kisaTeslim(deadline, now)}</span>}
+            </button>
+          ))}
+        </section>
+      )}
+
+      {/* Exams in the same quiet voice as "Ayrıca": what and when, as a day.
+          This block had never rendered — every takvim exam came back "past"
+          from the API — and was built with countdown chips and per-course
+          colours, which spend the attention budget and colour a taxonomy
+          rather than a state (İ6, İ8). They follow "Ayrıca":
+          exams weeks away sat above homework due in four days. */}
+      {listeSinavlari.length > 0 && (
+        <section className="today-exams" aria-label="Sınavlar">
+          <div className="today-also__head">
+            <span className="today-also__title">SINAVLAR</span>
+          </div>
+          {listeSinavlari.map(({ e, d }) => (
+            <button
+              key={e.id}
+              type="button"
+              className="today-also__item"
+              onClick={() => navigate('/sinavlar')}
+            >
+              <span className="today-also__name">{e.title || e.rawTitle}</span>
+              <span className="today-also__due">{kisaTeslim(d, now)}</span>
+            </button>
+          ))}
+        </section>
+      )}
+
+      {yarinGoster && sonrakiGun && (
+        <section className="today-tomorrow" aria-label="Sıradaki okul günü">
+          <span className="today-tomorrow__eyebrow">
+            {sonrakiGun.k === 1 ? `YARIN · ${sonrakiGun.gunAdi}` : sonrakiGun.gunAdi}
+          </span>
+          {yarinSinavlari.map(({ e, d }) => (
+            <p key={e.id} className="today-tomorrow__exam">
+              SINAV · {saatDk(d)} · {e.title || e.rawTitle}
+            </p>
+          ))}
+          <p className="today-tomorrow__first">
+            İlk ders {sonrakiGun.dersleri[0].time.split('\u2013')[0]} · {sonrakiGun.dersleri[0].name}
+          </p>
+          <p className="today-tomorrow__line">
+            {sonrakiGun.dersleri.length} ders: {[...new Set(sonrakiGun.dersleri.map(d => d.name))].join(' · ')}
+          </p>
+          {sonrakiGun.etkinlikler.map(e => (
+            <p key={`${e.startMin}-${e.name}`} className="today-tomorrow__line">
+              {e.time.split('\u2013')[0]} · {e.name}
+            </p>
+          ))}
+        </section>
       )}
 
       {agenda.length === 0 ? (
@@ -577,41 +721,27 @@ export default function TodaySchedule() {
         </EmptyLine>
       ) : (
         <>
-          {/* ── Hero card ── */}
-          {selectedIsToday ? (
-            activeItem ? (
-              <HeroActive item={activeItem} nowMin={nowMin} />
-            ) : nextItem ? (
-              <HeroNext item={nextItem} nowMin={nowMin} />
-            ) : (
-              <HeroDone lessonsDone={lessonsDone} />
-            )
-          ) : (
-            <HeroPlanned dateLabel={`${dayName}, ${dateStr}`} itemCount={agenda.length} />
-          )}
-
-          {/* ── School day progress ── */}
-          {schoolDayActive && lessonsTotal > 0 && (
-            <div className="today-daybar">
-              <div className="today-daybar__track">
-                <div className="today-daybar__fill" style={{ width: `${progress}%` }} />
-              </div>
-              <div className="today-daybar__labels">
-                <span>08:00</span>
-                <span>{lessonsRemaining > 0 ? `${lessonsRemaining} ders kaldı` : 'Son ders'}</span>
-                <span>15:45</span>
-              </div>
-            </div>
+          {gecmis.length > 0 && (
+            <button
+              type="button"
+              className="today-past-fold"
+              aria-expanded={gecmisAcik}
+              onClick={() => setGecmisAcik(v => !v)}
+            >
+              <Checkmark size={16} />
+              <span>{bitenOzeti(gecmis)}</span>
+              <span className="today-past-fold__action">{gecmisAcik ? 'Gizle' : 'Göster'}</span>
+            </button>
           )}
 
           {/* ── Timeline ── */}
           <div className="today-tl">
-            {agenda.map((item, i) => {
+            {gorunen.map((item, i) => {
               const cfg = TYPE_CONFIG[item.type]
               const Icon = cfg.icon
 
               return (
-                <div key={i}>
+                <div key={`${item.type}-${item.startMin}-${item.name}`}>
                   {showNowMarker && nowInsertIdx === i && (
                     <NowMarker time={nowTimeStr} />
                   )}
@@ -668,76 +798,55 @@ export default function TodaySchedule() {
 
 /* ── Sub-components ────────────────────────────────────────────────────────── */
 
-function HeroActive({ item, nowMin }: { item: AgendaItem; nowMin: number }) {
-  const elapsed = nowMin - item.startMin
-  const total = item.endMin - item.startMin
-  const remaining = item.endMin - nowMin
-  const pct = total > 0 ? (elapsed / total) * 100 : 0
-  const Icon = TYPE_CONFIG[item.type].icon
-
-  return (
-    <div className="today-hero today-hero--active">
-      <div className="today-hero__top">
-        <div className="today-hero__badge">
-          <span className="today-hero__pulse" />
-          Şu an
-        </div>
-        <Icon size={20} className="today-hero__icon" />
-      </div>
-      <h2 className="today-hero__title">{item.name}</h2>
-      {item.subtitle && <p className="today-hero__sub">{item.subtitle}</p>}
-      <div className="today-hero__footer">
-        <span className="today-hero__time-range">{item.time}</span>
-        <span className="today-hero__remaining">{remaining} dk kaldı</span>
-      </div>
-      <div className="today-hero__bar">
-        <div className="today-hero__bar-fill" style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  )
+/** "7 ders, 1 etkinlik bitti": what the folded line is holding, in words. */
+function bitenOzeti(items: AgendaItem[]): string {
+  const ders = items.filter(a => a.type === 'lesson').length
+  const teslim = items.filter(a => a.type === 'deadline').length
+  const diger = items.length - ders - teslim
+  const parcalar: string[] = []
+  if (ders) parcalar.push(`${ders} ders`)
+  if (diger) parcalar.push(`${diger} etkinlik`)
+  if (teslim) parcalar.push(`${teslim} teslim`)
+  return `${parcalar.join(', ')} bitti`
 }
 
-function HeroNext({ item, nowMin }: { item: AgendaItem; nowMin: number }) {
-  const until = item.startMin - nowMin
-  const Icon = TYPE_CONFIG[item.type].icon
+/**
+ * The one thing while school runs: where to be now, and what comes after.
+ *
+ * Same shape as the next-thing card, because it is the same idea. It used to
+ * be a saturated gradient with a pulsing dot and its own progress bar — the
+ * loudest block on the page, one of three time bars, and still fourth in
+ * reading order (İ1, İ6). The day strip is the only bar now.
+ */
+function SimdiKarti({ yer, sonraki, kalanDers, nowMin, ilk }: {
+  yer: AgendaItem
+  sonraki?: AgendaItem
+  kalanDers: number
+  nowMin: number
+  ilk: boolean
+}) {
+  const baslar = yer.time.split('\u2013')[0]
+  const kala = yer.startMin - nowMin
+  const ust = yer.isActive
+    ? `ŞU AN · ${yer.endMin - nowMin} dk kaldı`
+    : ilk && yer.type === 'lesson'
+      ? `İLK DERS · ${baslar}`
+      : `SIRADAKİ · ${kala <= 60 ? `${kala} dk sonra` : baslar}`
 
   return (
-    <div className="today-hero today-hero--next">
-      <div className="today-hero__top">
-        <div className="today-hero__badge today-hero__badge--upcoming">Sıradaki</div>
-        <Icon size={20} className="today-hero__icon" />
-      </div>
-      <h2 className="today-hero__title">{item.name}</h2>
-      {item.subtitle && <p className="today-hero__sub">{item.subtitle}</p>}
-      <div className="today-hero__footer">
-        <span className="today-hero__time-range">{item.time}</span>
-        <span className="today-hero__remaining">{until} dk sonra</span>
-      </div>
-    </div>
-  )
-}
-
-function HeroDone({ lessonsDone }: { lessonsDone: number }) {
-  return (
-    <div className="today-hero today-hero--done">
-      <div className="today-hero__badge today-hero__badge--complete">Tamamlandı</div>
-      <h2 className="today-hero__title">Bugünkü program bitti</h2>
-      {lessonsDone > 0 && (
-        <p className="today-hero__sub">{lessonsDone} ders tamamlandı</p>
-      )}
-    </div>
-  )
-}
-
-function HeroPlanned({ dateLabel, itemCount }: { dateLabel: string; itemCount: number }) {
-  return (
-    <div className="today-hero today-hero--next">
-      <div className="today-hero__top">
-        <div className="today-hero__badge today-hero__badge--upcoming">Seçili gün</div>
-      </div>
-      <h2 className="today-hero__title">{dateLabel}</h2>
-      <p className="today-hero__sub">{itemCount} ajanda öğesi planlandı</p>
-    </div>
+    <section className="today-now" aria-label="Şu anki ders">
+      <span className="today-now__eyebrow">{ust}</span>
+      <h2 className="today-now__title">{yer.name}</h2>
+      {yer.subtitle && <p className="today-now__sub">{yer.subtitle}</p>}
+      <p className="today-now__next">
+        <span>
+          {sonraki
+            ? `Sonra: ${sonraki.name} ${sonraki.time.split('\u2013')[0]}`
+            : 'Bugünün sonuncusu'}
+        </span>
+        {kalanDers > 0 && <span>{kalanDers} ders kaldı</span>}
+      </p>
+    </section>
   )
 }
 

@@ -18,7 +18,7 @@ const MODULE_CITATION = {
 function answer(citations: unknown[], text = 'Bu konu için yayınlanmış bir modül var [S1].', degraded: string[] = []) {
   return {
     answer: text, citations, safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
-    meta: { model: 'gemini-3.7-flash', degraded, dropped_citations: 0 },
+    meta: { model: 'claude-sonnet-5', degraded, dropped_citations: 0 },
   }
 }
 

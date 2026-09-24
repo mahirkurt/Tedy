@@ -132,9 +132,33 @@ export function cleanTeacherNames(text: string): string {
     .join(', ')
 }
 
-/** Capitalizes the first letter of each word (simple title-case). */
-export function toTitleCase(str: string): string {
-  return str.replace(/\S+/g, word => word.charAt(0).toUpperCase() + word.slice(1))
+/** Plain text from a fragment the portal sends as HTML.
+ *
+ *  Calendar descriptions arrive as "<p>…</p>" and were printed verbatim under
+ *  the event on Bugün (measured 2026-09-24) — internal representation reaching
+ *  the reader (D4). DOMParser builds an inert document: nothing in it runs,
+ *  and entities decode the way a browser would. */
+export function htmlToText(s?: string | null): string {
+  if (!s) return ''
+  if (!/[<&]/.test(s)) return s.trim()
+  const doc = new DOMParser().parseFromString(s, 'text/html')
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim()
+}
+
+const GUNLER = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
+
+/** When something is due, in the words a person would use: "bugün 12:00",
+ *  "yarın 12:00", "Pazartesi 08:55" within the week, "3 Eki 12:00" beyond it.
+ *  A countdown ("1g 1s") makes the reader do the arithmetic; a day name does
+ *  not. */
+export function kisaTeslim(deadline: Date, now: Date): string {
+  const gun = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const fark = Math.round((gun(deadline) - gun(now)) / 86_400_000)
+  const saat = `${String(deadline.getHours()).padStart(2, '0')}:${String(deadline.getMinutes()).padStart(2, '0')}`
+  if (fark === 0) return `bugün ${saat}`
+  if (fark === 1) return `yarın ${saat}`
+  if (fark > 1 && fark < 7) return `${GUNLER[deadline.getDay()]} ${saat}`
+  return `${deadline.getDate()} ${MONTHS_SHORT[deadline.getMonth()]} ${saat}`
 }
 
 /** Turkish names for the scrape sections health.json reports on. Shared so the
@@ -149,4 +173,17 @@ export const SECTION_LABELS: Record<string, string> = {
   takim_calismalari: 'Takımlar',
   ogep: 'ÖGEP',
   duyurular: 'Duyurular',
+}
+
+/** A model identifier as a person would say it: "claude-sonnet-5" →
+ *  "Claude Sonnet 5", "claude-opus-4-8" → "Claude Opus 4.8". The AI label
+ *  names the model that wrote the answer; an API identifier there is internal
+ *  representation reaching the reader (D4). Anything unrecognised passes
+ *  through unchanged rather than being guessed at. */
+export function modelAdi(id?: string | null): string {
+  if (!id) return ''
+  const m = id.match(/^claude-([a-z]+)-(\d+)(?:-(\d+))?$/)
+  if (!m) return id
+  const aile = m[1].charAt(0).toUpperCase() + m[1].slice(1)
+  return `Claude ${aile} ${m[2]}${m[3] ? `.${m[3]}` : ''}`
 }

@@ -436,7 +436,7 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
                 />
               </label>
               <p className="photo-intake-form__hint">
-                Boş bırakırsanız teslim tarihi fotoğraftan Gemini ile otomatik çıkarılır.
+                Boş bırakırsanız teslim tarihi fotoğraftan yapay zekâ ile otomatik çıkarılır.
               </p>
             </div>
           )}

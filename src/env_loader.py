@@ -1,5 +1,24 @@
 """Load environment variables from a .env file."""
 import os
+import time
+
+# The family, the school and the portal all live on Istanbul time; the host
+# does not (Etc/UTC). Every naive `datetime.now()` in TEDY — health stamps,
+# "İlk görülme", the sync chip, exam status — was UTC while the portal's times
+# and the browser's clock were Istanbul, so a sync from seven minutes earlier
+# read "3 saat önce" on Işık's phone (measured 2026-09-24). The zone belongs to
+# the application, not to however it was launched: cron, systemd and a manual
+# `python src/run_sync.py` all pass through here. A TZ already in the real
+# environment still wins, like every other variable in this module.
+UYGULAMA_SAAT_DILIMI = "Europe/Istanbul"
+
+
+def saat_dilimini_kur():
+    """Make naive local time Istanbul time for this process and its children
+    (chromedriver and Chrome inherit it), unless TZ is already set."""
+    os.environ.setdefault("TZ", UYGULAMA_SAAT_DILIMI)
+    if hasattr(time, "tzset"):
+        time.tzset()
 
 
 def load_env(path=None):
@@ -19,6 +38,7 @@ def load_env(path=None):
             os.path.dirname(os.path.abspath(__file__)), "..", ".env",
         )
     if not os.path.exists(path):
+        saat_dilimini_kur()
         return
     with open(path) as f:
         for line in f:
@@ -27,3 +47,5 @@ def load_env(path=None):
                 continue
             key, value = line.split("=", 1)
             os.environ.setdefault(key.strip(), value.strip())
+    # After .env, so a TZ written there would win over the default.
+    saat_dilimini_kur()

@@ -374,11 +374,6 @@ body {
 // ─── Today's Schedule ────────────────────────────────────────────────────────
 
 // Animations
-@keyframes today-pulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.6); opacity: 0.3; }
-}
-
 @keyframes today-shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
@@ -509,245 +504,191 @@ body {
   color: var(--ted-color-text-secondary);
 }
 
-.today__lesson-counter {
-  @include type.type-style('label-01');
-  font-weight: 600;
-  color: var(--ted-color-text-helper);
-  background: #e8ecf2;
-  padding: 2px 10px;
-  border-radius: 10px;
-}
+// ── The one thing while school runs ──
+// Same shape as .next-thing, because it is the same idea: the one place to be.
+// The gradient hero, its pulsing dot and its progress bar lived here, along
+// with a raw-hex homework box and a second day bar (İ1, İ6, D1).
 
-.today-homework {
-  border: 1px solid #d0e2ff;
-  background: #f8fbff;
-  border-radius: var(--ted-radius-card);
-  padding: var(--ted-space-sm) var(--ted-space-md);
-  margin-bottom: var(--ted-space-md);
-}
-
-.today-homework__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--ted-space-xs);
+.today-now {
+  padding: var(--ted-space-md) var(--ted-space-lg);
+  background: var(--cds-layer-01);
+  border-inline-start: 3px solid var(--cds-interactive);
+  border-radius: 2px;
   margin-bottom: var(--ted-space-xs);
 }
 
-.today-homework__title {
+.today-now__eyebrow {
+  display: block;
   @include type.type-style('label-01');
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #0043ce;
-}
-
-.today-homework__all-btn {
-  border: none;
-  background: none;
-  color: #0043ce;
-  @include type.type-style('label-01');
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-
-  &:hover {
-    text-decoration: underline;
-  }
-}
-
-.today-homework__list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ted-space-2xs);
-}
-
-.today-homework__item {
-  border: 1px solid #d0e2ff;
-  background: #fff;
-  border-radius: var(--ted-radius-sm);
-  padding: var(--ted-space-xs) var(--ted-space-sm);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--ted-space-sm);
-  text-align: left;
-  cursor: pointer;
-  transition: background-color var(--ted-transition-fast), border-color var(--ted-transition-fast);
-
-  &:hover {
-    background: #edf5ff;
-    border-color: #78a9ff;
-  }
-}
-
-.today-homework__item-main {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.today-homework__item-course {
-  @include type.type-style('label-01');
-  font-weight: 600;
-  color: var(--ted-color-text-helper);
-}
-
-.today-homework__item-title {
-  @include type.type-style('heading-compact-01');
-  color: var(--ted-color-text-primary);
-}
-
-.today-homework__item-deadline {
-  @include type.type-style('label-01');
-  color: var(--ted-color-text-secondary);
-}
-
-.today-homework__more {
-  margin: var(--ted-space-xs) 0 0;
-  @include type.type-style('label-01');
-  color: var(--ted-color-text-helper);
-}
-
-// ── Hero card ──
-
-.today-hero {
-  border-radius: var(--ted-radius-card);
-  padding: 1.25rem var(--ted-space-lg);
-  margin-bottom: var(--ted-space-md);
-  animation: card-fade-in 0.25s ease-out;
-}
-
-.today-hero__top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--ted-space-xs);
-}
-
-.today-hero__badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  @include type.type-style('label-01');
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.today-hero__pulse {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  animation: today-pulse 2s ease-in-out infinite;
-}
-
-.today-hero__icon {
-  opacity: 0.7;
-}
-
-.today-hero__title {
-  @include type.type-style('heading-02');
-  margin: 0 0 2px;
-  letter-spacing: -0.005em;
-}
-
-.today-hero__sub {
-  @include type.type-style('label-01');
-  margin: 0;
-  opacity: 0.75;
-}
-
-.today-hero__footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: var(--ted-space-sm);
-  @include type.type-style('label-01');
-  font-weight: 600;
-}
-
-.today-hero__remaining {
+  color: var(--cds-text-secondary);
+  letter-spacing: 0.08em;
+  margin-bottom: var(--ted-space-2xs);
   font-variant-numeric: tabular-nums;
 }
 
-.today-hero__bar {
-  height: 4px;
-  border-radius: 2px;
-  overflow: hidden;
-  margin-top: 10px;
+.today-now__title {
+  @include type.type-style('heading-03');
+  color: var(--cds-text-primary);
+  margin: 0;
 }
 
-.today-hero__bar-fill {
-  height: 100%;
-  border-radius: 2px;
-  transition: width 1s ease-out;
+.today-now__sub {
+  @include type.type-style('body-compact-01');
+  color: var(--cds-text-secondary);
+  margin: 2px 0 0;
 }
 
-// Active hero — deep blue gradient
-.today-hero--active {
-  background: linear-gradient(135deg, #002d9c 0%, #0043ce 100%);
-  color: #fff;
-  box-shadow: 0 4px 16px rgb(0 45 156 / 20%);
-
-  .today-hero__pulse { background: #78a9ff; }
-  .today-hero__bar { background: rgb(255 255 255 / 18%); }
-  .today-hero__bar-fill { background: #fff; }
+.today-now__next {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--ted-space-xs);
+  margin: var(--ted-space-sm) 0 0;
+  @include type.type-style('body-compact-01');
+  color: var(--cds-text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
-// Next hero — soft blue surface
-.today-hero--next {
-  background: #edf5ff;
-  border: 1px solid #d0e2ff;
-  color: var(--ted-color-text-primary);
+// ── "Ayrıca": the rest of what is owed, said quietly ──
 
-  .today-hero__badge--upcoming { color: #0043ce; }
-  .today-hero__icon { color: #0043ce; }
-  .today-hero__remaining { color: #0043ce; }
+.today-also {
+  margin-bottom: var(--ted-space-md);
 }
 
-// Done hero — calm green
-.today-hero--done {
-  background: #defbe6;
-  border: 1px solid #a7f0ba;
-  color: var(--ted-color-text-primary);
-
-  .today-hero__badge--complete { color: var(--ted-text-success); }
-}
-
-// ── School day progress bar ──
-
-.today-daybar {
-  margin-bottom: var(--ted-space-lg);
-}
-
-.today-daybar__track {
-  height: 6px;
-  background: var(--cds-layer-accent-01);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.today-daybar__fill {
-  height: 100%;
-  background: linear-gradient(90deg, #002d9c, #0f62fe);
-  border-radius: 3px;
-  transition: width 1s ease-out;
-}
-
-.today-daybar__labels {
+.today-also__head {
   display: flex;
   justify-content: space-between;
-  margin-top: 4px;
-  @include type.type-style('label-01');
-  color: var(--ted-color-text-helper);
+  align-items: baseline;
+  gap: var(--ted-space-xs);
+  margin-bottom: var(--ted-space-2xs);
+}
 
-  span:nth-child(2) {
-    font-weight: 600;
-    color: var(--ted-color-text-secondary);
-  }
+.today-also__title {
+  @include type.type-style('label-01');
+  color: var(--cds-text-secondary);
+  letter-spacing: 0.08em;
+}
+
+.today-also__all {
+  border: none;
+  background: none;
+  padding: 0;
+  min-height: 1.5rem;
+  @include type.type-style('label-01');
+  color: var(--cds-link-primary);
+  cursor: pointer;
+
+  &:hover { text-decoration: underline; }
+  &:focus-visible { outline: 2px solid var(--cds-focus); outline-offset: 2px; }
+}
+
+.today-also__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--ted-space-sm);
+  width: 100%;
+  min-height: 2rem;
+  padding: var(--ted-space-xs) 0;
+  border: none;
+  border-bottom: 1px solid var(--cds-border-subtle-01);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  @include type.type-style('body-compact-01');
+  color: var(--cds-text-primary);
+
+  &:hover { background: var(--cds-layer-hover-01); }
+  &:focus-visible { outline: 2px solid var(--cds-focus); outline-offset: -2px; }
+}
+
+.today-also__name {
+  min-width: 0;
+}
+
+.today-also__due {
+  flex: none;
+  color: var(--cds-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+// ── The next school day, for the evening ──
+// Where to be tomorrow — first lesson, the day's courses, any event — so the
+// bag can be packed the night before. Quiet text, like "Ayrıca": it informs,
+// it does not compete with the card (İ6).
+
+.today-tomorrow {
+  margin-bottom: var(--ted-space-md);
+  padding-top: var(--ted-space-xs);
+  border-top: 1px solid var(--cds-border-subtle-01);
+}
+
+.today-tomorrow__eyebrow {
+  display: block;
+  @include type.type-style('label-01');
+  color: var(--cds-text-secondary);
+  letter-spacing: 0.08em;
+  margin-bottom: var(--ted-space-2xs);
+}
+
+.today-tomorrow__first {
+  @include type.type-style('body-compact-01');
+  font-weight: 600;
+  color: var(--cds-text-primary);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.today-tomorrow__line {
+  @include type.type-style('body-compact-01');
+  color: var(--cds-text-secondary);
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+// Tomorrow's exam leads the card: said first and in full, still without the
+// warning colour — it is information for the evening, not an alarm (İ4, İ6).
+.today-tomorrow__exam {
+  @include type.type-style('body-compact-01');
+  font-weight: 600;
+  color: var(--cds-text-primary);
+  margin: 0 0 var(--ted-space-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+// What "Yaptım" recorded, said once and quietly under the card.
+.today-done-note {
+  display: flex;
+  align-items: center;
+  gap: var(--ted-space-xs);
+  margin: calc(-1 * var(--ted-space-sm)) 0 var(--ted-space-md);
+  @include type.type-style('body-compact-01');
+  color: var(--cds-text-secondary);
+}
+
+// ── Finished items fold to one line (İ7) ──
+
+.today-past-fold {
+  display: flex;
+  align-items: center;
+  gap: var(--ted-space-xs);
+  width: 100%;
+  min-height: 2rem;
+  padding: var(--ted-space-xs) 0;
+  margin-bottom: var(--ted-space-xs);
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  @include type.type-style('body-compact-01');
+  color: var(--cds-text-secondary);
+
+  &:hover { color: var(--cds-text-primary); }
+  &:focus-visible { outline: 2px solid var(--cds-focus); outline-offset: 2px; }
+}
+
+.today-past-fold__action {
+  color: var(--cds-link-primary);
 }
 
 // ── Vertical timeline ──
@@ -2125,11 +2066,11 @@ body {
   .today-tl__card-tags,
   .dashboard-summary-text,
   .today-exams,
-  .today-homework,
-  .today-hero,
-  .today-daybar,
-  .today-tl,
-  .today__lesson-counter {
+  .today-also,
+  .today-tomorrow,
+  .today-past-fold,
+  .next-thing--quiet,
+  .today-tl {
     display: none;
   }
 
@@ -2498,7 +2439,7 @@ body {
     @include type.type-style('body-01');
   }
 
-  .today-hero {
+  .today-now {
     padding: var(--ted-space-md);
   }
 
@@ -3075,102 +3016,9 @@ body {
 
 // ── Today page: Yaklaşan Sınavlar card ──
 
+// Exams share "Ayrıca"'s rows (.today-also__*): same voice, same weight.
 .today-exams {
-  border: 1px solid #ffd7d9;
-  background: #fff1f1;
-  border-radius: var(--ted-radius-card);
-  padding: var(--ted-space-sm) var(--ted-space-md);
   margin-bottom: var(--ted-space-md);
-}
-
-.today-exams__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--ted-space-xs);
-  margin-bottom: var(--ted-space-xs);
-}
-
-.today-exams__title {
-  @include type.type-style('label-01');
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #a2191f;
-}
-
-.today-exams__all-btn {
-  border: none;
-  background: none;
-  color: #a2191f;
-  @include type.type-style('label-01');
-  font-weight: 600;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 2px;
-
-  &:hover {
-    text-decoration: underline;
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--status-info);
-    outline-offset: 1px;
-  }
-}
-
-.today-exams__list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ted-space-2xs);
-}
-
-.today-exams__item {
-  border: 1px solid #ffd7d9;
-  background: var(--ted-card-bg);
-  border-radius: var(--ted-radius-sm);
-  padding: var(--ted-space-sm) var(--ted-space-sm);
-  min-height: 44px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--ted-space-sm);
-  text-align: left;
-  cursor: pointer;
-  transition: background-color var(--ted-transition-fast), border-color var(--ted-transition-fast);
-
-  &:hover {
-    background: #fff1f1;
-    border-color: #ff8389;
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--status-info);
-    outline-offset: -2px;
-  }
-}
-
-.today-exams__item-main {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.today-exams__item-course {
-  @include type.type-style('label-01');
-  font-weight: 600;
-  color: var(--ted-color-text-helper);
-}
-
-.today-exams__item-title {
-  @include type.type-style('heading-compact-01');
-  color: var(--ted-color-text-primary);
-}
-
-.today-exams__item-date {
-  @include type.type-style('label-01');
-  color: var(--ted-color-text-secondary);
 }
 
 // ── Exam responsive ──
@@ -3214,14 +3062,6 @@ body {
 
   .exam-section__title {
     @include type.type-style('body-01');
-  }
-
-  .today-exams {
-    padding: var(--ted-space-xs) var(--ted-space-sm);
-  }
-
-  .today-exams__item {
-    padding: var(--ted-space-sm);
   }
 }
 
@@ -5050,7 +4890,6 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 //     opacity 0 and blank the card entirely.
 @media (prefers-reduced-motion: reduce) {
   .tag-urgent,
-  .today-hero__pulse,
   .hw-countdown-bar__fill--critical,
   .login-page__hero {
     animation: none;
@@ -5058,7 +4897,6 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 
   .dashboard-card,
   .today,
-  .today-hero,
   .today-tl__item,
   .health-popover,
   .calendar-popover,
@@ -5133,4 +4971,12 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 .course-content__week-picker {
   inline-size: 17rem;
   max-inline-size: 100%;
+}
+
+// A "Yaptım" that could not be stored says so under its own button.
+.homework-item__error {
+  display: block;
+  @include type.type-style('helper-text-01');
+  color: var(--cds-text-error);
+  margin-top: var(--ted-space-2xs);
 }

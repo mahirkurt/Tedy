@@ -30,6 +30,7 @@ from typing import Any
 
 import requests as http_requests
 
+from src import claude_api
 from src.json_utils import atomic_json_dump
 
 
@@ -197,280 +198,220 @@ class ToolLoopResult:
     citations: list[dict[str, Any]] = field(default_factory=list)
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     budget_exhausted: bool = False
+    # Summed over every request of one answer: input, output, cache reads and
+    # writes. Cost was never logged under Gemini; this is what makes it visible.
+    usage: dict[str, int] = field(default_factory=dict)
 
 
-class GeminiClient:
-    """Gemini API chat client — fast cloud inference, no local memory cost."""
+class ClaudeClient:
+    """The assistant's model: Claude on the Anthropic Messages API.
 
-    # Measured 2026-08-23 against the live key: every model here answers and
-    # supports function calling. gemini-2.0-* were removed because the API now
-    # returns 404 "no longer available" for them — the old chain only looked
-    # redundant, so the first quota hit took the assistant down entirely.
-    FAST_MODELS = [
-        "gemini-3.7-flash",
-        "gemini-3.5-flash",
-        "gemini-2.5-flash",
-        "gemini-flash-lite-latest",
-    ]
-    DEEP_MODELS = ["gemini-pro-latest"]
+    Replaced the Gemini chain on 2026-09-24. The Gemini API terms say "You must
+    be 18 years of age or older" and forbid services "likely to be accessed by
+    individuals under the age of 18"; this assistant is used by a 12-year-old.
+    Anthropic permits organisations serving minors with safeguards (see
+    docs/frontend-design-principles.md and the AI label on every answer).
 
-    MODELS = FAST_MODELS  # backwards compatibility for models() endpoint
+    One model at two depths: `effort` (low for a normal question, high for
+    "Daha derine in" and the deep intents) replaces the old fast/deep model
+    chain. Tool results go back as native tool_result blocks tied to their call
+    id instead of text pasted into one flattened prompt. No sampling
+    parameters: Sonnet 5 rejects them and SDK 1.x no longer has them.
+    """
 
-    def __init__(self, api_key: str = ""):
-        self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "").strip()
-        self._client: Any = None
+    DEFAULT_MODEL = claude_api.VARSAYILAN_MODEL
+    EFFORT = {"fast": "low", "deep": "high"}
+    # Thinking counts toward max_tokens; a low cap truncates mid-thought. The
+    # length of an answer is the prompt's job, not this ceiling's.
+    MAX_TOKENS = 16000
+    # Per request. The tool loop makes at most max_rounds + 1 requests inside
+    # one gunicorn worker (timeout 360 s), so one call must not own it.
+    TIMEOUT_S = 100.0
+
+    def __init__(self, api_key: str = "", model: str = "", client: Any = None):
+        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "").strip()
+        self.model = (model or os.environ.get("ASSISTANT_CLAUDE_MODEL", "").strip()
+                      or self.DEFAULT_MODEL)
+        self._client: Any = client
         self.last_model_used = ""
-        self._exhausted: set[str] = set()   # quota — clears when all are spent
-        self._unavailable: set[str] = set()  # 404 — never retried this process
 
     @property
     def available(self) -> bool:
-        return bool(self.api_key)
+        return bool(self.api_key) or self._client is not None
 
     def _get_client(self) -> Any:
         if self._client is None:
-            from google import genai  # lazy import
-            self._client = genai.Client(api_key=self.api_key)
+            import anthropic  # lazy: tests and tools that never chat don't need it
+            self._client = anthropic.Anthropic(
+                api_key=self.api_key, timeout=self.TIMEOUT_S, max_retries=1)
         return self._client
 
-    def _build_prompt(self, messages: list[dict[str, str]]) -> str:
-        """Build a Gemini-compatible prompt from chat messages.
+    @staticmethod
+    def _split(messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
+        """System text apart; turns as the Messages API wants them.
 
-        System-role messages are collected and joined with newlines, placed
-        first, followed by a blank line, then the remaining message contents
-        joined with two newlines.
+        The API rejects a conversation that opens on the assistant and any
+        empty text block. The runtime keeps the last three turns of history,
+        which can start mid-dialogue, so leading assistant turns are dropped.
         """
-        system_parts = []
-        contents = []
+        system = "\n".join(str(m.get("content", "")) for m in messages
+                           if m.get("role") == "system" and m.get("content"))
+        turns: list[dict[str, Any]] = []
         for m in messages:
             role = m.get("role", "user")
-            content = m.get("content", "")
             if role == "system":
-                system_parts.append(content)
-            else:
-                contents.append(content)
+                continue
+            content = str(m.get("content", "")).strip()
+            if not content:
+                continue
+            role = "assistant" if role == "assistant" else "user"
+            if not turns and role == "assistant":
+                continue
+            turns.append({"role": role, "content": content})
+        return system, turns
 
-        prompt = ""
-        if system_parts:
-            prompt = "\n".join(system_parts) + "\n\n"
-        prompt += "\n\n".join(contents)
-        return prompt
-
-    def chat(
-        self,
-        messages: list[dict[str, str]],
-        temperature: float = 0.2,
-        tier: str = "fast",
-        max_output_tokens: int = 2048,
-    ) -> str:
-        if not self.available:
-            raise RuntimeError("gemini_no_api_key")
-
-        client = self._get_client()
-        prompt = self._build_prompt(messages)
-        config = {
-            "temperature": temperature,
-            "max_output_tokens": max_output_tokens,
+    def _request(self, system: str, turns: list[dict[str, Any]], tier: str,
+                 usage: dict[str, int], tools: list[dict[str, Any]] | None = None,
+                 tool_choice: dict[str, Any] | None = None) -> Any:
+        params: dict[str, Any] = {
+            "model": self.model,
+            "max_tokens": self.MAX_TOKENS,
+            "messages": turns,
+            "thinking": {"type": "adaptive"},
+            "output_config": {"effort": self.EFFORT.get(tier, "low")},
         }
-        response = self._generate(client, prompt, config, tier)
-        return (getattr(response, "text", "") or "").strip()
+        if system:
+            # Render order is tools -> system -> messages, so one breakpoint on
+            # the system block caches the tool list and the prompt together:
+            # every round of a tool loop re-sends exactly that prefix.
+            params["system"] = [{"type": "text", "text": system,
+                                 "cache_control": {"type": "ephemeral"}}]
+        if tools:
+            params["tools"] = tools
+        if tool_choice:
+            params["tool_choice"] = tool_choice
+        resp = self._get_client().messages.create(**params)
+        self.last_model_used = getattr(resp, "model", "") or self.model
+        u = getattr(resp, "usage", None)
+        for key in ("input_tokens", "output_tokens",
+                    "cache_read_input_tokens", "cache_creation_input_tokens"):
+            usage[key] = usage.get(key, 0) + int(getattr(u, key, 0) or 0)
+        if getattr(resp, "stop_reason", "") == "refusal":
+            # Not an empty answer to show as if it were one: the runtime turns
+            # this into its honest fallback.
+            raise RuntimeError("claude_refusal")
+        return resp
 
-    def _chain(self, tier: str) -> list[str]:
-        """Candidate models for a tier, skipping known-dead and spent ones."""
-        base = list(self.DEEP_MODELS) + list(self.FAST_MODELS) \
-            if tier == "deep" else list(self.FAST_MODELS)
-        base = [m for m in base if m not in self._unavailable]
-        live = [m for m in base if m not in self._exhausted]
-        if live:
-            return live
-        # Every candidate is quota-spent; the window may have rolled over.
-        self._exhausted.clear()
-        return base
-
-    def _classify_failure(self, model: str, exc: Exception) -> str:
-        err = str(exc)
-        if "404" in err or "no longer available" in err:
-            # Permanent: the model was retired. Retrying it every request
-            # burns a round-trip and hides the real error behind a dead one.
-            self._unavailable.add(model)
-            logger.error("Gemini model %s is retired (404); disabling", model)
-            return f"model_retired:{model}"
-        if "RESOURCE_EXHAUSTED" in err or "429" in err:
-            self._exhausted.add(model)
-            logger.warning("Gemini model %s quota exhausted", model)
-            return f"quota_exhausted:{model}"
-        logger.error("Gemini error (%s): %s", model, err)
-        return err
+    @staticmethod
+    def _text(resp: Any) -> str:
+        return "".join(getattr(b, "text", "") for b in (getattr(resp, "content", None) or [])
+                       if getattr(b, "type", "") == "text").strip()
 
     def chat_with_tools(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         declarations: list[dict[str, Any]],
         dispatch: Any,
         tier: str = "fast",
         max_rounds: int = 4,
-        max_output_tokens: int = 2048,
-        temperature: float = 0.2,
     ) -> ToolLoopResult:
         """Run the model until it answers, dispatching tools it asks for.
 
         The round budget is a hard stop: a model that keeps calling tools would
-        otherwise hold a worker open indefinitely. The budget is checked before
-        each dispatch, not after — a single turn can return more calls than the
-        remaining budget, and a call past the limit is never dispatched, but it
-        is still named in the transcript rather than vanishing silently, so the
-        model knows what did not happen. Once the budget is spent, the model is
-        asked once more with tools withdrawn, so the user gets an answer built
-        from the evidence already gathered instead of an error.
+        otherwise hold a worker open indefinitely. It is checked before each
+        dispatch, not after — one turn can ask for more calls than remain, and
+        a call past the limit is never run but still answered, so the model
+        knows what did not happen (the API requires a result for every call
+        anyway). Once the budget is spent the model is asked once more with
+        tool_choice none — tools withdrawn, tool list kept so the cached prefix
+        survives — and answers from the evidence already gathered.
         """
-        from google.genai import types
         from src.assistant_tools import ToolOutcome
 
         if not self.available:
-            raise RuntimeError("gemini_no_api_key")
-        client = self._get_client()
+            raise RuntimeError("anthropic_no_api_key")
 
-        tools = [types.Tool(function_declarations=[
-            types.FunctionDeclaration(
-                name=d["name"],
-                description=d.get("description", ""),
-                parameters=d.get("parameters") or {"type": "object", "properties": {}},
-            ) for d in declarations])]
-
-        transcript = self._build_prompt(messages)
+        system, turns = self._split(messages)
         out = ToolLoopResult()
+        tools = [{
+            "name": d["name"],
+            "description": d.get("description", ""),
+            "input_schema": d.get("parameters") or {"type": "object", "properties": {}},
+        } for d in declarations]
 
-        if max_rounds <= 0:
-            response = self._generate(
-                client, transcript,
-                {"temperature": temperature,
-                 "max_output_tokens": max_output_tokens}, tier)
-            out.text = (getattr(response, "text", "") or "").strip()
+        if max_rounds <= 0 or not tools:
+            out.text = self._text(self._request(system, turns, tier, out.usage))
             return out
 
         for _round in range(max_rounds):
-            config: dict[str, Any] = {
-                "temperature": temperature,
-                "max_output_tokens": max_output_tokens,
-                "tools": tools,
-            }
-            response = self._generate(client, transcript, config, tier)
-            calls = self._function_calls(response)
-
-            if not calls:
-                out.text = (getattr(response, "text", "") or "").strip()
+            resp = self._request(system, turns, tier, out.usage, tools=tools)
+            uses = [b for b in (resp.content or []) if getattr(b, "type", "") == "tool_use"]
+            if not uses:
+                out.text = self._text(resp)
                 return out
 
-            for call in calls:
+            # Back exactly as received: thinking blocks are signed and must not
+            # be edited, and the tool_result ids must match these tool_use ids.
+            turns.append({"role": "assistant", "content": resp.content})
+            results: list[dict[str, Any]] = []
+            for use in uses:
                 if len(out.tool_calls) >= max_rounds:
-                    # Budget spent mid-turn: this call is never dispatched, but
-                    # it must not disappear without a trace — the model needs
-                    # to know it asked for something that never happened.
                     out.budget_exhausted = True
-                    transcript += (
-                        f"\n\n[araç:{call.name} çalıştırılmadı — tur bütçesi doldu]"
-                    )
+                    results.append({"type": "tool_result", "tool_use_id": use.id,
+                                    "is_error": True,
+                                    "content": "Çalıştırılmadı — tur bütçesi doldu."})
                     continue
 
-                raw_args = call.args
-                if isinstance(raw_args, dict):
-                    args = dict(raw_args)
-                    dispatchable = True
-                elif not raw_args:
-                    # Falsy (None, "", []): the SDK's normal way of saying "no
-                    # arguments" for a zero-argument call — not malformed.
-                    args = {}
-                    dispatchable = True
+                raw = use.input
+                if isinstance(raw, dict):
+                    args, dispatchable = dict(raw), True
+                elif not raw:
+                    # None / {}: an ordinary zero-argument call, not malformed.
+                    args, dispatchable = {}, True
                 else:
-                    # call.args comes from the model, which sits outside our
-                    # tested contracts — a truthy non-mapping is genuinely
-                    # unusable input. Do not silently coerce it to {} and
-                    # dispatch as if the model made a normal call; that would
-                    # invent a call it never actually made.
-                    args = {}
-                    dispatchable = False
+                    # Model-supplied and outside our tested contracts: a truthy
+                    # non-mapping is unusable. Never coerce it and run a call
+                    # the model did not actually make.
+                    args, dispatchable = {}, False
 
                 if dispatchable:
                     started = time.perf_counter()
-                    outcome = dispatch(call.name, args)
+                    outcome = dispatch(use.name, args)
                     elapsed = int((time.perf_counter() - started) * 1000)
                 else:
                     elapsed = 0
                     outcome = ToolOutcome(
                         ok=False,
-                        error=f"Model geçersiz argüman gönderdi (sözlük bekleniyor): {raw_args!r}",
-                    )
+                        error=f"Model geçersiz argüman gönderdi (sözlük bekleniyor): {raw!r}")
 
-                out.tool_calls.append({
-                    "name": call.name, "ms": elapsed, "ok": bool(outcome.ok),
-                })
+                out.tool_calls.append({"name": use.name, "ms": elapsed, "ok": bool(outcome.ok)})
                 if outcome.ok:
                     first = len(out.citations) + 1
                     out.citations.extend(outcome.citations)
-                    # Modelin gördüğü numaralar ile _finalize_citations'ın atadığı
-                    # numaralar AYNI sayaçtan gelmeli; yoksa model doğru cümleye
-                    # yanlış kaynağı bağlar ve bu panelde doğrulanmış görünür.
-                    marks = "\n".join(
-                        f"[S{first + j}] {c.get('label', '')}"
-                        for j, c in enumerate(outcome.citations)
-                    )
+                    # The numbers the model sees and the ones
+                    # _finalize_citations assigns come from the same counter;
+                    # otherwise the right sentence cites the wrong source and it
+                    # looks verified in the panel.
+                    marks = "\n".join(f"[S{first + j}] {c.get('label', '')}"
+                                      for j, c in enumerate(outcome.citations))
                     body = f"{marks}\n{outcome.text}" if marks else outcome.text
                 else:
-                    # Hand the failure back verbatim. The schemas are strict and
-                    # the message names the offending field, so the model can
-                    # usually fix its own call on the next round.
+                    # Verbatim: the message names the offending field, so the
+                    # model can usually fix its own call next round.
                     body = f"HATA: {outcome.error}"
-                transcript += (
-                    f"\n\n[araç:{call.name} girdi={json.dumps(args, ensure_ascii=False)}]\n"
-                    f"{body[:4000]}"
-                )
+                results.append({"type": "tool_result", "tool_use_id": use.id,
+                                "is_error": not outcome.ok,
+                                "content": (body or "").strip()[:4000] or "(sonuç boş)"})
+            turns.append({"role": "user", "content": results})
 
             if len(out.tool_calls) >= max_rounds:
                 out.budget_exhausted = True
-                final = self._generate(
-                    client, transcript,
-                    {"temperature": temperature,
-                     "max_output_tokens": max_output_tokens}, tier)
-                out.text = (getattr(final, "text", "") or "").strip()
+                final = self._request(system, turns, tier, out.usage, tools=tools,
+                                      tool_choice={"type": "none"})
+                out.text = self._text(final)
                 return out
 
         return out
-
-    def _generate(self, client: Any, contents: str,
-                  config: dict[str, Any], tier: str) -> Any:
-        """Walk the model chain, skipping a response that is not a real answer.
-
-        A response counts as usable if it carries non-empty text OR at least
-        one function call — a tool-calling turn legitimately has no text at
-        all. Anything else (blocked, filtered, truncated to nothing) is
-        recorded as empty_gemini_response and the chain moves on, so a bad
-        first-round response cannot masquerade as a successful empty answer;
-        the chain Task 1 built is only skipped when it is truly exhausted.
-        """
-        last_error = ""
-        for model in self._chain(tier):
-            try:
-                resp = client.models.generate_content(
-                    model=model, contents=contents, config=config)
-                text = (getattr(resp, "text", "") or "").strip()
-                if text or self._function_calls(resp):
-                    self.last_model_used = model
-                    return resp
-                last_error = "empty_gemini_response"
-            except Exception as e:
-                last_error = self._classify_failure(model, e)
-        raise RuntimeError(last_error or "gemini_all_models_failed")
-
-    @staticmethod
-    def _function_calls(response: Any) -> list[Any]:
-        calls = []
-        for cand in getattr(response, "candidates", None) or []:
-            content = getattr(cand, "content", None)
-            for part in (getattr(content, "parts", None) or []):
-                fc = getattr(part, "function_call", None)
-                if fc is not None:
-                    calls.append(fc)
-        return calls
 
 
 HybridChatRouter = None  # Removed — Gemini-only
@@ -968,7 +909,7 @@ class AssistantIndexer:
             "embedded_chunks_new": embedded,
             "skipped_embeddings": skipped_embeddings,
             "embeddings_enabled": False,
-            "chat_model": "gemini",
+            "chat_model": os.environ.get("ASSISTANT_CLAUDE_MODEL", "").strip() or ClaudeClient.DEFAULT_MODEL,
             "chat_fallback_model": None,
             "embed_model": None,
             "duration_ms": int((time.perf_counter() - start) * 1000),
@@ -1333,8 +1274,9 @@ class AssistantRuntime:
     def __init__(self, project_root: str | os.PathLike[str]):
         self.config = AssistantConfig.from_project_root(
             project_root)
-        self.gemini = GeminiClient()
-        self.router = self.gemini  # Direct Gemini, no fallback
+        self.llm = ClaudeClient()
+        self.router = self.llm
+        self._sinif_cache: tuple[float, str] = (-1.0, "")
         self.indexer = AssistantIndexer(self.config)
         self.policy = SafetyPolicy()
 
@@ -1360,7 +1302,7 @@ class AssistantRuntime:
         return "deep" if (force_deep or intent in cls.DEEP_INTENTS) else "fast"
 
     SYSTEM_PROMPT = (
-        "Sen TEDY Eğitim Asistanısın — 6. sınıf öğrencisi Işık ve ailesi için "
+        "Sen TEDY Eğitim Asistanısın — {SINIF} öğrencisi Işık ve ailesi için "
         "kişisel eğitim danışmanısın. Varsayılan dil Türkçe.\n\n"
 
         "## Hangi araca ne zaman uzanırsın\n"
@@ -1417,6 +1359,32 @@ class AssistantRuntime:
         "- Riskli psikolojik durumda profesyonel destek yönlendirmesi yap."
     )
 
+    def _sinif(self) -> str:
+        """"7. sınıf", from the class the portal profile shows ("7-D").
+
+        The prompt said "6. sınıf" as a literal for a year after Işık moved up.
+        Read once per change of the scrape file, not per request: it is large.
+        """
+        yol = self.config.output_dir / "scraped_data.json"
+        try:
+            mtime = yol.stat().st_mtime
+        except OSError:
+            return "ortaokul"
+        if self._sinif_cache[0] != mtime:
+            sinif = ""
+            try:
+                with yol.open(encoding="utf-8") as fh:
+                    profil = (json.load(fh) or {}).get("ogrenci_profili") or {}
+                m = re.match(r"\s*(\d{1,2})", str(profil.get("class_name") or ""))
+                sinif = f"{m.group(1)}. sınıf" if m else ""
+            except (OSError, ValueError, AttributeError):
+                sinif = ""
+            self._sinif_cache = (mtime, sinif)
+        return self._sinif_cache[1] or "ortaokul"
+
+    def _system_prompt(self) -> str:
+        return self.SYSTEM_PROMPT.replace("{SINIF}", self._sinif())
+
     def reindex(self, incremental: bool = True) -> dict[str, Any]:
         stats = self.indexer.reindex(incremental=incremental)
         try:
@@ -1457,7 +1425,9 @@ class AssistantRuntime:
         convo = self._build_conversation(messages, user_query, intent, safety_flags)
 
         try:
-            loop = self.gemini.chat_with_tools(
+            # `temperature` stays in chat()'s signature for /v1 callers but is
+            # not forwarded: Sonnet 5 rejects sampling parameters (400).
+            loop = self.llm.chat_with_tools(
                 messages=convo,
                 declarations=self.registry.declarations(),
                 # Module progress enters the model context only for a signed-in person (plan K-S6);
@@ -1465,12 +1435,14 @@ class AssistantRuntime:
                 dispatch=dispatch or functools.partial(
                     self.registry.dispatch, ilerleme_izni=ilerleme_izni is True),
                 tier=tier,
-                max_output_tokens=8192 if tier == "deep" else 2048,
-                temperature=temperature,
             )
         except Exception as exc:
             logger.error("Assistant tool loop failed: %s", exc)
-            loop = ToolLoopResult(text=self._fallback_answer(user_query))
+            # Not the reader's fault, so not "rephrase your question": from
+            # 2026-09-22 every request failed with a 400 from the model and
+            # that is exactly what she was told (D3).
+            loop = ToolLoopResult(text=self._model_hata_cevabi())
+            safety_flags.append("error:model_unavailable")
 
         if not loop.text.strip():
             # The loop can legitimately return empty text — a model asked with
@@ -1502,8 +1474,9 @@ class AssistantRuntime:
             "intent": intent,
             "session_id": session_id,
             "meta": {
-                "model": self.gemini.last_model_used or "gemini",
-                "provider": "gemini",
+                "model": self.llm.last_model_used or self.llm.model,
+                "provider": "anthropic",
+                "usage": dict(loop.usage),
                 "tier": tier,
                 "tool_calls": loop.tool_calls,
                 "dropped_citations": dropped,
@@ -1519,6 +1492,8 @@ class AssistantRuntime:
             "type": "chat", "session_id": session_id, "intent": intent,
             "tier": tier, "latency_ms": latency_ms, "citations": len(citations),
             "tool_calls": len(loop.tool_calls),
+            "model": payload["meta"]["model"],
+            "usage": dict(loop.usage),
             "safety_flags": payload["safety_flags"],
             "timestamp": _utcnow_naive().isoformat() + "Z",
         })
@@ -1631,7 +1606,7 @@ class AssistantRuntime:
         ended up under every answer. Evidence now enters through the tools.
         """
         return [
-            {"role": "system", "content": self.SYSTEM_PROMPT},
+            {"role": "system", "content": self._system_prompt()},
             *[
                 {"role": str(m.get("role", "user")),
                  "content": str(m.get("content", ""))[:2000]}
@@ -1643,6 +1618,14 @@ class AssistantRuntime:
                 f"Soru: {user_query}"
             )},
         ]
+
+    @staticmethod
+    def _model_hata_cevabi() -> str:
+        return (
+            "TEDY Asistanı şu an yanıt veremiyor. Sorun senin sorunda değil; "
+            "bağlantıda ya da ayarlarda. Biraz sonra yeniden dene, sürerse "
+            "ailene haber ver."
+        )
 
     @staticmethod
     def _fallback_answer(user_query: str) -> str:
@@ -1677,9 +1660,9 @@ class AssistantRuntime:
                 "id": name,
                 "object": "model",
                 "created": 0,
-                "owned_by": "google",
+                "owned_by": "anthropic",
             }
-            for name in self.gemini.MODELS
+            for name in [self.llm.model]
         ]
 
     def openai_chat_completion(
@@ -1718,7 +1701,7 @@ class AssistantRuntime:
         completion_tokens = self._estimate_tokens(answer)
 
         used_model = str(
-            out.get("meta", {}).get("model") or self.gemini.MODELS[0]
+            out.get("meta", {}).get("model") or self.llm.model
         )
         return {
             "id": f"chatcmpl-{hashlib.md5((session_id + str(time.time())).encode()).hexdigest()[:16]}",

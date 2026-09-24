@@ -788,7 +788,6 @@ class TestBookTranslationApi:
         self, client, monkeypatch
     ):
         monkeypatch.setenv("DEEPL_API_KEY", "test-key:fx")
-        monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
         provider_response = Mock()
         provider_response.json.return_value = {
             "translations": [
@@ -831,31 +830,27 @@ class TestBookTranslationApi:
         )
         provider_get.assert_not_called()
 
-    def test_falls_back_to_gemini_when_deepl_fails(
+    def test_falls_back_to_claude_when_deepl_fails(
         self, client, monkeypatch
     ):
+        # The middle step was Gemini until 2026-09-24; the Gemini API terms
+        # forbid services likely to be used by under-18s.
+        import src.dashboard_api as api
+        from types import SimpleNamespace as NS
         monkeypatch.setenv("DEEPL_API_KEY", "test-key:fx")
-        monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
-        def provider_post(url, **kwargs):
-            if "deepl.com" in url:
-                raise http_requests.RequestException("deepl unavailable")
-            prompt = kwargs["json"]["contents"][0]["parts"][0]["text"]
-            translated = (
-                "tünel"
-                if "dictionary headword" in prompt
-                else "tünel gibiydi"
-            )
-            gemini_response = Mock()
-            gemini_response.json.return_value = {
-                "candidates": [
-                    {"content": {"parts": [{"text": translated}]}}
-                ]
-            }
-            return gemini_response
+        istekler = []
 
+        def create(**kw):
+            istekler.append(kw)
+            prompt = kw["messages"][0]["content"]
+            translated = "tünel" if "dictionary headword" in prompt else "tünel gibiydi"
+            return NS(content=[NS(type="text", text=translated)], stop_reason="end_turn")
+
+        monkeypatch.setattr(api.claude_api, "istemci",
+                            lambda **k: NS(messages=NS(create=create)))
         with patch(
             "src.dashboard_api.http_requests.post",
-            side_effect=provider_post,
+            side_effect=http_requests.RequestException("deepl unavailable"),
         ) as post_request, patch(
             "src.dashboard_api.http_requests.get"
         ) as provider_get:
@@ -869,25 +864,33 @@ class TestBookTranslationApi:
 
         assert response.status_code == 200
         assert response.get_json()["translatedText"] == "tünel"
-        assert response.get_json()["provider"] == "Gemini 2.5 Flash"
-        assert post_request.call_count == 2
-        gemini_call = post_request.call_args_list[1]
-        assert gemini_call.args[0].endswith(
-            "/models/gemini-2.5-flash:generateContent"
-        )
-        assert gemini_call.kwargs["headers"] == {
-            "x-goog-api-key": "test-gemini-key"
-        }
-        prompt = gemini_call.kwargs["json"]["contents"][0]["parts"][0]["text"]
+        assert response.get_json()["provider"] == "Claude Sonnet 5"
+        # DeepL over HTTP; Claude through its SDK.
+        assert post_request.call_count == 1
+        assert istekler[0]["model"] == "claude-sonnet-5"
+        assert istekler[0]["output_config"] == {"effort": "low"}
+        assert not {"temperature", "top_p", "top_k"} & set(istekler[0])
+        prompt = istekler[0]["messages"][0]["content"]
         assert '"tunnel"' in prompt
         assert '"The hall was like a tunnel."' in prompt
         provider_get.assert_not_called()
 
-    def test_falls_back_to_contextual_mymemory_after_deepl_and_gemini(
+    def test_falls_back_to_contextual_mymemory_after_deepl_and_claude(
         self, client, monkeypatch
     ):
+        import anthropic
+        import src.dashboard_api as api
+        from types import SimpleNamespace as NS
+        from unittest.mock import Mock as _Mock
         monkeypatch.setenv("DEEPL_API_KEY", "test-key:fx")
-        monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
+
+        def claude_down(**kw):
+            raise anthropic.APIConnectionError(request=_Mock())
+
+        # An SDK error is not one the chain used to catch; it must still fall
+        # through to MyMemory rather than surface as a 500.
+        monkeypatch.setattr(api.claude_api, "istemci",
+                            lambda **k: NS(messages=NS(create=claude_down)))
         provider_payload = {
             "responseData": {
                 "translatedText": "Salon bir tünel gibiydi."
@@ -912,7 +915,7 @@ class TestBookTranslationApi:
         assert response.status_code == 200
         assert response.get_json()["translatedText"] == "Salon bir tünel gibiydi."
         assert response.get_json()["provider"] == "MyMemory"
-        assert provider_post.call_count == 2
+        assert provider_post.call_count == 1
         provider_get.assert_called_once_with(
             "https://api.mymemory.translated.net/get",
             params={
@@ -969,7 +972,6 @@ class TestBookTranslationApi:
         self, client, monkeypatch
     ):
         monkeypatch.setenv("DEEPL_API_KEY", "test-key:fx")
-        monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
         with patch(
             "src.dashboard_api.http_requests.post",
             side_effect=http_requests.RequestException("private upstream detail"),
@@ -999,7 +1001,7 @@ def test_assistant_stream_emits_tool_events_then_the_answer(client, monkeypatch)
             yield {"event": "answer", "payload": {
                 "answer": "cevap", "citations": [], "safety_flags": [],
                 "plan_blocks": [], "intent": "qa", "session_id": "",
-                "meta": {"model": "gemini-3.7-flash", "degraded": []}}}
+                "meta": {"model": "claude-sonnet-5", "degraded": []}}}
 
     monkeypatch.setattr(api, "_assistant_runtime", lambda: _Rt())
 

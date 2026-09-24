@@ -120,7 +120,7 @@ def _hostile_model(captured):
 def test_progress_and_identity_never_leave_ted_through_the_assistant(world, monkeypatch, izin):
     runtime, remote = world
     captured = []
-    monkeypatch.setattr(runtime.gemini, "chat_with_tools", _hostile_model(captured))
+    monkeypatch.setattr(runtime.llm, "chat_with_tools", _hostile_model(captured))
 
     payload = runtime.chat(messages=[{"role": "user", "content": "suyun hâlleri modülü"}], ilerleme_izni=izin)
 

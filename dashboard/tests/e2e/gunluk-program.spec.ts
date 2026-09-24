@@ -50,7 +50,9 @@ const ac = async (
 }
 
 test('çarşamba günü o günün dersleri listelenir', async ({ page }) => {
-  await ac(page, '2026-09-23T09:10:00')
+  // Before the first bell: finished lessons now fold to one line (İ7), and
+  // this test is about finding the day's column, not about folding.
+  await ac(page, '2026-09-23T07:50:00')
 
   const isimler = page.locator('.today-tl__card-name')
   await expect(isimler.first()).toBeVisible()

@@ -6,6 +6,9 @@ After=network.target
 Type=notify
 WorkingDirectory=/mnt/thunderbolt/workspaces/TED
 Environment=PATH=/mnt/thunderbolt/workspaces/TED/.venv/bin:/usr/bin:/bin
+# Istanbul time, not the host's UTC: see src/env_loader.py. Before any
+# EnvironmentFile line, which would override it if .env ever set TZ.
+Environment=TZ=Europe/Istanbul
 EnvironmentFile=/mnt/thunderbolt/workspaces/TED/.env
 ExecStart=/mnt/thunderbolt/workspaces/TED/.venv/bin/gunicorn \
     --bind 0.0.0.0:8085 \

@@ -3,6 +3,7 @@ import base64
 import hashlib
 import hmac
 import html
+import io
 import json
 import os
 import re
@@ -15,6 +16,7 @@ from functools import wraps
 
 import requests as http_requests
 from flask import Flask, Response, jsonify, request, send_from_directory, session
+from zoneinfo import ZoneInfo
 from flask_cors import CORS
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
@@ -36,6 +38,7 @@ from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.US
     USER_ROLES,
 )
 from src import module_progress, module_store, module_ticket
+from src import claude_api
 
 load_env()
 
@@ -116,7 +119,10 @@ PHOTO_HOMEWORK_FILE = os.path.join(OUTPUT_DIR, "photo_homework.json")
 PRIVATE_LESSON_FILE = os.path.join(OUTPUT_DIR, "private_lessons.json")
 STUDENT_DONE_FILE = os.path.join(OUTPUT_DIR, "homework_student_done.json")
 MAX_PHOTO_SIZE_BYTES = 12 * 1024 * 1024
-GEMINI_VISION_MODEL = os.environ.get("HOMEWORK_VISION_MODEL", "gemini-2.5-flash")
+# Longest edge sent to the model. Claude downsizes past ~1568 px anyway and
+# refuses images over 5 MB; 2000 px JPEG keeps worksheet text legible and every
+# phone photo well under the limit.
+PHOTO_MAX_EDGE_PX = 2000
 
 # --- Roles: defined in src/roles.py (shared with the ted-mcp orchestrator) ---
 
@@ -383,6 +389,70 @@ def _load_json(filename):
 
 def _scraped():
     return _load_json("scraped_data.json")
+
+
+# Takvim times are wall-clock Istanbul time whatever suffix they carry.
+# scrape_takvim reads FullCalendar's `e.startStr`, which is formatted in the
+# *browser's* zone: while Chrome ran on the host's UTC, wall-clock 12:40 came out
+# "12:40:00Z"; since 2026-09-24 (TEDY on Europe/Istanbul) the same event is
+# "12:40:00+03:00". Measured over all 38 timed events that day, the "Z" ones were
+# plainly local — 18 start at the 08:00 bell, school-day ones end at 15:45, the
+# parent seminar is "19:00Z", the club slot fills Thursday's two empty periods.
+# Taken at its word the "Z" put every event three hours late in a Turkish
+# browser, and an aware datetime compared with a naive `now` raised a TypeError
+# that was caught as "past" — so no takvim exam was ever "upcoming". The API
+# answers with naive local time at the boundary; the scrape keeps its raw
+# strings, and ids hash a canonical form (_kimlik_zamani) so they do not move
+# when the scraper's zone does.
+
+_ISTANBUL = ZoneInfo("Europe/Istanbul")
+_OFSET = re.compile(r"T.*[+-]\d{2}:\d{2}$")
+
+
+def _portal_yerel(value):
+    """A takvim time as naive Istanbul wall clock.
+
+    "Z" is the old UTC-browser artefact (the digits are already local), so it
+    is dropped; a real offset is converted to Istanbul time."""
+    s = str(value or "").strip()
+    if s.endswith("Z"):
+        return s[:-1]
+    if _OFSET.search(s):
+        try:
+            return datetime.fromisoformat(s).astimezone(_ISTANBUL).replace(tzinfo=None).isoformat()
+        except ValueError:
+            return s
+    return s
+
+
+def _kimlik_zamani(value):
+    """The form ids hash: the wall clock plus "Z", i.e. the string every id was
+    computed from before the switch. Modules link to exams by id, so an id must
+    not change because the scraper's browser changed zone."""
+    s = _portal_yerel(value)
+    return f"{s}Z" if s and "T" in s else str(value or "")
+
+
+def _portal_zamani(value):
+    """A portal timestamp as a naive local datetime, or None."""
+    s = _portal_yerel(value)
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s).replace(tzinfo=None)
+    except ValueError:
+        return None
+
+
+def _portal_etkinligi(ev):
+    """A takvim event with local times, as a copy: the scrape is shared."""
+    if not isinstance(ev, dict):
+        return ev
+    out = dict(ev)
+    for k in ("start", "end"):
+        if k in out:
+            out[k] = _portal_yerel(out[k])
+    return out
 
 
 def _parse_iso_datetime(value):
@@ -781,11 +851,56 @@ def _extract_json_payload(raw_text):
     raise ValueError("Model output did not contain valid JSON")
 
 
+class GorselOkunamadi(ValueError):
+    """The upload is not an image this server can read (e.g. HEIC)."""
+
+
+# What the photo extraction must return: structured output holds the model to
+# it, so "SADECE geçerli JSON dön" is no longer a request but a guarantee.
+_ODEV_FOTO_SEMASI = {
+    "type": "object",
+    "properties": {"homework": {"type": "array", "items": {
+        "type": "object",
+        "properties": {k: {"type": "string"} for k in (
+            "ders_adi", "odev_basligi", "odev_kaynagi",
+            "son_teslim_tarihi", "odev_durumu", "aciklama")},
+        "required": ["ders_adi", "odev_basligi", "odev_kaynagi",
+                     "son_teslim_tarihi", "odev_durumu", "aciklama"],
+        "additionalProperties": False,
+    }}},
+    "required": ["homework"],
+    "additionalProperties": False,
+}
+
+
+def _claude_icin_gorsel(image_bytes):
+    """Any readable image -> upright JPEG, longest edge PHOTO_MAX_EDGE_PX.
+
+    Gemini took any image/* up to 12 MB inline. Claude takes JPEG/PNG/GIF/WebP
+    at up to 5 MB, and a phone photo shot sideways carries its rotation only in
+    EXIF — sent raw, the worksheet would be read on its side."""
+    from PIL import Image, ImageOps, UnidentifiedImageError
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            img = ImageOps.exif_transpose(img).convert("RGB")
+            img.thumbnail((PHOTO_MAX_EDGE_PX, PHOTO_MAX_EDGE_PX))
+            out = io.BytesIO()
+            img.save(out, "JPEG", quality=88, optimize=True)
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise GorselOkunamadi(
+            "Bu görsel biçimi okunamadı; fotoğrafı JPEG ya da PNG olarak gönder."
+        ) from exc
+    return out.getvalue(), "image/jpeg"
+
+
 def _extract_homework_candidates_from_photo(image_bytes, mime_type):
-    """Extract homework candidates from photo via Gemini vision."""
-    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError("GEMINI_API_KEY ayarlı değil")
+    """Extract homework candidates from a photo with Claude's vision.
+
+    On Gemini until 2026-09-24; the Gemini API terms forbid services likely to
+    be used by under-18s. `mime_type` is kept for the caller's contract — the
+    image is normalised to JPEG whatever it arrived as."""
+    gorsel, tur = _claude_icin_gorsel(image_bytes)
+    import anthropic
 
     now_str = datetime.now().strftime("%d.%m.%Y")
     prompt = f"""Sen bir okul ödevi çıkarım ajanısın.
@@ -793,63 +908,38 @@ Görselde görünen ödevleri OCR + anlama ile çıkar.
 
 Bugünün tarihi: {now_str}
 
-SADECE geçerli JSON dön. Açıklama ekleme.
-JSON şeması:
-{{
-  "homework": [
-    {{
-      "ders_adi": "string",
-      "odev_basligi": "string",
-      "odev_kaynagi": "string",
-      "son_teslim_tarihi": "DD.MM.YYYY HH:MM",
-      "odev_durumu": "Değerlendirilmemiş",
-      "aciklama": "string"
-    }}
-  ]
-}}
+Her ödev için: ders_adi, odev_basligi, odev_kaynagi, son_teslim_tarihi,
+odev_durumu ("Değerlendirilmemiş"), aciklama.
 
 Kurallar:
 - Görselde birden fazla ödev varsa hepsini listele.
 - son_teslim_tarihi mutlaka DD.MM.YYYY HH:MM formatında olsun.
 - Saat bilgisi yoksa 23:59 kullan.
 - Emin olmadığın alanları boş string yap.
-- Bilgi uydurma."""
+- Bilgi uydurma. Görselde ödev yoksa boş liste döndür."""
 
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": prompt},
-                    {
-                        "inline_data": {
-                            "mime_type": mime_type,
-                            "data": base64.b64encode(image_bytes).decode("ascii"),
-                        }
-                    },
-                ]
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.1,
-            "responseMimeType": "application/json",
-        },
-    }
+    client = claude_api.istemci(timeout=120.0)   # ClaudeYapilandirilmamis is a RuntimeError
+    try:
+        resp = client.messages.create(
+            model=claude_api.model_kimligi("HOMEWORK_PHOTO_CLAUDE_MODEL"),
+            max_tokens=16000,
+            messages=[{"role": "user", "content": [
+                {"type": "image", "source": {
+                    "type": "base64", "media_type": tur,
+                    "data": base64.b64encode(gorsel).decode("ascii")}},
+                {"type": "text", "text": prompt},
+            ]}],
+            output_config={"format": {"type": "json_schema", "schema": _ODEV_FOTO_SEMASI}},
+        )
+    except anthropic.APIError as exc:
+        # The SDK's message can carry request ids and upstream detail; the
+        # reader gets a sentence, the log keeps the rest.
+        app.logger.error("Homework photo: Claude call failed: %s", exc)
+        raise RuntimeError("AI servisine ulaşılamadı") from exc
+    if getattr(resp, "stop_reason", "") == "refusal":
+        raise RuntimeError("Model bu görseli işlemedi")
 
-    url = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{GEMINI_VISION_MODEL}:generateContent?key={api_key}"
-    )
-    resp = http_requests.post(url, json=payload, timeout=90)
-    resp.raise_for_status()
-    data = resp.json()
-
-    candidates = data.get("candidates", [])
-    if not candidates:
-        raise RuntimeError("Model aday üretmedi")
-    parts = candidates[0].get("content", {}).get("parts", [])
-    text = "".join(p.get("text", "") for p in parts if isinstance(p, dict))
-    parsed = _extract_json_payload(text)
-
+    parsed = _extract_json_payload(claude_api.metin(resp))
     if isinstance(parsed, list):
         return [x for x in parsed if isinstance(x, dict)]
     if isinstance(parsed, dict):
@@ -1218,6 +1308,8 @@ def homework_from_photo():
 
     try:
         candidates = _extract_homework_candidates_from_photo(image_bytes, mime_type)
+    except GorselOkunamadi as e:
+        return jsonify({"error": str(e)}), 415
     except RuntimeError as e:
         return jsonify({"error": f"AI işleme başarısız: {e}"}), 503
     except http_requests.HTTPError as e:
@@ -1284,7 +1376,7 @@ def calendar():
     base = data.get("takvim", [])
     if not isinstance(base, list):
         base = []
-    merged = [*base, *_private_lessons_calendar_events()]
+    merged = [*(_portal_etkinligi(e) for e in base), *_private_lessons_calendar_events()]
     return jsonify({"events": merged})
 
 
@@ -1665,12 +1757,10 @@ def exams():
         course, raw_course, exam_number = _extract_exam_info(title)
         date_str = evt.get("start", "")
 
-        # Determine status
-        try:
-            evt_dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-            status = "upcoming" if evt_dt > now else "past"
-        except (ValueError, TypeError):
-            status = "past"
+        # Local clock on both sides (see _portal_yerel). An unreadable date
+        # is still "past", but no longer because the comparison itself threw.
+        evt_dt = _portal_zamani(date_str)
+        status = "upcoming" if evt_dt is not None and evt_dt > now else "past"
 
         # Match grade
         grade = None
@@ -1696,7 +1786,7 @@ def exams():
                     study_guide = ev.get("note")
                     break
 
-        exam_id = hashlib.md5(f"{course}|{title}|{date_str}".encode()).hexdigest()[:12]
+        exam_id = hashlib.md5(f"{course}|{title}|{_kimlik_zamani(date_str)}".encode()).hexdigest()[:12]
 
         if exam_number:
             seen_course_nums.add((course, str(exam_number)))
@@ -1709,8 +1799,8 @@ def exams():
             "rawTitle": title,
             "courseColor": _course_color(course),
             "examNumber": exam_number,
-            "date": date_str or None,
-            "endDate": evt.get("end") or None,
+            "date": _portal_yerel(date_str) or None,
+            "endDate": _portal_yerel(evt.get("end")) or None,
             "allDay": evt.get("allDay", False),
             "status": status,
             "grade": grade,
@@ -2170,11 +2260,12 @@ def calendar_unified():
     takvim = data.get("takvim", [])
     for ev in takvim:
         events.append({
-            "id": _make_id("event", ev.get("title", ""), ev.get("start", "")),
+            # A canonical form, so the id does not move with the scraper's zone.
+            "id": _make_id("event", ev.get("title", ""), _kimlik_zamani(ev.get("start", ""))),
             "title": ev.get("title", ""),
             "type": "event",
-            "start": ev.get("start", ""),
-            "end": ev.get("end", ev.get("start", "")),
+            "start": _portal_yerel(ev.get("start", "")),
+            "end": _portal_yerel(ev.get("end", ev.get("start", ""))),
             "color": _UNIFIED_COLORS["event"],
         })
 
@@ -2195,12 +2286,6 @@ BOOK_SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 BOOK_CHAPTER_ID_RE = re.compile(r"^[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)*$")
 BOOK_DEFAULT_WPM = 180
 BOOK_TRANSLATION_MYMEMORY_API_URL = "https://api.mymemory.translated.net/get"
-BOOK_TRANSLATION_GEMINI_API_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models"
-)
-BOOK_TRANSLATION_GEMINI_MODEL = os.environ.get(
-    "BOOK_TRANSLATION_GEMINI_MODEL", "gemini-2.5-flash"
-).strip()
 BOOK_TRANSLATION_MAX_BYTES = 500
 BOOK_TRANSLATION_CONTEXT_MAX_BYTES = 1500
 
@@ -2252,10 +2337,14 @@ def _book_translate_deepl(source_text, context):
     return translated
 
 
-def _book_translate_gemini(source_text, context):
-    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if not api_key:
-        raise BookTranslationProviderError("gemini_not_configured")
+def _book_translate_claude(source_text, context):
+    """The chain's middle step: DeepL, then this, then MyMemory.
+
+    Was Gemini until 2026-09-24 (terms forbid under-18 services). A reader is
+    waiting on a tap, so effort is low and there are no retries: a failure
+    falls through to MyMemory, which is why every SDK error becomes the chain's
+    own BookTranslationProviderError — anything else would surface as a 500."""
+    import anthropic
 
     prompt = (
         "Translate the selected English text into natural Turkish for a "
@@ -2268,49 +2357,28 @@ def _book_translate_gemini(source_text, context):
         f"Selected text: {json.dumps(source_text, ensure_ascii=False)}\n"
         f"Context: {json.dumps(context or source_text, ensure_ascii=False)}"
     )
-    provider_request = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0,
-            "maxOutputTokens": 200,
-            "thinkingConfig": {"thinkingBudget": 0},
-        },
-    }
-    api_url = (
-        f"{BOOK_TRANSLATION_GEMINI_API_URL}/"
-        f"{BOOK_TRANSLATION_GEMINI_MODEL}:generateContent"
-    )
-    response = http_requests.post(
-        api_url,
-        headers={"x-goog-api-key": api_key},
-        json=provider_request,
-        timeout=12,
-    )
-    response.raise_for_status()
-    provider_payload = response.json()
-    if not isinstance(provider_payload, dict):
-        raise BookTranslationProviderError("gemini_invalid_response")
-    candidates = provider_payload.get("candidates")
-    if not isinstance(candidates, list) or not candidates:
-        raise BookTranslationProviderError("gemini_empty_response")
-    first = candidates[0]
-    if not isinstance(first, dict):
-        raise BookTranslationProviderError("gemini_invalid_candidate")
-    content = first.get("content")
-    parts = content.get("parts") if isinstance(content, dict) else None
-    if not isinstance(parts, list):
-        raise BookTranslationProviderError("gemini_invalid_content")
-    translated = "".join(
-        str(part.get("text") or "")
-        for part in parts
-        if isinstance(part, dict)
-    ).strip()
+    try:
+        client = claude_api.istemci(timeout=20.0, max_retries=0)
+        resp = client.messages.create(
+            model=claude_api.model_kimligi("BOOK_TRANSLATION_CLAUDE_MODEL"),
+            max_tokens=2048,
+            output_config={"effort": "low"},
+            messages=[{"role": "user", "content": prompt}],
+        )
+    except claude_api.ClaudeYapilandirilmamis as exc:
+        raise BookTranslationProviderError("claude_not_configured") from exc
+    except anthropic.APIError as exc:
+        raise BookTranslationProviderError("claude_unavailable") from exc
+    if getattr(resp, "stop_reason", "") == "refusal":
+        raise BookTranslationProviderError("claude_refusal")
+
+    translated = claude_api.metin(resp)
     if translated.startswith("```"):
         translated = re.sub(
             r"^```(?:text)?\s*|\s*```$", "", translated, flags=re.IGNORECASE
         ).strip()
     if not translated:
-        raise BookTranslationProviderError("gemini_empty_translation")
+        raise BookTranslationProviderError("claude_empty_translation")
     return translated
 
 
@@ -2624,7 +2692,8 @@ def book_translate():
 
     providers = (
         ("DeepL", _book_translate_deepl),
-        ("Gemini 2.5 Flash", _book_translate_gemini),
+        (claude_api.okunur_ad(claude_api.model_kimligi("BOOK_TRANSLATION_CLAUDE_MODEL")),
+         _book_translate_claude),
         ("MyMemory", _book_translate_mymemory),
     )
     for provider_name, translate in providers:

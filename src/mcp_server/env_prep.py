@@ -34,7 +34,10 @@ OPTIONAL = ("ANAMNESIS_MCP_API_KEY", "MUFREDAT_MCP_API_KEY", "EGITIM_KAYNAK_MCP_
 TOPOLOGY = ("TED_MCP_HOST", "TED_MCP_PORT", "TED_MCP_PUBLIC_BASE_URL", "TED_MCP_ALLOWED_HOSTS",
             "TED_DASHBOARD_API_URL")
 UNIT_ONLY = TOPOLOGY + ("TED_MCP_PROJECT_ROOT", "TED_MCP_MAX_BODY_BYTES", "TED_MCP_EXTRA_REDIRECT_URIS",
-                        "TED_MCP_EXTRA_FORM_ACTION_ORIGINS")
+                        "TED_MCP_EXTRA_FORM_ACTION_ORIGINS",
+                        # Istanbul time for the whole of TEDY (src/env_loader.py); a TZ in .env
+                        # would beat the unit and could split the two services onto two clocks.
+                        "TZ")
 DASHBOARD_KEY_LABEL = "ted-mcp"
 MIN_FORM_SECRET_BYTES = 32
 

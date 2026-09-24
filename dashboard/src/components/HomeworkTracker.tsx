@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import type { ExamItem, ModuleCard } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
 import { useFocusMode } from '../contexts/focusMode'
+import { yaptimIsaretle } from '../utils/odevYaptim'
 
 type HomeworkGroupKey = 'aktif' | 'yapilan' | 'tamamlanan' | 'yapilmayan'
 
@@ -50,6 +51,9 @@ export default function HomeworkTracker() {
     yapilmayan: true,
   })
   const [markingKey, setMarkingKey] = useState<string | null>(null)
+  // The row whose "Yaptım" could not be stored. It used to fail in silence —
+  // the button simply came back, and nothing said the mark was not kept (D3).
+  const [markErrorKey, setMarkErrorKey] = useState<string | null>(null)
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 60000)
     return () => clearInterval(t)
@@ -146,22 +150,10 @@ export default function HomeworkTracker() {
     const fallbackKey = `${hw["Ders Adı"]}|${hw["Ödev Başlığı"]}|${hw["Ödev Son Teslim Tarihi"]}`
     const key = hw.homework_key || fallbackKey
     setMarkingKey(key)
+    setMarkErrorKey(null)
     try {
-      const res = await fetch('/api/homework/mark-done', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          homework_key: hw.homework_key,
-          "Ders Adı": hw["Ders Adı"],
-          "Ödev Başlığı": hw["Ödev Başlığı"],
-          "Ödev Son Teslim Tarihi": hw["Ödev Son Teslim Tarihi"],
-        }),
-      })
-      if (res.ok) {
-        refreshHomework()
-        window.dispatchEvent(new Event('tedy:homework-updated'))
-      }
+      if (await yaptimIsaretle(hw)) refreshHomework()
+      else setMarkErrorKey(key)
     } finally {
       setMarkingKey(null)
     }
@@ -206,6 +198,7 @@ export default function HomeworkTracker() {
                   showDoneAction={showDoneAction}
                   onDone={showDoneAction ? handleMarkDone : undefined}
                   doneLoading={isMarking}
+                  doneError={markErrorKey === actionKey}
                 />
               )
             })}
@@ -226,8 +219,10 @@ export default function HomeworkTracker() {
       {nextHw && (
         <NextThing
           eyebrow="SIRADAKİ"
+          // The normalised name, as the list below prints it: the raw one put
+          // "İkinci Yabancı Dil (Fransızca)" over rows saying "Fransızca" (İ9).
           title={[
-            String(nextHw["Ders Adı"] || '').trim(),
+            String(nextHw.normalized_course || nextHw["Ders Adı"] || '').trim(),
             String(nextHw["Ödev Başlığı"] || '').trim(),
           ].filter(Boolean).join(' — ') || 'Ödev'}
           stepMinutes={10}
@@ -258,7 +253,11 @@ export default function HomeworkTracker() {
               const when = e.date ? new Date(e.date) : null
               return (
                 <li key={e.id} className="exams-ahead__row">
-                  <span className="exams-ahead__course">{e.course}</span>
+                  {/* Live titles often carry the course already ("Özdebir …
+                      GİS · İzleme Sınavı"); saying it twice is not information. */}
+                  {!(e.title || '').startsWith(e.course) && (
+                    <span className="exams-ahead__course">{e.course}</span>
+                  )}
                   <span className="exams-ahead__title">{e.title}</span>
                   {when && (
                     <span className="exams-ahead__when tedy-time">
@@ -333,12 +332,14 @@ function HomeworkCard({
   showDoneAction,
   onDone,
   doneLoading,
+  doneError,
 }: {
   hw: HomeworkItem
   onOpen: (hw: HomeworkItem) => void
   showDoneAction?: boolean
   onDone?: (hw: HomeworkItem) => void
   doneLoading?: boolean
+  doneError?: boolean
 }) {
   const deadline = parseDeadline(hw["Ödev Son Teslim Tarihi"])
   const countdown = getCountdown(deadline)
@@ -421,6 +422,11 @@ function HomeworkCard({
                 >
                   Yaptım
                 </Button>
+              )}
+              {doneError && (
+                <span className="homework-item__error" role="alert">
+                  Kaydedilemedi. Bağlantını kontrol edip yeniden dene.
+                </span>
               )}
             </div>
           )}

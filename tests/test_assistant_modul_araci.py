@@ -119,7 +119,7 @@ def test_reindex_reports_module_catalog_state(tmp_path, monkeypatch):
     assert stats["moduller"] == {"katalog": "yok", "aktif_modul": 0, "iddiali_modul": 0}
 
 
-def _gemini_calling_modul_ara(seen):
+def _model_calling_modul_ara(seen):
     def fake(messages, declarations, dispatch, **kwargs):
         seen.setdefault("declared", set()).update(d["name"] for d in declarations)
         outcome = dispatch("modul_ara", {"sorgu": "madde"})
@@ -135,7 +135,7 @@ def test_chat_and_chat_events_forward_the_permission(tmp_path, monkeypatch, kwar
     index = _FakeIndex()
     runtime.registry.module_index = index
     seen = {}
-    monkeypatch.setattr(runtime.gemini, "chat_with_tools", _gemini_calling_modul_ara(seen))
+    monkeypatch.setattr(runtime.llm, "chat_with_tools", _model_calling_modul_ara(seen))
     messages = [{"role": "user", "content": "modül var mı"}]
 
     out = runtime.chat(messages=messages, **kwargs)
@@ -152,7 +152,7 @@ def test_study_plan_forwards_and_the_openai_path_never_grants(tmp_path, monkeypa
     runtime = _runtime(tmp_path, monkeypatch)
     index = _FakeIndex()
     runtime.registry.module_index = index
-    monkeypatch.setattr(runtime.gemini, "chat_with_tools", _gemini_calling_modul_ara({}))
+    monkeypatch.setattr(runtime.llm, "chat_with_tools", _model_calling_modul_ara({}))
     messages = [{"role": "user", "content": "plan"}]
     runtime.study_plan(messages=messages, ilerleme_izni=True)
     runtime.openai_chat_completion({"messages": messages, "ilerleme_izni": True})

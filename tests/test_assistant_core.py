@@ -5,7 +5,7 @@ import time
 from types import SimpleNamespace
 from pathlib import Path
 
-from src.assistant_core import AssistantRuntime, GeminiClient
+from src.assistant_core import AssistantRuntime, ClaudeClient
 
 
 class _DummyOllama:
@@ -135,12 +135,12 @@ def test_chat_returns_citations_and_answer(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("ASSISTANT_ENABLE_EMBEDDINGS", "0")
 
     runtime = AssistantRuntime(tmp_path)
-    # runtime.router IS runtime.gemini (same object) — patching a fresh object
-    # onto runtime.router leaves runtime.gemini untouched and chat() would hit
-    # the real Gemini API over the network. Patch the method on the real
+    # runtime.router IS runtime.llm (same object) — patching a fresh object
+    # onto runtime.router leaves runtime.llm untouched and chat() would hit
+    # the real model API over the network. Patch the method on the real
     # object instead.
     monkeypatch.setattr(
-        runtime.gemini, "chat_with_tools",
+        runtime.llm, "chat_with_tools",
         lambda *a, **k: ToolLoopResult(
             text="TEST_ANSWER::kesir çalışması [S1]",
             citations=[{"kind": "ogrenci", "label": "scraped_data.json",
@@ -179,7 +179,7 @@ def test_chat_marks_limited_confidence_when_retrieval_weak(tmp_path: Path, monke
 
     runtime = AssistantRuntime(tmp_path)
     monkeypatch.setattr(
-        runtime.gemini, "chat_with_tools",
+        runtime.llm, "chat_with_tools",
         lambda *a, **k: ToolLoopResult(text="TEST", citations=[]))
 
     runtime.reindex(incremental=False)
@@ -195,16 +195,17 @@ def test_chat_marks_limited_confidence_when_retrieval_weak(tmp_path: Path, monke
     assert response.get("citations") == []
 
 
-def test_gemini_only_no_ollama(tmp_path: Path):
-    """Verify Ollama is fully removed."""
+def test_models_lists_the_one_claude_model(tmp_path: Path, monkeypatch):
+    """Ollama is gone, and so is the Gemini chain: one model, two efforts."""
+    monkeypatch.delenv("ASSISTANT_CLAUDE_MODEL", raising=False)
     runtime = AssistantRuntime(tmp_path)
     assert not hasattr(runtime, "ollama")
-    assert not hasattr(runtime.config, "ollama_base_url")
-    assert [model["id"] for model in runtime.models()] == GeminiClient.FAST_MODELS
-    assert all(model["owned_by"] == "google" for model in runtime.models())
+    assert not hasattr(runtime, "gemini")
+    assert [model["id"] for model in runtime.models()] == [ClaudeClient.DEFAULT_MODEL]
+    assert all(model["owned_by"] == "anthropic" for model in runtime.models())
 
 
-def test_openai_completion_uses_gemini_default_model(tmp_path: Path):
+def test_openai_completion_uses_the_claude_default_model(tmp_path: Path, monkeypatch):
     """When chat() reports no explicit model, the OpenAI-compatible endpoint
     must still report a real, current model — not a stale/retired literal."""
     runtime = AssistantRuntime(tmp_path)
@@ -214,7 +215,8 @@ def test_openai_completion_uses_gemini_default_model(tmp_path: Path):
         "messages": [{"role": "user", "content": "test"}],
     })
 
-    assert completion["model"] == GeminiClient.FAST_MODELS[0]
+    monkeypatch.delenv("ASSISTANT_CLAUDE_MODEL", raising=False)
+    assert completion["model"] == ClaudeClient.DEFAULT_MODEL
 
 
 from src.assistant_core import AssistantRuntime, ToolLoopResult
@@ -241,7 +243,7 @@ def test_chat_reports_degraded_servers_in_meta(tmp_path, monkeypatch):
     monkeypatch.setattr(rt.registry, "degraded", lambda: ["maarif-mufredat"])
     monkeypatch.setattr(rt.registry, "declarations", lambda: [])
     monkeypatch.setattr(
-        rt.gemini, "chat_with_tools",
+        rt.llm, "chat_with_tools",
         lambda *a, **k: ToolLoopResult(text="cevap", citations=[]))
 
     out = rt.chat([{"role": "user", "content": "merhaba"}])
@@ -256,7 +258,7 @@ def test_empty_model_output_becomes_an_honest_message_not_a_blank_reply(tmp_path
 
     monkeypatch.setattr(rt.registry, "declarations", lambda: [])
     monkeypatch.setattr(rt.registry, "degraded", lambda: [])
-    monkeypatch.setattr(rt.gemini, "chat_with_tools",
+    monkeypatch.setattr(rt.llm, "chat_with_tools",
                         lambda *a, **k: ToolLoopResult(text="   ", budget_exhausted=True))
 
     out = rt.chat([{"role": "user", "content": "kesir nedir"}])
@@ -270,7 +272,7 @@ def test_chat_meta_carries_the_tool_ledger_and_dropped_count(tmp_path, monkeypat
 
     monkeypatch.setattr(rt.registry, "declarations", lambda: [])
     monkeypatch.setattr(rt.registry, "degraded", lambda: [])
-    monkeypatch.setattr(rt.gemini, "chat_with_tools", lambda *a, **k: ToolLoopResult(
+    monkeypatch.setattr(rt.llm, "chat_with_tools", lambda *a, **k: ToolLoopResult(
         text="Kaynaklı [S1] ve uydurma [S5].",
         citations=[{"kind": "mufredat", "label": "MEB", "locator": {},
                     "snippet": "s", "confidence": 0.9}],
@@ -362,7 +364,7 @@ def test_chat_events_streams_tool_progress_in_real_time(tmp_path, monkeypatch):
 
     monkeypatch.setattr(runtime.registry, "declarations", lambda: [])
     monkeypatch.setattr(runtime.registry, "degraded", lambda: [])
-    monkeypatch.setattr(runtime.gemini, "chat_with_tools", slow_chat_with_tools)
+    monkeypatch.setattr(runtime.llm, "chat_with_tools", slow_chat_with_tools)
 
     start = time.perf_counter()
     timestamps: list[tuple[str, float]] = []
@@ -439,7 +441,7 @@ def test_concurrent_chat_events_do_not_leak_dispatch_between_calls(tmp_path, mon
             second_done.set()
             return ToolLoopResult(text="ANSWER_SECOND", citations=[])
 
-    monkeypatch.setattr(runtime.gemini, "chat_with_tools", shared_chat_with_tools)
+    monkeypatch.setattr(runtime.llm, "chat_with_tools", shared_chat_with_tools)
 
     events_by_thread: dict[str, list[dict]] = {}
     errors: list[BaseException] = []
@@ -487,7 +489,7 @@ def test_abandoned_stream_stops_the_worker_at_the_next_tool_boundary(tmp_path, m
     """A reader who thinks the assistant is stuck presses "yeniden üret" or
     navigates away. The SSE response is torn down, but the worker thread
     running chat() is a daemon that nobody was telling to stop — so it kept
-    going through the whole remaining tool loop, spending Gemini turns and
+    going through the whole remaining tool loop, spending model turns and
     MCP calls on an answer no one would ever see. With four gthread workers
     and an impatient reader that compounds into several abandoned loops at
     once.
@@ -517,7 +519,7 @@ def test_abandoned_stream_stops_the_worker_at_the_next_tool_boundary(tmp_path, m
     monkeypatch.setattr(runtime.registry, "declarations", lambda: [])
     monkeypatch.setattr(runtime.registry, "degraded", lambda: [])
     monkeypatch.setattr(runtime.registry, "dispatch", counting_dispatch)
-    monkeypatch.setattr(runtime.gemini, "chat_with_tools", many_tools)
+    monkeypatch.setattr(runtime.llm, "chat_with_tools", many_tools)
 
     stream = runtime.chat_events(
         messages=[{"role": "user", "content": "kesir"}], session_id="s1")
@@ -538,3 +540,44 @@ def test_abandoned_stream_stops_the_worker_at_the_next_tool_boundary(tmp_path, m
     assert len(dispatched) <= 2, (
         f"{len(dispatched)} tools ran after the client disconnected "
         f"({dispatched}); cancellation should stop at the next boundary")
+
+
+def test_sistem_istemi_sinifi_profilden_okur(tmp_path: Path):
+    # The prompt said "6. sınıf" as a literal for a year after Işık moved up.
+    (tmp_path / "output").mkdir()
+    rt = AssistantRuntime(tmp_path)
+    assert "6. sınıf" not in rt._system_prompt()
+    assert "ortaokul öğrencisi Işık" in rt._system_prompt()   # no scrape yet: honest, not stale
+
+    (tmp_path / "output" / "scraped_data.json").write_text(
+        '{"ogrenci_profili": {"class_name": "7-D"}}', encoding="utf-8")
+    assert "7. sınıf öğrencisi Işık" in rt._system_prompt()
+
+
+def test_model_hatasi_soruyu_yeniden_yaz_demez(tmp_path, monkeypatch):
+    # From 2026-09-22 every request failed (400 from the model) and the reader
+    # was told to rephrase her question — the fault was never hers (D3).
+    (tmp_path / "output").mkdir()
+    rt = AssistantRuntime(tmp_path)
+    monkeypatch.setattr(rt.registry, "declarations", lambda: [])
+    monkeypatch.setattr(rt.registry, "degraded", lambda: [])
+
+    def patla(*a, **k):
+        raise RuntimeError("anthropic_no_api_key")
+    monkeypatch.setattr(rt.llm, "chat_with_tools", patla)
+
+    out = rt.chat([{"role": "user", "content": "kesir nedir"}])
+    assert "belirgin" not in out["answer"]
+    assert "şu an yanıt veremiyor" in out["answer"]
+    assert "error:model_unavailable" in out["safety_flags"]
+
+
+def test_bos_cevapta_eski_nazik_istek_kalir(tmp_path, monkeypatch):
+    (tmp_path / "output").mkdir()
+    rt = AssistantRuntime(tmp_path)
+    monkeypatch.setattr(rt.registry, "declarations", lambda: [])
+    monkeypatch.setattr(rt.registry, "degraded", lambda: [])
+    monkeypatch.setattr(rt.llm, "chat_with_tools", lambda *a, **k: ToolLoopResult(text=""))
+    out = rt.chat([{"role": "user", "content": "kesir nedir"}])
+    assert "kesir nedir" in out["answer"]
+    assert "error:model_unavailable" not in out["safety_flags"]
