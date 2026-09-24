@@ -12,6 +12,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Callable
 
 from src.mcp_client import McpClient, McpToolResult
@@ -46,6 +47,111 @@ _KIND_BY_TOOL: dict[str, str] = {
 }
 
 LOCAL_TOOL = "ogrenci_verisi_ara"
+# The homework list as Bugün and İşler show it (portal rows, photo-added ones,
+# Işık's own "Yaptım" marks). Declared only when the caller supplies a source.
+ODEV_TOOL = "odev_listesi"
+ODEV_ATIF = "Ödevlerim · güncel liste"
+
+_GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
+_COZULMUS = {"yaptı", "yapti", "yapmadı", "yapmadi", "eksik", "tamamlandı", "tamamlandi"}
+_GECMIS_GUN = 14
+_BOLUM_SINIRI = 10
+
+
+def bugun_satiri(simdi: datetime) -> str:
+    """"Bugün: Perşembe 24.09.2026 16:10" — the model has no clock of its own."""
+    return f"Bugün: {_GUNLER[simdi.weekday()]} {simdi:%d.%m.%Y %H:%M}"
+
+
+def _teslim(deger: str) -> datetime | None:
+    s = str(deger or "").strip()
+    for bicim in ("%d.%m.%Y %H:%M", "%d.%m.%Y"):
+        try:
+            return datetime.strptime(s, bicim)
+        except ValueError:
+            continue
+    return None
+
+
+def _goreli(teslim: datetime, simdi: datetime) -> str:
+    fark = (teslim.date() - simdi.date()).days
+    if fark == 0:
+        return "bugün"
+    if fark == 1:
+        return "yarın"
+    if fark == -1:
+        return "dün"
+    return f"{fark} gün sonra" if fark > 0 else f"{-fark} gün önce"
+
+
+def odev_listesi_metni(rows: list[dict[str, Any]], simdi: datetime) -> str:
+    """The homework list for the model, in the groups İşler uses.
+
+    Written for a reader, not a parser: the model quotes from it. Work Işık
+    marked "Yaptım" is never listed as still to do — that is the mistake the
+    smoke test caught — and the open work carries the teacher's instructions."""
+    bas = bugun_satiri(simdi)
+    if not rows:
+        return f"{bas}\nŞu an portalda kayıtlı ödev yok."
+
+    yapilacak, yaptim, gecmis, cozulmus = [], [], [], []
+    eski = 0
+    for r in rows:
+        teslim = _teslim(r.get("Ödev Son Teslim Tarihi", ""))
+        # A deadline more than two weeks past is history, whatever its status:
+        # on 2026-09-24 twelve "Yaptım" rows from March sorted ahead of this
+        # week's and pushed it past the cap. They are counted, not hidden.
+        if teslim is not None and (simdi - teslim).days > _GECMIS_GUN:
+            eski += 1
+            continue
+        cozuldu = r.get("teacher_resolved")
+        if cozuldu is None:
+            cozuldu = str(r.get("Ödev Durumu", "")).strip().lower() in _COZULMUS
+        if cozuldu:
+            cozulmus.append((teslim, r))
+        elif r.get("student_marked_done"):
+            yaptim.append((teslim, r))
+        elif teslim is not None and teslim < simdi:
+            gecmis.append((teslim, r))
+        else:
+            yapilacak.append((teslim, r))
+
+    def satir(teslim: datetime | None, r: dict[str, Any], aciklama: bool = False) -> str:
+        ad = " — ".join(x for x in (str(r.get("normalized_course") or r.get("Ders Adı") or "").strip(),
+                                    str(r.get("Ödev Başlığı") or "").strip()) if x)
+        zaman = (f"teslim {_GUNLER[teslim.weekday()]} {teslim:%d.%m.%Y %H:%M} ({_goreli(teslim, simdi)})"
+                 if teslim else "teslim tarihi okunamadı")
+        metin = f"- {ad} · {zaman}"
+        if aciklama:
+            detay = " ".join(str((r.get("detail") or {}).get("description") or "").split())
+            if detay:
+                kisa = detay if len(detay) <= 240 else detay[:240].rsplit(" ", 1)[0] + " …"
+                metin += f"\n  Açıklama: {kisa}"
+        return metin
+
+    def sirala(grup):
+        return sorted(grup, key=lambda x: (x[0] is None, x[0] or simdi))
+
+    parcalar = [bas + " (portal listesi, Işık'ın \"Yaptım\" işaretleriyle)"]
+    parcalar.append(f"YAPILACAK ({len(yapilacak)}):\n" + ("\n".join(
+        satir(t, r, aciklama=True) for t, r in sirala(yapilacak)[:_BOLUM_SINIRI]) or "- yok"))
+    if yaptim:
+        parcalar.append(f"YAPTIM DEDİ, ÖĞRETMEN HENÜZ DEĞERLENDİRMEDİ ({len(yaptim)}):\n"
+                        + "\n".join(satir(t, r) for t, r in sirala(yaptim)[:_BOLUM_SINIRI]))
+    if gecmis:
+        parcalar.append(f"SÜRESİ GEÇTİ, YAPTIM İŞARETİ YOK — son {_GECMIS_GUN} gün ({len(gecmis)}):\n"
+                        + "\n".join(satir(t, r) for t, r in sirala(gecmis)[:_BOLUM_SINIRI]))
+    if cozulmus:
+        dagilim: dict[str, int] = {}
+        for _, r in cozulmus:
+            d = str(r.get("Ödev Durumu", "")).strip() or "?"
+            dagilim[d] = dagilim.get(d, 0) + 1
+        parcalar.append(f"ÖĞRETMEN DEĞERLENDİRDİ — son {_GECMIS_GUN} gün: {len(cozulmus)} ödev ("
+                        + ", ".join(f"{k} {v}" for k, v in sorted(dagilim.items())) + ")")
+    if eski:
+        parcalar.append(f"Listeye alınmadı: teslimi {_GECMIS_GUN} günden eski {eski} ödev. "
+                        "Onlar sorulursa `ogrenci_verisi_ara` kullan.")
+    return "\n\n".join(parcalar)
 
 MCP_SERVERS = {
     "maarif-mufredat": ("https://mufredat.cureonics.com/mcp",
@@ -106,7 +212,8 @@ class McpRegistry:
     def __init__(self, clients: dict[str, McpClient],
                  local_search: Callable[[str, int], list[dict[str, Any]]],
                  unconfigured: list[str] | None = None,
-                 module_index: Any = None) -> None:
+                 module_index: Any = None,
+                 odev_kaynagi: Callable[[], list[dict[str, Any]]] | None = None) -> None:
         self.clients = clients
         self.local_search = local_search
         # Servers that were configured (named in MCP_SERVERS) but had no API
@@ -117,6 +224,9 @@ class McpRegistry:
         # Published edupedia modules (src/assistant_modules.py). Local and read-only; None keeps
         # the registry usable in tests and tools that have no catalog.
         self.module_index = module_index
+        # The rows /api/homework serves (src/dashboard_api._canli_odevler).
+        # None in tests and tools with no dashboard: the tool is not declared.
+        self.odev_kaynagi = odev_kaynagi
 
     def degraded(self) -> list[str]:
         unhealthy = {n for n, c in self.clients.items() if not c.healthy}
@@ -139,6 +249,17 @@ class McpRegistry:
                 "required": ["query"],
             },
         }]
+        if self.odev_kaynagi is not None:
+            decls.append({
+                "name": ODEV_TOOL,
+                "description": (
+                    "Işık'ın ödev listesi, Bugün ve İşler sayfalarının gösterdiği haliyle: "
+                    "yapılacaklar (teslim zamanı ve öğretmenin talimatıyla), Işık'ın 'Yaptım' "
+                    "dedikleri, süresi geçenler. Ödev sorularında (ne var, ne zaman teslim, "
+                    "neyi yaptı) önce BU aracı kullan — ödevin durumu için tek güvenilir kaynak."
+                ),
+                "parameters": {"type": "object", "properties": {}},
+            })
         if self.module_index is not None:
             decls.append(dict(assistant_modules.DECLARATION))
         for local_name, (server, mcp_name) in TOOL_ALLOWLIST.items():
@@ -160,6 +281,8 @@ class McpRegistry:
     def dispatch(self, name: str, args: dict[str, Any], ilerleme_izni: bool = False) -> ToolOutcome:
         if name == LOCAL_TOOL:
             return self._dispatch_local(args)
+        if name == ODEV_TOOL and self.odev_kaynagi is not None:
+            return self._dispatch_odev()
         if name == assistant_modules.TOOL_NAME:
             return self._dispatch_modules(args, ilerleme_izni is True)
         if name not in TOOL_ALLOWLIST:
@@ -222,6 +345,21 @@ class McpRegistry:
         text = "\n\n".join(str(r.get("snippet", "")) for r in rows) or "(kayıt yok)"
         return ToolOutcome(ok=True, text=text, citations=citations)
 
+    def _dispatch_odev(self) -> ToolOutcome:
+        try:
+            rows = self.odev_kaynagi() or []
+        except Exception as exc:  # noqa: BLE001 — told to the model, never raised through the loop
+            logger.error("odev_listesi failed: %s", type(exc).__name__)
+            return ToolOutcome(ok=False, error=f"ödev listesi okunamadı: {type(exc).__name__}")
+        metin = odev_listesi_metni(rows, datetime.now())
+        return ToolOutcome(ok=True, text=metin, citations=[{
+            "kind": "ogrenci",
+            "label": ODEV_ATIF,
+            "locator": {"tool": ODEV_TOOL},
+            "snippet": metin[:400],
+            "confidence": 1.0,
+        }])
+
     def _dispatch_modules(self, args: dict[str, Any], ilerleme_izni: bool) -> ToolOutcome:
         if self.module_index is None:
             return ToolOutcome(ok=False, error="modül kataloğu bağlanmadı")
@@ -249,7 +387,8 @@ class McpRegistry:
 
 
 def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
-                   module_index: Any = None) -> McpRegistry:
+                   module_index: Any = None,
+                   odev_kaynagi: Callable[[], list[dict[str, Any]]] | None = None) -> McpRegistry:
     """Wire the configured servers. A server with no key is simply absent —
     its tools are not declared — but it is still named by degraded(), so an
     unset env var never looks like a healthy system with nothing to say."""
@@ -263,4 +402,5 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
             continue
         clients[name] = McpClient(name=name, url=url, api_key=key)
     return McpRegistry(clients=clients, local_search=local_search,
-                       unconfigured=unconfigured, module_index=module_index)
+                       unconfigured=unconfigured, module_index=module_index,
+                       odev_kaynagi=odev_kaynagi)

@@ -411,6 +411,20 @@ rozeti, SSE akışı. İlkelerle **zaten büyük ölçüde uyumlu**.
   basılıyor — başlık dürüst ama görsel ayrım zayıf (ertelenmiş minor).
 - `CitationChip`'e `aria-describedby` eklenmemiş (ertelenmiş minor, D2).
 
+**Cevap yazılırken görünür (2026-09-24).** Normal bir soru orta eforda ~17 sn
+sürüyor; bu okur için boş bir bekleme dikkatin gittiği yerdir. Akışın
+`answer_delta` olayları düşünme göstergesinin yerine `.ac-msg--writing`
+taslağını koyar (`aria-busy`); son `answer` gelince taslak onun yerini bırakır.
+Taslakta `[S1]` görünmez: kaynağı henüz gelmemiş bir işaret iç temsildir (D4),
+çip bir an sonra gelir. Araç çağrısından önce yazılan metin cevap değildir;
+`answer_reset` onu siler. Taslak uzarken sayfa onu izleyip kaymaz, yalnız
+yazım başlarken bir kez kayar (İ6).
+
+**Ödev soruları Bugün'ün listesinden (2026-09-24).** Asistan ödevi `odev_listesi`
+aracıyla okur: Bugün'ün gösterdiği satırlar, Işık'ın "Yaptım" işaretleriyle. Metin
+dizininden okurken "Yaptım" dediği işi yapılacak diye saymıştı; iki yüzey aynı
+şeyi farklı söyleyemez (İ9).
+
 ---
 
 ### 4.11 Tedy Books — *ayrı dünya*
@@ -594,3 +608,4 @@ görüntüsüyle doğrulanır.
 | 1.1 | 2026-09-24 | Bugün: saate göre tek ana kart, yerinde zaman kutusu, katlanan geçmiş; ham HTML ve `3/7` kaldırıldı. |
 | 1.2 | 2026-09-24 | Bugün: akşam için "Yarın", kutu içinde "Yaptım"; öğrencinin işaretlediği iş artık sıradaki iş olmaz. |
 | 1.3 | 2026-09-24 | Sınavlar sessiz liste; yarınki sınav Yarın'ın başında. İşler: "Yaptım" hatası görünür, ders adı tek. Portal saatleri yerel okunur. |
+| 1.4 | 2026-09-24 | Asistan: cevap yazılırken görünür, taslakta çıplak atıf yok; ödev soruları Bugün'ün listesinden, "Yaptım" işaretleriyle. |

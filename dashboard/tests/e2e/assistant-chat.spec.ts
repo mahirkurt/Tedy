@@ -640,3 +640,112 @@ test('an unrecognised source group looks different from a verified one', async (
     .evaluate(el => getComputedStyle(el).borderLeftColor)
   expect(unknownBorder).not.toBe(knownBorder)
 })
+
+// An SSE responder the test drives frame by frame. The staggered server above
+// sends on a timer, so an intermediate state lasts one gap; Playwright polls
+// assertions at up to one-second intervals and can miss a state that lasts
+// less (measured: the draft below, visible ~0.9 s, was missed three runs out
+// of three). Here each frame goes out only when the test sends it, after the
+// previous state has been asserted.
+function startManualSseServer() {
+  let res: ServerResponse | null = null
+  let connected!: () => void
+  const ready = new Promise<void>(r => { connected = r })
+  const server = createServer((req: IncomingMessage, response: ServerResponse) => {
+    const origin = req.headers.origin
+    if (origin) {
+      response.setHeader('Access-Control-Allow-Origin', origin)
+      response.setHeader('Access-Control-Allow-Credentials', 'true')
+    }
+    response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    if (req.method === 'OPTIONS') {
+      response.writeHead(204)
+      response.end()
+      return
+    }
+    response.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    })
+    res = response
+    connected()
+  })
+  return new Promise<{
+    port: number
+    ready: Promise<void>
+    send: (event: string, data: unknown) => void
+    end: () => void
+    close: () => Promise<void>
+  }>((resolve, reject) => {
+    server.on('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address()
+      resolve({
+        port: typeof address === 'object' && address ? address.port : 0,
+        ready,
+        send: (event, data) => { res?.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`) },
+        end: () => { res?.end() },
+        close: () => new Promise<void>(r => { res?.end(); server.close(() => r()) }),
+      })
+    })
+  })
+}
+
+// The answer is shown while it is written (2026-09-24). At medium effort a
+// normal question takes ~17 s; for this reader a blank wait that long is where
+// attention leaves. Three things are pinned: text written before a tool call
+// is dropped when `answer_reset` arrives (it is not part of the answer), a
+// citation marker never shows as bare "[S1]" while its source is not yet
+// known (D4), and the final `answer` replaces the draft with chips.
+test('the answer appears while it is written, and the final answer replaces the draft', async ({ page }) => {
+  await page.route('**/api/assistant/chat', route => route.abort())
+
+  const payload = {
+    answer: 'KESİRYAZIMI bir bölme işlemidir [S1].',
+    citations: [{ id: 'S1', kind: 'mufredat', label: 'MEB · kesir', locator: {},
+                  snippet: 'kaynak', confidence: 0.9 }],
+    safety_flags: [], plan_blocks: [], intent: 'qa', session_id: 'dashboard-default',
+    meta: { model: 'claude-sonnet-5', degraded: [], dropped_citations: 0 },
+  }
+  const sse = await startManualSseServer()
+  try {
+    await page.route('**/api/assistant/stream', route =>
+      route.continue({ url: `http://127.0.0.1:${sse.port}/` }))
+    await page.goto('/asistan')
+    await page.fill('#ac-input', 'kesir nedir')
+    await page.getByLabel('Gönder').click()
+    await sse.ready
+
+    const taslak = page.locator('.ac-msg--writing')
+    sse.send('answer_delta', { text: 'ÖNMETİN bakıyorum.' })
+    await expect(taslak).toContainText('ÖNMETİN')
+    await expect(taslak).toHaveAttribute('aria-busy', 'true')
+
+    sse.send('answer_reset', {})
+    sse.send('tool_start', { name: 'kazanim_ara' })
+    await expect(page.getByText('MEB kazanımları aranıyor')).toBeVisible()
+    await expect(page.getByText('ÖNMETİN')).toHaveCount(0)
+
+    sse.send('tool_end', { name: 'kazanim_ara', ok: true })
+    sse.send('answer_delta', { text: 'KESİRYAZIMI bir ' })
+    sse.send('answer_delta', { text: 'bölme işlemidir [S1' })
+    await expect(taslak).toContainText('bölme işlemidir')
+    await expect(taslak).not.toContainText('[S')
+
+    sse.send('answer_delta', { text: '].' })
+    await expect(taslak).toContainText('işlemidir.')
+    await expect(taslak).not.toContainText('[S')
+
+    sse.send('answer', { payload })
+    sse.send('done', {})
+    sse.end()
+    const answerBody = lastAnswerBody(page)
+    await expect(answerBody.locator('.ac-cite')).toHaveText('1')
+    await expect(taslak).toHaveCount(0)
+    await expect(page.locator('.ac-msg--thinking')).toHaveCount(0)
+    await expect(page.getByText('KESİRYAZIMI')).toHaveCount(1)
+  } finally {
+    await sse.close()
+  }
+})

@@ -43,6 +43,30 @@ class _Sahte:
         self.istekler.append({**kw, "messages": list(kw["messages"])})
         return self.cevaplar.pop(0)
 
+    def stream(self, **kw):
+        self.istekler.append({**kw, "messages": list(kw["messages"]), "_akis": True})
+        return _SahteAkis(self.cevaplar.pop(0))
+
+
+class _SahteAkis:
+    """messages.stream(): a context manager with text_stream (word by word, as
+    the API sends text_delta events) and get_final_message()."""
+
+    def __init__(self, cevap):
+        import re
+        self.cevap = cevap
+        metin = "".join(b.text for b in cevap.content if b.type == "text")
+        self.text_stream = iter(re.findall(r"\S+\s*", metin))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def get_final_message(self):
+        return self.cevap
+
 
 def _istemci(*cevaplar, **kw):
     sahte = _Sahte(*cevaplar)
@@ -74,7 +98,10 @@ def test_varsayilan_model_sonnet_5_ve_ortamdan_degistirilebilir(monkeypatch):
 
 
 def test_tek_model_iki_derinlik_efor_ile():
-    for katman, efor in (("fast", "low"), ("deep", "high")):
+    # medium, not low, for a normal question: measured 2026-09-24 on a
+    # curriculum question, low answered from memory with no tool and no
+    # citation; medium called mufredat_ara and cited it.
+    for katman, efor in (("fast", "medium"), ("deep", "high")):
         c, s = _istemci(_cevap(_metin("tamam")))
         c.chat_with_tools(KONUSMA, BILDIRIM, _ok, tier=katman)
         istek = s.istekler[0]
@@ -232,3 +259,49 @@ def test_arac_sonucu_hic_bos_gitmez():
 def test_loop_sonucu_toolloopresult():
     c, _ = _istemci(_cevap(_metin("tamam")))
     assert isinstance(c.chat_with_tools(KONUSMA, BILDIRIM, _ok), ToolLoopResult)
+
+
+# ── streaming: the answer is shown while it is written ────────────────────────
+# A normal question takes ~17 s at medium effort. For this reader a blank
+# wait of that length is where attention leaves; words appearing is not.
+
+def test_akis_cevabi_parca_parca_verir():
+    c, s = _istemci(_cevap(_metin("Kesir, bir bütünün eş parçalarından biridir.")))
+    parcalar = []
+    out = c.chat_with_tools(KONUSMA, BILDIRIM, _ok, on_delta=parcalar.append)
+    assert len(parcalar) > 1
+    assert "".join(parcalar) == out.text == "Kesir, bir bütünün eş parçalarından biridir."
+    assert s.istekler[0]["_akis"] is True
+
+
+def test_akis_istenmezse_tek_parca_istek():
+    c, s = _istemci(_cevap(_metin("tamam")))
+    c.chat_with_tools(KONUSMA, BILDIRIM, _ok)
+    assert "_akis" not in s.istekler[0]
+
+
+def test_araca_donen_turun_metni_silinir():
+    """Text written before a tool call is not part of the answer: the final
+    text is the last round's only. The reader is told to drop it."""
+    c, _ = _istemci(
+        _cevap(_metin("Müfredata bakıyorum."), _arac("t1", "kazanim_ara", {"q": "kesir"}),
+               stop="tool_use"),
+        _cevap(_metin("Kesir bir parçadır [S1].")))
+    olaylar = []
+    out = c.chat_with_tools(KONUSMA, BILDIRIM, _ok,
+                            on_delta=lambda p: olaylar.append(p),
+                            on_reset=lambda: olaylar.append(None))
+    sifir = olaylar.index(None)
+    assert "".join(olaylar[:sifir]) == "Müfredata bakıyorum."
+    assert "".join(olaylar[sifir + 1:]) == out.text == "Kesir bir parçadır [S1]."
+    assert olaylar.count(None) == 1
+
+
+def test_metinsiz_arac_turu_sifirlamaz():
+    c, _ = _istemci(
+        _cevap(_arac("t1", "kazanim_ara", {"q": "kesir"}), stop="tool_use"),
+        _cevap(_metin("Cevap.")))
+    sifirlar = []
+    c.chat_with_tools(KONUSMA, BILDIRIM, _ok, on_delta=lambda p: None,
+                      on_reset=lambda: sifirlar.append(1))
+    assert sifirlar == []

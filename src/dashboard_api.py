@@ -324,7 +324,7 @@ def _assistant_runtime():
         try:
             from src.assistant_core import AssistantRuntime
 
-            _ASSISTANT_RUNTIME = AssistantRuntime(PROJECT_ROOT)
+            _ASSISTANT_RUNTIME = AssistantRuntime(PROJECT_ROOT, odev_kaynagi=_canli_odevler)
         except Exception as exc:
             app.logger.error(
                 "Assistant subsystem unavailable (%s)", type(exc).__name__
@@ -783,6 +783,43 @@ def _combined_homework_rows(scraped_data):
     return _dedupe_homework_rows(rows)
 
 
+def _ogrenci_isaretini_uygula(row, marks):
+    """Put Işık's own "Yaptım" mark and the teacher's verdict on one row.
+
+    Returns True when the teacher's verdict made the mark obsolete and it was
+    dropped from ``marks`` — the caller decides whether that is written back.
+    /api/homework writes it; the assistant's read never does."""
+    hw_key = _homework_row_key(row)
+    row["homework_key"] = hw_key
+    teacher_resolved = _is_teacher_resolved_homework_status(
+        _normalize_homework_status_text(row.get("Ödev Durumu", ""))
+    )
+    row["teacher_resolved"] = teacher_resolved
+    budandi = False
+    if teacher_resolved and hw_key in marks:
+        marks.pop(hw_key, None)
+        budandi = True
+    row["student_marked_done"] = bool(hw_key and hw_key in marks and not teacher_resolved)
+    if row["student_marked_done"]:
+        row["student_done_at"] = marks.get(hw_key, "")
+    return budandi
+
+
+def _canli_odevler():
+    """The homework rows as /api/homework serves them, for the assistant.
+
+    Read-only: a copy of the marks, and neither first-seen nor the marks file
+    is touched. Live smoke test 2026-09-24 — asked for the week's homework, the
+    assistant, reading only the text index, listed work Işık had marked
+    "Yaptım" and missed the open one's deadline. Bugün and the assistant must
+    read the same list."""
+    rows = _combined_homework_rows(_scraped())
+    marks = dict(_load_student_done_marks())
+    for r in rows:
+        _ogrenci_isaretini_uygula(r, marks)
+    return rows
+
+
 def _normalize_due_datetime(value):
     """Normalize due datetime to 'DD.MM.YYYY HH:MM'."""
     if value is None:
@@ -1174,21 +1211,8 @@ def homework():
         if "Ders Adı" in r:
             r["normalized_course"] = normalize_course(r["Ders Adı"])
 
-        hw_key = _homework_row_key(r)
-        r["homework_key"] = hw_key
-        status_text = _normalize_homework_status_text(r.get("Ödev Durumu", ""))
-        teacher_resolved = _is_teacher_resolved_homework_status(status_text)
-
-        if teacher_resolved and hw_key in student_done_marks:
-            student_done_marks.pop(hw_key, None)
+        if _ogrenci_isaretini_uygula(r, student_done_marks):
             student_done_changed = True
-
-        student_marked_done = bool(
-            hw_key and hw_key in student_done_marks and not teacher_resolved
-        )
-        r["student_marked_done"] = student_marked_done
-        if student_marked_done:
-            r["student_done_at"] = student_done_marks.get(hw_key, "")
 
         title = r.get("Ödev Başlığı", "")
         if title and title not in first_seen:

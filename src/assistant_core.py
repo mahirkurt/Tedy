@@ -108,9 +108,10 @@ class _StreamAbandoned(Exception):
     """Raised inside a chat_events() worker when the consumer has gone away.
 
     Cancellation is cooperative and can only be checked where chat_events()
-    has a hook: the dispatch wrapper, i.e. at tool boundaries. A model or
-    tool call already in flight still runs to completion — the bound is one
-    in-flight operation, not zero.
+    has a hook: the dispatch wrapper (tool boundaries) and, since the answer
+    is streamed, every piece of text. A tool call already in flight still runs
+    to completion, and a model call stops at its next piece of text.
+    chat() re-raises it rather than treating it as a model failure.
     """
 
 
@@ -212,7 +213,7 @@ class ClaudeClient:
     Anthropic permits organisations serving minors with safeguards (see
     docs/frontend-design-principles.md and the AI label on every answer).
 
-    One model at two depths: `effort` (low for a normal question, high for
+    One model at two depths: `effort` (medium for a normal question, high for
     "Daha derine in" and the deep intents) replaces the old fast/deep model
     chain. Tool results go back as native tool_result blocks tied to their call
     id instead of text pasted into one flattened prompt. No sampling
@@ -220,7 +221,11 @@ class ClaudeClient:
     """
 
     DEFAULT_MODEL = claude_api.VARSAYILAN_MODEL
-    EFFORT = {"fast": "low", "deep": "high"}
+    # medium, not low, for a normal question. Measured 2026-09-24 on a live
+    # curriculum question: low answered in ~10 s from memory, no tool called,
+    # no citation — the fabrication ban unenforced; medium called mufredat_ara
+    # and cited it, in ~17 s. The seconds are paid for with streaming.
+    EFFORT = {"fast": "medium", "deep": "high"}
     # Thinking counts toward max_tokens; a low cap truncates mid-thought. The
     # length of an answer is the prompt's job, not this ceiling's.
     MAX_TOKENS = 16000
@@ -273,13 +278,14 @@ class ClaudeClient:
 
     def _request(self, system: str, turns: list[dict[str, Any]], tier: str,
                  usage: dict[str, int], tools: list[dict[str, Any]] | None = None,
-                 tool_choice: dict[str, Any] | None = None) -> Any:
+                 tool_choice: dict[str, Any] | None = None,
+                 on_delta: Callable[[str], None] | None = None) -> Any:
         params: dict[str, Any] = {
             "model": self.model,
             "max_tokens": self.MAX_TOKENS,
             "messages": turns,
             "thinking": {"type": "adaptive"},
-            "output_config": {"effort": self.EFFORT.get(tier, "low")},
+            "output_config": {"effort": self.EFFORT.get(tier, "medium")},
         }
         if system:
             # Render order is tools -> system -> messages, so one breakpoint on
@@ -291,7 +297,18 @@ class ClaudeClient:
             params["tools"] = tools
         if tool_choice:
             params["tool_choice"] = tool_choice
-        resp = self._get_client().messages.create(**params)
+        if on_delta is None:
+            resp = self._get_client().messages.create(**params)
+        else:
+            # Streamed so the reader watches the answer being written: at
+            # medium effort a normal question takes ~17 s, and for this reader
+            # a blank wait that long is where attention leaves. The final
+            # message is the same object create() would have returned.
+            with self._get_client().messages.stream(**params) as akis:
+                for parca in akis.text_stream:
+                    if parca:
+                        on_delta(parca)
+                resp = akis.get_final_message()
         self.last_model_used = getattr(resp, "model", "") or self.model
         u = getattr(resp, "usage", None)
         for key in ("input_tokens", "output_tokens",
@@ -315,8 +332,15 @@ class ClaudeClient:
         dispatch: Any,
         tier: str = "fast",
         max_rounds: int = 4,
+        on_delta: Callable[[str], None] | None = None,
+        on_reset: Callable[[], None] | None = None,
     ) -> ToolLoopResult:
         """Run the model until it answers, dispatching tools it asks for.
+
+        With `on_delta` every request is streamed and its text handed over as
+        it arrives. Text a round writes before calling a tool is not part of
+        the answer (the answer is the last round's text), so `on_reset` is
+        called when such a round ends — the reader drops what was shown.
 
         The round budget is a hard stop: a model that keeps calling tools would
         otherwise hold a worker open indefinitely. It is checked before each
@@ -341,15 +365,19 @@ class ClaudeClient:
         } for d in declarations]
 
         if max_rounds <= 0 or not tools:
-            out.text = self._text(self._request(system, turns, tier, out.usage))
+            out.text = self._text(self._request(system, turns, tier, out.usage,
+                                                on_delta=on_delta))
             return out
 
         for _round in range(max_rounds):
-            resp = self._request(system, turns, tier, out.usage, tools=tools)
+            resp = self._request(system, turns, tier, out.usage, tools=tools,
+                                 on_delta=on_delta)
             uses = [b for b in (resp.content or []) if getattr(b, "type", "") == "tool_use"]
             if not uses:
                 out.text = self._text(resp)
                 return out
+            if on_reset is not None and self._text(resp):
+                on_reset()
 
             # Back exactly as received: thinking blocks are signed and must not
             # be edited, and the tool_result ids must match these tool_use ids.
@@ -408,7 +436,7 @@ class ClaudeClient:
             if len(out.tool_calls) >= max_rounds:
                 out.budget_exhausted = True
                 final = self._request(system, turns, tier, out.usage, tools=tools,
-                                      tool_choice={"type": "none"})
+                                      tool_choice={"type": "none"}, on_delta=on_delta)
                 out.text = self._text(final)
                 return out
 
@@ -1272,7 +1300,8 @@ class SafetyPolicy:
 class AssistantRuntime:
     """High-level assistant runtime used by API endpoints and sync hooks."""
 
-    def __init__(self, project_root: str | os.PathLike[str]):
+    def __init__(self, project_root: str | os.PathLike[str],
+                 odev_kaynagi: Callable[[], list[dict[str, Any]]] | None = None):
         self.config = AssistantConfig.from_project_root(
             project_root)
         self.llm = ClaudeClient()
@@ -1288,7 +1317,9 @@ class AssistantRuntime:
         from src.assistant_tools import build_registry
         # Published edupedia modules (plan SP5 K-S1): read-only, per process, no index file.
         self.modules = ModuleIndex(self.config.output_dir)
-        self.registry = build_registry(self._local_search, module_index=self.modules)
+        # odev_kaynagi: the homework rows Bugün shows (dashboard_api._canli_odevler).
+        self.registry = build_registry(self._local_search, module_index=self.modules,
+                                       odev_kaynagi=odev_kaynagi)
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """The retriever, shaped as a tool the model can choose to call."""
@@ -1307,8 +1338,14 @@ class AssistantRuntime:
         "kişisel eğitim danışmanısın. Varsayılan dil Türkçe.\n\n"
 
         "## Hangi araca ne zaman uzanırsın\n"
-        "- Işık'a özel her soru (ödev, sınav, not, ders programı, duyuru) → "
-        "`ogrenci_verisi_ara`. Bu veriler yalnız orada bulunur.\n"
+        "- Ödev sorusu (hangi ödevler var, ne zaman teslim, neyi yaptı, ne kaldı) → "
+        "önce `odev_listesi`. Ödevin durumu için tek güvenilir kaynak odur: Bugün "
+        "sayfasının gösterdiği listeyi, Işık'ın 'Yaptım' işaretleriyle verir. "
+        "Işık'ın 'Yaptım' dediği bir ödevi yapılacak diye sunma. Teslim zamanını "
+        "söylerken listedeki gün ve saati kullan; 'bu hafta', 'yarın' gibi sözleri "
+        "sorudaki 'Bugün:' satırına göre çöz.\n"
+        "- Işık'a özel diğer sorular (sınav, not, ders programı, duyuru) ve bir "
+        "ödevin ayrıntısı → `ogrenci_verisi_ara`. Bu veriler yalnız orada bulunur.\n"
         "- Konu, kavram, müfredat, kazanım sorusu → `kazanim_ara`, "
         "`mufredat_ara`, `kitap_listele` + `kitap_sayfa`. MEB korpusu bu "
         "konularda tek otoritedir.\n"
@@ -1404,6 +1441,8 @@ class AssistantRuntime:
         force_deep: bool = False,
         dispatch: Callable[[str, dict[str, Any]], Any] | None = None,
         ilerleme_izni: bool = False,
+        on_delta: Callable[[str], None] | None = None,
+        on_reset: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
         # `dispatch`, if given, replaces self.registry.dispatch for this
         # call only. chat_events() (below) uses this to wrap tool calls
@@ -1436,7 +1475,14 @@ class AssistantRuntime:
                 dispatch=dispatch or functools.partial(
                     self.registry.dispatch, ilerleme_izni=ilerleme_izni is True),
                 tier=tier,
+                on_delta=on_delta,
+                on_reset=on_reset,
             )
+        except _StreamAbandoned:
+            # The reader left; the model did not fail. Answering "şu an yanıt
+            # veremiyor" and logging an error here would count every closed
+            # tab as an outage.
+            raise
         except Exception as exc:
             logger.error("Assistant tool loop failed: %s", exc)
             # Not the reader's fault, so not "rephrase your question": from
@@ -1553,11 +1599,22 @@ class AssistantRuntime:
                 raise _StreamAbandoned()
             return outcome
 
+        def writing(parca: str) -> None:
+            # Also a cancellation point: with the text streamed, a closed tab
+            # stops a long answer mid-sentence, not only at a tool boundary.
+            if cancelled.is_set():
+                raise _StreamAbandoned()
+            events.put({"event": "answer_delta", "text": parca})
+
+        def reset() -> None:
+            events.put({"event": "answer_reset"})
+
         outcome_box: dict[str, Any] = {}
 
         def run() -> None:
             try:
-                outcome_box["payload"] = self.chat(dispatch=announcing, **kwargs)
+                outcome_box["payload"] = self.chat(
+                    dispatch=announcing, on_delta=writing, on_reset=reset, **kwargs)
             except _StreamAbandoned:
                 # Nobody is listening. Not an error, and deliberately not
                 # recorded in outcome_box — there is no caller left to
@@ -1605,7 +1662,11 @@ class AssistantRuntime:
         Retrieved context is deliberately absent: it used to be pasted in here
         whether or not the question called for it, which is how raw EBA OCR
         ended up under every answer. Evidence now enters through the tools.
+
+        Today's date goes in the user turn, not the system prompt: the system
+        block is cached, and a clock in it would miss the cache every minute.
         """
+        from src.assistant_tools import bugun_satiri
         return [
             {"role": "system", "content": self._system_prompt()},
             *[
@@ -1614,6 +1675,7 @@ class AssistantRuntime:
                 for m in messages[-3:] if isinstance(m, dict)
             ],
             {"role": "user", "content": (
+                f"{bugun_satiri(datetime.now())}\n"
                 f"Soru türü: {intent}\n"
                 f"Güvenlik: {', '.join(safety_flags) if safety_flags else 'yok'}\n\n"
                 f"Soru: {user_query}"

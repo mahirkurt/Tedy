@@ -2,6 +2,8 @@ import json
 import os
 import threading
 import time
+
+import pytest
 from types import SimpleNamespace
 from pathlib import Path
 
@@ -612,3 +614,73 @@ def test_guncellik_saat_dilimi_karistirmaz(tmp_path, monkeypatch):
     finally:
         monkeypatch.undo()
         _time.tzset()
+
+
+def test_chat_events_cevabi_yazilirken_iletir(tmp_path, monkeypatch):
+    """answer_delta carries the answer as it is written; answer_reset drops
+    text that turned out to precede a tool call; answer still closes."""
+    (tmp_path / "output").mkdir()
+    runtime = AssistantRuntime(tmp_path)
+
+    def yazan(*, dispatch, on_delta=None, on_reset=None, **kwargs):
+        on_delta("Bakıyorum.")
+        on_reset()
+        on_delta("Kesir ")
+        on_delta("bir parçadır.")
+        return ToolLoopResult(text="Kesir bir parçadır.", citations=[])
+
+    monkeypatch.setattr(runtime.registry, "declarations", lambda: [])
+    monkeypatch.setattr(runtime.registry, "degraded", lambda: [])
+    monkeypatch.setattr(runtime.llm, "chat_with_tools", yazan)
+
+    olaylar = list(runtime.chat_events(messages=[{"role": "user", "content": "kesir"}],
+                                       session_id="s1"))
+    assert [o["event"] for o in olaylar] == [
+        "answer_delta", "answer_reset", "answer_delta", "answer_delta", "answer"]
+    assert olaylar[2]["text"] == "Kesir "
+    assert olaylar[-1]["payload"]["answer"].startswith("Kesir bir parçadır.")
+
+
+def test_terk_edilen_akis_yazmayi_da_durdurur(tmp_path, monkeypatch):
+    """Cancellation used to be checked at tool boundaries only; with the text
+    streamed it is also checked at every piece, so a closed tab stops a long
+    answer mid-sentence instead of paying for the rest of it."""
+    (tmp_path / "output").mkdir()
+    runtime = AssistantRuntime(tmp_path)
+    yazilan: list[int] = []
+    bitti = threading.Event()
+
+    def uzun(*, dispatch, on_delta=None, **kwargs):
+        for i in range(20):
+            on_delta(f"k{i} ")
+            yazilan.append(i)
+            time.sleep(0.02)
+        bitti.set()
+        return ToolLoopResult(text="x", citations=[])
+
+    monkeypatch.setattr(runtime.registry, "declarations", lambda: [])
+    monkeypatch.setattr(runtime.registry, "degraded", lambda: [])
+    monkeypatch.setattr(runtime.llm, "chat_with_tools", uzun)
+
+    akis = runtime.chat_events(messages=[{"role": "user", "content": "kesir"}], session_id="s1")
+    assert next(akis)["event"] == "answer_delta"
+    akis.close()
+    time.sleep(0.6)
+    assert not bitti.is_set()
+    assert len(yazilan) <= 3
+
+
+def test_terk_edilen_akis_model_hatasi_sayilmaz(tmp_path, monkeypatch):
+    """A reader leaving is not the model failing: chat() must not log it as a
+    failed loop and answer "TEDY Asistanı şu an yanıt veremiyor"."""
+    from src.assistant_core import _StreamAbandoned
+    (tmp_path / "output").mkdir()
+    runtime = AssistantRuntime(tmp_path)
+
+    def terk(**kwargs):
+        raise _StreamAbandoned()
+
+    monkeypatch.setattr(runtime.registry, "declarations", lambda: [])
+    monkeypatch.setattr(runtime.llm, "chat_with_tools", terk)
+    with pytest.raises(_StreamAbandoned):
+        runtime.chat(messages=[{"role": "user", "content": "kesir"}], session_id="s1")

@@ -66,6 +66,7 @@ const TOOL_LABEL: Record<string, string> = {
   oer_ara: 'Açık kaynaklar taranıyor',
   oer_kazanima_gore: 'Kazanıma bağlı kaynaklar alınıyor',
   modul_ara: 'Yayınlanmış modüller aranıyor',
+  odev_listesi: 'Ödev listen okunuyor',
 }
 
 const DEFAULT_THINKING_MESSAGE = 'Yanıt hazırlanıyor...'
@@ -193,6 +194,31 @@ function ThinkingIndicator({ stage }: { stage: string | null }) {
   )
 }
 
+/** Citation markers hidden while the answer is being written: the sources
+ * they point at arrive only with the final answer, and a bare "[S1]" is
+ * internal representation (D4). A marker cut in half at the end of what has
+ * arrived so far ("[S", "[S1") goes too. */
+function taslakMetni(text: string): string {
+  return text.replace(/\s?\[S\d+\]/g, '').replace(/\s?\[(S\d*)?$/, '')
+}
+
+/** The answer while it is written. It takes the thinking indicator's place:
+ * words appearing is the visible-time cue, for a reader who loses a blank
+ * seventeen-second wait. The final answer replaces it. */
+function WritingAnswer({ text }: { text: string }) {
+  return (
+    <article className="ac-msg ac-msg--assistant ac-msg--writing" aria-busy="true">
+      <div className="ac-msg__avatar ac-msg__avatar--ai">
+        <AILabel size="mini" slugLabel="yanıtı" aria-label="Yapay zekâ yanıtı" />
+      </div>
+      <div className="ac-msg__body">
+        <span className="ac-msg__role">Asistan</span>
+        <div className="ac-msg__content">{renderMarkdown(taslakMetni(text))}</div>
+      </div>
+    </article>
+  )
+}
+
 function AnswerBody({
   text,
   citations,
@@ -238,6 +264,9 @@ export default function AssistantChat() {
   const [error, setError] = useState<string | null>(null)
   const [activeCitation, setActiveCitation] = useState<string | null>(null)
   const [stage, setStage] = useState<string | null>(null)
+  /** The answer as it streams in; empty when nothing is being written. */
+  const [writing, setWriting] = useState('')
+  const isWriting = writing !== ''
 
   const latestAssistant = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -246,9 +275,11 @@ export default function AssistantChat() {
     return null
   }, [messages])
 
+  // Once when writing starts, not on every piece: following the text down
+  // would pull the reader's eye along with it (İ6).
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
+  }, [messages, loading, isWriting])
 
   /** Appends one assistant turn to the transcript from an AssistantResponse
    * payload, whether it arrived via the stream's `answer` event or a classic
@@ -285,6 +316,7 @@ export default function AssistantChat() {
     setLoading(true)
     setError(null)
     setStage(null)
+    setWriting('')
 
     const requestBody = {
       session_id: 'dashboard-default',
@@ -335,8 +367,15 @@ export default function AssistantChat() {
       await readEventStream(res, (name, data) => {
         if (name === 'tool_start') {
           setStage(TOOL_LABEL[String(data.name)] ?? 'Kaynaklar taranıyor')
+        } else if (name === 'answer_delta') {
+          const piece = String(data.text ?? '')
+          setWriting(prev => prev + piece)
+        } else if (name === 'answer_reset') {
+          // What was written came before a tool call; it is not the answer.
+          setWriting('')
         } else if (name === 'answer') {
           answered = true
+          setWriting('')
           appendAssistantMessage(data.payload as AssistantResponse)
         } else if (name === 'error') {
           throw new Error(String(data.error ?? 'akış hatası'))
@@ -350,6 +389,8 @@ export default function AssistantChat() {
       // not surfaced via setError — the reader gets an answer either way, so
       // it is not an error from where they sit.
       console.warn('akış başarısız, klasik uca düşülüyor:', streamErr)
+      // A half-written draft must not sit there looking like the answer.
+      setWriting('')
       try {
         const res = await fetch('/api/assistant/chat', {
           method: 'POST',
@@ -367,6 +408,7 @@ export default function AssistantChat() {
       }
     } finally {
       setStage(null)
+      setWriting('')
       setLoading(false)
     }
   }
@@ -515,7 +557,9 @@ export default function AssistantChat() {
               </article>
             ))}
 
-            {loading && <ThinkingIndicator stage={stage} />}
+            {loading && (isWriting
+              ? <WritingAnswer text={writing} />
+              : <ThinkingIndicator stage={stage} />)}
             <div ref={messagesEndRef} />
           </div>
 
