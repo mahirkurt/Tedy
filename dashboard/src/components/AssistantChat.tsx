@@ -654,7 +654,7 @@ export default function AssistantChat() {
                 {latestAssistant!.planBlocks!.map((b, idx) => (
                   <li key={`${b.day}-${idx}`} className="ac__plan-item">
                     <div className="ac__plan-header">
-                      <Tag type="blue" size="sm">{b.day}</Tag>
+                      <Tag type="gray" size="sm">{b.day}</Tag>
                       <span className="ac__plan-time">{b.estimated_minutes} dk</span>
                     </div>
                     <span className="ac__plan-title">{b.title}</span>

@@ -110,8 +110,10 @@ export interface UnifiedEvent {
   type: 'lesson' | 'homework' | 'private_lesson' | 'ogep' | 'team' | 'sebit' | 'event'
   start: string
   end: string
+  /** The course's mark colour (backend `_takvim_rengi`); grey without a course. */
   color: string
   course?: string
+  courseFamily?: SubjectFamily
   status?: string
   subtitle?: string
 }

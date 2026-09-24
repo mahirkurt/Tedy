@@ -226,6 +226,7 @@ export default function HomeworkTracker() {
             String(nextHw.normalized_course || nextHw["Ders Adı"] || '').trim(),
             String(nextHw["Ödev Başlığı"] || '').trim(),
           ].filter(Boolean).join(' — ') || 'Ödev'}
+          course={String(nextHw.normalized_course || nextHw["Ders Adı"] || '').trim() || undefined}
           stepMinutes={10}
           actionLabel="Başla"
           onAction={() => setSelectedHw(nextHw)}
@@ -256,10 +257,20 @@ export default function HomeworkTracker() {
                 <li key={e.id} className="exams-ahead__row">
                   {/* Live titles often carry the course already ("Özdebir …
                       GİS · İzleme Sınavı"); saying it twice is not information. */}
-                  {!(e.title || '').startsWith(e.course) && (
-                    <span className="exams-ahead__course">{e.course}</span>
+                  {/* The mark leads the row: on the course when it is printed,
+                      on the title when the title already names it. */}
+                  {!(e.title || '').startsWith(e.course) ? (
+                    <>
+                      <span className="exams-ahead__course">
+                        <SubjectLabel course={e.course} family={e.courseFamily} />
+                      </span>
+                      <span className="exams-ahead__title">{e.title}</span>
+                    </>
+                  ) : (
+                    <span className="exams-ahead__title">
+                      <SubjectLabel course={e.course} family={e.courseFamily}>{e.title}</SubjectLabel>
+                    </span>
                   )}
-                  <span className="exams-ahead__title">{e.title}</span>
                   {when && (
                     <span className="exams-ahead__when tedy-time">
                       {describeDaysAhead(when)}

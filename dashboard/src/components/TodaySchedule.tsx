@@ -25,6 +25,8 @@ import { yaptimIsaretle } from '../utils/odevYaptim'
 import type { BookSummary } from '../types'
 import type { HomeworkItem, CalendarEvent, OgepSession, ExamsApiResponse } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
+import SubjectLabel from './SubjectLabel'
+import { subjectClass } from '../utils/subject'
 
 interface ScheduleData {
   latest: { schedule?: { rows: string[][] } }
@@ -38,6 +40,8 @@ interface AgendaItem {
   name: string
   subtitle: string
   type: 'lesson' | 'ogep' | 'deadline' | 'private_lesson' | 'event'
+  /** The course, when the item has one: its mark colours the dot. */
+  course?: string
   isActive: boolean
   isPast: boolean
   period?: number
@@ -51,17 +55,20 @@ type ActiveHomeworkItem = {
   countdown: ReturnType<typeof getCountdown>
 }
 
+// The kind of an item is its icon and its label, not a colour: teal, purple
+// and blue are courses now (Tedy ders renk sistemi) and red is urgency. The
+// dot takes the course's mark; an item without a course is the neutral grey.
+// Red stays on "Teslim" alone — a deadline on today's line is urgent.
 const TYPE_CONFIG: Record<AgendaItem['type'], {
-  color: string
-  tagType: 'blue' | 'teal' | 'red' | 'purple' | 'warm-gray'
+  tagType: 'gray' | 'red'
   label: string
   icon: IconComponent
 }> = {
-  lesson:         { color: 'var(--ted-cat-lesson)', tagType: 'blue',      label: '',           icon: Education },
-  ogep:           { color: 'var(--ted-cat-ogep)', tagType: 'teal',      label: 'ÖGEP',       icon: Bookmark },
-  deadline:       { color: 'var(--ted-cat-homework)', tagType: 'red',       label: 'Teslim',     icon: TaskIcon },
-  private_lesson: { color: 'var(--ted-cat-private-lesson)', tagType: 'warm-gray', label: 'Özel Ders',  icon: UserAvatar },
-  event:          { color: 'var(--ted-cat-team)', tagType: 'purple',    label: 'Etkinlik',   icon: EventSchedule },
+  lesson:         { tagType: 'gray', label: '',          icon: Education },
+  ogep:           { tagType: 'gray', label: 'ÖGEP',      icon: Bookmark },
+  deadline:       { tagType: 'red',  label: 'Teslim',    icon: TaskIcon },
+  private_lesson: { tagType: 'gray', label: 'Özel Ders', icon: UserAvatar },
+  event:          { tagType: 'gray', label: 'Etkinlik',  icon: EventSchedule },
 }
 
 const DAYS_TR = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
@@ -211,6 +218,7 @@ function buildAgenda(
         name: normalizeCourseDisplayName(lines[0]?.trim() || ''),
         subtitle: cleanTeacherNames(teacherRaw),
         type: 'lesson',
+        course: normalizeCourseDisplayName(lines[0]?.trim() || ''),
         isActive: timeState.isActive,
         isPast: timeState.isPast,
         period: +periodMatch[1],
@@ -251,6 +259,7 @@ function buildAgenda(
       name: hw["Ödev Başlığı"],
       subtitle: hw.normalized_course || hw["Ders Adı"],
       type: 'deadline',
+      course: hw.normalized_course || hw["Ders Adı"],
       isActive: false,
       isPast: dayRelation === 0 ? nowMin > startMin : timeState.isPast,
     })
@@ -410,6 +419,7 @@ export default function TodaySchedule() {
         props: {
           eyebrow: voice.eyebrow,
           title: [course, title].filter(Boolean).join(' — ') || 'Ödev',
+          course: course || undefined,
           stepMinutes: 10,
           actionLabel: 'Başla',
           // Opens the box here. It used to navigate to İşler, so "Başla"
@@ -655,7 +665,9 @@ export default function TodaySchedule() {
               onClick={() => navigate('/isler')}
             >
               <span className="today-also__name">
-                {[hw.normalized_course || hw['Ders Adı'], hw['Ödev Başlığı']].filter(Boolean).join(' — ')}
+                <SubjectLabel course={hw.normalized_course || hw['Ders Adı']}>
+                  {[hw.normalized_course || hw['Ders Adı'], hw['Ödev Başlığı']].filter(Boolean).join(' — ')}
+                </SubjectLabel>
               </span>
               {deadline && <span className="today-also__due">{kisaTeslim(deadline, now)}</span>}
             </button>
@@ -666,9 +678,11 @@ export default function TodaySchedule() {
       {/* Exams in the same quiet voice as "Ayrıca": what and when, as a day.
           This block had never rendered — every takvim exam came back "past"
           from the API — and was built with countdown chips and per-course
-          colours, which spend the attention budget and colour a taxonomy
-          rather than a state (İ6, İ8). They follow "Ayrıca":
-          exams weeks away sat above homework due in four days. */}
+          colour fills, which spend the attention budget and colour a taxonomy
+          rather than a state (İ6, İ8). What stays is the subject's 10 px mark,
+          the system's quiet form (the name stays neutral text), as on İşler.
+          They follow "Ayrıca": exams weeks away sat above homework due in four
+          days. */}
       {listeSinavlari.length > 0 && (
         <section className="today-exams" aria-label="Sınavlar">
           <div className="today-also__head">
@@ -681,7 +695,9 @@ export default function TodaySchedule() {
               className="today-also__item"
               onClick={() => navigate('/sinavlar')}
             >
-              <span className="today-also__name">{e.title || e.rawTitle}</span>
+              <span className="today-also__name">
+                <SubjectLabel course={e.course} family={e.courseFamily}>{e.title || e.rawTitle}</SubjectLabel>
+              </span>
               <span className="today-also__due">{kisaTeslim(d, now)}</span>
             </button>
           ))}
@@ -695,7 +711,7 @@ export default function TodaySchedule() {
           </span>
           {yarinSinavlari.map(({ e, d }) => (
             <p key={e.id} className="today-tomorrow__exam">
-              SINAV · {saatDk(d)} · {e.title || e.rawTitle}
+              SINAV · {saatDk(d)} · <SubjectLabel course={e.course} family={e.courseFamily}>{e.title || e.rawTitle}</SubjectLabel>
             </p>
           ))}
           <p className="today-tomorrow__first">
@@ -748,11 +764,11 @@ export default function TodaySchedule() {
                   <div
                     className={[
                       'today-tl__item',
+                      subjectClass(item.course),
                       item.isPast && 'today-tl__item--past',
                       item.isActive && 'today-tl__item--active',
                       item.type === 'deadline' && 'today-tl__item--deadline',
                     ].filter(Boolean).join(' ')}
-                    style={{ '--tl-color': cfg.color } as React.CSSProperties}
                     onClick={item.type === 'deadline' ? () => navigate('/isler') : undefined}
                   >
                     <div className="today-tl__time">
@@ -777,7 +793,7 @@ export default function TodaySchedule() {
                       )}
                       {(cfg.label || item.isActive) && (
                         <div className="today-tl__card-tags">
-                          {item.isActive && <Tag type="blue" size="sm">Devam ediyor</Tag>}
+                          {item.isActive && <Tag type="gray" size="sm">Devam ediyor</Tag>}
                           {cfg.label && <Tag type={cfg.tagType} size="sm">{cfg.label}</Tag>}
                         </div>
                       )}

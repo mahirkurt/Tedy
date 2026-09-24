@@ -43,7 +43,6 @@
   // pair as --tedy-brand-text-secondary / --tedy-brand-rule.
   --ted-color-brand-text-secondary: #{colors.$blue-20};
   --ted-color-brand-rule: #{colors.$blue-60};
-  --ted-color-brand-accent: #{colors.$red-60};
   // Cool grey rather than Carbon's neutral $gray-10. The faint blue cast is the
   // one deliberate deviation from g10's ground: it reads as "school" against
   // the white cards, and neutral grey made the dashboard look unfinished.
@@ -67,7 +66,9 @@
 
   --ted-shadow-card: 0 1px 3px rgb(0 0 0 / 5%), 0 1px 2px rgb(0 0 0 / 8%);
   --ted-shadow-card-hover: 0 4px 12px rgb(0 0 0 / 8%), 0 2px 4px rgb(0 0 0 / 6%);
-  --ted-shadow-popover: 0 8px 24px rgb(0 45 156 / 12%), 0 2px 8px rgb(0 0 0 / 8%);
+  // Carbon's menu shadow (shadow-menu), as the Tedy layer gives popovers. It
+  // was a navy-tinted 24px blur: the brand colour doing a shadow's job.
+  --ted-shadow-popover: 0 2px 6px var(--cds-shadow);
   // Carbon is square by default. The softened corner is intentional TEDY
   // character — this is a child's dashboard, not a console — and it is the
   // second and last deliberate deviation.
@@ -75,8 +76,10 @@
   // alarm: it says "there is fuel here", and only one attention-grabbing
   // colour is allowed per screen (principle İ6). Derived from Carbon's yellow
   // so it stays inside the palette rather than being an invented hex.
-  --ted-day-window: #{rgba(colors.$yellow-30, 0.22)};
-  --ted-day-window-edge: #{rgba(colors.$yellow-60, 0.45)};
+  // Opaque palette steps, not yellow at 22% / 45%: the track under the window
+  // is layer-01, so the same field and edge are these two steps by name.
+  --ted-day-window: #{colors.$yellow-10};
+  --ted-day-window-edge: #{colors.$yellow-30};
   --ted-day-window-text: #{colors.$yellow-80};
 
   // 8px = the module template's --cds-border-radius-08, so a card in the
@@ -96,7 +99,6 @@
 
   --ted-header-bg: var(--ted-color-brand-primary);
   --ted-header-text: var(--ted-color-text-on-color);
-  --ted-accent: var(--ted-color-brand-accent);
   --ted-page-bg: var(--ted-color-page-bg);
   --ted-card-bg: var(--ted-color-layer);
 
@@ -144,16 +146,9 @@
   --status-info: var(--ted-text-info);
   --status-warning: var(--ted-text-warning);
 
-  // ── Event categories ──────────────────────────────────────────────────────
-  // The schedule and calendar each declared this palette independently in TSX
-  // and had already drifted apart. One declaration, read from both.
-  --ted-cat-lesson: var(--ted-color-brand-primary);
-  --ted-cat-homework: var(--ted-color-brand-accent);
-  --ted-cat-ogep: var(--ted-color-accent-teal);
-  --ted-cat-team: var(--ted-color-accent-purple);
-  --ted-cat-event: var(--ted-color-accent-cyan);
-  --ted-cat-private-lesson: var(--cds-support-caution-major);
-  --ted-cat-sebit: var(--cds-text-helper);
+  // No event-category palette: an event's kind is its icon, its colour is its
+  // course's mark (Tedy ders renk sistemi). Every homework was red and every
+  // private lesson orange — meaning colours — and ÖGEP teal read as Fen.
 
   --highlight-active: #{colors.$blue-20};
   --highlight-today: #{colors.$blue-60};
@@ -303,7 +298,7 @@ body {
 // still matches a touchscreen laptop, so pointer users lose nothing.
 @media (any-hover: hover) {
   .dashboard-card:hover {
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.06);
+    box-shadow: var(--ted-shadow-card-hover);
   }
 }
 
@@ -318,7 +313,8 @@ body {
 }
 
 .dashboard-card__title svg {
-  color: var(--ted-color-brand-primary);
+  // The navy belongs to the band (Tedy layer); a title's icon is secondary.
+  color: var(--cds-icon-secondary);
   flex-shrink: 0;
 }
 
@@ -326,9 +322,6 @@ body {
   margin-bottom: 0;
 }
 
-.dashboard-card--accent {
-  border-left-color: var(--ted-accent);
-}
 
 // ─── List Tiles ──────────────────────────────────────────────────────────────
 .dashboard-list-tile.cds--tile {
@@ -383,11 +376,6 @@ body {
 // ─── Today's Schedule ────────────────────────────────────────────────────────
 
 // Animations
-@keyframes today-shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
 @keyframes tl-stagger {
   from { opacity: 0; transform: translateX(-8px); }
   to { opacity: 1; transform: translateX(0); }
@@ -401,14 +389,13 @@ body {
   padding: var(--ted-space-lg) 0;
 }
 
-.today-loading__bar {
+// Carbon's SkeletonPlaceholder in the content's shape (surface designs §2.4),
+// not a hand-drawn gradient shimmer.
+.today-loading__block.cds--skeleton__placeholder {
+  width: 100%;
   height: 56px;
-  border-radius: var(--ted-radius-card);
-  background: linear-gradient(90deg, var(--cds-skeleton-background) 25%, var(--cds-layer-01) 50%, var(--cds-skeleton-background) 75%);
-  background-size: 200% 100%;
-  animation: today-shimmer 1.5s ease-in-out infinite;
 
-  &--short { width: 60%; height: 40px; }
+  &.today-loading__block--short { width: 60%; height: 40px; }
 }
 
 // Empty state
@@ -466,7 +453,7 @@ body {
 .today__nav-btn,
 .today__today-btn {
   border: 1px solid var(--ted-color-border-subtle);
-  background: #fff;
+  background: var(--cds-layer-01);
   color: var(--ted-color-text-secondary);
   border-radius: 999px;
   display: inline-flex;
@@ -495,9 +482,9 @@ body {
 
 .today__nav-btn:hover,
 .today__today-btn:hover {
-  background-color: #edf5ff;
-  color: #0043ce;
-  border-color: #a6c8ff;
+  background-color: #{colors.$blue-10};
+  color: var(--cds-link-primary-hover);
+  border-color: #{colors.$blue-30};
 }
 
 .today__day-name {
@@ -731,14 +718,12 @@ body {
   opacity: 1;
 
   .today-tl__card {
-    background: #edf5ff;
-    border-color: #78a9ff;
-    box-shadow: 0 0 0 1px rgb(15 98 254 / 15%),
-                0 2px 8px rgb(15 98 254 / 8%);
+    background: #{colors.$blue-10};
+    border-color: #{colors.$blue-40};
   }
 
   .today-tl__dot {
-    box-shadow: 0 0 0 3px #d0e2ff;
+    box-shadow: 0 0 0 3px #{colors.$blue-20};
   }
 }
 
@@ -777,7 +762,8 @@ body {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--tl-color, var(--cds-layer-active-01));
+  // The item's course mark; a neutral grey without one (ted-subject--gray).
+  background: var(--ted-subject-accent, var(--cds-layer-active-01));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -786,13 +772,13 @@ body {
   margin-top: 8px;
   flex-shrink: 0;
 
-  svg { fill: #fff; }
+  svg { fill: var(--cds-icon-on-color); }
 }
 
 .today-tl__card {
   background: var(--ted-card-bg);
   border: 1px solid var(--ted-color-border-subtle);
-  border-radius: 6px;
+  border-radius: var(--ted-radius-card);
   padding: 8px 12px;
   min-height: 40px;
   transition: background-color var(--ted-transition-fast);
@@ -846,13 +832,13 @@ body {
   text-align: right;
   @include type.type-style('label-01');
   font-weight: 600;
-  color: #0f62fe;
+  color: var(--cds-interactive);
   font-variant-numeric: tabular-nums;
 }
 
 .today-tl__now-line {
   height: 2px;
-  background: #0f62fe;
+  background: var(--cds-interactive);
   border-radius: 1px;
   position: relative;
 
@@ -864,7 +850,7 @@ body {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #0f62fe;
+    background: var(--cds-interactive);
     transform: translate(-50%, -50%);
   }
 }
@@ -895,7 +881,7 @@ body {
 .dashboard-event-date__day {
   @include type.type-style('heading-03');
   font-weight: 600;
-  color: var(--ted-color-brand-primary);
+  color: var(--cds-text-primary);
 }
 
 .dashboard-event-date__month {
@@ -1020,20 +1006,21 @@ body {
 }
 
 .homework-modal__attachment-link:hover {
-  color: var(--ted-color-brand-primary);
+  color: var(--cds-link-primary-hover);
 }
 
 // ─── Today Timeline — Clickable deadline items ───────────────────────────────
 .today-tl__item--deadline {
   cursor: pointer;
 
+  // A deadline on today's line is urgent: the one place red is spent here.
   .today-tl__card {
-    border-left: 2px solid #da1e28;
+    border-left: 2px solid var(--cds-support-error);
   }
 
   &:not(.today-tl__item--past) .today-tl__card:hover {
-    background-color: #fff1f1;
-    border-color: #a2191f;
+    background-color: var(--cds-notification-background-error);
+    border-color: #{colors.$red-70};
   }
 }
 
@@ -1198,7 +1185,7 @@ body {
 }
 
 .today-column {
-  background-color: #edf5ff;
+  background-color: #{colors.$blue-10};
   font-weight: 600;
 }
 
@@ -1221,7 +1208,7 @@ body {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  border: 2px solid rgb(255 255 255 / 38%);
+  border: 2px solid var(--ted-color-brand-rule);
   flex-shrink: 0;
 }
 
@@ -1235,7 +1222,7 @@ body {
 
 .dashboard-header__user-name {
   font-weight: 600;
-  color: #fff;
+  color: var(--cds-text-on-color);
   max-width: 15.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1248,7 +1235,7 @@ body {
 
 .dashboard-header__user-email {
   @include type.type-style('label-01');
-  color: rgb(255 255 255 / 78%);
+  color: var(--ted-color-brand-text-secondary);
   max-width: 15.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1282,7 +1269,7 @@ body {
   align-items: center;
 
   &:focus-visible {
-    outline: 2px solid #fff;
+    outline: 2px solid var(--cds-focus-inverse);
     outline-offset: 2px;
     border-radius: 12px;
   }
@@ -1304,12 +1291,12 @@ body {
 .dashboard-header__meta .cds--tag--warm-gray { border-color: #{colors.$yellow-30}; }
 .dashboard-header__meta .cds--tag--gray { border-color: #{colors.$gray-50}; }
 
-.cds--header__action svg { fill: #fff !important; }
+.cds--header__action svg { fill: var(--cds-icon-on-color) !important; }
 @media (any-hover: hover) {
   .cds--header__action:hover { background-color: var(--ted-color-brand-primary-hover); }
 }
 .cds--header__action:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--cds-focus-inverse);
   outline-offset: -2px;
 }
 
@@ -1384,7 +1371,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 3rem;
-  color: #fff;
+  color: var(--cds-text-on-color);
 }
 
 // Geometric CSS-only decoration
@@ -1399,7 +1386,7 @@ body {
     width: 420px;
     height: 420px;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--ted-color-brand-primary-hover);
     top: -120px;
     right: -80px;
   }
@@ -1410,7 +1397,7 @@ body {
     width: 280px;
     height: 280px;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--ted-color-brand-primary-hover);
     bottom: -60px;
     left: -40px;
   }
@@ -1434,7 +1421,7 @@ body {
   @include type.type-style('heading-02');
   margin: 0;
   letter-spacing: 0.01em;
-  color: #fff;
+  color: var(--cds-text-on-color);
 }
 
 .login-page__hero-subtitle {
@@ -1446,7 +1433,7 @@ body {
 
 // Form panel (right)
 .login-page__panel {
-  background-color: #fff;
+  background-color: var(--cds-layer-01);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1519,8 +1506,9 @@ body {
 }
 
 .cds--side-nav__link--current {
-  border-left: 3px solid var(--ted-color-brand-primary);
-  background-color: #edf5ff;
+  // Carbon's own current marker; the navy stays on the band.
+  border-left: 3px solid var(--cds-border-interactive);
+  background-color: #{colors.$blue-10};
 }
 
 @media (any-hover: hover) {
@@ -1593,7 +1581,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 6px 0;
-  border-bottom: 1px solid #f4f4f4;
+  border-bottom: 1px solid #{colors.$gray-10};
 }
 
 .health-popover__value {
@@ -1645,7 +1633,7 @@ body {
 .announcements-detail__link {
   @include type.type-style('body-01');
   font-weight: 600;
-  color: var(--ted-color-brand-primary);
+  color: var(--cds-link-primary);
   text-decoration: none;
 
   &:hover {
@@ -1697,25 +1685,28 @@ body {
   opacity: 0.35;
 }
 
-.calendar-legend__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.calendar-legend__icon {
   flex-shrink: 0;
+  fill: var(--cds-icon-secondary);
 }
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: 50px repeat(5, 1fr);
+  // minmax(0, 1fr), not 1fr: a 1fr track grows to its content's min-content,
+  // and one long unbreakable event title ("5,6,7,8. Sınıflar Kulüp
+  // Tanıtımları/ …", 2026-09-24) widened its day and pushed Friday off the grid.
+  grid-template-columns: 50px repeat(5, minmax(0, 1fr));
   gap: 1px;
   background: var(--cds-layer-accent-01);
   border-radius: var(--ted-radius-card);
   overflow: hidden;
 }
 
+// Neutral like a Carbon table head: the navy is the band's, and a navy strip
+// inside the content was a second saturated field on the page.
 .calendar-grid__header {
-  background: var(--ted-color-brand-primary);
-  color: #fff;
+  background: var(--cds-layer-accent-01);
+  color: var(--cds-text-primary);
   padding: 0.5rem;
   text-align: center;
   @include type.type-style('label-01');
@@ -1723,7 +1714,8 @@ body {
 }
 
 .calendar-grid__header--today {
-  background: #0043ce;
+  background: #{colors.$blue-20};
+  box-shadow: inset 0 -2px 0 var(--cds-border-interactive);
 }
 
 .calendar-grid__time {
@@ -1736,7 +1728,7 @@ body {
 }
 
 .calendar-grid__cell {
-  background: #fff;
+  background: var(--cds-layer-01);
   padding: 2px;
   min-height: 48px;
   position: relative;
@@ -1748,51 +1740,55 @@ body {
   opacity: 0.45;
 }
 
-.calendar-grid__cell--past .calendar-event {
-  filter: grayscale(0.5);
-}
 
 .calendar-grid__cell--today {
   background: #{colors.$blue-10};
 }
 
+// An event is a neutral chip with its course's mark as the left edge (İ8:
+// colour as mark, bar and edge; the title stays neutral text) and its kind as
+// an icon. Chips filled with a category colour — red homework, orange private
+// lessons — spent meaning colours on a taxonomy.
 .calendar-event {
   @include type.type-style('label-01');
+  display: flex;
+  align-items: center;
+  gap: 3px;
   padding: 2px 4px;
-  border-radius: 3px;
+  border-left: 3px solid var(--ted-subject-accent, var(--cds-border-strong-01));
+  border-radius: 2px;
   margin-bottom: 1px;
   cursor: pointer;
-  color: #fff;
+  background: var(--cds-layer-02);
+  color: var(--cds-text-primary);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.calendar-event__icon {
+  flex-shrink: 0;
+  fill: var(--cds-icon-secondary);
+}
+
+.calendar-event__title {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 @media (any-hover: hover) {
   .calendar-event:hover {
-    opacity: 0.85;
-    filter: brightness(1.1);
+    background: var(--cds-layer-hover-02);
   }
-}
-
-.calendar-event--homework {
-  border-left: 3px solid var(--cds-support-error);
-  background: var(--cds-notification-background-error);
-  color: var(--ted-text-error);
-}
-
-.calendar-event--private {
-  border-left: 3px solid #{colors.$orange-40};
-  background: #{colors.$orange-10};
-  color: var(--ted-text-warning);
 }
 
 .calendar-event--continuation {
   height: 4px;
+  border-left: 0;
   border-radius: 2px;
   margin: 0 2px 1px;
   padding: 0;
-  opacity: 0.5;
+  background: var(--ted-subject-border, var(--cds-border-subtle-01));
 }
 
 // ── Calendar Popover ──
@@ -1818,16 +1814,6 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--ted-space-xs);
-}
-
-.calendar-popover__type {
-  @include type.type-style('label-01');
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #fff;
-  padding: 2px 8px;
-  border-radius: 8px;
 }
 
 .calendar-popover__close {
@@ -2013,7 +1999,7 @@ body {
 .course-content__card-teacher {
   @include type.type-style('label-01');
   font-weight: 600;
-  color: var(--ted-color-brand-primary);
+  color: var(--cds-text-secondary);
 }
 
 .course-content__card-date {
@@ -2069,11 +2055,11 @@ body {
   // Simplify card visuals
   .dashboard-card {
     border-left-color: transparent;
-    box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+    box-shadow: var(--ted-shadow-card);
   }
 
   .dashboard-card:hover {
-    box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+    box-shadow: var(--ted-shadow-card);
     transform: none;
   }
 }
@@ -2225,7 +2211,7 @@ body {
 
 .platform-a3k-score__value {
   @include type.type-style('heading-compact-01');
-  color: var(--ted-color-brand-primary);
+  color: var(--cds-text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2335,7 +2321,7 @@ body {
 
 .platform-detail-row__score {
   font-weight: 600;
-  color: var(--ted-color-brand-primary);
+  color: var(--cds-text-primary);
 }
 
 .platform-detail-row__teacher {
@@ -2379,7 +2365,7 @@ body {
 
 // ─── DataTable Overrides ────────────────────────────────────────────────
 .cds--data-table .today-column {
-  background-color: #edf5ff;
+  background-color: #{colors.$blue-10};
   font-weight: 600;
 }
 
@@ -2400,7 +2386,7 @@ body {
 
   .cds--side-nav--rail.cds--side-nav--expanded {
     transform: translateX(0);
-    box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 24%);
+    box-shadow: var(--ted-shadow-popover);
   }
 
   .app-shell-nav-scrim {
@@ -2411,7 +2397,7 @@ body {
     width: 100%;
     padding: 0;
     border: 0;
-    background: rgb(0 0 0 / 38%);
+    background: var(--cds-overlay);
   }
 
   .app-shell-content.cds--content {
@@ -2573,7 +2559,7 @@ body {
   }
 
   .calendar-grid {
-    grid-template-columns: 36px repeat(5, 1fr);
+    grid-template-columns: 36px repeat(5, minmax(0, 1fr));
   }
 
   .calendar-grid__header {
@@ -2633,19 +2619,20 @@ body {
 .homework-modal__enrichment {
   margin-top: 1rem;
   padding: 0.75rem 1rem;
-  background: #{colors.$blue-10};
-  border-left: 3px solid var(--ted-color-brand-primary);
+  // An information callout in Carbon's info roles; it borrowed the band's navy.
+  background: var(--cds-notification-background-info);
+  border-left: 3px solid var(--cds-support-info);
   border-radius: 0 var(--ted-radius-sm) var(--ted-radius-sm) 0;
 }
 .homework-modal__enrichment-title {
   @include type.type-style('heading-compact-01');
   margin-bottom: 0.375rem;
-  color: var(--ted-color-brand-primary);
+  color: var(--ted-text-info);
 }
 .homework-modal__enrichment-text {
   @include type.type-style('body-01');
   white-space: pre-wrap;
-  color: var(--cds-text-secondary, #525252);
+  color: var(--cds-text-secondary);
 }
 
 .student-profile {
@@ -2818,7 +2805,7 @@ body {
 
 .exam-section__title {
   @include type.type-style('heading-compact-01');
-  color: var(--ted-color-brand-primary);
+  color: var(--cds-text-primary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: var(--ted-space-sm);
@@ -2863,7 +2850,7 @@ body {
   transition: box-shadow var(--ted-transition-fast);
 
   &:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--ted-shadow-card-hover);
   }
 
   // The left edge is the subject mark (ted-subject--<family>, see _subjects.scss).
@@ -2917,7 +2904,7 @@ body {
   font-weight: 600;
   // The subject's text role (Carbon -70 step, >= 7:1) — the same colour a module
   // gives its kicker, so an exam card and its study module read as one subject.
-  color: var(--ted-subject-text, var(--ted-color-brand-primary));
+  color: var(--ted-subject-text, var(--cds-text-secondary));
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }

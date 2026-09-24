@@ -331,6 +331,16 @@ günleri ve bugünün geçmiş saatleri soluklaşır, etkinlikleri doygunluğunu
 yitirir. Bugün zaten vurguluydu; eksik olan, harcanmış olanın ayırt
 edilmesiydi.
 
+**Tedy ders renk sistemi (2026-09-24).** Etkinliğin **türü ikonudur**, rengi
+dersinin işaretidir. Çip nötr (`layer-02`), dersin rengi yalnız 3 px sol kenar;
+dersi olmayan etkinlik nötr gridir. Önceden her tür bir renk taşıyordu: her ödev
+kırmızı, her özel ders turuncu (anlam renkleri), ÖGEP teal ve takım mor (artık
+Fen ve Matematik). Legend renk noktası yerine ikon gösterir, süzgeç işi aynı.
+Gün başlıkları nötr (`layer-accent-01`); lacivert şerit bandın rengini içeriğe
+taşıyordu. Bugün sütunu `blue-20` başlık ve `border-interactive` alt çizgi.
+Sütunlar `minmax(0, 1fr)`: uzun, kırılmayan bir başlık günü genişletip Cuma'yı
+ızgaranın dışına itiyordu.
+
 **Değerlendirildi, uygulanmadı:** popover'ı satır içi panele çevirmek. Gerekçe
 "kaybolan yüzey"di (İ5), ama popover yalnız dışarı tıklandığında kapanıyor —
 standart davranış, ve okurun yeniden bulmak zorunda kalacağı bir durum
@@ -610,3 +620,4 @@ görüntüsüyle doğrulanır.
 | 1.3 | 2026-09-24 | Sınavlar sessiz liste; yarınki sınav Yarın'ın başında. İşler: "Yaptım" hatası görünür, ders adı tek. Portal saatleri yerel okunur. |
 | 1.4 | 2026-09-24 | Asistan: cevap yazılırken görünür, taslakta çıplak atıf yok; ödev soruları Bugün'ün listesinden, "Yaptım" işaretleriyle. |
 | 1.5 | 2026-09-24 | Asistan tek sesle konuşur: Işık'a "sen", aileye "siz" (sayfa metinleri de); kaynak numaraları okuma sırasıyla. |
+| 1.6 | 2026-09-24 | Tedy Tasarım Sistemi v3 panoda: lacivert yalnız bantta, renk aritmetiği yok, rol token'ları; ders işareti Bugün ve İşler sınavlarında ve ödevlerde; takvim ve zaman çizelgesinde tür ikon, renk ders. |

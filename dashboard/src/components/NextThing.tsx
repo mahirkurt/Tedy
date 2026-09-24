@@ -2,12 +2,15 @@ import { Button } from '@carbon/react'
 import { ArrowRight, Document } from '@carbon/icons-react'
 import './patterns/patterns.scss'
 import './NextThing.scss'
+import SubjectLabel from './SubjectLabel'
 
 export interface NextThingProps {
   /** When this happens — "ŞİMDİ", "BU AKŞAM". */
   eyebrow: string
   /** What it is, named the way Işık would name it. */
   title: string
+  /** The course the work belongs to: its mark leads the title (Tedy İ8). */
+  course?: string
   /** The opening move. A box to start inside, not a claim about length. */
   stepMinutes: number
   stepSuffix?: string
@@ -53,13 +56,15 @@ export function NextThing({
   eyebrow, title, stepMinutes, stepSuffix = 'başla',
   actionLabel, onAction, variant = 'work', hint,
   due, quiet, box, instruction, attachments, onMore, onStop, onDone, doneState = 'bos',
+  course,
 }: NextThingProps) {
+  const baslik = course ? <SubjectLabel course={course}>{title}</SubjectLabel> : title
   if (quiet) {
     return (
       <section className="next-thing next-thing--quiet" aria-label="Okuldan sonraki iş">
         <div className="next-thing__body">
           <span className="next-thing__eyebrow">{eyebrow}</span>
-          <p className="next-thing__title">{title}</p>
+          <p className="next-thing__title">{baslik}</p>
           {due && <span className="next-thing__due">{due}</span>}
         </div>
       </section>
@@ -82,7 +87,7 @@ export function NextThing({
     >
       <div className="next-thing__body">
         <span className="next-thing__eyebrow">{ust}</span>
-        <h2 className="next-thing__title">{title}</h2>
+        <h2 className="next-thing__title">{baslik}</h2>
         {due && <span className="next-thing__due">{due}</span>}
 
         {!box && (

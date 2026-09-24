@@ -64,15 +64,16 @@
 }
 
 .ac__prompt-chip--primary {
-  background: var(--ted-color-brand-primary);
-  border-color: var(--ted-color-brand-primary);
+  // Carbon's action blue: the navy is the band's, not an action colour.
+  background: var(--cds-button-primary);
+  border-color: var(--cds-button-primary);
   color: var(--ted-color-text-on-color);
   font-weight: 600;
 }
 
 .ac__prompt-chip--primary:hover:not(:disabled) {
-  background: var(--ted-color-brand-primary-hover);
-  border-color: var(--ted-color-brand-primary-hover);
+  background: var(--cds-button-primary-hover);
+  border-color: var(--cds-button-primary-hover);
   color: var(--ted-color-text-on-color);
 }
 
@@ -144,8 +145,8 @@
 }
 
 .ac-msg__avatar--user {
-  background: var(--ted-color-brand-primary);
-  color: var(--ted-color-text-on-color);
+  background: var(--cds-layer-accent-01);
+  color: var(--cds-text-primary);
 }
 
 .ac-msg__body {
@@ -271,17 +272,7 @@
   flex-shrink: 0;
 }
 
-.ac__send-group .cds--btn--primary {
-  background-color: var(--ted-color-brand-primary);
-}
-
-.ac__send-group .cds--btn--primary:hover {
-  background-color: var(--ted-color-brand-primary-hover);
-}
-
-.ac__send-group .cds--btn--ghost svg {
-  fill: var(--ted-color-brand-primary);
-}
+// Send and plan buttons keep Carbon's own colours (button-primary, icon-primary).
 
 .ac__error {
   display: flex;

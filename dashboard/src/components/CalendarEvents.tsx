@@ -1,11 +1,15 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
-import { Button } from '@carbon/react'
-import { ChevronLeft, ChevronRight, EventSchedule, Close } from '@carbon/icons-react'
+import { Button, SkeletonPlaceholder, Tag } from '@carbon/react'
+import {
+  Bookmark, ChevronLeft, ChevronRight, Close, Education, EventSchedule, Group, Task, UserAvatar, Video,
+} from '@carbon/icons-react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import type { HealthData, UnifiedEvent } from '../types'
 import { MONTHS_SHORT } from '../utils/formatters'
 import { EmptyLine } from './patterns/EmptyLine'
+import SubjectLabel from './SubjectLabel'
+import { subjectClass } from '../utils/subject'
 
 // ── Constants ──
 
@@ -24,14 +28,18 @@ const TYPE_LABELS: Record<string, string> = {
   event: 'Etkinlik',
 }
 
-const TYPE_COLORS: Record<string, string> = {
-  lesson: 'var(--ted-cat-lesson)',
-  homework: 'var(--ted-cat-homework)',
-  private_lesson: 'var(--ted-cat-private-lesson)',
-  ogep: 'var(--ted-cat-ogep)',
-  team: 'var(--ted-cat-team)',
-  sebit: 'var(--ted-cat-sebit)',
-  event: 'var(--ted-cat-event)',
+// The kind of an event is its icon; its colour is its course's mark (Tedy ders
+// renk sistemi). A colour per kind made every homework red and every private
+// lesson orange — meaning colours — and ÖGEP teal and team purple read as Fen
+// and Matematik.
+const TYPE_ICONS: Record<string, typeof Education> = {
+  lesson: Education,
+  homework: Task,
+  private_lesson: UserAvatar,
+  ogep: Bookmark,
+  team: Group,
+  sebit: Video,
+  event: EventSchedule,
 }
 
 const MONTHS_LONG = [
@@ -204,8 +212,8 @@ export default function CalendarEvents() {
           Haftalık Takvim
         </h2>
         <div className="today-loading">
-          <div className="today-loading__bar" />
-          <div className="today-loading__bar today-loading__bar--short" />
+          <SkeletonPlaceholder className="today-loading__block" />
+          <SkeletonPlaceholder className="today-loading__block today-loading__block--short" />
         </div>
       </div>
     )
@@ -268,17 +276,20 @@ export default function CalendarEvents() {
           // read past before reaching the week itself (İ6). A kind the
           // reader has hidden stays listed, or there would be no way back.
           .filter(([type]) => typesInWeek.has(type) || hiddenTypes.has(type))
-          .map(([type, label]) => (
+          .map(([type, label]) => {
+          const Icon = TYPE_ICONS[type] ?? EventSchedule
+          return (
           <button
             key={type}
             className={`calendar-legend__chip${hiddenTypes.has(type) ? ' calendar-legend__chip--hidden' : ''}`}
             onClick={() => toggleType(type)}
             title={`${label} ${hiddenTypes.has(type) ? 'göster' : 'gizle'}`}
           >
-            <span className="calendar-legend__dot" style={{ background: TYPE_COLORS[type] }} />
+            <Icon size={16} className="calendar-legend__icon" aria-hidden="true" />
             {label}
           </button>
-        ))}
+          )
+        })}
       </div>
 
       {/* Grid */}
@@ -320,9 +331,9 @@ export default function CalendarEvents() {
                   }
                 >
                   {cellEvts.map(ev => {
-                    const isHw = ev.type === 'homework'
-                    const isPrivate = ev.type === 'private_lesson'
-                    const isBlock = !isHw && ev.type !== 'sebit'
+                    const isBlock = ev.type !== 'homework' && ev.type !== 'sebit'
+                    const Icon = TYPE_ICONS[ev.type] ?? EventSchedule
+                    const ders = subjectClass(ev.course, ev.courseFamily)
                     // Only show title in the first hour of a block event
                     const isFirstHour = ev._start ? ev._start.getHours() === hour : true
                     if (!isFirstHour && isBlock) {
@@ -330,8 +341,7 @@ export default function CalendarEvents() {
                       return (
                         <div
                           key={ev.id}
-                          className="calendar-event calendar-event--continuation"
-                          style={{ background: ev.color }}
+                          className={`calendar-event calendar-event--continuation ${ders}`}
                           onClick={() => setSelectedEvent(ev)}
                         />
                       )
@@ -339,16 +349,12 @@ export default function CalendarEvents() {
                     return (
                       <div
                         key={ev.id}
-                        className={[
-                          'calendar-event',
-                          isHw ? 'calendar-event--homework' : '',
-                          isPrivate ? 'calendar-event--private' : '',
-                        ].filter(Boolean).join(' ')}
-                        style={isHw ? {} : { background: ev.color }}
+                        className={`calendar-event ${ders}`}
                         onClick={() => setSelectedEvent(ev)}
-                        title={ev.title}
+                        title={`${TYPE_LABELS[ev.type] ?? ''}: ${ev.title}`}
                       >
-                        {ev.title}
+                        <Icon size={12} className="calendar-event__icon" aria-hidden="true" />
+                        <span className="calendar-event__title">{ev.title}</span>
                       </div>
                     )
                   })}
@@ -363,12 +369,9 @@ export default function CalendarEvents() {
       {selectedEvent && (
         <div className="calendar-popover" ref={popoverRef}>
           <div className="calendar-popover__header">
-            <span
-              className="calendar-popover__type"
-              style={{ background: selectedEvent.color }}
-            >
+            <Tag type="gray" size="sm" renderIcon={TYPE_ICONS[selectedEvent.type] ?? EventSchedule}>
               {TYPE_LABELS[selectedEvent.type] ?? selectedEvent.type}
-            </span>
+            </Tag>
             <button
               className="calendar-popover__close"
               onClick={() => setSelectedEvent(null)}
@@ -387,7 +390,9 @@ export default function CalendarEvents() {
             </p>
           )}
           {selectedEvent.course && (
-            <p className="calendar-popover__meta">Ders: {selectedEvent.course}</p>
+            <p className="calendar-popover__meta">
+              <SubjectLabel course={selectedEvent.course} family={selectedEvent.courseFamily} />
+            </p>
           )}
           {selectedEvent.subtitle && (
             <p className="calendar-popover__meta">{selectedEvent.subtitle}</p>

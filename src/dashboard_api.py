@@ -2083,15 +2083,18 @@ def openai_chat_completions():
 
 
 # --- Color constants for unified calendar ---
-_UNIFIED_COLORS = {
-    "lesson": "#002d9c",
-    "homework": "#da1e28",
-    "private_lesson": "#ff832b",
-    "ogep": "#009d9a",
-    "team": "#8a3ffc",
-    "sebit": "#6f6f6f",
-    "event": "#0072c3",
-}
+def _takvim_rengi(course):
+    """A unified calendar event's colour: its course's mark, or the neutral
+    "genel" grey when it has none (Tedy ders renk sistemi).
+
+    Until 2026-09-24 every event took its category's colour: every homework
+    red, every private lesson orange, ÖGEP teal, team purple, lessons brand
+    navy. Red and orange are meaning colours (urgency, warning), teal and
+    purple are now Fen and Matematik, and the navy is the band's. A category
+    colour read as a subject or an alarm. The kind of event travels in `type`
+    and the dashboard draws it as an icon."""
+    family = subject_themes.family_of(course or "")
+    return {"color": subject_themes.role(family, "accent"), "courseFamily": family}
 
 
 def _make_id(*parts):
@@ -2184,7 +2187,7 @@ def calendar_unified():
                     "type": "lesson",
                     "start": start_dt.isoformat(),
                     "end": end_dt.isoformat(),
-                    "color": _UNIFIED_COLORS["lesson"],
+                    **_takvim_rengi(lesson_name),
                     "course": lesson_name,
                     "subtitle": subtitle,
                 })
@@ -2203,14 +2206,14 @@ def calendar_unified():
             "type": "homework",
             "start": iso_start,
             "end": iso_start,
-            "color": _UNIFIED_COLORS["homework"],
+            **_takvim_rengi(course),
             "course": course,
             "status": status,
         })
 
     # 3. Private lessons
     for pev in _private_lessons_for_week(week_dates):
-        pev["color"] = _UNIFIED_COLORS["private_lesson"]
+        pev.update(_takvim_rengi(pev.get("course", "")))
         events.append(pev)
 
     # 4. ÖGEP sessions
@@ -2226,7 +2229,7 @@ def calendar_unified():
             "type": "ogep",
             "start": _parse_ddmmyyyy_hhmm(start_str),
             "end": _parse_ddmmyyyy_hhmm(end_str),
-            "color": _UNIFIED_COLORS["ogep"],
+            **_takvim_rengi(""),
             "status": status,
         })
 
@@ -2243,7 +2246,7 @@ def calendar_unified():
             "type": "team",
             "start": _parse_ddmmyyyy_hhmm(start_str),
             "end": _parse_ddmmyyyy_hhmm(end_str),
-            "color": _UNIFIED_COLORS["team"],
+            **_takvim_rengi(""),
             "status": status,
         })
 
@@ -2270,7 +2273,7 @@ def calendar_unified():
             "type": "sebit",
             "start": iso_start,
             "end": iso_end,
-            "color": _UNIFIED_COLORS["sebit"],
+            **_takvim_rengi(course),
             "course": course,
             "status": s.get("state_text", ""),
         })
@@ -2285,7 +2288,7 @@ def calendar_unified():
             "type": "event",
             "start": _portal_yerel(ev.get("start", "")),
             "end": _portal_yerel(ev.get("end", ev.get("start", ""))),
-            "color": _UNIFIED_COLORS["event"],
+            **_takvim_rengi(""),
         })
 
     return jsonify({"events": events})
