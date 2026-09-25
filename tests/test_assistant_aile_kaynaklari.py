@@ -220,6 +220,57 @@ def test_reindex_ayri_dizine_yazar_ve_pedagojiyi_ana_indeksten_ayik_tutar(tmp_pa
     assert ana_isabet == []
 
 
+# ── Final review, finding 2: deploy-order exposure ──────────────────────────
+#
+# Until the first successful rebuild after a deploy that changes include/
+# exclude rules, `_load_retriever`/`_load_aile_retriever` used to serve
+# whatever `chunks.json` already had on disk verbatim — including a v1-shaped
+# index built before content/pedagoji (or a cookie file) was excluded. A
+# student question could then reach adult pedagogy text, or session-cookie
+# content, until `reindex()` next ran. The fix drops any persisted chunk
+# whose path is excluded under the CURRENT include/exclude rules of that
+# index at load time, so deploy order cannot expose it even for one request.
+
+def _persist_raw_chunks(path, chunks):
+    import json
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(chunks, ensure_ascii=False), encoding="utf-8")
+
+
+def test_load_retriever_drops_a_stale_pedagoji_chunk_and_a_cookie_chunk(tmp_path):
+    rt = _rt(tmp_path)
+    stale_chunks = [
+        {"chunk_id": "c1", "path": "content/pedagoji/eski-not.md", "chunk_index": 0,
+         "text": "yetiskin pedagoji notu benzersizanahtar", "confidence": 0.9},
+        {"chunk_id": "c2", "path": "output/portal_cookies.json", "chunk_index": 0,
+         "text": "cerez verisi benzersizanahtar", "confidence": 0.9},
+        {"chunk_id": "c3", "path": "output/notlar.txt", "chunk_index": 0,
+         "text": "gercek okul verisi benzersizanahtar", "confidence": 0.9},
+    ]
+    _persist_raw_chunks(rt.config.chunks_path, stale_chunks)
+
+    hits = rt._local_search("benzersizanahtar", 10)
+    paths = {h["path"] for h in hits}
+
+    assert paths == {"output/notlar.txt"}
+
+
+def test_load_aile_retriever_drops_a_chunk_outside_content_pedagoji(tmp_path):
+    rt = _rt(tmp_path)
+    stale_chunks = [
+        {"chunk_id": "c1", "path": "content/pedagoji/gecerli-not.md", "chunk_index": 0,
+         "text": "gecerli pedagoji notu benzersizanahtar", "confidence": 0.9},
+        {"chunk_id": "c2", "path": "output/notlar.txt", "chunk_index": 0,
+         "text": "aile indeksinde olmamasi gereken kayit benzersizanahtar", "confidence": 0.9},
+    ]
+    _persist_raw_chunks(rt.aile_config.chunks_path, stale_chunks)
+
+    hits = rt._aile_search("benzersizanahtar", 10)
+    paths = {h["path"] for h in hits}
+
+    assert paths == {"content/pedagoji/gecerli-not.md"}
+
+
 def test_aile_indeksleyici_pedagojiyi_bulur_ana_indeksleyici_bulmaz(tmp_path):
     _write(tmp_path, "content/pedagoji/01-gelisim-psikolojisi.md", "içerik")
     rt = _rt(tmp_path)

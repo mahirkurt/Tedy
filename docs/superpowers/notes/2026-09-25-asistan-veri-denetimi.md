@@ -46,6 +46,15 @@ Salt-okuma denetim; ölçüm, tahmin değil. Plan: `docs/superpowers/plans/2026-
 
 **(b) Dosya türleri.**
 - **PDF:** pypdf ile yalnız ilk 120 sayfa okunuyor. 10 EBA kitabının 8'i daha uzun (131–222 sayfa).
+  **Düzeltme (final whole-branch review, 2026-09-25):** bu bulgu üretimde doğru değil. Üretim
+  `.venv`'inde `pypdf` kurulu değil — `_extract_pdf_text` her zaman `pdftotext` yoluna düşüyor,
+  o da sayfa sınırı olmadan (`ASSISTANT_PDF_MAX_PAGES` yalnız pypdf dalı çalışırken uygulanıyor,
+  üretimde hiç çalışmıyor) her sayfayı okuyor; tek sınır `ASSISTANT_PDF_TIMEOUT` (eskiden sabit,
+  yapılandırılamaz 40 sn — load 7.8'de gerçek kitaplar 38.6/34.1/29.9 sn sürdü, tam da bu sınırı
+  zorlayacak kadar yakın). Bu denetimdeki "120 sayfada kesiliyor" ölçümü testlerde sahte bir
+  `pypdf` modülüyle üretildi; canlı indekste EBA kitapları zaten tam haldeydi (Matematik 6 1.
+  Kitap, 222 sayfa → 230 parça). Bkz. `docs/superpowers/plans/2026-09-25-asistan-tam-baglam.md`
+  final düzeltme dalgası, bulgu 1 ve 3; güncel gerçek CLAUDE.md'nin BM25 indeks maddesindedir.
 - **Taranmış PDF:** OCR yok, yalnız üst veri kalıyor.
 - **ZIP/XLSX:** üst veri ya da çöp.
 - **Görseller:** OCR kapalı.
@@ -110,7 +119,12 @@ bulgusu için: kapandı (hangi görev) ya da ertelendi (neden).
   göre yeniden yazıldı; ayrıca beş canlı araç (`ders_programi`, `sinavlar`, `takvim`,
   `ders_icerigi`, `notlar`) aynı veriye BM25'in dışından da erişir.
 - `content/eba` 120 sayfada kesiliyordu (10 kitabın 8'i 131–222 sayfa) → **kapandı
-  (Görev 1)**: `ASSISTANT_PDF_MAX_PAGES` 400'e çıktı.
+  (Görev 1)**: `ASSISTANT_PDF_MAX_PAGES` 400'e çıktı. **Düzeltme (final review,
+  2026-09-25):** bu bulgunun kendisi üretimde hiç doğru değildi — üretim `pypdf`
+  kurulu olmadığından hep `pdftotext`'e düşüyor ve sayfa sınırı hiç uygulanmıyor;
+  gerçek sınır `pdftotext`'in zaman aşımıydı (final düzeltme dalgası, bulgu 1),
+  şimdi `ASSISTANT_PDF_TIMEOUT` (180 sn) ile yapılandırılabilir ve zaman aşımı/hata
+  artık "metin yok" ile karıştırılmıyor (`PdfExtractionError`).
 - `content/pedagoji` tavana çarpıp %65'te kalıyordu → **kapandı (Görev 1 + Görev 5)**:
   tavan 15.000'den 30.000'e çıktı, ve `content/pedagoji` artık paylaşılan tavanla hiç
   yarışmıyor — kendi ayrı indeksinde (`aile_kaynak_ara`, Görev 5).
@@ -164,7 +178,10 @@ bulgusu için: kapandı (hangi görev) ya da ertelendi (neden).
   (bu değişmedi — o yalnız arama isabeti), ama birincil yol artık `odev_listesi`
   (tam metin) ve `notlar` (önceki öğretim yılını açıkça etiketleyen) araçları;
   istem bu araçları önce çağırmayı söylüyor.
-- PDF 120 sayfa → **kapandı (Görev 1)**, taranmış PDF/ZIP/XLSX/görsel OCR'ı →
+- PDF 120 sayfa → **kapandı (Görev 1)** — **düzeltme (final review):** bu bulgu
+  üretimde hiç geçerli değildi, bkz. §2b'deki düzeltme notu ve final düzeltme
+  dalgası bulgu 1/3; gerçek üretim yolu (`pdftotext`, sınırsız sayfa, yapılandırılabilir
+  zaman aşımı) orada kapatıldı. Taranmış PDF/ZIP/XLSX/görsel OCR'ı →
   **ertelendi** (yukarıdaki gibi, bu planın kapsamı dışında).
 - `portal_cookies.json`, `book_progress.json`, `crontab`, `.sync_zamanlama.json`,
   `*.pid` indekse sızıyordu → **kapandı (Görev 1)**: hepsi artık

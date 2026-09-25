@@ -53,8 +53,10 @@ def _dusen_dosyalari_yazdir(stats):
     and logs a warning — this CLI summary must not swallow that by only
     printing the counters."""
     dusen = stats.get("dusen_dosyalar") or []
+    nedenler = stats.get("dusen_dosyalar_nedenleri") or {}
     if dusen:
-        print(f"  dusen_dosyalar ({len(dusen)}): {', '.join(dusen)}")
+        etiketli = [f"{p} ({nedenler[p]})" if p in nedenler else p for p in dusen]
+        print(f"  dusen_dosyalar ({len(dusen)}): {', '.join(etiketli)}")
 
 
 if __name__ == "__main__":

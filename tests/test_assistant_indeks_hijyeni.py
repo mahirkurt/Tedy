@@ -10,8 +10,11 @@ Fixtures hold only invented content — never real personal data.
 """
 import json
 import logging
+import subprocess
 import sys
 import types
+
+import pytest
 
 from src.assistant_core import (
     AssistantConfig,
@@ -19,6 +22,7 @@ from src.assistant_core import (
     FileAdapters,
     HybridRetriever,
     INDEX_FORMAT_VERSION,
+    PdfExtractionError,
     turkce_kucult_katla,
 )
 from src.assistant_tools import McpRegistry
@@ -53,6 +57,10 @@ FORBIDDEN_FILES = (
     "output/portal_cookies.json",
     "output/session_cookie_backup.json",
     "output/portal_architecture.json",
+    # Final review, finding 5: same class as portal_architecture.json — scraper
+    # internals/bookkeeping, not school content.
+    "output/page_structure.json",
+    "output/sheets_id.txt",
     "output/book_progress.json",
     "output/homework_first_seen.json",
     "output/run_sync.pid",
@@ -173,6 +181,127 @@ def test_pdf_max_pages_env_override_bounds_extraction(tmp_path, monkeypatch):
     text = adapters._extract_pdf_text(pdf_path)
 
     assert text.count("sayfa ") == 7
+
+
+# ── 3b. PDF timeout / extraction failure (final review, finding 1) ─────────
+#
+# Production's .venv has no pypdf, so `_extract_pdf_text` always falls back
+# to pdftotext. A hard 40s timeout there measured 38.6s/34.1s/29.9s on real
+# textbooks at load 7.8 — close enough to trip. On timeout the old code
+# swallowed the exception and returned "", which `extract()` and
+# `reindex()` then recorded as a legitimate "no text layer" file: a
+# metadata-only manifest entry whose sha256 never changes, so it is never
+# retried. The fix makes the timeout configurable and lets a timeout/error
+# propagate as `PdfExtractionError` instead of being indistinguishable from
+# a genuinely scanned PDF.
+
+def test_pdf_timeout_env_default_is_180(monkeypatch, tmp_path):
+    monkeypatch.delenv("ASSISTANT_PDF_TIMEOUT", raising=False)
+    config = AssistantConfig.from_project_root(tmp_path)
+    assert config.pdf_timeout == 180
+
+
+def test_pdf_timeout_env_override(monkeypatch, tmp_path):
+    monkeypatch.setenv("ASSISTANT_PDF_TIMEOUT", "45")
+    config = AssistantConfig.from_project_root(tmp_path)
+    assert config.pdf_timeout == 45
+
+
+def test_pdftotext_receives_the_configured_timeout(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASSISTANT_PDF_TIMEOUT", "45")
+    config = AssistantConfig.from_project_root(tmp_path)
+    adapters = FileAdapters(config)
+    pdf_path = tmp_path / "kitap.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4 fake")
+
+    seen = {}
+
+    def spy(cmd, **kw):
+        seen["timeout"] = kw.get("timeout")
+        return subprocess.CompletedProcess(cmd, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("src.assistant_core.subprocess.run", spy)
+    adapters._extract_pdf_text(pdf_path)
+
+    assert seen["timeout"] == 45
+
+
+def test_pdf_extraction_timeout_raises_instead_of_returning_empty(tmp_path, monkeypatch):
+    config = AssistantConfig.from_project_root(tmp_path)
+    adapters = FileAdapters(config)
+    pdf_path = tmp_path / "kitap.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4 fake")
+
+    def timeout_run(cmd, **kw):
+        raise subprocess.TimeoutExpired(cmd=cmd, timeout=kw.get("timeout", 0))
+
+    monkeypatch.setattr("src.assistant_core.subprocess.run", timeout_run)
+
+    with pytest.raises(PdfExtractionError) as exc_info:
+        adapters._extract_pdf_text(pdf_path)
+    assert exc_info.value.reason == "timeout"
+
+
+def test_pdf_subprocess_error_also_raises_not_silently_empty(tmp_path, monkeypatch):
+    config = AssistantConfig.from_project_root(tmp_path)
+    adapters = FileAdapters(config)
+    pdf_path = tmp_path / "kitap.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4 fake")
+
+    def broken_run(cmd, **kw):
+        raise FileNotFoundError("pdftotext not found")
+
+    monkeypatch.setattr("src.assistant_core.subprocess.run", broken_run)
+
+    with pytest.raises(PdfExtractionError) as exc_info:
+        adapters._extract_pdf_text(pdf_path)
+    assert exc_info.value.reason == "error"
+
+
+def test_genuinely_scanned_pdf_returns_empty_text_without_raising(tmp_path, monkeypatch):
+    """A PDF pdftotext runs cleanly on but extracts nothing from (a scanned
+    page with no text layer) is a real fact about the file, not a failure —
+    must still return "" rather than raising."""
+    config = AssistantConfig.from_project_root(tmp_path)
+    adapters = FileAdapters(config)
+    pdf_path = tmp_path / "kitap.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4 fake")
+
+    def empty_run(cmd, **kw):
+        return subprocess.CompletedProcess(cmd, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("src.assistant_core.subprocess.run", empty_run)
+    text = adapters._extract_pdf_text(pdf_path)
+
+    assert text == ""
+
+
+def test_pdf_timeout_during_reindex_gets_no_manifest_entry_and_a_named_reason(tmp_path, monkeypatch):
+    _project(tmp_path, monkeypatch)
+    _write(tmp_path, "content/eba/kitap.pdf", "gercek PDF degil, icerik onemli degil")
+
+    def timeout_run(cmd, **kw):
+        raise subprocess.TimeoutExpired(cmd=cmd, timeout=kw.get("timeout", 0))
+
+    monkeypatch.setattr("src.assistant_core.subprocess.run", timeout_run)
+
+    runtime = AssistantRuntime(tmp_path)
+    stats = runtime.reindex(incremental=False)
+
+    manifest = json.loads(runtime.config.manifest_path.read_text(encoding="utf-8"))
+    chunks = json.loads(runtime.config.chunks_path.read_text(encoding="utf-8"))
+
+    assert "content/eba/kitap.pdf" not in manifest["files"]
+    assert [c for c in chunks if c["path"] == "content/eba/kitap.pdf"] == []
+    assert "content/eba/kitap.pdf" in stats["dusen_dosyalar"]
+    assert stats["dusen_dosyalar_nedenleri"]["content/eba/kitap.pdf"] == "timeout"
+
+    # Retried next run: no manifest entry exists to "match" a sha256 against,
+    # so the file is reprocessed (and fails again here, on purpose) rather
+    # than being treated as already indexed forever.
+    stats2 = runtime.reindex(incremental=True)
+    assert "content/eba/kitap.pdf" in stats2["dusen_dosyalar"]
+    assert stats2["dusen_dosyalar_nedenleri"]["content/eba/kitap.pdf"] == "timeout"
 
 
 # ── 4. Türkçe belirteçleme ───────────────────────────────────────────────────

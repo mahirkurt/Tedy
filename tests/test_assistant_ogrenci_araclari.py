@@ -228,6 +228,35 @@ def test_sinavlar_api_exams_ile_ayni_listeyi_verir(api, monkeypatch):
     assert out.citations[0]["label"] == "Sınavlar"
 
 
+def test_canli_sinavlar_passes_istanbul_clock_not_host_utc(api, monkeypatch):
+    """Final review, finding 6: `sinavlar` classifies upcoming/past through
+    `_canli_sinavlar` -> `_sinav_listesi(data, now=...)`. The route
+    (`/api/exams`) keeps its own bare `datetime.now()` — the host runs on
+    Etc/UTC and that is unchanged here — but the assistant's own copy must
+    pass `now=istanbul_simdi()`, or an exam within the ~3-hour Istanbul/UTC
+    skew of "now" is classified on the wrong side of upcoming/past."""
+    from src.assistant_tools import istanbul_simdi
+
+    veri = _sinav_verisi()
+    monkeypatch.setattr(api, "_scraped", lambda: _kopya(veri))
+
+    calls = []
+    orijinal = api._sinav_listesi
+
+    def casus(data, now=None):
+        calls.append(now)
+        return orijinal(data, now=now)
+
+    monkeypatch.setattr(api, "_sinav_listesi", casus)
+
+    api._canli_sinavlar()
+
+    assert len(calls) == 1
+    assert calls[0] is not None
+    fark = abs((calls[0] - istanbul_simdi()).total_seconds())
+    assert fark < 2  # a real Istanbul wall-clock reading, not the bare host clock
+
+
 def test_sinavlar_metni_tarih_ve_turu_yazar():
     simdi = datetime(2026, 9, 24, 16, 10)
     sinavlar = [

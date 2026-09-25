@@ -858,8 +858,15 @@ def _canli_program():
 
 
 def _canli_sinavlar():
-    """The exams /api/exams serves, in its order."""
-    return _sinav_listesi(_scraped())["exams"]
+    """The exams /api/exams serves, in its order.
+
+    Unlike the route, this passes `now=istanbul_simdi()` (final review,
+    finding 6): the host runs on Etc/UTC, and `_sinav_listesi`'s own default
+    (`datetime.now()`) is the bare host clock — comparing an Istanbul-local
+    event time against it misclassifies anything within the ~3-hour skew.
+    The route's own behaviour is intentionally left unchanged."""
+    from src.assistant_tools import istanbul_simdi
+    return _sinav_listesi(_scraped(), now=istanbul_simdi())["exams"]
 
 
 # How far ahead the assistant's calendar reaches for private lessons; the

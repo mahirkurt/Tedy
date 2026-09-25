@@ -106,6 +106,11 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     # school content (audit §2c).
     "*cookie*",
     "portal_architecture.json",
+    # Final review, finding 5: same class as portal_architecture.json —
+    # scraper-internal page structure map and a Google Sheets id, not school
+    # content.
+    "page_structure.json",
+    "sheets_id.txt",
     # Per-person Tedy Books reading position (emails, reading location).
     "book_progress.json",
     # Process/cron bookkeeping: pid files, crontab dumps, the sync scheduler state.
@@ -178,6 +183,7 @@ class AssistantConfig:
     max_file_size_mb: int
     max_chunks: int
     pdf_max_pages: int
+    pdf_timeout: int
     chunk_size: int
     chunk_overlap: int
     retrieval_k: int
@@ -212,10 +218,21 @@ class AssistantConfig:
             "ASSISTANT_MAX_FILE_SIZE_MB", "250"))
         max_chunks = int(os.environ.get(
             "ASSISTANT_MAX_CHUNKS", "30000"))
-        # 120 lost 8 of the 10 EBA books (131-222 pages each; audit §2b).
-        # 400 covers every measured book with headroom.
+        # 120 lost 8 of the 10 EBA books (131-222 pages each; audit §2b) —
+        # but this cap only ever applies when pypdf is installed. Production
+        # has no pypdf (final review, finding 3): _extract_pdf_text always
+        # falls back to pdftotext there, which reads every page uncapped,
+        # bounded only by ASSISTANT_PDF_TIMEOUT below.
         pdf_max_pages = int(os.environ.get(
             "ASSISTANT_PDF_MAX_PAGES", "400"))
+        # The pdftotext fallback's timeout (final review, finding 1). A hard
+        # 40s used to be baked in; measured at load 7.8 real textbooks took
+        # 38.6s/34.1s/29.9s — close enough to trip it, and a timeout used to
+        # be indistinguishable from "this PDF genuinely has no text layer"
+        # (see PdfExtractionError). 180s covers the measured worst case with
+        # headroom.
+        pdf_timeout = int(os.environ.get(
+            "ASSISTANT_PDF_TIMEOUT", "180"))
 
         if include_dirs is not None:
             includes = set(include_dirs)
@@ -258,6 +275,7 @@ class AssistantConfig:
             max_file_size_mb=max_file_size_mb,
             max_chunks=max_chunks,
             pdf_max_pages=pdf_max_pages,
+            pdf_timeout=pdf_timeout,
             chunk_size=int(os.environ.get("ASSISTANT_CHUNK_SIZE", "1400")),
             chunk_overlap=int(os.environ.get("ASSISTANT_CHUNK_OVERLAP", "220")),
             retrieval_k=int(os.environ.get("ASSISTANT_RETRIEVAL_K", "8")),
@@ -540,6 +558,15 @@ class ClaudeClient:
     EN_COK_GORSEL = 2
     GORSEL_SINIRI = 1_500_000
 
+    # Final review, finding 4: `ogrenci_verisi_ara`/`kitap_ara`/`aile_kaynak_ara`
+    # size their own body to ~3,900 chars, but the `[S#] label` marks
+    # `chat_with_tools` prefixes onto it are not counted against that budget —
+    # with >=8 citations the marks alone add well over 100 chars, and a plain
+    # `[:4000]` used to cut the tail of the last hit's text with no visible
+    # sign. Any actual cut now leaves this marker instead.
+    KESME_ISARETI = "…[kesildi]"
+    TOOL_RESULT_SINIRI = 4000
+
     @classmethod
     def _sonuc_icerigi(cls, body: str | None,
                        images: list[dict[str, Any]] | None) -> str | list[dict[str, Any]]:
@@ -547,29 +574,45 @@ class ClaudeClient:
         returned images (figur_getir) — a list of a text block and up to two
         image blocks, so the model sees the figure it is asked to explain.
         An image left out is named in the text; a silent drop would let the
-        model describe a picture it never saw."""
-        metin = (body or "").strip()[:4000] or "(sonuç boş)"
-        if not images:
-            return metin
-        from src.assistant_tools import GORSEL_BICIMLERI
+        model describe a picture it never saw.
+
+        The 4,000-char budget is shared between the body (marks + tool text)
+        and any image-overflow notes: notes are reserved first (they are
+        short and load-bearing — an image the model was not actually sent
+        must always be named), then the body is truncated to what remains,
+        with a visible marker if it did not already fit — never a silent
+        `[:4000]` that could land inside the last citation's text."""
+        raw = (body or "").strip()
 
         bloklar: list[dict[str, Any]] = []
         notlar: list[str] = []
-        for g in images:
-            data = str(g.get("data") or "")
-            mime = str(g.get("mimeType") or "")
-            if len(bloklar) >= cls.EN_COK_GORSEL:
-                notlar.append("(bir görsel daha var; en çok iki görsel gönderilir)")
-            elif len(data) > cls.GORSEL_SINIRI:
-                notlar.append("(görsel çok büyük; gönderilmedi)")
-            elif mime not in GORSEL_BICIMLERI or not data:
-                notlar.append("(görsel biçimi desteklenmiyor; gönderilmedi)")
-            else:
-                bloklar.append({"type": "image", "source": {
-                    "type": "base64", "media_type": mime, "data": data}})
-        if notlar:
-            ek = "\n" + "\n".join(dict.fromkeys(notlar))
-            metin = metin[:4000 - len(ek)] + ek
+        if images:
+            from src.assistant_tools import GORSEL_BICIMLERI
+
+            for g in images:
+                data = str(g.get("data") or "")
+                mime = str(g.get("mimeType") or "")
+                if len(bloklar) >= cls.EN_COK_GORSEL:
+                    notlar.append("(bir görsel daha var; en çok iki görsel gönderilir)")
+                elif len(data) > cls.GORSEL_SINIRI:
+                    notlar.append("(görsel çok büyük; gönderilmedi)")
+                elif mime not in GORSEL_BICIMLERI or not data:
+                    notlar.append("(görsel biçimi desteklenmiyor; gönderilmedi)")
+                else:
+                    bloklar.append({"type": "image", "source": {
+                        "type": "base64", "media_type": mime, "data": data}})
+
+        ek = ("\n" + "\n".join(dict.fromkeys(notlar))) if notlar else ""
+        limit = max(cls.TOOL_RESULT_SINIRI - len(ek), 0)
+        if len(raw) > limit:
+            cut_at = max(limit - len(cls.KESME_ISARETI), 0)
+            metin = raw[:cut_at] + cls.KESME_ISARETI
+        else:
+            metin = raw
+        metin = (metin or "(sonuç boş)") + ek
+
+        if not images:
+            return metin
         return [{"type": "text", "text": metin}, *bloklar]
 
     SON_TUR_NOTU = ("Araç bütçesi doldu; yeni araç çağıramazsın. Topladığın sonuçlarla "
@@ -853,6 +896,18 @@ def _fmt_exam_map(data: dict) -> str:
     return "\n".join(parts)
 
 
+class PdfExtractionError(Exception):
+    """Raised by `FileAdapters._extract_pdf_text` when extraction genuinely
+    failed or timed out — never for a PDF that ran cleanly and simply has no
+    text layer (a scanned page). `extract()`/`reindex()` must not create a
+    manifest entry for a file that raises this: it needs to be retried, not
+    permanently recorded as "indexed, no text" (final review, finding 1)."""
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
 class FileAdapters:
     def __init__(self, config: AssistantConfig):
         self.config = config
@@ -895,7 +950,20 @@ class FileAdapters:
             }
 
         if ext in PDF_EXTENSIONS:
-            text = self._extract_pdf_text(file_path)
+            try:
+                text = self._extract_pdf_text(file_path)
+            except PdfExtractionError as exc:
+                # Not "no text layer" — a timeout or a real extraction
+                # failure. The caller (reindex()) must not persist a
+                # manifest entry for this: it needs to be retried, and named
+                # with its reason, not silently indexed as blank forever.
+                return {
+                    "text": "",
+                    "source_kind": "metadata",
+                    "confidence": 0.0,
+                    "warnings": [f"pdf_extraction_{exc.reason}"],
+                    "extraction_error": exc.reason,
+                }
             return {
                 "text": text or self._metadata_only_text(rel_path, file_path, reason="pdf_no_text"),
                 "source_kind": "pdf" if text else "metadata",
@@ -978,20 +1046,31 @@ class FileAdapters:
         except Exception:
             pass
 
-        # Optional fallback to pdftotext if present.
+        # Fallback to pdftotext — the only path that actually runs in
+        # production, which has no pypdf installed (final review, finding
+        # 3). Uncapped: pdftotext reads every page, bounded only by the
+        # configurable timeout below, not by pdf_max_pages.
         try:
             proc = subprocess.run(
                 ["pdftotext", "-layout", str(file_path), "-"],
                 capture_output=True,
                 text=True,
-                timeout=40,
+                timeout=self.config.pdf_timeout,
                 check=False,
             )
-            if proc.returncode == 0 and proc.stdout.strip():
-                return proc.stdout
-        except Exception:
-            pass
+        except subprocess.TimeoutExpired as exc:
+            raise PdfExtractionError("timeout") from exc
+        except Exception as exc:
+            # pdftotext missing, permission denied, etc. — a deployment/
+            # environment problem, not a fact about this PDF's content.
+            raise PdfExtractionError("error") from exc
 
+        if proc.returncode == 0 and proc.stdout.strip():
+            return proc.stdout
+
+        # pdftotext ran to completion and produced nothing: a genuinely
+        # scanned PDF with no text layer. A real fact about the file, not an
+        # extraction failure — return "" normally rather than raising.
         return ""
 
     def _extract_image_text(self, file_path: Path) -> str:
@@ -1059,6 +1138,12 @@ class AssistantIndexer:
         new_manifest_files: dict[str, dict[str, Any]] = {}
         new_chunks: list[dict[str, Any]] = []
         new_embeddings: dict[str, list[float]] = {}
+        # Final review, finding 1: files whose extraction failed or timed
+        # out (PdfExtractionError) rather than being cut by the chunk cap —
+        # named with a reason, on top of the plain dusen_dosyalar listing
+        # both share (dropped_files below is "discovered minus manifest",
+        # which already includes these with no extra bookkeeping).
+        failed_extractions: dict[str, str] = {}
 
         changed = 0
         unchanged = 0
@@ -1113,6 +1198,20 @@ class AssistantIndexer:
                 continue
 
             extracted = self.adapters.extract(file_path, rel_path)
+
+            extraction_error = extracted.get("extraction_error")
+            if extraction_error:
+                # No manifest entry, no chunks: sha256 stays unmatched next
+                # run, so this file is retried in full rather than being
+                # recorded as "indexed, no text" forever (final review,
+                # finding 1).
+                failed_extractions[rel_path] = str(extraction_error)
+                logger.warning(
+                    "assistant index: extraction failed for %s (%s) — "
+                    "no manifest entry written, will retry next run",
+                    rel_path, extraction_error)
+                continue
+
             text = str(extracted.get("text", ""))
             source_kind = str(extracted.get("source_kind", "text"))
             confidence = float(extracted.get("confidence", 0.5))
@@ -1170,10 +1269,14 @@ class AssistantIndexer:
             {file_path.relative_to(self.config.project_root).as_posix() for file_path in discovered}
             - set(new_manifest_files.keys())
         )
-        if dropped_files:
+        # Extraction failures already logged their own reason above; this
+        # message is specifically about the chunk cap, so it only names the
+        # files that landed here because of it.
+        cap_dropped = [p for p in dropped_files if p not in failed_extractions]
+        if cap_dropped:
             logger.warning(
                 "assistant index: chunk cap (%d) reached — %d file(s) dropped: %s",
-                max_chunks, len(dropped_files), ", ".join(dropped_files))
+                max_chunks, len(cap_dropped), ", ".join(cap_dropped))
 
         total_embedded = len(new_embeddings)
         meta = {
@@ -1185,6 +1288,11 @@ class AssistantIndexer:
             "unchanged_files": unchanged,
             "deleted_files": deleted,
             "dusen_dosyalar": dropped_files,
+            # Final review, finding 1: a reason for the subset of
+            # dusen_dosyalar that failed extraction (timeout/error) rather
+            # than being cut by the chunk cap — path -> reason ("timeout"/
+            # "error"). Cap-dropped files have no entry here.
+            "dusen_dosyalar_nedenleri": failed_extractions,
             # Report total persisted embeddings so incremental runs keep stable visibility.
             "embedded_chunks": total_embedded,
             "embedded_chunks_new": embedded,
@@ -1269,6 +1377,33 @@ class AssistantIndexer:
             files.extend(group)
 
         return files
+
+    def is_path_currently_included(self, rel_path: str) -> bool:
+        """Whether `rel_path` would be discovered under this indexer's
+        CURRENT include/exclude rules (final review, finding 2).
+
+        `_load_retriever`/`_load_aile_retriever` load `chunks.json` straight
+        off disk; until the next successful `reindex()`, that file can still
+        hold chunks a rule change (a new excluded dir/pattern, or an
+        include_dirs change like Görev 5's separate content/pedagoji index)
+        would no longer produce — e.g. a v1-shaped main index still carrying
+        content/pedagoji or a session-cookie chunk. Re-checking each
+        persisted chunk's path against the live rules at load time closes
+        that window instead of waiting for a rebuild."""
+        normalized = rel_path.strip("/")
+        if not normalized:
+            return False
+        if not any(normalized == d or normalized.startswith(d + "/")
+                   for d in self.config.include_dirs):
+            return False
+        parent = str(Path(normalized).parent).replace("\\", "/")
+        if parent == ".":
+            parent = ""
+        if self._is_excluded_dir(parent):
+            return False
+        if self._is_excluded_file(normalized):
+            return False
+        return True
 
     def _is_excluded_dir(self, rel_dir: str) -> bool:
         normalized = rel_dir.strip("/")
@@ -2458,6 +2593,12 @@ class AssistantRuntime:
         chunks = self._load_json(self.config.chunks_path, [])
         if not isinstance(chunks, list):
             chunks = []
+        # Final review, finding 2: a persisted chunk whose path a rule change
+        # (or a stale pre-migration index) would no longer discover must
+        # never be served, even for the one request window before the next
+        # reindex() — see AssistantIndexer.is_path_currently_included.
+        chunks = [c for c in chunks if isinstance(c, dict)
+                  and self.indexer.is_path_currently_included(str(c.get("path", "")))]
         embeddings = self._load_json(self.config.embeddings_path, {})
         if not isinstance(embeddings, dict):
             embeddings = {}
@@ -2470,7 +2611,8 @@ class AssistantRuntime:
 
     def _load_aile_retriever(self) -> HybridRetriever:
         """Same lazy, mtime-cached load as `_load_retriever`, over the
-        separate content/pedagoji index (Görev 5)."""
+        separate content/pedagoji index (Görev 5) — filtered the same way,
+        symmetrically, against the family index's own (narrower) rules."""
         chunks_mtime = (self.aile_config.chunks_path.stat().st_mtime
                         if self.aile_config.chunks_path.exists() else 0.0)
         if self._aile_retriever and chunks_mtime == self._aile_retriever_cache_mtime:
@@ -2479,6 +2621,8 @@ class AssistantRuntime:
         chunks = self._load_json(self.aile_config.chunks_path, [])
         if not isinstance(chunks, list):
             chunks = []
+        chunks = [c for c in chunks if isinstance(c, dict)
+                  and self.aile_indexer.is_path_currently_included(str(c.get("path", "")))]
 
         self._aile_retriever = HybridRetriever(chunks=chunks)
         self._aile_retriever_cache_mtime = chunks_mtime
