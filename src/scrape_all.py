@@ -267,6 +267,12 @@ def scrape_ogrenci_profili(driver):
     url = f"{BASE_URL}/pages/ogrenci_istekler/p_temel_bilgiler"
     driver.get(url)
     time.sleep(3)
+    # A dropped session redirects here to the login page, and every label on it
+    # was read as a profile field: on 2026-09-25 Profil showed one field, "Beni
+    # hatırla / Remember Me: on", in place of fifteen. Raising lets run_sync
+    # keep the last good reading and name the section as unread.
+    if "/login" in (driver.current_url or "").lower():
+        raise RuntimeError("profil sayfası yerine giriş sayfası geldi (oturum düşmüş)")
 
     fields = {}
 

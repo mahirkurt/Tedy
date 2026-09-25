@@ -131,6 +131,9 @@
 
 @media (max-width: 42rem) {
   .next-thing { padding: $spacing-05; }
+  // The quiet variant is a line in the page, not a card: it keeps the page's
+  // edge. The rule above, later in the file, indented it 16px on phones.
+  .next-thing--quiet { padding-inline: 0; }
   .next-thing__action { flex: 1 1 100%; }
   .next-thing__action .cds--btn--primary { width: 100%; }
 }

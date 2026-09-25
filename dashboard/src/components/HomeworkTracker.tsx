@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, Button, InlineLoading } from '@carbon/react'
+import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, Button, InlineLoading, Link } from '@carbon/react'
 import { Timer, Document, CheckmarkFilled, CloseFilled, ChevronDown, ChevronUp } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import type { HomeworkItem } from '../types'
@@ -163,13 +163,11 @@ export default function HomeworkTracker() {
   const renderAccordionSection = ({
     keyName,
     title,
-    labelClass,
     items,
     showDoneAction,
   }: {
     keyName: HomeworkGroupKey
     title: string
-    labelClass?: string
     items: HomeworkItem[]
     showDoneAction?: boolean
   }) => {
@@ -182,7 +180,10 @@ export default function HomeworkTracker() {
           aria-expanded={!isCollapsed(keyName)}
           type="button"
         >
-          <span className={["hw-section__label", labelClass].filter(Boolean).join(' ')}>{title}</span>
+          {/* Neutral like "Aktif Ödevler": a settled group's label was painted
+              blue, green or red, putting history in colour above the work
+              still owed (İ7), and red is kept for urgency. */}
+          <span className="hw-section__label">{title}</span>
           <span className="hw-section__count">{items.length}</span>
           {isCollapsed(keyName) ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
         </button>
@@ -289,10 +290,16 @@ export default function HomeworkTracker() {
               )
             })}
           </ul>}
+          {/* A link, not a ghost button: it goes to a page, and the button's
+              padding set its text 16px off the list's edge. */}
           {!focusMode && (
-            <Button kind="ghost" size="sm" onClick={() => navigate('/sinavlar')}>
+            <Link
+              href="/sinavlar"
+              className="exams-ahead__all"
+              onClick={e => { e.preventDefault(); navigate('/sinavlar') }}
+            >
               Tüm sınavlar
-            </Button>
+            </Link>
           )}
         </div>
       )}
@@ -300,21 +307,18 @@ export default function HomeworkTracker() {
       {!focusMode && renderAccordionSection({
         keyName: 'yapilan',
         title: 'Yapılan',
-        labelClass: 'hw-section__label--info',
         items: yapilan,
       })}
 
       {!focusMode && renderAccordionSection({
         keyName: 'tamamlanan',
         title: 'Tamamlandı',
-        labelClass: 'hw-section__label--success',
         items: tamamlanan,
       })}
 
       {!focusMode && renderAccordionSection({
         keyName: 'yapilmayan',
         title: 'Yapılmayan',
-        labelClass: 'hw-section__label--error',
         items: yapilmayan,
       })}
     </div>

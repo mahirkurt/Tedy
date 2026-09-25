@@ -302,9 +302,12 @@ export default function AssistantChat() {
   }, [messages])
 
   // Once when writing starts, not on every piece: following the text down
-  // would pull the reader's eye along with it (İ6).
+  // would pull the reader's eye along with it (İ6). The pane scrolls, never
+  // the window: scrollIntoView moved every scrollable ancestor, so on a phone
+  // opening Asistan slid the page past its own title and prompts.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const pane = messagesEndRef.current?.parentElement
+    if (pane) pane.scrollTop = pane.scrollHeight
   }, [messages, loading, isWriting])
 
   /** Appends one assistant turn to the transcript from an AssistantResponse

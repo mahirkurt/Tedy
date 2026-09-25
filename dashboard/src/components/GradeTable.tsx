@@ -69,7 +69,12 @@ export default function GradeTable() {
             <Table {...getTableProps()}>
               <TableHead>
                 <TableRow>
-                  {!focusMode && <TableExpandHeader {...getExpandHeaderProps()} />}
+                  {/* A header cell with no text is a blank column to a screen reader (axe). */}
+                  {!focusMode && (
+                    <TableExpandHeader {...getExpandHeaderProps()}>
+                      <span className="cds--visually-hidden">Ayrıntı</span>
+                    </TableExpandHeader>
+                  )}
                   {dtHeaders.map(header => (
                     <TableHeader
                       {...getHeaderProps({ header })}

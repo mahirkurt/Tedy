@@ -66,9 +66,17 @@ function ExamCard({ exam, showCountdown, focusMode }: {
     <Tile className={`${cardClass} ${subjectClass(exam.course, exam.courseFamily)}`}>
       <div className="exam-card__header">
         <div className="exam-card__info">
-          <span className="exam-card__course">{exam.course}</span>
+          {/* Live titles often carry the course already ("Özdebir … GİS ·
+              İzleme Sınavı"); the kicker said it a second time. İşler drops it
+              by the same rule. The left edge still carries the subject. */}
+          {!(exam.title || exam.rawTitle || '').startsWith(exam.course) && (
+            <span className="exam-card__course">{exam.course}</span>
+          )}
           <span className="exam-card__title">{exam.title || exam.rawTitle}</span>
-          <span className="exam-card__date">{formatExamDate(exam.date)}</span>
+          {/* No line when the portal gives no date: the graded exams come from
+              the grade table, which carries none, and "Tarih bilinmiyor" under
+              every one of 25 cards was the same sentence 25 times (İ6). */}
+          {exam.date && <span className="exam-card__date">{formatExamDate(exam.date)}</span>}
         </div>
         <div className="exam-card__badges">
           {showCountdown && countdown && (
@@ -199,7 +207,7 @@ export default function ExamTimeline() {
 
       {upcoming.length > 0 && (
         <div className="exam-section">
-          <h3 className="exam-section__title">Yaklaşan Sınavlar</h3>
+          <h2 className="exam-section__title">Yaklaşan Sınavlar</h2>
           <div className="exam-section__list">
             {upcoming.map(exam => (
               <ExamCard key={exam.id} exam={exam} showCountdown focusMode={focusMode} />

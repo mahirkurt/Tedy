@@ -620,4 +620,5 @@ görüntüsüyle doğrulanır.
 | 1.3 | 2026-09-24 | Sınavlar sessiz liste; yarınki sınav Yarın'ın başında. İşler: "Yaptım" hatası görünür, ders adı tek. Portal saatleri yerel okunur. |
 | 1.4 | 2026-09-24 | Asistan: cevap yazılırken görünür, taslakta çıplak atıf yok; ödev soruları Bugün'ün listesinden, "Yaptım" işaretleriyle. |
 | 1.5 | 2026-09-24 | Asistan tek sesle konuşur: Işık'a "sen", aileye "siz" (sayfa metinleri de); kaynak numaraları okuma sırasıyla. |
+| 1.7 | 2026-09-25 | Playwright + axe denetimi (13 sayfa × 4 genişlik): tek sütun genişliği, telefonda üst boşluk, odak halkaları, geçmiş öğelerde kontrast, haftalık tablo telefonda okunur, Asistan açılışta kaymaz; axe ihlali sıfır. |
 | 1.6 | 2026-09-24 | Tedy Tasarım Sistemi v3 panoda: lacivert yalnız bantta, renk aritmetiği yok, rol token'ları; ders işareti Bugün ve İşler sınavlarında ve ödevlerde; takvim ve zaman çizelgesinde tür ikon, renk ders. |

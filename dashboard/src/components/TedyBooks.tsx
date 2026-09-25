@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { Tag } from '@carbon/react'
 import { ArrowRight, ArrowLeft, CheckmarkFilled, Time, Book as BookIcon } from '@carbon/icons-react'
@@ -18,7 +19,10 @@ export function BookCover({ book, size = 'md' }: { book: BookSummary; size?: 'sm
       <div className="book-cover__frame">
         <span className="book-cover__author">{book.author}</span>
         <span className="book-cover__rule" />
-        <span className="book-cover__title">{book.title}</span>
+        <span
+          className="book-cover__title"
+          style={{ '--kelime': Math.max(...book.title.split(/\s+/).map(k => k.length)) } as CSSProperties}
+        >{book.title}</span>
         {book.subtitle && <span className="book-cover__subtitle">{book.subtitle}</span>}
         <span className="book-cover__ornament"><Ornament variant="mark" /></span>
         <span className="book-cover__imprint">{book.publisher}</span>

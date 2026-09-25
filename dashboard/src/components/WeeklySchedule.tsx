@@ -1,8 +1,9 @@
 import { Calendar } from '@carbon/icons-react'
 import {
   DataTable, Table, TableHead, TableRow, TableHeader,
-  TableBody, TableCell, TableContainer,
+  TableBody, TableCell, TableContainer, SkeletonText,
 } from '@carbon/react'
+import { useEffect, useRef } from 'react'
 import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import { cleanTeacherNames, normalizeCourseDisplayName } from '../utils/formatters'
@@ -50,8 +51,30 @@ export default function WeeklySchedule() {
     { latest: {}, today: '' }
   )
   const { focusMode } = useFocusMode()
+  const kapRef = useRef<HTMLDivElement>(null)
 
-  if (loading) return <div className="dashboard-card">Yükleniyor...</div>
+  // On a phone Carbon's table container scrolls the grid sideways, and a
+  // scroll region has to be reachable by keyboard and named (axe
+  // scrollable-region-focusable). The container is Carbon's own element, so
+  // it is found after render rather than given props.
+  useEffect(() => {
+    const kap = kapRef.current?.querySelector<HTMLElement>('.cds--data-table-content')
+    if (!kap) return
+    kap.tabIndex = 0
+    kap.setAttribute('role', 'region')
+    kap.setAttribute('aria-label', 'Haftalık program tablosu')
+  })
+
+  // Carbon's skeleton in the content's shape (surface designs §2.4), not a
+  // bare "Yükleniyor..." line.
+  if (loading) {
+    return (
+      <div className="dashboard-card">
+        <SkeletonText heading width="40%" />
+        <SkeletonText paragraph lineCount={6} />
+      </div>
+    )
+  }
 
   // No week picker. The portal offers 36 weeks and every one of them renders
   // the identical grid — a school timetable repeats — so the API's `latest`
@@ -103,7 +126,7 @@ export default function WeeklySchedule() {
 
   return (
     <div className="dashboard-card">
-      <div className="schedule-table">
+      <div className="schedule-table" ref={kapRef}>
       <TableContainer
         title={
           <span className="dashboard-card__title dashboard-card__title--tight">

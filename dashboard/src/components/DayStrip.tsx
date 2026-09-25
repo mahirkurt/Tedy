@@ -97,12 +97,6 @@ export function DayStrip({ nowMin, bedtimeMin, focusEndMin, anchorMin }: DayStri
         ))}
       </div>
 
-      {anchorPct !== undefined && (
-        <div
-          className="day-strip__anchor-line"
-          style={{ ['--anchor-pos' as string]: `${anchorPct}%` }}
-        />
-      )}
     </section>
   )
 }

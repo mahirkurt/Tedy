@@ -2,6 +2,7 @@
 // ── Assistant Chat (Carbon AI style) ─────────────────────────────────────────
 @use '@carbon/react/scss/theme' as theme;
 @use '@carbon/react/scss/utilities/ai-gradient' as ai;
+@use '@carbon/react/scss/type' as type;
 
 .ac {
   display: flex;
@@ -52,7 +53,8 @@
   padding: 0.4rem 0.85rem;
   font-size: 0.8125rem;
   cursor: pointer;
-  transition: all 0.15s ease;
+  // Colours only: `all` animated the focus outline in from 0px as well.
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 // Previously hard-coded a light-blue fill and Blue-60 border/text, imitating
@@ -75,6 +77,11 @@
   background: var(--cds-button-primary-hover);
   border-color: var(--cds-button-primary-hover);
   color: var(--ted-color-text-on-color);
+}
+
+.ac__prompt-chip:focus-visible {
+  outline: 2px solid var(--cds-focus);
+  outline-offset: 2px;
 }
 
 .ac__prompt-chip:disabled {
@@ -183,7 +190,7 @@
 
 .ac-msg__role {
   display: block;
-  font-size: 0.6875rem;
+  @include type.type-style('label-01');   // 12px, Carbon's smallest step; was 11px
   font-weight: 600;
   color: var(--ted-color-text-helper);
   margin-bottom: 2px;

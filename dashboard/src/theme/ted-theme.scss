@@ -234,7 +234,9 @@ body {
 }
 
 .app-shell-content.cds--content {
-  padding: 3.5rem var(--ted-space-lg) var(--ted-space-xl);
+  // 3rem clears the fixed header; the rest is the page's own top margin. It
+  // was 0.5rem: the first card sat against the band.
+  padding: calc(3rem + var(--ted-space-lg)) var(--ted-space-lg) var(--ted-space-xl);
   max-width: 960px;
   // On a mostly-empty day the content ran out around 500px and the footer
   // sat halfway down the window with 200px of nothing under it, which reads
@@ -252,6 +254,7 @@ body {
 @media (min-width: 66rem) {
   .app-shell-content.cds--content:not(.app-shell-content--reader) {
     margin-inline-start: 16rem;
+    width: calc(100% - 16rem);
   }
 }
 
@@ -326,7 +329,7 @@ body {
 // ─── List Tiles ──────────────────────────────────────────────────────────────
 .dashboard-list-tile.cds--tile {
   padding: var(--ted-space-xs) var(--ted-space-md);
-  border-radius: var(--ted-radius-sm);
+  border-radius: var(--ted-radius-card);
   transition: background-color var(--ted-transition-fast);
 }
 
@@ -706,7 +709,16 @@ body {
 }
 
 .today-tl__item--past {
-  opacity: 0.4;
+  // Receding by colour, not opacity: text at 40% opacity fell under 3:1.
+  .today-tl__card {
+    background: var(--cds-layer-02);
+    border-color: var(--cds-border-subtle-01);
+  }
+
+  .today-tl__card-name,
+  .today-tl__time {
+    color: var(--cds-text-secondary);
+  }
 
   .today-tl__dot {
     background: var(--cds-layer-active-01) !important;
@@ -860,7 +872,7 @@ body {
   display: flex;
   gap: var(--ted-space-md);
   align-items: center;
-  border-radius: var(--ted-radius-sm);
+  border-radius: var(--ted-radius-card);
   transition: background-color var(--ted-transition-fast);
 }
 
@@ -875,7 +887,7 @@ body {
   min-width: 52px;
   padding: var(--ted-space-xs) var(--ted-space-xs);
   background: #{colors.$blue-10};
-  border-radius: var(--ted-radius-sm);
+  border-radius: var(--ted-radius-card);
 }
 
 .dashboard-event-date__day {
@@ -895,7 +907,7 @@ body {
 // ─── Homework ────────────────────────────────────────────────────────────────
 .homework-item.cds--tile {
   padding: 0.75rem var(--ted-space-md);
-  border-radius: var(--ted-radius-sm);
+  border-radius: var(--ted-radius-card);
   transition: background-color var(--ted-transition-fast);
 }
 
@@ -953,6 +965,13 @@ body {
   margin-top: var(--ted-space-xs);
   display: flex;
   justify-content: flex-end;
+
+  // Carbon reserves 3rem at the end of a button for an icon; "Yaptım" has
+  // none, so the button was 124px wide and on a phone pushed "İlk görülme"
+  // apart from its own time. The end padding matches the start.
+  .cds--btn:not(.cds--btn--icon-only) {
+    padding-inline-end: 15px;
+  }
 }
 
 // ─── Homework Countdown Bar ─────────────────────────────────────────────
@@ -1045,9 +1064,16 @@ body {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--ted-color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  // Wraps rather than cuts: on a phone "7. Sınıf MEB Ülke Geneli Türk…" hid
+  // which exam it was, with no way to read the rest.
+  overflow-wrap: anywhere;
+}
+
+.exams-ahead__all {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 1.5rem;   // WCAG 2.5.8: a 24px target, not an 18px line
+  margin-block-start: var(--ted-space-xs);
 }
 
 .exams-ahead__when {
@@ -1077,7 +1103,7 @@ body {
   width: 100%;
   text-align: left;
   padding: var(--ted-space-2xs) 0;
-  border-radius: var(--ted-radius-sm);
+  border-radius: 0;   // a Carbon control is square
 
   &:hover { background-color: var(--ted-color-page-bg); }
   &:hover { .hw-section__label { color: var(--ted-color-text-primary); } }
@@ -1091,9 +1117,6 @@ body {
   color: var(--ted-color-text-helper);
   flex: 1;
 
-  &--info { color: var(--status-info); }
-  &--success { color: var(--status-success); }
-  &--error { color: var(--status-error); }
 }
 
 .hw-section__count {
@@ -1165,7 +1188,7 @@ body {
 
 .homework-modal__description {
   background: var(--cds-layer-02);
-  border-radius: var(--ted-radius-sm);
+  border-radius: var(--ted-radius-card);
   padding: var(--ted-space-sm) var(--ted-space-md);
 }
 
@@ -1295,6 +1318,17 @@ body {
 @media (any-hover: hover) {
   .cds--header__action:hover { background-color: var(--ted-color-brand-primary-hover); }
 }
+.cds--header a.cds--header__name:focus,
+.cds--header a.cds--header__name:focus-visible {
+  // Carbon's blue focus border measured ~2.4:1 on the navy band; the band's
+  // actions already use focus-inverse (white).
+  border-color: var(--cds-focus-inverse);
+}
+
+.dashboard-header__focus-toggle .cds--toggle__button:focus + .cds--toggle__label .cds--toggle__switch {
+  box-shadow: 0 0 0 1px var(--ted-header-bg), 0 0 0 3px var(--cds-focus-inverse);
+}
+
 .cds--header__action:focus-visible {
   outline: 2px solid var(--cds-focus-inverse);
   outline-offset: -2px;
@@ -1338,7 +1372,7 @@ body {
 
 .photo-intake-form__input {
   border: 1px solid var(--ted-color-border-subtle);
-  border-radius: var(--ted-radius-sm);
+  border-radius: 0;   // a Carbon control is square
   padding: 0.5rem 0.625rem;
   @include type.type-style('body-01');
 }
@@ -1505,11 +1539,6 @@ body {
   display: none;
 }
 
-.cds--side-nav__link--current {
-  // Carbon's own current marker; the navy stays on the band.
-  border-left: 3px solid var(--cds-border-interactive);
-  background-color: #{colors.$blue-10};
-}
 
 @media (any-hover: hover) {
   .cds--side-nav__link:hover {
@@ -1521,7 +1550,7 @@ body {
 
 // Tiles — inherit card radius
 .cds--tile {
-  border-radius: var(--ted-radius-sm);
+  border-radius: var(--ted-radius-card);
 }
 
 // ─── Health Popover ──────────────────────────────────────────────────────────
@@ -1569,7 +1598,7 @@ body {
 .health-popover__warning {
   margin: 0 0 var(--ted-space-xs);
   padding: 0.375rem 0.5rem;
-  border-radius: var(--ted-radius-sm);
+  border-radius: var(--ted-radius-card);
   background: var(--cds-notification-background-warning);
   color: var(--ted-text-warning);
   @include type.type-style('label-01');
@@ -1668,7 +1697,7 @@ body {
   align-items: center;
   gap: 5px;
   padding: 3px 10px;
-  border-radius: 12px;
+  border-radius: 1rem;   // a Carbon Tag's radius
   border: 1px solid var(--ted-color-border-subtle);
   background: var(--ted-card-bg);
   @include type.type-style('label-01');
@@ -1735,9 +1764,22 @@ body {
 }
 
 // Spent hours recede rather than disappear: still readable if she looks, never
-// competing with what is still ahead (İ7).
+// competing with what is still ahead (İ7). By colour, not opacity: at 0.45 a
+// past event's title measured 3.03:1 (axe, 2026-09-25). The cell turns
+// layer-02, the chip loses its fill, its text goes secondary (7:1) and its
+// edge takes the subject's lighter border step.
 .calendar-grid__cell--past {
-  opacity: 0.45;
+  background: var(--cds-layer-02);
+
+  .calendar-event {
+    background: transparent;
+    color: var(--cds-text-secondary);
+    border-left-color: var(--ted-subject-border, var(--cds-border-subtle-01));
+  }
+}
+
+.calendar-grid__cell--today.calendar-grid__cell--past {
+  background: #{colors.$blue-10};
 }
 
 
@@ -1977,7 +2019,7 @@ body {
 
 .course-content__card-item {
   padding: var(--ted-space-sm) var(--ted-space-md);
-  border-radius: var(--ted-radius-sm);
+  border-radius: var(--ted-radius-card);
   background: var(--ted-card-bg);
   border: 1px solid var(--ted-color-border-subtle);
 
@@ -2255,7 +2297,7 @@ body {
   align-items: center;
   gap: var(--ted-space-xs);
   padding: var(--ted-space-2xs) var(--ted-space-xs);
-  border-radius: var(--ted-radius-sm);
+  border-radius: var(--ted-radius-card);
   @include type.type-style('body-01');
   transition: background var(--ted-transition-fast);
 
@@ -2333,7 +2375,18 @@ body {
 }
 
 // ─── Weekly Schedule Table Sizing ───────────────────────────────────────
-.schedule-table .cds--data-table { table-layout: fixed; }
+// Six columns do not fit a phone: at 390px each day got ~55px and "Matematik"
+// was cut to "Matema" (2026-09-25). The table keeps a readable minimum and
+// Carbon's table container scrolls it sideways; the hour column stays put.
+.schedule-table .cds--data-table { table-layout: fixed; min-width: 40rem; }
+.schedule-table .cds--data-table th:first-child,
+.schedule-table .cds--data-table td:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+}
+.schedule-table .cds--data-table td:first-child { background-color: var(--cds-layer-01); }
+.schedule-table .cds--data-table th:first-child { background-color: var(--cds-layer-accent-01); }
 .schedule-table .cds--data-table td {
   vertical-align: middle;
   @include type.type-style('label-01');
@@ -2403,14 +2456,18 @@ body {
   .app-shell-content.cds--content {
     width: 100%;
     max-width: none;
+    // Carbon's .cds--content carries margin-top: 3rem; the header is fixed, so
+    // the padding already clears it and the margin put 56px of nothing on top
+    // of every phone page (measured 2026-09-25: content began at y=104).
+    margin-top: 0;
     margin-left: 0 !important;
-    padding: 3.5rem var(--ted-space-xs) var(--ted-space-md) !important;
+    padding: calc(3rem + var(--ted-space-md)) var(--ted-space-xs) var(--ted-space-md) !important;
   }
 
   .dashboard-card {
     margin-bottom: var(--ted-space-md);
     padding: var(--ted-space-md);
-    border-radius: var(--ted-radius-sm);
+    border-radius: var(--ted-radius-card);
   }
 
   .dashboard-card__title {
@@ -2542,10 +2599,10 @@ body {
     @include type.type-style('label-01');
   }
 
+  // Wrap, not cut: a card's title and its date were both lost to "…".
   .cds--accordion__title {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   // Odak stays reachable on a phone: identity text yields the room.
@@ -2613,7 +2670,20 @@ body {
 @media (min-width: 672px) {
   .app-shell-content.cds--content {
     margin: 0 auto;
+    // A column flex item with auto margins does not stretch: without a width
+    // the shell took its content's width and every page had its own — Bugün
+    // 736px, Dersler 912px, İlerleme 290px, the cards of Profil 369px
+    // (measured 2026-09-25). One column, one width.
+    width: 100%;
   }
+}
+
+// Carbon's InlineNotification caps itself at 46rem on large screens; the
+// portal banners belong to the page column and span it like the cards below.
+.portal-status.cds--inline-notification,
+.portal-unread.cds--inline-notification {
+  max-width: none;
+  margin-block: 0 var(--ted-space-md);
 }
 
 .homework-modal__enrichment {
@@ -2693,7 +2763,7 @@ body {
 
 .student-profile__field {
   border: 1px solid var(--ted-color-border-subtle);
-  border-radius: var(--ted-radius-sm);
+  border-radius: var(--ted-radius-card);
   padding: 0.5rem 0.625rem;
   display: flex;
   flex-direction: column;
@@ -2714,20 +2784,38 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--ted-space-sm);
+  max-width: 30rem;   // a form is read down, not across a 912px card
 }
 
 .private-lesson-form__label {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  @include type.type-style('heading-compact-01');
+  gap: var(--ted-space-xs);
+  // Carbon's form label: label-01 in text-secondary above the field.
+  @include type.type-style('label-01');
+  color: var(--cds-text-secondary);
 }
 
 .private-lesson-form__input {
-  border: 1px solid var(--ted-color-border-subtle);
-  border-radius: var(--ted-radius-sm);
-  padding: 0.5rem 0.625rem;
-  @include type.type-style('body-01');
+  // Carbon's text-input anatomy on native controls: field fill, one bottom
+  // rule, square corners, 40px, Carbon's focus. They were three looks at once
+  // — a grey rounded select, a white bordered input, a bordered time field.
+  block-size: 2.5rem;
+  padding: 0 var(--ted-space-md);
+  border: 0;
+  border-block-end: 1px solid var(--cds-border-strong-01);
+  border-radius: 0;   // a Carbon control is square
+  background: var(--cds-field-02);
+  color: var(--cds-text-primary);
+  @include type.type-style('body-compact-01');
+
+  &::placeholder { color: var(--cds-text-placeholder); }
+
+  &:focus,
+  &:focus-visible {
+    outline: 2px solid var(--cds-focus);
+    outline-offset: -2px;
+  }
 }
 
 .private-lesson-form__checkbox {
@@ -2737,6 +2825,7 @@ body {
   @include type.type-style('body-01');
 
   input[type='checkbox'] {
+    accent-color: var(--cds-interactive);
     width: 1.5rem;
     height: 1.5rem;
     min-width: 1.5rem;
@@ -3206,7 +3295,9 @@ body {
 }
 
 .book-cover__title {
-  font-size: 0.95em;
+  // Sized by the longest word so it fits the frame: "Yüzüklerin" (10 letters)
+  // ran past both edges of the cover at 0.95em. --kelime comes from TedyBooks.
+  font-size: min(0.95em, calc(6.4em / var(--kelime, 6)));
   font-weight: 600;
   color: var(--book-gold-bright);
   text-shadow: 0 1px 0 rgb(0 0 0 / 45%);

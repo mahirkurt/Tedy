@@ -87,8 +87,8 @@
   position: absolute;
   inset-block-start: 0;
   transform: translateX(-50%);
+  // label-01 is Carbon's smallest step (12px); the marks were set at 11px.
   @include type.type-style('label-01');
-  font-size: 0.6875rem;
   white-space: nowrap;
 }
 
@@ -102,22 +102,6 @@
 .day-strip__boundary--start {
   transform: none;
   margin-inline-start: $spacing-02;
-}
-
-.day-strip__anchor-line {
-  position: relative;
-  height: $spacing-05;
-}
-
-.day-strip__anchor-line::before {
-  content: '';
-  position: absolute;
-  inset-block: 0;
-  inset-inline-start: var(--anchor-pos, 0%);
-  width: 2px;
-  background: theme.$interactive;
-  opacity: 0.5;
-  transform: translateX(-50%);
 }
 
 @media (max-width: 42rem) {
