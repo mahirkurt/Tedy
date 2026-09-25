@@ -371,9 +371,9 @@ def test_system_prompt_routing_order_matches_the_consolidated_plan():
     hangi = p.split("## Hangi araca ne zaman uzanırsın\n", 1)[1]
     hangi = hangi.split("## Uydurma yasağı", 1)[0]
     sira = ["`ders_programi`", "`odev_listesi`", "`ogrenci_verisi_ara`",
-            "`kazanim_ara`", "`figur_ara`", "`video_listele`", "`oer_ara`",
-            "`modul_ara`", "`kitap_ara`", "`platform_ilerlemesi`", "`video_oner`",
-            "`aile_kaynak_ara`"]
+            "`kazanim_ara`", "`kazanim_listele`", "`figur_ara`", "`video_listele`",
+            "`oer_ara`", "`oer_kazanima_gore`", "`modul_ara`", "`kitap_ara`",
+            "`platform_ilerlemesi`", "`video_oner`", "`aile_kaynak_ara`"]
     konumlar = [hangi.index(arac) for arac in sira]
     assert konumlar == sorted(konumlar)
     for arac in sira:
@@ -384,6 +384,41 @@ def test_system_prompt_routing_order_matches_the_consolidated_plan():
             continue
         desen = r"→ (?:önce )?" + re.escape(arac)
         assert len(re.findall(desen, hangi)) == 1, arac
+
+
+def test_system_prompt_routing_names_every_declared_tool_exactly_once():
+    """Fix round 1 (controller review of Görev 6): the previous version of
+    the ordering test above only checked a hand-picked subset of tools, so
+    it silently missed `kazanim_listele` and `oer_kazanima_gore` — both
+    declared in `TOOL_ALLOWLIST` (src/assistant_tools.py) but absent from
+    the routing section entirely. This test enumerates every tool the
+    runtime can actually declare — every `TOOL_ALLOWLIST` key (imported
+    live, so a future addition is caught automatically the next time this
+    runs) plus the fixed local tool names (the five live student-data
+    tools, `odev_listesi`, `ogrenci_verisi_ara`, `kitap_ara`,
+    `platform_ilerlemesi`, `video_oner`, `modul_ara`, `aile_kaynak_ara`) —
+    and asserts each is named, by its backtick token, exactly once in
+    "## Hangi araca ne zaman uzanırsın". That makes the routing section's
+    own claim ("every tool appears in exactly one routing bullet")
+    self-verifying instead of asserted."""
+    from src.assistant_tools import TOOL_ALLOWLIST
+
+    p = AssistantRuntime.SYSTEM_PROMPT
+    hangi = p.split("## Hangi araca ne zaman uzanırsın\n", 1)[1]
+    hangi = hangi.split("## Uydurma yasağı", 1)[0]
+
+    yerel_araclar = (
+        "ders_programi", "sinavlar", "takvim", "ders_icerigi", "notlar",
+        "odev_listesi", "ogrenci_verisi_ara", "kitap_ara",
+        "platform_ilerlemesi", "video_oner", "modul_ara", "aile_kaynak_ara",
+    )
+    tum_araclar = sorted(set(TOOL_ALLOWLIST) | set(yerel_araclar))
+    # Sanity: this must be the full 26-tool surface, not an accidentally
+    # narrowed set (e.g. an empty TOOL_ALLOWLIST import would pass trivially).
+    assert len(tum_araclar) == 26
+
+    eksik = [arac for arac in tum_araclar if hangi.count(f"`{arac}`") != 1]
+    assert not eksik, eksik
 
 
 def test_chat_events_streams_tool_progress_in_real_time(tmp_path, monkeypatch):

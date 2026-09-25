@@ -129,9 +129,10 @@ bulgusu için: kapandı (hangi görev) ya da ertelendi (neden).
 - `private_lessons.json` görünmezdi → **kapandı (Görev 2)**: `takvim` aracı, hafta
   sonu dahil, aynı `_birlesik_takvim`/`_private_lessons_for_week` verisini okur.
 - `englishcentral_progress.json`/`achieve3000_progress.json` ham JSON olarak
-  indekste → **kısmen kapandı (Görev 3)**: `platform_ilerlemesi` okunur bir özet
-  verir (ham JSON modele hiç gitmez), ama iki dosya `DEFAULT_EXCLUDED_FILE_PATTERNS`'e
-  eklenmedi — ham hallleri hâlâ ayrıca genel indekste de var (küçük, giderilmemiş artık).
+  indekste → **kapandı (Görev 3 + fix round 1)**: `platform_ilerlemesi` okunur bir
+  özet verir (ham JSON modele hiç gitmez); fix round 1'de (kontrolör) iki dosya da
+  `DEFAULT_EXCLUDED_FILE_PATTERNS`'e eklendi, artık genel indekste de yok
+  (`tests/test_assistant_indeks_hijyeni.py::test_excluded_files_are_never_discovered`).
 - `ec_dialog_details.json`, `a3k_*.json` görünmezdi → **ertelendi**: `platform_ilerlemesi`
   yalnız özet dosyalarını okur, diyalog ayrıntısı hâlâ erişilemez; kasıtlı dışlama
   desenleri (`ec_*.json`, `a3k_*.json`, Görev 1) bunları indeksten de çıkardı.
@@ -204,8 +205,12 @@ bulgusu için: kapandı (hangi görev) ya da ertelendi (neden).
   `video_getir`, `oer_getir`. maarif-mufredat artık 11 araç, egitim-kaynak 3
   (`oer_ara`, `oer_kazanima_gore`, `oer_getir`) — üçü de `TOOL_ALLOWLIST`'te ve
   uzak sunucu onları listelediği sürece otomatik ilan ediliyor. `oer_kazanima_gore`
-  (`kb_for_outcome`) zaten izinliydi (denetimden önce); istem henüz ona özel bir
-  yönlendirme satırı taşımıyor — **ertelendi**, aracın kendisi çağrılabilir durumda.
+  (`kb_for_outcome`) ve `kazanim_listele` (`list_learning_outcomes`) zaten izinliydi
+  (denetimden önce) ama Görev 6'nın ilk halinde istemde hiç yönlendirme satırı
+  taşımıyorlardı — declared-ama-unrouted, review bulgusu (Önemli) → **kapandı
+  (fix round 1)**: ikisi de artık kendi `→` satırına sahip ve
+  `tests/test_assistant_core.py::test_system_prompt_routing_names_every_declared_tool_exactly_once`
+  bunu, `TOOL_ALLOWLIST`'i canlı okuyarak, her araç için doğruluyor.
 
 **§5 `get_figure` görselleri**
 - Görsellerin ne modele ne arayüze ulaşmaması → **kapandı (Görev 4)**:

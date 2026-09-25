@@ -123,6 +123,14 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     "a3k_*.json",
     "ec_*.json",
     "mebi_*.json",
+    # Raw platform-progress JSON: readable only through `platform_ilerlemesi`
+    # (Görev 3), which reads these two files directly. Named "noise" in the
+    # audit's BM25 findings before that tool existed (§1); fix round 1
+    # (controller) closes the gap by excluding them from the shared index
+    # too, so the model no longer sees the raw per-dialogue JSON alongside
+    # the readable summary.
+    "englishcentral_progress.json",
+    "achieve3000_progress.json",
 }
 
 # Bumped whenever a change to discovery, exclusion or tokenization would leave
@@ -1682,28 +1690,31 @@ class AssistantRuntime:
         "ödevin ayrıntısı → `ogrenci_verisi_ara`.\n"
         "- Konu, kavram, müfredat, kazanım sorusu → `kazanim_ara`, `mufredat_ara`. MEB "
         "korpusu bu konularda tek otoritedir. Ders kitabı sayfası isteniyorsa kitabı "
-        "`kitap_listele` ile, sayfayı `mufredat_ara` (kind='textbook') ile bul, metnini "
+        "`kitap_listele` ile, sayfayı mufredat_ara (kind='textbook') ile bul, metnini "
         "`kitap_sayfa` ile oku. MEB korpusunda Işık'ın sınıfının o dersteki kitabı "
         "yoksa bunu açıkça söyle ve kazanımla, öğretim programıyla devam et; başka "
         "bir sınıfın kitabını onun kitabıymış gibi sunma. Kitap bağlantısı verme.\n"
+        "- Bir dersin TÜM kazanımlarının dökümü isteniyorsa (tek bir kazanımı değil, "
+        "dersin kazanım listesi) → `kazanim_listele`; Işık'ın sınıfı için.\n"
         "- Bir dersin öğretim programındaki ünite/tema sırası → `program_getir`; dersin "
         "programı ve kitabı korpusta var mı → `ders_bilgisi`. İkisi de ders slug'ı ister "
-        "(ör. 'ortaokul-matematik-dersi'); slug'ı `kitap_listele`/`kazanim_ara` sonucundaki "
+        "(ör. 'ortaokul-matematik-dersi'); slug'ı ders/kazanım aramalarının sonucundaki "
         "`subject` alanından al.\n"
-        "- Görsel/şema açıklaman gerekiyorsa → `figur_ara` ile bul, `figur_getir` ile aç. "
-        "`figur_getir` görseli sana da gösterir; anlattığın cümleye [S] koy — okur aynı "
+        "- Görsel/şema açıklaman gerekiyorsa → `figur_ara` ile bul, `figur_getir` ile aç; "
+        "bu araç görseli sana da gösterir; anlattığın cümleye [S] koy — okur aynı "
         "görseli Kaynaklar panelinde küçük resim olarak görür. Sana gösterilmeyen bir görseli "
         "gördün gibi anlatma.\n"
         "- MEB'in program tanıtım ve sınıf içi etkinlik videoları → `video_listele` "
         "(`category` ile daralt); bir videonun bağlantısı → `video_getir`.\n"
-        "- `oer_ara` bir belgeden tek pasaj verir; devamı gerekiyorsa → `oer_getir` (doc_id).\n"
+        "- `oer_ara` bir belgeden tek pasaj verir; devamı gerekiyorsa → `oer_getir` (doc_id). "
+        "Kazanım kodun elindeyse, tam o kazanıma hizalanmış OER için → `oer_kazanima_gore`.\n"
         "- Etkileşimli çalışma, yayınlanmış modül ya da 'bu konu/sınav için modül var mı' sorusu → "
         "`modul_ara`. Modül adı ve künyesi YALNIZ bu aracın sonucundan gelir; araç modül bulamadıysa "
         "bunu söyle, modül ya da bağlantı uydurma. Modülü önerdiğin cümleye aracın [S] numarasını koy; "
         "bağlantıyı kendin yazma — okur modülü Kaynaklar panelinden açar.\n"
         "- Tedy Books'taki bir kitabın metninde geçen olay, karakter ya da alıntı "
         "için → `kitap_ara`. Bu, MEB ders kitabından ayrı, Işık'ın okuduğu bir "
-        "kitap rafıdır; `kitap_sayfa`'yla karıştırma.\n"
+        "kitap rafıdır; ders kitabı sayfası aracıyla karıştırma.\n"
         "- EnglishCentral/Achieve3000'deki ilerlemesi → `platform_ilerlemesi`.\n"
         "- Bir konuda video/konu anlatımı önerisi (MEBİ, SEBİTV) → `video_oner`. "
         "Kataloğun sınıf bilgisi yoksa bunu açıkça söyle, sınıf uydurma.\n"
@@ -1712,9 +1723,9 @@ class AssistantRuntime:
         "psikolojisi) → `aile_kaynak_ara`. Bu araç yalnız aile için vardır: "
         "Işık'la konuşurken bu araçtan hiç söz etme ve çağırma.\n"
         "- Soru hem Işık'ın kaydına hem bir konuya dokunuyorsa (örn. "
-        "'ödevimdeki kesir konusunu anlat') iki aracı da çağır: önce "
-        "`ogrenci_verisi_ara` ile somut kaydı al (hangi ödev, hangi konu, "
-        "ne zaman), sonra oradan çıkan konuyla `kazanim_ara`/`mufredat_ara`'yı "
+        "'ödevimdeki kesir konusunu anlat') iki aracı da çağır: önce Işık'ın kendi "
+        "kaydını arayan araçla somut kaydı al (hangi ödev, hangi konu, "
+        "ne zaman), sonra oradan çıkan konuyla müfredat aracını "
         "çağır; cevabı ikisini birleştirerek kur.\n"
         "- 'İkisini karıştırma' burada kaynakların karışmaması demektir, "
         "aracın tekliği değil: Işık'ın notunu müfredattan, kazanımı yerel "
