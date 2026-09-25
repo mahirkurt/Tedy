@@ -695,3 +695,12 @@ def test_system_prompt_fixes_one_answer_skeleton():
     assert "`### `" in p
     assert "`**Şimdi:** …`" in p and "`**Not:** …`" in p
     assert "Tablo, yatay çizgi" in p
+
+
+def test_system_prompt_says_what_to_do_when_the_textbook_is_missing():
+    """The maarif corpus had 2 of the 19 grade-7 textbooks on 2026-09-25; an
+    assistant that silently falls back to last year's book would teach from
+    the wrong one."""
+    p = AssistantRuntime.SYSTEM_PROMPT
+    assert "kind='textbook'" in p and "`kitap_sayfa`" in p
+    assert "başka bir sınıfın kitabını onun kitabıymış gibi sunma" in p.replace('"\n        "', "")

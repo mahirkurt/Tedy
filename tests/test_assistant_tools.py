@@ -197,3 +197,64 @@ def test_dizi_parametresi_eleman_tipini_korur():
     assert props["include_fragments"]["items"] == {"type": "string", "enum": ["a", "b"]}
     assert props["etiketler"]["items"] == {"type": "integer"}
     assert props["ciplak"]["items"] == {"type": "string"}
+
+
+# ── the student's grade, dead links, book titles (2026-09-25) ───────────────
+
+def _sinifli(**over):
+    reg = _registry(**over)
+    reg.sinif = lambda: "7.Sınıf"
+    return reg
+
+
+def test_curriculum_search_defaults_to_the_students_grade():
+    """Live 2026-09-25 the model searched outcomes with no grade and got every
+    year's results mixed together. A search Işık did not scope is scoped to her
+    own grade; the model can still ask for another one explicitly."""
+    reg = _sinifli()
+    reg.dispatch("kazanim_ara", {"q": "kesir"})
+    reg.dispatch("kazanim_ara", {"q": "kesir", "grade": "6.Sınıf"})
+    reg.dispatch("kazanim_ara", {"q": "kesir", "grade": None})
+    calls = [args for _, args in reg.clients["maarif-mufredat"].calls]
+    assert calls == [{"q": "kesir", "grade": "7.Sınıf"},
+                     {"q": "kesir", "grade": "6.Sınıf"},
+                     {"q": "kesir", "grade": "7.Sınıf"}]
+
+
+def test_the_grade_default_is_declared_to_the_model():
+    decl = next(d for d in _sinifli().declarations() if d["name"] == "kazanim_ara")
+    assert "7.Sınıf" in decl["description"]
+
+
+def test_no_grade_is_invented_when_the_class_is_unknown():
+    reg = _registry()
+    reg.dispatch("kazanim_ara", {"q": "kesir"})
+    assert reg.clients["maarif-mufredat"].calls == [("search_learning_outcomes", {"q": "kesir"})]
+
+
+def test_dead_pdf_links_never_reach_the_model():
+    """Every pdf_url/source_url in the corpus answers HTTP 500 since MEB moved
+    its files (CureoHub DISCOVERY-UPSTREAM-2026-09.md §2). A link the model
+    repeats would be a broken promise to the reader."""
+    body = ('{\n  "document_id": 233,\n  "title": "Multi English 7.Sınıf Ders Kitabı",\n'
+            '  "pdf_url": "https://tymm.meb.gov.tr/upload/kitap/x.pdf",\n'
+            '  "source_url": "https://tymm.meb.gov.tr/ders-kitaplari"\n}\n'
+            '{\n  "document_id": 234,\n  "pdf_url": "https://tymm.meb.gov.tr/upload/kitap/y.pdf"\n}')
+    tools = [{"name": "list_textbooks", "description": "Kitaplar.",
+              "inputSchema": {"type": "object", "properties": {}}}]
+    client = _FakeClient("maarif-mufredat", tools, McpToolResult(ok=True, text=body))
+    out = _registry(clients={"maarif-mufredat": client}).dispatch("kitap_listele", {})
+    assert "tymm.meb.gov.tr" not in out.text
+    assert "Multi English 7.Sınıf Ders Kitabı" in out.text and '"document_id": 234' in out.text
+
+
+def test_a_textbook_page_is_labelled_with_the_book_title():
+    body = ('{"document": {"document_id": 213, "title": "Matematik 6.Sınıf Ders Kitabı", '
+            '"pdf_url": "https://tymm.meb.gov.tr/upload/kitap/m.pdf"}, "pages": '
+            '[{"page_no": 84, "text": "Oran"}]}')
+    tools = [{"name": "get_document_text", "description": "Sayfa metni.",
+              "inputSchema": {"type": "object", "properties": {}}}]
+    client = _FakeClient("maarif-mufredat", tools, McpToolResult(ok=True, text=body))
+    out = _registry(clients={"maarif-mufredat": client}).dispatch(
+        "kitap_sayfa", {"document_id": 213, "page": 84})
+    assert out.citations[0]["label"] == "Matematik 6.Sınıf Ders Kitabı · s.84"

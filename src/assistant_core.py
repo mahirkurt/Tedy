@@ -334,6 +334,7 @@ class ClaudeClient:
         max_rounds: int = 4,
         on_delta: Callable[[str], None] | None = None,
         on_reset: Callable[[], None] | None = None,
+        max_calls: int = 8,
     ) -> ToolLoopResult:
         """Run the model until it answers, dispatching tools it asks for.
 
@@ -342,14 +343,18 @@ class ClaudeClient:
         the answer (the answer is the last round's text), so `on_reset` is
         called when such a round ends — the reader drops what was shown.
 
-        The round budget is a hard stop: a model that keeps calling tools would
-        otherwise hold a worker open indefinitely. It is checked before each
-        dispatch, not after — one turn can ask for more calls than remain, and
-        a call past the limit is never run but still answered, so the model
-        knows what did not happen (the API requires a result for every call
-        anyway). Once the budget is spent the model is asked once more with
-        tool_choice none — tools withdrawn, tool list kept so the cached prefix
-        survives — and answers from the evidence already gathered.
+        Two budgets are hard stops: a model that keeps calling tools would
+        otherwise hold a worker open indefinitely. `max_rounds` counts model
+        turns that call tools — two tools asked for at once are one round;
+        until 2026-09-25 it counted calls, so a model working in parallel ran
+        out at four and its fifth call never happened. `max_calls` caps the
+        calls themselves and is checked before each dispatch: a call past it
+        is never run but still answered, so the model knows what did not
+        happen (the API requires a result for every call anyway). Once either
+        is spent the model is asked once more with tool_choice none — tools
+        withdrawn, tool list kept so the cached prefix survives — and told in
+        words to answer from what it has, because withdrawing the tools alone
+        was measured to produce a thinking block and no text.
         """
         from src.assistant_tools import ToolOutcome
 
@@ -384,7 +389,7 @@ class ClaudeClient:
             turns.append({"role": "assistant", "content": resp.content})
             results: list[dict[str, Any]] = []
             for use in uses:
-                if len(out.tool_calls) >= max_rounds:
+                if len(out.tool_calls) >= max_calls:
                     out.budget_exhausted = True
                     results.append({"type": "tool_result", "tool_use_id": use.id,
                                     "is_error": True,
@@ -434,14 +439,25 @@ class ClaudeClient:
                                 "content": (body or "").strip()[:4000] or "(sonuç boş)"})
             turns.append({"role": "user", "content": results})
 
-            if len(out.tool_calls) >= max_rounds:
+            if out.budget_exhausted or len(out.tool_calls) >= max_calls \
+                    or _round == max_rounds - 1:
                 out.budget_exhausted = True
-                final = self._request(system, turns, tier, out.usage, tools=tools,
-                                      tool_choice={"type": "none"}, on_delta=on_delta)
-                out.text = self._text(final)
+                # After the tool results, in the same user turn: the API wants
+                # every tool_result first.
+                results.append({"type": "text", "text": self.SON_TUR_NOTU})
+                out.text = ""
+                for _ in range(2):
+                    final = self._request(system, turns, tier, out.usage, tools=tools,
+                                          tool_choice={"type": "none"}, on_delta=on_delta)
+                    out.text = self._text(final)
+                    if out.text:
+                        break
                 return out
 
         return out
+
+    SON_TUR_NOTU = ("Araç bütçesi doldu; yeni araç çağıramazsın. Topladığın sonuçlarla "
+                    "cevabı şimdi yaz. Bulamadığın bir şey varsa bulunamadığını açıkça söyle.")
 
 
 HybridChatRouter = None  # Removed — Gemini-only
@@ -1320,7 +1336,8 @@ class AssistantRuntime:
         self.modules = ModuleIndex(self.config.output_dir)
         # odev_kaynagi: the homework rows Bugün shows (dashboard_api._canli_odevler).
         self.registry = build_registry(self._local_search, module_index=self.modules,
-                                       odev_kaynagi=odev_kaynagi)
+                                       odev_kaynagi=odev_kaynagi,
+                                       sinif=self._mufredat_sinifi)
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """The retriever, shaped as a tool the model can choose to call."""
@@ -1350,6 +1367,10 @@ class AssistantRuntime:
         "- Konu, kavram, müfredat, kazanım sorusu → `kazanim_ara`, "
         "`mufredat_ara`, `kitap_listele` + `kitap_sayfa`. MEB korpusu bu "
         "konularda tek otoritedir.\n"
+        "- Ders kitabı: sayfayı `mufredat_ara` (kind='textbook') ile bul, metnini "
+        "`kitap_sayfa` ile oku. MEB korpusunda Işık'ın sınıfının o dersteki kitabı "
+        "yoksa bunu açıkça söyle ve kazanımla, öğretim programıyla devam et; başka "
+        "bir sınıfın kitabını onun kitabıymış gibi sunma. Kitap bağlantısı verme.\n"
         "- Görsel/şema açıklaman gerekiyorsa → `figur_ara`, sonra `figur_getir`.\n"
         "- Etkileşimli çalışma, yayınlanmış modül ya da 'bu konu/sınav için modül var mı' sorusu → "
         "`modul_ara`. Modül adı ve künyesi YALNIZ bu aracın sonucundan gelir; araç modül bulamadıysa "
@@ -1442,6 +1463,11 @@ class AssistantRuntime:
         "- Klinik tanı koyma, tedavi önerme.\n"
         "- Riskli psikolojik durumda profesyonel destek yönlendirmesi yap."
     )
+
+    def _mufredat_sinifi(self) -> str | None:
+        """The grade in the maarif corpus's form: "7. sınıf" -> "7.Sınıf"."""
+        m = re.match(r"(\d+)\. sınıf$", self._sinif())
+        return f"{m.group(1)}.Sınıf" if m else None
 
     def _sinif(self) -> str:
         """"7. sınıf", from the class the portal profile shows ("7-D").

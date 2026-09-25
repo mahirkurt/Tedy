@@ -46,6 +46,46 @@ _KIND_BY_TOOL: dict[str, str] = {
     "oer_kazanima_gore": "oer",
 }
 
+# Curriculum tools that take a `grade` filter. A search the model did not
+# scope is scoped to Işık's own grade (`McpRegistry.sinif`): measured
+# 2026-09-25, an unscoped outcome search mixed every year's results.
+SINIF_ARACLARI = frozenset({"kazanim_ara", "kazanim_listele", "mufredat_ara",
+                            "kitap_listele", "figur_ara"})
+
+# Every pdf_url/source_url in the maarif corpus answers HTTP 500 since MEB
+# moved its files in summer 2026 (CureoHub mcp-servers/mufredat-mcp/
+# DISCOVERY-UPSTREAM-2026-09.md §2). They are removed before the model reads a
+# result, so it cannot hand the reader a dead link.
+OLU_BAGLANTILAR = frozenset({"pdf_url", "source_url"})
+
+
+def _json_parcalari(text: str) -> list[Any] | None:
+    """The maarif server answers with one or more JSON values back to back
+    (one content block per list item). None when the text is not that."""
+    decoder = json.JSONDecoder()
+    out: list[Any] = []
+    i = 0
+    while i < len(text):
+        while i < len(text) and text[i].isspace():
+            i += 1
+        if i >= len(text):
+            break
+        try:
+            value, i = decoder.raw_decode(text, i)
+        except ValueError:
+            return None
+        out.append(value)
+    return out or None
+
+
+def _baglantisiz(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: _baglantisiz(v) for k, v in value.items() if k not in OLU_BAGLANTILAR}
+    if isinstance(value, list):
+        return [_baglantisiz(v) for v in value]
+    return value
+
+
 LOCAL_TOOL = "ogrenci_verisi_ara"
 # The homework list as Bugün and İşler show it (portal rows, photo-added ones,
 # Işık's own "Yaptım" marks). Declared only when the caller supplies a source.
@@ -214,8 +254,13 @@ class McpRegistry:
                  local_search: Callable[[str, int], list[dict[str, Any]]],
                  unconfigured: list[str] | None = None,
                  module_index: Any = None,
-                 odev_kaynagi: Callable[[], list[dict[str, Any]]] | None = None) -> None:
+                 odev_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
+                 sinif: Callable[[], str | None] | None = None) -> None:
         self.clients = clients
+        # Işık's grade in the corpus's form ("7.Sınıf"), read when asked so a
+        # new school year needs no restart. None, or a None answer, means
+        # unknown: no grade is then invented.
+        self.sinif = sinif
         self.local_search = local_search
         # Servers that were configured (named in MCP_SERVERS) but had no API
         # key. They are not in `clients` — there is nothing to call — but
@@ -272,12 +317,23 @@ class McpRegistry:
             if spec is None:
                 logger.warning("MCP %s does not expose %s", server, mcp_name)
                 continue
+            description = spec.get("description", "")
+            sinif = self._sinif()
+            if sinif and local_name in SINIF_ARACLARI:
+                description += (f"\n\nIşık {sinif} öğrencisi: `grade` vermezsen "
+                                f"'{sinif}' kullanılır. Önceki yılın konusu için sınıfı açıkça ver.")
             decls.append({
                 "name": local_name,
-                "description": spec.get("description", ""),
+                "description": description,
                 "parameters": sanitize_schema(spec.get("inputSchema") or {}),
             })
         return decls
+
+    def _sinif(self) -> str | None:
+        try:
+            return (self.sinif() or None) if self.sinif is not None else None
+        except Exception:  # noqa: BLE001 — an unknown grade is a normal state
+            return None
 
     def dispatch(self, name: str, args: dict[str, Any], ilerleme_izni: bool = False) -> ToolOutcome:
         if name == LOCAL_TOOL:
@@ -299,19 +355,29 @@ class McpRegistry:
         if client is None:
             return ToolOutcome(ok=False, error=f"sunucu yapılandırılmadı: {server}")
 
+        sinif = self._sinif()
+        if sinif and name in SINIF_ARACLARI and not args.get("grade"):
+            args = {**args, "grade": sinif}
+
         result: McpToolResult = client.call_tool(mcp_name, args)
         if not result.ok:
             return ToolOutcome(ok=False, error=result.error or "araç hatası")
 
+        text = result.text
+        parcalar = _json_parcalari(text) if server == "maarif-mufredat" else None
+        if parcalar is not None:
+            text = "\n".join(json.dumps(_baglantisiz(p), ensure_ascii=False, indent=2)
+                             for p in parcalar)
+
         kind = _KIND_BY_TOOL.get(name, "mufredat")
         return ToolOutcome(
             ok=True,
-            text=result.text,
+            text=text,
             citations=[{
                 "kind": kind,
-                "label": self._label(kind, name, args),
+                "label": self._label(kind, name, args, parcalar),
                 "locator": {"tool": name, "args": args, "server": server},
-                "snippet": result.text[:400],
+                "snippet": text[:400],
                 "confidence": 0.9,
             }],
         )
@@ -374,10 +440,17 @@ class McpRegistry:
         return ToolOutcome(ok=True, text=text, citations=citations)
 
     @staticmethod
-    def _label(kind: str, tool: str, args: dict[str, Any]) -> str:
+    def _label(kind: str, tool: str, args: dict[str, Any],
+               parcalar: list[Any] | None = None) -> str:
         if kind == "kitap":
             doc = args.get("document_id")
             page = args.get("page") or args.get("page_range")
+            # The book's name, not its corpus number: "Ders kitabı #213" told
+            # the reader nothing.
+            belge = parcalar[0].get("document") if parcalar and isinstance(parcalar[0], dict) else None
+            baslik = belge.get("title") if isinstance(belge, dict) else None
+            if baslik and page:
+                return f"{baslik} · s.{page}"
             if doc and page:
                 return f"Ders kitabı #{doc} · s.{page}"
             return "Ders kitabı"
@@ -389,7 +462,8 @@ class McpRegistry:
 
 def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                    module_index: Any = None,
-                   odev_kaynagi: Callable[[], list[dict[str, Any]]] | None = None) -> McpRegistry:
+                   odev_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
+                   sinif: Callable[[], str | None] | None = None) -> McpRegistry:
     """Wire the configured servers. A server with no key is simply absent —
     its tools are not declared — but it is still named by degraded(), so an
     unset env var never looks like a healthy system with nothing to say."""
@@ -404,4 +478,4 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
         clients[name] = McpClient(name=name, url=url, api_key=key)
     return McpRegistry(clients=clients, local_search=local_search,
                        unconfigured=unconfigured, module_index=module_index,
-                       odev_kaynagi=odev_kaynagi)
+                       odev_kaynagi=odev_kaynagi, sinif=sinif)

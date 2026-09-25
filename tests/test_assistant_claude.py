@@ -204,17 +204,51 @@ def test_butce_dolunca_arac_kapali_son_tur_ve_fazla_cagri_kaybolmaz():
         _cevap(_arac("t1", "kazanim_ara", {"q": "a"}), _arac("t2", "kazanim_ara", {"q": "b"}),
                stop="tool_use"),
         _cevap(_metin("eldekiyle cevap")))
-    out = c.chat_with_tools(KONUSMA, BILDIRIM, _ok, max_rounds=1)
+    out = c.chat_with_tools(KONUSMA, BILDIRIM, _ok, max_rounds=1, max_calls=1)
     assert out.budget_exhausted is True
     assert len(out.tool_calls) == 1
     # Every tool_use gets its tool_result — the API requires it — and the one
     # past the budget says so instead of vanishing.
-    sonuclar = s.istekler[1]["messages"][-1]["content"]
+    sonuclar = [r for r in s.istekler[1]["messages"][-1]["content"] if r["type"] == "tool_result"]
     assert [r["tool_use_id"] for r in sonuclar] == ["t1", "t2"]
     assert sonuclar[1]["is_error"] is True and "bütçe" in sonuclar[1]["content"]
     # The last word is asked for with tools withdrawn, not with tools removed:
     # the tool list stays, so the cached prefix does too.
     assert s.istekler[1]["tool_choice"] == {"type": "none"}
+    assert out.text == "eldekiyle cevap"
+
+
+def test_ayni_turdaki_paralel_cagrilar_tek_tur_sayilir():
+    """Live 2026-09-25: the model asked for two tools at once in each of three
+    rounds; the budget counted calls, ran out at four, and the fifth call was
+    never made. A round is one model turn, however many tools it asks for."""
+    c, s = _istemci(
+        _cevap(_arac("t1", "kazanim_ara", {"q": "a"}), _arac("t2", "kazanim_ara", {"q": "b"}),
+               stop="tool_use"),
+        _cevap(_arac("t3", "kazanim_ara", {"q": "c"}), _arac("t4", "kazanim_ara", {"q": "d"}),
+               stop="tool_use"),
+        _cevap(_metin("cevap")))
+    out = c.chat_with_tools(KONUSMA, BILDIRIM, _ok, max_rounds=2)
+    assert len(out.tool_calls) == 4
+    assert out.text == "cevap"
+
+
+def test_son_tur_cevabi_acikca_ister_ve_bos_donerse_bir_kez_daha_sorar():
+    """Live 2026-09-25: with the budget spent the model was asked once more
+    with tools withdrawn and answered with a thinking block and no text — the
+    reader got "cevap üretemedim" after four successful tool calls. The last
+    turn now says in words that the tools are done, and an empty reply is
+    asked for once more."""
+    dusunce = NS(type="thinking", thinking="...", signature="x")
+    c, s = _istemci(
+        _cevap(_arac("t1", "kazanim_ara", {"q": "a"}), stop="tool_use"),
+        _cevap(dusunce),
+        _cevap(_metin("eldekiyle cevap")))
+    out = c.chat_with_tools(KONUSMA, BILDIRIM, _ok, max_rounds=1)
+    son_kullanici = s.istekler[1]["messages"][-1]["content"]
+    assert son_kullanici[0]["type"] == "tool_result"
+    assert son_kullanici[-1]["type"] == "text" and "cevabı şimdi yaz" in son_kullanici[-1]["text"]
+    assert len(s.istekler) == 3 and s.istekler[2]["tool_choice"] == {"type": "none"}
     assert out.text == "eldekiyle cevap"
 
 
