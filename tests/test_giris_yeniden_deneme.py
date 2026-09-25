@@ -1,10 +1,12 @@
-"""After a failed portal login, try again every 10 minutes until one succeeds.
+"""After a failed portal login, try again every 5 minutes until one succeeds.
 
 Asked for 2026-09-25, after the 22:00 run of the day before ended "[ERROR]
 Login failed, aborting" (five CAPTCHA attempts inside one run) and the next
 chance was the next 15-minute cron tick. Cron now ticks every 5 minutes with
 `--zamanla`, and the code decides: 15 minutes after the last attempt
-normally, 10 after a failed login. A run started by hand never waits.
+normally, 5 after a failed login — every tick — until a login succeeds. The
+same day it was first 10; the family asked for 5. A run started by hand
+never waits.
 """
 import json
 from datetime import datetime, timedelta
@@ -42,8 +44,8 @@ def test_olagan_aralik_15_dakika(dk, beklenen):
     assert run_sync._sira_geldi_mi(_durum(giris_basarisiz=False), _tik(dk)) is beklenen
 
 
-@pytest.mark.parametrize("dk,beklenen", [(5, False), (10, True), (15, True)])
-def test_giris_basarisizsa_10_dakika(dk, beklenen):
+@pytest.mark.parametrize("dk,beklenen", [(0, False), (5, True), (10, True)])
+def test_giris_basarisizsa_5_dakika(dk, beklenen):
     assert run_sync._sira_geldi_mi(_durum(giris_basarisiz=True), _tik(dk)) is beklenen
 
 
@@ -96,7 +98,7 @@ def test_elle_baslatilan_kosu_beklemez(monkeypatch):
         run_sync.main()
 
 
-def test_basarisiz_giris_10_dakika_sonrasini_yazar(monkeypatch, yollar, capsys):
+def test_basarisiz_giris_5_dakika_sonrasini_yazar(monkeypatch, yollar, capsys):
     monkeypatch.setattr(run_sync, "create_driver", lambda: _Surucu())
     monkeypatch.setattr(run_sync, "login", lambda d: None)
     once = datetime.now()
@@ -106,18 +108,18 @@ def test_basarisiz_giris_10_dakika_sonrasini_yazar(monkeypatch, yollar, capsys):
     assert d["giris_basarisiz"] is True and d["ardisik_basarisiz"] == 1
     saglik = json.loads((yollar / "health.json").read_text(encoding="utf-8"))
     sonraki = datetime.fromisoformat(saglik["login"]["sonraki_deneme"])
-    assert timedelta(minutes=9) < sonraki - once < timedelta(minutes=11)
-    assert "10 dakika sonra yeniden denenecek" in capsys.readouterr().out
+    assert timedelta(minutes=4) < sonraki - once < timedelta(minutes=6)
+    assert "5 dakika sonra yeniden denenecek" in capsys.readouterr().out
 
-    # The next tick five minutes later waits; the one after tries again.
-    assert not run_sync._sira_geldi_mi(d, once + timedelta(minutes=5))
-    assert run_sync._sira_geldi_mi(d, once + timedelta(minutes=10))
+    # A minute later it waits; the next tick, five minutes on, tries again.
+    assert not run_sync._sira_geldi_mi(d, once + timedelta(minutes=1))
+    assert run_sync._sira_geldi_mi(d, once + timedelta(minutes=5))
 
 
 def test_hata_firlatan_giris_de_basarisiz_giristir(monkeypatch, yollar, capsys):
     """scrape_all.login waits 10 s for the login form; with the portal down
     that is a TimeoutException, which crashed the run and left the schedule
-    thinking the last login had worked (15 minutes, not 10)."""
+    thinking the last login had worked (15 minutes, not 5)."""
     monkeypatch.setattr(run_sync, "create_driver", lambda: _Surucu())
 
     def zaman_asimi(d):

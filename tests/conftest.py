@@ -9,7 +9,7 @@ variable themselves.
 
 run_sync.main() records every attempt in output/.sync_zamanlama.json, the
 file cron's 5-minute ticks read to decide whether to run (15 minutes normally,
-10 after a failed portal login). Measured 2026-09-25: the rollover tests call
+5 after a failed portal login). Measured 2026-09-25: the rollover tests call
 main() and wrote that file in the live checkout. Every test gets its own.
 """
 import sys

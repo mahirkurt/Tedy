@@ -165,16 +165,17 @@ def _okunamadi_kaydi(name, e, onceki):
 
 # ── When to run ──────────────────────────────────────────────────────────────
 # Cron ticks every 5 minutes with --zamanla; the code decides whether this tick
-# runs. 15 minutes after the last attempt normally, 10 after a failed portal
-# login, until a login succeeds (asked for 2026-09-25: the 22:00 run of the
-# day before failed its five CAPTCHA attempts and the next chance was 15
-# minutes away). A run started by hand never waits.
+# runs. 15 minutes after the last attempt normally, 5 after a failed portal
+# login — every tick — until a login succeeds (asked for 2026-09-25: the 22:00
+# run of the day before failed its five CAPTCHA attempts and the next chance
+# was 15 minutes away; first set to 10, then 5). A failed login run takes
+# about 30 s, so the ticks never meet. A run started by hand never waits.
 ZAMANLAMA_PATH = os.path.join(PROJECT_ROOT, "output", ".sync_zamanlama.json")
 OLAGAN_ARALIK = timedelta(minutes=15)
-GIRIS_YENIDEN_ARALIK = timedelta(minutes=10)
+GIRIS_YENIDEN_ARALIK = timedelta(minutes=5)
 # A run records its start a few seconds after its tick, so the tick exactly
 # one interval later sees a little less than the interval. Anything under a
-# tick's width (5 minutes) works; one minute is plenty.
+# tick's width works; one minute is plenty.
 TIK_TOLERANSI = timedelta(minutes=1)
 
 
@@ -304,7 +305,7 @@ def main(zamanla=False):
             # The login form did not load (a 10 s wait timed out) or was not
             # the form we know. That is a failed login too — the portal being
             # down is the commonest reason a login fails at all — so it takes
-            # the 10-minute path instead of crashing the run.
+            # the retry path instead of crashing the run.
             print(f"[ERROR] Login raised: {_kisa_hata(e)}")
             login_info = None
         zamanlama = _giris_sonucu(bool(login_info), datetime.now())
