@@ -198,9 +198,18 @@ export interface AssistantCitation {
   id: string
   kind: CitationKind
   label: string
+  /** Where the source lives. A textbook figure the assistant opened with `figur_getir` carries
+   *  `figure_id` (and `caption` when the corpus has one) — see `FigureLocator`. */
   locator: Record<string, unknown>
   snippet: string
   confidence: number
+}
+
+/** The part of a `figur_getir` citation's locator the Kaynaklar panel reads: the image comes
+ *  from `/api/assistant/figure/<figure_id>` and `caption` is its alt text. */
+export interface FigureLocator {
+  figure_id: number
+  caption?: string
 }
 
 export interface AssistantToolCall {

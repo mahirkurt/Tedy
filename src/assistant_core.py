@@ -477,7 +477,8 @@ class ClaudeClient:
                     body = f"HATA: {outcome.error}"
                 results.append({"type": "tool_result", "tool_use_id": use.id,
                                 "is_error": not outcome.ok,
-                                "content": (body or "").strip()[:4000] or "(sonuç boş)"})
+                                "content": self._sonuc_icerigi(
+                                    body, outcome.images if outcome.ok else None)})
             turns.append({"role": "user", "content": results})
 
             if out.budget_exhausted or len(out.tool_calls) >= max_calls \
@@ -496,6 +497,45 @@ class ClaudeClient:
                 return out
 
         return out
+
+    # A tool_result carries at most this many images, and none whose base64
+    # exceeds GORSEL_SINIRI characters: get_figure's are ≤ ~110 KB (≈150 K
+    # base64), so the cap only ever trips on something that is not a textbook
+    # figure — and an image block counts against the request's size limit.
+    EN_COK_GORSEL = 2
+    GORSEL_SINIRI = 1_500_000
+
+    @classmethod
+    def _sonuc_icerigi(cls, body: str | None,
+                       images: list[dict[str, Any]] | None) -> str | list[dict[str, Any]]:
+        """A tool_result's content: the text as before, or — when the tool
+        returned images (figur_getir) — a list of a text block and up to two
+        image blocks, so the model sees the figure it is asked to explain.
+        An image left out is named in the text; a silent drop would let the
+        model describe a picture it never saw."""
+        metin = (body or "").strip()[:4000] or "(sonuç boş)"
+        if not images:
+            return metin
+        from src.assistant_tools import GORSEL_BICIMLERI
+
+        bloklar: list[dict[str, Any]] = []
+        notlar: list[str] = []
+        for g in images:
+            data = str(g.get("data") or "")
+            mime = str(g.get("mimeType") or "")
+            if len(bloklar) >= cls.EN_COK_GORSEL:
+                notlar.append("(bir görsel daha var; en çok iki görsel gönderilir)")
+            elif len(data) > cls.GORSEL_SINIRI:
+                notlar.append("(görsel çok büyük; gönderilmedi)")
+            elif mime not in GORSEL_BICIMLERI or not data:
+                notlar.append("(görsel biçimi desteklenmiyor; gönderilmedi)")
+            else:
+                bloklar.append({"type": "image", "source": {
+                    "type": "base64", "media_type": mime, "data": data}})
+        if notlar:
+            ek = "\n" + "\n".join(dict.fromkeys(notlar))
+            metin = metin[:4000 - len(ek)] + ek
+        return [{"type": "text", "text": metin}, *bloklar]
 
     SON_TUR_NOTU = ("Araç bütçesi doldu; yeni araç çağıramazsın. Topladığın sonuçlarla "
                     "cevabı şimdi yaz. Bulamadığın bir şey varsa bulunamadığını açıkça söyle.")
@@ -1601,7 +1641,17 @@ class AssistantRuntime:
         "kitap rafıdır; `kitap_sayfa`'yla karıştırma.\n"
         "- Bir konuda video/konu anlatımı önerisi (MEBİ, SEBİTV) → `video_oner`. "
         "Kataloğun sınıf bilgisi yoksa bunu açıkça söyle, sınıf uydurma.\n"
-        "- Görsel/şema açıklaman gerekiyorsa → `figur_ara`, sonra `figur_getir`.\n"
+        "- Görsel/şema açıklaman gerekiyorsa → `figur_ara` ile bul, `figur_getir` ile aç. "
+        "`figur_getir` görseli sana da gösterir; anlattığın cümleye [S] koy — okur aynı "
+        "görseli Kaynaklar panelinde küçük resim olarak görür. Sana gösterilmeyen bir görseli "
+        "gördün gibi anlatma.\n"
+        "- Bir dersin öğretim programındaki ünite/tema sırası → `program_getir`; dersin "
+        "programı ve kitabı korpusta var mı → `ders_bilgisi`. İkisi de ders slug'ı ister "
+        "(ör. 'ortaokul-matematik-dersi'); slug'ı `kitap_listele`/`kazanim_ara` sonucundaki "
+        "`subject` alanından al.\n"
+        "- MEB'in program tanıtım ve sınıf içi etkinlik videoları → `video_listele` "
+        "(`category` ile daralt); bir videonun bağlantısı → `video_getir`.\n"
+        "- `oer_ara` bir belgeden tek pasaj verir; devamı gerekiyorsa → `oer_getir` (doc_id).\n"
         "- Etkileşimli çalışma, yayınlanmış modül ya da 'bu konu/sınav için modül var mı' sorusu → "
         "`modul_ara`. Modül adı ve künyesi YALNIZ bu aracın sonucundan gelir; araç modül bulamadıysa "
         "bunu söyle, modül ya da bağlantı uydurma. Modülü önerdiğin cümleye aracın [S] numarasını koy; "

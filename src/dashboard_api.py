@@ -9,8 +9,10 @@ import os
 import re
 import secrets
 import sys
+import threading
 import time
 import unicodedata
+from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
@@ -2208,6 +2210,59 @@ def assistant_reindex():
         return jsonify({"ok": False, "error": "assistant_unavailable"}), 503
     except Exception as e:
         return jsonify({"ok": False, "error": f"reindex failed: {e}"}), 500
+
+
+# A textbook figure the assistant cited (figur_getir), as the image the
+# Kaynaklar panel shows. Per process, 64 entries, least recently used out:
+# get_figure images are ≤ ~110 KB, so the cache stays under ~7 MB per worker,
+# and a figure id's image never changes, so there is nothing to expire.
+FIGUR_ONBELLEK_BOYUTU = 64
+_FIGUR_ONBELLEGI: "OrderedDict[int, tuple[bytes, str]]" = OrderedDict()
+_FIGUR_KILIDI = threading.Lock()
+FIGUR_ULASILAMADI = "Ders kitabı görseline şu an ulaşılamadı; biraz sonra yeniden deneyin."
+
+
+def _figur_yaniti(veri: bytes, mime: str) -> Response:
+    return Response(veri, mimetype=mime, headers={
+        # Private: behind the sign-in. A day: the image for an id never changes.
+        "Cache-Control": "private, max-age=86400",
+        "X-Content-Type-Options": "nosniff",
+    })
+
+
+@app.route("/api/assistant/figure/<int:figure_id>")
+@require_auth
+def assistant_figure(figure_id):
+    access = _require_assistant_access()
+    if access is not None:
+        return access
+
+    with _FIGUR_KILIDI:
+        kayit = _FIGUR_ONBELLEGI.get(figure_id)
+        if kayit is not None:
+            _FIGUR_ONBELLEGI.move_to_end(figure_id)
+    if kayit is not None:
+        return _figur_yaniti(*kayit)
+
+    try:
+        durum, veri, mime = _assistant_runtime().registry.figur_gorseli(figure_id)
+    except AssistantUnavailableError:
+        durum, veri, mime = "ulasilamadi", b"", ""
+    except Exception as exc:  # noqa: BLE001 — a figure the panel cannot load is not a 500
+        app.logger.error("assistant figure %s failed: %s", figure_id, type(exc).__name__)
+        durum, veri, mime = "ulasilamadi", b"", ""
+
+    if durum == "yok":
+        return jsonify({"error": "Bu görsel müfredat korpusunda bulunamadı."}), 404
+    if durum != "var":
+        return jsonify({"error": FIGUR_ULASILAMADI}), 502
+
+    with _FIGUR_KILIDI:
+        _FIGUR_ONBELLEGI[figure_id] = (veri, mime)
+        _FIGUR_ONBELLEGI.move_to_end(figure_id)
+        while len(_FIGUR_ONBELLEGI) > FIGUR_ONBELLEK_BOYUTU:
+            _FIGUR_ONBELLEGI.popitem(last=False)
+    return _figur_yaniti(veri, mime)
 
 
 @app.route("/v1/models")

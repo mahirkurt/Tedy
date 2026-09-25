@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import { Tile } from '@carbon/react'
 import { DocumentView } from '@carbon/icons-react'
-import type { AssistantCitation, CitationKind } from '../types'
+import type { AssistantCitation, CitationKind, FigureLocator } from '../types'
 import { moduleRoute } from '../utils/moduleLink'
 
 // Işık's own data first, then her published modules and Tedy Books (both TED's own material),
@@ -42,6 +42,33 @@ function ModuleOpen({ locator }: { locator: Record<string, unknown> | undefined 
   return <Link className="ac__ref-open" to={route}>Modülü aç</Link>
 }
 
+/** The figure part of a locator, or null. The value arrives as unchecked JSON, and it becomes a
+ *  URL path segment — so only a positive integer id is accepted. */
+function figureOf(locator: Record<string, unknown> | undefined): FigureLocator | null {
+  const id = locator?.figure_id
+  if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) return null
+  const caption = typeof locator?.caption === 'string' ? locator.caption.trim() : ''
+  return caption ? { figure_id: id, caption } : { figure_id: id }
+}
+
+/** A textbook figure the answer drew on, small, beside its citation (Görev 4). The caption is the
+ *  alt text, so it is not repeated as a snippet. An image that fails to load says so rather than
+ *  leaving a broken-image box (D3). */
+function FigureThumb({ figure }: { figure: FigureLocator }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return <p className="ac__ref-unlinked">Görsel yüklenemedi</p>
+  return (
+    <img
+      className="ac__ref-figure"
+      src={`/api/assistant/figure/${figure.figure_id}`}
+      alt={figure.caption || 'Ders kitabı görseli'}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
 function RefGroup({
   title,
   items,
@@ -64,20 +91,23 @@ function RefGroup({
     <section className={`ac__ref-group${modifier}`}>
       <h3 className="ac__ref-group-title">{title}</h3>
       <ul className="ac__ref-list">
-        {items.map(c => (
-          <li
-            key={c.id}
-            ref={c.id === activeId ? activeRef : undefined}
-            className={`ac__ref-item${c.id === activeId ? ' ac__ref-item--active' : ''}`}
-          >
-            <span className="ac__ref-index">{c.id.replace('S', '')}</span>
-            <div>
-              <span className="ac__ref-path">{c.label}</span>
-              <p className="ac__ref-snippet">{c.snippet}</p>
-              {kind === 'modul' && <ModuleOpen locator={c.locator} />}
-            </div>
-          </li>
-        ))}
+        {items.map(c => {
+          const figure = figureOf(c.locator)
+          return (
+            <li
+              key={c.id}
+              ref={c.id === activeId ? activeRef : undefined}
+              className={`ac__ref-item${c.id === activeId ? ' ac__ref-item--active' : ''}`}
+            >
+              <span className="ac__ref-index">{c.id.replace('S', '')}</span>
+              <div>
+                <span className="ac__ref-path">{c.label}</span>
+                {figure ? <FigureThumb figure={figure} /> : <p className="ac__ref-snippet">{c.snippet}</p>}
+                {kind === 'modul' && <ModuleOpen locator={c.locator} />}
+              </div>
+            </li>
+          )
+        })}
       </ul>
     </section>
   )

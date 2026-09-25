@@ -8,6 +8,7 @@ grade:"6"; the server's schema, descriptions intact, produced grade:"5.Sınıf".
 """
 from __future__ import annotations
 
+import base64
 import copy
 import html
 import json
@@ -26,7 +27,7 @@ from src import assistant_kitaplar, assistant_modules
 logger = logging.getLogger(__name__)
 
 # Gemini-facing name -> (server, MCP tool name).
-# Ten of the 27 available tools. The rest are not exposed because a large tool
+# Fourteen of the 27 available tools. The rest are not exposed because a large tool
 # list bloats every prompt and slows the loop; adding one is a single line.
 TOOL_ALLOWLIST: dict[str, tuple[str, str]] = {
     "kazanim_ara":       ("maarif-mufredat", "search_learning_outcomes"),
@@ -36,8 +37,13 @@ TOOL_ALLOWLIST: dict[str, tuple[str, str]] = {
     "kitap_sayfa":       ("maarif-mufredat", "get_document_text"),
     "figur_ara":         ("maarif-mufredat", "search_figures"),
     "figur_getir":       ("maarif-mufredat", "get_figure"),
+    "program_getir":     ("maarif-mufredat", "get_curriculum_program"),
+    "ders_bilgisi":      ("maarif-mufredat", "get_subject"),
+    "video_listele":     ("maarif-mufredat", "list_videos"),
+    "video_getir":       ("maarif-mufredat", "get_video"),
     "oer_ara":           ("egitim-kaynak", "kb_search"),
     "oer_kazanima_gore": ("egitim-kaynak", "kb_for_outcome"),
+    "oer_getir":         ("egitim-kaynak", "kb_get"),
 }
 
 # Which citation class a server's output belongs to. The distinction is load
@@ -49,13 +55,30 @@ _KIND_BY_TOOL: dict[str, str] = {
     "figur_getir": "kitap",
     "oer_ara": "oer",
     "oer_kazanima_gore": "oer",
+    "oer_getir": "oer",
+    "program_getir": "mufredat",
+    "ders_bilgisi": "mufredat",
+    "video_listele": "mufredat",
+    "video_getir": "mufredat",
 }
 
 # Curriculum tools that take a `grade` filter. A search the model did not
 # scope is scoped to Işık's own grade (`McpRegistry.sinif`): measured
 # 2026-09-25, an unscoped outcome search mixed every year's results.
+# get_curriculum_program, get_subject, list_videos, get_video and kb_get take
+# no `grade` (tools/list, 2026-09-25), so none of them is here.
 SINIF_ARACLARI = frozenset({"kazanim_ara", "kazanim_listele", "mufredat_ara",
                             "kitap_listele", "figur_ara"})
+
+# Görev 4's tools. Unlike the first seven, their bodies are shaped to fit
+# GOVDE_SINIRI rather than left to chat_with_tools' blind 4,000-character cut.
+_YENI_MAARIF = frozenset({"program_getir", "ders_bilgisi", "video_listele", "video_getir"})
+_YENI_ARACLAR = _YENI_MAARIF | {"oer_getir"}
+
+# What the Messages API accepts as an image block, and so the only formats
+# the figure endpoint serves: a remote server must not pick what the
+# dashboard's origin serves (an SVG can carry script).
+GORSEL_BICIMLERI = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp"})
 
 # Every pdf_url/source_url in the maarif corpus answers HTTP 500 since MEB
 # moved its files in summer 2026 (CureoHub mcp-servers/mufredat-mcp/
@@ -89,6 +112,114 @@ def _baglantisiz(value: Any) -> Any:
     if isinstance(value, list):
         return [_baglantisiz(v) for v in value]
     return value
+
+
+def _hata_zarfi(parcalar: list[Any]) -> str | None:
+    """The maarif server reports a miss as data, not isError: get_figure with an
+    unknown id answers `{"error": "figure N not found"}`, get_curriculum_program
+    `{"error": "program not found for subject", "subject": …}` (measured
+    2026-09-25). Cited as a source, that envelope read as evidence."""
+    if len(parcalar) == 1 and isinstance(parcalar[0], dict):
+        hata = parcalar[0].get("error")
+        if isinstance(hata, str) and hata:
+            return json.dumps(parcalar[0], ensure_ascii=False)
+    return None
+
+
+# kb_get with no max_chars returns the whole document; the rest of its
+# envelope (licence, caveat, flags) measured ~800 characters, so this keeps
+# the body inside GOVDE_SINIRI.
+OER_METIN_SINIRI = 2500
+
+
+def _sigdir(satirlar: list[str], sinir: int, kalan_notu: Callable[[int], str]) -> str:
+    """Whole lines up to `sinir` characters; when some do not fit, the note
+    saying how many were left out takes their place — a silent cut would
+    read as the complete list."""
+    out: list[str] = []
+    boy = 0
+    for i, satir in enumerate(satirlar):
+        sonra = len(satirlar) - i - 1
+        # This line, plus room for the note if any line would still follow.
+        gerek = boy + len(satir) + 1 + (len(kalan_notu(sonra)) + 1 if sonra else 0)
+        if gerek > sinir:
+            out.append(kalan_notu(len(satirlar) - i))
+            break
+        out.append(satir)
+        boy += len(satir) + 1
+    return "\n".join(out)
+
+
+def _video_listesi_metni(parcalar: list[Any]) -> str:
+    """list_videos answers 157 records, 46,539 characters (2026-09-25): as JSON
+    the 4,000-character cut kept the first dozen. One line per video, grouped
+    by category; `video_getir` gives a video's links and description."""
+    videolar = [v for v in parcalar if isinstance(v, dict)]
+    kategoriler: dict[str, list[dict[str, Any]]] = {}
+    for v in videolar:
+        kategoriler.setdefault(str(v.get("category") or "diğer"), []).append(v)
+    satirlar = [f"{len(videolar)} video. Bağlantı ve açıklama için `video_getir`'e id ver."]
+    for kat, grup in kategoriler.items():
+        satirlar.append(f"[{kat}]")
+        satirlar.extend(f"#{v.get('id')} {v.get('title', '')}" for v in grup)
+    adlar = ", ".join(kategoriler)
+    return _sigdir(satirlar, GOVDE_SINIRI,
+                   lambda n: f"… {n} satır daha listelenmedi; `category` ile daralt ({adlar}).")
+
+
+_BASLIK_SAYFA_NO = re.compile(r"\d+$")
+_PROGRAM_BOLUMU = re.compile(r"ünite|tema|sınıf", re.IGNORECASE)
+
+
+def _program_metni(p: dict[str, Any]) -> str:
+    """get_curriculum_program's `toc`: every entry's head repeats the page
+    number and the programme's running header ("FEN BILIMLERI DERSI ÖĞRETIM
+    PROGRAMI151"), and the Fen Bilimleri toc measured 12,134 characters.
+    Header dropped, one line per page; when that still does not fit, the unit,
+    theme and grade lines are what the reader asks for ("ünite sırası")."""
+    toc = p.get("toc")
+    if not isinstance(toc, list):
+        return json.dumps(_baglantisiz(p), ensure_ascii=False)
+    belge = p.get("document") if isinstance(p.get("document"), dict) else {}
+    ust = [str(belge.get("title") or p.get("subject") or "Öğretim programı")]
+    if belge.get("grade_or_grades"):
+        ust.append(f"Sınıflar: {belge['grade_or_grades']}")
+    if p.get("page_count"):
+        ust.append(f"{p['page_count']} sayfa. Bir sayfanın metni için `kitap_sayfa`.")
+
+    ayrik = []
+    for t in toc:
+        if not isinstance(t, dict):
+            continue
+        satirlar = [s.strip() for s in str(t.get("head") or "").split("\n")]
+        if satirlar and satirlar[0] == str(t.get("page_no")):
+            satirlar = satirlar[1:]
+        ayrik.append((t.get("page_no"), satirlar))
+    basliklar = [_BASLIK_SAYFA_NO.sub("", s[0]) for _, s in ayrik if s]
+    tekrar = max(set(basliklar), key=basliklar.count) if basliklar else None
+    if tekrar is not None and basliklar.count(tekrar) < 2:
+        tekrar = None
+
+    satirlar = []
+    for no, s in ayrik:
+        if s and tekrar is not None and _BASLIK_SAYFA_NO.sub("", s[0]) == tekrar:
+            s = s[1:]
+        metin = " ".join(" ".join(s).split())
+        if metin:
+            satirlar.append(f"s.{no}: {metin}")
+    sinir = GOVDE_SINIRI - sum(len(u) + 1 for u in ust) - 1
+    if sum(len(s) + 1 for s in satirlar) > sinir:
+        secilen = [s for s in satirlar if _PROGRAM_BOLUMU.search(s)]
+        if secilen:
+            ust.append(f"Yalnız ünite/tema/sınıf başlıklı sayfalar ({len(secilen)}/{len(satirlar)}):")
+            sinir = GOVDE_SINIRI - sum(len(u) + 1 for u in ust) - 1
+            satirlar = secilen
+    govde = _sigdir(satirlar, sinir, lambda n: f"… {n} sayfa daha; `kitap_sayfa` ya da `mufredat_ara` ile bak.")
+    return "\n".join(ust + [govde])
+
+
+def _figur_bilgisi(parcalar: list[Any] | None) -> dict[str, Any]:
+    return parcalar[0] if parcalar and isinstance(parcalar[0], dict) else {}
 
 
 LOCAL_TOOL = "ogrenci_verisi_ara"
@@ -1165,6 +1296,10 @@ class ToolOutcome:
     text: str = ""
     citations: list[dict[str, Any]] = field(default_factory=list)
     error: str | None = None
+    # MCP image content, [{data (base64), mimeType}] — for the model's eyes
+    # only: chat_with_tools puts up to two in the tool_result. Never copied
+    # into a citation; the reader's panel fetches /api/assistant/figure/<id>.
+    images: list[dict[str, Any]] = field(default_factory=list)
 
 
 def sanitize_schema(schema: dict[str, Any]) -> dict[str, Any]:
@@ -1454,28 +1589,90 @@ class McpRegistry:
         if sinif and name in SINIF_ARACLARI and not args.get("grade"):
             args = {**args, "grade": sinif}
 
+        if name == "oer_getir" and args.get("max_chars") is None:
+            args = {**args, "max_chars": OER_METIN_SINIRI}
+
         result: McpToolResult = client.call_tool(mcp_name, args)
         if not result.ok:
             return ToolOutcome(ok=False, error=result.error or "araç hatası")
 
         text = result.text
         parcalar = _json_parcalari(text) if server == "maarif-mufredat" else None
+        if name == "oer_getir":
+            parcalar = _json_parcalari(text)
+            belge = _figur_bilgisi(parcalar)
+            if belge.get("status") == "not_found":
+                return ToolOutcome(ok=False, error=f"belge bulunamadı: {args.get('doc_id')}")
+            parcalar = None  # licence and source_url stay: OER links are live
         if parcalar is not None:
-            text = "\n".join(json.dumps(_baglantisiz(p), ensure_ascii=False, indent=2)
-                             for p in parcalar)
+            hata = _hata_zarfi(parcalar)
+            if hata is not None:
+                return ToolOutcome(ok=False, error=hata)
+            if name == "video_listele":
+                text = _video_listesi_metni(parcalar)
+            elif name == "program_getir" and isinstance(parcalar[0], dict):
+                text = _program_metni(parcalar[0])
+            elif name in _YENI_MAARIF:
+                text = _kirp("\n".join(json.dumps(_baglantisiz(p), ensure_ascii=False)
+                                       for p in parcalar), GOVDE_SINIRI)
+            else:
+                text = "\n".join(json.dumps(_baglantisiz(p), ensure_ascii=False, indent=2)
+                                 for p in parcalar)
+        elif name in _YENI_ARACLAR:
+            text = _kirp(text, GOVDE_SINIRI)
 
         kind = _KIND_BY_TOOL.get(name, "mufredat")
+        locator: dict[str, Any] = {"tool": name, "args": args, "server": server}
+        if name == "figur_getir":
+            # What the reader's panel needs to show the figure: its id for
+            # /api/assistant/figure/<id>, and the caption as the image's alt.
+            figur = _figur_bilgisi(parcalar)
+            figure_id = figur.get("figure_id", args.get("figure_id"))
+            try:
+                locator["figure_id"] = int(figure_id)
+            except (TypeError, ValueError):
+                pass
+            if isinstance(figur.get("caption"), str) and figur["caption"].strip():
+                locator["caption"] = figur["caption"].strip()
         return ToolOutcome(
             ok=True,
             text=text,
             citations=[{
                 "kind": kind,
-                "label": self._label(kind, name, args, parcalar),
-                "locator": {"tool": name, "args": args, "server": server},
-                "snippet": text[:400],
+                "label": self._label(kind, name, args, parcalar or _json_parcalari(text)),
+                "locator": locator,
+                # A figure's caption, not its metadata JSON: the panel shows
+                # the snippet to the reader.
+                "snippet": locator.get("caption") or text[:400],
                 "confidence": 0.9,
             }],
+            images=list(result.images or []),
         )
+
+    def figur_gorseli(self, figure_id: int) -> tuple[str, bytes, str]:
+        """One textbook figure's bytes for the reader's panel
+        (/api/assistant/figure/<id>). Returns (durum, veri, mime): durum is
+        "var", "yok" (the corpus has no such figure) or "ulasilamadi" (server
+        unconfigured, unreachable, or it answered something unusable)."""
+        client = self.clients.get("maarif-mufredat")
+        if client is None:
+            return "ulasilamadi", b"", ""
+        result = client.call_tool("get_figure", {"figure_id": int(figure_id), "include_image": True})
+        if not result.ok:
+            durum = "yok" if "not found" in (result.error or "").lower() else "ulasilamadi"
+            return durum, b"", ""
+        if not result.images:
+            # Measured: an unknown id is ok=True, `{"error": "… not found"}`, no image.
+            return "yok", b"", ""
+        gorsel = result.images[0]
+        mime = str(gorsel.get("mimeType") or "")
+        if mime not in GORSEL_BICIMLERI:
+            return "ulasilamadi", b"", ""
+        try:
+            veri = base64.b64decode(str(gorsel.get("data") or ""), validate=True)
+        except (ValueError, TypeError):
+            return "ulasilamadi", b"", ""
+        return ("var", veri, mime) if veri else ("ulasilamadi", b"", "")
 
     def _dispatch_local(self, args: dict[str, Any]) -> ToolOutcome:
         query = str(args.get("query", "")).strip()
@@ -1608,6 +1805,22 @@ class McpRegistry:
     @staticmethod
     def _label(kind: str, tool: str, args: dict[str, Any],
                parcalar: list[Any] | None = None) -> str:
+        ilk = _figur_bilgisi(parcalar)
+        if tool == "figur_getir":
+            if ilk.get("title") and ilk.get("page_no"):
+                return f"{ilk['title']} · s.{ilk['page_no']} · görsel"
+            return "Ders kitabı görseli"
+        if tool == "program_getir":
+            belge = ilk.get("document") if isinstance(ilk.get("document"), dict) else {}
+            return f"Öğretim programı · {belge['title']}" if belge.get("title") else "Öğretim programı"
+        if tool == "ders_bilgisi" and ilk.get("name"):
+            return f"MEB müfredatı · {ilk['name']}"
+        if tool == "video_listele":
+            return "MEB videoları"
+        if tool == "video_getir":
+            return f"MEB videosu · {ilk['title']}" if ilk.get("title") else "MEB videosu"
+        if tool == "oer_getir" and ilk.get("title"):
+            return f"Açık eğitsel kaynak · {ilk['title']}"
         if kind == "kitap":
             doc = args.get("document_id")
             page = args.get("page") or args.get("page_range")

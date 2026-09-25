@@ -91,7 +91,13 @@ class McpClient:
     @staticmethod
     def _decode(resp: Any) -> dict[str, Any]:
         ctype = (resp.headers or {}).get("content-type", "")
-        body = resp.text
+        # MCP bodies are UTF-8 JSON. Read the bytes as such rather than trusting
+        # requests' guess: egitim-kaynak answers text/event-stream with no
+        # charset, requests then falls back to ISO-8859-1, and (measured
+        # 2026-09-25) every Turkish letter of kb_search/kb_get reached the
+        # model as mojibake ("Kesir OluÅtur").
+        raw = getattr(resp, "content", None)
+        body = raw.decode("utf-8", errors="replace") if isinstance(raw, (bytes, bytearray)) else resp.text
         if "text/event-stream" in ctype:
             for line in body.splitlines():
                 if line.startswith("data:"):

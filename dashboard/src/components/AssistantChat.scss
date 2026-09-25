@@ -496,6 +496,19 @@
   color: var(--ted-color-text-secondary);
 }
 
+// A textbook figure the answer drew on (Görev 4). Small — the panel is a
+// reference column, not a viewer — and inside a subtle border on its own layer,
+// so a white scanned page does not melt into the panel. Square corners: it is
+// neither a card nor a control, and Carbon draws images square.
+.ac__ref-figure {
+  display: block;
+  max-inline-size: 100%;
+  max-block-size: 10rem;
+  margin-top: spacing.$spacing-02;
+  border: 1px solid theme.$border-subtle-01;
+  background: theme.$layer-01;
+}
+
 // Plan blocks
 .ac__plan-item {
   display: flex;
