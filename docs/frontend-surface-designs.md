@@ -451,6 +451,20 @@ değil (İ3). Modele de aynı iskelet verilir (`## Biçim`: açılış cümlesi,
 kaynak bir bölümde tekrar ediyorsa işareti ilk cümlede kalır
 (`_tekrari_topla`). Telefonda cevap tüm genişliği alır.
 
+**Yeni kaynaklar ve görsel önizleme (2026-09-25).** Kaynaklar paneli artık
+Işık'ın kendi verisinden gelen dört yeni grup gösterir — ders programı, sınav
+listesi, birleşik takvim, ders içeriği/notlar — hepsi `odev_listesi`'yle aynı
+"kaynak yoksa araç yok" kuralıyla bağlı; Tedy Books arama sonuçları kendi
+`tedy-kitap` grubunda, EnglishCentral/Achieve3000 özeti ve MEBİ/SEBİTV video
+önerisi kendi etiketleriyle listelenir. `figur_getir`'in döndürdüğü ders kitabı
+görseli artık modele metinle birlikte gerçek bir resim olarak gidiyor —
+"gördüğünü" anlatan model bunu artık gerçekten görmüş oluyor — ve aynı görsel
+`SourcePanel`'de `figure_id` taşıyan atfın yanında küçük bir önizleme (thumbnail)
+olarak belirir; alt metni başlık ya da "Ders kitabı görseli", yüklenemezse
+"Görsel yüklenemedi" yazar. Bir aile üyesi sorduğunda görünen `aile-kaynak`
+grubu Işık'ın oturumunda hiç çağrılmaz ve hiç görünmez (D3/D4: iç temsil, bu
+durumda "bu kaynak var ama sana kapalı" bilgisi, okura hiç sızmaz).
+
 ---
 
 ### 4.11 Tedy Books — *ayrı dünya*
@@ -640,3 +654,4 @@ görüntüsüyle doğrulanır.
 | 1.8 | 2026-09-25 | Denetim araçları devrede: görsel regresyon (13 sayfa × 2 genişlik + giriş), ARIA ağaç anlık görüntüleri, IBM Equal Access, WebKit + Firefox, azaltılmış hareket ve Windows yüksek kontrast kipleri, stylelint-plugin-carbon-tokens (sıfır hata; aralık, hareket ve yazı değerleri Carbon belirteçlerine taşındı), Lighthouse CI, paket analizi. IBM'in bulduğu beş erişilebilirlik hatası giderildi (görünen metinle uyuşmayan ad, etiketsiz metin alanı, adsız aside, boş aria-controls, kaymayan odaklanabilir bölge). Sınavlar sütunu sola hizalı. |
 | 1.9 | 2026-09-25 | Asistan cevapları kitap dizgisinden ayrıldı: Carbon tipinde sohbet biçimi, kalın satır → başlık, `Şimdi`/`Not` kutuları, kesintisiz numaralı liste, bölüm başına tek atıf çipi, telefonda tam genişlik; modele `## Biçim` iskeleti. |
 | 1.6 | 2026-09-24 | Tedy Tasarım Sistemi v3 panoda: lacivert yalnız bantta, renk aritmetiği yok, rol token'ları; ders işareti Bugün ve İşler sınavlarında ve ödevlerde; takvim ve zaman çizelgesinde tür ikon, renk ders. |
+| 1.10 | 2026-09-25 | Asistanın Kaynaklar paneli dört yeni öğrenci-verisi grubu (ders programı, sınavlar, birleşik takvim, ders içeriği/notlar), Tedy Books araması ve platform ilerlemesi/video önerisini gösterir; `figur_getir`'in ders kitabı görseli artık modele de gerçek resim olarak gidiyor ve panelde küçük önizleme olarak beliriyor; aileye özel `aile-kaynak` grubu Işık'ın oturumunda hiç görünmez. |

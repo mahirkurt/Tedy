@@ -337,6 +337,55 @@ def test_no_fabrication_rule_does_not_forbid_general_knowledge():
     assert "genel bilgi" in p
 
 
+def test_system_prompt_warns_about_runtime_declared_tools():
+    """Görev 6 consolidation: the prompt names every live-data tool (odev_listesi,
+    ders_programi, kitap_ara, ...) regardless of whether the runtime actually wired
+    that source — a source-less deployment (tests, a stripped runtime) never declares
+    the tool at all. The routing section must say so once, up front, rather than
+    let a line read as an unconditional instruction to call an absent tool."""
+    p = AssistantRuntime.SYSTEM_PROMPT
+    hangi = p.split("## Hangi araca ne zaman uzanırsın\n", 1)[1]
+    assert "ilan edilir" in hangi
+    assert "listende" in hangi and "çağırma" in hangi
+
+
+def test_system_prompt_gates_the_family_tool_on_who_is_asking():
+    """The system prompt is shared verbatim between Işık and her family (there is
+    no per-reader prompt variant) — so aile_kaynak_ara's line must read as
+    conditional on the asker, not as a plain standing instruction, even though the
+    tool itself is also gated server-side by McpRegistry.declarations(okur='aile')."""
+    p = AssistantRuntime.SYSTEM_PROMPT
+    satir = next(s for s in p.splitlines() if "`aile_kaynak_ara`" in s)
+    assert satir.startswith("- Soran aileden biri ise")
+    assert "Işık'la konuşurken bu araçtan hiç söz etme" in p
+
+
+def test_system_prompt_routing_order_matches_the_consolidated_plan():
+    """Görev 6: one pass, own-data tools before homework before curriculum/
+    textbook/figure tools before OER/video/module tools before Tedy Books/
+    platform tools before the family-only tool — each tool routed to from
+    exactly one bullet, no contradictory duplicate."""
+    import re
+
+    p = AssistantRuntime.SYSTEM_PROMPT
+    hangi = p.split("## Hangi araca ne zaman uzanırsın\n", 1)[1]
+    hangi = hangi.split("## Uydurma yasağı", 1)[0]
+    sira = ["`ders_programi`", "`odev_listesi`", "`ogrenci_verisi_ara`",
+            "`kazanim_ara`", "`figur_ara`", "`video_listele`", "`oer_ara`",
+            "`modul_ara`", "`kitap_ara`", "`platform_ilerlemesi`", "`video_oner`",
+            "`aile_kaynak_ara`"]
+    konumlar = [hangi.index(arac) for arac in sira]
+    assert konumlar == sorted(konumlar)
+    for arac in sira:
+        if arac == "`oer_ara`":
+            # phrased as the sentence subject ("`oer_ara` bir belgeden ..."),
+            # not as an arrow target — just check it is not repeated.
+            assert hangi.count(arac) == 1, arac
+            continue
+        desen = r"→ (?:önce )?" + re.escape(arac)
+        assert len(re.findall(desen, hangi)) == 1, arac
+
+
 def test_chat_events_streams_tool_progress_in_real_time(tmp_path, monkeypatch):
     """Fix round 3, Bulgu 1. Measured before this fix: five events for two
     dispatch() calls 0.3s apart all landed within 0.9s of each other — i.e.

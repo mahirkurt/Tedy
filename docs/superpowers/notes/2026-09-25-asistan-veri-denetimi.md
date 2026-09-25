@@ -98,3 +98,127 @@ Görseller modele de arayüze de hiç ulaşmıyor:
 - **Portalda okunmayan sayfa:** Akademik Takvim; öğrenci hesabına kapalı.
 - **Google Drive arşivi:** erişim yolu yok.
 - **EBA/MEBİ/SEBİTV:** keşif JSON'ları var ama indirmeler geçen yıla ait.
+
+## Kapanış (2026-09-25, plan `docs/superpowers/plans/2026-09-25-asistan-tam-baglam.md`, Görev 6)
+
+Görev 1–5'in her biri bu denetimin bir kesitini kapattı. Aşağıda denetimin her
+bulgusu için: kapandı (hangi görev) ya da ertelendi (neden).
+
+**§1 Yerel veri envanteri**
+- Ders programı/ders içerikleri metni indekse hiç girmiyordu → **kapandı (Görev 2)**:
+  `_fmt_scraped_data` diskteki gerçek biçimlere (`{headers, rows}`, `{tab_id, text, …}`)
+  göre yeniden yazıldı; ayrıca beş canlı araç (`ders_programi`, `sinavlar`, `takvim`,
+  `ders_icerigi`, `notlar`) aynı veriye BM25'in dışından da erişir.
+- `content/eba` 120 sayfada kesiliyordu (10 kitabın 8'i 131–222 sayfa) → **kapandı
+  (Görev 1)**: `ASSISTANT_PDF_MAX_PAGES` 400'e çıktı.
+- `content/pedagoji` tavana çarpıp %65'te kalıyordu → **kapandı (Görev 1 + Görev 5)**:
+  tavan 15.000'den 30.000'e çıktı, ve `content/pedagoji` artık paylaşılan tavanla hiç
+  yarışmıyor — kendi ayrı indeksinde (`aile_kaynak_ara`, Görev 5).
+- `content/yabanci-dil`'deki taranmış PDF'ler (OCR yok) → **ertelendi**: bu planın
+  kapsamında OCR işi yok; hâlâ yalnız üst veri.
+- `content/mebi`, `content/sebitv-interactive` diskte yok → **ertelendi**: ortada
+  indekslenecek veri olmadığından bu plan bir şey scrape etmedi.
+- `books/` (Tedy Books) görünmezdi → **kapandı (Görev 3)**: `kitap_ara`, kendi küçük
+  BM25 indeksiyle (`src/assistant_kitaplar.py`), `dashboard_api._book_chapters()`'ı
+  yeniden kullanarak.
+- `sebit_homework.json` `odev_listesi`'nde görünmüyordu → **kapandı (Görev 3)**:
+  `odev_listesi`'nin kendi "SEBİT" bölümü.
+- `photo_homework.json`, `homework_student_done.json` → **değişmedi (kasıtlı)**:
+  denetim bunları zaten "yalnız `odev_listesi` üzerinden, bilerek indeks dışı" diye
+  işaretlemişti; bu plan onu bozmadı.
+- `private_lessons.json` görünmezdi → **kapandı (Görev 2)**: `takvim` aracı, hafta
+  sonu dahil, aynı `_birlesik_takvim`/`_private_lessons_for_week` verisini okur.
+- `englishcentral_progress.json`/`achieve3000_progress.json` ham JSON olarak
+  indekste → **kısmen kapandı (Görev 3)**: `platform_ilerlemesi` okunur bir özet
+  verir (ham JSON modele hiç gitmez), ama iki dosya `DEFAULT_EXCLUDED_FILE_PATTERNS`'e
+  eklenmedi — ham hallleri hâlâ ayrıca genel indekste de var (küçük, giderilmemiş artık).
+- `ec_dialog_details.json`, `a3k_*.json` görünmezdi → **ertelendi**: `platform_ilerlemesi`
+  yalnız özet dosyalarını okur, diyalog ayrıntısı hâlâ erişilemez; kasıtlı dışlama
+  desenleri (`ec_*.json`, `a3k_*.json`, Görev 1) bunları indeksten de çıkardı.
+- `mebi_videos_discovered.json` (112), `sebitv_discovered.json` (657) görünmezdi →
+  **kapandı (Görev 3)**: `video_oner` bu iki katalogda arar; bağlantı yalnız kayıtta
+  varsa verilir, sınıf hiç uydurulmaz — kayıtların hiçbirinde sınıf alanı yok
+  (0/769, ölçüldü), bunun yerine katalogun kendi toplanma zamanı (dosya mtime'ı)
+  okunur (fix round 1).
+- `sebitv_content_tree.json` → **ertelendi**: hiçbir yeni araç bunu okumuyor.
+- `enrichment_cache.json`, `exam_content_map.json` (diskte yok) → **ertelendi**:
+  `dashboard_api._sinav_listesi()` bunları hâlâ okumaya çalışıyor (no-op, dosyalar
+  yok); ölü kod yolu bu planın kapsamı dışında bırakıldı.
+- `book_progress.json`, `module_progress.json`, `health.json` → **değişmedi**:
+  üçü de `DEFAULT_EXCLUDED_FILE_PATTERNS`'te kalıyor (health.json Görev 1'de
+  eklendi, diğer ikisi zaten dışarıdaydı).
+
+**§2 BM25 indeksi**
+- 15.049 parça, tavana dayanmış, `sync.log.1`/`portal_architecture.json`/
+  `mebi_quiz_discovery` gürültüsü, `saat_dilimi_gocu_yedek` kopyası → **kapandı
+  (Görev 1)**: `*.log.*` deseni, `portal_architecture.json`, `mebi_quiz_discovery`
+  ve `saat_dilimi_gocu_yedek`/`crontab_yedek`/`archive` dizinleri artık dışlanıyor;
+  tavan 30.000'e çıktı; tavanda kısmen sığan dosya artık ne yarım ne de sonsuza
+  dek "tam" görünüyor (fix round 1, atomik dosya-bazlı yazım).
+- `_fmt_scraped_data` diskteki biçime uymuyordu (DERS PROGRAMI/DERS İÇERİKLERİ boş;
+  haftalar/ek sayfalar/rubrikler/takvim `extendedProps`/profil hiç okunmuyordu) →
+  **kapandı (Görev 2)**: hepsi yeniden yazılan biçimlendiricide.
+- Ödevler 200 karakterde kesikti, notlar geçen yılınkiydi → **kapandı (Görev 2,
+  canlı araçlar üzerinden)**: BM25'in kendi metni hâlâ 200 karakterde kesiliyor
+  (bu değişmedi — o yalnız arama isabeti), ama birincil yol artık `odev_listesi`
+  (tam metin) ve `notlar` (önceki öğretim yılını açıkça etiketleyen) araçları;
+  istem bu araçları önce çağırmayı söylüyor.
+- PDF 120 sayfa → **kapandı (Görev 1)**, taranmış PDF/ZIP/XLSX/görsel OCR'ı →
+  **ertelendi** (yukarıdaki gibi, bu planın kapsamı dışında).
+- `portal_cookies.json`, `book_progress.json`, `crontab`, `.sync_zamanlama.json`,
+  `*.pid` indekse sızıyordu → **kapandı (Görev 1)**: hepsi artık
+  `DEFAULT_EXCLUDED_FILE_PATTERNS`'te (`*cookie*`, `book_progress.json`,
+  `crontab*`, `.sync_zamanlama.json`, `*.pid`).
+- 260 karakterlik snippet, Türkçe büyük/küçük harf hatası ("İngilizce" →
+  `['i','ngilizce']`), "ders programı yarın" → `sync.log.1`, "İngilizce ödevi" →
+  `homework_first_seen.json` → **kapandı (Görev 1)**: `turkce_kucult_katla` İ/I
+  çevirisini `.lower()`'dan önce yapıyor; `sync.log.1` ve `homework_first_seen.json`
+  artık dışlanıyor. Atıf snippet'i hâlâ 260 karakter (kasıtlı — kısa önizleme);
+  `ogrenci_verisi_ara` artık isabet başına ≤1.200/toplam ≤3.900 karakterlik tam
+  metin döndürüyor, snippet'in yerini değil, tam metin ihtiyacını karşılıyor.
+
+**§3 Asistanın ulaşamadığı pano uçları**
+- `/api/schedule`, `/api/calendar/unified` → **kapandı (Görev 2)**: `ders_programi`,
+  `takvim`. Unified'ın ÖGEP/takım/özel ders birleşimi de `takvim` üzerinden gelir;
+  yalnız unified'ın kendi ders-çizme hatası (bkz. CLAUDE.md "Panonun bilinen
+  sorunları") `takvim`'i de etkiler — `ders_programi` ayrı bir Python portu
+  olduğundan bu hatadan bağımsız çalışır.
+- `/api/content`, `/api/content/weeks` → **kapandı (Görev 2)**: `ders_icerigi`.
+- `/api/exams` (yalnız dolaylı, sınıflandırma dashboard_api'de) → **kapandı
+  (Görev 2)**: `sinavlar` aynı `_sinav_listesi()`'ni okur; sınıflandırmanın
+  dashboard_api'de kalması kasıtlı (tek kaynak, asistan onu kopyalamıyor).
+  `relatedContent`'in her zaman boş gelmesi ayrı, önceden bilinmeyen bir hataydı
+  → **ertelendi** (CLAUDE.md "Panonun bilinen sorunları"; bu plan dashboard
+  hatalarını düzeltmiyor, asistanın veri erişimini düzeltiyor).
+- `/api/grades` (rubriksiz) → **kapandı (Görev 2)**: `notlar` rubrikleri de okur.
+- `/api/pages` → **kapandı (Görev 2)**: `_fmt_scraped_data`'nın ek sayfalar bloğu +
+  `ogrenci_verisi_ara`. `/api/sebit` → **kapandı (Görev 3)**. `/api/private-lessons`
+  → **kapandı (Görev 2, `takvim` üzerinden)**. `/api/books*` → **kapandı (Görev 3,
+  `kitap_ara`)**. `/api/progress/a3k` → **kapandı (Görev 3, `platform_ilerlemesi`)**.
+- `/api/homework` (SEBİT hariç tam) → **kapandı (Görev 3)**: SEBİT bölümü eklendi.
+- `/api/modules` → değişmedi, zaten kapalıydı (alt proje 5, bu plandan önce).
+
+**§4 MCP kapsamı — 27 araçtan 9'u izinli**
+- `get_curriculum_program`, `get_subject`, `list_videos`/`get_video`, `kb_get` →
+  **kapandı (Görev 4)**: `program_getir`, `ders_bilgisi`, `video_listele`/
+  `video_getir`, `oer_getir`. maarif-mufredat artık 11 araç, egitim-kaynak 3
+  (`oer_ara`, `oer_kazanima_gore`, `oer_getir`) — üçü de `TOOL_ALLOWLIST`'te ve
+  uzak sunucu onları listelediği sürece otomatik ilan ediliyor. `oer_kazanima_gore`
+  (`kb_for_outcome`) zaten izinliydi (denetimden önce); istem henüz ona özel bir
+  yönlendirme satırı taşımıyor — **ertelendi**, aracın kendisi çağrılabilir durumda.
+
+**§5 `get_figure` görselleri**
+- Görsellerin ne modele ne arayüze ulaşmaması → **kapandı (Görev 4)**:
+  `ToolOutcome.images` → `chat_with_tools` gerçek görsel bloğu (≤2, boyut/biçim
+  filtreli) → model artık görüyor; `/api/assistant/figure/<id>` + `SourcePanel`
+  küçük önizleme → okur da görüyor.
+
+**§6 Diğer kaynaklar**
+- ted-mcp federasyonu (anamnesis, pexels, minimax, comfyui, tr-literatur, openalex)
+  → **ertelendi**: bu plan pano asistanını bu federasyona bağlamadı; kapsam dışı.
+- Akademik Takvim (portalın kendisi reddediyor) → **ertelendi**: scraper/portal
+  erişim kısıtı, asistanın veri erişimi düzeltmesiyle çözülmez.
+- Google Drive arşivi → **ertelendi**: erişim yolu hâlâ yok, kapsam dışı.
+- EBA/MEBİ/SEBİTV indirmeleri geçen yıla ait → **kısmen ertelendi**: `video_oner`
+  artık en azından katalogun kendi toplanma tarihini dürüstçe söylüyor (Görev 3
+  fix round 1); indirmelerin kendisi bu planda yeniden çalıştırılmadı.
