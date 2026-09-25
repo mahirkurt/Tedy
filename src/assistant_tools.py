@@ -1449,6 +1449,49 @@ def _aile_kaynak_etiketi(path: str) -> str:
     return f"Aile kaynağı · {baslik}" if baslik else "Aile kaynağı"
 
 
+def _dispatch_bm25_arama(arama: Callable[[str, int], list[dict[str, Any]]],
+                         sorgu: str, kind: str,
+                         etiket_fn: Callable[[str], str],
+                         hata_onek: str) -> ToolOutcome:
+    """Shared body for `ogrenci_verisi_ara` and `aile_kaynak_ara`: both are a
+    plain BM25 search over one HybridRetriever, differing only in which
+    retriever is called, the citation kind, the label function and the
+    error-message prefix. Kept as a free function (no `self` used) so a third
+    reader-scoped BM25 tool, if one is ever added, does not have to duplicate
+    this again.
+    """
+    try:
+        rows = arama(sorgu, 8)
+    except Exception as exc:
+        # `arama` is caller-supplied and, unlike the MCP path, carries no
+        # contract against raising. A failure here must not take the whole
+        # dispatch() call down with it — and must not be swallowed either,
+        # per "sessiz arıza yok".
+        logger.error("%s search failed for %r: %s", kind, sorgu, exc)
+        return ToolOutcome(ok=False, error=f"{hata_onek}: {exc}")
+
+    rows = [r for r in rows if isinstance(r, dict)]
+    citations = []
+    for r in rows:
+        try:
+            confidence = float(r.get("confidence", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        citations.append({
+            "kind": kind,
+            "label": etiket_fn(str(r.get("path", ""))),
+            "locator": {"path": r.get("path", ""),
+                        "chunk_index": r.get("chunk_index", 0)},
+            # The citation panel keeps the short snippet (≤260 chars, set by
+            # the retriever) — only the model's own tool body gets the full
+            # chunk text below.
+            "snippet": str(r.get("snippet", ""))[:400],
+            "confidence": confidence,
+        })
+    text = _yerel_tam_metin(rows)
+    return ToolOutcome(ok=True, text=text, citations=citations)
+
+
 class McpRegistry:
     def __init__(self, clients: dict[str, McpClient],
                  local_search: Callable[[str, int], list[dict[str, Any]]],
@@ -1734,64 +1777,17 @@ class McpRegistry:
 
     def _dispatch_local(self, args: dict[str, Any]) -> ToolOutcome:
         query = str(args.get("query", "")).strip()
-        try:
-            rows = self.local_search(query, 8)
-        except Exception as exc:
-            # local_search is caller-supplied and, unlike the MCP path,
-            # carries no contract against raising. A failure here must not
-            # take the whole dispatch() call down with it — and must not be
-            # swallowed either, per "sessiz arıza yok".
-            logger.error("local_search failed for %r: %s", query, exc)
-            return ToolOutcome(ok=False, error=f"yerel arama hatası: {exc}")
-
-        rows = [r for r in rows if isinstance(r, dict)]
-        citations = []
-        for r in rows:
-            try:
-                confidence = float(r.get("confidence", 0.0) or 0.0)
-            except (TypeError, ValueError):
-                confidence = 0.0
-            citations.append({
-                "kind": "ogrenci",
-                "label": _yerel_isabet_etiketi(str(r.get("path", ""))),
-                "locator": {"path": r.get("path", ""),
-                            "chunk_index": r.get("chunk_index", 0)},
-                # The citation panel keeps the short snippet (≤260 chars, set
-                # by the retriever) — only the model's own tool body gets the
-                # full chunk text below.
-                "snippet": str(r.get("snippet", ""))[:400],
-                "confidence": confidence,
-            })
-        text = _yerel_tam_metin(rows)
-        return ToolOutcome(ok=True, text=text, citations=citations)
+        return _dispatch_bm25_arama(
+            self.local_search, query, kind="ogrenci",
+            etiket_fn=_yerel_isabet_etiketi, hata_onek="yerel arama hatası")
 
     def _dispatch_aile_kaynak(self, args: dict[str, Any]) -> ToolOutcome:
-        """aile_kaynak_ara (Görev 5): the same shape as _dispatch_local, over
-        content/pedagoji's own retriever and its own citation kind."""
+        """aile_kaynak_ara (Görev 5): the same shared body as _dispatch_local,
+        over content/pedagoji's own retriever and its own citation kind."""
         query = str(args.get("sorgu", "")).strip()
-        try:
-            rows = self.aile_kaynak_arama(query, 8)
-        except Exception as exc:
-            logger.error("aile_kaynak_arama failed for %r: %s", query, exc)
-            return ToolOutcome(ok=False, error=f"aile kaynağı araması hatası: {exc}")
-
-        rows = [r for r in rows if isinstance(r, dict)]
-        citations = []
-        for r in rows:
-            try:
-                confidence = float(r.get("confidence", 0.0) or 0.0)
-            except (TypeError, ValueError):
-                confidence = 0.0
-            citations.append({
-                "kind": "aile-kaynak",
-                "label": _aile_kaynak_etiketi(str(r.get("path", ""))),
-                "locator": {"path": r.get("path", ""),
-                            "chunk_index": r.get("chunk_index", 0)},
-                "snippet": str(r.get("snippet", ""))[:400],
-                "confidence": confidence,
-            })
-        text = _yerel_tam_metin(rows)
-        return ToolOutcome(ok=True, text=text, citations=citations)
+        return _dispatch_bm25_arama(
+            self.aile_kaynak_arama, query, kind="aile-kaynak",
+            etiket_fn=_aile_kaynak_etiketi, hata_onek="aile kaynağı araması hatası")
 
     def _dispatch_odev(self) -> ToolOutcome:
         try:

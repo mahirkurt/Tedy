@@ -35,6 +35,7 @@ def main():
     for k in summary_keys:
         print(f"  {k}: {stats.get(k)}")
     print(f"  moduller: {stats.get('moduller')}")
+    _dusen_dosyalari_yazdir(stats)
 
     # Görev 5: content/pedagoji's own index, built by the same reindex() call —
     # own directory (output/assistant_index_aile), own summary, never folded
@@ -43,6 +44,17 @@ def main():
     print("[Assistant] Aile kaynağı reindex complete")
     for k in summary_keys:
         print(f"  {k}: {aile_stats.get(k)}")
+    _dusen_dosyalari_yazdir(aile_stats)
+
+
+def _dusen_dosyalari_yazdir(stats):
+    """No silent drop (task-1 brief §2, "sessiz düşme yok"): AssistantIndexer
+    .reindex() already names every chunk-cap-dropped file in `dusen_dosyalar`
+    and logs a warning — this CLI summary must not swallow that by only
+    printing the counters."""
+    dusen = stats.get("dusen_dosyalar") or []
+    if dusen:
+        print(f"  dusen_dosyalar ({len(dusen)}): {', '.join(dusen)}")
 
 
 if __name__ == "__main__":

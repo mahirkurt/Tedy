@@ -145,6 +145,57 @@ def test_chat_dispatch_okuru_iletir_ogrenci_cagirsa_bile_reddeder(tmp_path, monk
     assert not yakalanan["cikti"].ok
 
 
+# ── chat_events(): the streaming path threads okur too (Fix round 1, Minor 2) ──
+# chat_events() builds its own dispatch wrapper (`real_dispatch`) from the
+# kwargs it receives, separately from chat()'s own default-partial path — a
+# fix to one does not exercise the other, so both need their own coverage.
+
+def test_chat_events_arac_listesi_yalniz_aile_okurunda_gorunur(tmp_path, monkeypatch):
+    rt = _rt(tmp_path)
+    gorulen = {}
+
+    def yakala(*, declarations, **kwargs):
+        gorulen["adlar"] = {d["name"] for d in declarations}
+        return ToolLoopResult(text="tamam")
+
+    monkeypatch.setattr(rt.llm, "chat_with_tools", yakala)
+
+    list(rt.chat_events(messages=[{"role": "user", "content": "sınav kaygısı"}],
+                        session_id="s", okur="ogrenci"))
+    assert AILE_TOOL not in gorulen["adlar"]
+
+    list(rt.chat_events(messages=[{"role": "user", "content": "sınav kaygısı"}],
+                        session_id="s", okur="aile"))
+    assert AILE_TOOL in gorulen["adlar"]
+
+
+def test_chat_events_dispatch_okuru_iletir_ogrenci_cagirsa_bile_reddeder(tmp_path, monkeypatch):
+    rt = _rt(tmp_path)
+    yakalanan = {}
+
+    def yakala(*, dispatch, **kwargs):
+        # A model that ignored the (undeclared) tool list and called it anyway.
+        yakalanan["cikti"] = dispatch(AILE_TOOL, {"sorgu": "x"})
+        return ToolLoopResult(text="tamam")
+
+    monkeypatch.setattr(rt.llm, "chat_with_tools", yakala)
+    list(rt.chat_events(messages=[{"role": "user", "content": "x"}], session_id="s", okur="ogrenci"))
+    assert not yakalanan["cikti"].ok
+
+
+def test_chat_events_dispatch_aile_okuru_icin_izin_verir(tmp_path, monkeypatch):
+    rt = _rt(tmp_path)
+    yakalanan = {}
+
+    def yakala(*, dispatch, **kwargs):
+        yakalanan["cikti"] = dispatch(AILE_TOOL, {"sorgu": "x"})
+        return ToolLoopResult(text="tamam")
+
+    monkeypatch.setattr(rt.llm, "chat_with_tools", yakala)
+    list(rt.chat_events(messages=[{"role": "user", "content": "x"}], session_id="s", okur="aile"))
+    assert yakalanan["cikti"].ok
+
+
 # ── real files: the family index is separate, own directory, reported by reindex ──
 
 def test_reindex_ayri_dizine_yazar_ve_pedagojiyi_ana_indeksten_ayik_tutar(tmp_path):
@@ -192,3 +243,25 @@ def test_reindex_cli_ozeti_iki_indeksi_de_raporlar(tmp_path, monkeypatch, capsys
     out = capsys.readouterr().out
     assert "[Assistant] Reindex complete" in out
     assert "[Assistant] Aile kaynağı reindex complete" in out
+
+
+def test_reindex_cli_dusen_dosyalari_hem_ana_hem_aile_icin_yazdirir(tmp_path, monkeypatch, capsys):
+    """Fix round 1, Minor 3: "sessiz düşme yok" (task-1 brief §2) applies to
+    the CLI summary too — a file the chunk cap dropped must be named, for
+    both indexes, not only counted."""
+    monkeypatch.setenv("ASSISTANT_MAX_CHUNKS", "1")
+    _write(tmp_path, "output/aaa_ilk.txt", "kısa metin bir")
+    _write(tmp_path, "output/zzz_ikinci.txt", "kısa metin iki")
+    _write(tmp_path, "content/pedagoji/01-ilk.md", "kısa metin uc")
+    _write(tmp_path, "content/pedagoji/02-ikinci.md", "kısa metin dort")
+
+    import src.reindex_assistant as cli
+    monkeypatch.setattr(sys, "argv", ["reindex_assistant.py"])
+    monkeypatch.setattr(cli, "PROJECT_ROOT", str(tmp_path))
+
+    cli.main()
+
+    out = capsys.readouterr().out
+    assert out.count("dusen_dosyalar") == 2  # once per index's own summary
+    assert "output/zzz_ikinci.txt" in out
+    assert "content/pedagoji/02-ikinci.md" in out
