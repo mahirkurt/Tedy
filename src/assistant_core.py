@@ -182,7 +182,7 @@ class AssistantConfig:
         max_file_size_mb = int(os.environ.get(
             "ASSISTANT_MAX_FILE_SIZE_MB", "250"))
         max_chunks = int(os.environ.get(
-            "ASSISTANT_MAX_CHUNKS", "15000"))
+            "ASSISTANT_MAX_CHUNKS", "30000"))
         # 120 lost 8 of the 10 EBA books (131-222 pages each; audit §2b).
         # 400 covers every measured book with headroom.
         pdf_max_pages = int(os.environ.get(
@@ -928,7 +928,6 @@ class AssistantIndexer:
                 "mtime": stat.st_mtime,
                 "ext": ext,
             }
-            new_manifest_files[rel_path] = file_record
 
             old_rec = old_files.get(rel_path) if isinstance(old_files, dict) else None
             can_reuse = bool(
@@ -939,8 +938,17 @@ class AssistantIndexer:
             )
 
             if can_reuse:
-                unchanged += 1
                 file_chunks = old_chunks_by_path.get(rel_path, [])
+                # A file's chunks are all-or-nothing (fix round 1, item 2): a
+                # manifest entry must never claim a file is indexed when only
+                # some of its chunks fit under the cap — that reads as
+                # complete forever (sha256 unchanged) and the rest is gone
+                # with no record. If it does not fully fit, stop here; it
+                # lands in dusen_dosyalar below like any other cut-off file.
+                if len(file_chunks) > max_chunks - len(new_chunks):
+                    break
+                new_manifest_files[rel_path] = file_record
+                unchanged += 1
                 for chunk in file_chunks:
                     new_chunks.append(chunk)
                     chunk_id = str(chunk.get("chunk_id", ""))
@@ -952,7 +960,6 @@ class AssistantIndexer:
                     break
                 continue
 
-            changed += 1
             extracted = self.adapters.extract(file_path, rel_path)
             text = str(extracted.get("text", ""))
             source_kind = str(extracted.get("source_kind", "text"))
@@ -965,9 +972,16 @@ class AssistantIndexer:
             if not chunks:
                 chunks = [text[: self.config.chunk_size] if text else ""]
 
+            # Same all-or-nothing rule for freshly extracted files: decide
+            # before writing anything, so a file the cap would cut in the
+            # middle is never partially persisted under a manifest entry
+            # that claims it is complete.
+            if len(chunks) > max_chunks - len(new_chunks):
+                break
+
+            new_manifest_files[rel_path] = file_record
+            changed += 1
             for chunk_index, chunk_text in enumerate(chunks):
-                if len(new_chunks) >= max_chunks:
-                    break
                 chunk_id = self._chunk_id(rel_path, sha, chunk_index)
                 chunk_obj = {
                     "chunk_id": chunk_id,

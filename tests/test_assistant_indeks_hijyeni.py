@@ -285,3 +285,66 @@ def test_index_format_version_bump_forces_a_full_rebuild(tmp_path, monkeypatch):
     assert second["unchanged_files"] == 0
     manifest2 = json.loads(runtime.config.manifest_path.read_text(encoding="utf-8"))
     assert manifest2["version"] == INDEX_FORMAT_VERSION
+
+
+# ── Fix round 1 ──────────────────────────────────────────────────────────────
+
+def test_max_chunks_default_is_30000(tmp_path, monkeypatch):
+    """Brief item 2, verbatim: "Tavan varsayılanı 30.000 parça."."""
+    monkeypatch.delenv("ASSISTANT_MAX_CHUNKS", raising=False)
+    config = AssistantConfig.from_project_root(tmp_path)
+    assert config.max_chunks == 30000
+
+
+# A single file whose own chunk_text() output is several chunks — long enough
+# that a small cap falls strictly inside it, not at a file boundary.
+_UZUN_PARA = "Bu cümle test içeriği doldurmak için tekrar tekrar yazılır. " * 8
+_UZUN_METIN = "\n\n".join([_UZUN_PARA] * 12)
+
+
+def test_file_truncated_mid_chunking_is_not_recorded_as_fully_indexed(tmp_path, monkeypatch):
+    """A file the cap would only partially chunk must never get a manifest
+    entry claiming it is complete: with sha256 unchanged, an incremental run
+    would reuse that partial slice forever and no more of the file would ever
+    be indexed. It must instead be treated exactly like any other cut-off
+    file — absent from the manifest, named in dusen_dosyalar, logged — so the
+    next reindex (which sees no old record for it) reprocesses it in full."""
+    _project(tmp_path, monkeypatch, ASSISTANT_MAX_CHUNKS="3")
+    _write(tmp_path, "output/uzun.txt", _UZUN_METIN)
+    runtime = AssistantRuntime(tmp_path)
+
+    # This file alone produces more than 3 chunks (verified below via the
+    # uncapped rerun), so the cap cuts it strictly mid-file.
+    stats = runtime.reindex(incremental=False)
+
+    manifest = json.loads(runtime.config.manifest_path.read_text(encoding="utf-8"))
+    chunks = json.loads(runtime.config.chunks_path.read_text(encoding="utf-8"))
+
+    assert "output/uzun.txt" not in manifest["files"]
+    assert [c for c in chunks if c["path"] == "output/uzun.txt"] == []
+    assert "output/uzun.txt" in stats["dusen_dosyalar"]
+
+    # A later run with room enough must reprocess it in full — not skip it
+    # forever because some prior sha256 "matches" a record that never existed.
+    monkeypatch.delenv("ASSISTANT_MAX_CHUNKS", raising=False)
+    runtime2 = AssistantRuntime(tmp_path)
+    second = runtime2.reindex(incremental=True)
+
+    manifest2 = json.loads(runtime2.config.manifest_path.read_text(encoding="utf-8"))
+    chunks2 = json.loads(runtime2.config.chunks_path.read_text(encoding="utf-8"))
+    file_chunks2 = [c for c in chunks2 if c["path"] == "output/uzun.txt"]
+
+    assert "output/uzun.txt" in manifest2["files"]
+    assert len(file_chunks2) > 3  # proves the cap really did cut it short above
+    assert second["changed_files"] >= 1  # reprocessed, not silently "unchanged"
+
+
+def test_file_truncated_mid_chunking_logs_a_warning(tmp_path, monkeypatch, caplog):
+    _project(tmp_path, monkeypatch, ASSISTANT_MAX_CHUNKS="3")
+    _write(tmp_path, "output/uzun.txt", _UZUN_METIN)
+    runtime = AssistantRuntime(tmp_path)
+
+    with caplog.at_level(logging.WARNING):
+        runtime.reindex(incremental=False)
+
+    assert any("output/uzun.txt" in rec.message for rec in caplog.records)
