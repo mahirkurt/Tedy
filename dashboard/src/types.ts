@@ -192,7 +192,7 @@ export interface HealthData {
   okunamadi?: Record<string, { detail?: string; son_okuma?: string }>
 }
 
-export type CitationKind = 'ogrenci' | 'mufredat' | 'kitap' | 'oer' | 'modul'
+export type CitationKind = 'ogrenci' | 'mufredat' | 'kitap' | 'oer' | 'modul' | 'tedy-kitap'
 
 export interface AssistantCitation {
   id: string

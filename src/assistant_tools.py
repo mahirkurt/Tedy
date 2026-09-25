@@ -21,7 +21,7 @@ from zoneinfo import ZoneInfo
 
 from src.course_names import normalize_course
 from src.mcp_client import McpClient, McpToolResult
-from src import assistant_modules
+from src import assistant_kitaplar, assistant_modules
 
 logger = logging.getLogger(__name__)
 
@@ -129,15 +129,67 @@ def _goreli(teslim: datetime, simdi: datetime) -> str:
     return f"{fark} gün sonra" if fark > 0 else f"{-fark} gün önce"
 
 
-def odev_listesi_metni(rows: list[dict[str, Any]], simdi: datetime) -> str:
+def _sebit_zaman(deger: Any) -> datetime | None:
+    """sebit_homework.json's own date shape ("2026-05-18 06:57"), distinct
+    from the portal's "DD.MM.YYYY HH:MM" — SEBİT is a different platform with
+    its own scrape (src/scrape_sebit_homework.py)."""
+    s = str(deger or "").strip()
+    for bicim in ("%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(s, bicim)
+        except ValueError:
+            continue
+    return None
+
+
+def _sebit_bolumu_metni(veri: Any, simdi: datetime) -> str:
+    """SEBİT ödevleri (sebit_homework.json, /api/sebit'in okuduğu dosya) as
+    their own section: a different platform with its own progress percentage
+    and end date, not the TED portal's homework the sections above cover."""
+    veri = veri if isinstance(veri, dict) else {}
+    rows = [r for r in (veri.get("homework") or []) if isinstance(r, dict)]
+    if not rows:
+        return "SEBİT (0): şu an SEBİT'te kayıtlı ödev yok."
+
+    acik = [r for r in rows if not r.get("completed")]
+    tamam = [r for r in rows if r.get("completed")]
+
+    def satir(r: dict[str, Any]) -> str:
+        ad = " — ".join(x for x in (str(r.get("course") or "").strip(),
+                                    str(r.get("title") or "").strip()) if x)
+        bitis = _sebit_zaman(r.get("end_date"))
+        zaman = (f"bitiş {_GUNLER[bitis.weekday()]} {bitis:%d.%m.%Y %H:%M} ({_goreli(bitis, simdi)})"
+                 if bitis else "bitiş tarihi okunamadı")
+        ilerleme = r.get("progress")
+        yuzde = f" · %{ilerleme:.0f}" if isinstance(ilerleme, (int, float)) else ""
+        durum = str(r.get("state_text") or "").strip()
+        return f"- {ad} · {zaman}{yuzde}" + (f" · {durum}" if durum else "")
+
+    def sirala(grup: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return sorted(grup, key=lambda r: ((_sebit_zaman(r.get("end_date")) is None),
+                                            _sebit_zaman(r.get("end_date")) or simdi))
+
+    parcalar = [f"SEBİT — AÇIK ({len(acik)}):\n" + ("\n".join(
+        satir(r) for r in sirala(acik)[:_BOLUM_SINIRI]) or "- yok")]
+    if tamam:
+        parcalar.append(f"SEBİT — TAMAMLANDI ({len(tamam)})")
+    return "\n\n".join(parcalar)
+
+
+def odev_listesi_metni(rows: list[dict[str, Any]], simdi: datetime, sebit: Any = None) -> str:
     """The homework list for the model, in the groups İşler uses.
 
     Written for a reader, not a parser: the model quotes from it. Work Işık
     marked "Yaptım" is never listed as still to do — that is the mistake the
-    smoke test caught — and the open work carries the teacher's instructions."""
+    smoke test caught — and the open work carries the teacher's instructions.
+
+    `sebit`, when given, is sebit_homework.json's own data (a different
+    platform, /api/sebit) and is appended as its own section — the existing
+    sections and their order are untouched (plan Görev 3)."""
     bas = bugun_satiri(simdi)
     if not rows:
-        return f"{bas}\nŞu an portalda kayıtlı ödev yok."
+        metin = f"{bas}\nŞu an portalda kayıtlı ödev yok."
+        return metin if sebit is None else metin + "\n\n" + _sebit_bolumu_metni(sebit, simdi)
 
     yapilacak, yaptim, gecmis, cozulmus = [], [], [], []
     eski = 0
@@ -197,7 +249,8 @@ def odev_listesi_metni(rows: list[dict[str, Any]], simdi: datetime) -> str:
         parcalar.append(f"Not (okura aktarma): teslimi {_GECMIS_GUN} günden eski {eski} ödev "
                         "bu listede yok. Yalnız eski ödevler sorulursa `ogrenci_verisi_ara` "
                         "ile bak.")
-    return "\n\n".join(parcalar)
+    metin = "\n\n".join(parcalar)
+    return metin if sebit is None else metin + "\n\n" + _sebit_bolumu_metni(sebit, simdi)
 
 
 # ── Live student data (plan Görev 2) ─────────────────────────────────────────
@@ -211,6 +264,19 @@ SINAV_TOOL = "sinavlar"
 TAKVIM_TOOL = "takvim"
 ICERIK_TOOL = "ders_icerigi"
 NOT_TOOL = "notlar"
+# Added in Görev 3 (audit §1): EnglishCentral/Achieve3000 progress used to
+# reach the model only as raw JSON in the BM25 index. Same wiring — a
+# callable source, no source no declaration.
+PLATFORM_TOOL = "platform_ilerlemesi"
+# Tedy Books search (audit §1: `books/` was outside the file index entirely)
+# lives in assistant_kitaplar.py; its own dispatch method below because,
+# unlike the five tools above, a search returns several passage-level
+# citations rather than one whole-answer citation.
+KITAP_TOOL = assistant_kitaplar.TOOL_NAME
+# MEBİ/SEBİTV video and content-summary metadata (audit §1: `Görünmez` —
+# nothing served either file). Also its own dispatch method, for the same
+# reason as KITAP_TOOL.
+VIDEO_TOOL = "video_oner"
 
 # chat_with_tools slices every tool_result to 4,000 chars; a body cut there
 # loses its end silently, so each body is held under it here.
@@ -805,6 +871,183 @@ def notlar_metni(kaynak: Any) -> tuple[str, str]:
     return _kirp(metin, GOVDE_SINIRI), etiket
 
 
+# EnglishCentral and Achieve3000 carry one scrape timestamp for the whole
+# file, never a per-video/per-lesson one — so "last activity" is honestly
+# "when this file was last read", not an invented per-item time.
+_PLATFORM_SATIR_SINIRI = 8
+
+
+def _platform_zaman_notu(scraped_at: Any) -> str:
+    an = _zaman_oku(scraped_at)
+    if an is None:
+        return "bu verinin ne zaman okunduğu bilinmiyor"
+    return f"bu veri {_GUNLER[an.weekday()]} {an:%d.%m.%Y %H:%M} tarihinde okundu"
+
+
+def _ec_bolumu(ec: Any) -> str:
+    ec = ec if isinstance(ec, dict) else {}
+    videolar = [v for v in (ec.get("videos") or []) if isinstance(v, dict)]
+    toplam = ec.get("total_videos")
+    toplam = toplam if isinstance(toplam, int) else len(videolar)
+    tamam = ec.get("completed_videos")
+    tamam = tamam if isinstance(tamam, int) else sum(1 for v in videolar if v.get("completed"))
+    if not videolar and not toplam:
+        return "ENGLISHCENTRAL: portalda kayıtlı video yok."
+    eksikler = [v for v in videolar if not v.get("completed")]
+    satirlar = "\n".join(
+        f"- {str(v.get('title') or '?').strip()} (düzey {v.get('difficulty', '?')})"
+        for v in eksikler[:_PLATFORM_SATIR_SINIRI]) or "- yok"
+    govde = f"ENGLISHCENTRAL — {tamam}/{toplam} video tamamlandı:\nKALAN VİDEOLAR:\n{satirlar}"
+    if len(eksikler) > _PLATFORM_SATIR_SINIRI:
+        govde += f"\n(+{len(eksikler) - _PLATFORM_SATIR_SINIRI} video daha)"
+    return govde + f"\n({_platform_zaman_notu(ec.get('scraped_at'))}.)"
+
+
+def _a3k_bolumu(a3k: Any) -> str:
+    a3k = a3k if isinstance(a3k, dict) else {}
+    dersler = [x for x in (a3k.get("lessons") or [])
+              if isinstance(x, dict) and x.get("is_teacher_assigned") is not False]
+    hedef = a3k.get("teacher_assigned_count")
+    hedef = hedef if isinstance(hedef, int) else len(dersler)
+    tamam = a3k.get("teacher_assigned_completed")
+    tamam = tamam if isinstance(tamam, int) else sum(1 for x in dersler if x.get("completed"))
+    if not dersler and not hedef:
+        return "ACHIEVE3000: portalda öğretmenin atadığı ders yok."
+    eksikler = [x for x in dersler if not x.get("completed")]
+    satirlar = "\n".join(
+        f"- {str(x.get('title') or '?').strip()} ({str(x.get('category') or '?').strip()}) "
+        f"{x.get('completed_steps', 0)}/{x.get('total_steps', 0)} adım"
+        for x in eksikler[:_PLATFORM_SATIR_SINIRI]) or "- yok"
+    govde = f"ACHIEVE3000 — {tamam}/{hedef} ders tamamlandı:\nKALAN DERSLER:\n{satirlar}"
+    if len(eksikler) > _PLATFORM_SATIR_SINIRI:
+        govde += f"\n(+{len(eksikler) - _PLATFORM_SATIR_SINIRI} ders daha)"
+    stats = a3k.get("dashboard_stats") if isinstance(a3k.get("dashboard_stats"), dict) else {}
+    if stats.get("firstTryScore") is not None:
+        govde += f"\nİlk deneme skoru: {stats['firstTryScore']}"
+    return govde + f"\n({_platform_zaman_notu(a3k.get('scraped_at'))}.)"
+
+
+def platform_ilerlemesi_metni(veri: Any) -> str:
+    """EnglishCentral and Achieve3000 progress, readable: what is done, what
+    is left (with EnglishCentral's difficulty level), and when the data was
+    last read — never the raw JSON the BM25 index used to carry (audit §1)."""
+    veri = veri if isinstance(veri, dict) else {}
+    return _kirp("\n\n".join((_ec_bolumu(veri.get("ec")), _a3k_bolumu(veri.get("a3k")))), GOVDE_SINIRI)
+
+
+# ── video_oner: MEBİ + SEBİTV discovery catalogs (audit §1: "Görünmez" — no
+# route or index reached either file) ────────────────────────────────────────
+_VIDEO_SATIR_SINIRI = 12
+_VIDEO_SINIF_NOTU = ("Not (okura aktarma): bu video/içerik kataloğunda sınıf bilgisi yok; "
+                     "kayıtlar önceki bir taramadan olabilir, güncel sınıfın konusu olduğunu "
+                     "varsayma.")
+
+_VIDEO_BILDIRIM: dict[str, Any] = {
+    "name": VIDEO_TOOL,
+    "description": (
+        "MEBİ ve SEBİTV video/konu anlatımı kataloğunda konuya göre arama yapar: başlık, ders, "
+        "ünite ve (kayıtta varsa) doğrudan bağlantı döner. 'X konusunda video var mı' sorularında "
+        "BU aracı kullan. Kataloğun sınıf bilgisi yok — bunu okura söyle, sınıf uydurma."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "konu": {"type": "string",
+                     "description": "Aranacak konu (ör. 'kesirler', 'fotosentez')."},
+            "ders": {"type": "string",
+                     "description": "Dersle daraltmak için (ör. 'Matematik'). Boş bırakılırsa tüm derslerde arar."},
+        },
+        "required": ["konu"],
+    },
+}
+
+
+def _ders_eslesir(v_ders: Any, hedef: Any) -> bool:
+    a = _katla(normalize_course(str(v_ders or "")))
+    b = _katla(normalize_course(str(hedef or "")))
+    return bool(a) and bool(b) and (b in a or a in b)
+
+
+def _video_metin_alanlari(v: dict[str, Any]) -> str:
+    return " ".join(str(v.get(k) or "") for k in ("topic", "unit", "subSubject", "title", "course"))
+
+
+def _video_puanla(v: dict[str, Any], q_tokens: list[str]) -> int:
+    metin = _katla(_video_metin_alanlari(v))
+    return sum(1 for t in q_tokens if t and t in metin)
+
+
+def _video_satiri(v: dict[str, Any], kaynak: str) -> str:
+    konu = str(v.get("topic") or v.get("title") or "").strip() or "adsız"
+    if kaynak == "sebitv":
+        baslik = str(v.get("title") or "").strip()
+        if baslik and baslik != konu:
+            konu = f"{konu} — {baslik}"
+    ders = str(v.get("course") or "").strip()
+    unite = str(v.get("unit") or "").strip()
+    tur = "MEBİ videosu" if kaynak == "mebi" else "SEBİTV içeriği"
+    satir = f"- {konu}"
+    if ders:
+        satir += f" · {ders}"
+    if unite:
+        satir += f" ({unite})"
+    satir += f" [{tur}]"
+    # A link only when the catalog itself carries one — MEBİ's cdnUrl. SEBİTV
+    # entries never carry a link; none is built from resourceId/code.
+    baglanti = str(v.get("cdnUrl") or "").strip() if kaynak == "mebi" else ""
+    if baglanti:
+        satir += f"\n  Bağlantı: {baglanti}"
+    return satir
+
+
+def _video_etiket(v: dict[str, Any], kaynak: str) -> str:
+    konu = str(v.get("topic") or v.get("title") or "adsız").strip()
+    ders = str(v.get("course") or "").strip()
+    tur = "MEBİ" if kaynak == "mebi" else "SEBİTV"
+    return f"{tur} · {ders} · {konu}" if ders else f"{tur} · {konu}"
+
+
+def video_oner_metni(veri: Any, konu: Any, ders: Any = None) -> tuple[str, list[dict[str, Any]]]:
+    """(body, citations): MEBİ and SEBİTV catalog rows whose topic, unit,
+    sub-subject, title or course matches `konu`, optionally narrowed by
+    `ders`. A link is only ever copied from the catalog's own field, never
+    built from an id."""
+    konu = str(konu or "").strip()
+    q_tokens = [t for t in _katla(konu).split() if t]
+    if not q_tokens:
+        return "Aranacak bir konu verilmedi.", []
+
+    veri = veri if isinstance(veri, dict) else {}
+    aday: list[tuple[int, str, dict[str, Any]]] = []
+    for kaynak in ("mebi", "sebitv"):
+        for v in veri.get(kaynak) or []:
+            if not isinstance(v, dict):
+                continue
+            if ders and not _ders_eslesir(v.get("course"), ders):
+                continue
+            puan = _video_puanla(v, q_tokens)
+            if puan > 0:
+                aday.append((puan, kaynak, v))
+    if not aday:
+        return f"'{konu}' konusunda kayıtlı video ya da içerik bulunamadı.", []
+
+    aday.sort(key=lambda x: -x[0])
+    secilenler = aday[:_VIDEO_SATIR_SINIRI]
+    satirlar = [_video_satiri(v, kaynak) for _, kaynak, v in secilenler]
+    metin = (f"'{konu}' için {len(aday)} kayıt (ilk {len(secilenler)}):\n"
+            + "\n".join(satirlar) + "\n\n" + _VIDEO_SINIF_NOTU)
+    max_puan = secilenler[0][0] or 1
+    citations = [{
+        "kind": "ogrenci",
+        "label": _video_etiket(v, kaynak),
+        "locator": {"tool": VIDEO_TOOL, "kaynak": kaynak,
+                    "uuid": v.get("uuid"), "resourceId": v.get("resourceId")},
+        "snippet": _video_satiri(v, kaynak)[:400],
+        "confidence": round(min(1.0, puan / max_puan), 4),
+    } for puan, kaynak, v in secilenler]
+    return _kirp(metin, GOVDE_SINIRI), citations
+
+
 # What the source was, for "… okunamadı" when it fails.
 _OKUNAMADI = {
     PROGRAM_TOOL: "ders programı",
@@ -812,6 +1055,7 @@ _OKUNAMADI = {
     TAKVIM_TOOL: "takvim",
     ICERIK_TOOL: "ders içerikleri",
     NOT_TOOL: "notlar",
+    PLATFORM_TOOL: "platform ilerlemesi",
 }
 
 _OGRENCI_BILDIRIMLERI: dict[str, dict[str, Any]] = {
@@ -865,6 +1109,17 @@ _OGRENCI_BILDIRIMLERI: dict[str, dict[str, Any]] = {
             "Işık'ın gelişim raporu (Notlar sayfası): derslere göre sınav ve performans "
             "notları ile kazanım düzeyleri, dönem adıyla. Rapor önceki öğretim yılına aitse "
             "sonuç bunu açıkça söyler."
+        ),
+        "parameters": {"type": "object", "properties": {}},
+    },
+    PLATFORM_TOOL: {
+        "name": PLATFORM_TOOL,
+        "description": (
+            "Işık'ın dil/okuma platformlarındaki ilerlemesi (Platform İlerleme kartı): "
+            "EnglishCentral'da tamamlanan/kalan video (düzeyleriyle) ve Achieve3000'de "
+            "öğretmenin atadığı derslerden tamamlanan/kalan, ilk deneme skoruyla. Veri en son "
+            "ne zaman okunduysa onu söyler. 'EnglishCentral/Achieve3000'de ne durumdayım' gibi "
+            "sorularda BU aracı kullan."
         ),
         "parameters": {"type": "object", "properties": {}},
     },
@@ -1006,6 +1261,10 @@ class McpRegistry:
                  takvim_kaynagi: Callable[[], Any] | None = None,
                  icerik_kaynagi: Callable[[], Any] | None = None,
                  not_kaynagi: Callable[[], Any] | None = None,
+                 sebit_kaynagi: Callable[[], Any] | None = None,
+                 platform_kaynagi: Callable[[], Any] | None = None,
+                 kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
+                 video_kaynagi: Callable[[], Any] | None = None,
                  saat: Callable[[], datetime] | None = None) -> None:
         self.clients = clients
         # Işık's grade in the corpus's form ("7.Sınıf"), read when asked so a
@@ -1024,6 +1283,10 @@ class McpRegistry:
         # The rows /api/homework serves (src/dashboard_api._canli_odevler).
         # None in tests and tools with no dashboard: the tool is not declared.
         self.odev_kaynagi = odev_kaynagi
+        # sebit_homework.json (/api/sebit), appended to odev_listesi as its
+        # own section (plan Görev 3). Optional even when odev_kaynagi is
+        # given: its absence never blanks the TED portal homework list.
+        self.sebit_kaynagi = sebit_kaynagi
         # The live student-data sources (dashboard_api._canli_*), one per
         # tool; each absent source leaves its tool undeclared.
         self.ogrenci_kaynaklari: dict[str, Callable[[], Any] | None] = {
@@ -1032,7 +1295,15 @@ class McpRegistry:
             TAKVIM_TOOL: takvim_kaynagi,
             ICERIK_TOOL: icerik_kaynagi,
             NOT_TOOL: not_kaynagi,
+            PLATFORM_TOOL: platform_kaynagi,
         }
+        # Tedy Books' matched chapters (dashboard_api._canli_kitaplar) and the
+        # MEBİ/SEBİTV discovery catalogs (dashboard_api._canli_videolar).
+        # Neither fits ogrenci_kaynaklari's one-citation-per-call shape — a
+        # search returns several passage-level citations — so each keeps its
+        # own dispatch method below.
+        self.kitap_kaynagi = kitap_kaynagi
+        self.video_kaynagi = video_kaynagi
         # The clock "bugün"/"yarın" are read against; read in Istanbul either
         # way. Tests pin it; production reads the real one.
         self.saat = saat
@@ -1055,19 +1326,26 @@ class McpRegistry:
             },
         }]
         if self.odev_kaynagi is not None:
+            sebit_notu = (" SEBİT ödevleri de ayrı bir bölümde bu listededir."
+                         if self.sebit_kaynagi is not None else "")
             decls.append({
                 "name": ODEV_TOOL,
                 "description": (
                     "Işık'ın ödev listesi, Bugün ve İşler sayfalarının gösterdiği haliyle: "
                     "yapılacaklar (teslim zamanı ve öğretmenin talimatıyla), Işık'ın 'Yaptım' "
-                    "dedikleri, süresi geçenler. Ödev sorularında (ne var, ne zaman teslim, "
-                    "neyi yaptı) önce BU aracı kullan — ödevin durumu için tek güvenilir kaynak."
+                    "dedikleri, süresi geçenler." + sebit_notu + " Ödev sorularında (ne var, ne "
+                    "zaman teslim, neyi yaptı) önce BU aracı kullan — ödevin durumu için tek "
+                    "güvenilir kaynak."
                 ),
                 "parameters": {"type": "object", "properties": {}},
             })
         for ad, kaynak in self.ogrenci_kaynaklari.items():
             if kaynak is not None:
                 decls.append(copy.deepcopy(_OGRENCI_BILDIRIMLERI[ad]))
+        if self.kitap_kaynagi is not None:
+            decls.append(dict(assistant_kitaplar.DECLARATION))
+        if self.video_kaynagi is not None:
+            decls.append(dict(_VIDEO_BILDIRIM))
         if self.module_index is not None:
             decls.append(dict(assistant_modules.DECLARATION))
         for local_name, (server, mcp_name) in TOOL_ALLOWLIST.items():
@@ -1108,7 +1386,8 @@ class McpRegistry:
                 (SINAV_TOOL, "sınav tarihleri → `sinavlar`"),
                 (TAKVIM_TOOL, "etkinlik, tatil, özel ders → `takvim`"),
                 (ICERIK_TOOL, "bir haftanın ders içeriği → `ders_icerigi`"),
-                (NOT_TOOL, "notlar ve kazanım düzeyleri → `notlar`"))]
+                (NOT_TOOL, "notlar ve kazanım düzeyleri → `notlar`"),
+                (PLATFORM_TOOL, "EnglishCentral/Achieve3000 ilerlemesi → `platform_ilerlemesi`"))]
         varsa = [not_ for kaynak, not_ in yonlendirme if kaynak is not None]
         if varsa:
             metin += " Güncel ve düzenli hâlleri için önce kendi aracını kullan: " + "; ".join(varsa) + "."
@@ -1127,6 +1406,10 @@ class McpRegistry:
             return self._dispatch_odev()
         if self.ogrenci_kaynaklari.get(name) is not None:
             return self._dispatch_ogrenci(name, args or {})
+        if name == KITAP_TOOL and self.kitap_kaynagi is not None:
+            return self._dispatch_kitap(args or {})
+        if name == VIDEO_TOOL and self.video_kaynagi is not None:
+            return self._dispatch_video(args or {})
         if name == assistant_modules.TOOL_NAME:
             return self._dispatch_modules(args, ilerleme_izni is True)
         if name not in TOOL_ALLOWLIST:
@@ -1208,7 +1491,14 @@ class McpRegistry:
         except Exception as exc:  # noqa: BLE001 — told to the model, never raised through the loop
             logger.error("odev_listesi failed: %s", type(exc).__name__)
             return ToolOutcome(ok=False, error=f"ödev listesi okunamadı: {type(exc).__name__}")
-        metin = odev_listesi_metni(rows, datetime.now())
+        sebit = None
+        if self.sebit_kaynagi is not None:
+            try:
+                sebit = self.sebit_kaynagi()
+            except Exception as exc:  # noqa: BLE001 — SEBİT is a bonus section; its failure must not blank the TED portal list
+                logger.error("sebit_odevleri source failed: %s", type(exc).__name__)
+                sebit = None
+        metin = _kirp(odev_listesi_metni(rows, datetime.now(), sebit=sebit), GOVDE_SINIRI)
         return ToolOutcome(ok=True, text=metin, citations=[{
             "kind": "ogrenci",
             "label": ODEV_ATIF,
@@ -1216,6 +1506,33 @@ class McpRegistry:
             "snippet": metin[:400],
             "confidence": 1.0,
         }])
+
+    def _dispatch_kitap(self, args: dict[str, Any]) -> ToolOutcome:
+        try:
+            kitaplar = self.kitap_kaynagi() or []
+        except Exception as exc:  # noqa: BLE001 — told to the model, never raised through the loop
+            logger.error("kitap_ara source failed: %s", type(exc).__name__)
+            return ToolOutcome(ok=False, error=f"Tedy Books okunamadı: {type(exc).__name__}")
+        try:
+            metin, citations = assistant_kitaplar.kitap_ara_metni(
+                kitaplar, args.get("sorgu", ""), args.get("kitap"))
+        except Exception as exc:  # noqa: BLE001 — told to the model, never raised through the loop
+            logger.error("kitap_ara failed: %s", type(exc).__name__)
+            return ToolOutcome(ok=False, error=f"kitap araması hatası: {type(exc).__name__}")
+        return ToolOutcome(ok=True, text=metin, citations=citations)
+
+    def _dispatch_video(self, args: dict[str, Any]) -> ToolOutcome:
+        try:
+            veri = self.video_kaynagi()
+        except Exception as exc:  # noqa: BLE001 — told to the model, never raised through the loop
+            logger.error("video_oner source failed: %s", type(exc).__name__)
+            return ToolOutcome(ok=False, error=f"video kataloğu okunamadı: {type(exc).__name__}")
+        try:
+            metin, citations = video_oner_metni(veri, args.get("konu", ""), args.get("ders"))
+        except Exception as exc:  # noqa: BLE001 — told to the model, never raised through the loop
+            logger.error("video_oner failed: %s", type(exc).__name__)
+            return ToolOutcome(ok=False, error=f"video araması hatası: {type(exc).__name__}")
+        return ToolOutcome(ok=True, text=metin, citations=citations)
 
     def _dispatch_ogrenci(self, name: str, args: dict[str, Any]) -> ToolOutcome:
         try:
@@ -1233,8 +1550,10 @@ class McpRegistry:
                 metin, etiket = takvim_metni(veri, simdi, args.get("gun_sayisi", _TAKVIM_VARSAYILAN_GUN)), "Takvim"
             elif name == ICERIK_TOOL:
                 metin, etiket = ders_icerigi_metni(veri, args.get("ders"), args.get("hafta"))
-            else:
+            elif name == NOT_TOOL:
                 metin, etiket = notlar_metni(veri)
+            else:
+                metin, etiket = platform_ilerlemesi_metni(veri), "Platform ilerlemesi"
         except ValueError as exc:     # an argument the model can correct
             return ToolOutcome(ok=False, error=str(exc))
         except Exception as exc:  # noqa: BLE001 — a data shape nobody expected
@@ -1291,6 +1610,10 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                    takvim_kaynagi: Callable[[], Any] | None = None,
                    icerik_kaynagi: Callable[[], Any] | None = None,
                    not_kaynagi: Callable[[], Any] | None = None,
+                   sebit_kaynagi: Callable[[], Any] | None = None,
+                   platform_kaynagi: Callable[[], Any] | None = None,
+                   kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
+                   video_kaynagi: Callable[[], Any] | None = None,
                    saat: Callable[[], datetime] | None = None) -> McpRegistry:
     """Wire the configured servers. A server with no key is simply absent —
     its tools are not declared — but it is still named by degraded(), so an
@@ -1309,4 +1632,6 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                        odev_kaynagi=odev_kaynagi, sinif=sinif,
                        program_kaynagi=program_kaynagi, sinav_kaynagi=sinav_kaynagi,
                        takvim_kaynagi=takvim_kaynagi, icerik_kaynagi=icerik_kaynagi,
-                       not_kaynagi=not_kaynagi, saat=saat)
+                       not_kaynagi=not_kaynagi, sebit_kaynagi=sebit_kaynagi,
+                       platform_kaynagi=platform_kaynagi, kitap_kaynagi=kitap_kaynagi,
+                       video_kaynagi=video_kaynagi, saat=saat)

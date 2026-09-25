@@ -337,6 +337,10 @@ def _assistant_runtime():
                 takvim_kaynagi=_canli_takvim,
                 icerik_kaynagi=_canli_ders_icerikleri,
                 not_kaynagi=_canli_notlar,
+                sebit_kaynagi=_canli_sebit_odevleri,
+                platform_kaynagi=_canli_platform_ilerlemesi,
+                kitap_kaynagi=_canli_kitaplar,
+                video_kaynagi=_canli_videolar,
             )
         except Exception as exc:
             app.logger.error(
@@ -909,6 +913,28 @@ def _canli_notlar():
             "ogretim_yili": yil.get("year") if isinstance(yil, dict) else None}
 
 
+def _canli_sebit_odevleri():
+    """SEBİT ödevleri, /api/sebit'in okuduğu dosyadan (aynı fonksiyon,
+    plan Görev 3): odev_listesi bunu ayrı bir bölüm olarak ekler."""
+    return _sebit_verisi()
+
+
+def _canli_platform_ilerlemesi():
+    """EnglishCentral (/api/progress/ec) and Achieve3000 (/api/progress/a3k)
+    progress, for the assistant's readable summary (plan Görev 3)."""
+    return {"ec": _ec_verisi(), "a3k": _a3k_verisi()}
+
+
+def _canli_videolar():
+    """MEBİ ve SEBİTV keşif katalogları (video/konu içerik üst verisi):
+    hiçbir pano rotası bugüne kadar bunları sunmuyordu (denetim §1:
+    'Görünmez'). Salt okunur; indirme rotaları bunu okumaz."""
+    mebi = _load_json("mebi_videos_discovered.json")
+    sebitv = _load_json("sebitv_discovered.json")
+    return {"mebi": mebi if isinstance(mebi, list) else [],
+            "sebitv": sebitv if isinstance(sebitv, list) else []}
+
+
 def _normalize_due_datetime(value):
     """Normalize due datetime to 'DD.MM.YYYY HH:MM'."""
     if value is None:
@@ -1476,10 +1502,17 @@ def homework_from_photo():
     })
 
 
+def _sebit_verisi():
+    """SEBİT homework rows, in the file's own shape (scraped_at,
+    total_homework, completed_count, courses, homework[]). Shared with the
+    assistant's odev_listesi (plan Görev 3, _canli_sebit_odevleri)."""
+    return _load_json("sebit_homework.json")
+
+
 @app.route("/api/sebit")
 @require_auth
 def sebit():
-    return jsonify(_load_json("sebit_homework.json"))
+    return jsonify(_sebit_verisi())
 
 
 @app.route("/api/grades")
@@ -1582,16 +1615,28 @@ def announcements():
     return jsonify({"announcements": ann})
 
 
+def _ec_verisi():
+    """EnglishCentral progress, in the file's own shape. Shared with the
+    assistant's platform_ilerlemesi (plan Görev 3)."""
+    return _load_json("englishcentral_progress.json")
+
+
+def _a3k_verisi():
+    """Achieve3000 progress, in the file's own shape. Shared with the
+    assistant's platform_ilerlemesi (plan Görev 3)."""
+    return _load_json("achieve3000_progress.json")
+
+
 @app.route("/api/progress/ec")
 @require_auth
 def progress_ec():
-    return jsonify(_load_json("englishcentral_progress.json"))
+    return jsonify(_ec_verisi())
 
 
 @app.route("/api/progress/a3k")
 @require_auth
 def progress_a3k():
-    return jsonify(_load_json("achieve3000_progress.json"))
+    return jsonify(_a3k_verisi())
 
 
 @app.route("/api/enrichment")
@@ -2773,6 +2818,40 @@ def _book_load(slug):
         return None, None, None
     manifest = _book_manifest(slug, book_dir)
     return book_dir, manifest, _book_chapters(slug, book_dir, manifest)
+
+
+def _canli_kitaplar():
+    """Tedy Books' chapters, matched exactly as `_book_load()`/`_book_chapters()`
+    match them for `/api/books*` — no separate discovery logic — with each
+    available chapter's body text (front matter stripped by
+    `_book_split_front_matter()`) for the assistant's search (plan Görev 3,
+    src/assistant_kitaplar.py). Read-only; re-scans the shelf on every call
+    exactly as the book routes do, so a new chapter is searchable without a
+    restart."""
+    kitaplar = []
+    if not os.path.isdir(BOOKS_DIR):
+        return kitaplar
+    for slug in sorted(os.listdir(BOOKS_DIR)):
+        book_dir, manifest, chapters = _book_load(slug)
+        if not book_dir or not chapters:
+            continue
+        bolumler = []
+        for chapter in chapters:
+            filename = chapter.get("_file")
+            if not chapter.get("available") or not filename:
+                continue
+            try:
+                with open(os.path.join(book_dir, filename), encoding="utf-8") as f:
+                    ham = f.read()
+            except OSError:
+                continue
+            _, govde = _book_split_front_matter(ham)
+            bolumler.append({"id": chapter["id"], "title": chapter.get("title") or chapter["id"],
+                             "text": govde})
+        if bolumler:
+            kitaplar.append({"slug": slug, "title": manifest.get("title") or slug,
+                             "chapters": bolumler})
+    return kitaplar
 
 
 def _public_chapter(chapter):

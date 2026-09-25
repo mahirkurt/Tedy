@@ -1522,7 +1522,11 @@ class AssistantRuntime:
                  sinav_kaynagi: Callable[[], Any] | None = None,
                  takvim_kaynagi: Callable[[], Any] | None = None,
                  icerik_kaynagi: Callable[[], Any] | None = None,
-                 not_kaynagi: Callable[[], Any] | None = None):
+                 not_kaynagi: Callable[[], Any] | None = None,
+                 sebit_kaynagi: Callable[[], Any] | None = None,
+                 platform_kaynagi: Callable[[], Any] | None = None,
+                 kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
+                 video_kaynagi: Callable[[], Any] | None = None):
         self.config = AssistantConfig.from_project_root(
             project_root)
         self.llm = ClaudeClient()
@@ -1548,7 +1552,11 @@ class AssistantRuntime:
                                        sinav_kaynagi=sinav_kaynagi,
                                        takvim_kaynagi=takvim_kaynagi,
                                        icerik_kaynagi=icerik_kaynagi,
-                                       not_kaynagi=not_kaynagi)
+                                       not_kaynagi=not_kaynagi,
+                                       sebit_kaynagi=sebit_kaynagi,
+                                       platform_kaynagi=platform_kaynagi,
+                                       kitap_kaynagi=kitap_kaynagi,
+                                       video_kaynagi=video_kaynagi)
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """The retriever, shaped as a tool the model can choose to call."""
@@ -1577,7 +1585,8 @@ class AssistantRuntime:
         "Sınav tarihleri → `sinavlar`. Okul etkinliği, tatil, özel ders → `takvim`. "
         "Bir dersin haftalık içeriği → `ders_icerigi`. Notlar ve kazanım düzeyleri → "
         "`notlar`; rapor önceki öğretim yılına aitse bunu söyle, eski yılın notunu bu "
-        "yılınki gibi sunma.\n"
+        "yılınki gibi sunma. EnglishCentral/Achieve3000'deki ilerlemesi → "
+        "`platform_ilerlemesi`.\n"
         "- Işık'a özel diğer sorular (duyuru, eski ödev, portalın ek sayfaları) ve bir "
         "ödevin ayrıntısı → `ogrenci_verisi_ara`.\n"
         "- Konu, kavram, müfredat, kazanım sorusu → `kazanim_ara`, "
@@ -1587,6 +1596,11 @@ class AssistantRuntime:
         "`kitap_sayfa` ile oku. MEB korpusunda Işık'ın sınıfının o dersteki kitabı "
         "yoksa bunu açıkça söyle ve kazanımla, öğretim programıyla devam et; başka "
         "bir sınıfın kitabını onun kitabıymış gibi sunma. Kitap bağlantısı verme.\n"
+        "- Tedy Books'taki bir kitabın metninde geçen olay, karakter ya da alıntı "
+        "için → `kitap_ara`. Bu, MEB ders kitabından ayrı, Işık'ın okuduğu bir "
+        "kitap rafıdır; `kitap_sayfa`'yla karıştırma.\n"
+        "- Bir konuda video/konu anlatımı önerisi (MEBİ, SEBİTV) → `video_oner`. "
+        "Kataloğun sınıf bilgisi yoksa bunu açıkça söyle, sınıf uydurma.\n"
         "- Görsel/şema açıklaman gerekiyorsa → `figur_ara`, sonra `figur_getir`.\n"
         "- Etkileşimli çalışma, yayınlanmış modül ya da 'bu konu/sınav için modül var mı' sorusu → "
         "`modul_ara`. Modül adı ve künyesi YALNIZ bu aracın sonucundan gelir; araç modül bulamadıysa "

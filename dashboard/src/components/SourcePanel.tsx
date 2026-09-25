@@ -6,14 +6,15 @@ import { DocumentView } from '@carbon/icons-react'
 import type { AssistantCitation, CitationKind } from '../types'
 import { moduleRoute } from '../utils/moduleLink'
 
-// Işık's own data first, then her published modules (TED's own material), then the external
-// authorities.
-const GROUP_ORDER: CitationKind[] = ['ogrenci', 'modul', 'mufredat', 'kitap', 'oer']
+// Işık's own data first, then her published modules and Tedy Books (both TED's own material),
+// then the external authorities.
+const GROUP_ORDER: CitationKind[] = ['ogrenci', 'modul', 'tedy-kitap', 'mufredat', 'kitap', 'oer']
 const KNOWN_KINDS = new Set<string>(GROUP_ORDER)
 
 const GROUP_TITLE: Record<CitationKind, string> = {
   ogrenci: 'Işık’ın okul verisi',
   modul: 'Yayınlanmış modül',
+  'tedy-kitap': 'Tedy Books',
   mufredat: 'MEB müfredatı',
   kitap: 'Ders kitabı',
   oer: 'Açık eğitsel kaynak',

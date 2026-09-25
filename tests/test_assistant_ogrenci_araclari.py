@@ -566,7 +566,13 @@ def test_panonun_asistani_butun_kaynaklarla_kurulur(api, monkeypatch):
     assert alinan == {"odev_kaynagi": api._canli_odevler, "program_kaynagi": api._canli_program,
                       "sinav_kaynagi": api._canli_sinavlar, "takvim_kaynagi": api._canli_takvim,
                       "icerik_kaynagi": api._canli_ders_icerikleri,
-                      "not_kaynagi": api._canli_notlar}
+                      "not_kaynagi": api._canli_notlar,
+                      # plan Görev 3 (test_assistant_yerel_kaynaklar.py owns these sources' own
+                      # behaviour; this test only pins that _assistant_runtime() wires them in)
+                      "sebit_kaynagi": api._canli_sebit_odevleri,
+                      "platform_kaynagi": api._canli_platform_ilerlemesi,
+                      "kitap_kaynagi": api._canli_kitaplar,
+                      "video_kaynagi": api._canli_videolar}
 
 
 def test_canli_program_api_schedule_ile_ayni_haftayi_verir(api, monkeypatch):
