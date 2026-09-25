@@ -938,16 +938,36 @@ def platform_ilerlemesi_metni(veri: Any) -> str:
 # ── video_oner: MEBİ + SEBİTV discovery catalogs (audit §1: "Görünmez" — no
 # route or index reached either file) ────────────────────────────────────────
 _VIDEO_SATIR_SINIRI = 12
-_VIDEO_SINIF_NOTU = ("Not (okura aktarma): bu video/içerik kataloğunda sınıf bilgisi yok; "
-                     "kayıtlar önceki bir taramadan olabilir, güncel sınıfın konusu olduğunu "
-                     "varsayma.")
+_KAYNAK_ADI = {"mebi": "MEBİ", "sebitv": "SEBİTV"}
+
+
+def _ogretim_yili_etiketi(tarih: datetime) -> str:
+    """Sept–Aug Turkish school year label for a date, e.g. 18.02.2026 (Şubat,
+    okulun ikinci yarısı) -> "2025-2026". Derived, never hardcoded."""
+    baslangic = tarih.year if tarih.month >= 9 else tarih.year - 1
+    return f"{baslangic}-{baslangic + 1}"
+
+
+def _katalog_zaman_ifadesi(kaynak: str, toplanma: Any) -> str:
+    """Fix round 1 (denetim'in 'sınıf etiketlenir' bulgusu): kayıtların
+    sınıf alanı yok (0/769 doğrulandı, gerçek kontrolde), ama var olan tek
+    somut kanıt kataloğun kendi toplanma zamanıdır — dosyanın mtime'ı
+    (`dashboard_api._kaynak_toplanma_zamani`, içerikte tarih yok). `toplanma`
+    okunamazsa tarih iddia edilmez."""
+    ad = _KAYNAK_ADI.get(kaynak, kaynak.upper())
+    an = _zaman_oku(toplanma)
+    if an is None:
+        return f"{ad} kataloğunun toplanma zamanı bilinmiyor"
+    return f"{ad} kataloğu {_ogretim_yili_etiketi(an)} öğretim yılında ({an:%d.%m.%Y}) toplandı"
+
 
 _VIDEO_BILDIRIM: dict[str, Any] = {
     "name": VIDEO_TOOL,
     "description": (
         "MEBİ ve SEBİTV video/konu anlatımı kataloğunda konuya göre arama yapar: başlık, ders, "
         "ünite ve (kayıtta varsa) doğrudan bağlantı döner. 'X konusunda video var mı' sorularında "
-        "BU aracı kullan. Kataloğun sınıf bilgisi yok — bunu okura söyle, sınıf uydurma."
+        "BU aracı kullan. Kataloğun sınıf bilgisi yok — bunu okura söyle, sınıf uydurma; "
+        "kataloğun ne zaman toplandığı verilir, o toplanma zamanından çıkan öğretim yılını söyle."
     ),
     "parameters": {
         "type": "object",
@@ -1034,8 +1054,13 @@ def video_oner_metni(veri: Any, konu: Any, ders: Any = None) -> tuple[str, list[
     aday.sort(key=lambda x: -x[0])
     secilenler = aday[:_VIDEO_SATIR_SINIRI]
     satirlar = [_video_satiri(v, kaynak) for _, kaynak, v in secilenler]
+    # Only the catalogs actually represented among the results get a
+    # sentence — a sentence about a catalog that matched nothing is noise.
+    kaynaklar_gorulen = sorted({kaynak for _, kaynak, _ in secilenler})
+    zaman_ifadeleri = [_katalog_zaman_ifadesi(k, veri.get(f"{k}_toplanma")) for k in kaynaklar_gorulen]
+    sinif_notu = "Not (okura aktarma): " + "; ".join(zaman_ifadeleri) + "; kayıtlarda sınıf bilgisi yok."
     metin = (f"'{konu}' için {len(aday)} kayıt (ilk {len(secilenler)}):\n"
-            + "\n".join(satirlar) + "\n\n" + _VIDEO_SINIF_NOTU)
+            + "\n".join(satirlar) + "\n\n" + sinif_notu)
     max_puan = secilenler[0][0] or 1
     citations = [{
         "kind": "ogrenci",

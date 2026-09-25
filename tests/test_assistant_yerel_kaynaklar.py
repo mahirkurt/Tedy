@@ -13,7 +13,7 @@ Every fixture below has the real shape of its source file and invented
 values: no real names, teachers, e-mails, ids or scores.
 """
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 os.environ["TEST_AUTH_BYPASS"] = "1"
 
@@ -341,6 +341,78 @@ def test_video_govde_siniri_asilmaz():
     assert len(out.text) <= GOVDE_SINIRI
 
 
+# ── 4b. video_oner — fix round 1: katalog toplanma zamanından öğretim yılı ──
+# Controller kararı: kayıt başına sınıf uydurulmaz (doğru — hiçbir kayıtta
+# yok); bunun yerine var olan tek somut kanıt (kataloğun kendi toplanma
+# zamanı, dosyanın mtime'ı) okura aktarılır. Her iki gerçek dosyanın
+# mtime'ı 2026-02-18 — bu tarih 18.02.2026, "2025-2026" öğretim yılına
+# denk gelir (Eylül–Ağustos).
+
+def test_ogretim_yili_etiketi_eylul_agustos_siniri():
+    assert at._ogretim_yili_etiketi(datetime(2026, 9, 1)) == "2026-2027"     # Eylül: yeni yıl başlar
+    assert at._ogretim_yili_etiketi(datetime(2026, 8, 31)) == "2025-2026"   # Ağustos: hâlâ önceki yıl
+    assert at._ogretim_yili_etiketi(datetime(2026, 2, 18)) == "2025-2026"   # gerçek dosyaların mtime'ı
+
+
+def test_video_bilinen_mtimeden_ogretim_yili_cumlesi_uretir():
+    veri = {"mebi": MEBI, "sebitv": [], "mebi_toplanma": "2026-02-18T15:18:43+00:00"}
+    reg = build_registry(lambda q, k: [], video_kaynagi=lambda: veri)
+    out = reg.dispatch(at.VIDEO_TOOL, {"konu": "kesir"})
+    assert out.ok, out.error
+    assert ("MEBİ kataloğu 2025-2026 öğretim yılında (18.02.2026) toplandı; "
+           "kayıtlarda sınıf bilgisi yok.") in out.text
+
+
+def test_video_toplanma_zamani_eksikse_tarih_uydurmaz():
+    veri = {"mebi": MEBI, "sebitv": [], "mebi_toplanma": None}
+    reg = build_registry(lambda q, k: [], video_kaynagi=lambda: veri)
+    out = reg.dispatch(at.VIDEO_TOOL, {"konu": "kesir"})
+    assert out.ok, out.error
+    assert "MEBİ kataloğunun toplanma zamanı bilinmiyor" in out.text
+    assert "öğretim yılında" not in out.text
+    assert "kayıtlarda sınıf bilgisi yok." in out.text
+
+
+def test_video_iki_katalogda_da_esliyorsa_ikisinin_de_zamanini_soyler():
+    veri = {"mebi": MEBI, "sebitv": SEBITV,
+            "mebi_toplanma": "2026-02-18T15:18:43+00:00", "sebitv_toplanma": None}
+    reg = build_registry(lambda q, k: [], video_kaynagi=lambda: veri)
+    out = reg.dispatch(at.VIDEO_TOOL, {"konu": "kesir"})
+    assert out.ok, out.error
+    assert "MEBİ kataloğu 2025-2026 öğretim yılında (18.02.2026) toplandı" in out.text
+    assert "SEBİTV kataloğunun toplanma zamanı bilinmiyor" in out.text
+    assert "SEBİTV kataloğu 20" not in out.text     # no fabricated date for the missing one
+
+
+def test_kaynak_toplanma_zamani_dosya_mtimeini_okur(tmp_path, monkeypatch):
+    import src.dashboard_api as api
+    monkeypatch.setattr(api, "OUTPUT_DIR", str(tmp_path))
+    dosya = tmp_path / "mebi_videos_discovered.json"
+    dosya.write_text("[]", encoding="utf-8")
+    hedef = datetime(2026, 2, 18, 15, 18, 43, tzinfo=timezone.utc)
+    os.utime(dosya, (hedef.timestamp(), hedef.timestamp()))
+    toplanma = api._kaynak_toplanma_zamani("mebi_videos_discovered.json")
+    assert toplanma is not None
+    okunan = datetime.fromisoformat(toplanma)
+    assert okunan.astimezone(timezone.utc).replace(microsecond=0) == hedef
+
+
+def test_kaynak_toplanma_zamani_dosya_yoksa_none(tmp_path, monkeypatch):
+    import src.dashboard_api as api
+    monkeypatch.setattr(api, "OUTPUT_DIR", str(tmp_path))
+    assert api._kaynak_toplanma_zamani("hic_yok.json") is None
+
+
+def test_canli_videolar_gercek_dosyalarin_toplanma_zamanini_tasir(monkeypatch):
+    import src.dashboard_api as api
+    monkeypatch.setattr(api, "_load_json", lambda ad: [])
+    monkeypatch.setattr(api, "_kaynak_toplanma_zamani",
+                        lambda ad: "2026-02-18T15:18:43+00:00" if "mebi" in ad else None)
+    canli = api._canli_videolar()
+    assert canli["mebi_toplanma"] == "2026-02-18T15:18:43+00:00"
+    assert canli["sebitv_toplanma"] is None
+
+
 # ── 5. Runtime and dashboard wiring ─────────────────────────────────────────
 
 def test_runtime_yeni_kaynaklari_registrye_iletir(tmp_path):
@@ -400,7 +472,9 @@ def test_canli_platform_ilerlemesi_ec_ve_a3k_rotalariyla_ayni(monkeypatch):
 def test_canli_videolar_liste_disini_bosa_indirger(monkeypatch):
     import src.dashboard_api as api
     monkeypatch.setattr(api, "_load_json", lambda ad: {"beklenmedik": "sekil"})
-    assert api._canli_videolar() == {"mebi": [], "sebitv": []}
+    monkeypatch.setattr(api, "_kaynak_toplanma_zamani", lambda ad: None)
+    assert api._canli_videolar() == {"mebi": [], "sebitv": [],
+                                     "mebi_toplanma": None, "sebitv_toplanma": None}
 
 
 def test_canli_kitaplar_bolum_metnini_on_madde_olmadan_doner(tmp_path, monkeypatch):

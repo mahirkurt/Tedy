@@ -11,7 +11,7 @@ import secrets
 import sys
 import time
 import unicodedata
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 import requests as http_requests
@@ -925,14 +925,34 @@ def _canli_platform_ilerlemesi():
     return {"ec": _ec_verisi(), "a3k": _a3k_verisi()}
 
 
+def _kaynak_toplanma_zamani(dosya_adi):
+    """A catalog file's own collection time is nowhere in its content — both
+    mebi_videos_discovered.json and sebitv_discovered.json are bare JSON
+    lists, no top-level timestamp field (verified against the live checkout,
+    fix round 1) — so the file's own mtime stands in for it. Returned as an
+    aware UTC ISO string; assistant_tools._zaman_oku/istanbul_simdi convert
+    it to Istanbul wall clock, exactly like sebit_homework.json's own
+    scraped_at is read. None when the file does not exist."""
+    yol = os.path.join(OUTPUT_DIR, dosya_adi)
+    try:
+        mtime = os.stat(yol).st_mtime
+    except OSError:
+        return None
+    return datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
+
+
 def _canli_videolar():
     """MEBİ ve SEBİTV keşif katalogları (video/konu içerik üst verisi):
     hiçbir pano rotası bugüne kadar bunları sunmuyordu (denetim §1:
-    'Görünmez'). Salt okunur; indirme rotaları bunu okumaz."""
+    'Görünmez'). Salt okunur; indirme rotaları bunu okumaz. Her katalog için
+    kendi toplanma zamanı da döner (fix round 1): kayıtların sınıf alanı yok
+    (0/769 doğrulandı), tek somut kanıt katalogun ne zaman toplandığıdır."""
     mebi = _load_json("mebi_videos_discovered.json")
     sebitv = _load_json("sebitv_discovered.json")
     return {"mebi": mebi if isinstance(mebi, list) else [],
-            "sebitv": sebitv if isinstance(sebitv, list) else []}
+            "sebitv": sebitv if isinstance(sebitv, list) else [],
+            "mebi_toplanma": _kaynak_toplanma_zamani("mebi_videos_discovered.json"),
+            "sebitv_toplanma": _kaynak_toplanma_zamani("sebitv_discovered.json")}
 
 
 def _normalize_due_datetime(value):
