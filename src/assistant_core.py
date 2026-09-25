@@ -532,15 +532,58 @@ def _semantic_json_text(path: Path, basename: str) -> str:
     return json.dumps(data, ensure_ascii=False, indent=1)
 
 
+# The profile names no school; TEDY reads one school's portal.
+_OKUL_ADI = "TED Rönesans Koleji"
+
+
+def _tablo_satirlari(tablo: Any) -> list[str]:
+    satirlar = tablo.get("rows") if isinstance(tablo, dict) else tablo
+    out = []
+    for r in satirlar or []:
+        if isinstance(r, list):
+            hucre = [str(c).strip() for c in r if str(c or "").strip()]
+            if hucre:
+                out.append(" | ".join(hucre))
+    return out
+
+
 def _fmt_scraped_data(data: dict) -> str:
+    """scraped_data.json as the BM25 index reads it.
+
+    Rewritten 2026-09-25 against the shapes on disk (audit §2a): the old
+    formatter wanted the timetable as day -> slots and course content as
+    lists, got `{headers, rows}` and `{tab_id, text, cards, …}`, and wrote
+    only a week label and an empty heading — so neither ever reached the
+    index. Records are separated by blank lines (the chunker's paragraph
+    boundary) and each opens with what it is ("DERS PROGRAMI · Cuma",
+    "DERS İÇERİĞİ · Matematik · 3. Hafta …"), so a hit names itself.
+    The profile gives class, section and school only: no name, e-mail,
+    national id, student number or the contact fields."""
+    from src.assistant_tools import (_GUNLER, aciklama_metni, guncel_hafta_dersleri,
+                                     gunun_dersleri, html_metne, icerik_ozeti)
+    from src.course_names import normalize_course
+
     parts: list[str] = []
+
+    # Profil
+    profil = data.get("ogrenci_profili")
+    if isinstance(profil, dict) and profil:
+        alanlar = []
+        sinif = str(profil.get("class_name") or "").strip()
+        sube = str(profil.get("branch") or "").strip()
+        if sinif:
+            alanlar.append(f"Sınıf: {sinif}")
+        if sube:
+            alanlar.append(f"Şube: {sube}")
+        alanlar.append(f"Okul: {str(profil.get('school') or '').strip() or _OKUL_ADI}")
+        parts.append("ÖĞRENCİ PROFİLİ\n" + " · ".join(alanlar))
 
     # Ödevler
     hw_rows = (data.get("odevlerim", {})
                .get("homework", {})
                .get("rows", []))
     if hw_rows:
-        parts.append("=== ÖDEVLER ===")
+        satirlar = ["=== ÖDEVLER ==="]
         for r in hw_rows:
             if not isinstance(r, dict):
                 continue
@@ -559,48 +602,52 @@ def _fmt_scraped_data(data: dict) -> str:
                 line += f" | Durum: {durum}"
             if desc:
                 line += f" | {desc[:200]}"
-            parts.append(line)
+            satirlar.append(line)
+        parts.append("\n".join(satirlar))
 
-    # Ders programı
-    prog = data.get("ders_programi", [])
-    if isinstance(prog, list) and prog:
-        parts.append("\n=== DERS PROGRAMI ===")
-        for week in prog:
-            if not isinstance(week, dict):
-                continue
-            label = week.get("week_label", "")
-            sched = week.get("schedule", {})
-            if not isinstance(sched, dict):
-                continue
-            parts.append(f"Hafta: {label}")
-            for day, slots in sched.items():
-                if isinstance(slots, list):
-                    for s in slots:
-                        if isinstance(s, dict):
-                            parts.append(
-                                f"  {day} {s.get('saat','')} "
-                                f"{s.get('ders','')}")
+    # Ders programı: the current week (it repeats), one paragraph per day,
+    # read through the dashboard's two-block parser.
+    weeks = [w for w in (data.get("ders_programi") or []) if isinstance(w, dict)]
+    hafta = next((w for w in weeks if w.get("is_current")), weeks[-1] if weeks else None)
+    guncel_etiket = str((hafta or {}).get("week_label") or "")
+    rows = ((hafta or {}).get("schedule") or {}).get("rows") or []
+    for gun in _GUNLER:
+        dersler = gunun_dersleri(rows, gun)
+        if dersler:
+            parts.append(f"DERS PROGRAMI · {gun}" + (f" ({guncel_etiket})" if guncel_etiket else "")
+                         + "\n" + "\n".join(
+                             f"{gun} · {d['ders_no']}. ders {d['baslangic']}–{d['bitis']} {d['ders']}"
+                             for d in dersler))
 
-    # Takvim etkinlikleri
+    # Takvim etkinlikleri, with their description (not when it only repeats
+    # the title) and place.
     takvim = data.get("takvim", [])
     if isinstance(takvim, list) and takvim:
-        parts.append("\n=== TAKVİM ===")
+        satirlar = ["=== TAKVİM ==="]
         for ev in takvim:
             if not isinstance(ev, dict):
                 continue
             t = ev.get("title", "")
-            s = ev.get("start", "")[:16]
-            parts.append(f"{s} | {t}")
+            satir = f"{str(ev.get('start') or '')[:16]} | {t}"
+            ek = ev.get("extendedProps") if isinstance(ev.get("extendedProps"), dict) else {}
+            aciklama = aciklama_metni(ek.get("description"), t)
+            if aciklama:
+                satir += f" | {aciklama[:400]}"
+            yer = html_metne(ek.get("location"))
+            if yer:
+                satir += f" | Yer: {yer}"
+            satirlar.append(satir)
+        parts.append("\n".join(satirlar))
 
-    # Notlar
+    # Notlar ve kazanım düzeyleri
     gelisim = data.get("gelisim_raporu", {})
-    grades = (gelisim.get("grades", [])
-              if isinstance(gelisim, dict) else [])
+    gelisim = gelisim if isinstance(gelisim, dict) else {}
+    semester = str(gelisim.get("semester") or "")
+    grades = gelisim.get("grades", []) or []
     if grades:
-        parts.append("\n=== NOTLAR ===")
-        semester = gelisim.get("semester", "")
+        satirlar = ["=== NOTLAR ==="]
         if semester:
-            parts.append(f"Dönem: {semester}")
+            satirlar.append(f"Dönem: {semester}")
         for g in grades:
             if not isinstance(g, dict):
                 continue
@@ -610,59 +657,89 @@ def _fmt_scraped_data(data: dict) -> str:
                 if k != "Ders" and v and v != "-":
                     cols.append(f"{k}: {v}")
             if cols:
-                parts.append(f"{ders} | {' | '.join(cols)}")
+                satirlar.append(f"{ders} | {' | '.join(cols)}")
+        parts.append("\n".join(satirlar))
+    rubrikler = [r for r in (gelisim.get("rubrics") or []) if isinstance(r, dict)]
+    if rubrikler:
+        satirlar = ["=== KAZANIM DÜZEYLERİ ===" + (f" ({semester})" if semester else "")]
+        for r in rubrikler:
+            satirlar.append(" | ".join(str(r.get(k) or "").strip()
+                                       for k in ("ders", "alan", "kazanim", "duzey")))
+        parts.append("\n".join(satirlar))
 
-    # Ders içerikleri
-    ders_ic = data.get("ders_icerikleri", {})
-    if isinstance(ders_ic, dict) and ders_ic:
-        parts.append("\n=== DERS İÇERİKLERİ ===")
-        for course, items in ders_ic.items():
-            if not isinstance(items, list):
+    # Ders içerikleri: the open week first, then every other collected week,
+    # one paragraph per course. The current label follows /api/content/weeks
+    # (dashboard_api._icerik_haftalari): the week the timetable marks current.
+    haftalar = data.get("ders_icerikleri_haftalar")
+    haftalar = haftalar if isinstance(haftalar, dict) else {}
+    if guncel_etiket not in haftalar:
+        guncel_etiket = next(iter(haftalar), "") if not guncel_etiket else guncel_etiket
+
+    def icerik_paragraflari(dersler: Any, etiket: str) -> None:
+        for ad, kayit in (dersler.items() if isinstance(dersler, dict) else []):
+            # One paragraph per course-week: a blank line inside would let
+            # the chunker cut the record away from the heading that names it.
+            ozet = re.sub(r"\n\s*\n", "\n", icerik_ozeti(kayit))
+            if not ozet:
                 continue
-            for item in items:
-                if isinstance(item, dict):
-                    title = item.get(
-                        "title", item.get("konu", ""))
-                    parts.append(f"{course} | {title}")
-                elif isinstance(item, str):
-                    parts.append(f"{course} | {item}")
+            kanon = normalize_course(str(ad)) or str(ad)
+            adi = kanon if kanon == ad else f"{kanon} ({ad})"
+            parts.append(f"DERS İÇERİĞİ · {adi}" + (f" · {etiket}" if etiket else "") + f"\n{ozet}")
 
-    # ÖGEP
-    ogep = data.get("ogep", {})
-    sessions = (ogep.get("sessions", [])
-                if isinstance(ogep, dict) else [])
-    if sessions:
-        parts.append("\n=== ÖGEP ===")
-        for s in sessions:
-            if isinstance(s, dict):
-                name = s.get("ÖGEP Adı", "")
-                date = s.get("Başlangıç", "")
-                parts.append(f"{name} | {date}")
+    icerik_paragraflari(guncel_hafta_dersleri(data.get("ders_icerikleri"), haftalar.get(guncel_etiket)),
+                        f"{guncel_etiket} (güncel hafta)" if guncel_etiket else "güncel hafta")
+    for etiket, dersler in haftalar.items():
+        if etiket != guncel_etiket:
+            icerik_paragraflari(dersler, etiket)
 
-    # Takım çalışmaları
-    takim = data.get("takim_calismalari", {})
-    activities = (takim.get("activities", [])
-                  if isinstance(takim, dict) else [])
-    if activities:
-        parts.append("\n=== TAKIM ÇALIŞMALARI ===")
-        for a in activities:
-            if isinstance(a, dict):
-                name = a.get("Takım Adı", "")
-                parts.append(name)
+    # ÖGEP and team work: `{headers, rows}` tables, keyed as the unified
+    # calendar reads them.
+    for bolum, anahtar, ad_alani, baslik in (
+            ("ogep", "sessions", "ÖGEP (Öğrenci Gelişim Programı)", "ÖGEP"),
+            ("takim_calismalari", "activities", "Academy+", "TAKIM ÇALIŞMALARI")):
+        tablo = (data.get(bolum) or {}).get(anahtar) if isinstance(data.get(bolum), dict) else None
+        satirlar_ham = tablo.get("rows") if isinstance(tablo, dict) else tablo
+        satirlar = [f"=== {baslik} ==="]
+        for r in satirlar_ham or []:
+            if isinstance(r, dict):
+                satirlar.append(" | ".join(str(r.get(k) or "").strip() for k in (
+                    ad_alani, "Çalışma Başlangıç", "Çalışma Bitiş", "Katılım Durumu")))
+        if len(satirlar) > 1:
+            parts.append("\n".join(satirlar))
 
     # Duyurular
     duyuru = data.get("duyurular", {})
     items = (duyuru.get("announcements", [])
              if isinstance(duyuru, dict) else [])
     if items:
-        parts.append("\n=== DUYURULAR ===")
+        satirlar = ["=== DUYURULAR ==="]
         for d in items:
             if isinstance(d, dict):
                 title = d.get("title", d.get("başlık", ""))
                 date = d.get("date", d.get("tarih", ""))
-                parts.append(f"{date} | {title}")
+                satirlar.append(f"{date} | {title}")
+        parts.append("\n".join(satirlar))
 
-    return "\n".join(parts)
+    # Portalın ek sayfaları: only those with something in them — an empty
+    # page's `text` is whatever the portal rendered instead (measured: the
+    # login form), exactly what /api/pages keeps off the dashboard.
+    sayfalar = data.get("ek_sayfalar")
+    for kayit in (sayfalar.values() if isinstance(sayfalar, dict) else []):
+        if not isinstance(kayit, dict) or kayit.get("empty"):
+            continue
+        satirlar = [f"PORTAL SAYFASI · {str(kayit.get('title') or '').strip()}"]
+        if str(kayit.get("text") or "").strip():
+            satirlar.append(str(kayit["text"]).strip())
+        for tablo in kayit.get("tables") or []:
+            satirlar.extend(_tablo_satirlari(tablo))
+        for secenek in kayit.get("options") or []:
+            if isinstance(secenek, dict) and secenek.get("degerler"):
+                satirlar.append("Seçenekler: " + ", ".join(map(str, secenek["degerler"])))
+        if kayit.get("documents"):
+            satirlar.append(f"Belge sayısı: {len(kayit['documents'])}")
+        parts.append("\n".join(satirlar))
+
+    return "\n\n".join(parts)
 
 
 def _fmt_enrichment(data: dict) -> str:
@@ -1440,7 +1517,12 @@ class AssistantRuntime:
     """High-level assistant runtime used by API endpoints and sync hooks."""
 
     def __init__(self, project_root: str | os.PathLike[str],
-                 odev_kaynagi: Callable[[], list[dict[str, Any]]] | None = None):
+                 odev_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
+                 program_kaynagi: Callable[[], Any] | None = None,
+                 sinav_kaynagi: Callable[[], Any] | None = None,
+                 takvim_kaynagi: Callable[[], Any] | None = None,
+                 icerik_kaynagi: Callable[[], Any] | None = None,
+                 not_kaynagi: Callable[[], Any] | None = None):
         self.config = AssistantConfig.from_project_root(
             project_root)
         self.llm = ClaudeClient()
@@ -1457,9 +1539,16 @@ class AssistantRuntime:
         # Published edupedia modules (plan SP5 K-S1): read-only, per process, no index file.
         self.modules = ModuleIndex(self.config.output_dir)
         # odev_kaynagi: the homework rows Bugün shows (dashboard_api._canli_odevler).
+        # The other *_kaynagi are the live student-data sources (dashboard_api
+        # ._canli_*); each one absent leaves its tool undeclared.
         self.registry = build_registry(self._local_search, module_index=self.modules,
                                        odev_kaynagi=odev_kaynagi,
-                                       sinif=self._mufredat_sinifi)
+                                       sinif=self._mufredat_sinifi,
+                                       program_kaynagi=program_kaynagi,
+                                       sinav_kaynagi=sinav_kaynagi,
+                                       takvim_kaynagi=takvim_kaynagi,
+                                       icerik_kaynagi=icerik_kaynagi,
+                                       not_kaynagi=not_kaynagi)
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """The retriever, shaped as a tool the model can choose to call."""
@@ -1484,8 +1573,13 @@ class AssistantRuntime:
         "Işık'ın 'Yaptım' dediği bir ödevi yapılacak diye sunma. Teslim zamanını "
         "söylerken listedeki gün ve saati kullan; 'bu hafta', 'yarın' gibi sözleri "
         "sorudaki 'Bugün:' satırına göre çöz.\n"
-        "- Işık'a özel diğer sorular (sınav, not, ders programı, duyuru) ve bir "
-        "ödevin ayrıntısı → `ogrenci_verisi_ara`. Bu veriler yalnız orada bulunur.\n"
+        "- Ders programı (bugün/yarın hangi dersler, kaçta) → `ders_programi`. "
+        "Sınav tarihleri → `sinavlar`. Okul etkinliği, tatil, özel ders → `takvim`. "
+        "Bir dersin haftalık içeriği → `ders_icerigi`. Notlar ve kazanım düzeyleri → "
+        "`notlar`; rapor önceki öğretim yılına aitse bunu söyle, eski yılın notunu bu "
+        "yılınki gibi sunma.\n"
+        "- Işık'a özel diğer sorular (duyuru, eski ödev, portalın ek sayfaları) ve bir "
+        "ödevin ayrıntısı → `ogrenci_verisi_ara`.\n"
         "- Konu, kavram, müfredat, kazanım sorusu → `kazanim_ara`, "
         "`mufredat_ara`, `kitap_listele` + `kitap_sayfa`. MEB korpusu bu "
         "konularda tek otoritedir.\n"

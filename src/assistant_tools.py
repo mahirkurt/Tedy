@@ -8,13 +8,18 @@ grade:"6"; the server's schema, descriptions intact, produced grade:"5.Sınıf".
 """
 from __future__ import annotations
 
+import copy
+import html
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
+from zoneinfo import ZoneInfo
 
+from src.course_names import normalize_course
 from src.mcp_client import McpClient, McpToolResult
 from src import assistant_modules
 
@@ -194,6 +199,678 @@ def odev_listesi_metni(rows: list[dict[str, Any]], simdi: datetime) -> str:
                         "ile bak.")
     return "\n\n".join(parcalar)
 
+
+# ── Live student data (plan Görev 2) ─────────────────────────────────────────
+# Audit 2026-09-25 §2a/§3: the assistant could reach neither /api/schedule nor
+# /api/calendar/unified nor /api/content(/weeks); it saw exams only through
+# takvim titles and grades without rubrics. Each tool below reads what the
+# dashboard page reads, through a callable the runtime is given
+# (dashboard_api._canli_*). No callable, no declaration — as with odev_listesi.
+PROGRAM_TOOL = "ders_programi"
+SINAV_TOOL = "sinavlar"
+TAKVIM_TOOL = "takvim"
+ICERIK_TOOL = "ders_icerigi"
+NOT_TOOL = "notlar"
+
+# chat_with_tools slices every tool_result to 4,000 chars; a body cut there
+# loses its end silently, so each body is held under it here.
+GOVDE_SINIRI = 3900
+
+_ISTANBUL = ZoneInfo("Europe/Istanbul")
+
+
+def istanbul_simdi(an: datetime | None = None) -> datetime:
+    """Naive Istanbul wall clock. An aware time is converted; a naive one is
+    taken as already local. With no argument the real clock is read in
+    Istanbul, whatever zone the host runs on (it is Etc/UTC)."""
+    if an is None:
+        an = datetime.now(timezone.utc)
+    if an.tzinfo is None:
+        return an
+    return an.astimezone(_ISTANBUL).replace(tzinfo=None)
+
+
+def _katla(metin: Any) -> str:
+    # Lazy: assistant_core imports this module when it builds the registry.
+    from src.assistant_core import turkce_kucult_katla
+    return turkce_kucult_katla(str(metin or "")).strip()
+
+
+def html_metne(deger: Any) -> str:
+    """Plain text from a fragment the portal sends as HTML — the dashboard's
+    htmlToText (utils/formatters.ts). Tags become spaces rather than nothing,
+    so "<p>a</p><p>b</p>" reads "a b", not "ab"."""
+    s = str(deger or "")
+    if not s:
+        return ""
+    if "<" in s or "&" in s:
+        s = html.unescape(re.sub(r"<[^>]+>", " ", s))
+    return " ".join(s.split())
+
+
+def _ayni_metin(a: str, b: str) -> bool:
+    return " ".join(_katla(a).split()) == " ".join(_katla(b).split())
+
+
+def aciklama_metni(aciklama: Any, baslik: Any) -> str:
+    """A calendar description as text, or "" when it only repeats the title
+    (TodaySchedule.tsx altBaslik): the portal sends most as "<p>{title}</p>"."""
+    metin = html_metne(aciklama)
+    return "" if not metin or _ayni_metin(metin, str(baslik or "")) else metin
+
+
+def _zaman_oku(deger: Any) -> datetime | None:
+    """An ISO time (naive, date-only or with an offset) or "DD.MM.YYYY HH:MM",
+    as naive Istanbul wall clock; None when unreadable."""
+    s = str(deger or "").strip()
+    if not s:
+        return None
+    try:
+        an = datetime.fromisoformat(s)
+    except ValueError:
+        try:
+            an = datetime.strptime(s, "%d.%m.%Y %H:%M")
+        except ValueError:
+            return None
+    return istanbul_simdi(an) if an.tzinfo else an
+
+
+# The weekly grid, ported from dashboard/src/utils/schedule.ts. It is two
+# tables side by side — Mon–Thu and Fri–Sun — each with its own time column,
+# because Friday runs on a later bell (measured 2026-09-23: 2nd lesson 08:55
+# vs 09:00, ten minutes apart by the 5th). Reading Friday's times from column 0
+# puts every lesson five to ten minutes early.
+
+def _gun_anahtari(s: str) -> str:
+    """normDay: uppercase, dotted İ folded onto I. The portal writes
+    "PAZARTESI" dotless; a Turkish-aware upper would give "PAZARTESİ"."""
+    return str(s or "").strip().upper().replace("İ", "I")
+
+
+def zaman_sutunu(baslik: list[Any], gun_idx: int) -> int:
+    """timeColumnFor: the nearest blank header at or before the day's column;
+    0 for a single-block grid."""
+    for i in range(gun_idx - 1, -1, -1):
+        if not str(baslik[i] or "").strip():
+            return i
+    return 0
+
+
+def gun_sutunlari(baslik: list[Any], gunler: list[str] | tuple[str, ...]) -> list[tuple[str, int, int]]:
+    """dayColumns: (day, lesson column, that day's time column) for each day
+    the grid publishes; the pairing means a missing day cannot shift the rest."""
+    out: list[tuple[str, int, int]] = []
+    for gun in gunler:
+        idx = next((i for i, h in enumerate(baslik) if _gun_anahtari(h) == _gun_anahtari(gun)), -1)
+        if idx >= 0:
+            out.append((gun, idx, zaman_sutunu(baslik, idx)))
+    return out
+
+
+# Cells that sit in a lesson column but are not lessons (TodaySchedule.tsx).
+_ARA_HUCRELER = frozenset({"Kahvaltı", "Öğle yemeği", "İkindi Kahvaltısı", "Çıkış"})
+_DERS_NO = re.compile(r"(\d+)\. Ders")
+_SAAT_ARALIGI = re.compile(r"(\d{2}):(\d{2})\s*-\s*(\d{2}):(\d{2})")
+
+
+def gunun_dersleri(rows: list[Any], gun: str) -> list[dict[str, Any]]:
+    """One day's lessons in order, each with its own block's bell times and
+    its name through normalize_course. Break rows are skipped: they are short
+    rows whose cells do not line up with the day columns."""
+    if not rows or not isinstance(rows[0], list):
+        return []
+    sutun = gun_sutunlari(rows[0], [gun])
+    if not sutun:
+        return []
+    _, idx, zidx = sutun[0]
+    dersler: list[dict[str, Any]] = []
+    for row in rows[1:]:
+        if not isinstance(row, list):
+            continue
+        zaman = str((row[zidx] if zidx < len(row) else "") or "")
+        icerik = str((row[idx] if idx < len(row) else "") or "")
+        if not icerik or icerik in _ARA_HUCRELER:
+            continue
+        no, saat = _DERS_NO.search(zaman), _SAAT_ARALIGI.search(zaman)
+        if not no or not saat:
+            continue
+        dersler.append({
+            "ders_no": int(no.group(1)),
+            "baslangic": f"{saat.group(1)}:{saat.group(2)}",
+            "bitis": f"{saat.group(3)}:{saat.group(4)}",
+            "ders": normalize_course(icerik.split("\n")[0].strip()),
+        })
+    return dersler
+
+
+def _gun_coz(gun: Any, simdi: datetime) -> datetime | None:
+    """"bugün", "yarın" or a day name -> that date (a day name is its next
+    occurrence, today included); None for the whole week. Case and Turkish
+    letters do not matter ("PERSEMBE", "perşembe")."""
+    s = _katla(gun)
+    if not s:
+        return None
+    bugun = datetime(simdi.year, simdi.month, simdi.day)
+    if s == "bugun":
+        return bugun
+    if s == "yarin":
+        return bugun + timedelta(days=1)
+    for i, ad in enumerate(_GUNLER):
+        if _katla(ad) == s:
+            return bugun + timedelta(days=(i - bugun.weekday()) % 7)
+    raise ValueError(f"gün anlaşılmadı: {gun!r} — 'bugün', 'yarın' ya da bir gün adı ver")
+
+
+def _ders_satiri(d: dict[str, Any], simdi: datetime | None = None) -> str:
+    satir = f"- {d['ders_no']}. ders {d['baslangic']}–{d['bitis']} {d['ders']}"
+    if simdi is not None:
+        saat = f"{simdi:%H:%M}"
+        if saat >= d["bitis"]:
+            satir += " (bitti)"
+        elif saat >= d["baslangic"]:
+            satir += " (şu an)"
+    return satir
+
+
+def _gun_blogu(rows: list[Any], tarih: datetime, simdi: datetime) -> tuple[str, bool]:
+    ad = _GUNLER[tarih.weekday()]
+    fark = (tarih.date() - simdi.date()).days
+    baslik = f"{ad} {tarih:%d.%m.%Y}" + {0: " (bugün)", 1: " (yarın)"}.get(fark, "")
+    dersler = gunun_dersleri(rows, ad)
+    if not dersler:
+        if tarih.weekday() >= 5:
+            return f"{baslik}: hafta sonu, okul yok.", False
+        return f"{baslik}: programda ders yok.", False
+    bugun_mu = simdi if fark == 0 else None
+    return (f"{baslik} — {len(dersler)} ders:\n"
+            + "\n".join(_ders_satiri(d, bugun_mu) for d in dersler)), True
+
+
+_PROGRAM_NOTU = ("Not (okura aktarma): tatiller ve okul etkinlikleri bu tabloda görünmez; "
+                 "bir günün tatil olup olmadığı okul takviminden okunur.")
+
+
+def ders_programi_metni(hafta: Any, gun: Any, simdi: datetime) -> str:
+    """The timetable for the model: one day (with its date) or the whole
+    week. Raises ValueError for a day it cannot read."""
+    bas = bugun_satiri(simdi)
+    rows = ((hafta.get("schedule") or {}).get("rows") if isinstance(hafta, dict) else None) or []
+    if not rows or not isinstance(rows[0], list) or not gun_sutunlari(rows[0], _GUNLER):
+        return f"{bas}\nPortalda okunmuş bir ders programı yok."
+    etiket = str(hafta.get("week_label") or "").strip()
+    program = (f"Program: {etiket} — okulun haftalık programı her hafta aynıdır."
+               if etiket else "Program: okulun haftalık programı (her hafta aynı).")
+
+    tarih = _gun_coz(gun, simdi)
+    if tarih is None:
+        parcalar = [bas, program]
+        for ad in _GUNLER:
+            dersler = gunun_dersleri(rows, ad)
+            if not dersler and ad in ("Cumartesi", "Pazar"):
+                continue
+            parcalar.append(f"{ad}:\n" + ("\n".join(_ders_satiri(d) for d in dersler) or "- ders yok"))
+        parcalar.append(_PROGRAM_NOTU)
+        return _kirp("\n\n".join(parcalar), GOVDE_SINIRI)
+
+    blok, dersli = _gun_blogu(rows, tarih, simdi)
+    parcalar = [bas, program, blok]
+    if not dersli:
+        # "Okul yok" is only half an answer: the next school day is what the
+        # reader has to get ready for.
+        for i in range(1, 8):
+            sonraki = tarih + timedelta(days=i)
+            sonraki_blok, var = _gun_blogu(rows, sonraki, simdi)
+            if var:
+                parcalar.append("Sonraki okul günü: " + sonraki_blok)
+                break
+    parcalar.append(_PROGRAM_NOTU)
+    return _kirp("\n\n".join(parcalar), GOVDE_SINIRI)
+
+
+def _tarih_yaz(deger: Any, simdi: datetime, tum_gun: bool = False) -> str:
+    an = _zaman_oku(deger)
+    if an is None:
+        return "tarihi yok"
+    saatsiz = tum_gun or len(str(deger).strip()) <= 10
+    bicim = "%d.%m.%Y" if saatsiz else "%d.%m.%Y %H:%M"
+    return f"{_GUNLER[an.weekday()]} {an.strftime(bicim)} ({_goreli(an, simdi)})"
+
+
+_YAKLASAN_SINIRI = 15
+_GECMIS_SINAV_SINIRI = 8
+
+
+def sinavlar_metni(sinavlar: Any, simdi: datetime) -> str:
+    """The exams as /api/exams lists them — upcoming by date, past newest
+    first — with course, kind and date. The status is the API's own."""
+    bas = bugun_satiri(simdi)
+    satirlar = [e for e in (sinavlar or []) if isinstance(e, dict)]
+    if not satirlar:
+        return f"{bas}\nPortalda kayıtlı sınav yok."
+    yaklasan = [e for e in satirlar if e.get("status") == "upcoming"]
+    gecmis = [e for e in satirlar if e.get("status") != "upcoming"]
+
+    def satir(e: dict[str, Any], ham_ad: bool) -> str:
+        ders = str(e.get("course") or "").strip() or "Ders belirsiz"
+        baslik = str(e.get("title") or "").strip()
+        tur = baslik.split(" · ", 1)[1] if " · " in baslik else (baslik or "Sınav")
+        metin = f"- {ders} — {tur} · {_tarih_yaz(e.get('date'), simdi, bool(e.get('allDay')))}"
+        if str(e.get("grade") or "").strip():
+            metin += f" · not {e['grade']}"
+        ham = " ".join(str(e.get("rawTitle") or "").split())
+        if ham_ad and ham and ham != baslik:
+            metin += f"\n  Portaldaki adı: {_kirp(ham, 140)}"
+        return metin
+
+    parcalar = [bas + " (Sınavlar sayfasının listesi: portal takvimi ve not tablosu)"]
+    govde = "\n".join(satir(e, True) for e in yaklasan[:_YAKLASAN_SINIRI]) or "- yok"
+    if len(yaklasan) > _YAKLASAN_SINIRI:
+        govde += f"\n(+{len(yaklasan) - _YAKLASAN_SINIRI} sınav daha)"
+    parcalar.append(f"YAKLAŞAN SINAVLAR ({len(yaklasan)}):\n{govde}")
+    govde = "\n".join(satir(e, False) for e in gecmis[:_GECMIS_SINAV_SINIRI]) or "- yok"
+    if len(gecmis) > _GECMIS_SINAV_SINIRI:
+        govde += f"\n(+{len(gecmis) - _GECMIS_SINAV_SINIRI} eski sınav daha)"
+    parcalar.append(f"GEÇMİŞ SINAVLAR ({len(gecmis)}, en yenisi önce):\n{govde}")
+    if any(not e.get("date") for e in gecmis):
+        # /api/exams synthesises these from graded columns; measured
+        # 2026-09-25 the grade table was still 2025-2026's.
+        parcalar.append("Not (okura aktarma): tarihi olmayan sınavlar not tablosundan türetildi; "
+                        "o tablo önceki bir öğretim yılına ait olabilir, bu yılın sınavı gibi sunma.")
+    return _kirp("\n\n".join(parcalar), GOVDE_SINIRI)
+
+
+# /api/calendar/unified's kinds this tool speaks for. Lessons and homework
+# deadlines are left out on purpose: ders_programi and odev_listesi read them
+# with the bell times and the "Yaptım" marks this list does not carry.
+_TAKVIM_TURLERI = {
+    "event": "okul takvimi",
+    "private_lesson": "özel ders",
+    "sebit": "SEBİT ödevi",
+    "ogep": "ÖGEP",
+    "team": "takım çalışması",
+}
+_TAKVIM_VARSAYILAN_GUN = 14
+_TAKVIM_EN_COK_GUN = 60
+_TAKVIM_SATIR_SINIRI = 40
+
+
+def _gun_sayisi(deger: Any) -> int:
+    try:
+        n = int(deger)
+    except (TypeError, ValueError):
+        return _TAKVIM_VARSAYILAN_GUN
+    return max(1, min(_TAKVIM_EN_COK_GUN, n))
+
+
+def _ne_zaman(bas: datetime, son: datetime, tum_gun: bool) -> str:
+    gun = f"{_GUNLER[bas.weekday()]} {bas:%d.%m}"
+    if bas.date() != son.date():
+        if tum_gun:
+            return f"{gun} → {_GUNLER[son.weekday()]} {son:%d.%m}"
+        return f"{gun} {bas:%H:%M} → {_GUNLER[son.weekday()]} {son:%d.%m} {son:%H:%M}"
+    if tum_gun or (bas.hour, bas.minute) == (0, 0) == (son.hour, son.minute):
+        return f"{gun} (tüm gün)"
+    if son > bas:
+        return f"{gun} {bas:%H:%M}–{son:%H:%M}"
+    return f"{gun} {bas:%H:%M}"
+
+
+def takvim_metni(etkinlikler: Any, simdi: datetime, gun_sayisi: Any = _TAKVIM_VARSAYILAN_GUN) -> str:
+    """The unified calendar from today for N days: school events (with their
+    description and place), private lessons, SEBİT assignments, ÖGEP and team
+    sessions. An event that started earlier and is still running is in."""
+    n = _gun_sayisi(gun_sayisi)
+    bas = bugun_satiri(simdi)
+    pencere_bas = datetime(simdi.year, simdi.month, simdi.day)
+    pencere_son = pencere_bas + timedelta(days=n)
+    aralik = f"{pencere_bas:%d.%m}–{pencere_son - timedelta(days=1):%d.%m.%Y}"
+
+    secilen: list[tuple[datetime, datetime, dict[str, Any]]] = []
+    for e in etkinlikler or []:
+        if not isinstance(e, dict) or e.get("type") not in _TAKVIM_TURLERI:
+            continue
+        basla = _zaman_oku(e.get("start"))
+        if basla is None:
+            continue
+        bitir = _zaman_oku(e.get("end")) or basla
+        if bitir < pencere_bas or basla >= pencere_son:
+            continue
+        secilen.append((basla, bitir, e))
+    secilen.sort(key=lambda x: x[0])
+    if not secilen:
+        return (f"{bas}\nÖnümüzdeki {n} günde ({aralik}) takvimde bir şey yok. "
+                "(Dersler ve ödev teslimleri bu listede değil.)")
+
+    satirlar = []
+    for basla, bitir, e in secilen[:_TAKVIM_SATIR_SINIRI]:
+        baslik = " ".join(str(e.get("title") or "").split()) or "(adsız)"
+        tur = e.get("type")
+        satir = f"- {_ne_zaman(basla, bitir, bool(e.get('allDay')))} · {baslik} [{_TAKVIM_TURLERI[tur]}]"
+        ek = [str(x).strip() for x in (e.get("course") if tur == "sebit" else "",
+                                       e.get("status") if tur in ("sebit", "ogep", "team") else "")
+              if str(x or "").strip()]
+        if ek:
+            satir += " (" + ", ".join(ek) + ")"
+        aciklama = aciklama_metni(e.get("description"), baslik)
+        if aciklama:
+            satir += f"\n  {_kirp(aciklama, 240)}"
+        yer = html_metne(e.get("location"))
+        if yer:
+            satir += f"\n  Yer: {_kirp(yer, 100)}"
+        satirlar.append(satir)
+    if len(secilen) > _TAKVIM_SATIR_SINIRI:
+        satirlar.append(f"(+{len(secilen) - _TAKVIM_SATIR_SINIRI} etkinlik daha; daha kısa bir aralık iste)")
+    return _kirp(f"{bas}\nÖnümüzdeki {n} gün ({aralik}), {len(secilen)} kayıt:\n"
+                 + "\n".join(satirlar)
+                 + "\n\nNot (okura aktarma): dersler ve ödev teslimleri bu listede yok.", GOVDE_SINIRI)
+
+
+# Course content cards carry the portal's own chrome ("Daha fazla oku",
+# "Yorum Ekle") and, between "Daha fazla oku" and "Yorum Ekle", the comment
+# block: other children's names, like counts and comments. None of it is the
+# teacher's content, and the names are not ours to pass on.
+_ICERIK_SUSU = re.compile(
+    r"^(?:Daha fazla oku|Yorum Ekle|İlk yorum yapan sen olmak ister misin\?|\d+ Yorum yapıldı!)$")
+
+
+def _temiz_icerik(metin: Any) -> str:
+    satirlar: list[str] = []
+    yorumda = False
+    for ham in str(metin or "").split("\n"):
+        s = ham.strip()
+        if s == "Daha fazla oku":
+            yorumda = True
+            continue
+        if s == "Yorum Ekle" or not s:
+            yorumda = False
+            if not s and satirlar and satirlar[-1]:
+                satirlar.append("")
+            continue
+        if yorumda or _ICERIK_SUSU.match(s):
+            continue
+        satirlar.append(s)
+    return "\n".join(satirlar).strip()
+
+
+def _duz(metin: str) -> str:
+    return " ".join(_katla(metin).split())
+
+
+def icerik_ozeti(kayit: Any) -> str:
+    """A course's weekly content, readable: the `text` the portal rendered,
+    plus any item, card or table row that text does not already contain
+    (cards mostly repeat it). A course whose read failed carries only
+    `error` — a Selenium trace — and yields nothing."""
+    if not isinstance(kayit, dict):
+        return ""
+    govde = _temiz_icerik(kayit.get("text"))
+    icinde = _duz(govde)
+    ekler: list[str] = []
+
+    def ekle(parca: str, madde: bool = False) -> None:
+        nonlocal icinde
+        if parca and _duz(parca) not in icinde:
+            ekler.append(f"- {parca}" if madde else parca)
+            icinde += " " + _duz(parca)
+
+    for item in kayit.get("items") or []:
+        if isinstance(item, dict):
+            item = item.get("title") or item.get("konu") or item.get("text") or ""
+        ekle(" ".join(str(item or "").split()), madde=True)
+    for kart in kayit.get("cards") or []:
+        if isinstance(kart, dict):
+            kart = kart.get("text") or ""
+        ekle(_temiz_icerik(kart))
+    for tablo in kayit.get("tables") or []:
+        satirlar = tablo.get("rows") if isinstance(tablo, dict) else tablo
+        for r in satirlar or []:
+            if isinstance(r, list):
+                ekle(" | ".join(str(c).strip() for c in r if str(c or "").strip()))
+    return "\n".join(x for x in (govde, *ekler) if x).strip()
+
+
+def _icerik_var(kayit: Any) -> bool:
+    return isinstance(kayit, dict) and any(kayit.get(k) for k in ("text", "items", "cards", "tables"))
+
+
+def guncel_hafta_dersleri(guncel: Any, o_hafta: Any) -> dict[str, Any]:
+    """The open week, course by course: `ders_icerikleri` (what /api/content
+    serves) where this run read the course, else that week's entry in
+    `ders_icerikleri_haftalar`. Measured 2026-09-25: every course in
+    `ders_icerikleri` carried only a Selenium `error` while the same week in
+    `ders_icerikleri_haftalar` held all of it."""
+    guncel = guncel if isinstance(guncel, dict) else {}
+    o_hafta = o_hafta if isinstance(o_hafta, dict) else {}
+    dersler: dict[str, Any] = {}
+    for ad in [*guncel, *(k for k in o_hafta if k not in guncel)]:
+        g, h = guncel.get(ad), o_hafta.get(ad)
+        dersler[ad] = g if _icerik_var(g) or h is None else h
+    return dersler
+
+
+def _hafta_no(etiket: Any) -> int | None:
+    m = re.match(r"\s*(\d+)\s*\.", str(etiket or ""))
+    return int(m.group(1)) if m else None
+
+
+def _ders_bul(sorgu: Any, adlar: list[str]) -> str | None:
+    """A course the reader named -> the canonical name in this week's list:
+    through normalize_course ("DKAB" -> "Din Kültürü"), then case- and
+    letter-insensitive exact, prefix ("mat") and substring match."""
+    q = _katla(normalize_course(str(sorgu or "")))
+    if not q:
+        return None
+    katli = {ad: _katla(ad) for ad in adlar}
+    for kosul in (lambda k: k == q, lambda k: k.startswith(q), lambda k: q in k):
+        for ad in adlar:
+            if kosul(katli[ad]):
+                return ad
+    return None
+
+
+def ders_icerigi_metni(kaynak: Any, ders: Any, hafta: Any) -> tuple[str, str]:
+    """(body, citation label) for one course's content in a week, or the
+    week's course list when no course is named.
+
+    The current week comes from `ders_icerikleri` — the open week, as
+    /api/content serves it — and a course whose read failed this run falls
+    back to that week's entry in `ders_icerikleri_haftalar`; any other week
+    comes from `ders_icerikleri_haftalar` (/api/content/weeks)."""
+    kaynak = kaynak if isinstance(kaynak, dict) else {}
+    guncel = kaynak.get("guncel") if isinstance(kaynak.get("guncel"), dict) else {}
+    haftalar = kaynak.get("haftalar") if isinstance(kaynak.get("haftalar"), dict) else {}
+    guncel_etiket = str(kaynak.get("guncel_hafta") or "")
+    guncel_no = _hafta_no(guncel_etiket)
+    if hafta not in (None, ""):
+        try:
+            hafta = int(hafta)
+        except (TypeError, ValueError):
+            raise ValueError(f"hafta bir sayı olmalı: {hafta!r}") from None
+    else:
+        hafta = None
+
+    if hafta is None or hafta == guncel_no:
+        hafta_etiketi, no = guncel_etiket, guncel_no
+        dersler = guncel_hafta_dersleri(guncel, haftalar.get(guncel_etiket))
+    else:
+        bulunan = next((e for e in haftalar if _hafta_no(e) == hafta), None)
+        if bulunan is None or not isinstance(haftalar.get(bulunan), dict):
+            mevcut = sorted({n for n in map(_hafta_no, haftalar) if n})
+            liste = ", ".join(map(str, mevcut)) or "yok"
+            return (f"{hafta}. hafta için toplanmış ders içeriği yok. Toplanan haftalar: {liste}.",
+                    "Ders içerikleri")
+        hafta_etiketi, no, dersler = bulunan, hafta, haftalar[bulunan]
+
+    gruplar: dict[str, list[tuple[str, Any]]] = {}
+    for ad, kayit in dersler.items():
+        gruplar.setdefault(normalize_course(str(ad)) or str(ad), []).append((str(ad), kayit))
+    hafta_adi = hafta_etiketi or "güncel hafta"
+
+    if not str(ders or "").strip():
+        satirlar = []
+        for kanon, girdiler in gruplar.items():
+            ozet = " ".join(" ".join(icerik_ozeti(k).split()) for _, k in girdiler).strip()
+            if ozet:
+                satirlar.append(f"- {kanon} — {_kirp(ozet, 140)}")
+            elif any(isinstance(k, dict) and k.get("error") for _, k in girdiler):
+                satirlar.append(f"- {kanon} — portal bu dersin içeriğini okuyamadı")
+            else:
+                satirlar.append(f"- {kanon} — bu hafta içerik yok")
+        metin = (f"{hafta_adi} — ders içerikleri ({len(gruplar)} ders):\n" + "\n".join(satirlar)
+                 + "\n\nNot (okura aktarma): bir dersin tamamı için `ders` ver.")
+        etiket = f"Ders içerikleri · {no}. hafta" if no else "Ders içerikleri"
+        return _kirp(metin, GOVDE_SINIRI), etiket
+
+    hedef = _ders_bul(ders, list(gruplar))
+    if hedef is None:
+        return (f"'{ders}' adlı ders {hafta_adi} içeriklerinde yok. Bu haftanın dersleri: "
+                f"{', '.join(gruplar) or 'yok'}.", "Ders içerikleri")
+    girdiler = gruplar[hedef]
+    bloklar = []
+    for ad, kayit in girdiler:
+        ozet = icerik_ozeti(kayit)
+        if ozet:
+            bloklar.append((f"[{ad}]\n" if len(girdiler) > 1 else "") + ozet)
+    if bloklar:
+        govde = "\n\n".join(bloklar)
+    elif any(isinstance(k, dict) and k.get("error") for _, k in girdiler):
+        govde = "Portal bu dersin içeriğini bu hafta okuyamadı."
+    else:
+        govde = "Bu hafta bu ders için yayımlanmış içerik yok."
+    etiket = f"{hedef} · {no}. hafta içeriği" if no else f"{hedef} · ders içeriği"
+    return _kirp(f"{hedef} — {hafta_adi}:\n{govde}", GOVDE_SINIRI), etiket
+
+
+def notlar_metni(kaynak: Any) -> tuple[str, str]:
+    """(body, citation label): the gelişim report's grades and outcome levels
+    with the term's name. A report from an earlier school year — the portal
+    kept showing 2025-2026's "4. Arakarne" well into 2026-2027 — says so
+    before anything else, so last year's grade is never read as this year's."""
+    kaynak = kaynak if isinstance(kaynak, dict) else {}
+    g = kaynak.get("gelisim") if isinstance(kaynak.get("gelisim"), dict) else {}
+    yil = str(kaynak.get("ogretim_yili") or "").strip()
+    donem = str(g.get("semester") or "").strip()
+    etiket = f"Notlar · {donem}" if donem else "Notlar"
+
+    notlar = []
+    for r in g.get("grades") or []:
+        if not isinstance(r, dict):
+            continue
+        sutunlar = [f"{k} {v}" for k, v in r.items()
+                    if k != "Ders" and str(v or "").strip() not in ("", "-")]
+        if sutunlar:
+            notlar.append(f"- {str(r.get('Ders') or '').strip()} · " + " · ".join(sutunlar))
+    rubrikler = [r for r in g.get("rubrics") or [] if isinstance(r, dict) and r.get("kazanim")]
+
+    if not notlar and not rubrikler:
+        yil_ad = f"{yil} öğretim yılı" if yil else "Bu öğretim yılı"
+        return f"{yil_ad} için portalda henüz not ya da kazanım düzeyi yok.", etiket
+
+    parcalar = []
+    if donem:
+        parcalar.append(f"Dönem: {donem}")
+    m = re.search(r"(\d{4})\s*-\s*(\d{4})", donem)
+    if m and yil and f"{m.group(1)}-{m.group(2)}" != yil:
+        parcalar.append(f"ÖNCEKİ ÖĞRETİM YILI: portalın gelişim raporu {m.group(1)}-{m.group(2)} "
+                        f"yılını gösteriyor; şu an {yil} öğretim yılı ve bu yıl için not girilmemiş. "
+                        "Bu notları bu yılın notu gibi sunma.")
+    if notlar:
+        parcalar.append(f"NOTLAR ({len(notlar)} ders):\n" + "\n".join(notlar))
+    if rubrikler:
+        dagilim: dict[str, dict[str, int]] = {}
+        for r in rubrikler:
+            d = dagilim.setdefault(str(r.get("ders") or "").strip() or "?", {})
+            duzey = str(r.get("duzey") or "").strip() or "?"
+            d[duzey] = d.get(duzey, 0) + 1
+        parcalar.append(f"KAZANIM DÜZEYLERİ ({len(rubrikler)} kazanım):\n" + "\n".join(
+            f"{ders}: " + ", ".join(f"{k} {v}" for k, v in sorted(say.items()))
+            for ders, say in dagilim.items()))
+    metin = "\n\n".join(parcalar)
+
+    if rubrikler:
+        ayrinti, kalan = [], len(rubrikler)
+        uzunluk = len(metin) + len("\n\nKAZANIMLAR:\n")
+        for r in rubrikler:
+            satir = (f"- {str(r.get('ders') or '').strip()} · {str(r.get('alan') or '').strip()}: "
+                     f"{_kirp(' '.join(str(r['kazanim']).split()), 160)} → {str(r.get('duzey') or '').strip()}")
+            if uzunluk + len(satir) + 1 > GOVDE_SINIRI - 40:
+                break
+            ayrinti.append(satir)
+            uzunluk += len(satir) + 1
+            kalan -= 1
+        if ayrinti:
+            metin += "\n\nKAZANIMLAR:\n" + "\n".join(ayrinti)
+        if kalan:
+            metin += f"\n(+{kalan} kazanım daha)"
+    return _kirp(metin, GOVDE_SINIRI), etiket
+
+
+# What the source was, for "… okunamadı" when it fails.
+_OKUNAMADI = {
+    PROGRAM_TOOL: "ders programı",
+    SINAV_TOOL: "sınav listesi",
+    TAKVIM_TOOL: "takvim",
+    ICERIK_TOOL: "ders içerikleri",
+    NOT_TOOL: "notlar",
+}
+
+_OGRENCI_BILDIRIMLERI: dict[str, dict[str, Any]] = {
+    PROGRAM_TOOL: {
+        "name": PROGRAM_TOOL,
+        "description": (
+            "Işık'ın haftalık ders programı, Bugün ve Dersler sayfalarının okuduğu tablodan: "
+            "günün dersleri sırasıyla, her biri kendi zil saatiyle (Cuma'nın zili farklıdır). "
+            "'Bugün/yarın hangi dersler var', 'Cuma ilk ders ne', 'kaçta biter' soruları için "
+            "BU aracı kullan. 'bugün' ve 'yarın' İstanbul tarihine göre çözülür."
+        ),
+        "parameters": {"type": "object", "properties": {"gun": {
+            "type": "string",
+            "description": "'bugün', 'yarın' ya da gün adı (ör. 'Cuma'). Boş bırakılırsa bütün hafta."}}},
+    },
+    SINAV_TOOL: {
+        "name": SINAV_TOOL,
+        "description": (
+            "Işık'ın sınavları, Sınavlar ve İşler sayfalarının listesiyle aynı: yaklaşanlar "
+            "(ders, tür, tarih-saat) ve geçmişler (varsa notuyla). Sınav tarihi ve 'hangi "
+            "sınavlar var' soruları için BU aracı kullan."
+        ),
+        "parameters": {"type": "object", "properties": {}},
+    },
+    TAKVIM_TOOL: {
+        "name": TAKVIM_TOOL,
+        "description": (
+            "Okul takvimi ve Işık'ın ajandası, Takvim sayfasının birleşik listesinden, bugünden "
+            "itibaren: okul etkinlikleri (açıklama ve yeriyle), özel dersler, SEBİT ödevleri, "
+            "ÖGEP ve takım çalışmaları. Tatil, tören, gezi, veli toplantısı, özel ders "
+            "soruları için BU aracı kullan. Dersler ve ödev teslimleri bu listede yoktur."
+        ),
+        "parameters": {"type": "object", "properties": {"gun_sayisi": {
+            "type": "integer",
+            "description": "Bugünden itibaren kaç gün (1–60, varsayılan 14)."}}},
+    },
+    ICERIK_TOOL: {
+        "name": ICERIK_TOOL,
+        "description": (
+            "Öğretmenlerin portalda yayımladığı haftalık ders içeriği (Dersler sayfası): o "
+            "hafta işlenen konu, öğretmenin notu ve maddeleri. `ders` verilmezse o haftanın "
+            "ders listesi döner; `hafta` verilmezse güncel hafta."
+        ),
+        "parameters": {"type": "object", "properties": {
+            "ders": {"type": "string", "description": "Ders adı (ör. 'Matematik', 'Fen')."},
+            "hafta": {"type": "integer", "description": "Öğretim yılının kaçıncı haftası (ör. 3)."}}},
+    },
+    NOT_TOOL: {
+        "name": NOT_TOOL,
+        "description": (
+            "Işık'ın gelişim raporu (Notlar sayfası): derslere göre sınav ve performans "
+            "notları ile kazanım düzeyleri, dönem adıyla. Rapor önceki öğretim yılına aitse "
+            "sonuç bunu açıkça söyler."
+        ),
+        "parameters": {"type": "object", "properties": {}},
+    },
+}
+
+
 MCP_SERVERS = {
     "maarif-mufredat": ("https://mufredat.cureonics.com/mcp",
                         "MUFREDAT_MCP_API_KEY"),
@@ -323,7 +1000,13 @@ class McpRegistry:
                  unconfigured: list[str] | None = None,
                  module_index: Any = None,
                  odev_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
-                 sinif: Callable[[], str | None] | None = None) -> None:
+                 sinif: Callable[[], str | None] | None = None,
+                 program_kaynagi: Callable[[], Any] | None = None,
+                 sinav_kaynagi: Callable[[], Any] | None = None,
+                 takvim_kaynagi: Callable[[], Any] | None = None,
+                 icerik_kaynagi: Callable[[], Any] | None = None,
+                 not_kaynagi: Callable[[], Any] | None = None,
+                 saat: Callable[[], datetime] | None = None) -> None:
         self.clients = clients
         # Işık's grade in the corpus's form ("7.Sınıf"), read when asked so a
         # new school year needs no restart. None, or a None answer, means
@@ -341,6 +1024,18 @@ class McpRegistry:
         # The rows /api/homework serves (src/dashboard_api._canli_odevler).
         # None in tests and tools with no dashboard: the tool is not declared.
         self.odev_kaynagi = odev_kaynagi
+        # The live student-data sources (dashboard_api._canli_*), one per
+        # tool; each absent source leaves its tool undeclared.
+        self.ogrenci_kaynaklari: dict[str, Callable[[], Any] | None] = {
+            PROGRAM_TOOL: program_kaynagi,
+            SINAV_TOOL: sinav_kaynagi,
+            TAKVIM_TOOL: takvim_kaynagi,
+            ICERIK_TOOL: icerik_kaynagi,
+            NOT_TOOL: not_kaynagi,
+        }
+        # The clock "bugün"/"yarın" are read against; read in Istanbul either
+        # way. Tests pin it; production reads the real one.
+        self.saat = saat
 
     def degraded(self) -> list[str]:
         unhealthy = {n for n, c in self.clients.items() if not c.healthy}
@@ -350,11 +1045,7 @@ class McpRegistry:
     def declarations(self) -> list[dict[str, Any]]:
         decls: list[dict[str, Any]] = [{
             "name": LOCAL_TOOL,
-            "description": (
-                "Işık'ın kendi okul verisinde arama yapar: ödevler, sınavlar, "
-                "notlar, ders programı, duyurular, ders içerikleri. Işık'a özel "
-                "her soru için BU aracı kullan — konu/müfredat bilgisi için değil."
-            ),
+            "description": self._yerel_aciklama(),
             "parameters": {
                 "type": "object",
                 "properties": {"query": {
@@ -374,6 +1065,9 @@ class McpRegistry:
                 ),
                 "parameters": {"type": "object", "properties": {}},
             })
+        for ad, kaynak in self.ogrenci_kaynaklari.items():
+            if kaynak is not None:
+                decls.append(copy.deepcopy(_OGRENCI_BILDIRIMLERI[ad]))
         if self.module_index is not None:
             decls.append(dict(assistant_modules.DECLARATION))
         for local_name, (server, mcp_name) in TOOL_ALLOWLIST.items():
@@ -397,6 +1091,29 @@ class McpRegistry:
             })
         return decls
 
+    def _yerel_aciklama(self) -> str:
+        """What the text index really holds, and — for each live tool this
+        registry declares — the tool to use instead. Until 2026-09-25 it
+        promised the timetable, exams and course content, none of which the
+        index held in readable form (audit §2a)."""
+        metin = ("Işık'ın okul verisinin metin indeksinde arama yapar: ödev açıklamaları ve "
+                 "eski ödevler, duyurular, portalın ek sayfaları, ders içerikleri (geçmiş "
+                 "haftalar dahil), okul takvimi, ders programı, notlar ve kazanım düzeyleri. "
+                 "Son eşitlemedeki metni gösterir; Işık'ın 'Yaptım' işaretlerini bilmez. "
+                 "Işık'a özel, başka bir aracın kapsamadığı sorular için kullan — konu/müfredat "
+                 "bilgisi için değil.")
+        yonlendirme = [(self.odev_kaynagi, "ödevlerin durumu → `odev_listesi`")] + [
+            (self.ogrenci_kaynaklari[ad], not_) for ad, not_ in (
+                (PROGRAM_TOOL, "ders programı → `ders_programi`"),
+                (SINAV_TOOL, "sınav tarihleri → `sinavlar`"),
+                (TAKVIM_TOOL, "etkinlik, tatil, özel ders → `takvim`"),
+                (ICERIK_TOOL, "bir haftanın ders içeriği → `ders_icerigi`"),
+                (NOT_TOOL, "notlar ve kazanım düzeyleri → `notlar`"))]
+        varsa = [not_ for kaynak, not_ in yonlendirme if kaynak is not None]
+        if varsa:
+            metin += " Güncel ve düzenli hâlleri için önce kendi aracını kullan: " + "; ".join(varsa) + "."
+        return metin
+
     def _sinif(self) -> str | None:
         try:
             return (self.sinif() or None) if self.sinif is not None else None
@@ -408,6 +1125,8 @@ class McpRegistry:
             return self._dispatch_local(args)
         if name == ODEV_TOOL and self.odev_kaynagi is not None:
             return self._dispatch_odev()
+        if self.ogrenci_kaynaklari.get(name) is not None:
+            return self._dispatch_ogrenci(name, args or {})
         if name == assistant_modules.TOOL_NAME:
             return self._dispatch_modules(args, ilerleme_izni is True)
         if name not in TOOL_ALLOWLIST:
@@ -498,6 +1217,38 @@ class McpRegistry:
             "confidence": 1.0,
         }])
 
+    def _dispatch_ogrenci(self, name: str, args: dict[str, Any]) -> ToolOutcome:
+        try:
+            veri = self.ogrenci_kaynaklari[name]()
+        except Exception as exc:  # noqa: BLE001 — told to the model, never raised through the loop
+            logger.error("%s source failed: %s", name, type(exc).__name__)
+            return ToolOutcome(ok=False, error=f"{_OKUNAMADI[name]} okunamadı: {type(exc).__name__}")
+        simdi = istanbul_simdi(self.saat() if self.saat is not None else None)
+        try:
+            if name == PROGRAM_TOOL:
+                metin, etiket = ders_programi_metni(veri, args.get("gun"), simdi), "Ders programı"
+            elif name == SINAV_TOOL:
+                metin, etiket = sinavlar_metni(veri, simdi), "Sınavlar"
+            elif name == TAKVIM_TOOL:
+                metin, etiket = takvim_metni(veri, simdi, args.get("gun_sayisi", _TAKVIM_VARSAYILAN_GUN)), "Takvim"
+            elif name == ICERIK_TOOL:
+                metin, etiket = ders_icerigi_metni(veri, args.get("ders"), args.get("hafta"))
+            else:
+                metin, etiket = notlar_metni(veri)
+        except ValueError as exc:     # an argument the model can correct
+            return ToolOutcome(ok=False, error=str(exc))
+        except Exception as exc:  # noqa: BLE001 — a data shape nobody expected
+            logger.error("%s formatting failed: %s", name, type(exc).__name__)
+            return ToolOutcome(ok=False, error=f"{_OKUNAMADI[name]} okunamadı: {type(exc).__name__}")
+        metin = _kirp(metin, GOVDE_SINIRI)
+        return ToolOutcome(ok=True, text=metin, citations=[{
+            "kind": "ogrenci",
+            "label": etiket,
+            "locator": {"tool": name, "args": dict(args)},
+            "snippet": metin[:400],
+            "confidence": 1.0,
+        }])
+
     def _dispatch_modules(self, args: dict[str, Any], ilerleme_izni: bool) -> ToolOutcome:
         if self.module_index is None:
             return ToolOutcome(ok=False, error="modül kataloğu bağlanmadı")
@@ -534,7 +1285,13 @@ class McpRegistry:
 def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                    module_index: Any = None,
                    odev_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
-                   sinif: Callable[[], str | None] | None = None) -> McpRegistry:
+                   sinif: Callable[[], str | None] | None = None,
+                   program_kaynagi: Callable[[], Any] | None = None,
+                   sinav_kaynagi: Callable[[], Any] | None = None,
+                   takvim_kaynagi: Callable[[], Any] | None = None,
+                   icerik_kaynagi: Callable[[], Any] | None = None,
+                   not_kaynagi: Callable[[], Any] | None = None,
+                   saat: Callable[[], datetime] | None = None) -> McpRegistry:
     """Wire the configured servers. A server with no key is simply absent —
     its tools are not declared — but it is still named by degraded(), so an
     unset env var never looks like a healthy system with nothing to say."""
@@ -549,4 +1306,7 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
         clients[name] = McpClient(name=name, url=url, api_key=key)
     return McpRegistry(clients=clients, local_search=local_search,
                        unconfigured=unconfigured, module_index=module_index,
-                       odev_kaynagi=odev_kaynagi, sinif=sinif)
+                       odev_kaynagi=odev_kaynagi, sinif=sinif,
+                       program_kaynagi=program_kaynagi, sinav_kaynagi=sinav_kaynagi,
+                       takvim_kaynagi=takvim_kaynagi, icerik_kaynagi=icerik_kaynagi,
+                       not_kaynagi=not_kaynagi, saat=saat)

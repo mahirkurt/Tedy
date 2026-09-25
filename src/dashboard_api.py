@@ -329,7 +329,15 @@ def _assistant_runtime():
         try:
             from src.assistant_core import AssistantRuntime
 
-            _ASSISTANT_RUNTIME = AssistantRuntime(PROJECT_ROOT, odev_kaynagi=_canli_odevler)
+            _ASSISTANT_RUNTIME = AssistantRuntime(
+                PROJECT_ROOT,
+                odev_kaynagi=_canli_odevler,
+                program_kaynagi=_canli_program,
+                sinav_kaynagi=_canli_sinavlar,
+                takvim_kaynagi=_canli_takvim,
+                icerik_kaynagi=_canli_ders_icerikleri,
+                not_kaynagi=_canli_notlar,
+            )
         except Exception as exc:
             app.logger.error(
                 "Assistant subsystem unavailable (%s)", type(exc).__name__
@@ -568,15 +576,19 @@ def _normalize_weekday_name(value):
     return labels[idx]
 
 
-def _private_lessons_for_week(week_dates):
-    """Expand private lesson configs into concrete events for current week."""
+def _private_lessons_for_week(week_dates, hafta_sonu=False):
+    """Expand private lesson configs into concrete events for current week.
+
+    The weekly calendar draws Mon–Fri only. `hafta_sonu=True` (with seven
+    `week_dates`) keeps Saturday and Sunday for the assistant's takvim:
+    measured 2026-09-25, both of Işık's private lessons are on Saturday."""
     events = []
     lessons = _load_private_lessons()
     if not lessons:
         return events
 
     monday = week_dates[0]
-    friday = week_dates[4]
+    friday = week_dates[-1] if hafta_sonu else week_dates[4]
 
     for lesson in lessons:
         if not lesson.get("active", True):
@@ -595,7 +607,7 @@ def _private_lessons_for_week(week_dates):
             weekday_idx = _WEEKDAY_TO_INDEX.get(str(weekday_name).strip().lower())
             if weekday_idx is None:
                 continue
-            if weekday_idx > 4:
+            if weekday_idx > 4 and not hafta_sonu:
                 # Weekly calendar UI currently shows Mon-Fri.
                 continue
             day_date = week_dates[weekday_idx]
@@ -829,6 +841,72 @@ def _canli_odevler():
     for r in rows:
         _ogrenci_isaretini_uygula(r, marks)
     return rows
+
+
+# The assistant's live student-data sources (plan Görev 2): each returns what
+# the matching dashboard route serves, built by the same function, read-only.
+
+def _canli_program():
+    """The week /api/schedule serves as `latest`."""
+    return _program_verisi(_scraped())[1]
+
+
+def _canli_sinavlar():
+    """The exams /api/exams serves, in its order."""
+    return _sinav_listesi(_scraped())["exams"]
+
+
+# How far ahead the assistant's calendar reaches for private lessons; the
+# takvim tool caps its window at 60 days (assistant_tools._TAKVIM_EN_COK_GUN).
+_TAKVIM_OZEL_DERS_HAFTA = 9
+
+
+def _canli_takvim():
+    """/api/calendar/unified's events, with two additions the page does not
+    need: a portal event's description and place (the route drops
+    extendedProps; the assistant reads them), and private lessons for the
+    weeks ahead, weekends included — the route draws only this week's
+    Monday to Friday."""
+    data = _scraped()
+    olaylar = [dict(e) for e in _birlesik_takvim(data) if e.get("type") != "private_lesson"]
+    ayrinti = {}
+    takvim = data.get("takvim", [])
+    for ev in takvim if isinstance(takvim, list) else []:
+        if not isinstance(ev, dict):
+            continue
+        ek = ev.get("extendedProps") if isinstance(ev.get("extendedProps"), dict) else {}
+        kimlik = _make_id("event", ev.get("title", ""), _kimlik_zamani(ev.get("start", "")))
+        ayrinti[kimlik] = (ek.get("description") or "", ek.get("location") or "")
+    for e in olaylar:
+        if e.get("type") == "event" and e.get("id") in ayrinti:
+            e["description"], e["location"] = ayrinti[e["id"]]
+    bugun = datetime.now().date()
+    pazartesi = bugun - timedelta(days=bugun.weekday())
+    for h in range(_TAKVIM_OZEL_DERS_HAFTA):
+        gunler = [pazartesi + timedelta(days=7 * h + i) for i in range(7)]
+        olaylar.extend(_private_lessons_for_week(gunler, hafta_sonu=True))
+    return olaylar
+
+
+def _canli_ders_icerikleri():
+    """The open week's content (/api/content) and every collected week
+    (/api/content/weeks), with the label of the current one."""
+    data = _scraped()
+    haftalar = _icerik_haftalari(data)
+    guncel = data.get("ders_icerikleri")
+    return {"guncel": guncel if isinstance(guncel, dict) else {},
+            "haftalar": haftalar["weeks"], "guncel_hafta": haftalar["current"]}
+
+
+def _canli_notlar():
+    """The gelişim report /api/grades serves, with the school year TEDY
+    believes it is in, so a report still showing last year can say so."""
+    try:
+        yil = _load_json("academic_year.json")
+    except (OSError, ValueError):
+        yil = {}  # an unknown year labels nothing "old"; it must not hide the grades
+    return {"gelisim": _scraped().get("gelisim_raporu", {}),
+            "ogretim_yili": yil.get("year") if isinstance(yil, dict) else None}
 
 
 def _normalize_due_datetime(value):
@@ -1080,12 +1158,11 @@ def _to_photo_homework_row(
 
 # --- API endpoints (all require auth) ---
 
-@app.route("/api/schedule")
-@require_auth
-def schedule():
-    data = _scraped()
+def _program_verisi(data):
+    """(weeks, latest) as /api/schedule serves them, course names in the
+    current week's cells normalised in place. Shared with the assistant's
+    ders_programi so both read one week the same way."""
     weeks = data.get("ders_programi", [])
-    today = DAY_NAMES.get(datetime.now().weekday(), "")
     # The scraper now keeps the whole published year, so the last element is a
     # week in June. The week the scraper saw selected carries `is_current`;
     # weeks[-1] stays the fallback for data written before that mark existed.
@@ -1102,6 +1179,14 @@ def schedule():
                 lines = cell.split("\n")
                 lines[0] = normalize_course(lines[0])
                 rows[r][c] = "\n".join(lines)
+    return weeks, latest
+
+
+@app.route("/api/schedule")
+@require_auth
+def schedule():
+    weeks, latest = _program_verisi(_scraped())
+    today = DAY_NAMES.get(datetime.now().weekday(), "")
     return jsonify({"weeks": weeks, "latest": latest, "today": today})
 
 
@@ -1468,7 +1553,12 @@ def content_weeks():
     cards in week 2 than in week 1. /api/content stays the open week so the
     surfaces that read it do not change shape.
     """
-    data = _scraped()
+    return jsonify(_icerik_haftalari(_scraped()))
+
+
+def _icerik_haftalari(data):
+    """{"weeks", "current"} as /api/content/weeks serves them; shared with
+    the assistant's ders_icerigi."""
     haftalar = data.get("ders_icerikleri_haftalar") or {}
     if not isinstance(haftalar, dict):
         haftalar = {}
@@ -1481,7 +1571,7 @@ def content_weeks():
     # somewhere to start even on data written before the weeks existed.
     if guncel not in haftalar:
         guncel = next(iter(haftalar), "")
-    return jsonify({"weeks": haftalar, "current": guncel})
+    return {"weeks": haftalar, "current": guncel}
 
 
 @app.route("/api/announcements")
@@ -1729,8 +1819,15 @@ def _find_related_content(exam_course, ders_icerikleri):
 @app.route("/api/exams")
 @require_auth
 def exams():
-    data = _scraped()
-    now = datetime.now()
+    return jsonify(_sinav_listesi(_scraped()))
+
+
+def _sinav_listesi(data, now=None):
+    """{"exams", "stats"} as /api/exams serves them: takvim exam events
+    classified upcoming/past on the local clock, plus synthetic exams from
+    graded columns with no takvim event. The assistant's sinavlar reads this
+    same list rather than re-deriving it."""
+    now = now or datetime.now()
 
     # --- Takvim exam events ---
     takvim = data.get("takvim", [])
@@ -1876,14 +1973,14 @@ def exams():
     grade_vals = [int(e["grade"]) for e in exams_list if e["grade"] and e["grade"].isdigit()]
     avg_grade = round(sum(grade_vals) / len(grade_vals), 1) if grade_vals else None
 
-    return jsonify({
+    return {
         "exams": all_exams,
         "stats": {
             "upcoming": len(upcoming),
             "past": len(past),
             "averageGrade": avg_grade,
         },
-    })
+    }
 
 
 @app.route("/api/health")
@@ -2131,7 +2228,13 @@ def _parse_ddmmyyyy_hhmm(s):
 @app.route("/api/calendar/unified")
 @require_auth
 def calendar_unified():
-    data = _scraped()
+    return jsonify({"events": _birlesik_takvim(_scraped())})
+
+
+def _birlesik_takvim(data):
+    """The unified calendar's events (lessons, homework deadlines, private
+    lessons, ÖGEP, teams, SEBİT, takvim) as /api/calendar/unified serves
+    them. The assistant's takvim builds on this list (_canli_takvim)."""
     events = []
     week_dates = _current_week_dates()
 
@@ -2291,7 +2394,7 @@ def calendar_unified():
             **_takvim_rengi(""),
         })
 
-    return jsonify({"events": events})
+    return events
 
 
 # --- Tedy Books ---
