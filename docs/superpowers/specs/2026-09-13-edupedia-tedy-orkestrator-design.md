@@ -520,7 +520,8 @@ planında yer alır.
   `http://127.0.0.1:8090`, proxied CNAME (yedek `hp-ai-node-config-20260915T074557Z-2faa.json`). Genel uçta: PRM 200,
   `/mcp` kimliksiz 401 + `WWW-Authenticate`, `/oauth/token` 16 385 bayt → 413, CORS `https://claude.ai` 204, kenar hız
   sınırı 429, `tdyM_` anahtarıyla `initialize` (`2025-06-18`, `TEDY edupedia` `0.1.0`) + `tools/list` beş araç; test
-  anahtarı `sp3-kabul-20260914` iptal edildi. Google JavaScript origin: bekliyor (insan adımı).
+  anahtarı `sp3-kabul-20260914` iptal edildi. Google JavaScript origin: bu kabul anında bekliyordu (insan adımı);
+  2026-09-18'de eklendi ve doğrulandı (bkz. Alt proje 6 plan güncellemeleri).
 
 ### Alt proje 4 plan güncellemeleri (2026-09-14)
 
