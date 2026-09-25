@@ -1,0 +1,7 @@
+- main:
+  - heading "Takvim" [level=1]
+  - heading "Haftalık Takvim" [level=2]
+  - button "Onceki hafta"
+  - text: /\d+ - \d+ Eylül \d+/
+  - button "Sonraki hafta"
+  - text: /Pzt \d+ Eyl Sal \d+ Eyl Çar \d+ Eyl Per \d+ Eyl Cum \d+ Eyl \d+:\d+ \d+:\d+ \d+:\d+ \d+:\d+ \d+:\d+ \d+:\d+ \d+:\d+ \d+:\d+ \d+:\d+ \d+:\d+ \d+:\d+/

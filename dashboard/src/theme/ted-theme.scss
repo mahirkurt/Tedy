@@ -150,8 +150,8 @@
   // course's mark (Tedy ders renk sistemi). Every homework was red and every
   // private lesson orange — meaning colours — and ÖGEP teal read as Fen.
 
-  --highlight-active: #{colors.$blue-20};
-  --highlight-today: #{colors.$blue-60};
+  --ted-highlight-active: #{colors.$blue-20};
+  --ted-highlight-today: #{colors.$blue-60};
 
   // ── Motion ────────────────────────────────────────────────────────────────
   // Both durations and the curve were already Carbon's productive values,
@@ -178,7 +178,7 @@ body {
   background-color: var(--ted-page-bg);
   color: var(--ted-color-text-primary);
   margin: 0;
-  font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  @include type.font-family('sans');
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -192,7 +192,7 @@ body {
 @keyframes popover-enter {
   from {
     opacity: 0;
-    transform: translateY(-4px) scale(0.98);
+    transform: translateY(calc(-1 * #{spacing.$spacing-02})) scale(0.98);
   }
   to {
     opacity: 1;
@@ -203,7 +203,7 @@ body {
 @keyframes card-fade-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(spacing.$spacing-03);
   }
   to {
     opacity: 1;
@@ -217,7 +217,45 @@ body {
 }
 
 .tag-urgent {
-  animation: pulse-urgent 1.5s ease-in-out infinite;
+}
+
+// ─── Reduced motion ──────────────────────────────────────────────────────────
+// The design system allows one entrance and turns it off under this
+// preference (color-system.md §2.5); until 2026-09-25 only Tedy Books listened.
+// Everything settles at once: a card is simply there, the nav opens without
+// sliding, hover states change without fading. Carbon's own component
+// transitions are included on purpose — a reader who asked for less motion
+// asked the whole page.
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// ─── Windows high contrast (forced colors) ──────────────────────────────────
+// Measured in forced colors, 2026-09-25: the header's icons, drawn white for
+// the navy band, were white on the system Canvas; the day strip's window and
+// track, the timeline dots and the subject marks are backgrounds, and forced
+// colors removed them, leaving the strip a single line.
+@media (forced-colors: active) {
+  // More specific than the band's own `.cds--header__action svg` rule, which
+  // is also !important and comes later in this file.
+  .cds--header .cds--header__action svg { fill: ButtonText !important; }
+
+  // Data encodings keep their own colours, as charts should: a system palette
+  // would erase what the window, the dots and the marks say.
+  .day-strip__track,
+  .today-tl__dot,
+  .ted-subject-label__mark,
+  .calendar-event,
+  .calendar-event--continuation {
+    forced-color-adjust: none;
+  }
 }
 
 // ─── App Shell ───────────────────────────────────────────────────────────────
@@ -234,9 +272,9 @@ body {
 }
 
 .app-shell-content.cds--content {
-  // 3rem clears the fixed header; the rest is the page's own top margin. It
-  // was 0.5rem: the first card sat against the band.
-  padding: calc(3rem + var(--ted-space-lg)) var(--ted-space-lg) var(--ted-space-xl);
+  // spacing-10 (4rem): the fixed 3rem header plus 1rem of the page's own. It
+  // was 3.5rem and the first card sat against the band.
+  padding: spacing.$spacing-10 var(--ted-space-lg) var(--ted-space-xl);
   max-width: 960px;
   // On a mostly-empty day the content ran out around 500px and the footer
   // sat halfway down the window with 200px of nothing under it, which reads
@@ -253,6 +291,7 @@ body {
 // has to start after it instead of underneath it.
 @media (min-width: 66rem) {
   .app-shell-content.cds--content:not(.app-shell-content--reader) {
+    /* stylelint-disable-next-line carbon/layout-use -- the resident nav's width (Carbon side nav, 16rem), not spacing */
     margin-inline-start: 16rem;
     width: calc(100% - 16rem);
   }
@@ -272,7 +311,7 @@ body {
 .stack-xs {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: spacing.$spacing-03;
 }
 
 .stack-sm {
@@ -285,13 +324,13 @@ body {
 .dashboard-card {
   background: var(--ted-card-bg);
   border-radius: var(--ted-radius-card);
-  padding: 1.25rem var(--ted-space-lg);
+  padding: var(--ted-space-lg);   // 1.25rem was off Carbon's scale
   margin-bottom: var(--ted-space-lg);
   border-left: 3px solid transparent;
   box-shadow: var(--ted-shadow-card);
   transition: box-shadow var(--ted-transition-med),
               transform var(--ted-transition-med);
-  animation: card-fade-in 0.3s ease-out both;
+  animation: card-fade-in motion.$duration-moderate-02 motion.motion(entrance, productive) both;
 }
 
 // Carbon 1.113 moved its own ui-shell and pagination hover styles behind
@@ -348,7 +387,7 @@ body {
 
 .dashboard-list-tile__label {
   @include type.type-style('body-01');
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .dashboard-list-tile__meta {
@@ -380,7 +419,7 @@ body {
 
 // Animations
 @keyframes tl-stagger {
-  from { opacity: 0; transform: translateX(-8px); }
+  from { opacity: 0; transform: translateX(calc(-1 * #{spacing.$spacing-03})); }
   to { opacity: 1; transform: translateX(0); }
 }
 
@@ -403,12 +442,6 @@ body {
 
 // Empty state
 
-.today-empty__icon {
-  font-size: 2.5rem;
-  margin-bottom: var(--ted-space-sm);
-  line-height: 1;
-}
-
 .today-empty__title {
   @include type.type-style('heading-02');
   margin: 0 0 var(--ted-space-xs);
@@ -423,7 +456,7 @@ body {
 
 // Main container
 .today {
-  animation: card-fade-in 0.3s ease-out;
+  animation: card-fade-in motion.$duration-moderate-02 motion.motion(entrance, productive);
 }
 
 // Date header
@@ -476,7 +509,7 @@ body {
 
 .today__today-btn {
   height: 1.75rem;
-  padding: 0 0.625rem;
+  padding: 0 spacing.$spacing-04;
   @include type.type-style('label-01');
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -534,7 +567,7 @@ body {
 .today-now__sub {
   @include type.type-style('body-compact-01');
   color: var(--cds-text-secondary);
-  margin: 2px 0 0;
+  margin: spacing.$spacing-01 0 0;
 }
 
 .today-now__next {
@@ -641,7 +674,7 @@ body {
 .today-tomorrow__line {
   @include type.type-style('body-compact-01');
   color: var(--cds-text-secondary);
-  margin: 2px 0 0;
+  margin: spacing.$spacing-01 0 0;
   font-variant-numeric: tabular-nums;
 }
 
@@ -660,7 +693,7 @@ body {
   display: flex;
   align-items: center;
   gap: var(--ted-space-xs);
-  margin: calc(-1 * var(--ted-space-sm)) 0 var(--ted-space-md);
+  margin: calc(-1 * #{spacing.$spacing-04}) 0 var(--ted-space-md);
   @include type.type-style('body-compact-01');
   color: var(--cds-text-secondary);
 }
@@ -699,9 +732,9 @@ body {
 .today-tl__item {
   display: grid;
   grid-template-columns: 48px 22px 1fr;
-  gap: 0 8px;
-  padding: 5px 0;
-  animation: tl-stagger 0.3s ease-out both;
+  gap: 0 spacing.$spacing-03;
+  padding: spacing.$spacing-02 0;
+  animation: tl-stagger motion.$duration-moderate-02 motion.motion(entrance, productive) both;
 
   @for $i from 1 through 20 {
     &:nth-child(#{$i}) { animation-delay: #{$i * 40}ms; }
@@ -744,7 +777,7 @@ body {
   font-weight: 600;
   color: var(--ted-color-text-helper);
   text-align: right;
-  padding-top: 10px;
+  padding-top: spacing.$spacing-04;
   font-variant-numeric: tabular-nums;
 }
 
@@ -781,7 +814,7 @@ body {
   justify-content: center;
   position: relative;
   z-index: 1;
-  margin-top: 8px;
+  margin-top: spacing.$spacing-03;
   flex-shrink: 0;
 
   svg { fill: var(--cds-icon-on-color); }
@@ -791,7 +824,7 @@ body {
   background: var(--ted-card-bg);
   border: 1px solid var(--ted-color-border-subtle);
   border-radius: var(--ted-radius-card);
-  padding: 8px 12px;
+  padding: spacing.$spacing-03 spacing.$spacing-04;
   min-height: 40px;
   transition: background-color var(--ted-transition-fast);
 }
@@ -835,9 +868,9 @@ body {
 .today-tl__now {
   display: grid;
   grid-template-columns: 48px 1fr;
-  gap: 0 8px;
+  gap: 0 spacing.$spacing-03;
   align-items: center;
-  padding: 6px 0;
+  padding: spacing.$spacing-03 0;
 }
 
 .today-tl__now-time {
@@ -906,7 +939,7 @@ body {
 
 // ─── Homework ────────────────────────────────────────────────────────────────
 .homework-item.cds--tile {
-  padding: 0.75rem var(--ted-space-md);
+  padding: spacing.$spacing-04 var(--ted-space-md);
   border-radius: var(--ted-radius-card);
   transition: background-color var(--ted-transition-fast);
 }
@@ -970,7 +1003,7 @@ body {
   // none, so the button was 124px wide and on a phone pushed "İlk görülme"
   // apart from its own time. The end padding matches the start.
   .cds--btn:not(.cds--btn--icon-only) {
-    padding-inline-end: 15px;
+    padding-inline-end: spacing.$spacing-05;
   }
 }
 
@@ -986,14 +1019,13 @@ body {
 .hw-countdown-bar__fill {
   height: 100%;
   border-radius: 2px;
-  transition: width 1s ease-out;
+  transition: width motion.$duration-slow-02 motion.motion(entrance, productive);
 
   &--normal { background: var(--status-info); }
   &--soon { background: var(--cds-border-strong-01); }
   &--urgent { background: var(--status-error); }
   &--critical {
     background: var(--status-error);
-    animation: pulse-urgent 1.5s ease-in-out infinite;
   }
   &--expired { background: var(--cds-layer-active-01); }
 }
@@ -1052,7 +1084,7 @@ body {
   display: flex;
   align-items: baseline;
   gap: var(--ted-space-sm, 0.5rem);
-  padding: 0.5rem 0;
+  padding: spacing.$spacing-03 0;
   border-bottom: 1px solid var(--ted-color-border-subtle);
 }
 
@@ -1077,8 +1109,8 @@ body {
 }
 
 .exams-ahead__when {
+  @include type.type-style('body-compact-01');
   flex: 0 0 auto;
-  font-size: 0.8125rem;
   color: var(--ted-color-text-secondary);
 }
 
@@ -1127,7 +1159,7 @@ body {
   // Carbon's own accent layer, which also retires a raw hex (D1).
   color: var(--cds-text-secondary);
   background: var(--cds-layer-accent-01);
-  padding: 1px 7px;
+  padding: 1px spacing.$spacing-03;
   border-radius: 8px;
 }
 
@@ -1202,8 +1234,8 @@ body {
 
 // ─── Schedule Table ──────────────────────────────────────────────────────────
 .lesson-active {
-  background-color: var(--highlight-active) !important;
-  border-left: 3px solid var(--highlight-today) !important;
+  background-color: var(--ted-highlight-active) !important;
+  border-left: 3px solid var(--ted-highlight-today) !important;
   position: relative;
 }
 
@@ -1239,7 +1271,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  line-height: 1.2;
   min-width: 0;
 }
 
@@ -1286,7 +1317,7 @@ body {
   cursor: pointer;
   // Measured 82x20 — under the 24px WCAG 2.2 minimum. The pill inside keeps
   // its own size; this only grows the hit area around it.
-  padding: 0.25rem 0;
+  padding: spacing.$spacing-02 0;
   min-height: 1.5rem;
   display: inline-flex;
   align-items: center;
@@ -1335,7 +1366,8 @@ body {
 }
 
 .dashboard-header__spin {
-  animation: header-spin 1s linear infinite;
+  /* stylelint-disable-next-line carbon/motion-easing-use -- a rotation is linear; Carbon's curves are for movement between states */
+  animation: header-spin motion.$duration-slow-02 linear infinite;
 }
 
 .photo-intake-select__text {
@@ -1365,7 +1397,7 @@ body {
 .photo-intake-form__label {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: spacing.$spacing-02;
   @include type.type-style('heading-compact-01');
   color: var(--ted-color-text-primary);
 }
@@ -1373,7 +1405,7 @@ body {
 .photo-intake-form__input {
   border: 1px solid var(--ted-color-border-subtle);
   border-radius: 0;   // a Carbon control is square
-  padding: 0.5rem 0.625rem;
+  padding: spacing.$spacing-03 spacing.$spacing-04;
   @include type.type-style('body-01');
 }
 
@@ -1404,7 +1436,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3rem;
+  padding: spacing.$spacing-09;
   color: var(--cds-text-on-color);
 }
 
@@ -1421,8 +1453,9 @@ body {
     height: 420px;
     border-radius: 50%;
     border: 1px solid var(--ted-color-brand-primary-hover);
+    /* stylelint-disable-next-line carbon/layout-use -- the login hero's decorative rings sit by position, not spacing */
     top: -120px;
-    right: -80px;
+    right: calc(-1 * #{spacing.$spacing-11});
   }
 
   &::after {
@@ -1432,8 +1465,9 @@ body {
     height: 280px;
     border-radius: 50%;
     border: 1px solid var(--ted-color-brand-primary-hover);
+    /* stylelint-disable-next-line carbon/layout-use -- as above */
     bottom: -60px;
-    left: -40px;
+    left: calc(-1 * #{spacing.$spacing-08});
   }
 }
 
@@ -1471,7 +1505,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2.5rem;
+  padding: spacing.$spacing-08;
 }
 
 .login-page__panel-inner {
@@ -1556,7 +1590,7 @@ body {
 // ─── Health Popover ──────────────────────────────────────────────────────────
 .health-popover {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + #{spacing.$spacing-03});
   right: 0;
   z-index: 9000;
   background: var(--ted-card-bg);
@@ -1568,7 +1602,7 @@ body {
   min-width: 320px;
   max-width: min(92vw, 380px);
   color: var(--ted-color-text-primary);
-  animation: popover-enter 0.2s ease-out;
+  animation: popover-enter motion.$duration-moderate-02 motion.motion(entrance, productive);
 }
 
 .health-popover__title {
@@ -1578,7 +1612,7 @@ body {
 }
 
 .health-popover__meta {
-  margin: 0 0 0.35rem;
+  margin: 0 0 spacing.$spacing-02;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1597,7 +1631,7 @@ body {
 
 .health-popover__warning {
   margin: 0 0 var(--ted-space-xs);
-  padding: 0.375rem 0.5rem;
+  padding: spacing.$spacing-03 spacing.$spacing-03;
   border-radius: var(--ted-radius-card);
   background: var(--cds-notification-background-warning);
   color: var(--ted-text-warning);
@@ -1609,14 +1643,14 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 0;
+  padding: spacing.$spacing-03 0;
   border-bottom: 1px solid #{colors.$gray-10};
 }
 
 .health-popover__value {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: spacing.$spacing-02;
 }
 
 .health-popover__row:last-child {
@@ -1695,8 +1729,8 @@ body {
 .calendar-legend__chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
+  gap: spacing.$spacing-02;
+  padding: spacing.$spacing-02 spacing.$spacing-04;
   border-radius: 1rem;   // a Carbon Tag's radius
   border: 1px solid var(--ted-color-border-subtle);
   background: var(--ted-card-bg);
@@ -1736,7 +1770,7 @@ body {
 .calendar-grid__header {
   background: var(--cds-layer-accent-01);
   color: var(--cds-text-primary);
-  padding: 0.5rem;
+  padding: spacing.$spacing-03;
   text-align: center;
   @include type.type-style('label-01');
   font-weight: 600;
@@ -1749,7 +1783,7 @@ body {
 
 .calendar-grid__time {
   background: var(--cds-layer-02);
-  padding: 0.25rem;
+  padding: spacing.$spacing-02;
   text-align: right;
   @include type.type-style('label-01');
   color: var(--ted-color-text-helper);
@@ -1758,7 +1792,7 @@ body {
 
 .calendar-grid__cell {
   background: var(--cds-layer-01);
-  padding: 2px;
+  padding: spacing.$spacing-01;
   min-height: 48px;
   position: relative;
 }
@@ -1795,8 +1829,8 @@ body {
   @include type.type-style('label-01');
   display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 2px 4px;
+  gap: spacing.$spacing-02;
+  padding: spacing.$spacing-01 spacing.$spacing-02;
   border-left: 3px solid var(--ted-subject-accent, var(--cds-border-strong-01));
   border-radius: 2px;
   margin-bottom: 1px;
@@ -1828,7 +1862,7 @@ body {
   height: 4px;
   border-left: 0;
   border-radius: 2px;
-  margin: 0 2px 1px;
+  margin: 0 spacing.$spacing-01 1px;
   padding: 0;
   background: var(--ted-subject-border, var(--cds-border-subtle-01));
 }
@@ -1848,7 +1882,7 @@ body {
   padding: var(--ted-space-md);
   min-width: 260px;
   max-width: 340px;
-  animation: popover-enter 0.2s ease-out;
+  animation: popover-enter motion.$duration-moderate-02 motion.motion(entrance, productive);
 }
 
 .calendar-popover__header {
@@ -1863,7 +1897,7 @@ body {
   border: none;
   cursor: pointer;
   color: var(--ted-color-text-helper);
-  padding: 2px;
+  padding: spacing.$spacing-01;
   border-radius: 4px;
 
   &:hover {
@@ -1889,7 +1923,7 @@ body {
 .calendar-popover__meta {
   @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
-  margin: 0 0 2px;
+  margin: 0 0 spacing.$spacing-01;
 }
 
 // ─── Calendar Date Groups (legacy) ──────────────────────────────────────
@@ -1916,6 +1950,7 @@ body {
   display: flex;
   align-items: center;
   gap: var(--ted-space-sm);
+  /* stylelint-disable-next-line carbon/layout-use -- aligns under the 52px time column */
   margin-left: calc(52px + var(--ted-space-sm));
 }
 
@@ -1960,7 +1995,7 @@ body {
 
 // ─── Staggered card animations ──────────────────────────────────────────
 .stack-sm > * {
-  animation: card-fade-in 0.3s ease-out both;
+  animation: card-fade-in motion.$duration-moderate-02 motion.motion(entrance, productive) both;
 }
 
 .stack-sm > *:nth-child(1)  { animation-delay: 0ms; }
@@ -2063,7 +2098,7 @@ body {
   .cds--toggle__text {
     color: var(--ted-header-text);
     @include type.type-style('label-01');
-    font-weight: 500;
+    font-weight: 600;
   }
 }
 
@@ -2071,8 +2106,8 @@ body {
 .app-shell-content--focus {
   // Kill all animations and transitions
   *, *::before, *::after {
-    animation-duration: 0s !important;
-    transition-duration: 50ms !important;
+    animation-duration: motion.$duration-fast-01 !important;
+    transition-duration: motion.$duration-fast-01 !important;
   }
 
   // Hide secondary info across all components.
@@ -2126,7 +2161,7 @@ body {
 
 .schedule-lesson {
   display: block;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .schedule-detail {
@@ -2170,7 +2205,7 @@ body {
 .grade-detail__bar-fill {
   height: 100%;
   border-radius: 4px;
-  transition: width 0.6s ease-out;
+  transition: width motion.$duration-slow-02 motion.motion(entrance, productive);
 }
 
 .grade-detail__value {
@@ -2190,7 +2225,7 @@ body {
 
 .team-cell-name {
   @include type.type-style('body-01');
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .team-cell-date {
@@ -2219,7 +2254,7 @@ body {
 
 .platform-item__name {
   @include type.type-style('body-01');
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .platform-a3k-score {
@@ -2248,7 +2283,7 @@ body {
   height: 100%;
   background: var(--cds-interactive);
   border-radius: 4px;
-  transition: width 0.6s ease-out;
+  transition: width motion.$duration-slow-02 motion.motion(entrance, productive);
 }
 
 .platform-a3k-score__value {
@@ -2287,7 +2322,7 @@ body {
 .platform-detail-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: spacing.$spacing-01;
   margin-top: var(--ted-space-xs);
 }
 
@@ -2367,7 +2402,7 @@ body {
 }
 
 .platform-detail-row__teacher {
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .platform-detail-row__dates {
@@ -2390,7 +2425,7 @@ body {
 .schedule-table .cds--data-table td {
   vertical-align: middle;
   @include type.type-style('label-01');
-  padding: 0.25rem 0.375rem;
+  padding: spacing.$spacing-02 spacing.$spacing-03;
   height: 3.25rem;
 }
 .schedule-table .cds--data-table th {
@@ -2406,7 +2441,6 @@ body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  line-height: 1.25;
 }
 
 .schedule-table .schedule-detail {
@@ -2423,8 +2457,8 @@ body {
 }
 
 .cds--data-table .lesson-active td {
-  background-color: var(--highlight-active);
-  border-left: 3px solid var(--highlight-today);
+  background-color: var(--ted-highlight-active);
+  border-left: 3px solid var(--ted-highlight-today);
 }
 
 // ─── Responsive ──────────────────────────────────────────────────────────────
@@ -2445,7 +2479,7 @@ body {
   .app-shell-nav-scrim {
     position: fixed;
     z-index: 7999;
-    inset: 3rem 0 0;
+    inset: spacing.$spacing-09 0 0;
     display: block;
     width: 100%;
     padding: 0;
@@ -2461,7 +2495,7 @@ body {
     // of every phone page (measured 2026-09-25: content began at y=104).
     margin-top: 0;
     margin-left: 0 !important;
-    padding: calc(3rem + var(--ted-space-md)) var(--ted-space-xs) var(--ted-space-md) !important;
+    padding: spacing.$spacing-10 var(--ted-space-xs) var(--ted-space-md) !important;
   }
 
   .dashboard-card {
@@ -2480,12 +2514,12 @@ body {
 
   .today-tl__item {
     grid-template-columns: 40px 18px 1fr;
-    gap: 0 6px;
+    gap: 0 spacing.$spacing-03;
   }
 
   .today-tl__now {
     grid-template-columns: 40px 1fr;
-    gap: 0 6px;
+    gap: 0 spacing.$spacing-03;
   }
 
   .today__day-name {
@@ -2494,7 +2528,7 @@ body {
 
   .health-popover {
     min-width: 250px;
-    right: -0.75rem;
+    right: calc(-1 * #{spacing.$spacing-04});
     padding: var(--ted-space-xs) var(--ted-space-sm);
   }
 
@@ -2554,7 +2588,7 @@ body {
     }
 
     .cds--header .cds--header__name {
-      padding-inline: 0.5rem;
+      padding-inline: spacing.$spacing-03;
     }
 
     .cds--header__global .cds--header__action {
@@ -2585,7 +2619,7 @@ body {
   .login-page__panel {
     padding: var(--ted-space-xl) var(--ted-space-lg);
     align-items: flex-start;
-    padding-top: 2rem;
+    padding-top: spacing.$spacing-07;
   }
 
   .cds--data-table-container {
@@ -2595,7 +2629,7 @@ body {
 
   .cds--data-table td,
   .cds--data-table th {
-    padding: 0.375rem 0.5rem;
+    padding: spacing.$spacing-03 spacing.$spacing-03;
     @include type.type-style('label-01');
   }
 
@@ -2621,12 +2655,12 @@ body {
 
   .calendar-grid__header {
     @include type.type-style('label-01');
-    padding: 0.375rem 2px;
+    padding: spacing.$spacing-03 spacing.$spacing-01;
   }
 
   .calendar-grid__time {
     @include type.type-style('label-01');
-    padding: 0.25rem 2px;
+    padding: spacing.$spacing-02 spacing.$spacing-01;
   }
 
   .calendar-grid__cell {
@@ -2635,7 +2669,7 @@ body {
 
   .calendar-event {
     @include type.type-style('label-01');
-    padding: 1px 2px;
+    padding: 1px spacing.$spacing-01;
   }
 
   .calendar-nav__label {
@@ -2687,8 +2721,8 @@ body {
 }
 
 .homework-modal__enrichment {
-  margin-top: 1rem;
-  padding: 0.75rem 1rem;
+  margin-top: spacing.$spacing-05;
+  padding: spacing.$spacing-04 spacing.$spacing-05;
   // An information callout in Carbon's info roles; it borrowed the band's navy.
   background: var(--cds-notification-background-info);
   border-left: 3px solid var(--cds-support-info);
@@ -2696,7 +2730,7 @@ body {
 }
 .homework-modal__enrichment-title {
   @include type.type-style('heading-compact-01');
-  margin-bottom: 0.375rem;
+  margin-bottom: spacing.$spacing-03;
   color: var(--ted-text-info);
 }
 .homework-modal__enrichment-text {
@@ -2764,10 +2798,10 @@ body {
 .student-profile__field {
   border: 1px solid var(--ted-color-border-subtle);
   border-radius: var(--ted-radius-card);
-  padding: 0.5rem 0.625rem;
+  padding: spacing.$spacing-03 spacing.$spacing-04;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: spacing.$spacing-02;
 }
 
 .student-profile__field-key {
@@ -2848,7 +2882,7 @@ body {
 }
 
 .student-private-lesson-item__meta {
-  margin-top: 0.25rem;
+  margin-top: spacing.$spacing-02;
   @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
 }
@@ -2857,9 +2891,10 @@ body {
 // Exam Timeline
 // ═══════════════════════════════════════════════
 
+// The page column, like every other page: this was a 720px column centred
+// inside it, so Sınavlar alone began 96px to the right (2026-09-25).
 .exam-timeline {
-  max-width: 720px;
-  margin: 0 auto;
+  max-width: none;
 }
 
 .exam-stats {
@@ -2876,7 +2911,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: spacing.$spacing-01;
 }
 
 .exam-stats__value {
@@ -2958,7 +2993,7 @@ body {
 .exam-card__info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: spacing.$spacing-01;
   min-width: 0;
 }
 
@@ -2970,7 +3005,7 @@ body {
 .ted-subject-label {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: spacing.$spacing-03;
   min-width: 0;
   vertical-align: middle;
 }
@@ -3031,7 +3066,7 @@ body {
 .exam-card__countdown-fill {
   height: 100%;
   border-radius: 2px;
-  transition: width 0.6s ease;
+  transition: width motion.$duration-slow-02 motion.motion(standard, productive);
   background-color: var(--status-info);
 
   .exam-card--critical & { background-color: var(--status-error); }
@@ -3057,10 +3092,10 @@ body {
   @include type.type-style('label-01');
   font-weight: 600;
   color: var(--ted-color-text-secondary);
-  margin-bottom: 4px;
+  margin-bottom: spacing.$spacing-02;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: spacing.$spacing-02;
 }
 
 .exam-card__section-text {
@@ -3075,7 +3110,7 @@ body {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: spacing.$spacing-02;
 
   li {
     @include type.type-style('body-01');
@@ -3084,7 +3119,7 @@ body {
     justify-content: space-between;
     align-items: center;
     gap: var(--ted-space-xs);
-    padding: 4px 0;
+    padding: spacing.$spacing-02 0;
   }
 }
 
@@ -3172,10 +3207,13 @@ body {
   .exam-card__list li {
     flex-direction: column;
     align-items: flex-start;
-    gap: 2px;
+    gap: spacing.$spacing-01;
   }
 }
 
+/* stylelint-disable carbon/theme-use, carbon/layout-use, carbon/type-use, carbon/motion-duration-use, carbon/motion-easing-use --
+   Tedy Books is its own world (surface designs §4.11); everything below this
+   line is out of the Carbon token lint. */
 /* ═══════════════════════════════════════════════════════════════════════════
    Tedy Books
    A fine-press reading room inside the dashboard: cloth-bound covers, gold

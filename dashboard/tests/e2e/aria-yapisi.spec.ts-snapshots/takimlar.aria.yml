@@ -1,0 +1,17 @@
+- main:
+  - heading "Takımlar" [level=1]
+  - heading "Takım Çalışmaları & ÖGEP" [level=2]
+  - heading "Academy+" [level=3]
+  - table "Structured list section":
+    - rowgroup:
+      - row "Etkinlik Tarih Durum Konum":
+        - columnheader "Etkinlik"
+        - columnheader "Tarih"
+        - columnheader "Durum"
+        - columnheader "Konum"
+    - rowgroup:
+      - row "Bekliyor":
+        - cell
+        - cell
+        - cell "Bekliyor"
+        - cell

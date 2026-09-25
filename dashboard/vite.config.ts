@@ -1,8 +1,17 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // `npm run analyze`: a treemap of what each chunk is made of, with gzip and
+    // brotli sizes. Written beside package.json, never into dashboard-dist,
+    // which the dashboard serves live.
+    ...(process.env.ANALYZE
+      ? [visualizer({ filename: 'paket-analizi.html', template: 'treemap', gzipSize: true, brotliSize: true })]
+      : []),
+  ],
   build: {
     outDir: '../dashboard-dist',
     emptyOutDir: true,

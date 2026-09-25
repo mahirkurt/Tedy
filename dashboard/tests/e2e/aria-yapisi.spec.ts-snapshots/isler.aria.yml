@@ -1,0 +1,19 @@
+- main:
+  - heading "İşler" [level=1]
+  - text: SIRADAKİ
+  - heading "Matematik — 2. HAFTA MATEMATİK HAFTA İÇİ ÖDEVİ" [level=2]
+  - text: /\d+ dakikayla başla/
+  - button "Başla"
+  - button "Aktif Ödevler 3" [expanded]
+  - text: "/Matematik 2\\. HAFTA MATEMATİK HAFTA İÇİ ÖDEVİ Teslim: \\d+ Eyl \\d+ \\d+:\\d+ 1g \\d+[hmsp]+/"
+  - button "Yaptım"
+  - text: "/Fransızca S1 Les verbes Teslim: \\d+ Eyl \\d+ \\d+:\\d+ 3g \\d+[hmsp]+/"
+  - button "Yaptım"
+  - text: "/Fen Bilimleri Ödev \\(Hibrit \\d+-\\d+\\) Teslim: \\d+ Eyl \\d+ \\d+:\\d+ 5g \\d+[hmsp]+/"
+  - button "Yaptım"
+  - text: Yaklaşan Sınavlar 2
+  - list:
+    - listitem: Matematik 1. Yazılı 7 gün sonra
+    - listitem: /Özdebir Gelişim İzleme Sınavı GİS · İzleme Sınavı \d+ gün sonra/
+  - link "Tüm sınavlar":
+    - /url: /sinavlar

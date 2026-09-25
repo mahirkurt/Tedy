@@ -55,15 +55,29 @@ export default function WeeklySchedule() {
 
   // On a phone Carbon's table container scrolls the grid sideways, and a
   // scroll region has to be reachable by keyboard and named (axe
-  // scrollable-region-focusable). The container is Carbon's own element, so
-  // it is found after render rather than given props.
+  // scrollable-region-focusable). Only while it scrolls: a tab stop that
+  // scrolls nothing is a non-widget in the tab order (IBM Equal Access
+  // element_tabbable_role_valid, on the desktop, 2026-09-25). The container is
+  // Carbon's own element, so it is found after render rather than given props.
   useEffect(() => {
     const kap = kapRef.current?.querySelector<HTMLElement>('.cds--data-table-content')
     if (!kap) return
-    kap.tabIndex = 0
-    kap.setAttribute('role', 'region')
-    kap.setAttribute('aria-label', 'Haftalık program tablosu')
-  })
+    const ayarla = () => {
+      if (kap.scrollWidth > kap.clientWidth + 1) {
+        kap.tabIndex = 0
+        kap.setAttribute('role', 'region')
+        kap.setAttribute('aria-label', 'Haftalık program tablosu')
+      } else {
+        kap.removeAttribute('tabindex')
+        kap.removeAttribute('role')
+        kap.removeAttribute('aria-label')
+      }
+    }
+    ayarla()
+    const gozcu = new ResizeObserver(ayarla)
+    gozcu.observe(kap)
+    return () => gozcu.disconnect()
+  }, [data])
 
   // Carbon's skeleton in the content's shape (surface designs §2.4), not a
   // bare "Yükleniyor..." line.

@@ -1,6 +1,8 @@
 /* Assistant page */
 // ── Assistant Chat (Carbon AI style) ─────────────────────────────────────────
 @use '@carbon/react/scss/theme' as theme;
+@use '@carbon/react/scss/spacing' as spacing;
+@use '@carbon/react/scss/motion' as motion;
 @use '@carbon/react/scss/utilities/ai-gradient' as ai;
 @use '@carbon/react/scss/type' as type;
 
@@ -23,15 +25,15 @@
 }
 
 .ac__title {
+  @include type.type-style('heading-03');
   margin: 0;
-  font-size: 1.25rem;
   font-weight: 600;
   color: var(--ted-color-text-primary);
 }
 
 .ac__subtitle {
+  @include type.type-style('body-compact-01');
   margin: 0;
-  font-size: 0.8125rem;
   color: var(--ted-color-text-helper);
 }
 
@@ -43,18 +45,18 @@
 }
 
 .ac__prompt-chip {
+  @include type.type-style('body-compact-01');
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: spacing.$spacing-03;
   border: 1px solid var(--ted-color-border-subtle);
   background: var(--ted-color-layer);
   color: var(--ted-color-text-primary);
   border-radius: 999px;
-  padding: 0.4rem 0.85rem;
-  font-size: 0.8125rem;
+  padding: spacing.$spacing-03 spacing.$spacing-04;
   cursor: pointer;
   // Colours only: `all` animated the focus outline in from 0px as well.
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color motion.$duration-moderate-01 motion.motion(standard, productive), border-color motion.$duration-moderate-01 motion.motion(standard, productive), color motion.$duration-moderate-01 motion.motion(standard, productive);
 }
 
 // Previously hard-coded a light-blue fill and Blue-60 border/text, imitating
@@ -122,11 +124,11 @@
   display: flex;
   gap: var(--ted-space-xs);
   max-width: 92%;
-  animation: ac-fade-in 0.3s ease;
+  animation: ac-fade-in motion.$duration-moderate-02 motion.motion(standard, productive);
 }
 
 @keyframes ac-fade-in {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(spacing.$spacing-03); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -136,6 +138,7 @@
 }
 
 .ac-msg__avatar {
+  @include type.type-style('label-01');
   flex-shrink: 0;
   width: 28px;
   height: 28px;
@@ -143,7 +146,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -157,9 +159,8 @@
 }
 
 .ac-msg__body {
-  padding: 0.65rem 0.85rem;
+  padding: spacing.$spacing-04 spacing.$spacing-04;
   border-radius: 12px;
-  line-height: 1.5;
 }
 
 // Carbon's AI surface language, not an imitation of it. Values come from the
@@ -193,21 +194,21 @@
   @include type.type-style('label-01');   // 12px, Carbon's smallest step; was 11px
   font-weight: 600;
   color: var(--ted-color-text-helper);
-  margin-bottom: 2px;
+  margin-bottom: spacing.$spacing-01;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .ac-msg__content {
+  @include type.type-style('body-01');
   margin: 0;
   white-space: pre-wrap;
-  font-size: 0.875rem;
 }
 
 .ac-msg__flags {
   margin-top: var(--ted-space-2xs);
   display: flex;
-  gap: 4px;
+  gap: spacing.$spacing-02;
 }
 
 // Thinking / loading indicator
@@ -223,7 +224,7 @@
 }
 
 .ac-msg__elapsed {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-helper);
   font-variant-numeric: tabular-nums;
 }
@@ -275,7 +276,7 @@
 .ac__send-group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: spacing.$spacing-01;
   flex-shrink: 0;
 }
 
@@ -305,12 +306,12 @@
 }
 
 .ac__panel-title {
+  @include type.type-style('heading-compact-01');
   margin: 0 0 var(--ted-space-sm) 0;
-  font-size: 0.875rem;
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: spacing.$spacing-03;
   color: var(--ted-color-text-primary);
 }
 
@@ -335,25 +336,24 @@
 }
 
 .ac__ref-path {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   font-weight: 600;
   color: theme.$link-primary;
   display: block;
-  margin-bottom: 2px;
+  margin-bottom: spacing.$spacing-01;
 }
 
 .ac__ref-snippet {
+  @include type.type-style('body-compact-01');
   margin: 0;
-  font-size: 0.8125rem;
   color: var(--ted-color-text-secondary);
-  line-height: 1.4;
 }
 
 // Plan blocks
 .ac__plan-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: spacing.$spacing-01;
   padding-bottom: var(--ted-space-xs);
   border-bottom: 1px solid var(--ted-color-border-subtle);
 }
@@ -370,45 +370,44 @@
 }
 
 .ac__plan-time {
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
   color: var(--ted-color-text-helper);
   font-variant-numeric: tabular-nums;
 }
 
 .ac__plan-title {
-  font-size: 0.8125rem;
+  @include type.type-style('body-compact-01');
   font-weight: 600;
 }
 
 .ac__plan-actions {
+  @include type.type-style('body-compact-01');
   margin: 0;
-  font-size: 0.8125rem;
   color: var(--ted-color-text-secondary);
 }
 
 .ac__muted {
+  @include type.type-style('body-compact-01');
   margin: 0;
   color: var(--ted-color-text-helper);
-  font-size: 0.8125rem;
   font-style: italic;
 }
 
 // Inline citation chips — the [S1] markers the assistant writes into the
 // answer text render as these rather than being stripped by the frontend.
 .ac-cite {
+  @include type.type-style('label-01');
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-inline-size: 1.15rem;
   block-size: 1.15rem;
-  margin-inline: 0.15rem;
-  padding: 0 0.3rem;
+  margin-inline: spacing.$spacing-01;
+  padding: 0 spacing.$spacing-02;
   border: 1px solid theme.$ai-border-strong;
   border-radius: 999px;
   background: theme.$ai-aura-hover-background;
   color: theme.$text-primary;
-  font-size: 0.6875rem;
-  line-height: 1;
   cursor: pointer;
   vertical-align: super;
 
@@ -426,24 +425,23 @@
 }
 
 .ac-cite__kind {
+  @include type.type-style('label-01');
   display: block;
-  font-size: 0.6875rem;
   color: theme.$text-secondary;
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
 
 .ac-cite__label {
+  @include type.type-style('body-compact-01');
   display: block;
-  font-size: 0.8125rem;
-  margin-top: 2px;
+  margin-top: spacing.$spacing-01;
 }
 
 .ac-cite__snippet {
+  @include type.type-style('body-compact-01');
   margin: var(--ted-space-2xs) 0 0;
-  font-size: 0.8125rem;
   color: theme.$text-secondary;
-  line-height: 1.4;
 }
 
 // Every group carries a left rule so the unclassified one differs by colour
@@ -466,8 +464,8 @@
 }
 
 .ac__ref-group-title {
-  margin: var(--ted-space-sm) 0 0.25rem;
-  font-size: 0.75rem;
+  @include type.type-style('label-01');
+  margin: var(--ted-space-sm) 0 spacing.$spacing-02;
   font-weight: 600;
   color: theme.$text-secondary;
   text-transform: uppercase;
@@ -485,11 +483,11 @@
 // overrides it) alongside the flex/index-circle layout SourcePanel needs.
 .ac__ref-item {
   display: flex;
-  gap: 0.5rem;
-  padding: 0.5rem;
+  gap: spacing.$spacing-03;
+  padding: spacing.$spacing-03;
   border-radius: 4px;
   border-bottom: 1px solid var(--ted-color-border-subtle);
-  transition: background 0.15s ease;
+  transition: background motion.$duration-moderate-01 motion.motion(standard, productive);
 }
 
 // Sidebar reference the chip's onActivate scrolls to and highlights.
@@ -503,23 +501,22 @@
 }
 
 .ac__ref-index {
+  @include type.type-style('label-01');
   flex: 0 0 auto;
   inline-size: 1.15rem;
   block-size: 1.15rem;
   border: 1px solid theme.$ai-border-strong;
   border-radius: 999px;
-  font-size: 0.6875rem;
   text-align: center;
-  line-height: 1.05rem;
 }
 
 .ac-msg__actions {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  margin-block-start: 0.35rem;
+  gap: spacing.$spacing-02;
+  margin-block-start: spacing.$spacing-02;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity motion.$duration-moderate-01 motion.motion(standard, productive);
 }
 
 .ac-msg:hover .ac-msg__actions,
@@ -531,8 +528,8 @@
 .ac-msg__degraded {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-block-end: 0.35rem;
+  gap: spacing.$spacing-02;
+  margin-block-end: spacing.$spacing-02;
 }
 
 @media (max-width: 1100px) {
@@ -543,12 +540,12 @@
 
 @media (max-width: 671px) {
   .ac__prompts {
-    gap: 4px;
+    gap: spacing.$spacing-02;
   }
 
   .ac__prompt-chip {
-    font-size: 0.75rem;
-    padding: 0.3rem 0.65rem;
+    @include type.type-style('label-01');
+    padding: spacing.$spacing-02 spacing.$spacing-04;
   }
 }
 
@@ -556,23 +553,22 @@
 // Carbon paints the popover itself; these only set the rhythm of the words
 // inside it.
 .ac__ai-pop-title {
+  @include type.type-style('body-01');
   margin: 0 0 var(--ted-space-2xs);
-  font-size: 0.875rem;
   font-weight: 600;
   color: theme.$text-primary;
 }
 
 .ac__ai-pop-body {
+  @include type.type-style('body-compact-01');
   margin: 0 0 var(--ted-space-2xs);
   max-width: 34ch;
-  font-size: 0.8125rem;
-  line-height: 1.45;
   color: theme.$text-secondary;
 }
 
 .ac__ai-pop-meta {
+  @include type.type-style('label-01');
   margin: var(--ted-space-2xs) 0 0;
-  font-size: 0.75rem;
   color: theme.$text-helper;
 }
 
@@ -582,9 +578,9 @@
 }
 
 .ac__ref-open {
+  @include type.type-style('body-compact-01');
   display: inline-block;
-  margin-top: 0.25rem;
-  font-size: 0.8125rem;
+  margin-top: spacing.$spacing-02;
   font-weight: 600;
   color: theme.$link-primary;
 }
@@ -595,7 +591,7 @@
 }
 
 .ac__ref-unlinked {
-  margin: 0.25rem 0 0;
-  font-size: 0.8125rem;
+  @include type.type-style('body-compact-01');
+  margin: spacing.$spacing-02 0 0;
   color: theme.$text-secondary;
 }

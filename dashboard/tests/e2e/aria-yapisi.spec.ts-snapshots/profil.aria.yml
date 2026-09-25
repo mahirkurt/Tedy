@@ -1,0 +1,39 @@
+- main:
+  - heading "Profil" [level=1]
+  - heading "Öğrenci Profili" [level=2]
+  - heading "Deneme Öğrenci" [level=3]
+  - text: "/No: \\d+ Sınıf: 7-D Şube: D Okul No \\d+ Doğum Tarihi \\d+\\.\\d+\\.\\d+ İkinci Yabancı Dil Fransızca Servis No \\d+/"
+  - heading "Özel Ders Ekle" [level=2]
+  - text: Ders
+  - combobox "Ders":
+    - option "Genel"
+    - option "Matematik" [selected]
+    - option "Fen Bilimleri"
+    - option "Sosyal Bilgiler"
+    - option "Türkçe"
+    - option "İngilizce"
+    - option "İngilizce (Language)"
+    - option "Fransızca"
+    - option "Ahlak ve Yurttaşlık"
+    - option "Bilişim Teknolojileri"
+    - option "Din Kültürü ve Ahlak"
+  - text: Öğretmen Adı
+  - textbox "Öğretmen Adı":
+    - /placeholder: "Örn: Ayşe Yılmaz"
+  - checkbox "Ders tekrar ediyor" [checked]
+  - text: Ders tekrar ediyor Haftanın Günü
+  - combobox "Haftanın Günü":
+    - option "Pazartesi" [selected]
+    - option "Salı"
+    - option "Çarşamba"
+    - option "Perşembe"
+    - option "Cuma"
+    - option "Cumartesi"
+    - option "Pazar"
+  - text: Başlangıç
+  - textbox "Başlangıç"
+  - text: Bitiş
+  - textbox "Bitiş": /\d+:\d+/
+  - button "Özel Ders Ekle"
+  - heading "Tanımlı Özel Dersler" [level=2]
+  - paragraph: Tanımlı özel ders yok.

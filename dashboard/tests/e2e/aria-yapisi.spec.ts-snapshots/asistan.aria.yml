@@ -1,0 +1,23 @@
+- main:
+  - heading "Asistan" [level=1]
+  - button "AI bilgisi"
+  - heading "TEDY Asistan" [level=2]
+  - paragraph: Kaynaklı soru-cevap ve kişisel çalışma planı
+  - button "Işık bugün neye öncelik vermeli?"
+  - button "Işık için çalışma planı hazırla"
+  - button "Işık'ın eksik konularını özetle"
+  - article:
+    - button "AI yanıtı"
+    - text: Asistan
+    - paragraph: Merhaba! TEDY Asistan olarak size yardımcı olabilirim. Işık'ın ödevleri, sınavları ve dersleri hakkında soru sorabilir veya onun için çalışma planı isteyebilirsiniz.
+  - text: Sorun
+  - textbox "Sorun":
+    - /placeholder: Bir soru sorun veya çalışma planı isteyin...
+  - alert
+  - button "Gönder" [disabled]
+  - button "Çalışma Planı" [disabled]
+  - complementary "Kaynaklar ve çalışma planı":
+    - heading "Kaynaklar" [level=2]
+    - paragraph: Soru sorduğunda kaynaklar burada görünecek.
+    - heading "Plan Blokları" [level=2]
+    - paragraph: Çalışma planı oluşturulduğunda burada görünecek.

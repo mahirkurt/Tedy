@@ -1,0 +1,7 @@
+- main:
+  - heading "Duyurular" [level=1]
+  - heading "Okul Duyuruları" [level=2]
+  - heading "Diğer" [level=3]
+  - list:
+    - listitem:
+      - button "title"

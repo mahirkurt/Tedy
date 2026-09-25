@@ -96,7 +96,7 @@ test.describe('SPA serving', () => {
 
   test('header shows sync tag and popover details', async ({ page }) => {
     await page.goto('/')
-    const syncTrigger = page.getByRole('button', { name: 'Senkron durumunu göster' })
+    const syncTrigger = page.getByRole('button', { name: /^Senkron durumu:/ })
     await expect(syncTrigger).toBeVisible()
     await syncTrigger.click()
     await expect(page.getByRole('dialog', { name: 'Senkron sağlık bilgisi' })).toBeVisible()
@@ -150,7 +150,7 @@ test.describe('SPA serving', () => {
 
   test('health popover opens and closes with Escape', async ({ page }) => {
     await page.goto('/')
-    const trigger = page.getByRole('button', { name: 'Senkron durumunu göster' })
+    const trigger = page.getByRole('button', { name: /^Senkron durumu:/ })
     await trigger.click()
     await expect(page.getByRole('dialog', { name: 'Senkron sağlık bilgisi' })).toBeVisible()
     await page.keyboard.press('Escape')

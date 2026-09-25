@@ -1,0 +1,25 @@
+- main:
+  - heading "Bugün" [level=1]
+  - button "Önceki gün"
+  - text: /Perşembe \d+ Eylül/
+  - button "Sonraki gün"
+  - region /Şimdi \d+:\d+\. \d+ saatin var\. Odak penceresi \d+:\d+'da kapanıyor\. Gün \d+:\d+'da bitiyor\./
+  - region "Şu anki ders":
+    - text: SIRADAKİ · 5 dk sonra
+    - heading "Matematik" [level=2]
+    - paragraph: Elif Özge Şener
+    - paragraph: "/Sonra: Fen Bilimleri \\d+:\\d+ 4 ders kaldı/"
+  - region "Okuldan sonraki iş":
+    - text: ""
+    - paragraph: Matematik — 2. HAFTA MATEMATİK HAFTA İÇİ ÖDEVİ
+    - text: /Teslim yarın \d+:\d+/
+  - region "Ayrıca":
+    - text: AYRICA
+    - button /Fransızca — S1 Les verbes Pazartesi \d+:\d+/
+    - button /Fen Bilimleri — Ödev \(Hibrit \d+-\d+\) Salı \d+:\d+/
+  - region "Sınavlar":
+    - text: SINAVLAR
+    - button /Matematik 1\. Yazılı 1 Eki \d+:\d+/
+    - button /Özdebir Gelişim İzleme Sınavı GİS · İzleme Sınavı \d+ Eki \d+:\d+/
+  - button "3 ders bitti Göster"
+  - text: /\d+:\d+ \d+:\d+ Matematik 4\. Elif Özge Şener \d+:\d+ Fen Bilimleri 5\. Yasemin Kuzucu \d+:\d+ Türkçe 8\. Eda Şen \d+:\d+ Kültür ve Medeniyetimize Yön Verenler 9\. Eda Şen/

@@ -1,0 +1,10 @@
+- main:
+  - heading "İlerleme" [level=1]
+  - heading "Platform İlerleme" [level=2]
+  - list:
+    - listitem:
+      - button "EnglishCentral 0/0"
+    - listitem:
+      - button "Achieve3000 3/5"
+    - listitem:
+      - button "SEBIT 1/1"

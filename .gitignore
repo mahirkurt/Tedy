@@ -52,6 +52,8 @@ fix_credentials.py
 
 # Screenshots
 *.png
+# …except the visual-regression baselines, which are the test
+!dashboard/tests/e2e/*-snapshots/*.png
 
 # Local tooling
 .claude/
@@ -83,3 +85,5 @@ src/discover_*.py
 # Playwright çıktıları (koşum artefaktı, izlenmez)
 dashboard/test-results/
 dashboard/playwright-report/
+dashboard/.lighthouseci/
+dashboard/paket-analizi.html

@@ -1,0 +1,5 @@
+- main:
+  - heading "Sınavlar" [level=1]
+  - region "Sınav istatistikleri": /2 Yaklaşan 1 Geçmiş \d+ Ortalama/
+  - heading "Yaklaşan Sınavlar" [level=2]
+  - text: /Matematik 1\. Yazılı 1 Eki \d+:\d+ 6g \d+[hmsp]+ Özdebir Gelişim İzleme Sınavı GİS · İzleme Sınavı \d+ Eki \d+:\d+ 28g \d+[hmsp]+ Geçmiş Sınavlar Türkçe 1\. Yazılı \d+ Eyl \d+:\d+ \d+/

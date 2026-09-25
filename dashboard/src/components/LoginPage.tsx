@@ -99,7 +99,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       <div className="login-page__hero">
         <div className="login-page__hero-geo" aria-hidden="true" />
         <div className="login-page__hero-content">
-          <img src="/tedy-logo-white.svg" alt="TEDY" className="login-page__hero-logo" />
+          <picture>
+            {/* Windows high contrast paints the band in the system Canvas, usually
+                white; the white logo vanished on it (2026-09-25). */}
+            <source srcSet="/tedy-logo.svg" media="(forced-colors: active)" />
+            <img src="/tedy-logo-white.svg" alt="TEDY" className="login-page__hero-logo" />
+          </picture>
           <p className="login-page__hero-school">TED Rönesans Koleji</p>
           <p className="login-page__hero-subtitle">Öğrenci Takip Paneli</p>
         </div>

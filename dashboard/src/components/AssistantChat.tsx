@@ -593,7 +593,7 @@ export default function AssistantChat() {
               <TextArea
                 ref={textareaRef}
                 id="ac-input"
-                labelText=""
+                labelText="Sorun"
                 hideLabel
                 value={draft}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDraft(e.target.value)}
@@ -645,7 +645,7 @@ export default function AssistantChat() {
         </div>
 
         {/* Side panels */}
-        <aside className="ac__side">
+        <aside className="ac__side" aria-label="Kaynaklar ve çalışma planı">
           <SourcePanel citations={latestAssistant?.citations ?? []} activeId={activeCitation} />
 
           <Tile className="ac__panel">

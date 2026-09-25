@@ -18,6 +18,15 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${PORT}`,
     screenshot: 'only-on-failure',
   },
+  // The whole suite runs in Chromium (the unnamed project, so snapshot file
+  // names carry no project suffix). WebKit — Safari, and every iPhone browser —
+  // and Firefox run the cross-browser smoke spec only; screenshots and the
+  // design audits stay in one engine because engines set type differently.
+  projects: [
+    {},
+    { name: 'webkit', use: { browserName: 'webkit' }, testMatch: /capraz-tarayici\.spec\.ts/ },
+    { name: 'firefox', use: { browserName: 'firefox' }, testMatch: /capraz-tarayici\.spec\.ts/ },
+  ],
   webServer: {
     command: `cd .. && TEST_AUTH_BYPASS=1 .venv/bin/python -c "from src.dashboard_api import app; app.run(host='127.0.0.1', port=${PORT})"`,
     port: PORT,

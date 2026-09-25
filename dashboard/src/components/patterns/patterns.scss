@@ -7,7 +7,7 @@
 // compared without being read. One class, so the treatment cannot drift apart
 // across surfaces the way it had already started to.
 .tedy-time {
-  font-family: 'IBM Plex Mono', 'Menlo', monospace;
+  @include type.font-family('mono');
   font-variant-numeric: tabular-nums;
 }
 

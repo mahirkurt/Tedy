@@ -1,0 +1,34 @@
+- main:
+  - paragraph: Tedy Books
+  - heading "Kitaplık" [level=1]
+  - paragraph: Rafındaki kitapları buradan, kendi okuma düzeninde okuyabilirsin.
+  - article:
+    - heading "The Hobbit" [level=2]
+    - paragraph: English Reader
+    - paragraph: J.R.R. Tolkien
+    - paragraph: Bilbo Baggins'in macerasını İngilizce okuma pratiğiyle birlikte keşfet.
+    - button "Okumaya başla"
+    - link "İçindekiler":
+      - /url: /kitaplar/hobbit-eng
+    - term: Hazır bölüm
+    - definition: /6 \/ \d+/
+    - term: Okuma süresi
+    - definition: 1 sa 3 dk
+    - term: Baskı
+    - definition: /Enhanced Edition \(\d+\)/
+    - text: /Kitabın %\d+ kadarı yayında · yeni bölümler eklendikçe burada belirir/
+  - article:
+    - heading "Yüzüklerin Efendisi" [level=2]
+    - paragraph: Üç cilt bir arada
+    - paragraph: J.R.R. Tolkien · çev. Çiğdem Erkal İpek
+    - paragraph: Bilbo Baggins'in yüz on birinci yaş günü davetiyle başlayan yolculuk, Frodo'yu Shire'dan Hüküm Dağı'na taşır. Üç cilt — Yüzük Kardeşliği, İki Kule ve Kralın Dönüşü — burada tek bir okuma akışında birleşiyor.
+    - button "Okumaya başla"
+    - link "İçindekiler":
+      - /url: /kitaplar/yuzuklerin-efendisi
+    - term: Hazır bölüm
+    - definition: /6 \/ \d+/
+    - term: Okuma süresi
+    - definition: /3 sa \d+ dk/
+    - term: Baskı
+    - definition: /\d+ yaş uyarlaması/
+    - text: Kitabın %9 kadarı yayında · yeni bölümler eklendikçe burada belirir

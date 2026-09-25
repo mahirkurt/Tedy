@@ -1,0 +1,51 @@
+- main:
+  - heading "Notlar" [level=1]
+  - heading "Notlar" [level=2]
+  - table "Notlar":
+    - rowgroup:
+      - row "Ayrıntı Ders S1 S2 S3 P1 P2 P3":
+        - columnheader "Ayrıntı"
+        - columnheader "Ders"
+        - columnheader "S1"
+        - columnheader "S2"
+        - columnheader "S3"
+        - columnheader "P1"
+        - columnheader "P2"
+        - columnheader "P3"
+    - rowgroup:
+      - row "Expand current row - - - - - -":
+        - cell "Expand current row":
+          - button "Expand current row"
+        - cell
+        - cell "-"
+        - cell "-"
+        - cell "-"
+        - cell "-"
+        - cell "-"
+        - cell "-"
+      - row "1. Sınav - 2. Sınav - 3. Sınav - DİKP/Performans-1 - DİKP/Performans-2 - DİKP/Performans-3 -":
+        - cell "1. Sınav - 2. Sınav - 3. Sınav - DİKP/Performans-1 - DİKP/Performans-2 - DİKP/Performans-3 -"
+      - row "Expand current row - - - - - -":
+        - cell "Expand current row":
+          - button "Expand current row"
+        - cell
+        - cell "-"
+        - cell "-"
+        - cell "-"
+        - cell "-"
+        - cell "-"
+        - cell "-"
+      - row "1. Sınav - 2. Sınav - 3. Sınav - DİKP/Performans-1 - DİKP/Performans-2 - DİKP/Performans-3 -":
+        - cell "1. Sınav - 2. Sınav - 3. Sınav - DİKP/Performans-1 - DİKP/Performans-2 - DİKP/Performans-3 -"
+      - row "Expand current row - - - - - -":
+        - cell "Expand current row":
+          - button "Expand current row"
+        - cell
+        - cell "-"
+        - cell "-"
+        - cell "-"
+        - cell "-"
+        - cell "-"
+        - cell "-"
+      - row "1. Sınav - 2. Sınav - 3. Sınav - DİKP/Performans-1 - DİKP/Performans-2 - DİKP/Performans-3 -":
+        - cell "1. Sınav - 2. Sınav - 3. Sınav - DİKP/Performans-1 - DİKP/Performans-2 - DİKP/Performans-3 -"

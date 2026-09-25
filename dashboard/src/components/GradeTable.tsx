@@ -151,7 +151,9 @@ function GradeExpandRow({ row, rawGrade, getRowProps }: {
           )
         })}
       </TableExpandRow>
-      <TableExpandedRow colSpan={headers.length + 1}>
+      {/* The expand button's aria-controls names this row; Carbon renders the
+          row but gives it no id, so the reference pointed at nothing. */}
+      <TableExpandedRow colSpan={headers.length + 1} id={String(getRowProps({ row })['aria-controls'] ?? '')}>
         <div className="grade-detail">
           {COLS.map((col, ci) => {
             const val = rawGrade?.[col] || '-'

@@ -1,0 +1,86 @@
+- main:
+  - heading "Dersler" [level=1]
+  - heading /Haftalık Program — 2\. Hafta \d+ Eyl\. - \d+ Eyl\./ [level=2]
+  - table /Haftalık Program — 2\. Hafta \d+ Eyl\. - \d+ Eyl\./:
+    - rowgroup:
+      - row "Saat Pazartesi Salı Çarşamba Perşembe Cuma":
+        - columnheader "Saat"
+        - columnheader "Pazartesi"
+        - columnheader "Salı"
+        - columnheader "Çarşamba"
+        - columnheader "Perşembe"
+        - columnheader "Cuma"
+    - rowgroup:
+      - row /1\. \d+:\d+ Türkçe Eda Şen Matematik Nagihan Özdemir Sosyal Bilgiler Emre Angıç/:
+        - cell /1\. \d+:\d+/
+        - cell "Türkçe Eda Şen"
+        - cell
+        - cell
+        - cell "Matematik Nagihan Özdemir"
+        - cell "Sosyal Bilgiler Emre Angıç"
+      - row /2\. \d+:\d+ Fransızca Harika Ebru Kalkan İngilizce Merima Gueller \d+:\d+ Fen Bilimleri Yasemin Kuzucu/:
+        - cell /2\. \d+:\d+/
+        - cell "Fransızca Harika Ebru Kalkan"
+        - cell
+        - cell
+        - cell "İngilizce Merima Gueller"
+        - cell /\d+:\d+ Fen Bilimleri Yasemin Kuzucu/
+      - row /3\. \d+:\d+ İngilizce İpek Pehlevan İngilizce Merima Gueller \d+:\d+ Türkçe Eda Şen/:
+        - cell /3\. \d+:\d+/
+        - cell "İngilizce İpek Pehlevan"
+        - cell
+        - cell
+        - cell "İngilizce Merima Gueller"
+        - cell /\d+:\d+ Türkçe Eda Şen/
+      - row /4\. \d+:\d+ Matematik Elif Özge Şener \d+:\d+ Müzik Ayşe Kaya/:
+        - cell /4\. \d+:\d+/
+        - cell
+        - cell
+        - cell
+        - cell "Matematik Elif Özge Şener"
+        - cell /\d+:\d+ Müzik Ayşe Kaya/
+      - row /5\. \d+:\d+ Fen Bilimleri Yasemin Kuzucu \d+:\d+ İngilizce İpek Pehlevan/:
+        - cell /5\. \d+:\d+/
+        - cell
+        - cell
+        - cell
+        - cell "Fen Bilimleri Yasemin Kuzucu"
+        - cell /\d+:\d+ İngilizce İpek Pehlevan/
+      - row /6\. \d+:\d+/:
+        - cell /6\. \d+:\d+/
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+      - row /7\. \d+:\d+/:
+        - cell /7\. \d+:\d+/
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+      - row /8\. \d+:\d+ Türkçe Eda Şen/:
+        - cell /8\. \d+:\d+/
+        - cell
+        - cell
+        - cell
+        - cell "Türkçe Eda Şen"
+        - cell
+      - row /9\. \d+:\d+ Kültür ve Medeniyetimize Yön Verenler Eda Şen/:
+        - cell /9\. \d+:\d+/
+        - cell
+        - cell
+        - cell
+        - cell "Kültür ve Medeniyetimize Yön Verenler Eda Şen"
+        - cell
+  - heading "Ders İçerikleri" [level=2]
+  - tablist "Ders içerikleri":
+    - tab "Matematik" [selected]
+    - tab "Fen Bilimleri"
+    - tab "Türkçe"
+  - tabpanel "Matematik":
+    - list:
+      - listitem:
+        - button "Kesirlerde toplama ve çıkarma işlendi. Payda eşitleme üzerinde duruldu." [expanded]
+        - text: Kesirlerde toplama ve çıkarma işlendi. Payda eşitleme üzerinde duruldu.

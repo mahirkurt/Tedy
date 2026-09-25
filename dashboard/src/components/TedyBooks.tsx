@@ -232,7 +232,11 @@ function ShelfCard({ book }: { book: BookSummary }) {
 
   return (
     <article className="shelf-card">
-      <Link to={`/kitaplar/${book.slug}`} className="shelf-card__cover-link" aria-label={`${book.title} — kitap sayfası`}>
+      {/* A second way to the book page for the pointer; keyboard and screen
+          reader reach it through "İçindekiler". As its own tab stop its name
+          ("… — kitap sayfası") did not contain the cover's visible text, which
+          fails WCAG 2.5.3 (IBM Equal Access, 2026-09-25). */}
+      <Link to={`/kitaplar/${book.slug}`} className="shelf-card__cover-link" tabIndex={-1} aria-hidden="true">
         <BookCover book={book} size="lg" />
       </Link>
 

@@ -220,7 +220,12 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
           onClick={onClickSideNavExpand}
         />
         <HeaderName href="/" prefix="">
-          <img src="/tedy-logo-white.svg" alt="TEDY" className="dashboard-header__brand-logo" />
+          <picture>
+            {/* Windows high contrast paints the band in the system Canvas, usually
+                white; the white logo vanished on it (2026-09-25). */}
+            <source srcSet="/tedy-logo.svg" media="(forced-colors: active)" />
+            <img src="/tedy-logo-white.svg" alt="TEDY" className="dashboard-header__brand-logo" />
+          </picture>
         </HeaderName>
         <HeaderGlobalBar>
           <div className="dashboard-header__meta">
@@ -242,10 +247,13 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
                 type="button"
                 onClick={() => setHealthOpen(o => !o)}
                 className="dashboard-header__health-trigger"
-                aria-label="Senkron durumunu göster"
+                // Named by its visible text plus a hidden prefix, not an
+                // aria-label: "Senkron durumunu göster" on a button reading
+                // "15 dk önce" failed WCAG 2.5.3 — a voice user says what they see.
                 aria-expanded={healthOpen}
                 aria-haspopup="dialog"
               >
+                <span className="cds--visually-hidden">Senkron durumu: </span>
                 {loading ? (
                   <SkeletonText width="72px" />
                 ) : (
