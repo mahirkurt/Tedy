@@ -54,6 +54,12 @@ EMBED_TARGET_EXTENSIONS = {".md", ".txt", ".json", ".csv", ".html", ".htm", ".pd
 # Whitelist: scrape data + downloaded educational content
 DEFAULT_INCLUDE_DIRS = {"output", "content"}
 
+# Discovery order (task-1 brief §2): output/ first, then content/, so a chunk-cap
+# overrun drops the far larger content/ textbook corpus before it ever touches
+# Işık's own scraped data. Any include dir not named here (a custom
+# ASSISTANT_INCLUDE_DIRS entry) is scanned last, alphabetically.
+_DISCOVERY_PRIORITY = ("output", "content")
+
 DEFAULT_EXCLUDED_DIRS = {
     "__pycache__",
     "assistant_index",
@@ -63,6 +69,14 @@ DEFAULT_EXCLUDED_DIRS = {
     "output/modules",
     "output/edupedia_drafts",
     "output/edupedia_runs",
+    # Migration/rollover backups and a sealed prior-year archive: historical
+    # copies, not current school data (docs/superpowers/notes/2026-09-25-asistan-veri-denetimi.md §1-2).
+    "output/saat_dilimi_gocu_yedek",
+    "output/crontab_yedek",
+    "output/mebi_quiz_discovery",
+    "output/archive",
+    # Adult-facing pedagogy notes — Görev 5 indexes this separately.
+    "content/pedagoji",
 }
 
 DEFAULT_EXCLUDED_FILE_PATTERNS = {
@@ -70,15 +84,28 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     "*.html",
     "*.jsonl",
     "*.log",
+    "*.log.*",
     "sync.log",
     "classroom_sync.json",
     "homework_student_done.json",
+    "homework_first_seen.json",
     "health.json",
     "photo_homework.json",
     "private_lessons.json",
     # Per-person module progress (spec §6.4), lock sidecars, the media ledger and the ted-mcp
     # OAuth store: none of it is school data, and raw progress must never reach a prompt.
     "module_progress.json",
+    # Portal session cookies, whatever their exact name, and the portal's own
+    # scraped page-structure map — session state and scraper internals, not
+    # school content (audit §2c).
+    "*cookie*",
+    "portal_architecture.json",
+    # Per-person Tedy Books reading position (emails, reading location).
+    "book_progress.json",
+    # Process/cron bookkeeping: pid files, crontab dumps, the sync scheduler state.
+    "*.pid",
+    "crontab*",
+    ".sync_zamanlama.json",
     "*.lock",
     "edupedia_media_ledger.json",
     "ted_mcp_oauth.sqlite3*",
@@ -91,6 +118,14 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     "ec_*.json",
     "mebi_*.json",
 }
+
+# Bumped whenever a change to discovery, exclusion or tokenization would leave
+# a stale on-disk index silently wrong (task-1 brief §4: index and query must
+# tokenize identically, which only holds once every persisted chunk was
+# produced under the current rules). AssistantIndexer.reindex() treats a
+# manifest whose version does not match this constant as fully stale and
+# rebuilds from scratch, regardless of the incremental flag or matching sha256s.
+INDEX_FORMAT_VERSION = 2
 
 # Files with structured student data — get semantic chunking
 _SEMANTIC_JSON_FILES = {
@@ -128,6 +163,7 @@ class AssistantConfig:
     enable_ocr: bool
     max_file_size_mb: int
     max_chunks: int
+    pdf_max_pages: int
     chunk_size: int
     chunk_overlap: int
     retrieval_k: int
@@ -147,6 +183,10 @@ class AssistantConfig:
             "ASSISTANT_MAX_FILE_SIZE_MB", "250"))
         max_chunks = int(os.environ.get(
             "ASSISTANT_MAX_CHUNKS", "15000"))
+        # 120 lost 8 of the 10 EBA books (131-222 pages each; audit §2b).
+        # 400 covers every measured book with headroom.
+        pdf_max_pages = int(os.environ.get(
+            "ASSISTANT_PDF_MAX_PAGES", "400"))
 
         includes = set(DEFAULT_INCLUDE_DIRS)
         custom_includes = os.environ.get(
@@ -182,6 +222,7 @@ class AssistantConfig:
                 "ASSISTANT_ENABLE_OCR", "0") == "1",
             max_file_size_mb=max_file_size_mb,
             max_chunks=max_chunks,
+            pdf_max_pages=pdf_max_pages,
             chunk_size=int(os.environ.get("ASSISTANT_CHUNK_SIZE", "1400")),
             chunk_overlap=int(os.environ.get("ASSISTANT_CHUNK_OVERLAP", "220")),
             retrieval_k=int(os.environ.get("ASSISTANT_RETRIEVAL_K", "8")),
@@ -776,7 +817,7 @@ class FileAdapters:
 
             reader = PdfReader(str(file_path))
             pages = []
-            for page in reader.pages[:120]:
+            for page in reader.pages[: self.config.pdf_max_pages]:
                 t = page.extract_text() or ""
                 if t.strip():
                     pages.append(t)
@@ -831,12 +872,26 @@ class AssistantIndexer:
         start = time.perf_counter()
 
         old_manifest = self._load_json(self.config.manifest_path, {"files": {}})
-        old_files = old_manifest.get("files", {}) if isinstance(old_manifest, dict) else {}
+        # A manifest built under an older index format (different discovery,
+        # exclusion or tokenization rules) must not be trusted for reuse: a
+        # matching sha256 says the *file* did not change, not that the chunk
+        # it produced still reflects the current rules. Treat it as absent —
+        # every file is reprocessed — regardless of the incremental flag.
+        manifest_is_current = (
+            isinstance(old_manifest, dict)
+            and old_manifest.get("version") == INDEX_FORMAT_VERSION
+        )
+        if not manifest_is_current and isinstance(old_manifest, dict) and old_manifest.get("files"):
+            logger.warning(
+                "assistant index format changed (persisted v%r -> v%d): full rebuild",
+                old_manifest.get("version"), INDEX_FORMAT_VERSION)
+        old_files = (old_manifest.get("files", {})
+                     if manifest_is_current and isinstance(old_manifest, dict) else {})
 
-        old_chunks = self._load_json(self.config.chunks_path, [])
+        old_chunks = self._load_json(self.config.chunks_path, []) if manifest_is_current else []
         if not isinstance(old_chunks, list):
             old_chunks = []
-        old_embeddings = self._load_json(self.config.embeddings_path, {})
+        old_embeddings = self._load_json(self.config.embeddings_path, {}) if manifest_is_current else {}
         if not isinstance(old_embeddings, dict):
             old_embeddings = {}
 
@@ -941,6 +996,19 @@ class AssistantIndexer:
             new_paths = set(new_manifest_files.keys())
             deleted = len(old_paths - new_paths)
 
+        # Files the chunk cap cut off before they were ever processed: no
+        # manifest entry was created for them (task-1 brief §2 — "sessiz
+        # düşme yok"). Discovery order (output/ before content/) means these
+        # are, in practice, the tail of content/.
+        dropped_files = sorted(
+            {file_path.relative_to(self.config.project_root).as_posix() for file_path in discovered}
+            - set(new_manifest_files.keys())
+        )
+        if dropped_files:
+            logger.warning(
+                "assistant index: chunk cap (%d) reached — %d file(s) dropped: %s",
+                max_chunks, len(dropped_files), ", ".join(dropped_files))
+
         total_embedded = len(new_embeddings)
         meta = {
             "generated_at": _utcnow_naive().isoformat() + "Z",
@@ -950,6 +1018,7 @@ class AssistantIndexer:
             "changed_files": changed,
             "unchanged_files": unchanged,
             "deleted_files": deleted,
+            "dusen_dosyalar": dropped_files,
             # Report total persisted embeddings so incremental runs keep stable visibility.
             "embedded_chunks": total_embedded,
             "embedded_chunks_new": embedded,
@@ -962,7 +1031,7 @@ class AssistantIndexer:
         }
 
         manifest_payload = {
-            "version": 1,
+            "version": INDEX_FORMAT_VERSION,
             "generated_at": meta["generated_at"],
             "files": new_manifest_files,
             "stats": {
@@ -978,16 +1047,26 @@ class AssistantIndexer:
 
         return meta
 
+    def _ordered_include_dirs(self) -> list[str]:
+        """output/ before content/ (task-1 brief §2): if the chunk cap cuts
+        the run short, the far larger content/ textbook corpus is what gets
+        dropped, never Işık's own scraped data. Any other configured include
+        dir (a custom ASSISTANT_INCLUDE_DIRS entry) is scanned last."""
+        priority = [d for d in _DISCOVERY_PRIORITY if d in self.config.include_dirs]
+        rest = sorted(self.config.include_dirs - set(priority))
+        return priority + rest
+
     def _discover_files(self) -> list[Path]:
-        """Discover files from whitelisted directories only."""
+        """Discover files from whitelisted directories only, output/ first."""
         files: list[Path] = []
         root = self.config.project_root
         idx_dir = self.config.index_dir.resolve()
 
-        for inc_dir in sorted(self.config.include_dirs):
+        for inc_dir in self._ordered_include_dirs():
             scan_root = root / inc_dir
             if not scan_root.is_dir():
                 continue
+            group: list[Path] = []
             for dirpath, dirnames, filenames in os.walk(
                     scan_root):
                 dir_path = Path(dirpath)
@@ -1013,12 +1092,16 @@ class AssistantIndexer:
                     try:
                         if not file_path.is_file():
                             continue
-                        files.append(file_path)
+                        group.append(file_path)
                     except Exception:
                         continue
 
-        files.sort(
-            key=lambda p: p.relative_to(root).as_posix())
+            # Sort within this include dir only — a global re-sort across all
+            # groups would put "content/..." back ahead of "output/..."
+            # alphabetically and silently undo the priority above.
+            group.sort(key=lambda p: p.relative_to(root).as_posix())
+            files.extend(group)
+
         return files
 
     def _is_excluded_dir(self, rel_dir: str) -> bool:
@@ -1028,6 +1111,13 @@ class AssistantIndexer:
         for ex in self.config.excluded_dirs:
             ex_norm = ex.strip("/")
             if normalized == ex_norm or normalized.startswith(ex_norm + "/"):
+                return True
+        # Any path segment naming itself a backup — "saat_dilimi_gocu_yedek",
+        # "eba_backup", "2026_yedek_kopya" — is a copy of something already
+        # indexed under its real name, wherever in the tree it sits.
+        for segment in normalized.split("/"):
+            low = segment.lower()
+            if "yedek" in low or "backup" in low:
                 return True
         return False
 
@@ -1136,6 +1226,24 @@ class AssistantIndexer:
                 return json.load(f)
         except Exception:
             return default
+
+
+# Turkish-aware casefold + accent folding, shared by index-time and
+# query-time tokenization (task-1 brief §4). Order matters: Python's plain
+# str.lower() turns 'İ' into 'i' plus a COMBINING DOT ABOVE (U+0307) — a
+# character outside any plain-ASCII token pattern — which silently split
+# "İngilizce" into the tokens ['i', 'ngilizce'] (measured, audit §2d). The
+# İ/I translation must run before .lower() touches the rest of the string;
+# the accent fold then runs last so 'ısı' and 'isi' tokenize identically.
+_TR_UPPER_MAP = str.maketrans({"İ": "i", "I": "ı"})
+_TR_FOLD_MAP = str.maketrans({"ı": "i", "ş": "s", "ğ": "g", "ü": "u", "ö": "o", "ç": "c"})
+
+
+def turkce_kucult_katla(text: str) -> str:
+    """Turkish-aware lowercase, then accent fold: 'İngilizce'/'ingilizce' and
+    'ısı'/'isi' become the same string. Used for both indexed chunk text and
+    the search query, so the two can never tokenize differently."""
+    return text.translate(_TR_UPPER_MAP).lower().translate(_TR_FOLD_MAP)
 
 
 class HybridRetriever:
@@ -1252,7 +1360,7 @@ class HybridRetriever:
         return False
 
     def _tokenize(self, text: str) -> list[str]:
-        return re.findall(r"[A-Za-z0-9ÇĞİÖŞÜçğıöşü_]+", text.lower())
+        return re.findall(r"[a-z0-9_]+", turkce_kucult_katla(text))
 
     def _dot(self, a: list[float], b: list[float]) -> float:
         m = min(len(a), len(b))

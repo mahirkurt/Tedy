@@ -249,6 +249,74 @@ def sanitize_schema(schema: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# ogrenci_verisi_ara's tool body (task-1 brief §5): the model gets the full
+# chunk text, not the 260-char citation snippet — capped per hit so one huge
+# chunk cannot crowd out the rest, and in total so the whole body fits inside
+# chat_with_tools' 4,000-char per-result truncation (assistant_core.py
+# ChatClient.chat_with_tools slices tool_result content to [:4000]).
+_YEREL_ISABET_SINIRI = 1200
+_YEREL_TOPLAM_SINIRI = 3900
+
+
+def _kirp(metin: str, sinir: int) -> str:
+    if len(metin) <= sinir:
+        return metin
+    if sinir <= 2:
+        return metin[:sinir]
+    govde = sinir - 2  # reserve room for the " …" suffix itself
+    kesik = metin[:govde].rsplit(" ", 1)[0]
+    return (kesik or metin[:govde]) + " …"
+
+
+def _yerel_tam_metin(rows: list[dict[str, Any]]) -> str:
+    """Each hit's full chunk text (not the snippet), joined; per-hit and
+    total budgets both enforced so the model reads more than a 260-char
+    fragment without the body blowing past chat_with_tools' cutoff."""
+    parcalar: list[str] = []
+    toplam = 0
+    for r in rows:
+        parca = str(r.get("text") or r.get("snippet") or "").strip()
+        if not parca:
+            continue
+        parca = _kirp(parca, _YEREL_ISABET_SINIRI)
+        ayrac = 2 if parcalar else 0  # "\n\n" between hits
+        if toplam + ayrac + len(parca) > _YEREL_TOPLAM_SINIRI:
+            kalan = _YEREL_TOPLAM_SINIRI - toplam - ayrac
+            if kalan > 0:
+                parcalar.append(_kirp(parca, kalan))
+            break
+        parcalar.append(parca)
+        toplam += ayrac + len(parca)
+    return "\n\n".join(parcalar) or "(kayıt yok)"
+
+
+# content/eba and content/sebitv filenames carry the grade as a bare digit
+# token, e.g. "Matematik 6 1. Kitap.pdf" (6 = grade, "1." = volume number —
+# the trailing period on "1." is what tells the two apart: isdigit() is
+# False for "1."). Unmatched filenames keep their plain basename label.
+_SINIF_ETIKETLI_DIZINLER = ("content/eba/", "content/sebitv/")
+
+
+def _sinif_etiketi_dosyadan(dosya_adi: str) -> str | None:
+    kok = os.path.splitext(dosya_adi)[0]
+    for token in kok.split():
+        if token.isdigit():
+            n = int(token)
+            if 1 <= n <= 12:
+                return f"{n}. sınıf"
+    return None
+
+
+def _yerel_isabet_etiketi(path: str) -> str:
+    base = os.path.basename(path) or "okul verisi"
+    if path.startswith(_SINIF_ETIKETLI_DIZINLER):
+        sinif = _sinif_etiketi_dosyadan(base)
+        if sinif:
+            baslik = os.path.splitext(base)[0]
+            return f"{sinif} · {baslik}"
+    return base
+
+
 class McpRegistry:
     def __init__(self, clients: dict[str, McpClient],
                  local_search: Callable[[str, int], list[dict[str, Any]]],
@@ -403,13 +471,16 @@ class McpRegistry:
                 confidence = 0.0
             citations.append({
                 "kind": "ogrenci",
-                "label": os.path.basename(str(r.get("path", ""))) or "okul verisi",
+                "label": _yerel_isabet_etiketi(str(r.get("path", ""))),
                 "locator": {"path": r.get("path", ""),
                             "chunk_index": r.get("chunk_index", 0)},
+                # The citation panel keeps the short snippet (≤260 chars, set
+                # by the retriever) — only the model's own tool body gets the
+                # full chunk text below.
                 "snippet": str(r.get("snippet", ""))[:400],
                 "confidence": confidence,
             })
-        text = "\n\n".join(str(r.get("snippet", "")) for r in rows) or "(kayıt yok)"
+        text = _yerel_tam_metin(rows)
         return ToolOutcome(ok=True, text=text, citations=citations)
 
     def _dispatch_odev(self) -> ToolOutcome:
