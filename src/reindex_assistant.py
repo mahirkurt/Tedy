@@ -21,8 +21,7 @@ def main():
 
     runtime = AssistantRuntime(PROJECT_ROOT)
     stats = runtime.reindex(incremental=not args.full)
-    print("[Assistant] Reindex complete")
-    for k in (
+    summary_keys = (
         "incremental",
         "files_indexed",
         "chunks_indexed",
@@ -31,9 +30,19 @@ def main():
         "deleted_files",
         "embedded_chunks",
         "duration_ms",
-        "moduller",
-    ):
+    )
+    print("[Assistant] Reindex complete")
+    for k in summary_keys:
         print(f"  {k}: {stats.get(k)}")
+    print(f"  moduller: {stats.get('moduller')}")
+
+    # Görev 5: content/pedagoji's own index, built by the same reindex() call —
+    # own directory (output/assistant_index_aile), own summary, never folded
+    # into the main index's numbers above.
+    aile_stats = stats.get("aile_kaynagi") or {}
+    print("[Assistant] Aile kaynağı reindex complete")
+    for k in summary_keys:
+        print(f"  {k}: {aile_stats.get(k)}")
 
 
 if __name__ == "__main__":

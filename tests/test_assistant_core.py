@@ -243,7 +243,7 @@ def test_chat_reports_degraded_servers_in_meta(tmp_path, monkeypatch):
     rt = AssistantRuntime(tmp_path)
 
     monkeypatch.setattr(rt.registry, "degraded", lambda: ["maarif-mufredat"])
-    monkeypatch.setattr(rt.registry, "declarations", lambda: [])
+    monkeypatch.setattr(rt.registry, "declarations", lambda *a, **k: [])
     monkeypatch.setattr(
         rt.llm, "chat_with_tools",
         lambda *a, **k: ToolLoopResult(text="cevap", citations=[]))
@@ -258,7 +258,7 @@ def test_empty_model_output_becomes_an_honest_message_not_a_blank_reply(tmp_path
     (tmp_path / "output").mkdir()
     rt = AssistantRuntime(tmp_path)
 
-    monkeypatch.setattr(rt.registry, "declarations", lambda: [])
+    monkeypatch.setattr(rt.registry, "declarations", lambda *a, **k: [])
     monkeypatch.setattr(rt.registry, "degraded", lambda: [])
     monkeypatch.setattr(rt.llm, "chat_with_tools",
                         lambda *a, **k: ToolLoopResult(text="   ", budget_exhausted=True))
@@ -272,7 +272,7 @@ def test_chat_meta_carries_the_tool_ledger_and_dropped_count(tmp_path, monkeypat
     (tmp_path / "output").mkdir()
     rt = AssistantRuntime(tmp_path)
 
-    monkeypatch.setattr(rt.registry, "declarations", lambda: [])
+    monkeypatch.setattr(rt.registry, "declarations", lambda *a, **k: [])
     monkeypatch.setattr(rt.registry, "degraded", lambda: [])
     monkeypatch.setattr(rt.llm, "chat_with_tools", lambda *a, **k: ToolLoopResult(
         text="Kaynaklı [S1] ve uydurma [S5].",
@@ -364,7 +364,7 @@ def test_chat_events_streams_tool_progress_in_real_time(tmp_path, monkeypatch):
         time.sleep(SLEEP)
         return ToolLoopResult(text="TEST_ANSWER [S1]", citations=[])
 
-    monkeypatch.setattr(runtime.registry, "declarations", lambda: [])
+    monkeypatch.setattr(runtime.registry, "declarations", lambda *a, **k: [])
     monkeypatch.setattr(runtime.registry, "degraded", lambda: [])
     monkeypatch.setattr(runtime.llm, "chat_with_tools", slow_chat_with_tools)
 
@@ -416,7 +416,7 @@ def test_concurrent_chat_events_do_not_leak_dispatch_between_calls(tmp_path, mon
     """
     (tmp_path / "output").mkdir()
     runtime = AssistantRuntime(tmp_path)
-    monkeypatch.setattr(runtime.registry, "declarations", lambda: [])
+    monkeypatch.setattr(runtime.registry, "declarations", lambda *a, **k: [])
     monkeypatch.setattr(runtime.registry, "degraded", lambda: [])
 
     first_dispatched = threading.Event()
@@ -518,7 +518,7 @@ def test_abandoned_stream_stops_the_worker_at_the_next_tool_boundary(tmp_path, m
         dispatched.append(name)
         return SimpleNamespace(ok=True, payload={}, error=None)
 
-    monkeypatch.setattr(runtime.registry, "declarations", lambda: [])
+    monkeypatch.setattr(runtime.registry, "declarations", lambda *a, **k: [])
     monkeypatch.setattr(runtime.registry, "degraded", lambda: [])
     monkeypatch.setattr(runtime.registry, "dispatch", counting_dispatch)
     monkeypatch.setattr(runtime.llm, "chat_with_tools", many_tools)
@@ -561,7 +561,7 @@ def test_model_hatasi_soruyu_yeniden_yaz_demez(tmp_path, monkeypatch):
     # was told to rephrase her question — the fault was never hers (D3).
     (tmp_path / "output").mkdir()
     rt = AssistantRuntime(tmp_path)
-    monkeypatch.setattr(rt.registry, "declarations", lambda: [])
+    monkeypatch.setattr(rt.registry, "declarations", lambda *a, **k: [])
     monkeypatch.setattr(rt.registry, "degraded", lambda: [])
 
     def patla(*a, **k):
@@ -577,7 +577,7 @@ def test_model_hatasi_soruyu_yeniden_yaz_demez(tmp_path, monkeypatch):
 def test_bos_cevapta_eski_nazik_istek_kalir(tmp_path, monkeypatch):
     (tmp_path / "output").mkdir()
     rt = AssistantRuntime(tmp_path)
-    monkeypatch.setattr(rt.registry, "declarations", lambda: [])
+    monkeypatch.setattr(rt.registry, "declarations", lambda *a, **k: [])
     monkeypatch.setattr(rt.registry, "degraded", lambda: [])
     monkeypatch.setattr(rt.llm, "chat_with_tools", lambda *a, **k: ToolLoopResult(text=""))
     out = rt.chat([{"role": "user", "content": "kesir nedir"}])
@@ -629,7 +629,7 @@ def test_chat_events_cevabi_yazilirken_iletir(tmp_path, monkeypatch):
         on_delta("bir parçadır.")
         return ToolLoopResult(text="Kesir bir parçadır.", citations=[])
 
-    monkeypatch.setattr(runtime.registry, "declarations", lambda: [])
+    monkeypatch.setattr(runtime.registry, "declarations", lambda *a, **k: [])
     monkeypatch.setattr(runtime.registry, "degraded", lambda: [])
     monkeypatch.setattr(runtime.llm, "chat_with_tools", yazan)
 
@@ -658,7 +658,7 @@ def test_terk_edilen_akis_yazmayi_da_durdurur(tmp_path, monkeypatch):
         bitti.set()
         return ToolLoopResult(text="x", citations=[])
 
-    monkeypatch.setattr(runtime.registry, "declarations", lambda: [])
+    monkeypatch.setattr(runtime.registry, "declarations", lambda *a, **k: [])
     monkeypatch.setattr(runtime.registry, "degraded", lambda: [])
     monkeypatch.setattr(runtime.llm, "chat_with_tools", uzun)
 
@@ -680,7 +680,7 @@ def test_terk_edilen_akis_model_hatasi_sayilmaz(tmp_path, monkeypatch):
     def terk(**kwargs):
         raise _StreamAbandoned()
 
-    monkeypatch.setattr(runtime.registry, "declarations", lambda: [])
+    monkeypatch.setattr(runtime.registry, "declarations", lambda *a, **k: [])
     monkeypatch.setattr(runtime.llm, "chat_with_tools", terk)
     with pytest.raises(_StreamAbandoned):
         runtime.chat(messages=[{"role": "user", "content": "kesir"}], session_id="s1")

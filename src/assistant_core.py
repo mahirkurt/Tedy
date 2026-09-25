@@ -63,6 +63,12 @@ _DISCOVERY_PRIORITY = ("output", "content")
 DEFAULT_EXCLUDED_DIRS = {
     "__pycache__",
     "assistant_index",
+    # Görev 5's separate content/pedagoji index directory. Without this, the main
+    # indexer's own "output/" walk discovers it as ordinary output content (its
+    # manifest/chunks/embeddings/meta JSON) the moment it exists on disk — the
+    # `full == idx_dir` guard in _discover_files only ever knows about *this*
+    # config's own index_dir, not a sibling one built from a second AssistantConfig.
+    "output/assistant_index_aile",
     # edupedia (spec §4.2): ted-mcp's catalog, immutable drafts and run pages. Published modules
     # reach the model only through modul_ara (src/assistant_modules.py); run pages carry
     # third-party textbook and OER text that must not enter a prompt without kaynak_verisi.
@@ -173,10 +179,25 @@ class AssistantConfig:
     excluded_file_patterns: set[str]
 
     @classmethod
-    def from_project_root(cls, project_root: str | os.PathLike[str]) -> "AssistantConfig":
+    def from_project_root(cls, project_root: str | os.PathLike[str],
+                          index_subdir: str = "assistant_index",
+                          include_dirs: set[str] | None = None,
+                          excluded_dirs: set[str] | None = None) -> "AssistantConfig":
+        """Build a config rooted at `project_root`.
+
+        `index_subdir`/`include_dirs`/`excluded_dirs` let a caller build a
+        second, isolated index over a different slice of the tree (Görev 5:
+        content/pedagoji, aile_kaynak_ara) without touching the main one —
+        same retriever and indexer classes, a different AssistantConfig.
+        Passing `include_dirs`/`excluded_dirs` explicitly bypasses the
+        ASSISTANT_INCLUDE_DIRS/ASSISTANT_EXCLUDED_DIRS env overrides (those
+        are the main index's operator knobs); the file-level safety patterns
+        below always apply, so no secret pattern is ever skipped for a
+        second index.
+        """
         root = Path(project_root).resolve()
         output_dir = root / "output"
-        index_dir = output_dir / "assistant_index"
+        index_dir = output_dir / index_subdir
         index_dir.mkdir(parents=True, exist_ok=True)
 
         max_file_size_mb = int(os.environ.get(
@@ -188,19 +209,25 @@ class AssistantConfig:
         pdf_max_pages = int(os.environ.get(
             "ASSISTANT_PDF_MAX_PAGES", "400"))
 
-        includes = set(DEFAULT_INCLUDE_DIRS)
-        custom_includes = os.environ.get(
-            "ASSISTANT_INCLUDE_DIRS", "").strip()
-        if custom_includes:
-            includes = {x.strip() for x in
-                        custom_includes.split(",") if x.strip()}
-        excluded = set(DEFAULT_EXCLUDED_DIRS)
-        custom_excluded = os.environ.get(
-            "ASSISTANT_EXCLUDED_DIRS", "").strip()
-        if custom_excluded:
-            excluded.update(
-                x.strip() for x in
-                custom_excluded.split(",") if x.strip())
+        if include_dirs is not None:
+            includes = set(include_dirs)
+        else:
+            includes = set(DEFAULT_INCLUDE_DIRS)
+            custom_includes = os.environ.get(
+                "ASSISTANT_INCLUDE_DIRS", "").strip()
+            if custom_includes:
+                includes = {x.strip() for x in
+                            custom_includes.split(",") if x.strip()}
+        if excluded_dirs is not None:
+            excluded = set(excluded_dirs)
+        else:
+            excluded = set(DEFAULT_EXCLUDED_DIRS)
+            custom_excluded = os.environ.get(
+                "ASSISTANT_EXCLUDED_DIRS", "").strip()
+            if custom_excluded:
+                excluded.update(
+                    x.strip() for x in
+                    custom_excluded.split(",") if x.strip())
         excluded_files = set(DEFAULT_EXCLUDED_FILE_PATTERNS)
         custom_excluded_files = os.environ.get(
             "ASSISTANT_EXCLUDED_FILES", "").strip()
@@ -1578,6 +1605,22 @@ class AssistantRuntime:
         self._retriever: HybridRetriever | None = None
         self._retriever_cache_mtime: float = 0.0
 
+        # Görev 5: content/pedagoji (adult parenting/learning-science notes) as its
+        # own BM25 section — a separate AssistantConfig/AssistantIndexer pointed at
+        # a second index directory, never mixed into the main one (which excludes
+        # content/pedagoji outright; see DEFAULT_EXCLUDED_DIRS). Built unconditionally
+        # here — the tool's gate is the reader (`aile_kaynak_ara` declared only for
+        # okur == "aile"; see McpRegistry), not whether this directory has content.
+        self.aile_config = AssistantConfig.from_project_root(
+            project_root,
+            index_subdir="assistant_index_aile",
+            include_dirs={"content/pedagoji"},
+            excluded_dirs=set(),
+        )
+        self.aile_indexer = AssistantIndexer(self.aile_config)
+        self._aile_retriever: HybridRetriever | None = None
+        self._aile_retriever_cache_mtime: float = 0.0
+
         from src.assistant_modules import ModuleIndex
         from src.assistant_tools import build_registry
         # Published edupedia modules (plan SP5 K-S1): read-only, per process, no index file.
@@ -1596,11 +1639,17 @@ class AssistantRuntime:
                                        sebit_kaynagi=sebit_kaynagi,
                                        platform_kaynagi=platform_kaynagi,
                                        kitap_kaynagi=kitap_kaynagi,
-                                       video_kaynagi=video_kaynagi)
+                                       video_kaynagi=video_kaynagi,
+                                       aile_kaynak_arama=self._aile_search)
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """The retriever, shaped as a tool the model can choose to call."""
         return self._load_retriever().search(query, top_k=top_k)
+
+    def _aile_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
+        """content/pedagoji's own retriever (Görev 5). Wired unconditionally;
+        `aile_kaynak_ara` is declared only when the reader is `aile` (McpRegistry.declarations)."""
+        return self._load_aile_retriever().search(query, top_k=top_k)
 
     DEEP_INTENTS = frozenset({"study_plan", "grade_analysis", "exam_solving"})
 
@@ -1656,6 +1705,9 @@ class AssistantRuntime:
         "`modul_ara`. Modül adı ve künyesi YALNIZ bu aracın sonucundan gelir; araç modül bulamadıysa "
         "bunu söyle, modül ya da bağlantı uydurma. Modülü önerdiğin cümleye aracın [S] numarasını koy; "
         "bağlantıyı kendin yazma — okur modülü Kaynaklar panelinden açar.\n"
+        "- Bir aile üyesinin ebeveynlik ya da öğrenme bilimi sorusu (motivasyon, sınav kaygısı, "
+        "üstbiliş/öz-düzenleme, ölçme-değerlendirme, gelişim psikolojisi) → `aile_kaynak_ara`. "
+        "Bu araç yalnız aile için vardır: Işık'la konuşurken bu araçtan hiç söz etme ve çağırma.\n"
         "- Soru hem Işık'ın kaydına hem bir konuya dokunuyorsa (örn. "
         "'ödevimdeki kesir konusunu anlat') iki aracı da çağır: önce "
         "`ogrenci_verisi_ara` ile somut kaydı al (hangi ödev, hangi konu, "
@@ -1777,12 +1829,16 @@ class AssistantRuntime:
 
     def reindex(self, incremental: bool = True) -> dict[str, Any]:
         stats = self.indexer.reindex(incremental=incremental)
+        # Görev 5: the family pedagogy index is a second, independent run over
+        # its own directory — same command path, its own summary, reported
+        # alongside the main index rather than folded into it.
+        aile_stats = self.aile_indexer.reindex(incremental=incremental)
         try:
             moduller = self.modules.durum(yenile=True)
         except Exception as exc:  # noqa: BLE001 — the file index already succeeded; say what failed
             logger.error("module index rebuild failed: %s", type(exc).__name__)
             moduller = {"katalog": "hata", "hata": type(exc).__name__}
-        return {**stats, "moduller": moduller}
+        return {**stats, "moduller": moduller, "aile_kaynagi": aile_stats}
 
     def chat(
         self,
@@ -1823,11 +1879,13 @@ class AssistantRuntime:
             # not forwarded: Sonnet 5 rejects sampling parameters (400).
             loop = self.llm.chat_with_tools(
                 messages=convo,
-                declarations=self.registry.declarations(),
+                # aile_kaynak_ara (Görev 5) is declared only for okur == "aile" —
+                # the reader decides the tool list, not a per-call opt-in.
+                declarations=self.registry.declarations(okur),
                 # Module progress enters the model context only for a signed-in person (plan K-S6);
                 # the caller decides, and only an exact True counts.
                 dispatch=dispatch or functools.partial(
-                    self.registry.dispatch, ilerleme_izni=ilerleme_izni is True),
+                    self.registry.dispatch, ilerleme_izni=ilerleme_izni is True, okur=okur),
                 tier=tier,
                 on_delta=on_delta,
                 on_reset=on_reset,
@@ -1940,7 +1998,8 @@ class AssistantRuntime:
 
         # Read once, per call — never assigned back onto the registry.
         real_dispatch = functools.partial(
-            self.registry.dispatch, ilerleme_izni=kwargs.get("ilerleme_izni") is True)
+            self.registry.dispatch, ilerleme_izni=kwargs.get("ilerleme_izni") is True,
+            okur=kwargs.get("okur", "bilinmiyor"))
 
         def announcing(name: str, args: dict[str, Any]) -> Any:
             if cancelled.is_set():
@@ -2394,6 +2453,22 @@ class AssistantRuntime:
         )
         self._retriever_cache_mtime = chunks_mtime
         return self._retriever
+
+    def _load_aile_retriever(self) -> HybridRetriever:
+        """Same lazy, mtime-cached load as `_load_retriever`, over the
+        separate content/pedagoji index (Görev 5)."""
+        chunks_mtime = (self.aile_config.chunks_path.stat().st_mtime
+                        if self.aile_config.chunks_path.exists() else 0.0)
+        if self._aile_retriever and chunks_mtime == self._aile_retriever_cache_mtime:
+            return self._aile_retriever
+
+        chunks = self._load_json(self.aile_config.chunks_path, [])
+        if not isinstance(chunks, list):
+            chunks = []
+
+        self._aile_retriever = HybridRetriever(chunks=chunks)
+        self._aile_retriever_cache_mtime = chunks_mtime
+        return self._aile_retriever
 
     def _load_scraped_data(self) -> dict[str, Any]:
         return self._load_json(self.config.output_dir / "scraped_data.json", {})

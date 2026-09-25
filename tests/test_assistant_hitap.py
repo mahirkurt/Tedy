@@ -73,7 +73,7 @@ def test_chat_soranı_modele_iletir(rt, monkeypatch):
         gorulen["son"] = messages[-1]["content"]
         return ToolLoopResult(text="tamam")
 
-    monkeypatch.setattr(rt.registry, "declarations", lambda: [])
+    monkeypatch.setattr(rt.registry, "declarations", lambda *a, **k: [])
     monkeypatch.setattr(rt.llm, "chat_with_tools", yakala)
     rt.chat(messages=BODY["messages"], session_id="s", okur="aile")
     assert "Soran: Işık'ın ailesinden biri" in gorulen["son"]

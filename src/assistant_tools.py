@@ -410,6 +410,11 @@ KITAP_TOOL = assistant_kitaplar.TOOL_NAME
 # nothing served either file). Also its own dispatch method, for the same
 # reason as KITAP_TOOL.
 VIDEO_TOOL = "video_oner"
+# Görev 5: content/pedagoji's own BM25 section (adult parenting/learning-science
+# notes — Woolfolk, Santrock, Child Psychopathology). Declared only for okur ==
+# "aile" (McpRegistry.declarations) and refused in dispatch() even if called —
+# this is family-only material and must never reach Işık.
+AILE_TOOL = "aile_kaynak_ara"
 
 # chat_with_tools slices every tool_result to 4,000 chars; a body cut there
 # loses its end silently, so each body is held under it here.
@@ -1411,6 +1416,39 @@ def _yerel_isabet_etiketi(path: str) -> str:
     return base
 
 
+# aile_kaynak_ara's declaration (Görev 5). Its own tool body, not chat_with_tools'
+# blind 4,000-char cut — the same _YEREL_* budgets as ogrenci_verisi_ara.
+_AILE_ARAMA_BILDIRIMI: dict[str, Any] = {
+    "name": AILE_TOOL,
+    "description": (
+        "Aile pedagoji kaynağında arama yapar: gelişim psikolojisi, öğrenme kuramları, "
+        "üstbiliş ve öz-düzenleme, sınav kaygısı ve duygusal destek, ebeveyn rehberliği, "
+        "ölçme-değerlendirme, ders bazlı pedagoji notları. Bu kaynak yetişkinler içindir — "
+        "yalnız bir aile üyesiyle konuşurken kullan, Işık'a bu kaynaktan hiç söz etme."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {"sorgu": {
+            "type": "string",
+            "description": "Aranacak ifade (ör. 'sınav kaygısı', 'öz düzenleme')."}},
+        "required": ["sorgu"],
+    },
+}
+
+
+def _aile_kaynak_etiketi(path: str) -> str:
+    """Turns e.g. content/pedagoji/05-ebeveyn-rehberligi.md into
+    "Aile kaynağı · Ebeveyn Rehberligi".
+
+    The corpus's ASCII file names are the only readable handle available at
+    retrieval time: a numeric ordering prefix and the extension are stripped
+    and dashes become spaces. No internal path reaches the citation label."""
+    base = os.path.splitext(os.path.basename(path))[0]
+    base = re.sub(r"^\d+[-_]+", "", base)
+    baslik = " ".join(w.capitalize() for w in re.split(r"[-_]+", base) if w)
+    return f"Aile kaynağı · {baslik}" if baslik else "Aile kaynağı"
+
+
 class McpRegistry:
     def __init__(self, clients: dict[str, McpClient],
                  local_search: Callable[[str, int], list[dict[str, Any]]],
@@ -1427,6 +1465,7 @@ class McpRegistry:
                  platform_kaynagi: Callable[[], Any] | None = None,
                  kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
                  video_kaynagi: Callable[[], Any] | None = None,
+                 aile_kaynak_arama: Callable[[str, int], list[dict[str, Any]]] | None = None,
                  saat: Callable[[], datetime] | None = None) -> None:
         self.clients = clients
         # Işık's grade in the corpus's form ("7.Sınıf"), read when asked so a
@@ -1466,6 +1505,9 @@ class McpRegistry:
         # own dispatch method below.
         self.kitap_kaynagi = kitap_kaynagi
         self.video_kaynagi = video_kaynagi
+        # content/pedagoji's own retriever (Görev 5). Kept separate from
+        # local_search — a different index, a family-only tool, its own gate.
+        self.aile_kaynak_arama = aile_kaynak_arama
         # The clock "bugün"/"yarın" are read against; read in Istanbul either
         # way. Tests pin it; production reads the real one.
         self.saat = saat
@@ -1475,7 +1517,7 @@ class McpRegistry:
         modules = set(self.module_index.degraded()) if self.module_index is not None else set()
         return sorted(unhealthy | set(self.unconfigured) | modules)
 
-    def declarations(self) -> list[dict[str, Any]]:
+    def declarations(self, okur: str = "bilinmiyor") -> list[dict[str, Any]]:
         decls: list[dict[str, Any]] = [{
             "name": LOCAL_TOOL,
             "description": self._yerel_aciklama(),
@@ -1510,6 +1552,12 @@ class McpRegistry:
             decls.append(dict(_VIDEO_BILDIRIM))
         if self.module_index is not None:
             decls.append(dict(assistant_modules.DECLARATION))
+        # Görev 5: family-only, gated by reader — not by whether the source is
+        # wired. A student or unknown caller never sees this tool declared, and
+        # dispatch() refuses it too (defence in depth) even if a model called it
+        # without seeing the declaration.
+        if self.aile_kaynak_arama is not None and okur == "aile":
+            decls.append(copy.deepcopy(_AILE_ARAMA_BILDIRIMI))
         for local_name, (server, mcp_name) in TOOL_ALLOWLIST.items():
             client = self.clients.get(server)
             if client is None:
@@ -1561,7 +1609,8 @@ class McpRegistry:
         except Exception:  # noqa: BLE001 — an unknown grade is a normal state
             return None
 
-    def dispatch(self, name: str, args: dict[str, Any], ilerleme_izni: bool = False) -> ToolOutcome:
+    def dispatch(self, name: str, args: dict[str, Any], ilerleme_izni: bool = False,
+                okur: str = "bilinmiyor") -> ToolOutcome:
         if name == LOCAL_TOOL:
             return self._dispatch_local(args)
         if name == ODEV_TOOL and self.odev_kaynagi is not None:
@@ -1574,6 +1623,13 @@ class McpRegistry:
             return self._dispatch_video(args or {})
         if name == assistant_modules.TOOL_NAME:
             return self._dispatch_modules(args, ilerleme_izni is True)
+        if name == AILE_TOOL and self.aile_kaynak_arama is not None:
+            # Defence in depth: declarations() already hides this tool from
+            # anyone but "aile" — this refuses it even if a model called it
+            # anyway (a stale tool list, a hand-crafted request).
+            if okur != "aile":
+                return ToolOutcome(ok=False, error="bu araç yalnızca aile için kullanılabilir")
+            return self._dispatch_aile_kaynak(args or {})
         if name not in TOOL_ALLOWLIST:
             return ToolOutcome(ok=False, error=f"bilinmeyen araç: {name}")
         if assistant_modules.contains_progress(args):
@@ -1703,6 +1759,34 @@ class McpRegistry:
                 # The citation panel keeps the short snippet (≤260 chars, set
                 # by the retriever) — only the model's own tool body gets the
                 # full chunk text below.
+                "snippet": str(r.get("snippet", ""))[:400],
+                "confidence": confidence,
+            })
+        text = _yerel_tam_metin(rows)
+        return ToolOutcome(ok=True, text=text, citations=citations)
+
+    def _dispatch_aile_kaynak(self, args: dict[str, Any]) -> ToolOutcome:
+        """aile_kaynak_ara (Görev 5): the same shape as _dispatch_local, over
+        content/pedagoji's own retriever and its own citation kind."""
+        query = str(args.get("sorgu", "")).strip()
+        try:
+            rows = self.aile_kaynak_arama(query, 8)
+        except Exception as exc:
+            logger.error("aile_kaynak_arama failed for %r: %s", query, exc)
+            return ToolOutcome(ok=False, error=f"aile kaynağı araması hatası: {exc}")
+
+        rows = [r for r in rows if isinstance(r, dict)]
+        citations = []
+        for r in rows:
+            try:
+                confidence = float(r.get("confidence", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                confidence = 0.0
+            citations.append({
+                "kind": "aile-kaynak",
+                "label": _aile_kaynak_etiketi(str(r.get("path", ""))),
+                "locator": {"path": r.get("path", ""),
+                            "chunk_index": r.get("chunk_index", 0)},
                 "snippet": str(r.get("snippet", ""))[:400],
                 "confidence": confidence,
             })
@@ -1854,6 +1938,7 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                    platform_kaynagi: Callable[[], Any] | None = None,
                    kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
                    video_kaynagi: Callable[[], Any] | None = None,
+                   aile_kaynak_arama: Callable[[str, int], list[dict[str, Any]]] | None = None,
                    saat: Callable[[], datetime] | None = None) -> McpRegistry:
     """Wire the configured servers. A server with no key is simply absent —
     its tools are not declared — but it is still named by degraded(), so an
@@ -1874,4 +1959,5 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                        takvim_kaynagi=takvim_kaynagi, icerik_kaynagi=icerik_kaynagi,
                        not_kaynagi=not_kaynagi, sebit_kaynagi=sebit_kaynagi,
                        platform_kaynagi=platform_kaynagi, kitap_kaynagi=kitap_kaynagi,
-                       video_kaynagi=video_kaynagi, saat=saat)
+                       video_kaynagi=video_kaynagi, aile_kaynak_arama=aile_kaynak_arama,
+                       saat=saat)

@@ -14,10 +14,11 @@ const KIND_LABEL: Record<AssistantCitation['kind'], string> = {
   oer: 'Açık kaynak',
   modul: 'Yayınlanmış modül',
   'tedy-kitap': 'Tedy Books',
+  'aile-kaynak': 'Aile kaynağı',
 }
 
 // `citation.kind` is a closed union at compile time but an unchecked string
-// off the wire at runtime — a backend value outside the four known kinds
+// off the wire at runtime — a backend value outside the known kinds above
 // must not turn into the literal word "undefined" leaking into the
 // accessible name or the popover body.
 const UNKNOWN_KIND_LABEL = 'Kaynak'
