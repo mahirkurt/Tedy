@@ -2213,10 +2213,15 @@ def assistant_reindex():
 
 
 # A textbook figure the assistant cited (figur_getir), as the image the
-# Kaynaklar panel shows. Per process, 64 entries, least recently used out:
-# get_figure images are ≤ ~110 KB, so the cache stays under ~7 MB per worker,
-# and a figure id's image never changes, so there is nothing to expire.
+# Kaynaklar panel shows. Per process, 64 entries, least recently used out, and
+# bounded in bytes too: get_figure images are ≤ ~110 KB (so 64 of them are
+# ~7 MB), but the count alone would let 64 large answers pin 64× their size in
+# every worker. An image over FIGUR_TEK_SINIRI (the size chat_with_tools will
+# not send the model either) is served but never cached; the whole cache stays
+# under FIGUR_TOPLAM_SINIRI. A figure id's image never changes: nothing expires.
 FIGUR_ONBELLEK_BOYUTU = 64
+FIGUR_TEK_SINIRI = 1_500_000
+FIGUR_TOPLAM_SINIRI = 16 * 1024 * 1024
 _FIGUR_ONBELLEGI: "OrderedDict[int, tuple[bytes, str]]" = OrderedDict()
 _FIGUR_KILIDI = threading.Lock()
 FIGUR_ULASILAMADI = "Ders kitabı görseline şu an ulaşılamadı; biraz sonra yeniden deneyin."
@@ -2230,7 +2235,9 @@ def _figur_yaniti(veri: bytes, mime: str) -> Response:
     })
 
 
-@app.route("/api/assistant/figure/<int:figure_id>")
+# Bounded like the corpus's own integer ids: an id outside 1..2**31-1 is a
+# 404 at routing and never reaches the curriculum server.
+@app.route("/api/assistant/figure/<int(min=1, max=2147483647):figure_id>")
 @require_auth
 def assistant_figure(figure_id):
     access = _require_assistant_access()
@@ -2257,11 +2264,13 @@ def assistant_figure(figure_id):
     if durum != "var":
         return jsonify({"error": FIGUR_ULASILAMADI}), 502
 
-    with _FIGUR_KILIDI:
-        _FIGUR_ONBELLEGI[figure_id] = (veri, mime)
-        _FIGUR_ONBELLEGI.move_to_end(figure_id)
-        while len(_FIGUR_ONBELLEGI) > FIGUR_ONBELLEK_BOYUTU:
-            _FIGUR_ONBELLEGI.popitem(last=False)
+    if len(veri) <= FIGUR_TEK_SINIRI:
+        with _FIGUR_KILIDI:
+            _FIGUR_ONBELLEGI[figure_id] = (veri, mime)
+            _FIGUR_ONBELLEGI.move_to_end(figure_id)
+            while (len(_FIGUR_ONBELLEGI) > FIGUR_ONBELLEK_BOYUTU
+                   or sum(len(v) for v, _ in _FIGUR_ONBELLEGI.values()) > FIGUR_TOPLAM_SINIRI):
+                _FIGUR_ONBELLEGI.popitem(last=False)
     return _figur_yaniti(veri, mime)
 
 

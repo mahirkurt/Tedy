@@ -78,6 +78,21 @@ export const FULL: Record<string, unknown> = {
   // the real server, and a test that empties /api/content still sees the
   // portal's 36 weeks of cards.
   'content/weeks': { weeks: {}, current: '' },
+  // Profil reads this. Left unrouted it reached the real server, so "the
+  // profile fields fit the phone" passed only in a checkout with a live
+  // output/ and failed in a data-less worktree. Invented values (the live
+  // profile carries the family's names and phone numbers); one long value so
+  // the phone-width test has something that could overflow. _gorsel-fixtures
+  // overrides this with its own for the screenshot baselines.
+  'student/profile': {
+    auth: { email: 'test@tedy.online', name: 'Test User', picture: '' },
+    name: 'Deneme Öğrenci', student_no: '100', class_name: '7-D', branch: 'D',
+    fields: {
+      'Okul No': '100', 'Doğum Tarihi': '01.01.2014', 'İkinci Yabancı Dil': 'Fransızca',
+      'Servis Güzergâhı': 'Çamlıca Mahallesi – Kısıklı Caddesi – Bağlarbaşı – Okul Ana Kapısı',
+    },
+    photo_data_url: '', scraped_at: '2026-09-16T08:05:00',
+  },
 }
 
 export async function mock(page: Page, data: Record<string, unknown>) {

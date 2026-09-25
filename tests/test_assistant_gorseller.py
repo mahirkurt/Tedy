@@ -428,3 +428,62 @@ def test_figur_atfinin_ozeti_baslik_metnidir_json_degil():
     maarif = _FakeClient("maarif-mufredat", MAARIF_TOOLS, results={"get_figure": _figur_sonucu()})
     c = _registry(maarif=maarif).dispatch("figur_getir", {"figure_id": 1875}).citations[0]
     assert c["snippet"] == FIGUR_META["caption"]
+
+
+# ── Fix round 1 ───────────────────────────────────────────────────────────────
+
+def test_hata_zarfindaki_olu_baglanti_modele_gitmez():
+    zarf = {"error": "program not found for subject", "subject": "turkce-dersi",
+            "pdf_url": "https://tymm.meb.gov.tr/x.pdf", "source_url": "https://tymm.meb.gov.tr/y"}
+    maarif = _FakeClient("maarif-mufredat", MAARIF_TOOLS, results={
+        "get_curriculum_program": McpToolResult(ok=True, text=json.dumps(zarf))})
+    out = _registry(maarif=maarif).dispatch("program_getir", {"subject_slug": "turkce-dersi"})
+    assert out.ok is False
+    assert "program not found" in out.error and "tymm.meb.gov.tr" not in out.error
+
+
+def test_buyuk_figur_sunulur_ama_onbellege_girmez(figur_env):
+    client, maarif, _ = figur_env
+    buyuk = b"\x89PNG" + b"0" * dashboard_api.FIGUR_TEK_SINIRI
+    maarif.results["get_figure"] = _figur_sonucu(images=[
+        {"data": base64.b64encode(buyuk).decode(), "mimeType": "image/png"}])
+    r = client.get("/api/assistant/figure/12")
+    assert r.status_code == 200 and r.data == buyuk
+    assert 12 not in dashboard_api._FIGUR_ONBELLEGI
+    client.get("/api/assistant/figure/12")
+    assert len(maarif.calls) == 2  # not cached, so fetched again
+
+
+def test_figur_onbellegi_toplam_baytla_sinirli(figur_env, monkeypatch):
+    client, _, _ = figur_env
+    monkeypatch.setattr(dashboard_api, "FIGUR_TOPLAM_SINIRI", 3 * len(PNG))
+    for i in range(1, 6):
+        assert client.get(f"/api/assistant/figure/{i}").status_code == 200
+    assert list(dashboard_api._FIGUR_ONBELLEGI) == [3, 4, 5]
+
+
+@pytest.mark.parametrize("yol", ["/api/assistant/figure/0",
+                                 "/api/assistant/figure/2147483648",
+                                 "/api/assistant/figure/99999999999999999999999"])
+def test_sinir_disi_figur_id_rotada_404(figur_env, yol):
+    client, maarif, _ = figur_env
+    assert client.get(yol).status_code == 404
+    assert maarif.calls == []
+
+
+def test_en_buyuk_gecerli_figur_id_sunucuya_sorulur(figur_env):
+    client, maarif, _ = figur_env
+    assert client.get("/api/assistant/figure/2147483647").status_code == 404  # fake: not found
+    assert maarif.calls == [("get_figure", {"figure_id": 2147483647, "include_image": True})]
+
+
+def test_pano_api_anahtari_figur_ucuna_401(figur_env, monkeypatch):
+    # A dashboard integration key passes require_auth but is not assistant
+    # access: the figure endpoint follows /api/assistant/stream.
+    client, maarif, _ = figur_env
+    monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS", False)
+    monkeypatch.setattr(dashboard_api, "API_KEYS", [("entegrasyon", "tdyK_test")])
+    monkeypatch.setattr(dashboard_api, "ASSISTANT_API_KEY", "asst_test")
+    r = client.get("/api/assistant/figure/12", headers={"Authorization": "Bearer tdyK_test"})
+    assert r.status_code == 401
+    assert maarif.calls == []

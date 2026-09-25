@@ -122,7 +122,9 @@ def _hata_zarfi(parcalar: list[Any]) -> str | None:
     if len(parcalar) == 1 and isinstance(parcalar[0], dict):
         hata = parcalar[0].get("error")
         if isinstance(hata, str) and hata:
-            return json.dumps(parcalar[0], ensure_ascii=False)
+            # The envelope reaches the model as the error text: strip dead links
+            # from it as from any other maarif result.
+            return json.dumps(_baglantisiz(parcalar[0]), ensure_ascii=False)
     return None
 
 
