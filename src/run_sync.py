@@ -3,12 +3,13 @@
 
 Designed to run via crontab every 15 minutes.
 """
+import json
 import os
 import re
 import sys
 import time
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Ensure project root for imports
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -162,6 +163,70 @@ def _okunamadi_kaydi(name, e, onceki):
     return kayit
 
 
+# ── When to run ──────────────────────────────────────────────────────────────
+# Cron ticks every 5 minutes with --zamanla; the code decides whether this tick
+# runs. 15 minutes after the last attempt normally, 10 after a failed portal
+# login, until a login succeeds (asked for 2026-09-25: the 22:00 run of the
+# day before failed its five CAPTCHA attempts and the next chance was 15
+# minutes away). A run started by hand never waits.
+ZAMANLAMA_PATH = os.path.join(PROJECT_ROOT, "output", ".sync_zamanlama.json")
+OLAGAN_ARALIK = timedelta(minutes=15)
+GIRIS_YENIDEN_ARALIK = timedelta(minutes=10)
+# A run records its start a few seconds after its tick, so the tick exactly
+# one interval later sees a little less than the interval. Anything under a
+# tick's width (5 minutes) works; one minute is plenty.
+TIK_TOLERANSI = timedelta(minutes=1)
+
+
+def _zamanlama_oku():
+    """The schedule record, or {} — an unreadable record must never stop the
+    syncs; it only costs one run sooner than planned."""
+    try:
+        with open(ZAMANLAMA_PATH, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _zamanlama_yaz(d):
+    from src.json_utils import atomic_json_dump
+    atomic_json_dump(d, ZAMANLAMA_PATH)
+
+
+def _sira_geldi_mi(durum, simdi):
+    son = durum.get("son_deneme")
+    if not son:
+        return True
+    try:
+        gecen = simdi - datetime.fromisoformat(son)
+    except (TypeError, ValueError):
+        return True
+    aralik = GIRIS_YENIDEN_ARALIK if durum.get("giris_basarisiz") else OLAGAN_ARALIK
+    return gecen >= aralik - TIK_TOLERANSI
+
+
+def _deneme_basladi(simdi):
+    d = _zamanlama_oku()
+    d["son_deneme"] = simdi.isoformat()
+    _zamanlama_yaz(d)
+    return d
+
+
+def _giris_sonucu(basarili, simdi):
+    d = _zamanlama_oku()
+    if basarili:
+        d["giris_basarisiz"] = False
+        d["ardisik_basarisiz"] = 0
+        d.pop("ilk_basarisiz", None)
+    else:
+        d["giris_basarisiz"] = True
+        d["ardisik_basarisiz"] = int(d.get("ardisik_basarisiz") or 0) + 1
+        d.setdefault("ilk_basarisiz", simdi.isoformat())
+    _zamanlama_yaz(d)
+    return d
+
+
 def _tek_kosu_kilidi():
     """Refuse to start while another sync is running, and say so.
 
@@ -190,8 +255,13 @@ def _tek_kosu_kilidi():
     return kilit
 
 
-def main():
+def main(zamanla=False):
     os.chdir(PROJECT_ROOT)
+    # Checked before anything else and silent when it is not this tick's turn:
+    # two of every three 5-minute ticks end here, and sync.log should not
+    # carry a line for each of them.
+    if zamanla and not _sira_geldi_mi(_zamanlama_oku(), datetime.now()):
+        return
     rotate_sync_log()
 
     kilit = _tek_kosu_kilidi()
@@ -199,6 +269,7 @@ def main():
         print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] "
               "Başka bir senkron koşuyor, bu tur atlandı.")
         return
+    _deneme_basladi(datetime.now())
 
     start_time = time.time()
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -227,16 +298,34 @@ def main():
 
     try:
         # 1. Login
-        login_info = login(driver)
+        try:
+            login_info = login(driver)
+        except Exception as e:
+            # The login form did not load (a 10 s wait timed out) or was not
+            # the form we know. That is a failed login too — the portal being
+            # down is the commonest reason a login fails at all — so it takes
+            # the 10-minute path instead of crashing the run.
+            print(f"[ERROR] Login raised: {_kisa_hata(e)}")
+            login_info = None
+        zamanlama = _giris_sonucu(bool(login_info), datetime.now())
         if not login_info:
-            print("[ERROR] Login failed, aborting")
+            sonraki = datetime.fromisoformat(zamanlama["son_deneme"]) + GIRIS_YENIDEN_ARALIK
+            print("[ERROR] Login failed, aborting — "
+                  f"{GIRIS_YENIDEN_ARALIK.seconds // 60} dakika sonra yeniden denenecek "
+                  f"({sonraki:%H:%M}; art arda {zamanlama['ardisik_basarisiz']}. başarısız giriş)")
             scrape_errors.append("login: Login failed")
             health = {
                 "timestamp": datetime.now().isoformat(),
                 "success": False,
                 "scrape_errors": scrape_errors,
                 "duration_seconds": round(time.time() - start_time),
-                "login": {"method": "failed", "captcha_attempts": 5},
+                "login": {
+                    "method": "failed",
+                    "captcha_attempts": 5,
+                    "ardisik_basarisiz": zamanlama["ardisik_basarisiz"],
+                    "ilk_basarisiz": zamanlama.get("ilk_basarisiz"),
+                    "sonraki_deneme": sonraki.isoformat(),
+                },
             }
             from src.json_utils import atomic_json_dump
             atomic_json_dump(health, os.path.join(OUTPUT_DIR, "health.json"))
@@ -450,7 +539,7 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        main(zamanla="--zamanla" in sys.argv[1:])
     except Exception:
         traceback.print_exc()
         sys.exit(1)
