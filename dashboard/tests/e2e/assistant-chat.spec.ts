@@ -159,9 +159,9 @@ test('citation chips render inside every markdown block type, not just one', asy
 
   const answerBody = lastAnswerBody(page)
   await expect(answerBody.locator('h3 .ac-cite')).toHaveText('4')
-  await expect(answerBody.locator('p .ac-cite')).toHaveText('2')
+  await expect(answerBody.locator('p.ac-md__p .ac-cite')).toHaveText('2')
   await expect(answerBody.locator('li .ac-cite')).toHaveText('1')
-  await expect(answerBody.locator('.bookmd__verse .ac-cite')).toHaveText('3')
+  await expect(answerBody.locator('.ac-md__quote .ac-cite')).toHaveText('3')
   await expect(answerBody).not.toContainText('[S1]')
   await expect(answerBody).not.toContainText('[S2]')
   await expect(answerBody).not.toContainText('[S3]')

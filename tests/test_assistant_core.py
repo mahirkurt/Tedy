@@ -684,3 +684,14 @@ def test_terk_edilen_akis_model_hatasi_sayilmaz(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.llm, "chat_with_tools", terk)
     with pytest.raises(_StreamAbandoned):
         runtime.chat(messages=[{"role": "user", "content": "kesir"}], session_id="s1")
+
+
+def test_system_prompt_fixes_one_answer_skeleton():
+    """Live 2026-09-25 an answer mixed a heading, bold lines standing in for
+    headings and three different labels ("Bugün için not:", "Öneri:") — the
+    chat can only give a shape to what arrives in a known form."""
+    p = AssistantRuntime.SYSTEM_PROMPT
+    assert "## Biçim" in p
+    assert "`### `" in p
+    assert "`**Şimdi:** …`" in p and "`**Not:** …`" in p
+    assert "Tablo, yatay çizgi" in p

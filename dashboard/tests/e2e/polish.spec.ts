@@ -27,9 +27,9 @@ test('a markdown list looks like a list', async ({ page }) => {
   await page.fill('#ac-input', 'nasıl')
   await page.getByLabel('Gönder').click()
   // Wait for the element being measured: evaluate() below does not retry.
-  await page.locator('.bookmd__list').first().waitFor()
+  await page.locator('.ac-md__list').first().waitFor()
 
-  const style = await page.locator('.bookmd__list').first()
+  const style = await page.locator('.ac-md__list').first()
     .evaluate(el => getComputedStyle(el).listStyleType)
   expect(style, 'liste işareti yok').not.toBe('none')
 })

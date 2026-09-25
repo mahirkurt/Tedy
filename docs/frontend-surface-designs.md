@@ -435,6 +435,22 @@ aracıyla okur: Bugün'ün gösterdiği satırlar, Işık'ın "Yaptım" işaretl
 dizininden okurken "Yaptım" dediği işi yapılacak diye saymıştı; iki yüzey aynı
 şeyi farklı söyleyemez (İ9).
 
+**Cevabın dizgisi (2026-09-25).** Cevaplar Tedy Books'un bölüm dizgisiyle
+basılıyordu: serif başlıklar, ilk paragraftan sonraki her paragrafta kitap
+girintisi, kısa satırlarda şiir italiği. Telefonda bir ödev cevabı; serif bir
+başlık, girintili kalın satırlar ve her cümlenin ardında "1" yazan bir çiple
+dağınık okunuyordu. Şimdi `renderMarkdown(…, { bicim: 'sohbet' })` kendi
+`ac-md__*` sınıflarıyla Carbon tipinde basar: tek okuma puntosu (body-02),
+tek dikey ritim, bölüm başlıkları `heading-03`, alt başlıklar `heading-02`.
+Modelin başlık yerine yazdığı kalın satır başlık olur; boş satırla ayrılmış ya
+da alt maddeli numaralı liste 1'den yeniden başlamaz. Kapanıştaki
+`**Şimdi:**` (atılacak ilk küçük adım, etkileşim kenarı) ve `**Not:**` (çekince,
+nötr kenar) ayrı kutudur. Cevap bir şey yapmakla biter, daha çok metinle
+değil (İ3). Modele de aynı iskelet verilir (`## Biçim`: açılış cümlesi,
+`###` bölümler, "kalın ad — açıklama" maddeleri, tablo/emoji yok). Aynı
+kaynak bir bölümde tekrar ediyorsa işareti ilk cümlede kalır
+(`_tekrari_topla`). Telefonda cevap tüm genişliği alır.
+
 ---
 
 ### 4.11 Tedy Books — *ayrı dünya*
@@ -622,4 +638,5 @@ görüntüsüyle doğrulanır.
 | 1.5 | 2026-09-24 | Asistan tek sesle konuşur: Işık'a "sen", aileye "siz" (sayfa metinleri de); kaynak numaraları okuma sırasıyla. |
 | 1.7 | 2026-09-25 | Playwright + axe denetimi (13 sayfa × 4 genişlik): tek sütun genişliği, telefonda üst boşluk, odak halkaları, geçmiş öğelerde kontrast, haftalık tablo telefonda okunur, Asistan açılışta kaymaz; axe ihlali sıfır. |
 | 1.8 | 2026-09-25 | Denetim araçları devrede: görsel regresyon (13 sayfa × 2 genişlik + giriş), ARIA ağaç anlık görüntüleri, IBM Equal Access, WebKit + Firefox, azaltılmış hareket ve Windows yüksek kontrast kipleri, stylelint-plugin-carbon-tokens (sıfır hata; aralık, hareket ve yazı değerleri Carbon belirteçlerine taşındı), Lighthouse CI, paket analizi. IBM'in bulduğu beş erişilebilirlik hatası giderildi (görünen metinle uyuşmayan ad, etiketsiz metin alanı, adsız aside, boş aria-controls, kaymayan odaklanabilir bölge). Sınavlar sütunu sola hizalı. |
+| 1.9 | 2026-09-25 | Asistan cevapları kitap dizgisinden ayrıldı: Carbon tipinde sohbet biçimi, kalın satır → başlık, `Şimdi`/`Not` kutuları, kesintisiz numaralı liste, bölüm başına tek atıf çipi, telefonda tam genişlik; modele `## Biçim` iskeleti. |
 | 1.6 | 2026-09-24 | Tedy Tasarım Sistemi v3 panoda: lacivert yalnız bantta, renk aritmetiği yok, rol token'ları; ders işareti Bugün ve İşler sınavlarında ve ödevlerde; takvim ve zaman çizelgesinde tür ikon, renk ders. |

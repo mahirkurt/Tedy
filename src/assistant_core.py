@@ -1403,8 +1403,8 @@ class AssistantRuntime:
 
         "## Nasıl anlatırsın (DEHB-dostu)\n"
         "- İlk cümlede doğrudan cevabı ver.\n"
-        "- Anlatımı 3–6 dakikada tüketilebilir parçalara böl; her parçanın "
-        "kendi başlığı olsun.\n"
+        "- Anlatımı 3–6 dakikada tüketilebilir parçalara böl; birden çok "
+        "parçası olan cevapta her parçanın kendi başlığı olsun (bkz. Biçim).\n"
         "- Adımları numaralandır — 'neredeyim' sorusunun cevabı görünür olsun.\n"
         "- Bir ödevin ya da çalışmanın ne kadar süreceğini tahmin etme: portal "
         "bunu söylemez, tahmin uydurma olur, ve süreyi fazla tahmin eden bir "
@@ -1415,6 +1415,26 @@ class AssistantRuntime:
         "- Somut ol: ne yapılacak, ne zaman.\n"
         "- Başarıyı önce söyle, eksiği sonra ve yapıcı biçimde.\n"
         "- Uzun paragraf yazma; madde işareti ve kısa cümle kullan.\n\n"
+
+        "## Biçim\n"
+        "Cevabın sohbet penceresinde Markdown olarak dizilir; her cevap aynı "
+        "iskeleti izlesin ki okur neyin nerede olduğunu aramasın.\n"
+        "- Açılış: bir iki cümlelik doğrudan cevap. Üstüne başlık koyma.\n"
+        "- Bölümler: cevap birden çok parçaysa her parçaya `### ` ile kısa bir "
+        "başlık ver — 2–5 kelime; iki nokta, parantez, emoji yok (\"Pazartesiye "
+        "üç ödev\", \"Sonra\"). Kısa bir cevapta başlık kullanma. Başlık yerine "
+        "kalın bir satır yazma; başlık gerekiyorsa `###` yaz.\n"
+        "- Listeler: sıra ya da öncelik bildiriyorsa numaralı, değilse madde "
+        "işaretli. Her madde tek satır: kalın ad, ' — ', kısa açıklama "
+        "(\"**Matematik** — Test 1 s.5-6; işlemsiz kabul edilmiyor\"). Alt madde "
+        "en çok bir düzey.\n"
+        "- Kalın yazıyı yalnız bir maddenin adı ve kilit bir tarih için kullan; "
+        "cümleyi kalın yazma.\n"
+        "- Kapanış: gerekiyorsa tek satır `**Şimdi:** …` — atılacak ilk küçük "
+        "adım. Okurun bilmesi gereken bir çekince varsa `**Not:** …`. Başka "
+        "etiket (\"Öneri:\", \"Bugün için not:\") uydurma; bu iki satır cevapta "
+        "ayrı kutu olarak gösterilir.\n"
+        "- Tablo, yatay çizgi (---), alıntı bloğu ve emoji kullanma.\n\n"
 
         "## Sınırlar\n"
         "- Modül ilerleme özetini yalnız soran kişiye aktar; ilerleme bilgisini (cevaplanan soru, "
@@ -2090,6 +2110,35 @@ class AssistantRuntime:
             pass
 
     _MARKER_RE = re.compile(r"\[S(\d+)\]")
+    # A section starts at a Markdown heading or at a line that is nothing but
+    # bold text — the chat renders both as headings.
+    _BOLUM_RE = re.compile(r"^\s*(#{1,6}\s|\*\*[^*]+\*\*:?\s*$)")
+
+    @classmethod
+    def _tekrari_topla(cls, text: str) -> str:
+        """Drop a marker that repeats the one just before it in its section.
+
+        Live 2026-09-25: an answer drawn wholly from `odev_listesi` put a chip
+        reading "1" after every sentence and list item. The first marker
+        already ties the section to its source — the prompt asks for exactly
+        that, and the model did not comply. A different source in between, or
+        a new section, brings the marker back.
+        """
+        son: str | None = None
+        satirlar = []
+        for satir in text.split("\n"):
+            if cls._BOLUM_RE.match(satir):
+                son = None
+
+            def ele(m: "re.Match[str]") -> str:
+                nonlocal son
+                if m.group(0) == son:
+                    return ""
+                son = m.group(0)
+                return son
+
+            satirlar.append(cls._MARKER_RE.sub(ele, satir))
+        return "\n".join(satirlar)
 
     def _finalize_citations(
         self,
@@ -2121,7 +2170,7 @@ class AssistantRuntime:
             dropped += 1
             return ""
 
-        cleaned = self._MARKER_RE.sub(replace, text)
+        cleaned = self._tekrari_topla(self._MARKER_RE.sub(replace, text))
         cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
         cleaned = re.sub(r" +([,.;:!?])", r"\1", cleaned).strip()
 

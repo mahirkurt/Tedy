@@ -202,7 +202,154 @@
 .ac-msg__content {
   @include type.type-style('body-01');
   margin: 0;
+}
+
+// What the asker typed keeps its own line breaks.
+.ac-msg__content--own {
   white-space: pre-wrap;
+}
+
+// ── The answer as an interface, not a book ──────────────────────────────
+// Answers were set by Tedy Books' chapter styles: serif headings, a printed
+// book's first-line indent on every paragraph after the first, loose-verse
+// italics for short lines. Measured 2026-09-25 on a phone, "Öncelik sırası"
+// and "Öneri" sat indented for no reason the reader could see. Here: Carbon
+// type, one vertical rhythm, sections the eye can jump between.
+// One reading size for the whole answer. Carbon's reset sets <p> to body-02
+// and a list item inherited body-01, so an answer ran 16px and 14px by turns.
+.ac-md {
+  @include type.type-style('body-02');
+}
+
+.ac-md > * + * {
+  margin-top: spacing.$spacing-04;
+}
+
+.ac-md > .ac-md__h {
+  margin-top: spacing.$spacing-06;
+}
+
+.ac-md > .ac-md__h:first-child {
+  margin-top: 0;
+}
+
+.ac-md > .ac-md__h + * {
+  margin-top: spacing.$spacing-03;
+}
+
+.ac-md__p {
+  @include type.type-style('body-02');
+  margin: 0;
+}
+
+.ac-md__h {
+  margin: 0;
+  color: theme.$text-primary;
+}
+
+.ac-md__h--3 {
+  @include type.type-style('heading-03');
+}
+
+.ac-md__h--4 {
+  @include type.type-style('heading-02');
+}
+
+.ac-md strong {
+  font-weight: 600;
+}
+
+.ac-md code {
+  @include type.type-style('code-01');
+  padding: 0 spacing.$spacing-01;
+  background: theme.$layer-02;
+}
+
+// Carbon's reset strips list markers from every ul/ol; an answer's steps
+// need theirs back.
+.ac-md__list {
+  margin: 0;
+  padding-left: spacing.$spacing-06;
+}
+
+.ac-md__list--ul {
+  list-style: disc;
+}
+
+.ac-md__list--ol {
+  list-style: decimal;
+}
+
+.ac-md__list li + li {
+  margin-top: spacing.$spacing-03;
+}
+
+.ac-md__list li::marker {
+  color: theme.$text-secondary;
+}
+
+// "Where am I" in a sequence is the number (İ3): it carries weight.
+.ac-md__list--ol > li::marker {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ac-md__list .ac-md__list {
+  margin-top: spacing.$spacing-02;
+}
+
+.ac-md__list .ac-md__list li + li {
+  margin-top: spacing.$spacing-02;
+}
+
+// The closing "Şimdi:" / "Not:" line: one step or one caveat, set apart so
+// the answer ends on something to do rather than on more text.
+.ac-md__callout {
+  padding: spacing.$spacing-03 spacing.$spacing-04;
+  background: theme.$layer-01;
+  border-left: 3px solid theme.$border-interactive;
+}
+
+.ac-md__callout--not {
+  border-left-color: theme.$border-strong-01;
+}
+
+.ac-md__callout-label {
+  @include type.type-style('label-01');
+  display: block;
+  margin-bottom: spacing.$spacing-01;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: theme.$text-secondary;
+}
+
+.ac-md__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ac-md__table th {
+  @include type.type-style('heading-compact-01');
+  text-align: left;
+}
+
+.ac-md__table th,
+.ac-md__table td {
+  padding: spacing.$spacing-03 spacing.$spacing-04;
+  border-bottom: 1px solid theme.$border-subtle-01;
+  vertical-align: top;
+}
+
+.ac-md__quote {
+  padding-left: spacing.$spacing-04;
+  border-left: 2px solid theme.$border-subtle-01;
+  color: theme.$text-secondary;
+}
+
+.ac-md__rule {
+  border: 0;
+  border-top: 1px solid theme.$border-subtle-01;
 }
 
 .ac-msg__flags {
@@ -546,6 +693,20 @@
   .ac__prompt-chip {
     @include type.type-style('label-01');
     padding: spacing.$spacing-02 spacing.$spacing-04;
+  }
+
+  // On a 390px phone an answer's text column was about 250px: every list
+  // item wrapped. The answer is what the page is for, so it gets the width.
+  .ac__messages {
+    padding: spacing.$spacing-04 spacing.$spacing-03;
+  }
+
+  .ac-msg--assistant {
+    max-width: 100%;
+  }
+
+  .ac-msg--assistant .ac-msg__body {
+    padding: spacing.$spacing-04 spacing.$spacing-04 spacing.$spacing-04 spacing.$spacing-03;
   }
 }
 

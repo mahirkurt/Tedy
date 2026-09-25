@@ -237,7 +237,7 @@ function WritingAnswer({ text }: { text: string }) {
       </div>
       <div className="ac-msg__body">
         <span className="ac-msg__role">Asistan</span>
-        <div className="ac-msg__content">{renderMarkdown(taslakMetni(text))}</div>
+        <div className="ac-msg__content ac-md">{renderMarkdown(taslakMetni(text), { bicim: 'sohbet' })}</div>
       </div>
     </article>
   )
@@ -260,6 +260,7 @@ function AnswerBody({
   return (
     <>
       {renderMarkdown(text, {
+        bicim: 'sohbet',
         renderToken: (token, key) => {
           const citation = byId.get(token.slice(1, -1))
           // A marker the backend could not resolve should not have survived,
@@ -548,7 +549,7 @@ export default function AssistantChat() {
                   <span className="ac-msg__role">
                     {msg.role === 'user' ? askerName : 'Asistan'}
                   </span>
-                  <div className="ac-msg__content">
+                  <div className={msg.role === 'assistant' ? 'ac-msg__content ac-md' : 'ac-msg__content ac-msg__content--own'}>
                     {msg.role === 'assistant'
                       ? <AnswerBody text={msg.id === 'welcome' ? voice.welcome : msg.content}
                           citations={msg.citations ?? []} onActivate={activateCitation} />
