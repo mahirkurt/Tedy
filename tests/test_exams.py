@@ -68,7 +68,7 @@ def _grade_row(course, s1="-", s2="-", s3="-"):
 
 
 def _scraped_with_exams(takvim=None, homework=None, grades=None,
-                        ders_icerikleri=None):
+                        ders_icerikleri=None, semester="2. Dönem"):
     data = {
         "takvim": takvim or [],
         "odevlerim": {
@@ -76,7 +76,7 @@ def _scraped_with_exams(takvim=None, homework=None, grades=None,
             "homework": {"rows": homework or []},
         },
         "gelisim_raporu": {
-            "semester": "2. Dönem",
+            "semester": semester,
             "grades": grades or [],
             "physical": {},
         },
@@ -568,6 +568,45 @@ class TestSyntheticExams:
                           return_value=_scraped_with_exams(grades=grades)):
             data = client.get("/api/exams").get_json()
             assert data["exams"][0]["date"] is None
+
+    # Measured: the portal kept 2025-2026's "4. Arakarne" report well into
+    # 2026-2027, and /api/exams listed its graded columns as this year's past
+    # exams. The assistant's notlar already makes this check.
+    def test_prior_year_report_makes_no_synthetic_exams(self, client):
+        grades = [_grade_row("Matematik", s1="85", s2="90")]
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                grades=grades, semester="2025-2026 4. Arakarne")), \
+             patch.object(dashboard_api, "_guncel_ogretim_yili", return_value="2026-2027"):
+            data = client.get("/api/exams").get_json()
+        assert data["exams"] == []
+        assert data["stats"] == {"upcoming": 0, "past": 0, "averageGrade": None}
+
+    def test_prior_year_report_keeps_takvim_exams(self, client):
+        past = (datetime.now() - timedelta(days=5)).isoformat() + "Z"
+        takvim = [_exam_event("5-6-7-8. SINIFLAR TÜRKÇE – 1. DÖNEM 1. YAZILI SINAVI", past)]
+        grades = [_grade_row("Matematik", s1="85")]
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                takvim=takvim, grades=grades, semester="2025-2026 4. Arakarne")), \
+             patch.object(dashboard_api, "_guncel_ogretim_yili", return_value="2026-2027"):
+            data = client.get("/api/exams").get_json()
+        assert len(data["exams"]) == 1
+        assert data["exams"][0]["date"] is not None          # the takvim one, not a synthetic
+
+    def test_current_year_report_still_makes_synthetic_exams(self, client):
+        grades = [_grade_row("Matematik", s1="85", s2="90")]
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                grades=grades, semester="2026-2027 1. Dönem")), \
+             patch.object(dashboard_api, "_guncel_ogretim_yili", return_value="2026-2027"):
+            data = client.get("/api/exams").get_json()
+        assert len(data["exams"]) == 2 and data["stats"]["averageGrade"] == 87.5
+
+    def test_unknown_year_keeps_synthetic_exams(self, client):
+        grades = [_grade_row("Matematik", s1="85")]
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                grades=grades, semester="2025-2026 4. Arakarne")), \
+             patch.object(dashboard_api, "_guncel_ogretim_yili", return_value=None):
+            data = client.get("/api/exams").get_json()
+        assert len(data["exams"]) == 1
 
 
 class TestExamEdgeCases:

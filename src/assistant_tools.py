@@ -950,6 +950,25 @@ def ders_icerigi_metni(kaynak: Any, ders: Any, hafta: Any) -> tuple[str, str]:
     return _kirp(f"{hedef} — {hafta_adi}:\n{govde}", GOVDE_SINIRI), etiket
 
 
+_DONEM_YILI = re.compile(r"(\d{4})\s*-\s*(\d{4})")
+
+
+def rapor_yili(donem: Any) -> str | None:
+    """The school year a gelişim report's term names ("2025-2026 4. Arakarne"
+    -> "2025-2026"); None when the term names none ("2. Dönem")."""
+    m = _DONEM_YILI.search(str(donem or ""))
+    return f"{m.group(1)}-{m.group(2)}" if m else None
+
+
+def onceki_yil_raporu_mu(donem: Any, ogretim_yili: Any) -> bool:
+    """True when the report names a school year, TEDY knows the current one,
+    and they differ. Unknown on either side is not "old": it must not hide
+    the grades. notlar_metni and /api/exams (_sinav_listesi) share this."""
+    rapor = rapor_yili(donem)
+    yil = str(ogretim_yili or "").strip()
+    return bool(rapor and yil and rapor != yil)
+
+
 def notlar_metni(kaynak: Any) -> tuple[str, str]:
     """(body, citation label): the gelişim report's grades and outcome levels
     with the term's name. A report from an earlier school year — the portal
@@ -978,9 +997,8 @@ def notlar_metni(kaynak: Any) -> tuple[str, str]:
     parcalar = []
     if donem:
         parcalar.append(f"Dönem: {donem}")
-    m = re.search(r"(\d{4})\s*-\s*(\d{4})", donem)
-    if m and yil and f"{m.group(1)}-{m.group(2)}" != yil:
-        parcalar.append(f"ÖNCEKİ ÖĞRETİM YILI: portalın gelişim raporu {m.group(1)}-{m.group(2)} "
+    if onceki_yil_raporu_mu(donem, yil):
+        parcalar.append(f"ÖNCEKİ ÖĞRETİM YILI: portalın gelişim raporu {rapor_yili(donem)} "
                         f"yılını gösteriyor; şu an {yil} öğretim yılı ve bu yıl için not girilmemiş. "
                         "Bu notları bu yılın notu gibi sunma.")
     if notlar:

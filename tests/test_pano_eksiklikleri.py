@@ -125,3 +125,30 @@ def test_bu_haftanin_tarihleri_pazartesiden_pazara(api):
     assert len(gunler) == 7
     assert gunler[0].weekday() == 0 and gunler[-1].weekday() == 6
     assert all((b - a).days == 1 for a, b in zip(gunler, gunler[1:]))
+
+
+# ── 4. A report on an earlier school year is not this year's exams ───────────
+
+@pytest.mark.parametrize("donem, yil, beklenen", [
+    ("2025-2026 4. Arakarne", "2026-2027", True),
+    ("2026-2027 1. Dönem", "2026-2027", False),
+    ("2025 - 2026 2. Dönem", "2026-2027", True),
+    ("2. Dönem", "2026-2027", False),          # the term names no year
+    ("2025-2026 4. Arakarne", None, False),    # the current year is unknown
+    ("", "", False),
+])
+def test_onceki_yil_raporu_mu(donem, yil, beklenen):
+    assert at.onceki_yil_raporu_mu(donem, yil) is beklenen
+
+
+def test_rapor_yili():
+    assert at.rapor_yili("2025-2026 4. Arakarne") == "2025-2026"
+    assert at.rapor_yili("2. Dönem") is None
+
+
+def test_guncel_ogretim_yili_dosyadan_okunur(api, monkeypatch):
+    monkeypatch.setattr(api, "_load_json",
+                        lambda ad: {"year": "2026-2027"} if ad == "academic_year.json" else {})
+    assert api._guncel_ogretim_yili() == "2026-2027"
+    monkeypatch.setattr(api, "_load_json", lambda ad: {})
+    assert api._guncel_ogretim_yili() is None

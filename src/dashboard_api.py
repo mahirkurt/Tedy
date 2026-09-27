@@ -912,15 +912,21 @@ def _canli_ders_icerikleri():
             "haftalar": haftalar["weeks"], "guncel_hafta": haftalar["current"]}
 
 
-def _canli_notlar():
-    """The gelişim report /api/grades serves, with the school year TEDY
-    believes it is in, so a report still showing last year can say so."""
+def _guncel_ogretim_yili():
+    """The school year TEDY believes it is in (output/academic_year.json's
+    `year`, e.g. "2026-2027"), or None when unknown."""
     try:
         yil = _load_json("academic_year.json")
     except (OSError, ValueError):
-        yil = {}  # an unknown year labels nothing "old"; it must not hide the grades
+        return None  # an unknown year labels nothing "old"; it must not hide the grades
+    return yil.get("year") if isinstance(yil, dict) else None
+
+
+def _canli_notlar():
+    """The gelişim report /api/grades serves, with the school year TEDY
+    believes it is in, so a report still showing last year can say so."""
     return {"gelisim": _scraped().get("gelisim_raporu", {}),
-            "ogretim_yili": yil.get("year") if isinstance(yil, dict) else None}
+            "ogretim_yili": _guncel_ogretim_yili()}
 
 
 def _canli_sebit_odevleri():
@@ -1932,6 +1938,14 @@ def _sinav_listesi(data, now=None):
     grades_list = gelisim.get("grades", []) if isinstance(gelisim, dict) else []
     grade_lookup = _build_grade_lookup(grades_list)
 
+    # A report still on an earlier school year — measured: 2025-2026's
+    # "4. Arakarne" persisted well into 2026-2027 — is last year's exams, not
+    # this year's past ones: no synthetic exams from it (the check the
+    # assistant's notlar makes). Notlar still shows the report under its term.
+    from src.assistant_tools import onceki_yil_raporu_mu
+    onceki_yil = isinstance(gelisim, dict) and onceki_yil_raporu_mu(
+        gelisim.get("semester"), _guncel_ogretim_yili())
+
     # --- Homework rows ---
     hw_rows = _combined_homework_rows(data)
 
@@ -2016,7 +2030,7 @@ def _sinav_listesi(data, now=None):
         })
 
     # --- Synthetic exams from grades without takvim events ---
-    for row in grades_list:
+    for row in ([] if onceki_yil else grades_list):
         if not isinstance(row, dict):
             continue
         course = normalize_course(row.get("Ders", ""))
