@@ -36,13 +36,13 @@
 
 ## Karara bağlanan belirsizlikler
 
-- **Notlar'daki "önceki yıl" etiketi yok.** Tasarım "mevcut 'önceki yıl' etiketiyle" diyor; planlama sırasında ölçüldü: `dashboard/src/components/GradeTable.tsx` yalnız `Notlar — {semester}` başlığını basıyor ("Notlar — 2025-2026 4. Arakarne"), ayrı bir önceki-yıl işareti yok. Yıl, dönem adının içinde görünür. Kapsam eklenmediği için bu plan Notlar'a etiket **eklemez**; CLAUDE.md bunu olduğu gibi yazar. Etiket isteniyorsa ayrı bir iş.
+- **Notlar'daki "önceki yıl" etiketi yoktu.** Planlama sırasında ölçüldü: `dashboard/src/components/GradeTable.tsx` yalnız `Notlar — {semester}` başlığını basıyor. Görev 5 Notlar'a dokunmaz; kullanıcının "tüm eksiklikleri gider" isteğiyle etiket **Görev 8(d)**'de eklenir (`/api/grades` `priorYear`, gri küçük Carbon `Tag` "Önceki öğretim yılı").
 - **Hafta sonu sütunu uyarlanır.** Takvim cumartesi/pazar sütununu yalnız o haftada o gün bir olay varsa gösterir (efsanedeki "yalnız ekrandaki türler" kuralının aynısı, İ6); gizlenen bir tür sütununu kaybettirmez. Hafta sonu boş bir haftada ızgara bugünkü gibi beş sütundur; böylece mevcut "uzun başlık günü genişletmez" testi (beş başlık) değişmeden geçer.
 - **`CitationChip.tsx` figür adresi kurmuyor.** Figür adresini yalnız `SourcePanel.tsx` (`FigureThumb`) kuruyor; `CitationChip` değişmez. Sürümü olmayan bir figür atfı (dağıtımdan önce açılmış bir sekme) adresi `v`'siz kurar; uç nokta 404 verir ve küçük resim "Görsel yüklenemedi" der (`<img>` hata gövdesini okuyamaz; tam cümle doğrudan API istemcisine gider).
 - **Sürüm okunamazsa:** `v` yoksa her durumda 404 (sürümü bilmek gerekmez). `v` var ama güncel sürüm okunamıyorsa (maarif kapalı/yapılandırılmamış) cevap mevcut 502 "Ders kitabı görseline şu an ulaşılamadı…" olur; görsel zaten getirilemezdi. Başarısız okuma önbelleğe girmez. TTL 300 s.
-- **Takvim sınavlarına not eşleme değişmez.** Tasarım yalnız sentetik sınavları çıkarıyor. Eski yılın raporu açıkken bir takvim sınavı (`N. Sınav`) yine o raporun sütunundan not alabilir; bu plan dokunmaz, controller'a ayrıca bildirildi.
-- **Hafta seçimi değişmez.** `_birlesik_takvim` `weeks[-1]` okumaya devam eder (`/api/schedule` `is_current`'i tercih eder); canlı veride tek hafta var ve tablo haftadan haftaya aynı. Kapsam dışı.
-- **Bugün'ün `/api/calendar`'ı** (`_private_lessons_for_day`, beş günlük hafta) cumartesi özel dersini yine göstermez; tasarım yalnız birleşik takvimi kapsıyor, dokunulmaz.
+- **Takvim sınavlarına not eşleme** Görev 5'te değişmez; ölçüldü (2026-09-28, mevcut kod): önceki yılın raporundaki `1. Sınav` 85, bu yılın geçmiş Matematik takvim sınavına not olarak bağlanıyor ve ortalamaya giriyor. **Görev 8(a)** kapatır.
+- **Hafta seçimi:** Görev 1 `weeks[-1]`'i korur; **Görev 8(b)** `/api/schedule` ile aynı `is_current` çözümüne (`_guncel_hafta`) geçirir.
+- **Bugün'ün `/api/calendar`'ı** (`_private_lessons_for_day`, beş günlük hafta) cumartesi özel dersini göstermiyordu. Bugün arayüzü (`TodaySchedule.buildAgenda`) hangi gün olursa olsun o günün `/api/calendar` olaylarını çizer; eksik olan yalnız arka uçtu. **Görev 8(c)** kapatır ve Bugün'ü cumartesi günü e2e ile sabitler.
 
 ## Dosya haritası
 
@@ -59,7 +59,8 @@
 | `tests/test_assistant_gorseller.py` | sürüm, 404 cümlesi, `(sürüm, id)` LRU | 6 |
 | `dashboard/tests/e2e/takvim.spec.ts`, `_gorsel-fixtures.ts`, `gorsel-regresyon.spec.ts-snapshots/takvim-*.png`, `aria-yapisi.spec.ts-snapshots/takvim.aria.yml` | hafta sonu e2e ve taban çizgileri | 3 |
 | `dashboard/tests/e2e/asistan-gorsel-kaynak.spec.ts` | `?v=` adresleri | 7 |
-| `CLAUDE.md` | bilinen sorunlar maddesinin kaldırılması; figür kimliği uyarısının yeni davranışla değişmesi | 5, 7 |
+| `CLAUDE.md` | bilinen sorunlar maddesinin kaldırılması; figür kimliği uyarısının yeni davranışla değişmesi; Görev 8'in dört düzeltmesi | 5, 7, 8 |
+| `dashboard/src/components/GradeTable.tsx`, `dashboard/tests/e2e/polish.spec.ts`, `today.spec.ts`, `notlar-*.png`, `notlar.aria.yml` | önceki yıl etiketi; cumartesi özel dersi Bugün'de | 8 |
 
 ---
 
@@ -1664,6 +1665,476 @@ Kaynaklar paneli figür adresini korpus sürümüyle kursun
 SourcePanel /api/assistant/figure/<id>?v=<corpus_version> ister; sürümü
 olmayan eski atıf v'siz kalır ve "Görsel yüklenemedi" der. CLAUDE.md'deki
 2026-09-27 figür kimliği uyarısı yeni davranışla değişti.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+EOF
+)"
+```
+
+---
+
+### Görev 8: Kalan eksikler — takvim sınavı notu, güncel hafta, Bugün'de cumartesi, Notlar'da önceki yıl etiketi
+
+Kullanıcı "tüm eksiklikleri gider" dedi; Görev 1–7'nin bilerek dokunmadığı dört nokta burada kapanır. Görev 5'ten (`onceki_yil_raporu_mu`, `_guncel_ogretim_yili`, `_sinav_listesi`'deki `onceki_yil`) ve Görev 1–2'den (`_birlesik_takvim`, `tests/test_pano_eksiklikleri.py` yardımcıları) sonra koşar.
+
+**Files:**
+- Modify: `src/dashboard_api.py` — `_sinav_listesi` (`grade_lookup` satırı), yeni `_guncel_hafta`, `_program_verisi`, `_birlesik_takvim` bölüm 1'in hafta seçimi, `_private_lessons_for_day`, `grades` rotası
+- Modify: `tests/test_exams.py` (yeni `TestPriorYearGrades`), `tests/test_pano_eksiklikleri.py` (yeni bölümler), `tests/test_assistant_ogrenci_araclari.py:615-626`
+- Modify: `dashboard/src/components/GradeTable.tsx`
+- Modify: `dashboard/tests/e2e/today.spec.ts`, `dashboard/tests/e2e/polish.spec.ts`, `dashboard/tests/e2e/_gorsel-fixtures.ts`
+- Modify (yeniden üretilir): `dashboard/tests/e2e/gorsel-regresyon.spec.ts-snapshots/notlar-masaustu-linux.png`, `notlar-telefon-linux.png`, `dashboard/tests/e2e/aria-yapisi.spec.ts-snapshots/notlar.aria.yml`
+- Modify: `CLAUDE.md` (Görev 5'in eklediği "Unified calendar and exam list" maddesi)
+
+**Interfaces:**
+- Consumes: `assistant_tools.onceki_yil_raporu_mu(donem, ogretim_yili) -> bool`, `dashboard_api._guncel_ogretim_yili() -> str | None` (Görev 5); `_haftayi_sabitle`, `_birlesik`, `_ozel_ders`, `api` fixture'ı, `HAFTA` (Görev 1–2, `tests/test_pano_eksiklikleri.py`).
+- Produces: `dashboard_api._guncel_hafta(weeks) -> dict` (`is_current` haftası, yoksa sonuncusu, hiç yoksa `{}`); `/api/grades` yanıtına `priorYear: bool` alanı (rapor bir sözlükse); `GradeTable`'da `Tag` "Önceki öğretim yılı".
+
+Ölçülen durum (2026-09-28, planlamada, değişmemiş kodla): takvimde geçmiş bir "MATEMATİK … 1. YAZILI SINAVI" ve `semester: "2025-2026 4. Arakarne"` raporunda Matematik `1. Sınav: 85` varken `_sinav_listesi` sınava `grade: "85"` bağlıyor ve `averageGrade: 85.0` veriyor. `TodaySchedule.buildAgenda` `/api/calendar`'ın her olayını `isSameDay` ile seçili güne koyar, hafta sonu için ayrı bir dal yoktur; eksik olan arka uçtur (`_private_lessons_for_day` beş günlük hafta kurup `hafta_sonu` vermiyor). `GradeTable` başlığı `.dashboard-card__title` (flex, `gap: var(--ted-space-xs)`) içindedir; etiket için yeni SCSS gerekmez.
+
+- [ ] **Step 1: (a) ve (b) için başarısız Python testlerini yaz**
+
+`tests/test_exams.py` sonuna ekle:
+
+```python
+class TestPriorYearGrades:
+    """A takvim exam takes its grade only from this school year's report.
+    Measured 2026-09-28: with 2025-2026's "4. Arakarne" still on the portal,
+    this year's past Matematik exam was shown with last year's 1. Sınav (85)
+    and counted in the average."""
+
+    MAT_SINAVI = "5-6-7-8. SINIFLAR MATEMATİK – 2. DÖNEM 1. YAZILI SINAVI"
+
+    def _exams(self, client, semester, yil):
+        past = (datetime.now() - timedelta(days=5)).isoformat() + "Z"
+        data = _scraped_with_exams(takvim=[_exam_event(self.MAT_SINAVI, past)],
+                                   grades=[_grade_row("Matematik", s1="85")],
+                                   semester=semester)
+        with patch.object(dashboard_api, "_scraped", return_value=data), \
+             patch.object(dashboard_api, "_guncel_ogretim_yili", return_value=yil):
+            return client.get("/api/exams").get_json()
+
+    def test_prior_year_report_grades_no_takvim_exam(self, client):
+        data = self._exams(client, "2025-2026 4. Arakarne", "2026-2027")
+        assert len(data["exams"]) == 1                      # the exam itself stays
+        assert data["exams"][0]["grade"] is None
+        assert data["stats"]["averageGrade"] is None
+
+    def test_current_year_report_still_grades_takvim_exam(self, client):
+        data = self._exams(client, "2026-2027 1. Dönem", "2026-2027")
+        assert data["exams"][0]["grade"] == "85"
+        assert data["stats"]["averageGrade"] == 85.0
+
+    def test_unknown_year_still_grades_takvim_exam(self, client):
+        data = self._exams(client, "2025-2026 4. Arakarne", None)
+        assert data["exams"][0]["grade"] == "85"
+```
+
+`tests/test_pano_eksiklikleri.py` sonuna ekle:
+
+```python
+# ── 8b. The unified calendar reads the week /api/schedule serves ─────────────
+
+from tests.test_assistant_ogrenci_araclari import BASLIK  # noqa: E402
+
+
+def _baska_hafta(is_current=False):
+    """A later week whose Monday starts with Müzik (invented), so reading it
+    instead of the current one shows."""
+    return {"week_label": "36. Hafta 15 Haz. - 21 Haz.", "week_index": 35, "is_current": is_current,
+            "schedule": {"headers": [], "empty_state": False, "rows": [
+                BASLIK,
+                ["1. Ders\n\n08:00 - 08:40", "Müzik (i-908)\nHayali Müzisyen",
+                 "", "", "", "1. Ders\n\n08:00 - 08:40", "", "", ""],
+            ]},
+            "screenshot": ""}
+
+
+def test_birlesik_takvim_is_current_haftasini_okur(api, monkeypatch):
+    _haftayi_sabitle(api, monkeypatch)
+    # The scraper can keep the whole year: the last element is a June week.
+    monkeypatch.setattr(api, "_scraped", lambda: {"ders_programi": [_kopya(HAFTA), _baska_hafta()]})
+    pazartesi = sorted((e["start"], e["title"]) for e in _birlesik(api)
+                       if e["type"] == "lesson" and e["start"].startswith("2026-09-21"))
+    assert pazartesi[0] == ("2026-09-21T08:00:00", "Türkçe")
+    assert "Müzik" not in [t for s, t in pazartesi if s.endswith("08:00:00")]
+    with api.app.test_client() as c:
+        latest = c.get("/api/schedule").get_json()["latest"]
+    assert latest["week_label"] == HAFTA["week_label"]        # the same week both ways
+
+
+def test_is_current_yoksa_son_hafta(api):
+    eski = dict(_kopya(HAFTA), is_current=False)
+    assert api._guncel_hafta([eski, _baska_hafta()])["week_index"] == 35
+    assert api._guncel_hafta([eski, _baska_hafta(is_current=False), dict(eski, is_current=True)]) \
+        ["week_label"] == HAFTA["week_label"]
+    assert api._guncel_hafta([]) == {}
+    assert api._guncel_hafta(None) == {}
+
+
+# ── 8c. Bugün's /api/calendar keeps the weekend's private lessons ────────────
+
+def test_bugun_takvimi_cumartesi_ve_pazar_ozel_derslerini_verir(api, monkeypatch):
+    monkeypatch.setattr(api, "_scraped", lambda: {"takvim": []})
+    bugun = date.today()
+    pazar = bugun + timedelta(days=(6 - bugun.weekday()) or 7)
+    monkeypatch.setattr(api, "_load_private_lessons", lambda: [
+        _ozel_ders(id="pl2", course="Fen Bilimleri", weekday="Cumartesi",
+                   start_time="12:00", end_time="13:00"),
+        _ozel_ders(id="pl3", course="Türkçe", is_recurring=False, weekday="",
+                   date=pazar.isoformat(), start_time="10:00", end_time="11:00"),
+    ])
+    with api.app.test_client() as c:
+        olaylar = c.get("/api/calendar").get_json()["events"]
+    ozel = [e for e in olaylar if e["extendedProps"]["kind"] == "private_lesson"]
+    cumartesi = [e for e in ozel if e["extendedProps"]["course"] == "Fen Bilimleri"]
+    # Before: _private_lessons_for_day built a Mon–Fri week — zero of these.
+    assert cumartesi
+    assert all(date.fromisoformat(e["start"][:10]).weekday() == 5 for e in cumartesi)
+    assert all(e["start"][11:16] == "12:00" for e in cumartesi)
+    assert len({e["start"] for e in cumartesi}) == len(cumartesi)      # each Saturday once
+    assert [e["start"][:10] for e in ozel
+            if e["extendedProps"]["course"] == "Türkçe"] == [pazar.isoformat()]
+
+
+# ── 8d. /api/grades says whether its report is last year's ───────────────────
+
+@pytest.mark.parametrize("donem, yil, beklenen", [
+    ("2025-2026 4. Arakarne", "2026-2027", True),
+    ("2026-2027 1. Dönem", "2026-2027", False),
+    ("2025-2026 4. Arakarne", None, False),
+])
+def test_notlar_rotasi_onceki_yili_bildirir(api, monkeypatch, donem, yil, beklenen):
+    rapor = {"semester": donem, "grades": [], "physical": {}, "rubrics": []}
+    monkeypatch.setattr(api, "_scraped", lambda: {"gelisim_raporu": dict(rapor)})
+    monkeypatch.setattr(api, "_guncel_ogretim_yili", lambda: yil)
+    with api.app.test_client() as c:
+        yanit = c.get("/api/grades").get_json()
+    assert yanit["priorYear"] is beklenen
+    assert {k: v for k, v in yanit.items() if k != "priorYear"} == rapor   # the report itself unchanged
+```
+
+- [ ] **Step 2: Testlerin başarısız olduğunu gör**
+
+Run: `DASHBOARD_SECRET_KEY=yerel-test-anahtari-pano-eksiklikleri .venv/bin/python -m pytest -q -p no:cacheprovider tests/test_exams.py::TestPriorYearGrades tests/test_pano_eksiklikleri.py -k "PriorYear or is_current or son_hafta or bugun_takvimi or notlar_rotasi"`
+Expected: `test_prior_year_report_grades_no_takvim_exam` FAIL (`'85' is not None`); `test_birlesik_takvim_is_current_haftasini_okur` FAIL (08:00 Müzik); `test_is_current_yoksa_son_hafta` FAIL (`_guncel_hafta` yok); `test_bugun_takvimi_…` FAIL (`assert cumartesi` boş); `test_notlar_rotasi_…` FAIL (`KeyError: 'priorYear'`). Diğer ikisi PASS.
+
+- [ ] **Step 3: (a) Takvim sınavı eski yılın notunu almaz**
+
+`src/dashboard_api.py`, `_sinav_listesi` içinde `grade_lookup = _build_grade_lookup(grades_list)` satırını **sil**. Görev 5'in eklediği `onceki_yil = isinstance(gelisim, dict) and onceki_yil_raporu_mu(…)` ifadesinin hemen altına ekle:
+
+```python
+    # Nor does a takvim exam take its grade from such a report (2026-09-28):
+    # last year's "1. Sınav" column is not this year's first exam.
+    grade_lookup = {} if onceki_yil else _build_grade_lookup(grades_list)
+```
+
+- [ ] **Step 4: (b) Güncel hafta tek yerden çözülür**
+
+`src/dashboard_api.py`, `def _program_verisi(data):` satırının hemen üstüne:
+
+```python
+def _guncel_hafta(weeks):
+    """The week the scraper saw selected (`is_current`), else the last one
+    (data written before that mark existed), else {}. /api/schedule's
+    `latest`, the assistant's ders_programi and the unified calendar all read
+    this one week. The scraper may keep the whole published year, so the last
+    element can be a week in June."""
+    if not isinstance(weeks, list) or not weeks:
+        return {}
+    son = weeks[-1] if isinstance(weeks[-1], dict) else {}
+    return next((w for w in weeks if isinstance(w, dict) and w.get("is_current")), son)
+```
+
+`_program_verisi` içindeki
+
+```python
+    # The scraper now keeps the whole published year, so the last element is a
+    # week in June. The week the scraper saw selected carries `is_current`;
+    # weeks[-1] stays the fallback for data written before that mark existed.
+    latest = next(
+        (w for w in weeks if isinstance(w, dict) and w.get("is_current")),
+        weeks[-1] if weeks else {},
+    )
+```
+
+bloğunu şununla değiştir:
+
+```python
+    latest = _guncel_hafta(weeks)
+```
+
+`_birlesik_takvim` bölüm 1'de (Görev 1'in yazdığı) şu satırları:
+
+```python
+    weeks = data.get("ders_programi", [])
+    if weeks:
+        latest = weeks[-1]
+        rows = latest.get("schedule", {}).get("rows", [])
+        for day_idx, day_date in enumerate(week_dates):
+```
+
+şununla değiştir (döngünün gövdesi aynı kalır, bir girinti sola kayar):
+
+```python
+    # The same week /api/schedule serves as `latest`, not weeks[-1].
+    latest = _guncel_hafta(data.get("ders_programi", []))
+    rows = (latest.get("schedule") or {}).get("rows", [])
+    for day_idx, day_date in enumerate(week_dates):
+```
+
+Döngü gövdesinin girintisini düzelt (`for ders in …` 8 boşluk, `sh, sm = …` ve `events.append` 12 boşluk olmalı); `.venv/bin/python -m py_compile src/dashboard_api.py` ile doğrula.
+
+- [ ] **Step 5: (c) Bugün'ün takvimi hafta sonunu kapsar**
+
+`src/dashboard_api.py`, `_private_lessons_for_day` fonksiyonunun ilk üç satırını (`"""…"""`, `monday = …`, `week_dates = …`, `events = …`) şununla değiştir:
+
+```python
+def _private_lessons_for_day(day_date):
+    """Expand private lessons for a specific date into simple calendar events.
+
+    A seven-day week with the weekend kept: Bugün (/api/calendar) showed no
+    private lesson on a Saturday, and both of Işık's are on Saturday
+    (measured 2026-09-25)."""
+    monday = day_date - timedelta(days=day_date.weekday())
+    week_dates = [monday + timedelta(days=i) for i in range(7)]
+    events = _private_lessons_for_week(week_dates, hafta_sonu=True)
+```
+
+(fonksiyonun geri kalanı — `out = []` ve süzme döngüsü — değişmez.)
+
+- [ ] **Step 6: (d) `/api/grades` `priorYear` taşır**
+
+`src/dashboard_api.py`, `grades` rotası:
+
+```python
+@app.route("/api/grades")
+@require_auth
+def grades():
+    """The gelişim report as scraped, plus `priorYear`: true when its term
+    names a school year other than academic_year.json's — the check notlar
+    and /api/exams make — so Notlar can say the grades are last year's."""
+    from src.assistant_tools import onceki_yil_raporu_mu
+    rapor = _scraped().get("gelisim_raporu", {})
+    if not isinstance(rapor, dict):
+        return jsonify(rapor)
+    return jsonify({**rapor, "priorYear": onceki_yil_raporu_mu(
+        rapor.get("semester"), _guncel_ogretim_yili())})
+```
+
+`tests/test_assistant_ogrenci_araclari.py`, `test_canli_icerik_ve_notlar_kaynaklari` son satırını şununla değiştir (asistanın kaynağı ham raporu okur; `priorYear` rotanın eklediği alandır):
+
+```python
+    rapor = {k: v for k, v in notlar.items() if k != "priorYear"}
+    assert api._canli_notlar() == {"gelisim": rapor, "ogretim_yili": "2026-2027"}
+```
+
+- [ ] **Step 7: Python testlerinin geçtiğini gör**
+
+Run: `DASHBOARD_SECRET_KEY=yerel-test-anahtari-pano-eksiklikleri .venv/bin/python -m pytest -q -p no:cacheprovider tests/test_exams.py tests/test_pano_eksiklikleri.py tests/test_assistant_ogrenci_araclari.py tests/test_dashboard_api.py tests/test_cross_system_consistency.py tests/test_portal_saati.py tests/test_reader_role.py`
+Expected: hepsi PASS.
+
+- [ ] **Step 8: Ön yüz için başarısız e2e testlerini yaz**
+
+`dashboard/tests/e2e/today.spec.ts` sonuna ekle:
+
+```ts
+// 2026-09-28: both of Işık's private lessons are on Saturday, and /api/calendar
+// expanded private lessons over Monday to Friday only, so Bugün on a Saturday
+// showed "planlı ders … yok". The agenda itself draws any day's events; this
+// pins that a Saturday private lesson reaches the Saturday timeline.
+test.describe('saturday', () => {
+  test.use({ timezoneId: 'Europe/Istanbul' })
+
+  test('a Saturday private lesson is on Saturday\'s timeline', async ({ page }) => {
+    await mockDay(page)
+    // Registered after mockDay, so it takes precedence over its empty calendar.
+    await page.route('**/api/calendar', r => r.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ events: [{
+        id: 'p1', title: 'Fen Bilimleri · Deneme Hoca', allDay: false,
+        start: '2026-09-26T12:00:00', end: '2026-09-26T13:00:00',
+        extendedProps: { kind: 'private_lesson', badge: 'Özel Ders', course: 'Fen Bilimleri',
+          description: 'Özel Ders • Deneme Hoca', private_lesson_id: 'p1' },
+      }] }),
+    }))
+    await page.clock.setFixedTime(new Date('2026-09-26T10:00:00+03:00'))   // a Saturday
+    await page.goto('/')
+
+    const ders = page.locator('.today-tl__item', { hasText: 'Fen Bilimleri · Deneme Hoca' })
+    await expect(ders).toBeVisible()
+    await expect(ders.locator('.today-tl__time')).toHaveText('12:00')
+    await expect(ders).toContainText('Özel Ders')
+    // The empty line is for a day with nothing on it; this day has something.
+    await expect(page.getByText('için planlı ders, ödev teslimi veya etkinlik yok')).toHaveCount(0)
+  })
+})
+```
+
+`dashboard/tests/e2e/polish.spec.ts` sonuna ekle:
+
+```ts
+// 2026-09-28: the portal kept 2025-2026's "4. Arakarne" report well into
+// 2026-2027, and Notlar showed it like this year's. /api/grades now says
+// `priorYear`, and the title carries a small grey tag — calm, not a warning.
+const RAPOR = (priorYear: boolean) => ({
+  semester: priorYear ? '2025-2026 4. Arakarne' : '2026-2027 1. Dönem', priorYear,
+  physical: {}, rubrics: [],
+  grades: [{ Ders: 'Matematik', '1. Sınav': '88', '2. Sınav': '-', '3. Sınav': '-',
+    'DİKP/Performans-1': '-', 'DİKP/Performans-2': '-', 'DİKP/Performans-3': '-' }],
+})
+
+test('a last-year report is tagged "Önceki öğretim yılı" in the Notlar title', async ({ page }) => {
+  await mock(page, LIVE)
+  await page.route('**/api/grades', r => r.fulfill(json(RAPOR(true))))
+  await page.goto('/notlar')
+  await expect(page.locator('table')).toBeVisible()
+  const baslik = page.locator('.dashboard-card__title')
+  await expect(baslik).toContainText('Notlar — 2025-2026 4. Arakarne')
+  const etiket = baslik.locator('.cds--tag')
+  await expect(etiket).toHaveText('Önceki öğretim yılı')
+  await expect(etiket).toHaveClass(/cds--tag--gray/)
+  await expect(etiket).toHaveClass(/cds--tag--sm/)
+})
+
+test('this year\'s report carries no tag', async ({ page }) => {
+  await mock(page, LIVE)
+  await page.route('**/api/grades', r => r.fulfill(json(RAPOR(false))))
+  await page.goto('/notlar')
+  // The table rendered first, so the absence below is about the tag.
+  await expect(page.locator('table')).toBeVisible()
+  await expect(page.locator('.dashboard-card__title')).toContainText('2026-2027 1. Dönem')
+  await expect(page.locator('.dashboard-card__title .cds--tag')).toHaveCount(0)
+})
+```
+
+- [ ] **Step 9: Derle ve başarısız olduğunu gör**
+
+Run:
+```bash
+cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/asistan-tam-baglam/dashboard
+npm run build; echo "build çıkış: $?"
+DASHBOARD_SECRET_KEY=yerel-test-anahtari-pano-eksiklikleri TEDY_E2E_PORT=8296 npx playwright test today polish --reporter=line
+```
+Expected: build 0; "a last-year report is tagged…" FAIL (etiket yok). Cumartesi testi **PASS** — arayüz zaten her günün olayını çizer (planlamada kod okunarak doğrulandı); bu test (c)'nin ön yüz yarısını sabitler, arka uç yarısı Step 1'deki pytest'tir. Cumartesi testi FAIL ederse dur ve bildir: o zaman `TodaySchedule`'da hafta sonunu eleyen bir dal vardır ve bu plan onu öngörmemiştir.
+
+- [ ] **Step 10: `GradeTable`'a etiketi ekle**
+
+`dashboard/src/components/GradeTable.tsx`:
+
+İçe aktarmada `@carbon/react` listesine `Tag` ekle:
+
+```tsx
+import {
+  DataTable, Table, TableHead, TableRow, TableHeader,
+  TableBody, TableCell, TableContainer,
+  TableExpandRow, TableExpandedRow, TableExpandHeader, Tag,
+} from '@carbon/react'
+```
+
+`useApi` çağrısı:
+
+```tsx
+  // priorYear: the report's term names an earlier school year than the one
+  // TEDY is in (/api/grades, the check /api/exams and the assistant make).
+  const { data } = useApi<{ semester?: string; grades?: GradeItem[]; priorYear?: boolean }>(
+    '/api/grades', {}
+  )
+```
+
+Başlık `span`'ı:
+
+```tsx
+          <span className="dashboard-card__title dashboard-card__title--tight">
+            <Certificate size={20} />
+            {data.semester ? `Notlar — ${data.semester}` : 'Notlar'}
+            {/* Grey and small: a fact about the table, not an alarm (İ6).
+                A span, because it sits inside the table's heading. */}
+            {data.priorYear && (
+              <Tag as="span" type="gray" size="sm">Önceki öğretim yılı</Tag>
+            )}
+          </span>
+```
+
+Yeni SCSS yok: `.dashboard-card__title` zaten `display: flex` ve `gap: var(--ted-space-xs)`; renk ve boyut Carbon `Tag`'in kendi token'larıdır. `gray` bir ders ailesi değildir (`tests/test_pano_tasarim_sistemi.py` yalnız blue/teal/purple/magenta/cyan'ı yasaklar).
+
+- [ ] **Step 11: Lint, derleme, e2e**
+
+Run:
+```bash
+cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/asistan-tam-baglam/dashboard
+npm run lint; echo "lint çıkış: $?"
+npm run build; echo "build çıkış: $?"
+DASHBOARD_SECRET_KEY=yerel-test-anahtari-pano-eksiklikleri TEDY_E2E_PORT=8296 npx playwright test today polish kontrast bugun-duzen bugun-yarin-yaptim gunluk-program --reporter=line
+```
+Expected: lint 0, build 0, hepsi PASS.
+
+- [ ] **Step 12: Görsel fixture'a gerçek biçimli notlar ekle; farkı oku, sonra taban çizgisini yenile**
+
+`dashboard/tests/e2e/_gorsel-fixtures.ts`, `GORSEL` nesnesinde `calendar: { events: [] },` satırından önce ekle:
+
+```ts
+  // The shape /api/grades serves (gelisim_raporu + priorYear). FULL's rows
+  // ({ders, sinav, puan}) predate it and drew a table of dashes. Last year's
+  // report, as the portal still showed on 2026-09-28, so the Notlar baseline
+  // carries the "Önceki öğretim yılı" tag. Invented grades.
+  grades: { semester: '2025-2026 4. Arakarne', priorYear: true, physical: {}, rubrics: [], grades: [
+    { Ders: 'Matematik', '1. Sınav': '88', '2. Sınav': '92', '3. Sınav': '-',
+      'DİKP/Performans-1': '95', 'DİKP/Performans-2': '-', 'DİKP/Performans-3': '-' },
+    { Ders: 'Türkçe', '1. Sınav': '76', '2. Sınav': '-', '3. Sınav': '-',
+      'DİKP/Performans-1': '-', 'DİKP/Performans-2': '-', 'DİKP/Performans-3': '-' },
+  ] },
+```
+
+Run (güncellemesiz):
+```bash
+cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/asistan-tam-baglam/dashboard
+DASHBOARD_SECRET_KEY=yerel-test-anahtari-pano-eksiklikleri TEDY_E2E_PORT=8296 npx playwright test gorsel-regresyon aria-yapisi -g notlar --reporter=line
+```
+Expected: `notlar looks as it did (masaustu)`, `(telefon)` ve notlar aria testi FAIL.
+
+`find test-results -name 'notlar-*-actual.png' -o -name 'notlar-*-diff.png' -o -name 'notlar-*-expected.png'` ile bulunan PNG'leri Read aracıyla aç. Kabul koşulu, görev raporuna yazılır: fark yalnız Notlar kartında — başlık "Notlar — 2025-2026 4. Arakarne" ve yanında gri küçük "Önceki öğretim yılı" etiketi; tire dolu üç satırın yerini Matematik ve Türkçe satırları (renkli notlar) alır. Üst bant, yan menü ve kart dışı alan değişmemiş olmalı. Aria farkı yalnız başlık adını, tablo adını ve satırları değiştirmeli. Başka bir fark varsa **dur ve bildir**; taban çizgisini yenileme.
+
+Fark kabul edilirse:
+```bash
+DASHBOARD_SECRET_KEY=yerel-test-anahtari-pano-eksiklikleri TEDY_E2E_PORT=8296 npx playwright test gorsel-regresyon aria-yapisi -g notlar --update-snapshots --reporter=line
+DASHBOARD_SECRET_KEY=yerel-test-anahtari-pano-eksiklikleri TEDY_E2E_PORT=8296 npx playwright test gorsel-regresyon aria-yapisi ibm-erisilebilirlik gorunum-kipleri tasarim-denetimi --reporter=line
+```
+Expected: ikinci komutta hepsi PASS (yalnız notlar dosyaları değişti). `ibm-erisilebilirlik` ya da axe başlıktaki etiket için ihlal verirse taban çizgisini commit'leme, ihlali rapora yaz (DONE_WITH_CONCERNS).
+
+- [ ] **Step 13: CLAUDE.md**
+
+Görev 5'in eklediği "**Unified calendar and exam list**" maddesinde üç değişiklik:
+
+1. `` draws lessons through `assistant_tools.gunun_dersleri`, `` → `` draws the `is_current` week's lessons (`_guncel_hafta`, the same week `/api/schedule` serves as `latest`) through `assistant_tools.gunun_dersleri`, ``
+2. `` `_current_week_dates()` is Monday to Sunday and private lessons are expanded with `hafta_sonu=True`, so both Saturday lessons appear; `` → `` `_current_week_dates()` is Monday to Sunday and private lessons are expanded with `hafta_sonu=True` — here and in Bugün's `/api/calendar` (`_private_lessons_for_day`, a seven-day week) — so both Saturday lessons appear, on the Takvim grid and on Saturday's Bugün timeline; ``
+3. `` yields no synthetic past exams; an unknown year on either side keeps them. The Notlar page still lists such a report under its term title ("Notlar — 2025-2026 4. Arakarne"); it has no separate "önceki yıl" flag. `` → `` yields no synthetic past exams and grades no takvim exam (its `N. Sınav` columns are last year's); an unknown year on either side keeps both. `/api/grades` adds `priorYear` from the same check, and Notlar shows such a report under its term title with a small grey Carbon `Tag` "Önceki öğretim yılı" (inside the heading, `as="span"`). ``
+
+Doğrula: `grep -n "no separate" CLAUDE.md` boş; `grep -c "Önceki öğretim yılı" CLAUDE.md` 1.
+
+- [ ] **Step 14: Tam Python paketi**
+
+Run: `DASHBOARD_SECRET_KEY=yerel-test-anahtari-pano-eksiklikleri .venv/bin/python -m pytest -q -p no:cacheprovider 2>&1 | tail -15`
+Expected: önceden kırmızılar dışında kırmızı yok.
+
+- [ ] **Step 15: Commit**
+
+```bash
+cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/asistan-tam-baglam
+git branch --show-current   # fix/pano-eksiklikleri
+git status --short          # yalnız aşağıdaki dosyalar
+git add src/dashboard_api.py tests/test_exams.py tests/test_pano_eksiklikleri.py \
+  tests/test_assistant_ogrenci_araclari.py dashboard/src/components/GradeTable.tsx \
+  dashboard/tests/e2e/today.spec.ts dashboard/tests/e2e/polish.spec.ts dashboard/tests/e2e/_gorsel-fixtures.ts \
+  dashboard/tests/e2e/gorsel-regresyon.spec.ts-snapshots/notlar-masaustu-linux.png \
+  dashboard/tests/e2e/gorsel-regresyon.spec.ts-snapshots/notlar-telefon-linux.png \
+  dashboard/tests/e2e/aria-yapisi.spec.ts-snapshots/notlar.aria.yml CLAUDE.md
+git commit -m "$(cat <<'EOF'
+Kalan pano eksiklerini gider: takvim sınavı notu, güncel hafta, cumartesi, önceki yıl etiketi
+
+Takvim sınavı önceki yılın raporundan not almıyor; birleşik takvim
+/api/schedule ile aynı is_current haftasını okuyor; Bugün'ün /api/calendar'ı
+hafta sonu özel derslerini veriyor; Notlar önceki yılın raporunu gri
+"Önceki öğretim yılı" etiketiyle gösteriyor. Notlar taban çizgileri fark
+okunduktan sonra yenilendi.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 EOF
