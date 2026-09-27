@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect, type CSSProperties } from 'react'
 import { Button, SkeletonPlaceholder, Tag } from '@carbon/react'
 import {
   Bookmark, ChevronLeft, ChevronRight, Close, Education, EventSchedule, Group, Task, UserAvatar, Video,
@@ -13,7 +13,7 @@ import { subjectClass } from '../utils/subject'
 
 // ── Constants ──
 
-const DAY_LABELS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum'] as const
+const DAY_LABELS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'] as const
 const HOUR_START = 7
 const HOUR_END = 17
 const HOURS = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i)
@@ -71,15 +71,14 @@ function isSameDay(a: Date, b: Date): boolean {
 }
 
 function weekDates(monday: Date): Date[] {
-  return Array.from({ length: 5 }, (_, i) => addDays(monday, i))
+  return Array.from({ length: 7 }, (_, i) => addDays(monday, i))
 }
 
-function weekLabel(monday: Date): string {
-  const friday = addDays(monday, 4)
-  const mLabel = `${monday.getDate()} ${
-    monday.getMonth() === friday.getMonth() ? '' : MONTHS_LONG[monday.getMonth()] + ' '
+function weekLabel(first: Date, last: Date): string {
+  const mLabel = `${first.getDate()} ${
+    first.getMonth() === last.getMonth() ? '' : MONTHS_LONG[first.getMonth()] + ' '
   }`
-  return `${mLabel.trim()} - ${friday.getDate()} ${MONTHS_LONG[friday.getMonth()]} ${friday.getFullYear()}`
+  return `${mLabel.trim()} - ${last.getDate()} ${MONTHS_LONG[last.getMonth()]} ${last.getFullYear()}`
 }
 
 function parseEventDate(s: string): Date | null {
@@ -116,7 +115,24 @@ export default function CalendarEvents() {
     m.setDate(m.getDate() + weekOffset * 7)
     return m
   }, [today, weekOffset])
-  const days = useMemo(() => weekDates(monday), [monday])
+  const weekEnd = useMemo(() => {
+    const sunday = addDays(monday, 6)
+    sunday.setHours(23, 59, 59, 999)
+    return sunday
+  }, [monday])
+  // Monday to Friday always; Saturday and Sunday only in a week that has
+  // something on that day. Both of Işık's private lessons are on Saturday
+  // (2026-09-28), and an empty weekend column every week is two more columns
+  // to read past (İ6). Decided from the dates alone, not from the kinds the
+  // reader has hidden, so hiding a kind never takes its day away.
+  const days = useMemo(() => {
+    const starts = data.events
+      .map(ev => parseEventDate(ev.start))
+      .filter((d): d is Date => d !== null)
+    return weekDates(monday)
+      .map((date, dayIndex) => ({ date, dayIndex }))
+      .filter(({ date, dayIndex }) => dayIndex < 5 || starts.some(s => isSameDay(s, date)))
+  }, [monday, data.events])
 
   // Close popover on outside click
   useEffect(() => {
@@ -141,35 +157,31 @@ export default function CalendarEvents() {
       })
       .filter(ev => {
         if (!ev._start) return false
-        const friday = addDays(monday, 4)
-        friday.setHours(23, 59, 59)
-        return ev._start >= monday && ev._start <= friday
+        return ev._start >= monday && ev._start <= weekEnd
       })
-  }, [data.events, monday, hiddenTypes])
+  }, [data.events, monday, weekEnd, hiddenTypes])
 
   // Which kinds this week actually holds. Derived from the date filter only —
   // not from eventsInWeek, which has already dropped the hidden kinds, so a
   // kind the reader hid would vanish from the legend and could never be
   // brought back.
   const typesInWeek = useMemo(() => {
-    const friday = addDays(monday, 4)
-    friday.setHours(23, 59, 59)
     const kinds = new Set<string>()
     for (const ev of data.events) {
       const start = parseEventDate(ev.start)
-      if (start && start >= monday && start <= friday) kinds.add(ev.type)
+      if (start && start >= monday && start <= weekEnd) kinds.add(ev.type)
     }
     return kinds
-  }, [data.events, monday])
+  }, [data.events, monday, weekEnd])
 
   // Group events by day column index
   const eventsByDay = useMemo(() => {
     const map: Record<number, typeof eventsInWeek> = {}
-    for (let i = 0; i < 5; i++) map[i] = []
+    for (let i = 0; i < days.length; i++) map[i] = []
     for (const ev of eventsInWeek) {
       if (!ev._start) continue
-      for (let di = 0; di < 5; di++) {
-        if (isSameDay(ev._start, days[di])) {
+      for (let di = 0; di < days.length; di++) {
+        if (isSameDay(ev._start, days[di].date)) {
           map[di].push(ev)
           break
         }
@@ -253,7 +265,7 @@ export default function CalendarEvents() {
           iconDescription="Onceki hafta"
           onClick={() => setWeekOffset(w => w - 1)}
         />
-        <span className="calendar-nav__label">{weekLabel(monday)}</span>
+        <span className="calendar-nav__label">{weekLabel(days[0].date, days[days.length - 1].date)}</span>
         <Button
           kind="ghost"
           size="sm"
@@ -293,15 +305,18 @@ export default function CalendarEvents() {
       </div>
 
       {/* Grid */}
-      <div className="calendar-grid">
+      <div
+        className="calendar-grid"
+        style={{ '--calendar-day-count': days.length } as CSSProperties}
+      >
         {/* Header row */}
         <div className="calendar-grid__header" />
-        {days.map((d, i) => (
+        {days.map(({ date: d, dayIndex }, i) => (
           <div
             key={i}
             className={`calendar-grid__header${isSameDay(d, today) ? ' calendar-grid__header--today' : ''}`}
           >
-            <div>{DAY_LABELS[i]}</div>
+            <div>{DAY_LABELS[dayIndex]}</div>
             <div>{d.getDate()} {MONTHS_SHORT[d.getMonth()]}</div>
           </div>
         ))}
@@ -312,7 +327,7 @@ export default function CalendarEvents() {
             <div key={`t-${hour}`} className="calendar-grid__time">
               {hour.toString().padStart(2, '0')}:00
             </div>
-            {days.map((d, di) => {
+            {days.map(({ date: d }, di) => {
               const cellEvts = getCellEvents(hour, di)
               const isToday = isSameDay(d, today)
               // Hours already spent cannot be acted on, so they stop competing
