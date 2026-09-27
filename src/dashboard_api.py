@@ -2258,18 +2258,23 @@ def assistant_reindex():
 # ~7 MB), but the count alone would let 64 large answers pin 64× their size in
 # every worker. An image over FIGUR_TEK_SINIRI (the size chat_with_tools will
 # not send the model either) is served but never cached; the whole cache stays
-# under FIGUR_TOPLAM_SINIRI. A figure id's image never changes: nothing expires.
+# under FIGUR_TOPLAM_SINIRI. Keyed by (corpus version, id): the 1.6 build
+# renumbered figure ids (2026-09-27), so an id means a picture only together
+# with the build it was cited under. Nothing expires; a new build is a new key.
 FIGUR_ONBELLEK_BOYUTU = 64
 FIGUR_TEK_SINIRI = 1_500_000
 FIGUR_TOPLAM_SINIRI = 16 * 1024 * 1024
-_FIGUR_ONBELLEGI: "OrderedDict[int, tuple[bytes, str]]" = OrderedDict()
+_FIGUR_ONBELLEGI: "OrderedDict[tuple[str, int], tuple[bytes, str]]" = OrderedDict()
 _FIGUR_KILIDI = threading.Lock()
 FIGUR_ULASILAMADI = "Ders kitabı görseline şu an ulaşılamadı; biraz sonra yeniden deneyin."
+FIGUR_SURUM_DEGISTI = ("Bu görsel, müfredat korpusu güncellendiği için değişti; "
+                       "soruyu yeniden sorun.")
 
 
 def _figur_yaniti(veri: bytes, mime: str) -> Response:
     return Response(veri, mimetype=mime, headers={
-        # Private: behind the sign-in. A day: the image for an id never changes.
+        # Private: behind the sign-in. A day: the URL carries the corpus
+        # version, and an (id, version) pair's image never changes.
         "Cache-Control": "private, max-age=86400",
         "X-Content-Type-Options": "nosniff",
     })
@@ -2284,17 +2289,35 @@ def assistant_figure(figure_id):
     if access is not None:
         return access
 
+    # The URL names the corpus build it was cited under (?v=). Without it, or
+    # under another build, the id may name a different picture: say so rather
+    # than serve it. Missing needs no lookup; a mismatch needs the current one.
+    istenen = request.args.get("v", "").strip()
+    if not istenen:
+        return jsonify({"error": FIGUR_SURUM_DEGISTI}), 404
+    try:
+        registry = _assistant_runtime().registry
+        guncel = registry.korpus_surumu()
+    except AssistantUnavailableError:
+        registry, guncel = None, None
+    except Exception as exc:  # noqa: BLE001 — a figure the panel cannot load is not a 500
+        app.logger.error("assistant figure %s version failed: %s", figure_id, type(exc).__name__)
+        registry, guncel = None, None
+    if guncel is None:
+        return jsonify({"error": FIGUR_ULASILAMADI}), 502
+    if istenen != guncel:
+        return jsonify({"error": FIGUR_SURUM_DEGISTI}), 404
+
+    anahtar = (guncel, figure_id)
     with _FIGUR_KILIDI:
-        kayit = _FIGUR_ONBELLEGI.get(figure_id)
+        kayit = _FIGUR_ONBELLEGI.get(anahtar)
         if kayit is not None:
-            _FIGUR_ONBELLEGI.move_to_end(figure_id)
+            _FIGUR_ONBELLEGI.move_to_end(anahtar)
     if kayit is not None:
         return _figur_yaniti(*kayit)
 
     try:
-        durum, veri, mime = _assistant_runtime().registry.figur_gorseli(figure_id)
-    except AssistantUnavailableError:
-        durum, veri, mime = "ulasilamadi", b"", ""
+        durum, veri, mime = registry.figur_gorseli(figure_id)
     except Exception as exc:  # noqa: BLE001 — a figure the panel cannot load is not a 500
         app.logger.error("assistant figure %s failed: %s", figure_id, type(exc).__name__)
         durum, veri, mime = "ulasilamadi", b"", ""
@@ -2306,8 +2329,8 @@ def assistant_figure(figure_id):
 
     if len(veri) <= FIGUR_TEK_SINIRI:
         with _FIGUR_KILIDI:
-            _FIGUR_ONBELLEGI[figure_id] = (veri, mime)
-            _FIGUR_ONBELLEGI.move_to_end(figure_id)
+            _FIGUR_ONBELLEGI[anahtar] = (veri, mime)
+            _FIGUR_ONBELLEGI.move_to_end(anahtar)
             while (len(_FIGUR_ONBELLEGI) > FIGUR_ONBELLEK_BOYUTU
                    or sum(len(v) for v, _ in _FIGUR_ONBELLEGI.values()) > FIGUR_TOPLAM_SINIRI):
                 _FIGUR_ONBELLEGI.popitem(last=False)

@@ -15,6 +15,8 @@ import json
 import logging
 import os
 import re
+import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
@@ -85,6 +87,12 @@ GORSEL_BICIMLERI = frozenset({"image/png", "image/jpeg", "image/gif", "image/web
 # DISCOVERY-UPSTREAM-2026-09.md §2). They are removed before the model reads a
 # result, so it cannot hand the reader a dead link.
 OLU_BAGLANTILAR = frozenset({"pdf_url", "source_url"})
+
+# How long a corpus_version read from maarif's server_info is trusted, per
+# process. The corpus changes only when CureoHub swaps a build in (1.5 -> 1.6
+# on 2026-09-27, which renumbered figure ids); five minutes bounds how long
+# after such a swap a URL cited under the old build is still accepted.
+KORPUS_SURUMU_TTL = 300.0
 
 
 def _json_parcalari(text: str) -> list[Any] | None:
@@ -1577,6 +1585,12 @@ class McpRegistry:
         # The clock "bugün"/"yarın" are read against; read in Istanbul either
         # way. Tests pin it; production reads the real one.
         self.saat = saat
+        # maarif's corpus_version (server_info) and when it was read. Every
+        # figure citation carries it and /api/assistant/figure checks it, so
+        # a figure id from another build is refused, not mis-served.
+        self._korpus_surumu: tuple[str, float] | None = None
+        self._korpus_kilidi = threading.Lock()
+        self.monotonik: Callable[[], float] = time.monotonic
 
     def degraded(self) -> list[str]:
         unhealthy = {n for n, c in self.clients.items() if not c.healthy}
@@ -1758,6 +1772,11 @@ class McpRegistry:
                 pass
             if isinstance(figur.get("caption"), str) and figur["caption"].strip():
                 locator["caption"] = figur["caption"].strip()
+            # The build this id belongs to: the panel asks for
+            # /api/assistant/figure/<id>?v=<corpus_version>.
+            surum = self.korpus_surumu()
+            if surum:
+                locator["corpus_version"] = surum
         return ToolOutcome(
             ok=True,
             text=text,
@@ -1772,6 +1791,32 @@ class McpRegistry:
             }],
             images=list(result.images or []),
         )
+
+    def korpus_surumu(self) -> str | None:
+        """maarif's current corpus_version ("1.6"), read from server_info and
+        trusted for KORPUS_SURUMU_TTL seconds. None when the server is not
+        configured or gave no version; a failure is not cached, so the next
+        request asks again."""
+        simdi = self.monotonik()
+        with self._korpus_kilidi:
+            if self._korpus_surumu and simdi - self._korpus_surumu[1] < KORPUS_SURUMU_TTL:
+                return self._korpus_surumu[0]
+        client = self.clients.get("maarif-mufredat")
+        if client is None:
+            return None
+        result = client.call_tool("server_info", {})
+        if not result.ok:
+            return None
+        bilgi = _figur_bilgisi(_json_parcalari(result.text))
+        if isinstance(bilgi.get("result"), dict):
+            # The {result: …} envelope the server's own notes describe.
+            bilgi = bilgi["result"]
+        surum = str(bilgi.get("corpus_version") or "").strip()
+        if not surum:
+            return None
+        with self._korpus_kilidi:
+            self._korpus_surumu = (surum, simdi)
+        return surum
 
     def figur_gorseli(self, figure_id: int) -> tuple[str, bytes, str]:
         """One textbook figure's bytes for the reader's panel
