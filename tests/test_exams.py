@@ -442,45 +442,92 @@ class TestExamRelatedHomework:
             assert len(data["exams"]) >= 1
 
 
-class TestExamRelatedContent:
-    """Related course content matching."""
+def _icerik(text="", cards=(), items=()):
+    """ders_icerikleri[course] in its real shape (measured 2026-09-28):
+    cards and items are strings. Invented teachers and text."""
+    return {"tab_id": "ders_4", "text": text, "tables": [],
+            "items": list(items), "cards": list(cards)}
 
-    def test_finds_matching_course_content(self, client):
-        exam_date = "2026-03-31T10:00:00Z"
-        takvim = [_exam_event(
-            "5-6-7-8. SINIFLAR FEN BİLİMLERİ"
-            " – 2. DÖNEM 1. YAZILI SINAVI",
-            exam_date)]
-        ders = {
-            "Fen Bilimleri": [
-                {"title": "Madde ve Isı", "konu": ""},
-                {"title": "Kuvvet ve Hareket", "konu": ""},
-            ]
-        }
+
+class TestExamRelatedContent:
+    """Related course content, read from the real {tab_id, text, tables,
+    items, cards} shape. The old tests fed a list — a shape the scraper never
+    writes — so relatedContent was [] on every real exam while they passed."""
+
+    FEN_SINAVI = ("5-6-7-8. SINIFLAR FEN BİLİMLERİ – 2. DÖNEM 1. YAZILI SINAVI")
+
+    def _related(self, client, title, ders):
+        takvim = [_exam_event(title, "2026-03-31T10:00:00Z")]
         with patch.object(dashboard_api, "_scraped",
                           return_value=_scraped_with_exams(
-                              takvim=takvim,
-                              ders_icerikleri=ders)):
-            data = client.get("/api/exams").get_json()
-            content = data["exams"][0]["relatedContent"]
-            assert len(content) == 2
+                              takvim=takvim, ders_icerikleri=ders)):
+            return client.get("/api/exams").get_json()["exams"][0]["relatedContent"]
+
+    def test_finds_matching_course_content(self, client):
+        ders = {"Fen Bilimleri": _icerik(
+            text="3. Hafta\nKurgu Öğretmen | 28.09.2026\nBu hafta Güneş sistemi.",
+            cards=[
+                "3. Hafta\nKurgu Öğretmen | 28.09.2026\nSevgili öğrencilerim,\n"
+                "Bu hafta Güneş sistemi.\n  1 Yorum yapıldı!\n  Daha fazla oku\n"
+                "Uydurma Öğrenci\nçok güzel\nYorum Ekle",
+                # The portal's second, title-less rendering of the same post.
+                "Kurgu Öğretmen | 28.09.2026\nSevgili öğrencilerim,\nBu hafta Güneş sistemi.",
+            ],
+            items=["Gezegenleri  Güneş'e uzaklıklarına göre sıralar."])}
+        assert self._related(client, self.FEN_SINAVI, ders) == [
+            {"title": "3. Hafta", "type": "ders_icerikleri"},
+            {"title": "Gezegenleri Güneş'e uzaklıklarına göre sıralar.", "type": "ders_icerikleri"},
+        ]
+
+    def test_teacher_signature_and_comments_never_become_titles(self, client):
+        ders = {"Fen Bilimleri": _icerik(cards=[
+            "Kurgu Öğretmen | 28.09.2026\nSevgili öğrencilerim,",
+            "Uzay Çağı\nKurgu Öğretmen | 21.09.2026\n  Daha fazla oku\nUydurma Öğrenci\nYorum Ekle",
+        ])}
+        basliklar = [c["title"] for c in self._related(client, self.FEN_SINAVI, ders)]
+        assert basliklar == ["Uzay Çağı"]
+        assert not any("Kurgu Öğretmen" in b or "Uydurma Öğrenci" in b for b in basliklar)
 
     def test_turkish_case_content_matching(self, client):
         """Course name case mismatch must still find content."""
-        exam_date = "2026-03-31T10:00:00Z"
-        takvim = [_exam_event(
-            "5-6-7-8. SINIFLAR İNGİLİZCE"
-            " – 2. DÖNEM 1. YAZILI SINAVI",
-            exam_date)]
+        ders = {"İngilizce": _icerik(cards=["Week 3\nÖrnek Teacher | 28.09.2026\nDear 7th graders,"])}
+        content = self._related(
+            client, "5-6-7-8. SINIFLAR İNGİLİZCE – 2. DÖNEM 1. YAZILI SINAVI", ders)
+        assert content == [{"title": "Week 3", "type": "ders_icerikleri"}]
+
+    def test_other_courses_and_unread_courses_add_nothing(self, client):
         ders = {
-            "İngilizce": [{"title": "Unit 5 Grammar"}]
+            "Matematik": _icerik(cards=["Rasyonel sayılar\nÖrnek Hoca | 28.09.2026"]),
+            "Fen Bilimleri": {"tab_id": "ders_4", "error": "Message: no such element"},
         }
-        with patch.object(dashboard_api, "_scraped",
-                          return_value=_scraped_with_exams(
-                              takvim=takvim,
-                              ders_icerikleri=ders)):
-            data = client.get("/api/exams").get_json()
-            assert len(data["exams"][0]["relatedContent"]) == 1
+        assert self._related(client, self.FEN_SINAVI, ders) == []
+
+    def test_titles_are_bounded_and_deduplicated(self, client):
+        uzun = "Kuvvet ve enerji " * 20
+        ders = {"Fen Bilimleri": _icerik(
+            cards=[f"Başlık {i}\nKurgu Öğretmen | 28.09.2026" for i in range(8)],
+            # An item repeating a card title is listed once.
+            items=[uzun, "Başlık 1"] + [f"Kazanım {i}" for i in range(8)])}
+        content = self._related(client, self.FEN_SINAVI, ders)
+        basliklar = [c["title"] for c in content]
+        # Five card titles, then the first five items with the repeat dropped.
+        assert basliklar[:5] == [f"Başlık {i}" for i in range(5)]
+        assert basliklar[6:] == ["Kazanım 0", "Kazanım 1", "Kazanım 2"]
+        assert basliklar.count("Başlık 1") == 1
+        assert basliklar[5].endswith("…") and len(basliklar[5]) <= 140
+        assert all(len(b) <= 140 for b in basliklar)
+
+    def test_at_most_ten_across_duplicate_course_tabs(self, client):
+        # The portal has two tabs for one course ("İngilizce", "İngilizce (2)"
+        # both normalise to İngilizce); together they must not exceed ten.
+        ders = {
+            "İngilizce": _icerik(cards=[f"Week {i}" for i in range(5)],
+                                 items=[f"Outcome {i}" for i in range(5)]),
+            "İngilizce (2)": _icerik(cards=["Reading club"]),
+        }
+        content = self._related(
+            client, "5-6-7-8. SINIFLAR İNGİLİZCE – 2. DÖNEM 1. YAZILI SINAVI", ders)
+        assert len(content) == 10
 
 
 class TestSyntheticExams:

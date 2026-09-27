@@ -1867,26 +1867,44 @@ def _find_related_homework(exam_course, exam_date_str, homework_rows):
     return related[:5]
 
 
+# A card whose first line is only "<name> | DD.MM.YYYY" is the portal's
+# second, title-less rendering of the post before it; the line is a
+# teacher's name, not a content title.
+_KART_IMZASI = re.compile(r"^.+ \| \d{2}\.\d{2}\.\d{4}$")
+_ILGILI_BASLIK_SINIRI = 140
+
+
 def _find_related_content(exam_course, ders_icerikleri):
-    """Find course content from same course."""
+    """The exam's course's content in the open week: each card's title (its
+    first line, portal chrome and comments dropped) and each item, at most
+    five of each and ten in all. ders_icerikleri[course] is
+    {tab_id, text, tables, items, cards} with cards and items as strings
+    (measured 2026-09-28); this used to branch on a list, a shape the scraper
+    never writes, so relatedContent was [] on every exam."""
+    from src.assistant_tools import _temiz_icerik
     related = []
     if not isinstance(ders_icerikleri, dict):
         return related
 
     exam_lower = _turkish_lower(exam_course)
-    for course_name, items in ders_icerikleri.items():
-        nc = normalize_course(course_name)
-        if _turkish_lower(nc) != exam_lower:
+    for course_name, kayit in ders_icerikleri.items():
+        if not isinstance(kayit, dict):
             continue
-        if isinstance(items, list):
-            for item in items[:5]:
-                if isinstance(item, dict):
-                    related.append({
-                        "title": item.get("title", item.get("konu", str(item))),
-                        "type": "ders_icerikleri",
-                    })
-                elif isinstance(item, str):
-                    related.append({"title": item, "type": "ders_icerikleri"})
+        if _turkish_lower(normalize_course(course_name)) != exam_lower:
+            continue
+        kart_basliklari = []
+        for kart in kayit.get("cards") or []:
+            if not isinstance(kart, str):
+                continue
+            ilk = next((s for s in _temiz_icerik(kart).split("\n") if s.strip()), "")
+            if ilk and not _KART_IMZASI.match(ilk):
+                kart_basliklari.append(ilk)
+        maddeler = [" ".join(m.split()) for m in kayit.get("items") or [] if isinstance(m, str)]
+        for baslik in kart_basliklari[:5] + [m for m in maddeler if m][:5]:
+            if len(baslik) > _ILGILI_BASLIK_SINIRI:
+                baslik = baslik[:_ILGILI_BASLIK_SINIRI - 1].rstrip() + "…"
+            if all(r["title"] != baslik for r in related):
+                related.append({"title": baslik, "type": "ders_icerikleri"})
 
     return related[:10]
 
