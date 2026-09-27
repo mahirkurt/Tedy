@@ -538,11 +538,16 @@ def gunun_dersleri(rows: list[Any], gun: str) -> list[dict[str, Any]]:
         no, saat = _DERS_NO.search(zaman), _SAAT_ARALIGI.search(zaman)
         if not no or not saat:
             continue
+        satirlar = icerik.split("\n")
         dersler.append({
             "ders_no": int(no.group(1)),
             "baslangic": f"{saat.group(1)}:{saat.group(2)}",
             "bitis": f"{saat.group(3)}:{saat.group(4)}",
-            "ders": normalize_course(icerik.split("\n")[0].strip()),
+            "ders": normalize_course(satirlar[0].strip()),
+            # The cell's second line (the teacher, in the portal's grid). The
+            # unified calendar shows it as the lesson's subtitle; the
+            # ders_programi text never prints it.
+            "alt": satirlar[1].strip() if len(satirlar) > 1 else "",
         })
     return dersler
 

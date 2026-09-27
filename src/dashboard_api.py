@@ -2343,15 +2343,6 @@ def _current_week_dates():
     return [monday + timedelta(days=i) for i in range(5)]
 
 
-def _parse_time_range(cell_text):
-    """Parse time range from first column like '1. Ders\\n08:00 - 08:40' or '08:40 - 08:55'.
-    Returns (start_h, start_m, end_h, end_m) or None."""
-    m = re.search(r"(\d{1,2})[:.:](\d{2})\s*[-–/]\s*(\d{1,2})[:.:](\d{2})", cell_text)
-    if m:
-        return int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))
-    return None
-
-
 def _parse_ddmmyyyy_hhmm(s):
     """Parse 'DD.MM.YYYY HH:MM' to ISO string."""
     try:
@@ -2374,52 +2365,23 @@ def _birlesik_takvim(data):
     events = []
     week_dates = _current_week_dates()
 
-    # 1. Lessons from ders_programi
+    # 1. Lessons from ders_programi, read through the assistant's port of
+    # utils/schedule.ts dayColumns (assistant_tools.gunun_dersleri): the header
+    # row is upper-case dotless Turkish ("PAZARTESI") and holds two blocks,
+    # Friday on its own bell. Matching "Pazartesi" against it never succeeded,
+    # so until 2026-09-28 this drew no lesson at all.
+    from src.assistant_tools import gunun_dersleri
     weeks = data.get("ders_programi", [])
     if weeks:
         latest = weeks[-1]
         rows = latest.get("schedule", {}).get("rows", [])
-        # headers row: ['', 'Pazartesi', 'Salı', ...]
-        # day_col_map: column index -> weekday index (0=Mon)
-        day_names_order = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"]
-        day_col_map = {}
-        if rows:
-            for ci, hdr in enumerate(rows[0]):
-                for di, dn in enumerate(day_names_order):
-                    if dn in str(hdr):
-                        day_col_map[ci] = di
-                        break
-
-        for r in range(1, len(rows)):
-            row = rows[r]
-            if not row:
-                continue
-            time_cell = row[0] if row else ""
-            parsed = _parse_time_range(time_cell)
-            if not parsed:
-                continue
-            sh, sm, eh, em = parsed
-
-            for ci in range(1, len(row)):
-                cell = row[ci]
-                if not cell or ci not in day_col_map:
-                    continue
-                # Skip break/breakfast rows
-                cell_lower = cell.strip().lower()
-                if cell_lower in ("kahvaltı", "öğle yemeği", "teneffüs", "yemek"):
-                    continue
-                if re.match(r"^\d{1,2}[:.]\d{2}\s*[-–]\s*\d{1,2}[:.]\d{2}$", cell.strip()):
-                    continue
-
-                day_idx = day_col_map[ci]
-                day_date = week_dates[day_idx]
+        for day_idx, day_date in enumerate(week_dates):
+            for ders in gunun_dersleri(rows, DAY_NAMES[day_idx]):
+                sh, sm = (int(x) for x in ders["baslangic"].split(":"))
+                eh, em = (int(x) for x in ders["bitis"].split(":"))
+                lesson_name = ders["ders"]
                 start_dt = datetime(day_date.year, day_date.month, day_date.day, sh, sm)
                 end_dt = datetime(day_date.year, day_date.month, day_date.day, eh, em)
-
-                lines = cell.split("\n")
-                lesson_name = normalize_course(lines[0].strip())
-                subtitle = lines[1].strip() if len(lines) > 1 else ""
-
                 events.append({
                     "id": _make_id("lesson", day_idx, sh, sm, lesson_name),
                     "title": lesson_name,
@@ -2428,7 +2390,7 @@ def _birlesik_takvim(data):
                     "end": end_dt.isoformat(),
                     **_takvim_rengi(lesson_name),
                     "course": lesson_name,
-                    "subtitle": subtitle,
+                    "subtitle": ders["alt"],
                 })
 
     # 2. Homework deadlines
