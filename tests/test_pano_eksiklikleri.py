@@ -86,3 +86,42 @@ def test_programsiz_birlesik_takvim_ders_uydurmaz(api, monkeypatch):
     _haftayi_sabitle(api, monkeypatch)
     monkeypatch.setattr(api, "_scraped", lambda: {"ders_programi": []})
     assert not [e for e in _birlesik(api) if e["type"] == "lesson"]
+
+
+# ── 2. Private lessons: the weekend is part of the week ──────────────────────
+
+def _ozel_ders(**kw):
+    ders = {"id": "pl1", "course": "Matematik", "teacher": "Deneme Hoca", "is_recurring": True,
+            "weekday": "Pazartesi", "date": "", "start_time": "17:00", "end_time": "18:00",
+            "active": True}
+    ders.update(kw)
+    return ders
+
+
+def test_birlesik_takvim_cumartesi_ve_pazar_ozel_derslerini_verir(api, monkeypatch):
+    _haftayi_sabitle(api, monkeypatch)
+    monkeypatch.setattr(api, "_scraped", lambda: {})
+    monkeypatch.setattr(api, "_load_private_lessons", lambda: [
+        _ozel_ders(),
+        # Measured 2026-09-25: both of Işık's real private lessons are on Saturday.
+        _ozel_ders(id="pl2", course="Fen Bilimleri", weekday="Cumartesi",
+                   start_time="12:00", end_time="13:00"),
+        _ozel_ders(id="pl3", course="Türkçe", is_recurring=False, weekday="",
+                   date="2026-09-27", start_time="10:00", end_time="11:00"),
+        # A one-off lesson next Monday is outside this week.
+        _ozel_ders(id="pl4", course="İngilizce", is_recurring=False, weekday="",
+                   date="2026-09-28", start_time="10:00", end_time="11:00"),
+    ])
+    ozel = sorted((e["start"], e["course"]) for e in _birlesik(api) if e["type"] == "private_lesson")
+    assert ozel == [
+        ("2026-09-21T17:00:00", "Matematik"),
+        ("2026-09-26T12:00:00", "Fen Bilimleri"),
+        ("2026-09-27T10:00:00", "Türkçe"),
+    ]
+
+
+def test_bu_haftanin_tarihleri_pazartesiden_pazara(api):
+    gunler = api._current_week_dates()
+    assert len(gunler) == 7
+    assert gunler[0].weekday() == 0 and gunler[-1].weekday() == 6
+    assert all((b - a).days == 1 for a, b in zip(gunler, gunler[1:]))

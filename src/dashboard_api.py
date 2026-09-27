@@ -583,11 +583,12 @@ def _normalize_weekday_name(value):
 
 
 def _private_lessons_for_week(week_dates, hafta_sonu=False):
-    """Expand private lesson configs into concrete events for current week.
+    """Expand private lesson configs into concrete events for one week.
 
-    The weekly calendar draws Mon–Fri only. `hafta_sonu=True` (with seven
-    `week_dates`) keeps Saturday and Sunday for the assistant's takvim:
-    measured 2026-09-25, both of Işık's private lessons are on Saturday."""
+    `hafta_sonu=True` (with seven `week_dates`) keeps Saturday and Sunday —
+    the unified calendar and the assistant's takvim both pass it: measured
+    2026-09-25, both of Işık's private lessons are on Saturday. Without it
+    only Monday to Friday is expanded (`_private_lessons_for_day`)."""
     events = []
     lessons = _load_private_lessons()
     if not lessons:
@@ -2337,10 +2338,12 @@ def _make_id(*parts):
 
 
 def _current_week_dates():
-    """Return list of 5 date objects (Mon-Fri) for the current week."""
+    """The seven dates (Mon–Sun) of the current week. Seven, not five: both
+    of Işık's private lessons are on Saturday (measured 2026-09-25), and a
+    Mon–Fri week dropped them from the unified calendar."""
     today = datetime.now().date()
     monday = today - timedelta(days=today.weekday())
-    return [monday + timedelta(days=i) for i in range(5)]
+    return [monday + timedelta(days=i) for i in range(7)]
 
 
 def _parse_ddmmyyyy_hhmm(s):
@@ -2412,8 +2415,9 @@ def _birlesik_takvim(data):
             "status": status,
         })
 
-    # 3. Private lessons
-    for pev in _private_lessons_for_week(week_dates):
+    # 3. Private lessons, weekend included (CalendarEvents draws a Saturday or
+    # Sunday column in a week that has something on it).
+    for pev in _private_lessons_for_week(week_dates, hafta_sonu=True):
         pev.update(_takvim_rengi(pev.get("course", "")))
         events.append(pev)
 

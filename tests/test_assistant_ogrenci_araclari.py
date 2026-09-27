@@ -339,9 +339,9 @@ def test_canli_takvim_birlesik_rotanin_etkinliklerini_aciklamayla_verir(api, mon
     with api.app.test_client() as c:
         rota = c.get("/api/calendar/unified").get_json()["events"]
     canli = api._canli_takvim()
-    # Measured 2026-09-25: both real private lessons are on Saturday, which
-    # the Mon–Fri week grid never draws; the assistant must still see them.
-    assert not any(e.get("course") == "Fen Bilimleri" for e in rota if e["type"] == "private_lesson")
+    # Measured 2026-09-25: both real private lessons are on Saturday. Since
+    # 2026-09-28 the route's week runs to Sunday, so both lists carry it.
+    assert any(e.get("course") == "Fen Bilimleri" for e in rota if e["type"] == "private_lesson")
     assert any(e.get("course") == "Fen Bilimleri" for e in canli if e["type"] == "private_lesson")
     rota_etkinlik = {e["id"] for e in rota if e["type"] == "event"}
     assert rota_etkinlik == {e["id"] for e in canli if e["type"] == "event"}
