@@ -285,7 +285,7 @@ class EkDeposu:
         ekler = veri.get("ekler") if isinstance(veri, dict) else None
         if not isinstance(ekler, dict):
             return {}
-        return {k: v for k, v in ekler.items() if KIMLIK_DESENI.match(str(k)) and isinstance(v, dict)}
+        return {k: v for k, v in ekler.items() if KIMLIK_DESENI.fullmatch(str(k)) and isinstance(v, dict)}
 
     def yaz(self, ekler: dict[str, dict[str, Any]]) -> None:
         atomic_json_dump({"surum": 1, "guncellendi": datetime.now().isoformat(timespec="seconds"),
@@ -293,7 +293,7 @@ class EkDeposu:
 
     def kayit(self, kimlik: Any) -> dict[str, Any] | None:
         kimlik = str(kimlik or "")
-        return self.oku().get(kimlik) if KIMLIK_DESENI.match(kimlik) else None
+        return self.oku().get(kimlik) if KIMLIK_DESENI.fullmatch(kimlik) else None
 
     def dosya_yolu(self, kayit: dict[str, Any] | None) -> Path | None:
         """The record's own copy, or None. The name is checked against the
@@ -321,7 +321,7 @@ class EkDeposu:
         return self.dizin / f"{kimlik}.meta.json"
 
     def meta(self, kimlik: Any) -> dict[str, Any]:
-        if not KIMLIK_DESENI.match(str(kimlik or "")):
+        if not KIMLIK_DESENI.fullmatch(str(kimlik or "")):
             return {}
         try:
             veri = json.loads(self.meta_yolu(str(kimlik)).read_text(encoding="utf-8"))

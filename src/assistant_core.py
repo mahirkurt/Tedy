@@ -985,6 +985,19 @@ class PdfExtractionError(Exception):
         self.reason = reason
 
 
+class DocxExtractionError(Exception):
+    """Raised by `FileAdapters._extract_docx_text(..., hata_bildir=True)` when
+    the archive could not be read — "bozuk" (not a zip, no
+    word/document.xml, malformed XML), "dtd" (a DTD or entity declaration,
+    refused) or "sinir" (document.xml larger than the cap) — as opposed to a
+    real document that simply has no text. The default call keeps returning
+    "" for all of these, as the index has always relied on."""
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
 class FileAdapters:
     def __init__(self, config: AssistantConfig):
         self.config = config
@@ -1159,7 +1172,8 @@ class FileAdapters:
         # extraction failure — return "" normally rather than raising.
         return ""
 
-    def _extract_docx_text(self, file_path: Path) -> str:
+    def _extract_docx_text(self, file_path: Path, sinir: int | None = None,
+                           hata_bildir: bool = False) -> str:
         """A .docx's paragraphs, from word/document.xml, with the stdlib only.
 
         Teachers attach Word sheets as often as PDFs (plan 2026-09-28
@@ -1183,7 +1197,13 @@ class FileAdapters:
         made encoding-proof (see _docx_declares_dtd_or_entity's docstring),
         so the real DTD/entity gate now runs at the parser (expat) rather
         than on undecoded bytes; the regex is kept only as a cheap first
-        filter for the common ASCII/UTF-8 case."""
+        filter for the common ASCII/UTF-8 case.
+
+        `sinir` overrides DOCX_XML_SINIRI for one call (the portal
+        attachment sync reads at most 8 MiB: measured on f29062c, 49 MB of
+        XML cost 554 MB RSS). With `hata_bildir` an unreadable archive raises
+        DocxExtractionError with its reason instead of returning ""."""
+        sinir = DOCX_XML_SINIRI if sinir is None else sinir
         try:
             with zipfile.ZipFile(file_path) as arsiv:
                 bilgi = arsiv.getinfo("word/document.xml")
@@ -1194,8 +1214,8 @@ class FileAdapters:
                 # (a zip bomb). A size already over the cap short-circuits
                 # here without opening a read stream at all; the real
                 # enforcement is the bounded read below.
-                if bilgi.file_size > DOCX_XML_SINIRI:
-                    return ""
+                if bilgi.file_size > sinir:
+                    raise DocxExtractionError("sinir")
                 parcalar: list[bytes] = []
                 toplam = 0
                 with arsiv.open(bilgi) as akis:
@@ -1204,12 +1224,12 @@ class FileAdapters:
                         if not parca:
                             break
                         toplam += len(parca)
-                        if toplam > DOCX_XML_SINIRI:
+                        if toplam > sinir:
                             # The real decompressed size exceeds the cap
                             # regardless of what file_size claimed. Stop
                             # reading immediately — never materialise the
                             # rest of the stream just to throw it away.
-                            return ""
+                            raise DocxExtractionError("sinir")
                         parcalar.append(parca)
                 veri = b"".join(parcalar)
             # No defusedxml (not installed; the design allows no new
@@ -1226,17 +1246,21 @@ class FileAdapters:
             # expat — the same parser ElementTree uses — directly, so no
             # encoding it understands gets past it.
             if re.search(rb"<!DOCTYPE|<!ENTITY", veri, re.IGNORECASE):
-                return ""
+                raise DocxExtractionError("dtd")
             if _docx_declares_dtd_or_entity(veri):
-                return ""
+                raise DocxExtractionError("dtd")
             kok = ElementTree.fromstring(veri)
-        except Exception:
+        except Exception as exc:
             # Anything reading or parsing this archive can raise: a bad
             # zip, a missing word/document.xml, malformed XML, or an
             # XML-declared encoding name Python's codec registry does not
             # know (LookupError, not a subclass of any of the narrower
             # exceptions this used to catch). One bad .docx must never
-            # raise out of here and abort a whole index update.
+            # raise out of here and abort a whole index update — unless
+            # the caller asked for the reason (hata_bildir).
+            if hata_bildir:
+                neden = exc.reason if isinstance(exc, DocxExtractionError) else "bozuk"
+                raise DocxExtractionError(neden) from exc
             return ""
         paragraflar: list[str] = []
         for p in kok.iter(f"{_WORD_NS}p"):

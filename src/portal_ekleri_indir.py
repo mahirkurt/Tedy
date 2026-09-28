@@ -34,6 +34,7 @@ import math
 import os
 import re
 import selectors
+import shutil
 import signal
 import socket
 import struct
@@ -824,15 +825,36 @@ def _tamamla(kayit: dict[str, Any], parca: Path, dizin: Path) -> Sonuc:
 EK_YENIDEN_DENEME = timedelta(hours=24)
 METIN_SURE_TAVANI = 180.0
 METIN_DENEME_SINIRI = 3
-# pdftotext's output is read into memory to become <id>.txt. A 400-page
-# textbook is a few MB of text; a crafted PDF can emit text for as long as it
-# runs, so what is kept stops here and the child is killed.
+# An extraction cut by the run's end is an attempt only if it was given at
+# least this long. Görev 7's budget is min(180 s, …), so `sure` always equals
+# what is left: measured on f29062c (probe C), a PDF pdftotext never finishes
+# was cut, uncounted and retried first on every run, forever.
+METIN_ADIL_SURE = 60.0
+# The most text one attachment keeps. A 400-page textbook is a few MB; a
+# crafted PDF can emit text for as long as it runs, so pdftotext is killed
+# one byte past this and _metni_hazirla cuts every text here, marked.
 METIN_AZAMI_BAYT = 16 * MB
+# word/document.xml read for an attachment. FileAdapters' own cap is 50 MB:
+# measured on f29062c, 49 MB cost 4.4 s, 554 MB RSS and a 25.7 M-character
+# text; 8 MB cost 0.73 s and 116 MB RSS.
+METIN_DOCX_XML_SINIRI = 8 * MB
+# Runs in a row in which a download received bytes but its part file did
+# not grow: a host that ignores Range restarts at 0 every run, and a file
+# larger than one run's byte budget never finishes (probe B on f29062c).
+EK_ILERLEMESIZ_SINIRI = 2
+_ILERLEMESIZ = "kaynak sürdürmeyi desteklemiyor ve dosya bir turun bayt bütçesinden büyük"
 _PDF = frozenset({".pdf"})
 _DOCX = frozenset({".docx"})
 _GORSEL = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp"})
 _METIN_NOTU = {METIN_YOK: "(Metin katmanı yok: taranmış belge ya da görsel.)",
                METIN_DESTEKLENMIYOR: "(Bu ek türünün metni okunmuyor.)"}
+_KESILDI_NOTU = "(Metin burada kesildi: bu ekin metni {mb} MB sınırını aşıyor; devamı okunmadı.)"
+_NEDEN_SURE = "metin çıkarma süresi doldu"
+_NEDEN_PDFTOTEXT = "pdftotext çalıştırılamadı"
+_NEDEN_PDF_BOZUK = "PDF okunamadı (bozuk ya da şifreli)"
+_DOCX_NEDENLERI = {"bozuk": "Word belgesi okunamadı (bozuk dosya)",
+                   "dtd": "Word belgesi güvenlik gereği okunmadı (DTD ya da varlık bildirimi var)",
+                   "sinir": f"Word belgesinin metni {METIN_DOCX_XML_SINIRI // MB} MB sınırından büyük"}
 
 
 @dataclass
@@ -856,14 +878,22 @@ def _grubu_oldur(surec: subprocess.Popen) -> None:
 
 def _alt_surec_metni(komut: list[str], sure: float) -> tuple[int | None, bytes]:
     """(exit code, stdout) of `komut`, waited for at most `sure` seconds of
-    wall clock: (None, b"") when time ran out and the process group was
-    killed. Stdout is read through a selector against the deadline, not by
-    communicate(), so neither a silent child nor a grandchild holding the
-    pipe open can stretch the wait; past METIN_AZAMI_BAYT the child is
-    killed and what was read is kept."""
+    wall clock: (None, b"") when time ran out. Stdout is read through a
+    selector against the deadline, not by communicate(), so neither a silent
+    child nor a grandchild holding the pipe open can stretch the wait. Past
+    METIN_AZAMI_BAYT the child is killed and one byte more than the cap is
+    kept, so the caller can tell the text was cut.
+
+    The process group is always killed at the end, even after the child
+    exited: measured on f29062c (probe A), `sleep 20 & exit 0` left the
+    grandchild alive. The command also runs under `timeout -s KILL`, so if
+    this process is killed first (cron's `timeout 600` kills run_sync, not
+    the session started here) the orphan still ends ceil(sure) + 1 s later."""
     if not (sure > 0):
         return None, b""
     son_an = time.monotonic() + sure
+    if shutil.which("timeout"):
+        komut = ["timeout", "-s", "KILL", str(math.ceil(min(sure, 1e9)) + 1)] + komut
     surec = subprocess.Popen(komut, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                              stderr=subprocess.DEVNULL, start_new_session=True)
     parcalar: list[bytes] = []
@@ -883,17 +913,18 @@ def _alt_surec_metni(komut: list[str], sure: float) -> tuple[int | None, bytes]:
                     break                                   # EOF
                 parcalar.append(blok)
                 toplam += len(blok)
-                if toplam >= METIN_AZAMI_BAYT:
-                    return 0, b"".join(parcalar)[:METIN_AZAMI_BAYT]
+                if toplam > METIN_AZAMI_BAYT:
+                    return 0, b"".join(parcalar)[:METIN_AZAMI_BAYT + 1]
         try:
             kod = surec.wait(timeout=max(0.0, son_an - time.monotonic()))
         except subprocess.TimeoutExpired:
             return None, b""
         return kod, b"".join(parcalar)
     finally:
-        if surec.poll() is None:
-            _grubu_oldur(surec)
-            surec.wait()
+        # The group outlives its reaped leader while any member is alive, and
+        # Linux does not hand out a pid still in use as a process group id.
+        _grubu_oldur(surec)
+        surec.wait()
         surec.stdout.close()
 
 
@@ -905,33 +936,35 @@ def _pdf_metni(yol: Path, sure: float) -> tuple[str, str]:
     try:
         kod, ham = _alt_surec_metni(["pdftotext", "-layout", os.fspath(yol), "-"], sure)
     except OSError as exc:
-        # pdftotext missing or not executable: a deployment problem, retried
-        # up to METIN_DENEME_SINIRI times like any failed extraction.
         logger.warning("portal eki metni: pdftotext başlatılamadı (%s)", type(exc).__name__)
-        return METIN_HATA, ""
+        return METIN_HATA, _NEDEN_PDFTOTEXT
     if kod is None:
-        return METIN_HATA, ""
+        return METIN_HATA, _NEDEN_SURE
     metin = ham.decode("utf-8", errors="replace")
     if metin.strip():
         return METIN_VAR, metin.strip()
     # Exit 0 with nothing printed: a scan with no text layer (OCR is Görev
-    # 14–15). A non-zero exit with nothing printed is a damaged or locked
-    # PDF — an extraction failure, not a fact about the text.
-    return (METIN_YOK, "") if kod == 0 else (METIN_HATA, "")
+    # 14–15). 126/127 is `timeout` saying pdftotext could not be run; any
+    # other non-zero exit is a damaged or locked PDF.
+    if kod == 0:
+        return METIN_YOK, ""
+    return METIN_HATA, _NEDEN_PDFTOTEXT if kod in (126, 127) else _NEDEN_PDF_BOZUK
 
 
 def metin_cikar(yol: Path, sure: float) -> tuple[str, str]:
     """(text status, text) for one downloaded copy, within `sure` seconds.
+    For METIN_HATA the second element is the reason, in Turkish, for the
+    tracker's `text_reason` — never written as the attachment's text.
 
     - PDF: pdftotext, a child process killed at `sure` (see _pdf_metni). A
       PDF without a text layer is METIN_YOK — reported, never OCR'd here:
       rasterising and OCR'ing a scan costs seconds per page, and one
       100-page book would outlast the whole 600 s cron run (plan 2026-09-28,
       decision 2; OCR arrives in Görev 14–15).
-    - .docx: the assistant's own FileAdapters reader, in process. Bounded by
-      size, not by `sure`: word/document.xml is read at most DOCX_XML_SINIRI
-      (50 MB) bytes; measured 2026-09-28 a 50 MB document.xml took 9.5 s and
-      671 MB RSS at load 9 on the HP host.
+    - .docx: the assistant's own reader, in process, reading at most
+      METIN_DOCX_XML_SINIRI of word/document.xml. An archive it cannot read
+      (not a zip, a DTD, over the cap) is METIN_HATA with its reason;
+      METIN_YOK is only a real document with no text in it.
     - Images: METIN_YOK. FileAdapters' tesseract call has no timeout, so it
       is not run here even with ASSISTANT_ENABLE_OCR=1.
     - Anything else: METIN_DESTEKLENMIYOR."""
@@ -942,21 +975,20 @@ def metin_cikar(yol: Path, sure: float) -> tuple[str, str]:
         return METIN_YOK, ""
     if uzanti not in _DOCX:
         return METIN_DESTEKLENMIYOR, ""
-    from src.assistant_core import FileAdapters
+    from src.assistant_core import DocxExtractionError, FileAdapters
     ayar = _CikarmaAyari(max_file_size_mb=EK_BOYUT_SINIRI // MB + 1, pdf_max_pages=400,
                          pdf_timeout=sure, enable_ocr=False)
-    sonuc = FileAdapters(ayar).extract(yol, yol.name)
-    if sonuc.get("extraction_error"):
-        return METIN_HATA, ""
-    if sonuc.get("source_kind") == "metadata":
-        return METIN_YOK, ""
-    return METIN_VAR, str(sonuc.get("text") or "")
+    try:
+        metin = FileAdapters(ayar)._extract_docx_text(yol, sinir=METIN_DOCX_XML_SINIRI, hata_bildir=True)
+    except DocxExtractionError as exc:
+        return METIN_HATA, _DOCX_NEDENLERI.get(exc.reason, _DOCX_NEDENLERI["bozuk"])
+    return (METIN_VAR, metin) if metin.strip() else (METIN_YOK, "")
 
 
 def metin_dosyasi(kayit: dict[str, Any], durum: str, metin: str) -> str:
     """<id>.txt: a METIN_ONEKI header paragraph (so the index finds an
     attachment by its name), a note when there is no text, then the text."""
-    kaynak = kayit.get("source") if isinstance(kayit.get("source"), dict) else {}
+    kaynak = _kaynak(kayit)
     parcalar = [ek_basligi(kayit)] + ([kaynak["course"]] if kaynak.get("course") else [])
     bas = METIN_ONEKI + " · ".join(parcalar)
     not_ = _METIN_NOTU.get(durum, "")
@@ -964,9 +996,36 @@ def metin_dosyasi(kayit: dict[str, Any], durum: str, metin: str) -> str:
     return "\n".join(x for x in (bas, not_) if x) + (f"\n\n{govde}" if govde else "") + "\n"
 
 
+# The tracker is a file on disk, and a record the scrape no longer carries
+# keeps whatever it holds, so every value is read defensively. Measured on
+# f29062c (probe D): `partial_bytes: [1]`, `source: "x"`, an aware
+# `next_attempt` and `attempts: "x"` each crashed every run.
+def _tamsayi(deger: Any) -> int:
+    if isinstance(deger, bool):
+        return 0
+    if isinstance(deger, (int, float, str)):
+        try:
+            return max(0, int(deger))
+        except (ValueError, OverflowError):
+            return 0
+    return 0
+
+
+def _kaynak(kayit: dict[str, Any]) -> dict[str, Any]:
+    kaynak = kayit.get("source")
+    return kaynak if isinstance(kaynak, dict) else {}
+
+
+def _yerel(an: datetime) -> datetime:
+    return an.astimezone().replace(tzinfo=None) if an.tzinfo else an
+
+
 def _zaman(deger: Any) -> datetime | None:
+    """Naive local time, or None — which means "retry now", never "never"."""
+    if not isinstance(deger, str) or not deger:
+        return None
     try:
-        return datetime.fromisoformat(str(deger)) if deger else None
+        return _yerel(datetime.fromisoformat(deger))
     except ValueError:
         return None
 
@@ -984,29 +1043,69 @@ def _indirilmeli(kayit: dict[str, Any], depo: EkDeposu, an: datetime) -> bool:
 
 
 def _metin_gerekli(kayit: dict[str, Any], depo: EkDeposu) -> bool:
-    return (kayit.get("status") == DURUM_INDIRILDI
-            and kayit.get("text") in (None, "", METIN_BEKLIYOR, METIN_HATA)
-            and int(kayit.get("text_attempts") or 0) < METIN_DENEME_SINIRI
-            and depo.dosya_yolu(kayit) is not None)
+    if kayit.get("status") != DURUM_INDIRILDI or depo.dosya_yolu(kayit) is None:
+        return False
+    metin = kayit.get("text")
+    if metin in (METIN_VAR, METIN_YOK, METIN_DESTEKLENMIYOR):
+        return not depo.metin_yolu(kayit["id"]).exists()   # the .txt went missing
+    return (metin in (None, "", METIN_BEKLIYOR, METIN_HATA)
+            and _tamsayi(kayit.get("text_attempts")) < METIN_DENEME_SINIRI)
+
+
+def _geride(kayit: dict[str, Any], depo: EkDeposu, an: datetime) -> bool:
+    """Work that already lost a run — a download that made no net progress,
+    or a text extraction cut at the run's end — waits behind fresh work, so
+    one pathological file cannot take every run's budget first."""
+    if _tamsayi(kayit.get("stalled_runs")) > 0:
+        return True
+    return kayit.get("text_cut") is True and not _indirilmeli(kayit, depo, an)
 
 
 def _is_sirasi(ekler: dict[str, dict[str, Any]], depo: EkDeposu, an: datetime) -> list[dict[str, Any]]:
-    """Part files first (finish what is started), then homework, newest first."""
+    """Fresh work before work that lost a run; within each, part files first
+    (finish what is started), then homework, newest first."""
     isler = [k for k in ekler.values() if _indirilmeli(k, depo, an) or _metin_gerekli(k, depo)]
     isler.sort(key=lambda k: str(k.get("first_seen") or ""), reverse=True)
-    isler.sort(key=lambda k: (0 if int(k.get("partial_bytes") or 0) > 0 else 1,
-                              0 if (k.get("source") or {}).get("section") == "odevler" else 1))
+    isler.sort(key=lambda k: (_geride(k, depo, an),
+                              0 if _tamsayi(k.get("partial_bytes")) > 0 else 1,
+                              0 if _kaynak(k).get("section") == "odevler" else 1))
     return isler
+
+
+def _ilerlemeyi_denetle(kayit: dict[str, Any], sonuc: Sonuc, onceki: int, alinan: int,
+                        depo: EkDeposu) -> Sonuc:
+    """A `bekliyor` that received bytes this run yet left the part file no
+    longer than the last run did has restarted at 0. EK_ILERLEMESIZ_SINIRI
+    such runs in a row make the attachment terminal `cok_buyuk`. A run that
+    received nothing (the budget was gone first) says nothing either way."""
+    if sonuc.durum != DURUM_BEKLIYOR:
+        kayit.pop("stalled_runs", None)
+        return sonuc
+    if alinan <= 0:
+        return sonuc
+    ilerlemedi = onceki > 0 and sonuc.parca_bayt <= onceki
+    sayi = _tamsayi(kayit.get("stalled_runs")) + 1 if ilerlemedi else 0
+    if sayi < EK_ILERLEMESIZ_SINIRI:
+        if sayi:
+            kayit["stalled_runs"] = sayi
+        else:
+            kayit.pop("stalled_runs", None)
+        return sonuc
+    kayit.pop("stalled_runs", None)
+    _parcayi_sil(depo.dizin / ".parca" / f"{kayit['id']}.part")
+    return Sonuc(DURUM_COK_BUYUK, _ILERLEMESIZ)
 
 
 def _sonucu_yaz(kayit: dict[str, Any], sonuc: Sonuc, an: datetime) -> None:
     zaman = an.isoformat(timespec="seconds")
-    kayit["attempts"] = int(kayit.get("attempts") or 0) + 1
+    kayit["attempts"] = _tamsayi(kayit.get("attempts")) + 1
     kayit.update(status=sonuc.durum, reason=sonuc.neden, last_attempt=zaman, partial_bytes=sonuc.parca_bayt)
     if sonuc.durum == DURUM_INDIRILDI:
         kayit.update(file=sonuc.dosya, ext=sonuc.uzanti, mime=sonuc.mime, size=sonuc.boyut,
                      sha256=sonuc.sha256, fetched_at=zaman, text=METIN_BEKLIYOR, text_attempts=0,
                      next_attempt=None, partial_bytes=0)
+        for alan in ("text_cut", "text_reason", "text_truncated"):
+            kayit.pop(alan, None)
         return
     kayit["file"] = None
     kayit["next_attempt"] = ((an + EK_YENIDEN_DENEME).isoformat(timespec="seconds")
@@ -1016,9 +1115,11 @@ def _sonucu_yaz(kayit: dict[str, Any], sonuc: Sonuc, an: datetime) -> None:
 def _atomik_yaz(yol: Path, metin: str) -> None:
     """tmp + rename in the same directory. The temporary name is unique and
     dot-prefixed, so two overlapping runs never share it and _tamamla's
-    `<id>.*` sweep never sees it."""
+    `<id>.*` sweep never sees it. mkstemp creates 0600; the .txt is made
+    0644 like the .meta.json beside it (open() under umask 022)."""
     fd, gecici = tempfile.mkstemp(prefix=".", suffix=".tmp", dir=yol.parent)
     try:
+        os.fchmod(fd, 0o644)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(metin)
         os.replace(gecici, yol)
@@ -1030,27 +1131,47 @@ def _atomik_yaz(yol: Path, metin: str) -> None:
 def _metni_hazirla(depo: EkDeposu, kayit: dict[str, Any], butce: Butce,
                    cikarici: Callable[[Path, float], tuple[str, str]]) -> bool:
     """Extract once into <id>.txt and <id>.meta.json. False when the run's
-    end cut the extraction short: that is not an attempt (it says nothing
-    about the file) and the record stays METIN_BEKLIYOR for the next run."""
+    end cut an extraction given less than METIN_ADIL_SURE: that says nothing
+    about the file, so it is not an attempt; the record stays METIN_BEKLIYOR
+    and, marked `text_cut`, waits behind fresh work next run. Given at least
+    METIN_ADIL_SURE, a cut is an attempt like any failure."""
     kimlik = kayit["id"]
     yol = depo.dosya_yolu(kayit)
+    sure = min(METIN_SURE_TAVANI, butce.kalan_sure())
     try:
-        durum, metin = cikarici(yol, min(METIN_SURE_TAVANI, butce.kalan_sure()))
+        durum, metin = cikarici(yol, sure)
     except Exception as exc:
         logger.warning("portal eki %s: metin çıkarılamadı (%s)", kimlik, type(exc).__name__, exc_info=True)
-        durum, metin = METIN_HATA, ""
-    if durum not in (METIN_VAR, METIN_YOK, METIN_DESTEKLENMIYOR) or not isinstance(metin, str):
+        durum, metin = METIN_HATA, f"metin çıkarılırken beklenmeyen hata ({type(exc).__name__})"
+    if durum not in (METIN_VAR, METIN_YOK, METIN_DESTEKLENMIYOR, METIN_HATA) or not isinstance(metin, str):
         durum, metin = METIN_HATA, ""
     if durum == METIN_HATA and butce.bitti():
-        return False
-    kayit["text_attempts"] = int(kayit.get("text_attempts") or 0) + 1
+        kayit["text_cut"] = True
+        if sure < METIN_ADIL_SURE:
+            return False
+        metin = metin or _NEDEN_SURE
+    elif durum != METIN_HATA:
+        kayit.pop("text_cut", None)
+    kayit["text_attempts"] = _tamsayi(kayit.get("text_attempts")) + 1
+    kaynak = _kaynak(kayit)
+    meta = {"id": kimlik, "name": kayit.get("name", ""), "title": kaynak.get("title", ""),
+            "section": kaynak.get("section", ""), "course": kaynak.get("course", "")}
+    kayit.pop("text_truncated", None)
+    if durum == METIN_HATA:
+        kayit.update(text=durum, text_chars=0, text_reason=metin)
+        atomic_json_dump(meta, os.fspath(depo.meta_yolu(kimlik)))
+        return True
+    kayit.pop("text_reason", None)
+    ham = metin.encode("utf-8")
+    if len(ham) > METIN_AZAMI_BAYT:
+        # Never stored as if complete: the .txt says where it stops, the
+        # sidecar and the tracker carry the flag.
+        metin = ham[:METIN_AZAMI_BAYT].decode("utf-8", errors="ignore").rstrip()
+        metin += "\n\n" + _KESILDI_NOTU.format(mb=max(1, METIN_AZAMI_BAYT // MB))
+        kayit["text_truncated"] = meta["text_truncated"] = True
     kayit.update(text=durum, text_chars=len(metin))
-    kaynak = kayit.get("source") if isinstance(kayit.get("source"), dict) else {}
-    atomic_json_dump({"id": kimlik, "name": kayit.get("name", ""), "title": kaynak.get("title", ""),
-                      "section": kaynak.get("section", ""), "course": kaynak.get("course", "")},
-                     os.fspath(depo.meta_yolu(kimlik)))
-    if durum != METIN_HATA:
-        _atomik_yaz(depo.metin_yolu(kimlik), metin_dosyasi(kayit, durum, metin))
+    atomic_json_dump(meta, os.fspath(depo.meta_yolu(kimlik)))
+    _atomik_yaz(depo.metin_yolu(kimlik), metin_dosyasi(kayit, durum, metin))
     return True
 
 
@@ -1068,7 +1189,7 @@ def ekleri_esitle(proje_koku: str | Path, veri: Any, oturum: Any, butce: Butce, 
     and that daemon thread may still be inside `oturum` — a requests.Session
     is not thread-safe, so no second download may start on it this run."""
     depo = EkDeposu(proje_koku)
-    an = simdi()
+    an = _yerel(simdi())
     zaman = an.isoformat(timespec="seconds")
     ekler = depo.oku()
     for kimlik, kayit in ekler.items():
@@ -1090,16 +1211,19 @@ def ekleri_esitle(proje_koku: str | Path, veri: Any, oturum: Any, butce: Butce, 
         if butce.bitti():
             break
         if _indirilmeli(kayit, depo, an):
-            sonuc = ek_indir(oturum, kayit, depo.dizin, butce, cerezler)
+            onceki, harcanan = _tamsayi(kayit.get("partial_bytes")), butce.harcanan
+            ham = ek_indir(oturum, kayit, depo.dizin, butce, cerezler)
+            sonuc = _ilerlemeyi_denetle(kayit, ham, onceki, butce.harcanan - harcanan, depo)
             _sonucu_yaz(kayit, sonuc, an)
             depo.yaz(ekler)
-            if sonuc.durum == DURUM_BEKLIYOR:
+            if ham.durum == DURUM_BEKLIYOR:
                 break
             if sonuc.durum == DURUM_INDIRILDI:
                 bu_tur["indirilen"] += 1
                 bu_tur["bayt"] += sonuc.boyut
         if _metin_gerekli(kayit, depo) and not butce.bitti():
             if not _metni_hazirla(depo, kayit, butce, metin_cikarici):
+                depo.yaz(ekler)
                 break
             depo.yaz(ekler)
             bu_tur["metin"] += 1
