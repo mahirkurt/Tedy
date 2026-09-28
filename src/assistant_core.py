@@ -705,6 +705,7 @@ def _fmt_scraped_data(data: dict, ogretim_yili: str | None = None) -> str:
                                      gunun_dersleri, html_metne, icerik_ozeti,
                                      onceki_yil_raporu_mu, rapor_yili)
     from src.course_names import normalize_course
+    from src.portal_susu import temiz_metin
 
     parts: list[str] = []
 
@@ -737,7 +738,7 @@ def _fmt_scraped_data(data: dict, ogretim_yili: str | None = None) -> str:
             desc = ""
             detail = r.get("detail")
             if isinstance(detail, dict):
-                desc = detail.get("description", "")
+                desc = temiz_metin(detail.get("description", ""))
             line = f"{ders} | {baslik}"
             if tarih:
                 line += f" | Son teslim: {tarih}"
@@ -878,7 +879,7 @@ def _fmt_scraped_data(data: dict, ogretim_yili: str | None = None) -> str:
             continue
         satirlar = [f"PORTAL SAYFASI · {str(kayit.get('title') or '').strip()}"]
         if str(kayit.get("text") or "").strip():
-            satirlar.append(str(kayit["text"]).strip())
+            satirlar.append(temiz_metin(kayit["text"]))
         for tablo in kayit.get("tables") or []:
             satirlar.extend(_tablo_satirlari(tablo))
         for secenek in kayit.get("options") or []:

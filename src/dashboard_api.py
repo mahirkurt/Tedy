@@ -32,6 +32,7 @@ from src.env_loader import load_env
 from src.json_utils import atomic_json_dump
 from src.course_names import normalize_course
 from src.hafta_secici import guncel_hafta as _guncel_hafta
+from src.portal_susu import temiz_dersler, temiz_haftalar, temiz_metin
 from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.USER_ROLES etc.)
     ALLOWED_EMAILS,
     FULL_ACCESS_EMAILS,
@@ -815,6 +816,11 @@ def _combined_homework_rows(scraped_data):
         r = dict(row)
         if "Ders Adı" in r:
             r["normalized_course"] = normalize_course(r["Ders Adı"])
+        detay = r.get("detail")
+        if isinstance(detay, dict):
+            # Portal chrome and comment blocks never reach a surface
+            # (src/portal_susu.py); a description is cleaned like course content.
+            r["detail"] = {**detay, "description": temiz_metin(detay.get("description"))}
         rows.append(r)
     return _dedupe_homework_rows(rows)
 
@@ -911,7 +917,7 @@ def _canli_ders_icerikleri():
     (/api/content/weeks), with the label of the current one."""
     data = _scraped()
     haftalar = _icerik_haftalari(data)
-    guncel = data.get("ders_icerikleri")
+    guncel = temiz_dersler(data.get("ders_icerikleri"))
     return {"guncel": guncel if isinstance(guncel, dict) else {},
             "haftalar": haftalar["weeks"], "guncel_hafta": haftalar["current"]}
 
@@ -1592,7 +1598,7 @@ def teams():
 @require_auth
 def content():
     data = _scraped()
-    return jsonify(data.get("ders_icerikleri", {}))
+    return jsonify(temiz_dersler(data.get("ders_icerikleri", {})))
 
 
 @app.route("/api/pages")
@@ -1611,7 +1617,7 @@ def portal_pages():
     if not isinstance(sayfalar, dict):
         sayfalar = {}
     dolu = {
-        k: v for k, v in sayfalar.items()
+        k: {**v, "text": temiz_metin(v.get("text"))} for k, v in sayfalar.items()
         if isinstance(v, dict) and not v.get("empty")
     }
     engelli = {
@@ -1641,6 +1647,7 @@ def _icerik_haftalari(data):
     haftalar = data.get("ders_icerikleri_haftalar") or {}
     if not isinstance(haftalar, dict):
         haftalar = {}
+    haftalar = temiz_haftalar(haftalar)
     guncel = ""
     for w in data.get("ders_programi") or []:
         if isinstance(w, dict) and w.get("is_current"):
@@ -1653,12 +1660,20 @@ def _icerik_haftalari(data):
     return {"weeks": haftalar, "current": guncel}
 
 
+def _duyuru_satiri(satir):
+    """An announcement row with every text field cleaned; links untouched."""
+    if not isinstance(satir, dict):
+        return satir
+    return {k: (temiz_metin(v) if isinstance(v, str) and not k.endswith("_url") else v)
+            for k, v in satir.items()}
+
+
 @app.route("/api/announcements")
 @require_auth
 def announcements():
     data = _scraped()
     ann = data.get("duyurular", {}).get("announcements", [])
-    return jsonify({"announcements": ann})
+    return jsonify({"announcements": [_duyuru_satiri(a) for a in ann]})
 
 
 def _ec_verisi():

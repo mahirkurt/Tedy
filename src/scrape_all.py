@@ -17,6 +17,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait, Select
 
 from src.env_loader import load_env
+from src.portal_susu import temiz_icerik_kaydi, temiz_metin
 from src.scrape_helpers import wait_for, wait_for_js
 load_env()
 
@@ -632,12 +633,12 @@ def _scrape_homework_detail(driver, odev_id, ders_id):
                     text = sib.get_text(strip=True) if hasattr(sib, 'get_text') else str(sib).strip()
                     if text:
                         parts.append(text)
-                detail["description"] = "\n".join(parts)
+                detail["description"] = temiz_metin("\n".join(parts))
             else:
                 # Fallback: get all text in div minus label
                 full = div.get_text(separator="\n", strip=True)
                 lbl_text = label.get_text(strip=True)
-                detail["description"] = full.replace(lbl_text, "", 1).strip()
+                detail["description"] = temiz_metin(full.replace(lbl_text, "", 1).strip())
             break
 
     # Look for file attachment links
@@ -932,6 +933,23 @@ def scrape_takvim(driver, sinif=None):
 # =============================================================================
 # 5. DERS İÇERİKLERİ (dashboard tabları)
 # =============================================================================
+def _icerik_kaydi(tab_id, panel_text, tables_data, items, cards):
+    """One course tab as stored: portal chrome and comment blocks out
+    (src/portal_susu.py) *before* the length caps, so a cap can no longer cut
+    a block open and keep the half that holds other children's names."""
+    kayit = temiz_icerik_kaydi({
+        "tab_id": tab_id,
+        "text": panel_text,
+        "tables": tables_data,
+        "items": items,
+        "cards": cards,
+    })
+    kayit["text"] = kayit["text"][:8000]
+    kayit["items"] = [t[:2000] for t in kayit["items"]]
+    kayit["cards"] = [t[:2000] for t in kayit["cards"] if len(t) > 5]
+    return kayit
+
+
 def _icerik_acik_hafta(driver, git=True):
     """Extract the dashboard's course tabs for whichever week is open.
 
@@ -987,22 +1005,16 @@ def _icerik_acik_hafta(driver, git=True):
             for li in panel.find_elements(By.TAG_NAME, "li"):
                 text = li.text.strip()
                 if text:
-                    items.append(text[:2000])
+                    items.append(text)
 
             # Extract card content
             cards = []
             for card in panel.find_elements(By.CSS_SELECTOR, ".card, .card-body, .list-group-item"):
                 text = card.text.strip()
                 if text and len(text) > 5:
-                    cards.append(text[:2000])
+                    cards.append(text)
 
-            all_content[ders_name] = {
-                "tab_id": tab_id,
-                "text": panel_text[:8000],
-                "tables": tables_data,
-                "items": items,
-                "cards": cards,
-            }
+            all_content[ders_name] = _icerik_kaydi(tab_id, panel_text, tables_data, items, cards)
 
         except Exception as e:
             print(f"    Error: {e}")
@@ -1372,7 +1384,7 @@ def scrape_ek_sayfalar(driver):
                     continue
 
             kayit.update({
-                "text": veri.get("metin", ""),
+                "text": temiz_metin(veri.get("metin", "")),
                 "tables": tablolar,
                 "documents": veri.get("belgeler", []),
                 "options": veri.get("secenekler", []),
