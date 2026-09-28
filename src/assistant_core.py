@@ -30,7 +30,7 @@ from typing import Any
 
 import requests as http_requests
 
-from src import claude_api
+from src import assistant_skills, claude_api
 from src.json_utils import atomic_json_dump
 
 
@@ -296,6 +296,9 @@ class ToolLoopResult:
     # Summed over every request of one answer: input, output, cache reads and
     # writes. Cost was never logged under Gemini; this is what makes it visible.
     usage: dict[str, int] = field(default_factory=dict)
+    # Reader-stream events tools left behind (ToolOutcome.olay), in call order:
+    # mod_oner's mode_suggestion. /chat, which has no stream, reads them here.
+    olaylar: list[dict[str, Any]] = field(default_factory=list)
 
 
 class ClaudeClient:
@@ -347,15 +350,19 @@ class ClaudeClient:
         return self._client
 
     @staticmethod
-    def _split(messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
-        """System text apart; turns as the Messages API wants them.
+    def _split(messages: list[dict[str, Any]]) -> tuple[list[str], list[dict[str, Any]]]:
+        """System blocks apart, one per system message; turns as the Messages API wants them.
 
         The API rejects a conversation that opens on the assistant and any
         empty text block. The runtime keeps the last three turns of history,
         which can start mid-dialogue, so leading assistant turns are dropped.
+
+        One block per system message, not one joined text: a teacher mode adds
+        its own block after the base prompt, and each is cached on its own
+        (spec §1 "Modele bağlama").
         """
-        system = "\n".join(str(m.get("content", "")) for m in messages
-                           if m.get("role") == "system" and m.get("content"))
+        system = [str(m.get("content", "")) for m in messages
+                  if m.get("role") == "system" and str(m.get("content", "")).strip()]
         turns: list[dict[str, Any]] = []
         for m in messages:
             role = m.get("role", "user")
@@ -370,7 +377,7 @@ class ClaudeClient:
             turns.append({"role": role, "content": content})
         return system, turns
 
-    def _request(self, system: str, turns: list[dict[str, Any]], tier: str,
+    def _request(self, system: str | list[str], turns: list[dict[str, Any]], tier: str,
                  usage: dict[str, int], tools: list[dict[str, Any]] | None = None,
                  tool_choice: dict[str, Any] | None = None,
                  on_delta: Callable[[str], None] | None = None) -> Any:
@@ -381,12 +388,15 @@ class ClaudeClient:
             "thinking": {"type": "adaptive"},
             "output_config": {"effort": self.EFFORT.get(tier, "medium")},
         }
-        if system:
-            # Render order is tools -> system -> messages, so one breakpoint on
-            # the system block caches the tool list and the prompt together:
-            # every round of a tool loop re-sends exactly that prefix.
-            params["system"] = [{"type": "text", "text": system,
-                                 "cache_control": {"type": "ephemeral"}}]
+        bloklar = [b for b in ([system] if isinstance(system, str) else system) if b]
+        if bloklar:
+            # Render order is tools -> system -> messages, so a breakpoint on
+            # the system blocks caches the tool list and the prompt together:
+            # every round of a tool loop re-sends exactly that prefix. One
+            # breakpoint per block: the base prompt (byte-identical in every
+            # mode) and, in a teacher mode, that teacher's block after it.
+            params["system"] = [{"type": "text", "text": b,
+                                 "cache_control": {"type": "ephemeral"}} for b in bloklar]
         if tools:
             params["tools"] = tools
         if tool_choice:
@@ -513,6 +523,8 @@ class ClaudeClient:
                         error=f"Model geçersiz argüman gönderdi (sözlük bekleniyor): {raw!r}")
 
                 out.tool_calls.append({"name": use.name, "ms": elapsed, "ok": bool(outcome.ok)})
+                if outcome.ok and outcome.olay:
+                    out.olaylar.append(dict(outcome.olay))
                 if outcome.ok:
                     first = len(out.citations) + 1
                     out.citations.extend(outcome.citations)
@@ -1736,7 +1748,14 @@ class AssistantRuntime:
                  sebit_kaynagi: Callable[[], Any] | None = None,
                  platform_kaynagi: Callable[[], Any] | None = None,
                  kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
-                 video_kaynagi: Callable[[], Any] | None = None):
+                 video_kaynagi: Callable[[], Any] | None = None,
+                 skills: dict[str, Any] | None = None):
+        # First, before anything else is built: a broken teacher skill stops the
+        # assistant from opening at all (spec "Hata ve boşluk durumları"), with
+        # the skill and the reason in the error — never a silent fallback.
+        # `skills` lets tests bring their own; production reads the repo's.
+        self.skills: dict[str, Any] = (assistant_skills.varsayilan() if skills is None
+                                       else dict(skills))
         self.config = AssistantConfig.from_project_root(
             project_root)
         self.llm = ClaudeClient()
@@ -1783,7 +1802,8 @@ class AssistantRuntime:
                                        platform_kaynagi=platform_kaynagi,
                                        kitap_kaynagi=kitap_kaynagi,
                                        video_kaynagi=video_kaynagi,
-                                       aile_kaynak_arama=self._aile_search)
+                                       aile_kaynak_arama=self._aile_search,
+                                       skills=self.skills)
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """The retriever, shaped as a tool the model can choose to call."""
@@ -1864,7 +1884,16 @@ class AssistantRuntime:
         "çağır; cevabı ikisini birleştirerek kur.\n"
         "- 'İkisini karıştırma' burada kaynakların karışmaması demektir, "
         "aracın tekliği değil: Işık'ın notunu müfredattan, kazanımı yerel "
-        "dosyadan çıkarma.\n\n"
+        "dosyadan çıkarma.\n"
+        "- Araç listende `mod_oner` varsa ve soru açıkça Türkçe, Fen Bilimleri, Sosyal "
+        "Bilgiler ya da Matematik dersinde bir konuyu, kavramı ya da soru çözmeyi öğrenmekle "
+        "ilgiliyse soruyu yine eksiksiz cevapla ve `mod_oner`'i bir kez çağır: o dersin "
+        "öğretmeni ve okura gösterilecek tek kısa gerekçe. Ödev listesi, sınav tarihi, ders "
+        "programı gibi sorular bir ders adı taşısa da konu öğrenmek değildir; onlarda çağırma. "
+        "Öneriyi cevap metninde tekrar etme; okur onu ayrı bir düğme olarak görür.\n"
+        "- Bu istemden sonra bir 'Öğretmen modu' bölümü geliyorsa o dersin öğretmenisin: o "
+        "bölüme uy. Bu istemin Hitap, Uydurma yasağı, Atıf ve Biçim kuralları orada da "
+        "geçerlidir; o bölüm açıkça bir istisna koymadıkça.\n\n"
 
         "## Uydurma yasağı\n"
         "- Kazanım kodu, ders kitabı adı ve sayfa numarası YALNIZ araç "
@@ -2001,6 +2030,7 @@ class AssistantRuntime:
         on_delta: Callable[[str], None] | None = None,
         on_reset: Callable[[], None] | None = None,
         okur: str = "bilinmiyor",
+        ogretmen: str = assistant_skills.GENEL,
     ) -> dict[str, Any]:
         # `dispatch`, if given, replaces self.registry.dispatch for this
         # call only. chat_events() (below) uses this to wrap tool calls
@@ -2010,6 +2040,9 @@ class AssistantRuntime:
         # Passing the wrapper in as an argument keeps each call's
         # narration local to its own stack frame instead of racing
         # another call's over one shared attribute.
+        if ogretmen != assistant_skills.GENEL and ogretmen not in self.skills:
+            # The API answers 400 before this; reaching here is a caller's bug.
+            raise ValueError(f"bilinmeyen öğretmen: {ogretmen}")
         start = time.perf_counter()
 
         user_query = self._latest_user_message(messages)
@@ -2021,7 +2054,7 @@ class AssistantRuntime:
             safety_flags.append("warning:stale_context")
 
         convo = self._build_conversation(messages, user_query, intent, safety_flags,
-                                         okur=okur)
+                                         okur=okur, ogretmen=ogretmen)
 
         try:
             # `temperature` stays in chat()'s signature for /v1 callers but is
@@ -2030,11 +2063,14 @@ class AssistantRuntime:
                 messages=convo,
                 # aile_kaynak_ara (Görev 5) is declared only for okur == "aile" —
                 # the reader decides the tool list, not a per-call opt-in.
-                declarations=self.registry.declarations(okur),
+                # The teacher decides the rest: mod_oner in genel, skill_kaynagi in a
+                # teacher mode (B1).
+                declarations=self.registry.declarations(okur, ogretmen=ogretmen),
                 # Module progress enters the model context only for a signed-in person (plan K-S6);
                 # the caller decides, and only an exact True counts.
                 dispatch=dispatch or functools.partial(
-                    self.registry.dispatch, ilerleme_izni=ilerleme_izni is True, okur=okur),
+                    self.registry.dispatch, ilerleme_izni=ilerleme_izni is True, okur=okur,
+                    ogretmen=ogretmen),
                 tier=tier,
                 on_delta=on_delta,
                 on_reset=on_reset,
@@ -2081,11 +2117,17 @@ class AssistantRuntime:
             "plan_blocks": [],
             "intent": intent,
             "session_id": session_id,
+            # The last switch suggestion mod_oner made, without its event name;
+            # the stream also sends it as it happens. None when there was none.
+            "mode_suggestion": next(
+                ({k: v for k, v in o.items() if k != "event"} for o in reversed(loop.olaylar)
+                 if o.get("event") == "mode_suggestion"), None),
             "meta": {
                 "model": self.llm.last_model_used or self.llm.model,
                 "provider": "anthropic",
                 "usage": dict(loop.usage),
                 "tier": tier,
+                "ogretmen": ogretmen,
                 "tool_calls": loop.tool_calls,
                 "dropped_citations": dropped,
                 "degraded": self.registry.degraded(),
@@ -2098,7 +2140,8 @@ class AssistantRuntime:
 
         self._write_metric({
             "type": "chat", "session_id": session_id, "intent": intent,
-            "tier": tier, "latency_ms": latency_ms, "citations": len(citations),
+            "tier": tier, "ogretmen": ogretmen, "latency_ms": latency_ms,
+            "citations": len(citations),
             "tool_calls": len(loop.tool_calls),
             "model": payload["meta"]["model"],
             "usage": dict(loop.usage),
@@ -2148,7 +2191,8 @@ class AssistantRuntime:
         # Read once, per call — never assigned back onto the registry.
         real_dispatch = functools.partial(
             self.registry.dispatch, ilerleme_izni=kwargs.get("ilerleme_izni") is True,
-            okur=kwargs.get("okur", "bilinmiyor"))
+            okur=kwargs.get("okur", "bilinmiyor"),
+            ogretmen=kwargs.get("ogretmen", assistant_skills.GENEL))
 
         def announcing(name: str, args: dict[str, Any]) -> Any:
             if cancelled.is_set():
@@ -2157,6 +2201,9 @@ class AssistantRuntime:
             outcome = real_dispatch(name, args)
             events.put({"event": "tool_end", "name": name,
                         "ok": bool(outcome.ok)})
+            if outcome.ok and outcome.olay:
+                # mod_oner's suggestion reaches the reader as it happens.
+                events.put(dict(outcome.olay))
             if cancelled.is_set():
                 raise _StreamAbandoned()
             return outcome
@@ -2219,6 +2266,7 @@ class AssistantRuntime:
         intent: str,
         safety_flags: list[str],
         okur: str = "bilinmiyor",
+        ogretmen: str = assistant_skills.GENEL,
     ) -> list[dict[str, str]]:
         """System prompt plus recent turns.
 
@@ -2230,10 +2278,18 @@ class AssistantRuntime:
         block is cached, and a clock in it would miss the cache every minute.
         """
         from src.assistant_tools import bugun_satiri
+        sistem = [{"role": "system", "content": self._system_prompt()}]
+        skill = self.skills.get(ogretmen)
+        if skill is not None:
+            # A second block after the base prompt, which stays byte-identical
+            # in every mode (spec §1 "Modele bağlama").
+            sistem.append({"role": "system", "content": skill.sistem_blogu()})
         return [
-            {"role": "system", "content": self._system_prompt()},
+            *sistem,
             *[
-                {"role": str(m.get("role", "user")),
+                # Only "assistant" stays itself. A client-sent "system" turn
+                # must never become a system block of ours.
+                {"role": "assistant" if m.get("role") == "assistant" else "user",
                  "content": str(m.get("content", ""))[:2000]}
                 for m in messages[-3:] if isinstance(m, dict)
             ],
