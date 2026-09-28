@@ -15,6 +15,7 @@ import src.portal_ekleri_indir as indir_modulu
 from src.portal_ekleri import EkDeposu, METIN_ONEKI, ek_kimligi
 from src.portal_ekleri_indir import (MB, METIN_SURE_TAVANI, Butce, Sonuc, ekleri_esitle,
                                      metin_cikar)
+from src.portal_ekleri_indir import PARCA_BOYUTU as PARCA
 from tests.sahte_http import (DRIVE_URL, GIRIS_DUVARI, PDF, SP_DUVAR_URL, SP_URL, YOUTUBE,
                               SahteOturum, SahteYanit, aralikli, docx_bayt)
 
@@ -724,3 +725,45 @@ def test_hata_ile_biten_metin_eski_txtyi_siler(tmp_path):
                        "text_attempts": 0, "url": SP_URL, "type": "sharepoint"}})
     _esitle(tmp_path, SahteOturum(_rotalar()), _veri(("a.pdf", SP_URL)), cikarici=lambda y, s: ("hata", "x"))
     assert depo.kayit(kimlik)["text"] == "hata" and not depo.metin_yolu(kimlik).exists()
+
+
+# ── Round 3: queue order does not depend on stall counting ───────────────────
+
+def test_zamanla_biten_buyumeyen_parca_taze_isin_arkasina_gecer(tmp_path):
+    """A slow host that ignores Range, cut by the run's time budget: the
+    second run fetches less than the part held (alinan < onceki), so no
+    stall is counted — but the part did not grow either, and it must not
+    stay first. The next run tries the other attachment before it."""
+    saat = [0.0]
+    ilk = PDF + b"0" * (PARCA - len(PDF))
+    dolgu = b"0" * PARCA
+
+    def blok(veri):
+        def uret():
+            saat[0] += 1.0                  # one second of wall clock per block
+            return veri
+        return uret
+
+    def yavas(u, h):
+        return SahteYanit(200, headers={"Content-Type": "application/pdf",
+                                        "Content-Length": str(PARCA * 100)},
+                          bloklar=[blok(ilk)] + [blok(dolgu) for _ in range(99)])
+    rota = {SP: yavas, "https://drive.google.com/uc?": lambda u, h: SahteYanit(
+        200, PDF, {"Content-Type": "application/octet-stream"})}
+    veri = _veri(("a.pdf", SP_URL), ("b.pdf", DRIVE_URL))
+    depo = EkDeposu(tmp_path)
+    oturumlar = []
+    for i, saniye in enumerate([10.0, 5.0, 10.0]):
+        saat[0] = 0.0
+        oturum = SahteOturum(rota)
+        # Run 0: a is first by insertion; run 1: its part grew in run 0, so
+        # it is first again. Its `bekliyor` ends each run before b.
+        _esitle(tmp_path, oturum, veri, an=AN + timedelta(minutes=15 * i),
+                butce=Butce(saniye, 100 * MB, saat=lambda: saat[0]))
+        oturumlar.append([x["url"][:26] for x in oturum.istekler])
+        if i == 1:
+            a = depo.kayit(ek_kimligi(SP_URL))
+            assert a["status"] == "bekliyor" and not a.get("stalled_runs")   # neutral, not counted
+    assert oturumlar[0] == oturumlar[1] == ["https://ornekokul-my.share"]
+    assert oturumlar[2][0].startswith("https://drive.google.com/")
+    assert depo.kayit(ek_kimligi(DRIVE_URL))["status"] == "indirildi"

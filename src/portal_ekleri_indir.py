@@ -1063,17 +1063,23 @@ def _metin_gerekli(kayit: dict[str, Any], depo: EkDeposu) -> bool:
 
 
 def _geride(kayit: dict[str, Any], depo: EkDeposu, an: datetime) -> bool:
-    """Work that already lost a run — a download that made no net progress,
-    or a text extraction cut at the run's end — waits behind fresh work, so
-    one pathological file cannot take every run's budget first."""
+    """Work that already lost a run — a part file its last run did not grow,
+    a counted stall, or a text extraction cut at the run's end — waits
+    behind fresh work, so one pathological file cannot take every run's
+    budget first. Independent of stall counting: a Range-ignoring host cut
+    by the time budget fetches less each run (alinan < onceki), which
+    counts no stall, yet the part does not grow (round 3 on f300a9c)."""
     if _tamsayi(kayit.get("stalled_runs")) > 0:
+        return True
+    if _tamsayi(kayit.get("partial_bytes")) > 0 and kayit.get("partial_grew") is not True:
         return True
     return kayit.get("text_cut") is True and not _indirilmeli(kayit, depo, an)
 
 
 def _is_sirasi(ekler: dict[str, dict[str, Any]], depo: EkDeposu, an: datetime) -> list[dict[str, Any]]:
     """Fresh work before work that lost a run; within each, part files first
-    (finish what is started), then homework, newest first."""
+    (finish what is started — a part is fresh only while its runs grow it),
+    then homework, newest first."""
     isler = [k for k in ekler.values() if _indirilmeli(k, depo, an) or _metin_gerekli(k, depo)]
     isler.sort(key=lambda k: str(k.get("first_seen") or ""), reverse=True)
     isler.sort(key=lambda k: (_geride(k, depo, an),
@@ -1234,6 +1240,11 @@ def ekleri_esitle(proje_koku: str | Path, veri: Any, oturum: Any, butce: Butce, 
             ham = ek_indir(oturum, kayit, depo.dizin, butce, cerezler)
             sonuc = _ilerlemeyi_denetle(kayit, ham, onceki, butce.harcanan - harcanan, depo)
             _sonucu_yaz(kayit, sonuc, an)
+            # Queue order only: a part goes first next run if this run grew it.
+            if sonuc.parca_bayt > 0:
+                kayit["partial_grew"] = sonuc.parca_bayt > onceki
+            else:
+                kayit.pop("partial_grew", None)
             depo.yaz(ekler)
             if ham.durum == DURUM_BEKLIYOR:
                 break
