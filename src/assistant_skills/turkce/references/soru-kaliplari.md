@@ -8,7 +8,7 @@ Bir konuyu anlattıktan sonra "Sıra sende" alıştırmasını bu kalıplardan b
 **Ne zaman:** Okuma-anlama kazanımlarında (derin anlam, ana fikir, konu).
 **Nasıl yazılır:** Üç-dört cümlelik kısa bir paragraf ve dört seçenek; biri ana fikir, biri konu, biri yardımcı fikir, biri metinde olmayan bir yargı.
 **Örnek:** "Her gün yarım saat kitap okuyan biri bir yılda onlarca kitap bitirir. Okudukça yeni sözcükler öğrenir, farklı hayatları tanır. Kısacası okumak, insanın dünyasını genişletir." Bu paragrafın ana fikri hangisidir? A) Kitap okumak B) Düzenli okuma kişinin bakış açısını ve bilgisini genişletir. C) Kitaplar pahalıdır. D) Okuyan yeni sözcükler öğrenir.
-**Cevap:** B. Doğru seçenek metnin son cümlesini birebir kopyalamaz, aynı yargıyı kendi sözcükleriyle anlatır — ana fikir sorusunun cevabı metinden alıntı değil, okurun kendi ifadesi olmalıdır. A konudur, D yardımcı fikirdir, C metinde yoktur.
+**Cevap:** B. Doğru seçenek metnin son cümlesini birebir kopyalamaz, aynı yargıyı kendi sözcükleriyle anlatır — ana fikir genellikle okurun kendi sözcükleriyle ifade edilir. A konudur, D yardımcı fikirdir, C metinde yoktur.
 
 ### Yazım ve noktalama doğru-yanlış
 

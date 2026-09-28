@@ -27,16 +27,16 @@ YASAK_ARACLAR = {at.MOD_ONER_TOOL, at.AILE_TOOL, "alistirma_olustur", "ogrenme_g
 INGILIZCE = re.compile(r"\b(the|and|of|with|you|your|is|are|this|that|for)\b", re.IGNORECASE)
 SORU_TURLERI = {"coktan_secmeli", "dogru_yanlis", "kisa_cevap", "acik_uclu"}
 # "siz" hitabı: -sInIz çekimi (sorabilirsiniz), "size/sizin/siz", çıplak -(I)nIz (iyelik ya da
-# resmi/çoğul buyurma: "eviniz", "bakınız") ve çıplak çoğul/resmi buyurma "-In/-Un" ("getirin",
-# "bakın"). Son ikisi sık yanlış-pozitif üretir: "-DığIn" (2. tekil şahıs ilgi eki, "yazdığın",
-# her zaman "ğ" ile biter) ve "sen/kendin" ailesi (2. tekil "sen" hitabı, "siz" değil) dışarıda
-# tutulur; "için/onun/bunun/şunun/yakın/uzun/oyun/boyun/soyun" gibi çok sık, hitapla ilgisiz
-# sözcükler de kısa bir istisna listesiyle elenir.
-_SIZ_ISTISNA = "için|onun|bunun|şunun|yakın|uzun|oyun|boyun|soyun|sen\\w*|kendin\\w*"
+# resmi/çoğul buyurma: "eviniz", "bakınız") ve küçük, açık bir çoğul/resmi buyurma sözcük listesi.
+# Çıplak "-In/-Un" sonekini genel bir desenle yakalamak ölçüldü: "istersin", "yapabilirsin"
+# (2. tekil "sen" çekimi), "Ödevin", "Kitabın", "metnin", "sorunun", "konunun" (ilgi eki/iyelik),
+# "Bugün", "gelsin" gibi çok sayıda yanlış-pozitif üretiyor — bu yüzden bare (ın|in|un|ün) deseni
+# kullanılmaz; yalnız aşağıdaki açık listedeki buyurma biçimleri yakalanır.
+_COGUL_BUYURMA = ("getirin", "bakın", "yapın", "okuyun", "dinleyin", "söyleyin", "yazın")
 SIZ = re.compile(
     r"(siniz|sınız|sunuz|sünüz|size|sizin|\bsiz\b"
-    rf"|\b\w+(ınız|iniz|unuz|ünüz)\b"
-    rf"|\b(?!(?:{_SIZ_ISTISNA})\b)\w+(?<!ğ)(ın|in|un|ün)\b)"
+    r"|\b\w+(ınız|iniz|unuz|ünüz)\b"
+    rf"|\b(?:{'|'.join(_COGUL_BUYURMA)})\b)"
 )
 BLOK_SINIRI = 12_000
 
@@ -132,6 +132,23 @@ def test_hitap(skiller, ad):
     assert not any("Işık" in q for q in s.hizli_sorular["ogrenci"])
     rol = sk.govde_bolumleri(s)["Rol ve ses"]
     assert '"sen"' in rol and '"siz"' in rol
+
+
+@pytest.mark.parametrize("metin", [
+    "istersin", "yapabilirsin", "ödevin", "metnin ana fikri", "Bugün", "gelsin",
+])
+def test_siz_deseni_sen_ve_ilgi_ekini_yakalamaz(metin):
+    """SIZ, 2. tekil 'sen' çekimini ('istersin', 'yapabilirsin') ve ilgi eki/iyeliği
+    ('ödevin', 'metnin ana fikri') ya da tesadüfen '-In/-Un' ile biten sıradan sözcükleri
+    ('Bugün', 'gelsin') yanlışlıkla 'siz' hitabı saymamalı."""
+    assert not SIZ.search(metin)
+
+
+@pytest.mark.parametrize("metin", [
+    "sorabilirsiniz", "getirin", "sizin",
+])
+def test_siz_deseni_gercek_siz_hitabini_yakalar(metin):
+    assert SIZ.search(metin)
 
 
 @pytest.mark.parametrize("ad", DIZINLER)

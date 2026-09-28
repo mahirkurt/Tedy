@@ -68,11 +68,11 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 **Nasıl düzeltirsin:** Aynı cümleyi kurallı ve devrik yaz; iki durumda da yükleme soru sorarak özneyi bul.
 **Kontrol sorusu:** "Geldi sonunda beklediğimiz gün" cümlesinin yüklemini ve öznesini bul.
 
-### Özne ile yüklem her zaman sayıca (teklik-çokluk) da aynı olmalıdır
+### Özne ile yüklem her zaman sayıca (tekillik-çoğulluk) da aynı olmalıdır
 
-**Doğrusu:** Kişi uyumu kesindir: özne birinci, ikinci ya da üçüncü kişiyse yüklem de o kişiye göre çekimlenir. Teklik-çokluk (sayı) uyumunda kural tek yönlüdür: tekil bir özne çoğul yüklem alamaz ("Öğrenci geldiler" yanlıştır), ama çoğul bir özne tekil yüklem alabilir. İnsan dışı ve topluluk adı olan öznelerde ("Kuşlar uçtu", "Ordu ilerledi") tekil yüklem kuraldır, çoğul yüklem yerine tercih edilir. İnsan olan çoğul öznelerde de tekil yüklem yaygın ve doğrudur ("Öğrenciler bahçede oynuyordu").
-**Nasıl düzeltirsin:** Önce kişiyi kontrol et (özne ile yüklem aynı kişi mi); sonra sayıyı kontrol et — tekil özneye çoğul yüklem asla bağlanmaz, ama çoğul özneye tekil yüklem çoğu zaman doğrudur, özellikle özne insan dışıysa ya da bir topluluk adıysa.
-**Kontrol sorusu:** "Kuşlar gökyüzünde uçtu" ile "Öğrenci sınıfa girdiler" cümlelerinden hangisi doğru, hangisi yanlıştır? Nedenini tekillik-çokluk uyumuyla açıkla.
+**Doğrusu:** Kişi uyumu kesindir: özne birinci, ikinci ya da üçüncü kişiyse yüklem de o kişiye göre çekimlenir. Tekillik-çoğulluk (sayı) uyumunda kural tek yönlüdür: tekil bir özne çoğul yüklem alamaz — saygı bildirme dışında ("Öğretmenimiz derse girdiler", "Dedem geldiler" saygı bildirdiği için doğrudur). Saygı bildirilmeyen bir bağlamda tekil özneye çoğul yüklem yanlıştır ("Öğrenci sınıfa girdiler" yanlıştır: burada bir saygı bildirimi yoktur). Çoğul bir özne ise tekil yüklem alabilir; insan dışı öznelerde ("Kuşlar uçtu") tekil yüklem kuraldır, çoğul yüklem yerine tercih edilir; insan olan çoğul öznelerde de tekil yüklem yaygın ve doğrudur ("Öğrenciler bahçede oynuyordu"). (Ayrı bir not: "ordu", "sınıf" gibi topluluk adları biçimce zaten tekildir — "Ordu ilerledi" bu yüzden sıradan bir tekil-özne-tekil-yüklem cümlesidir, çoğul-özne kuralının bir örneği değildir.)
+**Nasıl düzeltirsin:** Önce kişiyi kontrol et (özne ile yüklem aynı kişi mi); sonra sayıyı kontrol et — tekil özneye çoğul yüklem yalnız saygı bildirimi bağlamında bağlanır, başka hiçbir bağlamda bağlanmaz; çoğul özneye tekil yüklem ise çoğu zaman doğrudur, özellikle özne insan dışıysa.
+**Kontrol sorusu:** "Kuşlar gökyüzünde uçtu" ile "Öğrenci sınıfa girdiler" cümlelerinden hangisi doğru, hangisi yanlıştır? Nedenini tekillik-çoğulluk uyumuyla açıkla.
 
 ### "-yor" eki her zaman şimdiki zamanı bildirir
 
