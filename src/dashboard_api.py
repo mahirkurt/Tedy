@@ -40,7 +40,7 @@ from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.US
     USER_ROLES,
     okur_turu,
 )
-from src import module_progress, module_store, module_ticket, subject_themes
+from src import assistant_skills, module_progress, module_store, module_ticket, subject_themes
 from src import claude_api
 
 load_env()
@@ -346,18 +346,19 @@ def _assistant_runtime():
             )
         except Exception as exc:
             # SkillHatasi's own message names which skill and why (spec "Hata ve
-            # boşluk durumları"); logging only the type name lost that — the
-            # reader still gets the generic "assistant_unavailable" either way,
-            # this is only what lands in the log. Checked by name, not
-            # `isinstance` against an import done here: importing
-            # src.assistant_skills inside this handler would itself raise if
-            # that module were the thing broken, and the reader would get a
-            # bare 500 instead of AssistantUnavailableError (review round 2,
-            # finding NB3).
-            detay = f": {exc}" if type(exc).__name__ == "SkillHatasi" else ""
-            app.logger.error(
-                "Assistant subsystem unavailable (%s)%s", type(exc).__name__, detay
-            )
+            # boşluk durumları"). Checked by class NAME, not `isinstance` against
+            # an import done inside this handler: importing src.assistant_skills
+            # here would itself raise if that module were the thing broken, and
+            # the reader would get a bare 500 instead of AssistantUnavailableError
+            # (review round 2, finding NB3). assistant_skills is imported at
+            # module top for _istek_ogretmeni and /api/assistant/ogretmenler, so
+            # this branch never needs an import of its own.
+            if type(exc).__name__ == "SkillHatasi":
+                app.logger.error("Assistant subsystem unavailable: %s", exc)
+            else:
+                app.logger.error(
+                    "Assistant subsystem unavailable (%s)", type(exc).__name__
+                )
             raise AssistantUnavailableError("assistant_unavailable") from exc
 
     return _ASSISTANT_RUNTIME
@@ -403,6 +404,24 @@ def _assistant_okur() -> str:
     """Who is asking, for the assistant's form of address. Read inside the
     request, like the progress permission: the stream generator outlives it."""
     return okur_turu(_module_person())
+
+
+def _istek_ogretmeni(payload: dict):
+    """The request's `ogretmen` (spec §1): absent or null is genel; anything else must name a
+    loaded teacher, or the request is refused with 400 — never silently answered as genel.
+    Returns (ogretmen, None) or (None, error response)."""
+    deger = payload.get("ogretmen")
+    if deger is None:
+        return assistant_skills.GENEL, None
+    try:
+        bilinen = {assistant_skills.GENEL, *assistant_skills.varsayilan()}
+    except assistant_skills.SkillHatasi as exc:
+        app.logger.error("Assistant subsystem unavailable: %s", exc)
+        return None, (jsonify({"error": "assistant_unavailable"}), 503)
+    if not isinstance(deger, str) or deger not in bilinen:
+        return None, (jsonify({"error": "Bilinmeyen öğretmen modu.",
+                               "gecerli": sorted(bilinen)}), 400)
+    return deger, None
 
 
 def _assistant_progress_allowed() -> bool:
@@ -2119,6 +2138,10 @@ def assistant_chat():
     if not isinstance(context_filters, dict):
         return jsonify({"error": "context_filters dict olmalı"}), 400
 
+    ogretmen, hata = _istek_ogretmeni(payload)
+    if hata is not None:
+        return hata
+
     session_id = str(payload.get("session_id", "")).strip()
     temperature = payload.get("temperature", 0.2)
     try:
@@ -2135,6 +2158,7 @@ def assistant_chat():
             temperature=temperature,
             ilerleme_izni=_assistant_progress_allowed(),
             okur=_assistant_okur(),
+            ogretmen=ogretmen,
         )
         return jsonify(out)
     except AssistantUnavailableError:
@@ -2151,6 +2175,10 @@ def assistant_stream():
         return access
 
     data = request.get_json(silent=True) or {}
+    # Before the stream opens: an unknown teacher is a 400, not an SSE error.
+    ogretmen, hata = _istek_ogretmeni(data)
+    if hata is not None:
+        return hata
     messages = data.get("messages") or []
     session_id = str(data.get("session_id", ""))
     force_deep = bool(data.get("force_deep", False))
@@ -2164,7 +2192,7 @@ def assistant_stream():
             runtime = _assistant_runtime()
             for event in runtime.chat_events(
                 messages=messages, session_id=session_id, force_deep=force_deep,
-                ilerleme_izni=ilerleme_izni, okur=okur,
+                ilerleme_izni=ilerleme_izni, okur=okur, ogretmen=ogretmen,
             ):
                 name = event.pop("event")
                 yield f"event: {name}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
@@ -2178,6 +2206,24 @@ def assistant_stream():
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache",
                              "X-Accel-Buffering": "no"})
+
+
+@app.route("/api/assistant/ogretmenler")
+@require_auth
+def assistant_ogretmenler():
+    """The teacher selector's list (spec §1 "Seçici ve tema"): id, short name, teacher's name,
+    subject, colour family, greeting and quick prompts for each reader. Genel is not in the
+    list — the page draws it itself — but `varsayilan` names it."""
+    access = _require_assistant_access()
+    if access is not None:
+        return access
+    try:
+        skiller = assistant_skills.varsayilan()
+    except assistant_skills.SkillHatasi as exc:
+        app.logger.error("Assistant subsystem unavailable: %s", exc)
+        return jsonify({"error": "Öğretmen modları şu an yüklenemedi."}), 503
+    return jsonify({"varsayilan": assistant_skills.GENEL,
+                    "ogretmenler": [s.secici_ozeti() for s in skiller.values()]})
 
 
 @app.route("/api/assistant/plan", methods=["POST"])
