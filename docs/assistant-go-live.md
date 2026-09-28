@@ -349,6 +349,12 @@ gönderildiğinde yanıt `gemini-3.7-flash` ile geldi; istekteki değerle hiçbi
 Yanıttaki `model`/`meta.model` isteğin *kopyası* değil, `GeminiClient`'ın o çağrı için
 **gerçekten seçtiği** modeldir (§4'teki sabit `FAST_MODELS`/`DEEP_MODELS` zincirinden).
 
+`messages` içindeki bir `{"role": "system", ...}` da özel değildir: B1'den beri (öğretmen
+modları, 2026-09-28) `ClaudeClient._build_conversation` bir istemcinin gönderdiği `assistant`
+olmayan her turu `user` olarak işler, bu yüzden bir OpenAI-uyumlu `/v1` istemcisinin kendi
+`system` mesajı asla gerçek sistem bloğunun yerine geçmez (istemci taraflı sistem-rolü
+enjeksiyonu B1'de kapatıldı).
+
 Response (özet — `meta.model` gerçek seçim, yukarıdaki istekteki `model` değeriyle
 karıştırılmamalı):
 
