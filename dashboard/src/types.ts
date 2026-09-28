@@ -243,6 +243,15 @@ export interface OgretmenListesi {
   ogretmenler: Ogretmen[]
 }
 
+/** mod_oner's suggestion: the stream's `mode_suggestion` event, or the answer's field. */
+export interface ModOnerisi {
+  ogretmen: string
+  ogretmen_adi: string
+  soru: string
+  gerekce: string
+  renk_ailesi: SubjectFamily
+}
+
 export interface AssistantResponse {
   answer: string
   citations: AssistantCitation[]
@@ -250,6 +259,8 @@ export interface AssistantResponse {
   plan_blocks: AssistantPlanBlock[]
   intent: string
   session_id: string
+  /** Set when the genel-mode answer suggested a subject teacher (B1). */
+  mode_suggestion?: ModOnerisi | null
   meta: {
     model: string
     retrieval_count?: number

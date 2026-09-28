@@ -23,13 +23,14 @@ import {
   Time,
   Idea,
 } from '@carbon/icons-react'
-import type { AssistantCitation, AssistantPlanBlock, AssistantResponse } from '../types'
+import type { AssistantCitation, AssistantPlanBlock, AssistantResponse, ModOnerisi as Oneri } from '../types'
 import { renderMarkdown } from '../utils/markdown'
 import { modelAdi } from '../utils/formatters'
 import { subjectClass } from '../utils/subject'
 import { firstName, useSession } from '../contexts/session'
-import { useOgretmen } from '../hooks/useOgretmen'
+import { GENEL, useOgretmen } from '../hooks/useOgretmen'
 import CitationChip from './CitationChip'
+import ModOnerisi from './ModOnerisi'
 import OgretmenSecici from './OgretmenSecici'
 import SourcePanel from './SourcePanel'
 
@@ -47,6 +48,8 @@ interface ChatMessage {
    *  so this is not a constant and Carbon's AI guidance asks that it be
    *  disclosed rather than implied. */
   model?: string
+  /** A genel-mode answer's suggestion to switch teacher; shown as a button, never applied. */
+  modOnerisi?: Oneri | null
 }
 
 // The page speaks to whoever is signed in, as the model does (the prompt's
@@ -331,7 +334,7 @@ export default function AssistantChat() {
    * payload, whether it arrived via the stream's `answer` event or a classic
    * JSON response — both endpoints return the same shape, so this is the one
    * place that turns it into a ChatMessage. */
-  function appendAssistantMessage(payload: AssistantResponse) {
+  function appendAssistantMessage(payload: AssistantResponse, oneri: Oneri | null = null) {
     const answer = (payload.answer || '').trim() || 'Yanıt üretilemedi.'
     const assistantMsg: ChatMessage = {
       id: `assistant-${Date.now()}`,
@@ -342,6 +345,8 @@ export default function AssistantChat() {
       planBlocks: payload.plan_blocks || [],
       degraded: payload.meta?.degraded || [],
       model: payload.meta?.model,
+      // The stream's own event arrives first; /chat carries the same in the payload.
+      modOnerisi: payload.mode_suggestion ?? oneri,
     }
     setMessages(prev => [...prev, assistantMsg])
   }
@@ -411,8 +416,11 @@ export default function AssistantChat() {
       if (!res.ok || !res.body) throw new Error(`akış açılamadı (${res.status})`)
 
       let answered = false
+      let oneri: Oneri | null = null
       await readEventStream(res, (name, data) => {
-        if (name === 'tool_start') {
+        if (name === 'mode_suggestion') {
+          oneri = data as unknown as Oneri
+        } else if (name === 'tool_start') {
           setStage(TOOL_LABEL[String(data.name)] ?? 'Kaynaklar taranıyor')
         } else if (name === 'answer_delta') {
           const piece = String(data.text ?? '')
@@ -423,7 +431,7 @@ export default function AssistantChat() {
         } else if (name === 'answer') {
           answered = true
           setWriting('')
-          appendAssistantMessage(data.payload as AssistantResponse)
+          appendAssistantMessage(data.payload as AssistantResponse, oneri)
         } else if (name === 'error') {
           throw new Error(String(data.error ?? 'akış hatası'))
         }
@@ -593,6 +601,13 @@ export default function AssistantChat() {
                         <Tag key={f} type={flagTone(f)} size="sm">{FLAG_LABELS[f] ?? f}</Tag>
                       ))}
                     </div>
+                  )}
+                  {/* Only while still in Genel, and only for a teacher the list has: once the
+                      reader has moved, or the teacher is gone, the button would do nothing. */}
+                  {msg.modOnerisi && ogretmen.id === GENEL
+                    && ogretmen.liste.some(o => o.id === msg.modOnerisi?.ogretmen) && (
+                    <ModOnerisi oneri={msg.modOnerisi}
+                      onGec={() => ogretmen.sec(msg.modOnerisi!.ogretmen)} />
                   )}
                   {msg.role === 'assistant' && msg.id !== 'welcome' && (
                     <div className="ac-msg__actions">

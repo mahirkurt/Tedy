@@ -119,3 +119,65 @@ test('a list that failed says so and Genel still works', async ({ page }) => {
   await expect(page.getByRole('group', { name: 'Öğretmen' }).getByRole('radio')).toHaveCount(1)
   await expect(page.getByText('Öğretmen modları şu an yüklenemedi; Genel modda sorabilirsiniz.')).toBeVisible()
 })
+
+// ── mod_oner: a suggestion is a button, never a switch ─────────────────────
+
+const ONERI = {
+  ogretmen: 'matematik', ogretmen_adi: 'Matematik öğretmeni',
+  soru: 'Matematik öğretmenine geçelim mi?',
+  gerekce: 'Bu bir oran-orantı sorusu; Matematik öğretmeni adım adım çözer.',
+  renk_ailesi: 'purple',
+}
+
+
+const sse = (...olaylar: [string, unknown][]) =>
+  olaylar.map(([ad, veri]) => `event: ${ad}\ndata: ${JSON.stringify(veri)}\n\n`).join('')
+
+async function sor(page: Page) {
+  await page.fill('#ac-input', 'Oran nedir?')
+  await page.getByRole('button', { name: 'Gönder' }).click()
+  await expect(page.locator('.ac-msg--assistant')).toHaveCount(2)
+}
+
+test('a suggestion from the stream shows a button and changes nothing by itself', async ({ page }) => {
+  await asistan(page)
+  await page.route('**/api/assistant/stream', r => r.fulfill({
+    status: 200, contentType: 'text/event-stream',
+    body: sse(['tool_start', { name: 'mod_oner' }], ['tool_end', { name: 'mod_oner', ok: true }],
+      ['mode_suggestion', ONERI], ['answer', { payload: cevap() }], ['done', {}]),
+  }))
+  await sor(page)
+  const dugme = page.getByRole('button', { name: 'Matematik öğretmenine geçelim mi?' })
+  await expect(dugme).toBeVisible()
+  await expect(page.getByText(ONERI.gerekce)).toBeVisible()
+  // Nothing switched on its own.
+  await expect(kok(page)).toHaveAttribute('data-ogretmen', 'genel')
+  await expect(page.getByRole('radio', { name: 'Genel' })).toBeChecked()
+  expect(await page.evaluate(k => localStorage.getItem(k), ANAHTAR)).toBeNull()
+
+  await dugme.click()
+  await expect(kok(page)).toHaveAttribute('data-ogretmen', 'matematik')
+  await expect(page.getByRole('radio', { name: 'Matematik' })).toBeChecked()
+  expect(await page.evaluate(k => localStorage.getItem(k), ANAHTAR)).toBe('matematik')
+  await expect(dugme).toHaveCount(0)          // in a teacher mode there is nothing to suggest
+})
+
+test('the classic endpoint carries the suggestion too', async ({ page }) => {
+  await asistan(page)
+  await page.route('**/api/assistant/stream', r => r.abort())
+  await page.route('**/api/assistant/chat', r => r.fulfill(json(cevap({ mode_suggestion: ONERI }))))
+  await sor(page)
+  await expect(page.getByRole('button', { name: 'Matematik öğretmenine geçelim mi?' })).toBeVisible()
+  await expect(kok(page)).toHaveAttribute('data-ogretmen', 'genel')
+})
+
+test('no suggestion, no button', async ({ page }) => {
+  await asistan(page)
+  await page.route('**/api/assistant/stream', r => r.fulfill({
+    status: 200, contentType: 'text/event-stream',
+    body: sse(['answer', { payload: cevap() }], ['done', {}]),
+  }))
+  await sor(page)
+  await expect(page.locator('.ac-msg--assistant').last()).toContainText('Oran, iki çokluğun')
+  await expect(page.locator('.ac-msg__oneri')).toHaveCount(0)
+})
