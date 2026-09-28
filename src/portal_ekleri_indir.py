@@ -29,6 +29,7 @@ import hashlib
 import ipaddress
 import itertools
 import json
+import logging
 import math
 import os
 import re
@@ -48,6 +49,8 @@ from bs4 import BeautifulSoup
 from src.json_utils import atomic_json_dump
 from src.portal_ekleri import (DURUM_BEKLIYOR, DURUM_COK_BUYUK, DURUM_ERISILEMEDI, DURUM_HATA,
                                DURUM_INDIRILDI, KIMLIK_DESENI, PORTAL_HOST, indirme_adresi)
+
+logger = logging.getLogger(__name__)
 
 MB = 1024 * 1024
 EK_BOYUT_SINIRI = 300 * MB
@@ -90,6 +93,7 @@ _ARALIK = re.compile(r"bytes\s+(\d+)-(\d+)/(\d+|\*)")
 _TOPLAM = re.compile(r"bytes\s+\*/(\d+)")
 _YENIDEN = "kaldığı yerden sürdürülemedi; baştan indirilecek"
 _BUTCE_DOLDU = "bu turun bütçesi doldu; sonraki eşitlemede kaldığı yerden sürecek"
+_BOZUK_ADRES = "kaynak bozuk bir adrese yönlendirdi; indirilmedi"
 _IC_ADRES = "iç adres ya da çözülemeyen bir ada gidiyor; güvenlik gereği indirilmedi"
 
 
@@ -162,29 +166,30 @@ def _bas_metni(bas: bytes) -> str:
 
 
 def _html_gibi(metin: str) -> bool:
-    """Skip whitespace, `<!-- … -->` comments and `<?xml … ?>` declarations,
-    then look for an HTML tag. A head that is nothing but those (or an
-    unterminated comment) is markup too: no binary file starts that way, and
-    a long enough prologue would otherwise push the tag past the head."""
+    """Skip whitespace/NUL, `<!-- … -->` comments and `<?xml … ?>`
+    declarations, then require an HTML tag. Whitespace or NUL alone is not
+    markup (a binary may open with 64 KiB of zero bytes). A comment or
+    declaration prologue that runs to the edge of the head is: measured on
+    2cb0918, 4 369 closed comments ending the 64 KiB window on a lone `<`
+    hid the <html> tag behind it, and no binary file opens with a comment."""
     i, n = 0, len(metin)
+    onsoz = False
     while True:
         while i < n and (metin[i].isspace() or metin[i] in _GORUNMEZ):
             i += 1
-        if i >= n:
-            return n > 0
         bas = metin[i:i + 16].lower()
-        if bas.startswith("<!--"):
-            son = metin.find("-->", i + 4)
+        if bas.startswith(("<!--", "<?")):
+            kapanis = "-->" if bas.startswith("<!--") else "?>"
+            son = metin.find(kapanis, i + 2)
             if son < 0:
-                return True
-            i = son + 3
-        elif bas.startswith("<?"):
-            son = metin.find("?>", i + 2)
-            if son < 0:
-                return True
-            i = son + 2
-        else:
-            return bas.startswith(_HTML_ETIKETLERI)
+                return True                     # unterminated: runs past the head
+            i, onsoz = son + len(kapanis), True
+            continue
+        if bas.startswith(_HTML_ETIKETLERI):
+            return True
+        # After a markup prologue, a head that ends within reach of the next
+        # opener may have cut it (`<`, `<!-`, `<ht`): still markup.
+        return onsoz and n - i < 16
 
 
 def html_mi(bas: bytes, icerik_turu: str) -> bool:
@@ -294,7 +299,10 @@ def drive_onay_adresi(html: str, yanit_url: str) -> str | None:
     form = soup.find("form", id="download-form") or next(
         (f for f in soup.find_all("form") if "download" in str(f.get("action") or "")), None)
     if form is not None:
-        eylem = urljoin(yanit_url, str(form.get("action") or ""))
+        try:
+            eylem = urljoin(yanit_url, str(form.get("action") or ""))
+        except ValueError:                      # e.g. `https://[::1/x`: not a URL at all
+            return None
         alanlar = [(str(i.get("name")), str(i.get("value") or "")) for i in form.find_all("input")
                    if i.get("type") == "hidden" and i.get("name")]
         if eylem and alanlar:
@@ -302,18 +310,29 @@ def drive_onay_adresi(html: str, yanit_url: str) -> str | None:
             return adres if _onay_hostunda_mi(adres) else None
     m = re.search(r"confirm=([0-9A-Za-z_-]+)", html)
     if m:
-        p = urlsplit(yanit_url)
+        try:
+            p = urlsplit(yanit_url)
+        except ValueError:
+            return None
         sorgu = [(k, v) for k, v in parse_qsl(p.query) if k != "confirm"] + [("confirm", m.group(1))]
         adres = urlunsplit((p.scheme, p.netloc, p.path, urlencode(sorgu), ""))
         return adres if _onay_hostunda_mi(adres) else None
     return None
 
 
+# Measured 2026-09-28 on Python 3.12.3: ipaddress calls these is_global,
+# yet each can carry or reach a non-global target — IPv4-compatible ::/96
+# (::10.0.0.1), the NAT64 prefix (64:ff9b::a00:1) — or is not unicast at all
+# (224.0.0.1 and ff02::1 are "global" too).
+_YASAK_AGLAR = (ipaddress.ip_network("::/96"), ipaddress.ip_network("64:ff9b::/96"))
+
+
 def kuresel_adres_mi(host: str) -> bool:
     """The default address policy: the host is, or resolves only to, global
     unicast addresses — no loopback, private, link-local (169.254.169.254),
-    CGNAT, reserved or IPv4-mapped-private address, and not one of several.
-    A name that does not resolve is refused too.
+    CGNAT, reserved, multicast, IPv4-mapped-private, IPv4-compatible or
+    NAT64 address, and not one of several. A name that does not resolve is
+    refused too.
 
     Accepted residue: DNS rebinding between this check and requests' own
     resolution. The fetch is a blind GET into TEDY's own store of a link a
@@ -336,7 +355,9 @@ def kuresel_adres_mi(host: str) -> bool:
     for adres in adresler:
         if adres.version == 6 and adres.ipv4_mapped is not None:
             adres = adres.ipv4_mapped
-        if not adres.is_global:
+        if not adres.is_global or adres.is_multicast:
+            return False
+        if adres.version == 6 and any(adres in ag for ag in _YASAK_AGLAR):
             return False
     return True
 
@@ -596,6 +617,15 @@ def ek_indir(oturum: Any, kayit: dict[str, Any], dizin: Path, butce: Butce,
         if butce.bitti():
             return _bekliyor(_boyut(parca))     # a timeout cut to the budget's end
         return Sonuc(DURUM_HATA, f"ağ hatası ({type(exc).__name__})", parca_bayt=_boyut(parca))
+    except Exception as exc:
+        # The contract is "never raises": ekleri_esitle calls this per
+        # attachment without a try, so a bug or an input nobody foresaw
+        # (measured on 2cb0918: `Location: https://[::1/x` → ValueError)
+        # must cost this one attachment, not the run's attachment step. The
+        # log names the id and the error, never the URL (it can carry a
+        # per-recipient token).
+        logger.warning("portal eki %s: beklenmeyen hata (%s)", kimlik, type(exc).__name__, exc_info=True)
+        return Sonuc(DURUM_HATA, f"beklenmeyen hata ({type(exc).__name__})", parca_bayt=_boyut(parca))
 
 
 def _indir(oturum: Any, kayit: dict[str, Any], url: str, parca: Path, dizin: Path, butce: Butce,
@@ -626,9 +656,17 @@ def _indir(oturum: Any, kayit: dict[str, Any], url: str, parca: Path, dizin: Pat
             return Sonuc(DURUM_ERISILEMEDI, _IC_ADRES, parca_bayt=baslangic)
         zaman = (min(BAGLANTI_SURESI, kalan), min(OKUMA_SURESI, kalan))
         istek_adresi, istek_basliklari = adres, dict(basliklar)
-        bitti, yanit = _sureli(lambda: oturum.get(istek_adresi, headers=istek_basliklari, stream=True,
-                                                  timeout=zaman, allow_redirects=False, cookies=kavanoz),
-                               son_an - time.monotonic())
+        try:
+            bitti, yanit = _sureli(lambda: oturum.get(istek_adresi, headers=istek_basliklari, stream=True,
+                                                      timeout=zaman, allow_redirects=False, cookies=kavanoz),
+                                   son_an - time.monotonic())
+        except ValueError as exc:
+            if isinstance(exc, requests.RequestException):
+                raise
+            # Measured on 2cb0918: even with allow_redirects=False, requests
+            # parses a 3xx Location up front (Session.send → resolve_redirects
+            # for `r._next`); `https://[::1/x` raises a plain ValueError there.
+            return Sonuc(DURUM_ERISILEMEDI, _BOZUK_ADRES, parca_bayt=baslangic)
         if not bitti:
             return _bekliyor(baslangic)
         if yanit.status_code in _YONLENDIRMELER:
@@ -642,7 +680,11 @@ def _indir(oturum: Any, kayit: dict[str, Any], url: str, parca: Path, dizin: Pat
             if atlama > EK_AZAMI_YONLENDIRME:
                 return Sonuc(DURUM_ERISILEMEDI, f"{EK_AZAMI_YONLENDIRME} adımdan uzun yönlendirme; indirilmedi",
                              parca_bayt=baslangic)
-            adres = urljoin(onceki, str(konum))
+            try:
+                adres = urljoin(onceki, str(konum))
+                urlsplit(adres).hostname        # an invalid IPv6 host raises only here
+            except ValueError:
+                return Sonuc(DURUM_ERISILEMEDI, _BOZUK_ADRES, parca_bayt=baslangic)
             continue
         sonuc = _yaniti_isle(yanit, kayit, adres, parca, dizin, butce, sinir, baslangic, surum,
                              onaylandi, son_an)

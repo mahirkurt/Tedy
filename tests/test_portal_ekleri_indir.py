@@ -8,6 +8,7 @@ urllib3 does with a slow socket, a redirect or a cookie jar. Name resolution
 is always a monkeypatched `socket.getaddrinfo`: no test does real DNS."""
 import hashlib
 import io
+import logging
 import ipaddress
 import json
 import socket
@@ -29,7 +30,8 @@ from requests.models import Response
 import src.portal_ekleri_indir as indir_modulu
 from src.portal_ekleri import ek_kimligi, ek_turu
 from src.portal_ekleri_indir import (DOCX_MIME, EK_AZAMI_YONLENDIRME, EK_BOYUT_SINIRI, MB,
-                                     PARCA_BOYUTU, Butce, drive_onay_adresi, ek_indir, html_mi,
+                                     HTML_BAS_SINIRI, PARCA_BOYUTU, Butce, drive_onay_adresi, ek_indir,
+                                     html_mi,
                                      portal_cerez_kavanozu, tur_bul)
 from tests.sahte_http import (DOCS_URL, DRIVE_KIMLIK, DRIVE_ONAY, DRIVE_URL, GIRIS_DUVARI, PDF,
                               PORTAL_URL, SP_DUVAR_URL, SP_URL, SahteOturum, SahteSaat,
@@ -665,6 +667,11 @@ _COZUCU = {
     "karisik.ornek": [_DIS_IP, "192.168.1.5"],
     "cgnat.ornek": ["100.64.0.7"],
     "esleme.ornek": ["::ffff:10.0.0.1"],
+    "uyumlu.ornek": ["::8.8.8.8"],                 # IPv4-compatible ::/96
+    "nat64.ornek": ["64:ff9b::808:808"],           # NAT64 well-known prefix
+    "cokgonderim4.ornek": ["224.0.0.1"],
+    "cokgonderim6.ornek": ["ff0e::1"],
+    "altidort.ornek": ["2002:a00:1::1"],           # 6to4 around 10.0.0.1
 }
 
 
@@ -679,6 +686,12 @@ _COZUCU = {
     "https://cgnat.ornek/rapor.pdf",
     "https://esleme.ornek/rapor.pdf",
     "https://cozulmeyen.ornek/rapor.pdf",
+    "https://uyumlu.ornek/rapor.pdf",
+    "https://nat64.ornek/rapor.pdf",
+    "https://cokgonderim4.ornek/rapor.pdf",
+    "https://cokgonderim6.ornek/rapor.pdf",
+    "https://altidort.ornek/rapor.pdf",
+    "https://[ff02::1]/rapor.pdf",
 ])
 def test_varsayilan_politika_ic_adrese_gitmez(tmp_path, monkeypatch, url):
     """Measured on 4f6f8ca: a link at 127.0.0.1 was fetched and stored."""
@@ -1007,3 +1020,86 @@ def test_sahte_katmanda_da_degisen_surum_karismaz(tmp_path):
     assert ilk.durum == "bekliyor"
     ikinci = ek_indir(SahteOturum({SP: aralikli(yeni)}), kayit, tmp_path, _sinirsiz())
     assert (tmp_path / ikinci.dosya).read_bytes() == yeni
+
+
+
+# ---------------------------------------------------------------------------
+# Fix round 2
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("konum", ["https://[::1/x", "https://[zz::1]/x.pdf"])
+def test_bozuk_location_erisilemedi_olur_istisna_kacmaz(tmp_path, yerel, https_oturum, konum):
+    """Measured on 2cb0918: `Location: https://[::1/x` made urljoin raise
+    ValueError out of ek_indir — Görev 7's ekleri_esitle has no try around
+    it, so one such link would stop every run's attachment step."""
+    def yanitla(h, dur):
+        h.send_response(302)
+        h.send_header("Location", konum)
+        h.send_header("Content-Length", "0")
+        h.end_headers()
+    kok, kayitlar = yerel(yanitla)
+    sonuc = ek_indir(https_oturum, _dosya_kaydi(f"{kok}/bozuk.pdf"), tmp_path, _sinirsiz(),
+                     adres_izni=_yalniz_yerel)
+    assert sonuc.durum == "erisilemedi" and "adres" in sonuc.neden, sonuc
+    assert len(kayitlar) == 1
+
+
+def test_bozuk_onay_formu_eylemi_istisna_firlatmaz():
+    html = ('<form id="download-form" action="https://[::1/download">'
+            '<input type="hidden" name="id" value="x"></form>')
+    assert drive_onay_adresi(html, "https://drive.google.com/uc?export=download&id=x") is None
+    assert drive_onay_adresi('<a href="?confirm=AbC1">x</a>', "https://[::1/uc") is None
+
+
+def test_beklenmeyen_ic_hata_hata_sonucu_olur_ve_loglanir(tmp_path, monkeypatch, caplog):
+    """The contract is "never raises": a bug below ek_indir costs this one
+    attachment a `hata`, not the whole attachment step."""
+    def bozuk(*a, **k):
+        raise RuntimeError("iç hata")
+    monkeypatch.setattr(indir_modulu, "_tamamla", bozuk)
+    oturum = SahteOturum({SP: SahteYanit(200, PDF, {"Content-Type": "application/pdf"})})
+    with caplog.at_level(logging.WARNING, logger="src.portal_ekleri_indir"):
+        sonuc = ek_indir(oturum, _kayit(SP_URL), tmp_path, _sinirsiz())
+    assert sonuc.durum == "hata" and "RuntimeError" in sonuc.neden
+    assert any("RuntimeError" in (r.exc_text or "") or r.exc_info for r in caplog.records)
+    assert all("ornekokul" not in r.getMessage() for r in caplog.records)   # no URL in the log
+
+
+@pytest.mark.parametrize("govde", [bytes(70 * 1024), b" " * (70 * 1024), b"\r\n\t" * 30000,
+                                   bytes(10) + b"ikili"])
+def test_yalniz_nul_ya_da_bosluk_bas_html_sayilmaz(tmp_path, govde):
+    assert not html_mi(govde, "application/octet-stream")
+    yanit = SahteYanit(200, govde, {"Content-Type": "application/octet-stream"})
+    sonuc = ek_indir(SahteOturum({SP: yanit}), _kayit(SP_URL), tmp_path, _sinirsiz())
+    assert (sonuc.durum, sonuc.uzanti) == ("indirildi", ".bin")
+
+
+def test_basi_dolduran_yorum_onsozu_hala_html():
+    """A prologue of closed comments filling the whole head is markup, not a
+    file: otherwise padding would push the <html> tag past the window."""
+    govde = b"<!-- dolgu -->\n" * (HTML_BAS_SINIRI // 15 + 10) + b"<html><body>x</body></html>"
+    assert html_mi(govde, "application/octet-stream")
+
+
+def test_soket_canli_yanitta_bulunur(yerel, https_oturum):
+    """The watchdog reaches the socket through urllib3 private attributes
+    (urllib3>=2.6,<3 pinned). An upgrade that renames them fails here, at
+    once, not only as a slow drip test."""
+    def yanitla(h, dur):
+        h.send_response(200)
+        h.send_header("Content-Length", "4")
+        h.end_headers()
+        h.wfile.write(b"%PDF")
+    kok, _ = yerel(yanitla)
+    with https_oturum.get(f"{kok}/x.pdf", stream=True, timeout=5) as yanit:
+        soket = indir_modulu._soket(yanit)
+        assert isinstance(soket, ssl.SSLSocket) and soket.fileno() >= 0
+        assert soket.getpeername()[0] == YEREL
+
+
+def test_sahte_oturumda_bozuk_location_da_erisilemedi(tmp_path):
+    """A session that does not pre-parse Location (the fake layer Görev 6/7
+    drive) reaches ek_indir's own urljoin: guarded there as well."""
+    oturum = SahteOturum({SP: SahteYanit(302, b"", {"Location": "https://[::1/x"})})
+    sonuc = ek_indir(oturum, _kayit(SP_URL), tmp_path, _sinirsiz())
+    assert sonuc.durum == "erisilemedi" and "adres" in sonuc.neden and len(oturum.istekler) == 1

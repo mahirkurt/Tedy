@@ -9,7 +9,9 @@ pytest>=7.0
 requests>=2.31
 # 2.6: streaming decompression is bounded per read (CVE-2025-66471); portal
 # attachments are fetched with stream=True from hosts teachers link to.
-urllib3>=2.6
+# <3: the download watchdog reaches the socket through urllib3 2.x internals
+# (src/portal_ekleri_indir._soket; tested directly).
+urllib3>=2.6,<3
 selenium>=4.18
 
 # MCP orchestrator (src/mcp_server) — pins match the fleet's proven egitim-kaynak lock.
