@@ -30,7 +30,7 @@ os.chdir(PROJECT_ROOT)
 
 from src.env_loader import load_env
 from src.json_utils import atomic_json_dump
-from src.course_names import normalize_course
+from src.course_names import normalize_course, COURSE_ALIASES
 from src.hafta_secici import guncel_hafta as _guncel_hafta
 from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.USER_ROLES etc.)
     ALLOWED_EMAILS,
@@ -1819,6 +1819,97 @@ def _extract_exam_info(title):
     return normalized, raw_course, exam_number
 
 
+def _bilinen_ders_adaylari(ders_icerikleri):
+    """Surface forms to recognise inside an exam title, mapped to their
+    canonical course: this run's real course-content keys (never a
+    hand-written list — measured 2026-09-28, they include "Türkçe",
+    "Matematik", "Fen Bilimleri", "Sosyal Bilgiler", "DKAB", "İngilizce")
+    plus the alias vocabulary already in src/course_names.py, so a variant
+    embedded in a title ("DKAB") is recognised even when it is not
+    literally the content map's own key."""
+    adaylar = {}
+    if isinstance(ders_icerikleri, dict):
+        for anahtar in ders_icerikleri:
+            if isinstance(anahtar, str) and anahtar.strip():
+                adaylar.setdefault(anahtar.strip(), normalize_course(anahtar))
+    for kanonik, takma_adlar in COURSE_ALIASES.items():
+        adaylar.setdefault(kanonik, kanonik)
+        for takma in takma_adlar:
+            adaylar.setdefault(takma, kanonik)
+    return adaylar
+
+
+def _baslikta_bilinen_ders_ara(title, ders_icerikleri):
+    """A known course name embedded in `title`'s Turkish half (before the
+    " / " English half), Turkish-folded (accent + case, `turkce_kucult_katla`)
+    and word-boundary matched, longest surface form first. Returns the
+    canonical course, or None when zero or more than one distinct course is
+    found — never invents a course for a course-less or multi-subject title
+    (e.g. a "GİS" development-monitoring exam, or one naming two courses)."""
+    from src.assistant_core import turkce_kucult_katla
+
+    adaylar = _bilinen_ders_adaylari(ders_icerikleri)
+    if not adaylar:
+        return None
+    hedef = turkce_kucult_katla(str(title or "").split(" / ")[0])
+    if not hedef.strip():
+        return None
+
+    kalan = hedef
+    bulunanlar = set()
+    for yuzey in sorted(adaylar, key=len, reverse=True):
+        katlanmis = turkce_kucult_katla(yuzey)
+        if not katlanmis.strip():
+            continue
+        eslesme = re.search(
+            r"(?<!\w)" + re.escape(katlanmis) + r"(?!\w)", kalan)
+        if eslesme:
+            bulunanlar.add(adaylar[yuzey])
+            baslangic, bitis = eslesme.span()
+            # Blank out the matched span so a shorter candidate fully inside
+            # it (mapping to a different canonical) cannot also match, while
+            # a genuinely distinct course mentioned elsewhere still can.
+            kalan = kalan[:baslangic] + (" " * (bitis - baslangic)) + kalan[bitis:]
+    if len(bulunanlar) == 1:
+        return next(iter(bulunanlar))
+    return None
+
+
+def _bilinen_ders_mi(course, ders_icerikleri):
+    """Whether `course` — as _extract_exam_info's regexes already resolved
+    it — is already a real, single known course, so the title-scan fallback
+    never overrides an extraction that already worked."""
+    if not course:
+        return False
+    hedef = _turkish_lower(course)
+    if hedef in (_turkish_lower(k) for k in COURSE_ALIASES):
+        return True
+    if isinstance(ders_icerikleri, dict):
+        for anahtar in ders_icerikleri:
+            if isinstance(anahtar, str) and _turkish_lower(normalize_course(anahtar)) == hedef:
+                return True
+    return False
+
+
+def _cozumlenen_sinav_dersi(course, title, ders_icerikleri):
+    """The course actually shown for an exam (label, grade match, related
+    homework/content, calendar colour). _extract_exam_info's regexes need a
+    dash (_COURSE_FROM_TITLE_RE) or the plural "Sınıflar" prefix; measured
+    2026-09-28, real portal titles like "7. Sınıf MEB Ülke Geneli Türkçe 1.
+    Dönem 2. Ortak Yazılı Sınavı" have neither, so `course` stayed the whole
+    title and relatedContent was always []. When that has happened, look for
+    a known course name in the title instead — never when it already
+    resolved to one, and never inventing one for an ambiguous or
+    course-less title (see _baslikta_bilinen_ders_ara). This never feeds the
+    exam id or the exam_content_map.json legacy key: both keep hashing
+    _extract_exam_info's own return value, unchanged, so an existing id or
+    map entry never moves."""
+    if _bilinen_ders_mi(course, ders_icerikleri):
+        return course
+    bulunan = _baslikta_bilinen_ders_ara(title, ders_icerikleri)
+    return bulunan or course
+
+
 def _build_grade_lookup(grades_list):
     """Build {normalized_course: {"1": score, "2": score, "3": score}} from gelisim_raporu grades."""
     lookup = {}
@@ -1986,6 +2077,11 @@ def _sinav_listesi(data, now=None):
             continue
 
         course, raw_course, exam_number = _extract_exam_info(title)
+        # Everything below shows the reader the *resolved* course (a real
+        # title may embed one — "Türkçe" — that the regexes above could not
+        # isolate); the exam id and the content-map's legacy key keep
+        # hashing `course` itself, unchanged, so neither moves.
+        display_course = _cozumlenen_sinav_dersi(course, title, ders_icerikleri)
         date_str = evt.get("start", "")
 
         # Local clock on both sides (see _portal_yerel). An unreadable date
@@ -1995,17 +2091,21 @@ def _sinav_listesi(data, now=None):
 
         # Match grade
         grade = None
-        if exam_number and course in grade_lookup:
-            grade = grade_lookup[course].get(str(exam_number))
+        if exam_number and display_course in grade_lookup:
+            grade = grade_lookup[display_course].get(str(exam_number))
 
         # Related content
-        related_hw = _find_related_homework(course, date_str, hw_rows)
-        related_content = _find_related_content(course, ders_icerikleri)
+        related_hw = _find_related_homework(display_course, date_str, hw_rows)
+        related_content = _find_related_content(display_course, ders_icerikleri)
 
-        # AI content map
-        map_key = f"{course}|{title}|{date_str[:10] if date_str else ''}"
+        # AI content map: try the legacy key first (existing
+        # exam_content_map.json entries were written before this fix and
+        # must not be orphaned), then the resolved course.
+        date10 = date_str[:10] if date_str else ""
         ai_summary = None
-        map_entry = content_map.get(map_key)
+        map_entry = content_map.get(f"{course}|{title}|{date10}")
+        if map_entry is None and display_course != course:
+            map_entry = content_map.get(f"{display_course}|{title}|{date10}")
         if isinstance(map_entry, dict):
             ai_summary = map_entry.get("summary")
 
@@ -2017,19 +2117,21 @@ def _sinav_listesi(data, now=None):
                     study_guide = ev.get("note")
                     break
 
+        # The id hashes the legacy course — see the "Critical constraint"
+        # note in the 2026-09-28 sınav-ders plan: it must not move.
         exam_id = hashlib.md5(f"{course}|{title}|{_kimlik_zamani(date_str)}".encode()).hexdigest()[:12]
 
         if exam_number:
-            seen_course_nums.add((course, str(exam_number)))
+            seen_course_nums.add((display_course, str(exam_number)))
 
         exams_list.append({
             "id": exam_id,
-            "course": course,
+            "course": display_course,
             "title": _clean_exam_title(
-                course, exam_number, title),
+                display_course, exam_number, title),
             "rawTitle": title,
-            "courseColor": _course_color(course),
-            "courseFamily": subject_themes.family_of(course),
+            "courseColor": _course_color(display_course),
+            "courseFamily": subject_themes.family_of(display_course),
             "examNumber": exam_number,
             "date": _portal_yerel(date_str) or None,
             "endDate": _portal_yerel(evt.get("end")) or None,
