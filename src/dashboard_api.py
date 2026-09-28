@@ -345,8 +345,14 @@ def _assistant_runtime():
                 video_kaynagi=_canli_videolar,
             )
         except Exception as exc:
+            from src.assistant_skills import SkillHatasi
+            # SkillHatasi's own message names which skill and why (spec "Hata ve
+            # boşluk durumları"); logging only the type name lost that — the
+            # reader still gets the generic "assistant_unavailable" either way,
+            # this is only what lands in the log.
+            detay = f": {exc}" if isinstance(exc, SkillHatasi) else ""
             app.logger.error(
-                "Assistant subsystem unavailable (%s)", type(exc).__name__
+                "Assistant subsystem unavailable (%s)%s", type(exc).__name__, detay
             )
             raise AssistantUnavailableError("assistant_unavailable") from exc
 

@@ -604,6 +604,26 @@ def test_panonun_asistani_butun_kaynaklarla_kurulur(api, monkeypatch):
                       "video_kaynagi": api._canli_videolar}
 
 
+def test_bozuk_skill_hatasi_log_hangi_skil_ve_nedeni_soyler(api, monkeypatch, caplog):
+    # Review finding 3 (B1 Task 7): logging only the exception's type name lost
+    # SkillHatasi's own message — which skill, and why — leaving nothing to act
+    # on in the log. The reader still gets the generic assistant_unavailable
+    # either way; this is only what a maintainer sees.
+    import src.assistant_core as core
+    from src.assistant_skills import SkillHatasi
+
+    class Sahte:
+        def __init__(self, root, **kw):
+            raise SkillHatasi("matematik: gövde başlığı eksik: 'Sınırlar'")
+
+    monkeypatch.setattr(core, "AssistantRuntime", Sahte)
+    monkeypatch.setattr(api, "_ASSISTANT_RUNTIME", None)
+    with caplog.at_level("ERROR"):
+        with pytest.raises(api.AssistantUnavailableError):
+            api._assistant_runtime()
+    assert "matematik: gövde başlığı eksik: 'Sınırlar'" in caplog.text
+
+
 def test_canli_program_api_schedule_ile_ayni_haftayi_verir(api, monkeypatch):
     monkeypatch.setattr(api, "_scraped", lambda: {"ders_programi": [_kopya(HAFTA)]})
     with api.app.test_client() as c:

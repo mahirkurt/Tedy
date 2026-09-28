@@ -422,6 +422,11 @@ AILE_TOOL = "aile_kaynak_ara"
 # dispatch() in the other mode too (defence in depth, as aile_kaynak_ara).
 SKILL_TOOL = "skill_kaynagi"
 MOD_ONER_TOOL = "mod_oner"
+# Tools that only leave a ToolOutcome.olay behind and change nothing else: a
+# model round that writes its answer and calls just one of these does not need
+# on_reset or another model round (chat_with_tools, review finding 1). B4's
+# quiz event will join this set the same way.
+OLAY_ARACLARI = {MOD_ONER_TOOL}
 MOD_GEREKCE_SINIRI = 200
 
 # chat_with_tools slices every tool_result to 4,000 chars; a body cut there
@@ -1576,7 +1581,8 @@ class McpRegistry:
         modules = set(self.module_index.degraded()) if self.module_index is not None else set()
         return sorted(unhealthy | set(self.unconfigured) | modules)
 
-    def declarations(self, okur: str = "bilinmiyor", ogretmen: str = GENEL) -> list[dict[str, Any]]:
+    def declarations(self, okur: str = "bilinmiyor", ogretmen: str = GENEL,
+                     mod_onerisi: bool = True) -> list[dict[str, Any]]:
         decls: list[dict[str, Any]] = [{
             "name": LOCAL_TOOL,
             "description": self._yerel_aciklama(),
@@ -1637,14 +1643,21 @@ class McpRegistry:
                 "parameters": sanitize_schema(spec.get("inputSchema") or {}),
             })
         # Last, so every mode shares the same list up to here.
-        decls.extend(self._ogretmen_bildirimleri(ogretmen))
+        decls.extend(self._ogretmen_bildirimleri(ogretmen, mod_onerisi))
         return decls
 
-    def _ogretmen_bildirimleri(self, ogretmen: str) -> list[dict[str, Any]]:
-        """mod_oner in genel mode, skill_kaynagi in a teacher mode, nothing without skills."""
+    def _ogretmen_bildirimleri(self, ogretmen: str, mod_onerisi: bool = True) -> list[dict[str, Any]]:
+        """mod_oner in genel mode, skill_kaynagi in a teacher mode, nothing without skills.
+
+        `mod_onerisi=False` (from /v1 and /plan, which have no switch button —
+        chat()'s own kwarg, not a per-mode thing) withholds the tool outright
+        rather than declaring it and having dispatch() refuse the call.
+        """
         if not self.skills:
             return []
         if ogretmen == GENEL:
+            if not mod_onerisi:
+                return []
             return [{
                 "name": MOD_ONER_TOOL,
                 "description": (
@@ -1720,9 +1733,10 @@ class McpRegistry:
             return None
 
     def dispatch(self, name: str, args: dict[str, Any], ilerleme_izni: bool = False,
-                okur: str = "bilinmiyor", ogretmen: str = GENEL) -> ToolOutcome:
+                okur: str = "bilinmiyor", ogretmen: str = GENEL,
+                mod_onerisi: bool = True) -> ToolOutcome:
         if name == MOD_ONER_TOOL:
-            return self._dispatch_mod_oner(args or {}, ogretmen)
+            return self._dispatch_mod_oner(args or {}, ogretmen, mod_onerisi)
         if name == SKILL_TOOL:
             return self._dispatch_skill_kaynagi(args or {}, ogretmen)
         if name == LOCAL_TOOL:
@@ -1846,10 +1860,14 @@ class McpRegistry:
             return "ulasilamadi", b"", ""
         return ("var", veri, mime) if veri else ("ulasilamadi", b"", "")
 
-    def _dispatch_mod_oner(self, args: dict[str, Any], ogretmen: str) -> ToolOutcome:
-        # Defence in depth: declared only in genel mode, refused anywhere else —
-        # a teacher mode has nothing to suggest, and a stale tool list must not
-        # put a switch button under a teacher's answer.
+    def _dispatch_mod_oner(self, args: dict[str, Any], ogretmen: str,
+                           mod_onerisi: bool = True) -> ToolOutcome:
+        # Defence in depth: declared only in genel mode with mod_onerisi=True
+        # (/v1, /plan pass False — no switch button there), refused anywhere
+        # else — a teacher mode has nothing to suggest, and a stale tool list
+        # must not put a switch button under a teacher's answer or an API reply.
+        if not mod_onerisi:
+            return ToolOutcome(ok=False, error="mod önerisi bu istekte kapalı")
         if ogretmen != GENEL or not self.skills:
             return ToolOutcome(ok=False, error="mod önerisi yalnız genel modda yapılabilir")
         hedef = self.skills.get(str(args.get("ogretmen") or ""))

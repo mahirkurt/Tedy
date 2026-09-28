@@ -99,7 +99,7 @@ def test_bilinmeyen_ogretmen_hata(rt):
 def test_temel_istem_mod_oner_ve_ogretmen_bolumunu_anlatir(rt):
     p = rt._system_prompt()
     assert "Araç listende `mod_oner` varsa" in p
-    assert "'Öğretmen modu' bölümü" in p
+    assert "ikinci bir sistem bölümü olarak 'Öğretmen modu'" in p
 
 
 # ── tools per mode ─────────────────────────────────────────────────────────
@@ -155,6 +155,53 @@ def test_arac_dongusu_olaylari_toplar():
     assert loop.olaylar == [olay]
 
 
+def test_dongu_metin_ve_mod_oner_ayni_turda_cevabi_korur():
+    # Review finding 1 (B1 Task 7): a round that writes the full answer and
+    # calls mod_oner in the same breath used to have its text wiped by
+    # on_reset — the final answer became the next round's short filler line.
+    # mod_oner is event-only (OLAY_ARACLARI): its text IS the answer.
+    sahte = _Sahte(_cevap(
+        _metin("Oran iki çokluğun karşılaştırmasıdır."),
+        NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
+           input={"ogretmen": "matematik", "gerekce": "g"})))
+    istemci = ClaudeClient(api_key="test", client=sahte)
+    resetlendi = []
+    olay = {"event": "mode_suggestion", "ogretmen": "matematik"}
+    loop = istemci.chat_with_tools(
+        [{"role": "system", "content": "S"}, {"role": "user", "content": "q"}],
+        [{"name": MOD_ONER_TOOL, "description": "d", "parameters": {"type": "object"}}],
+        lambda ad, args: ToolOutcome(ok=True, text="gösterildi", olay=olay),
+        on_reset=lambda: resetlendi.append(True))
+    assert not resetlendi
+    assert loop.text == "Oran iki çokluğun karşılaştırmasıdır."
+    assert len(sahte.istekler) == 1          # exactly one model round
+    assert loop.olaylar == [olay]
+
+
+def test_ayni_turda_iki_mod_oner_tek_oneri_birakir():
+    # Minor 5: the model is told to call mod_oner once; nothing enforces that.
+    # Two suggestions in one answer must not leave two competing buttons —
+    # the first wins.
+    sahte = _Sahte(_cevap(
+        _metin("Cevap."),
+        NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
+           input={"ogretmen": "matematik", "gerekce": "g1"}),
+        NS(type="tool_use", id="t2", name=MOD_ONER_TOOL,
+           input={"ogretmen": "turkce", "gerekce": "g2"})))
+    istemci = ClaudeClient(api_key="test", client=sahte)
+
+    def dispatch(ad, args):
+        return ToolOutcome(ok=True, text="gösterildi",
+                           olay={"event": "mode_suggestion", "ogretmen": args["ogretmen"]})
+
+    loop = istemci.chat_with_tools(
+        [{"role": "system", "content": "S"}, {"role": "user", "content": "q"}],
+        [{"name": MOD_ONER_TOOL, "description": "d", "parameters": {"type": "object"}}],
+        dispatch)
+    assert loop.text == "Cevap."
+    assert loop.olaylar == [{"event": "mode_suggestion", "ogretmen": "matematik"}]
+
+
 def test_chat_events_oneriyi_aninda_yayar_mod_degismez(rt, monkeypatch):
     def model(*, dispatch, **_):
         dispatch(MOD_ONER_TOOL, {"ogretmen": "matematik", "gerekce": "Bu bir oran sorusu."})
@@ -202,3 +249,59 @@ def test_v1_her_zaman_genel(rt, monkeypatch):
     monkeypatch.setattr(rt, "chat", chat)
     rt.openai_chat_completion({"messages": SORU, "ogretmen": "matematik"})
     assert alinan.get("ogretmen", "genel") == "genel"
+
+
+# ── mod_onerisi: no switch button on /v1 or /plan ───────────────────────────
+
+def test_v1_mod_oner_bildirmez(rt, monkeypatch):
+    gorulen = _gorulen_araclar(rt, monkeypatch, ogretmen="genel")
+    assert MOD_ONER_TOOL in gorulen        # sanity: genel mode declares it by default
+
+    gorulen_v1 = {}
+
+    def yakala(*, declarations, **_):
+        gorulen_v1["adlar"] = {d["name"] for d in declarations}
+        return ToolLoopResult(text="tamam")
+
+    monkeypatch.setattr(rt.llm, "chat_with_tools", yakala)
+    rt.openai_chat_completion({"messages": SORU})
+    assert MOD_ONER_TOOL not in gorulen_v1["adlar"]
+
+
+def test_plan_mod_oner_bildirmez(rt, monkeypatch):
+    gorulen = {}
+
+    def yakala(*, declarations, **_):
+        gorulen["adlar"] = {d["name"] for d in declarations}
+        return ToolLoopResult(text="tamam")
+
+    monkeypatch.setattr(rt.llm, "chat_with_tools", yakala)
+    rt.study_plan(messages=SORU, session_id="s")
+    assert MOD_ONER_TOOL not in gorulen["adlar"]
+
+
+def test_mod_onerisi_kapali_dispatch_de_reddeder(rt, monkeypatch):
+    sonuc = {}
+
+    def yakala(*, dispatch, **_):
+        sonuc["oneri"] = dispatch(MOD_ONER_TOOL, {"ogretmen": "matematik", "gerekce": "x"})
+        return ToolLoopResult(text="tamam")
+
+    monkeypatch.setattr(rt.llm, "chat_with_tools", yakala)
+    rt.chat(messages=SORU, session_id="s", mod_onerisi=False)
+    assert not sonuc["oneri"].ok           # defence in depth, even if declared elsewhere
+
+
+# ── minor 4: perform_incremental_reindex is not shielded from a broken skill ─
+
+def test_perform_incremental_reindex_bozuk_skill_durdurur(tmp_path, monkeypatch):
+    import src.assistant_core as core
+    from src.assistant_skills import SkillHatasi
+
+    def bozuk():
+        raise SkillHatasi("turkce: SKILL.md yok")
+
+    monkeypatch.setattr(core.assistant_skills, "varsayilan", bozuk)
+    (tmp_path / "output").mkdir()
+    with pytest.raises(SkillHatasi):
+        core.perform_incremental_reindex(tmp_path)

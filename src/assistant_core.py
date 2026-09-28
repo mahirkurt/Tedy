@@ -460,7 +460,7 @@ class ClaudeClient:
         words to answer from what it has, because withdrawing the tools alone
         was measured to produce a thinking block and no text.
         """
-        from src.assistant_tools import ToolOutcome
+        from src.assistant_tools import OLAY_ARACLARI, ToolOutcome
 
         if not self.available:
             raise RuntimeError("anthropic_no_api_key")
@@ -485,7 +485,18 @@ class ClaudeClient:
             if not uses:
                 out.text = self._text(resp)
                 return out
-            if on_reset is not None and self._text(resp):
+            round_text = self._text(resp)
+            # A round that writes the answer and, in the same breath, calls only
+            # an event-only tool (mod_oner) is not "text before a tool call" the
+            # way a content-tool round is — the text IS the answer; mod_oner
+            # changes nothing the model needs a further round to react to. Until
+            # this, on_reset wiped that text and the next round's short filler
+            # line ("Öneri okura gösterildi…" territory) became the answer
+            # instead (review finding 1). If the round has no text, today's
+            # behaviour (loop again) is unchanged.
+            son_tur = bool(round_text) and all(
+                getattr(use, "name", "") in OLAY_ARACLARI for use in uses)
+            if not son_tur and on_reset is not None and round_text:
                 on_reset()
 
             # Back exactly as received: thinking blocks are signed and must not
@@ -523,7 +534,11 @@ class ClaudeClient:
                         error=f"Model geçersiz argüman gönderdi (sözlük bekleniyor): {raw!r}")
 
                 out.tool_calls.append({"name": use.name, "ms": elapsed, "ok": bool(outcome.ok)})
-                if outcome.ok and outcome.olay:
+                if outcome.ok and outcome.olay and not any(
+                        o.get("event") == outcome.olay.get("event") for o in out.olaylar):
+                    # First suggestion wins: a model that calls mod_oner twice in
+                    # one answer (it is told not to, but nothing enforced it)
+                    # must not leave two competing "geçelim mi?" buttons behind.
                     out.olaylar.append(dict(outcome.olay))
                 if outcome.ok:
                     first = len(out.citations) + 1
@@ -545,6 +560,13 @@ class ClaudeClient:
                                 "content": self._sonuc_icerigi(
                                     body, outcome.images if outcome.ok else None)})
             turns.append({"role": "user", "content": results})
+
+            if son_tur:
+                # The round's own text stands as the answer; the tool(s) still
+                # ran (announced, dispatched, their olay collected above) but
+                # there is nothing left for another model round to add.
+                out.text = round_text
+                return out
 
             if out.budget_exhausted or len(out.tool_calls) >= max_calls \
                     or _round == max_rounds - 1:
@@ -1887,13 +1909,14 @@ class AssistantRuntime:
         "dosyadan çıkarma.\n"
         "- Araç listende `mod_oner` varsa ve soru açıkça Türkçe, Fen Bilimleri, Sosyal "
         "Bilgiler ya da Matematik dersinde bir konuyu, kavramı ya da soru çözmeyi öğrenmekle "
-        "ilgiliyse soruyu yine eksiksiz cevapla ve `mod_oner`'i bir kez çağır: o dersin "
-        "öğretmeni ve okura gösterilecek tek kısa gerekçe. Ödev listesi, sınav tarihi, ders "
-        "programı gibi sorular bir ders adı taşısa da konu öğrenmek değildir; onlarda çağırma. "
-        "Öneriyi cevap metninde tekrar etme; okur onu ayrı bir düğme olarak görür.\n"
-        "- Bu istemden sonra bir 'Öğretmen modu' bölümü geliyorsa o dersin öğretmenisin: o "
-        "bölüme uy. Bu istemin Hitap, Uydurma yasağı, Atıf ve Biçim kuralları orada da "
-        "geçerlidir; o bölüm açıkça bir istisna koymadıkça.\n\n"
+        "ilgiliyse `mod_oner`'i ilk turda, cevabı yazmadan önce ya da cevapla birlikte bir kez "
+        "çağır; soruyu yine eksiksiz cevapla: o dersin öğretmeni ve okura gösterilecek tek kısa "
+        "gerekçe. Ödev listesi, sınav tarihi, ders programı gibi sorular bir ders adı taşısa da "
+        "konu öğrenmek değildir; onlarda çağırma. Öneriyi cevap metninde tekrar etme; okur onu "
+        "ayrı bir düğme olarak görür.\n"
+        "- Bu istemden sonra ikinci bir sistem bölümü olarak 'Öğretmen modu' geliyorsa o dersin "
+        "öğretmenisin: o bölüme uy. Bu istemin Hitap, Uydurma yasağı, Atıf ve Biçim kuralları "
+        "orada da geçerlidir; o bölüm açıkça bir istisna koymadıkça.\n\n"
 
         "## Uydurma yasağı\n"
         "- Kazanım kodu, ders kitabı adı ve sayfa numarası YALNIZ araç "
@@ -2031,6 +2054,7 @@ class AssistantRuntime:
         on_reset: Callable[[], None] | None = None,
         okur: str = "bilinmiyor",
         ogretmen: str = assistant_skills.GENEL,
+        mod_onerisi: bool = True,
     ) -> dict[str, Any]:
         # `dispatch`, if given, replaces self.registry.dispatch for this
         # call only. chat_events() (below) uses this to wrap tool calls
@@ -2064,13 +2088,15 @@ class AssistantRuntime:
                 # aile_kaynak_ara (Görev 5) is declared only for okur == "aile" —
                 # the reader decides the tool list, not a per-call opt-in.
                 # The teacher decides the rest: mod_oner in genel, skill_kaynagi in a
-                # teacher mode (B1).
-                declarations=self.registry.declarations(okur, ogretmen=ogretmen),
+                # teacher mode (B1). mod_onerisi=False (/v1, /plan) withholds
+                # mod_oner even in genel — those endpoints have no switch button.
+                declarations=self.registry.declarations(
+                    okur, ogretmen=ogretmen, mod_onerisi=mod_onerisi),
                 # Module progress enters the model context only for a signed-in person (plan K-S6);
                 # the caller decides, and only an exact True counts.
                 dispatch=dispatch or functools.partial(
                     self.registry.dispatch, ilerleme_izni=ilerleme_izni is True, okur=okur,
-                    ogretmen=ogretmen),
+                    ogretmen=ogretmen, mod_onerisi=mod_onerisi),
                 tier=tier,
                 on_delta=on_delta,
                 on_reset=on_reset,
@@ -2192,7 +2218,8 @@ class AssistantRuntime:
         real_dispatch = functools.partial(
             self.registry.dispatch, ilerleme_izni=kwargs.get("ilerleme_izni") is True,
             okur=kwargs.get("okur", "bilinmiyor"),
-            ogretmen=kwargs.get("ogretmen", assistant_skills.GENEL))
+            ogretmen=kwargs.get("ogretmen", assistant_skills.GENEL),
+            mod_onerisi=kwargs.get("mod_onerisi", True))
 
         def announcing(name: str, args: dict[str, Any]) -> Any:
             if cancelled.is_set():
@@ -2341,6 +2368,7 @@ class AssistantRuntime:
             force_deep=True,
             ilerleme_izni=ilerleme_izni,
             okur=okur,
+            mod_onerisi=False,  # /plan has no switch button (spec: B1 is /stream and /chat only)
         )
         out["intent"] = "study_plan"
         out["plan_blocks"] = self._build_rule_based_plan(
@@ -2387,6 +2415,7 @@ class AssistantRuntime:
                 session_id=session_id,
                 context_filters=context_filters,
                 temperature=temperature,
+                mod_onerisi=False,  # /v1 is an API-key client: no switch button either
             )
 
         answer = out.get("answer", "")
