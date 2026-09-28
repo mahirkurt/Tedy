@@ -97,7 +97,7 @@ const TOOL_LABEL: Record<string, string> = {
   oer_kazanima_gore: 'Kazanıma bağlı kaynaklar alınıyor',
   modul_ara: 'Yayınlanmış modüller aranıyor',
   odev_listesi: 'Ödev listen okunuyor',
-  skill_kaynagi: 'Öğretmen notlarına bakılıyor',
+  skill_kaynagi: 'Öğretmen notları açılıyor',
   mod_oner: 'Öğretmen önerisi hazırlanıyor',
 }
 
