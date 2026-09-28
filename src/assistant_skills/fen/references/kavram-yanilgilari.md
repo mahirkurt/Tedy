@@ -34,7 +34,7 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### Kinetik enerji yalnız hıza bağlıdır
 
-**Doğrusu:** Kinetik enerji hem kütleye hem hıza bağlıdır: kütle ya da hız arttıkça kinetik enerji de artar. Kütleyle doğru orantılıdır; ama hızla ilişkisi doğrusal değildir — hızdaki küçük bir artış kinetik enerjide daha büyük bir artışa yol açar, bu yüzden "hızla doğru orantılı" deme. Aynı hızla giden bir kamyon, bir bisikletten çok daha fazla kinetik enerjiye sahiptir.
+**Doğrusu:** Kinetik enerji hem kütleye hem hıza bağlıdır: kütle ya da hız arttıkça kinetik enerji de artar. Kütleyle doğru orantılıdır; ama hızla ilişkisi doğrusal değildir — hız iki katına çıkınca kinetik enerji iki katından fazla artar, bu yüzden "hızla doğru orantılı" deme. Ders kitabı "Kinetik enerji kütle ve hızla doğru orantılıdır" der (kitap 1, s.68); bunu kütle için birebir, hız için "hız arttıkça kinetik enerji artar" diye oku — kütleyle ilişki gerçekten doğru orantılı, hızla ilişki ise daha hızlı büyür; formül vermeden bunu belirtmen yeter. Aynı hızla giden bir kamyon, bir bisikletten çok daha fazla kinetik enerjiye sahiptir.
 **Nasıl düzeltirsin:** Aynı hızla yuvarlanan pinpon topu ile bowling topunun bir kutuya çarpmasını karşılaştır.
 **Kontrol sorusu:** Kütleleri farklı iki koşucu aynı hızla koşuyor. Hangisinin kinetik enerjisi büyüktür?
 
@@ -65,7 +65,7 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 ### Ortam değiştiren ışık her zaman kırılır
 
 **Doğrusu:** Bir ortamdan ötekine dik (90°) giren ışık ışınları doğrultusunu değiştirmeden geçer; ama hızları değişir. Eğik giren ışın hem hız hem doğrultu değiştirdiği için kırılır; kırılma yalnız eğik gelişte gözle görülür bir yön değişikliği yaratır.
-**Nasıl düzeltirsin:** Bir el fenerinin ışığını önce suya tam dik, sonra eğik tutarak ışın demetini gözlemleyin; her ikisinde de demetin yanına normali çizin. Dik demetin doğrultusu değişmez; eğik demet normale doğru kırılır.
+**Nasıl düzeltirsin:** Saydam bir kaba su doldur, birkaç damla süt kat ve ışık demetinin görünür olması için kabın yanından bak. Bir el fenerinin ışığını önce suya tam dik, sonra eğik tutarak ışın demetini gözle; her ikisinde de demetin yanına normali çiz. Dik demetin doğrultusu değişmez; eğik demet normale doğru kırılır.
 **Kontrol sorusu:** Havadan suya dik giren bir ışık ışınının doğrultusu ve hızı nasıl değişir?
 
 ### Mercek görüntüyü her zaman büyütür
@@ -89,7 +89,7 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 ### Çözünme ile erime aynıdır
 
 **Doğrusu:** Şeker suda çözünür: şeker tanecikleri su tanecikleri arasına dağılır. Erime ise bir katının ısı alarak sıvı hâle geçmesidir (buzun erimesi).
-**Nasıl düzeltirsin:** Çayda kaybolan şekeri ve oda sıcaklığında kendiliğinden eriyen bir buz küpünü karşılaştır: birinde ikinci bir madde var, ötekinde yok.
+**Nasıl düzeltirsin:** Çayda kaybolan şekeri ve oda havasından ısı alarak eriyen bir buz küpünü karşılaştır: birinde ikinci bir madde var, ötekinde yok.
 **Kontrol sorusu:** "Tuz suda eridi" cümlesini bilimsel olarak düzelt.
 
 ### Sürtünmeyle elektriklenmede yük yoktan var olur ya da protonlar taşınır

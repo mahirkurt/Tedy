@@ -1,6 +1,6 @@
 # 7. sınıf Fen Bilimleri — soru kalıpları
 
-Bir konuyu anlattıktan sonra "Sıra sende" sorusunu bu kalıplardan biriyle yaz. Bağlamı değiştir; soruyu anlattığın kazanımın alan becerisine (gözlemleme, hipotez oluşturma, deney yapma, model oluşturma) bağla. Yanlış seçenekleri kavram yanılgılarından kur.
+Bir konuyu anlattıktan sonra "Sıra sende" sorusunu bu kalıplardan biriyle yaz. Bağlamı değiştir; soruyu anlattığın kazanımın dayandığı beceriye (gözlemleme, hipotez oluşturma, deney yapma, model oluşturma) bağla. Yanlış seçenekleri kavram yanılgılarından kur.
 
 ### Çoktan seçmeli kavram sorusu
 
@@ -32,15 +32,15 @@ Bir konuyu anlattıktan sonra "Sıra sende" sorusunu bu kalıplardan biriyle yaz
 **Ne zaman:** Hipotez oluşturma ve deney yapma becerilerinde (çözünme hızı, karışımları ayırma).
 **Nasıl yazılır:** Bir araştırma sorusu ver; öğrenciden hipotez yazmasını, bağımsız, bağımlı ve sabit tutulan değişkeni adlandırmasını iste.
 **Örnek:** "Suyun sıcaklığı şekerin çözünme hızını etkiler mi?" sorusu için bir hipotez yaz ve değişkenleri belirt.
-**Cevap:** Hipotez: Eğer suyun sıcaklığı artarsa, o zaman şekerin çözünme süresi kısalır. Bağımsız: suyun sıcaklığı; bağımlı: çözünme süresi; sabit: su miktarı, şekerin tane büyüklüğü (temas yüzeyi), karıştırma.
+**Cevap:** Hipotez: Eğer suyun sıcaklığı artarsa, o zaman şekerin çözünme süresi kısalır. Bağımsız: suyun sıcaklığı; bağımlı: çözünme süresi; sabit: su miktarı, şeker miktarı, şekerin tane büyüklüğü (temas yüzeyi), karıştırma.
 
 ### Tablo ya da grafik okuma
 
 **Tür:** acik_uclu
 **Ne zaman:** Veriden çıkarım yapma becerisinde.
 **Nasıl yazılır:** Küçük bir veri tablosu ver (en çok dört satır); öğrenciden bir örüntü bulmasını ve sonucu açıklamasını iste.
-**Örnek:** Aynı süratle çarpan 1 kg, 2 kg ve 4 kg'lık topların kinetik enerjileri sırasıyla 20 J, 40 J ve 80 J ölçülmüştür. Kütle ile kinetik enerji arasındaki ilişki nedir?
-**Cevap:** Aynı süratte kütle iki katına çıkınca kinetik enerji de iki katına çıkar; kinetik enerji kütleyle doğru orantılıdır.
+**Örnek:** Aynı hızla yere çarpan 1 kg, 2 kg ve 4 kg'lık topların kinetik enerjileri sırasıyla 20 J, 40 J ve 80 J ölçülmüştür. Kütle ile kinetik enerji arasındaki ilişki nedir?
+**Cevap:** Aynı hızda kütle iki katına çıkınca kinetik enerji de iki katına çıkar; kinetik enerji kütleyle doğru orantılıdır.
 
 ### Model kurma
 
