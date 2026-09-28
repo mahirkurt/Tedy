@@ -23,16 +23,16 @@ const CAPTION = 'Bitki hücresinin kesit çizimi: hücre duvarı, hücre zarı v
 // The citation shape src/assistant_tools.py McpRegistry.dispatch builds for figur_getir.
 const FIGURE_CITATION = {
   id: 'S1', kind: 'kitap', label: 'Fen Bilimleri 7.Sınıf Ders Kitabı · s.114 · görsel',
-  locator: { tool: 'figur_getir', server: 'maarif-mufredat', args: { figure_id: 1875 }, figure_id: 1875, caption: CAPTION },
+  locator: { tool: 'figur_getir', server: 'maarif-mufredat', args: { figure_id: 1875 }, figure_id: 1875, caption: CAPTION, corpus_version: '1.6' },
   snippet: CAPTION, confidence: 0.9,
 }
 const UNCAPTIONED = {
   ...FIGURE_CITATION, id: 'S2', label: 'Fen Bilimleri 7.Sınıf Ders Kitabı · s.120 · görsel',
-  locator: { tool: 'figur_getir', figure_id: 1876 }, snippet: '',
+  locator: { tool: 'figur_getir', figure_id: 1876, corpus_version: '1.6' }, snippet: '',
 }
 const BROKEN = {
   ...FIGURE_CITATION, id: 'S3', label: 'Fen Bilimleri 7.Sınıf Ders Kitabı · s.130 · görsel',
-  locator: { tool: 'figur_getir', figure_id: 1877, caption: 'Kırık görsel' }, snippet: 'Kırık görsel',
+  locator: { tool: 'figur_getir', figure_id: 1877, caption: 'Kırık görsel', corpus_version: '1.6' }, snippet: 'Kırık görsel',
 }
 // A figure id that is not a positive integer must never become a URL segment.
 const UNSAFE = {
@@ -56,9 +56,9 @@ async function ask(page: Page, prompt: string) {
 async function mockFigures(page: Page) {
   const requested: string[] = []
   await page.route('**/api/assistant/figure/**', route => {
-    const url = route.request().url()
-    requested.push(new URL(url).pathname)
-    if (url.endsWith('/1877')) {
+    const url = new URL(route.request().url())
+    requested.push(url.pathname + url.search)
+    if (url.pathname.endsWith('/1877')) {
       return route.fulfill({ status: 502, contentType: 'application/json',
         body: JSON.stringify({ error: 'Ders kitabı görseline şu an ulaşılamadı; biraz sonra yeniden deneyin.' }) })
     }
@@ -88,7 +88,7 @@ test('a figure citation shows the textbook image in the source panel, captioned 
   // 1. The captioned figure: the image loaded, from the dashboard's own endpoint, alt = caption.
   const first = items.nth(0).locator('img.ac__ref-figure')
   await expect(first).toBeVisible()
-  await expect(first).toHaveAttribute('src', '/api/assistant/figure/1875')
+  await expect(first).toHaveAttribute('src', '/api/assistant/figure/1875?v=1.6')
   await expect(first).toHaveAttribute('alt', CAPTION)
   await expect.poll(() => first.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBe(96)
   // The caption is the alt text; printing it again as a snippet would read it twice.
@@ -105,7 +105,7 @@ test('a figure citation shows the textbook image in the source panel, captioned 
   await expect(items.nth(3).locator('.ac__ref-snippet')).toHaveText('kaçak özet')
   await expect(items.nth(3).locator('img')).toHaveCount(0)
   expect(requested.sort()).toEqual([
-    '/api/assistant/figure/1875', '/api/assistant/figure/1876', '/api/assistant/figure/1877'])
+    '/api/assistant/figure/1875?v=1.6', '/api/assistant/figure/1876?v=1.6', '/api/assistant/figure/1877?v=1.6'])
 })
 
 test('the source panel with a figure passes axe and IBM Equal Access', async ({ page }) => {
@@ -138,4 +138,27 @@ test('the source panel with a figure passes axe and IBM Equal Access', async ({ 
     .filter(s => !(s.ruleId === 'aria_id_unique' && /cds--ai-label|cds--toggletip/.test(s.snippet + ' ' + s.path.dom)))
     .map(s => `${s.ruleId}: ${s.message} — ${s.snippet.slice(0, 120)}`)
   expect(ihlal).toEqual([])
+})
+
+// 2026-09-28: a figure id means a picture only together with the corpus build it was cited
+// under (the 1.6 build renumbered them), so the URL carries it. A citation from before the
+// version existed asks without it; the server answers 404 and the panel says so in words.
+test('the figure URL carries the corpus version, encoded; a citation without one asks without it', async ({ page }) => {
+  const requested = await mockFigures(page)
+  const ODD = { ...FIGURE_CITATION, id: 'S1', label: 'Garip sürüm',
+    locator: { tool: 'figur_getir', figure_id: 1879, corpus_version: '1.6/x' }, snippet: '' }
+  const NONE = { ...FIGURE_CITATION, id: 'S2', label: 'Sürümsüz',
+    locator: { tool: 'figur_getir', figure_id: 1878 }, snippet: '' }
+  await page.route('**/api/assistant/stream', route => route.abort())
+  await page.route('**/api/assistant/chat', route => route.fulfill(json(answer(
+    [ODD, NONE], 'Birinci [S1], ikinci [S2].'))))
+
+  await ask(page, 'iki görsel göster')
+  const items = page.locator('.ac__ref-group--kitap .ac__ref-item')
+  await expect(items).toHaveCount(2)
+  await expect(items.nth(0).locator('img.ac__ref-figure'))
+    .toHaveAttribute('src', '/api/assistant/figure/1879?v=1.6%2Fx')
+  await expect(items.nth(1).locator('img.ac__ref-figure'))
+    .toHaveAttribute('src', '/api/assistant/figure/1878')
+  await expect.poll(() => requested.length).toBe(2)
 })
