@@ -5,9 +5,15 @@ and ids: SharePoint `download=1` (200 application/pdf, or a login wall that
 ends on login.microsoftonline.com as text/html), Drive `uc?export=download`
 (octet-stream, or the virus-scan confirm page with a download form), Google
 Docs `/export?format=pdf`. An unplanned URL fails the test.
+
+The fake never resolves a host name, so SahteOturum carries a permissive
+`adres_izni` (ek_indir's address policy): the invented hosts would fail the
+strict global-address check only because they do not exist. That check is
+proven on its own, with a fake resolver, in tests/test_portal_ekleri_indir.py.
 """
 from __future__ import annotations
 
+import hashlib
 import io
 import zipfile
 from typing import Any, Callable
@@ -70,13 +76,18 @@ class SahteYanit:
 class SahteOturum:
     """Routes by URL prefix, in insertion order; records every request."""
 
+    # ek_indir asks the session before its strict default (see module doc):
+    # the fake layer never resolves a name, so every invented host is allowed.
+    adres_izni = staticmethod(lambda host: True)
+
     def __init__(self, rotalar: dict[str, Any]):
         self.rotalar = rotalar
         self.istekler: list[dict[str, Any]] = []
 
     def get(self, url, headers=None, stream=False, timeout=None, allow_redirects=True, cookies=None):
         self.istekler.append({"url": url, "headers": dict(headers or {}), "cookies": cookies,
-                              "stream": stream, "timeout": timeout})
+                              "stream": stream, "timeout": timeout,
+                              "allow_redirects": allow_redirects})
         for onek, yanit in self.rotalar.items():
             if url.startswith(onek):
                 y = yanit(url, headers or {}) if callable(yanit) else yanit
@@ -98,18 +109,30 @@ class SahteSaat:
         return self.an
 
 
+def surum_etiketi(govde: bytes) -> str:
+    """The strong ETag `aralikli` gives a body: a new body is a new version."""
+    return '"' + hashlib.sha256(govde).hexdigest()[:16] + '"'
+
+
 def aralikli(govde: bytes, icerik_turu: str = "application/pdf") -> Callable[[str, dict], SahteYanit]:
-    """A host that honours `Range: bytes=<n>-` (206) and says 416 past the end."""
+    """A host that honours `Range: bytes=<n>-` (206) and says 416 past the end.
+    It sends a strong ETag and, like a real one, answers a Range whose
+    `If-Range` names another version with the whole new body (200)."""
+    etiket = surum_etiketi(govde)
+
     def yanitla(url: str, headers: dict) -> SahteYanit:
         aralik = headers.get("Range")
-        if aralik:
+        kosul = headers.get("If-Range")
+        if aralik and kosul in (None, etiket):
             bas = int(aralik.split("=", 1)[1].rstrip("-"))
             if bas >= len(govde):
-                return SahteYanit(416, b"", {"Content-Range": f"bytes */{len(govde)}"})
+                return SahteYanit(416, b"", {"Content-Range": f"bytes */{len(govde)}", "ETag": etiket})
             parca = govde[bas:]
             return SahteYanit(206, parca, {"Content-Type": icerik_turu, "Content-Length": str(len(parca)),
-                                           "Content-Range": f"bytes {bas}-{len(govde) - 1}/{len(govde)}"})
-        return SahteYanit(200, govde, {"Content-Type": icerik_turu, "Content-Length": str(len(govde))})
+                                           "Content-Range": f"bytes {bas}-{len(govde) - 1}/{len(govde)}",
+                                           "ETag": etiket})
+        return SahteYanit(200, govde, {"Content-Type": icerik_turu, "Content-Length": str(len(govde)),
+                                       "ETag": etiket})
     return yanitla
 
 
