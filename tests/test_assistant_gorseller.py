@@ -70,12 +70,17 @@ class _FakeClient:
         self.results = results or {}
         self.healthy = healthy
         self.calls = []
+        # The timeout the last call_tool() got, whatever it named (None when
+        # the caller passed none) — lets a test check korpus_surumu()'s 5 s
+        # budget without widening the calls tuples every other test asserts on.
+        self.son_zaman_asimi = None
 
     def list_tools(self):
         return self._tools
 
-    def call_tool(self, name, arguments):
+    def call_tool(self, name, arguments, timeout=None):
         self.calls.append((name, dict(arguments)))
+        self.son_zaman_asimi = timeout
         r = self.results.get(name, McpToolResult(ok=True, text="{}"))
         return r(arguments) if callable(r) else r
 
@@ -534,20 +539,63 @@ def at_ttl():
     return KORPUS_SURUMU_TTL
 
 
+def at_hata_bekleme():
+    from src.assistant_tools import KORPUS_SURUMU_HATA_BEKLEME
+    return KORPUS_SURUMU_HATA_BEKLEME
+
+
 def test_korpus_surumu_result_zarfini_da_okur():
     maarif = _FakeClient("maarif-mufredat", MAARIF_TOOLS, results={"server_info": McpToolResult(
         ok=True, text=json.dumps({"result": {"corpus_version": SURUM}}))})
     assert _registry(maarif=maarif).korpus_surumu() == SURUM
 
 
-def test_okunamayan_surum_none_ve_onbellege_girmez():
+def test_korpus_surumu_5_saniye_zaman_asimiyla_cagirir():
+    # A short budget, not the client's full 25 s default: a maarif outage must
+    # not tie up a gthread worker on every figure request.
+    maarif = _FakeClient("maarif-mufredat", MAARIF_TOOLS, results={"server_info": _server_info()})
+    _registry(maarif=maarif).korpus_surumu()
+    assert maarif.son_zaman_asimi == 5.0
+
+
+def test_okunamayan_surum_bilinen_iyi_deger_yoksa_gecici_olarak_none_donderir():
+    # No known-good version yet: the failure is remembered for
+    # KORPUS_SURUMU_HATA_BEKLEME seconds so it is not retried on every call.
     maarif = _FakeClient("maarif-mufredat", MAARIF_TOOLS, results={
         "server_info": McpToolResult(ok=False, error="timeout")})
     reg = _registry(maarif=maarif)
+    saat = [1000.0]
+    reg.monotonik = lambda: saat[0]
     assert reg.korpus_surumu() is None
     maarif.results["server_info"] = _server_info()
-    assert reg.korpus_surumu() == SURUM           # the failure was not remembered
+    saat[0] += at_hata_bekleme() - 1
+    assert reg.korpus_surumu() is None             # still backed off; no repeat call
+    assert len(maarif.calls) == 1
+    saat[0] += 2                                   # past the backoff: retried
+    assert reg.korpus_surumu() == SURUM
+    assert len(maarif.calls) == 2
     assert _registry(maarif=False).korpus_surumu() is None
+
+
+def test_surum_hatasinda_bilinen_son_iyi_surum_gecerli_kalir_30sn_tekrar_denenmez():
+    # Stale-if-error: once a good version was read, a later failure serves it
+    # rather than refusing, and does not retry server_info within the backoff.
+    maarif = _FakeClient("maarif-mufredat", MAARIF_TOOLS, results={"server_info": _server_info()})
+    reg = _registry(maarif=maarif)
+    saat = [1000.0]
+    reg.monotonik = lambda: saat[0]
+    assert reg.korpus_surumu() == SURUM
+    saat[0] += at_ttl() + 1                        # past the TTL: due for a re-read
+    maarif.results["server_info"] = McpToolResult(ok=False, error="timeout")
+    assert reg.korpus_surumu() == SURUM            # stale-if-error: last known-good served
+    assert len(maarif.calls) == 2
+    saat[0] += at_hata_bekleme() - 1
+    assert reg.korpus_surumu() == SURUM            # still backed off; no repeat call
+    assert len(maarif.calls) == 2
+    saat[0] += 2                                   # past the backoff: retried
+    maarif.results["server_info"] = _server_info("1.7")
+    assert reg.korpus_surumu() == "1.7"
+    assert len(maarif.calls) == 3
 
 
 def test_figur_atfi_korpus_surumunu_tasir():
