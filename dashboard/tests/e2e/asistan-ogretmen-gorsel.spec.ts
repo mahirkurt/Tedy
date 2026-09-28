@@ -98,6 +98,41 @@ for (const [boy, w, h] of [['masaustu', 1440, 900], ['telefon', 390, 844]] as co
     expect(ihlal).toEqual([])
     const tasma = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(tasma, 'yatay taşma (px)').toBeLessThanOrEqual(0)
+
+    // The page-level scrollWidth check above cannot see this: .ac__chat clips
+    // overflow (`overflow: hidden`) so a too-wide suggestion block never
+    // widens the page — it is silently cut off inside the bubble instead.
+    // Assert containment directly against the enclosing message bubble
+    // (.ac-msg--assistant, the flex row with the avatar — not .ac-msg__body
+    // itself, which is exactly the element that can balloon past the bubble:
+    // Carbon's Button sets `inline-size: max-content`, which drags the
+    // ancestor flex item's automatic `min-width: auto` up to the button's own
+    // preferred width, past the space the row actually has). 1px tolerance
+    // for subpixel rounding.
+    const kutular = await page.evaluate(() => {
+      const box = (el: Element | null) => el ? el.getBoundingClientRect() : null
+      const bubbles = document.querySelectorAll('.ac-msg--assistant')
+      const balon = bubbles[bubbles.length - 1]
+      return {
+        balon: box(balon),
+        oneri: box(balon.querySelector('.ac-msg__oneri')),
+        gerekce: box(balon.querySelector('.ac-msg__oneri-gerekce')),
+        buton: box(balon.querySelector('.ac-msg__oneri button')),
+        gerekceTasma: (() => {
+          const g = balon.querySelector('.ac-msg__oneri-gerekce') as HTMLElement
+          return g.scrollWidth - g.clientWidth
+        })(),
+      }
+    })
+    const TOLERANS = 1
+    for (const [ad, kutu] of [['oneri', kutular.oneri], ['gerekce', kutular.gerekce],
+                              ['buton', kutular.buton]] as const) {
+      expect(kutu!.right, `${ad} sağ kenarı bubble içinde`)
+        .toBeLessThanOrEqual(kutular.balon!.right + TOLERANS)
+      expect(kutu!.left, `${ad} sol kenarı bubble içinde`)
+        .toBeGreaterThanOrEqual(kutular.balon!.left - TOLERANS)
+    }
+    expect(kutular.gerekceTasma, 'gerekçe scrollWidth - clientWidth').toBeLessThanOrEqual(0)
   })
 }
 
