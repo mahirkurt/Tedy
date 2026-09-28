@@ -44,5 +44,12 @@ export function useOgretmen(email: string | null | undefined) {
     }
   }
 
-  return { liste, secili, id: secili ? secili.id : GENEL, sec, yukleniyor: loading, hata: error }
+  // Final-fix item 8: useApi keeps the previous successful `data` on a failed
+  // poll (see useApi.ts's catch block, which never resets `data`), so
+  // `error` can be truthy while `liste` still holds a perfectly good, if
+  // stale, list — a transient error must not cover it with "yüklenemedi".
+  // The message is warranted only once the list itself is actually empty.
+  const hata = liste.length === 0 ? error : null
+
+  return { liste, secili, id: secili ? secili.id : GENEL, sec, yukleniyor: loading, hata }
 }

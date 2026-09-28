@@ -120,6 +120,24 @@ test('a list that failed says so and Genel still works', async ({ page }) => {
   await expect(page.getByText('Öğretmen modları şu an yüklenemedi; Genel modda sorabilirsiniz.')).toBeVisible()
 })
 
+test('a stale list plus a transient error shows the list, not the banner', async ({ page }) => {
+  // Final-fix item 8: useOgretmen's `hata` must gate on an empty list, not
+  // merely on useApi's `error` — useApi keeps the previous successful `data`
+  // on a failed poll (see useApi.ts), so a transient failure after a good
+  // load must not show "yüklenemedi" over a list that is still right there.
+  await asistan(page)
+  await expect(page.getByRole('group', { name: 'Öğretmen' }).getByRole('radio')).toHaveCount(5)
+  await page.route('**/api/assistant/ogretmenler', r => r.fulfill({ status: 500, body: '{}' }))
+  const yenidenIstek = page.waitForResponse('**/api/assistant/ogretmenler')
+  // useApi refetches on this event (homework updates use the same poll hook
+  // family); it is the one way to force a re-poll without the real 5-minute
+  // interval.
+  await page.evaluate(() => window.dispatchEvent(new Event('tedy:homework-updated')))
+  await yenidenIstek
+  await expect(page.getByRole('group', { name: 'Öğretmen' }).getByRole('radio')).toHaveCount(5)
+  await expect(page.getByText('Öğretmen modları şu an yüklenemedi; Genel modda sorabilirsiniz.')).toHaveCount(0)
+})
+
 // ── mod_oner: a suggestion is a button, never a switch ─────────────────────
 
 const ONERI = {
@@ -141,11 +159,14 @@ async function sor(page: Page) {
 
 test('a suggestion from the stream shows a button and changes nothing by itself', async ({ page }) => {
   await asistan(page)
+  // Both answered here (Global Constraint): an unanswered stream falls back
+  // to /chat, and /chat must never reach the real model.
   await page.route('**/api/assistant/stream', r => r.fulfill({
     status: 200, contentType: 'text/event-stream',
     body: sse(['tool_start', { name: 'mod_oner' }], ['tool_end', { name: 'mod_oner', ok: true }],
       ['mode_suggestion', ONERI], ['answer', { payload: cevap() }], ['done', {}]),
   }))
+  await page.route('**/api/assistant/chat', r => r.fulfill(json(cevap({ mode_suggestion: ONERI }))))
   await sor(page)
   const dugme = page.getByRole('button', { name: 'Matematik öğretmenine geçelim mi?' })
   await expect(dugme).toBeVisible()
@@ -173,10 +194,13 @@ test('the classic endpoint carries the suggestion too', async ({ page }) => {
 
 test('no suggestion, no button', async ({ page }) => {
   await asistan(page)
+  // Both answered here (Global Constraint): an unanswered stream falls back
+  // to /chat, and /chat must never reach the real model.
   await page.route('**/api/assistant/stream', r => r.fulfill({
     status: 200, contentType: 'text/event-stream',
     body: sse(['answer', { payload: cevap() }], ['done', {}]),
   }))
+  await page.route('**/api/assistant/chat', r => r.fulfill(json(cevap())))
   await sor(page)
   await expect(page.locator('.ac-msg--assistant').last()).toContainText('Oran, iki çokluğun')
   await expect(page.locator('.ac-msg__oneri')).toHaveCount(0)
