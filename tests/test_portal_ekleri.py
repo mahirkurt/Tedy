@@ -24,6 +24,9 @@ YOUTUBE = "https://www.youtube.com/watch?v=ornekvideo01"
     (SP_URL, "sharepoint"),
     ("https://ornekokul-my.sharepoint.com/:f:/g/personal/ogretmen_ornekokul_k12_tr/EkLaSoR?e=q1", "baglanti"),
     ("https://ornekokul-my.sharepoint.com/personal/ogretmen/Documents/calisma.docx", "sharepoint"),
+    ("https://ornekokul-my.sharepoint.com/:w:/g/personal/ogretmen_ornekokul_k12_tr/EaBcDeFgHiJkLmNoPqRsTuV?e=AbC123", "sharepoint"),
+    ("https://ornekokul-my.sharepoint.com/:x:/g/personal/ogretmen_ornekokul_k12_tr/EaBcDeFgHiJkLmNoPqRsTuV?e=AbC123", "sharepoint"),
+    ("https://ornekokul-my.sharepoint.com/:p:/g/personal/ogretmen_ornekokul_k12_tr/EaBcDeFgHiJkLmNoPqRsTuV?e=AbC123", "sharepoint"),
     (DRIVE_URL, "drive"),
     (f"https://drive.google.com/open?id={DRIVE_KIMLIK}", "drive"),
     ("https://drive.google.com/drive/folders/1KlAsOr0000000000", "baglanti"),
@@ -63,6 +66,9 @@ def test_indirme_adresleri():
                                         "1ZyXwVuTsRqPoNmLkJiHgFeDcBa98765/export?format=pdf")
     assert indirme_adresi(PORTAL_URL) == PORTAL_URL
     assert indirme_adresi(YOUTUBE) is None
+    for marker in ("w", "x", "p"):
+        url = SP_URL.replace(":b:", f":{marker}:")
+        assert indirme_adresi(url) == url + "&download=1"
 
 
 VERI = {
@@ -157,6 +163,18 @@ def test_meta_ve_baslik(tmp_path):
     assert depo.meta("../x") == {}
     assert ek_basligi({"name": "Rehber", "source": {"title": "Rehber"}}) == "Rehber"
     assert ek_basligi({}) == "Portal eki"
+
+
+def test_metin_ve_meta_yolu_kimligi_dogrular(tmp_path):
+    depo = EkDeposu(tmp_path)
+    for kotu in ("../../etc/passwd", "", "0" * 15, ek_kimligi(SP_URL).upper()):
+        with pytest.raises(ValueError):
+            depo.metin_yolu(kotu)
+        with pytest.raises(ValueError):
+            depo.meta_yolu(kotu)
+    kimlik = ek_kimligi(SP_URL)
+    assert depo.metin_yolu(kimlik) == depo.dizin / f"{kimlik}.txt"
+    assert depo.meta_yolu(kimlik) == depo.dizin / f"{kimlik}.meta.json"
 
 
 def test_ek_ozeti_durumlari():

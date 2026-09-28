@@ -109,6 +109,8 @@ def kanonik_adres(url: Any) -> str:
         return f"https://docs.google.com/{m.group(1)}/d/{m.group(2)}"
     if tur == "sharepoint":
         return urlunsplit(("https", p.netloc.lower(), p.path, "", ""))
+    # portal/dosya/baglanti: query kept verbatim — no tracking parameter was
+    # measured on either host, unlike SharePoint's per-recipient `?e=`.
     return urlunsplit((p.scheme.lower(), p.netloc.lower(), p.path, p.query, ""))
 
 
@@ -305,9 +307,17 @@ class EkDeposu:
         return yol if yol.is_file() else None
 
     def metin_yolu(self, kimlik: str) -> Path:
+        """Unlike `kayit`/`meta`, an invalid id is a programming error here —
+        a caller (e.g. the future `/api/ekler/<id>`) that passes a raw,
+        URL-derived id through unchecked must fail loudly, not silently
+        resolve to a path outside `EK_DIZINI`."""
+        if not KIMLIK_DESENI.fullmatch(str(kimlik or "")):
+            raise ValueError(f"geçersiz ek kimliği: {kimlik!r}")
         return self.dizin / f"{kimlik}.txt"
 
     def meta_yolu(self, kimlik: str) -> Path:
+        if not KIMLIK_DESENI.fullmatch(str(kimlik or "")):
+            raise ValueError(f"geçersiz ek kimliği: {kimlik!r}")
         return self.dizin / f"{kimlik}.meta.json"
 
     def meta(self, kimlik: Any) -> dict[str, Any]:
