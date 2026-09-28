@@ -316,3 +316,27 @@ def test_reindex_cli_dusen_dosyalari_hem_ana_hem_aile_icin_yazdirir(tmp_path, mo
     assert out.count("dusen_dosyalar") == 2  # once per index's own summary
     assert "output/zzz_ikinci.txt" in out
     assert "content/pedagoji/02-ikinci.md" in out
+
+
+def test_reindex_cli_bozuk_skille_ragmen_calisir(tmp_path, monkeypatch, capsys):
+    """Final-fix item 5: reindex_assistant.py's CLI must build its runtime
+    with skills={}, exactly like perform_incremental_reindex — cron's BM25
+    refresh needs no teacher skill loaded, and a broken SKILL.md must not
+    freeze it. Proven by making assistant_skills.varsayilan() itself raise:
+    if the CLI's runtime ever loaded the real skills, this would fail loudly
+    instead of completing."""
+    import src.assistant_core as core
+    import src.reindex_assistant as cli
+    from src.assistant_skills import SkillHatasi
+
+    def bozuk():
+        raise SkillHatasi("turkce: SKILL.md yok")
+
+    monkeypatch.setattr(core.assistant_skills, "varsayilan", bozuk)
+    monkeypatch.setattr(sys, "argv", ["reindex_assistant.py"])
+    monkeypatch.setattr(cli, "PROJECT_ROOT", str(tmp_path))
+
+    cli.main()
+
+    out = capsys.readouterr().out
+    assert "[Assistant] Reindex complete" in out
