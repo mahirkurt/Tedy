@@ -8,6 +8,7 @@ Covers:
 - Timezone handling in related homework matching
 - Scraper takvim checkbox and lazy-load behavior
 """
+import hashlib
 import os
 import sys
 from datetime import datetime, timedelta
@@ -68,7 +69,7 @@ def _grade_row(course, s1="-", s2="-", s3="-"):
 
 
 def _scraped_with_exams(takvim=None, homework=None, grades=None,
-                        ders_icerikleri=None):
+                        ders_icerikleri=None, semester="2. Dönem"):
     data = {
         "takvim": takvim or [],
         "odevlerim": {
@@ -76,7 +77,7 @@ def _scraped_with_exams(takvim=None, homework=None, grades=None,
             "homework": {"rows": homework or []},
         },
         "gelisim_raporu": {
-            "semester": "2. Dönem",
+            "semester": semester,
             "grades": grades or [],
             "physical": {},
         },
@@ -442,45 +443,323 @@ class TestExamRelatedHomework:
             assert len(data["exams"]) >= 1
 
 
-class TestExamRelatedContent:
-    """Related course content matching."""
+def _icerik(text="", cards=(), items=()):
+    """ders_icerikleri[course] in its real shape (measured 2026-09-28):
+    cards and items are strings. Invented teachers and text."""
+    return {"tab_id": "ders_4", "text": text, "tables": [],
+            "items": list(items), "cards": list(cards)}
 
-    def test_finds_matching_course_content(self, client):
-        exam_date = "2026-03-31T10:00:00Z"
-        takvim = [_exam_event(
-            "5-6-7-8. SINIFLAR FEN BİLİMLERİ"
-            " – 2. DÖNEM 1. YAZILI SINAVI",
-            exam_date)]
-        ders = {
-            "Fen Bilimleri": [
-                {"title": "Madde ve Isı", "konu": ""},
-                {"title": "Kuvvet ve Hareket", "konu": ""},
-            ]
-        }
+
+class TestExamRelatedContent:
+    """Related course content, read from the real {tab_id, text, tables,
+    items, cards} shape. The old tests fed a list — a shape the scraper never
+    writes — so relatedContent was [] on every real exam while they passed."""
+
+    FEN_SINAVI = ("5-6-7-8. SINIFLAR FEN BİLİMLERİ – 2. DÖNEM 1. YAZILI SINAVI")
+
+    def _related(self, client, title, ders):
+        takvim = [_exam_event(title, "2026-03-31T10:00:00Z")]
         with patch.object(dashboard_api, "_scraped",
                           return_value=_scraped_with_exams(
-                              takvim=takvim,
-                              ders_icerikleri=ders)):
-            data = client.get("/api/exams").get_json()
-            content = data["exams"][0]["relatedContent"]
-            assert len(content) == 2
+                              takvim=takvim, ders_icerikleri=ders)):
+            return client.get("/api/exams").get_json()["exams"][0]["relatedContent"]
+
+    def test_finds_matching_course_content(self, client):
+        ders = {"Fen Bilimleri": _icerik(
+            text="3. Hafta\nKurgu Öğretmen | 28.09.2026\nBu hafta Güneş sistemi.",
+            cards=[
+                "3. Hafta\nKurgu Öğretmen | 28.09.2026\nSevgili öğrencilerim,\n"
+                "Bu hafta Güneş sistemi.\n  1 Yorum yapıldı!\n  Daha fazla oku\n"
+                "Uydurma Öğrenci\nçok güzel\nYorum Ekle",
+                # The portal's second, title-less rendering of the same post.
+                "Kurgu Öğretmen | 28.09.2026\nSevgili öğrencilerim,\nBu hafta Güneş sistemi.",
+            ],
+            items=["Gezegenleri  Güneş'e uzaklıklarına göre sıralar."])}
+        assert self._related(client, self.FEN_SINAVI, ders) == [
+            {"title": "3. Hafta", "type": "ders_icerikleri"},
+            {"title": "Gezegenleri Güneş'e uzaklıklarına göre sıralar.", "type": "ders_icerikleri"},
+        ]
+
+    def test_teacher_signature_and_comments_never_become_titles(self, client):
+        ders = {"Fen Bilimleri": _icerik(cards=[
+            "Kurgu Öğretmen | 28.09.2026\nSevgili öğrencilerim,",
+            "Uzay Çağı\nKurgu Öğretmen | 21.09.2026\n  Daha fazla oku\nUydurma Öğrenci\nYorum Ekle",
+        ])}
+        basliklar = [c["title"] for c in self._related(client, self.FEN_SINAVI, ders)]
+        assert basliklar == ["Uzay Çağı"]
+        assert not any("Kurgu Öğretmen" in b or "Uydurma Öğrenci" in b for b in basliklar)
 
     def test_turkish_case_content_matching(self, client):
         """Course name case mismatch must still find content."""
-        exam_date = "2026-03-31T10:00:00Z"
-        takvim = [_exam_event(
-            "5-6-7-8. SINIFLAR İNGİLİZCE"
-            " – 2. DÖNEM 1. YAZILI SINAVI",
-            exam_date)]
+        ders = {"İngilizce": _icerik(cards=["Week 3\nÖrnek Teacher | 28.09.2026\nDear 7th graders,"])}
+        content = self._related(
+            client, "5-6-7-8. SINIFLAR İNGİLİZCE – 2. DÖNEM 1. YAZILI SINAVI", ders)
+        assert content == [{"title": "Week 3", "type": "ders_icerikleri"}]
+
+    def test_other_courses_and_unread_courses_add_nothing(self, client):
         ders = {
-            "İngilizce": [{"title": "Unit 5 Grammar"}]
+            "Matematik": _icerik(cards=["Rasyonel sayılar\nÖrnek Hoca | 28.09.2026"]),
+            "Fen Bilimleri": {"tab_id": "ders_4", "error": "Message: no such element"},
         }
-        with patch.object(dashboard_api, "_scraped",
-                          return_value=_scraped_with_exams(
-                              takvim=takvim,
-                              ders_icerikleri=ders)):
+        assert self._related(client, self.FEN_SINAVI, ders) == []
+
+    def test_titles_are_bounded_and_deduplicated(self, client):
+        uzun = "Kuvvet ve enerji " * 20
+        ders = {"Fen Bilimleri": _icerik(
+            cards=[f"Başlık {i}\nKurgu Öğretmen | 28.09.2026" for i in range(8)],
+            # An item repeating a card title is listed once.
+            items=[uzun, "Başlık 1"] + [f"Kazanım {i}" for i in range(8)])}
+        content = self._related(client, self.FEN_SINAVI, ders)
+        basliklar = [c["title"] for c in content]
+        # Five card titles, then the first five items with the repeat dropped.
+        assert basliklar[:5] == [f"Başlık {i}" for i in range(5)]
+        assert basliklar[6:] == ["Kazanım 0", "Kazanım 1", "Kazanım 2"]
+        assert basliklar.count("Başlık 1") == 1
+        assert basliklar[5].endswith("…") and len(basliklar[5]) <= 140
+        assert all(len(b) <= 140 for b in basliklar)
+
+    def test_at_most_ten_across_duplicate_course_tabs(self, client):
+        # The portal has two tabs for one course ("İngilizce", "İngilizce (2)"
+        # both normalise to İngilizce); together they must not exceed ten.
+        ders = {
+            "İngilizce": _icerik(cards=[f"Week {i}" for i in range(5)],
+                                 items=[f"Outcome {i}" for i in range(5)]),
+            "İngilizce (2)": _icerik(cards=["Reading club"]),
+        }
+        content = self._related(
+            client, "5-6-7-8. SINIFLAR İNGİLİZCE – 2. DÖNEM 1. YAZILI SINAVI", ders)
+        assert len(content) == 10
+
+
+class TestRealPortalExamTitles:
+    """Real titles measured 2026-09-28 (plan
+    docs/superpowers/sdd/2026-09-28-pano-eksiklikleri/): _extract_exam_info's
+    regexes need a dash (_COURSE_FROM_TITLE_RE) or the plural "Sınıflar"
+    prefix, neither of which every real portal title has, so `course` stayed
+    the whole title and relatedContent was always []. The fix looks for a
+    known course name (from ders_icerikleri's own keys, Turkish-folded,
+    word-bounded) inside the title when the regexes did not land on one —
+    without ever moving the exam id, which hashes the *legacy* course."""
+
+    TURKCE_ORTAK = (
+        "7. Sınıf MEB Ülke Geneli Türkçe 1. Dönem 2. Ortak Yazılı Sınavı"
+        " / 7th Grade MEB Türkiye-wide Turkish 1st Term 2nd Common Written Exam"
+    )
+    # Same real exam, but with the "Ortak" word dropped so _SINAV_NUMBER_RE
+    # (which requires the digit directly before "Yazılı"/"Sınav") resolves
+    # examNumber — used to test grade/homework matching under the resolved
+    # course, a thing the literal title (no examNumber) cannot exercise.
+    TURKCE_SAYILI = (
+        "7. Sınıf MEB Ülke Geneli Türkçe 1. Dönem 2. Yazılı Sınavı"
+        " / 7th Grade MEB Türkiye-wide Turkish 1st Term 2nd Written Exam"
+    )
+    GIS = (
+        "5-6-7. Sınıflar Özdebir Gelişim İzleme Sınavı GİS-1 (Türkiye Geneli)"
+        " / 5th-6th-7th Grades Ozdebir Development Monitoring Exam GIS-1 (Turkey-wide)"
+    )
+    HAFTA_BASLANGICI = (
+        "5-6-7-8. Sınıflar MEB 1. Dönem 2. Yazılı Sınav Haftası Başlangıcı"
+        " / 5th-6th-7th-8th Grades MEB 1st Term 2nd Written Exam Week Beginning"
+    )
+
+    DERS = {
+        "Türkçe": _icerik(cards=[
+            "3. Ünite\nGerçek Öğretmen | 20.09.2026\nBu hafta şiir türleri."]),
+        "Matematik": _icerik(cards=["Rasyonel sayılar\nGerçek Hoca | 20.09.2026"]),
+    }
+
+    def test_week_marker_is_not_an_exam(self):
+        """_SINAV_EXCLUDE already screens this out via "başlangıcı" — pinned
+        so a future change to the fix does not silently start treating a
+        week-marker announcement as an exam."""
+        assert not dashboard_api._is_exam_event(self.HAFTA_BASLANGICI)
+
+    def test_gis_is_an_exam_event(self):
+        assert dashboard_api._is_exam_event(self.GIS)
+
+    def test_legacy_extraction_still_returns_whole_title(self):
+        """_extract_exam_info itself must stay untouched — the exam id is
+        computed from its return value. This pins the bug the new fallback
+        works around, and doubles as the "before" half of the id-stability
+        proof below."""
+        course, raw, num = dashboard_api._extract_exam_info(self.TURKCE_ORTAK)
+        assert course.startswith("7. Sınıf")
+        assert "Türkçe" in course  # embedded, just not isolated
+
+    def test_turkce_ortak_sinavi_related_content(self, client):
+        takvim = [_exam_event(self.TURKCE_ORTAK, "2026-03-31T10:00:00Z")]
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                takvim=takvim, ders_icerikleri=self.DERS)):
+            exam = client.get("/api/exams").get_json()["exams"][0]
+        assert exam["course"] == "Türkçe"
+        assert exam["relatedContent"] == [
+            {"title": "3. Ünite", "type": "ders_icerikleri"}]
+        assert exam["rawTitle"] == self.TURKCE_ORTAK       # full title still visible
+        assert exam["title"].startswith("Türkçe ·")         # sensible label
+
+    def test_gis_stays_courseless(self, client):
+        takvim = [_exam_event(self.GIS, "2026-03-31T10:00:00Z")]
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                takvim=takvim, ders_icerikleri=self.DERS)):
+            exam = client.get("/api/exams").get_json()["exams"][0]
+        assert exam["course"] not in self.DERS
+        assert exam["relatedContent"] == []
+
+    def test_ambiguous_title_stays_courseless(self):
+        """Two distinct known courses named in one title: never force it
+        onto either one."""
+        title = ("7. Sınıf MEB Ülke Geneli Türkçe ve Matematik Ortak Sınavı"
+                 " / 7th Grade MEB Türkiye-wide Turkish and Mathematics Common Exam")
+        legacy, _, _ = dashboard_api._extract_exam_info(title)
+        resolved = dashboard_api._cozumlenen_sinav_dersi(legacy, title, self.DERS)
+        assert resolved not in ("Türkçe", "Matematik")
+
+    def test_exam_id_unchanged_by_course_resolution_fix(self, client):
+        """The id hashes the *legacy* course (whatever _extract_exam_info
+        returns), the title, and _kimlik_zamani(date) — untouched by the new
+        course-resolution fallback, so an id already handed to a module or
+        bookmark never moves."""
+        date_str = "2026-03-31T10:00:00Z"
+        takvim = [_exam_event(self.TURKCE_ORTAK, date_str)]
+        legacy_course, _, _ = dashboard_api._extract_exam_info(self.TURKCE_ORTAK)
+        expected_id = hashlib.md5(
+            f"{legacy_course}|{self.TURKCE_ORTAK}|"
+            f"{dashboard_api._kimlik_zamani(date_str)}".encode()
+        ).hexdigest()[:12]
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                takvim=takvim, ders_icerikleri=self.DERS)):
+            exam = client.get("/api/exams").get_json()["exams"][0]
+        assert exam["id"] == expected_id
+        assert exam["course"] == "Türkçe"        # display resolved...
+        assert legacy_course != "Türkçe"          # ...but the id's input did not
+
+    def test_grade_and_homework_use_resolved_course(self, client):
+        past = "2026-03-31T10:00:00Z"
+        takvim = [_exam_event(self.TURKCE_SAYILI, past)]
+        grades = [_grade_row("Türkçe", s2="90")]
+        homework = [_homework_row("Türkçe", "Şiir tekrarı", "20.03.2026 12:00")]
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                takvim=takvim, grades=grades, homework=homework,
+                ders_icerikleri=self.DERS)):
+            exam = client.get("/api/exams").get_json()["exams"][0]
+        assert exam["grade"] == "90"
+        assert [hw["title"] for hw in exam["relatedHomework"]] == ["Şiir tekrarı"]
+
+    def test_content_map_key_tries_legacy_then_resolved(self, client):
+        """exam_content_map.json entries were written keyed on the *old*
+        course value (course_names.py never invented one before this fix);
+        they must not be orphaned."""
+        past = "2026-03-31T10:00:00Z"
+        takvim = [_exam_event(self.TURKCE_ORTAK, past)]
+        legacy_course, _, _ = dashboard_api._extract_exam_info(self.TURKCE_ORTAK)
+        legacy_key = f"{legacy_course}|{self.TURKCE_ORTAK}|{past[:10]}"
+        content_map = {legacy_key: {"summary": "Eski özet"}}
+
+        def _load_json_yerine(name):
+            return content_map if name == "exam_content_map.json" else {}
+
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                takvim=takvim, ders_icerikleri=self.DERS)), \
+             patch.object(dashboard_api, "_load_json", side_effect=_load_json_yerine):
+            exam = client.get("/api/exams").get_json()["exams"][0]
+        assert exam["aiSummary"] == "Eski özet"
+
+    def test_content_map_key_also_tries_resolved_course(self, client):
+        """A future entry keyed on the resolved course must also be found."""
+        past = "2026-03-31T10:00:00Z"
+        takvim = [_exam_event(self.TURKCE_ORTAK, past)]
+        resolved_key = f"Türkçe|{self.TURKCE_ORTAK}|{past[:10]}"
+        content_map = {resolved_key: {"summary": "Yeni özet"}}
+
+        def _load_json_yerine(name):
+            return content_map if name == "exam_content_map.json" else {}
+
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                takvim=takvim, ders_icerikleri=self.DERS)), \
+             patch.object(dashboard_api, "_load_json", side_effect=_load_json_yerine):
+            exam = client.get("/api/exams").get_json()["exams"][0]
+        assert exam["aiSummary"] == "Yeni özet"
+
+    def test_no_duplicate_synthetic_exam_after_course_resolution(self, client):
+        """Once the takvim exam's course resolves to the real "Türkçe", the
+        grade-derived synthetic-exam loop must recognise it as already seen
+        and not double it."""
+        past = "2026-03-31T10:00:00Z"
+        takvim = [_exam_event(self.TURKCE_SAYILI, past)]
+        grades = [_grade_row("Türkçe", s2="90")]
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                takvim=takvim, grades=grades, ders_icerikleri=self.DERS)):
             data = client.get("/api/exams").get_json()
-            assert len(data["exams"][0]["relatedContent"]) == 1
+        assert len(data["exams"]) == 1
+
+    # -- Review finding (critical, 2026-09-28): ders_icerikleri also carries
+    # non-subject tabs measured on live data — "Genel" (the school-wide
+    # announcement feed), "PDR" (guidance) and "Sınıf Öğretmeni" (homeroom
+    # teacher). Taking every key unfiltered let a title like "... Genel
+    # Deneme Sınavı / ..." resolve to a fake course "Genel" and surface an
+    # unrelated announcement as relatedContent.
+
+    DERS_GENEL_KARISIK = {
+        "Türkçe": _icerik(cards=[
+            "3. Ünite\nGerçek Öğretmen | 20.09.2026\nBu hafta şiir türleri."]),
+        "Genel": _icerik(cards=["Okul duyurusu: Veli toplantısı 10 Ekimde."]),
+        "PDR": _icerik(cards=["Rehberlik saati: sınav kaygısı."]),
+        "Sınıf Öğretmeni": _icerik(cards=["Sınıf öğretmeni notu: kitap listesi."]),
+    }
+
+    def test_genel_review_title_stays_courseless(self, client):
+        titles = [
+            ("5-6-7-8. Sınıflar MEB 1. Dönem Genel Deneme Sınavı"
+             " / 5th-6th-7th-8th Grades MEB 1st Term General Trial Exam"),
+            ("5-6-7-8. Sınıflar MEB 2. Dönem Genel Tekrar Sınavı"
+             " / 5th-6th-7th-8th Grades MEB 2nd Term General Review Exam"),
+            ("5-6-7-8. Sınıflar MEB 1. Dönem Genel Tarama Sınavı"
+             " / 5th-6th-7th-8th Grades MEB 1st Term General Screening Exam"),
+        ]
+        for title in titles:
+            takvim = [_exam_event(title, "2026-03-31T10:00:00Z")]
+            with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                    takvim=takvim, ders_icerikleri=self.DERS_GENEL_KARISIK)):
+                exam = client.get("/api/exams").get_json()["exams"][0]
+            assert exam["course"] != "Genel", title
+            assert exam["relatedContent"] == [], title
+
+    def test_pdr_and_sinif_ogretmeni_titles_never_resolve_to_tab(self, client):
+        titles = [
+            ("5-6-7-8. Sınıflar PDR Değerlendirme Sınavı"
+             " / 5th-6th-7th-8th Grades PDR Assessment Exam"),
+            ("5-6-7-8. Sınıflar Sınıf Öğretmeni Bilgilendirme Sınavı"
+             " / 5th-6th-7th-8th Grades Homeroom Teacher Briefing Exam"),
+        ]
+        for title in titles:
+            takvim = [_exam_event(title, "2026-03-31T10:00:00Z")]
+            with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                    takvim=takvim, ders_icerikleri=self.DERS_GENEL_KARISIK)):
+                exam = client.get("/api/exams").get_json()["exams"][0]
+            assert exam["course"] not in ("PDR", "Sınıf Öğretmeni"), title
+            assert exam["relatedContent"] == [], title
+
+    def test_genel_key_is_not_a_candidate_directly(self):
+        """Unit-level: "Genel"/"PDR"/"Sınıf Öğretmeni" must never even enter
+        the candidate map — subject_themes.domain_of() resolves each of them
+        only to the generic fallback domain ("genel")."""
+        adaylar = dashboard_api._bilinen_ders_adaylari(self.DERS_GENEL_KARISIK)
+        assert "Genel" not in adaylar
+        assert "PDR" not in adaylar
+        assert "Sınıf Öğretmeni" not in adaylar
+        assert "Türkçe" in adaylar
+
+    def test_slash_split_tolerates_spacing_variants(self):
+        """The Turkish/English split must not depend on exact " / " spacing:
+        if the English half leaks into the scan (no split at all), its
+        "Türkçe Karşılığı" gloss would add a second, spurious course and
+        turn a clean single match ("İngilizce") into a false ambiguity."""
+        taban = ("7. Sınıf İngilizce 1. Dönem 2. Yazılı Sınavı"
+                 "{sep}7th Grade Turkish equivalent: Türkçe Karşılığı")
+        for sep in ("/", " /", "/ ", " / ", "  /  "):
+            title = taban.format(sep=sep)
+            assert dashboard_api._baslikta_bilinen_ders_ara(
+                title, self.DERS) == "İngilizce", title
 
 
 class TestSyntheticExams:
@@ -521,6 +800,45 @@ class TestSyntheticExams:
                           return_value=_scraped_with_exams(grades=grades)):
             data = client.get("/api/exams").get_json()
             assert data["exams"][0]["date"] is None
+
+    # Measured: the portal kept 2025-2026's "4. Arakarne" report well into
+    # 2026-2027, and /api/exams listed its graded columns as this year's past
+    # exams. The assistant's notlar already makes this check.
+    def test_prior_year_report_makes_no_synthetic_exams(self, client):
+        grades = [_grade_row("Matematik", s1="85", s2="90")]
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                grades=grades, semester="2025-2026 4. Arakarne")), \
+             patch.object(dashboard_api, "_guncel_ogretim_yili", return_value="2026-2027"):
+            data = client.get("/api/exams").get_json()
+        assert data["exams"] == []
+        assert data["stats"] == {"upcoming": 0, "past": 0, "averageGrade": None}
+
+    def test_prior_year_report_keeps_takvim_exams(self, client):
+        past = (datetime.now() - timedelta(days=5)).isoformat() + "Z"
+        takvim = [_exam_event("5-6-7-8. SINIFLAR TÜRKÇE – 1. DÖNEM 1. YAZILI SINAVI", past)]
+        grades = [_grade_row("Matematik", s1="85")]
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                takvim=takvim, grades=grades, semester="2025-2026 4. Arakarne")), \
+             patch.object(dashboard_api, "_guncel_ogretim_yili", return_value="2026-2027"):
+            data = client.get("/api/exams").get_json()
+        assert len(data["exams"]) == 1
+        assert data["exams"][0]["date"] is not None          # the takvim one, not a synthetic
+
+    def test_current_year_report_still_makes_synthetic_exams(self, client):
+        grades = [_grade_row("Matematik", s1="85", s2="90")]
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                grades=grades, semester="2026-2027 1. Dönem")), \
+             patch.object(dashboard_api, "_guncel_ogretim_yili", return_value="2026-2027"):
+            data = client.get("/api/exams").get_json()
+        assert len(data["exams"]) == 2 and data["stats"]["averageGrade"] == 87.5
+
+    def test_unknown_year_keeps_synthetic_exams(self, client):
+        grades = [_grade_row("Matematik", s1="85")]
+        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                grades=grades, semester="2025-2026 4. Arakarne")), \
+             patch.object(dashboard_api, "_guncel_ogretim_yili", return_value=None):
+            data = client.get("/api/exams").get_json()
+        assert len(data["exams"]) == 1
 
 
 class TestExamEdgeCases:
@@ -577,3 +895,36 @@ class TestExamEdgeCases:
                           return_value=_scraped_with_exams(takvim=takvim)):
             data = client.get("/api/exams").get_json()
             assert len(data["exams"]) == 2
+
+
+class TestPriorYearGrades:
+    """A takvim exam takes its grade only from this school year's report.
+    Measured 2026-09-28: with 2025-2026's "4. Arakarne" still on the portal,
+    this year's past Matematik exam was shown with last year's 1. Sınav (85)
+    and counted in the average."""
+
+    MAT_SINAVI = "5-6-7-8. SINIFLAR MATEMATİK – 2. DÖNEM 1. YAZILI SINAVI"
+
+    def _exams(self, client, semester, yil):
+        past = (datetime.now() - timedelta(days=5)).isoformat() + "Z"
+        data = _scraped_with_exams(takvim=[_exam_event(self.MAT_SINAVI, past)],
+                                   grades=[_grade_row("Matematik", s1="85")],
+                                   semester=semester)
+        with patch.object(dashboard_api, "_scraped", return_value=data), \
+             patch.object(dashboard_api, "_guncel_ogretim_yili", return_value=yil):
+            return client.get("/api/exams").get_json()
+
+    def test_prior_year_report_grades_no_takvim_exam(self, client):
+        data = self._exams(client, "2025-2026 4. Arakarne", "2026-2027")
+        assert len(data["exams"]) == 1                      # the exam itself stays
+        assert data["exams"][0]["grade"] is None
+        assert data["stats"]["averageGrade"] is None
+
+    def test_current_year_report_still_grades_takvim_exam(self, client):
+        data = self._exams(client, "2026-2027 1. Dönem", "2026-2027")
+        assert data["exams"][0]["grade"] == "85"
+        assert data["stats"]["averageGrade"] == 85.0
+
+    def test_unknown_year_still_grades_takvim_exam(self, client):
+        data = self._exams(client, "2025-2026 4. Arakarne", None)
+        assert data["exams"][0]["grade"] == "85"

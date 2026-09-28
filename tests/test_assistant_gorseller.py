@@ -70,12 +70,17 @@ class _FakeClient:
         self.results = results or {}
         self.healthy = healthy
         self.calls = []
+        # The timeout the last call_tool() got, whatever it named (None when
+        # the caller passed none) — lets a test check korpus_surumu()'s 5 s
+        # budget without widening the calls tuples every other test asserts on.
+        self.son_zaman_asimi = None
 
     def list_tools(self):
         return self._tools
 
-    def call_tool(self, name, arguments):
+    def call_tool(self, name, arguments, timeout=None):
         self.calls.append((name, dict(arguments)))
+        self.son_zaman_asimi = timeout
         r = self.results.get(name, McpToolResult(ok=True, text="{}"))
         return r(arguments) if callable(r) else r
 
@@ -311,10 +316,30 @@ import src.dashboard_api as dashboard_api  # noqa: E402
 FULL = "isikkurtx@gmail.com"
 READER = "murzogluhulya@gmail.com"
 
+SURUM = "1.6"
+
+
+def _server_info(surum=SURUM):
+    # server_info's real answer (measured 2026-09-28), counts trimmed.
+    return McpToolResult(ok=True, text=json.dumps({
+        "app_version": "0.4.1", "app_revision": "unknown", "source": "tymm.meb.gov.tr",
+        "corpus_version": surum, "build_date": "2026-09-26T00:17:53+00:00",
+        "counts": {"textbook": 203}, "entities": {"figure": 53290}}))
+
+
+def _yol(figure_id, surum=SURUM):
+    return f"/api/assistant/figure/{figure_id}?v={surum}"
+
+
+def _figur_cagrilari(maarif):
+    """get_figure calls only: the endpoint also asks server_info."""
+    return [c for c in maarif.calls if c[0] == "get_figure"]
+
 
 @pytest.fixture
 def figur_env(monkeypatch):
     maarif = _FakeClient("maarif-mufredat", MAARIF_TOOLS, results={
+        "server_info": _server_info(),
         "get_figure": lambda args: (_figur_sonucu() if args["figure_id"] < 1000
                                     else McpToolResult(ok=True, text=json.dumps(
                                         {"error": f"figure {args['figure_id']} not found"})))})
@@ -330,53 +355,53 @@ def figur_env(monkeypatch):
 
 def test_figur_ucu_gorseli_bayt_olarak_dondurur(figur_env):
     client, maarif, _ = figur_env
-    r = client.get("/api/assistant/figure/12")
+    r = client.get(_yol(12))
     assert r.status_code == 200
     assert r.mimetype == "image/png"
     assert r.data == PNG
     assert r.headers.get("X-Content-Type-Options") == "nosniff"
-    assert maarif.calls == [("get_figure", {"figure_id": 12, "include_image": True})]
+    assert _figur_cagrilari(maarif) == [("get_figure", {"figure_id": 12, "include_image": True})]
 
 
 def test_figur_ucu_onbellekten_okur(figur_env):
     client, maarif, _ = figur_env
-    assert client.get("/api/assistant/figure/12").status_code == 200
-    assert client.get("/api/assistant/figure/12").data == PNG
-    assert len(maarif.calls) == 1
+    assert client.get(_yol(12)).status_code == 200
+    assert client.get(_yol(12)).data == PNG
+    assert len(_figur_cagrilari(maarif)) == 1
 
 
 def test_figur_onbellegi_64_girdiyle_sinirli(figur_env):
     client, maarif, _ = figur_env
     for i in range(1, 66):
-        assert client.get(f"/api/assistant/figure/{i}").status_code == 200
+        assert client.get(_yol(i)).status_code == 200
     assert len(dashboard_api._FIGUR_ONBELLEGI) == 64
-    assert 1 not in dashboard_api._FIGUR_ONBELLEGI and 65 in dashboard_api._FIGUR_ONBELLEGI
-    client.get("/api/assistant/figure/1")
-    assert len(maarif.calls) == 66  # the evicted one is fetched again
+    assert (SURUM, 1) not in dashboard_api._FIGUR_ONBELLEGI and (SURUM, 65) in dashboard_api._FIGUR_ONBELLEGI
+    client.get(_yol(1))
+    assert len(_figur_cagrilari(maarif)) == 66  # the evicted one is fetched again
 
 
 def test_bilinmeyen_figur_404(figur_env):
     client, _, _ = figur_env
-    r = client.get("/api/assistant/figure/5000")
+    r = client.get(_yol(5000))
     assert r.status_code == 404
-    assert 5000 not in dashboard_api._FIGUR_ONBELLEGI
+    assert (SURUM, 5000) not in dashboard_api._FIGUR_ONBELLEGI
 
 
 def test_mcp_kapaliyken_502_ve_turkce_cumle(figur_env, monkeypatch):
     client, maarif, _ = figur_env
     maarif.results["get_figure"] = McpToolResult(ok=False, error="timeout")
-    r = client.get("/api/assistant/figure/12")
+    r = client.get(_yol(12))
     assert r.status_code == 502
     hata = r.get_json()["error"]
     assert "ulaşılamadı" in hata or "ulaşamadı" in hata
-    assert 12 not in dashboard_api._FIGUR_ONBELLEGI
+    assert (SURUM, 12) not in dashboard_api._FIGUR_ONBELLEGI
 
 
 def test_mufredat_sunucusu_yapilandirilmamissa_502(figur_env, monkeypatch):
     client, _, _ = figur_env
     reg = _registry(maarif=False)
     monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: NS(registry=reg))
-    assert client.get("/api/assistant/figure/12").status_code == 502
+    assert client.get(_yol(12)).status_code == 502
 
 
 def test_desteklenmeyen_bicim_sunulmaz(figur_env):
@@ -385,20 +410,20 @@ def test_desteklenmeyen_bicim_sunulmaz(figur_env):
     client, maarif, _ = figur_env
     maarif.results["get_figure"] = _figur_sonucu(images=[
         {"data": base64.b64encode(b"<svg onload='x'/>").decode(), "mimeType": "image/svg+xml"}])
-    assert client.get("/api/assistant/figure/12").status_code == 502
+    assert client.get(_yol(12)).status_code == 502
 
 
 def test_figur_ucu_okura_ve_girissize_kapali(figur_env, monkeypatch):
     client, maarif, _ = figur_env
     monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS", False)
-    assert client.get("/api/assistant/figure/12").status_code == 401
+    assert client.get(_yol(12)).status_code == 401
     with client.session_transaction() as sess:
         sess["user_email"] = READER
-    assert client.get("/api/assistant/figure/12").status_code == 403
+    assert client.get(_yol(12)).status_code == 403
     assert maarif.calls == []
     with client.session_transaction() as sess:
         sess["user_email"] = FULL
-    assert client.get("/api/assistant/figure/12").status_code == 200
+    assert client.get(_yol(12)).status_code == 200
 
 
 # ── 5. the OER server's text reaches the model as Turkish, not mojibake ───────
@@ -447,19 +472,19 @@ def test_buyuk_figur_sunulur_ama_onbellege_girmez(figur_env):
     buyuk = b"\x89PNG" + b"0" * dashboard_api.FIGUR_TEK_SINIRI
     maarif.results["get_figure"] = _figur_sonucu(images=[
         {"data": base64.b64encode(buyuk).decode(), "mimeType": "image/png"}])
-    r = client.get("/api/assistant/figure/12")
+    r = client.get(_yol(12))
     assert r.status_code == 200 and r.data == buyuk
-    assert 12 not in dashboard_api._FIGUR_ONBELLEGI
-    client.get("/api/assistant/figure/12")
-    assert len(maarif.calls) == 2  # not cached, so fetched again
+    assert (SURUM, 12) not in dashboard_api._FIGUR_ONBELLEGI
+    client.get(_yol(12))
+    assert len(_figur_cagrilari(maarif)) == 2  # not cached, so fetched again
 
 
 def test_figur_onbellegi_toplam_baytla_sinirli(figur_env, monkeypatch):
     client, _, _ = figur_env
     monkeypatch.setattr(dashboard_api, "FIGUR_TOPLAM_SINIRI", 3 * len(PNG))
     for i in range(1, 6):
-        assert client.get(f"/api/assistant/figure/{i}").status_code == 200
-    assert list(dashboard_api._FIGUR_ONBELLEGI) == [3, 4, 5]
+        assert client.get(_yol(i)).status_code == 200
+    assert list(dashboard_api._FIGUR_ONBELLEGI) == [(SURUM, 3), (SURUM, 4), (SURUM, 5)]
 
 
 @pytest.mark.parametrize("yol", ["/api/assistant/figure/0",
@@ -473,8 +498,8 @@ def test_sinir_disi_figur_id_rotada_404(figur_env, yol):
 
 def test_en_buyuk_gecerli_figur_id_sunucuya_sorulur(figur_env):
     client, maarif, _ = figur_env
-    assert client.get("/api/assistant/figure/2147483647").status_code == 404  # fake: not found
-    assert maarif.calls == [("get_figure", {"figure_id": 2147483647, "include_image": True})]
+    assert client.get(_yol(2147483647)).status_code == 404  # fake: not found
+    assert _figur_cagrilari(maarif) == [("get_figure", {"figure_id": 2147483647, "include_image": True})]
 
 
 def test_pano_api_anahtari_figur_ucuna_401(figur_env, monkeypatch):
@@ -484,6 +509,140 @@ def test_pano_api_anahtari_figur_ucuna_401(figur_env, monkeypatch):
     monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS", False)
     monkeypatch.setattr(dashboard_api, "API_KEYS", [("entegrasyon", "tdyK_test")])
     monkeypatch.setattr(dashboard_api, "ASSISTANT_API_KEY", "asst_test")
-    r = client.get("/api/assistant/figure/12", headers={"Authorization": "Bearer tdyK_test"})
+    r = client.get(_yol(12), headers={"Authorization": "Bearer tdyK_test"})
     assert r.status_code == 401
     assert maarif.calls == []
+
+
+# ── 7. the corpus version travels with every figure URL (2026-09-28) ─────────
+# The 1.6 build renumbered figure ids: an id from before it names a different
+# picture. A URL now carries the version it was cited under, and the endpoint
+# refuses any other.
+
+def test_korpus_surumu_server_info_dan_okunur_ve_sureli_tutulur():
+    maarif = _FakeClient("maarif-mufredat", MAARIF_TOOLS, results={"server_info": _server_info()})
+    reg = _registry(maarif=maarif)
+    saat = [1000.0]
+    reg.monotonik = lambda: saat[0]
+    assert reg.korpus_surumu() == SURUM
+    saat[0] += at_ttl() - 1
+    assert reg.korpus_surumu() == SURUM
+    assert [c[0] for c in maarif.calls] == ["server_info"]
+    saat[0] += 2                                  # past the TTL: asked again
+    maarif.results["server_info"] = _server_info("1.7")
+    assert reg.korpus_surumu() == "1.7"
+    assert [c[0] for c in maarif.calls] == ["server_info", "server_info"]
+
+
+def at_ttl():
+    from src.assistant_tools import KORPUS_SURUMU_TTL
+    return KORPUS_SURUMU_TTL
+
+
+def at_hata_bekleme():
+    from src.assistant_tools import KORPUS_SURUMU_HATA_BEKLEME
+    return KORPUS_SURUMU_HATA_BEKLEME
+
+
+def test_korpus_surumu_result_zarfini_da_okur():
+    maarif = _FakeClient("maarif-mufredat", MAARIF_TOOLS, results={"server_info": McpToolResult(
+        ok=True, text=json.dumps({"result": {"corpus_version": SURUM}}))})
+    assert _registry(maarif=maarif).korpus_surumu() == SURUM
+
+
+def test_korpus_surumu_5_saniye_zaman_asimiyla_cagirir():
+    # A short budget, not the client's full 25 s default: a maarif outage must
+    # not tie up a gthread worker on every figure request.
+    maarif = _FakeClient("maarif-mufredat", MAARIF_TOOLS, results={"server_info": _server_info()})
+    _registry(maarif=maarif).korpus_surumu()
+    assert maarif.son_zaman_asimi == 5.0
+
+
+def test_okunamayan_surum_bilinen_iyi_deger_yoksa_gecici_olarak_none_donderir():
+    # No known-good version yet: the failure is remembered for
+    # KORPUS_SURUMU_HATA_BEKLEME seconds so it is not retried on every call.
+    maarif = _FakeClient("maarif-mufredat", MAARIF_TOOLS, results={
+        "server_info": McpToolResult(ok=False, error="timeout")})
+    reg = _registry(maarif=maarif)
+    saat = [1000.0]
+    reg.monotonik = lambda: saat[0]
+    assert reg.korpus_surumu() is None
+    maarif.results["server_info"] = _server_info()
+    saat[0] += at_hata_bekleme() - 1
+    assert reg.korpus_surumu() is None             # still backed off; no repeat call
+    assert len(maarif.calls) == 1
+    saat[0] += 2                                   # past the backoff: retried
+    assert reg.korpus_surumu() == SURUM
+    assert len(maarif.calls) == 2
+    assert _registry(maarif=False).korpus_surumu() is None
+
+
+def test_surum_hatasinda_bilinen_son_iyi_surum_gecerli_kalir_30sn_tekrar_denenmez():
+    # Stale-if-error: once a good version was read, a later failure serves it
+    # rather than refusing, and does not retry server_info within the backoff.
+    maarif = _FakeClient("maarif-mufredat", MAARIF_TOOLS, results={"server_info": _server_info()})
+    reg = _registry(maarif=maarif)
+    saat = [1000.0]
+    reg.monotonik = lambda: saat[0]
+    assert reg.korpus_surumu() == SURUM
+    saat[0] += at_ttl() + 1                        # past the TTL: due for a re-read
+    maarif.results["server_info"] = McpToolResult(ok=False, error="timeout")
+    assert reg.korpus_surumu() == SURUM            # stale-if-error: last known-good served
+    assert len(maarif.calls) == 2
+    saat[0] += at_hata_bekleme() - 1
+    assert reg.korpus_surumu() == SURUM            # still backed off; no repeat call
+    assert len(maarif.calls) == 2
+    saat[0] += 2                                   # past the backoff: retried
+    maarif.results["server_info"] = _server_info("1.7")
+    assert reg.korpus_surumu() == "1.7"
+    assert len(maarif.calls) == 3
+
+
+def test_figur_atfi_korpus_surumunu_tasir():
+    maarif = _FakeClient("maarif-mufredat", MAARIF_TOOLS, results={
+        "get_figure": _figur_sonucu(), "server_info": _server_info()})
+    c = _registry(maarif=maarif).dispatch("figur_getir", {"figure_id": 1875}).citations[0]
+    assert c["locator"]["figure_id"] == 1875 and c["locator"]["corpus_version"] == SURUM
+
+
+def test_surum_okunamazsa_atif_surumsuz_kalir():
+    maarif = _FakeClient("maarif-mufredat", MAARIF_TOOLS, results={
+        "get_figure": _figur_sonucu(), "server_info": McpToolResult(ok=False, error="timeout")})
+    out = _registry(maarif=maarif).dispatch("figur_getir", {"figure_id": 1875})
+    assert out.ok and "corpus_version" not in out.citations[0]["locator"]
+
+
+SURUM_CUMLESI = "Bu görsel, müfredat korpusu güncellendiği için değişti; soruyu yeniden sorun."
+
+
+@pytest.mark.parametrize("yol", ["/api/assistant/figure/12", "/api/assistant/figure/12?v=",
+                                 "/api/assistant/figure/12?v=1.5"])
+def test_surumsuz_ya_da_eski_surumlu_istek_404_ve_turkce_cumle(figur_env, yol):
+    client, maarif, _ = figur_env
+    r = client.get(yol)
+    assert r.status_code == 404
+    assert r.get_json() == {"error": SURUM_CUMLESI}
+    assert dashboard_api.FIGUR_SURUM_DEGISTI == SURUM_CUMLESI
+    assert _figur_cagrilari(maarif) == []         # the old id is never looked up
+
+
+def test_onbellek_surum_ve_id_ile_anahtarlanir(figur_env):
+    client, maarif, reg = figur_env
+    assert client.get(_yol(12)).status_code == 200
+    assert (SURUM, 12) in dashboard_api._FIGUR_ONBELLEGI
+    # The corpus moves to 1.7: the cached 1.6 picture is not served for it.
+    maarif.results["server_info"] = _server_info("1.7")
+    reg._korpus_surumu = None
+    assert client.get(_yol(12)).status_code == 404
+    assert client.get(_yol(12, "1.7")).status_code == 200
+    assert (("1.7", 12) in dashboard_api._FIGUR_ONBELLEGI
+            and len(_figur_cagrilari(maarif)) == 2)
+
+
+def test_surum_okunamazsa_502(figur_env):
+    client, maarif, _ = figur_env
+    maarif.results["server_info"] = McpToolResult(ok=False, error="timeout")
+    r = client.get(_yol(12))
+    assert r.status_code == 502
+    assert r.get_json() == {"error": dashboard_api.FIGUR_ULASILAMADI}
+    assert _figur_cagrilari(maarif) == []

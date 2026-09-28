@@ -31,6 +31,7 @@ from typing import Any
 import requests as http_requests
 
 from src import assistant_skills, claude_api
+from src.hafta_secici import guncel_hafta
 from src.json_utils import atomic_json_dump
 
 
@@ -778,6 +779,21 @@ HybridChatRouter = None  # Removed — Gemini-only
 
 # ── Semantic JSON → readable text ──────────────────────────
 
+def _guncel_ogretim_yili_dosyadan(klasor: Path) -> str | None:
+    """The school year TEDY believes it is in (`academic_year.json`'s
+    `year`), read from the same directory as `scraped_data.json`. None when
+    unknown or unreadable — an unknown year must label nothing "old"
+    (`assistant_tools.onceki_yil_raporu_mu`'s own rule). Mirrors
+    `dashboard_api._guncel_ogretim_yili`, which reads through Flask's own
+    `_load_json`; this one has no Flask app to read through."""
+    try:
+        with (klasor / "academic_year.json").open("r", encoding="utf-8") as f:
+            veri = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return veri.get("year") if isinstance(veri, dict) else None
+
+
 def _semantic_json_text(path: Path, basename: str) -> str:
     """Convert known student-data JSON files into
     human-readable, search-friendly text blocks."""
@@ -790,7 +806,7 @@ def _semantic_json_text(path: Path, basename: str) -> str:
         return ""
 
     if basename == "scraped_data.json":
-        return _fmt_scraped_data(data)
+        return _fmt_scraped_data(data, _guncel_ogretim_yili_dosyadan(path.parent))
     if basename == "enrichment_cache.json":
         return _fmt_enrichment(data)
     if basename in ("eba_textbooks_uploaded.json",
@@ -819,7 +835,7 @@ def _tablo_satirlari(tablo: Any) -> list[str]:
     return out
 
 
-def _fmt_scraped_data(data: dict) -> str:
+def _fmt_scraped_data(data: dict, ogretim_yili: str | None = None) -> str:
     """scraped_data.json as the BM25 index reads it.
 
     Rewritten 2026-09-25 against the shapes on disk (audit §2a): the old
@@ -830,9 +846,18 @@ def _fmt_scraped_data(data: dict) -> str:
     boundary) and each opens with what it is ("DERS PROGRAMI · Cuma",
     "DERS İÇERİĞİ · Matematik · 3. Hafta …"), so a hit names itself.
     The profile gives class, section and school only: no name, e-mail,
-    national id, student number or the contact fields."""
+    national id, student number or the contact fields.
+
+    `ogretim_yili` is the school year TEDY believes it is in
+    (`output/academic_year.json`'s `year`, read by the caller since this
+    function only ever sees `scraped_data.json`'s own content): when the
+    gelişim report names an earlier year, the NOTLAR paragraph says so,
+    exactly as `assistant_tools.notlar_metni` (the `notlar` tool) already
+    does — before this it was the one of the three surfaces reading this
+    report that stayed silent (final review, Minor 5)."""
     from src.assistant_tools import (_GUNLER, aciklama_metni, guncel_hafta_dersleri,
-                                     gunun_dersleri, html_metne, icerik_ozeti)
+                                     gunun_dersleri, html_metne, icerik_ozeti,
+                                     onceki_yil_raporu_mu, rapor_yili)
     from src.course_names import normalize_course
 
     parts: list[str] = []
@@ -878,9 +903,11 @@ def _fmt_scraped_data(data: dict) -> str:
         parts.append("\n".join(satirlar))
 
     # Ders programı: the current week (it repeats), one paragraph per day,
-    # read through the dashboard's two-block parser.
-    weeks = [w for w in (data.get("ders_programi") or []) if isinstance(w, dict)]
-    hafta = next((w for w in weeks if w.get("is_current")), weeks[-1] if weeks else None)
+    # read through the dashboard's two-block parser. `guncel_hafta` is the
+    # same "is_current, else the last one" resolver dashboard_api._guncel_hafta
+    # and the unified calendar use (src/hafta_secici.py) — this paragraph
+    # used to re-implement it slightly differently (final review, Minor 4).
+    hafta = guncel_hafta(data.get("ders_programi") or [])
     guncel_etiket = str((hafta or {}).get("week_label") or "")
     rows = ((hafta or {}).get("schedule") or {}).get("rows") or []
     for gun in _GUNLER:
@@ -920,6 +947,10 @@ def _fmt_scraped_data(data: dict) -> str:
         satirlar = ["=== NOTLAR ==="]
         if semester:
             satirlar.append(f"Dönem: {semester}")
+        if onceki_yil_raporu_mu(semester, ogretim_yili):
+            satirlar.append(f"ÖNCEKİ ÖĞRETİM YILI: portalın gelişim raporu {rapor_yili(semester)} "
+                            f"yılını gösteriyor; şu an {ogretim_yili} öğretim yılı ve bu yıl için "
+                            "not girilmemiş. Bu notları bu yılın notu gibi sunma.")
         for g in grades:
             if not isinstance(g, dict):
                 continue
@@ -2628,9 +2659,19 @@ class AssistantRuntime:
                 "rationale": "Teslim tarihine göre önceliklendirildi",
             })
 
-        # Add practice blocks when grades exist.
-        grades = scraped.get("gelisim_raporu", {}).get("grades", [])
-        if isinstance(grades, list) and grades:
+        # Add practice blocks when grades exist, but never inferred from a
+        # gelişim report still on an earlier school year (final review of
+        # docs/superpowers/plans/2026-09-28-pano-eksiklikleri.md, Minor 5):
+        # such a report's "1. Sınav"/"DİKP" columns are last year's, not a
+        # weakness to build this week's plan around. `notlar`, `/api/exams`
+        # and the BM25 NOTLAR paragraph already share this same check.
+        from src.assistant_tools import onceki_yil_raporu_mu
+        gelisim = scraped.get("gelisim_raporu", {})
+        gelisim = gelisim if isinstance(gelisim, dict) else {}
+        grades = gelisim.get("grades", [])
+        onceki_yil = onceki_yil_raporu_mu(
+            gelisim.get("semester"), _guncel_ogretim_yili_dosyadan(self.config.output_dir))
+        if isinstance(grades, list) and grades and not onceki_yil:
             weak_courses = self._infer_weak_courses(grades)
             for course in weak_courses[:2]:
                 blocks.append({

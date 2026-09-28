@@ -339,9 +339,9 @@ def test_canli_takvim_birlesik_rotanin_etkinliklerini_aciklamayla_verir(api, mon
     with api.app.test_client() as c:
         rota = c.get("/api/calendar/unified").get_json()["events"]
     canli = api._canli_takvim()
-    # Measured 2026-09-25: both real private lessons are on Saturday, which
-    # the Mon–Fri week grid never draws; the assistant must still see them.
-    assert not any(e.get("course") == "Fen Bilimleri" for e in rota if e["type"] == "private_lesson")
+    # Measured 2026-09-25: both real private lessons are on Saturday. Since
+    # 2026-09-28 the route's week runs to Sunday, so both lists carry it.
+    assert any(e.get("course") == "Fen Bilimleri" for e in rota if e["type"] == "private_lesson")
     assert any(e.get("course") == "Fen Bilimleri" for e in canli if e["type"] == "private_lesson")
     rota_etkinlik = {e["id"] for e in rota if e["type"] == "event"}
     assert rota_etkinlik == {e["id"] for e in canli if e["type"] == "event"}
@@ -349,9 +349,12 @@ def test_canli_takvim_birlesik_rotanin_etkinliklerini_aciklamayla_verir(api, mon
     assert all("description" not in e for e in rota)
     seminer = next(e for e in canli if e["title"] == "Veli Semineri")
     assert seminer["description"] == "<p>Seminer çevrim içi yapılacak.</p>" and seminer["location"] == "Teams"
-    # Private lessons beyond this week, which the week-bound route cannot draw.
+    # Private lessons across the weeks ahead — since 2026-09-28 the route
+    # itself (`rota`) draws these too (final review, Minor 3), so `canli`
+    # no longer strips and regenerates them; both carry the same wide set.
     ozel = sorted(e["start"] for e in canli if e["type"] == "private_lesson")
     assert len(ozel) >= 3 and len(set(ozel)) == len(ozel)
+    assert sorted(e["start"] for e in rota if e["type"] == "private_lesson") == ozel
 
     reg = build_registry(lambda q, k: [], takvim_kaynagi=api._canli_takvim)
     out = reg.dispatch(at.TAKVIM_TOOL, {"gun_sayisi": 14})
@@ -666,7 +669,8 @@ def test_canli_icerik_ve_notlar_kaynaklari(api, monkeypatch):
     assert icerik["haftalar"] == haftalar["weeks"] and icerik["guncel_hafta"] == haftalar["current"]
     assert icerik["guncel"] == GUNCEL
     monkeypatch.setattr(api, "_load_json", lambda ad: {"year": "2026-2027"} if ad == "academic_year.json" else {})
-    assert api._canli_notlar() == {"gelisim": notlar, "ogretim_yili": "2026-2027"}
+    rapor = {k: v for k, v in notlar.items() if k != "priorYear"}
+    assert api._canli_notlar() == {"gelisim": rapor, "ogretim_yili": "2026-2027"}
 
 
 def test_sistem_istemi_yeni_araclara_yonlendirir():
@@ -752,6 +756,34 @@ def test_bicimlendirici_rubrik_takvim_ek_sayfa_ve_profil():
     for sizmasin in ("uydurma@example.invalid", "00000000000", "99999", "0000 000 00 00",
                      "Hayali Veli", "Uydurma Öğrenci", "base64"):
         assert sizmasin not in metin, sizmasin
+
+
+# ── NOTLAR: a prior-year report is labelled, exactly as notlar_metni does
+# (final review of docs/superpowers/plans/2026-09-28-pano-eksiklikleri.md,
+# Minor 5a) ──────────────────────────────────────────────────────────────
+
+def test_bicimlendirici_onceki_yil_raporunu_etiketler():
+    from src.assistant_core import _fmt_scraped_data
+    # GELISIM's semester is "2025-2026 4. Arakarne"; TEDY is in 2026-2027.
+    metin = _fmt_scraped_data(_tam_veri(), "2026-2027")
+    assert "ÖNCEKİ ÖĞRETİM YILI" in metin
+    assert "2025-2026" in metin and "2026-2027" in metin
+
+
+def test_bicimlendirici_guncel_yil_raporunu_etiketlemez():
+    from src.assistant_core import _fmt_scraped_data
+    metin = _fmt_scraped_data(_tam_veri(), "2025-2026")
+    assert "ÖNCEKİ ÖĞRETİM YILI" not in metin
+
+
+def test_bicimlendirici_yil_bilinmiyorsa_etiketlemez():
+    """No `ogretim_yili` (the caller couldn't read academic_year.json, or
+    the caller is a test that predates this parameter): unknown is not
+    "old" — it must not hide the grades."""
+    from src.assistant_core import _fmt_scraped_data
+    metin = _fmt_scraped_data(_tam_veri())
+    assert "ÖNCEKİ ÖĞRETİM YILI" not in metin
+    assert "Matematik" in metin and "NOTLAR" in metin
 
 
 def test_bm25_ders_programini_ve_icerigi_bulur(tmp_path, monkeypatch):

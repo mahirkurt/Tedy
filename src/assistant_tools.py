@@ -15,6 +15,8 @@ import json
 import logging
 import os
 import re
+import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
@@ -86,6 +88,21 @@ GORSEL_BICIMLERI = frozenset({"image/png", "image/jpeg", "image/gif", "image/web
 # DISCOVERY-UPSTREAM-2026-09.md §2). They are removed before the model reads a
 # result, so it cannot hand the reader a dead link.
 OLU_BAGLANTILAR = frozenset({"pdf_url", "source_url"})
+
+# How long a corpus_version read from maarif's server_info is trusted, per
+# process. The corpus changes only when CureoHub swaps a build in (1.5 -> 1.6
+# on 2026-09-27, which renumbered figure ids); five minutes bounds how long
+# after such a swap a URL cited under the old build is still accepted.
+KORPUS_SURUMU_TTL = 300.0
+
+# How long a failed server_info read is remembered before korpus_surumu() will
+# try the network again. Without this, a maarif outage would have every
+# /api/assistant/figure request — including one the LRU could already serve —
+# block on the client's full default timeout (25 s) repeating the same doomed
+# call and tying up a gthread worker. During the window, korpus_surumu()
+# serves the last known-good version instead (stale-if-error) or, when none
+# was ever read, None — so the endpoint answers 502 without a repeat MCP call.
+KORPUS_SURUMU_HATA_BEKLEME = 30.0
 
 
 def _json_parcalari(text: str) -> list[Any] | None:
@@ -551,11 +568,16 @@ def gunun_dersleri(rows: list[Any], gun: str) -> list[dict[str, Any]]:
         no, saat = _DERS_NO.search(zaman), _SAAT_ARALIGI.search(zaman)
         if not no or not saat:
             continue
+        satirlar = icerik.split("\n")
         dersler.append({
             "ders_no": int(no.group(1)),
             "baslangic": f"{saat.group(1)}:{saat.group(2)}",
             "bitis": f"{saat.group(3)}:{saat.group(4)}",
-            "ders": normalize_course(icerik.split("\n")[0].strip()),
+            "ders": normalize_course(satirlar[0].strip()),
+            # The cell's second line (the teacher, in the portal's grid). The
+            # unified calendar shows it as the lesson's subtitle; the
+            # ders_programi text never prints it.
+            "alt": satirlar[1].strip() if len(satirlar) > 1 else "",
         })
     return dersler
 
@@ -958,6 +980,25 @@ def ders_icerigi_metni(kaynak: Any, ders: Any, hafta: Any) -> tuple[str, str]:
     return _kirp(f"{hedef} — {hafta_adi}:\n{govde}", GOVDE_SINIRI), etiket
 
 
+_DONEM_YILI = re.compile(r"(\d{4})\s*-\s*(\d{4})")
+
+
+def rapor_yili(donem: Any) -> str | None:
+    """The school year a gelişim report's term names ("2025-2026 4. Arakarne"
+    -> "2025-2026"); None when the term names none ("2. Dönem")."""
+    m = _DONEM_YILI.search(str(donem or ""))
+    return f"{m.group(1)}-{m.group(2)}" if m else None
+
+
+def onceki_yil_raporu_mu(donem: Any, ogretim_yili: Any) -> bool:
+    """True when the report names a school year, TEDY knows the current one,
+    and they differ. Unknown on either side is not "old": it must not hide
+    the grades. notlar_metni and /api/exams (_sinav_listesi) share this."""
+    rapor = rapor_yili(donem)
+    yil = str(ogretim_yili or "").strip()
+    return bool(rapor and yil and rapor != yil)
+
+
 def notlar_metni(kaynak: Any) -> tuple[str, str]:
     """(body, citation label): the gelişim report's grades and outcome levels
     with the term's name. A report from an earlier school year — the portal
@@ -986,9 +1027,8 @@ def notlar_metni(kaynak: Any) -> tuple[str, str]:
     parcalar = []
     if donem:
         parcalar.append(f"Dönem: {donem}")
-    m = re.search(r"(\d{4})\s*-\s*(\d{4})", donem)
-    if m and yil and f"{m.group(1)}-{m.group(2)}" != yil:
-        parcalar.append(f"ÖNCEKİ ÖĞRETİM YILI: portalın gelişim raporu {m.group(1)}-{m.group(2)} "
+    if onceki_yil_raporu_mu(donem, yil):
+        parcalar.append(f"ÖNCEKİ ÖĞRETİM YILI: portalın gelişim raporu {rapor_yili(donem)} "
                         f"yılını gösteriyor; şu an {yil} öğretim yılı ve bu yıl için not girilmemiş. "
                         "Bu notları bu yılın notu gibi sunma.")
     if notlar:
@@ -1575,6 +1615,17 @@ class McpRegistry:
         # The clock "bugün"/"yarın" are read against; read in Istanbul either
         # way. Tests pin it; production reads the real one.
         self.saat = saat
+        # maarif's corpus_version (server_info) and when it was read. Every
+        # figure citation carries it and /api/assistant/figure checks it, so
+        # a figure id from another build is refused, not mis-served.
+        self._korpus_surumu: tuple[str, float] | None = None
+        # When the last server_info read failed (or gave no version); cleared
+        # on a success. Backs off korpus_surumu()'s retries during an outage
+        # (KORPUS_SURUMU_HATA_BEKLEME below) without ever overwriting a good
+        # value read earlier.
+        self._korpus_hata_zamani: float | None = None
+        self._korpus_kilidi = threading.Lock()
+        self.monotonik: Callable[[], float] = time.monotonic
 
     def degraded(self) -> list[str]:
         unhealthy = {n for n, c in self.clients.items() if not c.healthy}
@@ -1820,6 +1871,11 @@ class McpRegistry:
                 pass
             if isinstance(figur.get("caption"), str) and figur["caption"].strip():
                 locator["caption"] = figur["caption"].strip()
+            # The build this id belongs to: the panel asks for
+            # /api/assistant/figure/<id>?v=<corpus_version>.
+            surum = self.korpus_surumu()
+            if surum:
+                locator["corpus_version"] = surum
         return ToolOutcome(
             ok=True,
             text=text,
@@ -1834,6 +1890,44 @@ class McpRegistry:
             }],
             images=list(result.images or []),
         )
+
+    def korpus_surumu(self) -> str | None:
+        """maarif's current corpus_version ("1.6"), read from server_info and
+        trusted for KORPUS_SURUMU_TTL seconds. The read itself is capped at a
+        short 5 s budget (not the client's full 25 s default) so a maarif
+        outage cannot tie up a gthread worker on every figure request. On
+        failure (or an empty version) the last known-good version is served
+        stale rather than refused — a failure never overwrites a good value —
+        and, with no known-good version yet, None; either way the failure is
+        remembered for KORPUS_SURUMU_HATA_BEKLEME seconds so the network is
+        not retried on every call during the outage. None also when the
+        server is not configured."""
+        simdi = self.monotonik()
+        with self._korpus_kilidi:
+            if self._korpus_surumu and simdi - self._korpus_surumu[1] < KORPUS_SURUMU_TTL:
+                return self._korpus_surumu[0]
+            if (self._korpus_hata_zamani is not None
+                    and simdi - self._korpus_hata_zamani < KORPUS_SURUMU_HATA_BEKLEME):
+                return self._korpus_surumu[0] if self._korpus_surumu else None
+        client = self.clients.get("maarif-mufredat")
+        if client is None:
+            return self._korpus_surumu[0] if self._korpus_surumu else None
+        result = client.call_tool("server_info", {}, timeout=5.0)
+        surum = ""
+        if result.ok:
+            bilgi = _figur_bilgisi(_json_parcalari(result.text))
+            if isinstance(bilgi.get("result"), dict):
+                # The {result: …} envelope the server's own notes describe.
+                bilgi = bilgi["result"]
+            surum = str(bilgi.get("corpus_version") or "").strip()
+        if not surum:
+            with self._korpus_kilidi:
+                self._korpus_hata_zamani = simdi
+            return self._korpus_surumu[0] if self._korpus_surumu else None
+        with self._korpus_kilidi:
+            self._korpus_surumu = (surum, simdi)
+            self._korpus_hata_zamani = None
+        return surum
 
     def figur_gorseli(self, figure_id: int) -> tuple[str, bytes, str]:
         """One textbook figure's bytes for the reader's panel

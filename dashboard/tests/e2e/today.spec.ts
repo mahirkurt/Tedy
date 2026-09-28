@@ -108,3 +108,33 @@ test('with no school work, reading takes the slot instead of shouting above it',
   await expect(next).toContainText('Tedy Books')
   await expect(page.locator('.books-callout')).toHaveCount(0)
 })
+
+// 2026-09-28: both of Işık's private lessons are on Saturday, and /api/calendar
+// expanded private lessons over Monday to Friday only, so Bugün on a Saturday
+// showed "planlı ders … yok". The agenda itself draws any day's events; this
+// pins that a Saturday private lesson reaches the Saturday timeline.
+test.describe('saturday', () => {
+  test.use({ timezoneId: 'Europe/Istanbul' })
+
+  test('a Saturday private lesson is on Saturday\'s timeline', async ({ page }) => {
+    await mockDay(page)
+    // Registered after mockDay, so it takes precedence over its empty calendar.
+    await page.route('**/api/calendar', r => r.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ events: [{
+        id: 'p1', title: 'Fen Bilimleri · Deneme Hoca', allDay: false,
+        start: '2026-09-26T12:00:00', end: '2026-09-26T13:00:00',
+        extendedProps: { kind: 'private_lesson', badge: 'Özel Ders', course: 'Fen Bilimleri',
+          description: 'Özel Ders • Deneme Hoca', private_lesson_id: 'p1' },
+      }] }),
+    }))
+    await page.clock.setFixedTime(new Date('2026-09-26T10:00:00+03:00'))   // a Saturday
+    await page.goto('/')
+
+    const ders = page.locator('.today-tl__item', { hasText: 'Fen Bilimleri · Deneme Hoca' })
+    await expect(ders).toBeVisible()
+    await expect(ders.locator('.today-tl__time')).toHaveText('12:00')
+    await expect(ders).toContainText('Özel Ders')
+    // The empty line is for a day with nothing on it; this day has something.
+    await expect(page.getByText('için planlı ders, ödev teslimi veya etkinlik yok')).toHaveCount(0)
+  })
+})

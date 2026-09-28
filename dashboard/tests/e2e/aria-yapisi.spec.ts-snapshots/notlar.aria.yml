@@ -1,7 +1,7 @@
 - main:
   - heading "Notlar" [level=1]
-  - heading "Notlar" [level=2]
-  - table "Notlar":
+  - heading /Notlar — \d+-\d+ 4\. Arakarne Önceki öğretim yılı/ [level=2]
+  - table /Notlar — \d+-\d+ 4\. Arakarne Önceki öğretim yılı/:
     - rowgroup:
       - row "Ayrıntı Ders S1 S2 S3 P1 P2 P3":
         - columnheader "Ayrıntı"
@@ -13,39 +13,27 @@
         - columnheader "P2"
         - columnheader "P3"
     - rowgroup:
-      - row "Expand current row - - - - - -":
+      - row /Expand current row Matematik \d+ \d+ - \d+ - -/:
         - cell "Expand current row":
           - button "Expand current row"
-        - cell
+        - cell "Matematik"
+        - cell /\d+/
+        - cell /\d+/
+        - cell "-"
+        - cell /\d+/
         - cell "-"
         - cell "-"
-        - cell "-"
-        - cell "-"
-        - cell "-"
-        - cell "-"
-      - row "1. Sınav - 2. Sınav - 3. Sınav - DİKP/Performans-1 - DİKP/Performans-2 - DİKP/Performans-3 -":
-        - cell "1. Sınav - 2. Sınav - 3. Sınav - DİKP/Performans-1 - DİKP/Performans-2 - DİKP/Performans-3 -"
-      - row "Expand current row - - - - - -":
+      - row /1\. Sınav \d+ 2\. Sınav \d+ 3\. Sınav - DİKP\/Performans-1 \d+ DİKP\/Performans-2 - DİKP\/Performans-3 -/:
+        - cell /1\. Sınav \d+ 2\. Sınav \d+ 3\. Sınav - DİKP\/Performans-1 \d+ DİKP\/Performans-2 - DİKP\/Performans-3 -/
+      - row /Expand current row Türkçe \d+ - - - - -/:
         - cell "Expand current row":
           - button "Expand current row"
-        - cell
+        - cell "Türkçe"
+        - cell /\d+/
         - cell "-"
         - cell "-"
         - cell "-"
         - cell "-"
         - cell "-"
-        - cell "-"
-      - row "1. Sınav - 2. Sınav - 3. Sınav - DİKP/Performans-1 - DİKP/Performans-2 - DİKP/Performans-3 -":
-        - cell "1. Sınav - 2. Sınav - 3. Sınav - DİKP/Performans-1 - DİKP/Performans-2 - DİKP/Performans-3 -"
-      - row "Expand current row - - - - - -":
-        - cell "Expand current row":
-          - button "Expand current row"
-        - cell
-        - cell "-"
-        - cell "-"
-        - cell "-"
-        - cell "-"
-        - cell "-"
-        - cell "-"
-      - row "1. Sınav - 2. Sınav - 3. Sınav - DİKP/Performans-1 - DİKP/Performans-2 - DİKP/Performans-3 -":
-        - cell "1. Sınav - 2. Sınav - 3. Sınav - DİKP/Performans-1 - DİKP/Performans-2 - DİKP/Performans-3 -"
+      - row /1\. Sınav \d+ 2\. Sınav - 3\. Sınav - DİKP\/Performans-1 - DİKP\/Performans-2 - DİKP\/Performans-3 -/:
+        - cell /1\. Sınav \d+ 2\. Sınav - 3\. Sınav - DİKP\/Performans-1 - DİKP\/Performans-2 - DİKP\/Performans-3 -/

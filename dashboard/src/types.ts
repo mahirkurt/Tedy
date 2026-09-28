@@ -206,10 +206,12 @@ export interface AssistantCitation {
 }
 
 /** The part of a `figur_getir` citation's locator the Kaynaklar panel reads: the image comes
- *  from `/api/assistant/figure/<figure_id>` and `caption` is its alt text. */
+ *  from `/api/assistant/figure/<figure_id>?v=<corpus_version>` and `caption` is its alt text.
+ *  `corpus_version` is the curriculum build the id belongs to; the endpoint refuses any other. */
 export interface FigureLocator {
   figure_id: number
   caption?: string
+  corpus_version?: string
 }
 
 export interface AssistantToolCall {

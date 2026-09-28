@@ -30,7 +30,8 @@ os.chdir(PROJECT_ROOT)
 
 from src.env_loader import load_env
 from src.json_utils import atomic_json_dump
-from src.course_names import normalize_course
+from src.course_names import normalize_course, COURSE_ALIASES
+from src.hafta_secici import guncel_hafta as _guncel_hafta
 from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.USER_ROLES etc.)
     ALLOWED_EMAILS,
     FULL_ACCESS_EMAILS,
@@ -611,19 +612,24 @@ def _normalize_weekday_name(value):
     return labels[idx]
 
 
-def _private_lessons_for_week(week_dates, hafta_sonu=False):
-    """Expand private lesson configs into concrete events for current week.
+def _private_lessons_for_week(week_dates, lessons=None):
+    """Expand private lesson configs into concrete events for one week.
 
-    The weekly calendar draws Mon–Fri only. `hafta_sonu=True` (with seven
-    `week_dates`) keeps Saturday and Sunday for the assistant's takvim:
-    measured 2026-09-25, both of Işık's private lessons are on Saturday."""
+    `week_dates` is always the seven Monday-to-Sunday dates of one week —
+    every caller (`_private_lessons_for_day`, the unified calendar's
+    `_birlesik_takvim`) passes all seven: measured 2026-09-25, both of
+    Işık's private lessons are on Saturday, so the weekend is part of the
+    week, not an opt-in."""
     events = []
-    lessons = _load_private_lessons()
+    # `lessons` lets a caller that expands many weeks (the unified calendar)
+    # read private_lessons.json once instead of once per week.
+    if lessons is None:
+        lessons = _load_private_lessons()
     if not lessons:
         return events
 
     monday = week_dates[0]
-    friday = week_dates[-1] if hafta_sonu else week_dates[4]
+    son_gun = week_dates[-1]
 
     for lesson in lessons:
         if not lesson.get("active", True):
@@ -642,9 +648,6 @@ def _private_lessons_for_week(week_dates, hafta_sonu=False):
             weekday_idx = _WEEKDAY_TO_INDEX.get(str(weekday_name).strip().lower())
             if weekday_idx is None:
                 continue
-            if weekday_idx > 4 and not hafta_sonu:
-                # Weekly calendar UI currently shows Mon-Fri.
-                continue
             day_date = week_dates[weekday_idx]
         else:
             date_str = str(lesson.get("date", "")).strip()
@@ -654,7 +657,7 @@ def _private_lessons_for_week(week_dates, hafta_sonu=False):
                 d = datetime.strptime(date_str, "%Y-%m-%d").date()
             except ValueError:
                 continue
-            if d < monday or d > friday:
+            if d < monday or d > son_gun:
                 continue
             day_date = d
 
@@ -685,9 +688,13 @@ def _private_lessons_for_week(week_dates, hafta_sonu=False):
 
 
 def _private_lessons_for_day(day_date):
-    """Expand private lessons for a specific date into simple calendar events."""
+    """Expand private lessons for a specific date into simple calendar events.
+
+    A seven-day week with the weekend kept: Bugün (/api/calendar) showed no
+    private lesson on a Saturday, and both of Işık's are on Saturday
+    (measured 2026-09-25)."""
     monday = day_date - timedelta(days=day_date.weekday())
-    week_dates = [monday + timedelta(days=i) for i in range(5)]
+    week_dates = [monday + timedelta(days=i) for i in range(7)]
     events = _private_lessons_for_week(week_dates)
     out = []
     for ev in events:
@@ -898,19 +905,22 @@ def _canli_sinavlar():
     return _sinav_listesi(_scraped(), now=istanbul_simdi())["exams"]
 
 
-# How far ahead the assistant's calendar reaches for private lessons; the
-# takvim tool caps its window at 60 days (assistant_tools._TAKVIM_EN_COK_GUN).
+# How many weeks ahead (from the current Monday) private lessons are
+# expanded — shared by the unified calendar route (_birlesik_takvim, so
+# "Sonraki hafta" has something to show for a recurring weekend lesson) and
+# the assistant's takvim tool (_canli_takvim); the takvim tool separately
+# caps its own text at 60 days (assistant_tools._TAKVIM_EN_COK_GUN).
 _TAKVIM_OZEL_DERS_HAFTA = 9
 
 
 def _canli_takvim():
-    """/api/calendar/unified's events, with two additions the page does not
+    """/api/calendar/unified's events, with one addition the page does not
     need: a portal event's description and place (the route drops
-    extendedProps; the assistant reads them), and private lessons for the
-    weeks ahead, weekends included — the route draws only this week's
-    Monday to Friday."""
+    extendedProps; the assistant reads them). Private lessons for the weeks
+    ahead are already in the route's own output (_birlesik_takvim, Görev 3),
+    so nothing is stripped or regenerated here any more."""
     data = _scraped()
-    olaylar = [dict(e) for e in _birlesik_takvim(data) if e.get("type") != "private_lesson"]
+    olaylar = [dict(e) for e in _birlesik_takvim(data)]
     ayrinti = {}
     takvim = data.get("takvim", [])
     for ev in takvim if isinstance(takvim, list) else []:
@@ -922,11 +932,6 @@ def _canli_takvim():
     for e in olaylar:
         if e.get("type") == "event" and e.get("id") in ayrinti:
             e["description"], e["location"] = ayrinti[e["id"]]
-    bugun = datetime.now().date()
-    pazartesi = bugun - timedelta(days=bugun.weekday())
-    for h in range(_TAKVIM_OZEL_DERS_HAFTA):
-        gunler = [pazartesi + timedelta(days=7 * h + i) for i in range(7)]
-        olaylar.extend(_private_lessons_for_week(gunler, hafta_sonu=True))
     return olaylar
 
 
@@ -940,15 +945,21 @@ def _canli_ders_icerikleri():
             "haftalar": haftalar["weeks"], "guncel_hafta": haftalar["current"]}
 
 
-def _canli_notlar():
-    """The gelişim report /api/grades serves, with the school year TEDY
-    believes it is in, so a report still showing last year can say so."""
+def _guncel_ogretim_yili():
+    """The school year TEDY believes it is in (output/academic_year.json's
+    `year`, e.g. "2026-2027"), or None when unknown."""
     try:
         yil = _load_json("academic_year.json")
     except (OSError, ValueError):
-        yil = {}  # an unknown year labels nothing "old"; it must not hide the grades
+        return None  # an unknown year labels nothing "old"; it must not hide the grades
+    return yil.get("year") if isinstance(yil, dict) else None
+
+
+def _canli_notlar():
+    """The gelişim report /api/grades serves, with the school year TEDY
+    believes it is in, so a report still showing last year can say so."""
     return {"gelisim": _scraped().get("gelisim_raporu", {}),
-            "ogretim_yili": yil.get("year") if isinstance(yil, dict) else None}
+            "ogretim_yili": _guncel_ogretim_yili()}
 
 
 def _canli_sebit_odevleri():
@@ -1242,18 +1253,17 @@ def _to_photo_homework_row(
 
 # --- API endpoints (all require auth) ---
 
+# _guncel_hafta itself lives in src/hafta_secici.py (imported above), shared
+# with assistant_core so the two never re-implement "is_current, else the
+# last one" and drift apart again.
+
+
 def _program_verisi(data):
     """(weeks, latest) as /api/schedule serves them, course names in the
     current week's cells normalised in place. Shared with the assistant's
     ders_programi so both read one week the same way."""
     weeks = data.get("ders_programi", [])
-    # The scraper now keeps the whole published year, so the last element is a
-    # week in June. The week the scraper saw selected carries `is_current`;
-    # weeks[-1] stays the fallback for data written before that mark existed.
-    latest = next(
-        (w for w in weeks if isinstance(w, dict) and w.get("is_current")),
-        weeks[-1] if weeks else {},
-    )
+    latest = _guncel_hafta(weeks)
     # Normalize course names in schedule cells
     rows = latest.get("schedule", {}).get("rows", [])
     for r in range(1, len(rows)):
@@ -1576,8 +1586,15 @@ def sebit():
 @app.route("/api/grades")
 @require_auth
 def grades():
-    data = _scraped()
-    return jsonify(data.get("gelisim_raporu", {}))
+    """The gelişim report as scraped, plus `priorYear`: true when its term
+    names a school year other than academic_year.json's — the check notlar
+    and /api/exams make — so Notlar can say the grades are last year's."""
+    from src.assistant_tools import onceki_yil_raporu_mu
+    rapor = _scraped().get("gelisim_raporu", {})
+    if not isinstance(rapor, dict):
+        return jsonify(rapor)
+    return jsonify({**rapor, "priorYear": onceki_yil_raporu_mu(
+        rapor.get("semester"), _guncel_ogretim_yili())})
 
 
 @app.route("/api/calendar")
@@ -1831,6 +1848,122 @@ def _extract_exam_info(title):
     return normalized, raw_course, exam_number
 
 
+def _bilinen_ders_adaylari(ders_icerikleri):
+    """Surface forms to recognise inside an exam title, mapped to their
+    canonical course: this run's real course-content keys, filtered down to
+    actual school subjects (never a hand-written subject list), plus the
+    alias vocabulary already in src/course_names.py — so a variant embedded
+    in a title ("DKAB") is recognised even when it is not literally the
+    content map's own key.
+
+    ders_icerikleri's keys are not all subjects. Measured 2026-09-28 on live
+    data, alongside "Türkçe", "Matematik", "Fen Bilimleri", "Sosyal
+    Bilgiler", "DKAB", "İngilizce" and other real courses, the tab list also
+    carries "Genel" (the school-wide announcement feed), "PDR" (guidance)
+    and "Sınıf Öğretmeni" (homeroom teacher) — none of them a subject. Taking
+    every key unfiltered let a title like "... MEB 1. Dönem Genel Deneme
+    Sınavı / ..." resolve to a fake course "Genel" and surface an unrelated
+    announcement as relatedContent. The filter is
+    `subject_themes.domain_of()` — the same domain table the frontend and
+    the module template use for course colour — applied to each key's
+    canonical form: a key that resolves only to the generic fallback domain
+    ("genel", `subject_themes.themes()["fallback"]["id"]`) is not a subject
+    and is dropped, whichever tab produced it. The same filter is applied to
+    COURSE_ALIASES' canonical targets, though none of the six currently
+    listed there (Fransızca, Din Kültürü, Beden Eğitimi, İngilizce, Bilişim,
+    Ahlak ve Yurttaşlık) actually falls into "genel"."""
+    adaylar = {}
+    if isinstance(ders_icerikleri, dict):
+        for anahtar in ders_icerikleri:
+            if not isinstance(anahtar, str) or not anahtar.strip():
+                continue
+            kanonik = normalize_course(anahtar)
+            if subject_themes.domain_of(kanonik)["id"] == "genel":
+                continue
+            adaylar.setdefault(anahtar.strip(), kanonik)
+    for kanonik, takma_adlar in COURSE_ALIASES.items():
+        if subject_themes.domain_of(kanonik)["id"] == "genel":
+            continue
+        adaylar.setdefault(kanonik, kanonik)
+        for takma in takma_adlar:
+            adaylar.setdefault(takma, kanonik)
+    return adaylar
+
+
+def _baslikta_bilinen_ders_ara(title, ders_icerikleri):
+    """A known course name embedded in `title`'s Turkish half (before the
+    "/" English half — the split tolerates surrounding whitespace, since a
+    real title's spacing around the slash is not guaranteed), Turkish-folded
+    (accent + case, `turkce_kucult_katla`) and word-boundary matched, longest
+    surface form first. Returns the canonical course, or None when zero or
+    more than one distinct course is found — never invents a course for a
+    course-less or multi-subject title (e.g. a "GİS" development-monitoring
+    exam, or one naming two courses)."""
+    from src.assistant_core import turkce_kucult_katla
+
+    adaylar = _bilinen_ders_adaylari(ders_icerikleri)
+    if not adaylar:
+        return None
+    turkce_yari = re.split(r"\s*/\s*", str(title or ""), maxsplit=1)[0]
+    hedef = turkce_kucult_katla(turkce_yari)
+    if not hedef.strip():
+        return None
+
+    kalan = hedef
+    bulunanlar = set()
+    for yuzey in sorted(adaylar, key=len, reverse=True):
+        katlanmis = turkce_kucult_katla(yuzey)
+        if not katlanmis.strip():
+            continue
+        eslesme = re.search(
+            r"(?<!\w)" + re.escape(katlanmis) + r"(?!\w)", kalan)
+        if eslesme:
+            bulunanlar.add(adaylar[yuzey])
+            baslangic, bitis = eslesme.span()
+            # Blank out the matched span so a shorter candidate fully inside
+            # it (mapping to a different canonical) cannot also match, while
+            # a genuinely distinct course mentioned elsewhere still can.
+            kalan = kalan[:baslangic] + (" " * (bitis - baslangic)) + kalan[bitis:]
+    if len(bulunanlar) == 1:
+        return next(iter(bulunanlar))
+    return None
+
+
+def _bilinen_ders_mi(course, ders_icerikleri):
+    """Whether `course` — as _extract_exam_info's regexes already resolved
+    it — is already a real, single known course, so the title-scan fallback
+    never overrides an extraction that already worked."""
+    if not course:
+        return False
+    hedef = _turkish_lower(course)
+    if hedef in (_turkish_lower(k) for k in COURSE_ALIASES):
+        return True
+    if isinstance(ders_icerikleri, dict):
+        for anahtar in ders_icerikleri:
+            if isinstance(anahtar, str) and _turkish_lower(normalize_course(anahtar)) == hedef:
+                return True
+    return False
+
+
+def _cozumlenen_sinav_dersi(course, title, ders_icerikleri):
+    """The course actually shown for an exam (label, grade match, related
+    homework/content, calendar colour). _extract_exam_info's regexes need a
+    dash (_COURSE_FROM_TITLE_RE) or the plural "Sınıflar" prefix; measured
+    2026-09-28, real portal titles like "7. Sınıf MEB Ülke Geneli Türkçe 1.
+    Dönem 2. Ortak Yazılı Sınavı" have neither, so `course` stayed the whole
+    title and relatedContent was always []. When that has happened, look for
+    a known course name in the title instead — never when it already
+    resolved to one, and never inventing one for an ambiguous or
+    course-less title (see _baslikta_bilinen_ders_ara). This never feeds the
+    exam id or the exam_content_map.json legacy key: both keep hashing
+    _extract_exam_info's own return value, unchanged, so an existing id or
+    map entry never moves."""
+    if _bilinen_ders_mi(course, ders_icerikleri):
+        return course
+    bulunan = _baslikta_bilinen_ders_ara(title, ders_icerikleri)
+    return bulunan or course
+
+
 def _build_grade_lookup(grades_list):
     """Build {normalized_course: {"1": score, "2": score, "3": score}} from gelisim_raporu grades."""
     lookup = {}
@@ -1895,26 +2028,44 @@ def _find_related_homework(exam_course, exam_date_str, homework_rows):
     return related[:5]
 
 
+# A card whose first line is only "<name> | DD.MM.YYYY" is the portal's
+# second, title-less rendering of the post before it; the line is a
+# teacher's name, not a content title.
+_KART_IMZASI = re.compile(r"^.+ \| \d{2}\.\d{2}\.\d{4}$")
+_ILGILI_BASLIK_SINIRI = 140
+
+
 def _find_related_content(exam_course, ders_icerikleri):
-    """Find course content from same course."""
+    """The exam's course's content in the open week: each card's title (its
+    first line, portal chrome and comments dropped) and each item, at most
+    five of each and ten in all. ders_icerikleri[course] is
+    {tab_id, text, tables, items, cards} with cards and items as strings
+    (measured 2026-09-28); this used to branch on a list, a shape the scraper
+    never writes, so relatedContent was [] on every exam."""
+    from src.assistant_tools import _temiz_icerik
     related = []
     if not isinstance(ders_icerikleri, dict):
         return related
 
     exam_lower = _turkish_lower(exam_course)
-    for course_name, items in ders_icerikleri.items():
-        nc = normalize_course(course_name)
-        if _turkish_lower(nc) != exam_lower:
+    for course_name, kayit in ders_icerikleri.items():
+        if not isinstance(kayit, dict):
             continue
-        if isinstance(items, list):
-            for item in items[:5]:
-                if isinstance(item, dict):
-                    related.append({
-                        "title": item.get("title", item.get("konu", str(item))),
-                        "type": "ders_icerikleri",
-                    })
-                elif isinstance(item, str):
-                    related.append({"title": item, "type": "ders_icerikleri"})
+        if _turkish_lower(normalize_course(course_name)) != exam_lower:
+            continue
+        kart_basliklari = []
+        for kart in kayit.get("cards") or []:
+            if not isinstance(kart, str):
+                continue
+            ilk = next((s for s in _temiz_icerik(kart).split("\n") if s.strip()), "")
+            if ilk and not _KART_IMZASI.match(ilk):
+                kart_basliklari.append(ilk)
+        maddeler = [" ".join(m.split()) for m in kayit.get("items") or [] if isinstance(m, str)]
+        for baslik in kart_basliklari[:5] + [m for m in maddeler if m][:5]:
+            if len(baslik) > _ILGILI_BASLIK_SINIRI:
+                baslik = baslik[:_ILGILI_BASLIK_SINIRI - 1].rstrip() + "…"
+            if all(r["title"] != baslik for r in related):
+                related.append({"title": baslik, "type": "ders_icerikleri"})
 
     return related[:10]
 
@@ -1940,7 +2091,18 @@ def _sinav_listesi(data, now=None):
     # --- Grades lookup ---
     gelisim = data.get("gelisim_raporu", {})
     grades_list = gelisim.get("grades", []) if isinstance(gelisim, dict) else []
-    grade_lookup = _build_grade_lookup(grades_list)
+
+    # A report still on an earlier school year — measured: 2025-2026's
+    # "4. Arakarne" persisted well into 2026-2027 — is last year's exams, not
+    # this year's past ones: no synthetic exams from it (the check the
+    # assistant's notlar makes). Notlar still shows the report under its term.
+    from src.assistant_tools import onceki_yil_raporu_mu
+    onceki_yil = isinstance(gelisim, dict) and onceki_yil_raporu_mu(
+        gelisim.get("semester"), _guncel_ogretim_yili())
+
+    # Nor does a takvim exam take its grade from such a report (2026-09-28):
+    # last year's "1. Sınav" column is not this year's first exam.
+    grade_lookup = {} if onceki_yil else _build_grade_lookup(grades_list)
 
     # --- Homework rows ---
     hw_rows = _combined_homework_rows(data)
@@ -1969,6 +2131,11 @@ def _sinav_listesi(data, now=None):
             continue
 
         course, raw_course, exam_number = _extract_exam_info(title)
+        # Everything below shows the reader the *resolved* course (a real
+        # title may embed one — "Türkçe" — that the regexes above could not
+        # isolate); the exam id and the content-map's legacy key keep
+        # hashing `course` itself, unchanged, so neither moves.
+        display_course = _cozumlenen_sinav_dersi(course, title, ders_icerikleri)
         date_str = evt.get("start", "")
 
         # Local clock on both sides (see _portal_yerel). An unreadable date
@@ -1978,17 +2145,21 @@ def _sinav_listesi(data, now=None):
 
         # Match grade
         grade = None
-        if exam_number and course in grade_lookup:
-            grade = grade_lookup[course].get(str(exam_number))
+        if exam_number and display_course in grade_lookup:
+            grade = grade_lookup[display_course].get(str(exam_number))
 
         # Related content
-        related_hw = _find_related_homework(course, date_str, hw_rows)
-        related_content = _find_related_content(course, ders_icerikleri)
+        related_hw = _find_related_homework(display_course, date_str, hw_rows)
+        related_content = _find_related_content(display_course, ders_icerikleri)
 
-        # AI content map
-        map_key = f"{course}|{title}|{date_str[:10] if date_str else ''}"
+        # AI content map: try the legacy key first (existing
+        # exam_content_map.json entries were written before this fix and
+        # must not be orphaned), then the resolved course.
+        date10 = date_str[:10] if date_str else ""
         ai_summary = None
-        map_entry = content_map.get(map_key)
+        map_entry = content_map.get(f"{course}|{title}|{date10}")
+        if map_entry is None and display_course != course:
+            map_entry = content_map.get(f"{display_course}|{title}|{date10}")
         if isinstance(map_entry, dict):
             ai_summary = map_entry.get("summary")
 
@@ -2000,19 +2171,21 @@ def _sinav_listesi(data, now=None):
                     study_guide = ev.get("note")
                     break
 
+        # The id hashes the legacy course — see the "Critical constraint"
+        # note in the 2026-09-28 sınav-ders plan: it must not move.
         exam_id = hashlib.md5(f"{course}|{title}|{_kimlik_zamani(date_str)}".encode()).hexdigest()[:12]
 
         if exam_number:
-            seen_course_nums.add((course, str(exam_number)))
+            seen_course_nums.add((display_course, str(exam_number)))
 
         exams_list.append({
             "id": exam_id,
-            "course": course,
+            "course": display_course,
             "title": _clean_exam_title(
-                course, exam_number, title),
+                display_course, exam_number, title),
             "rawTitle": title,
-            "courseColor": _course_color(course),
-            "courseFamily": subject_themes.family_of(course),
+            "courseColor": _course_color(display_course),
+            "courseFamily": subject_themes.family_of(display_course),
             "examNumber": exam_number,
             "date": _portal_yerel(date_str) or None,
             "endDate": _portal_yerel(evt.get("end")) or None,
@@ -2026,7 +2199,7 @@ def _sinav_listesi(data, now=None):
         })
 
     # --- Synthetic exams from grades without takvim events ---
-    for row in grades_list:
+    for row in ([] if onceki_yil else grades_list):
         if not isinstance(row, dict):
             continue
         course = normalize_course(row.get("Ders", ""))
@@ -2294,18 +2467,23 @@ def assistant_reindex():
 # ~7 MB), but the count alone would let 64 large answers pin 64× their size in
 # every worker. An image over FIGUR_TEK_SINIRI (the size chat_with_tools will
 # not send the model either) is served but never cached; the whole cache stays
-# under FIGUR_TOPLAM_SINIRI. A figure id's image never changes: nothing expires.
+# under FIGUR_TOPLAM_SINIRI. Keyed by (corpus version, id): the 1.6 build
+# renumbered figure ids (2026-09-27), so an id means a picture only together
+# with the build it was cited under. Nothing expires; a new build is a new key.
 FIGUR_ONBELLEK_BOYUTU = 64
 FIGUR_TEK_SINIRI = 1_500_000
 FIGUR_TOPLAM_SINIRI = 16 * 1024 * 1024
-_FIGUR_ONBELLEGI: "OrderedDict[int, tuple[bytes, str]]" = OrderedDict()
+_FIGUR_ONBELLEGI: "OrderedDict[tuple[str, int], tuple[bytes, str]]" = OrderedDict()
 _FIGUR_KILIDI = threading.Lock()
 FIGUR_ULASILAMADI = "Ders kitabı görseline şu an ulaşılamadı; biraz sonra yeniden deneyin."
+FIGUR_SURUM_DEGISTI = ("Bu görsel, müfredat korpusu güncellendiği için değişti; "
+                       "soruyu yeniden sorun.")
 
 
 def _figur_yaniti(veri: bytes, mime: str) -> Response:
     return Response(veri, mimetype=mime, headers={
-        # Private: behind the sign-in. A day: the image for an id never changes.
+        # Private: behind the sign-in. A day: the URL carries the corpus
+        # version, and an (id, version) pair's image never changes.
         "Cache-Control": "private, max-age=86400",
         "X-Content-Type-Options": "nosniff",
     })
@@ -2320,17 +2498,35 @@ def assistant_figure(figure_id):
     if access is not None:
         return access
 
+    # The URL names the corpus build it was cited under (?v=). Without it, or
+    # under another build, the id may name a different picture: say so rather
+    # than serve it. Missing needs no lookup; a mismatch needs the current one.
+    istenen = request.args.get("v", "").strip()
+    if not istenen:
+        return jsonify({"error": FIGUR_SURUM_DEGISTI}), 404
+    try:
+        registry = _assistant_runtime().registry
+        guncel = registry.korpus_surumu()
+    except AssistantUnavailableError:
+        registry, guncel = None, None
+    except Exception as exc:  # noqa: BLE001 — a figure the panel cannot load is not a 500
+        app.logger.error("assistant figure %s version failed: %s", figure_id, type(exc).__name__)
+        registry, guncel = None, None
+    if guncel is None:
+        return jsonify({"error": FIGUR_ULASILAMADI}), 502
+    if istenen != guncel:
+        return jsonify({"error": FIGUR_SURUM_DEGISTI}), 404
+
+    anahtar = (guncel, figure_id)
     with _FIGUR_KILIDI:
-        kayit = _FIGUR_ONBELLEGI.get(figure_id)
+        kayit = _FIGUR_ONBELLEGI.get(anahtar)
         if kayit is not None:
-            _FIGUR_ONBELLEGI.move_to_end(figure_id)
+            _FIGUR_ONBELLEGI.move_to_end(anahtar)
     if kayit is not None:
         return _figur_yaniti(*kayit)
 
     try:
-        durum, veri, mime = _assistant_runtime().registry.figur_gorseli(figure_id)
-    except AssistantUnavailableError:
-        durum, veri, mime = "ulasilamadi", b"", ""
+        durum, veri, mime = registry.figur_gorseli(figure_id)
     except Exception as exc:  # noqa: BLE001 — a figure the panel cannot load is not a 500
         app.logger.error("assistant figure %s failed: %s", figure_id, type(exc).__name__)
         durum, veri, mime = "ulasilamadi", b"", ""
@@ -2342,8 +2538,8 @@ def assistant_figure(figure_id):
 
     if len(veri) <= FIGUR_TEK_SINIRI:
         with _FIGUR_KILIDI:
-            _FIGUR_ONBELLEGI[figure_id] = (veri, mime)
-            _FIGUR_ONBELLEGI.move_to_end(figure_id)
+            _FIGUR_ONBELLEGI[anahtar] = (veri, mime)
+            _FIGUR_ONBELLEGI.move_to_end(anahtar)
             while (len(_FIGUR_ONBELLEGI) > FIGUR_ONBELLEK_BOYUTU
                    or sum(len(v) for v, _ in _FIGUR_ONBELLEGI.values()) > FIGUR_TOPLAM_SINIRI):
                 _FIGUR_ONBELLEGI.popitem(last=False)
@@ -2406,19 +2602,12 @@ def _make_id(*parts):
 
 
 def _current_week_dates():
-    """Return list of 5 date objects (Mon-Fri) for the current week."""
+    """The seven dates (Mon–Sun) of the current week. Seven, not five: both
+    of Işık's private lessons are on Saturday (measured 2026-09-25), and a
+    Mon–Fri week dropped them from the unified calendar."""
     today = datetime.now().date()
     monday = today - timedelta(days=today.weekday())
-    return [monday + timedelta(days=i) for i in range(5)]
-
-
-def _parse_time_range(cell_text):
-    """Parse time range from first column like '1. Ders\\n08:00 - 08:40' or '08:40 - 08:55'.
-    Returns (start_h, start_m, end_h, end_m) or None."""
-    m = re.search(r"(\d{1,2})[:.:](\d{2})\s*[-–/]\s*(\d{1,2})[:.:](\d{2})", cell_text)
-    if m:
-        return int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))
-    return None
+    return [monday + timedelta(days=i) for i in range(7)]
 
 
 def _parse_ddmmyyyy_hhmm(s):
@@ -2443,62 +2632,32 @@ def _birlesik_takvim(data):
     events = []
     week_dates = _current_week_dates()
 
-    # 1. Lessons from ders_programi
-    weeks = data.get("ders_programi", [])
-    if weeks:
-        latest = weeks[-1]
-        rows = latest.get("schedule", {}).get("rows", [])
-        # headers row: ['', 'Pazartesi', 'Salı', ...]
-        # day_col_map: column index -> weekday index (0=Mon)
-        day_names_order = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"]
-        day_col_map = {}
-        if rows:
-            for ci, hdr in enumerate(rows[0]):
-                for di, dn in enumerate(day_names_order):
-                    if dn in str(hdr):
-                        day_col_map[ci] = di
-                        break
-
-        for r in range(1, len(rows)):
-            row = rows[r]
-            if not row:
-                continue
-            time_cell = row[0] if row else ""
-            parsed = _parse_time_range(time_cell)
-            if not parsed:
-                continue
-            sh, sm, eh, em = parsed
-
-            for ci in range(1, len(row)):
-                cell = row[ci]
-                if not cell or ci not in day_col_map:
-                    continue
-                # Skip break/breakfast rows
-                cell_lower = cell.strip().lower()
-                if cell_lower in ("kahvaltı", "öğle yemeği", "teneffüs", "yemek"):
-                    continue
-                if re.match(r"^\d{1,2}[:.]\d{2}\s*[-–]\s*\d{1,2}[:.]\d{2}$", cell.strip()):
-                    continue
-
-                day_idx = day_col_map[ci]
-                day_date = week_dates[day_idx]
-                start_dt = datetime(day_date.year, day_date.month, day_date.day, sh, sm)
-                end_dt = datetime(day_date.year, day_date.month, day_date.day, eh, em)
-
-                lines = cell.split("\n")
-                lesson_name = normalize_course(lines[0].strip())
-                subtitle = lines[1].strip() if len(lines) > 1 else ""
-
-                events.append({
-                    "id": _make_id("lesson", day_idx, sh, sm, lesson_name),
-                    "title": lesson_name,
-                    "type": "lesson",
-                    "start": start_dt.isoformat(),
-                    "end": end_dt.isoformat(),
-                    **_takvim_rengi(lesson_name),
-                    "course": lesson_name,
-                    "subtitle": subtitle,
-                })
+    # 1. Lessons from ders_programi, read through the assistant's port of
+    # utils/schedule.ts dayColumns (assistant_tools.gunun_dersleri): the header
+    # row is upper-case dotless Turkish ("PAZARTESI") and holds two blocks,
+    # Friday on its own bell. Matching "Pazartesi" against it never succeeded,
+    # so until 2026-09-28 this drew no lesson at all.
+    from src.assistant_tools import gunun_dersleri
+    # The same week /api/schedule serves as `latest`, not weeks[-1].
+    latest = _guncel_hafta(data.get("ders_programi", []))
+    rows = (latest.get("schedule") or {}).get("rows", [])
+    for day_idx, day_date in enumerate(week_dates):
+        for ders in gunun_dersleri(rows, DAY_NAMES[day_idx]):
+            sh, sm = (int(x) for x in ders["baslangic"].split(":"))
+            eh, em = (int(x) for x in ders["bitis"].split(":"))
+            lesson_name = ders["ders"]
+            start_dt = datetime(day_date.year, day_date.month, day_date.day, sh, sm)
+            end_dt = datetime(day_date.year, day_date.month, day_date.day, eh, em)
+            events.append({
+                "id": _make_id("lesson", day_idx, sh, sm, lesson_name),
+                "title": lesson_name,
+                "type": "lesson",
+                "start": start_dt.isoformat(),
+                "end": end_dt.isoformat(),
+                **_takvim_rengi(lesson_name),
+                "course": lesson_name,
+                "subtitle": ders["alt"],
+            })
 
     # 2. Homework deadlines
     hw_rows = _combined_homework_rows(data)
@@ -2519,10 +2678,20 @@ def _birlesik_takvim(data):
             "status": status,
         })
 
-    # 3. Private lessons
-    for pev in _private_lessons_for_week(week_dates):
-        pev.update(_takvim_rengi(pev.get("course", "")))
-        events.append(pev)
+    # 3. Private lessons, weekend included (CalendarEvents draws a Saturday or
+    # Sunday column in a week that has something on it), for the weeks ahead
+    # (_TAKVIM_OZEL_DERS_HAFTA), not only this one: CalendarEvents fetches
+    # this route once and filters the result client-side by week offset, so
+    # "Sonraki hafta" does not refetch — until 2026-09-28 only this week's
+    # private lessons were generated, so a Saturday lesson that recurs every
+    # week (both of Işık's do) vanished the moment the reader stepped
+    # forward, even though nothing about the lesson had changed.
+    ozel_dersler = _load_private_lessons()
+    for h in range(_TAKVIM_OZEL_DERS_HAFTA):
+        gunler = [week_dates[0] + timedelta(days=7 * h + i) for i in range(7)]
+        for pev in _private_lessons_for_week(gunler, ozel_dersler):
+            pev.update(_takvim_rengi(pev.get("course", "")))
+            events.append(pev)
 
     # 4. ÖGEP sessions
     ogep_rows = data.get("ogep", {}).get("sessions", {}).get("rows", [])

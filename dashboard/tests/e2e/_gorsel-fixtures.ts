@@ -72,6 +72,29 @@ export const GORSEL: Record<string, unknown> = {
   ], scraped_at: '2026-09-16T08:05:00', total_homework: 1 },
   'progress/a3k': { class_name: '7-D', dashboard_stats: { completed: 3, firstTryScore: 80, scoredAboveLine: 3, target: 5 },
     lessons: [], scraped_at: '2026-09-16T08:05:00', teacher_assigned_completed: 3, teacher_assigned_count: 5, total_lessons: 3 },
+  // The shape /api/grades serves (gelişim_raporu + priorYear). FULL's rows
+  // ({ders, sinav, puan}) predate it and drew a table of dashes. Last year's
+  // report, as the portal still showed on 2026-09-28, so the Notlar baseline
+  // carries the "Önceki öğretim yılı" tag. Invented grades.
+  grades: { semester: '2025-2026 4. Arakarne', priorYear: true, physical: {}, rubrics: [], grades: [
+    { Ders: 'Matematik', '1. Sınav': '88', '2. Sınav': '92', '3. Sınav': '-',
+      'DİKP/Performans-1': '95', 'DİKP/Performans-2': '-', 'DİKP/Performans-3': '-' },
+    { Ders: 'Türkçe', '1. Sınav': '76', '2. Sınav': '-', '3. Sınav': '-',
+      'DİKP/Performans-1': '-', 'DİKP/Performans-2': '-', 'DİKP/Performans-3': '-' },
+  ] },
   calendar: { events: [] },
   'assistant/ogretmenler': OGRETMENLER,
+  // The unified calendar in its real shape. FULL's rows (baslik/tarih/tur)
+  // predate it and put nothing on the grid, so the Takvim baseline was an
+  // empty week. Thursday's first lessons and a Saturday private lesson, so it
+  // shows the weekend column (2026-09-28). Invented teacher.
+  'calendar/unified': { events: [
+    { id: 'l1', type: 'lesson', title: 'Matematik', start: '2026-09-24T08:00:00', end: '2026-09-24T08:40:00',
+      color: '', course: 'Matematik', courseFamily: 'purple', status: '', subtitle: '' },
+    { id: 'l2', type: 'lesson', title: 'Türkçe', start: '2026-09-24T09:45:00', end: '2026-09-24T10:25:00',
+      color: '', course: 'Türkçe', courseFamily: 'magenta', status: '', subtitle: '' },
+    { id: 'p1', type: 'private_lesson', title: 'Fen Bilimleri · Deneme Hoca',
+      start: '2026-09-26T12:00:00', end: '2026-09-26T13:00:00', color: '', course: 'Fen Bilimleri',
+      courseFamily: 'teal', status: 'Özel Ders', subtitle: 'Özel Ders • Deneme Hoca' },
+  ] },
 }

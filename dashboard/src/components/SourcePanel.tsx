@@ -45,12 +45,26 @@ function ModuleOpen({ locator }: { locator: Record<string, unknown> | undefined 
 }
 
 /** The figure part of a locator, or null. The value arrives as unchecked JSON, and it becomes a
- *  URL path segment — so only a positive integer id is accepted. */
+ *  URL path segment — so only a positive integer id is accepted. The corpus version is a query
+ *  value, encoded where the URL is built. */
 function figureOf(locator: Record<string, unknown> | undefined): FigureLocator | null {
   const id = locator?.figure_id
   if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) return null
   const caption = typeof locator?.caption === 'string' ? locator.caption.trim() : ''
-  return caption ? { figure_id: id, caption } : { figure_id: id }
+  const version = typeof locator?.corpus_version === 'string' ? locator.corpus_version.trim() : ''
+  return {
+    figure_id: id,
+    ...(caption ? { caption } : {}),
+    ...(version ? { corpus_version: version } : {}),
+  }
+}
+
+/** The figure's URL under the corpus build it was cited in. The 1.6 build renumbered figure ids
+ *  (2026-09-27), so an id alone can name another picture; without a version the endpoint answers
+ *  404 and the thumbnail says "Görsel yüklenemedi". */
+function figureSrc(figure: FigureLocator): string {
+  const base = `/api/assistant/figure/${figure.figure_id}`
+  return figure.corpus_version ? `${base}?v=${encodeURIComponent(figure.corpus_version)}` : base
 }
 
 /** A textbook figure the answer drew on, small, beside its citation (Görev 4). The caption is the
@@ -62,7 +76,7 @@ function FigureThumb({ figure }: { figure: FigureLocator }) {
   return (
     <img
       className="ac__ref-figure"
-      src={`/api/assistant/figure/${figure.figure_id}`}
+      src={figureSrc(figure)}
       alt={figure.caption || 'Ders kitabı görseli'}
       loading="lazy"
       decoding="async"
