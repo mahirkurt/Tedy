@@ -21,12 +21,17 @@ import {
   Copy,
   Search,
   Time,
+  Idea,
 } from '@carbon/icons-react'
-import type { AssistantCitation, AssistantPlanBlock, AssistantResponse } from '../types'
+import type { AssistantCitation, AssistantPlanBlock, AssistantResponse, ModOnerisi as Oneri } from '../types'
 import { renderMarkdown } from '../utils/markdown'
 import { modelAdi } from '../utils/formatters'
+import { subjectClass } from '../utils/subject'
 import { firstName, useSession } from '../contexts/session'
+import { GENEL, useOgretmen } from '../hooks/useOgretmen'
 import CitationChip from './CitationChip'
+import ModOnerisi from './ModOnerisi'
+import OgretmenSecici from './OgretmenSecici'
 import SourcePanel from './SourcePanel'
 
 type ChatRole = 'user' | 'assistant'
@@ -43,6 +48,8 @@ interface ChatMessage {
    *  so this is not a constant and Carbon's AI guidance asks that it be
    *  disclosed rather than implied. */
   model?: string
+  /** A genel-mode answer's suggestion to switch teacher; shown as a button, never applied. */
+  modOnerisi?: Oneri | null
 }
 
 // The page speaks to whoever is signed in, as the model does (the prompt's
@@ -60,6 +67,7 @@ const VOICE = {
     placeholder: 'Bir soru sor veya çalışma planı iste...',
     sources: 'Her iddianın yanındaki numara, o cümlenin nereden geldiğini gösterir — MEB müfredatı, ders kitabın veya kendi okul verin. Numaraya dokunup kaynağı okuyabilirsin.',
     caution: 'Yapay zekâ yanılabilir. Bir şey tuhaf geldiyse kaynağa bak.',
+    ogretmenHata: 'Öğretmen modları şu an yüklenemedi; Genel modda sorabilirsin.',
   },
   family: {
     welcome: "Merhaba! TEDY Asistan olarak size yardımcı olabilirim. Işık'ın ödevleri, sınavları ve dersleri hakkında soru sorabilir veya onun için çalışma planı isteyebilirsiniz.",
@@ -71,6 +79,7 @@ const VOICE = {
     placeholder: 'Bir soru sorun veya çalışma planı isteyin...',
     sources: "Her iddianın yanındaki numara, o cümlenin nereden geldiğini gösterir — MEB müfredatı, ders kitabı veya Işık'ın okul verisi. Numaraya dokunup kaynağı okuyabilirsiniz.",
     caution: 'Yapay zekâ yanılabilir. Bir şey tuhaf geldiyse kaynağa bakın.',
+    ogretmenHata: 'Öğretmen modları şu an yüklenemedi; Genel modda sorabilirsiniz.',
   },
 }
 
@@ -91,6 +100,8 @@ const TOOL_LABEL: Record<string, string> = {
   oer_kazanima_gore: 'Kazanıma bağlı kaynaklar alınıyor',
   modul_ara: 'Yayınlanmış modüller aranıyor',
   odev_listesi: 'Ödev listen okunuyor',
+  skill_kaynagi: 'Öğretmen notları açılıyor',
+  mod_oner: 'Öğretmen önerisi hazırlanıyor',
 }
 
 const DEFAULT_THINKING_MESSAGE = 'Yanıt hazırlanıyor...'
@@ -278,6 +289,14 @@ export default function AssistantChat() {
   const isStudent = user?.student === true
   const voice = isStudent ? VOICE.student : VOICE.family
   const askerName = isStudent ? 'Işık' : (firstName(user) || 'Siz')
+  const okur = isStudent ? 'ogrenci' : 'aile'
+  const ogretmen = useOgretmen(user?.email)
+  const secili = ogretmen.secili
+  // A teacher's greeting and quick prompts come from its skill; Genel keeps the page's own.
+  const welcome = secili ? secili.karsilama[okur] : voice.welcome
+  const prompts = secili
+    ? secili.hizli_sorular[okur].map((text, i) => ({ text, icon: Idea, mode: 'chat' as const, primary: i === 0 }))
+    : voice.prompts
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -315,7 +334,7 @@ export default function AssistantChat() {
    * payload, whether it arrived via the stream's `answer` event or a classic
    * JSON response — both endpoints return the same shape, so this is the one
    * place that turns it into a ChatMessage. */
-  function appendAssistantMessage(payload: AssistantResponse) {
+  function appendAssistantMessage(payload: AssistantResponse, oneri: Oneri | null = null) {
     const answer = (payload.answer || '').trim() || 'Yanıt üretilemedi.'
     const assistantMsg: ChatMessage = {
       id: `assistant-${Date.now()}`,
@@ -326,6 +345,8 @@ export default function AssistantChat() {
       planBlocks: payload.plan_blocks || [],
       degraded: payload.meta?.degraded || [],
       model: payload.meta?.model,
+      // The stream's own event arrives first; /chat carries the same in the payload.
+      modOnerisi: payload.mode_suggestion ?? oneri,
     }
     setMessages(prev => [...prev, assistantMsg])
   }
@@ -352,6 +373,7 @@ export default function AssistantChat() {
       session_id: 'dashboard-default',
       context_filters: {},
       messages: toApiMessages(nextMessages),
+      ogretmen: ogretmen.id,
       ...(opts?.deep ? { force_deep: true } : {}),
     }
 
@@ -394,8 +416,11 @@ export default function AssistantChat() {
       if (!res.ok || !res.body) throw new Error(`akış açılamadı (${res.status})`)
 
       let answered = false
+      let oneri: Oneri | null = null
       await readEventStream(res, (name, data) => {
-        if (name === 'tool_start') {
+        if (name === 'mode_suggestion') {
+          oneri = data as unknown as Oneri
+        } else if (name === 'tool_start') {
           setStage(TOOL_LABEL[String(data.name)] ?? 'Kaynaklar taranıyor')
         } else if (name === 'answer_delta') {
           const piece = String(data.text ?? '')
@@ -406,7 +431,7 @@ export default function AssistantChat() {
         } else if (name === 'answer') {
           answered = true
           setWriting('')
-          appendAssistantMessage(data.payload as AssistantResponse)
+          appendAssistantMessage(data.payload as AssistantResponse, oneri)
         } else if (name === 'error') {
           throw new Error(String(data.error ?? 'akış hatası'))
         }
@@ -477,7 +502,13 @@ export default function AssistantChat() {
   const latestModel = latestAssistant?.model
 
   return (
-    <section className="ac">
+    // data-ogretmen names the mode; the family class brings that subject's role tokens
+    // (theme/_subjects.scss), which AssistantChat.scss applies only when the mode is not
+    // Genel. The brand band is outside this section and never changes.
+    <section
+      className={['ac', secili && subjectClass(null, secili.renk_ailesi)].filter(Boolean).join(' ')}
+      data-ogretmen={ogretmen.id}
+    >
       {/* Header */}
       <header className="ac__header">
         <div className="ac__header-left">
@@ -504,14 +535,23 @@ export default function AssistantChat() {
           </AILabel>
           <div>
             <h2 className="ac__title">TEDY Asistan</h2>
-            <p className="ac__subtitle">Kaynaklı soru-cevap ve kişisel çalışma planı</p>
+            <p className="ac__subtitle">
+              {secili ? `${secili.ogretmen_adi} — konuyu adım adım anlatır` : 'Kaynaklı soru-cevap ve kişisel çalışma planı'}
+            </p>
           </div>
         </div>
       </header>
 
+      <OgretmenSecici
+        liste={ogretmen.liste}
+        secili={ogretmen.id}
+        onSec={ogretmen.sec}
+        hata={ogretmen.hata ? voice.ogretmenHata : null}
+      />
+
       {/* Quick prompts */}
       <div className="ac__prompts">
-        {voice.prompts.map(qp => (
+        {prompts.map(qp => (
           <button
             key={qp.text}
             type="button"
@@ -551,7 +591,7 @@ export default function AssistantChat() {
                   </span>
                   <div className={msg.role === 'assistant' ? 'ac-msg__content ac-md' : 'ac-msg__content ac-msg__content--own'}>
                     {msg.role === 'assistant'
-                      ? <AnswerBody text={msg.id === 'welcome' ? voice.welcome : msg.content}
+                      ? <AnswerBody text={msg.id === 'welcome' ? welcome : msg.content}
                           citations={msg.citations ?? []} onActivate={activateCitation} />
                       : msg.content}
                   </div>
@@ -561,6 +601,13 @@ export default function AssistantChat() {
                         <Tag key={f} type={flagTone(f)} size="sm">{FLAG_LABELS[f] ?? f}</Tag>
                       ))}
                     </div>
+                  )}
+                  {/* Only while still in Genel, and only for a teacher the list has: once the
+                      reader has moved, or the teacher is gone, the button would do nothing. */}
+                  {msg.modOnerisi && ogretmen.id === GENEL
+                    && ogretmen.liste.some(o => o.id === msg.modOnerisi?.ogretmen) && (
+                    <ModOnerisi oneri={msg.modOnerisi}
+                      onGec={() => ogretmen.sec(msg.modOnerisi!.ogretmen)} />
                   )}
                   {msg.role === 'assistant' && msg.id !== 'welcome' && (
                     <div className="ac-msg__actions">

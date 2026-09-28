@@ -30,7 +30,7 @@ os.chdir(PROJECT_ROOT)
 
 from src.env_loader import load_env
 from src.json_utils import atomic_json_dump
-from src.course_names import normalize_course
+from src.course_names import normalize_course, COURSE_ALIASES
 from src.hafta_secici import guncel_hafta as _guncel_hafta
 from src.portal_susu import temiz_dersler, temiz_haftalar, temiz_metin
 from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.USER_ROLES etc.)
@@ -42,7 +42,7 @@ from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.US
     USER_ROLES,
     okur_turu,
 )
-from src import module_progress, module_store, module_ticket, subject_themes
+from src import assistant_skills, module_progress, module_store, module_ticket, subject_themes
 from src import claude_api
 
 load_env()
@@ -347,9 +347,20 @@ def _assistant_runtime():
                 video_kaynagi=_canli_videolar,
             )
         except Exception as exc:
-            app.logger.error(
-                "Assistant subsystem unavailable (%s)", type(exc).__name__
-            )
+            # SkillHatasi's own message names which skill and why (spec "Hata ve
+            # boşluk durumları"). Checked by class NAME, not `isinstance` against
+            # an import done inside this handler: importing src.assistant_skills
+            # here would itself raise if that module were the thing broken, and
+            # the reader would get a bare 500 instead of AssistantUnavailableError
+            # (review round 2, finding NB3). assistant_skills is imported at
+            # module top for _istek_ogretmeni and /api/assistant/ogretmenler, so
+            # this branch never needs an import of its own.
+            if type(exc).__name__ == "SkillHatasi":
+                app.logger.error("Assistant subsystem unavailable: %s", exc)
+            else:
+                app.logger.error(
+                    "Assistant subsystem unavailable (%s)", type(exc).__name__
+                )
             raise AssistantUnavailableError("assistant_unavailable") from exc
 
     return _ASSISTANT_RUNTIME
@@ -395,6 +406,24 @@ def _assistant_okur() -> str:
     """Who is asking, for the assistant's form of address. Read inside the
     request, like the progress permission: the stream generator outlives it."""
     return okur_turu(_module_person())
+
+
+def _istek_ogretmeni(payload: dict):
+    """The request's `ogretmen` (spec §1): absent or null is genel; anything else must name a
+    loaded teacher, or the request is refused with 400 — never silently answered as genel.
+    Returns (ogretmen, None) or (None, error response)."""
+    deger = payload.get("ogretmen")
+    if deger is None:
+        return assistant_skills.GENEL, None
+    try:
+        bilinen = {assistant_skills.GENEL, *assistant_skills.varsayilan()}
+    except assistant_skills.SkillHatasi as exc:
+        app.logger.error("Assistant subsystem unavailable: %s", exc)
+        return None, (jsonify({"error": "assistant_unavailable"}), 503)
+    if not isinstance(deger, str) or deger not in bilinen:
+        return None, (jsonify({"error": "Bilinmeyen öğretmen modu.",
+                               "gecerli": sorted(bilinen)}), 400)
+    return deger, None
 
 
 def _assistant_progress_allowed() -> bool:
@@ -1834,6 +1863,122 @@ def _extract_exam_info(title):
     return normalized, raw_course, exam_number
 
 
+def _bilinen_ders_adaylari(ders_icerikleri):
+    """Surface forms to recognise inside an exam title, mapped to their
+    canonical course: this run's real course-content keys, filtered down to
+    actual school subjects (never a hand-written subject list), plus the
+    alias vocabulary already in src/course_names.py — so a variant embedded
+    in a title ("DKAB") is recognised even when it is not literally the
+    content map's own key.
+
+    ders_icerikleri's keys are not all subjects. Measured 2026-09-28 on live
+    data, alongside "Türkçe", "Matematik", "Fen Bilimleri", "Sosyal
+    Bilgiler", "DKAB", "İngilizce" and other real courses, the tab list also
+    carries "Genel" (the school-wide announcement feed), "PDR" (guidance)
+    and "Sınıf Öğretmeni" (homeroom teacher) — none of them a subject. Taking
+    every key unfiltered let a title like "... MEB 1. Dönem Genel Deneme
+    Sınavı / ..." resolve to a fake course "Genel" and surface an unrelated
+    announcement as relatedContent. The filter is
+    `subject_themes.domain_of()` — the same domain table the frontend and
+    the module template use for course colour — applied to each key's
+    canonical form: a key that resolves only to the generic fallback domain
+    ("genel", `subject_themes.themes()["fallback"]["id"]`) is not a subject
+    and is dropped, whichever tab produced it. The same filter is applied to
+    COURSE_ALIASES' canonical targets, though none of the six currently
+    listed there (Fransızca, Din Kültürü, Beden Eğitimi, İngilizce, Bilişim,
+    Ahlak ve Yurttaşlık) actually falls into "genel"."""
+    adaylar = {}
+    if isinstance(ders_icerikleri, dict):
+        for anahtar in ders_icerikleri:
+            if not isinstance(anahtar, str) or not anahtar.strip():
+                continue
+            kanonik = normalize_course(anahtar)
+            if subject_themes.domain_of(kanonik)["id"] == "genel":
+                continue
+            adaylar.setdefault(anahtar.strip(), kanonik)
+    for kanonik, takma_adlar in COURSE_ALIASES.items():
+        if subject_themes.domain_of(kanonik)["id"] == "genel":
+            continue
+        adaylar.setdefault(kanonik, kanonik)
+        for takma in takma_adlar:
+            adaylar.setdefault(takma, kanonik)
+    return adaylar
+
+
+def _baslikta_bilinen_ders_ara(title, ders_icerikleri):
+    """A known course name embedded in `title`'s Turkish half (before the
+    "/" English half — the split tolerates surrounding whitespace, since a
+    real title's spacing around the slash is not guaranteed), Turkish-folded
+    (accent + case, `turkce_kucult_katla`) and word-boundary matched, longest
+    surface form first. Returns the canonical course, or None when zero or
+    more than one distinct course is found — never invents a course for a
+    course-less or multi-subject title (e.g. a "GİS" development-monitoring
+    exam, or one naming two courses)."""
+    from src.assistant_core import turkce_kucult_katla
+
+    adaylar = _bilinen_ders_adaylari(ders_icerikleri)
+    if not adaylar:
+        return None
+    turkce_yari = re.split(r"\s*/\s*", str(title or ""), maxsplit=1)[0]
+    hedef = turkce_kucult_katla(turkce_yari)
+    if not hedef.strip():
+        return None
+
+    kalan = hedef
+    bulunanlar = set()
+    for yuzey in sorted(adaylar, key=len, reverse=True):
+        katlanmis = turkce_kucult_katla(yuzey)
+        if not katlanmis.strip():
+            continue
+        eslesme = re.search(
+            r"(?<!\w)" + re.escape(katlanmis) + r"(?!\w)", kalan)
+        if eslesme:
+            bulunanlar.add(adaylar[yuzey])
+            baslangic, bitis = eslesme.span()
+            # Blank out the matched span so a shorter candidate fully inside
+            # it (mapping to a different canonical) cannot also match, while
+            # a genuinely distinct course mentioned elsewhere still can.
+            kalan = kalan[:baslangic] + (" " * (bitis - baslangic)) + kalan[bitis:]
+    if len(bulunanlar) == 1:
+        return next(iter(bulunanlar))
+    return None
+
+
+def _bilinen_ders_mi(course, ders_icerikleri):
+    """Whether `course` — as _extract_exam_info's regexes already resolved
+    it — is already a real, single known course, so the title-scan fallback
+    never overrides an extraction that already worked."""
+    if not course:
+        return False
+    hedef = _turkish_lower(course)
+    if hedef in (_turkish_lower(k) for k in COURSE_ALIASES):
+        return True
+    if isinstance(ders_icerikleri, dict):
+        for anahtar in ders_icerikleri:
+            if isinstance(anahtar, str) and _turkish_lower(normalize_course(anahtar)) == hedef:
+                return True
+    return False
+
+
+def _cozumlenen_sinav_dersi(course, title, ders_icerikleri):
+    """The course actually shown for an exam (label, grade match, related
+    homework/content, calendar colour). _extract_exam_info's regexes need a
+    dash (_COURSE_FROM_TITLE_RE) or the plural "Sınıflar" prefix; measured
+    2026-09-28, real portal titles like "7. Sınıf MEB Ülke Geneli Türkçe 1.
+    Dönem 2. Ortak Yazılı Sınavı" have neither, so `course` stayed the whole
+    title and relatedContent was always []. When that has happened, look for
+    a known course name in the title instead — never when it already
+    resolved to one, and never inventing one for an ambiguous or
+    course-less title (see _baslikta_bilinen_ders_ara). This never feeds the
+    exam id or the exam_content_map.json legacy key: both keep hashing
+    _extract_exam_info's own return value, unchanged, so an existing id or
+    map entry never moves."""
+    if _bilinen_ders_mi(course, ders_icerikleri):
+        return course
+    bulunan = _baslikta_bilinen_ders_ara(title, ders_icerikleri)
+    return bulunan or course
+
+
 def _build_grade_lookup(grades_list):
     """Build {normalized_course: {"1": score, "2": score, "3": score}} from gelisim_raporu grades."""
     lookup = {}
@@ -2001,6 +2146,11 @@ def _sinav_listesi(data, now=None):
             continue
 
         course, raw_course, exam_number = _extract_exam_info(title)
+        # Everything below shows the reader the *resolved* course (a real
+        # title may embed one — "Türkçe" — that the regexes above could not
+        # isolate); the exam id and the content-map's legacy key keep
+        # hashing `course` itself, unchanged, so neither moves.
+        display_course = _cozumlenen_sinav_dersi(course, title, ders_icerikleri)
         date_str = evt.get("start", "")
 
         # Local clock on both sides (see _portal_yerel). An unreadable date
@@ -2010,17 +2160,21 @@ def _sinav_listesi(data, now=None):
 
         # Match grade
         grade = None
-        if exam_number and course in grade_lookup:
-            grade = grade_lookup[course].get(str(exam_number))
+        if exam_number and display_course in grade_lookup:
+            grade = grade_lookup[display_course].get(str(exam_number))
 
         # Related content
-        related_hw = _find_related_homework(course, date_str, hw_rows)
-        related_content = _find_related_content(course, ders_icerikleri)
+        related_hw = _find_related_homework(display_course, date_str, hw_rows)
+        related_content = _find_related_content(display_course, ders_icerikleri)
 
-        # AI content map
-        map_key = f"{course}|{title}|{date_str[:10] if date_str else ''}"
+        # AI content map: try the legacy key first (existing
+        # exam_content_map.json entries were written before this fix and
+        # must not be orphaned), then the resolved course.
+        date10 = date_str[:10] if date_str else ""
         ai_summary = None
-        map_entry = content_map.get(map_key)
+        map_entry = content_map.get(f"{course}|{title}|{date10}")
+        if map_entry is None and display_course != course:
+            map_entry = content_map.get(f"{display_course}|{title}|{date10}")
         if isinstance(map_entry, dict):
             ai_summary = map_entry.get("summary")
 
@@ -2032,19 +2186,21 @@ def _sinav_listesi(data, now=None):
                     study_guide = ev.get("note")
                     break
 
+        # The id hashes the legacy course — see the "Critical constraint"
+        # note in the 2026-09-28 sınav-ders plan: it must not move.
         exam_id = hashlib.md5(f"{course}|{title}|{_kimlik_zamani(date_str)}".encode()).hexdigest()[:12]
 
         if exam_number:
-            seen_course_nums.add((course, str(exam_number)))
+            seen_course_nums.add((display_course, str(exam_number)))
 
         exams_list.append({
             "id": exam_id,
-            "course": course,
+            "course": display_course,
             "title": _clean_exam_title(
-                course, exam_number, title),
+                display_course, exam_number, title),
             "rawTitle": title,
-            "courseColor": _course_color(course),
-            "courseFamily": subject_themes.family_of(course),
+            "courseColor": _course_color(display_course),
+            "courseFamily": subject_themes.family_of(display_course),
             "examNumber": exam_number,
             "date": _portal_yerel(date_str) or None,
             "endDate": _portal_yerel(evt.get("end")) or None,
@@ -2161,7 +2317,15 @@ def health():
 @app.route("/api/assistant/chat", methods=["POST"])
 @require_auth
 def assistant_chat():
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, dict):
+        # Final-fix item P8a: a list or bare string body must be refused
+        # before anything else reads it — payload.get(...) on either raises
+        # AttributeError, which the generic handler would otherwise turn
+        # into an unrelated 500.
+        return jsonify({"error": "Geçersiz istek gövdesi."}), 400
     messages = payload.get("messages", [])
     if not isinstance(messages, list):
         return jsonify({"error": "messages list olmalı"}), 400
@@ -2169,6 +2333,10 @@ def assistant_chat():
     context_filters = payload.get("context_filters", {})
     if not isinstance(context_filters, dict):
         return jsonify({"error": "context_filters dict olmalı"}), 400
+
+    ogretmen, hata = _istek_ogretmeni(payload)
+    if hata is not None:
+        return hata
 
     session_id = str(payload.get("session_id", "")).strip()
     temperature = payload.get("temperature", 0.2)
@@ -2186,6 +2354,7 @@ def assistant_chat():
             temperature=temperature,
             ilerleme_izni=_assistant_progress_allowed(),
             okur=_assistant_okur(),
+            ogretmen=ogretmen,
         )
         return jsonify(out)
     except AssistantUnavailableError:
@@ -2201,7 +2370,16 @@ def assistant_stream():
     if access is not None:
         return access
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if data is None:
+        data = {}
+    if not isinstance(data, dict):
+        # Final-fix item P8a: same as /chat — refused before the stream opens.
+        return jsonify({"error": "Geçersiz istek gövdesi."}), 400
+    # Before the stream opens: an unknown teacher is a 400, not an SSE error.
+    ogretmen, hata = _istek_ogretmeni(data)
+    if hata is not None:
+        return hata
     messages = data.get("messages") or []
     session_id = str(data.get("session_id", ""))
     force_deep = bool(data.get("force_deep", False))
@@ -2215,7 +2393,7 @@ def assistant_stream():
             runtime = _assistant_runtime()
             for event in runtime.chat_events(
                 messages=messages, session_id=session_id, force_deep=force_deep,
-                ilerleme_izni=ilerleme_izni, okur=okur,
+                ilerleme_izni=ilerleme_izni, okur=okur, ogretmen=ogretmen,
             ):
                 name = event.pop("event")
                 yield f"event: {name}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
@@ -2229,6 +2407,24 @@ def assistant_stream():
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache",
                              "X-Accel-Buffering": "no"})
+
+
+@app.route("/api/assistant/ogretmenler")
+@require_auth
+def assistant_ogretmenler():
+    """The teacher selector's list (spec §1 "Seçici ve tema"): id, short name, teacher's name,
+    subject, colour family, greeting and quick prompts for each reader. Genel is not in the
+    list — the page draws it itself — but `varsayilan` names it."""
+    access = _require_assistant_access()
+    if access is not None:
+        return access
+    try:
+        skiller = assistant_skills.varsayilan()
+    except assistant_skills.SkillHatasi as exc:
+        app.logger.error("Assistant subsystem unavailable: %s", exc)
+        return jsonify({"error": "Öğretmen modları şu an yüklenemedi."}), 503
+    return jsonify({"varsayilan": assistant_skills.GENEL,
+                    "ogretmenler": [s.secici_ozeti() for s in skiller.values()]})
 
 
 @app.route("/api/assistant/plan", methods=["POST"])

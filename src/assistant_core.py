@@ -33,7 +33,7 @@ from typing import Any
 
 import requests as http_requests
 
-from src import claude_api
+from src import assistant_skills, claude_api
 from src.hafta_secici import guncel_hafta
 from src.json_utils import atomic_json_dump
 
@@ -342,6 +342,9 @@ class ToolLoopResult:
     # Summed over every request of one answer: input, output, cache reads and
     # writes. Cost was never logged under Gemini; this is what makes it visible.
     usage: dict[str, int] = field(default_factory=dict)
+    # Reader-stream events tools left behind (ToolOutcome.olay), in call order:
+    # mod_oner's mode_suggestion. /chat, which has no stream, reads them here.
+    olaylar: list[dict[str, Any]] = field(default_factory=list)
 
 
 class ClaudeClient:
@@ -393,15 +396,19 @@ class ClaudeClient:
         return self._client
 
     @staticmethod
-    def _split(messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
-        """System text apart; turns as the Messages API wants them.
+    def _split(messages: list[dict[str, Any]]) -> tuple[list[str], list[dict[str, Any]]]:
+        """System blocks apart, one per system message; turns as the Messages API wants them.
 
         The API rejects a conversation that opens on the assistant and any
         empty text block. The runtime keeps the last three turns of history,
         which can start mid-dialogue, so leading assistant turns are dropped.
+
+        One block per system message, not one joined text: a teacher mode adds
+        its own block after the base prompt, and each is cached on its own
+        (spec §1 "Modele bağlama").
         """
-        system = "\n".join(str(m.get("content", "")) for m in messages
-                           if m.get("role") == "system" and m.get("content"))
+        system = [str(m.get("content", "")) for m in messages
+                  if m.get("role") == "system" and str(m.get("content", "")).strip()]
         turns: list[dict[str, Any]] = []
         for m in messages:
             role = m.get("role", "user")
@@ -416,7 +423,7 @@ class ClaudeClient:
             turns.append({"role": role, "content": content})
         return system, turns
 
-    def _request(self, system: str, turns: list[dict[str, Any]], tier: str,
+    def _request(self, system: str | list[str], turns: list[dict[str, Any]], tier: str,
                  usage: dict[str, int], tools: list[dict[str, Any]] | None = None,
                  tool_choice: dict[str, Any] | None = None,
                  on_delta: Callable[[str], None] | None = None) -> Any:
@@ -427,12 +434,15 @@ class ClaudeClient:
             "thinking": {"type": "adaptive"},
             "output_config": {"effort": self.EFFORT.get(tier, "medium")},
         }
-        if system:
-            # Render order is tools -> system -> messages, so one breakpoint on
-            # the system block caches the tool list and the prompt together:
-            # every round of a tool loop re-sends exactly that prefix.
-            params["system"] = [{"type": "text", "text": system,
-                                 "cache_control": {"type": "ephemeral"}}]
+        bloklar = [b for b in ([system] if isinstance(system, str) else system) if b]
+        if bloklar:
+            # Render order is tools -> system -> messages, so a breakpoint on
+            # the system blocks caches the tool list and the prompt together:
+            # every round of a tool loop re-sends exactly that prefix. One
+            # breakpoint per block: the base prompt (byte-identical in every
+            # mode) and, in a teacher mode, that teacher's block after it.
+            params["system"] = [{"type": "text", "text": b,
+                                 "cache_control": {"type": "ephemeral"}} for b in bloklar]
         if tools:
             params["tools"] = tools
         if tool_choice:
@@ -496,7 +506,7 @@ class ClaudeClient:
         words to answer from what it has, because withdrawing the tools alone
         was measured to produce a thinking block and no text.
         """
-        from src.assistant_tools import ToolOutcome
+        from src.assistant_tools import OLAY_ARACLARI, ToolOutcome
 
         if not self.available:
             raise RuntimeError("anthropic_no_api_key")
@@ -514,15 +524,53 @@ class ClaudeClient:
                                                 on_delta=on_delta))
             return out
 
+        kept_text = ""  # text an earlier event-only round wrote, carried into the final answer
         for _round in range(max_rounds):
+            round_on_delta = on_delta
+            if on_delta is not None and kept_text:
+                # This round continues text a round already put on the stream
+                # (kept_text is non-empty going in) — `_birlestir` puts a
+                # blank line between kept_text and what follows in the final
+                # joined answer, but the stream itself had no such break
+                # before this: the draft ran the two straight together
+                # ("…bakayım.Oran…"). Backend-only, cosmetic (review round 3,
+                # finding 4): one leading "\n\n" delta before this round's
+                # first non-empty chunk, so the draft matches the final text.
+                round_on_delta = self._ayracli_delta(on_delta)
             resp = self._request(system, turns, tier, out.usage, tools=tools,
-                                 on_delta=on_delta)
+                                 on_delta=round_on_delta)
             uses = [b for b in (resp.content or []) if getattr(b, "type", "") == "tool_use"]
+            round_text = self._text(resp)
             if not uses:
-                out.text = self._text(resp)
+                out.text = self._birlestir(kept_text, round_text)
                 return out
-            if on_reset is not None and self._text(resp):
-                on_reset()
+            # A round whose only tool calls are event-only (mod_oner) may carry
+            # real answer text: the prompt now invites the model to call
+            # mod_oner "ilk içerik aracınla birlikte ya da tam cevapla
+            # birlikte", so a bare lead-in ("Önce müfredata bakayım.") is
+            # expected too, not just a finished answer. Either way this text is
+            # kept rather than thrown away by on_reset, and the loop keeps
+            # going so a lead-in gets its follow-up round (review round 2,
+            # finding NB1) — a genuinely complete answer simply gets an empty
+            # follow-up round merged onto it, unchanged.
+            son_tur = bool(round_text) and all(
+                getattr(use, "name", "") in OLAY_ARACLARI for use in uses)
+            if son_tur:
+                kept_text = self._birlestir(kept_text, round_text)
+            elif round_text:
+                # A real tool call reasserts ordinary reset semantics for THIS
+                # round's text; any text kept from an earlier event-only round
+                # is discarded with it rather than left as an unlabelled prefix
+                # ahead of a retry the model may frame completely differently
+                # — the simpler of the two correct options the review offered
+                # (see the fix report). Cleared whether or not on_reset is
+                # given: /chat and /v1 pass on_reset=None (nothing to stream a
+                # reset to), but kept_text must still be dropped there too, or
+                # those endpoints answer differently from /stream (review
+                # round 3, finding 2).
+                if on_reset is not None:
+                    on_reset()
+                kept_text = ""
 
             # Back exactly as received: thinking blocks are signed and must not
             # be edited, and the tool_result ids must match these tool_use ids.
@@ -559,7 +607,31 @@ class ClaudeClient:
                         error=f"Model geçersiz argüman gönderdi (sözlük bekleniyor): {raw!r}")
 
                 out.tool_calls.append({"name": use.name, "ms": elapsed, "ok": bool(outcome.ok)})
-                if outcome.ok:
+                if outcome.ok and outcome.olay and not any(
+                        o.get("event") == outcome.olay.get("event") for o in out.olaylar):
+                    # First suggestion wins: a model that calls mod_oner twice in
+                    # one answer (it is told not to, but nothing enforced it)
+                    # must not leave two competing "geçelim mi?" buttons behind.
+                    out.olaylar.append(dict(outcome.olay))
+                if son_tur:
+                    if outcome.ok:
+                        # The model already knows mod_oner ran (it just called
+                        # it); what it needs is confirmation that this round's
+                        # own text already reached the reader, so it neither
+                        # repeats itself nor stalls waiting for a "result" to
+                        # react to.
+                        body = f"Öneri iletildi. {self.MOD_ONER_TUR_NOTU}"
+                    else:
+                        # mod_oner itself failed (a bad ogretmen argument, say)
+                        # but the round's text was kept regardless — it was
+                        # already added to kept_text before this dispatch loop
+                        # ran, unconditionally on son_tur, not on the call
+                        # succeeding. Without this the model saw only "HATA:
+                        # …" and, not knowing its text had already been shown,
+                        # repeated it while retrying the call (review round 3,
+                        # finding 3).
+                        body = f"HATA: {outcome.error}\n\n{self.MOD_ONER_TUR_NOTU}"
+                elif outcome.ok:
                     first = len(out.citations) + 1
                     out.citations.extend(outcome.citations)
                     # The numbers the model sees and the ones
@@ -582,19 +654,45 @@ class ClaudeClient:
 
             if out.budget_exhausted or len(out.tool_calls) >= max_calls \
                     or _round == max_rounds - 1:
+                if son_tur:
+                    # The round that just hit a budget boundary (the last
+                    # round, or a mod_oner call that itself reached max_calls)
+                    # was event-only-with-text — kept_text already holds a
+                    # complete answer. Sending SON_TUR_NOTU on top of the
+                    # tool_result's own MOD_ONER_TUR_NOTU asked the model to
+                    # both "say nothing, your text was shown" and "answer now"
+                    # in the same turn, producing a duplicated or wasted
+                    # re-ask. There is nothing left to ask for: return the
+                    # kept text directly, with no further request, and do not
+                    # count a complete answer as exhausted unless a call was
+                    # genuinely dropped this round (out.budget_exhausted was
+                    # already set True by the max_calls skip above, if so;
+                    # review round 3, finding 1).
+                    out.text = kept_text
+                    return out
                 out.budget_exhausted = True
                 # After the tool results, in the same user turn: the API wants
                 # every tool_result first.
                 results.append({"type": "text", "text": self.SON_TUR_NOTU})
                 out.text = ""
+                # P7b: this re-ask continues kept_text from an earlier
+                # event-only round exactly as an ordinary round does — the
+                # same "\n\n" separator wrapping applies, or the streamed
+                # draft glues the continuation onto kept_text with no break
+                # while the final joined text (_birlestir, below) has one.
+                son_tur_on_delta = on_delta
+                if on_delta is not None and kept_text:
+                    son_tur_on_delta = self._ayracli_delta(on_delta)
                 for _ in range(2):
                     final = self._request(system, turns, tier, out.usage, tools=tools,
-                                          tool_choice={"type": "none"}, on_delta=on_delta)
+                                          tool_choice={"type": "none"}, on_delta=son_tur_on_delta)
                     out.text = self._text(final)
                     if out.text:
                         break
+                out.text = self._birlestir(kept_text, out.text)
                 return out
 
+        out.text = self._birlestir(kept_text, out.text)
         return out
 
     # A tool_result carries at most this many images, and none whose base64
@@ -663,6 +761,62 @@ class ClaudeClient:
 
     SON_TUR_NOTU = ("Araç bütçesi doldu; yeni araç çağıramazsın. Topladığın sonuçlarla "
                     "cevabı şimdi yaz. Bulamadığın bir şey varsa bulunamadığını açıkça söyle.")
+
+    # Told to the model in the tool_result of an event-only round (mod_oner):
+    # its lead-in or answer already reached the reader (chat_with_tools kept
+    # it rather than resetting it), so it should continue from there instead
+    # of repeating itself or waiting for a "result" that has nothing to add.
+    # Split in two (final-fix item P7a): "Öneri iletildi." is true only when
+    # mod_oner itself succeeded — a FAILED call must not claim the suggestion
+    # reached the reader, only that the round's own text did.
+    MOD_ONER_TUR_NOTU = ("Bu turda yazdığın metin okura gösterildi; tekrarlama. "
+                        "Cevabın tamamsa hiçbir şey yazma; eksikse kaldığın yerden devam et.")
+
+    @staticmethod
+    def _birlestir(onceki: str, sonraki: str) -> str:
+        """Join two answer fragments with a blank line; either may be empty.
+
+        Carries a lead-in an event-only round wrote (mod_oner) into the final
+        answer instead of losing it — the reader already saw it stream in, so
+        it becomes the start of the answer, not a discarded draft (review
+        round 2, finding NB1).
+        """
+        onceki, sonraki = onceki.strip(), sonraki.strip()
+        if not onceki:
+            return sonraki
+        if not sonraki:
+            return onceki
+        return f"{onceki}\n\n{sonraki}"
+
+    @staticmethod
+    def _ayracli_delta(on_delta: Callable[[str], None]) -> Callable[[str], None]:
+        """Wrap on_delta so the round's first non-empty chunk is preceded by
+        one "\n\n" delta — used only for a round that continues kept_text, so
+        the streamed draft gets the same blank-line break `_birlestir` puts in
+        the final joined answer (review round 3, finding 4; backend-only, the
+        UI is unchanged).
+
+        A whitespace-only chunk before the first real content is dropped
+        outright (not forwarded) rather than becoming visible text stuck
+        right after the separator, and that first real chunk is itself
+        lstripped — otherwise a model that streams a leading space ("Oran"
+        arriving as " " then "Oran…") would leave a visible gap ("\n\n
+        Oran…") that `_birlestir`'s equivalent join never has, since
+        `_birlestir` strips both fragments before joining them (final-fix
+        item P7c)."""
+        yazildi = False
+
+        def sarici(parca: str) -> None:
+            nonlocal yazildi
+            if not yazildi:
+                if not parca.strip():
+                    return  # whitespace-only chunk before real content: dropped
+                on_delta("\n\n")
+                yazildi = True
+                on_delta(parca.lstrip())
+                return
+            on_delta(parca)
+        return sarici
 
 
 HybridChatRouter = None  # Removed — Gemini-only
@@ -1940,7 +2094,14 @@ class AssistantRuntime:
                  sebit_kaynagi: Callable[[], Any] | None = None,
                  platform_kaynagi: Callable[[], Any] | None = None,
                  kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
-                 video_kaynagi: Callable[[], Any] | None = None):
+                 video_kaynagi: Callable[[], Any] | None = None,
+                 skills: dict[str, Any] | None = None):
+        # First, before anything else is built: a broken teacher skill stops the
+        # assistant from opening at all (spec "Hata ve boşluk durumları"), with
+        # the skill and the reason in the error — never a silent fallback.
+        # `skills` lets tests bring their own; production reads the repo's.
+        self.skills: dict[str, Any] = (assistant_skills.varsayilan() if skills is None
+                                       else dict(skills))
         self.config = AssistantConfig.from_project_root(
             project_root)
         self.llm = ClaudeClient()
@@ -1987,7 +2148,8 @@ class AssistantRuntime:
                                        platform_kaynagi=platform_kaynagi,
                                        kitap_kaynagi=kitap_kaynagi,
                                        video_kaynagi=video_kaynagi,
-                                       aile_kaynak_arama=self._aile_search)
+                                       aile_kaynak_arama=self._aile_search,
+                                       skills=self.skills)
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """The retriever, shaped as a tool the model can choose to call."""
@@ -2068,7 +2230,18 @@ class AssistantRuntime:
         "çağır; cevabı ikisini birleştirerek kur.\n"
         "- 'İkisini karıştırma' burada kaynakların karışmaması demektir, "
         "aracın tekliği değil: Işık'ın notunu müfredattan, kazanımı yerel "
-        "dosyadan çıkarma.\n\n"
+        "dosyadan çıkarma.\n"
+        "- Araç listende `mod_oner` varsa ve soru açıkça Türkçe, Fen Bilimleri, Sosyal "
+        "Bilgiler ya da Matematik dersinde bir konuyu, kavramı ya da soru çözmeyi öğrenmekle "
+        "ilgiliyse `mod_oner`'i ilk içerik aracınla birlikte ya da tam cevapla birlikte çağır; "
+        "yalnız `mod_oner` çağırdığın bir turda yazdığın metin cevabın başı olarak okura "
+        "gösterilir. Soruyu eksiksiz cevapla: o dersin öğretmeni ve okura gösterilecek tek kısa "
+        "gerekçe. Ödev listesi, sınav tarihi, ders programı gibi sorular bir ders adı taşısa da "
+        "konu öğrenmek değildir; onlarda çağırma. Öneriyi cevap metninde tekrar etme; okur onu "
+        "ayrı bir düğme olarak görür.\n"
+        "- Bu istemden sonra ikinci bir sistem bölümü olarak 'Öğretmen modu' geliyorsa o dersin "
+        "öğretmenisin: o bölüme uy. Bu istemin Hitap, Uydurma yasağı, Atıf ve Biçim kuralları "
+        "orada da geçerlidir; o bölüm açıkça bir istisna koymadıkça.\n\n"
 
         "## Uydurma yasağı\n"
         "- Kazanım kodu, ders kitabı adı ve sayfa numarası YALNIZ araç "
@@ -2205,6 +2378,8 @@ class AssistantRuntime:
         on_delta: Callable[[str], None] | None = None,
         on_reset: Callable[[], None] | None = None,
         okur: str = "bilinmiyor",
+        ogretmen: str = assistant_skills.GENEL,
+        mod_onerisi: bool = True,
     ) -> dict[str, Any]:
         # `dispatch`, if given, replaces self.registry.dispatch for this
         # call only. chat_events() (below) uses this to wrap tool calls
@@ -2214,6 +2389,9 @@ class AssistantRuntime:
         # Passing the wrapper in as an argument keeps each call's
         # narration local to its own stack frame instead of racing
         # another call's over one shared attribute.
+        if ogretmen != assistant_skills.GENEL and ogretmen not in self.skills:
+            # The API answers 400 before this; reaching here is a caller's bug.
+            raise ValueError(f"bilinmeyen öğretmen: {ogretmen}")
         start = time.perf_counter()
 
         user_query = self._latest_user_message(messages)
@@ -2225,7 +2403,7 @@ class AssistantRuntime:
             safety_flags.append("warning:stale_context")
 
         convo = self._build_conversation(messages, user_query, intent, safety_flags,
-                                         okur=okur)
+                                         okur=okur, ogretmen=ogretmen)
 
         try:
             # `temperature` stays in chat()'s signature for /v1 callers but is
@@ -2234,11 +2412,16 @@ class AssistantRuntime:
                 messages=convo,
                 # aile_kaynak_ara (Görev 5) is declared only for okur == "aile" —
                 # the reader decides the tool list, not a per-call opt-in.
-                declarations=self.registry.declarations(okur),
+                # The teacher decides the rest: mod_oner in genel, skill_kaynagi in a
+                # teacher mode (B1). mod_onerisi=False (/v1, /plan) withholds
+                # mod_oner even in genel — those endpoints have no switch button.
+                declarations=self.registry.declarations(
+                    okur, ogretmen=ogretmen, mod_onerisi=mod_onerisi),
                 # Module progress enters the model context only for a signed-in person (plan K-S6);
                 # the caller decides, and only an exact True counts.
                 dispatch=dispatch or functools.partial(
-                    self.registry.dispatch, ilerleme_izni=ilerleme_izni is True, okur=okur),
+                    self.registry.dispatch, ilerleme_izni=ilerleme_izni is True, okur=okur,
+                    ogretmen=ogretmen, mod_onerisi=mod_onerisi),
                 tier=tier,
                 on_delta=on_delta,
                 on_reset=on_reset,
@@ -2285,11 +2468,17 @@ class AssistantRuntime:
             "plan_blocks": [],
             "intent": intent,
             "session_id": session_id,
+            # The last switch suggestion mod_oner made, without its event name;
+            # the stream also sends it as it happens. None when there was none.
+            "mode_suggestion": next(
+                ({k: v for k, v in o.items() if k != "event"} for o in reversed(loop.olaylar)
+                 if o.get("event") == "mode_suggestion"), None),
             "meta": {
                 "model": self.llm.last_model_used or self.llm.model,
                 "provider": "anthropic",
                 "usage": dict(loop.usage),
                 "tier": tier,
+                "ogretmen": ogretmen,
                 "tool_calls": loop.tool_calls,
                 "dropped_citations": dropped,
                 "degraded": self.registry.degraded(),
@@ -2302,7 +2491,8 @@ class AssistantRuntime:
 
         self._write_metric({
             "type": "chat", "session_id": session_id, "intent": intent,
-            "tier": tier, "latency_ms": latency_ms, "citations": len(citations),
+            "tier": tier, "ogretmen": ogretmen, "latency_ms": latency_ms,
+            "citations": len(citations),
             "tool_calls": len(loop.tool_calls),
             "model": payload["meta"]["model"],
             "usage": dict(loop.usage),
@@ -2352,7 +2542,16 @@ class AssistantRuntime:
         # Read once, per call — never assigned back onto the registry.
         real_dispatch = functools.partial(
             self.registry.dispatch, ilerleme_izni=kwargs.get("ilerleme_izni") is True,
-            okur=kwargs.get("okur", "bilinmiyor"))
+            okur=kwargs.get("okur", "bilinmiyor"),
+            ogretmen=kwargs.get("ogretmen", assistant_skills.GENEL),
+            mod_onerisi=kwargs.get("mod_onerisi", True))
+
+        # First suggestion wins here too (review round 2, finding NB2): without
+        # this, a model calling mod_oner twice in one answer put two
+        # mode_suggestion events on the SSE stream, while chat()'s own payload
+        # (deduped in chat_with_tools) carried only one — the stream and the
+        # final /chat-shaped payload must agree.
+        yayinlanan_olaylar: set[str] = set()
 
         def announcing(name: str, args: dict[str, Any]) -> Any:
             if cancelled.is_set():
@@ -2361,6 +2560,12 @@ class AssistantRuntime:
             outcome = real_dispatch(name, args)
             events.put({"event": "tool_end", "name": name,
                         "ok": bool(outcome.ok)})
+            if outcome.ok and outcome.olay:
+                ad = outcome.olay.get("event")
+                if ad not in yayinlanan_olaylar:
+                    # mod_oner's suggestion reaches the reader as it happens.
+                    yayinlanan_olaylar.add(ad)
+                    events.put(dict(outcome.olay))
             if cancelled.is_set():
                 raise _StreamAbandoned()
             return outcome
@@ -2423,6 +2628,7 @@ class AssistantRuntime:
         intent: str,
         safety_flags: list[str],
         okur: str = "bilinmiyor",
+        ogretmen: str = assistant_skills.GENEL,
     ) -> list[dict[str, str]]:
         """System prompt plus recent turns.
 
@@ -2434,10 +2640,18 @@ class AssistantRuntime:
         block is cached, and a clock in it would miss the cache every minute.
         """
         from src.assistant_tools import bugun_satiri
+        sistem = [{"role": "system", "content": self._system_prompt()}]
+        skill = self.skills.get(ogretmen)
+        if skill is not None:
+            # A second block after the base prompt, which stays byte-identical
+            # in every mode (spec §1 "Modele bağlama").
+            sistem.append({"role": "system", "content": skill.sistem_blogu()})
         return [
-            {"role": "system", "content": self._system_prompt()},
+            *sistem,
             *[
-                {"role": str(m.get("role", "user")),
+                # Only "assistant" stays itself. A client-sent "system" turn
+                # must never become a system block of ours.
+                {"role": "assistant" if m.get("role") == "assistant" else "user",
                  "content": str(m.get("content", ""))[:2000]}
                 for m in messages[-3:] if isinstance(m, dict)
             ],
@@ -2489,6 +2703,7 @@ class AssistantRuntime:
             force_deep=True,
             ilerleme_izni=ilerleme_izni,
             okur=okur,
+            mod_onerisi=False,  # /plan has no switch button (spec: B1 is /stream and /chat only)
         )
         out["intent"] = "study_plan"
         out["plan_blocks"] = self._build_rule_based_plan(
@@ -2535,6 +2750,7 @@ class AssistantRuntime:
                 session_id=session_id,
                 context_filters=context_filters,
                 temperature=temperature,
+                mod_onerisi=False,  # /v1 is an API-key client: no switch button either
             )
 
         answer = out.get("answer", "")
@@ -2935,6 +3151,14 @@ class AssistantRuntime:
 
 
 def perform_incremental_reindex(project_root: str | os.PathLike[str]) -> dict[str, Any]:
-    """Convenience function for sync pipeline hooks."""
-    runtime = AssistantRuntime(project_root)
+    """Convenience function for sync pipeline hooks.
+
+    `skills={}` on purpose (review round 2, finding 4): reindexing the BM25
+    file index needs no teacher skill loaded, and this is cron's own path —
+    a broken SKILL.md must not freeze every sync's index refresh until
+    someone notices and fixes the skill file. The dashboard's own runtime
+    (`_assistant_runtime` in dashboard_api.py) is unaffected and still loads
+    the real skills, so a broken one still blocks the chat surface itself.
+    """
+    runtime = AssistantRuntime(project_root, skills={})
     return runtime.reindex(incremental=True)

@@ -19,7 +19,13 @@ def main():
     parser.add_argument("--full", action="store_true", help="full rebuild instead of incremental")
     args = parser.parse_args()
 
-    runtime = AssistantRuntime(PROJECT_ROOT)
+    # skills={} on purpose (final-fix item 5, mirrors perform_incremental_reindex
+    # in assistant_core.py): reindexing the BM25 file index needs no teacher
+    # skill loaded, and this is cron's own path — a broken SKILL.md must not
+    # freeze every sync's index refresh. The dashboard's own runtime
+    # (_assistant_runtime in dashboard_api.py) is unaffected and still loads
+    # the real skills, so a broken one still blocks the chat surface itself.
+    runtime = AssistantRuntime(PROJECT_ROOT, skills={})
     stats = runtime.reindex(incremental=not args.full)
     summary_keys = (
         "incremental",

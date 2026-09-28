@@ -161,6 +161,13 @@
 .ac-msg__body {
   padding: spacing.$spacing-04 spacing.$spacing-04;
   border-radius: 12px;
+  // Flex items default to `min-width: auto`, which resolves to a
+  // descendant's own explicit-width contribution rather than shrinking to
+  // fit the row — Carbon's Button sets `inline-size: max-content` (capped at
+  // 320px), and that dragged this whole bubble wider than the message row
+  // at a phone width, silently clipped by .ac__chat's `overflow: hidden`
+  // (final-fix item 6, round 2: page-level scrollWidth cannot see this).
+  min-width: 0;
 }
 
 // Carbon's AI surface language, not an imitation of it. Values come from the
@@ -768,4 +775,162 @@
   @include type.type-style('body-compact-01');
   margin: spacing.$spacing-02 0 0;
   color: theme.$text-secondary;
+}
+
+// ─── Öğretmen seçici ve modu (B1) ────────────────────────────────────────────
+// Genel · Türkçe · Fen · Sosyal · Matematik as radio chips. A chip's colour is
+// its own subject's (the family class on its label, theme/_subjects.scss); the
+// chosen one fills with that accent and carries a checkmark, so "chosen" is
+// never colour alone (İ8).
+.ac__ogretmen {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ac__ogretmen-baslik {
+  @include type.type-style('label-01');
+  padding: 0;
+  color: var(--ted-color-text-helper);
+}
+
+.ac__ogretmen-secenekler {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ted-space-xs);
+}
+
+.ac__ogretmen-secenek {
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.ac__ogretmen-cip {
+  @include type.type-style('body-compact-01');
+  display: inline-flex;
+  align-items: center;
+  gap: spacing.$spacing-03;
+  border: 1px solid var(--ted-color-border-subtle);
+  border-radius: 999px;
+  padding: spacing.$spacing-03 spacing.$spacing-04;
+  background: var(--ted-color-layer);
+  color: var(--ted-color-text-primary);
+}
+
+.ac__ogretmen-isaret {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 2px;
+  background: var(--ted-subject-accent);
+}
+
+.ac__ogretmen-secenek:hover .ac__ogretmen-cip {
+  background: var(--ted-subject-surface-hover, var(--cds-layer-hover-01));
+}
+
+.ac__ogretmen-girdi:focus-visible + .ac__ogretmen-cip {
+  outline: 2px solid var(--cds-focus);
+  outline-offset: 2px;
+}
+
+// Genel, chosen: Carbon's inverse, as a content switcher's selected segment.
+.ac__ogretmen-girdi:checked + .ac__ogretmen-cip {
+  border-color: var(--cds-background-inverse);
+  background: var(--cds-background-inverse);
+  color: var(--cds-text-inverse);
+  font-weight: 600;
+}
+
+// A teacher, chosen: its accent, white text (>= 4.5:1, tests/test_ders_renkleri.py).
+.ac__ogretmen-secenek.ted-subject .ac__ogretmen-girdi:checked + .ac__ogretmen-cip {
+  border-color: var(--ted-subject-accent);
+  background: var(--ted-subject-accent);
+  color: var(--ted-color-text-on-color);
+}
+
+.ac__ogretmen-hata {
+  @include type.type-style('body-compact-01');
+  margin: 0;
+  color: var(--ted-color-text-helper);
+}
+
+// A teacher mode: the send button, the primary quick prompt, the chat panel's
+// edge and the reader's own bubble take the subject's roles. Genel has no
+// family class and none of these rules: it looks as it did.
+.ac[data-ogretmen]:not([data-ogretmen='genel']) {
+  --cds-button-primary: var(--ted-subject-accent);
+  --cds-button-primary-hover: var(--ted-subject-text);
+  --cds-button-primary-active: var(--ted-subject-text);
+}
+
+.ac[data-ogretmen]:not([data-ogretmen='genel']) .ac__chat {
+  border-color: var(--ted-subject-border);
+  border-top: 4px solid var(--ted-subject-accent);
+}
+
+.ac[data-ogretmen]:not([data-ogretmen='genel']) .ac-msg--user .ac-msg__body {
+  background: var(--ted-subject-surface);
+  color: var(--ted-subject-on-surface);
+}
+
+// The asker's name above the bubble: text-helper is 3.8:1 on a -20 surface;
+// the family's on-surface role holds 4.5:1 (tests/test_ders_renkleri.py).
+.ac[data-ogretmen]:not([data-ogretmen='genel']) .ac-msg--user .ac-msg__role {
+  color: var(--ted-subject-on-surface);
+}
+
+.ac[data-ogretmen]:not([data-ogretmen='genel']) .ac-msg__avatar--user {
+  background: var(--ted-subject-accent);
+  color: var(--ted-color-text-on-color);
+}
+
+@media (forced-colors: active) {
+  .ac__ogretmen-girdi:checked + .ac__ogretmen-cip {
+    border-color: Highlight;
+  }
+}
+
+// mod_oner's suggestion under a Genel answer: the suggested subject's edge (İ8),
+// the model's one-sentence reason, and a button. Always visible — not inside
+// .ac-msg__actions, which hides until hover.
+.ac-msg__oneri {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: spacing.$spacing-03;
+  margin-top: spacing.$spacing-04;
+  padding-left: spacing.$spacing-04;
+  border-left: 3px solid var(--ted-subject-accent);
+  // Same overflow as .ac-msg__body above, one level down: a flex-column
+  // child sized by `align-items: flex-start` (not `stretch`) is otherwise
+  // free to size itself past this block's own width.
+  width: 100%;
+  min-width: 0;
+
+  // Carbon's Button sets `inline-size: max-content; max-inline-size: 320px`
+  // (@carbon/styles button mixin) — an explicit width that ignores how much
+  // room is actually available and only yields to a smaller `max-width`.
+  // At a phone width this block has well under 320px to work with, so
+  // without this the button (and the gerekçe text sized to match it, both
+  // measured spilling ~22px past the message bubble) is clipped invisibly by
+  // .ac__chat's `overflow: hidden` — no horizontal page scrollbar appears,
+  // so the page-level scrollWidth check cannot catch it (final-fix item 6,
+  // round 2).
+  .cds--btn {
+    max-width: 100%;
+    min-width: 0;
+  }
+}
+
+.ac-msg__oneri-gerekce {
+  @include type.type-style('body-compact-01');
+  margin: 0;
+  color: var(--ted-color-text-secondary);
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }

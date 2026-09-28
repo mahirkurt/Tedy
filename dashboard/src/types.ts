@@ -229,6 +229,31 @@ export interface AssistantPlanBlock {
   rationale: string
 }
 
+/** One subject teacher from GET /api/assistant/ogretmenler (a skill's front matter). */
+export interface Ogretmen {
+  id: string
+  kisa_ad: string
+  ogretmen_adi: string
+  ders: string
+  renk_ailesi: SubjectFamily
+  karsilama: { ogrenci: string; aile: string }
+  hizli_sorular: { ogrenci: string[]; aile: string[] }
+}
+
+export interface OgretmenListesi {
+  varsayilan: string
+  ogretmenler: Ogretmen[]
+}
+
+/** mod_oner's suggestion: the stream's `mode_suggestion` event, or the answer's field. */
+export interface ModOnerisi {
+  ogretmen: string
+  ogretmen_adi: string
+  soru: string
+  gerekce: string
+  renk_ailesi: SubjectFamily
+}
+
 export interface AssistantResponse {
   answer: string
   citations: AssistantCitation[]
@@ -236,6 +261,8 @@ export interface AssistantResponse {
   plan_blocks: AssistantPlanBlock[]
   intent: string
   session_id: string
+  /** Set when the genel-mode answer suggested a subject teacher (B1). */
+  mode_suggestion?: ModOnerisi | null
   meta: {
     model: string
     retrieval_count?: number
@@ -246,6 +273,7 @@ export interface AssistantResponse {
     dropped_citations?: number
     degraded?: string[]
     budget_exhausted?: boolean
+    ogretmen?: string
   }
 }
 
