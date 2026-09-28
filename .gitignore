@@ -87,3 +87,6 @@ dashboard/test-results/
 dashboard/playwright-report/
 dashboard/.lighthouseci/
 dashboard/paket-analizi.html
+
+# Portal attachment copies, extracted text and sidecars (src/portal_ekleri.py)
+content/portal-ekleri/
