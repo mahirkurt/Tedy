@@ -214,3 +214,49 @@ zorunlu başlık vardır, `renk_ailesi` `subject_themes`'le eşleşir, `referenc
 - Sunucu tarafı konuşma tanıma / metin okuma (ücretli servis).
 - Öğretmenlerin (okul) sisteme erişimi; bu yalnız aile içi bir panodur.
 - Din Kültürü ve İngilizce öğretmen modları (istenmedi; skill düzeni ileride eklemeye açık).
+
+## Ek (2026-09-28, kullanıcı onaylı): bağlam muhafazası ve değerlendirme
+
+Kullanıcı istedi: "asistanın bağlam muhafaza ve değerlendirme yeteneklerini optimize et; skill-öğretmen
+bazlı değerlendirmeleri zenginleştir". Kararlar: bağlam = uzun sohbet + sohbetler arası öğrenci hafızası
++ kaynak seçimi; değerlendirme = Işık'ın çalışmasını değerlendirme + sınav hazırlığı + asistanın kendi
+cevabını denetlemesi. Taranmış PDF OCR'ı C planına eklenir (Claude Haiku 4.5 görüsü, Tesseract yedek,
+aylık tavan 10 USD).
+
+### B3'e eklenenler — bağlam muhafazası
+- **Sohbet özeti**: bir sohbetin turları belirli bir token eşiğini aşınca eski turlar ucuz bir modelle
+  (Haiku 4.5) özetlenir ve `sohbet.ozet`'te saklanır; model her istekte özet + son turları görür. Özet
+  yüklenen ekleri (ad + kimlik), çözülen soruları ve açık kalan işleri korur. Özet mesaj tablosunu
+  silmez; okur tam sohbeti görmeye devam eder.
+- **Öğrenci hafızası**: `ogrenci_notu` tablosu (kısa notlar: zorlandığı konu, tercih ettiği anlatım,
+  hedef; kaynak sohbet, tarih). Model `hafiza_yaz` / `hafiza_duzelt` araçlarıyla yazar; notlar her yeni
+  sohbette kullanıcı turuna (önbelleği bozmadan) kısa bir blok olarak eklenir. Aile notları görür,
+  düzeltir, siler ("Asistanın notları" paneli). Sağlık, aile içi, üçüncü kişi bilgisi gibi hassas içerik
+  yazılmaz: istem kuralı + kodda basit denetim + ailenin görebilmesi.
+- **Kaynak seçimi**: araç sonuçlarında aynı parçaların tekrarı elenir; her aracın bağlamdaki payı
+  sınırlanır; uzun sohbette eski araç gövdeleri özetle değiştirilir; soru aramadan önce sorguya
+  dönüştürülür (ek model çağrısı olmadan, kural tabanlı; gerekirse B6'da ölçülerek genişletilir).
+
+### B4'e eklenenler — değerlendirme ve sınav hazırlığı
+- **Rubrikler**: her öğretmen skill'ine `references/degerlendirme-rubrigi.md` (Maarif ölçme-değerlendirme
+  anlayışı: süreç odaklı, not vermez; ölçütler ve düzey betimleri programın kazanım/süreç bileşeni
+  dilinden). Türkçe: yazma ve okuma-anlama; Matematik: çözüm yolu ve gösterim; Fen: deney tasarımı ve
+  bilimsel açıklama; Sosyal: kaynak ve kanıt kullanımı, neden-sonuç.
+- **`calisma_degerlendir` aracı**: yüklenen çalışmayı (B2 eki) etkin öğretmenin rubriğine göre
+  değerlendirir; yapılandırılmış çıktı: güçlü yanlar, düzeyler, tek bir sonraki adım; öğrenme günlüğüne
+  işlenir. Işık'a dil cesaretlendirici, aileye aynı içerik "siz" hitabıyla.
+- **Sınav hazırlığı**: alıştırmalar kazanım kodu taşır, üç zorluk kademesi; yanlış cevaplar skill'in
+  kavram yanılgısı kataloğuna eşlenir ("yanlış analizi"); `sinavlar` aracındaki yaklaşan sınavın dersine
+  ve konularına göre çalışma planı önerilir.
+
+### B6 (yeni) — cevap denetimi ve değerlendirme seti
+- **Cevap denetimi**: öğretmen modlarında ve uzun cevaplarda son cevap okura gitmeden ucuz bir denetim
+  çağrısından geçer (kaynaklarla tutarlılık, 7. sınıf seviyesi, anlatan öğretmen kuralları, hitap);
+  ciddi sorun varsa cevap bir kez düzeltilir. Akış korunur (taslak akarken denetim sonucu `answer`
+  olayında uygulanır); denetim atlanırsa ya da hata verirse cevap olduğu gibi gider, meta'da işaretlenir.
+- **Değerlendirme seti**: ders başına altın soru seti (beklenen kaynak, beklenen araç, beklenen içerik
+  noktaları); `scripts/asistan_eval.py` ile yalnız elle ve açık onayla koşar (ücretli), sonuçlar
+  `output/asistan_eval/` altında sürümlü kaydedilir; testler asla koşmaz.
+
+### Sıra
+B1 → B2 → B3 (+bağlam) → B4 (+değerlendirme, sınav hazırlığı) → B5 → B6. C paralel; OCR C'nin sonuna.
