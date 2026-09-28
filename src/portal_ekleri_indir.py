@@ -857,6 +857,13 @@ _DOCX_NEDENLERI = {"bozuk": "Word belgesi okunamadı (bozuk dosya)",
                    "sinir": f"Word belgesinin metni {METIN_DOCX_XML_SINIRI // MB} MB sınırından büyük"}
 
 
+class KesikMetin(str):
+    """A text its producer cut at METIN_AZAMI_BAYT. The flag travels with the
+    text, so _metni_hazirla marks the cut whatever the text's length ends up
+    being — measured on 9294c7f, a newline as the one byte past the cap was
+    stripped away and a cut text was stored as if complete."""
+
+
 @dataclass
 class _CikarmaAyari:
     """The settings FileAdapters reads, without building an AssistantConfig
@@ -876,13 +883,13 @@ def _grubu_oldur(surec: subprocess.Popen) -> None:
         pass
 
 
-def _alt_surec_metni(komut: list[str], sure: float) -> tuple[int | None, bytes]:
-    """(exit code, stdout) of `komut`, waited for at most `sure` seconds of
-    wall clock: (None, b"") when time ran out. Stdout is read through a
-    selector against the deadline, not by communicate(), so neither a silent
-    child nor a grandchild holding the pipe open can stretch the wait. Past
-    METIN_AZAMI_BAYT the child is killed and one byte more than the cap is
-    kept, so the caller can tell the text was cut.
+def _alt_surec_metni(komut: list[str], sure: float) -> tuple[int | None, bytes, bool]:
+    """(exit code, stdout, cut) of `komut`, waited for at most `sure` seconds
+    of wall clock: (None, b"", False) when time ran out. Stdout is read
+    through a selector against the deadline, not by communicate(), so neither
+    a silent child nor a grandchild holding the pipe open can stretch the
+    wait. Past METIN_AZAMI_BAYT the child is killed, the first
+    METIN_AZAMI_BAYT bytes are kept and `cut` is True.
 
     The process group is always killed at the end, even after the child
     exited: measured on f29062c (probe A), `sleep 20 & exit 0` left the
@@ -890,7 +897,7 @@ def _alt_surec_metni(komut: list[str], sure: float) -> tuple[int | None, bytes]:
     this process is killed first (cron's `timeout 600` kills run_sync, not
     the session started here) the orphan still ends ceil(sure) + 1 s later."""
     if not (sure > 0):
-        return None, b""
+        return None, b"", False
     son_an = time.monotonic() + sure
     if shutil.which("timeout"):
         komut = ["timeout", "-s", "KILL", str(math.ceil(min(sure, 1e9)) + 1)] + komut
@@ -905,7 +912,7 @@ def _alt_surec_metni(komut: list[str], sure: float) -> tuple[int | None, bytes]:
             while True:
                 kalan = son_an - time.monotonic()
                 if kalan <= 0:
-                    return None, b""
+                    return None, b"", False
                 if not secici.select(min(kalan, threading.TIMEOUT_MAX)):
                     continue
                 blok = os.read(fd, PARCA_BOYUTU)
@@ -914,12 +921,12 @@ def _alt_surec_metni(komut: list[str], sure: float) -> tuple[int | None, bytes]:
                 parcalar.append(blok)
                 toplam += len(blok)
                 if toplam > METIN_AZAMI_BAYT:
-                    return 0, b"".join(parcalar)[:METIN_AZAMI_BAYT + 1]
+                    return 0, b"".join(parcalar)[:METIN_AZAMI_BAYT], True
         try:
             kod = surec.wait(timeout=max(0.0, son_an - time.monotonic()))
         except subprocess.TimeoutExpired:
-            return None, b""
-        return kod, b"".join(parcalar)
+            return None, b"", False
+        return kod, b"".join(parcalar), False
     finally:
         # The group outlives its reaped leader while any member is alive, and
         # Linux does not hand out a pid still in use as a process group id.
@@ -934,12 +941,15 @@ def _pdf_metni(yol: Path, sure: float) -> tuple[str, str]:
     is installed) and, in the plan's version, was given max(5, int(sure))
     seconds — measured 2026-09-28, 0.3 s of budget left became a 5 s wait."""
     try:
-        kod, ham = _alt_surec_metni(["pdftotext", "-layout", os.fspath(yol), "-"], sure)
+        kod, ham, kesildi = _alt_surec_metni(["pdftotext", "-layout", os.fspath(yol), "-"], sure)
     except OSError as exc:
         logger.warning("portal eki metni: pdftotext başlatılamadı (%s)", type(exc).__name__)
         return METIN_HATA, _NEDEN_PDFTOTEXT
     if kod is None:
         return METIN_HATA, _NEDEN_SURE
+    if kesildi:
+        # errors="ignore": the cut may split the last UTF-8 sequence.
+        return METIN_VAR, KesikMetin(ham.decode("utf-8", errors="ignore").strip())
     metin = ham.decode("utf-8", errors="replace")
     if metin.strip():
         return METIN_VAR, metin.strip()
@@ -1074,17 +1084,23 @@ def _is_sirasi(ekler: dict[str, dict[str, Any]], depo: EkDeposu, an: datetime) -
 
 def _ilerlemeyi_denetle(kayit: dict[str, Any], sonuc: Sonuc, onceki: int, alinan: int,
                         depo: EkDeposu) -> Sonuc:
-    """A `bekliyor` that received bytes this run yet left the part file no
-    longer than the last run did has restarted at 0. EK_ILERLEMESIZ_SINIRI
-    such runs in a row make the attachment terminal `cok_buyuk`. A run that
-    received nothing (the budget was gone first) says nothing either way."""
+    """A `bekliyor` that received at least as many bytes this run as the
+    part file already held, yet left it no longer, has restarted at 0 and
+    got nowhere: a stall. EK_ILERLEMESIZ_SINIRI stalls make the attachment
+    terminal `cok_buyuk`. A part that grew resets the count. A run that
+    received less than the part held (a smaller budget, or other files took
+    part of it) says nothing either way: measured on 9294c7f, budgets of
+    2.5, 2.0 and 1.5 MB made a 3 MB file terminal, though it would finish
+    in any run given 3 MB."""
     if sonuc.durum != DURUM_BEKLIYOR:
         kayit.pop("stalled_runs", None)
         return sonuc
-    if alinan <= 0:
+    if onceki > 0 and sonuc.parca_bayt > onceki:
+        kayit.pop("stalled_runs", None)                 # progress
         return sonuc
-    ilerlemedi = onceki > 0 and sonuc.parca_bayt <= onceki
-    sayi = _tamsayi(kayit.get("stalled_runs")) + 1 if ilerlemedi else 0
+    if onceki <= 0 or alinan < onceki:
+        return sonuc
+    sayi = _tamsayi(kayit.get("stalled_runs")) + 1
     if sayi < EK_ILERLEMESIZ_SINIRI:
         if sayi:
             kayit["stalled_runs"] = sayi
@@ -1160,10 +1176,13 @@ def _metni_hazirla(depo: EkDeposu, kayit: dict[str, Any], butce: Butce,
     if durum == METIN_HATA:
         kayit.update(text=durum, text_chars=0, text_reason=metin)
         atomic_json_dump(meta, os.fspath(depo.meta_yolu(kimlik)))
+        # A .txt left from an earlier copy or an older run would be indexed
+        # and served as this attachment's text; with no text there is none.
+        depo.metin_yolu(kimlik).unlink(missing_ok=True)
         return True
     kayit.pop("text_reason", None)
     ham = metin.encode("utf-8")
-    if len(ham) > METIN_AZAMI_BAYT:
+    if isinstance(metin, KesikMetin) or len(ham) > METIN_AZAMI_BAYT:
         # Never stored as if complete: the .txt says where it stops, the
         # sidecar and the tracker carry the flag.
         metin = ham[:METIN_AZAMI_BAYT].decode("utf-8", errors="ignore").rstrip()
@@ -1219,6 +1238,8 @@ def ekleri_esitle(proje_koku: str | Path, veri: Any, oturum: Any, butce: Butce, 
             if ham.durum == DURUM_BEKLIYOR:
                 break
             if sonuc.durum == DURUM_INDIRILDI:
+                # New bytes: the old <id>.txt describes the previous copy.
+                depo.metin_yolu(kayit["id"]).unlink(missing_ok=True)
                 bu_tur["indirilen"] += 1
                 bu_tur["bayt"] += sonuc.boyut
         if _metin_gerekli(kayit, depo) and not butce.bitti():

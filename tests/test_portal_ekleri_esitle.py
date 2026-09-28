@@ -356,8 +356,9 @@ def test_pdftotext_ciktisi_tavanda_kesilir(tmp_path, monkeypatch):
     bas = time.monotonic()
     durum, metin = metin_cikar(pdf, 30.0)
     assert time.monotonic() - bas < 15.0       # uncapped: the 30 s timeout
-    # One byte past the cap is kept, so _metni_hazirla can tell it was cut.
-    assert durum == "var" and metin.startswith("Bumerang") and 4096 < len(metin.encode()) <= 4097
+    # Cut at the cap, and flagged as cut by the runner, not by its length.
+    assert durum == "var" and metin.startswith("Bumerang") and len(metin.encode()) <= 4096
+    assert isinstance(metin, indir_modulu.KesikMetin)
 
 
 @pytest.mark.parametrize("govde, beklenen", [
@@ -468,7 +469,7 @@ def test_araligi_yok_sayan_buyuk_dosya_kuyrugu_tikamaz(tmp_path):
                          200, PDF, {"Content-Type": "application/octet-stream"})}
     veri = _veri(("a.pdf", SP_URL), ("b.pdf", DRIVE_URL))
     istekler = []
-    for i in range(4):
+    for i in range(5):
         oturum = SahteOturum(oturum_rotasi)
         _esitle(tmp_path, oturum, veri, an=AN + timedelta(minutes=15 * i), butce=_butce(2 * MB))
         istekler.append([x["url"][:30] for x in oturum.istekler])
@@ -477,7 +478,10 @@ def test_araligi_yok_sayan_buyuk_dosya_kuyrugu_tikamaz(tmp_path):
     assert b["status"] == "indirildi"
     assert a["status"] == "cok_buyuk"
     assert a["reason"] == "kaynak sürdürmeyi desteklemiyor ve dosya bir turun bayt bütçesinden büyük"
-    assert istekler[3] == []
+    # run 1: first stall; run 2: b goes first, then a still fetches a full
+    # 2 MB (the budget is spent in 64 KiB blocks, b's few KB round away):
+    # second stall, terminal. Runs 3 and 4 request nothing.
+    assert istekler[3] == [] and istekler[4] == []
     assert not (depo.dizin / ".parca" / f"{a['id']}.part").exists()
 
 
@@ -650,3 +654,73 @@ def test_txt_izinleri_0644(tmp_path):
     _esitle(tmp_path, SahteOturum(_rotalar()), _veri(("a.pdf", SP_URL)))
     depo = EkDeposu(tmp_path)
     assert depo.metin_yolu(ek_kimligi(SP_URL)).stat().st_mode & 0o777 == 0o644
+
+
+# ── Fix round 2 ──────────────────────────────────────────────────────────────
+
+def test_kesilen_metin_bosluktan_sonra_da_isaretlenir(tmp_path, monkeypatch):
+    """Re-review probe (9294c7f): cap 4096, 4096 × 'a', a newline at byte
+    4096, then 1 MB more. The strip removed the one byte past the cap and the
+    cut went unmarked; the runner's own flag decides now."""
+    monkeypatch.setattr(indir_modulu, "METIN_AZAMI_BAYT", 4096)
+    _sahte_pdftotext(tmp_path, monkeypatch,
+                     "head -c 4096 /dev/zero | tr '\\0' a\nprintf '\\n'\n"
+                     "head -c 1000000 /dev/zero | tr '\\0' b\n")
+    kok = tmp_path / "kok"
+    ekleri_esitle(kok, _veri(("a.pdf", SP_URL)), SahteOturum(_rotalar()), _butce(), simdi=lambda: AN)
+    depo = EkDeposu(kok)
+    kayit = depo.kayit(ek_kimligi(SP_URL))
+    metin = depo.metin_yolu(kayit["id"]).read_text(encoding="utf-8")
+    assert kayit["text"] == "var" and kayit["text_truncated"] is True
+    assert depo.meta(kayit["id"])["text_truncated"] is True
+    assert "Metin burada kesildi" in metin and "b" not in metin_govdesi_(metin)
+
+
+def metin_govdesi_(metin):
+    from src.portal_ekleri import metin_govdesi
+    return metin_govdesi(metin).replace("Metin burada kesildi: bu ekin metni", "")
+
+
+def test_kuculen_butce_ilerlemesizlik_sayilmaz(tmp_path):
+    """Re-review probe: a Range-ignoring host with budgets of 2.5, 2.0 and
+    1.5 MB made the file terminal after the third run, though each run
+    simply fetched less. Only a run that fetched at least as much as the
+    part already held, and got no further, is a stall."""
+    govde = PDF + b"0" * (3 * MB)
+    rota = {SP: lambda u, h: SahteYanit(200, govde, {"Content-Type": "application/pdf",
+                                                     "Content-Length": str(len(govde))})}
+    veri = _veri(("a.pdf", SP_URL))
+    for i, mb in enumerate([2.5, 2.0, 1.5]):
+        _esitle(tmp_path, SahteOturum(rota), veri, an=AN + timedelta(minutes=15 * i), butce=_butce(int(mb * MB)))
+    kayit = EkDeposu(tmp_path).kayit(ek_kimligi(SP_URL))
+    assert kayit["status"] == "bekliyor" and not kayit.get("stalled_runs")
+    _esitle(tmp_path, SahteOturum(rota), veri, an=AN + timedelta(hours=1), butce=_butce(10 * MB))
+    assert EkDeposu(tmp_path).kayit(ek_kimligi(SP_URL))["status"] == "indirildi"
+
+
+def test_yeniden_indirilen_ekin_eski_metni_hata_altinda_kalmaz(tmp_path):
+    """A copy downloaded again is new bytes: the old <id>.txt no longer
+    describes it. If its extraction then fails, the index and ek_oku must
+    not keep serving the old text as this attachment's."""
+    veri = _veri(("a.pdf", SP_URL))
+    _esitle(tmp_path, SahteOturum(_rotalar()), veri, cikarici=lambda y, s: ("var", "eski sürümün metni"))
+    depo = EkDeposu(tmp_path)
+    kimlik = ek_kimligi(SP_URL)
+    assert depo.metin_yolu(kimlik).exists()
+    depo.dosya_yolu(depo.kayit(kimlik)).unlink()
+    _esitle(tmp_path, SahteOturum(_rotalar()), veri, an=AN + timedelta(minutes=15),
+            cikarici=lambda y, s: ("hata", "PDF okunamadı (bozuk ya da şifreli)"))
+    assert depo.kayit(kimlik)["text"] == "hata"
+    assert not depo.metin_yolu(kimlik).exists()
+
+
+def test_hata_ile_biten_metin_eski_txtyi_siler(tmp_path):
+    depo = EkDeposu(tmp_path)
+    kimlik = ek_kimligi(SP_URL)
+    depo.dizin.mkdir(parents=True)
+    (depo.dizin / f"{kimlik}.pdf").write_bytes(PDF)
+    depo.metin_yolu(kimlik).write_text("PORTAL EKİ · eski\n\neski metin\n", encoding="utf-8")
+    depo.yaz({kimlik: {"id": kimlik, "status": "indirildi", "file": f"{kimlik}.pdf", "text": "bekliyor",
+                       "text_attempts": 0, "url": SP_URL, "type": "sharepoint"}})
+    _esitle(tmp_path, SahteOturum(_rotalar()), _veri(("a.pdf", SP_URL)), cikarici=lambda y, s: ("hata", "x"))
+    assert depo.kayit(kimlik)["text"] == "hata" and not depo.metin_yolu(kimlik).exists()
