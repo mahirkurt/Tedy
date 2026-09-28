@@ -2,10 +2,10 @@
 
 Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmediğini gösteren bir kontrol sorusu. Bir öğrencinin cevabında yanılgının izini görürsen önce bir gözlem ya da örnek ver; öğrencinin kendi açıklamasıyla çeliştiğini fark etmesine alan bırak, sonra doğrusunu adlandır.
 
-### Uzayda yerçekimi yoktur
+### Uzayda yer çekimi yoktur
 
-**Doğrusu:** Yerçekimi uzayda da vardır; Uluslararası Uzay İstasyonu'nun bulunduğu yükseklikte Dünya'daki değerinin onda dokuzuna yakındır. Astronotlar istasyonla birlikte Dünya'nın çevresinde sürekli serbest düşüş hâlinde olduğu için süzülür.
-**Nasıl düzeltirsin:** Ay'ın Dünya'nın çevresinde neden dolandığını sor: onu tutan kuvvet yerçekimidir. Asansörün aniden aşağı indiği anda hissedilen hafiflikle karşılaştır.
+**Doğrusu:** Yer çekimi uzayda da vardır; Uluslararası Uzay İstasyonu'nun bulunduğu yükseklikte Dünya'daki değerinin onda dokuzuna yakındır. Astronotlar istasyonla birlikte Dünya'nın çevresinde sürekli serbest düşüş hâlinde olduğu için süzülür.
+**Nasıl düzeltirsin:** Ay'ın Dünya'nın çevresinde neden dolandığını sor: onu tutan kuvvet yer çekimidir. Asansörün aniden aşağı indiği anda hissedilen hafiflikle karşılaştır.
 **Kontrol sorusu:** Uzay istasyonundaki bir astronotu Dünya'ya doğru çeken bir kuvvet var mıdır? Hangisidir?
 
 ### Bütün yıldızlar aynıdır ve sonsuza kadar yaşar
@@ -16,27 +16,27 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### Güneş sistemi bir galaksidir, galaksi ile evren aynı şeydir
 
-**Doğrusu:** Güneş sistemi, Samanyolu galaksisindeki milyarlarca yıldızdan birinin, Güneş'in, çevresindeki sistemdir. Evren, Samanyolu dahil bütün galaksileri kapsar.
+**Doğrusu:** Güneş sistemi, Samanyolu galaksisindeki milyarlarca yıldızdan birinin, Güneş'in, çevresindeki sistemdir. Evren, Samanyolu dâhil bütün galaksileri kapsar.
 **Nasıl düzeltirsin:** İç içe halkalar çiz: gezegen → Güneş sistemi → Samanyolu galaksisi → evren. Her halkaya bir örnek yaz.
 **Kontrol sorusu:** Dünya, Samanyolu ve Güneş'i küçükten büyüğe sırala.
 
 ### Kuvvet uyguladıysam iş yapmışımdır
 
 **Doğrusu:** Fiziksel anlamda iş için cisme kuvvet uygulanmalı ve cisim kuvvet doğrultusunda yol almalıdır. Kıpırdamayan bir duvarı itmek yorar ama fiziksel anlamda iş yapılmaz.
-**Nasıl düzeltirsin:** Üç durumu karşılaştır: duvarı itmek (yol yok), çantayı yerden kaldırmak (kuvvet ve yol aynı doğrultuda), çantayı elinde tutarak yatay yürümek (kaldırma kuvveti yukarı, yol yatay).
+**Nasıl düzeltirsin:** Üç durumu karşılaştır: duvarı itmek (yol yok), çantayı yerden kaldırmak (kuvvet ve yol aynı doğrultuda), çantayı elinde tutarak yatay yürümek (elin uyguladığı kuvvet yukarı, yol yatay).
 **Kontrol sorusu:** Elinde kitapla yerinde duran biri kitaba fiziksel anlamda iş yapar mı? Neden?
 
 ### Duran bir cismin enerjisi yoktur
 
-**Doğrusu:** Duran bir cismin kinetik enerjisi yoktur ama potansiyel enerjisi olabilir: yüksekteki bir saksının yer çekimi potansiyel enerjisi, gerilmiş bir lastiğin esneklik potansiyel enerjisi vardır.
+**Doğrusu:** Duran bir cismin kinetik enerjisi yoktur ama potansiyel enerjisi olabilir: yüksekteki bir saksının çekim potansiyel enerjisi, gerilmiş bir lastiğin esneklik potansiyel enerjisi vardır.
 **Nasıl düzeltirsin:** Raftaki topu bırakınca neden hızlandığını sor: hızlanmak için enerji bir yerden gelmelidir.
 **Kontrol sorusu:** Kurulmuş ama henüz bırakılmamış bir oyuncak arabanın hangi enerjisi vardır?
 
 ### Kinetik enerji yalnız hıza bağlıdır
 
-**Doğrusu:** Kinetik enerji hem kütleye hem sürate bağlıdır. Aynı süratle giden bir kamyon, bir bisikletten çok daha fazla kinetik enerjiye sahiptir.
-**Nasıl düzeltirsin:** Aynı süratle yuvarlanan pinpon topu ile bowling topunun bir kutuya çarpmasını karşılaştır.
-**Kontrol sorusu:** Kütleleri farklı iki koşucu aynı süratle koşuyor. Hangisinin kinetik enerjisi büyüktür?
+**Doğrusu:** Kinetik enerji hem kütleye hem hıza bağlıdır: kütle ya da hız arttıkça kinetik enerji de artar. Kütleyle doğru orantılıdır; ama hızla ilişkisi doğrusal değildir — hızdaki küçük bir artış kinetik enerjide daha büyük bir artışa yol açar, bu yüzden "hızla doğru orantılı" deme. Aynı hızla giden bir kamyon, bir bisikletten çok daha fazla kinetik enerjiye sahiptir.
+**Nasıl düzeltirsin:** Aynı hızla yuvarlanan pinpon topu ile bowling topunun bir kutuya çarpmasını karşılaştır.
+**Kontrol sorusu:** Kütleleri farklı iki koşucu aynı hızla koşuyor. Hangisinin kinetik enerjisi büyüktür?
 
 ### Enerji harcanınca yok olur
 
@@ -46,27 +46,27 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### Sindirim midede başlar
 
-**Doğrusu:** Sindirim ağızda başlar: dişler besini parçalar (mekanik sindirim), tükürük nişastanın sindirimini başlatır (kimyasal sindirim). Besinlerin kana emilimi çoğunlukla ince bağırsakta olur.
+**Doğrusu:** Sindirim ağızda başlar: dişler besini parçalar (fiziksel sindirim), tükürük nişastanın sindirimini başlatır (kimyasal sindirim). Besinlerin kana emilimi çoğunlukla ince bağırsakta olur.
 **Nasıl düzeltirsin:** Ekmeği uzun süre çiğneyince tadının neden tatlılaştığını sor.
 **Kontrol sorusu:** Besinlerin kana geçtiği organ hangisidir?
 
-### Atardamarlar temiz kan, toplardamarlar kirli kan taşır
+### Atardamarlar oksijence zengin kan, toplardamarlar oksijen oranı düşük kan taşır
 
-**Doğrusu:** Atardamar kanı kalpten organlara götürür, toplardamar organlardan kalbe getirir. Akciğer atardamarı kalpten akciğerlere kirli kan, akciğer toplardamarı akciğerlerden kalbe temiz kan taşır.
+**Doğrusu:** Atardamar kanı kalpten organlara götürür, toplardamar organlardan kalbe getirir. Akciğer atardamarı kalpten akciğerlere oksijen oranı düşük kan, akciğer toplardamarı akciğerlerden kalbe oksijence zengin kan taşır.
 **Nasıl düzeltirsin:** Damarları kanın yönüne göre adlandır: "kalpten çıkan", "kalbe gelen". Küçük ve büyük kan dolaşımını iki ayrı döngü olarak çiz.
 **Kontrol sorusu:** Akciğer toplardamarı hangi yöne, nasıl bir kan taşır?
 
 ### Akciğerler kendi kendine şişip söner
 
-**Doğrusu:** Akciğerlerin kası yoktur. Soluk alırken diyafram kasılıp aşağı iner, kaburgalar yukarı ve dışarı hareket eder; göğüs boşluğu genişler ve hava akciğerlere dolar.
+**Doğrusu:** Akciğerler kendi kendine genişleyip daralamaz; bunu diyafram ve kaburgalar arası kaslar sağlar. Soluk alırken diyafram kasılıp aşağı iner, kaburgalar yukarı ve dışarı hareket eder; göğüs boşluğu genişler ve hava akciğerlere dolar.
 **Nasıl düzeltirsin:** Elini göğsüne ve karnına koyup derin soluk almayı dene; balon ve şişe modeliyle diyaframın rolünü göster.
 **Kontrol sorusu:** Soluk verirken diyafram nasıl hareket eder?
 
-### Işık bir ortamdan ötekine geçerken her zaman kırılır
+### Ortam değiştiren ışık her zaman kırılır
 
-**Doğrusu:** Işık yüzeye dik gelirse doğrultusunu değiştirmeden geçer. Eğik gelen ışın, ortam değiştirirken sürati değiştiği için kırılır.
-**Nasıl düzeltirsin:** Su dolu bardağa yandan ve tam yukarıdan bakarak içindeki kalemin görünüşünü karşılaştır; ışın çiziminde normali çiz.
-**Kontrol sorusu:** Havadan suya dik gelen bir ışın neden kırılmaz?
+**Doğrusu:** Bir ortamdan ötekine dik (90°) giren ışık ışınları doğrultusunu değiştirmeden geçer; ama hızları değişir. Eğik giren ışın hem hız hem doğrultu değiştirdiği için kırılır; kırılma yalnız eğik gelişte gözle görülür bir yön değişikliği yaratır.
+**Nasıl düzeltirsin:** Bir el fenerinin ışığını önce suya tam dik, sonra eğik tutarak ışın demetini gözlemleyin; her ikisinde de demetin yanına normali çizin. Dik demetin doğrultusu değişmez; eğik demet normale doğru kırılır.
+**Kontrol sorusu:** Havadan suya dik giren bir ışık ışınının doğrultusu ve hızı nasıl değişir?
 
 ### Mercek görüntüyü her zaman büyütür
 
@@ -89,7 +89,7 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 ### Çözünme ile erime aynıdır
 
 **Doğrusu:** Şeker suda çözünür: şeker tanecikleri su tanecikleri arasına dağılır. Erime ise bir katının ısı alarak sıvı hâle geçmesidir (buzun erimesi).
-**Nasıl düzeltirsin:** Çayda kaybolan şekeri ve ocakta eriyen tereyağını karşılaştır: birinde ikinci bir madde var, ötekinde yok.
+**Nasıl düzeltirsin:** Çayda kaybolan şekeri ve oda sıcaklığında kendiliğinden eriyen bir buz küpünü karşılaştır: birinde ikinci bir madde var, ötekinde yok.
 **Kontrol sorusu:** "Tuz suda eridi" cümlesini bilimsel olarak düzelt.
 
 ### Sürtünmeyle elektriklenmede yük yoktan var olur ya da protonlar taşınır
