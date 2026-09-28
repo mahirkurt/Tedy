@@ -583,7 +583,7 @@ def _normalize_weekday_name(value):
     return labels[idx]
 
 
-def _private_lessons_for_week(week_dates):
+def _private_lessons_for_week(week_dates, lessons=None):
     """Expand private lesson configs into concrete events for one week.
 
     `week_dates` is always the seven Monday-to-Sunday dates of one week —
@@ -592,7 +592,10 @@ def _private_lessons_for_week(week_dates):
     Işık's private lessons are on Saturday, so the weekend is part of the
     week, not an opt-in."""
     events = []
-    lessons = _load_private_lessons()
+    # `lessons` lets a caller that expands many weeks (the unified calendar)
+    # read private_lessons.json once instead of once per week.
+    if lessons is None:
+        lessons = _load_private_lessons()
     if not lessons:
         return events
 
@@ -2487,9 +2490,10 @@ def _birlesik_takvim(data):
     # private lessons were generated, so a Saturday lesson that recurs every
     # week (both of Işık's do) vanished the moment the reader stepped
     # forward, even though nothing about the lesson had changed.
+    ozel_dersler = _load_private_lessons()
     for h in range(_TAKVIM_OZEL_DERS_HAFTA):
         gunler = [week_dates[0] + timedelta(days=7 * h + i) for i in range(7)]
-        for pev in _private_lessons_for_week(gunler):
+        for pev in _private_lessons_for_week(gunler, ozel_dersler):
             pev.update(_takvim_rengi(pev.get("course", "")))
             events.append(pev)
 

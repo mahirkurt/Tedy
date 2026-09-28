@@ -295,3 +295,12 @@ def test_notlar_rotasi_sozluk_olmayan_raporu_oldugu_gibi_dondurur(api, monkeypat
     with api.app.test_client() as c:
         yanit = c.get("/api/grades").get_json()
     assert yanit == "invalid"
+
+
+def test_birlesik_takvim_ozel_ders_dosyasini_bir_kez_okur(api, monkeypatch):
+    # Final-fix re-review: nine weeks of private lessons used to read
+    # private_lessons.json nine times per /api/calendar/unified request.
+    okuma = []
+    monkeypatch.setattr(api, "_load_private_lessons", lambda: okuma.append(1) or [])
+    api._birlesik_takvim({})
+    assert len(okuma) == 1
