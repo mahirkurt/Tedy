@@ -7,8 +7,8 @@ Bir konuyu anlattıktan sonra "Sıra sende" alıştırmasını bu kalıplardan b
 **Tür:** coktan_secmeli
 **Ne zaman:** Okuma-anlama kazanımlarında (derin anlam, ana fikir, konu).
 **Nasıl yazılır:** Üç-dört cümlelik kısa bir paragraf ve dört seçenek; biri ana fikir, biri konu, biri yardımcı fikir, biri metinde olmayan bir yargı.
-**Örnek:** "Her gün yarım saat kitap okuyan biri bir yılda onlarca kitap bitirir. Okudukça yeni sözcükler öğrenir, farklı hayatları tanır. Kısacası okumak, insanın dünyasını genişletir." Bu paragrafın ana fikri hangisidir? A) Kitap okumak B) Okumak insanın dünyasını genişletir. C) Kitaplar pahalıdır. D) Okuyan yeni sözcükler öğrenir.
-**Cevap:** B. A konudur, D yardımcı fikirdir, C metinde yoktur.
+**Örnek:** "Her gün yarım saat kitap okuyan biri bir yılda onlarca kitap bitirir. Okudukça yeni sözcükler öğrenir, farklı hayatları tanır. Kısacası okumak, insanın dünyasını genişletir." Bu paragrafın ana fikri hangisidir? A) Kitap okumak B) Düzenli okuma kişinin bakış açısını ve bilgisini genişletir. C) Kitaplar pahalıdır. D) Okuyan yeni sözcükler öğrenir.
+**Cevap:** B. Doğru seçenek metnin son cümlesini birebir kopyalamaz, aynı yargıyı kendi sözcükleriyle anlatır — ana fikir sorusunun cevabı metinden alıntı değil, okurun kendi ifadesi olmalıdır. A konudur, D yardımcı fikirdir, C metinde yoktur.
 
 ### Yazım ve noktalama doğru-yanlış
 
@@ -21,10 +21,10 @@ Bir konuyu anlattıktan sonra "Sıra sende" alıştırmasını bu kalıplardan b
 ### Kısa cevaplı dil yapısı
 
 **Tür:** kisa_cevap
-**Ne zaman:** Dil yapılarında (fiilimsi, ek, özne, yüklem bulma).
-**Nasıl yazılır:** Bir cümle ve tek sözcükle cevaplanacak bir soru; kabul edilen biçimleri düşün (ek kesme işaretiyle ya da işaretsiz).
-**Örnek:** "Koşarak gelen çocuk nefes nefese kalmıştı." cümlesinde "gelen" sözcüğü hangi tür fiilimsidir?
-**Cevap:** Sıfat-fiil (ortaç); "çocuk" ismini niteliyor.
+**Ne zaman:** Dil yapılarında; TYMM programı 7. sınıfta fiilimsiyi türüyle değil işleviyle işler (DYS.DO.7.4/DYS.KY.7.4 zaman işlevi, DYS.DO.7.8/DYS.KY.7.8 durum işlevi) — soru "hangi tür fiilimsi" değil, "eylemle ilgili ne bildiriyor" diye sorulur.
+**Nasıl yazılır:** Bir cümle ve fiilimsiyi işaret edip onun zaman mı yoksa durum mu bildirdiğini soran kısa bir soru.
+**Örnek:** "Koşarak gelen çocuk nefes nefese kalmıştı." cümlesindeki "koşarak" sözü eylemle ilgili ne bildirir: zaman mı, durum mu?
+**Cevap:** Durum bildirir; "gelmek" eyleminin nasıl, hangi biçimde yapıldığını anlatır ("koşarak gelmek").
 
 ### Söz sanatı bulma
 
@@ -40,7 +40,7 @@ Bir konuyu anlattıktan sonra "Sıra sende" alıştırmasını bu kalıplardan b
 **Ne zaman:** Anlatım bozukluğu, özne-yüklem uyumu ve bağlantı ifadeleri kazanımlarında.
 **Nasıl yazılır:** Bozuk bir cümle; öğrenciden sorunu adlandırmasını ve cümleyi düzeltmesini iste.
 **Örnek:** "Öğrenciler bahçede oynuyordu ve ben de onları izledik." cümlesini düzelt.
-**Cevap:** Özne-yüklem uyumu bozuk: "ben" öznesiyle "izledik" uyuşmuyor. Doğrusu: "Öğrenciler bahçede oynuyordu, ben de onları izliyordum."
+**Cevap:** Özne-yüklem uyumu bozuk: "ben" tekil, "izledik" çoğul birinci kişi. En küçük düzeltme, zamanı değiştirmeden kişi ve sayıyı düzeltmektir: "Öğrenciler bahçede oynuyordu, ben de onları izledim." ("Öğrenciler ... oynuyordu" bozuk değildir: çoğul özne insan olsa da tekil yüklem alabilir.)
 
 ### Kısa yazma görevi
 

@@ -46,8 +46,8 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### "Ki" her zaman ayrı yazılır
 
-**Doğrusu:** Bağlaç olan "ki" ayrı yazılır ("Duydum ki okula yeni bir öğretmen gelmiş"). Ek olan "-ki" bitişik yazılır: "-deki" ("evdeki kitap") ya da aitlik bildiren "-ki" ("benimki", "seninki"). Kalıplaşmış bazı sözcükler bitişik yazılır: "belki", "çünkü", "sanki", "oysaki".
-**Nasıl düzeltirsin:** "-ki"yi çıkar ya da yerine "-daki" sorusunu sor; bir yer ya da aitlik bildiriyorsa ektir.
+**Doğrusu:** Ek olan "-ki" sözcüğe yer, zaman ya da aitlik anlamı katar ve bitişik yazılır: "evdeki" (ev+de+ki, bir yer), "yarınki" (yarın+ki, bir zaman), "dünkü" (dün+kü, ünlü uyumuyla), "benimki" (ben+im+ki, bir aitlik). Bağlaç olan "ki" iki cümleyi ya da yargıyı birbirine bağlar ve ayrı yazılır ("Duydum ki okula yeni bir öğretmen gelmiş"). Kalıplaşmış birkaç sözcük bitişik yazılır: "belki", "çünkü", "sanki", "oysaki".
+**Nasıl düzeltirsin:** "-ki"yi çıkarma testiyle değil, anlamıyla ayır: bir yere, zamana ya da "kimin?" sorusuna cevap veren bir aitliğe işaret ediyorsa ektir ve bitişik yaz; iki yargıyı birbirine bağlıyorsa bağlaçtır ve ayrı yaz (çıkarma testi yalnız bağlaç olan "de/da" için geçerlidir, "ki" için kullanılmaz).
 **Kontrol sorusu:** "Masadaki kalem senin mi, yoksa benimki mi?" cümlesinde "ki"ler neden bitişik yazılmıştır?
 
 ### Soru eki "mi" bitişik yazılır
@@ -64,9 +64,15 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### Özne her zaman cümlenin başında, yüklem her zaman sondadır
 
-**Doğrusu:** Kurallı cümlede yüklem sondadır; devrik cümlede yüklem başta ya da ortada olabilir. Özneyi yere göre değil, yükleme "kim, ne" sorusunu sorarak buluruz. Özne ile yüklem kişi ve teklik-çokluk bakımından uyumlu olmalıdır.
+**Doğrusu:** Kurallı cümlede yüklem sondadır; devrik cümlede yüklem başta ya da ortada olabilir. Özneyi yere göre değil, yükleme "kim, ne" sorusunu sorarak buluruz.
 **Nasıl düzeltirsin:** Aynı cümleyi kurallı ve devrik yaz; iki durumda da yükleme soru sorarak özneyi bul.
 **Kontrol sorusu:** "Geldi sonunda beklediğimiz gün" cümlesinin yüklemini ve öznesini bul.
+
+### Özne ile yüklem her zaman sayıca (teklik-çokluk) da aynı olmalıdır
+
+**Doğrusu:** Kişi uyumu kesindir: özne birinci, ikinci ya da üçüncü kişiyse yüklem de o kişiye göre çekimlenir. Teklik-çokluk (sayı) uyumunda kural tek yönlüdür: tekil bir özne çoğul yüklem alamaz ("Öğrenci geldiler" yanlıştır), ama çoğul bir özne tekil yüklem alabilir. İnsan dışı ve topluluk adı olan öznelerde ("Kuşlar uçtu", "Ordu ilerledi") tekil yüklem kuraldır, çoğul yüklem yerine tercih edilir. İnsan olan çoğul öznelerde de tekil yüklem yaygın ve doğrudur ("Öğrenciler bahçede oynuyordu").
+**Nasıl düzeltirsin:** Önce kişiyi kontrol et (özne ile yüklem aynı kişi mi); sonra sayıyı kontrol et — tekil özneye çoğul yüklem asla bağlanmaz, ama çoğul özneye tekil yüklem çoğu zaman doğrudur, özellikle özne insan dışıysa ya da bir topluluk adıysa.
+**Kontrol sorusu:** "Kuşlar gökyüzünde uçtu" ile "Öğrenci sınıfa girdiler" cümlelerinden hangisi doğru, hangisi yanlıştır? Nedenini tekillik-çokluk uyumuyla açıkla.
 
 ### "-yor" eki her zaman şimdiki zamanı bildirir
 

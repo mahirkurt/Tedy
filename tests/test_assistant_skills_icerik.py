@@ -26,7 +26,18 @@ ZORUNLU_ARACLAR = {"kitap_listele", "kitap_sayfa", "mufredat_ara", "figur_ara", 
 YASAK_ARACLAR = {at.MOD_ONER_TOOL, at.AILE_TOOL, "alistirma_olustur", "ogrenme_gunlugu"}
 INGILIZCE = re.compile(r"\b(the|and|of|with|you|your|is|are|this|that|for)\b", re.IGNORECASE)
 SORU_TURLERI = {"coktan_secmeli", "dogru_yanlis", "kisa_cevap", "acik_uclu"}
-SIZ = re.compile(r"(siniz|sınız|sunuz|sünüz|size|sizin|\bsiz\b)")
+# "siz" hitabı: -sInIz çekimi (sorabilirsiniz), "size/sizin/siz", çıplak -(I)nIz (iyelik ya da
+# resmi/çoğul buyurma: "eviniz", "bakınız") ve çıplak çoğul/resmi buyurma "-In/-Un" ("getirin",
+# "bakın"). Son ikisi sık yanlış-pozitif üretir: "-DığIn" (2. tekil şahıs ilgi eki, "yazdığın",
+# her zaman "ğ" ile biter) ve "sen/kendin" ailesi (2. tekil "sen" hitabı, "siz" değil) dışarıda
+# tutulur; "için/onun/bunun/şunun/yakın/uzun/oyun/boyun/soyun" gibi çok sık, hitapla ilgisiz
+# sözcükler de kısa bir istisna listesiyle elenir.
+_SIZ_ISTISNA = "için|onun|bunun|şunun|yakın|uzun|oyun|boyun|soyun|sen\\w*|kendin\\w*"
+SIZ = re.compile(
+    r"(siniz|sınız|sunuz|sünüz|size|sizin|\bsiz\b"
+    rf"|\b\w+(ınız|iniz|unuz|ünüz)\b"
+    rf"|\b(?!(?:{_SIZ_ISTISNA})\b)\w+(?<!ğ)(ın|in|un|ün)\b)"
+)
 BLOK_SINIRI = 12_000
 
 
@@ -67,8 +78,11 @@ def test_b1de_olmayan_ya_da_baska_moda_ait_arac_anilmaz(skiller, ad):
 @pytest.mark.parametrize("ad", DIZINLER)
 def test_ders_akisi_anlatan_ogretmen(skiller, ad):
     bolum = sk.govde_bolumleri(skiller[ad])["Ders akışı"]
-    for baslik in ("### Adım adım", "### Neden böyle?", "### Sıra sende"):
+    basliklar = ("### Adım adım", "### Neden böyle?", "### Sıra sende")
+    for baslik in basliklar:
         assert baslik in bolum
+    konumlar = [bolum.index(baslik) for baslik in basliklar]
+    assert konumlar == sorted(konumlar), "üç başlık bu sırada olmalı: " + " | ".join(basliklar)
 
 
 @pytest.mark.parametrize("ad", DIZINLER)
@@ -133,3 +147,16 @@ def test_metin_turkce(skiller, ad):
     metinler.update({k: s.kaynak_oku(k) for k in s.kaynaklar})
     ingilizce = {dosya: INGILIZCE.findall(m) for dosya, m in metinler.items() if INGILIZCE.search(m)}
     assert ingilizce == {}
+
+
+def test_turkce_unite_haritasi_yanlis_govdeyi_secmez(skiller):
+    """T.Y.7.1'in gerçek kazanım ifadesi 'Yazma sürecini yönetebilme'dir (heading satırı,
+    program s.127); korpustaki 'outcome' satırı iki fıkralı bir açıklama metninin ortasından
+    kesiktir ve 'tartışabilme' ile 'değerlendirebilme' ifadelerini birlikte taşır — harita bu
+    kesik ifadeyi asla seçmemeli (bkz. scripts/skill_unite_haritasi.py'nin heading tercihi ve
+    tests/test_skill_unite_haritasi.py'deki üretici testleri)."""
+    if "turkce" not in skiller:
+        pytest.skip("turkce skill'i yok")
+    harita = skiller["turkce"].kaynak_oku("unite-haritasi.md")
+    assert "**T.Y.7.1** — Yazma sürecini yönetebilme" in harita
+    assert "**T.Y.7.1** — Yazılı üretimlerinde ve yazılı etkileşimlerinde tartışabilme" not in harita

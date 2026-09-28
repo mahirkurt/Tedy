@@ -37,20 +37,63 @@ KUCUK = "a-zçğıöşüâîû"
 # Program PDF'lerinin metin katmanındaki harf aralığı bozulmaları (ölçüldü 2026-09-27).
 OCR_DUZELTME = {"SOSY AL": "SOSYAL", "DÜNY A": "DÜNYA", "HAY ATIMIZDAKİ": "HAYATIMIZDAKİ",
                 "YAŞAY AN": "YAŞAYAN", "KÜL TÜRÜ": "KÜLTÜRÜ"}
+# Satır sonu tirelemesiyle karışan GERÇEK bileşik sözcükler: 'yer- yön' (satır kırığı) genel
+# tireleme temizliğinde tiresiz 'yeryön'e döner; bu, 'yer-yön' bileşiğini bozar (ölçüldü,
+# DYS.DO.7.6, korpus 1.6). temizle() önce genel kırığı giderir, sonra bu sözcüğü düzeltir.
+BILESIK_KORUMA = {"yeryön": "yer-yön"}
 TURKCE_BECERILER = {"T.D": "Dinleme/İzleme", "T.O": "Okuma", "T.K": "Konuşma", "T.Y": "Yazma",
                     "DYS.DO": "Dil yapıları — dinleme/okumada belirleme",
                     "DYS.KY": "Dil yapıları — konuşma/yazmada kullanma"}
 
 
 def temizle(metin: str) -> str:
-    """Satır sonu tirelemesi ve fazla boşluk: 'yapa - bilme' -> 'yapabilme'."""
+    """Satır sonu tirelemesi ve fazla boşluk: 'yapa - bilme' -> 'yapabilme'.
+
+    Gerçek bileşik sözcüklerin (ör. 'yer-yön') tiresi bu genel temizlikte yanlışlıkla
+    silinirse BILESIK_KORUMA ile geri konur.
+    """
     metin = " ".join(metin.split())
-    return re.sub(rf"(?<=[{KUCUK}])\s?-\s+(?=[{KUCUK}])", "", metin)
+    metin = re.sub(rf"(?<=[{KUCUK}])\s?-\s+(?=[{KUCUK}])", "", metin)
+    for yanlis, dogru in BILESIK_KORUMA.items():
+        metin = metin.replace(yanlis, dogru)
+    return metin
 
 
 def ana_cumle(metin: str) -> str:
     """Kazanımın ana ifadesi: ' a) ' ile başlayan süreç bileşenlerinden önceki kısım."""
     return re.split(r"\s[a-zç]\)\s", temizle(metin), maxsplit=1)[0].strip()
+
+
+def _tek_bilme_govdesi(temiz: str) -> bool:
+    """Aday satır büyük harfle başlamalı, açık parantezle (bir açıklama metninin ortasından
+    kesilmiş) bitmemeli ve tam olarak bir '-bilme' fıkrası taşımalı. '\\bbilme\\b' sınırı
+    kullanılır: 'bilmediği' gibi rastlantısal iç geçişler (fiil değil) sayılmaz, yalnız
+    sözcük SONUNDAKİ '-bilme'ler ('tartışabilme,', 'edebilme') sayılır."""
+    return bool(temiz) and bool(re.match(f"[{BUYUK}]", temiz)) and not temiz.endswith("(") \
+        and len(re.findall(r"bilme\b", temiz)) == 1
+
+
+def baslik_ifadesi(metin: str) -> str | None:
+    """Bir 'heading' (başlık) satırının kendisi tek bir '-bilme' fıkrası mı: kabul edilirse o
+    metni döner. Başka bir başlıkla yapışık satırlar ('... değerlendirebilme Okuma' gibi, iki
+    ayrı başlığın korpusta yan yana düşmesinden) ya da uçtan kesik satırlar reddedilir —
+    bunlar 'bilme' ile bitmediği için ('Okuma' ile bitiyor) elenir."""
+    temiz = temizle(metin).strip().rstrip(".")
+    if not _tek_bilme_govdesi(temiz) or not temiz.endswith("bilme"):
+        return None
+    return temiz
+
+
+def aciklama_ifadesi(metin: str) -> str | None:
+    """Bir 'outcome' (açıklama) satırından ana ifadeyi çıkarır: süreç bileşenlerinden ayırır,
+    sonra ilk '-bilme' sınırına keser. Birden çok fıkra taşıyan (ör. 'tartışabilme, ...
+    değerlendirebilme (') ya da açık parantezle kesilen satırlar — bunlar tek bir kazanımın
+    değil, birkaçının ortak açıklaması — reddedilir."""
+    temiz = temizle(metin).strip()
+    if not _tek_bilme_govdesi(temiz):
+        return None
+    eslesme = re.match(r"^(.*?bilme)\b", ana_cumle(metin))
+    return eslesme.group(1) if eslesme else None
 
 
 def baslik_yaz(ad: str) -> str:
@@ -96,6 +139,21 @@ def main(ad: str) -> None:
         if re.match(kod_deseni, kod or ""):
             kodlar.setdefault(kod, []).append((sayfa, metin))
 
+    # Türkçe'de bazı 'T.' kodlarının tam ifadesi 'outcome' parçasında değil, 'heading'
+    # (başlık) satırında temiz duruyor — ör. T.Y.7.1'in outcome satırı iki fıkralı bir
+    # açıklama metninin ortasından kesik ("... tartışabilme, ... değerlendirebilme (");
+    # heading satırı ise tek başına doğru ifade ("Yazma sürecini yönetebilme"). Yalnız
+    # Türkçe'de sorgulanır (diğer derslerin kod şeması bu ayrıma ihtiyaç duymaz).
+    basliklar: dict[str, list[tuple[int, str]]] = {}
+    if ad == "turkce":
+        for kod, sayfa, metin in con.execute(
+                "SELECT lo.code, lo.page_no, lo.text FROM learning_outcome lo "
+                "JOIN subject s ON s.id = lo.subject_id "
+                "WHERE s.slug = ? AND lo.grade_label = '7.Sınıf' AND lo.fragment_type = 'heading' "
+                "ORDER BY lo.page_no, lo.id", (slug,)):
+            if re.match(kod_deseni, kod or ""):
+                basliklar.setdefault(kod, []).append((sayfa, metin))
+
     print(f"# 7. sınıf {ders} — tema ve kazanım haritası\n")
     print(f"<!-- kaynak: {URI} · subject={slug} · program document_id={belge} · "
           f"sayfa {ilk}-{son} · corpus_version={surum} -->\n")
@@ -129,10 +187,16 @@ def main(ad: str) -> None:
         print(f"\n### {baslik}\n")
         yalniz_kod = []
         for kod in grup:
-            adaylar = [ana_cumle(m) for _, m in kodlar[kod] if re.match(f"[{BUYUK}]", m.strip())]
             if onek.startswith("T."):
-                adaylar = [m.group(1) for m in (re.match(r"^(.*?bilme)\b", a) for a in adaylar) if m]
+                # Başlık satırından temiz bir tek-fıkra ifadesi varsa onu tercih et; yoksa
+                # açıklama satırından çıkar.
+                adaylar = [f for f in (baslik_ifadesi(m) for _, m in basliklar.get(kod, []))
+                           if f]
+                if not adaylar:
+                    adaylar = [f for f in (aciklama_ifadesi(m) for _, m in kodlar.get(kod, []))
+                               if f]
             else:
+                adaylar = [ana_cumle(m) for _, m in kodlar[kod] if re.match(f"[{BUYUK}]", m.strip())]
                 adaylar = [a.split(". ")[0].rstrip(".") + "." for a in adaylar]
             if adaylar:
                 print(f"- **{kod}** — {adaylar[0]}")

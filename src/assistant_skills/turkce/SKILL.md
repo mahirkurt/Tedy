@@ -53,7 +53,7 @@ Işık'ın programı Türkiye Yüzyılı Maarif Modeli'nin Ortaokul Türkçe Der
 6. Hak ve Sorumluluklar
 
 - Türkçe programında kazanımlar temaya göre değil, beceri alanına göre kodlanır; aynı beceri her temada yeniden işlenir. Kod biçimi `T.<beceri>.7.<no>`: D dinleme/izleme, O okuma, K konuşma, Y yazma (ör. `T.O.7.7`, basit çıkarımlar yoluyla metnin derin anlamını belirleyebilme). Dil yapıları ayrıca kodlanır: `DYS.DO.7.<no>` dinleme ve okumada belirleme, `DYS.KY.7.<no>` konuşma ve yazmada kullanma.
-- Temaların ve kazanımların tam listesi `unite-haritasi.md` notundadır; o not korpus 1.6'dan üretilmiştir. Bazı kodların tam ifadesi korpusta yalnız açıklama metni içinde geçer; onları `kazanim_ara` ile ara. Bir kazanım kodunu ya da tema adını hatırlayarak yazma.
+- Temaların ve kazanımların tam listesi `unite-haritasi.md` notundadır; o not korpus 1.6'dan üretilmiştir. Yalnız beş kodun (T.D.7.25, T.K.7.24, T.K.7.25, T.O.7.25, T.O.7.26) tam ifadesi korpusta kendi satırıyla değil, yalnız açıklama metni içinde geçer; onları `kazanim_ara` ile ara. Bir kazanım kodunu ya da tema adını hatırlayarak yazma.
 - Program okuduğunu anlama, söz varlığını geliştirme ve dil yapılarını işlevleriyle kullanmayı öne çıkarır: bir kuralı ezber olarak değil, cümlede ne işe yaradığıyla anlat.
 
 ## Derse özgü anlatım teknikleri
@@ -62,7 +62,7 @@ Işık'ın programı Türkiye Yüzyılı Maarif Modeli'nin Ortaokul Türkçe Der
 - **Okuma-anlama stratejileri.** Konu ile ana fikri ayır: konu "metin neyi anlatıyor" sorusunun cevabıdır, ana fikir "yazar ne söylemek istiyor" sorusunun cevabı olan bir yargıdır. Anahtar kelimeleri bul, bilinmeyen kelimenin anlamını bağlamdan tahmin et, basit ve üst düzey çıkarımları ayır.
 - **Söz varlığı ve söz sanatları.** Kelimenin gerçek, mecaz ve terim anlamlarını cümle içinde göster. Benzetme, kişileştirme, konuşturma ve abartmayı birer örnek cümleyle tanıt; bir sanatı gösterirken cümlenin hangi parçasının onu oluşturduğunu işaretle.
 - **Dil yapıları.** Eki ve kökü ayırarak yaz (ör. "okul-da", "gel-ince"). Fiil çekimini (kip ve kişi), fiilimsileri, zaman ve durum bildiren yapıları, özne-yüklem uyumunu işlevleriyle anlat: "Bu ek cümleye ne kattı?"
-- **Yazım ve noktalama.** Kuralı TDK yazım kurallarına göre, bir doğru ve bir yanlış örnekle ver. Sık karışanları (bağlaç "de" ile hâl eki "-de", bağlaç "ki" ile ek "-ki", soru eki "mi") çıkarma testiyle ayır: bağlaç çıkarılınca cümle bozulmaz.
+- **Yazım ve noktalama.** Kuralı TDK yazım kurallarına göre, bir doğru ve bir yanlış örnekle ver. Bağlaç olan "de/da" ile hâl eki "-de/-da"yı çıkarma testiyle ayır: bağlacı çıkarınca cümle bozulmaz, çıkarınca bozuluyorsa hâl ekidir (çıkarma testi yalnız bu ikisi için geçerlidir). Ek olan "-ki" sözcüğe yer, zaman ya da aitlik anlamı katar ve bitişik yazılır ("evdeki", "yarınki", "benimki"); bağlaç olan "ki" iki cümleyi birbirine bağlar ve ayrı yazılır — bu ikisi çıkarma testiyle değil, anlamına bakarak ayrılır. Soru eki "mi" her zaman ayrı yazılır, kendinden önceki sözcüğün son ünlüsüne uyar, ondan sonra gelen ekler ona bitişir ("Geldin mi?", "Güzel miydi?").
 - **Yazma geri bildirimi.** Planlama (giriş, gelişme, sonuç), paragraf düzeni, bağlantı ifadeleri, sonra yazım ve noktalama sırasıyla bak. Işık'ın kendi cümlesini düzeltilmiş hâliyle yan yana göster.
 
 ## Sık kavram yanılgıları

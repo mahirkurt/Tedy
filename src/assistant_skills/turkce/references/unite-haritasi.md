@@ -19,7 +19,16 @@ Türkçe programında kazanımlar temaya göre değil, beceri alanına göre kod
 
 ### Dinleme/İzleme
 
+- **T.D.7.1** — Dinlemede/izlemede materyal seçimini yönetebilme
+- **T.D.7.2** — Dinlemede/izlemede strateji, yöntem ve teknik seçimlerini yönetebilme
+- **T.D.7.3** — Dinleyeceğinin/izleyeceğinin içeriğine yönelik tahminde bulunabilme
+- **T.D.7.4** — Dinlediğinde/izlediğinde geçen anlamını bilmediği söz varlığı unsurlarının anlamını tahmin edebilme
+- **T.D.7.5** — Dinlediğinin/izlediğinin yüzey anlamını belirleyebilme
 - **T.D.7.6** — Basit çıkarımlar yoluyla dinlediğinin/izlediğinin derin anlamını belirleyebilme
+- **T.D.7.7** — Üst düzey çıkarımlar yoluyla dinlediğinin/izlediğinin derin anlamını belirleyebilme
+- **T.D.7.8** — Dinlediklerini/izlediklerini karşılaştırabilme
+- **T.D.7.9** — Dinlediğindeki/izlediğindeki unsurları sınıflandırabilme
+- **T.D.7.10** — Dinlediğini/izlediğini yorumlayabilme
 - **T.D.7.11** — Öyküleyici metinde hikâye unsurlarını belirlemeye yönelik çözümleme yapabilme
 - **T.D.7.12** — Bilgilendirici metinde metin yapılarından hareketle önemli bilgileri belirlemeye yönelik çözümleme yapabilme
 - **T.D.7.13** — Dinlediğinin/izlediğinin anahtar kelimelerini belirlemeye yönelik çözümleme yapabilme
@@ -27,40 +36,92 @@ Türkçe programında kazanımlar temaya göre değil, beceri alanına göre kod
 - **T.D.7.15** — Bilgilendirici metinde düşünceyi geliştirme yollarını belirlemeye yönelik çözümleme yapabilme
 - **T.D.7.16** — Dinlediğindeki/izlediğindeki söz sanatlarını belirlemeye yönelik çözümleme yapabilme
 - **T.D.7.17** — Dinlediğinde/izlediğinde kullanılan ikna tekniklerini belirlemeye yönelik çözümleme yapabilme
-- Korpusta yalnız açıklama metni içinde geçenler (tam ifade için `kazanim_ara`): T.D.7.1, T.D.7.2, T.D.7.3, T.D.7.4, T.D.7.5, T.D.7.7, T.D.7.8, T.D.7.9, T.D.7.10, T.D.7.18, T.D.7.19, T.D.7.20, T.D.7.21, T.D.7.22, T.D.7.23, T.D.7.24, T.D.7.25
+- **T.D.7.18** — Dinlediğinden/izlediğinden hareketle söz varlığını geliştirmeye yönelik çözümleme yapabilme
+- **T.D.7.19** — Çoklu ortam ögelerine yönelik çözümleme yapabilme
+- **T.D.7.20** — Dinlediğini/izlediğini özetleyebilme
+- **T.D.7.21** — Dinlediğini/izlediğini değerlendirebilme
+- **T.D.7.22** — Medya içeriğini sorgulayabilme
+- **T.D.7.23** — Dinlediğini/izlediğini eleştirebilme
+- **T.D.7.24** — Dinlediğindeki/izlediğindeki probleme çözüm üretebilme
+- Korpusta yalnız açıklama metni içinde geçenler (tam ifade için `kazanim_ara`): T.D.7.25
 
 ### Okuma
 
+- **T.O.7.1** — Okumada materyal seçimini yönetebilme
+- **T.O.7.2** — Okumada strateji, yöntem ve teknik seçimlerini yönetebilme
+- **T.O.7.3** — Okuyacağı metnin içeriğine yönelik tahminde bulunabilme
 - **T.O.7.4** — Metinde geçen anlamını bilmediği söz varlığı unsurlarının anlamını tahmin edebilme
+- **T.O.7.5** — Metnin yüzey anlamını belirleyebilme
+- **T.O.7.6** — Görselle iletilen anlamı belirleyebilme
 - **T.O.7.7** — Basit çıkarımlar yoluyla metnin derin anlamını belirleyebilme
 - **T.O.7.8** — Üst düzey çıkarımlar yoluyla metnin derin anlamını belirleyebilme
+- **T.O.7.9** — Okuduklarını karşılaştırabilme
+- **T.O.7.10** — Metindeki unsurları sınıflandırabilme
+- **T.O.7.11** — Metni yorumlayabilme
 - **T.O.7.12** — Öyküleyici metinde hikâye unsurlarını belirlemeye yönelik çözümleme yapabilme
 - **T.O.7.13** — Bilgilendirici metinde metin yapılarından hareketle önemli bilgileri belirlemeye yönelik çözümleme yapabilme
 - **T.O.7.14** — Metnin anahtar kelimelerini belirlemeye yönelik çözümleme yapabilme
+- **T.O.7.15** — Metnin bölümlerini belirlemeye yönelik çözümleme yapabilme
 - **T.O.7.16** — Şiirin biçim özelliklerini belirlemeye yönelik çözümleme yapabilme
 - **T.O.7.17** — Bilgilendirici metinde düşünceyi geliştirme yollarını belirlemeye yönelik çözümleme yapabilme
 - **T.O.7.18** — Metindeki söz sanatlarını belirlemeye yönelik çözümleme yapabilme
-- Korpusta yalnız açıklama metni içinde geçenler (tam ifade için `kazanim_ara`): T.O.7.1, T.O.7.2, T.O.7.3, T.O.7.5, T.O.7.6, T.O.7.9, T.O.7.10, T.O.7.11, T.O.7.15, T.O.7.19, T.O.7.20, T.O.7.21, T.O.7.22, T.O.7.23, T.O.7.24, T.O.7.25, T.O.7.26
+- **T.O.7.19** — Metinde kullanılan ikna tekniklerini belirlemeye yönelik çözümleme yapabilme
+- **T.O.7.20** — Metinden hareketle söz varlığını geliştirmeye yönelik çözümleme yapabilme
+- **T.O.7.21** — Okuduğunu özetleyebilme
+- **T.O.7.22** — Okuduğunu değerlendirebilme
+- **T.O.7.23** — Basılı ve dijital medya metnini sorgulayabilme
+- **T.O.7.24** — Metni eleştirebilme
+- Korpusta yalnız açıklama metni içinde geçenler (tam ifade için `kazanim_ara`): T.O.7.25, T.O.7.26
 
 ### Konuşma
 
+- **T.K.7.1** — Konuşma sürecini yönetebilme
+- **T.K.7.2** — Konuşmada yöntem ve teknik seçimlerini yönetebilme
 - **T.K.7.3** — Konuşmasında amaç ve içeriğe yönelik seçimlerini yönetebilme
+- **T.K.7.4** — İletişimi sürdürmek amacıyla soru sorabilme
 - **T.K.7.5** — Konuşmasında çoklu ortam ögeleriyle içerik oluşturabilme
+- **T.K.7.6** — Yaratıcı konuşma yapabilme
+- **T.K.7.7** — Hazırlıksız konuşma yapabilme
+- **T.K.7.8** — Konuşmasında sesini uygun şekilde kullanabilme
+- **T.K.7.9** — Sözlü sunum yapabilme
+- **T.K.7.10** — Konuşmasında tahminlerinden yararlanabilme
 - **T.K.7.11** — Konuşmasında karşılaştırma yapabilme
+- **T.K.7.12** — Konuşmasında sınıflandırma yapabilme
+- **T.K.7.13** — Yorumunu sözlü olarak ifade edebilme
+- **T.K.7.14** — Sözlü olarak özetleyebilme
+- **T.K.7.15** — Değerlendirmesini sözlü olarak ifade edebilme
+- **T.K.7.16** — Sözlü olarak tartışabilme
+- **T.K.7.17** — Eleştirisini sözlü olarak ifade edebilme
+- **T.K.7.18** — Problem çözümüne yönelik konuşma yapabilme
+- **T.K.7.19** — Hazırlıklı konuşmasını yapılandırabilme
 - **T.K.7.20** — Düşünceyi geliştirme yollarını kullanarak konuşmasını yapılandırabilme
+- **T.K.7.21** — Konuşmasını zenginleştirecek biçimde söz varlığını kullanabilme
+- **T.K.7.22** — Konuşmasında açık ve örtük ifadeleri kullanabilme
 - **T.K.7.23** — Uygun bağlantı ifadelerini kullanabilme
-- Korpusta yalnız açıklama metni içinde geçenler (tam ifade için `kazanim_ara`): T.K.7.1, T.K.7.2, T.K.7.4, T.K.7.6, T.K.7.7, T.K.7.8, T.K.7.9, T.K.7.10, T.K.7.12, T.K.7.13, T.K.7.14, T.K.7.15, T.K.7.16, T.K.7.17, T.K.7.18, T.K.7.19, T.K.7.21, T.K.7.22, T.K.7.24, T.K.7.25
+- Korpusta yalnız açıklama metni içinde geçenler (tam ifade için `kazanim_ara`): T.K.7.24, T.K.7.25
 
 ### Yazma
 
-- **T.Y.7.1** — Yazılı üretimlerinde ve yazılı etkileşimlerinde tartışabilme
+- **T.Y.7.1** — Yazma sürecini yönetebilme
+- **T.Y.7.2** — Yazmada strateji, yöntem ve teknik seçimlerini yönetebilme
+- **T.Y.7.3** — Yazısında içerik ve yapıya yönelik seçimlerini yönetebilme
 - **T.Y.7.4** — Yazısında çoklu ortam ögeleriyle içerik oluşturabilme
+- **T.Y.7.5** — Yaratıcı yazı yazabilme
+- **T.Y.7.6** — Yazılı üretim ve yazılı etkileşiminde tahminlerinden yararlanabilme
+- **T.Y.7.7** — Yazısında karşılaştırma yapabilme
 - **T.Y.7.8** — Yazısında sınıflandırma yapabilme
+- **T.Y.7.9** — Yorumunu yazılı olarak ifade edebilme
+- **T.Y.7.10** — Yazılı olarak özetleyebilme
+- **T.Y.7.11** — Değerlendirmesini yazılı olarak ifade edebilme
 - **T.Y.7.12** — Yazılı üretiminde ve yazılı etkileşiminde tartışabilme
+- **T.Y.7.13** — Eleştirisini yazılı olarak ifade edebilme
+- **T.Y.7.14** — Problem çözümüne yönelik yazabilme
+- **T.Y.7.15** — Düşünceyi geliştirme yollarını kullanarak metni yapılandırabilme
+- **T.Y.7.16** — Yazısını zenginleştirecek biçimde söz varlığını kullanabilme
 - **T.Y.7.17** — Yazısında açık ve örtük ifadeleri kullanabilme
 - **T.Y.7.18** — Uygun bağlantı ifadelerini kullanabilme
 - **T.Y.7.19** — Yazım ve noktalama işaretleriyle ilgili kuralları uygulayabilme
-- Korpusta yalnız açıklama metni içinde geçenler (tam ifade için `kazanim_ara`): T.Y.7.2, T.Y.7.3, T.Y.7.5, T.Y.7.6, T.Y.7.7, T.Y.7.9, T.Y.7.10, T.Y.7.11, T.Y.7.13, T.Y.7.14, T.Y.7.15, T.Y.7.16, T.Y.7.20
+- **T.Y.7.20** — Yazma sürecini değerlendirebilme
 
 ### Dil yapıları — dinleme/okumada belirleme
 
@@ -69,7 +130,7 @@ Türkçe programında kazanımlar temaya göre değil, beceri alanına göre kod
 - **DYS.DO.7.3** — Zaman yönüyle başlangıç-bitiş ifade etme işlevli (-DAn beri, -DAn itibaren, -A dek, -A kadar vb.) dil yapılarını belirler.
 - **DYS.DO.7.4** — Zaman işlevli fiilimsi dil yapılarını belirler.
 - **DYS.DO.7.5** — Bir eylemin gerçekleşmesinin gerekli olduğunun söylendiği (-mAlI, -mAsI gerek, -mAnIz gerek, -mAmIz gerek, -mAsI lazım vb.), dilek-şart olarak ifade edildiği (-sA, -IncA, - mAdAn), istek hâlinde belirtildiği (-A, -AyIm, -AlIm; lütfen vb.) ve emir şeklinde dile getirildiği (Ø, -sIn, -sInlAr, -nIz vb.) dil yapıları ve söz varlığını belirler.
-- **DYS.DO.7.6** — Fiilleri çeşitli yönlerden belirten söz varlığının cümlenin anlamına katkısını (durum, zaman, yeryön ve soru) belirler.
+- **DYS.DO.7.6** — Fiilleri çeşitli yönlerden belirten söz varlığının cümlenin anlamına katkısını (durum, zaman, yer-yön ve soru) belirler.
 - **DYS.DO.7.7** — Sözcükleri miktar yönünden belirten söz varlığının cümlenin anlamına katkısını belirler.
 - **DYS.DO.7.8** — Durum işlevli fiilimsi dil yapılarını belirler.
 - **DYS.DO.7.9** — Özne-yüklem uyumunu ayırt eder.
