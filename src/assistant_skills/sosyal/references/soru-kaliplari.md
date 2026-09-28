@@ -1,6 +1,6 @@
 # 7. sınıf Sosyal Bilgiler — soru kalıpları
 
-Bir konuyu anlattıktan sonra "Sıra sende" sorusunu bu kalıplardan biriyle yaz. Soruyu anlattığın kazanımın dayandığı kavramsal beceriye (Sorgulama KB2.8, Çıkarım Yapma KB2.10, Yorumlama KB2.14, Özetleme KB2.3) bağla. Yanlış seçenekleri kavram yanılgılarından kur; tarih ve yer adlarını yalnız kaynağa dayanarak yaz.
+Bir konuyu anlattıktan sonra "Sıra sende" sorusunu bu kalıplardan biriyle yaz. Soruyu anlattığın kazanımın dayandığı beceriye bağla: programda o kazanımın yanında yazan alan becerisi (SBAB) ya da kavramsal beceri (KB). Yanlış seçenekleri kavram yanılgılarından kur; tarih ve yer adlarını yalnız kaynağa dayanarak yaz.
 
 ### Çoktan seçmeli kavram sorusu
 
@@ -29,7 +29,7 @@ Bir konuyu anlattıktan sonra "Sıra sende" sorusunu bu kalıplardan biriyle yaz
 ### Neden-sonuç eşleştirme
 
 **Tür:** acik_uclu
-**Ne zaman:** Olayları nedenleri ve sonuçlarıyla yorumlama (KB2.14) becerisinde.
+**Ne zaman:** Değişim ve sürekliliği neden ve sonuçlarıyla yorumlama (SBAB4.2) becerisinde — ör. SB.7.3.2, SB.7.5.1.
 **Nasıl yazılır:** İki ya da üç neden ve sonucu karışık ver; öğrenciden eşleştirmesini ve her eşleşmeyi tek cümleyle açıklamasını iste.
 **Örnek:** Nedenleri sonuçlarıyla eşleştir. Nedenler: 1) Ticaret yollarının denetimi 2) İskân politikası. Sonuçlar: A) Fethedilen bölgelerde kalıcı hâkimiyetin sağlanması B) Devletin gümrük ve vergi gelirlerinin artması.
 **Cevap:** 1-B: ticaret yollarını denetleyen devlet gümrük ve vergi geliri elde eder. 2-A: iskân, fethedilen topraklara nüfus yerleştirerek kalıcı hâkimiyeti sağlar.

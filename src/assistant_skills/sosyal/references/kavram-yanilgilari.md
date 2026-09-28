@@ -22,7 +22,7 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### Osmanlı yenilikleri Batı'yı kopyalamaktan ibaretti
 
-**Doğrusu:** Osmanlı Devleti bu yenilikleri yaparken Avrupa'yı gerçekten örnek aldı (Lale Devri'nde "Batı örnek alınarak modernleşme hareketleri başlamıştır"; sanayileşmede "Batı'daki fabrikalaşma modeli örnek alındı"). Ama örnek almak kopyalamak değildi: yenilikler askerî alanın yanı sıra sosyal, kültürel ve ekonomik alanlarda da yapıldı ve devletin kendi ihtiyaçlarına göre şekillendi. Etki de tek yönlü değildi: Osmanlı-Avrupa ilişkileri Avrupa'yı da etkiledi.
+**Doğrusu:** Osmanlı Devleti bu yenilikleri yaparken Avrupa'yı gerçekten örnek aldı (Lale Devri'nde "Batı örnek alınarak modernleşme hareketleri başlamıştır"; sanayileşmede "Batı'daki fabrikalaşma modelini örnek alarak sanayileşme çabalarını artırdı"). Ama örnek almak kopyalamak değildi: yenilikler askerî alanın yanı sıra sosyal, kültürel ve ekonomik alanlarda da yapıldı ve devletin kendi ihtiyaçlarına göre şekillendi. Etki de tek yönlü değildi: Osmanlı-Avrupa ilişkileri Avrupa'yı da etkiledi.
 **Nasıl düzeltirsin:** Yenilikleri askerî, sosyal, kültürel ve ekonomik alanlara göre grupla ve her birinin hangi soruna çözüm arandığını yanına yaz; "örnek almak" ile "aynısını yapmak" arasındaki farkı sor.
 **Kontrol sorusu:** 1727'de açılan ilk Türk matbaası askerî değil hangi alanda bir yenilikti?
 
@@ -64,7 +64,7 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### Millî kalkınma yalnız fabrika kurmaktır
 
-**Doğrusu:** Cumhuriyet'in ilk yıllarındaki millî kalkınma hamleleri sanayiyi, demiryolu yapımını, çay tarımını ve havacılığı da kapsadı; 17 Şubat 1923'te İzmir'de toplanan Türkiye İktisat Kongresi'nin Misak-ı İktisadi kararları bu hamlelerin yönünü belirledi.
+**Doğrusu:** Cumhuriyet'in ilk yıllarındaki millî kalkınma hamleleri yalnız fabrika kurmak değildi: sanayinin yanında demiryolu yapımını, çay tarımını ve havacılığı da kapsadı; 17 Şubat 1923'te İzmir'de toplanan Türkiye İktisat Kongresi'nin Misak-ı İktisadi kararları bu hamlelerin yönünü belirledi.
 **Nasıl düzeltirsin:** Kalkınmayı alanlara ayır ve her alan için bir örnek hamle bul.
 **Kontrol sorusu:** Demiryolu yapımı ekonomik kalkınmaya nasıl katkı sağlar?
 
@@ -76,7 +76,7 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### Özel gereksinimli bireylere yardım etmek fırsat eşitliği demektir
 
-**Doğrusu:** Fırsat eşitliği yalnız acımak ya da yardım etmekle sınırlı değildir; herkesin eğitim, ulaşım, iletişim gibi haklara eşit biçimde erişebilmesidir: rampa, sesli uyarı, kabartma yazı, erişilebilir bilgi. Şefkatli olmak (D9.2) ve destekleyici davranışlar sergilemek bu erişimi sağlamanın bir parçasıdır.
+**Doğrusu:** Fırsat eşitliği yalnız yardım etmekle sınırlı değildir; herkesin eğitim, ulaşım, iletişim gibi haklara eşit biçimde erişebilmesidir: rampa, sesli uyarı, kabartma yazı, erişilebilir bilgi. Şefkatli olmak (D9.2) ve destekleyici davranışlar sergilemek bu erişimi sağlamanın bir parçasıdır.
 **Nasıl düzeltirsin:** Okulun ya da mahallenin bir yerini tekerlekli sandalye kullanan birinin gözünden gez: nerede engel var, ne düzenleme gerekir?
 **Kontrol sorusu:** Okulunda fırsat eşitliğini artıracak bir düzenleme öner.
 

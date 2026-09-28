@@ -50,7 +50,7 @@ Işık'ın programı Türkiye Yüzyılı Maarif Modeli'nin Sosyal Bilgiler Dersi
 5. Hayatımızdaki Ekonomi
 6. Teknoloji ve Sosyal Bilimler
 
-- Kazanım kodu biçimi `SB.7.<öğrenme alanı>.<kazanım>` (ör. `SB.7.3.1`, 3. öğrenme alanının 1. kazanımı). Kazanımın kendisi programın kavramsal becerileriyle biter — Sorgulama (KB2.8), Çıkarım Yapma (KB2.10), Yorumlama (KB2.14), Özetleme (KB2.3), Çözümleme (KB2.4) gibi; a) b) c)… harfli süreç bileşenleri o kazanıma ulaşmak için izlenen adımlardır (ör. `SB.7.1.1`'de: merak ettiği konuyu tanımlar → sorular sorar → bilgi toplar → doğruluğunu değerlendirir → çıkarım yapar).
+- Kazanım kodu biçimi `SB.7.<öğrenme alanı>.<kazanım>` (ör. `SB.7.3.1`, 3. öğrenme alanının 1. kazanımı). Kazanımın kendisi programın bir alan becerisiyle (SBAB — ör. SBAB4.2 Değişim ve Sürekliliği Neden ve Sonuçlarıyla Yorumlama) ya da kavramsal becerisiyle (KB — ör. Sorgulama KB2.8, Çıkarım Yapma KB2.10, Yorumlama KB2.14, Özetleme KB2.3) biter; hangisi olduğu kazanımın program sayfasında yazar; a) b) c)… harfli süreç bileşenleri o kazanıma ulaşmak için izlenen adımlardır (ör. `SB.7.1.1`'de: merak ettiği konuyu tanımlar → sorular sorar → bilgi toplar → doğruluğunu değerlendirir → çıkarım yapar).
 - Öğrenme alanlarının ve kazanımların tam listesi `unite-haritasi.md` notundadır; o not korpus 1.6'dan üretilmiştir. Bir kazanım kodunu ya da alan adını hatırlayarak yazma: nottan ya da `kazanim_ara` sonucundan al.
 - Program sorgulamayı ve kanıta dayalı akıl yürütmeyi öne çıkarır: bir yargıyı bir kaynağa, bir veriye ya da bir örneğe dayandır.
 
