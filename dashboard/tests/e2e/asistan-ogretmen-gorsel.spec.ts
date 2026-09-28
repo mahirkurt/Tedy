@@ -39,6 +39,68 @@ async function modda(page: Page, id: string, w: number, h: number) {
   await expect(page.locator('.ac-msg--assistant')).toHaveCount(2)
 }
 
+// Final-fix item 6: a mode_suggestion (ModOnerisi) carrying its longest legal
+// reason (MOD_GEREKCE_SINIRI = 200 chars, src/assistant_tools.py) must not
+// overflow the page at a phone width, and must stay axe/IBM clean like every
+// other mode's screenshot.
+const GEREKCE_200 = (
+  'Bu soru Türkiye’nin bölgesel farklılıklarını, nüfus hareketlerini, tarihsel dönüm ' +
+  'noktalarını ve toplumsal yaşamı bir arada ele alıyor; harita okuma, kronoloji kurma ve ' +
+  'neden-sonuç ilişkisi kurma becerisi istiyor, bunun için Sosyal Bilgiler öğretmeni konuyu ' +
+  'örneklerle çok daha iyi anlatabilir ve adım adım ilerleyebilir bence, denemeye değer olur.'
+).slice(0, 200)
+
+const ONERI_TASMA = {
+  ogretmen: 'sosyal', ogretmen_adi: 'Sosyal Bilgiler öğretmeni',
+  soru: 'Sosyal Bilgiler öğretmenine geçelim mi?',
+  gerekce: GEREKCE_200, renk_ailesi: 'cyan',
+}
+
+async function oneriyle(page: Page, w: number, h: number) {
+  await sabitAc(page, '/asistan', w, h)
+  await page.route('**/api/assistant/stream', r => r.abort())
+  await page.route('**/api/assistant/chat', r => r.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({
+      answer: 'Bir cevap.', citations: [], safety_flags: [], plan_blocks: [], intent: 'qa',
+      session_id: '', mode_suggestion: ONERI_TASMA,
+      meta: { model: 'claude-sonnet-5', degraded: [], ogretmen: 'genel' } }),
+  }))
+  await page.fill('#ac-input', 'Bir soru')
+  await page.getByRole('button', { name: 'Gönder' }).click()
+  await expect(page.getByRole('button', { name: ONERI_TASMA.soru })).toBeVisible()
+}
+
+for (const [boy, w, h] of [['masaustu', 1440, 900], ['telefon', 390, 844]] as const) {
+  test(`mod_oner önerisi, en uzun gerekçe (${boy}): looks as it did`, async ({ page }) => {
+    await oneriyle(page, w, h)
+    await expect(page).toHaveScreenshot(`asistan-oneri-tasma-${boy}.png`, {
+      fullPage: true, animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.002,
+    })
+  })
+
+  test(`mod_oner önerisi, en uzun gerekçe (${boy}): axe, IBM ve taşma yok`, async ({ page }) => {
+    await oneriyle(page, w, h)
+    const { violations } = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
+      .analyze()
+    expect(violations.map(v =>
+      `${v.impact} ${v.id}: ${v.nodes.slice(0, 3).map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
+    await page.addScriptTag({ path: ACE })
+    const sonuclar: Sonuc[] = await page.evaluate(async () => {
+      // @ts-expect-error — `ace` is the injected engine's global
+      const rapor = await new window.ace.Checker().check(document, ['IBM_Accessibility'])
+      return rapor.results
+    })
+    const ihlal = sonuclar
+      .filter(s => s.value[0] === 'VIOLATION' && s.value[1] === 'FAIL')
+      .filter(s => !CARBON_ISTISNA(s.ruleId, s.snippet + ' ' + s.path.dom))
+      .map(s => `${s.ruleId}: ${s.message} — ${s.snippet.slice(0, 120)}`)
+    expect(ihlal).toEqual([])
+    const tasma = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    expect(tasma, 'yatay taşma (px)').toBeLessThanOrEqual(0)
+  })
+}
+
 for (const [boy, w, h] of [['masaustu', 1440, 900], ['telefon', 390, 844]] as const) {
   for (const id of MODLAR) {
     test(`${id} (${boy}): looks as it did`, async ({ page }) => {
