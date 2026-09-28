@@ -663,3 +663,36 @@ class TestExamEdgeCases:
                           return_value=_scraped_with_exams(takvim=takvim)):
             data = client.get("/api/exams").get_json()
             assert len(data["exams"]) == 2
+
+
+class TestPriorYearGrades:
+    """A takvim exam takes its grade only from this school year's report.
+    Measured 2026-09-28: with 2025-2026's "4. Arakarne" still on the portal,
+    this year's past Matematik exam was shown with last year's 1. Sınav (85)
+    and counted in the average."""
+
+    MAT_SINAVI = "5-6-7-8. SINIFLAR MATEMATİK – 2. DÖNEM 1. YAZILI SINAVI"
+
+    def _exams(self, client, semester, yil):
+        past = (datetime.now() - timedelta(days=5)).isoformat() + "Z"
+        data = _scraped_with_exams(takvim=[_exam_event(self.MAT_SINAVI, past)],
+                                   grades=[_grade_row("Matematik", s1="85")],
+                                   semester=semester)
+        with patch.object(dashboard_api, "_scraped", return_value=data), \
+             patch.object(dashboard_api, "_guncel_ogretim_yili", return_value=yil):
+            return client.get("/api/exams").get_json()
+
+    def test_prior_year_report_grades_no_takvim_exam(self, client):
+        data = self._exams(client, "2025-2026 4. Arakarne", "2026-2027")
+        assert len(data["exams"]) == 1                      # the exam itself stays
+        assert data["exams"][0]["grade"] is None
+        assert data["stats"]["averageGrade"] is None
+
+    def test_current_year_report_still_grades_takvim_exam(self, client):
+        data = self._exams(client, "2026-2027 1. Dönem", "2026-2027")
+        assert data["exams"][0]["grade"] == "85"
+        assert data["stats"]["averageGrade"] == 85.0
+
+    def test_unknown_year_still_grades_takvim_exam(self, client):
+        data = self._exams(client, "2025-2026 4. Arakarne", None)
+        assert data["exams"][0]["grade"] == "85"

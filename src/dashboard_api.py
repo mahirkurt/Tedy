@@ -657,10 +657,14 @@ def _private_lessons_for_week(week_dates, hafta_sonu=False):
 
 
 def _private_lessons_for_day(day_date):
-    """Expand private lessons for a specific date into simple calendar events."""
+    """Expand private lessons for a specific date into simple calendar events.
+
+    A seven-day week with the weekend kept: Bugün (/api/calendar) showed no
+    private lesson on a Saturday, and both of Işık's are on Saturday
+    (measured 2026-09-25)."""
     monday = day_date - timedelta(days=day_date.weekday())
-    week_dates = [monday + timedelta(days=i) for i in range(5)]
-    events = _private_lessons_for_week(week_dates)
+    week_dates = [monday + timedelta(days=i) for i in range(7)]
+    events = _private_lessons_for_week(week_dates, hafta_sonu=True)
     out = []
     for ev in events:
         try:
@@ -879,8 +883,8 @@ def _canli_takvim():
     """/api/calendar/unified's events, with two additions the page does not
     need: a portal event's description and place (the route drops
     extendedProps; the assistant reads them), and private lessons for the
-    weeks ahead, weekends included — the route draws only this week's
-    Monday to Friday."""
+    weeks ahead, weekends included — the route already draws this week's
+    weekend private lessons since Görev 2, but only this one week."""
     data = _scraped()
     olaylar = [dict(e) for e in _birlesik_takvim(data) if e.get("type") != "private_lesson"]
     ayrinti = {}
@@ -1220,18 +1224,24 @@ def _to_photo_homework_row(
 
 # --- API endpoints (all require auth) ---
 
+def _guncel_hafta(weeks):
+    """The week the scraper saw selected (`is_current`), else the last one
+    (data written before that mark existed), else {}. /api/schedule's
+    `latest`, the assistant's ders_programi and the unified calendar all read
+    this one week. The scraper may keep the whole published year, so the last
+    element can be a week in June."""
+    if not isinstance(weeks, list) or not weeks:
+        return {}
+    son = weeks[-1] if isinstance(weeks[-1], dict) else {}
+    return next((w for w in weeks if isinstance(w, dict) and w.get("is_current")), son)
+
+
 def _program_verisi(data):
     """(weeks, latest) as /api/schedule serves them, course names in the
     current week's cells normalised in place. Shared with the assistant's
     ders_programi so both read one week the same way."""
     weeks = data.get("ders_programi", [])
-    # The scraper now keeps the whole published year, so the last element is a
-    # week in June. The week the scraper saw selected carries `is_current`;
-    # weeks[-1] stays the fallback for data written before that mark existed.
-    latest = next(
-        (w for w in weeks if isinstance(w, dict) and w.get("is_current")),
-        weeks[-1] if weeks else {},
-    )
+    latest = _guncel_hafta(weeks)
     # Normalize course names in schedule cells
     rows = latest.get("schedule", {}).get("rows", [])
     for r in range(1, len(rows)):
@@ -1554,8 +1564,15 @@ def sebit():
 @app.route("/api/grades")
 @require_auth
 def grades():
-    data = _scraped()
-    return jsonify(data.get("gelisim_raporu", {}))
+    """The gelişim report as scraped, plus `priorYear`: true when its term
+    names a school year other than academic_year.json's — the check notlar
+    and /api/exams make — so Notlar can say the grades are last year's."""
+    from src.assistant_tools import onceki_yil_raporu_mu
+    rapor = _scraped().get("gelisim_raporu", {})
+    if not isinstance(rapor, dict):
+        return jsonify(rapor)
+    return jsonify({**rapor, "priorYear": onceki_yil_raporu_mu(
+        rapor.get("semester"), _guncel_ogretim_yili())})
 
 
 @app.route("/api/calendar")
@@ -1936,7 +1953,6 @@ def _sinav_listesi(data, now=None):
     # --- Grades lookup ---
     gelisim = data.get("gelisim_raporu", {})
     grades_list = gelisim.get("grades", []) if isinstance(gelisim, dict) else []
-    grade_lookup = _build_grade_lookup(grades_list)
 
     # A report still on an earlier school year — measured: 2025-2026's
     # "4. Arakarne" persisted well into 2026-2027 — is last year's exams, not
@@ -1945,6 +1961,10 @@ def _sinav_listesi(data, now=None):
     from src.assistant_tools import onceki_yil_raporu_mu
     onceki_yil = isinstance(gelisim, dict) and onceki_yil_raporu_mu(
         gelisim.get("semester"), _guncel_ogretim_yili())
+
+    # Nor does a takvim exam take its grade from such a report (2026-09-28):
+    # last year's "1. Sınav" column is not this year's first exam.
+    grade_lookup = {} if onceki_yil else _build_grade_lookup(grades_list)
 
     # --- Homework rows ---
     hw_rows = _combined_homework_rows(data)
@@ -2429,27 +2449,26 @@ def _birlesik_takvim(data):
     # Friday on its own bell. Matching "Pazartesi" against it never succeeded,
     # so until 2026-09-28 this drew no lesson at all.
     from src.assistant_tools import gunun_dersleri
-    weeks = data.get("ders_programi", [])
-    if weeks:
-        latest = weeks[-1]
-        rows = latest.get("schedule", {}).get("rows", [])
-        for day_idx, day_date in enumerate(week_dates):
-            for ders in gunun_dersleri(rows, DAY_NAMES[day_idx]):
-                sh, sm = (int(x) for x in ders["baslangic"].split(":"))
-                eh, em = (int(x) for x in ders["bitis"].split(":"))
-                lesson_name = ders["ders"]
-                start_dt = datetime(day_date.year, day_date.month, day_date.day, sh, sm)
-                end_dt = datetime(day_date.year, day_date.month, day_date.day, eh, em)
-                events.append({
-                    "id": _make_id("lesson", day_idx, sh, sm, lesson_name),
-                    "title": lesson_name,
-                    "type": "lesson",
-                    "start": start_dt.isoformat(),
-                    "end": end_dt.isoformat(),
-                    **_takvim_rengi(lesson_name),
-                    "course": lesson_name,
-                    "subtitle": ders["alt"],
-                })
+    # The same week /api/schedule serves as `latest`, not weeks[-1].
+    latest = _guncel_hafta(data.get("ders_programi", []))
+    rows = (latest.get("schedule") or {}).get("rows", [])
+    for day_idx, day_date in enumerate(week_dates):
+        for ders in gunun_dersleri(rows, DAY_NAMES[day_idx]):
+            sh, sm = (int(x) for x in ders["baslangic"].split(":"))
+            eh, em = (int(x) for x in ders["bitis"].split(":"))
+            lesson_name = ders["ders"]
+            start_dt = datetime(day_date.year, day_date.month, day_date.day, sh, sm)
+            end_dt = datetime(day_date.year, day_date.month, day_date.day, eh, em)
+            events.append({
+                "id": _make_id("lesson", day_idx, sh, sm, lesson_name),
+                "title": lesson_name,
+                "type": "lesson",
+                "start": start_dt.isoformat(),
+                "end": end_dt.isoformat(),
+                **_takvim_rengi(lesson_name),
+                "course": lesson_name,
+                "subtitle": ders["alt"],
+            })
 
     # 2. Homework deadlines
     hw_rows = _combined_homework_rows(data)

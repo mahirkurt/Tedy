@@ -623,7 +623,8 @@ def test_canli_icerik_ve_notlar_kaynaklari(api, monkeypatch):
     assert icerik["haftalar"] == haftalar["weeks"] and icerik["guncel_hafta"] == haftalar["current"]
     assert icerik["guncel"] == GUNCEL
     monkeypatch.setattr(api, "_load_json", lambda ad: {"year": "2026-2027"} if ad == "academic_year.json" else {})
-    assert api._canli_notlar() == {"gelisim": notlar, "ogretim_yili": "2026-2027"}
+    rapor = {k: v for k, v in notlar.items() if k != "priorYear"}
+    assert api._canli_notlar() == {"gelisim": rapor, "ogretim_yili": "2026-2027"}
 
 
 def test_sistem_istemi_yeni_araclara_yonlendirir():

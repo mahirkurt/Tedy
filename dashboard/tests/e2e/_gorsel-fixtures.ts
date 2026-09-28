@@ -48,6 +48,16 @@ export const GORSEL: Record<string, unknown> = {
   ], scraped_at: '2026-09-16T08:05:00', total_homework: 1 },
   'progress/a3k': { class_name: '7-D', dashboard_stats: { completed: 3, firstTryScore: 80, scoredAboveLine: 3, target: 5 },
     lessons: [], scraped_at: '2026-09-16T08:05:00', teacher_assigned_completed: 3, teacher_assigned_count: 5, total_lessons: 3 },
+  // The shape /api/grades serves (gelişim_raporu + priorYear). FULL's rows
+  // ({ders, sinav, puan}) predate it and drew a table of dashes. Last year's
+  // report, as the portal still showed on 2026-09-28, so the Notlar baseline
+  // carries the "Önceki öğretim yılı" tag. Invented grades.
+  grades: { semester: '2025-2026 4. Arakarne', priorYear: true, physical: {}, rubrics: [], grades: [
+    { Ders: 'Matematik', '1. Sınav': '88', '2. Sınav': '92', '3. Sınav': '-',
+      'DİKP/Performans-1': '95', 'DİKP/Performans-2': '-', 'DİKP/Performans-3': '-' },
+    { Ders: 'Türkçe', '1. Sınav': '76', '2. Sınav': '-', '3. Sınav': '-',
+      'DİKP/Performans-1': '-', 'DİKP/Performans-2': '-', 'DİKP/Performans-3': '-' },
+  ] },
   calendar: { events: [] },
   // The unified calendar in its real shape. FULL's rows (baslik/tarih/tur)
   // predate it and put nothing on the grid, so the Takvim baseline was an

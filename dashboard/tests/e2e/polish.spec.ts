@@ -135,3 +135,36 @@ test('the calendar legend names only the kinds in view', async ({ page }) => {
   const labels = (await chips.allInnerTexts()).map(s => s.trim()).sort()
   expect(labels).toEqual(['Ders', 'Ödev'])
 })
+
+// 2026-09-28: the portal kept 2025-2026's "4. Arakarne" report well into
+// 2026-2027, and Notlar showed it like this year's. /api/grades now says
+// `priorYear`, and the title carries a small grey tag — calm, not a warning.
+const RAPOR = (priorYear: boolean) => ({
+  semester: priorYear ? '2025-2026 4. Arakarne' : '2026-2027 1. Dönem', priorYear,
+  physical: {}, rubrics: [],
+  grades: [{ Ders: 'Matematik', '1. Sınav': '88', '2. Sınav': '-', '3. Sınav': '-',
+    'DİKP/Performans-1': '-', 'DİKP/Performans-2': '-', 'DİKP/Performans-3': '-' }],
+})
+
+test('a last-year report is tagged "Önceki öğretim yılı" in the Notlar title', async ({ page }) => {
+  await mock(page, LIVE)
+  await page.route('**/api/grades', r => r.fulfill(json(RAPOR(true))))
+  await page.goto('/notlar')
+  await expect(page.locator('table')).toBeVisible()
+  const baslik = page.locator('.dashboard-card__title')
+  await expect(baslik).toContainText('Notlar — 2025-2026 4. Arakarne')
+  const etiket = baslik.locator('.cds--tag')
+  await expect(etiket).toHaveText('Önceki öğretim yılı')
+  await expect(etiket).toHaveClass(/cds--tag--gray/)
+  await expect(etiket).toHaveClass(/cds--tag--sm/)
+})
+
+test('this year\'s report carries no tag', async ({ page }) => {
+  await mock(page, LIVE)
+  await page.route('**/api/grades', r => r.fulfill(json(RAPOR(false))))
+  await page.goto('/notlar')
+  // The table rendered first, so the absence below is about the tag.
+  await expect(page.locator('table')).toBeVisible()
+  await expect(page.locator('.dashboard-card__title')).toContainText('2026-2027 1. Dönem')
+  await expect(page.locator('.dashboard-card__title .cds--tag')).toHaveCount(0)
+})

@@ -5,7 +5,7 @@ import { Certificate } from '@carbon/icons-react'
 import {
   DataTable, Table, TableHead, TableRow, TableHeader,
   TableBody, TableCell, TableContainer,
-  TableExpandRow, TableExpandedRow, TableExpandHeader,
+  TableExpandRow, TableExpandedRow, TableExpandHeader, Tag,
 } from '@carbon/react'
 import type { GradeItem } from '../types'
 import { gradeColor } from '../utils/formatters'
@@ -28,7 +28,9 @@ const headers = [
 ]
 
 export default function GradeTable() {
-  const { data } = useApi<{ semester?: string; grades?: GradeItem[] }>(
+  // priorYear: the report's term names an earlier school year than the one
+  // TEDY is in (/api/grades, the check /api/exams and the assistant make).
+  const { data } = useApi<{ semester?: string; grades?: GradeItem[]; priorYear?: boolean }>(
     '/api/grades', {}
   )
   const { focusMode } = useFocusMode()
@@ -61,6 +63,11 @@ export default function GradeTable() {
           <span className="dashboard-card__title dashboard-card__title--tight">
             <Certificate size={20} />
             {data.semester ? `Notlar — ${data.semester}` : 'Notlar'}
+            {/* Grey and small: a fact about the table, not an alarm (İ6).
+                A span, because it sits inside the table's heading. */}
+            {data.priorYear && (
+              <Tag as="span" type="gray" size="sm">Önceki öğretim yılı</Tag>
+            )}
           </span>
         }
       >
