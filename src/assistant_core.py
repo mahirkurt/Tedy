@@ -1129,23 +1129,62 @@ class FileAdapters:
         extension branch and its zip bytes were read as text. Tabs and line
         breaks inside a paragraph are kept; paragraphs are blank-line
         separated so the chunker keeps them apart. An unreadable archive is
-        "" (metadata only), never garbage."""
+        "" (metadata only), never garbage.
+
+        Fix round 1 (reviewer-verified defects, see tests/test_assistant_docx.py):
+        the DTD/entity scan now covers the whole (already size-bounded) byte
+        string instead of a fixed 4096-byte prefix a padded leading comment
+        could push the real marker past; the size cap is enforced by a
+        bounded chunked read rather than trusting the archive's own declared
+        (forgeable) ZipInfo.file_size; and the except clause is broadened so
+        no parsing exception — e.g. LookupError from an XML-declared
+        encoding name Python's codec registry does not know — escapes and
+        aborts a whole reindex over one bad attachment."""
         try:
             with zipfile.ZipFile(file_path) as arsiv:
                 bilgi = arsiv.getinfo("word/document.xml")
+                # Fast pre-filter only: ZipInfo.file_size is declared by the
+                # archive's own central directory and is not a fact about
+                # the entry — a crafted zip can declare a tiny size whose
+                # real deflate stream decompresses to something far larger
+                # (a zip bomb). A size already over the cap short-circuits
+                # here without opening a read stream at all; the real
+                # enforcement is the bounded read below.
                 if bilgi.file_size > DOCX_XML_SINIRI:
                     return ""
-                veri = arsiv.read(bilgi)
+                parcalar: list[bytes] = []
+                toplam = 0
+                with arsiv.open(bilgi) as akis:
+                    while True:
+                        parca = akis.read(65536)
+                        if not parca:
+                            break
+                        toplam += len(parca)
+                        if toplam > DOCX_XML_SINIRI:
+                            # The real decompressed size exceeds the cap
+                            # regardless of what file_size claimed. Stop
+                            # reading immediately — never materialise the
+                            # rest of the stream just to throw it away.
+                            return ""
+                        parcalar.append(parca)
+                veri = b"".join(parcalar)
             # No defusedxml (not installed; the design allows no new
-            # dependency). A real document.xml never declares a DTD, so one
-            # that does is refused before parsing — no entity of any kind is
-            # expanded. Behind that, ElementTree fetches no external entity and
-            # the bundled expat (2.6.1, measured 2026-09-28) refuses entity
-            # amplification ("billion laughs") on its own.
-            if b"<!DOCTYPE" in veri[:4096].upper():
+            # dependency). A real document.xml never declares a DTD or an
+            # entity, so either one refuses parsing outright — scanned
+            # across the whole byte string, not a fixed-size prefix a large
+            # leading comment could push the real marker past. veri is
+            # already bounded by DOCX_XML_SINIRI above, so this scan stays
+            # cheap regardless of document size.
+            if re.search(rb"<!DOCTYPE|<!ENTITY", veri, re.IGNORECASE):
                 return ""
             kok = ElementTree.fromstring(veri)
-        except (KeyError, zipfile.BadZipFile, ElementTree.ParseError, OSError, ValueError):
+        except Exception:
+            # Anything reading or parsing this archive can raise: a bad
+            # zip, a missing word/document.xml, malformed XML, or an
+            # XML-declared encoding name Python's codec registry does not
+            # know (LookupError, not a subclass of any of the narrower
+            # exceptions this used to catch). One bad .docx must never
+            # raise out of here and abort a whole index update.
             return ""
         paragraflar: list[str] = []
         for p in kok.iter(f"{_WORD_NS}p"):
