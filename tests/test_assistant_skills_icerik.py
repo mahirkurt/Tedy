@@ -177,3 +177,8 @@ def test_turkce_unite_haritasi_yanlis_govdeyi_secmez(skiller):
     harita = skiller["turkce"].kaynak_oku("unite-haritasi.md")
     assert "**T.Y.7.1** — Yazma sürecini yönetebilme" in harita
     assert "**T.Y.7.1** — Yazılı üretimlerinde ve yazılı etkileşimlerinde tartışabilme" not in harita
+
+
+def test_dort_ogretmen_secici_sirasiyla():
+    assert list(sk.yukle()) == ["turkce", "fen", "sosyal", "matematik"]
+    assert list(sk.varsayilan()) == ["turkce", "fen", "sosyal", "matematik"]
