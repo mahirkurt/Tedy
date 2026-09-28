@@ -39,6 +39,29 @@ class _Sahte:
         self.istekler.append(kw)
         return self.cevaplar.pop(0)
 
+    def stream(self, **kw):
+        # chat_events always passes on_delta, so _request takes this branch —
+        # needed to test chat_events end to end rather than only chat_with_tools.
+        self.istekler.append(kw)
+        return _SahteAkis(self.cevaplar.pop(0))
+
+
+class _SahteAkis:
+    """messages.stream(): a context manager with text_stream and get_final_message()."""
+
+    def __init__(self, cevap):
+        self.cevap = cevap
+        self.text_stream = iter(b.text for b in cevap.content if getattr(b, "type", "") == "text")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def get_final_message(self):
+        return self.cevap
+
 
 def _cevap(*bloklar):
     return NS(content=list(bloklar), stop_reason="end_turn", model="claude-sonnet-5",
@@ -155,15 +178,37 @@ def test_arac_dongusu_olaylari_toplar():
     assert loop.olaylar == [olay]
 
 
-def test_dongu_metin_ve_mod_oner_ayni_turda_cevabi_korur():
-    # Review finding 1 (B1 Task 7): a round that writes the full answer and
-    # calls mod_oner in the same breath used to have its text wiped by
-    # on_reset — the final answer became the next round's short filler line.
-    # mod_oner is event-only (OLAY_ARACLARI): its text IS the answer.
-    sahte = _Sahte(_cevap(
-        _metin("Oran iki çokluğun karşılaştırmasıdır."),
-        NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
-           input={"ogretmen": "matematik", "gerekce": "g"})))
+def test_a_lead_in_mod_oner_sonraki_tur_cevabi_yazar():
+    # Review round 2, finding NB1(a): a lead-in plus mod_oner in round 1, the
+    # real answer in round 2 — final = lead-in + answer, joined; no reset; one
+    # suggestion; two model rounds, not the early-returning one this fixed.
+    sahte = _Sahte(
+        _cevap(_metin("Önce müfredata bakayım."),
+              NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
+                 input={"ogretmen": "matematik", "gerekce": "g"})),
+        _cevap(_metin("Oran iki çokluğun karşılaştırmasıdır.")))
+    istemci = ClaudeClient(api_key="test", client=sahte)
+    resetlendi = []
+    olay = {"event": "mode_suggestion", "ogretmen": "matematik"}
+    loop = istemci.chat_with_tools(
+        [{"role": "system", "content": "S"}, {"role": "user", "content": "q"}],
+        [{"name": MOD_ONER_TOOL, "description": "d", "parameters": {"type": "object"}}],
+        lambda ad, args: ToolOutcome(ok=True, text="gösterildi", olay=olay),
+        on_reset=lambda: resetlendi.append(True))
+    assert not resetlendi
+    assert loop.text == "Önce müfredata bakayım.\n\nOran iki çokluğun karşılaştırmasıdır."
+    assert len(sahte.istekler) == 2
+    assert loop.olaylar == [olay]
+
+
+def test_b_tam_cevap_mod_oner_bos_sonraki_tur_cevabi_degistirmez():
+    # NB1(b): a complete answer plus mod_oner in round 1, an empty round 2 —
+    # final = the round-1 answer, unchanged; still no reset.
+    sahte = _Sahte(
+        _cevap(_metin("Oran iki çokluğun karşılaştırmasıdır."),
+              NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
+                 input={"ogretmen": "matematik", "gerekce": "g"})),
+        _cevap())
     istemci = ClaudeClient(api_key="test", client=sahte)
     resetlendi = []
     olay = {"event": "mode_suggestion", "ogretmen": "matematik"}
@@ -174,20 +219,69 @@ def test_dongu_metin_ve_mod_oner_ayni_turda_cevabi_korur():
         on_reset=lambda: resetlendi.append(True))
     assert not resetlendi
     assert loop.text == "Oran iki çokluğun karşılaştırmasıdır."
-    assert len(sahte.istekler) == 1          # exactly one model round
+    assert len(sahte.istekler) == 2
     assert loop.olaylar == [olay]
+
+
+def test_c_mod_oner_gercek_aracla_karisirsa_eskisi_gibi_resetlenir():
+    # NB1(c): mod_oner mixed with a real tool in the same round is not
+    # event-only — ordinary reset semantics still apply to that round's text.
+    sahte = _Sahte(
+        _cevap(_metin("Bakıyorum."),
+              NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
+                 input={"ogretmen": "matematik", "gerekce": "g"}),
+              NS(type="tool_use", id="t2", name="baska_arac", input={})),
+        _cevap(_metin("Gerçek cevap.")))
+    istemci = ClaudeClient(api_key="test", client=sahte)
+    resetlendi = []
+    olay = {"event": "mode_suggestion", "ogretmen": "matematik"}
+
+    def dispatch(ad, args):
+        if ad == MOD_ONER_TOOL:
+            return ToolOutcome(ok=True, text="gösterildi", olay=olay)
+        return ToolOutcome(ok=True, text="araç sonucu")
+
+    loop = istemci.chat_with_tools(
+        [{"role": "system", "content": "S"}, {"role": "user", "content": "q"}],
+        [{"name": MOD_ONER_TOOL, "description": "d", "parameters": {"type": "object"}},
+         {"name": "baska_arac", "description": "d", "parameters": {"type": "object"}}],
+        dispatch, on_reset=lambda: resetlendi.append(True))
+    assert resetlendi == [True]          # the mixed round's lead-in is reset, as before
+    assert loop.text == "Gerçek cevap."
+    assert loop.olaylar == [olay]         # the olay itself is still collected
+
+
+def test_d_chat_events_lead_in_akiste_answer_reset_yok(rt):
+    # NB1(d): the SSE stream must not carry answer_reset for cases (a)/(b).
+    # chat_events wires its "answer_reset" event to on_reset one-to-one (see
+    # chat_events' `reset()` closure) — proven here through the real
+    # ClaudeClient.chat_with_tools, not a stubbed-out one, with the streaming
+    # fake client (_Sahte.stream/_SahteAkis) since chat_events always streams.
+    sahte = _Sahte(
+        _cevap(_metin("Önce müfredata bakayım."),
+              NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
+                 input={"ogretmen": "matematik", "gerekce": "Bu bir oran sorusu."})),
+        _cevap(_metin("Oran iki çokluğun karşılaştırmasıdır.")))
+    rt.llm = ClaudeClient(api_key="test", client=sahte)
+    olaylar = list(rt.chat_events(messages=SORU, session_id="s", okur="ogrenci"))
+    adlar = [o["event"] for o in olaylar]
+    assert "answer_reset" not in adlar
+    assert adlar.count("mode_suggestion") == 1
+    yuk = olaylar[-1]["payload"]
+    assert yuk["answer"] == "Önce müfredata bakayım.\n\nOran iki çokluğun karşılaştırmasıdır."
 
 
 def test_ayni_turda_iki_mod_oner_tek_oneri_birakir():
     # Minor 5: the model is told to call mod_oner once; nothing enforces that.
     # Two suggestions in one answer must not leave two competing buttons —
     # the first wins.
-    sahte = _Sahte(_cevap(
-        _metin("Cevap."),
-        NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
-           input={"ogretmen": "matematik", "gerekce": "g1"}),
-        NS(type="tool_use", id="t2", name=MOD_ONER_TOOL,
-           input={"ogretmen": "turkce", "gerekce": "g2"})))
+    sahte = _Sahte(
+        _cevap(_metin("Cevap."),
+              NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
+                 input={"ogretmen": "matematik", "gerekce": "g1"}),
+              NS(type="tool_use", id="t2", name=MOD_ONER_TOOL,
+                 input={"ogretmen": "turkce", "gerekce": "g2"})),
+        _cevap())
     istemci = ClaudeClient(api_key="test", client=sahte)
 
     def dispatch(ad, args):
@@ -200,6 +294,21 @@ def test_ayni_turda_iki_mod_oner_tek_oneri_birakir():
         dispatch)
     assert loop.text == "Cevap."
     assert loop.olaylar == [{"event": "mode_suggestion", "ogretmen": "matematik"}]
+
+
+def test_chat_events_iki_mod_oner_akiste_tek_olay_kalir(rt):
+    # NB2: chat_events' own SSE emission dedupes too, matching chat()'s payload.
+    sahte = _Sahte(
+        _cevap(_metin("Cevap."),
+              NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
+                 input={"ogretmen": "matematik", "gerekce": "g1"}),
+              NS(type="tool_use", id="t2", name=MOD_ONER_TOOL,
+                 input={"ogretmen": "turkce", "gerekce": "g2"})),
+        _cevap())
+    rt.llm = ClaudeClient(api_key="test", client=sahte)
+    olaylar = list(rt.chat_events(messages=SORU, session_id="s", okur="ogrenci"))
+    adlar = [o["event"] for o in olaylar]
+    assert adlar.count("mode_suggestion") == 1
 
 
 def test_chat_events_oneriyi_aninda_yayar_mod_degismez(rt, monkeypatch):
@@ -292,9 +401,14 @@ def test_mod_onerisi_kapali_dispatch_de_reddeder(rt, monkeypatch):
     assert not sonuc["oneri"].ok           # defence in depth, even if declared elsewhere
 
 
-# ── minor 4: perform_incremental_reindex is not shielded from a broken skill ─
+# ── finding 4 (ruling, round 2): cron's reindex must not depend on skills ──
 
-def test_perform_incremental_reindex_bozuk_skill_durdurur(tmp_path, monkeypatch):
+def test_perform_incremental_reindex_bozuk_skille_ragmen_calisir(tmp_path, monkeypatch):
+    # Ruling, review round 2: cron's reindex needs no teacher skill at all, so
+    # it builds its runtime with skills={} and never calls
+    # assistant_skills.varsayilan() — a broken SKILL.md must not freeze every
+    # sync's BM25 refresh. Proven here by making varsayilan() itself raise:
+    # if perform_incremental_reindex ever called it, this would fail loudly.
     import src.assistant_core as core
     from src.assistant_skills import SkillHatasi
 
@@ -303,5 +417,5 @@ def test_perform_incremental_reindex_bozuk_skill_durdurur(tmp_path, monkeypatch)
 
     monkeypatch.setattr(core.assistant_skills, "varsayilan", bozuk)
     (tmp_path / "output").mkdir()
-    with pytest.raises(SkillHatasi):
-        core.perform_incremental_reindex(tmp_path)
+    stats = core.perform_incremental_reindex(tmp_path)
+    assert isinstance(stats, dict)

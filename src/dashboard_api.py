@@ -345,12 +345,16 @@ def _assistant_runtime():
                 video_kaynagi=_canli_videolar,
             )
         except Exception as exc:
-            from src.assistant_skills import SkillHatasi
             # SkillHatasi's own message names which skill and why (spec "Hata ve
             # boşluk durumları"); logging only the type name lost that — the
             # reader still gets the generic "assistant_unavailable" either way,
-            # this is only what lands in the log.
-            detay = f": {exc}" if isinstance(exc, SkillHatasi) else ""
+            # this is only what lands in the log. Checked by name, not
+            # `isinstance` against an import done here: importing
+            # src.assistant_skills inside this handler would itself raise if
+            # that module were the thing broken, and the reader would get a
+            # bare 500 instead of AssistantUnavailableError (review round 2,
+            # finding NB3).
+            detay = f": {exc}" if type(exc).__name__ == "SkillHatasi" else ""
             app.logger.error(
                 "Assistant subsystem unavailable (%s)%s", type(exc).__name__, detay
             )

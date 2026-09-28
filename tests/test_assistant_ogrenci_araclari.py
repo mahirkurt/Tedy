@@ -624,6 +624,29 @@ def test_bozuk_skill_hatasi_log_hangi_skil_ve_nedeni_soyler(api, monkeypatch, ca
     assert "matematik: gövde başlığı eksik: 'Sınırlar'" in caplog.text
 
 
+def test_assistant_skills_ice_aktarilamasa_bile_genel_hata_verir(api, monkeypatch):
+    # Review round 2, finding NB3: the except handler used to do
+    # `from src.assistant_skills import SkillHatasi` inside itself — if that
+    # module were the thing broken, the import would raise again and the
+    # reader would get a bare 500 instead of AssistantUnavailableError. The
+    # handler now checks the exception's type name, no import at all; proven
+    # here by making src.assistant_skills unimportable and confirming the
+    # generic error path (an unrelated RuntimeError) still resolves cleanly.
+    import sys
+
+    import src.assistant_core as core
+
+    class Sahte:
+        def __init__(self, root, **kw):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(core, "AssistantRuntime", Sahte)
+    monkeypatch.setattr(api, "_ASSISTANT_RUNTIME", None)
+    monkeypatch.setitem(sys.modules, "src.assistant_skills", None)
+    with pytest.raises(api.AssistantUnavailableError):
+        api._assistant_runtime()
+
+
 def test_canli_program_api_schedule_ile_ayni_haftayi_verir(api, monkeypatch):
     monkeypatch.setattr(api, "_scraped", lambda: {"ders_programi": [_kopya(HAFTA)]})
     with api.app.test_client() as c:
