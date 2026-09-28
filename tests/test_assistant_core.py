@@ -788,3 +788,52 @@ def test_system_prompt_says_what_to_do_when_the_textbook_is_missing():
     p = AssistantRuntime.SYSTEM_PROMPT
     assert "kind='textbook'" in p and "`kitap_sayfa`" in p
     assert "başka bir sınıfın kitabını onun kitabıymış gibi sunma" in p.replace('"\n        "', "")
+
+
+# ── /api/assistant/plan: a prior-year report is not a weakness (final
+# review of docs/superpowers/plans/2026-09-28-pano-eksiklikleri.md, Minor 5b) ──
+
+def _gelisim_projesi(tmp_path: Path, semester: str, ogretim_yili: str):
+    _write(tmp_path / "output" / "academic_year.json",
+          json.dumps({"year": ogretim_yili}))
+    _write(tmp_path / "output" / "scraped_data.json", json.dumps({
+        "odevlerim": {"homework": {"rows": []}},
+        "gelisim_raporu": {
+            "semester": semester,
+            "grades": [{"Ders": "Matematik", "1. Sınav": "40"}],
+        },
+    }))
+
+
+def test_plan_zayif_ders_onceki_yil_raporundan_cikarilmaz(tmp_path: Path):
+    """A gelişim report still on last year's semester ("2025-2026 4.
+    Arakarne" while TEDY is in 2026-2027) must not produce a "kısa
+    ölçme-değerlendirme" block: its "1. Sınav" column is last year's grade,
+    not this year's weakness."""
+    _gelisim_projesi(tmp_path, "2025-2026 4. Arakarne", "2026-2027")
+    runtime = AssistantRuntime(tmp_path)
+    blocks = runtime._build_rule_based_plan("plan yap")
+    assert not any(b["type"] == "assessment" for b in blocks)
+
+
+def test_plan_zayif_ders_guncel_yil_raporundan_cikarilir(tmp_path: Path):
+    """The same report, but naming the current school year, still yields a
+    weak-course practice block — the gate must not hide current data too."""
+    _gelisim_projesi(tmp_path, "2026-2027 1. Dönem", "2026-2027")
+    runtime = AssistantRuntime(tmp_path)
+    blocks = runtime._build_rule_based_plan("plan yap")
+    assert any(b["type"] == "assessment" and "Matematik" in b["title"] for b in blocks)
+
+
+def test_guncel_ogretim_yili_dosyadan_okunur(tmp_path: Path):
+    from src.assistant_core import _guncel_ogretim_yili_dosyadan
+    (tmp_path / "academic_year.json").write_text(
+        json.dumps({"year": "2026-2027"}), encoding="utf-8")
+    assert _guncel_ogretim_yili_dosyadan(tmp_path) == "2026-2027"
+
+
+def test_guncel_ogretim_yili_dosya_yoksa_bilinmez(tmp_path: Path):
+    from src.assistant_core import _guncel_ogretim_yili_dosyadan
+    assert _guncel_ogretim_yili_dosyadan(tmp_path) is None
+    (tmp_path / "academic_year.json").write_text("not json", encoding="utf-8")
+    assert _guncel_ogretim_yili_dosyadan(tmp_path) is None

@@ -138,4 +138,41 @@ test.describe('weekend', () => {
     await expect(page.locator('.calendar-nav__label')).toHaveText('28 Eylül - 2 Ekim 2026')
     await expect(heads).toHaveCount(6)
   })
+
+  // 2026-09-28 (final review, Minor 3): CalendarEvents fetches the route once
+  // and pages through the result by week offset — "Sonraki hafta" does not
+  // refetch — so a private lesson that recurs every Saturday has to already
+  // be in the response for the week ahead, or it vanishes the moment the
+  // reader steps forward even though nothing about the lesson changed. This
+  // is what /api/calendar/unified now sends (dashboard_api._birlesik_takvim
+  // expands weekend private lessons over the weeks ahead, not just this one).
+  test('a recurring Saturday private lesson survives "Sonraki hafta" too', async ({ page }) => {
+    await page.route('**/api/health', r => r.fulfill(json({
+      timestamp: '', success: true, scrape_errors: [], duration_seconds: 1,
+    })))
+    await page.route('**/api/calendar/unified', r => r.fulfill(json({ events: [
+      { id: 'p1', type: 'private_lesson', title: 'Fen Bilimleri · Deneme Hoca',
+        start: '2026-09-26T12:00:00', end: '2026-09-26T13:00:00',
+        color: '', course: 'Fen Bilimleri', courseFamily: 'teal', status: 'Özel Ders',
+        subtitle: 'Özel Ders • Deneme Hoca' },
+      { id: 'p2', type: 'private_lesson', title: 'Fen Bilimleri · Deneme Hoca',
+        start: '2026-10-03T12:00:00', end: '2026-10-03T13:00:00',
+        color: '', course: 'Fen Bilimleri', courseFamily: 'teal', status: 'Özel Ders',
+        subtitle: 'Özel Ders • Deneme Hoca' },
+    ] })))
+    await page.clock.setFixedTime(new Date('2026-09-24T10:30:00+03:00'))
+    await page.goto('/takvim')
+
+    const heads = page.locator('.calendar-grid__header')
+    await expect(heads).toHaveCount(7)
+    await expect(heads.nth(6)).toContainText('Cmt')
+    await expect(heads.nth(6)).toContainText('26 Eyl')
+
+    await page.getByRole('button', { name: 'Sonraki hafta' }).click()
+    await expect(page.locator('.calendar-nav__label')).toHaveText('28 Eylül - 3 Ekim 2026')
+    await expect(heads).toHaveCount(7)                 // the Saturday column survives
+    await expect(heads.nth(6)).toContainText('Cmt')
+    await expect(heads.nth(6)).toContainText('3 Eki')
+    await expect(page.locator('.calendar-event', { hasText: 'Fen Bilimleri' })).toBeVisible()
+  })
 })

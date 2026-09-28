@@ -99,7 +99,7 @@ def _ozel_ders(**kw):
 
 
 def test_birlesik_takvim_cumartesi_ve_pazar_ozel_derslerini_verir(api, monkeypatch):
-    _haftayi_sabitle(api, monkeypatch)
+    gunler = _haftayi_sabitle(api, monkeypatch)
     monkeypatch.setattr(api, "_scraped", lambda: {})
     monkeypatch.setattr(api, "_load_private_lessons", lambda: [
         _ozel_ders(),
@@ -108,16 +108,45 @@ def test_birlesik_takvim_cumartesi_ve_pazar_ozel_derslerini_verir(api, monkeypat
                    start_time="12:00", end_time="13:00"),
         _ozel_ders(id="pl3", course="Türkçe", is_recurring=False, weekday="",
                    date="2026-09-27", start_time="10:00", end_time="11:00"),
-        # A one-off lesson next Monday is outside this week.
+        # A one-off lesson next Monday is a later week's, not this one's.
         _ozel_ders(id="pl4", course="İngilizce", is_recurring=False, weekday="",
                    date="2026-09-28", start_time="10:00", end_time="11:00"),
     ])
-    ozel = sorted((e["start"], e["course"]) for e in _birlesik(api) if e["type"] == "private_lesson")
+    bu_hafta = {g.isoformat() for g in gunler}
+    ozel = sorted((e["start"], e["course"]) for e in _birlesik(api)
+                 if e["type"] == "private_lesson" and e["start"][:10] in bu_hafta)
     assert ozel == [
         ("2026-09-21T17:00:00", "Matematik"),
         ("2026-09-26T12:00:00", "Fen Bilimleri"),
         ("2026-09-27T10:00:00", "Türkçe"),
     ]
+
+
+def test_birlesik_takvim_sonraki_haftalarin_hafta_sonu_ozel_dersini_de_verir(api, monkeypatch):
+    """CalendarEvents fetches /api/calendar/unified once and pages through
+    the result by week offset — 'Sonraki hafta' does not refetch — so a
+    Saturday lesson that recurs every week has to already be in this
+    response for the weeks beyond the current one, or it disappears the
+    moment the reader steps forward even though nothing changed about the
+    lesson (final review of docs/superpowers/plans/2026-09-28-pano-eksiklikleri.md,
+    Minor 3)."""
+    _haftayi_sabitle(api, monkeypatch)
+    monkeypatch.setattr(api, "_scraped", lambda: {})
+    monkeypatch.setattr(api, "_load_private_lessons", lambda: [
+        _ozel_ders(id="pl2", course="Fen Bilimleri", weekday="Cumartesi",
+                   start_time="12:00", end_time="13:00"),
+        # A one-off lesson three weeks out, inside the expanded window.
+        _ozel_ders(id="pl4", course="İngilizce", is_recurring=False, weekday="",
+                   date="2026-10-12", start_time="10:00", end_time="11:00"),
+    ])
+    olaylar = _birlesik(api)
+    cumartesiler = sorted(e["start"] for e in olaylar
+                          if e["type"] == "private_lesson" and e["course"] == "Fen Bilimleri")
+    assert "2026-09-26T12:00:00" in cumartesiler       # this week
+    assert "2026-10-03T12:00:00" in cumartesiler        # next week ("Sonraki hafta")
+    assert len(cumartesiler) == len(set(cumartesiler)) == api._TAKVIM_OZEL_DERS_HAFTA
+    assert any(e["start"] == "2026-10-12T10:00:00" and e["course"] == "İngilizce"
+              for e in olaylar if e["type"] == "private_lesson")
 
 
 def test_bu_haftanin_tarihleri_pazartesiden_pazara(api):
@@ -191,6 +220,29 @@ def test_is_current_yoksa_son_hafta(api):
         ["week_label"] == HAFTA["week_label"]
     assert api._guncel_hafta([]) == {}
     assert api._guncel_hafta(None) == {}
+
+
+# ── 8d/e. One "is_current, else the last one" resolver, not three
+# (final review, Minor 4) ─────────────────────────────────────────────────
+
+def test_guncel_hafta_paylasilan_modulden_gelir(api):
+    """dashboard_api._guncel_hafta is src.hafta_secici.guncel_hafta itself —
+    not a re-implementation — so the unified calendar and the assistant's
+    BM25 timetable paragraph cannot silently drift apart again."""
+    from src.hafta_secici import guncel_hafta
+    assert api._guncel_hafta is guncel_hafta
+
+
+def test_bicimlendirici_paylasilan_guncel_hafta_ile_ayni_secimi_yapar(api):
+    """The BM25 paragraph's old copy filtered out non-dict weeks before
+    falling back to "the last one" — dashboard_api._guncel_hafta never did,
+    it only ever inspects the raw last element. On a week list ending in a
+    non-dict entry, with no is_current match, the two used to disagree;
+    now both read the same function and agree: no week at all."""
+    from src.assistant_core import _fmt_scraped_data
+    haftalar = [dict(_kopya(HAFTA), is_current=False), "bozuk-kayit"]
+    assert api._guncel_hafta(haftalar) == {}
+    assert "DERS PROGRAMI" not in _fmt_scraped_data({"ders_programi": haftalar})
 
 
 # ── 8c. Bugün's /api/calendar keeps the weekend's private lessons ────────────

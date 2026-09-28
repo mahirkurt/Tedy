@@ -349,9 +349,12 @@ def test_canli_takvim_birlesik_rotanin_etkinliklerini_aciklamayla_verir(api, mon
     assert all("description" not in e for e in rota)
     seminer = next(e for e in canli if e["title"] == "Veli Semineri")
     assert seminer["description"] == "<p>Seminer çevrim içi yapılacak.</p>" and seminer["location"] == "Teams"
-    # Private lessons beyond this week, which the week-bound route cannot draw.
+    # Private lessons across the weeks ahead — since 2026-09-28 the route
+    # itself (`rota`) draws these too (final review, Minor 3), so `canli`
+    # no longer strips and regenerates them; both carry the same wide set.
     ozel = sorted(e["start"] for e in canli if e["type"] == "private_lesson")
     assert len(ozel) >= 3 and len(set(ozel)) == len(ozel)
+    assert sorted(e["start"] for e in rota if e["type"] == "private_lesson") == ozel
 
     reg = build_registry(lambda q, k: [], takvim_kaynagi=api._canli_takvim)
     out = reg.dispatch(at.TAKVIM_TOOL, {"gun_sayisi": 14})
@@ -710,6 +713,34 @@ def test_bicimlendirici_rubrik_takvim_ek_sayfa_ve_profil():
     for sizmasin in ("uydurma@example.invalid", "00000000000", "99999", "0000 000 00 00",
                      "Hayali Veli", "Uydurma Öğrenci", "base64"):
         assert sizmasin not in metin, sizmasin
+
+
+# ── NOTLAR: a prior-year report is labelled, exactly as notlar_metni does
+# (final review of docs/superpowers/plans/2026-09-28-pano-eksiklikleri.md,
+# Minor 5a) ──────────────────────────────────────────────────────────────
+
+def test_bicimlendirici_onceki_yil_raporunu_etiketler():
+    from src.assistant_core import _fmt_scraped_data
+    # GELISIM's semester is "2025-2026 4. Arakarne"; TEDY is in 2026-2027.
+    metin = _fmt_scraped_data(_tam_veri(), "2026-2027")
+    assert "ÖNCEKİ ÖĞRETİM YILI" in metin
+    assert "2025-2026" in metin and "2026-2027" in metin
+
+
+def test_bicimlendirici_guncel_yil_raporunu_etiketlemez():
+    from src.assistant_core import _fmt_scraped_data
+    metin = _fmt_scraped_data(_tam_veri(), "2025-2026")
+    assert "ÖNCEKİ ÖĞRETİM YILI" not in metin
+
+
+def test_bicimlendirici_yil_bilinmiyorsa_etiketlemez():
+    """No `ogretim_yili` (the caller couldn't read academic_year.json, or
+    the caller is a test that predates this parameter): unknown is not
+    "old" — it must not hide the grades."""
+    from src.assistant_core import _fmt_scraped_data
+    metin = _fmt_scraped_data(_tam_veri())
+    assert "ÖNCEKİ ÖĞRETİM YILI" not in metin
+    assert "Matematik" in metin and "NOTLAR" in metin
 
 
 def test_bm25_ders_programini_ve_icerigi_bulur(tmp_path, monkeypatch):

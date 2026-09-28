@@ -31,6 +31,7 @@ os.chdir(PROJECT_ROOT)
 from src.env_loader import load_env
 from src.json_utils import atomic_json_dump
 from src.course_names import normalize_course
+from src.hafta_secici import guncel_hafta as _guncel_hafta
 from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.USER_ROLES etc.)
     ALLOWED_EMAILS,
     FULL_ACCESS_EMAILS,
@@ -582,20 +583,21 @@ def _normalize_weekday_name(value):
     return labels[idx]
 
 
-def _private_lessons_for_week(week_dates, hafta_sonu=False):
+def _private_lessons_for_week(week_dates):
     """Expand private lesson configs into concrete events for one week.
 
-    `hafta_sonu=True` (with seven `week_dates`) keeps Saturday and Sunday —
-    the unified calendar and the assistant's takvim both pass it: measured
-    2026-09-25, both of Işık's private lessons are on Saturday. Without it
-    only Monday to Friday is expanded (`_private_lessons_for_day`)."""
+    `week_dates` is always the seven Monday-to-Sunday dates of one week —
+    every caller (`_private_lessons_for_day`, the unified calendar's
+    `_birlesik_takvim`) passes all seven: measured 2026-09-25, both of
+    Işık's private lessons are on Saturday, so the weekend is part of the
+    week, not an opt-in."""
     events = []
     lessons = _load_private_lessons()
     if not lessons:
         return events
 
     monday = week_dates[0]
-    friday = week_dates[-1] if hafta_sonu else week_dates[4]
+    son_gun = week_dates[-1]
 
     for lesson in lessons:
         if not lesson.get("active", True):
@@ -614,9 +616,6 @@ def _private_lessons_for_week(week_dates, hafta_sonu=False):
             weekday_idx = _WEEKDAY_TO_INDEX.get(str(weekday_name).strip().lower())
             if weekday_idx is None:
                 continue
-            if weekday_idx > 4 and not hafta_sonu:
-                # Weekly calendar UI currently shows Mon-Fri.
-                continue
             day_date = week_dates[weekday_idx]
         else:
             date_str = str(lesson.get("date", "")).strip()
@@ -626,7 +625,7 @@ def _private_lessons_for_week(week_dates, hafta_sonu=False):
                 d = datetime.strptime(date_str, "%Y-%m-%d").date()
             except ValueError:
                 continue
-            if d < monday or d > friday:
+            if d < monday or d > son_gun:
                 continue
             day_date = d
 
@@ -664,7 +663,7 @@ def _private_lessons_for_day(day_date):
     (measured 2026-09-25)."""
     monday = day_date - timedelta(days=day_date.weekday())
     week_dates = [monday + timedelta(days=i) for i in range(7)]
-    events = _private_lessons_for_week(week_dates, hafta_sonu=True)
+    events = _private_lessons_for_week(week_dates)
     out = []
     for ev in events:
         try:
@@ -874,19 +873,22 @@ def _canli_sinavlar():
     return _sinav_listesi(_scraped(), now=istanbul_simdi())["exams"]
 
 
-# How far ahead the assistant's calendar reaches for private lessons; the
-# takvim tool caps its window at 60 days (assistant_tools._TAKVIM_EN_COK_GUN).
+# How many weeks ahead (from the current Monday) private lessons are
+# expanded — shared by the unified calendar route (_birlesik_takvim, so
+# "Sonraki hafta" has something to show for a recurring weekend lesson) and
+# the assistant's takvim tool (_canli_takvim); the takvim tool separately
+# caps its own text at 60 days (assistant_tools._TAKVIM_EN_COK_GUN).
 _TAKVIM_OZEL_DERS_HAFTA = 9
 
 
 def _canli_takvim():
-    """/api/calendar/unified's events, with two additions the page does not
+    """/api/calendar/unified's events, with one addition the page does not
     need: a portal event's description and place (the route drops
-    extendedProps; the assistant reads them), and private lessons for the
-    weeks ahead, weekends included — the route already draws this week's
-    weekend private lessons since Görev 2, but only this one week."""
+    extendedProps; the assistant reads them). Private lessons for the weeks
+    ahead are already in the route's own output (_birlesik_takvim, Görev 3),
+    so nothing is stripped or regenerated here any more."""
     data = _scraped()
-    olaylar = [dict(e) for e in _birlesik_takvim(data) if e.get("type") != "private_lesson"]
+    olaylar = [dict(e) for e in _birlesik_takvim(data)]
     ayrinti = {}
     takvim = data.get("takvim", [])
     for ev in takvim if isinstance(takvim, list) else []:
@@ -898,11 +900,6 @@ def _canli_takvim():
     for e in olaylar:
         if e.get("type") == "event" and e.get("id") in ayrinti:
             e["description"], e["location"] = ayrinti[e["id"]]
-    bugun = datetime.now().date()
-    pazartesi = bugun - timedelta(days=bugun.weekday())
-    for h in range(_TAKVIM_OZEL_DERS_HAFTA):
-        gunler = [pazartesi + timedelta(days=7 * h + i) for i in range(7)]
-        olaylar.extend(_private_lessons_for_week(gunler, hafta_sonu=True))
     return olaylar
 
 
@@ -1224,16 +1221,9 @@ def _to_photo_homework_row(
 
 # --- API endpoints (all require auth) ---
 
-def _guncel_hafta(weeks):
-    """The week the scraper saw selected (`is_current`), else the last one
-    (data written before that mark existed), else {}. /api/schedule's
-    `latest`, the assistant's ders_programi and the unified calendar all read
-    this one week. The scraper may keep the whole published year, so the last
-    element can be a week in June."""
-    if not isinstance(weeks, list) or not weeks:
-        return {}
-    son = weeks[-1] if isinstance(weeks[-1], dict) else {}
-    return next((w for w in weeks if isinstance(w, dict) and w.get("is_current")), son)
+# _guncel_hafta itself lives in src/hafta_secici.py (imported above), shared
+# with assistant_core so the two never re-implement "is_current, else the
+# last one" and drift apart again.
 
 
 def _program_verisi(data):
@@ -2490,10 +2480,18 @@ def _birlesik_takvim(data):
         })
 
     # 3. Private lessons, weekend included (CalendarEvents draws a Saturday or
-    # Sunday column in a week that has something on it).
-    for pev in _private_lessons_for_week(week_dates, hafta_sonu=True):
-        pev.update(_takvim_rengi(pev.get("course", "")))
-        events.append(pev)
+    # Sunday column in a week that has something on it), for the weeks ahead
+    # (_TAKVIM_OZEL_DERS_HAFTA), not only this one: CalendarEvents fetches
+    # this route once and filters the result client-side by week offset, so
+    # "Sonraki hafta" does not refetch — until 2026-09-28 only this week's
+    # private lessons were generated, so a Saturday lesson that recurs every
+    # week (both of Işık's do) vanished the moment the reader stepped
+    # forward, even though nothing about the lesson had changed.
+    for h in range(_TAKVIM_OZEL_DERS_HAFTA):
+        gunler = [week_dates[0] + timedelta(days=7 * h + i) for i in range(7)]
+        for pev in _private_lessons_for_week(gunler):
+            pev.update(_takvim_rengi(pev.get("course", "")))
+            events.append(pev)
 
     # 4. ÖGEP sessions
     ogep_rows = data.get("ogep", {}).get("sessions", {}).get("rows", [])
