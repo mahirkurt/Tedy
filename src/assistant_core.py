@@ -480,8 +480,19 @@ class ClaudeClient:
 
         kept_text = ""  # text an earlier event-only round wrote, carried into the final answer
         for _round in range(max_rounds):
+            round_on_delta = on_delta
+            if on_delta is not None and kept_text:
+                # This round continues text a round already put on the stream
+                # (kept_text is non-empty going in) — `_birlestir` puts a
+                # blank line between kept_text and what follows in the final
+                # joined answer, but the stream itself had no such break
+                # before this: the draft ran the two straight together
+                # ("…bakayım.Oran…"). Backend-only, cosmetic (review round 3,
+                # finding 4): one leading "\n\n" delta before this round's
+                # first non-empty chunk, so the draft matches the final text.
+                round_on_delta = self._ayracli_delta(on_delta)
             resp = self._request(system, turns, tier, out.usage, tools=tools,
-                                 on_delta=on_delta)
+                                 on_delta=round_on_delta)
             uses = [b for b in (resp.content or []) if getattr(b, "type", "") == "tool_use"]
             round_text = self._text(resp)
             if not uses:
@@ -500,14 +511,19 @@ class ClaudeClient:
                 getattr(use, "name", "") in OLAY_ARACLARI for use in uses)
             if son_tur:
                 kept_text = self._birlestir(kept_text, round_text)
-            elif on_reset is not None and round_text:
-                on_reset()
+            elif round_text:
                 # A real tool call reasserts ordinary reset semantics for THIS
                 # round's text; any text kept from an earlier event-only round
                 # is discarded with it rather than left as an unlabelled prefix
                 # ahead of a retry the model may frame completely differently
                 # — the simpler of the two correct options the review offered
-                # (see the fix report).
+                # (see the fix report). Cleared whether or not on_reset is
+                # given: /chat and /v1 pass on_reset=None (nothing to stream a
+                # reset to), but kept_text must still be dropped there too, or
+                # those endpoints answer differently from /stream (review
+                # round 3, finding 2).
+                if on_reset is not None:
+                    on_reset()
                 kept_text = ""
 
             # Back exactly as received: thinking blocks are signed and must not
@@ -551,12 +567,24 @@ class ClaudeClient:
                     # one answer (it is told not to, but nothing enforced it)
                     # must not leave two competing "geçelim mi?" buttons behind.
                     out.olaylar.append(dict(outcome.olay))
-                if son_tur and outcome.ok:
-                    # The model already knows mod_oner ran (it just called it);
-                    # what it needs is confirmation that this round's own text
-                    # already reached the reader, so it neither repeats itself
-                    # nor stalls waiting for a "result" to react to.
-                    body = self.MOD_ONER_TUR_NOTU
+                if son_tur:
+                    if outcome.ok:
+                        # The model already knows mod_oner ran (it just called
+                        # it); what it needs is confirmation that this round's
+                        # own text already reached the reader, so it neither
+                        # repeats itself nor stalls waiting for a "result" to
+                        # react to.
+                        body = self.MOD_ONER_TUR_NOTU
+                    else:
+                        # mod_oner itself failed (a bad ogretmen argument, say)
+                        # but the round's text was kept regardless — it was
+                        # already added to kept_text before this dispatch loop
+                        # ran, unconditionally on son_tur, not on the call
+                        # succeeding. Without this the model saw only "HATA:
+                        # …" and, not knowing its text had already been shown,
+                        # repeated it while retrying the call (review round 3,
+                        # finding 3).
+                        body = f"HATA: {outcome.error}\n\n{self.MOD_ONER_TUR_NOTU}"
                 elif outcome.ok:
                     first = len(out.citations) + 1
                     out.citations.extend(outcome.citations)
@@ -580,6 +608,22 @@ class ClaudeClient:
 
             if out.budget_exhausted or len(out.tool_calls) >= max_calls \
                     or _round == max_rounds - 1:
+                if son_tur:
+                    # The round that just hit a budget boundary (the last
+                    # round, or a mod_oner call that itself reached max_calls)
+                    # was event-only-with-text — kept_text already holds a
+                    # complete answer. Sending SON_TUR_NOTU on top of the
+                    # tool_result's own MOD_ONER_TUR_NOTU asked the model to
+                    # both "say nothing, your text was shown" and "answer now"
+                    # in the same turn, producing a duplicated or wasted
+                    # re-ask. There is nothing left to ask for: return the
+                    # kept text directly, with no further request, and do not
+                    # count a complete answer as exhausted unless a call was
+                    # genuinely dropped this round (out.budget_exhausted was
+                    # already set True by the max_calls skip above, if so;
+                    # review round 3, finding 1).
+                    out.text = kept_text
+                    return out
                 out.budget_exhausted = True
                 # After the tool results, in the same user turn: the API wants
                 # every tool_result first.
@@ -686,6 +730,23 @@ class ClaudeClient:
         if not sonraki:
             return onceki
         return f"{onceki}\n\n{sonraki}"
+
+    @staticmethod
+    def _ayracli_delta(on_delta: Callable[[str], None]) -> Callable[[str], None]:
+        """Wrap on_delta so the round's first non-empty chunk is preceded by
+        one "\n\n" delta — used only for a round that continues kept_text, so
+        the streamed draft gets the same blank-line break `_birlestir` puts in
+        the final joined answer (review round 3, finding 4; backend-only, the
+        UI is unchanged)."""
+        yazildi = False
+
+        def sarici(parca: str) -> None:
+            nonlocal yazildi
+            if not yazildi and parca:
+                on_delta("\n\n")
+                yazildi = True
+            on_delta(parca)
+        return sarici
 
 
 HybridChatRouter = None  # Removed — Gemini-only

@@ -311,6 +311,149 @@ def test_chat_events_iki_mod_oner_akiste_tek_olay_kalir(rt):
     assert adlar.count("mode_suggestion") == 1
 
 
+# ── review round 3 ───────────────────────────────────────────────────────────
+
+def test_i1a_son_turda_mod_oner_ile_tam_cevap_hemen_donuyor():
+    # Finding 1 (Important): the last-round boundary. A son_tur round that
+    # also happens to be the final allowed round used to fall into the
+    # SON_TUR_NOTU re-ask, stacked on top of the tool_result's own
+    # MOD_ONER_TUR_NOTU ("say nothing, your text was shown") — a duplicated
+    # or wasted re-ask. It must instead return kept_text immediately: one
+    # request only, budget_exhausted False (a complete answer is not exhausted).
+    sahte = _Sahte(_cevap(
+        _metin("TAM CEVAP."),
+        NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
+           input={"ogretmen": "matematik", "gerekce": "g"})))
+    istemci = ClaudeClient(api_key="test", client=sahte)
+    olay = {"event": "mode_suggestion", "ogretmen": "matematik"}
+    loop = istemci.chat_with_tools(
+        [{"role": "system", "content": "S"}, {"role": "user", "content": "q"}],
+        [{"name": MOD_ONER_TOOL, "description": "d", "parameters": {"type": "object"}}],
+        lambda ad, args: ToolOutcome(ok=True, text="gösterildi", olay=olay),
+        max_rounds=1)
+    assert loop.text == "TAM CEVAP."
+    assert loop.budget_exhausted is False
+    assert len(sahte.istekler) == 1
+    assert loop.olaylar == [olay]
+
+
+def test_i1b_max_calls_sinirinda_mod_oner_ile_kept_text_donuyor():
+    # Finding 1: the max_calls boundary. Rounds 1-3 use a real tool (3 calls);
+    # round 4 is "TAM CEVAP." + mod_oner, whose call is itself the one that
+    # reaches max_calls=4. Same fix, same assertions, different trigger.
+    sahte = _Sahte(
+        _cevap(NS(type="tool_use", id="t1", name="baska_arac", input={})),
+        _cevap(NS(type="tool_use", id="t2", name="baska_arac", input={})),
+        _cevap(NS(type="tool_use", id="t3", name="baska_arac", input={})),
+        _cevap(_metin("TAM CEVAP."),
+              NS(type="tool_use", id="t4", name=MOD_ONER_TOOL,
+                 input={"ogretmen": "matematik", "gerekce": "g"})))
+    istemci = ClaudeClient(api_key="test", client=sahte)
+
+    def dispatch(ad, args):
+        if ad == MOD_ONER_TOOL:
+            return ToolOutcome(ok=True, text="gösterildi",
+                               olay={"event": "mode_suggestion", "ogretmen": "matematik"})
+        return ToolOutcome(ok=True, text="araç sonucu")
+
+    loop = istemci.chat_with_tools(
+        [{"role": "system", "content": "S"}, {"role": "user", "content": "q"}],
+        [{"name": MOD_ONER_TOOL, "description": "d", "parameters": {"type": "object"}},
+         {"name": "baska_arac", "description": "d", "parameters": {"type": "object"}}],
+        dispatch, max_rounds=10, max_calls=4)
+    assert loop.text == "TAM CEVAP."
+    assert loop.budget_exhausted is False
+    assert len(sahte.istekler) == 4          # one request per round, no re-ask
+
+
+def test_min2_gercek_arac_sirasinda_kept_text_on_reset_olmadan_da_silinir():
+    # Minor 2: kept_text used to be cleared only inside `on_reset is not
+    # None`, so /chat and /v1 (on_reset=None) never cleared it — a real
+    # tool's round would leave the earlier lead-in glued onto the final
+    # answer there, while /stream (on_reset given) was fine. Both shapes
+    # must now give the same answer.
+    def sahte_yaz():
+        return _Sahte(
+            _cevap(_metin("Önce müfredata bakayım."),
+                  NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
+                     input={"ogretmen": "matematik", "gerekce": "g"})),
+            _cevap(_metin("Araca bakıyorum."),
+                  NS(type="tool_use", id="t2", name="baska_arac", input={})),
+            _cevap(_metin("Cevap.")))
+
+    def dispatch(ad, args):
+        if ad == MOD_ONER_TOOL:
+            return ToolOutcome(ok=True, text="gösterildi",
+                               olay={"event": "mode_suggestion", "ogretmen": "matematik"})
+        return ToolOutcome(ok=True, text="araç sonucu")
+
+    tools = [{"name": MOD_ONER_TOOL, "description": "d", "parameters": {"type": "object"}},
+             {"name": "baska_arac", "description": "d", "parameters": {"type": "object"}}]
+
+    # /stream shape: on_reset given, called once for the real-tool round.
+    resetlendi = []
+    istemci = ClaudeClient(api_key="test", client=sahte_yaz())
+    loop = istemci.chat_with_tools(
+        [{"role": "system", "content": "S"}, {"role": "user", "content": "q"}],
+        tools, dispatch, on_reset=lambda: resetlendi.append(True))
+    assert resetlendi == [True]
+    assert loop.text == "Cevap."
+
+    # /chat, /v1 shape: no on_reset at all — kept_text must still be cleared.
+    istemci2 = ClaudeClient(api_key="test", client=sahte_yaz())
+    loop2 = istemci2.chat_with_tools(
+        [{"role": "system", "content": "S"}, {"role": "user", "content": "q"}],
+        tools, dispatch, on_reset=None)
+    assert loop2.text == "Cevap."
+
+
+def test_min3_basarisiz_mod_oner_de_metin_gosterildi_der():
+    # Minor 3: mod_oner failing (a bad ogretmen argument) in a son_tur round
+    # must not leave the model thinking its text was never shown — the error
+    # tool_result also carries the "already shown, do not repeat" sentence.
+    sahte = _Sahte(
+        _cevap(_metin("Bakalım."),
+              NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
+                 input={"ogretmen": "gecersiz", "gerekce": "g"})),
+        _cevap(_metin("Devamı.")))
+    istemci = ClaudeClient(api_key="test", client=sahte)
+    loop = istemci.chat_with_tools(
+        [{"role": "system", "content": "S"}, {"role": "user", "content": "q"}],
+        [{"name": MOD_ONER_TOOL, "description": "d", "parameters": {"type": "object"}}],
+        lambda ad, args: ToolOutcome(ok=False, error="ogretmen bilinmiyor"))
+    assert loop.text == "Bakalım.\n\nDevamı."
+    ikinci_istek = sahte.istekler[1]
+    tool_result = ikinci_istek["messages"][-1]["content"][0]
+    assert tool_result["is_error"] is True
+    assert "HATA:" in tool_result["content"]
+    assert "okura gösterildi" in tool_result["content"]
+
+
+def test_min4_akista_kept_text_sonrasi_ayrac_eklenir():
+    # Minor 4, cosmetic: the streamed draft must not run the kept round and
+    # the continuation round together with no separator. Backend-only —
+    # `_ayracli_delta` puts one "\n\n" delta before the first non-empty chunk
+    # of a round that continues kept_text; the final joined text (which the
+    # UI actually renders) is unaffected — `_birlestir` already did this.
+    sahte = _Sahte(
+        _cevap(_metin("Önce müfredata bakayım."),
+              NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
+                 input={"ogretmen": "matematik", "gerekce": "g"})),
+        _cevap(_metin("Oran iki çokluğun karşılaştırmasıdır.")))
+    istemci = ClaudeClient(api_key="test", client=sahte)
+    parcalar = []
+    olay = {"event": "mode_suggestion", "ogretmen": "matematik"}
+    loop = istemci.chat_with_tools(
+        [{"role": "system", "content": "S"}, {"role": "user", "content": "q"}],
+        [{"name": MOD_ONER_TOOL, "description": "d", "parameters": {"type": "object"}}],
+        lambda ad, args: ToolOutcome(ok=True, text="gösterildi", olay=olay),
+        on_delta=parcalar.append)
+    akis = "".join(parcalar)
+    assert "\n\nOran" in akis                 # separator before the continuation round
+    assert not akis.startswith("\n\n")        # the very first round gets no leading separator
+    assert akis == loop.text                  # the stream and the final answer now agree
+
+
 def test_chat_events_oneriyi_aninda_yayar_mod_degismez(rt, monkeypatch):
     def model(*, dispatch, **_):
         dispatch(MOD_ONER_TOOL, {"ogretmen": "matematik", "gerekce": "Bu bir oran sorusu."})
