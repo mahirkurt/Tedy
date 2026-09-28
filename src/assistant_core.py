@@ -574,7 +574,7 @@ class ClaudeClient:
                         # own text already reached the reader, so it neither
                         # repeats itself nor stalls waiting for a "result" to
                         # react to.
-                        body = self.MOD_ONER_TUR_NOTU
+                        body = f"Öneri iletildi. {self.MOD_ONER_TUR_NOTU}"
                     else:
                         # mod_oner itself failed (a bad ogretmen argument, say)
                         # but the round's text was kept regardless — it was
@@ -629,9 +629,17 @@ class ClaudeClient:
                 # every tool_result first.
                 results.append({"type": "text", "text": self.SON_TUR_NOTU})
                 out.text = ""
+                # P7b: this re-ask continues kept_text from an earlier
+                # event-only round exactly as an ordinary round does — the
+                # same "\n\n" separator wrapping applies, or the streamed
+                # draft glues the continuation onto kept_text with no break
+                # while the final joined text (_birlestir, below) has one.
+                son_tur_on_delta = on_delta
+                if on_delta is not None and kept_text:
+                    son_tur_on_delta = self._ayracli_delta(on_delta)
                 for _ in range(2):
                     final = self._request(system, turns, tier, out.usage, tools=tools,
-                                          tool_choice={"type": "none"}, on_delta=on_delta)
+                                          tool_choice={"type": "none"}, on_delta=son_tur_on_delta)
                     out.text = self._text(final)
                     if out.text:
                         break
@@ -712,7 +720,10 @@ class ClaudeClient:
     # its lead-in or answer already reached the reader (chat_with_tools kept
     # it rather than resetting it), so it should continue from there instead
     # of repeating itself or waiting for a "result" that has nothing to add.
-    MOD_ONER_TUR_NOTU = ("Öneri iletildi. Bu turda yazdığın metin okura gösterildi; tekrarlama. "
+    # Split in two (final-fix item P7a): "Öneri iletildi." is true only when
+    # mod_oner itself succeeded — a FAILED call must not claim the suggestion
+    # reached the reader, only that the round's own text did.
+    MOD_ONER_TUR_NOTU = ("Bu turda yazdığın metin okura gösterildi; tekrarlama. "
                         "Cevabın tamamsa hiçbir şey yazma; eksikse kaldığın yerden devam et.")
 
     @staticmethod
@@ -737,14 +748,27 @@ class ClaudeClient:
         one "\n\n" delta — used only for a round that continues kept_text, so
         the streamed draft gets the same blank-line break `_birlestir` puts in
         the final joined answer (review round 3, finding 4; backend-only, the
-        UI is unchanged)."""
+        UI is unchanged).
+
+        A whitespace-only chunk before the first real content is dropped
+        outright (not forwarded) rather than becoming visible text stuck
+        right after the separator, and that first real chunk is itself
+        lstripped — otherwise a model that streams a leading space ("Oran"
+        arriving as " " then "Oran…") would leave a visible gap ("\n\n
+        Oran…") that `_birlestir`'s equivalent join never has, since
+        `_birlestir` strips both fragments before joining them (final-fix
+        item P7c)."""
         yazildi = False
 
         def sarici(parca: str) -> None:
             nonlocal yazildi
-            if not yazildi and parca:
+            if not yazildi:
+                if not parca.strip():
+                    return  # whitespace-only chunk before real content: dropped
                 on_delta("\n\n")
                 yazildi = True
+                on_delta(parca.lstrip())
+                return
             on_delta(parca)
         return sarici
 

@@ -73,10 +73,10 @@ def _metin(t):
     return NS(type="text", text=t)
 
 
-def _istek(rt, ogretmen):
+def _istek(rt, ogretmen, okur="ogrenci"):
     sahte = _Sahte(_cevap(_metin("tamam")))
     rt.llm = ClaudeClient(api_key="test", client=sahte)
-    rt.chat(messages=SORU, session_id="s", okur="ogrenci", ogretmen=ogretmen)
+    rt.chat(messages=SORU, session_id="s", okur=okur, ogretmen=ogretmen)
     return sahte.istekler[0]
 
 
@@ -86,6 +86,14 @@ def test_temel_blok_her_modda_bayt_bayt_ayni(rt):
     genel, mat, tr = (_istek(rt, o) for o in ("genel", "matematik", "turkce"))
     assert genel["system"][0] == mat["system"][0] == tr["system"][0]
     assert genel["system"][0]["text"] == rt._system_prompt()
+
+    # Final-fix item 9: pin the same invariant for okur="aile", not only the
+    # student reader — the base system block must be byte-identical across
+    # modes for the family reader too.
+    genel_aile, mat_aile, tr_aile = (
+        _istek(rt, o, okur="aile") for o in ("genel", "matematik", "turkce"))
+    assert genel_aile["system"][0] == mat_aile["system"][0] == tr_aile["system"][0]
+    assert genel_aile["system"][0]["text"] == rt._system_prompt()
 
 
 def test_ogretmen_ikinci_onbellekli_blok(rt):
@@ -427,6 +435,9 @@ def test_min3_basarisiz_mod_oner_de_metin_gosterildi_der():
     assert tool_result["is_error"] is True
     assert "HATA:" in tool_result["content"]
     assert "okura gösterildi" in tool_result["content"]
+    # Final-fix item P7a: a FAILED mod_oner never claims the suggestion itself
+    # reached the reader — only the round's own text did.
+    assert "Öneri iletildi." not in tool_result["content"]
 
 
 def test_min4_akista_kept_text_sonrasi_ayrac_eklenir():
@@ -545,6 +556,59 @@ def test_mod_onerisi_kapali_dispatch_de_reddeder(rt, monkeypatch):
 
 
 # ── finding 4 (ruling, round 2): cron's reindex must not depend on skills ──
+
+# ── final-fix batch ──────────────────────────────────────────────────────────
+
+def test_p7b_son_tur_yeniden_soru_kept_text_ile_ayracli_akar():
+    # Final-fix item P7b: the SON_TUR_NOTU re-ask (budget exhausted, non-son_tur
+    # round) must stream through `_ayracli_delta` when kept_text is non-empty
+    # and on_delta is given — matching the ordinary per-round wrapping.
+    # Round 1 is event-only-with-text (kept_text set); round 2 calls a real
+    # tool with no text, hits the round boundary (max_rounds=2) not as
+    # son_tur, so it falls into the SON_TUR_NOTU re-ask carrying kept_text.
+    # Before the fix the re-ask streamed unwrapped: the draft glued the
+    # continuation straight onto kept_text with no separator while the final
+    # joined text (_birlestir) has one — the two disagreed.
+    sahte = _Sahte(
+        _cevap(_metin("Önce bakayım."),
+              NS(type="tool_use", id="t1", name=MOD_ONER_TOOL,
+                 input={"ogretmen": "matematik", "gerekce": "g"})),
+        _cevap(NS(type="tool_use", id="t2", name="baska_arac", input={})),
+        _cevap(_metin("Devamı burada.")))
+    istemci = ClaudeClient(api_key="test", client=sahte)
+
+    def dispatch(ad, args):
+        if ad == MOD_ONER_TOOL:
+            return ToolOutcome(ok=True, text="gösterildi",
+                               olay={"event": "mode_suggestion", "ogretmen": "matematik"})
+        return ToolOutcome(ok=True, text="araç sonucu")
+
+    parcalar = []
+    loop = istemci.chat_with_tools(
+        [{"role": "system", "content": "S"}, {"role": "user", "content": "q"}],
+        [{"name": MOD_ONER_TOOL, "description": "d", "parameters": {"type": "object"}},
+         {"name": "baska_arac", "description": "d", "parameters": {"type": "object"}}],
+        dispatch, max_rounds=2, on_delta=parcalar.append)
+    akis = "".join(parcalar)
+    assert loop.text == "Önce bakayım.\n\nDevamı burada."
+    assert akis == loop.text
+
+
+def test_p7c_ayracli_delta_bosluklari_atar_ilk_gercek_parcayi_lstriplar():
+    # Final-fix item P7c: `_ayracli_delta` must drop whitespace-only chunks
+    # that arrive before the first real (non-whitespace) chunk — not forward
+    # them verbatim after the "\n\n" separator — and lstrip that first real
+    # chunk itself, so a model that streams a leading space before its actual
+    # continuation ("Önce bakayım." -> " " -> "Oran...") does not leave a
+    # visible gap after the separator ("\n\n Oran…").
+    parcalar = []
+    sarici = ClaudeClient._ayracli_delta(parcalar.append)
+    sarici("")            # empty chunk before real content: dropped
+    sarici("   ")         # whitespace-only chunk before real content: dropped
+    sarici(" Oran ")      # first real chunk: separator + lstripped
+    sarici(" iki çokluk")  # later chunks forwarded verbatim (no further strip)
+    assert parcalar == ["\n\n", "Oran ", " iki çokluk"]
+
 
 def test_perform_incremental_reindex_bozuk_skille_ragmen_calisir(tmp_path, monkeypatch):
     # Ruling, review round 2: cron's reindex needs no teacher skill at all, so
