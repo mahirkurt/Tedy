@@ -6,7 +6,12 @@ the original implementation (see /tmp/test_a_dtd_after_4k.py,
 /tmp/test_c_ziplie.py, /tmp/test_d_bad_encoding.py): a DTD/entity gate that
 only scanned the first 4096 bytes, a zip-bomb cap that trusted the archive's
 own declared (and forgeable) uncompressed size, and a narrow except clause
-that let an XML-declared unknown encoding's LookupError escape."""
+that let an XML-declared unknown encoding's LookupError escape.
+
+Fix round 2 adds a fourth: the fix-round-1 byte-level regex gate is not
+encoding-proof — a UTF-16-encoded document.xml puts a NUL byte between
+every ASCII letter, so the literal bytes "<!DOCTYPE"/"<!ENTITY" never occur
+even though the decoded document declares both."""
 import struct
 import time
 import tracemalloc
@@ -178,3 +183,30 @@ def test_bilinmeyen_kodlama_metadata_olur_hata_firlatmaz(tmp_path):
         z.writestr("word/document.xml", xml.encode("ascii"))
     sonuc = _adaptor(tmp_path).extract(yol, "x.docx")  # must not raise
     assert sonuc["source_kind"] == "metadata"
+
+
+def test_utf16_kodlanmis_dtd_de_yakalanir(tmp_path):
+    # Fix round 2 — coordinator-verified: a byte-level scan cannot be made
+    # encoding-proof. UTF-16 puts a NUL byte between every ASCII letter, so
+    # the literal bytes "<!DOCTYPE"/"<!ENTITY" never occur in the raw byte
+    # string even though the decoded document declares both — and
+    # ElementTree.fromstring, which does decode it, still expanded &a; to
+    # "PWNED". The gate must sit at the parser (expat), not at the bytes.
+    #
+    # Uses real w:p/w:r/w:t structure (not the coordinator's bare <d>&a;</d>
+    # example) so a bypassed gate actually surfaces in the paragraph text —
+    # a non-Word root produces no <w:p> matches and would read "metadata"
+    # either way, silently passing regardless of whether the entity was
+    # caught. Measured pre-fix with this structure: source_kind "docx",
+    # text "PWNED" (entity expanded, gate bypassed).
+    xml = (
+        '<?xml version="1.0" encoding="UTF-16"?>'
+        '<!DOCTYPE w:document [<!ENTITY a "PWNED">]>'
+        f'<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>&a;</w:t></w:r></w:p></w:body></w:document>'
+    ).encode("utf-16")
+    yol = tmp_path / "utf16.docx"
+    with zipfile.ZipFile(yol, "w") as z:
+        z.writestr("word/document.xml", xml)
+    sonuc = _adaptor(tmp_path).extract(yol, "x.docx")
+    assert sonuc["source_kind"] == "metadata"
+    assert "PWNED" not in sonuc["text"]

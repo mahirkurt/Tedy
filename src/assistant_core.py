@@ -24,6 +24,7 @@ import fnmatch
 import functools
 import zipfile
 from xml.etree import ElementTree
+from xml.parsers import expat as _expat
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -58,6 +59,43 @@ DOCX_EXTENSIONS = {".docx"}
 DOCX_XML_SINIRI = 50 * 1024 * 1024
 _WORD_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 EMBED_TARGET_EXTENSIONS = {".md", ".txt", ".json", ".csv", ".html", ".htm", ".pdf"}
+
+
+class _DocxDtdSinyali(Exception):
+    """Internal signal only: expat's own DOCTYPE/entity handler fired."""
+
+
+def _docx_declares_dtd_or_entity(veri: bytes) -> bool:
+    """Whether `veri` declares a DTD or an entity, decided by expat's own
+    declaration handlers rather than a byte-level scan.
+
+    Fix round 2 (coordinator-verified): a byte scan cannot be made
+    encoding-proof. A UTF-16-encoded document.xml puts a NUL byte between
+    every ASCII letter, so the literal bytes "<!DOCTYPE"/"<!ENTITY" never
+    occur in the raw byte string even though the decoded document declares
+    both — and ElementTree.fromstring, which does decode it, still expands
+    the entity. expat is the same underlying parser ElementTree uses, so it
+    decodes `veri` exactly the same way; asking it directly, instead of
+    grepping the undecoded bytes, is not fooled by any encoding it
+    understands."""
+    parser = _expat.ParserCreate()
+
+    def _isaretle(*_args, **_kwargs):
+        raise _DocxDtdSinyali()
+
+    parser.StartDoctypeDeclHandler = _isaretle
+    parser.EntityDeclHandler = _isaretle
+    try:
+        parser.Parse(veri, True)
+    except _DocxDtdSinyali:
+        return True
+    except _expat.ExpatError:
+        # Any other parse failure here is not this gate's business: the
+        # ElementTree.fromstring parse below raises its own error (caught
+        # by _extract_docx_text's broad except), or this document was
+        # never going to declare anything anyway.
+        return False
+    return False
 
 # Whitelist: scrape data + downloaded educational content
 DEFAULT_INCLUDE_DIRS = {"output", "content"}
@@ -1139,7 +1177,13 @@ class FileAdapters:
         (forgeable) ZipInfo.file_size; and the except clause is broadened so
         no parsing exception — e.g. LookupError from an XML-declared
         encoding name Python's codec registry does not know — escapes and
-        aborts a whole reindex over one bad attachment."""
+        aborts a whole reindex over one bad attachment.
+
+        Fix round 2 (coordinator-verified): a byte-level regex cannot be
+        made encoding-proof (see _docx_declares_dtd_or_entity's docstring),
+        so the real DTD/entity gate now runs at the parser (expat) rather
+        than on undecoded bytes; the regex is kept only as a cheap first
+        filter for the common ASCII/UTF-8 case."""
         try:
             with zipfile.ZipFile(file_path) as arsiv:
                 bilgi = arsiv.getinfo("word/document.xml")
@@ -1170,12 +1214,20 @@ class FileAdapters:
                 veri = b"".join(parcalar)
             # No defusedxml (not installed; the design allows no new
             # dependency). A real document.xml never declares a DTD or an
-            # entity, so either one refuses parsing outright — scanned
-            # across the whole byte string, not a fixed-size prefix a large
-            # leading comment could push the real marker past. veri is
-            # already bounded by DOCX_XML_SINIRI above, so this scan stays
-            # cheap regardless of document size.
+            # entity, so either one refuses parsing outright. The regex is
+            # a cheap first filter for the common ASCII/UTF-8 case, scanned
+            # across the whole (already size-bounded) byte string rather
+            # than a fixed prefix a large leading comment could push the
+            # real marker past — but it is not the real gate: a byte scan
+            # cannot be made encoding-proof (a UTF-16-encoded document puts
+            # a NUL byte between every ASCII letter, so these literal bytes
+            # never occur even though the decoded document declares both).
+            # The actual gate is _docx_declares_dtd_or_entity, which asks
+            # expat — the same parser ElementTree uses — directly, so no
+            # encoding it understands gets past it.
             if re.search(rb"<!DOCTYPE|<!ENTITY", veri, re.IGNORECASE):
+                return ""
+            if _docx_declares_dtd_or_entity(veri):
                 return ""
             kok = ElementTree.fromstring(veri)
         except Exception:
