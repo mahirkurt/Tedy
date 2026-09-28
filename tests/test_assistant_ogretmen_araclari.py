@@ -6,11 +6,17 @@
   mode_suggestion olayı bırakır.
 Her ikisi de öbür modda dispatch() tarafından da reddedilir (aile_kaynak_ara gibi).
 """
+import re
+from pathlib import Path
+
 import pytest
 
+from src import assistant_skills
 from src.assistant_tools import (MOD_GEREKCE_SINIRI, MOD_ONER_TOOL, SKILL_TOOL, ToolOutcome,
                                  build_registry)
 from tests.skill_ornegi import KAYNAKLAR, iki_skill, skill_yaz
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture(autouse=True)
@@ -147,3 +153,68 @@ def test_skill_kaynagi_sayfa_sayfa(tmp_path):
 
 def test_tooloutcome_olay_varsayilan_bos():
     assert ToolOutcome(ok=True).olay is None
+
+
+# ── final-fix item 9: TS fixtures pinned to the Python shapes ──────────────
+#
+# A simple regex/key-set comparison — not a general JS parser — good enough
+# for these small, hand-written object literals. It must fail the moment
+# either side (the TS fixture or the Python shape) gains or loses a key.
+
+def _ust_seviye_anahtarlar(kaynak: str, baslangic_isareti: str) -> set:
+    """The top-level keys of the object literal whose first '{' follows
+    `baslangic_isareti`, found by brace-depth counting so nested objects
+    (karsilama/hizli_sorular) do not leak their own keys into the result."""
+    start = kaynak.index(baslangic_isareti)
+    brace_start = kaynak.index("{", start)
+    depth, i = 0, brace_start
+    while i < len(kaynak):
+        if kaynak[i] == "{":
+            depth += 1
+        elif kaynak[i] == "}":
+            depth -= 1
+            if depth == 0:
+                break
+        i += 1
+    govde = kaynak[brace_start + 1:i]
+
+    parcalar, derinlik, basi = [], 0, 0
+    for j, ch in enumerate(govde):
+        if ch in "{[(":
+            derinlik += 1
+        elif ch in "}])":
+            derinlik -= 1
+        elif ch == "," and derinlik == 0:
+            parcalar.append(govde[basi:j])
+            basi = j + 1
+    parcalar.append(govde[basi:])
+
+    anahtarlar = set()
+    for parca in parcalar:
+        m = re.match(r"\s*([a-zA-Z_][a-zA-Z0-9_]*)", parca)
+        if m:
+            anahtarlar.add(m.group(1))
+    return anahtarlar
+
+
+def test_e2e_ogretmenler_fikstürü_python_seciciyle_ayni_anahtarlari_tasir():
+    kaynak = (ROOT / "dashboard" / "tests" / "e2e" / "_gorsel-fixtures.ts").read_text("utf-8")
+    ts_anahtarlar = _ust_seviye_anahtarlar(kaynak, "const ogretmen = (")
+
+    skiller = assistant_skills.varsayilan()
+    assert skiller, "gerçek skiller yüklenemedi — karşılaştırma anlamsız olurdu"
+    py_anahtarlar = set(next(iter(skiller.values())).secici_ozeti())
+    assert all(set(s.secici_ozeti()) == py_anahtarlar for s in skiller.values())
+
+    assert ts_anahtarlar == py_anahtarlar
+
+
+def test_e2e_oneri_fikstürü_mod_oner_olayiyla_ayni_anahtarlari_tasir(reg):
+    kaynak = (ROOT / "dashboard" / "tests" / "e2e" / "asistan-ogretmen.spec.ts").read_text("utf-8")
+    ts_anahtarlar = _ust_seviye_anahtarlar(kaynak, "const ONERI = {")
+
+    out = reg.dispatch(MOD_ONER_TOOL, {"ogretmen": "matematik", "gerekce": "x"}, ogretmen="genel")
+    assert out.ok
+    py_anahtarlar = set(out.olay) - {"event"}
+
+    assert ts_anahtarlar == py_anahtarlar
