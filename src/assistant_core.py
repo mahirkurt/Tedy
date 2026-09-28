@@ -22,6 +22,8 @@ import threading
 import time
 import fnmatch
 import functools
+import zipfile
+from xml.etree import ElementTree
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -50,6 +52,11 @@ TEXT_EXTENSIONS = {
 }
 PDF_EXTENSIONS = {".pdf"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".gif"}
+DOCX_EXTENSIONS = {".docx"}
+# word/document.xml is read whole; a real homework sheet is kilobytes. The cap
+# keeps a hostile or broken archive (a zip bomb) from ballooning in memory.
+DOCX_XML_SINIRI = 50 * 1024 * 1024
+_WORD_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 EMBED_TARGET_EXTENSIONS = {".md", ".txt", ".json", ".csv", ".html", ".htm", ".pdf"}
 
 # Whitelist: scrape data + downloaded educational content
@@ -1003,6 +1010,15 @@ class FileAdapters:
                 "warnings": [] if text else ["pdf_no_text"],
             }
 
+        if ext in DOCX_EXTENSIONS:
+            text = self._extract_docx_text(file_path)
+            return {
+                "text": text or self._metadata_only_text(rel_path, file_path, reason="docx_no_text"),
+                "source_kind": "docx" if text else "metadata",
+                "confidence": 0.8 if text else 0.2,
+                "warnings": [] if text else ["docx_no_text"],
+            }
+
         if ext in IMAGE_EXTENSIONS:
             text = self._extract_image_text(file_path)
             if text:
@@ -1104,6 +1120,47 @@ class FileAdapters:
         # scanned PDF with no text layer. A real fact about the file, not an
         # extraction failure — return "" normally rather than raising.
         return ""
+
+    def _extract_docx_text(self, file_path: Path) -> str:
+        """A .docx's paragraphs, from word/document.xml, with the stdlib only.
+
+        Teachers attach Word sheets as often as PDFs (plan 2026-09-28
+        portal-ekleri). Before this a .docx fell through to the unknown-
+        extension branch and its zip bytes were read as text. Tabs and line
+        breaks inside a paragraph are kept; paragraphs are blank-line
+        separated so the chunker keeps them apart. An unreadable archive is
+        "" (metadata only), never garbage."""
+        try:
+            with zipfile.ZipFile(file_path) as arsiv:
+                bilgi = arsiv.getinfo("word/document.xml")
+                if bilgi.file_size > DOCX_XML_SINIRI:
+                    return ""
+                veri = arsiv.read(bilgi)
+            # No defusedxml (not installed; the design allows no new
+            # dependency). A real document.xml never declares a DTD, so one
+            # that does is refused before parsing — no entity of any kind is
+            # expanded. Behind that, ElementTree fetches no external entity and
+            # the bundled expat (2.6.1, measured 2026-09-28) refuses entity
+            # amplification ("billion laughs") on its own.
+            if b"<!DOCTYPE" in veri[:4096].upper():
+                return ""
+            kok = ElementTree.fromstring(veri)
+        except (KeyError, zipfile.BadZipFile, ElementTree.ParseError, OSError, ValueError):
+            return ""
+        paragraflar: list[str] = []
+        for p in kok.iter(f"{_WORD_NS}p"):
+            parcalar: list[str] = []
+            for el in p.iter():
+                if el.tag == f"{_WORD_NS}t" and el.text:
+                    parcalar.append(el.text)
+                elif el.tag == f"{_WORD_NS}tab":
+                    parcalar.append("\t")
+                elif el.tag in (f"{_WORD_NS}br", f"{_WORD_NS}cr"):
+                    parcalar.append("\n")
+            satir = "".join(parcalar).strip()
+            if satir:
+                paragraflar.append(satir)
+        return "\n\n".join(paragraflar)
 
     def _extract_image_text(self, file_path: Path) -> str:
         if not self.config.enable_ocr:
