@@ -233,3 +233,13 @@ def test_notlar_rotasi_onceki_yili_bildirir(api, monkeypatch, donem, yil, beklen
         yanit = c.get("/api/grades").get_json()
     assert yanit["priorYear"] is beklenen
     assert {k: v for k, v in yanit.items() if k != "priorYear"} == rapor   # the report itself unchanged
+
+
+def test_notlar_rotasi_sozluk_olmayan_raporu_oldugu_gibi_dondurur(api, monkeypatch):
+    """A non-dict gelisim_raporu (portal read failure, or a shape the scraper
+    hasn't normalised yet) is served as-is — no priorYear key invented on it,
+    and no crash from calling .get() on it."""
+    monkeypatch.setattr(api, "_scraped", lambda: {"gelisim_raporu": "invalid"})
+    with api.app.test_client() as c:
+        yanit = c.get("/api/grades").get_json()
+    assert yanit == "invalid"
