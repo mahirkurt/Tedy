@@ -1,6 +1,6 @@
 # 7. sınıf Sosyal Bilgiler — soru kalıpları
 
-Bir konuyu anlattıktan sonra "Sıra sende" sorusunu bu kalıplardan biriyle yaz. Soruyu anlattığın kazanımın süreç bileşenine (sorgulama, çıkarım yapma, yorumlama, özetleme) bağla. Yanlış seçenekleri kavram yanılgılarından kur; tarih ve yer adlarını yalnız kaynağa dayanarak yaz.
+Bir konuyu anlattıktan sonra "Sıra sende" sorusunu bu kalıplardan biriyle yaz. Soruyu anlattığın kazanımın dayandığı kavramsal beceriye (Sorgulama KB2.8, Çıkarım Yapma KB2.10, Yorumlama KB2.14, Özetleme KB2.3) bağla. Yanlış seçenekleri kavram yanılgılarından kur; tarih ve yer adlarını yalnız kaynağa dayanarak yaz.
 
 ### Çoktan seçmeli kavram sorusu
 
@@ -29,23 +29,23 @@ Bir konuyu anlattıktan sonra "Sıra sende" sorusunu bu kalıplardan biriyle yaz
 ### Neden-sonuç eşleştirme
 
 **Tür:** acik_uclu
-**Ne zaman:** Olayları nedenleri ve sonuçlarıyla yorumlama bileşenlerinde.
+**Ne zaman:** Olayları nedenleri ve sonuçlarıyla yorumlama (KB2.14) becerisinde.
 **Nasıl yazılır:** İki ya da üç neden ve sonucu karışık ver; öğrenciden eşleştirmesini ve her eşleşmeyi tek cümleyle açıklamasını iste.
 **Örnek:** Nedenleri sonuçlarıyla eşleştir. Nedenler: 1) Ticaret yollarının denetimi 2) İskân politikası. Sonuçlar: A) Fethedilen bölgelerde kalıcı hâkimiyetin sağlanması B) Devletin gümrük ve vergi gelirlerinin artması.
 **Cevap:** 1-B: ticaret yollarını denetleyen devlet gümrük ve vergi geliri elde eder. 2-A: iskân, fethedilen topraklara nüfus yerleştirerek kalıcı hâkimiyeti sağlar.
 
-### Kaynak yorumlama: olgu mu, görüş mü?
+### Kaynak yorumlama: kanıta dayalı bilgi mi, görüş mü?
 
 **Tür:** acik_uclu
-**Ne zaman:** Kaynak okuma ve çıkarım yapma bileşenlerinde.
-**Nasıl yazılır:** İki ya da üç cümlelik kısa bir metin ver; öğrenciden olgu ve görüş cümlelerini ayırmasını ve bir gerekçe yazmasını iste.
-**Örnek:** "Türkiye İktisat Kongresi 1923'te toplandı. Kongre, dönemin en önemli toplantısıydı." Hangi cümle olgu, hangisi görüş?
-**Cevap:** Birinci cümle olgudur (tarihi kanıtlanabilir); ikinci cümle görüştür (bir değerlendirmedir).
+**Ne zaman:** Kaynak okuma ve çıkarım yapma (KB2.10) becerisinde.
+**Nasıl yazılır:** İki ya da üç cümlelik kısa bir metin ver; öğrenciden kanıta dayalı bilgi ve görüş cümlelerini ayırmasını ve bir gerekçe yazmasını iste.
+**Örnek:** "Türkiye İktisat Kongresi 1923'te toplandı. Kongre, dönemin en önemli toplantısıydı." Hangi cümle kanıta dayalı bilgi, hangisi görüş?
+**Cevap:** Birinci cümle kanıta dayalı bilgidir (tarihi kanıtlanabilir); ikinci cümle görüştür (bir değerlendirmedir).
 
 ### Zaman çizelgesi sıralama
 
 **Tür:** acik_uclu
 **Ne zaman:** Kronoloji ve dönem kavrama çalışmalarında.
 **Nasıl yazılır:** Üç ya da dört olayı karışık ver; öğrenciden eskiden yeniye sıralamasını iste. Tarihleri yalnız kaynaktan al.
-**Örnek:** Şu olayları eskiden yeniye sırala: Cumhuriyet'in ilanı (1923), İstanbul'un fethi (1453), Osmanlı Devleti'nin kuruluşu (1299).
-**Cevap:** 1299 kuruluş → 1453 İstanbul'un fethi → 1923 Cumhuriyet'in ilanı.
+**Örnek:** Şu olayları eskiden yeniye sırala: Cumhuriyet'in ilanı (1923), İstanbul'un fethi (1453), ilk Türk matbaasının açılması (1727).
+**Cevap:** 1453 İstanbul'un fethi → 1727 ilk Türk matbaasının açılması → 1923 Cumhuriyet'in ilanı.

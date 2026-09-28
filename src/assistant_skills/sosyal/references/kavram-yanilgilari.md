@@ -10,7 +10,7 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### Geçmişteki insanlar bugünün değerleriyle yargılanabilir
 
-**Doğrusu:** Geçmişi anlamak için o dönemin koşullarına, bilgisine ve değerlerine bakmak gerekir. Bugünün bakışıyla yargılamak (anakronizm) olayların nedenini gizler.
+**Doğrusu:** Geçmişi anlamak için o dönemin koşullarına, bilgisine ve değerlerine bakmak gerekir. Bugünün ölçüleriyle geçmişi yargılamak olayların nedenini gizler.
 **Nasıl düzeltirsin:** "O dönemde insanlar ne biliyordu, neye sahip değildi?" sorusunu sor; aynı olayı dönemin bir insanının gözünden anlat.
 **Kontrol sorusu:** 16. yüzyılda bir tüccarın ticaret yolu seçerken neleri düşünmüş olabileceğini yaz.
 
@@ -20,11 +20,11 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 **Nasıl düzeltirsin:** "Bir toprağı almak mı zor, orada kalıcı olmak mı?" diye sor; kalıcılığı sağlayan politikaları listele.
 **Kontrol sorusu:** İskân politikasının fethedilen topraklarda kalıcı olmaya nasıl katkısı vardı?
 
-### Osmanlı yenilikleri yalnız askerî alandaydı ve Batı'yı kopyalamaktı
+### Osmanlı yenilikleri Batı'yı kopyalamaktan ibaretti
 
-**Doğrusu:** Yenilikler askerî alanın yanı sıra sosyal, kültürel ve ekonomik alanlarda da yapıldı (ör. matbaa ve yeni okullar kültürel ve sosyal alandaki yeniliklerdendir). Değişen dünya dengeleri karşısında devletin kendi ihtiyaçlarına göre şekillendi; neden ve sonuçlarıyla değerlendirilir.
-**Nasıl düzeltirsin:** Yenilikleri askerî, sosyal, kültürel ve ekonomik alanlara göre grupla ve her birinin hangi soruna çözüm arandığını yanına yaz.
-**Kontrol sorusu:** Askerî olmayan bir Osmanlı yeniliği söyle ve hangi ihtiyaçtan doğduğunu açıkla.
+**Doğrusu:** Osmanlı Devleti bu yenilikleri yaparken Avrupa'yı gerçekten örnek aldı (Lale Devri'nde "Batı örnek alınarak modernleşme hareketleri başlamıştır"; sanayileşmede "Batı'daki fabrikalaşma modeli örnek alındı"). Ama örnek almak kopyalamak değildi: yenilikler askerî alanın yanı sıra sosyal, kültürel ve ekonomik alanlarda da yapıldı ve devletin kendi ihtiyaçlarına göre şekillendi. Etki de tek yönlü değildi: Osmanlı-Avrupa ilişkileri Avrupa'yı da etkiledi.
+**Nasıl düzeltirsin:** Yenilikleri askerî, sosyal, kültürel ve ekonomik alanlara göre grupla ve her birinin hangi soruna çözüm arandığını yanına yaz; "örnek almak" ile "aynısını yapmak" arasındaki farkı sor.
+**Kontrol sorusu:** 1727'de açılan ilk Türk matbaası askerî değil hangi alanda bir yenilikti?
 
 ### Küreselleşme yalnız ekonomiyle ilgilidir
 
@@ -54,17 +54,17 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 **Doğrusu:** Cumhuriyet, egemenliğin kalıtımla değil halk tarafından seçilen temsilcilerle kullanıldığı yönetim biçimidir. Demokrasi ise hak ve özgürlüklere, katılıma ve hukukun üstünlüğüne dayanan bir yönetim anlayışıdır. İkisi birbirini tamamlar ama aynı kavram değildir.
 **Nasıl düzeltirsin:** İki kavramın tanımını yan yana yaz ve her birinin neyi anlattığını ayır: biri devletin başının nasıl belirlendiğini, öbürü yönetimin nasıl işlediğini.
-**Kontrol sorusu:** Türkiye Cumhuriyeti'nin temel niteliklerinden ikisini söyle.
+**Kontrol sorusu:** Cumhuriyetle yönetilen ama demokratik olmayan bir ülke olabilir mi? Neden?
 
-### Kaynakta yazan her şey olgudur
+### Kaynakta yazan her şey kanıta dayalı doğru bilgidir
 
-**Doğrusu:** Bir kaynakta olgular (kanıtlanabilir bilgiler) ile görüşler (yorumlar, değerlendirmeler) bir arada bulunur. Her kaynak kim tarafından, ne zaman ve hangi amaçla yazıldığıyla okunur; birincil ve ikincil kaynak ayrılır.
+**Doğrusu:** Bir kaynakta kanıta dayalı bilgiler ile görüşler (yorumlar, değerlendirmeler) bir arada bulunur. Her kaynak kim tarafından, ne zaman ve hangi amaçla yazıldığıyla okunur; dönemin kaynağı (o zamandan kalan belge, fotoğraf, anı) ile sonradan yazılmış kaynak (bugünün incelemesi) ayrılır.
 **Nasıl düzeltirsin:** Bir paragrafın cümlelerini "kanıtlanabilir mi?" sorusuyla tek tek ayır.
-**Kontrol sorusu:** "Osmanlı Devleti 1299'da kuruldu" ve "Osmanlı Devleti en güzel mimariye sahipti" cümlelerinden hangisi olgu, hangisi görüştür?
+**Kontrol sorusu:** "İstanbul 1453 yılında fethedildi" ve "Osmanlı Devleti en güzel mimariye sahipti" cümlelerinden hangisi kanıta dayalı bilgi, hangisi görüştür?
 
 ### Millî kalkınma yalnız fabrika kurmaktır
 
-**Doğrusu:** Cumhuriyet'in ilk yıllarındaki millî kalkınma hamleleri sanayinin yanında tarımı, ulaşımı (demiryolları) ve bankacılığı da kapsadı; 17 Şubat 1923'te İzmir'de toplanan Türkiye İktisat Kongresi'nin Misak-ı İktisadi kararları bu hamlelerin yönünü belirledi.
+**Doğrusu:** Cumhuriyet'in ilk yıllarındaki millî kalkınma hamleleri sanayiyi, demiryolu yapımını, çay tarımını ve havacılığı da kapsadı; 17 Şubat 1923'te İzmir'de toplanan Türkiye İktisat Kongresi'nin Misak-ı İktisadi kararları bu hamlelerin yönünü belirledi.
 **Nasıl düzeltirsin:** Kalkınmayı alanlara ayır ve her alan için bir örnek hamle bul.
 **Kontrol sorusu:** Demiryolu yapımı ekonomik kalkınmaya nasıl katkı sağlar?
 
@@ -76,7 +76,7 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### Özel gereksinimli bireylere yardım etmek fırsat eşitliği demektir
 
-**Doğrusu:** Fırsat eşitliği acımak ya da yardım etmek değil, herkesin eğitim, ulaşım, iletişim gibi haklara eşit biçimde erişebilmesidir: rampa, sesli uyarı, kabartma yazı, erişilebilir bilgi.
+**Doğrusu:** Fırsat eşitliği yalnız acımak ya da yardım etmekle sınırlı değildir; herkesin eğitim, ulaşım, iletişim gibi haklara eşit biçimde erişebilmesidir: rampa, sesli uyarı, kabartma yazı, erişilebilir bilgi. Şefkatli olmak (D9.2) ve destekleyici davranışlar sergilemek bu erişimi sağlamanın bir parçasıdır.
 **Nasıl düzeltirsin:** Okulun ya da mahallenin bir yerini tekerlekli sandalye kullanan birinin gözünden gez: nerede engel var, ne düzenleme gerekir?
 **Kontrol sorusu:** Okulunda fırsat eşitliğini artıracak bir düzenleme öner.
 
@@ -95,5 +95,5 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 ### MÖ tarihlerde sayı büyüdükçe olay yakına gelir
 
 **Doğrusu:** Milattan önce (MÖ) sayılar geriye doğru sayılır: MÖ 3000, MÖ 500'den daha eskidir. Milattan sonra (MS) sayı büyüdükçe olay bugüne yaklaşır.
-**Nasıl düzeltirsin:** Sıfırı ortada olan bir zaman çizgisi çiz; MÖ tarihleri solda, MS tarihleri sağda yerleştir.
+**Nasıl düzeltirsin:** Milat ortada olan bir zaman çizgisi çiz; MÖ tarihleri solda, MS tarihleri sağda yerleştir.
 **Kontrol sorusu:** MÖ 776 ile MÖ 3500'den hangisi daha eskidir?
