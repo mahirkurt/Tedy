@@ -13,15 +13,15 @@ Bir konuyu anlattıktan sonra "Sıra sende" sorusunu bu kalıplardan biriyle yaz
 ### Doğru-yanlış ve gerekçe
 
 **Tür:** dogru_yanlis
-**Ne zaman:** Bir genellemenin sınırını sınamak için (çarpma büyütür mü, iki çokluk birlikte artınca orantılı mı).
+**Ne zaman:** Bir genellemenin sınırını sınamak için (çarpma büyütür mü, iki nicelik birlikte artınca orantılı mı).
 **Nasıl yazılır:** Tek bir iddia; öğrenciden doğru ya da yanlış demesi ve bir örnekle gerekçelendirmesi istenir.
 **Örnek:** "Bir sayıyı herhangi bir sayıya bölünce sonuç her zaman küçülür." Doğru mu, yanlış mı? Bir örnekle göster.
-**Cevap:** Yanlış. 8 ÷ 1/2 = 16; 1'den küçük pozitif bir sayıya bölünce sonuç büyür.
+**Cevap:** Yanlış, ve yalnız pozitif sayılar için tartışılabilir: 8 ÷ 1/2 = 16; pozitif bir sayıyı 0 ile 1 arasındaki bir sayıya bölünce sonuç büyür. Negatif sayılarda yön tersine döner: −12 ÷ 1/2 = −24, ve −24, −12'den küçüktür.
 
 ### Kısa cevaplı hesap
 
 **Tür:** kisa_cevap
-**Ne zaman:** Tek bir sayı ya da ifadeyle cevaplanan hesaplar için (hacim, olasılık, denklem kökü).
+**Ne zaman:** Tek bir sayı ya da ifadeyle cevaplanan hesaplar için (hacim, olasılık, denklem çözümü).
 **Nasıl yazılır:** Cevap tek bir sayı ve gerekiyorsa birimi olsun; kabul edilen yazımları düşün (0,5 ve 1/2 gibi).
 **Örnek:** Kenar uzunlukları 3 cm, 4 cm ve 5 cm olan dikdörtgenler prizmasının hacmi kaç cm³'tür?
 **Cevap:** 60 (cm³). 3 × 4 × 5 = 60.
@@ -55,5 +55,13 @@ Bir konuyu anlattıktan sonra "Sıra sende" sorusunu bu kalıplardan biriyle yaz
 **Tür:** kisa_cevap
 **Ne zaman:** Olay, tümleyen ve eşit olasılıklı olay kazanımlarında.
 **Nasıl yazılır:** Tüm çıktıları listelenebilen bir deney; cevap kesir olarak.
-**Örnek:** Bir zar atılıyor. Üst yüze asal sayı gelme olasılığı kaçtır?
+**Örnek:** Bir sayı küpü atılıyor. Üst yüze asal sayı gelme olasılığı kaçtır?
 **Cevap:** 3/6 = 1/2. Asal sayılar 2, 3 ve 5'tir.
+
+### Yüzde problemi
+
+**Tür:** kisa_cevap
+**Ne zaman:** Doğru orantı kazanımında yüzde problemleri için (MAT.7.1.7).
+**Nasıl yazılır:** Bir niceliğin yüzdesini bulma, yüzdesi verilen bir niceliğin tamamını bulma, bir niceliği diğerinin yüzdesi olarak ifade etme ya da bir niceliği yüzdeyle artırma/azaltma durumlarından biri seçilir; birim oran (yüzdenin 1 birimine karşılık gelen miktar) üzerinden çözülür.
+**Örnek:** Bir pantolonun etiket fiyatı 800 TL'dir. Mağaza %25 indirim yapıyor. İndirimli fiyat kaç TL'dir?
+**Cevap:** 600 TL. İndirim miktarı: 800 × 25/100 = 200 TL; indirimli fiyat: 800 − 200 = 600 TL.

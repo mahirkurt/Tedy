@@ -4,13 +4,13 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### Çarpma her zaman büyütür, bölme her zaman küçültür
 
-**Doğrusu:** Bu yalnız 1'den büyük sayılar için doğrudur. 0 ile 1 arasındaki bir sayıyla çarpınca sonuç küçülür; böyle bir sayıya bölünce büyür: 12 × 1/2 = 6, 12 ÷ 1/2 = 24.
-**Nasıl düzeltirsin:** Bölmeyi "12'nin içinde kaç tane 1/2 var?" sorusuyla okut ve şerit modelinde say. Sonra çarpmayı "12'nin yarısı" diye okut.
-**Kontrol sorusu:** 6 ÷ 0,5 kaçtır ve neden 6'dan büyüktür?
+**Doğrusu:** Bu yalnız pozitif sayılar için doğrudur, ayrıca çarpanın büyüklüğüne bağlıdır: pozitif bir sayıyı 1'den büyük bir sayıyla çarpınca sonuç büyür, 0 ile 1 arasındaki bir sayıyla çarpınca küçülür (0 ile 1 arasındaki bir sayıya bölmek bunun tersini yapar): 12 × 1/2 = 6, 12 ÷ 1/2 = 24. Negatif sayılarda yön tersine döner: −12 × 1/2 = −6, ve −6, −12'den büyüktür — çarpma burada sonucu küçültmez, büyütür.
+**Nasıl düzeltirsin:** Bölmeyi "12'nin içinde kaç tane 1/2 var?" sorusuyla okut ve şerit modelinde say. Sonra çarpmayı "12'nin yarısı" diye okut. Negatif bir sayıyla aynı işlemi sayı doğrusunda göster: yön nereye döner?
+**Kontrol sorusu:** 6 ÷ 0,5 kaçtır ve neden 6'dan büyüktür? −6 × 1/2 kaçtır ve −6'dan büyük müdür, küçük müdür?
 
-### Negatif sayılarda büyük olan, rakamı büyük olandır
+### Negatif sayılarda mutlak değeri büyük olan sayı büyüktür
 
-**Doğrusu:** Sayı doğrusunda sağdaki sayı büyüktür: −2 > −5. −5, sıfırdan daha uzaktır ama daha küçüktür.
+**Doğrusu:** Mutlak değeri büyük olan sayı negatif sayılarda daha küçüktür: |−5| = 5, |−2| = 2; 5 > 2 olsa da −2 > −5'tir. Sayı doğrusunda sağdaki sayı büyüktür. −5, sıfırdan daha uzaktır (mutlak değeri büyüktür) ama daha küçüktür.
 **Nasıl düzeltirsin:** Sıcaklıkla anlat: −5 °C mi daha soğuk, −2 °C mi? Sayı doğrusunu çizip iki noktayı işaretle.
 **Kontrol sorusu:** −7 ile −3'ü sıralayıp aralarına < ya da > koy.
 
@@ -34,9 +34,9 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### Rasyonel sayının ondalık gösterimi her zaman biter
 
-**Doğrusu:** Payı paydasına bölünce bazı rasyonel sayıların ondalık gösterimi biter (1/4 = 0,25), bazılarınınki devreder (1/3 = 0,333…). İkisi de rasyonel sayıdır.
-**Nasıl düzeltirsin:** 1'i 3'e uzun bölmeyle böl ve kalanın hep 1 olduğunu göster.
-**Kontrol sorusu:** 2/3'ün ondalık gösterimi biter mi, devreder mi? Bölmeyle göster.
+**Doğrusu:** Payı paydasına bölünce bazı rasyonel sayıların ondalık gösterimi sonludur (1/4 = 0,25), bazılarının ondalık gösterimi devirlidir (1/3 = 0,333…). İkisi de rasyonel sayıdır.
+**Nasıl düzeltirsin:** 1'i 3'e bölme işlemiyle böl ve kalanın hep 1 olduğunu göster.
+**Kontrol sorusu:** 2/3'ün ondalık gösterimi sonlu mu, devirli mi? Bölme işlemiyle göster.
 
 ### Oran bir farktır
 
@@ -44,10 +44,10 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 **Nasıl düzeltirsin:** Limonata tarifi: 2 bardak şurup ve 3 bardak su ile 4 bardak şurup ve 5 bardak su aynı tatta olur mu? Tabloyla iki tarifi de 6 bardak suya ölçekle.
 **Kontrol sorusu:** 3:4 oranına eşit bir oran yaz ve neden eşit olduğunu açıkla.
 
-### İki çokluk birlikte artıyorsa doğru orantılıdır
+### İki nicelik birlikte artıyorsa doğru orantılıdır
 
-**Doğrusu:** Doğru orantıda iki çokluğun oranı sabittir (y/x = k). Yaşla boy birlikte artar ama oranları sabit değildir; orantılı değildir.
-**Nasıl düzeltirsin:** Tablo kur, her sütunda y/x'i hesapla. Oran değişiyorsa orantı yoktur.
+**Doğrusu:** Doğru orantıda iki niceliğin birim oranı sabittir. Yaşla boy birlikte artar ama birim oranları sabit değildir; orantılı değildir.
+**Nasıl düzeltirsin:** Tablo kur, her sütunda birim oranı hesapla. Birim oran değişiyorsa orantı yoktur.
 **Kontrol sorusu:** Taksi ücreti açılış ücreti artı kilometre başına ücretse, ücret ile yol doğru orantılı mıdır?
 
 ### Harf belli bir nesnenin kısaltmasıdır
@@ -59,7 +59,7 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 ### Benzer olmayan terimler de toplanır
 
 **Doğrusu:** Yalnız benzer terimler toplanır: 2x + 3x = 5x, ama 2x + 3 toplanıp 5x olmaz. Toplamada x'in kuvveti de değişmez; 2x + 3x'in 5x² olduğunu düşünmek yanlıştır.
-**Nasıl düzeltirsin:** Cebir karolarıyla ya da "2 kutu + 3 kutu = 5 kutu, 2 kutu + 3 bilye ≠ 5 kutu" diyerek grupla.
+**Nasıl düzeltirsin:** "2 kutu + 3 kutu = 5 kutu, 2 kutu + 3 bilye ≠ 5 kutu" diyerek grupla; benzer terimleri aynı türden nesneler gibi say.
 **Kontrol sorusu:** 4x + 2 + x ifadesini sadeleştir.
 
 ### Karşıya geçen her şeyin işareti değişir
@@ -76,15 +76,15 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### Eşitsizliğin tek bir çözümü vardır
 
-**Doğrusu:** x > 3 eşitsizliğini 3'ten büyük bütün sayılar sağlar; çözüm bir aralıktır ve sayı doğrusunda gösterilir. 3'ün kendisi dahil değildir.
+**Doğrusu:** x > 3 eşitsizliğini 3'ten büyük bütün sayılar sağlar; eşitsizliği sağlayan bütün değerler sayı doğrusunda gösterilir, tek bir sayı değil. 3'ün kendisi dahil değildir.
 **Nasıl düzeltirsin:** 3,1; 4; 100 sayılarını dene, hepsinin sağladığını göster; sonra 3'ü dene.
 **Kontrol sorusu:** x + 2 < 7 eşitsizliğini sağlayan üç sayı yaz; 5 sağlar mı?
 
 ### Yüzey alanı ile hacim aynı şeydir
 
-**Doğrusu:** Yüzey alanı prizmanın dış yüzlerinin toplam alanıdır (cm²); hacim içini dolduran birim küplerin sayısıdır (cm³).
+**Doğrusu:** Yüzey alanı dikdörtgenler prizmasının dış yüzlerinin toplam alanıdır (cm²); hacim içini dolduran birim küplerin sayısıdır (cm³).
 **Nasıl düzeltirsin:** Bir kutuyu açınımına ayır ve yüzleri say; sonra aynı kutuyu birim küplerle katman katman doldur.
-**Kontrol sorusu:** 2 cm × 3 cm × 4 cm'lik prizmanın hacmi ve yüzey alanı kaçtır? Birimlerine dikkat et.
+**Kontrol sorusu:** 2 cm × 3 cm × 4 cm'lik dikdörtgenler prizmasının hacmi ve yüzey alanı kaçtır? Birimlerine dikkat et.
 
 ### 1 m³ 100 dm³'tür
 
@@ -100,12 +100,12 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### Ayrık olmayan olaylar da ayrık sanılır
 
-**Doğrusu:** İki olayın çıktı kümeleri en az bir ortak çıktı paylaşıyorsa bu olaylar ayrık değildir; hiç ortak çıktı yoksa ayrıktır. Bir zar atışında "çift sayı gelmesi" (2, 4, 6) ile "asal sayı gelmesi" (2, 3, 5) olaylarının 2 gibi ortak bir çıktısı vardır; bu ikisi ayrık değildir.
+**Doğrusu:** İki olayın çıktı kümeleri en az bir ortak çıktı paylaşıyorsa bu olaylar ayrık değildir; hiç ortak çıktı yoksa ayrıktır. Bir sayı küpü atışında "çift sayı gelmesi" (2, 4, 6) ile "asal sayı gelmesi" (2, 3, 5) olaylarının 2 gibi ortak bir çıktısı vardır; bu ikisi ayrık değildir.
 **Nasıl düzeltirsin:** Her iki olayın çıktı listesini yan yana yaz ve ortak elemanı işaretle; ortak eleman varsa olaylar ayrık değildir, yoksa ayrıktır.
-**Kontrol sorusu:** Bir zar atışında "tek sayı gelmesi" ile "2'den büyük sayı gelmesi" olaylarının çıktılarını listele; bu iki olay ayrık mıdır?
+**Kontrol sorusu:** Bir sayı küpü atışında "tek sayı gelmesi" ile "2'den büyük sayı gelmesi" olaylarının çıktılarını listele; bu iki olay ayrık mıdır?
 
 ### Bir olayın olasılığı ile tümleyeninin olasılığı ayrı ayrı hesaplanmalıdır
 
-**Doğrusu:** Bir olayın ve tümleyeninin olasılıkları toplamı 1'dir: P(A) + P(A') = 1. Biri biliniyorsa öbürü çıkarmayla bulunur. Olasılık hiçbir zaman 0'dan küçük ya da 1'den büyük olmaz.
-**Nasıl düzeltirsin:** Bir zar atışında "6 gelmesi" ve "6 gelmemesi" olaylarının çıktılarını ayrı ayrı listele; iki listenin bütün çıktıları kapsadığını göster.
+**Doğrusu:** Bir olayın olasılığı ile tümleyeninin olasılığının toplamı 1'dir. Biri biliniyorsa öbürü çıkarmayla bulunur. Olasılık hiçbir zaman 0'dan küçük ya da 1'den büyük olmaz.
+**Nasıl düzeltirsin:** Bir sayı küpü atışında "6 gelmesi" ve "6 gelmemesi" olaylarının çıktılarını ayrı ayrı listele; iki listenin bütün çıktıları kapsadığını göster.
 **Kontrol sorusu:** Bir torbadan kırmızı top çekme olasılığı 3/8 ise kırmızı olmayan top çekme olasılığı kaçtır?
