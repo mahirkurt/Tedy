@@ -769,3 +769,121 @@
   margin: spacing.$spacing-02 0 0;
   color: theme.$text-secondary;
 }
+
+// ─── Öğretmen seçici ve modu (B1) ────────────────────────────────────────────
+// Genel · Türkçe · Fen · Sosyal · Matematik as radio chips. A chip's colour is
+// its own subject's (the family class on its label, theme/_subjects.scss); the
+// chosen one fills with that accent and carries a checkmark, so "chosen" is
+// never colour alone (İ8).
+.ac__ogretmen {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ac__ogretmen-baslik {
+  @include type.type-style('label-01');
+  padding: 0;
+  color: var(--ted-color-text-helper);
+}
+
+.ac__ogretmen-secenekler {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ted-space-xs);
+}
+
+.ac__ogretmen-secenek {
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.ac__ogretmen-cip {
+  @include type.type-style('body-compact-01');
+  display: inline-flex;
+  align-items: center;
+  gap: spacing.$spacing-03;
+  border: 1px solid var(--ted-color-border-subtle);
+  border-radius: 999px;
+  padding: spacing.$spacing-03 spacing.$spacing-04;
+  background: var(--ted-color-layer);
+  color: var(--ted-color-text-primary);
+}
+
+.ac__ogretmen-isaret {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 2px;
+  background: var(--ted-subject-accent);
+}
+
+.ac__ogretmen-secenek:hover .ac__ogretmen-cip {
+  background: var(--ted-subject-surface-hover, var(--cds-layer-hover-01));
+}
+
+.ac__ogretmen-girdi:focus-visible + .ac__ogretmen-cip {
+  outline: 2px solid var(--cds-focus);
+  outline-offset: 2px;
+}
+
+// Genel, chosen: Carbon's inverse, as a content switcher's selected segment.
+.ac__ogretmen-girdi:checked + .ac__ogretmen-cip {
+  border-color: var(--cds-background-inverse);
+  background: var(--cds-background-inverse);
+  color: var(--cds-text-inverse);
+  font-weight: 600;
+}
+
+// A teacher, chosen: its accent, white text (>= 4.5:1, tests/test_ders_renkleri.py).
+.ac__ogretmen-secenek.ted-subject .ac__ogretmen-girdi:checked + .ac__ogretmen-cip {
+  border-color: var(--ted-subject-accent);
+  background: var(--ted-subject-accent);
+  color: var(--ted-color-text-on-color);
+}
+
+.ac__ogretmen-hata {
+  @include type.type-style('body-compact-01');
+  margin: 0;
+  color: var(--ted-color-text-helper);
+}
+
+// A teacher mode: the send button, the primary quick prompt, the chat panel's
+// edge and the reader's own bubble take the subject's roles. Genel has no
+// family class and none of these rules: it looks as it did.
+.ac[data-ogretmen]:not([data-ogretmen='genel']) {
+  --cds-button-primary: var(--ted-subject-accent);
+  --cds-button-primary-hover: var(--ted-subject-text);
+  --cds-button-primary-active: var(--ted-subject-text);
+}
+
+.ac[data-ogretmen]:not([data-ogretmen='genel']) .ac__chat {
+  border-color: var(--ted-subject-border);
+  border-top: 4px solid var(--ted-subject-accent);
+}
+
+.ac[data-ogretmen]:not([data-ogretmen='genel']) .ac-msg--user .ac-msg__body {
+  background: var(--ted-subject-surface);
+  color: var(--ted-subject-on-surface);
+}
+
+// The asker's name above the bubble: text-helper is 3.8:1 on a -20 surface;
+// the family's on-surface role holds 4.5:1 (tests/test_ders_renkleri.py).
+.ac[data-ogretmen]:not([data-ogretmen='genel']) .ac-msg--user .ac-msg__role {
+  color: var(--ted-subject-on-surface);
+}
+
+.ac[data-ogretmen]:not([data-ogretmen='genel']) .ac-msg__avatar--user {
+  background: var(--ted-subject-accent);
+  color: var(--ted-color-text-on-color);
+}
+
+@media (forced-colors: active) {
+  .ac__ogretmen-girdi:checked + .ac__ogretmen-cip {
+    border-color: Highlight;
+  }
+}

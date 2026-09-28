@@ -3,6 +3,18 @@
   - button "AI bilgisi"
   - heading "TEDY Asistan" [level=2]
   - paragraph: Kaynaklı soru-cevap ve kişisel çalışma planı
+  - group "Öğretmen":
+    - text: ""
+    - radio "Genel" [checked]
+    - text: ""
+    - radio "Türkçe"
+    - text: ""
+    - radio "Fen"
+    - text: ""
+    - radio "Sosyal"
+    - text: ""
+    - radio "Matematik"
+    - text: Matematik
   - button "Işık bugün neye öncelik vermeli?"
   - button "Işık için çalışma planı hazırla"
   - button "Işık'ın eksik konularını özetle"

@@ -21,12 +21,16 @@ import {
   Copy,
   Search,
   Time,
+  Idea,
 } from '@carbon/icons-react'
 import type { AssistantCitation, AssistantPlanBlock, AssistantResponse } from '../types'
 import { renderMarkdown } from '../utils/markdown'
 import { modelAdi } from '../utils/formatters'
+import { subjectClass } from '../utils/subject'
 import { firstName, useSession } from '../contexts/session'
+import { useOgretmen } from '../hooks/useOgretmen'
 import CitationChip from './CitationChip'
+import OgretmenSecici from './OgretmenSecici'
 import SourcePanel from './SourcePanel'
 
 type ChatRole = 'user' | 'assistant'
@@ -60,6 +64,7 @@ const VOICE = {
     placeholder: 'Bir soru sor veya çalışma planı iste...',
     sources: 'Her iddianın yanındaki numara, o cümlenin nereden geldiğini gösterir — MEB müfredatı, ders kitabın veya kendi okul verin. Numaraya dokunup kaynağı okuyabilirsin.',
     caution: 'Yapay zekâ yanılabilir. Bir şey tuhaf geldiyse kaynağa bak.',
+    ogretmenHata: 'Öğretmen modları şu an yüklenemedi; Genel modda sorabilirsin.',
   },
   family: {
     welcome: "Merhaba! TEDY Asistan olarak size yardımcı olabilirim. Işık'ın ödevleri, sınavları ve dersleri hakkında soru sorabilir veya onun için çalışma planı isteyebilirsiniz.",
@@ -71,6 +76,7 @@ const VOICE = {
     placeholder: 'Bir soru sorun veya çalışma planı isteyin...',
     sources: "Her iddianın yanındaki numara, o cümlenin nereden geldiğini gösterir — MEB müfredatı, ders kitabı veya Işık'ın okul verisi. Numaraya dokunup kaynağı okuyabilirsiniz.",
     caution: 'Yapay zekâ yanılabilir. Bir şey tuhaf geldiyse kaynağa bakın.',
+    ogretmenHata: 'Öğretmen modları şu an yüklenemedi; Genel modda sorabilirsiniz.',
   },
 }
 
@@ -91,6 +97,8 @@ const TOOL_LABEL: Record<string, string> = {
   oer_kazanima_gore: 'Kazanıma bağlı kaynaklar alınıyor',
   modul_ara: 'Yayınlanmış modüller aranıyor',
   odev_listesi: 'Ödev listen okunuyor',
+  skill_kaynagi: 'Öğretmen notlarına bakılıyor',
+  mod_oner: 'Öğretmen önerisi hazırlanıyor',
 }
 
 const DEFAULT_THINKING_MESSAGE = 'Yanıt hazırlanıyor...'
@@ -278,6 +286,14 @@ export default function AssistantChat() {
   const isStudent = user?.student === true
   const voice = isStudent ? VOICE.student : VOICE.family
   const askerName = isStudent ? 'Işık' : (firstName(user) || 'Siz')
+  const okur = isStudent ? 'ogrenci' : 'aile'
+  const ogretmen = useOgretmen(user?.email)
+  const secili = ogretmen.secili
+  // A teacher's greeting and quick prompts come from its skill; Genel keeps the page's own.
+  const welcome = secili ? secili.karsilama[okur] : voice.welcome
+  const prompts = secili
+    ? secili.hizli_sorular[okur].map((text, i) => ({ text, icon: Idea, mode: 'chat' as const, primary: i === 0 }))
+    : voice.prompts
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -352,6 +368,7 @@ export default function AssistantChat() {
       session_id: 'dashboard-default',
       context_filters: {},
       messages: toApiMessages(nextMessages),
+      ogretmen: ogretmen.id,
       ...(opts?.deep ? { force_deep: true } : {}),
     }
 
@@ -477,7 +494,13 @@ export default function AssistantChat() {
   const latestModel = latestAssistant?.model
 
   return (
-    <section className="ac">
+    // data-ogretmen names the mode; the family class brings that subject's role tokens
+    // (theme/_subjects.scss), which AssistantChat.scss applies only when the mode is not
+    // Genel. The brand band is outside this section and never changes.
+    <section
+      className={['ac', secili && subjectClass(null, secili.renk_ailesi)].filter(Boolean).join(' ')}
+      data-ogretmen={ogretmen.id}
+    >
       {/* Header */}
       <header className="ac__header">
         <div className="ac__header-left">
@@ -504,14 +527,23 @@ export default function AssistantChat() {
           </AILabel>
           <div>
             <h2 className="ac__title">TEDY Asistan</h2>
-            <p className="ac__subtitle">Kaynaklı soru-cevap ve kişisel çalışma planı</p>
+            <p className="ac__subtitle">
+              {secili ? `${secili.ogretmen_adi} — konuyu adım adım anlatır` : 'Kaynaklı soru-cevap ve kişisel çalışma planı'}
+            </p>
           </div>
         </div>
       </header>
 
+      <OgretmenSecici
+        liste={ogretmen.liste}
+        secili={ogretmen.id}
+        onSec={ogretmen.sec}
+        hata={ogretmen.hata ? voice.ogretmenHata : null}
+      />
+
       {/* Quick prompts */}
       <div className="ac__prompts">
-        {voice.prompts.map(qp => (
+        {prompts.map(qp => (
           <button
             key={qp.text}
             type="button"
@@ -551,7 +583,7 @@ export default function AssistantChat() {
                   </span>
                   <div className={msg.role === 'assistant' ? 'ac-msg__content ac-md' : 'ac-msg__content ac-msg__content--own'}>
                     {msg.role === 'assistant'
-                      ? <AnswerBody text={msg.id === 'welcome' ? voice.welcome : msg.content}
+                      ? <AnswerBody text={msg.id === 'welcome' ? welcome : msg.content}
                           citations={msg.citations ?? []} onActivate={activateCitation} />
                       : msg.content}
                   </div>

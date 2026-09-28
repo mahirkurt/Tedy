@@ -20,6 +20,30 @@ const sinav = (id: string, title: string, course: string, courseFamily: string, 
   relatedContent: [], relatedHomework: [],
 })
 
+// GET /api/assistant/ogretmenler — the shape src/assistant_skills.py serves
+// (Skill.secici_ozeti). Fixed text, not the live skills': a teacher's greeting
+// edited in its SKILL.md must not move a screenshot.
+const ogretmen = (id: string, kisa_ad: string, ders: string, renk_ailesi: string) => ({
+  id, kisa_ad, ogretmen_adi: `${ders} öğretmeni`, ders, renk_ailesi,
+  karsilama: {
+    ogrenci: `Merhaba! ${ders} öğretmeni olarak buradayım. Bir soruyu getir; adım adım bakalım.`,
+    aile: `Merhaba! ${ders} öğretmeni olarak buradayım. Işık'ın sorusunu sorabilirsiniz.`,
+  },
+  hizli_sorular: {
+    ogrenci: [`${kisa_ad}: birinci soru`, `${kisa_ad}: ikinci soru`, `${kisa_ad}: üçüncü soru`],
+    aile: [`Işık için ${kisa_ad} sorusu`, `Işık'ın ${kisa_ad} konuları`, `Işık'a ${kisa_ad} nasıl anlatılır?`],
+  },
+})
+export const OGRETMENLER = {
+  varsayilan: 'genel',
+  ogretmenler: [
+    ogretmen('turkce', 'Türkçe', 'Türkçe', 'magenta'),
+    ogretmen('fen', 'Fen', 'Fen Bilimleri', 'teal'),
+    ogretmen('sosyal', 'Sosyal', 'Sosyal Bilgiler', 'cyan'),
+    ogretmen('matematik', 'Matematik', 'Matematik', 'purple'),
+  ],
+}
+
 export const GORSEL: Record<string, unknown> = {
   ...FULL,
   health: { ...LIVE_HEALTH, timestamp: '2026-09-24T10:15:00', validation_warnings: [], unavailable: {} },
@@ -49,4 +73,5 @@ export const GORSEL: Record<string, unknown> = {
   'progress/a3k': { class_name: '7-D', dashboard_stats: { completed: 3, firstTryScore: 80, scoredAboveLine: 3, target: 5 },
     lessons: [], scraped_at: '2026-09-16T08:05:00', teacher_assigned_completed: 3, teacher_assigned_count: 5, total_lessons: 3 },
   calendar: { events: [] },
+  'assistant/ogretmenler': OGRETMENLER,
 }
