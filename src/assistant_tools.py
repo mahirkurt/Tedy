@@ -23,6 +23,7 @@ from zoneinfo import ZoneInfo
 from src.course_names import normalize_course
 from src.mcp_client import McpClient, McpToolResult
 from src import assistant_kitaplar, assistant_modules
+from src.assistant_skills import GENEL
 
 logger = logging.getLogger(__name__)
 
@@ -415,6 +416,13 @@ VIDEO_TOOL = "video_oner"
 # "aile" (McpRegistry.declarations) and refused in dispatch() even if called —
 # this is family-only material and must never reach Işık.
 AILE_TOOL = "aile_kaynak_ara"
+# Öğretmen modları (B1, spec §1). skill_kaynagi is declared only in a teacher
+# mode and opens that teacher's references/ notes; mod_oner only in genel mode,
+# where it asks the reader — by a button — to switch. Both are refused by
+# dispatch() in the other mode too (defence in depth, as aile_kaynak_ara).
+SKILL_TOOL = "skill_kaynagi"
+MOD_ONER_TOOL = "mod_oner"
+MOD_GEREKCE_SINIRI = 200
 
 # chat_with_tools slices every tool_result to 4,000 chars; a body cut there
 # loses its end silently, so each body is held under it here.
@@ -1307,6 +1315,10 @@ class ToolOutcome:
     # only: chat_with_tools puts up to two in the tool_result. Never copied
     # into a citation; the reader's panel fetches /api/assistant/figure/<id>.
     images: list[dict[str, Any]] = field(default_factory=list)
+    # An event for the reader's stream, not text for the model: mod_oner's
+    # {"event": "mode_suggestion", ...}. chat_events() puts it on the SSE
+    # stream as it happens; chat_with_tools() collects it for /chat.
+    olay: dict[str, Any] | None = None
 
 
 def sanitize_schema(schema: dict[str, Any]) -> dict[str, Any]:
@@ -1509,8 +1521,12 @@ class McpRegistry:
                  kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
                  video_kaynagi: Callable[[], Any] | None = None,
                  aile_kaynak_arama: Callable[[str, int], list[dict[str, Any]]] | None = None,
-                 saat: Callable[[], datetime] | None = None) -> None:
+                 saat: Callable[[], datetime] | None = None,
+                 skills: dict[str, Any] | None = None) -> None:
         self.clients = clients
+        # Öğretmen skill'leri (src/assistant_skills.py), id -> Skill. Empty: no
+        # teacher tool is declared in any mode.
+        self.skills: dict[str, Any] = dict(skills or {})
         # Işık's grade in the corpus's form ("7.Sınıf"), read when asked so a
         # new school year needs no restart. None, or a None answer, means
         # unknown: no grade is then invented.
@@ -1560,7 +1576,7 @@ class McpRegistry:
         modules = set(self.module_index.degraded()) if self.module_index is not None else set()
         return sorted(unhealthy | set(self.unconfigured) | modules)
 
-    def declarations(self, okur: str = "bilinmiyor") -> list[dict[str, Any]]:
+    def declarations(self, okur: str = "bilinmiyor", ogretmen: str = GENEL) -> list[dict[str, Any]]:
         decls: list[dict[str, Any]] = [{
             "name": LOCAL_TOOL,
             "description": self._yerel_aciklama(),
@@ -1620,7 +1636,58 @@ class McpRegistry:
                 "description": description,
                 "parameters": sanitize_schema(spec.get("inputSchema") or {}),
             })
+        # Last, so every mode shares the same list up to here.
+        decls.extend(self._ogretmen_bildirimleri(ogretmen))
         return decls
+
+    def _ogretmen_bildirimleri(self, ogretmen: str) -> list[dict[str, Any]]:
+        """mod_oner in genel mode, skill_kaynagi in a teacher mode, nothing without skills."""
+        if not self.skills:
+            return []
+        if ogretmen == GENEL:
+            return [{
+                "name": MOD_ONER_TOOL,
+                "description": (
+                    "Okura, sorusuna uyan ders öğretmenine geçmeyi bir düğmeyle önerir. Hiçbir "
+                    "şeyi değiştirmez: mod yalnız okur düğmeye basarsa değişir. Soru açıkça bir "
+                    "dersin konusunu, kavramını ya da soru çözmeyi öğrenmekle ilgiliyse cevabını "
+                    "yine eksiksiz ver ve bu aracı bir kez çağır."),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "ogretmen": {
+                            "type": "string", "enum": list(self.skills),
+                            "description": "Önerilen öğretmen: " + "; ".join(
+                                f"{s.ad} = {s.ders}" for s in self.skills.values())},
+                        "gerekce": {
+                            "type": "string",
+                            "description": ("Okura düğmenin üstünde gösterilecek tek kısa cümle, "
+                                            "soranın hitabıyla (en çok 200 karakter).")},
+                    },
+                    "required": ["ogretmen", "gerekce"],
+                },
+            }]
+        skill = self.skills.get(ogretmen)
+        if skill is None:
+            return []
+        return [{
+            "name": SKILL_TOOL,
+            "description": (
+                f"{skill.ogretmen_adi} olarak öğretmen notlarından birini açar: kavram "
+                "yanılgıları kataloğu, ünite ve kazanım haritası, soru kalıpları. Uzun bir not "
+                "sayfa sayfa gelir; devamı için `sayfa` ver. Notlar senin içindir, okura kaynak "
+                "olarak gösterilmez."),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ad": {"type": "string", "enum": list(skill.kaynaklar),
+                           "description": "Açılacak notun dosya adı."},
+                    "sayfa": {"type": "integer", "minimum": 1,
+                              "description": "Sayfa numarası; verilmezse 1."},
+                },
+                "required": ["ad"],
+            },
+        }]
 
     def _yerel_aciklama(self) -> str:
         """What the text index really holds, and — for each live tool this
@@ -1653,7 +1720,11 @@ class McpRegistry:
             return None
 
     def dispatch(self, name: str, args: dict[str, Any], ilerleme_izni: bool = False,
-                okur: str = "bilinmiyor") -> ToolOutcome:
+                okur: str = "bilinmiyor", ogretmen: str = GENEL) -> ToolOutcome:
+        if name == MOD_ONER_TOOL:
+            return self._dispatch_mod_oner(args or {}, ogretmen)
+        if name == SKILL_TOOL:
+            return self._dispatch_skill_kaynagi(args or {}, ogretmen)
         if name == LOCAL_TOOL:
             return self._dispatch_local(args)
         if name == ODEV_TOOL and self.odev_kaynagi is not None:
@@ -1774,6 +1845,57 @@ class McpRegistry:
         except (ValueError, TypeError):
             return "ulasilamadi", b"", ""
         return ("var", veri, mime) if veri else ("ulasilamadi", b"", "")
+
+    def _dispatch_mod_oner(self, args: dict[str, Any], ogretmen: str) -> ToolOutcome:
+        # Defence in depth: declared only in genel mode, refused anywhere else —
+        # a teacher mode has nothing to suggest, and a stale tool list must not
+        # put a switch button under a teacher's answer.
+        if ogretmen != GENEL or not self.skills:
+            return ToolOutcome(ok=False, error="mod önerisi yalnız genel modda yapılabilir")
+        hedef = self.skills.get(str(args.get("ogretmen") or ""))
+        if hedef is None:
+            return ToolOutcome(ok=False, error=(
+                "ogretmen şunlardan biri olmalı: " + ", ".join(self.skills)))
+        gerekce = " ".join(str(args.get("gerekce") or "").split())
+        if not gerekce:
+            return ToolOutcome(ok=False, error="gerekce boş olamaz; okura tek kısa cümle yaz")
+        if len(gerekce) > MOD_GEREKCE_SINIRI:
+            gerekce = gerekce[:MOD_GEREKCE_SINIRI - 1].rstrip() + "…"
+        return ToolOutcome(
+            ok=True,
+            text=("Öneri okura bir düğme olarak gösterildi. Mod değişmedi ve okur düğmeye "
+                  "basmadıkça değişmeyecek. Cevabını genel modda tamamla; öneriyi cevap "
+                  "metninde tekrar etme."),
+            olay={"event": "mode_suggestion", "ogretmen": hedef.ad,
+                  "ogretmen_adi": hedef.ogretmen_adi, "soru": hedef.gecis_sorusu,
+                  "gerekce": gerekce, "renk_ailesi": hedef.renk_ailesi},
+        )
+
+    def _dispatch_skill_kaynagi(self, args: dict[str, Any], ogretmen: str) -> ToolOutcome:
+        skill = self.skills.get(ogretmen)
+        if skill is None:
+            return ToolOutcome(ok=False, error="öğretmen notları yalnız bir öğretmen modunda açılır")
+        ad = args.get("ad")
+        # Membership in the loaded list, nothing else: no path is ever built
+        # from the model's string, so "../", absolute paths and SKILL.md all miss.
+        if not isinstance(ad, str) or ad not in skill.kaynaklar:
+            return ToolOutcome(ok=False, error=(
+                "ad şunlardan biri olmalı: " + ", ".join(skill.kaynaklar)))
+        sayfa = args.get("sayfa", 1)
+        if isinstance(sayfa, bool) or not isinstance(sayfa, int):
+            return ToolOutcome(ok=False, error="sayfa bir tam sayı olmalı (1, 2, …)")
+        try:
+            metin, toplam = skill.kaynak_sayfasi(ad, sayfa)
+        except IndexError:
+            _, toplam = skill.kaynak_sayfasi(ad, 1)
+            return ToolOutcome(ok=False, error=f"{ad} {toplam} sayfa; sayfa 1–{toplam} arasında olmalı")
+        except OSError as exc:
+            logger.error("skill_kaynagi %s/%s okunamadı: %s", skill.ad, ad, type(exc).__name__)
+            return ToolOutcome(ok=False, error="öğretmen notu okunamadı")
+        devam = (f"\n\n(Devamı: skill_kaynagi ad='{ad}' sayfa={sayfa + 1})"
+                 if sayfa < toplam else "")
+        # No citation: these are the teacher's own notes, not a source for the reader.
+        return ToolOutcome(ok=True, text=f"{ad} · sayfa {sayfa}/{toplam}\n\n{metin}{devam}")
 
     def _dispatch_local(self, args: dict[str, Any]) -> ToolOutcome:
         query = str(args.get("query", "")).strip()
@@ -1935,7 +2057,8 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                    kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
                    video_kaynagi: Callable[[], Any] | None = None,
                    aile_kaynak_arama: Callable[[str, int], list[dict[str, Any]]] | None = None,
-                   saat: Callable[[], datetime] | None = None) -> McpRegistry:
+                   saat: Callable[[], datetime] | None = None,
+                   skills: dict[str, Any] | None = None) -> McpRegistry:
     """Wire the configured servers. A server with no key is simply absent —
     its tools are not declared — but it is still named by degraded(), so an
     unset env var never looks like a healthy system with nothing to say."""
@@ -1956,4 +2079,4 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                        not_kaynagi=not_kaynagi, sebit_kaynagi=sebit_kaynagi,
                        platform_kaynagi=platform_kaynagi, kitap_kaynagi=kitap_kaynagi,
                        video_kaynagi=video_kaynagi, aile_kaynak_arama=aile_kaynak_arama,
-                       saat=saat)
+                       saat=saat, skills=skills)
