@@ -1821,18 +1821,40 @@ def _extract_exam_info(title):
 
 def _bilinen_ders_adaylari(ders_icerikleri):
     """Surface forms to recognise inside an exam title, mapped to their
-    canonical course: this run's real course-content keys (never a
-    hand-written list — measured 2026-09-28, they include "Türkçe",
-    "Matematik", "Fen Bilimleri", "Sosyal Bilgiler", "DKAB", "İngilizce")
-    plus the alias vocabulary already in src/course_names.py, so a variant
-    embedded in a title ("DKAB") is recognised even when it is not
-    literally the content map's own key."""
+    canonical course: this run's real course-content keys, filtered down to
+    actual school subjects (never a hand-written subject list), plus the
+    alias vocabulary already in src/course_names.py — so a variant embedded
+    in a title ("DKAB") is recognised even when it is not literally the
+    content map's own key.
+
+    ders_icerikleri's keys are not all subjects. Measured 2026-09-28 on live
+    data, alongside "Türkçe", "Matematik", "Fen Bilimleri", "Sosyal
+    Bilgiler", "DKAB", "İngilizce" and other real courses, the tab list also
+    carries "Genel" (the school-wide announcement feed), "PDR" (guidance)
+    and "Sınıf Öğretmeni" (homeroom teacher) — none of them a subject. Taking
+    every key unfiltered let a title like "... MEB 1. Dönem Genel Deneme
+    Sınavı / ..." resolve to a fake course "Genel" and surface an unrelated
+    announcement as relatedContent. The filter is
+    `subject_themes.domain_of()` — the same domain table the frontend and
+    the module template use for course colour — applied to each key's
+    canonical form: a key that resolves only to the generic fallback domain
+    ("genel", `subject_themes.themes()["fallback"]["id"]`) is not a subject
+    and is dropped, whichever tab produced it. The same filter is applied to
+    COURSE_ALIASES' canonical targets, though none of the six currently
+    listed there (Fransızca, Din Kültürü, Beden Eğitimi, İngilizce, Bilişim,
+    Ahlak ve Yurttaşlık) actually falls into "genel"."""
     adaylar = {}
     if isinstance(ders_icerikleri, dict):
         for anahtar in ders_icerikleri:
-            if isinstance(anahtar, str) and anahtar.strip():
-                adaylar.setdefault(anahtar.strip(), normalize_course(anahtar))
+            if not isinstance(anahtar, str) or not anahtar.strip():
+                continue
+            kanonik = normalize_course(anahtar)
+            if subject_themes.domain_of(kanonik)["id"] == "genel":
+                continue
+            adaylar.setdefault(anahtar.strip(), kanonik)
     for kanonik, takma_adlar in COURSE_ALIASES.items():
+        if subject_themes.domain_of(kanonik)["id"] == "genel":
+            continue
         adaylar.setdefault(kanonik, kanonik)
         for takma in takma_adlar:
             adaylar.setdefault(takma, kanonik)
@@ -1841,17 +1863,20 @@ def _bilinen_ders_adaylari(ders_icerikleri):
 
 def _baslikta_bilinen_ders_ara(title, ders_icerikleri):
     """A known course name embedded in `title`'s Turkish half (before the
-    " / " English half), Turkish-folded (accent + case, `turkce_kucult_katla`)
-    and word-boundary matched, longest surface form first. Returns the
-    canonical course, or None when zero or more than one distinct course is
-    found — never invents a course for a course-less or multi-subject title
-    (e.g. a "GİS" development-monitoring exam, or one naming two courses)."""
+    "/" English half — the split tolerates surrounding whitespace, since a
+    real title's spacing around the slash is not guaranteed), Turkish-folded
+    (accent + case, `turkce_kucult_katla`) and word-boundary matched, longest
+    surface form first. Returns the canonical course, or None when zero or
+    more than one distinct course is found — never invents a course for a
+    course-less or multi-subject title (e.g. a "GİS" development-monitoring
+    exam, or one naming two courses)."""
     from src.assistant_core import turkce_kucult_katla
 
     adaylar = _bilinen_ders_adaylari(ders_icerikleri)
     if not adaylar:
         return None
-    hedef = turkce_kucult_katla(str(title or "").split(" / ")[0])
+    turkce_yari = re.split(r"\s*/\s*", str(title or ""), maxsplit=1)[0]
+    hedef = turkce_kucult_katla(turkce_yari)
     if not hedef.strip():
         return None
 

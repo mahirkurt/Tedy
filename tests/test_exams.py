@@ -692,6 +692,75 @@ class TestRealPortalExamTitles:
             data = client.get("/api/exams").get_json()
         assert len(data["exams"]) == 1
 
+    # -- Review finding (critical, 2026-09-28): ders_icerikleri also carries
+    # non-subject tabs measured on live data — "Genel" (the school-wide
+    # announcement feed), "PDR" (guidance) and "Sınıf Öğretmeni" (homeroom
+    # teacher). Taking every key unfiltered let a title like "... Genel
+    # Deneme Sınavı / ..." resolve to a fake course "Genel" and surface an
+    # unrelated announcement as relatedContent.
+
+    DERS_GENEL_KARISIK = {
+        "Türkçe": _icerik(cards=[
+            "3. Ünite\nGerçek Öğretmen | 20.09.2026\nBu hafta şiir türleri."]),
+        "Genel": _icerik(cards=["Okul duyurusu: Veli toplantısı 10 Ekimde."]),
+        "PDR": _icerik(cards=["Rehberlik saati: sınav kaygısı."]),
+        "Sınıf Öğretmeni": _icerik(cards=["Sınıf öğretmeni notu: kitap listesi."]),
+    }
+
+    def test_genel_review_title_stays_courseless(self, client):
+        titles = [
+            ("5-6-7-8. Sınıflar MEB 1. Dönem Genel Deneme Sınavı"
+             " / 5th-6th-7th-8th Grades MEB 1st Term General Trial Exam"),
+            ("5-6-7-8. Sınıflar MEB 2. Dönem Genel Tekrar Sınavı"
+             " / 5th-6th-7th-8th Grades MEB 2nd Term General Review Exam"),
+            ("5-6-7-8. Sınıflar MEB 1. Dönem Genel Tarama Sınavı"
+             " / 5th-6th-7th-8th Grades MEB 1st Term General Screening Exam"),
+        ]
+        for title in titles:
+            takvim = [_exam_event(title, "2026-03-31T10:00:00Z")]
+            with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                    takvim=takvim, ders_icerikleri=self.DERS_GENEL_KARISIK)):
+                exam = client.get("/api/exams").get_json()["exams"][0]
+            assert exam["course"] != "Genel", title
+            assert exam["relatedContent"] == [], title
+
+    def test_pdr_and_sinif_ogretmeni_titles_never_resolve_to_tab(self, client):
+        titles = [
+            ("5-6-7-8. Sınıflar PDR Değerlendirme Sınavı"
+             " / 5th-6th-7th-8th Grades PDR Assessment Exam"),
+            ("5-6-7-8. Sınıflar Sınıf Öğretmeni Bilgilendirme Sınavı"
+             " / 5th-6th-7th-8th Grades Homeroom Teacher Briefing Exam"),
+        ]
+        for title in titles:
+            takvim = [_exam_event(title, "2026-03-31T10:00:00Z")]
+            with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
+                    takvim=takvim, ders_icerikleri=self.DERS_GENEL_KARISIK)):
+                exam = client.get("/api/exams").get_json()["exams"][0]
+            assert exam["course"] not in ("PDR", "Sınıf Öğretmeni"), title
+            assert exam["relatedContent"] == [], title
+
+    def test_genel_key_is_not_a_candidate_directly(self):
+        """Unit-level: "Genel"/"PDR"/"Sınıf Öğretmeni" must never even enter
+        the candidate map — subject_themes.domain_of() resolves each of them
+        only to the generic fallback domain ("genel")."""
+        adaylar = dashboard_api._bilinen_ders_adaylari(self.DERS_GENEL_KARISIK)
+        assert "Genel" not in adaylar
+        assert "PDR" not in adaylar
+        assert "Sınıf Öğretmeni" not in adaylar
+        assert "Türkçe" in adaylar
+
+    def test_slash_split_tolerates_spacing_variants(self):
+        """The Turkish/English split must not depend on exact " / " spacing:
+        if the English half leaks into the scan (no split at all), its
+        "Türkçe Karşılığı" gloss would add a second, spurious course and
+        turn a clean single match ("İngilizce") into a false ambiguity."""
+        taban = ("7. Sınıf İngilizce 1. Dönem 2. Yazılı Sınavı"
+                 "{sep}7th Grade Turkish equivalent: Türkçe Karşılığı")
+        for sep in ("/", " /", "/ ", " / ", "  /  "):
+            title = taban.format(sep=sep)
+            assert dashboard_api._baslikta_bilinen_ders_ara(
+                title, self.DERS) == "İngilizce", title
+
 
 class TestSyntheticExams:
     """Exams created from grade table when no takvim event exists."""
