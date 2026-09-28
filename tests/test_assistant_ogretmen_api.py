@@ -73,6 +73,21 @@ def test_bilinmeyen_ogretmen_400_ve_cagri_yok(istemci, uc, deger):
     assert k.cagrilar == []
 
 
+@pytest.mark.parametrize("uc", ["/api/assistant/stream", "/api/assistant/chat"])
+@pytest.mark.parametrize("govde", [["mesaj"], "sadece bir metin"])
+def test_nesne_olmayan_govde_400_ve_cagri_yok(istemci, uc, govde):
+    # Final-fix item P8a: a JSON body that is not an object (a list, a bare
+    # string) must be refused with 400 before anything else reads it —
+    # payload.get(...) on a list/string would otherwise raise AttributeError,
+    # surfacing as an unrelated 500.
+    c, k = istemci
+    res = c.post(uc, json=govde)
+    assert res.status_code == 400
+    assert res.headers["Content-Type"].startswith("application/json")
+    assert res.get_json()["error"] == "Geçersiz istek gövdesi."
+    assert k.cagrilar == []
+
+
 def test_ogretmenler_listesi(istemci):
     c, _ = istemci
     res = c.get("/api/assistant/ogretmenler")

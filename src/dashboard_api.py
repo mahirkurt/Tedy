@@ -2129,7 +2129,15 @@ def health():
 @app.route("/api/assistant/chat", methods=["POST"])
 @require_auth
 def assistant_chat():
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, dict):
+        # Final-fix item P8a: a list or bare string body must be refused
+        # before anything else reads it — payload.get(...) on either raises
+        # AttributeError, which the generic handler would otherwise turn
+        # into an unrelated 500.
+        return jsonify({"error": "Geçersiz istek gövdesi."}), 400
     messages = payload.get("messages", [])
     if not isinstance(messages, list):
         return jsonify({"error": "messages list olmalı"}), 400
@@ -2174,7 +2182,12 @@ def assistant_stream():
     if access is not None:
         return access
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if data is None:
+        data = {}
+    if not isinstance(data, dict):
+        # Final-fix item P8a: same as /chat — refused before the stream opens.
+        return jsonify({"error": "Geçersiz istek gövdesi."}), 400
     # Before the stream opens: an unknown teacher is a 400, not an SSE error.
     ogretmen, hata = _istek_ogretmeni(data)
     if hata is not None:
