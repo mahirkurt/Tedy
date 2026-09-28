@@ -25,6 +25,7 @@ from zoneinfo import ZoneInfo
 from src.course_names import normalize_course
 from src.mcp_client import McpClient, McpToolResult
 from src import assistant_kitaplar, assistant_modules
+from src.portal_susu import temiz_metin
 
 logger = logging.getLogger(__name__)
 
@@ -791,33 +792,6 @@ def takvim_metni(etkinlikler: Any, simdi: datetime, gun_sayisi: Any = _TAKVIM_VA
                  + "\n\nNot (okura aktarma): dersler ve ödev teslimleri bu listede yok.", GOVDE_SINIRI)
 
 
-# Course content cards carry the portal's own chrome ("Daha fazla oku",
-# "Yorum Ekle") and, between "Daha fazla oku" and "Yorum Ekle", the comment
-# block: other children's names, like counts and comments. None of it is the
-# teacher's content, and the names are not ours to pass on.
-_ICERIK_SUSU = re.compile(
-    r"^(?:Daha fazla oku|Yorum Ekle|İlk yorum yapan sen olmak ister misin\?|\d+ Yorum yapıldı!)$")
-
-
-def _temiz_icerik(metin: Any) -> str:
-    satirlar: list[str] = []
-    yorumda = False
-    for ham in str(metin or "").split("\n"):
-        s = ham.strip()
-        if s == "Daha fazla oku":
-            yorumda = True
-            continue
-        if s == "Yorum Ekle" or not s:
-            yorumda = False
-            if not s and satirlar and satirlar[-1]:
-                satirlar.append("")
-            continue
-        if yorumda or _ICERIK_SUSU.match(s):
-            continue
-        satirlar.append(s)
-    return "\n".join(satirlar).strip()
-
-
 def _duz(metin: str) -> str:
     return " ".join(_katla(metin).split())
 
@@ -829,7 +803,7 @@ def icerik_ozeti(kayit: Any) -> str:
     `error` — a Selenium trace — and yields nothing."""
     if not isinstance(kayit, dict):
         return ""
-    govde = _temiz_icerik(kayit.get("text"))
+    govde = temiz_metin(kayit.get("text"))
     icinde = _duz(govde)
     ekler: list[str] = []
 
@@ -846,7 +820,7 @@ def icerik_ozeti(kayit: Any) -> str:
     for kart in kayit.get("cards") or []:
         if isinstance(kart, dict):
             kart = kart.get("text") or ""
-        ekle(_temiz_icerik(kart))
+        ekle(temiz_metin(kart))
     for tablo in kayit.get("tables") or []:
         satirlar = tablo.get("rows") if isinstance(tablo, dict) else tablo
         for r in satirlar or []:

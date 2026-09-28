@@ -1897,7 +1897,7 @@ def _find_related_content(exam_course, ders_icerikleri):
     {tab_id, text, tables, items, cards} with cards and items as strings
     (measured 2026-09-28); this used to branch on a list, a shape the scraper
     never writes, so relatedContent was [] on every exam."""
-    from src.assistant_tools import _temiz_icerik
+    from src.portal_susu import temiz_metin
     related = []
     if not isinstance(ders_icerikleri, dict):
         return related
@@ -1912,7 +1912,7 @@ def _find_related_content(exam_course, ders_icerikleri):
         for kart in kayit.get("cards") or []:
             if not isinstance(kart, str):
                 continue
-            ilk = next((s for s in _temiz_icerik(kart).split("\n") if s.strip()), "")
+            ilk = next((s for s in temiz_metin(kart).split("\n") if s.strip()), "")
             if ilk and not _KART_IMZASI.match(ilk):
                 kart_basliklari.append(ilk)
         maddeler = [" ".join(m.split()) for m in kayit.get("items") or [] if isinstance(m, str)]
