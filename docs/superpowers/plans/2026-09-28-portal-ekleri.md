@@ -6,7 +6,7 @@
 
 **Architecture:** Saf bir toplayıcı (`src/portal_ekleri.py`) kazınan veriden bütün ek bağlantılarını toplar, her birine kanonik adresin karmasından kararlı bir kimlik verir ve izleyiciyi (`output/portal_ekleri.json`) okur/yazar. Ağ yarısı (`src/portal_ekleri_indir.py`) `run_sync` içinde, kazıyıcılardan sonra ve sağlık/yeniden indekslemeden önce, açık bir süre ve bayt bütçesiyle çalışır: akışla geçici parça dosyasına indirir, türü baytlardan okur, HTML'i asla dosya diye saklamaz, 300 MB'ı reddeder, bütçe biterse parçayı saklar ve sonraki turda Range ile sürdürür; indirdiği her dosyanın metnini aynı bütçe içinde bir kez çıkarıp `<id>.txt` + `<id>.meta.json` yan dosyalarına yazar. Pano `GET /api/ekler/<id>` ile dosyayı Range destekli, satır içi sunar; ödev/sayfa/duyuru yükleri her eke `tedyUrl` ve `status` ekler. Asistan yalnız `<id>.txt`'yi BM25'e alır, `ek_oku(id, sayfa)` ile eki sayfa sayfa okur, `odev_listesi` ekleri kimlikleriyle listeler. Süs kuralları tek modülde (`src/portal_susu.py`) toplanır ve kazıyıcıda, API sınırında ve tarayıcıda (savunma) uygulanır.
 
-**Tech Stack:** Python 3 / Flask 3.1 (`send_file` + werkzeug Range), `requests` 2.32, `bs4`, stdlib `zipfile` + `xml.etree`, pytest 9; React 19 + TypeScript + Carbon + SCSS, Playwright (+ `@axe-core/playwright`).
+**Tech Stack:** Python 3 / Flask 3.1 (`send_file` + werkzeug Range), `requests` 2.32, `bs4`, stdlib `zipfile` + `xml.etree`, poppler `pdfinfo`/`pdftotext`/`pdftoppm`, Claude Haiku 4.5 görüsü (OCR, `src/claude_api.py` istemcisiyle) + Tesseract `tur+eng` (`pytesseract`), pytest 9; React 19 + TypeScript + Carbon + SCSS, Playwright (+ `@axe-core/playwright`).
 
 **Spec:** Ayrı spec dosyası yok. Kullanıcının 2026-09-28'de onayladığı tasarım (C) aşağıdaki "Onaylı tasarım (C)" bölümünde birebirdir ve bağlayıcıdır; kapsam odur.
 
@@ -15,6 +15,7 @@
 - **Çalışma ağacı ve dal:** yalnız `/mnt/thunderbolt/workspaces/TED/.claude/worktrees/portal-ekleri`, dal `feat/portal-ekleri` (main `f7cad72`'den). Her commit'ten önce `test "$(git -C /mnt/thunderbolt/workspaces/TED/.claude/worktrees/portal-ekleri branch --show-current)" = feat/portal-ekleri && echo dal-dogru` çıktısı `dal-dogru` olmalı.
 - **Ana checkout paylaşımlıdır:** `/mnt/thunderbolt/workspaces/TED` başka oturumlarca kullanılır. Oraya yazma, orada git komutu koşma. `output/` ve `content/` yalnız orada vardır; biçim için **salt-okunur** okunabilir (yalnız sayım/şekil yazdır, içerik yazdırma).
 - **Kişisel veri yok:** plan, test, fixture ve commit mesajlarında gerçek öğrenci/öğretmen adı, gerçek SharePoint yolu, gerçek Drive kimliği, gerçek not yok. Fixture'lar gerçek biçimi taşır, değerler uydurmadır (`Kurgu Öğrenci Bir`, `ornekokul-my.sharepoint.com`, `ogretmen_ornekokul_k12_tr`).
+- **OCR testleri ücretli API'yi asla çağırmaz:** görü okuyucusu her testte `tests/sahte_ocr.py`'deki sahte okuyucudur; `ClaudeGorselOkuyucu`'nun kendi testi sahte bir Anthropic istemcisiyle koşar. `tests/conftest.py` `ANTHROPIC_API_KEY`'i siler ve (Görev 15'ten sonra) `ASSISTANT_PDF_OCR=0` koyar; OCR'u yalnız onu sınayan testler açar. Gerçek Tesseract testlerde çalışmaz (sayfa başına ~20 s ölçüldü); yerine sahte bir işlev verilir. `pdfinfo`/`pdftotext`/`pdftoppm` yerel ve ağsızdır, testlerde gerçek çalışır.
 - **Testler ağa ve ücretli API'ye asla çıkmaz.** İndirmeler yalnız `tests/sahte_http.py` sahte HTTP katmanıyla sınanır (SharePoint, Drive, Docs yanıt biçimleri; HTML giriş duvarı, Drive onay sayfası, Range, 300 MB tavan benzetimi, bütçe tükenmesi). `tests/conftest.py` `ANTHROPIC_API_KEY`'i zaten siler. Şüphede `unshare -rn` altında koş.
 - **Python testleri:** `DASHBOARD_SECRET_KEY=yerel-test-anahtari-portal-ekleri .venv/bin/python -m pytest -q -p no:cacheprovider …`. Çalışma ağacında `.env` yok (ölçüldü 2026-09-28); önek olmadan `src.dashboard_api` içe aktarılırken `RuntimeError` atar. `.env` oluşturma, symlink kurma.
 - **Pano:** `dashboard/node_modules` yoksa önce `cd dashboard && npm ci`. Sonra `npm run lint` ve `npm run build`; çıkış kodunu **boru olmadan** oku (`npm run build; echo "build çıkış: $?"`). Playwright `dashboard-dist/`'i sunar: her e2e koşusundan önce build. Playwright `env -u ANTHROPIC_API_KEY TEDY_E2E_PORT=8297 DASHBOARD_SECRET_KEY=yerel-test-anahtari-portal-ekleri npx playwright test …` ile koşar.
@@ -46,10 +47,37 @@ Tasarım:
 5. **Süs temizliği.** `_temiz_icerik` kuralları tek ortak temizleyici modüle taşınır ve uygulanır: (a) kazıyıcı çıktısında (yeni veri temiz saklanır); (b) API sınırında `/api/content`, `/api/content/weeks`, ödev açıklamaları ve süsü taşıyabilecek her metin alanı için (mevcut veri temiz sunulur); (c) savunma olarak `CourseContent.tsx` `parseCard`'da. Başka öğrencilerin adları ve yorumları hiçbir yüzeye ve indekse ulaşmaz. "Genel" akışın okul gönderileri kalır; yorum blokları gider. Temizleyici gerçek süs biçimleri (yalnız uydurma adlar) ve bilinen süs dizgeleri üzerinde testlerle sabitlenir.
 6. **Belgeler.** CLAUDE.md bölümleri: veri akışı, temel desenler, asistan araçları.
 
+### Genişletme — OCR (kullanıcı onayı, 2026-09-28, bağlayıcı)
+
+Taranmış PDF'ler için gelişmiş OCR artık kapsamda:
+- Ortak bir OCR katmanı (ör. `src/ocr_katmani.py`). Metin katmanı olmayan PDF sayfaları görüntüye çevrilir (`pdftoppm` var; çözünürlük/maliyet dengesi denetlenir); her sayfa mevcut `src/claude_api.py` istemcisiyle, TEDY'nin anahtarıyla Claude Haiku 4.5 görüsüne gönderilir; model başlıkları, tabloları ve formülleri koruyan Markdown döndürür.
+- Sayfa başına sonuç önbelleği; anahtar (dosya sha256, sayfa, motor ve istem sürümü) — bir sayfa bir kez okunur.
+- Aylık 10 USD tavanı: `output/` altında bir defter, `response.usage`'dan ölçülen kullanım ve fiyat sabitleriyle. Tavana varınca ya da API hatasında yerel Tesseract'a (`tur+eng`, `FileAdapters`'ta zaten var) düşülür.
+- Her sayfa motorunu ve bir güven tahminini taşır; asistan düşük güvenli sayfaları "OCR, güven düşük" etiketiyle görür.
+- Mevcut ek eşitlemesinin süre ve bayt bütçesi içinde çalışır: sayfa sayfa, turlar arası sürdürülebilir.
+- Asistanın BM25 indeksindeki taranmış PDF'lere de genel olarak hizmet eder (`FileAdapters`'ın PDF yolu, pdftotext boş döndüğünde), yeniden indekslemenin kendi süre sınırları içinde.
+- `ek_oku` ve metin yan dosyası OCR metnini içerir.
+- Testler ücretli API'yi hiç çağırmaz: sahte görü istemcisi; tavan ve düşüş için testler.
+
+## Uygulama sırası
+
+Görev 1–12, sonra **14 ve 15**, en son **13** (tam doğrulama ve CLAUDE.md her şeyin üstünde koşar). Görev 13'ün metni buna göre yazılmıştır.
+
 ## Karara bağlanan belirsizlikler
 
 1. **Metin yan dosyası.** İkili dosya `content/portal-ekleri/<id><uzantı>`'da durur. Metni indirme anında, aynı bütçe içinde, bir kez `<id>.txt`'ye çıkarılır (ilk paragraf `PORTAL EKİ · <ek adı> · <bağlam> · <ders>` başlığı; BM25 eki adıyla da bulur), yan meta `<id>.meta.json`'a yazılır. BM25 `content/portal-ekleri/` altında **yalnız** `<id>.txt`'yi alır; ikili dosyalar, `.meta.json` ve `.parca/` parça dosyaları dışlanır. Gerekçe: 112 MB'lık bir PDF'in pdftotext'i yeniden indekslemede bütçe dışında koşmaz, `ek_oku` her çağrıda pdftotext çalıştırmaz.
-2. **OCR kapsam dışı.** Taranmış PDF için tesseract yolunu yeniden kullanmak sayfa başına rasterleştirme (`pdftoppm`) + OCR demektir; saniyeler/sayfa, 100 sayfalık bir tarama tek başına 600 s'lik cron turunu aşar ve turlar arası sürdürülebilir OCR yeni bir alt sistemdir. Metin katmanı olmayan PDF `text: "yok"` olur; `ek_oku` "metin katmanı yok" der. Görsel ekler, TEDY'nin öteki görselleri gibi, yalnız `ASSISTANT_ENABLE_OCR=1` iken mevcut tesseract yolundan geçer.
+2. **OCR kapsamda (Görev 14–15; önceki "kapsam dışı" kararının yerine).** Kullanıcı 2026-09-28'de genişletti. Ölçülenler ve kararlar:
+   - **Çizim:** `pdftoppm -scale-to 1568 -jpeg` (uzun kenar 1568 px). Claude uzun kenarı ~1568 px'i aşan görseli zaten küçültür; daha büyüğü yalnız çizim süresi getirir. Ölçüldü (2026-09-28, 70 MB'lık bir PDF'in 5. sayfası): 150 dpi 1214×1650 3,2 s, 200 dpi 1619×2200 5,3 s. 1568 px A4'te ~190 dpi'dir; görsel ≈ w·h/750 ≈ 2.400 girdi token'ı.
+   - **Maliyet:** Haiku 4.5 1 $/5 $ MTok (claude-api başvurusu, önbellek 2026-06-24). Sayfa başına ~2.700 girdi + ~1.000 çıktı ≈ 0,008 $; 10 $ ≈ 1.250 sayfa/ay. Çağrıdan önce en kötü durum (4.000 girdi + 4.096 çıktı ≈ 0,0245 $) sığmıyorsa Claude çağrılmaz; kullanım `response.usage`'dan deftere yazılır. Eşzamanlı iki süreç (cron + panonun `/api/assistant/reindex`'i) tavanı en çok süreç başına bir sayfa (≤ 0,025 $) aşabilir; rezervasyon yerine bu sınır, çöken bir süreç tavanı kalıcı olarak yemesin diye seçildi.
+   - **Güven:** Claude sayfa sonunda `<!-- okunabilirlik: yuksek|orta|dusuk -->` yazar (0,9/0,7/0,4; satır yoksa orta; `max_tokens` ile kesildiyse düşük). Tesseract için kelime güvenlerinin ortalaması. 0,6 altı "OCR, güven düşük". Yapılandırılmış çıktı (JSON) seçilmedi: kesilen bir JSON bütün sayfayı kaybettirir, kesilen Markdown'ın okunan kısmı kalır.
+   - **Boş sayfa:** Çizilen sayfanın gri tonu sapması 2'nin altındaysa API çağrılmaz (`bos` motoru, önbelleğe girer). Bir ders kitabının kapak arkası için para ödenmez.
+   - **Düşüş:** Tavanda, API hatasında, rette ya da anahtar yoksa Tesseract. Tesseract ile okunmuş **düşük güvenli** bir sayfa, tavan izin verdiğinde (ör. yeni ay) Claude ile bir kez daha denenir; yüksek güvenli Tesseract sonucu kalır.
+   - **Kapsam:** Genel indekste yalnız pdftotext tümüyle boş dönen PDF'ler (tasarımdaki gibi; bir ders kitabının resimli sayfaları OCR'a gitmez). Eklerde metinsiz her sayfa.
+   - **Süre:** Eklerde eşitleme bütçesinin kalanı (`min(180 s, kalan)`); indekslemede indeksleyici başına `ASSISTANT_OCR_SURE` (45 s). `perform_incremental_reindex` iki indeksleyici koşar (ana + aile), en kötü 90 s; bu, `run_sync`'in 150 s'lik yedeğinin içindedir. 15 s'den az kalmışsa Claude çağrısı, 10 s'den az kalmışsa Tesseract başlatılmaz; Claude istemcisi `max_retries=0` ve kalan süre kadar zaman aşımıyla kurulur, böylece taşma en çok bir çağrıdır.
+   - **Sürdürme:** Okunan her sayfa hemen önbelleğe yazılır. Yarım kalan PDF indekste `PdfExtractionError("ocr_suruyor")` olur (manifest kaydı yok, sonraki turda yeniden); eklerde `text: "bekliyor"` + `ocr_ilerleme: "12/40"` olur ve bu, 3 denemelik metin hatası sınırını tüketmez.
+   - **Eski indeks kayıtları:** Canlı indekste 3 `pdf_no_text` parçası var (`content/yabanci-dil`, 2026-09-28). OCR açıkken `pdf_no_text` parçası taşıyan dosya sha'sı aynı olsa da yeniden çıkarılır; `INDEX_FORMAT_VERSION` artırılmaz (bütün kitapları yeniden okutmak gereksiz).
+   - **Model:** `claude-haiku-4-5` (tasarım adıyla istedi); `OCR_CLAUDE_MODEL` ile değişir, ama fiyat sabitleri Haiku 4.5 içindir. Model değişirse sabitler de değişmeli. Düşünme ve `temperature` gönderilmez.
+   - **Defter ve önbellek BM25 dışında:** `output/ocr_onbellek/` dizini ve `ocr_defteri.json` dışlanır. Kilit dosyası `*.lock` kuralına zaten takılır.
 3. **"Range" iki yerde:** sunmada (`send_file(conditional=True)` → 206) ve indirmede: bütçe biten dosya `content/portal-ekleri/.parca/<id>.part` olarak kalır, sonraki tur `Range: bytes=<n>-` ile sürdürür (206 başlangıcı uymazsa ya da 416 gelirse parça atılıp baştan; sunucu Range'i yok sayıp 200 dönerse baştan yazılır; 416 ile toplam = parça boyu ise dosya tamamdır).
 4. **Durumlar:** `bekliyor`, `indirildi`, `erisilemedi`, `cok_buyuk`, `hata`, `baglanti`. `baglanti` dosya olmayan bağlantılardır (YouTube, SharePoint `:f:` klasörü, form): asla indirilmez, arayüzde uyarısız "kaynağa git" bağlantısıdır. Yeniden deneme: `bekliyor` ve `hata` her tur; `erisilemedi` 24 saat sonra (öğretmen paylaşımı açabilir); `cok_buyuk` ve `baglanti` hiç; `indirildi` yalnız kopya silinmişse. Metin çıkarma hatası en çok 3 kez denenir.
 5. **API anahtarları:** `/api/ekler/<id>` her veri rotası gibi `require_auth`'u izler (full rol oturumu ya da API anahtarı); okur rolü 403 alır (READER_ENDPOINTS'e eklenmez).
@@ -83,7 +111,10 @@ Tasarım:
 | `dashboard/src/types.ts`, `components/patterns/EkBaglantisi.{tsx,scss}` (yeni), `HomeworkTracker.tsx`, `NextThing.{tsx,scss}`, `Announcements.tsx`, `theme/ted-theme.scss` | Ek bağlantısı yüzeyleri | 11 |
 | `dashboard/tests/e2e/portal-ekleri.spec.ts` (yeni) | Ek e2e | 11 |
 | `dashboard/src/utils/portalSusu.ts` (yeni), `CourseContent.tsx`, `dashboard/tests/e2e/dersler-portal-susu.spec.ts` (yeni) | Tarayıcı savunması | 12 |
-| `CLAUDE.md` | Veri akışı, modüller, desenler, asistan araçları, komut | 13 |
+| `src/ocr_katmani.py` (yeni) | Metinsiz PDF sayfası → `pdftoppm` → Claude Haiku 4.5 görüsü (Markdown) ya da Tesseract; sayfa önbelleği, aylık USD defteri, güven etiketi | 14 |
+| `tests/sahte_ocr.py`, `tests/test_ocr_katmani.py`, `tests/test_ocr_baglanti.py` (yeni) | Sahte görü okuyucusu, sahte Tesseract, taranmış PDF üreticisi; OCR testleri | 14, 15 |
+| `src/assistant_core.py`, `src/portal_ekleri_indir.py`, `src/assistant_tools.py`, `tests/conftest.py` | OCR bağlantısı: `FileAdapters`/indeksleyici, ek metni, `ek_oku`, testlerde OCR kapalı | 15 |
+| `CLAUDE.md` | Veri akışı, modüller, desenler, asistan araçları, komut; OCR maddesi | 13, 15 |
 
 ---
 
@@ -4462,6 +4493,8 @@ EOF
 
 ### Görev 13: CLAUDE.md ve tam doğrulama
 
+> **Sıra:** bu görev Görev 14 ve 15'ten **sonra** koşar (bkz. "Uygulama sırası"); CLAUDE.md metinleri ve doğrulama OCR'u içerir.
+
 **Files:**
 - Modify: `CLAUDE.md` (Commands bloğu, Deployment "Cron" maddesi, Core Modules tablosu, Data Flow, Key Patterns → Scraping & Data, Dashboard asistan maddeleri)
 
@@ -4482,7 +4515,7 @@ flock -n output/.sync.lock .venv/bin/python -m src.portal_ekleri_indir --sure 30
 Deployment → **Cron** maddesinin sonuna (son cümle "…backed up in `output/crontab_yedek/`." sonrasına):
 
 ```
-Portal attachments download inside the same run and under the same lock — after every scraper, before `health.json` and the reindex — in a budget of `min(180 s, start + 600 − 150 − now)` and 250 MB (`TEDY_EK_SURE_BUTCESI`, `TEDY_EK_BAYT_BUTCESI_MB`); under 15 s the step is skipped, and `health.json` carries its summary as `ekler`. Measured 2026-09-28 over 40 runs: p50 244 s, longest 393 s.
+Portal attachments download inside the same run and under the same lock — after every scraper, before `health.json` and the reindex — in a budget of `min(180 s, start + 600 − 150 − now)` and 250 MB (`TEDY_EK_SURE_BUTCESI`, `TEDY_EK_BAYT_BUTCESI_MB`); under 15 s the step is skipped, and `health.json` carries its summary as `ekler`. Measured 2026-09-28 over 40 runs: p50 244 s, longest 393 s. OCR of scanned attachments runs inside that same budget; the reindex after it gives OCR 45 s per indexer (`ASSISTANT_OCR_SURE`, two indexers), inside the 150 s reserve.
 ```
 
 - [ ] **Step 3: Modüller ve veri akışı**
@@ -4493,6 +4526,7 @@ Core Modules tablosunda `src/ocr_pdf_to_md.py` satırının altına:
 | `src/portal_susu.py` | Portal UI residue — "Daha fazla oku … Yorum Ekle" comment blocks (other children's names), "N Yorum yapıldı!", "İlk yorum yapan…" — removed in one place; used by the scraper, run_sync's week merge, the API boundary and the index (TS port `dashboard/src/utils/portalSusu.ts`) |
 | `src/portal_ekleri.py` | Attachment links: classify, stable id (sha256 of the canonical URL), download URL per host, collector over `scraped_data.json`, `EkDeposu` (copies + tracker), `ek_ozeti` payloads |
 | `src/portal_ekleri_indir.py` | Attachment downloads inside `run_sync` (budgeted, resumable, HTML never stored, 300 MB cap), one-time text extraction to `<id>.txt`, CLI |
+| `src/ocr_katmani.py` | OCR for PDF pages without a text layer: `pdftoppm` → Claude Haiku 4.5 vision (Markdown) under a 10 USD/month ledger, Tesseract fallback, per-page cache, engine + confidence per page |
 ```
 
 Data Flow bloğunda `SEBİTV …` satırının altına:
@@ -4506,7 +4540,7 @@ Portal ekleri → portal_ekleri_indir.py (inside run_sync, budgeted) → content
 Key Patterns → Scraping & Data'da **Ek sayfalar** maddesinin altına iki madde:
 
 ```
-- **Portal attachments** (plan `docs/superpowers/plans/2026-09-28-portal-ekleri.md`): every attachment link in the scrape — homework `detail.attachments`, `ek_sayfalar.documents`, announcements' `<column>_url`, plus a generic scan of every other string for file-looking links — is collected by `src/portal_ekleri.py` under a stable id (first 16 hex of sha256 of the canonical URL: Drive's preview/view/open/uc collapse to `/file/d/<id>`, SharePoint drops `?e=`) and fetched by `src/portal_ekleri_indir.py`: SharePoint with `download=1`, Drive `uc?export=download` (its virus-scan confirm page is passed through its download form), Docs/Slides/Sheets `/export?format=pdf`, a portal-hosted file with the driver's cookies scoped to the portal's own domain. Measured 2026-09-28 without a login: SharePoint 4 of 5 PDFs (112 and 101 MB among them), the fifth a login wall; Drive 4 of 4. Rules: streamed into `content/portal-ekleri/.parca/<id>.part`, renamed atomically to `<id><ext>`; type from the magic bytes (unknown → `.bin`); a web page where a file was expected is never stored — `erisilemedi` with a reason; over 300 MB → `cok_buyuk`; a download that runs out of the run's budget keeps its part file and resumes with `Range` next run. Statuses `bekliyor`/`indirildi`/`erisilemedi`/`cok_buyuk`/`hata`/`baglanti` (a link that is not one file — a video, a folder — never downloaded); `hata` retries next run, `erisilemedi` after 24 h, `cok_buyuk`/`baglanti` never. Text is extracted once at download time into `<id>.txt` (header `PORTAL EKİ · <name> · <context> · <course>`) with a `<id>.meta.json` sidecar; a PDF without a text layer is `text: "yok"` — no OCR (rasterising + OCR per page would outlast a 600 s run). Tracker `output/portal_ekleri.json` (`url, id, name, type, size, sha256, source{section,item,title,course}, status, reason, fetched_at` …). `GET /api/ekler/<id>` serves the copy (full role, readers 403 by default-deny, `send_file(conditional=True)` so Range → 206, known types inline, `.bin` as attachment, `nosniff`); `/api/homework`, `/api/pages` and `/api/announcements` give each attachment `{name, url, id, tedyUrl, status[, reason]}` and `components/patterns/EkBaglantisi.tsx` renders it: TEDY's copy first, "Kaynağında aç" secondary, "İndirilemedi — kaynağında aç" without a copy. Copies are gitignored (`content/portal-ekleri/`).
+- **Portal attachments** (plan `docs/superpowers/plans/2026-09-28-portal-ekleri.md`): every attachment link in the scrape — homework `detail.attachments`, `ek_sayfalar.documents`, announcements' `<column>_url`, plus a generic scan of every other string for file-looking links — is collected by `src/portal_ekleri.py` under a stable id (first 16 hex of sha256 of the canonical URL: Drive's preview/view/open/uc collapse to `/file/d/<id>`, SharePoint drops `?e=`) and fetched by `src/portal_ekleri_indir.py`: SharePoint with `download=1`, Drive `uc?export=download` (its virus-scan confirm page is passed through its download form), Docs/Slides/Sheets `/export?format=pdf`, a portal-hosted file with the driver's cookies scoped to the portal's own domain. Measured 2026-09-28 without a login: SharePoint 4 of 5 PDFs (112 and 101 MB among them), the fifth a login wall; Drive 4 of 4. Rules: streamed into `content/portal-ekleri/.parca/<id>.part`, renamed atomically to `<id><ext>`; type from the magic bytes (unknown → `.bin`); a web page where a file was expected is never stored — `erisilemedi` with a reason; over 300 MB → `cok_buyuk`; a download that runs out of the run's budget keeps its part file and resumes with `Range` next run. Statuses `bekliyor`/`indirildi`/`erisilemedi`/`cok_buyuk`/`hata`/`baglanti` (a link that is not one file — a video, a folder — never downloaded); `hata` retries next run, `erisilemedi` after 24 h, `cok_buyuk`/`baglanti` never. Text is extracted once at download time into `<id>.txt` (header `PORTAL EKİ · <name> · <context> · <course>`) with a `<id>.meta.json` sidecar; a scanned page is read by the OCR layer inside the same budget (see the OCR bullet); a scan read part-way is `text: "bekliyor"` with `ocr_ilerleme` and continues next run, and a PDF with no readable text even after OCR is `text: "yok"`. Tracker `output/portal_ekleri.json` (`url, id, name, type, size, sha256, source{section,item,title,course}, status, reason, fetched_at` …). `GET /api/ekler/<id>` serves the copy (full role, readers 403 by default-deny, `send_file(conditional=True)` so Range → 206, known types inline, `.bin` as attachment, `nosniff`); `/api/homework`, `/api/pages` and `/api/announcements` give each attachment `{name, url, id, tedyUrl, status[, reason]}` and `components/patterns/EkBaglantisi.tsx` renders it: TEDY's copy first, "Kaynağında aç" secondary, "İndirilemedi — kaynağında aç" without a copy. Copies are gitignored (`content/portal-ekleri/`).
 - **Portal residue and other children's comments**: the portal renders a post's comment block — per comment another child's name, a like count and the comment — between "Daha fazla oku" and "Yorum Ekle"; measured 445 blocks on 2026-09-28, mostly in the "Genel" school feed. `src/portal_susu.py` drops it and the chrome lines; a blank line does not end a block and an unclosed block runs to the end of the text (87 cards end at "Daha fazla oku"; the scraper cuts a tab at 8,000 chars). It runs in `scrape_all` (before the length caps), in `run_sync._icerik_birlestir` (so earlier weeks are cleaned too), at the API boundary (`/api/content`, `/api/content/weeks`, homework descriptions, `/api/pages`, `/api/announcements`) and in the BM25 text; `CourseContent.tsx` applies the TS port as defence. School posts stay; their comment blocks go.
 ```
 
@@ -4515,7 +4549,7 @@ Key Patterns → Scraping & Data'da **Ek sayfalar** maddesinin altına iki madde
 **Asistan ve ödevler** maddesinin altına:
 
 ```
-- **Asistan ve portal ekleri** (plan `docs/superpowers/plans/2026-09-28-portal-ekleri.md`): the BM25 index takes only `content/portal-ekleri/<id>.txt` (binaries, `.meta.json`, `.parca/` and `output/portal_ekleri.json` excluded — the binaries would be re-extracted outside the sync's budget), and those files lead `content/` in discovery. A hit is labelled "<ek adı> · <ödev başlığı>" from the sidecar (`McpRegistry._yerel_etiket`), never by path. `ek_oku(id, sayfa)` pages an attachment's text in ≤ 3,300-character text pages inside the 3,900 body budget, says which PDF pages a text page spans, and is honest about every state: not downloaded (with the reason), "metin katmanı yok", a type whose text is not read, text not extracted yet. `odev_listesi` names each homework's attachments as `Ekler: <ad> [ek:<id>]` (or `· indirilemedi`, or `(bağlantı)`); the ödevler paragraph of `_fmt_scraped_data` carries attachment names. `FileAdapters` reads `.docx` with the stdlib (`zipfile` + `word/document.xml`). The runtime always wires `EkDeposu`, so 27 tools are routed, each exactly once (`test_system_prompt_routing_names_every_declared_tool_exactly_once`).
+- **Asistan ve portal ekleri** (plan `docs/superpowers/plans/2026-09-28-portal-ekleri.md`): the BM25 index takes only `content/portal-ekleri/<id>.txt` (binaries, `.meta.json`, `.parca/` and `output/portal_ekleri.json` excluded — the binaries would be re-extracted outside the sync's budget), and those files lead `content/` in discovery. A hit is labelled "<ek adı> · <ödev başlığı>" from the sidecar (`McpRegistry._yerel_etiket`), never by path. `ek_oku(id, sayfa)` pages an attachment's text in ≤ 3,300-character text pages inside the 3,900 body budget, says which PDF pages a text page spans, and is honest about every state: not downloaded (with the reason), no text even after OCR, OCR under way ("12/40 sayfa okundu"), a type whose text is not read, text not extracted yet; an OCR'd page keeps its `[PDF s.N · OCR …]` line, and "OCR, güven düşük" pages come with a note not to treat them as certain. `odev_listesi` names each homework's attachments as `Ekler: <ad> [ek:<id>]` (or `· indirilemedi`, or `(bağlantı)`); the ödevler paragraph of `_fmt_scraped_data` carries attachment names. `FileAdapters` reads `.docx` with the stdlib (`zipfile` + `word/document.xml`). The runtime always wires `EkDeposu`, so 27 tools are routed, each exactly once (`test_system_prompt_routing_names_every_declared_tool_exactly_once`).
 ```
 
 - [ ] **Step 6: Tam Python paketi**
@@ -4523,8 +4557,11 @@ Key Patterns → Scraping & Data'da **Ek sayfalar** maddesinin altına iki madde
 Run (Bash timeout 600000): `cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/portal-ekleri && DASHBOARD_SECRET_KEY=yerel-test-anahtari-portal-ekleri .venv/bin/python -m pytest -q -p no:cacheprovider 2>&1 | tail -15`
 Expected: Görev 1 Step 1'deki başlangıçla aynı kırmızılar (ya da hiç), yeni kırmızı yok; geçen sayısı yeni testler kadar artmış.
 
-Run: `cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/portal-ekleri && DASHBOARD_SECRET_KEY=yerel-test-anahtari-portal-ekleri unshare -rn .venv/bin/python -m pytest -q -p no:cacheprovider tests/test_portal_susu.py tests/test_portal_susu_uygulama.py tests/test_portal_ekleri.py tests/test_portal_ekleri_indir.py tests/test_portal_ekleri_esitle.py tests/test_portal_ekleri_sync.py tests/test_portal_ekleri_api.py tests/test_portal_ekleri_indeks.py tests/test_assistant_docx.py tests/test_assistant_ek_oku.py`
-Expected: PASS ağsız ad alanında (hiçbir yeni test ağa dokunmaz).
+Run: `cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/portal-ekleri && DASHBOARD_SECRET_KEY=yerel-test-anahtari-portal-ekleri unshare -rn .venv/bin/python -m pytest -q -p no:cacheprovider tests/test_portal_susu.py tests/test_portal_susu_uygulama.py tests/test_portal_ekleri.py tests/test_portal_ekleri_indir.py tests/test_portal_ekleri_esitle.py tests/test_portal_ekleri_sync.py tests/test_portal_ekleri_api.py tests/test_portal_ekleri_indeks.py tests/test_assistant_docx.py tests/test_assistant_ek_oku.py tests/test_ocr_katmani.py tests/test_ocr_baglanti.py`
+Expected: PASS ağsız ad alanında (hiçbir yeni test ağa dokunmaz; OCR testleri yalnız sahte okuyucu ve sahte Tesseract kullanır, gerçek `pdfinfo`/`pdftotext`/`pdftoppm` yereldir).
+
+Run (ücretli çağrı olmadığının kanıtı): `cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/portal-ekleri && grep -n "ClaudeGorselOkuyucu()" tests/*.py; ls output/ocr_defteri.json 2>&1`
+Expected: tek eşleşme `tests/test_ocr_katmani.py`'deki sahte Anthropic istemcili test; `output/ocr_defteri.json` çalışma ağacında yok (hiçbir test gerçek defteri yazmadı).
 
 - [ ] **Step 7: Pano paketi**
 
@@ -4550,6 +4587,1318 @@ EOF
 
 ---
 
+### Görev 14: OCR katmanı, sayfa önbelleği, aylık tavan defteri ve Tesseract düşüşü
+
+**Files:**
+- Create: `src/ocr_katmani.py`
+- Create: `tests/sahte_ocr.py`
+- Test: `tests/test_ocr_katmani.py`
+
+**Interfaces:**
+- Consumes: `src.claude_api.istemci(timeout: float, max_retries: int) -> anthropic.Anthropic`, `src.claude_api.metin(yanit) -> str`, `src.claude_api.okunur_ad(model) -> str`; `src.json_utils.atomic_json_dump`; poppler `pdfinfo`/`pdftotext`/`pdftoppm`; `pytesseract` + Pillow (production venv'de var, ölçüldü).
+- Produces (`src.ocr_katmani`):
+  - Sabitler: `OCR_VARSAYILAN_MODEL = "claude-haiku-4-5"`, `GIRDI_USD_MTOK = 1.00`, `CIKTI_USD_MTOK = 5.00`, `ISTEM_SURUMU = "1"`, `ISTEM`, `MOTOR_TESSERACT = "tesseract-tur+eng"`, `MOTOR_BOS = "bos"`, `AYLIK_TAVAN_USD` (env `TEDY_OCR_AYLIK_USD`, varsayılan 10), `UZUN_KENAR = 1568`, `CIKTI_SINIRI = 4096`, `SAYFA_TAHMINI_USD`, `DUSUK_GUVEN = 0.6`, `CLAUDE_EN_AZ_SURE = 15.0`, `TESSERACT_EN_AZ_SURE = 10.0`, `ONBELLEK = PurePosixPath("output/ocr_onbellek")`, `DEFTER = PurePosixPath("output/ocr_defteri.json")`.
+  - `class OcrHatasi(RuntimeError)`.
+  - `pdf_sayfa_sayisi(pdf, sure) -> int`, `pdf_sayfa_metinleri(pdf, sure) -> list[str]`, `metin_katmani_var(metin: str) -> bool`, `sayfa_gorseli(pdf, sayfa, sure) -> bytes` (JPEG), `bos_sayfa_mi(jpeg: bytes) -> bool`.
+  - `@dataclass GorselOkuma(markdown: str, okunabilirlik: str, girdi_token: int, cikti_token: int, kesildi: bool = False, reddedildi: bool = False)`.
+  - `class ClaudeGorselOkuyucu(model: str | None = None)`: `.model`, `.motor -> "claude:<model>"`, `oku(jpeg: bytes, sure: float) -> GorselOkuma`. Bir okuyucu, bu iki üyeyi (`motor`, `oku`) taşıyan her nesnedir; testler sahtesini verir.
+  - `tesseract_verisinden(veri: dict) -> tuple[str, float]`, `tesseract_oku(jpeg: bytes, sure: float) -> tuple[str, float]`.
+  - `@dataclass SayfaOkumasi(sayfa: int, metin: str, motor: str, guven: float, usd: float = 0.0)` + `dusuk_guven: bool`, `etiket() -> str`.
+  - `class OcrOnbellegi(dizin)`: `al(sha, sayfa, motor) -> SayfaOkumasi | None`, `koy(sha, okuma) -> None`.
+  - `class OcrDefteri(yol, tavan=AYLIK_TAVAN_USD, simdi=datetime.now)`: `harcanan() -> float`, `izin_var() -> bool`, `yaz(motor, girdi_token, cikti_token) -> float`.
+  - `@dataclass PdfOcrSonucu(metin: str, toplam_sayfa: int, metinsiz: int, ocr_sayfalari: list[int], eksik: list[int], dusuk_guvenli: list[int])` + `ilerleme -> "okunan/toplam"`. `metin` sayfaları `chr(12)` ile birleştirir (pdftotext gibi); OCR'lı her sayfa `SayfaOkumasi.etiket()` satırıyla başlar.
+  - `class OcrKatmani(proje_koku, okuyucu=None, tesseract=tesseract_oku, saat=time.monotonic, simdi=datetime.now, tavan=None)`: `.saat`, `.defter`, `.onbellek`, `.okuyucu`, `pdf_oku(pdf, son_an: float, sayfa_metinleri: list[str] | None = None) -> PdfOcrSonucu`. `son_an` `.saat()` ile aynı saattedir.
+- Produces (`tests.sahte_ocr`): `MARKDOWN`, `Saat`, `SahteOkuyucu`, `SahteTesseract`, `taranmis_pdf(yol, icerikli=1, bos=0) -> Path` (Görev 15 kullanır).
+
+- [ ] **Step 1: Sahte OCR yardımcılarını yaz**
+
+`tests/sahte_ocr.py`:
+
+```python
+"""Fakes for the OCR layer (plan 2026-09-28-portal-ekleri, Görev 14–15).
+
+No test calls the paid API or spends ~20 s in real Tesseract (measured
+2026-09-28 per A4 page at 150 dpi). A scanned PDF is made with Pillow: image
+pages, no text layer — exactly what pdftotext returns nothing for.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from src.ocr_katmani import GorselOkuma
+
+MARKDOWN = "# Soru 1\n\nKesirleri topla: $x^2 + y^2$\n\n| a | b |\n|---|---|\n| 1 | 2 |"
+
+
+class Saat:
+    """A monotonic clock that moves only when a test moves it."""
+
+    def __init__(self, an: float = 0.0):
+        self.an = an
+
+    def __call__(self) -> float:
+        return self.an
+
+
+class SahteOkuyucu:
+    """Stands in for ClaudeGorselOkuyucu: records calls, returns a fixed page."""
+
+    motor = "claude:claude-haiku-4-5"
+
+    def __init__(self, markdown: str = MARKDOWN, okunabilirlik: str = "yuksek", girdi: int = 2400,
+                 cikti: int = 300, hata: Exception | None = None, reddet: bool = False,
+                 saat: Saat | None = None, adim: float = 0.0):
+        self.markdown, self.okunabilirlik = markdown, okunabilirlik
+        self.girdi, self.cikti = girdi, cikti
+        self.hata, self.reddet = hata, reddet
+        self.saat, self.adim = saat, adim
+        self.cagrilar: list[int] = []
+
+    def oku(self, jpeg: bytes, sure: float) -> GorselOkuma:
+        self.cagrilar.append(len(jpeg))
+        if self.saat is not None:
+            self.saat.an += self.adim
+        if self.hata is not None:
+            raise self.hata
+        return GorselOkuma(markdown="" if self.reddet else self.markdown,
+                           okunabilirlik=self.okunabilirlik, girdi_token=self.girdi,
+                           cikti_token=self.cikti, kesildi=False, reddedildi=self.reddet)
+
+
+class SahteTesseract:
+    def __init__(self, metin: str = "Soru 1 kesirleri topla", guven: float = 0.45):
+        self.metin, self.guven = metin, guven
+        self.cagrilar = 0
+
+    def __call__(self, jpeg: bytes, sure: float) -> tuple[str, float]:
+        self.cagrilar += 1
+        return self.metin, self.guven
+
+
+def taranmis_pdf(yol: Path, icerikli: int = 1, bos: int = 0) -> Path:
+    """`icerikli` drawn pages, then `bos` white ones; no text layer at all."""
+    from PIL import Image, ImageDraw
+    sayfalar = []
+    for i in range(icerikli):
+        img = Image.new("RGB", (620, 877), "white")
+        cizim = ImageDraw.Draw(img)
+        cizim.rectangle([40, 40, 580, 120], outline="black", width=3)
+        cizim.text((60, 70), f"Soru {i + 1}: Kesirleri topla.", fill="black")
+        for y in range(160, 800, 40):
+            cizim.line([60, y, 560, y], fill="black", width=2)
+        sayfalar.append(img)
+    sayfalar += [Image.new("RGB", (620, 877), "white") for _ in range(bos)]
+    sayfalar[0].save(yol, "PDF", save_all=True, append_images=sayfalar[1:], resolution=72)
+    return Path(yol)
+```
+
+- [ ] **Step 2: Başarısız testi yaz**
+
+`tests/test_ocr_katmani.py`:
+
+```python
+"""OCR layer (plan 2026-09-28-portal-ekleri, Görev 14): Claude Haiku 4.5 vision per
+textless page, a per-page cache, a monthly USD cap and the Tesseract fallback.
+The paid API is never called: the reader is tests/sahte_ocr.SahteOkuyucu, and
+ClaudeGorselOkuyucu's own test runs against a fake Anthropic client."""
+from datetime import datetime
+from types import SimpleNamespace
+
+import pytest
+
+import src.ocr_katmani as ocr
+from src.ocr_katmani import (AYLIK_TAVAN_USD, SAYFA_TAHMINI_USD, ClaudeGorselOkuyucu, OcrDefteri,
+                             OcrKatmani, pdf_sayfa_metinleri, tesseract_verisinden)
+from tests.sahte_ocr import MARKDOWN, Saat, SahteOkuyucu, SahteTesseract, taranmis_pdf
+
+EYLUL = datetime(2026, 9, 28, 10, 0)
+EKIM = datetime(2026, 10, 1, 9, 0)
+FF = chr(12)
+
+
+def _katman(kok, okuyucu, tesseract=None, simdi=lambda: EYLUL, **kw):
+    return OcrKatmani(kok, okuyucu=okuyucu, tesseract=tesseract or SahteTesseract(), simdi=simdi, **kw)
+
+
+def test_taranmis_pdf_metin_katmani_tasimaz(tmp_path):
+    pdf = taranmis_pdf(tmp_path / "t.pdf", icerikli=2, bos=1)
+    assert [s.strip() for s in pdf_sayfa_metinleri(pdf, 30)] == ["", "", ""]
+
+
+def test_metinsiz_sayfa_claude_ile_okunur_bos_sayfa_para_harcamaz(tmp_path):
+    pdf = taranmis_pdf(tmp_path / "t.pdf", icerikli=1, bos=1)
+    okuyucu = SahteOkuyucu()
+    katman = _katman(tmp_path, okuyucu)
+    sonuc = katman.pdf_oku(pdf, katman.saat() + 60)
+    assert len(okuyucu.cagrilar) == 1                    # the white page cost nothing
+    assert (sonuc.ocr_sayfalari, sonuc.eksik, sonuc.metinsiz, sonuc.ilerleme) == ([1], [], 2, "2/2")
+    ilk, ikinci = sonuc.metin.split(FF)
+    assert ilk == "[PDF s.1 · OCR · Claude Haiku 4.5 · güven %90]\n" + MARKDOWN
+    assert ikinci == ""
+    assert katman.defter.harcanan() == pytest.approx((2400 * 1.0 + 300 * 5.0) / 1_000_000)
+
+
+def test_bir_sayfa_bir_kez_okunur(tmp_path):
+    pdf = taranmis_pdf(tmp_path / "t.pdf")
+    okuyucu = SahteOkuyucu()
+    katman = _katman(tmp_path, okuyucu)
+    katman.pdf_oku(pdf, katman.saat() + 60)
+    harcanan = katman.defter.harcanan()
+    ikinci = katman.pdf_oku(pdf, katman.saat() + 60)
+    assert len(okuyucu.cagrilar) == 1 and katman.defter.harcanan() == harcanan
+    assert MARKDOWN in ikinci.metin
+
+
+def test_istem_surumu_degisince_yeniden_okunur(tmp_path, monkeypatch):
+    pdf = taranmis_pdf(tmp_path / "t.pdf")
+    okuyucu = SahteOkuyucu()
+    katman = _katman(tmp_path, okuyucu)
+    katman.pdf_oku(pdf, katman.saat() + 60)
+    monkeypatch.setattr(ocr, "ISTEM_SURUMU", "2")
+    katman.pdf_oku(pdf, katman.saat() + 60)
+    assert len(okuyucu.cagrilar) == 2
+
+
+def test_aylik_tavanda_tesseract_a_duser_defter_degismez(tmp_path):
+    assert AYLIK_TAVAN_USD == 10.0
+    pdf = taranmis_pdf(tmp_path / "t.pdf")
+    okuyucu, tesseract = SahteOkuyucu(), SahteTesseract()
+    katman = _katman(tmp_path, okuyucu, tesseract)
+    katman.defter.yaz("claude:claude-haiku-4-5", 10_000_000, 0)      # 10.00 USD spent this month
+    assert not katman.defter.izin_var()
+    sonuc = katman.pdf_oku(pdf, katman.saat() + 60)
+    assert okuyucu.cagrilar == [] and tesseract.cagrilar == 1
+    assert sonuc.metin.startswith("[PDF s.1 · OCR, güven düşük · Tesseract]\n")
+    assert sonuc.dusuk_guvenli == [1]
+    assert katman.defter.harcanan() == pytest.approx(10.0)
+
+
+def test_tavan_bir_sayfanin_en_kotu_maliyetine_yer_birakir(tmp_path):
+    defter = OcrDefteri(tmp_path / "d.json", tavan=10.0, simdi=lambda: EYLUL)
+    defter.yaz("m", int((10.0 - SAYFA_TAHMINI_USD) * 1_000_000) + 1, 0)
+    assert not defter.izin_var()
+    assert OcrDefteri(tmp_path / "d.json", tavan=10.0, simdi=lambda: EKIM).izin_var()   # a new month
+
+
+def test_defter_olcumu_ay_ay_kaydeder(tmp_path):
+    defter = OcrDefteri(tmp_path / "ocr_defteri.json", simdi=lambda: EYLUL)
+    assert defter.yaz("claude:claude-haiku-4-5", 2400, 300) == pytest.approx(0.0039)
+    import json
+    ay = json.loads((tmp_path / "ocr_defteri.json").read_text(encoding="utf-8"))["aylar"]["2026-09"]
+    assert ay == {"usd": pytest.approx(0.0039), "sayfa": 1, "girdi_token": 2400, "cikti_token": 300}
+
+
+def test_api_hatasinda_tesseract_a_duser_para_yazilmaz(tmp_path):
+    pdf = taranmis_pdf(tmp_path / "t.pdf")
+    okuyucu, tesseract = SahteOkuyucu(hata=RuntimeError("529 overloaded")), SahteTesseract(guven=0.8)
+    katman = _katman(tmp_path, okuyucu, tesseract)
+    sonuc = katman.pdf_oku(pdf, katman.saat() + 60)
+    assert len(okuyucu.cagrilar) == 1 and tesseract.cagrilar == 1
+    assert sonuc.metin.startswith("[PDF s.1 · OCR · Tesseract · güven %80]\n")
+    assert katman.defter.harcanan() == 0.0
+
+
+def test_ret_kullanimini_yazar_ve_tesseract_a_duser(tmp_path):
+    pdf = taranmis_pdf(tmp_path / "t.pdf")
+    okuyucu, tesseract = SahteOkuyucu(reddet=True), SahteTesseract()
+    katman = _katman(tmp_path, okuyucu, tesseract)
+    katman.pdf_oku(pdf, katman.saat() + 60)
+    assert tesseract.cagrilar == 1 and katman.defter.harcanan() > 0
+
+
+def test_yeni_ay_dusuk_guvenli_tesseract_sayfasini_claude_ile_yeniler(tmp_path):
+    pdf = taranmis_pdf(tmp_path / "t.pdf")
+    an = {"t": EYLUL}
+    okuyucu, tesseract = SahteOkuyucu(), SahteTesseract(guven=0.45)
+    katman = _katman(tmp_path, okuyucu, tesseract, simdi=lambda: an["t"])
+    katman.defter.yaz("claude:claude-haiku-4-5", 10_000_000, 0)
+    katman.pdf_oku(pdf, katman.saat() + 60)
+    an["t"] = EKIM
+    sonuc = katman.pdf_oku(pdf, katman.saat() + 60)
+    assert len(okuyucu.cagrilar) == 1 and tesseract.cagrilar == 1
+    assert "Claude Haiku 4.5" in sonuc.metin and sonuc.dusuk_guvenli == []
+
+
+def test_yuksek_guvenli_tesseract_sonucu_kalir(tmp_path):
+    pdf = taranmis_pdf(tmp_path / "t.pdf")
+    an = {"t": EYLUL}
+    okuyucu, tesseract = SahteOkuyucu(), SahteTesseract(guven=0.85)
+    katman = _katman(tmp_path, okuyucu, tesseract, simdi=lambda: an["t"])
+    katman.defter.yaz("claude:claude-haiku-4-5", 10_000_000, 0)
+    katman.pdf_oku(pdf, katman.saat() + 60)
+    an["t"] = EKIM
+    katman.pdf_oku(pdf, katman.saat() + 60)
+    assert okuyucu.cagrilar == [] and tesseract.cagrilar == 1
+
+
+def test_sure_dolunca_kalan_sayfa_sonraki_turda_surer(tmp_path):
+    pdf = taranmis_pdf(tmp_path / "t.pdf", icerikli=3)
+    saat = Saat()
+    okuyucu, tesseract = SahteOkuyucu(saat=saat, adim=10.0), SahteTesseract()
+    katman = _katman(tmp_path, okuyucu, tesseract, saat=saat)
+    sonuc = katman.pdf_oku(pdf, son_an=25.0)              # pages 1–2 fit; 5 s left for page 3
+    assert sonuc.eksik == [3] and sonuc.ilerleme == "2/3" and tesseract.cagrilar == 0
+    sonuc = katman.pdf_oku(pdf, son_an=saat() + 100)
+    assert sonuc.eksik == [] and len(okuyucu.cagrilar) == 3   # pages 1–2 came from the cache
+
+
+def test_claude_okuyucusu_istegi_ve_okunabilirligi(monkeypatch):
+    gonderilen, alinan = {}, {}
+
+    def yanit(stop="end_turn", metin=MARKDOWN + "\n<!-- okunabilirlik: yuksek -->"):
+        return SimpleNamespace(content=[SimpleNamespace(type="text", text=metin)], stop_reason=stop,
+                               usage=SimpleNamespace(input_tokens=2412, output_tokens=180))
+    cevaplar = [yanit(), yanit(stop="max_tokens", metin="# Yarım"), yanit(stop="refusal", metin="")]
+
+    class Istemci:
+        def __init__(self):
+            self.messages = SimpleNamespace(create=self.create)
+
+        def create(self, **kw):
+            gonderilen.update(kw)
+            return cevaplar.pop(0)
+
+    def istemci(timeout, max_retries=1):
+        alinan.update(timeout=timeout, max_retries=max_retries)
+        return Istemci()
+    monkeypatch.setattr("src.claude_api.istemci", istemci)
+    monkeypatch.delenv("OCR_CLAUDE_MODEL", raising=False)
+    okuyucu = ClaudeGorselOkuyucu()
+    bir = okuyucu.oku(b"jpeg-baytlari", 40.0)
+    assert (bir.markdown, bir.okunabilirlik, bir.girdi_token, bir.cikti_token) == (MARKDOWN, "yuksek", 2412, 180)
+    assert gonderilen["model"] == "claude-haiku-4-5" and okuyucu.motor == "claude:claude-haiku-4-5"
+    gorsel = gonderilen["messages"][0]["content"][0]
+    assert gorsel["type"] == "image" and gorsel["source"]["media_type"] == "image/jpeg"
+    assert "thinking" not in gonderilen and "temperature" not in gonderilen
+    assert gonderilen["max_tokens"] == ocr.CIKTI_SINIRI
+    assert alinan == {"timeout": 40.0, "max_retries": 0}
+    iki = okuyucu.oku(b"x", 40.0)
+    assert iki.kesildi and iki.okunabilirlik == "dusuk" and iki.markdown == "# Yarım"
+    assert okuyucu.oku(b"x", 40.0).reddedildi
+
+
+def test_tesseract_verisinden_satirlar_ve_guven():
+    veri = {"text": ["", "Soru", "1", "", "Kesirleri", "topla"],
+            "conf": ["-1", "90", "80", "-1", "40", "30"],
+            "block_num": [1, 1, 1, 2, 2, 2], "par_num": [1, 1, 1, 1, 1, 1],
+            "line_num": [0, 1, 1, 0, 1, 1]}
+    metin, guven = tesseract_verisinden(veri)
+    assert metin == "Soru 1\n\nKesirleri topla"
+    assert guven == pytest.approx(0.6)
+```
+
+- [ ] **Step 3: Kırmızı olduğunu gör**
+
+Run: `cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/portal-ekleri && DASHBOARD_SECRET_KEY=yerel-test-anahtari-portal-ekleri .venv/bin/python -m pytest -q -p no:cacheprovider tests/test_ocr_katmani.py`
+Expected: FAIL — `ModuleNotFoundError: No module named 'src.ocr_katmani'`.
+
+- [ ] **Step 4: Katmanı yaz**
+
+`src/ocr_katmani.py`:
+
+```python
+"""OCR for PDF pages without a text layer (plan 2026-09-28-portal-ekleri, Görev 14).
+
+pdftotext returns nothing for a scanned page: measured 2026-09-28, three
+chunks of the live index were "pdf_no_text" (content/yabanci-dil), and a
+scanned homework attachment would read "metin katmanı yok". Each such page is
+rendered with pdftoppm and read by Claude Haiku 4.5's vision into Markdown
+(headings, tables and formulas kept). A page is read once — cached by (file
+sha256, page, engine, prompt version). Spend is held under a monthly cap in a
+ledger fed by each response's `usage`; at the cap, on an API error or a
+refusal, the page falls back to local Tesseract (tur+eng). Every page carries
+its engine and a confidence estimate, and a low one is labelled for the model.
+"""
+from __future__ import annotations
+
+import base64
+import fcntl
+import hashlib
+import io
+import json
+import logging
+import os
+import re
+import subprocess
+import tempfile
+import time
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path, PurePosixPath
+from typing import Any, Callable, Iterator
+
+from src.json_utils import atomic_json_dump
+
+logger = logging.getLogger(__name__)
+
+OCR_VARSAYILAN_MODEL = "claude-haiku-4-5"
+# Anthropic first-party list price of Claude Haiku 4.5, USD per million tokens
+# (claude-api reference, cached 2026-06-24). An OCR_CLAUDE_MODEL override must
+# bring its own prices here, or the ledger under-counts.
+GIRDI_USD_MTOK = 1.00
+CIKTI_USD_MTOK = 5.00
+# Part of every cache key: a new prompt re-reads pages; a new engine too.
+ISTEM_SURUMU = "1"
+MOTOR_TESSERACT = "tesseract-tur+eng"
+MOTOR_BOS = "bos"
+AYLIK_TAVAN_USD = float(os.environ.get("TEDY_OCR_AYLIK_USD", "10"))
+# Claude downsizes an image whose long edge passes ~1568 px, so rendering
+# bigger buys nothing but render time: measured 2026-09-28 on page 5 of a
+# 70 MB PDF, 150 dpi rendered 1214x1650 in 3.2 s and 200 dpi 1619x2200 in
+# 5.3 s. 1568 px is ~190 dpi on A4 and costs about w*h/750 ≈ 2,400 input tokens.
+UZUN_KENAR = 1568
+CIKTI_SINIRI = 4096
+# One page's worst case: the image (≤ 1568²/750 ≈ 3,300 tokens) plus the
+# prompt, rounded to 4,000 input tokens, and CIKTI_SINIRI output tokens.
+# Claude is called only while this still fits under the cap.
+SAYFA_TAHMINI_USD = (4000 * GIRDI_USD_MTOK + CIKTI_SINIRI * CIKTI_USD_MTOK) / 1_000_000
+DUSUK_GUVEN = 0.6
+# No new Claude call with less than this left (its timeout is the time left,
+# no retries, so a call can overrun its deadline by at most one call); no
+# Tesseract run with less than this left (~20 s a page measured at 150 dpi).
+CLAUDE_EN_AZ_SURE = 15.0
+TESSERACT_EN_AZ_SURE = 10.0
+ONBELLEK = PurePosixPath("output/ocr_onbellek")
+DEFTER = PurePosixPath("output/ocr_defteri.json")
+_METIN_ESIGI = 20          # fewer non-space characters than this: no text layer
+_BOS_SAPMA = 2.0           # grey-level stddev under this: a white page
+_GUVEN = {"yuksek": 0.9, "orta": 0.7, "dusuk": 0.4}
+_OKUNABILIRLIK = re.compile(r"\s*<!--\s*okunabilirlik:\s*(yuksek|orta|dusuk)\s*-->\s*$")
+
+ISTEM = (
+    "Bu görsel, bir okul belgesinin taranmış tek bir sayfası. Sayfadaki bütün metni, "
+    "göründüğü sırayla ve olduğu gibi Markdown olarak yaz:\n"
+    "- Başlıkları # ve ## ile, listeleri madde olarak, tabloları Markdown tablosu olarak koru.\n"
+    "- Matematik ve fen ifadelerini LaTeX ile yaz ($...$ ya da $$...$$).\n"
+    "- Metni özetleme, çevirme, düzeltme ya da tamamlama. Okuyamadığın yeri [okunamadı] diye işaretle.\n"
+    "- Şekil ve fotoğrafları yalnız kısa bir notla an: [şekil: kısa açıklama].\n"
+    "- Markdown'dan başka bir şey yazma. En son satıra, sayfanın ne kadar net okunduğunu şu "
+    "biçimde ekle: <!-- okunabilirlik: yuksek --> (yuksek, orta ya da dusuk)."
+)
+
+
+class OcrHatasi(RuntimeError):
+    """A page or file could not be rendered or measured; nothing is cached."""
+
+
+def _sha256(yol: Path) -> str:
+    h = hashlib.sha256()
+    with yol.open("rb") as f:
+        for blok in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(blok)
+    return h.hexdigest()
+
+
+def _kos(komut: list[str], sure: float) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(komut, capture_output=True, timeout=max(1.0, sure), check=False)
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        raise OcrHatasi(f"{komut[0]}: {type(exc).__name__}") from exc
+
+
+def pdf_sayfa_sayisi(pdf: Path, sure: float) -> int:
+    proc = _kos(["pdfinfo", str(pdf)], sure)
+    m = re.search(r"^Pages:\s+(\d+)", proc.stdout.decode("utf-8", "replace"), re.M)
+    if proc.returncode != 0 or not m:
+        raise OcrHatasi("pdfinfo sayfa sayısını okuyamadı")
+    return int(m.group(1))
+
+
+def pdf_sayfa_metinleri(pdf: Path, sure: float) -> list[str]:
+    """One string per page, as pdftotext renders it (pages end in a form feed)."""
+    n = pdf_sayfa_sayisi(pdf, sure)
+    proc = _kos(["pdftotext", "-layout", str(pdf), "-"], sure)
+    if proc.returncode != 0:
+        raise OcrHatasi("pdftotext okuyamadı")
+    sayfalar = proc.stdout.decode("utf-8", "replace").split(chr(12))
+    return (sayfalar + [""] * n)[:n]
+
+
+def metin_katmani_var(metin: str) -> bool:
+    return len("".join(str(metin or "").split())) >= _METIN_ESIGI
+
+
+def sayfa_gorseli(pdf: Path, sayfa: int, sure: float) -> bytes:
+    """Page `sayfa` (1-based) as a JPEG whose long edge is UZUN_KENAR."""
+    with tempfile.TemporaryDirectory() as dizin:
+        kok = os.path.join(dizin, "sayfa")
+        proc = _kos(["pdftoppm", "-f", str(sayfa), "-l", str(sayfa), "-scale-to", str(UZUN_KENAR),
+                     "-jpeg", "-jpegopt", "quality=85", "-singlefile", str(pdf), kok], sure)
+        yol = Path(kok + ".jpg")
+        if proc.returncode != 0 or not yol.is_file():
+            raise OcrHatasi("pdftoppm sayfayı çizemedi")
+        return yol.read_bytes()
+
+
+def bos_sayfa_mi(jpeg: bytes) -> bool:
+    from PIL import Image, ImageStat
+    with Image.open(io.BytesIO(jpeg)) as img:
+        return ImageStat.Stat(img.convert("L")).stddev[0] < _BOS_SAPMA
+
+
+@dataclass
+class GorselOkuma:
+    markdown: str
+    okunabilirlik: str
+    girdi_token: int
+    cikti_token: int
+    kesildi: bool = False
+    reddedildi: bool = False
+
+
+class ClaudeGorselOkuyucu:
+    """One page image → Markdown, through src/claude_api.py with TEDY's key.
+
+    No thinking and no temperature (Haiku 4.5 needs neither for transcription).
+    Markdown rather than structured JSON output: a reply cut at CIKTI_SINIRI
+    keeps the part it read, where a cut JSON would lose the page. The model
+    rates its own reading on the last line; a cut reply is rated low."""
+
+    def __init__(self, model: str | None = None):
+        self.model = model or os.environ.get("OCR_CLAUDE_MODEL", "").strip() or OCR_VARSAYILAN_MODEL
+
+    @property
+    def motor(self) -> str:
+        return f"claude:{self.model}"
+
+    def oku(self, jpeg: bytes, sure: float) -> GorselOkuma:
+        from src import claude_api
+        istemci = claude_api.istemci(timeout=max(10.0, sure), max_retries=0)
+        yanit = istemci.messages.create(
+            model=self.model,
+            max_tokens=CIKTI_SINIRI,
+            messages=[{"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
+                                             "data": base64.b64encode(jpeg).decode("ascii")}},
+                {"type": "text", "text": ISTEM},
+            ]}],
+        )
+        kullanim = getattr(yanit, "usage", None)
+        durdu = str(getattr(yanit, "stop_reason", "") or "")
+        metin = claude_api.metin(yanit)
+        m = _OKUNABILIRLIK.search(metin)
+        okunabilirlik = "dusuk" if durdu == "max_tokens" else (m.group(1) if m else "orta")
+        return GorselOkuma(markdown=_OKUNABILIRLIK.sub("", metin).strip(), okunabilirlik=okunabilirlik,
+                           girdi_token=int(getattr(kullanim, "input_tokens", 0) or 0),
+                           cikti_token=int(getattr(kullanim, "output_tokens", 0) or 0),
+                           kesildi=durdu == "max_tokens", reddedildi=durdu == "refusal")
+
+
+def tesseract_verisinden(veri: dict[str, Any]) -> tuple[str, float]:
+    """pytesseract's image_to_data dict → (text, mean word confidence 0..1).
+    Lines keep their words; a new block or paragraph starts after a blank line."""
+    satirlar: dict[tuple[Any, Any, Any], list[str]] = {}
+    guvenler: list[float] = []
+    for i, kelime in enumerate(veri.get("text") or []):
+        kelime = str(kelime or "").strip()
+        if not kelime:
+            continue
+        try:
+            guven = float(veri["conf"][i])
+        except (KeyError, IndexError, TypeError, ValueError):
+            guven = -1.0
+        if guven >= 0:
+            guvenler.append(guven)
+        anahtar = (veri["block_num"][i], veri["par_num"][i], veri["line_num"][i])
+        satirlar.setdefault(anahtar, []).append(kelime)
+    parcalar: list[str] = []
+    onceki = None
+    for (blok, par, _satir), kelimeler in satirlar.items():
+        if onceki is not None and (blok, par) != onceki:
+            parcalar.append("")
+        parcalar.append(" ".join(kelimeler))
+        onceki = (blok, par)
+    return "\n".join(parcalar).strip(), (sum(guvenler) / len(guvenler) / 100.0 if guvenler else 0.0)
+
+
+def tesseract_oku(jpeg: bytes, sure: float) -> tuple[str, float]:
+    """The existing local path (FileAdapters' images use it too), tur+eng."""
+    import pytesseract
+    from PIL import Image
+    with Image.open(io.BytesIO(jpeg)) as img:
+        veri = pytesseract.image_to_data(img, lang=os.environ.get("ASSISTANT_OCR_LANG", "tur+eng"),
+                                         output_type=pytesseract.Output.DICT, timeout=max(5, int(sure)))
+    return tesseract_verisinden(veri)
+
+
+@dataclass
+class SayfaOkumasi:
+    sayfa: int
+    metin: str
+    motor: str
+    guven: float
+    usd: float = 0.0
+
+    @property
+    def dusuk_guven(self) -> bool:
+        return self.guven < DUSUK_GUVEN
+
+    def etiket(self) -> str:
+        """The line the model reads above an OCR'd page."""
+        if self.motor.startswith("claude:"):
+            from src.claude_api import okunur_ad
+            ad = okunur_ad(self.motor.split(":", 1)[1])
+        else:
+            ad = "Tesseract"
+        if self.dusuk_guven:
+            return f"[PDF s.{self.sayfa} · OCR, güven düşük · {ad}]"
+        return f"[PDF s.{self.sayfa} · OCR · {ad} · güven %{round(self.guven * 100)}]"
+
+
+class OcrOnbellegi:
+    """output/ocr_onbellek/<sha[:2]>/<sha[:16]>-s<page>-<key>.json, key over
+    (file sha256, page, engine, ISTEM_SURUMU)."""
+
+    def __init__(self, dizin: str | Path):
+        self.dizin = Path(dizin)
+
+    def _yol(self, sha: str, sayfa: int, motor: str) -> Path:
+        anahtar = hashlib.sha256(f"{sha}|{sayfa}|{motor}|{ISTEM_SURUMU}".encode("utf-8")).hexdigest()[:24]
+        return self.dizin / sha[:2] / f"{sha[:16]}-s{sayfa}-{anahtar}.json"
+
+    def al(self, sha: str, sayfa: int, motor: str) -> SayfaOkumasi | None:
+        try:
+            veri = json.loads(self._yol(sha, sayfa, motor).read_text(encoding="utf-8"))
+            return SayfaOkumasi(int(veri["sayfa"]), str(veri["metin"]), str(veri["motor"]),
+                                float(veri["guven"]), float(veri.get("usd", 0.0)))
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
+
+    def koy(self, sha: str, okuma: SayfaOkumasi) -> None:
+        atomic_json_dump({"sayfa": okuma.sayfa, "metin": okuma.metin, "motor": okuma.motor,
+                          "guven": okuma.guven, "usd": okuma.usd, "istem_surumu": ISTEM_SURUMU,
+                          "okundu": datetime.now().isoformat(timespec="seconds")},
+                         str(self._yol(sha, okuma.sayfa, okuma.motor)))
+
+
+class OcrDefteri:
+    """output/ocr_defteri.json: measured spend per month (Istanbul wall clock).
+
+    A Claude call is made only while the month's spend plus one page's worst
+    case (SAYFA_TAHMINI_USD) fits under the cap, and the real cost is written
+    from response.usage afterwards. Two processes checking at once (the cron
+    reindex and a dashboard reindex) can pass the cap by at most one page each
+    (≤ 0.025 USD); a reservation scheme would instead let a crashed process
+    eat the cap for the rest of the month."""
+
+    def __init__(self, yol: str | Path, tavan: float = AYLIK_TAVAN_USD,
+                 simdi: Callable[[], datetime] = datetime.now):
+        self.yol = Path(yol)
+        self.tavan = float(tavan)
+        self.simdi = simdi
+
+    @contextmanager
+    def _kilitli(self) -> Iterator[None]:
+        self.yol.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.yol.with_name(self.yol.name + ".lock"), "a") as kilit:
+            fcntl.flock(kilit, fcntl.LOCK_EX)
+            yield
+
+    def _oku(self) -> dict[str, Any]:
+        try:
+            veri = json.loads(self.yol.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        return veri if isinstance(veri, dict) else {}
+
+    def _ay(self) -> str:
+        return self.simdi().strftime("%Y-%m")
+
+    def harcanan(self) -> float:
+        ay = (self._oku().get("aylar") or {}).get(self._ay()) or {}
+        return float(ay.get("usd", 0.0))
+
+    def izin_var(self) -> bool:
+        return self.harcanan() + SAYFA_TAHMINI_USD <= self.tavan
+
+    def yaz(self, motor: str, girdi_token: int, cikti_token: int) -> float:
+        usd = (girdi_token * GIRDI_USD_MTOK + cikti_token * CIKTI_USD_MTOK) / 1_000_000
+        with self._kilitli():
+            veri = self._oku()
+            ay = veri.setdefault("aylar", {}).setdefault(
+                self._ay(), {"usd": 0.0, "sayfa": 0, "girdi_token": 0, "cikti_token": 0})
+            ay["usd"] = round(float(ay.get("usd", 0.0)) + usd, 6)
+            ay["sayfa"] = int(ay.get("sayfa", 0)) + 1
+            ay["girdi_token"] = int(ay.get("girdi_token", 0)) + int(girdi_token)
+            ay["cikti_token"] = int(ay.get("cikti_token", 0)) + int(cikti_token)
+            veri["tavan_usd"] = self.tavan
+            veri["son_motor"] = motor
+            atomic_json_dump(veri, str(self.yol))
+        return usd
+
+
+@dataclass
+class PdfOcrSonucu:
+    metin: str
+    toplam_sayfa: int
+    metinsiz: int
+    ocr_sayfalari: list[int] = field(default_factory=list)
+    eksik: list[int] = field(default_factory=list)
+    dusuk_guvenli: list[int] = field(default_factory=list)
+
+    @property
+    def ilerleme(self) -> str:
+        return f"{self.metinsiz - len(self.eksik)}/{self.metinsiz}"
+
+
+class OcrKatmani:
+    """The shared layer: the attachment sync and the BM25 indexer both call
+    pdf_oku with a deadline on `saat`; whatever is not read by then stays
+    `eksik` and is read on a later run, the pages done coming from the cache."""
+
+    def __init__(self, proje_koku: str | Path, okuyucu: Any = None,
+                 tesseract: Callable[[bytes, float], tuple[str, float]] = tesseract_oku,
+                 saat: Callable[[], float] = time.monotonic,
+                 simdi: Callable[[], datetime] = datetime.now,
+                 tavan: float | None = None):
+        kok = Path(proje_koku)
+        self.onbellek = OcrOnbellegi(kok / ONBELLEK)
+        self.defter = OcrDefteri(kok / DEFTER, tavan=AYLIK_TAVAN_USD if tavan is None else tavan, simdi=simdi)
+        self.okuyucu = okuyucu if okuyucu is not None else ClaudeGorselOkuyucu()
+        self.tesseract = tesseract
+        self.saat = saat
+
+    def _kalan(self, son_an: float) -> float:
+        return son_an - self.saat()
+
+    def pdf_oku(self, pdf: str | Path, son_an: float,
+                sayfa_metinleri: list[str] | None = None) -> PdfOcrSonucu:
+        pdf = Path(pdf)
+        if sayfa_metinleri is None:
+            sayfa_metinleri = pdf_sayfa_metinleri(pdf, max(5.0, self._kalan(son_an)))
+        sha = _sha256(pdf)
+        parcalar: list[str] = []
+        ocr_sayfalari: list[int] = []
+        eksik: list[int] = []
+        dusuk: list[int] = []
+        metinsiz = 0
+        for i, metin in enumerate(sayfa_metinleri, 1):
+            if metin_katmani_var(metin):
+                parcalar.append(metin)
+                continue
+            metinsiz += 1
+            okuma = self._sayfa(pdf, sha, i, son_an)
+            if okuma is None:
+                eksik.append(i)
+                parcalar.append("")
+                continue
+            if okuma.motor == MOTOR_BOS or not okuma.metin.strip():
+                parcalar.append("")
+                continue
+            ocr_sayfalari.append(i)
+            if okuma.dusuk_guven:
+                dusuk.append(i)
+            parcalar.append(f"{okuma.etiket()}\n{okuma.metin.strip()}")
+        return PdfOcrSonucu(chr(12).join(parcalar), len(sayfa_metinleri), metinsiz,
+                            ocr_sayfalari, eksik, dusuk)
+
+    def _sayfa(self, pdf: Path, sha: str, sayfa: int, son_an: float) -> SayfaOkumasi | None:
+        for motor in (self.okuyucu.motor, MOTOR_BOS):
+            okuma = self.onbellek.al(sha, sayfa, motor)
+            if okuma is not None:
+                return okuma
+        tesseract = self.onbellek.al(sha, sayfa, MOTOR_TESSERACT)
+        # A Tesseract reading stays unless it is low and Claude may be asked
+        # (e.g. a new month): checked before rendering, so a full cap does not
+        # cost a render per low page per run.
+        if tesseract is not None and (not tesseract.dusuk_guven or not self.defter.izin_var()):
+            return tesseract
+        if self._kalan(son_an) <= 0:
+            return tesseract
+        return self._oku(pdf, sha, sayfa, son_an, tesseract)
+
+    def _sakla(self, sha: str, okuma: SayfaOkumasi) -> SayfaOkumasi:
+        self.onbellek.koy(sha, okuma)
+        return okuma
+
+    def _oku(self, pdf: Path, sha: str, sayfa: int, son_an: float,
+             onceki: SayfaOkumasi | None) -> SayfaOkumasi | None:
+        try:
+            jpeg = sayfa_gorseli(pdf, sayfa, max(5.0, self._kalan(son_an)))
+        except OcrHatasi as exc:
+            logger.warning("OCR: %s s.%d çizilemedi (%s)", pdf.name, sayfa, exc)
+            return onceki
+        if bos_sayfa_mi(jpeg):
+            return self._sakla(sha, SayfaOkumasi(sayfa, "", MOTOR_BOS, 1.0))
+        if self._kalan(son_an) >= CLAUDE_EN_AZ_SURE and self.defter.izin_var():
+            okuma = self._claude(jpeg, sha, sayfa, son_an)
+            if okuma is not None:
+                return okuma
+        if onceki is not None:
+            return onceki
+        if self._kalan(son_an) < TESSERACT_EN_AZ_SURE:
+            return None
+        try:
+            metin, guven = self.tesseract(jpeg, self._kalan(son_an))
+        except Exception as exc:  # noqa: BLE001 — a page left unread is retried next run
+            logger.warning("OCR: Tesseract %s s.%d okuyamadı (%s)", pdf.name, sayfa, type(exc).__name__)
+            return None
+        return self._sakla(sha, SayfaOkumasi(sayfa, metin, MOTOR_TESSERACT, guven))
+
+    def _claude(self, jpeg: bytes, sha: str, sayfa: int, son_an: float) -> SayfaOkumasi | None:
+        try:
+            sonuc = self.okuyucu.oku(jpeg, self._kalan(son_an))
+        except Exception as exc:  # noqa: BLE001 — API error, no key, network: fall back
+            logger.warning("OCR: Claude okuyamadı (%s); Tesseract'a düşülüyor", type(exc).__name__)
+            return None
+        usd = self.defter.yaz(self.okuyucu.motor, sonuc.girdi_token, sonuc.cikti_token)
+        if sonuc.reddedildi:
+            return None
+        return self._sakla(sha, SayfaOkumasi(sayfa, sonuc.markdown, self.okuyucu.motor,
+                                             _GUVEN.get(sonuc.okunabilirlik, 0.7), usd))
+```
+
+- [ ] **Step 5: Yeşil olduğunu gör**
+
+Run: `cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/portal-ekleri && DASHBOARD_SECRET_KEY=yerel-test-anahtari-portal-ekleri unshare -rn .venv/bin/python -m pytest -q -p no:cacheprovider tests/test_ocr_katmani.py`
+Expected: PASS, ağsız ad alanında (poppler yereldir; okuyucu sahtedir).
+
+- [ ] **Step 6: Commit**
+
+```bash
+cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/portal-ekleri && test "$(git branch --show-current)" = feat/portal-ekleri && echo dal-dogru
+git add src/ocr_katmani.py tests/sahte_ocr.py tests/test_ocr_katmani.py
+git commit -m "$(cat <<'EOF'
+OCR katmanı: Claude Haiku 4.5 görüsü, sayfa önbelleği, aylık tavan, Tesseract
+
+Metin katmanı olmayan sayfa 1568 px'e çizilip Markdown'a okunur; sonuç
+(sha256, sayfa, motor, istem sürümü) anahtarıyla önbelleğe girer. Aylık
+10 USD tavanı response.usage'dan beslenen defterle tutulur; tavanda, API
+hatasında ya da retle Tesseract'a düşülür. Boş sayfa ücretsizdir; her sayfa
+motorunu ve güvenini taşır. Testler sahte okuyucuyla, ücretli API'siz.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+EOF
+)"
+```
+
+---
+
+### Görev 15: OCR'u ek eşitlemesine, `FileAdapters`'a ve `ek_oku`'ya bağla; CLAUDE.md notu
+
+**Files:**
+- Modify: `src/assistant_core.py` (`DEFAULT_EXCLUDED_DIRS`, `DEFAULT_EXCLUDED_FILE_PATTERNS`, `AssistantConfig` + `from_project_root`, `PdfExtractionError`, `FileAdapters.__init__` + PDF dalı + yeni `_pdf_ocr`, `AssistantIndexer.__init__` + `reindex` başı + `can_reuse`, `SYSTEM_PROMPT` "Uydurma yasağı")
+- Modify: `src/portal_ekleri_indir.py` (`metin_cikar`, `_METIN_NOTU`, `_metni_hazirla`, `ekleri_esitle` imzası + çıkarıcı + özet, yeni `_varsayilan_ocr`)
+- Modify: `src/assistant_tools.py` (içe aktarma; `ek_oku_metni` iki ileti + OCR notu)
+- Modify: `tests/conftest.py` (autouse: `ASSISTANT_PDF_OCR=0`)
+- Modify: `CLAUDE.md` (OCR maddesi)
+- Test: `tests/test_ocr_baglanti.py`
+
+**Interfaces:**
+- Consumes: Görev 14 `OcrKatmani`, `OcrDefteri`, `OcrHatasi`, `metin_katmani_var`, `DEFTER`; Görev 6 `metin_cikar`, `_metni_hazirla`, `ekleri_esitle`; Görev 10 `ek_oku_metni`; `tests.sahte_ocr`, `tests.sahte_http`.
+- Produces: `AssistantConfig.pdf_ocr: bool` (env `ASSISTANT_PDF_OCR`, üretimde varsayılan açık), `AssistantConfig.ocr_sure: int` (env `ASSISTANT_OCR_SURE`, 45); `PdfExtractionError(reason, ilerleme="")` + `.ilerleme`; `FileAdapters(config, ocr=None)` + `.ocr`, `.ocr_son_an`, `.ocr_her_sayfa`; `extract()` OCR'lı PDF için `source_kind "pdf_ocr"`, yarımda `extraction_error "ocr_suruyor"` + `ocr_ilerleme`; `AssistantIndexer(config, ocr=None)`; `metin_cikar(yol, sure, ocr=None)` — yarımda `(METIN_BEKLIYOR, "okunan/toplam")`; ek kaydında `ocr_ilerleme`; `ekleri_esitle(..., ocr=None)` ve özette `ocr_bu_ay_usd`.
+
+- [ ] **Step 1: Başarısız testi yaz**
+
+`tests/test_ocr_baglanti.py`:
+
+```python
+"""OCR wired in (plan 2026-09-28-portal-ekleri, Görev 15): the general index reads
+scanned PDFs, attachments are read page by page inside the sync budget, ek_oku
+and the text sidecar carry the OCR text and its labels. Fake reader only."""
+from src.assistant_core import AssistantConfig, AssistantIndexer, AssistantRuntime, FileAdapters, HybridRetriever
+from src.assistant_tools import EK_TOOL, McpRegistry
+from src.ocr_katmani import OcrKatmani
+from src.portal_ekleri import EkDeposu, ek_kimligi
+from src.portal_ekleri_indir import MB, Butce, ekleri_esitle, metin_cikar
+from tests.sahte_http import SP_URL, SahteOturum, SahteYanit
+from tests.sahte_ocr import MARKDOWN, Saat, SahteOkuyucu, SahteTesseract, taranmis_pdf
+
+ETIKET = "[PDF s.1 · OCR · Claude Haiku 4.5 · güven %90]"
+
+
+def _katman(kok, okuyucu=None, tesseract=None, **kw):
+    return OcrKatmani(kok, okuyucu=okuyucu or SahteOkuyucu(), tesseract=tesseract or SahteTesseract(), **kw)
+
+
+def _adaptor(kok, katman, son=60.0):
+    ad = FileAdapters(AssistantConfig.from_project_root(kok), ocr=katman)
+    if katman is not None:
+        ad.ocr_son_an = katman.saat() + son
+    return ad
+
+
+def test_testlerde_ocr_kapali_uretimde_acik(tmp_path, monkeypatch):
+    assert AssistantConfig.from_project_root(tmp_path).pdf_ocr is False       # tests/conftest.py
+    monkeypatch.delenv("ASSISTANT_PDF_OCR")
+    assert AssistantConfig.from_project_root(tmp_path).pdf_ocr is True
+    assert AssistantConfig.from_project_root(tmp_path).ocr_sure == 45
+
+
+def test_genel_indekste_bos_pdf_ocr_ile_okunur(tmp_path):
+    pdf = taranmis_pdf(tmp_path / "tarama.pdf")
+    sonuc = _adaptor(tmp_path, _katman(tmp_path)).extract(pdf, "content/yabanci-dil/tarama.pdf")
+    assert sonuc["source_kind"] == "pdf_ocr" and sonuc["warnings"] == ["ocr"]
+    assert sonuc["text"].startswith(f"{ETIKET}\n{MARKDOWN}")
+
+
+def test_metin_katmanli_pdf_genel_indekste_ocr_a_gitmez(tmp_path, monkeypatch):
+    pdf = taranmis_pdf(tmp_path / "kitap.pdf")
+    monkeypatch.setattr(FileAdapters, "_extract_pdf_text",
+                        lambda self, yol: "Bu sayfada okunur bir metin katmanı var.\n" + chr(12))
+    okuyucu = SahteOkuyucu()
+    sonuc = _adaptor(tmp_path, _katman(tmp_path, okuyucu)).extract(pdf, "content/eba/kitap.pdf")
+    assert sonuc["source_kind"] == "pdf" and okuyucu.cagrilar == []
+
+
+def test_ocr_verilmezse_eski_davranis(tmp_path):
+    pdf = taranmis_pdf(tmp_path / "tarama.pdf")
+    sonuc = _adaptor(tmp_path, None).extract(pdf, "content/x/tarama.pdf")
+    assert sonuc["source_kind"] == "metadata" and sonuc["warnings"] == ["pdf_no_text"]
+
+
+def test_sure_yetmezse_ocr_suruyor_ve_ilerleme(tmp_path):
+    pdf = taranmis_pdf(tmp_path / "tarama.pdf", icerikli=2)
+    saat = Saat()
+    katman = _katman(tmp_path, SahteOkuyucu(saat=saat, adim=10.0), saat=saat)
+    sonuc = _adaptor(tmp_path, katman, son=18.0).extract(pdf, "content/x/tarama.pdf")
+    assert sonuc["extraction_error"] == "ocr_suruyor" and sonuc["ocr_ilerleme"] == "1/2"
+
+
+def test_indeks_eski_metinsiz_pdf_kaydini_ocr_ile_yeniler(tmp_path):
+    taranmis_pdf(_dizin(tmp_path / "content" / "yabanci-dil") / "tarama.pdf")
+    config = AssistantConfig.from_project_root(tmp_path)
+    AssistantIndexer(config).reindex(incremental=True)            # conftest: OCR off
+    import json
+    once = json.loads(config.chunks_path.read_text(encoding="utf-8"))
+    assert once[0]["warnings"] == ["pdf_no_text"]
+    ix = AssistantIndexer(config, ocr=_katman(tmp_path))
+    meta = ix.reindex(incremental=True)
+    sonra = json.loads(config.chunks_path.read_text(encoding="utf-8"))
+    assert meta["changed_files"] == 1 and sonra[0]["source_kind"] == "pdf_ocr"
+    assert HybridRetriever(chunks=sonra).search("Kesirleri topla", top_k=1)[0]["path"] == \
+        "content/yabanci-dil/tarama.pdf"
+
+
+def _dizin(yol):
+    yol.mkdir(parents=True, exist_ok=True)
+    return yol
+
+
+def test_ocr_defteri_ve_onbellegi_indekse_girmez(tmp_path):
+    ix = AssistantIndexer(AssistantConfig.from_project_root(tmp_path))
+    assert ix._is_excluded_file("output/ocr_defteri.json")
+    assert ix._is_excluded_file("output/ocr_defteri.json.lock")
+    assert ix._is_excluded_dir("output/ocr_onbellek/ab")
+
+
+def test_ek_metni_ocr_ile_cikar(tmp_path):
+    pdf = taranmis_pdf(tmp_path / "ek.pdf")
+    durum, metin = metin_cikar(pdf, 30.0, ocr=_katman(tmp_path))
+    assert durum == "var" and metin.startswith(f"{ETIKET}\n{MARKDOWN}")
+
+
+def test_yarim_ek_metni_bekliyor_ve_ilerleme(tmp_path):
+    pdf = taranmis_pdf(tmp_path / "ek.pdf", icerikli=2)
+    saat = Saat()
+    katman = _katman(tmp_path, SahteOkuyucu(saat=saat, adim=10.0), saat=saat)
+    # The 5 s floor is too little for a Claude call (15 s) or Tesseract (10 s):
+    # nothing is read, nothing is lost, and the next run starts again.
+    assert metin_cikar(pdf, 0.0, ocr=katman) == ("bekliyor", "0/2")
+
+
+VERI = {"odevlerim": {"homework": {"rows": [{
+    "Ders Adı": "Matematik", "Ödev Başlığı": "Kesir çalışma kağıdı",
+    "Ödev Son Teslim Tarihi": "30.09.2026 12:00",
+    "detail": {"description": "", "attachments": [{"name": "Çalışma kağıdı.pdf", "url": SP_URL}]}}]}}}
+
+
+def _taranmis_oturum(tmp_path):
+    govde = taranmis_pdf(tmp_path / "kaynak.pdf").read_bytes()
+    return SahteOturum({"https://ornekokul-my.sharepoint.com/":
+                        lambda u, h: SahteYanit(200, govde, {"Content-Type": "application/pdf"})})
+
+
+def test_ek_esitlemesi_ocr_metnini_yan_dosyaya_ve_ek_oku_ya_tasir(tmp_path):
+    kok = _dizin(tmp_path / "kok")
+    ozet = ekleri_esitle(kok, VERI, _taranmis_oturum(tmp_path), Butce(float("inf"), 100 * MB),
+                         ocr=_katman(kok))
+    depo = EkDeposu(kok)
+    kayit = depo.kayit(ek_kimligi(SP_URL))
+    assert kayit["text"] == "var" and "ocr_ilerleme" not in kayit
+    assert f"{ETIKET}\n{MARKDOWN}" in depo.metin_yolu(kayit["id"]).read_text(encoding="utf-8")
+    assert ozet["ocr_bu_ay_usd"] > 0
+    out = McpRegistry(clients={}, local_search=lambda q, k: [], ek_deposu=depo).dispatch(EK_TOOL, {"id": kayit["id"]})
+    assert out.ok and ETIKET in out.text and "OCR ile okundu" in out.text and "# Soru 1" in out.text
+
+
+def test_dusuk_guvenli_sayfa_etiketiyle_gorunur(tmp_path):
+    kok = _dizin(tmp_path / "kok")
+    ekleri_esitle(kok, VERI, _taranmis_oturum(tmp_path), Butce(float("inf"), 100 * MB),
+                  ocr=_katman(kok, tesseract=SahteTesseract(guven=0.4), tavan=0.0))
+    depo = EkDeposu(kok)
+    metin = depo.metin_yolu(ek_kimligi(SP_URL)).read_text(encoding="utf-8")
+    assert "[PDF s.1 · OCR, güven düşük · Tesseract]" in metin
+
+
+def test_yarim_ocr_deneme_saymaz_ve_ek_oku_ilerlemeyi_soyler(tmp_path):
+    kok = _dizin(tmp_path / "kok")
+    cevaplar = [("bekliyor", "1/3"), ("var", "Soru 1 metni")]
+    oturum = _taranmis_oturum(tmp_path)
+    ekleri_esitle(kok, VERI, oturum, Butce(float("inf"), 100 * MB),
+                  metin_cikarici=lambda y, s: cevaplar.pop(0))
+    depo = EkDeposu(kok)
+    kayit = depo.kayit(ek_kimligi(SP_URL))
+    assert (kayit["text"], kayit["ocr_ilerleme"], kayit.get("text_attempts", 0)) == ("bekliyor", "1/3", 0)
+    out = McpRegistry(clients={}, local_search=lambda q, k: [], ek_deposu=depo).dispatch(EK_TOOL, {"id": kayit["id"]})
+    assert "OCR ile okunuyor (1/3 sayfa okundu)" in out.text
+    ekleri_esitle(kok, VERI, oturum, Butce(float("inf"), 100 * MB), metin_cikarici=lambda y, s: cevaplar.pop(0))
+    kayit = depo.kayit(ek_kimligi(SP_URL))
+    assert (kayit["text"], kayit["text_attempts"]) == ("var", 1) and "ocr_ilerleme" not in kayit
+
+
+def test_istem_dusuk_guvenli_ocr_sayfasini_kesin_saymaz():
+    assert "OCR, güven düşük" in AssistantRuntime.SYSTEM_PROMPT
+```
+
+- [ ] **Step 2: Kırmızı olduğunu gör**
+
+Run: `cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/portal-ekleri && DASHBOARD_SECRET_KEY=yerel-test-anahtari-portal-ekleri .venv/bin/python -m pytest -q -p no:cacheprovider tests/test_ocr_baglanti.py`
+Expected: FAIL — `FileAdapters.__init__() got an unexpected keyword argument 'ocr'` ve `pdf_ocr` yok.
+
+- [ ] **Step 3: Test bekçisi**
+
+`tests/conftest.py` sonuna:
+
+```python
+@pytest.fixture(autouse=True)
+def _pdf_ocr_kapali(monkeypatch):
+    """OCR of scanned PDFs (src/ocr_katmani.py) is on by default in production.
+    In tests it is off unless a test turns it on and hands in a fake reader: a
+    scanned PDF in an unrelated test must not reach Claude, write the OCR
+    ledger, or spend ~20 s per page in real Tesseract (plan 2026-09-28, Görev 15)."""
+    monkeypatch.setenv("ASSISTANT_PDF_OCR", "0")
+```
+
+- [ ] **Step 4: `assistant_core`**
+
+`DEFAULT_EXCLUDED_DIRS` içinde `"content/pedagoji",` satırının altına:
+
+```python
+    # The OCR page cache (src/ocr_katmani.py): one JSON per page read; the
+    # text reaches the index through the PDF it came from, never twice.
+    "output/ocr_onbellek",
+```
+
+`DEFAULT_EXCLUDED_FILE_PATTERNS` içinde (Görev 9'un `"portal_ekleri.json",` satırının altına):
+
+```python
+    # The OCR spend ledger: months, tokens, USD — bookkeeping, not school data.
+    "ocr_defteri.json",
+```
+
+`AssistantConfig` alanlarının sonuna (`excluded_file_patterns: set[str]` altına):
+
+```python
+    # OCR for PDFs whose pdftotext text is empty (src/ocr_katmani.py): on unless
+    # ASSISTANT_PDF_OCR=0; seconds of OCR per indexer run. perform_incremental_
+    # reindex runs two indexers (main + aile), so 45 s each stays inside the
+    # 150 s run_sync reserves after the attachments (run_sync.EK_YEDEK_SURE).
+    pdf_ocr: bool = False
+    ocr_sure: int = 45
+```
+
+`from_project_root`'un `return cls(...)` çağrısına `excluded_file_patterns=excluded_files,` altına:
+
+```python
+            pdf_ocr=os.environ.get("ASSISTANT_PDF_OCR", "1") == "1",
+            ocr_sure=int(os.environ.get("ASSISTANT_OCR_SURE", "45")),
+```
+
+`PdfExtractionError.__init__`:
+
+```python
+    def __init__(self, reason: str, ilerleme: str = ""):
+        super().__init__(reason)
+        self.reason = reason
+        # "read/total" textless pages when OCR is part-way (reason "ocr_suruyor").
+        self.ilerleme = ilerleme
+```
+
+`FileAdapters.__init__`:
+
+```python
+    def __init__(self, config: AssistantConfig, ocr: Any = None):
+        self.config = config
+        # src.ocr_katmani.OcrKatmani, or None (no OCR). The caller sets the
+        # deadline (on ocr.saat) before extracting; ocr_her_sayfa reads every
+        # textless page (attachments), otherwise only PDFs with no text at all
+        # (the general index — a textbook's picture pages are not OCR'd).
+        self.ocr = ocr
+        self.ocr_son_an: float | None = None
+        self.ocr_her_sayfa = False
+```
+
+`extract` içindeki PDF dalının tamamı:
+
+```python
+        if ext in PDF_EXTENSIONS:
+            try:
+                text = self._extract_pdf_text(file_path)
+                ocr_sonucu = self._pdf_ocr(file_path, text)
+            except PdfExtractionError as exc:
+                # Not "no text layer" — a timeout, a real failure, or OCR still
+                # under way. No manifest entry: retried in full next run (the
+                # OCR'd pages come back from its cache).
+                return {
+                    "text": "",
+                    "source_kind": "metadata",
+                    "confidence": 0.0,
+                    "warnings": [f"pdf_extraction_{exc.reason}"],
+                    "extraction_error": exc.reason,
+                    "ocr_ilerleme": exc.ilerleme,
+                }
+            if ocr_sonucu is not None:
+                return ocr_sonucu
+            return {
+                "text": text or self._metadata_only_text(rel_path, file_path, reason="pdf_no_text"),
+                "source_kind": "pdf" if text else "metadata",
+                "confidence": 0.8 if text else 0.2,
+                "warnings": [] if text else ["pdf_no_text"],
+            }
+```
+
+`_extract_image_text`'in üstüne:
+
+```python
+    def _pdf_ocr(self, file_path: Path, text: str) -> dict[str, Any] | None:
+        """Pages without a text layer through the OCR layer (plan 2026-09-28,
+        Görev 15). None: no OCR configured, nothing to OCR, or the file could
+        not be measured — the caller then keeps the plain pdftotext result."""
+        if self.ocr is None or self.ocr_son_an is None:
+            return None
+        if not self.ocr_her_sayfa and text.strip():
+            return None
+        from src.ocr_katmani import OcrHatasi
+        sayfalar = None
+        if chr(12) in text:
+            sayfalar = text.split(chr(12))
+            if sayfalar and not sayfalar[-1].strip():
+                sayfalar = sayfalar[:-1]
+        try:
+            sonuc = self.ocr.pdf_oku(file_path, self.ocr_son_an, sayfa_metinleri=sayfalar)
+        except OcrHatasi as exc:
+            logger.warning("OCR %s: %s", file_path.name, exc)
+            return None
+        if sonuc.eksik:
+            raise PdfExtractionError("ocr_suruyor", ilerleme=sonuc.ilerleme)
+        if not sonuc.ocr_sayfalari:
+            return None
+        dusuk = bool(sonuc.dusuk_guvenli)
+        return {
+            "text": sonuc.metin,
+            "source_kind": "pdf_ocr",
+            "confidence": 0.55 if dusuk else 0.75,
+            "warnings": ["ocr"] + (["ocr_dusuk_guven"] if dusuk else []),
+        }
+```
+
+`AssistantIndexer.__init__`:
+
+```python
+    def __init__(self, config: AssistantConfig, ocr: Any = None):
+        self.config = config
+        if ocr is None and config.pdf_ocr:
+            from src.ocr_katmani import OcrKatmani
+            ocr = OcrKatmani(config.project_root)
+        self.adapters = FileAdapters(config, ocr=ocr)
+```
+
+`reindex` içinde `start = time.perf_counter()` satırının altına:
+
+```python
+        if self.adapters.ocr is not None:
+            # OCR's share of this run: a scan is read page by page until this
+            # deadline; the rest is read on a later run (src/ocr_katmani.py).
+            self.adapters.ocr_son_an = self.adapters.ocr.saat() + max(0, self.config.ocr_sure)
+```
+
+`can_reuse` hesabı:
+
+```python
+            can_reuse = bool(
+                incremental
+                and old_rec
+                and old_rec.get("sha256") == sha
+                and rel_path in old_chunks_by_path
+                # A scan indexed before OCR existed ("pdf_no_text", 3 chunks in
+                # the live index on 2026-09-28) is read again once OCR is on,
+                # though its sha256 has not changed.
+                and not (self.adapters.ocr is not None and ext in PDF_EXTENSIONS
+                         and any("pdf_no_text" in (c.get("warnings") or [])
+                                 for c in old_chunks_by_path[rel_path]))
+            )
+```
+
+`SYSTEM_PROMPT`'ta `"- Araç sonuç döndürmediyse eksikliği açıkça söyle. Boşluğu doldurma.\n"` satırının altına:
+
+```python
+        "- '[PDF s.N · OCR, güven düşük …]' satırıyla başlayan bir sayfadan aldığın bilgiyi "
+        "kesinmiş gibi sunma: OCR ile okunduğunu söyle ve okura sayfayı kendisinin kontrol "
+        "etmesini öner.\n"
+```
+
+- [ ] **Step 5: Ek eşitlemesi**
+
+`src/portal_ekleri_indir.py`'de `_METIN_NOTU`:
+
+```python
+_METIN_NOTU = {METIN_YOK: "(Metin katmanı yok ve OCR okunur metin bulamadı: boş ya da yalnız görsel sayfalar.)",
+               METIN_DESTEKLENMIYOR: "(Bu ek türünün metni okunmuyor.)"}
+```
+
+`metin_cikar`'ın tamamı:
+
+```python
+def metin_cikar(yol: Path, sure: float, ocr: Any = None) -> tuple[str, str]:
+    """(text status, text) through the assistant's own FileAdapters: pdftotext
+    for a PDF, stdlib zip/XML for a .docx, tesseract for an image only when
+    ASSISTANT_ENABLE_OCR=1, as for every other image TEDY indexes.
+
+    With `ocr` (src/ocr_katmani.OcrKatmani), every PDF page without a text
+    layer is read by Claude Haiku 4.5's vision, or Tesseract past the monthly
+    cap, until `sure` seconds have passed. A scan read part-way is
+    METIN_BEKLIYOR with the progress ("read/total") as the second element; the
+    pages done are cached and the rest continue on the next run."""
+    from src.assistant_core import FileAdapters
+    if yol.suffix.lower() not in _METIN_UZANTILARI:
+        return METIN_DESTEKLENMIYOR, ""
+    ayar = _CikarmaAyari(max_file_size_mb=EK_BOYUT_SINIRI // MB + 1, pdf_max_pages=400,
+                         pdf_timeout=max(5, int(sure)),
+                         enable_ocr=os.environ.get("ASSISTANT_ENABLE_OCR", "0") == "1")
+    adaptor = FileAdapters(ayar, ocr=ocr)
+    if ocr is not None:
+        adaptor.ocr_son_an = ocr.saat() + max(5.0, sure)
+        adaptor.ocr_her_sayfa = True
+    sonuc = adaptor.extract(yol, yol.name)
+    if sonuc.get("extraction_error") == "ocr_suruyor":
+        return METIN_BEKLIYOR, str(sonuc.get("ocr_ilerleme") or "")
+    if sonuc.get("extraction_error"):
+        return METIN_HATA, ""
+    if sonuc.get("source_kind") == "metadata":
+        return METIN_YOK, ""
+    return METIN_VAR, str(sonuc.get("text") or "")
+
+
+def _varsayilan_ocr(proje_koku: str | Path) -> Any:
+    """The OCR layer the sync uses unless a caller hands one in; none when
+    ASSISTANT_PDF_OCR=0 (tests/conftest.py sets it for every test)."""
+    if os.environ.get("ASSISTANT_PDF_OCR", "1") == "0":
+        return None
+    from src.ocr_katmani import OcrKatmani
+    return OcrKatmani(proje_koku)
+```
+
+`_metni_hazirla`'nın tamamı:
+
+```python
+def _metni_hazirla(depo: EkDeposu, kayit: dict[str, Any], sure: float,
+                   cikarici: Callable[[Path, float], tuple[str, str]]) -> None:
+    yol = depo.dosya_yolu(kayit)
+    durum, metin = cikarici(yol, sure)
+    if durum == METIN_BEKLIYOR:
+        # A scan read part-way: its pages are cached (src/ocr_katmani.py) and
+        # the rest continue next run. Not an attempt — METIN_DENEME_SINIRI is
+        # for extractions that fail, not for a long book.
+        kayit.update(text=METIN_BEKLIYOR, ocr_ilerleme=metin)
+        return
+    kayit["text_attempts"] = int(kayit.get("text_attempts") or 0) + 1
+    kayit.update(text=durum, text_chars=len(metin))
+    kayit.pop("ocr_ilerleme", None)
+    kaynak = kayit.get("source") if isinstance(kayit.get("source"), dict) else {}
+    atomic_json_dump({"id": kayit["id"], "name": kayit.get("name", ""), "title": kaynak.get("title", ""),
+                      "section": kaynak.get("section", ""), "course": kaynak.get("course", "")},
+                     str(depo.meta_yolu(kayit["id"])))
+    if durum != METIN_HATA:
+        _atomik_yaz(depo.metin_yolu(kayit["id"]), metin_dosyasi(kayit, durum, metin))
+```
+
+`ekleri_esitle` imzası (`metin_cikarici` parametresinden sonra):
+
+```python
+                  metin_cikarici: Callable[[Path, float], tuple[str, str]] = metin_cikar,
+                  ocr: Any = None) -> dict[str, Any]:
+```
+
+gövdenin başına (`depo = EkDeposu(proje_koku)` satırının altına):
+
+```python
+    if metin_cikarici is metin_cikar:
+        katman = ocr if ocr is not None else _varsayilan_ocr(proje_koku)
+
+        def metin_cikarici(yol: Path, sure: float, _katman: Any = katman) -> tuple[str, str]:
+            return metin_cikar(yol, sure, ocr=_katman)
+```
+
+dönüş sözlüğüne `"bu_tur_metin": bu_tur["metin"],` satırının altına:
+
+```python
+            "ocr_bu_ay_usd": round(OcrDefteri(Path(proje_koku) / DEFTER).harcanan(), 4),
+```
+
+ve dosyanın içe aktarmalarına:
+
+```python
+from src.ocr_katmani import DEFTER, OcrDefteri
+```
+
+- [ ] **Step 6: `ek_oku`**
+
+`src/assistant_tools.py` `from src.portal_ekleri import (...)` satırına `METIN_BEKLIYOR` ekle. `ek_oku_metni` içinde `METIN_YOK` dalı:
+
+```python
+    if metin_durumu == METIN_YOK:
+        return (f"{bas}\nBu ekin metin katmanı yok ve OCR da okunur metin bulamadı (boş ya da "
+                "yalnız görsel sayfalar); içeriğini okuyamıyorum. Okur dosyayı TEDY'de açabilir."), etiket, kimlik
+    if metin_durumu == METIN_BEKLIYOR and kayit.get("ocr_ilerleme"):
+        return (f"{bas}\nBu ek taranmış; sayfaları OCR ile okunuyor ({kayit['ocr_ilerleme']} sayfa "
+                "okundu). Metin sonraki eşitlemelerde tamamlanır; içeriğini şimdilik okuyamıyorum."), etiket, kimlik
+```
+
+ve son `return`'den önce (sayfa parçası hazırlandıktan sonra):
+
+```python
+    ocr_notu = ("\nNot: bu metin sayfasındaki PDF sayfalarının bir kısmı OCR ile okundu; "
+                "'OCR, güven düşük' diye işaretli sayfadaki bilgiyi kesin sayma.") if "· OCR" in parca else ""
+    return f"{bas}\nMetin sayfası {n}/{toplam}{pdf}{ocr_notu}\n\n{parca}{kuyruk}", etiket, kimlik
+```
+
+(docstring'deki "no text layer (a scan — no OCR, plan decision 2)" ifadesini "no text even after OCR, or OCR still under way (plan decision 2)" yap.)
+
+- [ ] **Step 7: Yeşil olduğunu gör**
+
+Run: `cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/portal-ekleri && DASHBOARD_SECRET_KEY=yerel-test-anahtari-portal-ekleri unshare -rn .venv/bin/python -m pytest -q -p no:cacheprovider tests/test_ocr_baglanti.py tests/test_ocr_katmani.py tests/test_portal_ekleri_esitle.py tests/test_assistant_ek_oku.py tests/test_assistant_docx.py tests/test_portal_ekleri_indeks.py tests/test_assistant_indeks_hijyeni.py tests/test_assistant_core.py`
+Expected: PASS, ağsız ad alanında.
+
+- [ ] **Step 8: CLAUDE.md**
+
+**Asistan ve portal ekleri** maddesinin (Görev 13 Step 5) altına — Görev 13 bu görevden sonra koşar; madde yoksa **Asistan ve ödevler** maddesinin altına koy:
+
+```
+- **OCR for scanned PDFs** (plan `docs/superpowers/plans/2026-09-28-portal-ekleri.md`, Görev 14–15; `src/ocr_katmani.py`): a PDF page without a text layer (< 20 non-space characters from pdftotext) is rendered by `pdftoppm -scale-to 1568` (Claude downsizes past ~1568 px anyway; ~2,400 input tokens a page) and read by Claude Haiku 4.5 vision (`claude-haiku-4-5`, `OCR_CLAUDE_MODEL`) through `src/claude_api.py` into Markdown with headings, tables and LaTeX kept. A white page (grey stddev < 2) costs nothing. Each page is cached under `output/ocr_onbellek/` by (file sha256, page, engine, `ISTEM_SURUMU`) and read once. Spend is capped at 10 USD a month (`TEDY_OCR_AYLIK_USD`) in `output/ocr_defteri.json`, written from `response.usage` at 1/5 USD per MTok; Claude is called only while one page's worst case (≈ 0.0245 USD) still fits. At the cap, on an API error or a refusal, Tesseract `tur+eng` reads the page; a low-confidence Tesseract page is retried on Claude once the cap allows. Every OCR'd page opens with `[PDF s.N · OCR · <engine> · güven %NN]`, or `[PDF s.N · OCR, güven düşük · <engine>]` below 0.6, and the system prompt tells the model not to present such a page as certain. Attachments: every textless page, inside the sync's budget; a scan read part-way is `text: "bekliyor"` with `ocr_ilerleme` ("12/40"), not a failed attempt, and continues next run; `ek_oku` says so. General index: only PDFs whose pdftotext is empty, `ASSISTANT_OCR_SURE` (45 s) per indexer run; a part-read PDF is `dusen_dosyalar_nedenleri: "ocr_suruyor"` and continues next run; old `pdf_no_text` chunks are re-read without an `INDEX_FORMAT_VERSION` bump. `ASSISTANT_PDF_OCR=0` turns it off (every test runs with it off unless it hands in a fake reader).
+```
+
+- [ ] **Step 9: Commit**
+
+```bash
+cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/portal-ekleri && test "$(git branch --show-current)" = feat/portal-ekleri && echo dal-dogru
+git add src/assistant_core.py src/portal_ekleri_indir.py src/assistant_tools.py tests/conftest.py tests/test_ocr_baglanti.py CLAUDE.md
+git commit -m "$(cat <<'EOF'
+OCR'u ek eşitlemesine, genel indekse ve ek_oku'ya bağla
+
+Eklerde metinsiz her sayfa eşitleme bütçesi içinde, genel indekste
+pdftotext'i boş PDF'ler indeksleyici başına 45 s içinde okunur; yarım kalan
+sonraki turda sürer ve deneme saymaz. Yan dosya ve ek_oku OCR metnini,
+motorunu ve "OCR, güven düşük" etiketini taşır; testlerde OCR kapalıdır.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+EOF
+)"
+```
+
+---
+
 ## Controller: dağıtım (görev değil; controller yapar)
 
 1. **Birleştir:** ana checkout paylaşımlıdır; birleştirmeyi geçici bir worktree'de yap, dalı doğrula, `main`'i ancak `f7cad72` (ya da o anki `origin/main`) `feat/portal-ekleri`'nin atasıysa ileri sar; atalık korumalı push.
@@ -4558,3 +5907,4 @@ EOF
 4. **Yüzeyler:** tedy.online'da İşler'de bir ödev modalı açılır; ek adı TEDY kopyasını (`/api/ekler/…`) açar, 100 MB'lık PDF'in ilk sayfası tamamı inmeden görünür (Range); "Kaynağında aç" özgünü açar; giriş duvarındaki ek "İndirilemedi — kaynağında aç" der.
 5. **Asistan:** "Sosyal Bilgiler ödevimin ekinde ne isteniyor?" → `odev_listesi` + `ek_oku` çağrılır, atıf "<ek adı> · <ödev başlığı>" olur.
 6. **Sonraki cron turu:** `output/sync.log`'da `[EKLER]` satırı ve `Completed in …s` < 600; `health.json`'da `ekler`. Aynı turdan sonra süs sayımı (Görev 2 Step 7 betiği, bu kez ham dosyada) `0` olmalı: `run_sync` önceki haftaları temizleyerek yazar.
+7. **OCR (Görev 14–15):** 3. adımın `--indeksle` koşusu ve sonraki cron turları taranmış sayfaları okur. `output/ocr_defteri.json`'da bu ayın `usd`/`sayfa`/`girdi_token`/`cikti_token` değerleri görünmeli; sayfa başına ~0,004–0,01 $ beklenir (Haiku 4.5, ~2.400 görsel token'ı). Aşarsa dur ve ölç; tavan 10 $/ay (`TEDY_OCR_AYLIK_USD`, `.env`'e yazmak gerekmez). İndeksin `meta.json`'unda `dusen_dosyalar_nedenleri` içindeki `ocr_suruyor` kayıtları (2026-09-28'de `content/yabanci-dil`'de 3 taranmış PDF vardı) turlar geçtikçe azalmalı; bir taranmış ekte `ocr_ilerleme` artmalı ve sonunda `text: "var"` olmalı. Asistana taranmış bir sayfayı sor: cevap `[PDF s.N · OCR …]` sayfasından gelmeli, düşük güvenliyse bunu söylemeli. `output/sync.log`'da her turun `Completed in …s` değeri < 600 kalmalı.
