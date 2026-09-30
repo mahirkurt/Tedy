@@ -120,3 +120,24 @@ etkileşimi doğrula. Doküman değişikliklerinde en azından
 `git diff --check -- <dosya>` kullan. Commit istenirse yalnız hedef dosyaları
 adıyla stage et ve `feat:`, `fix:`, `docs:`, `chore:` gibi mevcut Conventional
 Commit biçimini kullan.
+
+## Cursor Cloud specific instructions
+
+- Kurulum `.venv` ve `dashboard/node_modules` üretir, ardından `npm run build`
+  ile `dashboard-dist/` oluşur. Kilit dosyası `dashboard/package-lock.json`;
+  `npm ci` kullan.
+- API, `DASHBOARD_SECRET_KEY` olmadan import sırasında düşer. Kurulum, `.env`
+  yoksa yalnız yerel bir anahtar yazar (gitignored, mode 600). Var olan `.env`
+  dosyasının üzerine yazma. Boş `DASHBOARD_SECRET_KEY` export etme:
+  `load_env()` zaten set edilmiş bir değişkeni değiştirmez, boş değer `.env`'i ezer.
+- Geliştirme sunucuları: `DASHBOARD_COOKIE_SECURE=0 .venv/bin/python src/dashboard_api.py`
+  (`:8085`, üretim demeti) ve `cd dashboard && npm run dev` (`:3000`, `/api`
+  8085'e gider). Oturumsuz `GET /api/auth/me` 401 döner; bu, API'nin ayakta
+  olduğunun işaretidir.
+- `pytest` bu `.env` ile çalışır. Panel kapıları `cd dashboard && npm run lint`
+  ve `npm run build`. Playwright Chromium `npx playwright install chromium` ile kurulur.
+- Portal taraması (`src/run_sync.py`) `PORTAL_USERNAME` / `PORTAL_PASSWORD` ister
+  ve bulut geliştirme döngüsünün parçası değildir. Asistan `ANTHROPIC_API_KEY`
+  ister; testler bu anahtarı bilerek siler.
+- Uygulama `TZ`'yi `src/env_loader.py` içinde `Europe/Istanbul` yapar. VM saati
+  UTC kalabilir.
