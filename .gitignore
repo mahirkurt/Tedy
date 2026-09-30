@@ -90,3 +90,9 @@ dashboard/paket-analizi.html
 
 # Portal attachment copies, extracted text and sidecars (src/portal_ekleri.py)
 content/portal-ekleri/
+
+# React Native Android client (project lives in android/; native Gradle in android/android)
+node_modules/
+*.keystore
+local.properties
+.gradle/
