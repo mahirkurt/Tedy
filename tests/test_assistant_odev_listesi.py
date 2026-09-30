@@ -130,6 +130,16 @@ def test_eski_yaptimlar_bu_haftakini_itmez():
     assert "14 günden eski 12 ödev" in metin     # left out, and said so
 
 
+def test_fotograf_satiri_portal_kaydi_degildir():
+    foto = _hw("Matematik", "Sayfa 4", "", aciklama="1-5. sorular")
+    foto["source"] = "photo_ai_ted"
+    yap = _bolum(odev_listesi_metni([foto], SIMDI), "YAPILACAK")
+    assert "fotoğraftan eklendi" in yap
+    assert "teslim tarihi fotoğrafta yazmıyor" in yap
+    assert "1-5. sorular" in yap
+    assert "Kaynak: TED Connect" not in yap
+
+
 def test_uzun_aciklama_kesildigini_belli_eder():
     uzun = _hw("Türkçe", "Test", "28.09.2026 12:00", aciklama="kelime " * 100)
     satir = _bolum(odev_listesi_metni([uzun], SIMDI), "YAPILACAK")

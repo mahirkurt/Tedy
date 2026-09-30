@@ -14,6 +14,14 @@ import type { HealthData, SectionHealth, PrivateLesson } from '../types'
 import type { User } from '../hooks/useAuth'
 import { COURSE_CONTENT_ORDER, SECTION_LABELS } from '../utils/formatters'
 
+interface PhotoDraft {
+  course: string
+  title: string
+  due: string
+  description: string
+  kaynak: string
+}
+
 function StatusIcon({ status }: { status: SectionHealth['status'] }) {
   if (status === 'ok') return <CheckmarkFilled size={14} style={{ color: 'var(--status-success)' }} />
   if (status === 'warning') return <WarningFilled size={14} style={{ color: 'var(--status-warning)' }} />
@@ -65,10 +73,11 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
   const [photoProcessing, setPhotoProcessing] = useState(false)
   const [photoModalOpen, setPhotoModalOpen] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null)
+  const [photoError, setPhotoError] = useState('')
+  const [photoHash, setPhotoHash] = useState('')
+  const [photoDrafts, setPhotoDrafts] = useState<PhotoDraft[] | null>(null)
   const [sourceType, setSourceType] = useState<'ted' | 'private'>('ted')
-  const [course, setCourse] = useState('Matematik')
   const [privateLessonId, setPrivateLessonId] = useState('')
-  const [dueDate, setDueDate] = useState('')
   const popoverRef = useRef<HTMLElement>(null)
   const photoCaptureInputRef = useRef<HTMLInputElement>(null)
   const photoUploadInputRef = useRef<HTMLInputElement>(null)
@@ -125,28 +134,27 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
   }, [privateLessons])
 
   useEffect(() => {
-    if (courseOptions.length === 0) return
-    if (!course || !courseOptions.includes(course)) {
-      setCourse(courseOptions[0])
-    }
-  }, [courseOptions, course])
-
-  useEffect(() => {
     if (sourceType !== 'private') return
     if (!privateLessonId && privateLessons.length > 0) {
       setPrivateLessonId(privateLessons[0].id)
-      return
     }
-    const selected = privateLessons.find(l => l.id === privateLessonId)
-    if (selected?.course) setCourse(selected.course)
   }, [sourceType, privateLessonId, privateLessons])
 
   function resetPhotoFlow() {
     setSelectedPhoto(null)
     setSourceType('ted')
     setPrivateLessonId('')
-    setDueDate('')
+    setPhotoError('')
+    setPhotoHash('')
+    setPhotoDrafts(null)
     setPhotoModalOpen(false)
+  }
+
+  function photoFormBase() {
+    const formData = new FormData()
+    formData.append('source_type', sourceType)
+    if (privateLessonId) formData.append('private_lesson_id', privateLessonId)
+    return formData
   }
 
   function handlePhotoSelected(e: ChangeEvent<HTMLInputElement>) {
@@ -155,30 +163,27 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
     if (!file) return
 
     if (!file.type.startsWith('image/')) {
-      window.alert('Lütfen bir görsel dosyası seçin.')
+      setPhotoError('Lütfen bir görsel dosyası seçin.')
       return
     }
+    setPhotoError('')
+    setPhotoHash('')
+    setPhotoDrafts(null)
     setSelectedPhoto(file)
   }
 
-  async function submitPhotoHomework() {
-    if (!selectedPhoto) return
-    if (!course) {
-      window.alert('Lütfen ders seçin.')
-      return
-    }
+  async function readPhotoHomework() {
+    if (!selectedPhoto || photoProcessing) return
     if (sourceType === 'private' && !privateLessonId) {
-      window.alert('Lütfen öğrenciye tanımlı bir özel ders seçin.')
+      setPhotoError('Özel ders seçilmeden fotoğraf okunmaz.')
       return
     }
     setPhotoProcessing(true)
+    setPhotoError('')
     try {
-      const formData = new FormData()
+      const formData = photoFormBase()
+      formData.append('stage', 'preview')
       formData.append('photo', selectedPhoto)
-      formData.append('source_type', sourceType)
-      formData.append('course', course)
-      if (privateLessonId) formData.append('private_lesson_id', privateLessonId)
-      if (dueDate) formData.append('due_date', dueDate)
       const res = await fetch('/api/homework/photo', {
         method: 'POST',
         credentials: 'include',
@@ -188,19 +193,78 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
       if (!res.ok) {
         throw new Error(payload?.error || `HTTP ${res.status}`)
       }
+      const rows = Array.isArray(payload?.homework) ? payload.homework : []
+      if (rows.length === 0) {
+        setPhotoError('Bu fotoğrafta ödev görünmüyor.')
+        setPhotoDrafts(null)
+        return
+      }
+      setPhotoHash(String(payload?.photo_hash || ''))
+      setPhotoDrafts(rows.map((row: Record<string, unknown>) => ({
+        course: String(row['Ders Adı'] || ''),
+        title: String(row['Ödev Başlığı'] || ''),
+        due: String(row['Ödev Son Teslim Tarihi'] || ''),
+        description: String(
+          (row.detail && typeof row.detail === 'object'
+            ? (row.detail as { description?: string }).description
+            : '') || '',
+        ),
+        kaynak: String(row.odev_kaynagi || ''),
+      })))
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'Fotoğraf okunamadı.')
+    } finally {
+      setPhotoProcessing(false)
+    }
+  }
 
+  function updateDraft(index: number, patch: Partial<PhotoDraft>) {
+    setPhotoDrafts(prev => prev?.map((row, i) => (i === index ? { ...row, ...patch } : row)) ?? prev)
+  }
+
+  async function commitPhotoHomework() {
+    if (!photoDrafts || photoProcessing) return
+    const named = photoDrafts.filter(row => row.title.trim() && row.title.trim() !== 'Başlıksız Ödev')
+    if (named.length === 0) {
+      setPhotoError('Eklenecek işin bir başlığı olmalı.')
+      return
+    }
+    setPhotoProcessing(true)
+    setPhotoError('')
+    try {
+      const formData = photoFormBase()
+      formData.append('stage', 'commit')
+      formData.append('photo_hash', photoHash)
+      formData.append('homework', JSON.stringify(named.map(row => ({
+        'Ders Adı': row.course,
+        'Ödev Başlığı': row.title.trim(),
+        'Ödev Son Teslim Tarihi': row.due.trim(),
+        odev_kaynagi: row.kaynak,
+        detail: { description: row.description.trim() },
+      }))))
+      const res = await fetch('/api/homework/photo', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      })
+      const payload = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(payload?.error || `HTTP ${res.status}`)
+      }
       const addedCount = Number(payload?.added_count || 0)
       const skippedCount = Number(payload?.skipped_count || 0)
       window.dispatchEvent(new CustomEvent('tedy:homework-updated'))
-      resetPhotoFlow()
-      if (addedCount > 0) {
-        window.alert(`${addedCount} ödev AI ile işlendi ve sisteme eklendi.`)
-      } else {
-        window.alert(`Yeni ödev eklenmedi. ${skippedCount} kayıt zaten mevcut.`)
+      if (addedCount === 0) {
+        setPhotoError(
+          skippedCount > 0
+            ? 'Bu iş zaten listede. Yeni bir şey eklenmedi.'
+            : 'Eklenecek yeni bir iş yok.',
+        )
+        return
       }
+      resetPhotoFlow()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Bilinmeyen hata'
-      window.alert(`Fotoğraf işlenemedi: ${msg}`)
+      setPhotoError(err instanceof Error ? err.message : 'Ödev eklenemedi.')
     } finally {
       setPhotoProcessing(false)
     }
@@ -368,7 +432,10 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
         onClose={resetPhotoFlow}
         size="md"
       >
-        <ModalHeader title="Ödev Fotoğrafı Ekle" label="AI Destekli Ödev İşleme" />
+        <ModalHeader
+          title={photoDrafts ? 'Okunan işler' : 'Ödev fotoğrafı'}
+          label={photoDrafts ? 'Eklemeden önce kontrol et' : 'Fotoğraftan okuma'}
+        />
         <ModalBody>
           {!selectedPhoto ? (
             <div className="photo-intake-select">
@@ -383,6 +450,7 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
                   Galeriden yükle
                 </Button>
               </div>
+              {photoError && <p className="photo-intake-form__error" role="alert">{photoError}</p>}
             </div>
           ) : (
             <div className="photo-intake-form">
@@ -390,62 +458,94 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
                 Seçilen dosya: <strong>{selectedPhoto.name}</strong>
               </p>
 
-              <label className="photo-intake-form__label">
-                Kaynak
-                <select
-                  className="photo-intake-form__input"
-                  value={sourceType}
-                  onChange={e => setSourceType(e.target.value as 'ted' | 'private')}
-                >
-                  <option value="ted">TED Connect</option>
-                  <option value="private">Özel Ders</option>
-                </select>
-              </label>
+              {!photoDrafts && (
+                <>
+                  <label className="photo-intake-form__label">
+                    Kaynak
+                    <select
+                      className="photo-intake-form__input"
+                      value={sourceType}
+                      onChange={e => setSourceType(e.target.value as 'ted' | 'private')}
+                    >
+                      <option value="ted">Okul ödevi</option>
+                      <option value="private">Özel Ders</option>
+                    </select>
+                  </label>
 
-              {sourceType === 'private' && (
-                <label className="photo-intake-form__label">
-                  Özel Ders
-                  <select
-                    className="photo-intake-form__input"
-                    value={privateLessonId}
-                    onChange={e => setPrivateLessonId(e.target.value)}
-                  >
-                    {privateLessons.length === 0 && <option value="">Tanımlı özel ders yok</option>}
-                    {privateLessons.map(lesson => (
-                      <option key={lesson.id} value={lesson.id}>
-                        {lesson.course} · {lesson.teacher}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  {sourceType === 'private' && (
+                    <label className="photo-intake-form__label">
+                      Özel Ders
+                      <select
+                        className="photo-intake-form__input"
+                        value={privateLessonId}
+                        onChange={e => setPrivateLessonId(e.target.value)}
+                      >
+                        {privateLessons.length === 0 && <option value="">Tanımlı özel ders yok</option>}
+                        {privateLessons.map(lesson => (
+                          <option key={lesson.id} value={lesson.id}>
+                            {lesson.course} · {lesson.teacher}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <p className="photo-intake-form__hint">
+                    Önce fotoğraf okunur. Ders ve teslim tarihi sayfada yazıyorsa oradan gelir; yazmıyorsa boş kalır.
+                  </p>
+                </>
               )}
 
-              <label className="photo-intake-form__label">
-                Ders
-                <select
-                  className="photo-intake-form__input"
-                  value={course}
-                  onChange={e => setCourse(e.target.value)}
-                  disabled={sourceType === 'private'}
-                >
-                  {courseOptions.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </label>
+              {photoDrafts?.map((draft, index) => (
+                <fieldset key={index} className="photo-intake-draft">
+                  <legend className="photo-intake-draft__legend">İş {index + 1}</legend>
+                  {draft.kaynak && (
+                    <p className="photo-intake-form__hint">Kaynak: {draft.kaynak}</p>
+                  )}
+                  <label className="photo-intake-form__label">
+                    Ders
+                    <select
+                      className="photo-intake-form__input"
+                      value={draft.course}
+                      onChange={e => updateDraft(index, { course: e.target.value })}
+                    >
+                      {draft.course && !courseOptions.includes(draft.course) && (
+                        <option value={draft.course}>{draft.course}</option>
+                      )}
+                      {courseOptions.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="photo-intake-form__label">
+                    Başlık
+                    <input
+                      className="photo-intake-form__input"
+                      value={draft.title}
+                      onChange={e => updateDraft(index, { title: e.target.value })}
+                    />
+                  </label>
+                  <label className="photo-intake-form__label">
+                    Teslim
+                    <input
+                      className="photo-intake-form__input"
+                      value={draft.due}
+                      placeholder="Fotoğrafta yoksa boş bırak"
+                      onChange={e => updateDraft(index, { due: e.target.value })}
+                    />
+                  </label>
+                  <label className="photo-intake-form__label">
+                    Yönerge
+                    <textarea
+                      className="photo-intake-form__input"
+                      rows={3}
+                      value={draft.description}
+                      onChange={e => updateDraft(index, { description: e.target.value })}
+                    />
+                  </label>
+                </fieldset>
+              ))}
 
-              <label className="photo-intake-form__label">
-                Teslim Tarihi (opsiyonel)
-                <input
-                  type="datetime-local"
-                  className="photo-intake-form__input"
-                  value={dueDate}
-                  onChange={e => setDueDate(e.target.value)}
-                />
-              </label>
-              <p className="photo-intake-form__hint">
-                Boş bırakırsanız teslim tarihi fotoğraftan yapay zekâ ile otomatik çıkarılır.
-              </p>
+              {photoError && <p className="photo-intake-form__error" role="alert">{photoError}</p>}
             </div>
           )}
         </ModalBody>
@@ -454,7 +554,11 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
             <Button
               kind="ghost"
               size="sm"
-              onClick={() => setSelectedPhoto(null)}
+              onClick={() => {
+                setSelectedPhoto(null)
+                setPhotoDrafts(null)
+                setPhotoError('')
+              }}
               disabled={photoProcessing}
             >
               Fotoğrafı değiştir
@@ -468,14 +572,25 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
           >
             İptal
           </Button>
-          <Button
-            kind="primary"
-            size="sm"
-            onClick={submitPhotoHomework}
-            disabled={!selectedPhoto || photoProcessing}
-          >
-            {photoProcessing ? 'İşleniyor...' : 'Kaydet ve İşle'}
-          </Button>
+          {photoDrafts ? (
+            <Button
+              kind="primary"
+              size="sm"
+              onClick={commitPhotoHomework}
+              disabled={photoProcessing}
+            >
+              {photoProcessing ? 'Ekleniyor...' : 'İşler\'e ekle'}
+            </Button>
+          ) : (
+            <Button
+              kind="primary"
+              size="sm"
+              onClick={readPhotoHomework}
+              disabled={!selectedPhoto || photoProcessing}
+            >
+              {photoProcessing ? 'Okunuyor...' : 'Fotoğrafı oku'}
+            </Button>
+          )}
         </ModalFooter>
       </ComposedModal>
       )}

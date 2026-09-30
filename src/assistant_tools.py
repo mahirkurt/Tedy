@@ -368,9 +368,16 @@ def odev_listesi_metni(rows: list[dict[str, Any]], simdi: datetime, sebit: Any =
     def satir(teslim: datetime | None, r: dict[str, Any], aciklama: bool = False) -> str:
         ad = " — ".join(x for x in (str(r.get("normalized_course") or r.get("Ders Adı") or "").strip(),
                                     str(r.get("Ödev Başlığı") or "").strip()) if x)
-        zaman = (f"teslim {_GUNLER[teslim.weekday()]} {teslim:%d.%m.%Y %H:%M} ({_goreli(teslim, simdi)})"
-                 if teslim else "teslim tarihi okunamadı")
+        foto = str(r.get("source") or "").startswith("photo_ai")
+        if teslim:
+            zaman = f"teslim {_GUNLER[teslim.weekday()]} {teslim:%d.%m.%Y %H:%M} ({_goreli(teslim, simdi)})"
+        elif foto:
+            zaman = "teslim tarihi fotoğrafta yazmıyor"
+        else:
+            zaman = "teslim tarihi okunamadı"
         metin = f"- {ad} · {zaman}"
+        if foto:
+            metin += " · fotoğraftan eklendi"
         if aciklama:
             detay = " ".join(str((r.get("detail") or {}).get("description") or "").split())
             if detay:
@@ -1627,7 +1634,9 @@ class McpRegistry:
                 "description": (
                     "Işık'ın ödev listesi, Bugün ve İşler sayfalarının gösterdiği haliyle: "
                     "yapılacaklar (teslim zamanı ve öğretmenin talimatıyla), Işık'ın 'Yaptım' "
-                    "dedikleri, süresi geçenler." + sebit_notu + " Ödev sorularında (ne var, ne "
+                    "dedikleri, süresi geçenler. 'fotoğraftan eklendi' diyen satır portal "
+                    "kaydı değildir; tarihi 'fotoğrafta yazmıyor' ise tarihi uydurma."
+                    + sebit_notu + " Ödev sorularında (ne var, ne "
                     "zaman teslim, neyi yaptı) önce BU aracı kullan — ödevin durumu için tek "
                     "güvenilir kaynak."
                 ),
