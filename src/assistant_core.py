@@ -2095,7 +2095,8 @@ class AssistantRuntime:
                  platform_kaynagi: Callable[[], Any] | None = None,
                  kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
                  video_kaynagi: Callable[[], Any] | None = None,
-                 skills: dict[str, Any] | None = None):
+                 skills: dict[str, Any] | None = None,
+                 odev_belge_ara: Callable[[str, str], str] | None = None):
         # First, before anything else is built: a broken teacher skill stops the
         # assistant from opening at all (spec "Hata ve boşluk durumları"), with
         # the skill and the reason in the error — never a silent fallback.
@@ -2149,7 +2150,8 @@ class AssistantRuntime:
                                        kitap_kaynagi=kitap_kaynagi,
                                        video_kaynagi=video_kaynagi,
                                        aile_kaynak_arama=self._aile_search,
-                                       skills=self.skills)
+                                       skills=self.skills,
+                                       odev_belge_ara=odev_belge_ara)
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """The retriever, shaped as a tool the model can choose to call."""
@@ -2187,6 +2189,9 @@ class AssistantRuntime:
         "Işık'ın 'Yaptım' dediği bir ödevi yapılacak diye sunma. Teslim zamanını "
         "söylerken listedeki gün ve saati kullan; 'bu hafta', 'yarın' gibi sözleri "
         "sorudaki 'Bugün:' satırına göre çöz.\n"
+        "- Seçili bir ödevin ekli belgesi (sayfa, soru, metin) → `odev_belgesi`. "
+        "Yalnız asistan ekranında seçilmiş ödevin belgelerine bakar. Belgede olmayanı "
+        "belgede yazıyormuş gibi söyleme. Seçim yoksa belge okunamaz; ödev seçilmesini iste.\n"
         "- Işık'a özel diğer sorular (duyuru, eski ödev, portalın ek sayfaları) ve bir "
         "ödevin ayrıntısı → `ogrenci_verisi_ara`.\n"
         "- Konu, kavram, müfredat, kazanım sorusu → `kazanim_ara`, `mufredat_ara`. MEB "
@@ -2380,6 +2385,8 @@ class AssistantRuntime:
         okur: str = "bilinmiyor",
         ogretmen: str = assistant_skills.GENEL,
         mod_onerisi: bool = True,
+        secili_odev: str = "",
+        odev_anahtari: str = "",
     ) -> dict[str, Any]:
         # `dispatch`, if given, replaces self.registry.dispatch for this
         # call only. chat_events() (below) uses this to wrap tool calls
@@ -2403,7 +2410,7 @@ class AssistantRuntime:
             safety_flags.append("warning:stale_context")
 
         convo = self._build_conversation(messages, user_query, intent, safety_flags,
-                                         okur=okur, ogretmen=ogretmen)
+                                         okur=okur, ogretmen=ogretmen, secili_odev=secili_odev)
 
         try:
             # `temperature` stays in chat()'s signature for /v1 callers but is
@@ -2421,7 +2428,8 @@ class AssistantRuntime:
                 # the caller decides, and only an exact True counts.
                 dispatch=dispatch or functools.partial(
                     self.registry.dispatch, ilerleme_izni=ilerleme_izni is True, okur=okur,
-                    ogretmen=ogretmen, mod_onerisi=mod_onerisi),
+                    ogretmen=ogretmen, mod_onerisi=mod_onerisi,
+                    odev_anahtari=odev_anahtari),
                 tier=tier,
                 on_delta=on_delta,
                 on_reset=on_reset,
@@ -2544,7 +2552,8 @@ class AssistantRuntime:
             self.registry.dispatch, ilerleme_izni=kwargs.get("ilerleme_izni") is True,
             okur=kwargs.get("okur", "bilinmiyor"),
             ogretmen=kwargs.get("ogretmen", assistant_skills.GENEL),
-            mod_onerisi=kwargs.get("mod_onerisi", True))
+            mod_onerisi=kwargs.get("mod_onerisi", True),
+            odev_anahtari=str(kwargs.get("odev_anahtari") or ""))
 
         # First suggestion wins here too (review round 2, finding NB2): without
         # this, a model calling mod_oner twice in one answer put two
@@ -2629,6 +2638,7 @@ class AssistantRuntime:
         safety_flags: list[str],
         okur: str = "bilinmiyor",
         ogretmen: str = assistant_skills.GENEL,
+        secili_odev: str = "",
     ) -> list[dict[str, str]]:
         """System prompt plus recent turns.
 
@@ -2659,8 +2669,9 @@ class AssistantRuntime:
                 f"{bugun_satiri(datetime.now())}\n"
                 f"Soran: {self._SORAN.get(okur, self._SORAN['bilinmiyor'])}\n"
                 f"Soru türü: {intent}\n"
-                f"Güvenlik: {', '.join(safety_flags) if safety_flags else 'yok'}\n\n"
-                f"Soru: {user_query}"
+                f"Güvenlik: {', '.join(safety_flags) if safety_flags else 'yok'}\n"
+                + (f"\n{secili_odev}\n" if secili_odev else "\n")
+                + f"\nSoru: {user_query}"
             )},
         ]
 
@@ -2695,6 +2706,8 @@ class AssistantRuntime:
         context_filters: dict[str, Any] | None = None,
         ilerleme_izni: bool = False,
         okur: str = "bilinmiyor",
+        secili_odev: str = "",
+        odev_anahtari: str = "",
     ) -> dict[str, Any]:
         out = self.chat(
             messages=messages,
@@ -2704,6 +2717,8 @@ class AssistantRuntime:
             ilerleme_izni=ilerleme_izni,
             okur=okur,
             mod_onerisi=False,  # /plan has no switch button (spec: B1 is /stream and /chat only)
+            secili_odev=secili_odev,
+            odev_anahtari=odev_anahtari,
         )
         out["intent"] = "study_plan"
         out["plan_blocks"] = self._build_rule_based_plan(

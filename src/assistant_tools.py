@@ -247,6 +247,7 @@ LOCAL_TOOL = "ogrenci_verisi_ara"
 # The homework list as Bugün and İşler show it (portal rows, photo-added ones,
 # Işık's own "Yaptım" marks). Declared only when the caller supplies a source.
 ODEV_TOOL = "odev_listesi"
+ODEV_BELGE = "odev_belgesi"
 ODEV_ATIF = "Ödevlerim · güncel liste"
 
 _GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
@@ -371,6 +372,13 @@ def odev_listesi_metni(rows: list[dict[str, Any]], simdi: datetime, sebit: Any =
         zaman = (f"teslim {_GUNLER[teslim.weekday()]} {teslim:%d.%m.%Y %H:%M} ({_goreli(teslim, simdi)})"
                  if teslim else "teslim tarihi okunamadı")
         metin = f"- {ad} · {zaman}"
+        belgeler = [
+            str(d.get("name") or "").strip()
+            for d in (r.get("documents") or [])
+            if isinstance(d, dict) and str(d.get("name") or "").strip()
+        ]
+        if belgeler:
+            metin += " · belge: " + ", ".join(belgeler[:3])
         if aciklama:
             detay = " ".join(str((r.get("detail") or {}).get("description") or "").split())
             if detay:
@@ -1541,11 +1549,15 @@ class McpRegistry:
                  video_kaynagi: Callable[[], Any] | None = None,
                  aile_kaynak_arama: Callable[[str, int], list[dict[str, Any]]] | None = None,
                  saat: Callable[[], datetime] | None = None,
-                 skills: dict[str, Any] | None = None) -> None:
+                 skills: dict[str, Any] | None = None,
+                 odev_belge_ara: Callable[[str, str], str] | None = None) -> None:
         self.clients = clients
         # Öğretmen skill'leri (src/assistant_skills.py), id -> Skill. Empty: no
         # teacher tool is declared in any mode.
         self.skills: dict[str, Any] = dict(skills or {})
+        # (homework_key, query) -> passages of that homework's documents only.
+        # None: odev_belgesi is not declared.
+        self.odev_belge_ara = odev_belge_ara
         # Işık's grade in the corpus's form ("7.Sınıf"), read when asked so a
         # new school year needs no restart. None, or a None answer, means
         # unknown: no grade is then invented.
@@ -1632,6 +1644,26 @@ class McpRegistry:
                     "güvenilir kaynak."
                 ),
                 "parameters": {"type": "object", "properties": {}},
+            })
+        if self.odev_belge_ara is not None:
+            decls.append({
+                "name": ODEV_BELGE,
+                "description": (
+                    "Asistan ekranında seçilmiş ödevin ekli belgelerinde ara. "
+                    "Yalnız o ödevin vektörlenmiş parçalarını döner. Belgede "
+                    "olmayan bir şeyi bu aracın sonucuna ekleme. Seçim yoksa "
+                    "çağırma; okurdan ödev seçmesini iste."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "sorgu": {
+                            "type": "string",
+                            "description": "Belgede aranacak soru ya da ifade.",
+                        },
+                    },
+                    "required": ["sorgu"],
+                },
             })
         for ad, kaynak in self.ogrenci_kaynaklari.items():
             if kaynak is not None:
@@ -1759,7 +1791,7 @@ class McpRegistry:
 
     def dispatch(self, name: str, args: dict[str, Any], ilerleme_izni: bool = False,
                 okur: str = "bilinmiyor", ogretmen: str = GENEL,
-                mod_onerisi: bool = True) -> ToolOutcome:
+                mod_onerisi: bool = True, odev_anahtari: str = "") -> ToolOutcome:
         if name == MOD_ONER_TOOL:
             return self._dispatch_mod_oner(args or {}, ogretmen, mod_onerisi)
         if name == SKILL_TOOL:
@@ -1768,6 +1800,8 @@ class McpRegistry:
             return self._dispatch_local(args)
         if name == ODEV_TOOL and self.odev_kaynagi is not None:
             return self._dispatch_odev()
+        if name == ODEV_BELGE and self.odev_belge_ara is not None:
+            return self._dispatch_odev_belgesi(args or {}, odev_anahtari)
         if self.ogrenci_kaynaklari.get(name) is not None:
             return self._dispatch_ogrenci(name, args or {})
         if name == KITAP_TOOL and self.kitap_kaynagi is not None:
@@ -2019,6 +2053,28 @@ class McpRegistry:
             "confidence": 1.0,
         }])
 
+    def _dispatch_odev_belgesi(self, args: dict[str, Any], anahtar: str) -> ToolOutcome:
+        if self.odev_belge_ara is None:
+            return ToolOutcome(ok=False, error="bu araç yok")
+        anahtar = str(anahtar or "").strip()
+        if not anahtar:
+            return ToolOutcome(ok=False, error="Önce asistan ekranından bir ödev seç.")
+        sorgu = str(args.get("sorgu") or "").strip()
+        if not sorgu:
+            return ToolOutcome(ok=False, error="sorgu gerekli")
+        try:
+            metin = self.odev_belge_ara(anahtar, sorgu)
+        except Exception as exc:  # noqa: BLE001 — told to the model, never raised through the loop
+            logger.error("odev_belgesi failed: %s", type(exc).__name__)
+            return ToolOutcome(ok=False, error=f"belge aranamadı: {type(exc).__name__}")
+        return ToolOutcome(ok=True, text=str(metin), citations=[{
+            "kind": "ogrenci",
+            "label": "Ödev belgesi",
+            "locator": {"tool": ODEV_BELGE},
+            "snippet": str(metin)[:400],
+            "confidence": 1.0,
+        }])
+
     def _dispatch_kitap(self, args: dict[str, Any]) -> ToolOutcome:
         try:
             kitaplar = self.kitap_kaynagi() or []
@@ -2144,7 +2200,8 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                    video_kaynagi: Callable[[], Any] | None = None,
                    aile_kaynak_arama: Callable[[str, int], list[dict[str, Any]]] | None = None,
                    saat: Callable[[], datetime] | None = None,
-                   skills: dict[str, Any] | None = None) -> McpRegistry:
+                   skills: dict[str, Any] | None = None,
+                   odev_belge_ara: Callable[[str, str], str] | None = None) -> McpRegistry:
     """Wire the configured servers. A server with no key is simply absent —
     its tools are not declared — but it is still named by degraded(), so an
     unset env var never looks like a healthy system with nothing to say."""
@@ -2165,4 +2222,4 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                        not_kaynagi=not_kaynagi, sebit_kaynagi=sebit_kaynagi,
                        platform_kaynagi=platform_kaynagi, kitap_kaynagi=kitap_kaynagi,
                        video_kaynagi=video_kaynagi, aile_kaynak_arama=aile_kaynak_arama,
-                       saat=saat, skills=skills)
+                       saat=saat, skills=skills, odev_belge_ara=odev_belge_ara)
