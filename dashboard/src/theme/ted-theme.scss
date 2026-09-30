@@ -1060,6 +1060,24 @@ body {
   color: var(--cds-link-primary-hover);
 }
 
+.homework-modal__doc {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ted-space-xs);
+}
+
+.homework-modal__doc-hint,
+.homework-modal__doc-error {
+  margin: var(--ted-space-2xs) 0 0;
+  @include type.type-style('label-01');
+  color: var(--ted-color-text-secondary);
+}
+
+.homework-modal__doc-error {
+  color: var(--ted-text-error);
+}
+
 // ─── Today Timeline — Clickable deadline items ───────────────────────────────
 .today-tl__item--deadline {
   cursor: pointer;

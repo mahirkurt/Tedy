@@ -345,6 +345,7 @@ def _assistant_runtime():
                 platform_kaynagi=_canli_platform_ilerlemesi,
                 kitap_kaynagi=_canli_kitaplar,
                 video_kaynagi=_canli_videolar,
+                odev_belge_ara=_odev_belgesi_ara,
             )
         except Exception as exc:
             # SkillHatasi's own message names which skill and why (spec "Hata ve
@@ -888,7 +889,71 @@ def _canli_odevler():
     marks = dict(_load_student_done_marks())
     for r in rows:
         _ogrenci_isaretini_uygula(r, marks)
+    _belgeleri_yapistir(rows)
     return rows
+
+
+def _belge_koku():
+    from pathlib import Path
+    return Path(OUTPUT_DIR) / "homework_docs"
+
+
+def _belgeleri_yapistir(rows):
+    """Attach public document metadata. Embeddings never leave the index."""
+    import src.homework_docs as homework_docs
+    grup = homework_docs.hepsi(_belge_koku())
+    if not grup:
+        return rows
+    for r in rows:
+        belgeler = grup.get(_homework_row_key(r))
+        if belgeler:
+            r["documents"] = belgeler
+    return rows
+
+
+def _odev_belgesi_ara(anahtar, sorgu):
+    import src.homework_docs as homework_docs
+    return homework_docs.ara(_belge_koku(), anahtar, sorgu)
+
+
+def _secili_odev_metni(row):
+    ders = str(row.get("normalized_course") or row.get("Ders Adı") or "").strip()
+    baslik = str(row.get("Ödev Başlığı") or "").strip()
+    teslim = str(row.get("Ödev Son Teslim Tarihi") or "").strip() or "teslim tarihi yok"
+    yonerge = " ".join(str((row.get("detail") or {}).get("description") or "").split())[:500]
+    adlar = []
+    for doc in row.get("documents") or []:
+        if not isinstance(doc, dict):
+            continue
+        ad = str(doc.get("name") or "").strip()
+        if not ad:
+            continue
+        adlar.append(ad if doc.get("ready") else f"{ad} (vektör yok)")
+    belge = ", ".join(adlar) if adlar else "yok"
+    return (
+        f"Seçilen ödev: {ders} — {baslik} · teslim {teslim}\n"
+        f"Yönerge: {yonerge or 'yok'}\n"
+        f"Ekli belgeler: {belge}\n"
+        "Bu soru bu ödev hakkındadır. Belgeden bir parça gerekiyorsa `odev_belgesi` çağır. "
+        "Başka ödevin belgesini kullanma. Belgede olmayanı belgede varmış gibi yazma."
+    )
+
+
+def _secili_odev(payload):
+    """(anahtar, metin, error_response) for an assistant request.
+
+    An empty selection is the general chat. An unknown key is refused
+    before the model runs, so a document search cannot be pointed at a
+    homework that is not on the list."""
+    anahtar = str((payload or {}).get("odev_anahtari") or "").strip()
+    if not anahtar:
+        return "", "", None
+    if len(anahtar) > 400:
+        return "", "", (jsonify({"error": "Ödev bulunamadı"}), 404)
+    row = next((r for r in _canli_odevler() if r.get("homework_key") == anahtar), None)
+    if row is None:
+        return "", "", (jsonify({"error": "Ödev bulunamadı"}), 404)
+    return anahtar, _secili_odev_metni(row), None
 
 
 # The assistant's live student-data sources (plan Görev 2): each returns what
@@ -1421,6 +1486,7 @@ def homework():
     if student_done_changed:
         _save_student_done_marks(student_done_marks)
 
+    _belgeleri_yapistir(rows)
     return jsonify({"summary": summary, "homework": rows})
 
 
@@ -1574,6 +1640,60 @@ def homework_from_photo():
         "skipped_count": skipped,
         "homework": added,
     })
+
+
+@app.route("/api/homework/documents", methods=["POST"])
+@require_auth
+def homework_document_upload():
+    """Attach a file to one homework row and embed it on mbp-node."""
+    import src.homework_docs as homework_docs
+
+    key = str(request.form.get("homework_key") or "").strip()
+    if not key or len(key) > 400:
+        return jsonify({"error": "Ödev bulunamadı"}), 404
+    if not any(_homework_row_key(r) == key for r in _combined_homework_rows(_scraped())):
+        return jsonify({"error": "Ödev bulunamadı"}), 404
+    upload = request.files.get("file")
+    if upload is None:
+        return jsonify({"error": "Dosya gerekli"}), 400
+    data = upload.read()
+    try:
+        doc = homework_docs.ekle(_belge_koku(), key, upload.filename or "", data)
+    except homework_docs.BelgeReddedildi as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001 — the reader gets a sentence, the log the type
+        app.logger.error("homework document failed: %s", type(exc).__name__)
+        return jsonify({"error": "Belge eklenemedi"}), 500
+    return jsonify({
+        "document": doc,
+        "documents": homework_docs.hepsi(_belge_koku()).get(key, []),
+    })
+
+
+@app.route("/api/homework/documents/<doc_id>", methods=["DELETE"])
+@require_auth
+def homework_document_delete(doc_id):
+    import src.homework_docs as homework_docs
+    if not homework_docs.sil(_belge_koku(), doc_id):
+        return jsonify({"error": "Belge bulunamadı"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/homework/documents/<doc_id>")
+@require_auth
+def homework_document_download(doc_id):
+    import src.homework_docs as homework_docs
+    from urllib.parse import quote
+
+    found = homework_docs.dosya(_belge_koku(), doc_id)
+    if found is None:
+        return jsonify({"error": "Belge bulunamadı"}), 404
+    path, name, mime = found
+    resp = send_from_directory(path.parent, path.name, mimetype=mime, as_attachment=True,
+                               download_name=name)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(name)}"
+    return resp
 
 
 def _sebit_verisi():
@@ -2337,6 +2457,9 @@ def assistant_chat():
     ogretmen, hata = _istek_ogretmeni(payload)
     if hata is not None:
         return hata
+    odev_anahtari, secili_odev, odev_hata = _secili_odev(payload)
+    if odev_hata is not None:
+        return odev_hata
 
     session_id = str(payload.get("session_id", "")).strip()
     temperature = payload.get("temperature", 0.2)
@@ -2355,6 +2478,8 @@ def assistant_chat():
             ilerleme_izni=_assistant_progress_allowed(),
             okur=_assistant_okur(),
             ogretmen=ogretmen,
+            secili_odev=secili_odev,
+            odev_anahtari=odev_anahtari,
         )
         return jsonify(out)
     except AssistantUnavailableError:
@@ -2380,6 +2505,9 @@ def assistant_stream():
     ogretmen, hata = _istek_ogretmeni(data)
     if hata is not None:
         return hata
+    odev_anahtari, secili_odev, odev_hata = _secili_odev(data)
+    if odev_hata is not None:
+        return odev_hata
     messages = data.get("messages") or []
     session_id = str(data.get("session_id", ""))
     force_deep = bool(data.get("force_deep", False))
@@ -2394,6 +2522,7 @@ def assistant_stream():
             for event in runtime.chat_events(
                 messages=messages, session_id=session_id, force_deep=force_deep,
                 ilerleme_izni=ilerleme_izni, okur=okur, ogretmen=ogretmen,
+                secili_odev=secili_odev, odev_anahtari=odev_anahtari,
             ):
                 name = event.pop("event")
                 yield f"event: {name}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
@@ -2440,6 +2569,9 @@ def assistant_plan():
         return jsonify({"error": "context_filters dict olmalı"}), 400
 
     session_id = str(payload.get("session_id", "")).strip()
+    odev_anahtari, secili_odev, odev_hata = _secili_odev(payload)
+    if odev_hata is not None:
+        return odev_hata
 
     try:
         runtime = _assistant_runtime()
@@ -2449,6 +2581,8 @@ def assistant_plan():
             context_filters=context_filters,
             ilerleme_izni=_assistant_progress_allowed(),
             okur=_assistant_okur(),
+            secili_odev=secili_odev,
+            odev_anahtari=odev_anahtari,
         )
         return jsonify(out)
     except AssistantUnavailableError:
