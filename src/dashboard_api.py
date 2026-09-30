@@ -345,6 +345,7 @@ def _assistant_runtime():
                 platform_kaynagi=_canli_platform_ilerlemesi,
                 kitap_kaynagi=_canli_kitaplar,
                 video_kaynagi=_canli_videolar,
+                odev_yazici=_foto_odev_tamamla,
             )
         except Exception as exc:
             # SkillHatasi's own message names which skill and why (spec "Hata ve
@@ -1303,6 +1304,7 @@ def _to_photo_homework_row(
         "private_lesson_id": (private_lesson or {}).get("id", "") if isinstance(private_lesson, dict) else "",
         # Round-tripped by the review step. İşler shows `Ödev Kaynağı`, not this.
         "odev_kaynagi": "" if source_type == "private" else candidate_source,
+        "eksik_birakilan": _foto_birakilan(candidate.get("eksik_birakilan")),
     }
 
 
@@ -1335,8 +1337,126 @@ def _confirmed_photo_candidates(items):
             "son_teslim_tarihi": due_raw,
             "odev_durumu": "Değerlendirilmemiş",
             "aciklama": detail.get("description") or item.get("aciklama") or "",
+            "eksik_birakilan": _foto_birakilan(item.get("eksik_birakilan")),
         })
     return candidates
+
+
+def _foto_birakilan(value):
+    """Fields the reader was asked about and left unknown. Anything else is dropped."""
+    if not isinstance(value, list):
+        return []
+    return [a for a in value if a in {"ders", "teslim"}][:2]
+
+
+_BILMIYORUM = frozenset({
+    "bilmiyorum", "bilinmiyor", "yok", "emin değilim", "emin degilim",
+    "fotoğrafta yok", "fotografta yok",
+})
+_AY_ADLARI = {
+    "ocak": 1, "şubat": 2, "subat": 2, "mart": 3, "nisan": 4,
+    "mayıs": 5, "mayis": 5, "haziran": 6, "temmuz": 7, "ağustos": 8,
+    "agustos": 8, "eylül": 9, "eylul": 9, "ekim": 10, "kasım": 11,
+    "kasim": 11, "aralık": 12, "aralik": 12,
+}
+
+
+def _okurun_teslimi(deger, simdi):
+    """The reader's own due-date words, as DD.MM.YYYY HH:MM.
+
+    An empty string means they said they do not know. None means the words
+    are not a date — the caller turns that into an error, and does not invent
+    one."""
+    s = " ".join(str(deger or "").strip().casefold().split())
+    if s in _BILMIYORUM:
+        return ""
+    m = re.fullmatch(r"(bugün|bugun|yarın|yarin)(?:\s+(\d{1,2})[:.](\d{2}))?", s)
+    if m:
+        gun = simdi + timedelta(days=1 if m.group(1).startswith("yar") else 0)
+        saat, dakika = int(m.group(2) or 23), int(m.group(3) or 59)
+        try:
+            return datetime(gun.year, gun.month, gun.day, saat, dakika).strftime("%d.%m.%Y %H:%M")
+        except ValueError:
+            return None
+    m = re.fullmatch(
+        r"(\d{1,2})\s+([a-zçğıöşü]+)(?:\s+(\d{4}))?(?:\s+(\d{1,2})[:.](\d{2}))?",
+        s,
+    )
+    if m and m.group(2) in _AY_ADLARI:
+        yil = int(m.group(3) or simdi.year)
+        saat, dakika = int(m.group(4) or 23), int(m.group(5) or 59)
+        try:
+            return datetime(
+                yil, _AY_ADLARI[m.group(2)], int(m.group(1)), saat, dakika,
+            ).strftime("%d.%m.%Y %H:%M")
+        except ValueError:
+            return None
+    return _normalize_due_datetime(deger) or None
+
+
+def _foto_alan_birak(row, alan, birak):
+    mevcut = [a for a in (row.get("eksik_birakilan") or []) if a in {"ders", "teslim"} and a != alan]
+    if birak:
+        mevcut.append(alan)
+    row["eksik_birakilan"] = mevcut
+
+
+def _foto_odev_tamamla(anahtar, alan, deger, simdi=None):
+    """Write one reader-supplied field onto a photographed homework row.
+
+    Raises ValueError with a sentence the model can show. Portal rows are
+    never touched: a missing portal date is not Işık's to invent."""
+    anahtar = str(anahtar or "").strip()
+    alan = str(alan or "").strip()
+    if not anahtar:
+        raise ValueError("anahtar gerekli")
+    if alan not in {"ders", "teslim"}:
+        raise ValueError("alan 'ders' veya 'teslim' olmalı")
+    simdi = simdi or datetime.now()
+    rows = _load_photo_homework_rows()
+    hedef = None
+    for row in rows:
+        if str(row.get("source") or "").startswith("photo_ai") and _homework_row_key(row) == anahtar:
+            hedef = row
+            break
+    if hedef is None:
+        raise ValueError("Bu anahtar fotoğraftan eklenen bir ödeve ait değil.")
+    baslik = str(hedef.get("Ödev Başlığı") or "").strip() or "bu iş"
+    if alan == "ders":
+        soz = " ".join(str(deger or "").strip().casefold().split())
+        if soz in _BILMIYORUM:
+            _foto_alan_birak(hedef, "ders", True)
+            cumle = f"Kaydedildi: {baslik} için ders bilinmiyor; bir daha sorma."
+        else:
+            ders = normalize_course(str(deger or "").strip())
+            if ders not in _FOTO_DERSLERI:
+                raise ValueError("Ders, listedeki bir ders olmalı.")
+            hedef["Ders Adı"] = ders
+            _foto_alan_birak(hedef, "ders", False)
+            cumle = f"Kaydedildi: {baslik} dersi {ders}."
+    else:
+        teslim = _okurun_teslimi(deger, simdi)
+        if teslim is None:
+            raise ValueError(
+                "Teslim tarihi gün.ay.yıl, gün ay, bugün veya yarın olmalı. "
+                "Okur bilmiyorsa bunu 'bilmiyorum' diye yaz."
+            )
+        if teslim == "":
+            _foto_alan_birak(hedef, "teslim", True)
+            cumle = f"Kaydedildi: {baslik} için teslim tarihi bilinmiyor; bir daha sorma."
+        else:
+            hedef["Ödev Son Teslim Tarihi"] = teslim
+            _foto_alan_birak(hedef, "teslim", False)
+            cumle = f"Kaydedildi: {baslik} teslim {teslim}."
+    eski = anahtar
+    yeni = _homework_row_key(hedef)
+    if eski != yeni:
+        marks = _load_student_done_marks()
+        if eski in marks:
+            marks[yeni] = marks.pop(eski)
+            _save_student_done_marks(marks)
+    _save_photo_homework_rows(rows)
+    return cumle
 
 
 # --- API endpoints (all require auth) ---

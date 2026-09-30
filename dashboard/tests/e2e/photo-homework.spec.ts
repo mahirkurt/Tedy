@@ -53,17 +53,21 @@ test('reads the photo, then saves the edited row', async ({ page }) => {
 
   await pickPhoto(page, { name: 'odev.png', mimeType: 'image/png', buffer: PNG })
   await page.getByRole('button', { name: 'Fotoğrafı oku' }).click()
+  await expect(page.getByRole('heading', { name: 'Ne zaman teslim?' })).toBeVisible()
+  await page.getByLabel('Teslim tarihi').fill('02.10.2026')
+  await page.getByRole('button', { name: 'Devam' }).click()
   await expect(page.getByRole('heading', { name: 'Okunan işler' })).toBeVisible()
   await expect(page.getByText('Kaynak: Fasikül')).toBeVisible()
   const title = page.getByLabel('Başlık')
   await expect(title).toHaveValue('Sayfa 4')
-  await expect(page.getByLabel('Teslim')).toHaveValue('')
+  await expect(page.getByLabel('Teslim')).toHaveValue('02.10.2026')
   await title.fill('Sayfa 5')
   await page.getByRole('button', { name: "İşler'e ekle" }).click()
   await expect(page.getByRole('heading', { name: 'Okunan işler' })).toBeHidden()
   expect(stages).toEqual(['preview', 'commit'])
   expect(commitBody).toContain('Sayfa 5')
   expect(commitBody).toContain('Fasikül')
+  expect(commitBody).toContain('02.10.2026')
   expect(commitBody).toContain('commit')
 })
 
@@ -91,9 +95,45 @@ test('a duplicate stays open with a sentence', async ({ page }) => {
   })
   await pickPhoto(page, { name: 'odev.png', mimeType: 'image/png', buffer: PNG })
   await page.getByRole('button', { name: 'Fotoğrafı oku' }).click()
+  await page.getByRole('button', { name: 'Bilmiyorum' }).click()
   await page.getByRole('button', { name: "İşler'e ekle" }).click()
   await expect(page.getByRole('alert')).toHaveText('Bu iş zaten listede. Yeni bir şey eklenmedi.')
   await expect(page.getByRole('heading', { name: 'Okunan işler' })).toBeVisible()
+})
+
+test('a missing course is asked before the due date', async ({ page }) => {
+  let commitBody = ''
+  await page.route('**/api/homework/photo', async route => {
+    const body = route.request().postData() || ''
+    if (body.includes('name="stage"') && body.includes('preview')) {
+      await json(route, {
+        preview: true,
+        photo_hash: 'abc',
+        added_count: 0,
+        skipped_count: 0,
+        homework: [{
+          ...READ_ROW,
+          'Ders Adı': 'Genel',
+          'Ödev Son Teslim Tarihi': '',
+        }],
+      })
+      return
+    }
+    commitBody = body
+    await json(route, { added_count: 1, skipped_count: 0, homework: [] })
+  })
+  await pickPhoto(page, { name: 'odev.png', mimeType: 'image/png', buffer: PNG })
+  await page.getByRole('button', { name: 'Fotoğrafı oku' }).click()
+  await expect(page.getByRole('heading', { name: 'Bu iş hangi ders?' })).toBeVisible()
+  await page.getByLabel('Hangi ders?').selectOption('Matematik')
+  await page.getByRole('button', { name: 'Devam' }).click()
+  await expect(page.getByRole('heading', { name: 'Ne zaman teslim?' })).toBeVisible()
+  await page.getByRole('button', { name: 'Bilmiyorum' }).click()
+  await expect(page.getByRole('heading', { name: 'Okunan işler' })).toBeVisible()
+  await page.getByRole('button', { name: "İşler'e ekle" }).click()
+  await expect(page.getByRole('heading', { name: 'Okunan işler' })).toBeHidden()
+  expect(commitBody).toContain('Matematik')
+  expect(commitBody).toContain('teslim')
 })
 
 test('a non-image is refused in the modal, without a dialog', async ({ page }) => {

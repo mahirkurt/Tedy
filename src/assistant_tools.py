@@ -247,6 +247,7 @@ LOCAL_TOOL = "ogrenci_verisi_ara"
 # The homework list as Bugün and İşler show it (portal rows, photo-added ones,
 # Işık's own "Yaptım" marks). Declared only when the caller supplies a source.
 ODEV_TOOL = "odev_listesi"
+ODEV_TAMAMLA = "odev_tamamla"
 ODEV_ATIF = "Ödevlerim · güncel liste"
 
 _GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
@@ -268,6 +269,45 @@ def _teslim(deger: str) -> datetime | None:
         except ValueError:
             continue
     return None
+
+
+def foto_eksik_alanlar(row: dict[str, Any]) -> list[str]:
+    """Critical fields a photographed homework row still does not have.
+
+    Only `photo_ai` rows: a portal date that failed to parse is the portal's
+    gap, and asking Işık to invent it would write a date the school never set.
+    A field in `eksik_birakilan` was already asked, and the reader said they
+    do not know — ask once."""
+    if not str(row.get("source") or "").startswith("photo_ai"):
+        return []
+    birakilan = {str(a) for a in (row.get("eksik_birakilan") or [])}
+    eksik: list[str] = []
+    ders = str(row.get("normalized_course") or row.get("Ders Adı") or "").strip()
+    if "ders" not in birakilan and ders in {"", "Genel", "Özel Ders"}:
+        eksik.append("ders")
+    if "teslim" not in birakilan and _teslim(str(row.get("Ödev Son Teslim Tarihi") or "")) is None:
+        eksik.append("teslim")
+    return eksik
+
+
+def _eksik_soru(row: dict[str, Any], alan: str) -> str:
+    baslik = str(row.get("Ödev Başlığı") or "").strip() or "Bu iş"
+    if alan == "ders":
+        return f"{baslik} hangi ders?"
+    return f"{baslik} ne zaman teslim?"
+
+
+def _deger_okurun_sozu(deger: str, soz: str) -> bool:
+    """True when `deger` is the reader's own words, or the canonical course
+    for an alias they actually said. A date the model rewrote is not."""
+    parca = " ".join(deger.casefold().split())
+    govde = " ".join(soz.casefold().split())
+    if not parca or parca not in govde:
+        from src.course_names import COURSE_ALIASES, normalize_course
+        hedef = normalize_course(deger.strip())
+        adaylar = [hedef, *COURSE_ALIASES.get(hedef, [])]
+        return any(" ".join(a.casefold().split()) in govde for a in adaylar if a)
+    return True
 
 
 def _goreli(teslim: datetime, simdi: datetime) -> str:
@@ -389,6 +429,24 @@ def odev_listesi_metni(rows: list[dict[str, Any]], simdi: datetime, sebit: Any =
         return sorted(grup, key=lambda x: (x[0] is None, x[0] or simdi))
 
     parcalar = [bas + " (portal listesi, Işık'ın \"Yaptım\" işaretleriyle)"]
+    eksikler = [(r, foto_eksik_alanlar(r)) for _, r in sirala(yapilacak)]
+    eksikler = [(r, alanlar) for r, alanlar in eksikler if alanlar]
+    if eksikler:
+        satirlar = []
+        for r, alanlar in eksikler[:3]:
+            anahtar = str(r.get("homework_key") or "").strip()
+            kim = f"anahtar: {anahtar} · " if anahtar else ""
+            alan = alanlar[0]
+            satirlar.append(
+                f"- {kim}{str(r.get('Ödev Başlığı') or '').strip() or 'bu iş'}"
+                f" · eksik: {alan} · sor: \"{_eksik_soru(r, alan)}\""
+            )
+        fazla = len(eksikler) - len(satirlar)
+        ek = f"\nve {fazla} iş daha; önce bunları sor." if fazla else ""
+        parcalar.append(
+            "EKSİK ALAN (okura anahtarı söyleme; listedeki ilk soruyu sor, "
+            "cevabı gelmeden odev_tamamla çağırma, tarihi ve dersi uydurma):\n"
+            + "\n".join(satirlar) + ek)
     parcalar.append(f"YAPILACAK ({len(yapilacak)}):\n" + ("\n".join(
         satir(t, r, aciklama=True) for t, r in sirala(yapilacak)[:_BOLUM_SINIRI]) or "- yok"))
     if yaptim:
@@ -1548,7 +1606,8 @@ class McpRegistry:
                  video_kaynagi: Callable[[], Any] | None = None,
                  aile_kaynak_arama: Callable[[str, int], list[dict[str, Any]]] | None = None,
                  saat: Callable[[], datetime] | None = None,
-                 skills: dict[str, Any] | None = None) -> None:
+                 skills: dict[str, Any] | None = None,
+                 odev_yazici: Callable[[str, str, str], str] | None = None) -> None:
         self.clients = clients
         # Öğretmen skill'leri (src/assistant_skills.py), id -> Skill. Empty: no
         # teacher tool is declared in any mode.
@@ -1566,6 +1625,9 @@ class McpRegistry:
         # Published edupedia modules (src/assistant_modules.py). Local and read-only; None keeps
         # the registry usable in tests and tools that have no catalog.
         self.module_index = module_index
+        # Writes one field the reader just supplied onto a photo homework row.
+        # None: odev_tamamla is not declared (tests, a read-only registry).
+        self.odev_yazici = odev_yazici
         # The rows /api/homework serves (src/dashboard_api._canli_odevler).
         # None in tests and tools with no dashboard: the tool is not declared.
         self.odev_kaynagi = odev_kaynagi
@@ -1642,6 +1704,28 @@ class McpRegistry:
                 ),
                 "parameters": {"type": "object", "properties": {}},
             })
+            if self.odev_yazici is not None:
+                decls.append({
+                    "name": ODEV_TAMAMLA,
+                    "description": (
+                        "Fotoğraftan eklenen bir ödevin eksik dersini veya teslim tarihini, "
+                        "okurun az önce söylediği sözle kaydeder. Yalnız `odev_listesi` EKSİK "
+                        "ALAN dedikten ve okur cevap verdikten sonra çağır. deger, okurun "
+                        "cümlesindeki sözün kendisidir; tarihi veya dersi sen çevirme. "
+                        "anahtarı okura gösterme."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "anahtar": {"type": "string",
+                                        "description": "EKSİK ALAN satırındaki anahtar."},
+                            "alan": {"type": "string", "enum": ["ders", "teslim"]},
+                            "deger": {"type": "string",
+                                      "description": "Okurun sözü, olduğu gibi."},
+                        },
+                        "required": ["anahtar", "alan", "deger"],
+                    },
+                })
         for ad, kaynak in self.ogrenci_kaynaklari.items():
             if kaynak is not None:
                 decls.append(copy.deepcopy(_OGRENCI_BILDIRIMLERI[ad]))
@@ -1768,7 +1852,7 @@ class McpRegistry:
 
     def dispatch(self, name: str, args: dict[str, Any], ilerleme_izni: bool = False,
                 okur: str = "bilinmiyor", ogretmen: str = GENEL,
-                mod_onerisi: bool = True) -> ToolOutcome:
+                mod_onerisi: bool = True, okur_sozu: str = "") -> ToolOutcome:
         if name == MOD_ONER_TOOL:
             return self._dispatch_mod_oner(args or {}, ogretmen, mod_onerisi)
         if name == SKILL_TOOL:
@@ -1777,6 +1861,8 @@ class McpRegistry:
             return self._dispatch_local(args)
         if name == ODEV_TOOL and self.odev_kaynagi is not None:
             return self._dispatch_odev()
+        if name == ODEV_TAMAMLA and self.odev_yazici is not None:
+            return self._dispatch_odev_tamamla(args or {}, okur_sozu)
         if self.ogrenci_kaynaklari.get(name) is not None:
             return self._dispatch_ogrenci(name, args or {})
         if name == KITAP_TOOL and self.kitap_kaynagi is not None:
@@ -2028,6 +2114,28 @@ class McpRegistry:
             "confidence": 1.0,
         }])
 
+    def _dispatch_odev_tamamla(self, args: dict[str, Any], okur_sozu: str) -> ToolOutcome:
+        if self.odev_yazici is None:
+            return ToolOutcome(ok=False, error="bu araç yok")
+        soz = str(okur_sozu or "").strip()
+        if not soz:
+            return ToolOutcome(ok=False, error="okurun sözü olmadan alan yazılmaz")
+        deger = str(args.get("deger") or "").strip()
+        if not _deger_okurun_sozu(deger, soz):
+            return ToolOutcome(
+                ok=False,
+                error="Bu değer okurun son cümlesinde yok. Okurun sözünü olduğu gibi yaz.",
+            )
+        try:
+            metin = self.odev_yazici(
+                str(args.get("anahtar") or "").strip(),
+                str(args.get("alan") or "").strip(),
+                deger,
+            )
+        except ValueError as exc:
+            return ToolOutcome(ok=False, error=str(exc))
+        return ToolOutcome(ok=True, text=str(metin))
+
     def _dispatch_kitap(self, args: dict[str, Any]) -> ToolOutcome:
         try:
             kitaplar = self.kitap_kaynagi() or []
@@ -2153,7 +2261,8 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                    video_kaynagi: Callable[[], Any] | None = None,
                    aile_kaynak_arama: Callable[[str, int], list[dict[str, Any]]] | None = None,
                    saat: Callable[[], datetime] | None = None,
-                   skills: dict[str, Any] | None = None) -> McpRegistry:
+                   skills: dict[str, Any] | None = None,
+                   odev_yazici: Callable[[str, str, str], str] | None = None) -> McpRegistry:
     """Wire the configured servers. A server with no key is simply absent —
     its tools are not declared — but it is still named by degraded(), so an
     unset env var never looks like a healthy system with nothing to say."""
@@ -2174,4 +2283,4 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                        not_kaynagi=not_kaynagi, sebit_kaynagi=sebit_kaynagi,
                        platform_kaynagi=platform_kaynagi, kitap_kaynagi=kitap_kaynagi,
                        video_kaynagi=video_kaynagi, aile_kaynak_arama=aile_kaynak_arama,
-                       saat=saat, skills=skills)
+                       saat=saat, skills=skills, odev_yazici=odev_yazici)

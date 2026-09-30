@@ -20,6 +20,29 @@ interface PhotoDraft {
   due: string
   description: string
   kaynak: string
+  dueSkipped: boolean
+}
+
+type PhotoGap = { index: number, field: 'course' | 'due' }
+
+function courseMissing(course: string): boolean {
+  const name = course.trim()
+  return name === '' || name === 'Genel' || name === 'Özel Ders'
+}
+
+function dueLooksReal(value: string): boolean {
+  const text = value.trim()
+  return /^\d{1,2}[./-]\d{1,2}[./-]\d{4}(?:\s+\d{1,2}[:.]\d{2})?$/.test(text)
+    || /^\d{4}[./-]\d{1,2}[./-]\d{1,2}(?:\s+\d{1,2}[:.]\d{2})?$/.test(text)
+}
+
+function firstPhotoGap(drafts: PhotoDraft[]): PhotoGap | null {
+  for (let index = 0; index < drafts.length; index += 1) {
+    const draft = drafts[index]
+    if (courseMissing(draft.course)) return { index, field: 'course' }
+    if (!draft.due.trim() && !draft.dueSkipped) return { index, field: 'due' }
+  }
+  return null
 }
 
 function StatusIcon({ status }: { status: SectionHealth['status'] }) {
@@ -210,6 +233,7 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
             : '') || '',
         ),
         kaynak: String(row.odev_kaynagi || ''),
+        dueSkipped: false,
       })))
     } catch (err) {
       setPhotoError(err instanceof Error ? err.message : 'Fotoğraf okunamadı.')
@@ -220,6 +244,41 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
 
   function updateDraft(index: number, patch: Partial<PhotoDraft>) {
     setPhotoDrafts(prev => prev?.map((row, i) => (i === index ? { ...row, ...patch } : row)) ?? prev)
+  }
+
+  const photoGap = photoDrafts ? firstPhotoGap(photoDrafts) : null
+  const gapKey = photoGap ? `${photoGap.index}:${photoGap.field}` : ''
+  const [gapAnswer, setGapAnswer] = useState('')
+  const [seenGap, setSeenGap] = useState(gapKey)
+  if (seenGap !== gapKey) {
+    setSeenGap(gapKey)
+    setGapAnswer('')
+  }
+
+  function answerPhotoGap(value: string) {
+    if (!photoGap) return
+    if (photoGap.field === 'course') {
+      if (courseMissing(value)) {
+        setPhotoError('Ders seçilmeden devam edilmez.')
+        return
+      }
+      updateDraft(photoGap.index, { course: value })
+      setPhotoError('')
+      return
+    }
+    const due = value.trim()
+    if (!dueLooksReal(due)) {
+      setPhotoError('Teslim tarihi gün.ay.yıl olarak yazılmalı.')
+      return
+    }
+    updateDraft(photoGap.index, { due, dueSkipped: false })
+    setPhotoError('')
+  }
+
+  function skipPhotoDue() {
+    if (!photoGap || photoGap.field !== 'due') return
+    updateDraft(photoGap.index, { due: '', dueSkipped: true })
+    setPhotoError('')
   }
 
   async function commitPhotoHomework() {
@@ -240,6 +299,7 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
         'Ödev Başlığı': row.title.trim(),
         'Ödev Son Teslim Tarihi': row.due.trim(),
         odev_kaynagi: row.kaynak,
+        eksik_birakilan: row.dueSkipped && !row.due.trim() ? ['teslim'] : [],
         detail: { description: row.description.trim() },
       }))))
       const res = await fetch('/api/homework/photo', {
@@ -433,8 +493,12 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
         size="md"
       >
         <ModalHeader
-          title={photoDrafts ? 'Okunan işler' : 'Ödev fotoğrafı'}
-          label={photoDrafts ? 'Eklemeden önce kontrol et' : 'Fotoğraftan okuma'}
+          title={
+            photoGap?.field === 'course' ? 'Bu iş hangi ders?'
+              : photoGap?.field === 'due' ? 'Ne zaman teslim?'
+                : photoDrafts ? 'Okunan işler' : 'Ödev fotoğrafı'
+          }
+          label={photoGap ? 'Fotoğrafta bu yok' : photoDrafts ? 'Eklemeden önce kontrol et' : 'Fotoğraftan okuma'}
         />
         <ModalBody>
           {!selectedPhoto ? (
@@ -495,7 +559,40 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
                 </>
               )}
 
-              {photoDrafts?.map((draft, index) => (
+              {photoGap && photoDrafts && (
+                <div className="photo-intake-draft">
+                  <p className="photo-intake-draft__legend">
+                    {photoDrafts[photoGap.index].title || 'Bu iş'}
+                  </p>
+                  {photoGap.field === 'course' ? (
+                    <label className="photo-intake-form__label">
+                      Hangi ders?
+                      <select
+                        className="photo-intake-form__input"
+                        value={gapAnswer}
+                        onChange={e => setGapAnswer(e.target.value)}
+                      >
+                        <option value="">Ders seç</option>
+                        {courseOptions
+                          .filter(course => course !== 'Genel' && course !== 'Özel Ders')
+                          .map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </label>
+                  ) : (
+                    <label className="photo-intake-form__label">
+                      Teslim tarihi
+                      <input
+                        className="photo-intake-form__input"
+                        value={gapAnswer}
+                        placeholder="02.10.2026"
+                        onChange={e => setGapAnswer(e.target.value)}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+
+              {!photoGap && photoDrafts?.map((draft, index) => (
                 <fieldset key={index} className="photo-intake-draft">
                   <legend className="photo-intake-draft__legend">İş {index + 1}</legend>
                   {draft.kaynak && (
@@ -572,7 +669,18 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
           >
             İptal
           </Button>
-          {photoDrafts ? (
+          {photoGap ? (
+            <>
+              {photoGap.field === 'due' && (
+                <Button kind="ghost" size="sm" onClick={skipPhotoDue}>
+                  Bilmiyorum
+                </Button>
+              )}
+              <Button kind="primary" size="sm" onClick={() => answerPhotoGap(gapAnswer)}>
+                Devam
+              </Button>
+            </>
+          ) : photoDrafts ? (
             <Button
               kind="primary"
               size="sm"

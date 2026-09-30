@@ -130,6 +130,62 @@ def test_eski_yaptimlar_bu_haftakini_itmez():
     assert "14 günden eski 12 ödev" in metin     # left out, and said so
 
 
+def test_fotograf_eksik_alan_tek_soru_sorar():
+    foto = _hw("Genel", "Sayfa 4", "")
+    foto["source"] = "photo_ai_ted"
+    foto["homework_key"] = "genel|sayfa 4|"
+    metin = odev_listesi_metni([foto], SIMDI)
+    assert "EKSİK ALAN" in metin
+    assert 'sor: "Sayfa 4 hangi ders?"' in metin
+    assert "anahtar: genel|sayfa 4|" in metin
+    assert "ne zaman teslim?" not in metin
+
+    tarih = _hw("Matematik", "Sayfa 4", "")
+    tarih["source"] = "photo_ai_ted"
+    tarih["homework_key"] = "matematik|sayfa 4|"
+    assert 'sor: "Sayfa 4 ne zaman teslim?"' in odev_listesi_metni([tarih], SIMDI)
+
+
+def test_bilinmeyen_alan_ve_portal_satiri_soru_dogurmaz():
+    bildi = _hw("Matematik", "Sayfa 4", "")
+    bildi["source"] = "photo_ai_ted"
+    bildi["eksik_birakilan"] = ["teslim"]
+    assert "EKSİK ALAN" not in odev_listesi_metni([bildi], SIMDI)
+    assert "EKSİK ALAN" not in odev_listesi_metni([_hw("Matematik", "Sayfa 4", "")], SIMDI)
+
+
+def test_odev_tamamla_okurun_sozunden_yazar():
+    yazilan = []
+
+    def yaz(anahtar, alan, deger):
+        yazilan.append((anahtar, alan, deger))
+        return "kaydedildi"
+
+    reg = build_registry(lambda q, k: [], odev_kaynagi=lambda: [], odev_yazici=yaz)
+    assert "odev_tamamla" in [d["name"] for d in reg.declarations()]
+    assert "odev_tamamla" not in [
+        d["name"] for d in build_registry(lambda q, k: [], odev_kaynagi=lambda: []).declarations()
+    ]
+    red = reg.dispatch(
+        "odev_tamamla",
+        {"anahtar": "k", "alan": "teslim", "deger": "28.09.2026"},
+        okur_sozu="yarın teslim",
+    )
+    assert not red.ok and yazilan == []
+    oldu = reg.dispatch(
+        "odev_tamamla",
+        {"anahtar": "k", "alan": "teslim", "deger": "yarın"},
+        okur_sozu="yarın teslim",
+    )
+    assert oldu.ok and yazilan == [("k", "teslim", "yarın")]
+    takma = reg.dispatch(
+        "odev_tamamla",
+        {"anahtar": "k", "alan": "ders", "deger": "Din Kültürü"},
+        okur_sozu="bu dkab",
+    )
+    assert takma.ok and yazilan[-1] == ("k", "ders", "Din Kültürü")
+
+
 def test_fotograf_satiri_portal_kaydi_degildir():
     foto = _hw("Matematik", "Sayfa 4", "", aciklama="1-5. sorular")
     foto["source"] = "photo_ai_ted"

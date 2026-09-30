@@ -2,6 +2,7 @@
 import json
 import os
 import sys
+from datetime import datetime
 from io import BytesIO
 from unittest.mock import Mock, patch
 
@@ -464,6 +465,53 @@ class TestHomeworkPhotoEndpoint:
         assert resp.status_code == 400
         assert "gün.ay.yıl" in resp.get_json()["error"]
         assert not (isolated_output / "photo_homework.json").exists()
+
+    def test_commit_remembers_an_unknown_date(self, client, isolated_output):
+        resp = client.post(
+            "/api/homework/photo",
+            data={
+                "stage": "commit",
+                "homework": json.dumps([{
+                    "Ders Adı": "Türkçe",
+                    "Ödev Başlığı": "Okuma",
+                    "Ödev Son Teslim Tarihi": "",
+                    "eksik_birakilan": ["teslim", "uydurma"],
+                    "detail": {"description": "günlük"},
+                }]),
+            },
+            content_type="multipart/form-data",
+        )
+        stored = resp.get_json()["homework"][0]
+        assert resp.status_code == 200
+        assert stored["eksik_birakilan"] == ["teslim"]
+        assert stored["Ödev Son Teslim Tarihi"] == ""
+
+    def test_assistant_writes_the_readers_date_and_refuses_a_portal_row(self, isolated_output):
+        row = dashboard_api._to_photo_homework_row(
+            {"ders_adi": "Genel", "odev_basligi": "Sayfa 4", "son_teslim_tarihi": ""},
+            image_hash="h",
+        )
+        dashboard_api._save_photo_homework_rows([row])
+        key = dashboard_api._homework_row_key(row)
+        simdi = datetime(2026, 9, 24, 16, 10)
+        dashboard_api._foto_odev_tamamla(key, "teslim", "bilmiyorum", simdi=simdi)
+        stored = dashboard_api._load_photo_homework_rows()[0]
+        assert stored["Ödev Son Teslim Tarihi"] == ""
+        assert stored["eksik_birakilan"] == ["teslim"]
+
+        cumle = dashboard_api._foto_odev_tamamla(key, "teslim", "2 ekim", simdi=simdi)
+        assert "02.10.2026 23:59" in cumle
+        stored = dashboard_api._load_photo_homework_rows()[0]
+        assert stored["Ödev Son Teslim Tarihi"] == "02.10.2026 23:59"
+        assert stored["eksik_birakilan"] == []
+
+        yeni = dashboard_api._homework_row_key(stored)
+        dashboard_api._foto_odev_tamamla(yeni, "ders", "DKAB", simdi=simdi)
+        stored = dashboard_api._load_photo_homework_rows()[0]
+        assert stored["Ders Adı"] == "Din Kültürü"
+
+        with pytest.raises(ValueError, match="fotoğraftan"):
+            dashboard_api._foto_odev_tamamla("matematik|kesirler|15.03.2026 12:00", "teslim", "yarın")
 
 
 class TestPrivateLessonsEndpoint:

@@ -2095,7 +2095,8 @@ class AssistantRuntime:
                  platform_kaynagi: Callable[[], Any] | None = None,
                  kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
                  video_kaynagi: Callable[[], Any] | None = None,
-                 skills: dict[str, Any] | None = None):
+                 skills: dict[str, Any] | None = None,
+                 odev_yazici: Callable[[str, str, str], str] | None = None):
         # First, before anything else is built: a broken teacher skill stops the
         # assistant from opening at all (spec "Hata ve boşluk durumları"), with
         # the skill and the reason in the error — never a silent fallback.
@@ -2149,7 +2150,8 @@ class AssistantRuntime:
                                        kitap_kaynagi=kitap_kaynagi,
                                        video_kaynagi=video_kaynagi,
                                        aile_kaynak_arama=self._aile_search,
-                                       skills=self.skills)
+                                       skills=self.skills,
+                                       odev_yazici=odev_yazici)
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """The retriever, shaped as a tool the model can choose to call."""
@@ -2186,7 +2188,9 @@ class AssistantRuntime:
         "sayfasının gösterdiği listeyi, Işık'ın 'Yaptım' işaretleriyle verir. "
         "Işık'ın 'Yaptım' dediği bir ödevi yapılacak diye sunma. Teslim zamanını "
         "söylerken listedeki gün ve saati kullan; 'bu hafta', 'yarın' gibi sözleri "
-        "sorudaki 'Bugün:' satırına göre çöz.\n"
+        "sorudaki 'Bugün:' satırına göre çöz. Liste EKSİK ALAN diyorsa o alanı "
+        "kendin doldurma: bölümdeki tek soruyu sor, cevap gelince `odev_tamamla` "
+        "çağır ve deger'e okurun sözünü olduğu gibi yaz.\n"
         "- Işık'a özel diğer sorular (duyuru, eski ödev, portalın ek sayfaları) ve bir "
         "ödevin ayrıntısı → `ogrenci_verisi_ara`.\n"
         "- Konu, kavram, müfredat, kazanım sorusu → `kazanim_ara`, `mufredat_ara`. MEB "
@@ -2421,7 +2425,7 @@ class AssistantRuntime:
                 # the caller decides, and only an exact True counts.
                 dispatch=dispatch or functools.partial(
                     self.registry.dispatch, ilerleme_izni=ilerleme_izni is True, okur=okur,
-                    ogretmen=ogretmen, mod_onerisi=mod_onerisi),
+                    ogretmen=ogretmen, mod_onerisi=mod_onerisi, okur_sozu=user_query),
                 tier=tier,
                 on_delta=on_delta,
                 on_reset=on_reset,
@@ -2540,11 +2544,13 @@ class AssistantRuntime:
         cancelled = threading.Event()
 
         # Read once, per call — never assigned back onto the registry.
+        okur_sozu = self._latest_user_message(list(kwargs.get("messages") or []))
         real_dispatch = functools.partial(
             self.registry.dispatch, ilerleme_izni=kwargs.get("ilerleme_izni") is True,
             okur=kwargs.get("okur", "bilinmiyor"),
             ogretmen=kwargs.get("ogretmen", assistant_skills.GENEL),
-            mod_onerisi=kwargs.get("mod_onerisi", True))
+            mod_onerisi=kwargs.get("mod_onerisi", True),
+            okur_sozu=okur_sozu)
 
         # First suggestion wins here too (review round 2, finding NB2): without
         # this, a model calling mod_oner twice in one answer put two
