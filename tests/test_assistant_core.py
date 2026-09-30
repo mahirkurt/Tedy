@@ -409,13 +409,13 @@ def test_system_prompt_routing_names_every_declared_tool_exactly_once():
 
     yerel_araclar = (
         "ders_programi", "sinavlar", "takvim", "ders_icerigi", "notlar",
-        "odev_listesi", "ogrenci_verisi_ara", "kitap_ara",
+        "odev_listesi", "odev_tamamla", "ogrenci_verisi_ara", "kitap_ara",
         "platform_ilerlemesi", "video_oner", "modul_ara", "aile_kaynak_ara",
     )
     tum_araclar = sorted(set(TOOL_ALLOWLIST) | set(yerel_araclar))
-    # Sanity: this must be the full 26-tool surface, not an accidentally
+    # Sanity: this must be the full tool surface, not an accidentally
     # narrowed set (e.g. an empty TOOL_ALLOWLIST import would pass trivially).
-    assert len(tum_araclar) == 26
+    assert len(tum_araclar) == 27
 
     eksik = [arac for arac in tum_araclar if hangi.count(f"`{arac}`") != 1]
     assert not eksik, eksik

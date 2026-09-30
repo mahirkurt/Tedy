@@ -177,7 +177,7 @@ test.describe('SPA serving', () => {
     await page.goto('/')
     const trigger = page.getByRole('button', { name: 'Ödev fotoğrafı ekle' })
     await trigger.click()
-    const modal = page.locator('.cds--modal').filter({ hasText: 'Ödev Fotoğrafı Ekle' })
+    const modal = page.locator('.cds--modal').filter({ hasText: 'Ödev fotoğrafı' })
     await expect(modal).toBeVisible()
     await page.getByRole('button', { name: 'İptal' }).click()
     await expect(modal).toBeHidden()
