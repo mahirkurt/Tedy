@@ -170,6 +170,11 @@ def test_contrast_promises_hold_on_every_ground(family):
     # ters (inverse) tanım balonu: açık temada #393939 üstünde koyu modun text rolü, g100'de tersi
     assert contrast(dark["text"][1], "#393939") >= 4.5
     assert contrast(light["text"][1], "#f4f4f4") >= 4.5
+    # Geniş ders yüzeyi (İ8, 2026-10-02): panel açık modda aile-10, koyu modda aile-90; üstündeki
+    # metin `text` rolüdür, vurgu `accent`. Panel bir sayfadaki tek büyük renkli yüzeydir.
+    for mode, roles in (("light", light), ("dark", dark)):
+        assert contrast(roles["text"][1], roles["panel"][1]) >= 4.5, (family, mode)
+        assert contrast(roles["accent"][1], roles["panel"][1]) >= 3.0, (family, mode)
 
 
 # ── üretilmiş dosyalar ───────────────────────────────────────────────────────
@@ -251,3 +256,20 @@ def test_module_template_writes_only_carbon_palette_colours():
     html = TEMPLATE_PATH.read_text(encoding="utf-8")
     style = "".join(re.findall(r"<style[^>]*>(.*?)</style>", html, flags=re.S))
     assert _off_palette(style) == set()
+
+
+@pytest.mark.parametrize("family", sorted(ST["families"]))
+def test_panel_roles_are_the_named_light_and_dark_steps(family):
+    light, dark = ST["families"][family]["light"], ST["families"][family]["dark"]
+    assert light["panel"][0] == f"{family}-10"
+    assert light["panelBorder"][0] == f"{family}-30"
+    assert dark["panel"][0] == f"{family}-90"
+    assert dark["panelBorder"][0] == f"{family}-70"
+
+
+def test_dashboard_carries_panel_variables():
+    scss = (ROOT / "dashboard" / "src" / "theme" / "_subjects.scss").read_text(encoding="utf-8")
+    for family in ST["families"]:
+        block = scss.split(f".ted-subject--{family} {{", 1)[1].split("\n}", 1)[0]  # values hold "#{…}"
+        assert "--ted-subject-panel: #{colors.$" + f"{family}-10}};" in block
+        assert "--ted-subject-panel-border: #{colors.$" + f"{family}-30}};" in block

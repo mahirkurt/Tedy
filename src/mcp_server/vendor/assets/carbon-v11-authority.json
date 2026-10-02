@@ -1075,7 +1075,9 @@
     "onSurface": "surface üstündeki metin/ikon (tag-color-*); >= 5,8:1",
     "surfaceHover": "surface'in hover hâli (tag-hover-*)",
     "border": "surface çerçevesi (tag-border-*)",
-    "onAccent": "accent dolgu üstündeki ikon (açık: white-0, koyu: gray-100)"
+    "onAccent": "accent dolgu üstündeki ikon (açık: white-0, koyu: gray-100)",
+    "panel": "geniş ders yüzeyi (İ8, 2026-10-02): bir görünümün tek büyük renkli yüzeyi; açık modda aile-10, koyu modda aile-90; üstündeki metin `text`, vurgu `accent`",
+    "panelBorder": "panel çerçevesi: açık modda aile-30, koyu modda aile-70"
    },
    "families": {
     "magenta": {
@@ -1107,6 +1109,14 @@
       "onAccent": [
        "white-0",
        "#ffffff"
+      ],
+      "panel": [
+       "magenta-10",
+       "#fff0f7"
+      ],
+      "panelBorder": [
+       "magenta-30",
+       "#ffafd2"
       ]
      },
      "dark": {
@@ -1137,6 +1147,14 @@
       "onAccent": [
        "gray-100",
        "#161616"
+      ],
+      "panel": [
+       "magenta-90",
+       "#510224"
+      ],
+      "panelBorder": [
+       "magenta-70",
+       "#9f1853"
       ]
      }
     },
@@ -1169,6 +1187,14 @@
       "onAccent": [
        "white-0",
        "#ffffff"
+      ],
+      "panel": [
+       "purple-10",
+       "#f6f2ff"
+      ],
+      "panelBorder": [
+       "purple-30",
+       "#d4bbff"
       ]
      },
      "dark": {
@@ -1199,6 +1225,14 @@
       "onAccent": [
        "gray-100",
        "#161616"
+      ],
+      "panel": [
+       "purple-90",
+       "#31135e"
+      ],
+      "panelBorder": [
+       "purple-70",
+       "#6929c4"
       ]
      }
     },
@@ -1231,6 +1265,14 @@
       "onAccent": [
        "white-0",
        "#ffffff"
+      ],
+      "panel": [
+       "teal-10",
+       "#d9fbfb"
+      ],
+      "panelBorder": [
+       "teal-30",
+       "#3ddbd9"
       ]
      },
      "dark": {
@@ -1261,6 +1303,14 @@
       "onAccent": [
        "gray-100",
        "#161616"
+      ],
+      "panel": [
+       "teal-90",
+       "#022b30"
+      ],
+      "panelBorder": [
+       "teal-70",
+       "#005d5d"
       ]
      }
     },
@@ -1293,6 +1343,14 @@
       "onAccent": [
        "white-0",
        "#ffffff"
+      ],
+      "panel": [
+       "cyan-10",
+       "#e5f6ff"
+      ],
+      "panelBorder": [
+       "cyan-30",
+       "#82cfff"
       ]
      },
      "dark": {
@@ -1323,6 +1381,14 @@
       "onAccent": [
        "gray-100",
        "#161616"
+      ],
+      "panel": [
+       "cyan-90",
+       "#012749"
+      ],
+      "panelBorder": [
+       "cyan-70",
+       "#00539a"
       ]
      }
     },
@@ -1355,6 +1421,14 @@
       "onAccent": [
        "white-0",
        "#ffffff"
+      ],
+      "panel": [
+       "blue-10",
+       "#edf5ff"
+      ],
+      "panelBorder": [
+       "blue-30",
+       "#a6c8ff"
       ]
      },
      "dark": {
@@ -1385,6 +1459,14 @@
       "onAccent": [
        "gray-100",
        "#161616"
+      ],
+      "panel": [
+       "blue-90",
+       "#001d6c"
+      ],
+      "panelBorder": [
+       "blue-70",
+       "#0043ce"
       ]
      }
     },
@@ -1417,6 +1499,14 @@
       "onAccent": [
        "white-0",
        "#ffffff"
+      ],
+      "panel": [
+       "warm-gray-10",
+       "#f7f3f2"
+      ],
+      "panelBorder": [
+       "warm-gray-30",
+       "#cac5c4"
       ]
      },
      "dark": {
@@ -1447,6 +1537,14 @@
       "onAccent": [
        "gray-100",
        "#161616"
+      ],
+      "panel": [
+       "warm-gray-90",
+       "#272525"
+      ],
+      "panelBorder": [
+       "warm-gray-70",
+       "#565151"
       ]
      }
     },
@@ -1479,6 +1577,14 @@
       "onAccent": [
        "white-0",
        "#ffffff"
+      ],
+      "panel": [
+       "cool-gray-10",
+       "#f2f4f8"
+      ],
+      "panelBorder": [
+       "cool-gray-30",
+       "#c1c7cd"
       ]
      },
      "dark": {
@@ -1509,6 +1615,14 @@
       "onAccent": [
        "gray-100",
        "#161616"
+      ],
+      "panel": [
+       "cool-gray-90",
+       "#21272a"
+      ],
+      "panelBorder": [
+       "cool-gray-70",
+       "#4d5358"
       ]
      }
     },
@@ -1541,6 +1655,14 @@
       "onAccent": [
        "white-0",
        "#ffffff"
+      ],
+      "panel": [
+       "gray-10",
+       "#f4f4f4"
+      ],
+      "panelBorder": [
+       "gray-30",
+       "#c6c6c6"
       ]
      },
      "dark": {
@@ -1571,6 +1693,14 @@
       "onAccent": [
        "gray-100",
        "#161616"
+      ],
+      "panel": [
+       "gray-90",
+       "#262626"
+      ],
+      "panelBorder": [
+       "gray-70",
+       "#525252"
       ]
      }
     }

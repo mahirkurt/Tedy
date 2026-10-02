@@ -2,7 +2,7 @@
   "authority": "ted-mcp",
   "files": {
     "SKILL.md": "c3115d358478dd8a309851beb72845a09efef47745c656be92b2dd9fb5ec202f",
-    "assets/carbon-v11-authority.json": "db64c081cf0e7cd7641855fcf6f7d243029eeb6f1bf5a4fd1a98fd1a6c5f271d",
+    "assets/carbon-v11-authority.json": "d6958862826c8b36adae53781724b0447b06045d7853602984c85a48c32aa5ce",
     "assets/fonts-manifest.json": "23153bf47b3c0b1859eca6ffccae83ff0365e673b2e4f1ad7eb32353af47a7e0",
     "assets/ibm-plex-OFL.txt": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f",
     "assets/module-template.html": "b50a3265eb71a0ca2a0321e979a24fe69fefd3d3376912f619e25fc311e45767",
@@ -54,7 +54,7 @@
     "repo": "https://github.com/mahirkurt/CureoPrivate",
     "retired_in": "edupedia 1.0.0"
   },
-  "pinned_at": "2026-09-24T12:06:00+00:00",
+  "pinned_at": "2026-10-02T13:45:59+00:00",
   "source_commit": "1aee3845efffb103a0e4e5b489f4477c0b3017b0",
   "synced_at": "2026-09-18T10:43:35+00:00"
 }
