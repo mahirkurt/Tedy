@@ -302,10 +302,9 @@ def html_mi(bas: bytes, icerik_turu: str) -> bool:
         return True
     # UTF-8 without a BOM. U+200B is the bytes e2 80 8b; read as latin-1
     # those are ordinary characters and the tag behind them is missed.
-    try:
-        utf8 = bas.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        return False
+    # One 0xFF anywhere in the head makes a strict decode raise, and the
+    # page was stored. Replacement keeps the tag in front of that byte.
+    utf8 = bas.decode("utf-8-sig", errors="replace")
     return _html_gibi(utf8)
 
 

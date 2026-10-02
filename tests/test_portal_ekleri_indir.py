@@ -1146,13 +1146,15 @@ def test_saniyede_bir_bayt_butceyi_asamaz(tmp_path, yerel, https_oturum):
 
 
 @pytest.mark.parametrize("govde", [
-    "\u200b".encode() + b"<!-- giris --><html><body>Oturum acin</body></html>",
+    "\u200b".encode() + b"<!-- giris --><html><body>Oturum acin</body></html>\xff",
     b"\x01<!DOCTYPE html><html><body>Oturum acin</body></html>",
     b"<!-- Copyright -->\r\n<!DOCTYPE html><html></html>",
 ])
 def test_gizli_karakterli_html_gercek_sunucuda_saklanmaz(tmp_path, yerel, https_oturum, govde):
     """A login page whose Content-Type is a file, with a comment or one
-    hidden character in front. Stored once, it is never retried."""
+    hidden character in front. The zero-width case also carries one 0xFF
+    in the head: a strict UTF-8 decode used to give up and store the page.
+    Stored once, it is never retried."""
     def yanitla(h, dur):
         h.send_response(200)
         h.send_header("Content-Type", "application/octet-stream")
