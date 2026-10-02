@@ -67,3 +67,55 @@ test('focus mode keeps the four daily tabs and drops Daha fazla', async ({ page 
   const bar = page.getByRole('navigation', { name: 'Ana gezinme' })
   await expect(bar.getByRole('link')).toHaveText(SEKMELER.slice(0, 4))
 })
+
+// Fix round 1: the bar sat above the book reader (z-index 9500) and above an
+// open Carbon modal (z-index 9000) by pixel stacking only — still in the
+// accessibility tree and still reachable by Tab, which breaks "one
+// navigation at a time" even though nothing visible changed.
+
+test('the bar hides under the book reader overlay', async ({ page }) => {
+  await sabitAc(page, '/kitaplar/hobbit-eng/B01', 390, 844)
+  await expect(page.locator('.reader')).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Ana gezinme' })).toBeHidden()
+})
+
+test('the bar hides under an open modal and returns when it closes', async ({ page }) => {
+  await sabitAc(page, '/isler', 390, 844)
+  const bar = page.getByRole('navigation', { name: 'Ana gezinme' })
+  await expect(bar).toBeVisible()
+
+  await page.getByRole('button', { name: 'Başla' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await expect(bar).toBeHidden()
+
+  // Carbon's ModalHeader here carries no `iconDescription`, so its close
+  // button keeps the library default, English "Close" — not a translation
+  // gap this task owns; the close button is the reliable way to shut it.
+  await page.getByRole('button', { name: 'Close' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(bar).toBeVisible()
+})
+
+// Fix round 1, item 2: exams surface inside İşler (routes.ts), so /sinavlar
+// counts as İşler for the bar too — the active tab, not "Daha fazla".
+
+test('Sınavlar marks İşler, not Daha fazla', async ({ page }) => {
+  await sabitAc(page, '/sinavlar', 390, 844)
+  const bar = page.getByRole('navigation', { name: 'Ana gezinme' })
+  await expect(bar.getByRole('link', { name: 'İşler' })).toHaveAttribute('aria-current', 'page')
+  await expect(bar.getByRole('link', { name: 'Daha fazla' })).not.toHaveAttribute('aria-current', 'page')
+  await expect(bar.getByRole('link', { name: 'Bugün' })).not.toHaveAttribute('aria-current', 'page')
+})
+
+// Fix round 1, item 3: a tablet (between the phone cutoff and Carbon's lg
+// breakpoint) keeps the desktop shell — the menu button, not the bar.
+
+test('a tablet keeps the menu button and opens the side nav with it', async ({ page }) => {
+  await sabitAc(page, '/', 800, 900)
+  await expect(page.getByRole('navigation', { name: 'Ana gezinme' })).toBeHidden()
+  const menu = page.getByRole('button', { name: 'Menü' })
+  await expect(menu).toBeVisible()
+  await menu.click()
+  await expect(page.getByRole('navigation', { name: 'Navigasyon' })).toBeVisible()
+})

@@ -2756,6 +2756,16 @@ body {
     background: var(--cds-layer-01);
   }
 
+  // One navigation at a time, still: the bar sat visually under the book
+  // reader (z-index 9500) and an open Carbon modal (z-index 9000) by stacking
+  // alone — it stayed in the accessibility tree and reachable by Tab under
+  // both. Measured at /kitaplar/hobbit-eng/B01 and with İşler's homework
+  // modal open, both at 390px.
+  body:has(.reader) .bottom-nav,
+  body:has(.cds--modal.is-visible) .bottom-nav {
+    display: none;
+  }
+
   .bottom-nav__list {
     display: grid;
     grid-auto-flow: column;

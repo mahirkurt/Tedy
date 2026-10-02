@@ -1,4 +1,4 @@
-import { Link, NavLink, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { OverflowMenuHorizontal } from '@carbon/icons-react'
 import type { UserRole } from '../hooks/useAuth'
 import { primaryNavRoutes } from '../routes'
@@ -11,36 +11,48 @@ import { useFocusMode } from '../contexts/focusMode'
 // both in the accessibility tree.
 const GUNLUK = ['/', '/isler', '/asistan', '/dersler']
 
+// Sınavlar (fix round 1, item 2) is routable on its own (docs/frontend-...
+// §4.2) but counts as İşler for the bar: exams surface inside İşler now
+// (routes.ts), so a reader on /sinavlar should see İşler lit, not Daha fazla.
+const ALIAS: Record<string, string> = { '/sinavlar': '/isler' }
+
+// Every link here is a plain Link, not NavLink: NavLink computes aria-current
+// from its own isActive (a straight match against `to`), which overrides
+// whatever aria-current is passed in and knows nothing about ALIAS above —
+// measured landing on /notlar (Daha fazla's own isActive is false, so its
+// forced aria-current vanished) and on /sinavlar (İşler's isActive is false
+// too, since the path is literally different). Active state is ours to
+// compute, once, against the aliased path, for every tab alike.
 export default function BottomNav({ role }: { role: UserRole }) {
   const { focusMode } = useFocusMode()
   const { pathname } = useLocation()
+  const etkinYol = ALIAS[pathname] ?? pathname
   const sekmeler = primaryNavRoutes(role).filter(r => GUNLUK.includes(r.path))
-  const birincilde = sekmeler.some(r =>
-    r.path === '/' ? pathname === '/' : pathname === r.path || pathname.startsWith(`${r.path}/`))
+  const eslesiyorMu = (yol: string) =>
+    yol === '/' ? etkinYol === '/' : etkinYol === yol || etkinYol.startsWith(`${yol}/`)
+  const birincilde = sekmeler.some(r => eslesiyorMu(r.path))
 
   return (
     <nav className="bottom-nav" aria-label="Ana gezinme">
       <ul className="bottom-nav__list">
         {sekmeler.map(r => {
           const Icon = r.icon
+          const aktif = eslesiyorMu(r.path)
           return (
             <li key={r.path}>
-              <NavLink to={r.path} end={r.path === '/'} className="bottom-nav__link">
+              <Link
+                to={r.path}
+                className={'bottom-nav__link' + (aktif ? ' active' : '')}
+                aria-current={aktif ? 'page' : undefined}
+              >
                 <Icon aria-hidden="true" />
                 <span>{r.label}</span>
-              </NavLink>
+              </Link>
             </li>
           )
         })}
         {!focusMode && (
           <li>
-            {/*
-              A plain Link, not NavLink: NavLink computes aria-current from its
-              own isActive (a match against `to`), which stays false on every
-              secondary page and overrides whatever aria-current is passed in
-              — measured landing on /notlar, where the tab needs to read
-              current while its own href never matches the path.
-            */}
             <Link
               to="/daha-fazla"
               className={'bottom-nav__link' + (birincilde ? '' : ' active')}
