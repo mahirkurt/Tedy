@@ -97,7 +97,7 @@ def test_panel_roles_are_the_named_light_and_dark_steps(family):
 def test_dashboard_carries_panel_variables():
     scss = (ROOT / "dashboard" / "src" / "theme" / "_subjects.scss").read_text(encoding="utf-8")
     for family in ST["families"]:
-        block = scss.split(f".ted-subject--{family} {{", 1)[1].split("}", 1)[0]
+        block = scss.split(f".ted-subject--{family} {{", 1)[1].split("\n}", 1)[0]  # values hold "#{…}"
         assert "--ted-subject-panel: #{colors.$" + f"{family}-10}};" in block
         assert "--ted-subject-panel-border: #{colors.$" + f"{family}-30}};" in block
 ```
