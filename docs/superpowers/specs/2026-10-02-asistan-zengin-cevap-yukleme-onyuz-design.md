@@ -58,14 +58,12 @@ renklerinin ayrı tutulması ve tek büyük yüzey kuralıyla korunur.
 
 ### Ders yüzeyi token'ları
 
-Kaynak tek: `src/mcp_server/vendor/assets/carbon-v11-authority.json` → `tedyLayer.subjectThemes`. Her aile
-için dört rol eklenir: `surface` (aile-10), `surface-border` (aile-30), `on-surface` (aile-80; metin),
-`accent` (aile-60; şerit, nokta, birincil düğme). `scripts/gen_subject_themes.py` bunları
-`dashboard/src/theme/subjects.ts` ve `_subjects.scss`'e (`.ted-subject--<aile>` altında
-`--ted-subject-surface` … değişkenleri) üretir; şablon tarafı `sync_carbon_tokens.py --write-subjects` ile
-eşlenir. `tests/test_ders_renkleri.py` yeni rollerin eşliğini ve kontrastını (on-surface/surface ≥ 4.5:1,
-accent/surface ≥ 3:1) denetler; `tests/test_pano_tasarim_sistemi.py` sayfalarda el yazısı hex yasağını
-sürdürür.
+Kaynak tek: `src/mcp_server/vendor/assets/carbon-v11-authority.json` → `tedyLayer.subjectThemes`. Mevcut roller
+(`accent`, `text`, `surface` = Tag zemini, `onSurface`, `border`, …) korunur; geniş yüzey için iki rol eklenir
+(plan D3a, Görev 1): `panel` (açık aile-10, koyu aile-90) ve `panelBorder` (açık aile-30, koyu aile-70); panel
+üstündeki metin `text`, vurgu `accent`. `scripts/gen_subject_themes.py` bunları `_subjects.scss`'e
+`--ted-subject-panel` / `--ted-subject-panel-border` olarak üretir; modül şablonu bu rolleri taşımaz.
+`tests/test_ders_renkleri.py` adım adlarını ve kontrastı (text/panel ≥ 4.5:1, accent/panel ≥ 3:1) denetler.
 
 ### Kabuk — telefonda alt sekme çubuğu
 
