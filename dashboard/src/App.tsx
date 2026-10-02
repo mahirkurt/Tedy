@@ -30,6 +30,8 @@ import ExamTimeline from './components/ExamTimeline'
 import TedyBooks, { BookDetail } from './components/TedyBooks'
 import BookReader from './components/BookReader'
 import Modules, { ModuleViewerRoute, DraftViewerRoute } from './components/Modules'
+import BottomNav from './components/BottomNav'
+import DahaFazla from './components/DahaFazla'
 
 function matchRoute(pathname: string, list: ReturnType<typeof routesFor>) {
   const exact = list.find(r => r.path === pathname)
@@ -49,6 +51,7 @@ const COMPONENTS: Record<string, React.ComponentType> = {
   PlatformProgress, CalendarEvents, TeamActivities, CourseContent, Announcements, StudentProfile,
   TedyBooks, BookDetail, BookReader,
   Modules, ModuleViewerRoute, DraftViewerRoute,
+  DahaFazla,
 }
 
 export default function App() {
@@ -209,6 +212,7 @@ export default function App() {
         </Routes>
         </RouteBoundary>
       </Content>
+      {!isReader && navItems.length > 1 && <BottomNav role={user.role} />}
       {isReader ? <ReaderFooter /> : <DashboardFooter />}
     </SessionContext.Provider>
   )
