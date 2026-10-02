@@ -183,6 +183,25 @@ test('a suggestion from the stream shows a button and changes nothing by itself'
   await expect(dugme).toHaveCount(0)          // in a teacher mode there is nothing to suggest
 })
 
+test('keyboard activation of the suggestion focuses that teacher', async ({ page }) => {
+  await asistan(page)
+  // Both answered here (Global Constraint): an unanswered stream falls back
+  // to /chat, and /chat must never reach the real model.
+  await page.route('**/api/assistant/stream', r => r.fulfill({
+    status: 200, contentType: 'text/event-stream',
+    body: sse(['tool_start', { name: 'mod_oner' }], ['tool_end', { name: 'mod_oner', ok: true }],
+      ['mode_suggestion', ONERI], ['answer', { payload: cevap() }], ['done', {}]),
+  }))
+  await page.route('**/api/assistant/chat', r => r.fulfill(json(cevap({ mode_suggestion: ONERI }))))
+  await sor(page)
+  const dugme = page.getByRole('button', { name: 'Matematik öğretmenine geçelim mi?' })
+  await dugme.focus()
+  await page.keyboard.press('Enter')
+  const radyo = page.getByRole('radio', { name: 'Matematik' })
+  await expect(radyo).toBeChecked()
+  await expect(radyo).toBeFocused()
+})
+
 test('the classic endpoint carries the suggestion too', async ({ page }) => {
   await asistan(page)
   await page.route('**/api/assistant/stream', r => r.abort())

@@ -607,7 +607,18 @@ export default function AssistantChat() {
                   {msg.modOnerisi && ogretmen.id === GENEL
                     && ogretmen.liste.some(o => o.id === msg.modOnerisi?.ogretmen) && (
                     <ModOnerisi oneri={msg.modOnerisi}
-                      onGec={() => ogretmen.sec(msg.modOnerisi!.ogretmen)} />
+                      onGec={() => {
+                        const id = msg.modOnerisi!.ogretmen
+                        ogretmen.sec(id)
+                        // The button unmounts with the switch. Left alone, focus
+                        // falls to the document and the new teacher is never
+                        // announced. The radio is already on the page; focusing
+                        // it names the choice, and the chip's :focus-visible
+                        // ring draws for this keyboard action.
+                        document.querySelector<HTMLInputElement>(
+                          `input[name="ac-ogretmen"][value="${CSS.escape(id)}"]`,
+                        )?.focus({ focusVisible: true } as FocusOptions)
+                      }} />
                   )}
                   {msg.role === 'assistant' && msg.id !== 'welcome' && (
                     <div className="ac-msg__actions">
