@@ -564,6 +564,9 @@ _HTML_KILIKLARI = {
     "title": b"<TITLE>x</TITLE>",
     "body": b"<BODY onload=x()>",
     "kapanmamis_yorum": b"<!-- " + b"a" * (70 * 1024),
+    "zwsp": "\u200b".encode() + b"<!DOCTYPE html><html><body>Oturum</body></html>",
+    "zwsp_yorum": "\u200b".encode() + b"<!-- x --><html></html>",
+    "soh": b"\x01<!DOCTYPE html><html></html>",
 }
 
 
@@ -756,7 +759,9 @@ def test_yerel_sunucu_varsayilan_politikayla_reddedilir(tmp_path, yerel, https_o
 
 @pytest.mark.parametrize("eylem", ["http://127.0.0.1:9/api/gizli", "https://evil.example/download",
                                    "https://drive.google.com.evil.example/download",
-                                   "http://drive.usercontent.google.com/download", "//evil.example/x"])
+                                   "http://drive.usercontent.google.com/download", "//evil.example/x",
+                                   "https://evil.example@drive.google.com/download",
+                                   "/\\evil.example/x"])
 def test_drive_onay_formu_baska_yere_gitmez(eylem):
     html = (f'<!DOCTYPE html><html><form id="download-form" action="{eylem}">'
             '<input type="hidden" name="id" value="x"></form></html>')
@@ -797,7 +802,8 @@ def test_portal_cerezi_secure_kalir_ust_alan_adlari_dusurulur():
         {"name": "alt", "value": "v", "domain": "alt.portal.tedronesans.k12.tr", "path": "/"},
     ])
     assert sorted(c.name for c in kavanoz) == ["SID", "noktali"]
-    assert {c.name: c.secure for c in kavanoz} == {"SID": True, "noktali": False}
+    # Secure is forced, including on a cookie that arrived without the flag.
+    assert {c.name: c.secure for c in kavanoz} == {"SID": True, "noktali": True}
 
 
 def test_portal_cerezi_yonlendirmede_baska_hosta_gitmez(tmp_path):
@@ -1103,3 +1109,253 @@ def test_sahte_oturumda_bozuk_location_da_erisilemedi(tmp_path):
     oturum = SahteOturum({SP: SahteYanit(302, b"", {"Location": "https://[::1/x"})})
     sonuc = ek_indir(oturum, _kayit(SP_URL), tmp_path, _sinirsiz())
     assert sonuc.durum == "erisilemedi" and "adres" in sonuc.neden and len(oturum.istekler) == 1
+
+
+# ---------------------------------------------------------------------------
+# Fix round 3: the holes a fake session cannot show. Each one below speaks
+# real `requests` to a local server.
+# ---------------------------------------------------------------------------
+
+def _her_adresi_yerel(monkeypatch):
+    """Point every name at the loopback the local server is bound to."""
+    def getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (YEREL, port))]
+    monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo)
+
+
+def test_saniyede_bir_bayt_butceyi_asamaz(tmp_path, yerel, https_oturum):
+    """1 byte/s resets a read timeout forever, so a 600 s sync cap never
+    arrives from the socket. The watchdog is the cap. A 2 s budget that
+    runs until the server's 8 s give-up means the watchdog did not fire."""
+    def yanitla(h, dur):
+        h.send_response(200)
+        h.send_header("Content-Type", "application/pdf")
+        h.send_header("Connection", "close")
+        h.end_headers()
+        h.wfile.write(b"%PDF-1.7\n")
+        for _ in _oyalama(dur, 1.0):
+            h.wfile.write(b"x")
+    kok, kayitlar = yerel(yanitla)
+    t0 = time.monotonic()
+    sonuc = ek_indir(https_oturum, _dosya_kaydi(f"{kok}/yavas.pdf"), tmp_path,
+                     Butce(time.monotonic() + 2.0, 10 ** 12), adres_izni=_yalniz_yerel)
+    gecen = time.monotonic() - t0
+    assert gecen < 4.5, gecen
+    assert sonuc.durum == "bekliyor", sonuc
+    assert len(kayitlar) == 1
+
+
+@pytest.mark.parametrize("govde", [
+    "\u200b".encode() + b"<!-- giris --><html><body>Oturum acin</body></html>",
+    b"\x01<!DOCTYPE html><html><body>Oturum acin</body></html>",
+    b"<!-- Copyright -->\r\n<!DOCTYPE html><html></html>",
+])
+def test_gizli_karakterli_html_gercek_sunucuda_saklanmaz(tmp_path, yerel, https_oturum, govde):
+    """A login page whose Content-Type is a file, with a comment or one
+    hidden character in front. Stored once, it is never retried."""
+    def yanitla(h, dur):
+        h.send_response(200)
+        h.send_header("Content-Type", "application/octet-stream")
+        h.send_header("Content-Length", str(len(govde)))
+        h.send_header("Connection", "close")
+        h.end_headers()
+        h.wfile.write(govde)
+    kok, _ = yerel(yanitla)
+    sonuc = ek_indir(https_oturum, _dosya_kaydi(f"{kok}/duvar.pdf"), tmp_path, _sinirsiz(),
+                     adres_izni=_yalniz_yerel)
+    assert sonuc.durum == "erisilemedi" and "web sayfası" in sonuc.neden, sonuc
+    assert [p.name for p in tmp_path.iterdir()] == [".parca"] and _parcalar(tmp_path) == []
+
+
+def test_ic_adres_ve_oraya_yonlendirme_sunucuya_ulasilmaz(tmp_path, yerel, https_oturum, monkeypatch):
+    """https://127.0.0.1:<port> is the dashboard. Default policy must not
+    open it, and a public hop that redirects there must not either."""
+    def dosya(h, dur):
+        h.send_response(200)
+        h.send_header("Content-Type", "application/pdf")
+        h.send_header("Content-Length", str(len(PDF)))
+        h.send_header("Connection", "close")
+        h.end_headers()
+        h.wfile.write(PDF)
+    kok, dogrudan = yerel(dosya)
+    sonuc = ek_indir(https_oturum, _dosya_kaydi(f"{kok}/gizli.pdf"), tmp_path, _sinirsiz())
+    assert sonuc.durum == "erisilemedi" and "iç adres" in sonuc.neden and dogrudan == []
+
+    def yonlendir(h, dur):
+        port = h.server.server_address[1]
+        h.send_response(302)
+        h.send_header("Location", f"https://127.0.0.1:{port}/gizli.pdf")
+        h.send_header("Content-Length", "0")
+        h.end_headers()
+    kok2, kayitlar = yerel(yonlendir)
+    port = int(kok2.rsplit(":", 1)[1])
+    _her_adresi_yerel(monkeypatch)
+    https_oturum.verify = False
+
+    def izin(host):
+        if host == "dis.ornek":
+            return True
+        return indir_modulu.kuresel_adres_mi(host)
+    sonuc = ek_indir(https_oturum, _dosya_kaydi(f"https://dis.ornek:{port}/dis.pdf"), tmp_path / "b",
+                     _sinirsiz(), adres_izni=izin)
+    assert sonuc.durum == "erisilemedi" and "iç adres" in sonuc.neden, sonuc
+    assert [k["yol"] for k in kayitlar] == ["/dis.pdf"]
+
+
+def test_drive_onay_formu_yerel_sunucuya_gitmez(tmp_path, yerel, https_oturum):
+    """The confirm form's action is this machine. A permissive address
+    policy would fetch it; only the Google-host allow-list may stop it."""
+    def yanitla(h, dur):
+        h.send_response(200)
+        h.send_header("Content-Type", "application/pdf")
+        h.send_header("Content-Length", str(len(PDF)))
+        h.send_header("Connection", "close")
+        h.end_headers()
+        h.wfile.write(PDF)
+    kok, kayitlar = yerel(yanitla)
+    html = (f'<!DOCTYPE html><form id="download-form" action="{kok}/gizli">'
+            '<input type="hidden" name="id" value="abc"></form>').encode()
+
+    class _Form(BaseAdapter):
+        def __init__(self):
+            super().__init__()
+            self.urller = []
+
+        def send(self, request, **kwargs):
+            self.urller.append(request.url)
+            yanit = Response()
+            yanit.status_code = 200
+            yanit.url = request.url
+            yanit.request = request
+            yanit.headers["Content-Type"] = "text/html"
+            yanit.raw = io.BytesIO(html)
+            return yanit
+
+        def close(self):
+            pass
+
+    form = _Form()
+    for onek in ("https://drive.google.com/", "https://drive.usercontent.google.com/",
+                 "https://docs.google.com/"):
+        https_oturum.mount(onek, form)
+    sonuc = ek_indir(https_oturum, _kayit(DRIVE_URL), tmp_path, _sinirsiz(), adres_izni=lambda host: True)
+    assert sonuc.durum == "erisilemedi", sonuc
+    assert kayitlar == []
+    assert form.urller and all(YEREL not in u for u in form.urller)
+
+
+def test_cerez_duz_http_ye_ve_ust_alana_gitmez(tmp_path, yerel, https_oturum, monkeypatch):
+    """Secure is forced, so the portal session does not travel over plain
+    http. A parent-domain cookie, and the portal cookie itself, are not
+    sent to another host under that parent."""
+    portal = indir_modulu.PORTAL_HOST
+    jar = portal_cerez_kavanozu([
+        {"name": "SID", "value": "gizli", "domain": portal, "path": "/", "secure": False},
+        {"name": "GENIS", "value": "p", "domain": ".k12.tr", "path": "/", "secure": True},
+    ])
+    assert [c.name for c in jar] == ["SID"] and all(c.secure for c in jar)
+
+    gorulen = {}
+
+    class _Duz(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            gorulen["Cookie"] = self.headers.get("Cookie")
+            gorulen["yol"] = self.path
+            self.send_response(200)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    sunucu = ThreadingHTTPServer((YEREL, 0), _Duz)
+    http_port = sunucu.server_address[1]
+    dongu = threading.Thread(target=sunucu.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
+    dongu.start()
+    try:
+        _her_adresi_yerel(monkeypatch)
+        requests.get(f"http://{portal}:{http_port}/a.pdf", cookies=jar, timeout=3)
+        assert gorulen.get("yol") == "/a.pdf" and gorulen.get("Cookie") is None
+        gorulen.clear()
+        sonuc = ek_indir(requests.Session(), _kayit(f"http://{portal}:{http_port}/a.pdf"), tmp_path,
+                         _sinirsiz(), cerezler=jar)
+        assert sonuc.durum == "erisilemedi" and "https" in sonuc.neden and "yol" not in gorulen
+    finally:
+        sunucu.shutdown()
+        sunucu.server_close()
+        dongu.join(5)
+
+    def yanitla(h, dur):
+        port = h.server.server_address[1]
+        if h.path.startswith("/portal"):
+            h.send_response(302)
+            h.send_header("Location", f"https://alt.{portal}:{port}/alt.pdf")
+            h.send_header("Content-Length", "0")
+            h.end_headers()
+            return
+        h.send_response(200)
+        h.send_header("Content-Type", "application/pdf")
+        h.send_header("Content-Length", str(len(PDF)))
+        h.send_header("Connection", "close")
+        h.end_headers()
+        h.wfile.write(PDF)
+    kok, kayitlar = yerel(yanitla)
+    port = int(kok.rsplit(":", 1)[1])
+    https_oturum.verify = False
+    https_oturum.cookies.set_cookie(requests.cookies.create_cookie(
+        "GENIS", "p", domain=".k12.tr", path="/", secure=True))
+    sonuc = ek_indir(https_oturum, _kayit(f"https://{portal}:{port}/portal.pdf"), tmp_path / "b",
+                     _sinirsiz(), cerezler=jar,
+                     adres_izni=lambda host: host in (portal, f"alt.{portal}"))
+    assert sonuc.durum == "indirildi", sonuc
+    assert "SID=gizli" in (kayitlar[0]["Cookie"] or "") and "GENIS" not in (kayitlar[0]["Cookie"] or "")
+    assert kayitlar[1]["yol"] == "/alt.pdf" and kayitlar[1]["Cookie"] is None
+
+
+def test_ayni_boylu_yeni_surum_206_ile_karismaz(tmp_path, yerel, https_oturum):
+    """If-Range ignored, ETag omitted, same total length: the new tail must
+    not be glued onto the old head and marked downloaded."""
+    durum = {"govde": _ESKI, "etag": '"v1"'}
+    kok, kayitlar = yerel(_surumlu(durum))
+    kayit = _dosya_kaydi(f"{kok}/karisik.pdf")
+    _ilk_tur(tmp_path, https_oturum, kayit)
+    yeni = PDF + b"B" * (len(_ESKI) - len(PDF))
+    assert len(yeni) == len(_ESKI)
+    durum.update(govde=yeni, etag=None, if_range_yok_say=True)
+    ikinci = ek_indir(https_oturum, kayit, tmp_path, _sinirsiz(), adres_izni=_yalniz_yerel)
+    assert ikinci.durum == "hata", ikinci
+    assert _parcalar(tmp_path) == []
+    assert list(tmp_path.glob("*.pdf")) == []
+    ucuncu = ek_indir(https_oturum, kayit, tmp_path, _sinirsiz(), adres_izni=_yalniz_yerel)
+    assert ucuncu.durum == "indirildi"
+    assert (tmp_path / ucuncu.dosya).read_bytes() == yeni
+    assert b"A" * 64 not in (tmp_path / ucuncu.dosya).read_bytes()
+    assert kayitlar[2]["Range"] is None
+
+
+def test_bozuk_zip_gercek_sunucuda_cakilmaz(tmp_path, yerel, https_oturum):
+    govde = _gecersiz_adli_zip()
+
+    def yanitla(h, dur):
+        h.send_response(200)
+        h.send_header("Content-Type", "application/pdf")
+        h.send_header("Content-Length", str(len(govde)))
+        h.send_header("Connection", "close")
+        h.end_headers()
+        h.wfile.write(govde)
+    kok, _ = yerel(yanitla)
+    sonuc = ek_indir(https_oturum, _dosya_kaydi(f"{kok}/bozuk.zip"), tmp_path, _sinirsiz(),
+                     adres_izni=_yalniz_yerel)
+    assert (sonuc.durum, sonuc.uzanti) == ("indirildi", ".zip")
+
+
+def test_zip_dizini_bellegi_tuketirse_cakilmaz(tmp_path, monkeypatch):
+    yol = tmp_path / "a.bin"
+    yol.write_bytes(b"PK\x03\x04" + b"0" * 64)
+
+    def patla(_yol):
+        raise MemoryError("merkez dizini")
+    monkeypatch.setattr(indir_modulu, "_zip_dizini", patla)
+    assert tur_bul(b"PK\x03\x04" + b"0" * 16, yol) == (".bin", "application/octet-stream")

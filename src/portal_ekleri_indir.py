@@ -19,9 +19,11 @@ closes it — the links are typed by teachers, so hosts and bodies are hostile:
   streaming when the budget ends. run_sync runs under `timeout 600`.
 - addresses: a link at 127.0.0.1, or one redirecting there, was fetched and
   stored. Now every hop must be https and resolve only to global addresses.
-- HTML behind a BOM, a comment, a bare <head> or UTF-16 was stored as `.bin`.
+- HTML behind a BOM, a comment, a bare <head>, UTF-16 or a leading hidden
+  character was stored as `.bin`.
 - a resume after the file changed glued the old head to the new tail. Now
-  the first response's validator rides along as If-Range.
+  the first response's validator rides along as If-Range, and a 206 that
+  does not echo that same validator is not appended.
 """
 from __future__ import annotations
 
@@ -42,6 +44,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import unicodedata
 import zipfile
 from collections import Counter
 from dataclasses import dataclass
@@ -139,22 +142,90 @@ class Sonuc:
     parca_bayt: int = 0
 
 
+def _portal_alani(alan: str) -> str:
+    return alan.lstrip(".").lower().rstrip(".")
+
+
 def portal_cerez_kavanozu(cerezler: Iterable[dict[str, Any]] | None) -> requests.cookies.RequestsCookieJar | None:
     """Selenium's cookies as a jar holding only the portal host's own
-    cookies, so no hop to SharePoint or Google can carry the portal session.
-    A parent-domain cookie (`.k12.tr`, `tedronesans.k12.tr`) would be sent by
-    the jar to every host under that domain, so it is dropped; the Secure
-    flag is kept, so the session never goes out over plain http."""
+    cookies. A parent-domain cookie (`.k12.tr`, `tedronesans.k12.tr`) would
+    be sent to every host under that name, so it is dropped. Secure is
+    forced on: a cookie that arrived without the flag would otherwise leave
+    on plain http. Netscape's suffix match would still send a version-0
+    cookie to subdomains, so the request path attaches the jar only for
+    https on exactly PORTAL_HOST."""
     kavanoz = requests.cookies.RequestsCookieJar()
     for c in cerezler or []:
         if not isinstance(c, dict) or not c.get("name"):
             continue
-        alan = str(c.get("domain") or PORTAL_HOST).lstrip(".").lower()
+        alan = _portal_alani(str(c.get("domain") or PORTAL_HOST))
         if alan != PORTAL_HOST:
             continue
-        kavanoz.set(str(c["name"]), str(c.get("value") or ""), domain=alan,
-                    path=str(c.get("path") or "/"), secure=bool(c.get("secure")))
+        try:
+            kavanoz.set_cookie(requests.cookies.create_cookie(
+                str(c["name"]), str(c.get("value") or ""), domain=PORTAL_HOST,
+                path=str(c.get("path") or "/") or "/", secure=True))
+        except (TypeError, ValueError):
+            continue
     return kavanoz if len(kavanoz) else None
+
+
+def _istek_cerezleri(kavanoz: Any, adres: str) -> Any:
+    """The portal jar, and only when this hop is https to the portal host itself."""
+    if not kavanoz:
+        return None
+    try:
+        p = urlsplit(adres)
+    except ValueError:
+        return None
+    if p.scheme != "https" or _portal_alani(p.hostname or "") != PORTAL_HOST:
+        return None
+    return kavanoz
+
+
+def _cerez_guvenli(cerez: Any) -> bool:
+    return bool(getattr(cerez, "secure", False)) and _portal_alani(getattr(cerez, "domain", "") or "") == PORTAL_HOST
+
+
+def _oturum_cerezlerini_kis(oturum: Any, adres: str) -> list[Any]:
+    """Take off the session every cookie this hop must not carry.
+
+    Unsafe cookies (not Secure, or not exactly the portal host — a parent
+    domain such as `.k12.tr`) are discarded. Safe portal cookies are
+    returned when this hop is not the portal, so they can be put back
+    afterwards: left in the jar, Netscape would send them to a subdomain.
+    A session with no cookie jar is left alone (the fake HTTP layer)."""
+    kavanoz = getattr(oturum, "cookies", None)
+    if kavanoz is None or not hasattr(kavanoz, "clear"):
+        return []
+    try:
+        p = urlsplit(adres)
+        portal_hop = p.scheme == "https" and _portal_alani(p.hostname or "") == PORTAL_HOST
+    except ValueError:
+        portal_hop = False
+    geri: list[Any] = []
+    for cerez in list(kavanoz):
+        guvenli = _cerez_guvenli(cerez)
+        if portal_hop and guvenli:
+            continue
+        try:
+            kavanoz.clear(cerez.domain, cerez.path, cerez.name)
+        except (KeyError, ValueError):
+            continue
+        if guvenli:
+            geri.append(cerez)
+    return geri
+
+
+def _cerezleri_geri_koy(oturum: Any, cerezler: list[Any]) -> None:
+    kavanoz = getattr(oturum, "cookies", None)
+    if kavanoz is None:
+        return
+    for cerez in cerezler:
+        try:
+            kavanoz.set_cookie(cerez)
+        except (TypeError, ValueError):
+            continue
 
 
 def _bilinen_ikili(bas: bytes) -> bool:
@@ -175,17 +246,31 @@ def _bas_metni(bas: bytes) -> str:
     return bas.decode("latin-1")
 
 
+def _atlanan_bas(ch: str) -> bool:
+    """A character a login page can hide behind and a binary file can open
+    with. Whitespace and NUL alone are not markup. Format characters
+    (U+200B and the other Cf set) and the C0/C1 controls are: measured after
+    4f6f8ca, one leading U+200B or 0x01 in front of `<html>` was stored."""
+    if ch.isspace() or ch in _GORUNMEZ:
+        return True
+    o = ord(ch)
+    if o < 32 or o == 0x7F or 0x80 <= o <= 0x9F:
+        return True
+    return unicodedata.category(ch) == "Cf"
+
+
 def _html_gibi(metin: str) -> bool:
-    """Skip whitespace/NUL, `<!-- … -->` comments and `<?xml … ?>`
-    declarations, then require an HTML tag. Whitespace or NUL alone is not
-    markup (a binary may open with 64 KiB of zero bytes). A comment or
-    declaration prologue that runs to the edge of the head is: measured on
-    2cb0918, 4 369 closed comments ending the 64 KiB window on a lone `<`
-    hid the <html> tag behind it, and no binary file opens with a comment."""
+    """Skip whitespace, hidden characters, `<!-- … -->` comments and
+    `<?xml … ?>` declarations, then require an HTML tag. Whitespace or NUL
+    alone is not markup (a binary may open with 64 KiB of zero bytes). A
+    comment or declaration prologue that runs to the edge of the head is:
+    measured on 2cb0918, 4 369 closed comments ending the 64 KiB window on a
+    lone `<` hid the <html> tag behind it, and no binary file opens with a
+    comment."""
     i, n = 0, len(metin)
     onsoz = False
     while True:
-        while i < n and (metin[i].isspace() or metin[i] in _GORUNMEZ):
+        while i < n and _atlanan_bas(metin[i]):
             i += 1
         bas = metin[i:i + 16].lower()
         if bas.startswith(("<!--", "<?")):
@@ -204,15 +289,24 @@ def _html_gibi(metin: str) -> bool:
 
 def html_mi(bas: bytes, icerik_turu: str) -> bool:
     """A web page where a file was expected. Measured on 4f6f8ca: a UTF-8
-    BOM, a leading comment, a bare <head> or UTF-16 each slipped HTML past the
-    old `<!doctype html`/`<html` prefix test and it was stored as `.bin`."""
+    BOM, a leading comment, a bare <head>, UTF-16 or a leading U+200B (the
+    bytes e2 80 8b, invisible only once read as UTF-8) each slipped HTML
+    past the old `<!doctype html`/`<html` prefix test and it was stored."""
     tur = (icerik_turu or "").split(";")[0].strip().lower()
     if tur in ("text/html", "application/xhtml+xml"):
         return True
     bas = bas[:HTML_BAS_SINIRI]
     if _bilinen_ikili(bas):
         return False
-    return _html_gibi(_bas_metni(bas))
+    if _html_gibi(_bas_metni(bas)):
+        return True
+    # UTF-8 without a BOM. U+200B is the bytes e2 80 8b; read as latin-1
+    # those are ordinary characters and the tag behind them is missed.
+    try:
+        utf8 = bas.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return False
+    return _html_gibi(utf8)
 
 
 def _zip_dizini(yol: Path) -> tuple[int, int] | None:
@@ -246,7 +340,9 @@ def _zip_turu(yol: Path) -> tuple[str, str]:
     and a 400 000-entry archive (33 MB) cost 235 MB of memory in namelist()."""
     try:
         dizin = _zip_dizini(yol)
-    except OSError:
+    except Exception:
+        # MemoryError and struct.error included: a corrupt directory must
+        # cost this file its Office type, not the sync turn.
         return ".bin", "application/octet-stream"
     if dizin is None:
         return ".bin", "application/octet-stream"
@@ -292,11 +388,18 @@ def tur_bul(bas: bytes, yol: Path) -> tuple[str, str]:
 
 
 def _onay_hostunda_mi(adres: str) -> bool:
+    """Drive's own https hosts, with nothing in front of them. Userinfo
+    (`https://evil.example@drive.google.com/...`) and a backslash both
+    survive a hostname allow-list and are how a confirm form left Google."""
     try:
         p = urlsplit(adres)
-        return p.scheme == "https" and (p.hostname or "") in DRIVE_ONAY_HOSTLARI
     except ValueError:
         return False
+    if p.scheme != "https" or p.username is not None or p.password is not None:
+        return False
+    if "\\" in adres or "@" in (p.netloc or ""):
+        return False
+    return (p.hostname or "").rstrip(".").lower() in DRIVE_ONAY_HOSTLARI
 
 
 def drive_onay_adresi(html: str, yanit_url: str) -> str | None:
@@ -578,12 +681,15 @@ def _ayni_surumun_devami(yanit: Any, aralik: str, baslangic: int, surum: dict[st
         return False
     if not _kodlamasiz(yanit):
         return False
+    # The stored validator has to come back on the 206. A host that ignores
+    # If-Range and omits ETag/Last-Modified would otherwise glue the old
+    # head to a new tail of the same length and mark the mix downloaded.
     etag, lm = yanit.headers.get("ETag"), yanit.headers.get("Last-Modified")
-    if etag and surum["etag"] and etag != surum["etag"]:
-        return False
-    if lm and surum["last_modified"] and lm != surum["last_modified"]:
-        return False
-    return True
+    if surum.get("etag"):
+        return etag == surum["etag"]
+    if surum.get("last_modified"):
+        return lm == surum["last_modified"]
+    return False
 
 
 def _html_oku(ilk: bytes, akis: Any) -> str:
@@ -666,19 +772,32 @@ def _indir(oturum: Any, kayit: dict[str, Any], url: str, parca: Path, dizin: Pat
             return Sonuc(DURUM_ERISILEMEDI, _IC_ADRES, parca_bayt=baslangic)
         zaman = (min(BAGLANTI_SURESI, kalan), min(OKUMA_SURESI, kalan))
         istek_adresi, istek_basliklari = adres, dict(basliklar)
+        gonderilecek = _istek_cerezleri(kavanoz, istek_adresi)
+        geri = _oturum_cerezlerini_kis(oturum, istek_adresi)
+        bitti = None
         try:
-            bitti, yanit = _sureli(lambda: oturum.get(istek_adresi, headers=istek_basliklari, stream=True,
-                                                      timeout=zaman, allow_redirects=False, cookies=kavanoz),
-                                   son_an - time.monotonic())
-        except ValueError as exc:
-            if isinstance(exc, requests.RequestException):
-                raise
-            # Measured on 2cb0918: even with allow_redirects=False, requests
-            # parses a 3xx Location up front (Session.send → resolve_redirects
-            # for `r._next`); `https://[::1/x` raises a plain ValueError there.
-            return Sonuc(DURUM_ERISILEMEDI, _BOZUK_ADRES, parca_bayt=baslangic)
-        if not bitti:
-            return _bekliyor(baslangic)
+            try:
+                bitti, yanit = _sureli(lambda: oturum.get(istek_adresi, headers=istek_basliklari, stream=True,
+                                                          timeout=zaman, allow_redirects=False,
+                                                          cookies=gonderilecek),
+                                       son_an - time.monotonic())
+            except ValueError as exc:
+                if isinstance(exc, requests.RequestException):
+                    raise
+                # Measured on 2cb0918: even with allow_redirects=False, requests
+                # parses a 3xx Location up front (Session.send → resolve_redirects
+                # for `r._next`); `https://[::1/x` raises a plain ValueError there.
+                return Sonuc(DURUM_ERISILEMEDI, _BOZUK_ADRES, parca_bayt=baslangic)
+            if not bitti:
+                # The request thread is still inside `oturum`. The jar stays
+                # as this hop left it; ekleri_esitle stops on bekliyor.
+                return _bekliyor(baslangic)
+        finally:
+            if bitti is not False:
+                # Drop a Set-Cookie this response just stored (a parent domain,
+                # or one without Secure), then put the portal's own cookies back.
+                _oturum_cerezlerini_kis(oturum, istek_adresi)
+                _cerezleri_geri_koy(oturum, geri)
         if yanit.status_code in _YONLENDIRMELER:
             konum = yanit.headers.get("Location")
             onceki = yanit.url or adres
