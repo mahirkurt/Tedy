@@ -25,12 +25,10 @@ import {
   Search,
   Time,
   Idea,
-  Attachment,
-  Camera,
   Close,
   Microphone,
 } from '@carbon/icons-react'
-import type { AssistantCitation, AssistantPlanBlock, AssistantResponse, ModOnerisi as Oneri } from '../types'
+import type { AssistantCitation, AssistantPlanBlock, AssistantResponse, ModOnerisi as Oneri, Netlestirme } from '../types'
 import { renderMarkdown } from '../utils/markdown'
 import { modelAdi } from '../utils/formatters'
 import { subjectClass } from '../utils/subject'
@@ -46,6 +44,11 @@ import CitationChip from './CitationChip'
 import ModOnerisi from './ModOnerisi'
 import OgretmenSecici from './OgretmenSecici'
 import SourcePanel from './SourcePanel'
+import AlistirmaKarti, { type Alistirma } from './AlistirmaKarti'
+import OdevOnayKarti, { type OdevOnerisi } from './OdevOnayKarti'
+import NetlestirmeSecenekleri from './NetlestirmeSecenekleri'
+import YuklemeAlani from './YuklemeAlani'
+import YuklenenEk, { type Yukleme } from './YuklenenEk'
 
 type ChatRole = 'user' | 'assistant'
 
@@ -65,6 +68,10 @@ interface ChatMessage {
   modOnerisi?: Oneri | null
   /** Upload ids copied onto a composer send. Other paths leave this off. */
   ekler?: string[]
+  yuklemeler?: Yukleme[]
+  alistirma?: Alistirma[]
+  netlestirme?: Netlestirme | null
+  odevOnerisi?: OdevOnerisi | null
 }
 
 // The page speaks to whoever is signed in, as the model does (the prompt's
@@ -119,6 +126,10 @@ const TOOL_LABEL: Record<string, string> = {
   odev_tamamla: 'Eksik alan kaydediliyor',
   skill_kaynagi: 'Öğretmen notları açılıyor',
   mod_oner: 'Öğretmen önerisi hazırlanıyor',
+  netlestir: 'Seçenekler hazırlanıyor',
+  alistirma_hazirla: 'Alıştırma hazırlanıyor',
+  odev_fotograftan: 'Fotoğraftaki ödev okunuyor',
+  yuklenen_dosya_oku: 'Ek okunuyor',
 }
 
 const DEFAULT_THINKING_MESSAGE = 'Yanıt hazırlanıyor...'
@@ -149,11 +160,9 @@ async function readEventStream(
         if (line.startsWith('event: ')) name = line.slice(7).trim()
         else if (line.startsWith('data: ')) payload = line.slice(6)
       }
-      try {
-        onEvent(name, JSON.parse(payload))
-      } catch {
-        // A malformed frame must not kill the stream.
-      }
+      let data: Record<string, unknown>
+      try { data = JSON.parse(payload) } catch { continue }
+      onEvent(name, data)
     }
   }
 }
@@ -180,19 +189,8 @@ interface Cip {
   id?: string
   hata?: string
   yukleniyor?: boolean
-}
-
-function useKabaIsaret() {
-  const [kaba, setKaba] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches)
-  useEffect(() => {
-    const mq = window.matchMedia('(pointer: coarse)')
-    const guncelle = () => setKaba(mq.matches)
-    guncelle()
-    mq.addEventListener('change', guncelle)
-    return () => mq.removeEventListener('change', guncelle)
-  }, [])
-  return kaba
+  baglaniyor?: boolean
+  baglandi?: boolean
 }
 
 /** The user turn that produced a given assistant message, if any. */
@@ -351,10 +349,8 @@ export default function AssistantChat() {
     : voice.prompts
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const dosyaRef = useRef<HTMLInputElement>(null)
-  const kameraRef = useRef<HTMLInputElement>(null)
   const composerRef = useRef<HTMLFormElement>(null)
-  const kaba = useKabaIsaret()
+  const pendingRequest = useRef<{ mode: 'chat' | 'plan'; body: Record<string, unknown> } | null>(null)
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     // Its text comes from `voice` at render time: the session can settle
@@ -369,6 +365,7 @@ export default function AssistantChat() {
   const [stage, setStage] = useState<string | null>(null)
   /** The answer as it streams in; empty when nothing is being written. */
   const [writing, setWriting] = useState('')
+  const [akisAlistirmalar, setAkisAlistirmalar] = useState<Alistirma[]>([])
   const [odevKey, setOdevKey] = useState('')
   const isWriting = writing !== ''
   const ses = useSes(user?.email, draft, setDraft, () => textareaRef.current?.focus(), saltOkunur)
@@ -401,10 +398,11 @@ export default function AssistantChat() {
    * payload, whether it arrived via the stream's `answer` event or a classic
    * JSON response — both endpoints return the same shape, so this is the one
    * place that turns it into a ChatMessage. */
-  function appendAssistantMessage(payload: AssistantResponse, oneri: Oneri | null = null) {
+  function appendAssistantMessage(payload: AssistantResponse, oneri: Oneri | null = null,
+    etkinlikler: { alistirma?: Alistirma[]; netlestirme?: Netlestirme | null; odevOnerisi?: OdevOnerisi | null } = {}) {
     const answer = (payload.answer || '').trim() || 'Yanıt üretilemedi.'
     const assistantMsg: ChatMessage = {
-      id: `assistant-${Date.now()}`,
+      id: `assistant-${crypto.randomUUID()}`,
       role: 'assistant',
       content: answer,
       citations: payload.citations || [],
@@ -414,7 +412,11 @@ export default function AssistantChat() {
       model: payload.meta?.model,
       // The stream's own event arrives first; /chat carries the same in the payload.
       modOnerisi: payload.mode_suggestion ?? oneri,
+      alistirma: etkinlikler.alistirma ?? (payload.quiz ? [payload.quiz] : []),
+      netlestirme: payload.netlestirme ?? etkinlikler.netlestirme,
+      odevOnerisi: payload.odev_onerisi ?? etkinlikler.odevOnerisi,
     }
+    pendingRequest.current = null
     setMessages(prev => [...prev, assistantMsg])
     void sohbet.yenile()
   }
@@ -422,10 +424,15 @@ export default function AssistantChat() {
   async function sohbetAc(id: string, salt: boolean) {
     const result = await sohbet.ac(id, salt)
     if (!result) return
+    pendingRequest.current = null
     ogretmen.sec(result.sohbet.ogretmen)
     setMessages(result.mesajlar.length ? result.mesajlar.map(m => ({
       id: m.id, role: m.rol, content: m.icerik,
-      citations: kayitliAtiflar(m), ekler: JSON.parse(m.ekler_json || '[]') as string[],
+      citations: kayitliAtiflar(m), ekler: (JSON.parse(m.ekler_json || '[]') as (string | Yukleme)[])
+        .map(e => typeof e === 'string' ? e : e.id),
+      yuklemeler: m.yuklemeler ?? (JSON.parse(m.ekler_json || '[]') as (string | Yukleme)[])
+        .map((e, i) => typeof e === 'string' ? { id: e, ad: `Ek ${i + 1}`, tur: 'bilinmiyor' } : e),
+      alistirma: m.alistirma, netlestirme: m.netlestirme, odevOnerisi: m.odev_onerisi,
     })) : [{ id: 'welcome', role: 'assistant', content: '' }])
     setDraft('')
     setCipler([])
@@ -436,6 +443,7 @@ export default function AssistantChat() {
   async function yeniSohbet() {
     try {
       await sohbet.yeni(ogretmen.id)
+      pendingRequest.current = null
       setMessages([{ id: 'welcome', role: 'assistant', content: '' }])
       setDraft('')
       setCipler([])
@@ -448,6 +456,7 @@ export default function AssistantChat() {
     try {
       await sohbet.sil(id)
       if (acik) {
+        pendingRequest.current = null
         setMessages([{ id: 'welcome', role: 'assistant', content: '' }])
         setDraft('')
         setCipler([])
@@ -523,6 +532,24 @@ export default function AssistantChat() {
     for (const item of yuklenecek) void yukleBir(item.yerel, item.file)
   }
 
+  async function odeveBagla(cip: Cip) {
+    if (!cip.id || !odevKey || cip.baglaniyor || cip.baglandi) return
+    setCipler(prev => prev.map(c => c.yerel === cip.yerel ? { ...c, baglaniyor: true, hata: undefined } : c))
+    try {
+      const res = await fetch(`/api/assistant/uploads/${cip.id}/odeve-bagla`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ anahtar: odevKey }),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error || 'Belge ödeve bağlanamadı.')
+      setCipler(prev => prev.map(c => c.yerel === cip.yerel ? { ...c, baglaniyor: false, baglandi: true } : c))
+      window.dispatchEvent(new CustomEvent('tedy:homework-updated'))
+    } catch (e) {
+      setCipler(prev => prev.map(c => c.yerel === cip.yerel ? { ...c, baglaniyor: false,
+        hata: e instanceof Error ? e.message : 'Belge ödeve bağlanamadı.' } : c))
+    }
+  }
+
   const ekleRef = useRef(ekle)
   ekleRef.current = ekle
   // Carbon's TextArea always renders an empty role=alert counter. A chip
@@ -551,50 +578,59 @@ export default function AssistantChat() {
     return () => el.removeEventListener('paste', onPaste)
   }, [])
 
-  async function submit(mode: 'chat' | 'plan', forcedPrompt?: string, opts?: { deep?: boolean; transient?: boolean }) {
+  async function submit(mode: 'chat' | 'plan', forcedPrompt?: string, opts?: { deep?: boolean; transient?: boolean; retry?: boolean }) {
+    const retry = opts?.retry ? pendingRequest.current : null
     const content = (forcedPrompt ?? draft).trim()
-    if (!content || loading || saltOkunur) return
-
-    // Normal sends persist only the new turn; the server supplies trusted history.
-    // Regeneration and study plans remain independent requests by contract.
-    const kaydet = mode === 'chat' && !opts?.deep && !opts?.transient
-    let sohbetId = kaydet ? sohbet.secili?.id : undefined
+    if ((!retry && !content) || loading || saltOkunur || cipler.some(c => c.yukleniyor || c.baglaniyor)) return
     setLoading(true)
-    if (kaydet && !sohbetId) {
-      try { sohbetId = await sohbet.yeni(ogretmen.id) }
-      catch { setError('Sohbet kaydedilemedi.'); setLoading(false); return }
-    }
+    let requestBody: Record<string, unknown>
+    if (retry) {
+      mode = retry.mode
+      requestBody = retry.body
+    } else {
 
-    const gonderEk = forcedPrompt === undefined && mode === 'chat'
-    const ekler = gonderEk ? cipler.flatMap(c => c.id ? [c.id] : []) : []
-    const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content,
-      ...(ekler.length ? { ekler } : {}),
-    }
+      // Normal sends persist only the new turn; the server supplies trusted history.
+      // Regeneration and study plans remain independent requests by contract.
+      const kaydet = mode === 'chat' && !opts?.deep && !opts?.transient
+      let sohbetId = kaydet ? sohbet.secili?.id : undefined
+      if (kaydet && !sohbetId) {
+        try { sohbetId = await sohbet.yeni(ogretmen.id) }
+        catch { setError('Sohbet kaydedilemedi.'); setLoading(false); return }
+      }
 
-    const nextMessages = [...messages, userMsg]
-    const apiKaynak = gonderEk
-      ? nextMessages
-      : nextMessages.map(m => (m.ekler ? { ...m, ekler: undefined } : m))
-    setMessages(nextMessages)
-    setDraft('')
-    if (gonderEk && ekler.length) setCipler([])
-    setLoading(true)
+      const gonderEk = forcedPrompt === undefined && mode === 'chat'
+      const ekler = gonderEk ? cipler.flatMap(c => c.id ? [c.id] : []) : []
+      const userMsg: ChatMessage = {
+        id: `user-${crypto.randomUUID()}`,
+        role: 'user',
+        content,
+        ...(ekler.length ? { ekler, yuklemeler: cipler.flatMap(c => c.id ? [{ id: c.id, ad: c.ad, tur: c.tur || 'bilinmiyor' }] : []) } : {}),
+      }
+
+      const nextMessages = [...messages, userMsg]
+      const apiKaynak = gonderEk
+        ? nextMessages
+        : nextMessages.map(m => (m.ekler ? { ...m, ekler: undefined } : m))
+      setMessages(nextMessages)
+      setDraft('')
+      if (gonderEk && ekler.length) setCipler([])
+
+      requestBody = {
+        session_id: 'dashboard-default',
+        context_filters: {},
+        messages: toApiMessages(sohbetId ? [userMsg] : apiKaynak),
+        ogretmen: ogretmen.id,
+        ...(sohbetId ? { sohbet_id: sohbetId, request_id: crypto.randomUUID() } : {}),
+        ...(odevKey ? { odev_anahtari: odevKey } : {}),
+        ...(opts?.deep ? { force_deep: true } : {}),
+      }
+
+      pendingRequest.current = { mode, body: requestBody }
+    }
     setError(null)
     setStage(null)
     setWriting('')
-
-    const requestBody = {
-      session_id: 'dashboard-default',
-      context_filters: {},
-      messages: toApiMessages(sohbetId ? [userMsg] : apiKaynak),
-      ogretmen: ogretmen.id,
-      ...(sohbetId ? { sohbet_id: sohbetId, request_id: crypto.randomUUID() } : {}),
-      ...(odevKey ? { odev_anahtari: odevKey } : {}),
-      ...(opts?.deep ? { force_deep: true } : {}),
-    }
+    setAkisAlistirmalar([])
 
     // The streaming endpoint only narrates AssistantRuntime.chat() — a study
     // plan needs study_plan()'s own plan_blocks, which chat() never
@@ -625,6 +661,7 @@ export default function AssistantChat() {
       return
     }
 
+    let answered = false
     try {
       const res = await fetch('/api/assistant/stream', {
         method: 'POST',
@@ -634,11 +671,20 @@ export default function AssistantChat() {
       })
       if (!res.ok || !res.body) throw new Error(`akış açılamadı (${res.status})`)
 
-      let answered = false
       let oneri: Oneri | null = null
+      let netlestirme: Netlestirme | null = null
+      const alistirma: Alistirma[] = []
+      let odevOnerisi: OdevOnerisi | null = null
       await readEventStream(res, (name, data) => {
         if (name === 'mode_suggestion') {
           oneri = data as unknown as Oneri
+        } else if (name === 'clarify') {
+          netlestirme = data as unknown as Netlestirme
+        } else if (name === 'quiz') {
+          alistirma.push(data as unknown as Alistirma)
+          setAkisAlistirmalar([...alistirma])
+        } else if (name === 'odev_onerisi') {
+          odevOnerisi = data as unknown as OdevOnerisi
         } else if (name === 'tool_start') {
           setStage(TOOL_LABEL[String(data.name)] ?? 'Kaynaklar taranıyor')
         } else if (name === 'answer_delta') {
@@ -650,13 +696,15 @@ export default function AssistantChat() {
         } else if (name === 'answer') {
           answered = true
           setWriting('')
-          appendAssistantMessage(data.payload as AssistantResponse, oneri)
+          appendAssistantMessage(data.payload as AssistantResponse, oneri, { alistirma: alistirma.length ? alistirma : undefined, netlestirme, odevOnerisi })
+          setAkisAlistirmalar([])
         } else if (name === 'error') {
           throw new Error(String(data.error ?? 'akış hatası'))
         }
       })
       if (!answered) throw new Error('akış yanıtsız kapandı')
     } catch (streamErr) {
+      if (answered) return
       // The non-streaming endpoint stays in place precisely for this: a proxy
       // that buffers SSE, an older worker, or the stream failing mid-flight
       // must not cost the user an answer. This is reported to the console,
@@ -682,6 +730,7 @@ export default function AssistantChat() {
       }
     } finally {
       setStage(null)
+      setAkisAlistirmalar([])
       setWriting('')
       setLoading(false)
     }
@@ -817,6 +866,15 @@ export default function AssistantChat() {
                           citations={msg.citations ?? []} onActivate={activateCitation} />
                       : msg.content}
                   </div>
+                  {msg.yuklemeler?.map(ek => <YuklenenEk key={ek.id} ek={ek} odevler={odevSecenekleri}
+                    saltOkunur={saltOkunur} disabled={loading} />)}
+                  {msg.alistirma?.map(a => <AlistirmaKarti key={a.id} alistirma={a}
+                    saltOkunur={saltOkunur} disabled={loading}
+                    onYanlislar={metin => void submit('chat', `Yanlış yaptığım bu soruları açıklar mısın?\n${metin}`)} />)}
+                  {msg.odevOnerisi && <OdevOnayKarti oneri={msg.odevOnerisi} saltOkunur={saltOkunur || loading} />}
+                  {msg.netlestirme && <NetlestirmeSecenekleri secenekler={msg.netlestirme.secenekler}
+                    etkin={msg.id === latestAssistant?.id && !loading && !saltOkunur}
+                    onSec={metin => void submit('chat', metin)} onBaska={() => textareaRef.current?.focus()} />}
                   {msg.safetyFlags && msg.safetyFlags.length > 0 && (
                     <div className="ac-msg__flags">
                       {msg.safetyFlags.map(f => (
@@ -868,6 +926,8 @@ export default function AssistantChat() {
               </article>
             ))}
 
+            {akisAlistirmalar.map(a => <AlistirmaKarti key={a.id} alistirma={a}
+              disabled saltOkunur={saltOkunur} onYanlislar={() => {}} />)}
             {loading && (isWriting
               ? <WritingAnswer text={writing} />
               : <ThinkingIndicator stage={stage} />)}
@@ -891,9 +951,16 @@ export default function AssistantChat() {
               <ul className="ac__ekler">
                 {cipler.map(c => (
                   <li key={c.yerel} className="ac__ek">
+                    {c.id && c.tur === 'gorsel' && <img className="ac__ek-onizleme"
+                      src={`/api/assistant/uploads/${c.id}`} alt="Yüklenen görsel" />}
                     <span>{c.ad}</span>
                     {c.tur && TUR[c.tur] ? <span>{TUR[c.tur]}</span> : null}
                     {c.yukleniyor ? <span>Yükleniyor</span> : null}
+                    {c.id && c.tur !== 'gorsel' && <Button kind="ghost" size="sm"
+                      disabled={loading || saltOkunur || !odevKey || c.baglaniyor || c.baglandi}
+                      onClick={() => void odeveBagla(c)}>
+                      {c.baglandi ? 'Ödeve bağlandı' : c.baglaniyor ? 'Bağlanıyor…' : 'Bu ödeve bağla'}
+                    </Button>}
                     {c.hata ? <p role="alert" className="ac__ek-hata">{c.hata}</p> : null}
                     <button
                       type="button"
@@ -929,47 +996,7 @@ export default function AssistantChat() {
               })}
             </Select>
             <div className="ac__input-row">
-              <input
-                ref={dosyaRef}
-                className="ac__dosya-girdi"
-                type="file"
-                multiple
-                aria-hidden
-                tabIndex={-1}
-                onChange={e => { ekle([...(e.target.files ?? [])]); e.target.value = '' }}
-              />
-              {kaba && (
-                <input
-                  ref={kameraRef}
-                  className="ac__dosya-girdi ac__dosya-girdi--kamera"
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  aria-hidden
-                  tabIndex={-1}
-                  onChange={e => { ekle([...(e.target.files ?? [])]); e.target.value = '' }}
-                />
-              )}
-              <IconButton
-                kind="ghost"
-                size="lg"
-                label="Dosya ekle"
-                disabled={loading || saltOkunur}
-                onClick={() => dosyaRef.current?.click()}
-              >
-                <Attachment />
-              </IconButton>
-              {kaba && (
-                <IconButton
-                  kind="ghost"
-                  size="lg"
-                  label="Fotoğraf çek"
-                  disabled={loading || saltOkunur}
-                  onClick={() => kameraRef.current?.click()}
-                >
-                  <Camera />
-                </IconButton>
-              )}
+              <YuklemeAlani onDosyalar={ekle} disabled={loading || saltOkunur} />
               <TextArea
                 ref={textareaRef}
                 id="ac-input"
@@ -1024,8 +1051,7 @@ export default function AssistantChat() {
                   renderIcon={Renew}
                   onClick={() => {
                     setError(null)
-                    const lastUser = [...messages].reverse().find(m => m.role === 'user')
-                    if (lastUser) void submit('chat', lastUser.content)
+                    void submit('chat', undefined, { retry: true })
                   }}
                 >
                   Tekrar dene

@@ -211,11 +211,6 @@ body {
   }
 }
 
-@keyframes header-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
 .tag-urgent {
 }
 
@@ -1384,76 +1379,6 @@ body {
 .cds--header__action:focus-visible {
   outline: 2px solid var(--cds-focus-inverse);
   outline-offset: -2px;
-}
-
-.dashboard-header__spin {
-  /* stylelint-disable-next-line carbon/motion-easing-use -- a rotation is linear; Carbon's curves are for movement between states */
-  animation: header-spin motion.$duration-slow-02 linear infinite;
-}
-
-.photo-intake-select__text {
-  margin: 0 0 var(--ted-space-sm);
-  @include type.type-style('body-01');
-  color: var(--ted-color-text-secondary);
-}
-
-.photo-intake-select__actions {
-  display: flex;
-  gap: var(--ted-space-sm);
-  flex-wrap: wrap;
-}
-
-.photo-intake-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ted-space-sm);
-}
-
-.photo-intake-form__file {
-  margin: 0;
-  @include type.type-style('body-01');
-  color: var(--ted-color-text-secondary);
-}
-
-.photo-intake-form__label {
-  display: flex;
-  flex-direction: column;
-  gap: spacing.$spacing-02;
-  @include type.type-style('heading-compact-01');
-  color: var(--ted-color-text-primary);
-}
-
-.photo-intake-form__input {
-  border: 1px solid var(--ted-color-border-subtle);
-  border-radius: 0;   // a Carbon control is square
-  padding: spacing.$spacing-03 spacing.$spacing-04;
-  @include type.type-style('body-01');
-}
-
-.photo-intake-form__hint,
-.photo-intake-form__error {
-  margin: 0;
-  @include type.type-style('label-01');
-  color: var(--ted-color-text-secondary);
-}
-
-.photo-intake-form__error {
-  color: var(--ted-text-error);
-}
-
-.photo-intake-draft {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ted-space-sm);
-  margin: 0;
-  padding: var(--ted-space-sm) 0 0;
-  border: 0;
-  border-top: 1px solid var(--ted-color-border-subtle);
-}
-
-.photo-intake-draft__legend {
-  padding: 0;
-  @include type.type-style('heading-compact-01');
 }
 
 // ─── Login Page ──────────────────────────────────────────────────────────────

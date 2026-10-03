@@ -173,13 +173,9 @@ test.describe('SPA serving', () => {
       .not.toBe(beforeClass)
   })
 
-  test('photo homework modal opens and can be closed without upload', async ({ page }) => {
-    await page.goto('/')
-    const trigger = page.getByRole('button', { name: 'Ödev fotoğrafı ekle' })
-    await trigger.click()
-    const modal = page.locator('.cds--modal').filter({ hasText: 'Ödev fotoğrafı' })
-    await expect(modal).toBeVisible()
-    await page.getByRole('button', { name: 'İptal' }).click()
-    await expect(modal).toBeHidden()
+  test('homework photos are added from the assistant composer', async ({ page }) => {
+    await page.goto('/asistan')
+    await expect(page.getByRole('button', { name: 'Ödev fotoğrafı ekle' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Dosya ekle', exact: true })).toBeVisible()
   })
 })

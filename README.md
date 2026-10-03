@@ -4,7 +4,7 @@ Işık'ın okul portallarından (TED Rönesans, EBA, MEBI, SEBİTV, Achieve3000,
 EnglishCentral) veri toplayan ve `tedy.online` panelinde sunan yerel otomasyon.
 
 Google Classroom, Calendar ve Drive yazma yolu yoktur. Panel kimliği Google
-Sign-In ile doğrulanır; sohbet asistanı Gemini + BM25 + müfredat/OER MCP
+Sign-In ile doğrulanır; sohbet asistanı Claude + BM25 + müfredat/OER MCP
 kullanır.
 
 ## Çalıştırma
@@ -37,8 +37,20 @@ python src/check_books.py
 
 ## Asistan
 
-Sohbet Gemini API üzerindendir; yerel model sunucusu gerekmez. Bilgi indeksi
-BM25'tir.
+Sohbet Anthropic Claude API üzerindendir; yerel model sunucusu gerekmez.
+Bilgi indeksi BM25'tir. Öğretmen modları, sahipli dosya yükleme, kalıcı sohbetler,
+alıştırmalar ve öğrenme günlüğü panel içinde çalışır. Öğrenci sohbetleri aileye
+salt okunur açılır; özel yüklemeler genel bilgi indeksine girmez. Fotoğraftan
+çıkarılan ödevler yalnız kullanıcı karttaki bilgileri onayladığında kaydedilir.
+
+Sesli okuma tarayıcının Türkçe sesini kullanır. Mikrofon isteğe bağlıdır;
+konuşma tanımanın Chrome/Android üzerinde sesi Google'a göndermesi arayüzde
+onaydan önce açıklanır. Cevap denetimi bir Haiku çağrısıyla yapılır.
+
+Bu sürüme geçerken `python src/reindex_assistant.py --full` ile indeks biçimi
+3'e yenilenir. Yüklemeler ve sohbet deposu yeniden indekslemede dışarıda tutulur.
+Altın soru değerlendirmesi `scripts/asistan_eval.py` ile ayrı, açık onaylı bir
+komuttur; testler gerçek model çağrısı yapmaz.
 
 ```bash
 python src/reindex_assistant.py

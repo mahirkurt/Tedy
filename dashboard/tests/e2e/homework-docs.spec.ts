@@ -14,14 +14,21 @@ const ROW = {
 
 test('a document added on the homework is named there', async ({ page }) => {
   let posted = ''
+  let bound = ''
+  let documents = ROW.documents
   await page.route('**/api/homework', route => {
     if (route.request().method() === 'GET') {
-      return route.fulfill({ json: { summary: '', homework: [ROW] } })
+      return route.fulfill({ json: { summary: '', homework: [{ ...ROW, documents } ] } })
     }
     return route.continue()
   })
-  await page.route('**/api/homework/documents', async route => {
+  await page.route('**/api/assistant/uploads', async route => {
     posted = route.request().postData() || ''
+    await route.fulfill({ json: { id: 'ab'.repeat(16), ad: 'not.txt', tur: 'txt' } })
+  })
+  await page.route('**/api/assistant/uploads/*/odeve-bagla', async route => {
+    bound = route.request().postData() || ''
+    documents = [{ id: 'abc', name: 'not.txt', ready: true, error: '' }]
     await route.fulfill({
       json: {
         document: { id: 'abc', name: 'not.txt', ready: true, error: '' },
@@ -30,6 +37,7 @@ test('a document added on the homework is named there', async ({ page }) => {
     })
   })
 
+  await page.clock.setFixedTime(new Date('2026-10-01T10:00:00Z'))
   await page.goto('/isler')
   await page.getByText('Kesirler', { exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Kesirler', exact: true })).toBeVisible()
@@ -43,7 +51,7 @@ test('a document added on the homework is named there', async ({ page }) => {
     buffer: Buffer.from('Kesirlerde payda.'),
   })
   await expect(page.getByRole('link', { name: 'not.txt' })).toBeVisible()
-  expect(posted).toContain('matematik|kesirler|02.10.2026 23:59')
+  expect(bound).toContain('matematik|kesirler|02.10.2026 23:59')
   expect(posted).toContain('not.txt')
 })
 

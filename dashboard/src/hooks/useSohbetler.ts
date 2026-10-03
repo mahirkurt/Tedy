@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { AssistantCitation } from '../types'
+import type { AssistantCitation, Netlestirme } from '../types'
+import type { OdevOnerisi } from '../components/OdevOnayKarti'
+import type { Yukleme } from '../components/YuklenenEk'
+import type { Alistirma } from '../components/AlistirmaKarti'
 
 export interface Sohbet {
   id: string
@@ -12,6 +15,10 @@ export interface KayitliMesaj {
   icerik: string
   atiflar_json: string
   ekler_json: string
+  alistirma?: Alistirma[]
+  yuklemeler?: Yukleme[]
+  netlestirme?: Netlestirme | null
+  odev_onerisi?: OdevOnerisi | null
 }
 export interface AsistanNotu { id: string; metin: string }
 export interface SohbetIcerigi {

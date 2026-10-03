@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 const PORT = Number(process.env.TEDY_E2E_PORT ?? 8286)
 const ORIGIN = `http://127.0.0.1:${PORT}`
 const REPO = fileURLToPath(new URL('../../..', import.meta.url))
-const PYTHON = join(REPO, '.venv/bin/python')
+const PYTHON = process.env.TEDY_E2E_PYTHON ?? join(REPO, '.venv/bin/python')
 const SPEC_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; " +
   "font-src data:; media-src data:; connect-src 'none'; frame-ancestors https://tedy.online; base-uri 'none'; form-action 'none'"
 const FRAME_CSP = 'frame-src https://modul.tedy.online https://accounts.google.com'

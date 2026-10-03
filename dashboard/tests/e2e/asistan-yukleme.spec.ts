@@ -72,6 +72,8 @@ test('chat sends ekler and the plan button does not', async ({ page }) => {
   const son = govde.messages[govde.messages.length - 1]
   expect(govde.ogretmen).toBe('genel')
   expect(son).toMatchObject({ role: 'user', ekler: [ID] })
+  await expect(page.locator('.ac-msg--user .ac-yuklenen-ek')).toContainText('not.png')
+  await expect(page.locator('.ac-msg--user .ac-yuklenen-ek img')).toHaveCount(1)
 
   await page.locator('.ac__dosya-girdi').setInputFiles({ name: 'not.png', mimeType: 'image/png', buffer: Buffer.from('x') })
   await page.fill('#ac-input', 'plan')

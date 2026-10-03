@@ -278,6 +278,8 @@ export interface ModOnerisi {
   renk_ailesi: SubjectFamily
 }
 
+export interface Netlestirme { soru: string; secenekler: string[] }
+
 export interface AssistantResponse {
   answer: string
   citations: AssistantCitation[]
@@ -287,6 +289,9 @@ export interface AssistantResponse {
   session_id: string
   /** Set when the genel-mode answer suggested a subject teacher (B1). */
   mode_suggestion?: ModOnerisi | null
+  netlestirme?: Netlestirme | null
+  quiz?: import('./components/AlistirmaKarti').Alistirma | null
+  odev_onerisi?: import('./components/OdevOnayKarti').OdevOnerisi | null
   meta: {
     model: string
     retrieval_count?: number

@@ -118,3 +118,42 @@ test('Işık sees the family note and no notes panel', async ({ page }) => {
   await expect(page.getByText('Sohbetlerini ailen de görebilir.')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Asistanın notları' })).toHaveCount(0)
 })
+
+
+test('a stream error after its answer never appends a second reply', async ({ page }) => {
+  await sabitAc(page, '/asistan', 1440, 900)
+  let fallback = 0
+  const payload = { answer: 'Tek yanıt.', citations: [], safety_flags: [], plan_blocks: [], meta: {} }
+  await page.route('**/api/assistant/chat', r => { fallback += 1; return r.fulfill(json(payload)) })
+  await page.route('**/api/assistant/stream', r => r.fulfill({ contentType: 'text/event-stream',
+    body: `event: answer\ndata: ${JSON.stringify({ payload })}\n\nevent: error\ndata: {"error":"bağlantı kapandı"}\n\n` }))
+  await page.fill('#ac-input', 'Yanıtla')
+  await page.getByRole('button', { name: 'Gönder', exact: true }).click()
+  await expect(page.getByText('Tek yanıt.', { exact: true })).toHaveCount(1)
+  await expect(page.locator('#ac-input')).toBeEnabled()
+  expect(fallback).toBe(0)
+})
+
+test('retry preserves the request id and uploads without another user bubble', async ({ page }) => {
+  await sabitAc(page, '/asistan', 1440, 900)
+  const bodies: { request_id: string; messages: { ekler?: string[] }[] }[] = []
+  await page.route('**/api/assistant/uploads', r => r.fulfill(json({ id: 'cd'.repeat(16), ad: 'not.txt', tur: 'txt' })))
+  await page.route('**/api/assistant/stream', r => r.abort())
+  await page.route('**/api/assistant/chat', r => {
+    bodies.push(r.request().postDataJSON())
+    return r.fulfill(bodies.length === 1 ? { status: 503, json: { error: 'Geçici hata' } } : json({
+      answer: 'Ekli yanıt.', citations: [], safety_flags: [], plan_blocks: [], meta: {},
+    }))
+  })
+  await page.locator('input[type=file]').first().setInputFiles({ name: 'not.txt', mimeType: 'text/plain', buffer: Buffer.from('Kesir') })
+  await expect(page.locator('.ac__ek')).toContainText('Metin')
+  await page.fill('#ac-input', 'Bu eki açıkla')
+  await page.getByRole('button', { name: 'Gönder', exact: true }).click()
+  await page.getByRole('button', { name: 'Tekrar dene', exact: true }).click()
+  await expect(page.getByText('Ekli yanıt.', { exact: true })).toBeVisible()
+  expect(bodies).toHaveLength(2)
+  expect(bodies[0]).toEqual(bodies[1])
+  expect(bodies[0].request_id).toBeTruthy()
+  expect(bodies[0].messages[0].ekler).toEqual(['cd'.repeat(16)])
+  await expect(page.locator('.ac-msg--user')).toHaveCount(1)
+})

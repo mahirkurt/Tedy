@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, Button, InlineLoading, Link } from '@carbon/react'
-import { Timer, CheckmarkFilled, CloseFilled, ChevronDown, ChevronUp } from '@carbon/icons-react'
+import { Timer, CheckmarkFilled, CloseFilled, ChevronDown, ChevronUp, Document } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import type { HomeworkDocument, HomeworkItem } from '../types'
 import { parseDeadline, formatTurkishDate, getHomeworkStatus } from '../utils/formatters'
@@ -14,6 +14,7 @@ import type { ExamItem, ModuleCard } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
 import { EkBaglantisi } from './patterns/EkBaglantisi'
 import { useFocusMode } from '../contexts/focusMode'
+import YuklemeAlani from './YuklemeAlani'
 import { yaptimIsaretle } from '../utils/odevYaptim'
 
 type HomeworkGroupKey = 'aktif' | 'yapilan' | 'tamamlanan' | 'yapilmayan'
@@ -58,7 +59,6 @@ export default function HomeworkTracker() {
   const [markErrorKey, setMarkErrorKey] = useState<string | null>(null)
   const [docBusy, setDocBusy] = useState(false)
   const [docError, setDocError] = useState('')
-  const docInputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 60000)
     return () => clearInterval(t)
@@ -81,17 +81,22 @@ export default function HomeworkTracker() {
     setDocError('')
     try {
       const body = new FormData()
-      body.append('homework_key', key)
-      body.append('file', file)
-      const res = await fetch('/api/homework/documents', {
+      body.append('dosya', file)
+      const upload = await fetch('/api/assistant/uploads', {
         method: 'POST',
         credentials: 'include',
         body,
       })
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(payload?.error || `HTTP ${res.status}`)
+      const ek = await upload.json()
+      if (!upload.ok) throw new Error(ek.error || 'Belge yüklenemedi.')
+      const res = await fetch(`/api/assistant/uploads/${ek.id}/odeve-bagla`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ anahtar: key }),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error || 'Belge ödeve bağlanamadı.')
       const documents = Array.isArray(payload?.documents) ? payload.documents as HomeworkDocument[] : []
-      setSelectedHw(prev => prev ? { ...prev, documents } : prev)
+      if (documents.length) setSelectedHw(prev => prev ? { ...prev, documents } : prev)
       refreshHomework()
     } catch (err) {
       setDocError(err instanceof Error ? err.message : 'Belge eklenemedi.')
@@ -119,12 +124,6 @@ export default function HomeworkTracker() {
     } finally {
       setDocBusy(false)
     }
-  }
-
-  function onDocumentPicked(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (file) void addDocument(file)
   }
 
   const grouped = useMemo(() => {
@@ -405,15 +404,8 @@ export default function HomeworkTracker() {
             enrichmentData={enrichmentData}
             docBusy={docBusy}
             docError={docError}
-            onPickDocument={() => docInputRef.current?.click()}
+            onPickDocument={file => void addDocument(file)}
             onRemoveDocument={id => void removeDocument(id)}
-          />
-          <input
-            ref={docInputRef}
-            type="file"
-            accept=".pdf,.docx,.txt,.md,application/pdf,text/plain,text/markdown"
-            style={{ display: 'none' }}
-            onChange={onDocumentPicked}
           />
         </ModalBody>
       </ComposedModal>
@@ -549,7 +541,7 @@ function HomeworkModalBody({
   enrichmentData: Record<string, { course: string; title: string; note: string; type: string }>
   docBusy: boolean
   docError: string
-  onPickDocument: () => void
+  onPickDocument: (file: File) => void
   onRemoveDocument: (id: string) => void
 }) {
   const deadline = parseDeadline(hw["Ödev Son Teslim Tarihi"])
@@ -634,9 +626,7 @@ function HomeworkModalBody({
             </Button>
           </div>
         ))}
-        <Button kind="secondary" size="sm" disabled={docBusy} onClick={onPickDocument}>
-          {docBusy ? 'Vektörleniyor...' : 'Belge ekle'}
-        </Button>
+        <YuklemeAlani belge disabled={docBusy} onDosyalar={files => { if (files[0]) onPickDocument(files[0]) }} />
         <p className="homework-modal__doc-hint">
           Eklenen belge yalnız bu ödev sorulurken asistana açılır.
         </p>

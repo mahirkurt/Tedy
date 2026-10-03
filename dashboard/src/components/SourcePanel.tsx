@@ -6,10 +6,10 @@ import { DocumentView } from '@carbon/icons-react'
 import type { AssistantCitation, CitationKind, FigureLocator } from '../types'
 import { moduleRoute } from '../utils/moduleLink'
 
-// Işık's own data first, then her published modules and Tedy Books (both TED's own material),
+// The uploaded source first, then school data, published modules and Tedy Books,
 // then the external authorities. `aile-kaynak` (Görev 5) is family-only material — an answer to
 // Işık never carries it, but it sits last regardless, alongside the other external sources.
-const GROUP_ORDER: CitationKind[] = ['ogrenci', 'modul', 'tedy-kitap', 'mufredat', 'kitap', 'oer', 'aile-kaynak', 'yuklenen-dosya']
+const GROUP_ORDER: CitationKind[] = ['yuklenen-dosya', 'ogrenci', 'modul', 'tedy-kitap', 'mufredat', 'kitap', 'oer', 'aile-kaynak']
 const KNOWN_KINDS = new Set<string>(GROUP_ORDER)
 
 const GROUP_TITLE: Record<CitationKind, string> = {

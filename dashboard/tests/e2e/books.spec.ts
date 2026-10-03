@@ -25,7 +25,7 @@ test.describe('Tedy Books mobile experience', () => {
   test('keeps every header action inside a narrow phone viewport', async ({ page }) => {
     await page.goto(appUrl('/kitaplar'))
 
-    for (const name of ['Yenile', 'Ödev fotoğrafı ekle', 'Çıkış']) {
+    for (const name of ['Yenile', 'Çıkış']) {
       const box = await page.getByRole('button', { name }).boundingBox()
       expect(box).not.toBeNull()
       expect(box!.x).toBeGreaterThanOrEqual(0)
@@ -104,7 +104,7 @@ test.describe('Tedy Books mobile experience', () => {
       }
 
       await page.goto(appUrl('/kitaplar'))
-      for (const name of ['Yenile', 'Ödev fotoğrafı ekle', 'Çıkış']) {
+      for (const name of ['Yenile', 'Çıkış']) {
         const box = await page.getByRole('button', { name }).boundingBox()
         expect(box).not.toBeNull()
         expect(box!.x).toBeGreaterThanOrEqual(0)

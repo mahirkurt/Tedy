@@ -14,6 +14,7 @@ test('the calendar copy is spelled in Turkish', async ({ page }) => {
 })
 
 test('a markdown list looks like a list', async ({ page }) => {
+  await mock(page, FULL)
   // Carbon's reset sets `list-style: none` on every ul/ol, so the assistant's
   // answers rendered their steps as three unmarked lines.
   await page.route('**/api/assistant/stream', r => r.abort())
