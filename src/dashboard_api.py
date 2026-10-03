@@ -349,6 +349,7 @@ def _assistant_runtime():
                 video_kaynagi=_canli_videolar,
                 odev_belge_ara=_odev_belgesi_ara,
                 odev_yazici=_foto_odev_tamamla,
+                foto_odev_kaynagi=_extract_homework_candidates_from_photo,
             )
         except Exception as exc:
             # SkillHatasi's own message names which skill and why (spec "Hata ve
@@ -3069,11 +3070,19 @@ def _sohbet_ek_kimlikleri(row):
     return [e["id"] if isinstance(e, dict) else e for e in json.loads(row["ekler_json"])]
 
 
+def _istek_ek_okuyucu(messages):
+    # Bytes were ownership-checked before streaming. Restrict tools to attachments
+    # actually present in this request, and never access Flask session in a worker.
+    ekler = {e["meta"]["id"]: (e["meta"], e["veri"])
+             for mesaj in messages or [] for e in mesaj.get("ek_govde", [])}
+    return ekler.get
+
+
 def _sohbet_istegini_hazirla(payload, messages, email, ogretmen):
     """Capture private history and bytes before generate() loses its session."""
     if "sohbet_id" not in payload:
         hazir, hata = _ekleri_hazirla(messages, email)
-        return hazir, {}, hata
+        return hazir, {"kwargs": {"ek_okuyucu": _istek_ek_okuyucu(hazir)}} if hazir else {}, hata
     sid = payload["sohbet_id"]
     _row, sahip, hata = _sohbet_erisim(sid)
     if hata is not None:
@@ -3092,10 +3101,12 @@ def _sohbet_istegini_hazirla(payload, messages, email, ogretmen):
         return None, {}, (jsonify({"error": "İstek kimliği başka bir mesaja ait."}), 409)
     cevap = next((m for m in onceki if m["rol"] == "assistant"), None)
     if cevap:
+        alistirmalar = [_alistirma_yaniti(a) for a in depo.alistirmalar(cevap["id"])]
         return [], {"tekrar": {
             "answer": cevap["icerik"], "citations": json.loads(cevap["atiflar_json"]),
             "safety_flags": [], "plan_blocks": [], "intent": "qa", "session_id": "",
-            "mode_suggestion": None, "meta": {"ogretmen": cevap["ogretmen"]},
+            "mode_suggestion": None, "quiz": alistirmalar[0] if alistirmalar else None,
+            "odev_onerisi": None, "meta": {"ogretmen": cevap["ogretmen"]},
         }}, None
     from src.assistant_uploads import EkDeposu, ISTEK_SINIRI
     eski = depo.son_mesajlar(sid, 20 if onceki else 19)
@@ -3123,18 +3134,29 @@ def _sohbet_istegini_hazirla(payload, messages, email, ogretmen):
         yuklemeler = EkDeposu(OUTPUT_DIR)
         for ek in ekler:
             yuklemeler.bagla(email, ek["id"], sid)
-    return hazir, {"depo": depo, "sid": sid, "request_id": rid, "kwargs": {
+    alistirma_kimlikleri = []
+    return hazir, {"depo": depo, "sid": sid, "request_id": rid, "sahip_email": email,
+                   "alistirma_kimlikleri": alistirma_kimlikleri, "kwargs": {
         "pencere": 20, "sohbet_id": sid, "not_deposu": depo, "hafiza": True,
-        "ozet": depo.ozet_oku(sid),
+        "ozet": depo.ozet_oku(sid), "alistirma_kimlikleri": alistirma_kimlikleri,
+        "ek_okuyucu": _istek_ek_okuyucu(hazir),
+        "yukleme_deposu": EkDeposu(OUTPUT_DIR),
     }}, None
 
 
 def _sohbet_cevap_kaydet(sohbet, payload, ogretmen):
     if not sohbet.get("depo"):
         return
-    sohbet["depo"].mesaj_ekle(
+    depo = sohbet["depo"]
+    mid = depo.mesaj_ekle(
         sohbet["sid"], "assistant", payload["answer"], ogretmen, [], _asistan_simdi(),
         atiflar=payload.get("citations", []), istek_id=sohbet.get("request_id"))
+    for aid in sohbet.get("alistirma_kimlikleri", []):
+        depo.alistirma_bagla(aid, mid)
+    if ogretmen != assistant_skills.GENEL:
+        email = sohbet.get("sahip_email") or depo.getir(sohbet["sid"])["sahip_email"]
+        depo.calisilan_yaz(sohbet["sid"], mid, email, ogretmen,
+                          payload.get("citations", []), _asistan_simdi())
 
 
 def _sohbet_ozetle(sohbet):
@@ -3194,7 +3216,10 @@ def assistant_sohbet(sid):
         return hata
     depo = _sohbet_deposu()
     if request.method == "GET":
-        return jsonify({"sohbet": _sohbet_yaniti(row), "mesajlar": depo.tum_mesajlar(sid),
+        mesajlar = depo.tum_mesajlar(sid)
+        for mesaj in mesajlar:
+            mesaj["alistirma"] = [_alistirma_yaniti(a) for a in depo.alistirmalar(mesaj["id"])]
+        return jsonify({"sohbet": _sohbet_yaniti(row), "mesajlar": mesajlar,
                         "read_only": not sahip})
     if not sahip:
         return jsonify({"error": "Bu sohbet salt okunur."}), 403
@@ -3240,6 +3265,51 @@ def assistant_sohbet_mesaj(sid):
         return hata
     mid = _sohbet_deposu().mesaj_ekle(sid, "user", icerik.strip(), ogretmen, [], _asistan_simdi())
     return jsonify({"id": mid})
+
+
+def _alistirma_yaniti(alistirma):
+    """Return prompts only; answer keys and explanations stay on the server."""
+    sonuc = {k: alistirma[k] for k in ("id", "baslik", "ders", "konu", "kazanim_kodu", "zorluk")}
+    sonuc["sorular"] = [{k: soru[k] for k in ("tur", "soru", "secenekler") if k in soru}
+                         for soru in alistirma["sorular"]]
+    return sonuc
+
+
+@app.route("/api/assistant/alistirmalar/<aid>/cevap", methods=["POST"])
+@require_auth
+@_sohbet_kapisi
+def assistant_alistirma_cevap(aid):
+    from src.assistant_alistirma import cevap_dogru, yanlis_esle
+    depo = _sohbet_deposu()
+    alistirma = depo.alistirma_getir(aid) if re.fullmatch(r"[0-9a-f]{32}", aid) else None
+    if alistirma is None:
+        return jsonify({"error": "Alıştırma bulunamadı."}), 404
+    if alistirma["sahip_email"] != _module_person():
+        return jsonify({"error": "Bu sohbet salt okunur."}), 403
+    payload = request.get_json(silent=True)
+    sira = payload.get("sira") if isinstance(payload, dict) else None
+    cevap = payload.get("cevap") if isinstance(payload, dict) else None
+    if (type(sira) is not int or not 1 <= sira <= len(alistirma["sorular"])
+            or not isinstance(cevap, str) or not cevap.strip()):
+        return jsonify({"error": "Cevap alınamadı."}), 400
+    soru = alistirma["sorular"][sira - 1]
+    dogru = cevap_dogru(cevap, soru["dogru"], soru.get("kabul_edilenler"))
+    kayit = depo.cevap_yaz(aid, sira, dogru, _asistan_simdi())
+    sonuc = {"dogru": bool(kayit["dogru"]), "aciklama": soru["aciklama"]}
+    if not sonuc["dogru"] and alistirma["ogretmen"] != assistant_skills.GENEL:
+        skill = assistant_skills.varsayilan().get(alistirma["ogretmen"])
+        if skill is not None:
+            analiz = yanlis_esle(cevap, soru["soru"], skill.kaynak_oku("kavram-yanilgilari.md"))
+            if analiz is not None:
+                sonuc["yanlis_analizi"] = analiz
+    return jsonify(sonuc)
+
+
+@app.route("/api/assistant/ogrenme-gunlugu")
+@require_auth
+@_sohbet_kapisi
+def assistant_ogrenme_gunlugu():
+    return jsonify(_sohbet_deposu().gunluk(_module_person(), _asistan_simdi()))
 
 
 @app.route("/api/assistant/notlar")

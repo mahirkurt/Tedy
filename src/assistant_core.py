@@ -2267,7 +2267,8 @@ class AssistantRuntime:
                  video_kaynagi: Callable[[], Any] | None = None,
                  skills: dict[str, Any] | None = None,
                  odev_belge_ara: Callable[[str, str], str] | None = None,
-                 odev_yazici: Callable[[str, str, str], str] | None = None):
+                 odev_yazici: Callable[[str, str, str], str] | None = None,
+                 foto_odev_kaynagi: Callable[[bytes, str], list[dict]] | None = None):
         # First, before anything else is built: a broken teacher skill stops the
         # assistant from opening at all (spec "Hata ve boşluk durumları"), with
         # the skill and the reason in the error — never a silent fallback.
@@ -2325,7 +2326,8 @@ class AssistantRuntime:
                                        ek_deposu=EkDeposu(self.config.project_root),
                                        skills=self.skills,
                                        odev_belge_ara=odev_belge_ara,
-                                       odev_yazici=odev_yazici)
+                                       odev_yazici=odev_yazici,
+                                       foto_odev_kaynagi=foto_odev_kaynagi)
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """The retriever, shaped as a tool the model can choose to call."""
@@ -2372,6 +2374,9 @@ class AssistantRuntime:
         "ne isteniyor) → `ek_oku`; kimlik, ödev listesindeki 'Ekler' satırında [ek:…] olarak "
         "yazar. Ek indirilemediyse ya da metin katmanı yoksa bunu açıkça söyle; ekin "
         "içeriğini tahmin etme.\n"
+        "- Okur bir ödev kâğıdının ya da tahtanın fotoğrafını yükleyip ödev eklemek ister gibiyse "
+        "`odev_fotograftan` aracını o ekin kimliğiyle çağır; ödevi sen kaydetmezsin, okur kartta "
+        "onaylar. Teslim tarihi okunamadıysa bunu sor; tarih uydurma.\n"
         "- Işık'a özel diğer sorular (duyuru, eski ödev, portalın ek sayfaları) ve bir "
         "ödevin ayrıntısı → `ogrenci_verisi_ara`.\n"
         "- Konu, kavram, müfredat, kazanım sorusu → `kazanim_ara`, `mufredat_ara`. MEB "
@@ -2588,6 +2593,9 @@ class AssistantRuntime:
         secili_odev: str = "",
         odev_anahtari: str = "",
         denetle: Callable[[str, str], str] | None = None,
+        ek_okuyucu: Callable[[str], Any] | None = None,
+        alistirma_kimlikleri: list[str] | None = None,
+        yukleme_deposu=None,
     ) -> dict[str, Any]:
         # `dispatch`, if given, replaces self.registry.dispatch for this
         # call only. chat_events() (below) uses this to wrap tool calls
@@ -2617,7 +2625,7 @@ class AssistantRuntime:
                                          pencere=pencere, ozet=ozet, secili_odev=secili_odev,
                                          notlar=not_deposu.notlar() if hafiza and not_deposu is not None else None)
 
-        hafiza_kw = ({"hafiza": hafiza, "not_deposu": not_deposu}
+        hafiza_kw = ({"hafiza": hafiza, "not_deposu": not_deposu, "sohbet_id": sohbet_id}
                      if not_deposu is not None else {})
 
         try:
@@ -2638,7 +2646,10 @@ class AssistantRuntime:
                     self.registry.dispatch, ilerleme_izni=ilerleme_izni is True, okur=okur,
                     ogretmen=ogretmen, mod_onerisi=mod_onerisi,
                     odev_anahtari=odev_anahtari, okur_sozu=user_query,
-                    **({**hafiza_kw, "sohbet_id": sohbet_id} if hafiza_kw else {})),
+                    **({**hafiza_kw, "sahip_email": sahip_email or "",
+                        "yukleme_deposu": yukleme_deposu, "alistirma_kimlikleri": alistirma_kimlikleri}
+                       if hafiza_kw else {}),
+                    **({"ek_okuyucu": ek_okuyucu} if ek_okuyucu is not None else {})),
                 tier=tier,
                 on_delta=on_delta,
                 on_reset=on_reset,
@@ -2740,6 +2751,10 @@ class AssistantRuntime:
             "mode_suggestion": next(
                 ({k: v for k, v in o.items() if k != "event"} for o in reversed(loop.olaylar)
                  if o.get("event") == "mode_suggestion"), None),
+            "quiz": next(({k: v for k, v in o.items() if k != "event"}
+                          for o in loop.olaylar if o.get("event") == "quiz"), None),
+            "odev_onerisi": next(({k: v for k, v in o.items() if k != "event"}
+                                 for o in loop.olaylar if o.get("event") == "odev_onerisi"), None),
             "meta": {
                 "model": self.llm.last_model_used or self.llm.model,
                 "provider": "anthropic",
@@ -2818,8 +2833,12 @@ class AssistantRuntime:
             odev_anahtari=str(kwargs.get("odev_anahtari") or ""),
             okur_sozu=okur_sozu,
             **({"hafiza": kwargs.get("hafiza", True), "not_deposu": kwargs["not_deposu"],
-                "sohbet_id": kwargs.get("sohbet_id", "")}
-               if kwargs.get("not_deposu") is not None else {}))
+                "sohbet_id": kwargs.get("sohbet_id", ""),
+                "sahip_email": kwargs.get("sahip_email") or "",
+                "yukleme_deposu": kwargs.get("yukleme_deposu"),
+                "alistirma_kimlikleri": kwargs.get("alistirma_kimlikleri")}
+               if kwargs.get("not_deposu") is not None else {}),
+            **({"ek_okuyucu": kwargs["ek_okuyucu"]} if kwargs.get("ek_okuyucu") is not None else {}))
 
         # First suggestion wins here too (review round 2, finding NB2): without
         # this, a model calling mod_oner twice in one answer put two

@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import copy
 import html
+import hashlib
 import json
 import logging
 import os
@@ -255,6 +256,7 @@ ODEV_TOOL = "odev_listesi"
 ODEV_BELGE = "odev_belgesi"
 
 ODEV_TAMAMLA = "odev_tamamla"
+ODEV_FOTO_TOOL = "odev_fotograftan"
 ODEV_ATIF = "Ödevlerim · güncel liste"
 
 # Portal attachments (plan 2026-09-28-portal-ekleri): ek_oku pages the text
@@ -557,7 +559,7 @@ _HAFIZA_ARACLARI = {"hafiza_yaz", "hafiza_duzelt"}
 # Tools whose visible result is a ToolOutcome.olay: when a model already
 # writes its answer, their success needs neither on_reset nor another round.
 # Quiz rows are also persisted; only the answer-free card reaches the reader.
-OLAY_ARACLARI = {MOD_ONER_TOOL, "alistirma_olustur"}
+OLAY_ARACLARI = {MOD_ONER_TOOL, "alistirma_olustur", ODEV_FOTO_TOOL}
 _ALISTIRMA_ARACLARI = {"alistirma_olustur", "ogrenme_gunlugu", "calisma_degerlendir"}
 _RUBRIK = "degerlendirme-rubrigi.md"
 MOD_GEREKCE_SINIRI = 200
@@ -1788,7 +1790,8 @@ class McpRegistry:
                  skills: dict[str, Any] | None = None,
                  not_deposu: Any = None,
                  odev_belge_ara: Callable[[str, str], str] | None = None,
-                 odev_yazici: Callable[[str, str, str], str] | None = None) -> None:
+                 odev_yazici: Callable[[str, str, str], str] | None = None,
+                 foto_odev_kaynagi: Callable[[bytes, str], list[dict]] | None = None) -> None:
 
         self.clients = clients
         # Öğretmen skill'leri (src/assistant_skills.py), id -> Skill. Empty: no
@@ -1798,6 +1801,7 @@ class McpRegistry:
         # (homework_key, query) -> passages of that homework's documents only.
         # None: odev_belgesi is not declared.
         self.odev_belge_ara = odev_belge_ara
+        self.foto_odev_kaynagi = foto_odev_kaynagi
         # Işık's grade in the corpus's form ("7.Sınıf"), read when asked so a
         # new school year needs no restart. None, or a None answer, means
         # unknown: no grade is then invented.
@@ -1936,6 +1940,13 @@ class McpRegistry:
                     },
                     "required": ["anahtar", "alan", "deger"],
                 },
+            })
+        if self.foto_odev_kaynagi is not None and okur in ("ogrenci", "aile") and mod_onerisi:
+            decls.append({
+                "name": ODEV_FOTO_TOOL,
+                "description": "Yüklenen ödev fotoğrafını okur ve onay kartı gösterir. Ödevi kaydetmez; okur kartta onaylar.",
+                "parameters": {"type": "object", "properties": {
+                    "ek_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"}}, "required": ["ek_id"]},
             })
         if self.ek_deposu is not None:
             decls.append(copy.deepcopy(_EK_OKU_BILDIRIMI))
@@ -2120,7 +2131,10 @@ class McpRegistry:
                 mod_onerisi: bool = True, hafiza: bool = True,
                 not_deposu: Any = None, sohbet_id: str = "", odev_anahtari: str = "", okur_sozu: str = "",
                 sahip_email: str = "", yukleme_deposu: Any = None,
-                alistirma_kimlikleri: list[str] | None = None) -> ToolOutcome:
+                alistirma_kimlikleri: list[str] | None = None,
+                ek_okuyucu: Callable[[str], Any] | None = None) -> ToolOutcome:
+        if name == ODEV_FOTO_TOOL:
+            return self._dispatch_odev_fotograftan(args or {}, okur, mod_onerisi, ek_okuyucu)
         if name in _ALISTIRMA_ARACLARI:
             depo = not_deposu if not_deposu is not None else self.not_deposu
             return self._dispatch_alistirma(name, args or {}, ogretmen, okur, depo,
@@ -2358,6 +2372,36 @@ class McpRegistry:
                  if sayfa < toplam else "")
         # No citation: these are the teacher's own notes, not a source for the reader.
         return ToolOutcome(ok=True, text=f"{ad} · sayfa {sayfa}/{toplam}\n\n{metin}{devam}")
+
+    def _dispatch_odev_fotograftan(self, args, okur, etkilesimli, ek_okuyucu):
+        if (self.foto_odev_kaynagi is None or ek_okuyucu is None
+                or okur not in ("ogrenci", "aile") or not etkilesimli):
+            return ToolOutcome(ok=False, error="Bu istekte fotoğraftan ödev okunamaz.")
+        kimlik = args.get("ek_id")
+        if not isinstance(kimlik, str) or not re.fullmatch(r"[0-9a-f]{32}", kimlik):
+            return ToolOutcome(ok=False, error="Yüklenen görsel bulunamadı.")
+        bulunan = ek_okuyucu(kimlik)
+        if bulunan is None or bulunan[0].get("tur") != "gorsel":
+            return ToolOutcome(ok=False, error="Yüklenen görsel bulunamadı.")
+        try:
+            ham = self.foto_odev_kaynagi(bulunan[1], "image/jpeg")
+        except Exception as exc:
+            logger.warning("Homework photo extraction failed (%s)", type(exc).__name__)
+            return ToolOutcome(ok=False, error="Fotoğraftaki ödev şu an okunamadı; yeniden deneyebilirsin.")
+        adaylar = []
+        for satir in ham if isinstance(ham, list) else []:
+            if not isinstance(satir, dict):
+                continue
+            aday = {alan: str(satir.get(kaynak) or "").strip() for alan, kaynak in (
+                ("ders", "ders_adi"), ("baslik", "odev_basligi"),
+                ("teslim", "son_teslim_tarihi"), ("aciklama", "aciklama"))}
+            aday["eksik"] = [alan for alan in ("ders", "baslik", "teslim") if not aday[alan]]
+            adaylar.append(aday)
+        if not adaylar:
+            return ToolOutcome(ok=False, error="Bu görselde okunabilen bir ödev bulunamadı.")
+        return ToolOutcome(ok=True, text=json.dumps(adaylar, ensure_ascii=False), olay={
+            "event": "odev_onerisi", "ek_id": kimlik, "adaylar": adaylar,
+            "photo_hash": hashlib.sha256(bulunan[1]).hexdigest()[:16]})
 
     def _dispatch_alistirma(self, name: str, args: dict[str, Any], ogretmen: str,
                             okur: str, depo: Any, sohbet_id: str, sahip_email: str,
@@ -2656,7 +2700,8 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                    skills: dict[str, Any] | None = None,
                    not_deposu: Any = None,
                    odev_belge_ara: Callable[[str, str], str] | None = None,
-                   odev_yazici: Callable[[str, str, str], str] | None = None) -> McpRegistry:
+                   odev_yazici: Callable[[str, str, str], str] | None = None,
+                   foto_odev_kaynagi: Callable[[bytes, str], list[dict]] | None = None) -> McpRegistry:
 
     """Wire the configured servers. A server with no key is simply absent —
     its tools are not declared — but it is still named by degraded(), so an
@@ -2679,4 +2724,5 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                        platform_kaynagi=platform_kaynagi, kitap_kaynagi=kitap_kaynagi,
                        video_kaynagi=video_kaynagi, aile_kaynak_arama=aile_kaynak_arama,
                        saat=saat, skills=skills, not_deposu=not_deposu, odev_belge_ara=odev_belge_ara,
-                       odev_yazici=odev_yazici, ek_deposu=ek_deposu)
+                       odev_yazici=odev_yazici, ek_deposu=ek_deposu,
+                       foto_odev_kaynagi=foto_odev_kaynagi)
