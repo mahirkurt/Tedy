@@ -29,7 +29,8 @@ from src.assistant_skills import GENEL
 from src.portal_susu import temiz_metin
 from src.portal_ekleri import (DURUM_BAGLANTI, DURUM_BEKLIYOR, DURUM_COK_BUYUK, DURUM_ERISILEMEDI,
                                DURUM_HATA, DURUM_INDIRILDI, KIMLIK_DESENI, METIN_DESTEKLENMIYOR,
-                               METIN_VAR, METIN_YOK, ek_basligi, ek_kimligi, ek_turu, metin_govdesi)
+                               METIN_HATA, METIN_VAR, METIN_YOK, ek_basligi, ek_kimligi, ek_turu,
+                               metin_govdesi)
 
 logger = logging.getLogger(__name__)
 
@@ -1527,12 +1528,16 @@ def _ek_sayfa_sinirlari(govde: str, boyut: int = EK_SAYFA_KARAKTER) -> list[tupl
     last line break, form feed or space in the second half of a page."""
     sinirlar: list[tuple[int, int]] = []
     i = 0
+    ff = chr(12)
     while i < len(govde):
         son = min(len(govde), i + boyut)
         if son < len(govde):
-            kes = max(govde.rfind("\n", i, son), govde.rfind(" ", i, son), govde.rfind(chr(12), i, son))
+            kes = max(govde.rfind("\n", i, son), govde.rfind(" ", i, son), govde.rfind(ff, i, son))
             if kes > i + boyut // 2:
-                son = kes
+                # A form feed is the page break. Ending on it leaves the next
+                # slice starting on that character, and the page count then
+                # misses it — a slice that is only page 2 is labeled 1–2.
+                son = kes + 1 if govde[kes] == ff else kes
         if govde[i:son].strip():
             sinirlar.append((i, son))
         i = son
@@ -1543,7 +1548,8 @@ def ek_oku_metni(depo: Any, kimlik: Any, sayfa: Any = 1) -> tuple[str, str, str]
     """(body, citation label, id) for ek_oku. A ValueError is an argument the
     model can correct. Honest about every state: not downloaded (with the
     reason), no text layer (a scan — no OCR, plan decision 2), a type whose
-    text is not read, text not extracted yet."""
+    text is not read, extraction failed (with text_reason — a later sync does
+    not promise the text), text not extracted yet."""
     kimlik = str(kimlik or "").strip().lower()
     if kimlik.startswith("ek:"):
         kimlik = kimlik[3:]
@@ -1565,6 +1571,10 @@ def ek_oku_metni(depo: Any, kimlik: Any, sayfa: Any = 1) -> tuple[str, str, str]
     if metin_durumu == METIN_DESTEKLENMIYOR:
         return (f"{bas}\nBu ek türünün ({kayit.get('ext') or 'bilinmeyen tür'}) metnini okuyamıyorum; "
                 "okur dosyayı TEDY'de açabilir."), etiket, kimlik
+    if metin_durumu == METIN_HATA:
+        neden = " ".join(str(kayit.get("text_reason") or "").split())
+        ek = f" ({neden})" if neden else ""
+        return (f"{bas}\nBu ekin metni okunamadı{ek}. Okur dosyayı TEDY'de açabilir."), etiket, kimlik
     ham = ""
     if metin_durumu == METIN_VAR:
         try:
@@ -1586,8 +1596,19 @@ def ek_oku_metni(depo: Any, kimlik: Any, sayfa: Any = 1) -> tuple[str, str, str]
     ff = chr(12)
     pdf = ""
     if ff in govde:
-        ilk_s, son_s = govde.count(ff, 0, bas_i) + 1, govde.count(ff, 0, son_i) + 1
-        pdf = f" · PDF s.{ilk_s}" + (f"–{son_s}" if son_s != ilk_s else "")
+        # The start page is the first character that is not a form feed, so a
+        # slice that still opens on the break is not numbered one page early.
+        # A trailing form feed was consumed as the break, not as the next page.
+        basla = bas_i
+        while basla < son_i and govde[basla] == ff:
+            basla += 1
+        bitir = son_i
+        while bitir > basla and govde[bitir - 1] == ff:
+            bitir -= 1
+        if basla < bitir:
+            ilk_s = govde.count(ff, 0, basla) + 1
+            son_s = govde.count(ff, 0, bitir) + 1
+            pdf = f" · PDF s.{ilk_s}" + (f"–{son_s}" if son_s != ilk_s else "")
     parca = govde[bas_i:son_i].replace(ff, "\n").strip()
     kuyruk = f"\n\n(Devamı: ek_oku id={kimlik} sayfa={n + 1})" if n < toplam else "\n\n(Ekin sonu.)"
     return f"{bas}\nMetin sayfası {n}/{toplam}{pdf}\n\n{parca}{kuyruk}", etiket, kimlik

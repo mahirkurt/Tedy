@@ -4,9 +4,10 @@ odev_listesi names attachments with their ids, BM25 hits carry the sidecar label
 import json
 from datetime import datetime
 
-from src.assistant_tools import (EK_TOOL, GOVDE_SINIRI, McpRegistry, build_registry,
+from src.assistant_tools import (EK_SAYFA_KARAKTER, EK_TOOL, GOVDE_SINIRI, McpRegistry,
+                                 _ek_sayfa_sinirlari, build_registry, ek_oku_metni,
                                  odev_listesi_metni)
-from src.portal_ekleri import METIN_ONEKI, EkDeposu, ek_kimligi
+from src.portal_ekleri import METIN_HATA, METIN_ONEKI, EkDeposu, ek_kimligi
 
 SIMDI = datetime(2026, 9, 24, 16, 10)
 SP_URL = "https://ornekokul-my.sharepoint.com/:b:/g/personal/ogretmen_ornekokul_k12_tr/EaBcDeFgHiJ?e=AbC123"
@@ -61,6 +62,44 @@ def test_son_sayfa_ve_aralik_disi(tmp_path):
     assert not disari.ok and "metin sayfası var" in disari.error
 
 
+def _pdf_etiketi(metin: str) -> str:
+    satir = next(s for s in metin.splitlines() if "PDF s." in s)
+    return satir.split("PDF s.", 1)[1].strip()
+
+
+def test_form_beslemesi_sonraki_pdf_sayfasini_bir_geri_yazmaz(tmp_path):
+    """The 3,300-character cut lands on the form feed. The next slice is only
+    the following PDF page, so its label must not still name the previous one.
+    'PDF s.1' as a substring of 'PDF s.1–2' does not catch this."""
+    sayfa1 = "Birinci sayfa isareti qx7. " * 80
+    sayfa2 = "YALNIZIKINCI" * 200
+    govde = sayfa1 + FF + sayfa2
+    ff = govde.index(FF)
+    assert EK_SAYFA_KARAKTER // 2 < ff < EK_SAYFA_KARAKTER < len(govde)
+    sinir = _ek_sayfa_sinirlari(govde)
+    assert sinir[0][1] == ff + 1 and sinir[1][0] == ff + 1
+    assert FF not in govde[sinir[1][0]:sinir[1][1]]
+
+    depo = _depo(tmp_path)
+    depo.metin_yolu(KIMLIK).write_text(
+        f"{METIN_ONEKI}Sayfa 12-13.pdf · Kitap okuma ödevi\n\n{govde}", encoding="utf-8")
+    reg = _reg(depo)
+    ilk = reg.dispatch(EK_TOOL, {"id": KIMLIK})
+    sonraki = reg.dispatch(EK_TOOL, {"id": KIMLIK, "sayfa": 2})
+    assert ilk.ok and sonraki.ok
+    assert _pdf_etiketi(ilk.text) == "1"
+    assert _pdf_etiketi(sonraki.text) == "2"
+    assert "YALNIZIKINCI" in sonraki.text and "Birinci sayfa isareti" not in sonraki.text
+
+    # A slice that still opens on a form feed (the body itself does) counts
+    # from the first character that is not one.
+    onde = FF + ("YALNIZIKINCI" * 20)
+    depo.metin_yolu(KIMLIK).write_text(
+        f"{METIN_ONEKI}Sayfa 12-13.pdf · Kitap okuma ödevi\n\n{onde}", encoding="utf-8")
+    metin, _, _ = ek_oku_metni(depo, KIMLIK, 1)
+    assert _pdf_etiketi(metin) == "2"
+
+
 def test_gecersiz_ve_bilinmeyen_kimlik(tmp_path):
     reg = _reg(_depo(tmp_path))
     assert "16 karakterlik" in reg.dispatch(EK_TOOL, {"id": "../x"}).error
@@ -74,6 +113,10 @@ def test_durumlar_durustce_soylenir(tmp_path):
     assert "metin katmanı yok" in _reg(_depo(tmp_path, text="yok")).dispatch(EK_TOOL, {"id": KIMLIK}).text
     assert ".xlsx" in _reg(_depo(tmp_path, text="desteklenmiyor", ext=".xlsx")).dispatch(EK_TOOL, {"id": KIMLIK}).text
     assert "henüz çıkarılmadı" in _reg(_depo(tmp_path, text="bekliyor")).dispatch(EK_TOOL, {"id": KIMLIK}).text
+    neden = "pdftotext zaman asimi qx4"
+    hata = _reg(_depo(tmp_path, text=METIN_HATA, text_reason=neden)).dispatch(EK_TOOL, {"id": KIMLIK})
+    assert hata.ok and "okunamadı" in hata.text and neden in hata.text
+    assert "henüz çıkarılmadı" not in hata.text
 
 
 def test_bm25_isabeti_yan_meta_etiketini_tasir(tmp_path):
