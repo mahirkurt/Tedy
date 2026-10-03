@@ -8,6 +8,7 @@ import json
 import os
 import re
 import secrets
+import sqlite3
 import sys
 import threading
 import time
@@ -36,6 +37,7 @@ from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.US
     ALLOWED_EMAILS,
     FULL_ACCESS_EMAILS,
     GOOGLE_CLIENT_ID,
+    OGRENCI_EMAILS,
     ROLE_FULL,
     ROLE_READER,
     USER_ROLES,
@@ -2531,6 +2533,131 @@ def assistant_upload_oku(kimlik):
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
     })
+
+
+def _sohbet_deposu():
+    from pathlib import Path
+    from src.assistant_sohbet import SohbetDeposu
+    return SohbetDeposu(Path(OUTPUT_DIR) / "assistant_sohbetler.sqlite")
+
+
+def _asistan_simdi():
+    return datetime.now(timezone.utc)
+
+
+def _sohbet_erisim(sid):
+    """Return the row, ownership and a uniform error for absent/foreign chats."""
+    email = _module_person()
+    if not email:
+        return None, False, (jsonify({"error": "session_required"}), 403)
+    row = _sohbet_deposu().getir(sid) if isinstance(sid, str) else None
+    if row is None or (row["sahip_email"] != email and not (
+            okur_turu(email) == "aile" and row["sahip_email"] in OGRENCI_EMAILS)):
+        return None, False, (jsonify({"error": "Sohbet bulunamadı."}), 404)
+    return row, row["sahip_email"] == email, None
+
+
+def _sohbet_yaniti(row):
+    return {k: row[k] for k in ("id", "baslik", "ogretmen", "olusturma", "guncelleme")}
+
+
+def _sohbet_kapisi(view):
+    """Session-only storage; translate actual SQLite failures without private detail."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        access = _require_assistant_access()
+        if access is not None:
+            return access
+        if not _module_person():
+            return jsonify({"error": "session_required"}), 403
+        try:
+            return view(*args, **kwargs)
+        except sqlite3.OperationalError as exc:
+            app.logger.error("Assistant chat storage failed (%s)", type(exc).__name__)
+            return jsonify({"error": "Sohbet kaydedilemedi."}), 500
+    return wrapped
+
+
+@app.route("/api/assistant/sohbetler", methods=["GET", "POST"])
+@require_auth
+@_sohbet_kapisi
+def assistant_sohbetler():
+    email = _module_person()
+    if request.method == "GET":
+        kisi = request.args.get("kisi")
+        if kisi is not None:
+            if kisi != "ogrenci":
+                return jsonify({"error": "Bilinmeyen kişi."}), 400
+            if okur_turu(email) not in ("ogrenci", "aile"):
+                return jsonify({"error": "session_required"}), 403
+            email = email if email in OGRENCI_EMAILS else next(iter(OGRENCI_EMAILS))
+        return jsonify({"sohbetler": _sohbet_deposu().liste(email)})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Geçersiz istek gövdesi."}), 400
+    ogretmen, hata = _istek_ogretmeni(payload)
+    if hata is not None:
+        return hata
+    depo = _sohbet_deposu()
+    sid = depo.yarat(email, ogretmen, _asistan_simdi())
+    return jsonify(_sohbet_yaniti(depo.getir(sid)))
+
+
+@app.route("/api/assistant/sohbetler/<sid>", methods=["GET", "PATCH", "DELETE"])
+@require_auth
+@_sohbet_kapisi
+def assistant_sohbet(sid):
+    row, sahip, hata = _sohbet_erisim(sid)
+    if hata is not None:
+        return hata
+    depo = _sohbet_deposu()
+    if request.method == "GET":
+        return jsonify({"sohbet": _sohbet_yaniti(row), "mesajlar": depo.tum_mesajlar(sid),
+                        "read_only": not sahip})
+    if not sahip:
+        return jsonify({"error": "Bu sohbet salt okunur."}), 403
+    if request.method == "DELETE":
+        from src.assistant_uploads import EkDeposu
+        EkDeposu(OUTPUT_DIR).sohbet_eklerini_sil(sid)
+        depo.sil(sid)
+        return jsonify({"ok": True})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or not {"baslik", "ogretmen"}.intersection(payload):
+        return jsonify({"error": "Geçersiz istek gövdesi."}), 400
+    baslik = payload.get("baslik")
+    if "baslik" in payload:
+        if not isinstance(baslik, str) or not baslik.strip():
+            return jsonify({"error": "Başlık boş olamaz."}), 400
+        baslik = baslik.strip()
+    ogretmen = None
+    if "ogretmen" in payload:
+        ogretmen, hata = _istek_ogretmeni(payload)
+        if hata is not None:
+            return hata
+    depo.guncelle(sid, baslik, ogretmen, _asistan_simdi())
+    return jsonify(_sohbet_yaniti(depo.getir(sid)))
+
+
+@app.route("/api/assistant/sohbetler/<sid>/mesaj", methods=["POST"])
+@require_auth
+@_sohbet_kapisi
+def assistant_sohbet_mesaj(sid):
+    _row, sahip, hata = _sohbet_erisim(sid)
+    if hata is not None:
+        return hata
+    if not sahip:
+        return jsonify({"error": "Bu sohbet salt okunur."}), 403
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Geçersiz istek gövdesi."}), 400
+    icerik = payload.get("icerik")
+    if not isinstance(icerik, str) or not icerik.strip():
+        return jsonify({"error": "Mesaj boş olamaz."}), 400
+    ogretmen, hata = _istek_ogretmeni(payload)
+    if hata is not None:
+        return hata
+    mid = _sohbet_deposu().mesaj_ekle(sid, "user", icerik.strip(), ogretmen, [], _asistan_simdi())
+    return jsonify({"id": mid})
 
 
 @app.route("/api/assistant/plan", methods=["POST"])
