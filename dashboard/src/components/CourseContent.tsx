@@ -163,7 +163,7 @@ export default function CourseContent() {
   }
 
   return (
-    <div className="dashboard-card">
+    <div className="dashboard-card course-content">
       <div className="course-content__header">
         <h2 className="dashboard-card__title">
           <Education size={20} />

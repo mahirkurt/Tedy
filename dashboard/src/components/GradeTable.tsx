@@ -27,6 +27,18 @@ const headers = [
   ...COL_SHORT.map(c => ({ key: c, header: c })),
 ]
 
+// Carbon's default is the English "Expand current row". The column header
+// already calls this Ayrıntı; the row button should use the same word.
+function tabloDili(id: string): string {
+  switch (id) {
+    case 'carbon.table.row.expand': return 'Ayrıntı'
+    case 'carbon.table.row.collapse': return 'Ayrıntıyı gizle'
+    case 'carbon.table.all.expand': return 'Tüm ayrıntıları aç'
+    case 'carbon.table.all.collapse': return 'Tüm ayrıntıları gizle'
+    default: return id
+  }
+}
+
 export default function GradeTable() {
   // priorYear: the report's term names an earlier school year than the one
   // TEDY is in (/api/grades, the check /api/exams and the assistant make).
@@ -57,7 +69,7 @@ export default function GradeTable() {
   }))
 
   return (
-    <div className="dashboard-card">
+    <div className="dashboard-card grade-table">
       <TableContainer
         title={
           <span className="dashboard-card__title dashboard-card__title--tight">
@@ -71,7 +83,7 @@ export default function GradeTable() {
           </span>
         }
       >
-        <DataTable rows={tableRows} headers={headers} size="sm">
+        <DataTable rows={tableRows} headers={headers} size="sm" translateWithId={tabloDili}>
           {({ rows: dtRows, headers: dtHeaders, getTableProps, getHeaderProps, getRowProps, getExpandHeaderProps }) => (
             <Table {...getTableProps()}>
               <TableHead>

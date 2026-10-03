@@ -507,6 +507,15 @@ body {
   padding: 0;
 }
 
+// D3b phone gate is 44px. 1.75rem is 28px; spacing-09 is 48px, the same
+// floor the bottom bar already uses. Desktop stays the smaller circle.
+@media (max-width: 671px) {
+  .today__nav-btn {
+    width: spacing.$spacing-09;
+    height: spacing.$spacing-09;
+  }
+}
+
 .today__today-btn {
   height: 1.75rem;
   padding: 0 spacing.$spacing-04;
@@ -5245,4 +5254,29 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   @include type.type-style('helper-text-01');
   color: var(--cds-text-error);
   margin-top: var(--ted-space-2xs);
+}
+
+// D3b phone gate: a control the reader taps is at least 44px. spacing-09 is
+// 48px. Desktop sizes stay as they were.
+@media (max-width: 671px) {
+  .calendar-nav .cds--btn--sm {
+    min-block-size: spacing.$spacing-09;
+    min-inline-size: spacing.$spacing-09;
+  }
+
+  // The sm table row is 2rem, so the expand button measured 32×33.
+  .grade-table .cds--table-expand {
+    min-inline-size: spacing.$spacing-09;
+    min-block-size: spacing.$spacing-09;
+  }
+
+  .grade-table .cds--table-expand__button {
+    min-inline-size: spacing.$spacing-09;
+    min-block-size: spacing.$spacing-09;
+  }
+
+  // Accordion headings use the density height, measured 40px on Dersler.
+  .course-content .cds--accordion__heading {
+    min-block-size: spacing.$spacing-09;
+  }
 }

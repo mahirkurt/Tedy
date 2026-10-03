@@ -262,7 +262,7 @@ export default function CalendarEvents() {
           size="sm"
           hasIconOnly
           renderIcon={ChevronLeft}
-          iconDescription="Onceki hafta"
+          iconDescription="Önceki hafta"
           onClick={() => setWeekOffset(w => w - 1)}
         />
         <span className="calendar-nav__label">{weekLabel(days[0].date, days[days.length - 1].date)}</span>
