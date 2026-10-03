@@ -90,3 +90,14 @@ def test_reader_never_reaches_the_runtime(env):
     _sign_in(client, READER)
     assert _hit_all(client) == [403, 403, 403]
     assert recorder.calls == []
+
+
+def test_dashboard_key_cannot_open_persisted_chat(env, monkeypatch, tmp_path):
+    client, recorder = env
+    monkeypatch.setattr(dashboard_api, "OUTPUT_DIR", str(tmp_path))
+    response = client.post("/api/assistant/chat", json={**BODY, "sohbet_id": "ab" * 16},
+                           headers={"Authorization": "Bearer tdyK_test"})
+    assert response.status_code == 403
+    assert response.get_json()["error"] == "session_required"
+    assert recorder.calls == []
+    assert not (tmp_path / "assistant_sohbetler.sqlite").exists()

@@ -372,3 +372,34 @@ def test_storage_failure_is_redacted(istemci, monkeypatch):
         res = getattr(istemci, method)(path, json=body)
         assert res.status_code == 500
         assert res.get_json() == {"error": "Sohbet kaydedilemedi."}
+
+
+def test_completed_retry_restores_only_visible_cards(istemci, monkeypatch):
+    _giris(istemci, ISIK)
+    sid = istemci.post("/api/assistant/sohbetler", json={}).get_json()["id"]
+    photo = {"ek_id": "ab" * 16, "photo_hash": "ab" * 8, "adaylar": [
+        {"ders": "Matematik", "baslik": "Kesirler", "teslim": "", "aciklama": "Sayfa 3", "eksik": ["teslim"]}]}
+    clarify = {"soru": "Hangi konu?", "secenekler": ["Kesir", "Oran"]}
+    class Runtime:
+        def chat(self, **kwargs):
+            assert kwargs["force_deep"] is True
+            return {**_answer(), "odev_onerisi": {**photo, "private_trace": "gizli"},
+                    "netlestirme": {**clarify, "private_trace": "gizli"}, "meta": {"private_trace": "gizli"}}
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: Runtime())
+    body = {"sohbet_id": sid, "request_id": "ab" * 16, "force_deep": True,
+            "messages": [{"role": "user", "content": "Ödeve ekle"}]}
+    assert istemci.post("/api/assistant/chat", json=body).status_code == 200
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: pytest.fail("replay must not call model"))
+    replay = istemci.post("/api/assistant/chat", json=body).get_json()
+    assert replay["odev_onerisi"] == photo
+    assert replay["netlestirme"] == clarify
+    assert "gizli" not in str(replay)
+    rows = _sohbet_deposu().tum_mesajlar(sid)
+    assert len(rows) == 2 and all(r["meta_json"] == "{}" for r in rows)
+    _giris(istemci, AILE)
+    history = istemci.get(f"/api/assistant/sohbetler/{sid}").get_json()
+    assert history["read_only"] is True
+    assert history["mesajlar"][1]["odev_onerisi"] == photo
+    assert history["mesajlar"][1]["netlestirme"] == clarify
+    assert "gizli" not in str(history)
+    assert istemci.post("/api/assistant/chat", json=body).status_code == 403

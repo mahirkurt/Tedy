@@ -198,3 +198,34 @@ def test_upload_binding_keeps_original_chat(tmp_path):
     assert uploads.oku(ISIK, upload["id"])[0]["bagli_sohbet"] == "ab" * 16
     raw = json.loads((tmp_path / "assistant_uploads" / email_hash(ISIK) / (upload["id"] + ".json")).read_text())
     assert "id" not in raw
+
+
+def test_visible_card_migration_preserves_existing_message(tmp_path):
+    import sqlite3
+    from src.assistant_sohbet import SohbetDeposu
+    path = tmp_path / "older.sqlite"
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE mesaj (id TEXT PRIMARY KEY, sohbet_id TEXT, rol TEXT, icerik TEXT, "
+                 "atiflar_json TEXT DEFAULT '[]', ekler_json TEXT DEFAULT '[]', meta_json TEXT DEFAULT '{}', "
+                 "ogretmen TEXT, zaman TEXT, sira INTEGER, istek_id TEXT)")
+    conn.execute("INSERT INTO mesaj (id,sohbet_id,rol,icerik,ogretmen,zaman,sira) "
+                 "VALUES ('m','s','assistant','eski','genel','2026-10-03T00:00:00Z',1)")
+    conn.commit(); conn.close()
+    for _ in range(2):
+        row = SohbetDeposu(path).tum_mesajlar("s")[0]
+        assert row["icerik"] == "eski" and row["kartlar_json"] == "{}"
+        assert row["meta_json"] == "{}"
+
+
+def test_visible_cards_drop_nested_metadata_and_cannot_be_user_injected(tmp_path):
+    from src.assistant_sohbet import gorunen_kartlar
+    aday = {"ders": "Matematik", "baslik": "Kesirler", "teslim": "", "aciklama": "Sayfa 3",
+            "eksik": ["teslim", "private_trace"], "private_trace": "gizli"}
+    payload = {"odev_onerisi": {"ek_id": "ab" * 16, "adaylar": [aday], "meta": {"secret": "gizli"}},
+               "meta": {"secret": "gizli"}, "tool_results": ["gizli"]}
+    temiz = gorunen_kartlar(payload)
+    assert "gizli" not in str(temiz) and "private_trace" not in str(temiz)
+    depo = SohbetDeposu(tmp_path / "chat.sqlite")
+    sid = depo.yarat(ISIK, "genel", SIMDI)
+    depo.mesaj_ekle(sid, "user", "Oku", "genel", [], SIMDI, kartlar=payload)
+    assert depo.tum_mesajlar(sid)[0]["kartlar_json"] == "{}"

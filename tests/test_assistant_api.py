@@ -18,7 +18,8 @@ class _FakeRuntime:
     son_plan = {}
 
     def chat(self, messages, session_id="", context_filters=None, temperature=0.2, ilerleme_izni=False,
-             okur="bilinmiyor", ogretmen="genel", sahip_email=None, secili_odev="", odev_anahtari=""):
+             okur="bilinmiyor", ogretmen="genel", sahip_email=None, secili_odev="", odev_anahtari="",
+             force_deep=False, ek_okuyucu=None):
         # /chat forwards the homework selector (empty when the request names none).
         _FakeRuntime.son_sohbet = {"secili_odev": secili_odev, "odev_anahtari": odev_anahtari}
         return {

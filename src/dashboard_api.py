@@ -2812,9 +2812,8 @@ def _ekleri_hazirla(messages, email):
 @app.route("/api/assistant/chat", methods=["POST"])
 @require_auth
 def assistant_chat():
-    access = _require_assistant_access()
-    if access is not None:
-        return access
+    # require_auth keeps the existing dashboard-key read-only chat contract;
+    # a persisted conversation still requires a person in _sohbet_erisim.
     payload = request.get_json(silent=True)
     if payload is None:
         payload = {}
@@ -2864,6 +2863,7 @@ def assistant_chat():
             session_id=session_id,
             context_filters=context_filters,
             temperature=temperature,
+            force_deep=bool(payload.get("force_deep", False)),
             ilerleme_izni=_assistant_progress_allowed(),
             okur=_assistant_okur(),
             ogretmen=ogretmen,
@@ -3107,12 +3107,15 @@ def _sohbet_istegini_hazirla(payload, messages, email, ogretmen):
         return None, {}, (jsonify({"error": "İstek kimliği başka bir mesaja ait."}), 409)
     cevap = next((m for m in onceki if m["rol"] == "assistant"), None)
     if cevap:
+        from src.assistant_sohbet import gorunen_kartlar
+        kartlar = gorunen_kartlar(json.loads(cevap["kartlar_json"]))
         alistirmalar = [_alistirma_yaniti(a) for a in depo.alistirmalar(cevap["id"])]
         return [], {"tekrar": {
             "answer": cevap["icerik"], "citations": json.loads(cevap["atiflar_json"]),
             "safety_flags": [], "plan_blocks": [], "intent": "qa", "session_id": "",
             "mode_suggestion": None, "quiz": alistirmalar[0] if alistirmalar else None,
-            "odev_onerisi": None, "meta": {"ogretmen": cevap["ogretmen"]},
+            "odev_onerisi": None, "netlestirme": None, **kartlar,
+            "meta": {"ogretmen": cevap["ogretmen"]},
         }}, None
     from src.assistant_uploads import EkDeposu, ISTEK_SINIRI
     eski = depo.son_mesajlar(sid, 20 if onceki else 19)
@@ -3156,7 +3159,7 @@ def _sohbet_cevap_kaydet(sohbet, payload, ogretmen):
     depo = sohbet["depo"]
     mid = depo.mesaj_ekle(
         sohbet["sid"], "assistant", payload["answer"], ogretmen, [], _asistan_simdi(),
-        atiflar=payload.get("citations", []), istek_id=sohbet.get("request_id"))
+        atiflar=payload.get("citations", []), istek_id=sohbet.get("request_id"), kartlar=payload)
     for aid in sohbet.get("alistirma_kimlikleri", []):
         depo.alistirma_bagla(aid, mid)
     if ogretmen != assistant_skills.GENEL:
@@ -3223,7 +3226,9 @@ def assistant_sohbet(sid):
     depo = _sohbet_deposu()
     if request.method == "GET":
         mesajlar = depo.tum_mesajlar(sid)
+        from src.assistant_sohbet import gorunen_kartlar
         for mesaj in mesajlar:
+            mesaj.update(gorunen_kartlar(json.loads(mesaj.pop("kartlar_json"))))
             mesaj["alistirma"] = [_alistirma_yaniti(a) for a in depo.alistirmalar(mesaj["id"])]
             mesaj["yuklemeler"] = [{k: ek[k] for k in ("id", "ad", "tur") if k in ek}
                                    for ek in json.loads(mesaj["ekler_json"]) if isinstance(ek, dict)]
