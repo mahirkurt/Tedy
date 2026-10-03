@@ -3,7 +3,7 @@ scanned PDFs, attachments are read page by page inside the sync budget, ek_oku
 and the text sidecar carry the OCR text and its labels. Fake reader only."""
 from src.assistant_core import AssistantConfig, AssistantIndexer, AssistantRuntime, FileAdapters, HybridRetriever
 from src.assistant_tools import EK_TOOL, McpRegistry
-from src.ocr_katmani import OcrKatmani
+from src.ocr_katmani import OcrHatasi, OcrKatmani
 from src.portal_ekleri import EkDeposu, ek_kimligi
 from src.portal_ekleri_indir import MB, Butce, ekleri_esitle, metin_cikar
 from tests.sahte_http import SP_URL, SahteOturum, SahteYanit
@@ -150,6 +150,31 @@ def test_yarim_ocr_deneme_saymaz_ve_ek_oku_ilerlemeyi_soyler(tmp_path):
     ekleri_esitle(kok, VERI, oturum, Butce(float("inf"), 100 * MB), metin_cikarici=lambda y, s: cevaplar.pop(0))
     kayit = depo.kayit(ek_kimligi(SP_URL))
     assert (kayit["text"], kayit["text_attempts"]) == ("var", 1) and "ocr_ilerleme" not in kayit
+
+
+def test_olcum_hatasi_yok_sanilmaz_ve_yeniden_denenir(tmp_path):
+    """pdf_oku raising OcrHatasi is not "OCR found nothing": the sidecar must
+    not become the terminal yok state, and ek_oku must not say the pages were
+    read and empty."""
+    kok = _dizin(tmp_path / "kok")
+
+    class Olculemeyen:
+        def saat(self):
+            return 0.0
+
+        def pdf_oku(self, *a, **k):
+            raise OcrHatasi("pdfinfo sayfa sayısını okuyamadı")
+
+    ekleri_esitle(kok, VERI, _taranmis_oturum(tmp_path), Butce(float("inf"), 100 * MB),
+                  ocr=Olculemeyen())
+    depo = EkDeposu(kok)
+    kayit = depo.kayit(ek_kimligi(SP_URL))
+    yan = depo.metin_yolu(kayit["id"])
+    assert kayit["text"] == "bekliyor" and kayit.get("text_attempts", 0) == 0
+    assert not yan.exists()
+    out = McpRegistry(clients={}, local_search=lambda q, k: [], ek_deposu=depo).dispatch(
+        EK_TOOL, {"id": kayit["id"]})
+    assert out.ok and "okunur metin bulamadı" not in out.text
 
 
 def test_istem_dusuk_guvenli_ocr_sayfasini_kesin_saymaz():

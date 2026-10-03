@@ -1372,8 +1372,11 @@ class FileAdapters:
 
     def _pdf_ocr(self, file_path: Path, text: str) -> dict[str, Any] | None:
         """Pages without a text layer through the OCR layer (plan 2026-09-28,
-        Görev 15). None: no OCR configured, nothing to OCR, or the file could
-        not be measured — the caller then keeps the plain pdftotext result."""
+        Görev 15). None: no OCR configured, nothing to OCR, or OCR finished
+        and found no readable text — the caller then keeps the plain
+        pdftotext result. A measurement failure is not that result: it
+        raises PdfExtractionError("ocr_suruyor") so the file stays
+        retryable and is not recorded as finished with no text."""
         if self.ocr is None or self.ocr_son_an is None:
             return None
         if not self.ocr_her_sayfa and text.strip():
@@ -1387,8 +1390,12 @@ class FileAdapters:
         try:
             sonuc = self.ocr.pdf_oku(file_path, self.ocr_son_an, sayfa_metinleri=sayfalar)
         except OcrHatasi as exc:
+            # pdfinfo/pdftotext/pdftoppm failed before any page was read.
+            # Returning None makes extract() record "pdf_no_text", which the
+            # attachment sync stores as terminal yok and ek_oku reports as
+            # "OCR found nothing" for pages it never opened.
             logger.warning("OCR %s: %s", file_path.name, exc)
-            return None
+            raise PdfExtractionError("ocr_suruyor", ilerleme="") from exc
         if sonuc.eksik:
             raise PdfExtractionError("ocr_suruyor", ilerleme=sonuc.ilerleme)
         if not sonuc.ocr_sayfalari:
