@@ -1,4 +1,7 @@
 import type { ReactNode } from 'react'
+import Formul from '../components/Formul'
+import Kaydirilabilir from '../components/Kaydirilabilir'
+import './markdown.scss'
 
 /**
  * Purpose-built Markdown renderer for Tedy Books chapters and the assistant's
@@ -17,6 +20,15 @@ import type { ReactNode } from 'react'
 
 interface ListItem { text: string; children?: { ordered: boolean; items: string[] } }
 
+export type KutuAdi = 'kavram' | 'ornek' | 'adimlar' | 'sonuc' | 'hata'
+const KUTULAR: ReadonlySet<string> = new Set(['kavram', 'ornek', 'adimlar', 'sonuc', 'hata'])
+const KUTU_ACILIS_RE = /^:::\s*([a-zçğıöşü]+)\s*$/
+const KUTU_KAPANIS_RE = /^:::\s*$/
+const BLOK_FORMUL_RE = /^\$\$(.+)\$\$$/
+const ETIKET: Record<KutuAdi, string> = {
+  kavram: 'Kavram', ornek: 'Örnek', adimlar: 'Adımlar', sonuc: 'Sonuç', hata: 'Sık yapılan hata',
+}
+
 type Block =
   | { kind: 'heading'; level: 2 | 3 | 4; hashes: number; text: string }
   | { kind: 'verse'; lines: string[] }
@@ -24,6 +36,8 @@ type Block =
   | { kind: 'table'; header: string[]; rows: string[][] }
   | { kind: 'rule' }
   | { kind: 'paragraph'; text: string; sourceLines: number }
+  | { kind: 'kutu'; ad: KutuAdi; children: Block[] }
+  | { kind: 'formul'; tex: string }
 
 const HEADING_RE = /^(#{1,6})\s+(.*)$/
 const RULE_RE = /^\s*(?:---+|\*\*\*+|___+)\s*$/
@@ -37,7 +51,7 @@ const isOrdered = (marker: string) => /\d/.test(marker)
 const tableCells = (line: string) =>
   line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim())
 
-function parseBlocks(markdown: string, sohbet: boolean): Block[] {
+function parseBlocks(markdown: string, sohbet: boolean, icte = false): Block[] {
   const lines = markdown.replace(/\r\n?/g, '\n').split('\n')
   const blocks: Block[] = []
   let paragraph: string[] = []
@@ -54,6 +68,36 @@ function parseBlocks(markdown: string, sohbet: boolean): Block[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
+
+    const acilis = sohbet && !icte ? KUTU_ACILIS_RE.exec(line.trim()) : null
+    if (acilis) {
+      flushParagraph()
+      const icerik: string[] = []
+      i++
+      while (i < lines.length && !KUTU_KAPANIS_RE.test(lines[i].trim())) {
+        icerik.push(lines[i++])
+      }
+      const children = parseBlocks(icerik.join('\n'), true, true)
+      if (KUTULAR.has(acilis[1])) blocks.push({ kind: 'kutu', ad: acilis[1] as KutuAdi, children })
+      else blocks.push(...children)
+      continue
+    }
+
+    if (sohbet) {
+      const formul = BLOK_FORMUL_RE.exec(line.trim())
+      if (formul || line.trim() === '$$') {
+        flushParagraph()
+        let tex = formul?.[1] ?? ''
+        if (!formul) {
+          const icerik: string[] = []
+          i++
+          while (i < lines.length && lines[i].trim() !== '$$') icerik.push(lines[i++])
+          tex = icerik.join('\n')
+        }
+        blocks.push({ kind: 'formul', tex })
+        continue
+      }
+    }
 
     if (line.trim() === '') {
       flushParagraph()
@@ -232,6 +276,7 @@ function foldLooseVerse(blocks: Block[]): Block[] {
 }
 
 const INLINE_RE = /(\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_|`[^`]+`)/g
+const SOHBET_INLINE_RE = /(?<!\\)\$(?!\$)[^$\n]+?(?<!\\)\$|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_|`[^`]+`/g
 
 export type TokenRenderer = (token: string, key: string) => ReactNode
 
@@ -249,7 +294,9 @@ function pushText(
   text: string,
   key: string,
   renderToken?: TokenRenderer,
+  sohbet = false,
 ): void {
+  if (sohbet) text = text.replace(/\\\$/g, '$')
   if (!renderToken) {
     nodes.push(text)
     return
@@ -270,25 +317,30 @@ function renderInline(
   text: string,
   keyPrefix: string,
   renderToken?: TokenRenderer,
+  sohbet = false,
 ): ReactNode[] {
   const nodes: ReactNode[] = []
   let last = 0
   let match: RegExpExecArray | null
-  INLINE_RE.lastIndex = 0
+  const inline = sohbet ? SOHBET_INLINE_RE : INLINE_RE
+  inline.lastIndex = 0
 
-  while ((match = INLINE_RE.exec(text)) !== null) {
+  while ((match = inline.exec(text)) !== null) {
     if (match.index > last) {
-      pushText(nodes, text.slice(last, match.index), `${keyPrefix}-${last}`, renderToken)
+      pushText(nodes, text.slice(last, match.index), `${keyPrefix}-${last}`, renderToken, sohbet)
     }
     const token = match[0]
     const key = `${keyPrefix}-${match.index}`
-    if (token.startsWith('**') || token.startsWith('__')) {
+    if (sohbet && token.startsWith('$')) {
+      nodes.push(<Formul key={key} tex={token.slice(1, -1)} blok={false} />)
+    } else if (token.startsWith('**') || token.startsWith('__')) {
       // The emphasised text is itself a plain-text run, so a [S1] marker
       // written inside "**...**" gets the same renderToken treatment as one
       // outside it — otherwise "**a warning [S1]**" (ordinary model prose)
       // would carry a citation into a <strong> that never became a chip.
       const inner: ReactNode[] = []
-      pushText(inner, token.slice(2, -2), key, renderToken)
+      if (sohbet) inner.push(...renderInline(token.slice(2, -2), key, renderToken, true))
+      else pushText(inner, token.slice(2, -2), key, renderToken)
       nodes.push(<strong key={key}>{inner}</strong>)
     } else if (token.startsWith('`')) {
       // Code spans are verbatim by design: a "[S1]"-shaped string inside
@@ -298,14 +350,16 @@ function renderInline(
       nodes.push(<code key={key}>{token.slice(1, -1)}</code>)
     } else {
       const inner: ReactNode[] = []
-      pushText(inner, token.slice(1, -1), key, renderToken)
+      if (sohbet) inner.push(...renderInline(token.slice(1, -1), key, renderToken, true))
+      else pushText(inner, token.slice(1, -1), key, renderToken)
       nodes.push(<em key={key}>{inner}</em>)
     }
     last = match.index + token.length
+    inline.lastIndex = last
   }
 
   if (last < text.length) {
-    pushText(nodes, text.slice(last), `${keyPrefix}-${last}`, renderToken)
+    pushText(nodes, text.slice(last), `${keyPrefix}-${last}`, renderToken, sohbet)
   }
   return nodes
 }
@@ -327,6 +381,7 @@ const CALLOUT_RE = /^\*\*(Şimdi|Öneri|İpucu|Sonraki adım|Not|Dikkat|Hatırla
 const EYLEM = new Set(['Şimdi', 'Öneri', 'İpucu', 'Sonraki adım'])
 
 function renderSohbet(blocks: Block[], renderToken?: TokenRenderer): ReactNode[] {
+  const satir = (text: string, key: string) => renderInline(text, key, renderToken, true)
   // The page's own title is an h2, so an answer's sections are h3 and their
   // parts h4 — never an h4 straight under the h2.
   let sawSection = false
@@ -336,7 +391,7 @@ function renderSohbet(blocks: Block[], renderToken?: TokenRenderer): ReactNode[]
     const Tag = `h${level}` as 'h3' | 'h4'
     return (
       <Tag key={key} className={`ac-md__h ac-md__h--${level}`}>
-        {renderInline(text.replace(/:\s*$/, ''), key, renderToken)}
+        {satir(text.replace(/:\s*$/, ''), key)}
       </Tag>
     )
   }
@@ -347,7 +402,7 @@ function renderSohbet(blocks: Block[], renderToken?: TokenRenderer): ReactNode[]
         start={ordered && start !== 1 ? start : undefined}>
         {items.map((item, j) => (
           <li key={j}>
-            {renderInline(item.text, `${key}-${j}`, renderToken)}
+            {satir(item.text, `${key}-${j}`)}
             {item.children && list(`${key}-${j}-k`, item.children.ordered,
               item.children.items.map(text => ({ text })))}
           </li>
@@ -359,6 +414,37 @@ function renderSohbet(blocks: Block[], renderToken?: TokenRenderer): ReactNode[]
   return blocks.map((block, i) => {
     const key = `b${i}`
     switch (block.kind) {
+      case 'kutu': {
+        if (block.ad === 'adimlar') {
+          return <div key={key} className="ac-kutu--adimlar">{block.children.map((child, j) => {
+            if (child.kind !== 'list' || !child.ordered) {
+              return <div key={j}>{renderSohbet([child], renderToken)}</div>
+            }
+            return (
+              <ol key={j} className="ac-adimlar" aria-label="Adımlar" start={child.start}>
+                {child.items.map((item, k) => (
+                  <li key={k} className="ac-adim">
+                    <span className="ac-adim__no" aria-hidden="true">{child.start + k}</span>
+                    <div className="ac-adim__govde">
+                      {satir(item.text, `${key}-${j}-${k}`)}
+                      {item.children && list(`${key}-${j}-${k}-alt`, item.children.ordered,
+                        item.children.items.map(text => ({ text })))}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )
+          })}</div>
+        }
+        return (
+          <div key={key} className={`ac-kutu ac-kutu--${block.ad}`}>
+            <span className="ac-kutu__etiket">{ETIKET[block.ad]}</span>
+            {renderSohbet(block.children, renderToken)}
+          </div>
+        )
+      }
+      case 'formul':
+        return <Formul key={key} tex={block.tex} blok />
       case 'rule':
         return <hr key={key} className="ac-md__rule" />
       case 'heading':
@@ -369,7 +455,7 @@ function renderSohbet(blocks: Block[], renderToken?: TokenRenderer): ReactNode[]
         return (
           <blockquote key={key} className="ac-md__quote">
             {block.lines.map((line, j) => (
-              <p key={j}>{renderInline(line, `${key}-${j}`, renderToken)}</p>
+              <p key={j}>{satir(line, `${key}-${j}`)}</p>
             ))}
           </blockquote>
         )
@@ -377,20 +463,22 @@ function renderSohbet(blocks: Block[], renderToken?: TokenRenderer): ReactNode[]
         return list(key, block.ordered, block.items, block.start)
       case 'table':
         return (
-          <table key={key} className="ac-md__table">
+          <Kaydirilabilir key={key} className="ac-md__table-wrap" etiket="Tablo">
+          <table className="ac-md__table">
             <thead>
               <tr>{block.header.map((h, j) => (
-                <th key={j} scope="col">{renderInline(h, `${key}-h${j}`, renderToken)}</th>
+                <th key={j} scope="col">{satir(h, `${key}-h${j}`)}</th>
               ))}</tr>
             </thead>
             <tbody>
               {block.rows.map((row, r) => (
                 <tr key={r}>{row.map((cell, j) => (
-                  <td key={j}>{renderInline(cell, `${key}-${r}-${j}`, renderToken)}</td>
+                  <td key={j}>{satir(cell, `${key}-${r}-${j}`)}</td>
                 ))}</tr>
               ))}
             </tbody>
           </table>
+          </Kaydirilabilir>
         )
       case 'paragraph': {
         const bold = BOLD_LINE_RE.exec(block.text)
@@ -402,11 +490,11 @@ function renderSohbet(blocks: Block[], renderToken?: TokenRenderer): ReactNode[]
           return (
             <div key={key} className={`ac-md__callout ac-md__callout--${EYLEM.has(label) ? 'eylem' : 'not'}`}>
               <span className="ac-md__callout-label">{label}</span>
-              <p className="ac-md__p">{renderInline(body, key, renderToken)}</p>
+              <p className="ac-md__p">{satir(body, key)}</p>
             </div>
           )
         }
-        return <p key={key} className="ac-md__p">{renderInline(block.text, key, renderToken)}</p>
+        return <p key={key} className="ac-md__p">{satir(block.text, key)}</p>
       }
     }
   })
@@ -464,6 +552,8 @@ export function renderMarkdown(markdown: string, options: RenderOptions = {}): R
       }
 
       case 'table':
+      case 'kutu':
+      case 'formul':
         // Parsed only for 'sohbet'; a chapter never reaches here.
         return null
 

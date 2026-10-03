@@ -1,0 +1,113 @@
+@use '@carbon/styles/scss/spacing';
+@use '@carbon/styles/scss/type';
+
+.ac-kutu {
+  margin-block: spacing.$spacing-04;
+  padding: spacing.$spacing-04 spacing.$spacing-05;
+  border-inline-start: 3px solid var(--cds-border-strong-01);
+  background: var(--cds-layer-02);
+}
+
+.ac-kutu__etiket {
+  display: block;
+  margin-block-end: spacing.$spacing-02;
+  color: var(--cds-text-secondary);
+  @include type.type-style('label-01');
+  text-transform: uppercase;
+}
+
+.ac-kutu--ornek {
+  border: 1px solid var(--cds-border-subtle-01);
+  background: var(--cds-layer-01);
+}
+
+.ac-kutu--sonuc {
+  border-inline-start-color: var(--cds-support-success);
+  background: var(--cds-notification-background-success);
+  @include type.type-style('heading-compact-01');
+}
+
+.ac-kutu--hata {
+  border-inline-start-color: var(--cds-support-warning);
+  background: var(--cds-notification-background-warning);
+}
+
+.ac[data-ogretmen]:not([data-ogretmen='genel']) {
+  .ac-kutu--kavram {
+    border-inline-start-color: var(--ted-subject-accent, var(--cds-border-strong-01));
+    background: var(--ted-subject-panel, var(--cds-layer-02));
+  }
+
+  .ac-kutu--kavram .ac-kutu__etiket {
+    color: var(--ted-subject-text, var(--cds-text-primary));
+  }
+
+  .ac-adim__no {
+    background: var(--ted-subject-accent, var(--cds-button-primary));
+  }
+}
+
+.ac-adimlar {
+  display: grid;
+  gap: spacing.$spacing-03;
+  margin-block: spacing.$spacing-04;
+  padding-inline-start: 0;
+  list-style: none;
+}
+
+.ac-adim {
+  display: flex;
+  gap: spacing.$spacing-04;
+  align-items: flex-start;
+  padding: spacing.$spacing-04;
+  border: 1px solid var(--cds-border-subtle-01);
+  background: var(--cds-layer-01);
+}
+
+.ac-adim__govde {
+  min-inline-size: 0;
+}
+
+.ac-adim__no {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  inline-size: spacing.$spacing-06;
+  block-size: spacing.$spacing-06;
+  background: var(--cds-button-primary);
+  color: var(--cds-text-on-color);
+  @include type.type-style('label-02');
+}
+
+.ac-formul {
+  display: inline-block;
+  max-inline-size: 100%;
+  vertical-align: middle;
+  padding-block: spacing.$spacing-01;
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  &:focus-visible {
+    outline: 2px solid var(--cds-focus);
+  }
+}
+
+.ac-formul--blok {
+  display: block;
+  margin-block: spacing.$spacing-04;
+}
+
+.ac-formul__kaynak {
+  @include type.type-style('code-02');
+}
+
+.ac-md__table-wrap {
+  overflow-x: auto;
+  max-inline-size: 100%;
+  margin-block: spacing.$spacing-04;
+
+  &:focus-visible {
+    outline: 2px solid var(--cds-focus);
+  }
+}
