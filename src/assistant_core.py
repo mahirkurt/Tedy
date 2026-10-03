@@ -192,7 +192,10 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     "achieve3000_progress.json",
     # The attachment tracker: URLs (teachers' SharePoint paths), statuses and
     # hashes — bookkeeping, readable through the attachments themselves.
+    # atomic_json_dump writes path + ".tmp" and renames; a killed run leaves
+    # portal_ekleri.json.tmp, and an unknown extension is read as text.
     "portal_ekleri.json",
+    "portal_ekleri.json.*",
 }
 
 # Bumped whenever a change to discovery, exclusion or tokenization would leave
