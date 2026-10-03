@@ -26,6 +26,7 @@ from src.course_names import normalize_course
 from src.mcp_client import McpClient, McpToolResult
 from src import assistant_kitaplar, assistant_modules
 from src.assistant_skills import GENEL
+from src.assistant_alistirma import DUZEYLER, alistirma_hata
 from src.portal_susu import temiz_metin
 from src.portal_ekleri import (DURUM_BAGLANTI, DURUM_BEKLIYOR, DURUM_COK_BUYUK, DURUM_ERISILEMEDI,
                                DURUM_HATA, DURUM_INDIRILDI, KIMLIK_DESENI, METIN_BEKLIYOR,
@@ -553,11 +554,12 @@ AILE_TOOL = "aile_kaynak_ara"
 SKILL_TOOL = "skill_kaynagi"
 MOD_ONER_TOOL = "mod_oner"
 _HAFIZA_ARACLARI = {"hafiza_yaz", "hafiza_duzelt"}
-# Tools that only leave a ToolOutcome.olay behind and change nothing else: a
-# model round that writes its answer and calls just one of these does not need
-# on_reset or another model round (chat_with_tools, review finding 1). B4's
-# quiz event will join this set the same way.
-OLAY_ARACLARI = {MOD_ONER_TOOL}
+# Tools whose visible result is a ToolOutcome.olay: when a model already
+# writes its answer, their success needs neither on_reset nor another round.
+# Quiz rows are also persisted; only the answer-free card reaches the reader.
+OLAY_ARACLARI = {MOD_ONER_TOOL, "alistirma_olustur"}
+_ALISTIRMA_ARACLARI = {"alistirma_olustur", "ogrenme_gunlugu", "calisma_degerlendir"}
+_RUBRIK = "degerlendirme-rubrigi.md"
 MOD_GEREKCE_SINIRI = 200
 
 # chat_with_tools slices every tool_result to 4,000 chars; a body cut there
@@ -822,6 +824,10 @@ def sinavlar_metni(sinavlar: Any, simdi: datetime) -> str:
         ham = " ".join(str(e.get("rawTitle") or "").split())
         if ham_ad and ham and ham != baslik:
             metin += f"\n  Portaldaki adı: {_kirp(ham, 140)}"
+        if ham_ad:
+            konular = [str(r.get("title") or "").strip()
+                       for r in (e.get("relatedContent") or []) if isinstance(r, dict)]
+            metin += "\n  Konular: " + ("; ".join([k for k in konular if k][:10])[:2000] if any(konular) else "yok")
         return metin
 
     parcalar = [bas + " (Sınavlar sayfasının listesi: portal takvimi ve not tablosu)"]
@@ -1979,7 +1985,48 @@ class McpRegistry:
                               "description": "Öğrencinin zorlandığı konuyu, anlatım tercihini ya da hedefini not eder." if ad == "hafiza_yaz" else "Öğrenci hakkındaki mevcut öğrenme notunu düzeltir.",
                               "parameters": {"type": "object", "properties": alanlar,
                                              "required": list(alanlar)}})
+        if depo is not None and sohbet_id:
+            decls.extend(self._alistirma_bildirimleri(ogretmen))
         return decls
+
+    def _alistirma_bildirimleri(self, ogretmen: str) -> list[dict[str, Any]]:
+        soru = {
+            "type": "object", "properties": {
+                "tur": {"type": "string", "enum": ["coktan_secmeli", "dogru_yanlis", "kisa_cevap"]},
+                "soru": {"type": "string"},
+                "secenekler": {"type": "array", "items": {"type": "string"}, "minItems": 4, "maxItems": 4},
+                "dogru": {"type": "string", "description": "Doğru cevabın metni; çoktan seçmelide seçeneklerden biri."},
+                "kabul_edilenler": {"type": "array", "items": {"type": "string"}},
+                "aciklama": {"type": "string"}, "kaynak": {"type": "string"},
+            }, "required": ["tur", "soru", "dogru", "aciklama"],
+        }
+        sonuc = [{
+            "name": "alistirma_olustur",
+            "description": "3–10 soruluk alıştırmayı cevap anahtarı sunucuda kalacak şekilde kart olarak sunar. Doğru cevabı sohbet metnine yazma.",
+            "parameters": {"type": "object", "properties": {
+                "baslik": {"type": "string"}, "ders": {"type": "string"},
+                "konu": {"type": "string"}, "kazanim_kodu": {"type": "string"},
+                "zorluk": {"type": "string", "enum": ["kolay", "orta", "zor"]},
+                "sorular": {"type": "array", "items": soru, "minItems": 3, "maxItems": 10},
+            }, "required": ["baslik", "ders", "konu", "zorluk", "sorular"]},
+        }]
+        skill = self.skills.get(ogretmen)
+        if skill is None or _RUBRIK not in skill.kaynaklar:
+            return sonuc
+        sonuc.extend([{
+            "name": "ogrenme_gunlugu",
+            "description": "Öğrencinin alıştırmalarda zorlandığı konuları ve son çalıştığı konuları okur.",
+            "parameters": {"type": "object", "properties": {}},
+        }, {
+            "name": "calisma_degerlendir",
+            "description": "Öğrencinin yüklediği çalışmayı öğretmen rubriğine göre değerlendirir. Önce skill_kaynagi ile degerlendirme-rubrigi.md dosyasını oku; sayısal not verme.",
+            "parameters": {"type": "object", "properties": {
+                "ek": {"type": "string"}, "guclu_yanlar": {"type": "string"},
+                "duzeyler": {"type": "string", "enum": list(DUZEYLER)},
+                "sonraki_adim": {"type": "string"},
+            }, "required": ["ek", "guclu_yanlar", "duzeyler", "sonraki_adim"]},
+        }])
+        return sonuc
 
     def _ogretmen_bildirimleri(self, ogretmen: str, mod_onerisi: bool = True) -> list[dict[str, Any]]:
         """mod_oner in genel mode, skill_kaynagi in a teacher mode, nothing without skills.
@@ -2071,7 +2118,14 @@ class McpRegistry:
     def dispatch(self, name: str, args: dict[str, Any], ilerleme_izni: bool = False,
                 okur: str = "bilinmiyor", ogretmen: str = GENEL,
                 mod_onerisi: bool = True, hafiza: bool = True,
-                not_deposu: Any = None, sohbet_id: str = "", odev_anahtari: str = "", okur_sozu: str = "") -> ToolOutcome:
+                not_deposu: Any = None, sohbet_id: str = "", odev_anahtari: str = "", okur_sozu: str = "",
+                sahip_email: str = "", yukleme_deposu: Any = None,
+                alistirma_kimlikleri: list[str] | None = None) -> ToolOutcome:
+        if name in _ALISTIRMA_ARACLARI:
+            depo = not_deposu if not_deposu is not None else self.not_deposu
+            return self._dispatch_alistirma(name, args or {}, ogretmen, okur, depo,
+                                            sohbet_id, sahip_email, yukleme_deposu,
+                                            alistirma_kimlikleri)
         if name in _HAFIZA_ARACLARI:
             depo = not_deposu if not_deposu is not None else self.not_deposu
             return self._dispatch_hafiza(name, args or {}, okur, hafiza, depo, sohbet_id)
@@ -2304,6 +2358,48 @@ class McpRegistry:
                  if sayfa < toplam else "")
         # No citation: these are the teacher's own notes, not a source for the reader.
         return ToolOutcome(ok=True, text=f"{ad} · sayfa {sayfa}/{toplam}\n\n{metin}{devam}")
+
+    def _dispatch_alistirma(self, name: str, args: dict[str, Any], ogretmen: str,
+                            okur: str, depo: Any, sohbet_id: str, sahip_email: str,
+                            yukleme_deposu: Any, kimlikler: list[str] | None) -> ToolOutcome:
+        sohbet = depo.getir(sohbet_id) if depo is not None and sohbet_id else None
+        if sohbet is None or (sahip_email and sohbet["sahip_email"] != sahip_email):
+            return ToolOutcome(ok=False, error="Bu istekte alıştırma kaydı kullanılamaz.")
+        sahip = sohbet["sahip_email"]
+        simdi = self.saat() if self.saat is not None else datetime.now(timezone.utc)
+        if name == "alistirma_olustur":
+            hata = alistirma_hata(args)
+            if hata:
+                return ToolOutcome(ok=False, error=hata)
+            kod = (args.get("kazanim_kodu") or "").strip() or None
+            aid = depo.alistirma_yaz(sohbet_id, sahip, ogretmen, args["baslik"],
+                                    args["ders"], args["konu"], kod, args["zorluk"],
+                                    args["sorular"], simdi)
+            if kimlikler is not None:
+                kimlikler.append(aid)
+            olay = {k: args[k] for k in ("baslik", "ders", "konu", "zorluk")}
+            olay.update(event="quiz", id=aid, kazanim_kodu=kod,
+                        sorular=[{k: s[k] for k in ("tur", "soru", "secenekler") if k in s}
+                                 for s in args["sorular"]])
+            return ToolOutcome(ok=True, text="Alıştırma kartı gösterildi. Cevap anahtarını paylaşma.", olay=olay)
+        skill = self.skills.get(ogretmen)
+        if skill is None or _RUBRIK not in skill.kaynaklar:
+            return ToolOutcome(ok=False, error="Bu araç yalnız öğretmen modunda kullanılabilir.")
+        if name == "ogrenme_gunlugu":
+            gunluk = depo.gunluk(sahip, simdi)
+            return ToolOutcome(ok=True, text=json.dumps({
+                "zayif_konular": gunluk["zayif"], "calisilan": gunluk["calisilan"],
+            }, ensure_ascii=False))
+        for alan in ("ek", "guclu_yanlar", "duzeyler", "sonraki_adim"):
+            if not isinstance(args.get(alan), str) or not args[alan].strip():
+                return ToolOutcome(ok=False, error=f"{alan} boş olmayan bir metin olmalıdır.")
+        if args["duzeyler"] not in DUZEYLER:
+            return ToolOutcome(ok=False, error="Düzey başlangıç, gelişiyor ya da yeterli olmalıdır; sayısal not verilmez.")
+        if yukleme_deposu is None or yukleme_deposu.oku(sahip, args["ek"]) is None:
+            return ToolOutcome(ok=False, error="Yüklenen çalışma bulunamadı.")
+        depo.degerlendirme_yaz(sohbet_id, args["ek"], ogretmen, args["guclu_yanlar"].strip(),
+                              args["duzeyler"], args["sonraki_adim"].strip(), okur, simdi)
+        return ToolOutcome(ok=True, text="Çalışma değerlendirmesi öğrenme günlüğüne kaydedildi.")
 
     def _dispatch_hafiza(self, name: str, args: dict[str, Any], okur: str,
                         hafiza: bool, depo: Any, sohbet_id: str) -> ToolOutcome:
