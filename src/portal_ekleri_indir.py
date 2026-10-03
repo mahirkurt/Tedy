@@ -57,6 +57,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from src.json_utils import atomic_json_dump
+from src.ocr_katmani import DEFTER, OcrDefteri
 from src.portal_ekleri import (DURUM_BAGLANTI, DURUM_BEKLIYOR, DURUM_COK_BUYUK, DURUM_ERISILEMEDI,
                                DURUM_HATA, DURUM_INDIRILDI, KIMLIK_DESENI, METIN_BEKLIYOR,
                                METIN_DESTEKLENMIYOR, METIN_HATA, METIN_ONEKI, METIN_VAR, METIN_YOK,
@@ -964,7 +965,7 @@ _ILERLEMESIZ = "kaynak sürdürmeyi desteklemiyor ve dosya bir turun bayt bütç
 _PDF = frozenset({".pdf"})
 _DOCX = frozenset({".docx"})
 _GORSEL = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp"})
-_METIN_NOTU = {METIN_YOK: "(Metin katmanı yok: taranmış belge ya da görsel.)",
+_METIN_NOTU = {METIN_YOK: "(Metin katmanı yok ve OCR okunur metin bulamadı: boş ya da yalnız görsel sayfalar.)",
                METIN_DESTEKLENMIYOR: "(Bu ek türünün metni okunmuyor.)"}
 _KESILDI_NOTU = "(Metin burada kesildi: bu ekin metni {mb} MB sınırını aşıyor; devamı okunmadı.)"
 _NEDEN_SURE = "metin çıkarma süresi doldu"
@@ -1079,16 +1080,18 @@ def _pdf_metni(yol: Path, sure: float) -> tuple[str, str]:
     return METIN_HATA, _NEDEN_PDFTOTEXT if kod in (126, 127) else _NEDEN_PDF_BOZUK
 
 
-def metin_cikar(yol: Path, sure: float) -> tuple[str, str]:
+def metin_cikar(yol: Path, sure: float, ocr: Any = None) -> tuple[str, str]:
     """(text status, text) for one downloaded copy, within `sure` seconds.
     For METIN_HATA the second element is the reason, in Turkish, for the
     tracker's `text_reason` — never written as the attachment's text.
 
-    - PDF: pdftotext, a child process killed at `sure` (see _pdf_metni). A
-      PDF without a text layer is METIN_YOK — reported, never OCR'd here:
-      rasterising and OCR'ing a scan costs seconds per page, and one
-      100-page book would outlast the whole 600 s cron run (plan 2026-09-28,
-      decision 2; OCR arrives in Görev 14–15).
+    - PDF without `ocr`: pdftotext, a child process killed at `sure` (see
+      _pdf_metni). A PDF without a text layer is METIN_YOK.
+    - PDF with `ocr` (src.ocr_katmani.OcrKatmani): every page without a text
+      layer is read by Claude Haiku 4.5's vision, or Tesseract past the
+      monthly cap, until `sure` seconds have passed. A scan read part-way is
+      METIN_BEKLIYOR and the progress ("read/total") is the second element;
+      the pages done are cached and the rest continue on the next run.
     - .docx: the assistant's own reader, in process, reading at most
       METIN_DOCX_XML_SINIRI of word/document.xml. An archive it cannot read
       (not a zip, a DTD, over the cap) is METIN_HATA with its reason;
@@ -1096,6 +1099,8 @@ def metin_cikar(yol: Path, sure: float) -> tuple[str, str]:
     - Images: METIN_YOK. FileAdapters' tesseract call has no timeout, so it
       is not run here even with ASSISTANT_ENABLE_OCR=1.
     - Anything else: METIN_DESTEKLENMIYOR."""
+    if ocr is not None and yol.suffix.lower() in _PDF:
+        return _pdf_ocr_ile(yol, sure, ocr)
     uzanti = yol.suffix.lower()
     if uzanti in _PDF:
         return _pdf_metni(yol, sure)
@@ -1111,6 +1116,36 @@ def metin_cikar(yol: Path, sure: float) -> tuple[str, str]:
     except DocxExtractionError as exc:
         return METIN_HATA, _DOCX_NEDENLERI.get(exc.reason, _DOCX_NEDENLERI["bozuk"])
     return (METIN_VAR, metin) if metin.strip() else (METIN_YOK, "")
+
+
+def _pdf_ocr_ile(yol: Path, sure: float, ocr: Any) -> tuple[str, str]:
+    """The OCR path of metin_cikar: FileAdapters reads every textless page
+    until `sure` runs out. The no-OCR path stays on _pdf_metni, whose child
+    process is killed at `sure` rather than padded to 5 s."""
+    from src.assistant_core import FileAdapters
+    ayar = _CikarmaAyari(max_file_size_mb=EK_BOYUT_SINIRI // MB + 1, pdf_max_pages=400,
+                         pdf_timeout=max(5, int(sure)),
+                         enable_ocr=os.environ.get("ASSISTANT_ENABLE_OCR", "0") == "1")
+    adaptor = FileAdapters(ayar, ocr=ocr)
+    adaptor.ocr_son_an = ocr.saat() + max(5.0, sure)
+    adaptor.ocr_her_sayfa = True
+    sonuc = adaptor.extract(yol, yol.name)
+    if sonuc.get("extraction_error") == "ocr_suruyor":
+        return METIN_BEKLIYOR, str(sonuc.get("ocr_ilerleme") or "")
+    if sonuc.get("extraction_error"):
+        return METIN_HATA, ""
+    if sonuc.get("source_kind") == "metadata":
+        return METIN_YOK, ""
+    return METIN_VAR, str(sonuc.get("text") or "")
+
+
+def _varsayilan_ocr(proje_koku: str | Path) -> Any:
+    """The OCR layer the sync uses unless a caller hands one in; none when
+    ASSISTANT_PDF_OCR=0 (tests/conftest.py sets it for every test)."""
+    if os.environ.get("ASSISTANT_PDF_OCR", "1") == "0":
+        return None
+    from src.ocr_katmani import OcrKatmani
+    return OcrKatmani(proje_koku)
 
 
 def metin_dosyasi(kayit: dict[str, Any], durum: str, metin: str) -> str:
@@ -1283,6 +1318,12 @@ def _metni_hazirla(depo: EkDeposu, kayit: dict[str, Any], butce: Butce,
     except Exception as exc:
         logger.warning("portal eki %s: metin çıkarılamadı (%s)", kimlik, type(exc).__name__, exc_info=True)
         durum, metin = METIN_HATA, f"metin çıkarılırken beklenmeyen hata ({type(exc).__name__})"
+    if durum == METIN_BEKLIYOR and isinstance(metin, str):
+        # A scan read part-way: its pages are cached (src/ocr_katmani.py) and
+        # the rest continue next run. Not an attempt — METIN_DENEME_SINIRI is
+        # for extractions that fail, not for a long book.
+        kayit.update(text=METIN_BEKLIYOR, ocr_ilerleme=metin)
+        return True
     if durum not in (METIN_VAR, METIN_YOK, METIN_DESTEKLENMIYOR, METIN_HATA) or not isinstance(metin, str):
         durum, metin = METIN_HATA, ""
     if durum == METIN_HATA and butce.bitti():
@@ -1293,6 +1334,7 @@ def _metni_hazirla(depo: EkDeposu, kayit: dict[str, Any], butce: Butce,
     elif durum != METIN_HATA:
         kayit.pop("text_cut", None)
     kayit["text_attempts"] = _tamsayi(kayit.get("text_attempts")) + 1
+    kayit.pop("ocr_ilerleme", None)
     kaynak = _kaynak(kayit)
     meta = {"id": kimlik, "name": kayit.get("name", ""), "title": kaynak.get("title", ""),
             "section": kaynak.get("section", ""), "course": kaynak.get("course", "")}
@@ -1320,7 +1362,8 @@ def _metni_hazirla(depo: EkDeposu, kayit: dict[str, Any], butce: Butce,
 
 def ekleri_esitle(proje_koku: str | Path, veri: Any, oturum: Any, butce: Butce, cerezler: Any = None,
                   simdi: Callable[[], datetime] = datetime.now,
-                  metin_cikarici: Callable[[Path, float], tuple[str, str]] = metin_cikar) -> dict[str, Any]:
+                  metin_cikarici: Callable[[Path, float], tuple[str, str]] = metin_cikar,
+                  ocr: Any = None) -> dict[str, Any]:
     """One run: collect every link in `veri`, merge into the tracker, then
     download and extract text in priority order until the budget runs out.
     The tracker is written after every file, so a run killed mid-way keeps
@@ -1332,6 +1375,11 @@ def ekleri_esitle(proje_koku: str | Path, veri: Any, oturum: Any, butce: Butce, 
     and that daemon thread may still be inside `oturum` — a requests.Session
     is not thread-safe, so no second download may start on it this run."""
     depo = EkDeposu(proje_koku)
+    if metin_cikarici is metin_cikar:
+        katman = ocr if ocr is not None else _varsayilan_ocr(proje_koku)
+
+        def metin_cikarici(yol: Path, sure: float, _katman: Any = katman) -> tuple[str, str]:
+            return metin_cikar(yol, sure, ocr=_katman)
     an = _yerel(simdi())
     zaman = an.isoformat(timespec="seconds")
     ekler = depo.oku()
@@ -1384,6 +1432,7 @@ def ekleri_esitle(proje_koku: str | Path, veri: Any, oturum: Any, butce: Butce, 
                                             DURUM_COK_BUYUK, DURUM_HATA, DURUM_BAGLANTI)},
             "bu_tur_indirilen": bu_tur["indirilen"], "bu_tur_bayt": bu_tur["bayt"],
             "bu_tur_metin": bu_tur["metin"],
+            "ocr_bu_ay_usd": round(OcrDefteri(Path(proje_koku) / DEFTER).harcanan(), 4),
             "kalan_is": sum(1 for k in ekler.values()
                             if (_indirilmeli(k, depo, an) and k.get("status") != DURUM_ERISILEMEDI)
                             or _metin_gerekli(k, depo))}

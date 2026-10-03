@@ -28,9 +28,9 @@ from src import assistant_kitaplar, assistant_modules
 from src.assistant_skills import GENEL
 from src.portal_susu import temiz_metin
 from src.portal_ekleri import (DURUM_BAGLANTI, DURUM_BEKLIYOR, DURUM_COK_BUYUK, DURUM_ERISILEMEDI,
-                               DURUM_HATA, DURUM_INDIRILDI, KIMLIK_DESENI, METIN_DESTEKLENMIYOR,
-                               METIN_HATA, METIN_VAR, METIN_YOK, ek_basligi, ek_kimligi, ek_turu,
-                               metin_govdesi)
+                               DURUM_HATA, DURUM_INDIRILDI, KIMLIK_DESENI, METIN_BEKLIYOR,
+                               METIN_DESTEKLENMIYOR, METIN_HATA, METIN_VAR, METIN_YOK, ek_basligi,
+                               ek_kimligi, ek_turu, metin_govdesi)
 
 logger = logging.getLogger(__name__)
 
@@ -1547,7 +1547,7 @@ def _ek_sayfa_sinirlari(govde: str, boyut: int = EK_SAYFA_KARAKTER) -> list[tupl
 def ek_oku_metni(depo: Any, kimlik: Any, sayfa: Any = 1) -> tuple[str, str, str]:
     """(body, citation label, id) for ek_oku. A ValueError is an argument the
     model can correct. Honest about every state: not downloaded (with the
-    reason), no text layer (a scan — no OCR, plan decision 2), a type whose
+    reason), no text even after OCR, or OCR still under way (plan decision 2), a type whose
     text is not read, extraction failed (with text_reason — a later sync does
     not promise the text), text not extracted yet."""
     kimlik = str(kimlik or "").strip().lower()
@@ -1566,8 +1566,11 @@ def ek_oku_metni(depo: Any, kimlik: Any, sayfa: Any = 1) -> tuple[str, str, str]
                 "okur eki kaynağında açabilir."), etiket, kimlik
     metin_durumu = kayit.get("text")
     if metin_durumu == METIN_YOK:
-        return (f"{bas}\nBu ekin metin katmanı yok (taranmış belge ya da görsel); içeriğini "
-                "okuyamıyorum. Okur dosyayı TEDY'de açabilir."), etiket, kimlik
+        return (f"{bas}\nBu ekin metin katmanı yok ve OCR da okunur metin bulamadı (boş ya da "
+                "yalnız görsel sayfalar); içeriğini okuyamıyorum. Okur dosyayı TEDY'de açabilir."), etiket, kimlik
+    if metin_durumu == METIN_BEKLIYOR and kayit.get("ocr_ilerleme"):
+        return (f"{bas}\nBu ek taranmış; sayfaları OCR ile okunuyor ({kayit['ocr_ilerleme']} sayfa "
+                "okundu). Metin sonraki eşitlemelerde tamamlanır; içeriğini şimdilik okuyamıyorum."), etiket, kimlik
     if metin_durumu == METIN_DESTEKLENMIYOR:
         return (f"{bas}\nBu ek türünün ({kayit.get('ext') or 'bilinmeyen tür'}) metnini okuyamıyorum; "
                 "okur dosyayı TEDY'de açabilir."), etiket, kimlik
@@ -1611,7 +1614,9 @@ def ek_oku_metni(depo: Any, kimlik: Any, sayfa: Any = 1) -> tuple[str, str, str]
             pdf = f" · PDF s.{ilk_s}" + (f"–{son_s}" if son_s != ilk_s else "")
     parca = govde[bas_i:son_i].replace(ff, "\n").strip()
     kuyruk = f"\n\n(Devamı: ek_oku id={kimlik} sayfa={n + 1})" if n < toplam else "\n\n(Ekin sonu.)"
-    return f"{bas}\nMetin sayfası {n}/{toplam}{pdf}\n\n{parca}{kuyruk}", etiket, kimlik
+    ocr_notu = ("\nNot: bu metin sayfasındaki PDF sayfalarının bir kısmı OCR ile okundu; "
+                "'OCR, güven düşük' diye işaretli sayfadaki bilgiyi kesin sayma.") if "· OCR" in parca else ""
+    return f"{bas}\nMetin sayfası {n}/{toplam}{pdf}{ocr_notu}\n\n{parca}{kuyruk}", etiket, kimlik
 
 
 def _aile_kaynak_etiketi(path: str) -> str:

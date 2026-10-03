@@ -43,3 +43,12 @@ def _canli_ek_indirmesi_yok(monkeypatch):
     def _yasak(*a, **k):
         raise RuntimeError("testte gerçek ek indirmesi yok")
     monkeypatch.setattr(indir, "ekleri_esitle", _yasak)
+
+
+@pytest.fixture(autouse=True)
+def _pdf_ocr_kapali(monkeypatch):
+    """OCR of scanned PDFs (src/ocr_katmani.py) is on by default in production.
+    In tests it is off unless a test turns it on and hands in a fake reader: a
+    scanned PDF in an unrelated test must not reach Claude, write the OCR
+    ledger, or spend ~20 s per page in real Tesseract (plan 2026-09-28, Görev 15)."""
+    monkeypatch.setenv("ASSISTANT_PDF_OCR", "0")
