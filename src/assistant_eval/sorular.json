@@ -1,0 +1,25 @@
+{
+  "surum": 1,
+  "dersler": {
+    "matematik": [
+      {"id": "matematik-1", "soru": "1/2 + 1/3 işlemini adım adım çöz.", "arac": "kazanim_ara", "kaynak": "kesir", "noktalar": ["payda"]},
+      {"id": "matematik-2", "soru": "3x = 12 denkleminde x kaçtır? İki tarafa aynı işlemi uygulayarak çöz.", "arac": "kitap_sayfa", "kaynak": "denklem", "noktalar": ["iki taraf"]},
+      {"id": "matematik-3", "soru": "Bir dairenin çevresi ile alanı aynı mıdır?", "arac": "skill_kaynagi", "kaynak": "daire", "noktalar": ["çevre", "alan"]}
+    ],
+    "fen": [
+      {"id": "fen-1", "soru": "Sindirim nerede başlar?", "arac": "kazanim_ara", "kaynak": "sindirim", "noktalar": ["ağız"]},
+      {"id": "fen-2", "soru": "Enerji harcanınca yok olur mu?", "arac": "kitap_sayfa", "kaynak": "enerji", "noktalar": ["dönüş"]},
+      {"id": "fen-3", "soru": "Tuzlu su bir bileşik midir?", "arac": "kazanim_ara", "kaynak": "karışım", "noktalar": ["karışım"]}
+    ],
+    "turkce": [
+      {"id": "turkce-1", "soru": "Bağlaç olan de bitişik mi yazılır?", "arac": "skill_kaynagi", "kaynak": "bağlaç", "noktalar": ["ayrı"]},
+      {"id": "turkce-2", "soru": "Konu ile ana fikir aynı mıdır?", "arac": "kazanim_ara", "kaynak": "ana fikir", "noktalar": ["ana fikir"]},
+      {"id": "turkce-3", "soru": "Fiilimsi kip eki alır mı?", "arac": "kitap_sayfa", "kaynak": "fiilimsi", "noktalar": ["fiilimsi"]}
+    ],
+    "sosyal": [
+      {"id": "sosyal-1", "soru": "Kanunları kim yapar?", "arac": "kazanim_ara", "kaynak": "kanun", "noktalar": ["TBMM"]},
+      {"id": "sosyal-2", "soru": "Tarihte bir olayın tek nedeni olur mu?", "arac": "kitap_sayfa", "kaynak": "neden", "noktalar": ["birden çok"]},
+      {"id": "sosyal-3", "soru": "Demokrasi yalnız oy vermek midir?", "arac": "skill_kaynagi", "kaynak": "demokrasi", "noktalar": ["kuvvetler"]}
+    ]
+  }
+}

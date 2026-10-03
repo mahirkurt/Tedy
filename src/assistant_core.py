@@ -34,6 +34,10 @@ from typing import Any
 import requests as http_requests
 
 from src import assistant_skills, claude_api
+from src.assistant_denetim import (
+    DENETIM_ISTEMI, DENETIM_KAYNAK, DENETIM_MAX_TOKENS, DENETIM_MODEL,
+    DENETIM_TIMEOUT_S, denetim_gerekli, denetim_oku, denetim_uygula, ogretmen_kurallari,
+)
 from src.hafta_secici import guncel_hafta
 from src.json_utils import atomic_json_dump
 
@@ -2583,6 +2587,7 @@ class AssistantRuntime:
         ozet: str | None = None,
         secili_odev: str = "",
         odev_anahtari: str = "",
+        denetle: Callable[[str, str], str] | None = None,
     ) -> dict[str, Any]:
         # `dispatch`, if given, replaces self.registry.dispatch for this
         # call only. chat_events() (below) uses this to wrap tool calls
@@ -2664,6 +2669,55 @@ class AssistantRuntime:
         answer, citations, dropped = self._finalize_citations(
             loop.text, loop.citations)
 
+        hata_metinleri = [self._model_hata_cevabi(), self._fallback_answer(user_query)]
+        neden = denetim_gerekli(ogretmen, answer, hata_metinleri)
+        # An error sentence can itself contain a user-supplied citation marker;
+        # sanitizing that marker must not turn the error into a billable answer.
+        if loop.text in hata_metinleri:
+            neden = "hata_cevabi"
+        if neden is None and denetle is None and not self.llm.available:
+            neden = "model_yok"
+        denetim = {"durum": "atlandi", "neden": neden, "sorun": [], "model": None}
+        if neden is None:
+            denetim = {"durum": "hata", "neden": "cagri", "sorun": [], "model": DENETIM_MODEL}
+            kullanici_json = json.dumps({
+                "cevap": answer, "okur": okur, "ogretmen": ogretmen, "sinif": "7. sınıf",
+                "kaynaklar": [{anahtar: atif.get(anahtar, "")
+                                for anahtar in ("id", "label", "snippet")}
+                               for atif in citations[:DENETIM_KAYNAK]],
+                "kurallar": (ogretmen_kurallari(self.skills[ogretmen].govde)
+                             if ogretmen != assistant_skills.GENEL else None),
+            }, ensure_ascii=False)
+            try:
+                if denetle is not None:
+                    ham = denetle(DENETIM_ISTEMI, kullanici_json)
+                else:
+                    # The checker has its own budget and must not overwrite the
+                    # answer's model/usage or inherit thinking and tool settings.
+                    sonuc = self.llm._get_client().with_options(max_retries=0).messages.create(
+                        model=DENETIM_MODEL, max_tokens=DENETIM_MAX_TOKENS,
+                        timeout=DENETIM_TIMEOUT_S, system=DENETIM_ISTEMI,
+                        messages=[{"role": "user", "content": kullanici_json}],
+                    )
+                    ham = "".join(blok.text for blok in sonuc.content
+                                  if getattr(blok, "type", "") == "text")
+            except Exception as exc:
+                logger.warning("Assistant answer check failed: %s", type(exc).__name__)
+            else:
+                try:
+                    karar = denetim_oku(ham, ogretmen_bakisi=ogretmen != assistant_skills.GENEL)
+                except ValueError:
+                    denetim["neden"] = "bicim"
+                else:
+                    yeni, denetim = denetim_uygula(answer, karar)
+                    if yeni != answer:
+                        temiz, yeni_atiflar, yeni_dusen = self._finalize_citations(yeni, citations)
+                        dropped += yeni_dusen
+                        if temiz:
+                            answer, citations = temiz, yeni_atiflar
+                        else:
+                            denetim.update(durum="hata", neden="bos")
+
         # Eski chat() bu bayrağı zayıf retrieval'dan set ediyordu. Retrieval ön
         # adımı kalkıyor ama bayrağın anlamı kalkmıyor: cevabın arkasında kaynak
         # yoksa okur bunu bilmeli. Yeni mimarideki karşılığı, çözülmüş atıf
@@ -2692,6 +2746,7 @@ class AssistantRuntime:
                 "usage": dict(loop.usage),
                 "tier": tier,
                 "ogretmen": ogretmen,
+                "denetim": denetim,
                 "tool_calls": loop.tool_calls,
                 "dropped_citations": dropped,
                 "degraded": self.registry.degraded(),
@@ -2708,6 +2763,7 @@ class AssistantRuntime:
             "citations": len(citations),
             "tool_calls": len(loop.tool_calls),
             "model": payload["meta"]["model"],
+            "denetim": denetim["durum"],
             "usage": dict(loop.usage),
             "safety_flags": payload["safety_flags"],
             "timestamp": _utcnow_naive().isoformat() + "Z",
