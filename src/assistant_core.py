@@ -2160,7 +2160,8 @@ class AssistantRuntime:
                  kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
                  video_kaynagi: Callable[[], Any] | None = None,
                  skills: dict[str, Any] | None = None,
-                 odev_belge_ara: Callable[[str, str], str] | None = None):
+                 odev_belge_ara: Callable[[str, str], str] | None = None,
+                 odev_yazici: Callable[[str, str, str], str] | None = None):
         # First, before anything else is built: a broken teacher skill stops the
         # assistant from opening at all (spec "Hata ve boşluk durumları"), with
         # the skill and the reason in the error — never a silent fallback.
@@ -2215,7 +2216,8 @@ class AssistantRuntime:
                                        video_kaynagi=video_kaynagi,
                                        aile_kaynak_arama=self._aile_search,
                                        skills=self.skills,
-                                       odev_belge_ara=odev_belge_ara)
+                                       odev_belge_ara=odev_belge_ara,
+                                       odev_yazici=odev_yazici)
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """The retriever, shaped as a tool the model can choose to call."""
@@ -2252,7 +2254,9 @@ class AssistantRuntime:
         "sayfasının gösterdiği listeyi, Işık'ın 'Yaptım' işaretleriyle verir. "
         "Işık'ın 'Yaptım' dediği bir ödevi yapılacak diye sunma. Teslim zamanını "
         "söylerken listedeki gün ve saati kullan; 'bu hafta', 'yarın' gibi sözleri "
-        "sorudaki 'Bugün:' satırına göre çöz.\n"
+        "sorudaki 'Bugün:' satırına göre çöz. Liste EKSİK ALAN diyorsa o alanı "
+        "kendin doldurma: bölümdeki tek soruyu sor, cevap gelince `odev_tamamla` "
+        "çağır ve deger'e okurun sözünü olduğu gibi yaz.\n"
         "- Seçili bir ödevin ekli belgesi (sayfa, soru, metin) → `odev_belgesi`. "
         "Yalnız asistan ekranında seçilmiş ödevin belgelerine bakar. Belgede olmayanı "
         "belgede yazıyormuş gibi söyleme. Seçim yoksa belge okunamaz; ödev seçilmesini iste.\n"
@@ -2517,7 +2521,7 @@ class AssistantRuntime:
                 dispatch=dispatch or functools.partial(
                     self.registry.dispatch, ilerleme_izni=ilerleme_izni is True, okur=okur,
                     ogretmen=ogretmen, mod_onerisi=mod_onerisi,
-                    odev_anahtari=odev_anahtari,
+                    odev_anahtari=odev_anahtari, okur_sozu=user_query,
                     **({**hafiza_kw, "sohbet_id": sohbet_id} if hafiza_kw else {})),
                 tier=tier,
                 on_delta=on_delta,
@@ -2638,12 +2642,14 @@ class AssistantRuntime:
         cancelled = threading.Event()
 
         # Read once, per call — never assigned back onto the registry.
+        okur_sozu = self._latest_user_message(list(kwargs.get("messages") or []))
         real_dispatch = functools.partial(
             self.registry.dispatch, ilerleme_izni=kwargs.get("ilerleme_izni") is True,
             okur=kwargs.get("okur", "bilinmiyor"),
             ogretmen=kwargs.get("ogretmen", assistant_skills.GENEL),
             mod_onerisi=kwargs.get("mod_onerisi", True),
             odev_anahtari=str(kwargs.get("odev_anahtari") or ""),
+            okur_sozu=okur_sozu,
             **({"hafiza": kwargs.get("hafiza", True), "not_deposu": kwargs["not_deposu"],
                 "sohbet_id": kwargs.get("sohbet_id", "")}
                if kwargs.get("not_deposu") is not None else {}))

@@ -1436,10 +1436,30 @@ body {
   @include type.type-style('body-01');
 }
 
-.photo-intake-form__hint {
+.photo-intake-form__hint,
+.photo-intake-form__error {
   margin: 0;
   @include type.type-style('label-01');
-  color: var(--ted-color-text-helper);
+  color: var(--ted-color-text-secondary);
+}
+
+.photo-intake-form__error {
+  color: var(--ted-text-error);
+}
+
+.photo-intake-draft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ted-space-sm);
+  margin: 0;
+  padding: var(--ted-space-sm) 0 0;
+  border: 0;
+  border-top: 1px solid var(--ted-color-border-subtle);
+}
+
+.photo-intake-draft__legend {
+  padding: 0;
+  @include type.type-style('heading-compact-01');
 }
 
 // ─── Login Page ──────────────────────────────────────────────────────────────

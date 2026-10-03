@@ -1,6 +1,8 @@
 """Integration tests for dashboard API endpoints."""
+import json
 import os
 import sys
+from datetime import datetime
 from io import BytesIO
 from unittest.mock import Mock, patch
 
@@ -336,6 +338,180 @@ class TestHomeworkPhotoEndpoint:
         assert second.status_code == 200
         assert second_payload["added_count"] == 0
         assert second_payload["skipped_count"] == 1
+
+    def test_missing_date_is_not_invented(self):
+        row = dashboard_api._to_photo_homework_row(
+            {
+                "ders_adi": "DKAB",
+                "odev_basligi": "Sayfa 4",
+                "odev_kaynagi": "Fasikül",
+                "son_teslim_tarihi": "",
+                "aciklama": "Kaynak: TED Connect\n1-5. sorular",
+            },
+            image_hash="abc",
+            selected_course="Matematik",
+        )
+        assert row["Ders Adı"] == "Din Kültürü"
+        assert row["Ödev Son Teslim Tarihi"] == ""
+        assert row["detail"]["description"] == "1-5. sorular"
+        assert row["Ödev Kaynağı"] == "Fotoğraf · Fasikül"
+        assert row["odev_kaynagi"] == "Fasikül"
+        assert row["source"] == "photo_ai_ted"
+
+    def test_confirmed_private_course_is_the_edited_one(self):
+        lesson = {"id": "abc", "course": "Matematik", "teacher": "Ayşe"}
+        candidate = {"ders_adi": "Türkçe", "odev_basligi": "Okuma", "son_teslim_tarihi": ""}
+        preview = dashboard_api._to_photo_homework_row(
+            candidate, image_hash="h", source_type="private", private_lesson=lesson,
+        )
+        confirmed = dashboard_api._to_photo_homework_row(
+            candidate, image_hash="h", source_type="private",
+            private_lesson=lesson, confirmed=True,
+        )
+        assert preview["Ders Adı"] == "Matematik"
+        assert confirmed["Ders Adı"] == "Türkçe"
+
+    def test_preview_writes_nothing(self, client, isolated_output):
+        candidates = [{
+            "ders_adi": "Türkçe",
+            "odev_basligi": "Okuma",
+            "son_teslim_tarihi": "",
+            "aciklama": "günlük",
+        }]
+        with patch(
+            "src.dashboard_api._extract_homework_candidates_from_photo",
+            return_value=candidates,
+        ):
+            resp = client.post(
+                "/api/homework/photo",
+                data={
+                    "photo": (BytesIO(b"img"), "hw.png", "image/png"),
+                    "stage": "preview",
+                },
+                content_type="multipart/form-data",
+            )
+        payload = resp.get_json()
+        assert resp.status_code == 200
+        assert payload["preview"] is True
+        assert payload["homework"][0]["Ödev Başlığı"] == "Okuma"
+        assert payload["homework"][0]["Ödev Son Teslim Tarihi"] == ""
+        assert not (isolated_output / "photo_homework.json").exists()
+
+    def test_commit_stores_the_confirmed_row_without_rereading(self, client, isolated_output):
+        with patch(
+            "src.dashboard_api._extract_homework_candidates_from_photo",
+            side_effect=AssertionError("commit must not call the model"),
+        ):
+            resp = client.post(
+                "/api/homework/photo",
+                data={
+                    "stage": "commit",
+                    "photo_hash": "abc123",
+                    "homework": json.dumps([{
+                        "Ders Adı": "DKAB",
+                        "Ödev Başlığı": "Sayfa 4",
+                        "Ödev Son Teslim Tarihi": "",
+                        "detail": {"description": "1-5"},
+                    }]),
+                },
+                content_type="multipart/form-data",
+            )
+        payload = resp.get_json()
+        assert resp.status_code == 200
+        assert payload["added_count"] == 1
+        stored = payload["homework"][0]
+        assert stored["Ders Adı"] == "Din Kültürü"
+        assert stored["Ödev Son Teslim Tarihi"] == ""
+        assert stored["detail"]["description"] == "1-5"
+        assert stored["photo_hash"] == "abc123"
+        assert (isolated_output / "photo_homework.json").exists()
+
+    def test_commit_keeps_the_book_name(self, client, isolated_output):
+        resp = client.post(
+            "/api/homework/photo",
+            data={
+                "stage": "commit",
+                "photo_hash": "abc123",
+                "homework": json.dumps([{
+                    "Ders Adı": "Türkçe",
+                    "Ödev Başlığı": "Okuma",
+                    "Ödev Son Teslim Tarihi": "1.10.2026",
+                    "odev_kaynagi": "Fasikül",
+                    "detail": {"description": "günlük"},
+                }]),
+            },
+            content_type="multipart/form-data",
+        )
+        stored = resp.get_json()["homework"][0]
+        assert resp.status_code == 200
+        assert stored["Ödev Kaynağı"] == "Fotoğraf · Fasikül"
+        assert stored["Ödev Son Teslim Tarihi"] == "01.10.2026 23:59"
+        assert stored["odev_kaynagi"] == "Fasikül"
+
+    def test_commit_rejects_an_unparsed_date(self, client, isolated_output):
+        resp = client.post(
+            "/api/homework/photo",
+            data={
+                "stage": "commit",
+                "homework": json.dumps([{
+                    "Ders Adı": "Türkçe",
+                    "Ödev Başlığı": "Okuma",
+                    "Ödev Son Teslim Tarihi": "yarın",
+                    "detail": {"description": ""},
+                }]),
+            },
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 400
+        assert "gün.ay.yıl" in resp.get_json()["error"]
+        assert not (isolated_output / "photo_homework.json").exists()
+
+    def test_commit_remembers_an_unknown_date(self, client, isolated_output):
+        resp = client.post(
+            "/api/homework/photo",
+            data={
+                "stage": "commit",
+                "homework": json.dumps([{
+                    "Ders Adı": "Türkçe",
+                    "Ödev Başlığı": "Okuma",
+                    "Ödev Son Teslim Tarihi": "",
+                    "eksik_birakilan": ["teslim", "uydurma"],
+                    "detail": {"description": "günlük"},
+                }]),
+            },
+            content_type="multipart/form-data",
+        )
+        stored = resp.get_json()["homework"][0]
+        assert resp.status_code == 200
+        assert stored["eksik_birakilan"] == ["teslim"]
+        assert stored["Ödev Son Teslim Tarihi"] == ""
+
+    def test_assistant_writes_the_readers_date_and_refuses_a_portal_row(self, isolated_output):
+        row = dashboard_api._to_photo_homework_row(
+            {"ders_adi": "Genel", "odev_basligi": "Sayfa 4", "son_teslim_tarihi": ""},
+            image_hash="h",
+        )
+        dashboard_api._save_photo_homework_rows([row])
+        key = dashboard_api._homework_row_key(row)
+        simdi = datetime(2026, 9, 24, 16, 10)
+        dashboard_api._foto_odev_tamamla(key, "teslim", "bilmiyorum", simdi=simdi)
+        stored = dashboard_api._load_photo_homework_rows()[0]
+        assert stored["Ödev Son Teslim Tarihi"] == ""
+        assert stored["eksik_birakilan"] == ["teslim"]
+
+        cumle = dashboard_api._foto_odev_tamamla(key, "teslim", "2 ekim", simdi=simdi)
+        assert "02.10.2026 23:59" in cumle
+        stored = dashboard_api._load_photo_homework_rows()[0]
+        assert stored["Ödev Son Teslim Tarihi"] == "02.10.2026 23:59"
+        assert stored["eksik_birakilan"] == []
+
+        yeni = dashboard_api._homework_row_key(stored)
+        dashboard_api._foto_odev_tamamla(yeni, "ders", "DKAB", simdi=simdi)
+        stored = dashboard_api._load_photo_homework_rows()[0]
+        assert stored["Ders Adı"] == "Din Kültürü"
+
+        with pytest.raises(ValueError, match="fotoğraftan"):
+            dashboard_api._foto_odev_tamamla("matematik|kesirler|15.03.2026 12:00", "teslim", "yarın")
 
 
 class TestPrivateLessonsEndpoint:

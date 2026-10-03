@@ -116,6 +116,7 @@ const TOOL_LABEL: Record<string, string> = {
   modul_ara: 'Yayınlanmış modüller aranıyor',
   odev_listesi: 'Ödev listen okunuyor',
   odev_belgesi: 'Ödev belgesi aranıyor',
+  odev_tamamla: 'Eksik alan kaydediliyor',
   skill_kaynagi: 'Öğretmen notları açılıyor',
   mod_oner: 'Öğretmen önerisi hazırlanıyor',
 }

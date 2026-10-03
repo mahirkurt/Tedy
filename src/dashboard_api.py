@@ -348,6 +348,7 @@ def _assistant_runtime():
                 kitap_kaynagi=_canli_kitaplar,
                 video_kaynagi=_canli_videolar,
                 odev_belge_ara=_odev_belgesi_ara,
+                odev_yazici=_foto_odev_tamamla,
             )
         except Exception as exc:
             # SkillHatasi's own message names which skill and why (spec "Hata ve
@@ -1149,6 +1150,19 @@ class GorselOkunamadi(ValueError):
     """The upload is not an image this server can read (e.g. HEIC)."""
 
 
+class FotoTarihiOkunamadi(ValueError):
+    """A confirmed due date was typed, and it is not a calendar date."""
+
+
+# Names the photo reader may use. The same canonical set normalize_course()
+# writes onto İşler and onto odev_listesi, so a worksheet that says "DKAB"
+# does not become a second course the assistant has never heard of.
+_FOTO_DERSLERI = (
+    "Matematik", "Fen Bilimleri", "Sosyal Bilgiler", "Türkçe", "İngilizce",
+    "Fransızca", "Din Kültürü", "Beden Eğitimi", "Bilişim",
+    "Ahlak ve Yurttaşlık", "Görsel Sanatlar", "Müzik",
+)
+
 # What the photo extraction must return: structured output holds the model to
 # it, so "SADECE geçerli JSON dön" is no longer a request but a guarantee.
 _ODEV_FOTO_SEMASI = {
@@ -1197,18 +1211,25 @@ def _extract_homework_candidates_from_photo(image_bytes, mime_type):
     import anthropic
 
     now_str = datetime.now().strftime("%d.%m.%Y")
+    dersler = ", ".join(_FOTO_DERSLERI)
     prompt = f"""Sen bir okul ödevi çıkarım ajanısın.
-Görselde görünen ödevleri OCR + anlama ile çıkar.
+Görselde görünen ödevleri OCR + anlama ile çıkar. Çıktı, İşler listesine ve
+asistana aynı satır olarak gider; uydurulan bir tarih orada "bugün teslim" olur.
 
 Bugünün tarihi: {now_str}
+Bilinen ders adları: {dersler}
 
 Her ödev için: ders_adi, odev_basligi, odev_kaynagi, son_teslim_tarihi,
 odev_durumu ("Değerlendirilmemiş"), aciklama.
 
 Kurallar:
 - Görselde birden fazla ödev varsa hepsini listele.
-- son_teslim_tarihi mutlaka DD.MM.YYYY HH:MM formatında olsun.
-- Saat bilgisi yoksa 23:59 kullan.
+- ders_adi sayfada açıkça o dersse listedeki adı kullan (DKAB → Din Kültürü,
+  Bilişim Teknolojileri → Bilişim). Emin değilsen sayfadaki sözcükleri yaz.
+- son_teslim_tarihi yalnız görselde yazıyorsa DD.MM.YYYY HH:MM olsun.
+  Saat yoksa 23:59. Tarih yoksa boş string — bugünün tarihini koyma.
+- aciklama yalnız ödevin yönergesi (sayfa, soru). "Fotoğraftan işlendi" yazma.
+- odev_kaynagi kitap ya da fasikül adı. Yoksa boş string.
 - Emin olmadığın alanları boş string yap.
 - Bilgi uydurma. Görselde ödev yoksa boş liste döndür."""
 
@@ -1253,6 +1274,37 @@ def _coerce_homework_status(value):
     return "Değerlendirilmemiş"
 
 
+# Labels we used to write ourselves. A book title stays; these do not, or a
+# photo row would wear the portal's name.
+_FOTO_KAYNAK_YOK = frozenset({"ted connect", "fotoğraf", "fotograf"})
+
+
+def _foto_kaynak(value):
+    """A book or booklet name from the page, never a label we invented."""
+    text = str(value or "").strip()
+    if text.casefold() in _FOTO_KAYNAK_YOK:
+        return ""
+    return text[:80]
+
+
+def _foto_aciklama(value):
+    """The worksheet's own instructions, without the labels we used to prepend.
+
+    odev_listesi quotes `detail.description` as the teacher's directions. A
+    line that starts "Kaynak: TED Connect" was read back as if the portal had
+    said it."""
+    text = str(value or "").strip()
+    for prefix in (
+        "Kaynak: TED Connect\n",
+        "Kaynak: TED Connect",
+        "Fotoğraftan AI ile işlendi.",
+        "Fotoğraftan AI ile işlendi",
+    ):
+        if text.startswith(prefix):
+            text = text[len(prefix):].strip()
+    return text[:4000]
+
+
 def _to_photo_homework_row(
     candidate,
     image_hash,
@@ -1260,11 +1312,16 @@ def _to_photo_homework_row(
     selected_course="",
     due_override="",
     private_lesson=None,
+    confirmed=False,
 ):
-    """Convert extracted candidate to HomeworkItem-compatible row."""
+    """Convert extracted candidate to HomeworkItem-compatible row.
+
+    The course goes through normalize_course(), the same boundary İşler and
+    the assistant use. A missing date stays missing: filling in today 23:59
+    made odev_listesi say the work was due today."""
     source_type = str(source_type or "ted").strip().lower()
 
-    extracted_course = str(candidate.get("ders_adi", "")).strip()
+    extracted_course = normalize_course(str(candidate.get("ders_adi", "")).strip())
     selected_course = normalize_course(str(selected_course or "").strip()) if selected_course else ""
     lesson_course = ""
     lesson_teacher = ""
@@ -1272,38 +1329,29 @@ def _to_photo_homework_row(
         lesson_course = normalize_course(str(private_lesson.get("course", "")).strip())
         lesson_teacher = str(private_lesson.get("teacher", "")).strip()
 
-    if source_type == "private":
-        course = lesson_course or selected_course or extracted_course or "Özel Ders"
+    if source_type == "private" and not confirmed:
+        # Before the reader has looked, the lesson they picked names the course.
+        course = lesson_course or extracted_course or selected_course or "Özel Ders"
+    elif source_type == "private":
+        course = extracted_course or lesson_course or "Özel Ders"
     else:
-        course = selected_course or extracted_course or "Genel"
+        # The words on the page win. The form's course only fills a blank,
+        # so a default of "Matematik" cannot relabel a Türkçe worksheet.
+        course = extracted_course or selected_course or "Genel"
 
     title = str(candidate.get("odev_basligi", "")).strip() or "Başlıksız Ödev"
     due = _normalize_due_datetime(due_override) or _normalize_due_datetime(
         candidate.get("son_teslim_tarihi", "")
     )
-    if not due:
-        due = datetime.now().replace(
-            hour=23, minute=59, second=0, microsecond=0
-        ).strftime("%d.%m.%Y %H:%M")
 
     if source_type == "private":
-        if lesson_teacher:
-            source = f"Özel Ders ({lesson_teacher})"
-        else:
-            source = "Özel Ders"
+        source = f"Özel Ders ({lesson_teacher})" if lesson_teacher else "Özel Ders"
     else:
-        source = "TED Connect"
+        source = "Fotoğraf"
 
-    candidate_source = str(candidate.get("odev_kaynagi", "")).strip()
+    candidate_source = _foto_kaynak(candidate.get("odev_kaynagi", ""))
     if candidate_source and source_type != "private":
-        source = f"{source} • {candidate_source[:50]}"
-
-    description = str(candidate.get("aciklama", "")).strip()
-    detail_desc = description or "Fotoğraftan AI ile işlendi."
-    if source_type == "private" and lesson_teacher:
-        detail_desc = f"Özel ders öğretmeni: {lesson_teacher}\n{detail_desc}"
-    if source_type == "ted":
-        detail_desc = f"Kaynak: TED Connect\n{detail_desc}"
+        source = f"{source} · {candidate_source[:50]}"
 
     return {
         "Ders Adı": course[:120],
@@ -1313,7 +1361,7 @@ def _to_photo_homework_row(
         "Ödev Durumu": _coerce_homework_status(candidate.get("odev_durumu")),
         "Ödev Görüntüle": "",
         "detail": {
-            "description": detail_desc[:4000],
+            "description": _foto_aciklama(candidate.get("aciklama", "")),
             "attachments": [],
         },
         "created_at": datetime.now().isoformat(),
@@ -1321,7 +1369,161 @@ def _to_photo_homework_row(
         "photo_hash": image_hash,
         "source_type": source_type,
         "private_lesson_id": (private_lesson or {}).get("id", "") if isinstance(private_lesson, dict) else "",
+        # Round-tripped by the review step. İşler shows `Ödev Kaynağı`, not this.
+        "odev_kaynagi": "" if source_type == "private" else candidate_source,
+        "eksik_birakilan": _foto_birakilan(candidate.get("eksik_birakilan")),
     }
+
+
+def _confirmed_photo_candidates(items):
+    """Rows the reader confirmed, in the extractor's field names.
+
+    Commit does not call the model again: what was shown is what is stored.
+    A blank title is dropped rather than saved as "Başlıksız Ödev"."""
+    if not isinstance(items, list):
+        return None
+    candidates = []
+    for item in items[:20]:
+        if not isinstance(item, dict):
+            continue
+        detail = item.get("detail") if isinstance(item.get("detail"), dict) else {}
+        title = str(item.get("Ödev Başlığı") or item.get("odev_basligi") or "").strip()
+        if not title or title == "Başlıksız Ödev":
+            continue
+        due_raw = str(
+            item.get("Ödev Son Teslim Tarihi") or item.get("son_teslim_tarihi") or ""
+        ).strip()
+        # An empty date stays empty. A date we cannot read must not be stored
+        # as empty, or odev_listesi would say the photo never had one.
+        if due_raw and not _normalize_due_datetime(due_raw):
+            raise FotoTarihiOkunamadi(due_raw)
+        candidates.append({
+            "ders_adi": item.get("Ders Adı") or item.get("ders_adi") or "",
+            "odev_basligi": title,
+            "odev_kaynagi": _foto_kaynak(item.get("odev_kaynagi")),
+            "son_teslim_tarihi": due_raw,
+            "odev_durumu": "Değerlendirilmemiş",
+            "aciklama": detail.get("description") or item.get("aciklama") or "",
+            "eksik_birakilan": _foto_birakilan(item.get("eksik_birakilan")),
+        })
+    return candidates
+
+
+def _foto_birakilan(value):
+    """Fields the reader was asked about and left unknown. Anything else is dropped."""
+    if not isinstance(value, list):
+        return []
+    return [a for a in value if a in {"ders", "teslim"}][:2]
+
+
+_BILMIYORUM = frozenset({
+    "bilmiyorum", "bilinmiyor", "yok", "emin değilim", "emin degilim",
+    "fotoğrafta yok", "fotografta yok",
+})
+_AY_ADLARI = {
+    "ocak": 1, "şubat": 2, "subat": 2, "mart": 3, "nisan": 4,
+    "mayıs": 5, "mayis": 5, "haziran": 6, "temmuz": 7, "ağustos": 8,
+    "agustos": 8, "eylül": 9, "eylul": 9, "ekim": 10, "kasım": 11,
+    "kasim": 11, "aralık": 12, "aralik": 12,
+}
+
+
+def _okurun_teslimi(deger, simdi):
+    """The reader's own due-date words, as DD.MM.YYYY HH:MM.
+
+    An empty string means they said they do not know. None means the words
+    are not a date — the caller turns that into an error, and does not invent
+    one."""
+    s = " ".join(str(deger or "").strip().casefold().split())
+    if s in _BILMIYORUM:
+        return ""
+    m = re.fullmatch(r"(bugün|bugun|yarın|yarin)(?:\s+(\d{1,2})[:.](\d{2}))?", s)
+    if m:
+        gun = simdi + timedelta(days=1 if m.group(1).startswith("yar") else 0)
+        saat, dakika = int(m.group(2) or 23), int(m.group(3) or 59)
+        try:
+            return datetime(gun.year, gun.month, gun.day, saat, dakika).strftime("%d.%m.%Y %H:%M")
+        except ValueError:
+            return None
+    m = re.fullmatch(
+        r"(\d{1,2})\s+([a-zçğıöşü]+)(?:\s+(\d{4}))?(?:\s+(\d{1,2})[:.](\d{2}))?",
+        s,
+    )
+    if m and m.group(2) in _AY_ADLARI:
+        yil = int(m.group(3) or simdi.year)
+        saat, dakika = int(m.group(4) or 23), int(m.group(5) or 59)
+        try:
+            return datetime(
+                yil, _AY_ADLARI[m.group(2)], int(m.group(1)), saat, dakika,
+            ).strftime("%d.%m.%Y %H:%M")
+        except ValueError:
+            return None
+    return _normalize_due_datetime(deger) or None
+
+
+def _foto_alan_birak(row, alan, birak):
+    mevcut = [a for a in (row.get("eksik_birakilan") or []) if a in {"ders", "teslim"} and a != alan]
+    if birak:
+        mevcut.append(alan)
+    row["eksik_birakilan"] = mevcut
+
+
+def _foto_odev_tamamla(anahtar, alan, deger, simdi=None):
+    """Write one reader-supplied field onto a photographed homework row.
+
+    Raises ValueError with a sentence the model can show. Portal rows are
+    never touched: a missing portal date is not Işık's to invent."""
+    anahtar = str(anahtar or "").strip()
+    alan = str(alan or "").strip()
+    if not anahtar:
+        raise ValueError("anahtar gerekli")
+    if alan not in {"ders", "teslim"}:
+        raise ValueError("alan 'ders' veya 'teslim' olmalı")
+    simdi = simdi or datetime.now()
+    rows = _load_photo_homework_rows()
+    hedef = None
+    for row in rows:
+        if str(row.get("source") or "").startswith("photo_ai") and _homework_row_key(row) == anahtar:
+            hedef = row
+            break
+    if hedef is None:
+        raise ValueError("Bu anahtar fotoğraftan eklenen bir ödeve ait değil.")
+    baslik = str(hedef.get("Ödev Başlığı") or "").strip() or "bu iş"
+    if alan == "ders":
+        soz = " ".join(str(deger or "").strip().casefold().split())
+        if soz in _BILMIYORUM:
+            _foto_alan_birak(hedef, "ders", True)
+            cumle = f"Kaydedildi: {baslik} için ders bilinmiyor; bir daha sorma."
+        else:
+            ders = normalize_course(str(deger or "").strip())
+            if ders not in _FOTO_DERSLERI:
+                raise ValueError("Ders, listedeki bir ders olmalı.")
+            hedef["Ders Adı"] = ders
+            _foto_alan_birak(hedef, "ders", False)
+            cumle = f"Kaydedildi: {baslik} dersi {ders}."
+    else:
+        teslim = _okurun_teslimi(deger, simdi)
+        if teslim is None:
+            raise ValueError(
+                "Teslim tarihi gün.ay.yıl, gün ay, bugün veya yarın olmalı. "
+                "Okur bilmiyorsa bunu 'bilmiyorum' diye yaz."
+            )
+        if teslim == "":
+            _foto_alan_birak(hedef, "teslim", True)
+            cumle = f"Kaydedildi: {baslik} için teslim tarihi bilinmiyor; bir daha sorma."
+        else:
+            hedef["Ödev Son Teslim Tarihi"] = teslim
+            _foto_alan_birak(hedef, "teslim", False)
+            cumle = f"Kaydedildi: {baslik} teslim {teslim}."
+    eski = anahtar
+    yeni = _homework_row_key(hedef)
+    if eski != yeni:
+        marks = _load_student_done_marks()
+        if eski in marks:
+            marks[yeni] = marks.pop(eski)
+            _save_student_done_marks(marks)
+    _save_photo_homework_rows(rows)
+    return cumle
 
 
 # --- API endpoints (all require auth) ---
@@ -1564,21 +1766,14 @@ def homework_mark_done():
 @app.route("/api/homework/photo", methods=["POST"])
 @require_auth
 def homework_from_photo():
-    photo = request.files.get("photo")
-    if not photo:
-        return jsonify({"error": "photo dosyası gerekli"}), 400
+    """Read a worksheet photo, then store only what the reader confirms.
 
-    mime_type = (photo.mimetype or "").strip().lower()
-    if not mime_type.startswith("image/"):
-        return jsonify({"error": "Sadece görsel dosyası kabul edilir"}), 400
-
-    image_bytes = photo.read()
-    if not image_bytes:
-        return jsonify({"error": "Boş görsel gönderildi"}), 400
-    if len(image_bytes) > MAX_PHOTO_SIZE_BYTES:
-        return jsonify({
-            "error": "Görsel çok büyük (maksimum 12MB)"
-        }), 413
+    `stage=preview` returns the rows odev_listesi would quote and writes
+    nothing. `stage=commit` stores the rows sent back, without a second model
+    call. Omitting stage keeps the old extract-and-save behaviour."""
+    stage = str(request.form.get("stage", "")).strip().lower()
+    if stage not in {"", "preview", "commit"}:
+        return jsonify({"error": "stage 'preview' veya 'commit' olmalı"}), 400
 
     source_type = str(request.form.get("source_type", "ted")).strip().lower()
     if source_type not in {"ted", "private"}:
@@ -1594,18 +1789,51 @@ def homework_from_photo():
         if not private_lesson:
             return jsonify({"error": "Seçilen özel ders bulunamadı"}), 404
 
-    try:
-        candidates = _extract_homework_candidates_from_photo(image_bytes, mime_type)
-    except GorselOkunamadi as e:
-        return jsonify({"error": str(e)}), 415
-    except RuntimeError as e:
-        return jsonify({"error": f"AI işleme başarısız: {e}"}), 503
-    except http_requests.HTTPError as e:
-        return jsonify({"error": f"AI servis hatası: {e}"}), 502
-    except Exception as e:
-        return jsonify({"error": f"Görsel işlenemedi: {e}"}), 500
+    if stage == "commit":
+        try:
+            confirmed = json.loads(request.form.get("homework") or "null")
+        except json.JSONDecodeError:
+            return jsonify({"error": "homework JSON değil"}), 400
+        try:
+            candidates = _confirmed_photo_candidates(confirmed)
+        except FotoTarihiOkunamadi:
+            return jsonify({
+                "error": "Teslim tarihi gün.ay.yıl olarak yazılmalı. Fotoğrafta yoksa alanı boş bırak.",
+            }), 400
+        if candidates is None:
+            return jsonify({"error": "Onaylanacak ödev listesi gerekli"}), 400
+        image_hash = str(request.form.get("photo_hash", "")).strip()[:32]
+        due_override = ""
+        selected_course = ""
+    else:
+        photo = request.files.get("photo")
+        if not photo:
+            return jsonify({"error": "photo dosyası gerekli"}), 400
 
-    image_hash = hashlib.sha256(image_bytes).hexdigest()[:16]
+        mime_type = (photo.mimetype or "").strip().lower()
+        if not mime_type.startswith("image/"):
+            return jsonify({"error": "Sadece görsel dosyası kabul edilir"}), 400
+
+        image_bytes = photo.read()
+        if not image_bytes:
+            return jsonify({"error": "Boş görsel gönderildi"}), 400
+        if len(image_bytes) > MAX_PHOTO_SIZE_BYTES:
+            return jsonify({
+                "error": "Görsel çok büyük (maksimum 12MB)"
+            }), 413
+
+        try:
+            candidates = _extract_homework_candidates_from_photo(image_bytes, mime_type)
+        except GorselOkunamadi as e:
+            return jsonify({"error": str(e)}), 415
+        except RuntimeError as e:
+            return jsonify({"error": f"AI işleme başarısız: {e}"}), 503
+        except http_requests.HTTPError as e:
+            return jsonify({"error": f"AI servis hatası: {e}"}), 502
+        except Exception as e:
+            return jsonify({"error": f"Görsel işlenemedi: {e}"}), 500
+        image_hash = hashlib.sha256(image_bytes).hexdigest()[:16]
+
     extracted_rows = [
         _to_photo_homework_row(
             c,
@@ -1614,12 +1842,26 @@ def homework_from_photo():
             selected_course=selected_course,
             due_override=due_override,
             private_lesson=private_lesson,
+            confirmed=(stage == "commit"),
         )
         for c in candidates
         if isinstance(c, dict)
     ]
+    if stage == "preview":
+        return jsonify({
+            "preview": True,
+            "photo_hash": image_hash,
+            "added_count": 0,
+            "skipped_count": 0,
+            "homework": extracted_rows,
+        })
     if not extracted_rows:
-        return jsonify({"error": "Görselden ödev bilgisi çıkarılamadı"}), 422
+        message = (
+            "Eklenecek başlıklı bir ödev yok"
+            if stage == "commit"
+            else "Görselden ödev bilgisi çıkarılamadı"
+        )
+        return jsonify({"error": message}), 422
 
     existing_photo_rows = _load_photo_homework_rows()
     known_keys = {_homework_row_key(r) for r in _combined_homework_rows(_scraped())}
