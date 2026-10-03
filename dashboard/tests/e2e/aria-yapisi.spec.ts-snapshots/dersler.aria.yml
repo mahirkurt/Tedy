@@ -79,8 +79,4 @@
     - tab "Matematik" [selected]
     - tab "Fen Bilimleri"
     - tab "Türkçe"
-  - tabpanel "Matematik":
-    - list:
-      - listitem:
-        - button "Kesirlerde toplama ve çıkarma işlendi. Payda eşitleme üzerinde duruldu." [expanded]
-        - text: Kesirlerde toplama ve çıkarma işlendi. Payda eşitleme üzerinde duruldu.
+  - tabpanel "Matematik": Kesirlerde toplama ve çıkarma işlendi. Payda eşitleme üzerinde duruldu.

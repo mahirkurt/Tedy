@@ -1,6 +1,13 @@
 - main:
   - heading "İlerleme" [level=1]
   - heading "Platform İlerleme" [level=2]
+  - region "Öğrenme günlüğü":
+    - heading "Öğrenme günlüğü" [level=3]
+    - heading "Bu hafta" [level=4]
+    - paragraph: Sohbet · 0
+    - paragraph: Alıştırma · 0
+    - heading "Zorlanılan konular" [level=4]
+    - paragraph: Henüz deneme yok. Bir alıştırma bitince burada görünür.
   - list:
     - listitem:
       - button "EnglishCentral 0/0"

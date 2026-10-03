@@ -1,7 +1,7 @@
 - main:
   - heading "Takvim" [level=1]
   - heading "Haftalık Takvim" [level=2]
-  - button "Onceki hafta"
+  - button "Önceki hafta"
   - text: /\d+ - \d+ Eylül \d+/
   - button "Sonraki hafta"
   - button "Ders"

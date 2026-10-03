@@ -18,14 +18,26 @@
   - button "Işık bugün neye öncelik vermeli?"
   - button "Işık için çalışma planı hazırla"
   - button "Işık'ın eksik konularını özetle"
+  - complementary "Sohbet geçmişi":
+    - heading "Sohbetler" [level=3]
+    - button "Yeni sohbet"
+    - paragraph: Henüz sohbet yok — bir soru sorarak başla
+    - heading "Işık'ın sohbetleri" [level=3]
+    - paragraph: Henüz sohbet yok — bir soru sorarak başla
+    - heading "Asistanın notları" [level=3]
+    - list
   - article:
     - button "AI yanıtı"
     - text: Asistan
     - paragraph: Merhaba! TEDY Asistan olarak size yardımcı olabilirim. Işık'ın ödevleri, sınavları ve dersleri hakkında soru sorabilir veya onun için çalışma planı isteyebilirsiniz.
+  - text: Ödev
+  - combobox "Ödev":
+    - option "Seçilmedi — genel soru" [selected]
+  - button "Dosya ekle"
   - text: Sorun
   - textbox "Sorun":
     - /placeholder: Bir soru sorun veya çalışma planı isteyin...
-  - alert
+  - button "Sesle sor"
   - button "Gönder" [disabled]
   - button "Çalışma Planı" [disabled]
   - complementary "Kaynaklar ve çalışma planı":

@@ -13,9 +13,9 @@
         - columnheader "P2"
         - columnheader "P3"
     - rowgroup:
-      - row /Expand current row Matematik \d+ \d+ - \d+ - -/:
-        - cell "Expand current row":
-          - button "Expand current row"
+      - row /Ayrıntı Matematik \d+ \d+ - \d+ - -/:
+        - cell "Ayrıntı":
+          - button "Ayrıntı"
         - cell "Matematik"
         - cell /\d+/
         - cell /\d+/
@@ -25,9 +25,9 @@
         - cell "-"
       - row /1\. Sınav \d+ 2\. Sınav \d+ 3\. Sınav - DİKP\/Performans-1 \d+ DİKP\/Performans-2 - DİKP\/Performans-3 -/:
         - cell /1\. Sınav \d+ 2\. Sınav \d+ 3\. Sınav - DİKP\/Performans-1 \d+ DİKP\/Performans-2 - DİKP\/Performans-3 -/
-      - row /Expand current row Türkçe \d+ - - - - -/:
-        - cell "Expand current row":
-          - button "Expand current row"
+      - row /Ayrıntı Türkçe \d+ - - - - -/:
+        - cell "Ayrıntı":
+          - button "Ayrıntı"
         - cell "Türkçe"
         - cell /\d+/
         - cell "-"
