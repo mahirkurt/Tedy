@@ -33,6 +33,7 @@ from src.env_loader import load_env
 from src.json_utils import atomic_json_dump
 from src.course_names import normalize_course, COURSE_ALIASES
 from src.hafta_secici import guncel_hafta as _guncel_hafta
+from src.portal_susu import temiz_dersler, temiz_haftalar, temiz_metin
 from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.USER_ROLES etc.)
     ALLOWED_EMAILS,
     FULL_ACCESS_EMAILS,
@@ -346,6 +347,7 @@ def _assistant_runtime():
                 platform_kaynagi=_canli_platform_ilerlemesi,
                 kitap_kaynagi=_canli_kitaplar,
                 video_kaynagi=_canli_videolar,
+                odev_belge_ara=_odev_belgesi_ara,
             )
         except Exception as exc:
             # SkillHatasi's own message names which skill and why (spec "Hata ve
@@ -846,6 +848,11 @@ def _combined_homework_rows(scraped_data):
         r = dict(row)
         if "Ders Adı" in r:
             r["normalized_course"] = normalize_course(r["Ders Adı"])
+        detay = r.get("detail")
+        if isinstance(detay, dict):
+            # Portal chrome and comment blocks never reach a surface
+            # (src/portal_susu.py); a description is cleaned like course content.
+            r["detail"] = {**detay, "description": temiz_metin(detay.get("description"))}
         rows.append(r)
     return _dedupe_homework_rows(rows)
 
@@ -884,7 +891,71 @@ def _canli_odevler():
     marks = dict(_load_student_done_marks())
     for r in rows:
         _ogrenci_isaretini_uygula(r, marks)
+    _belgeleri_yapistir(rows)
     return rows
+
+
+def _belge_koku():
+    from pathlib import Path
+    return Path(OUTPUT_DIR) / "homework_docs"
+
+
+def _belgeleri_yapistir(rows):
+    """Attach public document metadata. Embeddings never leave the index."""
+    import src.homework_docs as homework_docs
+    grup = homework_docs.hepsi(_belge_koku())
+    if not grup:
+        return rows
+    for r in rows:
+        belgeler = grup.get(_homework_row_key(r))
+        if belgeler:
+            r["documents"] = belgeler
+    return rows
+
+
+def _odev_belgesi_ara(anahtar, sorgu):
+    import src.homework_docs as homework_docs
+    return homework_docs.ara(_belge_koku(), anahtar, sorgu)
+
+
+def _secili_odev_metni(row):
+    ders = str(row.get("normalized_course") or row.get("Ders Adı") or "").strip()
+    baslik = str(row.get("Ödev Başlığı") or "").strip()
+    teslim = str(row.get("Ödev Son Teslim Tarihi") or "").strip() or "teslim tarihi yok"
+    yonerge = " ".join(str((row.get("detail") or {}).get("description") or "").split())[:500]
+    adlar = []
+    for doc in row.get("documents") or []:
+        if not isinstance(doc, dict):
+            continue
+        ad = str(doc.get("name") or "").strip()
+        if not ad:
+            continue
+        adlar.append(ad if doc.get("ready") else f"{ad} (vektör yok)")
+    belge = ", ".join(adlar) if adlar else "yok"
+    return (
+        f"Seçilen ödev: {ders} — {baslik} · teslim {teslim}\n"
+        f"Yönerge: {yonerge or 'yok'}\n"
+        f"Ekli belgeler: {belge}\n"
+        "Bu soru bu ödev hakkındadır. Belgeden bir parça gerekiyorsa `odev_belgesi` çağır. "
+        "Başka ödevin belgesini kullanma. Belgede olmayanı belgede varmış gibi yazma."
+    )
+
+
+def _secili_odev(payload):
+    """(anahtar, metin, error_response) for an assistant request.
+
+    An empty selection is the general chat. An unknown key is refused
+    before the model runs, so a document search cannot be pointed at a
+    homework that is not on the list."""
+    anahtar = str((payload or {}).get("odev_anahtari") or "").strip()
+    if not anahtar:
+        return "", "", None
+    if len(anahtar) > 400:
+        return "", "", (jsonify({"error": "Ödev bulunamadı"}), 404)
+    row = next((r for r in _canli_odevler() if r.get("homework_key") == anahtar), None)
+    if row is None:
+        return "", "", (jsonify({"error": "Ödev bulunamadı"}), 404)
+    return anahtar, _secili_odev_metni(row), None
 
 
 # The assistant's live student-data sources (plan Görev 2): each returns what
@@ -942,7 +1013,7 @@ def _canli_ders_icerikleri():
     (/api/content/weeks), with the label of the current one."""
     data = _scraped()
     haftalar = _icerik_haftalari(data)
-    guncel = data.get("ders_icerikleri")
+    guncel = temiz_dersler(data.get("ders_icerikleri"))
     return {"guncel": guncel if isinstance(guncel, dict) else {},
             "haftalar": haftalar["weeks"], "guncel_hafta": haftalar["current"]}
 
@@ -1417,6 +1488,7 @@ def homework():
     if student_done_changed:
         _save_student_done_marks(student_done_marks)
 
+    _belgeleri_yapistir(rows)
     return jsonify({"summary": summary, "homework": rows})
 
 
@@ -1572,6 +1644,60 @@ def homework_from_photo():
     })
 
 
+@app.route("/api/homework/documents", methods=["POST"])
+@require_auth
+def homework_document_upload():
+    """Attach a file to one homework row and embed it on mbp-node."""
+    import src.homework_docs as homework_docs
+
+    key = str(request.form.get("homework_key") or "").strip()
+    if not key or len(key) > 400:
+        return jsonify({"error": "Ödev bulunamadı"}), 404
+    if not any(_homework_row_key(r) == key for r in _combined_homework_rows(_scraped())):
+        return jsonify({"error": "Ödev bulunamadı"}), 404
+    upload = request.files.get("file")
+    if upload is None:
+        return jsonify({"error": "Dosya gerekli"}), 400
+    data = upload.read()
+    try:
+        doc = homework_docs.ekle(_belge_koku(), key, upload.filename or "", data)
+    except homework_docs.BelgeReddedildi as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001 — the reader gets a sentence, the log the type
+        app.logger.error("homework document failed: %s", type(exc).__name__)
+        return jsonify({"error": "Belge eklenemedi"}), 500
+    return jsonify({
+        "document": doc,
+        "documents": homework_docs.hepsi(_belge_koku()).get(key, []),
+    })
+
+
+@app.route("/api/homework/documents/<doc_id>", methods=["DELETE"])
+@require_auth
+def homework_document_delete(doc_id):
+    import src.homework_docs as homework_docs
+    if not homework_docs.sil(_belge_koku(), doc_id):
+        return jsonify({"error": "Belge bulunamadı"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/homework/documents/<doc_id>")
+@require_auth
+def homework_document_download(doc_id):
+    import src.homework_docs as homework_docs
+    from urllib.parse import quote
+
+    found = homework_docs.dosya(_belge_koku(), doc_id)
+    if found is None:
+        return jsonify({"error": "Belge bulunamadı"}), 404
+    path, name, mime = found
+    resp = send_from_directory(path.parent, path.name, mimetype=mime, as_attachment=True,
+                               download_name=name)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(name)}"
+    return resp
+
+
 def _sebit_verisi():
     """SEBİT homework rows, in the file's own shape (scraped_at,
     total_homework, completed_count, courses, homework[]). Shared with the
@@ -1623,7 +1749,7 @@ def teams():
 @require_auth
 def content():
     data = _scraped()
-    return jsonify(data.get("ders_icerikleri", {}))
+    return jsonify(temiz_dersler(data.get("ders_icerikleri", {})))
 
 
 @app.route("/api/pages")
@@ -1642,7 +1768,7 @@ def portal_pages():
     if not isinstance(sayfalar, dict):
         sayfalar = {}
     dolu = {
-        k: v for k, v in sayfalar.items()
+        k: {**v, "text": temiz_metin(v.get("text"))} for k, v in sayfalar.items()
         if isinstance(v, dict) and not v.get("empty")
     }
     engelli = {
@@ -1672,6 +1798,7 @@ def _icerik_haftalari(data):
     haftalar = data.get("ders_icerikleri_haftalar") or {}
     if not isinstance(haftalar, dict):
         haftalar = {}
+    haftalar = temiz_haftalar(haftalar)
     guncel = ""
     for w in data.get("ders_programi") or []:
         if isinstance(w, dict) and w.get("is_current"):
@@ -1684,12 +1811,20 @@ def _icerik_haftalari(data):
     return {"weeks": haftalar, "current": guncel}
 
 
+def _duyuru_satiri(satir):
+    """An announcement row with every text field cleaned; links untouched."""
+    if not isinstance(satir, dict):
+        return satir
+    return {k: (temiz_metin(v) if isinstance(v, str) and not k.endswith("_url") else v)
+            for k, v in satir.items()}
+
+
 @app.route("/api/announcements")
 @require_auth
 def announcements():
     data = _scraped()
     ann = data.get("duyurular", {}).get("announcements", [])
-    return jsonify({"announcements": ann})
+    return jsonify({"announcements": [_duyuru_satiri(a) for a in ann]})
 
 
 def _ec_verisi():
@@ -2044,7 +2179,7 @@ def _find_related_content(exam_course, ders_icerikleri):
     {tab_id, text, tables, items, cards} with cards and items as strings
     (measured 2026-09-28); this used to branch on a list, a shape the scraper
     never writes, so relatedContent was [] on every exam."""
-    from src.assistant_tools import _temiz_icerik
+    from src.portal_susu import temiz_metin
     related = []
     if not isinstance(ders_icerikleri, dict):
         return related
@@ -2059,7 +2194,7 @@ def _find_related_content(exam_course, ders_icerikleri):
         for kart in kayit.get("cards") or []:
             if not isinstance(kart, str):
                 continue
-            ilk = next((s for s in _temiz_icerik(kart).split("\n") if s.strip()), "")
+            ilk = next((s for s in temiz_metin(kart).split("\n") if s.strip()), "")
             if ilk and not _KART_IMZASI.match(ilk):
                 kart_basliklari.append(ilk)
         maddeler = [" ".join(m.split()) for m in kayit.get("items") or [] if isinstance(m, str)]
@@ -2377,6 +2512,9 @@ def assistant_chat():
     ogretmen, hata = _istek_ogretmeni(payload)
     if hata is not None:
         return hata
+    odev_anahtari, secili_odev, odev_hata = _secili_odev(payload)
+    if odev_hata is not None:
+        return odev_hata
 
     email = _module_person()
     try:
@@ -2406,6 +2544,8 @@ def assistant_chat():
             ilerleme_izni=_assistant_progress_allowed(),
             okur=_assistant_okur(),
             ogretmen=ogretmen,
+            secili_odev=secili_odev,
+            odev_anahtari=odev_anahtari,
             sahip_email=email,
             **sohbet.get("kwargs", {}),
         )
@@ -2439,6 +2579,9 @@ def assistant_stream():
     ogretmen, hata = _istek_ogretmeni(data)
     if hata is not None:
         return hata
+    odev_anahtari, secili_odev, odev_hata = _secili_odev(data)
+    if odev_hata is not None:
+        return odev_hata
     messages = data.get("messages") or []
     if not isinstance(messages, list):
         return jsonify({"error": "messages list olmalı"}), 400
@@ -2467,6 +2610,7 @@ def assistant_stream():
             for event in runtime.chat_events(
                 messages=hazir, session_id=session_id, force_deep=force_deep,
                 ilerleme_izni=ilerleme_izni, okur=okur, ogretmen=ogretmen,
+                secili_odev=secili_odev, odev_anahtari=odev_anahtari,
                 sahip_email=email,
                 **sohbet.get("kwargs", {}),
             ):
@@ -2822,6 +2966,9 @@ def assistant_plan():
         return jsonify({"error": "context_filters dict olmalı"}), 400
 
     session_id = str(payload.get("session_id", "")).strip()
+    odev_anahtari, secili_odev, odev_hata = _secili_odev(payload)
+    if odev_hata is not None:
+        return odev_hata
 
     try:
         runtime = _assistant_runtime()
@@ -2831,6 +2978,8 @@ def assistant_plan():
             context_filters=context_filters,
             ilerleme_izni=_assistant_progress_allowed(),
             okur=_assistant_okur(),
+            secili_odev=secili_odev,
+            odev_anahtari=odev_anahtari,
         )
         return jsonify(out)
     except AssistantUnavailableError:

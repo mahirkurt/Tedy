@@ -41,6 +41,7 @@ from src.academic_year import (  # noqa: E402
     save_year_state,
 )
 from src.archive_year import archive_year_local  # noqa: E402
+from src.portal_susu import temiz_dersler, temiz_haftalar  # noqa: E402
 
 _YEAR_RE = re.compile(r"^\d{4}-\d{4}$")
 
@@ -161,6 +162,29 @@ def _okunamadi_kaydi(name, e, onceki):
     if onceki.get(name) and onceki.get("scraped_at"):
         kayit["son_okuma"] = onceki["scraped_at"]
     return kayit
+
+
+def _icerik_birlestir(data, onceki):
+    """Split scrape_ders_icerikleri's two shapes and keep the weeks earlier
+    runs collected — cleaned (src/portal_susu.py), so weeks stored before
+    the cleaner existed lose their comment blocks on the first run after
+    deploy instead of carrying other children's names forever.
+
+    `ders_programi` is not merged: it holds the open week only, because every
+    week the portal offers renders the same grid.
+    """
+    icerik = data.get("ders_icerikleri")
+    if isinstance(icerik, dict) and "haftalar" in icerik:
+        data["ders_icerikleri"] = icerik.get("guncel") or {}
+        data["ders_icerikleri_haftalar"] = {
+            **(onceki.get("ders_icerikleri_haftalar") or {}),
+            **(icerik.get("haftalar") or {}),
+        }
+    elif onceki.get("ders_icerikleri_haftalar"):
+        data["ders_icerikleri_haftalar"] = onceki["ders_icerikleri_haftalar"]
+    data["ders_icerikleri"] = temiz_dersler(data.get("ders_icerikleri") or {})
+    if "ders_icerikleri_haftalar" in data:
+        data["ders_icerikleri_haftalar"] = temiz_haftalar(data["ders_icerikleri_haftalar"])
 
 
 # ── When to run ──────────────────────────────────────────────────────────────
@@ -396,21 +420,7 @@ def main(zamanla=False):
                 okunamadi[name] = _okunamadi_kaydi(name, e, onceki)
                 print(f"[ERROR] {name} failed: {e}")
 
-        # `ders_programi` is not merged: it holds the open week only, because
-        # every week the portal offers renders the same grid.
-        #
-        # scrape_ders_icerikleri returns both shapes: the open week keyed by
-        # course (what /api/content and the assistant index already read) and
-        # every visited week beside it. Splitting here keeps that contract.
-        icerik = data.get("ders_icerikleri")
-        if isinstance(icerik, dict) and "haftalar" in icerik:
-            data["ders_icerikleri"] = icerik.get("guncel") or {}
-            data["ders_icerikleri_haftalar"] = {
-                **(onceki.get("ders_icerikleri_haftalar") or {}),
-                **(icerik.get("haftalar") or {}),
-            }
-        elif onceki.get("ders_icerikleri_haftalar"):
-            data["ders_icerikleri_haftalar"] = onceki["ders_icerikleri_haftalar"]
+        _icerik_birlestir(data, onceki)
         print(f"[HAFTA] program={len(data['ders_programi'])} hafta,"
               f" içerik={len(data.get('ders_icerikleri_haftalar') or {})} hafta"
               f" (kapsam: {kapsam})")

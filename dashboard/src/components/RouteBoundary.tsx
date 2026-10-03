@@ -49,8 +49,10 @@ export default class RouteBoundary extends Component<Props, State> {
       <section className="route-boundary" role="alert">
         <h2 className="route-boundary__title">Bu bölüm açılamadı</h2>
         <p className="route-boundary__body">
-          Panonun geri kalanı çalışıyor — soldaki menüden başka bir sayfaya
-          geçebilirsin. Bu sayfayı yeniden denemek istersen:
+          Panonun geri kalanı çalışıyor —{' '}
+          <span className="route-boundary__cikis route-boundary__cikis--menu">soldaki menüden</span>
+          <span className="route-boundary__cikis route-boundary__cikis--bar">alttaki gezinmeden</span>
+          {' '}başka bir sayfaya geçebilirsin. Bu sayfayı yeniden denemek istersen:
         </p>
         <Button
           kind="tertiary"

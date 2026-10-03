@@ -604,7 +604,8 @@ def test_panonun_asistani_butun_kaynaklarla_kurulur(api, monkeypatch):
                       "sebit_kaynagi": api._canli_sebit_odevleri,
                       "platform_kaynagi": api._canli_platform_ilerlemesi,
                       "kitap_kaynagi": api._canli_kitaplar,
-                      "video_kaynagi": api._canli_videolar}
+                      "video_kaynagi": api._canli_videolar,
+                      "odev_belge_ara": api._odev_belgesi_ara}
 
 
 def test_bozuk_skill_hatasi_log_hangi_skil_ve_nedeni_soyler(api, monkeypatch, caplog):

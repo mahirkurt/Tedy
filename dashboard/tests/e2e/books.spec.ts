@@ -6,35 +6,20 @@ const appUrl = (path: string) => `${externalBaseUrl}${path}`
 test.describe('Tedy Books mobile experience', () => {
   test.use({ viewport: { width: 320, height: 568 } })
 
-  test('keeps the library full width while the menu overlays it', async ({ page }) => {
+  test('keeps the library full width with the bottom bar instead of a menu', async ({ page }) => {
+    // D3a (2026-10-02): below 672px the menu button and the side nav it used
+    // to open are gone — the bottom bar is the only navigation landmark.
     await page.goto(appUrl('/kitaplar'))
     await expect(page.getByRole('heading', { name: 'Kitaplık' })).toBeVisible()
 
     const content = page.locator('.app-shell-content')
-    const navigation = page.getByRole('navigation', { name: 'Navigasyon' })
-    const closedContentBox = await content.boundingBox()
-    const closedNavBox = await navigation.boundingBox()
+    const contentBox = await content.boundingBox()
 
-    expect(closedContentBox?.x).toBe(0)
-    expect(closedContentBox?.width).toBe(320)
-    expect(closedNavBox).not.toBeNull()
-    expect(closedNavBox!.x + closedNavBox!.width).toBeLessThanOrEqual(0)
+    expect(contentBox?.x).toBe(0)
+    expect(contentBox?.width).toBe(320)
+    await expect(page.getByRole('navigation', { name: 'Ana gezinme' })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320)
-
-    await page.getByRole('button', { name: 'Menü' }).click()
-    await expect(page.getByRole('button', { name: 'Menüyü kapat' })).toBeVisible()
-    // Carbon animates the nav open with `inline-size` over 0.11s, and its x
-    // is 0 from the first frame — so polling x returns instantly and the
-    // width below was read mid-transition (measured 1.0 → 86.9 → 217.5 →
-    // 256). Wait for the property this test actually asserts.
-    await expect.poll(async () => (await navigation.boundingBox())?.width).toBe(256)
-
-    const openContentBox = await content.boundingBox()
-    const openNavBox = await navigation.boundingBox()
-    expect(openContentBox?.x).toBe(0)
-    expect(openContentBox?.width).toBe(320)
-    expect(openNavBox?.x).toBe(0)
-    expect(openNavBox?.width).toBe(256)
+    await expect(page.getByRole('button', { name: 'Menü' })).toBeHidden()
   })
 
   test('keeps every header action inside a narrow phone viewport', async ({ page }) => {

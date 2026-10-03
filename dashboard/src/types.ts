@@ -19,6 +19,14 @@ export interface HomeworkItem {
   source?: string
   source_type?: 'ted' | 'private'
   private_lesson_id?: string
+  documents?: HomeworkDocument[]
+}
+
+export interface HomeworkDocument {
+  id: string
+  name: string
+  ready: boolean
+  error: string
 }
 
 export interface SebitHomework {

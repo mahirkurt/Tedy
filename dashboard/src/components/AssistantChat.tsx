@@ -8,6 +8,8 @@ import {
   IconButton,
   InlineLoading,
   SkeletonText,
+  Select,
+  SelectItem,
   Tag,
   TextArea,
   Tile,
@@ -33,6 +35,8 @@ import { renderMarkdown } from '../utils/markdown'
 import { modelAdi } from '../utils/formatters'
 import { subjectClass } from '../utils/subject'
 import { firstName, useSession } from '../contexts/session'
+import { useApi } from '../hooks/useApi'
+import type { HomeworkItem } from '../types'
 import { GENEL, useOgretmen } from '../hooks/useOgretmen'
 import { kayitliAtiflar, useSohbetler } from '../hooks/useSohbetler'
 import SohbetListesi from './SohbetListesi'
@@ -111,6 +115,7 @@ const TOOL_LABEL: Record<string, string> = {
   oer_kazanima_gore: 'Kazanıma bağlı kaynaklar alınıyor',
   modul_ara: 'Yayınlanmış modüller aranıyor',
   odev_listesi: 'Ödev listen okunuyor',
+  odev_belgesi: 'Ödev belgesi aranıyor',
   skill_kaynagi: 'Öğretmen notları açılıyor',
   mod_oner: 'Öğretmen önerisi hazırlanıyor',
 }
@@ -363,8 +368,17 @@ export default function AssistantChat() {
   const [stage, setStage] = useState<string | null>(null)
   /** The answer as it streams in; empty when nothing is being written. */
   const [writing, setWriting] = useState('')
+  const [odevKey, setOdevKey] = useState('')
   const isWriting = writing !== ''
   const ses = useSes(user?.email, draft, setDraft, () => textareaRef.current?.focus(), saltOkunur)
+  const { data: hwData } = useApi<{ homework: HomeworkItem[] }>('/api/homework', { homework: [] })
+  const odevSecenekleri = useMemo(() => {
+    const kapali = new Set(['yaptı', 'yapti', 'yapmadı', 'yapmadi', 'eksik'])
+    return (hwData.homework || []).filter(hw => {
+      if (!hw.homework_key) return false
+      return !kapali.has((hw['Ödev Durumu'] || '').toLocaleLowerCase('tr-TR'))
+    }).slice(0, 20)
+  }, [hwData])
 
   const latestAssistant = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -577,6 +591,7 @@ export default function AssistantChat() {
       messages: toApiMessages(sohbetId ? [userMsg] : apiKaynak),
       ogretmen: ogretmen.id,
       ...(sohbetId ? { sohbet_id: sohbetId, request_id: crypto.randomUUID() } : {}),
+      ...(odevKey ? { odev_anahtari: odevKey } : {}),
       ...(opts?.deep ? { force_deep: true } : {}),
     }
 
@@ -892,6 +907,26 @@ export default function AssistantChat() {
                 ))}
               </ul>
             )}
+            <Select
+              id="ac-odev"
+              className="ac__odev"
+              labelText="Ödev"
+              value={odevKey}
+              onChange={e => setOdevKey(e.target.value)}
+              disabled={loading || saltOkunur}
+            >
+              <SelectItem value="" text="Seçilmedi — genel soru" />
+              {odevSecenekleri.map(hw => {
+                const ad = `${hw.normalized_course || hw['Ders Adı']} — ${hw['Ödev Başlığı']}`
+                return (
+                  <SelectItem
+                    key={hw.homework_key}
+                    value={hw.homework_key || ''}
+                    text={ad.length > 80 ? `${ad.slice(0, 79)}…` : ad}
+                  />
+                )
+              })}
+            </Select>
             <div className="ac__input-row">
               <input
                 ref={dosyaRef}

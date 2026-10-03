@@ -507,6 +507,15 @@ body {
   padding: 0;
 }
 
+// D3b phone gate is 44px. 1.75rem is 28px; spacing-09 is 48px, the same
+// floor the bottom bar already uses. Desktop stays the smaller circle.
+@media (max-width: 671px) {
+  .today__nav-btn {
+    width: spacing.$spacing-09;
+    height: spacing.$spacing-09;
+  }
+}
+
 .today__today-btn {
   height: 1.75rem;
   padding: 0 spacing.$spacing-04;
@@ -1058,6 +1067,24 @@ body {
 
 .homework-modal__attachment-link:hover {
   color: var(--cds-link-primary-hover);
+}
+
+.homework-modal__doc {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ted-space-xs);
+}
+
+.homework-modal__doc-hint,
+.homework-modal__doc-error {
+  margin: var(--ted-space-2xs) 0 0;
+  @include type.type-style('label-01');
+  color: var(--ted-color-text-secondary);
+}
+
+.homework-modal__doc-error {
+  color: var(--ted-text-error);
 }
 
 // ─── Today Timeline — Clickable deadline items ───────────────────────────────
@@ -2462,6 +2489,44 @@ body {
 }
 
 // ─── Responsive ──────────────────────────────────────────────────────────────
+
+// ─── Phone shell (D3a, 2026-10-02) ───────────────────────────────────────────
+// The bottom bar exists in the DOM everywhere and is shown only below md; the
+// side nav and its menu button are hidden there. One navigation at a time.
+.bottom-nav {
+  display: none;
+}
+
+.daha-fazla__baslik {
+  @include type.type-style('heading-03');
+  margin-block-end: spacing.$spacing-05;
+}
+
+.daha-fazla__liste {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: spacing.$spacing-03;
+}
+
+.daha-fazla__oge {
+  display: flex;
+  align-items: center;
+  gap: spacing.$spacing-03;
+  min-block-size: spacing.$spacing-10;
+  padding: spacing.$spacing-04;
+  border: 1px solid var(--cds-border-subtle-01);
+  border-radius: var(--ted-radius-card);
+  background: var(--cds-layer-01);
+  color: var(--cds-text-primary);
+  text-decoration: none;
+  @include type.type-style('body-compact-02');
+
+  &:focus-visible {
+    outline: 2px solid var(--cds-focus);
+    outline-offset: -2px;
+  }
+}
+
 @media (max-width: 671px) {
   .cds--side-nav--rail {
     width: 16rem;
@@ -2685,6 +2750,72 @@ body {
   .platform-a3k-score {
     grid-template-columns: 1fr auto;
     .platform-a3k-score__label { grid-column: 1 / -1; }
+  }
+
+  .bottom-nav {
+    position: fixed;
+    z-index: 8000;
+    inset-inline: 0;
+    inset-block-end: 0;
+    display: block;
+    // stylelint-disable-next-line carbon/layout-use -- the device's own home-
+    // indicator inset, not a spacing-scale value; no Carbon token represents it.
+    padding-block-end: env(safe-area-inset-bottom);
+    border-block-start: 1px solid var(--cds-border-subtle-01);
+    background: var(--cds-layer-01);
+  }
+
+  // One navigation at a time, still: the bar sat visually under the book
+  // reader (z-index 9500) and an open Carbon modal (z-index 9000) by stacking
+  // alone — it stayed in the accessibility tree and reachable by Tab under
+  // both. Measured at /kitaplar/hobbit-eng/B01 and with İşler's homework
+  // modal open, both at 390px.
+  body:has(.reader) .bottom-nav,
+  body:has(.cds--modal.is-visible) .bottom-nav {
+    display: none;
+  }
+
+  .bottom-nav__list {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+
+  .bottom-nav__link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: spacing.$spacing-01;
+    min-block-size: spacing.$spacing-09;
+    padding-block: spacing.$spacing-02;
+    color: var(--cds-text-secondary);
+    text-decoration: none;
+    @include type.type-style('label-01');
+
+    &.active {
+      color: var(--cds-link-primary);
+      box-shadow: inset 0 2px 0 var(--cds-link-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--cds-focus);
+      outline-offset: -2px;
+    }
+  }
+
+  // The bar replaces the menu: hide the button and the side nav it opened.
+  .cds--header__menu-toggle,
+  .cds--side-nav,
+  .app-shell-nav-scrim {
+    display: none !important;
+  }
+
+  // Content and footer end above the bar (bar height + the device's inset).
+  .app-root {
+    // stylelint-disable-next-line carbon/layout-use -- same device inset as
+    // .bottom-nav above, added to the bar's own Carbon spacing token.
+    padding-block-end: calc(#{spacing.$spacing-09} + env(safe-area-inset-bottom));
   }
 }
 
@@ -5080,6 +5211,15 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   color: var(--ted-color-text-secondary);
 }
 
+// One navigation at a time. Below md the side nav is hidden and the way out
+// is the bottom bar (aria-label "Ana gezinme").
+.route-boundary__cikis--bar { display: none; }
+
+@media (max-width: 671px) {
+  .route-boundary__cikis--menu { display: none; }
+  .route-boundary__cikis--bar { display: inline; }
+}
+
 
 // The app shell is a column: header and nav are fixed and out of flow, while
 // the routed content grows to take whatever height is left and the footer is
@@ -5123,4 +5263,35 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   @include type.type-style('helper-text-01');
   color: var(--cds-text-error);
   margin-top: var(--ted-space-2xs);
+}
+
+// D3b phone gate: a control the reader taps is at least 44px. spacing-09 is
+// 48px. Desktop sizes stay as they were.
+@media (max-width: 671px) {
+  .calendar-nav .cds--btn--sm {
+    min-block-size: spacing.$spacing-09;
+    min-inline-size: spacing.$spacing-09;
+  }
+
+  // The sm table row is 2rem, so the expand button measured 32×33.
+  .grade-table .cds--table-expand {
+    min-inline-size: spacing.$spacing-09;
+    min-block-size: spacing.$spacing-09;
+  }
+
+  .grade-table .cds--table-expand__button {
+    min-inline-size: spacing.$spacing-09;
+    min-block-size: spacing.$spacing-09;
+  }
+
+  // Accordion headings use the density height, measured 40px on Dersler.
+  .course-content .cds--accordion__heading {
+    min-block-size: spacing.$spacing-09;
+  }
+
+  // İşler group headers (Tamamlandı, Yapılmayan) measured 26px. The toggle
+  // is the control; the plain "Yaklaşan Sınavlar" label is not one.
+  .hw-section__header--toggle {
+    min-block-size: spacing.$spacing-09;
+  }
 }

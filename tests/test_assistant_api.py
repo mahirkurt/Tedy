@@ -14,8 +14,13 @@ app = dashboard_api.app
 
 
 class _FakeRuntime:
+    son_sohbet = {}
+    son_plan = {}
+
     def chat(self, messages, session_id="", context_filters=None, temperature=0.2, ilerleme_izni=False,
-             okur="bilinmiyor", ogretmen="genel", sahip_email=None):
+             okur="bilinmiyor", ogretmen="genel", sahip_email=None, secili_odev="", odev_anahtari=""):
+        # /chat forwards the homework selector (empty when the request names none).
+        _FakeRuntime.son_sohbet = {"secili_odev": secili_odev, "odev_anahtari": odev_anahtari}
         return {
             "answer": "chat ok",
             "citations": [{"id": "S1", "path": "output/scraped_data.json", "snippet": "..."}],
@@ -27,7 +32,8 @@ class _FakeRuntime:
         }
 
     def study_plan(self, messages, session_id="", context_filters=None, ilerleme_izni=False,
-                   okur="bilinmiyor"):
+                   okur="bilinmiyor", secili_odev="", odev_anahtari=""):
+        _FakeRuntime.son_plan = {"secili_odev": secili_odev, "odev_anahtari": odev_anahtari}
         return {
             "answer": "plan ok",
             "citations": [],
@@ -81,6 +87,7 @@ def test_assistant_chat_endpoint(client):
     data = resp.get_json()
     assert data["answer"] == "chat ok"
     assert isinstance(data["citations"], list)
+    assert _FakeRuntime.son_sohbet == {"secili_odev": "", "odev_anahtari": ""}
 
 
 def test_assistant_plan_endpoint(client):
@@ -89,6 +96,7 @@ def test_assistant_plan_endpoint(client):
     data = resp.get_json()
     assert data["answer"] == "plan ok"
     assert len(data["plan_blocks"]) == 1
+    assert _FakeRuntime.son_plan == {"secili_odev": "", "odev_anahtari": ""}
 
 
 def test_assistant_reindex_endpoint(client):

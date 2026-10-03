@@ -22,6 +22,9 @@ import threading
 import time
 import fnmatch
 import functools
+import zipfile
+from xml.etree import ElementTree
+from xml.parsers import expat as _expat
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -97,7 +100,49 @@ TEXT_EXTENSIONS = {
 }
 PDF_EXTENSIONS = {".pdf"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".gif"}
+DOCX_EXTENSIONS = {".docx"}
+# word/document.xml is read whole; a real homework sheet is kilobytes. The cap
+# keeps a hostile or broken archive (a zip bomb) from ballooning in memory.
+DOCX_XML_SINIRI = 50 * 1024 * 1024
+_WORD_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 EMBED_TARGET_EXTENSIONS = {".md", ".txt", ".json", ".csv", ".html", ".htm", ".pdf"}
+
+
+class _DocxDtdSinyali(Exception):
+    """Internal signal only: expat's own DOCTYPE/entity handler fired."""
+
+
+def _docx_declares_dtd_or_entity(veri: bytes) -> bool:
+    """Whether `veri` declares a DTD or an entity, decided by expat's own
+    declaration handlers rather than a byte-level scan.
+
+    Fix round 2 (coordinator-verified): a byte scan cannot be made
+    encoding-proof. A UTF-16-encoded document.xml puts a NUL byte between
+    every ASCII letter, so the literal bytes "<!DOCTYPE"/"<!ENTITY" never
+    occur in the raw byte string even though the decoded document declares
+    both — and ElementTree.fromstring, which does decode it, still expands
+    the entity. expat is the same underlying parser ElementTree uses, so it
+    decodes `veri` exactly the same way; asking it directly, instead of
+    grepping the undecoded bytes, is not fooled by any encoding it
+    understands."""
+    parser = _expat.ParserCreate()
+
+    def _isaretle(*_args, **_kwargs):
+        raise _DocxDtdSinyali()
+
+    parser.StartDoctypeDeclHandler = _isaretle
+    parser.EntityDeclHandler = _isaretle
+    try:
+        parser.Parse(veri, True)
+    except _DocxDtdSinyali:
+        return True
+    except _expat.ExpatError:
+        # Any other parse failure here is not this gate's business: the
+        # ElementTree.fromstring parse below raises its own error (caught
+        # by _extract_docx_text's broad except), or this document was
+        # never going to declare anything anyway.
+        return False
+    return False
 
 # Whitelist: scrape data + downloaded educational content
 DEFAULT_INCLUDE_DIRS = {"output", "content"}
@@ -923,6 +968,7 @@ def _fmt_scraped_data(data: dict, ogretim_yili: str | None = None) -> str:
                                      gunun_dersleri, html_metne, icerik_ozeti,
                                      onceki_yil_raporu_mu, rapor_yili)
     from src.course_names import normalize_course
+    from src.portal_susu import temiz_metin
 
     parts: list[str] = []
 
@@ -955,7 +1001,7 @@ def _fmt_scraped_data(data: dict, ogretim_yili: str | None = None) -> str:
             desc = ""
             detail = r.get("detail")
             if isinstance(detail, dict):
-                desc = detail.get("description", "")
+                desc = temiz_metin(detail.get("description", ""))
             line = f"{ders} | {baslik}"
             if tarih:
                 line += f" | Son teslim: {tarih}"
@@ -1096,7 +1142,7 @@ def _fmt_scraped_data(data: dict, ogretim_yili: str | None = None) -> str:
             continue
         satirlar = [f"PORTAL SAYFASI · {str(kayit.get('title') or '').strip()}"]
         if str(kayit.get("text") or "").strip():
-            satirlar.append(str(kayit["text"]).strip())
+            satirlar.append(temiz_metin(kayit["text"]))
         for tablo in kayit.get("tables") or []:
             satirlar.extend(_tablo_satirlari(tablo))
         for secenek in kayit.get("options") or []:
@@ -1151,6 +1197,19 @@ class PdfExtractionError(Exception):
     text layer (a scanned page). `extract()`/`reindex()` must not create a
     manifest entry for a file that raises this: it needs to be retried, not
     permanently recorded as "indexed, no text" (final review, finding 1)."""
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
+class DocxExtractionError(Exception):
+    """Raised by `FileAdapters._extract_docx_text(..., hata_bildir=True)` when
+    the archive could not be read — "bozuk" (not a zip, no
+    word/document.xml, malformed XML), "dtd" (a DTD or entity declaration,
+    refused) or "sinir" (document.xml larger than the cap) — as opposed to a
+    real document that simply has no text. The default call keeps returning
+    "" for all of these, as the index has always relied on."""
 
     def __init__(self, reason: str):
         super().__init__(reason)
@@ -1218,6 +1277,15 @@ class FileAdapters:
                 "source_kind": "pdf" if text else "metadata",
                 "confidence": 0.8 if text else 0.2,
                 "warnings": [] if text else ["pdf_no_text"],
+            }
+
+        if ext in DOCX_EXTENSIONS:
+            text = self._extract_docx_text(file_path)
+            return {
+                "text": text or self._metadata_only_text(rel_path, file_path, reason="docx_no_text"),
+                "source_kind": "docx" if text else "metadata",
+                "confidence": 0.8 if text else 0.2,
+                "warnings": [] if text else ["docx_no_text"],
             }
 
         if ext in IMAGE_EXTENSIONS:
@@ -1321,6 +1389,111 @@ class FileAdapters:
         # scanned PDF with no text layer. A real fact about the file, not an
         # extraction failure — return "" normally rather than raising.
         return ""
+
+    def _extract_docx_text(self, file_path: Path, sinir: int | None = None,
+                           hata_bildir: bool = False) -> str:
+        """A .docx's paragraphs, from word/document.xml, with the stdlib only.
+
+        Teachers attach Word sheets as often as PDFs (plan 2026-09-28
+        portal-ekleri). Before this a .docx fell through to the unknown-
+        extension branch and its zip bytes were read as text. Tabs and line
+        breaks inside a paragraph are kept; paragraphs are blank-line
+        separated so the chunker keeps them apart. An unreadable archive is
+        "" (metadata only), never garbage.
+
+        Fix round 1 (reviewer-verified defects, see tests/test_assistant_docx.py):
+        the DTD/entity scan now covers the whole (already size-bounded) byte
+        string instead of a fixed 4096-byte prefix a padded leading comment
+        could push the real marker past; the size cap is enforced by a
+        bounded chunked read rather than trusting the archive's own declared
+        (forgeable) ZipInfo.file_size; and the except clause is broadened so
+        no parsing exception — e.g. LookupError from an XML-declared
+        encoding name Python's codec registry does not know — escapes and
+        aborts a whole reindex over one bad attachment.
+
+        Fix round 2 (coordinator-verified): a byte-level regex cannot be
+        made encoding-proof (see _docx_declares_dtd_or_entity's docstring),
+        so the real DTD/entity gate now runs at the parser (expat) rather
+        than on undecoded bytes; the regex is kept only as a cheap first
+        filter for the common ASCII/UTF-8 case.
+
+        `sinir` overrides DOCX_XML_SINIRI for one call (the portal
+        attachment sync reads at most 8 MiB: measured on f29062c, 49 MB of
+        XML cost 554 MB RSS). With `hata_bildir` an unreadable archive raises
+        DocxExtractionError with its reason instead of returning ""."""
+        sinir = DOCX_XML_SINIRI if sinir is None else sinir
+        try:
+            with zipfile.ZipFile(file_path) as arsiv:
+                bilgi = arsiv.getinfo("word/document.xml")
+                # Fast pre-filter only: ZipInfo.file_size is declared by the
+                # archive's own central directory and is not a fact about
+                # the entry — a crafted zip can declare a tiny size whose
+                # real deflate stream decompresses to something far larger
+                # (a zip bomb). A size already over the cap short-circuits
+                # here without opening a read stream at all; the real
+                # enforcement is the bounded read below.
+                if bilgi.file_size > sinir:
+                    raise DocxExtractionError("sinir")
+                parcalar: list[bytes] = []
+                toplam = 0
+                with arsiv.open(bilgi) as akis:
+                    while True:
+                        parca = akis.read(65536)
+                        if not parca:
+                            break
+                        toplam += len(parca)
+                        if toplam > sinir:
+                            # The real decompressed size exceeds the cap
+                            # regardless of what file_size claimed. Stop
+                            # reading immediately — never materialise the
+                            # rest of the stream just to throw it away.
+                            raise DocxExtractionError("sinir")
+                        parcalar.append(parca)
+                veri = b"".join(parcalar)
+            # No defusedxml (not installed; the design allows no new
+            # dependency). A real document.xml never declares a DTD or an
+            # entity, so either one refuses parsing outright. The regex is
+            # a cheap first filter for the common ASCII/UTF-8 case, scanned
+            # across the whole (already size-bounded) byte string rather
+            # than a fixed prefix a large leading comment could push the
+            # real marker past — but it is not the real gate: a byte scan
+            # cannot be made encoding-proof (a UTF-16-encoded document puts
+            # a NUL byte between every ASCII letter, so these literal bytes
+            # never occur even though the decoded document declares both).
+            # The actual gate is _docx_declares_dtd_or_entity, which asks
+            # expat — the same parser ElementTree uses — directly, so no
+            # encoding it understands gets past it.
+            if re.search(rb"<!DOCTYPE|<!ENTITY", veri, re.IGNORECASE):
+                raise DocxExtractionError("dtd")
+            if _docx_declares_dtd_or_entity(veri):
+                raise DocxExtractionError("dtd")
+            kok = ElementTree.fromstring(veri)
+        except Exception as exc:
+            # Anything reading or parsing this archive can raise: a bad
+            # zip, a missing word/document.xml, malformed XML, or an
+            # XML-declared encoding name Python's codec registry does not
+            # know (LookupError, not a subclass of any of the narrower
+            # exceptions this used to catch). One bad .docx must never
+            # raise out of here and abort a whole index update — unless
+            # the caller asked for the reason (hata_bildir).
+            if hata_bildir:
+                neden = exc.reason if isinstance(exc, DocxExtractionError) else "bozuk"
+                raise DocxExtractionError(neden) from exc
+            return ""
+        paragraflar: list[str] = []
+        for p in kok.iter(f"{_WORD_NS}p"):
+            parcalar: list[str] = []
+            for el in p.iter():
+                if el.tag == f"{_WORD_NS}t" and el.text:
+                    parcalar.append(el.text)
+                elif el.tag == f"{_WORD_NS}tab":
+                    parcalar.append("\t")
+                elif el.tag in (f"{_WORD_NS}br", f"{_WORD_NS}cr"):
+                    parcalar.append("\n")
+            satir = "".join(parcalar).strip()
+            if satir:
+                paragraflar.append(satir)
+        return "\n\n".join(paragraflar)
 
     def _extract_image_text(self, file_path: Path) -> str:
         if not self.config.enable_ocr:
@@ -1986,7 +2159,8 @@ class AssistantRuntime:
                  platform_kaynagi: Callable[[], Any] | None = None,
                  kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
                  video_kaynagi: Callable[[], Any] | None = None,
-                 skills: dict[str, Any] | None = None):
+                 skills: dict[str, Any] | None = None,
+                 odev_belge_ara: Callable[[str, str], str] | None = None):
         # First, before anything else is built: a broken teacher skill stops the
         # assistant from opening at all (spec "Hata ve boşluk durumları"), with
         # the skill and the reason in the error — never a silent fallback.
@@ -2040,7 +2214,8 @@ class AssistantRuntime:
                                        kitap_kaynagi=kitap_kaynagi,
                                        video_kaynagi=video_kaynagi,
                                        aile_kaynak_arama=self._aile_search,
-                                       skills=self.skills)
+                                       skills=self.skills,
+                                       odev_belge_ara=odev_belge_ara)
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """The retriever, shaped as a tool the model can choose to call."""
@@ -2078,6 +2253,9 @@ class AssistantRuntime:
         "Işık'ın 'Yaptım' dediği bir ödevi yapılacak diye sunma. Teslim zamanını "
         "söylerken listedeki gün ve saati kullan; 'bu hafta', 'yarın' gibi sözleri "
         "sorudaki 'Bugün:' satırına göre çöz.\n"
+        "- Seçili bir ödevin ekli belgesi (sayfa, soru, metin) → `odev_belgesi`. "
+        "Yalnız asistan ekranında seçilmiş ödevin belgelerine bakar. Belgede olmayanı "
+        "belgede yazıyormuş gibi söyleme. Seçim yoksa belge okunamaz; ödev seçilmesini iste.\n"
         "- Işık'a özel diğer sorular (duyuru, eski ödev, portalın ek sayfaları) ve bir "
         "ödevin ayrıntısı → `ogrenci_verisi_ara`.\n"
         "- Konu, kavram, müfredat, kazanım sorusu → `kazanim_ara`, `mufredat_ara`. MEB "
@@ -2288,6 +2466,8 @@ class AssistantRuntime:
         sohbet_id: str = "",
         not_deposu=None,
         ozet: str | None = None,
+        secili_odev: str = "",
+        odev_anahtari: str = "",
     ) -> dict[str, Any]:
         # `dispatch`, if given, replaces self.registry.dispatch for this
         # call only. chat_events() (below) uses this to wrap tool calls
@@ -2314,7 +2494,7 @@ class AssistantRuntime:
         convo = self._build_conversation(messages, user_query, intent, safety_flags,
                                          okur=okur, ogretmen=ogretmen,
                                          sahip_email=sahip_email, ek_atiflari=ek_atiflari,
-                                         pencere=pencere, ozet=ozet,
+                                         pencere=pencere, ozet=ozet, secili_odev=secili_odev,
                                          notlar=not_deposu.notlar() if hafiza and not_deposu is not None else None)
 
         hafiza_kw = ({"hafiza": hafiza, "not_deposu": not_deposu}
@@ -2337,6 +2517,7 @@ class AssistantRuntime:
                 dispatch=dispatch or functools.partial(
                     self.registry.dispatch, ilerleme_izni=ilerleme_izni is True, okur=okur,
                     ogretmen=ogretmen, mod_onerisi=mod_onerisi,
+                    odev_anahtari=odev_anahtari,
                     **({**hafiza_kw, "sohbet_id": sohbet_id} if hafiza_kw else {})),
                 tier=tier,
                 on_delta=on_delta,
@@ -2462,6 +2643,7 @@ class AssistantRuntime:
             okur=kwargs.get("okur", "bilinmiyor"),
             ogretmen=kwargs.get("ogretmen", assistant_skills.GENEL),
             mod_onerisi=kwargs.get("mod_onerisi", True),
+            odev_anahtari=str(kwargs.get("odev_anahtari") or ""),
             **({"hafiza": kwargs.get("hafiza", True), "not_deposu": kwargs["not_deposu"],
                 "sohbet_id": kwargs.get("sohbet_id", "")}
                if kwargs.get("not_deposu") is not None else {}))
@@ -2554,6 +2736,7 @@ class AssistantRuntime:
         pencere: int = 3,
         ozet: str | None = None,
         notlar: list | None = None,
+        secili_odev: str = "",
     ) -> list[dict[str, Any]]:
         """System prompt plus recent turns.
 
@@ -2629,8 +2812,9 @@ class AssistantRuntime:
                 f"{bugun_satiri(datetime.now())}\n"
                 f"Soran: {self._SORAN.get(okur, self._SORAN['bilinmiyor'])}\n"
                 f"Soru türü: {intent}\n"
-                f"Güvenlik: {', '.join(safety_flags) if safety_flags else 'yok'}\n\n"
-                f"Soru: {user_query}"
+                f"Güvenlik: {', '.join(safety_flags) if safety_flags else 'yok'}\n"
+                + (f"\n{secili_odev}\n" if secili_odev else "\n")
+                + f"\nSoru: {user_query}"
             )},
         ]
 
@@ -2674,6 +2858,8 @@ class AssistantRuntime:
         context_filters: dict[str, Any] | None = None,
         ilerleme_izni: bool = False,
         okur: str = "bilinmiyor",
+        secili_odev: str = "",
+        odev_anahtari: str = "",
     ) -> dict[str, Any]:
         messages = self._eklersiz(messages)
         out = self.chat(
@@ -2684,6 +2870,8 @@ class AssistantRuntime:
             ilerleme_izni=ilerleme_izni,
             okur=okur,
             mod_onerisi=False,  # /plan has no switch button (spec: B1 is /stream and /chat only)
+            secili_odev=secili_odev,
+            odev_anahtari=odev_anahtari,
         )
         out["intent"] = "study_plan"
         out["plan_blocks"] = self._build_rule_based_plan(

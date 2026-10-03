@@ -1,5 +1,6 @@
 import { Time, Task, Certificate, EventSchedule, ExamMode,
-         GroupPresentation, Book, Catalog, ChartBar, Notification, Chat, UserAvatar, Education } from '@carbon/icons-react'
+         GroupPresentation, Book, Catalog, ChartBar, Notification, Chat, UserAvatar, Education,
+         OverflowMenuHorizontal } from '@carbon/icons-react'
 import type { ComponentType } from 'react'
 import type { UserRole } from './hooks/useAuth'
 
@@ -44,6 +45,9 @@ export const routes: RouteConfig[] = [
   { path: '/profil',    label: 'Profil',     icon: UserAvatar,        componentName: 'StudentProfile' , secondary: true },
 
   { path: '/moduller',  label: 'Modüller',   icon: Education, componentName: 'Modules', secondary: true, offPortal: true },
+  // The phone's fifth tab (D3a): every secondary page on one screen. Off the
+  // side nav — on a desktop the nav already lists them under "Daha fazla".
+  { path: '/daha-fazla', label: 'Daha fazla', icon: OverflowMenuHorizontal, componentName: 'DahaFazla', showInNav: false, offPortal: true },
   { path: '/moduller/taslak/:taslakId', label: 'Taslak', icon: Education, componentName: 'DraftViewerRoute', showInNav: false, offPortal: true },
   { path: '/moduller/:slug/:version',   label: 'Modül',  icon: Education, componentName: 'ModuleViewerRoute', showInNav: false, offPortal: true },
 
@@ -77,4 +81,14 @@ export function navRoutesFor(role: UserRole): RouteConfig[] {
 export const redirects: Record<string, string> = {
   '/odevler': '/isler',
   '/program': '/dersler',
+}
+
+/** The pages worth a tab of their own (bottom bar on a phone, top of the side nav). */
+export function primaryNavRoutes(role: UserRole): RouteConfig[] {
+  return navRoutesFor(role).filter(r => !r.secondary)
+}
+
+/** Everything reachable but one level down (İ1). */
+export function secondaryNavRoutes(role: UserRole): RouteConfig[] {
+  return navRoutesFor(role).filter(r => r.secondary)
 }

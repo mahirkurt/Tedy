@@ -24,7 +24,8 @@ TS_OUT = ROOT / "dashboard" / "src" / "theme" / "subjects.ts"
 SCSS_OUT = ROOT / "dashboard" / "src" / "theme" / "_subjects.scss"
 ROLE_VARS = (("accent", "--ted-subject-accent"), ("text", "--ted-subject-text"),
              ("surface", "--ted-subject-surface"), ("onSurface", "--ted-subject-on-surface"),
-             ("surfaceHover", "--ted-subject-surface-hover"), ("border", "--ted-subject-border"))
+             ("surfaceHover", "--ted-subject-surface-hover"), ("border", "--ted-subject-border"),
+             ("panel", "--ted-subject-panel"), ("panelBorder", "--ted-subject-panel-border"))
 HEADER = ("Üretilir: scripts/gen_subject_themes.py — elle düzenlemeyin. Kaynak:\n"
           "src/mcp_server/vendor/assets/carbon-v11-authority.json → tedyLayer.subjectThemes.")
 
@@ -38,8 +39,10 @@ def render_scss() -> str:
     lines = ["// " + line for line in HEADER.splitlines()]
     lines += [
         "//",
-        "// Ders kimliği (Tedy İ8): renk yalnız işarette, çubukta ve kenarda yaşar; ders adı metni nötr",
-        "// kalır. Değerler Carbon Tag token'larının g10 karşılıkları ve @carbon/colors adımlarıdır.",
+        "// Ders kimliği (Tedy İ8, 2026-10-02): durum renkleri (kırmızı/sarı/yeşil/turuncu) ders rengi",
+        "// olmaz; ders rengi yüzeye ölçüyle çıkar — bir görünümde tek büyük panel (--ted-subject-panel),",
+        "// listelerde şerit/kenar/nokta. Değerler Carbon Tag token'larının g10 karşılıkları ve",
+        "// @carbon/colors adımlarıdır.",
         "@use '@carbon/colors' as colors;",
         "",
     ]

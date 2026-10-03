@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react'
 import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, Button, InlineLoading, Link } from '@carbon/react'
 import { Timer, Document, CheckmarkFilled, CloseFilled, ChevronDown, ChevronUp } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
-import type { HomeworkItem } from '../types'
+import type { HomeworkDocument, HomeworkItem } from '../types'
 import { parseDeadline, formatTurkishDate, getHomeworkStatus } from '../utils/formatters'
 import { countdownTagType, getCountdown } from '../utils/countdown'
 import SubjectLabel from './SubjectLabel'
@@ -55,10 +55,76 @@ export default function HomeworkTracker() {
   // The row whose "Yaptım" could not be stored. It used to fail in silence —
   // the button simply came back, and nothing said the mark was not kept (D3).
   const [markErrorKey, setMarkErrorKey] = useState<string | null>(null)
+  const [docBusy, setDocBusy] = useState(false)
+  const [docError, setDocError] = useState('')
+  const docInputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 60000)
     return () => clearInterval(t)
   }, [])
+
+  useEffect(() => {
+    setSelectedHw(prev => {
+      if (!prev?.homework_key) return prev
+      return (hwData.homework || []).find(hw => hw.homework_key === prev.homework_key) ?? prev
+    })
+  }, [hwData])
+
+  async function addDocument(file: File) {
+    const key = selectedHw?.homework_key
+    if (!key) {
+      setDocError('Bu ödevin kimliği yok.')
+      return
+    }
+    setDocBusy(true)
+    setDocError('')
+    try {
+      const body = new FormData()
+      body.append('homework_key', key)
+      body.append('file', file)
+      const res = await fetch('/api/homework/documents', {
+        method: 'POST',
+        credentials: 'include',
+        body,
+      })
+      const payload = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(payload?.error || `HTTP ${res.status}`)
+      const documents = Array.isArray(payload?.documents) ? payload.documents as HomeworkDocument[] : []
+      setSelectedHw(prev => prev ? { ...prev, documents } : prev)
+      refreshHomework()
+    } catch (err) {
+      setDocError(err instanceof Error ? err.message : 'Belge eklenemedi.')
+    } finally {
+      setDocBusy(false)
+    }
+  }
+
+  async function removeDocument(id: string) {
+    setDocBusy(true)
+    setDocError('')
+    try {
+      const res = await fetch(`/api/homework/documents/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const payload = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(payload?.error || `HTTP ${res.status}`)
+      setSelectedHw(prev => prev
+        ? { ...prev, documents: (prev.documents || []).filter(doc => doc.id !== id) }
+        : prev)
+      refreshHomework()
+    } catch (err) {
+      setDocError(err instanceof Error ? err.message : 'Belge kaldırılamadı.')
+    } finally {
+      setDocBusy(false)
+    }
+  }
+
+  function onDocumentPicked(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (file) void addDocument(file)
+  }
 
   const grouped = useMemo(() => {
     const aktif: HomeworkItem[] = []
@@ -330,9 +396,24 @@ export default function HomeworkTracker() {
         <ModalHeader
           title={selectedHw["Ödev Başlığı"] || ''}
           label={selectedHw.normalized_course || selectedHw["Ders Adı"] || ''}
+          iconDescription="Kapat"
         />
         <ModalBody>
-          <HomeworkModalBody hw={selectedHw} enrichmentData={enrichmentData} />
+          <HomeworkModalBody
+            hw={selectedHw}
+            enrichmentData={enrichmentData}
+            docBusy={docBusy}
+            docError={docError}
+            onPickDocument={() => docInputRef.current?.click()}
+            onRemoveDocument={id => void removeDocument(id)}
+          />
+          <input
+            ref={docInputRef}
+            type="file"
+            accept=".pdf,.docx,.txt,.md,application/pdf,text/plain,text/markdown"
+            style={{ display: 'none' }}
+            onChange={onDocumentPicked}
+          />
         </ModalBody>
       </ComposedModal>
     )}
@@ -460,7 +541,16 @@ function HomeworkCard({
 
 /* ── HomeworkModalBody ───────────────────────────────────────────────────── */
 
-function HomeworkModalBody({ hw, enrichmentData }: { hw: HomeworkItem; enrichmentData: Record<string, { course: string; title: string; note: string; type: string }> }) {
+function HomeworkModalBody({
+  hw, enrichmentData, docBusy, docError, onPickDocument, onRemoveDocument,
+}: {
+  hw: HomeworkItem
+  enrichmentData: Record<string, { course: string; title: string; note: string; type: string }>
+  docBusy: boolean
+  docError: string
+  onPickDocument: () => void
+  onRemoveDocument: (id: string) => void
+}) {
   const deadline = parseDeadline(hw["Ödev Son Teslim Tarihi"])
   const countdown = getCountdown(deadline)
   const status = hw.student_marked_done
@@ -525,18 +615,33 @@ function HomeworkModalBody({ hw, enrichmentData }: { hw: HomeworkItem; enrichmen
         </div>
       )}
 
-      {/* Attachments */}
-      {(hw.detail?.attachments?.length ?? 0) > 0 && (
-        <div className="homework-modal__attachments">
-          <h5 className="homework-modal__attachments-title">Ekler</h5>
-          {hw.detail!.attachments.map((att, i) => (
-            <a key={i} href={att.url} target="_blank" rel="noopener noreferrer"
-               className="homework-modal__attachment-link">
-              <Document size={16} /> {att.name}
+      <div className="homework-modal__attachments">
+        <h5 className="homework-modal__attachments-title">Ekler</h5>
+        {(hw.detail?.attachments || []).map((att, i) => (
+          <a key={i} href={att.url} target="_blank" rel="noopener noreferrer"
+             className="homework-modal__attachment-link">
+            <Document size={16} /> {att.name}
+          </a>
+        ))}
+        {(hw.documents || []).map(doc => (
+          <div key={doc.id} className="homework-modal__doc">
+            <a href={`/api/homework/documents/${doc.id}`} className="homework-modal__attachment-link">
+              <Document size={16} /> {doc.name}
             </a>
-          ))}
-        </div>
-      )}
+            {doc.error && <p className="homework-modal__doc-error" role="alert">{doc.error}</p>}
+            <Button kind="ghost" size="sm" disabled={docBusy} onClick={() => onRemoveDocument(doc.id)}>
+              Kaldır
+            </Button>
+          </div>
+        ))}
+        <Button kind="secondary" size="sm" disabled={docBusy} onClick={onPickDocument}>
+          {docBusy ? 'Vektörleniyor...' : 'Belge ekle'}
+        </Button>
+        <p className="homework-modal__doc-hint">
+          Eklenen belge yalnız bu ödev sorulurken asistana açılır.
+        </p>
+        {docError && <p className="homework-modal__doc-error" role="alert">{docError}</p>}
+      </div>
 
       {enrichNote && (
         <div className="homework-modal__enrichment">

@@ -52,6 +52,27 @@ function parseCard(card: string): ParsedCard {
   return { raw: card, weekNum, teacher, date, body: bodyLines.join('\n') }
 }
 
+// The accordion title is the note's first 80 characters. When that is the
+// whole note, an open item prints the same sentence again. Show it once.
+function notBasligi(metin: string, govde = metin.slice(0, 1000)) {
+  const baslik = metin.length > 80 ? `${metin.slice(0, 80)}…` : metin
+  return { baslik, govde, ayni: baslik === govde }
+}
+
+function DersNotu({ metin, govde, acik }: { metin: string; govde?: string; acik?: boolean }) {
+  const not = notBasligi(metin, govde)
+  if (not.ayni) {
+    return <div className="course-content-text">{not.govde}</div>
+  }
+  return (
+    <Accordion className="course-content-accordion">
+      <AccordionItem title={not.baslik} open={acik}>
+        <div className="course-content-text">{not.govde}</div>
+      </AccordionItem>
+    </Accordion>
+  )
+}
+
 interface WeekGroup {
   weekNum: number
   cards: ParsedCard[]
@@ -163,7 +184,7 @@ export default function CourseContent() {
   }
 
   return (
-    <div className="dashboard-card">
+    <div className="dashboard-card course-content">
       <div className="course-content__header">
         <h2 className="dashboard-card__title">
           <Education size={20} />
@@ -210,16 +231,7 @@ export default function CourseContent() {
             return (
               <TabPanel key={name}>
                 {!hasCards && content.text && (
-                  <Accordion>
-                    <AccordionItem
-                      title={content.text.slice(0, 80) + (content.text.length > 80 ? '…' : '')}
-                      open={!focusMode}
-                    >
-                      <div className="course-content-text">
-                        {content.text.slice(0, 1000)}
-                      </div>
-                    </AccordionItem>
-                  </Accordion>
+                  <DersNotu metin={content.text} acik={!focusMode} />
                 )}
                 {hasCards && hasWeeks && (
                   <Accordion className="course-content-accordion">
@@ -266,18 +278,9 @@ export default function CourseContent() {
                   </Accordion>
                 )}
                 {hasCards && !hasWeeks && (
-                  <Accordion className="course-content-accordion">
-                    {deduped.slice(0, 8).map((card, i) => (
-                      <AccordionItem
-                        key={i}
-                        title={card.slice(0, 80) + (card.length > 80 ? '…' : '')}
-                      >
-                        <div className="course-content-text">
-                          {card}
-                        </div>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
+                  deduped.slice(0, 8).map((card, i) => (
+                    <DersNotu key={i} metin={card} govde={card} />
+                  ))
                 )}
               </TabPanel>
             )

@@ -201,31 +201,25 @@ Yarıdan azsa ilke ihlal edilmiştir.
 
 ---
 
-### İ8 — Renk durumu kodlar, taksonomiyi değil
+### İ8 — Renk önce durumu söyler; ders rengi yüzeye ölçüyle çıkar
 
-Renk öncelikle **ne yapılması gerektiğini** söyler (acil / bekliyor / bitti /
-bozuk). Ders veya içerik türü gibi taksonomi, renkten önce **konum, sıra ve
-etiketle** anlatılır. Taksonomi rengi ancak eylem rengiyle çakışmadığı yerde ve
-düşük doygunlukta kullanılır.
+1. **Durum renkleri ayrıdır.** Kırmızı, sarı, yeşil ve turuncu aciliyeti ve sonucu taşır
+   (`subjectThemes.reserved`); hiçbir ders bu ailelerden renk almaz.
+2. **Ders rengi yüzeye çıkabilir.** Carbon Tag ailesinin açık zemini, kendi koyu metni ve orta ton
+   kenarı (`--ted-subject-panel`, `--ted-subject-text`, `--ted-subject-panel-border`,
+   `--ted-subject-accent`). Gradyan, saydamlık, `filter`, `color-mix` yasağı sürer.
+3. **Bir görünümde en çok bir büyük renkli yüzey.** O ekranın "tek şey"i: Bugün'de sıradaki ders ya
+   da iş, asistanda öğretmen paneli. Listeler ders rengini şerit, kenar ya da noktayla taşır. Küçük
+   kartlar (ör. iki sütunlu ödev kartları) açık zemin ve üst şerit kullanabilir.
+4. **Gri tonlama testi geçer.** Aciliyet renk olmadan da (konum, etiket, ikon) anlaşılır.
 
-*Neden:* bugün yedi kategori rengi var (`--ted-cat-*`). Yedi renk, hiçbiri
-"bu önemli" diyemeyecek kadar çok renktir.
+*Neden:* 2026-10-02'de kullanıcı Bugün ekranının üç taslağından "ders renkleri yüzeyde" yönünü seçti.
+Eski İ8'in asıl derdi yedi kategori renginin "bu önemli"yi boğmasıydı. Bu dert, durum renklerinin
+ayrı tutulması ve tek büyük yüzey kuralıyla korunur.
 
-*Test:* Ekranı gri tonlamaya çevir. Neyin acil olduğu hâlâ anlaşılıyor mu?
-Anlaşılmıyorsa renk tek taşıyıcı olmuş demektir (D2 ihlali de sayılır).
-
-*Ders rengi (2026-09-24):* taksonominin renk alabilen tek biçimi **ders
-kimliğidir** ve bu ilkenin koşullarını yapısal olarak sağlar. Her ders bir alana,
-her alan bir Carbon Tag ailesine bağlanır (Türkçe magenta, matematik mor, fen
-teal, sosyal camgöbeği, yabancı diller mavi, değerler sıcak gri, bilişim soğuk
-gri, sanat-spor ve genel gri); tek kaynak `tedyLayer.subjectThemes`
-(`src/subject_themes.py`, `dashboard/src/theme/subjects.ts`). Eylem ve durum
-renkleri — kırmızı, yeşil, sarı, turuncu — hiçbir derse verilmez. Panoda ders
-rengi yalnız küçük işarettir (`SubjectLabel` karesi), kart kenarıdır ya da ders
-adının yanındaki kicker'dır; ders asla durum etiketi (`Tag`) biçiminde görünmez ve
-geri sayım etiketleri yalnız kırmızı + nötr kullanır, bu yüzden ders rengiyle
-durum rengi aynı biçimde karşılaşmaz. Modül, pano ve katalog aynı dersi aynı
-renkle gösterir.
+*Test:* Ekranı gri tonlamaya çevir: neyin acil olduğu hâlâ anlaşılıyor mu? Bir görünümde ders
+zemininde (`--ted-subject-panel`) duran ve yüksekliği 120 px'i aşan birden fazla yüzey var mı?
+Varsa İ8 ihlali.
 
 ---
 
