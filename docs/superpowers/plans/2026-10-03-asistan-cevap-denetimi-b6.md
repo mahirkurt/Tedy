@@ -37,7 +37,7 @@ Spec bu davranışları ister, sayı ya da zarf vermez. Görevler aşağıdaki d
 | Dört bakış | `kaynak`, `seviye`, `ogretmen`, `hitap`. Başka ad silinir. |
 | Kaynak | Okurun gördüğü `[Sn]` cümlesi, aynı numaralı snippet ile çelişiyorsa ya da snippet'te olmayan kazanım kodu veya sayfa numarası varsa ciddi. İşaretsiz genel bilgi ciddi değildir. |
 | Seviye | Her zaman `7. sınıf`. `_sinif()` okunmaz; kazıma `ortaokul` döndürebilir. Üniversite terimi ya da adımı atlayan çözüm ciddi. Kelime listesi yok. |
-| Öğretmen | `## Ders akışı` ile `## Sınırlar` bölümleri, bu sırayla, birlikte en çok 1500 karakter. Yalnız ipucu verip çözümü saklamak, ya da ödevi teslim metni veya cevap anahtarı diye yazmak ciddi. Benzer alıştırma cümlesinin yokluğu tek başına ciddi değildir. `ogretmen == "genel"` ise bu bakış yoktur; model `ogretmen` yazsa da o ad düşer. Liste boş kalırsa biçim hatasıdır. |
+| Öğretmen | Önce `## Sınırlar` bölümünün tamamı, sonra `## Ders akışı` bölümünün en çok 1500 karakteri. İkisini birleştirip 1500'de kesmek yasaktır: Türkçe'nin `## Ders akışı` bölümü tek başına 1684 karakterdir ve bu kesim dört skill'de de `cevap anahtarı`ndan önce biter. Yalnız ipucu verip çözümü saklamak, ya da ödevi teslim metni veya cevap anahtarı diye yazmak ciddi. Benzer alıştırma cümlesinin yokluğu tek başına ciddi değildir. `ogretmen == "genel"` ise bu bakış yoktur; model `ogretmen` yazsa da o ad düşer. Liste boş kalırsa biçim hatasıdır. |
 | Hitap | `okur == "ogrenci"` ise sen; Işık üçüncü şahıs ise ciddi. `aile` ve `bilinmiyor` ise siz; Işık üçüncü şahıs. Bir cevapta ikisi birden ciddi. |
 | Ciddi değil | `{"ciddi": false}`. Cevap değişmez. `durum` `gecti`. |
 | Ciddi | `{"ciddi": true, "sorun": ["kaynak"], "cevap": "<bütün metin>"}`. `cevap` taslağın yerine geçer. Taslağın sonuna eklenmez. `durum` `duzeltildi`. |
@@ -45,7 +45,7 @@ Spec bu davranışları ister, sayı ya da zarf vermez. Görevler aşağıdaki d
 | Biçim | JSON değilse, `ciddi` true iken `sorun` boşsa ya da `cevap` dizgi değilse `durum` `hata`, `neden` `bicim`. Üç ters tırnaklı çit varsa ilk çitin içi okunur. |
 | Çağrı hatası | İstisna yutulur. `durum` `hata`, `neden` `cagri`. Taslak durur. Loga yalnız `type(exc).__name__` yazılır. |
 | Atıf | Düzeltme, ilk çözmenin bıraktığı atıf listesiyle yeniden `_finalize_citations` olur. Numara, okurun gördüğü `[S1]` sırasıdır. Havuzda olmayan işaret düşer. `meta.dropped_citations` iki geçişin toplamıdır. |
-| Güvenlik | `guidance_suffix` denetimden sonra eklenir. Denetim bu son eki görmez ve silemez. `warning:limited_confidence` okura giden son atıf listesine göre konur. |
+| Güvenlik | `guidance_suffix` denetimden sonra eklenir. Klinik son ek `Not: Klinik tanı/tedavi önerisi veremem. Bu konuyu okul psikolojik danışmanı veya lisanslı uzmanla değerlendirin.` cümlelerinin ikisidir. Birinci cümlede duran bir test canlı son eki kısaltır. Denetim bu son eki görmez ve silemez. `warning:limited_confidence` okura giden son atıf listesine göre konur. |
 | Akış | `answer_delta` taslaktır. Denetim yeni delta ve `answer_reset` yazmaz. `answer` olayının gövdesi `{"payload": <chat dönüşü>}` olur. Sayfa `data.payload` okur. `/chat` aynı nesneyi sarmasız döner. |
 | Meta | `meta.denetim` her cevapta vardır. Sayfa bunu okumaz. `degraded` listesine yazılmaz. `mesaj.meta_json` `'{}'` kalır. Kullanım, cevap kullanımına eklenmez. |
 | Sorgu | `_sorguya` değişmez. Ek model yoktur. Düşen token, noktanın tokeniyle bütün olarak aynıysa `sorgu_dar` true olur. Alt dizgi sayılmaz: düşen `mi`, `kimyasal` içinde `sorgu_dar` yapmaz. |
@@ -80,14 +80,14 @@ Kullanıcı gövdesi şu anahtarlarla JSON'dur: `cevap`, `okur`, `ogretmen`, `si
 |---|---|---|
 | Modül | `src/assistant_denetim.py` | Saf karar. Flask yok. |
 | `denetim_gerekli` | `(ogretmen, cevap, hata_metinleri) -> str \| None` | None ise çağrı var. Aksi `genel_kisa` ya da `hata_cevabi`. |
-| `ogretmen_kurallari` | `(govde: str) -> str` | İki bölüm, 1500 karakter. |
+| `ogretmen_kurallari` | `(govde: str) -> str` | `## Sınırlar` bütün, sonra `## Ders akışı` en çok 1500. |
 | `denetim_oku` | `(ham: str) -> dict` | Biçim hatasında `ValueError`. |
 | `denetim_uygula` | `(cevap, karar) -> tuple[str, dict]` | Tek geçiş. |
 | `puanla` | `(soru, cevap, cagrilar, atiflar) -> dict` | Ücretli çağrı yok. |
 | `sorgu_dar` | `(dusen: list[str], noktalar: list[str]) -> bool` | Bütün token. |
 | Model | `DENETIM_MODEL = "claude-haiku-4-5"` | B3 `OZET_MODEL` ile aynı kimlik. |
 | Eşik | `UZUN_CEVAP = 800` | Spec sayı vermez. |
-| Kural payı | `KURAL_SINIRI = 1500` | Ucuz çağrı. |
+| Kural payı | `KURAL_SINIRI = 1500` | Yalnız `## Ders akışı` kesilir. `## Sınırlar` kesilmez. |
 | Kaynak payı | `DENETIM_KAYNAK = 8` | `retrieval_k` ile aynı tavan. |
 | Çağrı tavanı | `DENETIM_MAX_TOKENS = 2000`, `DENETIM_TIMEOUT_S = 30` | `_request` tavanı değil. |
 | Betik | `scripts/asistan_eval.py` | Spec adı. |
@@ -131,18 +131,7 @@ Okur cümleleri:
 
 `denetim_gerekli("genel", "kısa", [])` `genel_kisa` döner. 799 karakter `genel_kisa`, 800 karakter None. `denetim_gerekli("matematik", "kısa", [])` None. Hata metinleri kümesinde birebir duran metin `hata_cevabi` döner.
 
-`ogretmen_kurallari` şu gövdeden yalnız `çöz` ve `kopyalama` taşır, `Maarif` taşımaz. 1500 karakteri aşan gövde kesilir.
-
-```text
-## Ders akışı
-çöz
-## Maarif Modeli bağı
-Maarif
-## Sınırlar
-kopyalama
-## Sonrası
-yok
-```
+`ogretmen_kurallari` dört gerçek skill gövdesiyle ölçülür. `assistant_skills.yukle()` `turkce`, `fen`, `sosyal` ve `matematik` döner. Her `skill.govde` için özet `cevap anahtarı` taşır, `## Maarif` taşımaz, `## Sınırlar` `## Ders akışı`ndan önce gelir. Dört satırlık bir gövde bu iddiayı taşımaz: Türkçe'nin `## Ders akışı` bölümü tek başına 1684 karakterdir. Aynı uzunlukta bir `## Ders akışı`, ardından `cevap anahtarı` yazan bir `## Sınırlar` da özette `cevap anahtarı` bırakır. 1500 karakterlik birleşik kesim bırakmaz. `## Maarif Modeli bağı` özete girmez.
 
 `denetim_oku('{"ciddi": false}')` `ciddi` False verir. `denetim_oku` üç ters tırnaklı `json` çitinin içini okur. `ciddi` true, `sorun` `["kaynak", "uydurma", "kaynak"]` ise sorun `["kaynak"]` olur. `ogretmen` genel kapısında elenir: `ogretmen_bakisi` False iken `["ogretmen"]` `ValueError` verir. Boş `cevap`, dizgi olmayan `cevap` ve `{"ciddi": true}` `ValueError` verir.
 
@@ -165,7 +154,7 @@ Expected: FAIL, modül yok.
 
 - [ ] **Step 3: Uygula**
 
-Kilitlenen kapı, iki başlık, JSON ayrıştırma, tek uygulama, `turkce_kucult_katla` ile puan ve bütün token `sorgu_dar`. `puanla` ağa gitmez.
+Kilitlenen kapı. `ogretmen_kurallari` önce `## Sınırlar` bölümünün tamamını yazar, sonra `## Ders akışı` bölümünden en çok `KURAL_SINIRI` karakter alır. Başka başlık yok. JSON ayrıştırma, tek uygulama, `turkce_kucult_katla` ile puan ve bütün token `sorgu_dar`. `puanla` ağa gitmez.
 
 - [ ] **Step 4: PASS**
 
@@ -206,7 +195,7 @@ Ayrı test: `ogretmen="matematik"`, metin `kisa`, `denetle` verilmez, `llm.avail
 
 Ayrı test: `chat_with_tools` `text=""` döner. Cevap `_fallback_answer` olur. `denetle` 0 kez. `neden` `hata_cevabi`.
 
-Ayrı test: güvenlik bayrağı `risk:clinical_request` üreten kullanıcı metni ve ciddi düzeltme. Son metin `Not: Klinik tanı/tedavi önerisi veremem.` ile biter. Denetimin gördüğü `cevap` bu son eki içermez.
+Ayrı test: güvenlik bayrağı `risk:clinical_request` üreten kullanıcı metni ve ciddi düzeltme. Son metin `SafetyPolicy.guidance_suffix(["risk:clinical_request"])` ile biter. Bu dönüş iki cümledir: `Not: Klinik tanı/tedavi önerisi veremem. Bu konuyu okul psikolojik danışmanı veya lisanslı uzmanla değerlendirin.` Yalnız birinci cümleyi arayan test canlı son eki kısaltır. Denetimin gördüğü `cevap` bu son eki içermez.
 
 Ayrı test: düzeltme `[S9]` ekler. İşaret düşer. `dropped_citations`, ilk geçişteki düşenle bu düşenin toplamıdır.
 
@@ -216,7 +205,7 @@ Aynı pytest. Expected: FAIL, `denetle` parametresi yok.
 
 - [ ] **Step 3: Uygula**
 
-`chat` içinde sıra şudur. Araç döngüsü biter, boş metin yedek cümleye döner, `_finalize_citations` çalışır. `denetim_gerekli` None değilse `meta.denetim` `atlandi` olur ve `denetle` çağrılmaz. None ise ve `denetle` yoksa ve `llm.available` False ise `neden` `model_yok`. Aksi halde bir çağrı. Verilen `denetle(istem, kullanici_json)` ham dizgi döner. Varsayılan çağrı `messages.create` kullanır: `model` `DENETIM_MODEL`, `max_tokens` 2000, `timeout` 30, sistem `DENETIM_ISTEMI`, tek kullanıcı mesajı. Araç, thinking, temperature, stream ve `cache_control` yoktur. `last_model_used` ve `loop.usage` yazılmaz. `denetim_oku` `ValueError` ise `bicim`. Başka istisna `cagri`. `denetim_uygula` metni değiştirirse aynı atıf listesiyle ikinci `_finalize_citations`. Sonra boş atıf listesine `warning:limited_confidence`. Sonra `guidance_suffix`. `on_delta` bu arada çağrılmaz.
+`chat` içinde sıra şudur. Araç döngüsü biter, boş metin yedek cümleye döner, `_finalize_citations` çalışır. `denetim_gerekli` None değilse `meta.denetim` `atlandi` olur ve `denetle` çağrılmaz. None ise ve `denetle` yoksa ve `llm.available` False ise `neden` `model_yok`. Aksi halde bir çağrı. Verilen `denetle(istem, kullanici_json)` ham dizgi döner. Varsayılan çağrı `messages.create` kullanır: `model` `DENETIM_MODEL`, `max_tokens` 2000, `timeout` 30, sistem `DENETIM_ISTEMI`, tek kullanıcı mesajı. Araç, thinking, temperature, stream ve `cache_control` yoktur. `last_model_used` ve `loop.usage` yazılmaz. `denetim_oku` `ValueError` ise `bicim`. Başka istisna `cagri`. `denetim_uygula` metni değiştirirse aynı atıf listesiyle ikinci `_finalize_citations`. Sonra boş atıf listesine `warning:limited_confidence`. Sonra `guidance_suffix`. Klinik bayrakta bu, danışman cümlesini de içeren canlı son ektir; birinci cümlede kesilmez. `on_delta` bu arada çağrılmaz.
 
 `kurallar`, `ogretmen != "genel"` ise `ogretmen_kurallari(skill.govde)`. Genel modda null. `kaynaklar` çözülmüş atıfların ilk 8'i: `id`, `label`, `snippet`.
 
@@ -259,7 +248,7 @@ git commit -m "feat: cevap okura gitmeden önce bir kez denetlenir"
 
 `sorulari_yukle` dört ders görür: `turkce`, `fen`, `sosyal`, `matematik`. Her birinde 3 soru. Her soruda `id`, `soru`, `arac`, `kaynak`, `noktalar`. `id` `<ders>-1` biçimindedir. `arac` şunlardan biridir: `kazanim_ara`, `kitap_sayfa`, `skill_kaynagi`. Her nokta katlandıktan sonra en az 4 karakterdir ve şu kelimelerden biri değildir: `nedir`, `nelerdir`, `nasıl`, `nasil`, `neden`, `niçin`, `nicin`, `kim`, `kimdir`, `hangi`, `kaç`, `kac`, `mı`, `mi`, `mu`, `mü`. Toplam 12.
 
-`main([])` 2 döner. `tmp` altında `asistan_eval` dizini yoktur. Sahte `calistir` 0 kez çağrılır.
+`main([])` 2 döner. `tmp` altında `asistan_eval` dizini yoktur. Sahte `calistir` 0 kez çağrılır. `load_env` çağrılmaz. Dosya olarak `python scripts/asistan_eval.py` de 2 döner; `src` içe aktarılmaz.
 
 `sonuc_yaz(kok, satirlar, sha, simdi=datetime(2026, 10, 3, 9, 45, tzinfo=timezone.utc), calistir_sayisi=12)` `kok/20261003T094500Z/sonuc.json` yazar. `ozet.soru` 12. `sorular_sha256` verilen sha. Aynı damgaya ikinci yazış `20261003T094500Z-2` olur. Birinci dosya durur. Yazış `atomic_json_dump` iledir.
 
@@ -303,7 +292,7 @@ Aynı pytest. Expected: FAIL, soru dosyası yok.
 }
 ```
 
-`scripts/asistan_eval.py` modül başında yalnız stdlib, `src.assistant_denetim` ve `src.json_utils` alır. `AssistantRuntime` ile `_sorguya` fonksiyonun içinde, `--onayla` görüldükten sonra içe aktarılır.
+`scripts/asistan_eval.py` modül başında yalnız stdlib alır. `src` içe aktarımı fonksiyonun içindedir. Dosya olarak açılışta (`__name__ == "__main__"`) ve yalnız `--onayla` varken, bu içe aktarımdan önce proje kökü `sys.path`'e girer: `Path(__file__).resolve().parents[1]`. Ardından `src.env_loader.load_env()` çağrılır. Kök yoksa `src` içe aktarılamaz. `load_env` yoksa `ClaudeClient` anahtarı görmez ve on iki cevap bağlantı hata cümlesi olur. `--onayla` yokken ikisi de olmaz.
 
 `main(argv)` `--onayla` yoksa 2 döner ve hiçbir şey yazmaz. Varsa `kos` on iki soruyu sırayla çağırır. Her çağrı `runtime.chat(messages=[{"role": "user", "content": soru}], ogretmen=ders, okur="ogrenci", mod_onerisi=False)`. `sohbet_id` geçmez. Depo açılmaz. Bir soru istisna verirse satırın `cevap` alanı `""`, `denetim.durum` `hata`, `denetim.neden` `cagri` olur ve döngü sürer.
 
@@ -311,7 +300,7 @@ Düşen token: soru işaretleri silinmiş `split()` ile `_sorguya(soru).split()`
 
 `sonuc.json` anahtarları: `surum` `"1"`, `zaman`, `model` (cevap modeli), `denetim_model` `claude-haiku-4-5`, `sorular_sha256` (dosya baytlarının sha256'sı), `sorular` (on iki satır), `ozet` (`soru`, `arac_tamam`, `kaynak_tamam`, `nokta_tamam`). Cevap satırı kayıtta durur. `output/` altındadır.
 
-`if __name__ == "__main__"` yalnız `raise SystemExit(main(sys.argv[1:]))` olur.
+`if __name__ == "__main__"` önce argv'ye bakar. `--onayla` varsa kökü ekler, `load_env()` çağırır, sonra `raise SystemExit(main(sys.argv[1:]))`. Yoksa yalnız `main` çalışır ve 2 döner. Test `--onayla` geçirmez.
 
 - [ ] **Step 4: PASS**
 
@@ -362,6 +351,9 @@ git commit -m "docs: cevap denetimi planını CLAUDE.md'ye yaz"
 | Öğretmen modunda ve uzun cevapta ucuz denetim | 1, 2 |
 | Uzunluğun sayısı, 800 | 1, 2 |
 | Kaynak, 7. sınıf, anlatan öğretmen, hitap | 1, 2 |
+| `## Sınırlar` içindeki `cevap anahtarı` özette durur | 1 |
+| Klinik son ek danışman cümlesini de taşır | 2 |
+| Betik, dosya olarak ve `--onayla` sonrası kök ve `load_env` | 3 |
 | Ciddiyse bir kez bütün cevap değişir | 1, 2 |
 | Taslak akarken sonuç `answer` olayında | 2 |
 | Atlama ya da hata: taslak durur, meta işaretlenir | 1, 2 |
