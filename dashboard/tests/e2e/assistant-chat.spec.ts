@@ -2,6 +2,9 @@ import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { mockSohbetler } from './_audit-fixtures'
+
+test.beforeEach(async ({ page }) => { await mockSohbetler(page) })
 
 // Scopes to the answer body of the most recently added assistant message.
 // `.ac-msg__content` also matches the welcome message and the user's own

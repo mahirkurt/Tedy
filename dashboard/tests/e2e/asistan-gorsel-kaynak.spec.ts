@@ -2,6 +2,9 @@ import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { createRequire } from 'node:module'
+import { mockSohbetler } from './_audit-fixtures'
+
+test.beforeEach(async ({ page }) => { await mockSohbetler(page) })
 
 // Görev 4. A textbook figure the assistant opened with figur_getir reaches the reader: its citation
 // carries `locator.figure_id`, and the Kaynaklar panel shows the image from

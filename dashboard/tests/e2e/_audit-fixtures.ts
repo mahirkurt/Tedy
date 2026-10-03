@@ -74,6 +74,8 @@ export const FULL: Record<string, unknown> = {
   enrichment: {},
   'progress/ec': {}, 'progress/a3k': {}, sebit: {},
   'private-lessons': { lessons: [] },
+  'assistant/ogrenme-gunlugu': { zayif: [], calisilan: [], degerlendirmeler: [],
+    hafta: { baslangic: '2026-09-21', sohbet: [], alistirma: 0, puan: { dogru: 0, toplam: 0 } } },
   // Ders İçerikleri reads this too. Without it an unrouted request reaches
   // the real server, and a test that empties /api/content still sees the
   // portal's 36 weeks of cards.
@@ -95,7 +97,7 @@ export const FULL: Record<string, unknown> = {
   },
 }
 
-export async function mock(page: Page, data: Record<string, unknown>) {
+export async function mockSohbetler(page: Page) {
   // Conversation tests replace these routes with their own isolated rows.
   await page.route('**/api/assistant/sohbetler', r => r.fulfill(json(
     r.request().method() === 'POST' ? { id: 'ab'.repeat(16), ogretmen: 'genel', baslik: '' } : { sohbetler: [] },
@@ -104,6 +106,10 @@ export async function mock(page: Page, data: Record<string, unknown>) {
   await page.route('**/api/assistant/notlar', r => r.fulfill(json({ notlar: [] })))
   await page.route('**/api/assistant/sohbetler/*', r => r.request().method() === 'PATCH'
     ? r.fulfill(json({ ok: true })) : r.fallback())
+}
+
+export async function mock(page: Page, data: Record<string, unknown>) {
+  await mockSohbetler(page)
   // The stream endpoint is real backend code and would reach Gemini.
   // Playwright checks the newest route first. A spec that already registered
   // its own /stream handler (the upload test's fulfill) must still run;
@@ -141,6 +147,8 @@ export const LIVE: Record<string, unknown> = {
   enrichment: {},
   'progress/ec': {}, 'progress/a3k': {}, sebit: {},
   'private-lessons': { lessons: [] },
+  'assistant/ogrenme-gunlugu': { zayif: [], calisilan: [], degerlendirmeler: [],
+    hafta: { baslangic: '2026-09-21', sohbet: [], alistirma: 0, puan: { dogru: 0, toplam: 0 } } },
   // Ders İçerikleri reads this too. Without it an unrouted request reaches
   // the real server, and a test that empties /api/content still sees the
   // portal's 36 weeks of cards.

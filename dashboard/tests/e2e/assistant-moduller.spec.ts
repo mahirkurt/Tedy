@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test'
 import type { Page, Route } from '@playwright/test'
+import { mockSohbetler } from './_audit-fixtures'
+
+test.beforeEach(async ({ page }) => { await mockSohbetler(page) })
 
 // Sub-project 5. A module citation links to the dashboard's own module route, and only that
 // route fetches a viewing ticket (spec §5.4). Every absence below follows proof that the surface

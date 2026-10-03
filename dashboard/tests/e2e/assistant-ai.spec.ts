@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test'
-import { json } from './_audit-fixtures'
+import { json, mockSohbetler } from './_audit-fixtures'
+
+test.beforeEach(async ({ page }) => { await mockSohbetler(page) })
 
 // Carbon for AI treats the AI mark as a claim about provenance that must be
 // explainable. This surface carried the mark without the explanation, and
