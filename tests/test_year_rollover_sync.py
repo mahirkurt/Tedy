@@ -174,8 +174,19 @@ def test_archive_failure_in_main_does_not_abort_the_sync(tmp_path, monkeypatch):
     monkeypatch.setattr("src.scrape_achieve3000.scrape", lambda: None)
     monkeypatch.setattr("src.scrape_sebit_homework.scrape", lambda: None)
 
-    from src.run_sync import main
-    main()
+    # The attachment step writes under PROJECT_ROOT, which this test used to
+    # leave as the checkout. Point it at the temp tree before main() chdirs
+    # there, so a missing download guard cannot create the real tracker.
+    gercek_kok = os.path.abspath(run_sync.PROJECT_ROOT)
+    proje = os.path.join(out, "proje")
+    os.makedirs(proje)
+    monkeypatch.setattr(run_sync, "PROJECT_ROOT", proje)
+    cwd = os.getcwd()
+    try:
+        from src.run_sync import main
+        main()
+    finally:
+        os.chdir(cwd)
 
     with open(os.path.join(out, "health.json"), encoding="utf-8") as f:
         health = json.load(f)
@@ -185,3 +196,8 @@ def test_archive_failure_in_main_does_not_abort_the_sync(tmp_path, monkeypatch):
     assert any(e.startswith("year_rollover:") for e in health["scrape_errors"])
     assert not os.path.exists(os.path.join(out, "academic_year.json"))
     assert os.path.exists(os.path.join(out, "scraped_data.json"))
+    # The suite guard refuses the real download and the step records that.
+    # A summary here means the guard is gone and the step ran.
+    assert health["ekler"] == {"hata": "testte gerçek ek indirmesi yok"}
+    assert not os.path.exists(os.path.join(gercek_kok, "output", "portal_ekleri.json"))
+    assert not os.path.exists(os.path.join(gercek_kok, "content", "portal-ekleri"))

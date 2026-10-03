@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 import requests as http_requests
-from flask import Flask, Response, jsonify, request, send_from_directory, session
+from flask import Flask, Response, jsonify, request, send_file, send_from_directory, session
 from zoneinfo import ZoneInfo
 from flask_cors import CORS
 from google.auth.transport import requests as google_requests
@@ -437,6 +437,45 @@ def _assistant_progress_allowed() -> bool:
     return _module_person() is not None
 
 
+# --- Portal attachments (plan docs/superpowers/plans/2026-09-28-portal-ekleri.md) ---
+# TEDY's own copies under content/portal-ekleri, tracked in
+# output/portal_ekleri.json by src/portal_ekleri_indir.py inside run_sync.
+EK_PROJE_KOKU = PROJECT_ROOT
+EK_YOK = "Bu ek TEDY'de yok; kaynağında açabilirsiniz."
+# Everything recognised is served inline (a PDF or an image opens in the
+# browser's viewer; an Office file downloads anyway). Unknown bytes (.bin)
+# are forced to download so nothing of unknown type ever renders here.
+EK_BILINMEYEN_MIME = "application/octet-stream"
+_EK_YASAK_KARAKTER = re.compile("[" + re.escape('\\/:*?"<>|' + "".join(map(chr, range(32)))) + "]+")
+
+
+def _ek_deposu():
+    from src.portal_ekleri import EkDeposu
+    return EkDeposu(EK_PROJE_KOKU)
+
+
+def _ek_kayitlari():
+    """The tracker's records; an unreadable tracker means "not downloaded yet",
+    never a 500 on /api/homework."""
+    try:
+        return _ek_deposu().oku()
+    except Exception as exc:  # noqa: BLE001
+        app.logger.error("portal ekleri izleyicisi okunamadı: %s", type(exc).__name__)
+        return {}
+
+
+def _ek_dosya_adi(kayit):
+    ad = _EK_YASAK_KARAKTER.sub(" ", str(kayit.get("name") or "")).strip()[:120] or str(kayit["id"])
+    uzanti = str(kayit.get("ext") or "")
+    return ad if ad.lower().endswith(uzanti.lower()) else ad + uzanti
+
+
+def _odev_ekleri(detay, ekler):
+    from src.portal_ekleri import ek_ozeti
+    return [ek_ozeti(ekler, a.get("url"), a.get("name"))
+            for a in detay.get("attachments") or [] if isinstance(a, dict) and a.get("url")]
+
+
 # --- Data helpers ---
 
 def _load_json(filename):
@@ -836,12 +875,15 @@ def _is_teacher_resolved_homework_status(value):
 
 
 def _combined_homework_rows(scraped_data):
-    """Merge scraped and photo-extracted homework rows."""
+    """Merge scraped and photo-extracted homework rows. Each attachment
+    carries its TEDY copy (tedyUrl) and status (plan 2026-09-28 portal-ekleri);
+    the description is cleaned of portal chrome (src/portal_susu.py)."""
     scraped_rows = (
         scraped_data.get("odevlerim", {})
         .get("homework", {})
         .get("rows", [])
     )
+    ekler = _ek_kayitlari()
     rows = []
     for row in [*(scraped_rows or []), *_load_photo_homework_rows()]:
         if not isinstance(row, dict):
@@ -851,9 +893,8 @@ def _combined_homework_rows(scraped_data):
             r["normalized_course"] = normalize_course(r["Ders Adı"])
         detay = r.get("detail")
         if isinstance(detay, dict):
-            # Portal chrome and comment blocks never reach a surface
-            # (src/portal_susu.py); a description is cleaned like course content.
-            r["detail"] = {**detay, "description": temiz_metin(detay.get("description"))}
+            r["detail"] = {**detay, "description": temiz_metin(detay.get("description")),
+                           "attachments": _odev_ekleri(detay, ekler)}
         rows.append(r)
     return _dedupe_homework_rows(rows)
 
@@ -2009,10 +2050,17 @@ def portal_pages():
     sayfalar = data.get("ek_sayfalar") or {}
     if not isinstance(sayfalar, dict):
         sayfalar = {}
-    dolu = {
-        k: {**v, "text": temiz_metin(v.get("text"))} for k, v in sayfalar.items()
-        if isinstance(v, dict) and not v.get("empty")
-    }
+    from src.portal_ekleri import ek_ozeti, sayfa_belgesi_adi
+    ekler = _ek_kayitlari()
+    dolu = {}
+    for k, v in sayfalar.items():
+        if not isinstance(v, dict) or v.get("empty"):
+            continue
+        belgeler = [b for b in v.get("documents") or [] if isinstance(b, str)]
+        baslik = str(v.get("title") or k)
+        dolu[k] = {**v, "text": temiz_metin(v.get("text")),
+                   "attachments": [ek_ozeti(ekler, u, sayfa_belgesi_adi(baslik, i, len(belgeler)))
+                                   for i, u in enumerate(belgeler, 1)]}
     engelli = {
         k: v.get("unavailable") for k, v in sayfalar.items()
         if isinstance(v, dict) and v.get("unavailable")
@@ -2053,12 +2101,17 @@ def _icerik_haftalari(data):
     return {"weeks": haftalar, "current": guncel}
 
 
-def _duyuru_satiri(satir):
-    """An announcement row with every text field cleaned; links untouched."""
+def _duyuru_satiri(satir, ekler):
+    """An announcement row: text fields cleaned, links untouched, and each
+    `<column>_url` as an attachment with its TEDY copy and status."""
+    from src.portal_ekleri import duyuru_eki_adi, ek_ozeti
     if not isinstance(satir, dict):
         return satir
-    return {k: (temiz_metin(v) if isinstance(v, str) and not k.endswith("_url") else v)
-            for k, v in satir.items()}
+    temiz = {k: (temiz_metin(v) if isinstance(v, str) and not k.endswith("_url") else v)
+             for k, v in satir.items()}
+    temiz["ekler"] = [ek_ozeti(ekler, v, duyuru_eki_adi(satir, k)) for k, v in satir.items()
+                      if k.endswith("_url") and isinstance(v, str) and v.strip()]
+    return temiz
 
 
 @app.route("/api/announcements")
@@ -2066,7 +2119,8 @@ def _duyuru_satiri(satir):
 def announcements():
     data = _scraped()
     ann = data.get("duyurular", {}).get("announcements", [])
-    return jsonify({"announcements": [_duyuru_satiri(a) for a in ann]})
+    ekler = _ek_kayitlari()
+    return jsonify({"announcements": [_duyuru_satiri(a, ekler) for a in ann]})
 
 
 def _ec_verisi():
@@ -2447,6 +2501,31 @@ def _find_related_content(exam_course, ders_icerikleri):
                 related.append({"title": baslik, "type": "ders_icerikleri"})
 
     return related[:10]
+
+
+@app.route("/api/ekler/<ek_id>")
+@require_auth
+def portal_eki(ek_id):
+    """One downloaded portal attachment, streamed from TEDY's copy.
+
+    Full role (and the API keys every data route accepts); a reader is
+    refused by require_auth's default-deny list. send_file(conditional=True)
+    answers Range with 206, which a PDF viewer uses to open a 100 MB book
+    without fetching all of it first."""
+    from src.portal_ekleri import DURUM_INDIRILDI, KIMLIK_DESENI
+    if not KIMLIK_DESENI.match(ek_id):
+        return jsonify({"error": EK_YOK}), 404
+    depo = _ek_deposu()
+    kayit = depo.kayit(ek_id)
+    yol = depo.dosya_yolu(kayit) if kayit and kayit.get("status") == DURUM_INDIRILDI else None
+    if yol is None:
+        return jsonify({"error": EK_YOK}), 404
+    mime = str(kayit.get("mime") or EK_BILINMEYEN_MIME)
+    yanit = send_file(yol, mimetype=mime, as_attachment=(mime == EK_BILINMEYEN_MIME),
+                      download_name=_ek_dosya_adi(kayit), conditional=True)
+    yanit.headers["X-Content-Type-Options"] = "nosniff"
+    yanit.headers["Cache-Control"] = "private, max-age=3600"
+    return yanit
 
 
 @app.route("/api/exams")

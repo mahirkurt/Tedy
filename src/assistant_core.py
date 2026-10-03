@@ -153,6 +153,14 @@ DEFAULT_INCLUDE_DIRS = {"output", "content"}
 # ASSISTANT_INCLUDE_DIRS entry) is scanned last, alphabetically.
 _DISCOVERY_PRIORITY = ("output", "content")
 
+# Portal attachments (src/portal_ekleri.py): only the text TEDY extracted at
+# download time, content/portal-ekleri/<id>.txt, is indexed. The binaries
+# would be re-extracted here outside the sync's attachment budget (a 112 MB
+# PDF, measured 2026-09-28); the .meta.json sidecars and .parca/ part files
+# are bookkeeping. The citation label comes from the sidecar
+# (assistant_tools.McpRegistry._yerel_etiket), never from this path.
+PORTAL_EKLERI_DIZINI = "content/portal-ekleri"
+
 DEFAULT_EXCLUDED_DIRS = {
     "__pycache__",
     "assistant_index",
@@ -178,6 +186,9 @@ DEFAULT_EXCLUDED_DIRS = {
     "output/archive",
     # Adult-facing pedagogy notes — Görev 5 indexes this separately.
     "content/pedagoji",
+    # The OCR page cache (src/ocr_katmani.py): one JSON per page read; the
+    # text reaches the index through the PDF it came from, never twice.
+    "output/ocr_onbellek",
 }
 
 DEFAULT_EXCLUDED_FILE_PATTERNS = {
@@ -232,6 +243,14 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     # the readable summary.
     "englishcentral_progress.json",
     "achieve3000_progress.json",
+    # The attachment tracker: URLs (teachers' SharePoint paths), statuses and
+    # hashes — bookkeeping, readable through the attachments themselves.
+    # atomic_json_dump writes path + ".tmp" and renames; a killed run leaves
+    # portal_ekleri.json.tmp, and an unknown extension is read as text.
+    "portal_ekleri.json",
+    "portal_ekleri.json.*",
+    # The OCR spend ledger: months, tokens, USD — bookkeeping, not school data.
+    "ocr_defteri.json",
 }
 
 # Bumped whenever a change to discovery, exclusion or tokenization would leave
@@ -287,6 +306,12 @@ class AssistantConfig:
     include_dirs: set[str]
     excluded_dirs: set[str]
     excluded_file_patterns: set[str]
+    # OCR for PDFs whose pdftotext text is empty (src/ocr_katmani.py): on unless
+    # ASSISTANT_PDF_OCR=0; seconds of OCR per indexer run. perform_incremental_
+    # reindex runs two indexers (main + aile), so 45 s each stays inside the
+    # 150 s run_sync reserves after the attachments (run_sync.EK_YEDEK_SURE).
+    pdf_ocr: bool = False
+    ocr_sure: int = 45
 
     @classmethod
     def from_project_root(cls, project_root: str | os.PathLike[str],
@@ -380,6 +405,8 @@ class AssistantConfig:
             include_dirs=includes,
             excluded_dirs=excluded,
             excluded_file_patterns=excluded_files,
+            pdf_ocr=os.environ.get("ASSISTANT_PDF_OCR", "1") == "1",
+            ocr_sure=int(os.environ.get("ASSISTANT_OCR_SURE", "45")),
         )
 
 
@@ -1007,6 +1034,11 @@ def _fmt_scraped_data(data: dict, ogretim_yili: str | None = None) -> str:
                 line += f" | Son teslim: {tarih}"
             if durum:
                 line += f" | Durum: {durum}"
+            ek_adlari = [" ".join(str(a.get("name") or "").split())
+                         for a in (detail.get("attachments") or [] if isinstance(detail, dict) else [])
+                         if isinstance(a, dict) and str(a.get("name") or "").strip()]
+            if ek_adlari:
+                line += " | Ekler: " + "; ".join(ek_adlari)
             if desc:
                 line += f" | {desc[:200]}"
             satirlar.append(line)
@@ -1198,9 +1230,11 @@ class PdfExtractionError(Exception):
     manifest entry for a file that raises this: it needs to be retried, not
     permanently recorded as "indexed, no text" (final review, finding 1)."""
 
-    def __init__(self, reason: str):
+    def __init__(self, reason: str, ilerleme: str = ""):
         super().__init__(reason)
         self.reason = reason
+        # "read/total" textless pages when OCR is part-way (reason "ocr_suruyor").
+        self.ilerleme = ilerleme
 
 
 class DocxExtractionError(Exception):
@@ -1217,8 +1251,15 @@ class DocxExtractionError(Exception):
 
 
 class FileAdapters:
-    def __init__(self, config: AssistantConfig):
+    def __init__(self, config: AssistantConfig, ocr: Any = None):
         self.config = config
+        # src.ocr_katmani.OcrKatmani, or None (no OCR). The caller sets the
+        # deadline (on ocr.saat) before extracting; ocr_her_sayfa reads every
+        # textless page (attachments), otherwise only PDFs with no text at all
+        # (the general index — a textbook's picture pages are not OCR'd).
+        self.ocr = ocr
+        self.ocr_son_an: float | None = None
+        self.ocr_her_sayfa = False
 
     def extract(self, file_path: Path, rel_path: str) -> dict[str, Any]:
         ext = file_path.suffix.lower()
@@ -1260,18 +1301,21 @@ class FileAdapters:
         if ext in PDF_EXTENSIONS:
             try:
                 text = self._extract_pdf_text(file_path)
+                ocr_sonucu = self._pdf_ocr(file_path, text)
             except PdfExtractionError as exc:
-                # Not "no text layer" — a timeout or a real extraction
-                # failure. The caller (reindex()) must not persist a
-                # manifest entry for this: it needs to be retried, and named
-                # with its reason, not silently indexed as blank forever.
+                # Not "no text layer" — a timeout, a real failure, or OCR still
+                # under way. No manifest entry: retried in full next run (the
+                # OCR'd pages come back from its cache).
                 return {
                     "text": "",
                     "source_kind": "metadata",
                     "confidence": 0.0,
                     "warnings": [f"pdf_extraction_{exc.reason}"],
                     "extraction_error": exc.reason,
+                    "ocr_ilerleme": exc.ilerleme,
                 }
+            if ocr_sonucu is not None:
+                return ocr_sonucu
             return {
                 "text": text or self._metadata_only_text(rel_path, file_path, reason="pdf_no_text"),
                 "source_kind": "pdf" if text else "metadata",
@@ -1389,6 +1433,44 @@ class FileAdapters:
         # scanned PDF with no text layer. A real fact about the file, not an
         # extraction failure — return "" normally rather than raising.
         return ""
+
+    def _pdf_ocr(self, file_path: Path, text: str) -> dict[str, Any] | None:
+        """Pages without a text layer through the OCR layer (plan 2026-09-28,
+        Görev 15). None: no OCR configured, nothing to OCR, or OCR finished
+        and found no readable text — the caller then keeps the plain
+        pdftotext result. A measurement failure is not that result: it
+        raises PdfExtractionError("ocr_suruyor") so the file stays
+        retryable and is not recorded as finished with no text."""
+        if self.ocr is None or self.ocr_son_an is None:
+            return None
+        if not self.ocr_her_sayfa and text.strip():
+            return None
+        from src.ocr_katmani import OcrHatasi
+        sayfalar = None
+        if chr(12) in text:
+            sayfalar = text.split(chr(12))
+            if sayfalar and not sayfalar[-1].strip():
+                sayfalar = sayfalar[:-1]
+        try:
+            sonuc = self.ocr.pdf_oku(file_path, self.ocr_son_an, sayfa_metinleri=sayfalar)
+        except OcrHatasi as exc:
+            # pdfinfo/pdftotext/pdftoppm failed before any page was read.
+            # Returning None makes extract() record "pdf_no_text", which the
+            # attachment sync stores as terminal yok and ek_oku reports as
+            # "OCR found nothing" for pages it never opened.
+            logger.warning("OCR %s: %s", file_path.name, exc)
+            raise PdfExtractionError("ocr_suruyor", ilerleme="") from exc
+        if sonuc.eksik:
+            raise PdfExtractionError("ocr_suruyor", ilerleme=sonuc.ilerleme)
+        if not sonuc.ocr_sayfalari:
+            return None
+        dusuk = bool(sonuc.dusuk_guvenli)
+        return {
+            "text": sonuc.metin,
+            "source_kind": "pdf_ocr",
+            "confidence": 0.55 if dusuk else 0.75,
+            "warnings": ["ocr"] + (["ocr_dusuk_guven"] if dusuk else []),
+        }
 
     def _extract_docx_text(self, file_path: Path, sinir: int | None = None,
                            hata_bildir: bool = False) -> str:
@@ -1517,12 +1599,19 @@ class FileAdapters:
 
 
 class AssistantIndexer:
-    def __init__(self, config: AssistantConfig):
+    def __init__(self, config: AssistantConfig, ocr: Any = None):
         self.config = config
-        self.adapters = FileAdapters(config)
+        if ocr is None and config.pdf_ocr:
+            from src.ocr_katmani import OcrKatmani
+            ocr = OcrKatmani(config.project_root)
+        self.adapters = FileAdapters(config, ocr=ocr)
 
     def reindex(self, incremental: bool = True) -> dict[str, Any]:
         start = time.perf_counter()
+        if self.adapters.ocr is not None:
+            # OCR's share of this run: a scan is read page by page until this
+            # deadline; the rest is read on a later run (src/ocr_katmani.py).
+            self.adapters.ocr_son_an = self.adapters.ocr.saat() + max(0, self.config.ocr_sure)
 
         old_manifest = self._load_json(self.config.manifest_path, {"files": {}})
         # A manifest built under an older index format (different discovery,
@@ -1594,6 +1683,12 @@ class AssistantIndexer:
                 and old_rec
                 and old_rec.get("sha256") == sha
                 and rel_path in old_chunks_by_path
+                # A scan indexed before OCR existed ("pdf_no_text", 3 chunks in
+                # the live index on 2026-09-28) is read again once OCR is on,
+                # though its sha256 has not changed.
+                and not (self.adapters.ocr is not None and ext in PDF_EXTENSIONS
+                         and any("pdf_no_text" in (c.get("warnings") or [])
+                                 for c in old_chunks_by_path[rel_path]))
             )
 
             if can_reuse:
@@ -1795,7 +1890,11 @@ class AssistantIndexer:
             # Sort within this include dir only — a global re-sort across all
             # groups would put "content/..." back ahead of "output/..."
             # alphabetically and silently undo the priority above.
-            group.sort(key=lambda p: p.relative_to(root).as_posix())
+            # Işık's own school attachments lead content/, as output/ leads the
+            # whole walk: a chunk-cap overrun then drops textbooks first.
+            group.sort(key=lambda p: (
+                not p.relative_to(root).as_posix().startswith(PORTAL_EKLERI_DIZINI + "/"),
+                p.relative_to(root).as_posix()))
             files.extend(group)
 
         return files
@@ -1849,6 +1948,9 @@ class AssistantIndexer:
         if not normalized:
             return False
         base = Path(normalized).name
+        if normalized.startswith(PORTAL_EKLERI_DIZINI + "/"):
+            ic = normalized[len(PORTAL_EKLERI_DIZINI) + 1:]
+            return "/" in ic or not ic.endswith(".txt")
         # The noise filters below are broad globs (eba_*.json, mebi_*.json,
         # sebitv_*.json) aimed at discovery dumps. They would also swallow the
         # upload trackers, which have purpose-built semantic chunkers — an
@@ -2197,6 +2299,7 @@ class AssistantRuntime:
 
         from src.assistant_modules import ModuleIndex
         from src.assistant_tools import build_registry
+        from src.portal_ekleri import EkDeposu
         # Published edupedia modules (plan SP5 K-S1): read-only, per process, no index file.
         self.modules = ModuleIndex(self.config.output_dir)
         # odev_kaynagi: the homework rows Bugün shows (dashboard_api._canli_odevler).
@@ -2215,6 +2318,7 @@ class AssistantRuntime:
                                        kitap_kaynagi=kitap_kaynagi,
                                        video_kaynagi=video_kaynagi,
                                        aile_kaynak_arama=self._aile_search,
+                                       ek_deposu=EkDeposu(self.config.project_root),
                                        skills=self.skills,
                                        odev_belge_ara=odev_belge_ara,
                                        odev_yazici=odev_yazici)
@@ -2260,6 +2364,10 @@ class AssistantRuntime:
         "- Seçili bir ödevin ekli belgesi (sayfa, soru, metin) → `odev_belgesi`. "
         "Yalnız asistan ekranında seçilmiş ödevin belgelerine bakar. Belgede olmayanı "
         "belgede yazıyormuş gibi söyleme. Seçim yoksa belge okunamaz; ödev seçilmesini iste.\n"
+        "- Bir ödevin ya da portal sayfasının ekinin içeriği (hangi sorular, hangi sayfalar, "
+        "ne isteniyor) → `ek_oku`; kimlik, ödev listesindeki 'Ekler' satırında [ek:…] olarak "
+        "yazar. Ek indirilemediyse ya da metin katmanı yoksa bunu açıkça söyle; ekin "
+        "içeriğini tahmin etme.\n"
         "- Işık'a özel diğer sorular (duyuru, eski ödev, portalın ek sayfaları) ve bir "
         "ödevin ayrıntısı → `ogrenci_verisi_ara`.\n"
         "- Konu, kavram, müfredat, kazanım sorusu → `kazanim_ara`, `mufredat_ara`. MEB "
@@ -2320,6 +2428,9 @@ class AssistantRuntime:
         "- Kazanım kodu, ders kitabı adı ve sayfa numarası YALNIZ araç "
         "çıktısından gelir. Hiçbirini hatırlayarak veya tahmin ederek yazma.\n"
         "- Araç sonuç döndürmediyse eksikliği açıkça söyle. Boşluğu doldurma.\n"
+        "- '[PDF s.N · OCR, güven düşük …]' satırıyla başlayan bir sayfadan aldığın bilgiyi "
+        "kesinmiş gibi sunma: OCR ile okunduğunu söyle ve okura sayfayı kendisinin kontrol "
+        "etmesini öner.\n"
         "- Bir araca dayandırdığın cümlede, o kaynağı çürüten veya kaynakta olmayan bir olgu ekleme. Bu madde araç çıktısına dayanan cümleler içindir; kapsam dışı genel bilgi sorusunu yanıtlamanı yasaklamaz (bkz. Atıf).\n\n"
 
         "## Yüklenen dosya\n"

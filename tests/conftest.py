@@ -27,3 +27,28 @@ def _canli_sync_zamanlamasi_yok(tmp_path, monkeypatch):
     run_sync = sys.modules.get("src.run_sync")
     if run_sync is not None:
         monkeypatch.setattr(run_sync, "ZAMANLAMA_PATH", str(tmp_path / ".sync_zamanlama.json"))
+
+
+@pytest.fixture(autouse=True)
+def _canli_ek_indirmesi_yok(monkeypatch):
+    """run_sync.main() downloads portal attachments since 2026-09-28 (plan
+    portal-ekleri, Görev 7). A test that drives main() must never reach
+    SharePoint or Drive, nor write content/portal-ekleri: the step's network
+    entry point refuses here, and _ekleri_esitle_adimi turns that into
+    {"hata": …} as it does any failure. Tests of the step patch it again on
+    purpose; tests of ekleri_esitle import the function by name at
+    collection, which this does not touch."""
+    import src.portal_ekleri_indir as indir
+
+    def _yasak(*a, **k):
+        raise RuntimeError("testte gerçek ek indirmesi yok")
+    monkeypatch.setattr(indir, "ekleri_esitle", _yasak)
+
+
+@pytest.fixture(autouse=True)
+def _pdf_ocr_kapali(monkeypatch):
+    """OCR of scanned PDFs (src/ocr_katmani.py) is on by default in production.
+    In tests it is off unless a test turns it on and hands in a fake reader: a
+    scanned PDF in an unrelated test must not reach Claude, write the OCR
+    ledger, or spend ~20 s per page in real Tesseract (plan 2026-09-28, Görev 15)."""
+    monkeypatch.setenv("ASSISTANT_PDF_OCR", "0")

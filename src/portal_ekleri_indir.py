@@ -19,9 +19,11 @@ closes it — the links are typed by teachers, so hosts and bodies are hostile:
   streaming when the budget ends. run_sync runs under `timeout 600`.
 - addresses: a link at 127.0.0.1, or one redirecting there, was fetched and
   stored. Now every hop must be https and resolve only to global addresses.
-- HTML behind a BOM, a comment, a bare <head> or UTF-16 was stored as `.bin`.
+- HTML behind a BOM, a comment, a bare <head>, UTF-16 or a leading hidden
+  character was stored as `.bin`.
 - a resume after the file changed glued the old head to the new tail. Now
-  the first response's validator rides along as If-Range.
+  the first response's validator rides along as If-Range, and a 206 that
+  does not echo that same validator is not appended.
 """
 from __future__ import annotations
 
@@ -42,6 +44,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import unicodedata
 import zipfile
 from collections import Counter
 from dataclasses import dataclass
@@ -54,6 +57,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from src.json_utils import atomic_json_dump
+from src.ocr_katmani import DEFTER, OcrDefteri
 from src.portal_ekleri import (DURUM_BAGLANTI, DURUM_BEKLIYOR, DURUM_COK_BUYUK, DURUM_ERISILEMEDI,
                                DURUM_HATA, DURUM_INDIRILDI, KIMLIK_DESENI, METIN_BEKLIYOR,
                                METIN_DESTEKLENMIYOR, METIN_HATA, METIN_ONEKI, METIN_VAR, METIN_YOK,
@@ -139,22 +143,90 @@ class Sonuc:
     parca_bayt: int = 0
 
 
+def _portal_alani(alan: str) -> str:
+    return alan.lstrip(".").lower().rstrip(".")
+
+
 def portal_cerez_kavanozu(cerezler: Iterable[dict[str, Any]] | None) -> requests.cookies.RequestsCookieJar | None:
     """Selenium's cookies as a jar holding only the portal host's own
-    cookies, so no hop to SharePoint or Google can carry the portal session.
-    A parent-domain cookie (`.k12.tr`, `tedronesans.k12.tr`) would be sent by
-    the jar to every host under that domain, so it is dropped; the Secure
-    flag is kept, so the session never goes out over plain http."""
+    cookies. A parent-domain cookie (`.k12.tr`, `tedronesans.k12.tr`) would
+    be sent to every host under that name, so it is dropped. Secure is
+    forced on: a cookie that arrived without the flag would otherwise leave
+    on plain http. Netscape's suffix match would still send a version-0
+    cookie to subdomains, so the request path attaches the jar only for
+    https on exactly PORTAL_HOST."""
     kavanoz = requests.cookies.RequestsCookieJar()
     for c in cerezler or []:
         if not isinstance(c, dict) or not c.get("name"):
             continue
-        alan = str(c.get("domain") or PORTAL_HOST).lstrip(".").lower()
+        alan = _portal_alani(str(c.get("domain") or PORTAL_HOST))
         if alan != PORTAL_HOST:
             continue
-        kavanoz.set(str(c["name"]), str(c.get("value") or ""), domain=alan,
-                    path=str(c.get("path") or "/"), secure=bool(c.get("secure")))
+        try:
+            kavanoz.set_cookie(requests.cookies.create_cookie(
+                str(c["name"]), str(c.get("value") or ""), domain=PORTAL_HOST,
+                path=str(c.get("path") or "/") or "/", secure=True))
+        except (TypeError, ValueError):
+            continue
     return kavanoz if len(kavanoz) else None
+
+
+def _istek_cerezleri(kavanoz: Any, adres: str) -> Any:
+    """The portal jar, and only when this hop is https to the portal host itself."""
+    if not kavanoz:
+        return None
+    try:
+        p = urlsplit(adres)
+    except ValueError:
+        return None
+    if p.scheme != "https" or _portal_alani(p.hostname or "") != PORTAL_HOST:
+        return None
+    return kavanoz
+
+
+def _cerez_guvenli(cerez: Any) -> bool:
+    return bool(getattr(cerez, "secure", False)) and _portal_alani(getattr(cerez, "domain", "") or "") == PORTAL_HOST
+
+
+def _oturum_cerezlerini_kis(oturum: Any, adres: str) -> list[Any]:
+    """Take off the session every cookie this hop must not carry.
+
+    Unsafe cookies (not Secure, or not exactly the portal host — a parent
+    domain such as `.k12.tr`) are discarded. Safe portal cookies are
+    returned when this hop is not the portal, so they can be put back
+    afterwards: left in the jar, Netscape would send them to a subdomain.
+    A session with no cookie jar is left alone (the fake HTTP layer)."""
+    kavanoz = getattr(oturum, "cookies", None)
+    if kavanoz is None or not hasattr(kavanoz, "clear"):
+        return []
+    try:
+        p = urlsplit(adres)
+        portal_hop = p.scheme == "https" and _portal_alani(p.hostname or "") == PORTAL_HOST
+    except ValueError:
+        portal_hop = False
+    geri: list[Any] = []
+    for cerez in list(kavanoz):
+        guvenli = _cerez_guvenli(cerez)
+        if portal_hop and guvenli:
+            continue
+        try:
+            kavanoz.clear(cerez.domain, cerez.path, cerez.name)
+        except (KeyError, ValueError):
+            continue
+        if guvenli:
+            geri.append(cerez)
+    return geri
+
+
+def _cerezleri_geri_koy(oturum: Any, cerezler: list[Any]) -> None:
+    kavanoz = getattr(oturum, "cookies", None)
+    if kavanoz is None:
+        return
+    for cerez in cerezler:
+        try:
+            kavanoz.set_cookie(cerez)
+        except (TypeError, ValueError):
+            continue
 
 
 def _bilinen_ikili(bas: bytes) -> bool:
@@ -175,17 +247,31 @@ def _bas_metni(bas: bytes) -> str:
     return bas.decode("latin-1")
 
 
+def _atlanan_bas(ch: str) -> bool:
+    """A character a login page can hide behind and a binary file can open
+    with. Whitespace and NUL alone are not markup. Format characters
+    (U+200B and the other Cf set) and the C0/C1 controls are: measured after
+    4f6f8ca, one leading U+200B or 0x01 in front of `<html>` was stored."""
+    if ch.isspace() or ch in _GORUNMEZ:
+        return True
+    o = ord(ch)
+    if o < 32 or o == 0x7F or 0x80 <= o <= 0x9F:
+        return True
+    return unicodedata.category(ch) == "Cf"
+
+
 def _html_gibi(metin: str) -> bool:
-    """Skip whitespace/NUL, `<!-- … -->` comments and `<?xml … ?>`
-    declarations, then require an HTML tag. Whitespace or NUL alone is not
-    markup (a binary may open with 64 KiB of zero bytes). A comment or
-    declaration prologue that runs to the edge of the head is: measured on
-    2cb0918, 4 369 closed comments ending the 64 KiB window on a lone `<`
-    hid the <html> tag behind it, and no binary file opens with a comment."""
+    """Skip whitespace, hidden characters, `<!-- … -->` comments and
+    `<?xml … ?>` declarations, then require an HTML tag. Whitespace or NUL
+    alone is not markup (a binary may open with 64 KiB of zero bytes). A
+    comment or declaration prologue that runs to the edge of the head is:
+    measured on 2cb0918, 4 369 closed comments ending the 64 KiB window on a
+    lone `<` hid the <html> tag behind it, and no binary file opens with a
+    comment."""
     i, n = 0, len(metin)
     onsoz = False
     while True:
-        while i < n and (metin[i].isspace() or metin[i] in _GORUNMEZ):
+        while i < n and _atlanan_bas(metin[i]):
             i += 1
         bas = metin[i:i + 16].lower()
         if bas.startswith(("<!--", "<?")):
@@ -204,15 +290,23 @@ def _html_gibi(metin: str) -> bool:
 
 def html_mi(bas: bytes, icerik_turu: str) -> bool:
     """A web page where a file was expected. Measured on 4f6f8ca: a UTF-8
-    BOM, a leading comment, a bare <head> or UTF-16 each slipped HTML past the
-    old `<!doctype html`/`<html` prefix test and it was stored as `.bin`."""
+    BOM, a leading comment, a bare <head>, UTF-16 or a leading U+200B (the
+    bytes e2 80 8b, invisible only once read as UTF-8) each slipped HTML
+    past the old `<!doctype html`/`<html` prefix test and it was stored."""
     tur = (icerik_turu or "").split(";")[0].strip().lower()
     if tur in ("text/html", "application/xhtml+xml"):
         return True
     bas = bas[:HTML_BAS_SINIRI]
     if _bilinen_ikili(bas):
         return False
-    return _html_gibi(_bas_metni(bas))
+    if _html_gibi(_bas_metni(bas)):
+        return True
+    # UTF-8 without a BOM. U+200B is the bytes e2 80 8b; read as latin-1
+    # those are ordinary characters and the tag behind them is missed.
+    # One 0xFF anywhere in the head makes a strict decode raise, and the
+    # page was stored. Replacement keeps the tag in front of that byte.
+    utf8 = bas.decode("utf-8-sig", errors="replace")
+    return _html_gibi(utf8)
 
 
 def _zip_dizini(yol: Path) -> tuple[int, int] | None:
@@ -246,7 +340,9 @@ def _zip_turu(yol: Path) -> tuple[str, str]:
     and a 400 000-entry archive (33 MB) cost 235 MB of memory in namelist()."""
     try:
         dizin = _zip_dizini(yol)
-    except OSError:
+    except Exception:
+        # MemoryError and struct.error included: a corrupt directory must
+        # cost this file its Office type, not the sync turn.
         return ".bin", "application/octet-stream"
     if dizin is None:
         return ".bin", "application/octet-stream"
@@ -292,11 +388,18 @@ def tur_bul(bas: bytes, yol: Path) -> tuple[str, str]:
 
 
 def _onay_hostunda_mi(adres: str) -> bool:
+    """Drive's own https hosts, with nothing in front of them. Userinfo
+    (`https://evil.example@drive.google.com/...`) and a backslash both
+    survive a hostname allow-list and are how a confirm form left Google."""
     try:
         p = urlsplit(adres)
-        return p.scheme == "https" and (p.hostname or "") in DRIVE_ONAY_HOSTLARI
     except ValueError:
         return False
+    if p.scheme != "https" or p.username is not None or p.password is not None:
+        return False
+    if "\\" in adres or "@" in (p.netloc or ""):
+        return False
+    return (p.hostname or "").rstrip(".").lower() in DRIVE_ONAY_HOSTLARI
 
 
 def drive_onay_adresi(html: str, yanit_url: str) -> str | None:
@@ -578,12 +681,15 @@ def _ayni_surumun_devami(yanit: Any, aralik: str, baslangic: int, surum: dict[st
         return False
     if not _kodlamasiz(yanit):
         return False
+    # The stored validator has to come back on the 206. A host that ignores
+    # If-Range and omits ETag/Last-Modified would otherwise glue the old
+    # head to a new tail of the same length and mark the mix downloaded.
     etag, lm = yanit.headers.get("ETag"), yanit.headers.get("Last-Modified")
-    if etag and surum["etag"] and etag != surum["etag"]:
-        return False
-    if lm and surum["last_modified"] and lm != surum["last_modified"]:
-        return False
-    return True
+    if surum.get("etag"):
+        return etag == surum["etag"]
+    if surum.get("last_modified"):
+        return lm == surum["last_modified"]
+    return False
 
 
 def _html_oku(ilk: bytes, akis: Any) -> str:
@@ -666,19 +772,32 @@ def _indir(oturum: Any, kayit: dict[str, Any], url: str, parca: Path, dizin: Pat
             return Sonuc(DURUM_ERISILEMEDI, _IC_ADRES, parca_bayt=baslangic)
         zaman = (min(BAGLANTI_SURESI, kalan), min(OKUMA_SURESI, kalan))
         istek_adresi, istek_basliklari = adres, dict(basliklar)
+        gonderilecek = _istek_cerezleri(kavanoz, istek_adresi)
+        geri = _oturum_cerezlerini_kis(oturum, istek_adresi)
+        bitti = None
         try:
-            bitti, yanit = _sureli(lambda: oturum.get(istek_adresi, headers=istek_basliklari, stream=True,
-                                                      timeout=zaman, allow_redirects=False, cookies=kavanoz),
-                                   son_an - time.monotonic())
-        except ValueError as exc:
-            if isinstance(exc, requests.RequestException):
-                raise
-            # Measured on 2cb0918: even with allow_redirects=False, requests
-            # parses a 3xx Location up front (Session.send → resolve_redirects
-            # for `r._next`); `https://[::1/x` raises a plain ValueError there.
-            return Sonuc(DURUM_ERISILEMEDI, _BOZUK_ADRES, parca_bayt=baslangic)
-        if not bitti:
-            return _bekliyor(baslangic)
+            try:
+                bitti, yanit = _sureli(lambda: oturum.get(istek_adresi, headers=istek_basliklari, stream=True,
+                                                          timeout=zaman, allow_redirects=False,
+                                                          cookies=gonderilecek),
+                                       son_an - time.monotonic())
+            except ValueError as exc:
+                if isinstance(exc, requests.RequestException):
+                    raise
+                # Measured on 2cb0918: even with allow_redirects=False, requests
+                # parses a 3xx Location up front (Session.send → resolve_redirects
+                # for `r._next`); `https://[::1/x` raises a plain ValueError there.
+                return Sonuc(DURUM_ERISILEMEDI, _BOZUK_ADRES, parca_bayt=baslangic)
+            if not bitti:
+                # The request thread is still inside `oturum`. The jar stays
+                # as this hop left it; ekleri_esitle stops on bekliyor.
+                return _bekliyor(baslangic)
+        finally:
+            if bitti is not False:
+                # Drop a Set-Cookie this response just stored (a parent domain,
+                # or one without Secure), then put the portal's own cookies back.
+                _oturum_cerezlerini_kis(oturum, istek_adresi)
+                _cerezleri_geri_koy(oturum, geri)
         if yanit.status_code in _YONLENDIRMELER:
             konum = yanit.headers.get("Location")
             onceki = yanit.url or adres
@@ -846,7 +965,7 @@ _ILERLEMESIZ = "kaynak sürdürmeyi desteklemiyor ve dosya bir turun bayt bütç
 _PDF = frozenset({".pdf"})
 _DOCX = frozenset({".docx"})
 _GORSEL = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp"})
-_METIN_NOTU = {METIN_YOK: "(Metin katmanı yok: taranmış belge ya da görsel.)",
+_METIN_NOTU = {METIN_YOK: "(Metin katmanı yok ve OCR okunur metin bulamadı: boş ya da yalnız görsel sayfalar.)",
                METIN_DESTEKLENMIYOR: "(Bu ek türünün metni okunmuyor.)"}
 _KESILDI_NOTU = "(Metin burada kesildi: bu ekin metni {mb} MB sınırını aşıyor; devamı okunmadı.)"
 _NEDEN_SURE = "metin çıkarma süresi doldu"
@@ -961,16 +1080,18 @@ def _pdf_metni(yol: Path, sure: float) -> tuple[str, str]:
     return METIN_HATA, _NEDEN_PDFTOTEXT if kod in (126, 127) else _NEDEN_PDF_BOZUK
 
 
-def metin_cikar(yol: Path, sure: float) -> tuple[str, str]:
+def metin_cikar(yol: Path, sure: float, ocr: Any = None) -> tuple[str, str]:
     """(text status, text) for one downloaded copy, within `sure` seconds.
     For METIN_HATA the second element is the reason, in Turkish, for the
     tracker's `text_reason` — never written as the attachment's text.
 
-    - PDF: pdftotext, a child process killed at `sure` (see _pdf_metni). A
-      PDF without a text layer is METIN_YOK — reported, never OCR'd here:
-      rasterising and OCR'ing a scan costs seconds per page, and one
-      100-page book would outlast the whole 600 s cron run (plan 2026-09-28,
-      decision 2; OCR arrives in Görev 14–15).
+    - PDF without `ocr`: pdftotext, a child process killed at `sure` (see
+      _pdf_metni). A PDF without a text layer is METIN_YOK.
+    - PDF with `ocr` (src.ocr_katmani.OcrKatmani): every page without a text
+      layer is read by Claude Haiku 4.5's vision, or Tesseract past the
+      monthly cap, until `sure` seconds have passed. A scan read part-way is
+      METIN_BEKLIYOR and the progress ("read/total") is the second element;
+      the pages done are cached and the rest continue on the next run.
     - .docx: the assistant's own reader, in process, reading at most
       METIN_DOCX_XML_SINIRI of word/document.xml. An archive it cannot read
       (not a zip, a DTD, over the cap) is METIN_HATA with its reason;
@@ -978,6 +1099,8 @@ def metin_cikar(yol: Path, sure: float) -> tuple[str, str]:
     - Images: METIN_YOK. FileAdapters' tesseract call has no timeout, so it
       is not run here even with ASSISTANT_ENABLE_OCR=1.
     - Anything else: METIN_DESTEKLENMIYOR."""
+    if ocr is not None and yol.suffix.lower() in _PDF:
+        return _pdf_ocr_ile(yol, sure, ocr)
     uzanti = yol.suffix.lower()
     if uzanti in _PDF:
         return _pdf_metni(yol, sure)
@@ -993,6 +1116,36 @@ def metin_cikar(yol: Path, sure: float) -> tuple[str, str]:
     except DocxExtractionError as exc:
         return METIN_HATA, _DOCX_NEDENLERI.get(exc.reason, _DOCX_NEDENLERI["bozuk"])
     return (METIN_VAR, metin) if metin.strip() else (METIN_YOK, "")
+
+
+def _pdf_ocr_ile(yol: Path, sure: float, ocr: Any) -> tuple[str, str]:
+    """The OCR path of metin_cikar: FileAdapters reads every textless page
+    until `sure` runs out. The no-OCR path stays on _pdf_metni, whose child
+    process is killed at `sure` rather than padded to 5 s."""
+    from src.assistant_core import FileAdapters
+    ayar = _CikarmaAyari(max_file_size_mb=EK_BOYUT_SINIRI // MB + 1, pdf_max_pages=400,
+                         pdf_timeout=max(5, int(sure)),
+                         enable_ocr=os.environ.get("ASSISTANT_ENABLE_OCR", "0") == "1")
+    adaptor = FileAdapters(ayar, ocr=ocr)
+    adaptor.ocr_son_an = ocr.saat() + max(5.0, sure)
+    adaptor.ocr_her_sayfa = True
+    sonuc = adaptor.extract(yol, yol.name)
+    if sonuc.get("extraction_error") == "ocr_suruyor":
+        return METIN_BEKLIYOR, str(sonuc.get("ocr_ilerleme") or "")
+    if sonuc.get("extraction_error"):
+        return METIN_HATA, ""
+    if sonuc.get("source_kind") == "metadata":
+        return METIN_YOK, ""
+    return METIN_VAR, str(sonuc.get("text") or "")
+
+
+def _varsayilan_ocr(proje_koku: str | Path) -> Any:
+    """The OCR layer the sync uses unless a caller hands one in; none when
+    ASSISTANT_PDF_OCR=0 (tests/conftest.py sets it for every test)."""
+    if os.environ.get("ASSISTANT_PDF_OCR", "1") == "0":
+        return None
+    from src.ocr_katmani import OcrKatmani
+    return OcrKatmani(proje_koku)
 
 
 def metin_dosyasi(kayit: dict[str, Any], durum: str, metin: str) -> str:
@@ -1165,6 +1318,12 @@ def _metni_hazirla(depo: EkDeposu, kayit: dict[str, Any], butce: Butce,
     except Exception as exc:
         logger.warning("portal eki %s: metin çıkarılamadı (%s)", kimlik, type(exc).__name__, exc_info=True)
         durum, metin = METIN_HATA, f"metin çıkarılırken beklenmeyen hata ({type(exc).__name__})"
+    if durum == METIN_BEKLIYOR and isinstance(metin, str):
+        # A scan read part-way: its pages are cached (src/ocr_katmani.py) and
+        # the rest continue next run. Not an attempt — METIN_DENEME_SINIRI is
+        # for extractions that fail, not for a long book.
+        kayit.update(text=METIN_BEKLIYOR, ocr_ilerleme=metin)
+        return True
     if durum not in (METIN_VAR, METIN_YOK, METIN_DESTEKLENMIYOR, METIN_HATA) or not isinstance(metin, str):
         durum, metin = METIN_HATA, ""
     if durum == METIN_HATA and butce.bitti():
@@ -1175,6 +1334,7 @@ def _metni_hazirla(depo: EkDeposu, kayit: dict[str, Any], butce: Butce,
     elif durum != METIN_HATA:
         kayit.pop("text_cut", None)
     kayit["text_attempts"] = _tamsayi(kayit.get("text_attempts")) + 1
+    kayit.pop("ocr_ilerleme", None)
     kaynak = _kaynak(kayit)
     meta = {"id": kimlik, "name": kayit.get("name", ""), "title": kaynak.get("title", ""),
             "section": kaynak.get("section", ""), "course": kaynak.get("course", "")}
@@ -1202,7 +1362,8 @@ def _metni_hazirla(depo: EkDeposu, kayit: dict[str, Any], butce: Butce,
 
 def ekleri_esitle(proje_koku: str | Path, veri: Any, oturum: Any, butce: Butce, cerezler: Any = None,
                   simdi: Callable[[], datetime] = datetime.now,
-                  metin_cikarici: Callable[[Path, float], tuple[str, str]] = metin_cikar) -> dict[str, Any]:
+                  metin_cikarici: Callable[[Path, float], tuple[str, str]] = metin_cikar,
+                  ocr: Any = None) -> dict[str, Any]:
     """One run: collect every link in `veri`, merge into the tracker, then
     download and extract text in priority order until the budget runs out.
     The tracker is written after every file, so a run killed mid-way keeps
@@ -1214,6 +1375,11 @@ def ekleri_esitle(proje_koku: str | Path, veri: Any, oturum: Any, butce: Butce, 
     and that daemon thread may still be inside `oturum` — a requests.Session
     is not thread-safe, so no second download may start on it this run."""
     depo = EkDeposu(proje_koku)
+    if metin_cikarici is metin_cikar:
+        katman = ocr if ocr is not None else _varsayilan_ocr(proje_koku)
+
+        def metin_cikarici(yol: Path, sure: float, _katman: Any = katman) -> tuple[str, str]:
+            return metin_cikar(yol, sure, ocr=_katman)
     an = _yerel(simdi())
     zaman = an.isoformat(timespec="seconds")
     ekler = depo.oku()
@@ -1266,6 +1432,51 @@ def ekleri_esitle(proje_koku: str | Path, veri: Any, oturum: Any, butce: Butce, 
                                             DURUM_COK_BUYUK, DURUM_HATA, DURUM_BAGLANTI)},
             "bu_tur_indirilen": bu_tur["indirilen"], "bu_tur_bayt": bu_tur["bayt"],
             "bu_tur_metin": bu_tur["metin"],
+            "ocr_bu_ay_usd": round(OcrDefteri(Path(proje_koku) / DEFTER).harcanan(), 4),
             "kalan_is": sum(1 for k in ekler.values()
                             if (_indirilmeli(k, depo, an) and k.get("status") != DURUM_ERISILEMEDI)
                             or _metin_gerekli(k, depo))}
+
+
+def main(argv: list[str] | None = None, kok: Path | None = None) -> int:
+    """By hand: `flock`-free, it takes output/.sync.lock itself and refuses
+    while a sync runs. Uses the cached portal cookies (output/portal_cookies.json).
+
+        .venv/bin/python -m src.portal_ekleri_indir --sure 300 --bayt-mb 250 --indeksle
+    """
+    import argparse
+    import fcntl
+    import json as _json
+    from src.session_manager import load_cookies
+
+    ap = argparse.ArgumentParser(description="Portal eklerini indir (senkron kilidiyle).")
+    ap.add_argument("--sure", type=int, default=300, help="süre bütçesi, saniye")
+    ap.add_argument("--bayt-mb", type=int, default=250, help="bayt bütçesi, MB")
+    ap.add_argument("--indeksle", action="store_true", help="bitince asistan indeksini artımlı yenile")
+    arg = ap.parse_args(argv)
+    kok = Path(kok) if kok is not None else Path(__file__).resolve().parents[1]
+    kilit_yolu = kok / "output" / ".sync.lock"
+    kilit_yolu.parent.mkdir(parents=True, exist_ok=True)
+    with open(kilit_yolu, "a") as kilit:
+        try:
+            fcntl.flock(kilit, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            print("Başka bir senkron koşuyor; ekler şimdi indirilmedi.")
+            return 1
+        veri = _json.loads((kok / "output" / "scraped_data.json").read_text(encoding="utf-8"))
+        butce = Butce(time.monotonic() + arg.sure, arg.bayt_mb * MB)
+        ozet = ekleri_esitle(kok, veri, requests.Session(), butce,
+                             cerezler=portal_cerez_kavanozu(load_cookies() or []))
+        print(_json.dumps(ozet, ensure_ascii=False))
+        if arg.indeksle:
+            from src.assistant_core import perform_incremental_reindex
+            meta = perform_incremental_reindex(kok)
+            print(_json.dumps({k: meta.get(k) for k in ("files_indexed", "chunks_indexed",
+                                                         "changed_files", "dusen_dosyalar")},
+                              ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())

@@ -5,6 +5,7 @@ import { useFocusMode } from '../contexts/focusMode'
 import type { Announcement } from '../types'
 import { formatTurkishDate, MONTHS_SHORT } from '../utils/formatters'
 import { EmptyLine } from './patterns/EmptyLine'
+import { EkBaglantisi } from './patterns/EkBaglantisi'
 
 const DETAIL_FIELDS = [
   'e-Posta İçerik',
@@ -17,7 +18,7 @@ const DETAIL_FIELDS = [
 function getAnnouncementDetail(ann: Announcement): string {
   for (const field of DETAIL_FIELDS) {
     const value = ann[field]
-    if (value && value.trim() && value.trim() !== '-') return value.trim()
+    if (typeof value === 'string' && value.trim() && value.trim() !== '-') return value.trim()
   }
   return 'Detay bulunamadı.'
 }
@@ -84,7 +85,13 @@ export default function Announcements() {
                       Ek: {ann["Ekleri"]}
                     </p>
                   )}
-                  {ann["Ekleri_url"] && (
+                  {(ann.ekler?.length ?? 0) > 0 ? (
+                    <ul className="announcements-detail__ekler">
+                      {ann.ekler!.map((ek, j) => (
+                        <li key={ek.id ?? `${j}-${ek.url}`}><EkBaglantisi ek={ek} /></li>
+                      ))}
+                    </ul>
+                  ) : ann["Ekleri_url"] && (
                     <a
                       className="announcements-detail__link"
                       href={ann["Ekleri_url"]}

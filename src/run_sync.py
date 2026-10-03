@@ -120,6 +120,50 @@ def rotate_sync_log(log_path=None, max_bytes=SYNC_LOG_MAX_BYTES):
 
 SYNC_LOCK_PATH = os.path.join(PROJECT_ROOT, "output", ".sync.lock")
 
+# ── Portal attachments inside the run ───────────────────────────────────────
+# Cron runs this file under `timeout 600`. Measured over the last 40 runs on
+# 2026-09-28: p50 244 s, longest 393 s. Attachments get what is left after a
+# 150 s reserve for health and the incremental reindex, capped at 180 s and
+# 250 MB per run; under 15 s they wait for the next run. A file that does not
+# finish keeps its part file and resumes (src/portal_ekleri_indir.py).
+SYNC_SURE_SINIRI = 600
+EK_YEDEK_SURE = 150
+EK_SURE_BUTCESI = int(os.environ.get("TEDY_EK_SURE_BUTCESI", "180"))
+EK_BAYT_BUTCESI = int(os.environ.get("TEDY_EK_BAYT_BUTCESI_MB", "250")) * 1024 * 1024
+EK_EN_AZ_SURE = 15
+
+
+def _ek_butcesi(start_time, simdi=None):
+    """Seconds the attachments may take this run; below EK_EN_AZ_SURE, none."""
+    simdi = time.time() if simdi is None else simdi
+    return min(EK_SURE_BUTCESI, start_time + SYNC_SURE_SINIRI - EK_YEDEK_SURE - simdi)
+
+
+def _ekleri_esitle_adimi(start_time, portal_cerezleri, simdi=None):
+    """Download and extract portal attachments, best effort. Never raises:
+    an attachment problem must not cost the run its health file or its
+    reindex. Runs inside main(), so under the same sync lock."""
+    sure = _ek_butcesi(start_time, simdi)
+    if sure < EK_EN_AZ_SURE:
+        print(f"[EKLER] Süre kalmadı ({max(sure, 0):.0f} s); ekler sonraki eşitlemede.")
+        return {"atlandi": "sure_yok"}
+    try:
+        import requests
+        from src import portal_ekleri_indir as indir
+        with open(os.path.join(OUTPUT_DIR, "scraped_data.json"), encoding="utf-8") as f:
+            veri = json.load(f)
+        butce = indir.Butce(time.monotonic() + sure, EK_BAYT_BUTCESI)
+        ozet = indir.ekleri_esitle(PROJECT_ROOT, veri, requests.Session(), butce,
+                                   cerezler=indir.portal_cerez_kavanozu(portal_cerezleri))
+        print(f"[EKLER] indirilen={ozet.get('bu_tur_indirilen', 0)}"
+              f" bayt={ozet.get('bu_tur_bayt', 0)} metin={ozet.get('bu_tur_metin', 0)}"
+              f" kalan_iş={ozet.get('kalan_is', 0)} toplam={ozet.get('toplam', 0)}"
+              f" (bütçe {sure:.0f} s)")
+        return ozet
+    except Exception as e:
+        print(f"[WARN] Portal ekleri: {_kisa_hata(e)}")
+        return {"hata": _kisa_hata(e)}
+
 
 def _kisa_hata(e):
     """One line a family can read, not a Selenium stacktrace.
@@ -320,6 +364,7 @@ def main(zamanla=False):
     login_info = None
     validation = {"section_counts": {}, "errors": [], "warnings": []}
     prev_data = {}
+    portal_cerezleri = []
 
     try:
         # 1. Login
@@ -420,6 +465,13 @@ def main(zamanla=False):
                 okunamadi[name] = _okunamadi_kaydi(name, e, onceki)
                 print(f"[ERROR] {name} failed: {e}")
 
+        # The portal session, for an attachment the portal serves itself;
+        # src/portal_ekleri_indir.py scopes it to the portal's own domain.
+        try:
+            portal_cerezleri = driver.get_cookies() or []
+        except Exception:
+            portal_cerezleri = []
+
         _icerik_birlestir(data, onceki)
         print(f"[HAFTA] program={len(data['ders_programi'])} hafta,"
               f" içerik={len(data.get('ders_icerikleri_haftalar') or {})} hafta"
@@ -476,6 +528,10 @@ def main(zamanla=False):
         scrape_errors.append(f"sebit_homework: {e}")
         print(f"[WARN] SEBİT homework scrape failed: {e}")
 
+    # 5b. Portal attachments — after every scraper, before health and the
+    # reindex (so a new attachment's text is indexed this run), in a budget.
+    ekler_ozeti = _ekleri_esitle_adimi(start_time, portal_cerezleri)
+
     # 6. Write health check
     from src.json_utils import atomic_json_dump
     from src.data_validator import _count_section
@@ -509,6 +565,7 @@ def main(zamanla=False):
         "validation_warnings": validation.get("warnings", []),
         "unavailable": unavailable,
         "okunamadi": okunamadi,
+        "ekler": ekler_ozeti,
         "academic_year": year_info["year"],
         "year_detection": year_info["status"],
         "year_archived": year_info["archived"],

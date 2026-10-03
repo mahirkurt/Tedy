@@ -370,7 +370,7 @@ def test_system_prompt_routing_order_matches_the_consolidated_plan():
     p = AssistantRuntime.SYSTEM_PROMPT
     hangi = p.split("## Hangi araca ne zaman uzanırsın\n", 1)[1]
     hangi = hangi.split("## Uydurma yasağı", 1)[0]
-    sira = ["`ders_programi`", "`odev_listesi`", "`ogrenci_verisi_ara`",
+    sira = ["`ders_programi`", "`odev_listesi`", "`ek_oku`", "`ogrenci_verisi_ara`",
             "`kazanim_ara`", "`kazanim_listele`", "`figur_ara`", "`video_listele`",
             "`oer_ara`", "`oer_kazanima_gore`", "`modul_ara`", "`kitap_ara`",
             "`platform_ilerlemesi`", "`video_oner`", "`aile_kaynak_ara`"]
@@ -409,13 +409,13 @@ def test_system_prompt_routing_names_every_declared_tool_exactly_once():
 
     yerel_araclar = (
         "ders_programi", "sinavlar", "takvim", "ders_icerigi", "notlar",
-        "odev_listesi", "odev_belgesi", "odev_tamamla", "ogrenci_verisi_ara", "kitap_ara",
+        "odev_listesi", "odev_belgesi", "odev_tamamla", "ek_oku", "ogrenci_verisi_ara", "kitap_ara",
         "platform_ilerlemesi", "video_oner", "modul_ara", "aile_kaynak_ara",
     )
     tum_araclar = sorted(set(TOOL_ALLOWLIST) | set(yerel_araclar))
     # Sanity: this must be the full tool surface, not an accidentally
     # narrowed set (e.g. an empty TOOL_ALLOWLIST import would pass trivially).
-    assert len(tum_araclar) == 28
+    assert len(tum_araclar) == 29
 
     eksik = [arac for arac in tum_araclar if hangi.count(f"`{arac}`") != 1]
     assert not eksik, eksik

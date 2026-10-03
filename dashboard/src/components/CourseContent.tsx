@@ -4,6 +4,7 @@ import { Education } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import { COURSE_CONTENT_ORDER, normalizeCourseDisplayName } from '../utils/formatters'
+import { portalSusunuAyikla } from '../utils/portalSusu'
 import { EmptyLine } from './patterns/EmptyLine'
 
 interface CourseData {
@@ -24,10 +25,11 @@ interface ParsedCard {
 }
 
 function parseCard(card: string): ParsedCard {
-  const lines = card.split('\n').map(l => l.trim()).filter(Boolean)
+  const temiz = portalSusunuAyikla(card)
+  const lines = temiz.split('\n').map(l => l.trim()).filter(Boolean)
 
   // Extract week number
-  const weekMatch = card.match(/(\d+)\.\s*HAFTA/i)
+  const weekMatch = temiz.match(/(\d+)\.\s*HAFTA/i)
   const weekNum = weekMatch ? parseInt(weekMatch[1], 10) : null
 
   // Extract teacher + date: pattern "Teacher Name | DD.MM.YYYY"
@@ -49,7 +51,7 @@ function parseCard(card: string): ParsedCard {
     return true
   })
 
-  return { raw: card, weekNum, teacher, date, body: bodyLines.join('\n') }
+  return { raw: temiz, weekNum, teacher, date, body: bodyLines.join('\n') }
 }
 
 // The accordion title is the note's first 80 characters. When that is the
@@ -150,21 +152,28 @@ export default function CourseContent() {
 
   for (const [rawName, content] of Object.entries(kaynak)) {
     if (!content) continue
+    // Defence in depth (plan 2026-09-28): portal chrome and comment blocks
+    // are dropped before anything below reads text, cards or items.
+    const temizText = portalSusunuAyikla(content.text || '')
+    const temizCards = (content.cards || []).map(portalSusunuAyikla).filter(Boolean)
+    const temizItems = (content.items || [])
+      .map(x => (typeof x === 'string' ? portalSusunuAyikla(x) : x))
+      .filter(x => x !== '')
     const normalized = normalizeCourseDisplayName(rawName)
     const existing = mergedCourses.get(normalized)
     if (!existing) {
       mergedCourses.set(normalized, {
         ...content,
-        text: content.text || '',
-        cards: [...(content.cards || [])],
-        items: [...(content.items || [])],
+        text: temizText,
+        cards: [...temizCards],
+        items: [...temizItems],
       })
       continue
     }
 
-    const mergedText = [existing.text, content.text].filter(Boolean).join('\n\n').trim()
-    const mergedCards = [...(existing.cards || []), ...(content.cards || [])]
-    const mergedItems = [...(existing.items || []), ...(content.items || [])]
+    const mergedText = [existing.text, temizText].filter(Boolean).join('\n\n').trim()
+    const mergedCards = [...(existing.cards || []), ...temizCards]
+    const mergedItems = [...(existing.items || []), ...temizItems]
 
     mergedCourses.set(normalized, {
       ...existing,

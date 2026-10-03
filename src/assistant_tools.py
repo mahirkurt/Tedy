@@ -27,6 +27,10 @@ from src.mcp_client import McpClient, McpToolResult
 from src import assistant_kitaplar, assistant_modules
 from src.assistant_skills import GENEL
 from src.portal_susu import temiz_metin
+from src.portal_ekleri import (DURUM_BAGLANTI, DURUM_BEKLIYOR, DURUM_COK_BUYUK, DURUM_ERISILEMEDI,
+                               DURUM_HATA, DURUM_INDIRILDI, KIMLIK_DESENI, METIN_BEKLIYOR,
+                               METIN_DESTEKLENMIYOR, METIN_HATA, METIN_VAR, METIN_YOK, ek_basligi,
+                               ek_kimligi, ek_turu, metin_govdesi)
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +256,36 @@ ODEV_BELGE = "odev_belgesi"
 ODEV_TAMAMLA = "odev_tamamla"
 ODEV_ATIF = "Ödevlerim · güncel liste"
 
+# Portal attachments (plan 2026-09-28-portal-ekleri): ek_oku pages the text
+# TEDY extracted at download time; odev_listesi names each attachment with
+# the id ek_oku takes.
+EK_TOOL = "ek_oku"
+EK_SAYFA_KARAKTER = 3300
+PORTAL_EKLERI_ONEKI = "content/portal-ekleri/"
+_EK_SATIR_SINIRI = 4
+_EK_DURUM_KISA = {DURUM_BEKLIYOR: "henüz indirilmedi", DURUM_ERISILEMEDI: "indirilemedi",
+                  DURUM_COK_BUYUK: "çok büyük, indirilmedi", DURUM_HATA: "indirilemedi"}
+
+
+def _ek_satiri(r: dict[str, Any]) -> str:
+    """"Ekler: <ad> [ek:<id>]; …" — the id is what ek_oku takes. A copy TEDY
+    does not hold says so; a plain link is marked as one."""
+    ekler = [a for a in ((r.get("detail") or {}).get("attachments") or [])
+             if isinstance(a, dict) and a.get("url")]
+    parcalar = []
+    for a in ekler[:_EK_SATIR_SINIRI]:
+        ad = _kirp(" ".join(str(a.get("name") or "ek").split()), 60)
+        durum = a.get("status")
+        if durum == DURUM_BAGLANTI or ek_turu(a["url"]) == "baglanti":
+            parcalar.append(f"{ad} (bağlantı)")
+            continue
+        kimlik = a.get("id") or ek_kimligi(a["url"])
+        not_ = f" · {_EK_DURUM_KISA[durum]}" if durum in _EK_DURUM_KISA else ""
+        parcalar.append(f"{ad} [ek:{kimlik}{not_}]")
+    if len(ekler) > _EK_SATIR_SINIRI:
+        parcalar.append(f"+{len(ekler) - _EK_SATIR_SINIRI} ek")
+    return "; ".join(parcalar)
+
 _GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
 _COZULMUS = {"yaptı", "yapti", "yapmadı", "yapmadi", "eksik", "tamamlandı", "tamamlandi"}
 _GECMIS_GUN = 14
@@ -433,6 +467,9 @@ def odev_listesi_metni(rows: list[dict[str, Any]], simdi: datetime, sebit: Any =
             if detay:
                 kisa = detay if len(detay) <= 240 else detay[:240].rsplit(" ", 1)[0] + " …"
                 metin += f"\n  Açıklama: {kisa}"
+        ekler = _ek_satiri(r)
+        if ekler:
+            metin += f"\n  Ekler: {ekler}"
         return metin
 
     def sirala(grup):
@@ -1551,6 +1588,121 @@ _AILE_ARAMA_BILDIRIMI: dict[str, Any] = {
     },
 }
 
+_EK_OKU_BILDIRIMI: dict[str, Any] = {
+    "name": EK_TOOL,
+    "description": (
+        "Bir ödevin ya da portal sayfasının ekini (öğretmenin PDF'i, Word belgesi, Google "
+        "dokümanı) TEDY'deki kopyasından metin sayfası metin sayfası okur. `id`, ödev "
+        "listesindeki 'Ekler' satırında [ek:…] olarak yazan 16 karakterlik koddur. Ekin "
+        "içeriği sorulduğunda (hangi sorular, hangi sayfalar, ne isteniyor) BU aracı kullan; "
+        "ilk çağrıda sayfa=1, devamı gerekirse sonuçtaki sayfa numarasıyla."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string", "description": "Ekin kimliği, ör. 'a1b2c3d4e5f60718'."},
+            "sayfa": {"type": "integer", "description": "Kaçıncı metin sayfası (1'den başlar; varsayılan 1)."},
+        },
+        "required": ["id"],
+    },
+}
+
+
+def _ek_sayfa_sinirlari(govde: str, boyut: int = EK_SAYFA_KARAKTER) -> list[tuple[int, int]]:
+    """Deterministic text pages of at most `boyut` characters, cut at the
+    last line break, form feed or space in the second half of a page."""
+    sinirlar: list[tuple[int, int]] = []
+    i = 0
+    ff = chr(12)
+    while i < len(govde):
+        son = min(len(govde), i + boyut)
+        if son < len(govde):
+            kes = max(govde.rfind("\n", i, son), govde.rfind(" ", i, son), govde.rfind(ff, i, son))
+            if kes > i + boyut // 2:
+                # A form feed is the page break. Ending on it leaves the next
+                # slice starting on that character, and the page count then
+                # misses it — a slice that is only page 2 is labeled 1–2.
+                son = kes + 1 if govde[kes] == ff else kes
+        if govde[i:son].strip():
+            sinirlar.append((i, son))
+        i = son
+    return sinirlar
+
+
+def ek_oku_metni(depo: Any, kimlik: Any, sayfa: Any = 1) -> tuple[str, str, str]:
+    """(body, citation label, id) for ek_oku. A ValueError is an argument the
+    model can correct. Honest about every state: not downloaded (with the
+    reason), no text even after OCR, or OCR still under way (plan decision 2), a type whose
+    text is not read, extraction failed (with text_reason — a later sync does
+    not promise the text), text not extracted yet."""
+    kimlik = str(kimlik or "").strip().lower()
+    if kimlik.startswith("ek:"):
+        kimlik = kimlik[3:]
+    if not KIMLIK_DESENI.match(kimlik):
+        raise ValueError("ek kimliği 16 karakterlik bir koddur; ödev listesindeki [ek:…] değerini ver")
+    kayit = depo.kayit(kimlik)
+    if kayit is None:
+        raise ValueError(f"böyle bir ek yok: {kimlik}")
+    etiket = ek_basligi(kayit)
+    bas = f"Ek: {etiket}"
+    if kayit.get("status") != DURUM_INDIRILDI:
+        neden = str(kayit.get("reason") or _EK_DURUM_KISA.get(kayit.get("status"), "dosya değil"))
+        return (f"{bas}\nBu ek TEDY'ye indirilemedi ({neden}). İçeriğini okuyamıyorum; "
+                "okur eki kaynağında açabilir."), etiket, kimlik
+    metin_durumu = kayit.get("text")
+    if metin_durumu == METIN_YOK:
+        return (f"{bas}\nBu ekin metin katmanı yok ve OCR da okunur metin bulamadı (boş ya da "
+                "yalnız görsel sayfalar); içeriğini okuyamıyorum. Okur dosyayı TEDY'de açabilir."), etiket, kimlik
+    if metin_durumu == METIN_BEKLIYOR and kayit.get("ocr_ilerleme"):
+        return (f"{bas}\nBu ek taranmış; sayfaları OCR ile okunuyor ({kayit['ocr_ilerleme']} sayfa "
+                "okundu). Metin sonraki eşitlemelerde tamamlanır; içeriğini şimdilik okuyamıyorum."), etiket, kimlik
+    if metin_durumu == METIN_DESTEKLENMIYOR:
+        return (f"{bas}\nBu ek türünün ({kayit.get('ext') or 'bilinmeyen tür'}) metnini okuyamıyorum; "
+                "okur dosyayı TEDY'de açabilir."), etiket, kimlik
+    if metin_durumu == METIN_HATA:
+        neden = " ".join(str(kayit.get("text_reason") or "").split())
+        ek = f" ({neden})" if neden else ""
+        return (f"{bas}\nBu ekin metni okunamadı{ek}. Okur dosyayı TEDY'de açabilir."), etiket, kimlik
+    ham = ""
+    if metin_durumu == METIN_VAR:
+        try:
+            ham = depo.metin_yolu(kimlik).read_text(encoding="utf-8")
+        except OSError:
+            ham = ""
+    govde = metin_govdesi(ham)
+    sinirlar = _ek_sayfa_sinirlari(govde)
+    if not sinirlar:
+        return f"{bas}\nEkin metni henüz çıkarılmadı; bir sonraki eşitlemede hazır olur.", etiket, kimlik
+    try:
+        n = int(sayfa or 1)
+    except (TypeError, ValueError):
+        n = 1
+    toplam = len(sinirlar)
+    if not 1 <= n <= toplam:
+        raise ValueError(f"bu ekin {toplam} metin sayfası var; sayfa 1–{toplam} arası olmalı")
+    bas_i, son_i = sinirlar[n - 1]
+    ff = chr(12)
+    pdf = ""
+    if ff in govde:
+        # The start page is the first character that is not a form feed, so a
+        # slice that still opens on the break is not numbered one page early.
+        # A trailing form feed was consumed as the break, not as the next page.
+        basla = bas_i
+        while basla < son_i and govde[basla] == ff:
+            basla += 1
+        bitir = son_i
+        while bitir > basla and govde[bitir - 1] == ff:
+            bitir -= 1
+        if basla < bitir:
+            ilk_s = govde.count(ff, 0, basla) + 1
+            son_s = govde.count(ff, 0, bitir) + 1
+            pdf = f" · PDF s.{ilk_s}" + (f"–{son_s}" if son_s != ilk_s else "")
+    parca = govde[bas_i:son_i].replace(ff, "\n").strip()
+    kuyruk = f"\n\n(Devamı: ek_oku id={kimlik} sayfa={n + 1})" if n < toplam else "\n\n(Ekin sonu.)"
+    ocr_notu = ("\nNot: bu metin sayfasındaki PDF sayfalarının bir kısmı OCR ile okundu; "
+                "'OCR, güven düşük' diye işaretli sayfadaki bilgiyi kesin sayma.") if "· OCR" in parca else ""
+    return f"{bas}\nMetin sayfası {n}/{toplam}{pdf}{ocr_notu}\n\n{parca}{kuyruk}", etiket, kimlik
+
 
 def _aile_kaynak_etiketi(path: str) -> str:
     """Turns e.g. content/pedagoji/05-ebeveyn-rehberligi.md into
@@ -1625,6 +1777,7 @@ class McpRegistry:
                  kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
                  video_kaynagi: Callable[[], Any] | None = None,
                  aile_kaynak_arama: Callable[[str, int], list[dict[str, Any]]] | None = None,
+                 ek_deposu: Any = None,
                  saat: Callable[[], datetime] | None = None,
                  skills: dict[str, Any] | None = None,
                  not_deposu: Any = None,
@@ -1682,6 +1835,10 @@ class McpRegistry:
         # content/pedagoji's own retriever (Görev 5). Kept separate from
         # local_search — a different index, a family-only tool, its own gate.
         self.aile_kaynak_arama = aile_kaynak_arama
+        # Portal attachments (src/portal_ekleri.EkDeposu): ek_oku reads it and
+        # BM25 hits under content/portal-ekleri take its sidecar label. None
+        # leaves ek_oku undeclared.
+        self.ek_deposu = ek_deposu
         # The clock "bugün"/"yarın" are read against; read in Istanbul either
         # way. Tests pin it; production reads the real one.
         self.saat = saat
@@ -1774,6 +1931,8 @@ class McpRegistry:
                     "required": ["anahtar", "alan", "deger"],
                 },
             })
+        if self.ek_deposu is not None:
+            decls.append(copy.deepcopy(_EK_OKU_BILDIRIMI))
         for ad, kaynak in self.ogrenci_kaynaklari.items():
             if kaynak is not None:
                 decls.append(copy.deepcopy(_OGRENCI_BILDIRIMLERI[ad]))
@@ -1889,7 +2048,8 @@ class McpRegistry:
                  "Son eşitlemedeki metni gösterir; Işık'ın 'Yaptım' işaretlerini bilmez. "
                  "Işık'a özel, başka bir aracın kapsamadığı sorular için kullan — konu/müfredat "
                  "bilgisi için değil.")
-        yonlendirme = [(self.odev_kaynagi, "ödevlerin durumu → `odev_listesi`")] + [
+        yonlendirme = [(self.odev_kaynagi, "ödevlerin durumu → `odev_listesi`"),
+                       (self.ek_deposu, "bir ödev ya da sayfa ekinin içeriği → `ek_oku`")] + [
             (self.ogrenci_kaynaklari[ad], not_) for ad, not_ in (
                 (PROGRAM_TOOL, "ders programı → `ders_programi`"),
                 (SINAV_TOOL, "sınav tarihleri → `sinavlar`"),
@@ -1928,6 +2088,8 @@ class McpRegistry:
 
         if name == ODEV_TAMAMLA and self.odev_yazici is not None:
             return self._dispatch_odev_tamamla(args or {}, okur_sozu)
+        if name == EK_TOOL and self.ek_deposu is not None:
+            return self._dispatch_ek(args or {})
         if self.ogrenci_kaynaklari.get(name) is not None:
             return self._dispatch_ogrenci(name, args or {})
         if name == KITAP_TOOL and self.kitap_kaynagi is not None:
@@ -2167,7 +2329,33 @@ class McpRegistry:
         query = _sorguya(str(args.get("query", "")).strip())
         return _dispatch_bm25_arama(
             self.local_search, query, kind="ogrenci",
-            etiket_fn=_yerel_isabet_etiketi, hata_onek="yerel arama hatası")
+            etiket_fn=self._yerel_etiket, hata_onek="yerel arama hatası")
+
+    def _yerel_etiket(self, path: str) -> str:
+        """An attachment hit is named "<ek adı> · <ödev başlığı>" from its
+        .meta.json sidecar — never by its internal path."""
+        if path.startswith(PORTAL_EKLERI_ONEKI):
+            meta = self.ek_deposu.meta(os.path.splitext(os.path.basename(path))[0]) \
+                if self.ek_deposu is not None else {}
+            return ek_basligi(meta) if meta else "Portal eki"
+        return _yerel_isabet_etiketi(path)
+
+    def _dispatch_ek(self, args: dict[str, Any]) -> ToolOutcome:
+        try:
+            metin, etiket, kimlik = ek_oku_metni(self.ek_deposu, args.get("id"), args.get("sayfa", 1))
+        except ValueError as exc:
+            return ToolOutcome(ok=False, error=str(exc))
+        except Exception as exc:  # noqa: BLE001 — told to the model, never raised through the loop
+            logger.error("ek_oku failed: %s", type(exc).__name__)
+            return ToolOutcome(ok=False, error=f"ek okunamadı: {type(exc).__name__}")
+        metin = _kirp(metin, GOVDE_SINIRI)
+        return ToolOutcome(ok=True, text=metin, citations=[{
+            "kind": "ogrenci",
+            "label": etiket,
+            "locator": {"tool": EK_TOOL, "id": kimlik, "sayfa": args.get("sayfa", 1)},
+            "snippet": metin[:400],
+            "confidence": 1.0,
+        }])
 
     def _dispatch_aile_kaynak(self, args: dict[str, Any]) -> ToolOutcome:
         """aile_kaynak_ara (Görev 5): the same shared body as _dispatch_local,
@@ -2367,6 +2555,7 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                    kitap_kaynagi: Callable[[], list[dict[str, Any]]] | None = None,
                    video_kaynagi: Callable[[], Any] | None = None,
                    aile_kaynak_arama: Callable[[str, int], list[dict[str, Any]]] | None = None,
+                   ek_deposu: Any = None,
                    saat: Callable[[], datetime] | None = None,
                    skills: dict[str, Any] | None = None,
                    not_deposu: Any = None,
@@ -2394,4 +2583,4 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                        platform_kaynagi=platform_kaynagi, kitap_kaynagi=kitap_kaynagi,
                        video_kaynagi=video_kaynagi, aile_kaynak_arama=aile_kaynak_arama,
                        saat=saat, skills=skills, not_deposu=not_deposu, odev_belge_ara=odev_belge_ara,
-                       odev_yazici=odev_yazici)
+                       odev_yazici=odev_yazici, ek_deposu=ek_deposu)
