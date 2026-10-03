@@ -11,6 +11,7 @@ import {
   Tag,
   TextArea,
   Tile,
+  Modal,
 } from '@carbon/react'
 import {
   Send,
@@ -25,6 +26,7 @@ import {
   Attachment,
   Camera,
   Close,
+  Microphone,
 } from '@carbon/icons-react'
 import type { AssistantCitation, AssistantPlanBlock, AssistantResponse, ModOnerisi as Oneri } from '../types'
 import { renderMarkdown } from '../utils/markdown'
@@ -32,6 +34,10 @@ import { modelAdi } from '../utils/formatters'
 import { subjectClass } from '../utils/subject'
 import { firstName, useSession } from '../contexts/session'
 import { GENEL, useOgretmen } from '../hooks/useOgretmen'
+import { kayitliAtiflar, useSohbetler } from '../hooks/useSohbetler'
+import SohbetListesi from './SohbetListesi'
+import { useSes } from '../hooks/useSes'
+import { okunacakMetin } from '../utils/ses'
 import CitationChip from './CitationChip'
 import ModOnerisi from './ModOnerisi'
 import OgretmenSecici from './OgretmenSecici'
@@ -329,6 +335,8 @@ export default function AssistantChat() {
   const askerName = isStudent ? 'Işık' : (firstName(user) || 'Siz')
   const okur = isStudent ? 'ogrenci' : 'aile'
   const ogretmen = useOgretmen(user?.email)
+  const sohbet = useSohbetler(user?.email, isStudent)
+  const saltOkunur = sohbet.secili?.salt === true
   const secili = ogretmen.secili
   // A teacher's greeting and quick prompts come from its skill; Genel keeps the page's own.
   const welcome = secili ? secili.karsilama[okur] : voice.welcome
@@ -356,6 +364,7 @@ export default function AssistantChat() {
   /** The answer as it streams in; empty when nothing is being written. */
   const [writing, setWriting] = useState('')
   const isWriting = writing !== ''
+  const ses = useSes(user?.email, draft, setDraft, () => textareaRef.current?.focus(), saltOkunur)
 
   const latestAssistant = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -392,6 +401,51 @@ export default function AssistantChat() {
       modOnerisi: payload.mode_suggestion ?? oneri,
     }
     setMessages(prev => [...prev, assistantMsg])
+    void sohbet.yenile()
+  }
+
+  async function sohbetAc(id: string, salt: boolean) {
+    const result = await sohbet.ac(id, salt)
+    if (!result) return
+    ogretmen.sec(result.sohbet.ogretmen)
+    setMessages(result.mesajlar.length ? result.mesajlar.map(m => ({
+      id: m.id, role: m.rol, content: m.icerik,
+      citations: kayitliAtiflar(m), ekler: JSON.parse(m.ekler_json || '[]') as string[],
+    })) : [{ id: 'welcome', role: 'assistant', content: '' }])
+    setDraft('')
+    setCipler([])
+    setError(null)
+    setActiveCitation(null)
+  }
+
+  async function yeniSohbet() {
+    try {
+      await sohbet.yeni(ogretmen.id)
+      setMessages([{ id: 'welcome', role: 'assistant', content: '' }])
+      setDraft('')
+      setCipler([])
+      setError(null)
+    } catch { sohbet.setHata('Sohbet kaydedilemedi.') }
+  }
+
+  async function sohbetSil(id: string) {
+    const acik = sohbet.secili?.id === id
+    try {
+      await sohbet.sil(id)
+      if (acik) {
+        setMessages([{ id: 'welcome', role: 'assistant', content: '' }])
+        setDraft('')
+        setCipler([])
+      }
+    } catch { sohbet.setHata('Sohbet kaydedilemedi.') }
+  }
+
+  async function ogretmenSec(id: string) {
+    if (saltOkunur || loading) return
+    try {
+      if (sohbet.secili) await sohbet.degistir(sohbet.secili.id, { ogretmen: id })
+      ogretmen.sec(id)
+    } catch { sohbet.setHata('Sohbet kaydedilemedi.') }
   }
 
   async function yukleBir(yerel: string, file: File) {
@@ -431,7 +485,7 @@ export default function AssistantChat() {
   }
 
   function ekle(files: File[]) {
-    if (files.length === 0) return
+    if (files.length === 0 || saltOkunur || loading) return
     const dolu = cipler.filter(c => c.yukleniyor || c.id).length
     let yer = 4 - dolu
     const baslangic: Cip[] = []
@@ -482,9 +536,19 @@ export default function AssistantChat() {
     return () => el.removeEventListener('paste', onPaste)
   }, [])
 
-  async function submit(mode: 'chat' | 'plan', forcedPrompt?: string, opts?: { deep?: boolean }) {
+  async function submit(mode: 'chat' | 'plan', forcedPrompt?: string, opts?: { deep?: boolean; transient?: boolean }) {
     const content = (forcedPrompt ?? draft).trim()
-    if (!content || loading) return
+    if (!content || loading || saltOkunur) return
+
+    // Normal sends persist only the new turn; the server supplies trusted history.
+    // Regeneration and study plans remain independent requests by contract.
+    const kaydet = mode === 'chat' && !opts?.deep && !opts?.transient
+    let sohbetId = kaydet ? sohbet.secili?.id : undefined
+    setLoading(true)
+    if (kaydet && !sohbetId) {
+      try { sohbetId = await sohbet.yeni(ogretmen.id) }
+      catch { setError('Sohbet kaydedilemedi.'); setLoading(false); return }
+    }
 
     const gonderEk = forcedPrompt === undefined && mode === 'chat'
     const ekler = gonderEk ? cipler.flatMap(c => c.id ? [c.id] : []) : []
@@ -510,8 +574,9 @@ export default function AssistantChat() {
     const requestBody = {
       session_id: 'dashboard-default',
       context_filters: {},
-      messages: toApiMessages(apiKaynak),
+      messages: toApiMessages(sohbetId ? [userMsg] : apiKaynak),
       ogretmen: ogretmen.id,
+      ...(sohbetId ? { sohbet_id: sohbetId, request_id: crypto.randomUUID() } : {}),
       ...(opts?.deep ? { force_deep: true } : {}),
     }
 
@@ -612,7 +677,7 @@ export default function AssistantChat() {
     // Drop the answer being replaced so the new one does not read as a second
     // reply to the same question.
     setMessages(prev => prev.filter(m => m.id !== assistantId))
-    void submit('chat', prompt)
+    void submit('chat', prompt, { transient: true })
   }
 
   function deepen(assistantId: string) {
@@ -683,7 +748,7 @@ export default function AssistantChat() {
       <OgretmenSecici
         liste={ogretmen.liste}
         secili={ogretmen.id}
-        onSec={ogretmen.sec}
+        onSec={id => void ogretmenSec(id)}
         hata={ogretmen.hata ? voice.ogretmenHata : null}
       />
 
@@ -695,7 +760,7 @@ export default function AssistantChat() {
             type="button"
             className={qp.primary ? 'ac__prompt-chip ac__prompt-chip--primary' : 'ac__prompt-chip'}
             onClick={() => void submit(qp.mode, qp.text)}
-            disabled={loading}
+            disabled={loading || saltOkunur}
           >
             <qp.icon size={16} />
             {qp.text}
@@ -704,6 +769,9 @@ export default function AssistantChat() {
       </div>
 
       <div className="ac__layout">
+        <SohbetListesi depo={sohbet} student={isStudent} disabled={loading || sohbet.bekliyor}
+          onAc={(id, salt) => void sohbetAc(id, salt)} onYeni={() => void yeniSohbet()}
+          onSil={id => void sohbetSil(id)} />
         {/* Chat panel */}
         <div className="ac__chat">
           <div className="ac__messages">
@@ -745,9 +813,9 @@ export default function AssistantChat() {
                   {msg.modOnerisi && ogretmen.id === GENEL
                     && ogretmen.liste.some(o => o.id === msg.modOnerisi?.ogretmen) && (
                     <ModOnerisi oneri={msg.modOnerisi}
-                      onGec={() => {
+                      onGec={async () => {
                         const id = msg.modOnerisi!.ogretmen
-                        ogretmen.sec(id)
+                        await ogretmenSec(id)
                         // The button unmounts with the switch. Left alone, focus
                         // falls to the document and the new teacher is never
                         // announced. The radio is already on the page; focusing
@@ -765,13 +833,19 @@ export default function AssistantChat() {
                         <Copy />
                       </IconButton>
                       <IconButton kind="ghost" size="sm" label="Yeniden üret"
+                        disabled={loading || saltOkunur}
                         onClick={() => void regenerate(msg.id)}>
                         <Renew />
                       </IconButton>
                       <Button kind="ghost" size="sm" renderIcon={Search}
+                        disabled={loading || saltOkunur}
                         onClick={() => deepen(msg.id)}>
                         Daha derine in
                       </Button>
+                      {ses.ses && okunacakMetin(msg.content) && <Button kind="ghost" size="sm"
+                        aria-pressed={ses.okunan === msg.id} onClick={() => ses.oku(msg.id, msg.content)}>
+                        {ses.okunan === msg.id ? 'Durdur' : 'Sesli oku'}
+                      </Button>}
                     </div>
                   )}
                 </div>
@@ -785,6 +859,8 @@ export default function AssistantChat() {
           </div>
 
           {/* Composer */}
+          {isStudent && <p className="ac__aile-notu">Sohbetlerini ailen de görebilir.</p>}
+          {saltOkunur && <p className="ac__aile-notu">Bu sohbet salt okunur.</p>}
           <form
             ref={composerRef}
             className="ac__composer"
@@ -807,7 +883,7 @@ export default function AssistantChat() {
                       type="button"
                       className="ac__ek-kaldir"
                       aria-label={`Kaldır: ${c.ad}`}
-                      disabled={loading}
+                      disabled={loading || saltOkunur}
                       onClick={() => setCipler(prev => prev.filter(x => x.yerel !== c.yerel))}
                     >
                       <Close size={16} aria-hidden />
@@ -842,7 +918,7 @@ export default function AssistantChat() {
                 kind="ghost"
                 size="lg"
                 label="Dosya ekle"
-                disabled={loading}
+                disabled={loading || saltOkunur}
                 onClick={() => dosyaRef.current?.click()}
               >
                 <Attachment />
@@ -852,7 +928,7 @@ export default function AssistantChat() {
                   kind="ghost"
                   size="lg"
                   label="Fotoğraf çek"
-                  disabled={loading}
+                  disabled={loading || saltOkunur}
                   onClick={() => kameraRef.current?.click()}
                 >
                   <Camera />
@@ -875,15 +951,18 @@ export default function AssistantChat() {
                 }}
                 rows={2}
                 placeholder={loading ? 'Yanıt bekleniyor...' : voice.placeholder}
-                disabled={loading}
+                disabled={loading || saltOkunur}
                 className="ac__textarea"
               />
               <div className="ac__send-group">
+                {ses.mikrofonVar && <IconButton kind="ghost" size="lg"
+                  label={ses.dinliyor ? 'Dinlemeyi bitir' : 'Sesle sor'} disabled={loading}
+                  onClick={ses.mikrofon}><Microphone /></IconButton>}
                 <IconButton
                   kind="primary"
                   label="Gönder"
                   size="lg"
-                  disabled={loading || !draft.trim()}
+                  disabled={loading || saltOkunur || !draft.trim() || cipler.some(c => c.yukleniyor)}
                   type="submit"
                 >
                   <Send />
@@ -892,13 +971,14 @@ export default function AssistantChat() {
                   kind="ghost"
                   label="Çalışma Planı"
                   size="lg"
-                  disabled={loading || !draft.trim()}
+                  disabled={loading || saltOkunur || !draft.trim() || cipler.some(c => c.yukleniyor)}
                   onClick={() => void submit('plan')}
                 >
                   <CalendarHeatMap />
                 </IconButton>
               </div>
             </div>
+            {ses.hata && <p role="alert" className="ac__ses-hata">{ses.hata}</p>}
             {error && (
               <div className="ac__error">
                 <Tag type="red" size="sm">{error}</Tag>
@@ -946,6 +1026,10 @@ export default function AssistantChat() {
           </Tile>
         </aside>
       </div>
+      <Modal open={ses.onayAcik} modalHeading="Mikrofon" primaryButtonText="Onayla" secondaryButtonText="Vazgeç"
+        onRequestSubmit={ses.onayla} onRequestClose={ses.vazgec} onSecondarySubmit={ses.vazgec}>
+        <p>Chrome ve Android'de konuşma tanıma sesi Google'a gönderir.</p>
+      </Modal>
     </section>
   )
 }

@@ -95,8 +95,61 @@
 .ac__layout {
   display: grid;
   gap: var(--ted-space-md);
-  grid-template-columns: 1.6fr 1fr;
+  grid-template-columns: minmax(10rem, 0.7fr) minmax(0, 2fr);
 }
+
+.ac-sohbetler:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-04;
+  min-inline-size: 0;
+  padding: spacing.$spacing-04;
+  background: var(--cds-layer);
+  border: 1px solid var(--ted-color-border-subtle);
+}
+
+// Carbon's reset removes the browser's hidden display rule.
+.ac-sohbetler[hidden] { display: none; }
+
+.ac-sohbetler h3 {
+  @include type.type-style('heading-compact-01');
+  margin: 0;
+}
+
+.ac-sohbetler__baslik,
+.ac-sohbetler__eylemler {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: spacing.$spacing-02;
+}
+
+.ac-sohbetler__liste {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ac-sohbetler .cds--btn {
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.ac__aile-notu,
+.ac__ses-hata {
+  @include type.type-style('body-compact-01');
+  margin: 0;
+  padding: spacing.$spacing-04;
+  color: var(--cds-text-secondary);
+}
+
+.ac__ses-hata { color: var(--cds-text-error); }
 
 // Chat panel
 .ac__chat {
@@ -498,6 +551,7 @@
 
 // Side panels
 .ac__side {
+  grid-column: 2;
   display: flex;
   flex-direction: column;
   gap: var(--ted-space-md);
@@ -733,6 +787,7 @@
 
 .ac-msg__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: spacing.$spacing-02;
   margin-block-start: spacing.$spacing-02;
@@ -755,8 +810,25 @@
 
 @media (max-width: 1100px) {
   .ac__layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(10rem, 0.7fr) minmax(0, 2fr);
   }
+}
+
+@media (max-width: 34rem) {
+  .ac__layout { grid-template-columns: minmax(0, 1fr); }
+  .ac__side { grid-column: 1; }
+  .ac-sohbetler:not([hidden]) {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: 0;
+    max-block-size: 70vh;
+    overflow-y: auto;
+    z-index: 8001;
+  }
+  .ac-msg__actions { opacity: 1; }
+  .ac__input-row { flex-wrap: wrap; }
+  .ac__textarea { flex-basis: 60%; min-inline-size: 0; }
+  .ac__send-group { flex-direction: row; margin-inline-start: auto; }
 }
 
 @media (max-width: 671px) {

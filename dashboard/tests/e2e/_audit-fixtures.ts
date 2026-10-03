@@ -96,6 +96,14 @@ export const FULL: Record<string, unknown> = {
 }
 
 export async function mock(page: Page, data: Record<string, unknown>) {
+  // Conversation tests replace these routes with their own isolated rows.
+  await page.route('**/api/assistant/sohbetler', r => r.fulfill(json(
+    r.request().method() === 'POST' ? { id: 'ab'.repeat(16), ogretmen: 'genel', baslik: '' } : { sohbetler: [] },
+  )))
+  await page.route('**/api/assistant/sohbetler?*', r => r.fulfill(json({ sohbetler: [] })))
+  await page.route('**/api/assistant/notlar', r => r.fulfill(json({ notlar: [] })))
+  await page.route('**/api/assistant/sohbetler/*', r => r.request().method() === 'PATCH'
+    ? r.fulfill(json({ ok: true })) : r.fallback())
   // The stream endpoint is real backend code and would reach Gemini.
   // Playwright checks the newest route first. A spec that already registered
   // its own /stream handler (the upload test's fulfill) must still run;
