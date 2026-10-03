@@ -2412,6 +2412,66 @@ def assistant_ogretmenler():
                     "ogretmenler": [s.secici_ozeti() for s in skiller.values()]})
 
 
+@app.route("/api/assistant/uploads", methods=["POST"])
+@require_auth
+def assistant_upload():
+    access = _require_assistant_access()
+    if access is not None:
+        return access
+    email = _module_person()
+    if not email:
+        return jsonify({"error": "session_required"}), 403
+    dosya = request.files.get("dosya")
+    if dosya is None:
+        return jsonify({"error": "Dosya yok."}), 400
+    veri = dosya.read()
+    from src.assistant_uploads import (
+        EkDeposu, YuklemeHatasi, docx_metni, sinir_denetle, tur_tespit, txt_metni,
+    )
+    try:
+        tur = tur_tespit(veri)
+        sinir_denetle(tur, veri)
+        if tur == "gorsel":
+            try:
+                icerik, _mime = _claude_icin_gorsel(veri)
+            except GorselOkunamadi:
+                raise YuklemeHatasi(415, "Bu görsel okunamadı.") from None
+        elif tur == "pdf":
+            icerik = veri
+        elif tur == "docx":
+            icerik = docx_metni(veri).encode("utf-8")
+        else:
+            icerik = txt_metni(veri).encode("utf-8")
+        kayit = EkDeposu(OUTPUT_DIR).kaydet(
+            email, dosya.filename or "", tur, len(veri), icerik,
+            datetime.now(timezone.utc))
+    except YuklemeHatasi as exc:
+        return jsonify({"error": exc.cumle}), exc.status
+    return jsonify(kayit)
+
+
+@app.route("/api/assistant/uploads/<kimlik>")
+@require_auth
+def assistant_upload_oku(kimlik):
+    access = _require_assistant_access()
+    if access is not None:
+        return access
+    email = _module_person()
+    if not email:
+        return jsonify({"error": "session_required"}), 403
+    from src.assistant_uploads import EkDeposu
+    bulunan = EkDeposu(OUTPUT_DIR).oku(email, kimlik)
+    if bulunan is None:
+        return jsonify({"error": "Dosya bulunamadı."}), 404
+    meta, veri = bulunan
+    mime = {"gorsel": "image/jpeg", "pdf": "application/pdf"}.get(
+        meta["tur"], "text/plain; charset=utf-8")
+    return Response(veri, mimetype=mime, headers={
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+    })
+
+
 @app.route("/api/assistant/plan", methods=["POST"])
 @require_auth
 def assistant_plan():
