@@ -2157,6 +2157,7 @@ class AssistantRuntime:
 
         from src.assistant_modules import ModuleIndex
         from src.assistant_tools import build_registry
+        from src.portal_ekleri import EkDeposu
         # Published edupedia modules (plan SP5 K-S1): read-only, per process, no index file.
         self.modules = ModuleIndex(self.config.output_dir)
         # odev_kaynagi: the homework rows Bugün shows (dashboard_api._canli_odevler).
@@ -2175,6 +2176,7 @@ class AssistantRuntime:
                                        kitap_kaynagi=kitap_kaynagi,
                                        video_kaynagi=video_kaynagi,
                                        aile_kaynak_arama=self._aile_search,
+                                       ek_deposu=EkDeposu(self.config.project_root),
                                        skills=self.skills)
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
@@ -2213,6 +2215,10 @@ class AssistantRuntime:
         "Işık'ın 'Yaptım' dediği bir ödevi yapılacak diye sunma. Teslim zamanını "
         "söylerken listedeki gün ve saati kullan; 'bu hafta', 'yarın' gibi sözleri "
         "sorudaki 'Bugün:' satırına göre çöz.\n"
+        "- Bir ödevin ya da portal sayfasının ekinin içeriği (hangi sorular, hangi sayfalar, "
+        "ne isteniyor) → `ek_oku`; kimlik, ödev listesindeki 'Ekler' satırında [ek:…] olarak "
+        "yazar. Ek indirilemediyse ya da metin katmanı yoksa bunu açıkça söyle; ekin "
+        "içeriğini tahmin etme.\n"
         "- Işık'a özel diğer sorular (duyuru, eski ödev, portalın ek sayfaları) ve bir "
         "ödevin ayrıntısı → `ogrenci_verisi_ara`.\n"
         "- Konu, kavram, müfredat, kazanım sorusu → `kazanim_ara`, `mufredat_ara`. MEB "
