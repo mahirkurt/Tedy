@@ -27,7 +27,7 @@ def test_gecerli_skill_yuklenir(tmp_path):
                            "aile": "Merhaba! Işık'ın sorusunu sorabilirsiniz."}
     assert s.hizli_sorular["aile"] == ("Işık için birinci soru", "Işık için ikinci soru",
                                        "Işık için üçüncü soru")
-    assert s.kaynaklar == ("kavram-yanilgilari.md", "soru-kaliplari.md", "unite-haritasi.md")
+    assert s.kaynaklar == ("degerlendirme-rubrigi.md", "kavram-yanilgilari.md", "soru-kaliplari.md", "unite-haritasi.md")
     assert s.govde.startswith("## Rol ve ses")
     assert s.gecis_sorusu == "Matematik öğretmenine geçelim mi?"
 
@@ -210,3 +210,8 @@ def test_secici_ozeti(tmp_path):
 def test_on_bilgi_degerde_iki_nokta_kalir():
     ob = sk.on_bilgi_coz(["karsilama:", "  ogrenci: Bir soru getir: bakalım."], "x")
     assert ob == {"karsilama": {"ogrenci": "Bir soru getir: bakalım."}}
+
+
+def test_degerlendirme_rubrigi_zorunlu(tmp_path):
+    kaynaklar = {k: v for k, v in KAYNAKLAR.items() if k != "degerlendirme-rubrigi.md"}
+    assert "references/ eksik: degerlendirme-rubrigi.md" in _bozuk(tmp_path, kaynaklar=kaynaklar)

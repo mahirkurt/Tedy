@@ -11,6 +11,7 @@ from pathlib import Path
 BASLIKLAR = ("Rol ve ses", "Ders akışı", "Maarif Modeli bağı", "Derse özgü anlatım teknikleri",
              "Sık kavram yanılgıları", "Araç kullanımı", "Sınırlar")
 KAYNAKLAR = {
+    "degerlendirme-rubrigi.md": "# Değerlendirme\n\nBaşlangıç, gelişiyor ve yeterli.\n",
     "kavram-yanilgilari.md": "# Kavram yanılgıları\n\nPaydalar toplanmaz.\n",
     "soru-kaliplari.md": "# Soru kalıpları\n\nÇoktan seçmeli.\n",
     "unite-haritasi.md": "# Harita\n\n1. Sayılar ve Nicelikler\n",

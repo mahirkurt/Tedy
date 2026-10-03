@@ -18,12 +18,13 @@ DIZINLER = sorted(p.name for p in sk.SKILL_DIZINI.iterdir()
                   if p.is_dir() and not p.name.startswith(("_", ".")))
 GERCEK_ARACLAR = {at.LOCAL_TOOL, at.ODEV_TOOL, at.PROGRAM_TOOL, at.SINAV_TOOL, at.TAKVIM_TOOL,
                   at.ICERIK_TOOL, at.NOT_TOOL, at.PLATFORM_TOOL, at.KITAP_TOOL, at.VIDEO_TOOL,
-                  assistant_modules.TOOL_NAME, at.SKILL_TOOL, *at.TOOL_ALLOWLIST}
+                  assistant_modules.TOOL_NAME, at.SKILL_TOOL, "alistirma_olustur",
+                  "ogrenme_gunlugu", "calisma_degerlendir", *at.TOOL_ALLOWLIST}
 ZORUNLU_ARACLAR = {"kitap_listele", "kitap_sayfa", "mufredat_ara", "figur_ara", "figur_getir",
                    "kazanim_ara", "video_listele", at.PROGRAM_TOOL, at.SINAV_TOOL, at.ICERIK_TOOL,
                    at.ODEV_TOOL, at.SKILL_TOOL}
-# Genel moda ya da aileye ait araçlar ve B4'ün henüz olmayan araçları bir öğretmen tanımında anılmaz.
-YASAK_ARACLAR = {at.MOD_ONER_TOOL, at.AILE_TOOL, "alistirma_olustur", "ogrenme_gunlugu"}
+# Genel moda ya da aileye ait araçlar bir öğretmen tanımında anılmaz.
+YASAK_ARACLAR = {at.MOD_ONER_TOOL, at.AILE_TOOL}
 INGILIZCE = re.compile(r"\b(the|and|of|with|you|your|is|are|this|that|for)\b", re.IGNORECASE)
 SORU_TURLERI = {"coktan_secmeli", "dogru_yanlis", "kisa_cevap", "acik_uclu"}
 # "siz" hitabı: -sInIz çekimi (sorabilirsiniz), "size/sizin/siz", çıplak -(I)nIz (iyelik ya da
@@ -70,7 +71,7 @@ def test_arac_kullanimi_gercek_araclari_adlandirir(skiller, ad):
 
 
 @pytest.mark.parametrize("ad", DIZINLER)
-def test_b1de_olmayan_ya_da_baska_moda_ait_arac_anilmaz(skiller, ad):
+def test_baska_moda_ait_arac_anilmaz(skiller, ad):
     metin = (skiller[ad].dizin / "SKILL.md").read_text(encoding="utf-8")
     assert not [a for a in YASAK_ARACLAR if a in metin]
 

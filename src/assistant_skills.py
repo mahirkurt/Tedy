@@ -38,7 +38,8 @@ OKURLAR = ("ogrenci", "aile")
 ZORUNLU_BASLIKLAR = ("Rol ve ses", "Ders akışı", "Maarif Modeli bağı",
                      "Derse özgü anlatım teknikleri", "Sık kavram yanılgıları",
                      "Araç kullanımı", "Sınırlar")
-ZORUNLU_KAYNAKLAR = ("kavram-yanilgilari.md", "soru-kaliplari.md", "unite-haritasi.md")
+ZORUNLU_KAYNAKLAR = ("degerlendirme-rubrigi.md", "kavram-yanilgilari.md",
+                     "soru-kaliplari.md", "unite-haritasi.md")
 OGRETMEN_SONEKI = " öğretmeni"
 # skill_kaynagi bir notu bu boyda sayfalara böler: chat_with_tools araç sonucunu 4.000
 # karakterde keser, başlık ve "Devamı" satırı da o bütçeden yer.

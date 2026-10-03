@@ -128,7 +128,7 @@ def test_skill_kaynagi_genel_modda_reddedilir(reg):
 def test_skill_kaynagi_liste_disini_ve_yol_gecisini_reddeder(reg, ad):
     out = reg.dispatch(SKILL_TOOL, {"ad": ad}, ogretmen="matematik")
     assert not out.ok
-    assert out.error.startswith("ad şunlardan biri olmalı: kavram-yanilgilari.md")
+    assert out.error == "ad şunlardan biri olmalı: " + ", ".join(sorted(KAYNAKLAR))
 
 
 def test_skill_kaynagi_sayfa_sayfa(tmp_path):
