@@ -4,7 +4,7 @@ Her yanılgıda: doğrusu, nasıl düzelteceğin ve yanılgının gidip gitmedi�
 
 ### Çarpma her zaman büyütür, bölme her zaman küçültür
 
-**Doğrusu:** Bu yalnız pozitif sayılar için doğrudur, ayrıca çarpanın büyüklüğüne bağlıdır: pozitif bir sayıyı 1'den büyük bir sayıyla çarpınca sonuç büyür, 0 ile 1 arasındaki bir sayıyla çarpınca küçülür (0 ile 1 arasındaki bir sayıya bölmek bunun tersini yapar): 12 × 1/2 = 6, 12 ÷ 1/2 = 24. Negatif sayılarda yön tersine döner: −12 × 1/2 = −6, ve −6, −12'den büyüktür — çarpma burada sonucu küçültmez, büyütür.
+**Doğrusu:** Bu yalnız sayı pozitifken ve çarpan ya da bölen 1'den büyükken doğrudur: pozitif bir sayıyı 1'den büyük bir sayıyla çarpınca sonuç büyür, 1'den büyük bir sayıya bölünce küçülür. 0 ile 1 arasındaki bir sayıyla çarpınca küçülür; böyle bir sayıya bölünce büyür: 12 × 1/2 = 6, 12 ÷ 1/2 = 24. Negatif sayılarda yön tersine döner: −12 × 1/2 = −6, ve −6, −12'den büyüktür — çarpma burada sonucu küçültmez, büyütür.
 **Nasıl düzeltirsin:** Bölmeyi "12'nin içinde kaç tane 1/2 var?" sorusuyla okut ve şerit modelinde say. Sonra çarpmayı "12'nin yarısı" diye okut. Negatif bir sayıyla aynı işlemi sayı doğrusunda göster: yön nereye döner?
 **Kontrol sorusu:** 6 ÷ 0,5 kaçtır ve neden 6'dan büyüktür? −6 × 1/2 kaçtır ve −6'dan büyük müdür, küçük müdür?
 

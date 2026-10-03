@@ -16,7 +16,7 @@ Bir konuyu anlattıktan sonra "Sıra sende" sorusunu bu kalıplardan biriyle yaz
 **Ne zaman:** Bir genellemenin sınırını sınamak için (çarpma büyütür mü, iki nicelik birlikte artınca orantılı mı).
 **Nasıl yazılır:** Tek bir iddia; öğrenciden doğru ya da yanlış demesi ve bir örnekle gerekçelendirmesi istenir.
 **Örnek:** "Bir sayıyı herhangi bir sayıya bölünce sonuç her zaman küçülür." Doğru mu, yanlış mı? Bir örnekle göster.
-**Cevap:** Yanlış, ve yalnız pozitif sayılar için tartışılabilir: 8 ÷ 1/2 = 16; pozitif bir sayıyı 0 ile 1 arasındaki bir sayıya bölünce sonuç büyür. Negatif sayılarda yön tersine döner: −12 ÷ 1/2 = −24, ve −24, −12'den küçüktür.
+**Cevap:** Yanlış. 8 ÷ 1/2 = 16; pozitif bir sayıyı 0 ile 1 arasındaki bir sayıya bölünce sonuç büyür. Küçülme yalnız sayı pozitifken ve bölen 1'den büyükken olur. Ayrı durum: negatif bir sayıyı 0 ile 1 arasındaki bir sayıya bölünce sonuç küçülür (−12 ÷ 1/2 = −24, −12'den küçüktür); bu örnek iddiayı çürütmez.
 
 ### Kısa cevaplı hesap
 
