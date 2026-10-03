@@ -597,7 +597,7 @@ class ClaudeClient:
         words to answer from what it has, because withdrawing the tools alone
         was measured to produce a thinking block and no text.
         """
-        from src.assistant_tools import OLAY_ARACLARI, ToolOutcome
+        from src.assistant_tools import OLAY_ARACLARI, SONLANDIRICI_ARACLAR, ToolOutcome
 
         if not self.available:
             raise RuntimeError("anthropic_no_api_key")
@@ -647,11 +647,13 @@ class ClaudeClient:
             # going so a lead-in gets its follow-up round (review round 2,
             # finding NB1) — a genuinely complete answer simply gets an empty
             # follow-up round merged onto it, unchanged.
+            sonlandirici = (len(uses) == 1
+                            and getattr(uses[0], "name", "") in SONLANDIRICI_ARACLAR)
             son_tur = bool(round_text) and all(
                 getattr(use, "name", "") in OLAY_ARACLARI for use in uses)
             if son_tur:
                 kept_text = self._birlestir(kept_text, round_text)
-            elif round_text:
+            elif round_text and not sonlandirici:
                 # A real tool call reasserts ordinary reset semantics for THIS
                 # round's text; any text kept from an earlier event-only round
                 # is discarded with it rather than left as an unlabelled prefix
@@ -678,6 +680,14 @@ class ClaudeClient:
                                     "content": "Çalıştırılmadı — tur bütçesi doldu."})
                     continue
 
+                if getattr(use, "name", "") in SONLANDIRICI_ARACLAR and len(uses) > 1:
+                    results.append({"type": "tool_result", "tool_use_id": use.id,
+                                    "is_error": True,
+                                    "content": "HATA: netlestir yalnız başına çağrılır; bu turda "
+                                               "başka araç da çağırdın. Önce gerekeni bitir."})
+                    out.tool_calls.append({"name": use.name, "ms": 0, "ok": False})
+                    continue
+
                 raw = use.input
                 if isinstance(raw, dict):
                     args, dispatchable = dict(raw), True
@@ -701,6 +711,18 @@ class ClaudeClient:
                         error=f"Model geçersiz argüman gönderdi (sözlük bekleniyor): {raw!r}")
 
                 out.tool_calls.append({"name": use.name, "ms": elapsed, "ok": bool(outcome.ok)})
+                if sonlandirici and outcome.ok and outcome.olay:
+                    out.olaylar.append(dict(outcome.olay))
+                    soru = str(outcome.olay.get("soru", ""))
+                    onceki = self._birlestir(kept_text, round_text)
+                    if on_delta is not None:
+                        on_delta(("\n\n" if onceki else "") + soru)
+                    out.text = self._birlestir(onceki, soru)
+                    return out
+                if sonlandirici and not outcome.ok:
+                    if (round_text or kept_text) and on_reset is not None:
+                        on_reset()
+                    kept_text = ""
                 if outcome.ok and outcome.olay and not any(
                         o.get("event") == outcome.olay.get("event") for o in out.olaylar):
                     # First suggestion wins: a model that calls mod_oner twice in
@@ -2517,7 +2539,27 @@ class AssistantRuntime:
         "adım. Okurun bilmesi gereken bir çekince varsa `**Not:** …`. Başka "
         "etiket (\"Öneri:\", \"Bugün için not:\") uydurma; bu iki satır cevapta "
         "ayrı kutu olarak gösterilir.\n"
-        "- Tablo, yatay çizgi (---), alıntı bloğu ve emoji kullanma.\n\n"
+        "- Bloklar: içerik gerektiriyorsa şu beş bloktan birini kullan; başka ad uydurma. Blok "
+        "`:::ad` satırıyla açılır, tek başına `:::` satırıyla kapanır; iç içe blok yok.\n"
+        "  - `:::kavram` — bir tanım ya da kural (bir iki cümle).\n"
+        "  - `:::ornek` — somut bir örnek.\n"
+        "  - `:::adimlar` — çözüm ya da yöntem adımları; içi numaralı liste (1. 2. 3.).\n"
+        "  - `:::sonuc` — bir hesabın ya da karşılaştırmanın sonucu (tek satır).\n"
+        "  - `:::hata` — sık yapılan bir yanlış ve doğrusu.\n"
+        "  Bir cevapta en çok bir `sonuc` ve bir `hata` kullan. Kısa bir cevapta blok kullanma.\n"
+        "- Matematik: her sayısal ifade, kesir, üs ve denklem `$…$` içinde (ör. `$\\frac{3}{4}$`, "
+        "`$2^3$`); ayrı satırdaki uzun ifade `$$…$$`. Ondalık virgülü `0{,}75` diye yaz. Para "
+        "ya da düz metindeki dolar işaretini `\\$` diye yaz.\n"
+        "- Tablo yalnız karşılaştırma için: Markdown boru tablosu, en çok 4 sütun ve 6 satır. "
+        "Yatay çizgi (---), alıntı bloğu ve emoji kullanma.\n\n"
+
+        "## Netleştirme\n"
+        "- Soru birden çok anlamlı yöne gidebiliyorsa (ör. 'kesirleri anlat': karşılaştırma mı, "
+        "toplama mı, ondalık gösterim mi?) cevaplamadan önce `netlestir` ile tek kısa soru ve "
+        "2–4 seçenek sun. Arayüz 'Başka bir şey' seçeneğini kendisi ekler.\n"
+        "- Soru konuşmadan anlaşılıyorsa sorma. Art arda ikiden fazla netleştirme sorma; ikinci "
+        "netleştirmeden sonra en olası anlamı seçip cevapla ve bunu bir cümleyle söyle.\n"
+        "- `netlestir`'i başka bir araçla aynı turda çağırma; çağırdığında cevabın biter.\n\n"
 
         "## Sınırlar\n"
         "- Modül ilerleme özetini yalnız soran kişiye aktar; ilerleme bilgisini (cevaplanan soru, "
@@ -2583,7 +2625,7 @@ class AssistantRuntime:
         on_reset: Callable[[], None] | None = None,
         okur: str = "bilinmiyor",
         ogretmen: str = assistant_skills.GENEL,
-        mod_onerisi: bool = True,
+        etkilesimli: bool = True,
         sahip_email: str | None = None,
         pencere: int = 3,
         hafiza: bool = True,
@@ -2636,15 +2678,15 @@ class AssistantRuntime:
                 # aile_kaynak_ara (Görev 5) is declared only for okur == "aile" —
                 # the reader decides the tool list, not a per-call opt-in.
                 # The teacher decides the rest: mod_oner in genel, skill_kaynagi in a
-                # teacher mode (B1). mod_onerisi=False (/v1, /plan) withholds
+                # teacher mode (B1). etkilesimli=False (/v1, /plan) withholds
                 # mod_oner even in genel — those endpoints have no switch button.
                 declarations=self.registry.declarations(
-                    okur, ogretmen=ogretmen, mod_onerisi=mod_onerisi, **hafiza_kw),
+                    okur, ogretmen=ogretmen, etkilesimli=etkilesimli, **hafiza_kw),
                 # Module progress enters the model context only for a signed-in person (plan K-S6);
                 # the caller decides, and only an exact True counts.
                 dispatch=dispatch or functools.partial(
                     self.registry.dispatch, ilerleme_izni=ilerleme_izni is True, okur=okur,
-                    ogretmen=ogretmen, mod_onerisi=mod_onerisi,
+                    ogretmen=ogretmen, etkilesimli=etkilesimli,
                     odev_anahtari=odev_anahtari, okur_sozu=user_query,
                     **({**hafiza_kw, "sahip_email": sahip_email or "",
                         "yukleme_deposu": yukleme_deposu, "alistirma_kimlikleri": alistirma_kimlikleri}
@@ -2746,6 +2788,9 @@ class AssistantRuntime:
             "plan_blocks": [],
             "intent": intent,
             "session_id": session_id,
+            "netlestirme": next(
+                ({k: v for k, v in olay.items() if k != "event"} for olay in loop.olaylar
+                 if olay.get("event") == "clarify"), None),
             # The last switch suggestion mod_oner made, without its event name;
             # the stream also sends it as it happens. None when there was none.
             "mode_suggestion": next(
@@ -2829,7 +2874,7 @@ class AssistantRuntime:
             self.registry.dispatch, ilerleme_izni=kwargs.get("ilerleme_izni") is True,
             okur=kwargs.get("okur", "bilinmiyor"),
             ogretmen=kwargs.get("ogretmen", assistant_skills.GENEL),
-            mod_onerisi=kwargs.get("mod_onerisi", True),
+            etkilesimli=kwargs.get("etkilesimli", True),
             odev_anahtari=str(kwargs.get("odev_anahtari") or ""),
             okur_sozu=okur_sozu,
             **({"hafiza": kwargs.get("hafiza", True), "not_deposu": kwargs["not_deposu"],
@@ -3061,7 +3106,7 @@ class AssistantRuntime:
             force_deep=True,
             ilerleme_izni=ilerleme_izni,
             okur=okur,
-            mod_onerisi=False,  # /plan has no switch button (spec: B1 is /stream and /chat only)
+            etkilesimli=False,  # /plan has no switch button (spec: B1 is /stream and /chat only)
             secili_odev=secili_odev,
             odev_anahtari=odev_anahtari,
         )
@@ -3111,7 +3156,7 @@ class AssistantRuntime:
                 session_id=session_id,
                 context_filters=context_filters,
                 temperature=temperature,
-                mod_onerisi=False,  # /v1 is an API-key client: no switch button either
+                etkilesimli=False,  # /v1 is an API-key client: no switch button either
             )
 
         answer = out.get("answer", "")

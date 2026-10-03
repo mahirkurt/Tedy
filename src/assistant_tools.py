@@ -560,6 +560,10 @@ _HAFIZA_ARACLARI = {"hafiza_yaz", "hafiza_duzelt"}
 # writes its answer, their success needs neither on_reset nor another round.
 # Quiz rows are also persisted; only the answer-free card reaches the reader.
 OLAY_ARACLARI = {MOD_ONER_TOOL, "alistirma_olustur", ODEV_FOTO_TOOL}
+NETLESTIR_TOOL = "netlestir"
+SONLANDIRICI_ARACLAR = {NETLESTIR_TOOL}
+NETLESTIR_SORU_SINIRI = 140
+NETLESTIR_SECENEK_SINIRI = 60
 _ALISTIRMA_ARACLARI = {"alistirma_olustur", "ogrenme_gunlugu", "calisma_degerlendir"}
 _RUBRIK = "degerlendirme-rubrigi.md"
 MOD_GEREKCE_SINIRI = 200
@@ -1870,7 +1874,7 @@ class McpRegistry:
         return sorted(unhealthy | set(self.unconfigured) | modules)
 
     def declarations(self, okur: str = "bilinmiyor", ogretmen: str = GENEL,
-                     mod_onerisi: bool = True, hafiza: bool = True,
+                     etkilesimli: bool = True, hafiza: bool = True,
                      not_deposu: Any = None, sohbet_id: str = "") -> list[dict[str, Any]]:
         decls: list[dict[str, Any]] = [{
             "name": LOCAL_TOOL,
@@ -1941,7 +1945,7 @@ class McpRegistry:
                     "required": ["anahtar", "alan", "deger"],
                 },
             })
-        if self.foto_odev_kaynagi is not None and okur in ("ogrenci", "aile") and mod_onerisi:
+        if self.foto_odev_kaynagi is not None and okur in ("ogrenci", "aile") and etkilesimli:
             decls.append({
                 "name": ODEV_FOTO_TOOL,
                 "description": "Yüklenen ödev fotoğrafını okur ve onay kartı gösterir. Ödevi kaydetmez; okur kartta onaylar.",
@@ -1985,7 +1989,7 @@ class McpRegistry:
                 "parameters": sanitize_schema(spec.get("inputSchema") or {}),
             })
         # Last, so every mode shares the same list up to here.
-        decls.extend(self._ogretmen_bildirimleri(ogretmen, mod_onerisi))
+        decls.extend(self._ogretmen_bildirimleri(ogretmen, etkilesimli))
         depo = not_deposu if not_deposu is not None else self.not_deposu
         if hafiza and okur in ("ogrenci", "aile") and depo is not None:
             for ad in ("hafiza_yaz", "hafiza_duzelt"):
@@ -2039,19 +2043,35 @@ class McpRegistry:
         }])
         return sonuc
 
-    def _ogretmen_bildirimleri(self, ogretmen: str, mod_onerisi: bool = True) -> list[dict[str, Any]]:
-        """mod_oner in genel mode, skill_kaynagi in a teacher mode, nothing without skills.
-
-        `mod_onerisi=False` (from /v1 and /plan, which have no switch button —
-        chat()'s own kwarg, not a per-mode thing) withholds the tool outright
-        rather than declaring it and having dispatch() refuse the call.
-        """
+    def _ogretmen_bildirimleri(self, ogretmen: str, etkilesimli: bool = True) -> list[dict[str, Any]]:
+        """Interactive clarification first; the mode's own tool stays last."""
+        netlestirme = [{
+            "name": NETLESTIR_TOOL,
+            "description": (
+                "Soru birden çok anlamlı yöne gidebiliyorsa okura 2–4 kısa seçenek sun; okur "
+                "birine dokununca soru o yönde sürer. Soru konuşmadan anlaşılıyorsa çağırma. "
+                "Bu turda başka araç çağırma: netlestir çağrıldığında cevabın biter ve soru "
+                "okura gösterilir."),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "soru": {"type": "string", "maxLength": NETLESTIR_SORU_SINIRI,
+                             "description": "Okura sorulacak tek kısa soru."},
+                    "secenekler": {
+                        "type": "array", "minItems": 2, "maxItems": 4,
+                        "items": {"type": "string", "maxLength": NETLESTIR_SECENEK_SINIRI},
+                        "description": "2–4 kısa seçenek; 'Başka bir şey' ekleme, arayüz ekler.",
+                    },
+                },
+                "required": ["soru", "secenekler"],
+            },
+        }] if etkilesimli else []
         if not self.skills:
-            return []
+            return netlestirme
         if ogretmen == GENEL:
-            if not mod_onerisi:
+            if not etkilesimli:
                 return []
-            return [{
+            return netlestirme + [{
                 "name": MOD_ONER_TOOL,
                 "description": (
                     "Okura, sorusuna uyan ders öğretmenine geçmeyi bir düğmeyle önerir. Hiçbir "
@@ -2075,8 +2095,8 @@ class McpRegistry:
             }]
         skill = self.skills.get(ogretmen)
         if skill is None:
-            return []
-        return [{
+            return netlestirme
+        return netlestirme + [{
             "name": SKILL_TOOL,
             "description": (
                 f"{skill.ogretmen_adi} olarak öğretmen notlarından birini açar: kavram "
@@ -2128,13 +2148,17 @@ class McpRegistry:
 
     def dispatch(self, name: str, args: dict[str, Any], ilerleme_izni: bool = False,
                 okur: str = "bilinmiyor", ogretmen: str = GENEL,
-                mod_onerisi: bool = True, hafiza: bool = True,
+                etkilesimli: bool = True, hafiza: bool = True,
                 not_deposu: Any = None, sohbet_id: str = "", odev_anahtari: str = "", okur_sozu: str = "",
                 sahip_email: str = "", yukleme_deposu: Any = None,
                 alistirma_kimlikleri: list[str] | None = None,
                 ek_okuyucu: Callable[[str], Any] | None = None) -> ToolOutcome:
+        if name == NETLESTIR_TOOL:
+            if not etkilesimli:
+                return ToolOutcome(ok=False, error="netlestir bu istekte kapalı.")
+            return self._dispatch_netlestir(args or {})
         if name == ODEV_FOTO_TOOL:
-            return self._dispatch_odev_fotograftan(args or {}, okur, mod_onerisi, ek_okuyucu)
+            return self._dispatch_odev_fotograftan(args or {}, okur, etkilesimli, ek_okuyucu)
         if name in _ALISTIRMA_ARACLARI:
             depo = not_deposu if not_deposu is not None else self.not_deposu
             return self._dispatch_alistirma(name, args or {}, ogretmen, okur, depo,
@@ -2144,7 +2168,7 @@ class McpRegistry:
             depo = not_deposu if not_deposu is not None else self.not_deposu
             return self._dispatch_hafiza(name, args or {}, okur, hafiza, depo, sohbet_id)
         if name == MOD_ONER_TOOL:
-            return self._dispatch_mod_oner(args or {}, ogretmen, mod_onerisi)
+            return self._dispatch_mod_oner(args or {}, ogretmen, etkilesimli)
         if name == SKILL_TOOL:
             return self._dispatch_skill_kaynagi(args or {}, ogretmen)
         if name == LOCAL_TOOL:
@@ -2318,13 +2342,33 @@ class McpRegistry:
             return "ulasilamadi", b"", ""
         return ("var", veri, mime) if veri else ("ulasilamadi", b"", "")
 
+    def _dispatch_netlestir(self, args: dict[str, Any]) -> ToolOutcome:
+        soru = args.get("soru")
+        if not isinstance(soru, str) or not soru.strip() or len(soru.strip()) > NETLESTIR_SORU_SINIRI:
+            return ToolOutcome(ok=False, error=(
+                f"soru 1–{NETLESTIR_SORU_SINIRI} karakterlik bir metin olmalı."))
+        secenekler = args.get("secenekler")
+        if not isinstance(secenekler, list) or not 2 <= len(secenekler) <= 4:
+            return ToolOutcome(ok=False, error="secenekler 2–4 öğelik bir liste olmalı.")
+        temiz = []
+        for secenek in secenekler:
+            if not isinstance(secenek, str) or not secenek.strip() \
+                    or len(secenek.strip()) > NETLESTIR_SECENEK_SINIRI:
+                return ToolOutcome(ok=False, error=(
+                    f"her secenek 1–{NETLESTIR_SECENEK_SINIRI} karakterlik bir metin olmalı."))
+            if _katla(secenek) in {_katla(s) for s in temiz}:
+                return ToolOutcome(ok=False, error="secenekler birbirinin aynı olmamalı.")
+            temiz.append(secenek.strip())
+        return ToolOutcome(ok=True, text="Seçenekler okura gösterildi.",
+                           olay={"event": "clarify", "soru": soru.strip(), "secenekler": temiz})
+
     def _dispatch_mod_oner(self, args: dict[str, Any], ogretmen: str,
-                           mod_onerisi: bool = True) -> ToolOutcome:
-        # Defence in depth: declared only in genel mode with mod_onerisi=True
+                           etkilesimli: bool = True) -> ToolOutcome:
+        # Defence in depth: declared only in genel mode with etkilesimli=True
         # (/v1, /plan pass False — no switch button there), refused anywhere
         # else — a teacher mode has nothing to suggest, and a stale tool list
         # must not put a switch button under a teacher's answer or an API reply.
-        if not mod_onerisi:
+        if not etkilesimli:
             return ToolOutcome(ok=False, error="mod önerisi bu istekte kapalı")
         if ogretmen != GENEL or not self.skills:
             return ToolOutcome(ok=False, error="mod önerisi yalnız genel modda yapılabilir")

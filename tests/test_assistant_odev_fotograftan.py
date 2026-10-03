@@ -23,9 +23,9 @@ def test_bildirim_ve_cagri_kapisi():
     for okur in ("ogrenci", "aile"):
         assert "odev_fotograftan" in {d["name"] for d in reg.declarations(okur)}
     for okur, interaktif in (("bilinmiyor", True), ("ogrenci", False)):
-        assert "odev_fotograftan" not in {d["name"] for d in reg.declarations(okur, mod_onerisi=interaktif)}
+        assert "odev_fotograftan" not in {d["name"] for d in reg.declarations(okur, etkilesimli=interaktif)}
         assert not reg.dispatch("odev_fotograftan", {"ek_id": KIMLIK}, okur=okur,
-                                mod_onerisi=interaktif, ek_okuyucu=_oku).ok
+                                etkilesimli=interaktif, ek_okuyucu=_oku).ok
 
 
 def test_oneri_tarih_uydurmaz_yazmaz(tmp_path):

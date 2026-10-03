@@ -224,7 +224,7 @@ def test_eval_kosu_bir_hatayla_durmaz(tmp_path):
         def chat(self, **kw):
             self.cagrilar.append(kw)
             assert kw["okur"] == "ogrenci"
-            assert kw["mod_onerisi"] is False
+            assert kw["etkilesimli"] is False
             assert "sohbet_id" not in kw
             if len(self.cagrilar) == 1:
                 raise RuntimeError("sızmaması gereken hata")

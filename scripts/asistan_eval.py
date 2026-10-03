@@ -77,7 +77,7 @@ def kos(*, runtime=None, kok: Path | None = None) -> Path:
             try:
                 sonuc = runtime.chat(
                     messages=[{"role": "user", "content": soru["soru"]}],
-                    ogretmen=ders, okur="ogrenci", mod_onerisi=False,
+                    ogretmen=ders, okur="ogrenci", etkilesimli=False,
                 )
             except Exception:
                 # Bir sorunun hatası diğer on birini düşürmez; hata metni kayda girmez.

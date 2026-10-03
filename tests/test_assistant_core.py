@@ -778,7 +778,9 @@ def test_system_prompt_fixes_one_answer_skeleton():
     assert "## Biçim" in p
     assert "`### `" in p
     assert "`**Şimdi:** …`" in p and "`**Not:** …`" in p
-    assert "Tablo, yatay çizgi" in p
+    # D1 permits bounded comparison tables; the rest of the answer skeleton stays.
+    assert "en çok 4 sütun ve 6 satır" in p
+    assert "Yatay çizgi (---), alıntı bloğu ve emoji kullanma" in p
 
 
 def test_system_prompt_says_what_to_do_when_the_textbook_is_missing():

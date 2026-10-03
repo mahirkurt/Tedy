@@ -514,7 +514,7 @@ def test_v1_her_zaman_genel(rt, monkeypatch):
     assert alinan.get("ogretmen", "genel") == "genel"
 
 
-# ── mod_onerisi: no switch button on /v1 or /plan ───────────────────────────
+# ── etkilesimli: no switch button on /v1 or /plan ───────────────────────────
 
 def test_v1_mod_oner_bildirmez(rt, monkeypatch):
     gorulen = _gorulen_araclar(rt, monkeypatch, ogretmen="genel")
@@ -543,7 +543,7 @@ def test_plan_mod_oner_bildirmez(rt, monkeypatch):
     assert MOD_ONER_TOOL not in gorulen["adlar"]
 
 
-def test_mod_onerisi_kapali_dispatch_de_reddeder(rt, monkeypatch):
+def test_etkilesimli_kapali_dispatch_de_reddeder(rt, monkeypatch):
     sonuc = {}
 
     def yakala(*, dispatch, **_):
@@ -551,7 +551,7 @@ def test_mod_onerisi_kapali_dispatch_de_reddeder(rt, monkeypatch):
         return ToolLoopResult(text="tamam")
 
     monkeypatch.setattr(rt.llm, "chat_with_tools", yakala)
-    rt.chat(messages=SORU, session_id="s", mod_onerisi=False)
+    rt.chat(messages=SORU, session_id="s", etkilesimli=False)
     assert not sonuc["oneri"].ok           # defence in depth, even if declared elsewhere
 
 
