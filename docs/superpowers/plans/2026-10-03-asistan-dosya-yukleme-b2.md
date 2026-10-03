@@ -15,8 +15,8 @@
 - **Worktree:** `/mnt/thunderbolt/workspaces/TED/.claude/worktrees/asistan-b2-plan`, dal `cursor/asistan-b2-plan-a843` (`feat/asistan-ogretmen`, `1e9da7e`). Ana checkout'a, `feat/asistan-ogretmen` worktree'sine, `feat/asistan-zengin`'e ve portal dallarına dokunma. Her komutta mutlak yol kullan (`cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/asistan-b2-plan && …`).
 - **Git:** dosyaları adıyla stage et (`git add <yol>`); `git add -A` / `git add .` yok. Push yok.
 - **Testler ücretli bir API'ye ya da ağa hiç gitmez.** `tests/conftest.py` her testte `ANTHROPIC_API_KEY`'i siler. Playwright'ı `env -u ANTHROPIC_API_KEY` ile çalıştır. Soru gönderen her e2e testi hem `**/api/assistant/stream` hem `**/api/assistant/chat` rotasını kendisi cevaplar.
-- **Python:** bu worktree'de `.venv` yok; yorumlayıcı `/mnt/thunderbolt/workspaces/TED/.venv/bin/python`. `DASHBOARD_SECRET_KEY=yalniz-test` her pytest çağrısının önündedir. Gerçek `.env`'i worktree'ye bağlama.
-- **Pano:** `cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/asistan-b2-plan/dashboard`; `node_modules` yoksa `npm ci`. Sonra `npm run lint`, `npm run build`. Playwright `dashboard-dist/` sunar: her Playwright koşusundan önce `npm run build` ve çıkış kodunu doğrudan oku (boruya verme). Komut: `DASHBOARD_SECRET_KEY=yalniz-test env -u ANTHROPIC_API_KEY npx playwright test <spec>`.
+- **Python:** bu worktree'de `.venv` yok; yorumlayıcı `/mnt/thunderbolt/workspaces/TED/.venv/bin/python`. `DASHBOARD_SECRET_KEY=yalniz-test` her pytest çağrısının önündedir. Gerçek `.env`'i worktree'ye bağlama. Playwright'ın `webServer` komutu `dashboard/playwright.config.ts` içinde `cd .. && .venv/bin/python` çalıştırır; bu worktree'de o dosya yoktur. Her Playwright komutu `TEDY_E2E_PYTHON=/mnt/thunderbolt/workspaces/TED/.venv/bin/python` verir ve config bu değişkeni kullanır.
+- **Pano:** `cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/asistan-b2-plan/dashboard`; `node_modules` yoksa `npm ci`. Sonra `npm run lint`, `npm run build`. Playwright `dashboard-dist/` sunar: her Playwright koşusundan önce `npm run build` ve çıkış kodunu doğrudan oku (boruya verme). Komut: `TEDY_E2E_PYTHON=/mnt/thunderbolt/workspaces/TED/.venv/bin/python DASHBOARD_SECRET_KEY=yalniz-test env -u ANTHROPIC_API_KEY npx playwright test <spec>`.
 - **Hepsi ön planda.** Arka plan kabuk işi yok.
 - **Yeni bağımlılık yok.** `.docx` için stdlib `zipfile` + `xml.etree`. Üretimde `pypdf` yok (`src/assistant_core.py` `_extract_pdf_text` yorumu). PDF metin çıkarılmaz ve `pdftotext` çağrılmaz.
 - **Renk:** stilde elle hex yok, alfa renk yok, gradyan yok, `color-mix` yok. Yalnız mevcut `--cds-*`, `--ted-*` ve `theme.$text-error` (zaten `NextThing.scss`).
@@ -28,15 +28,13 @@
 
 Spec bunları B2 için kapatmıyor. Görevler bunları doldurmaz; implementer de doldurmaz.
 
-1. **PDF 50 sayfa.** Tablo "10 MB, 50 sayfa" der ve sınır aşımı 413'tür. Sayfa saymanın yolu yazılmamış. Üretimde `pypdf` yok; indeksin `pdf_max_pages` varsayılanı 400'dür ve B2'ye ait değildir. Sıkıştırılmış nesne akışında stdlib `/Type /Page` sayımı eksik sayar, kısa PDF'i geçirir. **50 sayfa reddi bu planda yok.** 10 MB reddi var.
-2. **Sohbet başına 10 ek.** Spec sayıyı B2'ye yazar. Sohbet kimliği B3'ün `output/assistant_sohbetler.sqlite` tablosudur. B2'de sayılacak küme (istek, son 3 tur, disk) yazılmamış. **10 sınırı uygulanmaz.**
-3. **Ailenin eki görmesi.** "B3 kuralıyla" aileye açık denir. B3 bu planda yok. Sahip olmayan herkes 404 alır.
-4. **`/plan` ve `/v1`.** Spec `ekler`'i hangi uçta istediğini yazmaz. B1 `ogretmen`'i yalnız `/stream` ve `/chat`'e bağlar. Bu plan ekleri yalnız o iki uçta doğrular. `/plan` (`study_plan`) ve `/v1` (`openai_chat_completion`) mesajlardaki `ekler` alanını düşürür, modele bloğa açmaz, bunun için ayrı bir hata da üretmez. Çalışma planı düğmesi çipleri göndermez.
-5. **Son 3 tur.** `AssistantRuntime._build_conversation` (`src/assistant_core.py`, bugün `messages[-3:]`) değişmez. Ek bloğu, o kullanıcı mesajı bu penceredeyken kalır. Pencere dışına çıkan mesajın bloğu B3'ün "son 20 mesaj" yüküne kalır; bu plan pencereyi büyütmez.
-6. **Metinsiz gönderim.** Spec yalnız dosyanın mesaj olup olmayacağını yazmaz. Bugün Gönder, `draft` boşken kapalıdır (`AssistantChat.tsx` Gönder `disabled`). Öyle kalır. Çipler durur; yazı yazılınca gider.
-7. **`bagli_sohbet` kim yazar.** Alan B2 metasındadır ve B2 onu hep `null` yazar. Değeri B3 koyar. Sonuç: B3 bağlayana kadar 30 günü dolan her ek, "hiçbir sohbete bağlanmamış" kuralıyla silinir. `sohbet_eklerini_sil` vardır, hiçbir B2 rotası onu çağırmaz.
-8. **Yeniden üret / Daha derine in.** `promptBehind` yalnız metni döndürür. Bu iki yol ekleri tekrar göndermez. Spec söylemez.
-9. **Kaldır sunucuda silmez.** Spec çipte "kaldır" der, `DELETE` ucu yazmaz. Kaldır yalnız o mesaja konacak kimlik listesinden düşer. Dosya, bağlı olmadığı için 30 gün temizliğine kalır.
+1. **Ailenin eki görmesi.** "B3 kuralıyla" aileye açık denir. B3 bu planda yok. Sahip olmayan herkes 404 alır.
+2. **`/plan` ve `/v1`.** Spec `ekler`'i hangi uçta istediğini yazmaz. B1 `ogretmen`'i yalnız `/stream` ve `/chat`'e bağlar. Bu plan ekleri yalnız o iki uçta doğrular. `/plan` (`study_plan`) ve `/v1` (`openai_chat_completion`) mesajlardaki `ekler` alanını düşürür, modele bloğa açmaz, bunun için ayrı bir hata da üretmez. Çalışma planı düğmesi çipleri göndermez.
+3. **Son 3 tur.** `AssistantRuntime._build_conversation` (`src/assistant_core.py`, bugün `messages[-3:]`) değişmez. Ek bloğu, o kullanıcı mesajı bu penceredeyken kalır. Pencere dışına çıkan mesajın bloğu B3'ün "son 20 mesaj" yüküne kalır; bu plan pencereyi büyütmez.
+4. **Metinsiz gönderim.** Spec yalnız dosyanın mesaj olup olmayacağını yazmaz. Bugün Gönder, `draft` boşken kapalıdır (`AssistantChat.tsx` Gönder `disabled`). Öyle kalır. Çipler durur; yazı yazılınca gider.
+5. **`bagli_sohbet` kim yazar.** Alan B2 metasındadır ve B2 onu hep `null` yazar. Değeri B3 koyar. Sonuç: B3 bağlayana kadar 30 günü dolan her ek, "hiçbir sohbete bağlanmamış" kuralıyla silinir. `sohbet_eklerini_sil` vardır, hiçbir B2 rotası onu çağırmaz.
+6. **Yeniden üret / Daha derine in.** `promptBehind` yalnız metni döndürür. Bu iki yol ekleri tekrar göndermez. Spec söylemez.
+7. **Kaldır sunucuda silmez.** Spec çipte "kaldır" der, `DELETE` ucu yazmaz. Kaldır yalnız o mesaja konacak kimlik listesinden düşer. Dosya, bağlı olmadığı için 30 gün temizliğine kalır.
 
 ## Kilitlenen adlar
 
@@ -53,7 +51,9 @@ Spec'in söylediği davranışın kodda durması için gereken adlar. Yeni ürü
 | `ad` | `Path(ad).name`, boşsa `dosya`, en çok 180 karakter | Okura yol gitmez. |
 | Form alanı | `dosya`, istek başına bir dosya | Spec alanı adlandırmıyor. Çipler teker teker yüklenir. |
 | Mesaj alanı | Kullanıcı mesajında `ekler: [<32 hex>, …]` | Blok o mesajın içinde kalır. Ayrı üst alan yok. |
-| Mesaj başına 4 | Sunucu da reddeder: HTTP 400, `Bir mesaja en fazla 4 dosya eklenebilir.` | Sınır spec'te. 413 spec'te tablo sınırına bağlıdır; bozuk gövde bu API'de 400'dür (`messages list olmalı`). |
+| PDF sayfa | `SAYFA_SINIRI = 50`. `pdf_sayfa_sayisi`: ham dosya ve her `/FlateDecode` akışının `zlib.decompress` çıktısında `/Type /Page` (ardından `s` yok). `/Type /Pages` sayılmaz. 50'den çoğu 413 `PDF 50 sayfa sınırını aşıyor.` Bayt sınırı önce gelir. | Spec tablosu "10 MB, 50 sayfa" ve sınır aşımı 413. `pypdf` yok; sayım stdlib. İndeks `pdf_max_pages` (400) bu sayım değildir. |
+| İstek başına 10 | `ISTEK_SINIRI = 10`. İstekteki her mesajın `ekler` uzunlukları toplanır; aynı kimlik iki kez yazıldıysa iki sayılır. 10'dan çoğu HTTP 400, `Bir istekte en fazla 10 dosya olabilir.` | Spec "sohbet başına en fazla 10 ek". Sohbet kimliği B3'tedir; B2'nin saydığı küme isteğin `messages` listesidir. 413 dosya tablosuna aittir, bu sayıya değil. |
+| Mesaj başına 4 | Sunucu da reddeder: HTTP 400, `Bir mesaja en fazla 4 dosya eklenebilir.` | Sınır spec'te. 413 spec'te tablo sınırına bağlıdır; bozuk gövde bu API'de 400'dür (`messages list olmalı`). Beş ek, on bir ekten önce bu cümleyi alır. |
 | Tür sırası | Sihirli bayt, sonra o türün boy sınırı. Bilinmeyen biçim büyük olsa da 415 | İki kural da spec'te; birlikte yazılmamış. |
 | Kişi yok | `{"error": "session_required"}` 403 | `_module_person()` None ise modül biletinin cevabı (`dashboard_api.py` `module_ticket_issue`). API anahtarı kapıdan geçer, e-postası yoktur, dosya yazılmaz. |
 | Başkasının kimliği | 404 `Dosya bulunamadı.` Eksik kimlikle aynı gövde | Spec 404. Varlık sızmaz. |
@@ -71,10 +71,12 @@ Okur cümleleri (yenisi yok):
 | Sihirli bayt görüntü, Pillow okuyamadı | 415 | `Bu görsel okunamadı.` |
 | Görüntü > 12 MiB | 413 | `Görsel 12 MB sınırını aşıyor.` |
 | PDF > 10 MiB | 413 | `PDF 10 MB sınırını aşıyor.` |
+| PDF > 50 sayfa, 10 MiB içinde | 413 | `PDF 50 sayfa sınırını aşıyor.` |
 | `.docx` veya `.txt` > 5 MiB | 413 | `Dosya 5 MB sınırını aşıyor.` |
 | Dosya parçası yok | 400 | `Dosya yok.` |
 | `ekler` biçimi bozuk | 400 | `Ekler bir kimlik listesi olmalı.` |
 | Bir mesajda 4'ten fazla | 400 | `Bir mesaja en fazla 4 dosya eklenebilir.` |
+| İstekte 10'dan fazla ek | 400 | `Bir istekte en fazla 10 dosya olabilir.` |
 | Kimlik yok ya da başkasının | 404 | `Dosya bulunamadı.` |
 | Çip, ağ hatası | — | `Dosya yüklenemedi.` |
 
@@ -91,7 +93,9 @@ Okur cümleleri (yenisi yok):
 | `src/assistant_core.py` | değişir | Sistem cümlesi; son 3 turda blok; önbellek işareti; hazır atıf; `/plan` ve `/v1` ekleri düşürür |
 | `tests/test_assistant_yukleme_model.py` | yeni | Blok, önbellek, istem cümlesi, hazır atıf numarası |
 | `dashboard/src/types.ts` | değişir | `yuklenen-dosya` |
+| `dashboard/src/components/CitationChip.tsx` | değişir | `KIND_LABEL` kaydı (`Record<CitationKind, string>`) |
 | `dashboard/src/components/SourcePanel.tsx` | değişir | Grup ve görüntü önizlemesi |
+| `dashboard/playwright.config.ts` | değişir | `webServer` python'u `TEDY_E2E_PYTHON` |
 | `dashboard/src/components/AssistantChat.tsx` / `.scss` | değişir | Ataş, kamera, çip, sürükle, yapıştır |
 | `dashboard/tests/e2e/asistan-yukleme.spec.ts` | yeni | Çip, hata, istek, panel, axe, IBM |
 | `CLAUDE.md` | değişir | B2 maddesi |
@@ -107,11 +111,12 @@ Okur cümleleri (yenisi yok):
 **Interfaces:**
 - Consumes: yok (Flask yok, Pillow yok).
 - Produces:
-  - `MIB = 1024 * 1024`, `SINIR = {"gorsel": 12 * MIB, "pdf": 10 * MIB, "docx": 5 * MIB, "txt": 5 * MIB}`, `MESAJ_SINIRI = 4`, `KIMLIK_RE` (`^[0-9a-f]{32}$`)
+  - `MIB = 1024 * 1024`, `SINIR = {"gorsel": 12 * MIB, "pdf": 10 * MIB, "docx": 5 * MIB, "txt": 5 * MIB}`, `MESAJ_SINIRI = 4`, `ISTEK_SINIRI = 10`, `SAYFA_SINIRI = 50`, `KIMLIK_RE` (`^[0-9a-f]{32}$`)
   - `TUR_ETIKETI = {"gorsel": "Görsel", "pdf": "PDF", "docx": "Word", "txt": "Metin"}`
   - `class YuklemeHatasi(ValueError)` alanları `status: int`, `cumle: str`
   - `tur_tespit(veri: bytes) -> str` — `gorsel` | `pdf` | `docx` | `txt`; olmazsa `YuklemeHatasi(415, …)`
-  - `sinir_denetle(tur: str, veri: bytes) -> None` — aşımda `YuklemeHatasi(413, …)`
+  - `pdf_sayfa_sayisi(veri: bytes) -> int`
+  - `sinir_denetle(tur: str, veri: bytes) -> None` — bayt aşımı ya da 50'den çok PDF sayfası: `YuklemeHatasi(413, …)`
   - `docx_metni(veri: bytes) -> str`, `txt_metni(veri: bytes) -> str`
   - `ad_temizle(ad: str) -> str`
 
@@ -224,6 +229,49 @@ def test_sinirin_kendisi_kabul():
     sinir_denetle("txt", b"a" * SINIR["txt"])
 
 
+def _pdf_sayfalar(n: int) -> bytes:
+    govde = [b"%PDF-1.4\n", b"99 0 obj\n<< /Type /Pages /Count 1 >>\nendobj\n"]
+    for i in range(1, n + 1):
+        govde.append(f"{i} 0 obj\n<< /Type /Page >>\nendobj\n".encode())
+    govde.append(b"%%EOF\n")
+    return b"".join(govde)
+
+
+def _pdf_sayfalar_flate(n: int) -> bytes:
+    import zlib
+    ic = b"\n".join(b"<< /Type /Page >>" for _ in range(n))
+    sik = zlib.compress(ic)
+    ham = (
+        b"%PDF-1.4\n1 0 obj\n<< /Filter /FlateDecode /Length "
+        + str(len(sik)).encode() + b" >>\nstream\n" + sik
+        + b"\nendstream\nendobj\n%%EOF\n"
+    )
+    assert b"/Type /Page" not in ham
+    return ham
+
+
+def test_pdf_50_sayfa_kabul_51_413():
+    sinir_denetle("pdf", _pdf_sayfalar(50))
+    with pytest.raises(YuklemeHatasi) as hata:
+        sinir_denetle("pdf", _pdf_sayfalar(51))
+    assert hata.value.status == 413
+    assert hata.value.cumle == "PDF 50 sayfa sınırını aşıyor."
+
+
+def test_pdf_sayfa_flate_akista_da_sayilir():
+    sinir_denetle("pdf", _pdf_sayfalar_flate(50))
+    with pytest.raises(YuklemeHatasi) as hata:
+        sinir_denetle("pdf", _pdf_sayfalar_flate(51))
+    assert hata.value.cumle == "PDF 50 sayfa sınırını aşıyor."
+
+
+def test_pdf_boy_sayfadan_once():
+    veri = b"%PDF-" + b"\x00" * SINIR["pdf"]
+    with pytest.raises(YuklemeHatasi) as hata:
+        sinir_denetle("pdf", veri)
+    assert hata.value.cumle == "PDF 10 MB sınırını aşıyor."
+
+
 def test_ad_yol_degil():
     assert ad_temizle("../../etc/passwd") == "passwd"
     assert ad_temizle("") == "dosya"
@@ -246,6 +294,7 @@ from __future__ import annotations
 
 import re
 import zipfile
+import zlib
 import xml.etree.ElementTree as ET
 from io import BytesIO
 from pathlib import Path
@@ -253,7 +302,10 @@ from pathlib import Path
 MIB = 1024 * 1024
 SINIR = {"gorsel": 12 * MIB, "pdf": 10 * MIB, "docx": 5 * MIB, "txt": 5 * MIB}
 MESAJ_SINIRI = 4
+ISTEK_SINIRI = 10
+SAYFA_SINIRI = 50
 KIMLIK_RE = re.compile(r"^[0-9a-f]{32}$")
+_SAYFA = re.compile(br"/Type\s*/Page(?!s)\b")
 TUR_ETIKETI = {"gorsel": "Görsel", "pdf": "PDF", "docx": "Word", "txt": "Metin"}
 _W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 _CUMLE_413 = {
@@ -300,9 +352,46 @@ def tur_tespit(veri: bytes) -> str:
     return "txt"
 
 
+def _pdf_metinleri(veri: bytes) -> list[bytes]:
+    parcalar = [veri]
+    bas = 0
+    while True:
+        i = veri.find(b"stream", bas)
+        if i < 0:
+            break
+        if i + 6 < len(veri) and veri[i + 6:i + 7] not in (b"\n", b"\r"):
+            bas = i + 6
+            continue
+        sozluk_basi = veri.rfind(b"<<", max(0, i - 8192), i)
+        sozluk = veri[sozluk_basi:i] if sozluk_basi >= 0 else b""
+        veri_bas = i + 8 if veri[i + 6:i + 8] == b"\r\n" else i + 7
+        son = veri.find(b"endstream", veri_bas)
+        if son < 0:
+            break
+        ham = veri[veri_bas:son]
+        if ham.endswith(b"\r\n"):
+            ham = ham[:-2]
+        elif ham.endswith((b"\n", b"\r")):
+            ham = ham[:-1]
+        bas = son + len(b"endstream")
+        if b"/FlateDecode" not in sozluk:
+            continue
+        try:
+            parcalar.append(zlib.decompress(ham))
+        except zlib.error:
+            continue
+    return parcalar
+
+
+def pdf_sayfa_sayisi(veri: bytes) -> int:
+    return sum(len(_SAYFA.findall(parca)) for parca in _pdf_metinleri(veri))
+
+
 def sinir_denetle(tur: str, veri: bytes) -> None:
     if len(veri) > SINIR[tur]:
         raise YuklemeHatasi(413, _CUMLE_413[tur])
+    if tur == "pdf" and pdf_sayfa_sayisi(veri) > SAYFA_SINIRI:
+        raise YuklemeHatasi(413, "PDF 50 sayfa sınırını aşıyor.")
 
 
 def docx_metni(veri: bytes) -> str:
@@ -718,6 +807,18 @@ def test_pdf_oldugu_gibi(istemci):
     assert okunan.data == pdf
 
 
+def test_pdf_51_sayfa_413_ve_saklanmaz(istemci, tmp_path):
+    _giris(istemci, FULL)
+    parca = [b"%PDF-1.4\n"]
+    for i in range(51):
+        parca.append(f"{i} 0 obj\n<< /Type /Page >>\nendobj\n".encode())
+    parca.append(b"%%EOF\n")
+    res = _gonder(istemci, b"".join(parca), "uzun.pdf")
+    assert res.status_code == 413
+    assert res.get_json()["error"] == "PDF 50 sayfa sınırını aşıyor."
+    assert list(tmp_path.rglob("*")) == []
+
+
 def test_docx_duz_metin(istemci):
     _giris(istemci, FULL)
     res = _gonder(istemci, _docx(), "not.docx")
@@ -860,7 +961,7 @@ git commit -m "feat: asistan yükleme uçlarını sahibine aç"
   - `AssistantRuntime._eklersiz(messages) -> list`. `study_plan` and `openai_chat_completion` pass the stripped list into `chat`.
   - `_build_conversation` still returns a list. A user message in `messages[-3:]` with `ekler` becomes a content-block list: one text block (the `[S]` lines plus `content[:2000]`), then one block per file that `icerik_bloku` did not skip. The last block of the latest such message gains `cache_control`. The trailing "Soru:" wrapper stays a string and has no file block.
   - System prompt contains the two sentences below, in the base block.
-  - `dashboard_api._istek_ekleri(messages, email)` returns a response tuple or None. `/stream` and `/chat` call it before any runtime work.
+  - `dashboard_api._ekleri_hazirla(messages, email)` returns `(messages, None)` or `(None, response)`. `/stream` and `/chat` call it in the view, before `def generate` and before `runtime.chat`. The returned messages carry server-built `ek_govde`. `generate()` and the `chat_events` worker must not call `_module_person()`.
 
 The base prompt gains this section immediately before `## Atıf` (today that heading is in `SYSTEM_PROMPT`, `src/assistant_core.py` around the "Uydurma yasağı" block's end):
 
@@ -1041,16 +1142,23 @@ Add parameter `ek_atiflari: list | None = None`. Default None keeps every existi
             rol = "assistant" if m.get("role") == "assistant" else "user"
             metin = str(m.get("content", ""))[:2000]
             ekler = m.get("ekler") if rol == "user" else None
-            if not (depo and isinstance(ekler, list) and ekler):
+            ek_govde = m.get("ek_govde") if rol == "user" else None
+            if isinstance(ek_govde, list) and ek_govde:
+                bulunanlar = [(p["meta"], p["veri"]) for p in ek_govde]
+            elif depo and isinstance(ekler, list) and ekler:
+                bulunanlar = []
+                for kimlik in ekler:
+                    bulunan = depo.oku(sahip_email, kimlik)
+                    if bulunan is not None:
+                        bulunanlar.append(bulunan)
+            else:
+                bulunanlar = []
+            if not bulunanlar:
                 gecmis.append({"role": rol, "content": metin})
                 continue
             isaret = []
             bloklar = []
-            for kimlik in ekler:
-                bulunan = depo.oku(sahip_email, kimlik)
-                if bulunan is None:
-                    continue
-                meta, icerik = bulunan
+            for meta, icerik in bulunanlar:
                 blok = icerik_bloku(meta["tur"], icerik)
                 if blok is None:
                     continue
@@ -1071,7 +1179,7 @@ Add parameter `ek_atiflari: list | None = None`. Default None keeps every existi
                 break
 ```
 
-`chat`: create `ek_atiflari: list = []` and pass it with `sahip_email=sahip_email` into `_build_conversation`. Add `sahip_email: str | None = None` to `chat`. Pass `hazir_atiflar=ek_atiflari` into `chat_with_tools`. `chat_events` already forwards `**kwargs`, so the new parameter reaches `chat` if the caller put it in kwargs. The stream view must pass it.
+`chat`: create `ek_atiflari: list = []` and pass it with `sahip_email=sahip_email` into `_build_conversation`. Add `sahip_email: str | None = None` to `chat`. Pass `hazir_atiflar=ek_atiflari` into `chat_with_tools`. `chat_events` already forwards `**kwargs`, so a `sahip_email` that is already a string reaches `chat` on the worker thread (`chat_events` starts `threading.Thread` and calls `self.chat(**kwargs)` from `run`). `chat` and `_build_conversation` must not call `_module_person` or read `session`. When `ek_govde` is present, the bytes are already on the message; the `depo.oku` branch is only for a direct caller that passed ids and `sahip_email` (the model tests). The API does not use that branch.
 
 `_eklersiz` as a static method:
 
@@ -1080,8 +1188,8 @@ Add parameter `ek_atiflari: list | None = None`. Default None keeps every existi
     def _eklersiz(messages: list) -> list:
         temiz = []
         for m in messages:
-            if isinstance(m, dict) and "ekler" in m:
-                m = {k: v for k, v in m.items() if k != "ekler"}
+            if isinstance(m, dict) and ("ekler" in m or "ek_govde" in m):
+                m = {k: v for k, v in m.items() if k not in ("ekler", "ek_govde")}
             temiz.append(m)
         return temiz
 ```
@@ -1092,7 +1200,7 @@ Do not pass `sahip_email` from those two.
 
 - [ ] **Step 4: İstek doğrulaması**
 
-Append to `tests/test_assistant_uploads_api.py` a test that posts `/api/assistant/chat` with a foreign id and expects 404 before the runtime, and a test that five ids return 400. Use the `_Kaydedici` pattern from `tests/test_assistant_ogretmen_api.py`: monkeypatch `_assistant_runtime` and assert `cagrilar == []` on 400 and 404.
+Append to `tests/test_assistant_uploads_api.py`. Use the `_Kaydedici` pattern from `tests/test_assistant_ogretmen_api.py`: monkeypatch `_assistant_runtime` and assert `cagrilar == []` on 400 and 404. The stream test drains the body (`res.get_data()`), the same way `tests/test_assistant_ogretmen_api.py` does, because the generator runs while the body is read. It must not abort `/stream` or assert only `/chat`. Composer e2e that aborts the stream and checks the `/chat` fallback stays in Task 6; it does not prove the model saw the file.
 
 ```python
 def test_chat_baskasinin_ekinde_404_ve_cagri_yok(istemci, monkeypatch):
@@ -1131,42 +1239,163 @@ def test_chat_beste_400(istemci, monkeypatch):
         "messages": [{"role": "user", "content": "bak", "ekler": kimlikler}]})
     assert res.status_code == 400
     assert res.get_json()["error"] == "Bir mesaja en fazla 4 dosya eklenebilir."
+
+
+def _on_kayit(istemci):
+    _giris(istemci, FULL)
+    return _gonder(istemci, b"merhaba", "a.txt").get_json()["id"]
+
+
+def test_istek_on_ek_kabul_on_bir_400(istemci, monkeypatch):
+    class _K:
+        def __init__(self):
+            self.cagrilar = []
+        def chat(self, **kw):
+            self.cagrilar.append(kw)
+            return {"answer": "x", "citations": [], "safety_flags": [], "plan_blocks": [],
+                    "intent": "qa", "session_id": "", "mode_suggestion": None, "meta": {}}
+    k = _K()
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: k)
+    kimlik = _on_kayit(istemci)
+    on = [
+        {"role": "user", "content": "a", "ekler": [kimlik] * 4},
+        {"role": "user", "content": "b", "ekler": [kimlik] * 4},
+        {"role": "user", "content": "c", "ekler": [kimlik] * 2},
+    ]
+    assert istemci.post("/api/assistant/chat", json={"messages": on}).status_code == 200
+    assert len(k.cagrilar) == 1
+    on_bir = on[:-1] + [{"role": "user", "content": "c", "ekler": [kimlik] * 3}]
+    res = istemci.post("/api/assistant/chat", json={"messages": on_bir})
+    assert res.status_code == 400
+    assert res.get_json()["error"] == "Bir istekte en fazla 10 dosya olabilir."
+    assert len(k.cagrilar) == 1
+
+
+def test_stream_sahibi_ve_baytlari_uretecten_once_tasir(istemci, monkeypatch):
+    import inspect
+    kimlik = _on_kayit(istemci)
+    gercek = dashboard_api._module_person
+
+    def izlenen():
+        # assistant_stream's comment: generate() runs after the view returns,
+        # where the session is gone. The test client still has a session
+        # while it reads the body, so an unguarded _module_person() inside
+        # generate() would pass. Treat that frame as no person.
+        for f in inspect.stack():
+            if f.function == "generate" and f.filename.endswith("dashboard_api.py"):
+                return None
+        return gercek()
+
+    monkeypatch.setattr(dashboard_api, "_module_person", izlenen)
+
+    class _K:
+        def __init__(self):
+            self.kw = None
+        def chat_events(self, **kw):
+            self.kw = kw
+            yield {"event": "answer", "payload": {
+                "answer": "x", "citations": [], "safety_flags": [], "plan_blocks": [],
+                "intent": "qa", "session_id": "", "mode_suggestion": None, "meta": {}}}
+        def chat(self, **kw):
+            raise AssertionError("stream fell through to chat")
+    k = _K()
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: k)
+    res = istemci.post("/api/assistant/stream", json={
+        "messages": [{"role": "user", "content": "bak", "ekler": [kimlik]}]})
+    govde = res.get_data().decode()
+    assert res.status_code == 200
+    assert "event: answer" in govde
+    assert k.kw is not None
+    assert k.kw["sahip_email"] == FULL
+    assert k.kw["messages"][0]["ek_govde"][0]["veri"] == b"merhaba"
 ```
 
 In `dashboard_api.py`:
 
 ```python
-def _istek_ekleri(messages, email):
-    from src.assistant_uploads import MESAJ_SINIRI, KIMLIK_RE, EkDeposu
+def _ekleri_hazirla(messages, email):
+    """Validate ekler and attach stored bytes while the request still has a session.
+
+    Returns (messages, None) or (None, error_response). Strips a client-supplied
+    ek_govde. Counts every ekler entry on every message (repeats count). Puts
+    ek_govde only on user messages.
+    """
+    from src.assistant_uploads import ISTEK_SINIRI, MESAJ_SINIRI, KIMLIK_RE, EkDeposu
     if not isinstance(messages, list):
-        return None
+        return messages, None
     depo = None
+    toplam = 0
+    hazir = []
     for m in messages:
-        if not isinstance(m, dict) or m.get("role") != "user":
+        if not isinstance(m, dict):
+            hazir.append(m)
             continue
-        ekler = m.get("ekler", None)
+        kopya = {k: v for k, v in m.items() if k != "ek_govde"}
+        ekler = kopya.get("ekler", None)
         if ekler is None:
+            hazir.append(kopya)
             continue
         if (not isinstance(ekler, list)
                 or any(not isinstance(x, str) or not KIMLIK_RE.fullmatch(x) for x in ekler)):
-            return jsonify({"error": "Ekler bir kimlik listesi olmalı."}), 400
+            return None, (jsonify({"error": "Ekler bir kimlik listesi olmalı."}), 400)
         if len(ekler) > MESAJ_SINIRI:
-            return jsonify({"error": "Bir mesaja en fazla 4 dosya eklenebilir."}), 400
+            return None, (jsonify({"error": "Bir mesaja en fazla 4 dosya eklenebilir."}), 400)
+        toplam += len(ekler)
+        if toplam > ISTEK_SINIRI:
+            return None, (jsonify({"error": "Bir istekte en fazla 10 dosya olabilir."}), 400)
         if not ekler:
+            hazir.append(kopya)
             continue
         if not email:
-            return jsonify({"error": "session_required"}), 403
+            return None, (jsonify({"error": "session_required"}), 403)
         if depo is None:
             depo = EkDeposu(OUTPUT_DIR)
+        govdeler = []
         for kimlik in ekler:
-            if depo.oku(email, kimlik) is None:
-                return jsonify({"error": "Dosya bulunamadı."}), 404
-    return None
+            bulunan = depo.oku(email, kimlik)
+            if bulunan is None:
+                return None, (jsonify({"error": "Dosya bulunamadı."}), 404)
+            meta, veri = bulunan
+            govdeler.append({"meta": meta, "veri": veri})
+        if kopya.get("role") == "user":
+            kopya["ek_govde"] = govdeler
+        hazir.append(kopya)
+    return hazir, None
 ```
 
-Call it in `assistant_chat` after the messages-list check and in `assistant_stream` after the teacher check, before `generate` is built. On a tuple, return it. Pass `sahip_email=_module_person()` into `runtime.chat` and into `runtime.chat_events`.
+`assistant_chat`, after the messages-list check, still inside the view:
 
-A request with no `ekler` and no session email stays valid: the öğretmens tests post under `TEST_AUTH_BYPASS` without a session and must stay 200.
+```python
+    email = _module_person()
+    hazir, hata = _ekleri_hazirla(messages, email)
+    if hata is not None:
+        return hata
+    ...
+        out = runtime.chat(..., messages=hazir, sahip_email=email)
+```
+
+`assistant_stream`, in the view, in the same place as `ilerleme_izni = _assistant_progress_allowed()` and `okur = _assistant_okur()` — before `def generate`. The comment above those two already says the generator outlives the session. `chat_events` (`src/assistant_core.py`) starts `threading.Thread(target=run)` and `run` calls `self.chat(**kwargs)`. Do not call `_module_person()` inside `generate` or pass `sahip_email=_module_person()` at the `chat_events(...)` call.
+
+```python
+    email = _module_person()
+    hazir, hata = _ekleri_hazirla(messages, email)
+    if hata is not None:
+        return hata
+
+    def generate():
+        try:
+            runtime = _assistant_runtime()
+            for event in runtime.chat_events(
+                messages=hazir, session_id=session_id, force_deep=force_deep,
+                ilerleme_izni=ilerleme_izni, okur=okur, ogretmen=ogretmen,
+                sahip_email=email,
+            ):
+                ...
+```
+
+`messages` on the stream route is today `data.get("messages") or []`. Pass that list into `_ekleri_hazirla`. Do not add a new status for a missing `messages` key.
+
+A request with no `ekler` and no session email stays valid: the öğretmen tests post under `TEST_AUTH_BYPASS` without a session and must stay 200. `_ekleri_hazirla` returns 403 only when some `ekler` list is non-empty and `email` is empty.
 
 - [ ] **Step 5: PASS, sonra komşu testler**
 
@@ -1195,12 +1424,13 @@ git commit -m "feat: yüklenen dosyayı kullanıcı mesajının bloğu yap"
 
 **Files:**
 - Modify: `dashboard/src/types.ts` (`CitationKind`)
+- Modify: `dashboard/src/components/CitationChip.tsx` (`KIND_LABEL`)
 - Modify: `dashboard/src/components/SourcePanel.tsx`
-- Test: `dashboard/tests/e2e/asistan-yukleme.spec.ts` (the panel case is written in Task 6 so the page exists; this task's check is `npm run lint` plus the type)
+- Test: `dashboard/tests/e2e/asistan-yukleme.spec.ts` (the panel case is written in Task 6 so the page exists; this task's check is `npm run build`)
 
 **Interfaces:**
 - Consumes: citation `kind: "yuklenen-dosya"`, `locator.upload_id` (32 hex), `locator.tur === "gorsel"` for the preview.
-- Produces: group title `Yüklediğin dosya`, appended after `aile-kaynak` so existing group order is unchanged. Image: `<img class="ac__ref-figure" src={/api/assistant/uploads/${id}} alt={label}>`. Load error text `Görsel yüklenemedi` (the figure thumb's sentence). Non-image kinds keep the snippet, no `<img>`.
+- Produces: group title `Yüklediğin dosya`, appended after `aile-kaynak` so existing group order is unchanged. `CitationChip` kind label `Yüklediğin dosya`. Image: `<img class="ac__ref-figure" src={/api/assistant/uploads/${id}} alt={label}>`. Load error text `Görsel yüklenemedi` (the figure thumb's sentence). Non-image kinds keep the snippet, no `<img>`.
 
 - [ ] **Step 1: Tür ve grup**
 
@@ -1208,6 +1438,13 @@ In `types.ts`, extend the union:
 
 ```ts
 export type CitationKind = 'ogrenci' | 'mufredat' | 'kitap' | 'oer' | 'modul' | 'tedy-kitap' | 'aile-kaynak' | 'yuklenen-dosya'
+```
+
+In `dashboard/src/components/CitationChip.tsx`, `KIND_LABEL` is `Record<AssistantCitation['kind'], string>` (line 10). Add the key in that record. `npm run build` is `tsc -b && vite build` (`dashboard/package.json`). Omitting the key fails `tsc -b`. `npm run lint` does not typecheck the record, so lint staying green is not this task's check.
+
+```ts
+  'aile-kaynak': 'Aile kaynağı',
+  'yuklenen-dosya': 'Yüklediğin dosya',
 ```
 
 In `SourcePanel.tsx`, append `'yuklenen-dosya'` to `GROUP_ORDER` and add `'yuklenen-dosya': 'Yüklediğin dosya'` to `GROUP_TITLE`.
@@ -1238,16 +1475,17 @@ function YuklemeOnizleme({ id, ad }: { id: string; ad: string }) {
 
 In `RefGroup`'s item, when `kind === 'yuklenen-dosya'` and `locator.tur === 'gorsel'` and `uploadId` is non-null, render `YuklemeOnizleme` instead of the snippet paragraph. Otherwise keep the snippet. Do not add a colour class.
 
-- [ ] **Step 2: Lint**
+- [ ] **Step 2: Build**
 
-Run: `cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/asistan-b2-plan/dashboard && npm run lint`
+Run: `cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/asistan-b2-plan/dashboard && npm run build`
 
-Expected: exit 0. The panel behaviour is asserted in Task 6's e2e, after the build.
+Expected: exit 0. If `KIND_LABEL` has no `'yuklenen-dosya'`, `tsc -b` fails and the exit is non-zero. The panel behaviour is asserted in Task 6's e2e.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add dashboard/src/types.ts dashboard/src/components/SourcePanel.tsx
+git add dashboard/src/types.ts dashboard/src/components/CitationChip.tsx \
+  dashboard/src/components/SourcePanel.tsx
 git commit -m "feat: kaynaklara yüklenen dosya grubunu ekle"
 ```
 
@@ -1256,6 +1494,7 @@ git commit -m "feat: kaynaklara yüklenen dosya grubunu ekle"
 ### Task 6: Yazma alanı — ataş, kamera, çip, sürükle, yapıştır
 
 **Files:**
+- Modify: `dashboard/playwright.config.ts` (`webServer.command`)
 - Modify: `dashboard/src/components/AssistantChat.tsx`
 - Modify: `dashboard/src/components/AssistantChat.scss`
 - Create: `dashboard/tests/e2e/asistan-yukleme.spec.ts`
@@ -1274,6 +1513,20 @@ git commit -m "feat: kaynaklara yüklenen dosya grubunu ekle"
   - Gönder stays disabled when `draft` is empty.
 
 - [ ] **Step 1: e2e, önce kırmızı**
+
+`dashboard/playwright.config.ts` today runs `cd .. && .venv/bin/python`. This worktree has no `.venv`. Before the spec, set:
+
+```ts
+const PYTHON = process.env.TEDY_E2E_PYTHON ?? '.venv/bin/python'
+```
+
+and the `webServer.command` to:
+
+```ts
+command: `cd .. && TEST_AUTH_BYPASS=1 ${PYTHON} -c "from src.dashboard_api import app; app.run(host='127.0.0.1', port=${PORT})"`,
+```
+
+The default stays `.venv/bin/python` for a checkout that has that symlink. Every Playwright command below sets `TEDY_E2E_PYTHON=/mnt/thunderbolt/workspaces/TED/.venv/bin/python`. Without it the server exits before any assertion, and a missing `Dosya ekle` button is not what failed.
 
 `dashboard/tests/e2e/asistan-yukleme.spec.ts`:
 
@@ -1338,6 +1591,8 @@ test('the fifth file is not posted', async ({ page }) => {
   expect(n).toBe(4)
 })
 
+// hazir() aborts /stream. This test only checks the /chat fallback and the plan
+// button. It does not prove the composer posts ekler to /stream.
 test('chat sends ekler and the plan button does not', async ({ page }) => {
   await hazir(page)
   await page.route('**/api/assistant/uploads', r => yukleme(r))
@@ -1357,6 +1612,29 @@ test('chat sends ekler and the plan button does not', async ({ page }) => {
   await page.getByRole('button', { name: 'Çalışma Planı' }).click()
   const planGovde = (await plan).postDataJSON() as { messages: { ekler?: string[] }[] }
   expect(planGovde.messages.every(m => m.ekler === undefined)).toBe(true)
+})
+
+test('the composer posts ekler to /stream and does not fall back', async ({ page }) => {
+  let sohbet = 0
+  await page.route('**/api/assistant/chat', () => { sohbet += 1 })
+  await page.route('**/api/assistant/plan', r => r.fulfill(json(CEVAP)))
+  await page.route('**/api/assistant/uploads', r => yukleme(r))
+  await page.route('**/api/assistant/stream', async r => {
+    const govde = r.request().postDataJSON() as { messages: { ekler?: string[] }[] }
+    const son = govde.messages[govde.messages.length - 1]
+    expect(son.ekler).toEqual([ID])
+    await r.fulfill({
+      status: 200, contentType: 'text/event-stream',
+      body: `event: answer\ndata: ${JSON.stringify({ payload: CEVAP })}\n\nevent: done\ndata: {}\n\n`,
+    })
+  })
+  await sabitAc(page, '/asistan', 1440, 900)
+  await page.locator('.ac__dosya-girdi').setInputFiles({ name: 'not.png', mimeType: 'image/png', buffer: Buffer.from('x') })
+  await expect(page.getByText('Görsel', { exact: true })).toBeVisible()
+  await page.fill('#ac-input', 'bak')
+  await page.getByRole('button', { name: 'Gönder' }).click()
+  await expect(page.getByText('Baktım.')).toBeVisible()
+  expect(sohbet).toBe(0)
 })
 
 test('drop and paste add a chip; a text paste does not', async ({ page }) => {
@@ -1442,7 +1720,7 @@ test.describe('phone camera', () => {
 
 - [ ] **Step 2: FAIL**
 
-`cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/asistan-b2-plan/dashboard && npm run build && DASHBOARD_SECRET_KEY=yalniz-test env -u ANTHROPIC_API_KEY npx playwright test asistan-yukleme.spec.ts`
+`cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/asistan-b2-plan/dashboard && npm run build && TEDY_E2E_PYTHON=/mnt/thunderbolt/workspaces/TED/.venv/bin/python DASHBOARD_SECRET_KEY=yalniz-test env -u ANTHROPIC_API_KEY npx playwright test asistan-yukleme.spec.ts`
 
 Expected: FAIL, button `Dosya ekle` is missing. If `npm ci` is required first, run it in `dashboard/` before the build.
 
@@ -1536,8 +1814,8 @@ The attach button changes the assistant screenshots in `asistan-ogretmen-gorsel.
 cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/asistan-b2-plan/dashboard
 npm run lint
 npm run build
-DASHBOARD_SECRET_KEY=yalniz-test env -u ANTHROPIC_API_KEY npx playwright test asistan-yukleme.spec.ts asistan-ogretmen.spec.ts
-DASHBOARD_SECRET_KEY=yalniz-test env -u ANTHROPIC_API_KEY npx playwright test asistan-ogretmen-gorsel.spec.ts --update-snapshots
+TEDY_E2E_PYTHON=/mnt/thunderbolt/workspaces/TED/.venv/bin/python DASHBOARD_SECRET_KEY=yalniz-test env -u ANTHROPIC_API_KEY npx playwright test asistan-yukleme.spec.ts asistan-ogretmen.spec.ts
+TEDY_E2E_PYTHON=/mnt/thunderbolt/workspaces/TED/.venv/bin/python DASHBOARD_SECRET_KEY=yalniz-test env -u ANTHROPIC_API_KEY npx playwright test asistan-ogretmen-gorsel.spec.ts --update-snapshots
 ```
 
 Expected: lint exit 0, build exit 0, both Playwright commands exit 0. `asistan-ogretmen.spec.ts` must stay green without a snapshot update (it does not screenshot). The gorsel update is only the composer button.
@@ -1545,7 +1823,8 @@ Expected: lint exit 0, build exit 0, both Playwright commands exit 0. `asistan-o
 - [ ] **Step 5: Commit**
 
 ```bash
-git add dashboard/src/components/AssistantChat.tsx dashboard/src/components/AssistantChat.scss \
+git add dashboard/playwright.config.ts \
+  dashboard/src/components/AssistantChat.tsx dashboard/src/components/AssistantChat.scss \
   dashboard/tests/e2e/asistan-yukleme.spec.ts \
   dashboard/tests/e2e/asistan-ogretmen-gorsel.spec.ts-snapshots
 git commit -m "feat: asistan yazma alanına dosya çiplerini ekle"
@@ -1565,7 +1844,7 @@ If the snapshot directory name differs, add the directory Playwright wrote. Do n
 Immediately after that bullet, add:
 
 ```markdown
-- **Asistan dosya yükleme (B2)** (spec §2, plan `docs/superpowers/plans/2026-10-03-asistan-dosya-yukleme-b2.md`): `POST /api/assistant/uploads` (one multipart field `dosya`) and `GET /api/assistant/uploads/<32 hex>`. Type comes from leading bytes (`src/assistant_uploads.py`), then that type's size (image 12 MiB, PDF 10 MiB, docx/txt 5 MiB). Images go through `_claude_icin_gorsel` and are stored as JPEG. PDF is stored as itself and sent as a Claude `document` block. `.docx` is stdlib zip+XML; `.txt` is UTF-8 with or without BOM. The 50-page PDF cap and the 10-per-chat cap are not implemented (see the plan's open decisions). Files live in `output/assistant_uploads/<email_hash>/<uuid>` with a sidecar JSON (`sahip_email`, `ad`, `tur`, `boyut`, `zaman`, `bagli_sohbet`). `bagli_sohbet` stays null until B3. Unlinked files older than 30 days are deleted at the next upload. Another person's id is 404 `Dosya bulunamadı.` `/stream` and `/chat` expand a user message's `ekler` into content blocks while that message is inside the existing last-3-turn window; the newest such message's last block carries `cache_control`. The base prompt says uploaded instructions are data. Citation kind `yuklenen-dosya` is dropped from the panel unless the answer marks it, same as every other citation. `/plan` and `/v1` strip `ekler`.
+- **Asistan dosya yükleme (B2)** (spec §2, plan `docs/superpowers/plans/2026-10-03-asistan-dosya-yukleme-b2.md`): `POST /api/assistant/uploads` (one multipart field `dosya`) and `GET /api/assistant/uploads/<32 hex>`. Type comes from leading bytes (`src/assistant_uploads.py`), then that type's size (image 12 MiB, PDF 10 MiB, docx/txt 5 MiB). Images go through `_claude_icin_gorsel` and are stored as JPEG. PDF is stored as itself and sent as a Claude `document` block. `.docx` is stdlib zip+XML; `.txt` is UTF-8 with or without BOM. A PDF over 10 MiB or over 50 pages (`/Type /Page` in the file and in inflated FlateDecode streams, not `/Pages`) is 413. More than 10 `ekler` entries across the request's messages is 400. Files live in `output/assistant_uploads/<email_hash>/<uuid>` with a sidecar JSON (`sahip_email`, `ad`, `tur`, `boyut`, `zaman`, `bagli_sohbet`). `bagli_sohbet` stays null until B3. Unlinked files older than 30 days are deleted at the next upload. Another person's id is 404 `Dosya bulunamadı.` `/stream` captures the owner and the stored bytes in the view, before `generate()`, and passes them into `chat_events`; the session is already gone inside the generator, and `chat()` runs on a worker thread. `/chat` uses the same helper. Blocks are expanded only while that user message is inside the existing last-3-turn window; the newest such message's last block carries `cache_control`. The base prompt says uploaded instructions are data. Citation kind `yuklenen-dosya` is dropped from the panel unless the answer marks it, same as every other citation. `/plan` and `/v1` strip `ekler`.
 ```
 
 - [ ] **Step 2: Son kapı**
@@ -1578,7 +1857,7 @@ DASHBOARD_SECRET_KEY=yalniz-test /mnt/thunderbolt/workspaces/TED/.venv/bin/pytho
   tests/test_assistant_citations.py -q -p no:cacheprovider
 git diff --check -- CLAUDE.md docs/superpowers/plans/2026-10-03-asistan-dosya-yukleme-b2.md
 cd dashboard && npm run lint && npm run build
-DASHBOARD_SECRET_KEY=yalniz-test env -u ANTHROPIC_API_KEY npx playwright test asistan-yukleme.spec.ts
+TEDY_E2E_PYTHON=/mnt/thunderbolt/workspaces/TED/.venv/bin/python DASHBOARD_SECRET_KEY=yalniz-test env -u ANTHROPIC_API_KEY npx playwright test asistan-yukleme.spec.ts
 ```
 
 Expected: pytest `0 failed`, `git diff --check` prints nothing, lint and build and Playwright exit 0.
@@ -1614,12 +1893,12 @@ git commit -m "docs: asistan dosya yüklemeyi CLAUDE.md'ye yaz"
 | `output/assistant_uploads/<özet>/<uuid>` + meta | 2 |
 | Başkasının kimliği 404 | 2, 3, 4 |
 | 30 gün, yüklerken | 2, 3 (`kaydet` calls `temizlik`) |
-| Sohbet silinince ekler | 2'nin fonksiyonu; rota yok (açık karar 7) |
-| `ekler`, blokun mesajda kalması | 4, 6 |
+| Sohbet silinince ekler | 2'nin fonksiyonu; rota yok (açık karar 5) |
+| `ekler`, blokun mesajda kalması; akış `generate` öncesi sahip ve bayt | 4, 6 |
 | Son ekli mesaja önbellek | 4 |
-| Sohbet başına 10 | uygulanmaz (açık karar 2) |
-| PDF 50 sayfa | uygulanmaz (açık karar 1) |
+| İstekte 10 ek | 4 (`_ekleri_hazirla` her mesajın `ekler` uzunluğunu toplar) |
+| PDF 50 sayfa, aşım 413 | 1 (`pdf_sayfa_sayisi` `sinir_denetle` içinde), 3 |
 | İstem: yönergeler veridir | 4 |
-| `yuklenen-dosya`, grup `Yüklediğin dosya`, görüntü önizlemesi, sahip URL'si | 3, 5, 6 |
-| Aile URL'si | uygulanmaz (açık karar 3) |
+| `yuklenen-dosya`, grup `Yüklediğin dosya`, çip etiketi, görüntü önizlemesi, sahip URL'si | 3, 5 (`CitationChip.tsx`), 6 |
+| Aile URL'si | uygulanmaz (açık karar 1) |
 | Test: sihirli bayt, sınır, sahiplik, docx; çipler; ücretli API yok | 1, 2, 3, 6 |
