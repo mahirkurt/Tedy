@@ -18,7 +18,7 @@ python src/scrape_eba_textbooks.py      # EBA textbook PDFs → content/eba/
 python src/scrape_mebi_videos.py        # MEBI course videos → content/mebi/
 python src/scrape_sebitv.py             # SEBİTV videos/PDFs → content/sebitv/
 python src/scrape_sebitv_interactive.py  # SEBİTV interactive ZIPs → content/sebitv-interactive/
-flock -n output/.sync.lock .venv/bin/python -m src.portal_ekleri_indir --sure 300 --bayt-mb 250 --indeksle  # portal attachments by hand (the sync does this itself, in its budget)
+.venv/bin/python -m src.portal_ekleri_indir --sure 300 --bayt-mb 250 --indeksle  # portal attachments by hand (the CLI takes output/.sync.lock itself; the sync does this in its budget)
 
 # Tests
 pytest                                                # Run all Python tests (unit + schema + API)
