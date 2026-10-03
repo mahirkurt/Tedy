@@ -40,7 +40,7 @@ Spec bu davranışları ister, sayı ya da düğme adı vermez. Görevler aşağ
 | Mikrofon düğmesi | Boşta `Sesle sor`, dinlerken `Dinlemeyi bitir`. `stop()`, `abort()` değil. Bitince metin durur, istek gitmez, odak `#ac-input`'a döner. |
 | Onay anahtarı | `tedy-ses-onay::` + e-postanın trim ve küçük hali. Değer `1`. Boş e-posta anahtar yazmaz ve mikrofonu açmaz. `localStorage` yazılamazsa bu ziyarette açılır, anahtar kalmaz. |
 | Not | İlk basışta Carbon `Modal`. Başlık `Mikrofon`. Gövde spec cümlesidir. `Onayla` yazar ve tanımayı başlatır. `Vazgeç` ve kapatma yazmaz, başlatmaz. Cümle her tarayıcıda aynıdır. |
-| Ara metin | Başlangıçtaki taslak `taban`'dır (ref). `birlestir` tek boşluk koyar. Ara sonuç `taban`'ı değiştirmez. Son sonuç `taban`'ı ilerletir. Dinlerken gelen sonuç alanı ezer. |
+| Ara metin | Tek model. Tanıma `results[0][0].transcript` okur; düz `transcript` alanı yoktur. Bu dizgi o ana kadarki bütün sözcedir. Son alternatif ara hipotezin yerine geçer, üstüne eklenmez. `taban` bir ref'tir (başlangıçtaki taslak). Her `onresult` `setDraft(birlestir(taban.current, results[0][0].transcript))` çağırır. `Gönder` `draft` boşken kapalıdır; yalnız ref yazmak düğmeyi açmaz. |
 | Hata | `not-allowed` → `Mikrofon açılamadı.` `aborted` sessizdir. Diğerleri → `Ses anlaşılamadı.` Sohbet hatasının `Tekrar dene` düğmesine yazılmaz. |
 | Salt okunur | B3: `#ac-input` kapalı ve `Bu sohbet salt okunur.` Mikrofon düğmesi yoktur. `Sesli oku` durur. |
 | Yükleniyor | Mikrofon `disabled`, gizli değil. Okuma düğmesi durur. |
@@ -190,9 +190,23 @@ git commit -m "feat: sesli okuma metnini ve onay anahtarını ekle"
 
 - [ ] **Step 1: e2e**
 
-`dashboard/tests/e2e/asistan-ses.spec.ts`. `sabitAc` akışı keser. `page.addInitScript` uygulama açılmadan `window.speechSynthesis` stub'ı koyar: `getVoices` bir `tr-TR` ses döner, `speak` utterance'ı `window.__spoken` dizisine iter, `cancel` aynı diziye `'CANCEL'` iter. `voiceschanged` dinleyicisi saklanır ve stub hemen olayı da gönderebilir. Montaj `getVoices` ile de bakar.
+`dashboard/tests/e2e/asistan-ses.spec.ts`. `sabitAc` akışı keser. `page.addInitScript` uygulama açılmadan `window.speechSynthesis` stub'ı koyar: `getVoices` bir `tr-TR` ses döner, `speak` utterance'ı `window.__spoken` dizisine iter, `cancel` aynı diziye `'CANCEL'` iter. `voiceschanged` dinleyicisi saklanır ve stub hemen olayı da gönderebilir. Montaj `getVoices` ile de bakar. Headless Chromium'da Türkçe ses yoktur; stub yoksa düğme gizlenir.
 
-Akış bir cevap üretir: `Payda **eşitlenir** [S1].` Atıf çipi ekranda durur. `Sesli oku` görünür. Basılınca konuşulan metin `Payda eşitlenir.` olur. Utterance `lang` `tr-TR`, `rate` `1`, `pitch` `1`, `volume` `1`, `voice.lang` `tr-TR`. Düğme `Durdur` olur, `aria-pressed` true. İkinci cevapta `Sesli oku`'ya basılınca dizi `CANCEL` görür ve birinci düğme yeniden `Sesli oku` olur. `Durdur` `cancel` çağırır. Karşılama balonunda düğme yoktur.
+Canlı yol `**/api/assistant/stream` rotasını `abort` eder ve `**/api/assistant/chat`'e düşer. İkisi de cevaplanır. `/chat` gövdesi `appendAssistantMessage`'ın okuduğu nesnedir. Akış yolunda aynı nesne `answer` olayının `data.payload` alanıdır (`appendAssistantMessage(data.payload)`). Düz dizgi bu zarf değildir.
+
+```ts
+{
+  answer: 'Payda **eşitlenir** [S1].',
+  citations: [{
+    id: 'S1', kind: 'mufredat', label: 'Payda', locator: {},
+    snippet: 'Paydalar eşitlenir.', confidence: 0.9,
+  }],
+  safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '',
+  meta: { model: 'claude-sonnet-5', degraded: [] },
+}
+```
+
+`AnswerBody` `[S1]` için `token.slice(1, -1)` ile `S1` arar. `id` eşleşmezse işaret düz metin kalır, çip olmaz. Test çipi görür, düz `[S1]` dizgisini görmez. `Sesli oku` görünür. Basılınca konuşulan metin `Payda eşitlenir.` olur. Utterance `lang` `tr-TR`, `rate` `1`, `pitch` `1`, `volume` `1`, `voice.lang` `tr-TR`. Düğme `Durdur` olur, `aria-pressed` true. İkinci cevapta `Sesli oku`'ya basılınca dizi `CANCEL` görür ve birinci düğme yeniden `Sesli oku` olur. `Durdur` `cancel` çağırır. Karşılama balonunda düğme yoktur.
 
 Ayrı test: `getVoices` yalnız `en-US` döner. `Sesli oku` sayısı 0.
 
@@ -241,13 +255,13 @@ Aynı spec dosyasına eklenir. Init script `SpeechRecognition`'ı siler, `webkit
 
 İlk `Sesle sor`: modalda spec cümlesi birebir durur. `start` sayacı 0. `Vazgeç` modalı kapatır, `localStorage` anahtarı yoktur, sayaç 0.
 
-Yeniden bas, `Onayla`: anahtar `tedy-ses-onay::test@tedy.online` ve değer `1` (fixture e-postası `test@tedy.online`). Sayaç 1. `lang` `tr-TR`, `interimResults` true, `continuous` false, `maxAlternatives` 1. Ara sonuç `{ isFinal: false, transcript: 'kesir' }` alanı `kesir` yapar. `**/api/assistant/chat` ve `**/api/assistant/stream` sayacı 0 kalır. Son sonuç `kaçtır` alanı `kesir kaçtır` yapar. `Dinlemeyi bitir` `stop` çağırır, etiket `Sesle sor` olur, alan durur. Ancak o zaman `Gönder` bir istek yapar.
+Yeniden bas, `Onayla`: anahtar `tedy-ses-onay::test@tedy.online` ve değer `1` (fixture e-postası `test@tedy.online`). Sayaç 1. `lang` `tr-TR`, `interimResults` true, `continuous` false, `maxAlternatives` 1. `onresult` düz `transcript` taşımaz. İlk olay `results[0][0].transcript === 'kesir'`, `results[0].isFinal === false`. `setDraft` alanı `kesir` yapar. `Gönder` bu metinle açılır; `draft` boş kalsaydı kapalı kalırdı. İkinci olay aynı sözcenin tamamıdır: `results[0][0].transcript === 'kesir kaçtır'`, `isFinal === true`. Alan `kesir kaçtır` olur. `kesir` ile `kaçtır` yapıştırılmaz. `**/api/assistant/chat` ve `**/api/assistant/stream` sayacı 0 kalır. `Dinlemeyi bitir` `stop` çağırır, etiket `Sesle sor` olur, alan durur. Ancak o zaman `Gönder` bir istek yapar.
 
 Sayfa `tedy-ses-onay::test@tedy.online` = `1` ile açılırsa modal yoktur, basış `start` eder. Anahtar başka e-postadaysa (`baska@tedy.online`) modal yine gelir.
 
 `webkitSpeechRecognition` da yoksa `Sesle sor` sayısı 0. `Sesli oku` bu testte durur.
 
-Salt okunur: B3'ün Işık sohbeti. `#ac-input` `disabled`, sayfada `Bu sohbet salt okunur.` `Sesle sor` sayısı 0. Cevapta `Sesli oku` vardır.
+Salt okunur: B3'ün Işık sohbeti. Açılıştan önce Görev 2'nin `tr-TR` `getVoices` stub'ı kurulur. `#ac-input` `disabled`, sayfada `Bu sohbet salt okunur.` `Sesle sor` sayısı 0. GET satırı `rol` ve `icerik` taşır; `icerik` `Payda **eşitlenir** [S1].` olur. Sayfa bunu `content` yapar. `Sesli oku` `content` okur ve görünür. `icerik` `content`'e yazılmazsa okunacak metin boştur, düğme yoktur.
 
 `not-allowed` olayı `Mikrofon açılamadı.` yazar ve `Tekrar dene` bu satırda yoktur. `aborted` satır yazmaz.
 
@@ -259,7 +273,7 @@ Aynı Playwright komutu. Expected: FAIL, `Sesle sor` yok.
 
 - [ ] **Step 3: Arayüz**
 
-`IconButton` `Microphone`, gönder grubunda, `Gönder`'den önce. Etiket `Sesle sor` / `Dinlemeyi bitir`. Kurucu `webkit` yedeğiyle. Modal kilitlenen üç metinle. `taban` bir ref'tir. Hata `ac__error` sohbet hatasına yazılmaz; kendi satırı `ac__ses-hata` olur. Yüklenirken `disabled`. Salt okunurda düğme yok. E-posta boşsa düğme yok. Yeni hex yok.
+`IconButton` `Microphone`, gönder grubunda, `Gönder`'den önce. Etiket `Sesle sor` / `Dinlemeyi bitir`. Kurucu `webkit` yedeğiyle. Modal kilitlenen üç metinle. `taban` bir ref'tir; tanıma başlarken o anki `draft`'ı tutar. Her `onresult` yalnız `results[0][0].transcript` okur ve `setDraft(birlestir(taban.current, o))` çağırır. Önceki hipotez yeni dizgiye eklenmez. Hata `ac__error` sohbet hatasına yazılmaz; kendi satırı `ac__ses-hata` olur. Yüklenirken `disabled`. Salt okunurda düğme yok. Yüklenen satırda `content`, `icerik`'tir. E-posta boşsa düğme yok. Yeni hex yok.
 
 - [ ] **Step 4: PASS**
 
