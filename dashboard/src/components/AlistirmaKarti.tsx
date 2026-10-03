@@ -101,7 +101,12 @@ export default function AlistirmaKarti({ alistirma, saltOkunur = false, disabled
         {!sonuc.dogru && sonuc.yanlis_analizi?.baslik && <p>{sonuc.yanlis_analizi.baslik}</p>}
         <p>{sonuc.aciklama}</p>
       </div>}
-      {sonuc && !tamam && <Button kind="tertiary" onClick={sonraki}>Sonraki soru</Button>}
+      {saltOkunur ? <>
+        <Button kind="tertiary" disabled={disabled || sira === 0}
+          onClick={() => setSira(sira - 1)}>Önceki soru</Button>
+        <Button kind="tertiary" disabled={disabled || sira === alistirma.sorular.length - 1}
+          onClick={sonraki}>Sonraki soru</Button>
+      </> : sonuc && !tamam && <Button kind="tertiary" onClick={sonraki}>Sonraki soru</Button>}
     </>}
     {tamam && <div className="ac-alistirma__puan" aria-live="polite">
       <p><strong>Puan</strong> · {sonuclar.filter(s => s.dogru).length}/{alistirma.sorular.length}</p>

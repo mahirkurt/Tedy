@@ -72,7 +72,7 @@ test('a family reading the student conversation cannot answer the saved card', a
   await page.route('**/api/assistant/chat', r => r.fulfill(json({ answer: 'Yedek', citations: [] })))
   await page.route('**/api/assistant/sohbetler?*', r => r.fulfill(json({ sohbetler: [SOHBET] })))
   await page.route(`**/api/assistant/sohbetler/${SID}`, r => r.fulfill(json({
-    sohbet: SOHBET, salt_okunur: true,
+    sohbet: SOHBET, read_only: true,
     mesajlar: [{ id: 'ef'.repeat(16), rol: 'assistant', icerik: 'Alıştırma hazır.', ogretmen: 'matematik',
       atiflar_json: '[]', ekler_json: '[]', alistirma: [QUIZ], zaman: SOHBET.guncelleme }],
   })))
@@ -82,6 +82,20 @@ test('a family reading the student conversation cannot answer the saved card', a
   await expect(card.getByText('Bu sohbet salt okunur.')).toBeVisible()
   await expect(card.getByLabel('Cevabın', { exact: true })).toBeDisabled()
   await expect(card.getByRole('button', { name: 'Cevabı gönder' })).toBeDisabled()
+  let yazma = 0
+  await page.route(`**/api/assistant/alistirmalar/${QUIZ.id}/cevap`, r => { yazma += 1; return r.abort() })
+  await expect(card.getByRole('button', { name: 'Önceki soru' })).toBeDisabled()
+  await card.getByRole('button', { name: 'Sonraki soru' }).click()
+  await expect(card.getByText('Yarıma eşit olanı seç.', { exact: true })).toBeVisible()
+  await expect(card.getByText('Soru 2/3', { exact: true })).toBeVisible()
+  await expect(card.getByRole('radio', { name: '2/4', exact: true })).toBeDisabled()
+  await expect(card.getByRole('button', { name: 'Cevabı gönder' })).toBeDisabled()
+  await card.getByRole('button', { name: 'Sonraki soru' }).click()
+  await expect(card.getByText('Paydalar toplanır mı?', { exact: true })).toBeVisible()
+  await expect(card.getByRole('button', { name: 'Sonraki soru' })).toBeDisabled()
+  await card.getByRole('button', { name: 'Önceki soru' }).click()
+  await expect(card.getByText('Soru 2/3', { exact: true })).toBeVisible()
+  expect(yazma).toBe(0)
 })
 
 test('the journal shows week counts, weak topics and rubric levels', async ({ page }) => {
