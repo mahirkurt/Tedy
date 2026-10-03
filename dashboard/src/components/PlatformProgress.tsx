@@ -5,6 +5,7 @@ import { useFocusMode } from '../contexts/focusMode'
 import type { ECVideo, A3KLesson, SebitHomework } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
 import SubjectLabel from './SubjectLabel'
+import './AlistirmaKarti.scss'
 
 interface ECData {
   total_videos?: number
@@ -23,6 +24,54 @@ interface SebitData {
   total_homework?: number
   completed_count?: number
   homework?: SebitHomework[]
+}
+
+interface Gunluk {
+  zayif: { konu: string; kazanim_kodu: string | null; dogru: number; toplam: number }[]
+  calisilan: { id: string; kazanim_kodu: string | null; sayfa_basligi: string | null; ogretmen: string }[]
+  degerlendirmeler: { id: string; guclu_yanlar: string; duzeyler: 'baslangic' | 'gelisiyor' | 'yeterli'; sonraki_adim: string }[]
+  hafta: { baslangic: string; sohbet: { ogretmen: string; sayi: number }[]; alistirma: number; puan: { dogru: number; toplam: number } }
+}
+
+const OGRETMEN_ADLARI: Record<string, string> = { genel: 'Genel', turkce: 'Türkçe', fen: 'Fen', sosyal: 'Sosyal', matematik: 'Matematik' }
+const DUZEY_ADLARI = { baslangic: 'Başlangıç', gelisiyor: 'Gelişiyor', yeterli: 'Yeterli' }
+
+function OgrenmeGunlugu() {
+  const { data, loading, error } = useApi<Gunluk | null>('/api/assistant/ogrenme-gunlugu', null)
+  if (error === 'HTTP 403') return null
+  return <section className="ogrenme-gunlugu" aria-labelledby="ogrenme-gunlugu-baslik">
+    <h3 id="ogrenme-gunlugu-baslik">Öğrenme günlüğü</h3>
+    {loading ? <SkeletonText paragraph lineCount={3} /> : error ? <p>Öğrenme günlüğü alınamadı.</p> : data && <>
+      <div>
+        <h4>Bu hafta</h4>
+        {data.hafta.sohbet.length === 0 ? <p>Sohbet · 0</p> : data.hafta.sohbet.map(s =>
+          <p key={s.ogretmen}>{OGRETMEN_ADLARI[s.ogretmen] || s.ogretmen} · {s.sayi}</p>)}
+        <p>Alıştırma · {data.hafta.alistirma}</p>
+        {data.hafta.puan.toplam > 0 && <p>Puan · {data.hafta.puan.dogru}/{data.hafta.puan.toplam}</p>}
+      </div>
+      <div>
+        <h4>Zorlanılan konular</h4>
+        {data.zayif.length === 0 ? <p>Henüz deneme yok. Bir alıştırma bitince burada görünür.</p> :
+          <ul>{data.zayif.map(s => <li key={`${s.konu}-${s.kazanim_kodu || ''}`}>
+            <span>{s.konu}</span> · {s.dogru}/{s.toplam}{s.kazanim_kodu && ` · ${s.kazanim_kodu}`}
+          </li>)}</ul>}
+      </div>
+      {data.calisilan.length > 0 && <div>
+        <h4>Son çalışılan konular</h4>
+        <ul>{data.calisilan.map((s, i) => <li key={s.id || i}>
+          {s.kazanim_kodu || s.sayfa_basligi}
+        </li>)}</ul>
+      </div>}
+      {data.degerlendirmeler.length > 0 && <div>
+        <h4>Çalışma değerlendirmeleri</h4>
+        <ul>{data.degerlendirmeler.map(s => <li key={s.id}>
+          <p><strong>{DUZEY_ADLARI[s.duzeyler]}</strong></p>
+          <p>{s.guclu_yanlar}</p>
+          <p>{s.sonraki_adim}</p>
+        </li>)}</ul>
+      </div>}
+    </>}
+  </section>
 }
 
 function DifficultyTag({ level }: { level: number }) {
@@ -65,6 +114,8 @@ export default function PlatformProgress() {
           className="platform-complete-notification"
         />
       )}
+
+      <OgrenmeGunlugu />
 
       <Accordion className="platform-accordion">
         {/* EnglishCentral */}
