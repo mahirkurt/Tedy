@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test'
 import type { Locator } from '@playwright/test'
+import { mock } from './_audit-fixtures'
+import { GORSEL } from './_gorsel-fixtures'
 import { sabitAc } from './_gorsel-yardim'
 
 // D3b page gate after the audit: on a phone, a control the reader taps is at
@@ -43,8 +45,26 @@ test('Notlar row detail control is Turkish and at least 44px on a phone', async 
   await enAz(page.getByRole('button', { name: 'Ayrıntı', exact: true }))
 })
 
-test('Dersler content headings are at least 44px on a phone', async ({ page }) => {
+test('İşler section headers are at least 44px on a phone', async ({ page }) => {
+  await sabitAc(page, '/isler', 390, 844)
+  await enAz(page.getByRole('button', { name: 'Aktif Ödevler' }))
+})
+
+test('Dersler shows a short lesson note once', async ({ page }) => {
   await sabitAc(page, '/dersler', 390, 844)
-  // Other course tabs keep their headings in the DOM, hidden. Measure the one on screen.
+  const note = 'Kesirlerde toplama ve çıkarma işlendi. Payda eşitleme üzerinde duruldu.'
+  await expect(page.getByText(note, { exact: true })).toHaveCount(1)
+})
+
+test('a longer Dersler note keeps a 44px heading and one body', async ({ page }) => {
+  const uzun = 'Kuvvet ve hareket ünitesine giriş yapıldı. '.repeat(4)
+  await mock(page, {
+    ...GORSEL,
+    content: { 'Fen Bilimleri': { text: uzun, cards: [], items: [] } },
+  })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/dersler')
+  await page.waitForLoadState('networkidle')
   await enAz(page.locator('.course-content .cds--accordion__heading:visible'))
+  await expect(page.locator('.course-content-text').filter({ hasText: uzun.slice(0, 40) })).toHaveCount(1)
 })

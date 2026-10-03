@@ -23,6 +23,24 @@ test('a component crash leaves the shell standing and says what happened', async
   // it replaces the fixed wait that used to precede a one-shot body read.
   await expect(page.locator('nav').first().getByText('Bugün', { exact: true })).toBeVisible()
   await expect(page.getByText('Bu bölüm açılamadı', { exact: false })).toBeVisible()
+  // Desktop still leaves by the side nav. The phone wording is the next test.
+  await expect(page.getByText('soldaki menüden')).toBeVisible()
+  await expect(page.getByText('alttaki gezinmeden')).toBeHidden()
+})
+
+test('a phone crash points at the bottom navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.route('**/api/assistant/stream', r => r.abort())
+  for (const ep of Object.keys(LIVE)) {
+    await page.route(`**/api/${ep}`, r => r.fulfill(json({})))
+  }
+  await page.goto('/isler')
+  await page.waitForLoadState('networkidle')
+
+  await expect(page.getByText('Bu bölüm açılamadı', { exact: false })).toBeVisible()
+  await expect(page.getByText('soldaki menüden')).toBeHidden()
+  await expect(page.getByText('alttaki gezinmeden')).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Ana gezinme' })).toBeVisible()
 })
 
 test('the focus toggle label is readable on the header', async ({ page }) => {

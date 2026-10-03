@@ -5211,6 +5211,15 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   color: var(--ted-color-text-secondary);
 }
 
+// One navigation at a time. Below md the side nav is hidden and the way out
+// is the bottom bar (aria-label "Ana gezinme").
+.route-boundary__cikis--bar { display: none; }
+
+@media (max-width: 671px) {
+  .route-boundary__cikis--menu { display: none; }
+  .route-boundary__cikis--bar { display: inline; }
+}
+
 
 // The app shell is a column: header and nav are fixed and out of flow, while
 // the routed content grows to take whatever height is left and the footer is
@@ -5277,6 +5286,12 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 
   // Accordion headings use the density height, measured 40px on Dersler.
   .course-content .cds--accordion__heading {
+    min-block-size: spacing.$spacing-09;
+  }
+
+  // İşler group headers (Tamamlandı, Yapılmayan) measured 26px. The toggle
+  // is the control; the plain "Yaklaşan Sınavlar" label is not one.
+  .hw-section__header--toggle {
     min-block-size: spacing.$spacing-09;
   }
 }
