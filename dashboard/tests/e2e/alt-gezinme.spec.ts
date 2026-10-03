@@ -89,10 +89,7 @@ test('the bar hides under an open modal and returns when it closes', async ({ pa
   await expect(dialog).toBeVisible()
   await expect(bar).toBeHidden()
 
-  // Carbon's ModalHeader here carries no `iconDescription`, so its close
-  // button keeps the library default, English "Close" — not a translation
-  // gap this task owns; the close button is the reliable way to shut it.
-  await page.getByRole('button', { name: 'Close' }).click()
+  await page.getByRole('button', { name: 'Kapat' }).click()
   await expect(dialog).toBeHidden()
   await expect(bar).toBeVisible()
 })

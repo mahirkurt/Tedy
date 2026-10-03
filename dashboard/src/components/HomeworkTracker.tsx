@@ -396,6 +396,7 @@ export default function HomeworkTracker() {
         <ModalHeader
           title={selectedHw["Ödev Başlığı"] || ''}
           label={selectedHw.normalized_course || selectedHw["Ders Adı"] || ''}
+          iconDescription="Kapat"
         />
         <ModalBody>
           <HomeworkModalBody

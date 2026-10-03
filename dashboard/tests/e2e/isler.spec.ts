@@ -80,3 +80,16 @@ test('the navigation lost a decision', async ({ page }) => {
   await expect(nav.getByText('Sınavlar', { exact: true })).toHaveCount(0)
   await expect(nav.getByText('Ödevler', { exact: true })).toHaveCount(0)
 })
+
+test('the homework window close control is named Kapat', async ({ page }) => {
+  await mock(page)
+  await page.goto('/isler')
+  await page.getByRole('button', { name: 'Başla' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  // The book reader and the calendar popover already say Kapat. Carbon's
+  // ModalHeader default is the English word, so this fails while that
+  // default is still the accessible name.
+  await expect(dialog.getByRole('button', { name: 'Kapat', exact: true })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0)
+})
