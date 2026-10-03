@@ -129,9 +129,9 @@ def test_heic_415_ve_buyuk_jpeg_413(istemci):
 
 
 def test_baskasi_ve_yok_ayni_404(istemci):
-    _giris(istemci, FULL)
-    kayit = _gonder(istemci, b"merhaba", "a.txt").get_json()
     _giris(istemci, DIGER)
+    kayit = _gonder(istemci, b"merhaba", "a.txt").get_json()
+    _giris(istemci, FULL)
     yabanci = istemci.get(f"/api/assistant/uploads/{kayit['id']}")
     yok = istemci.get("/api/assistant/uploads/" + "ab" * 16)
     assert yabanci.status_code == yok.status_code == 404

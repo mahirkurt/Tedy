@@ -2354,6 +2354,9 @@ def _ekleri_hazirla(messages, email):
 @app.route("/api/assistant/chat", methods=["POST"])
 @require_auth
 def assistant_chat():
+    access = _require_assistant_access()
+    if access is not None:
+        return access
     payload = request.get_json(silent=True)
     if payload is None:
         payload = {}
@@ -2367,11 +2370,6 @@ def assistant_chat():
     if not isinstance(messages, list):
         return jsonify({"error": "messages list olmalı"}), 400
 
-    email = _module_person()
-    hazir, hata = _ekleri_hazirla(messages, email)
-    if hata is not None:
-        return hata
-
     context_filters = payload.get("context_filters", {})
     if not isinstance(context_filters, dict):
         return jsonify({"error": "context_filters dict olmalı"}), 400
@@ -2379,6 +2377,17 @@ def assistant_chat():
     ogretmen, hata = _istek_ogretmeni(payload)
     if hata is not None:
         return hata
+
+    email = _module_person()
+    try:
+        hazir, sohbet, hata = _sohbet_istegini_hazirla(payload, messages, email, ogretmen)
+    except sqlite3.OperationalError as exc:
+        app.logger.error("Assistant chat storage failed (%s)", type(exc).__name__)
+        return jsonify({"error": "Sohbet kaydedilemedi."}), 500
+    if hata is not None:
+        return hata
+    if sohbet.get("tekrar"):
+        return jsonify(sohbet["tekrar"])
 
     session_id = str(payload.get("session_id", "")).strip()
     temperature = payload.get("temperature", 0.2)
@@ -2398,12 +2407,19 @@ def assistant_chat():
             okur=_assistant_okur(),
             ogretmen=ogretmen,
             sahip_email=email,
+            **sohbet.get("kwargs", {}),
         )
+        _sohbet_cevap_kaydet(sohbet, out, ogretmen)
+        _sohbet_ozetle(sohbet)
         return jsonify(out)
     except AssistantUnavailableError:
         return jsonify({"error": "assistant_unavailable"}), 503
-    except Exception as e:
-        return jsonify({"error": f"assistant chat failed: {e}"}), 500
+    except sqlite3.OperationalError as exc:
+        app.logger.error("Assistant chat storage failed (%s)", type(exc).__name__)
+        return jsonify({"error": "Sohbet kaydedilemedi."}), 500
+    except Exception as exc:
+        app.logger.error("Assistant chat failed (%s)", type(exc).__name__)
+        return jsonify({"error": "Asistan yanıtı alınamadı."}), 500
 
 
 @app.route("/api/assistant/stream", methods=["POST"])
@@ -2424,6 +2440,8 @@ def assistant_stream():
     if hata is not None:
         return hata
     messages = data.get("messages") or []
+    if not isinstance(messages, list):
+        return jsonify({"error": "messages list olmalı"}), 400
     session_id = str(data.get("session_id", ""))
     force_deep = bool(data.get("force_deep", False))
     # Decided here, inside the request: generate() runs after this view has returned, where the
@@ -2431,25 +2449,40 @@ def assistant_stream():
     ilerleme_izni = _assistant_progress_allowed()
     okur = _assistant_okur()
     email = _module_person()
-    hazir, hata = _ekleri_hazirla(messages, email)
+    try:
+        hazir, sohbet, hata = _sohbet_istegini_hazirla(data, messages, email, ogretmen)
+    except sqlite3.OperationalError as exc:
+        app.logger.error("Assistant chat storage failed (%s)", type(exc).__name__)
+        return jsonify({"error": "Sohbet kaydedilemedi."}), 500
     if hata is not None:
         return hata
 
     def generate():
         try:
+            if sohbet.get("tekrar"):
+                yield f'event: answer\ndata: {json.dumps({"payload": sohbet["tekrar"]}, ensure_ascii=False)}\n\n'
+                yield "event: done\ndata: {}\n\n"
+                return
             runtime = _assistant_runtime()
             for event in runtime.chat_events(
                 messages=hazir, session_id=session_id, force_deep=force_deep,
                 ilerleme_izni=ilerleme_izni, okur=okur, ogretmen=ogretmen,
                 sahip_email=email,
+                **sohbet.get("kwargs", {}),
             ):
-                name = event.pop("event")
-                yield f"event: {name}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+                name = event["event"]
+                if name == "answer":
+                    _sohbet_cevap_kaydet(sohbet, event["payload"], ogretmen)
+                body = {k: v for k, v in event.items() if k != "event"}
+                yield f"event: {name}\ndata: {json.dumps(body, ensure_ascii=False)}\n\n"
+                if name == "answer":
+                    _sohbet_ozetle(sohbet)
         except AssistantUnavailableError:
             yield 'event: error\ndata: {"error":"assistant_unavailable"}\n\n'
         except Exception as exc:  # noqa: BLE001 — the stream must always close
-            app.logger.error("assistant stream failed: %s", exc)
-            yield f'event: error\ndata: {json.dumps({"error": str(exc)})}\n\n'
+            app.logger.error("Assistant stream failed (%s)", type(exc).__name__)
+            cumle = "Sohbet kaydedilemedi." if isinstance(exc, sqlite3.OperationalError) else "Asistan yanıtı alınamadı."
+            yield f'event: error\ndata: {json.dumps({"error": cumle})}\n\n'
         yield "event: done\ndata: {}\n\n"
 
     return Response(generate(), mimetype="text/event-stream",
@@ -2523,7 +2556,13 @@ def assistant_upload_oku(kimlik):
     if not email:
         return jsonify({"error": "session_required"}), 403
     from src.assistant_uploads import EkDeposu
-    bulunan = EkDeposu(OUTPUT_DIR).oku(email, kimlik)
+    depo = EkDeposu(OUTPUT_DIR)
+    bulunan = depo.oku(email, kimlik)
+    if bulunan is None and okur_turu(email) == "aile":
+        for ogrenci in OGRENCI_EMAILS:
+            bulunan = depo.oku(ogrenci, kimlik)
+            if bulunan is not None:
+                break
     if bulunan is None:
         return jsonify({"error": "Dosya bulunamadı."}), 404
     meta, veri = bulunan
@@ -2559,6 +2598,84 @@ def _sohbet_erisim(sid):
 
 def _sohbet_yaniti(row):
     return {k: row[k] for k in ("id", "baslik", "ogretmen", "olusturma", "guncelleme")}
+
+
+def _sohbet_ek_kimlikleri(row):
+    return [e["id"] if isinstance(e, dict) else e for e in json.loads(row["ekler_json"])]
+
+
+def _sohbet_istegini_hazirla(payload, messages, email, ogretmen):
+    """Capture private history and bytes before generate() loses its session."""
+    if "sohbet_id" not in payload:
+        hazir, hata = _ekleri_hazirla(messages, email)
+        return hazir, {}, hata
+    sid = payload["sohbet_id"]
+    _row, sahip, hata = _sohbet_erisim(sid)
+    if hata is not None:
+        return None, {}, hata
+    if not sahip:
+        return None, {}, (jsonify({"error": "Bu sohbet salt okunur."}), 403)
+    yeni = next((m for m in reversed(messages) if isinstance(m, dict) and m.get("role") == "user"), None)
+    if yeni is None or not isinstance(yeni.get("content"), str) or not yeni["content"].strip():
+        return None, {}, (jsonify({"error": "Mesaj boş olamaz."}), 400)
+    rid = payload.get("request_id")
+    if rid is not None and (not isinstance(rid, str) or not re.fullmatch(r"[0-9a-f-]{32,36}", rid)):
+        return None, {}, (jsonify({"error": "Geçersiz istek gövdesi."}), 400)
+    depo = _sohbet_deposu()
+    onceki = depo.istek_mesajlari(sid, rid) if rid else []
+    if onceki and onceki[0]["icerik"] != yeni["content"].strip():
+        return None, {}, (jsonify({"error": "İstek kimliği başka bir mesaja ait."}), 409)
+    cevap = next((m for m in onceki if m["rol"] == "assistant"), None)
+    if cevap:
+        return [], {"tekrar": {
+            "answer": cevap["icerik"], "citations": json.loads(cevap["atiflar_json"]),
+            "safety_flags": [], "plan_blocks": [], "intent": "qa", "session_id": "",
+            "mode_suggestion": None, "meta": {"ogretmen": cevap["ogretmen"]},
+        }}, None
+    from src.assistant_uploads import EkDeposu, ISTEK_SINIRI
+    eski = depo.son_mesajlar(sid, 20 if onceki else 19)
+    yeni_ekler = yeni.get("ekler") or []
+    if not isinstance(yeni_ekler, list):
+        return None, {}, (jsonify({"error": "Ekler bir kimlik listesi olmalı."}), 400)
+    toplam = sum(len(_sohbet_ek_kimlikleri(m)) for m in eski)
+    if not onceki:
+        toplam += len(yeni_ekler)
+    if toplam > ISTEK_SINIRI:
+        return None, {}, (jsonify({"error": "Bir istekte en fazla 10 dosya olabilir."}), 400)
+    # All bytes, including old uploads, are checked before committing the new row.
+    adaylar = [{"role": m["rol"], "content": m["icerik"],
+                "ekler": _sohbet_ek_kimlikleri(m)} for m in eski]
+    if not onceki:
+        adaylar.append({**yeni, "content": yeni["content"].strip()})
+    hazir, hata = _ekleri_hazirla(adaylar, email)
+    if hata is not None:
+        return None, {}, hata
+    if not onceki:
+        ekler = [{k: e["meta"][k] for k in ("id", "ad", "tur")}
+                 for e in hazir[-1].get("ek_govde", [])]
+        depo.mesaj_ekle(sid, "user", yeni["content"].strip(), ogretmen, ekler,
+                        _asistan_simdi(), istek_id=rid)
+        yuklemeler = EkDeposu(OUTPUT_DIR)
+        for ek in ekler:
+            yuklemeler.bagla(email, ek["id"], sid)
+    return hazir, {"depo": depo, "sid": sid, "request_id": rid, "kwargs": {
+        "pencere": 20, "sohbet_id": sid, "not_deposu": depo, "hafiza": True,
+        "ozet": depo.ozet_oku(sid),
+    }}, None
+
+
+def _sohbet_cevap_kaydet(sohbet, payload, ogretmen):
+    if not sohbet.get("depo"):
+        return
+    sohbet["depo"].mesaj_ekle(
+        sohbet["sid"], "assistant", payload["answer"], ogretmen, [], _asistan_simdi(),
+        atiflar=payload.get("citations", []), istek_id=sohbet.get("request_id"))
+
+
+def _sohbet_ozetle(sohbet):
+    if sohbet.get("depo"):
+        from src.assistant_core import eski_turleri_ozetle
+        eski_turleri_ozetle(sohbet["depo"], sohbet["sid"])
 
 
 def _sohbet_kapisi(view):
@@ -2658,6 +2775,38 @@ def assistant_sohbet_mesaj(sid):
         return hata
     mid = _sohbet_deposu().mesaj_ekle(sid, "user", icerik.strip(), ogretmen, [], _asistan_simdi())
     return jsonify({"id": mid})
+
+
+@app.route("/api/assistant/notlar")
+@require_auth
+@_sohbet_kapisi
+def assistant_notlar():
+    if okur_turu(_module_person()) != "aile":
+        return jsonify({"error": "Bu notları yalnız aile düzenler."}), 403
+    return jsonify({"notlar": _sohbet_deposu().notlar()})
+
+
+@app.route("/api/assistant/notlar/<nid>", methods=["PATCH", "DELETE"])
+@require_auth
+@_sohbet_kapisi
+def assistant_not(nid):
+    if okur_turu(_module_person()) != "aile":
+        return jsonify({"error": "Bu notları yalnız aile düzenler."}), 403
+    depo = _sohbet_deposu()
+    if request.method == "DELETE":
+        bulundu = depo.not_sil(nid)
+    else:
+        payload = request.get_json(silent=True)
+        metin = payload.get("metin") if isinstance(payload, dict) else None
+        if not isinstance(metin, str) or not metin.strip():
+            return jsonify({"error": "Mesaj boş olamaz."}), 400
+        from src.assistant_sohbet import hassas_not
+        if hassas_not(metin):
+            return jsonify({"error": "Bu not yazılmadı."}), 400
+        bulundu = depo.not_duzelt(nid, metin.strip())
+    if not bulundu:
+        return jsonify({"error": "Not bulunamadı."}), 404
+    return jsonify({"ok": True})
 
 
 @app.route("/api/assistant/plan", methods=["POST"])

@@ -1,11 +1,14 @@
 """Session-owned conversations and family read access; no model network calls."""
 import io
 import json
+import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+
+os.environ["TEST_AUTH_BYPASS"] = "1"
 
 from src import dashboard_api
 from src.assistant_sohbet import SohbetDeposu
@@ -90,3 +93,282 @@ def test_bilinmeyen_kisi_400(istemci):
     res = istemci.get("/api/assistant/sohbetler?kisi=aile")
     assert res.status_code == 400
     assert res.get_json()["error"] == "Bilinmeyen kişi."
+
+
+def test_akis_yirmiyi_yukler_yarim_cevabi_yazmaz(istemci, monkeypatch):
+    _giris(istemci, ISIK)
+    sid = istemci.post("/api/assistant/sohbetler", json={}).get_json()["id"]
+    for i in range(21):
+        istemci.post(f"/api/assistant/sohbetler/{sid}/mesaj",
+                     json={"icerik": f"eski{i}", "ogretmen": "genel"})
+    gorulen = {}
+
+    class _K:
+        def chat_events(self, **kw):
+            gorulen.update(kw)
+            yield {"event": "answer", "payload": {
+                "answer": "tamam", "citations": [], "safety_flags": [],
+                "plan_blocks": [], "intent": "qa", "session_id": "",
+                "mode_suggestion": None, "meta": {"ogretmen": "genel"}}}
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: _K())
+    res = istemci.post("/api/assistant/stream", json={
+        "sohbet_id": sid,
+        "messages": [
+            {"role": "user", "content": "sahte geçmiş"},
+            {"role": "user", "content": "yeni soru"},
+        ],
+    })
+    assert "event: answer" in res.get_data().decode()
+    icerikler = [m["content"] for m in gorulen["messages"] if isinstance(m, dict)]
+    assert "sahte geçmiş" not in icerikler
+    assert icerikler[0] == "eski2"          # 21 eski + yeni = 22; son 20 eski2'den başlar
+    assert icerikler[-1] == "yeni soru"
+    assert gorulen["pencere"] == 20
+    depo = _sohbet_deposu()
+    roller = [m["rol"] for m in depo.tum_mesajlar(sid)]
+    assert roller[-2:] == ["user", "assistant"]
+
+
+def test_akis_koparsa_cevap_satiri_yok(istemci, monkeypatch):
+    _giris(istemci, ISIK)
+    sid = istemci.post("/api/assistant/sohbetler", json={}).get_json()["id"]
+
+    class _K:
+        def chat_events(self, **kw):
+            raise RuntimeError("koptu")
+            yield {}
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: _K())
+    istemci.post("/api/assistant/stream", json={
+        "sohbet_id": sid, "messages": [{"role": "user", "content": "kaldı"}]})
+    roller = [m["rol"] for m in _sohbet_deposu().tum_mesajlar(sid)]
+    assert roller == ["user"]
+
+
+def test_v1_ve_plansiz_depo_acmadi(istemci, tmp_path, monkeypatch):
+    monkeypatch.setattr(dashboard_api, "OUTPUT_DIR", str(tmp_path))
+    # /v1 api_key_only. Bypass anahtarsız 401 bırakır; depo dosyası yine yok.
+    istemci.post("/v1/chat/completions", json={"messages": [{"role": "user", "content": "x"}]})
+    assert not (tmp_path / "assistant_sohbetler.sqlite").exists()
+
+
+def test_plan_depo_acmadi(istemci, tmp_path, monkeypatch):
+    monkeypatch.setattr(dashboard_api, "OUTPUT_DIR", str(tmp_path))
+    gorulen = {}
+
+    class _K:
+        def study_plan(self, **kw):
+            gorulen.update(kw)
+            return {"blocks": []}
+
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: _K())
+    _giris(istemci, ISIK)
+    res = istemci.post("/api/assistant/plan", json={
+        "messages": [{"role": "user", "content": "plan"}]})
+    assert res.status_code == 200
+    assert "sohbet_id" not in gorulen
+    assert gorulen.get("hafiza") is not True
+    assert not (tmp_path / "assistant_sohbetler.sqlite").exists()
+
+
+def test_sohbet_id_yoksa_dosya_yok(istemci, tmp_path, monkeypatch):
+    monkeypatch.setattr(dashboard_api, "OUTPUT_DIR", str(tmp_path))
+
+    class _K:
+        def chat_events(self, **kw):
+            yield {"event": "answer", "payload": {
+                "answer": "tamam", "citations": [], "safety_flags": [],
+                "plan_blocks": [], "intent": "qa", "session_id": "",
+                "mode_suggestion": None, "meta": {"ogretmen": "genel"}}}
+        def chat(self, **kw):
+            return {"answer": "tamam", "citations": [], "safety_flags": [],
+                    "plan_blocks": [], "intent": "qa", "session_id": "",
+                    "mode_suggestion": None, "meta": {"ogretmen": "genel"}}
+
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: _K())
+    _giris(istemci, ISIK)
+    istemci.post("/api/assistant/stream", json={
+        "messages": [{"role": "user", "content": "x"}]})
+    istemci.post("/api/assistant/chat", json={
+        "messages": [{"role": "user", "content": "x"}]})
+    assert not (tmp_path / "assistant_sohbetler.sqlite").exists()
+
+
+def test_eski_ekler_on_tavanina_girer(istemci, monkeypatch):
+    _giris(istemci, ISIK)
+    sid = istemci.post("/api/assistant/sohbetler", json={}).get_json()["id"]
+    depo = _sohbet_deposu()
+    for i in range(9):
+        depo.mesaj_ekle(sid, "user", f"eski{i}", "genel", ["ab" * 15 + f"{i:02x}"], SIMDI)
+    cagrildi = {"n": 0}
+
+    class _K:
+        def chat_events(self, **kw):
+            cagrildi["n"] += 1
+            yield {"event": "answer", "payload": {
+                "answer": "tamam", "citations": [], "safety_flags": [],
+                "plan_blocks": [], "intent": "qa", "session_id": "",
+                "mode_suggestion": None, "meta": {}}}
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: _K())
+    res = istemci.post("/api/assistant/stream", json={
+        "sohbet_id": sid,
+        "messages": [{"role": "user", "content": "yeni", "ekler": ["cd" * 16, "ef" * 16]}],
+    })
+    assert res.status_code == 400
+    assert res.get_json()["error"] == "Bir istekte en fazla 10 dosya olabilir."
+    assert cagrildi["n"] == 0
+    assert [m["icerik"] for m in depo.tum_mesajlar(sid)] == [f"eski{i}" for i in range(9)]
+
+
+def _answer():
+    return {"answer": "Tamam [S1]", "citations": [{"kind": "kitap", "label": "Kaynak"}],
+            "safety_flags": [], "plan_blocks": [], "intent": "qa", "session_id": "",
+            "mode_suggestion": None, "meta": {"private-tool-body": "do not persist"}}
+
+
+def test_stream_retry_keeps_one_user_and_replays_complete_answer(istemci, monkeypatch):
+    _giris(istemci, ISIK)
+    sid = istemci.post("/api/assistant/sohbetler", json={}).get_json()["id"]
+    calls = []
+
+    class Runtime:
+        def chat_events(self, **kw):
+            calls.append("stream")
+            raise RuntimeError("upstream failed")
+            yield {}
+        def chat(self, **kw):
+            calls.append("chat")
+            return _answer()
+
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: Runtime())
+    payload = {"sohbet_id": sid, "request_id": "ab" * 16,
+               "messages": [{"role": "user", "content": "Soru"}]}
+    response = istemci.post("/api/assistant/stream", json=payload)
+    assert "event: error" in response.get_data(as_text=True)
+    response = istemci.post("/api/assistant/chat", json=payload)
+    assert response.status_code == 200
+    repeated = istemci.post("/api/assistant/chat", json=payload)
+    assert repeated.get_json()["answer"] == _answer()["answer"]
+    assert repeated.get_json()["citations"] == _answer()["citations"]
+    assert calls == ["stream", "chat"]
+    rows = _sohbet_deposu().tum_mesajlar(sid)
+    assert [r["rol"] for r in rows] == ["user", "assistant"]
+    assert all(r["meta_json"] == "{}" for r in rows)
+    assert json.loads(rows[-1]["atiflar_json"]) == _answer()["citations"]
+    # The same wording, deliberately sent again, is a different request.
+    payload["request_id"] = "cd" * 16
+    assert istemci.post("/api/assistant/chat", json=payload).status_code == 200
+    assert len(_sohbet_deposu().tum_mesajlar(sid)) == 4
+
+
+def test_family_cannot_send_to_child_chat_or_open_parent_chat(istemci):
+    _giris(istemci, ISIK)
+    sid = istemci.post("/api/assistant/sohbetler", json={}).get_json()["id"]
+    _giris(istemci, AILE)
+    for endpoint in ("chat", "stream"):
+        res = istemci.post("/api/assistant/" + endpoint, json={
+            "sohbet_id": sid, "messages": [{"role": "user", "content": "write"}]})
+        assert res.status_code == 403
+        assert res.get_json()["error"] == "Bu sohbet salt okunur."
+    assert _sohbet_deposu().tum_mesajlar(sid) == []
+
+
+def test_api_key_cannot_open_storage(istemci, tmp_path, monkeypatch):
+    monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS", False)
+    monkeypatch.setattr(dashboard_api, "API_KEYS", [("synthetic", "tdyK_unit-test")])
+    res = istemci.post("/api/assistant/sohbetler", json={},
+                       headers={"Authorization": "Bearer tdyK_unit-test"})
+    assert res.status_code in (401, 403)
+    assert not (tmp_path / "assistant_sohbetler.sqlite").exists()
+
+
+def test_family_notes_endpoint_and_sensitive_gate(istemci):
+    nid = _sohbet_deposu().not_yaz("Paydada zorlanıyor", None, SIMDI)
+    _giris(istemci, ISIK)
+    assert istemci.get("/api/assistant/notlar").status_code == 403
+    assert istemci.patch("/api/assistant/notlar/" + nid, json={"metin": "değişti"}).status_code == 403
+    assert istemci.delete("/api/assistant/notlar/" + nid).status_code == 403
+    _giris(istemci, AILE)
+    assert len(istemci.get("/api/assistant/notlar").get_json()["notlar"]) == 1
+    for metin in ("İlaç kullanıyor", "Boşanma", "parent@example.test", "01234567890"):
+        res = istemci.patch("/api/assistant/notlar/" + nid, json={"metin": metin})
+        assert res.status_code == 400
+        assert res.get_json()["error"] == "Bu not yazılmadı."
+    assert istemci.patch("/api/assistant/notlar/" + nid, json={"metin": "Örnekle öğreniyor"}).status_code == 200
+    assert istemci.delete("/api/assistant/notlar/" + nid).status_code == 200
+    assert istemci.delete("/api/assistant/notlar/" + nid).status_code == 404
+
+
+def test_family_upload_read_is_one_way(istemci):
+    _giris(istemci, ISIK)
+    child = istemci.post("/api/assistant/uploads", data={"dosya": (io.BytesIO(b"child"), "note.txt")}).get_json()
+    _giris(istemci, AILE)
+    assert istemci.get("/api/assistant/uploads/" + child["id"]).data == b"child"
+    parent = istemci.post("/api/assistant/uploads", data={"dosya": (io.BytesIO(b"parent"), "note.txt")}).get_json()
+    _giris(istemci, DIGER)
+    assert istemci.get("/api/assistant/uploads/" + child["id"]).status_code == 200
+    assert istemci.get("/api/assistant/uploads/" + parent["id"]).status_code == 404
+    _giris(istemci, ISIK)
+    assert istemci.get("/api/assistant/uploads/" + parent["id"]).status_code == 404
+
+
+def test_delete_removes_bound_upload_and_chat(istemci, monkeypatch):
+    from src.assistant_uploads import EkDeposu
+    _giris(istemci, ISIK)
+    sid = istemci.post("/api/assistant/sohbetler", json={}).get_json()["id"]
+    upload = istemci.post("/api/assistant/uploads", data={"dosya": (io.BytesIO(b"lesson"), "note.txt")}).get_json()
+
+    class Runtime:
+        def chat(self, **kw):
+            return _answer()
+
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: Runtime())
+    assert istemci.post("/api/assistant/chat", json={"sohbet_id": sid,
+        "messages": [{"role": "user", "content": "Oku", "ekler": [upload["id"]]}]}).status_code == 200
+    uploads = EkDeposu(dashboard_api.OUTPUT_DIR)
+    assert uploads.oku(ISIK, upload["id"])[0]["bagli_sohbet"] == sid
+    assert istemci.delete("/api/assistant/sohbetler/" + sid).status_code == 200
+    assert uploads.oku(ISIK, upload["id"]) is None
+    assert istemci.get("/api/assistant/sohbetler/" + sid).status_code == 404
+
+
+def test_ten_historical_uploads_are_captured_before_stream(istemci, monkeypatch):
+    import inspect
+    _giris(istemci, ISIK)
+    sid = istemci.post("/api/assistant/sohbetler", json={}).get_json()["id"]
+    upload = istemci.post("/api/assistant/uploads", data={"dosya": (io.BytesIO(b"lesson"), "note.txt")}).get_json()
+    depo = _sohbet_deposu()
+    for i in range(8):
+        depo.mesaj_ekle(sid, "user", f"old{i}", "genel", [upload], SIMDI)
+    original = dashboard_api._module_person
+
+    def person():
+        if any(f.function == "generate" and f.filename.endswith("dashboard_api.py") for f in inspect.stack()):
+            raise AssertionError("session accessed inside stream")
+        return original()
+
+    seen = {}
+    class Runtime:
+        def chat_events(self, **kw):
+            seen.update(kw)
+            yield {"event": "answer", "payload": _answer()}
+
+    monkeypatch.setattr(dashboard_api, "_module_person", person)
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: Runtime())
+    res = istemci.post("/api/assistant/stream", json={"sohbet_id": sid,
+        "messages": [{"role": "user", "content": "new", "ekler": [upload["id"]] * 2}]})
+    assert "event: answer" in res.get_data(as_text=True)
+    assert sum(len(m.get("ek_govde", [])) for m in seen["messages"]) == 10
+    assert seen["pencere"] == 20
+    assert seen["sohbet_id"] == sid
+
+
+def test_storage_failure_is_redacted(istemci, monkeypatch):
+    _giris(istemci, ISIK)
+    def broken():
+        raise sqlite3.OperationalError("private-path-and-person")
+    monkeypatch.setattr(dashboard_api, "_sohbet_deposu", broken)
+    for method, path, body in [("get", "/api/assistant/sohbetler", None),
+                               ("post", "/api/assistant/chat", {"sohbet_id": "ab" * 16, "messages": []})]:
+        res = getattr(istemci, method)(path, json=body)
+        assert res.status_code == 500
+        assert res.get_json() == {"error": "Sohbet kaydedilemedi."}

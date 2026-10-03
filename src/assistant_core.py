@@ -38,6 +38,53 @@ from src.json_utils import atomic_json_dump
 logger = logging.getLogger(__name__)
 
 
+OZET_MODEL = "claude-haiku-4-5"
+
+
+def eski_turleri_ozetle(depo, sid: str, tamamla=None) -> None:
+    """Summarize outside-window turns without removing the permanent transcript."""
+    mesajlar = depo.tum_mesajlar(sid)
+    if len(mesajlar) <= 20:
+        return
+    satirlar = []
+    onceki = depo.ozet_oku(sid)
+    if onceki:
+        satirlar.append("Önceki özet:\n" + onceki)
+    satirlar.append(
+        "Eski turları kısa özete indir; yüklenen eklerin adını ve kimliğini, çözülen "
+        "soruları ve açık kalan işleri koru. Eski araç gövdesini olduğu gibi taşıma, "
+        "kaynağın adını koru. Yalnız özet metnini yaz.")
+    for mesaj in mesajlar[:-20]:
+        satirlar.append(f"{mesaj['rol']}: {mesaj['icerik']}")
+        for ek in json.loads(mesaj["ekler_json"]):
+            if isinstance(ek, dict):
+                satirlar.append(f"Ek: {ek.get('ad', '')} ({ek.get('id', '')})")
+        for atif in json.loads(mesaj["atiflar_json"]):
+            if isinstance(atif, dict) and atif.get("label"):
+                satirlar.append(f"Kaynak: {atif['label']}")
+    try:
+        if tamamla is None:
+            llm = ClaudeClient()
+            if not llm.available:
+                return
+            def tamamla(prompt):
+                response = llm._get_client().messages.create(
+                    model=OZET_MODEL, max_tokens=2000, timeout=30,
+                    messages=[{"role": "user", "content": prompt}])
+                return llm._text(response)
+        ozet = tamamla("\n\n".join(satirlar))
+        if isinstance(ozet, str) and ozet.strip():
+            depo.ozet_yaz(sid, ozet.strip())
+    except Exception as exc:  # an optional model call must not undo a saved answer
+        logger.warning("Assistant summary failed (%s)", type(exc).__name__)
+
+
+def _parcayi_ele(onceki: set[str], govde: str) -> str:
+    parcalar = [parca for parca in govde.split("\n\n") if parca and parca not in onceki]
+    onceki.update(parcalar)
+    return "\n\n".join(parcalar) or "Aynı parça zaten duruyor."
+
+
 def _utcnow_naive() -> datetime:
     """Return a naive UTC datetime without using deprecated utcnow()."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -76,6 +123,8 @@ DEFAULT_EXCLUDED_DIRS = {
     "output/modules",
     "output/edupedia_drafts",
     "output/edupedia_runs",
+    # Session-owned uploads must only enter their owner's explicit chat request.
+    "output/assistant_uploads",
     # Migration/rollover backups and a sealed prior-year archive: historical
     # copies, not current school data (docs/superpowers/notes/2026-09-25-asistan-veri-denetimi.md §1-2).
     "output/saat_dilimi_gocu_yedek",
@@ -121,6 +170,7 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     "*.lock",
     "edupedia_media_ledger.json",
     "ted_mcp_oauth.sqlite3*",
+    "assistant_sohbetler.sqlite*",
     # Discovery/metadata JSONs — too noisy for BM25
     "*_discovered.json",
     "sebitv_*.json",
@@ -145,7 +195,7 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
 # produced under the current rules). AssistantIndexer.reindex() treats a
 # manifest whose version does not match this constant as fully stale and
 # rebuilds from scratch, regardless of the incremental flag or matching sha256s.
-INDEX_FORMAT_VERSION = 2
+INDEX_FORMAT_VERSION = 3
 
 # Files with structured student data — get semantic chunking
 _SEMANTIC_JSON_FILES = {
@@ -492,6 +542,7 @@ class ClaudeClient:
             return out
 
         kept_text = ""  # text an earlier event-only round wrote, carried into the final answer
+        onceki_parcalar: dict[str, set[str]] = {}
         for _round in range(max_rounds):
             round_on_delta = on_delta
             if on_delta is not None and kept_text:
@@ -608,7 +659,8 @@ class ClaudeClient:
                     # looks verified in the panel.
                     marks = "\n".join(f"[S{first + j}] {c.get('label', '')}"
                                       for j, c in enumerate(outcome.citations))
-                    body = f"{marks}\n{outcome.text}" if marks else outcome.text
+                    govde = _parcayi_ele(onceki_parcalar.setdefault(use.name, set()), outcome.text)
+                    body = f"{marks}\n{govde}" if marks else govde
                 else:
                     # Verbatim: the message names the offending field, so the
                     # model can usually fix its own call next round.
@@ -2093,6 +2145,12 @@ class AssistantRuntime:
         "- Dosyanın [S] numarası, eklendiği mesajda yazılıdır. Cevap o dosyaya "
         "dayanıyorsa o numarayı kullan.\n\n"
 
+        "## Öğrenci notu\n"
+        "- `hafiza_yaz` ve `hafiza_duzelt` Işık hakkında kısa not tutar: zorlandığı konu, "
+        "tercih ettiği anlatım, hedef.\n"
+        "- Sağlık, aile içi ve üçüncü kişi bilgisi yazma.\n"
+        "- Not, sistem istemine değil, kullanıcı turundaki bloğa konur.\n\n"
+
         "## Atıf\n"
         "- Araçtan gelen her bilgiyi kullandığın cümlede [S1], [S2] biçiminde "
         "işaretle. Bu numaralar araç sonucunda sana zaten gösterilir — yalnız "
@@ -2225,6 +2283,11 @@ class AssistantRuntime:
         ogretmen: str = assistant_skills.GENEL,
         mod_onerisi: bool = True,
         sahip_email: str | None = None,
+        pencere: int = 3,
+        hafiza: bool = True,
+        sohbet_id: str = "",
+        not_deposu=None,
+        ozet: str | None = None,
     ) -> dict[str, Any]:
         # `dispatch`, if given, replaces self.registry.dispatch for this
         # call only. chat_events() (below) uses this to wrap tool calls
@@ -2250,7 +2313,12 @@ class AssistantRuntime:
         ek_atiflari: list = []
         convo = self._build_conversation(messages, user_query, intent, safety_flags,
                                          okur=okur, ogretmen=ogretmen,
-                                         sahip_email=sahip_email, ek_atiflari=ek_atiflari)
+                                         sahip_email=sahip_email, ek_atiflari=ek_atiflari,
+                                         pencere=pencere, ozet=ozet,
+                                         notlar=not_deposu.notlar() if hafiza and not_deposu is not None else None)
+
+        hafiza_kw = ({"hafiza": hafiza, "not_deposu": not_deposu}
+                     if not_deposu is not None else {})
 
         try:
             # `temperature` stays in chat()'s signature for /v1 callers but is
@@ -2263,12 +2331,13 @@ class AssistantRuntime:
                 # teacher mode (B1). mod_onerisi=False (/v1, /plan) withholds
                 # mod_oner even in genel — those endpoints have no switch button.
                 declarations=self.registry.declarations(
-                    okur, ogretmen=ogretmen, mod_onerisi=mod_onerisi),
+                    okur, ogretmen=ogretmen, mod_onerisi=mod_onerisi, **hafiza_kw),
                 # Module progress enters the model context only for a signed-in person (plan K-S6);
                 # the caller decides, and only an exact True counts.
                 dispatch=dispatch or functools.partial(
                     self.registry.dispatch, ilerleme_izni=ilerleme_izni is True, okur=okur,
-                    ogretmen=ogretmen, mod_onerisi=mod_onerisi),
+                    ogretmen=ogretmen, mod_onerisi=mod_onerisi,
+                    **({**hafiza_kw, "sohbet_id": sohbet_id} if hafiza_kw else {})),
                 tier=tier,
                 on_delta=on_delta,
                 on_reset=on_reset,
@@ -2392,7 +2461,10 @@ class AssistantRuntime:
             self.registry.dispatch, ilerleme_izni=kwargs.get("ilerleme_izni") is True,
             okur=kwargs.get("okur", "bilinmiyor"),
             ogretmen=kwargs.get("ogretmen", assistant_skills.GENEL),
-            mod_onerisi=kwargs.get("mod_onerisi", True))
+            mod_onerisi=kwargs.get("mod_onerisi", True),
+            **({"hafiza": kwargs.get("hafiza", True), "not_deposu": kwargs["not_deposu"],
+                "sohbet_id": kwargs.get("sohbet_id", "")}
+               if kwargs.get("not_deposu") is not None else {}))
 
         # First suggestion wins here too (review round 2, finding NB2): without
         # this, a model calling mod_oner twice in one answer put two
@@ -2479,6 +2551,9 @@ class AssistantRuntime:
         ogretmen: str = assistant_skills.GENEL,
         sahip_email: str | None = None,
         ek_atiflari: list | None = None,
+        pencere: int = 3,
+        ozet: str | None = None,
+        notlar: list | None = None,
     ) -> list[dict[str, Any]]:
         """System prompt plus recent turns.
 
@@ -2500,7 +2575,7 @@ class AssistantRuntime:
         depo = EkDeposu(self.config.output_dir) if sahip_email else None
         gecmis = []
         sira = 1
-        for m in messages[-3:]:
+        for m in messages[-pencere:]:
             if not isinstance(m, dict):
                 continue
             # Only "assistant" stays itself. A client-sent "system" turn
@@ -2547,6 +2622,10 @@ class AssistantRuntime:
             *sistem,
             *gecmis,
             {"role": "user", "content": (
+                (f"Önceki özet:\n{ozet}\n\n" if ozet else "")
+                + ("Öğrenci notları:\n" + "\n".join(f"- {n['metin']}" for n in notlar) + "\n\n"
+                   if notlar else "")
+                +
                 f"{bugun_satiri(datetime.now())}\n"
                 f"Soran: {self._SORAN.get(okur, self._SORAN['bilinmiyor'])}\n"
                 f"Soru türü: {intent}\n"

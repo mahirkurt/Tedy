@@ -207,6 +207,16 @@ class EkDeposu:
             for yol in kisi.glob("*.json"):
                 yield yol
 
+    def bagla(self, email: str, kimlik: str, sohbet_id: str) -> None:
+        bulunan = self.oku(email, kimlik)
+        if bulunan is None:
+            return
+        meta, _veri = bulunan
+        if meta.get("bagli_sohbet") is None:
+            meta["bagli_sohbet"] = sohbet_id
+            meta.pop("id", None)
+            atomic_json_dump(meta, str(self._dizin(email) / f"{kimlik}.json"))
+
     def temizlik(self, simdi: datetime) -> int:
         if simdi.tzinfo is None:
             simdi = simdi.replace(tzinfo=timezone.utc)
