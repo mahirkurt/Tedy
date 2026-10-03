@@ -143,3 +143,110 @@ def test_dosya_parcasi_yoksa_400(istemci):
     res = istemci.post("/api/assistant/uploads", data={}, content_type="multipart/form-data")
     assert res.status_code == 400
     assert res.get_json() == {"error": "Dosya yok."}
+
+
+def test_chat_baskasinin_ekinde_404_ve_cagri_yok(istemci, monkeypatch):
+    class _K:
+        def __init__(self):
+            self.cagrilar = []
+        def chat(self, **kw):
+            self.cagrilar.append(kw)
+            return {"answer": "x", "citations": [], "safety_flags": [], "plan_blocks": [],
+                    "intent": "qa", "session_id": "", "mode_suggestion": None, "meta": {}}
+    k = _K()
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: k)
+    _giris(istemci, FULL)
+    kayit = _gonder(istemci, b"merhaba", "a.txt").get_json()
+    _giris(istemci, DIGER)
+    res = istemci.post("/api/assistant/chat", json={
+        "messages": [{"role": "user", "content": "bak", "ekler": [kayit["id"]]}]})
+    assert res.status_code == 404
+    assert res.get_json() == {"error": "Dosya bulunamadı."}
+    assert k.cagrilar == []
+
+
+def test_chat_beste_400(istemci, monkeypatch):
+    class _K:
+        cagrilar = []
+        def chat(self, **kw):
+            self.cagrilar.append(kw)
+            return {"answer": "x", "citations": [], "safety_flags": [], "plan_blocks": [],
+                    "intent": "qa", "session_id": "", "mode_suggestion": None, "meta": {}}
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: _K())
+    _giris(istemci, FULL)
+    kimlikler = []
+    for i in range(5):
+        kimlikler.append(_gonder(istemci, f"n{i}".encode(), f"n{i}.txt").get_json()["id"])
+    res = istemci.post("/api/assistant/chat", json={
+        "messages": [{"role": "user", "content": "bak", "ekler": kimlikler}]})
+    assert res.status_code == 400
+    assert res.get_json()["error"] == "Bir mesaja en fazla 4 dosya eklenebilir."
+
+
+def _on_kayit(istemci):
+    _giris(istemci, FULL)
+    return _gonder(istemci, b"merhaba", "a.txt").get_json()["id"]
+
+
+def test_istek_on_ek_kabul_on_bir_400(istemci, monkeypatch):
+    class _K:
+        def __init__(self):
+            self.cagrilar = []
+        def chat(self, **kw):
+            self.cagrilar.append(kw)
+            return {"answer": "x", "citations": [], "safety_flags": [], "plan_blocks": [],
+                    "intent": "qa", "session_id": "", "mode_suggestion": None, "meta": {}}
+    k = _K()
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: k)
+    kimlik = _on_kayit(istemci)
+    on = [
+        {"role": "user", "content": "a", "ekler": [kimlik] * 4},
+        {"role": "user", "content": "b", "ekler": [kimlik] * 4},
+        {"role": "user", "content": "c", "ekler": [kimlik] * 2},
+    ]
+    assert istemci.post("/api/assistant/chat", json={"messages": on}).status_code == 200
+    assert len(k.cagrilar) == 1
+    on_bir = on[:-1] + [{"role": "user", "content": "c", "ekler": [kimlik] * 3}]
+    res = istemci.post("/api/assistant/chat", json={"messages": on_bir})
+    assert res.status_code == 400
+    assert res.get_json()["error"] == "Bir istekte en fazla 10 dosya olabilir."
+    assert len(k.cagrilar) == 1
+
+
+def test_stream_sahibi_ve_baytlari_uretecten_once_tasir(istemci, monkeypatch):
+    import inspect
+    kimlik = _on_kayit(istemci)
+    gercek = dashboard_api._module_person
+
+    def izlenen():
+        # assistant_stream's comment: generate() runs after the view returns,
+        # where the session is gone. The test client still has a session
+        # while it reads the body, so an unguarded _module_person() inside
+        # generate() would pass. Treat that frame as no person.
+        for f in inspect.stack():
+            if f.function == "generate" and f.filename.endswith("dashboard_api.py"):
+                return None
+        return gercek()
+
+    monkeypatch.setattr(dashboard_api, "_module_person", izlenen)
+
+    class _K:
+        def __init__(self):
+            self.kw = None
+        def chat_events(self, **kw):
+            self.kw = kw
+            yield {"event": "answer", "payload": {
+                "answer": "x", "citations": [], "safety_flags": [], "plan_blocks": [],
+                "intent": "qa", "session_id": "", "mode_suggestion": None, "meta": {}}}
+        def chat(self, **kw):
+            raise AssertionError("stream fell through to chat")
+    k = _K()
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: k)
+    res = istemci.post("/api/assistant/stream", json={
+        "messages": [{"role": "user", "content": "bak", "ekler": [kimlik]}]})
+    govde = res.get_data().decode()
+    assert res.status_code == 200
+    assert "event: answer" in govde
+    assert k.kw is not None
+    assert k.kw["sahip_email"] == FULL
+    assert k.kw["messages"][0]["ek_govde"][0]["veri"] == b"merhaba"

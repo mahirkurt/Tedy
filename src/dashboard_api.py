@@ -2299,6 +2299,56 @@ def health():
     return jsonify(payload)
 
 
+def _ekleri_hazirla(messages, email):
+    """Validate ekler and attach stored bytes while the request still has a session.
+
+    Returns (messages, None) or (None, error_response). Strips a client-supplied
+    ek_govde. Counts every ekler entry on every message (repeats count). Puts
+    ek_govde only on user messages.
+    """
+    from src.assistant_uploads import ISTEK_SINIRI, MESAJ_SINIRI, KIMLIK_RE, EkDeposu
+    if not isinstance(messages, list):
+        return messages, None
+    depo = None
+    toplam = 0
+    hazir = []
+    for m in messages:
+        if not isinstance(m, dict):
+            hazir.append(m)
+            continue
+        kopya = {k: v for k, v in m.items() if k != "ek_govde"}
+        ekler = kopya.get("ekler", None)
+        if ekler is None:
+            hazir.append(kopya)
+            continue
+        if (not isinstance(ekler, list)
+                or any(not isinstance(x, str) or not KIMLIK_RE.fullmatch(x) for x in ekler)):
+            return None, (jsonify({"error": "Ekler bir kimlik listesi olmalı."}), 400)
+        if len(ekler) > MESAJ_SINIRI:
+            return None, (jsonify({"error": "Bir mesaja en fazla 4 dosya eklenebilir."}), 400)
+        toplam += len(ekler)
+        if toplam > ISTEK_SINIRI:
+            return None, (jsonify({"error": "Bir istekte en fazla 10 dosya olabilir."}), 400)
+        if not ekler:
+            hazir.append(kopya)
+            continue
+        if not email:
+            return None, (jsonify({"error": "session_required"}), 403)
+        if depo is None:
+            depo = EkDeposu(OUTPUT_DIR)
+        govdeler = []
+        for kimlik in ekler:
+            bulunan = depo.oku(email, kimlik)
+            if bulunan is None:
+                return None, (jsonify({"error": "Dosya bulunamadı."}), 404)
+            meta, veri = bulunan
+            govdeler.append({"meta": meta, "veri": veri})
+        if kopya.get("role") == "user":
+            kopya["ek_govde"] = govdeler
+        hazir.append(kopya)
+    return hazir, None
+
+
 @app.route("/api/assistant/chat", methods=["POST"])
 @require_auth
 def assistant_chat():
@@ -2314,6 +2364,11 @@ def assistant_chat():
     messages = payload.get("messages", [])
     if not isinstance(messages, list):
         return jsonify({"error": "messages list olmalı"}), 400
+
+    email = _module_person()
+    hazir, hata = _ekleri_hazirla(messages, email)
+    if hata is not None:
+        return hata
 
     context_filters = payload.get("context_filters", {})
     if not isinstance(context_filters, dict):
@@ -2333,13 +2388,14 @@ def assistant_chat():
     try:
         runtime = _assistant_runtime()
         out = runtime.chat(
-            messages=messages,
+            messages=hazir,
             session_id=session_id,
             context_filters=context_filters,
             temperature=temperature,
             ilerleme_izni=_assistant_progress_allowed(),
             okur=_assistant_okur(),
             ogretmen=ogretmen,
+            sahip_email=email,
         )
         return jsonify(out)
     except AssistantUnavailableError:
@@ -2372,13 +2428,18 @@ def assistant_stream():
     # session is no longer reachable.
     ilerleme_izni = _assistant_progress_allowed()
     okur = _assistant_okur()
+    email = _module_person()
+    hazir, hata = _ekleri_hazirla(messages, email)
+    if hata is not None:
+        return hata
 
     def generate():
         try:
             runtime = _assistant_runtime()
             for event in runtime.chat_events(
-                messages=messages, session_id=session_id, force_deep=force_deep,
+                messages=hazir, session_id=session_id, force_deep=force_deep,
                 ilerleme_izni=ilerleme_izni, okur=okur, ogretmen=ogretmen,
+                sahip_email=email,
             ):
                 name = event.pop("event")
                 yield f"event: {name}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
