@@ -1,5 +1,5 @@
 import './AssistantChat.scss'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   AILabel,
@@ -22,6 +22,9 @@ import {
   Search,
   Time,
   Idea,
+  Attachment,
+  Camera,
+  Close,
 } from '@carbon/icons-react'
 import type { AssistantCitation, AssistantPlanBlock, AssistantResponse, ModOnerisi as Oneri } from '../types'
 import { renderMarkdown } from '../utils/markdown'
@@ -50,6 +53,8 @@ interface ChatMessage {
   model?: string
   /** A genel-mode answer's suggestion to switch teacher; shown as a button, never applied. */
   modOnerisi?: Oneri | null
+  /** Upload ids copied onto a composer send. Other paths leave this off. */
+  ekler?: string[]
 }
 
 // The page speaks to whoever is signed in, as the model does (the prompt's
@@ -142,7 +147,40 @@ async function readEventStream(
 }
 
 function toApiMessages(messages: ChatMessage[]) {
-  return messages.map(m => ({ role: m.role, content: m.content }))
+  return messages.map(m => ({
+    role: m.role,
+    content: m.content,
+    ...(m.ekler && m.ekler.length ? { ekler: m.ekler } : {}),
+  }))
+}
+
+const TUR: Record<string, string> = {
+  gorsel: 'Görsel',
+  pdf: 'PDF',
+  docx: 'Word',
+  txt: 'Metin',
+}
+
+interface Cip {
+  yerel: string
+  ad: string
+  tur?: string
+  id?: string
+  hata?: string
+  yukleniyor?: boolean
+}
+
+function useKabaIsaret() {
+  const [kaba, setKaba] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(pointer: coarse)')
+    const guncelle = () => setKaba(mq.matches)
+    guncelle()
+    mq.addEventListener('change', guncelle)
+    return () => mq.removeEventListener('change', guncelle)
+  }, [])
+  return kaba
 }
 
 /** The user turn that produced a given assistant message, if any. */
@@ -299,6 +337,10 @@ export default function AssistantChat() {
     : voice.prompts
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const dosyaRef = useRef<HTMLInputElement>(null)
+  const kameraRef = useRef<HTMLInputElement>(null)
+  const composerRef = useRef<HTMLFormElement>(null)
+  const kaba = useKabaIsaret()
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     // Its text comes from `voice` at render time: the session can settle
@@ -306,6 +348,7 @@ export default function AssistantChat() {
     { id: 'welcome', role: 'assistant', content: '' },
   ])
   const [draft, setDraft] = useState('')
+  const [cipler, setCipler] = useState<Cip[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeCitation, setActiveCitation] = useState<string | null>(null)
@@ -351,19 +394,114 @@ export default function AssistantChat() {
     setMessages(prev => [...prev, assistantMsg])
   }
 
+  async function yukleBir(yerel: string, file: File) {
+    const body = new FormData()
+    body.append('dosya', file)
+    try {
+      const res = await fetch('/api/assistant/uploads', {
+        method: 'POST',
+        credentials: 'include',
+        body,
+      })
+      let payload: { error?: unknown; id?: unknown; ad?: unknown; tur?: unknown } = {}
+      try {
+        payload = await res.json()
+      } catch {
+        payload = {}
+      }
+      if (!res.ok || typeof payload.id !== 'string') {
+        const hata = typeof payload.error === 'string' ? payload.error : 'Dosya yüklenemedi.'
+        setCipler(prev => prev.map(c => c.yerel === yerel
+          ? { ...c, yukleniyor: false, hata }
+          : c))
+        return
+      }
+      setCipler(prev => prev.map(c => c.yerel === yerel ? {
+        ...c,
+        yukleniyor: false,
+        id: payload.id as string,
+        ad: typeof payload.ad === 'string' ? payload.ad : c.ad,
+        tur: typeof payload.tur === 'string' ? payload.tur : undefined,
+      } : c))
+    } catch {
+      setCipler(prev => prev.map(c => c.yerel === yerel
+        ? { ...c, yukleniyor: false, hata: 'Dosya yüklenemedi.' }
+        : c))
+    }
+  }
+
+  function ekle(files: File[]) {
+    if (files.length === 0) return
+    const dolu = cipler.filter(c => c.yukleniyor || c.id).length
+    let yer = 4 - dolu
+    const baslangic: Cip[] = []
+    const yuklenecek: { yerel: string; file: File }[] = []
+    for (const file of files) {
+      const yerel = crypto.randomUUID()
+      if (yer > 0) {
+        yer -= 1
+        baslangic.push({ yerel, ad: file.name, yukleniyor: true })
+        yuklenecek.push({ yerel, file })
+      } else {
+        baslangic.push({
+          yerel,
+          ad: file.name,
+          hata: 'Bir mesaja en fazla 4 dosya eklenebilir.',
+        })
+      }
+    }
+    setCipler(prev => [...prev, ...baslangic])
+    for (const item of yuklenecek) void yukleBir(item.yerel, item.file)
+  }
+
+  const ekleRef = useRef(ekle)
+  ekleRef.current = ekle
+  // Carbon's TextArea always renders an empty role=alert counter. A chip
+  // error is the alert the reader (and the upload checks) should find.
+  useLayoutEffect(() => {
+    const root = composerRef.current
+    if (!root) return
+    root.querySelectorAll<HTMLElement>('[class*="text-area__counter-alert"]').forEach(el => {
+      if ((el.textContent || '').trim()) return
+      el.removeAttribute('role')
+      el.removeAttribute('aria-live')
+    })
+  })
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    // Carbon's TextArea registers its own onPaste and does not call ours.
+    const onPaste = (e: ClipboardEvent) => {
+      const files = e.clipboardData?.files
+      if (files && files.length) {
+        e.preventDefault()
+        ekleRef.current([...files])
+      }
+    }
+    el.addEventListener('paste', onPaste)
+    return () => el.removeEventListener('paste', onPaste)
+  }, [])
+
   async function submit(mode: 'chat' | 'plan', forcedPrompt?: string, opts?: { deep?: boolean }) {
     const content = (forcedPrompt ?? draft).trim()
     if (!content || loading) return
 
+    const gonderEk = forcedPrompt === undefined && mode === 'chat'
+    const ekler = gonderEk ? cipler.flatMap(c => c.id ? [c.id] : []) : []
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
       content,
+      ...(ekler.length ? { ekler } : {}),
     }
 
     const nextMessages = [...messages, userMsg]
+    const apiKaynak = gonderEk
+      ? nextMessages
+      : nextMessages.map(m => (m.ekler ? { ...m, ekler: undefined } : m))
     setMessages(nextMessages)
     setDraft('')
+    if (gonderEk && ekler.length) setCipler([])
     setLoading(true)
     setError(null)
     setStage(null)
@@ -372,7 +510,7 @@ export default function AssistantChat() {
     const requestBody = {
       session_id: 'dashboard-default',
       context_filters: {},
-      messages: toApiMessages(nextMessages),
+      messages: toApiMessages(apiKaynak),
       ogretmen: ogretmen.id,
       ...(opts?.deep ? { force_deep: true } : {}),
     }
@@ -647,8 +785,79 @@ export default function AssistantChat() {
           </div>
 
           {/* Composer */}
-          <form className="ac__composer" onSubmit={onSubmit}>
+          <form
+            ref={composerRef}
+            className="ac__composer"
+            onSubmit={onSubmit}
+            onDragOver={e => { e.preventDefault() }}
+            onDrop={e => {
+              e.preventDefault()
+              ekle([...(e.dataTransfer.files ?? [])])
+            }}
+          >
+            {cipler.length > 0 && (
+              <ul className="ac__ekler">
+                {cipler.map(c => (
+                  <li key={c.yerel} className="ac__ek">
+                    <span>{c.ad}</span>
+                    {c.tur && TUR[c.tur] ? <span>{TUR[c.tur]}</span> : null}
+                    {c.yukleniyor ? <span>Yükleniyor</span> : null}
+                    {c.hata ? <p role="alert" className="ac__ek-hata">{c.hata}</p> : null}
+                    <button
+                      type="button"
+                      className="ac__ek-kaldir"
+                      aria-label={`Kaldır: ${c.ad}`}
+                      disabled={loading}
+                      onClick={() => setCipler(prev => prev.filter(x => x.yerel !== c.yerel))}
+                    >
+                      <Close size={16} aria-hidden />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
             <div className="ac__input-row">
+              <input
+                ref={dosyaRef}
+                className="ac__dosya-girdi"
+                type="file"
+                multiple
+                aria-hidden
+                tabIndex={-1}
+                onChange={e => { ekle([...(e.target.files ?? [])]); e.target.value = '' }}
+              />
+              {kaba && (
+                <input
+                  ref={kameraRef}
+                  className="ac__dosya-girdi ac__dosya-girdi--kamera"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  aria-hidden
+                  tabIndex={-1}
+                  onChange={e => { ekle([...(e.target.files ?? [])]); e.target.value = '' }}
+                />
+              )}
+              <IconButton
+                kind="ghost"
+                size="lg"
+                label="Dosya ekle"
+                disabled={loading}
+                onClick={() => dosyaRef.current?.click()}
+              >
+                <Attachment />
+              </IconButton>
+              {kaba && (
+                <IconButton
+                  kind="ghost"
+                  size="lg"
+                  label="Fotoğraf çek"
+                  disabled={loading}
+                  onClick={() => kameraRef.current?.click()}
+                >
+                  <Camera />
+                </IconButton>
+              )}
               <TextArea
                 ref={textareaRef}
                 id="ac-input"
@@ -657,6 +866,13 @@ export default function AssistantChat() {
                 value={draft}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDraft(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onPaste={e => {
+                  const files = e.clipboardData?.files
+                  if (files && files.length) {
+                    e.preventDefault()
+                    ekle([...files])
+                  }
+                }}
                 rows={2}
                 placeholder={loading ? 'Yanıt bekleniyor...' : voice.placeholder}
                 disabled={loading}

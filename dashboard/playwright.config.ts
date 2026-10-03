@@ -9,6 +9,7 @@ import { defineConfig } from '@playwright/test'
 //   * the server is never reused, so a collision fails loudly at startup
 //     instead of quietly producing meaningless results.
 const PORT = Number(process.env.TEDY_E2E_PORT ?? 8286)
+const PYTHON = process.env.TEDY_E2E_PYTHON ?? '.venv/bin/python'
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -28,7 +29,7 @@ export default defineConfig({
     { name: 'firefox', use: { browserName: 'firefox' }, testMatch: /capraz-tarayici\.spec\.ts/ },
   ],
   webServer: {
-    command: `cd .. && TEST_AUTH_BYPASS=1 .venv/bin/python -c "from src.dashboard_api import app; app.run(host='127.0.0.1', port=${PORT})"`,
+    command: `cd .. && TEST_AUTH_BYPASS=1 ${PYTHON} -c "from src.dashboard_api import app; app.run(host='127.0.0.1', port=${PORT})"`,
     port: PORT,
     reuseExistingServer: false,
     timeout: 15000,

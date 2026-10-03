@@ -97,7 +97,19 @@ export const FULL: Record<string, unknown> = {
 
 export async function mock(page: Page, data: Record<string, unknown>) {
   // The stream endpoint is real backend code and would reach Gemini.
-  await page.route('**/api/assistant/stream', r => r.abort())
+  // Playwright checks the newest route first. A spec that already registered
+  // its own /stream handler (the upload test's fulfill) must still run;
+  // yielding here reaches that handler. With no earlier handler, abort so
+  // the composer falls back to /chat and never calls the model.
+  await page.route('**/api/assistant/stream', async route => {
+    const url = route.request().url()
+    const routes = (page as unknown as { _routes?: { matches: (u: string) => boolean }[] })._routes ?? []
+    if (routes.filter(h => h.matches(url)).length > 1) {
+      await route.fallback()
+      return
+    }
+    await route.abort()
+  })
   for (const [ep, body] of Object.entries(data)) {
     await page.route(`**/api/${ep}`, r => r.fulfill(json(body)))
   }
