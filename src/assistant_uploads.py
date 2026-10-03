@@ -1,12 +1,19 @@
 """Assistant uploads (spec §2). Type from leading bytes. No Flask, no Pillow."""
 from __future__ import annotations
 
+import base64
+import json
 import re
+import uuid
 import zipfile
 import zlib
 import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
+
+from src.json_utils import atomic_json_dump
+from src.module_ticket import email_hash
 
 MIB = 1024 * 1024
 SINIR = {"gorsel": 12 * MIB, "pdf": 10 * MIB, "docx": 5 * MIB, "txt": 5 * MIB}
@@ -126,3 +133,141 @@ def txt_metni(veri: bytes) -> str:
         return veri.decode("utf-8-sig")
     except UnicodeDecodeError:
         raise YuklemeHatasi(415, "Bu metin UTF-8 olarak okunamadı.") from None
+
+
+_OTUZ = timedelta(days=30)
+
+
+def _zaman(an: datetime) -> str:
+    if an.tzinfo is None:
+        an = an.replace(tzinfo=timezone.utc)
+    return an.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _an(metin: str) -> datetime | None:
+    try:
+        return datetime.strptime(metin, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return None
+
+
+class EkDeposu:
+    def __init__(self, output_dir: Path):
+        self.kok = Path(output_dir) / "assistant_uploads"
+
+    def _dizin(self, email: str) -> Path:
+        return self.kok / email_hash(email)
+
+    def kaydet(self, email: str, ad: str, tur: str, boyut: int,
+               icerik: bytes, simdi: datetime) -> dict:
+        self.temizlik(simdi)
+        kimlik = uuid.uuid4().hex
+        dizin = self._dizin(email)
+        dizin.mkdir(parents=True, exist_ok=True)
+        gecici = dizin / f"{kimlik}.part"
+        gecici.write_bytes(icerik)
+        hedef = dizin / kimlik
+        gecici.replace(hedef)
+        meta = {
+            "sahip_email": email,
+            "ad": ad_temizle(ad),
+            "tur": tur,
+            "boyut": boyut,
+            "zaman": _zaman(simdi),
+            "bagli_sohbet": None,
+        }
+        try:
+            atomic_json_dump(meta, str(dizin / f"{kimlik}.json"))
+        except BaseException:
+            hedef.unlink(missing_ok=True)
+            raise
+        return {"id": kimlik, "ad": meta["ad"], "tur": tur, "boyut": boyut}
+
+    def oku(self, email: str, kimlik: str) -> tuple[dict, bytes] | None:
+        if not isinstance(kimlik, str) or not KIMLIK_RE.fullmatch(kimlik):
+            return None
+        dizin = self._dizin(email)
+        meta_yol, veri_yol = dizin / f"{kimlik}.json", dizin / kimlik
+        try:
+            meta = json.loads(meta_yol.read_text(encoding="utf-8"))
+            veri = veri_yol.read_bytes()
+        except (OSError, json.JSONDecodeError):
+            return None
+        if not isinstance(meta, dict) or meta.get("sahip_email") != email:
+            return None
+        meta["id"] = kimlik
+        return meta, veri
+
+    def _meta_dosyalari(self):
+        if not self.kok.is_dir():
+            return
+        for kisi in self.kok.iterdir():
+            if not kisi.is_dir():
+                continue
+            for yol in kisi.glob("*.json"):
+                yield yol
+
+    def temizlik(self, simdi: datetime) -> int:
+        if simdi.tzinfo is None:
+            simdi = simdi.replace(tzinfo=timezone.utc)
+        silinen = 0
+        for yol in list(self._meta_dosyalari()):
+            try:
+                meta = json.loads(yol.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(meta, dict) or meta.get("bagli_sohbet") is not None:
+                continue
+            an = _an(meta.get("zaman"))
+            if an is None or simdi - an < _OTUZ:
+                continue
+            kimlik = yol.stem
+            if not KIMLIK_RE.fullmatch(kimlik):
+                continue
+            yol.unlink(missing_ok=True)
+            (yol.parent / kimlik).unlink(missing_ok=True)
+            silinen += 1
+        return silinen
+
+    def sohbet_eklerini_sil(self, sohbet_id: str) -> int:
+        if not sohbet_id:
+            return 0
+        silinen = 0
+        for yol in list(self._meta_dosyalari()):
+            try:
+                meta = json.loads(yol.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(meta, dict) or meta.get("bagli_sohbet") != sohbet_id:
+                continue
+            kimlik = yol.stem
+            yol.unlink(missing_ok=True)
+            if KIMLIK_RE.fullmatch(kimlik):
+                (yol.parent / kimlik).unlink(missing_ok=True)
+            silinen += 1
+        return silinen
+
+
+def atif(meta: dict) -> dict:
+    return {
+        "kind": "yuklenen-dosya",
+        "label": meta["ad"],
+        "locator": {"upload_id": meta["id"], "tur": meta["tur"]},
+        "snippet": TUR_ETIKETI[meta["tur"]],
+        "confidence": 0.9,
+    }
+
+
+def icerik_bloku(tur: str, icerik: bytes) -> dict | None:
+    if tur == "gorsel":
+        return {"type": "image", "source": {
+            "type": "base64", "media_type": "image/jpeg",
+            "data": base64.b64encode(icerik).decode("ascii")}}
+    if tur == "pdf":
+        return {"type": "document", "source": {
+            "type": "base64", "media_type": "application/pdf",
+            "data": base64.b64encode(icerik).decode("ascii")}}
+    metin = icerik.decode("utf-8")
+    if not metin.strip():
+        return None
+    return {"type": "text", "text": metin}

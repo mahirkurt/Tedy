@@ -149,3 +149,68 @@ def test_ad_yol_degil():
     assert ad_temizle("../../etc/passwd") == "passwd"
     assert ad_temizle("") == "dosya"
     assert len(ad_temizle("a" * 500)) == 180
+
+
+from datetime import datetime, timedelta, timezone
+
+from src.assistant_uploads import EkDeposu
+from src.module_ticket import email_hash
+
+FULL = "isikkurtx@gmail.com"
+DIGER = "drmahirkurt@gmail.com"
+SIMDI = datetime(2026, 10, 3, 6, 0, tzinfo=timezone.utc)
+
+
+def test_kayit_ozet_dizinde_ve_meta_alani(tmp_path):
+    depo = EkDeposu(tmp_path)
+    kayit = depo.kaydet(FULL, "../not.txt", "txt", 5, b"merhaba", SIMDI)
+    assert kayit["ad"] == "not.txt" and kayit["tur"] == "txt" and kayit["boyut"] == 5
+    dizin = tmp_path / "assistant_uploads" / email_hash(FULL)
+    assert (dizin / kayit["id"]).read_bytes() == b"merhaba"
+    meta, icerik = depo.oku(FULL, kayit["id"])
+    assert icerik == b"merhaba"
+    assert meta["sahip_email"] == FULL and meta["bagli_sohbet"] is None
+    assert meta["zaman"] == "2026-10-03T06:00:00Z"
+    assert FULL not in str(dizin)
+
+
+def test_baskasinin_kimligi_yok_sayilir(tmp_path):
+    depo = EkDeposu(tmp_path)
+    kayit = depo.kaydet(FULL, "a.txt", "txt", 1, b"a", SIMDI)
+    assert depo.oku(DIGER, kayit["id"]) is None
+    assert depo.oku(FULL, "a" * 32) is None
+    assert depo.oku(FULL, "../" + kayit["id"]) is None
+
+
+def test_baglanmamis_otuz_gunde_silinir_baglanan_kalir(tmp_path):
+    depo = EkDeposu(tmp_path)
+    eski = SIMDI - timedelta(days=30)
+    genc = SIMDI - timedelta(days=29)
+    gitti = depo.kaydet(FULL, "eski.txt", "txt", 1, b"e", eski)
+    kalir = depo.kaydet(FULL, "genc.txt", "txt", 1, b"g", genc)
+    bagli = depo.kaydet(FULL, "bagli.txt", "txt", 1, b"b", eski)
+    meta_yol = tmp_path / "assistant_uploads" / email_hash(FULL) / f"{bagli['id']}.json"
+    import json
+    meta = json.loads(meta_yol.read_text())
+    meta["bagli_sohbet"] = "sohbet-1"
+    meta_yol.write_text(json.dumps(meta))
+    assert depo.temizlik(SIMDI) == 1
+    assert depo.oku(FULL, gitti["id"]) is None
+    assert depo.oku(FULL, kalir["id"]) is not None
+    assert depo.oku(FULL, bagli["id"]) is not None
+
+
+def test_sohbet_silme_yalniz_o_sohbetin_ekini_siler(tmp_path):
+    depo = EkDeposu(tmp_path)
+    bir = depo.kaydet(FULL, "a.txt", "txt", 1, b"a", SIMDI)
+    iki = depo.kaydet(DIGER, "b.txt", "txt", 1, b"b", SIMDI)
+    import json
+    for email, kayit, sohbet in ((FULL, bir, "s1"), (DIGER, iki, "s2")):
+        yol = tmp_path / "assistant_uploads" / email_hash(email) / f"{kayit['id']}.json"
+        meta = json.loads(yol.read_text())
+        meta["bagli_sohbet"] = sohbet
+        yol.write_text(json.dumps(meta))
+    assert depo.sohbet_eklerini_sil("") == 0
+    assert depo.sohbet_eklerini_sil("s1") == 1
+    assert depo.oku(FULL, bir["id"]) is None
+    assert depo.oku(DIGER, iki["id"]) is not None
