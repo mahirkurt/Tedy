@@ -439,6 +439,7 @@ AILE_TOOL = "aile_kaynak_ara"
 # dispatch() in the other mode too (defence in depth, as aile_kaynak_ara).
 SKILL_TOOL = "skill_kaynagi"
 MOD_ONER_TOOL = "mod_oner"
+_HAFIZA_ARACLARI = {"hafiza_yaz", "hafiza_duzelt"}
 # Tools that only leave a ToolOutcome.olay behind and change nothing else: a
 # model round that writes its answer and calls just one of these does not need
 # on_reset or another model round (chat_with_tools, review finding 1). B4's
@@ -468,6 +469,15 @@ def _katla(metin: Any) -> str:
     # Lazy: assistant_core imports this module when it builds the registry.
     from src.assistant_core import turkce_kucult_katla
     return turkce_kucult_katla(str(metin or "")).strip()
+
+
+def _sorguya(metin: str) -> str:
+    """Yerel aramada soru sözcüklerini ek model çağrısı olmadan ayıklar."""
+    temiz = metin.replace("?", "").replace("!", "")
+    soru_sozcukleri = {"nedir", "nelerdir", "nasil", "neden", "nicin", "kim",
+                      "kimdir", "hangi", "kac", "mi", "mu"}
+    kalan = [parca for parca in temiz.split() if _katla(parca) not in soru_sozcukleri]
+    return " ".join(kalan) or metin.replace("?", "").strip()
 
 
 def html_metne(deger: Any) -> str:
@@ -1567,11 +1577,13 @@ class McpRegistry:
                  video_kaynagi: Callable[[], Any] | None = None,
                  aile_kaynak_arama: Callable[[str, int], list[dict[str, Any]]] | None = None,
                  saat: Callable[[], datetime] | None = None,
-                 skills: dict[str, Any] | None = None) -> None:
+                 skills: dict[str, Any] | None = None,
+                 not_deposu: Any = None) -> None:
         self.clients = clients
         # Öğretmen skill'leri (src/assistant_skills.py), id -> Skill. Empty: no
         # teacher tool is declared in any mode.
         self.skills: dict[str, Any] = dict(skills or {})
+        self.not_deposu = not_deposu
         # Işık's grade in the corpus's form ("7.Sınıf"), read when asked so a
         # new school year needs no restart. None, or a None answer, means
         # unknown: no grade is then invented.
@@ -1633,7 +1645,8 @@ class McpRegistry:
         return sorted(unhealthy | set(self.unconfigured) | modules)
 
     def declarations(self, okur: str = "bilinmiyor", ogretmen: str = GENEL,
-                     mod_onerisi: bool = True) -> list[dict[str, Any]]:
+                     mod_onerisi: bool = True, hafiza: bool = True,
+                     not_deposu: Any = None, sohbet_id: str = "") -> list[dict[str, Any]]:
         decls: list[dict[str, Any]] = [{
             "name": LOCAL_TOOL,
             "description": self._yerel_aciklama(),
@@ -1695,6 +1708,16 @@ class McpRegistry:
             })
         # Last, so every mode shares the same list up to here.
         decls.extend(self._ogretmen_bildirimleri(ogretmen, mod_onerisi))
+        depo = not_deposu if not_deposu is not None else self.not_deposu
+        if hafiza and okur in ("ogrenci", "aile") and depo is not None:
+            for ad in ("hafiza_yaz", "hafiza_duzelt"):
+                alanlar = {"metin": {"type": "string", "description": "Öğrenmeyle ilgili kısa not; sağlık, aile ve kişi bilgisi yazma."}}
+                if ad == "hafiza_duzelt":
+                    alanlar["id"] = {"type": "string", "description": "Düzeltilecek öğrenci notunun kimliği."}
+                decls.append({"name": ad,
+                              "description": "Öğrencinin zorlandığı konuyu, anlatım tercihini ya da hedefini not eder." if ad == "hafiza_yaz" else "Öğrenci hakkındaki mevcut öğrenme notunu düzeltir.",
+                              "parameters": {"type": "object", "properties": alanlar,
+                                             "required": list(alanlar)}})
         return decls
 
     def _ogretmen_bildirimleri(self, ogretmen: str, mod_onerisi: bool = True) -> list[dict[str, Any]]:
@@ -1785,7 +1808,11 @@ class McpRegistry:
 
     def dispatch(self, name: str, args: dict[str, Any], ilerleme_izni: bool = False,
                 okur: str = "bilinmiyor", ogretmen: str = GENEL,
-                mod_onerisi: bool = True) -> ToolOutcome:
+                mod_onerisi: bool = True, hafiza: bool = True,
+                not_deposu: Any = None, sohbet_id: str = "") -> ToolOutcome:
+        if name in _HAFIZA_ARACLARI:
+            depo = not_deposu if not_deposu is not None else self.not_deposu
+            return self._dispatch_hafiza(name, args or {}, okur, hafiza, depo, sohbet_id)
         if name == MOD_ONER_TOOL:
             return self._dispatch_mod_oner(args or {}, ogretmen, mod_onerisi)
         if name == SKILL_TOOL:
@@ -2009,8 +2036,28 @@ class McpRegistry:
         # No citation: these are the teacher's own notes, not a source for the reader.
         return ToolOutcome(ok=True, text=f"{ad} · sayfa {sayfa}/{toplam}\n\n{metin}{devam}")
 
+    def _dispatch_hafiza(self, name: str, args: dict[str, Any], okur: str,
+                        hafiza: bool, depo: Any, sohbet_id: str) -> ToolOutcome:
+        from src.assistant_sohbet import hassas_not
+
+        if not hafiza or okur not in ("ogrenci", "aile") or depo is None:
+            return ToolOutcome(ok=False, error="Bu istekte öğrenci notu yazılamaz.")
+        metin = args.get("metin")
+        if not isinstance(metin, str) or not metin.strip() or hassas_not(metin):
+            return ToolOutcome(ok=False, error="Bu not yazılmadı.")
+        if name == "hafiza_yaz":
+            simdi = self.saat() if self.saat is not None else datetime.now(timezone.utc)
+            nid = depo.not_yaz(metin.strip(), sohbet_id or None, simdi)
+            if not nid:
+                return ToolOutcome(ok=False, error="Bu not yazılmadı.")
+            return ToolOutcome(ok=True, text=json.dumps({"id": nid}, ensure_ascii=False))
+        nid = args.get("id")
+        if not isinstance(nid, str) or not re.fullmatch(r"[0-9a-f]{32}", nid) or not depo.not_duzelt(nid, metin.strip()):
+            return ToolOutcome(ok=False, error="Not bulunamadı.")
+        return ToolOutcome(ok=True, text="Not düzeltildi.")
+
     def _dispatch_local(self, args: dict[str, Any]) -> ToolOutcome:
-        query = str(args.get("query", "")).strip()
+        query = _sorguya(str(args.get("query", "")).strip())
         return _dispatch_bm25_arama(
             self.local_search, query, kind="ogrenci",
             etiket_fn=_yerel_isabet_etiketi, hata_onek="yerel arama hatası")
@@ -2018,7 +2065,7 @@ class McpRegistry:
     def _dispatch_aile_kaynak(self, args: dict[str, Any]) -> ToolOutcome:
         """aile_kaynak_ara (Görev 5): the same shared body as _dispatch_local,
         over content/pedagoji's own retriever and its own citation kind."""
-        query = str(args.get("sorgu", "")).strip()
+        query = _sorguya(str(args.get("sorgu", "")).strip())
         return _dispatch_bm25_arama(
             self.aile_kaynak_arama, query, kind="aile-kaynak",
             etiket_fn=_aile_kaynak_etiketi, hata_onek="aile kaynağı araması hatası")
@@ -2170,7 +2217,8 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                    video_kaynagi: Callable[[], Any] | None = None,
                    aile_kaynak_arama: Callable[[str, int], list[dict[str, Any]]] | None = None,
                    saat: Callable[[], datetime] | None = None,
-                   skills: dict[str, Any] | None = None) -> McpRegistry:
+                   skills: dict[str, Any] | None = None,
+                   not_deposu: Any = None) -> McpRegistry:
     """Wire the configured servers. A server with no key is simply absent —
     its tools are not declared — but it is still named by degraded(), so an
     unset env var never looks like a healthy system with nothing to say."""
@@ -2191,4 +2239,4 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                        not_kaynagi=not_kaynagi, sebit_kaynagi=sebit_kaynagi,
                        platform_kaynagi=platform_kaynagi, kitap_kaynagi=kitap_kaynagi,
                        video_kaynagi=video_kaynagi, aile_kaynak_arama=aile_kaynak_arama,
-                       saat=saat, skills=skills)
+                       saat=saat, skills=skills, not_deposu=not_deposu)
