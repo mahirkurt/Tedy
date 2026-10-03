@@ -1387,3 +1387,47 @@ def ekleri_esitle(proje_koku: str | Path, veri: Any, oturum: Any, butce: Butce, 
             "kalan_is": sum(1 for k in ekler.values()
                             if (_indirilmeli(k, depo, an) and k.get("status") != DURUM_ERISILEMEDI)
                             or _metin_gerekli(k, depo))}
+
+
+def main(argv: list[str] | None = None, kok: Path | None = None) -> int:
+    """By hand: `flock`-free, it takes output/.sync.lock itself and refuses
+    while a sync runs. Uses the cached portal cookies (output/portal_cookies.json).
+
+        .venv/bin/python -m src.portal_ekleri_indir --sure 300 --bayt-mb 250 --indeksle
+    """
+    import argparse
+    import fcntl
+    import json as _json
+    from src.session_manager import load_cookies
+
+    ap = argparse.ArgumentParser(description="Portal eklerini indir (senkron kilidiyle).")
+    ap.add_argument("--sure", type=int, default=300, help="süre bütçesi, saniye")
+    ap.add_argument("--bayt-mb", type=int, default=250, help="bayt bütçesi, MB")
+    ap.add_argument("--indeksle", action="store_true", help="bitince asistan indeksini artımlı yenile")
+    arg = ap.parse_args(argv)
+    kok = Path(kok) if kok is not None else Path(__file__).resolve().parents[1]
+    kilit_yolu = kok / "output" / ".sync.lock"
+    kilit_yolu.parent.mkdir(parents=True, exist_ok=True)
+    with open(kilit_yolu, "a") as kilit:
+        try:
+            fcntl.flock(kilit, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            print("Başka bir senkron koşuyor; ekler şimdi indirilmedi.")
+            return 1
+        veri = _json.loads((kok / "output" / "scraped_data.json").read_text(encoding="utf-8"))
+        butce = Butce(time.monotonic() + arg.sure, arg.bayt_mb * MB)
+        ozet = ekleri_esitle(kok, veri, requests.Session(), butce,
+                             cerezler=portal_cerez_kavanozu(load_cookies() or []))
+        print(_json.dumps(ozet, ensure_ascii=False))
+        if arg.indeksle:
+            from src.assistant_core import perform_incremental_reindex
+            meta = perform_incremental_reindex(kok)
+            print(_json.dumps({k: meta.get(k) for k in ("files_indexed", "chunks_indexed",
+                                                         "changed_files", "dusen_dosyalar")},
+                              ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())
