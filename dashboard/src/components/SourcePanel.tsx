@@ -9,7 +9,7 @@ import { moduleRoute } from '../utils/moduleLink'
 // Işık's own data first, then her published modules and Tedy Books (both TED's own material),
 // then the external authorities. `aile-kaynak` (Görev 5) is family-only material — an answer to
 // Işık never carries it, but it sits last regardless, alongside the other external sources.
-const GROUP_ORDER: CitationKind[] = ['ogrenci', 'modul', 'tedy-kitap', 'mufredat', 'kitap', 'oer', 'aile-kaynak']
+const GROUP_ORDER: CitationKind[] = ['ogrenci', 'modul', 'tedy-kitap', 'mufredat', 'kitap', 'oer', 'aile-kaynak', 'yuklenen-dosya']
 const KNOWN_KINDS = new Set<string>(GROUP_ORDER)
 
 const GROUP_TITLE: Record<CitationKind, string> = {
@@ -20,6 +20,7 @@ const GROUP_TITLE: Record<CitationKind, string> = {
   kitap: 'Ders kitabı',
   oer: 'Açık eğitsel kaynak',
   'aile-kaynak': 'Aile kaynakları',
+  'yuklenen-dosya': 'Yüklediğin dosya',
 }
 
 // A citation whose `kind` is not one of the known authorities. This is a runtime possibility even
@@ -70,6 +71,26 @@ function figureSrc(figure: FigureLocator): string {
 /** A textbook figure the answer drew on, small, beside its citation (Görev 4). The caption is the
  *  alt text, so it is not repeated as a snippet. An image that fails to load says so rather than
  *  leaving a broken-image box (D3). */
+function uploadId(locator: Record<string, unknown> | undefined): string | null {
+  const id = locator?.upload_id
+  return typeof id === 'string' && /^[0-9a-f]{32}$/.test(id) ? id : null
+}
+
+function YuklemeOnizleme({ id, ad }: { id: string; ad: string }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return <p className="ac__ref-unlinked">Görsel yüklenemedi</p>
+  return (
+    <img
+      className="ac__ref-figure"
+      src={`/api/assistant/uploads/${id}`}
+      alt={ad || 'Yüklediğin dosya'}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
 function FigureThumb({ figure }: { figure: FigureLocator }) {
   const [failed, setFailed] = useState(false)
   if (failed) return <p className="ac__ref-unlinked">Görsel yüklenemedi</p>
@@ -109,6 +130,9 @@ function RefGroup({
       <ul className="ac__ref-list">
         {items.map(c => {
           const figure = figureOf(c.locator)
+          const yukleme = kind === 'yuklenen-dosya' && c.locator?.tur === 'gorsel'
+            ? uploadId(c.locator)
+            : null
           return (
             <li
               key={c.id}
@@ -118,7 +142,11 @@ function RefGroup({
               <span className="ac__ref-index">{c.id.replace('S', '')}</span>
               <div>
                 <span className="ac__ref-path">{c.label}</span>
-                {figure ? <FigureThumb figure={figure} /> : <p className="ac__ref-snippet">{c.snippet}</p>}
+                {figure
+                  ? <FigureThumb figure={figure} />
+                  : yukleme
+                    ? <YuklemeOnizleme id={yukleme} ad={c.label} />
+                    : <p className="ac__ref-snippet">{c.snippet}</p>}
                 {kind === 'modul' && <ModuleOpen locator={c.locator} />}
               </div>
             </li>
