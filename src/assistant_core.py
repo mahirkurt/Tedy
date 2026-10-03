@@ -106,6 +106,14 @@ DEFAULT_INCLUDE_DIRS = {"output", "content"}
 # ASSISTANT_INCLUDE_DIRS entry) is scanned last, alphabetically.
 _DISCOVERY_PRIORITY = ("output", "content")
 
+# Portal attachments (src/portal_ekleri.py): only the text TEDY extracted at
+# download time, content/portal-ekleri/<id>.txt, is indexed. The binaries
+# would be re-extracted here outside the sync's attachment budget (a 112 MB
+# PDF, measured 2026-09-28); the .meta.json sidecars and .parca/ part files
+# are bookkeeping. The citation label comes from the sidecar
+# (assistant_tools.McpRegistry._yerel_etiket), never from this path.
+PORTAL_EKLERI_DIZINI = "content/portal-ekleri"
+
 DEFAULT_EXCLUDED_DIRS = {
     "__pycache__",
     "assistant_index",
@@ -182,6 +190,9 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     # the readable summary.
     "englishcentral_progress.json",
     "achieve3000_progress.json",
+    # The attachment tracker: URLs (teachers' SharePoint paths), statuses and
+    # hashes — bookkeeping, readable through the attachments themselves.
+    "portal_ekleri.json",
 }
 
 # Bumped whenever a change to discovery, exclusion or tokenization would leave
@@ -943,6 +954,11 @@ def _fmt_scraped_data(data: dict, ogretim_yili: str | None = None) -> str:
                 line += f" | Son teslim: {tarih}"
             if durum:
                 line += f" | Durum: {durum}"
+            ek_adlari = [" ".join(str(a.get("name") or "").split())
+                         for a in (detail.get("attachments") or [] if isinstance(detail, dict) else [])
+                         if isinstance(a, dict) and str(a.get("name") or "").strip()]
+            if ek_adlari:
+                line += " | Ekler: " + "; ".join(ek_adlari)
             if desc:
                 line += f" | {desc[:200]}"
             satirlar.append(line)
@@ -1731,7 +1747,11 @@ class AssistantIndexer:
             # Sort within this include dir only — a global re-sort across all
             # groups would put "content/..." back ahead of "output/..."
             # alphabetically and silently undo the priority above.
-            group.sort(key=lambda p: p.relative_to(root).as_posix())
+            # Işık's own school attachments lead content/, as output/ leads the
+            # whole walk: a chunk-cap overrun then drops textbooks first.
+            group.sort(key=lambda p: (
+                not p.relative_to(root).as_posix().startswith(PORTAL_EKLERI_DIZINI + "/"),
+                p.relative_to(root).as_posix()))
             files.extend(group)
 
         return files
@@ -1785,6 +1805,9 @@ class AssistantIndexer:
         if not normalized:
             return False
         base = Path(normalized).name
+        if normalized.startswith(PORTAL_EKLERI_DIZINI + "/"):
+            ic = normalized[len(PORTAL_EKLERI_DIZINI) + 1:]
+            return "/" in ic or not ic.endswith(".txt")
         # The noise filters below are broad globs (eba_*.json, mebi_*.json,
         # sebitv_*.json) aimed at discovery dumps. They would also swallow the
         # upload trackers, which have purpose-built semantic chunkers — an
