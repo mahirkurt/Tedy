@@ -61,7 +61,7 @@ def test_vektor_yazilamazsa_belge_durur_ve_uydurulmaz(kok):
 
 def test_yanlis_tur_reddedilir(kok):
     with pytest.raises(homework_docs.BelgeReddedildi):
-        homework_docs.ekle(kok, "matematik|kesirler|", "not.png", b"abc", embed=_embed)
+        homework_docs.ekle(kok, "matematik|kesirler|", "not.png", b"\x89PNG\r\n\x1a\n", embed=_embed)
 
 
 def test_arac_secili_odevin_anahtarini_kullanir():

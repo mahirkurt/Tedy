@@ -1236,7 +1236,7 @@ def _claude_icin_gorsel(image_bytes):
             img.thumbnail((PHOTO_MAX_EDGE_PX, PHOTO_MAX_EDGE_PX))
             out = io.BytesIO()
             img.save(out, "JPEG", quality=88, optimize=True)
-    except (UnidentifiedImageError, OSError, ValueError) as exc:
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as exc:
         raise GorselOkunamadi(
             "Bu görsel biçimi okunamadı; fotoğrafı JPEG ya da PNG olarak gönder."
         ) from exc
@@ -1856,7 +1856,7 @@ def homework_from_photo():
         if not mime_type.startswith("image/"):
             return jsonify({"error": "Sadece görsel dosyası kabul edilir"}), 400
 
-        image_bytes = photo.read()
+        image_bytes = photo.read(MAX_PHOTO_SIZE_BYTES + 1)
         if not image_bytes:
             return jsonify({"error": "Boş görsel gönderildi"}), 400
         if len(image_bytes) > MAX_PHOTO_SIZE_BYTES:
@@ -1942,7 +1942,7 @@ def homework_document_upload():
     upload = request.files.get("file")
     if upload is None:
         return jsonify({"error": "Dosya gerekli"}), 400
-    data = upload.read()
+    data = upload.read(homework_docs.MAX_BYTES + 1)
     try:
         doc = homework_docs.ekle(_belge_koku(), key, upload.filename or "", data)
     except homework_docs.BelgeReddedildi as exc:
@@ -2801,6 +2801,7 @@ def _ekleri_hazirla(messages, email):
             if bulunan is None:
                 return None, (jsonify({"error": "Dosya bulunamadı."}), 404)
             meta, veri = bulunan
+            depo.dokun(email, kimlik, _asistan_simdi())
             govdeler.append({"meta": meta, "veri": veri})
         if kopya.get("role") == "user":
             kopya["ek_govde"] = govdeler
@@ -2986,7 +2987,7 @@ def assistant_upload():
     dosya = request.files.get("dosya")
     if dosya is None:
         return jsonify({"error": "Dosya yok."}), 400
-    veri = dosya.read()
+    veri = dosya.read(12 * 1024 * 1024 + 1)
     from src.assistant_uploads import (
         EkDeposu, YuklemeHatasi, docx_metni, sinir_denetle, tur_tespit, txt_metni,
     )
@@ -3012,7 +3013,7 @@ def assistant_upload():
     return jsonify(kayit)
 
 
-@app.route("/api/assistant/uploads/<kimlik>")
+@app.route("/api/assistant/uploads/<kimlik>", methods=["GET", "DELETE"])
 @require_auth
 def assistant_upload_oku(kimlik):
     access = _require_assistant_access()
@@ -3023,6 +3024,10 @@ def assistant_upload_oku(kimlik):
         return jsonify({"error": "session_required"}), 403
     from src.assistant_uploads import EkDeposu
     depo = EkDeposu(OUTPUT_DIR)
+    if request.method == "DELETE":
+        if not depo.sil(email, kimlik):
+            return jsonify({"error": "Dosya bulunamadı."}), 404
+        return "", 204
     bulunan = depo.oku(email, kimlik)
     if bulunan is None and okur_turu(email) == "aile":
         for ogrenci in OGRENCI_EMAILS:
@@ -3032,6 +3037,7 @@ def assistant_upload_oku(kimlik):
     if bulunan is None:
         return jsonify({"error": "Dosya bulunamadı."}), 404
     meta, veri = bulunan
+    depo.dokun(meta["sahip_email"], kimlik, _asistan_simdi())
     mime = {"gorsel": "image/jpeg", "pdf": "application/pdf"}.get(
         meta["tur"], "text/plain; charset=utf-8")
     return Response(veri, mimetype=mime, headers={
@@ -3219,6 +3225,8 @@ def assistant_sohbet(sid):
         mesajlar = depo.tum_mesajlar(sid)
         for mesaj in mesajlar:
             mesaj["alistirma"] = [_alistirma_yaniti(a) for a in depo.alistirmalar(mesaj["id"])]
+            mesaj["yuklemeler"] = [{k: ek[k] for k in ("id", "ad", "tur") if k in ek}
+                                   for ek in json.loads(mesaj["ekler_json"]) if isinstance(ek, dict)]
         return jsonify({"sohbet": _sohbet_yaniti(row), "mesajlar": mesajlar,
                         "read_only": not sahip})
     if not sahip:
@@ -3310,6 +3318,40 @@ def assistant_alistirma_cevap(aid):
 @_sohbet_kapisi
 def assistant_ogrenme_gunlugu():
     return jsonify(_sohbet_deposu().gunluk(_module_person(), _asistan_simdi()))
+
+
+@app.route("/api/assistant/uploads/<kimlik>/odeve-bagla", methods=["POST"])
+@require_auth
+@_sohbet_kapisi
+def assistant_upload_odeve_bagla(kimlik):
+    from pathlib import Path
+    from src.assistant_uploads import EkDeposu
+    from src import homework_docs
+    depo = EkDeposu(OUTPUT_DIR)
+    email = _module_person()
+    bulunan = depo.oku(email, kimlik)
+    if bulunan is None:
+        return jsonify({"error": "Dosya bulunamadı."}), 404
+    meta, veri = bulunan
+    if meta["tur"] == "gorsel":
+        return jsonify({"error": "Görseli ödev belgesi olarak bağlayamazsın."}), 415
+    payload = request.get_json(silent=True)
+    key = payload.get("anahtar") if isinstance(payload, dict) else None
+    if not isinstance(key, str) or not any(_homework_row_key(r) == key for r in _combined_homework_rows(_scraped())):
+        return jsonify({"error": "Ödev bulunamadı."}), 404
+    # B2 stores extracted Word text, so pass its actual bytes as text rather than
+    # sending UTF-8 to a ZIP parser. The upload's original display name stays put.
+    ad = str(Path(meta["ad"]).with_suffix(".txt")) if meta["tur"] == "docx" else meta["ad"]
+    try:
+        belge = homework_docs.ekle(_belge_koku(), key, ad, veri)
+    except homework_docs.BelgeReddedildi as exc:
+        return jsonify({"error": str(exc)}), 400
+    except homework_docs.EmbedHatasi:
+        belge = {"ready": False}
+    if not belge["ready"]:
+        return jsonify({"error": "Belge şu an ödeve bağlanamadı; biraz sonra yeniden dene."}), 503
+    depo.dokun(email, kimlik, _asistan_simdi())
+    return jsonify({"documents": homework_docs.hepsi(_belge_koku()).get(key, [])})
 
 
 @app.route("/api/assistant/notlar")

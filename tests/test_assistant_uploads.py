@@ -102,25 +102,36 @@ def test_sinirin_kendisi_kabul():
     sinir_denetle("txt", b"a" * SINIR["txt"])
 
 
-def _pdf_sayfalar(n: int) -> bytes:
-    govde = [b"%PDF-1.4\n", b"99 0 obj\n<< /Type /Pages /Count 1 >>\nendobj\n"]
-    for i in range(1, n + 1):
-        govde.append(f"{i} 0 obj\n<< /Type /Page >>\nendobj\n".encode())
-    govde.append(b"%%EOF\n")
-    return b"".join(govde)
+def _pdf_sayfalar(n: int, akis: bytes = b"") -> bytes:
+    # Minimal real PDF: a catalog, page tree and cross-reference table. The old
+    # regex fixture lacked these and accepted files no PDF reader could open.
+    nesneler = [b"<< /Type /Catalog /Pages 2 0 R >>",
+                f"<< /Type /Pages /Count {n} /Kids [".encode()
+                + b" ".join(f"{i + 3} 0 R".encode() for i in range(n)) + b"] >>"]
+    for i in range(n):
+        nesneler.append(b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100]"
+                        + (f" /Contents {n + 3} 0 R".encode() if akis else b"") + b" >>")
+    if akis:
+        nesneler.append(b"<< /Filter /FlateDecode /Length " + str(len(akis)).encode()
+                        + b" >>\nstream\n" + akis + b"\nendstream")
+    sonuc = bytearray(b"%PDF-1.4\n")
+    yerler = [0]
+    for i, nesne in enumerate(nesneler, 1):
+        yerler.append(len(sonuc))
+        sonuc.extend(f"{i} 0 obj\n".encode() + nesne + b"\nendobj\n")
+    xref = len(sonuc)
+    sonuc.extend(f"xref\n0 {len(yerler)}\n0000000000 65535 f \n".encode())
+    for yer in yerler[1:]:
+        sonuc.extend(f"{yer:010d} 00000 n \n".encode())
+    sonuc.extend(f"trailer\n<< /Size {len(yerler)} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode())
+    return bytes(sonuc)
 
 
 def _pdf_sayfalar_flate(n: int) -> bytes:
     import zlib
-    ic = b"\n".join(b"<< /Type /Page >>" for _ in range(n))
-    sik = zlib.compress(ic)
-    ham = (
-        b"%PDF-1.4\n1 0 obj\n<< /Filter /FlateDecode /Length "
-        + str(len(sik)).encode() + b" >>\nstream\n" + sik
-        + b"\nendstream\nendobj\n%%EOF\n"
-    )
-    assert b"/Type /Page" not in ham
-    return ham
+    # A compressed content stream mentioning page-looking text must not add
+    # fake pages to the page-tree count or expand in the application worker.
+    return _pdf_sayfalar(n, zlib.compress(b"/Type /Page " * 1000))
 
 
 def test_pdf_50_sayfa_kabul_51_413():

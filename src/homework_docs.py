@@ -202,29 +202,40 @@ def ekle(kok: Path, homework_key: str, filename: str, data: bytes,
         raise BelgeReddedildi("Boş dosya gönderildi.")
     if len(data) > MAX_BYTES:
         raise BelgeReddedildi("Belge çok büyük (en fazla 8 MB).")
+    from src.assistant_uploads import YuklemeHatasi, docx_metni, sinir_denetle, tur_tespit, txt_metni
     name = _guvenli_ad(filename)
-    ext = Path(name).suffix.lower()
-    if ext not in ALLOWED_EXT:
-        raise BelgeReddedildi("PDF, Word, metin veya Markdown dosyası ekleyebilirsin.")
+    try:
+        tur = tur_tespit(data)
+        sinir_denetle(tur, data)
+        if tur == "gorsel":
+            raise BelgeReddedildi("PDF, Word, metin veya Markdown dosyası ekleyebilirsin.")
+        hazir_metin = docx_metni(data) if tur == "docx" else txt_metni(data) if tur == "txt" else None
+    except YuklemeHatasi as exc:
+        raise BelgeReddedildi(exc.cumle) from None
+    ext = {"pdf": ".pdf", "docx": ".docx", "txt": ".txt"}[tur]
+    if tur == "txt" and Path(name).suffix.lower() == ".md":
+        ext = ".md"
 
     kok, files, index = _koku(kok)
     lock = _kilit(kok)
     try:
         rows = _yukle(index)
         ayni = [r for r in rows if r.get("homework_key") == key]
-        if len(ayni) >= MAX_PER_HOMEWORK:
-            raise BelgeReddedildi("Bu ödeve en fazla 6 belge eklenebilir.")
         sha = hashlib.sha256(data).hexdigest()
-        for row in ayni:
-            if row.get("sha256") == sha:
-                return herkese(row)
-
-        doc_id = secrets.token_hex(8)
+        eski = next((r for r in ayni if r.get("sha256") == sha), None)
+        if eski is not None and herkese(eski)["ready"]:
+            return herkese(eski)
+        if eski is None and len(ayni) >= MAX_PER_HOMEWORK:
+            raise BelgeReddedildi("Bu ödeve en fazla 6 belge eklenebilir.")
+        # An unavailable vector service must be recoverable on the next bind
+        # attempt. Reuse the same document instead of adding another copy.
+        doc_id = eski["id"] if eski is not None else secrets.token_hex(8)
         files.mkdir(parents=True, exist_ok=True)
         stored = files / f"{doc_id}{ext}"
         stored.write_bytes(data)
         try:
-            text, read_error = _metin(stored)
+            text, read_error = (_metin(stored) if hazir_metin is None
+                                else (hazir_metin, "" if hazir_metin.strip() else "Bu belgeden metin çıkmadı."))
         except Exception:
             text, read_error = "", "Bu belgeden metin çıkmadı."
         chunks: list[dict] = []
@@ -254,6 +265,7 @@ def ekle(kok: Path, homework_key: str, filename: str, data: bytes,
             "error": error,
             "chunks": chunks,
         }
+        rows = [r for r in rows if r.get("id") != doc_id]
         rows.append(doc)
         _kaydet(index, rows)
         return herkese(doc)

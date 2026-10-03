@@ -6,7 +6,10 @@ import json
 import re
 import uuid
 import zipfile
-import zlib
+import fcntl
+import subprocess
+import tempfile
+from contextlib import contextmanager
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
@@ -21,7 +24,9 @@ MESAJ_SINIRI = 4
 ISTEK_SINIRI = 10
 SAYFA_SINIRI = 50
 KIMLIK_RE = re.compile(r"^[0-9a-f]{32}$")
-_SAYFA = re.compile(br"/Type\s*/Page(?!s)\b")
+DOCX_XML_SINIRI = 8 * MIB
+KISI_KOTASI = 200 * MIB
+PDFINFO_SURESI = 10
 TUR_ETIKETI = {"gorsel": "Görsel", "pdf": "PDF", "docx": "Word", "txt": "Metin"}
 _W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 _CUMLE_413 = {
@@ -45,6 +50,8 @@ def ad_temizle(ad: str) -> str:
 
 
 def tur_tespit(veri: bytes) -> str:
+    if not veri:
+        raise YuklemeHatasi(400, "Boş dosya gönderildi.")
     if veri.startswith(b"\xff\xd8\xff") or veri.startswith(b"\x89PNG\r\n\x1a\n"):
         return "gorsel"
     if veri.startswith((b"GIF87a", b"GIF89a")):
@@ -68,42 +75,27 @@ def tur_tespit(veri: bytes) -> str:
         veri.decode("utf-8")
     except UnicodeDecodeError:
         raise YuklemeHatasi(415, "Bu dosya biçimi okunamadı.") from None
+    if any(c < 32 and c not in (9, 10, 13) for c in veri):
+        raise YuklemeHatasi(415, "Bu dosya biçimi okunamadı.")
     return "txt"
 
 
-def _pdf_metinleri(veri: bytes) -> list[bytes]:
-    parcalar = [veri]
-    bas = 0
-    while True:
-        i = veri.find(b"stream", bas)
-        if i < 0:
-            break
-        if i + 6 < len(veri) and veri[i + 6:i + 7] not in (b"\n", b"\r"):
-            bas = i + 6
-            continue
-        sozluk_basi = veri.rfind(b"<<", max(0, i - 8192), i)
-        sozluk = veri[sozluk_basi:i] if sozluk_basi >= 0 else b""
-        veri_bas = i + 8 if veri[i + 6:i + 8] == b"\r\n" else i + 7
-        son = veri.find(b"endstream", veri_bas)
-        if son < 0:
-            break
-        ham = veri[veri_bas:son]
-        if ham.endswith(b"\r\n"):
-            ham = ham[:-2]
-        elif ham.endswith((b"\n", b"\r")):
-            ham = ham[:-1]
-        bas = son + len(b"endstream")
-        if b"/FlateDecode" not in sozluk:
-            continue
-        try:
-            parcalar.append(zlib.decompress(ham))
-        except zlib.error:
-            continue
-    return parcalar
-
-
 def pdf_sayfa_sayisi(veri: bytes) -> int:
-    return sum(len(_SAYFA.findall(parca)) for parca in _pdf_metinleri(veri))
+    # Let Poppler parse the page tree, including compressed object streams.
+    # Never decompress arbitrary PDF streams inside a Gunicorn worker.
+    with tempfile.NamedTemporaryFile(suffix=".pdf") as dosya:
+        dosya.write(veri)
+        dosya.flush()
+        try:
+            sonuc = subprocess.run(["pdfinfo", dosya.name], capture_output=True,
+                                    text=True, timeout=PDFINFO_SURESI)
+        except (subprocess.TimeoutExpired, OSError):
+            raise YuklemeHatasi(415, "Bu PDF okunamadı.") from None
+    if sonuc.returncode == 0:
+        sayfa = re.search(r"^Pages:\s+([0-9]+)\s*$", sonuc.stdout, re.MULTILINE)
+        if sayfa and int(sayfa.group(1)) > 0:
+            return int(sayfa.group(1))
+    raise YuklemeHatasi(415, "Bu PDF okunamadı.")
 
 
 def sinir_denetle(tur: str, veri: bytes) -> None:
@@ -116,9 +108,17 @@ def sinir_denetle(tur: str, veri: bytes) -> None:
 def docx_metni(veri: bytes) -> str:
     try:
         with zipfile.ZipFile(BytesIO(veri)) as zf:
-            xml = zf.read("word/document.xml")
+            if sum(info.file_size for info in zf.infolist()) > DOCX_XML_SINIRI:
+                raise YuklemeHatasi(413, "Açılan Word içeriği 8 MB sınırını aşıyor.")
+            with zf.open("word/document.xml") as kaynak:
+                xml = kaynak.read(DOCX_XML_SINIRI + 1)
+            if len(xml) > DOCX_XML_SINIRI:
+                raise YuklemeHatasi(413, "Açılan Word içeriği 8 MB sınırını aşıyor.")
+        # OOXML needs no DTD. Removing NUL also detects UTF-16/32 markup.
+        if re.search(br"<!\s*(?:DOCTYPE|ENTITY)\b", xml.replace(b"\x00", b""), re.I):
+            raise YuklemeHatasi(415, "Bu Word dosyası okunamadı.")
         kok = ET.fromstring(xml)
-    except (zipfile.BadZipFile, KeyError, ET.ParseError):
+    except (zipfile.BadZipFile, KeyError, ET.ParseError, RuntimeError):
         raise YuklemeHatasi(415, "Bu Word dosyası okunamadı.") from None
     paragraflar = []
     for p in kok.iter(f"{_W}p"):
@@ -151,6 +151,17 @@ def _an(metin: str) -> datetime | None:
         return None
 
 
+@contextmanager
+def _kilit(dizin: Path):
+    dizin.mkdir(parents=True, exist_ok=True)
+    with (dizin / ".lock").open("a+") as kilit:
+        fcntl.flock(kilit, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(kilit, fcntl.LOCK_UN)
+
+
 class EkDeposu:
     def __init__(self, output_dir: Path):
         self.kok = Path(output_dir) / "assistant_uploads"
@@ -163,25 +174,29 @@ class EkDeposu:
         self.temizlik(simdi)
         kimlik = uuid.uuid4().hex
         dizin = self._dizin(email)
-        dizin.mkdir(parents=True, exist_ok=True)
-        gecici = dizin / f"{kimlik}.part"
-        gecici.write_bytes(icerik)
-        hedef = dizin / kimlik
-        gecici.replace(hedef)
-        meta = {
-            "sahip_email": email,
-            "ad": ad_temizle(ad),
-            "tur": tur,
-            "boyut": boyut,
-            "zaman": _zaman(simdi),
-            "bagli_sohbet": None,
-        }
-        try:
-            atomic_json_dump(meta, str(dizin / f"{kimlik}.json"))
-        except BaseException:
-            hedef.unlink(missing_ok=True)
-            raise
-        return {"id": kimlik, "ad": meta["ad"], "tur": tur, "boyut": boyut}
+        with _kilit(dizin):
+            toplam = sum(p.stat().st_size for p in dizin.iterdir() if KIMLIK_RE.fullmatch(p.name))
+            if toplam + len(icerik) > KISI_KOTASI:
+                raise YuklemeHatasi(507, "Yükleme alanın doldu; kullanmadığın dosyaları silebilirsin.")
+            gecici = dizin / f"{kimlik}.part"
+            gecici.write_bytes(icerik)
+            hedef = dizin / kimlik
+            gecici.replace(hedef)
+            meta = {
+                "sahip_email": email,
+                "ad": ad_temizle(ad),
+                "tur": tur,
+                "boyut": boyut,
+                "zaman": _zaman(simdi),
+                "son_kullanim": _zaman(simdi),
+                "bagli_sohbet": None,
+            }
+            try:
+                atomic_json_dump(meta, str(dizin / f"{kimlik}.json"))
+            except BaseException:
+                hedef.unlink(missing_ok=True)
+                raise
+            return {"id": kimlik, "ad": meta["ad"], "tur": tur, "boyut": boyut}
 
     def oku(self, email: str, kimlik: str) -> tuple[dict, bytes] | None:
         if not isinstance(kimlik, str) or not KIMLIK_RE.fullmatch(kimlik):
@@ -198,6 +213,34 @@ class EkDeposu:
         meta["id"] = kimlik
         return meta, veri
 
+    def sil(self, email: str, kimlik: str) -> bool:
+        if not isinstance(kimlik, str) or not KIMLIK_RE.fullmatch(kimlik):
+            return False
+        dizin = self._dizin(email)
+        if not dizin.is_dir():
+            return False
+        with _kilit(dizin):
+            if self.oku(email, kimlik) is None:
+                return False
+            (dizin / f"{kimlik}.json").unlink(missing_ok=True)
+            (dizin / kimlik).unlink(missing_ok=True)
+        return True
+
+    def dokun(self, email: str, kimlik: str, simdi: datetime) -> None:
+        if not isinstance(kimlik, str) or not KIMLIK_RE.fullmatch(kimlik):
+            return
+        dizin = self._dizin(email)
+        if not dizin.is_dir():
+            return
+        with _kilit(dizin):
+            bulunan = self.oku(email, kimlik)
+            if bulunan is None:
+                return
+            meta = bulunan[0]
+            meta.pop("id", None)
+            meta["son_kullanim"] = _zaman(simdi)
+            atomic_json_dump(meta, str(dizin / f"{kimlik}.json"))
+
     def _meta_dosyalari(self):
         if not self.kok.is_dir():
             return
@@ -208,35 +251,39 @@ class EkDeposu:
                 yield yol
 
     def bagla(self, email: str, kimlik: str, sohbet_id: str) -> None:
-        bulunan = self.oku(email, kimlik)
-        if bulunan is None:
+        if not isinstance(kimlik, str) or not KIMLIK_RE.fullmatch(kimlik):
             return
-        meta, _veri = bulunan
-        if meta.get("bagli_sohbet") is None:
-            meta["bagli_sohbet"] = sohbet_id
-            meta.pop("id", None)
-            atomic_json_dump(meta, str(self._dizin(email) / f"{kimlik}.json"))
+        with _kilit(self._dizin(email)):
+            bulunan = self.oku(email, kimlik)
+            if bulunan is None:
+                return
+            meta, _veri = bulunan
+            if meta.get("bagli_sohbet") is None:
+                meta["bagli_sohbet"] = sohbet_id
+                meta.pop("id", None)
+                atomic_json_dump(meta, str(self._dizin(email) / f"{kimlik}.json"))
 
     def temizlik(self, simdi: datetime) -> int:
         if simdi.tzinfo is None:
             simdi = simdi.replace(tzinfo=timezone.utc)
         silinen = 0
         for yol in list(self._meta_dosyalari()):
-            try:
-                meta = json.loads(yol.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
-            if not isinstance(meta, dict) or meta.get("bagli_sohbet") is not None:
-                continue
-            an = _an(meta.get("zaman"))
-            if an is None or simdi - an < _OTUZ:
-                continue
-            kimlik = yol.stem
-            if not KIMLIK_RE.fullmatch(kimlik):
-                continue
-            yol.unlink(missing_ok=True)
-            (yol.parent / kimlik).unlink(missing_ok=True)
-            silinen += 1
+            with _kilit(yol.parent):
+                try:
+                    meta = json.loads(yol.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                if not isinstance(meta, dict) or meta.get("bagli_sohbet") is not None:
+                    continue
+                an = _an(meta.get("son_kullanim") or meta.get("zaman"))
+                if an is None or simdi - an < _OTUZ:
+                    continue
+                kimlik = yol.stem
+                if not KIMLIK_RE.fullmatch(kimlik):
+                    continue
+                yol.unlink(missing_ok=True)
+                (yol.parent / kimlik).unlink(missing_ok=True)
+                silinen += 1
         return silinen
 
     def sohbet_eklerini_sil(self, sohbet_id: str) -> int:
@@ -244,17 +291,18 @@ class EkDeposu:
             return 0
         silinen = 0
         for yol in list(self._meta_dosyalari()):
-            try:
-                meta = json.loads(yol.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
-            if not isinstance(meta, dict) or meta.get("bagli_sohbet") != sohbet_id:
-                continue
-            kimlik = yol.stem
-            yol.unlink(missing_ok=True)
-            if KIMLIK_RE.fullmatch(kimlik):
-                (yol.parent / kimlik).unlink(missing_ok=True)
-            silinen += 1
+            with _kilit(yol.parent):
+                try:
+                    meta = json.loads(yol.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                if not isinstance(meta, dict) or meta.get("bagli_sohbet") != sohbet_id:
+                    continue
+                kimlik = yol.stem
+                yol.unlink(missing_ok=True)
+                if KIMLIK_RE.fullmatch(kimlik):
+                    (yol.parent / kimlik).unlink(missing_ok=True)
+                silinen += 1
         return silinen
 
 

@@ -88,7 +88,8 @@ def test_png_jpeg_olarak_saklanir_ve_sahip_okur(istemci):
 
 def test_pdf_oldugu_gibi(istemci):
     _giris(istemci, FULL)
-    pdf = b"%PDF-1.4\n%%EOF"
+    from tests.test_assistant_uploads import _pdf_sayfalar
+    pdf = _pdf_sayfalar(1)
     res = _gonder(istemci, pdf, "kagit.pdf")
     assert res.get_json()["tur"] == "pdf"
     okunan = istemci.get(f"/api/assistant/uploads/{res.get_json()['id']}")
@@ -98,11 +99,8 @@ def test_pdf_oldugu_gibi(istemci):
 
 def test_pdf_51_sayfa_413_ve_saklanmaz(istemci, tmp_path):
     _giris(istemci, FULL)
-    parca = [b"%PDF-1.4\n"]
-    for i in range(51):
-        parca.append(f"{i} 0 obj\n<< /Type /Page >>\nendobj\n".encode())
-    parca.append(b"%%EOF\n")
-    res = _gonder(istemci, b"".join(parca), "uzun.pdf")
+    from tests.test_assistant_uploads import _pdf_sayfalar
+    res = _gonder(istemci, _pdf_sayfalar(51), "uzun.pdf")
     assert res.status_code == 413
     assert res.get_json()["error"] == "PDF 50 sayfa sınırını aşıyor."
     assert list(tmp_path.rglob("*")) == []
