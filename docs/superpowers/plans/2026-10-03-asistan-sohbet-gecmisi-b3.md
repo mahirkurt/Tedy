@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** TEDY Asistanı sohbeti `output/assistant_sohbetler.sqlite` içinde tutar; istemci `sohbet_id` ve yeni mesajı gönderir; sunucu son 20 mesajı yükler; aile Işık'ın sohbetini ve ekinin önizlemesini salt okur; sohbet silinince ekleri de silinir.
+**Goal:** TEDY Asistanı sohbeti `output/assistant_sohbetler.sqlite` içinde tutar; istemci `sohbet_id` ve yeni mesajı gönderir; sunucu son 20 mesajı yükler; 20'yi aşan eski turları Haiku 4.5 `sohbet.ozet`'e yazar; aile Işık'ın sohbetini ve ekinin önizlemesini salt okur; sohbet silinince ekleri de silinir.
 
-**Architecture:** `src/assistant_sohbet.py` Flask'a import etmez. Bağlantı işlem başına açılır ve kapanır (WAL, `busy_timeout` 5000). `/stream` ve `/chat` sohbet satırını `generate()` kurulmadan önce yazar; cevap satırı yalnız tamamlanmış `answer` olayından sonra yazılır. Dosya baytları B2'nin `_ekleri_hazirla` çıktısıdır. `bagli_sohbet` bu planda dolar. `/v1` ve API anahtarı bu dosyaya dokunmaz.
+**Architecture:** `src/assistant_sohbet.py` Flask'a import etmez. Bağlantı işlem başına açılır ve kapanır (WAL, `busy_timeout` 5000). `/stream` ve `/chat` sohbet satırını `generate()` kurulmadan önce yazar; cevap satırı yalnız tamamlanmış `answer` olayından sonra yazılır. Dosya baytları B2'nin `_ekleri_hazirla` çıktısıdır; son 20'ye giren eski ekler de B2'nin 10 tavanına girer. `bagli_sohbet` bu planda dolar. `AssistantRuntime` bu dosyayı kurmaz. `sohbet_id` yoksa dosya açılmaz. `/v1`, `/plan` ve API anahtarı bu dosyaya dokunmaz.
 
 **Tech Stack:** Python 3.12 (stdlib `sqlite3`, Flask), mevcut `EkDeposu` (B2 planı `docs/superpowers/plans/2026-10-03-asistan-dosya-yukleme-b2.md`), React 19 + Carbon, Playwright + `@axe-core/playwright` + IBM Equal Access.
 
-**Spec:** `docs/superpowers/specs/2026-09-28-asistan-ogretmen-modlari-design.md` — **§3**, "Hata ve boşluk durumları" ile "Test"in B3'e düşen maddeleri, §2'deki "B3 kuralıyla aile" cümlesi, ve ekteki "B3'e eklenenler"den eşiği yazılmış olanlar. B4, B5, B6 yok. B2 plan dosyası değiştirilmez.
+**Spec:** `docs/superpowers/specs/2026-09-28-asistan-ogretmen-modlari-design.md` — **§3**, "Hata ve boşluk durumları" ile "Test"in B3'e düşen maddeleri, §2'deki "B3 kuralıyla aile" cümlesi, ve ekteki "B3'e eklenenler"in üçü (özet yazımı, kaynak seçimi, hassas notun kod denetimi). Sayı yazılmamış olması bu üçüne görevi düşürmez. B4, B5, B6 yok. B2 plan dosyası değiştirilmez.
 
 Bu worktree'nin kodu `c2ff982` üzerindedir: `assistant_uploads.py` henüz yok. Görevler B2 planının adlandırdığı sembolleri tüketir (`EkDeposu`, `_ekleri_hazirla`, `messages[-3:]` varsayılanı, `sohbet_eklerini_sil`). B2 uygulanmadan B3 uygulanmaz.
 
@@ -27,14 +27,11 @@ Bu worktree'nin kodu `c2ff982` üzerindedir: `assistant_uploads.py` henüz yok. 
 
 ## Açık kararlar
 
-Spec bunları kapatmıyor. Görevler bunları doldurmaz.
+Ek, sayı vermediği üç maddeyi de B3'e koyar. Özet yazımı, kaynak seçimi ve hassas notun kod denetimi açık karar değildir; aşağıdaki kilitler ve görev 4 onları yazar. Işık'ın not paneli (yalnız `okur_turu == "aile"`, öğrenci 403) ve `/plan`'ın depoyu açmaması da açık karar değildir.
 
-1. **Özet eşiği.** Ek: turlar "belirli bir token eşiğini" aşınca Haiku 4.5 özetler, `sohbet.ozet`'e yazılır. Eşik sayısı yok. Repoda Haiku modeli yok. **Özet üreten çağrı bu planda yok.** Kolon vardır, B3 onu yazmaz. Dolu bir `ozet` (test yazar) modelin kullanıcı turuna eklenir.
-2. **Kaynak seçimi.** Ek: tekrar elenir, araç payı sınırlanır, eski araç gövdesi özetlenir, sorgu kural tabanlı dönüşür. Aynı parça, pay, "uzun sohbet" ve kural tanımı yok. **Görev yok.**
-3. **Hassas notun kod denetimi.** Ek: sağlık, aile içi, üçüncü kişi yazılmaz; istem kuralı + kodda basit denetim + ailenin görmesi. Sözcük listesi yok. **İstem cümlesi var. Kod listesi yok.** Yanlış bir liste ödev notunu da keser.
-4. **Işık not panelini görür mü.** Ek yalnız aileyi yazar: görür, düzeltir, siler. Panel ve `GET/PATCH/DELETE /api/assistant/notlar` yalnız `okur_turu == "aile"`. Öğrenci 403.
+Bilinçli olarak görev dışı kalanlar:
+
 5. **Boş başlık sözcüğü.** İlk soru gelene kadar `baslik` boş kalır. Okur cümlesi yok. Liste `baslik` boş satırı döndürmez. "Yeni sohbet" düğmesinin adı satıra yazılmaz.
-6. **`/plan`.** Spec depo yasağını API anahtarı ve `/v1` için yazar. `/plan` yazılmaz. `study_plan` depoyu açmaz, not araçlarını ilan etmez.
 7. **Yeniden üret / Daha derine in.** §3'te yok. B2 onları `ekler` dışında bırakır. Bu plan `sohbet_id` de göndermez; satır yazılmaz.
 
 ## Kilitlenen adlar
@@ -43,20 +40,26 @@ Spec bunları kapatmıyor. Görevler bunları doldurmaz.
 |---|---|---|
 | Dosya | `output/assistant_sohbetler.sqlite` | Spec yolu. `OUTPUT_DIR` altında. |
 | Bağlantı | İşlem başına `sqlite3.connect`, `isolation_level=None`, bitince `close`. `PRAGMA journal_mode=WAL`. `PRAGMA busy_timeout=5000` | Spec: WAL, işlem başına bağlantı, iki gunicorn işçisi. 5000, `src/mcp_server/oauth_store.py` `BUSY_TIMEOUT_MS`. |
-| `sohbet` | `id, sahip_email, baslik, ogretmen, olusturma, guncelleme, ozet` | §3 kolonları + ekteki `sohbet.ozet`. `ozet` NULL. |
-| `mesaj` | `id, sohbet_id, rol, icerik, atiflar_json, ekler_json, meta_json, ogretmen, zaman` | §3. `meta_json` B3'te `{}`. |
+| `sohbet` | `id, sahip_email, baslik, ogretmen, olusturma, guncelleme, ozet` | §3 kolonları + ekteki `sohbet.ozet`. `ozet` NULL başlar; 20 mesajı aşınca ürün yazar. |
+| `mesaj` | `id, sohbet_id, rol, icerik, atiflar_json, ekler_json, meta_json, ogretmen, zaman, sira` | §3. `meta_json` B3'te `{}`. `sira` ekleme sırasıdır. |
 | `ogrenci_notu` | `id, metin, kaynak_sohbet, zaman` | Ek: kısa not, kaynak sohbet, tarih. Tür kolonu yok. |
 | Kimlik | `uuid.uuid4().hex`, `^[0-9a-f]{32}$` | B2 ek kimliği ile aynı biçim. `bagli_sohbet` bu dizgiyi tutar. |
 | Zaman | UTC `YYYY-MM-DDTHH:MM:SSZ` | B2 `_zaman`. |
 | Sıra | `guncelleme DESC, id ASC` | Liste. Spec sıra yazmaz; kolon güncelleme zamanıdır. |
-| Son 20 | Kullanıcı satırı yazıldıktan sonra `ORDER BY zaman DESC, id DESC LIMIT 20`, sonra çevrilir | Spec yükler. Yeni mesaj yirminin içindedir. |
+| `sira` | `INTEGER NOT NULL`. Aynı `BEGIN IMMEDIATE` içinde `(SELECT COALESCE(MAX(sira), 0) + 1 FROM mesaj)` | Aynı saniyedeki kullanıcı satırı ile cevabı ekleme sırasını tutar. `id` rastgele uuid'dir; eşitlik anahtarı değildir. |
+| Son 20 | `ORDER BY zaman DESC, sira DESC LIMIT n`, sonra çevrilir. `tum_mesajlar` `ORDER BY zaman ASC, sira ASC` | Testler tek `SIMDI` dondurur ve bu sırayı bekler. `id` sıralamaya girmez. |
 | Pencere | `_build_conversation(..., pencere: int = 3)`. Depodan gelen çağrı `pencere=20` | Bugün `messages[-3:]` (`assistant_core.py`). B2 varsayılanı 3 kalır. Spec'in 20'si depo yoluna aittir. |
 | `sohbet_id` | İstek alanı. Varken istemcinin eski mesajları yok sayılır; son kullanıcı mesajı yeni turdur | Spec: istemci yalnız kimlik + yeni mesaj. Sahte geçmiş içeri girmez. |
 | Başlık | İlk kullanıcı metninin `split()` ile birleştirilmiş hali, yalnız `baslik` boşken | "İlk sorudan türetilir, ek model çağrısı yok." Kesme sayısı yok; kesilmez. |
 | Aile eki | `okur_turu(email) == "aile"` ise `oku` Işık'ın adresine (`OGRENCI_EMAILS`) düşer | §2 "B3 kuralıyla". Kural: aile Işık'ı okur. Başka ebeveynin dosyası 404. Bağsız dosya da okunur; spec bağ şartı koymaz. |
 | Sohbet okuma | Sahip okur. Aile Işık'ın satırını okur (`?kisi=ogrenci` ve `GET /<id>`). Işık bir ebeveynin satırını okumaz. Bir ebeveyn diğerinin satırını okumaz. İkisi de yok olan id ile aynı 404 | Spec'in okuma listesi budur: kendi sohbeti, ve aile için Işık. |
 | Not bloğu | Her depolu istekte sarmalayıcı kullanıcı turuna, sistem istemine değil | Ek: önbelleği bozmadan. Sistem bloğu keşli. Blok saklanmaz; 20 turdan düşmez. |
-| İstek başına 10 ek | B2'nin `ISTEK_SINIRI` | B2 incelemesi bu sayıyı B3'e bırakmadı. İkinci bir sohbet sayacı yok. |
+| Sohbet öğretmeni | `mesaj_ekle` `sohbet.ogretmen` yazmaz. Mesaj satırı kendi `ogretmen`'ini tutar. Açılan sohbet `useOgretmen`'i `sohbet.ogretmen` ile kurar | Seçici, `tedy-asistan-ogretmen::<email>` değerinin önüne geçer. Öğretmeni değiştiren yol `PATCH`'tir. |
+| İstek başına 10 ek | B2'nin `ISTEK_SINIRI`. Yeni mesajın `ekler`'i ile `son_mesajlar(sid, 19)` içindeki eski kimlikler toplanır. Toplam 10'u aşarsa `mesaj_ekle`'den önce 400 | `_ekleri_hazirla` yalnız yeni mesaja bakar. Yanına konan eski ekler aynı tavana girer. Pencerenin dışında kalacak ek sayılmaz. Aynı kimlik iki kez yazıldıysa iki sayılır. İkinci sabit yok. Cümle B2'nindir: `Bir istekte en fazla 10 dosya olabilir.` |
+| Özet yazımı | Cevap satırı yazıldıktan sonra, `tum_mesajlar` 20'yi aştıysa eski turlar `claude-haiku-4-5` ile özetlenir ve `ozet_yaz` kolonu yazar. Mesaj satırı silinmez | Ek eşik sayısı vermez. Eşik, kilitli pencere 20'dir. Ayrı token sayacı yok. `ClaudeClient.DEFAULT_MODEL` (`claude-sonnet-5`) değişmez. Çağrı enjekte edilir; test ağa gitmez. Hata özeti olduğu gibi bırakır, cevap satırını silmez. |
+| Kaynak seçimi | Aynı parça ikinci kez konmaz. Pay, bugünkü `TOOL_RESULT_SINIRI` (4000). 20'nin dışındaki araç gövdesi modele açılmaz; yerine `ozet` gider. `_sorguya` ek model çağrısı yapmaz | Ek pay sayısı vermez. Yeni karakter tavanı yok. |
+| Hassas not | `hassas_not` yazmadan önce bakar. İstem cümlesi tek başına yetmez | Sözcük listesi spec'te yok. Kilit görev 4'ün token listesidir; ödev cümlesini kesmez. |
+| Depo kim açar | Yalnız `sohbet_id` taşıyan `/stream` ve `/chat` | `AssistantRuntime.__init__` açmaz. `hafiza=True` varsayılanı dosya açmaz. `not_deposu` view'dan gelir; None ise `notlar()` çağrılmaz. `/plan` ve `/v1` `SohbetDeposu` kurmaz. |
 | Silme sırası | Önce `EkDeposu.sohbet_eklerini_sil`, sonra tek transaction'da mesaj + sohbet | Bağlı dosyayı 30 gün temizliği silmez (`bagli_sohbet is not None`). Dosya önce giderse tekrar silme tamamlar. |
 
 Okur cümleleri:
@@ -71,6 +74,7 @@ Okur cümleleri:
 | Depo hatası | 500 | `Sohbet kaydedilemedi.` |
 | Not yok | 404 | `Not bulunamadı.` |
 | Öğrenci not ucu | 403 | `Bu notları yalnız aile düzenler.` |
+| Hassas not | 400; araçta `ok` False | `Bu not yazılmadı.` |
 | Boş liste | — | `Henüz sohbet yok — bir soru sorarak başla` |
 | Işık'ın notu | — | `Sohbetlerini ailen de görebilir.` |
 | Aile bölümü | — | `Işık'ın sohbetleri` |
@@ -85,12 +89,12 @@ Bilinmeyen öğretmen B1 cümlesidir: `Bilinmeyen öğretmen modu.`
 
 | Dosya | Durum | Sorumluluk |
 |---|---|---|
-| `src/assistant_sohbet.py` | yeni | Şema, sohbet, mesaj, not |
-| `tests/test_assistant_sohbet.py` | yeni | WAL, iki yazıcı, son 20 |
-| `src/dashboard_api.py` | değişir | Uçlar; akışta kayıt; aile ek okuması |
+| `src/assistant_sohbet.py` | yeni | Şema, `sira`, sohbet, mesaj, not, `hassas_not`, `ozet_yaz` |
+| `tests/test_assistant_sohbet.py` | yeni | WAL, iki yazıcı, son 20, aynı saniye, öğretmen ezilmez |
+| `src/dashboard_api.py` | değişir | Uçlar; akışta kayıt; eski eklerin tavanı; aile ek okuması |
 | `src/assistant_uploads.py` | değişir | `EkDeposu.bagla` (B2 dosyası) |
-| `src/assistant_core.py` | değişir | `pencere`, özet, not bloğu, not araçları |
-| `src/assistant_tools.py` | değişir | `hafiza_yaz`, `hafiza_duzelt` |
+| `src/assistant_core.py` | değişir | `pencere`, özet yazma ve okuma, not bloğu, parça elemesi |
+| `src/assistant_tools.py` | değişir | `hafiza_yaz`, `hafiza_duzelt`, `_sorguya` |
 | `tests/test_assistant_sohbet_api.py` | yeni | Sahiplik, aile, akış, `/v1` |
 | `tests/test_assistant_uploads_api.py` | değişir | B2'nin "başkası 404" testi aile kuralına göre |
 | `dashboard/src/components/AssistantChat.tsx` / `.scss` | değişir | Liste, not, salt okuma |
@@ -140,6 +144,23 @@ def test_son_yirmi_yeniyi_tutar(tmp_path):
     son = depo.son_mesajlar(sid, 20)
     assert [m["icerik"] for m in son] == [f"m{i}" for i in range(5, 25)]
     assert depo.tum_mesajlar(sid)[0]["icerik"] == "m0"
+
+
+def test_ayni_saniye_soru_cevap_sirasi(tmp_path):
+    depo = SohbetDeposu(tmp_path / "assistant_sohbetler.sqlite")
+    sid = depo.yarat(ISIK, "matematik", SIMDI)
+    depo.mesaj_ekle(sid, "user", "soru", "matematik", [], SIMDI)
+    depo.mesaj_ekle(sid, "assistant", "cevap", "matematik", [], SIMDI)
+    assert [m["rol"] for m in depo.son_mesajlar(sid, 20)] == ["user", "assistant"]
+    assert [m["rol"] for m in depo.tum_mesajlar(sid)] == ["user", "assistant"]
+
+
+def test_mesaj_ogretmeni_satiri_ezmez(tmp_path):
+    depo = SohbetDeposu(tmp_path / "assistant_sohbetler.sqlite")
+    sid = depo.yarat(ISIK, "matematik", SIMDI)
+    depo.mesaj_ekle(sid, "user", "soru", "fen", [], SIMDI)
+    assert depo.getir(sid)["ogretmen"] == "matematik"
+    assert depo.tum_mesajlar(sid)[0]["ogretmen"] == "fen"
 
 
 def test_iki_yazici(tmp_path):
@@ -207,9 +228,10 @@ CREATE TABLE IF NOT EXISTS mesaj (
     ekler_json TEXT NOT NULL DEFAULT '[]',
     meta_json TEXT NOT NULL DEFAULT '{}',
     ogretmen TEXT NOT NULL,
-    zaman TEXT NOT NULL
+    zaman TEXT NOT NULL,
+    sira INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS mesaj_sohbet_zaman ON mesaj(sohbet_id, zaman, id);
+CREATE INDEX IF NOT EXISTS mesaj_sohbet_sira ON mesaj(sohbet_id, sira);
 CREATE TABLE IF NOT EXISTS ogrenci_notu (
     id TEXT PRIMARY KEY,
     metin TEXT NOT NULL,
@@ -287,7 +309,8 @@ class SohbetDeposu:
             try:
                 conn.execute(
                     "INSERT INTO mesaj (id, sohbet_id, rol, icerik, atiflar_json, ekler_json, "
-                    "meta_json, ogretmen, zaman) VALUES (?, ?, ?, ?, ?, ?, '{}', ?, ?)",
+                    "meta_json, ogretmen, zaman, sira) VALUES (?, ?, ?, ?, ?, ?, '{}', ?, ?, "
+                    "(SELECT COALESCE(MAX(sira), 0) + 1 FROM mesaj))",
                     (mid, sid, rol, icerik, json.dumps(atiflar or [], ensure_ascii=False),
                      json.dumps(ekler, ensure_ascii=False), ogretmen, yazi),
                 )
@@ -296,8 +319,8 @@ class SohbetDeposu:
                 if rol == "user" and not baslik.strip():
                     baslik = " ".join(icerik.split())
                 conn.execute(
-                    "UPDATE sohbet SET guncelleme = ?, ogretmen = ?, baslik = ? WHERE id = ?",
-                    (yazi, ogretmen, baslik, sid),
+                    "UPDATE sohbet SET guncelleme = ?, baslik = ? WHERE id = ?",
+                    (yazi, baslik, sid),
                 )
                 conn.execute("COMMIT")
             except BaseException:
@@ -308,7 +331,7 @@ class SohbetDeposu:
     def son_mesajlar(self, sid: str, n: int) -> list[dict]:
         with self._baglan() as conn:
             rows = conn.execute(
-                "SELECT * FROM mesaj WHERE sohbet_id = ? ORDER BY zaman DESC, id DESC LIMIT ?",
+                "SELECT * FROM mesaj WHERE sohbet_id = ? ORDER BY zaman DESC, sira DESC LIMIT ?",
                 (sid, n),
             ).fetchall()
         return [dict(r) for r in reversed(rows)]
@@ -316,7 +339,7 @@ class SohbetDeposu:
     def tum_mesajlar(self, sid: str) -> list[dict]:
         with self._baglan() as conn:
             rows = conn.execute(
-                "SELECT * FROM mesaj WHERE sohbet_id = ? ORDER BY zaman ASC, id ASC",
+                "SELECT * FROM mesaj WHERE sohbet_id = ? ORDER BY zaman ASC, sira ASC",
                 (sid,),
             ).fetchall()
         return [dict(r) for r in rows]
@@ -357,6 +380,17 @@ class SohbetDeposu:
         if row is None:
             return None
         return row["ozet"]
+
+    def ozet_yaz(self, sid: str, ozet: str) -> None:
+        """Ürün yolu. Yalnız `ozet` kolonunu yazar; mesaj silmez, `ogretmen` değiştirmez."""
+        with self._baglan() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                conn.execute("UPDATE sohbet SET ozet = ? WHERE id = ?", (ozet, sid))
+                conn.execute("COMMIT")
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
 
     def not_yaz(self, metin: str, kaynak: str | None, simdi: datetime) -> str:
         nid = uuid.uuid4().hex
@@ -637,9 +671,62 @@ def test_plan_depo_acmadi(istemci, tmp_path, monkeypatch):
     assert "sohbet_id" not in gorulen
     assert gorulen.get("hafiza") is not True
     assert not (tmp_path / "assistant_sohbetler.sqlite").exists()
+
+
+def test_sohbet_id_yoksa_dosya_yok(istemci, tmp_path, monkeypatch):
+    monkeypatch.setattr(dashboard_api, "OUTPUT_DIR", str(tmp_path))
+
+    class _K:
+        def chat_events(self, **kw):
+            yield {"event": "answer", "payload": {
+                "answer": "tamam", "citations": [], "safety_flags": [],
+                "plan_blocks": [], "intent": "qa", "session_id": "",
+                "mode_suggestion": None, "meta": {"ogretmen": "genel"}}}
+        def chat(self, **kw):
+            return {"answer": "tamam", "citations": [], "safety_flags": [],
+                    "plan_blocks": [], "intent": "qa", "session_id": "",
+                    "mode_suggestion": None, "meta": {"ogretmen": "genel"}}
+
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: _K())
+    _giris(istemci, ISIK)
+    istemci.post("/api/assistant/stream", json={
+        "messages": [{"role": "user", "content": "x"}]})
+    istemci.post("/api/assistant/chat", json={
+        "messages": [{"role": "user", "content": "x"}]})
+    assert not (tmp_path / "assistant_sohbetler.sqlite").exists()
+
+
+def test_eski_ekler_on_tavanina_girer(istemci, monkeypatch):
+    _giris(istemci, ISIK)
+    sid = istemci.post("/api/assistant/sohbetler", json={}).get_json()["id"]
+    depo = _sohbet_deposu()
+    for i in range(9):
+        depo.mesaj_ekle(sid, "user", f"eski{i}", "genel", ["ab" * 15 + f"{i:02x}"], SIMDI)
+    cagrildi = {"n": 0}
+
+    class _K:
+        def chat_events(self, **kw):
+            cagrildi["n"] += 1
+            yield {"event": "answer", "payload": {
+                "answer": "tamam", "citations": [], "safety_flags": [],
+                "plan_blocks": [], "intent": "qa", "session_id": "",
+                "mode_suggestion": None, "meta": {}}}
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: _K())
+    res = istemci.post("/api/assistant/stream", json={
+        "sohbet_id": sid,
+        "messages": [{"role": "user", "content": "yeni", "ekler": ["cd" * 16, "ef" * 16]}],
+    })
+    assert res.status_code == 400
+    assert res.get_json()["error"] == "Bir istekte en fazla 10 dosya olabilir."
+    assert cagrildi["n"] == 0
+    assert [m["icerik"] for m in depo.tum_mesajlar(sid)] == [f"eski{i}" for i in range(9)]
 ```
 
-`study_plan` bugün `hafiza` almaz. Spy `**kw` ile durur. Rota depoyu açmaz ve `hafiza=True` geçirmez. `messages` gövdesi bugünkü `/api/assistant/plan` alanıdır.
+`SIMDI`, görev 1'deki saattir; bu test dosyası aynı adı tanımlar. `ab` * 15 + iki hex, 32 karakterlik kimliktir. Dokuz eski ek + iki yeni ek = 11. Sayım `mesaj_ekle`'den önce bittiği için onuncu satır yazılmaz ve model çağrılmaz.
+
+`test_eski_ekler_tavanda_modele_gider`: sekiz eski ek + iki yeni ek 200'dür. Spy'a giden mesajlardaki `ek_govde` toplamı 10'dur. Kimlikler B2'nin yükleme testinin kaydettiği yolla durur; `oku` baytı bulur. Dokuz artı iki, yukarıdaki test, modele gitmez.
+
+`study_plan` bugün `hafiza` almaz. Spy `**kw` ile durur. Rota depoyu açmaz ve `hafiza=True` geçirmez. `messages` gövdesi bugünkü `/api/assistant/plan` alanıdır. Spy `_assistant_runtime`'ın yerine geçtiği için kurucuyu ölçmez. Kurucuyu görev 4'teki `test_runtime_hafiza_varsayilani_dosya_acmaz` ölçer.
 
 Silme: Işık bir ek yükler (B2 `POST /api/assistant/uploads`), stream o ekle gider, `bagli_sohbet` sid olur, `DELETE` sonrası meta dosyası yoktur ve `GET` sohbet 404'tür.
 
@@ -657,11 +744,12 @@ Silme: Işık bir ek yükler (B2 `POST /api/assistant/uploads`), stream o ekle g
 
 `assistant_stream` / `assistant_chat`, view içinde, B2'nin `email = _module_person()` ve `_ekleri_hazirla` satırlarının yanında:
 
-- `sohbet_id` yoksa bugünkü yol. Depo açılmaz. `pencere` gönderilmez.
+- `sohbet_id` yoksa bugünkü yol. `_sohbet_deposu` çağrılmaz. `pencere` gönderilmez. `AssistantRuntime` da dosyayı kurmaz.
 - Varsa `_sohbet_erisim`. Sahip değilse 403, gövdeyi açmadan (SSE değil).
 - Son kullanıcı mesajı: listedeki son `role==user`. Yoksa ya da metin strip boşsa 400 `Mesaj boş olamaz.` Önceki istemci mesajları atılır.
-- `_ekleri_hazirla([o mesaj], email)` — B2, view içinde.
-- `mesaj_ekle` kullanıcı satırı. `ekler` alanı `ek_govde` varsa `[{id, ad, tur}, ...]` (`meta["id"]`, `meta["ad"]`, `meta["tur"]`), yoksa `[]`.
+- Tavan, `_ekleri_hazirla`'dan önce: `son_mesajlar(sid, 19)` satırlarında `json.loads(ekler_json)` ile yeni mesajın `ekler` listesi toplanır. Toplam `ISTEK_SINIRI`'yi (10) aşarsa 400 `Bir istekte en fazla 10 dosya olabilir.` `mesaj_ekle` yok, model yok. 19, yeni satırın yirminci olacağı içindir; bu pencereden düşecek en eski satırın ekleri sayılmaz. Sohbette 19'dan az satır varsa hepsi sayılır. Aynı kimlik iki kez geçtiyse iki sayılır. İkinci bir sabit yok.
+- `_ekleri_hazirla([o mesaj], email)` — B2, view içinde, yalnız yeni mesaj. Eski eklerin baytları bunun yanında, aynı view'da, `oku` ile `ek_govde`'ye konur ve yukarıdaki sayıma dahildir.
+- `mesaj_ekle` kullanıcı satırı. `sohbet.ogretmen` değişmez. `ekler` alanı `ek_govde` varsa `[{id, ad, tur}, ...]` (`meta["id"]`, `meta["ad"]`, `meta["tur"]`), yoksa `[]`.
 - Her id için `EkDeposu(OUTPUT_DIR).bagla(email, id, sid)`.
 - `son_mesajlar(sid, 20)` model listesi olur. `content` kolonu `content`, `role` `rol`. Ekli kullanıcı mesajına `ekler` id listesi ve `ek_govde` yeniden konur (B2 bloğu `pencere=20` içinde kalsın). `ek_govde` diskten `oku` ile, view içinde, `generate` öncesi.
 - `chat_events(..., messages=hazir, pencere=20, sahip_email=email)`. `generate` `_module_person` çağırmaz.
@@ -696,16 +784,17 @@ git commit -m "feat: sohbet akışına son yirmi turu bağla"
 
 ---
 
-### Task 4: Aile eki, not, özet okuma
+### Task 4: Aile eki, not, özet yazımı, kaynak seçimi
 
 **Files:**
-- Modify: `src/dashboard_api.py` (`assistant_upload_oku`, not uçları)
+- Modify: `src/dashboard_api.py` (`assistant_upload_oku`, not uçları, cevap satırından sonra özet)
+- Modify: `src/assistant_sohbet.py` (`hassas_not`, `ozet_yaz` görev 1'de)
 - Modify: `src/assistant_tools.py`, `src/assistant_core.py`
-- Test: `tests/test_assistant_uploads_api.py`, `tests/test_assistant_sohbet_api.py`
+- Test: `tests/test_assistant_uploads_api.py`, `tests/test_assistant_sohbet_api.py`, `tests/test_assistant_sohbet.py`, `tests/test_assistant_core.py`
 
 **Interfaces:**
-- Consumes: `OGRENCI_EMAILS`, `okur_turu`, `EkDeposu.oku`.
-- Produces: `hafiza_yaz` `{metin: string}`, `hafiza_duzelt` `{id, metin}`. İlan yalnız `okur` `ogrenci` ya da `aile` iken ve `hafiza=True` iken. `study_plan` ve `openai_chat_completion` `hafiza=False`.
+- Consumes: `OGRENCI_EMAILS`, `okur_turu`, `EkDeposu.oku`, `TOOL_RESULT_SINIRI`.
+- Produces: `hafiza_yaz` `{metin: string}`, `hafiza_duzelt` `{id, metin}`, `hassas_not`, `eski_turleri_ozetle`, `_sorguya`, `_parcayi_ele`. İlan yalnız `okur` `ogrenci` ya da `aile` iken, `hafiza=True` iken ve `not_deposu` verilmişken. `study_plan` ve `openai_chat_completion` depo kurmaz.
 
 - [ ] **Step 1: Test**
 
@@ -717,9 +806,88 @@ Not: aile `POST /api/assistant/notlar` yok. Model aracı yazar. HTTP:
 - `PATCH /api/assistant/notlar/<id>` `{metin}` aile, boş metin 400 `Mesaj boş olamaz.`
 - `DELETE` aile. Öğrenci 403. Yok 404 `Not bulunamadı.`
 
-Araç testi, depo tmp, `dispatch("hafiza_yaz", {"metin": "payda"}, okur="ogrenci", hafiza=True)`. Satır var. `okur="bilinmiyor"` yazmaz, `ok` False. `hafiza=False` yazmaz.
+Araç testi, depo tmp, `dispatch("hafiza_yaz", {"metin": "Paydada zorlanıyor"}, okur="ogrenci", hafiza=True, not_deposu=depo)`. Satır var. `okur="bilinmiyor"` yazmaz, `ok` False. `hafiza=False` yazmaz. `not_deposu` verilmezse yazmaz ve sqlite dosyası açılmaz.
 
-Özet: satıra test `UPDATE` ile `ozet` yazar (üretim yolu yok). `pencere=20` çağrısında sarmalayıcı kullanıcı metni `Önceki özet:\n` ile başlar. `ozet` NULL ise o satır yoktur.
+Hassas not, aynı depoda, yazmadan önce `hassas_not`. Şunlar satır yazmaz, `ok` False, hata `Bu not yazılmadı.`: `İlaç kullanıyor`, `Boşanma konuşuldu`, `05321112233`, `veli@example.com`. Şunlar yazılır: `Paydada zorlanıyor`, `Üçüncü soruyu yarım bırakıyor`, `sınav notu düşük`. Aile `PATCH` ile aynı metinleri gönderir: hassas olan 400 `Bu not yazılmadı.`, ödev cümlesi 200.
+
+Özet ürün yolu. `tamamla` enjekte edilir; varsayılan `claude-haiku-4-5` çağrısı testte kurulmaz.
+
+```python
+def test_yirmi_asimi_ozeti_yazar_mesaji_silmez(tmp_path):
+    depo = SohbetDeposu(tmp_path / "assistant_sohbetler.sqlite")
+    sid = depo.yarat(ISIK, "genel", SIMDI)
+    for i in range(21):
+        depo.mesaj_ekle(sid, "user", f"m{i}", "genel", [], SIMDI)
+    gorulen = {}
+
+    def tamamla(prompt):
+        gorulen["prompt"] = prompt
+        return "kısa özet"
+
+    from src.assistant_core import eski_turleri_ozetle
+    eski_turleri_ozetle(depo, sid, tamamla)
+    assert depo.ozet_oku(sid) == "kısa özet"
+    assert len(depo.tum_mesajlar(sid)) == 21
+    assert "user: m0" in gorulen["prompt"]
+    assert "user: m20" not in gorulen["prompt"]
+
+
+def test_yirmi_asmazsa_ozet_yok(tmp_path):
+    depo = SohbetDeposu(tmp_path / "assistant_sohbetler.sqlite")
+    sid = depo.yarat(ISIK, "genel", SIMDI)
+    for i in range(20):
+        depo.mesaj_ekle(sid, "user", f"m{i}", "genel", [], SIMDI)
+
+    def tamamla(prompt):
+        raise AssertionError("çağrılmamalı")
+
+    from src.assistant_core import eski_turleri_ozetle
+    eski_turleri_ozetle(depo, sid, tamamla)
+    assert depo.ozet_oku(sid) is None
+
+
+def test_ozet_hatasi_cevap_satirini_birakir(tmp_path):
+    depo = SohbetDeposu(tmp_path / "assistant_sohbetler.sqlite")
+    sid = depo.yarat(ISIK, "genel", SIMDI)
+    for i in range(22):
+        depo.mesaj_ekle(sid, "user", f"m{i}", "genel", [], SIMDI)
+
+    def tamamla(prompt):
+        raise RuntimeError("ağ yok")
+
+    from src.assistant_core import eski_turleri_ozetle
+    eski_turleri_ozetle(depo, sid, tamamla)
+    assert depo.ozet_oku(sid) is None
+    assert len(depo.tum_mesajlar(sid)) == 22
+```
+
+Akış testi: cevap satırı yazıldıktan sonra view `eski_turleri_ozetle` çağırır. 21 eski kullanıcı satırı varken tamamlanan bir `answer`, `ozet`'i stub'ın metnine eşitler ve asistan satırını silmez. Stub patlarsa asistan satırı durur, `ozet` NULL kalır. `pencere=20` çağrısında dolu `ozet` sarmalayıcı kullanıcı metnini `Önceki özet:\n` ile başlatır. NULL ise o satır yoktur.
+
+Kaynak seçimi, ağ yok:
+
+```python
+def test_sorgu_soru_ekini_dusurur():
+    from src.assistant_tools import _sorguya
+    assert _sorguya("Payda neden eşitlenir?") == "Payda eşitlenir"
+    assert _sorguya("Paydada zorlanıyor") == "Paydada zorlanıyor"
+
+
+def test_ayni_parca_ikinci_kez_konmaz():
+    from src.assistant_core import _parcayi_ele
+    assert _parcayi_ele({"Payda eşittir."}, "Payda eşittir.\n\nYeni satır") == "Yeni satır"
+    assert _parcayi_ele({"Payda eşittir."}, "Payda eşittir.") == "Aynı parça zaten duruyor."
+```
+
+```python
+def test_runtime_hafiza_varsayilani_dosya_acmaz(tmp_path):
+    from src.assistant_core import AssistantRuntime
+    rt = AssistantRuntime(tmp_path)
+    assert not (tmp_path / "output" / "assistant_sohbetler.sqlite").exists()
+    rt.chat(messages=[{"role": "user", "content": "x"}], hafiza=True)
+    assert not (tmp_path / "output" / "assistant_sohbetler.sqlite").exists()
+```
+
+`chat` anahtarsızdır (`tests/conftest.py` `ANTHROPIC_API_KEY`'i siler). Dönüş "şu an yanıt veremiyor" yolu olabilir; dosya yine yoktur. Bu test runtime'ı spy ile değiştirmez.
 
 İstem: `SYSTEM_PROMPT` içinde B2'nin `## Yüklenen dosya` bölümünden hemen sonra:
 
@@ -736,7 +904,7 @@ Not bloğu: depolu istekte sarmalayıcıda `Öğrenci notları:\n` ve her not `-
 
 - [ ] **Step 2: FAIL**
 
-`tests/test_assistant_uploads_api.py` ve `tests/test_assistant_sohbet_api.py`. Expected: FAIL.
+`tests/test_assistant_uploads_api.py`, `tests/test_assistant_sohbet.py`, `tests/test_assistant_sohbet_api.py` ve `tests/test_assistant_core.py`. Expected: FAIL. `_sorguya`, `_parcayi_ele` ve runtime testi `tests/test_assistant_core.py` içindedir. `hassas_not` ile özet testleri `tests/test_assistant_sohbet.py` içindedir.
 
 - [ ] **Step 3: Uygula**
 
@@ -744,22 +912,31 @@ Not bloğu: depolu istekte sarmalayıcıda `Öğrenci notları:\n` ve her not `-
 
 Not uçları `_require_assistant_access` + aile kapısı. Depo `notlar`, `not_duzelt`, `not_sil`.
 
-`build_registry` / `McpRegistry`: opsiyonel `not_deposu=None`. None ise araç ilan edilmez (bugünkü test kayıtları değişmez). `AssistantRuntime` deposunu `output_dir / "assistant_sohbetler.sqlite"` ile kurar ve geçirir.
+`hassas_not(metin) -> bool` `src/assistant_sohbet.py` içindedir. Harf olmayanla ayrılmış parçalar token'dır. Katlanırken `İ` → `i`, `I` → `ı`, sonra `casefold`. Şu token'lardan biri varsa True: `sağlık`, `saglik`, `hastalık`, `hastalik`, `hasta`, `ilaç`, `ilac`, `tedavi`, `teşhis`, `teshis`, `tanı`, `tani`, `boşanma`, `bosanma`. Ayrıca `@` ya da art arda 10 rakam varsa True. `tanım` ve `üçüncü` tek başına yetmez. `not_yaz` True ise satır yazmaz, `""` döner. `not_duzelt` True ise güncellemez, False döner. HTTP önce bu kapıya bakar: hassas 400 `Bu not yazılmadı.`; yok 404.
 
-`declarations(..., hafiza: bool = True)`: `hafiza` ve `okur in ("ogrenci", "aile")` ve depo varsa iki aracı ekler. `dispatch` aynı kapıyı tekrarlar; kapalıysa yazmaz.
+`build_registry` / `McpRegistry`: opsiyonel `not_deposu=None`. None ise araç ilan edilmez ve `notlar()` çağrılmaz (bugünkü test kayıtları değişmez). `AssistantRuntime.__init__` `SohbetDeposu` kurmaz. `hafiza` varsayılanı True kalsa da depo argümanı yoksa dosya açılmaz.
 
-`chat(..., hafiza: bool = True, sohbet_id: str = "")`: `hafiza` ise `notlar()` metinlerini `_build_conversation`'a verir. `hafiza_yaz` `kaynak_sohbet=sohbet_id or None`.
+`declarations(..., hafiza: bool = True)`: `hafiza` ve `okur in ("ogrenci", "aile")` ve `not_deposu is not None` ise iki aracı ekler. `dispatch` aynı kapıyı ve `hassas_not`'u tekrarlar; kapalıysa ya da hassassa yazmaz.
 
-`/stream` ve `/chat` depolu istekte `hafiza=True` ve `sohbet_id` geçirir. `study_plan` ve `openai_chat_completion` `hafiza=False` geçirir, `not_deposu` çağırmaz.
+`chat(..., hafiza: bool = True, sohbet_id: str = "", not_deposu=None)`: `hafiza` ve `not_deposu` birlikte varsa `notlar()` metinlerini `_build_conversation`'a verir. İkisi birden yoksa depo kurulmaz. `hafiza_yaz` `kaynak_sohbet=sohbet_id or None`.
 
-Özet okuma: depolu istek `ozet_oku`. NULL değilse sarmalayıcıya, sisteme değil. Yazma yok.
+`/stream` ve `/chat` yalnız `sohbet_id` varken depoyu kurar, `hafiza=True` ve `not_deposu` geçirir. `sohbet_id` yoksa bu argümanlar geçmez. `study_plan` ve `openai_chat_completion` `SohbetDeposu` kurmaz, `not_deposu` geçirmez.
+
+Özet: `OZET_MODEL = "claude-haiku-4-5"` `assistant_core.py` içindedir. `eski_turleri_ozetle(depo, sid, tamamla)` mesaj sayısı 20'den büyükse, son 20'nin dışında kalan turları `tamamla`'ya verir. İstemi şudur: eski turları kısa özete indir; yüklenen eklerin adını ve kimliğini, çözülen soruları ve açık kalan işleri koru; eski araç gövdesini olduğu gibi taşıma, kaynağın adını koru; yalnız özet metnini yaz. Her eski tur `rol: icerik` satırıdır. Varsa önceki `ozet` istemin başındadır. Dönüş `ozet_yaz` ile yazılır. `tamamla` verilmezse tek çağrı `OZET_MODEL` iledir; Sonnet değişmez. İstisna yutulur, tipi loglanır, `ozet` değişmez. Eski turun `ekler_json` değeri isteme `ad` ve `id` ile yazılır. View bu fonksiyonu asistan satırı yazıldıktan sonra çağırır; `answer` olayı Haiku'yu beklemez. Okuma: depolu istek `ozet_oku`. NULL değilse sarmalayıcıya, sisteme değil.
+
+Kaynak seçimi:
+
+- `_parcayi_ele(onceki: set[str], govde: str) -> str` gövdeyi `\n\n` ile böler, `onceki`'de olan parçayı düşürür, kalanı geri verir, kalan yoksa `Aynı parça zaten duruyor.` `chat_with_tools` her başarılı araç gövdesinde, `_sonuc_icerigi`'nden önce bunu çağırır. Araç adı başına biriken küme bu istektir. `tool_result` yine döner; API eksik sonuç kabul etmez. `TOOL_RESULT_SINIRI` (4000) durur. Yeni bir karakter tavanı yazılmaz. Bu, spec'in vermediği pay sayısının yerine konan kilitir.
+- Uzun sohbet: `mesaj.meta_json` `{}` kalır, araç gövdesi satıra yazılmaz. 20'nin dışındaki gövde bir sonraki istekte açılmaz. Onun yerine `ozet` gider. İkinci bir özet modeli yok.
+- `_sorguya(metin)` `?` ve `!` siler, `split()` eder, katlanmış token şunlardansa düşürür: `nedir`, `nelerdir`, `nasıl`, `nasil`, `neden`, `niçin`, `nicin`, `kim`, `kimdir`, `hangi`, `kaç`, `kac`, `mı`, `mi`, `mu`, `mü`. Kalan boşsa, `?` silinmiş özgün metin kalır. Ek model çağrısı yok. Yalnız `_dispatch_local` ve `_dispatch_aile_kaynak` aramadan önce uygular.
 
 - [ ] **Step 4: PASS**
 
 ```bash
 cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/asistan-b2-plan
 DASHBOARD_SECRET_KEY=yalniz-test /mnt/thunderbolt/workspaces/TED/.venv/bin/python -m pytest \
-  tests/test_assistant_uploads_api.py tests/test_assistant_sohbet_api.py \
+  tests/test_assistant_uploads_api.py tests/test_assistant_sohbet.py \
+  tests/test_assistant_sohbet_api.py tests/test_assistant_core.py \
   tests/test_assistant_ogretmen_modu.py tests/test_assistant_yerel_kaynaklar.py \
   -q -p no:cacheprovider
 ```
@@ -771,7 +948,7 @@ Expected: PASS.
 ```bash
 git add src/dashboard_api.py src/assistant_core.py src/assistant_tools.py \
   tests/test_assistant_uploads_api.py tests/test_assistant_sohbet_api.py
-git commit -m "feat: aileye Işık'ın ekini ve notunu aç"
+git commit -m "feat: aile notunu, özeti ve kaynak seçimini bağla"
 ```
 
 ---
@@ -815,6 +992,22 @@ test('desktop lists the chat and loads it', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Sohbetler' })).toBeVisible()
   await page.getByRole('button', { name: 'Payda eşitle' }).click()
   await expect(page.getByText('Paydalar toplanmaz.')).toBeVisible()
+})
+
+test('the open chat teacher beats localStorage', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('tedy-asistan-ogretmen::test@tedy.online', 'genel')
+  })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await sabitAc(page, '/asistan', 1440, 900)
+  await page.route('**/api/assistant/sohbetler?*', r => r.fulfill(json({ sohbetler: [] })))
+  await page.route('**/api/assistant/sohbetler', r => r.fulfill(json({ sohbetler: [SOHBET] })))
+  await page.route(`**/api/assistant/sohbetler/${SOHBET.id}`, r => r.fulfill(json({
+    sohbet: SOHBET, mesajlar: MESAJLAR,
+  })))
+  await page.goto('/asistan')
+  await page.getByRole('button', { name: 'Payda eşitle' }).click()
+  await expect(page.locator('input[name="ac-ogretmen"][value="matematik"]')).toBeChecked()
 })
 
 test('an empty list uses the spec sentence', async ({ page }) => {
@@ -888,7 +1081,7 @@ Durum: `sohbetId`, `liste`, `isikListe` (yalnız `!student`), `notlar` (yalnız 
 
 `Yeni sohbet` POST, dönen `id` seçilir, mesajlar karşılama satırına iner. Başlık boşken satır çizilmez.
 
-Satır düğmesi başlığı açar: `GET .../<id>`, mesajlar `rol`/`icerik` ile çizilir. Kendi satırında `Yeniden adlandır` (`TextInput`, Enter PATCH) ve `Sil` (DELETE). Işık satırında ikisi de yok. Seçili Işık sohbetinde `#ac-input` `disabled`, yanında `Bu sohbet salt okunur.`
+Satır düğmesi başlığı açar: `GET .../<id>`, mesajlar `rol`/`icerik` ile çizilir. Dönüşteki `sohbet.ogretmen` seçiciye yazılır: `ogretmen.sec(sohbet.ogretmen)`. `useOgretmen` anahtarı `tedy-asistan-ogretmen::<email>` yalnız seçili sohbet yokken geçerlidir. Seçili sohbetin öğretmeni onu ezer. Seçiciyi elle değiştirmek `PATCH` ile `sohbet.ogretmen` yazar; gönderim `mesaj_ekle` üzerinden bu kolonu değiştirmez. Kendi satırında `Yeniden adlandır` (`TextInput`, Enter PATCH) ve `Sil` (DELETE). Işık satırında ikisi de yok. Seçili Işık sohbetinde `#ac-input` `disabled`, yanında `Bu sohbet salt okunur.`
 
 Gönder, seçili kendi sohbetinde: gövde `{sohbet_id, ogretmen, messages: [{role:'user', content, ekler?}]}`. Tek mesaj. `sohbet_id` yoksa önce POST, sonra aynı gövde. B2'nin plan / yeniden üret / daha derine yolları `sohbet_id` koymaz.
 
@@ -929,7 +1122,7 @@ git commit -m "feat: asistan sayfasına sohbet listesini ekle"
 - [ ] **Step 1: Madde**
 
 ```markdown
-- **Asistan sohbet geçmişi (B3)** (spec §3, plan `docs/superpowers/plans/2026-10-03-asistan-sohbet-gecmisi-b3.md`): `output/assistant_sohbetler.sqlite` (WAL, connection per transaction, busy_timeout 5000). `GET/POST /api/assistant/sohbetler`, `GET/PATCH/DELETE /api/assistant/sohbetler/<id>`, `?kisi=ogrenci` for Işık's chats. Family is read-only (`Bu sohbet salt okunur.`). `/stream` and `/chat` with `sohbet_id` save the user row before `generate()`, load the last 20, and save the assistant row only after the `answer` event. No `sohbet_id` means today's path and no database. `/v1` and API keys never open the file. `DELETE` calls `EkDeposu.sohbet_eklerini_sil` then drops the rows. Family `GET /api/assistant/uploads/<id>` reads Işık's file. `hafiza_yaz` / `hafiza_duzelt` and `GET/PATCH/DELETE /api/assistant/notlar` (family only). Summary column `ozet` is read when present and never written here (no token threshold). `/plan` does not use the store.
+- **Asistan sohbet geçmişi (B3)** (spec §3, plan `docs/superpowers/plans/2026-10-03-asistan-sohbet-gecmisi-b3.md`): `output/assistant_sohbetler.sqlite` (WAL, connection per transaction, busy_timeout 5000). `GET/POST /api/assistant/sohbetler`, `GET/PATCH/DELETE /api/assistant/sohbetler/<id>`, `?kisi=ogrenci` for Işık's chats. Family is read-only (`Bu sohbet salt okunur.`). `/stream` and `/chat` with `sohbet_id` save the user row before `generate()`, load the last 20 in insert order (`sira`, not the uuid), and save the assistant row only after the `answer` event. The chat's `ogretmen` loads the selector and `mesaj_ekle` does not overwrite it. Historical attachments inside that window count toward the 10-file cap. No `sohbet_id` means today's path and no database. `AssistantRuntime` does not create the file, including when `hafiza` defaults on. `/v1`, `/plan` and API keys never open the file. `DELETE` calls `EkDeposu.sohbet_eklerini_sil` then drops the rows. Family `GET /api/assistant/uploads/<id>` reads Işık's file. `hafiza_yaz` / `hafiza_duzelt` and `GET/PATCH/DELETE /api/assistant/notlar` (family only). `hassas_not` refuses the locked health, family and identifier patterns before a write. Past 20 messages the product writes `ozet` with `claude-haiku-4-5` and does not delete messages. Source selection drops a repeated piece, keeps the existing 4000-character tool cap, and rewrites the search query without a model call.
 ```
 
 - [ ] **Step 2: Son kapı**
@@ -960,17 +1153,21 @@ git commit -m "docs: asistan sohbet geçmişini CLAUDE.md'ye yaz"
 |---|---|
 | sqlite, WAL, işlem başına bağlantı, şema | 1 |
 | GET/POST/PATCH/DELETE, kendi sohbeti, `?kisi=ogrenci`, yazma sahibine | 2, 5 |
-| Son 20, iki tur, kopan akışta yarım cevap yok, başlık ilk sorudan | 3 |
+| Son 20, aynı saniyede ekleme sırası, kopan akışta yarım cevap yok, başlık ilk sorudan | 1, 3 |
+| Sohbet öğretmeni seçiciyi kurar; `mesaj_ekle` kolonu ezmez | 1, 5 |
+| Eski ekler 10 tavanına girer | 3 |
+| `sohbet_id` yoksa dosya yok; runtime `hafiza` varsayılanında dosya açmaz | 3, 4 |
 | Sohbet silinince ekler | 3 (`sohbet_eklerini_sil`, dosya önce) |
 | `bagli_sohbet` dolar | 3 (`bagla`) |
 | Aile ek URL'si | 4 |
-| Okur asistana giremez; `/v1` ve API anahtarı depoya dokunmaz | 2, 3 |
+| Okur asistana giremez; `/v1`, `/plan` ve API anahtarı depoya dokunmaz | 2, 3, 4 |
 | Boş liste cümlesi | 5 |
 | Masaüstü liste, telefon paneli, Yeni sohbet, yeniden adlandır, sil | 5 |
 | Işık notu; aile bölümü salt okunur | 5 |
 | `ogrenci_notu`, `hafiza_yaz` / `hafiza_duzelt`, aile paneli | 4, 5 |
-| Özet okuma, üretim yok | 4 (açık karar 1) |
-| Kaynak seçimi | yok (açık karar 2) |
-| Hassas içerik kod listesi | yok; istem cümlesi 4 (açık karar 3) |
+| Özet yazımı (`claude-haiku-4-5`), mesaj tablosu durur, okuma | 4 |
+| Kaynak seçimi (tekrar, pay, eski gövde, `_sorguya`) | 4 |
+| Hassas notun kod denetimi | 4 |
 | Eşzamanlı iki yazıcı, sahiplik, aile salt okuma | 1, 2 |
+| Boş başlık gizli; Yeniden üret / Daha derine in `sohbet_id` göndermez | açık karar 5 ve 7 |
 | B4–B6 | yok |
