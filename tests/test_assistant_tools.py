@@ -83,7 +83,7 @@ def _registry(**over):
 
 def test_declarations_expose_only_allowlisted_tools_under_local_names():
     reg = _registry()
-    names = {d["name"] for d in reg.declarations()}
+    names = {d["name"] for d in reg.declarations(etkilesimli=False)}
     assert "kazanim_ara" in names
     assert "search_learning_outcomes" not in names
     assert names <= set(TOOL_ALLOWLIST) | {"ogrenci_verisi_ara"}

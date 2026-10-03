@@ -32,7 +32,7 @@ def test_yalniz_metin_yan_dosyasi_indekslenir(tmp_path, monkeypatch):
         assert ix._is_excluded_file(rel), rel
         assert not ix.is_path_currently_included(rel), rel
     assert not ix._is_excluded_file(alinir) and ix.is_path_currently_included(alinir)
-    assert INDEX_FORMAT_VERSION == 2
+    assert INDEX_FORMAT_VERSION == 3
 
 
 def test_ekler_icerikte_ders_kitaplarindan_once_kesfedilir(tmp_path, monkeypatch):
