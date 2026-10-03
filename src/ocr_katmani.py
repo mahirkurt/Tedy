@@ -5,9 +5,13 @@ chunks of the live index were "pdf_no_text" (content/yabanci-dil), and a
 scanned homework attachment would read "metin katmanı yok". Each such page is
 rendered with pdftoppm and read by Claude Haiku 4.5's vision into Markdown
 (headings, tables and formulas kept). A page is read once — cached by (file
-sha256, page, engine, prompt version). Spend is held under a monthly cap in a
-ledger fed by each response's `usage`; at the cap, on an API error or a
-refusal, the page falls back to local Tesseract (tur+eng). Every page carries
+sha256, page, engine, prompt version). A refusal or an API error is remembered
+on that same key, so a later read in that calendar month reuses Tesseract.
+A new month asks Claude again only when the page never reached it because
+the cap was already full — that path writes no attempt. Spend is held
+under a monthly cap in a ledger fed by each response's `usage`; at the cap,
+on an API error or a refusal, the page falls back to local Tesseract
+(tur+eng). An API error is not written to the ledger. Every page carries
 its engine and a confidence estimate, and a low one is labelled for the model.
 """
 from __future__ import annotations
@@ -272,6 +276,28 @@ class OcrOnbellegi:
                           "okundu": datetime.now().isoformat(timespec="seconds")},
                          str(self._yol(sha, okuma.sayfa, okuma.motor)))
 
+    def _deneme_yol(self, sha: str, sayfa: int, motor: str) -> Path:
+        """Claude was asked for (file, page, engine, prompt version).
+
+        The calendar month of the attempt is stored in the file, from the
+        ledger clock. The marker is not dropped when the month changes: a
+        new month asks Claude only for a page that has no marker, which is
+        a page the cap kept from reaching Claude.
+        """
+        anahtar = hashlib.sha256(
+            f"{sha}|{sayfa}|{motor}|{ISTEM_SURUMU}|deneme".encode("utf-8")
+        ).hexdigest()[:24]
+        return self.dizin / sha[:2] / f"{sha[:16]}-s{sayfa}-deneme-{anahtar}.json"
+
+    def denendi(self, sha: str, sayfa: int, motor: str) -> bool:
+        return self._deneme_yol(sha, sayfa, motor).is_file()
+
+    def deneme_kaydet(self, sha: str, sayfa: int, motor: str, ay: str) -> None:
+        atomic_json_dump(
+            {"sayfa": sayfa, "motor": motor, "ay": ay, "istem_surumu": ISTEM_SURUMU},
+            str(self._deneme_yol(sha, sayfa, motor)),
+        )
+
 
 class OcrDefteri:
     """output/ocr_defteri.json: measured spend per month (Istanbul wall clock).
@@ -400,9 +426,14 @@ class OcrKatmani:
             if okuma is not None:
                 return okuma
         tesseract = self.onbellek.al(sha, sayfa, MOTOR_TESSERACT)
-        # A Tesseract reading stays unless it is low and Claude may be asked
-        # (e.g. a new month): checked before rendering, so a full cap does not
-        # cost a render per low page per run.
+        # Claude was already asked for this file, page, engine and prompt
+        # version (refusal or API error). Reuse Tesseract for the rest of
+        # this calendar month and after, even when confidence is low and
+        # budget remains. A page that never reached Claude because the cap
+        # was full has no attempt, so a new month may still ask — checked
+        # before rendering, so a full cap does not cost a render per low page.
+        if self.onbellek.denendi(sha, sayfa, self.okuyucu.motor):
+            return tesseract
         if tesseract is not None and (not tesseract.dusuk_guven or not self.defter.izin_var()):
             return tesseract
         if self._kalan(son_an) <= 0:
@@ -442,9 +473,14 @@ class OcrKatmani:
             sonuc = self.okuyucu.oku(jpeg, self._kalan(son_an))
         except Exception as exc:  # noqa: BLE001 — API error, no key, network: fall back
             logger.warning("OCR: Claude okuyamadı (%s); Tesseract'a düşülüyor", type(exc).__name__)
+            self._denemeyi_yaz(sha, sayfa)
             return None
         usd = self.defter.yaz(self.okuyucu.motor, sonuc.girdi_token, sonuc.cikti_token)
         if sonuc.reddedildi:
+            self._denemeyi_yaz(sha, sayfa)
             return None
         return self._sakla(sha, SayfaOkumasi(sayfa, sonuc.markdown, self.okuyucu.motor,
                                              _GUVEN.get(sonuc.okunabilirlik, 0.7), usd))
+
+    def _denemeyi_yaz(self, sha: str, sayfa: int) -> None:
+        self.onbellek.deneme_kaydet(sha, sayfa, self.okuyucu.motor, self.defter._ay())

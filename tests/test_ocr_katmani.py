@@ -99,12 +99,28 @@ def test_api_hatasinda_tesseract_a_duser_para_yazilmaz(tmp_path):
     assert katman.defter.harcanan() == 0.0
 
 
+def test_api_hatasi_dusuk_guvende_ikinci_okuma_claude_a_donmez(tmp_path):
+    pdf = taranmis_pdf(tmp_path / "t.pdf")
+    okuyucu = SahteOkuyucu(hata=RuntimeError("529 overloaded"))
+    tesseract = SahteTesseract(guven=0.45)
+    katman = _katman(tmp_path, okuyucu, tesseract)
+    katman.pdf_oku(pdf, katman.saat() + 60)
+    katman.pdf_oku(pdf, katman.saat() + 60)
+    assert len(okuyucu.cagrilar) == 1 and tesseract.cagrilar == 1
+    assert katman.defter.harcanan() == 0.0
+
+
 def test_ret_kullanimini_yazar_ve_tesseract_a_duser(tmp_path):
     pdf = taranmis_pdf(tmp_path / "t.pdf")
     okuyucu, tesseract = SahteOkuyucu(reddet=True), SahteTesseract()
     katman = _katman(tmp_path, okuyucu, tesseract)
     katman.pdf_oku(pdf, katman.saat() + 60)
-    assert tesseract.cagrilar == 1 and katman.defter.harcanan() > 0
+    assert len(okuyucu.cagrilar) == 1 and tesseract.cagrilar == 1
+    assert katman.defter.harcanan() > 0
+    harcanan = katman.defter.harcanan()
+    katman.pdf_oku(pdf, katman.saat() + 60)
+    assert len(okuyucu.cagrilar) == 1 and tesseract.cagrilar == 1
+    assert katman.defter.harcanan() == harcanan
 
 
 def test_yeni_ay_dusuk_guvenli_tesseract_sayfasini_claude_ile_yeniler(tmp_path):
