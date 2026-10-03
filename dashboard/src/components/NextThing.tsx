@@ -1,5 +1,7 @@
 import { Button } from '@carbon/react'
-import { ArrowRight, Document } from '@carbon/icons-react'
+import { ArrowRight } from '@carbon/icons-react'
+import type { PortalEki } from '../types'
+import { EkBaglantisi } from './patterns/EkBaglantisi'
 import './patterns/patterns.scss'
 import './NextThing.scss'
 import SubjectLabel from './SubjectLabel'
@@ -29,7 +31,7 @@ export interface NextThingProps {
   /** The teacher's own words, shown while the box runs — what to do for
    *  those minutes, without going to find it on another page (İ5). */
   instruction?: string[]
-  attachments?: { name: string; url: string }[]
+  attachments?: PortalEki[]
   /** Another box, once one has run out. */
   onMore?: () => void
   /** Close the box and return the card to rest. */
@@ -105,11 +107,7 @@ export function NextThing({
         {suruyor && (attachments?.length ?? 0) > 0 && (
           <ul className="next-thing__attachments">
             {attachments!.map((ek, i) => (
-              <li key={i}>
-                <a href={ek.url} target="_blank" rel="noopener noreferrer">
-                  <Document size={16} /> {ek.name}
-                </a>
-              </li>
+              <li key={ek.id ?? `${i}-${ek.url}`}><EkBaglantisi ek={ek} /></li>
             ))}
           </ul>
         )}

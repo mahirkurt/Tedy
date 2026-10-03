@@ -1,5 +1,19 @@
 import type { SubjectFamily } from './theme/subjects'
 
+/** Where TEDY stands with one portal attachment (backend src/portal_ekleri.py). */
+export type EkDurumu = 'indirildi' | 'bekliyor' | 'erisilemedi' | 'cok_buyuk' | 'hata' | 'baglanti'
+
+/** An attachment as /api/homework, /api/pages and /api/announcements serve it:
+ *  `tedyUrl` only when TEDY holds the copy; `url` is always the original. */
+export interface PortalEki {
+  name: string
+  url: string
+  id?: string | null
+  tedyUrl?: string | null
+  status?: EkDurumu
+  reason?: string
+}
+
 export interface HomeworkItem {
   "Ders Adı": string
   "Ödev Başlığı": string
@@ -14,7 +28,7 @@ export interface HomeworkItem {
   student_done_at?: string
   detail?: {
     description: string
-    attachments: { name: string; url: string }[]
+    attachments: PortalEki[]
   }
   source?: string
   source_type?: 'ted' | 'private'
@@ -123,12 +137,14 @@ export interface Announcement {
   "Ekleri": string
   "Yayın Tarihi": string
   "Ekleri_url"?: string
+  /** Each `<column>_url`, as an attachment with its TEDY copy (plan 2026-09-28). */
+  ekler?: PortalEki[]
   "e-Posta İçerik"?: string
   "Duyuru Detayı"?: string
   "İçerik"?: string
   "Açıklama"?: string
   "Mesaj"?: string
-  [key: string]: string | undefined
+  [key: string]: string | PortalEki[] | undefined
 }
 
 export interface ECVideo {

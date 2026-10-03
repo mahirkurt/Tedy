@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, Button, InlineLoading, Link } from '@carbon/react'
-import { Timer, Document, CheckmarkFilled, CloseFilled, ChevronDown, ChevronUp } from '@carbon/icons-react'
+import { Timer, CheckmarkFilled, CloseFilled, ChevronDown, ChevronUp } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import type { HomeworkItem } from '../types'
 import { parseDeadline, formatTurkishDate, getHomeworkStatus } from '../utils/formatters'
@@ -12,6 +12,7 @@ import './patterns/patterns.scss'
 import { useNavigate } from 'react-router-dom'
 import type { ExamItem, ModuleCard } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
+import { EkBaglantisi } from './patterns/EkBaglantisi'
 import { useFocusMode } from '../contexts/focusMode'
 import { yaptimIsaretle } from '../utils/odevYaptim'
 
@@ -525,16 +526,15 @@ function HomeworkModalBody({ hw, enrichmentData }: { hw: HomeworkItem; enrichmen
         </div>
       )}
 
-      {/* Attachments */}
+      {/* Attachments: TEDY's copy first, the original one step away */}
       {(hw.detail?.attachments?.length ?? 0) > 0 && (
         <div className="homework-modal__attachments">
           <h5 className="homework-modal__attachments-title">Ekler</h5>
-          {hw.detail!.attachments.map((att, i) => (
-            <a key={i} href={att.url} target="_blank" rel="noopener noreferrer"
-               className="homework-modal__attachment-link">
-              <Document size={16} /> {att.name}
-            </a>
-          ))}
+          <ul className="homework-modal__attachment-list">
+            {hw.detail!.attachments.map((ek, i) => (
+              <li key={ek.id ?? `${i}-${ek.url}`}><EkBaglantisi ek={ek} /></li>
+            ))}
+          </ul>
         </div>
       )}
 

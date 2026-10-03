@@ -1045,19 +1045,13 @@ body {
   margin-bottom: var(--ted-space-xs);
 }
 
-.homework-modal__attachment-link {
+.homework-modal__attachment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
-  align-items: center;
-  gap: var(--ted-space-xs);
-  @include type.type-style('body-01');
-  padding: var(--ted-space-2xs) 0;
-  color: var(--status-info);
-  text-decoration: none;
-  transition: color var(--ted-transition-fast);
-}
-
-.homework-modal__attachment-link:hover {
-  color: var(--cds-link-primary-hover);
+  flex-direction: column;
+  gap: var(--ted-space-2xs);
 }
 
 // ─── Today Timeline — Clickable deadline items ───────────────────────────────
@@ -1691,6 +1685,12 @@ body {
   @include type.type-style('body-01');
   color: var(--ted-color-text-secondary);
   margin: 0;
+}
+
+.announcements-detail__ekler {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .announcements-detail__link {

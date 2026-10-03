@@ -83,15 +83,9 @@
   list-style: none;
   margin: $spacing-03 0 0;
   padding: 0;
-
-  a {
-    display: inline-flex;
-    align-items: center;
-    gap: $spacing-02;
-    min-block-size: $spacing-07;
-    @include type.type-style('body-compact-01');
-    color: theme.$link-primary;
-  }
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-02;
 }
 
 // A failed "Yaptım" says so on the card it was pressed on, and the box stays

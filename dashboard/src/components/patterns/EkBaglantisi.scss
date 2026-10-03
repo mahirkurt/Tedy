@@ -1,0 +1,33 @@
+@use '@carbon/react/scss/theme' as theme;
+@use '@carbon/react/scss/type' as type;
+@use '@carbon/react/scss/spacing' as *;
+
+// One portal attachment (plan 2026-09-28-portal-ekleri): the copy TEDY holds
+// is the primary link; the original is a quieter second one, or the status
+// says why there is no copy. Carbon tokens only.
+.tedy-ek {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: $spacing-04;
+  row-gap: $spacing-01;
+}
+
+.tedy-ek__ana {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-02;
+  min-block-size: $spacing-07;
+  @include type.type-style('body-compact-01');
+  color: theme.$link-primary;
+}
+
+.tedy-ek__kaynak {
+  @include type.type-style('helper-text-01');
+  color: theme.$link-secondary;
+}
+
+.tedy-ek__durum {
+  @include type.type-style('helper-text-01');
+  color: theme.$text-secondary;
+}
