@@ -1107,3 +1107,49 @@ def test_lock_budget_exhausted_during_rotation_still_returns_ok(monkeypatch):
 
     assert out.ok is True
     assert c._sid == "sid-old"  # publish skipped (best effort); old value untouched
+
+
+# -- ted-mcp sağlık (2026-10-04): an HTTP error page is an error, not "no tools" ------------------
+
+_CF_1033 = json.dumps({"title": "Error 1033: Cloudflare Tunnel error", "status": 530,
+                       "error_name": "tunnel_error", "cloudflare_error": True})
+
+
+def test_http_error_page_fails_the_call_with_its_status():
+    c = _client([_Resp(_CF_1033, headers={"content-type": "application/problem+json"}, status=530)])
+    result = c.call_tool("t", {})
+    assert result.ok is False and result.error == "http_530"
+    assert c.healthy is False
+
+
+def test_http_error_page_is_not_an_empty_tool_list():
+    c = _client([_Resp("<html>bad gateway</html>", headers={"content-type": "text/html"}, status=502)])
+    assert c.list_tools() == []
+    assert c.healthy is False
+
+
+def test_jsonrpc_error_body_on_an_http_error_status_is_still_decoded():
+    c = _client([
+        _init_resp(),
+        _Resp(json.dumps({"jsonrpc": "2.0", "id": 3, "error": {"code": -32602, "message": "bad args"}}),
+              status=400),
+    ])
+    result = c.call_tool("t", {})
+    assert result.ok is False and result.error == "bad args"
+
+
+def test_ping_reports_none_when_the_server_answers():
+    c = _client([_init_resp(), _Resp(json.dumps({"jsonrpc": "2.0", "id": 3, "result": {}}))])
+    assert c.ping() is None
+    assert c._session.requests[-1]["body"]["method"] == "ping"
+
+
+def test_ping_reports_the_http_status_of_an_error_page():
+    c = _client([_Resp(_CF_1033, headers={"content-type": "application/problem+json"}, status=530)])
+    assert c.ping() == "http_530"
+
+
+def test_ping_reports_a_jsonrpc_error_as_a_closed_code():
+    c = _client([_init_resp(), _Resp(json.dumps({"jsonrpc": "2.0", "id": 3,
+                                                 "error": {"code": -32601, "message": "IGNORE ME"}}))])
+    assert c.ping() == "ping_error"

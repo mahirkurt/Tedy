@@ -35,6 +35,8 @@ from src import roles
 from src.mcp_server.google_identity import IdentityError
 from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
+logger = logging.getLogger(__name__)
+
 REALM = "ted-mcp"
 DEFAULT_HOST = "127.0.0.1"
 # 8087 (spec's first choice) is held by another service on hp-ai-node; spec §4.1 and §12b.
@@ -312,6 +314,55 @@ class BearerGateMiddleware:
                 return
             scope.setdefault("state", {})["ted_email"] = email
         await self.app(scope, receive, send)
+
+
+# Statuses the MCP transport itself answers a refused request with (bad version/session/headers).
+_TRANSPORT_REJECT = frozenset({400, 404, 406, 415})
+_REJECT_BODY_CAP = 2048
+
+
+def _reject_reason(body: bytes) -> str:
+    """The transport's own error message, one line, bounded; '' when the body is not its JSON."""
+    try:
+        err = json.loads(body.decode("utf-8", errors="replace")).get("error")
+    except (ValueError, AttributeError):
+        return ""
+    msg = err.get("message") if isinstance(err, dict) else err
+    return " ".join(str(msg or "").split())[:160]
+
+
+class TransportRejectLogMiddleware:
+    """Journals why the MCP transport refused a request: status, the client's declared
+    mcp-protocol-version and the transport's message — never the bearer or the request body.
+
+    Measured 2026-10-03/04: every reconnect from claude.ai began with one unexplained
+    "POST /mcp 400" before a normal session; uvicorn's access line alone could not say why.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not scope["path"].startswith("/mcp"):
+            await self.app(scope, receive, send)
+            return
+        seen: dict[str, Any] = {"status": None, "body": b""}
+
+        async def capture(message: dict[str, Any]) -> None:
+            if message["type"] == "http.response.start":
+                seen["status"] = message["status"]
+            elif (message["type"] == "http.response.body" and seen["status"] in _TRANSPORT_REJECT
+                  and len(seen["body"]) < _REJECT_BODY_CAP):
+                seen["body"] += message.get("body", b"")[:_REJECT_BODY_CAP]
+            await send(message)
+
+        try:
+            await self.app(scope, receive, capture)
+        finally:
+            if seen["status"] in _TRANSPORT_REJECT:
+                version = _header(scope, b"mcp-protocol-version")[:40] or None
+                logger.warning("mcp_reddedildi durum=%s surum=%r mesaj=%r", seen["status"], version,
+                               _reject_reason(seen["body"]))
 
 
 class BodyLimitMiddleware:
@@ -650,6 +701,7 @@ def build_app(
             Middleware(HostGuardMiddleware, allowed_hosts=settings.allowed_hosts),
             Middleware(BearerGateMiddleware, store=store, base_url=base),
             Middleware(BodyLimitMiddleware, mcp_max_body_bytes=settings.mcp_max_body_bytes),
+            Middleware(TransportRejectLogMiddleware),
         ],
     )
 

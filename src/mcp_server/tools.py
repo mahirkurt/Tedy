@@ -1,6 +1,7 @@
 """Business logic for ted-mcp tools, kept free of FastMCP so it is unit-testable."""
 from __future__ import annotations
 
+import subprocess
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -38,13 +39,31 @@ _HEALTH_CALLS: dict[str, tuple[str, dict[str, Any]]] = {
 }
 
 
+def _git_revision(root: Path) -> str | None:
+    try:
+        out = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True,
+                             text=True, timeout=5, check=True)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.stdout.strip() or None
+
+
+# Read once at import: the commit whose code this process actually loaded. The service runs from a
+# git checkout and no deploy step writes REVISION, so app_revision was always null; reading HEAD at
+# call time instead would claim code a later pull put on disk but this process never imported.
+_LOADED_REVISION = _git_revision(PROJECT_ROOT)
+
+
 def app_revision(root: Path = PROJECT_ROOT) -> str | None:
-    """Deploy revision from a REVISION file next to the project root; None when absent."""
+    """Deploy revision: a non-empty REVISION file next to the project root wins; otherwise the git
+    commit (for the project root, the one loaded at startup); None when neither exists."""
     try:
         text = (root / "REVISION").read_text(encoding="utf-8").strip()
     except OSError:
-        return None
-    return text or None
+        text = ""
+    if text:
+        return text
+    return _LOADED_REVISION if root == PROJECT_ROOT else _git_revision(root)
 
 
 class Tools:
@@ -100,12 +119,14 @@ class Tools:
                     cov.skipped(name, "anahtar yok")
                     continue
                 call = _HEALTH_CALLS.get(name)
-                if call is None:
-                    cov.skipped(name, "saglik_cagrisi_yok")
-                    continue
-                tool, args = call
                 try:
-                    self.federation.call(name, tool, args, beklenen="nesne", deadline=deadline)
+                    if call is None:
+                        # No cheap tool to call: MCP ping still proves the server (and any tunnel
+                        # in front of it) answers, at no upstream quota.
+                        self.federation.ping(name, deadline=deadline)
+                    else:
+                        tool, args = call
+                        self.federation.call(name, tool, args, beklenen="nesne", deadline=deadline)
                     cov.hit(name)
                 except FederationError as exc:
                     cov.degraded(name, exc.reason)

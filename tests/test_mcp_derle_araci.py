@@ -40,6 +40,9 @@ class _Fed:
     def call(self, server_name, tool, args, beklenen, deadline=None):
         return {"ok": True}
 
+    def ping(self, server_name, deadline=None):
+        return None
+
 
 @pytest.fixture
 def derleyici(tmp_path):
@@ -95,9 +98,9 @@ def test_parent_origin_accepts_loopback_and_the_default(tmp_path):
     assert load_settings({}, project_root=tmp_path).parent_origin == "https://tedy.online"
 
 
-def test_durum_skips_servers_without_a_health_call(tmp_path):
+def test_durum_pings_servers_without_a_health_call(tmp_path):
     body = tools.Tools(load_settings({}, project_root=tmp_path), _Fed()).durum(FULL, canli=True)
-    assert body["coverage"]["pexels"] == "skipped:saglik_cagrisi_yok"
+    assert body["coverage"]["pexels"] == "hit"
     assert body["coverage"]["maarif-mufredat"] == "hit"
 
 

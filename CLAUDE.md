@@ -276,6 +276,13 @@ unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
   Çalıştırmanın anamnesis alımı tam değilse (`coverage.anamnesis` `hit` değilse), `edupedia_kaynak_oku`
   anamnesis'e sormaz; bunun yerine çalıştırmanın tüm sayfalarını yerel BM25 ile arar ve bunu `skipped:<kod>`
   olarak bildirir.
+- Sağlık: `edupedia_durum(canli=true)` yapılandırılmış her filo sunucusunu yoklar — hafif bir araç çağrısı
+  olmayanları (pexels, comfyui, openalex) MCP `ping` ile; hiçbiri atlanmaz. Sunucunun önündeki bir ağ geçidinin
+  hata sayfası (ör. Cloudflare 530 / 1033, tünel kapalı) `degraded:http_530` olur, "0 araç" sanılmaz.
+  `app_revision`: `REVISION` dosyası yoksa sürecin açılışta yüklediği git commit'i. Taşıma katmanı `/mcp`
+  isteğini reddederse günlükte `mcp_reddedildi durum=… surum=… mesaj=…` satırı çıkar (bearer ve gövde yazılmaz).
+  Ana checkout'a birleştirmeden sonra `ted-dashboard` ve `ted-mcp` ikisi de yeniden başlatılır (ikisi de
+  buradan çalışır; `src/mcp_client.py` ortaktır).
 - Ortam: `TED_MCP_FORM_SECRET` (zorunlu, ≥32 bayt, OAuth form imzası), `TED_MCP_PUBLIC_BASE_URL` (varsayılan
   `https://mcp.tedy.online`), `TED_MCP_ALLOWED_HOSTS` (Host başlığı allowlist'i), `TED_MCP_HOST`/`TED_MCP_PORT`
   (yalnız `python -m src.mcp_server.http_app` bind adresi), `TED_MCP_PROJECT_ROOT` (test/servis için proje kökünü

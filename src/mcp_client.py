@@ -31,6 +31,20 @@ class _BudgetExhausted(Exception):
     """A call_tool(timeout=...) budget ran out before the next HTTP post."""
 
 
+class McpHttpError(Exception):
+    """An HTTP error status whose body is not a JSON-RPC message.
+
+    A gateway in front of the server (measured 2026-10-04: Cloudflare 530 / error 1033, the
+    comfyui tunnel down) answers with its own error page. Decoded as JSON-RPC that page has no
+    "result", so it used to surface as "0 tools" or "malformed_result: None" and the outage
+    stayed invisible. str() is the closed code "http_<status>"; the page text is never carried.
+    """
+
+    def __init__(self, status: int) -> None:
+        super().__init__(f"http_{status}")
+        self.status = status
+
+
 @dataclass
 class McpToolResult:
     ok: bool
@@ -129,6 +143,18 @@ class McpClient:
             timeout=timeout,
         )
         resp_sid = (resp.headers or {}).get("mcp-session-id")
+        status = getattr(resp, "status_code", 200)
+        if isinstance(status, int) and status >= 400:
+            # A JSON-RPC error (an expired session's 404, a 400 for bad params) is still the
+            # server talking and keeps its existing handling; anything else is the error page of
+            # whatever stands in front of it.
+            try:
+                body = self._decode(resp)
+            except ValueError:
+                body = None
+            if not (isinstance(body, dict) and body.get("jsonrpc") == "2.0"):
+                raise McpHttpError(status)
+            return body, resp_sid
         if not str(payload.get("method", "")).startswith("notifications/"):
             return self._decode(resp), resp_sid
         return {}, resp_sid
@@ -356,6 +382,30 @@ class McpClient:
         return {}
 
     # ── public API ───────────────────────────────────────────────────────
+
+    def ping(self, timeout: float | None = None) -> str | None:
+        """MCP liveness check (spec "ping"): None when the server answered, else a closed code —
+        "http_<status>", "timeout", "ping_error" (a JSON-RPC error) or "unreachable". Unlike a
+        tool call it costs no upstream quota, so it can probe a server that has no cheap tool."""
+        deadline = None if timeout is None else _monotonic() + timeout
+        try:
+            rpc = self._rpc("ping", {}, deadline)
+        except _BudgetExhausted:
+            return "timeout"
+        except McpHttpError as exc:
+            self._healthy = False
+            return str(exc)
+        except requests.Timeout:
+            self._healthy = False
+            return "timeout"
+        except Exception as exc:
+            self._healthy = False
+            logger.error("MCP %s ping failed: %s", self.name, exc)
+            return "unreachable"
+        if rpc.get("error") or not isinstance(rpc.get("result"), dict):
+            return "ping_error"
+        self._healthy = True
+        return None
 
     def list_tools(self) -> list[dict[str, Any]]:
         if self._tools is not None:

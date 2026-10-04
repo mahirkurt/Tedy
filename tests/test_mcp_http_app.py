@@ -684,3 +684,28 @@ def test_successful_register_writes_no_rejection_line(client, caplog):
     assert r.status_code == 201
     assert r.json()["client_id"]  # the surface under test answered before the absence claim
     assert not [x for x in caplog.records if x.name == "ted_mcp.oauth"]
+
+
+# -- ted-mcp sağlık (2026-10-04): why the transport refused a request reaches the journal ---------
+
+def test_transport_rejection_logs_the_declared_version_and_reason(client, store, caplog):
+    key = store.create_static_key("surum", FULL)
+    headers = {**MCP_HEADERS, "authorization": f"Bearer {key}", "mcp-protocol-version": "2026-07-28"}
+    with caplog.at_level(logging.WARNING, logger="src.mcp_server.http_app"):
+        r = client.post("/mcp", json=_rpc("tools/list"), headers=headers)
+    assert r.status_code == 400
+    lines = [rec.getMessage() for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]
+    assert len(lines) == 1
+    assert "durum=400" in lines[0] and "'2026-07-28'" in lines[0]
+    assert "Unsupported protocol version" in lines[0]
+    assert key not in lines[0]
+
+
+def test_accepted_requests_log_no_rejection(client, store, caplog):
+    key = store.create_static_key("kabul", FULL)
+    with caplog.at_level(logging.WARNING, logger="src.mcp_server.http_app"):
+        r = client.post("/mcp", json=_rpc("initialize", {"protocolVersion": "2025-11-25", "capabilities": {},
+                                                          "clientInfo": {"name": "t", "version": "0"}}),
+                        headers={**MCP_HEADERS, "authorization": f"Bearer {key}"})
+    assert r.status_code == 200
+    assert not [rec for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]

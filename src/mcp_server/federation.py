@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 import unicodedata
 from typing import Any, Callable, Literal
@@ -49,12 +50,18 @@ def upstream_log_text(text: object) -> str:
                    for c in str(text)[:UPSTREAM_LOG_MAX_CHARS])
 
 
+_HTTP_CODE = re.compile(r"http_[1-5][0-9]{2}")
+_PING_CODES = frozenset({"timeout", "ping_error", "unreachable"})
+
+
 def _failure_code(error: str | None) -> str:
     """Closed code for a failed client call; the client's own error text never becomes the reason."""
     if error == "timeout":
         return "timeout"
     if (error or "").startswith("malformed_result"):
         return "malformed_result"
+    if _HTTP_CODE.fullmatch(error or ""):
+        return error  # "http_530": the client's own closed code for a gateway error page
     return "tool_error"
 
 
@@ -119,6 +126,27 @@ class Federation:
         if len(values) == 1 and isinstance(values[0], dict):
             return values[0]
         raise FederationError(server, tool, "unexpected_shape")
+
+    def ping(self, server: str, deadline: float | None = None) -> None:
+        """MCP ping under the same budget contract as call(); raises FederationError on failure.
+
+        For edupedia_durum(canli=True) on servers with no cheap health tool: before this they were
+        reported "skipped" and a dead server (comfyui behind a down tunnel) looked fine.
+        """
+        if not self.configured(server):
+            raise FederationError(server, "ping", "not_configured")
+        timeout = CALL_TIMEOUT_SECONDS
+        if deadline is not None:
+            remaining = deadline - self._monotonic()
+            if remaining < MIN_CALL_SECONDS:
+                raise FederationError(server, "ping", ZAMAN_ASIMI)
+            timeout = min(CALL_TIMEOUT_SECONDS, remaining)
+        code = self._client(server).ping(timeout=timeout)
+        if code is None:
+            return
+        if code in _PING_CODES or _HTTP_CODE.fullmatch(code):
+            raise FederationError(server, "ping", code)
+        raise FederationError(server, "ping", "tool_error")
 
     def call_raw(self, server: str, tool: str, args: dict[str, Any], deadline: float | None = None) -> Any:
         """Tool result with text and image blocks untouched (textbook figures carry ImageContent).
