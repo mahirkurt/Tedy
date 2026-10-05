@@ -52,3 +52,18 @@ def _pdf_ocr_kapali(monkeypatch):
     scanned PDF in an unrelated test must not reach Claude, write the OCR
     ledger, or spend ~20 s per page in real Tesseract (plan 2026-09-28, Görev 15)."""
     monkeypatch.setenv("ASSISTANT_PDF_OCR", "0")
+
+
+@pytest.fixture(autouse=True)
+def _vektor_gommesi_kapali(monkeypatch):
+    """Hybrid search (src/assistant_vektor.py) is on in production through .env, which
+    dashboard_api loads at import. In tests it is off, and the real embed call fails loudly, so a
+    reindex or search can never reach mbp/Pi/HP's Ollama; a test that wants vectors turns it on and
+    hands in a fake (2026-10-05)."""
+    from src import assistant_vektor
+
+    monkeypatch.setenv("ASSISTANT_ENABLE_EMBEDDINGS", "0")
+
+    def _yasak(*a, **k):
+        raise RuntimeError("testte gerçek gömme çağrısı yok")
+    monkeypatch.setattr(assistant_vektor, "ollama_gom", _yasak)

@@ -145,3 +145,34 @@ def test_yukleme_odeve_eklenir_ve_vektor_disari_cikmaz(client, tmp_path, monkeyp
     sil = client.delete(f"/api/homework/documents/{body['document']['id']}")
     assert sil.status_code == 200
     assert client.get(f"/api/homework/documents/{body['document']['id']}").status_code == 404
+
+
+def test_gomme_dusen_dugumden_sonrakine_gecer(monkeypatch):
+    """2026-10-05: mbp kapalıyken belge eklenemiyordu; Pi ve HP aynı bge-m3 vektörünü verir."""
+    import requests as gercek
+
+    denenen = []
+
+    class Yanit:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"embeddings": [[0.1, 0.2]]}
+
+    def post(url, json=None, timeout=None):
+        denenen.append(url.split("/api/")[0])
+        if len(denenen) == 1:
+            raise gercek.ConnectionError("mbp yok")
+        return Yanit()
+
+    monkeypatch.setattr(homework_docs, "EMBED_URLS", ("http://mbp", "http://pi", "http://hp"))
+    monkeypatch.setattr(homework_docs.http_requests, "post", post)
+    assert homework_docs.ollama_embed(["metin"]) == [[0.1, 0.2]]
+    assert denenen == ["http://mbp", "http://pi"]
+
+    denenen.clear()
+    monkeypatch.setattr(homework_docs.http_requests, "post",
+                        lambda url, json=None, timeout=None: (_ for _ in ()).throw(gercek.ConnectionError("yok")))
+    with pytest.raises(homework_docs.EmbedHatasi):
+        homework_docs.ollama_embed(["metin"])

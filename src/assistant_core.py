@@ -20,6 +20,7 @@ import re
 import subprocess
 import threading
 import time
+import dataclasses
 import fnmatch
 import functools
 import zipfile
@@ -31,9 +32,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import requests as http_requests
 
-from src import assistant_skills, claude_api
+from src import assistant_skills, assistant_vektor, claude_api
 from src.assistant_denetim import (
     DENETIM_ISTEMI, DENETIM_KAYNAK, DENETIM_MAX_TOKENS, DENETIM_MODEL,
     DENETIM_TIMEOUT_S, denetim_gerekli, denetim_oku, denetim_uygula, ogretmen_kurallari,
@@ -196,6 +198,8 @@ DEFAULT_EXCLUDED_DIRS = {
     # The OCR page cache (src/ocr_katmani.py): one JSON per page read; the
     # text reaches the index through the PDF it came from, never twice.
     "output/ocr_onbellek",
+    # Playwright CLI page snapshots ("- paragraph [ref=e5]: Yükleniyor..."), 2026-10-05.
+    "output/playwright",
 }
 
 DEFAULT_EXCLUDED_FILE_PATTERNS = {
@@ -258,6 +262,15 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     "portal_ekleri.json.*",
     # The OCR spend ledger: months, tokens, USD — bookkeeping, not school data.
     "ocr_defteri.json",
+    # Internal reports and markers that were being served as school data (measured 2026-10-05):
+    # assistant latency/validation reports, the deploy status, CureoHub validation cases, the
+    # time-zone migration marker, Classroom course ids (Classroom is gone) and an empty Drive tracker.
+    "assistant_*report*.json",
+    "assistant_postdeploy_status.json",
+    "cureohub_validation.json",
+    ".saat_dilimi_gocu.json",
+    "classroom_courses.json",
+    "uploaded_files.json",
 }
 
 # Bumped whenever a change to discovery, exclusion or tokenization would leave
@@ -2101,13 +2114,26 @@ def turkce_kucult_katla(text: str) -> str:
 
 
 class HybridRetriever:
+    """BM25 over the chunks, fused with bge-m3 vector ranking when vectors are given (2026-10-05).
+
+    `vektorler` is (chunk positions, unit-length matrix rows in the same order); `sorgu_gom`
+    embeds the question and may return None — then, or with `vektor_agirligi` 0, the result is
+    exactly the BM25 one. The two rankings are combined by weighted RRF (src/assistant_vektor.py).
+    """
+
     def __init__(self, chunks: list[dict[str, Any]],
                  embeddings: dict[str, list[float]] | None = None,
                  ollama: Any = None,
-                 vector_weight: float = 0.0):
+                 vector_weight: float = 0.0, *,
+                 vektorler: "tuple[Any, Any] | None" = None,
+                 sorgu_gom: Callable[[str], Any] | None = None,
+                 vektor_agirligi: float = 0.0):
         self.chunks = chunks
         self.embeddings = embeddings or {}
-        self.vector_weight = 0.0  # BM25 only
+        self.vector_weight = 0.0  # legacy argument; vectors arrive through `vektorler`
+        self._vektorler = vektorler if vektorler is not None and len(vektorler[0]) else None
+        self.sorgu_gom = sorgu_gom
+        self.vektor_agirligi = max(0.0, float(vektor_agirligi))
 
         self._tokens_per_doc: list[list[str]] = []
         self._doc_freq: dict[str, int] = {}
@@ -2149,9 +2175,19 @@ class HybridRetriever:
             max_bm25 = 1.0
 
         combined: list[tuple[int, float, float, float]] = []
-        for idx, raw in bm25_scores.items():
-            b = raw / max_bm25
-            combined.append((idx, b, b, 0.0))
+        benzerlik = self._vektor_benzerligi(query, path_prefixes)
+        if benzerlik is None:
+            for idx, raw in bm25_scores.items():
+                b = raw / max_bm25
+                combined.append((idx, b, b, 0.0))
+        else:
+            bm25_sira = sorted(bm25_scores, key=lambda i: -bm25_scores[i])[:assistant_vektor.ADAY_SAYISI]
+            puanli = assistant_vektor.rrf_puanli(
+                [(bm25_sira, 1.0), (list(benzerlik), self.vektor_agirligi)])
+            en_yuksek = puanli[0][1] if puanli else 1.0
+            for idx, puan in puanli:
+                combined.append((idx, puan / en_yuksek, bm25_scores.get(idx, 0.0) / max_bm25,
+                                 benzerlik.get(idx, 0.0)))
 
         combined.sort(key=lambda x: x[1], reverse=True)
 
@@ -2174,6 +2210,26 @@ class HybridRetriever:
                 "source_kind": ch.get("source_kind", "text"),
             })
         return results
+
+    def _vektor_benzerligi(self, query: str, path_prefixes: list[str]) -> dict[int, float] | None:
+        """Chunk position -> cosine for the ADAY_SAYISI nearest chunks, best first; None when there
+        is nothing to fuse (no vectors, weight 0, or the question could not be embedded)."""
+        if self._vektorler is None or self.vektor_agirligi <= 0 or self.sorgu_gom is None:
+            return None
+        soru = self.sorgu_gom(query)
+        if soru is None:
+            return None
+        satirlar, matris = self._vektorler
+        benzerlikler = matris @ soru
+        sonuc: dict[int, float] = {}
+        for j in np.argsort(-benzerlikler):
+            idx = int(satirlar[j])
+            if path_prefixes and not self._path_allowed(str(self.chunks[idx].get("path", "")), path_prefixes):
+                continue
+            sonuc[idx] = float(benzerlikler[j])
+            if len(sonuc) >= assistant_vektor.ADAY_SAYISI:
+                break
+        return sonuc
 
     def _bm25_scores(self, query_tokens: list[str], path_prefixes: list[str]) -> dict[int, float]:
         k1 = 1.2
@@ -2325,7 +2381,9 @@ class AssistantRuntime:
         )
         self.aile_indexer = AssistantIndexer(self.aile_config)
         self._aile_retriever: HybridRetriever | None = None
-        self._aile_retriever_cache_mtime: float = 0.0
+        self._aile_retriever_cache_mtime: Any = 0.0
+        # Hybrid search (2026-10-05): read once per runtime; ASSISTANT_ENABLE_EMBEDDINGS=1 turns it on.
+        self.vektor_ayar = assistant_vektor.ayarlar()
 
         from src.assistant_modules import ModuleIndex
         from src.assistant_tools import build_registry
@@ -2602,12 +2660,14 @@ class AssistantRuntime:
     def _system_prompt(self) -> str:
         return self.SYSTEM_PROMPT.replace("{SINIF}", self._sinif())
 
-    def reindex(self, incremental: bool = True) -> dict[str, Any]:
+    def reindex(self, incremental: bool = True, gomme_sure: float | None = None) -> dict[str, Any]:
         stats = self.indexer.reindex(incremental=incremental)
         # Görev 5: the family pedagogy index is a second, independent run over
         # its own directory — same command path, its own summary, reported
         # alongside the main index rather than folded into it.
         aile_stats = self.aile_indexer.reindex(incremental=incremental)
+        if self.vektor_ayar.acik:
+            stats["vektor"], aile_stats["vektor"] = self._vektorleri_doldur(gomme_sure)
         try:
             moduller = self.modules.durum(yenile=True)
         except Exception as exc:  # noqa: BLE001 — the file index already succeeded; say what failed
@@ -3432,8 +3492,39 @@ class AssistantRuntime:
                 continue
         return None
 
+    def _vektor_deposu(self, config: "AssistantConfig") -> "assistant_vektor.VektorDeposu":
+        return assistant_vektor.VektorDeposu(config.chunks_path.parent)
+
+    def _onbellek_imzasi(self, config: "AssistantConfig") -> tuple[float, float]:
+        """A retriever is rebuilt when its chunks or its vectors change on disk."""
+        chunks_mtime = config.chunks_path.stat().st_mtime if config.chunks_path.exists() else 0.0
+        vektor_mtime = self._vektor_deposu(config).degisim_zamani() if self.vektor_ayar.acik else 0.0
+        return (chunks_mtime, vektor_mtime)
+
+    def _vektorlu_retriever(self, chunks: list[dict[str, Any]], config: "AssistantConfig",
+                            agirlik: float) -> HybridRetriever:
+        if not self.vektor_ayar.acik or agirlik <= 0:
+            return HybridRetriever(chunks=chunks)
+        anahtarlar, matris, model = self._vektor_deposu(config).yukle()
+        if matris is None or model != self.vektor_ayar.model:
+            return HybridRetriever(chunks=chunks)
+        satir_no = {a: i for i, a in enumerate(anahtarlar)}
+        konumlar, satirlar = [], []
+        for konum, ch in enumerate(chunks):
+            satir = satir_no.get(assistant_vektor.metin_anahtari(str(ch.get("text", ""))))
+            if satir is not None:
+                konumlar.append(konum)
+                satirlar.append(satir)
+        if not konumlar:
+            return HybridRetriever(chunks=chunks)
+        return HybridRetriever(chunks=chunks, vektorler=(np.asarray(konumlar), matris[satirlar]),
+                               sorgu_gom=self._sorgu_gom, vektor_agirligi=agirlik)
+
+    def _sorgu_gom(self, soru: str) -> Any:
+        return assistant_vektor.sorgu_vektoru(soru, self.vektor_ayar)
+
     def _load_retriever(self) -> HybridRetriever:
-        chunks_mtime = self.config.chunks_path.stat().st_mtime if self.config.chunks_path.exists() else 0.0
+        chunks_mtime = self._onbellek_imzasi(self.config)
         if self._retriever and chunks_mtime == self._retriever_cache_mtime:
             return self._retriever
 
@@ -3446,22 +3537,38 @@ class AssistantRuntime:
         # reindex() — see AssistantIndexer.is_path_currently_included.
         chunks = [c for c in chunks if isinstance(c, dict)
                   and self.indexer.is_path_currently_included(str(c.get("path", "")))]
-        embeddings = self._load_json(self.config.embeddings_path, {})
-        if not isinstance(embeddings, dict):
-            embeddings = {}
-
-        self._retriever = HybridRetriever(
-            chunks=chunks,
-        )
+        self._retriever = self._vektorlu_retriever(chunks, self.config, self.vektor_ayar.agirlik_ogrenci)
         self._retriever_cache_mtime = chunks_mtime
         return self._retriever
+
+    def _vektorleri_doldur(self, gomme_sure: float | None) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Bulk-embed both indexes' missing chunks on mbp/Pi within one shared time budget (the
+        student index first). A failure is reported, never raised: the chunk index is already
+        written and BM25 keeps working."""
+        sure = self.vektor_ayar.sure if gomme_sure is None else max(0.0, gomme_sure)
+        bas = time.monotonic()
+        sonuclar = []
+        for config, indexer in ((self.config, self.indexer), (self.aile_config, self.aile_indexer)):
+            kalan = 0.0 if sure == 0 else sure - (time.monotonic() - bas)
+            if sure > 0 and kalan < 1:
+                sonuclar.append({"atlandi": "sure"})
+                continue
+            parcalar = self._load_json(config.chunks_path, [])
+            parcalar = [c for c in parcalar if isinstance(c, dict)
+                        and indexer.is_path_currently_included(str(c.get("path", "")))] if isinstance(parcalar, list) else []
+            ayar = dataclasses.replace(self.vektor_ayar, sure=kalan)
+            try:
+                sonuclar.append(assistant_vektor.doldur(parcalar, self._vektor_deposu(config), ayar))
+            except Exception as exc:  # noqa: BLE001
+                logger.error("vektör doldurma başarısız (%s): %s", config.chunks_path.parent.name, type(exc).__name__)
+                sonuclar.append({"hata": type(exc).__name__})
+        return sonuclar[0], sonuclar[1]
 
     def _load_aile_retriever(self) -> HybridRetriever:
         """Same lazy, mtime-cached load as `_load_retriever`, over the
         separate content/pedagoji index (Görev 5) — filtered the same way,
         symmetrically, against the family index's own (narrower) rules."""
-        chunks_mtime = (self.aile_config.chunks_path.stat().st_mtime
-                        if self.aile_config.chunks_path.exists() else 0.0)
+        chunks_mtime = self._onbellek_imzasi(self.aile_config)
         if self._aile_retriever and chunks_mtime == self._aile_retriever_cache_mtime:
             return self._aile_retriever
 
@@ -3471,7 +3578,7 @@ class AssistantRuntime:
         chunks = [c for c in chunks if isinstance(c, dict)
                   and self.aile_indexer.is_path_currently_included(str(c.get("path", "")))]
 
-        self._aile_retriever = HybridRetriever(chunks=chunks)
+        self._aile_retriever = self._vektorlu_retriever(chunks, self.aile_config, self.vektor_ayar.agirlik_aile)
         self._aile_retriever_cache_mtime = chunks_mtime
         return self._aile_retriever
 

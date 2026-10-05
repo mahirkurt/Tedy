@@ -25,6 +25,11 @@ from src.json_utils import atomic_json_dump
 EMBED_URL = os.environ.get(
     "HOMEWORK_EMBED_URL", "http://mbp-node.tail67843b.ts.net:11434"
 ).rstrip("/")
+# 2026-10-05: with mbp down a document could not be added at all. bge-m3 gives the same vectors on
+# mbp, Pi and HP (cosine ≥ 0.99999, measured), so the others stand in; an explicit
+# HOMEWORK_EMBED_URL still means that host only.
+EMBED_URLS = ((EMBED_URL,) if os.environ.get("HOMEWORK_EMBED_URL")
+              else (EMBED_URL, "http://pi.lan:11434", "http://127.0.0.1:11434"))
 EMBED_MODEL = os.environ.get("HOMEWORK_EMBED_MODEL", "bge-m3").strip() or "bge-m3"
 
 ALLOWED_EXT = {".pdf", ".txt", ".md", ".docx"}
@@ -57,19 +62,25 @@ class EmbedHatasi(RuntimeError):
 
 
 def ollama_embed(texts: list[str]) -> list[list[float]]:
-    """Embed `texts` with the configured model on mbp-node."""
+    """Embed `texts` with the configured model on mbp-node, then Pi, then HP (EMBED_URLS)."""
     if not texts:
         return []
-    try:
-        resp = http_requests.post(
-            f"{EMBED_URL}/api/embed",
-            json={"model": EMBED_MODEL, "input": texts},
-            timeout=90,
-        )
-    except http_requests.RequestException as exc:
-        raise EmbedHatasi("bağlantı") from exc
-    if resp.status_code != 200:
-        raise EmbedHatasi("http")
+    resp, neden = None, "bağlantı"
+    for url in EMBED_URLS:
+        try:
+            resp = http_requests.post(
+                f"{url}/api/embed",
+                json={"model": EMBED_MODEL, "input": texts},
+                timeout=90,
+            )
+        except http_requests.RequestException:
+            resp, neden = None, "bağlantı"
+            continue
+        if resp.status_code == 200:
+            break
+        resp, neden = None, "http"
+    if resp is None:
+        raise EmbedHatasi(neden)
     try:
         vectors = resp.json().get("embeddings")
     except ValueError as exc:

@@ -17,6 +17,9 @@ def main():
     load_env()
     parser = argparse.ArgumentParser(description="Reindex TEDY assistant knowledge base")
     parser.add_argument("--full", action="store_true", help="full rebuild instead of incremental")
+    parser.add_argument("--gomme-sure", type=float, default=None, metavar="SN",
+                        help="bge-m3 toplu gömme süresi (sn); 0 = bitene kadar (ilk doldurma). "
+                             "Varsayılan ASSISTANT_GOMME_SURE (60). Yalnız ASSISTANT_ENABLE_EMBEDDINGS=1 iken.")
     args = parser.parse_args()
 
     # skills={} on purpose (final-fix item 5, mirrors perform_incremental_reindex
@@ -26,7 +29,7 @@ def main():
     # (_assistant_runtime in dashboard_api.py) is unaffected and still loads
     # the real skills, so a broken one still blocks the chat surface itself.
     runtime = AssistantRuntime(PROJECT_ROOT, skills={})
-    stats = runtime.reindex(incremental=not args.full)
+    stats = runtime.reindex(incremental=not args.full, gomme_sure=args.gomme_sure)
     summary_keys = (
         "incremental",
         "files_indexed",
@@ -41,6 +44,7 @@ def main():
     for k in summary_keys:
         print(f"  {k}: {stats.get(k)}")
     print(f"  moduller: {stats.get('moduller')}")
+    print(f"  vektor: {stats.get('vektor', 'kapalı')}")
     _dusen_dosyalari_yazdir(stats)
 
     # Görev 5: content/pedagoji's own index, built by the same reindex() call —
@@ -50,6 +54,7 @@ def main():
     print("[Assistant] Aile kaynağı reindex complete")
     for k in summary_keys:
         print(f"  {k}: {aile_stats.get(k)}")
+    print(f"  vektor: {aile_stats.get('vektor', 'kapalı')}")
     _dusen_dosyalari_yazdir(aile_stats)
 
 
