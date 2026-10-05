@@ -110,7 +110,10 @@ def test_hicbir_dugum_yoksa_depo_bozulmaz(tmp_path):
     assert depo.yukle()[1].shape == (1, 8)
 
 
-def test_soru_vektoru_sirayla_dener_hepsi_duserse_none():
+def test_soru_vektoru_sirayla_dener_hepsi_duserse_none(monkeypatch):
+    import time
+    # Warm-up is its own test; here it would race the call log.
+    monkeypatch.setattr(av, "_son_isitma", {"http://hp": time.monotonic()})
     cagrilar = []
     v = av.sorgu_vektoru("galaksi", _ayar(sorgu_adresleri=("http://hp", "http://mbp")),
                          gom=_sahte_gom(cagrilar, bozuk={"http://hp"}))
@@ -141,3 +144,48 @@ def test_ayarlar_ortamdan(monkeypatch):
     monkeypatch.setenv("ASSISTANT_EMBED_TOPLU_URLS", "http://a:1/, http://b:2")
     a = av.ayarlar()
     assert a.acik and a.agirlik_ogrenci == 2.0 and a.toplu_adresleri == ("http://a:1", "http://b:2")
+
+
+def test_ilk_dugum_soguksa_arka_planda_isitilir_ve_soru_bekletilmez(monkeypatch):
+    """Canlı 2026-10-05: HP'de bge-m3 soğukken yükleme 4.4 sn sürdü, 2 sn'lik soru bekleyişi her
+    seferinde kesti ve bütün aramalar mbp'ye düştü (medyan 2.3 sn). İlk düğüm düşünce o düğüm arka
+    planda süresiz bir istekle ısıtılır; soru o arada sıradaki düğümden yanıtlanır."""
+    isitma = []
+
+    def gercek_gibi(adres, model, metinler, zaman_asimi):
+        if zaman_asimi is None:
+            isitma.append(adres)
+            return [_vektor("x")]
+        if adres == "http://hp":
+            raise TimeoutError("soğuk")
+        return [_vektor(m) for m in metinler]
+
+    monkeypatch.setattr(av, "ollama_gom", gercek_gibi)
+    monkeypatch.setattr(av, "_son_isitma", {})
+    ayar = _ayar(sorgu_adresleri=("http://hp", "http://mbp"))
+    assert av.sorgu_vektoru("galaksi", ayar) is not None
+    av._isitma_bekle()
+    assert isitma == ["http://hp"]
+    assert av.sorgu_vektoru("galaksi", ayar) is not None
+    av._isitma_bekle()
+    assert isitma == ["http://hp"]  # aynı düğüm bir dakika içinde yeniden ısıtılmaz
+
+
+def test_gomme_istegi_modeli_bellekte_tutar(monkeypatch):
+    gonderilen = {}
+
+    class Yanit:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"embeddings": [[0.1]]}
+
+    def post(url, json=None, timeout=None):
+        gonderilen.update(json)
+        return Yanit()
+
+    monkeypatch.setattr(av.requests, "post", post)
+    monkeypatch.setattr(av, "ollama_gom", av._ollama_gom_gercek)
+    av.ollama_gom("http://hp", "bge-m3", ["x"], 2.0)
+    assert gonderilen["keep_alive"] == -1

@@ -44,7 +44,7 @@ DUGUM_HATA_SINIRI = 3
 RRF_K = 60
 ADAY_SAYISI = 100
 
-Gom = Callable[[str, str, list[str], float], list[list[float]]]
+Gom = Callable[[str, str, list[str], "float | None"], list[list[float]]]
 
 
 @dataclass(frozen=True)
@@ -95,13 +95,52 @@ def metin_anahtari(metin: str) -> str:
     return hashlib.sha256((metin or "")[:GOMME_MAX_KARAKTER].encode("utf-8")).hexdigest()[:24]
 
 
-def ollama_gom(adres: str, model: str, metinler: list[str], zaman_asimi: float) -> list[list[float]]:
-    resp = requests.post(f"{adres}/api/embed", json={"model": model, "input": metinler}, timeout=zaman_asimi)
+def ollama_gom(adres: str, model: str, metinler: list[str], zaman_asimi: float | None) -> list[list[float]]:
+    """keep_alive -1 keeps the model resident on that node (mbp and Pi already pin bge-m3; on HP a
+    cold load took 4.4 s against a 40 ms warm call, measured 2026-10-05)."""
+    resp = requests.post(f"{adres}/api/embed", json={"model": model, "input": metinler, "keep_alive": -1},
+                         timeout=zaman_asimi)
     resp.raise_for_status()
     vektorler = resp.json().get("embeddings")
     if not isinstance(vektorler, list) or len(vektorler) != len(metinler):
         raise ValueError("embeddings adedi")
     return vektorler
+
+
+_ollama_gom_gercek = ollama_gom
+
+# A failed first query node is warmed in the background with an unbounded request, at most once a
+# minute per node: the question cannot wait out a cold load, and a request cut at the timeout may
+# never let the load finish — live 2026-10-05 every search fell through to mbp (median 2.3 s).
+ISITMA_ARALIGI = 60.0
+_son_isitma: dict[str, float] = {}
+_isitma_kilidi = threading.Lock()
+_isitma_iplikleri: list[threading.Thread] = []
+
+
+def _isit(adres: str, model: str, gom: Gom) -> None:
+    simdi = time.monotonic()
+    with _isitma_kilidi:
+        if simdi - _son_isitma.get(adres, float("-inf")) < ISITMA_ARALIGI:
+            return
+        _son_isitma[adres] = simdi
+
+    def calis() -> None:
+        try:
+            gom(adres, model, ["ısıtma"], None)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("gömme düğümü ısıtılamadı %s: %s", adres, type(exc).__name__)
+
+    iplik = threading.Thread(target=calis, daemon=True)
+    iplik.start()
+    _isitma_iplikleri.append(iplik)
+
+
+def _isitma_bekle(sure: float = 5.0) -> None:
+    """For tests: wait for the background warm-ups started so far."""
+    for iplik in list(_isitma_iplikleri):
+        iplik.join(sure)
+    _isitma_iplikleri.clear()
 
 
 def _normalize(matris: np.ndarray) -> np.ndarray:
@@ -217,6 +256,8 @@ def sorgu_vektoru(metin: str, ayar: VektorAyari, *, gom: Gom | None = None) -> n
                            dtype=np.float32)
         except Exception as exc:  # noqa: BLE001
             logger.warning("soru gömme %s başarısız: %s", adres, type(exc).__name__)
+            if i == 0 and len(ayar.sorgu_adresleri) > 1:
+                _isit(adres, ayar.model, gom)
             continue
         norm = float(np.linalg.norm(v))
         if norm > 0:
