@@ -59,17 +59,17 @@ Spec bu davranışları ister, sayı ya da zarf vermez. Görevler aşağıdaki d
 {"durum": "atlandi", "neden": "genel_kisa", "sorun": [], "model": null}
 ```
 
-`durum`: `atlandi` | `gecti` | `duzeltildi` | `hata`. `neden`: `genel_kisa` | `hata_cevabi` | `model_yok` | `cagri` | `bicim` | `bos` | `ayni` | null. `gecti` ve `duzeltildi` için `neden` null. Çağrı olduysa `model` `claude-haiku-4-5`.
+`durum`: `atlandi` | `gecti` | `duzeltildi` | `hata`. `neden`: `genel_kisa` | `hata_cevabi` | `model_yok` | `cagri` | `bicim` | `bos` | `ayni` | `denetim_dili` | `atif_kaybi` | null. `gecti` ve `duzeltildi` için `neden` null. Çağrı olduysa `model` `claude-haiku-4-5`.
 
-Denetim istemi, bayt bayt:
+Denetim istemi, bayt bayt (2026-10-05 düzeltmesiyle: snippet kısaltılmış baştır, görünmemesi tek başına ciddi değildir; `cevap` okura gösterilecek tam cevaptır, denetim notu yazılmaz. Canlıda Haiku düzeltme yerine eleştirisini yazdı ve o not Fen cevabının yerine geçti. Ayrıca `denetim_uygula` denetçi dili taşıyan ya da — `ogretmen` dışında — taslağın bütün atıflarını düşüren metni reddeder: `denetim_dili`, `atif_kaybi`):
 
 ```text
-Sen bir denetçisin. Cevabı okura gösterme. Yalnız bir JSON nesnesi yaz.
-kaynak: [Sn] cümlesi aynı numaralı snippet ile çelişiyorsa ya da snippet'te olmayan kazanım kodu veya sayfa numarası varsa ciddi. İşaretsiz genel bilgi ciddi değildir.
+Sen bir denetçisin. Okura yazma; yalnız bir JSON nesnesi yaz.
+kaynak: snippet kaynağın yalnız kısaltılmış başıdır; bir bilginin snippet'te görünmemesi tek başına ciddi değildir. [Sn] cümlesi aynı numaralı snippet ile açıkça çelişiyorsa ya da cümledeki kazanım kodu veya sayfa numarası o kaynağın label'ında ve snippet'inde hiç yoksa ciddi. İşaretsiz genel bilgi ciddi değildir.
 seviye: anlatım 7. sınıf içindir. Üniversite terimi ya da adımı atlayan çözüm ciddi.
 ogretmen: kurallar null ise bu bakış yoktur, sorun listesine ogretmen yazma. Varsa yalnız ipucu verip çözümü saklamak ya da ödevi teslim metni veya cevap anahtarı diye yazmak ciddi. Benzer alıştırma cümlesinin yokluğu tek başına ciddi değildir.
 hitap: okur ogrenci ise sen; Işık üçüncü şahıs ise ciddi. okur aile ya da bilinmiyor ise siz ve Işık üçüncü şahıs. İkisi birden ciddi.
-Ciddi değilse {"ciddi": false}. Ciddi ise {"ciddi": true, "sorun": ["kaynak"], "cevap": "bütün cevap"}. cevap taslağın yerine geçer, sonuna eklenmez. Yeni [S] numarası uydurma. Snippet'te olmayan olgu ekleme.
+Ciddi değilse {"ciddi": false}. Ciddi ise {"ciddi": true, "sorun": ["kaynak"], "cevap": "bütün cevap"}. cevap okura gösterilecek düzeltilmiş tam cevaptır: taslağın [S] işaretlerini korur, taslağın yerine geçer, sonuna eklenmez. cevap'a denetim notu, eleştiri ya da snippet sözü yazma. Yeni [S] numarası uydurma. Snippet'te olmayan olgu ekleme.
 ```
 
 Kullanıcı gövdesi şu anahtarlarla JSON'dur: `cevap`, `okur`, `ogretmen`, `sinif` (`"7. sınıf"`), `kaynaklar` (`id`, `label`, `snippet`; en çok 8; snippet zaten 400 karakterdedir), `kurallar` (dizgi ya da null).

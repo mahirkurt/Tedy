@@ -189,7 +189,8 @@ class SohbetDeposu:
 
     def mesaj_ekle(self, sid: str, rol: str, icerik: str, ogretmen: str,
                    ekler: list, simdi: datetime, atiflar: list | None = None,
-                   istek_id: str | None = None, kartlar: dict | None = None) -> str:
+                   istek_id: str | None = None, kartlar: dict | None = None,
+                   meta: dict | None = None) -> str:
         mid = uuid.uuid4().hex
         yazi = zaman_yazi(simdi)
         with self._baglan() as conn:
@@ -205,10 +206,11 @@ class SohbetDeposu:
                         return onceki["id"]
                 conn.execute(
                     "INSERT INTO mesaj (id, sohbet_id, rol, icerik, atiflar_json, ekler_json, "
-                    "meta_json, ogretmen, zaman, sira, istek_id, kartlar_json) VALUES (?, ?, ?, ?, ?, ?, '{}', ?, ?, "
+                    "meta_json, ogretmen, zaman, sira, istek_id, kartlar_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "
                     "(SELECT COALESCE(MAX(sira), 0) + 1 FROM mesaj), ?, ?)",
                     (mid, sid, rol, icerik, json.dumps(atiflar or [], ensure_ascii=False),
-                     json.dumps(ekler, ensure_ascii=False), ogretmen, yazi, istek_id,
+                     json.dumps(ekler, ensure_ascii=False), json.dumps(meta or {}, ensure_ascii=False),
+                     ogretmen, yazi, istek_id,
                      json.dumps(gorunen_kartlar(kartlar) if rol == "assistant" else {}, ensure_ascii=False)),
                 )
                 row = conn.execute("SELECT baslik FROM sohbet WHERE id = ?", (sid,)).fetchone()

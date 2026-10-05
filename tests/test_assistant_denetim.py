@@ -248,3 +248,54 @@ def test_eval_kosu_bir_hatayla_durmaz(tmp_path):
                           "eksik_noktalar", "cagrilan_araclar", "denetim", "sorgu_dar",
                           "dusen_tokenler", "cevap"}
     assert "sızmaması" not in yol.read_text()
+
+
+# -- 2026-10-05 canlı hata: denetçinin notu cevap diye gösterildi -----------------------------------
+
+CANLI_NOT = ("Snippet'ler eksik veya kesilmiş; sayfa numaraları (s.16 ve s.27) kısmi bilgi içeriyor ve içerik "
+             "gösterilmiyor. Türksat 6A, TÜBİTAK UZAY, TEKNOFEST ve Türkiye Uzay Ajansı bilgileri snippet'te "
+             "doğrulanmadığı için kaynak olarak kullanılamaz. Eğer bu bilgiler kitapta varsa lütfen tam snippet "
+             "sağlayın; yoksa bilgi kütüphaneden silinmelidir.")
+UZAY_TASLAK = "Türkiye uzayda Türksat 6A ile yer aldı [S1]. TÜBİTAK UZAY uydular geliştirir [S2]."
+
+
+@pytest.mark.parametrize("yeni", [
+    CANLI_NOT,
+    '{"ciddi": true, "sorun": ["kaynak"], "cevap": "Türksat 6A [S1]."}',
+    "Bu bilgi kaynak olarak kullanılamaz [S1].",
+])
+def test_denetci_dili_taslagin_yerine_gecmez(yeni):
+    cevap, meta = denetim_uygula(UZAY_TASLAK, {"ciddi": True, "sorun": ["kaynak"], "cevap": yeni})
+    assert cevap == UZAY_TASLAK
+    assert meta["durum"] == "hata" and meta["neden"] == "denetim_dili"
+    assert meta["sorun"] == ["kaynak"]
+
+
+@pytest.mark.parametrize("sorun", [["kaynak"], ["seviye"], ["hitap"]])
+def test_butun_atiflari_dusuren_duzeltme_reddedilir(sorun):
+    cevap, meta = denetim_uygula(UZAY_TASLAK, {"ciddi": True, "sorun": sorun,
+                                               "cevap": "Türkiye uzayda uydularıyla yer alır."})
+    assert cevap == UZAY_TASLAK
+    assert meta["durum"] == "hata" and meta["neden"] == "atif_kaybi"
+
+
+def test_ogretmen_duzeltmesi_atifsiz_olabilir():
+    """Cevap anahtarı yazan taslağın yerine geçen ret cümlesi atıf taşımak zorunda değil; taslağı
+    tutmak, kuralın engellediği şeyi okura göstermek olurdu."""
+    taslak = "Cevap anahtarı: 1) Türksat 6A [S1] 2) TÜBİTAK UZAY [S2]."
+    yeni = "Ödevi senin yerine yazamam; kitaptaki soruları birlikte okuyalım."
+    cevap, meta = denetim_uygula(taslak, {"ciddi": True, "sorun": ["ogretmen"], "cevap": yeni})
+    assert cevap == yeni and meta["durum"] == "duzeltildi"
+
+
+def test_atifli_duzeltme_ve_atifsiz_taslak_gecer():
+    assert denetim_uygula(UZAY_TASLAK, {"ciddi": True, "sorun": ["seviye"],
+                                        "cevap": "Türksat 6A bir uydudur [S1]."})[1]["durum"] == "duzeltildi"
+    assert denetim_uygula("Atıfsız taslak.", {"ciddi": True, "sorun": ["hitap"],
+                                              "cevap": "Atıfsız yeni cevap."})[1]["durum"] == "duzeltildi"
+
+
+def test_istem_snippetin_kisa_oldugunu_ve_cevap_alanini_soyler():
+    assert "Cevabı okura gösterme" not in DENETIM_ISTEMI
+    assert "kısaltılmış" in DENETIM_ISTEMI and "görünmemesi" in DENETIM_ISTEMI
+    assert "denetim notu" in DENETIM_ISTEMI

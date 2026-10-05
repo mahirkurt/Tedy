@@ -12,12 +12,26 @@ KURAL_SINIRI = 1500
 DENETIM_KAYNAK = 8
 DENETIM_MAX_TOKENS = 2000
 DENETIM_TIMEOUT_S = 30
-DENETIM_ISTEMI = """Sen bir denetçisin. Cevabı okura gösterme. Yalnız bir JSON nesnesi yaz.
-kaynak: [Sn] cümlesi aynı numaralı snippet ile çelişiyorsa ya da snippet'te olmayan kazanım kodu veya sayfa numarası varsa ciddi. İşaretsiz genel bilgi ciddi değildir.
+DENETIM_ISTEMI = """Sen bir denetçisin. Okura yazma; yalnız bir JSON nesnesi yaz.
+kaynak: snippet kaynağın yalnız kısaltılmış başıdır; bir bilginin snippet'te görünmemesi tek başına ciddi değildir. [Sn] cümlesi aynı numaralı snippet ile açıkça çelişiyorsa ya da cümledeki kazanım kodu veya sayfa numarası o kaynağın label'ında ve snippet'inde hiç yoksa ciddi. İşaretsiz genel bilgi ciddi değildir.
 seviye: anlatım 7. sınıf içindir. Üniversite terimi ya da adımı atlayan çözüm ciddi.
 ogretmen: kurallar null ise bu bakış yoktur, sorun listesine ogretmen yazma. Varsa yalnız ipucu verip çözümü saklamak ya da ödevi teslim metni veya cevap anahtarı diye yazmak ciddi. Benzer alıştırma cümlesinin yokluğu tek başına ciddi değildir.
 hitap: okur ogrenci ise sen; Işık üçüncü şahıs ise ciddi. okur aile ya da bilinmiyor ise siz ve Işık üçüncü şahıs. İkisi birden ciddi.
-Ciddi değilse {"ciddi": false}. Ciddi ise {"ciddi": true, "sorun": ["kaynak"], "cevap": "bütün cevap"}. cevap taslağın yerine geçer, sonuna eklenmez. Yeni [S] numarası uydurma. Snippet'te olmayan olgu ekleme."""
+Ciddi değilse {"ciddi": false}. Ciddi ise {"ciddi": true, "sorun": ["kaynak"], "cevap": "bütün cevap"}. cevap okura gösterilecek düzeltilmiş tam cevaptır: taslağın [S] işaretlerini korur, taslağın yerine geçer, sonuna eklenmez. cevap'a denetim notu, eleştiri ya da snippet sözü yazma. Yeni [S] numarası uydurma. Snippet'te olmayan olgu ekleme."""
+
+
+_ATIF = re.compile(r"\[S\d+\]")
+# Yalnız bir denetçinin yazacağı ifadeler; 7. sınıfa yazılmış bir cevapta geçmez. Ölçüldü 2026-10-05:
+# Haiku düzeltilmiş cevap yerine "Snippet'ler eksik … kaynak olarak kullanılamaz … kütüphaneden
+# silinmelidir" yazdı ve bu not Fen cevabının yerine okura gösterildi.
+_DENETCI_DILI = ("snippet", "kaynak olarak kullanılamaz", "kütüphaneden", '"ciddi"')
+
+
+def _denetci_dili(metin: str) -> bool:
+    from src.assistant_core import turkce_kucult_katla
+
+    katli = turkce_kucult_katla(metin)
+    return any(turkce_kucult_katla(ifade) in katli for ifade in _DENETCI_DILI)
 
 
 def denetim_gerekli(ogretmen: str, cevap: str, hata_metinleri: list[str]) -> str | None:
@@ -81,6 +95,15 @@ def denetim_uygula(cevap: str, karar: dict[str, Any]) -> tuple[str, dict[str, An
     yeni = karar["cevap"].strip()
     if not yeni or yeni == cevap.strip():
         meta.update(durum="hata", neden="bos" if not yeni else "ayni")
+        return cevap, meta
+    # Değişim, taslağı okura göstermekten daha kötü olabilir: yerine geçen metin cevap değil de
+    # denetçinin notuysa, ya da kaynak/seviye/hitap düzeltmesi taslağın bütün atıflarını düşürüyorsa
+    # taslak kalır. ogretmen düzeltmesi (cevap anahtarı yerine ret) atıfsız olabilir.
+    if _denetci_dili(yeni):
+        meta.update(durum="hata", neden="denetim_dili")
+        return cevap, meta
+    if "ogretmen" not in meta["sorun"] and _ATIF.search(cevap) and not _ATIF.search(yeni):
+        meta.update(durum="hata", neden="atif_kaybi")
         return cevap, meta
     meta["durum"] = "duzeltildi"
     return yeni, meta

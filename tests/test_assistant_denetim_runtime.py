@@ -176,3 +176,42 @@ def test_fallback_sorudaki_atif_temizlense_de_denetlenmez(runtime, monkeypatch):
     payload = runtime.chat([{"role": "user", "content": "Payda [S9]"}], ogretmen="fen",
                            denetle=lambda *args: pytest.fail("yedek cevap denetlenmez"))
     assert payload["meta"]["denetim"]["neden"] == "hata_cevabi"
+
+
+# -- 2026-10-05 canlı hata: denetçinin notu taslağın yerine geçmez; müdahale sunucuda kayda geçer ------
+
+def _kayit(runtime):
+    yol = runtime.config.metrics_path.with_name("assistant_denetim_kaydi.jsonl")
+    return [json.loads(s) for s in yol.read_text(encoding="utf-8").splitlines()] if yol.exists() else []
+
+
+def test_denetci_notu_taslagi_ve_atiflari_silmez(runtime):
+    notu = json.dumps({"ciddi": True, "sorun": ["kaynak"],
+                       "cevap": "Snippet'ler eksik; bilgi kaynak olarak kullanılamaz."}, ensure_ascii=False)
+    payload = runtime.chat([{"role": "user", "content": "Payda"}], ogretmen="fen",
+                           denetle=lambda *args: notu)
+    assert payload["answer"] == "taslak [S1]."
+    assert len(payload["citations"]) == 1
+    assert payload["meta"]["denetim"]["durum"] == "hata"
+    assert payload["meta"]["denetim"]["neden"] == "denetim_dili"
+    assert "warning:limited_confidence" not in payload["safety_flags"]
+    kayit = _kayit(runtime)
+    assert len(kayit) == 1
+    assert kayit[0]["taslak"] == "taslak [S1]."
+    assert "kaynak olarak kullanılamaz" in kayit[0]["reddedilen"]
+    assert kayit[0]["neden"] == "denetim_dili" and kayit[0]["ogretmen"] == "fen"
+    assert "taslak" not in json.dumps(payload["meta"]["denetim"], ensure_ascii=False)
+
+
+def test_duzeltme_taslagi_sunucu_kaydinda_tutar(runtime):
+    payload = runtime.chat([{"role": "user", "content": "Payda"}], ogretmen="matematik",
+                           denetle=lambda *a: '{"ciddi": true, "sorun": ["kaynak"], "cevap": "Payda eşitlenir [S1]."}')
+    assert payload["answer"] == "Payda eşitlenir [S1]."
+    kayit = _kayit(runtime)
+    assert len(kayit) == 1 and kayit[0]["durum"] == "duzeltildi"
+    assert kayit[0]["taslak"] == "taslak [S1]." and "reddedilen" not in kayit[0]
+
+
+def test_gecen_denetim_kayit_yazmaz(runtime):
+    runtime.chat([{"role": "user", "content": "Payda"}], ogretmen="fen", denetle=lambda *a: '{"ciddi": false}')
+    assert _kayit(runtime) == []

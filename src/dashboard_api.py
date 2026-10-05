@@ -3157,9 +3157,15 @@ def _sohbet_cevap_kaydet(sohbet, payload, ogretmen):
     if not sohbet.get("depo"):
         return
     depo = sohbet["depo"]
+    # Only the check's decision is kept with the message — never the rest of meta (tool bodies)
+    # and never the draft; the draft lives in the server-side check log (2026-10-05).
+    denetim = (payload.get("meta") or {}).get("denetim")
+    meta = ({"denetim": {k: denetim.get(k) for k in ("durum", "neden", "sorun")}}
+            if isinstance(denetim, dict) and denetim.get("durum") in ("duzeltildi", "hata") else None)
     mid = depo.mesaj_ekle(
         sohbet["sid"], "assistant", payload["answer"], ogretmen, [], _asistan_simdi(),
-        atiflar=payload.get("citations", []), istek_id=sohbet.get("request_id"), kartlar=payload)
+        atiflar=payload.get("citations", []), istek_id=sohbet.get("request_id"), kartlar=payload,
+        meta=meta)
     for aid in sohbet.get("alistirma_kimlikleri", []):
         depo.alistirma_bagla(aid, mid)
     if ogretmen != assistant_skills.GENEL:
@@ -3228,6 +3234,7 @@ def assistant_sohbet(sid):
         mesajlar = depo.tum_mesajlar(sid)
         from src.assistant_sohbet import gorunen_kartlar
         for mesaj in mesajlar:
+            mesaj.pop("meta_json", None)  # server-side audit only
             mesaj.update(gorunen_kartlar(json.loads(mesaj.pop("kartlar_json"))))
             mesaj["alistirma"] = [_alistirma_yaniti(a) for a in depo.alistirmalar(mesaj["id"])]
             mesaj["yuklemeler"] = [{k: ek[k] for k in ("id", "ad", "tur") if k in ek}

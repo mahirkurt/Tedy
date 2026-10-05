@@ -39,6 +39,9 @@ from src.assistant_denetim import (
     DENETIM_TIMEOUT_S, denetim_gerekli, denetim_oku, denetim_uygula, ogretmen_kurallari,
 )
 from src.hafta_secici import guncel_hafta
+
+# Denetimin taslağı değiştirdiği ya da değiştirmeyi reddettiği durumlar sunucu kaydına yazılır.
+_DENETIM_KAYDI_NEDENLERI = frozenset({"denetim_dili", "atif_kaybi", "bos"})
 from src.json_utils import atomic_json_dump
 
 
@@ -2731,6 +2734,7 @@ class AssistantRuntime:
         if neden is None and denetle is None and not self.llm.available:
             neden = "model_yok"
         denetim = {"durum": "atlandi", "neden": neden, "sorun": [], "model": None}
+        taslak, karar = answer, None
         if neden is None:
             denetim = {"durum": "hata", "neden": "cagri", "sorun": [], "model": DENETIM_MODEL}
             kullanici_json = json.dumps({
@@ -2770,6 +2774,13 @@ class AssistantRuntime:
                             answer, citations = temiz, yeni_atiflar
                         else:
                             denetim.update(durum="hata", neden="bos")
+        if denetim["durum"] == "duzeltildi" or denetim["neden"] in _DENETIM_KAYDI_NEDENLERI:
+            kayit = {"timestamp": _utcnow_naive().isoformat() + "Z", "session_id": session_id,
+                     "ogretmen": ogretmen, "durum": denetim["durum"], "neden": denetim["neden"],
+                     "sorun": denetim["sorun"], "taslak": taslak}
+            if denetim["durum"] != "duzeltildi" and karar is not None:
+                kayit["reddedilen"] = karar.get("cevap")
+            self._denetim_kaydi_yaz(kayit)
 
         # Eski chat() bu bayrağı zayıf retrieval'dan set ediyordu. Retrieval ön
         # adımı kalkıyor ama bayrağın anlamı kalkmıyor: cevabın arkasında kaynak
@@ -3475,6 +3486,18 @@ class AssistantRuntime:
                 return json.load(f)
         except Exception:
             return default
+
+    def _denetim_kaydi_yaz(self, kayit: dict[str, Any]) -> None:
+        """Denetim cevaba dokunduğunda taslak ve reddedilen metin yalnız sunucuda kalır: payload'a
+        girmez (taslak hiçbir uçtan okura dönmez), mesaj kaydına yalnız karar yazılır. .jsonl
+        asistan indeksine girmez."""
+        try:
+            yol = self.config.metrics_path.with_name("assistant_denetim_kaydi.jsonl")
+            yol.parent.mkdir(parents=True, exist_ok=True)
+            with yol.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(kayit, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
 
     def _write_metric(self, payload: dict[str, Any]) -> None:
         try:

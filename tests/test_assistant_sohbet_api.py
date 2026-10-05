@@ -403,3 +403,33 @@ def test_completed_retry_restores_only_visible_cards(istemci, monkeypatch):
     assert history["mesajlar"][1]["netlestirme"] == clarify
     assert "gizli" not in str(history)
     assert istemci.post("/api/assistant/chat", json=body).status_code == 403
+
+
+# -- 2026-10-05: denetim kararı mesajın yanında saklanır, geçmiş API'sine çıkmaz ----------------------
+
+@pytest.mark.parametrize("denetim,beklenen", [
+    ({"durum": "hata", "neden": "denetim_dili", "sorun": ["kaynak"], "model": "claude-haiku-4-5",
+      "gizli": "x"}, {"durum": "hata", "neden": "denetim_dili", "sorun": ["kaynak"]}),
+    ({"durum": "duzeltildi", "neden": None, "sorun": ["hitap"], "model": "claude-haiku-4-5"},
+     {"durum": "duzeltildi", "neden": None, "sorun": ["hitap"]}),
+    ({"durum": "gecti", "neden": None, "sorun": [], "model": "claude-haiku-4-5"}, None),
+    ({"durum": "atlandi", "neden": "genel_kisa", "sorun": [], "model": None}, None),
+])
+def test_denetim_karari_saklanir_ve_gecmise_cikmaz(istemci, monkeypatch, denetim, beklenen):
+    _giris(istemci, ISIK)
+    sid = istemci.post("/api/assistant/sohbetler", json={}).get_json()["id"]
+    cevap = _answer()
+    cevap["meta"] = {**cevap["meta"], "denetim": denetim}
+
+    class Runtime:
+        def chat(self, **kw):
+            return cevap
+
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: Runtime())
+    body = {"sohbet_id": sid, "request_id": "ef" * 16, "messages": [{"role": "user", "content": "Soru"}]}
+    assert istemci.post("/api/assistant/chat", json=body).status_code == 200
+    satir = _sohbet_deposu().tum_mesajlar(sid)[-1]
+    assert json.loads(satir["meta_json"]) == ({"denetim": beklenen} if beklenen else {})
+    assert "private-tool-body" not in satir["meta_json"]
+    gecmis = istemci.get(f"/api/assistant/sohbetler/{sid}").get_json()["mesajlar"]
+    assert all("meta_json" not in m for m in gecmis)
