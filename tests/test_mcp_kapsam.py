@@ -64,6 +64,8 @@ def _responses(over=None):
             {"figure_id": 11, "document_id": 197, "page_no": 115, "label": "Görsel 4.2", "caption": "Su döngüsü " * 40},
             {"figure_id": 10, "document_id": 197, "page_no": 112, "label": "Görsel 4.1", "caption": "Katı sıvı gaz"},
         ]},
+        # Page-text search (2026-10-05 page finder): no hits by default, so figures alone frame pages.
+        ("maarif-mufredat", "search"): {"results": [], "included_outcome_fragment_types": ["outcome"]},
         ("maarif-mufredat", "get_document_text"): {"document": {"document_id": 197}, "total_pages": 240, "returned": 6,
                                                    "truncated": False, "pages": [{"page_no": p, "text": f"sayfa {p} metni"} for p in range(111, 117)]},
         ("egitim-kaynak", "kb_search"): {"status": "ok", "results": [

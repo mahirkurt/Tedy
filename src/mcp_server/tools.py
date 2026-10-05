@@ -174,8 +174,10 @@ class Tools:
                 "caveat": "İlerleme tedy.online'daki modül köprüsünden yazılır; kişi kimliği dönmez, yalnız toplamlar."}
 
     def kapsam(self, email: str, ders: str, sinif: str, konu: str | None = None,
-               kazanim_kodu: str | None = None) -> dict[str, Any]:
-        return KapsamBuilder(self.federation, self.runs, self.clock).build(email, ders, sinif, konu, kazanim_kodu)
+               kazanim_kodu: str | None = None, sayfalar: str | None = None,
+               kitap_id: int | None = None) -> dict[str, Any]:
+        return KapsamBuilder(self.federation, self.runs, self.clock).build(
+            email, ders, sinif, konu, kazanim_kodu, sayfalar=sayfalar, kitap_id=kitap_id)
 
     def kaynak_oku(self, email: str, run_id: str, soru: str, top_k: int = 5) -> dict[str, Any]:
         body = KaynakOkuyucu(self.federation, self.runs).oku(run_id, soru, top_k=top_k)

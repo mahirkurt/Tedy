@@ -26,6 +26,16 @@ ESLESME_STATUSES = frozenset({"ok", "degraded"})
 ESLESME_REASONS = frozenset({"interim_low_relevance", "outcome_code_unknown", "outcome_text_unavailable"})
 
 
+class _SecimHatasi(Exception):
+    """A hand-given page range or book that the textbook catalogue does not allow; build returns
+    its status without saving a run."""
+
+    def __init__(self, status: str, not_: str, **detay: Any) -> None:
+        super().__init__(status)
+        self.status = status
+        self.detay = {**detay, "not": not_}
+
+
 class KapsamError(Exception):
     def __init__(self, status: str, **detay: Any) -> None:
         super().__init__(status)
@@ -229,6 +239,19 @@ def verify_outcomes(federation: Federation, slug: str, grade: str, konu: str | N
 
 
 PAGE_WINDOW = 6
+# 2026-10-05: the window grows over neighbouring evidence up to this many pages (a section such as
+# "Uzayda Neler Var?", FB.7.1.4-5, spans ~17 pages); a hand-given range may be up to ELLE_SAYFA_MAX,
+# get_document_text's own 25-page ceiling.
+PAGE_WINDOW_MAX = 12
+ELLE_SAYFA_MAX = 25
+FIGURE_SEARCH_LIMIT = 20
+# Page-text search (maarif-mufredat `search`, kind=textbook) ANDs every word of its query, so a
+# multi-word topic finds nothing; single terms are searched one by one. It is extra evidence, never
+# allowed to starve what follows (page fetch, anamnesis ingest, OER): a term is only searched while
+# this much of the 60 s budget remains. Fleet calls normally take well under a second, so the search
+# runs; on a slow fleet it is skipped and the figures alone, still by rank, frame the pages.
+SAYFA_ARAMA_TERIM_MAX = 3
+SAYFA_ARAMA_PAYI = 35.0
 FIGURE_MAX = 6
 OER_MAX = 5
 # Task 11 Ruling 4: cap on multi-part anamnesis ingest before giving up and reporting a
@@ -267,6 +290,91 @@ def _part_doc_id(base_doc_id: str, part: int) -> str:
     return f"{truncated}{suffix}"
 
 
+_KELIME_RE = re.compile(r"[0-9A-Za-zÇĞİÖŞÜçğıöşüÂÎÛâîû]+")
+_DURAK = frozenset({"için", "olan", "gibi", "nedir", "nasıl", "neden", "veya", "daha", "kavram", "kavramı",
+                    "kavramları", "kavramlarını", "ilgili", "arasındaki", "ilişkileri", "ortaya", "koyar",
+                    "uyumlu", "bütün", "oluşturur", "elde", "ettiği", "dayalı", "unsurlardan", "konusu"})
+
+
+# Plural/case/possessive endings, longest first. The page index does no stemming, so the outcome's
+# own "yaşamını" finds 5 pages where the prefix "yaşam*" finds the section, and "devresi" must become
+# "devre*", not "devres*" (measured 2026-10-05).
+_EKLER = ("ların", "lerin", "ları", "leri", "lar", "ler", "nın", "nin", "nun", "nün",
+          "ını", "ini", "unu", "ünü", "sı", "si", "su", "sü", "ın", "in", "un", "ün", "ı", "i", "u", "ü")
+
+
+def _kok(kelime: str) -> str:
+    for ek in _EKLER:
+        if kelime.endswith(ek) and len(kelime) - len(ek) >= 4:
+            return kelime[: -len(ek)]
+    return kelime
+
+
+def arama_terimleri(metin: str) -> list[str]:
+    """Up to SAYFA_ARAMA_TERIM_MAX distinct prefix queries ("yıldız*"), in the caller's own order
+    (the most specific word usually comes first in a topic). Outcome boilerplate — -abilme/-ebilme
+    skill verbs, -arak/-erek gerunds, short words and a small stop list — is dropped, so an outcome
+    text used as the query does not spend the searches on "açıklayarak yapılandırabilme"."""
+    terimler: list[str] = []
+    for kelime in _KELIME_RE.findall(metin or ""):
+        k = _fold(kelime)
+        if len(k) < 4 or k in _DURAK or k.endswith(("abilme", "ebilme", "arak", "erek")):
+            continue
+        terim = _kok(k) + "*"
+        if terim in terimler:
+            continue
+        terimler.append(terim)
+        if len(terimler) == SAYFA_ARAMA_TERIM_MAX:
+            break
+    return terimler
+
+
+def sayfa_araligi(metin: str) -> tuple[int, int] | None:
+    """'34-50' -> (34, 50); None unless 1 <= a <= b and the range is at most ELLE_SAYFA_MAX pages."""
+    m = re.fullmatch(r"\s*([0-9]+)\s*-\s*([0-9]+)\s*", metin or "")
+    if not m:
+        return None
+    a, b = int(m.group(1)), int(m.group(2))
+    if a < 1 or b < a or b - a + 1 > ELLE_SAYFA_MAX:
+        return None
+    return a, b
+
+
+def _pencere(skor: dict[int, float], page_count: int) -> tuple[int, int]:
+    """The page window with the most evidence, not the earliest hit (2026-10-05: one weak figure on
+    p.20 used to beat three strong ones on p.49). The best PAGE_WINDOW-page stretch is chosen
+    (earliest on a tie), then grown over neighbouring scored pages — at most one blank page apart,
+    the stronger side first — up to PAGE_WINDOW_MAX, keeping one page of lead-in before the first hit."""
+    sayfalar = sorted(skor)
+    en_iyi, bas = -1.0, sayfalar[0]
+    for p in sayfalar:
+        toplam = sum(v for q, v in skor.items() if p <= q < p + PAGE_WINDOW)
+        if toplam > en_iyi:
+            en_iyi, bas = toplam, p
+    lo = bas
+    hi = max(q for q in sayfalar if bas <= q < bas + PAGE_WINDOW)
+    while True:
+        # Grow toward the stronger neighbour each step (a tie goes backward, toward the section's
+        # start): growing forward first filled the cap past FB.7.1.4's own "Yıldız Oluşumu" pages.
+        adaylar = []
+        ileri = next((q for q in (hi + 1, hi + 2) if q in skor), None)
+        if ileri is not None and ileri - lo + 2 <= PAGE_WINDOW_MAX:
+            adaylar.append((skor[ileri], 0, ileri))
+        geri = next((q for q in (lo - 1, lo - 2) if q in skor), None)
+        if geri is not None and hi - geri + 2 <= PAGE_WINDOW_MAX:
+            adaylar.append((skor[geri], 1, geri))
+        if not adaylar:
+            break
+        _, geriye, q = max(adaylar)
+        if geriye:
+            lo = q
+        else:
+            hi = q
+    first = max(1, lo - 1)
+    last = min(page_count, max(hi, first + PAGE_WINDOW - 1))
+    return first, last
+
+
 class KapsamBuilder:
     def __init__(self, federation: Federation, runs: RunStore, clock: Callable[[], float] = time.time,
                  monotonic: Callable[[], float] = time.monotonic) -> None:
@@ -276,12 +384,20 @@ class KapsamBuilder:
         self.monotonic = monotonic  # spec §7 budget
 
     def build(self, email: str, ders: str, sinif: str | int, konu: str | None = None,
-              kazanim_kodu: str | None = None) -> dict[str, Any]:
+              kazanim_kodu: str | None = None, sayfalar: str | None = None,
+              kitap_id: int | None = None) -> dict[str, Any]:
         deadline = self.monotonic() + TOOL_BUDGET_SECONDS
         cov = Coverage()
         grade = normalize_grade(sinif)
         if grade is None:
             return {"status": "gecersiz_sinif", "sinif": str(sinif), "mcp_verified": False}
+        elle = None
+        if sayfalar is not None:
+            elle = sayfa_araligi(sayfalar)
+            if elle is None:
+                return {"status": "gecersiz_sayfalar", "sayfalar": str(sayfalar)[:40],
+                        "not": f"sayfalar 'ilk-son' biçiminde, 1'den başlayan ve en çok {ELLE_SAYFA_MAX} sayfalık bir aralık olmalı.",
+                        "mcp_verified": False}
         try:
             subject = resolve_subject(self.federation, ders, deadline)
             verified = verify_outcomes(self.federation, subject["slug"], grade, konu, kazanim_kodu, deadline)
@@ -313,7 +429,10 @@ class KapsamBuilder:
         shape_degraded = False
         try:
             cerceve, pages, figures, shape_degraded = self._frame(
-                run_id, subject["slug"], grade, query, verified["kazanimlar"], deadline)
+                run_id, subject["slug"], grade, query, verified["kazanimlar"], deadline,
+                elle=elle, kitap_id=kitap_id)
+        except _SecimHatasi as exc:
+            return {"status": exc.status, **exc.detay, "mcp_verified": False}
         except KapsamError as exc:
             cov.degraded(MUFREDAT, exc.detay.get("neden", "hata"))
             cerceve = {"kind": None, "document_id": None, "title": None, "sayfalar": None,
@@ -351,28 +470,35 @@ class KapsamBuilder:
         self.runs.save(run_id, {
             "run_id": run_id, "created_by": email,
             "created_at": datetime.fromtimestamp(self.clock(), timezone.utc).isoformat(timespec="seconds"),
-            "girdi": {"ders": ders, "sinif": str(sinif), "konu": konu, "kazanim_kodu": kazanim_kodu},
+            "girdi": {"ders": ders, "sinif": str(sinif), "konu": konu, "kazanim_kodu": kazanim_kodu,
+                      **({"sayfalar": sayfalar} if sayfalar is not None else {}),
+                      **({"kitap_id": kitap_id} if kitap_id is not None else {})},
             "ders": subject, "sinif": grade, "kazanimlar": verified["kazanimlar"], "cerceve": cerceve,
             "coverage": cov.as_dict(),
         })
         return body
 
     def _frame(self, run_id: str, slug: str, grade: str, query: str, kazanimlar: list[dict[str, Any]],
-               deadline: float) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], bool]:
+               deadline: float, elle: tuple[int, int] | None = None,
+               kitap_id: int | None = None) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], bool]:
         """Returns (cerceve, pages, figures, shape_degraded). shape_degraded (fix round 2 Ruling
         R2-2, generalized by fix round 3 Ruling R3-4 to books/pages too) tells the caller (build)
         whether any fleet row across books/figures/pages was dropped for shape reasons this
         build — build applies the resulting degraded:unexpected_shape coverage itself, at the
-        very end, so it cannot be masked by an earlier cov.hit(MUFREDAT)."""
+        very end, so it cannot be masked by an earlier cov.hit(MUFREDAT).
+
+        2026-10-05 (FB.7.1.4 → 26-31, FB.7.1.5 → 19-24; the section was 439's 34-50): the book and
+        the window are chosen by evidence, not position. Figure hits are weighted by their rank
+        (search_figures returns them by relevance), page-text hits by rank and by how specific the
+        term is; every textbook of the subject/grade competes, not only the first one listed.
+        `elle` (and optionally `kitap_id`) skips the finder for a hand-given range."""
         raw_books = _mufredat(self.federation, "list_textbooks", {"subject": slug, "grade": grade, "limit": 20},
                              "liste", deadline)
         book_rows, books_shape_degraded = _fleet_rows(raw_books)
         candidates = []
         for b in book_rows:
             # A row whose page_count is not an integer-convertible value is not eligible, never
-            # raises (§6.3 Ruling C). The survivor carries its OWN already-validated int
-            # page_count forward (fix round 1 Minor M4): re-deriving it again below from the
-            # same raw field would be dead code — it can only ever repeat this exact result.
+            # raises (§6.3 Ruling C).
             page_count = _fleet_int(b.get("page_count"))
             if page_count and page_count > 0:
                 candidates.append((b, page_count))
@@ -381,38 +507,93 @@ class KapsamBuilder:
             return ({"kind": "program", "document_id": doc, "title": None, "sayfalar": None,
                      "not": "Bu ders ve sınıf için tam metinli ders kitabı yok; çerçeve öğretim programıdır."},
                     [], [], books_shape_degraded)
-        book, page_count = candidates[0]
-        doc_id = _fleet_int(book.get("document_id"), server=MUFREDAT, tool="list_textbooks")
-        found = _mufredat(self.federation, "search_figures",
-                          {"query": query, "subject": slug, "grade": grade, "document_id": doc_id, "limit": 12},
-                          "nesne", deadline)
-        # The "figures" field itself might not be a list, or a row might not be a dict (fix
-        # round 3 Ruling R3-4); a figure whose page_no is not an integer-convertible value, or
-        # whose figure_id is missing or not int-convertible (so it cannot be compared against
-        # another figure's id in the sort key below), is excluded the same way (fix round 1
-        # Minor M5, fix round 2 Ruling R2-2) — never a crash. Both page_no AND figure_id are
-        # normalized to int here, so the sort key below can never raise KeyError (missing
-        # figure_id) or TypeError (e.g. int vs str figure_id at a tied page_no) — every
-        # surviving row's key fields are guaranteed homogeneous ints.
+        if kitap_id is not None:
+            candidates = [c for c in candidates if _fleet_int(c[0].get("document_id")) == kitap_id]
+            if not candidates:
+                raise _SecimHatasi("gecersiz_kitap", kitap_id=kitap_id,
+                                   not_="kitap_id bu ders ve sınıfın tam metinli ders kitaplarından biri olmalı.")
+        books = {}
+        for b, page_count in candidates:
+            doc = _fleet_int(b.get("document_id"))
+            if doc is not None and doc not in books:
+                books[doc] = (b, page_count)
+        if not books:
+            # The only eligible rows carry no usable id: the same failure the single-book path had.
+            _fleet_int(candidates[0][0].get("document_id"), server=MUFREDAT, tool="list_textbooks")
+        tek_kitap = next(iter(books)) if len(books) == 1 else None
+
+        fig_args: dict[str, Any] = {"query": query, "subject": slug, "grade": grade, "limit": FIGURE_SEARCH_LIMIT}
+        if tek_kitap is not None:
+            fig_args["document_id"] = tek_kitap
+        found = _mufredat(self.federation, "search_figures", fig_args, "nesne", deadline)
+        # Malformed figure rows (page_no/figure_id not int-convertible, row not a dict, list not a
+        # list) are dropped and degrade coverage (fix rounds 1-3, R2-2/R3-4); a well-formed figure
+        # of some other book is simply not a candidate.
         figure_rows, figures_container_degraded = _fleet_rows(found.get("figures"))
         figs = []
         for f in figure_rows:
             page_no = _fleet_int(f.get("page_no"), minimum=1)
             figure_id = _fleet_int(f.get("figure_id"))
-            if page_no and figure_id is not None:
-                figs.append({**f, "page_no": page_no, "figure_id": figure_id})
-        figs.sort(key=lambda f: (f["page_no"], f["figure_id"]))
+            if page_no is None or figure_id is None:
+                continue
+            doc = _fleet_int(f.get("document_id"))
+            doc = tek_kitap if doc is None else doc
+            figs.append({**f, "page_no": page_no, "figure_id": figure_id, "_doc": doc, "_sira": len(figs)})
         shape_degraded = books_shape_degraded or figures_container_degraded or len(figs) < len(figure_rows)
-        figures = [{"figure_id": f["figure_id"], "page_no": f["page_no"], "etiket": f.get("label") or "",
-                    "aciklama": (f.get("caption") or f.get("snippet") or "")[:200]} for f in figs[:FIGURE_MAX]]
+
+        skor: dict[int, dict[int, float]] = {doc: {} for doc in books}
+        for f in figs:
+            if f["_doc"] in skor:
+                skor[f["_doc"]][f["page_no"]] = skor[f["_doc"]].get(f["page_no"], 0.0) + 1.0 / (1 + f["_sira"])
+        if elle is None:
+            for terim in arama_terimleri(query):
+                if deadline - self.monotonic() < SAYFA_ARAMA_PAYI:
+                    break
+                try:
+                    sonuc = self.federation.call(MUFREDAT, "search", {"q": terim, "kind": "textbook", "subject": slug,
+                                                                      "grade": grade, "limit": 25},
+                                                 beklenen="nesne", deadline=deadline)
+                except FederationError as exc:
+                    logger.warning("%s.search (sayfa) %s", MUFREDAT, exc.reason)
+                    break
+                isabetler = []
+                for r in _fleet_rows(sonuc.get("results") if isinstance(sonuc, dict) else None)[0]:
+                    loc = r.get("locator") if isinstance(r.get("locator"), dict) else {}
+                    doc, page_no = _fleet_int(loc.get("document_id")), _fleet_int(loc.get("page_no"), minimum=1)
+                    if doc in skor and page_no is not None:
+                        isabetler.append((doc, page_no))
+                # A term found on few pages says more about where the topic is than one found on many.
+                agirlik = 1.0 / max(1.0, len(isabetler)) ** 0.5
+                for sira, (doc, page_no) in enumerate(isabetler):
+                    skor[doc][page_no] = skor[doc].get(page_no, 0.0) + agirlik / (1 + sira)
+
+        if tek_kitap is not None:
+            doc_id = tek_kitap
+        else:
+            # Most evidence wins; with none at all the first listed book stays, as before.
+            doc_id = max(books, key=lambda d: (sum(skor[d].values()), -list(books).index(d)))
+        book, page_count = books[doc_id]
         cerceve: dict[str, Any] = {"kind": "textbook", "document_id": doc_id, "title": book.get("title"), "sayfalar": None}
-        if not figs:
-            cerceve["not"] = "Figür aramasında sayfa isabeti yok; sayfa penceresi seçilmedi, kitapta konuyu elle doğrula."
-            return cerceve, [], figures, shape_degraded
-        first = max(1, figs[0]["page_no"] - 1)
-        last = min(page_count, first + PAGE_WINDOW - 1)
+        if elle is not None:
+            first, last = elle
+            if last > page_count:
+                raise _SecimHatasi("gecersiz_sayfalar", sayfalar=f"{first}-{last}", kitap_id=doc_id,
+                                   not_=f"Bu kitap {page_count} sayfa; aralık 1-{page_count} içinde olmalı.")
+            cerceve["secim"] = "elle"
+        elif not skor[doc_id]:
+            cerceve["not"] = ("Figür ve sayfa aramasında isabet yok; sayfa penceresi seçilmedi, kitapta konuyu elle "
+                              "doğrula ya da edupedia_kapsam'ı sayfalar ile çağır.")
+            return cerceve, [], [], shape_degraded
+        else:
+            first, last = _pencere(skor[doc_id], page_count)
+        pencere_figurleri = sorted((f for f in figs if f["_doc"] == doc_id and first <= f["page_no"] <= last),
+                                   key=lambda f: (f["page_no"], f["figure_id"]))
+        figures = [{"figure_id": f["figure_id"], "page_no": f["page_no"], "etiket": f.get("label") or "",
+                    "aciklama": (f.get("caption") or f.get("snippet") or "")[:200]}
+                   for f in pencere_figurleri[:FIGURE_MAX]]
         text = _mufredat(self.federation, "get_document_text",
-                         {"document_id": doc_id, "page_range": f"{first}-{last}", "max_chars": 60000}, "nesne", deadline)
+                         {"document_id": doc_id, "page_range": f"{first}-{last}",
+                          "max_chars": max(60000, 6000 * (last - first + 1))}, "nesne", deadline)
         if text.get("error"):
             logger.warning("%s.get_document_text error: %s", MUFREDAT, upstream_log_text(text.get("error")))
             cerceve["not"] = "Sayfa metni alınamadı."
@@ -425,8 +606,7 @@ class KapsamBuilder:
         # partway through the list must not leave a partially-saved run whose files disagree
         # with the cerceve/coverage the caller ends up reporting for this same failure. The
         # converted int is also carried forward into the returned page dicts themselves (fix
-        # round 2 O-5) — kitap_sayfalari and _ingest used to read the RAW (possibly string)
-        # page_no straight from these dicts, so e.g. "111" was reported as a string, not int 111.
+        # round 2 O-5).
         page_nos = [_fleet_int(p.get("page_no"), server=MUFREDAT, tool="get_document_text", minimum=1)
                     for p in page_rows]
         pages = []

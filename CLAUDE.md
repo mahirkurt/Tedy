@@ -276,6 +276,16 @@ unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
   Çalıştırmanın anamnesis alımı tam değilse (`coverage.anamnesis` `hit` değilse), `edupedia_kaynak_oku`
   anamnesis'e sormaz; bunun yerine çalıştırmanın tüm sayfalarını yerel BM25 ile arar ve bunu `skipped:<kod>`
   olarak bildirir.
+- Sayfa bulucu (`kapsam._frame`, 2026-10-05): kitap ve sayfa penceresi kanıta göre seçilir, sıraya göre değil.
+  Figür isabetleri `search_figures` sırasıyla ağırlıklanır; sayfa metni maarif-mufredat `search`
+  (`kind=textbook`) ile en çok 3 tek terimle aranır (çok kelimeli sorgu VE'lenip boş döner; terimler Türkçe
+  ek budamasıyla önek sorgusudur: "yaşamını" → `yaşam*`, "devresi" → `devre*`), az sayfada geçen terim daha
+  ağır basar. Ders+sınıfın bütün ders kitapları yarışır (eskiden hep listedeki ilk kitap; 7. sınıf Fen'in
+  elektrik ünitesi 2. kitaptadır). En güçlü 6 sayfa seçilir, komşu isabetlere doğru en çok 12 sayfaya büyür.
+  Sayfa araması yalnız ≥35 sn bütçe kaldıysa yapılır (yavaş filoda atlanır). Canlı vaka: FB.7.1.4 26-31'e,
+  FB.7.1.5 19-24'e düşüyordu (doğrusu 439'un 34-50'si); şimdi 36-47 ve 44-52. Bulucu yanılırsa
+  `edupedia_kapsam(..., sayfalar="34-50", kitap_id=439)` bulucuyu atlar (en çok 25 sayfa, kitap sınırı içinde;
+  aksi `gecersiz_sayfalar` / `gecersiz_kitap`, çağrı yapılmadan ya da run kaydedilmeden).
 - Sağlık: `edupedia_durum(canli=true)` yapılandırılmış her filo sunucusunu yoklar — hafif bir araç çağrısı
   olmayanları (pexels, comfyui, openalex) MCP `ping` ile; hiçbiri atlanmaz. Sunucunun önündeki bir ağ geçidinin
   hata sayfası (ör. Cloudflare 530 / 1033, tünel kapalı) `degraded:http_530` olur, "0 araç" sanılmaz.

@@ -308,7 +308,7 @@ def test_parked_tool_bodies_never_take_the_threads_auth_and_store_calls_need(tmp
         def baglam(self, email, gun=7):
             return park()
 
-        def kapsam(self, email, ders, sinif, konu=None, kazanim_kodu=None):
+        def kapsam(self, email, ders, sinif, konu=None, kazanim_kodu=None, sayfalar=None, kitap_id=None):
             return park()
 
         def kaynak_oku(self, email, run_id, soru, top_k=5):
