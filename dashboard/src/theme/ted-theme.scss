@@ -172,7 +172,26 @@ html {
   // and quietly overrides the reader's own font-size choice.
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  // 4K (2026-10-06): above 1920 px the whole interface grows with the window, so a 3840 px screen
+  // shows exactly the full-HD layout at twice the sharpness. Before, every page was a 960 px strip
+  // with 14 px text in the top-left quarter of a 4K screen. Up to 1920 px nothing changes (phone and
+  // 1440 baselines are untouched); 100% keeps the reader's own browser text size as the floor.
+  /* stylelint-disable-next-line carbon/type-use -- the root scale itself, not a type style */
+  font-size: clamp(100%, calc(100vw / 120), 250%);
 }
+
+// Carbon icons arrive as <svg width="16" height="16">: an attribute, so on a 4K screen they kept
+// their pixel size while the text around them doubled. Any CSS rule outranks the attribute, and
+// :where() keeps this one below every component's own icon sizing.
+:where(svg[width='10'][height='10']) { width: 0.625rem; height: 0.625rem; }
+:where(svg[width='12'][height='12']) { width: 0.75rem; height: 0.75rem; }
+:where(svg[width='14'][height='14']) { width: 0.875rem; height: 0.875rem; }
+:where(svg[width='18'][height='18']) { width: 1.125rem; height: 1.125rem; }
+:where(svg[width='16'][height='16']) { width: 1rem; height: 1rem; }
+:where(svg[width='20'][height='20']) { width: 1.25rem; height: 1.25rem; }
+:where(svg[width='24'][height='24']) { width: 1.5rem; height: 1.5rem; }
+:where(svg[width='32'][height='32']) { width: 2rem; height: 2rem; }
+:where(svg[width='36'][height='36']) { width: 2.25rem; height: 2.25rem; }
 
 body {
   background-color: var(--ted-page-bg);
@@ -270,7 +289,9 @@ body {
   // spacing-10 (4rem): the fixed 3rem header plus 1rem of the page's own. It
   // was 3.5rem and the first card sat against the band.
   padding: spacing.$spacing-10 var(--ted-space-lg) var(--ted-space-xl);
-  max-width: 960px;
+  // 60rem, not 960px: the column grows with the root scale on a 4K screen.
+  /* stylelint-disable-next-line carbon/layout-use -- the page column's own width, not spacing */
+  max-width: 60rem;
   // On a mostly-empty day the content ran out around 500px and the footer
   // sat halfway down the window with 200px of nothing under it, which reads
   // as a page that failed to finish loading. The shell is a column and the
@@ -405,7 +426,7 @@ body {
 }
 
 .dashboard-loading-tile.cds--tile {
-  min-height: 120px;
+  min-height: 7.5rem;
   display: grid;
   place-items: center;
 }
@@ -430,9 +451,9 @@ body {
 // not a hand-drawn gradient shimmer.
 .today-loading__block.cds--skeleton__placeholder {
   width: 100%;
-  height: 56px;
+  height: 3.5rem;
 
-  &.today-loading__block--short { width: 60%; height: 40px; }
+  &.today-loading__block--short { width: 60%; height: 2.5rem; }
 }
 
 // Empty state
@@ -735,7 +756,7 @@ body {
 
 .today-tl__item {
   display: grid;
-  grid-template-columns: 48px 22px 1fr;
+  grid-template-columns: 3rem 1.375rem 1fr;
   gap: 0 spacing.$spacing-03;
   padding: spacing.$spacing-02 0;
   animation: tl-stagger motion.$duration-moderate-02 motion.motion(entrance, productive) both;
@@ -808,8 +829,8 @@ body {
 .today-tl > div:last-child .today-tl__spine::before { bottom: 50%; }
 
 .today-tl__dot {
-  width: 20px;
-  height: 20px;
+  width: 1.25rem;
+  height: 1.25rem;
   border-radius: 50%;
   // The item's course mark; a neutral grey without one (ted-subject--gray).
   background: var(--ted-subject-accent, var(--cds-layer-active-01));
@@ -829,7 +850,7 @@ body {
   border: 1px solid var(--ted-color-border-subtle);
   border-radius: var(--ted-radius-card);
   padding: spacing.$spacing-03 spacing.$spacing-04;
-  min-height: 40px;
+  min-height: 2.5rem;
   transition: background-color var(--ted-transition-fast);
 }
 
@@ -871,7 +892,7 @@ body {
 // Now marker
 .today-tl__now {
   display: grid;
-  grid-template-columns: 48px 1fr;
+  grid-template-columns: 3rem 1fr;
   gap: 0 spacing.$spacing-03;
   align-items: center;
   padding: spacing.$spacing-03 0;
@@ -896,8 +917,8 @@ body {
     position: absolute;
     left: 0;
     top: 50%;
-    width: 8px;
-    height: 8px;
+    width: 0.5rem;
+    height: 0.5rem;
     border-radius: 50%;
     background: var(--cds-interactive);
     transform: translate(-50%, -50%);
@@ -921,7 +942,7 @@ body {
 
 .dashboard-event-date {
   text-align: center;
-  min-width: 52px;
+  min-width: 3.25rem;
   padding: var(--ted-space-xs) var(--ted-space-xs);
   background: #{colors.$blue-10};
   border-radius: var(--ted-radius-card);
@@ -994,7 +1015,7 @@ body {
 
 .homework-item__countdown {
   text-align: right;
-  min-width: 80px;
+  min-width: 5rem;
   flex-shrink: 0;
 }
 
@@ -1013,7 +1034,7 @@ body {
 
 // ─── Homework Countdown Bar ─────────────────────────────────────────────
 .hw-countdown-bar {
-  height: 4px;
+  height: 0.25rem;
   background: var(--cds-layer-accent-01);
   border-radius: 2px;
   overflow: hidden;
@@ -1262,7 +1283,7 @@ body {
 
 // ─── Header ──────────────────────────────────────────────────────────────────
 .dashboard-header__brand-logo {
-  height: 30px;
+  height: 1.875rem;
   vertical-align: middle;
 }
 
@@ -1276,8 +1297,8 @@ body {
 }
 
 .dashboard-header__avatar {
-  width: 28px;
-  height: 28px;
+  width: 1.75rem;
+  height: 1.75rem;
   border-radius: 50%;
   border: 2px solid var(--ted-color-brand-rule);
   flex-shrink: 0;
@@ -1415,8 +1436,8 @@ body {
   &::before {
     content: '';
     position: absolute;
-    width: 420px;
-    height: 420px;
+    width: 26.25rem;
+    height: 26.25rem;
     border-radius: 50%;
     border: 1px solid var(--ted-color-brand-primary-hover);
     /* stylelint-disable-next-line carbon/layout-use -- the login hero's decorative rings sit by position, not spacing */
@@ -1427,8 +1448,8 @@ body {
   &::after {
     content: '';
     position: absolute;
-    width: 280px;
-    height: 280px;
+    width: 17.5rem;
+    height: 17.5rem;
     border-radius: 50%;
     border: 1px solid var(--ted-color-brand-primary-hover);
     /* stylelint-disable-next-line carbon/layout-use -- as above */
@@ -1447,7 +1468,7 @@ body {
 }
 
 .login-page__hero-logo {
-  height: 56px;
+  height: 3.5rem;
   margin-bottom: var(--ted-space-xs);
 }
 
@@ -1476,7 +1497,7 @@ body {
 
 .login-page__panel-inner {
   width: 100%;
-  max-width: 340px;
+  max-width: 21.25rem;
 }
 
 .login-page__heading {
@@ -1565,8 +1586,8 @@ body {
   box-shadow: var(--ted-shadow-popover);
   padding: var(--ted-space-sm) var(--ted-space-md);
   @include type.type-style('body-01');
-  min-width: 320px;
-  max-width: min(92vw, 380px);
+  min-width: 20rem;
+  max-width: min(92vw, 23.75rem);
   color: var(--ted-color-text-primary);
   animation: popover-enter motion.$duration-moderate-02 motion.motion(entrance, productive);
 }
@@ -1687,7 +1708,7 @@ body {
 
 .calendar-nav__label {
   @include type.type-style('heading-02');
-  min-width: 180px;
+  min-width: 11.25rem;
   text-align: center;
 }
 
@@ -1730,7 +1751,7 @@ body {
   // minmax(0, 1fr), not 1fr: a 1fr track grows to its content's min-content,
   // and one long unbreakable event title ("5,6,7,8. Sınıflar Kulüp
   // Tanıtımları/ …", 2026-09-24) widened its day and pushed Friday off the grid.
-  grid-template-columns: 50px repeat(var(--calendar-day-count, 5), minmax(0, 1fr));
+  grid-template-columns: 3.125rem repeat(var(--calendar-day-count, 5), minmax(0, 1fr));
   gap: 1px;
   background: var(--cds-layer-accent-01);
   border-radius: var(--ted-radius-card);
@@ -1765,7 +1786,7 @@ body {
 .calendar-grid__cell {
   background: var(--cds-layer-01);
   padding: spacing.$spacing-01;
-  min-height: 48px;
+  min-height: 3rem;
   position: relative;
 }
 
@@ -1831,7 +1852,7 @@ body {
 }
 
 .calendar-event--continuation {
-  height: 4px;
+  height: 0.25rem;
   border-left: 0;
   border-radius: 2px;
   margin: 0 spacing.$spacing-01 1px;
@@ -1852,8 +1873,8 @@ body {
   border-radius: var(--ted-radius-card);
   box-shadow: var(--ted-shadow-popover);
   padding: var(--ted-space-md);
-  min-width: 260px;
-  max-width: 340px;
+  min-width: 16.25rem;
+  max-width: 21.25rem;
   animation: popover-enter motion.$duration-moderate-02 motion.motion(entrance, productive);
 }
 
@@ -1953,7 +1974,7 @@ body {
 
 // ─── Custom Scrollbar ───────────────────────────────────────────────────
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 0.375rem;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -2157,7 +2178,7 @@ body {
 
 .grade-detail__row {
   display: grid;
-  grid-template-columns: 140px 1fr 40px;
+  grid-template-columns: 8.75rem 1fr 2.5rem;
   align-items: center;
   gap: var(--ted-space-xs);
 }
@@ -2168,7 +2189,7 @@ body {
 }
 
 .grade-detail__bar-track {
-  height: 8px;
+  height: 0.5rem;
   background: var(--cds-layer-accent-01);
   border-radius: 4px;
   overflow: hidden;
@@ -2245,7 +2266,7 @@ body {
 }
 
 .platform-a3k-score__gauge {
-  height: 8px;
+  height: 0.5rem;
   background: var(--cds-layer-accent-01);
   border-radius: 4px;
   overflow: hidden;
@@ -2300,7 +2321,7 @@ body {
 
 .platform-detail-row {
   display: grid;
-  grid-template-columns: 20px 1fr auto;
+  grid-template-columns: 1.25rem 1fr auto;
   align-items: center;
   gap: var(--ted-space-xs);
   padding: var(--ted-space-2xs) var(--ted-space-xs);
@@ -2314,7 +2335,7 @@ body {
 }
 
 .platform-detail-row--sebit {
-  grid-template-columns: 20px 1fr auto;
+  grid-template-columns: 1.25rem 1fr auto;
   grid-template-rows: auto auto;
 
   .platform-detail-row__sebit-meta {
@@ -2406,7 +2427,7 @@ body {
   height: 2.5rem;
 }
 .schedule-table .cds--data-table th:first-child,
-.schedule-table .cds--data-table td:first-child { width: 60px; text-align: right; }
+.schedule-table .cds--data-table td:first-child { width: 3.75rem; text-align: right; }
 
 .schedule-table .schedule-lesson {
   display: -webkit-box;
@@ -2523,12 +2544,12 @@ body {
   }
 
   .today-tl__item {
-    grid-template-columns: 40px 18px 1fr;
+    grid-template-columns: 2.5rem 1.125rem 1fr;
     gap: 0 spacing.$spacing-03;
   }
 
   .today-tl__now {
-    grid-template-columns: 40px 1fr;
+    grid-template-columns: 2.5rem 1fr;
     gap: 0 spacing.$spacing-03;
   }
 
@@ -2537,7 +2558,7 @@ body {
   }
 
   .health-popover {
-    min-width: 250px;
+    min-width: 15.625rem;
     right: calc(-1 * #{spacing.$spacing-04});
     padding: var(--ted-space-xs) var(--ted-space-sm);
   }
@@ -2594,7 +2615,7 @@ body {
 
   @media (max-width: 22rem) {
     .dashboard-header__brand-logo {
-      height: 22px;
+      height: 1.375rem;
     }
 
     .cds--header .cds--header__name {
@@ -2614,12 +2635,12 @@ body {
 
   .login-page__hero {
     padding: var(--ted-space-lg) var(--ted-space-md);
-    min-height: 140px;
+    min-height: 8.75rem;
     align-items: center;
   }
 
   .login-page__hero-logo {
-    height: 36px;
+    height: 2.25rem;
   }
 
   .login-page__hero-school {
@@ -2652,7 +2673,7 @@ body {
   // Odak stays reachable on a phone: identity text yields the room.
 
   .grade-detail__row {
-    grid-template-columns: 100px 1fr 32px;
+    grid-template-columns: 6.25rem 1fr 2rem;
   }
 
   .calendar-event-flat {
@@ -2660,7 +2681,7 @@ body {
   }
 
   .calendar-grid {
-    grid-template-columns: 36px repeat(var(--calendar-day-count, 5), minmax(0, 1fr));
+    grid-template-columns: 2.25rem repeat(var(--calendar-day-count, 5), minmax(0, 1fr));
   }
 
   .calendar-grid__header {
@@ -2674,7 +2695,7 @@ body {
   }
 
   .calendar-grid__cell {
-    min-height: 36px;
+    min-height: 2.25rem;
   }
 
   .calendar-event {
@@ -2684,12 +2705,12 @@ body {
 
   .calendar-nav__label {
     @include type.type-style('body-01');
-    min-width: 140px;
+    min-width: 8.75rem;
   }
 
   .calendar-popover {
-    min-width: 220px;
-    max-width: 280px;
+    min-width: 13.75rem;
+    max-width: 17.5rem;
   }
 
   .platform-a3k-score {
@@ -2817,7 +2838,7 @@ body {
 
 .student-profile {
   display: grid;
-  grid-template-columns: 120px 1fr;
+  grid-template-columns: 7.5rem 1fr;
   gap: var(--ted-space-md);
 }
 
@@ -2828,16 +2849,16 @@ body {
 }
 
 .student-profile__photo {
-  width: 104px;
-  height: 104px;
+  width: 6.5rem;
+  height: 6.5rem;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid var(--ted-color-border-subtle);
 }
 
 .student-profile__photo-fallback {
-  width: 104px;
-  height: 104px;
+  width: 6.5rem;
+  height: 6.5rem;
   border-radius: 50%;
   border: 2px dashed var(--ted-color-border-subtle);
   display: grid;
@@ -3277,7 +3298,7 @@ body {
   }
 
   .exam-stats__item {
-    min-width: 60px;
+    min-width: 3.75rem;
   }
 
   .exam-card__list li {
@@ -3438,9 +3459,9 @@ body {
   white-space: nowrap;
 }
 
-.book-cover--sm { width: 58px; font-size: 17px; }
-.book-cover--md { width: 132px; font-size: 26px; }
-.book-cover--lg { width: 176px; font-size: 32px; }
+.book-cover--sm { width: 3.625rem; font-size: 1.0625rem; }
+.book-cover--md { width: 8.25rem; font-size: 1.625rem; }
+.book-cover--lg { width: 11rem; font-size: 2rem; }
 
 /* At thumbnail size only the title survives — everything else turns to mush. */
 .book-cover--sm .book-cover__author,
@@ -3452,21 +3473,21 @@ body {
 .book-cover--sm .book-cover__title { font-size: 0.62em; }
 
 @media (width <= 42rem) {
-  .book-cover--lg { width: 132px; font-size: 26px; }
+  .book-cover--lg { width: 8.25rem; font-size: 1.625rem; }
 }
 
 /* ─── Fleuron ───────────────────────────────────────────────────────────── */
 
 .ornament {
   display: block;
-  width: 72px;
-  height: 12px;
+  width: 4.5rem;
+  height: 0.75rem;
   margin: 0 auto;
   color: inherit;
   overflow: visible;
 }
 
-.ornament--mark { width: 10px; height: 10px; }
+.ornament--mark { width: 0.625rem; height: 0.625rem; }
 
 /* ─── Buttons shared by the books screens ───────────────────────────────── */
 
@@ -3799,7 +3820,7 @@ body {
 }
 
 .books-loading__cover {
-  width: 132px;
+  width: 8.25rem;
   aspect-ratio: 2 / 3;
   border-radius: 2px 7px 7px 2px;
   background: var(--ted-color-border-subtle);
@@ -3809,7 +3830,7 @@ body {
 .books-loading__lines { flex: 1; display: flex; flex-direction: column; gap: 0.75rem; padding-top: 0.5rem; }
 
 .books-loading__lines span {
-  height: 14px;
+  height: 0.875rem;
   border-radius: 4px;
   background: var(--ted-color-border-subtle);
   animation: pulse-urgent 1.4s ease-in-out infinite;
@@ -4406,7 +4427,7 @@ ol.bookmd__list { list-style: decimal; }
 }
 
 .reader__skeleton span {
-  height: 14px;
+  height: 0.875rem;
   border-radius: 4px;
   background: var(--reader-hairline);
   animation: pulse-urgent 1.4s ease-in-out infinite;
@@ -4795,8 +4816,8 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 }
 
 .reader-header__avatar {
-  width: 26px;
-  height: 26px;
+  width: 1.625rem;
+  height: 1.625rem;
   border-radius: 50%;
   border: 1px solid var(--book-gold-dim);
   flex-shrink: 0;
@@ -4921,8 +4942,8 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 
 /* A bound book earns more presence than the callout's thumbnail. */
 .resume-band__cover .book-cover--sm {
-  width: 88px;
-  font-size: 26px;
+  width: 5.5rem;
+  font-size: 1.625rem;
 }
 
 .resume-band:hover .resume-band__cover { transform: rotate(-1deg) translateY(-2px); }
@@ -5076,7 +5097,7 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
     gap: var(--ted-space-md);
   }
 
-  .resume-band__cover .book-cover--sm { width: 66px; font-size: 19px; }
+  .resume-band__cover .book-cover--sm { width: 4.125rem; font-size: 1.1875rem; }
 
   .resume-band__cta { width: 100%; justify-content: center; }
 }
