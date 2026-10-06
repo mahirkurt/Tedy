@@ -35,7 +35,7 @@ from typing import Any
 import numpy as np
 import requests as http_requests
 
-from src import assistant_skills, assistant_vektor, claude_api
+from src import assistant_skills, assistant_vektor, claude_api, yerel_llm
 from src.assistant_denetim import (
     DENETIM_ISTEMI, DENETIM_KAYNAK, DENETIM_MAX_TOKENS, DENETIM_MODEL,
     DENETIM_TIMEOUT_S, denetim_gerekli, denetim_oku, denetim_uygula, ogretmen_kurallari,
@@ -53,6 +53,67 @@ logger = logging.getLogger(__name__)
 OZET_MODEL = "claude-haiku-4-5"
 
 
+OZET_TUR_SINIRI = 1200
+BASLIK_ESIGI = 40
+
+
+def _haiku_ozet(prompt: str) -> str:
+    llm = ClaudeClient()
+    response = llm._get_client().messages.create(
+        model=OZET_MODEL, max_tokens=2000, timeout=30,
+        messages=[{"role": "user", "content": prompt}])
+    return llm._text(response)
+
+
+def _ozet_tamamlayici():
+    """The house model first (the transcript stays home), Haiku only if it fails; with the house
+    model off, Haiku as before. None when neither can run."""
+    ayar = yerel_llm.ayarlar()
+    if not ayar.acik:
+        return _haiku_ozet if ClaudeClient().available else None
+
+    def yerel_once(prompt: str) -> str:
+        try:
+            return yerel_llm.sohbet([{"role": "user", "content": prompt}], ayar=ayar,
+                                    max_token=600, zaman_asimi=300)
+        except yerel_llm.YerelHata as exc:
+            logger.warning("local summary failed (%s), trying Haiku", exc)
+            if not ClaudeClient().available:
+                raise
+            return _haiku_ozet(prompt)
+    return yerel_once
+
+
+def baslik_oner(depo, sid: str, tamamla=None) -> None:
+    """After the first answer, a short title from the house model — only while the title is still
+    the first question verbatim (the reader has not renamed it) and that question is long; a short
+    question already is a good title. No paid fallback: a title is not worth a call."""
+    mesajlar = depo.tum_mesajlar(sid)
+    soru = [m for m in mesajlar if m["rol"] == "user"]
+    cevap = [m for m in mesajlar if m["rol"] == "assistant"]
+    sohbet = depo.getir(sid)
+    if len(cevap) != 1 or not soru or sohbet is None:
+        return
+    ilk = " ".join(soru[0]["icerik"].split())
+    if sohbet["baslik"] != ilk or len(ilk) <= BASLIK_ESIGI:
+        return
+    istem = ("Aşağıdaki sohbet için en çok 6 kelimelik, konuyu söyleyen Türkçe bir başlık yaz. "
+             "Yalnız başlığı yaz.\n\n"
+             f"Soru: {ilk[:600]}\n\nCevabın başı: {cevap[0]['icerik'][:400]}")
+    if tamamla is None:
+        ayar = yerel_llm.ayarlar()
+
+        def tamamla(p: str) -> str:
+            return yerel_llm.sohbet([{"role": "user", "content": p}], ayar=ayar, max_token=30, zaman_asimi=120)
+    try:
+        yeni = yerel_llm.baslik_temizle(tamamla(istem))
+    except Exception as exc:  # noqa: BLE001 — a title is optional
+        logger.warning("chat title failed (%s)", type(exc).__name__)
+        return
+    if yeni and yeni != ilk:
+        depo.baslik_oner(sid, ilk, yeni)
+
+
 def eski_turleri_ozetle(depo, sid: str, tamamla=None) -> None:
     """Summarize outside-window turns without removing the permanent transcript."""
     mesajlar = depo.tum_mesajlar(sid)
@@ -67,7 +128,9 @@ def eski_turleri_ozetle(depo, sid: str, tamamla=None) -> None:
         "soruları ve açık kalan işleri koru. Eski araç gövdesini olduğu gibi taşıma, "
         "kaynağın adını koru. Yalnız özet metnini yaz.")
     for mesaj in mesajlar[:-20]:
-        satirlar.append(f"{mesaj['rol']}: {mesaj['icerik']}")
+        # Each old turn is capped: the house model reads 8 k tokens, and a summary does not need a
+        # long answer verbatim (2026-10-06).
+        satirlar.append(f"{mesaj['rol']}: {mesaj['icerik'][:OZET_TUR_SINIRI]}")
         for ek in json.loads(mesaj["ekler_json"]):
             if isinstance(ek, dict):
                 satirlar.append(f"Ek: {ek.get('ad', '')} ({ek.get('id', '')})")
@@ -76,14 +139,9 @@ def eski_turleri_ozetle(depo, sid: str, tamamla=None) -> None:
                 satirlar.append(f"Kaynak: {atif['label']}")
     try:
         if tamamla is None:
-            llm = ClaudeClient()
-            if not llm.available:
+            tamamla = _ozet_tamamlayici()
+            if tamamla is None:
                 return
-            def tamamla(prompt):
-                response = llm._get_client().messages.create(
-                    model=OZET_MODEL, max_tokens=2000, timeout=30,
-                    messages=[{"role": "user", "content": prompt}])
-                return llm._text(response)
         ozet = tamamla("\n\n".join(satirlar))
         if isinstance(ozet, str) and ozet.strip():
             depo.ozet_yaz(sid, ozet.strip())
@@ -2384,6 +2442,8 @@ class AssistantRuntime:
         self._aile_retriever_cache_mtime: Any = 0.0
         # Hybrid search (2026-10-05): read once per runtime; ASSISTANT_ENABLE_EMBEDDINGS=1 turns it on.
         self.vektor_ayar = assistant_vektor.ayarlar()
+        # The house model (2026-10-06): fallback answer, chat titles and summaries; ASSISTANT_YEREL_LLM=1.
+        self.yerel_ayar = yerel_llm.ayarlar()
 
         from src.assistant_modules import ModuleIndex
         from src.assistant_tools import build_registry
@@ -2733,6 +2793,7 @@ class AssistantRuntime:
         hafiza_kw = ({"hafiza": hafiza, "not_deposu": not_deposu, "sohbet_id": sohbet_id}
                      if not_deposu is not None else {})
 
+        yerel_yedek = False
         try:
             # `temperature` stays in chat()'s signature for /v1 callers but is
             # not forwarded: Sonnet 5 rejects sampling parameters (400).
@@ -2767,11 +2828,19 @@ class AssistantRuntime:
             raise
         except Exception as exc:
             logger.error("Assistant tool loop failed: %s", exc)
-            # Not the reader's fault, so not "rephrase your question": from
-            # 2026-09-22 every request failed with a 400 from the model and
-            # that is exactly what she was told (D3).
-            loop = ToolLoopResult(text=self._model_hata_cevabi())
-            safety_flags.append("error:model_unavailable")
+            # 2026-10-06: before the error sentence, the house model (Gemma 4 on mbp) gets one
+            # chance to answer — short, without tools or sources, and saying so.
+            yedek = self._yerel_yedek_cevap(messages, okur, ogretmen, on_delta, on_reset)
+            if yedek is not None:
+                loop = ToolLoopResult(text=yedek)
+                yerel_yedek = True
+                safety_flags.append("warning:yerel_yedek")
+            else:
+                # Not the reader's fault, so not "rephrase your question": from
+                # 2026-09-22 every request failed with a 400 from the model and
+                # that is exactly what she was told (D3).
+                loop = ToolLoopResult(text=self._model_hata_cevabi())
+                safety_flags.append("error:model_unavailable")
 
         if not loop.text.strip():
             # The loop can legitimately return empty text — a model asked with
@@ -2793,6 +2862,9 @@ class AssistantRuntime:
             neden = "hata_cevabi"
         if neden is None and denetle is None and not self.llm.available:
             neden = "model_yok"
+        if yerel_yedek:
+            # The checker is Claude too, and a source-free fallback has nothing to check against.
+            neden = "yerel_yedek"
         denetim = {"durum": "atlandi", "neden": neden, "sorun": [], "model": None}
         taslak, karar = answer, None
         if neden is None:
@@ -2872,8 +2944,8 @@ class AssistantRuntime:
             "odev_onerisi": next(({k: v for k, v in o.items() if k != "event"}
                                  for o in loop.olaylar if o.get("event") == "odev_onerisi"), None),
             "meta": {
-                "model": self.llm.last_model_used or self.llm.model,
-                "provider": "anthropic",
+                "model": self.yerel_ayar.model if yerel_yedek else (self.llm.last_model_used or self.llm.model),
+                "provider": "yerel" if yerel_yedek else "anthropic",
                 "usage": dict(loop.usage),
                 "tier": tier,
                 "ogretmen": ogretmen,
@@ -3133,6 +3205,57 @@ class AssistantRuntime:
         "aile": "Işık'ın ailesinden biri",
         "bilinmiyor": "bilinmiyor",
     }
+
+    YEREL_YEDEK_TUR = 6
+
+    def _yerel_yedek_cevap(self, messages: list[dict[str, Any]], okur: str, ogretmen: str,
+                           on_delta: Callable[[str], None] | None,
+                           on_reset: Callable[[], None] | None) -> str | None:
+        """The house model's answer when Claude is unreachable, or None. Only the last turns' text
+        goes (no tools, attachments or school data — it has none of them); the system prompt keeps
+        hitap and the explaining-teacher rule, and the answer ends by saying it is unsourced."""
+        self.yerel_ayar = yerel_llm.ayarlar()  # read per call: cheap, and an .env change needs no restart
+        if not self.yerel_ayar.acik:
+            return None
+        tur = []
+        for m in messages[-self.YEREL_YEDEK_TUR:]:
+            rol = "assistant" if str(m.get("role", "")).lower() == "assistant" else "user"
+            icerik = m.get("content")
+            if isinstance(icerik, list):
+                icerik = "\n".join(str(b.get("text", "")) for b in icerik
+                                   if isinstance(b, dict) and b.get("type") == "text")
+            icerik = str(icerik or "").strip()
+            if icerik:
+                tur.append({"role": rol, "content": icerik})
+        if not tur or tur[-1]["role"] != "user":
+            return None
+        if okur == "ogrenci":
+            hitap = "Okur Işık; ona 'sen' diye hitap et."
+        elif okur == "aile":
+            hitap = "Okur Işık'ın ailesinden biri; 'siz' diye hitap et ve Işık'tan üçüncü şahıs olarak söz et."
+        else:
+            hitap = "Okuru tanımıyorsun; 'siz' diye hitap et."
+        ders = "" if ogretmen == assistant_skills.GENEL or ogretmen not in self.skills else (
+            f" Konu {self.skills[ogretmen].ders} dersi.")
+        sistem = (
+            "Sen TEDY Asistanı'nın evdeki yedek modelisin. Asıl model şu an ulaşılamıyor. Ders kitabına, "
+            "ödev listesine, okul verisine ve araçlara erişimin yok; bunları biliyormuş gibi yazma ve kaynak "
+            "numarası verme. 7. sınıf düzeyinde, Türkçe, kısa ve açık yaz. Emin olmadığın bilgiyi uydurma; "
+            "emin değilsen bunu söyle. Ödevi öğrencinin yerine yazma ve cevap anahtarı verme; adım adım "
+            f"yönlendir.{ders} {hitap}")
+        if on_reset is not None:
+            on_reset()  # whatever Claude streamed before failing is not the answer
+        try:
+            metin = yerel_llm.sohbet(tur, ayar=self.yerel_ayar, sistem=sistem, on_delta=on_delta)
+        except yerel_llm.YerelHata as exc:
+            logger.warning("local fallback failed: %s", exc)
+            return None
+        fiil = "sor" if okur == "ogrenci" else "sorun"
+        not_ = (f"\n\n_Bu cevap TEDY'nin evdeki yedek modelinden geldi: asıl model şu an ulaşılamıyor ve "
+                f"kaynaklara bakılamadı. Önemli bir konuysa biraz sonra yeniden {fiil}._")
+        if on_delta is not None:
+            on_delta(not_)
+        return metin + not_
 
     @staticmethod
     def _model_hata_cevabi() -> str:

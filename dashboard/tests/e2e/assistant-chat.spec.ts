@@ -790,3 +790,27 @@ test('the page addresses Işık as "sen" and the family as "siz"', async ({ page
   await page.getByLabel('Gönder').click()
   await expect(page.locator('.ac-msg--user .ac-msg__role')).toHaveText('Işık')
 })
+
+// 2026-10-06: when Claude is unreachable the house model answers; the reader sees a quiet grey
+// "Yedek modelden" tag, never the raw "warning:yerel_yedek" token.
+test('local fallback answer is labelled, not shown as a raw flag', async ({ page }) => {
+  await page.route('**/api/assistant/stream', route => route.abort())
+  await page.route('**/api/assistant/chat', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({
+      answer: 'Paydaları eşitle.\n\n_Bu cevap TEDY\'nin evdeki yedek modelinden geldi._',
+      citations: [],
+      safety_flags: ['warning:limited_confidence', 'warning:yerel_yedek'],
+      plan_blocks: [], intent: 'qa', session_id: '',
+      meta: { model: 'gemma4-e4b-cpu', provider: 'yerel', degraded: [], dropped_citations: 0 },
+    }),
+  }))
+  await page.goto('/asistan')
+  await page.fill('#ac-input', 'kesir nasıl toplanır')
+  await page.getByLabel('Gönder').click()
+  const flags = page.locator('.ac-msg--assistant').last().locator('.ac-msg__flags .cds--tag')
+  const yedek = flags.filter({ hasText: 'Yedek modelden' })
+  await expect(yedek).toHaveCount(1)
+  await expect(yedek).toHaveClass(/cds--tag--gray/)
+  await expect(page.locator('.ac-msg--assistant').last()).not.toContainText('warning:yerel_yedek')
+})

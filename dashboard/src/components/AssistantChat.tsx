@@ -213,6 +213,8 @@ const FLAG_LABELS: Record<string, string> = {
   'warning:limited_confidence': 'Kaynaksız cevap',
   'warning:stale_context': 'Veriler güncel olmayabilir',
   'error:model_unavailable': 'Asistana ulaşılamadı',
+  // 2026-10-06: Claude was unreachable and the house model (Gemma 4 on mbp) answered, unsourced.
+  'warning:yerel_yedek': 'Yedek modelden',
 }
 
 function flagTone(f: string): 'red' | 'gray' {

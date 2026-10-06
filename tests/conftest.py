@@ -67,3 +67,16 @@ def _vektor_gommesi_kapali(monkeypatch):
     def _yasak(*a, **k):
         raise RuntimeError("testte gerçek gömme çağrısı yok")
     monkeypatch.setattr(assistant_vektor, "ollama_gom", _yasak)
+
+
+@pytest.fixture(autouse=True)
+def _yerel_llm_kapali(monkeypatch):
+    """The house model (src/yerel_llm.py) is on in production through .env. In tests it is off and
+    its transport raises, so no fallback, title or summary job reaches mbp (2026-10-06)."""
+    from src import yerel_llm
+
+    monkeypatch.setenv("ASSISTANT_YEREL_LLM", "0")
+
+    def _yasak(*a, **k):
+        raise RuntimeError("testte gerçek yerel model çağrısı yok")
+    monkeypatch.setattr(yerel_llm, "_istek", _yasak)

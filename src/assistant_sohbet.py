@@ -173,6 +173,14 @@ class SohbetDeposu:
                 raise
         return sid
 
+    def baslik_oner(self, sid: str, beklenen: str, yeni: str) -> bool:
+        """Set an auto-generated title only if the title is still `beklenen` (compare-and-set), so
+        a rename by the reader in the meantime always wins. guncelleme is left alone: a title is
+        not activity, and the list order must not jump."""
+        with self._baglan() as conn:
+            cur = conn.execute("UPDATE sohbet SET baslik = ? WHERE id = ? AND baslik = ?", (yeni, sid, beklenen))
+            return cur.rowcount == 1
+
     def getir(self, sid: str) -> dict | None:
         with self._baglan() as conn:
             row = conn.execute("SELECT * FROM sohbet WHERE id = ?", (sid,)).fetchone()

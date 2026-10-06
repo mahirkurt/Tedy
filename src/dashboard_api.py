@@ -3174,10 +3174,43 @@ def _sohbet_cevap_kaydet(sohbet, payload, ogretmen):
                           payload.get("citations", []), _asistan_simdi())
 
 
+_YEREL_BEKLEYEN: set = set()
+_YEREL_KILIT = threading.Lock()
+
+
+def _yerel_is_planla(anahtar, is_, *args):
+    """Queue a house-model job unless the same one is already waiting or running; None if skipped.
+    Jobs run on yerel_llm's single worker, after the reader already has the answer."""
+    from src import yerel_llm
+
+    with _YEREL_KILIT:
+        if anahtar in _YEREL_BEKLEYEN:
+            return None
+        _YEREL_BEKLEYEN.add(anahtar)
+
+    def sar():
+        try:
+            is_(*args)
+        finally:
+            with _YEREL_KILIT:
+                _YEREL_BEKLEYEN.discard(anahtar)
+    return yerel_llm.arka_planda(sar)
+
+
 def _sohbet_ozetle(sohbet):
-    if sohbet.get("depo"):
-        from src.assistant_core import eski_turleri_ozetle
-        eski_turleri_ozetle(sohbet["depo"], sohbet["sid"])
+    if not sohbet.get("depo"):
+        return
+    from src import yerel_llm
+    from src.assistant_core import baslik_oner, eski_turleri_ozetle
+
+    depo, sid = sohbet["depo"], sohbet["sid"]
+    if yerel_llm.ayarlar().acik:
+        # 2026-10-06: the house model writes the summary and the title in the background — at
+        # ~7 tokens/s it would otherwise hold the stream and a gthread worker open for a minute.
+        _yerel_is_planla(("ozet", sid), eski_turleri_ozetle, depo, sid)
+        _yerel_is_planla(("baslik", sid), baslik_oner, depo, sid)
+    else:
+        eski_turleri_ozetle(depo, sid)
 
 
 def _sohbet_kapisi(view):
