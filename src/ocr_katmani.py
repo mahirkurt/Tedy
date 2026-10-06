@@ -45,7 +45,23 @@ GIRDI_USD_MTOK = 1.00
 CIKTI_USD_MTOK = 5.00
 # Part of every cache key: a new prompt re-reads pages; a new engine too.
 ISTEM_SURUMU = "1"
-MOTOR_TESSERACT = "tesseract-tur+eng"
+# 2026-10-06: the French pack (tesseract-ocr-fra) is installed and in the default. Measured on three
+# French textbook pages against Haiku's reading: words found tur+eng 0.76 -> tur+eng+fra 0.84,
+# accented words 0.62 -> 0.87; a Turkish textbook page's CER 0.100 -> 0.099 (no loss). The language
+# is part of the cache's engine name, so pages read under an older setting are read again.
+TESSERACT_DILI = "tur+eng+fra"
+ESKI_TESSERACT_MOTORLARI = ("tesseract-tur+eng",)
+
+
+def tesseract_dili() -> str:
+    return os.environ.get("ASSISTANT_OCR_LANG", "").strip() or TESSERACT_DILI
+
+
+def motor_tesseract() -> str:
+    return f"tesseract-{tesseract_dili()}"
+
+
+MOTOR_TESSERACT = motor_tesseract()  # import-time value, kept for callers that read the name
 MOTOR_BOS = "bos"
 AYLIK_TAVAN_USD = float(os.environ.get("TEDY_OCR_AYLIK_USD", "10"))
 # Claude downsizes an image whose long edge passes ~1568 px, so rendering
@@ -222,7 +238,7 @@ def tesseract_oku(jpeg: bytes, sure: float) -> tuple[str, float]:
     import pytesseract
     from PIL import Image
     with Image.open(io.BytesIO(jpeg)) as img:
-        veri = pytesseract.image_to_data(img, lang=os.environ.get("ASSISTANT_OCR_LANG", "tur+eng"),
+        veri = pytesseract.image_to_data(img, lang=tesseract_dili(),
                                          output_type=pytesseract.Output.DICT, timeout=max(5, int(sure)))
     return tesseract_verisinden(veri)
 
@@ -425,7 +441,12 @@ class OcrKatmani:
             okuma = self.onbellek.al(sha, sayfa, motor)
             if okuma is not None:
                 return okuma
-        tesseract = self.onbellek.al(sha, sayfa, MOTOR_TESSERACT)
+        tesseract = self.onbellek.al(sha, sayfa, motor_tesseract())
+        # A reading under an older Tesseract language setting is only a stand-in: used when this run
+        # cannot read the page again, never kept in place of a new reading.
+        eski = None if tesseract is not None else next(
+            (o for m in ESKI_TESSERACT_MOTORLARI if m != motor_tesseract()
+             for o in [self.onbellek.al(sha, sayfa, m)] if o is not None), None)
         # Claude was already asked for this file, page, engine and prompt
         # version (refusal or API error). Reuse Tesseract for the rest of
         # this calendar month and after, even when confidence is low and
@@ -433,12 +454,15 @@ class OcrKatmani:
         # was full has no attempt, so a new month may still ask — checked
         # before rendering, so a full cap does not cost a render per low page.
         if self.onbellek.denendi(sha, sayfa, self.okuyucu.motor):
-            return tesseract
+            if tesseract is not None:
+                return tesseract
+            # The language changed since: read it again locally, never by asking Claude again.
+            return self._tesseract_ile(pdf, sha, sayfa, son_an) or eski
         if tesseract is not None and (not tesseract.dusuk_guven or not self.defter.izin_var()):
             return tesseract
         if self._kalan(son_an) <= 0:
-            return tesseract
-        return self._oku(pdf, sha, sayfa, son_an, tesseract)
+            return tesseract or eski
+        return self._oku(pdf, sha, sayfa, son_an, tesseract) or eski
 
     def _sakla(self, sha: str, okuma: SayfaOkumasi) -> SayfaOkumasi:
         self.onbellek.koy(sha, okuma)
@@ -459,6 +483,20 @@ class OcrKatmani:
                 return okuma
         if onceki is not None:
             return onceki
+        return self._tesseract_oku(pdf, sha, sayfa, son_an, jpeg)
+
+    def _tesseract_ile(self, pdf: Path, sha: str, sayfa: int, son_an: float) -> SayfaOkumasi | None:
+        """Render and read one page with Tesseract only (no Claude); None if there is no time."""
+        if self._kalan(son_an) < TESSERACT_EN_AZ_SURE:
+            return None
+        try:
+            jpeg = sayfa_gorseli(pdf, sayfa, max(5.0, self._kalan(son_an)))
+        except OcrHatasi as exc:
+            logger.warning("OCR: %s s.%d çizilemedi (%s)", pdf.name, sayfa, exc)
+            return None
+        return self._tesseract_oku(pdf, sha, sayfa, son_an, jpeg)
+
+    def _tesseract_oku(self, pdf: Path, sha: str, sayfa: int, son_an: float, jpeg: bytes) -> SayfaOkumasi | None:
         if self._kalan(son_an) < TESSERACT_EN_AZ_SURE:
             return None
         try:
@@ -466,7 +504,7 @@ class OcrKatmani:
         except Exception as exc:  # noqa: BLE001 — a page left unread is retried next run
             logger.warning("OCR: Tesseract %s s.%d okuyamadı (%s)", pdf.name, sayfa, type(exc).__name__)
             return None
-        return self._sakla(sha, SayfaOkumasi(sayfa, metin, MOTOR_TESSERACT, guven))
+        return self._sakla(sha, SayfaOkumasi(sayfa, metin, motor_tesseract(), guven))
 
     def _claude(self, jpeg: bytes, sha: str, sayfa: int, son_an: float) -> SayfaOkumasi | None:
         try:

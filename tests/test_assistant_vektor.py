@@ -137,7 +137,7 @@ def test_ayarlar_ortamdan(monkeypatch):
     for k in ("ASSISTANT_ENABLE_EMBEDDINGS", "ASSISTANT_EMBED_MODEL", "ASSISTANT_VEKTOR_AGIRLIGI"):
         monkeypatch.delenv(k, raising=False)
     a = av.ayarlar()
-    assert a.acik is False and a.model == "bge-m3" and a.agirlik_ogrenci == 3.0 and a.agirlik_aile == 1.0
+    assert a.acik is False and a.model == "bge-m3" and a.agirlik_ogrenci == 3.0 and a.agirlik_aile == 3.0
     assert a.sorgu_adresleri[0] == "http://127.0.0.1:11434"
     monkeypatch.setenv("ASSISTANT_ENABLE_EMBEDDINGS", "1")
     monkeypatch.setenv("ASSISTANT_VEKTOR_AGIRLIGI", "2")

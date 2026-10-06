@@ -202,3 +202,44 @@ def test_tesseract_verisinden_satirlar_ve_guven():
     metin, guven = tesseract_verisinden(veri)
     assert metin == "Soru 1\n\nKesirleri topla"
     assert guven == pytest.approx(0.6)
+
+
+# -- 2026-10-06: Fransızca paket; dil motor adına girer, eski okuma kaybolmaz -------------------------
+
+def test_tesseract_dili_varsayilan_fransizca_icerir(monkeypatch):
+    """Ölçüldü: 3 Fransızca sayfada aksanlı sözcük isabeti tur+eng 0.62 -> tur+eng+fra 0.87; Türkçe
+    sayfada CER 0.100 -> 0.099. Dil önbellek motor adına girer ki eski okumalar yeniden okunsun."""
+    monkeypatch.delenv("ASSISTANT_OCR_LANG", raising=False)
+    assert ocr.tesseract_dili() == "tur+eng+fra" and ocr.motor_tesseract() == "tesseract-tur+eng+fra"
+    monkeypatch.setenv("ASSISTANT_OCR_LANG", "tur+eng")
+    assert ocr.motor_tesseract() == "tesseract-tur+eng"
+
+
+def _eski_dille_reddedilmis(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASSISTANT_OCR_LANG", "tur+eng")
+    pdf = taranmis_pdf(tmp_path / "t.pdf")
+    okuyucu = SahteOkuyucu(reddet=True)
+    katman = _katman(tmp_path, okuyucu, SahteTesseract(metin="Bonjour ca va", guven=0.8))
+    katman.pdf_oku(pdf, katman.saat() + 60)
+    monkeypatch.setenv("ASSISTANT_OCR_LANG", "tur+eng+fra")
+    return pdf, okuyucu
+
+
+def test_dil_degisince_claudeun_reddettigi_sayfa_yalniz_tesseract_ile_yeniden_okunur(tmp_path, monkeypatch):
+    pdf, okuyucu = _eski_dille_reddedilmis(tmp_path, monkeypatch)
+    yeni = SahteTesseract(metin="Bonjour ça va", guven=0.8)
+    katman = _katman(tmp_path, okuyucu, yeni)
+    sonuc = katman.pdf_oku(pdf, katman.saat() + 60)
+    assert yeni.cagrilar == 1 and len(okuyucu.cagrilar) == 1  # Claude'a yeniden sorulmadı
+    assert "Bonjour ça va" in sonuc.metin and not sonuc.eksik
+    ikinci = SahteTesseract(metin="tekrar")
+    _katman(tmp_path, okuyucu, ikinci).pdf_oku(pdf, katman.saat() + 60)
+    assert ikinci.cagrilar == 0  # yeni dilin okuması önbellekte
+
+
+def test_yeniden_okumaya_sure_yoksa_eski_okuma_kullanilir(tmp_path, monkeypatch):
+    pdf, okuyucu = _eski_dille_reddedilmis(tmp_path, monkeypatch)
+    yeni = SahteTesseract(metin="yeni")
+    katman = _katman(tmp_path, okuyucu, yeni)
+    sonuc = katman.pdf_oku(pdf, katman.saat())
+    assert yeni.cagrilar == 0 and "Bonjour ca va" in sonuc.metin and not sonuc.eksik

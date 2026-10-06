@@ -1685,7 +1685,8 @@ class FileAdapters:
             import pytesseract  # type: ignore
 
             image = Image.open(file_path)
-            text = pytesseract.image_to_string(image, lang=os.environ.get("ASSISTANT_OCR_LANG", "tur+eng"))
+            from src.ocr_katmani import tesseract_dili
+            text = pytesseract.image_to_string(image, lang=tesseract_dili())
             return text.strip()
         except Exception:
             return ""

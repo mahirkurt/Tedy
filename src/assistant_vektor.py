@@ -2,8 +2,9 @@
 
 Ölçüm 2026-10-05 (85 soru, bilinen parça, ilk 8): BM25 dolaylı soruda 0.53, karma 0.69. Öğrenci
 indeksinde vektör ağırlıklı karma 0.49 -> 0.82; aile indeksinin %94'ü İngilizce kitap olduğundan
-Türkçe soruya BM25 orada 0.00 buluyordu. Aile indeksinin küçük Türkçe notlarında ise BM25 güçlü, bu
-yüzden orada iki sıralama eşit ağırlıkta birleşir.
+Türkçe soruya BM25 orada 0.00 buluyordu. 2026-10-06'da 60 gerçekçi soruyla (havuzlanmış, derecelendirilmiş
+ilgi) yeniden ölçüldü: nDCG@5 öğrenci BM25 0.37 -> 1:3 0.72, aile BM25 0.33 / 1:1 0.58 -> 1:3 0.79; iki
+indeks de 1:3 ile birleşir.
 
 - Toplu gömme mbp ve Pi'de paralel yapılır (bge-m3 üç düğümde aynı vektörü verir, kosinüs ≥ 0.99999);
   eşitleme içinde süreyle sınırlıdır, eksik kalan bir sonraki turda gömülür.
@@ -80,7 +81,10 @@ def ayarlar() -> VektorAyari:
                                   "http://127.0.0.1:11434,http://mbp.lan:11434,http://pi.lan:11434"),
         toplu_adresleri=_adresler("ASSISTANT_EMBED_TOPLU_URLS", "http://mbp.lan:11434,http://pi.lan:11434"),
         agirlik_ogrenci=_sayi("ASSISTANT_VEKTOR_AGIRLIGI", 3.0),
-        agirlik_aile=_sayi("ASSISTANT_AILE_VEKTOR_AGIRLIGI", 1.0),
+        # 2026-10-06, 30 realistic parent questions, pooled graded relevance: nDCG@5 1:1 0.578,
+        # 1:3 0.785 (success@5 0.80 -> 0.90). The first measurement's 1:1 leaned on questions drawn
+        # from the small Turkish notes; real questions need the English books.
+        agirlik_aile=_sayi("ASSISTANT_AILE_VEKTOR_AGIRLIGI", 3.0),
         # Inside run_sync the reindex shares the 150 s left after attachments with OCR (45 s);
         # ~10 s reindex + 45 s OCR + 60 s embedding fits. The first fill runs by hand, unbounded.
         sure=_sayi("ASSISTANT_GOMME_SURE", 60.0),
