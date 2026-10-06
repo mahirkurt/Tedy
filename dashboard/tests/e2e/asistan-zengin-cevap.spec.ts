@@ -100,13 +100,26 @@ for (const mod of ['genel', 'matematik']) {
     test(`${mod} ${boy}: zengin cevap görünümü`, async ({ page }) => {
       await sor(page, CEVAP, mod, w, h)
       await expect(page.locator('.ac-formul .katex').first()).toBeVisible()
-      await page.evaluate(() => {
-        const pane = document.querySelector<HTMLElement>('.ac__messages')!
-        const messages = pane.querySelectorAll<HTMLElement>('.ac-msg--assistant')
-        pane.style.scrollBehavior = 'auto'
-        pane.scrollTop += messages[messages.length - 1].getBoundingClientRect().top - pane.getBoundingClientRect().top
+      // The pane scrolls smoothly to the bottom on every new message; measured
+      // mid-glide, the fractional offset rounded to 260 or 261 px from run to
+      // run and the baseline failed by a 1 px shift. Wait for the glide to end,
+      // then jump to a whole-pixel target and confirm it held.
+      const pane = page.locator('.ac__messages')
+      await pane.evaluate(el => { el.style.scrollBehavior = 'auto' })
+      await expect.poll(() => pane.evaluate(el => new Promise<boolean>(done => {
+        const once = el.scrollTop
+        requestAnimationFrame(() => requestAnimationFrame(() => done(el.scrollTop === once)))
+      }))).toBe(true)
+      const hedef = await pane.evaluate(el => {
+        const messages = el.querySelectorAll<HTMLElement>('.ac-msg--assistant')
+        const son = messages[messages.length - 1]
+        const hedef = Math.min(el.scrollHeight - el.clientHeight,
+          Math.round(el.scrollTop + son.getBoundingClientRect().top - el.getBoundingClientRect().top))
+        el.scrollTop = hedef
         window.scrollTo(0, 0)
+        return Math.round(el.scrollTop)
       })
+      await expect.poll(() => pane.evaluate(el => Math.round(el.scrollTop))).toBe(hedef)
       await expect(page).toHaveScreenshot(`zengin-cevap-${mod}-${boy}.png`, {
         fullPage: true, animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.002,
       })
