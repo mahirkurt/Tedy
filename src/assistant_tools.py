@@ -1950,7 +1950,9 @@ class McpRegistry:
                 "name": ODEV_FOTO_TOOL,
                 "description": "Yüklenen ödev fotoğrafını okur ve onay kartı gösterir. Ödevi kaydetmez; okur kartta onaylar.",
                 "parameters": {"type": "object", "properties": {
-                    "ek_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"}}, "required": ["ek_id"]},
+                    "ek_id": {"type": "string", "pattern": "^[0-9a-f]{32}$",
+                              "description": "Görselin eklendiği mesajdaki 'ek kimliği'."}},
+                    "required": ["ek_id"]},
             })
         if self.ek_deposu is not None:
             decls.append(copy.deepcopy(_EK_OKU_BILDIRIMI))
@@ -2036,7 +2038,8 @@ class McpRegistry:
             "name": "calisma_degerlendir",
             "description": "Öğrencinin yüklediği çalışmayı öğretmen rubriğine göre değerlendirir. Önce skill_kaynagi ile degerlendirme-rubrigi.md dosyasını oku; sayısal not verme.",
             "parameters": {"type": "object", "properties": {
-                "ek": {"type": "string"}, "guclu_yanlar": {"type": "string"},
+                "ek": {"type": "string", "description": "Çalışmanın eklendiği mesajdaki 'ek kimliği'."},
+                "guclu_yanlar": {"type": "string"},
                 "duzeyler": {"type": "string", "enum": list(DUZEYLER)},
                 "sonraki_adim": {"type": "string"},
             }, "required": ["ek", "guclu_yanlar", "duzeyler", "sonraki_adim"]},

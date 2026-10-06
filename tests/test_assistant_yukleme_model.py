@@ -95,3 +95,22 @@ def test_plan_ve_v1_ekleri_dusurur(monkeypatch, tmp_path):
     rt.openai_chat_completion(
         {"messages": [{"role": "user", "content": "x", "ekler": ["ab" * 16]}]})
     assert "ekler" not in gelen["messages"][0]
+
+
+def test_ek_isareti_araclarin_istedigi_kimligi_tasir(tmp_path):
+    # Canlı 2026-10-06: model görseli gördü ama `odev_fotograftan` için
+    # kimliği bilemedi — işarette yalnız dosya adı vardı.
+    rt = AssistantRuntime(tmp_path)
+    kayit = EkDeposu(tmp_path / "output").kaydet(
+        FULL, "not.txt", "txt", 5, "Payda.".encode(), SIMDI)
+    konusma = rt._build_conversation(
+        [{"role": "user", "content": "işlere ekle", "ekler": [kayit["id"]]}],
+        "işlere ekle", "qa", [], sahip_email=FULL)
+    ilk = [m for m in konusma if m["role"] == "user"][0]["content"][0]["text"]
+    assert f"[S1] not.txt · ek kimliği: {kayit['id']}" in ilk
+
+
+def test_istem_ve_arac_tanimi_kimligin_yerini_soyler(tmp_path):
+    rt = AssistantRuntime(tmp_path)
+    p = rt._system_prompt()
+    assert "ek kimliği" in p and "`odev_fotograftan`" in p
