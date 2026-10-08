@@ -25,7 +25,7 @@ test('desktop lists the chat and loads it', async ({ page }) => {
   await page.goto('/asistan')
   await expect(page.getByRole('heading', { name: 'Sohbetler', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Payda eşitle' }).click()
-  await expect(page.getByText('Paydalar toplanmaz.')).toBeVisible()
+  await expect(page.getByText('Paydalar toplanmaz.', { exact: true })).toBeVisible()
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', 1440)
   await page.screenshot({ path: 'test-results/sohbet-desktop.png', fullPage: true })
 })
@@ -52,7 +52,7 @@ test('an empty list uses the spec sentence', async ({ page }) => {
   await page.route('**/api/assistant/sohbetler**', r => r.fulfill(json({ sohbetler: [] })))
   await page.goto('/asistan')
   await expect(page.getByRole('heading', { name: "Işık'ın sohbetleri" })).toBeVisible()
-  await expect(page.getByText('Henüz sohbet yok — bir soru sorarak başla')).toHaveCount(2)
+  await expect(page.getByText('Henüz sohbet yok — bir soru sorarak başla', { exact: true })).toHaveCount(2)
 })
 
 test('phone hides the list until Sohbetler', async ({ page }) => {
@@ -86,7 +86,7 @@ test('new conversation sends only the current user turn and a stable retry id', 
   await page.getByRole('button', { name: 'Yeni sohbet', exact: true }).click()
   await soruAlani(page).fill('Yeni soru')
   await page.getByRole('button', { name: 'Gönder', exact: true }).click()
-  await expect(page.getByText('Örnek cevap')).toBeVisible()
+  await expect(page.getByText('Örnek cevap', { exact: true })).toBeVisible()
   expect(posted).toMatchObject({ sohbet_id: 'ab'.repeat(16), messages: [{ role: 'user', content: 'Yeni soru' }] })
   expect(posted?.['request_id']).toBeTruthy()
 })
@@ -104,9 +104,9 @@ test('family section is read only and has no student note', async ({ page }) => 
   await page.goto('/asistan')
   await expect(page.getByRole('heading', { name: "Işık'ın sohbetleri" })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Yeniden adlandır' })).toHaveCount(0)
-  await expect(page.getByText('Sohbetlerini ailen de görebilir.')).toHaveCount(0)
+  await expect(page.getByText('Sohbetlerini ailen de görebilir.', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Asistanın notları' })).toBeVisible()
-  await expect(page.getByText('Paydada zorlanıyor')).toBeVisible()
+  await expect(page.getByText('Paydada zorlanıyor', { exact: true })).toBeVisible()
   // Only the family note is deletable; the student conversation has no actions.
   await expect(page.getByRole('button', { name: 'Sil', exact: true })).toHaveCount(1)
 })
@@ -118,7 +118,7 @@ test('Işık sees the family note and no notes panel', async ({ page }) => {
   })))
   await page.route('**/api/assistant/sohbetler*', r => r.fulfill(json({ sohbetler: [] })))
   await page.goto('/asistan')
-  await expect(page.getByText('Sohbetlerini ailen de görebilir.')).toBeVisible()
+  await expect(page.getByText('Sohbetlerini ailen de görebilir.', { exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Asistanın notları' })).toHaveCount(0)
 })
 
@@ -164,4 +164,28 @@ test('Carbon yeni sohbet düğmesi yeni kayıt açar ve konuşmayı boşaltır',
   await page.getByRole('button', { name: 'Sohbeti yeniden başlat' }).click()
   await expect(page.getByText('Paydalar toplanmaz.', { exact: true })).toHaveCount(0)
   expect(yeni).toBe(1)
+})
+
+test('retry preserves the request id and uploads without another user bubble', async ({ page }) => {
+  await carbonSabitAc(page, '/asistan', 1440, 900)
+  const bodies: { request_id: string; messages: { ekler?: string[] }[] }[] = []
+  await page.route('**/api/assistant/uploads', r => r.fulfill(json({ id: 'cd'.repeat(16), ad: 'not.txt', tur: 'txt' })))
+  await page.route('**/api/assistant/stream', r => r.abort())
+  await page.route('**/api/assistant/chat', r => {
+    bodies.push(r.request().postDataJSON())
+    return r.fulfill(bodies.length === 1 ? { status: 503, json: { error: 'Geçici hata' } } : json({
+      answer: 'Ekli yanıt.', citations: [], safety_flags: [], plan_blocks: [], meta: {},
+    }))
+  })
+  await page.locator('input[type=file]').first().setInputFiles({ name: 'not.txt', mimeType: 'text/plain', buffer: Buffer.from('Kesir') })
+  await expect(page.locator('.ac__ek')).toContainText('Metin')
+  await soruAlani(page).fill('Bu eki açıkla')
+  await page.getByRole('button', { name: 'Gönder', exact: true }).click()
+  await page.getByRole('button', { name: 'Tekrar dene', exact: true }).click()
+  await expect(page.getByText('Ekli yanıt.', { exact: true })).toBeVisible()
+  expect(bodies).toHaveLength(2)
+  expect(bodies[0]).toEqual(bodies[1])
+  expect(bodies[0].request_id).toBeTruthy()
+  expect(bodies[0].messages[0].ekler).toEqual(['cd'.repeat(16)])
+  await expect(page.getByText('Bu eki açıkla', { exact: true })).toHaveCount(1)
 })

@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { tedyChatConfig } from '../src/asistan/tedyChatConfig.ts'
 import type { ConfigGirdisi } from '../src/asistan/tedyChatConfig.ts'
 
-const G: ConfigGirdisi = { bicim: 'sayfa', okur: 'ogrenci', karsilama: 'Merhaba!', hizliSorular: [{ metin: 'Soru 1' }],
+const G: ConfigGirdisi = { bicim: 'sayfa', okur: 'ogrenci',
   saltOkunur: false, altBaslik: 'Kaynaklı soru-cevap', gonder: async () => {} }
 
 test('güvenlik ve görünüm kararları (Görev 1 raporu, güvenlik incelemesi)', () => {
@@ -26,12 +26,12 @@ test('gömülü sayfa açık başlar ve başlatıcısızdır; panel başlatıcı
 test('salt okunur: hızlı soru ve yeniden başlatma yok; aileye siz', () => {
   const c = tedyChatConfig({ ...G, saltOkunur: true, okur: 'aile' })
   assert.equal(c.isReadonly, true)
-  assert.equal(c.homescreen?.starters?.isOn, false)
   assert.equal(c.header?.showRestartButton, false)
   assert.equal(c.strings?.input_placeholder, 'Bir soru sorun veya çalışma planı isteyin...')
 })
 
-test('mesajlı sohbet açılınca başlangıç ekranı kapanır (Carbon yalnız gönderince kapatıyor)', () => {
-  assert.equal(tedyChatConfig({ ...G, mesajVar: true }).homescreen?.isOn, false)
-  assert.equal(tedyChatConfig({ ...G, mesajVar: false }).homescreen?.isOn, true)
+test('Carbon başlangıç ekranı kapalı, karşılama isteği gönderilmez: tek giriş alanı (karşılama ve hızlı sorular bizim)', () => {
+  const c = tedyChatConfig(G)
+  assert.equal(c.homescreen?.isOn, false)
+  assert.equal(c.messaging?.skipWelcome, true)
 })

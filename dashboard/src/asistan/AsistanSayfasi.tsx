@@ -7,11 +7,25 @@ import { useAsistanSohbeti } from './useAsistanSohbeti.tsx'
 import { kaydirmaOdaginiYonet } from './kaydirmaOdagi.ts'
 import { VOICE } from './ses.ts'
 import { useAsistanDurumu } from './asistanDeposu.ts'
+import SesOnayi from './SesOnayi.tsx'
+import { dosyalariEkle } from './ekler.ts'
 
 export default function AsistanSayfasi() {
-  const { props, ogretmen, ogretmenSec } = useAsistanSohbeti('sayfa')
+  const { props, ogretmen, ogretmenSec, sesOnay } = useAsistanSohbeti('sayfa')
   const kok = useRef<HTMLElement>(null)
   useEffect(() => (kok.current ? kaydirmaOdaginiYonet(kok.current) : undefined), [])
+  // Sürükle-bırak ve dosya yapıştırma (eski giriş alanı gibi). Yakalama evresi: Carbon'un düzenleyicisi gölge
+  // kökte işlemeden önce dosyalar alınır; düz metin yapıştırma dokunulmadan geçer.
+  useEffect(() => {
+    const el = kok.current
+    if (!el) return
+    // Dosya içeren olay düzenleyiciye hiç ulaşmaz: Carbon'un düzenleyicisi dosya yapıştırmasında yazılan metni siliyordu.
+    const yapistir = (e: ClipboardEvent) => { const f = e.clipboardData?.files; if (f?.length) { e.preventDefault(); e.stopPropagation(); dosyalariEkle([...f]) } }
+    const birak = (e: DragEvent) => { if (e.dataTransfer?.files.length) { e.preventDefault(); e.stopPropagation(); dosyalariEkle([...e.dataTransfer.files]) } }
+    const uzerinde = (e: DragEvent) => e.preventDefault()
+    el.addEventListener('paste', yapistir, true); el.addEventListener('drop', birak, true); el.addEventListener('dragover', uzerinde)
+    return () => { el.removeEventListener('paste', yapistir, true); el.removeEventListener('drop', birak, true); el.removeEventListener('dragover', uzerinde) }
+  }, [])
   const secili = ogretmen.secili
   const okur = useAsistanDurumu(d => d.okur)
   return (
@@ -19,8 +33,8 @@ export default function AsistanSayfasi() {
       data-ogretmen={ogretmen.id}>
       <OgretmenSecici liste={ogretmen.liste} secili={ogretmen.id} onSec={id => void ogretmenSec(id)}
         hata={ogretmen.hata ? VOICE[okur].ogretmenHata : null} />
-      {okur === 'ogrenci' && <p className="asistan__aile-notu">Sohbetlerini ailen de görebilir.</p>}
       <ChatCustomElement className="asistan__sohbet" {...props} />
+      <SesOnayi onay={sesOnay} />
     </section>
   )
 }

@@ -14,6 +14,8 @@ export default function SohbetListesi({ depo, student, disabled, onAc, onYeni, o
 }) {
   const [telefonEkrani, setTelefon] = useState(() => window.matchMedia('(max-width: 34rem)').matches)
   const telefon = telefonEkrani && !gomulu
+  // Gömülüyken sayfada başka başlık yok (Carbon'un başlığı başlık öğesi değil): h1'den sonra h2 gelir.
+  const B = gomulu ? 'h2' : 'h3'
   const [acik, setAcik] = useState(false)
   const [duzenle, setDuzenle] = useState<{ id: string; not: boolean; metin: string } | null>(null)
   useEffect(() => {
@@ -55,14 +57,14 @@ export default function SohbetListesi({ depo, student, disabled, onAc, onYeni, o
     {telefon && <Button className="ac-sohbetler__ac" kind="tertiary" size="sm"
       aria-expanded={acik} aria-controls="ac-sohbetler" onClick={() => setAcik(!acik)}>Sohbetler</Button>}
     <aside id="ac-sohbetler" className="ac-sohbetler" hidden={telefon && !acik} aria-label="Sohbet geçmişi">
-      <div className="ac-sohbetler__baslik"><h3>Sohbetler</h3>
+      <div className="ac-sohbetler__baslik"><B>Sohbetler</B>
         {telefon && <Button kind="ghost" size="sm" onClick={() => setAcik(false)}>Kapat</Button>}
       </div>
       <Button kind="tertiary" size="sm" disabled={disabled} onClick={() => { onYeni(); setAcik(false) }}>Yeni sohbet</Button>
       {depo.hata && <p role="alert">{depo.hata}</p>}
       {satirlar(depo.liste)}
-      {!student && <><h3>Işık'ın sohbetleri</h3>{satirlar(depo.isikListe, true)}
-        <h3>Asistanın notları</h3>
+      {!student && <><B>Işık'ın sohbetleri</B>{satirlar(depo.isikListe, true)}
+        <B>Asistanın notları</B>
         <ul className="ac-sohbetler__liste">{depo.notlar.map(n => <li key={n.id}>
           <p>{n.metin}</p>
           <div className="ac-sohbetler__eylemler">

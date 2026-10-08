@@ -5,14 +5,10 @@ export interface ConfigGirdisi {
   /** 'sayfa': /asistan'a gömülü (açık başlar, başlatıcı yok). 'panel': diğer sayfalarda başlatıcıyla açılan yan panel. */
   bicim: 'sayfa' | 'panel'
   okur: 'ogrenci' | 'aile'
-  karsilama: string
-  hizliSorular: { metin: string; plan?: boolean }[]
   saltOkunur: boolean
   altBaslik: string
   gonder: PublicConfigMessaging['customSendMessage']
   gecmisYukle?: PublicConfigMessaging['customLoadHistory']
-  /** Ekranda mesaj var mı: Carbon başlangıç ekranını yalnız gönderince kapatır; yüklenen geçmişte isOn kapatılır. */
-  mesajVar?: boolean
 }
 
 /** Sayfa ve başlatıcı aynı yapılandırmayı kullanır; farkları bileşen (ChatCustomElement / ChatContainer) yapar. */
@@ -34,17 +30,16 @@ export function tedyChatConfig(g: ConfigGirdisi): Omit<PublicConfig, 'markdown'>
     launcher: { isOn: g.bicim === 'panel' },
     // Carbon'un başlık AI etiketi axe nested-interactive ihlali veriyor; açıklama kendi AILabel'ımızla (Görev 14).
     header: { title: 'TEDY Asistan', name: g.altBaslik, showAiLabel: false, showRestartButton: !g.saltOkunur },
-    homescreen: {
-      isOn: !g.mesajVar, greeting: g.karsilama, disableReturn: false,
-      starters: { isOn: !g.saltOkunur, buttons: g.hizliSorular.map(s => ({ label: s.metin })) },
-    },
+    // Carbon'un başlangıç ekranı ayrı bir giriş alanı kullanır (yuvalar, mikrofon, ekler orada yok) ve yüklenen
+    // geçmişte açık kalır: karşılama ve hızlı sorular eski arayüzdeki gibi tek giriş alanının üstünde (Karsilama.tsx).
+    homescreen: { isOn: false },
     history: { isOn: true, showMobileMenu: true },
     upload: { isOn: false },   // ekler bugünkü çiplerle giriş üstü yuvada (Görev 16)
     layout: { showFrame: false, hasContentMaxWidth: true },
     messaging: {
       customSendMessage: g.gonder,
       ...(g.gecmisYukle ? { customLoadHistory: g.gecmisYukle } : {}),
-      messageTimeoutSecs: 180, showStopButtonImmediately: true,
+      messageTimeoutSecs: 180, showStopButtonImmediately: true, skipWelcome: true,
     },
     isReadonly: g.saltOkunur,
     persistFeedback: true,

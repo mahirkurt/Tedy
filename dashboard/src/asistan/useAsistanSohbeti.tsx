@@ -4,7 +4,7 @@ import { useSession } from '../contexts/session'
 import { GENEL, useOgretmen } from '../hooks/useOgretmen'
 import { useSohbetler } from '../hooks/useSohbetler'
 import { useSes } from '../hooks/useSes'
-import { asistanDeposu, useAsistanDurumu } from './asistanDeposu.ts'
+import { asistanDeposu } from './asistanDeposu.ts'
 import { hataYaniti } from './olayEslemesi.ts'
 import { calistir } from './istek.ts'
 import { tedyChatConfig } from './tedyChatConfig.ts'
@@ -18,6 +18,9 @@ import { altbilgiCizici } from './altbilgi.tsx'
 import { geriBildirimGonder } from './geriBildirim.ts'
 import GecmisPaneli from './GecmisPaneli.tsx'
 import IstekEkleri from './IstekEkleri.tsx'
+import GirisEkleri from './GirisEkleri.tsx'
+import Karsilama from './Karsilama.tsx'
+import GirisDugmeleri from './GirisDugmeleri.tsx'
 import { etkinSohbetiOku, etkinSohbetiYaz, yeniSohbet } from './useAsistanOturumu.ts'
 import { gecmisOgeleri } from './gecmis.ts'
 import type { BusEventFeedback } from '@carbon/ai-chat'
@@ -103,7 +106,6 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel') {
   const ozelYanit = useMemo(() => ozelYanitCizici(ogretmenSec), [ogretmenSec])
 
   const email = user?.email
-  const mesajVar = useAsistanDurumu(d => d.mesajVar)
   const gecmisYukle = useCallback(async () => {
     const etkin = etkinSohbetiOku(email)
     if (!etkin || !guncelSohbet) return []
@@ -118,10 +120,10 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel') {
   }, [email, okur])
 
   const config = useMemo(() => tedyChatConfig({
-    bicim, okur, karsilama, hizliSorular, saltOkunur: salt,
+    bicim, okur, saltOkunur: salt,
     altBaslik: secili ? `${secili.ogretmen_adi} — konuyu adım adım anlatır` : 'Kaynaklı soru-cevap ve kişisel çalışma planı',
-    gonder, gecmisYukle, mesajVar,
-  }), [bicim, okur, karsilama, hizliSorular, salt, secili, gonder, gecmisYukle, mesajVar])
+    gonder, gecmisYukle,
+  }), [bicim, okur, salt, secili, gonder, gecmisYukle])
 
   const props: ChatContainerProps = {
     ...config,
@@ -141,8 +143,12 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel') {
     renderCustomRequestFooter: (_slot, mesaj) => <IstekEkleri mesajId={mesaj.id} />,
     renderWriteableElements: {
       workspacePanelElement: <KaynakPaneli />, headerFixedActionsElement: <AiAciklama />,
+      beforeInputElement: <><Karsilama inst={() => instance.current} karsilama={karsilama} hizliSorular={hizliSorular} /><GirisEkleri /></>,
+      promptLineSendButtonStart: <GirisDugmeleri inst={() => instance.current}
+        mikrofon={{ var: ses.mikrofonVar, dinliyor: ses.dinliyor, bas: ses.mikrofon }} />,
       historyPanelElement: <GecmisPaneli depo={sohbet} ogrenci={ogrenci} inst={() => instance.current} ogretmenSec={ogretmen.sec} />,
     },
   }
-  return { props, instance, ogretmen, ogretmenSec, sohbet, bicim, ses }
+  const sesOnay = { acik: ses.onayAcik, onayla: ses.onayla, vazgec: ses.vazgec, hata: ses.hata }
+  return { props, instance, ogretmen, ogretmenSec, sohbet, bicim, ses, sesOnay }
 }

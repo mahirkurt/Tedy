@@ -16,3 +16,17 @@
 }
 
 .asistan__aile-notu { margin: 0; }
+
+// Boş sohbette karşılama ve hızlı sorular (Karsilama.tsx), giriş alanının üstünde.
+.asistan__karsilama {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-04;
+  padding-block-end: spacing.$spacing-05;
+}
+
+.asistan__hizli-sorular {
+  display: flex;
+  flex-wrap: wrap;
+  gap: spacing.$spacing-03;
+}
