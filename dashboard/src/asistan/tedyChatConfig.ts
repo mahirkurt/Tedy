@@ -11,6 +11,8 @@ export interface ConfigGirdisi {
   altBaslik: string
   gonder: PublicConfigMessaging['customSendMessage']
   gecmisYukle?: PublicConfigMessaging['customLoadHistory']
+  /** Ekranda mesaj var mı: Carbon başlangıç ekranını yalnız gönderince kapatır; yüklenen geçmişte isOn kapatılır. */
+  mesajVar?: boolean
 }
 
 /** Sayfa ve başlatıcı aynı yapılandırmayı kullanır; farkları bileşen (ChatCustomElement / ChatContainer) yapar. */
@@ -33,7 +35,7 @@ export function tedyChatConfig(g: ConfigGirdisi): Omit<PublicConfig, 'markdown'>
     // Carbon'un başlık AI etiketi axe nested-interactive ihlali veriyor; açıklama kendi AILabel'ımızla (Görev 14).
     header: { title: 'TEDY Asistan', name: g.altBaslik, showAiLabel: false, showRestartButton: !g.saltOkunur },
     homescreen: {
-      isOn: true, greeting: g.karsilama, disableReturn: false,
+      isOn: !g.mesajVar, greeting: g.karsilama, disableReturn: false,
       starters: { isOn: !g.saltOkunur, buttons: g.hizliSorular.map(s => ({ label: s.metin })) },
     },
     history: { isOn: true, showMobileMenu: true },

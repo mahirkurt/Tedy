@@ -4,7 +4,7 @@ import { useSession } from '../contexts/session'
 import { GENEL, useOgretmen } from '../hooks/useOgretmen'
 import { useSohbetler } from '../hooks/useSohbetler'
 import { useSes } from '../hooks/useSes'
-import { asistanDeposu } from './asistanDeposu.ts'
+import { asistanDeposu, useAsistanDurumu } from './asistanDeposu.ts'
 import { hataYaniti } from './olayEslemesi.ts'
 import { calistir } from './istek.ts'
 import { tedyChatConfig } from './tedyChatConfig.ts'
@@ -16,6 +16,10 @@ import KaynakPaneli from './KaynakPaneli.tsx'
 import AiAciklama from './AiAciklama.tsx'
 import { altbilgiCizici } from './altbilgi.tsx'
 import { geriBildirimGonder } from './geriBildirim.ts'
+import GecmisPaneli from './GecmisPaneli.tsx'
+import IstekEkleri from './IstekEkleri.tsx'
+import { etkinSohbetiOku, etkinSohbetiYaz, yeniSohbet } from './useAsistanOturumu.ts'
+import { gecmisOgeleri } from './gecmis.ts'
 import type { BusEventFeedback } from '@carbon/ai-chat'
 
 const TABLO = { table: tabloCiz }
@@ -62,7 +66,10 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel') {
     const kaydet = !plan && !ek.deep && !ek.transient
     let sohbetId = kaydet ? d.sohbetId : undefined
     if (kaydet && !sohbetId) {
-      try { sohbetId = await guncelSohbet!.yeni(d.ogretmenId) } catch {
+      try {
+        sohbetId = await guncelSohbet!.yeni(d.ogretmenId)
+        etkinSohbetiYaz(d.email, { id: sohbetId, salt: false })
+      } catch {
         await inst.messaging.addMessage(hataYaniti(crypto.randomUUID(), 'Sohbet kaydedilemedi.')); return
       }
     }
@@ -78,7 +85,7 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel') {
       ...(d.sayfa ? { sayfa: { ad: d.sayfa.ad, ...(d.sayfa.oge ? { oge: d.sayfa.oge } : {}) } } : {}),
     }
     const goruntu = d.cipler.flatMap(c => c.id ? [{ id: c.id, ad: c.ad, tur: c.tur ?? 'bilinmiyor' }] : [])
-    asistanDeposu.ayarla({ sonrakiIstek: {}, dokum, sayfa: null,
+    asistanDeposu.ayarla({ sonrakiIstek: {}, dokum, sayfa: null, mesajVar: true,
       ...(ekler.length ? { cipler: [], ekGoruntuleri: { ...d.ekGoruntuleri, [istek.id ?? '']: goruntu } } : {}) })
     await calistir(inst, govde, plan, sec.signal)
     void guncelSohbet?.yenile()
@@ -95,22 +102,47 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel') {
   }, [ogretmen])
   const ozelYanit = useMemo(() => ozelYanitCizici(ogretmenSec), [ogretmenSec])
 
+  const email = user?.email
+  const mesajVar = useAsistanDurumu(d => d.mesajVar)
+  const gecmisYukle = useCallback(async () => {
+    const etkin = etkinSohbetiOku(email)
+    if (!etkin || !guncelSohbet) return []
+    const sonuc = await guncelSohbet.ac(etkin.id, etkin.salt)
+    if (!sonuc) { etkinSohbetiYaz(email, null); return [] }
+    const saltMi = sonuc.read_only ?? etkin.salt
+    const ekGoruntuleri: Record<string, { id: string; ad: string; tur: string }[]> = {}
+    for (const m of sonuc.mesajlar) if (m.rol === 'user' && m.yuklemeler?.length) ekGoruntuleri[m.id] = m.yuklemeler
+    asistanDeposu.ayarla({ sohbetId: etkin.id, saltOkunur: saltMi, ekGoruntuleri, mesajVar: sonuc.mesajlar.length > 0,
+      dokum: sonuc.mesajlar.map(m => ({ role: m.rol, content: m.icerik })) })
+    return gecmisOgeleri(sonuc.mesajlar, { geriBildirim: !saltMi, ogrenci: okur === 'ogrenci' })
+  }, [email, okur])
+
   const config = useMemo(() => tedyChatConfig({
     bicim, okur, karsilama, hizliSorular, saltOkunur: salt,
     altBaslik: secili ? `${secili.ogretmen_adi} — konuyu adım adım anlatır` : 'Kaynaklı soru-cevap ve kişisel çalışma planı',
-    gonder,
-  }), [bicim, okur, karsilama, hizliSorular, salt, secili, gonder])
+    gonder, gecmisYukle, mesajVar,
+  }), [bicim, okur, karsilama, hizliSorular, salt, secili, gonder, gecmisYukle, mesajVar])
 
   const props: ChatContainerProps = {
     ...config,
     markdown: { markdownItPlugins: TEDY_MARKDOWN_EKLENTILERI, customRenderers: TABLO },
     onBeforeRender: inst => {
       instance.current = inst
-      inst.on({ type: 'feedback' as never, handler: (e: unknown) => void geriBildirimGonder(e as BusEventFeedback) })
+      inst.on([
+        { type: 'feedback' as never, handler: (e: unknown) => void geriBildirimGonder(e as BusEventFeedback) },
+        // Carbon'un "Yeni sohbet" ve yeniden başlat düğmeleri de yeni kayıt açar.
+        { type: 'history:newChat' as never, handler: () => { if (guncelSohbet) void yeniSohbet(inst, guncelSohbet) } },
+        { type: 'restartConversation' as never, handler: () => { if (guncelSohbet) void yeniSohbet(inst, guncelSohbet) } },
+      ])
+      if (asistanDeposu.al().saltOkunur) inst.updateInputIsDisabled(true)
     },
     renderUserDefinedResponse: ozelYanit,
     renderCustomMessageFooter: ALTBILGI,
-    renderWriteableElements: { workspacePanelElement: <KaynakPaneli />, headerFixedActionsElement: <AiAciklama /> },
+    renderCustomRequestFooter: (_slot, mesaj) => <IstekEkleri mesajId={mesaj.id} />,
+    renderWriteableElements: {
+      workspacePanelElement: <KaynakPaneli />, headerFixedActionsElement: <AiAciklama />,
+      historyPanelElement: <GecmisPaneli depo={sohbet} ogrenci={ogrenci} inst={() => instance.current} ogretmenSec={ogretmen.sec} />,
+    },
   }
   return { props, instance, ogretmen, ogretmenSec, sohbet, bicim, ses }
 }

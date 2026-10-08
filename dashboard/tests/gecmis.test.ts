@@ -14,7 +14,7 @@ test('kullanıcı ve asistan sırası, zaman, geri bildirim durumu', () => {
       geri_bildirim: { deger: 'olumsuz', kategori: 'Anlamadım', metin: 'hızlı' } }),
   ], { geriBildirim: true, ogrenci: true })
   assert.equal(ogeler.length, 2)
-  assert.deepEqual((ogeler[0].message as Record<string, any>).input, { text: 'Kesir nedir?' })
+  assert.deepEqual((ogeler[0].message as Record<string, any>).input, { text: 'Kesir nedir?', message_type: 'text' })
   assert.equal(ogeler[0].time, '2026-10-08T09:00:00Z')
   const yanit = ogeler[1].message as Record<string, any>
   assert.equal(yanit.output.generic[0].response_type, 'conversational_search')
@@ -27,4 +27,11 @@ test('salt okunur sohbette geri bildirim kapalı; kayıtlı kartlar geri gelir',
   const g = (o.message as Record<string, any>).output.generic
   assert.equal(g[0].message_item_options.feedback, undefined)
   assert.equal(g[1].user_defined.tedy.tur, 'netlestirme')
+})
+
+test('geçmiş öğeleri akış kimliği taşımaz, kullanıcı girdisi metin türündedir', () => {
+  const [u, a] = gecmisOgeleri([M({ id: 'u2', rol: 'user', icerik: 'Soru' }), M({ id: 'c'.repeat(32), rol: 'assistant', icerik: 'Cevap' })],
+    { geriBildirim: true, ogrenci: true })
+  assert.equal((u.message as Record<string, any>).input.message_type, 'text')
+  for (const g of (a.message as Record<string, any>).output.generic) assert.equal(g.streaming_metadata, undefined)
 })

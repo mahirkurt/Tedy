@@ -4,13 +4,16 @@ import type { Sohbet, useSohbetler } from '../hooks/useSohbetler'
 
 type Depo = ReturnType<typeof useSohbetler>
 
-export default function SohbetListesi({ depo, student, disabled, onAc, onYeni, onSil }: {
+export default function SohbetListesi({ depo, student, disabled, onAc, onYeni, onSil, gomulu = false }: {
   depo: Depo; student: boolean; disabled: boolean
+  /** Carbon AI Chat'in geçmiş paneline gömülü: panel kendi mobil menüsüyle açılır, kendi aç/kapat düğmesi yok. */
+  gomulu?: boolean
   onAc: (id: string, salt: boolean) => void
   onYeni: () => void
   onSil: (id: string) => void
 }) {
-  const [telefon, setTelefon] = useState(() => window.matchMedia('(max-width: 34rem)').matches)
+  const [telefonEkrani, setTelefon] = useState(() => window.matchMedia('(max-width: 34rem)').matches)
+  const telefon = telefonEkrani && !gomulu
   const [acik, setAcik] = useState(false)
   const [duzenle, setDuzenle] = useState<{ id: string; not: boolean; metin: string } | null>(null)
   useEffect(() => {

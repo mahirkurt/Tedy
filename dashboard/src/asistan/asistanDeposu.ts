@@ -18,10 +18,12 @@ export interface AsistanDurumu {
   sonModel?: string
   /** Tek paylaşılan sesli okuyucu: bir cevabı okumak öncekini durdurur, düğme etiketleri birlikte değişir. */
   ses: { var: boolean; okunan: string | null; oku: (id: string, metin: string) => void } | null
+  /** Ekranda mesaj var mı (başlangıç ekranını kapatmak için, tedyChatConfig). */
+  mesajVar: boolean
 }
 
 const BASLANGIC: AsistanDurumu = { okur: 'aile', ogretmenId: 'genel', saltOkunur: false, odevKey: '', cipler: [], sayfa: null,
-  sonrakiIstek: {}, dokum: [], bekleyen: null, yukleniyor: false, ekGoruntuleri: {}, acikAtif: null, ses: null }
+  sonrakiIstek: {}, dokum: [], bekleyen: null, yukleniyor: false, ekGoruntuleri: {}, acikAtif: null, ses: null, mesajVar: false }
 
 let durum = BASLANGIC
 const dinleyiciler = new Set<() => void>()

@@ -30,3 +30,8 @@ test('salt okunur: hızlı soru ve yeniden başlatma yok; aileye siz', () => {
   assert.equal(c.header?.showRestartButton, false)
   assert.equal(c.strings?.input_placeholder, 'Bir soru sorun veya çalışma planı isteyin...')
 })
+
+test('mesajlı sohbet açılınca başlangıç ekranı kapanır (Carbon yalnız gönderince kapatıyor)', () => {
+  assert.equal(tedyChatConfig({ ...G, mesajVar: true }).homescreen?.isOn, false)
+  assert.equal(tedyChatConfig({ ...G, mesajVar: false }).homescreen?.isOn, true)
+})

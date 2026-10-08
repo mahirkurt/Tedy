@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { mockSohbetler } from './_audit-fixtures'
+import { mock, mockSohbetler } from './_audit-fixtures'
+import { GORSEL } from './_gorsel-fixtures'
 
 export const sse = (...c: [string, unknown][]) => c.map(([a, v]) => `event: ${a}\ndata: ${JSON.stringify(v)}\n\n`).join('')
 export const PAYLOAD = (p: Record<string, unknown> = {}) => ({ answer: 'Cevap metni.', citations: [], safety_flags: [], plan_blocks: [],
@@ -27,4 +28,13 @@ export async function asistanAc(page: Page, yol = '/asistan') {
 export async function sor(page: Page, metin: string) {
   await soruAlani(page).fill(metin)
   await gonderDugmesi(page).click()
+}
+
+/** sabitAc'ın Carbon sayfaları için hâli: saati dondurmaz. page.clock.setFixedTime Date.now'u durdurur ve
+ *  Carbon'un markdown çizimindeki lodash throttle'ın sondaki çağrısı hiç gelmez — yüklenen geçmiş boş çizilir. */
+export async function carbonSabitAc(page: Page, yol: string, w: number, h: number) {
+  await mock(page, GORSEL)
+  await page.setViewportSize({ width: w, height: h })
+  await page.goto(yol)
+  await expect(soruAlani(page)).toBeVisible({ timeout: 15000 })
 }

@@ -9,7 +9,7 @@ import type { SonYanitSecenekleri } from './olayEslemesi.ts'
 export function gecmisOgeleri(mesajlar: KayitliMesaj[], sec: SonYanitSecenekleri): HistoryItem[] {
   return mesajlar.map(m => {
     const time = m.zaman ?? new Date(0).toISOString()
-    if (m.rol === 'user') return { message: { id: m.id, input: { text: m.icerik } }, time }
+    if (m.rol === 'user') return { message: { id: m.id, input: { text: m.icerik, message_type: 'text' as never } }, time }
     const payload: AssistantResponse = {
       answer: m.icerik, citations: JSON.parse(m.atiflar_json || '[]') as AssistantCitation[], safety_flags: [],
       plan_blocks: [], intent: 'qa', session_id: '', meta: { model: '' }, mesaj_id: m.id,
@@ -17,6 +17,8 @@ export function gecmisOgeleri(mesajlar: KayitliMesaj[], sec: SonYanitSecenekleri
     }
     const d = { ...akisBaslat(m.id), alistirmalar: m.alistirma ?? [] }
     const yanit: MessageResponse = sonYanit(d, payload, sec)
+    // Akış kimlikleri yalnız canlı akış içindir; geçmişte öğe tamamlanmamış sayılıp boş çizilmesin.
+    for (const g of (yanit.output.generic ?? []) as { streaming_metadata?: unknown }[]) delete g.streaming_metadata
     const gb = m.geri_bildirim
     if (gb && sec.geriBildirim) {
       yanit.history = { feedback: { [m.id]: { is_positive: gb.deger === 'olumlu',

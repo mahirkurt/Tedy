@@ -3,6 +3,7 @@ import type { AssistantCitation, Netlestirme } from '../types'
 import type { OdevOnerisi } from '../components/OdevOnayKarti'
 import type { Yukleme } from '../components/YuklenenEk'
 import type { Alistirma } from '../components/AlistirmaKarti'
+import { etkinSohbetiOku } from '../asistan/useAsistanOturumu'
 
 export interface Sohbet {
   id: string
@@ -48,7 +49,8 @@ export function useSohbetler(email: string | undefined, student: boolean) {
   const [liste, setListe] = useState<Sohbet[]>([])
   const [isikListe, setIsikListe] = useState<Sohbet[]>([])
   const [notlar, setNotlar] = useState<AsistanNotu[]>([])
-  const [secili, setSecili] = useState<{ id: string; salt: boolean } | null>(null)
+  // Sayfa ile başlatıcı aynı etkin sohbeti açar (sekme oturumunda; yalnız yeni arayüz yazar).
+  const [secili, setSecili] = useState<{ id: string; salt: boolean } | null>(() => etkinSohbetiOku(email ?? undefined))
   const [hata, setHata] = useState<string | null>(null)
   const [bekliyor, setBekliyor] = useState(false)
   const nesil = useRef(0)
