@@ -2759,6 +2759,7 @@ class AssistantRuntime:
         not_deposu=None,
         ozet: str | None = None,
         secili_odev: str = "",
+        sayfa_satiri: str = "",
         odev_anahtari: str = "",
         denetle: Callable[[str, str], str] | None = None,
         ek_okuyucu: Callable[[str], Any] | None = None,
@@ -2791,6 +2792,7 @@ class AssistantRuntime:
                                          okur=okur, ogretmen=ogretmen,
                                          sahip_email=sahip_email, ek_atiflari=ek_atiflari,
                                          pencere=pencere, ozet=ozet, secili_odev=secili_odev,
+                                         sayfa_satiri=sayfa_satiri,
                                          notlar=not_deposu.notlar() if hafiza and not_deposu is not None else None)
 
         hafiza_kw = ({"hafiza": hafiza, "not_deposu": not_deposu, "sohbet_id": sohbet_id}
@@ -3121,6 +3123,7 @@ class AssistantRuntime:
         ozet: str | None = None,
         notlar: list | None = None,
         secili_odev: str = "",
+        sayfa_satiri: str = "",
     ) -> list[dict[str, Any]]:
         """System prompt plus recent turns.
 
@@ -3200,6 +3203,7 @@ class AssistantRuntime:
                 f"Soran: {self._SORAN.get(okur, self._SORAN['bilinmiyor'])}\n"
                 f"Soru türü: {intent}\n"
                 f"Güvenlik: {', '.join(safety_flags) if safety_flags else 'yok'}\n"
+                + (f"{sayfa_satiri}\n" if sayfa_satiri else "")
                 + (f"\n{secili_odev}\n" if secili_odev else "\n")
                 + f"\nSoru: {user_query}"
             )},

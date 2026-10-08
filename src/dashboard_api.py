@@ -1001,6 +1001,58 @@ def _secili_odev(payload):
     return anahtar, _secili_odev_metni(row), None
 
 
+# Sayfa bağlamı (spec §5.3): yalnız sayfa adı ve öğe kimliği gelir; başlık buradan çözülür.
+SAYFA_ADLARI = {
+    "bugun": "Bugün", "isler": "İşler", "dersler": "Dersler", "notlar": "Notlar",
+    "takvim": "Takvim", "takimlar": "Takımlar", "ilerleme": "İlerleme", "duyurular": "Duyurular",
+    "profil": "Profil", "moduller": "Modüller", "kitaplar": "Tedy Books", "sinavlar": "Sınavlar",
+}
+SAYFA_OGE_TURLERI = ("odev", "sinav", "etkinlik", "ders_haftasi")
+
+
+def _sayfa_ogesi_basligi(tur, kimlik):
+    try:
+        if tur == "odev":
+            row = next((r for r in _canli_odevler() if r.get("homework_key") == kimlik), None)
+            if row:
+                ders = str(row.get("normalized_course") or row.get("Ders Adı") or "").strip()
+                return f"{ders} — {str(row.get('Ödev Başlığı') or '').strip()}".strip(" —")
+        elif tur == "sinav":
+            sinav = next((s for s in _canli_sinavlar() if s.get("id") == kimlik), None)
+            if sinav:
+                return str(sinav.get("title") or "")
+        elif tur == "etkinlik":
+            olay = next((e for e in _birlesik_takvim(_scraped()) if e.get("id") == kimlik), None)
+            if olay:
+                return str(olay.get("title") or "")
+        elif tur == "ders_haftasi":
+            if kimlik in _icerik_haftalari(_scraped())["weeks"]:
+                return kimlik
+    except Exception as exc:  # noqa: BLE001 — bağlam satırı hiçbir zaman cevabı düşürmez
+        app.logger.warning("Sayfa öğesi çözülemedi (%s)", type(exc).__name__)
+    return ""
+
+
+def _istek_sayfasi(payload):
+    """(satır, None) ya da ("", 400 yanıtı). Alan yoksa boş satır — genel sohbet."""
+    sayfa = (payload or {}).get("sayfa")
+    if sayfa is None:
+        return "", None
+    hata = (jsonify({"error": "Bilinmeyen sayfa."}), 400)
+    if not isinstance(sayfa, dict) or sayfa.get("ad") not in SAYFA_ADLARI:
+        return "", hata
+    satir = f"Bulunduğu sayfa: {SAYFA_ADLARI[sayfa['ad']]}"
+    oge = sayfa.get("oge")
+    if oge is None:
+        return satir, None
+    kimlik = oge.get("id") if isinstance(oge, dict) else None
+    if (not isinstance(oge, dict) or oge.get("tur") not in SAYFA_OGE_TURLERI or not isinstance(kimlik, str)
+            or not kimlik.strip() or len(kimlik) > 400 or any(ord(c) < 32 for c in kimlik)):
+        return "", hata
+    baslik = " ".join(_sayfa_ogesi_basligi(oge["tur"], kimlik).split())[:160]
+    return (f"{satir} (açık: {baslik})" if baslik else satir), None
+
+
 # The assistant's live student-data sources (plan Görev 2): each returns what
 # the matching dashboard route serves, built by the same function, read-only.
 
@@ -2837,6 +2889,9 @@ def assistant_chat():
     odev_anahtari, secili_odev, odev_hata = _secili_odev(payload)
     if odev_hata is not None:
         return odev_hata
+    sayfa_satiri, sayfa_hata = _istek_sayfasi(payload)
+    if sayfa_hata is not None:
+        return sayfa_hata
 
     email = _module_person()
     try:
@@ -2869,6 +2924,7 @@ def assistant_chat():
             ogretmen=ogretmen,
             secili_odev=secili_odev,
             odev_anahtari=odev_anahtari,
+            sayfa_satiri=sayfa_satiri,
             sahip_email=email,
             **sohbet.get("kwargs", {}),
         )
@@ -2905,6 +2961,9 @@ def assistant_stream():
     odev_anahtari, secili_odev, odev_hata = _secili_odev(data)
     if odev_hata is not None:
         return odev_hata
+    sayfa_satiri, sayfa_hata = _istek_sayfasi(data)
+    if sayfa_hata is not None:
+        return sayfa_hata
     messages = data.get("messages") or []
     if not isinstance(messages, list):
         return jsonify({"error": "messages list olmalı"}), 400
@@ -2934,7 +2993,7 @@ def assistant_stream():
                 messages=hazir, session_id=session_id, force_deep=force_deep,
                 ilerleme_izni=ilerleme_izni, okur=okur, ogretmen=ogretmen,
                 secili_odev=secili_odev, odev_anahtari=odev_anahtari,
-                sahip_email=email,
+                sayfa_satiri=sayfa_satiri, sahip_email=email,
                 **sohbet.get("kwargs", {}),
             ):
                 name = event["event"]
