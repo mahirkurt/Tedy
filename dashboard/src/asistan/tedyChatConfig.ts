@@ -43,7 +43,8 @@ export function tedyChatConfig(g: ConfigGirdisi): Omit<PublicConfig, 'markdown'>
     },
     isReadonly: g.saltOkunur,
     persistFeedback: true,
-    injectCarbonTheme: 'g10' as PublicConfig['injectCarbonTheme'],   // panoyla aynı tema (DASHBOARD_THEME)
+    // injectCarbonTheme verilmez: Carbon temayı kendi kabına yazınca öğretmen modunun ders rengini eziyordu (ölçüldü);
+    // pano zaten g10 teması altında, token'lar sayfadan miras gelir.
     keyboardShortcuts: { messageFocusToggle: { isOn: true } },
   }
 }

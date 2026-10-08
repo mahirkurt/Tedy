@@ -8,7 +8,7 @@ import { asistanDeposu } from './asistanDeposu.ts'
 import { hataYaniti } from './olayEslemesi.ts'
 import { calistir } from './istek.ts'
 import { tedyChatConfig } from './tedyChatConfig.ts'
-import { TEDY_MARKDOWN_EKLENTILERI } from './markdownKurulumu.ts'
+import { TEDY_MARKDOWN_EKLENTILERI, useKatexHazir } from './markdownKurulumu.ts'
 import { tabloCiz } from './Tablo.tsx'
 import { VOICE } from './ses.ts'
 import { ozelYanitCizici } from './ozelYanit.tsx'
@@ -150,5 +150,6 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel') {
     },
   }
   const sesOnay = { acik: ses.onayAcik, onayla: ses.onayla, vazgec: ses.vazgec, hata: ses.hata }
-  return { props, instance, ogretmen, ogretmenSec, sohbet, bicim, ses, sesOnay }
+  const hazir = useKatexHazir()
+  return { props, hazir, instance, ogretmen, ogretmenSec, sohbet, bicim, ses, sesOnay }
 }

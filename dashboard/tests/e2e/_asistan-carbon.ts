@@ -38,3 +38,11 @@ export async function carbonSabitAc(page: Page, yol: string, w: number, h: numbe
   await page.goto(yol)
   await expect(soruAlani(page)).toBeVisible({ timeout: 15000 })
 }
+
+/** Son asistan mesajı (Carbon'un mesaj kabı). */
+// Carbon her cevapta bir de gizli kopya tutar; yalnız görünürler sayılır.
+export const sonCevap = (page: Page) => page.locator('.cds-aichat--assistant-message').filter({ visible: true }).last()
+/** Eklenti ve özel çizici çıktıları (kutu, formül, vurgu kutusu): Carbon bunları mesajın gölge kökünde değil,
+ *  sohbet öğesinin ışık DOM'unda yuvalı düğümler olarak tutar; mesaj konumlayıcısı onları görmez. Yalnız
+ *  görünenler: akışta çizilen eski düğümler yuvasız kalır. */
+export const eklentiler = (page: Page) => page.locator('cds-aichat-react > [slot]').filter({ visible: true })

@@ -50,8 +50,8 @@ test('vurgu kutuları: Şimdi/Öneri eylem, Not/Dikkat not; iki yazım biçimi',
   assert.match(r, /ac-md__callout--not"><span class="ac-md__callout-label">Not<\/span><p class="ac-md__p">Işık işaretlemiş\.<\/p>/)
 })
 
-test('yalnız kalın, kısa satır h4 başlık olur; uzun kalın satır paragraf kalır', () => {
-  assert.match(md().render('**Pazartesiye üç ödev**'), /^<h4>Pazartesiye üç ödev<\/h4>/)
+test('yalnız kalın, kısa satır başlık olur; uzun kalın satır paragraf kalır', () => {
+  assert.match(md().render('## Ödevler\n\n**Pazartesiye üç ödev**'), /<h4>Pazartesiye üç ödev<\/h4>/)
   assert.match(md().render('**' + 'a'.repeat(81) + '**'), /^<p><strong>/)
 })
 
@@ -75,4 +75,16 @@ test('ana metindeki ham HTML, HTML’e açık örnekte de yazı kalır (Carbon a
   const html = m.render('Metin <img src=x onerror="window.__xss=1"> son.\n\n<div onclick="x()">blok</div>')
   assert.ok(!/<img|<div onclick/.test(html), html)
   assert.match(html, /&lt;img src=x onerror=&quot;window.__xss=1&quot;&gt;/)
+})
+
+test('başlık düzeyi sayfanın h2’sinin altına iner: # ## ### → h3, daha derini ve kalın satır → h4', () => {
+  const etiketler = (s: string) => [...md().render(s).matchAll(/<(h\d)>([^<]*)</g)].map(m => `${m[1]}:${m[2]}`)
+  assert.deepEqual(etiketler('## Bölüm\n\n**Alt:**\n\nx\n\n#### Derin\n\n# Üst'), ['h3:Bölüm', 'h4:Alt', 'h4:Derin', 'h3:Üst'])
+  // Bölümden önceki kalın satır doğrudan h2'nin altına h4 olarak düşmez.
+  assert.deepEqual(etiketler('**Yalnız:**\n\nx\n\n**Sonraki**\n\ny'), ['h3:Yalnız', 'h4:Sonraki'])
+})
+
+test('boş satırsız gelen kalın satır ve vurgu satırı paragraftan ayrılır', () => {
+  const html = md().render('Metin satırı [S1].\n**Öncelik sırası:**\n\nx\nikinci satır\n**Şimdi:** Başla.')
+  assert.match(html, /^<p>Metin satırı \[S1\]\.<\/p>\n<h3>Öncelik sırası<\/h3>\n<p>x\nikinci satır<\/p>\n<div class="ac-md__callout ac-md__callout--eylem">/)
 })

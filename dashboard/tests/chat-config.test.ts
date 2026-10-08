@@ -14,6 +14,7 @@ test('güvenlik ve görünüm kararları (Görev 1 raporu, güvenlik incelemesi)
   assert.equal(c.hideAvatar, true)
   assert.equal(c.header?.showAiLabel, false)            // kendi AILabel'ımız (axe nested-interactive)
   assert.equal(c.upload?.isOn, false)
+  assert.equal(c.injectCarbonTheme, undefined)   // tema sayfadan miras; aksi ders rengini ezer
   assert.equal(c.strings?.input_placeholder, 'Bir soru sor veya çalışma planı iste...')
 })
 

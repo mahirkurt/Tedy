@@ -10,11 +10,13 @@ import { useAsistanDurumu } from './asistanDeposu.ts'
 import SesOnayi from './SesOnayi.tsx'
 import { ogretmenDegiskenleri } from './ogretmenRenkleri.ts'
 import { dosyalariEkle } from './ekler.ts'
+import { carbonErisilebilirlikOnarimi } from './carbonOnarimi.ts'
 
 export default function AsistanSayfasi() {
-  const { props, ogretmen, ogretmenSec, sesOnay } = useAsistanSohbeti('sayfa')
+  const { props, hazir, ogretmen, ogretmenSec, sesOnay } = useAsistanSohbeti('sayfa')
   const kok = useRef<HTMLElement>(null)
   useEffect(() => (kok.current ? kaydirmaOdaginiYonet(kok.current) : undefined), [])
+  useEffect(() => (kok.current ? carbonErisilebilirlikOnarimi(kok.current) : undefined), [])
   // Sürükle-bırak ve dosya yapıştırma (eski giriş alanı gibi). Yakalama evresi: Carbon'un düzenleyicisi gölge
   // kökte işlemeden önce dosyalar alınır; düz metin yapıştırma dokunulmadan geçer.
   useEffect(() => {
@@ -34,8 +36,9 @@ export default function AsistanSayfasi() {
       data-ogretmen={ogretmen.id}>
       <OgretmenSecici liste={ogretmen.liste} secili={ogretmen.id} onSec={id => void ogretmenSec(id)}
         hata={ogretmen.hata ? VOICE[okur].ogretmenHata : null} />
-      <ChatCustomElement className="asistan__sohbet" {...props}
-        style={ogretmenDegiskenleri(secili?.renk_ailesi ?? null) as CSSProperties} />
+      {/* KaTeX yüklemesi sonuçlanınca (başarılı ya da değil) çizilir; markdownKurulumu.ts. */}
+      {hazir && <ChatCustomElement className="asistan__sohbet" {...props}
+        style={ogretmenDegiskenleri(secili?.renk_ailesi ?? null) as CSSProperties} />}
       <SesOnayi onay={sesOnay} />
     </section>
   )

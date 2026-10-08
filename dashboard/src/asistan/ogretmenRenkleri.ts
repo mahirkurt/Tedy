@@ -9,6 +9,8 @@ export function ogretmenDegiskenleri(aile: SubjectFamily | null): Record<string,
     '--cds-button-primary': 'var(--ted-subject-accent)',
     '--cds-button-primary-hover': 'var(--ted-subject-text)',
     '--cds-button-primary-active': 'var(--ted-subject-text)',
+    // Carbon AI Chat'in gönder simgesi --cds-interactive ile boyanır (prompt-line/send-control).
+    '--cds-interactive': 'var(--ted-subject-accent)',
     '--cds-chat-bubble-user': 'var(--ted-subject-surface)',
     '--cds-chat-bubble-user-text': 'var(--ted-subject-on-surface)',
   }

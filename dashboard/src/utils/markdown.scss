@@ -32,7 +32,8 @@
   background: var(--cds-notification-background-warning);
 }
 
-.ac[data-ogretmen]:not([data-ogretmen='genel']) {
+// .ac eski sohbet kökü, .asistan Carbon AI sayfası (eklenti çıktısı onun ışık DOM'unda).
+:is(.ac, .asistan)[data-ogretmen]:not([data-ogretmen='genel']) {
   .ac-kutu--kavram {
     border-inline-start-color: var(--ted-subject-accent, var(--cds-border-strong-01));
     background: var(--ted-subject-panel, var(--cds-layer-02));
@@ -66,6 +67,19 @@
 
 .ac-adim__govde {
   min-inline-size: 0;
+}
+
+// Eklenti çıktısı Carbon'un markdown kabının dışında çizilir; kutu ve adım içindeki listelerin imi burada verilir.
+:is(.ac-kutu, .ac-adim__govde) {
+  ul {
+    padding-inline-start: spacing.$spacing-05;
+    list-style: disc;
+  }
+
+  ol {
+    padding-inline-start: spacing.$spacing-05;
+    list-style: decimal;
+  }
 }
 
 .ac-adim__no {
@@ -110,4 +124,11 @@
   &:focus-visible {
     outline: 2px solid var(--cds-focus);
   }
+}
+
+// Carbon AI Chat'in markdown kabı word-break: break-word miras bırakır; tablo hücresi kelime ortasından
+// kırılmasın, taşan tablo kendi içinde kaysın (eski sohbet tablosu gibi).
+.ac-md__table {
+  overflow-wrap: normal;
+  word-break: normal;
 }

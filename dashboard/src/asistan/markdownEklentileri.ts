@@ -119,8 +119,44 @@ export function tedyMarkdownEklentisi(md: MarkdownIt, katex?: KatexBenzeri): voi
   // Paragraf düzeyi dönüşümler, ayrıştırmadan sonra: vurgu kutusu ve kalın satır → h4 (eski renderer'daki gibi).
   md.core.ruler.after('inline', 'tedy_paragraf', durum => {
     const t = durum.tokens
-    for (let i = 0; i + 2 < t.length; i++) {
+    // Sayfanın başlığı h2: cevabın bölümleri h3, parçaları h4 — h2'nin hemen altında h4 olmaz (eski çizici gibi).
+    let bolumVar = false
+    const duzey = (oge: (typeof t)[number], derin: boolean) => {
+      const etiket = derin && bolumVar ? 'h4' : 'h3'
+      if (etiket === 'h3') bolumVar = true
+      oge.tag = etiket
+    }
+    for (let i = 0; i < t.length; i++) {
+      if (t[i].type === 'heading_open') {
+        duzey(t[i], t[i].markup.length > 3)
+        const kapanis = t.findIndex((o, j) => j > i && o.type === 'heading_close')
+        if (kapanis > 0) t[kapanis].tag = t[i].tag
+        continue
+      }
+      if (i + 2 >= t.length) break
       if (t[i].type !== 'paragraph_open' || t[i + 1].type !== 'inline' || t[i + 2].type !== 'paragraph_close') continue
+      // Boş satırsız gelen kalın satır ya da vurgu satırı paragrafa katılır; eski çizici gibi ayrı blok olur.
+      const satirlar = t[i + 1].content.split('\n')
+      const ozel = (x: string) => VURGU.test(x.trim()) || (KALIN_SATIR.exec(x.trim())?.[1].length ?? 99) <= 80
+      if (!t[i].hidden && satirlar.length > 1 && satirlar.some(ozel)) {
+        const gruplar: string[][] = []
+        for (const x of satirlar) {
+          if (ozel(x) || !gruplar.length || ozel(gruplar[gruplar.length - 1][0])) gruplar.push([x])
+          else gruplar[gruplar.length - 1].push(x)
+        }
+        const yeni = gruplar.flatMap(g => {
+          const ac = new durum.Token('paragraph_open', 'p', 1)
+          const ic = new durum.Token('inline', '', 0)
+          ic.content = g.join('\n'); ic.map = t[i].map; ic.children = []
+          durum.md.inline.parse(ic.content, durum.md, durum.env, ic.children)
+          ac.map = t[i].map; ac.block = true
+          const kapa = new durum.Token('paragraph_close', 'p', -1); kapa.block = true
+          return [ac, ic, kapa]
+        })
+        t.splice(i, 3, ...yeni)
+        i -= 1
+        continue
+      }
       const metin = t[i + 1].content.trim()
       const v = VURGU.exec(metin)
       if (v) {
@@ -133,11 +169,12 @@ export function tedyMarkdownEklentisi(md: MarkdownIt, katex?: KatexBenzeri): voi
       }
       const b = KALIN_SATIR.exec(metin)
       if (b && b[1].length <= 80) {
-        t[i].type = 'heading_open'; t[i].tag = 'h4'
-        t[i + 2].type = 'heading_close'; t[i + 2].tag = 'h4'
-        t[i + 1].content = b[1]
+        t[i].type = 'heading_open'; duzey(t[i], true)
+        t[i + 2].type = 'heading_close'; t[i + 2].tag = t[i].tag
+        const baslik = b[1].replace(/\s*:\s*$/, '')   // "**Sonra:**" başlıkta iki noktasız
+        t[i + 1].content = baslik
         const cocuklar: typeof t = []
-        durum.md.inline.parse(b[1], durum.md, durum.env, cocuklar)
+        durum.md.inline.parse(baslik, durum.md, durum.env, cocuklar)
         t[i + 1].children = cocuklar
       }
     }

@@ -111,7 +111,8 @@
 // Carbon's reset removes the browser's hidden display rule.
 .ac-sohbetler[hidden] { display: none; }
 
-.ac-sohbetler h3 {
+// h2: Carbon AI sayfasında geçmiş paneli gömülü (SohbetListesi gomulu).
+.ac-sohbetler :is(h2, h3) {
   @include type.type-style('heading-compact-01');
   margin: 0;
 }

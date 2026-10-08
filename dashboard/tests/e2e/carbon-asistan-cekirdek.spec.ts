@@ -92,6 +92,17 @@ test('atıflı cevaptaki ham HTML de çalışmaz (Carbon atıflı cevapta temizl
   expect(await page.evaluate(() => { const w = window as unknown as Record<string, number | undefined>; return [w.__xss, w.__xss3] })).toEqual([undefined, undefined])
 })
 
+test('giriş satırındaki mikrofon ve plan düğmeleri yan yana durur (eski giriş alanı gibi)', async ({ page }) => {
+  await page.addInitScript(() => Object.assign(window, { webkitSpeechRecognition: class { start() {} stop() {} abort() {} } }))
+  await asistanAc(page)
+  const [mik, plan] = await Promise.all([
+    page.getByRole('button', { name: 'Sesle sor', exact: true }).boundingBox(),
+    page.getByRole('button', { name: 'Çalışma Planı', exact: true }).boundingBox(),
+  ])
+  expect(Math.abs(mik!.y - plan!.y)).toBeLessThan(2)
+  expect(plan!.x).toBeGreaterThan(mik!.x)
+})
+
 test('zaman 24 saat, ad TEDY Asistan, tablo filtre kutusuz kendi tablomuz', async ({ page }) => {
   await cevapla(page, PAYLOAD({ answer: '| a | b |\n|---|---|\n| 1 | 2 |' }))
   await asistanAc(page)
