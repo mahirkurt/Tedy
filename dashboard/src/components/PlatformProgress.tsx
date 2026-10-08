@@ -31,6 +31,8 @@ interface Gunluk {
   calisilan: { id: string; kazanim_kodu: string | null; sayfa_basligi: string | null; ogretmen: string }[]
   degerlendirmeler: { id: string; guclu_yanlar: string; duzeyler: 'baslangic' | 'gelisiyor' | 'yeterli'; sonraki_adim: string }[]
   hafta: { baslangic: string; sohbet: { ogretmen: string; sayi: number }[]; alistirma: number; puan: { dogru: number; toplam: number } }
+  /** Asistan cevaplarına verilen geri bildirim (aileye öğrencinin, öğrenciye kendisinin). */
+  geri_bildirim?: { hafta: { olumlu: number; olumsuz: number }; son_olumsuz: { kategori: string | null; metin: string; zaman: string }[] }
 }
 
 const OGRETMEN_ADLARI: Record<string, string> = { genel: 'Genel', turkce: 'Türkçe', fen: 'Fen', sosyal: 'Sosyal', matematik: 'Matematik' }
@@ -69,6 +71,12 @@ function OgrenmeGunlugu() {
           <p>{s.guclu_yanlar}</p>
           <p>{s.sonraki_adim}</p>
         </li>)}</ul>
+      </div>}
+      {data.geri_bildirim && <div className="ogrenme-gunlugu__geri-bildirim">
+        <h4>Asistana geri bildirim</h4>
+        <p>Asistan cevapları: {data.geri_bildirim.hafta.olumlu} beğenildi, {data.geri_bildirim.hafta.olumsuz} beğenilmedi</p>
+        {data.geri_bildirim.son_olumsuz.length > 0 && <ul>{data.geri_bildirim.son_olumsuz.map(n => (
+          <li key={n.zaman}>{[n.kategori, n.metin].filter(Boolean).join(' — ')}</li>))}</ul>}
       </div>}
     </>}
   </section>

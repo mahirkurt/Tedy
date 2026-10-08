@@ -13,8 +13,13 @@ import { tabloCiz } from './Tablo.tsx'
 import { VOICE } from './ses.ts'
 import { ozelYanitCizici } from './ozelYanit.tsx'
 import KaynakPaneli from './KaynakPaneli.tsx'
+import AiAciklama from './AiAciklama.tsx'
+import { altbilgiCizici } from './altbilgi.tsx'
+import { geriBildirimGonder } from './geriBildirim.ts'
+import type { BusEventFeedback } from '@carbon/ai-chat'
 
 const TABLO = { table: tabloCiz }
+const ALTBILGI = altbilgiCizici()
 
 /** Gönderme işlevi Carbon'un yapılandırmasında yaşar; güncel sohbet deposunu render dışında buradan okur. */
 let guncelSohbet: ReturnType<typeof useSohbetler> | null = null
@@ -99,9 +104,13 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel') {
   const props: ChatContainerProps = {
     ...config,
     markdown: { markdownItPlugins: TEDY_MARKDOWN_EKLENTILERI, customRenderers: TABLO },
-    onBeforeRender: inst => { instance.current = inst },
+    onBeforeRender: inst => {
+      instance.current = inst
+      inst.on({ type: 'feedback' as never, handler: (e: unknown) => void geriBildirimGonder(e as BusEventFeedback) })
+    },
     renderUserDefinedResponse: ozelYanit,
-    renderWriteableElements: { customPanelElement: <KaynakPaneli /> },
+    renderCustomMessageFooter: ALTBILGI,
+    renderWriteableElements: { workspacePanelElement: <KaynakPaneli />, headerFixedActionsElement: <AiAciklama /> },
   }
   return { props, instance, ogretmen, ogretmenSec, sohbet, bicim, ses }
 }

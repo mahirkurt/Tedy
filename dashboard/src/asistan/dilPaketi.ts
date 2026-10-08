@@ -234,7 +234,7 @@ export const TURKCE: LanguagePack = {
   feedback_defaultPrompt: 'Neden bu değerlendirmeyi seçtin?',
   feedback_defaultPlaceholder: 'Yorum ekle',
   feedback_categoriesLabel: 'Geri bildirim türü',
-  feedback_submitLabel: 'Gönder',
+  feedback_submitLabel: 'Geri bildirimi gönder',
   feedback_cancelLabel: 'Vazgeç',
   input_stopResponse: 'Yanıtı durdur',
   messages_responseStopped: 'Yanıt durduruldu',

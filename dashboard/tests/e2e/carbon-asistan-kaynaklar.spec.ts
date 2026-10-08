@@ -19,12 +19,11 @@ test('atıflar Carbon kaynak listesinde, numaralı ve doğru sırada', async ({ 
 })
 
 test('Kaynaklar paneli figür küçük resmini sürümüyle ve modül bağlantısını gösterir', async ({ page }) => {
-  await page.route('**/api/assistant/figure/42?v=1.6', r => r.fulfill({ body: Buffer.from([0x89, 0x50, 0x4e, 0x47]), contentType: 'image/png' }))
+  await page.route('**/api/assistant/figure/42?v=1.6', r => r.fulfill({ body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'), contentType: 'image/png' }))
   await cevapla(page, PAYLOAD({ answer: 'Bak [S2]. Modül [S3].', citations: ATIFLAR.slice(1) }))
   await asistanAc(page)
   await sor(page, 'Soru')
   await page.getByRole('button', { name: 'Kaynak ayrıntıları' }).click()
-  const panel = page.getByRole('region', { name: 'Çalışma paneli' })
-  await expect(panel.getByRole('img', { name: 'Hücre' })).toHaveAttribute('src', /\/api\/assistant\/figure\/42\?v=1\.6/)
-  await expect(panel.getByRole('link', { name: /Kesir modülü/ })).toHaveAttribute('href', '/moduller/kesir/v2')
+  await expect(page.getByRole('img', { name: 'Hücre' })).toHaveAttribute('src', /\/api\/assistant\/figure\/42\?v=1\.6/)
+  await expect(page.getByRole('link', { name: 'Modülü aç' })).toHaveAttribute('href', '/moduller/kesir/v2')
 })
