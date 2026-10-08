@@ -1,0 +1,89 @@
+import { test, expect } from '@playwright/test'
+import { PAYLOAD, asistanAc, cevapla, sor, sse, soruAlani } from './_asistan-carbon'
+
+test('akış tüketilir: araç adımı görünür, cevap gelir, /chat çağrılmaz', async ({ page }) => {
+  const istekler = await cevapla(page, PAYLOAD({ answer: 'Kesir bir bütünün parçasıdır.' }),
+    [['tool_start', { name: 'kazanim_ara' }], ['tool_end', { name: 'kazanim_ara', ok: true, ozet: 'M.7.1.1' }]])
+  let klasik = 0
+  page.on('request', r => { if (r.url().endsWith('/api/assistant/chat')) klasik += 1 })
+  await asistanAc(page)
+  await sor(page, 'Kesir nedir?')
+  await expect(page.getByText('Kesir bir bütünün parçasıdır.')).toBeVisible()
+  // Carbon araç adımlarını cevaptan sonra katlar; adımlar "Bu cevaba nasıl ulaştım?" altında.
+  await page.getByRole('button', { name: 'Bu cevaba nasıl ulaştım?' }).click()
+  await expect(page.getByText('MEB kazanımları aranıyor').first()).toBeVisible()
+  expect(klasik).toBe(0)
+  expect(istekler[0]).toMatchObject({ ogretmen: 'genel' })
+})
+
+test('cevapsız kapanan akış /chat yedeğine düşer, yarım taslak kalmaz', async ({ page }) => {
+  await page.route('**/api/assistant/stream', r => r.fulfill({ status: 200, contentType: 'text/event-stream',
+    body: sse(['answer_delta', { text: 'YARIM TASLAK' }]) }))
+  await page.route('**/api/assistant/chat', r => r.fulfill({ json: PAYLOAD({ answer: 'Yedekten gelen cevap.' }) }))
+  await asistanAc(page)
+  await sor(page, 'Soru')
+  await expect(page.getByText('Yedekten gelen cevap.')).toBeVisible()
+  await expect(page.getByText('YARIM TASLAK')).toHaveCount(0)
+})
+
+test('answer_reset sonrası ön metin cevap sanılmaz; denetimli son metin taslağın yerine geçer', async ({ page }) => {
+  await cevapla(page, PAYLOAD({ answer: 'Denetlenmiş son metin.' }),
+    [['answer_delta', { text: 'Önce müfredata bakayım.' }], ['answer_reset', {}], ['answer_delta', { text: 'Taslak metin' }]])
+  await asistanAc(page)
+  await sor(page, 'Soru')
+  await expect(page.getByText('Denetlenmiş son metin.')).toBeVisible()
+  await expect(page.getByText('Önce müfredata bakayım.')).toHaveCount(0)
+  await expect(page.getByText('Taslak metin')).toHaveCount(0)
+})
+
+test('iki uç da 401: okura oturum cümlesi ve Tekrar dene; tekrar aynı gövdeyi yollar', async ({ page }) => {
+  let n = 0
+  const govdeler: unknown[] = []
+  await page.route('**/api/assistant/stream', r => r.fulfill({ status: 401, json: { error: 'session_required' } }))
+  await page.route('**/api/assistant/chat', async r => {
+    govdeler.push(r.request().postDataJSON()); n += 1
+    await r.fulfill(n === 1 ? { status: 401, json: { error: 'session_required' } } : { json: PAYLOAD({ answer: 'İkinci denemede geldi.' }) })
+  })
+  await asistanAc(page)
+  await sor(page, 'Soru')
+  await expect(page.getByText('Oturumun sona ermiş; sayfayı yenileyip yeniden giriş yap.')).toBeVisible()
+  await expect(page.getByText(/HTTP 401|session_required/)).toHaveCount(0)
+  await page.getByRole('button', { name: 'Tekrar dene' }).click()
+  await expect(page.getByText('İkinci denemede geldi.')).toBeVisible()
+  expect(govdeler[1]).toEqual(govdeler[0])
+})
+
+test('durdur isteği keser, hata kartı çıkmaz', async ({ page }) => {
+  await page.route('**/api/assistant/stream', () => { /* hiç yanıtlanmaz */ })
+  await page.route('**/api/assistant/chat', () => { /* hiç yanıtlanmaz */ })
+  await asistanAc(page)
+  await sor(page, 'Uzun soru')
+  await page.getByRole('button', { name: 'Yanıtı durdur' }).click()
+  await expect(page.getByText('Asistan yanıtı alınamadı.')).toHaveCount(0)
+  await expect(soruAlani(page)).toBeEditable()
+})
+
+test('öğrenciye sen, aileye siz: karşılama ve hızlı sorular', async ({ page }) => {
+  await asistanAc(page)
+  await expect(page.getByText(/size yardımcı olabilirim/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Işık bugün neye öncelik vermeli?' })).toBeVisible()
+})
+
+test('cevaptaki ve kutudaki ham HTML çalışmaz (XSS)', async ({ page }) => {
+  await cevapla(page, PAYLOAD({ answer: 'Metin <img src=x onerror="window.__xss=1"> son.\n\n:::kavram\n<img src=y onerror="window.__xss2=1">\n:::' }))
+  await asistanAc(page)
+  await sor(page, 'Soru')
+  await expect(page.getByText(/son\./)).toBeVisible()
+  await page.waitForTimeout(500)
+  expect(await page.evaluate(() => (window as unknown as { __xss?: number; __xss2?: number }).__xss ?? (window as unknown as { __xss2?: number }).__xss2)).toBeUndefined()
+})
+
+test('zaman 24 saat, ad TEDY Asistan, tablo filtre kutusuz kendi tablomuz', async ({ page }) => {
+  await cevapla(page, PAYLOAD({ answer: '| a | b |\n|---|---|\n| 1 | 2 |' }))
+  await asistanAc(page)
+  await sor(page, 'Tablo')
+  await expect(page.locator('table.ac-md__table')).toBeVisible()
+  await expect(page.getByPlaceholder(/Filter table|Tabloyu süz/).filter({ visible: true })).toHaveCount(0)
+  await expect(page.getByText(/\b(AM|PM)\b/)).toHaveCount(0)
+  await expect(page.getByText('watsonx')).toHaveCount(0)
+})

@@ -19,6 +19,8 @@ export interface KayitliMesaj {
   yuklemeler?: Yukleme[]
   netlestirme?: Netlestirme | null
   odev_onerisi?: OdevOnerisi | null
+  zaman?: string
+  geri_bildirim?: { deger: 'olumlu' | 'olumsuz'; kategori: string | null; metin: string } | null
 }
 export interface AsistanNotu { id: string; metin: string }
 export interface SohbetIcerigi {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- testler Carbon parçalarının iç içe yapısında serbestçe gezinir */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { akisBaslat, olayIsle, sonYanit, hataYaniti, taslakMetni, AkisHatasi, ALTBILGI_YUVASI }

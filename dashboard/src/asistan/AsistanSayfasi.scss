@@ -1,0 +1,18 @@
+@use '@carbon/react/scss/spacing';
+
+.asistan {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-05;
+  // Sayfa sütununu doldurur; pencere değil sohbet kendi içinde kayar (tasarim-denetimi).
+  block-size: calc(100dvh - 12rem);
+  min-block-size: 32rem;
+}
+
+.asistan__sohbet {
+  flex: 1;
+  min-block-size: 0;
+  inline-size: 100%;
+}
+
+.asistan__aile-notu { margin: 0; }

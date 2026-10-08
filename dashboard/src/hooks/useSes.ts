@@ -11,7 +11,7 @@ interface Tanima {
 type TanimaKurucu = new () => Tanima
 type SesWindow = Window & { SpeechRecognition?: TanimaKurucu; webkitSpeechRecognition?: TanimaKurucu }
 
-export function useSes(email: string | undefined, draft: string, setDraft: (s: string) => void,
+export function useSes(email: string | undefined, draft: string | (() => string), setDraft: (s: string) => void,
   odaklan: () => void, salt: boolean) {
   const [ses, setSes] = useState<SpeechSynthesisVoice | null>(null)
   const [okunan, setOkunan] = useState<string | null>(null)
@@ -67,7 +67,7 @@ export function useSes(email: string | undefined, draft: string, setDraft: (s: s
     if (!ctor || !anahtar || salt) return
     const rec = new ctor()
     rec.lang = 'tr-TR'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1
-    taban.current = draft
+    taban.current = typeof draft === 'function' ? draft() : draft
     recognition.current = rec
     setHata(null)
     rec.onresult = event => {

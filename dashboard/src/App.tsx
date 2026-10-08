@@ -18,6 +18,14 @@ import TodaySchedule from './components/TodaySchedule'
 import WeeklySchedule from './components/WeeklySchedule'
 import HomeworkTracker from './components/HomeworkTracker'
 import AssistantChat from './components/AssistantChat'
+import { lazy, Suspense } from 'react'
+import { CARBON_AI_ACIK } from './asistan/bayrak'
+
+// Yeni asistan (Carbon AI Chat) yalnız açıldığında yüklenir; bayrak kapalıyken eski bileşen çizilir.
+const AsistanSayfasi = lazy(() => import('./asistan/AsistanSayfasi'))
+function AsistanGirisi() {
+  return <Suspense fallback={<p className="app-shell-loading__text">Asistan yükleniyor…</p>}><AsistanSayfasi /></Suspense>
+}
 import GradeTable from './components/GradeTable'
 import PlatformProgress from './components/PlatformProgress'
 import CalendarEvents from './components/CalendarEvents'
@@ -47,7 +55,7 @@ function matchRoute(pathname: string, list: ReturnType<typeof routesFor>) {
 
 const COMPONENTS: Record<string, React.ComponentType> = {
   Lessons,
-  TodaySchedule, WeeklySchedule, HomeworkTracker, AssistantChat, GradeTable, ExamTimeline,
+  TodaySchedule, WeeklySchedule, HomeworkTracker, AssistantChat: CARBON_AI_ACIK ? AsistanGirisi : AssistantChat, GradeTable, ExamTimeline,
   PlatformProgress, CalendarEvents, TeamActivities, CourseContent, Announcements, StudentProfile,
   TedyBooks, BookDetail, BookReader,
   Modules, ModuleViewerRoute, DraftViewerRoute,
