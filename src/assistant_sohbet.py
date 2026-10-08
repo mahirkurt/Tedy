@@ -66,7 +66,16 @@ CREATE TABLE IF NOT EXISTS calisilan_konu (
     sahip_email TEXT NOT NULL, ogretmen TEXT NOT NULL, kazanim_kodu TEXT NOT NULL,
     sayfa_basligi TEXT NOT NULL, zaman TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS geri_bildirim (
+    mesaj_id TEXT NOT NULL, sahip_email TEXT NOT NULL, deger TEXT NOT NULL,
+    kategori TEXT, metin TEXT NOT NULL DEFAULT '', zaman TEXT NOT NULL,
+    PRIMARY KEY (mesaj_id, sahip_email)
+);
 """
+
+
+GERI_BILDIRIM_KATEGORILERI = ("Yanlış bilgi", "Anlamadım", "Seviyeme uygun değil", "Kaynak göstermedi", "Diğer")
+GERI_BILDIRIM_METIN_SINIRI = 500
 
 
 def zaman_yazi(an: datetime) -> str:
@@ -288,6 +297,8 @@ class SohbetDeposu:
                 conn.execute("DELETE FROM alistirma WHERE sohbet_id = ?", (sid,))
                 conn.execute("DELETE FROM calisma_degerlendirme WHERE sohbet_id = ?", (sid,))
                 conn.execute("DELETE FROM calisilan_konu WHERE sohbet_id = ?", (sid,))
+                conn.execute("DELETE FROM geri_bildirim WHERE mesaj_id IN "
+                             "(SELECT id FROM mesaj WHERE sohbet_id = ?)", (sid,))
                 conn.execute("DELETE FROM mesaj WHERE sohbet_id = ?", (sid,))
                 conn.execute("DELETE FROM sohbet WHERE id = ?", (sid,))
                 conn.execute("COMMIT")
@@ -482,3 +493,59 @@ class SohbetDeposu:
             "hafta": {"baslangic": bas.astimezone(ZoneInfo("Europe/Istanbul")).date().isoformat(),
                       "sohbet": [dict(row) for row in sohbetler], "alistirma": alistirma, "puan": dict(puan)},
         }
+
+    def mesaj_sahibi(self, mid: str) -> dict | None:
+        with self._baglan() as conn:
+            row = conn.execute(
+                "SELECT m.id AS mesaj_id, m.sohbet_id, m.rol, m.ogretmen, s.sahip_email FROM mesaj m "
+                "JOIN sohbet s ON s.id = m.sohbet_id WHERE m.id = ?", (mid,)).fetchone()
+        return dict(row) if row else None
+
+    def geri_bildirim_yaz(self, mid: str, email: str, deger: str, kategori: str | None,
+                          metin: str, simdi: datetime) -> dict:
+        metin = " ".join(str(metin or "").split())
+        if deger not in ("olumlu", "olumsuz"):
+            raise ValueError("deger")
+        if deger == "olumlu" and kategori is not None:
+            raise ValueError("kategori")
+        if kategori is not None and kategori not in GERI_BILDIRIM_KATEGORILERI:
+            raise ValueError("kategori")
+        if len(metin) > GERI_BILDIRIM_METIN_SINIRI:
+            raise ValueError("metin")
+        with self._baglan() as conn:
+            conn.execute(
+                "INSERT INTO geri_bildirim (mesaj_id, sahip_email, deger, kategori, metin, zaman) "
+                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (mesaj_id, sahip_email) DO UPDATE SET "
+                "deger = excluded.deger, kategori = excluded.kategori, metin = excluded.metin, zaman = excluded.zaman",
+                (mid, email, deger, kategori, metin, zaman_yazi(simdi)))
+        return {"deger": deger, "kategori": kategori, "metin": metin}
+
+    def geri_bildirim_sil(self, mid: str, email: str) -> bool:
+        with self._baglan() as conn:
+            return conn.execute("DELETE FROM geri_bildirim WHERE mesaj_id = ? AND sahip_email = ?",
+                                (mid, email)).rowcount > 0
+
+    def geri_bildirimler(self, sid: str, email: str) -> dict[str, dict]:
+        with self._baglan() as conn:
+            rows = conn.execute(
+                "SELECT g.mesaj_id, g.deger, g.kategori, g.metin FROM geri_bildirim g "
+                "JOIN mesaj m ON m.id = g.mesaj_id WHERE m.sohbet_id = ? AND g.sahip_email = ?",
+                (sid, email)).fetchall()
+        return {r["mesaj_id"]: {"deger": r["deger"], "kategori": r["kategori"], "metin": r["metin"]} for r in rows}
+
+    def geri_bildirim_ozeti(self, emails: set[str], simdi: datetime) -> dict:
+        bas, son = hafta_araligi(simdi)
+        sonuc = {"hafta": {"olumlu": 0, "olumsuz": 0}, "son_olumsuz": []}
+        if not emails:
+            return sonuc
+        yer = ",".join("?" * len(emails))
+        with self._baglan() as conn:
+            for r in conn.execute(
+                    f"SELECT deger, COUNT(*) AS n FROM geri_bildirim WHERE sahip_email IN ({yer}) "
+                    "AND zaman >= ? AND zaman < ? GROUP BY deger",
+                    (*sorted(emails), zaman_yazi(bas), zaman_yazi(son))):
+                sonuc["hafta"][r["deger"]] = r["n"]
+            sonuc["son_olumsuz"] = [dict(r) for r in conn.execute(
+                f"SELECT kategori, metin, zaman FROM geri_bildirim WHERE sahip_email IN ({yer}) "
+                "AND deger = 'olumsuz' ORDER BY zaman DESC, rowid DESC LIMIT 5", tuple(sorted(emails)))]
+        return sonuc
