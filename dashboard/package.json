@@ -20,6 +20,7 @@
     "@carbon/react": "^1.114.0",
     "@carbon/web-components": "^2.65.0",
     "katex": "^0.16.47",
+    "markdown-it": "14.3.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.1"
@@ -29,6 +30,7 @@
     "@eslint/js": "^9.39.1",
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.58.2",
+    "@types/markdown-it": "^14.2.0",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
