@@ -1,5 +1,6 @@
 // İstek çalıştırma: sayfa, başlatıcı ve kartlar (Tekrar dene, Daha derine in) aynı yolu kullanır.
 import type { ChatInstance, StreamChunk } from '@carbon/ai-chat'
+import type { AssistantCitation } from '../types'
 import { asistanDeposu } from './asistanDeposu.ts'
 import { akisBaslat, hataYaniti, olayIsle, sonYanit } from './olayEslemesi.ts'
 import type { SonYanitSecenekleri } from './olayEslemesi.ts'
@@ -58,3 +59,9 @@ export async function soruyuYeniden(inst: ChatInstance, metin: string, ek: { dee
   await inst.send(metin)
 }
 
+
+/** Kaynak ayrıntıları (figür küçük resmi, modül bağlantısı, kitap) workspace panelinde bugünkü SourcePanel ile. */
+export async function kaynaklariAc(inst: ChatInstance, atiflar: AssistantCitation[], etkin: string | null) {
+  asistanDeposu.ayarla({ acikAtif: { atiflar, etkin } })
+  await inst.customPanels?.getPanel('workspace' as never).open({ title: 'Kaynaklar', preferredLocation: 'end' } as never)
+}

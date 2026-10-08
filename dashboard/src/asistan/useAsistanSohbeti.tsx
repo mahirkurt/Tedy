@@ -12,6 +12,7 @@ import { TEDY_MARKDOWN_EKLENTILERI } from './markdownKurulumu.ts'
 import { tabloCiz } from './Tablo.tsx'
 import { VOICE } from './ses.ts'
 import { ozelYanitCizici } from './ozelYanit.tsx'
+import KaynakPaneli from './KaynakPaneli.tsx'
 
 const TABLO = { table: tabloCiz }
 
@@ -100,6 +101,7 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel') {
     markdown: { markdownItPlugins: TEDY_MARKDOWN_EKLENTILERI, customRenderers: TABLO },
     onBeforeRender: inst => { instance.current = inst },
     renderUserDefinedResponse: ozelYanit,
+    renderWriteableElements: { customPanelElement: <KaynakPaneli /> },
   }
   return { props, instance, ogretmen, ogretmenSec, sohbet, bicim, ses }
 }
