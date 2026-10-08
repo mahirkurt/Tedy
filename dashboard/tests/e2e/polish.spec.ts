@@ -87,8 +87,10 @@ test('the grade title has no dangling separator', async ({ page }) => {
 test('the portal banner stays off surfaces that are not portal data', async ({ page }) => {
   await mock(page, LIVE)
   for (const path of ['/kitaplar', '/asistan']) {
+    // networkidle yerine sağlık yanıtı: Carbon AI asistanı açıkken ağ uzun süre boşalmayabiliyor (zaman aşımı).
+    const saglik = page.waitForResponse(r => r.url().includes('/api/health'))
     await page.goto(path)
-    await page.waitForLoadState('networkidle')
+    await saglik
     // An absence is true of a page that has not rendered. The page heading is
     // written by the same App render that decides whether the banner mounts,
     // and networkidle means the health response it would show is already in
