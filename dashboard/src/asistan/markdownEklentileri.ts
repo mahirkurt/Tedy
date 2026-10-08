@@ -15,6 +15,11 @@ const ACILIS = /^:::\s*([a-zçğıöşü]+)\s*$/
 const KAPANIS = /^:::\s*$/
 const KATEX_AYARI = { throwOnError: true, output: 'htmlAndMathml', trust: false, strict: 'ignore', maxSize: 10, maxExpand: 100 }
 
+// Eski sohbet çizicisinin (utils/markdown.tsx) vurgu kutuları ve kalın satır başlıkları.
+const VURGU = /^\*\*(Şimdi|Öneri|İpucu|Sonraki adım|Not|Dikkat|Hatırlatma)\s*:\s*\*\*\s*(.+)$|^\*\*(Şimdi|Öneri|İpucu|Sonraki adım|Not|Dikkat|Hatırlatma)\*\*\s*:\s*(.+)$/
+const EYLEM = new Set(['Şimdi', 'Öneri', 'İpucu', 'Sonraki adım'])
+const KALIN_SATIR = /^\*\*([^*]+)\*\*:?$/
+
 const kac = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!))
 const satir = (s: BlokDurumu, n: number) => s.src.slice(s.bMarks[n] + s.tShift[n], s.eMarks[n])
 
@@ -80,6 +85,38 @@ function guvenliIc(katex?: KatexBenzeri): MarkdownIt {
 
 export function tedyMarkdownEklentisi(md: MarkdownIt, katex?: KatexBenzeri): void {
   const ic = guvenliIc(katex)
+
+  // Paragraf düzeyi dönüşümler, ayrıştırmadan sonra: vurgu kutusu ve kalın satır → h4 (eski renderer'daki gibi).
+  md.core.ruler.after('inline', 'tedy_paragraf', durum => {
+    const t = durum.tokens
+    for (let i = 0; i + 2 < t.length; i++) {
+      if (t[i].type !== 'paragraph_open' || t[i + 1].type !== 'inline' || t[i + 2].type !== 'paragraph_close') continue
+      const metin = t[i + 1].content.trim()
+      const v = VURGU.exec(metin)
+      if (v) {
+        const etiket = v[1] ?? v[3]
+        const govde = v[2] ?? v[4]
+        const k = new durum.Token('tedy_vurgu', 'div', 0)
+        k.block = true; k.info = etiket; k.content = govde; k.map = t[i].map
+        t.splice(i, 3, k)
+        continue
+      }
+      const b = KALIN_SATIR.exec(metin)
+      if (b && b[1].length <= 80) {
+        t[i].type = 'heading_open'; t[i].tag = 'h4'
+        t[i + 2].type = 'heading_close'; t[i + 2].tag = 'h4'
+        t[i + 1].content = b[1]
+        const cocuklar: typeof t = []
+        durum.md.inline.parse(b[1], durum.md, durum.env, cocuklar)
+        t[i + 1].children = cocuklar
+      }
+    }
+  })
+  md.renderer.rules.tedy_vurgu = (tokens, i) => {
+    const etiket = tokens[i].info
+    const tur = EYLEM.has(etiket) ? 'eylem' : 'not'
+    return `<div class="ac-md__callout ac-md__callout--${tur}"><span class="ac-md__callout-label">${kac(etiket)}</span><p class="ac-md__p">${ic.renderInline(tokens[i].content)}</p></div>`
+  }
   const kutu: BlokKurali = (s, bas, son, sessiz) => {
     const m = ACILIS.exec(satir(s, bas).trim())
     if (!m) return false

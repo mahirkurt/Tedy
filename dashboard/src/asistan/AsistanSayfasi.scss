@@ -30,3 +30,21 @@
   flex-wrap: wrap;
   gap: spacing.$spacing-03;
 }
+
+// Öğretmen modunda panelin kenarı ders rengiyle (eski .ac[data-ogretmen] .ac__chat kuralı); marka bandı değişmez.
+.asistan[data-ogretmen]:not([data-ogretmen='genel']) .asistan__sohbet {
+  border: 1px solid var(--ted-subject-border);
+  border-block-start: 0.25rem solid var(--ted-subject-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asistan__sohbet,
+  .asistan__sohbet * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .asistan__sohbet { border: 1px solid CanvasText; }
+}

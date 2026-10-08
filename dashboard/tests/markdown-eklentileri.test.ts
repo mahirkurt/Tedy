@@ -43,3 +43,14 @@ test('kutu ve formül içindeki ham HTML yazı olarak kalır (XSS yok), html aç
   assert.ok(!/href="javascript:/i.test(html), html)
   assert.ok(!/<b>x<\/b>/.test(html), html)
 })
+
+test('vurgu kutuları: Şimdi/Öneri eylem, Not/Dikkat not; iki yazım biçimi', () => {
+  const r = md().render('**Şimdi:** Matematiğe 10 dakika ayırın.\n\n**Not**: Işık işaretlemiş.')
+  assert.match(r, /<div class="ac-md__callout ac-md__callout--eylem"><span class="ac-md__callout-label">Şimdi<\/span><p class="ac-md__p">Matematiğe 10 dakika ayırın\.<\/p><\/div>/)
+  assert.match(r, /ac-md__callout--not"><span class="ac-md__callout-label">Not<\/span><p class="ac-md__p">Işık işaretlemiş\.<\/p>/)
+})
+
+test('yalnız kalın, kısa satır h4 başlık olur; uzun kalın satır paragraf kalır', () => {
+  assert.match(md().render('**Pazartesiye üç ödev**'), /^<h4>Pazartesiye üç ödev<\/h4>/)
+  assert.match(md().render('**' + 'a'.repeat(81) + '**'), /^<p><strong>/)
+})

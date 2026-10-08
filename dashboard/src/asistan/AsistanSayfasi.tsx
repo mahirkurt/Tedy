@@ -1,5 +1,5 @@
 import './AsistanSayfasi.scss'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type CSSProperties } from 'react'
 import { ChatCustomElement } from '@carbon/ai-chat'
 import OgretmenSecici from '../components/OgretmenSecici'
 import { subjectClass } from '../utils/subject'
@@ -8,6 +8,7 @@ import { kaydirmaOdaginiYonet } from './kaydirmaOdagi.ts'
 import { VOICE } from './ses.ts'
 import { useAsistanDurumu } from './asistanDeposu.ts'
 import SesOnayi from './SesOnayi.tsx'
+import { ogretmenDegiskenleri } from './ogretmenRenkleri.ts'
 import { dosyalariEkle } from './ekler.ts'
 
 export default function AsistanSayfasi() {
@@ -33,7 +34,8 @@ export default function AsistanSayfasi() {
       data-ogretmen={ogretmen.id}>
       <OgretmenSecici liste={ogretmen.liste} secili={ogretmen.id} onSec={id => void ogretmenSec(id)}
         hata={ogretmen.hata ? VOICE[okur].ogretmenHata : null} />
-      <ChatCustomElement className="asistan__sohbet" {...props} />
+      <ChatCustomElement className="asistan__sohbet" {...props}
+        style={ogretmenDegiskenleri(secili?.renk_ailesi ?? null) as CSSProperties} />
       <SesOnayi onay={sesOnay} />
     </section>
   )
