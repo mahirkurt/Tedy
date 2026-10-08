@@ -13,8 +13,10 @@
     "lhci": "lhci autorun"
   },
   "dependencies": {
+    "@carbon/ai-chat": "1.22.0",
     "@carbon/icons-react": "^11.86.0",
     "@carbon/react": "^1.114.0",
+    "@carbon/web-components": "^2.65.0",
     "katex": "^0.16.47",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
