@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "lint:css": "IBM_TELEMETRY_DISABLED=true stylelint \"src/**/*.scss\"",
     "analyze": "ANALYZE=1 npm run build",
-    "lhci": "lhci autorun"
+    "lhci": "lhci autorun",
+    "build:carbon-ai": "VITE_ASISTAN_CARBON_AI=1 npm run build",
+    "test:birim": "node --test tests/*.test.ts"
   },
   "dependencies": {
     "@carbon/ai-chat": "1.22.0",

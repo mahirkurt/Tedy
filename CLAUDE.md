@@ -33,6 +33,9 @@ cd dashboard && npm run build # Build production bundle to dashboard-dist/
 cd dashboard && npm run lint  # ESLint + stylelint (Carbon token plugin) — both must be clean
 cd dashboard && npm run lint:css   # stylelint alone
 cd dashboard && npm run analyze    # build + dashboard/paket-analizi.html (bundle treemap, gitignored)
+cd dashboard && IBM_TELEMETRY_DISABLED=true npm ci   # Carbon AI Chat kurulumu telemetrisiz; makinede ~/.config/environment.d/ibm-telemetri.conf da ayarlı
+cd dashboard && npm run build:carbon-ai              # yeni asistan arayüzüyle derle (VITE_ASISTAN_CARBON_AI=1); Görev 20'den sonra varsayılan
+cd dashboard && npm run test:birim                    # node:test birim testleri (tests/*.test.ts)
 cd dashboard && npm run lhci       # Lighthouse CI on 5 pages → dashboard/.lighthouseci/ (filesystem only, never uploaded)
 cd dashboard && npx playwright test gorsel-regresyon aria-yapisi gorunum-kipleri --update-snapshots   # after an intended visual/structural change — read the diff first
 python src/dashboard_api.py --generate-key  # Generate a new API key for third-party access

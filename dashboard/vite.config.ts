@@ -22,6 +22,9 @@ export default defineConfig({
         // brings each chunk under the size warning threshold.
         manualChunks(id: string) {
           if (!id.includes('node_modules')) return
+          // Carbon AI Chat ve bağımlılıkları (web components, lit, markdown-it, tiptap, CodeMirror)
+          // yalnız asistan açıldığında yüklenir: tembel import'un kendi parçasında kalırlar.
+          if (/[\\/]node_modules[\\/](@carbon[\\/](ai-chat|ai-chat-components|web-components)|lit|@lit|lit-html|lit-element|@tiptap|prosemirror-[^\\/]+|@codemirror|@lezer|markdown-it|dompurify)[\\/]/.test(id)) return
           if (id.includes('@carbon')) return 'carbon'
           if (id.includes('react-router')) return 'router'
           if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react'
