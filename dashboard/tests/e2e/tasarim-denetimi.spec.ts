@@ -64,6 +64,6 @@ test('opening Asistan on a phone does not scroll the page', async ({ page }) => 
   await ac(page, '/asistan', 390, 844)
   // Carbon AI Chat'in başlığı bir başlık öğesi değil; adı ve giriş alanı ekranda olmalı.
   await expect(page.getByText('TEDY Asistan', { exact: true }).first()).toBeInViewport()
-  await expect(page.getByRole('textbox', { name: 'Sorunu yaz' })).toBeInViewport()
+  await expect(page.getByRole('textbox', { name: /^Sorunu(zu)? yaz/ })).toBeInViewport()
   expect(await page.evaluate(() => window.scrollY)).toBe(0)
 })

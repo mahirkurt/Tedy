@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { json } from './_audit-fixtures'
-import { carbonSabitAc, soruAlani } from './_asistan-carbon'
+import { PAYLOAD, carbonSabitAc, cevapla, soruAlani } from './_asistan-carbon'
 
 // Eski asistan-sohbet.spec.ts'in testleri, aynı adlarla (Görev 15). Ekli tekrar testi Görev 16'da.
 const SOHBET = {
@@ -188,4 +188,20 @@ test('retry preserves the request id and uploads without another user bubble', a
   expect(bodies[0].request_id).toBeTruthy()
   expect(bodies[0].messages[0].ekler).toEqual(['cd'.repeat(16)])
   await expect(page.getByText('Bu eki açıkla', { exact: true })).toHaveCount(1)
+})
+
+test('başka yerde silinmiş etkin sohbet kilitlemez: yeni soru yeni sohbet açar', async ({ page }) => {
+  const OLU = 'de'.repeat(16)
+  const YENI = 'fa'.repeat(16)
+  await page.addInitScript(id => sessionStorage.setItem('tedy-asistan-etkin::test@tedy.online', JSON.stringify({ id, salt: false })), OLU)
+  const istekler = await cevapla(page, PAYLOAD({ answer: 'Yeni sohbette cevap.' }))
+  await carbonSabitAc(page, '/asistan', 1440, 900)
+  await page.route('**/api/assistant/sohbetler', r => r.request().method() === 'POST'
+    ? r.fulfill(json({ id: YENI, ogretmen: 'genel', baslik: '' })) : r.fulfill(json({ sohbetler: [] })))
+  await page.route(`**/api/assistant/sohbetler/${OLU}`, r => r.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'Sohbet bulunamadı.' }) }))
+  await page.goto('/asistan')
+  await soruAlani(page).fill('Merhaba')
+  await page.getByRole('button', { name: 'Gönder', exact: true }).click()
+  await expect(page.getByText('Yeni sohbette cevap.', { exact: true })).toBeVisible()
+  expect(istekler[0]).toMatchObject({ sohbet_id: YENI })
 })

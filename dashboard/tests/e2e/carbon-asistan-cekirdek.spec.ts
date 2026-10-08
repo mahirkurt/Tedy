@@ -112,3 +112,15 @@ test('zaman 24 saat, ad TEDY Asistan, tablo filtre kutusuz kendi tablomuz', asyn
   await expect(page.getByText(/\b(AM|PM)\b/)).toHaveCount(0)
   await expect(page.getByText('watsonx', { exact: true })).toHaveCount(0)
 })
+
+test('adımlar gösterilmişken akış da /chat da düşerse mesaj hata kartıyla biter, yarım kalmaz', async ({ page }) => {
+  await page.route('**/api/assistant/stream', r => r.fulfill({ status: 200, contentType: 'text/event-stream',
+    body: sse(['tool_start', { name: 'kazanim_ara' }]) }))
+  await page.route('**/api/assistant/chat', r => r.fulfill({ status: 500, json: { error: 'x' } }))
+  await asistanAc(page)
+  await sor(page, 'Soru')
+  await expect(page.getByRole('alert').filter({ hasText: 'Asistan yanıtı alınamadı.' }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Yanıtı durdur' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Tekrar dene' })).toBeVisible()
+  await expect(soruAlani(page)).toBeEditable()
+})

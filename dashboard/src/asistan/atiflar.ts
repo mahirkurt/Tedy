@@ -39,7 +39,14 @@ export function atiflariAyikla(ham: string, kaynaklar: AssistantCitation[]) {
     if (!byId.has(id)) { metin += m[0]; continue }
     if (!araliklar.has(id)) { araliklar.set(id, []); kimlikler.push(id) }
     const bitis = metin.trimEnd().length
-    const start = cumleBasi(metin, bitis)
+    let start = cumleBasi(metin, bitis)
+    // Carbon aralığı markdown kaynağına "==…==" ekleyerek vurgular: satırın blok imi (liste, başlık, alıntı)
+    // aralığa girerse blok bozulur; tablo satırında sütun sayısı bozulacağından aralık hiç verilmez.
+    const satirBasi = metin.lastIndexOf('\n', bitis - 1) + 1
+    const satir = metin.slice(satirBasi, bitis)
+    if (/^\s*\|/.test(satir)) continue
+    const im = /^(?:\s*(?:[-*+]|\d+[.)]|>|#{1,6})\s+)+/.exec(satir)
+    if (im && start < satirBasi + im[0].length) start = satirBasi + im[0].length
     if (bitis > start) araliklar.get(id)!.push({ start, end: bitis })
   }
   metin += ham.slice(son)

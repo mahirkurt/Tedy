@@ -21,10 +21,12 @@ export interface AsistanDurumu {
   ses: { var: boolean; okunan: string | null; oku: (id: string, metin: string) => void } | null
   /** Ekranda mesaj var mı (başlangıç ekranını kapatmak için, tedyChatConfig). */
   mesajVar: boolean
+  /** Bir eylem kaydedilemediğinde giriş üstünde gösterilen kısa uyarı (ör. geri bildirim). */
+  uyari: string | null
 }
 
 const BASLANGIC: AsistanDurumu = { okur: 'aile', ogretmenId: 'genel', saltOkunur: false, odevKey: '', cipler: [], sayfa: null,
-  sonrakiIstek: {}, dokum: [], bekleyen: null, yukleniyor: false, ekGoruntuleri: {}, acikAtif: null, ses: null, mesajVar: false }
+  sonrakiIstek: {}, dokum: [], bekleyen: null, yukleniyor: false, ekGoruntuleri: {}, acikAtif: null, ses: null, mesajVar: false, uyari: null }
 
 let durum = BASLANGIC
 const dinleyiciler = new Set<() => void>()

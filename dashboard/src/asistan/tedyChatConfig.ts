@@ -1,5 +1,5 @@
 import type { PublicConfig, PublicConfigMessaging } from '@carbon/ai-chat'
-import { TURKCE } from './dilPaketi.ts'
+import { AILE, TURKCE } from './dilPaketi.ts'
 
 export interface ConfigGirdisi {
   /** 'sayfa': /asistan'a gömülü (açık başlar, başlatıcı yok). 'panel': diğer sayfalarda başlatıcıyla açılan yan panel. */
@@ -20,8 +20,8 @@ export function tedyChatConfig(g: ConfigGirdisi): Omit<PublicConfig, 'markdown'>
     strings: {
       ...TURKCE,
       input_placeholder: g.okur === 'ogrenci' ? 'Bir soru sor veya çalışma planı iste...' : 'Bir soru sorun veya çalışma planı isteyin...',
-      // Soranın etiketi hitaba uyar (eski arayüzde VOICE): Işık'a "sen", aileye "siz".
-      ...(g.okur === 'aile' ? { message_labelYou: 'Siz {timestamp}', messages_youSaid: 'Siz yazdınız' } : {}),
+      // Hitap (eski arayüzde VOICE): Işık'a "sen", aileye "siz" — soranın etiketi ve cümle biçimli metinler.
+      ...(g.okur === 'aile' ? AILE : {}),
     },
     // Model cevabı ve alıntılanan portal metni ham HTML taşıyabilir: Carbon'un temizleyicisi açık (XSS).
     shouldSanitizeHTML: true,

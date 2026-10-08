@@ -189,3 +189,20 @@ test.describe('phone camera', () => {
     await expect(page.getByRole('button', { name: 'Fotoğraf çek' })).toBeVisible()
   })
 })
+
+test('yükleme sürerken gönderilen soru eki bekler ve onunla gider (ek sessizce düşmez)', async ({ page }) => {
+  const govdeler: { messages: { ekler?: string[] }[] }[] = []
+  await page.route('**/api/assistant/chat', r => r.fulfill(json(CEVAP)))
+  await page.route('**/api/assistant/stream', async r => {
+    govdeler.push(r.request().postDataJSON())
+    await r.fulfill({ status: 200, contentType: 'text/event-stream', body: `event: answer\ndata: ${JSON.stringify({ payload: CEVAP })}\n\n` })
+  })
+  await page.route('**/api/assistant/uploads', async r => { await new Promise(t => setTimeout(t, 1500)); await yukleme(r) })
+  await sabitAc(page, '/asistan', 1440, 900)
+  await page.locator('.ac__dosya-girdi').setInputFiles({ name: 'not.png', mimeType: 'image/png', buffer: Buffer.from('x') })
+  await soruAlani(page).fill('bak')
+  await page.getByRole('button', { name: 'Gönder' }).click()
+  await expect(page.getByText('Baktım.', { exact: true })).toBeVisible({ timeout: 10000 })
+  expect(govdeler).toHaveLength(1)
+  expect(govdeler[0].messages.at(-1)?.ekler).toEqual([ID])
+})

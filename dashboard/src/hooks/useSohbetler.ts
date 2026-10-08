@@ -94,6 +94,8 @@ export function useSohbetler(email: string | undefined, student: boolean) {
       setHata(null)
       return result
     } catch {
+      // Açılamayan (silinmiş) sohbet seçili kalmaz: sonraki soru ölü kimliğe gidip 404 almasın.
+      setSecili(prev => (prev?.id === id ? null : prev))
       setHata('Sohbetler yüklenemedi.')
       return null
     } finally { setBekliyor(false) }

@@ -67,3 +67,12 @@ test('İlerleme sayfası günlüğünde haftalık geri bildirim özeti', async (
   await expect(page.getByText('Asistan cevapları: 3 beğenildi, 1 beğenilmedi', { exact: true })).toBeVisible()
   await expect(page.getByText('Anlamadım — çok hızlı', { exact: true })).toBeVisible()
 })
+
+test('kaydedilemeyen geri bildirim okura söylenir (sessiz hata yok)', async ({ page }) => {
+  await page.route(`**/api/assistant/mesajlar/${MID}/geri-bildirim`, r => r.fulfill({ status: 500, json: { error: 'x' } }))
+  await cevapla(page, PAYLOAD({ answer: 'Cevap.', mesaj_id: MID }))
+  await asistanAc(page)
+  await sor(page, 'Soru')
+  await page.locator('button[aria-label="Bu yanıtı beğendim"]').click()
+  await expect(page.getByRole('alert').filter({ hasText: 'Geri bildirim kaydedilemedi.' })).toBeVisible()
+})

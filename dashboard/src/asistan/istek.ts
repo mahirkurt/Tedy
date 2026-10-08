@@ -15,6 +15,8 @@ function secenekler(): SonYanitSecenekleri {
 export async function calistir(inst: ChatInstance, govde: Record<string, unknown>, plan: boolean, signal: AbortSignal) {
   asistanDeposu.ayarla({ bekleyen: { govde, plan }, yukleniyor: true })
   let d = akisBaslat(crypto.randomUUID())
+  // Kısmi parçası Carbon'a gitmiş (açık, akan) mesaj: hata olursa yeni mesaj değil, bu mesaj hata kartıyla biter.
+  let acikYanit: string | null = null
   let zincir: Promise<unknown> = Promise.resolve()
   const sira = (f: () => Promise<unknown>) => { zincir = zincir.then(f); return zincir }
   try {
@@ -26,8 +28,9 @@ export async function calistir(inst: ChatInstance, govde: Record<string, unknown
       await soruGonder(govde, o => {
         const r = olayIsle(d, o, secenekler())
         d = r.durum
-        if (r.kaldir) { const k = r.kaldir; sira(() => inst.messaging.removeMessages(k)) }
+        if (r.kaldir) { const k = r.kaldir; sira(() => inst.messaging.removeMessages(k)); if (k.includes(acikYanit ?? '')) acikYanit = null }
         for (const p of r.parcalar) sira(() => inst.messaging.addMessageChunk(p))
+        if (r.parcalar.length) acikYanit = 'final_response' in r.parcalar[r.parcalar.length - 1] ? null : d.yanitId
         if (o.ad === 'answer') {
           const payload = o.veri.payload as { answer?: string; meta?: { model?: string } }
           const dk = asistanDeposu.al()
@@ -41,7 +44,8 @@ export async function calistir(inst: ChatInstance, govde: Record<string, unknown
   } catch (e) {
     await zincir.catch(() => {})
     if ((e as { name?: string })?.name === 'AbortError' || signal.aborted) return
-    await inst.messaging.addMessage(hataYaniti(crypto.randomUUID(), okurHatasi(e)))
+    if (acikYanit) await inst.messaging.addMessageChunk({ final_response: hataYaniti(acikYanit, okurHatasi(e)) } as StreamChunk)
+    else await inst.messaging.addMessage(hataYaniti(crypto.randomUUID(), okurHatasi(e)))
   } finally {
     asistanDeposu.ayarla({ yukleniyor: false })
   }

@@ -50,3 +50,18 @@ test('gömülü sayfada küçült düğmesi yok (başlatıcı yokken sohbet geri
   assert.equal(tedyChatConfig({ ...G, bicim: 'sayfa' }).header?.hideMinimizeButton, true)
   assert.equal(tedyChatConfig({ ...G, bicim: 'panel' }).header?.hideMinimizeButton, false)
 })
+
+test('aileye cümle biçimli Carbon metinleri de "siz" der; öğrenciye "sen"', () => {
+  const aile = tedyChatConfig({ ...G, okur: 'aile' }).strings!
+  const ogrenci = tedyChatConfig({ ...G, okur: 'ogrenci' }).strings!
+  assert.equal(aile.feedback_defaultPrompt, 'Neden bu değerlendirmeyi seçtiniz?')
+  assert.equal(ogrenci.feedback_defaultPrompt, 'Neden bu değerlendirmeyi seçtin?')
+  assert.equal(aile.input_ariaLabel, 'Sorunuzu yazın')
+  assert.equal(aile.conversationalSearch_streamingIncomplete, 'Bu mesaj tamamlanamadı. Yeniden deneyin.')
+  // Aileye giden hiçbir metinde ikinci tekil emir/şahıs kalıbı yok (seç, bas, dene, yazdın, sorabilirsin…).
+  const tekil = /(?<!\p{L})(seç|bas|dene|sen|yazdın|seçtin|sorabilirsin|gezin)(?!\p{L})/iu
+  const ilgili = ['errors_singleMessage', 'errors_busy', 'input_keyboardShortcutAnnouncement', 'messages_scrollHandleDetailed',
+    'messages_scrollHandleDetailedNoShortcut', 'messages_scrollHandleEndDetailed', 'messages_scrollHandleEndDetailedNoShortcut',
+    'general_ariaAnnounceEscapeOverlay', 'fileSharing_uploadErrorRecovery', 'options_select'] as const
+  for (const k of ilgili) assert.ok(!tekil.test(String(aile[k])), `${k}: ${aile[k]}`)
+})

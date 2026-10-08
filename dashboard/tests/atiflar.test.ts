@@ -31,7 +31,17 @@ test('metin başı, blok, tablo hücresi ve liste: aralık metnin içinde, işar
   }
   assert.ok((r.atiflar[0].ranges ?? []).every(g => g.end > g.start))
   assert.equal(r.metin.slice(r.atiflar[1].ranges![0].start, r.atiflar[1].ranges![0].end), 'Pay üstteki sayıdır')
-  assert.equal(r.metin.slice(r.atiflar[2].ranges![0].start, r.atiflar[2].ranges![0].end), '| a')
+  // Carbon aralığı markdown kaynağına "==…==" ekleyerek vurgular: blok imleri aralığa girmez, yoksa liste,
+  // başlık ve tablo bozulur. Tablo satırında aralık verilmez (sütun sayısı bozulurdu); atıf listede kalır.
+  assert.deepEqual(r.atiflar[2].ranges, [])
+  const madde = (r.atiflar[0].ranges ?? []).slice(-1)[0]
+  assert.equal(r.metin.slice(madde.start, madde.end), 'madde')
+})
+
+test('başlık, alıntı ve numaralı madde imi aralığa girmez', () => {
+  const r = atiflariAyikla('### Başlık [S1]\n\n> alıntı [S2]\n\n12. adım [S3]', [k('S1'), k('S2'), k('S3')])
+  const parca = (i: number) => { const g = (r.atiflar[i].ranges ?? [])[0]; return r.metin.slice(g.start, g.end) }
+  assert.deepEqual([parca(0), parca(1), parca(2)], ['Başlık', 'alıntı', 'adım'])
 })
 
 test('boş aralık atılır ama atıf listede kalır', () => {

@@ -18,7 +18,7 @@ export async function cevapla(page: Page, payload: Record<string, unknown>, olay
   await page.route('**/api/assistant/chat', async r => { istekler.push(r.request().postDataJSON()); await r.fulfill({ json: payload }) })
   return istekler
 }
-export const soruAlani = (page: Page) => page.getByRole('textbox', { name: 'Sorunu yaz' })
+export const soruAlani = (page: Page) => page.getByRole('textbox', { name: /^Sorunu(zu)? yaz/ })
 export const gonderDugmesi = (page: Page) => page.getByRole('button', { name: 'Gönder', exact: true })
 export async function asistanAc(page: Page, yol = '/asistan') {
   await mockSohbetler(page)

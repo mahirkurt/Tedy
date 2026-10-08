@@ -267,3 +267,23 @@ export const TURKCE: LanguagePack = {
   aria_iframePanel: 'İçerik paneli',
   aria_viewSourcePanel: 'Kaynak paneli',
 }
+
+/** Aileye "siz" (CLAUDE.md hitap kuralı): cümle biçimli metinler aile okurken bunlarla değişir. Düğme adları
+ *  ("Gönder", "Mesajı seç") arayüz komutudur, değişmez. Destek kişisi (canlı temsilci) metinleri kullanılmıyor. */
+export const AILE: Partial<LanguagePack> = {
+  errors_singleMessage: 'Gönderdiğiniz mesajda bir sorun oldu; başka bir şey sorabilirsiniz.',
+  errors_busy: 'Şu an çok yoğunuz; biraz sonra yeniden deneyin.',
+  input_ariaLabel: 'Sorunuzu yazın',
+  input_keyboardShortcutAnnouncement: 'Mesaj listesi ile giriş alanı arasında geçmek için {key} tuşuna basın.',
+  messages_youSaid: 'Siz yazdınız',
+  message_labelYou: 'Siz {timestamp}',
+  messages_scrollHandleDetailed: 'Sohbetin başı. İlk mesaja gitmek için bu düğmeyi seçin, mesajlar arasında ok tuşlarıyla gezinin. Listeden çıkmak için Esc\'ye basın. Mesaj listesi ile giriş alanı arasında geçmek için {shortcut} tuşuna basın.',
+  messages_scrollHandleDetailedNoShortcut: 'Sohbetin başı. İlk mesaja gitmek için bu düğmeyi seçin, mesajlar arasında ok tuşlarıyla gezinin. Listeden çıkmak için Esc\'ye basın.',
+  messages_scrollHandleEndDetailed: 'Sohbetin sonu. Son mesaja gitmek için bu düğmeyi seçin, mesajlar arasında ok tuşlarıyla gezinin. Listeden çıkmak için Esc\'ye basın. Mesaj listesi ile giriş alanı arasında geçmek için {shortcut} tuşuna basın.',
+  messages_scrollHandleEndDetailedNoShortcut: 'Sohbetin sonu. Son mesaja gitmek için bu düğmeyi seçin, mesajlar arasında ok tuşlarıyla gezinin. Listeden çıkmak için Esc\'ye basın.',
+  options_select: 'Bir seçenek seçin',
+  general_ariaAnnounceEscapeOverlay: 'Kapatmak için Esc\'ye basın ya da kapat düğmesini seçin.',
+  conversationalSearch_streamingIncomplete: 'Bu mesaj tamamlanamadı. Yeniden deneyin.',
+  fileSharing_uploadErrorRecovery: 'Eki kaldırıp yeniden deneyin.',
+  feedback_defaultPrompt: 'Neden bu değerlendirmeyi seçtiniz?',
+}

@@ -5,10 +5,12 @@ const ETIKET = 'cds-operational-tag'
 
 type Guncellenen = Element & { updateComplete?: Promise<unknown> }
 
-function onar(kok: ParentNode): void {
+/** `kalan`: iç düğme henüz yoksa öğenin güncellemesi beklenip en çok bu kadar yeniden denenir. Bitmiş bir Lit
+ *  öğesinin updateComplete'i hep çözülmüş gelir; sınırsız deneme sekmeyi donduran bir mikro görev döngüsüdür. */
+export function onar(kok: ParentNode, kalan = 3): void {
   for (const etiket of kok.querySelectorAll<Guncellenen>(`${ETIKET}[aria-expanded]`)) {
     const dugme = etiket.shadowRoot?.querySelector('[role="button"]')
-    if (!dugme) { void etiket.updateComplete?.then(() => onar(kok)); continue }
+    if (!dugme) { if (kalan > 0) void etiket.updateComplete?.then(() => onar(kok, kalan - 1)); continue }
     dugme.setAttribute('aria-expanded', etiket.getAttribute('aria-expanded') ?? 'false')
     etiket.removeAttribute('aria-expanded')
   }

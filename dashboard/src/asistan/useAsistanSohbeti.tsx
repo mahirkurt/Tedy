@@ -27,9 +27,19 @@ import type { BusEventFeedback } from '@carbon/ai-chat'
 import { sayfaEtiketi, useAcikOge } from './sayfaBaglami.ts'
 import { sayfaSorulari } from './sayfaSorulari.ts'
 import BaglamCipi from './BaglamCipi.tsx'
+import GirisUyarisi from './GirisUyarisi.tsx'
 
 const TABLO = { table: tabloCiz }
 const ALTBILGI = altbilgiCizici()
+
+const ekBekliyor = () => asistanDeposu.al().cipler.some(c => c.yukleniyor || c.baglaniyor)
+function eklerHazir(signal?: AbortSignal): Promise<void> {
+  if (!ekBekliyor()) return Promise.resolve()
+  return new Promise(bitti => {
+    const birak = asistanDeposu.abone(() => { if (!ekBekliyor()) { birak(); bitti() } })
+    signal?.addEventListener('abort', () => { birak(); bitti() }, { once: true })
+  })
+}
 
 /** Gönderme işlevi Carbon'un yapılandırmasında yaşar; güncel sohbet deposunu render dışında buradan okur. */
 let guncelSohbet: ReturnType<typeof useSohbetler> | null = null
@@ -78,8 +88,12 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
 
   const gonder = useCallback(async (istek: MessageRequest, sec: CustomSendMessageOptions, inst: ChatInstance) => {
     const metin = String((istek.input as { text?: string }).text ?? '').trim()
+    if (!metin || asistanDeposu.al().saltOkunur) return
+    // Yüklenen ya da ödeve bağlanan ek bitene kadar beklenir (eski arayüz gönderimi engelliyordu): yoksa ek
+    // bu sorudan düşer, çipi temizlenir ve yükleme sonucu boşa gider.
+    await eklerHazir(sec.signal)
+    if (sec.signal?.aborted) return
     const d = asistanDeposu.al()
-    if (!metin || d.saltOkunur) return
     const ek = d.sonrakiIstek
     const plan = !!ek.plan || hizliSorular.some(s => s.plan && s.metin === metin)
     const kaydet = !plan && !ek.deep && !ek.transient
@@ -126,7 +140,7 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
     const etkin = etkinSohbetiOku(email)
     if (!etkin || !guncelSohbet) return []
     const sonuc = await guncelSohbet.ac(etkin.id, etkin.salt)
-    if (!sonuc) { etkinSohbetiYaz(email, null); return [] }
+    if (!sonuc) { etkinSohbetiYaz(email, null); asistanDeposu.ayarla({ sohbetId: undefined }); return [] }
     const saltMi = sonuc.read_only ?? etkin.salt
     const ekGoruntuleri: Record<string, { id: string; ad: string; tur: string }[]> = {}
     for (const m of sonuc.mesajlar) if (m.rol === 'user' && m.yuklemeler?.length) ekGoruntuleri[m.id] = m.yuklemeler
@@ -160,7 +174,7 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
     renderWriteableElements: {
       workspacePanelElement: <KaynakPaneli inst={() => instance.current} />, headerFixedActionsElement: <AiAciklama />,
       beforeInputElement: <><Karsilama inst={() => instance.current} karsilama={karsilama} hizliSorular={hizliSorular} />
-        <BaglamCipi /><GirisEkleri /></>,
+        <GirisUyarisi /><BaglamCipi /><GirisEkleri /></>,
       promptLineSendButtonStart: <GirisDugmeleri inst={() => instance.current}
         mikrofon={{ var: ses.mikrofonVar, dinliyor: ses.dinliyor, bas: ses.mikrofon }} />,
       historyPanelElement: <GecmisPaneli depo={sohbet} ogrenci={ogrenci} inst={() => instance.current} ogretmenSec={ogretmen.sec} />,
