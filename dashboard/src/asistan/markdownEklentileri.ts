@@ -1,6 +1,6 @@
 // Bugünkü sohbet renderer'ının (utils/markdown.tsx, bicim: 'sohbet') kutu ve formül kuralları, markdown-it
 // eklentisi olarak. Carbon AI Chat eklenti çıktısını light DOM'a koyar; utils/markdown.scss sınıfları uygulanır.
-import type MarkdownIt from 'markdown-it'
+import MarkdownIt from 'markdown-it'
 
 type BlokKurali = Parameters<MarkdownIt['block']['ruler']['before']>[2]
 type SatirKurali = Parameters<MarkdownIt['inline']['ruler']['before']>[2]
@@ -31,28 +31,8 @@ function adimlarHtml(md: MarkdownIt, icerik: string): string {
   return `<ol class="ac-adimlar" aria-label="Adımlar">${lis.join('')}</ol>`
 }
 
-export function tedyMarkdownEklentisi(md: MarkdownIt, katex?: KatexBenzeri): void {
-  const kutu: BlokKurali = (s, bas, son, sessiz) => {
-    const m = ACILIS.exec(satir(s, bas).trim())
-    if (!m) return false
-    if (sessiz) return true
-    let n = bas + 1
-    while (n < son && !KAPANIS.test(satir(s, n).trim())) n += 1
-    const t = s.push('tedy_kutu', 'div', 0)
-    t.info = m[1]; t.content = s.getLines(bas + 1, n, s.blkIndent, false).replace(/\n$/, ''); t.block = true
-    t.map = [bas, Math.min(n + 1, son)]
-    s.line = Math.min(n + 1, son)
-    return true
-  }
-  md.block.ruler.before('fence', 'tedy_kutu', kutu, KESER)
-  md.renderer.rules.tedy_kutu = (tokens, i) => {
-    const ad = tokens[i].info as keyof typeof KUTULAR
-    const icerik = tokens[i].content
-    if (!(ad in KUTULAR)) return md.render(icerik)
-    if (ad === 'adimlar') return `<div class="ac-kutu--adimlar">${adimlarHtml(md, icerik)}</div>`
-    return `<div class="ac-kutu ac-kutu--${ad}"><span class="ac-kutu__etiket">${KUTULAR[ad]}</span>${md.render(icerik)}</div>`
-  }
-
+/** Formül kuralları (blok ve satır içi); hem Carbon'un örneğine hem kutu içi örneğine kurulur. */
+function formulKurallari(md: MarkdownIt, katex?: KatexBenzeri): void {
   const blokFormul: BlokKurali = (s, bas, son, sessiz) => {
     const ilk = satir(s, bas).trim()
     const tek = /^\$\$(.+)\$\$$/.exec(ilk)
@@ -82,4 +62,44 @@ export function tedyMarkdownEklentisi(md: MarkdownIt, katex?: KatexBenzeri): voi
   md.inline.ruler.before('escape', 'tedy_satir_formul', satirFormul)
   md.renderer.rules.tedy_formul = (tokens, i) => formulHtml(katex, tokens[i].content, true)
   md.renderer.rules.tedy_formul_satir = (tokens, i) => formulHtml(katex, tokens[i].content, false)
+}
+
+/** Kutu içi her zaman HTML'e kapalı ayrı bir örnekle çizilir: eklenti çıktısı light DOM'a innerHTML olarak
+ *  konur ve Carbon onu yalnız sanitize-html açıkken temizler. Model cevabındaki ham HTML yazı olarak kalır. */
+const icOrnekleri = new WeakMap<object, MarkdownIt>()
+function guvenliIc(katex?: KatexBenzeri): MarkdownIt {
+  const anahtar = katex ?? icOrnekleri
+  let ic = icOrnekleri.get(anahtar)
+  if (!ic) {
+    ic = new MarkdownIt({ html: false, linkify: false })
+    formulKurallari(ic, katex)
+    icOrnekleri.set(anahtar, ic)
+  }
+  return ic
+}
+
+export function tedyMarkdownEklentisi(md: MarkdownIt, katex?: KatexBenzeri): void {
+  const ic = guvenliIc(katex)
+  const kutu: BlokKurali = (s, bas, son, sessiz) => {
+    const m = ACILIS.exec(satir(s, bas).trim())
+    if (!m) return false
+    if (sessiz) return true
+    let n = bas + 1
+    while (n < son && !KAPANIS.test(satir(s, n).trim())) n += 1
+    const t = s.push('tedy_kutu', 'div', 0)
+    t.info = m[1]; t.content = s.getLines(bas + 1, n, s.blkIndent, false).replace(/\n$/, ''); t.block = true
+    t.map = [bas, Math.min(n + 1, son)]
+    s.line = Math.min(n + 1, son)
+    return true
+  }
+  md.block.ruler.before('fence', 'tedy_kutu', kutu, KESER)
+  md.renderer.rules.tedy_kutu = (tokens, i) => {
+    const ad = tokens[i].info as keyof typeof KUTULAR
+    const icerik = tokens[i].content
+    if (!(ad in KUTULAR)) return ic.render(icerik)
+    if (ad === 'adimlar') return `<div class="ac-kutu--adimlar">${adimlarHtml(ic, icerik)}</div>`
+    return `<div class="ac-kutu ac-kutu--${ad}"><span class="ac-kutu__etiket">${KUTULAR[ad]}</span>${ic.render(icerik)}</div>`
+  }
+
+  formulKurallari(md, katex)
 }

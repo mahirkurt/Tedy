@@ -34,3 +34,12 @@ test('formüller: satır içi, blok, çok satır, hatalı', () => {
 test('tek dolar ($5 ve $6 gibi para) formül sayılmaz', () => {
   assert.ok(!md().render('Fiyat 5$ ve 6 $ oldu').includes('katex'))
 })
+
+test('kutu ve formül içindeki ham HTML yazı olarak kalır (XSS yok), html açık bir örnekte bile', () => {
+  const m = new MarkdownIt({ html: true })   // Carbon'un örneği HTML'e açık olsa bile
+  m.use(tedyMarkdownEklentisi, katex)
+  const html = m.render(':::kavram\n<img src=x onerror="window.__xss=1">\n[tıkla](javascript:alert(1))\n:::\n\n$<b>x</b>$')
+  assert.ok(!/<img/i.test(html), html)
+  assert.ok(!/href="javascript:/i.test(html), html)
+  assert.ok(!/<b>x<\/b>/.test(html), html)
+})
