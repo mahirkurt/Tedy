@@ -79,6 +79,19 @@ test('cevaptaki ve kutudaki ham HTML çalışmaz (XSS)', async ({ page }) => {
   expect(await page.evaluate(() => (window as unknown as { __xss?: number; __xss2?: number }).__xss ?? (window as unknown as { __xss2?: number }).__xss2)).toBeUndefined()
 })
 
+test('atıflı cevaptaki ham HTML de çalışmaz (Carbon atıflı cevapta temizleyiciyi kapatıyor)', async ({ page }) => {
+  await cevapla(page, PAYLOAD({
+    answer: 'Metin <img src=x onerror="window.__xss=1"> son [S1].',
+    citations: [{ id: 'S1', kind: 'mufredat', label: 'Kesirler', locator: {}, snippet: 'Eş <img src=z onerror="window.__xss3=1"> parça', confidence: 0.9 }],
+  }))
+  await asistanAc(page)
+  await sor(page, 'Soru')
+  await expect(page.getByRole('button', { name: 'Kaynaklar', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Kaynaklar', exact: true }).click()
+  await page.waitForTimeout(500)
+  expect(await page.evaluate(() => { const w = window as unknown as Record<string, number | undefined>; return [w.__xss, w.__xss3] })).toEqual([undefined, undefined])
+})
+
 test('zaman 24 saat, ad TEDY Asistan, tablo filtre kutusuz kendi tablomuz', async ({ page }) => {
   await cevapla(page, PAYLOAD({ answer: '| a | b |\n|---|---|\n| 1 | 2 |' }))
   await asistanAc(page)

@@ -29,11 +29,36 @@ function formulHtml(katex: KatexBenzeri | undefined, tex: string, blok: boolean)
   return blok ? `<div class="ac-formul ac-formul--blok">${ic}</div>` : `<span class="ac-formul">${ic}</span>`
 }
 
+/** Kutudaki en dış numaralı liste adım kartlarına döner; alt maddeler adımın içinde, öbür bloklar olduğu gibi kalır. */
 function adimlarHtml(md: MarkdownIt, icerik: string): string {
-  const ogeler = icerik.split('\n').map(s => /^\s*(\d+)[.)]\s+(.+)$/.exec(s))
-  if (!ogeler.length || ogeler.some(o => !o)) return md.render(icerik)
-  const lis = ogeler.map(o => `<li class="ac-adim"><span class="ac-adim__no" aria-hidden="true">${o![1]}</span><div class="ac-adim__govde">${md.renderInline(o![2])}</div></li>`)
-  return `<ol class="ac-adimlar" aria-label="Adımlar">${lis.join('')}</ol>`
+  const t = md.parse(icerik, {})
+  const ciz = (a: number, b: number) => md.renderer.render(t.slice(a, b), md.options, {})
+  const disListe = (i: number) => t[i].type === 'ordered_list_open' && t[i].level === 0
+  let html = ''
+  let i = 0
+  while (i < t.length) {
+    if (!disListe(i)) {
+      const bas = i
+      do i += 1; while (i < t.length && !disListe(i))
+      html += ciz(bas, i)
+      continue
+    }
+    const ilk = Number(t[i].attrGet('start') ?? 1)
+    const adimlar: string[] = []
+    i += 1
+    while (t[i].type !== 'ordered_list_close') {
+      let j = i + 1
+      for (let derinlik = 1; derinlik > 0; j += 1) {
+        if (t[j].type === 'list_item_open') derinlik += 1
+        else if (t[j].type === 'list_item_close') derinlik -= 1
+      }
+      adimlar.push(`<li class="ac-adim"><span class="ac-adim__no" aria-hidden="true">${ilk + adimlar.length}</span><div class="ac-adim__govde">${ciz(i + 1, j - 1)}</div></li>`)
+      i = j
+    }
+    i += 1
+    html += `<ol class="ac-adimlar" aria-label="Adımlar"${ilk === 1 ? '' : ` start="${ilk}"`}>${adimlar.join('')}</ol>`
+  }
+  return html
 }
 
 /** Formül kuralları (blok ve satır içi); hem Carbon'un örneğine hem kutu içi örneğine kurulur. */
@@ -60,7 +85,8 @@ function formulKurallari(md: MarkdownIt, katex?: KatexBenzeri): void {
     if (s.src[s.pos] !== '$' || s.src[s.pos + 1] === '$' || /\s/.test(s.src[s.pos + 1] ?? ' ')) return false
     const kapanis = s.src.indexOf('$', s.pos + 1)
     if (kapanis < 0 || /\s/.test(s.src[kapanis - 1])) return false
-    if (!sessiz) { const t = s.push('tedy_formul_satir', 'span', 0); t.content = s.src.slice(s.pos + 1, kapanis) }
+    // Etiket boş: Carbon 'span' etiketli öğeyi kendisi (içi boş) çizer; tanımadığını ışık DOM'a <span> olarak taşır.
+    if (!sessiz) { const t = s.push('tedy_formul_satir', '', 0); t.content = s.src.slice(s.pos + 1, kapanis) }
     s.pos = kapanis + 1
     return true
   }
@@ -85,6 +111,10 @@ function guvenliIc(katex?: KatexBenzeri): MarkdownIt {
 
 export function tedyMarkdownEklentisi(md: MarkdownIt, katex?: KatexBenzeri): void {
   const ic = guvenliIc(katex)
+  // Ham HTML hiçbir cevapta çizilmez: Carbon atıflı (conversational_search) cevabı shouldSanitizeHTML'den bağımsız
+  // olarak temizleyicisiz çiziyor (overrideSanitize: false, 1.22.0) — model ya da portal metnindeki <img onerror>
+  // çalışıyordu. Kural kapalıyken etiket düz yazı olarak kalır.
+  md.disable(['html_block', 'html_inline'], true)
 
   // Paragraf düzeyi dönüşümler, ayrıştırmadan sonra: vurgu kutusu ve kalın satır → h4 (eski renderer'daki gibi).
   md.core.ruler.after('inline', 'tedy_paragraf', durum => {

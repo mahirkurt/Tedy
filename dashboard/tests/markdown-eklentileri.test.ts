@@ -54,3 +54,25 @@ test('yalnız kalın, kısa satır h4 başlık olur; uzun kalın satır paragraf
   assert.match(md().render('**Pazartesiye üç ödev**'), /^<h4>Pazartesiye üç ödev<\/h4>/)
   assert.match(md().render('**' + 'a'.repeat(81) + '**'), /^<p><strong>/)
 })
+
+test('satır içi formül öğesi Carbon’un kendi çizdiği etiketi taşımaz (yoksa içi boş <span> çizilir)', () => {
+  // Carbon yalnız tanımadığı etiketli öğeyi markdown-it çizicisine bırakıp ışık DOM'a taşır (pluginFallback).
+  const ogeler = md().parse('Metin $\\frac{1}{2}$ var.\n\n$$x$$', {}).flatMap(t => [t, ...(t.children ?? [])])
+  assert.deepEqual(ogeler.filter(t => t.type.startsWith('tedy_formul')).map(t => [t.type, t.tag]),
+    [['tedy_formul_satir', ''], ['tedy_formul', 'div']])
+})
+
+test('adımlar kutusu alt maddeyi adımın içinde, kapanış paragrafını listenin altında tutar', () => {
+  const html = md().render(':::adimlar\n1. Ortak payda\n2. Genişlet\n   - Eşit parçalar\n3. Karşılaştır\n\nBu adımlar karşılaştırır.\n:::')
+  assert.equal((html.match(/class="ac-adim"/g) ?? []).length, 3)
+  assert.match(html, /<span class="ac-adim__no" aria-hidden="true">2<\/span><div class="ac-adim__govde">Genişlet\n?<ul>\n<li>Eşit parçalar<\/li>/)
+  assert.match(html, /<\/ol><p>Bu adımlar karşılaştırır\.<\/p>/)
+})
+
+test('ana metindeki ham HTML, HTML’e açık örnekte de yazı kalır (Carbon atıflı cevapta temizleyiciyi kapatıyor)', () => {
+  const m = new MarkdownIt({ html: true })
+  m.use(tedyMarkdownEklentisi, katex)
+  const html = m.render('Metin <img src=x onerror="window.__xss=1"> son.\n\n<div onclick="x()">blok</div>')
+  assert.ok(!/<img|<div onclick/.test(html), html)
+  assert.match(html, /&lt;img src=x onerror=&quot;window.__xss=1&quot;&gt;/)
+})
