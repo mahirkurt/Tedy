@@ -45,3 +45,9 @@ test('çözülemeyen işaret metin olarak kalır', () => {
   assert.equal(r.metin, 'Bir şey [S9].')
   assert.deepEqual(r.atiflar, [])
 })
+
+test('kod aralığı ve kod bloğundaki işaret yazı olarak kalır, atıf sayılmaz', () => {
+  const { metin, kimlikler } = atiflariAyikla('Kod `örnek [S1]` aralığı [S2].\n\n```\nx = [S1]\n```', [k('S1'), k('S2')])
+  assert.equal(metin, 'Kod `örnek [S1]` aralığı.\n\n```\nx = [S1]\n```')
+  assert.deepEqual(kimlikler, ['S2'])
+})

@@ -283,3 +283,16 @@ Paketin tür tanımları ve depo desenleri incelenirken netleşen, onaylanan kar
 8. **Sayfa adları**: `bugun, isler, dersler, notlar, takvim, takimlar, ilerleme, duyurular, profil, moduller, kitaplar, sinavlar`.
 
 Uygulama planı: `docs/superpowers/plans/2026-10-08-asistan-carbon-ai-chat.md`.
+
+## Bilinen boşluklar (Görev 19, 2026-10-08)
+
+Ölçülerek bulunan, Carbon AI Chat 1.22.0'dan gelen ve bu geçişte ya geçici olarak onarılan ya da açık kalan noktalar:
+
+1. **Carbon'un kendi erişilebilirlik ihlalleri** (deneme raporu 5. satır): tablo ve başlık AI etiketi kendi bileşenlerimizle değiştirildi. Görev 17'de çıkan iki ihlal — atıf düğmesinde ("Kaynaklar", `cds-operational-tag`) rolsüz öğede `aria-expanded` (IBM `aria_attribute_valid`) ve etiketsiz ok ikonu (`svg_graphics_labelled`) — `dashboard/src/asistan/carbonOnarimi.ts` ile sayfada onarılıyor. Onarım Carbon'un DOM'una bağlıdır: paket güncellenip yapı değişirse onarım sessizce boşa düşer, `carbon-asistan-zengin-cevap` IBM testi kırmızıya döner. axe ve IBM denetimlerinde şu an kalan ihlal yok.
+2. **Atıflı cevapta temizleyici kapalı**: Carbon `conversational_search` cevabını `shouldSanitizeHTML`'den bağımsız olarak temizleyicisiz çiziyor. Bizim markdown eklentimiz `html_block`/`html_inline` kurallarını kapatıyor; ham HTML hiçbir cevapta çizilmez (e2e ile sabit). Eklenti kaldırılırsa açık geri gelir.
+3. **4K (3840 px)**: Carbon AI Chat'in metni kök yazı boyutuyla 2× büyür, ama piksel tabanlı kısıtları büyümez: mesaj sütunu 672 px (`--cds-aichat-messages-max-width`), geçmiş paneli dar kalır (başlıklar sarar), gölge kökteki ikonlar (yeniden başlat, gönder) 16 px kalır — `ted-theme.scss`'teki ikon kuralı gölge köke ulaşmaz. `ekran-4k` bu ikonları ölçmez.
+4. **Araç adımları** `chain_of_thought` yerine Carbon `reasoning` adımlarıdır (akışta açık, cevapla kapanır); adım başına başarı/başarısızlık simgesi yoktur, başarısız adımın sonucu metinle yazar.
+5. **Akışta yeniden çizilen eklenti düğümleri**: Carbon son cevap taslağın yerine geçince eski eklenti düğümlerini yuvasız bırakır (görünmez, erişilebilirlik ağacında yok); sayfa yenilenene kadar DOM'da durur.
+6. **Tam ekran panelde mesajlar da genişler**: yüzen pencerenin genişliği ve mesaj sütunu Carbon'da aynı değişkenle (`messages-max-width`) sınırlı.
+7. **Başarım**: Lighthouse `/asistan` başarımı 0.27 (diğer sayfalar ~0.55; yalnız uyarı). Erişilebilirlik 1.0, CLS ≤ 0.1. Carbon AI Chat yalnız asistan açılınca yüklenir.
+8. **Çalışma Planı düğmesi** giriş boşken etkin görünür (eski arayüzde devre dışıydı); boş girişte hiçbir şey yapmaz.

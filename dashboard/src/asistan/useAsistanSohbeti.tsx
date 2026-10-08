@@ -158,7 +158,7 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
     renderCustomMessageFooter: ALTBILGI,
     renderCustomRequestFooter: (_slot, mesaj) => <IstekEkleri mesajId={mesaj.id} />,
     renderWriteableElements: {
-      workspacePanelElement: <KaynakPaneli />, headerFixedActionsElement: <AiAciklama />,
+      workspacePanelElement: <KaynakPaneli inst={() => instance.current} />, headerFixedActionsElement: <AiAciklama />,
       beforeInputElement: <><Karsilama inst={() => instance.current} karsilama={karsilama} hizliSorular={hizliSorular} />
         <BaglamCipi /><GirisEkleri /></>,
       promptLineSendButtonStart: <GirisDugmeleri inst={() => instance.current}

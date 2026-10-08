@@ -29,7 +29,8 @@ test('Bugün day arrows are at least 44px on a phone', async ({ page }) => {
 
 test('Asistan prompt chips are at least 44px on a phone', async ({ page }) => {
   await sabitAc(page, '/asistan', 390, 844)
-  await enAz(page.locator('.ac__prompt-chip'))
+  // Carbon AI asistanı: hızlı sorular giriş üstündeki karşılamada (Karsilama.tsx).
+  await enAz(page.locator('.asistan__hizli-sorular button'))
 })
 
 test('Takvim week arrows say Önceki and are at least 44px on a phone', async ({ page }) => {

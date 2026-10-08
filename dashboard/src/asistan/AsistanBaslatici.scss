@@ -8,6 +8,12 @@
   z-index: 8000;
 }
 
+// Açık panel sabit kabın yığın bağlamında kalır: Carbon'un yüzen katmanıyla aynı düzeye çıkar ki ödev
+// penceresi (z 9000) açıkken de panele yazılabilsin (eskiden olduğu gibi).
+.asistan-baslatici--acik {
+  z-index: 99999;
+}
+
 // Tam ekran: Carbon'un yüzen paneli float özellikleriyle pencereyi kaplar; kap da üstte durur.
 .asistan-paneli--tam {
   position: fixed;

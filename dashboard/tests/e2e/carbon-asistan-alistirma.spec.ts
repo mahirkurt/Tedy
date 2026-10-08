@@ -3,6 +3,10 @@ import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { sabitAc } from './_gorsel-yardim'
 import { json } from './_audit-fixtures'
+import { carbonSabitAc, soruAlani, gonderDugmesi } from './_asistan-carbon'
+
+// Eski asistan-alistirma.spec.ts'in testleri, aynı adlarla (Görev 19). Kart aynı bileşen (AlistirmaKarti),
+// Carbon'un user_defined yanıtında; İlerleme sayfası testleri değişmedi.
 
 const ACE = createRequire(import.meta.url).resolve('accessibility-checker-engine/ace.js')
 const SID = 'ab'.repeat(16)
@@ -18,7 +22,7 @@ const SOHBET = { id: SID, baslik: 'Kesir alıştırması', ogretmen: 'matematik'
   olusturma: '2026-10-03T08:00:00Z', guncelleme: '2026-10-03T08:00:00Z' }
 
 async function hazir(page: Page, w = 1440) {
-  await sabitAc(page, '/asistan', w, 1000)
+  await carbonSabitAc(page, '/asistan', w, 1000)
   let fallback = 0
   const sorular: Record<string, unknown>[] = []
   await page.route('**/api/assistant/chat', r => { fallback += 1; return r.fulfill(json({ answer: 'Yedek', citations: [] })) })
@@ -28,8 +32,8 @@ async function hazir(page: Page, w = 1440) {
       (sorular.length === 1 ? `event: quiz\ndata: ${JSON.stringify(QUIZ)}\n\n` : '')
       + 'event: answer\ndata: {"payload":{"answer":"Paydaları eşitledim.","citations":[],"meta":{}}}\n\n' })
   })
-  await page.fill('#ac-input', 'Kesir alıştırması hazırla')
-  await page.getByRole('button', { name: 'Gönder', exact: true }).click()
+  await soruAlani(page).fill('Kesir alıştırması hazırla')
+  await gonderDugmesi(page).click()
   await expect(page.getByRole('heading', { name: 'Payda', exact: true })).toBeVisible()
   return { sorular, fallback: () => fallback }
 }
@@ -67,7 +71,7 @@ test('quiz hides solutions, scores each answer and sends only missed questions',
 })
 
 test('a family reading the student conversation cannot answer the saved card', async ({ page }) => {
-  await sabitAc(page, '/asistan', 1440, 1000)
+  await carbonSabitAc(page, '/asistan', 1440, 1000)
   await page.route('**/api/assistant/stream', r => r.abort())
   await page.route('**/api/assistant/chat', r => r.fulfill(json({ answer: 'Yedek', citations: [] })))
   await page.route('**/api/assistant/sohbetler?*', r => r.fulfill(json({ sohbetler: [SOHBET] })))
@@ -157,12 +161,12 @@ test('the exercise fits the phone and keeps touch targets usable', async ({ page
 })
 
 test('a JSON fallback keeps the quiz card after a failed stream', async ({ page }) => {
-  await sabitAc(page, '/asistan', 1440, 1000)
+  await carbonSabitAc(page, '/asistan', 1440, 1000)
   await page.route('**/api/assistant/stream', r => r.abort())
   await page.route('**/api/assistant/chat', r => r.fulfill(json({
     answer: 'Alıştırma hazır.', citations: [], meta: {}, quiz: QUIZ,
   })))
-  await page.fill('#ac-input', 'Alıştırma hazırla')
-  await page.getByRole('button', { name: 'Gönder', exact: true }).click()
+  await soruAlani(page).fill('Alıştırma hazırla')
+  await gonderDugmesi(page).click()
   await expect(page.getByRole('region', { name: 'Payda', exact: true })).toBeVisible()
 })

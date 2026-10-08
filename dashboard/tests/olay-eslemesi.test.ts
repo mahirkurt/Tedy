@@ -42,10 +42,12 @@ test('araç adımları sürer ve özetle biter', () => {
   const { d, tum } = oynat([{ ad: 'tool_start', veri: { name: 'kitap_sayfa' } },
     { ad: 'tool_end', veri: { name: 'kitap_sayfa', ok: true, ozet: 'Mat 7 · s.5' } },
     { ad: 'tool_start', veri: { name: 'yeni_arac' } }, { ad: 'tool_end', veri: { name: 'yeni_arac', ok: false } }])
-  const adimlar = tum[3].partial_response.message_options.chain_of_thought
-  assert.deepEqual(adimlar[0], { title: 'Ders kitabı sayfası okunuyor', description: 'Mat 7 · s.5', tool_name: 'kitap_sayfa', status: 'success' })
-  assert.equal(adimlar[1].title, 'Kaynaklar taranıyor')
-  assert.equal(adimlar[1].status, 'failure')
+  // Carbon'un kullanıcıya dönük adım bileşeni (reasoning): akış sürerken açık, ilk cevap öğesiyle kapanır —
+  // eski "düşünüyor" göstergesi gibi. Başarısız adımın sonucu adımın içeriğinde yazar.
+  const adimlar = tum[3].partial_response.message_options.reasoning.steps
+  assert.deepEqual(adimlar[0], { title: 'Ders kitabı sayfası okunuyor', content: 'Mat 7 · s.5' })
+  assert.deepEqual(adimlar[1], { title: 'Kaynaklar taranıyor', content: 'Bu kaynağa şu an ulaşılamadı.' })
+  assert.equal(tum[2].partial_response.message_options.reasoning.steps[1].content, undefined)   // sürerken içerik yok
   assert.equal(d.adimlar.length, 2)
 })
 
@@ -68,7 +70,8 @@ test('answer final_response üretir: atıflı metin, altbilgi, geri bildirim, ad
   assert.equal(ana.message_item_options.custom_footer_slot.slot_name, ALTBILGI_YUVASI)
   assert.equal(ana.message_item_options.custom_footer_slot.additional_data.metin, 'Cevap [S1].')
   assert.deepEqual(kart.user_defined.tedy, { tur: 'mod_onerisi', veri: { ogretmen: 'matematik', ogretmen_adi: 'Matematik öğretmeni', soru: 'x', gerekce: 'y', renk_ailesi: 'blue' } })
-  assert.equal(f.message_options.chain_of_thought[0].status, 'success')
+  assert.deepEqual(f.message_options.reasoning.steps.map((a: { content?: string }) => a.content), ['Mat 7 · s.5'])
+  assert.equal(f.message_options.chain_of_thought, undefined)
 })
 
 test('atıfsız cevap düz metin; mesaj kimliği yoksa geri bildirim yok; aile için yer tutucu', () => {
@@ -106,6 +109,21 @@ test('akis_dustu: eski mesaj kaldırılır, yeni kimlikle baştan başlanır', (
   assert.deepEqual(r.kaldir, ['y5'])
   assert.equal(r.durum.yanitId, 'y6')
   assert.equal(r.durum.gorunen, '')
+  assert.deepEqual(r.parcalar, [])   // adım yoksa yeni mesaj yedek cevabı bekler
+})
+
+test('akis_dustu: araç adımları yeni mesajda sürer, yedek cevap beklenirken görünür kalır', () => {
+  let d = akisBaslat('y5')
+  d = olayIsle(d, { ad: 'tool_start', veri: { name: 'modul_ara' } }, SEC).durum
+  d = olayIsle(d, { ad: 'answer_delta', veri: { text: 'yarım' } }, SEC).durum
+  const r = olayIsle(d, { ad: 'akis_dustu', veri: { yeniId: 'y6' } }, SEC)
+  assert.deepEqual(r.kaldir, ['y5'])
+  assert.equal(r.durum.gorunen, '')
+  assert.equal(r.durum.adimlar.length, 1)
+  const p = r.parcalar[0] as unknown as { partial_item: { text: string }; partial_response: { message_options: { reasoning: { steps: { title: string }[] } } }; streaming_metadata: { response_id: string } }
+  assert.equal(p.streaming_metadata.response_id, 'y6')
+  assert.equal(p.partial_item.text, '')
+  assert.equal(p.partial_response.message_options.reasoning.steps[0].title, 'Yayınlanmış modüller aranıyor')
 })
 
 test('error olayı AkisHatasi fırlatır; hata yanıtı kart taşır', () => {

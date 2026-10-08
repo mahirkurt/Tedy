@@ -43,6 +43,9 @@ def _pano_stilleri() -> list[tuple[str, str]]:
     for p in sorted((DASH / "components").glob("*.scss")):
         if not p.name.startswith("BookReader"):
             out.append((p.name, p.read_text(encoding="utf-8")))
+    # Carbon AI asistanı (plan 2026-10-08): kendi stilleri aynı kurallara tabidir.
+    for p in sorted((DASH / "asistan").glob("*.scss")):
+        out.append((p.name, p.read_text(encoding="utf-8")))
     return out
 
 
@@ -164,3 +167,12 @@ def test_takvimde_anlam_rengi_yok(api):
         assert api._takvim_rengi(ders)["color"].lower() not in ayrilmis
     assert not hasattr(api, "_UNIFIED_COLORS")
     assert subject_themes.family_of("Beden Eğitimi") == "gray"
+
+
+def test_asistan_stilleri_de_denetlenir():
+    """Carbon AI asistanının kendi stilleri (dashboard/src/asistan/*.scss) aynı kurallarla okunur;
+    Carbon AI Chat'in kendi stilleri paketin içindedir, burada değil."""
+    adlar = {ad for ad, _ in _pano_stilleri()}
+    beklenen = {p.name for p in (DASH / "asistan").glob("*.scss")}
+    assert beklenen, "asistan stil dosyası bulunamadı"
+    assert beklenen <= adlar

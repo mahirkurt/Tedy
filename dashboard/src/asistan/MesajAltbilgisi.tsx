@@ -36,7 +36,7 @@ export default function MesajAltbilgisi({ veri, mesaj, inst }: { veri: AltbilgiV
       </div>}
       <div className="asistan__eylemler">
         {veri.atiflar.length > 0 && <Button kind="ghost" size="sm" renderIcon={Book}
-          onClick={() => void kaynaklariAc(inst, veri.atiflar, null)}>Kaynak ayrıntıları</Button>}
+          onClick={e => void kaynaklariAc(inst, veri.atiflar, null, e.currentTarget)}>Kaynak ayrıntıları</Button>}
         <IconButton kind="ghost" size="sm" label="Kopyala" onClick={() => void navigator.clipboard.writeText(veri.metin)}><Copy /></IconButton>
         <IconButton kind="ghost" size="sm" label="Yeniden üret" disabled={kapali} onClick={async () => {
           const s = soru(veri.metin); if (!s) return

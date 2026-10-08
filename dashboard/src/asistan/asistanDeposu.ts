@@ -11,7 +11,8 @@ export interface AsistanDurumu {
   dokum: { role: 'user' | 'assistant'; content: string }[]
   bekleyen: { govde: Record<string, unknown>; plan: boolean } | null
   yukleniyor: boolean; ekGoruntuleri: Record<string, Yukleme[]>
-  acikAtif: { atiflar: AssistantCitation[]; etkin: string | null } | null
+  /** Açık kaynak paneli; `donus` paneli açan düğme (kapanınca odak oraya döner). */
+  acikAtif: { atiflar: AssistantCitation[]; etkin: string | null; donus?: HTMLElement } | null
   /** Son tamamlanan asistan yanıtının Carbon kimliği: netleştirme yalnız son cevapta etkin. */
   sonYanitId?: string
   /** AI açıklamasındaki "Son yanıtı … yazdı" için. */

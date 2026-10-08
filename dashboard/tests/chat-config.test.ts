@@ -36,3 +36,17 @@ test('Carbon başlangıç ekranı kapalı, karşılama isteği gönderilmez: tek
   assert.equal(c.homescreen?.isOn, false)
   assert.equal(c.messaging?.skipWelcome, true)
 })
+
+test('soranın etiketi hitaba uyar: öğrenciye "Sen", aileye "Siz"', () => {
+  const ogrenci = tedyChatConfig({ ...G, okur: 'ogrenci' }).strings
+  const aile = tedyChatConfig({ ...G, okur: 'aile' }).strings
+  assert.equal(ogrenci?.message_labelYou, 'Sen {timestamp}')
+  assert.equal(ogrenci?.messages_youSaid, 'Sen yazdın')
+  assert.equal(aile?.message_labelYou, 'Siz {timestamp}')
+  assert.equal(aile?.messages_youSaid, 'Siz yazdınız')
+})
+
+test('gömülü sayfada küçült düğmesi yok (başlatıcı yokken sohbet geri açılamazdı); panelde var', () => {
+  assert.equal(tedyChatConfig({ ...G, bicim: 'sayfa' }).header?.hideMinimizeButton, true)
+  assert.equal(tedyChatConfig({ ...G, bicim: 'panel' }).header?.hideMinimizeButton, false)
+})

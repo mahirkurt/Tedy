@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test'
 import type { Page, Route } from '@playwright/test'
 import { mockSohbetler } from './_audit-fixtures'
+import { asistanAc, sor, sonCevap } from './_asistan-carbon'
+
+// Eski assistant-moduller.spec.ts'in testleri, aynı adlarla (Görev 19). Kaynak paneli aynı bileşen (SourcePanel),
+// cevabın altbilgisindeki "Kaynak ayrıntıları" ile açılan çalışma alanında; araç adımı Carbon'un adım bileşeninde.
 
 test.beforeEach(async ({ page }) => { await mockSohbetler(page) })
 
@@ -26,9 +30,12 @@ function answer(citations: unknown[], text = 'Bu konu için yayınlanmış bir m
 }
 
 async function ask(page: Page, prompt: string) {
-  await page.goto('/asistan')
-  await page.fill('#ac-input', prompt)
-  await page.getByLabel('Gönder').click()
+  await asistanAc(page)
+  await sor(page, prompt)
+}
+async function kaynaklar(page: Page) {
+  await expect(page.getByRole('button', { name: 'Kaynaklar', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Kaynak ayrıntıları' }).click()
 }
 
 test('a module citation gets its own group and opens only through the ticketed module route', async ({ page }) => {
@@ -55,8 +62,8 @@ test('a module citation gets its own group and opens only through the ticketed m
 
   await ask(page, 'maddenin hâlleri için modül var mı')
 
-  // The fixture really produces the chip and the group this test is about.
-  await expect(page.locator('.ac-msg--assistant').last().locator('.ac-cite')).toHaveCount(1)
+  // Atıf Carbon'un kaynak düğmesinde; ayrıntı paneli açılır.
+  await kaynaklar(page)
   const group = page.locator('.ac__ref-group--modul')
   await expect(group.locator('.ac__ref-group-title')).toHaveText('Yayınlanmış modül')
   await expect(group.locator('.ac__ref-path')).toHaveText('Maddenin Hâlleri · Fen Bilimleri 5. Sınıf · v2')
@@ -85,7 +92,7 @@ test('a module citation with an unsafe locator renders without a link', async ({
 
   await ask(page, 'bozuk modül atıfları')
 
-  await expect(page.locator('.ac-msg--assistant').last().locator('.ac-cite')).toHaveCount(3)
+  await kaynaklar(page)
   const items = page.locator('.ac__ref-group--modul .ac__ref-item')
   await expect(items).toHaveCount(3)
   await expect(items.locator('.ac__ref-path')).toHaveText(['Kaçak yol', 'Taslak yolu', 'Metin sürüm'])
@@ -110,10 +117,10 @@ test('while modul_ara runs, the thinking indicator names it', async ({ page }) =
   })
 
   await ask(page, 'modül var mı')
-  await expect(page.locator('.ac-msg--thinking')).toContainText('Yayınlanmış modüller aranıyor')
+  await expect(page.getByText('Yayınlanmış modüller aranıyor', { exact: true }).filter({ visible: true }).first()).toBeVisible()
   releaseClassic()
-  await expect(page.locator('.ac-msg--assistant').last().locator('.ac-cite')).toHaveCount(1)
-  await expect(page.locator('.ac-msg--thinking')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Kaynaklar', exact: true })).toBeVisible()
+  await expect(sonCevap(page)).toContainText('Bu konu için yayınlanmış bir modül var')
 })
 
 test('an unreadable module catalog is named, not hidden', async ({ page }) => {
@@ -123,7 +130,7 @@ test('an unreadable module catalog is named, not hidden', async ({ page }) => {
 
   await ask(page, 'modül var mı')
 
-  const degraded = page.locator('.ac-msg--assistant').last().locator('.ac-msg__degraded')
+  const degraded = page.locator('[data-tedy-altbilgi]').filter({ visible: true }).last()
   await expect(degraded.locator('.cds--tag')).toHaveCount(1)
   await expect(degraded).toContainText('Modül kataloğu okunamadı')
   await expect(degraded).not.toContainText('modul-katalogu')

@@ -3,6 +3,10 @@ import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { createRequire } from 'node:module'
 import { mockSohbetler } from './_audit-fixtures'
+import { asistanAc, sor } from './_asistan-carbon'
+
+// Eski asistan-gorsel-kaynak.spec.ts'in testleri, aynı adlarla (Görev 19). Kaynak paneli aynı bileşen
+// (SourcePanel), Carbon'un çalışma alanında; cevabın altbilgisindeki "Kaynak ayrıntıları" ile açılır.
 
 test.beforeEach(async ({ page }) => { await mockSohbetler(page) })
 
@@ -51,9 +55,11 @@ function answer(citations: unknown[], text: string) {
 }
 
 async function ask(page: Page, prompt: string) {
-  await page.goto('/asistan')
-  await page.fill('#ac-input', prompt)
-  await page.getByLabel('Gönder').click()
+  await asistanAc(page)
+  await sor(page, prompt)
+  // Carbon atıf işaretlerini metinden çıkarıp cevabın altındaki "Kaynaklar" düğmesine taşır.
+  await expect(page.getByRole('button', { name: 'Kaynaklar', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Kaynak ayrıntıları' }).click()
 }
 
 async function mockFigures(page: Page) {
@@ -81,8 +87,8 @@ test('a figure citation shows the textbook image in the source panel, captioned 
 
   await ask(page, 'bitki hücresinin şeklini göster')
 
-  // The fixture really produces the chips and the group this test is about.
-  await expect(page.locator('.ac-msg--assistant').last().locator('.ac-cite')).toHaveCount(4)
+  // The fixture really produces the citations and the group this test is about.
+  await expect(page.getByText(/\[S\d\]/)).toHaveCount(0)
   const items = page.locator('.ac__ref-group--kitap .ac__ref-item')
   await expect(items).toHaveCount(4)
   await expect(items.locator('.ac__ref-path')).toHaveText([

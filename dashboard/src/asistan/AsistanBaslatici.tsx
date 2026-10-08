@@ -24,9 +24,12 @@ export default function AsistanBaslatici({ rol }: { rol: UserRole }) {
   }, [])
   if (!baslaticiGorunur(pathname, rol, focusMode, genis)) return null
   // İlk tıklamadan sonra Carbon'un kendi başlatıcısı aynı yerde devralır (ad yine "Sohbet penceresini aç").
-  if (!acildi) {
-    return <Button className="asistan-baslatici" kind="primary" size="lg" hasIconOnly renderIcon={Chat}
-      iconDescription="Sohbet penceresini aç" tooltipPosition="left" onClick={() => setAcildi(true)} />
-  }
-  return <Suspense fallback={null}><AsistanPaneli /></Suspense>
+  // Adlandırılmış bölge: içerik bir işaret bölgesinde (IBM aria_content_in_landmark) ve düğmenin ipucu
+  // sarmalayıcısı sayfa akışına girmez (sabit konum kapta).
+  return <aside className={`asistan-baslatici${acildi ? ' asistan-baslatici--acik' : ''}`} aria-label="TEDY Asistan">
+    {acildi
+      ? <Suspense fallback={null}><AsistanPaneli /></Suspense>
+      : <Button kind="primary" size="lg" hasIconOnly renderIcon={Chat} iconDescription="Sohbet penceresini aç"
+          tooltipPosition="left" onClick={() => setAcildi(true)} />}
+  </aside>
 }

@@ -3,7 +3,7 @@
 import type { AssistantCitation, AssistantPlanBlock, AssistantResponse, ModOnerisi, Netlestirme } from '../types'
 import type { Alistirma } from '../components/AlistirmaKarti'
 import type { OdevOnerisi } from '../components/OdevOnayKarti'
-import type { ChainOfThoughtStep, GenericItem, MessageResponse, StreamChunk } from '@carbon/ai-chat'
+import type { GenericItem, MessageResponse, ReasoningSteps, StreamChunk } from '@carbon/ai-chat'
 import { atiflariAyikla } from './atiflar.ts'
 
 export const ARAC_ETIKETI: Record<string, string> = {
@@ -59,14 +59,18 @@ export function akisBaslat(yanitId: string): AkisDurumu {
 
 const meta = (d: AkisDurumu) => ({ streaming_metadata: { response_id: d.yanitId } })
 const metinId = (d: AkisDurumu) => `metin-${d.ogeNo}`
-const adimlar = (d: AkisDurumu): ChainOfThoughtStep[] => d.adimlar.map(a => ({
-  title: a.baslik, ...(a.ozet ? { description: a.ozet } : {}), tool_name: a.arac, status: tur(a.durum),
-}))
+// Carbon'un kullanıcıya dönük adım bileşeni (reasoning): akış sürerken açık durur, ilk cevap öğesi gelince
+// kendiliğinden kapanır (eski "düşünüyor" göstergesi gibi); chain_of_thought ise hep katlı başlıyordu.
+const ULASILAMADI = 'Bu kaynağa şu an ulaşılamadı.'
+const adimlar = (d: AkisDurumu): ReasoningSteps => ({ steps: d.adimlar.map(a => ({
+  title: a.baslik,
+  ...(a.ozet ? { content: a.ozet } : a.durum === 'failure' ? { content: ULASILAMADI } : {}),
+})) })
 
 function kismi(d: AkisDurumu, text: string, adimlarla = false): StreamChunk {
   return {
     partial_item: { response_type: tur('text'), text, streaming_metadata: { id: metinId(d) } },
-    ...(adimlarla ? { partial_response: { message_options: { chain_of_thought: adimlar(d) } } } : {}),
+    ...(adimlarla ? { partial_response: { message_options: { reasoning: adimlar(d) } } } : {}),
     ...meta(d),
   } as StreamChunk
 }
@@ -118,8 +122,11 @@ export function olayIsle(d: AkisDurumu, o: TedyOlayi, sec: SonYanitSecenekleri):
       return { durum: { ...d, netlestirme: v as unknown as Netlestirme }, parcalar: [] }
     case 'odev_onerisi':
       return { durum: { ...d, odevOnerisi: v as unknown as OdevOnerisi }, parcalar: [] }
-    case 'akis_dustu':
-      return { durum: akisBaslat(String(v.yeniId ?? `${d.yanitId}-yedek`)), parcalar: [], kaldir: [d.yanitId] }
+    case 'akis_dustu': {
+      // Yarım taslak eski mesajla gider; araç adımları yeni mesajda sürer (yedek cevap beklenirken görünür).
+      const durum = { ...akisBaslat(String(v.yeniId ?? `${d.yanitId}-yedek`)), adimlar: d.adimlar }
+      return { durum, parcalar: durum.adimlar.length ? [kismi(durum, '', true)] : [], kaldir: [d.yanitId] }
+    }
     case 'answer': {
       const payload = v.payload as AssistantResponse
       return { durum: { ...d, bitti: true }, parcalar: [{ final_response: sonYanit(d, payload, sec) } as StreamChunk] }
@@ -167,7 +174,7 @@ export function sonYanit(d: AkisDurumu, payload: AssistantResponse, sec: SonYani
     id: d.yanitId,
     output: { generic: [ana, ...kartlar.map((k, i) => ({ ...kartOgesi(k),
       ...(k.tur === 'alistirma' && i < d.alistirmalar.length ? { streaming_metadata: { id: `kart-alistirma-${i}` } } : {}) }))] as unknown as GenericItem[] },
-    ...(d.adimlar.length ? { message_options: { chain_of_thought: adimlar(d) } } : {}),
+    ...(d.adimlar.length ? { message_options: { reasoning: adimlar(d) } } : {}),
   }
 }
 

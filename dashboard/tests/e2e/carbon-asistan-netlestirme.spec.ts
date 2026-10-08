@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { mock, FULL, json } from './_audit-fixtures'
+import { soruAlani, gonderDugmesi } from './_asistan-carbon'
+
+// Eski asistan-netlestirme.spec.ts'in testi, aynı adla (Görev 19); seçenekler aynı bileşen (NetlestirmeSecenekleri).
 
 for (const fallback of [false, true]) {
   test(`clarification options send a choice, preserve free text and disable old choices (${fallback ? 'JSON' : 'SSE'})`, async ({ page }) => {
@@ -18,9 +21,9 @@ for (const fallback of [false, true]) {
     })
     await page.route('**/api/assistant/chat', route => { calls.push(route.request().postDataJSON()); return route.fulfill(json(answer())) })
     await page.goto('/asistan')
-    const input = page.getByRole('textbox', { name: 'Sorun', exact: true })
+    const input = soruAlani(page)
     await input.fill('Matematik çalışalım')
-    await page.getByRole('button', { name: 'Gönder', exact: true }).click()
+    await gonderDugmesi(page).click()
     const group = page.getByRole('group', { name: 'Seçenekler', exact: true })
     await expect(group.getByRole('button', { name: 'Kesirler', exact: true })).toBeEnabled()
     await group.getByRole('button', { name: 'Başka bir şey yaz…' }).click()

@@ -9,10 +9,10 @@ test('akış tüketilir: araç adımı görünür, cevap gelir, /chat çağrılm
   await asistanAc(page)
   await sor(page, 'Kesir nedir?')
   await expect(page.getByText('Kesir bir bütünün parçasıdır.', { exact: true })).toBeVisible()
-  // Carbon araç adımlarını cevaptan sonra katlar; adımlar "Bu cevaba nasıl ulaştım?" altında.
-  await page.getByRole('button', { name: 'Bu cevaba nasıl ulaştım?' }).click()
-  // Carbon başlığı "1: <adım>" diye numaralar.
-  await expect(page.getByText(/MEB kazanımları aranıyor/).filter({ visible: true }).first()).toBeVisible()
+  // Carbon'un adım bileşeni (reasoning) akış sürerken açıktır, cevap gelince katlanır; "Adımları göster" açar.
+  await page.getByRole('button', { name: 'Adımları göster' }).click()
+  await expect(page.getByText('MEB kazanımları aranıyor', { exact: true }).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.getByText('M.7.1.1', { exact: true }).filter({ visible: true }).first()).toBeVisible()
   expect(klasik).toBe(0)
   expect(istekler[0]).toMatchObject({ ogretmen: 'genel' })
 })

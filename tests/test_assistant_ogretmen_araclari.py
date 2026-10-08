@@ -210,7 +210,7 @@ def test_e2e_ogretmenler_fikstürü_python_seciciyle_ayni_anahtarlari_tasir():
 
 
 def test_e2e_oneri_fikstürü_mod_oner_olayiyla_ayni_anahtarlari_tasir(reg):
-    kaynak = (ROOT / "dashboard" / "tests" / "e2e" / "asistan-ogretmen.spec.ts").read_text("utf-8")
+    kaynak = (ROOT / "dashboard" / "tests" / "e2e" / "carbon-asistan-ogretmen.spec.ts").read_text("utf-8")
     ts_anahtarlar = _ust_seviye_anahtarlar(kaynak, "const ONERI = {")
 
     out = reg.dispatch(MOD_ONER_TOOL, {"ogretmen": "matematik", "gerekce": "x"}, ogretmen="genel")

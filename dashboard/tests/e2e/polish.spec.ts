@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { soruAlani, gonderDugmesi, sonCevap } from './_asistan-carbon'
 import { mock, FULL, LIVE, json } from './_audit-fixtures'
 
 // Aesthetic findings from reading the captured surfaces. Each one is a thing
@@ -16,7 +17,8 @@ test('the calendar copy is spelled in Turkish', async ({ page }) => {
 test('a markdown list looks like a list', async ({ page }) => {
   await mock(page, FULL)
   // Carbon's reset sets `list-style: none` on every ul/ol, so the assistant's
-  // answers rendered their steps as three unmarked lines.
+  // answers rendered their steps as three unmarked lines. Carbon AI Chat's
+  // own list items draw their marker as ::before ("–") — Görev 19.
   await page.route('**/api/assistant/stream', r => r.abort())
   await page.route('**/api/assistant/chat', r => r.fulfill(json({
     answer: 'Adımlar:\n\n- önce paydayı eşitle\n- sonra payları topla',
@@ -24,15 +26,13 @@ test('a markdown list looks like a list', async ({ page }) => {
     meta: { model: 'gemini-3.7-flash', degraded: [], dropped_citations: 0 },
   })))
   await page.goto('/asistan')
-  await page.waitForLoadState('networkidle')
-  await page.fill('#ac-input', 'nasıl')
-  await page.getByLabel('Gönder').click()
+  await soruAlani(page).fill('nasıl')
+  await gonderDugmesi(page).click()
   // Wait for the element being measured: evaluate() below does not retry.
-  await page.locator('.ac-md__list').first().waitFor()
-
-  const style = await page.locator('.ac-md__list').first()
-    .evaluate(el => getComputedStyle(el).listStyleType)
-  expect(style, 'liste işareti yok').not.toBe('none')
+  const madde = sonCevap(page).locator('cds-list-item').first()
+  await madde.waitFor()
+  const isaret = await madde.evaluate(el => getComputedStyle(el, '::before').content)
+  expect(isaret, 'liste işareti yok').not.toMatch(/^(none|normal|"")$/)
 })
 
 test('the two empty sections on Dersler say which is which', async ({ page }) => {

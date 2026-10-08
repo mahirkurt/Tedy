@@ -61,7 +61,7 @@ export async function soruyuYeniden(inst: ChatInstance, metin: string, ek: { dee
 
 
 /** Kaynak ayrıntıları (figür küçük resmi, modül bağlantısı, kitap) workspace panelinde bugünkü SourcePanel ile. */
-export async function kaynaklariAc(inst: ChatInstance, atiflar: AssistantCitation[], etkin: string | null) {
-  asistanDeposu.ayarla({ acikAtif: { atiflar, etkin } })
+export async function kaynaklariAc(inst: ChatInstance, atiflar: AssistantCitation[], etkin: string | null, donus?: HTMLElement) {
+  asistanDeposu.ayarla({ acikAtif: { atiflar, etkin, donus } })
   await inst.customPanels?.getPanel('workspace' as never).open({ title: 'Kaynaklar', preferredLocation: 'end' } as never)
 }

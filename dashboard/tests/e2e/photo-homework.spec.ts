@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { createRequire } from 'node:module'
 import { mock, FULL, json } from './_audit-fixtures'
+import { soruAlani, gonderDugmesi } from './_asistan-carbon'
 
 const EK = 'ab'.repeat(16)
 const ONERI = { ek_id: EK, photo_hash: 'cd'.repeat(8), adaylar: [
@@ -24,10 +25,11 @@ async function hazirla(page: Page, options: { bos?: boolean; fallback?: boolean;
   await page.goto('/asistan')
   await expect(page.getByRole('button', { name: 'Ödev fotoğrafı ekle' })).toHaveCount(0)
   await page.locator('input[type=file]').first().setInputFiles({ name: 'odev.png', mimeType: 'image/png', buffer: PNG })
-  await expect(page.locator('.ac__ek')).toContainText('Görsel')
-  await page.getByRole('textbox', { name: 'Sorun', exact: true }).fill('Bu fotoğraftaki ödevi ekle')
-  await page.getByRole('button', { name: 'Gönder', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Gönder', exact: true })).toBeDisabled()
+  // Carbon AI asistanı: ek çipi giriş üstü yuvada, soru Carbon'un giriş alanında (Görev 16, 19).
+  await expect(page.getByText('Görsel', { exact: true })).toBeVisible()
+  await soruAlani(page).fill('Bu fotoğraftaki ödevi ekle')
+  await gonderDugmesi(page).click()
+  await expect(gonderDugmesi(page)).toBeDisabled()
   if (!options.bos) await expect(page.getByRole('region', { name: 'Ödev önerisi' })).toBeVisible()
 }
 

@@ -20,6 +20,8 @@ export function tedyChatConfig(g: ConfigGirdisi): Omit<PublicConfig, 'markdown'>
     strings: {
       ...TURKCE,
       input_placeholder: g.okur === 'ogrenci' ? 'Bir soru sor veya çalışma planı iste...' : 'Bir soru sorun veya çalışma planı isteyin...',
+      // Soranın etiketi hitaba uyar (eski arayüzde VOICE): Işık'a "sen", aileye "siz".
+      ...(g.okur === 'aile' ? { message_labelYou: 'Siz {timestamp}', messages_youSaid: 'Siz yazdınız' } : {}),
     },
     // Model cevabı ve alıntılanan portal metni ham HTML taşıyabilir: Carbon'un temizleyicisi açık (XSS).
     shouldSanitizeHTML: true,
@@ -29,7 +31,9 @@ export function tedyChatConfig(g: ConfigGirdisi): Omit<PublicConfig, 'markdown'>
     openChatByDefault: g.bicim === 'sayfa',
     launcher: { isOn: g.bicim === 'panel' },
     // Carbon'un başlık AI etiketi axe nested-interactive ihlali veriyor; açıklama kendi AILabel'ımızla (Görev 14).
-    header: { title: 'TEDY Asistan', name: g.altBaslik, showAiLabel: false, showRestartButton: !g.saltOkunur },
+    // Gömülü sayfada küçültülen sohbet geri açılamaz (başlatıcı kapalı, ölçüldü): küçült yalnız panelde.
+    header: { title: 'TEDY Asistan', name: g.altBaslik, showAiLabel: false, showRestartButton: !g.saltOkunur,
+      hideMinimizeButton: g.bicim === 'sayfa' },
     // Carbon'un başlangıç ekranı ayrı bir giriş alanı kullanır (yuvalar, mikrofon, ekler orada yok) ve yüklenen
     // geçmişte açık kalır: karşılama ve hızlı sorular eski arayüzdeki gibi tek giriş alanının üstünde (Karsilama.tsx).
     homescreen: { isOn: false },

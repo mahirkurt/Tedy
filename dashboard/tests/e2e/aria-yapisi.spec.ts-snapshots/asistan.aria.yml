@@ -1,8 +1,5 @@
 - main:
   - heading "Asistan" [level=1]
-  - button "AI bilgisi"
-  - heading "TEDY Asistan" [level=2]
-  - paragraph: Kaynaklı soru-cevap ve kişisel çalışma planı
   - group "Öğretmen":
     - text: ""
     - radio "Genel" [checked]
@@ -15,33 +12,33 @@
     - text: ""
     - radio "Matematik"
     - text: Matematik
-  - button "Işık bugün neye öncelik vermeli?"
-  - button "Işık için çalışma planı hazırla"
-  - button "Işık'ın eksik konularını özetle"
-  - complementary "Sohbet geçmişi":
-    - heading "Sohbetler" [level=3]
-    - button "Yeni sohbet"
-    - paragraph: Henüz sohbet yok — bir soru sorarak başla
-    - heading "Işık'ın sohbetleri" [level=3]
-    - paragraph: Henüz sohbet yok — bir soru sorarak başla
-    - heading "Asistanın notları" [level=3]
-    - list
-  - article:
-    - button "AI yanıtı"
-    - text: Asistan
-    - paragraph: Merhaba! TEDY Asistan olarak size yardımcı olabilirim. Işık'ın ödevleri, sınavları ve dersleri hakkında soru sorabilir veya onun için çalışma planı isteyebilirsiniz.
-  - text: Ödev
-  - combobox "Ödev":
-    - option "Seçilmedi — genel soru" [selected]
-  - button "Dosya ekle"
-  - text: Sorun
-  - textbox "Sorun":
-    - /placeholder: Bir soru sorun veya çalışma planı isteyin...
-  - button "Sesle sor"
-  - button "Gönder" [disabled]
-  - button "Çalışma Planı" [disabled]
-  - complementary "Kaynaklar ve çalışma planı":
-    - heading "Kaynaklar" [level=2]
-    - paragraph: Soru sorduğunda kaynaklar burada görünecek.
-    - heading "Plan Blokları" [level=2]
-    - paragraph: Çalışma planı oluşturulduğunda burada görünecek.
+  - region "Sohbet":
+    - text: TEDY Asistan Kaynaklı soru-cevap ve kişisel çalışma planı
+    - button "Sohbeti yeniden başlat"
+    - button "AI bilgisi"
+    - region "Sohbet geçmişi":
+      - complementary "Sohbet geçmişi":
+        - heading "Sohbetler" [level=2]
+        - button "Yeni sohbet"
+        - paragraph: Henüz sohbet yok — bir soru sorarak başla
+        - heading "Işık'ın sohbetleri" [level=2]
+        - paragraph: Henüz sohbet yok — bir soru sorarak başla
+        - heading "Asistanın notları" [level=2]
+        - list
+    - region "Sohbet mesajları":
+      - button "Sohbetin başı. İlk mesaja gitmek için bu düğmeyi seç, mesajlar arasında ok tuşlarıyla gezin. Listeden çıkmak için Esc'ye bas. Mesaj listesi ile giriş alanı arasında geçmek için F6 tuşuna bas."
+      - button "Sohbetin sonu. Son mesaja gitmek için bu düğmeyi seç, mesajlar arasında ok tuşlarıyla gezin. Listeden çıkmak için Esc'ye bas. Mesaj listesi ile giriş alanı arasında geçmek için F6 tuşuna bas."
+      - paragraph: Merhaba! TEDY Asistan olarak size yardımcı olabilirim. Işık'ın ödevleri, sınavları ve dersleri hakkında soru sorabilir veya onun için çalışma planı isteyebilirsiniz.
+      - button "Işık bugün neye öncelik vermeli?"
+      - button "Işık için çalışma planı hazırla"
+      - button "Işık'ın eksik konularını özetle"
+      - button "Dosya ekle"
+      - text: ""
+      - combobox "Ödev":
+        - option "Seçilmedi — genel soru" [selected]
+      - textbox "Sorunu yaz":
+        - /placeholder: Bir soru sorun veya çalışma planı isteyin...
+      - button "Sesle sor"
+      - button "Çalışma Planı"
+      - button "Gönder" [disabled]
+  - text: Sohbet penceresi açıldı Mesaj listesi ile giriş alanı arasında geçmek için F6 tuşuna bas.

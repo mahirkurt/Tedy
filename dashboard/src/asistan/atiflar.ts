@@ -11,6 +11,15 @@ function cumleBasi(metin: string, bitis: number): number {
   return bas
 }
 
+/** Kod bloklarının (``` … ```) ve satır içi kod aralıklarının (`…`) konumları: içlerindeki `[S1]` koddur, atıf değil. */
+function kodAraliklari(ham: string): [number, number][] {
+  const araliklar: [number, number][] = []
+  for (const m of ham.matchAll(/^```[^\n]*\n[\s\S]*?(?:^```[^\n]*$|(?![\s\S]))|`[^`\n]+`/gm)) {
+    araliklar.push([m.index ?? 0, (m.index ?? 0) + m[0].length])
+  }
+  return araliklar
+}
+
 /** Sunucunun okuma sırasıyla numaraladığı işaretleri metinden çıkarır, Carbon'un `ranges` biçimine çevirir.
  *  Çözülemeyen işaret metinde kalır (eski arayüzdeki gibi görünür kalır, yutulmaz). */
 export function atiflariAyikla(ham: string, kaynaklar: AssistantCitation[]) {
@@ -19,8 +28,10 @@ export function atiflariAyikla(ham: string, kaynaklar: AssistantCitation[]) {
   const kimlikler: string[] = []
   let metin = ''
   let son = 0
+  const kod = kodAraliklari(ham)
   for (const m of ham.matchAll(ISARET)) {
     const bas = m.index ?? 0
+    if (kod.some(([a, b]) => bas + m[0].length > a && bas < b)) continue   // kodun içinde: metin olduğu gibi kalır
     metin += ham.slice(son, bas)
     son = bas + m[0].length
     if (metin === '' && ham[son] === ' ') son += 1   // metnin başındaki işaretin ardındaki boşluk da gider
