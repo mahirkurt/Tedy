@@ -8,10 +8,11 @@ test('akış tüketilir: araç adımı görünür, cevap gelir, /chat çağrılm
   page.on('request', r => { if (r.url().endsWith('/api/assistant/chat')) klasik += 1 })
   await asistanAc(page)
   await sor(page, 'Kesir nedir?')
-  await expect(page.getByText('Kesir bir bütünün parçasıdır.')).toBeVisible()
+  await expect(page.getByText('Kesir bir bütünün parçasıdır.', { exact: true })).toBeVisible()
   // Carbon araç adımlarını cevaptan sonra katlar; adımlar "Bu cevaba nasıl ulaştım?" altında.
   await page.getByRole('button', { name: 'Bu cevaba nasıl ulaştım?' }).click()
-  await expect(page.getByText('MEB kazanımları aranıyor').first()).toBeVisible()
+  // Carbon başlığı "1: <adım>" diye numaralar.
+  await expect(page.getByText(/MEB kazanımları aranıyor/).filter({ visible: true }).first()).toBeVisible()
   expect(klasik).toBe(0)
   expect(istekler[0]).toMatchObject({ ogretmen: 'genel' })
 })
@@ -22,8 +23,8 @@ test('cevapsız kapanan akış /chat yedeğine düşer, yarım taslak kalmaz', a
   await page.route('**/api/assistant/chat', r => r.fulfill({ json: PAYLOAD({ answer: 'Yedekten gelen cevap.' }) }))
   await asistanAc(page)
   await sor(page, 'Soru')
-  await expect(page.getByText('Yedekten gelen cevap.')).toBeVisible()
-  await expect(page.getByText('YARIM TASLAK')).toHaveCount(0)
+  await expect(page.getByText('Yedekten gelen cevap.', { exact: true })).toBeVisible()
+  await expect(page.getByText('YARIM TASLAK', { exact: true })).toHaveCount(0)
 })
 
 test('answer_reset sonrası ön metin cevap sanılmaz; denetimli son metin taslağın yerine geçer', async ({ page }) => {
@@ -31,9 +32,9 @@ test('answer_reset sonrası ön metin cevap sanılmaz; denetimli son metin tasla
     [['answer_delta', { text: 'Önce müfredata bakayım.' }], ['answer_reset', {}], ['answer_delta', { text: 'Taslak metin' }]])
   await asistanAc(page)
   await sor(page, 'Soru')
-  await expect(page.getByText('Denetlenmiş son metin.')).toBeVisible()
-  await expect(page.getByText('Önce müfredata bakayım.')).toHaveCount(0)
-  await expect(page.getByText('Taslak metin')).toHaveCount(0)
+  await expect(page.getByText('Denetlenmiş son metin.', { exact: true })).toBeVisible()
+  await expect(page.getByText('Önce müfredata bakayım.', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Taslak metin', { exact: true })).toHaveCount(0)
 })
 
 test('iki uç da 401: okura oturum cümlesi ve Tekrar dene; tekrar aynı gövdeyi yollar', async ({ page }) => {
@@ -46,10 +47,10 @@ test('iki uç da 401: okura oturum cümlesi ve Tekrar dene; tekrar aynı gövdey
   })
   await asistanAc(page)
   await sor(page, 'Soru')
-  await expect(page.getByText('Oturumun sona ermiş; sayfayı yenileyip yeniden giriş yap.')).toBeVisible()
+  await expect(page.getByText('Oturumun sona ermiş; sayfayı yenileyip yeniden giriş yap.', { exact: true })).toBeVisible()
   await expect(page.getByText(/HTTP 401|session_required/)).toHaveCount(0)
   await page.getByRole('button', { name: 'Tekrar dene' }).click()
-  await expect(page.getByText('İkinci denemede geldi.')).toBeVisible()
+  await expect(page.getByText('İkinci denemede geldi.', { exact: true })).toBeVisible()
   expect(govdeler[1]).toEqual(govdeler[0])
 })
 
@@ -59,7 +60,7 @@ test('durdur isteği keser, hata kartı çıkmaz', async ({ page }) => {
   await asistanAc(page)
   await sor(page, 'Uzun soru')
   await page.getByRole('button', { name: 'Yanıtı durdur' }).click()
-  await expect(page.getByText('Asistan yanıtı alınamadı.')).toHaveCount(0)
+  await expect(page.getByText('Asistan yanıtı alınamadı.', { exact: true })).toHaveCount(0)
   await expect(soruAlani(page)).toBeEditable()
 })
 
@@ -73,7 +74,7 @@ test('cevaptaki ve kutudaki ham HTML çalışmaz (XSS)', async ({ page }) => {
   await cevapla(page, PAYLOAD({ answer: 'Metin <img src=x onerror="window.__xss=1"> son.\n\n:::kavram\n<img src=y onerror="window.__xss2=1">\n:::' }))
   await asistanAc(page)
   await sor(page, 'Soru')
-  await expect(page.getByText(/son\./)).toBeVisible()
+  await expect(page.locator('p', { hasText: /son\.$/ }).first()).toBeVisible()
   await page.waitForTimeout(500)
   expect(await page.evaluate(() => (window as unknown as { __xss?: number; __xss2?: number }).__xss ?? (window as unknown as { __xss2?: number }).__xss2)).toBeUndefined()
 })
@@ -85,5 +86,5 @@ test('zaman 24 saat, ad TEDY Asistan, tablo filtre kutusuz kendi tablomuz', asyn
   await expect(page.locator('table.ac-md__table')).toBeVisible()
   await expect(page.getByPlaceholder(/Filter table|Tabloyu süz/).filter({ visible: true })).toHaveCount(0)
   await expect(page.getByText(/\b(AM|PM)\b/)).toHaveCount(0)
-  await expect(page.getByText('watsonx')).toHaveCount(0)
+  await expect(page.getByText('watsonx', { exact: true })).toHaveCount(0)
 })

@@ -145,8 +145,10 @@ export function sonYanit(d: AkisDurumu, payload: AssistantResponse, sec: SonYani
     placeholder: sec.ogrenci ? 'Ailen bunu görebilir.' : 'Yorum ekle',
     categories: { negative: GERI_BILDIRIM_KATEGORILERI },
   } : undefined
+  // Akıştaki öğe kimlikleri korunur: son yanıt akışta gelen öğelerin yerine geçer, yanlarına eklenmez.
   const ana = {
     response_type: tur(atiflar.length ? 'conversational_search' : 'text'), text: metin,
+    streaming_metadata: { id: metinId(d) },
     ...(atiflar.length ? { citations: atiflar } : {}),
     message_item_options: {
       ...(geriBildirim ? { feedback: geriBildirim } : {}),
@@ -163,7 +165,8 @@ export function sonYanit(d: AkisDurumu, payload: AssistantResponse, sec: SonYani
   ]
   return {
     id: d.yanitId,
-    output: { generic: [ana, ...kartlar.map(kartOgesi)] as unknown as GenericItem[] },
+    output: { generic: [ana, ...kartlar.map((k, i) => ({ ...kartOgesi(k),
+      ...(k.tur === 'alistirma' && i < d.alistirmalar.length ? { streaming_metadata: { id: `kart-alistirma-${i}` } } : {}) }))] as unknown as GenericItem[] },
     ...(d.adimlar.length ? { message_options: { chain_of_thought: adimlar(d) } } : {}),
   }
 }

@@ -9,7 +9,7 @@ import { VOICE } from './ses.ts'
 import { useAsistanDurumu } from './asistanDeposu.ts'
 
 export default function AsistanSayfasi() {
-  const { props, ogretmen } = useAsistanSohbeti('sayfa')
+  const { props, ogretmen, ogretmenSec } = useAsistanSohbeti('sayfa')
   const kok = useRef<HTMLElement>(null)
   useEffect(() => (kok.current ? kaydirmaOdaginiYonet(kok.current) : undefined), [])
   const secili = ogretmen.secili
@@ -17,7 +17,7 @@ export default function AsistanSayfasi() {
   return (
     <section ref={kok} className={['asistan', secili && subjectClass(null, secili.renk_ailesi)].filter(Boolean).join(' ')}
       data-ogretmen={ogretmen.id}>
-      <OgretmenSecici liste={ogretmen.liste} secili={ogretmen.id} onSec={id => ogretmen.sec(id)}
+      <OgretmenSecici liste={ogretmen.liste} secili={ogretmen.id} onSec={id => void ogretmenSec(id)}
         hata={ogretmen.hata ? VOICE[okur].ogretmenHata : null} />
       {okur === 'ogrenci' && <p className="asistan__aile-notu">Sohbetlerini ailen de görebilir.</p>}
       <ChatCustomElement className="asistan__sohbet" {...props} />

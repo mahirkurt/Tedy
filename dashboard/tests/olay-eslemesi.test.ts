@@ -121,3 +121,12 @@ test('yerel yedek ve kaynak sorunları altbilgiye geçer', () => {
   const a = (m.output.generic![0] as Record<string, any>).message_item_options.custom_footer_slot.additional_data
   assert.deepEqual([a.bayraklar, a.kaynakSorunlari, a.model, a.ogretmen, a.denetim], [['warning:yerel_yedek'], ['maarif-mufredat'], 'gemma4-e4b-cpu', 'fen', 'duzeltildi'])
 })
+
+test('son yanıt öğeleri akıştaki kimlikleri taşır (kart iki kez çizilmez)', () => {
+  let d = akisBaslat('y10')
+  d = olayIsle(d, { ad: 'quiz', veri: { id: 'q1', sorular: [] } }, SEC).durum
+  d = olayIsle(d, { ad: 'answer_reset', veri: {} }, SEC).durum
+  const g = sonYanit(d, yuk({ citations: [] }), SEC).output.generic as Record<string, any>[]
+  assert.equal(g[0].streaming_metadata.id, 'metin-1')
+  assert.equal(g.find(x => x.user_defined?.tedy.tur === 'alistirma')!.streaming_metadata.id, 'kart-alistirma-0')
+})
