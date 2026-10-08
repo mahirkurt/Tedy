@@ -268,3 +268,18 @@ geri alınmaz. Eski bileşen birkaç gün sorunsuz kullanımdan sonra ayrı comm
 - Araç adımlarının kalıcı saklanması (§5.1).
 - Carbon AI Chat'in web bileşeni sürümünün başka uygulamalarda (edupedia modülleri vb.) kullanılması.
 - `/v1` ve API anahtarlı istemcilerin herhangi bir değişikliği.
+
+## Plan sırasında yapılan güncellemeler (2026-10-08)
+
+Paketin tür tanımları ve depo desenleri incelenirken netleşen, onaylanan kararları değiştirmeyen ayrıntılar:
+
+1. **Birim testleri** Vitest yerine depodaki desenle `node --test` (Node 26 tip silme, `dashboard/tests/*.test.ts`); saf modüller yalnız `import type` kullanır.
+2. **Geri bildirim kaydı** `assistant_metrics.jsonl` yerine ayrı `output/assistant_geri_bildirim.jsonl`'a yazılır ve metnin kendisini değil uzunluğunu taşır: `assistant_ops metrics` her satırı bir cevap sayıyor, karışık satırlar özeti bozardı.
+3. **Toplam hata** (akış ve `/chat` ikisi de düşerse) Carbon `inline_error` değil, "Tekrar dene" düğmeli bir `user_defined` hata kartıdır — eski arayüzdeki Tekrar dene davranışı korunur. 401/403'te okur "Oturumun sona ermiş; sayfayı yenileyip yeniden giriş yap." görür.
+4. **Ekler**: Carbon'un yükleme düğmesi kapalı (`upload.isOn: false`); ekler bugünkü çiplerle giriş üstü yuvada kalır (çipteki Türkçe hata, 4 dosya sınırı, "Bu ödeve bağla", kamera seçimi, sürükle/yapıştır).
+5. **Geçmiş paneli** içeriği Carbon'un geçmiş paneli yuvasına konan bugünkü `SohbetListesi`'dir; "Asistanın notları" de orada kalır (workspace'te ayrı "Notlar" sekmesi yok).
+6. **Tam ekran**: Carbon AI Chat'te hazır tam ekran düğmesi yok; başlatıcı panelinin başlığına "Tam ekran / Küçült" eylemi eklenir. Hazır kısayol olarak Carbon'un `messageFocusToggle`'ı açılır (sohbeti açıp kapatan hazır kısayol yok).
+7. **Cevap yükü** (`answer.payload` ve `/chat`) sohbete kaydedilen cevapta `mesaj_id` taşır; tekrar gönderimde dönen yük de.
+8. **Sayfa adları**: `bugun, isler, dersler, notlar, takvim, takimlar, ilerleme, duyurular, profil, moduller, kitaplar, sinavlar`.
+
+Uygulama planı: `docs/superpowers/plans/2026-10-08-asistan-carbon-ai-chat.md`.
