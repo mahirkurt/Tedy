@@ -19,9 +19,10 @@ class _FakeRuntime:
 
     def chat(self, messages, session_id="", context_filters=None, temperature=0.2, ilerleme_izni=False,
              okur="bilinmiyor", ogretmen="genel", sahip_email=None, secili_odev="", odev_anahtari="",
-             force_deep=False, ek_okuyucu=None):
-        # /chat forwards the homework selector (empty when the request names none).
-        _FakeRuntime.son_sohbet = {"secili_odev": secili_odev, "odev_anahtari": odev_anahtari}
+             force_deep=False, ek_okuyucu=None, sayfa_satiri=""):
+        # /chat forwards the homework selector and the page context (empty when the request names none).
+        _FakeRuntime.son_sohbet = {"secili_odev": secili_odev, "odev_anahtari": odev_anahtari,
+                                   "sayfa_satiri": sayfa_satiri}
         return {
             "answer": "chat ok",
             "citations": [{"id": "S1", "path": "output/scraped_data.json", "snippet": "..."}],
@@ -88,7 +89,7 @@ def test_assistant_chat_endpoint(client):
     data = resp.get_json()
     assert data["answer"] == "chat ok"
     assert isinstance(data["citations"], list)
-    assert _FakeRuntime.son_sohbet == {"secili_odev": "", "odev_anahtari": ""}
+    assert _FakeRuntime.son_sohbet == {"secili_odev": "", "odev_anahtari": "", "sayfa_satiri": ""}
 
 
 def test_assistant_plan_endpoint(client):
