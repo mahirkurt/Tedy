@@ -3171,6 +3171,7 @@ def _sohbet_istegini_hazirla(payload, messages, email, ogretmen):
         alistirmalar = [_alistirma_yaniti(a) for a in depo.alistirmalar(cevap["id"])]
         return [], {"tekrar": {
             "answer": cevap["icerik"], "citations": json.loads(cevap["atiflar_json"]),
+            "mesaj_id": cevap["id"],
             "safety_flags": [], "plan_blocks": [], "intent": "qa", "session_id": "",
             "mode_suggestion": None, "quiz": alistirmalar[0] if alistirmalar else None,
             "odev_onerisi": None, "netlestirme": None, **kartlar,
@@ -3225,6 +3226,8 @@ def _sohbet_cevap_kaydet(sohbet, payload, ogretmen):
         sohbet["sid"], "assistant", payload["answer"], ogretmen, [], _asistan_simdi(),
         atiflar=payload.get("citations", []), istek_id=sohbet.get("request_id"), kartlar=payload,
         meta=meta)
+    # Okurun geri bildirimi bu kimliğe yazılır (spec §5.2); SSE `answer` gövdesi bundan sonra kurulur.
+    payload["mesaj_id"] = mid
     for aid in sohbet.get("alistirma_kimlikleri", []):
         depo.alistirma_bagla(aid, mid)
     if ogretmen != assistant_skills.GENEL:
@@ -3325,7 +3328,9 @@ def assistant_sohbet(sid):
     if request.method == "GET":
         mesajlar = depo.tum_mesajlar(sid)
         from src.assistant_sohbet import gorunen_kartlar
+        geri = depo.geri_bildirimler(sid, _module_person()) if sahip else {}
         for mesaj in mesajlar:
+            mesaj["geri_bildirim"] = geri.get(mesaj["id"]) if mesaj["rol"] == "assistant" else None
             mesaj.pop("meta_json", None)  # server-side audit only
             mesaj.update(gorunen_kartlar(json.loads(mesaj.pop("kartlar_json"))))
             mesaj["alistirma"] = [_alistirma_yaniti(a) for a in depo.alistirmalar(mesaj["id"])]
@@ -3421,7 +3426,54 @@ def assistant_alistirma_cevap(aid):
 @require_auth
 @_sohbet_kapisi
 def assistant_ogrenme_gunlugu():
-    return jsonify(_sohbet_deposu().gunluk(_module_person(), _asistan_simdi()))
+    email = _module_person()
+    depo = _sohbet_deposu()
+    gunluk = depo.gunluk(email, _asistan_simdi())
+    kisiler = set(OGRENCI_EMAILS) if okur_turu(email) == "aile" else {email}
+    gunluk["geri_bildirim"] = depo.geri_bildirim_ozeti(kisiler, _asistan_simdi())
+    return jsonify(gunluk)
+
+
+def _geri_bildirim_kaydi(kayit):
+    """Sunucu kaydı: metnin kendisi değil uzunluğu. .jsonl asistan indeksine girmez."""
+    from pathlib import Path
+    try:
+        yol = Path(OUTPUT_DIR) / "assistant_geri_bildirim.jsonl"
+        with yol.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(kayit, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
+@app.route("/api/assistant/mesajlar/<mid>/geri-bildirim", methods=["PUT", "DELETE"])
+@require_auth
+@_sohbet_kapisi
+def assistant_geri_bildirim(mid):
+    email = _module_person()
+    depo = _sohbet_deposu()
+    mesaj = depo.mesaj_sahibi(mid) if re.fullmatch(r"[0-9a-f]{32}", mid or "") else None
+    if mesaj is None or mesaj["rol"] != "assistant":
+        return jsonify({"error": "Mesaj bulunamadı."}), 404
+    if mesaj["sahip_email"] != email:
+        if okur_turu(email) == "aile" and mesaj["sahip_email"] in OGRENCI_EMAILS:
+            return jsonify({"error": "Bu sohbet salt okunur."}), 403
+        return jsonify({"error": "Mesaj bulunamadı."}), 404
+    if request.method == "DELETE":
+        if not depo.geri_bildirim_sil(mid, email):
+            return jsonify({"error": "Geri bildirim bulunamadı."}), 404
+        return "", 204
+    govde = request.get_json(silent=True)
+    if not isinstance(govde, dict):
+        return jsonify({"error": "Geçersiz istek gövdesi."}), 400
+    try:
+        sonuc = depo.geri_bildirim_yaz(mid, email, govde.get("deger"), govde.get("kategori"),
+                                       govde.get("metin") or "", _asistan_simdi())
+    except (ValueError, TypeError):
+        return jsonify({"error": "Geçersiz geri bildirim."}), 400
+    _geri_bildirim_kaydi({"zaman": _asistan_simdi().isoformat(), "mesaj_id": mid, "sohbet_id": mesaj["sohbet_id"],
+                          "ogretmen": mesaj["ogretmen"], "deger": sonuc["deger"], "kategori": sonuc["kategori"],
+                          "metin_uzunlugu": len(sonuc["metin"])})
+    return jsonify(sonuc)
 
 
 @app.route("/api/assistant/uploads/<kimlik>/odeve-bagla", methods=["POST"])
