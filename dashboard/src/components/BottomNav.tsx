@@ -3,6 +3,8 @@ import { OverflowMenuHorizontal } from '@carbon/icons-react'
 import type { UserRole } from '../hooks/useAuth'
 import { primaryNavRoutes } from '../routes'
 import { useFocusMode } from '../contexts/focusMode'
+import { CARBON_AI_ACIK } from '../asistan/bayrak'
+import { sayfaAdi } from '../asistan/sayfaBaglami'
 
 // The phone's navigation (D3a, 2026-10-02). Four daily places and "Daha fazla",
 // always one tap away — the menu button behind the brand band asked for two taps
@@ -31,6 +33,11 @@ export default function BottomNav({ role }: { role: UserRole }) {
   const eslesiyorMu = (yol: string) =>
     yol === '/' ? etkinYol === '/' : etkinYol === yol || etkinYol.startsWith(`${yol}/`)
   const birincilde = sekmeler.some(r => eslesiyorMu(r.path))
+  // Carbon AI asistanında Asistan sekmesi bulunulan sayfayı bağlam olarak taşır (?sayfa=isler).
+  const hedef = (yol: string) => {
+    const ad = yol === '/asistan' && CARBON_AI_ACIK ? sayfaAdi(pathname) : null
+    return ad ? `/asistan?sayfa=${ad}` : yol
+  }
 
   return (
     <nav className="bottom-nav" aria-label="Ana gezinme">
@@ -41,7 +48,7 @@ export default function BottomNav({ role }: { role: UserRole }) {
           return (
             <li key={r.path}>
               <Link
-                to={r.path}
+                to={hedef(r.path)}
                 className={'bottom-nav__link' + (aktif ? ' active' : '')}
                 aria-current={aktif ? 'page' : undefined}
               >

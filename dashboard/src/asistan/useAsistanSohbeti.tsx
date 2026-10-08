@@ -4,7 +4,7 @@ import { useSession } from '../contexts/session'
 import { GENEL, useOgretmen } from '../hooks/useOgretmen'
 import { useSohbetler } from '../hooks/useSohbetler'
 import { useSes } from '../hooks/useSes'
-import { asistanDeposu } from './asistanDeposu.ts'
+import { asistanDeposu, useAsistanDurumu } from './asistanDeposu.ts'
 import { hataYaniti } from './olayEslemesi.ts'
 import { calistir } from './istek.ts'
 import { tedyChatConfig } from './tedyChatConfig.ts'
@@ -24,6 +24,9 @@ import GirisDugmeleri from './GirisDugmeleri.tsx'
 import { etkinSohbetiOku, etkinSohbetiYaz, yeniSohbet } from './useAsistanOturumu.ts'
 import { gecmisOgeleri } from './gecmis.ts'
 import type { BusEventFeedback } from '@carbon/ai-chat'
+import { sayfaEtiketi, useAcikOge } from './sayfaBaglami.ts'
+import { sayfaSorulari } from './sayfaSorulari.ts'
+import BaglamCipi from './BaglamCipi.tsx'
 
 const TABLO = { table: tabloCiz }
 const ALTBILGI = altbilgiCizici()
@@ -31,7 +34,8 @@ const ALTBILGI = altbilgiCizici()
 /** Gönderme işlevi Carbon'un yapılandırmasında yaşar; güncel sohbet deposunu render dışında buradan okur. */
 let guncelSohbet: ReturnType<typeof useSohbetler> | null = null
 
-export function useAsistanSohbeti(bicim: 'sayfa' | 'panel') {
+/** `sayfa`: bulunulan sayfanın adı (sayfaBaglami.ts) — başlatıcı paneli ya da /asistan?sayfa=…; yoksa null. */
+export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null = null) {
   const user = useSession()
   const ogrenci = user?.student === true
   const okur = ogrenci ? 'ogrenci' : 'aile'
@@ -40,11 +44,23 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel') {
   const instance = useRef<ChatInstance | null>(null)
   const salt = sohbet.secili?.salt === true
 
+  // Sayfa bağlamı: açılışta ve sayfa ya da açık öğe değişince yazılır; ilk sorudan sonra (gonder) ya da çip
+  // kapatılınca null olur. Bağlamsız açılış eski bağlamı da siler (başlatıcıdan kalan çip /asistan'a taşınmaz).
+  const oge = useAcikOge()
+  useLayoutEffect(() => {
+    const etiket = sayfaEtiketi(sayfa)
+    asistanDeposu.ayarla({ sayfa: sayfa && etiket ? { ad: sayfa, etiket,
+      ...(oge ? { oge: { tur: oge.tur, id: oge.id }, ogeEtiketi: oge.etiket } : {}) } : null })
+  }, [sayfa, oge])
+  const baglam = useAsistanDurumu(d => d.sayfa?.ad ?? null)
+
   const secili = ogretmen.secili
   const karsilama = secili ? secili.karsilama[okur] : VOICE[okur].welcome
-  const hizliSorular = useMemo<{ metin: string; plan?: boolean }[]>(() => secili
-    ? secili.hizli_sorular[okur].map(metin => ({ metin }))
-    : VOICE[okur].prompts.map(p => ({ metin: p.text, plan: p.mode === 'plan' })), [secili, okur])
+  const hizliSorular = useMemo<{ metin: string; plan?: boolean }[]>(() => baglam
+    ? sayfaSorulari(baglam, okur).map(metin => ({ metin }))
+    : secili
+      ? secili.hizli_sorular[okur].map(metin => ({ metin }))
+      : VOICE[okur].prompts.map(p => ({ metin: p.text, plan: p.mode === 'plan' })), [baglam, secili, okur])
 
   // Render sırasında değil: depo dinleyicileri başka bileşenlerdir.
   useLayoutEffect(() => { guncelSohbet = sohbet }, [sohbet])
@@ -143,7 +159,8 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel') {
     renderCustomRequestFooter: (_slot, mesaj) => <IstekEkleri mesajId={mesaj.id} />,
     renderWriteableElements: {
       workspacePanelElement: <KaynakPaneli />, headerFixedActionsElement: <AiAciklama />,
-      beforeInputElement: <><Karsilama inst={() => instance.current} karsilama={karsilama} hizliSorular={hizliSorular} /><GirisEkleri /></>,
+      beforeInputElement: <><Karsilama inst={() => instance.current} karsilama={karsilama} hizliSorular={hizliSorular} />
+        <BaglamCipi /><GirisEkleri /></>,
       promptLineSendButtonStart: <GirisDugmeleri inst={() => instance.current}
         mikrofon={{ var: ses.mikrofonVar, dinliyor: ses.dinliyor, bas: ses.mikrofon }} />,
       historyPanelElement: <GecmisPaneli depo={sohbet} ogrenci={ogrenci} inst={() => instance.current} ogretmenSec={ogretmen.sec} />,

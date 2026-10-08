@@ -1,0 +1,16 @@
+@use '@carbon/styles/scss/spacing';
+
+// Her sayfadaki sohbet başlatıcısı; Carbon'un kendi başlatıcısıyla aynı köşe.
+.asistan-baslatici {
+  position: fixed;
+  inset-block-end: spacing.$spacing-07;
+  inset-inline-end: spacing.$spacing-07;
+  z-index: 8000;
+}
+
+// Tam ekran: Carbon'un yüzen paneli float özellikleriyle pencereyi kaplar; kap da üstte durur.
+.asistan-paneli--tam {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+}

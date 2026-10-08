@@ -1,5 +1,6 @@
 import './AsistanSayfasi.scss'
 import { useEffect, useRef, type CSSProperties } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ChatCustomElement } from '@carbon/ai-chat'
 import OgretmenSecici from '../components/OgretmenSecici'
 import { subjectClass } from '../utils/subject'
@@ -11,9 +12,13 @@ import SesOnayi from './SesOnayi.tsx'
 import { ogretmenDegiskenleri } from './ogretmenRenkleri.ts'
 import { dosyalariEkle } from './ekler.ts'
 import { carbonErisilebilirlikOnarimi } from './carbonOnarimi.ts'
+import { sayfaEtiketi } from './sayfaBaglami.ts'
 
 export default function AsistanSayfasi() {
-  const { props, hazir, ogretmen, ogretmenSec, sesOnay } = useAsistanSohbeti('sayfa')
+  // Telefonda alt gezinmenin Asistan sekmesi bulunulan sayfayı taşır (?sayfa=isler); bilinmeyen ad yok sayılır.
+  const [arama] = useSearchParams()
+  const istenen = arama.get('sayfa')
+  const { props, hazir, ogretmen, ogretmenSec, sesOnay } = useAsistanSohbeti('sayfa', sayfaEtiketi(istenen) ? istenen : null)
   const kok = useRef<HTMLElement>(null)
   useEffect(() => (kok.current ? kaydirmaOdaginiYonet(kok.current) : undefined), [])
   useEffect(() => (kok.current ? carbonErisilebilirlikOnarimi(kok.current) : undefined), [])

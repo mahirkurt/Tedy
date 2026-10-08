@@ -20,6 +20,7 @@ import HomeworkTracker from './components/HomeworkTracker'
 import AssistantChat from './components/AssistantChat'
 import { lazy, Suspense } from 'react'
 import { CARBON_AI_ACIK } from './asistan/bayrak'
+import AsistanBaslatici from './asistan/AsistanBaslatici'
 
 // Yeni asistan (Carbon AI Chat) yalnız açıldığında yüklenir; bayrak kapalıyken eski bileşen çizilir.
 const AsistanSayfasi = lazy(() => import('./asistan/AsistanSayfasi'))
@@ -221,6 +222,7 @@ export default function App() {
         </RouteBoundary>
       </Content>
       {!isReader && navItems.length > 1 && <BottomNav role={user.role} />}
+      {CARBON_AI_ACIK && !isReader && <AsistanBaslatici rol={user.role} />}
       {isReader ? <ReaderFooter /> : <DashboardFooter />}
     </SessionContext.Provider>
   )

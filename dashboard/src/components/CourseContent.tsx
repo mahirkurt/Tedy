@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Tabs, TabList, Tab, TabPanels, TabPanel, Accordion, AccordionItem, Tag, Dropdown } from '@carbon/react'
 import { Education } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
@@ -6,6 +6,7 @@ import { useFocusMode } from '../contexts/focusMode'
 import { COURSE_CONTENT_ORDER, normalizeCourseDisplayName } from '../utils/formatters'
 import { portalSusunuAyikla } from '../utils/portalSusu'
 import { EmptyLine } from './patterns/EmptyLine'
+import { acikOgeyiBildir } from '../asistan/sayfaBaglami'
 
 interface CourseData {
   [course: string]: {
@@ -136,6 +137,10 @@ export default function CourseContent() {
   const { data: haftalik } = useApi<WeeksData>('/api/content/weeks', { weeks: {}, current: '' })
   const { focusMode } = useFocusMode()
   const [secilenHafta, setSecilenHafta] = useState<string | null>(null)
+  useEffect(() => {
+    acikOgeyiBildir(secilenHafta ? { tur: 'ders_haftasi', id: secilenHafta, etiket: secilenHafta } : null)
+    return () => acikOgeyiBildir(null)
+  }, [secilenHafta])
 
   const haftaAdlari = useMemo(
     () => Object.keys(haftalik.weeks || {}).sort((a, b) => weekNo(a) - weekNo(b)),

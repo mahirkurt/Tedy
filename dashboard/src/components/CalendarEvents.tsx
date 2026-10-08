@@ -10,6 +10,7 @@ import { MONTHS_SHORT } from '../utils/formatters'
 import { EmptyLine } from './patterns/EmptyLine'
 import SubjectLabel from './SubjectLabel'
 import { subjectClass } from '../utils/subject'
+import { acikOgeyiBildir } from '../asistan/sayfaBaglami'
 
 // ── Constants ──
 
@@ -134,10 +135,16 @@ export default function CalendarEvents() {
       .filter(({ date, dayIndex }) => dayIndex < 5 || starts.some(s => isSameDay(s, date)))
   }, [monday, data.events])
 
-  // Close popover on outside click
+  useEffect(() => {
+    acikOgeyiBildir(selectedEvent ? { tur: 'etkinlik', id: selectedEvent.id, etiket: selectedEvent.title } : null)
+    return () => acikOgeyiBildir(null)
+  }, [selectedEvent])
+
+  // Close popover on outside click — not on a click in the assistant panel, which is asking about this event.
   useEffect(() => {
     if (!selectedEvent) return
     function handleClick(e: MouseEvent) {
+      if ((e.target as Element | null)?.closest?.('.asistan-paneli')) return
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
         setSelectedEvent(null)
       }

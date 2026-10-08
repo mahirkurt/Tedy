@@ -10,6 +10,7 @@ import { NextThing } from './NextThing'
 import { describeDaysAhead } from './patterns/time'
 import './patterns/patterns.scss'
 import { useNavigate } from 'react-router-dom'
+import { acikOgeyiBildir } from '../asistan/sayfaBaglami'
 import type { ExamItem, ModuleCard } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
 import { EkBaglantisi } from './patterns/EkBaglantisi'
@@ -70,6 +71,13 @@ export default function HomeworkTracker() {
       return (hwData.homework || []).find(hw => hw.homework_key === prev.homework_key) ?? prev
     })
   }, [hwData])
+
+  // Asistan başlatıcısı açık ödevi sayfa bağlamına ekler (sayfaBaglami.ts).
+  useEffect(() => {
+    acikOgeyiBildir(selectedHw?.homework_key ? { tur: 'odev', id: selectedHw.homework_key,
+      etiket: `${selectedHw.normalized_course || selectedHw['Ders Adı']} — ${selectedHw['Ödev Başlığı']}` } : null)
+    return () => acikOgeyiBildir(null)
+  }, [selectedHw])
 
   async function addDocument(file: File) {
     const key = selectedHw?.homework_key

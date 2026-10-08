@@ -1,3 +1,4 @@
+import './GirisUstu.scss'
 import { Button } from '@carbon/react'
 import type { ChatInstance } from '@carbon/ai-chat'
 import { useAsistanDurumu } from './asistanDeposu.ts'
