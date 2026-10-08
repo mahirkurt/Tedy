@@ -283,6 +283,8 @@ export interface Netlestirme { soru: string; secenekler: string[] }
 export interface AssistantResponse {
   answer: string
   citations: AssistantCitation[]
+  /** Sohbete kaydedilen cevabın kimliği (geri bildirim buna yazılır, 2026-10-08). */
+  mesaj_id?: string
   safety_flags: string[]
   plan_blocks: AssistantPlanBlock[]
   intent: string
@@ -303,6 +305,7 @@ export interface AssistantResponse {
     degraded?: string[]
     budget_exhausted?: boolean
     ogretmen?: string
+    denetim?: { durum?: string }
   }
 }
 
