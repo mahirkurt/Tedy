@@ -3043,8 +3043,9 @@ class AssistantRuntime:
                 raise _StreamAbandoned()
             events.put({"event": "tool_start", "name": name})
             outcome = real_dispatch(name, args)
+            from src.assistant_tools import arac_ozeti
             events.put({"event": "tool_end", "name": name,
-                        "ok": bool(outcome.ok)})
+                        "ok": bool(outcome.ok), "ozet": arac_ozeti(name, outcome)})
             if outcome.ok and outcome.olay:
                 ad = outcome.olay.get("event")
                 if ad not in yayinlanan_olaylar:

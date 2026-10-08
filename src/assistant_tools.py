@@ -1474,6 +1474,34 @@ class ToolOutcome:
     olay: dict[str, Any] | None = None
 
 
+ARAC_OZETI_SINIRI = 120
+
+
+def arac_ozeti(ad: str, sonuc: "ToolOutcome") -> str:
+    """tool_end'in okura gösterilen tek satırı (Carbon AI Chat araç adımı, spec §5.1).
+
+    Ham argüman ya da araç gövdesi asla girmez (D4): yalnız aracın kendi atıf etiketleri,
+    yoksa sabit bir cümle."""
+    if not getattr(sonuc, "ok", False):
+        return "Bu kaynağa şu an ulaşılamadı"
+    if ad == "skill_kaynagi":
+        return "Öğretmen notlarına bakıldı"
+    etiketler: list[str] = []
+    for atif in getattr(sonuc, "citations", None) or []:
+        etiket = " ".join(str((atif or {}).get("label") or "").split())
+        if etiket and etiket not in etiketler:
+            etiketler.append(etiket)
+    if not etiketler:
+        return "Tamamlandı"
+    if len(etiketler) == 1:
+        ozet = etiketler[0]
+    elif len(etiketler) == 2:
+        ozet = f"{etiketler[0]} · {etiketler[1]}"
+    else:
+        ozet = f"{etiketler[0]} ve {len(etiketler) - 1} kaynak daha"
+    return ozet if len(ozet) <= ARAC_OZETI_SINIRI else ozet[:ARAC_OZETI_SINIRI - 1] + "…"
+
+
 def sanitize_schema(schema: dict[str, Any]) -> dict[str, Any]:
     """MCP inputSchema -> a declaration parameter block.
 
