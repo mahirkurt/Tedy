@@ -69,6 +69,8 @@ test('the AI aura stays off the sources, which are quotes', async ({ page }) => 
   // Satırların var olduğu önce kanıtlanır: hiç satır yoksa test yoklukla geçerdi.
   const satirlar = page.locator('.ac__ref-item')
   await expect(satirlar).toHaveCount(1)
+  // Eski test gibi durağan hâl ölçülür: panel açılınca fare satırın üstüne denk gelebilir (üzerine gelme ayrı).
+  await page.mouse.move(0, 0)
   for (const bg of await satirlar.evaluateAll(els => els.map(el => getComputedStyle(el).backgroundImage))) {
     expect(bg, 'kaynak satırında AI gradyanı').toBe('none')
   }
