@@ -295,4 +295,3 @@ Uygulama planı: `docs/superpowers/plans/2026-10-08-asistan-carbon-ai-chat.md`.
 5. **Akışta yeniden çizilen eklenti düğümleri**: Carbon son cevap taslağın yerine geçince eski eklenti düğümlerini yuvasız bırakır (görünmez, erişilebilirlik ağacında yok); sayfa yenilenene kadar DOM'da durur.
 6. **Tam ekran panelde mesajlar da genişler**: yüzen pencerenin genişliği ve mesaj sütunu Carbon'da aynı değişkenle (`messages-max-width`) sınırlı.
 7. **Başarım**: Lighthouse `/asistan` başarımı 0.27 (diğer sayfalar ~0.55; yalnız uyarı). Erişilebilirlik 1.0, CLS ≤ 0.1. Carbon AI Chat yalnız asistan açılınca yüklenir.
-8. **Çalışma Planı düğmesi** giriş boşken etkin görünür (eski arayüzde devre dışıydı); boş girişte hiçbir şey yapmaz.
