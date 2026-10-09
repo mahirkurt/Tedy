@@ -24,6 +24,7 @@ export default function AsistanPaneli() {
     'min-height': '100dvh', 'messages-max-width': '100vw', 'bottom-position': '0px', 'right-position': '0px' } : {}
   return <div ref={kok} className={`asistan-paneli${tam ? ' asistan-paneli--tam' : ''}`}
     style={ogretmenDegiskenleri(ogretmen.secili?.renk_ailesi ?? null) as CSSProperties}>
+    {!hazir && <p className="app-shell-loading__text" role="status">Asistan yükleniyor…</p>}
     {hazir && <ChatContainer {...props} openChatByDefault
       layout={{ ...props.layout, customProperties: boyut }}
       header={{ ...props.header, actions: [{ text: tam ? 'Küçült' : 'Tam ekran', icon: tam ? Minimize : Maximize, fixed: true,

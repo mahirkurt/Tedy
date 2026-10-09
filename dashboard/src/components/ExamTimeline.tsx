@@ -8,7 +8,7 @@ import { countdownTagType, getExamCountdown } from '../utils/countdown'
 import { subjectClass } from '../utils/subject'
 import { MONTHS_SHORT, gradeColor } from '../utils/formatters'
 import { EmptyLine } from './patterns/EmptyLine'
-import { acikOgeyiBildir } from '../asistan/sayfaBaglami'
+import { acikOgeAc } from '../asistan/sayfaBaglami'
 
 const EMPTY_RESPONSE: ExamsApiResponse = { exams: [], stats: { upcoming: 0, past: 0, averageGrade: null } }
 
@@ -42,11 +42,9 @@ function ExamCard({ exam, showCountdown, focusMode }: {
   focusMode: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
-  useEffect(() => {
-    if (!expanded) return
-    acikOgeyiBildir({ tur: 'sinav', id: exam.id, etiket: exam.title })
-    return () => acikOgeyiBildir(null)
-  }, [expanded, exam.id, exam.title])
+  // Her kart kendi kaydını bırakır: iki kart açıkken biri kapanınca öbürü bağlam olarak kalır.
+  useEffect(() => (expanded ? acikOgeAc({ tur: 'sinav', id: exam.id, etiket: exam.title }) : undefined),
+    [expanded, exam.id, exam.title])
   const countdown = useMemo(
     () => showCountdown && exam.date ? getExamCountdown(new Date(exam.date)) : null,
     [exam.date, showCountdown]

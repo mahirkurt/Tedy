@@ -41,7 +41,9 @@ export default function AsistanSayfasi() {
       data-ogretmen={ogretmen.id}>
       <OgretmenSecici liste={ogretmen.liste} secili={ogretmen.id} onSec={id => void ogretmenSec(id)}
         hata={ogretmen.hata ? VOICE[okur].ogretmenHata : null} />
-      {/* KaTeX yüklemesi sonuçlanınca (başarılı ya da değil) çizilir; markdownKurulumu.ts. */}
+      {/* KaTeX yüklemesi sonuçlanınca (başarılı, başarısız ya da süre dolunca) çizilir; markdownKurulumu.ts.
+          Beklerken alan boş kalmaz (D3). */}
+      {!hazir && <p className="app-shell-loading__text" role="status">Asistan yükleniyor…</p>}
       {hazir && <ChatCustomElement className="asistan__sohbet" {...props}
         style={ogretmenDegiskenleri(secili?.renk_ailesi ?? null) as CSSProperties} />}
       <SesOnayi onay={sesOnay} />

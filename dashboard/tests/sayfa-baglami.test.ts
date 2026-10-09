@@ -34,3 +34,18 @@ test('adresten gelen sayfa adı yalnız bilinen adlardan biri olabilir (nesne pr
   assert.equal(sayfaEtiketi('notlar'), 'Notlar')
   for (const ad of ['xyz', 'toString', 'constructor', '__proto__', '', null]) assert.equal(sayfaEtiketi(ad), null, String(ad))
 })
+
+test('açık öğeler yığın: biri kapanınca öbürü açık kalır; kayıt kendi öğesini bırakır', async () => {
+  const { acikOgeAc, acikOgeSimdi } = await import('../src/asistan/sayfaBaglami.ts')
+  const a = { tur: 'sinav' as const, id: 'a', etiket: 'A' }
+  const b = { tur: 'sinav' as const, id: 'b', etiket: 'B' }
+  const birakA = acikOgeAc(a)
+  const birakB = acikOgeAc(b)
+  assert.equal(acikOgeSimdi()?.id, 'b')
+  birakB()
+  assert.equal(acikOgeSimdi()?.id, 'a')   // eskiden null: ikinci kart kapanınca açık olan da unutuluyordu
+  birakB()                                 // iki kez bırakmak başkasını silmez
+  assert.equal(acikOgeSimdi()?.id, 'a')
+  birakA()
+  assert.equal(acikOgeSimdi(), null)
+})

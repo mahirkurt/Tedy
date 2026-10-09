@@ -46,3 +46,17 @@ export const sonCevap = (page: Page) => page.locator('.cds-aichat--assistant-mes
  *  sohbet öğesinin ışık DOM'unda yuvalı düğümler olarak tutar; mesaj konumlayıcısı onları görmez. Yalnız
  *  görünenler: akışta çizilen eski düğümler yuvasız kalır. */
 export const eklentiler = (page: Page) => page.locator('cds-aichat-react > [slot]').filter({ visible: true })
+/** Ekran görüntüsünden önce, kaydırma konumuna göre beliren Carbon öğesini ("en alta kaydır" düğmesi) gizler:
+ *  kaydırma bitişinin zamanlamasına göre bazen görünüyordu (tam koşularda ara sıra kırmızı). Düğme Carbon'un gölge
+ *  kökünde; belgeye eklenen stil (toHaveScreenshot `style`) oraya ulaşmaz. */
+export async function kayanlariGizle(page: Page) {
+  await page.evaluate(() => {
+    const gez = (k: ParentNode) => {
+      for (const el of k.querySelectorAll<HTMLElement>('*')) {
+        if (el.classList.contains('cds-aichat__scroll-to-bottom-button')) el.style.setProperty('visibility', 'hidden', 'important')
+        if (el.shadowRoot) gez(el.shadowRoot)
+      }
+    }
+    gez(document)
+  })
+}

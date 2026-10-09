@@ -137,3 +137,23 @@ test('açık ödev çipte görünür ve istekte öğe olarak gider; pencere kapa
   await expect.poll(() => istekler.length).toBe(1)
   expect(istekler[0]).toMatchObject({ sayfa: { ad: 'isler', oge: { tur: 'odev', id: 'mat-kesir' } } })
 })
+
+test('kapatılan bağlam çipi ödev listesi yenilenince geri gelmez', async ({ page }) => {
+  const ileri = new Date(Date.now() + 3 * 864e5)
+  const teslim = `${String(ileri.getDate()).padStart(2, '0')}.${String(ileri.getMonth() + 1).padStart(2, '0')}.${ileri.getFullYear()} 23:59`
+  const odev = { ...(FULL.homework as { homework: Record<string, unknown>[] }).homework[0], homework_key: 'mat-kesir',
+    'Ödev Son Teslim Tarihi': teslim }
+  await mock(page, { ...FULL, homework: { summary: '', homework: [odev] } })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/isler')
+  await baslatici(page).click()
+  await page.getByRole('button', { name: 'Başla', exact: true }).click()
+  await expect(page.getByText(/^Bu sayfa: İşler — Matematik/)).toBeVisible()
+  await page.getByRole('button', { name: 'Bağlamı kaldır: İşler' }).click()
+  await expect(page.getByText(/^Bu sayfa:/)).toHaveCount(0)
+  const yenilendi = page.waitForResponse(r => r.url().includes('/api/homework'))
+  await page.evaluate(() => window.dispatchEvent(new Event('tedy:homework-updated')))
+  await yenilendi
+  await page.waitForTimeout(500)
+  await expect(page.getByText(/^Bu sayfa:/)).toHaveCount(0)
+})

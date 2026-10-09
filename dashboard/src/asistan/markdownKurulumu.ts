@@ -7,9 +7,14 @@ import { tedyMarkdownEklentisi, type KatexBenzeri } from './markdownEklentileri.
 let katex: KatexBenzeri | undefined
 let sonuclandi = false
 const dinleyiciler = new Set<() => void>()
+const sonuclan = () => { if (!sonuclandi) { sonuclandi = true; dinleyiciler.forEach(f => f()) } }
 void Promise.all([import('katex'), import('katex/dist/katex.min.css')])
   .then(([m]) => { katex = m.default }, () => undefined)
-  .finally(() => { sonuclandi = true; dinleyiciler.forEach(f => f()) })
+  .finally(sonuclan)
+// Takılan parça sohbeti bekletmez: süre dolunca formüller kaynak metinle çizilir; paket sonradan gelirse
+// sonraki cevaplar formülle çizilir.
+export const KATEX_BEKLEME_MS = 5000
+setTimeout(sonuclan, KATEX_BEKLEME_MS)
 
 const katexVekili: KatexBenzeri = {
   renderToString(tex, ayar) {

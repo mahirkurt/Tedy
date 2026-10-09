@@ -57,12 +57,14 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
 
   // Sayfa bağlamı: açılışta ve sayfa ya da açık öğe değişince yazılır; ilk sorudan sonra (gonder) ya da çip
   // kapatılınca null olur. Bağlamsız açılış eski bağlamı da siler (başlatıcıdan kalan çip /asistan'a taşınmaz).
+  // İlkel bağımlılıklar: aynı öğe yeniden bildirildiğinde (nesne değişse de) okurun kapattığı çip geri gelmez.
   const oge = useAcikOge()
+  const ogeTur = oge?.tur, ogeId = oge?.id, ogeEtiket = oge?.etiket
   useLayoutEffect(() => {
     const etiket = sayfaEtiketi(sayfa)
     asistanDeposu.ayarla({ sayfa: sayfa && etiket ? { ad: sayfa, etiket,
-      ...(oge ? { oge: { tur: oge.tur, id: oge.id }, ogeEtiketi: oge.etiket } : {}) } : null })
-  }, [sayfa, oge])
+      ...(ogeTur && ogeId ? { oge: { tur: ogeTur, id: ogeId }, ogeEtiketi: ogeEtiket } : {}) } : null })
+  }, [sayfa, ogeTur, ogeId, ogeEtiket])
   const baglam = useAsistanDurumu(d => d.sayfa?.ad ?? null)
 
   const secili = ogretmen.secili
@@ -178,6 +180,11 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
         { type: 'restartConversation' as never, handler: () => { if (guncelSohbet) void yeniSohbet(inst, guncelSohbet) } },
         // Durdur düğmesi "Tekrar dene"nin başlattığı isteği de keser (Carbon'un kendi gönderiminin dışında koşar).
         { type: 'stopStreaming' as never, handler: () => tekrariDurdur() },
+        // Giriş alanının boşluğu (yazma, mikrofon, gönderim sonrası temizlenme) Carbon'un durum olayıyla izlenir.
+        { type: 'state:change' as never, handler: () => {
+          const bos = !inst.getState().input.rawValue.trim()
+          if (asistanDeposu.al().girisBos !== bos) asistanDeposu.ayarla({ girisBos: bos })
+        } },
       ])
       if (asistanDeposu.al().saltOkunur) inst.updateInputIsDisabled(true)
     },

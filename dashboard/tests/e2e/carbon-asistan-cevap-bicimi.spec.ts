@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { json } from './_audit-fixtures'
-import { carbonSabitAc as sabitAc, eklentiler, gonderDugmesi, soruAlani, sonCevap } from './_asistan-carbon'
+import { carbonSabitAc as sabitAc, eklentiler, gonderDugmesi, soruAlani, sonCevap, kayanlariGizle } from './_asistan-carbon'
 
 // How an answer is set. Until 2026-09-25 the assistant borrowed Tedy Books'
 // chapter styles: serif headings, a printed book's indent on every paragraph
@@ -112,6 +112,7 @@ test('the closing step and caveat are set apart', async ({ page }) => {
 for (const [boy, w, h] of [['masaustu', 1440, 900], ['telefon', 390, 844]] as const) {
   test(`an answer looks as it did (${boy})`, async ({ page }) => {
     const msg = await sor(page, YENI, w, h)
+    await kayanlariGizle(page)
     await expect(msg).toHaveScreenshot(`asistan-cevap-${boy}.png`, {
       animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.002,
     })

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { createRequire } from 'node:module'
-import { carbonSabitAc as sabitAc, soruAlani } from './_asistan-carbon'
+import { carbonSabitAc as sabitAc, soruAlani, kayanlariGizle } from './_asistan-carbon'
 
 // Every teacher mode, pinned as the other pages are: a screenshot per teacher at
 // a desktop and a phone width (spec "Test": "her öğretmen için görsel regresyon
@@ -73,6 +73,7 @@ async function oneriyle(page: Page, w: number, h: number) {
 for (const [boy, w, h] of [['masaustu', 1440, 900], ['telefon', 390, 844]] as const) {
   test(`mod_oner önerisi, en uzun gerekçe (${boy}): looks as it did`, async ({ page }) => {
     await oneriyle(page, w, h)
+    await kayanlariGizle(page)
     await expect(page).toHaveScreenshot(`asistan-oneri-tasma-${boy}.png`, {
       fullPage: true, animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.002,
     })
@@ -140,6 +141,7 @@ for (const [boy, w, h] of [['masaustu', 1440, 900], ['telefon', 390, 844]] as co
   for (const id of MODLAR) {
     test(`${id} (${boy}): looks as it did`, async ({ page }) => {
       await modda(page, id, w, h)
+      await kayanlariGizle(page)
       await expect(page).toHaveScreenshot(`asistan-${id}-${boy}.png`, {
         fullPage: true, animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.002,
       })

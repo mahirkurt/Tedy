@@ -24,10 +24,12 @@ export interface AsistanDurumu {
   uyari: string | null
   /** "Tekrar dene" Carbon'un gönderiminin dışında koşar; durdur düğmesi giriş satırında bizimdir. */
   tekrarSuruyor: boolean
+  /** Carbon'un giriş alanı boş mu (Çalışma Planı düğmesi boşken devre dışı). */
+  girisBos: boolean
 }
 
 const BASLANGIC: AsistanDurumu = { okur: 'aile', ogretmenId: 'genel', saltOkunur: false, odevKey: '', cipler: [], sayfa: null,
-  sonrakiIstek: {}, dokum: [], yukleniyor: false, ekGoruntuleri: {}, acikAtif: null, ses: null, mesajVar: false, uyari: null, tekrarSuruyor: false }
+  sonrakiIstek: {}, dokum: [], yukleniyor: false, ekGoruntuleri: {}, acikAtif: null, ses: null, mesajVar: false, uyari: null, tekrarSuruyor: false, girisBos: true }
 
 let durum = BASLANGIC
 const dinleyiciler = new Set<() => void>()

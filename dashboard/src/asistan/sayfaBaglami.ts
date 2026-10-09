@@ -30,10 +30,25 @@ export function baslaticiGorunur(yol: string, rol: UserRole, odak: boolean, geni
 }
 
 export interface AcikOge { tur: 'odev' | 'sinav' | 'etkinlik' | 'ders_haftasi'; id: string; etiket: string }
+
+// Açık öğeler yığın olarak tutulur: en son açılan bağlamdır; her kayıt yalnız kendi öğesini bırakır (iki sınav kartı
+// açıkken biri kapanınca öbürü bağlam olarak kalır).
+let yigin: { oge: AcikOge }[] = []
 let acik: AcikOge | null = null
 const dinleyenler = new Set<() => void>()
-/** Sayfalar açık öğeyi buraya bildirir (ödev penceresi, seçili sınav/etkinlik, ders içeriği haftası). */
-export function acikOgeyiBildir(oge: AcikOge | null): void { acik = oge; dinleyenler.forEach(f => f()) }
+function yay() {
+  const son = yigin.at(-1)?.oge ?? null
+  if (son !== acik) { acik = son; dinleyenler.forEach(f => f()) }
+}
+
+/** Sayfalar açık öğeyi bildirir (ödev penceresi, seçili sınav/etkinlik, ders içeriği haftası); dönen işlev bırakır. */
+export function acikOgeAc(oge: AcikOge): () => void {
+  const kayit = { oge }
+  yigin = [...yigin, kayit]
+  yay()
+  return () => { yigin = yigin.filter(k => k !== kayit); yay() }
+}
+export const acikOgeSimdi = (): AcikOge | null => acik
 export function useAcikOge(): AcikOge | null {
   return useSyncExternalStore(f => { dinleyenler.add(f); return () => { dinleyenler.delete(f) } }, () => acik)
 }

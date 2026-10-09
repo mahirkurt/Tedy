@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { createRequire } from 'node:module'
-import { json } from './_audit-fixtures'
-import { carbonSabitAc as sabitAc, eklentiler, gonderDugmesi, soruAlani, sonCevap } from './_asistan-carbon'
+import { json, mockSohbetler } from './_audit-fixtures'
+import { carbonSabitAc as sabitAc, eklentiler, gonderDugmesi, soruAlani, sonCevap, kayanlariGizle } from './_asistan-carbon'
 
 const ACE = createRequire(import.meta.url).resolve('accessibility-checker-engine/ace.js')
 const CEVAP = [
@@ -138,6 +138,7 @@ for (const mod of ['genel', 'matematik']) {
         window.scrollTo(0, 0)
       })
       await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
+      await kayanlariGizle(page)
       await expect(page).toHaveScreenshot(`zengin-cevap-${mod}-${boy}.png`, {
         fullPage: true, animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.002,
       })
@@ -189,4 +190,20 @@ test('açık adım bloğu akışta dolar, son cevap tek kalır', async ({ page }
   // Carbon akıştaki eski çizimin eklenti düğümünü yuvasız bırakıyor (görünmez, erişilebilirlik ağacında yok).
   await expect(eklentiler(page).locator('.ac-kutu--adimlar')).toHaveCount(1)
   await expect(eklentiler(page).locator('.ac-adimlar')).toHaveCount(1)
+})
+
+test('formül paketi takılırsa alan boş kalmaz, süre dolunca sohbet formülsüz açılır', async ({ page }) => {
+  await page.route(/\/assets\/katex[^/]*\.js$/, () => { /* hiç yanıtlanmaz */ })
+  await page.route('**/api/assistant/stream', r => r.abort())
+  await page.route('**/api/assistant/chat', r => r.fulfill(json(cevap('Payda $\\frac{1}{2}$ olarak yazılır.'))))
+  await mockSohbetler(page)
+  await page.goto('/asistan')
+  // Sayfa parçası yüklendi (öğretmen seçici çizildi) ama sohbet KaTeX'i bekliyor: alan boş değil, söylüyor.
+  await expect(page.getByRole('radio', { name: 'Genel' })).toBeAttached()
+  await expect(page.locator('.asistan').getByText('Asistan yükleniyor…', { exact: true })).toBeVisible()
+  await expect(soruAlani(page)).toBeVisible({ timeout: 15000 })
+  await expect(page.getByText('Asistan yükleniyor…', { exact: true })).toHaveCount(0)
+  await soruAlani(page).fill('Payda?')
+  await gonderDugmesi(page).click()
+  await expect(eklentiler(page).locator('.ac-formul__kaynak')).toHaveText('\\frac{1}{2}')
 })

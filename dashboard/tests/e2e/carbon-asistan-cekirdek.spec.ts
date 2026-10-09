@@ -180,3 +180,13 @@ test('Tekrar dene ile başlayan istek durdur düğmesiyle kesilir', async ({ pag
   await expect(page.getByText('Yeniden deneniyor…', { exact: true }).filter({ visible: true })).toHaveCount(0)
   await expect(soruAlani(page)).toBeEditable()
 })
+
+test('Çalışma Planı düğmesi giriş boşken devre dışı, yazınca etkin (eski giriş alanı gibi)', async ({ page }) => {
+  await asistanAc(page)
+  const plan = page.getByRole('button', { name: 'Çalışma Planı', exact: true })
+  await expect(plan).toBeDisabled()
+  await soruAlani(page).fill('Haftalık plan')
+  await expect(plan).toBeEnabled()
+  await soruAlani(page).fill('   ')
+  await expect(plan).toBeDisabled()
+})

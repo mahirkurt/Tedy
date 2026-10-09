@@ -9,12 +9,13 @@ export default function GirisDugmeleri({ inst, mikrofon }: { inst: () => ChatIns
   const salt = useAsistanDurumu(d => d.saltOkunur)
   const yukleniyor = useAsistanDurumu(d => d.yukleniyor)
   const tekrar = useAsistanDurumu(d => d.tekrarSuruyor)
+  const bos = useAsistanDurumu(d => d.girisBos)
   if (salt) return null
   // Tek satır: Carbon'un yuvası blok kap; iki düğme ayrı ayrı konunca alt alta düşüyordu.
   return <div className="asistan__giris-dugmeleri">
     {mikrofon.var && <IconButton kind="ghost" size="sm" label={mikrofon.dinliyor ? 'Dinlemeyi bitir' : 'Sesle sor'}
       disabled={yukleniyor} onClick={mikrofon.bas}><Microphone /></IconButton>}
-    <IconButton kind="ghost" size="sm" label="Çalışma Planı" disabled={yukleniyor} onClick={() => {
+    <IconButton kind="ghost" size="sm" label="Çalışma Planı" disabled={yukleniyor || bos} onClick={() => {
       const i = inst(); const metin = i?.getState().input.rawValue.trim() ?? ''
       if (i && metin) { i.input.updateRawValue(() => ''); void soruyuYeniden(i, metin, { plan: true }) }
     }}><CalendarHeatMap /></IconButton>

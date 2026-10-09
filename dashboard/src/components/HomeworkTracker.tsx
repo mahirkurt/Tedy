@@ -10,7 +10,7 @@ import { NextThing } from './NextThing'
 import { describeDaysAhead } from './patterns/time'
 import './patterns/patterns.scss'
 import { useNavigate } from 'react-router-dom'
-import { acikOgeyiBildir } from '../asistan/sayfaBaglami'
+import { acikOgeAc } from '../asistan/sayfaBaglami'
 import type { ExamItem, ModuleCard } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
 import { EkBaglantisi } from './patterns/EkBaglantisi'
@@ -72,12 +72,12 @@ export default function HomeworkTracker() {
     })
   }, [hwData])
 
-  // Asistan başlatıcısı açık ödevi sayfa bağlamına ekler (sayfaBaglami.ts).
-  useEffect(() => {
-    acikOgeyiBildir(selectedHw?.homework_key ? { tur: 'odev', id: selectedHw.homework_key,
-      etiket: `${selectedHw.normalized_course || selectedHw['Ders Adı']} — ${selectedHw['Ödev Başlığı']}` } : null)
-    return () => acikOgeyiBildir(null)
-  }, [selectedHw])
+  // Asistan başlatıcısı açık ödevi sayfa bağlamına ekler (sayfaBaglami.ts). İlkel bağımlılıklar: ödev listesi
+  // yenilenince (yeni nesne) yeniden kayıt olmaz, okurun kapattığı bağlam çipi geri gelmez.
+  const acikOdev = selectedHw?.homework_key
+  const acikOdevEtiketi = selectedHw ? `${selectedHw.normalized_course || selectedHw['Ders Adı']} — ${selectedHw['Ödev Başlığı']}` : ''
+  useEffect(() => (acikOdev ? acikOgeAc({ tur: 'odev', id: acikOdev, etiket: acikOdevEtiketi }) : undefined),
+    [acikOdev, acikOdevEtiketi])
 
   async function addDocument(file: File) {
     const key = selectedHw?.homework_key
