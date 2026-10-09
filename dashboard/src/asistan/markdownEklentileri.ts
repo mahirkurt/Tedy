@@ -200,7 +200,7 @@ export function tedyMarkdownEklentisi(md: MarkdownIt, katex?: KatexBenzeri): voi
   md.renderer.rules.tedy_kutu = (tokens, i) => {
     const ad = tokens[i].info as keyof typeof KUTULAR
     const icerik = tokens[i].content
-    if (!(ad in KUTULAR)) return ic.render(icerik)
+    if (!Object.hasOwn(KUTULAR, ad)) return ic.render(icerik)   // "constructor" gibi prototip adları kutu değil
     if (ad === 'adimlar') return `<div class="ac-kutu--adimlar">${adimlarHtml(ic, icerik)}</div>`
     return `<div class="ac-kutu ac-kutu--${ad}"><span class="ac-kutu__etiket">${KUTULAR[ad]}</span>${ic.render(icerik)}</div>`
   }

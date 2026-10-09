@@ -40,7 +40,10 @@ export async function sseOku(res: Response, onOlay: (o: TedyOlayi) => void): Pro
         if (s.startsWith('event: ')) ad = s.slice(7).trim()
         else if (s.startsWith('data: ')) veri = s.slice(6)
       }
-      try { onOlay({ ad, veri: JSON.parse(veri) }) } catch (e) { if (e instanceof AkisHatasi) throw e }
+      // Yalnız bozuk JSON çerçevesi atlanır; işleyicinin kendi hatası yukarı çıkar (yutulursa okur cevapsız kalır).
+      let cozulen: Record<string, unknown>
+      try { cozulen = JSON.parse(veri) } catch { continue }
+      onOlay({ ad, veri: cozulen })
     }
   }
 }
@@ -69,8 +72,8 @@ export async function soruGonder(govde: Record<string, unknown>, onOlay: (o: Ted
         if (cevaplandi) return
         throw new AkisHatasi(String(o.veri.error ?? 'akış hatası'))
       }
-      if (o.ad === 'answer') cevaplandi = true
       onOlay(o)
+      if (o.ad === 'answer') cevaplandi = true   // işleyici cevabı gerçekten aldıktan sonra
     })
     if (!cevaplandi) throw new AkisHatasi('akış yanıtsız kapandı')
   } catch (e) {

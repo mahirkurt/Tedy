@@ -69,3 +69,13 @@ test('plan klasik uca gider', async () => {
   assert.equal(p.plan_blocks.length, 1)
   assert.deepEqual(cagrilar, ['/api/assistant/plan'])
 })
+
+test('bozuk JSON çerçevesi atlanır; olay işleyicisinin hatası yutulmaz (okur cevapsız ve hatasız kalmaz)', async () => {
+  const bozuk = 'event: tool_start\ndata: {bozuk\n\n'
+  const { f } = sahte({ '/api/assistant/stream': () => akisYaniti(bozuk + sse(['answer', { payload: PAYLOAD }])),
+    '/api/assistant/chat': () => json(PAYLOAD) })
+  const olaylar: string[] = []
+  await assert.rejects(soruGonder({}, o => { olaylar.push(o.ad); if (o.ad === 'answer') throw new TypeError('eşleme hatası') },
+    new AbortController().signal, f), /eşleme hatası/)
+  assert.ok(!olaylar.includes('tool_start'))     // bozuk çerçeve işleyiciye hiç gitmedi
+})

@@ -124,3 +124,59 @@ test('adımlar gösterilmişken akış da /chat da düşerse mesaj hata kartıyl
   await expect(page.getByRole('button', { name: 'Tekrar dene' })).toBeVisible()
   await expect(soruAlani(page)).toBeEditable()
 })
+
+test('iki soru üst üste düşerse her kartın Tekrar dene düğmesi kendi sorusunu yeniden yollar', async ({ page }) => {
+  const govdeler: { messages: { content: string }[] }[] = []
+  let n = 0
+  await page.route('**/api/assistant/stream', r => r.abort())
+  await page.route('**/api/assistant/chat', async r => {
+    govdeler.push(r.request().postDataJSON()); n += 1
+    await r.fulfill(n <= 2 ? { status: 500, json: { error: 'x' } } : { json: PAYLOAD({ answer: 'Şimdi geldi.' }) })
+  })
+  await asistanAc(page)
+  await sor(page, 'Birinci soru')
+  await expect(page.getByRole('button', { name: 'Tekrar dene' })).toHaveCount(1)
+  await sor(page, 'İkinci soru')
+  await expect(page.getByRole('button', { name: 'Tekrar dene' })).toHaveCount(2)
+  await page.getByRole('button', { name: 'Tekrar dene' }).first().click()
+  await expect(page.getByText('Şimdi geldi.', { exact: true })).toBeVisible()
+  expect(govdeler[2].messages.at(-1)?.content).toBe('Birinci soru')
+  await expect(page.getByRole('button', { name: 'Tekrar dene' })).toHaveCount(1)   // ikincinin kartı duruyor
+})
+
+test('ilk soruda oturum düşerse sohbet açılamaz: oturum cümlesi ve aynı soruyu yollayan Tekrar dene', async ({ page }) => {
+  let acilis = 0
+  const istekler = await cevapla(page, PAYLOAD({ answer: 'Oturum geri geldi.' }))
+  await asistanAc(page)
+  await page.route('**/api/assistant/sohbetler', async r => {
+    if (r.request().method() !== 'POST') return r.fulfill({ json: { sohbetler: [] } })
+    acilis += 1
+    await r.fulfill(acilis === 1 ? { status: 401, json: { error: 'session_required' } } : { json: { id: 'cd'.repeat(16), ogretmen: 'genel', baslik: '' } })
+  })
+  await sor(page, 'Merhaba')
+  await expect(page.getByText('Oturumun sona ermiş; sayfayı yenileyip yeniden giriş yap.', { exact: true })).toBeVisible()
+  await expect(page.getByText('Sohbet kaydedilemedi.', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Tekrar dene' }).click()
+  await expect(page.getByText('Oturum geri geldi.', { exact: true })).toBeVisible()
+  expect(istekler.at(-1)).toMatchObject({ sohbet_id: 'cd'.repeat(16), messages: [{ role: 'user', content: 'Merhaba' }] })
+  await expect(page.getByText('Merhaba', { exact: true }).filter({ visible: true })).toHaveCount(1)   // soru balonu çoğalmaz
+})
+
+test('Tekrar dene ile başlayan istek durdur düğmesiyle kesilir', async ({ page }) => {
+  let n = 0
+  await page.route('**/api/assistant/stream', r => r.abort())
+  await page.route('**/api/assistant/chat', async r => {
+    n += 1
+    if (n === 1) return r.fulfill({ status: 500, json: { error: 'x' } })
+    // Tekrar: hiç yanıtlanmaz, okur durdurur.
+  })
+  await asistanAc(page)
+  await sor(page, 'Soru')
+  await page.getByRole('button', { name: 'Tekrar dene' }).click()
+  await page.getByRole('button', { name: 'Yanıtı durdur' }).click()
+  await expect(page.getByRole('button', { name: 'Yanıtı durdur' })).toHaveCount(0)
+  // Görünenler: ilk hatanın ekran okuyucu duyurusu gizli bölgede kalır.
+  await expect(page.getByText('Asistan yanıtı alınamadı.', { exact: true }).filter({ visible: true })).toHaveCount(0)
+  await expect(page.getByText('Yeniden deneniyor…', { exact: true }).filter({ visible: true })).toHaveCount(0)
+  await expect(soruAlani(page)).toBeEditable()
+})

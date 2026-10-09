@@ -88,3 +88,11 @@ test('boş satırsız gelen kalın satır ve vurgu satırı paragraftan ayrılı
   const html = md().render('Metin satırı [S1].\n**Öncelik sırası:**\n\nx\nikinci satır\n**Şimdi:** Başla.')
   assert.match(html, /^<p>Metin satırı \[S1\]\.<\/p>\n<h3>Öncelik sırası<\/h3>\n<p>x\nikinci satır<\/p>\n<div class="ac-md__callout ac-md__callout--eylem">/)
 })
+
+test('nesne prototipi adlı kutu (":::constructor") bilinmeyen kutu gibi düz metin olur', () => {
+  for (const ad of ['constructor', 'tostring', 'valueof']) {
+    const html = md().render(`:::${ad}\nmetin\n:::`)
+    assert.ok(!/native code|function|ac-kutu/.test(html), `${ad}: ${html}`)
+    assert.match(html, /<p>metin<\/p>/)
+  }
+})

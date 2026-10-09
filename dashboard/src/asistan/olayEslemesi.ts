@@ -7,27 +7,39 @@ import type { GenericItem, MessageResponse, ReasoningSteps, StreamChunk } from '
 import { atiflariAyikla } from './atiflar.ts'
 
 export const ARAC_ETIKETI: Record<string, string> = {
-  ogrenci_verisi_ara: 'Okul verilerin taranıyor', kazanim_ara: 'MEB kazanımları aranıyor',
+  // Okura dönük adım başlıkları; hitapsız (Işık da aile de okur). tests/test_asistan_adim_etiketleri.py her aracı denetler.
+  ogrenci_verisi_ara: 'Okul verileri taranıyor', kazanim_ara: 'MEB kazanımları aranıyor',
   kazanim_listele: 'Kazanım listesi alınıyor', mufredat_ara: 'Müfredat aranıyor',
   kitap_listele: 'Ders kitapları listeleniyor', kitap_sayfa: 'Ders kitabı sayfası okunuyor',
   figur_ara: 'Görsel aranıyor', figur_getir: 'Görsel getiriliyor', oer_ara: 'Açık kaynaklar taranıyor',
-  oer_kazanima_gore: 'Kazanıma bağlı kaynaklar alınıyor', modul_ara: 'Yayınlanmış modüller aranıyor',
-  odev_listesi: 'Ödev listen okunuyor', odev_belgesi: 'Ödev belgesi aranıyor', odev_tamamla: 'Eksik alan kaydediliyor',
+  oer_kazanima_gore: 'Kazanıma bağlı kaynaklar alınıyor', oer_getir: 'Açık kaynak açılıyor',
+  program_getir: 'Öğretim programı alınıyor', ders_bilgisi: 'Ders bilgisi alınıyor',
+  video_listele: 'MEB videoları listeleniyor', video_getir: 'Video bilgisi alınıyor',
+  modul_ara: 'Yayınlanmış modüller aranıyor', kitap_ara: 'Tedy Books taranıyor', video_oner: 'Ders videoları aranıyor',
+  odev_listesi: 'Ödev listesi okunuyor', odev_belgesi: 'Ödev belgesi aranıyor', odev_tamamla: 'Eksik alan kaydediliyor',
+  odev_fotograftan: 'Fotoğraftaki ödev okunuyor', ek_oku: 'Portal eki okunuyor',
+  ders_programi: 'Ders programı okunuyor', sinavlar: 'Sınav listesi okunuyor', takvim: 'Takvim okunuyor',
+  ders_icerigi: 'Ders içeriği okunuyor', notlar: 'Notlar okunuyor', platform_ilerlemesi: 'Platform ilerlemesi okunuyor',
+  aile_kaynak_ara: 'Aile kaynakları taranıyor',
   skill_kaynagi: 'Öğretmen notları açılıyor', mod_oner: 'Öğretmen önerisi hazırlanıyor',
-  netlestir: 'Seçenekler hazırlanıyor', alistirma_hazirla: 'Alıştırma hazırlanıyor',
-  odev_fotograftan: 'Fotoğraftaki ödev okunuyor', yuklenen_dosya_oku: 'Ek okunuyor',
+  netlestir: 'Seçenekler hazırlanıyor', alistirma_olustur: 'Alıştırma hazırlanıyor',
+  calisma_degerlendir: 'Çalışma değerlendiriliyor', ogrenme_gunlugu: 'Öğrenme günlüğü okunuyor',
+  hafiza_yaz: 'Öğretim notu kaydediliyor', hafiza_duzelt: 'Öğretim notu düzeltiliyor',
 }
 export const VARSAYILAN_ADIM = 'Kaynaklar taranıyor'
 export const ALTBILGI_YUVASI = 'tedy-altbilgi'
 export const GERI_BILDIRIM_KATEGORILERI = ['Yanlış bilgi', 'Anlamadım', 'Seviyeme uygun değil', 'Kaynak göstermedi', 'Diğer']
 
+/** Hata kartı: "Tekrar dene" kartın kendi isteğini yeniden çalıştırır (istek gövdesi, ya da sohbet açılamadan
+ *  düşen sorunun metni). Eskiden tek bir genel "bekleyen" vardı; iki kart düşünce ilk kart ikincinin isteğini çalıştırıyordu. */
+export interface HataKarti { mesaj: string; govde?: Record<string, unknown>; plan?: boolean; metin?: string }
 export type OzelKart =
   | { tur: 'alistirma'; veri: Alistirma; akista?: boolean }
   | { tur: 'odev_onerisi'; veri: OdevOnerisi }
   | { tur: 'netlestirme'; veri: Netlestirme }
   | { tur: 'mod_onerisi'; veri: ModOnerisi }
   | { tur: 'plan'; veri: AssistantPlanBlock[] }
-  | { tur: 'hata'; veri: { mesaj: string } }
+  | { tur: 'hata'; veri: HataKarti }
 
 export interface Adim { arac: string; baslik: string; durum: 'processing' | 'success' | 'failure'; ozet?: string }
 export interface TedyOlayi { ad: string; veri: Record<string, unknown> }
@@ -178,6 +190,6 @@ export function sonYanit(d: AkisDurumu, payload: AssistantResponse, sec: SonYani
   }
 }
 
-export function hataYaniti(yanitId: string, mesaj: string): MessageResponse {
-  return { id: yanitId, output: { generic: [kartOgesi({ tur: 'hata', veri: { mesaj } })] as unknown as GenericItem[] } }
+export function hataYaniti(yanitId: string, mesaj: string, yeniden: Omit<HataKarti, 'mesaj'> = {}): MessageResponse {
+  return { id: yanitId, output: { generic: [kartOgesi({ tur: 'hata', veri: { mesaj, ...yeniden } })] as unknown as GenericItem[] } }
 }

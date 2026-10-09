@@ -7,7 +7,7 @@ import NetlestirmeSecenekleri from '../components/NetlestirmeSecenekleri'
 import ModOnerisi from '../components/ModOnerisi'
 import { GENEL } from '../hooks/useOgretmen'
 import type { OzelKart } from './olayEslemesi.ts'
-import { asistanDeposu, useAsistanDurumu } from './asistanDeposu.ts'
+import { useAsistanDurumu } from './asistanDeposu.ts'
 import { soruyuYeniden, tekrarDene } from './istek.ts'
 
 export default function TedyKarti({ kart, state, inst, ogretmenSec }: { kart: OzelKart; state: RenderUserDefinedState; inst: ChatInstance; ogretmenSec: (id: string) => Promise<void> }) {
@@ -40,8 +40,8 @@ export default function TedyKarti({ kart, state, inst, ogretmenSec }: { kart: Oz
     case 'hata':
       return <div className="asistan__hata" role="alert">
         <Tag type="red" size="sm">{kart.veri.mesaj}</Tag>
-        {asistanDeposu.al().bekleyen && mesajId &&
-          <Button kind="ghost" size="sm" renderIcon={Renew} onClick={() => void tekrarDene(inst, mesajId)}>Tekrar dene</Button>}
+        {(kart.veri.govde || kart.veri.metin) && mesajId &&
+          <Button kind="ghost" size="sm" renderIcon={Renew} onClick={() => void tekrarDene(inst, mesajId, kart.veri)}>Tekrar dene</Button>}
       </div>
   }
 }

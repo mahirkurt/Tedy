@@ -44,6 +44,8 @@ SORU = {"messages": [{"role": "user", "content": "Bugün hangisinden başlayayı
     {"ad": "xyz"}, {"ad": 3}, "isler", {"ad": "isler", "oge": {"tur": "gizli", "id": "a"}},
     {"ad": "isler", "oge": {"tur": "odev", "id": ""}}, {"ad": "isler", "oge": {"tur": "odev", "id": "a\nb"}},
     {"ad": "isler", "oge": {"tur": "odev", "id": "x" * 401}},
+    # Hashlenemeyen ad ve tür: `in` sözlükte TypeError verip 500'e dönüyordu.
+    {"ad": ["isler"]}, {"ad": {"x": 1}}, {"ad": "isler", "oge": {"tur": ["odev"], "id": "a"}},
 ])
 def test_gecersiz_sayfa_akistan_once_400(istemci, uc, sayfa):
     yanit = istemci.post(uc, json={**SORU, "sayfa": sayfa})

@@ -1039,7 +1039,8 @@ def _istek_sayfasi(payload):
     if sayfa is None:
         return "", None
     hata = (jsonify({"error": "Bilinmeyen sayfa."}), 400)
-    if not isinstance(sayfa, dict) or sayfa.get("ad") not in SAYFA_ADLARI:
+    # Adın str olduğu önce denetlenir: liste ya da sözlük `in SAYFA_ADLARI`da TypeError verip 500'e dönüyordu.
+    if not isinstance(sayfa, dict) or not isinstance(sayfa.get("ad"), str) or sayfa["ad"] not in SAYFA_ADLARI:
         return "", hata
     satir = f"Bulunduğu sayfa: {SAYFA_ADLARI[sayfa['ad']]}"
     oge = sayfa.get("oge")

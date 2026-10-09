@@ -6,7 +6,8 @@ import { useSohbetler } from '../hooks/useSohbetler'
 import { useSes } from '../hooks/useSes'
 import { asistanDeposu, useAsistanDurumu } from './asistanDeposu.ts'
 import { hataYaniti } from './olayEslemesi.ts'
-import { calistir } from './istek.ts'
+import { IstekHatasi, okurHatasi } from './akisIstemcisi.ts'
+import { calistir, metinGondericiKur, tekrariDurdur } from './istek.ts'
 import { tedyChatConfig } from './tedyChatConfig.ts'
 import { TEDY_MARKDOWN_EKLENTILERI, useKatexHazir } from './markdownKurulumu.ts'
 import { tabloCiz } from './Tablo.tsx'
@@ -86,13 +87,13 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
     asistanDeposu.ayarla({ ses: { var: !!ses.ses, okunan: ses.okunan, oku: ses.oku } })
   }, [ses.ses, ses.okunan, ses.oku])
 
-  const gonder = useCallback(async (istek: MessageRequest, sec: CustomSendMessageOptions, inst: ChatInstance) => {
-    const metin = String((istek.input as { text?: string }).text ?? '').trim()
-    if (!metin || asistanDeposu.al().saltOkunur) return
+  // Sorunun gövdesini kurup çalıştırır. Carbon'un gönderimi ve sohbet açılamadan düşen sorunun "Tekrar dene"si
+  // (istek.ts metinGonderici) aynı yolu kullanır; soru balonu zaten ekrandadır.
+  const metniGonder = useCallback(async (inst: ChatInstance, metin: string, signal: AbortSignal, istekId?: string) => {
     // Yüklenen ya da ödeve bağlanan ek bitene kadar beklenir (eski arayüz gönderimi engelliyordu): yoksa ek
     // bu sorudan düşer, çipi temizlenir ve yükleme sonucu boşa gider.
-    await eklerHazir(sec.signal)
-    if (sec.signal?.aborted) return
+    await eklerHazir(signal)
+    if (signal.aborted) return
     const d = asistanDeposu.al()
     const ek = d.sonrakiIstek
     const plan = !!ek.plan || hizliSorular.some(s => s.plan && s.metin === metin)
@@ -102,8 +103,11 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
       try {
         sohbetId = await guncelSohbet!.yeni(d.ogretmenId)
         etkinSohbetiYaz(d.email, { id: sohbetId, salt: false })
-      } catch {
-        await inst.messaging.addMessage(hataYaniti(crypto.randomUUID(), 'Sohbet kaydedilemedi.')); return
+      } catch (e) {
+        // Oturum düştüyse okura oturum cümlesi; kart aynı soruyu yeniden yollayabilir.
+        const oturum = e instanceof IstekHatasi && (e.durum === 401 || e.durum === 403)
+        await inst.messaging.addMessage(hataYaniti(crypto.randomUUID(), oturum ? okurHatasi(e) : 'Sohbet kaydedilemedi.', { metin }))
+        return
       }
     }
     const ekler = !ek.deep && !ek.transient && !plan ? d.cipler.flatMap(c => c.id ? [c.id] : []) : []
@@ -119,10 +123,17 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
     }
     const goruntu = d.cipler.flatMap(c => c.id ? [{ id: c.id, ad: c.ad, tur: c.tur ?? 'bilinmiyor' }] : [])
     asistanDeposu.ayarla({ sonrakiIstek: {}, dokum, sayfa: null, mesajVar: true,
-      ...(ekler.length ? { cipler: [], ekGoruntuleri: { ...d.ekGoruntuleri, [istek.id ?? '']: goruntu } } : {}) })
-    await calistir(inst, govde, plan, sec.signal)
+      ...(ekler.length ? { cipler: [], ekGoruntuleri: { ...d.ekGoruntuleri, ...(istekId ? { [istekId]: goruntu } : {}) } } : {}) })
+    await calistir(inst, govde, plan, signal)
     void guncelSohbet?.yenile()
   }, [hizliSorular])
+  useLayoutEffect(() => { metinGondericiKur(metniGonder) }, [metniGonder])
+
+  const gonder = useCallback(async (istek: MessageRequest, sec: CustomSendMessageOptions, inst: ChatInstance) => {
+    const metin = String((istek.input as { text?: string }).text ?? '').trim()
+    if (!metin || asistanDeposu.al().saltOkunur) return
+    await metniGonder(inst, metin, sec.signal, istek.id)
+  }, [metniGonder])
 
   const ogretmenSec = useCallback(async (id: string) => {
     const d = asistanDeposu.al()
@@ -165,6 +176,8 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
         // Carbon'un "Yeni sohbet" ve yeniden başlat düğmeleri de yeni kayıt açar.
         { type: 'history:newChat' as never, handler: () => { if (guncelSohbet) void yeniSohbet(inst, guncelSohbet) } },
         { type: 'restartConversation' as never, handler: () => { if (guncelSohbet) void yeniSohbet(inst, guncelSohbet) } },
+        // Durdur düğmesi "Tekrar dene"nin başlattığı isteği de keser (Carbon'un kendi gönderiminin dışında koşar).
+        { type: 'stopStreaming' as never, handler: () => tekrariDurdur() },
       ])
       if (asistanDeposu.al().saltOkunur) inst.updateInputIsDisabled(true)
     },

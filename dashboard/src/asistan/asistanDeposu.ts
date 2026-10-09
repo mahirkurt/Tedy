@@ -9,7 +9,6 @@ export interface AsistanDurumu {
   odevKey: string; cipler: Cip[]; sayfa: SayfaIstegi | null
   sonrakiIstek: { deep?: boolean; transient?: boolean; plan?: boolean }
   dokum: { role: 'user' | 'assistant'; content: string }[]
-  bekleyen: { govde: Record<string, unknown>; plan: boolean } | null
   yukleniyor: boolean; ekGoruntuleri: Record<string, Yukleme[]>
   /** Açık kaynak paneli; `donus` paneli açan düğme (kapanınca odak oraya döner). */
   acikAtif: { atiflar: AssistantCitation[]; etkin: string | null; donus?: HTMLElement } | null
@@ -23,10 +22,12 @@ export interface AsistanDurumu {
   mesajVar: boolean
   /** Bir eylem kaydedilemediğinde giriş üstünde gösterilen kısa uyarı (ör. geri bildirim). */
   uyari: string | null
+  /** "Tekrar dene" Carbon'un gönderiminin dışında koşar; durdur düğmesi giriş satırında bizimdir. */
+  tekrarSuruyor: boolean
 }
 
 const BASLANGIC: AsistanDurumu = { okur: 'aile', ogretmenId: 'genel', saltOkunur: false, odevKey: '', cipler: [], sayfa: null,
-  sonrakiIstek: {}, dokum: [], bekleyen: null, yukleniyor: false, ekGoruntuleri: {}, acikAtif: null, ses: null, mesajVar: false, uyari: null }
+  sonrakiIstek: {}, dokum: [], yukleniyor: false, ekGoruntuleri: {}, acikAtif: null, ses: null, mesajVar: false, uyari: null, tekrarSuruyor: false }
 
 let durum = BASLANGIC
 const dinleyiciler = new Set<() => void>()

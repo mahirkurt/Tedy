@@ -4,6 +4,7 @@ import type { OdevOnerisi } from '../components/OdevOnayKarti'
 import type { Yukleme } from '../components/YuklenenEk'
 import type { Alistirma } from '../components/AlistirmaKarti'
 import { etkinSohbetiOku } from '../asistan/useAsistanOturumu'
+import { IstekHatasi } from '../asistan/akisIstemcisi.ts'
 
 export interface Sohbet {
   id: string
@@ -40,7 +41,8 @@ async function istek<T>(path: string, method = 'GET', body?: object): Promise<T>
     ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Sohbetler yüklenemedi.')
+  // Durum korunur: 401/403 okura oturum cümlesiyle söylenir (okurHatasi).
+  if (!res.ok) throw new IstekHatasi(data.error || 'Sohbetler yüklenemedi.', res.status)
   return data as T
 }
 

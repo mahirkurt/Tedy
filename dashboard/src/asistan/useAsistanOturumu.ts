@@ -28,7 +28,7 @@ export async function sohbetiAc(inst: ChatInstance, depo: Depo, ogretmenSec: (id
   ogretmenSec(sonuc.sohbet.ogretmen)
   const ekGoruntuleri: Record<string, Yukleme[]> = {}
   for (const m of sonuc.mesajlar) if (m.rol === 'user' && m.yuklemeler?.length) ekGoruntuleri[m.id] = m.yuklemeler
-  asistanDeposu.ayarla({ saltOkunur: saltMi, sohbetId: id, cipler: [], bekleyen: null, ekGoruntuleri,
+  asistanDeposu.ayarla({ saltOkunur: saltMi, sohbetId: id, cipler: [], ekGoruntuleri,
     mesajVar: sonuc.mesajlar.length > 0,
     dokum: sonuc.mesajlar.map(m => ({ role: m.rol, content: m.icerik })) })
   await inst.messaging.clearConversation()
@@ -40,7 +40,7 @@ export async function yeniSohbet(inst: ChatInstance, depo: Depo) {
   const d = asistanDeposu.al()
   const id = await depo.yeni(d.ogretmenId)
   etkinSohbetiYaz(d.email, { id, salt: false })
-  asistanDeposu.ayarla({ saltOkunur: false, sohbetId: id, dokum: [], cipler: [], bekleyen: null, ekGoruntuleri: {}, mesajVar: false })
+  asistanDeposu.ayarla({ saltOkunur: false, sohbetId: id, dokum: [], cipler: [], ekGoruntuleri: {}, mesajVar: false })
   await inst.messaging.clearConversation()
   inst.updateInputIsDisabled(false)
 }

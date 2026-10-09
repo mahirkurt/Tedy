@@ -3,7 +3,7 @@ import type { ChatInstance, StreamChunk } from '@carbon/ai-chat'
 import type { AssistantCitation } from '../types'
 import { asistanDeposu } from './asistanDeposu.ts'
 import { akisBaslat, hataYaniti, olayIsle, sonYanit } from './olayEslemesi.ts'
-import type { SonYanitSecenekleri } from './olayEslemesi.ts'
+import type { HataKarti, SonYanitSecenekleri } from './olayEslemesi.ts'
 import { okurHatasi, planGonder, soruGonder } from './akisIstemcisi.ts'
 
 function secenekler(): SonYanitSecenekleri {
@@ -13,7 +13,7 @@ function secenekler(): SonYanitSecenekleri {
 
 /** Bir isteği çalıştırır ve Carbon'a parça parça verir. Parçalar sırayla eklenir (addMessageChunk asenkron). */
 export async function calistir(inst: ChatInstance, govde: Record<string, unknown>, plan: boolean, signal: AbortSignal) {
-  asistanDeposu.ayarla({ bekleyen: { govde, plan }, yukleniyor: true })
+  asistanDeposu.ayarla({ yukleniyor: true })
   let d = akisBaslat(crypto.randomUUID())
   // Kısmi parçası Carbon'a gitmiş (açık, akan) mesaj: hata olursa yeni mesaj değil, bu mesaj hata kartıyla biter.
   let acikYanit: string | null = null
@@ -40,22 +40,42 @@ export async function calistir(inst: ChatInstance, govde: Record<string, unknown
       }, signal)
       await zincir
     }
-    asistanDeposu.ayarla({ bekleyen: null })
   } catch (e) {
     await zincir.catch(() => {})
     if ((e as { name?: string })?.name === 'AbortError' || signal.aborted) return
-    if (acikYanit) await inst.messaging.addMessageChunk({ final_response: hataYaniti(acikYanit, okurHatasi(e)) } as StreamChunk)
-    else await inst.messaging.addMessage(hataYaniti(crypto.randomUUID(), okurHatasi(e)))
+    const kart = hataYaniti(acikYanit ?? crypto.randomUUID(), okurHatasi(e), { govde, plan })
+    if (acikYanit) await inst.messaging.addMessageChunk({ final_response: kart } as StreamChunk)
+    else await inst.messaging.addMessage(kart)
   } finally {
     asistanDeposu.ayarla({ yukleniyor: false })
   }
 }
 
-export async function tekrarDene(inst: ChatInstance, hataMesajiId: string) {
-  const b = asistanDeposu.al().bekleyen
-  if (!b) return
+/** Sohbet açılamadan düşen bir sorunun metnini baştan gönderen işlev (useAsistanSohbeti kurar): soru balonu
+ *  zaten ekrandadır, yeniden gönderim yeni balon eklemez. */
+let metinGonderici: ((inst: ChatInstance, metin: string, signal: AbortSignal) => Promise<void>) | null = null
+export function metinGondericiKur(f: typeof metinGonderici) { metinGonderici = f }
+
+/** Süren tekrar denemesi: Carbon'un durdur düğmesi (stopStreaming olayı) bunu da keser. */
+let surenTekrar: AbortController | null = null
+export function tekrariDurdur() { surenTekrar?.abort() }
+
+export async function tekrarDene(inst: ChatInstance, hataMesajiId: string, kart: HataKarti) {
+  if (!kart.govde && !kart.metin) return
   await inst.messaging.removeMessages([hataMesajiId])
-  await calistir(inst, b.govde, b.plan, new AbortController().signal)
+  const denetim = new AbortController()
+  surenTekrar = denetim
+  // Carbon'un gönderiminin dışında koşar: yükleniyor göstergesi elle açılır (okur beklediğini görür).
+  inst.updateIsMessageLoadingCounter('increase', 'Yeniden deneniyor…')
+  asistanDeposu.ayarla({ tekrarSuruyor: true })
+  try {
+    if (kart.govde) await calistir(inst, kart.govde, kart.plan ?? false, denetim.signal)
+    else if (kart.metin && metinGonderici) await metinGonderici(inst, kart.metin, denetim.signal)
+  } finally {
+    inst.updateIsMessageLoadingCounter('decrease')
+    asistanDeposu.ayarla({ tekrarSuruyor: false })
+    if (surenTekrar === denetim) surenTekrar = null
+  }
 }
 
 export async function soruyuYeniden(inst: ChatInstance, metin: string, ek: { deep?: boolean; transient?: boolean; plan?: boolean }) {
