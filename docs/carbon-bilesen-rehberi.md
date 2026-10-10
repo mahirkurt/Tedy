@@ -1,6 +1,6 @@
 # Carbon Bileşen Rehberi — TEDY
 
-**Sürüm 1.0 · 2026-10-10** · `docs/tedy-ui-ux-talimatnamesi.md`'nin eki ("Talimatname").
+**Sürüm 1.1 · 2026-10-10** (1.1: talimatname Ç1–Ç10 kararları, S35–S44, işlendi) · `docs/tedy-ui-ux-talimatnamesi.md`'nin eki ("Talimatname").
 
 ## Bu belge nedir
 
@@ -56,8 +56,9 @@ bileşeninkiyle çakışırsa kalıp çapası `kalip-` öneki alır: `#kalip-ove
 - **§N**: talimatname bölümü (`docs/tedy-ui-ux-talimatnamesi.md`). Sık geçenler: §3.2 renk, §3.3
   tipografi, §3.4 yerleşim, §3.5 köşe/kenar/derinlik, §3.6 hareket, §3.7 ikon, §3.8 erişilebilirlik,
   §3.9 içerik ve dil, §4 bileşen seçimi, §5 kalıplar, §6 Carbon for AI, §9 edupedia modülleri.
-- **S1…S34**: talimatname §11.1, bilinçli sapmalar. **Ç1…Ç10**: talimatname §11.2, karar bekleyen çelişkiler.
-  **B1…B67**: talimatname §13, bilinen borçlar (borç kaydı; kapanan satır "Kapandı" diye kalır).
+- **S1…S45**: talimatname §11.1, bilinçli sapmalar (S1–S34) ve 2026-10-10'da Carbon pratiğine göre kararlaştırılan
+  çelişkiler (S35–S45). **Ç1…Ç11**: talimatname §11.2; hepsi kararlaştırıldı (→ S35–S45).
+  **B1…B75**: talimatname §13, bilinen borçlar (borç kaydı; kapanan satır "Kapandı" diye kalır).
 - **Yüzey §N.M**: `docs/frontend-surface-designs.md` bölümü.
 - **Modül şablonu**: `src/mcp_server/vendor/assets/module-template.html`; Carbon eşlemesi
   `src/mcp_server/vendor/references/carbon-child-system.md`.
@@ -152,7 +153,7 @@ kartının içindedir; UI shell üç karttır. Kartlar Carbon kimliğine göre a
   `isFlush`, `ordered`; `AccordionItem`: `open`, `title`, `disabled`).
 - **TEDY durumu:** **Kullanılıyor** — `PlatformProgress.tsx`, `CourseContent.tsx`,
   `Announcements.tsx`. TEDY kuralı (Yüzey §2.5, ölçülmüş): bugünün eyleme açık bölümü açık, geçmiş
-  kapalı, başlık `BAŞLIK (n) ⌄` — Carbon'un "hepsi kapalı" varsayılanından bilinçli sapma (S34); modül ve
+  kapalı, başlık "Başlık (n) ⌄" (cümle düzeni, S38) — Carbon'un "hepsi kapalı" varsayılanından bilinçli sapma (S34); modül ve
   geçmiş bölümleri Carbon varsayılanını izler. İşler grupları Carbon akordeonu değildir
   (`HomeworkTracker.tsx`: `<button aria-expanded>`, `aria-controls` ve liste sarmalayıcısı yok).
   Hiçbir yerde `size`/`align`/`isFlush` verilmiyor; Dersler'de 48 px telefon hedefi `size="lg"`
@@ -209,7 +210,8 @@ kartının içindedir; UI shell üç karttır. Kartlar Carbon kimliğine göre a
   Açık konular: canlı yüzeyde yalnız *broad* etiket var (eski `AssistantChat.tsx`'te mesaj başına
   *focused* `mini` etiket vardı); popover'da "Artifacts and resources" ve "Additional actions"
   yok; fotoğraftan çıkarılan ödev alanlarında (`OdevOnayKarti.tsx`) AI etiketi ve revert yok;
-  modül şablonunda AI etiketi yok (kullanıcı kararı bekliyor, §6 ve §9). Kısaltma: "AI" ("YZ" kararı
+  modül şablonunda AI etiketi yok — karar S41 (2026-10-10): etiket `ModuleViewer`'ın çerçeve başlığında,
+  açıklanabilirlik içeriğiyle; modülün içi değişmez (B71). Kısaltma: "AI" ("YZ" kararı
   verilmedi). Talimatname §6.
 - **Kaynak:** https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/
 
@@ -297,13 +299,15 @@ kartının içindedir; UI shell üç karttır. Kartlar Carbon kimliğine göre a
   ve birincilsiz: "Yaptım" (`NextThing.tsx`), "Belge ekle" (`YuklemeAlani.tsx`) — Carbon ve Yüzey
   §2.6 ikisi de ghost/tertiary der (B58). Danger hiç yok; sohbet ve not "Sil"
   (`SohbetListesi.tsx`) ve belge "Kaldır" onaysız ghost — Carbon (danger + onay modalı) ve İ5
-  (geri alınabilirlik) ikisini de karşılamıyor; seçim kullanıcıda (B23; karar Ç6). Düğmeyle gezinme:
+  (geri alınabilirlik) ikisini de karşılamıyor (B23). Karar S40 (2026-10-10): geri alınabilir düşük etkili eylem
+  onaysız + "Geri al"; geri alınamaz silme danger `Modal`, başlık ve birincil düğme nesneyi adlandırır. Düğmeyle gezinme:
   `Modules.tsx` "Aç"/"Modüllere dön" (Books doğru: `<Link>`; B58). Boy: 57 boyutlu düğmenin 44'ü `sm`;
   telefon hedefi yamalarla (S18, B8). Yükleniyor: `HomeworkTracker.tsx` düğmeyi `InlineLoading` ile
   değiştiriyor (Carbon'un inline loading kuralına uygun, 1.17); `NextThing.tsx` metni
-  "Kaydediliyor…" yapıp devre dışı bırakıyor. Öğretmen kiplerinde `--cds-button-primary` ders
-  vurgusuna boyanır (kullanıcı kararı, asistan B1 öğretmen modları planı; talimatname Ç1); modül referansı "birincil hep Blue 60" diyor — iki
-  çalışma zamanı ayrışıyor, talimatname §3.2'de tek kural. Modül şablonu `.btn--ghost` kenarlı
+  "Kaydediliyor…" yapıp devre dışı bırakıyor (S36: tek eylem tek `InlineLoading`, B69). Birincil düğme her kipte
+  `$button-primary` (Blue 60), öğretmen kiplerinde de (S35, 2026-10-10; Ç1'in kararı); bugün öğretmen kiplerinde
+  `--cds-button-primary` ders vurgusuna boyanıyor (B68). Modül referansının "birincil hep Blue 60" kuralı artık iki
+  çalışma zamanının ortak kuralıdır (talimatname §3.2). Modül şablonu `.btn--ghost` kenarlı
   (Carbon'un tertiary şekli), devre dışı `opacity: .45` (§9). Talimatname §4, §3.7.
 - **Kaynak:** https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/
 
@@ -692,7 +696,7 @@ kartının içindedir; UI shell üç karttır. Kartlar Carbon kimliğine göre a
   yerlerde metin değişimi, beş ayrı yazımla ("Ekleniyor…", "Ekleniyor...", "Yükleniyor", "Yükleniyor...",
   "Kaydediliyor…") — tek sözlük (İ9; B41). Yüzey §2.4 "dönen ikon yok" kuralı içerik yüklemesi
   içindir; tek eylem için tek bir `InlineLoading` İ6'nın "aynı anda tek hareket" ilkesine uyar —
-  talimatname §5 "yükleniyor" bu kapsamı yazar.
+  talimatname §5.2 ve S36 (2026-10-10 kararı) bu kapsamı yazar; `NextThing.tsx`'in metin değiştiren kaydı B69.
 - **Kaynak:** https://carbondesignsystem.com/building-blocks/core/components/inline-loading/guidelines/
 
 <a id="link"></a>
@@ -785,8 +789,8 @@ kartının içindedir; UI shell üç karttır. Kartlar Carbon kimliğine göre a
   `AISkeletonIcon`, `AISkeletonPlaceholder` vardır (`unstable__`/`preview__` takma adları kullanılmaz).
 - **React:** `Loading` (`withOverlay`, `small`, `description`); iskelet için `SkeletonText`,
   `SkeletonPlaceholder`, `SkeletonIcon`.
-- **TEDY durumu:** **Kullanılmaz (büyük döner gösterge + örtü).** Yüzey §2.4: içerik iskeleti
-  içeriğin şeklinde, dönen ikon yok, 400 ms altı hiçbir şey. Uygulama: `SkeletonText`
+- **TEDY durumu:** **Kullanılmaz (büyük döner gösterge + örtü).** Yüzey §2.4 (S36): içerik iskeleti
+  içeriğin şeklinde, içerik yüklemesinde dönen ikon yok, tek eylemde tek `InlineLoading`, 400 ms altı hiçbir şey. Uygulama: `SkeletonText`
   (`WeeklySchedule.tsx`, `PlatformProgress.tsx`, `ModuleViewer.tsx`, `Modules.tsx`,
   `DashboardHeader.tsx`), `SkeletonPlaceholder` (`CalendarEvents.tsx`). Carbon da sayfa ölçeğinde
   iskeleti tercih eder; TEDY'nin reddettiği tek durum bölümü kilitleyen spinner. Açıklar: 400 ms
@@ -1137,7 +1141,9 @@ kartının içindedir; UI shell üç karttır. Kartlar Carbon kimliğine göre a
   eşlemesidir (`carbon-child-system.md`): yatay, numaralı, görünür etiketsiz (`title` + `aria-label`),
   tamamlanan dolu daire, geçerli halka, gelecek adımlar `disabled` (Carbon'a göre ekran okuyucudan
   düşer), ok tuşu gezinmesi yok; "Son N durak" yalnız 1–2 durak kalınca. Toplamı baştan göstermek
-  İ3 ile gerilim yaratır; istisna modül pedagojisi kurallarında yazılır (§9).
+  İ3 ile gerilim yaratır; istisna modül pedagojisi kurallarında yazılır (§9). 2026-10-10'dan beri (S43) modül
+  ilerlemesi yalnız bu sessiz, etiketli göstergedir — seri çipi ve ödül animasyonu kalkar, XP varsa sessiz metindir (B73);
+  ProgressBar kullanıcı eylemiyle belirlenen ilerleme için kullanılmaz.
 - **Kaynak:** https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/guidelines/
 
 <a id="radio-button"></a>
@@ -1764,8 +1770,9 @@ talimatname ve anayasa kazanır (öncelik sırası, talimatname §0).
   düğmeleri B17. Silme Carbon'un etki derecesiyle yazılır: düşük → anında + aynı satırda "Geri al" (toast değil);
   orta (sohbet silme) → danger `Modal`, başlık ve birincil düğme aynı eylemi söyler ("Bu sohbet silinsin mi?" /
   "Sohbeti sil" / "Vazgeç"), başarı bildirimi yok (satırın listeden çıkması onaydır, İ6), başarısızlık satırda
-  "Sohbet silinemedi." (D3). §2.6'daki "Yıkıcı eylem yok" cümlesi bugünkü kodla çelişir — B23 (onaysız
-  silme + yanlış fiil); seçim Ç6. Tekrarlanan düğme ("Sil", "Yaptım") görünen metnini adında tutar, satırı
+  "Sohbet silinemedi." (D3). Bu derecelendirme 2026-10-10'da karara bağlandı (S40; yüzey tasarımları §2.6'nın eski
+  "Yıkıcı eylem yok" cümlesi yerine). Bugünkü kod B23 (onaysız silme + yanlış fiil), B63 ("Yaptım"ın geri alı).
+  Ad yazdırmalı yüksek etki basamağı kullanılmaz. Tekrarlanan düğme ("Sil", "Yaptım") görünen metnini adında tutar, satırı
   `aria-describedby` ile bağlar (WCAG 2.5.3). Kopyalama onayı ve "Kapat" metin düğmesi B41.
 - **Test.** Önerilen Playwright: "Sil" → `role=dialog`, birincil `.cds--btn--danger`, `DELETE` isteği yalnız
   onaydan sonra (rota sayacı); "Vazgeç" sonrası sohbet listede kalır. Grep: `components/` altında metni "Kapat"
@@ -2148,9 +2155,10 @@ talimatname ve anayasa kazanır (öncelik sırası, talimatname §0).
   yüklemede bölgenin şeklinde Carbon iskeleti; tek eylem sürerken düğmenin yerinde `InlineLoading` (biter → sonuç
   metni, hata → satır içi uyarı); tam ekran yükleme kullanılmaz; aynı anda en çok bir eylem yükleniyor gösterir
   (Carbon'un satır içi yükleme kuralı = İ6'nın tek hareketli öğesi; bir bölgenin iskeletleri tek hareket sayılır ve
-  `InlineLoading` ile yan yana koşmaz). Yüzey tasarımları §2.4'teki "Dönen ikon yok" ve "400 ms'den kısaysa hiçbir
-  şey gösterilmez" cümleleri kodla çelişir (spinner var; 400 ms uygulanmamış) — B48: ya `useApi`'de gecikmeli
-  iskelet ya cümle düzeltilir (eşik Carbon'da yok, TEDY'nin kendi kararıdır). Yükleme hatası `role="alert"` taşır
+  `InlineLoading` ile yan yana koşmaz). Bu ayrım 2026-10-10'da karara bağlandı (S36): yüzey tasarımları §2.4'ün
+  "Dönen ikon yok" cümlesi içerik yüklemesine daraltıldı. "400 ms'den kısaysa hiçbir şey gösterilmez" cümlesi hâlâ
+  kodla çelişir — B48: ya `useApi`'de gecikmeli iskelet ya cümle düzeltilir (eşik Carbon'da yok, TEDY'nin kendi
+  kararıdır). `NextThing`'in metin değiştiren kaydı B69. Yükleme hatası `role="alert"` taşır
   (D3) — B43. "Load more" yalnız geçmişte; aktif liste hep tam (İ7). B5 Bugün iskeleti.
 - **Test.** Var: `tests/e2e/gorunum-kipleri.spec.ts` (azaltılmış harekette hiçbir şey canlanmaz). Önerilen:
   `/api/homework` 1 sn geciktir → bölge şekilli `.cds--skeleton`; ilk "Yaptım" askıdayken ikinci "Yaptım" → sayfada
@@ -2427,9 +2435,11 @@ talimatname ve anayasa kazanır (öncelik sırası, talimatname §0).
   `preview__IconIndicator` kararlı olunca yeniden değerlendirilir (preview API'ye bağlanılmaz). Durum Tag'lerinin ikonsuz
   olması B16. Kırmızı/sarı/yeşil/turuncu anlam renkleridir, ders rengi olmaz; mavi ve mor TEDY'de ders ailesidir
   (İ8, kullanıcı kararı 2026-10-02) — "bekliyor/sürüyor" gri aile + simgeyle gösterilir; ders ailesi taşıyan durum
-  Tag'leri ve testin çalışma anında hesaplanan Tag türünü kaçırması B21 (B13 ile ilişkili). Başlıkta uyarı
-  sayısının gri kalması bilinçli sapma (S23): sürekli "4 uyarı" sarısı hiç çözülmeyen bir alarmdır (İ6). Not renklendirme
-  yüzey tasarımları §4.4 "renk kodlaması yok" ile çelişir — Ç8. Rozet yok ve öyle kalır (İ6, odak kipi).
+  Tag'leri ve testin çalışma anında hesaplanan Tag türünü kaçırması B21 (B13 ile ilişkili). Sistem arızasının şiddeti
+  Carbon'un durum anlamıyladır: başarısız ve ilerlenemiyor hata, kısmi/bayat uyarı, bilgilendirici bilgi; gri yalnız
+  başlamamış/taslak (S39, 2026-10-10). Başlıkta uyarı sayısının gri kalması bilinçli sapmaydı (S23: sürekli "4 uyarı"
+  sarısı hiç çözülmeyen bir alarmdır, İ6); S39 ile gerilimi ve asistanın gri "Yedek modelden" rozeti S45 ile kapandı: kısmi/bayat
+  durum uyarı ikonu + metin taşır (borç B75). Not renklendirilmez, nötr metindir (S42, 2026-10-10); bugünkü `gradeColor` bantları B72. Rozet yok ve öyle kalır (İ6, odak kipi).
   Eylem gerektirmeyen bilgi rozet değil düz metindir (yüzey tasarımları §2.7).
 - **Test.** Var: `tests/test_pano_tasarim_sistemi.py` (ders ailesi Tag'de yok — yalnız literal),
   `tests/test_ders_renkleri.py`, `tests/e2e/kontrast.spec.ts` (not bantları AA), `tests/e2e/sinav-ve-hata.spec.ts`

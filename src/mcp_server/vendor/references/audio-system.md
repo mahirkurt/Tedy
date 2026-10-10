@@ -25,7 +25,7 @@ başına hiçbir bilgi taşımaz (erişilebilirlik + işitme engeli + sessizde t
 | --- | --- | --- | --- |
 | `correct` | E5→B5, iki nota, sine | kısa, yükselen, hoş | her doğru/ödüllendirme (`addXP`) |
 | `retry`   | tek alçak nota (Eb4), sine | yumuşak, nazik, **cezasız** | yanlış cevap dalları |
-| `reward`  | E5→Ab5→Eb6 arpej, triangle | kutlama | modül tamamlama / özet |
+| `reward`  | E5→Ab5→Eb6 arpej, triangle | kutlama (2026-10-10, talimatname S43: kalkar; B73) | modül tamamlama / özet |
 | `notify`  | iki notalı nazik çan | bilgilendirici | mola hatırlatıcı; ses açılınca onay |
 
 Tüm tepe kazançları düşük tutulur; sesler kısa ve örtüşmesiz tasarlanır. "Yanlış" sesi
@@ -35,6 +35,8 @@ bilinçli olarak alçak ve kısa — başarısızlığı vurgulamaz, yeniden den
 
 - **XP onayı** — doğru cevapta XP sayacının yanında kısa yükselip sönen "+N XP" etiketi + sayaçta
   kısa opaklık nabzı (`pulseEl`; ölçek sıçraması yok). Reduced-motion'da yalnız sayı güncellenir.
+  2026-10-10'dan beri (talimatname S43) ödül hareketi yok: XP kalırsa yalnız sayı güncellenir, her
+  kipte; yükseliş ve nabız borçtur (B73).
 - **Yeni rozet** — `badge--new` ile yalnız belirir (opaklık; ölçeklenme yok). Tedy dili: kutlama
   yok, sessiz onay (`tedy-integration.md` §5).
 - **Doğru/yanlış işaretleri** — mevcut `feedback--ok/--no` + seçenek vurguları (renk DAİMA

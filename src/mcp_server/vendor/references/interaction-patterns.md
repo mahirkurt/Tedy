@@ -66,7 +66,8 @@ açmamak için yazar sorumluluğundadır). Ayrıntı: `subject-packs.md` §2(f),
 seçilebilir (Tab + Enter/Space); seçim sonrası doğru yeşil+onay ikonu, yanlış
 kırmızı+ikon ve doğru olan işaretlenir; açıklama `aria-live="polite"` ile okunur.
 **Yarışma varyantı:** Seri doğru (streak) sayacı; kişisel rekor; süre **opsiyonel**
-(varsayılan kapalı). Ceza yok; yanlışta açıklama + devam.
+(varsayılan kapalı). Ceza yok; yanlışta açıklama + devam. (2026-10-10, talimatname S43: seri sayacı
+ve ödül animasyonu kalkar; kişisel rekor sessiz metindir. Şablon değişene dek borç B73.)
 
 > **✓ Motorda uygulandı (v3.0.0 — Task 13, görünmez taban-korumalı uyarlanır zorluk,
 > gamified-flows.md §2.3/§3.3).** `questions[].tier?: 1|2|3` opsiyoneldir (1=kolay

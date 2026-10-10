@@ -124,9 +124,10 @@ Kaynak: [Color — Guidelines](https://carbondesignsystem.com/building-blocks/fo
     güvenliği; `carbon-child-system.md` §11). **Küçük metin düşük-kontrast aksan
     renginde asla yazılmaz** — aksan metin olarak taşınacaksa `--accent-strong`
     (= `--subject-text`, palet 70 / 30; tag çifti `--accent-tint`/`--accent-on`'dur)
-    zorunludur. *Adlı Tedy istisnası:* panodaki asistanın öğretmen modu
-    `--cds-button-primary`/`--cds-interactive`'i ders aksanına yönlendirir
-    (`dashboard/src/asistan/ogretmenRenkleri.ts`); bu kural modül için geçerli kalır (§2.9).
+    zorunludur. Kural panoda da istisnasızdır (2026-10-10, talimatname S35): panodaki
+    asistanın öğretmen modu da birincil eylemi Carbon mavisinde tutar, ders rengi yalnız
+    yüzeydedir; bugünkü `dashboard/src/asistan/ogretmenRenkleri.ts` yönlendirmesi borçtur
+    (talimatname B68), adlı istisna değildir (§2.9).
 
 ### 2.7 Veri görselleştirme (12–13)
 Kaynak: [Data Viz — Color Palettes](https://carbondesignsystem.com/building-blocks/data-visualization/color-palettes/) ·
@@ -224,8 +225,9 @@ Aşağıdakiler 15 maddeyi Carbon'un güncel rehberiyle inceltir (Carbon MCP `do
   ease-out (entrance) eğrisiyle, 90–120 ms statik sürede biter; `duration-fast-01` (70 ms)
   düğme/anahtar, `duration-fast-02` (110 ms) solma içindir
   (…/foundations/motion/overview/#duration-tokens). Motorun `--dur-fast` (110 ms) bandın
-  içindedir ama standard eğri kullanır. *Adlı Tedy istisnası:* "+N XP" yükselişi
-  `duration-slow-02` (700 ms) koşar ve G-CARBON-GRID onu görmez (yalnız literal `Nms` okur).
+  içindedir ama standard eğri kullanır. "+N XP" yükselişi `duration-slow-02` (700 ms) koşar ve
+  G-CARBON-GRID onu görmez (yalnız literal `Nms` okur); 2026-10-10'dan beri adlı istisna değil,
+  kalkacak bir ödül hareketidir (talimatname S43, borç B73).
 - **Madde 10 — tip seti.** Productive set ürün arayüzü, expressive set editoryal sayfalar
   içindir (…/foundations/typography/style-strategies/#overview). Modülde expressive/fluid
   stil yalnız kap dışı, sayfa düzeyi başlıkta kullanılır; kart, seçenek ya da soru bloğu içinde

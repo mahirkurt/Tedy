@@ -23,6 +23,7 @@ description: TEDY overlay on carbon-builder. Use for any TEDY UI work — dashbo
 - **S10** Radii: cards/panels 8px (`--ted-radius-card`), controls 0, tags pill. No new 2/4/12px.
 - **S11** No static shadows; depth = layer token + 1px border. Shadows only on transient surfaces.
 - **S13** Carbon AI Chat a11y repairs (`asistan/carbonOnarimi.ts`, `Tablo.tsx`, `AiAciklama.tsx`) stay; re-run the IBM test on every `@carbon/ai-chat` bump.
+- **S35–S45** (Carbon-aligned): primary always `$button-primary`; sentence case, no all-caps; heading weight from its token; skeleton for content, one `InlineLoading` per action; grey never marks a failure; grades not colour-banded. Open code: §13 B68–B75.
 
 ## Acceptance (talimatname §12)
 ```bash

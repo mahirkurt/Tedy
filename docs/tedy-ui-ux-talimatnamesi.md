@@ -1,6 +1,6 @@
 # TEDY UI-UX Tasarım Talimatnamesi
 
-**Sürüm 1.0 · 2026-10-10 · Kapsam: `dashboard/` (React 19, `@carbon/react` ^1.114.0, `@carbon/ai-chat` 1.22.0),
+**Sürüm 1.1 · 2026-10-10 · Kapsam: `dashboard/` (React 19, `@carbon/react` ^1.114.0, `@carbon/ai-chat` 1.22.0),
 Tedy Books ve edupedia modülleri (`src/mcp_server/vendor/`)**
 
 Bu belge TEDY'de bir arayüz kararının **nereden okunacağını** ve **hangi sırayla bağlayıcı olduğunu** yazar.
@@ -58,7 +58,7 @@ kaydı, bugünün kanıtı değil.
 
 | Dosya | Rolü | Sahibi / nasıl değişir |
 |---|---|---|
-| `docs/tedy-ui-ux-talimatnamesi.md` (bu belge) | Giriş kapısı ve konsolide kurallar: 15 premium işçilik ilkesi (P1–P15, §7), 34 bilinçli sapma (S1–S34) ve 10 karar bekleyen çelişki (Ç1–Ç10, §11), kapılar (§12) ve **borç kaydı** (§13: B1–B67, ikisi kapandı) | Elle; §14.2'deki kurala göre, değişiklik kaydıyla |
+| `docs/tedy-ui-ux-talimatnamesi.md` (bu belge) | Giriş kapısı ve konsolide kurallar: 15 premium işçilik ilkesi (P1–P15, §7), 45 bilinçli sapma ve kararlaştırılmış çelişki (S1–S45; S35–S45 2026-10-10'da Ç1–Ç11'den; karar bekleyen çelişki yok, §11), kapılar (§12) ve **borç kaydı** (§13: B1–B75, ikisi kapandı) | Elle; §14.2'deki kurala göre, değişiklik kaydıyla |
 | [`docs/frontend-design-principles.md`](frontend-design-principles.md) | Anayasa: kullanıcı, merkezî gerçek, D1–D4, İ1–İ9, yapmayacaklarımız, doğrulama kapıları | Elle; bölüm numaraları ve D/İ kimlikleri sabittir (testler, kod yorumları, vendor otoritesi onlara bağlanır) |
 | [`docs/frontend-surface-designs.md`](frontend-surface-designs.md) | Anayasanın yüzey yüzey uygulaması; ortak kalıplar §2, kabuk §3, yüzeyler §4 | Elle; bölüm numaraları sabit |
 | [`docs/carbon-bilesen-rehberi.md`](carbon-bilesen-rehberi.md) | 42 bileşen kartı (Carbon'un 43 girişi) + 18 kalıp kartı (Carbon ne der · TEDY nasıl kullanır) | Elle; Carbon iddiası MCP `anchor_url` ya da güncel URL taşır |
@@ -313,13 +313,13 @@ kullanılmaz". AI token'ları yalnız özel AI bileşeni yazarken kullanılır.
   → [S17](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), [B3](#13-bilinen-borçlar)
   *Ölçülmüş yanlış kullanım (2026-10-10):* yedi hover sayfa zeminine (`--ted-color-page-bg`), biri `layer-02`'ye,
   biri `--cds-notification-background-error`'a boyuyor; `--ted-color-layer-hover` tanımlı ve 0 kez kullanılıyor;
-  öğretmen kipinde hover ile basılı aynı renk (`--ted-subject-text`), basılı hâl hover'dan ayırt edilemiyor → [B31](#13-bilinen-borçlar).
+  öğretmen kipinde hover ile basılı aynı renk (`--ted-subject-text`), basılı hâl hover'dan ayırt edilemiyor → [B31](#13-bilinen-borçlar)
+  (S35 ile düğme yeniden Carbon mavisine döndüğünde bu madde kendiliğinden kapanır, [B68](#13-bilinen-borçlar)).
   *Test (eklenir):* pytest (`test_pano_tasarim_sistemi`'ne) — `:hover` bloklarındaki her `background` değeri
-  `-hover` ile biten bir token ya da `transparent`; öğretmen kipinde `--cds-button-primary-hover` ≠
-  `--cds-button-primary-active`.
+  `-hover` ile biten bir token ya da `transparent`.
 - **[3.2-4] Seçili ve basılı hâl hover'dan farklı bir adımdır** (`-selected` bir adım, `-active` iki adım).
-  Öğretmen kipi korunacaksa hover `colors.$<aile>-60-hover`, basılı `colors.$<aile>-80` olur (Carbon'un
-  Blue 60 → Blue 80 mantığı).
+  Bir ders ailesi etkileşimli bir öğeye renk verirse (ör. seçili öğretmen çipi) hover `colors.$<aile>-60-hover`,
+  basılı `colors.$<aile>-80` olur (Carbon'un Blue 60 → Blue 80 mantığı); birincil eylem ders rengi almaz (S35).
 - **[3.2-5] Durum opaklıkla verilmez.** Devre dışı TEDY denetimi gri aile token'larını kullanır; geri çekilen
   geçmiş öğe `text-secondary` / `layer-02` ile çizilir; gizlenmiş süzgeç çipi seçilmemiş hâlde (çerçeve +
   nötr zemin) çizilir. Okunması gereken içerik devre dışı değil salt okunurdur. Carbon'un kendi bileşenleri
@@ -361,7 +361,8 @@ birleşik durum en yüksek dikkat rengini alır.
   Durum `Tag` rengi yalnız `red`, `green`, `gray` ya da `outline`/`high-contrast` olur; `blue`, `purple`,
   `teal`, `magenta`, `cyan`, `cool-gray`, `warm-gray` ders ailelerine ayrılmıştır ve durum etiketi olmaz.
   Başlıktaki senkron etiketinin bölüm uyarılarını gri göstermesi Carbon'un "birleşik durum en yüksek dikkat
-  rengini alır" kuralına İ6 gerekçeli bilinçli istisnadır. → [S4](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), [S23](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler),
+  rengini alır" kuralına İ6 gerekçeli bilinçli istisnadır; S39'un "gri arıza için asla" kuralıyla gerilimi
+  S45 ile karara bağlandı. → [S4](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), [S23](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler),
   [B16](#13-bilinen-borçlar)
   *Ölçülen:* "Bekliyor" ve "YAPILAN" mavi `Tag` (`formatters.ts`, `HomeworkTracker.tsx`); `test_ders_rengi_etiket_olmaz`
   türü değişkenden gelen `Tag`'i görmüyor → [B21](#13-bilinen-borçlar).
@@ -383,7 +384,8 @@ Diğer renkler "seyrek ve amaçlı" kullanılır. Token'ın anlamı yeniden tan�
   hover'ı `--ted-color-brand-primary-hover` (`blue-90`). Hiçbir düğme, bağlantı, ilerleme göstergesi ya da
   içerik metni lacivert değildir.
   *Test:* `tests/test_pano_tasarim_sistemi.py::test_marka_laciverdi_yalniz_bantta` (var). Eklenir:
-  Playwright — `.ac[data-ogretmen]` dışındaki her `.cds--btn--primary`'nin computed arka planı `#0f62fe`.
+  Playwright — her `.cds--btn--primary`'nin computed arka planı `#0f62fe`, öğretmen kiplerinde de
+  ([S35](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler)).
 - **[3.2-10] Bant sözleşmesi.** Lacivert bant Carbon'un "yüksek kontrast anı"dır. İçinde yalnız
   `--ted-header-text` (= `text-on-color`), `--cds-icon-on-color`, `--cds-focus-inverse`, ikincil metin
   `--ted-color-brand-text-secondary` (`blue-20`, lacivert üstünde 8,6:1), ince çizgi `--ted-color-brand-rule`
@@ -392,14 +394,17 @@ Diğer renkler "seyrek ve amaçlı" kullanılır. Token'ın anlamı yeniden tan�
   dışında renk isteyen yeni bir başlık öğesi önce `<Theme theme="g100">` sarmalıyla denenir.
   *Test (eklenir):* pytest — `.cds--header` / `dashboard-header` bloklarında marka token'ları dışında
   `#{colors.$…}` geçmez; Playwright — başlıktaki her odaklanabilir öğenin `outline-color`'ı `focus-inverse`.
-- **[3.2-11] Öğretmen kipi istisnası (kullanıcı kararı, asistan B1 öğretmen modları planı; Ç1).** `.ac[data-ogretmen]:not([data-ogretmen='genel'])`
-  kapsamında `--cds-button-primary`, `--cds-button-tertiary` ve hover/active'leri ders aksanına bağlanır (gönder
-  düğmesi, ilk hızlı istem; `AssistantChat.scss:999-1003, 1110-1113`); Carbon AI Chat yolunda aynı kipte
-  `--cds-interactive` ve kullanıcı balonu (`--cds-chat-bubble-user*`) bağlanır (`asistan/ogretmenRenkleri.ts:9-15`).
-  Bu, Carbon'un "token rolünü değiştirme" kuralından ve modül referanslarının "butonlar Carbon mavisi kalır"
-  kuralından **adlandırılmış tek istisnadır**; bu kapsamın dışında hiçbir Carbon token'ı yeniden atanmaz. Modül
-  referanslarıyla çelişki [Ç1](#112-adı-konmuş-karar-bekleyen-çelişkiler)'de karar bekler; o zamana dek davranış korunur.
-  *Test (eklenir):* pytest — `--cds-(button|interactive)…:` ataması yalnız bu seçicide bulunur.
+- **[3.2-11] Öğretmen kipinde eylem yine Carbon mavisidir** ([S35](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), kullanıcı
+  kararı 2026-10-10; Ç1'in kararı). Birincil eylem her kipte `$button-primary` / `$interactive`'tir; öğretmen kipi
+  ders rengini yalnız yüzey rollerine verir: panel yüzeyi, panel kenarı, 4 px aksan kenarı ve okurun balonu
+  (`--cds-chat-bubble-user*`, surface/on-surface ≥ 4.5:1). Hiçbir kipte `--cds-button-*` ya da `--cds-interactive`
+  yeniden atanmaz. Tarihçe: asistan B1 öğretmen modları planı (2026-09-28) gönder düğmesini ve ilk hızlı istemi ders
+  aksanına boyamıştı; modül referansları ve Carbon "birincil eylem mavi" diyordu.
+  *Ölçülen (kod henüz uymuyor):* `asistan/ogretmenRenkleri.ts:9-13` `--cds-button-primary(-hover/-active)` ve
+  `--cds-interactive`'i ders aksanına bağlıyor; eski `AssistantChat.scss:999-1003, 1110-1113` aynısını yapıyor;
+  `carbon-asistan-ogretmen.spec.ts:14-21` kip başına dolgu rengini sabitliyor → [B68](#13-bilinen-borçlar).
+  *Test (eklenir):* pytest — `dashboard/src` altında `--cds-(button-primary|button-tertiary|interactive)` ataması 0;
+  `carbon-asistan-ogretmen.spec.ts` gönder düğmesinin dolgusunu beş kipte `rgb(15, 98, 254)` bekler.
 
 #### 3.2.5 Tedy ders renk sistemi ve İ8 panel kuralları
 
@@ -458,10 +463,11 @@ Panodaki roller (`.ted-subject--<aile>` kapsamında): `--ted-subject-accent` (60
   *Test (eklenir):* pytest — `background: var(--ted-subject-panel)` yazan her kural aynı blokta
   `--ted-subject-accent` kenarı tanımlar; Playwright — `panel` zeminli her öğenin en az bir kenarı aile aksanı
   renginde ve ≥ 3 px.
-- **[3.2-16] Gün Şeridi'nin sarısı "pencere"dir, uyarı değil.** `--ted-day-window` (`yellow-10`),
-  `--ted-day-window-edge` (`yellow-30`), `--ted-day-window-text` (`yellow-80`) imza öğenin odak penceresidir;
-  sarı başka hiçbir yerde pencere anlamında kullanılmaz. Şeridin grafik kontrastı 3:1'in altındadır →
-  [B9](#13-bilinen-borçlar); §8.
+- **[3.2-16] Gün Şeridi nötrdür (2026-10-10, Bugün yenilemesi).** Odak penceresi `$layer-accent-01` alanı ve 2px
+  `$border-strong-01` sınırıdır; ray `$layer-01` + 1px `$border-subtle-01`; "şimdi" 2px `$border-inverse`; çapa
+  opak 2px `$border-interactive`. Sarı `--ted-day-window*` token'ları kaldırıldı: sarı bir anlam rengidir (İ8.1) ve
+  Carbon'un "regular warning" alarm rengiyle aynıydı. Ölçülen grafik kontrastı: şimdi 18,1:1 (ray) / 13,7:1
+  (pencere), çapa 5,0 / 3,8:1, pencere sınırı 3,3:1 — B9 kapandı; `bugun-duzen.spec.ts` "D — yenileme" sabitler. §8.
 
 ---
 
@@ -526,11 +532,16 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
   `.next-thing__instruction`) bugün 14 px `body-01`; okuma bloğu sayılırsa `body-02`'ye geçer — karar yüzey
   tasarımlarına aittir.
 - **[3.3-3] Eşleme ve kalibre ağırlık.** Aynı satırdaki başlık ve gövde eşli token'ları kullanır (aynı satır
-  aralığı); bir token kendi ağırlığında kalır — `heading-03`'e bir yerde 600 eklenip başka yerde eklenmez,
-  `body-compact-01 + font-weight: 600` ile `heading-compact-01` yeniden kurulmaz. Hiyerarşi önce boyla kurulur.
+  aralığı); bir token kendi ağırlığında kalır — başlık token'ına `font-weight` hiç eklenmez
+  ([S44](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), Ç10'un kararı 2026-10-10): `heading-01`, `heading-02`,
+  `heading-compact-01/02` 600; `heading-03`–`heading-05` 400; `heading-06`/`-07` 300 (`@carbon/type` 11.69.0).
+  `body-compact-01 + font-weight: 600` ile `heading-compact-01` yeniden kurulmaz. Hiyerarşi önce boyla kurulur;
+  daha ağır bir başlık gerekiyorsa 600'lük daha küçük token seçilir, büyük token ağırlaştırılmaz. Modüller de aynı kurala
+  hizalanır.
   *Ölçülen:* `heading-03` 400 (`.today-now__title`, `.next-thing__title`) ve 600 (`.today__day-name`,
-  `.dashboard-event-date__day`); `heading-04` + 600 üç yerde; hafta başlığında `heading-compact-01` (18 px)
-  `body-01` (20 px) yanında → [B35](#13-bilinen-borçlar).
+  `.dashboard-event-date__day`; `ted-theme.scss:552-553, 952-953`); `heading-04` + 600 üç yerde (`:1504-1505,
+  3015-3016, 3151-3152`); modül şablonu `heading-03/04` karşılıklarını 600 yazıyor → [B74](#13-bilinen-borçlar). Hafta
+  başlığında `heading-compact-01` (18 px) `body-01` (20 px) yanında → [B35](#13-bilinen-borçlar).
   *Test (eklenir):* Playwright — `.course-content__week-header` çocuklarının computed `line-height`'ı eşit;
   `.today-now__title`, `.next-thing__title`, `.today__day-name` aynı ağırlıkta.
 - **[3.3-4] Harf aralığı token'dadır.** Elle `letter-spacing` yazılmaz; tek istisna büyük harfli kısa başlık
@@ -547,15 +558,18 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
   `NextThing.tsx` "{n} dakikayla"; `HomeworkTracker.tsx` "yarın"/"N gün sonra"); yalnız şerit işaretleri salt rakam; ders programının saat sütunu (`.schedule-time`) Sans 600 → [B36](#13-bilinen-borçlar).
   *Test (eklenir):* Playwright — her `.tedy-time`'ın `textContent`'i `/^[\d:.\-–\s]+$/`; `.schedule-time`'ın
   computed `font-family`'si `IBM Plex Mono` ile başlar.
-- **[3.3-6] Büyük harf.** Carbon başlık, etiket, düğme, sekme, bildirim ve sütun başlığında cümle düzeni ister
-  ([3.9-1]). TEDY'nin `BAŞLIK (n) ⌄` bölüm başlıkları ([yüzey tasarımları §2.5](frontend-surface-designs.md))
-  ve kısa kicker'ları (ŞİMDİ, YARIN, AYRICA…) adlandırılmış sapmadır; sınırı: **en çok iki sözcük**, `≤ 14 px`,
-  büyük harf **CSS ile** (`text-transform: uppercase`) verilir — kaynak metinde büyük harf yazılmaz —, tek
-  izleme token'ı. Başlık, düğme, sekme ve bildirim cümle düzeninde kalır. Bu sınır [Ç4](#112-adı-konmuş-karar-bekleyen-çelişkiler)'ün önerisidir;
-  karar verilene kadar yeni iş bu sınırı aşmaz. *Ölçülen:* kaynakta da büyük harf yazılıyor (`DayStrip.tsx`
-  "ŞİMDİ", `TodaySchedule.tsx` "YARIN"/"ŞİMDİ"/"BUGÜN", `HomeworkTracker.tsx` `'YAPILAN'`) → [B41](#13-bilinen-borçlar).
-  *Test (eklenir):* TSX dize sabitlerinde dört harften uzun tümü-büyük sözcük → 0 (kısaltma izin listesi);
-  Playwright — computed `text-transform: uppercase` taşıyan her öğe ≤ 2 sözcük ve ≤ 14 px.
+- **[3.3-6] Büyük harf yok; her yerde cümle düzeni** ([S38](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), Ç4'ün kararı
+  2026-10-10). Başlık, etiket, kaş (eyebrow), düğme, sekme, Tag, bildirim, sütun başlığı ve durum dizgesi cümle
+  düzenindedir ([3.9-1]). Kaynak metinde tümü büyük harf dizge yazılmaz, CSS `text-transform: uppercase` kullanılmaz;
+  yüzey tasarımları §2.5'in bölüm başlığı "Başlık (n) ⌄" biçimindedir; kısa kaşlar da cümle düzenindedir ("Şimdi",
+  "Yarın", "Ayrıca"). Kısaltmalar kendi yazımında kalır (ÖGEP, A3K, TEDY). Portaldan büyük harfle gelen veri
+  (gün adları, ders başlıkları) gösterilirken cümle düzenine çevrilmez ama kalınlaştırılmaz ([P11](#711-p11--içerik-önce-kelimeler-işi-yapar)).
+  Tedy Books kendi dünyasıdır (§4.11), bu kuralın dışındadır. Tarihçe: 1.0 sürümünde "≤ 2 sözcük, CSS ile" bir kaş
+  istisnası öneriliyordu; kaldırıldı. *Ölçülen:* panoda 14 `text-transform: uppercase` kuralı ve kaynakta büyük harfli
+  kaşlar (`TodaySchedule.tsx` "ŞİMDİ"/"YARIN"/"BUGÜN"/"OKULDAN SONRA"/"AYRICA"/"SINAVLAR", `NextThing.tsx` "SÜRE DOLDU",
+  `HomeworkTracker.tsx` "SIRADAKİ", `'YAPILAN'`, `DayStrip.tsx` "ŞİMDİ") → [B70](#13-bilinen-borçlar), [B41](#13-bilinen-borçlar).
+  *Test (eklenir):* pytest — Books bloğu dışındaki pano stil dosyalarında `text-transform: uppercase` → 0; TSX dize
+  sabitlerinde üç harften uzun tümü-büyük sözcük → 0 (kısaltma izin listesi).
 - **[3.3-7] İtalik ve kesme.** Bütün bir cümle (boş durum, sessiz not) italik yazılmaz; boş durum dik
   `.tedy-empty`'dir. Başlık, etiket, hata ve bildirim kesilmez; kesilen öğe adı tam metne klavyeyle ulaştırır
   (Carbon `Tooltip`; `title` özniteliği bilgi taşımaz).
@@ -806,17 +820,20 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
 - **[3.6-5] Yollar tek eksende.** Anahtar kareler yalnız X ya da Y'de öteler (`card-fade-in`, `popover-enter`
   `translateY`; `tl-stagger` `translateX`); çapraz yol, dönme ve ölçek sıçraması yoktur (popover'ın 0.98
   ölçeği tek istisnadır). Sonsuz döngü yalnız Books iskeletlerinde.
-- **[3.6-6] Azaltılmış hareket.** Bilgi taşıyan her hareketin önce **durağan eşdeğeri** yazılır (iskelet =
-  gri blok + `aria-busy` ve durum mesajı; "şimdi" işareti = konum + metin); ondan sonra
-  `prefers-reduced-motion: reduce` altında hareket tamamen kalkar. Böylece anayasa §5.4'ün "kapalıyken bilgi
-  kaybı yok" kapısı ile Carbon'un "durağan yolu her zaman olsun" kuralı aynı şeyi ister. Uygulama
+- **[3.6-6] Azaltılmış hareket** ([S37](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), Ç3'ün kararı 2026-10-10).
+  Hiçbir bilgi yalnız hareketle taşınmaz: her hareketin önce **durağan eşdeğeri** yazılır (iskelet = gri blok +
+  `aria-busy` ve durum mesajı; "şimdi" işareti = konum + metin); ondan sonra `prefers-reduced-motion: reduce`
+  altında temel olmayan her hareket durur — animasyon, geçiş, gecikme, yumuşak kaydırma. Durağan eşdeğeri olan
+  hareket temel değildir. Anayasa §5.4 2026-10-10'da bu kurala göre yeniden yazıldı (eski "bilgi taşıyan hareket
+  kalır" cümlesinin yerine; korunan şey bilgidir, hareket değil). Carbon'un "durağan yolu her zaman olsun" kuralı
+  (https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#adaptive-interface-motion-design)
+  ve WCAG 2.2 SC 2.3.3 aynı şeyi ister. Uygulama
   `ted-theme.scss`'teki genel blok (`animation-duration` / `transition-duration` 0s `!important`,
   `scroll-behavior: auto`). JavaScript'le başlayan hareket (yumuşak kaydırma, Web Animations) CSS'le
   kapanmadığından `matchMedia('(prefers-reduced-motion: reduce)')` ile ayrıca kapatılır.
   *Ölçülen açıklar:* `nth-child` gecikmeleri reduce altında da sızar; odak kipinin `fast-01 !important`
   kuralı özgüllükle reduce kuralını yener (iki tercihi olan okur 70 ms hareket görür); `SourcePanel`'in JS
-  yumuşak kaydırması reduce'a bakmaz; Books'taki eski blok artık ölü → [B39](#13-bilinen-borçlar). Anayasa §5.4'ün metni ile bu
-  uygulamanın uzlaştırılması §14 belge güncelleme kuralına göre yapılır.
+  yumuşak kaydırması reduce'a bakmaz; Books'taki eski blok artık ölü → [B39](#13-bilinen-borçlar), [B24](#13-bilinen-borçlar).
   *Test:* `gorunum-kipleri.spec.ts` — reduce altında hiçbir şey animasyon/geçiş süresi taşımaz (var).
   Eklenir: aynı testte `animation-delay` > 0 ve JS kaydırma davranışı da ölçülür.
 
@@ -985,9 +1002,9 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
 
 **TEDY kuralı** — ses ve sözlük [anayasa §5.5 ve İ9](frontend-design-principles.md)'dadır; burada uygulaması:
 
-- **[3.9-1] Cümle düzeni.** Başlık, düğme, sekme, etiket, bildirim ve tablo başlığında yalnız ilk sözcük ve özel
-  adlar büyük ("Yaklaşan sınavlar", "Haftalık program", "Özel ders ekle"). İstisna yalnız [3.3-6]'daki CSS ile
-  büyütülmüş kısa başlıklardır.
+- **[3.9-1] Cümle düzeni.** Başlık, düğme, sekme, etiket, kaş, Tag, bildirim, durum dizgesi ve tablo başlığında
+  yalnız ilk sözcük ve özel adlar büyük ("Yaklaşan sınavlar", "Haftalık program", "Özel ders ekle"). İstisna yok:
+  tümü büyük harf, kaynakta ya da CSS ile, kullanılmaz ([3.3-6], [S38](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler)).
   *Ölçülen:* Books dışında 21 Başlık Düzeni dizesi ("Yaklaşan Sınavlar", "Geçmiş Sınavlar", "Senkron Sağlığı",
   "Son Sync:", "Çalışma Planı", "Ders İçerikleri", "Haftalık Program", "Okul Duyuruları", "Tanımlı Özel Dersler",
   "Özel Ders Ekle", "Öğretmen Adı", "Haftanın Günü", "Öğrenci Takip Paneli" …) → [B41](#13-bilinen-borçlar).
@@ -1260,10 +1277,12 @@ eylem → `InlineLoading`, eylemi başlatan düğmenin yerinde; aynı anda birde
 1,5 sn "kaydedildi", hatada satır içi uyarı. Tam ekran `Loading` yalnız uygulamanın tamamı geçici olarak
 kilitlendiğinde. Ekran okuyucuya yükleme, meşguliyet, takılma **ve başarısızlık** söylenir.
 
-**TEDY** (yüzey tasarımları §2.4): içerik yüklenirken **içeriğin şeklinde** `SkeletonText`/`SkeletonPlaceholder`;
-aynı anda **tek** hareket eden öğe (İ6) — bir görünümde birden çok iskelet kümesi yok (İlerleme'nin üç ayrı
-yükleme metni ölçülmüş kusurdu). Tam ekran `Loading` ve büyük dönen gösterge kullanılmaz. "Dönen ikon yok" kuralı
-eylem dışını kapsar: tek eylemin `InlineLoading`'i serbesttir, çünkü o satırda başka hareket yoktur (İ6'nın
+**TEDY** (yüzey tasarımları §2.4; [S36](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), Ç2'nin kararı 2026-10-10):
+**içerik yüklemesi** = içeriğin şeklinde `SkeletonText`/`SkeletonPlaceholder`; **sürmekte olan tek eylem** = eylemi
+başlatan düğmenin yerinde tek `InlineLoading`. Aynı anda **tek** hareket eden öğe (İ6) — bir görünümde birden çok
+iskelet kümesi yok (İlerleme'nin üç ayrı yükleme metni ölçülmüş kusurdu), aynı anda birden çok `InlineLoading` yok.
+Tam ekran `Loading` ve büyük dönen gösterge kullanılmaz; yüzey tasarımları §2.4'ün "Dönen ikon yok" cümlesi içerik
+yüklemesine daraltıldı. Eylemin `InlineLoading`'i o satırdaki tek hareket ve "kayıt sürüyor" bilgisidir (İ6'nın
 "kaldırılırsa hangi bilgi kaybolur?" testi). Yükleme durumunun metni tek sözlüktür: "Kaydediliyor…",
 "Ekleniyor…" — üç noktalı `...` ve noktasız biçimler birleşir (İ9). 400 ms'den kısa yüklemede hiçbir şey
 gösterilmez kuralı belgede durur ama `useApi` bunu uygulamıyor ([B48](#13-bilinen-borçlar)).
@@ -1271,7 +1290,7 @@ gösterilmez kuralı belgede durur ama `useApi` bunu uygulamıyor ([B48](#13-bil
 - **Bileşenler:** `WeeklySchedule.tsx`, `CalendarEvents.tsx`, `PlatformProgress.tsx`, `Modules.tsx` (iskelet);
   `HomeworkTracker.tsx` (`InlineLoading description="Kaydediliyor"`, düğmenin yerinde). Aykırı: Bugün'ün
   iskeleti stilsiz (B5); `App.tsx`'in kabuk "Yükleniyor..." düz metni; `NextThing.tsx` düğme metnini değiştirip
-  canlı bölge duyurusu yapmıyor; yükleme metni beş yazımla ([B41](#13-bilinen-borçlar)).
+  canlı bölge duyurusu yapmıyor, `InlineLoading` kullanmıyor ([B69](#13-bilinen-borçlar)); yükleme metni beş yazımla ([B41](#13-bilinen-borçlar)).
 - **Sınama:** önerilen e2e — API 1 sn geciktirilince bölge şekilli `.cds--skeleton` görünür, 50 ms'de görünmez;
   bir görünümde aynı anda en çok bir iskelet kümesi; `Loading` içe aktarımı 0; İşler'de "Yaptım" sonrası
   `role="status"` "Yaptın" içerir (Bugün bunu yapıyor).
@@ -1316,6 +1335,12 @@ ikisi karışmaz. Kritik mesaj zamanlayıcıyla kapanmaz (WCAG 2.2.4); okur krit
 8. **Sayfayla gelen, kapatılamayan durum `Callout`'tur.** Portalın "okunamadı" bandı bugün kapatılamaz
    `InlineNotification` (`PortalStatusBanner.tsx`); Carbon tanımıyla callout.
 9. Odak kipi kritik olmayan bildirimi susturan denetimdir (WCAG 2.2.3, §5.11).
+10. **Sistem arızasının şiddeti Carbon'un durum anlamıyla seçilir** ([S39](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler),
+    Ç5'in kararı 2026-10-10): başarısız ya da reddedilmiş ve okur ilerleyemiyor → `kind="error"`; bozulmuş, kısmi ya
+    da bayat (son okuma gösteriliyor) → `warning`; bilgilendirici (okul bir bölümü sunmuyor) → `info`. Gri yalnız
+    başlamamış ya da taslak demektir; arıza için asla. Bugün `PortalStatusBanner.tsx` uyuyor (kapalı modül `info`,
+    okunamadı `warning`); başlıktaki senkron etiketinin gri uyarı sayısı (S23) ve asistanın gri "Yedek modelden" /
+    "Veriler güncel olmayabilir" rozetleri (§6.6 K7, K8) S45 ile uyarı ikonu + metne geçer (B75).
 
 - **Bileşenler:** `PortalStatusBanner.tsx` (kapalı portal bandı gün boyu kapatılabilir; okunamadı bandı
   kapatılamaz), `RouteBoundary.tsx` (sayfa içi "Yeniden dene", `role="alert"`), `asistan/GirisUyarisi.tsx`.
@@ -1336,8 +1361,8 @@ Akordeon: başlık bir başlık rolünde (h1–h6), ok sonda ve sayfada tutarlı
 
 - **Bugün eylem gerektiren bölüm açık, geçmiş kapalı başlar** (yüzey tasarımları §2.5; [S34](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler)). Carbon'un "hepsi kapalı
   başlar" varsayılanı modüllerde ve geçmiş bölümlerinde geçerli; panoda ölçülmüş TEDY kuralı kazanır.
-- Başlık biçimi `BAŞLIK (n) ⌄`: sayı, katlanmış içeriğin büyüklüğünü söyler ve açıkken de kalır. Kaynak metin
-  büyük harfle yazılmaz; büyük harf görünümü gerekiyorsa CSS'tedir (Carbon cümle düzeni).
+- Başlık biçimi "Başlık (n) ⌄", cümle düzeninde: sayı, katlanmış içeriğin büyüklüğünü söyler ve açıkken de kalır.
+  Büyük harf ne kaynakta ne CSS'te ([S38](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler); bugünkü aykırılar [B70](#13-bilinen-borçlar)).
 - **Katlama yalnız geçmişi saklar.** Etkin iş listesi her zaman tam ve en yakından başlar; "Daha fazla göster"
   borçlu işi gizleyemez (İ1, İ7). Katlanan grubun durumu dönüşte korunur (İ5).
 - Akordeon başlığı telefonda ≥ 44 px, `size="lg"` ile (bugün `ted-theme.scss`'te ezmeyle).
@@ -1363,11 +1388,14 @@ gideceğini söyleyen danger onayı; yüksek → diyalog + kaynağın adını ya
 - Modal kullanıcı eylemiyle açılır; sistem kendiliğinden modal açmaz.
 - Modalın başlığı onu açan düğmenin adını taşır (İ9). Aykırı: "Sesle sor" düğmesi "Mikrofon" başlıklı modal
   açıyor (`asistan/SesOnayi.tsx`; [B41](#13-bilinen-borçlar)). Tek cümlelik modal `size="xs"` ya da `"sm"`.
-- Yüzey tasarımları §2.6'nın "Yıkıcı eylem yok" cümlesi kodla çelişiyor: sohbet silme tek tıkla, onaysız ve geri
-  alınamaz (ekler, alıştırmalar ve günlük satırları da gider). Ç6 kararına kadar öneri, Carbon'un etki derecesiyle: sohbet
-  silme orta etkidir → `Modal danger`, başlık "Bu sohbet silinsin mi?", gövde neyin gideceğini sayar, birincil
-  "Sohbeti sil", ikincil "Vazgeç", odak "Vazgeç"te. Başarı bildirimi yok (satırın listeden çıkması onaydır); hata
-  satırda ve doğru fiille ("Sohbet silinemedi.", bugün "kaydedilemedi" diyor). Bugünkü durum [B23](#13-bilinen-borçlar), karar [Ç6](#112-adı-konmuş-karar-bekleyen-çelişkiler).
+- **Silme etkisine göre derecelenir** ([S40](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), Ç6'nın kararı 2026-10-10).
+  Geri alınabilir düşük etkili eylem onaysız yapılır ve aynı satırda "Geri al" sunar (İ5; "Yaptım" → "Geri al").
+  Geri alınamaz silme — sohbet, not, yüklenen dosya — `Modal danger` ile sorar: başlık ve birincil düğme nesneyi
+  adlandırır ("Bu sohbet silinsin mi?" / "Sohbeti sil", "Bu not silinsin mi?" / "Notu sil", "Bu dosya silinsin mi?" /
+  "Dosyayı sil"), gövde birlikte gidenleri sayar (sohbette ekler, alıştırmalar ve günlük satırları), ikincil "Vazgeç",
+  odak "Vazgeç"te. Carbon'un yüksek etki basamağındaki ad yazdırma kullanılmaz (S40). Başarı bildirimi yok (satırın
+  listeden çıkması onaydır); hata satırda ve doğru fiille ("Sohbet silinemedi.", bugün "kaydedilemedi" diyor).
+  Bugün sohbet ve not tek tıkla, onaysız ve geri alınamaz siliniyor → [B23](#13-bilinen-borçlar).
 - `Yaptım` düşük etkilidir ve geri alınabilir olmalıdır (yüzey tasarımları §2.6); belgedeki 10 saniyelik "Geri al" kodda yok —
   ya uygulanır ya belgeden çıkar ([B63](#13-bilinen-borçlar)).
 - Sunucu hatası modal içinde `InlineNotification`; alan hatası alanın üstünde (§5.6).
@@ -1566,7 +1594,7 @@ Carbon'un dört ilkesi, başlıklarıyla birebir
 | # | Carbon (alıntı) | TEDY'deki karşılığı | Test |
 |---|---|---|---|
 | C-AI1 | **"Use the AI label and styling to mark any instances of AI usage."** — "Transparency of AI presence is key to user trust." | Modelin yazdığı her yüzey AI etiketiyle işaretlenir (§6.2). | `carbon-asistan-ai.spec.ts` "the AI label explains itself instead of just marking" |
-| C-AI2 | **"Provide transparency of AI at each level of the experience."** — "Whether AI exists within a single word or across the entire page, users should clearly understand how pervasive an AI is implemented." | Sohbet yüzeyi geniş (broad) etiket; sohbet dışındaki AI kartları ve modüller kendi etiketlerini taşımalı — bugün taşımıyor (borç [B56](#13-bilinen-borçlar); modüller için karar [Ç7](#112-adı-konmuş-karar-bekleyen-çelişkiler)). | §6.7 |
+| C-AI2 | **"Provide transparency of AI at each level of the experience."** — "Whether AI exists within a single word or across the entire page, users should clearly understand how pervasive an AI is implemented." | Sohbet yüzeyi geniş (broad) etiket; sohbet dışındaki AI kartları ve modüller kendi etiketlerini taşımalı — bugün taşımıyor (borç [B56](#13-bilinen-borçlar); modüller [S41](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), borç [B71](#13-bilinen-borçlar)). | §6.7 |
 | C-AI3 | **"Integrate explainability into the overall user workflow and experience."** — "minimize distractions and show explanations only when needed or requested by the user." | Açıklama ekranda sürekli durmaz; etiketin açılır penceresindedir (İ6). Model adı mesaj listesinde değil, pencerede. | "the model that answered is disclosed" |
 | C-AI4 | **"Don't use the Carbon for AI styling as decoration."** — "While these new styling elements are enticing, they are strictly intended to identify any instances of AI being used in an experience." | **AI aurası bir köken işaretidir, süs değil** (§6.6, K1). | "the AI aura marks what the model wrote, not what Işık wrote"; "…stays off the sources" |
 
@@ -1855,7 +1883,7 @@ etiketle ayrışır. `hasRoundedCorners` kullanılmaz.
 | `AlistirmaKarti`, `NetlestirmeSecenekleri`, `ModOnerisi` | Sohbet yüzeyinin içinde, geniş etiketin altında | Yeterli; sohbet dışına çıkarlarsa kendi etiketi |
 | Durum Tag'leri ("Yedek modelden", "Kaynaksız cevap") | Nötr gri metinli Tag | AI Tag kuralı uygulanmaz: içeriği AI üretmez, durumu söyler |
 | Portal modalları (ödev, fotoğraf) | Portal verisi | `$ai-overlay` ve modal AI varyantı uygulanmaz |
-| edupedia modülleri | AI işareti yok | Kap yerleşimiyle etiket ([Ç7](#112-adı-konmuş-karar-bekleyen-çelişkiler); §9 ile birlikte karar) |
+| edupedia modülleri | AI işareti yok | `ModuleViewer` çerçeve başlığında Carbon `AILabel` + açıklanabilirlik içeriği ([S41](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler); borç [B71](#13-bilinen-borçlar)); modülün içi değişmez (G-VOICE) |
 | Tedy Books çevirisi | Sağlayıcı satırı metinle (`BookReader.tsx`) | Bilinçli istisna: Books ayrı dünyadır (yüzey tasarımları §4.11); şeffaflık sözle sağlanır, aura uygulanmaz |
 
 ### 6.5 Carbon AI Chat
@@ -1918,11 +1946,12 @@ ve `WriteableElementName.EXPLAINABILITY_POPOVER_CONTENT` / `EXPLAINABILITY_POPOV
 tür tanımlarında var). Her `@carbon/ai-chat` yükseltmesinde önce bu biçim denenir; axe ve IBM temiz çıkarsa
 `AiAciklama` kaldırılır, çıkmazsa sapma sürer.
 
-**Tema ve öğretmen rengi.** `ogretmenRenkleri.ts` öğretmen modunda yalnız şu özellikleri değiştirir:
-`--cds-button-primary(-hover/-active)`, `--cds-interactive` (gönder simgesi), `--cds-chat-bubble-user`,
-`--cds-chat-bubble-user-text`; değerler ders ailesinin rol token'larıdır (`var(--ted-subject-*)`), balonda
-surface/on-surface ≥ 4.5:1 (`tests/test_ders_renkleri.py`). Panel kenarı ve 4 px üst şerit `AsistanSayfasi.scss`'te;
-marka bandı değişmez. AI aurası Carbon'un 0.16/0.1 saydamlığında kalır, büyütülmez (İ6/İ8.3 ile birlikte iki renkli
+**Tema ve öğretmen rengi.** Kural ([S35](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), 2026-10-10): öğretmen modunda
+eylem rengi değişmez — gönder düğmesi ve simgesi `--cds-button-primary` / `--cds-interactive` (Blue 60) kalır; ders
+rengi yalnız yüzey rolleridir: `--cds-chat-bubble-user`, `--cds-chat-bubble-user-text` (ders ailesinin rol
+token'ları, `var(--ted-subject-*)`; balonda surface/on-surface ≥ 4.5:1, `tests/test_ders_renkleri.py`), panel kenarı ve
+4 px üst şerit (`AsistanSayfasi.scss`); marka bandı değişmez. Bugün `ogretmenRenkleri.ts:9-13` düğme ve
+`--cds-interactive`'i de ders aksanına bağlıyor → [B68](#13-bilinen-borçlar). AI aurası Carbon'un 0.16/0.1 saydamlığında kalır, büyütülmez (İ6/İ8.3 ile birlikte iki renkli
 işlem: mavi aura + ders yüzeyi; mesaj başına aura eklenmez).
 
 **Telemetri kapalı.** Paket kurulumları `IBM_TELEMETRY_DISABLED=true` ile koşar (makinede
@@ -1950,7 +1979,7 @@ genişler.
 | K4 | **Her etiket açıklar; çıplak etiket yoktur.** `AILabel`, `AILabelContent` olmadan yazılmaz. Pencere Carbon'un dört bölümünü izler (§6.2). | Carbon: "pathway to explainability" | `grep -rn '<AILabel' dashboard/src` → her çağrının çocuğu var; "the AI label explains itself…" |
 | K5 | **Etiket eylem değildir.** Hiçbir `AILabel` "Yeniden üret", "Daha derine in", gönder, yükle tetiği olmaz. | Carbon "Don't use the AI label as a trigger" | `AILabel`'da `onClick` yok; eylemler `MesajAltbilgisi.tsx`'te kendi ikonlarıyla |
 | K6 | **Kapsam AI'yı izler.** Bir kart/form/modalın yalnız bir parçası AI'lıysa stil ve etiket o parçadadır. AI'nın doldurduğu düzenlenebilir alan etiket + geri al taşır. | Carbon modal/form/tablo kapsam kuralı; revert | [B56](#13-bilinen-borçlar) kapanınca: önerilen dersi düzenle → geri al ikonu → etkinleştir → ilk değer, stil ve etiket geri |
-| K7 | **Yüzey teması geniş etikettir; mesaj başına durum rozette, açıklama pencerede.** "Yedek modelden", "Kaynaksız cevap", "Veriler güncel olmayabilir" gri metinli Tag; `risk:` kırmızı. Rozet yalnız `flags`/`degraded` varken çizilir. | Carbon "Levels of visibility"; İ6 | `carbon-asistan-altbilgi.spec.ts` |
+| K7 | **Yüzey teması geniş etikettir; mesaj başına durum rozette, açıklama pencerede.** "Yedek modelden", "Kaynaksız cevap", "Veriler güncel olmayabilir" gri metinli Tag; `risk:` kırmızı. Rozet yalnız `flags`/`degraded` varken çizilir. S45 (2026-10-10): "Yedek modelden" ve "Veriler güncel olmayabilir" uyarı ikonu + metne geçer (B75). | Carbon "Levels of visibility"; İ6 | `carbon-asistan-altbilgi.spec.ts` |
 | K8 | **Ev modeli yedeği dürüst işaretlenir.** Claude düşüp evdeki model (Gemma) cevap verdiğinde: `warning:yerel_yedek` → gri **"Yedek modelden"** rozeti, metnin sonunda sunucunun italik notu (kaynaksız, ev modelinden), `meta.provider: "yerel"`; asistanın B6 cevap denetimi atlanır. Açıklama penceresi bu cevabı da insan adıyla anar. | D3, D4; okur kaynaksız cevabı ayırt edebilmeli | Rozet: `MesajAltbilgisi.tsx` `BAYRAK`; pencere: [B55](#13-bilinen-borçlar) |
 | K9 | **Klavye sözleşmesini TEDY sınar.** `Enter`/`Space` açar-kapar ve odak tetikte kalır; `Tab` pencereye girer ya da kapatır; `Esc` kapatıp odağı tetiğe döndürür. | Carbon'un kendi klavye testi yok | [B57](#13-bilinen-borçlar): `AiAciklama` üzerinde klavye e2e |
 | K10 | **Token, değer değil.** AI renkleri yalnız `theme.$ai-*` / `--cds-ai-*` ve Carbon karışımlarından; §6.3'teki değerler başvurudur. `dashboard/src`'de `--cds-ai-*:` tanımı yoktur, böylece g100 açılırsa AI token'ları temayla döner (S14). | D1; Carbon "does not require a different theme" | `test_pano_renk_aritmetigi_yapmaz`; `grep -rn -- '--cds-ai-[a-z-]*:' dashboard/src` → 0 |
@@ -1993,8 +2022,8 @@ yazar (kod okunarak bulundu; e2e ile doğrulanmadı) — borç [B55](#13-bilinen
 6. Telemetri testi, paket boyutu, Lighthouse `/asistan`.
 
 **Bu bölümün borçları** §13'tedir: B53 (`AILabel` adı), B54 (eski stil sayfasının AI aurası), B55 (yedek modelin
-kimliği), B56 (`OdevOnayKarti`'nda AI etiketi ve geri al), B57 (AI etiketinin klavye testi). Modüllerde AI etiketi
-bir karar bekler: Ç7.
+kimliği), B56 (`OdevOnayKarti`'nda AI etiketi ve geri al), B57 (AI etiketinin klavye testi), B68 (öğretmen kipinde
+eylem rengi, S35), B71 (modül çerçevesinde AI etiketi, S41).
 
 ---
 
@@ -2177,12 +2206,12 @@ düşer:** `.dashboard-card:hover`, `.exam-card`, İşler NextThing.
 
 ### 7.5 P5 — Tek aksan, her renk görünümde tek anlam
 
-**Kural.** Ekranda en çok bir yüksek vurgulu eylem vardır (`$button-primary`); tekrarlanan satır eylemleri
-tertiary ya da ghost'tur (S12). Etkileşim mavisi (`$interactive`, `$border-interactive`) yalnız tıklanan,
+**Kural.** Ekranda en çok bir yüksek vurgulu eylem vardır (`$button-primary`, her kipte Carbon mavisi — S35);
+tekrarlanan satır eylemleri tertiary ya da ghost'tur (S12). Etkileşim mavisi (`$interactive`, `$border-interactive`) yalnız tıklanan,
 seçili ya da odaklanan şeyde görünür; statik kart kenarında süs olmaz. Kırmızı, sarı, turuncu ve yeşil
 yalnız okurdan bir şey isteyen durumda görünür (İ8). Ders rengi yalnız işaret, kenar, şerit ya da görünüm
 başına bir yüzeydir (İ8). Hiçbir Carbon Tag ders ailesi (mavi, teal, mor, magenta, camgöbeği) taşımaz; not
-ve seviye renklendirilmez: not bir bilgidir, yargı değil.
+ve seviye renklendirilmez: not bir bilgidir, yargı değil (S42).
 
 **Carbon dayanağı.**
 - Yerleşimde tek yüksek vurgulu düğme; birincil ekran başına bir kez:
@@ -2377,8 +2406,8 @@ yarıçap.
 ### 7.11 P11 — İçerik önce: kelimeler işi yapar
 
 **Kural.**
-- Her yerde cümle düzeni. Büyük harf yalnız tek bir `label-01` kaş stilinde, Carbon'un kendi harf
-  aralığıyla; yüzey tasarımları §2.5'teki "BAŞLIK (n)" bu istisnaya bağlanır.
+- Her yerde cümle düzeni, kaşlar dahil; tümü büyük harf ne kaynakta ne CSS'te (S38, 2026-10-10). Yüzey tasarımları
+  §2.5'in bölüm başlığı "Başlık (n)" biçimindedir. (1.0 sürümündeki tek `label-01` kaş istisnası kaldırıldı.)
 - Süre yalnız yüzey tasarımları §2.1'in üç biçimiyle yazılır: saat "15:45", kalan "3 saat 20 dakikan var", kutu "10 dakikayla
   başla" (`patterns/time.ts`). "1g 1s" dördüncü biçimdir ve yasaktır.
 - Arayüzde emoji ve sağlayıcı adı yoktur. Portaldan BÜYÜK HARFLE gelen başlık ayrıca kalınlaştırılmaz.
@@ -2557,7 +2586,7 @@ giriş bandının marka geometrisi (çalışma yüzeyi değil).
 | **Yukarı sayan sayılar** (count-up) | İ3 toplamı öne çıkarmaz; İ6 aynı anda tek hareket; sayıyı canlandırmak bilgi taşımaz, dikkat harcar. Okur sayıyı son hâliyle görür. | P7 testi: metin içeriği değişen animasyon yok; `getAnimations()` sayı öğesinde boş. |
 | **Kahraman görseli ve çalışma yüzeyinde dekoratif illüstrasyon ya da halka** | İ6: kaldırılınca bilgi kaybolmuyorsa vergidir; İ1: ilk ekran tek şeye aittir. Giriş bandındaki halkalar yalnız marka kahramanı olduğu için izinli. | İ6 testi ("kaldırılırsa hangi bilgi kaybolur?"); Playwright: çalışma yüzeyinde `main` içinde 48 px ve üstü dekoratif görsel (`img`, piktogram) yalnız boş durumda bulunur. |
 | **Paralaks ve kaydırmaya bağlı hareket** | İ6 ve §5.4: hareket yalnız konum değişimini, yeni geleni ya da bekleyişi anlatır. Carbon productive hareket "göze batmaz" (https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#productive-motion). | Playwright: kaydırma sırasında `getAnimations()` boş; `scroll` olayına bağlı `transform` yok. |
-| **Skeuomorfik rozet** (parlak madalya, kabartma, metalik doku) | D1 ve Carbon görsel dili (düz, geometrik, gradyansız). Modülde bile rozet Carbon ikonlu nötr seçili çiptir (tedy-integration §5; SKILL §11.6). | Gradyan/gölge/`filter` testleri; rozet = Carbon Tag + Carbon ikon. |
+| **Skeuomorfik rozet** (parlak madalya, kabartma, metalik doku) | D1 ve Carbon görsel dili (düz, geometrik, gradyansız). Modülde kazanılan rozet kalırsa sessiz bir listedir (S43; bugün Carbon ikonlu nötr seçili çip, tedy-integration §5; SKILL §11.6). | Gradyan/gölge/`filter` testleri; rozet = Carbon Tag + Carbon ikon. |
 | **Arayüzde emoji** | İ9 ve P11; modülde G-EMOJI zaten FAIL'dir. | P11 metin taraması (`Extended_Pictographic`). |
 
 Anayasanın §10 gri tonlama ve 2 saniye testleri değişmeden kalır; yukarıdaki testler onlara eklenir.
@@ -2674,7 +2703,8 @@ dakikan var"); toplam, puan, XP ve seri sayısı büyük sayı olmaz. Yüzde hal
 İ6'nın bütçesidir.
 
 Modül tamamlanma özetindeki ustalık halkası, "Toplam XP", rozet sayısı ve "En uzun seri" panonun bu yasağıyla
-çelişir; iki çalışma zamanı için tek kural §9'da yazılır.
+çelişir; 2026-10-10'dan beri iki çalışma zamanı için tek kural S43'tür (seri sayacı ve ödül yok, ilerleme sessiz ve
+etiketli; kod borcu [B73](#13-bilinen-borçlar)).
 
 - **Sınama:** anayasa §10 İ1 iki saniye ve İ3 testleri; önerilen — hiçbir pano sayfasında üç ve daha çok sayı
   karosundan ızgara yok; `GaugeChart`, `DonutChart` ve `stroke-dasharray` halkası İlerleme ve Notlar'da yok.
@@ -2706,10 +2736,11 @@ tamamlandı!" bandı kalkar (§5.3). Bugünkü durum [B51](#13-bilinen-borçlar)
 hedef çubuğu yoktur (Carbon'un bullet grafiği bu yüzden burada kullanılmaz). Ama §4.4'teki "renk kodlaması yok"
 cümlesi yazıldığı gün de doğru değildi: `utils/formatters.ts` `gradeColor` notu dört durum rengiyle boyuyor
 (≥ 85 başarı yeşili, ≥ 70 bilgi mavisi, ≥ 50 uyarı turuncusu, < 50 hata kırmızısı) ve bu renkler not metnine ve
-çubuk dolgusuna uygulanıyor. Bu hem Carbon'un uyarı paletinin anlamına (durum) hem İ8'e aykırıdır; kod ile `kontrast.spec.ts` bantları
-sabitlediği için seçim [Ç8](#112-adı-konmuş-karar-bekleyen-çelişkiler)'de kullanıcı kararı bekler. Öneri: not
-`text-primary`, mono ve tabular; çubuk tek nötr tonla. Bant gerçekten gerekirse tek renkli sıralı rampa (§8.1).
-Eğilim ok değil kelime. Sütun başlıkları kısaltma değil.
+çubuk dolgusuna uygulanıyor. Bu hem Carbon'un durum paletinin anlamına hem İ8'e aykırıdır. Karar
+([S42](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), Ç8'in kararı 2026-10-10): not renk bandıyla boyanmaz — not
+`text-primary`, mono ve tabular nötr metindir; çubuk varsa tek nötr tonla; eşik rengi, sıralı rampa ya da "iyi/kötü"
+rengi yoktur. `kontrast.spec.ts`'in "50-69 bandı ayrı bir renk" iddiası "her not aynı nötr renkte ve AA" iddiasıyla
+değişir. Bugünkü kod [B72](#13-bilinen-borçlar). Eğilim ok değil kelime. Sütun başlıkları kısaltma değil.
 
 - **Sınama:** `ilerleme.spec.ts`; önerilen — İlerleme'de `getByRole('progressbar')` sayısı 0 ve her satır
   done/total'ı metin olarak gösterir; Notlar'ın gri tonlama ekran görüntüsü bilgi kaybetmez; `gradeColor`
@@ -2761,10 +2792,11 @@ aynıdır.
 | Öğe | Token | Değer |
 |---|---|---|
 | İz zemini | `theme.$layer-01` | — |
-| Pencere alanı | `--ted-day-window` | `colors.$yellow-10` |
-| Pencere kenarı | `--ted-day-window-edge` | `colors.$yellow-30` |
-| Sınır etiketi | `--ted-day-window-text`, 600 | `colors.$yellow-80` |
-| Şimdi, çapa | `theme.$interactive` | çapa bugün %50 opak (B9) |
+| Pencere alanı | `theme.$layer-accent-01` | nötr (2026-10-10) |
+| Pencere sınırı | `theme.$border-strong-01`, 2px | 3,3:1 |
+| Sınır etiketi | `text-primary`, `label-01` | — |
+| Şimdi | `theme.$border-inverse`, 2px | 18,1:1 |
+| Çapa | `theme.$border-interactive`, 2px, opak | 5,0:1 (B9 kapandı) |
 | Baş etiketleri | `label-01` / `body-compact-01`; `text-primary`, `text-secondary`, `text-helper` | — |
 | İşaretler | `label-01`, `text-helper` | Carbon'un en küçük adımı (12 px) |
 
@@ -2845,17 +2877,17 @@ yerlerinde gerekçelidir; birinin kuralı ötekine taşınmaz.
 |---|---|---|---|
 | Sütun | Tek 60rem sütun (S1) | Tek 880 px okuma sütunu (`.wrap{max-width:880px}`) | `module-template.html` `.wrap` |
 | Gövde | Productive `body-01` 14 px | 18 px, satır yüksekliği 1,6; asla 16 px altı | carbon-child-system §4, §7 |
-| Başlık ağırlığı | Carbon token'ı olduğu gibi (P1) | `heading-03/04` 600 (çocuk hiyerarşi netliği) | carbon-child-system §4 |
+| Başlık ağırlığı | Carbon token'ı olduğu gibi (P1, S44) | Aynı kural (S44, 2026-10-10); şablon bugün `heading-03/04` karşılıklarını 600 yazıyor (B74) | carbon-child-system §4 |
 | Dokunma hedefi | ≥ 44 px, standart 48 px (S18) | `--tap: 48px` (Carbon size Large) | carbon-child-system §5 |
 | Tema | Yalnız g10 (S14 açık karar) | g10 ↔ g100, varsayılan g10 | tedy-integration §2 |
 | Gölge | Yeni statik gölge yok (S11, P4) | `.topbar` ve `.stage`'de `--tedy-shadow-card` (yalnız açık temada; g100'de `none`); iç kutular gölgesiz | tedy-integration §1, §4 |
 | Köşe | 0 / 8 px / tam / %50 (S10, P10) | Aynı dil: bant, sahne, kart 8 px; düğme, seçenek, alan, tablo 0; etiket tam | tedy-integration §4 |
 | Hareket | Yalnız productive (P7) | Productive; segment girişi `moderate-02` + entrance; bölüm geçişinde tek expressive an | carbon-child-system §6 |
-| Oyunlaştırma | Yok (anayasa §9) | Yumuşatılmış: XP, modüle özel 2–3 rozet, seri | tedy-integration §5; SKILL §11.4–§11.6 |
+| Oyunlaştırma | Yok (anayasa §9) | Yok (S43, 2026-10-10): kutlama/ödül animasyonu ve seri sayacı yok; ilerleme sessiz, etiketli; kazanılan rozet kalırsa sessiz liste. Şablon bugün XP, rozet ve seri taşıyor (B73) | tedy-integration §5; SKILL §11.4–§11.6 |
 | Font teslimi | Google Fonts (S2) | Plex WOFF2 `data:` URI olarak gömülü; ağ yok (G-SELFCONTAINED) | carbon-child-system §4 |
 | Emoji | Yok (P11) | Yok, G-EMOJI FAIL | SKILL §12 |
 
-**Oyunlaştırma yumuşatılmış hâliyle** (tedy-integration §5): ayrı altın hex yoktur, `--reward` Carbon
+**Bugünkü şablondaki oyunlaştırma** (tedy-integration §5; S43 ile kaldırılacak, [B73](#13-bilinen-borçlar)): ayrı altın hex yoktur, `--reward` Carbon
 sarısının metin-güvenli karşılığıdır; ölçek sıçraması ve konfeti yoktur, vurgu kısa bir opaklık nabzıdır;
 "+N XP" 10 px yükselip söner; kazanılan rozet sessiz bir seçili çiptir (`--cds-layer-selected-01`); seri çipi
 "Seri 3" yazar, ünlemsiz; yanlışta seri sıfırlanır ama dil cezalandırıcı değildir. Hepsi
@@ -2922,21 +2954,21 @@ Düzenleme kuralları (KARARLAR; CLAUDE.md ted-mcp bölümü):
 - Panonun `ted-theme.scss`'inde marka, zemin ya da durum metni rengi değişirse `tedyLayer` ve şablon aynı
   commit'te güncellenir (`test_tedy_tasarim_tutarliligi.py`).
 
-### 9.7 Adı konmuş çelişkiler (bilinen, çözülmemiş)
+### 9.7 Adı konmuş çelişkiler
 
 Bunlar Carbon'la ya da panonun kurallarıyla çelişen, kullanıcı kararı ya da ölçülmüş durum olan noktalardır.
 Sessizce "düzeltilmez"; vendor referanslarına adlı istisna ya da borç olarak yazılırlar.
 
 - **Statik gölge:** `.topbar` / `.stage` gölgesi carbon-excellence madde 4 ("statik kartta sıfır gölge")
   ile çelişir; Tedy kararıdır ve G-CARBON-GRID seçici listesinin dışındadır (S11).
-- **700 ms "+N XP" yükselişi** (`duration-slow-02`) carbon-excellence madde 9'un "tek geçiş 100–300 ms"
-  bandının dışında; G-CARBON-GRID yalnız literal `Nms`'yi okuduğu için görmez.
-- **Aynı anda ödül animasyonları:** kilometre taşı cevabında XP nabzı, "+N XP" ve seri vuruşu birlikte
-  koşar; İ6 "aynı anda en fazla bir hareket eden öğe" ile çelişir. tedy-integration §5 hareket bütçesi
-  koymaz.
-- **Öğretmen modu düğme rengi:** panoda asistanın öğretmen modu `--cds-button-primary` ve `--cds-interactive`'i
-  ders aksanına yönlendirir (`dashboard/src/asistan/ogretmenRenkleri.ts`); vendor kuralı "birincil eylem her
-  zaman Blue 60" (carbon-excellence 11, color-system §1, carbon-child-system §11).
+- **700 ms "+N XP" yükselişi** (`duration-slow-02`) ve **aynı anda ödül animasyonları** (kilometre taşı
+  cevabında XP nabzı, "+N XP" ve seri vuruşu birlikte; İ6'ya aykırı): **kararlaştırıldı 2026-10-10 — S43**,
+  ödül animasyonları ve seri sayacı kalkar; kod borcu [B73](#13-bilinen-borçlar).
+- **Öğretmen modu düğme rengi:** **kararlaştırıldı 2026-10-10 — S35**: birincil eylem her kipte Carbon mavisi;
+  vendor kuralı ("birincil eylem her zaman Blue 60", carbon-excellence 11, color-system §1, carbon-child-system §11)
+  doğru kural oldu, pano `ogretmenRenkleri.ts` ile ona uyacak ([B68](#13-bilinen-borçlar)).
+- **Başlık ağırlığı ve modüllerde AI etiketi:** kararlaştırıldı 2026-10-10 — S44 (Carbon ağırlığı, şablon B74) ve
+  S41 (pano çerçevesinde etiket, B71).
 - **4 px:** şablon tanım popover'ında ve satır içi terim vurgusunda 4 px kullanır; Carbon popover'ı 2 px'tir,
   Tedy köşe dilinde 4 px yoktur (S10).
 - **4K:** pano 1920 px üstünde kök puntoyu büyütür; modül çerçevesi 16 px kökte ve px boyutlarda kalır
@@ -2993,9 +3025,11 @@ liste ne eklendiğini ya da ekleneceğini söyler. Kaynak: 2026-10-10 Carbon tar
 17. **Yüksek kontrast anları** (…/foundations/color/overview/#high-contrast-moments): lacivert Tedy bandı
     açık sayfada marka bölgesidir, adlı sapma olarak yazılır.
 18. **Carbon for AI etiketi** (…/foundations/carbon-for-ai/#when-to-use-the-ai-label) yapay zekâ yazımı
-    modüller için açık bir kullanıcı kararı olarak kaydedilir (pano asistanı zaten etiketli).
-19. **Adlı Tedy istisnaları** "düzeltilecek" değil istisna diye yazılır: `.topbar`/`.stage` gölgesi, 700 ms XP
-    yükselişi, öğretmen modu düğme rengi, 8 px kart köşesi, tek g10 pano (§9.7).
+    modüller için açık bir kullanıcı kararı olarak kaydedildi; 2026-10-10'da S41 ile karara bağlandı (etiket pano
+    çerçevesinde, modülün içinde değil).
+19. **Adlı Tedy istisnaları** "düzeltilecek" değil istisna diye yazılır: `.topbar`/`.stage` gölgesi, 8 px kart
+    köşesi, tek g10 pano (§9.7). 700 ms XP yükselişi ve öğretmen modu düğme rengi 2026-10-10'da istisna olmaktan
+    çıktı (S43, S35).
 20. **Panodaki güncel durum:** İ8'in 2026-10-02 yeniden yazımı (görünüm başına bir büyük ders yüzeyi,
     `panel`/`panelBorder`, 9 rol) tedy-integration §3.1 "Panoda" ve "Roller" paragraflarına, P4/P10'un köşe ve
     derinlik dili ise §4'e işlenir.
@@ -3253,8 +3287,10 @@ Carbon rehberi bu satırlardan birine düşüyorsa kabul edilmiş bulgudur; sat�
 süreçle olur. carbon-builder kural kimlikleri (G, F, P, A, R) `.claude/skills/carbon-builder/` içindeki
 numaralandırmadır.
 
-Tablo 34 satırdır (S1–S34). S24, S26 ve S31'de TEDY sütunu kuralı yazar ama kod henüz uymuyor; aradaki fark
-borç kaydındadır (B34, B39, B24) — sapma "düzeltilmez", borç düzeltilir.
+Tablo 44 satırdır (S1–S44). S1–S34 Carbon'dan bilinçli sapmalardır. S35–S44, §11.2'deki Ç1–Ç10'un 2026-10-10
+kararlarıdır (kullanıcı: "çelişkileri en iyi Carbon pratiğiyle çöz"); bu satırlarda TEDY Carbon'a hizalanır ve
+"TEDY yapıyor" sütunu kuralı yazar. S24, S26, S31 ve S35–S44'ün çoğunda kod henüz kurala uymuyor; aradaki fark borç
+kaydındadır (B34, B39, B24; B68–B74 ve satırda anılanlar) — sapma ya da karar "düzeltilmez", borç düzeltilir.
 
 | # | Carbon diyor | TEDY yapıyor | Neden | Ölçüm / kanıt | Kaynak |
 |---|---|---|---|---|---|
@@ -3280,7 +3316,7 @@ borç kaydındadır (B34, B39, B24) — sapma "düzeltilmez", borç düzeltilir.
 | **S20** Sayfa zemini | Sayfa zemini temanın `$background`'ıdır (g10 `#f4f4f4`) | `body` ve kabuk zemini `--ted-page-bg` = `colors.$cool-gray-10` `#f2f4f8`; Carbon bileşenleri için `$background` `#f4f4f4` kalır; renk ya da durum anlamı taşımaz ([3.1-2]) | Nötr gri pano bitmemiş görünüyordu; serin gri "okul" hissi (`ted-theme.scss:46-48` yorumu) | `ted-theme.scss:49` (`--ted-color-page-bg`), `:197`, `:281`; hover'ların sayfa zeminine boyanması ayrı borç (B31) | [Themes — overview](https://carbondesignsystem.com/building-blocks/foundations/themes/overview/) |
 | **S21** Durum metni | Hata metni `$text-error` (Red 60); uyarı cümlesi `text-primary` + sarı ikon | Okunan durum kelimesi -70 adımı (`--ted-text-success/-error/-info/-warning` = green/red/blue/orange-70); işaret (ikon, şerit, kenar) `--ted-support-*`; ikonsuz tek uyarı kelimesi turuncu-70, ikonlu uyarı cümlesi `text-primary` + sarı ikon ([3.2-6], [3.2-7]) | -60 ailesi açılmış satır zemininde (`layer-hover-01`) 4,08–4,10:1'e düşüyordu; sarının metin-güvenli adımı yok (`yellow-30` beyazda 1,68:1, `yellow-50` 3,33:1; `yellow-60` 4,99:1 ama zeytin okunur) | `ted-theme.scss:128-134, 144-147`; `kontrast.spec.ts` yerinde ölçer | [Status indicators — status color palette](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#status-color-palette) |
 | **S22** Saat ve süre | Mono yalnız kod içindir (`code-01`/`code-02`); veri tablosu satırı Sans `body-compact-01` | Saat, süre ve sayaç rakamı IBM Plex Mono + tabular rakam (`.tedy-time`); sınıf yalnız rakamı sarar, çevresindeki sözcük Sans kalır ([3.3-5]) | Çizelge bir alettir: hizalı rakam zamanı yer olarak okutur (yüzey tasarımları §2.1, İ2) | `components/patterns/patterns.scss:9-12`; uygulama boşlukları (`.schedule-time` Sans, sözcük saran `.tedy-time`) B36 | [Typography — type sets](https://carbondesignsystem.com/building-blocks/foundations/typography/type-sets/) |
-| **S23** Birleşik durum | Bir bölgedeki birden çok durum tek göstergede birleşir ve en yüksek dikkat rengini alır | Başlıktaki senkron etiketi bölüm uyarılarını gri gösterir; yalnız senkron hatası kırmızıdır ([3.2-8]) | İ6: sürekli sarı "4 uyarı" hiç çözülmeyen bir alarmdır; sayı bilgidir, acil durum değil | `DashboardHeader.tsx:91-98` (`tagType` yalnız `gray` ya da `red`); bantta renk yalnız kenarda görünür (`ted-theme.scss:1368-1383`) | [Status indicators](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/) |
+| **S23** Birleşik durum | Bir bölgedeki birden çok durum tek göstergede birleşir ve en yüksek dikkat rengini alır | Başlıktaki senkron etiketi bölüm uyarılarını gri gösterir; yalnız senkron hatası kırmızıdır ([3.2-8]) | İ6: sürekli sarı "4 uyarı" hiç çözülmeyen bir alarmdır; sayı bilgidir, acil durum değil | `DashboardHeader.tsx:91-98` (`tagType` yalnız `gray` ya da `red`); bantta renk yalnız kenarda görünür (`ted-theme.scss:1368-1383`). S39 ile gerilim S45'le kapandı (2026-10-10) | [Status indicators](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/) |
 | **S24** Devre dışı ve gizli durum | Devre dışı ve seçilmemiş hâl opaklıkla (%50 / %25) çizilebilir | TEDY'nin yazdığı denetimde opaklık yok: devre dışı gri aile token'larıyla, gizlenmiş çip seçilmemiş hâlde (çerçeve + nötr zemin); okunacak içerik devre dışı değil salt okunurdur; Carbon bileşenlerinin yerleşik devre dışı görünümü kalır ([3.2-5]) | D1 renk aritmetiği yasağı; opaklık metni 3:1'in altına indiriyordu | Ölçüldü: opaklıklı öğeler 2,17–2,24:1. **Kural hedeftir, kod henüz uymuyor:** B34 (opaklık), B42 (`disabled` içerik) | [Disabled states](https://carbondesignsystem.com/building-blocks/core/patterns/disabled-states/) |
 | **S25** 1920 px üstü | Max kırılımının üstünde kenar boşlukları büyür ya da sütun eklenir; tip boyu sabittir | > 1920 px'te kök yazı boyu pencereyle büyür: `html { font-size: clamp(100%, calc(100vw / 120), 250%) }`; her ölçü `rem`; 3840 px tam HD düzeninin iki katı keskinlikte ([3.3-10], [3.4-6]) | 4K ekranda sayfa sol üst çeyrekte 960 px'lik, 14 px yazılı bir şeritti (ölçüldü 2026-10-06) | `ted-theme.scss:180`; `ekran-4k.spec.ts` (13 sayfada sütun, gezinme, başlık ve ikonlar 3840 px'te 2×) | [2x Grid — overview](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/overview/) |
 | **S26** Hareket stili | Productive ürün işi için; expressive önemli anlar için (sayfa açılışı, birincil düğme, sistem uyarısı); çok öğeli girişte ~20 ms kademe | Panoda yalnız productive; öğe başı kademe yok, liste tek blok olarak girer; Carbon bileşenlerinin yerleşik hareketi kalır ([3.6-2], [3.6-3]) | Anayasa İ6 (aynı anda tek hareket), §5.4, §9 (kutlama yok) | `expressive` panoda 0 kullanım. **Kademe kuralı hedeftir:** `ted-theme.scss:764-765` (`$i * 40ms`) ve `:1994-2003` (`.stack-sm`) bugün kademe yazıyor — B24, B39 | [Motion — overview](https://carbondesignsystem.com/building-blocks/foundations/motion/overview/), [choreography](https://carbondesignsystem.com/building-blocks/foundations/motion/choreography/#sequence-and-stagger) |
@@ -3292,24 +3328,48 @@ borç kaydındadır (B34, B39, B24) — sapma "düzeltilmez", borç düzeltilir.
 | **S32** Boş durum | Anatomi: isteğe bağlı görsel → başlık → gövde → isteğe bağlı eylem; alan darsa yalnız metin | Boş durum portalın kendi sözleriyle tek satır metindir; görsel, başlık bloğu ve birincil düğme yok (yüzey tasarımları §2.3) | İ1: boş bölge ekranın tek şeyi olmaz; 2026-08-31 ölçümünde ~200 px'lik güneş görseli ilk ekranı dolduruyordu | `components/patterns/EmptyLine.tsx` (tek `<p class="tedy-empty">`) | [Empty states](https://carbondesignsystem.com/building-blocks/core/patterns/empty-states/) |
 | **S33** Seçenek sırası | Açılır listede seçenekler alfabetik sıralanır | Seçenekler zaman ve aciliyet sırasındadır: hafta süzgeci kronolojik, ödev seçimi teslim sırasında | İ2/İ7: zaman bir yerdir, en yakın iş öndedir | `CourseContent.tsx:211-215` (hafta), `asistan/GirisEkleri.tsx` (ödev) | [Dropdown — usage](https://carbondesignsystem.com/building-blocks/core/components/dropdown/guidelines/) |
 | **S34** Akordeon başlangıcı | Akordeon panelleri varsayılan olarak kapalı başlar | Eylem gerektiren grup açık, geçmiş ve bitmiş gruplar kapalı başlar (yüzey tasarımları §2.5, İ7); eylem gerektiren hiçbir şey katlanmış başlamaz | İ7: bitmiş iş öne çıkmaz, yapılacak iş saklanmaz; Carbon'un açılır kalıbı da görevi bitirmek için gereken bilgiyi kapalı panelde saklamaz | `HomeworkTracker.tsx:48-55` (`aktif` açık; `yapilan`, `tamamlanan`, `yapilmayan` kapalı); Bugün'ün geçmiş öğeleri katlı (`TodaySchedule.tsx:317`). Odak kipinde `aktif` de katlanıyor (`HomeworkTracker.tsx:218`); bunun odak kipinin bilinçli daraltması olduğu yazılı değil | [Accordion — guidelines](https://carbondesignsystem.com/building-blocks/core/components/accordion/guidelines/), [Disclosures](https://carbondesignsystem.com/building-blocks/core/patterns/disclosures/) |
+| **S35** Birincil eylem rengi (Ç1) | Çekirdek mavi ailesi bütün ürünlerde birincil eylem rengidir; birincil düğmenin kabı `$button-primary`; token'ın rolü yeniden tanımlanmaz | Birincil eylem her kipte `$button-primary` / `$interactive` (Blue 60), öğretmen kipi dahil. Ders rengi yalnız yüzey rollerinde: panel yüzeyi, panel kenarı, 4 px aksan kenarı, okurun balonu (İ8); hiçbir kipte `--cds-button-*` / `--cds-interactive` yeniden atanmaz ([3.2-11]) | İ8: renk önce eylemi ve durumu söyler; İ9: "gönder" beş kipte beş renkte öğrenilmez; modül referansları ve Carbon aynı kuralı söylüyordu. Kullanıcı kararı 2026-10-10 | Kod henüz uymuyor: `asistan/ogretmenRenkleri.ts:9-13`, eski `AssistantChat.scss:999-1003, 1110-1113`; `carbon-asistan-ogretmen.spec.ts:14-21` kip başına dolguyu sabitliyor → B68 | [Color — color anatomy](https://carbondesignsystem.com/building-blocks/foundations/color/overview/#color-anatomy); [Button — primary button color](https://carbondesignsystem.com/building-blocks/core/components/button/specifications/#primary-button-color) |
+| **S36** Yükleniyor (Ç2) | İskelet, ilk yüklemede kap ve veri bileşenlerinin sadeleştirilmiş hâlidir; tek bir bileşen işlem yaparken satır içi yükleme kullanılır | İçerik yüklemesi = içeriğin şeklinde `SkeletonText`/`SkeletonPlaceholder`; sürmekte olan tek eylem = eylemi başlatan düğmenin yerinde tek `InlineLoading`; aynı anda en çok bir; tam ekran `Loading` yok. Yüzey tasarımları §2.4'ün "Dönen ikon yok"u içerik yüklemesine daraltıldı (§5.2) | İ6: eylemin satır içi yüklemesi o satırdaki tek hareket ve "kayıt sürüyor" bilgisidir; iskelet içeriğin yerini önceden tutar | Uyan: `HomeworkTracker.tsx:511`. Aykırı: `NextThing.tsx` düğme metnini değiştiriyor (B69); Bugün iskeleti stilsiz (B5); İlerleme'de üç iskelet kümesi (B66); 400 ms eşiği (B48) | [Loading — skeleton states](https://carbondesignsystem.com/building-blocks/core/patterns/loading/#skeleton-states), [#inline-loading](https://carbondesignsystem.com/building-blocks/core/patterns/loading/#inline-loading); [Inline loading — when to use](https://carbondesignsystem.com/building-blocks/core/components/inline-loading/guidelines/#when-to-use) |
+| **S37** Azaltılmış hareket (Ç3) | Durum geçişleri için her zaman alternatif sağlanır; benzer mesajı durağan olarak iletmenin her zaman bir yolu olur. (Carbon "her hareketi durdur" demez; durdurma ölçütü WCAG 2.3.3'tür) | `prefers-reduced-motion: reduce` altında temel olmayan her hareket durur (animasyon, geçiş, gecikme, yumuşak kaydırma); hiçbir bilgi yalnız hareketle taşınmaz, her hareketin önce durağan eşdeğeri vardır ([3.6-6]). Anayasa §5.4'ün "bilgi taşıyan hareket kalır" cümlesi bununla değiştirildi — tarihli düzeltme, gevşetme değil: korunan şey bilgidir | Bilgi hareketteyse reduce'u açan okur onu kaybeder; durağan eşdeğeri olan hareket temel değildir. Kod ve test zaten böyleydi; metin koda hizalandı | `ted-theme.scss:243-251` genel blok; `gorunum-kipleri.spec.ts`; açıklar B24 (gecikme sızıntısı), B39 (odak kipi `!important`, `SourcePanel` JS kaydırması) | [Motion — adaptive interface motion design](https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#adaptive-interface-motion-design); WCAG 2.2 SC 2.3.3 |
+| **S38** Büyük harf (Ç4) | Başlık, unvan, etiket, banner ve benzeri öğelerde cümle düzeni (IBM Style) | Her yerde cümle düzeni: başlık, etiket, kaş, düğme, Tag, durum dizgesi; kaynakta tümü büyük harf dizge yok, CSS `text-transform: uppercase` yok; bölüm başlığı "Başlık (n)"; kısaltmalar kendi yazımında; Books kapsam dışı ([3.3-6], [3.9-1]) | İ9 tek ses; 1.0'daki "≤ 2 sözcüklük kaş" istisnası her yeni yüzeyde genişliyordu | Panoda 14 `text-transform: uppercase` (`ted-theme.scss:541, 961, 1184, 1657, 3023, 3030, 3059, 3129`; `NextThing.scss:32`; `AssistantChat.scss:259, 383, 711, 751`; `utils/markdown.scss:16`); kaynakta "ŞİMDİ", "YARIN", "SIRADAKİ", `'YAPILAN'` …; modül şablonunda 5 → B70, B41 (Bugün bu dalın yenilemesinde) | [Content — content foundations](https://carbondesignsystem.com/building-blocks/foundations/content/#content-foundations) |
+| **S39** Sistem arızasının şiddeti (Ç5) | Durum paleti: kırmızı tehlike/hata, turuncu ciddi uyarı, sarı uyarı, yeşil başarı, mavi bilgi; gri taslak ya da başlamamış iş. Yüksek dikkat: sistem arızası okurdan eylem isterken | Başarısız ya da reddedilmiş ve okur ilerleyemiyor → hata (kırmızı, `kind="error"`); bozulmuş, kısmi ya da bayat → uyarı; bilgilendirici → bilgi; gri yalnız başlamamış/taslak, arıza için asla; her durum metin + ikonla (S4, §5.3 kural 10). Yüzey tasarımları §2.7 "Bozuk (sistem): Gri" değiştirildi | D3: gri bir arıza "önemsiz/bitmiş" okunur; şiddet okurun ne yapacağını söyler | `PortalStatusBanner.tsx:100` kapalı modül `info` (okulun kararı), `:127` okunamadı `warning` (son okuma tutuluyor) — uyuyor. Başlıktaki senkron etiketinin gri uyarı sayısı (`DashboardHeader.tsx:94-96`, S23) → S45, B75 | [Status indicators — status color palette](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#status-color-palette), [#severity-levels](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#severity-levels) |
+| **S40** Silme (Ç6) | Silme etkisine göre: düşük (geri alması ya da yeniden oluşturması kolay) → uyarısız; orta (geri alınamaz, yeniden oluşturulamaz ya da birden çok öğe) → ne olacağını söyleyen onay; yüksek → diyalog + kaynağın adını yazdırma. Yıkıcı ya da geri alınamaz eylemde danger modal; başlık ve düğme eylemi söyler | Geri alınabilir düşük etkili eylem onaysız, aynı satırda "Geri al" ile (İ5; "Yaptım" → "Geri al"). Geri alınamaz silme (sohbet, not, yüklenen dosya) danger `Modal`: başlık ve birincil düğme nesneyi adlandırır ("Bu sohbet silinsin mi?" / "Sohbeti sil"), gövde birlikte gidenleri sayar, odak "Vazgeç"te; başarı bildirimi yok, hata satırda doğru fiille (§5.5) | İ5 dönüş bedavadır; geri alınamaz kayıp ayrı bir sorudur. Sohbet silme bağlı ekleri de götürür (Carbon'un yüksek etki ölçütüne değer); ad yazdırma yerine gövde birlikte gidenleri sayar — ad yazdırmak çalışma belleği vergisidir (İ1, İ9) | Bugün onaysız tek tık: `SohbetListesi.tsx:50, 72`, ödev belgesi "Kaldır" `HomeworkTracker.tsx:632` → B23; "Yaptım"ın geri alı yok → B63 | [Common actions — delete](https://carbondesignsystem.com/building-blocks/core/patterns/common-actions/#delete); [Modal — danger modal](https://carbondesignsystem.com/building-blocks/core/components/modal/guidelines/#danger-modal) |
+| **S41** Modüllerde AI etiketi (Ç7) | AI ile ya da AI yardımıyla üretilen her örnek AI etiketiyle işaretlenir; etiket açıklanabilirliğe giden yoldur; kapta yerleşir | Panoda gösterilen her modül `ModuleViewer`'ın çerçeve başlığında Carbon `AILabel` taşır; açıklama penceresi neyin yapay zekâyla üretildiğini (anlatım, sorular, görseller) ve dayandığı kaynakları (kazanım, ders kitabı sayfaları, iddia dayanakları) söyler. Modülün içi değişmez: G-VOICE (öğrenci yüzeyinde kaynak-meta atıf yok) aynen | Carbon for AI şeffaflığı (C-AI2) ve okurun yaşı; etiket kap düzeyinde olduğundan modülün anlatım sesi bozulmaz | Bugün etiket yok (`ModuleViewer.tsx`); veri hazır: katalog kaydı ve taslağın `dogrulama` iddia özeti (`src/assistant_modules.py` aynı veriyi okur) → B71 | [AI label — mark AI-generated content](https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/#mark-ai-generated-content), [#in-containers](https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/#in-containers), [#explainability-template](https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/#explainability-template) |
+| **S42** Notların rengi (Ç8) | Durum paleti durumu söyler; renk tek başına bilgi taşımaz, metin ya da başka işaretle eşlenir | Not renk bandıyla boyanmaz: `text-primary`, mono + tabular nötr metin; çubuk varsa tek nötr ton; eşik rengi, sıralı rampa, "iyi/kötü" rengi yok (§8.7) | İ8 (not bir durum değil bilgidir), P5 ve yüzey tasarımları §4.4 ("not bir bilgidir, yargı değil"); mavi bant Yabancı diller ailesi ve bilgi rengiyle çakışıyordu | `utils/formatters.ts:115-122` `gradeColor` (≥ 85 yeşil, ≥ 70 mavi, ≥ 50 turuncu, < 50 kırmızı); `kontrast.spec.ts:79-88` dört rengi sabitliyor → B72 | [Status indicators — status color palette](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#status-color-palette), [#relying-only-on-color-is-insufficient](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#relying-only-on-color-is-insufficient) |
+| **S43** Modül oyunlaştırması (Ç9) | Productive hareket görev üzerindeyken göze batmaz, expressive seyrek önemli anlar içindir; ilerleme göstergesi doğrusal ve ≥ 3 adımlı süreçte mevcut adımı ve toplamı gösterir; ProgressBar kullanıcı eylemiyle belirlenen ilerleme için değildir | Modülde kutlama/ödül animasyonu ("+N XP" yükselişi, XP/seri nabzı, rozet belirişi) ve seri sayacı yok; ilerleme sessiz, etiketli bir göstergedir (doğrusal ≥ 3 adımda ProgressIndicator anlamı: mevcut adım ve toplam; daha azında düz metin "3/7 adım"); anında geri bildirim (modül pedagojisi İlke 3) kalır ama hareketsizdir — XP değeri varsa sessiz metindir, tamamlanma özetinde büyük sayı olmaz (§8.5); kazanılan rozet kalırsa sessiz bir listedir | Anayasa §9 (kutlama ve seri sayacı dışsal ödüldür), İ6 (kilometre taşında üç ödül hareketi birlikte koşuyor), İ7 | `module-template.html` `.xp`, `.streak-chip` (`:442-450`), `.badge--earned` (`:521`), 700 ms "+N XP"; `tedy-integration.md` §5, SKILL §11.4–§11.6; G-FLOW seri kapısı (`validate_module.py:2164-2169`) → B73 | [Motion — productive motion](https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#productive-motion); [Progress indicator — when to use](https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/guidelines/#when-to-use); [Progress bar — when not to use](https://carbondesignsystem.com/building-blocks/core/components/progress-bar/guidelines/#when-not-to-use) |
+| **S44** Başlık ağırlığı (Ç10) | Başlık token'ı kendi ağırlığını taşır: `heading-01`, `heading-02`, `heading-compact-01/02` 600; `heading-03`–`heading-05` 400; `heading-06`, `heading-07` 300 (`@carbon/type` 11.69.0) | Başlık ağırlığı token'dan değişmeden gelir; başlık token'ına `font-weight` eklenmez; daha ağır başlık gerekiyorsa 600'lük daha küçük token; modüller aynı kurala hizalanır ([3.3-3]) | İ9 tek karar: aynı token iki ağırlıkta yaşıyordu; P1 hiyerarşi boyla kurulur | 5 yer: `ted-theme.scss:552-553, 952-953` (`heading-03` + 600), `:1504-1505, 3015-3016, 3151-3152` (`heading-04` + 600); modül şablonu `.seg-head h2` (`:541`) ve `:689, 732, 753` 600 (carbon-child-system §4) → B74 | [Typography — type sets](https://carbondesignsystem.com/building-blocks/foundations/typography/type-sets/); npm `@carbon/type` |
+| **S45** Gri durum işaretleri (Ç11) | Durum göstergesi en az üç öğe taşır (ikon, şekil, renk, etiket); birleşik durum en yüksek dikkat rengini alır; gri taslak/başlamamış demektir | Arıza yokken senkron etiketi nötr ve sayısızdır; gerçek kısmi/bayat okuma ya da yedek model cevabı **uyarı ikonu + metin** taşır (Carbon Tag'inde uyarı rengi yoktur, uyarı ikon göstergesiyle verilir); senkron hatası hata (kırmızı); doğrulama uyarıları sayıya girmez. Asistanın "Yedek modelden" ve "Veriler güncel olmayabilir" rozetleri uyarı ikonu + metin olur; "Kaynaksız cevap" bilgidir | S39'un uygulaması; İ6 korunur: sayı sürekli alarm olmaz, ama bozulmuş durum gri de olmaz | `DashboardHeader.tsx:85-96`, `asistan/MesajAltbilgisi.tsx` → B75 | [Status indicators — consolidated statuses](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#consolidated-statuses), [#icon-indicator](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#icon-indicator) |
 
-### 11.2 Adı konmuş, karar bekleyen çelişkiler
+### 11.2 Adı konmuş çelişkiler ve kararları
 
-Aşağıdakiler henüz kapanmamış çelişkilerdir. Her biri kullanıcı kararı bekler; karar verilince bir S
-satırına dönüşür. Karar verilene kadar mevcut kod değiştirilmez ve yeni iş mevcut davranışı çoğaltmaz.
+Bir çelişki adıyla burada durur; karar verilince bir S satırına dönüşür ve Ç satırı "→ S#" ile tarih olarak kalır
+(§14.2). Karar verilene kadar mevcut kod değiştirilmez ve yeni iş mevcut davranışı çoğaltmaz.
+
+**Kararlaştırıldı (2026-10-10).** Kullanıcı kararı: "çelişkileri en iyi Carbon pratiğiyle çöz". Ç1–Ç10'un on kararı
+S35–S44'tür; her Carbon iddiası 2026-10-10 yerel taramasına ve Carbon MCP'ye karşı yeniden okundu (S37'de Carbon
+"her hareketi durdur" demez, durdurma ölçütü WCAG 2.3.3'tür; S43'te ProgressBar kullanıcı eylemiyle belirlenen
+ilerleme için değildir, modül ilerlemesi ProgressIndicator anlamındadır; S44'te `heading-06/07` 300'dür). Kodun henüz
+uymadığı yerler §13'te B68–B74 ve satırlarda anılan eski borçlardır. Aşağıdaki "Taraflar" sütunu karar öncesi
+durumu (1.0 sürümü) tarih olarak saklar.
+
+| # | Çelişki | Taraflar (2026-10-10 kararından önce) | Kanıt | Karar |
+|---|---|---|---|---|
+| **Ç1** | Öğretmen kipi birincil düğmeyi ders rengine boyar | Pano: `--cds-button-primary`, `--cds-interactive` ders aksanına (`asistan/ogretmenRenkleri.ts:9-13`, kullanıcı seçimi, asistan B1 öğretmen modları planı). Modül referansları: "birincil eylem her zaman Blue 60" (`carbon-excellence.md` §11, `color-system.md` §1). Carbon: ana mavi aile birincil eylem rengidir | `carbon-asistan-ogretmen.spec.ts` (kip başına gönder düğmesi rengi) | **→ S35 — birincil eylem her kipte Carbon mavisi; ders rengi yalnız yüzeyde (B68)** |
+| **Ç2** | Dönen ikon | Yüzey tasarımları §2.4 "Dönen ikon yok"; kod tek eylem için Carbon `InlineLoading` kullanır (`HomeworkTracker.tsx:511`). Carbon tek bir işlem süren bileşen için satır içi yüklenmeyi önerir. Öneri: yüzey §2.4 içerik yüklemesine (iskelet) daraltılır, eylem başına tek `InlineLoading` İ6'yla uyumludur | [Inline loading — when to use](https://carbondesignsystem.com/building-blocks/core/components/inline-loading/guidelines/#when-to-use) | **→ S36 — içerik yüklemesi iskelet, tek eylem tek `InlineLoading`; yüzey §2.4 daraltıldı (B69)** |
+| **Ç3** | Azaltılmış hareketin anlamı | Anayasa §5.4: bilgi taşıyan hareket kalır. Kod (`ted-theme.scss:243-251`) ve `gorunum-kipleri.spec.ts`: her şey durur. Carbon: her mesaj statik olarak da iletilir | [Motion — overview](https://carbondesignsystem.com/building-blocks/foundations/motion/overview/) | **→ S37 — reduce altında temel olmayan her hareket durur, bilgi yalnız harekette olmaz; anayasa §5.4 yeniden yazıldı** |
+| **Ç4** | Büyük harf etiketler | Carbon başlık, etiket, düğme ve bildirimde cümle düzeni ister; yüzey tasarımları §2.5 `BAŞLIK (n) ⌄` başlıkları ve kaynakta büyük harfli durum dizgeleri (`'YAPILAN'`). Öneri: büyük harf yalnız CSS ile, iki kelimeyi aşmayan üst etiket (eyebrow) stili | [Content](https://carbondesignsystem.com/building-blocks/foundations/content/) | **→ S38 — her yerde cümle düzeni, büyük harf ne kaynakta ne CSS'te; "Başlık (n)" (B70, B41)** |
+| **Ç5** | Sistem arızasının rengi | Yüzey tasarımları §2.7 "Bozuk (sistem): Gri"; `PortalStatusBanner.tsx:100` `kind="info"`, `:127` `kind="warning"`; Carbon durum paletinde gri taslak/başlamamış demektir | [Status indicators](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/) | **→ S39 — arıza şiddeti Carbon durum anlamıyla; gri arıza için asla; yüzey §2.7 değişti (S23 gerilimi → Ç11)** |
+| **Ç6** | Yıkıcı silme | İ5 (geri al) ile Carbon'un etkisine göre derecelenmiş onayı (danger modal) arasında seçim; bugün ikisi de yok (B23) | [Modal — guidelines](https://carbondesignsystem.com/building-blocks/core/components/modal/guidelines/) | **→ S40 — düşük etki: onaysız + "Geri al"; geri alınamaz silme: nesneyi adlandıran danger modal (B23, B63)** |
+| **Ç7** | Modüllerde AI etiketi | Carbon: AI üretimi içerik AI etiketi taşır. edupedia G-VOICE kaynağı öğrenci yüzeyinden gizler; pano AI aurasını yalnız modelin yazdığına koyar | [AI label — guidelines](https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/) | **→ S41 — `ModuleViewer` çerçeve başlığında `AILabel` + açıklanabilirlik; modülün içi (G-VOICE) değişmez (B71)** |
+| **Ç8** | Not bantlarının rengi | Kod notu bantla boyar (`utils/formatters.ts:115-122`, mavi `--status-info` dahil) ve `kontrast.spec.ts` "50-69 bandı ayrı bir renk"i sabitler; yüzey tasarımları §4.4 renk kodu olmadığını söyler; mavi aynı zamanda Yabancı diller ailesi ve Carbon'un bilgi rengidir | `kontrast.spec.ts:79` | **→ S42 — not renk bandıyla boyanmaz, nötr metin; `kontrast.spec.ts` bant iddiası değişir (B72)** |
+| **Ç9** | Modülde oyunlaştırma | Modül şablonu XP, seri, rozet ve ödül animasyonu taşır (`vendor/assets/module-template.html`; `tedy-integration.md` §5 "yumuşatılmış"); anayasa §9 kutlamayı ve seri sayacını reddeder, İ6 tek hareket der | Anayasa §9 | **→ S43 — modülde ödül animasyonu ve seri sayacı yok; ilerleme sessiz ve etiketli; rozet kalırsa sessiz liste (B73)** |
+| **Ç10** | Başlık ağırlığı | `heading-03/04` panoda kimi yerde 400, kimi yerde 600 (`ted-theme.scss:551-557, 586-590, 951-955, 1504-1508`); Carbon modal ve veri tablosu başlığında Regular 400 kullanır, modüller 600 seçti. İ9 tek karar ister | [Typography — overview](https://carbondesignsystem.com/building-blocks/foundations/typography/overview/) | **→ S44 — başlık ağırlığı Carbon token'ından, `font-weight` eklenmez; modüller hizalanır (B74)** |
+
+**Karar bekleyen.**
 
 | # | Çelişki | Taraflar | Kanıt |
 |---|---|---|---|
-| **Ç1** | Öğretmen kipi birincil düğmeyi ders rengine boyar | Pano: `--cds-button-primary`, `--cds-interactive` ders aksanına (`asistan/ogretmenRenkleri.ts:9-13`, kullanıcı seçimi, asistan B1 öğretmen modları planı). Modül referansları: "birincil eylem her zaman Blue 60" (`carbon-excellence.md` §11, `color-system.md` §1). Carbon: ana mavi aile birincil eylem rengidir | `carbon-asistan-ogretmen.spec.ts` (kip başına gönder düğmesi rengi) |
-| **Ç2** | Dönen ikon | Yüzey tasarımları §2.4 "Dönen ikon yok"; kod tek eylem için Carbon `InlineLoading` kullanır (`HomeworkTracker.tsx:511`). Carbon tek bir işlem süren bileşen için satır içi yüklenmeyi önerir. Öneri: yüzey §2.4 içerik yüklemesine (iskelet) daraltılır, eylem başına tek `InlineLoading` İ6'yla uyumludur | [Inline loading — when to use](https://carbondesignsystem.com/building-blocks/core/components/inline-loading/guidelines/#when-to-use) |
-| **Ç3** | Azaltılmış hareketin anlamı | Anayasa §5.4: bilgi taşıyan hareket kalır. Kod (`ted-theme.scss:243-251`) ve `gorunum-kipleri.spec.ts`: her şey durur. Carbon: her mesaj statik olarak da iletilir | [Motion — overview](https://carbondesignsystem.com/building-blocks/foundations/motion/overview/) |
-| **Ç4** | Büyük harf etiketler | Carbon başlık, etiket, düğme ve bildirimde cümle düzeni ister; yüzey tasarımları §2.5 `BAŞLIK (n) ⌄` başlıkları ve kaynakta büyük harfli durum dizgeleri (`'YAPILAN'`). Öneri: büyük harf yalnız CSS ile, iki kelimeyi aşmayan üst etiket (eyebrow) stili | [Content](https://carbondesignsystem.com/building-blocks/foundations/content/) |
-| **Ç5** | Sistem arızasının rengi | Yüzey tasarımları §2.7 "Bozuk (sistem): Gri"; `PortalStatusBanner.tsx:100` `kind="info"`, `:127` `kind="warning"`; Carbon durum paletinde gri taslak/başlamamış demektir | [Status indicators](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/) |
-| **Ç6** | Yıkıcı silme | İ5 (geri al) ile Carbon'un etkisine göre derecelenmiş onayı (danger modal) arasında seçim; bugün ikisi de yok (B23) | [Modal — guidelines](https://carbondesignsystem.com/building-blocks/core/components/modal/guidelines/) |
-| **Ç7** | Modüllerde AI etiketi | Carbon: AI üretimi içerik AI etiketi taşır. edupedia G-VOICE kaynağı öğrenci yüzeyinden gizler; pano AI aurasını yalnız modelin yazdığına koyar | [AI label — guidelines](https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/) |
-| **Ç8** | Not bantlarının rengi | Kod notu bantla boyar (`utils/formatters.ts:115-122`, mavi `--status-info` dahil) ve `kontrast.spec.ts` "50-69 bandı ayrı bir renk"i sabitler; yüzey tasarımları §4.4 renk kodu olmadığını söyler; mavi aynı zamanda Yabancı diller ailesi ve Carbon'un bilgi rengidir | `kontrast.spec.ts:79` |
-| **Ç9** | Modülde oyunlaştırma | Modül şablonu XP, seri, rozet ve ödül animasyonu taşır (`vendor/assets/module-template.html`; `tedy-integration.md` §5 "yumuşatılmış"); anayasa §9 kutlamayı ve seri sayacını reddeder, İ6 tek hareket der | Anayasa §9 |
-| **Ç10** | Başlık ağırlığı | `heading-03/04` panoda kimi yerde 400, kimi yerde 600 (`ted-theme.scss:551-557, 586-590, 951-955, 1504-1508`); Carbon modal ve veri tablosu başlığında Regular 400 kullanır, modüller 600 seçti. İ9 tek karar ister | [Typography — overview](https://carbondesignsystem.com/building-blocks/foundations/typography/overview/) |
+| **Ç11** | Gri durum işaretleri ve arıza şiddeti | S39 (2026-10-10): gri yalnız başlamamış/taslak demektir, arıza için asla; bozulmuş, kısmi ya da bayat durum uyarıdır. Bugün iki yer gri: (1) S23 — başlıktaki senkron etiketi bölüm uyarılarını (doğrulama uyarıları, kazıma hataları, bayat bölümler) gri sayar, yalnız senkron hatası kırmızıdır; gerekçe İ6, sürekli sarı "4 uyarı" hiç çözülmeyen bir alarmdır; Carbon'un birleşik durum kuralı en yüksek dikkat rengini ister. (2) Asistanın mesaj başına durum rozetleri (§6.6 K7, K8): "Yedek modelden", "Kaynaksız cevap", "Veriler güncel olmayabilir" gri metinli Tag; ilki bir model arızasının, sonuncusu bayat verinin işaretidir. Carbon Tag'inde uyarı rengi yoktur; uyarı ikon göstergesiyle (ikon + metin) verilir. Öneri: arıza yokken etiket gri ve sayısız kalır; gerçek kısmi okuma ya da yedek model uyarı ikonu + metin taşır, doğrulama uyarıları sayıya girmez | `DashboardHeader.tsx:85-96` (`tagType` yalnız `gray` ya da `red`); `asistan/MesajAltbilgisi.tsx`; [Status indicators — consolidated statuses](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#consolidated-statuses), [#icon-indicator](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#icon-indicator) — **→ S45 (2026-10-10): kısmi/bayat = uyarı ikonu + metin, gri arıza için asla** |
 
 ---
 
@@ -3393,8 +3453,8 @@ Bir yüzey değişikliği şu koşulların hepsi sağlandığında bitmiştir:
 
 Bu tablo TEDY arayüzünün **borç kaydıdır**: ölçülmüş, henüz düzeltilmemiş kusurların tek listesi. Başka bir belge
 (bileşen rehberi, yüzey tasarımları, anayasa §8) bir kusuru anarsa buradaki B numarasıyla anar; yeni kusur önce
-buraya ölçümüyle yazılır. Bugün 67 satır (B1–B67); B15 ve B30 kapandı. Ölçüm tarihi aksi yazılmadıkça
-2026-10-10'dur (HEAD `20a3c31`).
+buraya ölçümüyle yazılır. Bugün 74 satır (B1–B74); B15 ve B30 kapandı. Ölçüm tarihi aksi yazılmadıkça
+2026-10-10'dur (B1–B67 HEAD `20a3c31`; B68–B74, §11.2'deki Ç1–Ç10 kararlarının kod borçları, HEAD `487bf3a`).
 Satır numaraları ölçüm günündendir. Bir borç kapandığında satır silinmez: "Kapandı" ve commit yazılır.
 Tedy Books (`ted-theme.scss`'te `Tedy Books` başlığından sonrası) kendi dünyasıdır; Books'taki değerler
 ayrıca sayılır, pano borcu sayılmaz.
@@ -3405,11 +3465,11 @@ ayrıca sayılır, pano borcu sayılmaz.
 | **B2** | Statik kart gölgesi: `ted-theme.scss:346` (`.dashboard-card`), `:2128` (`.today-tl .dashboard-card`), `:3004` (`.exam-stats`), `:3069` (`.exam-card`); Books `:3671, 3847, 4515`; hover kaldırma `:359, 3074, 3675` | S11 | 7 statik yer (pano 4, Books 3) | Pano: gölge kaldırılır, derinlik `layer` token'ı + 1 px `border-subtle`; tıklanamayan kartta hover kaldırma yok; `gorsel-regresyon` ve zorunlu renk testi (`gorunum-kipleri`) kenarı korur |
 | **B3** | Korumasız hover | S17 | 47 `:hover` satırı (pano 30, Books 17); 7'si `@media (any-hover: hover)` içinde (`ted-theme.scss:357, 391, 937, 976, 1386, 1564, 1848`) | Pano hover'ları koruma bloğuna taşınır; bir stylelint ya da `test_pano` kuralı korumasız `:hover`'ı yakalar |
 | **B4** | Statik satır içi stil: `HomeworkTracker.tsx:486` (`fontSize: '0.75rem'`, `#525252` geri dönüşlü renk, `marginTop: '2px'`), `:602` (`marginTop: '0.25rem'`), `CalendarEvents.tsx:259` (`position: 'relative'`), `DashboardHeader.tsx:17-26` (durum ikonlarının sabit renkleri) | S5, D1 | 22 `style={{` yerinden 4'ü statik; `GradeTable.tsx:188-194` hesaplanan değerdir (S5'e uygun) | Statik değerler sınıfa taşınır (tip `type-style`, aralık token); B12'deki kapı eklenir |
-| **B5** | Bugün yükleniyor durumu: `TodaySchedule.tsx:556-560` `.today-loading__bar` | D3, yüzey tasarımları §2.4 | Bu sınıfın stili yok; tema yalnız `.today-loading__block.cds--skeleton__placeholder`'ı biçimler (`ted-theme.scss:443-457`, `CalendarEvents.tsx:233-235` kullanır). Bugün yüklenirken boş görünür | Carbon `SkeletonText` / `SkeletonPlaceholder` içeriğin gerçek biçiminde; 400 ms altında hiçbir şey; durum `aria-busy` ile de söylenir |
-| **B6** | Bugün API hataları: `TodaySchedule.tsx:301-376` altı `useApi` çağrısı | D3 | `useApi` `error` döndürür (`hooks/useApi.ts`); Bugün hiçbirini okumaz — başarısız bir uç boş bölüm gibi görünür | Her bölüm hata durumunda nedenini söyler ("… yüklenemedi"), boş durumdan ayrı; e2e testi |
-| **B7** | Zaman çizelgesi teslim satırları: `TodaySchedule.tsx:764-773` `div.today-tl__item` | D2 | `onClick` var; `role`, `tabIndex`, tuş işleyicisi yok — klavye `/isler`'e ulaşamaz | Satır içinde gerçek bağlantı ya da düğme; klavye testi |
-| **B8** | Telefonda 44 px altı hedefler: `.today__today-btn` "Bugüne dön" (`ted-theme.scss:536`, 1.75rem = 28 px), `.today-also__item` (`:648`, `min-height: 2rem`, ≈ 32–34 px), `.today-also__all` "+N iş daha" (`:633`, 1.5rem = 24 px), `.today-past-fold` (`:733`, 2rem = 32 px) | S18 | `d3b-dokunma.spec.ts` Bugün'de yalnız gün oklarını ölçer | `$spacing-09` hedef; liste satırları için Carbon `ContainedList` `size="lg"` (48 px) değerlendirilir; `d3b-dokunma` genişletilir |
-| **B9** | Gün Şeridi grafik kontrastı (`DayStrip.scss`, `ted-theme.scss:74-83` pencere renkleri) | D2 (grafik öğe 3:1) | 1.10–2.17:1, `@carbon/colors` değerlerinden WCAG göreli parlaklıkla hesaplandı (Bugün keşfi, 2026-10-10; tarayıcıda ölçülmedi) | Şerit izleri 3:1'i geçen adımlarla; bilgi yalnız renkte değil (etiket "ŞİMDİ", "odak sonu") |
+| **B5** | **Kapandı (2026-10-10, Bugün yenilemesi: iskelet: `SkeletonText`/`SkeletonPlaceholder` içeriğin şeklinde).** Bugün yükleniyor durumu: `TodaySchedule.tsx:556-560` `.today-loading__bar` | D3, yüzey tasarımları §2.4 | Bu sınıfın stili yok; tema yalnız `.today-loading__block.cds--skeleton__placeholder`'ı biçimler (`ted-theme.scss:443-457`, `CalendarEvents.tsx:233-235` kullanır). Bugün yüklenirken boş görünür | Carbon `SkeletonText` / `SkeletonPlaceholder` içeriğin gerçek biçiminde; 400 ms altında hiçbir şey; durum `aria-busy` ile de söylenir |
+| **B6** | **Kapandı (2026-10-10, Bugün yenilemesi: `useApi` hatası uyarı bandı (S39), ham HTTP metni yok; `bugun-duzen.spec.ts` "D — yenileme").** Bugün API hataları: `TodaySchedule.tsx:301-376` altı `useApi` çağrısı | D3 | `useApi` `error` döndürür (`hooks/useApi.ts`); Bugün hiçbirini okumaz — başarısız bir uç boş bölüm gibi görünür | Her bölüm hata durumunda nedenini söyler ("… yüklenemedi"), boş durumdan ayrı; e2e testi |
+| **B7** | **Kapandı (2026-10-10, Bugün yenilemesi: teslim satırı gerçek bağlantı; klavye testi `bugun-duzen.spec.ts` "D — yenileme").** Zaman çizelgesi teslim satırları: `TodaySchedule.tsx:764-773` `div.today-tl__item` | D2 | `onClick` var; `role`, `tabIndex`, tuş işleyicisi yok — klavye `/isler`'e ulaşamaz | Satır içinde gerçek bağlantı ya da düğme; klavye testi |
+| **B8** | **Kapandı (2026-10-10, Bugün yenilemesi: Bugün'ün bütün denetimleri telefonda ≥ 44 px (48 px); `d3b-dokunma.spec.ts` sabitler).** Telefonda 44 px altı hedefler: `.today__today-btn` "Bugüne dön" (`ted-theme.scss:536`, 1.75rem = 28 px), `.today-also__item` (`:648`, `min-height: 2rem`, ≈ 32–34 px), `.today-also__all` "+N iş daha" (`:633`, 1.5rem = 24 px), `.today-past-fold` (`:733`, 2rem = 32 px) | S18 | `d3b-dokunma.spec.ts` Bugün'de yalnız gün oklarını ölçer | `$spacing-09` hedef; liste satırları için Carbon `ContainedList` `size="lg"` (48 px) değerlendirilir; `d3b-dokunma` genişletilir |
+| **B9** | ~~Gün Şeridi grafik kontrastı~~ **Kapandı (2026-10-10, Bugün yenilemesi)** | D2 (grafik öğe 3:1) | Önce 1,10–2,17:1; şimdi şimdi-çizgisi 18,1:1, çapa 5,0:1, pencere sınırı 3,3:1 | Nötr pencere + opak çapa ([3.2-16]); `bugun-duzen.spec.ts` "D — yenileme" kontrastı sabitler |
 | **B10** | İki kırılım noktası 1 px ayrık: tema `@media (max-width: 671px)` (`ted-theme.scss:528, 2496, …`), bileşen `@media (max-width: 42rem)` (`DayStrip.scss:107`, `NextThing.scss:126`) | §3.4 tek kırılım dili | Tam 672 px'te bileşen kuralları uygulanır, tema kuralları uygulanmaz | Tek kırılım: Carbon `md` (672 px); bileşenler aynı ifadeyi kullanır |
 | **B11** | Atlama bağlantısı ve kaydırma boşluğu | D2; WCAG 2.2 2.4.11 (Focus Not Obscured) | `SkipToContent` yok; `scroll-padding` yok; sabit `Header` ve telefonda sabit `.bottom-nav` odağı örtebilir — 2.4.11 ölçülmedi | `Header`'ın ilk çocuğu `<SkipToContent href="#main-content" />` + `Content`'e `id`; `scroll-padding-top/bottom`; telefonda Tab turu odağın bant/çubukla kesişmediğini ölçer (ARIA tabanları değişir) |
 | **B12** | Statik JSX denetimi yok: `dashboard/eslint.config.js` | D1, D2 | Yalnız `js`, `typescript-eslint`, `react-hooks`, `react-refresh`; `eslint-plugin-jsx-a11y` yok; TSX statik stil hiçbir kapıda değil | `eslint-plugin-jsx-a11y` önerilen set (okur perdeleri gerekçeli istisna); statik `style` literallerini yakalayan `no-restricted-syntax` kuralı |
@@ -3423,7 +3483,7 @@ ayrıca sayılır, pano borcu sayılmaz.
 | **B20** | TEDY'nin kendi bileşenleri (`DayStrip`, `NextThing`, `SubjectLabel`, `EmptyLine`) Carbon'un bileşen kontrol listesine göre | Kalite çıtası (§7) | Dışa aktarılan props tipi, birim testi, varsayılan dışı durumların a11y denetimi, 320 px genişlik denetimi (testler 390 px) ve elle ekran okuyucu kaydı yok | Her bileşen için eksik maddeler kapatılır; 320 px bir Playwright projesi ya da tek spec |
 | **B21** | Ders ailesi renginde Tag'ler: `HomeworkTracker.tsx:446, 558` (`'YAPILAN'`, `type: 'blue' as const`), `utils/formatters.ts:110` (`'Bekliyor'`, `'blue'`), `TeamActivities.tsx:99` (`'blue'` / `'teal'`), `PlatformProgress.tsx:86` (zorluk Tag'i yeşil/mavi/sıcak gri/kırmızı) | İ8.1, S4, [3.2-8] | `test_ders_rengi_etiket_olmaz` yalnız `*.tsx`'te düz `type="…"` ve `tagType: '…'` desenlerini yakalar (`tests/test_pano_tasarim_sistemi.py:131-138`); üçlü ifade, `type: 'blue'` nesne alanı, yardımcı fonksiyon ve `.ts` dosyaları kaçar | Bu durumlar gri aile + ikonla; test Tag `type`'ına giden her ifadeyi (üçlü, dönüş nesnesi) yakalar |
 | **B22** | `StudentProfile.tsx:56-92`: beş `window.alert`, `:92` ham `err.message` | D3, D4, İ9 | Tarayıcı uyarısı; hata metni okura ham gider | Satır içi `InlineNotification` ve insan cümlesi (yüzey tasarımları §2 bildirim kalıbı) |
-| **B23** | Sohbet ve not silme: `SohbetListesi.tsx:50, 72` → `hooks/useSohbetler.ts:111-112`; silme hatası `asistan/GecmisPaneli.tsx:20` | İ5; yüzey tasarımları §2.6 "Yıkıcı eylem yok"; [3.9-4] | Tek tık, onaysız, bağlı ekler ve alıştırmalarla birlikte geri alınamaz siliniyor (danger düğme ve onay kodda yok); başarısız silme "Sohbet kaydedilemedi." diyor (yanlış fiil); ödev belgesi "Kaldır" da onaysız ghost (`HomeworkTracker.tsx:632`) | Ç6 kararından sonra: geri al ya da Carbon danger onayı |
+| **B23** | Sohbet ve not silme: `SohbetListesi.tsx:50, 72` → `hooks/useSohbetler.ts:111-112`; silme hatası `asistan/GecmisPaneli.tsx:20` | İ5; yüzey tasarımları §2.6 "Yıkıcı eylem yok"; [3.9-4] | Tek tık, onaysız, bağlı ekler ve alıştırmalarla birlikte geri alınamaz siliniyor (danger düğme ve onay kodda yok); başarısız silme "Sohbet kaydedilemedi." diyor (yanlış fiil); ödev belgesi "Kaldır" da onaysız ghost (`HomeworkTracker.tsx:632`) | S40 (Ç6'nın kararı): sohbet, not ve yüklenen dosya silme danger `Modal` ile — başlık ve birincil düğme nesneyi adlandırır ("Sohbeti sil"), gövde birlikte gidenleri sayar, odak "Vazgeç"te; silme hatası "Sohbet silinemedi."; e2e: `DELETE` yalnız onaydan sonra |
 | **B24** | Hareket kaskadı ve gecikme sızıntısı: `ted-theme.scss:765` (`$i * 40ms`, 20 satır, 800 ms'ye kadar), `:1994-2003` (`.stack-sm`, 360 ms'ye kadar) | İ6, D2, anayasa §5.4 | Azaltılmış hareket bloğu (`:243-251`) süreyi sıfırlar, `animation-delay`'i sıfırlamaz; `both` dolgu kipiyle öğe gecikme boyunca başlangıç durumunda kalır | Kaskad kaldırılır ya da tek giriş tek hareket sayılır (kullanıcı kararı); azaltılmış harekette `animation-delay: 0s` |
 | **B25** | `/sinavlar` sayı şeridi: `ExamTimeline.tsx:193` `.exam-stats` (`ted-theme.scss:2997-3005`) | İ3, anayasa §9 (KPI karoları), S15 | Sayfanın en belirgin sayıları toplamlar | Şerit kaldırılır; sayılar istendiğinde açılır |
 | **B26** | Telefon yan boşluğu: `ted-theme.scss:2529` (`var(--ted-space-xs)` = `$spacing-03`, 8 px) | §3.4; Carbon `sm` kırılımında metin kenardan 16 px | 390 px'te sayfa metni kenardan 8 px | `$spacing-05`; görsel taban okunarak |
@@ -3435,23 +3495,23 @@ ayrıca sayılır, pano borcu sayılmaz.
 | **B32** | Bileşen token'ı bileşeni dışında: `utils/markdown.scss:26, 32, 47, 92` (sonuç/hata kutusu, adım rozeti), `ted-theme.scss:1110` (teslim satırı hover'ı), `:1623` (sağlık kutusu uyarısı), `:2824` (ödev zenginleştirme kutusu), `AssistantChat.scss:72-80` (`.ac__prompt-chip--primary` düğme token'ı) | [3.2-2] | 7 yer `--cds-notification-*` / `--cds-button-*` ödünç alıyor | `InlineNotification`/`Callout` ya da `tedyLayer`'a rol; pytest seçici zinciri denetimi |
 | **B33** | Palet literali rol token'ıyla aynı değer: `ted-theme.scss:153` (`--ted-highlight-active` blue-20 = `$highlight`), `:154` (`--ted-highlight-today` blue-60 = `$interactive`), `:796` (`.today-tl__dot` blue-20 gölge), `:1773` (`.calendar-grid__header--today` blue-20), `:1380-1382` (bant etiket kenarları = `$support-*-inverse`) | [3.2-1] | Tema değişince (g100) bu değerler rol gibi dönmez | Rol token'ına çevrilir |
 | **B34** | Opaklıkla durum: `AssistantChat.scss:89-91` (`.ac__prompt-chip:disabled` 0.5), `ted-theme.scss:1740-1741` (`.calendar-legend__chip--hidden` 0.35, metin 2,24:1, `aria-pressed` yok, `CalendarEvents.tsx:301-306`), `DayStrip.scss:70-75` (`.day-strip__anchor` `$interactive` @ 0.5, 2,17:1); modül şablonu `module-template.html:647, 699, 720, 881, 903` (dört farklı değer: .45, .4, .75, .85) ve satır içi `opacity=".4"` (`:2229`) | [3.2-5], S24, S31, D1 | 3 pano yeri + 6 modül yeri | Gri aile token'ları; gizli çip seçilmemiş hâlde + onay işareti + `aria-pressed`; modül tarafı vendor düzeltmesi (`--pin`); Gün Şeridi çapası B9 ile |
-| **B35** | Tipografi: Books bloğunun `stylelint-disable`'ı kapanmıyor (`ted-theme.scss:3311`, B14); `.route-boundary__title` 1rem/600 literal (`:5167-5170`); TSX satır içi `fontWeight` (`GradeTable.tsx:122-123, 165-166`); `heading-01` 0 kullanım; `heading-04` + 600 üç yerde (`:1504, 3015, 3151`); hafta başlığı `heading-compact-01` ile `body-01` yan yana (`:2029-2034`); Books dışında 22 elle `letter-spacing` (−0,01em … 0,08em; tema 16, `DayStrip` 1, `AssistantChat` 4, `NextThing` 1); `.ac__muted` tam italik cümle (`AssistantChat.scss:669-673`); kesilen adlar tam metinsiz (`ted-theme.scss:2365-2368` `.platform-detail-row__title`, Books `:4157-4164` `.reader__bar-chapter`, takvim olay başlığı yalnız `title` ile `CalendarEvents.tsx:376`, ödev seçimi 80 karakterde ipucusuz `asistan/GirisEkleri.tsx:36`); Sans 700 ve Mono 500 boşuna yükleniyor (`index.html:12`) | [3.3-1]–[3.3-4], [3.3-6], [3.3-7], [3.3-9], [3.3-10]; §5.8 | `heading-03` ağırlık kararı ayrıca Ç10'dadır | Tip yalnız `type-style`; tek izleme token'ı; kesilen her ad `title` ya da tam metin; yüklenen ağırlıklar ⊆ {300, 400, 600}; Books bloğu `stylelint-enable` ile kapanır |
+| **B35** | Tipografi: Books bloğunun `stylelint-disable`'ı kapanmıyor (`ted-theme.scss:3311`, B14); `.route-boundary__title` 1rem/600 literal (`:5167-5170`); TSX satır içi `fontWeight` (`GradeTable.tsx:122-123, 165-166`); `heading-01` 0 kullanım; `heading-04` + 600 üç yerde (`:1504, 3015, 3151`); hafta başlığı `heading-compact-01` ile `body-01` yan yana (`:2029-2034`); Books dışında 22 elle `letter-spacing` (−0,01em … 0,08em; tema 16, `DayStrip` 1, `AssistantChat` 4, `NextThing` 1); `.ac__muted` tam italik cümle (`AssistantChat.scss:669-673`); kesilen adlar tam metinsiz (`ted-theme.scss:2365-2368` `.platform-detail-row__title`, Books `:4157-4164` `.reader__bar-chapter`, takvim olay başlığı yalnız `title` ile `CalendarEvents.tsx:376`, ödev seçimi 80 karakterde ipucusuz `asistan/GirisEkleri.tsx:36`); Sans 700 ve Mono 500 boşuna yükleniyor (`index.html:12`) | [3.3-1]–[3.3-4], [3.3-6], [3.3-7], [3.3-9], [3.3-10]; §5.8 | Başlık ağırlığı S44'le karara bağlandı; o kısım B74'te | Tip yalnız `type-style`; tek izleme token'ı; kesilen her ad `title` ya da tam metin; yüklenen ağırlıklar ⊆ {300, 400, 600}; Books bloğu `stylelint-enable` ile kapanır |
 | **B36** | Saat ve süre yazımı: `.tedy-time` altı yerin beşinde sözcük sarıyor (`DayStrip.tsx` "ŞİMDİ", "yatma", "odak sonu"; `NextThing.tsx:97` "{n} dakikayla"; `HomeworkTracker.tsx:350` "yarın"/"N gün sonra"); ders programı saat sütunu `.schedule-time` Sans 600 (`ted-theme.scss:2138-2143`) | [3.3-5], S22 | Yalnız şerit işaretleri salt rakam | Sınıf yalnız rakamı sarar; `.schedule-time` Mono + tabular; Playwright metin regex'i |
 | **B37** | Yerleşim: ızgara aralığı 8/12 px (`ted-theme.scss:2472` `.daha-fazla__liste`, `:2887` `.student-profile__fields`, `:2969` saat satırı); Bugün'de "AYRICA" bloğunun metni üstteki kartın metninden 27 px ayrı bir keyline'da (görsel tabandan ölçüldü); belgelenmemiş kırılımlar `420px`/`360px`/`22rem` (`:2616, 2788, 2795, 3295`), `AssistantChat.scss:816` (1100px), `:822` (34rem); kart dolgusu 24 px (`:343`) kararsız; `.stack-xs`/`.stack-sm` ikisi de 8 px (`:327-337`); özel ders saat satırı telefonda iki sütun (`:2968-2971`) | [3.4-1], [3.4-4], [3.4-5], [3.4-7], [3.4-8]; §7.3 | Telefon yan boşluğu B26'da, iki ayrık kırılım B10'da | Aralık gutter token'ı (`$spacing-05`/`$spacing-07`); tek sol çizgi; kırılımlar Carbon'unkiler; telefonda tek sütun |
 | **B38** | İkon: Books dışında 18 satırda Carbon boyu dışı ikon (10/12/14/36 px); emoji ikon yerine (`HomeworkTracker.tsx:646` "🤖 Gemini Notu", `ExamTimeline.tsx:129` "🤖 Çalışma Özeti", `:135` "🤖 Sınav Rehberi"); kart başlığı ve takvim çipi ikonu `icon-secondary`, yanındaki metin primary (`ted-theme.scss:375, 1839`); `.exam-card` 4 px şerit (`:3070`, şerit 3 px olmalı) | [3.7-1], [3.7-3], [3.5-3] | — | `size={16\|20\|24\|32}`; emoji yerine Carbon ikonu; ikon metnin rengini alır; şerit 3 px |
 | **B39** | Hareket: hover geçişi `--ted-transition-fast` 150 ms standard (`ted-theme.scss:159, 165`; Carbon mikro etkileşim 70–110 ms entrance); odak kipinin `!important` hızlandırması reduce'u özgüllükle yeniyor (`:2100-2103`); `SourcePanel.tsx:164` JS yumuşak kaydırması `prefers-reduced-motion`'a bakmıyor; `animation-delay` hiçbir lint kuralında değil; Books'taki eski reduce bloğu ölü | [3.6-1], [3.6-4], [3.6-6]; S26 | Kademe ve reduce altında gecikme sızıntısı B24'te | `motion.$duration-fast-01/02` + entrance; reduce kuralı odak kipinden sonra ve yüksek özgüllükle; JS hareketi `matchMedia` ile; stylelint `animation-delay` |
 | **B40** | Erişilebilirlik: etkinlik türü yalnız gizli ikonda; `.calendar-event` metinle birlikte `forced-color-adjust: none` altında (`ted-theme.scss:268-271`); menü düğmesi `aria-expanded`'sız (`DashboardHeader.tsx:105-108`); `<Header aria-label>` İngilizce "TEDY Dashboard" (`:104`); iskeletler `aria-busy`'siz (tek `aria-busy` eski `AssistantChat.tsx:295`); "Yaptım"tan sonra odak yerleştirilmiyor; Notlar tablosu adsız (`GradeTable`); `<abbr>` yok ("A3K", "ÖGEP", "dk"); hafta süzgecinin görünür etiketi yok (`CourseContent.tsx:211-215` `titleText=""`, "Hafta" hiç görünmüyor); giriş sayfasında landmark yok (`LoginPage.tsx:95` vd.); iki gezinme landmark'ı aynı gezinmeye iki ad veriyor ("Navigasyon" `App.tsx:140`, "Ana gezinme" `BottomNav.tsx:43`) | D2; [3.7-2], [3.8-5]–[3.8-9] | axe ve IBM tabanı bunları yakalamıyor | Her madde kendi düzeltmesiyle; `aria-busy` + durum mesajı; tablo `aria-label`; giriş `<main>`; tek gezinme adı; klavye ve zorunlu renk testleri genişler |
-| **B41** | İçerik ve dil: Books dışında 21 Başlık Düzeni dizesi ("Özel Ders Ekle", "Öğretmen Adı", "Haftanın Günü", "Öğrenci Takip Paneli" …); kaynakta büyük harf (`DayStrip.tsx` "ŞİMDİ", `TodaySchedule.tsx` "YARIN"/"ŞİMDİ"/"BUGÜN"; Ç4); "Son Sync:" ile "Senkron Sağlığı" (`DashboardHeader.tsx:162, 166`); kaldırılmış ürün adı "Gemini Notu" (`HomeworkTracker.tsx:646`); saniyeli ikinci tarih biçimi (`DashboardHeader.tsx:43` `toLocaleString`); yükleme metni beş yazımla ("Ekleniyor…", "Ekleniyor...", "Yükleniyor", "Yükleniyor...", "Kaydediliyor…"; `HomeworkTracker.tsx:511` noktasız "Kaydediliyor"); katlama fiili iki ("Detaylar"/"Gizle" `ExamTimeline.tsx:121`, "Göster"/"Gizle" `TodaySchedule.tsx:749`); "Çıkış" (`DashboardHeader.tsx:219`) / "Çıkış yap" (`ReaderChrome.tsx:40-41`); mikrofon penceresi başlığı "Mikrofon", birincil "Onayla", tetik "Sesle sor" (`asistan/SesOnayi.tsx:9`, `asistan/GirisDugmeleri.tsx:16`); "Modülü aç" her atıfta aynı metin (`SourcePanel.tsx:45`); odak anahtarı `labelA="Odak" labelB="Odak"` (`DashboardHeader.tsx:209-211`); kopyalama onaysız (`asistan/MesajAltbilgisi.tsx:40`), Carbon'un dizesi ünlemli "Kopyalandı!" (`asistan/dilPaketi.ts:219`) | İ9; [3.9-1], [3.9-3], [3.9-5], [3.9-6]; §5.5 | Sohbet silme hatasının yanlış fiili B23'te | Cümle düzeni; büyük harf yalnız CSS ile (Ç4); tek sözlük ("senkron", "Göster/Gizle", "Çıkış yap"); pencere başlığı = tetik ("Mikrofonu açalım mı?" / "Mikrofonu aç"); atıf düğmesi modül adını taşır; anahtar `labelText` + `hideLabel`; tek tarih biçimi |
+| **B41** | İçerik ve dil: Books dışında 21 Başlık Düzeni dizesi ("Özel Ders Ekle", "Öğretmen Adı", "Haftanın Günü", "Öğrenci Takip Paneli" …); kaynakta büyük harf (`DayStrip.tsx` "ŞİMDİ", `TodaySchedule.tsx` "YARIN"/"ŞİMDİ"/"BUGÜN"; Ç4); "Son Sync:" ile "Senkron Sağlığı" (`DashboardHeader.tsx:162, 166`); kaldırılmış ürün adı "Gemini Notu" (`HomeworkTracker.tsx:646`); saniyeli ikinci tarih biçimi (`DashboardHeader.tsx:43` `toLocaleString`); yükleme metni beş yazımla ("Ekleniyor…", "Ekleniyor...", "Yükleniyor", "Yükleniyor...", "Kaydediliyor…"; `HomeworkTracker.tsx:511` noktasız "Kaydediliyor"); katlama fiili iki ("Detaylar"/"Gizle" `ExamTimeline.tsx:121`, "Göster"/"Gizle" `TodaySchedule.tsx:749`); "Çıkış" (`DashboardHeader.tsx:219`) / "Çıkış yap" (`ReaderChrome.tsx:40-41`); mikrofon penceresi başlığı "Mikrofon", birincil "Onayla", tetik "Sesle sor" (`asistan/SesOnayi.tsx:9`, `asistan/GirisDugmeleri.tsx:16`); "Modülü aç" her atıfta aynı metin (`SourcePanel.tsx:45`); odak anahtarı `labelA="Odak" labelB="Odak"` (`DashboardHeader.tsx:209-211`); kopyalama onaysız (`asistan/MesajAltbilgisi.tsx:40`), Carbon'un dizesi ünlemli "Kopyalandı!" (`asistan/dilPaketi.ts:219`) | İ9; [3.9-1], [3.9-3], [3.9-5], [3.9-6]; §5.5 | Sohbet silme hatasının yanlış fiili B23'te | Cümle düzeni; büyük harf ne kaynakta ne CSS'te (S38, B70); tek sözlük ("senkron", "Göster/Gizle", "Çıkış yap"); pencere başlığı = tetik ("Mikrofonu açalım mı?" / "Mikrofonu aç"); atıf düğmesi modül adını taşır; anahtar `labelText` + `hideLabel`; tek tarih biçimi |
 | **B42** | Okunacak içerik `disabled`: `AlistirmaKarti.tsx:41, 87, 92` (cevaplanmış soru ve salt okunur sohbette seçenekler ve cevap), `OdevOnayKarti.tsx:46` (`<fieldset disabled={bekliyor \|\| saltOkunur}>`), `asistan/useAsistanSohbeti.tsx:189` (salt okunur sohbette giriş); modül şablonu `:2229` | D2; §5.9; Carbon salt okunur durumu | Devre dışı öğe ekran okuyucudan ve sekme sırasından düşer; Işık'ın kendi cevabı soluk görünür. `carbon-asistan-alistirma.spec.ts:95` `toBeDisabled()` ile sabitliyor. Yeni arayüz salt okunurda mikrofon ve plan düğmelerini zaten gizliyor (`asistan/GirisDugmeleri.tsx:13`) | Okunacak içerik `readOnly` ya da düz metin; yapılamayacak eylem gizlenir; `disabled` yalnız geçici durumda (yanıt beklenirken); e2e `readOnly`'yi sabitler |
 | **B43** | Ham hata metni okura gidiyor: `Modules.tsx:21, 30` `subtitle={error}` ← `hooks/useApi.ts:19-34` (`HTTP 500`, `Non-JSON response …`, ham `e.message`); `LoginPage.tsx:129` sunucunun `data.error` dizesi (`hooks/useAuth.ts:64`); not silme hatası ham `e.message` (`SohbetListesi.tsx:72`); yükleme hataları `role="alert"` taşımıyor (`PlatformProgress.tsx:46` düz `<p>`, `Modules.tsx:30` varsayılan `status`) | D3, D4 | Okur "HTTP 500" ya da İngilizce iç ileti görebilir; giriş yedek iletileri Türkçe harfsiz ("Giris basarisiz", "Baglanti hatasi", `useAuth.ts:64, 66`) | `useApi` hatayı türüyle döndürür, yüzey insan cümlesi yazar ("Modüller yüklenemedi. Sayfayı yenile."); durdurucu yükleme hatası `role="alert"`; B22 ile birlikte |
 | **B44** | İngilizce Carbon varsayılan adları (B15'in kapsamadığı yerler): `statusIconDescription` 8 `InlineNotification`'ın yalnız 1'inde (`asistan/GirisUyarisi.tsx:10`); `asistan/SesOnayi.tsx:9` `Modal` `closeButtonLabel` yok ("Close"); `HomeworkTracker.tsx:511` `InlineLoading` `iconDescription` yok ("loading") | İ9, D4, anayasa §5.5 | Ekran okuyucu İngilizce ikon adları okur | Her kullanımda Türkçe ad; `ibm-erisilebilirlik` ya da bir birim testi erişilebilir adda İngilizce kelime arar |
 | **B45** | Tag yanlış iş için: cümle Tag içinde (`asistan/OzelYanitlar.tsx:42` hata cümlesi kırmızı Tag'de, `Modules.tsx:76` "Taslak önizleme — ilerleme kaydedilmez", `asistan/MesajAltbilgisi.tsx:34`); `CalendarEvents.tsx:394` `size="sm"` Tag'e `renderIcon` (Carbon `Tag.js:127` ikonu sm'de çizmez); `DashboardHeader.tsx:151` Tag'e `title` (Carbon yalnız filtre kapatma düğmesinde kullanır, ipucu çıkmaz) | §4.4 Tag sınırları; §5.3 | Hata bir bildirimdir; ikon ve ipucu sessizce düşüyor | Cümle `InlineNotification` ya da düz metin; ikonlu Tag `md`; ipucu `Tooltip`/`Toggletip` |
 | **B46** | İşler satırı: `HomeworkTracker.tsx:458-459` `<Tile onClick=…>` | D2 | `role`, `tabIndex`, tuş işleyicisi yok — satır klavyeyle açılmıyor (B7'nin İşler'deki eşi) | `ClickableTile` ya da satırda gerçek düğme; klavye testi |
 | **B47** | Dersler sekmesi: `CourseContent.tsx:220` denetimsiz `<Tabs>` | İ5 (dönüş testi) | Yenilemede seçim ilk derse dönüyor; e2e'de sekmeye dokunan test yok (yalnız `dersler.aria.yml` ilk sekmeyi sabitler) | `selectedIndex` URL ya da `localStorage`'dan; `getByRole('tab')` ile yenileme testi |
-| **B48** | 400 ms eşiği: `hooks/useApi.ts:13` (`loading` ilk karede `true`, eşik yok) | Yüzey tasarımları §2.4 ("400 ms'den kısaysa hiçbir şey gösterilmez"), §5.2 | Belgedeki kural kodda yok; kısa yüklemede iskelet bir an yanıp söner | Ya `useApi`'de gecikmeli iskelet ya yüzey tasarımları §2.4 cümlesi düzeltilir (eşik Carbon'da yok, TEDY'nin kararı); Ç2 ile birlikte |
+| **B48** | 400 ms eşiği: `hooks/useApi.ts:13` (`loading` ilk karede `true`, eşik yok) | Yüzey tasarımları §2.4 ("400 ms'den kısaysa hiçbir şey gösterilmez"), §5.2 | Belgedeki kural kodda yok; kısa yüklemede iskelet bir an yanıp söner | Ya `useApi`'de gecikmeli iskelet ya yüzey tasarımları §2.4 cümlesi düzeltilir (eşik Carbon'da yok, TEDY'nin kararı); S36 ile birlikte |
 | **B49** | Elle yazılmış iki açılır kutu: takvim olay kutusu `CalendarEvents.tsx:392` (`role` yok, `Esc` yok, odak taşınmıyor, kartın ortasında, tetiğe bağlı değil; `ted-theme.scss:1865-1869`); senkron sağlık kutusu `DashboardHeader.tsx:141-142, 159` (`aria-controls` yok, `Tab` ile çıkınca kapanmıyor, odak içeri taşınmıyor) | D2; §5.4 | Klavye ve ekran okuyucu kullanıcısı için kutu ya kapanmıyor ya ilişkisi duyulmuyor | Carbon `Toggletip`/`Popover`; `Esc` kapatır, odak tetiğe döner; gölge `--ted-shadow-popover` |
 | **B50** | Haftalık program tablosu: `WeeklySchedule.tsx:152` `size="xs"`, `ted-theme.scss:2418-2428` | §4.5; Carbon DataTable boyları | `xs` (24 px) etiketli, satır 52 px, başlık 40 px, hücre metni 12 px `label-01` (Carbon'da başlık = satır yüksekliği; 14 px) | İçeriğe uyan Carbon boyu (`xl` 64 px iki satırlı hücre için) ve `body-compact-01`; yama kalkar; görsel taban okunarak |
-| **B51** | İlerleme ve Notlar veri gösterimi: `PlatformProgress.tsx:143, 193, 260` üç `ProgressBar` okurun tamamladığı etkinlik oranını çiziyor; `:116-123` kalıcı yeşil `kind="success"` "Tüm platformlar tamamlandı!" (`hideCloseButton`); `:86` zorluk Tag'i sıralı veriyi yeşil/mavi/sıcak gri/kırmızı ile boyuyor; Notlar'da eksik not 0 genişlikli çubuk (`GradeTable.tsx:181-191`) ve 4 px köşe (`ted-theme.scss:2194, 2200`) | §8.7; S4, İ8; anayasa §9 (kutlama yok); Carbon ProgressBar "kullanıcı eylemiyle belirlenen ilerleme için değil" | Not bantlarının renklendirilmesi ayrı bir karar bekler (Ç8) | Düz metin "12/40 video · son etkinlik …" ya da çubuğun neden kaldığı yüzey tasarımları §4.7'ye yazılır; başarı bandı kalkar (tamamlanma düz metin); zorluk nötr; eksik not "—" metniyle, çubuksuz; köşe B1 ile |
+| **B51** | İlerleme ve Notlar veri gösterimi: `PlatformProgress.tsx:143, 193, 260` üç `ProgressBar` okurun tamamladığı etkinlik oranını çiziyor; `:116-123` kalıcı yeşil `kind="success"` "Tüm platformlar tamamlandı!" (`hideCloseButton`); `:86` zorluk Tag'i sıralı veriyi yeşil/mavi/sıcak gri/kırmızı ile boyuyor; Notlar'da eksik not 0 genişlikli çubuk (`GradeTable.tsx:181-191`) ve 4 px köşe (`ted-theme.scss:2194, 2200`) | §8.7; S4, İ8; anayasa §9 (kutlama yok); Carbon ProgressBar "kullanıcı eylemiyle belirlenen ilerleme için değil" | Not bantlarının renklendirilmesi S42 ile karara bağlandı; o kısım B72'de | Düz metin "12/40 video · son etkinlik …" ya da çubuğun neden kaldığı yüzey tasarımları §4.7'ye yazılır; başarı bandı kalkar (tamamlanma düz metin); zorluk nötr; eksik not "—" metniyle, çubuksuz; köşe B1 ile |
 | **B52** | Modül `vizChart` ve `fractionBar`: `src/mcp_server/vendor/assets/module-template.html:2430, 2437` (`+p.value\|\|0`), `:2421-2423` (eksen etiketleri yuvarlanmamış en büyük değerden: 10, 8, 5, 3, 0), `:2432, 2437` (çubuk ve çizgi varsayılanı `var(--accent)`), `:3106` (`fractionBar` ilk yuva ders aksanı) | §8.2, §9; Carbon "veri asla enterpolasyonla ya da uydurmayla doldurulmaz" | Eksik değer 0 olarak çiziliyor; eksen adımı eşit görünüp eşit değil; grafik serisi ders rengini alıyor (S19) | Eksik değer boşluk ve etiketle; "nice" eksen adımı; seriler `--viz-*`; vendor düzeltmesi `vendor_sync --pin` ile |
 | **B53** | `asistan/AiAciklama.tsx:12` | D2 (erişilebilir ad), Carbon API | `slugLabel="bilgisi"` eskimiş ve `aria-label`'ı ezer → ad "AI bilgisi" (`@carbon/react` 1.114.0 `AILabel/index.js:83`, eskime `:171`) | `slugLabel=""` (boş dize; yazılmazsa varsayılan "Show information" kalır); `aria-label="Yapay zekâ hakkında bilgi"` (§6.2) |
 | **B54** | Eski stil sayfası: `components/AssistantChat.scss:565-572` (`.ac__panel` AI kenar gradyanı + gölge), `:600-602` (`.ac__ref-item:hover` aura), `:683-704` (`.ac-cite`, `.ac-cite__pop` `ai-popover-gradient()`) | §6.6 K1 | `AssistantChat.tsx` `App.tsx:20`'de statik içe aktarıldığı için stil pakette; `SourcePanel` yeni `asistan/KaynakPaneli.tsx:4` tarafından da kullanıldığından kaynak paneli bugün de AI token'ı taşıyor; e2e yalnız durağan satır zeminini ölçtüğü için geçiyor | `AssistantChat.tsx` silinirken stil sayfası da silinir; `SourcePanel`/`CitationChip` nötr stile geçer; e2e hover ve panel kenarını ölçer |
@@ -3468,6 +3528,14 @@ ayrıca sayılır, pano borcu sayılmaz.
 | **B65** | Takımlar: `TeamActivities.tsx:74` `StructuredListWrapper` | Yüzey tasarımları §4.6 (tek satırlık öğeler) | Yazıldığı gibi kurulmadı (yüzey tasarımları §6 durum notu) | Tek satırlık iş satırı kalıbı (yüzey tasarımları §2.2) |
 | **B66** | İlerleme: `PlatformProgress.tsx:134, 184, 251` üç `AccordionItem`, her biri kendi `SkeletonText`'iyle (`:170, 225, 288`) | Yüzey tasarımları §4.7 (tek liste, tek iskelet); İ6 | Aynı anda üç iskelet kümesi; yazıldığı gibi kurulmadı (yüzey tasarımları §6 durum notu) | Tek liste, tek iskelet; B51 ile birlikte |
 | **B67** | Duyurular: `Announcements.tsx:40-42, 74` haftaya göre katlanmış `AccordionItem` | Yüzey tasarımları §4.8 (okunmamış durumu) | Okunmamış durumu yok; yazıldığı gibi kurulmadı (yüzey tasarımları §6 durum notu) | Okunmamış işareti kişi başına (İ5); eylem gerektiren açık başlar (yüzey tasarımları §2.5) |
+| **B68** | Öğretmen kipinde eylem rengi: `asistan/ogretmenRenkleri.ts:9-13` (`--cds-button-primary(-hover/-active)`, `--cds-interactive` → `var(--ted-subject-accent/-text)`); eski `components/AssistantChat.scss:999-1003, 1110-1113` (gönder düğmesi, ilk hızlı istem, `--cds-button-tertiary`); `dashboard/tests/e2e/carbon-asistan-ogretmen.spec.ts:14-21` (kip başına dolgu rengi) ve `carbon-asistan-ogretmen-gorsel` tabanları | S35, [3.2-11] | Dört öğretmen kipinde gönder düğmesi ve simgesi ders aksanında; öğretmen kipinde hover = basılı (B31'in bir parçası) | `ogretmenRenkleri.ts` yalnız `--cds-chat-bubble-user*` (yüzey) taşır; eski stil sayfasındaki iki blok kalkar (ya da `AssistantChat.tsx` ile birlikte silinir); spec beş kipte `rgb(15, 98, 254)` bekler; görsel tabanlar fark okunarak güncellenir; pytest: `dashboard/src`'de `--cds-(button-primary\|button-tertiary\|interactive)` ataması 0 |
+| **B69** | **Kapandı (2026-10-10, Bugün yenilemesi: "Yaptım" kaydederken düğmenin yerinde tek `InlineLoading` (Bugün ve İşler aynı bileşen)).** `NextThing.tsx` "Yaptım" kaydı | S36, §5.2; [3.9-3] | Düğme metni "Kaydediliyor…" olur ve düğme devre dışı kalır; `InlineLoading` ve canlı bölge duyurusu yok (İşler aynı eylemde `InlineLoading` kullanıyor, `HomeworkTracker.tsx:511`) | Düğmenin yerinde tek `InlineLoading` (`description="Kaydediliyor…"`, Türkçe `iconDescription`), bitişte "Yaptın", hatada satır içi uyarı; Bugün yenilemesiyle birlikte |
+| **B70** | Büyük harf: pano stil dosyalarında 14 `text-transform: uppercase` (`ted-theme.scss:541, 961, 1184, 1657, 3023, 3030, 3059, 3129`; `NextThing.scss:32`; `AssistantChat.scss:259, 383, 711, 751`; `utils/markdown.scss:16`); kaynakta tümü büyük harf kaşlar ve durumlar (`TodaySchedule.tsx:106-135, 649, 689` "ŞİMDİ", "YARIN", "BUGÜN", "OKULDAN SONRA", "AYRICA", "SINAVLAR"; `NextThing.tsx:80` "SÜRE DOLDU"; `HomeworkTracker.tsx:297` "SIRADAKİ", `:446, 558` `'YAPILAN'`; `DayStrip.tsx` "ŞİMDİ"); modül şablonunda 5 `text-transform:uppercase` | S38, [3.3-6], [3.9-1] | 14 pano kuralı + ≥ 13 kaynak dizgesi + 5 modül kuralı (Books'taki 17 kural kapsam dışı) | Kaynak dizgeler cümle düzenine ("Şimdi", "Yarın", "Ayrıca", "Yapılan"); `text-transform` satırları kalkar; aria ve görsel tabanlar fark okunarak; pytest kapısı ([3.3-6] testi); modül tarafı vendor düzeltmesi (`--pin`). Bugün bu dalın yenilemesinde; B41 ile birlikte |
+| **B71** | Modül çerçevesinde AI etiketi: `components/ModuleViewer.tsx` | S41; §6.6 C-AI2 | Panoda açılan modülün çerçevesinde AI etiketi yok; modülün yapay zekâ yardımıyla yazıldığı ve dayanakları okura söylenmiyor | Çerçeve başlığında `AILabel` (`kind="default"`, Türkçe `aria-label`, B53'teki ad kuralı) + `AILabelContent`: üretilenler (anlatım, sorular, görseller), dayanaklar (kazanım kodu, ders kitabı ve sayfalar, iddia dayanakları — katalog kaydı ve `dogrulama` özeti, `sha256` eşleşirse); modülün içine dokunulmaz (G-VOICE); e2e: etiket görünür, klavyeyle açılır, axe/IBM temiz |
+| **B72** | Not rengi: `utils/formatters.ts:115-122` `gradeColor` (≥ 85 `--status-success`, ≥ 70 `--status-info`, ≥ 50 `--status-warning`, < 50 `--status-error`), `GradeTable.tsx` not metni ve çubuk dolgusu; `dashboard/tests/e2e/kontrast.spec.ts:79-88` "50-69 bandı ayrı bir renk" (`new Set(renkler).size` = 4) | S42, İ8, §8.7 | Dört durum rengi notu yargılıyor; mavi bant Yabancı diller ailesiyle ve bilgi rengiyle çakışıyor (`notlar-masaustu-linux.png`) | Not `text-primary` mono + tabular; çubuk tek nötr ton (ya da B51'le kalkar); `gradeColor` silinir; `kontrast.spec.ts` testi "her not aynı renkte ve ≥ 4.5:1" olur; Notlar görsel tabanı fark okunarak |
+| **B73** | Modül oyunlaştırması: `src/mcp_server/vendor/assets/module-template.html` `.xp` ve `#xpValue` (`:442-446`), `.streak-chip` (`:450`), `.badge--earned` (`:521`), XP/seri nabzı ve 700 ms "+N XP" yükselişi, tamamlanma özetinde "Toplam XP", rozet sayısı ve "En uzun seri"; `vendor/references/tedy-integration.md` §3, §5, `color-system.md` `--reward`, `carbon-child-system.md` ödül token'ları, `vendor/SKILL.md` §11.4–§11.6, `references/gamified-flows.md` (gain-only streak), `interaction-patterns.md` (yarışma varyantının seri sayacı), `audio-system.md` (`reward` sesi), `module-architecture.md` (üst çubuk); `scripts/validate_module.py:2164-2169` (G-FLOW seri imzası) | S43, anayasa §9, İ6 | Kilometre taşında üç ödül hareketi aynı anda; seri sayacı ve XP dışsal ödül olarak görünür | Ödül animasyonları (nabız, "+N XP" yükselişi, rozet belirişi, ödül sesi `reward` arpeji) ve seri çipi/"En uzun seri" kalkar; XP varsa animasyonsuz sessiz metin; ilerleme sessiz etiket ("Adım 3/7"; doğrusal ≥ 3 adımda ProgressIndicator anlamı); kazanılan rozet kalırsa sessiz liste; G-FLOW'un seri kolu ve SKILL bölümleri buna göre; `vendor_sync --pin` ve vendor testleri |
+| **B74** | Başlık ağırlığı: `ted-theme.scss:552-553`, `:952-953` (`heading-03` + 600), `:1504-1505`, `:3015-3016`, `:3151-3152` (`heading-04` + 600); modül şablonu `.seg-head h2` (`module-template.html:541`) ve `:689, 732, 753` (`--fs-h-seg`/`--fs-h-sub` 600; `carbon-child-system.md` §4 tablosu) | S44, [3.3-3], İ9 | 5 pano yeri + 4 modül yeri başlık token'ını 600'e çekiyor | `font-weight` satırları kalkar; ağırlık gerekiyorsa `heading-02`/`heading-compact-02`; stylelint ya da pytest: `type-style('heading-0[3-7]')` taşıyan blokta `font-weight` yok; şablon ve referans vendor düzeltmesi (`--pin`); görsel tabanlar fark okunarak |
+| **B75** | Gri durum işaretleri: `DashboardHeader.tsx:85-96` senkron etiketi bölüm uyarılarını gri sayar; `asistan/MesajAltbilgisi.tsx` "Yedek modelden" / "Veriler güncel olmayabilir" gri Tag | S45, S39, §5.3 kural 10 | 2 yer | Senkron etiketi arıza yokken nötr ve sayısız; kısmi/bayat okuma uyarı ikonu + metin; doğrulama uyarıları sayıdan çıkar; asistan rozetleri uyarı ikonu + metin; `dashboard.spec.ts` ve `carbon-asistan-altbilgi.spec.ts` güncellenir |
 
 ---
 
@@ -3618,3 +3686,5 @@ Carbon'un 43 bileşen girişi [Bileşen rehberi](carbon-bilesen-rehberi.md)'nde 
 | Sürüm | Tarih | Not |
 |---|---|---|
 | 1.0 | 2026-10-10 | İlk sürüm. Carbon Design System'in 2026-10-10 yerel taraması (307 sayfa), Carbon MCP alan taramaları, IBM carbon-builder 1.3.1'in TEDY'ye karşı çözümlemesi ve mevcut belgelerin denetimi üzerine. Giriş yolu ve belge haritası (§0), D1–D4/İ1–İ9 kapı tablosu (§2), temeller (§3), bileşen seçimi (§4), kalıplar (§5), Carbon for AI ve K1–K14 (§6), P1–P15 premium işçilik ilkeleri (§7), S1–S34 bilinçli sapmalar ve Ç1–Ç10 karar bekleyen çelişkiler (§11), kapılar ve "bitti" (§12), B1–B67 borç kaydı (§13; B15 ve B30 kapanmış olarak ölçüldü), süreç (§14), kaynakça (§15). Eşlik eden [bileşen rehberi](carbon-bilesen-rehberi.md): 42 bileşen kartı (Carbon'un 43 girişi) + 18 kalıp kartı. Birleştirmede beş yazarın geçici etiketleri kalıcı numaralara bağlandı; doğrulanan her aday kodda yeniden ölçüldü. |
+| 1.1 | 2026-10-10 | Ç1–Ç10 karara bağlandı (kullanıcı: "çelişkileri en iyi Carbon pratiğiyle çöz"): S35–S44 (§11.1), §11.2 "Kararlaştırıldı" tablosu (tarihçe korunarak) ve yeni karar bekleyen Ç11 (gri durum işaretleri: S23 ve asistanın K7/K8 rozetleri ↔ S39). Kod borçları B68–B74 (§13); B23, B35, B41, B48, B51 karara bağlandı. Kurallar buna göre yeniden yazıldı: [3.2-2]–[3.2-4], [3.2-9], [3.2-11] (öğretmen kipinde eylem mavisi), [3.3-3] (başlık ağırlığı), [3.3-6] ve [3.9-1] (büyük harf yok; kaş istisnası kalktı), [3.6-6] (azaltılmış hareket), §5.2, §5.3 kural 10, §5.4, §5.5, §6.4, §6.5, §6.7, §7.5, §7.11, §7.16, §8.5, §8.7, §9.3, §9.7, §9.8. Carbon iddiaları yerel taramaya ve Carbon MCP'ye karşı yeniden okundu; düzeltilenler: Carbon "her hareketi durdur" demez (S37, WCAG 2.3.3 eklendi), ProgressBar kullanıcı eylemiyle belirlenen ilerleme için değildir (S43 ProgressIndicator anlamı), `heading-06/07` 300'dür (S44). |
+| 1.2 | 2026-10-10 | Ç11 karara bağlandı (aynı kullanıcı kararı): S45 — kısmi/bayat okuma ve yedek model cevabı uyarı ikonu + metin, gri arıza için asla; S23 ve §6.6 K7 buna uyar; kod borcu B75. Karar bekleyen çelişki kalmadı. |

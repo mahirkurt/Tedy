@@ -1,6 +1,6 @@
 # TEDY Yüzey Tasarımları
 
-**Sürüm 1.11 · 2026-10-10 · `docs/frontend-design-principles.md`'nin uygulaması**
+**Sürüm 1.12 · 2026-10-10 · `docs/frontend-design-principles.md`'nin uygulaması**
 
 İlkeler dokümanı *neye göre karar verileceğini* yazar. Bu doküman o kararların
 her yüzeyde ne olduğunu yazar. Çelişki hâlinde ilkeler dokümanı kazanır.
@@ -129,9 +129,13 @@ Bugün teslim edilecek bir şey yok. Yeni ödevler portal açılınca görünece
 
 ### 2.4 Yükleniyor
 
-Carbon `SkeletonText`/`SkeletonPlaceholder`, gerçek içeriğin **şekliyle**.
-Dönen ikon yok (İ6: aynı anda tek hareket, ve o "şimdi" işaretçisi).
-Yükleme 400 ms'den kısaysa hiçbir şey gösterilmez — titreşim gürültüdür.
+**İçerik yüklenirken** Carbon `SkeletonText`/`SkeletonPlaceholder`, gerçek içeriğin
+**şekliyle**; içerik yüklemesinde dönen ikon yok (İ6: aynı anda tek hareket, ve o
+"şimdi" işaretçisi). **Sürmekte olan tek bir eylem** (ör. "Yaptım" kaydediliyor)
+eylemi başlatan düğmenin yerinde tek Carbon `InlineLoading` gösterir; aynı anda en
+çok bir. Yükleme 400 ms'den kısaysa hiçbir şey gösterilmez — titreşim gürültüdür.
+(Daraltıldı 2026-10-10, talimatname S36: "Dönen ikon yok" yalnız içerik yüklemesi
+içindir; Carbon tek bir işlem süren bileşen için satır içi yüklemeyi önerir.)
 
 ### 2.5 Bölüm başlığı ve katlama
 
@@ -139,8 +143,9 @@ Yükleme 400 ms'den kısaysa hiçbir şey gösterilmez — titreşim gürültüd
 **kapalı** başlar (İ7). Bugün Ödevler'de `collapsed` boş başlıyor, yani
 *hepsi* açık — bu tersine çevrilir.
 
-Başlık şu biçimdedir: `BAŞLIK  (n)  ⌄` — sayı, katlanmış içeriğin büyüklüğünü
-söyler; açıkken de kalır.
+Başlık şu biçimdedir: `Başlık  (n)  ⌄` — cümle düzeninde; sayı, katlanmış
+içeriğin büyüklüğünü söyler; açıkken de kalır. (2026-10-10, talimatname S38:
+eskiden `BAŞLIK (n)` yazıyordu; büyük harf ne kaynakta ne CSS'te kullanılır.)
 
 ### 2.6 Eylem
 
@@ -148,7 +153,13 @@ söyler; açıkken de kalır.
 - İkincil eylemler `kind="ghost"` veya `tertiary`.
 - Eylem adı akış boyunca **değişmez**: `Yaptım` diyen düğme `Yapıldı` sonucu
   üretir (İ9).
-- Yıkıcı eylem yok. `Yaptım` geri alınabilir olmalı (İ5).
+- Geri alınabilir düşük etkili eylem onaysız yapılır ve aynı satırda "Geri al"
+  sunar: `Yaptım` → "Geri al" (İ5).
+- Geri alınamaz silme (sohbet, not, yüklenen dosya) Carbon danger modalıyla
+  sorar; başlık ve birincil düğme nesneyi adlandırır ("Bu sohbet silinsin mi?" /
+  "Sohbeti sil"), gövde birlikte gidenleri sayar, odak "Vazgeç"te.
+  (2026-10-10, talimatname S40: eski "Yıkıcı eylem yok" cümlesinin yerine; kod
+  borcu talimatname B23, B63.)
 
 ### 2.7 Durum rozeti
 
@@ -160,7 +171,10 @@ Rozet **yalnız** bir durum ayrımı taşıyorsa konur (İ6). Şiddet ayrımı
 | Gecikmiş | Kırmızı, metinle: `2 gün gecikti` |
 | Yaklaşan | Nötr + mono kalan |
 | Bitmiş | Rozet **yok** — satır zaten nötr |
-| Bozuk (sistem) | Gri, nedenle (D3) |
+| Bozuk (sistem) | Carbon durum anlamıyla, nedenle (D3): başarısız/reddedilmiş ve ilerlenemiyor → hata (kırmızı); bozulmuş, kısmi ya da bayat → uyarı; bilgilendirici → bilgi. Gri yalnız başlamamış/taslak demektir, arıza için asla |
+
+(2026-10-10, talimatname S39: "Bozuk (sistem)" satırı eskiden "Gri" diyordu. Başlıktaki
+senkron etiketinin gri uyarı sayısı talimatname S45 ile uyarı ikonu + metne geçer, borç B75.)
 
 **Yasak:** bitmiş işe "Süresi doldu" rozeti. Teknik olarak doğru, anlamca
 yanlış, gereksiz alarm — bugün Ödevler'de 12 kez tekrarlanıyor.
@@ -222,7 +236,7 @@ dilime çapalanır.
 | Son zilden önce | Şu anki ya da sıradaki ders (`.today-now`): öğretmen, "Sonra: …", "N ders kaldı" | Ödev tek satır önizleme (`next-thing--quiet`): ad + teslim günü, düğmesiz |
 | Son zilden sonra | Ödev (`NextThing`), "Teslim yarın 12:00" ile | "Ayrıca": kalan işler ad + gün olarak, en çok iki satır |
 
-- **"Başla" başlatır.** Kartta 10 dakikalık bir kutu açar: "BAŞLADIN · N dk kaldı",
+- **"Başla" başlatır.** Kartta 10 dakikalık bir kutu açar: "Başladın · N dk kaldı",
   öğretmenin talimatı ve ekler kartın içinde. Kutu `localStorage`'da işin
   kimliğiyle tutulur; yenilemede ya da dönüşte kaybolmaz (İ5). Süre dolunca
   "10 dakika daha" önerir, yapılanla ilgili hüküm vermez.
@@ -242,15 +256,15 @@ dilime çapalanır.
   yalnız öğretmen durumuna baktığı için iki gün boyunca aynı işe "Başla" dedi.
 - **Yarın** (son zilden sonra; okul olmayan günde 15:45'ten sonra): sıradaki
   okul günü, yani ilk ders, o günün dersleri ve etkinlikler. Çanta akşamdan
-  hazırlansın diye. Cuma akşamı "PAZARTESİ" der. Teslimleri tekrar etmez; onlar
+  hazırlansın diye. Cuma akşamı "Pazartesi" der. Teslimleri tekrar etmez; onlar
   kartta ve "Ayrıca"da gün adıyla zaten yazıyor.
 - **Sınavlar** "Ayrıca"nın sessiz satırlarıyla gösterilir: ad ve gün. Renkli
   geri sayım etiketi ve ders rengi yok (İ6, İ8; güncellendi 2026-10-10: renkli geri sayım yok,
   ama 2026-09-24'ten beri satırda ders işareti var, `SubjectLabel`, bkz. değişiklik kaydı 1.6).
   Blok "Ayrıca"nın altında durur,
   çünkü haftalar sonraki bir sınav dört gün sonraki ödevin üstünde durmamalı.
-  Ertesi okul günündeki sınav akşam **Yarın'ın ilk satırı** olur ("SINAV · 09:00
-  · …") ve listeden çıkar. Ana karta **çıkmaz**: İ4'ün kendi testi, 20:00'de
+  Ertesi okul günündeki sınav akşam **Yarın'ın ilk satırı** olur ("Sınav · 09:00
+  · …"; cümle düzeni, talimatname S38) ve listeden çıkar. Ana karta **çıkmaz**: İ4'ün kendi testi, 20:00'de
   "sınav hazırlığına başla" demeyi ihlal sayar. Bu blok 2026-09-24'e kadar
   hiç görünmemişti; API takvimdeki her sınavı "geçmiş" sayıyordu.
 - **Önerilmeyen ve nedeni:** "teslim yarından sonraysa işi yarının penceresine
@@ -288,20 +302,20 @@ yazılır; onaydan sonra bu bölüm güncellenir.
 İşler
 
 ┌──────────────────────────────────────────────┐
-│ ŞİMDİ · Matematik — Sayfa 165                │
+│ Şimdi · Matematik — Sayfa 165                │
 │ 10 dakikayla başla            [ Başla ]      │   ← tek adım (İ1)
 └──────────────────────────────────────────────┘
 
-BEKLEYEN (3)                                  ⌄   ← açık
+Bekleyen (3)                                  ⌄   ← açık
   Matematik · Sayfa 165          yarın · 2 gün  [Yaptım]
   Fen · 3 soru                   perşembe       [Yaptım]
   Türkçe · okuma                 gelecek hafta  [Yaptım]
 
-SINAVLAR (2)                                  ⌄   ← açık
+Sınavlar (2)                                  ⌄   ← açık
   Matematik yazılı               12 gün sonra
   Fen yazılı                     19 gün sonra
 
-GEÇMİŞ (14)                                   ›   ← kapalı
+Geçmiş (14)                                   ›   ← kapalı
 ```
 
 - Özet satırı **silinir**. Sayı bölüm başlığındaki `(n)`'dedir.
@@ -340,7 +354,10 @@ gösterir, kart değil.
 
 **İncelendi (2026-08-31) — kusur bulunamadı.** `GradeTable` zaten Carbon
 `DataTable` + genişletilebilir satır kullanıyor: detay istendiğinde açılıyor,
-ok yok, renk kodlaması yok, kutlama yok, sıralama yok. Yani aşağıdaki tasarım
+ok yok, renk kodlaması yok, kutlama yok, sıralama yok. (Düzeltildi 2026-10-10: "renk
+kodlaması yok" yazıldığı gün de doğru değildi — `gradeColor` notu dört durum rengiyle
+boyuyor. Talimatname S42 kuralı koydu: not renk bandıyla boyanmaz, nötr metindir;
+kod borcu B72.) Yani aşağıdaki tasarım
 bir **düzeltme değil, iyileştirme** — ve eğilim hesaplamak için gereken not
 verisi henüz yok. Çalışan bir tabloyu doküman öyle diyor diye değiştirmiyoruz;
 not verisi geldiğinde yeniden değerlendirilir.
@@ -717,3 +734,4 @@ görüntüsüyle doğrulanır.
 | 1.6 | 2026-09-24 | Tedy Tasarım Sistemi v3 panoda: lacivert yalnız bantta, renk aritmetiği yok, rol token'ları; ders işareti Bugün ve İşler sınavlarında ve ödevlerde; takvim ve zaman çizelgesinde tür ikon, renk ders. |
 | 1.10 | 2026-09-25 | Asistanın Kaynaklar paneli dört yeni öğrenci-verisi grubu (ders programı, sınavlar, birleşik takvim, ders içeriği/notlar), Tedy Books araması ve platform ilerlemesi/video önerisini gösterir; `figur_getir`'in ders kitabı görseli artık modele de gerçek resim olarak gidiyor ve panelde küçük önizleme olarak beliriyor; aileye özel `aile-kaynak` grubu Işık'ın oturumunda hiç görünmez. |
 | 1.11 | 2026-10-10 | Talimatname (`tedy-ui-ux-talimatnamesi.md`) altına bağlandı: Giriş notu ve öncelik sırası, §2'ye talimatname §5 ve bileşen rehberi bağlantısı; tarihli düzeltmeler: §1 yedi ikincil ve telefonda Tedy Books Daha fazla'da, §3.2 `BottomNav` (D3a), §4.1 sınav satırında ders işareti ve bekleyen D3b/İ8 C yönü işareti, §4.10 Carbon AI Chat notu (2026-10-09), §4.11 IBM Plex Serif, §6 kurulmayan alt tasarımların durum notu. Başlık sürümü düzeltildi. |
+| 1.12 | 2026-10-10 | Talimatname 1.1'in Ç1–Ç10 kararlarıyla (S35–S44) hizalandı: §2.4 "Dönen ikon yok" içerik yüklemesine daraltıldı, tek eylem tek `InlineLoading` (S36); §2.5 bölüm başlığı "Başlık (n)", büyük harf yok (S38); §2.6 "Yıkıcı eylem yok" yerine etkiye göre silme — düşük etki "Geri al", geri alınamaz silme nesneyi adlandıran danger modal (S40); §2.7 "Bozuk (sistem): Gri" yerine Carbon durum anlamı (S39; başlık etiketi gerilimi Ç11); §4.4 not rengi notu (S42). Tarihli notlarla; bölüm numaraları değişmedi. |

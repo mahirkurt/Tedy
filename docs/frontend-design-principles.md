@@ -1,6 +1,6 @@
 # TEDY Arayüz Tasarım İlkeleri
 
-**Sürüm 1.1 · 2026-10-10 · Kapsam: `dashboard/` (React 19 + Carbon v11)**
+**Sürüm 1.2 · 2026-10-10 · Kapsam: `dashboard/` (React 19 + Carbon v11)**
 
 Bu doküman TEDY panosunun neye benzeyeceğini değil, **neye göre karar verileceğini**
 yazar. Bir ekran tasarlarken "bu doğru mu?" sorusunun cevabı buradan çıkmalı.
@@ -308,14 +308,25 @@ Hareket üç işe yarar: **konum değişimini anlatmak**, **yeni geleni işaret 
 **bekleyişi katlanılır kılmak**. Bunların dışındaki hareket İ6'ya göre vergidir.
 
 Süreler Carbon `motion` token'larından. Aynı anda tek hareket (İ6).
-`prefers-reduced-motion` yalnız süreyi kısaltmaz; hareketin **bilgi taşıdığı**
-yerde hareketi kaldırmaz, taşımadığı yerde tamamen kaldırır.
+**Hiçbir bilgi yalnız hareketle taşınmaz:** her hareketin önce durağan eşdeğeri
+vardır (konum + metin, iskelet + durum mesajı). `prefers-reduced-motion` altında
+temel olmayan **her** hareket durur — animasyon, geçiş, gecikme, yumuşak kaydırma;
+durağan eşdeğeri olan hareket temel değildir.
+(Değiştirildi 2026-10-10, talimatname S37: bu paragrafın eski cümlesi "hareketin
+bilgi taşıdığı yerde hareketi kaldırmaz, taşımadığı yerde tamamen kaldırır"
+diyordu. Bu bir gevşetme değil, sıkılaştırmadır: korunan şey bilgidir, hareket
+değil — bilgi hareketteyse reduce'u açan okur onu kaybederdi. Kod
+(`ted-theme.scss` azaltılmış hareket bloğu) ve `gorunum-kipleri.spec.ts` zaten
+böyleydi; metin onlara hizalandı. Carbon'un "durağan yol her zaman olsun" kuralı ve
+WCAG 2.2 SC 2.3.3 aynı şeyi ister.)
 
 Ayrıntı: talimatname §3.6.
 
 ### 5.5 Dil
 
-Türkçe, sen diliyle, cümle düzeninde (Başlık Her Kelime Büyük değil).
+Türkçe, sen diliyle, cümle düzeninde (Başlık Her Kelime Büyük değil; TÜMÜ BÜYÜK
+HARF de değil — kaşlar, Tag'ler ve durum dizgeleri dahil, ne kaynakta ne CSS'te;
+2026-10-10, talimatname S38).
 (Güncellendi 2026-10-10: 2026-09-24'ten beri Işık'a "sen", aileye "siz"; asistanda ve sayfa
 metinlerinde, Carbon AI Chat'te `asistan/dilPaketi.ts` `AILE` ile. Bkz. yüzey tasarımları
 değişiklik kaydı 1.5.)
@@ -434,7 +445,8 @@ maddenin sonunda durumu ve düzelten iş yazılı. Bugünün açık borçları t
   cevabıdır ve İ3'ü doğrudan ihlal eder (toplamı öne çıkarır).
 - **Kutlama.** Konfeti, rozet avı, seri sayacı. Dışsal ödül, bu profilde içsel
   motivasyonu aşındırma riski taşır ve İ6'nın bütçesini harcar. Tamamlanma
-  **sessizce ve net** gösterilir.
+  **sessizce ve net** gösterilir. (2026-10-10, talimatname S43: edupedia modüllerine
+  de uygulanır — ödül animasyonu ve seri sayacı yok, ilerleme sessiz ve etiketli.)
 - **Bildirim yağmuru.** Hatırlatma, kalıcı görünürlüğün yerini tutmaz. Kalıcı
   görünürlük (şerit) tercih edilir.
 - **Suçlayıcı dil.** "Yapmadın", "geciktin", kırmızı ünlem. Gecikme bilgi olarak
@@ -457,7 +469,7 @@ Bir ekran "bitti" sayılmadan önce:
 - [ ] **Sızıntı taraması** (D4): ekranda ham token, ISO damgası, iç kod yok.
 - [ ] **Klavye turu** (D2): her etkileşimli öğeye ulaşılıyor, odak görünür.
 - [ ] **Kontrast** (D2): AA sağlanıyor.
-- [ ] **Reduced motion** (5.4): kapalıyken bilgi kaybı yok.
+- [ ] **Reduced motion** (5.4): açıkken hiçbir şey hareket etmez ve bilgi kaybı yok.
 - [ ] **Boş durum** (D3): boşsa nedeni yazıyor.
 
 Otomatik kapılar ve komutlar: talimatname §12.
@@ -470,3 +482,4 @@ Otomatik kapılar ve komutlar: talimatname §12.
 |---|---|---|
 | 1.0 | 2026-08-31 | İlk sürüm. Işık'ın profili, ölçülmüş mevcut durum ve Carbon v11 tabanı üzerine. |
 | 1.1 | 2026-10-10 | Talimatname (`tedy-ui-ux-talimatnamesi.md`) altına bağlandı: Giriş notu ve öncelik sırası, §5 alt bölümlerine ve §10'a talimatname bağlantıları; bayat iddialar tarihli notla düzeltildi (D2 WCAG 2.2 AA, İ7 ve §8 kusurları giderildi/kısmen, §5.1 `--ted-cat-*` kalktı, §5.2 Books IBM Plex Serif, §5.5 aileye "siz", §6 Gün Şeridi'nin bugünkü kapsamı, §7 gezinme kararı ve D3a alt çubuğu). Hiçbir D/İ kuralı değişmedi. |
+| 1.2 | 2026-10-10 | Talimatname 1.1'in Ç1–Ç10 kararlarıyla (S35–S44) hizalandı. §5.4 azaltılmış hareket yeniden yazıldı (S37): eski "bilgi taşıyan hareket kalır" cümlesi yerine "hiçbir bilgi yalnız hareketle taşınmaz; reduce altında temel olmayan her hareket durur" — tarihli düzeltme, gevşetme değil; §10 kapısı buna göre. §5.5'e tümü büyük harf yasağı (S38), §9 "Kutlama"ya modüller (S43) eklendi. Hiçbir D/İ kimliği ve bölüm numarası değişmedi. |

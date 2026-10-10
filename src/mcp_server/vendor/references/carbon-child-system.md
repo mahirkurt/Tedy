@@ -257,13 +257,19 @@ kanıtı sistemde tesadüfen kurulu bir Plex yüzüne değil gömülü bloba day
 | Carbon stili | Otorite değeri | Edupedia rolü | Edupedia değeri | Sapma? |
 |---|---|---|---|---|
 | heading-05 | 2rem / 400 / lh 1.25 | — | — | — |
-| heading-04 | 1.75rem / 400 / lh 1.28 | `--fs-h-seg` segment başlığı | 1.75rem / **600** | ağırlık ↑ (çocuk hiyerarşi netliği) |
-| heading-03 | 1.25rem / 400 / lh 1.4 | `--fs-h-sub` alt başlık | 1.25rem / **600** | ağırlık ↑ |
+| heading-04 | 1.75rem / 400 / lh 1.28 | `--fs-h-seg` segment başlığı | 1.75rem / 400 (şablon bugün **600**, B74) | yok — ağırlık token'dan (talimatname S44) |
+| heading-03 | 1.25rem / 400 / lh 1.4 | `--fs-h-sub` alt başlık | 1.25rem / 400 (şablon bugün **600**, B74) | yok — ağırlık token'dan (S44) |
 | body-02 | 1rem / 400 / lh 1.5 | `--fs-compact` yardımcı | 1rem / 400 | — |
 | body-02 | 1rem | `--fs-body` gövde | **1.125rem (18px)** / lh 1.6 | boyut ↑ (bkz. §7) |
 | label-01 | .75rem / ls .32px | `--fs-label` etiket | **.875rem** / `--ls-label:.32px` | boyut ↑, letter-spacing otoriteyle aynı |
 | code-02 | .875rem / ls .32px | mono sayı/XP | 1rem mono / ls .32px | boyut ↑ |
 | display | — | `--fs-display` modül başlığı | 2.5rem / 600 / lh 1.2 | edupedia eklentisi |
+
+> **Başlık ağırlığı (2026-10-10, talimatname S44):** başlık ağırlığı Carbon tip token'ından değişmeden gelir —
+> `heading-01/02` ve `heading-compact-01/02` 600, `heading-03`–`heading-05` 400, `heading-06/07` 300
+> (`@carbon/type` 11.69.0). Başlık token'ına `font-weight` eklenmez; daha belirgin bir başlık gerekiyorsa 600'lük
+> daha küçük token seçilir. Pano ve modül aynı kuralı izler; şablonun bugünkü 600'leri (`.seg-head h2`, `--fs-h-sub`
+> kullanan başlıklar) borçtur (talimatname B74).
 
 > Çocuk için gövde **18px** (Carbon body-02 16px yerine); okunabilirlik ve
 > disleksi örtüşmesi (referans: adhd-pedagogy §5). Asla 16px altına düşürmeyin.
@@ -304,7 +310,7 @@ Bolca beyaz alan (negative space) DEHB'de dış yükü azaltır; ekranlar ferah 
 | `--cds-duration-fast-02` | 110ms | Buton/tile durum geçişi |
 | `--cds-duration-moderate-01` | 150ms | Küçük açılır öğe |
 | `--cds-duration-moderate-02` | 240ms | Segment girişi, panel |
-| `--cds-duration-slow-01` | 400ms | Ödül vurgusu (XP nabzı) |
+| `--cds-duration-slow-01` | 400ms | Büyük panel geçişi (eskiden XP nabzı; S43 ile ödül hareketi kalkar) |
 | `--cds-duration-slow-02` | 700ms | Büyük sahne geçişi (nadiren) |
 
 **Easing'ler (productive = fonksiyonel/kısa · expressive = ifadeli/ödül):**
@@ -322,9 +328,10 @@ Bolca beyaz alan (negative space) DEHB'de dış yükü azaltır; ekranlar ferah 
 `--ease-exit`→exit-expressive · `--dur-fast`→fast-02 ·
 `--dur-mod`→moderate-02 · `--dur-slow`→slow-01.
 
-**Animasyon eşlemesi:** segment girişi (`segIn`) moderate-02 + entrance;
-XP yükselişi/şerit kayboluşu exit; XP nabzı slow-01 + expressive; rozet
-patlaması entrance; şerit vuruşu expressive. **Yanıp sönme, sürekli döngü,
+**Animasyon eşlemesi:** segment girişi (`segIn`) moderate-02 + entrance.
+**Ödül hareketi yok** (2026-10-10, talimatname S43): XP yükselişi, XP nabzı, rozet belirişi ve
+seri vuruşu kalkar; şablonda bugün hâlâ var (talimatname B73: XP yükselişi/şerit kayboluşu exit,
+XP nabzı slow-01 + expressive, rozet entrance, seri vuruşu expressive). **Yanıp sönme, sürekli döngü,
 parıltı yok** (foto-duyarlılık + dikkat).
 
 **Zorunlu:** Tüm hareket `prefers-reduced-motion: reduce` altında devre dışı:
@@ -343,10 +350,10 @@ sapmalar** çocuk + DEHB için yapılır ve `adhd-pedagogy.md`'ye dayanır:
 |---|---|---|---|
 | Köşe yarıçapı | 0 (keskin) | Tedy kuralı: kart, panel ve üst bant `border-radius-08` (`--cds-radius`); düğme, seçenek kutusu, alan ve tablo `border-radius-00` (`--radius-btn`, `--radius-field`); etiket/çip `border-radius-max` (`--radius-tag`) | Panoyla aynı köşe dili; Carbon keskinliği eylem öğelerinde korunur, yumuşatma yalnız kartta |
 | Gövde boyutu | body-02 = 16px | 18px | Okunabilirlik + disleksi (ped §5) |
-| Başlık ağırlığı | heading 400 | 600 | Hiyerarşi belirginliği (yürütücü işlev desteği) |
+| Başlık ağırlığı | Token'ın kendi ağırlığı | Token'ın kendi ağırlığı (2026-10-10, S44; eskiden heading-03/04 için 600 — borç B74) | Hiyerarşi boy ve token seçimiyle; tek karar (Tedy İ9) |
 | Dokunma hedefi | size Medium 40px | ≥48px (= Carbon size **Large**) | Motor + dürtüsellik (WCAG 2.5.5; ped §5) |
 | Aksan yoğunluğu | Ölçülü | Kategori-renk yalnız odak çapalarında (ikon, çizgi, seçim) | Uyarılma (ped İlke 5) + Tedy İ6 "uyaran bir bütçedir" |
-| Hareket | Productive ağırlıklı | Productive; ödül anı sessiz onaydır (kısa opaklık nabzı, 10px yükselen "+N XP"; ölçek sıçraması yok) | Ödül belirginliği earcon + görsel eşle korunur (ped İlke 3); Tedy "kutlama yok" |
+| Hareket | Productive ağırlıklı | Productive; ödül anında hareket yok (2026-10-10, S43: opaklık nabzı ve yükselen "+N XP" kalkar, B73); anında geri bildirim metinle | Ped İlke 3'ün anında geri bildirimi metinle korunur; Tedy "kutlama yok" (anayasa §9), İ6 |
 | Piktogram | Seçici | Bol (her segment) | İkili kodlama (ped İlke 7) |
 
 > Bu sapmalar Carbon'un **token disiplinini bozmaz** — yalnız değerleri çocuk

@@ -17,7 +17,7 @@ Carbon tuvali üzerinde. Amaç, DEHB-sakin sınırını korurken renkle **odak, 
 | **Durum: hata** | `--cds-support-error` + `--cds-notification-background-error` (+ `--tedy-text-error`) | Yalnız yanlış şıkkı **işaretlemek** için; metin daima yapıcı ("tekrar dene"). Kırmızı ders aksanı olmaz. |
 | **Kategori** | `--viz-1..5` | Grafik serileri, sıralama/gruplama kategorileri, diyagram parçaları. Anlam renklerinden kaçınan TEDY alt kümesi (§7). |
 | **İllüstrasyon** | `--viz-sun/water/cloud` | Doğa/şema anlamsal renkleri. |
-| **İlerleme/ödül** | `--reward` (= `--tedy-text-warning`) + `--reward-bg` (= `notification-background-warning`) | XP, seri — sakin sıcak vurgu; ham altın hex yok. Kazanılan rozet nötr `layer-selected-01`. |
+| **İlerleme/ödül** | `--reward` (= `--tedy-text-warning`) + `--reward-bg` (= `notification-background-warning`) | XP, seri — sakin sıcak vurgu; ham altın hex yok. 2026-10-10'dan beri (talimatname S43) seri sayacı ve ödül vurgusu kalkar, ilerleme sessiz ve etiketli; rol şablondaki kalıntılar için yaşar (B73). Kazanılan rozet nötr `layer-selected-01`. |
 | **Tuval** | `--tedy-page-background` (sayfa), `--cds-layer-01/02/03` | Sayfa zemini Tedy cool-gray; kartlar ve iç yüzeyler Carbon katmanı (nötr, katmanlı derinlik). |
 
 ## 2. Beş kural

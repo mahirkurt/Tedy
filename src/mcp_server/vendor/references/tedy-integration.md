@@ -66,11 +66,15 @@ belirler (https://carbondesignsystem.com/building-blocks/foundations/color/guide
   Gradyan, radyal parıltı, ham hex ve cam (`rgba`) yüzey yoktur.
 - Bant üstündeki XP ve seri çipleri Carbon Tag'dir: `--tedy-brand-hover` zemin,
   `text-on-color` metin. XP yıldızı `--cds-support-warning` (lacivert üstünde 7,3:1).
+  2026-10-10'dan beri (talimatname S43) seri çipi kalkar, XP kalırsa hareketsiz sessiz metindir;
+  bu satır bugünkü şablonu tarif eder (borç B73).
 - Ders rengi bantta **değildir**; yalnız odak çapalarında yaşar: bölüm ikon karosu (`.seg-ic`),
   `kicker`, seçili seçenek halkası, anlatım kutularının 4 px sol çizgisi, tanım etiketi, zaman
   çizelgesi düğümü, piktogramlar ve küçük işaretler. Anlatım kutuları (`.lead`, `.hook-card`,
   `.se-model`, `.callout`, `.self-assess`) nötr `--cds-layer-02` yüzeydir.
 - İlerleme göstergesi ve düğmeler arayüz kabuğudur: Carbon `button-primary`/`interactive`.
+  Bu kural panoda da istisnasızdır (2026-10-10, talimatname S35): asistanın öğretmen modu da birincil
+  eylemi Carbon mavisinde tutar.
 
 ### 3.1 Tedy ders renk sistemi
 
@@ -158,7 +162,17 @@ ve Tedy köşe dilinde 4 px yoktur; ikisi de adlı sapmadır. `.topbar`/`.stage`
 
 ## 5. Oyunlaştırma (yumuşatılmış)
 
-XP, rozet ve seri korunur; dilleri Tedy'nin "kutlama yok" ilkesine yaklaştırıldı:
+**Karar (2026-10-10, talimatname S43, Ç9'un kararı):** modülde kutlama ya da ödül animasyonu
+(XP/seri nabzı, "+N XP" yükselişi, rozet belirişi, ödül sesi) ve seri sayacı yoktur. İlerleme sessiz,
+etiketli bir göstergedir (doğrusal ≥ 3 adımda Carbon ProgressIndicator anlamı: mevcut adım ve toplam;
+daha azında düz metin, ör. "Adım 3/7"). Anında geri bildirim metinle kalır; XP değeri kalırsa
+hareketsiz sessiz metindir ve özet ekranında büyük sayı olmaz. Kazanılan rozet kalırsa sessiz bir
+listedir. Dayanak: anayasa §9 ("kutlama", "seri sayacı"), İ6 (aynı anda tek hareket), Carbon productive
+hareket (https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#productive-motion).
+Aşağıdaki maddeler bugünkü şablonu tarif eder; şablon, SKILL §11.4–§11.6, `gamified-flows.md` ve
+G-FLOW kapısı bu karara göre değişene dek borçtur (talimatname B73).
+
+Bugünkü şablon — XP, rozet ve seri korunur; dilleri Tedy'nin "kutlama yok" ilkesine yaklaştırıldı:
 
 - Renk: ayrı altın ham-hex yoktur. `--reward` = `--tedy-text-warning` (Carbon sarısının
   metin-güvenli karşılığı), `--reward-bg` = `--cds-notification-background-warning`.
@@ -193,23 +207,26 @@ XP, rozet ve seri korunur; dilleri Tedy'nin "kutlama yok" ilkesine yaklaştırı
 
 - **Kanonik kılavuz:** `docs/tedy-ui-ux-talimatnamesi.md` (Talimatname, 2026-10-10). Modüller
   için §9 (panodan farklar, kapılar, adlı çelişkiler), Carbon MCP protokolü için §10, bilinçli
-  sapmalar için §11 (S1…S19), borçlar için §13. Bu dosya modülün yetkili kuralı olarak kalır;
+  sapmalar ve kararlaştırılmış çelişkiler için §11 (S1…S44), borçlar için §13. Bu dosya modülün yetkili kuralı olarak kalır;
   Talimatname bağı ve öncelik sırasını verir. Kod ajanları için TEDY katmanı:
   `.claude/skills/tedy-carbon/SKILL.md` (IBM'in `carbon-builder` becerisinin üstünde; çelişkide kazanır).
 - **Carbon iddiası kaynakla yazılır:** güncel `https://carbondesignsystem.com/building-blocks/...`
   URL'si ya da Carbon MCP `docs_search` `anchor_url`'ı; değer yine npm `@carbon/*`'tan
   (`carbon-sources.md`).
 - **Adlı Tedy istisnaları** (düzeltilecek değil, istisna): `.topbar`/`.stage` gölgesi (§4), 8 px
-  kart köşesi (§4), 700 ms "+N XP" yükselişi (§5), lacivert bant — Carbon'un "yüksek kontrast
+  kart köşesi (§4), lacivert bant — Carbon'un "yüksek kontrast
   anı" biçiminde marka bölgesi
-  (https://carbondesignsystem.com/building-blocks/foundations/color/overview/#high-contrast-moments),
-  tek g10 pano (§2, S14) ve panodaki asistanın öğretmen modunda `--cds-button-primary` /
-  `--cds-interactive`'in ders aksanına yönlenmesi (`dashboard/src/asistan/ogretmenRenkleri.ts`;
-  modülde birincil eylem Carbon mavisi kalır).
-- **Bilinen, çözülmemiş:** kilometre taşı cevabında XP nabzı, "+N XP" ve seri vuruşu aynı anda
-  koşar (İ6 "aynı anda en fazla bir hareket eden öğe" ile çelişir; §5 hareket bütçesi koymaz);
-  pano 1920 px üstünde kök puntoyu büyütür, modül çerçevesi 16 px kökte ve px boyutlarda kalır.
-- **AI etiketi — açık karar (Ç7).** Panonun asistanı Carbon for AI etiketini taşır; yapay zekâ
-  yardımıyla yazılmış modüllerin etiket taşıyıp taşımayacağı kullanıcıya ait açık bir karardır
-  (https://carbondesignsystem.com/building-blocks/foundations/carbon-for-ai/#when-to-use-the-ai-label).
-  Karar verilene kadar şablona etiket eklenmez.
+  (https://carbondesignsystem.com/building-blocks/foundations/color/overview/#high-contrast-moments)
+  ve tek g10 pano (§2, S14). 2026-10-10'da istisna olmaktan çıkanlar: 700 ms "+N XP" yükselişi
+  (S43, kalkar; B73) ve panodaki asistanın öğretmen modunda `--cds-button-primary` /
+  `--cds-interactive`'in ders aksanına yönlenmesi (S35: birincil eylem her yerde Carbon mavisi; B68).
+- **Bilinen, çözülmemiş:** pano 1920 px üstünde kök puntoyu büyütür, modül çerçevesi 16 px kökte ve
+  px boyutlarda kalır. (Kilometre taşı cevabında XP nabzı, "+N XP" ve seri vuruşunun aynı anda koşması
+  2026-10-10'da S43 ile karara bağlandı: ödül hareketi kalkar; borç B73.)
+- **AI etiketi — karar (2026-10-10, talimatname S41, Ç7'nin kararı).** Panoda gösterilen her modül
+  `ModuleViewer`'ın çerçeve başlığında Carbon `AILabel` taşır; açıklama penceresi neyin yapay zekâyla
+  üretildiğini (anlatım, sorular, görseller) ve dayandığı kaynakları (kazanım, ders kitabı sayfaları,
+  iddia dayanakları) söyler
+  (https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/#in-containers).
+  Etiket panonun çerçevesindedir, şablona eklenmez: modülün içinde G-VOICE aynen geçerlidir (öğrenci
+  yüzeyinde kaynak-meta atıf yok). Panodaki uygulama borcu B71.
