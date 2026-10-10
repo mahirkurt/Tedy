@@ -21,8 +21,10 @@ import GecmisPaneli from './GecmisPaneli.tsx'
 import IstekEkleri from './IstekEkleri.tsx'
 import GirisEkleri from './GirisEkleri.tsx'
 import Karsilama from './Karsilama.tsx'
-import GirisDugmeleri from './GirisDugmeleri.tsx'
-import { etkinSohbetiOku, etkinSohbetiYaz, yeniSohbet } from './useAsistanOturumu.ts'
+import GirisDugmeleri, { GirisEylemleri } from './GirisDugmeleri.tsx'
+import OgretmenSecimi, { OGRETMEN_SECIMI_ID } from './OgretmenSecimi.tsx'
+import { etkinSohbetiOku, etkinSohbetiYaz, gecmisiAc, yeniSohbet } from './useAsistanOturumu.ts'
+import { RecentlyViewed } from '@carbon/icons-react'
 import { gecmisOgeleri } from './gecmis.ts'
 import type { BusEventFeedback } from '@carbon/ai-chat'
 import { sayfaEtiketi, useAcikOge } from './sayfaBaglami.ts'
@@ -44,6 +46,12 @@ function eklerHazir(signal?: AbortSignal): Promise<void> {
 
 /** Gönderme işlevi Carbon'un yapılandırmasında yaşar; güncel sohbet deposunu render dışında buradan okur. */
 let guncelSohbet: ReturnType<typeof useSohbetler> | null = null
+/** Başlıktaki "Sohbetler" eylemi yapılandırmada yaşar; çizilen sohbetin örneğini render dışında buradan okur. */
+let gecmisOrnegi: ChatInstance | null = null
+function gecmisiDegistir() {
+  const i = gecmisOrnegi
+  if (i) void gecmisiAc(i, !i.getState().customPanels.history.isOpen)
+}
 
 /** `sayfa`: bulunulan sayfanın adı (sayfaBaglami.ts) — başlatıcı paneli ya da /asistan?sayfa=…; yoksa null. */
 export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null = null) {
@@ -142,8 +150,8 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
     if (d.saltOkunur || d.yukleniyor) return
     if (d.sohbetId) await guncelSohbet?.degistir(d.sohbetId, { ogretmen: id })
     ogretmen.sec(id)
-    // Düğme geçişle kaybolur; odak seçilen öğretmene gider ve seçim duyurulur.
-    document.querySelector<HTMLInputElement>(`input[name="ac-ogretmen"][value="${CSS.escape(id)}"]`)
+    // Öneri düğmesi geçişle kaybolur; odak öğretmen seçimine gider (seçilen öğretmen orada okunur).
+    document.getElementById(OGRETMEN_SECIMI_ID)?.querySelector<HTMLButtonElement>('button')
       ?.focus({ focusVisible: true } as FocusOptions)
   }, [ogretmen])
   const ozelYanit = useMemo(() => ozelYanitCizici(ogretmenSec), [ogretmenSec])
@@ -162,17 +170,22 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
     return gecmisOgeleri(sonuc.mesajlar, { geriBildirim: !saltMi, ogrenci: okur === 'ogrenci' })
   }, [email, okur])
 
+  // "Sohbetler": geçmiş paneli kapalı başlar (history.startClosed) ve bu eylemle açılır/kapanır; basılı hâli panelin
+  // durumunu izler (state:change).
+  const gecmisAcik = useAsistanDurumu(d => d.gecmisAcik)
+  const eylemler = useMemo(() => [{ text: 'Sohbetler', icon: RecentlyViewed, fixed: true, isSelected: gecmisAcik,
+    onClick: gecmisiDegistir }], [gecmisAcik])
   const config = useMemo(() => tedyChatConfig({
-    bicim, okur, saltOkunur: salt,
-    altBaslik: secili ? `${secili.ogretmen_adi} — konuyu adım adım anlatır` : 'Kaynaklı soru-cevap ve kişisel çalışma planı',
+    bicim, okur, saltOkunur: salt, baslik: secili ? secili.ogretmen_adi : 'Genel asistan', eylemler,
     gonder, gecmisYukle,
-  }), [bicim, okur, salt, secili, gonder, gecmisYukle])
+  }), [bicim, okur, salt, secili, eylemler, gonder, gecmisYukle])
 
   const props: ChatContainerProps = {
     ...config,
     markdown: { markdownItPlugins: TEDY_MARKDOWN_EKLENTILERI, customRenderers: TABLO },
     onBeforeRender: inst => {
       instance.current = inst
+      gecmisOrnegi = inst
       inst.on([
         { type: 'feedback' as never, handler: (e: unknown) => void geriBildirimGonder(e as BusEventFeedback) },
         // Carbon'un "Yeni sohbet" ve yeniden başlat düğmeleri de yeni kayıt açar.
@@ -182,8 +195,11 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
         { type: 'stopStreaming' as never, handler: () => tekrariDurdur() },
         // Giriş alanının boşluğu (yazma, mikrofon, gönderim sonrası temizlenme) Carbon'un durum olayıyla izlenir.
         { type: 'state:change' as never, handler: () => {
-          const bos = !inst.getState().input.rawValue.trim()
-          if (asistanDeposu.al().girisBos !== bos) asistanDeposu.ayarla({ girisBos: bos })
+          const durum = inst.getState()
+          const bos = !durum.input.rawValue.trim()
+          const gecmis = !!durum.customPanels?.history?.isOpen
+          const d = asistanDeposu.al()
+          if (d.girisBos !== bos || d.gecmisAcik !== gecmis) asistanDeposu.ayarla({ girisBos: bos, gecmisAcik: gecmis })
         } },
       ])
       if (asistanDeposu.al().saltOkunur) inst.updateInputIsDisabled(true)
@@ -192,11 +208,16 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
     renderCustomMessageFooter: ALTBILGI,
     renderCustomRequestFooter: (_slot, mesaj) => <IstekEkleri mesajId={mesaj.id} />,
     renderWriteableElements: {
-      workspacePanelElement: <KaynakPaneli inst={() => instance.current} />, headerFixedActionsElement: <AiAciklama />,
+      workspacePanelElement: <KaynakPaneli inst={() => instance.current} />,
+      headerFixedActionsElement: <AiAciklama ogretmenAdi={secili?.ogretmen_adi ?? null} />,
+      // Öğretmen seçimi başlığın altındaki satırda, tek kontrol (sohbet panelinin içinde ama AI yüzeyi değil: nötr).
+      headerBottomElement: <OgretmenSecimi liste={ogretmen.liste} secili={ogretmen.id}
+        onSec={id => void ogretmenSec(id)} hata={ogretmen.hata ? VOICE[okur].ogretmenHata : null} />,
       beforeInputElement: <><Karsilama inst={() => instance.current} karsilama={karsilama} hizliSorular={hizliSorular} />
         <GirisUyarisi /><BaglamCipi /><GirisEkleri /></>,
-      promptLineSendButtonStart: <GirisDugmeleri inst={() => instance.current}
+      promptLineActionsEnd: <GirisEylemleri inst={() => instance.current}
         mikrofon={{ var: ses.mikrofonVar, dinliyor: ses.dinliyor, bas: ses.mikrofon }} />,
+      promptLineSendButtonStart: <GirisDugmeleri />,
       historyPanelElement: <GecmisPaneli depo={sohbet} ogrenci={ogrenci} inst={() => instance.current} ogretmenSec={ogretmen.sec} />,
     },
   }

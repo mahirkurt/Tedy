@@ -532,6 +532,24 @@ olarak belirir; alt metni başlık ya da "Ders kitabı görseli", yüklenemezse
 grubu Işık'ın oturumunda hiç çağrılmaz ve hiç görünmez (D3/D4: iç temsil, bu
 durumda "bu kaynak var ama sana kapalı" bilgisi, okura hiç sızmaz).
 
+**Durum notu — Asistan yenilemesi (2026-10-10, spec `docs/superpowers/specs/2026-10-10-asistan-yenileme-design.md`,
+talimatname S46):** sayfa Carbon AI Chat'in kendi yuvaları üzerinde "odaklı öğretmen" düzenine geçti. Sohbet
+başlığı o anki öğretmendir ("Genel asistan", "Matematik öğretmeni"; ürün adı tekrarlanmaz); başlık eylemleri
+"Sohbetler" (geçmişi açar/kapatır, basılı hâli panelin durumunu izler), yeniden başlat ve Türkçe adlı AI etiketi
+("AI Yapay zekâ hakkında bilgi"; pencere modeli insan adıyla, yedek modeli, öğretmeni ve ikinci okumayı söyler).
+Öğretmen seçimi başlığın altındaki satırda tek Carbon `Dropdown`'dır (satır içi, lg, ders işaretli seçenekler;
+radyo çipleri telefonda iki satır ≈ 100 px tutuyordu). Geçmiş kapalı başlar; boş durum tek cümle, okurun sesiyle
+("Henüz sohbetin yok." / "Henüz sohbetiniz yok." / "Işık'ın henüz sohbeti yok." / "Asistan henüz not almadı.");
+silme Carbon tehlike modalıyla onaylanır. Karşılama tek cümle + en çok üç hızlı soru (hiçbiri birincil değil) ve
+yükleme sınırları; giriş üstündeki ataş + "Ödev" seçici yığını kalktı — dosya, fotoğraf, "Ödeve bağla" menüsü,
+mikrofon ve çalışma planı genişletilmiş girişin eylem satırındadır (48 px), seçilen ödev bağlam çipi olur. Mesaj
+sütunu 42rem, geçmiş 20rem (4K'da ölçeklenir). Durum göstergeleri ikon + metin; hata kartı `InlineNotification`.
+Ders rengi yalnız çerçevenin 1 px kenarı + 4 px üst şeridi ve okurun balonunda; gönder düğmesi her kipte mavi.
+Sohbet paneli Carbon'un AI yüzeyidir; öğretmen seçimi, geçmiş, kaynak paneli ve kartlar nötrdür (K1). Başlatıcı
+düğmesi ikincildir ve açık panel ödev penceresinin altında kalır. Yeni arayüz `components/AssistantChat.scss`'e
+dayanmaz (`asistan/Asistan.scss`); eski arayüz geri dönüş yolu olarak tembel yüklenir. Açık kalanlar talimatname
+§13'te (B76–B79).
+
 ---
 
 ### 4.11 Tedy Books — *ayrı dünya*

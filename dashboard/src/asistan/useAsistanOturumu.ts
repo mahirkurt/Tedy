@@ -44,3 +44,12 @@ export async function yeniSohbet(inst: ChatInstance, depo: Depo) {
   await inst.messaging.clearConversation()
   inst.updateInputIsDisabled(false)
 }
+
+/** Carbon geçmiş panelini açar ya da kapatır (history.startClosed ile dışarıdan denetim; tür tanımı HistoryConfig). */
+export async function gecmisiAc(inst: ChatInstance, acik: boolean) {
+  // PanelType.HISTORY ('history') dizgeyle: bu dosya ilk parçadaki useSohbetler'den de içe aktarılır, değer
+  // içe aktarması Carbon AI Chat'i ilk yüklemeye çekerdi.
+  const panel = inst.customPanels?.getPanel('history' as never)
+  if (!panel) return
+  await (acik ? panel.open() : panel.close())
+}

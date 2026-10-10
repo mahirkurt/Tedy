@@ -1,6 +1,10 @@
 import { asistanDeposu } from './asistanDeposu.ts'
 import type { Cip } from './asistanDeposu.ts'
 
+/** Sunucunun sınırları (B2, `/api/assistant/uploads`): okura dosya seçmeden önce söylenir (B59). */
+export const EK_SINIRI = 4
+export const YUKLEME_SINIRLARI = 'Görsel en çok 12 MB, PDF 10 MB ve 50 sayfa, Word ve metin 5 MB; bir mesaja en çok 4 dosya.'
+
 const guncelle = (yerel: string, p: Partial<Cip>) =>
   asistanDeposu.ayarla({ cipler: asistanDeposu.al().cipler.map(c => (c.yerel === yerel ? { ...c, ...p } : c)) })
 
@@ -21,7 +25,7 @@ async function yukleBir(yerel: string, file: File) {
 export function dosyalariEkle(files: File[]) {
   const d = asistanDeposu.al()
   if (!files.length || d.saltOkunur || d.yukleniyor) return
-  let yer = 4 - d.cipler.filter(c => c.yukleniyor || c.id).length
+  let yer = EK_SINIRI - d.cipler.filter(c => c.yukleniyor || c.id).length
   const yeni: Cip[] = []
   const yuklenecek: [string, File][] = []
   for (const file of files) {

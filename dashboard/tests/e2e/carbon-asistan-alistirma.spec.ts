@@ -3,7 +3,7 @@ import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { sabitAc } from './_gorsel-yardim'
 import { json } from './_audit-fixtures'
-import { carbonSabitAc, soruAlani, gonderDugmesi } from './_asistan-carbon'
+import { carbonSabitAc, soruAlani, gonderDugmesi, gecmisiAc } from './_asistan-carbon'
 
 // Eski asistan-alistirma.spec.ts'in testleri, aynı adlarla (Görev 19). Kart aynı bileşen (AlistirmaKarti),
 // Carbon'un user_defined yanıtında; İlerleme sayfası testleri değişmedi.
@@ -81,6 +81,7 @@ test('a family reading the student conversation cannot answer the saved card', a
       atiflar_json: '[]', ekler_json: '[]', alistirma: [QUIZ], zaman: SOHBET.guncelleme }],
   })))
   await page.goto('/asistan')
+  await gecmisiAc(page)
   await page.getByRole('button', { name: SOHBET.baslik, exact: true }).click()
   const card = page.getByRole('region', { name: 'Payda', exact: true })
   await expect(card.getByText('Bu sohbet salt okunur.')).toBeVisible()

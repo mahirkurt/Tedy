@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { carbonSabitAc as sabitAc, soruAlani } from './_asistan-carbon'
+import { carbonSabitAc as sabitAc, gecmisiAc, soruAlani } from './_asistan-carbon'
 import { json } from './_audit-fixtures'
 
 const CEVAP = { answer: 'Payda **eşitlenir** [S1].', citations: [{ id: 'S1', kind: 'mufredat', label: 'Payda', locator: {}, snippet: 'Paydalar eşitlenir.', confidence: 0.9 }], safety_flags: [], plan_blocks: [], intent: 'qa', session_id: '', meta: { model: 'test', degraded: [] } }
@@ -54,9 +54,9 @@ test('unsupported voices and recognition hide controls', async ({ page }) => {
   await hazir(page)
   await soruAlani(page).fill('Payda?')
   await page.getByRole('button', { name: 'Gönder', exact: true }).click()
-  await expect(page.getByText('Payda eşitlenir', { exact: false })).toBeVisible()
+  await expect(page.locator('p').filter({ hasText: 'Payda eşitlenir' }).first()).toBeVisible()   // aria-live duyurucusu da metni taşır
   await expect(page.getByRole('button', { name: 'Sesli oku' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Sesle sor' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Mikrofonu aç' })).toHaveCount(0)
 })
 
 test('microphone waits for consent, replaces interim text, and never auto-sends', async ({ page }) => {
@@ -64,12 +64,12 @@ test('microphone waits for consent, replaces interim text, and never auto-sends'
   await hazir(page)
   let sent = 0
   await page.route('**/api/assistant/stream', r => { sent++; return r.fulfill({ contentType: 'text/event-stream', body: `event: answer\ndata: ${JSON.stringify({ payload: CEVAP })}\n\n` }) })
-  await page.getByRole('button', { name: 'Sesle sor', exact: true }).click()
+  await page.locator('.asistan__giris-eylemleri').getByRole('button', { name: 'Mikrofonu aç', exact: true }).click()
   await expect(page.getByText("Chrome ve Android'de konuşma tanıma sesi Google'a gönderir.", { exact: true })).toBeVisible()
   expect(await page.evaluate(() => (window as unknown as { __ses: { started: number } }).__ses.started)).toBe(0)
   await page.getByRole('button', { name: 'Vazgeç', exact: true }).click()
-  await page.getByRole('button', { name: 'Sesle sor', exact: true }).click()
-  await page.getByRole('button', { name: 'Onayla', exact: true }).click()
+  await page.locator('.asistan__giris-eylemleri').getByRole('button', { name: 'Mikrofonu aç', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Mikrofonu aç', exact: true }).click()
   expect(await page.evaluate(() => localStorage.getItem('tedy-ses-onay::test@tedy.online'))).toBe('1')
   for (const text of ['kesir', 'kesir kaçtır']) {
     await page.evaluate(text => (window as unknown as { __rec: { onresult: (e: unknown) => void } }).__rec.onresult({ results: [[{ transcript: text }]] }), text)
@@ -86,7 +86,7 @@ test('denied permission is a separate Turkish error', async ({ page }) => {
   await sesKur(page)
   await page.addInitScript(() => localStorage.setItem('tedy-ses-onay::test@tedy.online', '1'))
   await hazir(page)
-  await page.getByRole('button', { name: 'Sesle sor', exact: true }).click()
+  await page.locator('.asistan__giris-eylemleri').getByRole('button', { name: 'Mikrofonu aç', exact: true }).click()
   await page.evaluate(() => (window as unknown as { __rec: { onerror: (e: unknown) => void } }).__rec.onerror({ error: 'not-allowed' }))
   await expect(page.getByText('Mikrofon açılamadı.', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Tekrar dene' })).toHaveCount(0)
@@ -100,9 +100,10 @@ test('family can read aloud but cannot dictate into a student conversation', asy
   await page.route(`**/api/assistant/sohbetler/${row.id}`, r => r.fulfill(json({ sohbet: row, read_only: true,
     mesajlar: [{ id: 'ef'.repeat(16), rol: 'assistant', icerik: CEVAP.answer, atiflar_json: JSON.stringify(CEVAP.citations), ekler_json: '[]' }] })))
   await page.reload()
+  await gecmisiAc(page)
   await page.getByRole('button', { name: 'Kesirler', exact: true }).click()
   await expect(soruAlani(page)).not.toBeEditable()
   await expect(page.getByText('Bu sohbet salt okunur.', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Sesle sor' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Mikrofonu aç' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Sesli oku' })).toBeVisible()
 })

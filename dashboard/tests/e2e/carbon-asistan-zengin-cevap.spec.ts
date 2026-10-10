@@ -72,21 +72,23 @@ test('bloklar, adımlar, formüller, atıf ve tablo anlamını korur', async ({ 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
 })
 
-test('öğretmen modunda kavram kutusu ders rengini alır; adımdaki alt madde imli, geçmiş başlıkları küçük', async ({ page }) => {
+test('öğretmen modunda kavram kutusu nötr kalır (ders rengi yalnız çerçevede); adımdaki alt madde imli, geçmiş başlığı küçük', async ({ page }) => {
   await sor(page, CEVAP, 'matematik', 1440, 900)
   const ek = eklentiler(page)
-  // Eklenti çıktısı Carbon'un kabı dışında: eski .ac kökündeki kurallar .asistan kökünde de geçerli olmalı.
-  const [kutu, panel] = await ek.locator('.ac-kutu--kavram').evaluate(k => {
-    const d = document.createElement('div')
-    d.style.background = 'var(--ted-subject-panel)'
-    k.parentElement!.appendChild(d)
-    const beklenen = getComputedStyle(d).backgroundColor
-    d.remove()
-    return [getComputedStyle(k).backgroundColor, beklenen]
+  // Asistan yenilemesi (2026-10-10, spec madde 8): ders rengi yalnız sohbet çerçevesinde ve okurun balonunda;
+  // kutu Carbon'un nötr katmanıdır (--cds-layer-02), ders paneli değil.
+  const [kutu, notr, ders] = await ek.locator('.ac-kutu--kavram').evaluate(k => {
+    const olc = (v: string) => {
+      const d = document.createElement('div'); d.style.background = v; k.parentElement!.appendChild(d)
+      const r = getComputedStyle(d).backgroundColor; d.remove(); return r
+    }
+    return [getComputedStyle(k).backgroundColor, olc('var(--cds-layer-02)'), olc('var(--ted-subject-panel)')]
   })
-  expect(kutu).toBe(panel)
+  expect(kutu).toBe(notr)
+  expect(kutu).not.toBe(ders)
   await expect(ek.locator('.ac-adim__govde ul').first()).toHaveCSS('list-style-type', 'disc')
-  await expect(page.getByRole('heading', { name: 'Sohbetler', exact: true })).toHaveCSS('font-size', '14px')
+  await page.getByRole('button', { name: 'Sohbetler', exact: true }).first().click()
+  await expect(page.getByRole('heading', { name: 'Sohbetler', exact: true })).toHaveCSS('font-size', '16px')
 })
 
 test('bozuk formül kaynak kodunu gösterir, matematikten URL açılmaz', async ({ page }) => {
@@ -198,8 +200,8 @@ test('formül paketi takılırsa alan boş kalmaz, süre dolunca sohbet formüls
   await page.route('**/api/assistant/chat', r => r.fulfill(json(cevap('Payda $\\frac{1}{2}$ olarak yazılır.'))))
   await mockSohbetler(page)
   await page.goto('/asistan')
-  // Sayfa parçası yüklendi (öğretmen seçici çizildi) ama sohbet KaTeX'i bekliyor: alan boş değil, söylüyor.
-  await expect(page.getByRole('radio', { name: 'Genel' })).toBeAttached()
+  // Sayfa parçası yüklendi (asistan bölümü çizildi) ama sohbet KaTeX'i bekliyor: alan boş değil, söylüyor.
+  await expect(page.locator('section.asistan')).toBeAttached()
   await expect(page.locator('.asistan').getByText('Asistan yükleniyor…', { exact: true })).toBeVisible()
   await expect(soruAlani(page)).toBeVisible({ timeout: 15000 })
   await expect(page.getByText('Asistan yükleniyor…', { exact: true })).toHaveCount(0)

@@ -1,24 +1,24 @@
+import './Asistan.scss'
 import './AsistanSayfasi.scss'
 import { useEffect, useRef, type CSSProperties } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ChatCustomElement } from '@carbon/ai-chat'
-import OgretmenSecici from '../components/OgretmenSecici'
 import { subjectClass } from '../utils/subject'
 import { useAsistanSohbeti } from './useAsistanSohbeti.tsx'
 import { kaydirmaOdaginiYonet } from './kaydirmaOdagi.ts'
-import { VOICE } from './ses.ts'
-import { useAsistanDurumu } from './asistanDeposu.ts'
 import SesOnayi from './SesOnayi.tsx'
+import SilmeOnayi from './SilmeOnayi.tsx'
 import { ogretmenDegiskenleri } from './ogretmenRenkleri.ts'
 import { dosyalariEkle } from './ekler.ts'
 import { carbonErisilebilirlikOnarimi } from './carbonOnarimi.ts'
 import { sayfaEtiketi } from './sayfaBaglami.ts'
+import { useGecmisGenisligi } from './useDar.ts'
 
 export default function AsistanSayfasi() {
   // Telefonda alt gezinmenin Asistan sekmesi bulunulan sayfayı taşır (?sayfa=isler); bilinmeyen ad yok sayılır.
   const [arama] = useSearchParams()
   const istenen = arama.get('sayfa')
-  const { props, hazir, ogretmen, ogretmenSec, sesOnay } = useAsistanSohbeti('sayfa', sayfaEtiketi(istenen) ? istenen : null)
+  const { props, hazir, ogretmen, sesOnay } = useAsistanSohbeti('sayfa', sayfaEtiketi(istenen) ? istenen : null)
   const kok = useRef<HTMLElement>(null)
   useEffect(() => (kok.current ? kaydirmaOdaginiYonet(kok.current) : undefined), [])
   useEffect(() => (kok.current ? carbonErisilebilirlikOnarimi(kok.current) : undefined), [])
@@ -35,18 +35,18 @@ export default function AsistanSayfasi() {
     return () => { el.removeEventListener('paste', yapistir, true); el.removeEventListener('drop', birak, true); el.removeEventListener('dragover', uzerinde) }
   }, [])
   const secili = ogretmen.secili
-  const okur = useAsistanDurumu(d => d.okur)
+  // Geçmiş paneli 20rem (4K'da kökle büyür, B28'in genişlik kısmı); px olarak, bkz. useGecmisGenisligi.
+  const gecmis = useGecmisGenisligi()
   return (
     <section ref={kok} className={['asistan', secili && subjectClass(null, secili.renk_ailesi)].filter(Boolean).join(' ')}
       data-ogretmen={ogretmen.id}>
-      <OgretmenSecici liste={ogretmen.liste} secili={ogretmen.id} onSec={id => void ogretmenSec(id)}
-        hata={ogretmen.hata ? VOICE[okur].ogretmenHata : null} />
       {/* KaTeX yüklemesi sonuçlanınca (başarılı, başarısız ya da süre dolunca) çizilir; markdownKurulumu.ts.
           Beklerken alan boş kalmaz (D3). */}
       {!hazir && <p className="app-shell-loading__text" role="status">Asistan yükleniyor…</p>}
       {hazir && <ChatCustomElement className="asistan__sohbet" {...props}
-        style={ogretmenDegiskenleri(secili?.renk_ailesi ?? null) as CSSProperties} />}
+        style={{ ...ogretmenDegiskenleri(secili?.renk_ailesi ?? null), '--cds-aichat-history-width': gecmis } as CSSProperties} />}
       <SesOnayi onay={sesOnay} />
+      <SilmeOnayi />
     </section>
   )
 }

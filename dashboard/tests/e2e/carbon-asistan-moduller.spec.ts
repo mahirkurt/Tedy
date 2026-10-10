@@ -131,7 +131,7 @@ test('an unreadable module catalog is named, not hidden', async ({ page }) => {
   await ask(page, 'modül var mı')
 
   const degraded = page.locator('[data-tedy-altbilgi]').filter({ visible: true }).last()
-  await expect(degraded.locator('.cds--tag')).toHaveCount(1)
+  await expect(degraded.locator('.asistan__durum')).toHaveCount(1)
   await expect(degraded).toContainText('Modül kataloğu okunamadı')
   await expect(degraded).not.toContainText('modul-katalogu')
 })

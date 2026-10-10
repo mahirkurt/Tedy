@@ -3,7 +3,7 @@ import { PAYLOAD, asistanAc, cevapla, sor } from './_asistan-carbon'
 
 const MID = 'a'.repeat(32)
 
-test('rozetler: kaynak sorunu, risk kırmızı, uyarı gri, yedek model; ham bayrak yok', async ({ page }) => {
+test('durumlar: kaynak sorunu ve yedek model uyarı ikonu + metin, risk hata; gri yok, ham bayrak yok', async ({ page }) => {
   await cevapla(page, PAYLOAD({ answer: 'Cevap.', safety_flags: ['risk:self_harm', 'warning:yerel_yedek'],
     meta: { model: 'gemma4-e4b-cpu', degraded: ['maarif-mufredat', 'yeni-sunucu'] } }))
   await asistanAc(page)
@@ -12,7 +12,32 @@ test('rozetler: kaynak sorunu, risk kırmızı, uyarı gri, yedek model; ham bay
   await expect(page.getByText('Kaynağa ulaşılamadı: yeni-sunucu', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('Yedek modelden', { exact: true })).toBeVisible()
   await expect(page.getByText('warning:yerel_yedek', { exact: true })).toHaveCount(0)
-  await expect(page.locator('[data-tedy-altbilgi] .cds--tag--red')).toHaveCount(1)
+  // S45 (B75): bozulmuş durum gri Tag değil; uyarı ikonu + metin; risk hata ikonu + metin.
+  const alt = page.locator('[data-tedy-altbilgi]').filter({ visible: true }).last()
+  await expect(alt.locator('.cds--tag')).toHaveCount(0)
+  await expect(alt.locator('.asistan__durum--hata')).toHaveCount(1)
+  await expect(alt.locator('.asistan__durum--uyari')).toHaveCount(3)
+  await expect(alt.locator('.asistan__durum--uyari svg[aria-label="Uyarı"]')).toHaveCount(3)
+  await expect(alt.locator('.asistan__durum--uyari').filter({ hasText: 'Yedek modelden' })).toHaveCount(1)
+})
+
+test('telefonda mesaj eylemleri en az 44 px', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await cevapla(page, PAYLOAD({ answer: 'Cevap [S1].', citations: [{ id: 'S1', kind: 'mufredat', label: 'K', locator: {}, snippet: 's', confidence: 1 }] }))
+  await asistanAc(page)
+  await sor(page, 'Soru')
+  const alt = page.locator('[data-tedy-altbilgi]').filter({ visible: true }).last()
+  const dugmeler = alt.getByRole('button')
+  await expect(dugmeler.first()).toBeVisible()
+  for (let i = 0; i < await dugmeler.count(); i++) {
+    const k = await dugmeler.nth(i).boundingBox()
+    expect(k!.height, `düğme ${i}`).toBeGreaterThanOrEqual(44)
+    expect(k!.width, `düğme ${i}`).toBeGreaterThanOrEqual(44)
+  }
+  // Kaynak paneli telefonda sohbeti örter; kapatma düğmesi de 48 px.
+  await alt.getByRole('button', { name: 'Kaynak ayrıntıları' }).click()
+  const kapat = page.getByRole('button', { name: 'Kaynakları kapat' })
+  expect((await kapat.boundingBox())!.height).toBeGreaterThanOrEqual(44)
 })
 
 test('Daha derine in force_deep yollar; Yeniden üret eskisini kaldırır; Kopyala', async ({ page, context }) => {

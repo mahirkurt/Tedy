@@ -54,6 +54,18 @@ test('Asistan prompt chips are at least 44px on a phone', async ({ page }) => {
   await enAz(page.locator('.asistan__hizli-sorular button'))
 })
 
+// Asistan yenilemesi (2026-10-10): every TEDY control on the assistant, not only the prompts — the teacher
+// selector, the input row's actions and the history panel's rows and actions.
+test('every Asistan control TEDY draws is at least 44px on a phone', async ({ page }) => {
+  await sabitAc(page, '/asistan', 390, 844)
+  await expect(page.getByRole('textbox', { name: /^Sorunu(zu)? yaz/ })).toBeVisible({ timeout: 15000 })
+  await enAz(page.locator('#asistan-ogretmen button'))
+  await enAz(page.locator('.asistan__giris-eylemleri button'))
+  await page.getByRole('button', { name: 'Sohbetler', exact: true }).first().click()
+  await expect(page.getByRole('heading', { name: 'Sohbetler', exact: true })).toBeVisible()
+  await enAz(page.locator('.asistan-gecmis button'))
+})
+
 test('Takvim week arrows say Önceki and are at least 44px on a phone', async ({ page }) => {
   await sabitAc(page, '/takvim', 390, 844)
   await expect(page.getByRole('button', { name: 'Onceki hafta', exact: true })).toHaveCount(0)

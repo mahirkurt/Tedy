@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import type { AssistantCitation } from '../types'
 import type { Yukleme } from '../components/YuklenenEk'
+import type { SilmeIstegi } from './SohbetGecmisi.tsx'
 
 export interface Cip { yerel: string; ad: string; tur?: string; id?: string; hata?: string; yukleniyor?: boolean; baglaniyor?: boolean; baglandi?: boolean }
 export interface SayfaIstegi { ad: string; oge?: { tur: string; id: string }; etiket: string; ogeEtiketi?: string }
@@ -16,6 +17,9 @@ export interface AsistanDurumu {
   sonYanitId?: string
   /** AI açıklamasındaki "Son yanıtı … yazdı" için. */
   sonModel?: string
+  /** Son yanıtın ikinci okuması (B6: gecti/duzeltildi/atlandi/hata) ve evdeki yedek modelden gelip gelmediği. */
+  sonDenetim?: string
+  sonYedek?: boolean
   /** Tek paylaşılan sesli okuyucu: bir cevabı okumak öncekini durdurur, düğme etiketleri birlikte değişir. */
   ses: { var: boolean; okunan: string | null; oku: (id: string, metin: string) => void } | null
   /** Ekranda mesaj var mı (başlangıç ekranını kapatmak için, tedyChatConfig). */
@@ -26,10 +30,15 @@ export interface AsistanDurumu {
   tekrarSuruyor: boolean
   /** Carbon'un giriş alanı boş mu (Çalışma Planı düğmesi boşken devre dışı). */
   girisBos: boolean
+  /** Carbon geçmiş paneli açık mı (başlıktaki "Sohbetler" eyleminin basılı hâli). */
+  gecmisAcik: boolean
+  /** Onay bekleyen geri dönüşsüz silme (SilmeOnayi). */
+  silinecek: SilmeIstegi | null
 }
 
 const BASLANGIC: AsistanDurumu = { okur: 'aile', ogretmenId: 'genel', saltOkunur: false, odevKey: '', cipler: [], sayfa: null,
-  sonrakiIstek: {}, dokum: [], yukleniyor: false, ekGoruntuleri: {}, acikAtif: null, ses: null, mesajVar: false, uyari: null, tekrarSuruyor: false, girisBos: true }
+  sonrakiIstek: {}, dokum: [], yukleniyor: false, ekGoruntuleri: {}, acikAtif: null, ses: null, mesajVar: false, uyari: null, tekrarSuruyor: false, girisBos: true,
+  gecmisAcik: false, silinecek: null }
 
 let durum = BASLANGIC
 const dinleyiciler = new Set<() => void>()

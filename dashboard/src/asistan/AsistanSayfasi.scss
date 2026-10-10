@@ -15,9 +15,9 @@
   inline-size: 100%;
 }
 
-.asistan__aile-notu { margin: 0; }
 
-// Öğretmen modunda panelin kenarı ders rengiyle (eski .ac[data-ogretmen] .ac__chat kuralı); marka bandı değişmez.
+// Öğretmen modunda ders rengi yalnız yüzeyde: sohbet çerçevesinin 1 px ders kenarı + 4 px üst aksan (S35); eylem
+// rengi ve marka bandı değişmez.
 .asistan[data-ogretmen]:not([data-ogretmen='genel']) .asistan__sohbet {
   border: 1px solid var(--ted-subject-border);
   border-block-start: 0.25rem solid var(--ted-subject-accent);

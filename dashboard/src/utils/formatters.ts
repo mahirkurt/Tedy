@@ -176,14 +176,16 @@ export const SECTION_LABELS: Record<string, string> = {
 }
 
 /** A model identifier as a person would say it: "claude-sonnet-5" →
- *  "Claude Sonnet 5", "claude-opus-4-8" → "Claude Opus 4.8". The AI label
+ *  "Claude Sonnet 5", "claude-opus-4-8" → "Claude Opus 4.8", the house model
+ *  ("gemma…", CLAUDE.md "Evdeki model") → "Evdeki model (Gemma)". The AI label
  *  names the model that wrote the answer; an API identifier there is internal
- *  representation reaching the reader (D4). Anything unrecognised passes
- *  through unchanged rather than being guessed at. */
+ *  representation reaching the reader (D4, B55). An unrecognised identifier is
+ *  not shown at all: '' rather than the raw id. */
 export function modelAdi(id?: string | null): string {
   if (!id) return ''
+  if (/^gemma/i.test(id)) return 'Evdeki model (Gemma)'
   const m = id.match(/^claude-([a-z]+)-(\d+)(?:-(\d+))?$/)
-  if (!m) return id
+  if (!m) return ''
   const aile = m[1].charAt(0).toUpperCase() + m[1].slice(1)
   return `Claude ${aile} ${m[2]}${m[3] ? `.${m[3]}` : ''}`
 }

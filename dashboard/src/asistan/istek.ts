@@ -12,6 +12,14 @@ function secenekler(): SonYanitSecenekleri {
 }
 
 /** Bir isteği çalıştırır ve Carbon'a parça parça verir. Parçalar sırayla eklenir (addMessageChunk asenkron). */
+type YanitOzeti = { safety_flags?: string[]; meta?: { model?: string; provider?: string; denetim?: string | { durum?: string } } }
+/** AI açıklama penceresinin "son yanıt" satırları (§6.2 Supporting details): model, ikinci okuma, yedek model. */
+function sonYanitBilgisi(p: YanitOzeti) {
+  const denetim = p.meta?.denetim
+  return { sonModel: p.meta?.model, sonDenetim: typeof denetim === 'string' ? denetim : denetim?.durum,
+    sonYedek: p.meta?.provider === 'yerel' || (p.safety_flags ?? []).includes('warning:yerel_yedek') }
+}
+
 export async function calistir(inst: ChatInstance, govde: Record<string, unknown>, plan: boolean, signal: AbortSignal) {
   asistanDeposu.ayarla({ yukleniyor: true })
   let d = akisBaslat(crypto.randomUUID())
@@ -23,7 +31,7 @@ export async function calistir(inst: ChatInstance, govde: Record<string, unknown
     if (plan) {
       const p = await planGonder(govde, signal)
       await inst.messaging.addMessageChunk({ final_response: sonYanit(d, p, secenekler()) } as StreamChunk)
-      asistanDeposu.ayarla({ sonYanitId: d.yanitId, sonModel: p.meta?.model })
+      asistanDeposu.ayarla({ sonYanitId: d.yanitId, ...sonYanitBilgisi(p) })
     } else {
       await soruGonder(govde, o => {
         const r = olayIsle(d, o, secenekler())
@@ -32,10 +40,10 @@ export async function calistir(inst: ChatInstance, govde: Record<string, unknown
         for (const p of r.parcalar) sira(() => inst.messaging.addMessageChunk(p))
         if (r.parcalar.length) acikYanit = 'final_response' in r.parcalar[r.parcalar.length - 1] ? null : d.yanitId
         if (o.ad === 'answer') {
-          const payload = o.veri.payload as { answer?: string; meta?: { model?: string } }
+          const payload = o.veri.payload as YanitOzeti & { answer?: string }
           const dk = asistanDeposu.al()
           asistanDeposu.ayarla({ dokum: [...dk.dokum, { role: 'assistant', content: payload.answer ?? '' }],
-            sonYanitId: d.yanitId, sonModel: payload.meta?.model })
+            sonYanitId: d.yanitId, ...sonYanitBilgisi(payload) })
         }
       }, signal)
       await zincir

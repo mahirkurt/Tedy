@@ -1,0 +1,640 @@
+@use '@carbon/react/scss/spacing';
+@use '@carbon/react/scss/theme';
+@use '@carbon/react/scss/type';
+
+// ─── Carbon AI asistanının TEDY parçaları (sayfa ve başlatıcı paneli ortak) ─────────────────────────────────
+// 2026-10-10 Asistan yenilemesi: yeni arayüz components/AssistantChat.scss'e (eski arayüz, geri dönüş yolu)
+// dayanmaz; kullandığı aileler buraya taşındı ve kurallara göre yeniden yazıldı. S46: sohbet paneli Carbon'un AI
+// yüzeyidir; buradaki her öğe nötrdür — AI token'ı, gradyan, gölge yok (K1). Köşe: kart/panel 8 px, kontrol 0,
+// çip tam (S10); büyük harf ve elle harf aralığı yok (S38); başlık ağırlığı token'dan (S44); boyutlar rem.
+
+// ── Öğretmen seçimi (başlığın altındaki satır, HEADER_BOTTOM_ELEMENT) ──
+.asistan__ogretmen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: spacing.$spacing-03;
+  padding-block: spacing.$spacing-02;
+  padding-inline: spacing.$spacing-05;
+  border-block-end: 1px solid theme.$border-subtle-01;
+  // Başlığın devamı: Carbon'un sohbet başlığıyla aynı zemin (AI degradesi değil, nötr; S46).
+  background: theme.$chat-header-background;
+}
+
+.asistan__ogretmen-hata {
+  @include type.type-style('helper-text-01');
+
+  margin: 0;
+  color: theme.$text-secondary;
+}
+
+// ── Karşılama, sınırlar, bağlam çipleri, uyarı (giriş üstü, BEFORE_INPUT_ELEMENT) ──
+.asistan__karsilama {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-04;
+  padding-block-end: spacing.$spacing-05;
+  padding-inline: spacing.$spacing-05;
+}
+
+.asistan__karsilama-metni {
+  @include type.type-style('body-02');
+
+  margin: 0;
+  max-inline-size: 40rem;
+  color: theme.$text-primary;
+}
+
+.asistan__hizli-sorular {
+  display: flex;
+  flex-wrap: wrap;
+  gap: spacing.$spacing-03;
+}
+
+.asistan__sinirlar {
+  @include type.type-style('helper-text-01');
+
+  margin: 0;
+  color: theme.$text-helper;
+}
+
+.asistan__baglam {
+  display: flex;
+  flex-wrap: wrap;
+  gap: spacing.$spacing-03;
+  padding-block-end: spacing.$spacing-03;
+  padding-inline: spacing.$spacing-05;
+}
+
+.asistan__uyari {
+  padding-inline: spacing.$spacing-05;
+}
+
+.asistan__salt-notu,
+.asistan__aile-notu,
+.asistan__ses-hata {
+  @include type.type-style('body-compact-01');
+
+  margin: 0;
+  padding-block: spacing.$spacing-03;
+  padding-inline: spacing.$spacing-05;
+  color: theme.$text-secondary;
+}
+
+.asistan__ses-hata {
+  color: theme.$text-error;
+}
+
+// ── Gönderilmeyi bekleyen ekler ──
+.asistan__ekler {
+  display: flex;
+  flex-wrap: wrap;
+  gap: spacing.$spacing-03;
+  margin: 0;
+  padding-block-end: spacing.$spacing-03;
+  padding-inline: spacing.$spacing-05;
+  list-style: none;
+}
+
+.asistan__ek {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: spacing.$spacing-03;
+  max-inline-size: 100%;
+  padding-inline-start: spacing.$spacing-04;
+  border: 1px solid theme.$border-subtle-01;
+  background: theme.$layer-01;
+  overflow-wrap: anywhere;
+}
+
+.asistan__ek-ad {
+  @include type.type-style('body-compact-01');
+}
+
+.asistan__ek-tur {
+  @include type.type-style('label-01');
+
+  color: theme.$text-secondary;
+}
+
+.asistan__ek-onizleme {
+  max-inline-size: spacing.$spacing-10;
+  max-block-size: spacing.$spacing-10;
+  object-fit: contain;
+}
+
+.asistan__ek-hata {
+  @include type.type-style('label-01');
+
+  flex-basis: 100%;
+  margin: 0;
+  padding-block-end: spacing.$spacing-03;
+  color: theme.$text-error;
+}
+
+.asistan__ek-yukleniyor {
+  inline-size: auto;
+}
+
+// Gizli dosya girdileri (YuklemeAlani): erişilebilir ad düğmededir.
+.ac__dosya-girdi {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+// ── Giriş satırının eylemleri (PROMPT_LINE_ACTIONS_END) ──
+.asistan__giris-eylemleri {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+// "Ödeve bağla" menüsü: ödev adları uzun; Carbon'un 10rem menüsü kısaltırdı. Başlatıcı panelinin (z 8000) üstünde.
+.asistan__odev-menusu {
+  inline-size: 20rem;
+  max-inline-size: calc(100vw - 2rem);
+  z-index: 8001;
+}
+
+// ── Mesaj altbilgisi: durum göstergeleri (ikon + metin, S45) ve eylemler ──
+.asistan__altbilgi {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-02;
+  margin-block-start: spacing.$spacing-03;
+}
+
+.asistan__durumlar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: spacing.$spacing-02 spacing.$spacing-05;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.asistan__durum {
+  @include type.type-style('label-02');
+
+  display: inline-flex;
+  align-items: center;
+  gap: spacing.$spacing-02;
+  color: theme.$text-primary;
+}
+
+.asistan__durum-ikon {
+  flex: none;
+}
+
+.asistan__durum--uyari .asistan__durum-ikon {
+  fill: theme.$support-warning;
+
+  [data-icon-path='inner-path'] {
+    fill: theme.$text-primary;
+    opacity: 1;
+  }
+}
+
+.asistan__durum--hata .asistan__durum-ikon {
+  fill: theme.$support-error;
+}
+
+.asistan__durum--bilgi .asistan__durum-ikon {
+  fill: theme.$support-info;
+}
+
+.asistan__eylemler {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: spacing.$spacing-01;
+}
+
+.asistan__hata {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: spacing.$spacing-02;
+}
+
+// ── Çalışma planı kartı ──
+.asistan-plan {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-04;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.asistan-plan__oge {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-02;
+  padding-block-end: spacing.$spacing-04;
+  border-block-end: 1px solid theme.$border-subtle-01;
+
+  &:last-child {
+    padding-block-end: 0;
+    border-block-end: 0;
+  }
+}
+
+.asistan-plan__ust {
+  display: flex;
+  align-items: center;
+  gap: spacing.$spacing-03;
+}
+
+.asistan-plan__sure {
+  @include type.type-style('label-01');
+
+  color: theme.$text-secondary;
+  font-variant-numeric: tabular-nums;
+}
+
+.asistan-plan__baslik {
+  @include type.type-style('heading-compact-01');
+}
+
+.asistan-plan__adimlar {
+  @include type.type-style('body-compact-01');
+
+  margin: 0;
+  color: theme.$text-secondary;
+}
+
+// ── Kaynak paneli (workspace paneli; SourcePanel) — nötr katman: kaynak, model metni değildir (K1, K3; B54) ──
+.asistan__kaynaklar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: spacing.$spacing-03;
+  padding: spacing.$spacing-05;
+}
+
+.asistan__kaynaklar .ac__panel {
+  inline-size: 100%;
+  padding: spacing.$spacing-05;
+  border: 1px solid theme.$border-subtle-01;
+  border-radius: var(--ted-radius-card);
+  background: theme.$layer-01;
+}
+
+.asistan__kaynaklar .ac__panel-title {
+  @include type.type-style('heading-compact-02');
+
+  display: flex;
+  align-items: center;
+  gap: spacing.$spacing-03;
+  margin: 0 0 spacing.$spacing-04;
+  color: theme.$text-primary;
+}
+
+.asistan__kaynaklar .ac__ref-group {
+  padding-inline-start: spacing.$spacing-03;
+  border-inline-start: 2px solid transparent;
+}
+
+.asistan__kaynaklar .ac__ref-group--unclassified {
+  border-inline-start-color: theme.$support-warning;
+}
+
+.asistan__kaynaklar .ac__ref-group-title {
+  @include type.type-style('heading-compact-01');
+
+  margin: spacing.$spacing-04 0 spacing.$spacing-02;
+  color: theme.$text-secondary;
+}
+
+.asistan__kaynaklar .ac__ref-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.asistan__kaynaklar .ac__ref-item {
+  display: flex;
+  gap: spacing.$spacing-03;
+  padding: spacing.$spacing-03;
+  border-block-end: 1px solid theme.$border-subtle-01;
+
+  &:last-child {
+    border-block-end: 0;
+  }
+}
+
+// Kaynak satırının hover'ı ve seçili hâli nötr katmandır, AI aurası değil (K1).
+@media (any-hover: hover) {
+  .asistan__kaynaklar .ac__ref-item:hover {
+    background: theme.$layer-hover-01;
+  }
+}
+
+.asistan__kaynaklar .ac__ref-item--active {
+  background: theme.$layer-selected-01;
+  outline: 1px solid theme.$border-interactive;
+}
+
+.asistan__kaynaklar .ac__ref-index {
+  @include type.type-style('label-01');
+
+  flex: none;
+  min-inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border: 1px solid theme.$border-strong-01;
+  border-radius: 999px;
+  text-align: center;
+  color: theme.$text-primary;
+}
+
+.asistan__kaynaklar .ac__ref-path {
+  @include type.type-style('heading-compact-01');
+
+  display: block;
+  margin-block-end: spacing.$spacing-01;
+  color: theme.$text-primary;
+}
+
+.asistan__kaynaklar .ac__ref-snippet,
+.asistan__kaynaklar .ac__ref-unlinked {
+  @include type.type-style('body-compact-01');
+
+  margin: 0;
+  color: theme.$text-secondary;
+}
+
+.asistan__kaynaklar .ac__ref-figure {
+  display: block;
+  max-inline-size: 100%;
+  max-block-size: 10rem;
+  margin-block-start: spacing.$spacing-02;
+  border: 1px solid theme.$border-subtle-01;
+  background: theme.$layer-01;
+}
+
+.asistan__kaynaklar .ac__ref-open {
+  @include type.type-style('body-compact-01');
+
+  display: inline-block;
+  margin-block-start: spacing.$spacing-02;
+  color: theme.$link-primary;
+
+  &:focus-visible {
+    outline: 2px solid theme.$focus;
+    outline-offset: 2px;
+  }
+}
+
+.asistan__kaynaklar .ac__muted {
+  @include type.type-style('body-compact-01');
+
+  margin: 0;
+  color: theme.$text-secondary;
+}
+
+// ── Sohbet geçmişi (HISTORY_PANEL_ELEMENT): nötr TEDY yüzeyi ──
+.asistan-gecmis {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-04;
+  // Telefonda panel sohbeti örter; AI degradesi geçmişe sızmasın diye kendi nötr zemini (S46).
+  min-block-size: 100%;
+  padding: spacing.$spacing-05;
+  background: theme.$background;
+  overflow-wrap: anywhere;
+}
+
+.asistan-gecmis__ust {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: spacing.$spacing-03;
+}
+
+.asistan-gecmis__baslik {
+  @include type.type-style('heading-compact-02');
+
+  margin: 0;
+}
+
+.asistan-gecmis__alt-baslik {
+  @include type.type-style('heading-compact-01');
+
+  margin: spacing.$spacing-03 0 0;
+  color: theme.$text-secondary;
+}
+
+.asistan-gecmis__liste {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.asistan-gecmis__satir {
+  border-block-end: 1px solid theme.$border-subtle-01;
+
+  &:last-child {
+    border-block-end: 0;
+  }
+}
+
+.asistan-gecmis__satir-ust {
+  display: flex;
+  align-items: center;
+}
+
+.asistan-gecmis__ac {
+  flex: 1;
+  min-inline-size: 0;
+  max-inline-size: none;
+  white-space: normal;
+  text-align: start;
+}
+
+.asistan-gecmis__ac[aria-current='true'] {
+  // Seçili satır: katman + 3 px kenar (S11: durağan gölge yok).
+  border-inline-start: 3px solid theme.$border-interactive;
+  background: theme.$layer-selected-01;
+}
+
+.asistan-gecmis__not {
+  @include type.type-style('body-compact-01');
+
+  flex: 1;
+  margin: 0;
+  padding-block: spacing.$spacing-03;
+}
+
+.asistan-gecmis__bos {
+  @include type.type-style('body-compact-01');
+
+  margin: 0;
+  color: theme.$text-secondary;
+}
+
+// ── AI açıklama penceresi: Carbon pencereyi boyar; burada yalnız sözlerin düzeni (§6.2 tip ölçüleri) ──
+.asistan-ai {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+  max-inline-size: 20rem;
+}
+
+.asistan-ai__baslik {
+  @include type.type-style('heading-04');
+
+  margin: 0;
+  color: theme.$text-primary;
+}
+
+.asistan-ai__govde {
+  @include type.type-style('body-01');
+
+  margin: 0;
+  color: theme.$text-secondary;
+}
+
+.asistan-ai__ayrintilar {
+  @include type.type-style('label-02');
+
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-02;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: theme.$text-primary;
+}
+
+// ── Kartlar (D1 netleştirme, D2 fotoğraftan ödev, B1 öneri, B2 gönderilmiş ek) ──
+.ac-msg__oneri {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: spacing.$spacing-03;
+  inline-size: 100%;
+  min-inline-size: 0;
+  margin-block-start: spacing.$spacing-04;
+  padding-inline-start: spacing.$spacing-04;
+  border-inline-start: 3px solid var(--ted-subject-accent);
+
+  // Carbon'un düğmesi max-content genişliktedir; dar ekranda balonun dışına taşıyordu (ölçüldü, öneri görsel testi).
+  .cds--btn {
+    max-inline-size: 100%;
+    min-inline-size: 0;
+  }
+}
+
+.ac-msg__oneri-gerekce {
+  @include type.type-style('body-compact-01');
+
+  margin: 0;
+  max-inline-size: 100%;
+  color: theme.$text-secondary;
+  overflow-wrap: anywhere;
+}
+
+.ac-netlestirme {
+  display: flex;
+  flex-wrap: wrap;
+  gap: spacing.$spacing-03;
+  margin-block-start: spacing.$spacing-04;
+}
+
+.ac-netlestirme .cds--btn,
+.ac-odev-onayi .cds--btn {
+  max-inline-size: 100%;
+  min-block-size: spacing.$spacing-09;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.ac-odev-onayi {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-04;
+  margin-block-start: spacing.$spacing-05;
+}
+
+.ac-odev-onayi h3 {
+  @include type.type-style('heading-compact-01');
+}
+
+.ac-odev-onayi fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-04;
+  min-inline-size: 0;
+  padding: spacing.$spacing-04;
+  border: 1px solid theme.$border-subtle-01;
+}
+
+.ac-odev-onayi [role='alert'] {
+  color: theme.$text-error;
+}
+
+.ac-yuklenen-ek {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: spacing.$spacing-03;
+  margin-block: spacing.$spacing-03;
+  padding: spacing.$spacing-03;
+  border: 1px solid theme.$border-subtle-01;
+  overflow-wrap: anywhere;
+
+  img {
+    max-inline-size: spacing.$spacing-10;
+    max-block-size: spacing.$spacing-10;
+    object-fit: contain;
+  }
+
+  a {
+    color: theme.$link-primary;
+  }
+
+  a:focus-visible {
+    outline: 2px solid theme.$focus;
+  }
+}
+
+// ── Cevaptaki vurgu satırı ("Şimdi:", "Not:"): cümle düzeni, büyük harf ve elle aralık yok (S38, B70) ──
+.ac-md__callout {
+  padding: spacing.$spacing-03 spacing.$spacing-04;
+  border-inline-start: 3px solid theme.$border-interactive;
+  background: theme.$layer-01;
+}
+
+.ac-md__callout--not {
+  border-inline-start-color: theme.$border-strong-01;
+}
+
+.ac-md__callout-label {
+  @include type.type-style('heading-compact-01');
+
+  display: block;
+  margin-block-end: spacing.$spacing-01;
+  color: theme.$text-secondary;
+}
+
+@media (max-width: 671px) {
+  .asistan__ogretmen {
+    padding-inline: spacing.$spacing-03;
+  }
+
+  .asistan__karsilama,
+  .asistan__baglam,
+  .asistan__ekler {
+    padding-inline: spacing.$spacing-03;
+  }
+}

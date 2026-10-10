@@ -1,4 +1,3 @@
-import './GirisUstu.scss'
 import { InlineNotification } from '@carbon/react'
 import { asistanDeposu, useAsistanDurumu } from './asistanDeposu.ts'
 

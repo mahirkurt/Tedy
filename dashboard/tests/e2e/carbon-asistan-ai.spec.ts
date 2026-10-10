@@ -101,3 +101,62 @@ test('the assistant stylesheet names no colour of its own', async () => {
   }
   expect(offenders, 'token yerine değişmez renk').toEqual([])
 })
+
+// ── Asistan yenilemesi (2026-10-10): ad, klavye (B53, B57, K9), yedek modelin adı (B55), S46 sınırı ──
+
+test('the AI label has a Turkish accessible name, not Carbon’s deprecated default', async ({ page }) => {
+  await page.route('**/api/assistant/stream', r => r.abort())
+  await asistanAc(page)
+  await expect(etiket(page)).toHaveAccessibleName('AI Yapay zekâ hakkında bilgi')
+})
+
+test('the AI label works from the keyboard: Enter opens, focus stays, Esc closes back to the trigger', async ({ page }) => {
+  await page.route('**/api/assistant/stream', r => r.abort())
+  await asistanAc(page)
+  await etiket(page).focus()
+  await page.keyboard.press('Enter')
+  await expect(aciklama(page)).toBeVisible()
+  await expect(etiket(page)).toBeFocused()
+  await expect(etiket(page)).toHaveAttribute('aria-expanded', 'true')
+  await page.keyboard.press('Escape')
+  await expect(etiket(page)).toHaveAttribute('aria-expanded', 'false')
+  await expect(etiket(page)).toBeFocused()
+  await page.keyboard.press('Space')
+  await expect(etiket(page)).toHaveAttribute('aria-expanded', 'true')
+  await page.keyboard.press('Space')
+  await expect(etiket(page)).toHaveAttribute('aria-expanded', 'false')
+})
+
+test('a house-model answer is named in words, never by its identifier', async ({ page }) => {
+  await page.route('**/api/assistant/stream', r => r.abort())
+  await page.route('**/api/assistant/chat', r => r.fulfill(json({ ...ANSWER, citations: [], answer: 'Paydaları eşitle.',
+    safety_flags: ['warning:yerel_yedek'], meta: { model: 'gemma4-e4b-cpu', provider: 'yerel', degraded: [] } })))
+  await asistanAc(page)
+  await sor(page, 'kesirler')
+  await expect(sonCevap(page)).toContainText('Paydaları eşitle.')
+  await etiket(page).click()
+  await expect(aciklama(page)).toContainText('Son yanıtı Evdeki model (Gemma) yazdı.')
+  await expect(aciklama(page)).toContainText('evdeki yedek model')
+  await expect(aciklama(page)).not.toContainText('gemma4')
+})
+
+test('S46: the chat panel is the AI surface; the TEDY parts outside the messages carry no AI gradient', async ({ page }) => {
+  await ask(page)
+  // Önce öğelerin çizildiği kanıtlanır (yokluk boş sayfada da doğrudur).
+  await expect(page.locator('.asistan__ogretmen')).toBeVisible()
+  await page.getByRole('button', { name: 'Sohbetler', exact: true }).first().click()
+  await expect(page.locator('.asistan-gecmis')).toBeVisible()
+  for (const sec of ['.asistan__ogretmen', '.asistan-gecmis', '.asistan__altbilgi']) {
+    const bg = await page.locator(sec).first().evaluate(el => getComputedStyle(el).backgroundImage)
+    expect(bg, `${sec} AI degradesi taşımamalı`).toBe('none')
+  }
+  await page.getByRole('button', { name: 'Kaynak ayrıntıları' }).click()
+  const panel = page.locator('.asistan__kaynaklar .ac__panel')
+  await expect(panel).toBeVisible()
+  const [bg, golge, kenar] = await panel.evaluate(el => {
+    const s = getComputedStyle(el); return [s.backgroundImage, s.boxShadow, s.borderTopColor]
+  })
+  expect(bg).toBe('none')
+  expect(golge).toBe('none')
+  expect(kenar).not.toBe('rgba(0, 0, 0, 0)')
+})

@@ -132,8 +132,10 @@ test('açık ödev çipte görünür ve istekte öğe olarak gider; pencere kapa
   await expect(page.getByText('Bu sayfa: İşler', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Başla', exact: true }).click()
   await expect(page.getByText('Bu sayfa: İşler — Matematik — Kesirlerde toplama — sayfa 165, 1-12 arası', { exact: true })).toBeVisible()
+  // B61: pencere açıkken panel onun altındadır (işaretçi pencereye gider); bağlamın isteğe taşınması burada
+  // durum olarak sınanır — gönderim olayı doğrudan düğmeye verilir.
   await page.getByRole('textbox', { name: /^Sorunu(zu)? yaz/ }).fill('Nasıl başlarım?')
-  await gonderDugmesi(page).click()
+  await gonderDugmesi(page).dispatchEvent('click')
   await expect.poll(() => istekler.length).toBe(1)
   expect(istekler[0]).toMatchObject({ sayfa: { ad: 'isler', oge: { tur: 'odev', id: 'mat-kesir' } } })
 })
@@ -149,11 +151,50 @@ test('kapatılan bağlam çipi ödev listesi yenilenince geri gelmez', async ({ 
   await baslatici(page).click()
   await page.getByRole('button', { name: 'Başla', exact: true }).click()
   await expect(page.getByText(/^Bu sayfa: İşler — Matematik/)).toBeVisible()
-  await page.getByRole('button', { name: 'Bağlamı kaldır: İşler' }).click()
+  // B61: ödev penceresi açıkken panel onun altında kalır (aşağıdaki test); çipin durumu burada sınanır, işaretçi
+  // değil — tıklama olayı doğrudan düğmeye verilir.
+  await page.getByRole('button', { name: 'Bağlamı kaldır: İşler' }).dispatchEvent('click')
   await expect(page.getByText(/^Bu sayfa:/)).toHaveCount(0)
   const yenilendi = page.waitForResponse(r => r.url().includes('/api/homework'))
   await page.evaluate(() => window.dispatchEvent(new Event('tedy:homework-updated')))
   await yenilendi
-  await page.waitForTimeout(500)
+  // Süre değil koşul: yenilenen ödev listesi çizildi (iki kare sonra React işlemesini bitirmiştir); sonra yokluk.
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
   await expect(page.getByText(/^Bu sayfa:/)).toHaveCount(0)
+})
+
+test('ödev penceresi açıkken asistan paneli onun altında kalır (tek diyalog, B61)', async ({ page }) => {
+  const ileri = new Date(Date.now() + 3 * 864e5)
+  const teslim = `${String(ileri.getDate()).padStart(2, '0')}.${String(ileri.getMonth() + 1).padStart(2, '0')}.${ileri.getFullYear()} 23:59`
+  const odev = { ...(FULL.homework as { homework: Record<string, unknown>[] }).homework[0], homework_key: 'mat-kesir',
+    'Ödev Son Teslim Tarihi': teslim }
+  await mock(page, { ...FULL, homework: { summary: '', homework: [odev] } })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/isler')
+  await baslatici(page).click()
+  const giris = page.getByRole('textbox', { name: /^Sorunu(zu)? yaz/ })
+  await expect(giris).toBeVisible({ timeout: 15000 })
+  await page.getByRole('button', { name: 'Başla', exact: true }).click()
+  await expect(page.locator('.cds--modal.is-visible').first()).toBeVisible()
+  // Panelin giriş alanının ortasında en üstteki öğe ödev penceresine (ya da örtüsüne) aittir, panele değil.
+  const kutu = (await giris.boundingBox())!
+  const ustteki = await page.evaluate(([x, y]) => {
+    const el = document.elementFromPoint(x, y)
+    return el ? (el.closest('.asistan-baslatici') ? 'panel' : el.closest('.cds--modal') ? 'pencere' : el.tagName) : 'yok'
+  }, [kutu.x + kutu.width / 2, kutu.y + kutu.height / 2])
+  expect(ustteki).toBe('pencere')
+  const [panelZ, pencereZ] = await page.evaluate(() => [
+    Number(getComputedStyle(document.querySelector('.asistan-baslatici')!).zIndex),
+    Number(getComputedStyle(document.querySelector('.cds--modal.is-visible')!).zIndex),
+  ])
+  expect(panelZ).toBeLessThan(pencereZ)
+})
+
+test('başlatıcı düğmesi birincil değil: sayfanın birincil eylemi tek kalır (S12, B17)', async ({ page }) => {
+  await mock(page, FULL)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/isler')
+  await expect(baslatici(page)).toBeVisible()
+  await expect(baslatici(page)).not.toHaveClass(/cds--btn--primary/)
+  await expect(baslatici(page)).toHaveClass(/cds--btn--secondary/)
 })

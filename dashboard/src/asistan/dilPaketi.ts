@@ -216,7 +216,7 @@ export const TURKCE: LanguagePack = {
   table_itemsPerPage: 'Sayfa başına:',
   table_paginationSupplementalText: '/ {pagesCount, number} sayfa',
   table_paginationStatus: '{start, number}–{end, number} / {count, number} öğe',
-  codeSnippet_feedback: 'Kopyalandı!',
+  codeSnippet_feedback: 'Kopyalandı',
   codeSnippet_showLessText: 'Daha az göster',
   codeSnippet_showMoreText: 'Daha fazla göster',
   codeSnippet_tooltipContent: 'Panoya kopyala',

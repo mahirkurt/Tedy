@@ -62,8 +62,8 @@ test('a phone page begins under the header, as a desktop one does', async ({ pag
 
 test('opening Asistan on a phone does not scroll the page', async ({ page }) => {
   await ac(page, '/asistan', 390, 844)
-  // Carbon AI Chat'in başlığı bir başlık öğesi değil; adı ve giriş alanı ekranda olmalı.
-  await expect(page.getByText('TEDY Asistan', { exact: true }).first()).toBeInViewport()
+  // Carbon AI Chat'in başlığı bir başlık öğesi değil; başlığı (o anki öğretmen) ve giriş alanı ekranda olmalı.
+  await expect(page.getByText('Genel asistan', { exact: true }).first()).toBeInViewport()
   await expect(page.getByRole('textbox', { name: /^Sorunu(zu)? yaz/ })).toBeInViewport()
   expect(await page.evaluate(() => window.scrollY)).toBe(0)
 })

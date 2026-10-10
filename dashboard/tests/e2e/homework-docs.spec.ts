@@ -60,8 +60,13 @@ test('the assistant can be aimed at one homework', async ({ page }) => {
     json: { summary: '', homework: [ROW] },
   }))
   await page.goto('/asistan')
-  const secim = page.getByLabel('Ödev', { exact: true })
-  await expect(secim).toBeVisible()
-  await secim.selectOption({ label: 'Matematik — Kesirler' })
-  await expect(secim).toHaveValue(ROW.homework_key)
+  // Asistan yenilemesi (2026-10-10): ödev seçimi giriş satırının bir eylemidir ("Ödeve bağla" menüsü); seçilen ödev
+  // giriş üstündeki bağlam çipi olur ve kaldırılabilir.
+  const ac = page.getByRole('button', { name: 'Ödeve bağla', exact: true })
+  await expect(ac).toBeVisible({ timeout: 15000 })
+  await ac.click()
+  await page.getByRole('menuitem', { name: 'Matematik — Kesirler' }).click()
+  await expect(page.getByText('Ödev: Matematik — Kesirler', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Ödevi kaldır' }).click()
+  await expect(page.getByText('Ödev: Matematik — Kesirler', { exact: true })).toHaveCount(0)
 })

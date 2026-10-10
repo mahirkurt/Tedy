@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { json } from './_audit-fixtures'
 import { OGRETMENLER } from './_gorsel-fixtures'
-import { carbonSabitAc as sabitAc, soruAlani, sonCevap } from './_asistan-carbon'
+import { carbonSabitAc as sabitAc, ogretmenSec, ogretmenSecimi, soruAlani, sonCevap } from './_asistan-carbon'
 
 // Öğretmen modları (spec §1, plan B1): the selector, its memory, each teacher's
 // theme, greeting and quick prompts, and the request carrying the mode.
@@ -11,10 +11,12 @@ test.use({ timezoneId: 'Europe/Istanbul', locale: 'tr-TR' })
 
 // The fixture's auth/me is test@tedy.online, a family member (student: false).
 const ANAHTAR = 'tedy-asistan-ogretmen::test@tedy.online'
-// The send button's fill: Carbon's button-primary (blue-60) in Genel, the
-// family's accent (the -60 palette step, theme/_subjects.scss) in a teacher mode.
-const VURGU: Record<string, string> = {
-  genel: 'rgb(15, 98, 254)',
+// S35 (B68, Asistan yenilemesi 2026-10-10): the send button keeps Carbon's action blue (blue-60) in every
+// mode; the subject's colour lives only on the chat frame's edge and the reader's own bubble.
+const MAVI = 'rgb(15, 98, 254)'
+const KIPLER = ['genel', 'turkce', 'fen', 'sosyal', 'matematik']
+// The frame's 4px top edge: the family's accent (the -60 palette step, theme/_subjects.scss).
+const KENAR: Record<string, string> = {
   turkce: 'rgb(208, 38, 112)',
   fen: 'rgb(0, 125, 121)',
   sosyal: 'rgb(0, 114, 195)',
@@ -37,51 +39,69 @@ async function hatirla(page: Page, id: string) {
 
 async function asistan(page: Page, w = 1440, h = 900) {
   await sabitAc(page, '/asistan', w, h)
-  await expect(page.getByRole('group', { name: 'Öğretmen' })).toBeVisible()
+  await expect(ogretmenSecimi(page)).toBeVisible()
 }
 
 const kok = (page: Page) => page.locator('section.asistan')
-// The chip, as a reader clicks it (the radio itself is visually hidden).
-const sec = (page: Page, ad: string) =>
-  page.getByRole('group', { name: 'Öğretmen' }).getByText(ad, { exact: true }).click()
 
-test('five teachers in order, Genel chosen at first', async ({ page }) => {
+test('one Dropdown, five teachers in order, Genel chosen at first', async ({ page }) => {
   await asistan(page)
-  const secenekler = page.getByRole('group', { name: 'Öğretmen' }).getByRole('radio')
+  // One control, labelled "Öğretmen", on the line under the chat's title (the radio chips are gone).
+  await expect(page.getByRole('radio')).toHaveCount(0)
+  await expect(page.getByText('Öğretmen', { exact: true }).first()).toBeVisible()
+  await expect(ogretmenSecimi(page)).toContainText('Genel')
+  await ogretmenSecimi(page).click()
+  const secenekler = page.getByRole('option')
   await expect(secenekler).toHaveCount(5)
-  for (const [i, ad] of ADLAR.entries()) await expect(secenekler.nth(i)).toHaveAccessibleName(ad)
-  await expect(page.getByRole('radio', { name: 'Genel' })).toBeChecked()
+  for (const [i, ad] of ADLAR.entries()) await expect(secenekler.nth(i)).toHaveText(ad)
   await expect(kok(page)).toHaveAttribute('data-ogretmen', 'genel')
+  // The title is the teacher; the product name is not repeated.
+  await expect(page.getByText('Genel asistan', { exact: true }).first()).toBeAttached()
 })
 
-test('arrow keys move through the teachers and the choice is remembered', async ({ page }) => {
+test('the keyboard opens the list and chooses, and the choice is remembered', async ({ page }) => {
   await asistan(page)
-  await page.getByRole('radio', { name: 'Genel' }).focus()
-  await page.keyboard.press('ArrowRight')
-  await expect(page.getByRole('radio', { name: 'Türkçe' })).toBeChecked()
-  await page.keyboard.press('ArrowRight')
-  await expect(page.getByRole('radio', { name: 'Fen' })).toBeChecked()
+  await ogretmenSecimi(page).focus()
+  // Carbon Dropdown (downshift select): ArrowDown opens the list on the chosen teacher, Enter chooses.
+  await page.keyboard.press('ArrowDown')
+  await expect(page.getByRole('option')).toHaveCount(5)
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+  await expect(ogretmenSecimi(page)).toContainText('Fen')
+  await expect(ogretmenSecimi(page)).toBeFocused()
   await expect(kok(page)).toHaveAttribute('data-ogretmen', 'fen')
   expect(await page.evaluate(k => localStorage.getItem(k), ANAHTAR)).toBe('fen')
   await page.reload()
-  await expect(page.getByRole('radio', { name: 'Fen' })).toBeChecked()
+  await expect(ogretmenSecimi(page)).toContainText('Fen')
 })
 
-for (const id of Object.keys(VURGU)) {
-  test(`${id}: the theme follows the teacher, the brand band does not`, async ({ page }) => {
+test('on a phone the selector is one row of at least 44px', async ({ page }) => {
+  await asistan(page, 390, 844)
+  const kutu = await ogretmenSecimi(page).boundingBox()
+  expect(kutu!.height).toBeGreaterThanOrEqual(44)
+  const satir = await page.locator('.asistan__ogretmen').boundingBox()
+  expect(satir!.height).toBeLessThan(70)
+})
+
+for (const id of KIPLER) {
+  test(`${id}: the frame follows the teacher, the send button and the brand band do not`, async ({ page }) => {
     await asistan(page)
     const bant = await page.locator('.cds--header').evaluate(el => getComputedStyle(el).backgroundColor)
-    await sec(page, ADLAR[Object.keys(VURGU).indexOf(id)])
+    if (id !== 'genel') await ogretmenSec(page, ADLAR[KIPLER.indexOf(id)])
     await expect(kok(page)).toHaveAttribute('data-ogretmen', id)
-    // A disabled button draws Carbon's disabled fill; type to enable it. toHaveCSS
-    // retries: Carbon's button eases its fill in from the disabled grey.
+    // A disabled button draws Carbon's disabled fill; type to enable it. expect.poll retries: Carbon's button
+    // eases its fill in from the disabled grey.
     await soruAlani(page).fill('x')
-    // Carbon AI Chat'in gönder düğmesi bir simge düğmesi: ders rengi simgenin dolgusundadır (--cds-interactive).
+    // Carbon AI Chat'in gönder düğmesi bir simge düğmesi; simgenin dolgusu --cds-interactive: her kipte mavi (S35).
     await expect.poll(() => page.getByRole('button', { name: 'Gönder', exact: true }).evaluate(b => {
       // Düğme cds-button'ın gölge kökünde; simge o öğenin ışık DOM'unda (slot="icon"). Boyanan dolgu ölçülür.
       const svg = (b.getRootNode() as ShadowRoot).host?.querySelector('svg[slot="icon"]')
       return svg ? getComputedStyle(svg).fill : 'simge yok'
-    })).toBe(VURGU[id])
+    })).toBe(MAVI)
+    const kenar = await page.locator('.asistan__sohbet').evaluate(el => getComputedStyle(el).borderTopColor)
+    if (id === 'genel') expect(await page.locator('.asistan__sohbet').evaluate(el => getComputedStyle(el).borderTopWidth)).toBe('0px')
+    else expect(kenar).toBe(KENAR[id])
     expect(await page.locator('.cds--header').evaluate(el => getComputedStyle(el).backgroundColor)).toBe(bant)
   })
 }
@@ -91,14 +111,17 @@ test('a teacher brings its own greeting and quick prompts', async ({ page }) => 
   await asistan(page)
   const mat = OGRETMENLER.ogretmenler[3]
   await expect(page.locator('.asistan__karsilama-metni')).toContainText(mat.karsilama.aile)
-  await expect(page.locator('.asistan__hizli-sorular button')).toHaveText(mat.hizli_sorular.aile)
-  await expect(page.getByText('Matematik öğretmeni — konuyu adım adım anlatır', { exact: true }).first()).toBeAttached()
+  await expect(page.locator('.asistan__hizli-sorular button')).toHaveText(mat.hizli_sorular.aile.slice(0, 3))
+  // The chat's title is the teacher's name (header title; no product name, no subtitle).
+  await expect(page.getByText('Matematik öğretmeni', { exact: true }).first()).toBeAttached()
+  // None of the quick questions is a primary button: the screen's one primary action is "Gönder" (S12).
+  await expect(page.locator('.asistan__hizli-sorular .cds--btn--primary')).toHaveCount(0)
 })
 
 test('a remembered teacher that no longer exists reads as Genel', async ({ page }) => {
   await hatirla(page, 'tarih')
   await asistan(page)
-  await expect(page.getByRole('radio', { name: 'Genel' })).toBeChecked()
+  await expect(ogretmenSecimi(page)).toContainText('Genel')
   await expect(kok(page)).toHaveAttribute('data-ogretmen', 'genel')
 })
 
@@ -121,8 +144,9 @@ test('a list that failed says so and Genel still works', async ({ page }) => {
   await sabitAc(page, '/asistan', 1440, 900)
   await page.route('**/api/assistant/ogretmenler', r => r.fulfill({ status: 503, body: '{}' }))
   await page.reload()
-  await expect(page.getByRole('group', { name: 'Öğretmen' }).getByRole('radio')).toHaveCount(1)
   await expect(page.getByText('Öğretmen modları şu an yüklenemedi; Genel modda sorabilirsiniz.')).toBeVisible()
+  await ogretmenSecimi(page).click()
+  await expect(page.getByRole('option')).toHaveCount(1)
 })
 
 test('a stale list plus a transient error shows the list, not the banner', async ({ page }) => {
@@ -131,7 +155,9 @@ test('a stale list plus a transient error shows the list, not the banner', async
   // on a failed poll (see useApi.ts), so a transient failure after a good
   // load must not show "yüklenemedi" over a list that is still right there.
   await asistan(page)
-  await expect(page.getByRole('group', { name: 'Öğretmen' }).getByRole('radio')).toHaveCount(5)
+  await ogretmenSecimi(page).click()
+  await expect(page.getByRole('option')).toHaveCount(5)
+  await page.keyboard.press('Escape')
   await page.route('**/api/assistant/ogretmenler', r => r.fulfill({ status: 500, body: '{}' }))
   const yenidenIstek = page.waitForResponse('**/api/assistant/ogretmenler')
   // useApi refetches on this event (homework updates use the same poll hook
@@ -139,7 +165,8 @@ test('a stale list plus a transient error shows the list, not the banner', async
   // interval.
   await page.evaluate(() => window.dispatchEvent(new Event('tedy:homework-updated')))
   await yenidenIstek
-  await expect(page.getByRole('group', { name: 'Öğretmen' }).getByRole('radio')).toHaveCount(5)
+  await ogretmenSecimi(page).click()
+  await expect(page.getByRole('option')).toHaveCount(5)
   await expect(page.getByText('Öğretmen modları şu an yüklenemedi; Genel modda sorabilirsiniz.')).toHaveCount(0)
 })
 
@@ -181,12 +208,12 @@ test('a suggestion from the stream shows a button and changes nothing by itself'
   await expect(page.getByText(ONERI.gerekce, { exact: true })).toBeVisible()
   // Nothing switched on its own.
   await expect(kok(page)).toHaveAttribute('data-ogretmen', 'genel')
-  await expect(page.getByRole('radio', { name: 'Genel' })).toBeChecked()
+  await expect(ogretmenSecimi(page)).toContainText('Genel')
   expect(await page.evaluate(k => localStorage.getItem(k), ANAHTAR)).toBeNull()
 
   await dugme.click()
   await expect(kok(page)).toHaveAttribute('data-ogretmen', 'matematik')
-  await expect(page.getByRole('radio', { name: 'Matematik' })).toBeChecked()
+  await expect(ogretmenSecimi(page)).toContainText('Matematik')
   expect(await page.evaluate(k => localStorage.getItem(k), ANAHTAR)).toBe('matematik')
   await expect(dugme).toHaveCount(0)          // in a teacher mode there is nothing to suggest
 })
@@ -205,9 +232,9 @@ test('keyboard activation of the suggestion focuses that teacher', async ({ page
   const dugme = page.getByRole('button', { name: 'Matematik öğretmenine geçelim mi?' })
   await dugme.focus()
   await page.keyboard.press('Enter')
-  const radyo = page.getByRole('radio', { name: 'Matematik' })
-  await expect(radyo).toBeChecked()
-  await expect(radyo).toBeFocused()
+  // The button disappears with the switch; focus goes to the teacher selector, which reads the new teacher.
+  await expect(ogretmenSecimi(page)).toContainText('Matematik')
+  await expect(ogretmenSecimi(page)).toBeFocused()
 })
 
 test('the classic endpoint carries the suggestion too', async ({ page }) => {

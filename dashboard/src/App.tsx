@@ -17,7 +17,6 @@ import { PortalStatusBanner } from './components/PortalStatusBanner'
 import TodaySchedule from './components/TodaySchedule'
 import WeeklySchedule from './components/WeeklySchedule'
 import HomeworkTracker from './components/HomeworkTracker'
-import AssistantChat from './components/AssistantChat'
 import { lazy, Suspense } from 'react'
 import { CARBON_AI_ACIK } from './asistan/bayrak'
 import AsistanBaslatici from './asistan/AsistanBaslatici'
@@ -26,6 +25,12 @@ import AsistanBaslatici from './asistan/AsistanBaslatici'
 const AsistanSayfasi = lazy(() => import('./asistan/AsistanSayfasi'))
 function AsistanGirisi() {
   return <Suspense fallback={<p className="app-shell-loading__text">Asistan yükleniyor…</p>}><AsistanSayfasi /></Suspense>
+}
+// Eski arayüz (geri dönüş yolu) da tembel: bayrak açıkken stil sayfası (components/AssistantChat.scss, AI aurası
+// taşıyan .ac__panel/.ac-cite kuralları — B54) pakete hiç girmez, yeni arayüzün kaynak paneline sızmaz.
+const EskiAsistan = lazy(() => import('./components/AssistantChat'))
+function EskiAsistanGirisi() {
+  return <Suspense fallback={<p className="app-shell-loading__text">Asistan yükleniyor…</p>}><EskiAsistan /></Suspense>
 }
 import GradeTable from './components/GradeTable'
 import PlatformProgress from './components/PlatformProgress'
@@ -56,7 +61,7 @@ function matchRoute(pathname: string, list: ReturnType<typeof routesFor>) {
 
 const COMPONENTS: Record<string, React.ComponentType> = {
   Lessons,
-  TodaySchedule, WeeklySchedule, HomeworkTracker, AssistantChat: CARBON_AI_ACIK ? AsistanGirisi : AssistantChat, GradeTable, ExamTimeline,
+  TodaySchedule, WeeklySchedule, HomeworkTracker, AssistantChat: CARBON_AI_ACIK ? AsistanGirisi : EskiAsistanGirisi, GradeTable, ExamTimeline,
   PlatformProgress, CalendarEvents, TeamActivities, CourseContent, Announcements, StudentProfile,
   TedyBooks, BookDetail, BookReader,
   Modules, ModuleViewerRoute, DraftViewerRoute,
