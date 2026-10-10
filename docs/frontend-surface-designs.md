@@ -550,6 +550,11 @@ düğmesi ikincildir ve açık panel ödev penceresinin altında kalır. Yeni ar
 dayanmaz (`asistan/Asistan.scss`); eski arayüz geri dönüş yolu olarak tembel yüklenir. Açık kalanlar talimatname
 §13'te (B76–B79).
 
+**Durum notu — 2. tur (2026-10-10):** B76–B79 kapandı: ödev penceresinde "Asistana sor" (pencere kapanır, ödev
+bağlam çipi olur, panel açılır); Carbon'un kendi düğmeleri telefonda 48 px, gölge kökteki ikonlar 4K'da ölçekli,
+azaltılmış harekette sohbet de durur; fotoğraftan ödev kartında yapay zekânın doldurduğu alanlar AI etiketi ve
+"Yapay zekânın önerisine dön" taşır; alıştırma ve ödev kartları okunacak içeriği salt okunur gösterir.
+
 ---
 
 ### 4.11 Tedy Books — *ayrı dünya*

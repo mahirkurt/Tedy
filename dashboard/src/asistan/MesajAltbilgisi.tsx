@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Button, IconButton } from '@carbon/react'
 import { Copy, Renew, Search, Book, ErrorFilled, InformationFilled, WarningAltFilled } from '@carbon/icons-react'
 import type { ChatInstance, MessageResponse } from '@carbon/ai-chat'
@@ -49,6 +50,10 @@ export default function MesajAltbilgisi({ veri, mesaj, inst }: { veri: AltbilgiV
   const ses = useAsistanDurumu(d => d.ses)
   // Telefonda 48 px (≥ 44 px dokunma hedefi); masaüstünde Carbon'un küçük düğmesi.
   const boy = useDar() ? 'lg' : 'sm'
+  // Kopyalama onaylanır (B41): düğmenin adı ve canlı bölge "Kopyalandı" der; pano reddederse "Kopyalanamadı".
+  const [kopya, setKopya] = useState<'' | 'Kopyalandı' | 'Kopyalanamadı'>('')
+  useEffect(() => { if (!kopya) return; const t = setTimeout(() => setKopya(''), 3000); return () => clearTimeout(t) }, [kopya])
+  const kopyala = () => navigator.clipboard.writeText(veri.metin).then(() => setKopya('Kopyalandı'), () => setKopya('Kopyalanamadı'))
   return (
     <div className="asistan__altbilgi" data-tedy-altbilgi>
       {(veri.kaynakSorunlari.length > 0 || veri.bayraklar.length > 0) && <ul className="asistan__durumlar">
@@ -58,7 +63,8 @@ export default function MesajAltbilgisi({ veri, mesaj, inst }: { veri: AltbilgiV
       <div className="asistan__eylemler">
         {veri.atiflar.length > 0 && <Button kind="ghost" size={boy} renderIcon={Book}
           onClick={e => void kaynaklariAc(inst, veri.atiflar, null, e.currentTarget)}>Kaynak ayrıntıları</Button>}
-        <IconButton kind="ghost" size={boy} label="Kopyala" onClick={() => void navigator.clipboard.writeText(veri.metin)}><Copy /></IconButton>
+        <IconButton kind="ghost" size={boy} label={kopya || 'Kopyala'} onClick={() => void kopyala()}><Copy /></IconButton>
+        {kopya && <span className="cds--visually-hidden" role="status">{kopya}</span>}
         {/* Salt okunur sohbette yapılamayacak eylem gizlenir, soluk gösterilmez (B42). */}
         {!salt && <IconButton kind="ghost" size={boy} label="Yeniden üret" disabled={yukleniyor} onClick={async () => {
           const s = soru(veri.metin); if (!s) return

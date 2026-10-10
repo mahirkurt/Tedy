@@ -60,6 +60,10 @@ test('every Asistan control TEDY draws is at least 44px on a phone', async ({ pa
   await sabitAc(page, '/asistan', 390, 844)
   await expect(page.getByRole('textbox', { name: /^Sorunu(zu)? yaz/ })).toBeVisible({ timeout: 15000 })
   await enAz(page.locator('#asistan-ogretmen button'))
+  // B79: Carbon AI Chat'in kendi denetimleri de (gölge kök; carbonOnarimi.ts dokunma kuralı) ve AI etiketi.
+  for (const ad of ['Gönder', 'Sohbetler', 'Sohbeti yeniden başlat', 'AI Yapay zekâ hakkında bilgi']) {
+    await enAz(page.getByRole('button', { name: ad, exact: true }).first())
+  }
   await enAz(page.locator('.asistan__giris-eylemleri button'))
   await page.getByRole('button', { name: 'Sohbetler', exact: true }).first().click()
   await expect(page.getByRole('heading', { name: 'Sohbetler', exact: true })).toBeVisible()

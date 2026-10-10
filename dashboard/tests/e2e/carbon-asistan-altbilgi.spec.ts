@@ -50,6 +50,9 @@ test('Daha derine in force_deep yollar; Yeniden üret eskisini kaldırır; Kopya
   expect(istekler[1]).toMatchObject({ force_deep: true })
   await page.getByRole('button', { name: 'Kopyala' }).first().click()
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('İlk cevap.')
+  // B41: kopyalama onaylanır — düğmenin adı ve canlı bölge "Kopyalandı" der (ünlemsiz).
+  await expect(page.getByRole('status').filter({ hasText: /^Kopyalandı$/ }).first()).toBeAttached()
+  await expect(page.getByRole('button', { name: 'Kopyalandı', exact: true }).first()).toBeVisible()
 })
 
 test('olumsuz geri bildirim kategorisiyle PUT eder; öğrenciye değil aileye uygun yer tutucu', async ({ page }) => {

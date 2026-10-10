@@ -81,3 +81,11 @@ export async function ogretmenSec(page: Page, ad: string) {
   await page.getByRole('option', { name: ad, exact: true }).click()
   await expect(ogretmenSecimi(page)).toContainText(ad)
 }
+
+/** Carbon'un atıf kaydırıcısı hazır mı: `cds-aichat-carousel` `firstUpdated`'da 100 ms bekleyip ancak sonra
+ *  `initCarousel` kurar; o ana dek "Sonraki slayt" `this.carousel?.next()` ile hiçbir şey yapmaz (yük altında daha
+ *  uzun — B76'nın kökü). Tıklamadan önce bu koşul beklenir. */
+export async function kaydiriciHazir(page: Page) {
+  await expect.poll(() => page.locator('cds-aichat-carousel').filter({ visible: true }).last()
+    .evaluate(el => Boolean((el as unknown as { carousel?: unknown }).carousel))).toBe(true)
+}

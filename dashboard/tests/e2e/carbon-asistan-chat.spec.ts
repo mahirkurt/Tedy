@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { mockSohbetler } from './_audit-fixtures'
-import { asistanAc, sor, sonCevap, soruAlani } from './_asistan-carbon'
+import { asistanAc, kaydiriciHazir, sor, sonCevap, soruAlani } from './_asistan-carbon'
 
 test.beforeEach(async ({ page }) => { await mockSohbetler(page) })
 
@@ -154,6 +154,8 @@ test('citations with an unknown kind get their own group, not folded into ogrenc
   await page.getByRole('button', { name: 'Kaynakları kapat' }).click()
   await page.getByRole('button', { name: 'Kaynaklar', exact: true }).click()
   await expect(sonCevap(page).locator('mark')).toContainText('Bilinen kaynak')
+  // B76: kaydırıcı kurulmadan gelen tıklama yutuluyordu (Carbon 100 ms sonra kurar); önce kurulması beklenir.
+  await kaydiriciHazir(page)
   await page.getByRole('button', { name: 'Sonraki slayt.' }).click()
   await expect(page.getByText('Bilinmeyen kaynak', { exact: true }).filter({ visible: true })).toHaveCount(1)
   await expect(sonCevap(page).locator('mark')).toContainText('tanınmayan kaynak')

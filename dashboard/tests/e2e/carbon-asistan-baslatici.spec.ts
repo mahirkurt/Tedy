@@ -198,3 +198,45 @@ test('başlatıcı düğmesi birincil değil: sayfanın birincil eylemi tek kal�
   await expect(baslatici(page)).not.toHaveClass(/cds--btn--primary/)
   await expect(baslatici(page)).toHaveClass(/cds--btn--secondary/)
 })
+
+// B78: ödev penceresi açıkken panel onun altında (B61); "Asistana sor" pencereyi kapatır, ödevi sonraki sorunun
+// bağlamı olarak sabitler ve paneli açar. Soru gidince bağlam düşer.
+function odevli() {
+  const ileri = new Date(Date.now() + 3 * 864e5)
+  const teslim = `${String(ileri.getDate()).padStart(2, '0')}.${String(ileri.getMonth() + 1).padStart(2, '0')}.${ileri.getFullYear()} 23:59`
+  return { ...(FULL.homework as { homework: Record<string, unknown>[] }).homework[0], homework_key: 'mat-kesir',
+    'Ödev Son Teslim Tarihi': teslim }
+}
+
+test('"Asistana sor" ödev penceresini kapatır, paneli ödev çipiyle açar; istek ödevi taşır (B78)', async ({ page }) => {
+  await mock(page, { ...FULL, homework: { summary: '', homework: [odevli()] } })
+  const istekler = await cevapla(page, PAYLOAD({ answer: 'Önce pay ve paydayı oku.' }))
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/isler')
+  await expect(baslatici(page)).toBeVisible()
+  await page.getByRole('button', { name: 'Başla', exact: true }).click()
+  const pencere = page.locator('.cds--modal.is-visible')
+  await expect(pencere).toBeVisible()
+  await pencere.getByRole('button', { name: 'Asistana sor', exact: true }).click()
+  await expect(pencere).toHaveCount(0)
+  const giris = page.getByRole('textbox', { name: /^Sorunu(zu)? yaz/ })
+  await expect(giris).toBeVisible({ timeout: 15000 })
+  await expect(page.getByText(/^Bu sayfa: İşler — Matematik/)).toBeVisible()
+  await giris.fill('Nasıl başlarım?')
+  await gonderDugmesi(page).click()   // gerçek tıklama: pencere kapandı, panelin üstünde başka diyalog yok
+  await expect.poll(() => istekler.length).toBe(1)
+  expect(istekler[0]).toMatchObject({ sayfa: { ad: 'isler', oge: { tur: 'odev', id: 'mat-kesir' } } })
+  await expect(page.getByText('Önce pay ve paydayı oku.', { exact: true })).toBeVisible()
+  await expect(page.getByText(/^Bu sayfa:/)).toHaveCount(0)
+})
+
+test('telefonda "Asistana sor" Asistan sayfasına ödev çipiyle gider (B78)', async ({ page }) => {
+  await mock(page, { ...FULL, homework: { summary: '', homework: [odevli()] } })
+  await cevapla(page, PAYLOAD())
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/isler')
+  await page.getByRole('button', { name: 'Başla', exact: true }).click()
+  await page.locator('.cds--modal.is-visible').getByRole('button', { name: 'Asistana sor', exact: true }).click()
+  await expect(page).toHaveURL(/\/asistan\?sayfa=isler$/)
+  await expect(page.getByText(/^Bu sayfa: İşler — Matematik/)).toBeVisible({ timeout: 15000 })
+})

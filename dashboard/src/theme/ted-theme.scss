@@ -1104,6 +1104,11 @@ body {
 }
 
 // ─── Homework Modal Enhanced ──────────────────────────────────────────────────
+// "Asistana sor" (B78): pencerenin içeriğinden sonra, kendi satırında; birincil değil (S12).
+.homework-modal__asistan {
+  margin-block-start: spacing.$spacing-06;
+}
+
 .homework-modal__body {
   display: flex;
   flex-direction: column;

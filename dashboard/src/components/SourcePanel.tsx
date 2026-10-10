@@ -39,10 +39,11 @@ interface Props {
 /** The only way from an answer to a module: the dashboard's own module route, which asks for a
  *  viewing ticket when it opens (spec §5.4). A locator that fails the catalog's rules gets no
  *  link, and says so instead of showing a dead one. */
-function ModuleOpen({ locator }: { locator: Record<string, unknown> | undefined }) {
+function ModuleOpen({ locator, label }: { locator: Record<string, unknown> | undefined; label: string }) {
   const route = moduleRoute(locator)
   if (!route) return <p className="ac__ref-unlinked">Bağlantı kurulamadı</p>
-  return <Link className="ac__ref-open" to={route}>Modülü aç</Link>
+  // Each link names its module (talimatname B41): several "Modülü aç" links in one panel read the same to a screen reader.
+  return <Link className="ac__ref-open" to={route}>Modülü aç: {label}</Link>
 }
 
 /** The figure part of a locator, or null. The value arrives as unchecked JSON, and it becomes a
@@ -147,7 +148,7 @@ function RefGroup({
                   : yukleme
                     ? <YuklemeOnizleme id={yukleme} ad={c.label} />
                     : <p className="ac__ref-snippet">{c.snippet}</p>}
-                {kind === 'modul' && <ModuleOpen locator={c.locator} />}
+                {kind === 'modul' && <ModuleOpen locator={c.locator} label={c.label} />}
               </div>
             </li>
           )

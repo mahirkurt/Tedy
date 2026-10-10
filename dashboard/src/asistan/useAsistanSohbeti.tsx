@@ -27,7 +27,7 @@ import { etkinSohbetiOku, etkinSohbetiYaz, gecmisiAc, yeniSohbet } from './useAs
 import { RecentlyViewed } from '@carbon/icons-react'
 import { gecmisOgeleri } from './gecmis.ts'
 import type { BusEventFeedback } from '@carbon/ai-chat'
-import { sayfaEtiketi, useAcikOge } from './sayfaBaglami.ts'
+import { sabitOgeyiBirak, sayfaEtiketi, useAcikOge } from './sayfaBaglami.ts'
 import { sayfaSorulari } from './sayfaSorulari.ts'
 import BaglamCipi from './BaglamCipi.tsx'
 import GirisUyarisi from './GirisUyarisi.tsx'
@@ -48,6 +48,9 @@ function eklerHazir(signal?: AbortSignal): Promise<void> {
 let guncelSohbet: ReturnType<typeof useSohbetler> | null = null
 /** Başlıktaki "Sohbetler" eylemi yapılandırmada yaşar; çizilen sohbetin örneğini render dışında buradan okur. */
 let gecmisOrnegi: ChatInstance | null = null
+/** Soruyla giden sabit öğe ("Asistana sor", B78) bırakılınca açık öğe değişir; bu tek değişim bağlam çipini geri
+ *  getirmemeli (çip ilk sorudan sonra düşer). */
+let baglamiAtla = false
 function gecmisiDegistir() {
   const i = gecmisOrnegi
   if (i) void gecmisiAc(i, !i.getState().customPanels.history.isOpen)
@@ -69,6 +72,7 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
   const oge = useAcikOge()
   const ogeTur = oge?.tur, ogeId = oge?.id, ogeEtiket = oge?.etiket
   useLayoutEffect(() => {
+    if (baglamiAtla) { baglamiAtla = false; return }
     const etiket = sayfaEtiketi(sayfa)
     asistanDeposu.ayarla({ sayfa: sayfa && etiket ? { ad: sayfa, etiket,
       ...(ogeTur && ogeId ? { oge: { tur: ogeTur, id: ogeId }, ogeEtiketi: ogeEtiket } : {}) } : null })
@@ -132,6 +136,8 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
       ...(d.sayfa ? { sayfa: { ad: d.sayfa.ad, ...(d.sayfa.oge ? { oge: d.sayfa.oge } : {}) } } : {}),
     }
     const goruntu = d.cipler.flatMap(c => c.id ? [{ id: c.id, ad: c.ad, tur: c.tur ?? 'bilinmiyor' }] : [])
+    // "Asistana sor" ile sabitlenen öğe bu soruyla gitti (B78); bırakılması bağlam çipini geri getirmez.
+    if (sabitOgeyiBirak()) baglamiAtla = true
     asistanDeposu.ayarla({ sonrakiIstek: {}, dokum, sayfa: null, mesajVar: true,
       ...(ekler.length ? { cipler: [], ekGoruntuleri: { ...d.ekGoruntuleri, ...(istekId ? { [istekId]: goruntu } : {}) } } : {}) })
     await calistir(inst, govde, plan, signal)

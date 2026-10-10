@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, Button, InlineLoading, Link } from '@carbon/react'
-import { Timer, CheckmarkFilled, CloseFilled, ChevronDown, ChevronUp, Document } from '@carbon/icons-react'
+import { Timer, CheckmarkFilled, CloseFilled, ChevronDown, ChevronUp, Document, Chat } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import type { HomeworkDocument, HomeworkItem } from '../types'
 import { parseDeadline, formatTurkishDate, getHomeworkStatus } from '../utils/formatters'
@@ -10,7 +10,7 @@ import { NextThing } from './NextThing'
 import { describeDaysAhead } from './patterns/time'
 import './patterns/patterns.scss'
 import { useNavigate } from 'react-router-dom'
-import { acikOgeAc } from '../asistan/sayfaBaglami'
+import { acikOgeAc, asistanaSor } from '../asistan/sayfaBaglami'
 import type { ExamItem, ModuleCard } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
 import { EkBaglantisi } from './patterns/EkBaglantisi'
@@ -43,6 +43,16 @@ export default function HomeworkTracker() {
   )
 
   const [selectedHw, setSelectedHw] = useState<HomeworkItem | null>(null)
+  const gezin = useNavigate()
+  // "Asistana sor" (B78): ödev penceresi açıkken asistan paneli onun altındadır (B61); pencere kapanır, ödev sonraki
+  // sorunun bağlamı olarak sabitlenir ve panel açılır — başlatıcı yoksa (telefon, odak kipi) Asistan sayfasına gidilir.
+  function odeviAsistanaSor(hw: HomeworkItem) {
+    if (!hw.homework_key) return
+    const karsilandi = asistanaSor({ tur: 'odev', id: hw.homework_key,
+      etiket: `${hw.normalized_course || hw['Ders Adı']} — ${hw['Ödev Başlığı']}` })
+    setSelectedHw(null)
+    if (!karsilandi) gezin('/asistan?sayfa=isler')
+  }
   const [, setTick] = useState(0)
   const { focusMode } = useFocusMode()
   const [collapsed, setCollapsed] = useState<Record<HomeworkGroupKey, boolean>>({
@@ -415,6 +425,8 @@ export default function HomeworkTracker() {
             onPickDocument={file => void addDocument(file)}
             onRemoveDocument={id => void removeDocument(id)}
           />
+          {selectedHw.homework_key && <Button className="homework-modal__asistan" kind="tertiary" size="lg" renderIcon={Chat}
+            onClick={() => odeviAsistanaSor(selectedHw)}>Asistana sor</Button>}
         </ModalBody>
       </ComposedModal>
     )}

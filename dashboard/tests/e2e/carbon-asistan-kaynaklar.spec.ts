@@ -25,7 +25,7 @@ test('Kaynaklar paneli figür küçük resmini sürümüyle ve modül bağlantı
   await sor(page, 'Soru')
   await page.getByRole('button', { name: 'Kaynak ayrıntıları' }).click()
   await expect(page.getByRole('img', { name: 'Hücre' })).toHaveAttribute('src', /\/api\/assistant\/figure\/42\?v=1\.6/)
-  await expect(page.getByRole('link', { name: 'Modülü aç' })).toHaveAttribute('href', '/moduller/kesir/v2')
+  await expect(page.getByRole('link', { name: 'Modülü aç: Kesir modülü' })).toHaveAttribute('href', '/moduller/kesir/v2')
 })
 
 test('kaynak paneli "Kaynakları kapat" ile kapanır, sohbet geri gelir (dar alanda panel sohbeti örter)', async ({ page }) => {

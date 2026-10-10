@@ -286,3 +286,25 @@ test('başka yerde silinmiş etkin sohbet kilitlemez: yeni soru yeni sohbet aça
   await expect(page.getByText('Yeni sohbette cevap.', { exact: true })).toBeVisible()
   expect(istekler[0]).toMatchObject({ sohbet_id: YENI })
 })
+
+// B77: Carbon dar/geniş kararını `--cds-aichat-history-width`'i px sanarak verir ("20rem" → 20); değer kök yazıdan
+// px hesaplanır (useGecmisGenisligi). Telefonda panel sohbeti örter (yan sütun değil), masaüstünde 20rem = 320 px,
+// 4K'da 640 px.
+for (const [w, h, bicim] of [[390, 844, 'telefon'], [1440, 900, 'masaustu'], [3840, 2160, '4k']] as const) {
+  test(`history width and layout hold at ${w}px (B77)`, async ({ page }) => {
+    await carbonSabitAc(page, '/asistan', w, h)
+    await gecmisiAc(page)
+    const gecmis = (await page.locator('.asistan-gecmis').boundingBox())!
+    const sohbet = (await page.locator('.asistan__sohbet').boundingBox())!
+    if (bicim === 'telefon') {
+      // Örten panel: sohbetin tamamı kadar geniş; sohbet ekran dışına itilmez.
+      expect(gecmis.width).toBeGreaterThan(sohbet.width - 4)
+      expect(sohbet.x + sohbet.width).toBeLessThanOrEqual(w)
+    } else {
+      expect(gecmis.width).toBeCloseTo(bicim === '4k' ? 640 : 320, -1)
+      // Yan sütun: giriş alanı görünür kalır.
+      await expect(soruAlani(page)).toBeInViewport()
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0)
+  })
+}

@@ -3,6 +3,7 @@ import { useApi } from '../hooks/useApi'
 import type { HomeworkItem } from '../types'
 import { asistanDeposu, useAsistanDurumu } from './asistanDeposu.ts'
 import { odevAdi } from './odevler.ts'
+import { sabitOgeyiBirak } from './sayfaBaglami.ts'
 
 /** "Bu sayfa: İşler — Matematik — Test 1" ve "Ödev: Matematik — Kesirler": sonraki soru bu bağlamla gider;
  *  kapatılırsa bağlamsız. Ödev çipi giriş satırındaki "Ödeve bağla" eyleminin seçimidir (istekte `odev_anahtari`). */
@@ -18,7 +19,7 @@ export default function BaglamCipi() {
   const odevMetni = `Ödev: ${odev ? odevAdi(odev) : 'seçili ödev'}`
   return <div className="asistan__baglam">
     {sayfa && <DismissibleTag type="gray" size="md" text={metin} title={kaldir} dismissTooltipLabel={kaldir}
-      onClose={() => asistanDeposu.ayarla({ sayfa: null })} />}
+      onClose={() => { sabitOgeyiBirak(); asistanDeposu.ayarla({ sayfa: null }) }} />}
     {odevKey && <DismissibleTag type="gray" size="md" text={odevMetni} title="Ödevi kaldır" dismissTooltipLabel="Ödevi kaldır"
       onClose={() => asistanDeposu.ayarla({ odevKey: '' })} />}
   </div>

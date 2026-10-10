@@ -2,6 +2,7 @@ import { AILabel, AILabelContent } from '@carbon/react'
 import { modelAdi } from '../utils/formatters'
 import { useAsistanDurumu } from './asistanDeposu.ts'
 import { VOICE } from './ses.ts'
+import { useDar } from './useDar.ts'
 
 const DENETIM: Record<string, string> = {
   gecti: 'Yanıtı ikinci bir model kaynak ve seviye açısından okudu; sorun bulmadı.',
@@ -34,8 +35,10 @@ export function AiAciklamaIcerigi({ ogretmenAdi }: { ogretmenAdi: string | null 
  *  varsayılan "Show information" adı ezer) + Türkçe aria-label → "AI Yapay zekâ hakkında bilgi". Salt okunur
  *  sohbette de etkin kalır (Carbon: "never disabled"). */
 export default function AiAciklama({ ogretmenAdi }: { ogretmenAdi: string | null }) {
+  // Telefonda dokunma hedefi ≥ 44 px (D3b, B79): lg (48 px); masaüstünde başlığın xs etiketi.
+  const dar = useDar()
   return (
-    <AILabel size="xs" autoAlign aiText="AI" slugLabel="" aria-label="Yapay zekâ hakkında bilgi" align="bottom-right">
+    <AILabel size={dar ? 'lg' : 'xs'} autoAlign aiText="AI" slugLabel="" aria-label="Yapay zekâ hakkında bilgi" align="bottom-right">
       <AILabelContent>
         <AiAciklamaIcerigi ogretmenAdi={ogretmenAdi} />
       </AILabelContent>

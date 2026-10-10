@@ -6,7 +6,7 @@ import { ChatContainer } from '@carbon/ai-chat'
 import { Maximize, Minimize } from '@carbon/icons-react'
 import { useAsistanSohbeti } from './useAsistanSohbeti.tsx'
 import { ogretmenDegiskenleri } from './ogretmenRenkleri.ts'
-import { sayfaAdi } from './sayfaBaglami.ts'
+import { ASISTANA_SOR, sayfaAdi } from './sayfaBaglami.ts'
 import { kaydirmaOdaginiYonet } from './kaydirmaOdagi.ts'
 import { carbonErisilebilirlikOnarimi } from './carbonOnarimi.ts'
 import SesOnayi from './SesOnayi.tsx'
@@ -18,7 +18,13 @@ import { useGecmisGenisligi } from './useDar.ts'
 /** Her sayfadaki başlatıcının açtığı yan panel (tembel parça): sayfadaki asistanla aynı kanca ve sohbet. */
 export default function AsistanPaneli() {
   const { pathname } = useLocation()
-  const { props, hazir, ogretmen, sesOnay } = useAsistanSohbeti('panel', sayfaAdi(pathname))
+  const { props, hazir, ogretmen, sesOnay, instance } = useAsistanSohbeti('panel', sayfaAdi(pathname))
+  // Küçültülmüş panel "Asistana sor" ile yeniden açılır (B78).
+  useEffect(() => {
+    const ac = () => { void instance.current?.changeView('mainWindow' as never) }
+    window.addEventListener(ASISTANA_SOR, ac)
+    return () => window.removeEventListener(ASISTANA_SOR, ac)
+  }, [instance])
   const [tam, setTam] = useState(false)
   const kok = useRef<HTMLDivElement>(null)
   useEffect(() => (kok.current ? kaydirmaOdaginiYonet(kok.current) : undefined), [])

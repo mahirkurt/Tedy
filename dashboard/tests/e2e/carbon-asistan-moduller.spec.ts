@@ -68,7 +68,7 @@ test('a module citation gets its own group and opens only through the ticketed m
   await expect(group.locator('.ac__ref-group-title')).toHaveText('Yayınlanmış modül')
   await expect(group.locator('.ac__ref-path')).toHaveText('Maddenin Hâlleri · Fen Bilimleri 5. Sınıf · v2')
   const open = group.locator('a.ac__ref-open')
-  await expect(open).toHaveText('Modülü aç')
+  await expect(open).toHaveText('Modülü aç: Maddenin Hâlleri · Fen Bilimleri 5. Sınıf · v2')   // B41: bağlantı modülü adlandırır
   await expect(open).toHaveAttribute('href', '/moduller/fen5-su/v2')
 
   // Rendering an answer must neither mint a ticket nor touch the viewer host.

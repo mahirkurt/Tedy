@@ -61,7 +61,10 @@ test('missing course must be filled and a missing date stays explicitly unknown'
   let body = ''
   await page.route('**/api/homework/photo', r => { body = r.request().postData() || ''; return r.fulfill(json({ added_count: 1 })) })
   await hazirla(page, { dersYok: true, fallback: true })
-  await expect(page.getByRole('button', { name: 'Ödevlere ekle' })).toBeDisabled()
+  // B56: düğme nedeni yazılmadan soluk değil; gönderimde eksik alan adıyla söylenir, istek gitmez.
+  await page.getByRole('button', { name: 'Ödevlere ekle' }).click()
+  await expect(page.getByText('Ders gerekli.', { exact: true })).toBeVisible()
+  expect(body).toBe('')
   await page.getByLabel('Ders', { exact: true }).fill('Fen Bilimleri')
   await page.getByRole('button', { name: 'Ödevlere ekle' }).click()
   await expect(page.getByRole('status')).toContainText('1 ödev eklendi')
@@ -120,4 +123,26 @@ test('photo proposal fits a phone and is accessible', async ({ page }) => {
     .filter(r => !(r.ruleId === 'aria_id_unique' && /cds--ai-label|cds--toggletip/.test(r.snippet + r.path.dom)))
     .map(r => r.ruleId)).toEqual([])
   await page.locator('.ac-odev-onayi').screenshot({ path: '/tmp/tedy-photo-proposal.png' })
+})
+
+test('AI-filled fields carry an AI label and revert to the photo’s reading (B56, K6)', async ({ page }) => {
+  await hazirla(page)
+  const kart = page.getByRole('region', { name: 'Ödev önerisi' })
+  // Yapay zekânın doldurduğu alanlarda etiket var; okuyamadığı boş "Teslim"de yok.
+  await expect(kart.getByRole('button', { name: /^AI Ders: yapay zekâ hakkında bilgi$/ })).toHaveCount(1)
+  await expect(kart.getByRole('button', { name: /^AI Başlık: yapay zekâ hakkında bilgi$/ })).toHaveCount(1)
+  await expect(kart.getByRole('button', { name: /Teslim: yapay zekâ/ })).toHaveCount(0)
+  // Biçim yardım metninde, yer tutucuda değil.
+  await expect(kart.getByText(/Biçim gg\.aa\.yyyy/)).toBeVisible()
+  const baslik = kart.getByLabel('Başlık', { exact: true })
+  await baslik.fill('Sayfa 9')
+  const geriAl = kart.getByRole('button', { name: 'Yapay zekânın önerisine dön' })
+  await expect(geriAl).toHaveCount(1)
+  await expect(kart.getByRole('button', { name: /^AI Başlık: yapay zekâ/ })).toHaveCount(0)
+  await geriAl.click()
+  await expect(baslik).toHaveValue('Sayfa 4')
+  await expect(kart.getByRole('button', { name: /^AI Başlık: yapay zekâ hakkında bilgi$/ })).toHaveCount(1)
+  // Etiket açıklar: alanı fotoğraftan yapay zekânın okuduğunu söyler (K4).
+  await kart.getByRole('button', { name: /^AI Ders: yapay zekâ/ }).click()
+  await expect(page.getByText(/Bu alanı yapay zekâ fotoğraftan okudu: “Matematik”/)).toBeVisible()
 })
