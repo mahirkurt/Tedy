@@ -126,20 +126,20 @@ function ExamCard({ exam, showCountdown, focusMode }: {
         <div className="exam-card__details" id={detailsId} role="region" aria-label={`${exam.rawTitle} detayları`}>
           {exam.aiSummary && (
             <div className="exam-card__section">
-              <div className="exam-card__section-title">🤖 Çalışma Özeti</div>
+              <div className="exam-card__section-title">Çalışma özeti (yapay zekâ)</div>
               <p className="exam-card__section-text">{exam.aiSummary}</p>
             </div>
           )}
           {exam.studyGuide && (
             <div className="exam-card__section">
-              <div className="exam-card__section-title">🤖 Sınav Rehberi</div>
+              <div className="exam-card__section-title">Sınav rehberi (yapay zekâ)</div>
               <p className="exam-card__section-text">{exam.studyGuide}</p>
             </div>
           )}
           {exam.relatedHomework.length > 0 && (
             <div className="exam-card__section">
               <div className="exam-card__section-title">
-                <TaskIcon size={14} /> İlgili Ödevler
+                <TaskIcon size={14} /> İlgili ödevler
               </div>
               <ul className="exam-card__list">
                 {exam.relatedHomework.map((hw, i) => (
@@ -154,7 +154,7 @@ function ExamCard({ exam, showCountdown, focusMode }: {
           {exam.relatedContent.length > 0 && (
             <div className="exam-card__section">
               <div className="exam-card__section-title">
-                <Document size={14} /> İlgili Ders İçerikleri
+                <Document size={14} /> İlgili ders içerikleri
               </div>
               <ul className="exam-card__list">
                 {exam.relatedContent.map((c, i) => (
@@ -211,7 +211,7 @@ export default function ExamTimeline() {
 
       {upcoming.length > 0 && (
         <div className="exam-section">
-          <h2 className="exam-section__title">Yaklaşan Sınavlar</h2>
+          <h2 className="exam-section__title">Yaklaşan sınavlar</h2>
           <div className="exam-section__list">
             {upcoming.map(exam => (
               <ExamCard key={exam.id} exam={exam} showCountdown focusMode={focusMode} />
@@ -223,7 +223,7 @@ export default function ExamTimeline() {
       {past.length > 0 && (
         <>
           <div className="exam-divider">
-            <span>Geçmiş Sınavlar</span>
+            <span>Geçmiş sınavlar</span>
           </div>
           <div className="exam-section">
             <div className="exam-section__list">

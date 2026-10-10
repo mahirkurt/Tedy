@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   Header, HeaderName, HeaderMenuButton, HeaderGlobalBar, HeaderGlobalAction,
-  Tag, SkeletonText, Toggle
+  SkeletonText, Toggle, Callout
 } from '@carbon/react'
 import {
   Renew, Logout,
@@ -11,7 +11,7 @@ import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import type { HealthData, SectionHealth } from '../types'
 import type { User } from '../hooks/useAuth'
-import { SECTION_LABELS } from '../utils/formatters'
+import { SECTION_LABELS, formatTurkishDate } from '../utils/formatters'
 
 function StatusIcon({ status }: { status: SectionHealth['status'] }) {
   if (status === 'ok') return <CheckmarkFilled size={14} style={{ color: 'var(--status-success)' }} />
@@ -36,11 +36,9 @@ function getTimeAgo(timestamp: string): string {
   return `${Math.floor(hours / 24)} gün önce`
 }
 
+// B41: panonun tek tarih biçimi ("24 Eyl 2026 10:25"); `toLocaleString` saniyeli ikinci bir biçim yazıyordu.
 function formatSyncDateTime(timestamp?: string): string {
-  if (!timestamp) return '—'
-  const parsed = new Date(timestamp)
-  if (Number.isNaN(parsed.getTime())) return '—'
-  return parsed.toLocaleString('tr-TR')
+  return formatTurkishDate(timestamp) || '—'
 }
 
 interface Props {
@@ -83,27 +81,27 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
   const effectiveSyncTimestamp = health.staleness?.last_successful_full_scrape || health.timestamp
   const syncAgo = effectiveSyncTimestamp ? getTimeAgo(effectiveSyncTimestamp) : 'Bekleniyor'
   const staleSections = health.staleness?.stale_sections || []
-  const warningCount = (health.validation_warnings?.length || 0)
-    + (health.scrape_errors?.length || 0)
-    + staleSections.length
-  // A constant "4 uyarı" is an alarm that never resolves (İ6). Name the
-  // sync, and only mention warnings when there are some and we are not in
-  // focus — focus silences badges (§5). Gray, not warm-gray: the count is
-  // information, not a yellow emergency.
-  const showWarningCount = warningCount > 0 && !focusMode
-  const tagType: 'gray' | 'red' = !effectiveSyncTimestamp || health.success
-    ? 'gray'
-    : 'red'
-  const tagText = showWarningCount ? `${syncAgo} · ${warningCount} uyarı` : syncAgo
-  const shortTagText = showWarningCount ? `${warningCount} uyarı` : syncAgo
+  // B75 (S45, S39): arıza yokken etiket nötr ve sayısızdır — sürekli "4 uyarı" hiç çözülmeyen bir alarmdı (İ6) ve
+  // doğrulama uyarıları okurun yapacağı bir şey değildir, sayıya girmez. Bozulmuş durum gri de olmaz: kısmi ya da
+  // bayat okuma uyarı ikonu + metin, başarısız senkron hata ikonu + metin taşır (Carbon durum göstergesi).
+  const kisimEksik = (health.scrape_errors?.length || 0) + staleSections.length
+    + Object.keys(health.okunamadi || {}).length > 0
+  const syncDurumu: 'tamam' | 'uyari' | 'hata' = effectiveSyncTimestamp && !health.success
+    ? 'hata'
+    : kisimEksik ? 'uyari' : 'tamam'
+  const syncText = syncDurumu === 'hata'
+    ? `${syncAgo} · senkron başarısız`
+    : syncDurumu === 'uyari' ? `${syncAgo} · kısmi okuma` : syncAgo
   const displayName = (user.name || '').trim() || user.email
   const shortDisplayName = displayName.split(/\s+/)[0] || displayName
 
   return (
     <>
-      <Header aria-label="TEDY Dashboard">
+      {/* B40: Turkish landmark name; the menu button says whether the side nav is open. */}
+      <Header aria-label="TEDY">
         <HeaderMenuButton
           aria-label="Menü"
+          aria-expanded={isSideNavExpanded}
           isActive={isSideNavExpanded}
           onClick={onClickSideNavExpand}
         />
@@ -145,30 +143,27 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
                 {loading ? (
                   <SkeletonText width="72px" />
                 ) : (
-                  <Tag
-                    type={tagType}
-                    size="sm"
-                    title={formatSyncDateTime(effectiveSyncTimestamp)}
-                  >
-                    <span className="dashboard-header__sync-label dashboard-header__sync-label--full">{tagText}</span>
-                    <span className="dashboard-header__sync-label dashboard-header__sync-label--short">{shortTagText}</span>
-                  </Tag>
+                  <span className={`dashboard-header__sync dashboard-header__sync--${syncDurumu}`}>
+                    {syncDurumu === 'hata' && <ErrorFilled size={16} aria-hidden="true" />}
+                    {syncDurumu === 'uyari' && <WarningFilled size={16} aria-hidden="true" />}
+                    <span className="dashboard-header__sync-label">{syncText}</span>
+                  </span>
                 )}
               </button>
               {healthOpen && !loading && (
                 <div className="health-popover" role="dialog" aria-label="Senkron sağlık bilgisi">
-                  <p className="health-popover__title">Senkron Sağlığı</p>
+                  <p className="health-popover__title">Senkron durumu</p>
                   <p className="health-popover__meta">
-                    <span className="health-popover__meta-label">Son Sync:</span>
+                    <span className="health-popover__meta-label">Son senkron</span>
                     <span className="health-popover__meta-value">{formatSyncDateTime(effectiveSyncTimestamp)}</span>
                   </p>
                   <p className="health-popover__meta">
-                    <span className="health-popover__meta-label">Son Başarılı Tam Sync:</span>
+                    <span className="health-popover__meta-label">Son başarılı tam senkron</span>
                     <span className="health-popover__meta-value">{formatSyncDateTime(health.staleness?.last_successful_full_scrape || effectiveSyncTimestamp)}</span>
                   </p>
                   {health.login && (
                     <p className="health-popover__meta">
-                      <span className="health-popover__meta-label">Login:</span>
+                      <span className="health-popover__meta-label">Giriş</span>
                       <span className="health-popover__meta-value">{health.login.method === 'cached_session'
                         ? 'Kayıtlı oturum'
                         : health.login.method === 'captcha_login'
@@ -177,13 +172,13 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
                     </p>
                   )}
                   <p className="health-popover__meta">
-                    <span className="health-popover__meta-label">Süre:</span>
+                    <span className="health-popover__meta-label">Süre</span>
                     <span className="health-popover__meta-value">{health.duration_seconds}s</span>
                   </p>
+                  {/* B32: uyarı kutusu bildirim token'ı ödünç almaz; Carbon'un kendi uyarı Callout'u. */}
                   {staleSections.length > 0 && (
-                    <p className="health-popover__warning">
-                      {staleSections.length} bölüm eski veriyle gösteriliyor.
-                    </p>
+                    <Callout className="health-popover__warning" kind="warning" lowContrast
+                      title={`${staleSections.length} bölüm eski veriyle gösteriliyor.`} />
                   )}
                   {health.sections && Object.entries(health.sections).map(([key, sec]) => (
                     <div key={key} className="health-popover__row">
@@ -203,12 +198,12 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
             </span>
           </div>
           <div className="dashboard-header__focus-toggle">
+            {/* B41: anahtarın adı `labelText`; `hideLabel` onu yandaki tek etiket yapar (labelA/labelB ikilisi yerine). */}
             <Toggle
               id="focus-mode-toggle"
               size="sm"
-              labelA="Odak"
-              labelB="Odak"
-              aria-label="Odak"
+              labelText="Odak"
+              hideLabel
               toggled={focusMode}
               onToggle={toggleFocusMode}
             />
@@ -216,7 +211,7 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
           <HeaderGlobalAction aria-label="Yenile" onClick={refresh}>
             <Renew size={20} />
           </HeaderGlobalAction>
-          <HeaderGlobalAction aria-label="Çıkış" onClick={onLogout}>
+          <HeaderGlobalAction aria-label="Çıkış yap" onClick={onLogout}>
             <Logout size={20} />
           </HeaderGlobalAction>
         </HeaderGlobalBar>

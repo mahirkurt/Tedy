@@ -51,7 +51,7 @@ export default function Announcements() {
   const { focusMode } = useFocusMode()
 
   if (data.announcements.length === 0) {
-    return <EmptyLine label="Okul Duyuruları">Okuldan yeni bir duyuru yok.</EmptyLine>
+    return <EmptyLine label="Okul duyuruları">Okuldan yeni bir duyuru yok.</EmptyLine>
   }
 
   const weekGroups = groupByWeek(data.announcements)
@@ -64,7 +64,7 @@ export default function Announcements() {
     <div className="dashboard-card">
       <h2 className="dashboard-card__title">
         <Notification size={20} />
-        Okul Duyuruları
+        Okul duyuruları
       </h2>
       {visibleWeeks.map(([weekLabel, anns]) => (
         <div key={weekLabel} className="announcements-week-group">

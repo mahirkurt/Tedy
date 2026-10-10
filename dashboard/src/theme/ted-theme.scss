@@ -835,8 +835,6 @@ body {
   @include type.type-style('label-01');
   font-weight: 600;
   color: var(--ted-color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 // ─── Homework ────────────────────────────────────────────────────────────────
@@ -877,6 +875,21 @@ body {
 .homework-item__title {
   @include type.type-style('body-01');
   color: var(--ted-color-text-secondary);
+}
+
+// B46: the title is the row's keyboard handle; it looks like the text it was.
+.homework-item__open {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: start;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--cds-focus);
+    outline-offset: 2px;
+  }
 }
 
 .homework-item__deadline {
@@ -1067,8 +1080,6 @@ body {
 .hw-section__label {
   @include type.type-style('label-01');
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--ted-color-text-helper);
   flex: 1;
 
@@ -1229,12 +1240,6 @@ body {
   min-width: 0;
 }
 
-// The two sync labels mirror the --full/--short pattern already used for the
-// user name. Wide screens read the elapsed time and the warning count; below
-// Carbon's md breakpoint only the count survives, which is what keeps the
-// header's action buttons on a 390px screen.
-.dashboard-header__sync-label--short { display: none; }
-
 // A header action is a fixed 3rem target. Letting flex shrink it was how the
 // last button ended up past the viewport edge once the sync tag grew.
 .cds--header__global .cds--header__action { flex-shrink: 0; }
@@ -1258,20 +1263,19 @@ body {
 }
 
 // ─── Header Tag & Action Overrides ───────────────────────────────────────────
-.dashboard-header__meta .cds--tag {
-  // On the brand band a tag is the module band's chip: blue-90 ground, white
-  // text. Status reads from the border, in the dark-theme support colours
-  // that stay above 3:1 on blue-90 — no translucent overlays.
-  background-color: var(--ted-color-brand-primary-hover);
+// B75 (S45): the sync status is words on the band, neutral when nothing is wrong. A degraded reading leads with
+// a warning icon, a failed sync with an error icon — both in the dark-theme support steps that stay above 3:1 on
+// the navy band (yellow-30, red-40). No Tag: the count and the grey chip are gone (B45).
+.dashboard-header__sync {
+  display: inline-flex;
+  align-items: center;
+  gap: spacing.$spacing-02;
   color: var(--ted-color-text-on-color);
-  border: 1px solid var(--ted-color-brand-rule);
+  @include type.type-style('label-01');
   font-weight: 600;
 }
-
-.dashboard-header__meta .cds--tag--green { border-color: #{colors.$green-40}; }
-.dashboard-header__meta .cds--tag--red { border-color: #{colors.$red-50}; }
-.dashboard-header__meta .cds--tag--warm-gray { border-color: #{colors.$yellow-30}; }
-.dashboard-header__meta .cds--tag--gray { border-color: #{colors.$gray-50}; }
+.dashboard-header__sync--uyari svg { fill: #{colors.$yellow-30}; }
+.dashboard-header__sync--hata svg { fill: #{colors.$red-40}; }
 
 .cds--header__action svg { fill: var(--cds-icon-on-color) !important; }
 @media (any-hover: hover) {
@@ -1508,13 +1512,9 @@ body {
 }
 
 .health-popover__warning {
+  // Carbon's own warning Callout (B32: no borrowed notification token on a hand-made box).
   margin: 0 0 var(--ted-space-xs);
-  padding: spacing.$spacing-03 spacing.$spacing-03;
-  border-radius: var(--ted-radius-card);
-  background: var(--cds-notification-background-warning);
-  color: var(--ted-text-warning);
-  @include type.type-style('label-01');
-  font-weight: 600;
+  max-width: none;
 }
 
 .health-popover__row {
@@ -1545,8 +1545,6 @@ body {
 .announcements-week-group__label {
   @include type.type-style('label-01');
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--ted-color-text-helper);
   margin: 0 0 var(--ted-space-2xs);
   padding-left: var(--ted-space-2xs);
@@ -2456,9 +2454,6 @@ body {
     display: none;
   }
 
-  .dashboard-header__sync-label--full { display: none; }
-  .dashboard-header__sync-label--short { display: inline; }
-
   .dashboard-header__user-name--full,
   .dashboard-header__user-email {
     display: none;
@@ -2707,22 +2702,12 @@ body {
 }
 
 .homework-modal__enrichment {
+  // Carbon's info Callout (B32): it borrowed the notification tokens on a hand-made box with a 4px corner (B1).
   margin-top: spacing.$spacing-05;
-  padding: spacing.$spacing-04 spacing.$spacing-05;
-  // An information callout in Carbon's info roles; it borrowed the band's navy.
-  background: var(--cds-notification-background-info);
-  border-left: 3px solid var(--cds-support-info);
-  border-radius: 0 var(--ted-radius-sm) var(--ted-radius-sm) 0;
-}
-.homework-modal__enrichment-title {
-  @include type.type-style('heading-compact-01');
-  margin-bottom: spacing.$spacing-03;
-  color: var(--ted-text-info);
+  max-width: none;
 }
 .homework-modal__enrichment-text {
-  @include type.type-style('body-01');
   white-space: pre-wrap;
-  color: var(--cds-text-secondary);
 }
 
 .student-profile {
@@ -2854,6 +2839,14 @@ body {
   }
 }
 
+// B22: a field's own error, Carbon's form-requirement anatomy (helper-text-01 in text-error).
+.private-lesson-form__hata {
+  @include type.type-style('helper-text-01');
+  color: var(--cds-text-error);
+}
+
+.private-lesson-form__sonuc.cds--inline-notification { max-width: none; }
+
 .private-lesson-form__time-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2909,15 +2902,11 @@ body {
 .exam-stats__label {
   @include type.type-style('label-01');
   color: var(--ted-color-text-helper);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .exam-section__title {
   @include type.type-style('heading-compact-01');
   color: var(--cds-text-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   margin-bottom: var(--ted-space-sm);
 }
 
@@ -2945,8 +2934,6 @@ body {
     @include type.type-style('label-01');
     font-weight: 600;
     color: var(--ted-color-text-helper);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
     white-space: nowrap;
   }
 }
@@ -3015,8 +3002,6 @@ body {
   // The subject's text role (Carbon -70 step, >= 7:1) — the same colour a module
   // gives its kicker, so an exam card and its study module read as one subject.
   color: var(--ted-subject-text, var(--cds-text-secondary));
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .exam-card__title {
@@ -3188,6 +3173,18 @@ body {
     align-items: flex-start;
     gap: spacing.$spacing-01;
   }
+}
+
+// A surface whose whole content is empty still has to say what is empty.
+// Quiet — a label, not a panel heading — because §2.3 keeps an empty state a
+// line rather than a card. Sentence case (S38, B70); it lived inside the Books
+// block, out of every pano check (B14).
+.tedy-empty__label {
+  display: block;
+  margin-bottom: spacing.$spacing-01;
+  @include type.type-style('label-01');
+  font-weight: 600;
+  color: var(--ted-color-text-secondary);
 }
 
 /* stylelint-disable carbon/theme-use, carbon/layout-use, carbon/type-use, carbon/motion-duration-use, carbon/motion-easing-use --
@@ -4204,18 +4201,6 @@ ol.bookmd__list { list-style: decimal; }
 
 .bookmd__list li { margin-bottom: 0.45em; }
 
-// A surface whose whole content is empty still has to say what is empty.
-// Quiet — a label, not a panel heading — because §2.3 keeps an empty state a
-// line rather than a card.
-.tedy-empty__label {
-  display: block;
-  margin-bottom: 0.125rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--ted-color-text-secondary);
-}
 
 .bookmd code {
   font-size: 0.88em;
@@ -4996,6 +4981,9 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   .resume-band:hover .resume-band__cover { transform: rotate(-2.5deg); }
 }
 
+/* stylelint-enable carbon/theme-use, carbon/layout-use, carbon/type-use, carbon/motion-duration-use, carbon/motion-easing-use --
+   end of the Tedy Books block (B14): the dashboard rules below are held to the Carbon token lint again. */
+
 // ─── Reduced motion ──────────────────────────────────────────────────────────
 // The reader surfaces already honoured this preference; the dashboard did not,
 // leaving six animations running for people whose OS asked them to stop. The
@@ -5022,6 +5010,7 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   .health-popover,
   .calendar-popover,
   .ac-msg {
+    // stylelint-disable-next-line carbon/motion-duration-use -- reduce's near-zero duration is not a Carbon motion token
     animation-duration: 1ms;
     animation-delay: 0ms;
   }
@@ -5038,8 +5027,7 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 
 .route-boundary__title {
   margin: 0 0 var(--ted-space-2xs);
-  font-size: 1rem;
-  font-weight: 600;
+  @include type.type-style('heading-compact-02');   // 16px/600, was a 1rem/600 literal (B35)
   color: var(--ted-color-text-primary);
 }
 

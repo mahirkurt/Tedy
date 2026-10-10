@@ -35,17 +35,21 @@ THEME = DASH / "theme" / "ted-theme.scss"
 BOOKS_HEADER = "   Tedy Books\n"
 
 
+BOOKS_SONU = "end of the Tedy Books block"
+
+
 def _pano_stilleri() -> list[tuple[str, str]]:
+    """Every dashboard stylesheet under src/ (B13: rglob, patterns/ and utils/ included), Books excluded: the
+    `BookReader*` sheets and the Books block of ted-theme.scss — the rules after its `stylelint-enable` are
+    the dashboard's again (B14) and are read, blanked out to keep their line numbers."""
     tema = THEME.read_text(encoding="utf-8")
-    kesim = tema.index(BOOKS_HEADER)
-    kesim = tema.rindex("/*", 0, kesim)
-    out = [("ted-theme.scss", tema[:kesim])]
-    for p in sorted((DASH / "components").glob("*.scss")):
-        if not p.name.startswith("BookReader"):
-            out.append((p.name, p.read_text(encoding="utf-8")))
-    # Carbon AI asistanı (plan 2026-10-08): kendi stilleri aynı kurallara tabidir.
-    for p in sorted((DASH / "asistan").glob("*.scss")):
-        out.append((p.name, p.read_text(encoding="utf-8")))
+    kesim = tema.rindex("/*", 0, tema.index(BOOKS_HEADER))
+    son = tema.index(BOOKS_SONU)
+    out = [("ted-theme.scss", tema[:kesim] + re.sub(r"[^\n]", " ", tema[kesim:son]) + tema[son:])]
+    for p in sorted(DASH.rglob("*.scss")):
+        if p == THEME or p.name.startswith("BookReader"):
+            continue
+        out.append((str(p.relative_to(DASH)), p.read_text(encoding="utf-8")))
     return out
 
 
@@ -130,9 +134,14 @@ DERS_AILESI = r"(blue|teal|purple|magenta|cyan)"
 
 def test_ders_rengi_etiket_olmaz():
     ihlal = []
-    for p in sorted(DASH.rglob("*.tsx")):
+    for p in sorted(list(DASH.rglob("*.tsx")) + list(DASH.rglob("*.ts"))):
+        if p.parts[-2] == "theme":
+            continue  # theme/subjects.ts is the subject table itself
         metin = p.read_text(encoding="utf-8")
-        for m in re.finditer(rf'type="{DERS_AILESI}"|tagType:\s*\'{DERS_AILESI}\'', metin):
+        # B21: a plain prop, a `tagType`/`type` object field, a ternary branch and a helper's return value all
+        # reach a Tag's `type`; `.ts` helpers (getHomeworkStatus) are read too.
+        for m in re.finditer(rf'type="{DERS_AILESI}"|(?:tagType|type):\s*\'{DERS_AILESI}\'|'
+                             rf'type=\{{[^}}]*\'{DERS_AILESI}\'|\btype\s*=\s*[^;\n]*\?\s*\'{DERS_AILESI}\'', metin):
             satir = metin.count("\n", 0, m.start()) + 1
             ihlal.append(f"{p.relative_to(DASH)}:{satir}  {m.group(0)}")
     assert not ihlal, "ders ailesi renginde Carbon Tag:\n" + "\n".join(ihlal)
@@ -173,6 +182,6 @@ def test_asistan_stilleri_de_denetlenir():
     """Carbon AI asistanının kendi stilleri (dashboard/src/asistan/*.scss) aynı kurallarla okunur;
     Carbon AI Chat'in kendi stilleri paketin içindedir, burada değil."""
     adlar = {ad for ad, _ in _pano_stilleri()}
-    beklenen = {p.name for p in (DASH / "asistan").glob("*.scss")}
+    beklenen = {str(p.relative_to(DASH)) for p in (DASH / "asistan").glob("*.scss")}
     assert beklenen, "asistan stil dosyası bulunamadı"
     assert beklenen <= adlar

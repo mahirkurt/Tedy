@@ -540,7 +540,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .seg-ic .pic{color:var(--accent-on);width:32px;height:32px}
 .seg-head h2{font-size:var(--fs-h-seg);font-weight:600;margin:0;line-height:1.25}
 .kicker{font-size:var(--fs-label);font-weight:600;color:var(--accent-strong);
-  text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+  margin-bottom:2px}
 .seg-body p{margin:0 0 var(--sp-05)}
 .seg-body ul,.seg-body ol{margin:0 0 var(--sp-05);padding-left:1.4em}
 .seg-body li{margin-bottom:var(--sp-03)}
@@ -579,8 +579,8 @@ mark.term{background:var(--accent-tint);color:var(--accent-on);padding:0 .25em;b
 .def-pop__ex{display:block;margin-top:var(--sp-04);padding-top:var(--sp-04);
   border-top:1px solid var(--def-pop-rule);font-size:.78rem;line-height:1.45}
 .def-pop__ex[hidden]{display:none}
-.def-pop__ex-lbl{font-family:var(--font-sans);font-weight:700;font-size:.6875rem;letter-spacing:.06em;
-  text-transform:uppercase;color:var(--def-pop-accent);margin-right:6px}
+.def-pop__ex-lbl{font-family:var(--font-sans);font-weight:700;font-size:.6875rem;
+  color:var(--def-pop-accent);margin-right:6px}
 .def-pop__ex-t{color:var(--def-pop-fg);opacity:.92}
 .def-pop__def{display:block;font-weight:400;font-size:.8125rem;line-height:1.5;color:var(--def-pop-fg)}
 .def-pop__arrow{position:absolute;left:var(--arrow-x,50%);width:11px;height:11px;
@@ -681,7 +681,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 /* eşleştirme */
 .match{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-05);margin:var(--sp-05) 0}
 .match__col{display:flex;flex-direction:column;gap:var(--sp-04)}
-.match__col h3{font-size:var(--fs-label);color:var(--cds-text-secondary);margin:0 0 var(--sp-02);text-transform:uppercase;letter-spacing:.03em}
+.match__col h3{font-size:var(--fs-label);color:var(--cds-text-secondary);margin:0 0 var(--sp-02)}
 /* flashcard */
 .flash{display:flex;flex-direction:column;align-items:center;gap:var(--sp-05);margin:var(--sp-06) 0}
 .card{width:100%;max-width:540px;min-height:180px;border-radius:var(--cds-radius);background:var(--cds-layer-02);
@@ -694,9 +694,11 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .pool{display:flex;flex-wrap:wrap;gap:var(--sp-04);margin:var(--sp-05) 0}
 .chip-btn{font-family:var(--font-sans);font-size:var(--fs-compact);min-height:var(--tap);padding:0 var(--sp-05);border:0;
   border-radius:var(--radius-btn);cursor:pointer;background:var(--cds-layer-02);box-shadow:inset 0 0 0 1px var(--cds-border-strong);color:var(--cds-text-primary)}
-.chip-btn:hover:not([disabled]){background:var(--cds-layer-hover-02);box-shadow:inset 0 0 0 2px var(--accent)}
+.chip-btn:hover:not([disabled]):not([aria-disabled="true"]){background:var(--cds-layer-hover-02);box-shadow:inset 0 0 0 2px var(--accent)}
 .chip-btn:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
 .chip-btn[disabled]{opacity:.4;cursor:default}
+/* denenmiş yanlış kelime okunacak içeriktir (talimatname B42): odakta ve ekran okuyucuda kalır, soluklaştırılmaz */
+.chip-btn[aria-disabled="true"]{cursor:default;background:var(--cds-layer-01);box-shadow:inset 0 0 0 1px var(--cds-border-subtle);color:var(--cds-text-secondary);text-decoration:line-through}
 /* soluk-çözümlü örnek (worked, fading worked example) — math g=0.48, fading en güçlü
    alt-özellik (Barbieri 2023); katman+inset kenarlık, gölge yok (G-CARBON-GRID) */
 .worked-steps{list-style:none;margin:var(--sp-05) 0;padding:0;display:flex;flex-direction:column;gap:var(--sp-04)}
@@ -881,7 +883,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .cmap-node[disabled]{cursor:default;opacity:.85}
 .cmap-edges{margin:var(--sp-05) 0}
 .cmap-edges__lbl{font-size:var(--fs-label);color:var(--cds-text-secondary);font-weight:600;
-  text-transform:uppercase;letter-spacing:.03em;margin:0 0 var(--sp-03)}
+  margin:0 0 var(--sp-03)}
 .cmap-edges__empty{font-size:var(--fs-compact);color:var(--cds-text-helper);margin:0 0 var(--sp-04)}
 .cmap-edges__empty[hidden]{display:none}
 .cmap-edges__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--sp-03)}
@@ -971,7 +973,7 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .gloss{display:flex;flex-wrap:wrap;gap:var(--sp-04) var(--sp-05);align-items:flex-end;font-size:1.2rem;padding:var(--sp-04) 0}
 .tok{display:inline-flex;flex-direction:column;align-items:center;gap:3px}
 .tok .w{font-weight:600;padding-bottom:3px;border-bottom:3px solid transparent}
-.tok .tg{font-size:.72rem;font-weight:600;color:var(--cds-text-secondary);text-transform:uppercase;letter-spacing:.02em}
+.tok .tg{font-size:.72rem;font-weight:600;color:var(--cds-text-secondary)}
 .tok[data-role="masc"] .w{border-bottom-color:var(--viz-1)}
 .tok[data-role="fem"] .w{border-bottom-color:var(--viz-3)}
 .tok[data-role="verb"] .w{border-bottom-color:var(--viz-2)}
@@ -1930,7 +1932,7 @@ const MODULE_DATA = {
     if(target&&typeof target.focus==="function") target.focus({preventScroll:true});
   }
   function focusFirstUsableOption(stage){
-    const target=stage.querySelector(".opt:not([disabled]),.chip-btn:not([disabled]),.hook-opt:not([disabled])");
+    const target=stage.querySelector(".opt:not([disabled]),.chip-btn:not([disabled]):not([aria-disabled=\"true\"]),.hook-opt:not([disabled])");
     if(target) target.focus({preventScroll:true}); else focusStageHeading(stage);
   }
   function focusActionButton(button){
@@ -2185,7 +2187,7 @@ const MODULE_DATA = {
       const sentence = it.text.replace("___",`<span class="blank" id="blankSpot">?</span>`);
       let pool = it.choices ? it.choices.slice() : s.items.map(x=>x.answer[0]);
       for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
-      let html=segHead(s,"Boşluğu Doldur")+instr(s);
+      let html=segHead(s,"Boşluğu doldur")+instr(s);
       html+=`<div class="streak">Cümle <b>${ii+1}</b> / <b>${s.items.length}</b></div>`;
       html+=`<p class="cloze">${sentence}</p>`;
       if(missSignal && it.hint) html+=`<div class="callout callout--info" data-adaptive="hint">${icon("ic-info")}<div><span class="callout__t">İpucu</span>${it.hint}</div></div>`;
@@ -2197,6 +2199,7 @@ const MODULE_DATA = {
       const gk=s.id+"#"+oi; let tried=false;
       stage.querySelectorAll(".chip-btn").forEach(btn=>{
         btn.addEventListener("click",()=>{
+          if(btn.getAttribute("aria-disabled")==="true") return;
           const w=btn.dataset.w;
           const ok=it.answer.map(norm).includes(norm(w));
           const blank=$("#blankSpot");
@@ -2226,7 +2229,8 @@ const MODULE_DATA = {
             }
             focusActionButton(nb);
           } else {
-            tried=true; btn.disabled=true; btn.style.opacity=".4";
+            tried=true; btn.setAttribute("aria-disabled","true");
+            btn.insertAdjacentHTML("beforeend",`<span class="sr-only"> (denendi, doğru değil)</span>`);
             const fb=$("#ffb"); fb.className="feedback feedback--no"; playSound("retry"); resetStreak();
             fb.innerHTML=icon("ic-close")+`<div><b>Bu değil.</b> İpucu: ${it.hint||"cümleyi yeniden oku."}</div>`;
             focusFirstUsableOption(stage);
@@ -2247,7 +2251,7 @@ const MODULE_DATA = {
     const steps=s.steps||[];
     const fadeFrom=(typeof s.fadeFrom==="number")?Math.max(0,s.fadeFrom):steps.length;
     const blankIdx=steps.map((_,i)=>i).filter(i=>i>=fadeFrom);
-    let html=segHead(s,"Çözümlü Örnek")+instr(s);
+    let html=segHead(s,"Çözümlü örnek")+instr(s);
     html+=ttsRow(stripTags((steps[0]&&steps[0].text)||""), defLang());
     html+=`<ol class="worked-steps">`;
     steps.forEach((st,i)=>{
@@ -2326,7 +2330,7 @@ const MODULE_DATA = {
      PUANLAMA/XP/CEZA YOK — setNav next HER ZAMAN etkin; yazsa da yazmasa da, modeli açsa
      da açmasa da ilerleme asla bloklanmaz (G-WELLBEING). */
   function renderSelfExplain(stage,s){
-    stage.innerHTML = segHead(s,"Öz-Açıklama") + instr(s)
+    stage.innerHTML = segHead(s,"Öz-açıklama") + instr(s)
       + `<p class="se-prompt">${icon("ic-help")}<span>${esc(s.prompt||"")}</span></p>`
       + ttsRow(stripTags(s.prompt||""), defLang())
       + `<div class="se-field">`
@@ -2372,7 +2376,7 @@ const MODULE_DATA = {
     const qs=s.mixedQuestions||[];
     showRecap();
     function showRecap(){
-      let html=segHead(s,"Kontrol Noktası");
+      let html=segHead(s,"Kontrol noktası");
       html+=`<div class="feedback feedback--info">${icon("ic-info")}
         <div><b>Kısa özet</b><ul style="margin:var(--sp-03) 0 0;padding-left:1.2em">`+
         (s.recap||[]).map(r=>`<li>${r}</li>`).join("")+`</ul></div></div>`;
@@ -2385,7 +2389,7 @@ const MODULE_DATA = {
     }
     function startQs(){ runQuestionSet(stage,s,qs,showSelfAssess,"Karma Geri-Getirme"); }
     function showSelfAssess(){
-      let h=segHead(s,"Kontrol Noktası");
+      let h=segHead(s,"Kontrol noktası");
       h+=`<div class="self-assess"><h3>Kendini değerlendir</h3>`;
       (s.selfAssess||["Bunu öğrendim","Tekrar etmeliyim"]).forEach((t,i)=>{
         h+=`<label class="check-row"><input type="radio" name="sa" value="${i}"> ${t}</label>`;
@@ -2877,7 +2881,7 @@ const MODULE_DATA = {
   function renderConceptMap(stage,s){
     const nodes = s.nodes||[];
     const targets = (s.targetEdges||[]).map(e=>[String(e[0]),String(e[1])]);
-    let html = segHead(s,"Kavram Haritası") + instr(s);
+    let html = segHead(s,"Kavram haritası") + instr(s);
     html += ttsRow(stripTags(s.instructions||s.title||""), defLang());
     if(nodes.length<2 || !targets.length){
       html += `<div class="feedback feedback--info">${icon("ic-info")}<div>`
@@ -3220,7 +3224,7 @@ const MODULE_DATA = {
     function show(){
       if(queue.length===0){ goNext(); return; }
       const card = queue[0]; let flipped=false;
-      let html = segHead(s,"Kart Destesi")+instr(s);
+      let html = segHead(s,"Kart destesi")+instr(s);
       html += `<div class="streak">Öğrenilen <b>${learned.size}</b> / <b>${total}</b> · Destede <b>${queue.length}</b> kart</div>`;
       html += `<div class="flash"><div class="card" id="fcard">${card.front}</div><div id="fctrl"></div></div>`;
       stage.innerHTML=html;
@@ -3267,7 +3271,7 @@ const MODULE_DATA = {
     const shown = s.items.map((t,i)=>({t,correct:i}));
     for(let i=shown.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[shown[i],shown[j]]=[shown[j],shown[i]];}
     let expected=0;
-    let html=segHead(s,"Sıraya Diz")+instr(s);
+    let html=segHead(s,"Sıraya diz")+instr(s);
     if(s.prompt) html+=`<p class="q-stem">${s.prompt}</p>`;
     html+=`<div class="opt-list" role="group" aria-label="Sıralanacak öğeler">`;
     shown.forEach(it=>{ html+=`<button class="opt" type="button" data-c="${it.correct}"><span class="opt__mark"></span><span>${it.t}</span></button>`; });
@@ -3305,7 +3309,7 @@ const MODULE_DATA = {
     let ii=0;
     function show(){
       const it=s.items[ii];
-      let html=segHead(s,"Gruplara Ayır")+instr(s);
+      let html=segHead(s,"Gruplara ayır")+instr(s);
       if(s.prompt) html+=`<p class="q-stem">${s.prompt}</p>`;
       html+=`<div class="streak">Öğe <b>${ii+1}</b> / <b>${s.items.length}</b></div>`;
       html+=`<div class="card" style="min-height:auto;padding:var(--sp-06);font-size:var(--fs-h-sub)">${it.label}</div>`;
@@ -3348,7 +3352,7 @@ const MODULE_DATA = {
     let pi=0;
     function show(){
       const sp=s.spots[pi];
-      let html=segHead(s,"Görseli Keşfet")+instr(s);
+      let html=segHead(s,"Görseli keşfet")+instr(s);
       html+=`<div class="streak">İpucu <b>${pi+1}</b> / <b>${s.spots.length}</b></div>`;
       html+=`<p class="q-stem">Bul ve tıkla: <span style="color:var(--accent-strong)">${sp.label}</span></p>`;
       html+=`<div class="visual hotspot-wrap">${s.svg}</div><div id="hfb" aria-live="polite"></div>`;
@@ -3386,7 +3390,7 @@ const MODULE_DATA = {
 
   /* ---- timeline (zaman çizelgesi — display materyali, notsuz) ---- */
   function renderTimeline(stage,s){
-    let html=segHead(s,"Zaman Çizelgesi")+instr(s);
+    let html=segHead(s,"Zaman çizelgesi")+instr(s);
     if(s.prompt) html+=`<p class="lead">${s.prompt}</p>`;
     html+=`<ol class="timeline">`;
     (s.events||[]).forEach((e,i)=>{

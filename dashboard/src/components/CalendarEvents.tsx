@@ -22,7 +22,7 @@ const HOURS = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_S
 const TYPE_LABELS: Record<string, string> = {
   lesson: 'Ders',
   homework: 'Ödev',
-  private_lesson: 'Özel Ders',
+  private_lesson: 'Özel ders',
   ogep: 'ÖGEP',
   team: 'Takım',
   sebit: 'SEBIT',
@@ -228,7 +228,7 @@ export default function CalendarEvents() {
       <div className="dashboard-card">
         <h2 className="dashboard-card__title">
           <EventSchedule size={20} />
-          Haftalık Takvim
+          Haftalık takvim
         </h2>
         <div className="today-loading">
           <SkeletonPlaceholder className="today-loading__block" />
@@ -243,7 +243,7 @@ export default function CalendarEvents() {
       <div className="dashboard-card">
         <h2 className="dashboard-card__title">
           <EventSchedule size={20} />
-          Haftalık Takvim
+          Haftalık takvim
         </h2>
         <EmptyLine>
           {calendarClosedDetail || 'Portal şu an takvimi sunmuyor.'}
@@ -259,7 +259,7 @@ export default function CalendarEvents() {
     <div className="dashboard-card" style={{ position: 'relative' }}>
       <h2 className="dashboard-card__title">
         <EventSchedule size={20} />
-        Haftalık Takvim
+        Haftalık takvim
       </h2>
 
       {/* Navigation */}
@@ -391,7 +391,8 @@ export default function CalendarEvents() {
       {selectedEvent && (
         <div className="calendar-popover" ref={popoverRef}>
           <div className="calendar-popover__header">
-            <Tag type="gray" size="sm" renderIcon={TYPE_ICONS[selectedEvent.type] ?? EventSchedule}>
+            {/* B45: Carbon draws renderIcon only from md up. */}
+            <Tag type="gray" size="md" renderIcon={TYPE_ICONS[selectedEvent.type] ?? EventSchedule}>
               {TYPE_LABELS[selectedEvent.type] ?? selectedEvent.type}
             </Tag>
             <button

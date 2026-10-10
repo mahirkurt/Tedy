@@ -65,7 +65,7 @@ test('focus keeps the counts so nothing feels lost', async ({ page }) => {
 
   // The list is closed, but its size is still on screen: focus puts the rest
   // one click away rather than pretending it is not there.
-  await expect(page.getByText('Aktif Ödevler', { exact: false })).toBeVisible()
+  await expect(page.getByText('Aktif ödevler', { exact: false })).toBeVisible()
   await expect(page.locator('.hw-section__count').first()).toBeVisible()
 })
 

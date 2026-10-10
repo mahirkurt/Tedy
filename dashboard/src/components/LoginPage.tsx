@@ -106,7 +106,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             <img src="/tedy-logo-white.svg" alt="TEDY" className="login-page__hero-logo" />
           </picture>
           <p className="login-page__hero-school">TED Rönesans Koleji</p>
-          <p className="login-page__hero-subtitle">Öğrenci Takip Paneli</p>
+          <p className="login-page__hero-subtitle">Öğrenci takip paneli</p>
         </div>
       </div>
 
@@ -125,6 +125,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           {error && (
             <InlineNotification
               kind="error"
+              role="alert"
+              statusIconDescription="Hata"
               title="Hata"
               subtitle={error}
               lowContrast

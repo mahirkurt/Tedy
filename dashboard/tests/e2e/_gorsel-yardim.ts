@@ -10,6 +10,8 @@ export const SAYFALAR: [string, string][] = [
   ['kitaplar', '/kitaplar'], ['notlar', '/notlar'], ['takvim', '/takvim'], ['takimlar', '/takimlar'],
   ['ilerleme', '/ilerleme'], ['duyurular', '/duyurular'], ['profil', '/profil'],
   ['moduller', '/moduller'], ['sinavlar', '/sinavlar'],
+  // B27: the phone's "Daha fazla" page is a surface like the others — axe, IBM, pixels and ARIA tree.
+  ['daha-fazla', '/daha-fazla'],
 ]
 
 // "No request in flight for half a second", counted from the page's own

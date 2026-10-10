@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Button, Tag } from '@carbon/react'
+import { Button, InlineLoading, InlineNotification, Tag } from '@carbon/react'
 import { UserAvatar, UserProfile, AddAlt } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import { COURSE_CONTENT_ORDER } from '../utils/formatters'
@@ -34,6 +34,10 @@ export default function StudentProfile() {
   const [startTime, setStartTime] = useState('17:00')
   const [endTime, setEndTime] = useState('18:00')
   const [saving, setSaving] = useState(false)
+  // B22 (D3, D4): the form answers on the page — a field's own error under it, the result under the form —
+  // never in a browser alert and never with the server's raw error text.
+  const [alanHatasi, setAlanHatasi] = useState<{ ogretmen?: string; saat?: string; tarih?: string }>({})
+  const [sonuc, setSonuc] = useState<{ tur: 'basari' | 'hata'; metin: string } | null>(null)
 
   const courseOptions = useMemo(() => {
     const dynamicCourses = new Set<string>()
@@ -52,18 +56,13 @@ export default function StudentProfile() {
 
   async function handleAddLesson(e: React.FormEvent) {
     e.preventDefault()
-    if (!teacher.trim()) {
-      window.alert('Öğretmen adı gerekli.')
-      return
-    }
-    if (!startTime || !endTime) {
-      window.alert('Başlangıç ve bitiş saatleri gerekli.')
-      return
-    }
-    if (!isRecurring && !singleDate) {
-      window.alert('Tek seferlik ders için tarih seçin.')
-      return
-    }
+    const hatalar: typeof alanHatasi = {}
+    if (!teacher.trim()) hatalar.ogretmen = 'Öğretmen adını yaz.'
+    if (!startTime || !endTime) hatalar.saat = 'Başlangıç ve bitiş saatini seç.'
+    if (!isRecurring && !singleDate) hatalar.tarih = 'Tek seferlik ders için tarihi seç.'
+    setAlanHatasi(hatalar)
+    setSonuc(null)
+    if (Object.keys(hatalar).length) return
 
     setSaving(true)
     try {
@@ -81,15 +80,14 @@ export default function StudentProfile() {
           end_time: endTime,
         }),
       })
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(payload?.error || `HTTP ${res.status}`)
+      if (!res.ok) throw new Error('kaydedilemedi')
       setTeacher('')
       if (!isRecurring) setSingleDate('')
       refreshLessons()
       window.dispatchEvent(new CustomEvent('tedy:homework-updated'))
-      window.alert('Özel ders eklendi. Takvimde "Özel Ders" badge’iyle görünecek.')
-    } catch (err) {
-      window.alert(`Özel ders eklenemedi: ${err instanceof Error ? err.message : 'Bilinmeyen hata'}`)
+      setSonuc({ tur: 'basari', metin: 'Özel ders eklendi. Takvimde ve Bugün\'de görünecek.' })
+    } catch {
+      setSonuc({ tur: 'hata', metin: 'Özel ders eklenemedi. Bağlantını kontrol edip yeniden dene.' })
     } finally {
       setSaving(false)
     }
@@ -100,7 +98,7 @@ export default function StudentProfile() {
       <div className="dashboard-card student-profile-card">
         <h2 className="dashboard-card__title">
           <UserProfile size={20} />
-          Öğrenci Profili
+          Öğrenci profili
         </h2>
         <div className="student-profile">
           <div className="student-profile__photo-wrap">
@@ -148,7 +146,7 @@ export default function StudentProfile() {
       <div className="dashboard-card">
         <h2 className="dashboard-card__title">
           <AddAlt size={20} />
-          Özel Ders Ekle
+          Özel ders ekle
         </h2>
         <form className="private-lesson-form" onSubmit={handleAddLesson}>
           <label className="private-lesson-form__label">
@@ -161,14 +159,17 @@ export default function StudentProfile() {
           </label>
 
           <label className="private-lesson-form__label">
-            Öğretmen Adı
+            Öğretmen adı
             <input
               value={teacher}
               onChange={e => setTeacher(e.target.value)}
               className="private-lesson-form__input"
               placeholder="Örn: Ayşe Yılmaz"
               required
+              aria-invalid={alanHatasi.ogretmen ? true : undefined}
+              aria-describedby={alanHatasi.ogretmen ? 'ozel-ders-ogretmen-hata' : undefined}
             />
+            {alanHatasi.ogretmen && <span id="ozel-ders-ogretmen-hata" className="private-lesson-form__hata">{alanHatasi.ogretmen}</span>}
           </label>
 
           <label className="private-lesson-form__checkbox">
@@ -182,7 +183,7 @@ export default function StudentProfile() {
 
           {isRecurring ? (
             <label className="private-lesson-form__label">
-              Haftanın Günü
+              Haftanın günü
               <select value={weekday} onChange={e => setWeekday(e.target.value)} className="private-lesson-form__input">
                 {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
@@ -197,6 +198,7 @@ export default function StudentProfile() {
                 className="private-lesson-form__input"
                 required={!isRecurring}
               />
+              {alanHatasi.tarih && <span className="private-lesson-form__hata">{alanHatasi.tarih}</span>}
             </label>
           )}
 
@@ -223,14 +225,20 @@ export default function StudentProfile() {
             </label>
           </div>
 
-          <Button kind="tertiary" size="sm" type="submit" disabled={saving}>
-            {saving ? 'Ekleniyor...' : 'Özel Ders Ekle'}
-          </Button>
+          {alanHatasi.saat && <span className="private-lesson-form__hata">{alanHatasi.saat}</span>}
+          {saving
+            ? <InlineLoading description="Ekleniyor…" iconDescription="Ekleniyor" status="active" />
+            : <Button kind="tertiary" size="sm" type="submit">Özel ders ekle</Button>}
+          {sonuc && (
+            <InlineNotification className="private-lesson-form__sonuc" lowContrast hideCloseButton
+              kind={sonuc.tur === 'basari' ? 'success' : 'error'} role={sonuc.tur === 'basari' ? 'status' : 'alert'}
+              statusIconDescription={sonuc.tur === 'basari' ? 'Başarılı' : 'Hata'} title={sonuc.metin} />
+          )}
         </form>
       </div>
 
       <div className="dashboard-card">
-        <h2 className="dashboard-card__title">Tanımlı Özel Dersler</h2>
+        <h2 className="dashboard-card__title">Tanımlı özel dersler</h2>
         {(lessonData.lessons || []).length === 0 ? (
           <EmptyLine>Tanımlı özel ders yok.</EmptyLine>
         ) : (
@@ -239,7 +247,7 @@ export default function StudentProfile() {
               <div key={lesson.id} className="dashboard-list-tile cds--tile student-private-lesson-item">
                 <div className="student-private-lesson-item__top">
                   <strong>{lesson.course}</strong>
-                  <Tag type="warm-gray" size="sm">Özel Ders</Tag>
+                  <Tag type="warm-gray" size="sm">Özel ders</Tag>
                 </div>
                 <div className="student-private-lesson-item__meta">
                   Öğretmen: {lesson.teacher}

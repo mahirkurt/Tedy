@@ -99,6 +99,8 @@ export function PortalStatusBanner({ pathname = '' }: { pathname?: string }) {
           className="portal-status"
           kind="info"
           lowContrast
+          statusIconDescription="Bilgi"
+          aria-label="Kapat"
           onClose={() => {
             try { sessionStorage.setItem(DISMISS_KEY, todayKey()) } catch { /* ignore */ }
             setDismissed(true)
@@ -126,6 +128,7 @@ export function PortalStatusBanner({ pathname = '' }: { pathname?: string }) {
           className="portal-unread"
           kind="warning"
           lowContrast
+          statusIconDescription="Uyarı"
           hideCloseButton
           title={
             unreadNames.length > 1

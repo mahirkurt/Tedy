@@ -256,8 +256,6 @@
   font-weight: 600;
   color: var(--ted-color-text-helper);
   margin-bottom: spacing.$spacing-01;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .ac-msg__content {
@@ -380,8 +378,6 @@
   display: block;
   margin-bottom: spacing.$spacing-01;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: theme.$text-secondary;
 }
 
@@ -708,8 +704,6 @@
   @include type.type-style('label-01');
   display: block;
   color: theme.$text-secondary;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
 }
 
 .ac-cite__label {
@@ -748,8 +742,6 @@
   margin: var(--ted-space-sm) 0 spacing.$spacing-02;
   font-weight: 600;
   color: theme.$text-secondary;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
 }
 
 // `.ac__ref-item` and `.ac__ref-item--active` were each defined twice

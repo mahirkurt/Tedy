@@ -19,7 +19,7 @@ export default function SilmeOnayi() {
       asistanDeposu.ayarla({ silinecek: null })
     }
   }
-  return <Modal open={!!istek} danger size="xs" modalHeading={istek?.baslik ?? ''} primaryButtonText={istek?.dugme ?? 'Sil'}
+  return <Modal open={!!istek} danger size="xs" closeButtonLabel="Kapat" modalHeading={istek?.baslik ?? ''} primaryButtonText={istek?.dugme ?? 'Sil'}
     secondaryButtonText="Vazgeç" selectorPrimaryFocus=".cds--btn--secondary" primaryButtonDisabled={siliniyor}
     loadingStatus={siliniyor ? 'active' : 'inactive'} loadingDescription="Siliniyor…"
     onRequestSubmit={() => void sil()} onRequestClose={kapat} onSecondarySubmit={kapat}>

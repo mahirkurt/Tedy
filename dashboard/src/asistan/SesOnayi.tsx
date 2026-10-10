@@ -8,7 +8,7 @@ export default function SesOnayi({ onay }: { onay: { acik: boolean; onayla: () =
   return <>
     {ogrenci && <p className="asistan__aile-notu">Sohbetlerini ailen de görebilir.</p>}
     {onay.hata && <p role="alert" className="asistan__ses-hata">{onay.hata}</p>}
-    <Modal open={onay.acik} size="xs" modalHeading="Mikrofonu açalım mı?" primaryButtonText="Mikrofonu aç" secondaryButtonText="Vazgeç"
+    <Modal open={onay.acik} size="xs" closeButtonLabel="Kapat" modalHeading="Mikrofonu açalım mı?" primaryButtonText="Mikrofonu aç" secondaryButtonText="Vazgeç"
       onRequestSubmit={onay.onayla} onRequestClose={onay.vazgec} onSecondarySubmit={onay.vazgec}>
       <p>Chrome ve Android'de konuşma tanıma sesi Google'a gönderir.</p>
     </Modal>

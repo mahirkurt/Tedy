@@ -85,7 +85,7 @@ test('Notlar row detail control is Turkish and at least 44px on a phone', async 
 
 test('İşler section headers are at least 44px on a phone', async ({ page }) => {
   await sabitAc(page, '/isler', 390, 844)
-  await enAz(page.getByRole('button', { name: 'Aktif Ödevler' }))
+  await enAz(page.getByRole('button', { name: 'Aktif ödevler' }))
 })
 
 test('Dersler shows a short lesson note once', async ({ page }) => {

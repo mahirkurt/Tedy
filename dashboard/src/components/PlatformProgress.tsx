@@ -43,7 +43,7 @@ function OgrenmeGunlugu() {
   if (error === 'HTTP 403') return null
   return <section className="ogrenme-gunlugu" aria-labelledby="ogrenme-gunlugu-baslik">
     <h3 id="ogrenme-gunlugu-baslik">Öğrenme günlüğü</h3>
-    {loading ? <SkeletonText paragraph lineCount={3} /> : error ? <p>Öğrenme günlüğü alınamadı.</p> : data && <>
+    {loading ? <SkeletonText paragraph lineCount={3} /> : error ? <p role="alert">Öğrenme günlüğü alınamadı.</p> : data && <>
       <div>
         <h4>Bu hafta</h4>
         {data.hafta.sohbet.length === 0 ? <p>Sohbet · 0</p> : data.hafta.sohbet.map(s =>
@@ -83,8 +83,8 @@ function OgrenmeGunlugu() {
 }
 
 function DifficultyTag({ level }: { level: number }) {
-  const type = level <= 2 ? 'green' : level <= 4 ? 'blue' : level <= 6 ? 'warm-gray' : 'red'
-  return <Tag type={type} size="sm">Seviye {level}</Tag>
+  // B21: sıralı veri durum ya da ders rengiyle boyanmaz; seviye sayının kendisidir.
+  return <Tag type="gray" size="sm">Seviye {level}</Tag>
 }
 
 
@@ -110,12 +110,13 @@ export default function PlatformProgress() {
     <div className="dashboard-card">
       <h2 className="dashboard-card__title">
         <ChartBar size={20} />
-        Platform İlerleme
+        Platform ilerlemesi
       </h2>
 
       {allComplete && (
         <InlineNotification
           kind="success"
+          statusIconDescription="Başarılı"
           title="Tüm platformlar tamamlandı!"
           hideCloseButton
           lowContrast
@@ -229,7 +230,7 @@ export default function PlatformProgress() {
               )}
               {a3k.dashboard_stats?.firstTryScore != null && (
                 <div className="platform-a3k-score">
-                  <span className="platform-a3k-score__label">A3K İlk Deneme Skoru</span>
+                  <span className="platform-a3k-score__label">A3K ilk deneme puanı</span>
                   <div className="platform-a3k-score__gauge">
                     <div
                       className="platform-a3k-score__gauge-fill"

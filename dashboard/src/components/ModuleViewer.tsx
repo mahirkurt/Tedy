@@ -95,14 +95,14 @@ export default function ModuleViewer({ ticketPath, title, progress }: ModuleView
   if (ticket.status === 'error') {
     return (
       <div className="module-viewer">
-        <InlineNotification kind="error" lowContrast hideCloseButton title="Modül açılamadı" subtitle={ticket.message} />
+        <InlineNotification kind="error" role="alert" lowContrast hideCloseButton statusIconDescription="Hata" title="Modül açılamadı" subtitle={ticket.message} />
       </div>
     )
   }
   return (
     <div className="module-viewer">
       {saveFailed && (
-        <InlineNotification kind="warning" lowContrast hideCloseButton title="İlerleme kaydedilemedi"
+        <InlineNotification kind="warning" lowContrast hideCloseButton statusIconDescription="Uyarı" title="İlerleme kaydedilemedi"
           subtitle="Modül çalışmaya devam ediyor; sayfayı yenileyince kayıt yeniden denenir." />
       )}
       <iframe ref={frameRef} className="module-frame" title={title} src={ticket.url}

@@ -1,6 +1,6 @@
 - main:
   - heading "İlerleme" [level=1]
-  - heading "Platform İlerleme" [level=2]
+  - heading "Platform ilerlemesi" [level=2]
   - region "Öğrenme günlüğü":
     - heading "Öğrenme günlüğü" [level=3]
     - heading "Bu hafta" [level=4]

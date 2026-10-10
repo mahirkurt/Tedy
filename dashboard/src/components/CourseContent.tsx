@@ -127,6 +127,8 @@ function weekNo(label: string): number {
   return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER
 }
 
+const DERS_SEKMESI = 'tedy-dersler-sekme'
+
 export default function CourseContent() {
   const { data } = useApi<CourseData>('/api/content', {})
   // The portal fills the year in ahead of time and the cards genuinely differ
@@ -137,6 +139,11 @@ export default function CourseContent() {
   const { data: haftalik } = useApi<WeeksData>('/api/content/weeks', { weeks: {}, current: '' })
   const { focusMode } = useFocusMode()
   const [secilenHafta, setSecilenHafta] = useState<string | null>(null)
+  // B47 (İ5): the chosen course tab survives a reload — remembered by name, so a course appearing or vanishing
+  // between syncs does not shift the choice onto its neighbour. A per-device convenience (localStorage).
+  const [secilenDers, setSecilenDers] = useState<string | null>(() => {
+    try { return localStorage.getItem(DERS_SEKMESI) } catch { return null }
+  })
   useEffect(() => (secilenHafta ? acikOgeAc({ tur: 'ders_haftasi', id: secilenHafta, etiket: secilenHafta }) : undefined),
     [secilenHafta])
 
@@ -192,7 +199,7 @@ export default function CourseContent() {
   )
 
   if (courses.length === 0) {
-    return <EmptyLine label="Ders İçerikleri">Derslere ait içerik henüz yok.</EmptyLine>
+    return <EmptyLine label="Ders içerikleri">Derslere ait içerik henüz yok.</EmptyLine>
   }
 
   return (
@@ -200,7 +207,7 @@ export default function CourseContent() {
       <div className="course-content__header">
         <h2 className="dashboard-card__title">
           <Education size={20} />
-          Ders İçerikleri
+          Ders içerikleri
         </h2>
         {/* One control, and only when there is more than one week to choose
             between. Hidden in focus mode, where the page holds one thing. */}
@@ -217,7 +224,14 @@ export default function CourseContent() {
           />
         )}
       </div>
-      <Tabs>
+      <Tabs
+        selectedIndex={Math.max(0, courses.findIndex(([ad]) => ad === secilenDers))}
+        onChange={({ selectedIndex }) => {
+          const ad = courses[selectedIndex]?.[0]
+          if (!ad) return
+          setSecilenDers(ad)
+          try { localStorage.setItem(DERS_SEKMESI, ad) } catch { /* private window: the choice lasts this visit */ }
+        }}>
         <TabList aria-label="Ders içerikleri" contained>
           {courses.map(([name]) => (
             <Tab key={name}>{name}</Tab>
@@ -250,7 +264,7 @@ export default function CourseContent() {
                     {weekGroups.map((group) => {
                       const weekLabel = group.weekNum === -1
                         ? 'Diğer'
-                        : `${group.weekNum}. Hafta`
+                        : `${group.weekNum}. hafta`
                       const dateLabel = group.latestDate ? ` — ${group.latestDate}` : ''
                       const title = (
                         <span className="course-content__week-header">

@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, Button, InlineLoading, Link } from '@carbon/react'
-import { Timer, CheckmarkFilled, CloseFilled, ChevronDown, ChevronUp, Document, Chat } from '@carbon/icons-react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, ModalFooter, Button, InlineLoading, Link, Callout } from '@carbon/react'
+import { Timer, CheckmarkFilled, CheckmarkOutline, CloseFilled, ChevronDown, ChevronUp, Document, Chat } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import type { HomeworkDocument, HomeworkItem } from '../types'
 import { parseDeadline, formatTurkishDate, getHomeworkStatus } from '../utils/formatters'
@@ -70,6 +70,22 @@ export default function HomeworkTracker() {
   const [markErrorKey, setMarkErrorKey] = useState<string | null>(null)
   const [docBusy, setDocBusy] = useState(false)
   const [docError, setDocError] = useState('')
+  // B23 (S40): silinecek belge. Ödev penceresi aynı yerde tehlike onayına döner; pencerenin üstüne ikinci bir
+  // pencere açılmaz.
+  const [silinecekBelge, setSilinecekBelge] = useState<HomeworkDocument | null>(null)
+  const modalRef = useRef<HTMLDivElement>(null)
+  // Carbon's Escape listener keeps the onClose of the render it was registered in, so onClose reads the live
+  // state through refs — otherwise Escape on the confirmation closed the whole homework window.
+  const onayRef = useRef<{ belge: HomeworkDocument | null; mesgul: boolean }>({ belge: null, mesgul: false })
+  useEffect(() => { onayRef.current = { belge: silinecekBelge, mesgul: docBusy } }, [silinecekBelge, docBusy])
+  useEffect(() => {
+    if (!silinecekBelge) return
+    // Onay açılırken ilk odak "Vazgeç"te (Carbon tehlike modalı); pencere zaten açık olduğu için elle verilir.
+    const kare = requestAnimationFrame(() => {
+      modalRef.current?.querySelector<HTMLButtonElement>('.cds--modal-footer .cds--btn--secondary')?.focus()
+    })
+    return () => cancelAnimationFrame(kare)
+  }, [silinecekBelge])
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 60000)
     return () => clearInterval(t)
@@ -131,16 +147,17 @@ export default function HomeworkTracker() {
         method: 'DELETE',
         credentials: 'include',
       })
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(payload?.error || `HTTP ${res.status}`)
+      // Sunucunun ham hata metni okura gitmez (D4); başarısız silme doğru fiille söylenir (S40).
+      if (!res.ok) throw new Error('Belge silinemedi.')
       setSelectedHw(prev => prev
         ? { ...prev, documents: (prev.documents || []).filter(doc => doc.id !== id) }
         : prev)
       refreshHomework()
-    } catch (err) {
-      setDocError(err instanceof Error ? err.message : 'Belge kaldırılamadı.')
+    } catch {
+      setDocError('Belge silinemedi.')
     } finally {
       setDocBusy(false)
+      setSilinecekBelge(null)
     }
   }
 
@@ -324,7 +341,7 @@ export default function HomeworkTracker() {
 
       {renderAccordionSection({
         keyName: 'aktif',
-        title: 'Aktif Ödevler',
+        title: 'Aktif ödevler',
         items: aktif,
         showDoneAction: true,
       })}
@@ -332,7 +349,7 @@ export default function HomeworkTracker() {
       {!focusMode && upcomingExams.length > 0 && (
         <div className="hw-section exams-ahead">
           <div className="hw-section__header">
-            <span className="hw-section__label">Yaklaşan Sınavlar</span>
+            <span className="hw-section__label">Yaklaşan sınavlar</span>
             <span className="hw-section__count">{upcomingExams.length}</span>
           </div>
           {!focusMode && <ul className="exams-ahead__list">
@@ -410,24 +427,47 @@ export default function HomeworkTracker() {
     {/* Mounted only while open: a closed ComposedModal keeps its
         ModalHeader in the document outline. */}
     {selectedHw && (
-      <ComposedModal open onClose={() => setSelectedHw(null)} size="md">
-        <ModalHeader
-          title={selectedHw["Ödev Başlığı"] || ''}
-          label={selectedHw.normalized_course || selectedHw["Ders Adı"] || ''}
-          iconDescription="Kapat"
-        />
-        <ModalBody>
-          <HomeworkModalBody
-            hw={selectedHw}
-            enrichmentData={enrichmentData}
-            docBusy={docBusy}
-            docError={docError}
-            onPickDocument={file => void addDocument(file)}
-            onRemoveDocument={id => void removeDocument(id)}
-          />
-          {selectedHw.homework_key && <Button className="homework-modal__asistan" kind="tertiary" size="lg" renderIcon={Chat}
-            onClick={() => odeviAsistanaSor(selectedHw)}>Asistana sor</Button>}
-        </ModalBody>
+      <ComposedModal ref={modalRef} open size={silinecekBelge ? 'xs' : 'md'} danger={!!silinecekBelge}
+        onClose={() => {
+          // Onay açıkken Escape ve kapatma onayı kapatır, ödev penceresini değil.
+          if (onayRef.current.belge) {
+            if (!onayRef.current.mesgul) setSilinecekBelge(null)
+            return false
+          }
+          setSelectedHw(null)
+        }}>
+        {/* Carbon wires closeModal only into direct ModalHeader/ModalFooter children (Children.toArray +
+            cloneElement), so the two states swap each part in place rather than a Fragment. */}
+        {silinecekBelge
+          ? <ModalHeader title="Bu belge silinsin mi?" iconDescription="Kapat" />
+          : <ModalHeader
+              title={selectedHw["Ödev Başlığı"] || ''}
+              label={selectedHw.normalized_course || selectedHw["Ders Adı"] || ''}
+              iconDescription="Kapat"
+            />}
+        {silinecekBelge
+          ? <ModalBody>
+              <p>“{silinecekBelge.name}” bu ödevden silinir; asistan onu artık okuyamaz. Bu geri alınamaz.</p>
+            </ModalBody>
+          : <ModalBody>
+              <HomeworkModalBody
+                hw={selectedHw}
+                enrichmentData={enrichmentData}
+                docBusy={docBusy}
+                docError={docError}
+                onPickDocument={file => void addDocument(file)}
+                onRemoveDocument={doc => { setDocError(''); setSilinecekBelge(doc) }}
+              />
+              {selectedHw.homework_key && <Button className="homework-modal__asistan" kind="tertiary" size="lg" renderIcon={Chat}
+                onClick={() => odeviAsistanaSor(selectedHw)}>Asistana sor</Button>}
+            </ModalBody>}
+        {silinecekBelge && (
+          <ModalFooter danger primaryButtonText="Belgeyi sil" secondaryButtonText="Vazgeç"
+            loadingStatus={docBusy ? 'active' : 'inactive'} loadingDescription="Siliniyor…"
+            onRequestClose={() => { if (!docBusy) setSilinecekBelge(null) }}
+            loadingIconDescription="Siliniyor"
+            onRequestSubmit={() => { if (!docBusy) void removeDocument(silinecekBelge.id) }}>{null}</ModalFooter>
+        )}
       </ComposedModal>
     )}
     </>
@@ -455,7 +495,7 @@ function HomeworkCard({
   const countdown = getCountdown(deadline)
 
   const status = hw.student_marked_done
-    ? { label: 'YAPILAN', type: 'blue' as const }
+    ? { label: 'Yapılan', type: 'gray' as const }
     : getHomeworkStatus(hw["Ödev Durumu"])
 
   // Determine left border class
@@ -481,16 +521,20 @@ function HomeworkCard({
                 size="sm"
                 className="homework-item__status-badge"
               >
+                {/* B21 (S4): Işık'ın kendi işareti gri + ikon; mavi bir ders ailesi gibi okunuyordu. */}
                 {status.type === 'green'
                   ? <CheckmarkFilled size={12} />
                   : status.type === 'red'
                     ? <CloseFilled size={12} />
-                    : null}
+                    : hw.student_marked_done ? <CheckmarkOutline size={12} /> : null}
                 {' '}{status.label}
               </Tag>
             )}
           </div>
-          <div className="homework-item__title">{hw["Ödev Başlığı"]}</div>
+          {/* B46 (D2): the row opens by keyboard too — the title is a real button (a clickable Tile would nest the
+              "Yaptım" button inside another control). The Tile keeps its click for the pointer. */}
+          <button type="button" className="homework-item__title homework-item__open"
+            onClick={e => { e.stopPropagation(); onOpen(hw) }}>{hw["Ödev Başlığı"]}</button>
           <div className="homework-item__deadline">
             Teslim: {formatTurkishDate(hw["Ödev Son Teslim Tarihi"])}
           </div>
@@ -520,7 +564,7 @@ function HomeworkCard({
               }}
             >
               {doneLoading ? (
-                <InlineLoading description="Kaydediliyor" status="active" />
+                <InlineLoading description="Kaydediliyor…" iconDescription="Kaydediliyor" status="active" />
               ) : (
                 <Button
                   size="sm"
@@ -562,12 +606,12 @@ function HomeworkModalBody({
   docBusy: boolean
   docError: string
   onPickDocument: (file: File) => void
-  onRemoveDocument: (id: string) => void
+  onRemoveDocument: (doc: HomeworkDocument) => void
 }) {
   const deadline = parseDeadline(hw["Ödev Son Teslim Tarihi"])
   const countdown = getCountdown(deadline)
   const status = hw.student_marked_done
-    ? { label: 'YAPILAN', type: 'blue' as const }
+    ? { label: 'Yapılan', type: 'gray' as const }
     : getHomeworkStatus(hw["Ödev Durumu"])
 
   const enrichKey = `${hw.normalized_course || hw["Ders Adı"]}|${hw["Ödev Başlığı"]}`
@@ -584,6 +628,7 @@ function HomeworkModalBody({
         <Tag type={status.type} size="md">
           {status.type === 'green' && <CheckmarkFilled size={14} />}
           {status.type === 'red' && <CloseFilled size={14} />}
+          {hw.student_marked_done && <CheckmarkOutline size={14} />}
           {' '}{status.label}
         </Tag>
         {hw["Ödev Kaynağı"] && (
@@ -641,7 +686,9 @@ function HomeworkModalBody({
               <Document size={16} /> {doc.name}
             </a>
             {doc.error && <p className="homework-modal__doc-error" role="alert">{doc.error}</p>}
-            <Button kind="ghost" size="sm" disabled={docBusy} onClick={() => onRemoveDocument(doc.id)}>
+            {/* B23: silme önce sorar; düğmenin adı nesneyi taşır (birden çok belgede her "Kaldır" ayırt edilir). */}
+            <Button kind="ghost" size="sm" disabled={docBusy} aria-label={`Kaldır: ${doc.name}`}
+              onClick={() => onRemoveDocument(doc)}>
               Kaldır
             </Button>
           </div>
@@ -654,10 +701,10 @@ function HomeworkModalBody({
       </div>
 
       {enrichNote && (
-        <div className="homework-modal__enrichment">
-          <h5 className="homework-modal__enrichment-title">🤖 Gemini Notu</h5>
-          <p className="homework-modal__enrichment-text">{enrichNote}</p>
-        </div>
+        // B41/B32: kaldırılmış ürün adı ve emoji yok; not yapay zekânın yazdığını söyler, Carbon'un bilgi Callout'unda.
+        <Callout className="homework-modal__enrichment" kind="info" lowContrast title="Yapay zekâ notu">
+          <span className="homework-modal__enrichment-text">{enrichNote}</span>
+        </Callout>
       )}
     </div>
   )

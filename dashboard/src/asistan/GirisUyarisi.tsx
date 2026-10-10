@@ -6,7 +6,7 @@ export default function GirisUyarisi() {
   const uyari = useAsistanDurumu(d => d.uyari)
   if (!uyari) return null
   return <div className="asistan__uyari">
-    <InlineNotification kind="error" lowContrast role="alert" title={uyari} statusIconDescription="Hata"
+    <InlineNotification kind="error" lowContrast role="alert" title={uyari} statusIconDescription="Hata" aria-label="Kapat"
       onClose={() => { asistanDeposu.ayarla({ uyari: null }); return false }} />
   </div>
 }

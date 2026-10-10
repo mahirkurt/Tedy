@@ -78,6 +78,24 @@ test('events carry their course as an edge and their kind as an icon', async ({ 
   expect(bas).toBe('rgb(224, 224, 224)')            // layer-accent-01, not the band's navy
 })
 
+// B45 (§4.4): Carbon draws a Tag's `renderIcon` only from md up (Tag.js skips it at sm) — the event kind's icon
+// had silently gone from the detail popover.
+test('the event detail names its kind with the icon drawn', async ({ page }) => {
+  await page.route('**/api/health', r => r.fulfill(json({
+    timestamp: '', success: true, scrape_errors: [], duration_seconds: 1,
+  })))
+  await page.route('**/api/calendar/unified', r => r.fulfill(json({ events: [
+    { id: 'b', type: 'homework', title: 'Okuma günlüğü', start: '2026-09-16T14:00:00', end: '2026-09-16T14:00:00',
+      color: '', course: 'Türkçe', courseFamily: 'magenta', status: '' },
+  ] })))
+  await page.clock.setFixedTime(new Date('2026-09-14T08:00:00'))
+  await page.goto('/takvim')
+  await page.locator('.calendar-grid .calendar-event', { hasText: 'Okuma günlüğü' }).click()
+  const tur = page.locator('.calendar-popover__header .cds--tag')
+  await expect(tur).toBeVisible()
+  await expect(tur.locator('svg')).toBeVisible()
+})
+
 // A 1fr track grows to its content's min-content: one long unbreakable title
 // widened its day and pushed Friday off the grid (live data, 2026-09-24).
 test('a long event title does not widen its day', async ({ page }) => {

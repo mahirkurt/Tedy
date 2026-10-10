@@ -113,6 +113,10 @@ test('a tablet keeps the menu button and opens the side nav with it', async ({ p
   await expect(page.getByRole('navigation', { name: 'Ana gezinme' })).toBeHidden()
   const menu = page.getByRole('button', { name: 'Menü' })
   await expect(menu).toBeVisible()
+  // B40: the button says whether the side nav is open; the band's landmark is named in Turkish.
+  await expect(menu).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByRole('banner', { name: 'TEDY', exact: true })).toBeVisible()
   await menu.click()
   await expect(page.getByRole('navigation', { name: 'Navigasyon' })).toBeVisible()
+  await expect(menu).toHaveAttribute('aria-expanded', 'true')
 })

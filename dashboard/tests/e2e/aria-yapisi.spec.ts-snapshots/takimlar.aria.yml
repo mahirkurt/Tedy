@@ -1,6 +1,6 @@
 - main:
   - heading "Takımlar" [level=1]
-  - heading "Takım Çalışmaları & ÖGEP" [level=2]
+  - heading "Takım çalışmaları & ÖGEP" [level=2]
   - heading "Academy+" [level=3]
   - table "Structured list section":
     - rowgroup:

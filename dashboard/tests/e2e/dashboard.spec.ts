@@ -100,9 +100,10 @@ test.describe('SPA serving', () => {
     await expect(syncTrigger).toBeVisible()
     await syncTrigger.click()
     await expect(page.getByRole('dialog', { name: 'Senkron sağlık bilgisi' })).toBeVisible()
-    await expect(page.getByText('Senkron Sağlığı')).toBeVisible()
-    await expect(page.getByText('Son Sync:')).toBeVisible()
-    await expect(page.getByText('Son Başarılı Tam Sync:')).toBeVisible()
+    // B41: tek sözlük ("senkron") ve cümle düzeni.
+    await expect(page.getByText('Senkron durumu', { exact: true })).toBeVisible()
+    await expect(page.getByText('Son senkron', { exact: true })).toBeVisible()
+    await expect(page.getByText('Son başarılı tam senkron', { exact: true })).toBeVisible()
   })
 
   test('header remains usable on mobile viewport', async ({ browser }) => {
@@ -121,7 +122,7 @@ test.describe('SPA serving', () => {
     // Sync status moved to the footer on a phone so Odak can stay in the
     // header. The header's job here is the working-state switch.
     await expect(page.getByRole('switch', { name: 'Odak' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Çıkış' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Çıkış yap' })).toBeVisible()
 
     await context.close()
   })
@@ -177,5 +178,55 @@ test.describe('SPA serving', () => {
     await page.goto('/asistan')
     await expect(page.getByRole('button', { name: 'Ödev fotoğrafı ekle' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Dosya ekle', exact: true })).toBeVisible()
+  })
+})
+
+// B75 (S45, S39): senkron etiketi arıza yokken nötr ve sayısızdır; kısmi/bayat okuma uyarı ikonu + metin, başarısız
+// senkron hata ikonu + metin taşır; doğrulama uyarıları sayıya girmez. B45: Tag yok (Tag'in `title`'ı ipucu vermez).
+test.describe('header sync status', () => {
+  test.use({ timezoneId: 'Europe/Istanbul' })  // health.json stamps are naive Istanbul wall clock
+  const SIMDI = new Date('2026-09-24T10:30:00+03:00')
+  const health = (ek: Record<string, unknown>) => ({
+    timestamp: '2026-09-24T10:25:00', success: true, scrape_errors: [], duration_seconds: 240,
+    validation_warnings: ['a', 'b', 'c'], staleness: { last_successful_full_scrape: '2026-09-24T10:25:00', stale_sections: [] },
+    sections: {}, ...ek,
+  })
+  async function ac(page: import('@playwright/test').Page, veri: Record<string, unknown>) {
+    await page.clock.setFixedTime(SIMDI)
+    await page.route('**/api/health', r => r.fulfill({ json: veri }))
+    await page.goto('/')
+    const tetik = page.getByRole('button', { name: /^Senkron durumu:/ })
+    await expect(tetik).toBeVisible()
+    await expect(tetik.locator('.cds--tag')).toHaveCount(0)
+    return tetik
+  }
+
+  test('nothing wrong: neutral, no count, no icon', async ({ page }) => {
+    const tetik = await ac(page, health({}))
+    await expect(tetik).toHaveAccessibleName('Senkron durumu: 5 dk önce')
+    await expect(tetik.locator('svg')).toHaveCount(0)
+    await expect(tetik).not.toContainText('uyarı')
+  })
+
+  test('a stale or unread section is a warning icon plus words', async ({ page }) => {
+    const tetik = await ac(page, health({
+      staleness: { last_successful_full_scrape: '2026-09-24T10:25:00', stale_sections: ['takvim'] },
+    }))
+    await expect(tetik).toHaveAccessibleName('Senkron durumu: 5 dk önce · kısmi okuma')
+    await expect(tetik.locator('.dashboard-header__sync--uyari svg')).toBeVisible()
+  })
+
+  test('a failed sync is an error icon plus words', async ({ page }) => {
+    const tetik = await ac(page, health({ success: false, scrape_errors: ['giriş'] }))
+    await expect(tetik).toHaveAccessibleName('Senkron durumu: 5 dk önce · senkron başarısız')
+    await expect(tetik.locator('.dashboard-header__sync--hata svg')).toBeVisible()
+  })
+
+  test('the popover writes one date format, without seconds', async ({ page }) => {
+    const tetik = await ac(page, health({}))
+    await tetik.click()
+    const pencere = page.getByRole('dialog', { name: 'Senkron sağlık bilgisi' })
+    await expect(pencere).toContainText('24 Eyl 2026 10:25')
+    await expect(pencere).not.toContainText('10:25:00')
   })
 })

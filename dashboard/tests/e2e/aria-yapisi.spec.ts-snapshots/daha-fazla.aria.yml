@@ -1,0 +1,29 @@
+- main:
+  - heading "Daha fazla" [level=1]
+  - region "Daha fazla":
+    - heading "Daha fazla" [level=2]
+    - list:
+      - listitem:
+        - link "Tedy Books":
+          - /url: /kitaplar
+      - listitem:
+        - link "Notlar":
+          - /url: /notlar
+      - listitem:
+        - link "Takvim":
+          - /url: /takvim
+      - listitem:
+        - link "Takımlar":
+          - /url: /takimlar
+      - listitem:
+        - link "İlerleme":
+          - /url: /ilerleme
+      - listitem:
+        - link "Duyurular":
+          - /url: /duyurular
+      - listitem:
+        - link "Profil":
+          - /url: /profil
+      - listitem:
+        - link "Modüller":
+          - /url: /moduller

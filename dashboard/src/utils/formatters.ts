@@ -98,7 +98,7 @@ export function parseDeadline(dateStr?: string | null): Date | null {
 }
 
 export function getHomeworkStatus(status: string): {
-  label: string; type: 'green' | 'red' | 'blue' | 'gray' | 'warm-gray'
+  label: string; type: 'green' | 'red' | 'gray' | 'warm-gray'
 } {
   switch (status) {
     case 'Yaptı':
@@ -107,7 +107,7 @@ export function getHomeworkStatus(status: string): {
     case 'Yapmadi': return { label: 'Yapmadı', type: 'red' }
     case 'Eksik': return { label: 'Eksik', type: 'warm-gray' }
     case 'Değerlendirilmemiş':
-    case 'Degerlendirilmemis': return { label: 'Bekliyor', type: 'blue' }
+    case 'Degerlendirilmemis': return { label: 'Bekliyor', type: 'gray' }
     default: return { label: status, type: 'gray' }
   }
 }
@@ -164,12 +164,12 @@ export function kisaTeslim(deadline: Date, now: Date): string {
 /** Turkish names for the scrape sections health.json reports on. Shared so the
  *  header popover and the portal-status banner cannot drift apart. */
 export const SECTION_LABELS: Record<string, string> = {
-  ogrenci_profili: 'Öğrenci Profili',
+  ogrenci_profili: 'Öğrenci profili',
   odevlerim: 'Ödevler',
-  ders_programi: 'Ders Programı',
+  ders_programi: 'Ders programı',
   takvim: 'Takvim',
   gelisim_raporu: 'Notlar',
-  ders_icerikleri: 'Ders İçerikleri',
+  ders_icerikleri: 'Ders içerikleri',
   takim_calismalari: 'Takımlar',
   ogep: 'ÖGEP',
   duyurular: 'Duyurular',

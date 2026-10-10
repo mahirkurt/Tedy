@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { girisHatasi } from '../utils/girisHatasi'
 
 export type UserRole = 'full' | 'reader'
 
@@ -56,14 +57,13 @@ export function useAuth() {
         credentials: 'include',
         body: JSON.stringify({ credential }),
       })
-      const data = await res.json()
       if (res.ok) {
-        setUser(toUser(data))
+        setUser(toUser(await res.json()))
         return { ok: true }
       }
-      return { ok: false, error: data.error || 'Giris basarisiz' }
+      return { ok: false, error: girisHatasi(res.status) }
     } catch {
-      return { ok: false, error: 'Baglanti hatasi' }
+      return { ok: false, error: girisHatasi(null) }
     }
   }, [])
 

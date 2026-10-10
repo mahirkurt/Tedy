@@ -58,14 +58,14 @@ export default function TeamActivities() {
   // Returning null left the page blank, which reads the same as a page that
   // failed to load (D3).
   if (activities.length === 0 && ogep.length === 0) {
-    return <EmptyLine label="Takım Çalışmaları &amp; ÖGEP">Kayıtlı takım etkinliği veya ÖGEP oturumu yok.</EmptyLine>
+    return <EmptyLine label="Takım çalışmaları &amp; ÖGEP">Kayıtlı takım etkinliği veya ÖGEP oturumu yok.</EmptyLine>
   }
 
   return (
     <div className="dashboard-card">
       <h2 className="dashboard-card__title">
         <GroupPresentation size={20} />
-        Takım Çalışmaları & ÖGEP
+        Takım çalışmaları & ÖGEP
       </h2>
 
       {activities.length > 0 && (
@@ -96,7 +96,7 @@ export default function TeamActivities() {
                   </StructuredListCell>
                   {!focusMode && (
                     <StructuredListCell>
-                      <Tag type={a["Teams Link"] === "Yüz Yüze" ? 'blue' : 'teal'} size="sm">
+                      <Tag type="gray" size="sm">
                         {a["Teams Link"]}
                       </Tag>
                     </StructuredListCell>

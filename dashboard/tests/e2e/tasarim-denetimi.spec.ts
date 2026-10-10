@@ -15,7 +15,7 @@ import { mock, FULL } from './_audit-fixtures'
 //     and its sideways scroll region was unreachable by keyboard.
 
 const SAYFALAR = ['/', '/isler', '/asistan', '/dersler', '/kitaplar', '/notlar', '/takvim',
-  '/takimlar', '/ilerleme', '/duyurular', '/profil', '/moduller', '/sinavlar']
+  '/takimlar', '/ilerleme', '/duyurular', '/profil', '/moduller', '/sinavlar', '/daha-fazla']  // B27
 const BOYUTLAR = [['masaüstü', 1440, 900], ['telefon', 390, 844]] as const
 
 async function ac(page: import('@playwright/test').Page, yol: string, w: number, h: number) {

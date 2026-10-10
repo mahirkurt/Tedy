@@ -22,12 +22,23 @@ const json = (b: unknown) => ({ status: 200, contentType: 'application/json', bo
 type Segment = { id: string; type: string; questions?: { correctIndex: number }[] }
 let moduleHtml = ''
 let quiz: { meta: { title: string }; segments: Segment[] }
+let clozeHtml = ''
 
 test.beforeAll(() => {
   const out = join(mkdtempSync(join(tmpdir(), 'tedy-modul-')), 'quiz.html')
   execFileSync(PYTHON, ['-m', 'src.mcp_server.derleme', '--ornek', 'QUIZ', '--cikti', out, '--ebeveyn-origin', ORIGIN],
     { cwd: REPO })
   moduleHtml = readFileSync(out, 'utf8')
+  // A module that opens on the template's fill-in-the-blank segment (B42): the real compiler and gates.
+  const dir = mkdtempSync(join(tmpdir(), 'tedy-cloze-'))
+  execFileSync(PYTHON, ['-c', [
+    'import json, sys', 'from src.mcp_server.ornekler import ornek, demo',
+    "d = ornek('QUIZ'); fb = next(s for s in demo()['segments'] if s['type'] == 'fillblank')",
+    "d['segments'] = [fb] + d['segments']", "open(sys.argv[1], 'w').write(json.dumps(d, ensure_ascii=False))",
+  ].join('\n'), join(dir, 'cloze.json')], { cwd: REPO })
+  execFileSync(PYTHON, ['-m', 'src.mcp_server.derleme', '--girdi', join(dir, 'cloze.json'), '--cikti', join(dir, 'cloze.html'),
+    '--ebeveyn-origin', ORIGIN], { cwd: REPO })
+  clozeHtml = readFileSync(join(dir, 'cloze.html'), 'utf8')
   quiz = JSON.parse(execFileSync(PYTHON, ['-c',
     'import json; from src.mcp_server.ornekler import ornek; print(json.dumps(ornek("QUIZ")))'],
   { cwd: REPO, encoding: 'utf8' }))
@@ -82,6 +93,31 @@ test('Modüller lists the published module under the frame-src policy', async ({
   await expect(card).toContainText('Yarışma')
   // The internal mode code must not reach the reader; the card has rendered (above) before this absence.
   await expect(card).not.toContainText('QUIZ')
+})
+
+// B17 (S12): the row action is not the page's primary button; B58: opening a module is navigation, so it is a
+// real link that names its module (B41: every "Aç" on the list is told apart).
+test('each module opens through a tertiary link that names it', async ({ page }) => {
+  await serveModule(page)
+  await page.goto('/moduller')
+  const ac = page.getByRole('link', { name: 'Aç: Maddenin Hâlleri', exact: true })
+  await expect(ac).toBeVisible()
+  await expect(ac).toHaveAttribute('href', '/moduller/fen5-su/v1')
+  await expect(ac).toHaveClass(/cds--btn--tertiary/)
+  await expect(page.locator('.modules .cds--btn--primary')).toHaveCount(0)
+  await ac.click()
+  await expect(page).toHaveURL(/\/moduller\/fen5-su\/v1$/)
+  await expect(page.getByRole('link', { name: 'Modüllere dön' })).toHaveAttribute('href', '/moduller')
+})
+
+// B43 (D3, D4): a failed catalogue says what happened in a sentence, never the raw HTTP text, and as an alert.
+test('a failed catalogue is a sentence, not a status code', async ({ page }) => {
+  await page.route('**/api/modules', r => r.fulfill({ status: 500, contentType: 'text/html', body: 'Internal Server Error' }))
+  await page.goto('/moduller')
+  const hata = page.locator('.modules .cds--inline-notification[role="alert"]')
+  await expect(hata).toContainText('Modüller yüklenemedi.')
+  await expect(hata).not.toContainText('HTTP')
+  await expect(hata).not.toContainText('Internal')
 })
 
 test('an empty catalogue says so', async ({ page }) => {
@@ -165,6 +201,17 @@ test('a draft preview opens without writing progress', async ({ page }) => {
   expect(progress.posts).toEqual([])
 })
 
+// B45 (§4.4): a sentence is not a Tag. The draft note is an info notification above the frame.
+test('the draft preview says so in a notification, not a tag', async ({ page }) => {
+  await recordProgress(page)
+  await serveModule(page)
+  await page.goto('/moduller/taslak/0123456789abcdef')
+  const not_ = page.locator('.module-page .cds--inline-notification--info')
+  await expect(not_).toContainText('Taslak önizleme')
+  await expect(not_).toContainText('İlerleme kaydedilmez.')
+  await expect(page.locator('.module-page .cds--tag')).toHaveCount(0)
+})
+
 test('the module takes on the dashboard theme, drafts included', async ({ page }) => {
   // Serve the frame starting in the dark theme so that adopting the dashboard's g10 is observable.
   const dark = moduleHtml.replace('<html lang="tr" data-theme="g10">', '<html lang="tr" data-theme="g100">')
@@ -229,4 +276,25 @@ test('a module linked to an upcoming exam is offered on İşler', async ({ page 
   await expect(unlinked.getByRole('button', { name: 'Modülü aç' })).toHaveCount(0)
   await linked.getByRole('button', { name: 'Modülü aç' }).click()
   await expect(page).toHaveURL(/\/moduller\/fen5-su\/v1$/)
+})
+
+// B42 (D2, §5.9): a word already tried is content to read, not a dead control — it stays in the tab order and in
+// the accessibility tree, says that it was tried, and is not faded (it was `disabled` at 40% opacity).
+test('a tried word in the module stays readable, not disabled', async ({ page }) => {
+  await recordProgress(page)
+  await serveModule(page, '/m/fen5-su/v1', clozeHtml)
+  await page.goto('/moduller/fen5-su/v1')
+  const frame = page.frameLocator('iframe.module-frame')
+  await expect(frame.locator('.pool .chip-btn')).toHaveCount(3)
+  const yanlis = frame.locator('.chip-btn[data-w="yoğuşma"]')
+  await yanlis.click()
+  await expect(frame.locator('#ffb')).toContainText('Bu değil.')
+  await expect(yanlis).toHaveAttribute('aria-disabled', 'true')
+  await expect(yanlis).not.toHaveAttribute('disabled', /.*/)
+  await expect(yanlis).toHaveAccessibleName(/yoğuşma.*denendi, doğru değil/)
+  expect(await yanlis.evaluate(el => getComputedStyle(el).opacity)).toBe('1')
+  await yanlis.focus()
+  await expect(yanlis).toBeFocused()
+  await frame.locator('.chip-btn[data-w="buharlaşma"]').click()
+  await expect(frame.locator('#ffb')).toContainText('Doğru!')
 })

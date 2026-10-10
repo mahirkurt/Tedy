@@ -1,7 +1,7 @@
 - main:
   - heading "Dersler" [level=1]
-  - heading /Haftalık Program — 2\. Hafta \d+ Eyl\. - \d+ Eyl\./ [level=2]
-  - table /Haftalık Program — 2\. Hafta \d+ Eyl\. - \d+ Eyl\./:
+  - heading /Haftalık program — 2\. Hafta \d+ Eyl\. - \d+ Eyl\./ [level=2]
+  - table /Haftalık program — 2\. Hafta \d+ Eyl\. - \d+ Eyl\./:
     - rowgroup:
       - row "Saat Pazartesi Salı Çarşamba Perşembe Cuma":
         - columnheader "Saat"
@@ -74,7 +74,7 @@
         - cell
         - cell "Kültür ve Medeniyetimize Yön Verenler Eda Şen"
         - cell
-  - heading "Ders İçerikleri" [level=2]
+  - heading "Ders içerikleri" [level=2]
   - tablist "Ders içerikleri":
     - tab "Matematik" [selected]
     - tab "Fen Bilimleri"
