@@ -1,4 +1,5 @@
 import { clock, describeRemaining } from './patterns/time'
+import { Rakamli } from './patterns/Rakamli'
 import './patterns/patterns.scss'
 import './DayStrip.scss'
 
@@ -57,10 +58,11 @@ export function DayStrip({ nowMin, bedtimeMin, focusEndMin, anchorMin }: DayStri
         `Gün ${clock(bedtimeMin)}'da bitiyor.`
       }
     >
+      {/* Sentence case (S38); only the figures are mono (.tedy-time). */}
       <div className="day-strip__head">
-        <span className="day-strip__now-label tedy-time">ŞİMDİ {clock(nowMin)}</span>
-        <span className="day-strip__left">{remaining}</span>
-        <span className="day-strip__end-label tedy-time">yatma {clock(bedtimeMin)}</span>
+        <span className="day-strip__now-label">Şimdi <span className="tedy-time">{clock(nowMin)}</span></span>
+        <span className="day-strip__left"><Rakamli metin={remaining} /></span>
+        <span className="day-strip__end-label">Yatma <span className="tedy-time">{clock(bedtimeMin)}</span></span>
       </div>
 
       <div className="day-strip__track">
@@ -82,12 +84,12 @@ export function DayStrip({ nowMin, bedtimeMin, focusEndMin, anchorMin }: DayStri
             // label would hang off the start of the strip, so it starts there
             // and runs right instead of being clipped.
             className={
-              'day-strip__boundary tedy-time' +
+              'day-strip__boundary' +
               (windowWidth < 24 ? ' day-strip__boundary--start' : '')
             }
             style={{ insetInlineStart: `${windowWidth}%` }}
           >
-            odak sonu {clock(windowEnd)}
+            Odak sonu <span className="tedy-time">{clock(windowEnd)}</span>
           </span>
         )}
         {ticks.map(m => (

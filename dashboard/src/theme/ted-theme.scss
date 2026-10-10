@@ -72,16 +72,6 @@
   // Carbon is square by default. The softened corner is intentional TEDY
   // character — this is a child's dashboard, not a console — and it is the
   // second and last deliberate deviation.
-  // Day Strip — the focus window is a calm warm field, deliberately not an
-  // alarm: it says "there is fuel here", and only one attention-grabbing
-  // colour is allowed per screen (principle İ6). Derived from Carbon's yellow
-  // so it stays inside the palette rather than being an invented hex.
-  // Opaque palette steps, not yellow at 22% / 45%: the track under the window
-  // is layer-01, so the same field and edge are these two steps by name.
-  --ted-day-window: #{colors.$yellow-10};
-  --ted-day-window-edge: #{colors.$yellow-30};
-  --ted-day-window-text: #{colors.$yellow-80};
-
   // 8px = the module template's --cds-border-radius-08, so a card in the
   // dashboard and a card inside a module turn the same corner.
   --ted-radius-card: 8px;
@@ -265,6 +255,7 @@ body {
   // would erase what the window, the dots and the marks say.
   .day-strip__track,
   .today-tl__dot,
+  .today-tl__now-line,
   .ted-subject-label__mark,
   .calendar-event,
   .calendar-event--continuation {
@@ -433,13 +424,14 @@ body {
 
 // ─── Today's Schedule ────────────────────────────────────────────────────────
 
-// Animations
-@keyframes tl-stagger {
-  from { opacity: 0; transform: translateX(calc(-1 * #{spacing.$spacing-03})); }
-  to { opacity: 1; transform: translateX(0); }
-}
+// Bugün, redesigned 2026-10-10 (docs/superpowers/specs/2026-10-10-bugun-yenileme-design.md).
+// One column of sections spaced by the parent's gap ([3.4-4]); one subject
+// panel per view (the lesson card or the work card, İ8.3); the rest neutral
+// and quiet. No entrance animation, no stagger (S26, B24): the page is simply
+// there, and "now" on the Day Strip is the only thing that moves.
 
-// Loading shimmer
+// Loading — Carbon skeletons in the content's shape (§5.2). `.today-loading*`
+// is also Takvim's (CalendarEvents.tsx).
 .today-loading {
   display: flex;
   flex-direction: column;
@@ -447,8 +439,6 @@ body {
   padding: var(--ted-space-lg) 0;
 }
 
-// Carbon's SkeletonPlaceholder in the content's shape (surface designs §2.4),
-// not a hand-drawn gradient shimmer.
 .today-loading__block.cds--skeleton__placeholder {
   width: 100%;
   height: 3.5rem;
@@ -456,104 +446,59 @@ body {
   &.today-loading__block--short { width: 60%; height: 2.5rem; }
 }
 
-// Empty state
-
-.today-empty__title {
-  @include type.type-style('heading-02');
-  margin: 0 0 var(--ted-space-xs);
-  color: var(--ted-color-text-primary);
+.today-skeleton__strip.cds--skeleton__placeholder {
+  width: 100%;
+  height: 3.5rem;
 }
 
-.today-empty__text {
-  @include type.type-style('body-01');
-  color: var(--ted-color-text-helper);
+.today-skeleton__card.cds--skeleton__placeholder {
+  width: 100%;
+  height: 9rem;
+  border-radius: var(--ted-radius-card);
+}
+
+// Main container: sections stacked by one gap, none carries its own margin.
+.today {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-06;
+}
+
+.today .next-thing,
+.today .day-strip {
   margin: 0;
 }
 
-// Main container
-.today {
-  animation: card-fade-in motion.$duration-moderate-02 motion.motion(entrance, productive);
+// The system-failure band spans the column (Carbon caps it at 46rem).
+.today-ariza.cds--inline-notification {
+  max-inline-size: none;
+  margin: 0;
 }
 
-// Date header
+// ── Day line ──
+// Outside every container, so the page's one fluid line (S16). Fluid
+// heading-03 (20px, 24px from 99rem), not -04: at 32px the day name outgrew
+// the card's 28px title, and the one thing is the largest text (P1).
+// The arrows are Carbon ghost icon buttons at lg (48px, every width — B8).
 .today__header {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--ted-space-sm);
-  margin-top: var(--ted-space-sm);
-  margin-bottom: var(--ted-space-md);
+  gap: spacing.$spacing-02;
 }
 
-.today__header-main {
+.today__day {
   display: flex;
-  align-items: center;
-  gap: var(--ted-space-xs);
-}
-
-.today__header-text {
-  display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-}
-
-.today__header-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--ted-space-xs);
-}
-
-.today__nav-btn,
-.today__today-btn {
-  border: 1px solid var(--ted-color-border-subtle);
-  background: var(--cds-layer-01);
-  color: var(--ted-color-text-secondary);
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background-color var(--ted-transition-fast),
-              color var(--ted-transition-fast),
-              border-color var(--ted-transition-fast);
-}
-
-.today__nav-btn {
-  width: 1.75rem;
-  height: 1.75rem;
-  padding: 0;
-}
-
-// D3b phone gate is 44px. 1.75rem is 28px; spacing-09 is 48px, the same
-// floor the bottom bar already uses. Desktop stays the smaller circle.
-@media (max-width: 671px) {
-  .today__nav-btn {
-    width: spacing.$spacing-09;
-    height: spacing.$spacing-09;
-  }
-}
-
-.today__today-btn {
-  height: 1.75rem;
-  padding: 0 spacing.$spacing-04;
-  @include type.type-style('label-01');
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.today__nav-btn:hover,
-.today__today-btn:hover {
-  background-color: #{colors.$blue-10};
-  color: var(--cds-link-primary-hover);
-  border-color: #{colors.$blue-30};
+  gap: 0 spacing.$spacing-03;
+  margin: 0;
+  padding-inline: spacing.$spacing-03;
 }
 
 .today__day-name {
-  @include type.type-style('heading-03');
-  font-weight: 600;
+  @include type.type-style('fluid-heading-03', true);
   color: var(--ted-color-text-primary);
-  margin-right: var(--ted-space-xs);
-  letter-spacing: -0.01em;
 }
 
 .today__date-str {
@@ -561,30 +506,40 @@ body {
   color: var(--ted-color-text-secondary);
 }
 
+.today__today-btn {
+  margin-inline-start: auto;
+}
+
 // ── The one thing while school runs ──
-// Same shape as .next-thing, because it is the same idea: the one place to be.
-// The gradient hero, its pulsing dot and its progress bar lived here, along
-// with a raw-hex homework box and a second day bar (İ1, İ6, D1).
+// The view's one subject panel (İ8.3, [3.2-13]): step-10 ground, step-30
+// border, 4px accent edge — the edge is what separates a grey family's panel
+// from the page ([3.2-15]). No shadow (S11), the card corner (S10).
 
 .today-now {
-  padding: var(--ted-space-md) var(--ted-space-lg);
+  padding: spacing.$spacing-06;
+  background: var(--ted-subject-panel);
+  border: 1px solid var(--ted-subject-panel-border);
+  border-inline-start: 4px solid var(--ted-subject-accent);
+  border-radius: var(--ted-radius-card);
+}
+
+// ÖGEP and other places without a course: neutral, with a strong edge.
+.today-now--neutral {
   background: var(--cds-layer-01);
-  border-inline-start: 3px solid var(--cds-interactive);
-  border-radius: 2px;
-  margin-bottom: var(--ted-space-xs);
+  border-color: var(--cds-border-subtle-01);
+  border-inline-start-color: var(--cds-border-strong-01);
 }
 
 .today-now__eyebrow {
   display: block;
   @include type.type-style('label-01');
   color: var(--cds-text-secondary);
-  letter-spacing: 0.08em;
-  margin-bottom: var(--ted-space-2xs);
-  font-variant-numeric: tabular-nums;
+  margin-bottom: spacing.$spacing-02;
 }
 
+// The largest text on the page (P1), at the token's own weight (S44).
 .today-now__title {
-  @include type.type-style('heading-03');
+  @include type.type-style('heading-04');
   color: var(--cds-text-primary);
   margin: 0;
 }
@@ -592,7 +547,7 @@ body {
 .today-now__sub {
   @include type.type-style('body-compact-01');
   color: var(--cds-text-secondary);
-  margin: spacing.$spacing-01 0 0;
+  margin: spacing.$spacing-02 0 0;
 }
 
 .today-now__next {
@@ -603,60 +558,27 @@ body {
   margin: var(--ted-space-sm) 0 0;
   @include type.type-style('body-compact-01');
   color: var(--cds-text-secondary);
-  font-variant-numeric: tabular-nums;
 }
 
-// ── "Ayrıca": the rest of what is owed, said quietly ──
+// ── "Ayrıca" and "Sınavlar": Carbon on-page contained lists at lg ──
+// Rows are Carbon's own 48px clickable items; only the row's inside is ours:
+// the work's name on the left, its day on the right.
 
-.today-also {
-  margin-bottom: var(--ted-space-md);
+// S3: Carbon adds 16px above an on-page list that follows another
+// (`.cds--contained-list--on-page + .cds--contained-list--on-page`); here the
+// page's own gap already separates them, and the two together measured 40px
+// plus the 48px header — the widest gap on the page, between two quiet lists.
+// No prop turns it off (ContainedList takes kind, size, isInset, label, action).
+.today .today-exams.cds--contained-list {
+  margin-block-start: 0;
 }
 
-.today-also__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--ted-space-xs);
-  margin-bottom: var(--ted-space-2xs);
-}
-
-.today-also__title {
-  @include type.type-style('label-01');
-  color: var(--cds-text-secondary);
-  letter-spacing: 0.08em;
-}
-
-.today-also__all {
-  border: none;
-  background: none;
-  padding: 0;
-  min-height: 1.5rem;
-  @include type.type-style('label-01');
-  color: var(--cds-link-primary);
-  cursor: pointer;
-
-  &:hover { text-decoration: underline; }
-  &:focus-visible { outline: 2px solid var(--cds-focus); outline-offset: 2px; }
-}
-
-.today-also__item {
+.today-also__row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: var(--ted-space-sm);
   width: 100%;
-  min-height: 2rem;
-  padding: var(--ted-space-xs) 0;
-  border: none;
-  border-bottom: 1px solid var(--cds-border-subtle-01);
-  background: none;
-  text-align: left;
-  cursor: pointer;
-  @include type.type-style('body-compact-01');
-  color: var(--cds-text-primary);
-
-  &:hover { background: var(--cds-layer-hover-01); }
-  &:focus-visible { outline: 2px solid var(--cds-focus); outline-offset: -2px; }
 }
 
 .today-also__name {
@@ -666,51 +588,44 @@ body {
 .today-also__due {
   flex: none;
   color: var(--cds-text-secondary);
-  font-variant-numeric: tabular-nums;
 }
 
 // ── The next school day, for the evening ──
 // Where to be tomorrow — first lesson, the day's courses, any event — so the
-// bag can be packed the night before. Quiet text, like "Ayrıca": it informs,
-// it does not compete with the card (İ6).
+// bag can be packed the night before. A neutral section, not a subject panel:
+// the view's one panel is the card above (İ6, İ8.3).
 
 .today-tomorrow {
-  margin-bottom: var(--ted-space-md);
-  padding-top: var(--ted-space-xs);
-  border-top: 1px solid var(--cds-border-subtle-01);
+  padding: spacing.$spacing-05;
+  background: var(--cds-layer-01);
+  border: 1px solid var(--cds-border-subtle-01);
+  border-radius: var(--ted-radius-card);
 }
 
-.today-tomorrow__eyebrow {
-  display: block;
-  @include type.type-style('label-01');
-  color: var(--cds-text-secondary);
-  letter-spacing: 0.08em;
-  margin-bottom: var(--ted-space-2xs);
+.today-tomorrow__title {
+  @include type.type-style('heading-02');
+  color: var(--cds-text-primary);
+  margin: 0 0 spacing.$spacing-03;
 }
 
 .today-tomorrow__first {
-  @include type.type-style('body-compact-01');
-  font-weight: 600;
+  @include type.type-style('heading-compact-01');
   color: var(--cds-text-primary);
   margin: 0;
-  font-variant-numeric: tabular-nums;
 }
 
 .today-tomorrow__line {
   @include type.type-style('body-compact-01');
   color: var(--cds-text-secondary);
-  margin: spacing.$spacing-01 0 0;
-  font-variant-numeric: tabular-nums;
+  margin: spacing.$spacing-02 0 0;
 }
 
-// Tomorrow's exam leads the card: said first and in full, still without the
-// warning colour — it is information for the evening, not an alarm (İ4, İ6).
+// Tomorrow's exam leads the section: said first and in full, still without
+// the warning colour — it is information for the evening, not an alarm (İ4).
 .today-tomorrow__exam {
-  @include type.type-style('body-compact-01');
-  font-weight: 600;
+  @include type.type-style('heading-compact-01');
   color: var(--cds-text-primary);
-  margin: 0 0 var(--ted-space-2xs);
-  font-variant-numeric: tabular-nums;
+  margin: 0 0 spacing.$spacing-03;
 }
 
 // What "Yaptım" recorded, said once and quietly under the card.
@@ -718,40 +633,30 @@ body {
   display: flex;
   align-items: center;
   gap: var(--ted-space-xs);
-  margin: calc(-1 * #{spacing.$spacing-04}) 0 var(--ted-space-md);
+  margin: 0;
   @include type.type-style('body-compact-01');
   color: var(--cds-text-secondary);
 }
 
-// ── Finished items fold to one line (İ7) ──
+// ── The day: fold of finished items, then the timeline ──
 
-.today-past-fold {
+.today-day {
   display: flex;
-  align-items: center;
-  gap: var(--ted-space-xs);
-  width: 100%;
-  min-height: 2rem;
-  padding: var(--ted-space-xs) 0;
-  margin-bottom: var(--ted-space-xs);
-  border: none;
-  background: none;
-  text-align: left;
-  cursor: pointer;
-  @include type.type-style('body-compact-01');
-  color: var(--cds-text-secondary);
-
-  &:hover { color: var(--cds-text-primary); }
-  &:focus-visible { outline: 2px solid var(--cds-focus); outline-offset: 2px; }
+  flex-direction: column;
+  gap: spacing.$spacing-03;
 }
 
-.today-past-fold__action {
-  color: var(--cds-link-primary);
+// Finished items fold to one line (İ7): a Carbon ghost button at lg with
+// aria-expanded / aria-controls and a chevron.
+.today-past-fold.cds--btn {
+  align-self: flex-start;
 }
-
-// ── Vertical timeline ──
 
 .today-tl {
   position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .today-tl__item {
@@ -759,11 +664,6 @@ body {
   grid-template-columns: 3rem 1.375rem 1fr;
   gap: 0 spacing.$spacing-03;
   padding: spacing.$spacing-02 0;
-  animation: tl-stagger motion.$duration-moderate-02 motion.motion(entrance, productive) both;
-
-  @for $i from 1 through 20 {
-    &:nth-child(#{$i}) { animation-delay: #{$i * 40}ms; }
-  }
 }
 
 .today-tl__item--past {
@@ -779,31 +679,22 @@ body {
   }
 
   .today-tl__dot {
-    background: var(--cds-layer-active-01) !important;
-    box-shadow: none !important;
+    background: var(--cds-layer-active-01);
   }
 }
 
-.today-tl__item--active {
-  opacity: 1;
-
-  .today-tl__card {
-    background: #{colors.$blue-10};
-    border-color: #{colors.$blue-40};
-  }
-
-  .today-tl__dot {
-    box-shadow: 0 0 0 3px #{colors.$blue-20};
-  }
+// The lesson running now: a strong edge in the course's own accent, the ground
+// stays neutral — the view's one panel is the card above (İ8.3).
+.today-tl__item--active .today-tl__card {
+  border-color: var(--cds-border-strong-01);
+  border-inline-start: 3px solid var(--ted-subject-accent);
 }
 
 .today-tl__time {
   @include type.type-style('label-01');
-  font-weight: 600;
   color: var(--ted-color-text-helper);
   text-align: right;
   padding-top: spacing.$spacing-04;
-  font-variant-numeric: tabular-nums;
 }
 
 .today-tl__spine {
@@ -824,9 +715,9 @@ body {
   }
 }
 
-// Hide connector above first and below last
-.today-tl > div:first-child .today-tl__spine::before { top: 50%; }
-.today-tl > div:last-child .today-tl__spine::before { bottom: 50%; }
+// No connector above the first item or below the last.
+.today-tl > li:first-child .today-tl__spine::before { top: 50%; }
+.today-tl > li:last-child .today-tl__spine::before { bottom: 50%; }
 
 .today-tl__dot {
   width: 1.25rem;
@@ -845,17 +736,17 @@ body {
   svg { fill: var(--cds-icon-on-color); }
 }
 
+// Every card on the line: a layer, a hairline, the card corner, no shadow. A
+// card without an action has no hover (P6).
 .today-tl__card {
+  display: block;
   background: var(--ted-card-bg);
   border: 1px solid var(--ted-color-border-subtle);
   border-radius: var(--ted-radius-card);
   padding: spacing.$spacing-03 spacing.$spacing-04;
   min-height: 2.5rem;
-  transition: background-color var(--ted-transition-fast);
-}
-
-.today-tl__item:not(.today-tl__item--past) .today-tl__card:hover {
-  background-color: var(--ted-color-page-bg);
+  color: inherit;
+  text-decoration: none;
 }
 
 .today-tl__card-top {
@@ -872,24 +763,26 @@ body {
 
 .today-tl__card-period {
   @include type.type-style('label-01');
-  font-weight: 600;
   color: var(--ted-color-text-helper);
   flex-shrink: 0;
 }
 
 .today-tl__card-sub {
+  display: block;
   @include type.type-style('label-01');
   color: var(--ted-color-text-secondary);
-  margin-top: 1px;
+  margin-top: spacing.$spacing-01;
 }
 
 .today-tl__card-tags {
   display: flex;
-  gap: var(--ted-space-2xs);
+  flex-wrap: wrap;
+  gap: spacing.$spacing-03;
   margin-top: var(--ted-space-2xs);
 }
 
-// Now marker
+// Now marker: a line between places, its time said in words for a screen
+// reader ("Şimdi 10:30").
 .today-tl__now {
   display: grid;
   grid-template-columns: 3rem 1fr;
@@ -901,28 +794,12 @@ body {
 .today-tl__now-time {
   text-align: right;
   @include type.type-style('label-01');
-  font-weight: 600;
-  color: var(--cds-interactive);
-  font-variant-numeric: tabular-nums;
+  color: var(--cds-text-primary);
 }
 
 .today-tl__now-line {
   height: 2px;
-  background: var(--cds-interactive);
-  border-radius: 1px;
-  position: relative;
-
-  &::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-    background: var(--cds-interactive);
-    transform: translate(-50%, -50%);
-  }
+  background: var(--cds-border-inverse);
 }
 
 // ─── Calendar Events ─────────────────────────────────────────────────────────
@@ -1097,18 +974,27 @@ body {
   color: var(--ted-text-error);
 }
 
-// ─── Today Timeline — Clickable deadline items ───────────────────────────────
-.today-tl__item--deadline {
-  cursor: pointer;
+// ─── Today Timeline — deadline rows ──────────────────────────────────────────
+// A deadline on today's line is urgent: the one place red is spent here, as a
+// 3px edge ([3.5-3]); once it has passed it recedes like everything past. The
+// card is a real link to İşler (B7), with Carbon's focus ring and a layer
+// hover behind `any-hover` (S17, B31).
+.today-tl__item--deadline .today-tl__card {
+  border-inline-start: 3px solid var(--cds-support-error);
+}
 
-  // A deadline on today's line is urgent: the one place red is spent here.
-  .today-tl__card {
-    border-left: 2px solid var(--cds-support-error);
-  }
+.today-tl__item--deadline.today-tl__item--past .today-tl__card {
+  border-inline-start-color: var(--cds-border-strong-01);
+}
 
-  &:not(.today-tl__item--past) .today-tl__card:hover {
-    background-color: var(--cds-notification-background-error);
-    border-color: #{colors.$red-70};
+.today-tl__card--link:focus-visible {
+  outline: 2px solid var(--cds-focus);
+  outline-offset: 2px;
+}
+
+@media (any-hover: hover) {
+  .today-tl__card--link:hover {
+    background-color: var(--cds-layer-hover-01);
   }
 }
 
@@ -2118,6 +2004,7 @@ body {
   .today-tomorrow,
   .today-past-fold,
   .next-thing--quiet,
+  .today-day,
   .today-tl {
     display: none;
   }
@@ -2539,6 +2426,7 @@ body {
     @include type.type-style('body-01');
   }
 
+  // Carbon steps a panel's padding down one stop on a phone ([3.4-3]).
   .today-now {
     padding: var(--ted-space-md);
   }
@@ -2551,10 +2439,6 @@ body {
   .today-tl__now {
     grid-template-columns: 2.5rem 1fr;
     gap: 0 spacing.$spacing-03;
-  }
-
-  .today__day-name {
-    @include type.type-style('body-02');
   }
 
   .health-popover {
@@ -3239,13 +3123,6 @@ body {
 .exam-empty__text {
   @include type.type-style('body-01');
   color: var(--ted-color-text-helper);
-}
-
-// ── Today page: Yaklaşan Sınavlar card ──
-
-// Exams share "Ayrıca"'s rows (.today-also__*): same voice, same weight.
-.today-exams {
-  margin-bottom: var(--ted-space-md);
 }
 
 // ── Exam responsive ──
@@ -5137,22 +5014,12 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   }
 
   .dashboard-card,
-  .today,
-  .today-tl__item,
   .health-popover,
   .calendar-popover,
   .ac-msg {
     animation-duration: 1ms;
     animation-delay: 0ms;
   }
-}
-
-// Empty state is a sentence, not a card (§2.3). A decorative icon and a
-// 200px panel announce the absence of news louder than the news itself.
-.today-empty {
-  margin: 0 0 var(--ted-space-md, 1rem);
-  color: var(--ted-color-text-secondary);
-  font-size: 0.875rem;
 }
 
 // ─── Route boundary ──────────────────────────────────────────────────────────

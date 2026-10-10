@@ -1,6 +1,6 @@
 - main:
   - heading "İşler" [level=1]
-  - text: SIRADAKİ
+  - text: Sıradaki
   - heading "Matematik — 2. HAFTA MATEMATİK HAFTA İÇİ ÖDEVİ" [level=2]
   - text: /\d+ dakikayla başla/
   - button "Başla"

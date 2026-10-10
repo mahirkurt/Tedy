@@ -294,7 +294,7 @@ export default function HomeworkTracker() {
           the work itself, so the verb keeps its meaning through the flow. */}
       {nextHw && (
         <NextThing
-          eyebrow="SIRADAKİ"
+          eyebrow="Sıradaki"
           // The normalised name, as the list below prints it: the raw one put
           // "İkinci Yabancı Dil (Fransızca)" over rows saying "Fransızca" (İ9).
           title={[

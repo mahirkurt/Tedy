@@ -21,7 +21,7 @@ test.describe('C4 — sınavlar', () => {
 
     const yarin = page.locator('.today-tomorrow')
     const ilkSatir = yarin.locator('p').first()
-    await expect(ilkSatir).toContainText('SINAV')
+    await expect(ilkSatir).toContainText('Sınav')
     await expect(ilkSatir).toContainText('09:00')
     await expect(ilkSatir).toContainText('Özdebir GİS-1')
 
