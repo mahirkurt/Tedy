@@ -1,11 +1,21 @@
 # TEDY Yüzey Tasarımları
 
-**Sürüm 1.0 · 2026-08-31 · `docs/frontend-design-principles.md`'nin uygulaması**
+**Sürüm 1.11 · 2026-10-10 · `docs/frontend-design-principles.md`'nin uygulaması**
 
 İlkeler dokümanı *neye göre karar verileceğini* yazar. Bu doküman o kararların
 her yüzeyde ne olduğunu yazar. Çelişki hâlinde ilkeler dokümanı kazanır.
 
 Atıflar: **D1–D4** değişmezler, **İ1–İ9** ilkeler.
+
+**Giriş (2026-10-10).** Arayüz işine başlayan herkesin ön kapısı
+[`docs/tedy-ui-ux-talimatnamesi.md`](tedy-ui-ux-talimatnamesi.md)'dir (talimatname); kimin hangi iş
+için neyi hangi sırayla okuyacağını onun §0'ı söyler. İlkeler dokümanı değişmezleri ve ilkeleri taşır;
+talimatname onları Carbon temelleri, kalıplar, bilinçli sapmalar ve kapılarla konsolide eder; **bu
+doküman yüzey yüzey uygulamadır**: her sayfada o kuralların ne olduğunu ve neden öyle olduğunu yazar.
+Öncelik sırası: D1–D4 → İ1–İ9 → talimatname → bu doküman → bileşen rehberi
+(`carbon-bilesen-rehberi.md`) → `tedy-carbon` katmanı → carbon-builder → Carbon'un genel rehberi.
+Çelişkide üstteki kazanır; ölçüm, kaynak göstermeyen genellemeyi yener. Aşağıdaki "Bugünkü kusur"
+listeleri ve §6 ölçüm günlüğü tarihli kayıttır; bugünün açık borçları talimatname §13'tedir.
 
 ---
 
@@ -40,6 +50,12 @@ başına taşıyıcı olamaz (çalışma belleği yükü).
 **İkincil** (bir "Daha fazla" altında): Notlar, Takvim, Takımlar, İlerleme,
 Duyurular, Profil.
 
+(Güncellendi 2026-10-10: ikincil artık 7; Modüller eklendi. Sınavlar kendi sayfasını, gezinmede
+görünmeyen bir rota olarak korur (`/sinavlar`, İşler'deki "Tüm sınavlar" bağlantısı). Telefonda
+(< 672px, D3a, `b9cdfb9`, 2026-10-02) dört günlük sekme Bugün · İşler · Asistan · Dersler'dir;
+Tedy Books beşinci sekme "Daha fazla"nın sayfasına (`/daha-fazla`) geçer. Bkz. §3.2;
+`routes.ts`, `BottomNav.tsx`, `DahaFazla.tsx`.)
+
 Eski rotalar **kırılmaz**, yenilerine yönlendirilir. `readerAccess` mantığı
 aynen korunur; okur yalnız Tedy Books görür.
 
@@ -53,6 +69,10 @@ Ayrı sayfalar, ürünün iç kategorilerini kullanıcıya ödev olarak veriyor.
 
 Bunlar bir kez burada tanımlanır, her yüzeyde tekrar edilmez. Yeni bir kalıp
 icat etmeden önce buraya bakılır.
+
+Kalıpların Carbon karşılıkları, bilinçli sapmaları ve burada olmayan kalıplar (bildirim ve hata,
+diyalog, form, salt okunur/devre dışı, taşan içerik): talimatname §5. Bileşen düzeyinde kartlar
+(ne zaman, hangi varyant, TEDY kuralı, test): `docs/carbon-bilesen-rehberi.md`.
 
 ### 2.1 Zaman gösterimi
 
@@ -164,6 +184,13 @@ Bugünkü hâli çalışıyor. İki değişiklik:
   `SideNav` genişletilmiş hâlde.
 - Aktif sayfa Carbon'un kendi göstergesiyle; ek süsleme yok.
 
+(Güncellendi 2026-10-10: dar ekran kararı verildi ve ikisi de değil. Carbon `md` kırılımının altında
+(< 672px, D3a, `b9cdfb9`, 2026-10-02) `SideNav` ve menü düğmesi gizlenir, yerini özel `BottomNav`
+alır: Bugün · İşler · Asistan · Dersler · Daha fazla, ikon üstte etiket altta. Erişilebilirlik
+ağacında tek gezinme vardır; sekmeler ≥ 48px ve güvenli alan dolgulu; `/sinavlar` İşler sekmesini
+yakar; odak kipi Daha fazla sekmesini düşürür. Masaüstünde 5 birincil öğe üstte, 7 ikincil
+"Daha fazla" `SideNavMenu`'sünün altındadır. Kabuk ve gezinme kalıbı: talimatname §5.)
+
 ### 3.3 Portal durum bandı
 
 Uygulandı (`PortalStatusBanner`). Kural: yalnız portalın **açıkça reddettiği**
@@ -218,7 +245,9 @@ dilime çapalanır.
   hazırlansın diye. Cuma akşamı "PAZARTESİ" der. Teslimleri tekrar etmez; onlar
   kartta ve "Ayrıca"da gün adıyla zaten yazıyor.
 - **Sınavlar** "Ayrıca"nın sessiz satırlarıyla gösterilir: ad ve gün. Renkli
-  geri sayım etiketi ve ders rengi yok (İ6, İ8). Blok "Ayrıca"nın altında durur,
+  geri sayım etiketi ve ders rengi yok (İ6, İ8; güncellendi 2026-10-10: renkli geri sayım yok,
+  ama 2026-09-24'ten beri satırda ders işareti var, `SubjectLabel`, bkz. değişiklik kaydı 1.6).
+  Blok "Ayrıca"nın altında durur,
   çünkü haftalar sonraki bir sınav dört gün sonraki ödevin üstünde durmamalı.
   Ertesi okul günündeki sınav akşam **Yarın'ın ilk satırı** olur ("SINAV · 09:00
   · …") ve listeden çıkar. Ana karta **çıkmaz**: İ4'ün kendi testi, 20:00'de
@@ -228,6 +257,16 @@ dilime çapalanır.
   ertele" kuralı. §2'ye göre ev ödevi zaten büyük ölçüde pencere dışında
   yapılıyor. Her işi 15:45–16:00 arasındaki 15 dakikalık dilime itmek dürüst olmaz.
   Pencere dışında kart yalnız kısa ve tek adımlı kalır ("10 dakikayla").
+
+**Bekleyen: İ8 C yönü (2026-10-10 notu).** 2026-10-02'de kullanıcı Bugün'ün üç taslağından "ders
+renkleri yüzeyde" yönünü (C) seçti ve İ8 buna göre yeniden yazıldı. Bugün henüz o hâlde değil:
+`.today-now` ve `NextThing` nötr `layer-01` zemin ve etkileşim kenarıyla duruyor; `--ted-subject-panel`'i
+şu an yalnız öğretmen kipindeki `:::kavram` kutusu kullanıyor (`utils/markdown.scss`). Bugün'ün
+D3b yenilemesi İ8'i C yönüyle uygulayacak; sıra taslak → onay → uygulama ve iş bekliyor (D3b'den
+yalnız dokunma hedefleri ve etiket düzeltmeleri sevk edildi, `c799907`). Kaynak: spec
+`docs/superpowers/specs/2026-10-02-asistan-zengin-cevap-yukleme-onyuz-design.md` (D3b), denetim
+`docs/superpowers/notes/2026-10-03-onyuz-denetimi.md`. Tasarım burada değil, onaylanan taslakta
+yazılır; onaydan sonra bu bölüm güncellenir.
 
 ---
 
@@ -412,6 +451,17 @@ Boş alan gizlenmez, **boş olduğu söylenir** (D3).
 
 **Ne için var:** "Bunu bana anlatır mısın?"
 
+**Arayüz değişti (2026-10-10 notu).** 2026-10-09'dan beri asistan IBM'in `@carbon/ai-chat`
+(1.22.0) bileşeni üzerinde çalışır: `/asistan` sayfasında ve ≥ 672px'te her sayfadaki başlatıcıda;
+uyarlayıcı `dashboard/src/asistan/` (`39e3573`; derleme bayrağı `VITE_ASISTAN_CARBON_AI`). Bu
+bölümün aşağıdaki metni 2026-08-31 ile 2026-09-25 arasındaki eski `AssistantChat` arayüzünü anlatır;
+o bileşen bayrak kapalıyken geri dönüş olarak kodda duruyor ve metin tarih kaydı olarak kalır.
+`.ac-msg--writing`, `ac-md__*`, `CitationChip` ve "tablo yok" kuralı Carbon AI Chat'te geçerli
+değildir (D1 artık en çok 4 sütun × 6 satır tablo, `:::` kutuları ve KaTeX tanır). Bugünkü
+kurallar, TEDY'nin Carbon onarımları (`Tablo.tsx`, `AiAciklama.tsx`, `carbonOnarimi.ts`) ve
+"Carbon AI kazanır, çekirdek kurallar korunur" kararı (2026-10-08): talimatname §6; spec
+`docs/superpowers/specs/2026-10-08-asistan-carbon-ai-chat-design.md`.
+
 **Bugünkü durum:** yeni tamamlandı — atıf çipleri, kaynak paneli, degradasyon
 rozeti, SSE akışı. İlkelerle **zaten büyük ölçüde uyumlu**.
 
@@ -471,8 +521,10 @@ durumda "bu kaynak var ama sana kapalı" bilgisi, okura hiç sızmaz).
 
 **Ne için var:** okumak.
 
-Bu yüzey **bilinçli olarak farklı bir sesle** konuşur: Cormorant Garamond +
-Literata, kitap tipografisi, tam ekran okuyucu. Bu ayrım korunur — yapma
+Bu yüzey **bilinçli olarak farklı bir sesle** konuşur: IBM Plex Serif, kitap
+tipografisi, tam ekran okuyucu. (Güncellendi 2026-10-10: Cormorant Garamond + Literata
+2026-09-24'te, `393c13f`, IBM Plex Serif ile değişti; kitabın arayüz parçaları Plex Sans.
+`ted-theme.scss` `--book-display` / `--book-serif` / `--book-sans`.) Bu ayrım korunur — yapma
 yüzeyine kitap sesi, okuma yüzeyine arayüz sesi sızmaz (§5.2, ilkeler).
 
 **Değişen tek şey:** kitap, pano üzerinde artık bağıran bir bant değil.
@@ -509,6 +561,15 @@ Sıra, en çok kazandırandan başlar ve her adım tek başına sevk edilebilir:
 | 6 | Notlar · Takvim · Takımlar · İlerleme · Duyurular | ✅ |
 | 7 | Odak kipi | ✅ |
 | 8 | Profil | ✅ |
+
+**Durum notu (2026-10-10).** ✅ işin sevk edildiğini söyler; her alt tasarımın yazıldığı gibi
+kurulduğunu değil. Yazıldığı gibi kurulmayanlar: §2.4'ün 400 ms kuralı (gecikme yok; "Kaydediliyor"
+için `InlineLoading` var), §2.6/§4.2'deki `Yaptım` için `Geri al` (işareti kaldıran uç yok, yalnız
+`/api/homework/mark-done`), §4.3'te derse tıklayınca içeriğin aynı sayfada açılması (`Lessons.tsx`
+programı ve içeriği alt alta koyar), §4.6 tek satırlık öğeler (Takımlar hâlâ `StructuredList`),
+§4.7 tek liste ve tek iskelet (İlerleme'de üç `AccordionItem`, her biri kendi iskeletiyle), §4.8
+okunmamış durumu (Duyurular haftaya göre katlanmış `AccordionItem`). Bunlar talimatname §13'te borç
+olarak izlenir: 400 ms B48, `Geri al` B63, Dersler B64, Takımlar B65, İlerleme B66, Duyurular B67. Satır 3, 4 ve 6 bu yüzden "kısmen" okunmalıdır.
 
 **Sıra değişikliği:** 4 ve 5 yer değiştirdi. Nav indirgemesi Dersler
 birleştirmesinden önce yapılırsa Program evsiz kalıyor; birleştirme önce gelmeli.
@@ -655,3 +716,4 @@ görüntüsüyle doğrulanır.
 | 1.9 | 2026-09-25 | Asistan cevapları kitap dizgisinden ayrıldı: Carbon tipinde sohbet biçimi, kalın satır → başlık, `Şimdi`/`Not` kutuları, kesintisiz numaralı liste, bölüm başına tek atıf çipi, telefonda tam genişlik; modele `## Biçim` iskeleti. |
 | 1.6 | 2026-09-24 | Tedy Tasarım Sistemi v3 panoda: lacivert yalnız bantta, renk aritmetiği yok, rol token'ları; ders işareti Bugün ve İşler sınavlarında ve ödevlerde; takvim ve zaman çizelgesinde tür ikon, renk ders. |
 | 1.10 | 2026-09-25 | Asistanın Kaynaklar paneli dört yeni öğrenci-verisi grubu (ders programı, sınavlar, birleşik takvim, ders içeriği/notlar), Tedy Books araması ve platform ilerlemesi/video önerisini gösterir; `figur_getir`'in ders kitabı görseli artık modele de gerçek resim olarak gidiyor ve panelde küçük önizleme olarak beliriyor; aileye özel `aile-kaynak` grubu Işık'ın oturumunda hiç görünmez. |
+| 1.11 | 2026-10-10 | Talimatname (`tedy-ui-ux-talimatnamesi.md`) altına bağlandı: Giriş notu ve öncelik sırası, §2'ye talimatname §5 ve bileşen rehberi bağlantısı; tarihli düzeltmeler: §1 yedi ikincil ve telefonda Tedy Books Daha fazla'da, §3.2 `BottomNav` (D3a), §4.1 sınav satırında ders işareti ve bekleyen D3b/İ8 C yönü işareti, §4.10 Carbon AI Chat notu (2026-10-09), §4.11 IBM Plex Serif, §6 kurulmayan alt tasarımların durum notu. Başlık sürümü düzeltildi. |

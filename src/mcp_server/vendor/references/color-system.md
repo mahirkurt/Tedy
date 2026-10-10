@@ -15,7 +15,7 @@ Carbon tuvali üzerinde. Amaç, DEHB-sakin sınırını korurken renkle **odak, 
 | **Durum: bilgi** | `--cds-support-info` + `--cds-notification-background-info` (+ `--tedy-text-info`) | İpucu, "hatırla", nötr geri bildirim. |
 | **Durum: uyarı** | `--cds-support-warning` + `--cds-notification-background-warning` (+ `--tedy-text-warning`) | Dikkat çekme (cezalandırıcı değil). |
 | **Durum: hata** | `--cds-support-error` + `--cds-notification-background-error` (+ `--tedy-text-error`) | Yalnız yanlış şıkkı **işaretlemek** için; metin daima yapıcı ("tekrar dene"). Kırmızı ders aksanı olmaz. |
-| **Kategori** | `--viz-1..5` | Grafik serileri, sıralama/gruplama kategorileri, diyagram parçaları. |
+| **Kategori** | `--viz-1..5` | Grafik serileri, sıralama/gruplama kategorileri, diyagram parçaları. Anlam renklerinden kaçınan TEDY alt kümesi (§7). |
 | **İllüstrasyon** | `--viz-sun/water/cloud` | Doğa/şema anlamsal renkleri. |
 | **İlerleme/ödül** | `--reward` (= `--tedy-text-warning`) + `--reward-bg` (= `notification-background-warning`) | XP, seri — sakin sıcak vurgu; ham altın hex yok. Kazanılan rozet nötr `layer-selected-01`. |
 | **Tuval** | `--tedy-page-background` (sayfa), `--cds-layer-01/02/03` | Sayfa zemini Tedy cool-gray; kartlar ve iç yüzeyler Carbon katmanı (nötr, katmanlı derinlik). |
@@ -45,14 +45,20 @@ kategori olarak kullanılınca "doğru" ve "bilgi" sinyalleri sulanıyordu, aç�
 3,3:1 ile AA'nın altındaydı. Etkinlik tipi artık ton + ikon + kicker metniyle okunur.
 
 ## 4. Derse göre kimlik (Tedy ders renk sistemi)
-Ders rengi `meta.subject`'ten türetilir ve Tedy'nin tüm yüzeylerinde (modül, pano, katalog) aynıdır.
+Ders rengi `meta.subject`'ten türetilir ve Tedy'nin her yüzeyinde (modül ve pano) aynıdır; emekli
+katalog sitesi artık bir yüzey değildir, panonun Modüller listesi dersi metinle gösterir.
 Tek kaynak `assets/carbon-v11-authority.json` → `tedyLayer.subjectThemes`; kurallar ve tablo
 `tedy-integration.md` §3'tedir. Özet: Türkçe ve edebiyat **magenta**, matematik **mor**, fen **teal**,
 sosyal bilimler **camgöbeği**, yabancı diller **mavi**, din ve değerler **sıcak gri**, bilişim
 **soğuk gri**, sanat-spor ve genel **gri**. Rolleri Carbon Tag token'ları ve palet adımları verir;
 tema değişince CSS kendiliğinden geçer (JavaScript renk hesabı yok). Kırmızı, yeşil, sarı ve
-turuncu anlam renkleridir, ders rengi olamaz. Üst bant Tedy laciverdidir; **butonlar ve ilerleme
-göstergesi Carbon mavisi kalır**.
+turuncu anlam renkleridir, ders rengi olamaz; Carbon'un uyarı paleti de aynı anlamları taşır
+(kırmızı hata, turuncu ciddi uyarı, sarı uyarı, yeşil başarı:
+https://carbondesignsystem.com/building-blocks/data-visualization/color-palettes/#alert-palette).
+Üst bant Tedy laciverdidir; modülde **butonlar ve ilerleme göstergesi Carbon mavisi kalır**
+(panodaki asistanın öğretmen modu bunun adlı istisnasıdır: `tedy-integration.md` §7).
+Otorite aile ve mod başına 9 rol taşır; `panel` ve `panelBorder` yalnız panonun tek büyük ders
+yüzeyi içindir (İ8), şablon 7 rol üretir.
 
 ## 5. Kontrast ve doğrulama
 - Küçük metin daima `--cds-text-primary`/`secondary`; aksan büyük/dolgu/çizgi öğelerinde.
@@ -63,3 +69,28 @@ göstergesi Carbon mavisi kalır**.
 
 ## 6. Tedy ile bütünlük
 Tema, kimlik bandı, köşe, gölge ve oyunlaştırma kuralları: `tedy-integration.md`.
+
+## 7. Veri görselleştirme renkleri (`--viz`)
+
+- **Ne oldukları.** `--viz-1..5` Carbon'un kategorik tonlarından Tedy anlam renklerini
+  (kırmızı, yeşil, sarı, turuncu) dışarıda bırakan bir **TEDY alt kümesidir** (S19): açık temada
+  purple70 · blue80 · cyan50 · teal60 · magenta70, g100'de aynı ailelerin 40 adımı. Resmî Carbon
+  5-renk gruplarından hiçbirine uymazlar; açık temanın resmî 5'li grupları Red 90 içerdiği için
+  olduğu gibi alınamaz. Yuvaların bir Carbon grubuna yaklaştırılması şablon değişikliğidir — **açık madde**
+  (`carbon-sources.md` §4).
+- **Sıra.** Seriler `--viz-1`'den başlayarak sırayla atanır; sıra keyfi değiştirilmez. Tek seri
+  `--accent` kullanır. 5 seriyi aşan veri doğrudan etiket ya da desenle ayrışır; anlam renkleri
+  hiçbir zaman seri rengi olmaz.
+- **Lejant.** Tek veri kategorisinde lejant yoktur; mümkünse veri doğrudan etiketlenir
+  (https://carbondesignsystem.com/building-blocks/data-visualization/legends/#usage).
+- **Eksik veri.** Enterpolasyon ve sıfır yok; boşluğun başı ve sonu etiketlenir
+  (https://carbondesignsystem.com/building-blocks/data-visualization/axes-and-labels/#gaps-in-data).
+  Motor `vizChart` eksik değeri bugün 0 çizer — açık madde (B52); yazar eksik noktayı veriye koymaz.
+- **Kontrast.** Grafik öğesi ve bilgi taşıyan SVG parçası zemine karşı ≥ 3:1
+  (https://carbondesignsystem.com/building-blocks/foundations/color/overview/#contrast-ratios).
+  Açık temada `--viz-sun` (1,68:1) ve `--viz-cloud` (1,70:1) bunu geçemez; dolgu olarak
+  kullanıldıklarında 3:1'i geçen kontur ya da etiket eşlik eder — açık madde.
+- **İkon rengi.** İkon komşu metnin rengini taşır, tek renktir ve 4,5:1 sağlar
+  (https://carbondesignsystem.com/building-blocks/foundations/icons/guidelines/#color).
+
+Ayrıntı: `carbon-excellence.md` §2.7 ve §2.9; kanonik kılavuz `docs/tedy-ui-ux-talimatnamesi.md` §8–§9.

@@ -369,6 +369,18 @@ Tam token tablosu ve çocuk-dostu uyarlama için `references/carbon-child-system
    `get_variable_defs` ile değer teyidi yapılabilir. Token değerinin kaynağı
    **asla** Figma değildir.
 
+### 10.2 Kanonik kılavuz ve Carbon MCP (2026-10-10)
+
+- Pano ile modülün tasarım bağı, öncelik sırası ve bilinçli sapmalar
+  `docs/tedy-ui-ux-talimatnamesi.md` §9'dadır; Carbon MCP ile çalışma protokolü §10'dadır.
+  Modülün yetkili kuralları bu dizinde kalır (`references/tedy-integration.md` §7).
+- Her Carbon iddiası kaynakla yazılır: güncel `https://carbondesignsystem.com/building-blocks/...`
+  URL'si ya da Carbon MCP `docs_search` `anchor_url`'ı. Kanonik ikon/piktogram/bileşen kodu
+  `code_search`, grafik `get_charts`, token ve erişilebilirlik denetimi `code_audit` ile
+  doğrulanır; değer yine npm `@carbon/*`'tır (§10.1, `references/carbon-sources.md` §5).
+- Düzeltme: Carbon 2x Grid'in temel birimi 8 px mini birimdir; 2 px yalnız en küçük aralık
+  adımıdır (yukarıdaki "2px tabanlı" ifadesi ölçeğin adımını anlatır).
+
 ## 11. İkon, piktogram ve SVG stratejisi (özet)
 
 Tam rehber: `references/icon-pictogram-svg.md`.

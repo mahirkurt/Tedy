@@ -271,7 +271,8 @@ kanıtı sistemde tesadüfen kurulu bir Plex yüzüne değil gömülü bloba day
 
 ## 5. Spacing ölçeği (tam 01–13) ve boyutlar
 
-`@carbon/layout@11.53.0` — 2px mini-unit tabanlı; şablonda tamamı tanımlı
+`@carbon/layout@11.53.0` — en küçük adım 2px'tir; 2x Grid'in temel birimi ise **8px mini birimdir**
+(https://carbondesignsystem.com/building-blocks/foundations/2x-grid/overview/#mini-unit); şablonda tamamı tanımlı
 (`--cds-spacing-01..13` + kısa `--sp-01..10` alias'ları):
 
 | Token | Değer | | Token | Değer |

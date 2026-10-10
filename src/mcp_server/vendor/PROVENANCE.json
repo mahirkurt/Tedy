@@ -1,17 +1,17 @@
 {
   "authority": "ted-mcp",
   "files": {
-    "SKILL.md": "c3115d358478dd8a309851beb72845a09efef47745c656be92b2dd9fb5ec202f",
+    "SKILL.md": "efd5f90e4445d7772d0e4f4ad6332ad53b264e9cd5340d17cc7f4ef2c64ffdd2",
     "assets/carbon-v11-authority.json": "d6958862826c8b36adae53781724b0447b06045d7853602984c85a48c32aa5ce",
     "assets/fonts-manifest.json": "23153bf47b3c0b1859eca6ffccae83ff0365e673b2e4f1ad7eb32353af47a7e0",
     "assets/ibm-plex-OFL.txt": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f",
     "assets/module-template.html": "b50a3265eb71a0ca2a0321e979a24fe69fefd3d3376912f619e25fc311e45767",
     "references/adhd-pedagogy.md": "33ddba2449dd81440c219b5d9353b65e714a899143da3205f5116c8547bac5db",
     "references/audio-system.md": "7bacb63825505c7ecea28c04d95ecb6cf6472c119575e0bdb3ca97d710e43266",
-    "references/carbon-child-system.md": "d545519ca78712aab37877b6d26507814663835b28ccaa6cf34bb0c2087dc08d",
-    "references/carbon-excellence.md": "5ca48ab08dbaf045ea25db8e1d7a00062777a28d89b20c036411aefcd937bf16",
-    "references/carbon-sources.md": "159265c8e68a0c67e4937b6195c0dce28255d289cdf3c66e361ab54e2a91925e",
-    "references/color-system.md": "e5288c2628d48566d7dd8c46e5234c3181491e1ab603c88bb1e5fc143be17ba9",
+    "references/carbon-child-system.md": "409b8c1616480fb5419db8c5227015c239fc9ac36ccc8685c4e77ca00bec5aa3",
+    "references/carbon-excellence.md": "2a4fac17e9ec236fac3db028a1aa070f641f85bd29de6287c1b3f96466b1149b",
+    "references/carbon-sources.md": "f56853202498b278c4441e12a6c4cf6f1768a4e2d37bfa8262cb670f4bafd0e1",
+    "references/color-system.md": "f5d441de8c4e3351462a0fd9e3271dc448f0cd59373788659d6fed94108ef358",
     "references/content-enrichment.md": "c0f3455a87cf71f7cf7e6dc6149c23ac1d65b901053ed43ee090cf77049739b0",
     "references/curriculum-integration.md": "a56eae62960dec161819da66e0ef6af6cc83f1b85a15982e962fe5931443e977",
     "references/exam-solving.md": "80b0334d866c8bc553c53cd584d390cb38039bf902d8cc4efe6aab46f667efde",
@@ -23,7 +23,7 @@
     "references/newgen-question-design.md": "068243dfe11d052d7570f0201eb79744616072e7d8b2e8ca1bf3848d72db28ba",
     "references/subject-packs.md": "f12d51a6cbe94f34fa88a8cc20d9a734614a8eadc0d155690431ca5c1296002e",
     "references/svg-authoring.md": "5a6cbb73bebc202ed11a059cb0ebd97dcaf4f202f3d85c09f092af6751080ae5",
-    "references/tedy-integration.md": "37a3d1d3920aff49bd3c00cbcada6b99a38e228e4bf89fe2655f0220549c6301",
+    "references/tedy-integration.md": "48bf76682ca7d074935d6ebe731abcf03f86f5a5bb3e551e59eb4211888df5aa",
     "scripts/embed_ibm_plex_fonts.py": "40330439feafc64792460062111b4aefe88c7a79af5f73fd11498f005036f0f0",
     "scripts/sync_carbon_tokens.py": "ce2c68522b3be4b991f42def76f1d44e55eea17aca02eb7c208108bff20c9ed6",
     "scripts/validate_module.py": "5ddea04a427a9e831b1c7852c21d5903a151c3d24717b4e89e1cf6105dc7b762",
@@ -54,7 +54,7 @@
     "repo": "https://github.com/mahirkurt/CureoPrivate",
     "retired_in": "edupedia 1.0.0"
   },
-  "pinned_at": "2026-10-02T13:45:59+00:00",
+  "pinned_at": "2026-10-10T14:34:44+00:00",
   "source_commit": "1aee3845efffb103a0e4e5b489f4477c0b3017b0",
   "synced_at": "2026-09-18T10:43:35+00:00"
 }
