@@ -71,11 +71,40 @@ test('events carry their course as an edge and their kind as an icon', async ({ 
   expect(renk.zemin).toBe('rgb(244, 244, 244)')     // layer-02, not a red fill
   expect(renk.kenar).toBe('rgb(208, 38, 112)')      // magenta-60: Türkçe's mark
   await expect(page.locator('.calendar-event', { hasText: 'Kulüp' })).toHaveClass(/ted-subject--gray/)
-  await expect(page.locator('.calendar-legend__chip svg')).toHaveCount(3)
+  await expect(page.locator('.calendar-legend__chip .calendar-legend__icon:not(.calendar-legend__icon--secili)')).toHaveCount(3)
 
   const bas = await page.locator('.calendar-grid__header').first()
     .evaluate(el => getComputedStyle(el).backgroundColor)
   expect(bas).toBe('rgb(224, 224, 224)')            // layer-accent-01, not the band's navy
+})
+
+// B34 (S24, S31): a hidden kind is said by aria-pressed and the missing checkmark, never by fading the chip —
+// at opacity 0.35 its label measured 2.24:1.
+test('a hidden legend chip stays readable and says it is off', async ({ page }) => {
+  await page.route('**/api/health', r => r.fulfill(json({
+    timestamp: '', success: true, scrape_errors: [], duration_seconds: 1,
+  })))
+  await page.route('**/api/calendar/unified', r => r.fulfill(json({ events: [
+    { id: 'a', type: 'lesson', title: 'Matematik', start: '2026-09-14T10:00:00', end: '2026-09-14T10:40:00',
+      color: '', course: 'Matematik', courseFamily: 'purple', status: '' },
+  ] })))
+  await page.clock.setFixedTime(new Date('2026-09-14T08:00:00'))
+  await page.goto('/takvim')
+  const cip = page.locator('.calendar-legend__chip').first()
+  await expect(cip).toHaveAttribute('aria-pressed', 'true')
+  await expect(cip.locator('.calendar-legend__icon--secili')).toHaveCount(1)
+  await cip.click()
+  await expect(cip).toHaveAttribute('aria-pressed', 'false')
+  await expect(cip.locator('.calendar-legend__icon--secili')).toHaveCount(0)
+  const { opaklik, renk } = await cip.evaluate(el => {
+    const cs = getComputedStyle(el)
+    return { opaklik: cs.opacity, renk: cs.color }
+  })
+  expect(opaklik).toBe('1')
+  expect(renk).toBe('rgb(82, 82, 82)')   // text-secondary on the white chip: 7.8:1
+  await cip.focus()
+  await page.keyboard.press('Enter')
+  await expect(cip).toHaveAttribute('aria-pressed', 'true')
 })
 
 // B45 (§4.4): Carbon draws a Tag's `renderIcon` only from md up (Tag.js skips it at sm) — the event kind's icon

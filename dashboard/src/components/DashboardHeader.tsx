@@ -14,16 +14,16 @@ import type { User } from '../hooks/useAuth'
 import { SECTION_LABELS, formatTurkishDate } from '../utils/formatters'
 
 function StatusIcon({ status }: { status: SectionHealth['status'] }) {
-  if (status === 'ok') return <CheckmarkFilled size={14} style={{ color: 'var(--status-success)' }} />
-  if (status === 'warning') return <WarningFilled size={14} style={{ color: 'var(--status-warning)' }} />
-  if (status === 'error') return <ErrorFilled size={14} style={{ color: 'var(--status-error)' }} />
+  if (status === 'ok') return <CheckmarkFilled size={16} className="durum-ikonu durum-ikonu--ok" />
+  if (status === 'warning') return <WarningFilled size={16} className="durum-ikonu durum-ikonu--uyari" />
+  if (status === 'error') return <ErrorFilled size={16} className="durum-ikonu durum-ikonu--hata" />
   // 'unavailable' means the portal itself refused the page — not our failure,
   // but distinct from a skip, so it gets its own colour rather than falling
   // through to the grey skip icon.
-  if (status === 'unavailable') return <WarningFilled size={14} style={{ color: 'var(--cds-support-caution-undefined)' }} />
+  if (status === 'unavailable') return <WarningFilled size={16} className="durum-ikonu durum-ikonu--kapali" />
   // Muted rather than near-invisible: the old #A8A8A8 sat at 2.2:1 on the
   // popover's white ground, under the 3:1 floor for a glyph that carries state.
-  return <SkipForwardFilled size={14} style={{ color: 'var(--cds-text-helper)' }} />
+  return <SkipForwardFilled size={16} className="durum-ikonu durum-ikonu--atlandi" />
 }
 
 function getTimeAgo(timestamp: string): string {

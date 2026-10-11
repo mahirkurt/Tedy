@@ -64,6 +64,7 @@
   --ted-color-text-on-color: var(--cds-text-on-color);
   --ted-color-focus: var(--cds-focus);
 
+  // Statik yüzey gölge almaz (S11, B2); bu iki gölge yalnız Tedy Books'un kitap kapaklarında kalır.
   --ted-shadow-card: 0 1px 3px rgb(0 0 0 / 5%), 0 1px 2px rgb(0 0 0 / 8%);
   --ted-shadow-card-hover: 0 4px 12px rgb(0 0 0 / 8%), 0 2px 4px rgb(0 0 0 / 6%);
   // Carbon's menu shadow (shadow-menu), as the Tedy layer gives popovers. It
@@ -75,7 +76,9 @@
   // 8px = the module template's --cds-border-radius-08, so a card in the
   // dashboard and a card inside a module turn the same corner.
   --ted-radius-card: 8px;
-  --ted-radius-sm: 4px;
+  // S10 (B1): card 8px, control and mark 0, tag/chip a full pill — no in-between corner. A bar, a swatch, an
+  // event chip and a focus ring are square, as Carbon draws its own.
+  --ted-radius-pill: 999px;
 
   // ── Spacing ───────────────────────────────────────────────────────────────
   // These six values were already Carbon's scale, written out by hand. Naming
@@ -140,13 +143,14 @@
   // course's mark (Tedy ders renk sistemi). Every homework was red and every
   // private lesson orange — meaning colours — and ÖGEP teal read as Fen.
 
-  --ted-highlight-active: #{colors.$blue-20};
-  --ted-highlight-today: #{colors.$blue-60};
+  // Role tokens, not the palette steps they happen to equal in g10 (B33, [3.2-1]).
+  --ted-highlight-active: var(--cds-highlight);
+  --ted-highlight-today: var(--cds-interactive);
 
   // ── Motion ────────────────────────────────────────────────────────────────
-  // Both durations and the curve were already Carbon's productive values,
-  // copied by hand. motion.motion(standard, productive) is that curve.
-  --ted-duration-fast: #{motion.$duration-moderate-01};   // 150ms
+  // Carbon's productive values. A hover or press is a micro-interaction: fast-02
+  // (110ms), not moderate-01 (150ms) (B39, [3.6-1]).
+  --ted-duration-fast: #{motion.$duration-fast-02};       // 110ms
   --ted-duration-med: #{motion.$duration-moderate-02};    // 240ms
   --ted-ease-standard: #{motion.motion(standard, productive)};
   --ted-ease-entrance: #{motion.motion(entrance, productive)};
@@ -236,7 +240,10 @@ body {
   *::after {
     animation-duration: 0s !important;
     animation-iteration-count: 1 !important;
+    // B24: a `both` fill held an element at its start state for the whole delay, even with the duration at 0.
+    animation-delay: 0s !important;
     transition-duration: 0s !important;
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
 }
@@ -315,12 +322,7 @@ body {
 }
 
 // ─── Layout Utilities ────────────────────────────────────────────────────────
-.stack-xs {
-  display: flex;
-  flex-direction: column;
-  gap: spacing.$spacing-03;
-}
-
+// One stack (B37): `.stack-xs` and `.stack-sm` were both 8px and the first was unused.
 .stack-sm {
   display: flex;
   flex-direction: column;
@@ -331,32 +333,29 @@ body {
 .dashboard-card {
   background: var(--ted-card-bg);
   border-radius: var(--ted-radius-card);
-  padding: var(--ted-space-lg);   // 1.25rem was off Carbon's scale
+  // Carbon's tile padding, spacing-05 (16px), at every width (B37): 24px on a desktop and 16px on a phone was
+  // a size picked twice; the card's lists and rows already inset their own 16px.
+  padding: spacing.$spacing-05;
   margin-bottom: var(--ted-space-lg);
-  border-left: 3px solid transparent;
-  box-shadow: var(--ted-shadow-card);
-  transition: box-shadow var(--ted-transition-med),
-              transform var(--ted-transition-med);
-  animation: card-fade-in motion.$duration-moderate-02 motion.motion(entrance, productive) both;
+  // Depth is the layer and a hairline, not a shadow (S11, B2); a card without an action has no hover lift (P6).
+  border: 1px solid var(--ted-color-border-subtle);
+  // One entrance for the card as a whole; nothing inside it is staggered (S26, B24).
+  animation: card-fade-in motion.$duration-moderate-02 motion.motion(entrance, productive);
 }
 
 // Carbon 1.113 moved its own ui-shell and pagination hover styles behind
 // `any-hover` (#22694, #22672). Our overrides sat outside that guard, so on a
 // phone they re-introduced exactly what the upstream fix removed: tap a card,
 // and it keeps the hover background until you tap something else. `any-hover`
-// still matches a touchscreen laptop, so pointer users lose nothing.
-@media (any-hover: hover) {
-  .dashboard-card:hover {
-    box-shadow: var(--ted-shadow-card-hover);
-  }
-}
+// still matches a touchscreen laptop, so pointer users lose nothing. Every
+// dashboard `:hover` lives inside this guard (S17, B3;
+// tests/test_pano_talimatname_borclari.py::test_b3_hover_any_hover_icinde).
 
 .dashboard-card__title {
   display: flex;
   align-items: center;
   gap: var(--ted-space-xs);
   @include type.type-style('heading-compact-01');
-  letter-spacing: -0.01em;
   margin: 0 0 var(--ted-space-md);
   color: var(--ted-color-text-primary);
 }
@@ -381,7 +380,7 @@ body {
 
 @media (any-hover: hover) {
   .dashboard-list-tile.cds--tile:hover {
-    background-color: var(--ted-color-page-bg);
+    background-color: var(--ted-color-layer-hover);
   }
 }
 
@@ -813,7 +812,7 @@ body {
 
 @media (any-hover: hover) {
   .dashboard-event-tile.cds--tile:hover {
-    background-color: var(--ted-color-page-bg);
+    background-color: var(--ted-color-layer-hover);
   }
 }
 
@@ -827,7 +826,6 @@ body {
 
 .dashboard-event-date__day {
   @include type.type-style('heading-03');
-  font-weight: 600;
   color: var(--cds-text-primary);
 }
 
@@ -850,7 +848,7 @@ body {
 
 @media (any-hover: hover) {
   .homework-item--clickable.cds--tile:hover {
-    background-color: var(--ted-color-page-bg);
+    background-color: var(--ted-color-layer-hover);
   }
 }
 
@@ -926,14 +924,12 @@ body {
 .hw-countdown-bar {
   height: 0.25rem;
   background: var(--cds-layer-accent-01);
-  border-radius: 2px;
   overflow: hidden;
   margin-top: var(--ted-space-xs);
 }
 
 .hw-countdown-bar__fill {
   height: 100%;
-  border-radius: 2px;
   transition: width motion.$duration-slow-02 motion.motion(entrance, productive);
 
   &--normal { background: var(--status-info); }
@@ -1072,9 +1068,14 @@ body {
   text-align: left;
   padding: var(--ted-space-2xs) 0;
   border-radius: 0;   // a Carbon control is square
+}
 
-  &:hover { background-color: var(--ted-color-page-bg); }
-  &:hover { .hw-section__label { color: var(--ted-color-text-primary); } }
+@media (any-hover: hover) {
+  .hw-section__header--toggle:hover {
+    background-color: var(--ted-color-layer-hover);
+
+    .hw-section__label { color: var(--ted-color-text-primary); }
+  }
 }
 
 .hw-section__label {
@@ -1094,7 +1095,7 @@ body {
   color: var(--cds-text-secondary);
   background: var(--cds-layer-accent-01);
   padding: 1px spacing.$spacing-03;
-  border-radius: 8px;
+  border-radius: var(--ted-radius-pill);   // a count is a chip (S10)
 }
 
 // ─── Homework Left Border Status Colors ──────────────────────────────────────
@@ -1258,7 +1259,6 @@ body {
   &:focus-visible {
     outline: 2px solid var(--cds-focus-inverse);
     outline-offset: 2px;
-    border-radius: 12px;
   }
 }
 
@@ -1370,7 +1370,6 @@ body {
 .login-page__hero-school {
   @include type.type-style('heading-02');
   margin: 0;
-  letter-spacing: 0.01em;
   color: var(--cds-text-on-color);
 }
 
@@ -1378,7 +1377,6 @@ body {
   @include type.type-style('body-01');
   color: var(--ted-color-brand-text-secondary);
   margin: 0;
-  letter-spacing: 0.02em;
 }
 
 // Form panel (right)
@@ -1397,10 +1395,8 @@ body {
 
 .login-page__heading {
   @include type.type-style('heading-04');
-  font-weight: 600;
   color: var(--ted-color-text-primary);
   margin: 0 0 var(--ted-space-sm);
-  letter-spacing: -0.01em;
 }
 
 .login-page__intro {
@@ -1455,12 +1451,7 @@ body {
   display: none;
 }
 
-
-@media (any-hover: hover) {
-  .cds--side-nav__link:hover {
-    background-color: var(--ted-color-page-bg);
-  }
-}
+// The side nav's hover is Carbon's own ($layer-hover on the nav's layer); a page-ground override was a second hover colour (B31).
 
 // Tags keep Carbon's own pill radius (the module template's --radius-tag).
 
@@ -1522,7 +1513,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: spacing.$spacing-03 0;
-  border-bottom: 1px solid #{colors.$gray-10};
+  border-bottom: 1px solid var(--cds-border-subtle-01);
 }
 
 .health-popover__value {
@@ -1580,10 +1571,10 @@ body {
   font-weight: 600;
   color: var(--cds-link-primary);
   text-decoration: none;
+}
 
-  &:hover {
-    text-decoration: underline;
-  }
+@media (any-hover: hover) {
+  .announcements-detail__link:hover { text-decoration: underline; }
 }
 
 // ─── Unified Calendar ────────────────────────────────────────────────────
@@ -1613,21 +1604,36 @@ body {
   align-items: center;
   gap: spacing.$spacing-02;
   padding: spacing.$spacing-02 spacing.$spacing-04;
-  border-radius: 1rem;   // a Carbon Tag's radius
+  border-radius: var(--ted-radius-pill);   // a chip (S10)
   border: 1px solid var(--ted-color-border-subtle);
   background: var(--ted-card-bg);
   @include type.type-style('label-01');
   font-weight: 600;
   cursor: pointer;
-  transition: opacity var(--ted-transition-fast), background-color var(--ted-transition-fast);
+  transition: background-color var(--ted-transition-fast);
 
-  &:hover {
-    background-color: var(--ted-color-page-bg);
+  &:focus-visible {
+    outline: 2px solid var(--cds-focus);
+    outline-offset: 1px;
   }
 }
 
+@media (any-hover: hover) {
+  .calendar-legend__chip:hover { background-color: var(--ted-color-layer-hover); }
+}
+
+// Shown: the chip's strong edge and a checkmark; hidden: the subtle edge, secondary text (still ≥ 4.5:1) and no
+// checkmark. Never opacity (S24, S31, B34).
+.calendar-legend__chip[aria-pressed='true'] {
+  border-color: var(--cds-border-strong-01);
+}
+
 .calendar-legend__chip--hidden {
-  opacity: 0.35;
+  color: var(--cds-text-secondary);
+}
+
+.calendar-legend__icon--secili {
+  fill: var(--cds-icon-primary);
 }
 
 .calendar-legend__icon {
@@ -1659,7 +1665,7 @@ body {
 }
 
 .calendar-grid__header--today {
-  background: #{colors.$blue-20};
+  background: var(--cds-highlight);
   box-shadow: inset 0 -2px 0 var(--cds-border-interactive);
 }
 
@@ -1713,14 +1719,22 @@ body {
   align-items: center;
   gap: spacing.$spacing-02;
   padding: spacing.$spacing-01 spacing.$spacing-02;
+  // A real button (B12): reset the native chrome, keep the chip's own look.
+  inline-size: 100%;
+  border: 0;
   border-left: 3px solid var(--ted-subject-accent, var(--cds-border-strong-01));
-  border-radius: 2px;
   margin-bottom: 1px;
   cursor: pointer;
   background: var(--cds-layer-02);
   color: var(--cds-text-primary);
+  text-align: start;
   overflow: hidden;
   white-space: nowrap;
+
+  &:focus-visible {
+    outline: 2px solid var(--cds-focus);
+    outline-offset: -2px;
+  }
 }
 
 .calendar-event__icon {
@@ -1743,7 +1757,6 @@ body {
 .calendar-event--continuation {
   height: 0.25rem;
   border-left: 0;
-  border-radius: 2px;
   margin: 0 spacing.$spacing-01 1px;
   padding: 0;
   background: var(--ted-subject-border, var(--cds-border-subtle-01));
@@ -1780,10 +1793,11 @@ body {
   cursor: pointer;
   color: var(--ted-color-text-helper);
   padding: spacing.$spacing-01;
-  border-radius: 4px;
+}
 
-  &:hover {
-    background: var(--cds-layer-02);
+@media (any-hover: hover) {
+  .calendar-popover__close:hover {
+    background: var(--ted-color-layer-hover);
     color: var(--ted-color-text-primary);
   }
 }
@@ -1868,28 +1882,15 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--cds-layer-active-01);
-  border-radius: 3px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--cds-layer-accent-active-01);
+@media (any-hover: hover) {
+  ::-webkit-scrollbar-thumb:hover { background: var(--cds-layer-accent-active-01); }
 }
 
-// ─── Staggered card animations ──────────────────────────────────────────
-.stack-sm > * {
-  animation: card-fade-in motion.$duration-moderate-02 motion.motion(entrance, productive) both;
-}
-
-.stack-sm > *:nth-child(1)  { animation-delay: 0ms; }
-.stack-sm > *:nth-child(2)  { animation-delay: 40ms; }
-.stack-sm > *:nth-child(3)  { animation-delay: 80ms; }
-.stack-sm > *:nth-child(4)  { animation-delay: 120ms; }
-.stack-sm > *:nth-child(5)  { animation-delay: 160ms; }
-.stack-sm > *:nth-child(6)  { animation-delay: 200ms; }
-.stack-sm > *:nth-child(7)  { animation-delay: 240ms; }
-.stack-sm > *:nth-child(8)  { animation-delay: 280ms; }
-.stack-sm > *:nth-child(9)  { animation-delay: 320ms; }
-.stack-sm > *:nth-child(10) { animation-delay: 360ms; }
+// No staggered entrance (S26, B24): a list enters with its card, as one block.
+// The cascade ran 10 rows × 40ms and, under reduced motion, held each row at
+// opacity 0 for its delay.
 
 // ─── Course Content ─────────────────────────────────────────────────────
 .course-content-text {
@@ -1920,7 +1921,7 @@ body {
 }
 
 .course-content__week-date {
-  @include type.type-style('body-01');
+  @include type.type-style('body-compact-01');   // beside heading-compact-01: one line height (B35)
   color: var(--ted-color-text-secondary);
 }
 
@@ -1939,13 +1940,8 @@ body {
   border-radius: var(--ted-radius-card);
   background: var(--ted-card-bg);
   border: 1px solid var(--ted-color-border-subtle);
-
-  & + & {
-    border-top: none;
-    border-radius: 0;
-    border-bottom-left-radius: var(--ted-radius-sm);
-    border-bottom-right-radius: var(--ted-radius-sm);
-  }
+  // Every card is a whole card (B1): the list's gap separates them; the follower lost its top edge and
+  // turned a 4px corner.
 }
 
 .course-content__card-meta {
@@ -2012,15 +2008,15 @@ body {
     display: none;
   }
 
-  // Simplify card visuals
-  .dashboard-card {
-    border-left-color: transparent;
-    box-shadow: var(--ted-shadow-card);
-  }
+}
 
-  .dashboard-card:hover {
-    box-shadow: var(--ted-shadow-card);
-    transform: none;
+// Reduced motion beats the focus mode's 70ms (B39): same !important, higher specificity, later in the file.
+@media (prefers-reduced-motion: reduce) {
+  .app-shell-content--focus *,
+  .app-shell-content--focus *::before,
+  .app-shell-content--focus *::after {
+    animation-duration: 0s !important;
+    transition-duration: 0s !important;
   }
 }
 
@@ -2081,13 +2077,11 @@ body {
 .grade-detail__bar-track {
   height: 0.5rem;
   background: var(--cds-layer-accent-01);
-  border-radius: 4px;
   overflow: hidden;
 }
 
 .grade-detail__bar-fill {
   height: 100%;
-  border-radius: 4px;
   transition: width motion.$duration-slow-02 motion.motion(entrance, productive);
 }
 
@@ -2158,14 +2152,12 @@ body {
 .platform-a3k-score__gauge {
   height: 0.5rem;
   background: var(--cds-layer-accent-01);
-  border-radius: 4px;
   overflow: hidden;
 }
 
 .platform-a3k-score__gauge-fill {
   height: 100%;
   background: var(--cds-interactive);
-  border-radius: 4px;
   transition: width motion.$duration-slow-02 motion.motion(entrance, productive);
 }
 
@@ -2218,10 +2210,10 @@ body {
   border-radius: var(--ted-radius-card);
   @include type.type-style('body-01');
   transition: background var(--ted-transition-fast);
+}
 
-  &:hover {
-    background: var(--cds-layer-hover-01);
-  }
+@media (any-hover: hover) {
+  .platform-detail-row:hover { background: var(--ted-color-layer-hover); }
 }
 
 .platform-detail-row--sebit {
@@ -2361,7 +2353,7 @@ body {
 .daha-fazla__liste {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: spacing.$spacing-03;
+  gap: spacing.$spacing-05;   // the gutter token, not 8px (B37)
 }
 
 .daha-fazla__oge {
@@ -2416,7 +2408,8 @@ body {
     // of every phone page (measured 2026-09-25: content began at y=104).
     margin-top: 0;
     margin-left: 0 !important;
-    padding: spacing.$spacing-10 var(--ted-space-xs) var(--ted-space-md) !important;
+    // 16px from the edge on a phone, Carbon's sm margin (B26); it was 8px.
+    padding: spacing.$spacing-10 spacing.$spacing-05 var(--ted-space-md) !important;
   }
 
   .dashboard-card {
@@ -2497,20 +2490,8 @@ body {
     display: none;
   }
 
-  @media (max-width: 22rem) {
-    .dashboard-header__brand-logo {
-      height: 1.375rem;
-    }
-
-    .cds--header .cds--header__name {
-      padding-inline: spacing.$spacing-03;
-    }
-
-    .cds--header__global .cds--header__action {
-      width: 2.5rem;
-      min-width: 2.5rem;
-    }
-  }
+  // No private 22rem breakpoint (B37): at 320px — Carbon's smallest — the band holds the logo, Odak and
+  // two 48px actions without shrinking them under the 44px phone target (d3b-dokunma.spec.ts, 320px).
 
   .login-page {
     grid-template-columns: 1fr;
@@ -2669,19 +2650,6 @@ body {
   }
 }
 
-@media (max-width: 420px) {
-  .dashboard-header__avatar,
-  .dashboard-header__identity {
-    display: none;
-  }
-}
-
-@media (max-width: 360px) {
-  .dashboard-header__meta {
-    display: none;
-  }
-}
-
 @media (min-width: 672px) {
   .app-shell-content.cds--content {
     margin: 0 auto;
@@ -2763,7 +2731,7 @@ body {
   // past the viewport and clipped its values mid-word. auto-fit lets the
   // grid drop to one column when two will not fit.
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: var(--ted-space-xs);
+  gap: spacing.$spacing-05;   // the gutter token (B37)
 }
 
 .student-profile__field {
@@ -2883,7 +2851,7 @@ body {
   padding: var(--ted-space-md) var(--ted-space-lg);
   background: var(--ted-card-bg);
   border-radius: var(--ted-radius-card);
-  box-shadow: var(--ted-shadow-card);
+  border: 1px solid var(--ted-color-border-subtle);
 }
 
 .exam-stats__item {
@@ -2895,7 +2863,6 @@ body {
 
 .exam-stats__value {
   @include type.type-style('heading-04');
-  font-weight: 600;
   color: var(--ted-color-text-primary);
 }
 
@@ -2942,13 +2909,9 @@ body {
   background: var(--ted-card-bg);
   border-radius: var(--ted-radius-card);
   padding: var(--ted-space-md);
-  box-shadow: var(--ted-shadow-card);
-  border-left: 4px solid var(--ted-color-border-subtle);
-  transition: box-shadow var(--ted-transition-fast);
-
-  &:hover {
-    box-shadow: var(--ted-shadow-card-hover);
-  }
+  // A layer and a hairline (S11, B2); the course edge is 3px like every mark ([3.5-3], B38).
+  border: 1px solid var(--ted-color-border-subtle);
+  border-left: 3px solid var(--ted-color-border-subtle);
 
   // The left edge is the subject mark (ted-subject--<family>, see _subjects.scss).
   // Urgency is not repeated here: the countdown tag and bar carry it, so one
@@ -2987,7 +2950,6 @@ body {
   flex: none;
   width: 0.625rem;
   height: 0.625rem;
-  border-radius: 2px;
   background: var(--ted-subject-accent);
 }
 
@@ -3023,20 +2985,17 @@ body {
 
 .exam-card__grade {
   @include type.type-style('heading-04');
-  font-weight: 600;
 }
 
 .exam-card__countdown-bar {
   margin-top: var(--ted-space-xs);
   height: 3px;
   background: var(--cds-layer-accent-01);
-  border-radius: 2px;
   overflow: hidden;
 }
 
 .exam-card__countdown-fill {
   height: 100%;
-  border-radius: 2px;
   transition: width motion.$duration-slow-02 motion.motion(standard, productive);
   background-color: var(--status-info);
 
@@ -3159,15 +3118,8 @@ body {
   }
 }
 
-@media (max-width: 420px) {
-  .exam-stats {
-    gap: var(--ted-space-xs);
-  }
-
-  .exam-stats__item {
-    min-width: 3.75rem;
-  }
-
+// Carbon's md breakpoint, not a private 420px one (B37).
+@media (max-width: 671px) {
   .exam-card__list li {
     flex-direction: column;
     align-items: flex-start;
@@ -3187,7 +3139,7 @@ body {
   color: var(--ted-color-text-secondary);
 }
 
-/* stylelint-disable carbon/theme-use, carbon/layout-use, carbon/type-use, carbon/motion-duration-use, carbon/motion-easing-use --
+/* stylelint-disable carbon/theme-use, carbon/layout-use, carbon/type-use, carbon/motion-duration-use, carbon/motion-easing-use, declaration-property-value-allowed-list, declaration-property-value-disallowed-list --
    Tedy Books is its own world (surface designs §4.11); everything below this
    line is out of the Carbon token lint. */
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -4981,7 +4933,7 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   .resume-band:hover .resume-band__cover { transform: rotate(-2.5deg); }
 }
 
-/* stylelint-enable carbon/theme-use, carbon/layout-use, carbon/type-use, carbon/motion-duration-use, carbon/motion-easing-use --
+/* stylelint-enable carbon/theme-use, carbon/layout-use, carbon/type-use, carbon/motion-duration-use, carbon/motion-easing-use, declaration-property-value-allowed-list, declaration-property-value-disallowed-list --
    end of the Tedy Books block (B14): the dashboard rules below are held to the Carbon token lint again. */
 
 // ─── Reduced motion ──────────────────────────────────────────────────────────
@@ -5008,8 +4960,7 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 
   .dashboard-card,
   .health-popover,
-  .calendar-popover,
-  .ac-msg {
+  .calendar-popover {
     // stylelint-disable-next-line carbon/motion-duration-use -- reduce's near-zero duration is not a Carbon motion token
     animation-duration: 1ms;
     animation-delay: 0ms;
@@ -5082,6 +5033,25 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   inline-size: 17rem;
   max-inline-size: 100%;
 }
+
+// The takvim card anchors its event popover.
+.calendar-card { position: relative; }
+
+// When the portal first showed a homework: quiet metadata under the deadline (B4: was an inline style).
+.homework-item__first-seen {
+  @include type.type-style('label-01');
+  color: var(--cds-text-secondary);
+  margin-top: spacing.$spacing-01;
+}
+
+// The health popover's per-section icons (B4: were inline colours). Status words, not support marks: the
+// icon sits beside text on the popover's white layer.
+.durum-ikonu { flex: none; }
+.durum-ikonu--ok { color: var(--status-success); }
+.durum-ikonu--uyari { color: var(--status-warning); }
+.durum-ikonu--hata { color: var(--status-error); }
+.durum-ikonu--kapali { color: var(--cds-support-caution-undefined); }
+.durum-ikonu--atlandi { color: var(--cds-text-helper); }
 
 // A "Yaptım" that could not be stored says so under its own button.
 .homework-item__error {

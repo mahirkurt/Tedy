@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect, type CSSProperties } from 'react'
 import { Button, SkeletonPlaceholder, Tag } from '@carbon/react'
 import {
-  Bookmark, ChevronLeft, ChevronRight, Close, Education, EventSchedule, Group, Task, UserAvatar, Video,
+  Bookmark, Checkmark, ChevronLeft, ChevronRight, Close, Education, EventSchedule, Group, Task, UserAvatar, Video,
 } from '@carbon/icons-react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
@@ -256,7 +256,7 @@ export default function CalendarEvents() {
   }
 
   return (
-    <div className="dashboard-card" style={{ position: 'relative' }}>
+    <div className="dashboard-card calendar-card">
       <h2 className="dashboard-card__title">
         <EventSchedule size={20} />
         Haftalık takvim
@@ -298,12 +298,18 @@ export default function CalendarEvents() {
           .map(([type, label]) => {
           const Icon = TYPE_ICONS[type] ?? EventSchedule
           return (
+          // B34 (S24, S31): shown or hidden is said by a checkmark and aria-pressed, never by fading the chip —
+          // at opacity 0.35 its label measured 2.24:1.
           <button
+            type="button"
             key={type}
             className={`calendar-legend__chip${hiddenTypes.has(type) ? ' calendar-legend__chip--hidden' : ''}`}
+            aria-pressed={!hiddenTypes.has(type)}
             onClick={() => toggleType(type)}
             title={`${label} ${hiddenTypes.has(type) ? 'göster' : 'gizle'}`}
           >
+            {!hiddenTypes.has(type) &&
+              <Checkmark size={16} className="calendar-legend__icon calendar-legend__icon--secili" aria-hidden="true" />}
             <Icon size={16} className="calendar-legend__icon" aria-hidden="true" />
             {label}
           </button>
@@ -359,25 +365,26 @@ export default function CalendarEvents() {
                     // Only show title in the first hour of a block event
                     const isFirstHour = ev._start ? ev._start.getHours() === hour : true
                     if (!isFirstHour && isBlock) {
-                      // Continuation block — thin colored bar
+                      // Continuation block — a thin coloured bar, drawn only; the event's first hour is its button.
                       return (
                         <div
                           key={ev.id}
+                          aria-hidden="true"
                           className={`calendar-event calendar-event--continuation ${ders}`}
-                          onClick={() => setSelectedEvent(ev)}
                         />
                       )
                     }
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={ev.id}
                         className={`calendar-event ${ders}`}
                         onClick={() => setSelectedEvent(ev)}
                         title={`${TYPE_LABELS[ev.type] ?? ''}: ${ev.title}`}
                       >
-                        <Icon size={12} className="calendar-event__icon" aria-hidden="true" />
+                        <Icon size={16} className="calendar-event__icon" aria-hidden="true" />
                         <span className="calendar-event__title">{ev.title}</span>
-                      </div>
+                      </button>
                     )
                   })}
                 </div>

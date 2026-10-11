@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, ModalFooter, Button, InlineLoading, Link, Callout } from '@carbon/react'
+import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, ModalFooter, Button, InlineLoading, Link, Callout, Layer } from '@carbon/react'
 import { Timer, CheckmarkFilled, CheckmarkOutline, CloseFilled, ChevronDown, ChevronUp, Document, Chat } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import type { HomeworkDocument, HomeworkItem } from '../types'
@@ -319,7 +319,9 @@ export default function HomeworkTracker() {
 
       {/* The page names one step before it lists anything (İ1). "Başla" opens
           the work itself, so the verb keeps its meaning through the flow. */}
+      {/* One layer up from the card it sits in (B31): Carbon's contextual tokens, not a hand-paired colour. */}
       {nextHw && (
+        <Layer>
         <NextThing
           eyebrow="Sıradaki"
           // The normalised name, as the list below prints it: the raw one put
@@ -333,6 +335,7 @@ export default function HomeworkTracker() {
           actionLabel="Başla"
           onAction={() => setSelectedHw(nextHw)}
         />
+        </Layer>
       )}
 
       {aktif.length === 0 && (
@@ -508,7 +511,8 @@ function HomeworkCard({
 
   return (
     <Tile
-      onClick={() => onOpen(hw)}
+      // The row opens its homework, except where a click lands on the row's own action ("Yaptım").
+      onClick={e => { if (!(e.target as HTMLElement).closest('.homework-item__action')) onOpen(hw) }}
       className={['homework-item', 'dashboard-list-tile', 'homework-item--clickable', borderClass].join(' ')}
     >
       <div className="homework-item__row">
@@ -539,7 +543,7 @@ function HomeworkCard({
             Teslim: {formatTurkishDate(hw["Ödev Son Teslim Tarihi"])}
           </div>
           {formatTurkishDate(hw.first_seen) && (
-            <div className="homework-item__first-seen" style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary, #525252)', marginTop: '2px' }}>
+            <div className="homework-item__first-seen">
               İlk görülme: {formatTurkishDate(hw.first_seen)}
             </div>
           )}
@@ -557,12 +561,7 @@ function HomeworkCard({
           )}
 
           {showDoneAction && onDone && (
-            <div
-              className="homework-item__action"
-              onClick={(e) => {
-                e.stopPropagation()
-              }}
-            >
+            <div className="homework-item__action">
               {doneLoading ? (
                 <InlineLoading description="Kaydediliyor…" iconDescription="Kaydediliyor" status="active" />
               ) : (
@@ -656,7 +655,7 @@ function HomeworkModalBody({
 
       {/* First seen */}
       {hw.first_seen && (
-        <div className="homework-modal__deadline-row" style={{ marginTop: '0.25rem' }}>
+        <div className="homework-modal__deadline-row">
           <span className="homework-modal__deadline-label">İlk görülme:</span>
           <span className="homework-modal__deadline-value">
             {formatTurkishDate(hw.first_seen)}

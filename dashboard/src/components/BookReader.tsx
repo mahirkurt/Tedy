@@ -336,7 +336,7 @@ export default function BookReader() {
           <div className="reader__bar-title">
             <span className="reader__bar-book">{data?.book.title ?? 'Tedy Books'}</span>
             {chapter && (
-              <span className="reader__bar-chapter">
+              <span className="reader__bar-chapter" title={[chapter.label, chapter.title].filter(Boolean).join(' · ')}>
                 {[chapter.label, chapter.title].filter(Boolean).join(' · ')}
               </span>
             )}
@@ -384,6 +384,9 @@ export default function BookReader() {
         />
       )}
 
+      {/* B12: the reading surface is the reader's curtain — a tap shows or hides the chrome; the keyboard
+          reaches every chrome control through Tab, so the surface needs no key handler of its own. */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div
         className="reader__scroll"
         ref={scrollRef}
