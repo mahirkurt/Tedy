@@ -411,3 +411,142 @@ def test_b19_carbon_colors_dogrudan_bagimlilik():
     kurulu = kilit["packages"]["node_modules/@carbon/colors"]["version"]
     assert paket["dependencies"]["@carbon/colors"].lstrip("^~") == kurulu
     assert "@carbon/colors" in kilit["packages"][""]["dependencies"]
+
+# ── module/vendor rows, 4th round (2026-10-11): B18, B34, B52, B73, B74 ────────
+
+VENDOR = ROOT / "src" / "mcp_server" / "vendor"
+
+
+def _sablon_kurallari(metin: str):
+    """(selector, body) of every CSS rule in the template's <style> blocks, comments dropped."""
+    for blok in re.findall(r"<style[^>]*>(.*?)</style>", metin, flags=re.S):
+        blok = re.sub(r"/\*.*?\*/", " ", blok, flags=re.S)
+        for m in re.finditer(r"([^{}]+)\{([^{}]*)\}", blok):
+            yield " ".join(m.group(1).split()), m.group(2)
+
+
+def test_b18_vendor_carbon_baglantilari_building_blocks():
+    """Every carbondesignsystem.com link the vendored skill gives an author is on today's site map (B18).
+
+    Verified 2026-10-11: each of the 36 distinct links answers 200 under /building-blocks/ and each anchor exists
+    on its page; the retired roots (/elements/, /components/, /data-visualization/ …) only redirect.
+    """
+    ihlal = []
+    for p in sorted(VENDOR.rglob("*")):
+        if p.suffix not in {".md", ".html", ".py", ".json"} or not p.is_file():
+            continue
+        for m in re.finditer(r"https?://(?:www\.)?carbondesignsystem\.com(/[^\s)\"'>`\]]*)?",
+                             p.read_text(encoding="utf-8")):
+            yol = m.group(1) or "/"
+            if not yol.startswith("/building-blocks/") and yol != "/":
+                ihlal.append(f"{p.relative_to(VENDOR)}: {m.group(0)}")
+    assert not ihlal, "bayat Carbon bağlantısı (B18):\n" + "\n".join(ihlal)
+
+
+def test_b74_modul_baslik_agirligi_tokendan():
+    """heading-03/04 sizes carry the token's own weight, 400 (S44, B74)."""
+    metin = SABLON.read_text(encoding="utf-8")
+    ihlal = []
+    for secici, govde in _sablon_kurallari(metin):
+        if re.search(r"font-size:\s*var\(--fs-h-(seg|sub)\)", govde):
+            agirlik = re.findall(r"font-weight:\s*(\d+)", govde)
+            if any(a != "400" for a in agirlik):
+                ihlal.append(f"{secici} {{font-weight:{','.join(agirlik)}}}")
+            if secici.split()[-1].startswith(("h2", "h3")) and not agirlik:
+                ihlal.append(f"{secici}: başlık öğesi ağırlıksız (tarayıcı varsayılanı kalın)")
+    assert not ihlal, "modül başlık token'ı 400 dışında (B74):\n" + "\n".join(ihlal)
+    tablo = (VENDOR / "references" / "carbon-child-system.md").read_text(encoding="utf-8")
+    assert "şablon bugün **600**" not in tablo
+
+
+def test_b34_modulde_durum_opaklikla_cizilmez():
+    """Disabled and held states are drawn with Carbon's disabled tokens, never faded (S24, B34)."""
+    metin = SABLON.read_text(encoding="utf-8")
+    ihlal = [f"{s} {{{g.strip()}}}" for s, g in _sablon_kurallari(metin)
+             if re.search(r"\[disabled\]|\[aria-disabled|--locked|\[data-held", s)
+             and re.search(r"(^|;)\s*opacity\s*:", g)]
+    assert not ihlal, "modülde opaklıkla durum (B34):\n" + "\n".join(ihlal)
+    for secici in (".btn[disabled]", ".chip-btn[disabled]", ".cmap-edge__remove[disabled]"):
+        govde = next((g for s, g in _sablon_kurallari(metin) if s == secici), None)
+        assert govde is not None and "-disabled" in govde, f"{secici} Carbon devre dışı token'ı taşımıyor"
+    # a solved step's answer is content: read-only, not disabled (§5.9)
+    assert "input.readOnly=true;" in metin and "input.disabled=true;" not in metin
+    assert any(s == ".worked-input[readonly]" for s, _ in _sablon_kurallari(metin))
+
+
+def test_b73_modulde_odul_hareketi_seri_ve_rozet_yok():
+    """No reward motion, streak counter, badge case or reward sound in the module (S43, anayasa §9, B73).
+
+    XP stays an internal number the progress bridge reports; the reader never sees it.
+    """
+    metin = SABLON.read_text(encoding="utf-8")
+    for iz in ('id="xpValue"', 'class="xp"', "xp-float", "xpPulse", "xpRise", "streakChip", "streak-chip",
+               "streakHit", "streak-float", "STREAK_MILESTONES", "badgePop", "badge--new", "badge--locked",
+               'id="badgeCase"', '" XP"', "Toplam XP", "En uzun seri", "Tebrikler", "reward:[[",
+               'playSound("reward")', "--reward", "stat--xp", "donut__pct"):
+        assert iz not in metin, f"modülde oyunlaştırma izi kaldı (B73): {iz}"
+    # the progress bridge still reports a number
+    assert "state.xp+=n" in metin.replace(" ", "")
+    dogrulayici = (VENDOR / "scripts" / "validate_module.py").read_text(encoding="utf-8")
+    assert "S43" in dogrulayici, "G-FLOW seri sayacını reddetmiyor"
+
+
+# ── B52 (§8.2, S19): module charts never invent data, step evenly, draw series in --viz-* ──
+
+def _js_fonksiyon(metin: str, ad: str) -> str:
+    bas = metin.index(f"function {ad}(")
+    i = metin.index("{", bas)
+    derinlik = 0
+    for j in range(i, len(metin)):
+        if metin[j] == "{":
+            derinlik += 1
+        elif metin[j] == "}":
+            derinlik -= 1
+            if derinlik == 0:
+                return metin[bas:j + 1]
+    raise AssertionError(ad)
+
+
+def _grafik_calistir(ifade: str) -> str:
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if node is None:
+        import pytest
+        pytest.skip("node yok")
+    metin = SABLON.read_text(encoding="utf-8")
+    esc = re.search(r"const esc = s => [^\n]*", metin).group(0)
+    kod = "\n".join([esc] + [_js_fonksiyon(metin, ad) for ad in ("vizId", "svgFigure", "vizNice", "vizChart",
+                                                                   "fractionBar")]
+                    + [f"process.stdout.write(String({ifade}));"])
+    return subprocess.run([node, "-e", kod], capture_output=True, text=True, check=True, timeout=30).stdout
+
+
+def test_b52_eksik_deger_sifir_cizilmez():
+    svg = _grafik_calistir('vizChart({title:"T",data:[{label:"A",value:3},{label:"B"},{label:"C",value:7}]})')
+    assert svg.count("<rect") == 2, "eksik değer 0 yüksekliğinde çubuk olarak çiziliyor"
+    assert "veri yok" in svg
+    assert "B: veri yok" in re.search(r"<desc[^>]*>(.*?)</desc>", svg).group(1)
+    cizgi = _grafik_calistir(
+        'vizChart({kind:"line",data:[{label:"A",value:3},{label:"B",value:null},{label:"C",value:7}]})')
+    assert cizgi.count("<circle") == 2
+    yol = re.search(r'<path d="([^"]+)"', cizgi).group(1)
+    assert "L" not in yol and yol.count("M") == 2, "çizgi eksik noktanın üstünden geçiyor"
+
+
+def test_b52_eksen_esit_ve_yuvarlak_adimli():
+    for veri, beklenen in (("[{label:'a',value:10}]", [0, 2, 4, 6, 8, 10]), ("[{label:'a',value:7}]", [0, 2, 4, 6, 8]),
+                           ("[{label:'a',value:37}]", [0, 10, 20, 30, 40]), ("[{label:'a',value:3}]", [0, 1, 2, 3])):
+        svg = _grafik_calistir(f"vizChart({{data:{veri}}})")
+        etiketler = [int(x) for x in re.findall(r'text-anchor="end"[^>]*>([^<]+)<', svg)]
+        assert sorted(etiketler) == beklenen, (veri, etiketler)
+
+
+def test_b52_seriler_viz_paletinde():
+    for ifade in ("vizChart({data:[{label:'a',value:1},{label:'b',value:2}]})",
+                  "vizChart({kind:'line',data:[{label:'a',value:1},{label:'b',value:2}]})",
+                  "fractionBar({num:2,den:5})", "fractionBar({ratio:[2,3],labels:['x','y']})",
+                  "fractionBar({addends:[1,2],den:4})"):
+        svg = _grafik_calistir(ifade)
+        assert "var(--accent" not in svg, f"grafik serisi ders aksanında (S19): {ifade}"
+        assert "var(--viz-1)" in svg, ifade

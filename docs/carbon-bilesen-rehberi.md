@@ -210,8 +210,8 @@ kartının içindedir; UI shell üç karttır. Kartlar Carbon kimliğine göre a
   Açık konular: canlı yüzeyde yalnız *broad* etiket var (eski `AssistantChat.tsx`'te mesaj başına
   *focused* `mini` etiket vardı); popover'da "Artifacts and resources" ve "Additional actions"
   yok; fotoğraftan çıkarılan ödev alanlarında (`OdevOnayKarti.tsx`) AI etiketi ve revert yok;
-  modül şablonunda AI etiketi yok — karar S41 (2026-10-10): etiket `ModuleViewer`'ın çerçeve başlığında,
-  açıklanabilirlik içeriğiyle; modülün içi değişmez (B71). Kısaltma: "AI" ("YZ" kararı
+  modüllerde AI etiketi S41 (2026-10-10) ile `ModuleViewer`'ın çerçeve başlığındadır (2026-10-11, B71 kapandı;
+  `ModulAiEtiketi.tsx`, açıklanabilirlik içeriğiyle); modülün içi değişmez. Kısaltma: "AI" ("YZ" kararı
   verilmedi). Talimatname §6.
 - **Kaynak:** https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/
 
@@ -1142,7 +1142,7 @@ kartının içindedir; UI shell üç karttır. Kartlar Carbon kimliğine göre a
   tamamlanan dolu daire, geçerli halka, gelecek adımlar `disabled` (Carbon'a göre ekran okuyucudan
   düşer), ok tuşu gezinmesi yok; "Son N durak" yalnız 1–2 durak kalınca. Toplamı baştan göstermek
   İ3 ile gerilim yaratır; istisna modül pedagojisi kurallarında yazılır (§9). 2026-10-10'dan beri (S43) modül
-  ilerlemesi yalnız bu sessiz, etiketli göstergedir — seri çipi ve ödül animasyonu kalkar, XP varsa sessiz metindir (B73);
+  ilerlemesi yalnız bu sessiz, etiketli göstergedir — seri çipi, rozet ve ödül animasyonu yoktur, XP ekranda gösterilmez (2026-10-11, B73 kapandı);
   ProgressBar kullanıcı eylemiyle belirlenen ilerleme için kullanılmaz.
 - **Kaynak:** https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/guidelines/
 
@@ -2496,7 +2496,7 @@ kaynak ile uygulayan bölüm eşleşir. Alt sayfalar ana sayfanın altındaki yo
 | Gantt charts | — | https://carbondesignsystem.com/building-blocks/data-visualization/gantt-charts/ | §8 |
 | Dashboards | — | https://carbondesignsystem.com/building-blocks/data-visualization/dashboards/ | §8 (S15 KPI karosu yok) |
 
-Eski yollar (`/elements/...`, `/components/...`, `/data-visualization/...`, `/guidelines/...`) bayattır (B18);
+Eski yollar (`/elements/...`, `/components/...`, `/data-visualization/...`, `/guidelines/...`) bayattır (B18, 2026-10-11'de kapandı);
 bağlantı yalnız yukarıdaki `/building-blocks/...` biçimiyle verilir.
 
 ## 4. Kaynak ve tazelik

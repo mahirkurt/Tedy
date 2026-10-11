@@ -1,3 +1,7 @@
+@use '@carbon/react/scss/spacing';
+@use '@carbon/react/scss/theme';
+@use '@carbon/react/scss/type';
+
 .module-list {
   list-style: none;
   margin: 0;
@@ -59,6 +63,69 @@
   width: 100%;
   min-width: 0;
   display: flex;
+  flex-direction: column;
+}
+
+// Frame header (S41, B71): a broad AI label for the whole module, upper right, never flush to the edge.
+.module-viewer__ust {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: spacing.$spacing-03;
+  padding-block: spacing.$spacing-02;
+  padding-inline-end: spacing.$spacing-03;
+}
+
+.module-viewer__not {
+  @include type.type-style('label-01');
+
+  margin: 0;
+  color: theme.$text-secondary;
+}
+
+// ── the AI label's explanation window: Carbon paints the window; only the words' order here (§6.2) ──
+.modul-ai {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+  max-inline-size: 22rem;
+}
+
+.modul-ai__baslik {
+  @include type.type-style('heading-04');
+
+  margin: 0;
+  color: theme.$text-primary;
+}
+
+.modul-ai__alt-baslik {
+  @include type.type-style('heading-compact-01');
+
+  margin: spacing.$spacing-03 0 0;
+  color: theme.$text-primary;
+}
+
+.modul-ai__govde {
+  @include type.type-style('body-01');
+
+  margin: 0;
+  color: theme.$text-secondary;
+}
+
+.modul-ai__ayrintilar {
+  @include type.type-style('label-02');
+
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-02;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: theme.$text-primary;
+}
+
+.modul-ai__dayanak {
+  color: theme.$text-secondary;
 }
 
 .module-frame {

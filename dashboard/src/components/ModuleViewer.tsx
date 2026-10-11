@@ -4,6 +4,7 @@ import type { ModuleTicket } from '../types'
 import {
   acceptProgressMessage, appearanceMessage, DASHBOARD_THEME, restoreMessage, type RestoreState,
 } from '../utils/moduleBridge'
+import ModulAiEtiketi from './ModulAiEtiketi'
 import './Modules.scss'
 
 type TicketState = { status: 'loading' } | { status: 'ready'; url: string } | { status: 'error'; message: string }
@@ -17,11 +18,13 @@ const TICKET_ERRORS: Record<number, string> = {
 export interface ModuleViewerProps {
   ticketPath: string
   title: string
+  /** What the frame's AI label explains (talimatname S41, B71). */
+  aciklamaPath: string
   /** Absent for draft previews: a draft never writes progress. */
   progress?: { slug: string; version: number }
 }
 
-export default function ModuleViewer({ ticketPath, title, progress }: ModuleViewerProps) {
+export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress }: ModuleViewerProps) {
   const frameRef = useRef<HTMLIFrameElement>(null)
   // Reset to loading during render when ticketPath changes, rather than with a
   // synchronous setState at the top of the effect below (React's "adjusting
@@ -105,6 +108,12 @@ export default function ModuleViewer({ ticketPath, title, progress }: ModuleView
         <InlineNotification kind="warning" lowContrast hideCloseButton statusIconDescription="Uyarı" title="İlerleme kaydedilemedi"
           subtitle="Modül çalışmaya devam ediyor; sayfayı yenileyince kayıt yeniden denenir." />
       )}
+      {/* Frame header (S41, B71): every module shown on the dashboard carries a broad AI label, upper right of
+          its container; the module inside is untouched (G-VOICE). */}
+      <div className="module-viewer__ust">
+        <p className="module-viewer__not">Yapay zekâ yardımıyla hazırlanmış modül</p>
+        <ModulAiEtiketi aciklamaPath={aciklamaPath} />
+      </div>
       <iframe ref={frameRef} className="module-frame" title={title} src={ticket.url}
         sandbox="allow-scripts" referrerPolicy="no-referrer" onLoad={onFrameLoad} />
     </div>
