@@ -29,7 +29,11 @@ export function baslaticiGorunur(yol: string, rol: UserRole, odak: boolean, geni
   return rol === 'full' && !odak && genis && !GIZLI.some(r => r.test(yol)) && sayfaAdi(yol) !== null
 }
 
-export interface AcikOge { tur: 'odev' | 'sinav' | 'etkinlik' | 'ders_haftasi'; id: string; etiket: string }
+export interface AcikOge {
+  tur: 'odev' | 'sinav' | 'etkinlik' | 'ders_haftasi' | 'konu'
+  id: string
+  etiket: string
+}
 
 // Açık öğeler yığın olarak tutulur: en son açılan bağlamdır; her kayıt yalnız kendi öğesini bırakır (iki sınav kartı
 // açıkken biri kapanınca öbürü bağlam olarak kalır).

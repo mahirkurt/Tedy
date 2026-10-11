@@ -1019,7 +1019,7 @@ SAYFA_ADLARI = {
     "takvim": "Takvim", "takimlar": "Takımlar", "ilerleme": "İlerleme", "duyurular": "Duyurular",
     "profil": "Profil", "moduller": "Modüller", "kitaplar": "Tedy Books", "sinavlar": "Sınavlar",
 }
-SAYFA_OGE_TURLERI = ("odev", "sinav", "etkinlik", "ders_haftasi")
+SAYFA_OGE_TURLERI = ("odev", "sinav", "etkinlik", "ders_haftasi", "konu")
 
 
 def _sayfa_ogesi_basligi(tur, kimlik):
@@ -1040,6 +1040,13 @@ def _sayfa_ogesi_basligi(tur, kimlik):
         elif tur == "ders_haftasi":
             if kimlik in _icerik_haftalari(_scraped())["weeks"]:
                 return kimlik
+        elif tur == "konu":
+            # Sunucu istemcinin etiketine güvenmez, kendi verisinden çözer (spec §4.1).
+            durum, agac = _mufredat_agaci()
+            bulunan = mufredat_agaci.konu_bul(agac, kimlik) if durum == "ok" and agac else None
+            if bulunan:
+                ders, _, konu = bulunan
+                return f"{ders['ders']} · {konu['ad']}"
     except Exception as exc:  # noqa: BLE001 — bağlam satırı hiçbir zaman cevabı düşürmez
         app.logger.warning("Sayfa öğesi çözülemedi (%s)", type(exc).__name__)
     return ""

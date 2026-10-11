@@ -1576,3 +1576,54 @@ def test_agac_ucu_okur_rolunde_reddediyor(monkeypatch):
             oturum["user_email"] = okur
         assert c.get("/api/modules/agac").status_code == 403
     assert "modules_agac" not in dashboard_api.READER_ENDPOINTS
+
+
+# ── Asistan bağlamında konu öğesi (spec §4.1) ───────────────────────────────
+
+
+def test_konu_turu_sayfa_oge_turlerinde():
+    assert "konu" in dashboard_api.SAYFA_OGE_TURLERI
+
+
+def test_konu_basligi_dersi_ve_konuyu_adlandiriyor(agac_dosyasi):
+    agac_dosyasi(_AGAC_GOVDESI)
+    baslik = dashboard_api._sayfa_ogesi_basligi("konu", "matematik-u1-tam-sayilar")
+    assert baslik == "Matematik · Tam Sayılar"
+
+
+# Review Focus 5: kötü konu kimliği.
+def test_konu_basligi_bilinmeyen_kimlikte_bos(agac_dosyasi):
+    agac_dosyasi(_AGAC_GOVDESI)
+    assert dashboard_api._sayfa_ogesi_basligi("konu", "matematik-u9-olmayan") == ""
+
+
+def test_konu_basligi_harita_okunamazken_bos(tmp_path, monkeypatch):
+    monkeypatch.setattr(dashboard_api, "MUFREDAT_AGACI_PATH", str(tmp_path / "yok.json"))
+    assert dashboard_api._sayfa_ogesi_basligi("konu", "matematik-u1-tam-sayilar") == ""
+
+
+def test_istek_sayfasi_konu_ogesini_kabul_ediyor(agac_dosyasi):
+    agac_dosyasi(_AGAC_GOVDESI)
+    # `_istek_sayfasi` hata demetini koşulsuz kurduğu için her çağrı uygulama bağlamı ister.
+    with app.test_request_context():
+        satir, hata = dashboard_api._istek_sayfasi(
+            {"sayfa": {"ad": "moduller",
+                       "oge": {"tur": "konu", "id": "matematik-u1-tam-sayilar"}}})
+    assert hata is None and "Matematik · Tam Sayılar" in satir
+
+
+@pytest.mark.parametrize("kimlik", ["x" * 401, "konu\nid", ""])
+def test_istek_sayfasi_bozuk_konu_kimligini_400_yapiyor(kimlik):
+    with app.test_request_context():
+        _, hata = dashboard_api._istek_sayfasi(
+            {"sayfa": {"ad": "moduller", "oge": {"tur": "konu", "id": kimlik}}})
+    assert hata is not None and hata[1] == 400
+
+
+def test_istek_sayfasi_bilinmeyen_konuda_sayfa_satirini_koruyor(agac_dosyasi):
+    """Bağlam satırı hiçbir zaman cevabı düşürmez: başlık çözülemese de sayfa adı kalır."""
+    agac_dosyasi(_AGAC_GOVDESI)
+    with app.test_request_context():
+        satir, hata = dashboard_api._istek_sayfasi(
+            {"sayfa": {"ad": "moduller", "oge": {"tur": "konu", "id": "matematik-u9-olmayan"}}})
+    assert hata is None and satir == "Bulunduğu sayfa: Modüller"
