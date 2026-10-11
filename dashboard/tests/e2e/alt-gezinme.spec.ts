@@ -15,7 +15,8 @@ test('a phone gets the bottom bar and no menu button', async ({ page }) => {
   await expect(bar).toBeVisible()
   await expect(bar.getByRole('link')).toHaveText(SEKMELER)
   await expect(page.getByRole('button', { name: 'Menü' })).toBeHidden()
-  await expect(page.getByRole('navigation', { name: 'Navigasyon' })).toBeHidden()
+  // B40: both navigations are "Ana gezinme"; told apart by element, only one is ever shown.
+  await expect(page.locator('nav.cds--side-nav')).toBeHidden()
   await expect(bar.getByRole('link', { name: 'Bugün' })).toHaveAttribute('aria-current', 'page')
   for (const link of await bar.getByRole('link').all()) {
     const box = await link.boundingBox()
@@ -57,8 +58,8 @@ test('the bar never covers the end of a page', async ({ page }) => {
 
 test('a desktop keeps the side nav and shows no bar', async ({ page }) => {
   await sabitAc(page, '/', 1440, 900)
-  await expect(page.getByRole('navigation', { name: 'Ana gezinme' })).toBeHidden()
-  await expect(page.getByRole('navigation', { name: 'Navigasyon' })).toBeVisible()
+  await expect(page.locator('nav.bottom-nav')).toBeHidden()
+  await expect(page.getByRole('navigation', { name: 'Ana gezinme' })).toHaveClass(/cds--side-nav/)
 })
 
 test('focus mode keeps the four daily tabs and drops Daha fazla', async ({ page }) => {
@@ -110,13 +111,14 @@ test('Sınavlar marks İşler, not Daha fazla', async ({ page }) => {
 
 test('a tablet keeps the menu button and opens the side nav with it', async ({ page }) => {
   await sabitAc(page, '/', 800, 900)
-  await expect(page.getByRole('navigation', { name: 'Ana gezinme' })).toBeHidden()
+  await expect(page.locator('nav.bottom-nav')).toBeHidden()
   const menu = page.getByRole('button', { name: 'Menü' })
   await expect(menu).toBeVisible()
   // B40: the button says whether the side nav is open; the band's landmark is named in Turkish.
   await expect(menu).toHaveAttribute('aria-expanded', 'false')
   await expect(page.getByRole('banner', { name: 'TEDY', exact: true })).toBeVisible()
   await menu.click()
-  await expect(page.getByRole('navigation', { name: 'Navigasyon' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Ana gezinme' })).toHaveClass(/cds--side-nav/)
+  await expect(page.locator('nav.cds--side-nav')).toBeVisible()
   await expect(menu).toHaveAttribute('aria-expanded', 'true')
 })

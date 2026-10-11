@@ -135,7 +135,8 @@ export default function App() {
       )}
       {navItems.length > 1 && (
       <SideNav
-        aria-label="Navigasyon"
+        // B40: one navigation, one name — the phone's bottom bar is "Ana gezinme" too.
+        aria-label="Ana gezinme"
         expanded={sideNavExpanded}
         onOverlayClick={() => setSideNavExpanded(false)}
         onSideNavBlur={() => setSideNavExpanded(false)}
@@ -188,6 +189,8 @@ export default function App() {
         />
       )}
       <Content
+        id="main-content"
+        tabIndex={-1}
         className={[
           'app-shell-content',
           focusMode ? 'app-shell-content--focus' : '',

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { apiHataTuru, type ApiHataTuru } from '../utils/apiHatasi'
 
 const REFRESH_INTERVAL = 5 * 60 * 1000
 const HOMEWORK_UPDATE_EVENT = 'tedy:homework-updated'
@@ -15,13 +16,17 @@ export function useApi<T>(endpoint: string, defaultValue: T): {
   /** True only while still loading once YUKLEME_ESIGI_MS has passed: draw the
    *  skeleton on this, and nothing while `loading` is true without it. */
   iskelet: boolean
+  /** Internal text, for logs and tests — never for the page (D4). */
   error: string | null
+  /** B43: the failure's kind; a surface turns it into a sentence with `apiHataCumlesi`. */
+  hataTuru: ApiHataTuru | null
   refresh: () => void
 } {
   const [data, setData] = useState<T>(defaultValue)
   const [loading, setLoading] = useState(true)
   const [esikGecti, setEsikGecti] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hataTuru, setHataTuru] = useState<ApiHataTuru | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setEsikGecti(true), YUKLEME_ESIGI_MS)
@@ -30,21 +35,33 @@ export function useApi<T>(endpoint: string, defaultValue: T): {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch(endpoint, { credentials: 'include' })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      let res: Response
+      try {
+        res = await fetch(endpoint, { credentials: 'include' })
+      } catch {
+        setHataTuru(apiHataTuru(null))
+        throw new Error('Fetch error')
+      }
+      if (!res.ok) {
+        setHataTuru(apiHataTuru(res.status))
+        throw new Error(`HTTP ${res.status}`)
+      }
       const text = await res.text()
       const ct = res.headers.get('content-type') || ''
       if (!ct.includes('application/json')) {
+        setHataTuru(apiHataTuru(res.status, true))
         throw new Error(`Non-JSON response (HTTP ${res.status})`)
       }
       let json: T
       try {
         json = JSON.parse(text) as T
       } catch {
+        setHataTuru(apiHataTuru(res.status, true))
         throw new Error(`Invalid JSON response (HTTP ${res.status})`)
       }
       setData(json)
       setError(null)
+      setHataTuru(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Fetch error')
     } finally {
@@ -65,5 +82,5 @@ export function useApi<T>(endpoint: string, defaultValue: T): {
     }
   }, [fetchData])
 
-  return { data, loading, iskelet: loading && esikGecti, error, refresh: fetchData }
+  return { data, loading, iskelet: loading && esikGecti, error, hataTuru, refresh: fetchData }
 }

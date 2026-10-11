@@ -89,7 +89,7 @@ export default function OdevOnayKarti({ oneri, saltOkunur = false }: { oneri: Od
       {hata && <p role="alert">{hata}</p>}
       {saltOkunur ? null : bekliyor
         ? <InlineLoading description="Ekleniyor…" iconDescription="Ekleniyor" />
-        : <Button kind="secondary" size="lg" onClick={() => void kaydet()}>Ödevlere ekle</Button>}
+        : <Button kind="tertiary" size="lg" onClick={() => void kaydet()}>Ödevlere ekle</Button>}
     </> : <p role="status">{sonuc} ödev eklendi</p>}
   </section>
 }

@@ -8,10 +8,15 @@
     - paragraph: Alıştırma · 0
     - heading "Zorlanılan konular" [level=4]
     - paragraph: Henüz deneme yok. Bir alıştırma bitince burada görünür.
+  - text: Platformlar
+  - list "Platformlar":
+    - listitem: EnglishCentral Atanmış iş yok
+    - listitem: Achieve3000 3/5 ders
+    - listitem: SEBIT Tamamlandı · 1/1 ödev
   - list:
     - listitem:
-      - button "EnglishCentral 0/0"
+      - button "EnglishCentral videoları"
     - listitem:
-      - button "Achieve3000 3/5"
+      - button "Achieve3000 dersleri"
     - listitem:
-      - button "SEBIT 1/1"
+      - button "SEBIT ödevleri"

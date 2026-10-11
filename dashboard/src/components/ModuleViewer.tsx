@@ -44,12 +44,14 @@ export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress
     let cancelled = false
     fetch(ticketPath, { credentials: 'include' })
       .then(async res => {
-        if (!res.ok) throw new Error(TICKET_ERRORS[res.status] ?? `Modül açılamadı (HTTP ${res.status}).`)
+        if (!res.ok) throw new Error(TICKET_ERRORS[res.status] ?? 'Modül şu an açılamadı. Birkaç dakika sonra yeniden dene.')
         const body = (await res.json()) as ModuleTicket
         if (!cancelled) setTicket({ status: 'ready', url: body.url })
       })
       .catch((e: unknown) => {
-        if (!cancelled) setTicket({ status: 'error', message: e instanceof Error ? e.message : 'Modül açılamadı.' })
+        // B43 (D4): only our own sentences reach the page; a network failure's text ("Failed to fetch") does not.
+        const bizim = e instanceof Error && Object.values(TICKET_ERRORS).concat('Modül şu an açılamadı. Birkaç dakika sonra yeniden dene.').includes(e.message)
+        if (!cancelled) setTicket({ status: 'error', message: bizim ? (e as Error).message : 'Modül açılamadı. Bağlantını kontrol edip yeniden dene.' })
       })
     return () => { cancelled = true }
   }, [ticketPath])
@@ -93,7 +95,7 @@ export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress
   }, [])
 
   if (ticket.status === 'loading') {
-    return <div className="module-viewer"><SkeletonText paragraph lineCount={3} /></div>
+    return <div className="module-viewer" aria-busy="true"><SkeletonText paragraph lineCount={3} /></div>
   }
   if (ticket.status === 'error') {
     return (

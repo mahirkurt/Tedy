@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   Header, HeaderName, HeaderMenuButton, HeaderGlobalBar, HeaderGlobalAction,
-  SkeletonText, Toggle, Callout
+  SkeletonText, Toggle, Callout, Popover, PopoverContent, SkipToContent
 } from '@carbon/react'
 import {
   Renew, Logout,
@@ -55,27 +55,14 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
     { timestamp: '', success: false, scrape_errors: [], duration_seconds: 0 }
   )
   const [healthOpen, setHealthOpen] = useState(false)
-  const popoverRef = useRef<HTMLElement>(null)
-
-  // Close popover on outside click
+  const tetikRef = useRef<HTMLButtonElement>(null)
+  // B49 (§5.4): Carbon's Popover closes on a click outside and when Tab leaves it; focus moves into the box on
+  // open and back to its trigger on Esc.
+  // PopoverContent's ref lands on its inner box; the dialog (with the tabindex) is the outer element, found by id.
   useEffect(() => {
     if (!healthOpen) return
-    function handleClick(e: MouseEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setHealthOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [healthOpen])
-
-  useEffect(() => {
-    if (!healthOpen) return
-    function onEscape(e: KeyboardEvent) {
-      if (e.key === 'Escape') setHealthOpen(false)
-    }
-    document.addEventListener('keydown', onEscape)
-    return () => document.removeEventListener('keydown', onEscape)
+    const kare = requestAnimationFrame(() => document.getElementById('senkron-durumu-kutusu')?.focus())
+    return () => cancelAnimationFrame(kare)
   }, [healthOpen])
 
   const effectiveSyncTimestamp = health.staleness?.last_successful_full_scrape || health.timestamp
@@ -99,6 +86,8 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
     <>
       {/* B40: Turkish landmark name; the menu button says whether the side nav is open. */}
       <Header aria-label="TEDY">
+        {/* B11 (D2, WCAG 2.4.1): the first stop in the tab order goes past the band and the navigation. */}
+        <SkipToContent href="#main-content">İçeriğe atla</SkipToContent>
         <HeaderMenuButton
           aria-label="Menü"
           aria-expanded={isSideNavExpanded}
@@ -128,20 +117,36 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
               <strong className="dashboard-header__user-name dashboard-header__user-name--short">{shortDisplayName}</strong>
               <span className="dashboard-header__user-email">{user.email}</span>
             </div>
-            <span className="dashboard-header__health-wrap" ref={popoverRef}>
+            <Popover
+              open={healthOpen && !loading}
+              align="bottom-end"
+              autoAlign
+              caret={false}
+              className="dashboard-header__health-wrap"
+              onRequestClose={() => setHealthOpen(false)}
+              onKeyDown={e => {
+                if (e.key !== 'Escape' || !healthOpen) return
+                e.preventDefault()
+                setHealthOpen(false)
+                tetikRef.current?.focus()
+              }}
+            >
               <button
+                ref={tetikRef}
                 type="button"
+                aria-controls={healthOpen && !loading ? 'senkron-durumu-kutusu' : undefined}
                 onClick={() => setHealthOpen(o => !o)}
                 className="dashboard-header__health-trigger"
                 // Named by its visible text plus a hidden prefix, not an
                 // aria-label: "Senkron durumunu göster" on a button reading
                 // "15 dk önce" failed WCAG 2.5.3 — a voice user says what they see.
                 aria-expanded={healthOpen}
+                aria-busy={loading || undefined}
                 aria-haspopup="dialog"
               >
                 <span className="cds--visually-hidden">Senkron durumu: </span>
                 {loading ? (
-                  iskelet ? <SkeletonText width="72px" /> : null
+                  iskelet ? <SkeletonText width="4.5rem" /> : null
                 ) : (
                   <span className={`dashboard-header__sync dashboard-header__sync--${syncDurumu}`}>
                     {syncDurumu === 'hata' && <ErrorFilled size={16} aria-hidden="true" />}
@@ -151,7 +156,8 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
                 )}
               </button>
               {healthOpen && !loading && (
-                <div className="health-popover" role="dialog" aria-label="Senkron sağlık bilgisi">
+                <PopoverContent id="senkron-durumu-kutusu" tabIndex={-1} className="health-popover"
+                  role="dialog" aria-label="Senkron sağlık bilgisi">
                   <p className="health-popover__title">Senkron durumu</p>
                   <p className="health-popover__meta">
                     <span className="health-popover__meta-label">Son senkron</span>
@@ -193,9 +199,9 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
                       </span>
                     </div>
                   ))}
-                </div>
+                </PopoverContent>
               )}
-            </span>
+            </Popover>
           </div>
           <div className="dashboard-header__focus-toggle">
             {/* B41: anahtarın adı `labelText`; `hideLabel` onu yandaki tek etiket yapar (labelA/labelB ikilisi yerine). */}

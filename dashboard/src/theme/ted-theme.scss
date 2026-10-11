@@ -172,7 +172,12 @@ html {
   // 1440 baselines are untouched); 100% keeps the reader's own browser text size as the floor.
   /* stylelint-disable-next-line carbon/type-use -- the root scale itself, not a type style */
   font-size: clamp(100%, calc(100vw / 120), 250%);
+  // B11 (WCAG 2.2 2.4.11): a focused element scrolled into view stops below the fixed 3rem band, not under it.
+  scroll-padding-block-start: spacing.$spacing-09;
 }
+
+// The skip link's target takes focus without drawing a ring around the whole page.
+#main-content:focus { outline: none; }
 
 // Carbon icons arrive as <svg width="16" height="16">: an attribute, so on a 4K screen they kept
 // their pixel size while the text around them doubled. Any CSS rule outranks the attribute, and
@@ -264,10 +269,10 @@ body {
   .today-tl__dot,
   .today-tl__now-line,
   .ted-subject-label__mark,
-  .calendar-event,
   .calendar-event--continuation {
     forced-color-adjust: none;
   }
+  // B40: an event chip carries text, so its text takes the system colours; only the drawn bar keeps its own.
 }
 
 // ─── App Shell ───────────────────────────────────────────────────────────────
@@ -361,8 +366,8 @@ body {
 }
 
 .dashboard-card__title svg {
-  // The navy belongs to the band (Tedy layer); a title's icon is secondary.
-  color: var(--cds-icon-secondary);
+  // The navy belongs to the band (Tedy layer); the icon takes its title's colour (B38, [3.7-3]).
+  color: currentColor;
   flex-shrink: 0;
 }
 
@@ -1455,15 +1460,11 @@ body {
 }
 
 // ─── Health Popover ──────────────────────────────────────────────────────────
+// B49: Carbon's Popover places and layers it (its shadow, a transient surface); the card corner and the
+// hairline are S30's.
 .health-popover {
-  position: absolute;
-  top: calc(100% + #{spacing.$spacing-03});
-  right: 0;
-  z-index: 9000;
-  background: var(--ted-card-bg);
   border: 1px solid var(--ted-color-border-subtle);
   border-radius: var(--ted-radius-card);
-  box-shadow: var(--ted-shadow-popover);
   padding: var(--ted-space-sm) var(--ted-space-md);
   @include type.type-style('body-01');
   min-width: 20rem;
@@ -1521,18 +1522,42 @@ body {
 }
 
 // ─── Announcements ──────────────────────────────────────────────────────
-.announcements-week-group {
-  margin-bottom: var(--ted-space-md);
-
-  &:last-child { margin-bottom: 0; }
+// B67: newest first, one list; unread opens itself and says "Yeni" (icon + word, S4).
+.announcements__ozet {
+  @include type.type-style('body-compact-01');
+  color: var(--cds-text-secondary);
+  margin: 0 0 var(--ted-space-xs);
 }
 
-.announcements-week-group__label {
+.announcements-item__baslik {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--ted-space-xs);
+}
+
+.announcements-item__ad {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.announcements-item--yeni .announcements-item__ad {
+  @include type.type-style('heading-compact-01');
+}
+
+.announcements-item__yeni {
+  display: inline-flex;
+  align-items: center;
+  gap: spacing.$spacing-02;
   @include type.type-style('label-01');
-  font-weight: 600;
-  color: var(--ted-color-text-helper);
-  margin: 0 0 var(--ted-space-2xs);
-  padding-left: var(--ted-space-2xs);
+  color: var(--cds-text-primary);
+
+  svg { fill: var(--cds-support-info); }
+}
+
+.announcements-item__tarih {
+  @include type.type-style('label-01');
+  color: var(--cds-text-secondary);
 }
 
 .announcements-detail {
@@ -1560,16 +1585,7 @@ body {
   padding: 0;
 }
 
-.announcements-detail__link {
-  @include type.type-style('body-01');
-  font-weight: 600;
-  color: var(--cds-link-primary);
-  text-decoration: none;
-}
 
-@media (any-hover: hover) {
-  .announcements-detail__link:hover { text-decoration: underline; }
-}
 
 // ─── Unified Calendar ────────────────────────────────────────────────────
 
@@ -1632,7 +1648,7 @@ body {
 
 .calendar-legend__icon {
   flex-shrink: 0;
-  fill: var(--cds-icon-secondary);
+  fill: currentColor;   // the icon takes its label's colour (B38)
 }
 
 .calendar-grid {
@@ -1733,7 +1749,7 @@ body {
 
 .calendar-event__icon {
   flex-shrink: 0;
-  fill: var(--cds-icon-secondary);
+  fill: currentColor;   // the icon takes its title's colour (B38)
 }
 
 .calendar-event__title {
@@ -1758,20 +1774,16 @@ body {
 
 // ── Calendar Popover ──
 
+// B49: the event detail is Carbon's Popover (layer ground, its own shadow and caret), anchored to the event.
+.calendar-event-popover {
+  display: block;
+}
+
 .calendar-popover {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 9000;
-  background: var(--ted-card-bg);
-  border: 1px solid var(--ted-color-border-subtle);
-  border-radius: var(--ted-radius-card);
-  box-shadow: var(--ted-shadow-popover);
   padding: var(--ted-space-md);
   min-width: 16.25rem;
   max-width: 21.25rem;
-  animation: popover-enter motion.$duration-moderate-02 motion.motion(entrance, productive);
+  white-space: normal;
 }
 
 .calendar-popover__header {
@@ -2015,11 +2027,10 @@ body {
 }
 
 // ─── Schedule DataTable ─────────────────────────────────────────────────
+// The hour column: period number in Sans, the time in `.tedy-time` mono (S22, B36); the table's own type.
 .schedule-time {
-  @include type.type-style('label-01');
-  font-weight: 600;
+  @include type.type-style('body-compact-01');
   white-space: nowrap;
-  font-variant-numeric: tabular-nums;
 }
 
 // Shown only on a day that runs on its own bell, so the shared Saat column
@@ -2032,9 +2043,31 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+// The lesson is a real button (B64): it opens the course's content below. It reads as the text it was.
 .schedule-lesson {
   display: block;
-  font-weight: 600;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cds-text-primary);
+  text-align: start;
+  cursor: pointer;
+  @include type.type-style('heading-compact-01');
+
+  &:focus-visible {
+    outline: 2px solid var(--cds-focus);
+    outline-offset: 2px;
+  }
+}
+
+@media (any-hover: hover) {
+  .schedule-lesson:hover { text-decoration: underline; }
+}
+
+.course-content__istenen {
+  @include type.type-style('body-compact-01');
+  color: var(--cds-text-secondary);
+  margin: 0;
 }
 
 .schedule-detail {
@@ -2053,13 +2086,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--ted-space-xs);
+  margin: 0;
   padding: var(--ted-space-xs) 0;
 }
 
 .grade-detail__row {
   display: grid;
-  grid-template-columns: 8.75rem 1fr 2.5rem;
-  align-items: center;
+  grid-template-columns: 8.75rem auto;
+  align-items: baseline;
   gap: var(--ted-space-xs);
 }
 
@@ -2068,97 +2102,93 @@ body {
   color: var(--ted-color-text-secondary);
 }
 
-.grade-detail__bar-track {
-  height: 0.5rem;
-  background: var(--cds-layer-accent-01);
-  overflow: hidden;
-}
-
-.grade-detail__bar-fill {
-  height: 100%;
-  transition: width motion.$duration-slow-02 motion.motion(entrance, productive);
-}
-
 .grade-detail__value {
+  @include type.type-style('body-compact-01');
+  color: var(--cds-text-primary);   // neutral (S42, B72)
+  margin: 0;
+}
+
+// A grade in the table: the figure in mono, tabular, at the row's own weight — no colour band (S42).
+// S3: Carbon's `.cds--data-table td` sets text-secondary; a grade is primary text, the course name stays as Carbon has it.
+.grade-table .cds--data-table td.grade-cell {
+  color: var(--cds-text-primary);
+}
+
+// ─── Team Activities: one-line work rows (§2.2, B65) ────────────────────
+.team-list + .team-list { margin-block-start: var(--ted-space-md); }
+
+.is-satiri {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--ted-space-sm);
+  width: 100%;
+}
+
+.is-satiri__ana {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.is-satiri__ad {
   @include type.type-style('heading-compact-01');
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+  color: var(--cds-text-primary);
+  overflow-wrap: anywhere;
 }
 
-// ─── Team Activities StructuredList ─────────────────────────────────────
-.team-section-label {
-  @include type.type-style('heading-compact-01');
-  margin: var(--ted-space-sm) 0 var(--ted-space-xs);
-  color: var(--ted-color-text-secondary);
-
-  &:first-of-type { margin-top: 0; }
-}
-
-.team-cell-name {
-  @include type.type-style('body-01');
-  font-weight: 600;
-}
-
-.team-cell-date {
+.is-satiri__ek {
   @include type.type-style('label-01');
-  font-variant-numeric: tabular-nums;
-  color: var(--ted-color-text-secondary);
+  color: var(--cds-text-secondary);
+}
+
+.is-satiri__yan {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: none;
+  gap: spacing.$spacing-01;
+}
+
+.is-satiri__zaman {
+  @include type.type-style('body-compact-01');
+  color: var(--cds-text-primary);
+}
+
+.is-satiri__durum {
+  display: inline-flex;
+  align-items: center;
+  gap: spacing.$spacing-02;
+  @include type.type-style('label-01');
+  color: var(--cds-text-secondary);
 }
 
 // ─── Platform Progress ──────────────────────────────────────────────────
-.platform-complete-notification {
-  margin-bottom: var(--ted-space-sm);
-}
-
-.platform-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ted-space-sm);
-}
-
-.platform-item__header {
+// One Carbon on-page list, a line per platform said in words (B51, B66).
+.platform-list__row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--ted-space-2xs);
+  align-items: baseline;
+  gap: var(--ted-space-sm);
+  width: 100%;
 }
 
-.platform-item__name {
-  @include type.type-style('body-01');
-  font-weight: 600;
+.platform-list__name {
+  @include type.type-style('heading-compact-01');
+}
+
+.platform-list__state {
+  @include type.type-style('body-compact-01');
+  color: var(--ted-color-text-secondary);
+  text-align: end;
 }
 
 .platform-a3k-score {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: var(--ted-space-xs);
-  margin-top: var(--ted-space-sm);
+  @include type.type-style('body-compact-01');
+  color: var(--ted-color-text-secondary);
+  margin: var(--ted-space-sm) 0 0;
   padding-top: var(--ted-space-sm);
   border-top: 1px solid var(--ted-color-border-subtle);
-}
-
-.platform-a3k-score__label {
-  @include type.type-style('label-01');
-  color: var(--ted-color-text-secondary);
-}
-
-.platform-a3k-score__gauge {
-  height: 0.5rem;
-  background: var(--cds-layer-accent-01);
-  overflow: hidden;
-}
-
-.platform-a3k-score__gauge-fill {
-  height: 100%;
-  background: var(--cds-interactive);
-  transition: width motion.$duration-slow-02 motion.motion(entrance, productive);
-}
-
-.platform-a3k-score__value {
-  @include type.type-style('heading-compact-01');
-  color: var(--cds-text-primary);
-  font-variant-numeric: tabular-nums;
 }
 
 // ─── Platform Accordion Detail Rows ─────────────────────────────────────
@@ -2168,31 +2198,13 @@ body {
   }
 }
 
-.platform-accordion__header {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ted-space-sm);
-}
-
-.platform-accordion__name {
-  @include type.type-style('heading-compact-01');
-}
-
-.platform-accordion__count {
-  @include type.type-style('label-01');
-  color: var(--ted-color-text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.platform-accordion__progress {
-  margin-bottom: var(--ted-space-sm);
-}
-
 .platform-detail-list {
   display: flex;
   flex-direction: column;
   gap: spacing.$spacing-01;
-  margin-top: var(--ted-space-xs);
+  margin: var(--ted-space-xs) 0 0;
+  padding: 0;
+  list-style: none;
 }
 
 .platform-detail-row {
@@ -2291,17 +2303,8 @@ body {
 }
 .schedule-table .cds--data-table td:first-child { background-color: var(--cds-layer-01); }
 .schedule-table .cds--data-table th:first-child { background-color: var(--cds-layer-accent-01); }
-.schedule-table .cds--data-table td {
-  vertical-align: middle;
-  @include type.type-style('label-01');
-  padding: spacing.$spacing-02 spacing.$spacing-03;
-  height: 3.25rem;
-}
-.schedule-table .cds--data-table th {
-  text-align: center;
-  @include type.type-style('label-01');
-  height: 2.5rem;
-}
+// B50: no row-height or type patch — Carbon's xl table (64px rows, body-compact-01) as it comes.
+.schedule-table .cds--data-table td { vertical-align: middle; }
 .schedule-table .cds--data-table th:first-child,
 .schedule-table .cds--data-table td:first-child { width: 3.75rem; text-align: right; }
 
@@ -2431,11 +2434,6 @@ body {
     gap: 0 spacing.$spacing-03;
   }
 
-  .health-popover {
-    min-width: 15.625rem;
-    right: calc(-1 * #{spacing.$spacing-04});
-    padding: var(--ted-space-xs) var(--ted-space-sm);
-  }
 
   .dashboard-header__meta {
     display: none;
@@ -2531,10 +2529,6 @@ body {
 
   // Odak stays reachable on a phone: identity text yields the room.
 
-  .grade-detail__row {
-    grid-template-columns: 6.25rem 1fr 2rem;
-  }
-
   .calendar-event-flat {
     margin-left: 0;
   }
@@ -2570,11 +2564,6 @@ body {
   .calendar-popover {
     min-width: 13.75rem;
     max-width: 17.5rem;
-  }
-
-  .platform-a3k-score {
-    grid-template-columns: 1fr auto;
-    .platform-a3k-score__label { grid-column: 1 / -1; }
   }
 
   .bottom-nav {
@@ -2634,6 +2623,12 @@ body {
   .cds--side-nav,
   .app-shell-nav-scrim {
     display: none !important;
+  }
+
+  // B11: a focused element stops above the bottom bar too (2.4.11).
+  html {
+    // stylelint-disable-next-line carbon/layout-use -- the bar's height plus the device's own inset
+    scroll-padding-block-end: calc(#{spacing.$spacing-09} + env(safe-area-inset-bottom));
   }
 
   // Content and footer end above the bar (bar height + the device's inset).
@@ -2750,7 +2745,10 @@ body {
 .private-lesson-form {
   display: flex;
   flex-direction: column;
-  gap: var(--ted-space-sm);
+  align-items: flex-start;
+  gap: spacing.$spacing-05;
+
+  > .cds--form-item, > .cds--select, > .cds--text-input-wrapper, > .private-lesson-form__time-row { align-self: stretch; }
   max-width: 30rem;   // a form is read down, not across a 912px card
 }
 
@@ -2769,65 +2767,17 @@ body {
   color: var(--cds-text-secondary);
 }
 
-.private-lesson-form__label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ted-space-xs);
-  // Carbon's form label: label-01 in text-secondary above the field.
-  @include type.type-style('label-01');
-  color: var(--cds-text-secondary);
-}
-
-.private-lesson-form__input {
-  // Carbon's text-input anatomy on native controls: field fill, one bottom
-  // rule, square corners, 40px, Carbon's focus. They were three looks at once
-  // — a grey rounded select, a white bordered input, a bordered time field.
-  block-size: 2.5rem;
-  padding: 0 var(--ted-space-md);
-  border: 0;
-  border-block-end: 1px solid var(--cds-border-strong-01);
-  border-radius: 0;   // a Carbon control is square
-  background: var(--cds-field-02);
-  color: var(--cds-text-primary);
-  @include type.type-style('body-compact-01');
-
-  &::placeholder { color: var(--cds-text-placeholder); }
-
-  &:focus,
-  &:focus-visible {
-    outline: 2px solid var(--cds-focus);
-    outline-offset: -2px;
-  }
-}
-
-.private-lesson-form__checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ted-space-xs);
-  @include type.type-style('body-01');
-
-  input[type='checkbox'] {
-    accent-color: var(--cds-interactive);
-    width: 1.5rem;
-    height: 1.5rem;
-    min-width: 1.5rem;
-    min-height: 1.5rem;
-    flex-shrink: 0;
-  }
-}
-
-// B22: a field's own error, Carbon's form-requirement anatomy (helper-text-01 in text-error).
-.private-lesson-form__hata {
-  @include type.type-style('helper-text-01');
-  color: var(--cds-text-error);
-}
-
 .private-lesson-form__sonuc.cds--inline-notification { max-width: none; }
 
+// Two times side by side from md up, one column on a phone (B60, B37); the gap is the gutter token.
 .private-lesson-form__time-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--ted-space-sm);
+  gap: spacing.$spacing-05;
+}
+
+@media (max-width: 671px) {
+  .private-lesson-form__time-row { grid-template-columns: 1fr; }
 }
 
 .student-private-lesson-item__top {
@@ -2851,33 +2801,6 @@ body {
 // inside it, so Sınavlar alone began 96px to the right (2026-09-25).
 .exam-timeline {
   max-width: none;
-}
-
-.exam-stats {
-  display: flex;
-  gap: var(--ted-space-lg);
-  margin-bottom: var(--ted-space-lg);
-  padding: var(--ted-space-md) var(--ted-space-lg);
-  background: var(--ted-card-bg);
-  border-radius: var(--ted-radius-card);
-  border: 1px solid var(--ted-color-border-subtle);
-}
-
-.exam-stats__item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: spacing.$spacing-01;
-}
-
-.exam-stats__value {
-  @include type.type-style('heading-04');
-  color: var(--ted-color-text-primary);
-}
-
-.exam-stats__label {
-  @include type.type-style('label-01');
-  color: var(--ted-color-text-helper);
 }
 
 .exam-section__title {
@@ -2906,12 +2829,19 @@ body {
     background: var(--ted-color-border-subtle);
   }
 
-  span {
-    @include type.type-style('label-01');
-    font-weight: 600;
-    color: var(--ted-color-text-helper);
+  .exam-divider__title {
+    @include type.type-style('heading-compact-01');
+    color: var(--ted-color-text-secondary);
+    margin: 0;
     white-space: nowrap;
   }
+}
+
+// The past exams' average: one quiet line, not a tile (B25, İ3).
+.exam-section__note {
+  @include type.type-style('body-compact-01');
+  color: var(--ted-color-text-secondary);
+  margin: 0 0 var(--ted-space-sm);
 }
 
 .exam-card {
@@ -2994,6 +2924,7 @@ body {
 
 .exam-card__grade {
   @include type.type-style('heading-04');
+  color: var(--cds-text-primary);   // neutral (S42, B72)
 }
 
 .exam-card__countdown-bar {
@@ -3088,17 +3019,6 @@ body {
 @media (max-width: 671px) {
   .exam-timeline {
     padding: 0 var(--ted-space-xs);
-  }
-
-  .exam-stats {
-    flex-wrap: wrap;
-    gap: var(--ted-space-sm);
-    padding: var(--ted-space-sm);
-    justify-content: center;
-  }
-
-  .exam-stats__value {
-    @include type.type-style('heading-03');
   }
 
   .exam-card {

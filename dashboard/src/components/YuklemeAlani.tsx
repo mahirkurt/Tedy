@@ -23,7 +23,7 @@ export default function YuklemeAlani({ onDosyalar, disabled = false, belge = fal
       aria-hidden tabIndex={-1} disabled={disabled}
       onChange={e => { onDosyalar([...e.target.files || []]); e.target.value = '' }} />
     {belge
-      ? <Button kind="secondary" size="sm" disabled={disabled} onClick={() => dosya.current?.click()}>
+      ? <Button kind="tertiary" size="sm" disabled={disabled} onClick={() => dosya.current?.click()}>
         {disabled ? 'Ekleniyor…' : 'Belge ekle'}</Button>
       : <IconButton kind="ghost" size="lg" label="Dosya ekle" disabled={disabled}
         onClick={() => dosya.current?.click()}><Attachment /></IconButton>}

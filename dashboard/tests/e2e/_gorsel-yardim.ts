@@ -32,6 +32,13 @@ async function agSakinlesir(page: Page, acik: Set<unknown>, sakin = 500, sinir =
 
 export async function sabitAc(page: Page, yol: string, w: number, h: number) {
   await page.clock.setFixedTime(new Date(SABIT_SAAT))
+  // Duyurular remembers what was read (B67); a fixed opening always sees them unread, so a second opening in
+  // the same test (4K: 1920 then 3840) draws the same page.
+  await page.addInitScript(() => {
+    try {
+      for (const k of Object.keys(localStorage)) if (k.startsWith('tedy-duyurular-okundu::')) localStorage.removeItem(k)
+    } catch { /* storage blocked: nothing remembered anyway */ }
+  })
   await mock(page, GORSEL)
   await page.setViewportSize({ width: w, height: h })
   const acik = new Set<unknown>()

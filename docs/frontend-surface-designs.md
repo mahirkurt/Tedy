@@ -337,6 +337,9 @@ Geçmiş (14)                                   ›   ← kapalı
 **Bugünkü kusur:** Program ayrı sayfa, içerik ayrı sayfa; ders adına iki kez
 gidiliyor. *(Görsel kusurlar doğrulanacak.)*
 
+**Uygulandı (2026-10-11, talimatname B64, B50):** programdaki ders adı düğmedir, aynı sayfada o dersin
+içerik sekmesini açar ve sekmeye odaklanır; içeriği yoksa söyler. Tablo Carbon `xl` boyunda.
+
 **Tasarım:** haftalık ızgara üstte, seçilen günün dersleri altta; bir derse
 tıklanınca o dersin içeriği **aynı sayfada** açılır.
 
@@ -351,6 +354,10 @@ gösterir, kart değil.
 ---
 
 ### 4.4 Notlar
+
+**Uygulandı (2026-10-11, talimatname B72, B51):** not renk bandıyla boyanmaz — tabloda ve ayrıntıda
+`text-primary`, Mono + tabular; ayrıntıda çubuk yok, her sütun tam adıyla ve rakamıyla; eksik not "—" ve
+ekran okuyucuya "Not girilmedi"; tablonun adı "Notlar".
 
 **Ne için var:** "Nerede iyiyim, nerede değilim?"
 
@@ -399,6 +406,10 @@ taşıyordu. Bugün sütunu `blue-20` başlık ve `border-interactive` alt çizg
 Sütunlar `minmax(0, 1fr)`: uzun, kırılmayan bir başlık günü genişletip Cuma'yı
 ızgaranın dışına itiyordu.
 
+**Uygulandı (2026-10-11, talimatname B49):** olay kutusu Carbon `Popover`, olaya bağlı: dışarı tıklama,
+Tab ve Esc kapatır, odak açılınca "Kapat"a girer ve Esc'te olaya döner. Lejant çipi seçimi onay işareti
+ve `aria-pressed` ile söyler (B34).
+
 **Değerlendirildi, uygulanmadı:** popover'ı satır içi panele çevirmek. Gerekçe
 "kaybolan yüzey"di (İ5), ama popover yalnız dışarı tıklandığında kapanıyor —
 standart davranış, ve okurun yeniden bulmak zorunda kalacağı bir durum
@@ -407,6 +418,9 @@ standart davranış, ve okurun yeniden bulmak zorunda kalacağı bir durum
 ---
 
 ### 4.6 Takımlar
+
+**Uygulandı (2026-10-11, talimatname B65):** iki Carbon `ContainedList` ("Academy+ (n)", "ÖGEP
+oturumları (n)"); satırda ad birincil, Teams bağlantısı ikincil, saat sağda mono, durum ikon + kelime.
 
 **Ne için var:** "Hangi kulüp/takım etkinliğim var?"
 
@@ -417,6 +431,11 @@ standart davranış, ve okurun yeniden bulmak zorunda kalacağı bir durum
 ---
 
 ### 4.7 İlerleme
+
+**Uygulandı (2026-10-11, talimatname B51, B66):** "Platformlar" tek Carbon `ContainedList`, her platform
+sözle ("3/5 ders", "Tamamlandı · 1/1 ödev", "Atanmış iş yok"); `ProgressBar` ve başarı bandı yok;
+ayrıntılar tek akordeonda kapalı; üç uç yüklenirken tek iskelet. "Son etkinlik" sütunu yok: uçlar
+platform başına bir etkinlik zamanı vermiyor (uydurulmaz, D4).
 
 **Ne için var:** "Dış platformlarda (EnglishCentral, Achieve3000, SEBİT)
 neredeyim?"
@@ -444,6 +463,10 @@ sınıfını bırakırlar. (Bu yüzden §2.3 çıkarımında dokunulmadılar —
 
 ### 4.8 Duyurular
 
+**Uygulandı (2026-10-11, talimatname B67):** en yeni üstte tek liste; okunmamış duyuru "Yeni" (ikon +
+kelime) taşır ve açık başlar; görülen duyurular kişi başına bu cihazda hatırlanır (talimatname K4-11).
+Uzun duyurunun "ilk iki satır" kısaltması kurulmadı: akordeon kapalıyken başlık, açıkken tam metin.
+
 **Ne için var:** "Okuldan ne haber var?"
 
 **Tasarım:** ters kronolojik liste; **okunmamış** olan öne çıkar, okunmuş nötr.
@@ -454,6 +477,9 @@ sınıfını bırakırlar. (Bu yüzden §2.3 çıkarımında dokunulmadılar —
 ---
 
 ### 4.9 Profil
+
+**Uygulandı (2026-10-11, talimatname B60):** özel ders formu Carbon `Select`, `TextInput`, `Checkbox`,
+`DatePicker` ve `TimePicker` ile, kartın bir katman üstünde (`<Layer>`); telefonda tek sütun.
 
 **Ne için var:** "Benim bilgilerim doğru mu?" (Işık) / "Kayıt doğru mu?" (veli)
 
@@ -613,7 +639,9 @@ programı ve içeriği alt alta koyar), §4.6 tek satırlık öğeler (Takımlar
 okunmamış durumu (Duyurular haftaya göre katlanmış `AccordionItem`). Bunlar talimatname §13'te borç
 olarak izlenir: 400 ms B48, `Geri al` B63, Dersler B64, Takımlar B65, İlerleme B66, Duyurular B67. Satır 3, 4 ve 6 bu yüzden "kısmen" okunmalıdır.
 (2026-10-11: B48 ve B63 kapandı — `useApi`'nin `iskelet` bayrağı 400 ms kuralını, `POST
-/api/homework/unmark-done` ve "Yaptın: … · Geri al" satırı `Geri al`'ı kurar.)
+/api/homework/unmark-done` ve "Yaptın: … · Geri al" satırı `Geri al`'ı kurar. Aynı gün B64, B65,
+B66 ve B67 de kapandı — Dersler'de program hücresi içeriği açar, Takımlar iş satırı, İlerleme tek liste
+ve tek iskelet, Duyurular okunmamış durumu taşır; satır 3, 4 ve 6 artık tamdır.)
 
 **Sıra değişikliği:** 4 ve 5 yer değiştirdi. Nav indirgemesi Dersler
 birleştirmesinden önce yapılırsa Program evsiz kalıyor; birleştirme önce gelmeli.
@@ -763,3 +791,4 @@ görüntüsüyle doğrulanır.
 | 1.11 | 2026-10-10 | Talimatname (`tedy-ui-ux-talimatnamesi.md`) altına bağlandı: Giriş notu ve öncelik sırası, §2'ye talimatname §5 ve bileşen rehberi bağlantısı; tarihli düzeltmeler: §1 yedi ikincil ve telefonda Tedy Books Daha fazla'da, §3.2 `BottomNav` (D3a), §4.1 sınav satırında ders işareti ve bekleyen D3b/İ8 C yönü işareti, §4.10 Carbon AI Chat notu (2026-10-09), §4.11 IBM Plex Serif, §6 kurulmayan alt tasarımların durum notu. Başlık sürümü düzeltildi. |
 | 1.12 | 2026-10-10 | Talimatname 1.1'in Ç1–Ç10 kararlarıyla (S35–S44) hizalandı: §2.4 "Dönen ikon yok" içerik yüklemesine daraltıldı, tek eylem tek `InlineLoading` (S36); §2.5 bölüm başlığı "Başlık (n)", büyük harf yok (S38); §2.6 "Yıkıcı eylem yok" yerine etkiye göre silme — düşük etki "Geri al", geri alınamaz silme nesneyi adlandıran danger modal (S40); §2.7 "Bozuk (sistem): Gri" yerine Carbon durum anlamı (S39; başlık etiketi gerilimi Ç11); §4.4 not rengi notu (S42). Tarihli notlarla; bölüm numaraları değişmedi. |
 | 1.13 | 2026-10-11 | Talimatname B48 ve B63 kapandı: §2.4'ün 400 ms kuralı `useApi`'de; §4.2'nin `Geri al`'ı kuruldu, 10 saniyelik süresi bilerek kaldırıldı (WCAG 2.2.1). §6 durum notuna tarihli ek. |
+| 1.14 | 2026-10-11 | Talimatname açık kalemler 4. tur: §4.3 (B64, B50), §4.4 (B72, B51), §4.5 (B49, B34), §4.6 (B65), §4.7 (B51, B66), §4.8 (B67), §4.9 (B60) uygulandı notları; §6 durum notu tamamlandı. |

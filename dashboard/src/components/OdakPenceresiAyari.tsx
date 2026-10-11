@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, InlineLoading, InlineNotification, SkeletonText, TimePicker } from '@carbon/react'
+import { Button, InlineLoading, InlineNotification, Layer, SkeletonText, TimePicker } from '@carbon/react'
 import { Time } from '@carbon/icons-react'
 import { useOdakPenceresi } from '../hooks/useOdakPenceresi'
 import {
@@ -32,8 +32,9 @@ export default function OdakPenceresiAyari() {
         Odak penceresi
       </h2>
       {loading
-        ? (iskelet ? <SkeletonText paragraph lineCount={3} /> : null)
-        : <Form ilk={pencere} onKaydedildi={refresh} />}
+        ? (iskelet ? <div aria-busy="true"><SkeletonText paragraph lineCount={3} /></div> : null)
+        // One layer above the card, like every form set in a card (B31): Carbon's field-02 on layer-01.
+        : <Layer><Form ilk={pencere} onKaydedildi={refresh} /></Layer>}
     </div>
   )
 }

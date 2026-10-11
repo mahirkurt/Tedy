@@ -94,7 +94,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   }, [scriptLoaded, onLogin])
 
   return (
-    <div className="login-page">
+    // B40: the sign-in page is one landmark (main), like every other page.
+    <main className="login-page">
       {/* Left Hero Panel */}
       <div className="login-page__hero">
         <div className="login-page__hero-geo" aria-hidden="true" />
@@ -140,6 +141,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </p>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

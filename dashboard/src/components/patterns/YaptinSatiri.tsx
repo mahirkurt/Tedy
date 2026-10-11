@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Button, InlineLoading } from '@carbon/react'
 import { Checkmark } from '@carbon/icons-react'
 import './patterns.scss'
@@ -26,9 +27,13 @@ export function YaptinSatiri({
   size?: 'sm' | 'md' | 'lg'
   className?: string
 }) {
+  // B40 (D2): after "Yaptım" the row it was pressed on moves or goes; focus lands here — on what was recorded —
+  // instead of falling to the page, and the next Tab reaches "Geri al".
+  const metinRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => { metinRef.current?.focus() }, [ad])
   return (
     <div className={['yaptin-satiri', className].filter(Boolean).join(' ')}>
-      <p className="yaptin-satiri__metin" role="status">
+      <p className="yaptin-satiri__metin" role="status" tabIndex={-1} ref={metinRef}>
         <Checkmark size={16} />
         <span>Yaptın: {ad}</span>
       </p>

@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, ModalFooter, Button, InlineLoading, Link, Callout, Layer } from '@carbon/react'
-import { Timer, CheckmarkFilled, CheckmarkOutline, CloseFilled, ChevronDown, ChevronUp, Document, Chat } from '@carbon/icons-react'
+import { Chat, CheckmarkFilled, CheckmarkOutline, ChevronDown, ChevronUp, CloseFilled, Document, Hourglass, Timer } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import type { HomeworkDocument, HomeworkItem } from '../types'
 import { parseDeadline, formatTurkishDate, getHomeworkStatus } from '../utils/formatters'
 import { countdownTagType, getCountdown } from '../utils/countdown'
 import SubjectLabel from './SubjectLabel'
 import { NextThing } from './NextThing'
+import { Rakamli } from './patterns/Rakamli'
 import { describeDaysAhead } from './patterns/time'
 import './patterns/patterns.scss'
 import { useNavigate } from 'react-router-dom'
@@ -330,7 +331,7 @@ export default function HomeworkTracker() {
               still owed (İ7), and red is kept for urgency. */}
           <span className="hw-section__label">{title}</span>
           <span className="hw-section__count">{items.length}</span>
-          {isCollapsed(keyName) ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          {isCollapsed(keyName) ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
         </button>
         {!isCollapsed(keyName) && (
           <div className="stack-sm">
@@ -428,9 +429,8 @@ export default function HomeworkTracker() {
                     </span>
                   )}
                   {when && (
-                    <span className="exams-ahead__when tedy-time">
-                      {describeDaysAhead(when)}
-                    </span>
+                    // B36: only the figure is mono ("7 gün sonra"), the words stay Sans.
+                    <span className="exams-ahead__when"><Rakamli metin={describeDaysAhead(when)} /></span>
                   )}
                   {moduleByExam.has(e.id) && (
                     <Button kind="ghost" size="sm" className="exams-ahead__module"
@@ -585,10 +585,10 @@ function HomeworkCard({
               >
                 {/* B21 (S4): Işık'ın kendi işareti gri + ikon; mavi bir ders ailesi gibi okunuyordu. */}
                 {status.type === 'green'
-                  ? <CheckmarkFilled size={12} />
+                  ? <CheckmarkFilled size={16} />
                   : status.type === 'red'
-                    ? <CloseFilled size={12} />
-                    : hw.student_marked_done ? <CheckmarkOutline size={12} /> : null}
+                    ? <CloseFilled size={16} />
+                    : hw.student_marked_done ? <CheckmarkOutline size={16} /> : null}
                 {' '}{status.label}
               </Tag>
             )}
@@ -610,12 +610,12 @@ function HomeworkCard({
           {countdown.urgency !== 'expired' && (
             <div className={countdown.urgency === 'critical' || countdown.urgency === 'urgent' ? 'tag-urgent' : ''}>
               <Tag type={countdownTagType(countdown.urgency)} size="sm">
-                <Timer size={12} /> {countdown.text}
+                <Timer size={16} /> {countdown.text}
               </Tag>
             </div>
           )}
           {countdown.urgency === 'expired' && !hw.student_marked_done && (
-            <Tag type="warm-gray" size="sm">Süresi doldu</Tag>
+            <Tag type="warm-gray" size="sm"><Hourglass size={16} /> Süresi doldu</Tag>
           )}
 
           {showDoneAction && onDone && (
@@ -704,9 +704,9 @@ function HomeworkModalBody({
       {/* Status + Meta row */}
       <div className="homework-modal__meta">
         <Tag type={status.type} size="md">
-          {status.type === 'green' && <CheckmarkFilled size={14} />}
-          {status.type === 'red' && <CloseFilled size={14} />}
-          {hw.student_marked_done && <CheckmarkOutline size={14} />}
+          {status.type === 'green' && <CheckmarkFilled size={16} />}
+          {status.type === 'red' && <CloseFilled size={16} />}
+          {hw.student_marked_done && <CheckmarkOutline size={16} />}
           {' '}{status.label}
         </Tag>
         {hw["Ödev Kaynağı"] && (
@@ -725,10 +725,10 @@ function HomeworkModalBody({
             type={countdownTagType(countdown.urgency)}
             size="sm"
           >
-            <Timer size={12} /> {countdown.text}
+            <Timer size={16} /> {countdown.text}
           </Tag>
         ) : (
-          <Tag type="warm-gray" size="sm">Süresi doldu</Tag>
+          <Tag type="warm-gray" size="sm"><Hourglass size={16} /> Süresi doldu</Tag>
         )}
       </div>
 

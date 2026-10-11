@@ -112,15 +112,6 @@ export function getHomeworkStatus(status: string): {
   }
 }
 
-export function gradeColor(score: string): string {
-  const n = parseInt(score)
-  if (isNaN(n)) return ''
-  if (n >= 85) return 'var(--status-success)'
-  if (n >= 70) return 'var(--status-info)'
-  if (n >= 50) return 'var(--status-warning)'
-  return 'var(--status-error)'
-}
-
 /** Strips trailing " ," from each line then joins with ', '.
  *  Fixes portal data like "Gözde Enginler ,\nAyşe Sinem Değer" → "Gözde Enginler, Ayşe Sinem Değer"
  */

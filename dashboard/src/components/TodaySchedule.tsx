@@ -4,18 +4,7 @@ import {
   Button, ContainedList, ContainedListItem, IconButton, InlineNotification,
   SkeletonPlaceholder, SkeletonText, Tag,
 } from '@carbon/react'
-import {
-  Education,
-  Bookmark,
-  Task as TaskIcon,
-  EventSchedule,
-  Checkmark,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  UserAvatar,
-} from '@carbon/icons-react'
+import { Bookmark, Checkmark, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Education, EventSchedule, InProgress, Task as TaskIcon, UserAvatar } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import {
   parseDeadline, cleanTeacherNames, normalizeCourseDisplayName, htmlToText, kisaTeslim,
@@ -712,8 +701,8 @@ export default function TodaySchedule() {
                   )}
                   {(cfg.label || item.isActive) && (
                     <span className="today-tl__card-tags">
-                      {item.isActive && <Tag as="span" type="gray" size="sm">Devam ediyor</Tag>}
-                      {cfg.label && <Tag as="span" type={cfg.tagType} size="sm">{cfg.label}</Tag>}
+                      {item.isActive && <Tag as="span" type="gray" size="sm"><InProgress size={16} /> Devam ediyor</Tag>}
+                      {cfg.label && <Tag as="span" type={cfg.tagType} size="sm"><cfg.icon size={16} /> {cfg.label}</Tag>}
                     </span>
                   )}
                 </>
@@ -734,7 +723,7 @@ export default function TodaySchedule() {
                     <span className="today-tl__time tedy-time">{item.time.split('–')[0]}</span>
                     <span className="today-tl__spine" aria-hidden="true">
                       <span className="today-tl__dot">
-                        {item.isPast ? <Checkmark size={10} /> : <Icon size={10} />}
+                        {item.isPast ? <Checkmark size={16} /> : <Icon size={16} />}
                       </span>
                     </span>
                     {item.type === 'deadline' ? (

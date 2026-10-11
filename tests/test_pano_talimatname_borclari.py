@@ -85,7 +85,7 @@ def test_b70_kaynakta_tumu_buyuk_dizge_yok():
 
 # Proper names keep their capitals.
 OZEL_AD = {"Tedy Books", "TED Rönesans Koleji", "Rönesans Koleji", "Carbon AI", "Google Drive", "Microsoft Teams",
-           "Ayşe Yılmaz"}  # the private-lesson form's example teacher name
+           "Ayşe Yılmaz", "Öğrenci Gelişim Programı"}  # an example teacher name; ÖGEP spelled out
 _KELIME = r"[A-ZÇĞİÖŞÜ][a-zçğıöşüâîû]+"
 _BASLIK_DUZENI = re.compile(rf"{_KELIME}(?:\s+{_KELIME})+")
 _ETIKET_PROP = r"(?:title|label|labelText|titleText|aria-label|description|primaryButtonText|secondaryButtonText|" \
@@ -375,6 +375,59 @@ def test_b34_durum_opaklikla_cizilmez():
                 if m.group(1).strip() not in ("1", "0"):
                     ihlal.append(f"{ad}:{_satir(metin, konum)}  {basliklar[-1]} {{ opacity: {m.group(1)} }}")
     assert not ihlal, "opaklıkla durum (S24, B34):\n" + "\n".join(ihlal)
+
+
+def test_b38_ikon_carbon_boyunda_ve_metnin_renginde():
+    ihlal = []
+    for p in _kaynaklar():
+        temiz = _yorumsuz_kod(p.read_text(encoding="utf-8"))
+        for m in re.finditer(r"<[A-Z]\w*\s[^>]*?\bsize=\{(\d+)\}", temiz):
+            if int(m.group(1)) not in (16, 20, 24, 32):
+                ihlal.append(f"{p.relative_to(DASH)}:{_satir(temiz, m.start())}  size={{{m.group(1)}}}")
+    assert not ihlal, "Carbon boyu dışı ikon (16/20/24/32; B38):\n" + "\n".join(ihlal)
+    tema = _yorumsuz_stil(THEME.read_text(encoding="utf-8"))
+    for secici in (".dashboard-card__title svg", ".calendar-legend__icon", ".calendar-event__icon"):
+        blok = tema[tema.index(secici + " {"):]
+        blok = blok[: blok.index("}")]
+        assert "icon-secondary" not in blok, f"{secici}: ikon metnin rengini alır (B38)"
+    assert "border-left: 4px" not in tema, "şerit 3 px ([3.5-3], B38)"
+
+
+_DURUM_ISARETI = ("Süresi doldu", "Henüz girilmedi", "Devam ediyor", "Bekliyor", "Önceki öğretim yılı",
+                  "countdown.text", "status.label", "cfg.label")
+
+
+def test_b16_durum_etiketi_ikon_tasir():
+    """S4: a status Tag carries an icon with its word (Carbon draws renderIcon only from md up, so sm Tags take the
+    icon as a child)."""
+    ihlal, sayi = [], 0
+    for p in _kaynaklar():
+        temiz = _yorumsuz_kod(p.read_text(encoding="utf-8"))
+        for m in re.finditer(r"<Tag\b(.*?)</Tag>", temiz, flags=re.S):
+            blok = m.group(0)
+            if not any(isaret in blok for isaret in _DURUM_ISARETI):
+                continue
+            sayi += 1
+            if not re.search(r"<[A-Za-z][\w.]*\s+size=\{16\}|renderIcon=", blok):
+                ihlal.append(f"{p.relative_to(DASH)}:{_satir(temiz, m.start())}")
+    assert sayi >= 8, f"durum etiketi bulunamadı ({sayi})"
+    assert not ihlal, "ikonsuz durum etiketi (S4, B16):\n" + "\n".join(ihlal)
+
+
+def test_b58_olumlu_eylem_birincilsiz_secondary_degil_ve_dis_baglanti_soyler():
+    ihlal = []
+    for p in _kaynaklar():
+        temiz = _yorumsuz_kod(p.read_text(encoding="utf-8"))
+        for konum, etiket in _acilis_etiketleri(temiz, "Button"):
+            # The floating assistant launcher is the one named exception (S12 side-panel launcher, B17).
+            if 'kind="secondary"' in etiket and p.name != "AsistanBaslatici.tsx":
+                ihlal.append(f"{p.relative_to(DASH)}:{_satir(temiz, konum)}  kind=\"secondary\"")
+    for ad, dosya in (("Kaynağında aç", "components/patterns/EkBaglantisi.tsx"),
+                      ("Eki aç", "components/Announcements.tsx")):
+        metin = (DASH / dosya).read_text(encoding="utf-8")
+        i = metin.rindex(ad)   # the JSX, not a comment above it
+        assert "Launch" in metin[max(0, i - 300): i + 120], f"{dosya}: \"{ad}\" sayfadan çıktığını söylemiyor (B58)"
+    assert not ihlal, "birincilsiz secondary (B58, §4.2):\n" + "\n".join(ihlal)
 
 
 def test_b74_baslik_tokeni_agirligini_tasir():

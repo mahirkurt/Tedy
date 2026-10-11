@@ -1,15 +1,16 @@
 import { test, expect } from '@playwright/test'
 import { mock, LIVE, FULL } from './_audit-fixtures'
 
-// A grade is coloured by its band, and the colour has to survive the surface it
-// lands on. Measured 2026-09-21 on the deployed build: an expanded Carbon row
+// Since 2026-10-11 (S42, B72) a grade carries no band colour: every grade is text-primary in mono, and it
+// still has to be read on every surface it lands on. Before, a grade was coloured by its band and the colour
+// had to survive the surface it lands on. Measured 2026-09-21 on the deployed build: an expanded Carbon row
 // draws on layer-hover-01 (#e8e8e8), not layer-01, and there the whole -60
 // family fell to 4.08-4.09 — while --status-warning, still bound to an
 // indicator yellow, measured 1.37. The tokens' own comments said 5.02 and were
 // not wrong; they were measured against a ground these numbers never touch.
 // So this test measures in place rather than trusting a declaration.
 
-// One row, four bands: gradeColor() splits at 85 / 70 / 50.
+// One row across the old four bands (85 / 70 / 50), and two missing grades.
 const GRADES = {
   semester: '1. Dönem',
   grades: [{
@@ -43,7 +44,7 @@ const OLC = (secici: string) => `(() => {
       return { metin: (el.textContent || '').trim(),
                oran: Math.round(((a + 0.05) / (b + 0.05)) * 100) / 100 }
     })
-    .filter(o => o.metin && o.metin !== '-')
+    .filter(o => o.metin && o.metin !== '-' && !o.metin.includes('Not girilmedi'))
 })()`
 
 test.describe('not renkleri okunur kalır', () => {
@@ -76,14 +77,16 @@ test.describe('not renkleri okunur kalır', () => {
     }
   })
 
-  test('50-69 bandı hâlâ diğerlerinden ayrı bir renk', async ({ page }) => {
-    // Passing AA by turning every band the same dark colour would satisfy the
-    // two tests above and destroy the signal. Four bands, four colours.
+  // B72 (S42): the old test pinned "four bands, four colours". A grade is information, not a verdict: every
+  // grade the same neutral colour, and a missing one an em dash that says what it is.
+  test('her not aynı nötr renkte, eksik not tire değil "Not girilmedi"', async ({ page }) => {
     const renkler = await page.evaluate(() =>
-      [...document.querySelectorAll('td.grade-col-center')]
-        .filter(el => (el.textContent || '').trim() !== '-')
-        .map(el => getComputedStyle(el).color))
-    expect(new Set(renkler).size).toBe(4)
+      [...document.querySelectorAll('td.grade-col-center .tedy-time')].map(el => getComputedStyle(el).color))
+    expect(renkler).toHaveLength(4)
+    expect(new Set(renkler)).toEqual(new Set(['rgb(22, 22, 22)']))   // text-primary
+    const eksik = page.locator('td.grade-col-center', { hasText: 'Not girilmedi' })
+    await expect(eksik).toHaveCount(2)
+    await expect(eksik.first()).toContainText('—')
   })
 })
 

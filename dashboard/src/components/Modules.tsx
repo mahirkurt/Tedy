@@ -3,6 +3,7 @@ import { useDar } from '../asistan/useDar'
 import { Education } from '@carbon/icons-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
+import { apiHataCumlesi } from '../utils/apiHatasi'
 import type { ModuleCard } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
 import ModuleViewer from './ModuleViewer'
@@ -20,18 +21,19 @@ const MODE_LABEL: Record<string, string> = {
 }
 
 export default function Modules() {
-  const { data, loading, iskelet, error } = useApi<{ moduller: ModuleCard[] }>('/api/modules', { moduller: [] })
+  const { data, loading, iskelet, error, hataTuru } = useApi<{ moduller: ModuleCard[] }>('/api/modules', { moduller: [] })
+  const hata = apiHataCumlesi(hataTuru ?? 'sunucu', 'Modüller')
   const navigate = useNavigate()
   const dar = useDar()
   const modules = Array.isArray(data.moduller) ? data.moduller : []
   return (
     <div className="dashboard-card modules">
       <h2 className="dashboard-card__title"><Education size={20} />Modüller</h2>
-      {iskelet && <SkeletonText paragraph lineCount={3} />}
+      {iskelet && <div aria-busy="true"><SkeletonText paragraph lineCount={3} /></div>}
       {!loading && error && (
         // B43 (D3, D4): the raw fetch error ("HTTP 500", "Non-JSON response") never reaches the reader.
         <InlineNotification kind="error" role="alert" lowContrast hideCloseButton statusIconDescription="Hata"
-          title="Modüller yüklenemedi." subtitle="Sayfayı birkaç dakika sonra yeniden aç." />
+          title={hata.baslik} subtitle={hata.ayrinti} />
       )}
       {!loading && !error && modules.length === 0 && (
         <EmptyLine label="Modüller">Henüz yayınlanmış modül yok.</EmptyLine>
