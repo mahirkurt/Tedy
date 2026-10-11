@@ -1,9 +1,6 @@
 import { useState } from 'react'
-import { Tag,
-  StructuredListWrapper, StructuredListHead, StructuredListRow,
-  StructuredListCell, StructuredListBody,
-} from '@carbon/react'
-import { GroupPresentation } from '@carbon/icons-react'
+import { ContainedList, ContainedListItem } from '@carbon/react'
+import { CheckmarkOutline, GroupPresentation } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import type { TeamActivity, OgepSession } from '../types'
@@ -23,6 +20,23 @@ function formatShortDate(s?: string | null): string {
   const m = s.match(/(\d{2})\.(\d{2})\.\d{4}\s+(\d{2}):(\d{2})/)
   if (!m) return s
   return `${m[1]}.${m[2]} ${m[3]}:${m[4]}`
+}
+
+function IsSatiri({ ad, ek, zaman, durum }: { ad?: string; ek?: string; zaman: string; durum?: string }) {
+  const katildi = durum === 'Katıldı'
+  return <span className="is-satiri">
+    <span className="is-satiri__ana">
+      <span className="is-satiri__ad">{ad}</span>
+      {ek && <span className="is-satiri__ek">{ek}</span>}
+    </span>
+    <span className="is-satiri__yan">
+      {zaman && <span className="is-satiri__zaman tedy-time">{zaman}</span>}
+      <span className="is-satiri__durum">
+        {katildi && <CheckmarkOutline size={16} aria-hidden="true" />}
+        {durum || 'Bekliyor'}
+      </span>
+    </span>
+  </span>
 }
 
 export default function TeamActivities() {
@@ -65,79 +79,31 @@ export default function TeamActivities() {
     <div className="dashboard-card">
       <h2 className="dashboard-card__title">
         <GroupPresentation size={20} />
-        Takım çalışmaları & ÖGEP
+        Takım çalışmaları & <abbr title="Öğrenci Gelişim Programı">ÖGEP</abbr>
       </h2>
 
+      {/* B65 (§4.6, §2.2): one-line work rows, not a three-column table — the name leads, the time sits on
+          the right in mono, the status is a word with its icon (S4); a finished row stays neutral (İ7). */}
       {activities.length > 0 && (
-        <>
-          <h3 className="team-section-label">Academy+</h3>
-          <StructuredListWrapper isCondensed>
-            <StructuredListHead>
-              <StructuredListRow head>
-                <StructuredListCell head>Etkinlik</StructuredListCell>
-                <StructuredListCell head>Tarih</StructuredListCell>
-                <StructuredListCell head>Durum</StructuredListCell>
-                {!focusMode && <StructuredListCell head>Konum</StructuredListCell>}
-              </StructuredListRow>
-            </StructuredListHead>
-            <StructuredListBody>
-              {activities.map((a, i) => (
-                <StructuredListRow key={i}>
-                  <StructuredListCell className="team-cell-name">
-                    {a["Academy+"]}
-                  </StructuredListCell>
-                  <StructuredListCell className="team-cell-date">
-                    {formatShortDate(a["Çalışma Başlangıç"])}
-                  </StructuredListCell>
-                  <StructuredListCell>
-                    <Tag type={a["Katılım Durumu"] === "Katıldı" ? 'green' : 'gray'} size="sm">
-                      {a["Katılım Durumu"] || 'Bekliyor'}
-                    </Tag>
-                  </StructuredListCell>
-                  {!focusMode && (
-                    <StructuredListCell>
-                      <Tag type="gray" size="sm">
-                        {a["Teams Link"]}
-                      </Tag>
-                    </StructuredListCell>
-                  )}
-                </StructuredListRow>
-              ))}
-            </StructuredListBody>
-          </StructuredListWrapper>
-        </>
+        <ContainedList label={`Academy+ (${activities.length})`} kind="on-page" size="lg" className="team-list">
+          {activities.map((a, i) => (
+            <ContainedListItem key={i}>
+              <IsSatiri ad={a["Academy+"]} ek={focusMode ? '' : a["Teams Link"]}
+                zaman={formatShortDate(a["Çalışma Başlangıç"])} durum={a["Katılım Durumu"]} />
+            </ContainedListItem>
+          ))}
+        </ContainedList>
       )}
 
       {ogep.length > 0 && (
-        <>
-          <h3 className="team-section-label">ÖGEP Oturumları</h3>
-          <StructuredListWrapper isCondensed>
-            <StructuredListHead>
-              <StructuredListRow head>
-                <StructuredListCell head>Oturum</StructuredListCell>
-                <StructuredListCell head>Tarih</StructuredListCell>
-                <StructuredListCell head>Katılım</StructuredListCell>
-              </StructuredListRow>
-            </StructuredListHead>
-            <StructuredListBody>
-              {ogep.map((s, i) => (
-                <StructuredListRow key={i}>
-                  <StructuredListCell className="team-cell-name">
-                    {s["ÖGEP (Öğrenci Gelişim Programı)"]}
-                  </StructuredListCell>
-                  <StructuredListCell className="team-cell-date">
-                    {formatShortDate(s["Çalışma Başlangıç"])}
-                  </StructuredListCell>
-                  <StructuredListCell>
-                    <Tag type={s["Katılım Durumu"] === "Katıldı" ? 'green' : 'gray'} size="sm">
-                      {s["Katılım Durumu"] || 'Bekliyor'}
-                    </Tag>
-                  </StructuredListCell>
-                </StructuredListRow>
-              ))}
-            </StructuredListBody>
-          </StructuredListWrapper>
-        </>
+        <ContainedList label={`ÖGEP oturumları (${ogep.length})`} kind="on-page" size="lg" className="team-list">
+          {ogep.map((s, i) => (
+            <ContainedListItem key={i}>
+              <IsSatiri ad={s["ÖGEP (Öğrenci Gelişim Programı)"]} zaman={formatShortDate(s["Çalışma Başlangıç"])}
+                durum={s["Katılım Durumu"]} />
+            </ContainedListItem>
+          ))}
+        </ContainedList>
       )}
     </div>
   )

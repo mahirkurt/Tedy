@@ -4,18 +4,7 @@ import {
   Button, ContainedList, ContainedListItem, IconButton, InlineNotification,
   SkeletonPlaceholder, SkeletonText, Tag,
 } from '@carbon/react'
-import {
-  Education,
-  Bookmark,
-  Task as TaskIcon,
-  EventSchedule,
-  Checkmark,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  UserAvatar,
-} from '@carbon/icons-react'
+import { Bookmark, Checkmark, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Education, EventSchedule, InProgress, Task as TaskIcon, UserAvatar } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import {
   parseDeadline, cleanTeacherNames, normalizeCourseDisplayName, htmlToText, kisaTeslim,
@@ -23,7 +12,7 @@ import {
 import { getCountdown } from '../utils/countdown'
 import { dayColumns } from '../utils/schedule'
 import {
-  BEDTIME, FOCUS_END, SCHOOL_START, SCHOOL_END, DAYS_TR, MONTHS_TR,
+  SCHOOL_START, DAYS_TR, MONTHS_TR,
   bitenOzeti, compareCalendarDay, isSameDay, okulGunuMu, sonrakiOkulGunu, simdiUstu,
   toMinutes, windowVoice, yarinBasligi, yerMi, yerSec, type AgendaSlot,
 } from '../utils/bugun'
@@ -31,7 +20,9 @@ import { DayStrip } from './DayStrip'
 import { NextThing } from './NextThing'
 import { useBookProgress } from '../hooks/useBookReader'
 import { useZamanKutusu } from '../hooks/useZamanKutusu'
-import { yaptimIsaretle } from '../utils/odevYaptim'
+import { yaptimIsaretle, yaptimGeriAl } from '../utils/odevYaptim'
+import { useOdakPenceresi } from '../hooks/useOdakPenceresi'
+import { YaptinSatiri, type GeriAlDurumu } from './patterns/YaptinSatiri'
 import type { BookSummary } from '../types'
 import type { HomeworkItem, CalendarEvent, OgepSession, ExamsApiResponse } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
@@ -226,7 +217,7 @@ function buildAgenda(
 
 export default function TodaySchedule() {
   const navigate = useNavigate()
-  const { data: scheduleData, loading, error: programHatasi } = useApi<ScheduleData>(
+  const { data: scheduleData, loading, iskelet: programIskeleti, error: programHatasi } = useApi<ScheduleData>(
     '/api/schedule', { latest: {}, today: '' }
   )
   const { data: teamsData } = useApi<{ ogep: OgepSession[] }>(
@@ -244,7 +235,11 @@ export default function TodaySchedule() {
   const [dayOffset, setDayOffset] = useState(0)
   const [gecmisAcik, setGecmisAcik] = useState(false)
   const [kayitDurumu, setKayitDurumu] = useState<'bos' | 'kaydediliyor' | 'hata'>('bos')
-  const [sonYapilan, setSonYapilan] = useState('')
+  // The work "Yaptım" just recorded, kept so "Geri al" can send the same record (B63).
+  const [sonYapilan, setSonYapilan] = useState<{ ad: string; hw: HomeworkItem } | null>(null)
+  const [geriAlDurumu, setGeriAlDurumu] = useState<GeriAlDurumu>('bos')
+  // The household's focus window (B29): today's values until it loads.
+  const { pencere, loading: pencereYukleniyor, iskelet: pencereIskeleti } = useOdakPenceresi()
 
   // Reference time for every countdown on this page, refreshed each minute.
   const [nowMs, setNowMs] = useState(() => Date.now())
@@ -348,7 +343,7 @@ export default function TodaySchedule() {
       // The normalised name, as "Ayrıca" and İşler print it (İ9).
       const course = String(top.hw.normalized_course || top.hw['Ders Adı'] || '').trim()
       const title = String(top.hw['Ödev Başlığı'] || '').trim()
-      const voice = windowVoice(minutes, 'work', okulGunu)
+      const voice = windowVoice(minutes, 'work', okulGunu, pencere)
       return {
         anchorMin: voice.anchorMin,
         props: {
@@ -371,7 +366,7 @@ export default function TodaySchedule() {
     const target = firstBook
       ? (resumeId ? `/kitaplar/${firstBook.slug}/${resumeId}` : `/kitaplar/${firstBook.slug}`)
       : '/kitaplar'
-    const voice = windowVoice(minutes, 'reading', okulGunu)
+    const voice = windowVoice(minutes, 'reading', okulGunu, pencere)
     return {
       anchorMin: voice.anchorMin,
       props: {
@@ -386,7 +381,7 @@ export default function TodaySchedule() {
         due: undefined,
       },
     }
-  }, [top, nowMs, okulGunu, firstBook, bookProgress.lastChapterId, navigate, baslat])
+  }, [top, nowMs, okulGunu, pencere, firstBook, bookProgress.lastChapterId, navigate, baslat])
 
   // "Yaptım" from inside the box. On success the homework reloads everywhere
   // (tedy:homework-updated), the card steps to the next work, and a quiet line
@@ -398,10 +393,25 @@ export default function TodaySchedule() {
     setKayitDurumu('kaydediliyor')
     if (await yaptimIsaretle(top.hw)) {
       kutu.birak()
-      setSonYapilan(ad)
+      setSonYapilan({ ad, hw: top.hw })
+      setGeriAlDurumu('bos')
       setKayitDurumu('bos')
     } else {
       setKayitDurumu('hata')
+    }
+  }
+
+  // "Geri al" on the same line (S40, B63): the mark goes, the homework reloads
+  // everywhere and comes back as the card's work. A failure keeps the line
+  // and says so (D3).
+  const geriAl = async () => {
+    if (!sonYapilan) return
+    setGeriAlDurumu('aliniyor')
+    if (await yaptimGeriAl(sonYapilan.hw)) {
+      setSonYapilan(null)
+      setGeriAlDurumu('bos')
+    } else {
+      setGeriAlDurumu('hata')
     }
   }
 
@@ -443,7 +453,7 @@ export default function TodaySchedule() {
   // Once today's last bell has gone — or, on a day without school, from the
   // usual end of the day — the evening turns to tomorrow's bag.
   const yarinGoster = selectedIsToday && !okulModu && sonrakiGun != null
-    && nowMin >= (yer.dersSayisi > 0 ? yer.sonZil : SCHOOL_END)
+    && nowMin >= (yer.dersSayisi > 0 ? yer.sonZil : pencere.okulBitisi)
 
   // Upcoming exams, soonest first. One that falls on the next school day leads
   // the evening's "Yarın" and leaves the list, so it is said once; it never
@@ -473,9 +483,12 @@ export default function TodaySchedule() {
     navigate(yol)
   }
 
-  if (loading) {
-    // The page's own shape, in Carbon skeletons (§5.2, B5): day line, strip,
-    // card and a few rows. One set, nothing else moves.
+  if (loading || pencereYukleniyor) {
+    // A load shorter than 400 ms shows nothing (S36, B48): a skeleton that
+    // blinks for a frame is noise. Past it, the page's own shape in Carbon
+    // skeletons (§5.2, B5): day line, strip, card and a few rows. One set,
+    // nothing else moves.
+    if (!programIskeleti && !pencereIskeleti) return null
     return (
       <div className="today today--yukleniyor" aria-busy="true">
         <span className="cds--visually-hidden" role="status">Bugün yükleniyor</span>
@@ -540,8 +553,8 @@ export default function TodaySchedule() {
 
       <DayStrip
         nowMin={nowMin}
-        bedtimeMin={BEDTIME}
-        focusEndMin={FOCUS_END}
+        bedtimeMin={pencere.yatma}
+        focusEndMin={pencere.odakSonu}
         anchorMin={nextThing.anchorMin}
       />
 
@@ -568,10 +581,7 @@ export default function TodaySchedule() {
       />
 
       {sonYapilan && (
-        <p className="today-done-note" role="status">
-          <Checkmark size={16} />
-          <span>Yaptın: {sonYapilan}</span>
-        </p>
+        <YaptinSatiri className="today-done-note" ad={sonYapilan.ad} durum={geriAlDurumu} onGeriAl={geriAl} />
       )}
 
       {/* The rest of what is owed, said quietly: names and days, no coloured
@@ -691,8 +701,8 @@ export default function TodaySchedule() {
                   )}
                   {(cfg.label || item.isActive) && (
                     <span className="today-tl__card-tags">
-                      {item.isActive && <Tag as="span" type="gray" size="sm">Devam ediyor</Tag>}
-                      {cfg.label && <Tag as="span" type={cfg.tagType} size="sm">{cfg.label}</Tag>}
+                      {item.isActive && <Tag as="span" type="gray" size="sm"><InProgress size={16} /> Devam ediyor</Tag>}
+                      {cfg.label && <Tag as="span" type={cfg.tagType} size="sm"><cfg.icon size={16} /> {cfg.label}</Tag>}
                     </span>
                   )}
                 </>
@@ -713,7 +723,7 @@ export default function TodaySchedule() {
                     <span className="today-tl__time tedy-time">{item.time.split('–')[0]}</span>
                     <span className="today-tl__spine" aria-hidden="true">
                       <span className="today-tl__dot">
-                        {item.isPast ? <Checkmark size={10} /> : <Icon size={10} />}
+                        {item.isPast ? <Checkmark size={16} /> : <Icon size={16} />}
                       </span>
                     </span>
                     {item.type === 'deadline' ? (

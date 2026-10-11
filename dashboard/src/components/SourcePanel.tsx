@@ -162,7 +162,9 @@ export default function SourcePanel({ citations, activeId }: Props) {
   const activeRef = useRef<HTMLLIElement>(null)
 
   useEffect(() => {
-    if (activeId) activeRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    // B39: smooth only when the reader has not asked for less motion.
+    const azHareket = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (activeId) activeRef.current?.scrollIntoView({ block: 'nearest', behavior: azHareket ? 'auto' : 'smooth' })
   }, [activeId])
 
   const unclassified = citations.filter(c => !KNOWN_KINDS.has(c.kind))

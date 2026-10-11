@@ -28,10 +28,12 @@
 }
 
 // No course (Tedy Books, an event): a neutral layer with a strong edge, so the
-// card keeps its shape without borrowing a subject's colour.
+// card keeps its shape without borrowing a subject's colour. Contextual tokens
+// (B31): inside İşler's card the block sits in a Carbon <Layer>, one step up —
+// it was layer-01 on layer-01, white on white.
 .next-thing--neutral {
-  background: theme.$layer-01;
-  border-color: theme.$border-subtle-01;
+  background: var(--cds-layer);
+  border-color: var(--cds-border-subtle);
   border-inline-start-color: theme.$border-strong-01;
 }
 
@@ -134,7 +136,9 @@
 // Before the last bell the homework is a preview under the lesson — named and
 // dated on one quiet line, not a second panel competing with it (İ1, İ6).
 .next-thing--quiet {
-  padding: 0;
+  // Its text on the same left line as the Carbon lists under it ("Ayrıca", "Sınavlar"), whose labels and rows
+  // sit 16px in (B37, P3): one keyline, not three.
+  padding: 0 $spacing-05;
   background: transparent;
   border: none;
   border-radius: 0;
@@ -147,7 +151,7 @@
 @include bp.breakpoint-down('md') {
   // Carbon steps the panel padding down one stop on a phone ([3.4-3]).
   .next-thing { padding: $spacing-05; }
-  .next-thing--quiet { padding: 0; }
+  .next-thing--quiet { padding: 0 $spacing-05; }
   .next-thing__action { flex: 1 1 100%; }
   .next-thing__action .cds--btn--primary { width: 100%; }
 }

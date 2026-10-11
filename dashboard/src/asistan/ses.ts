@@ -1,4 +1,4 @@
-// Sayfanın okura hitabı (eski AssistantChat'teki VOICE, metinler birebir): öğrenciye "sen", aileye "siz".
+// Sayfanın okura hitabı (VOICE): öğrenciye "sen", aileye "siz".
 export const VOICE = {
   ogrenci: {
     welcome: 'Merhaba! TEDY Asistan olarak sana yardımcı olabilirim. Ödevlerin, sınavların ve derslerin hakkında sorular sorabilir veya kişisel çalışma planı isteyebilirsin.',

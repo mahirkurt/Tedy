@@ -93,7 +93,7 @@ export default function BookReader() {
   const { settings, update } = useReaderSettings()
   const { save, flush } = useProgressWriter(slug, chapterId)
 
-  const { data, loading, error } = useApi<BookChapterResponse | null>(
+  const { data, loading, iskelet, error } = useApi<BookChapterResponse | null>(
     `/api/books/${slug}/chapters/${chapterId}`, null
   )
   const { data: detail } = useApi<BookDetail | null>(`/api/books/${slug}`, null)
@@ -336,7 +336,7 @@ export default function BookReader() {
           <div className="reader__bar-title">
             <span className="reader__bar-book">{data?.book.title ?? 'Tedy Books'}</span>
             {chapter && (
-              <span className="reader__bar-chapter">
+              <span className="reader__bar-chapter" title={[chapter.label, chapter.title].filter(Boolean).join(' · ')}>
                 {[chapter.label, chapter.title].filter(Boolean).join(' · ')}
               </span>
             )}
@@ -384,17 +384,20 @@ export default function BookReader() {
         />
       )}
 
+      {/* B12: the reading surface is the reader's curtain — a tap shows or hides the chrome; the keyboard
+          reaches every chrome control through Tab, so the surface needs no key handler of its own. */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div
         className="reader__scroll"
         ref={scrollRef}
         onScroll={handleScroll}
         onClick={handleSurfaceClick}
       >
-        {loading && !chapter ? (
+        {loading && !chapter ? (iskelet ? (
           <div className="reader__skeleton">
             {Array.from({ length: 8 }).map((_, i) => <span key={i} />)}
           </div>
-        ) : chapter ? (
+        ) : null) : chapter ? (
           <article className="reader__page" ref={pageRef}>
             <header className="reader__opening">
               {chapter.partHeading && (

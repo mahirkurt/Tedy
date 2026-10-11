@@ -7,7 +7,7 @@ import type { HomeworkItem } from '../types'
 import { asistanDeposu, useAsistanDurumu } from './asistanDeposu.ts'
 import { soruyuYeniden, tekrariDurdur } from './istek.ts'
 import { dosyalariEkle } from './ekler.ts'
-import { acikOdevler, odevAdi } from './odevler.ts'
+import { acikOdevler, odevAdi, odevTamAdi } from './odevler.ts'
 
 /** Giriş satırının eylemleri (genişletilmiş girişin eylem satırı, PROMPT_LINE_ACTIONS_END): dosya, fotoğraf (dokunmatik),
  *  ödeve bağla, sesle sor, çalışma planı. Hepsi ghost 48 px (telefonda ≥ 44 px); salt okunur sohbette hiçbiri yok
@@ -24,7 +24,7 @@ export function GirisEylemleri({ inst, mikrofon }: { inst: () => ChatInstance | 
     <YuklemeAlani onDosyalar={dosyalariEkle} disabled={yukleniyor} />
     {odevler.length > 0 && <OverflowMenu size="lg" renderIcon={Task} iconDescription="Ödeve bağla" aria-label="Ödeve bağla"
       menuOptionsClass="asistan__odev-menusu" direction="top" flipped>
-      {odevler.map(hw => <OverflowMenuItem key={hw.homework_key} itemText={odevAdi(hw)} requireTitle
+      {odevler.map(hw => <OverflowMenuItem key={hw.homework_key} itemText={odevAdi(hw)} title={odevTamAdi(hw)}
         onClick={() => asistanDeposu.ayarla({ odevKey: hw.homework_key || '' })}
         disabled={yukleniyor} aria-current={hw.homework_key === odevKey ? 'true' : undefined} />)}
     </OverflowMenu>}

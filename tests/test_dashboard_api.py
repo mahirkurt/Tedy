@@ -1195,3 +1195,226 @@ def test_assistant_stream_emits_tool_events_then_the_answer(client, monkeypatch)
 def test_assistant_stream_requires_auth(client_no_auth):
     res = client_no_auth.post("/api/assistant/stream", json={"messages": []})
     assert res.status_code in (401, 403)
+
+
+# ── B63: "Yaptım" can be taken back (talimatname §13, S40) ───────────────────
+
+class TestHomeworkUnmarkDoneEndpoint:
+    def _isaretle(self, client, scraped, key):
+        with patch("src.dashboard_api._scraped", return_value=scraped):
+            assert client.post("/api/homework/mark-done", json={"homework_key": key}).status_code == 200
+
+    def test_requires_identifier(self, client, isolated_output):
+        resp = client.post("/api/homework/unmark-done", json={})
+        assert resp.status_code == 400
+        assert "gerekli" in resp.get_json()["error"]
+
+    def test_unmarks_by_key_and_listing_shows_it_active_again(self, client, isolated_output):
+        scraped = _sample_scraped_homework()
+        key = dashboard_api._homework_row_key(scraped["odevlerim"]["homework"]["rows"][0])
+        self._isaretle(client, scraped, key)
+
+        with patch("src.dashboard_api._scraped", return_value=scraped):
+            resp = client.post("/api/homework/unmark-done", json={"homework_key": key})
+            assert resp.status_code == 200
+            payload = resp.get_json()
+            assert payload == {"ok": True, "homework_key": key, "removed": True}
+            listing = client.get("/api/homework").get_json()
+        assert listing["homework"][0]["student_marked_done"] is False
+        stored = json.loads((isolated_output / "homework_student_done.json").read_text("utf-8"))
+        assert key not in stored["marks"]
+
+    def test_is_idempotent(self, client, isolated_output):
+        scraped = _sample_scraped_homework()
+        key = dashboard_api._homework_row_key(scraped["odevlerim"]["homework"]["rows"][0])
+        self._isaretle(client, scraped, key)
+        with patch("src.dashboard_api._scraped", return_value=scraped):
+            first = client.post("/api/homework/unmark-done", json={"homework_key": key})
+            second = client.post("/api/homework/unmark-done", json={"homework_key": key})
+        assert first.status_code == second.status_code == 200
+        assert first.get_json()["removed"] is True
+        assert second.get_json() == {"ok": True, "homework_key": key, "removed": False}
+
+    def test_unmarks_by_title_and_due_like_mark_done(self, client, isolated_output):
+        scraped = _sample_scraped_homework()
+        row = scraped["odevlerim"]["homework"]["rows"][0]
+        key = dashboard_api._homework_row_key(row)
+        self._isaretle(client, scraped, key)
+        with patch("src.dashboard_api._scraped", return_value=scraped):
+            resp = client.post("/api/homework/unmark-done", json={
+                "Ödev Başlığı": row["Ödev Başlığı"],
+                "Ödev Son Teslim Tarihi": row["Ödev Son Teslim Tarihi"],
+                "Ders Adı": row["Ders Adı"],
+            })
+        assert resp.status_code == 200
+        assert resp.get_json()["homework_key"] == key
+        assert resp.get_json()["removed"] is True
+
+    def test_unknown_title_is_404(self, client, isolated_output):
+        with patch("src.dashboard_api._scraped", return_value=_sample_scraped_homework()):
+            resp = client.post("/api/homework/unmark-done", json={
+                "Ödev Başlığı": "Bilinmeyen", "Ödev Son Teslim Tarihi": "20.03.2026 12:00"})
+        assert resp.status_code == 404
+
+    def test_other_marks_are_kept(self, client, isolated_output):
+        dashboard_api._save_student_done_marks({"baska|is|x": "2026-10-01T10:00:00"})
+        scraped = _sample_scraped_homework()
+        key = dashboard_api._homework_row_key(scraped["odevlerim"]["homework"]["rows"][0])
+        self._isaretle(client, scraped, key)
+        with patch("src.dashboard_api._scraped", return_value=scraped):
+            client.post("/api/homework/unmark-done", json={"homework_key": key})
+        assert dashboard_api._load_student_done_marks() == {"baska|is|x": "2026-10-01T10:00:00"}
+
+    def test_unmark_by_key_works_after_the_row_left_the_list(self, client, isolated_output):
+        dashboard_api._save_student_done_marks({"gecmis|is|x": "2026-10-01T10:00:00"})
+        with patch("src.dashboard_api._scraped", return_value={}):
+            resp = client.post("/api/homework/unmark-done", json={"homework_key": "gecmis|is|x"})
+        assert resp.status_code == 200 and resp.get_json()["removed"] is True
+        assert dashboard_api._load_student_done_marks() == {}
+
+    def test_teacher_verdict_pruning_keeps_a_mark_written_meanwhile(
+        self, client, isolated_output, monkeypatch
+    ):
+        # /api/homework drops a mark the teacher's verdict made obsolete. It
+        # used to write back its own copy of the marks, losing a "Yaptım"
+        # another worker stored between its read and its write.
+        scraped = _sample_scraped_homework(status="Yaptı")
+        cozulen = dashboard_api._homework_row_key(scraped["odevlerim"]["homework"]["rows"][0])
+        dashboard_api._save_student_done_marks({cozulen: "2026-10-01T10:00:00"})
+        gercek_kilit = dashboard_api._isaret_kilidi
+
+        def araya_giren_kilit():
+            dashboard_api._save_student_done_marks({
+                **dashboard_api._load_student_done_marks(), "yeni|is|y": "2026-10-11T09:00:00"})
+            return gercek_kilit()
+
+        monkeypatch.setattr(dashboard_api, "_isaret_kilidi", araya_giren_kilit)
+        with patch("src.dashboard_api._scraped", return_value=scraped):
+            client.get("/api/homework")
+        assert dashboard_api._load_student_done_marks() == {"yeni|is|y": "2026-10-11T09:00:00"}
+
+    def test_requires_auth_and_refuses_a_reader(self, isolated_output, monkeypatch):
+        monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS", False)
+        okur = next(e for e, r in dashboard_api.USER_ROLES.items() if r == dashboard_api.ROLE_READER)
+        with app.test_client() as c:
+            assert c.post("/api/homework/unmark-done", json={"homework_key": "k"}).status_code == 401
+            with c.session_transaction() as s:
+                s["user_email"] = okur
+            assert c.post("/api/homework/unmark-done", json={"homework_key": "k"}).status_code == 403
+        assert "homework_unmark_done" not in dashboard_api.READER_ENDPOINTS
+
+
+# ── B29: the focus window is a parameter in output/ (anayasa §2) ─────────────
+
+class TestOdakPenceresiEndpoint:
+    def test_defaults_are_todays_values(self, client, isolated_output):
+        resp = client.get("/api/odak-penceresi")
+        assert resp.status_code == 200
+        assert resp.get_json() == {
+            "okul_bitisi": "15:45", "odak_sonu": "16:00", "yatma": "22:30", "varsayilan": True}
+
+    def test_put_stores_atomically_and_get_reads_it(self, client, isolated_output):
+        resp = client.put("/api/odak-penceresi", json={
+            "okul_bitisi": "15:30", "odak_sonu": "16:15", "yatma": "22:00"})
+        assert resp.status_code == 200
+        assert resp.get_json() == {
+            "okul_bitisi": "15:30", "odak_sonu": "16:15", "yatma": "22:00", "varsayilan": False}
+        stored = json.loads((isolated_output / "odak_penceresi.json").read_text("utf-8"))
+        assert stored["okul_bitisi"] == "15:30" and stored["yatma"] == "22:00"
+        assert not list(isolated_output.glob("*.tmp"))
+        assert client.get("/api/odak-penceresi").get_json()["odak_sonu"] == "16:15"
+
+    @pytest.mark.parametrize("govde", [
+        {"okul_bitisi": "15:45", "odak_sonu": "16:00"},                     # missing
+        {"okul_bitisi": "25:00", "odak_sonu": "16:00", "yatma": "22:30"},   # not a time
+        {"okul_bitisi": "15:45", "odak_sonu": "4pm", "yatma": "22:30"},
+        {"okul_bitisi": "16:30", "odak_sonu": "16:00", "yatma": "22:30"},   # window ends before school
+        {"okul_bitisi": "15:45", "odak_sonu": "23:00", "yatma": "22:30"},   # bedtime before window
+        ["15:45"],
+    ])
+    def test_put_rejects_a_bad_window_with_a_sentence(self, client, isolated_output, govde):
+        resp = client.put("/api/odak-penceresi", json=govde)
+        assert resp.status_code == 400
+        assert resp.get_json()["error"].endswith(".")
+        assert not (isolated_output / "odak_penceresi.json").exists()
+
+    def test_unreadable_file_reads_as_defaults(self, client, isolated_output):
+        (isolated_output / "odak_penceresi.json").write_text("{bozuk", "utf-8")
+        assert client.get("/api/odak-penceresi").get_json()["varsayilan"] is True
+        (isolated_output / "odak_penceresi.json").write_text(
+            json.dumps({"okul_bitisi": "99:00", "odak_sonu": "16:00", "yatma": "22:30"}), "utf-8")
+        assert client.get("/api/odak-penceresi").get_json()["okul_bitisi"] == "15:45"
+
+    def test_requires_auth_and_refuses_a_reader(self, isolated_output, monkeypatch):
+        monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS", False)
+        okur = next(e for e, r in dashboard_api.USER_ROLES.items() if r == dashboard_api.ROLE_READER)
+        govde = {"okul_bitisi": "15:45", "odak_sonu": "16:00", "yatma": "22:30"}
+        with app.test_client() as c:
+            assert c.get("/api/odak-penceresi").status_code == 401
+            assert c.put("/api/odak-penceresi", json=govde).status_code == 401
+            with c.session_transaction() as s:
+                s["user_email"] = okur
+            assert c.get("/api/odak-penceresi").status_code == 403
+            assert c.put("/api/odak-penceresi", json=govde).status_code == 403
+        assert not (isolated_output / "odak_penceresi.json").exists()
+
+
+# ── B41 (backend half): "Özel ders" in sentence case at the source (S38) ─────
+
+class TestOzelDersCumleDuzeni:
+    DERS = {"id": "pl1", "course": "Fen Bilimleri", "teacher": "Deneme Hoca",
+            "is_recurring": True, "weekday": "Cumartesi",
+            "start_time": "12:00", "end_time": "13:00", "active": True}
+
+    def test_week_events_say_ozel_ders(self):
+        from datetime import date, timedelta
+        pzt = date(2026, 9, 21)
+        gunler = [pzt + timedelta(days=i) for i in range(7)]
+        olaylar = dashboard_api._private_lessons_for_week(gunler, [self.DERS])
+        assert olaylar and olaylar[0]["status"] == "Özel ders"
+        assert olaylar[0]["subtitle"] == "Özel ders • Deneme Hoca"
+        isimsiz = dashboard_api._private_lessons_for_week(gunler, [{**self.DERS, "teacher": ""}])
+        assert isimsiz[0]["subtitle"] == "Özel ders"
+
+    def test_bugun_calendar_badge_and_description(self, client, monkeypatch):
+        monkeypatch.setattr(dashboard_api, "_load_private_lessons", lambda: [self.DERS])
+        olaylar = client.get("/api/calendar").get_json()["events"]
+        ozel = [e for e in olaylar if e["extendedProps"].get("kind") == "private_lesson"]
+        assert ozel
+        assert {e["extendedProps"]["badge"] for e in ozel} == {"Özel ders"}
+        assert {e["extendedProps"]["description"] for e in ozel} == {"Özel ders • Deneme Hoca"}
+
+    def test_no_title_case_left_in_the_api_source(self):
+        kaynak = open(dashboard_api.__file__, encoding="utf-8").read()
+        satirlar = [s for s in kaynak.splitlines() if "Özel Ders" in s and "ESKI_OZEL_DERS" not in s]
+        assert satirlar == []
+
+    def test_photo_row_from_a_private_lesson_says_ozel_ders(self):
+        ders = {"id": "abc", "course": "", "teacher": "Ayşe"}
+        aday = {"ders_adi": "", "odev_basligi": "Okuma", "son_teslim_tarihi": ""}
+        row = dashboard_api._to_photo_homework_row(
+            aday, image_hash="h", source_type="private", private_lesson=ders)
+        assert row["Ders Adı"] == "Özel ders"
+        assert row["Ödev Kaynağı"] == "Özel ders (Ayşe)"
+
+    def test_stored_title_case_rows_are_mapped_at_the_boundary(self, client, isolated_output):
+        eski = {"Ders Adı": "Özel Ders", "Ödev Başlığı": "Okuma", "Ödev Kaynağı": "Özel Ders (Ayşe)",
+                "Ödev Son Teslim Tarihi": "", "Ödev Durumu": "Değerlendirilmemiş",
+                "source": "photo_ai_private", "detail": {"description": "", "attachments": []}}
+        dashboard_api._save_photo_homework_rows([eski])
+        with patch("src.dashboard_api._scraped", return_value={}):
+            rows = client.get("/api/homework").get_json()["homework"]
+        assert rows[0]["normalized_course"] == "Özel ders"
+        assert rows[0]["Ödev Kaynağı"] == "Özel ders (Ayşe)"
+        # The file itself is not rewritten.
+        stored = json.loads((isolated_output / "photo_homework.json").read_text("utf-8"))
+        assert stored["homework"][0]["Ders Adı"] == "Özel Ders"
+        # And the key a "Yaptım" mark is stored under does not move.
+        assert rows[0]["homework_key"] == dashboard_api._homework_row_key(eski)
+
+    @pytest.mark.parametrize("ders", ["Özel ders", "Özel Ders"])
+    def test_assistant_still_asks_for_the_course_of_a_placeholder_row(self, ders):
+        from src.assistant_tools import foto_eksik_alanlar
+        row = {"source": "photo_ai_private", "Ders Adı": ders,
+               "Ödev Son Teslim Tarihi": "25.09.2026 12:00"}
+        assert foto_eksik_alanlar(row) == ["ders"]

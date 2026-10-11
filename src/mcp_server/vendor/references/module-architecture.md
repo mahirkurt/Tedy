@@ -20,12 +20,12 @@ modul.html
 ├── <head>: SHA-256 manifestli inline IBM Plex WOFF2, satır-içi Carbon CSS, reduced-motion
 ├── <body>
 │   ├── SVG icon sprite (gizli, currentColor)
-│   ├── Üst çubuk: modül başlığı + ilerleme rayı + XP sayacı + rozet kasası
+│   ├── Üst çubuk: modül başlığı + ilerleme rayı + araç düğmeleri (XP sayacı, seri, rozet yok — S43)
 │   ├── #stage: aktif segment buraya render edilir (tek-odak)
 │   └── Alt: yönlendirme (Geri / Devam), erişilebilirlik kontrolleri
 └── <script>
     ├── const MODULE_DATA = { ... }   ← İÇERİK BURADA (sen doldurursun)
-    └── engine: segment render, etkileşim mantığı, XP/ilerleme, özet  ← DEĞİŞMEZ
+    └── engine: segment render, etkileşim mantığı, iç ilerleme (xp), sessiz özet  ← DEĞİŞMEZ
 ```
 
 **Tek-odak ilkesi:** Aynı anda yalnız bir segment görünür (ped İlke 5, dış yük).
@@ -230,7 +230,7 @@ const MODULE_DATA = {
   **Bilinmeyen `simType`** → nazik/uydurmasız bir not ("Bu simülasyon için hazır
   şablon yok.") render edilir, kaydırıcı/SVG hiç kurulmaz — çökme yok. Segment
   **keşfedicidir/puanlanmaz** (`setNav` next hep etkin; `addXP`/`markMastered`/
-  `bumpStreak` dokunuşu yok; `totalGradeable` paydasına katkısı yok — `selfExplain`
+  dokunuşu yok; `totalGradeable` paydasına katkısı yok — `selfExplain`
   ile aynı ilke). Beş başlangıç preset'i (tam katalog: `subject-packs.md` §2g):
   `pendulum` (uzunluk + opsiyonel açı → pivot+kol+top), `projectile` (hız+açı →
   yörünge yayı), `wave` (genlik+frekans → sinüs eğrisi), `numberScale` (değer →
@@ -298,9 +298,11 @@ const MODULE_DATA = {
 2. **OTR:** İki `teach` arasında ≥1 etkileşim (ped İlke 2). Saf okuma zinciri yok.
 3. **Erken başarı:** İlk etkileşim kolay; zorluk kademeli (ped İlke 6).
 4. **Mola:** ≥6 segmentlik modülde ≥1 `brainbreak` (ped §4).
-5. **Anında ödül:** Her etkileşim sonrası anında geri bildirim + XP (ped İlke 3).
+5. **Anında geri bildirim:** Her etkileşim sonrası anında, hareketsiz geri bildirim metni (ped İlke 3);
+   XP yalnız iç ilerleme sayısıdır, ekranda gösterilmez (talimatname S43).
 6. **Geri-getirme:** Modül `checkpoint` ile biter (ped İlke 8) — motor ayrıca
-   otomatik **özet** ekranı (XP, ustalık, rozet, öz-değerlendirme) üretir.
+   otomatik, sessiz bir **özet** ekranı (tamamlanan alıştırma sayısı düz metinle, hedefler,
+   öz-değerlendirme; büyük sayı ve rozet yok) üretir.
 7. **Tek-odak:** Aynı anda tek segment (ped İlke 5).
 
 ## 4. İskeleden doldurmaya — adım adım

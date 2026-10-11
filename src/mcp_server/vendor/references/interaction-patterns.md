@@ -65,9 +65,9 @@ açmamak için yazar sorumluluğundadır). Ayrıntı: `subject-packs.md` §2(f),
 **Erişilebilirlik:** Seçenekler `role="radio"` benzeri buton listesi; klavyeyle
 seçilebilir (Tab + Enter/Space); seçim sonrası doğru yeşil+onay ikonu, yanlış
 kırmızı+ikon ve doğru olan işaretlenir; açıklama `aria-live="polite"` ile okunur.
-**Yarışma varyantı:** Seri doğru (streak) sayacı; kişisel rekor; süre **opsiyonel**
-(varsayılan kapalı). Ceza yok; yanlışta açıklama + devam. (2026-10-10, talimatname S43: seri sayacı
-ve ödül animasyonu kalkar; kişisel rekor sessiz metindir. Şablon değişene dek borç B73.)
+**Yarışma varyantı:** Soru sayacı ("Soru 2 / 5"); süre **opsiyonel** (varsayılan kapalı). Ceza yok;
+yanlışta açıklama + devam. Seri sayacı, kişisel rekor ve ödül animasyonu yoktur (talimatname S43;
+şablondan 2026-10-11'de kalktı, B73; G-FLOW seri sayacı öğesinde FAIL verir).
 
 > **✓ Motorda uygulandı (v3.0.0 — Task 13, görünmez taban-korumalı uyarlanır zorluk,
 > gamified-flows.md §2.3/§3.3).** `questions[].tier?: 1|2|3` opsiyoneldir (1=kolay
@@ -121,7 +121,7 @@ ekran okuyucuya açık; renk dışı durum (ikon+metin).
 > `null`/no-op döner; bu durumda tüm kutular varsayılan `1` sayılır ve sıralama no-op'tur
 > (eşit anahtarlarda orijinal indeks kırılımı sırayı korur) — segment **birebir eski
 > in-session davranışına** düşer, hiçbir kart kaybolmaz/çökme olmaz. Kalıcı depolama
-> izin listesi yalnız **tema + Leitner**'dır; XP/seri/rozet/yanıt kümeleri
+> izin listesi yalnız **tema + Leitner**'dır; iç ilerleme sayısı (xp) ve yanıt kümeleri
 > `sessionStorage` ile sekme oturumuna sınırlandırılır. Tüm sarmalayıcılar try/catch
 > ile degrade-safe'tir.
 
@@ -184,8 +184,8 @@ modülde en az 1).
   selfAssess: ["Bunu öğrendim", "Tekrar etmeliyim"]  // öğrenci işaretler
 }
 ```
-Modül sonu **summary** ekranı motor tarafından otomatik üretilir: ulaşılan XP,
-ustalık yüzdesi, rozet kasası, tekrar önerisi, öz-değerlendirme. Skor
+Modül sonu **summary** ekranı motor tarafından otomatik üretilir ve sessizdir: tamamlanan
+alıştırma sayısı düz metinle, hedefler, tekrar önerisi, öz-değerlendirme (XP, rozet, büyük sayı yok — S43). Skor
 *bilgilendirici* sunulur (etiketleyici değil); başarısızlık tekrara nazik davet.
 
 ---
@@ -357,7 +357,7 @@ içindedir, blok dışında hiçbir koşulsuz katkı yoktur.
 
 > **✓ Motorda uygulandı (v3.0.0 — Task 19).** `numberLine`+
 > `wireNumberlineInteractive` (module-template.html); segment puanlanmaz/
-> keşfedicidir (`sim` ile aynı ilke — `addXP`/`markMastered`/`bumpStreak`
+> keşfedicidir (`sim` ile aynı ilke — `addXP`/`markMastered`
 > dokunuşu yok, `totalGradeable` paydasına katkısı yok).
 
 ---

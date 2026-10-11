@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Tabs, TabList, Tab, TabPanels, TabPanel, Accordion, AccordionItem, Tag, Dropdown } from '@carbon/react'
 import { Education } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
@@ -7,6 +7,7 @@ import { COURSE_CONTENT_ORDER, normalizeCourseDisplayName } from '../utils/forma
 import { portalSusunuAyikla } from '../utils/portalSusu'
 import { EmptyLine } from './patterns/EmptyLine'
 import { acikOgeAc } from '../asistan/sayfaBaglami'
+import { DERS_AC_OLAYI } from '../utils/dersSecimi'
 
 interface CourseData {
   [course: string]: {
@@ -129,6 +130,29 @@ function weekNo(label: string): number {
 
 const DERS_SEKMESI = 'tedy-dersler-sekme'
 
+/** Applies a timetable request once per click: selects the tab, then scrolls to the card and focuses the tab. */
+function DersSecimiUygula({ istenen, var: bulundu, kart, sec }: {
+  istenen: { ders: string; sira: number } | null
+  var: boolean
+  kart: React.RefObject<HTMLDivElement | null>
+  sec: (ad: string) => void
+}) {
+  const uygulanan = useRef(0)
+  useEffect(() => {
+    if (!istenen || istenen.sira === uygulanan.current) return
+    uygulanan.current = istenen.sira
+    if (bulundu) sec(istenen.ders)
+    const azHareket = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    // After React has drawn the newly selected tab.
+    requestAnimationFrame(() => {
+      kart.current?.scrollIntoView({ block: 'start', behavior: azHareket ? 'auto' : 'smooth' })
+      const sekme = kart.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+      if (bulundu) sekme?.focus({ preventScroll: true })
+    })
+  }, [istenen, bulundu, kart, sec])
+  return null
+}
+
 export default function CourseContent() {
   const { data } = useApi<CourseData>('/api/content', {})
   // The portal fills the year in ahead of time and the cards genuinely differ
@@ -144,6 +168,14 @@ export default function CourseContent() {
   const [secilenDers, setSecilenDers] = useState<string | null>(() => {
     try { return localStorage.getItem(DERS_SEKMESI) } catch { return null }
   })
+  // B64: the timetable asked for a course. Found → its tab, scrolled to and focused; not found → said so (D3).
+  const [istenen, setIstenen] = useState<{ ders: string; sira: number } | null>(null)
+  const kartRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const dinle = (e: Event) => setIstenen(o => ({ ders: (e as CustomEvent<string>).detail, sira: (o?.sira ?? 0) + 1 }))
+    window.addEventListener(DERS_AC_OLAYI, dinle)
+    return () => window.removeEventListener(DERS_AC_OLAYI, dinle)
+  }, [])
   useEffect(() => (secilenHafta ? acikOgeAc({ tur: 'ders_haftasi', id: secilenHafta, etiket: secilenHafta }) : undefined),
     [secilenHafta])
 
@@ -198,25 +230,32 @@ export default function CourseContent() {
     v && (v.text || (v.cards && v.cards.length > 0))
   )
 
+  const istenenVar = istenen ? courses.some(([ad]) => ad === istenen.ders) : false
+
   if (courses.length === 0) {
     return <EmptyLine label="Ders içerikleri">Derslere ait içerik henüz yok.</EmptyLine>
   }
 
   return (
-    <div className="dashboard-card course-content">
+    <div className="dashboard-card course-content" ref={kartRef}>
+      <DersSecimiUygula istenen={istenen} var={istenenVar} kart={kartRef}
+        sec={ad => { setSecilenDers(ad); try { localStorage.setItem(DERS_SEKMESI, ad) } catch { /* private window */ } }} />
       <div className="course-content__header">
         <h2 className="dashboard-card__title">
           <Education size={20} />
           Ders içerikleri
         </h2>
+        {istenen && !istenenVar && (
+          <p className="course-content__istenen" role="status">{istenen.ders} için bu hafta içerik yok.</p>
+        )}
         {/* One control, and only when there is more than one week to choose
             between. Hidden in focus mode, where the page holds one thing. */}
         {haftaAdlari.length > 1 && !focusMode && (
           <Dropdown
             id="ders-icerik-hafta"
             className="course-content__week-picker"
-            titleText=""
-            label="Hafta"
+            titleText="Hafta"
+            label="Hafta seç"
             size="sm"
             items={haftaAdlari}
             selectedItem={aktifHafta || haftaAdlari[0]}

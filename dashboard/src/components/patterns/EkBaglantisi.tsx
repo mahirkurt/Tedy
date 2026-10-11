@@ -31,7 +31,8 @@ export function EkBaglantisi({ ek }: { ek: PortalEki }) {
           rel="noopener noreferrer"
           aria-label={`Kaynağında aç: ${ek.name}`}
         >
-          Kaynağında aç
+          {/* B58: a link that leaves TEDY says so with Carbon's Launch icon. */}
+          Kaynağında aç <Launch size={16} aria-hidden="true" />
         </a>
       </span>
     )

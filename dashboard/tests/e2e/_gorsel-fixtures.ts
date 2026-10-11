@@ -83,6 +83,26 @@ export const GORSEL: Record<string, unknown> = {
       'DİKP/Performans-1': '-', 'DİKP/Performans-2': '-', 'DİKP/Performans-3': '-' },
   ] },
   calendar: { events: [] },
+  // The shapes /api/teams and /api/announcements serve (portal column names). FULL's rows ({ad, gun, saat},
+  // {baslik, …}) predate them and drew an empty team row and an untitled announcement (2026-10-11). Invented.
+  teams: {
+    activities: [
+      { 'Academy+': 'Robotik kulübü', 'Çalışma Başlangıç': '25.09.2026 14:00', 'Çalışma Bitiş': '25.09.2026 15:30',
+        'Katılım Durumu': '', 'Teams Link': 'Teams' },
+      { 'Academy+': 'Münazara', 'Çalışma Başlangıç': '18.09.2026 14:00', 'Çalışma Bitiş': '18.09.2026 15:30',
+        'Katılım Durumu': 'Katıldı', 'Teams Link': 'Teams' },
+    ],
+    ogep: [
+      { 'ÖGEP (Öğrenci Gelişim Programı)': 'Hedef belirleme', 'Çalışma Başlangıç': '26.09.2026 10:00',
+        'Çalışma Bitiş': '26.09.2026 10:40', 'Katılım Durumu': '' },
+    ],
+  },
+  announcements: { announcements: [
+    { 'e-Posta Başlık': 'Veli toplantısı', 'Yayın Tarihi': '22.09.2026 09:00', 'Ekleri': '-',
+      'e-Posta İçerik': 'Birinci dönem veli toplantısı 2 Ekim Cuma 18:00\'de okul konferans salonunda.' },
+    { 'e-Posta Başlık': 'Kütüphane çalışma saatleri', 'Yayın Tarihi': '15.09.2026 09:00', 'Ekleri': '-',
+      'e-Posta İçerik': 'Kütüphane hafta içi 08:00–17:00 arasında açıktır.' },
+  ] },
   'assistant/ogretmenler': OGRETMENLER,
   // The unified calendar in its real shape. FULL's rows (baslik/tarih/tur)
   // predate it and put nothing on the grid, so the Takvim baseline was an
@@ -95,6 +115,6 @@ export const GORSEL: Record<string, unknown> = {
       color: '', course: 'Türkçe', courseFamily: 'magenta', status: '', subtitle: '' },
     { id: 'p1', type: 'private_lesson', title: 'Fen Bilimleri · Deneme Hoca',
       start: '2026-09-26T12:00:00', end: '2026-09-26T13:00:00', color: '', course: 'Fen Bilimleri',
-      courseFamily: 'teal', status: 'Özel Ders', subtitle: 'Özel Ders • Deneme Hoca' },
+      courseFamily: 'teal', status: 'Özel ders', subtitle: 'Özel ders • Deneme Hoca' },
   ] },
 }

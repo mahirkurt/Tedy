@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, ModalFooter, Button, InlineLoading, Link, Callout } from '@carbon/react'
-import { Timer, CheckmarkFilled, CheckmarkOutline, CloseFilled, ChevronDown, ChevronUp, Document, Chat } from '@carbon/icons-react'
+import { Tag, Tile, ComposedModal, ModalHeader, ModalBody, ModalFooter, Button, InlineLoading, Link, Callout, Layer } from '@carbon/react'
+import { Chat, CheckmarkFilled, CheckmarkOutline, ChevronDown, ChevronUp, CloseFilled, Document, Hourglass, Timer } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import type { HomeworkDocument, HomeworkItem } from '../types'
 import { parseDeadline, formatTurkishDate, getHomeworkStatus } from '../utils/formatters'
 import { countdownTagType, getCountdown } from '../utils/countdown'
 import SubjectLabel from './SubjectLabel'
 import { NextThing } from './NextThing'
+import { Rakamli } from './patterns/Rakamli'
 import { describeDaysAhead } from './patterns/time'
 import './patterns/patterns.scss'
 import { useNavigate } from 'react-router-dom'
@@ -16,7 +17,13 @@ import { EmptyLine } from './patterns/EmptyLine'
 import { EkBaglantisi } from './patterns/EkBaglantisi'
 import { useFocusMode } from '../contexts/focusMode'
 import YuklemeAlani from './YuklemeAlani'
-import { yaptimIsaretle } from '../utils/odevYaptim'
+import { yaptimIsaretle, yaptimGeriAl } from '../utils/odevYaptim'
+import { YaptinSatiri, type GeriAlDurumu } from './patterns/YaptinSatiri'
+
+const odevAdi = (hw: HomeworkItem) =>
+  [hw.normalized_course || hw['Ders Adı'], hw['Ödev Başlığı']].filter(Boolean).join(' — ')
+const eylemAnahtari = (hw: HomeworkItem) =>
+  hw.homework_key || `${hw['Ders Adı']}|${hw['Ödev Başlığı']}|${hw['Ödev Son Teslim Tarihi']}`
 
 type HomeworkGroupKey = 'aktif' | 'yapilan' | 'tamamlanan' | 'yapilmayan'
 
@@ -68,6 +75,14 @@ export default function HomeworkTracker() {
   // The row whose "Yaptım" could not be stored. It used to fail in silence —
   // the button simply came back, and nothing said the mark was not kept (D3).
   const [markErrorKey, setMarkErrorKey] = useState<string | null>(null)
+  // B63 (S40): the work "Yaptım" just recorded, said under the active list
+  // with "Geri al" on the same line, as on Bugün; and the row whose undo is
+  // in flight or failed in "Yapılan", where every mark of Işık's own can be
+  // taken back later too.
+  const [sonYapilan, setSonYapilan] = useState<HomeworkItem | null>(null)
+  const [sonGeriAl, setSonGeriAl] = useState<GeriAlDurumu>('bos')
+  const [geriAlinanKey, setGeriAlinanKey] = useState<string | null>(null)
+  const [geriAlHataKey, setGeriAlHataKey] = useState<string | null>(null)
   const [docBusy, setDocBusy] = useState(false)
   const [docError, setDocError] = useState('')
   // B23 (S40): silinecek belge. Ödev penceresi aynı yerde tehlike onayına döner; pencerenin üstüne ikinci bir
@@ -249,15 +264,43 @@ export default function HomeworkTracker() {
   }
 
   const handleMarkDone = async (hw: HomeworkItem) => {
-    const fallbackKey = `${hw["Ders Adı"]}|${hw["Ödev Başlığı"]}|${hw["Ödev Son Teslim Tarihi"]}`
-    const key = hw.homework_key || fallbackKey
+    const key = eylemAnahtari(hw)
     setMarkingKey(key)
     setMarkErrorKey(null)
     try {
-      if (await yaptimIsaretle(hw)) refreshHomework()
-      else setMarkErrorKey(key)
+      if (await yaptimIsaretle(hw)) {
+        setSonYapilan(hw)
+        setSonGeriAl('bos')
+        refreshHomework()
+      } else setMarkErrorKey(key)
     } finally {
       setMarkingKey(null)
+    }
+  }
+
+  // "Geri al" (S40, B63): the mark goes and the work is active again. The
+  // line under the list and a row in "Yapılan" use the same call.
+  const sonuGeriAl = async () => {
+    if (!sonYapilan) return
+    setSonGeriAl('aliniyor')
+    if (await yaptimGeriAl(sonYapilan)) {
+      setSonYapilan(null)
+      setSonGeriAl('bos')
+      refreshHomework()
+    } else setSonGeriAl('hata')
+  }
+
+  const satiriGeriAl = async (hw: HomeworkItem) => {
+    const key = eylemAnahtari(hw)
+    setGeriAlinanKey(key)
+    setGeriAlHataKey(null)
+    try {
+      if (await yaptimGeriAl(hw)) {
+        if (sonYapilan && eylemAnahtari(sonYapilan) === key) setSonYapilan(null)
+        refreshHomework()
+      } else setGeriAlHataKey(key)
+    } finally {
+      setGeriAlinanKey(null)
     }
   }
 
@@ -266,11 +309,13 @@ export default function HomeworkTracker() {
     title,
     items,
     showDoneAction,
+    showUndoAction,
   }: {
     keyName: HomeworkGroupKey
     title: string
     items: HomeworkItem[]
     showDoneAction?: boolean
+    showUndoAction?: boolean
   }) => {
     if (items.length === 0) return null
     return (
@@ -286,7 +331,7 @@ export default function HomeworkTracker() {
               still owed (İ7), and red is kept for urgency. */}
           <span className="hw-section__label">{title}</span>
           <span className="hw-section__count">{items.length}</span>
-          {isCollapsed(keyName) ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          {isCollapsed(keyName) ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
         </button>
         {!isCollapsed(keyName) && (
           <div className="stack-sm">
@@ -302,6 +347,9 @@ export default function HomeworkTracker() {
                   onDone={showDoneAction ? handleMarkDone : undefined}
                   doneLoading={isMarking}
                   doneError={markErrorKey === actionKey}
+                  onUndo={showUndoAction && hw.student_marked_done ? satiriGeriAl : undefined}
+                  undoLoading={geriAlinanKey === actionKey}
+                  undoError={geriAlHataKey === actionKey}
                 />
               )
             })}
@@ -319,7 +367,9 @@ export default function HomeworkTracker() {
 
       {/* The page names one step before it lists anything (İ1). "Başla" opens
           the work itself, so the verb keeps its meaning through the flow. */}
+      {/* One layer up from the card it sits in (B31): Carbon's contextual tokens, not a hand-paired colour. */}
       {nextHw && (
+        <Layer>
         <NextThing
           eyebrow="Sıradaki"
           // The normalised name, as the list below prints it: the raw one put
@@ -333,10 +383,15 @@ export default function HomeworkTracker() {
           actionLabel="Başla"
           onAction={() => setSelectedHw(nextHw)}
         />
+        </Layer>
       )}
 
       {aktif.length === 0 && (
         <EmptyLine>Şu an teslim bekleyen bir işin yok.</EmptyLine>
+      )}
+
+      {sonYapilan && (
+        <YaptinSatiri className="isler-yaptin" ad={odevAdi(sonYapilan)} durum={sonGeriAl} onGeriAl={sonuGeriAl} />
       )}
 
       {renderAccordionSection({
@@ -374,9 +429,8 @@ export default function HomeworkTracker() {
                     </span>
                   )}
                   {when && (
-                    <span className="exams-ahead__when tedy-time">
-                      {describeDaysAhead(when)}
-                    </span>
+                    // B36: only the figure is mono ("7 gün sonra"), the words stay Sans.
+                    <span className="exams-ahead__when"><Rakamli metin={describeDaysAhead(when)} /></span>
                   )}
                   {moduleByExam.has(e.id) && (
                     <Button kind="ghost" size="sm" className="exams-ahead__module"
@@ -409,6 +463,7 @@ export default function HomeworkTracker() {
         keyName: 'yapilan',
         title: 'Yapılan',
         items: yapilan,
+        showUndoAction: true,
       })}
 
       {!focusMode && renderAccordionSection({
@@ -483,6 +538,9 @@ function HomeworkCard({
   onDone,
   doneLoading,
   doneError,
+  onUndo,
+  undoLoading,
+  undoError,
 }: {
   hw: HomeworkItem
   onOpen: (hw: HomeworkItem) => void
@@ -490,6 +548,9 @@ function HomeworkCard({
   onDone?: (hw: HomeworkItem) => void
   doneLoading?: boolean
   doneError?: boolean
+  onUndo?: (hw: HomeworkItem) => void
+  undoLoading?: boolean
+  undoError?: boolean
 }) {
   const deadline = parseDeadline(hw["Ödev Son Teslim Tarihi"])
   const countdown = getCountdown(deadline)
@@ -508,7 +569,8 @@ function HomeworkCard({
 
   return (
     <Tile
-      onClick={() => onOpen(hw)}
+      // The row opens its homework, except where a click lands on the row's own action ("Yaptım").
+      onClick={e => { if (!(e.target as HTMLElement).closest('.homework-item__action')) onOpen(hw) }}
       className={['homework-item', 'dashboard-list-tile', 'homework-item--clickable', borderClass].join(' ')}
     >
       <div className="homework-item__row">
@@ -523,10 +585,10 @@ function HomeworkCard({
               >
                 {/* B21 (S4): Işık'ın kendi işareti gri + ikon; mavi bir ders ailesi gibi okunuyordu. */}
                 {status.type === 'green'
-                  ? <CheckmarkFilled size={12} />
+                  ? <CheckmarkFilled size={16} />
                   : status.type === 'red'
-                    ? <CloseFilled size={12} />
-                    : hw.student_marked_done ? <CheckmarkOutline size={12} /> : null}
+                    ? <CloseFilled size={16} />
+                    : hw.student_marked_done ? <CheckmarkOutline size={16} /> : null}
                 {' '}{status.label}
               </Tag>
             )}
@@ -539,7 +601,7 @@ function HomeworkCard({
             Teslim: {formatTurkishDate(hw["Ödev Son Teslim Tarihi"])}
           </div>
           {formatTurkishDate(hw.first_seen) && (
-            <div className="homework-item__first-seen" style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary, #525252)', marginTop: '2px' }}>
+            <div className="homework-item__first-seen">
               İlk görülme: {formatTurkishDate(hw.first_seen)}
             </div>
           )}
@@ -548,21 +610,16 @@ function HomeworkCard({
           {countdown.urgency !== 'expired' && (
             <div className={countdown.urgency === 'critical' || countdown.urgency === 'urgent' ? 'tag-urgent' : ''}>
               <Tag type={countdownTagType(countdown.urgency)} size="sm">
-                <Timer size={12} /> {countdown.text}
+                <Timer size={16} /> {countdown.text}
               </Tag>
             </div>
           )}
           {countdown.urgency === 'expired' && !hw.student_marked_done && (
-            <Tag type="warm-gray" size="sm">Süresi doldu</Tag>
+            <Tag type="warm-gray" size="sm"><Hourglass size={16} /> Süresi doldu</Tag>
           )}
 
           {showDoneAction && onDone && (
-            <div
-              className="homework-item__action"
-              onClick={(e) => {
-                e.stopPropagation()
-              }}
-            >
+            <div className="homework-item__action">
               {doneLoading ? (
                 <InlineLoading description="Kaydediliyor…" iconDescription="Kaydediliyor" status="active" />
               ) : (
@@ -580,6 +637,27 @@ function HomeworkCard({
               {doneError && (
                 <span className="homework-item__error" role="alert">
                   Kaydedilemedi. Bağlantını kontrol edip yeniden dene.
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* B63 (S40): Işık's own "Yaptım" is taken back on its own row. Ghost,
+              because a settled row's action is a correction, not a next step (İ1).
+              The name carries the homework so a list of them is told apart. */}
+          {onUndo && (
+            <div className="homework-item__action">
+              {undoLoading ? (
+                <InlineLoading description="Geri alınıyor…" iconDescription="Geri alınıyor" status="active" />
+              ) : (
+                <Button size="sm" kind="ghost" aria-label={`Geri al: ${hw["Ödev Başlığı"]}`}
+                  onClick={() => onUndo(hw)}>
+                  Geri al
+                </Button>
+              )}
+              {undoError && (
+                <span className="homework-item__error" role="alert">
+                  Geri alınamadı. Bağlantını kontrol edip yeniden dene.
                 </span>
               )}
             </div>
@@ -626,9 +704,9 @@ function HomeworkModalBody({
       {/* Status + Meta row */}
       <div className="homework-modal__meta">
         <Tag type={status.type} size="md">
-          {status.type === 'green' && <CheckmarkFilled size={14} />}
-          {status.type === 'red' && <CloseFilled size={14} />}
-          {hw.student_marked_done && <CheckmarkOutline size={14} />}
+          {status.type === 'green' && <CheckmarkFilled size={16} />}
+          {status.type === 'red' && <CloseFilled size={16} />}
+          {hw.student_marked_done && <CheckmarkOutline size={16} />}
           {' '}{status.label}
         </Tag>
         {hw["Ödev Kaynağı"] && (
@@ -647,16 +725,16 @@ function HomeworkModalBody({
             type={countdownTagType(countdown.urgency)}
             size="sm"
           >
-            <Timer size={12} /> {countdown.text}
+            <Timer size={16} /> {countdown.text}
           </Tag>
         ) : (
-          <Tag type="warm-gray" size="sm">Süresi doldu</Tag>
+          <Tag type="warm-gray" size="sm"><Hourglass size={16} /> Süresi doldu</Tag>
         )}
       </div>
 
       {/* First seen */}
       {hw.first_seen && (
-        <div className="homework-modal__deadline-row" style={{ marginTop: '0.25rem' }}>
+        <div className="homework-modal__deadline-row">
           <span className="homework-modal__deadline-label">İlk görülme:</span>
           <span className="homework-modal__deadline-value">
             {formatTurkishDate(hw.first_seen)}

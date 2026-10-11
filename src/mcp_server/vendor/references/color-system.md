@@ -17,7 +17,8 @@ Carbon tuvali üzerinde. Amaç, DEHB-sakin sınırını korurken renkle **odak, 
 | **Durum: hata** | `--cds-support-error` + `--cds-notification-background-error` (+ `--tedy-text-error`) | Yalnız yanlış şıkkı **işaretlemek** için; metin daima yapıcı ("tekrar dene"). Kırmızı ders aksanı olmaz. |
 | **Kategori** | `--viz-1..5` | Grafik serileri, sıralama/gruplama kategorileri, diyagram parçaları. Anlam renklerinden kaçınan TEDY alt kümesi (§7). |
 | **İllüstrasyon** | `--viz-sun/water/cloud` | Doğa/şema anlamsal renkleri. |
-| **İlerleme/ödül** | `--reward` (= `--tedy-text-warning`) + `--reward-bg` (= `notification-background-warning`) | XP, seri — sakin sıcak vurgu; ham altın hex yok. 2026-10-10'dan beri (talimatname S43) seri sayacı ve ödül vurgusu kalkar, ilerleme sessiz ve etiketli; rol şablondaki kalıntılar için yaşar (B73). Kazanılan rozet nötr `layer-selected-01`. |
+| **İlerleme** | `--cds-text-primary` / `--cds-text-secondary`, ray `--cds-interactive` | İlerleme sessiz ve etiketlidir ("Bölüm 3 / 7"). Ödül rolü (`--reward`, `--reward-bg`) 2026-10-11'de kalktı: XP sayacı, seri ve rozet ekranda yok (talimatname S43, B73). |
+| **Devre dışı** | `--cds-button-disabled`, `--cds-text-on-color-disabled`, `--cds-text-disabled`, `--cds-icon-disabled`, `--cds-border-disabled` | Carbon'un devre dışı token'ları; durum opaklıkla çizilmez (talimatname S24, B34). Okunacak içerik (çözülmüş adımın cevabı, denenmiş kelime) devre dışı değil salt okunurdur. |
 | **Tuval** | `--tedy-page-background` (sayfa), `--cds-layer-01/02/03` | Sayfa zemini Tedy cool-gray; kartlar ve iç yüzeyler Carbon katmanı (nötr, katmanlı derinlik). |
 
 ## 2. Beş kural

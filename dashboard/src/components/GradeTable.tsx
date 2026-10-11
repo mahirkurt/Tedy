@@ -1,14 +1,13 @@
 import type { ComponentProps } from 'react'
 import { useApi } from '../hooks/useApi'
 import { EmptyLine } from './patterns/EmptyLine'
-import { Certificate } from '@carbon/icons-react'
+import { Certificate, Information } from '@carbon/icons-react'
 import {
   DataTable, Table, TableHead, TableRow, TableHeader,
   TableBody, TableCell, TableContainer,
   TableExpandRow, TableExpandedRow, TableExpandHeader, Tag,
 } from '@carbon/react'
 import type { GradeItem } from '../types'
-import { gradeColor } from '../utils/formatters'
 import { useFocusMode } from '../contexts/focusMode'
 
 /* Row and prop-getter shapes come from Carbon's own render-prop signature, so
@@ -21,6 +20,14 @@ type GetRowProps = DataTableRenderArgs['getRowProps']
 
 const COLS = ['1. Sınav', '2. Sınav', '3. Sınav', 'DİKP/Performans-1', 'DİKP/Performans-2', 'DİKP/Performans-3'] as const
 const COL_SHORT = ['S1', 'S2', 'S3', 'P1', 'P2', 'P3']
+
+/** A grade cell's text (S42, B72): the figure as it is, one neutral colour; a missing grade is an em dash with
+ *  its meaning for a screen reader — never a 0-wide bar or a hyphen that reads as "minus". */
+function NotDegeri({ deger }: { deger: string }) {
+  const bos = !deger || deger === '-'
+  if (bos) return <><span aria-hidden="true">—</span><span className="cds--visually-hidden">Not girilmedi</span></>
+  return <span className="tedy-time">{deger}</span>
+}
 
 const headers = [
   { key: 'ders', header: 'Ders' },
@@ -78,14 +85,14 @@ export default function GradeTable() {
             {/* Grey and small: a fact about the table, not an alarm (İ6).
                 A span, because it sits inside the table's heading. */}
             {data.priorYear && (
-              <Tag as="span" type="gray" size="sm">Önceki öğretim yılı</Tag>
+              <Tag as="span" type="gray" size="sm"><Information size={16} /> Önceki öğretim yılı</Tag>
             )}
           </span>
         }
       >
         <DataTable rows={tableRows} headers={headers} size="sm" translateWithId={tabloDili}>
           {({ rows: dtRows, headers: dtHeaders, getTableProps, getHeaderProps, getRowProps, getExpandHeaderProps }) => (
-            <Table {...getTableProps()}>
+            <Table {...getTableProps()} aria-label="Notlar">
               <TableHead>
                 <TableRow>
                   {/* A header cell with no text is a blank column to a screen reader (axe). */}
@@ -113,16 +120,9 @@ export default function GradeTable() {
                       {row.cells.map(cell => {
                         const isGrade = cell.info.header !== 'ders'
                         const val = String(cell.value || '')
-                        const color = isGrade ? gradeColor(val) : ''
                         return (
-                          <TableCell
-                            key={cell.id}
-                            className={isGrade ? 'grade-col-center' : ''}
-                            style={isGrade && color
-                              ? { fontWeight: 600, color }
-                              : isGrade ? { fontWeight: 600 } : { fontWeight: 500 }}
-                          >
-                            {val}
+                          <TableCell key={cell.id} className={isGrade ? 'grade-col-center grade-cell' : ''}>
+                            {isGrade ? <NotDegeri deger={val} /> : val}
                           </TableCell>
                         )
                       })}
@@ -151,21 +151,11 @@ function GradeExpandRow({ row, rawGrade, getRowProps }: {
         {row.cells.map(cell => {
           const isGrade = cell.info.header !== 'ders'
           const val = String(cell.value || '')
-          const color = isGrade ? gradeColor(val) : ''
+          // No colour band (S42, B72): four status colours were judging the grade, and the blue band was also
+          // Yabancı diller's family and Carbon's information colour.
           return (
-            <TableCell
-              key={cell.id}
-              className={isGrade ? 'grade-col-center' : ''}
-              // No background tint: `${color}11` appended two hex digits to a
-              // `var(--status-success)` string, which is not a colour, so the
-              // declaration was dropped and the tint has never rendered.
-              // Measured 2026-09-21. The number's own colour carries the band;
-              // a second coat behind it would only spend stimulus (İ6).
-              style={isGrade && color
-                ? { fontWeight: 600, color }
-                : isGrade ? { fontWeight: 600 } : { fontWeight: 500 }}
-            >
-              {val}
+            <TableCell key={cell.id} className={isGrade ? 'grade-col-center grade-cell' : ''}>
+              {isGrade ? <NotDegeri deger={val} /> : val}
             </TableCell>
           )
         })}
@@ -173,31 +163,16 @@ function GradeExpandRow({ row, rawGrade, getRowProps }: {
       {/* The expand button's aria-controls names this row; Carbon renders the
           row but gives it no id, so the reference pointed at nothing. */}
       <TableExpandedRow colSpan={headers.length + 1} id={String(getRowProps({ row })['aria-controls'] ?? '')}>
-        <div className="grade-detail">
-          {COLS.map((col, ci) => {
-            const val = rawGrade?.[col] || '-'
-            const color = gradeColor(val)
-            const numVal = parseInt(val)
-            const barWidth = !isNaN(numVal) ? numVal : 0
-            return (
-              <div key={ci} className="grade-detail__row">
-                <span className="grade-detail__label">{col}</span>
-                <div className="grade-detail__bar-track">
-                  <div
-                    className="grade-detail__bar-fill"
-                    style={{
-                      width: `${barWidth}%`,
-                      backgroundColor: color || 'var(--cds-border-subtle-01)',
-                    }}
-                  />
-                </div>
-                <span className="grade-detail__value" style={{ color: color || undefined }}>
-                  {val}
-                </span>
-              </div>
-            )
-          })}
-        </div>
+        {/* The detail names each column in full (S1 → "1. Sınav") with its figure. No bars (B51, §8.7): a
+            missing grade drew a 0-wide bar that read as a zero, and the figure already is the information. */}
+        <dl className="grade-detail">
+          {COLS.map((col, ci) => (
+            <div key={ci} className="grade-detail__row">
+              <dt className="grade-detail__label">{col}</dt>
+              <dd className="grade-detail__value"><NotDegeri deger={rawGrade?.[col] || '-'} /></dd>
+            </div>
+          ))}
+        </dl>
       </TableExpandedRow>
     </>
   )

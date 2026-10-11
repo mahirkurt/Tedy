@@ -3,6 +3,7 @@ import { useDar } from '../asistan/useDar'
 import { Education } from '@carbon/icons-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
+import { apiHataCumlesi } from '../utils/apiHatasi'
 import type { ModuleCard } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
 import ModuleViewer from './ModuleViewer'
@@ -20,18 +21,19 @@ const MODE_LABEL: Record<string, string> = {
 }
 
 export default function Modules() {
-  const { data, loading, error } = useApi<{ moduller: ModuleCard[] }>('/api/modules', { moduller: [] })
+  const { data, loading, iskelet, error, hataTuru } = useApi<{ moduller: ModuleCard[] }>('/api/modules', { moduller: [] })
+  const hata = apiHataCumlesi(hataTuru ?? 'sunucu', 'Modüller')
   const navigate = useNavigate()
   const dar = useDar()
   const modules = Array.isArray(data.moduller) ? data.moduller : []
   return (
     <div className="dashboard-card modules">
       <h2 className="dashboard-card__title"><Education size={20} />Modüller</h2>
-      {loading && <SkeletonText paragraph lineCount={3} />}
+      {iskelet && <div aria-busy="true"><SkeletonText paragraph lineCount={3} /></div>}
       {!loading && error && (
         // B43 (D3, D4): the raw fetch error ("HTTP 500", "Non-JSON response") never reaches the reader.
         <InlineNotification kind="error" role="alert" lowContrast hideCloseButton statusIconDescription="Hata"
-          title="Modüller yüklenemedi." subtitle="Sayfayı birkaç dakika sonra yeniden aç." />
+          title={hata.baslik} subtitle={hata.ayrinti} />
       )}
       {!loading && !error && modules.length === 0 && (
         <EmptyLine label="Modüller">Henüz yayınlanmış modül yok.</EmptyLine>
@@ -72,7 +74,8 @@ export function ModuleViewerRoute() {
     <div className="module-page">
       <Button className="module-page__back" kind="ghost" size="md" href="/moduller"
         onClick={(e: React.MouseEvent) => { e.preventDefault(); navigate('/moduller') }}>Modüllere dön</Button>
-      <ModuleViewer ticketPath={`/api/modules/${slug}/v${n}/ticket`} title="Öğrenme modülü" progress={{ slug, version: n }} />
+      <ModuleViewer ticketPath={`/api/modules/${slug}/v${n}/ticket`} aciklamaPath={`/api/modules/${slug}/v${n}/aciklama`}
+        title="Öğrenme modülü" progress={{ slug, version: n }} />
     </div>
   )
 }
@@ -87,7 +90,8 @@ export function DraftViewerRoute() {
       {/* B45 (§4.4): a sentence is not a Tag. */}
       <InlineNotification className="module-page__back module-page__taslak" kind="info" lowContrast hideCloseButton
         statusIconDescription="Bilgi" title="Taslak önizleme" subtitle="İlerleme kaydedilmez." />
-      <ModuleViewer ticketPath={`/api/modules/taslak/${taslakId}/ticket`} title="Taslak modül önizlemesi" />
+      <ModuleViewer ticketPath={`/api/modules/taslak/${taslakId}/ticket`}
+        aciklamaPath={`/api/modules/taslak/${taslakId}/aciklama`} title="Taslak modül önizlemesi" />
     </div>
   )
 }

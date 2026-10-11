@@ -123,8 +123,8 @@ test.describe('saturday', () => {
       status: 200, contentType: 'application/json', body: JSON.stringify({ events: [{
         id: 'p1', title: 'Fen Bilimleri · Deneme Hoca', allDay: false,
         start: '2026-09-26T12:00:00', end: '2026-09-26T13:00:00',
-        extendedProps: { kind: 'private_lesson', badge: 'Özel Ders', course: 'Fen Bilimleri',
-          description: 'Özel Ders • Deneme Hoca', private_lesson_id: 'p1' },
+        extendedProps: { kind: 'private_lesson', badge: 'Özel ders', course: 'Fen Bilimleri',
+          description: 'Özel ders • Deneme Hoca', private_lesson_id: 'p1' },
       }] }),
     }))
     await page.clock.setFixedTime(new Date('2026-09-26T10:00:00+03:00'))   // a Saturday

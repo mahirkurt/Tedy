@@ -4,36 +4,58 @@
   - heading "Deneme Öğrenci" [level=3]
   - text: "/No: \\d+ Sınıf: 7-D Şube: D Okul No \\d+ Doğum Tarihi \\d+\\.\\d+\\.\\d+ İkinci Yabancı Dil Fransızca Servis No \\d+/"
   - heading "Özel ders ekle" [level=2]
-  - text: Ders
-  - combobox "Ders":
-    - option "Genel"
-    - option "Matematik" [selected]
-    - option "Fen Bilimleri"
-    - option "Sosyal Bilgiler"
-    - option "Türkçe"
-    - option "İngilizce"
-    - option "İngilizce (Language)"
-    - option "Fransızca"
-    - option "Ahlak ve Yurttaşlık"
-    - option "Bilişim Teknolojileri"
-    - option "Din Kültürü ve Ahlak"
-  - text: Öğretmen adı
-  - textbox "Öğretmen adı":
-    - /placeholder: "Örn: Ayşe Yılmaz"
-  - checkbox "Ders tekrar ediyor" [checked]
-  - text: Ders tekrar ediyor Haftanın günü
-  - combobox "Haftanın günü":
-    - option "Pazartesi" [selected]
-    - option "Salı"
-    - option "Çarşamba"
-    - option "Perşembe"
-    - option "Cuma"
-    - option "Cumartesi"
-    - option "Pazar"
-  - text: Başlangıç
-  - textbox "Başlangıç"
-  - text: Bitiş
-  - textbox "Bitiş": /\d+:\d+/
-  - button "Özel ders ekle"
+  - form "Özel ders ekle":
+    - text: ""
+    - combobox "Ders":
+      - option "Genel"
+      - option "Matematik" [selected]
+      - option "Fen Bilimleri"
+      - option "Sosyal Bilgiler"
+      - option "Türkçe"
+      - option "İngilizce"
+      - option "İngilizce (Language)"
+      - option "Fransızca"
+      - option "Ahlak ve Yurttaşlık"
+      - option "Bilişim Teknolojileri"
+      - option "Din Kültürü ve Ahlak"
+    - text: ""
+    - textbox "Öğretmen adı":
+      - /placeholder: "Örn: Ayşe Yılmaz"
+    - alert
+    - checkbox "Ders her hafta tekrar ediyor" [checked]
+    - text: Ders her hafta tekrar ediyor Haftanın günü
+    - combobox "Haftanın günü":
+      - option "Pazartesi" [selected]
+      - option "Salı"
+      - option "Çarşamba"
+      - option "Perşembe"
+      - option "Cuma"
+      - option "Cumartesi"
+      - option "Pazar"
+    - text: ""
+    - textbox "Başlangıç":
+      - /placeholder: ss:dd
+      - text: ""
+    - text: ""
+    - textbox "Bitiş":
+      - /placeholder: ss:dd
+      - text: /\d+:\d+/
+    - button "Özel ders ekle"
+  - heading "Odak penceresi" [level=2]
+  - form "Odak penceresi":
+    - paragraph: Son zilden pencerenin sonuna kadar Bugün tek bir zor iş önerir; sonrasında kısa işler. Yatma saatinden sonra işi yarına bırakır.
+    - text: ""
+    - textbox "Son zil":
+      - /placeholder: ss:dd
+      - text: ""
+    - text: Odak penceresinin sonu
+    - textbox "Odak penceresinin sonu":
+      - /placeholder: ss:dd
+      - text: ""
+    - text: ""
+    - textbox "Yatma saati":
+      - /placeholder: ss:dd
+      - text: ""
+    - button "Pencereyi kaydet"
   - heading "Tanımlı özel dersler" [level=2]
   - paragraph: Tanımlı özel ders yok.

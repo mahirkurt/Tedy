@@ -11,11 +11,11 @@
     "lint:css": "IBM_TELEMETRY_DISABLED=true stylelint \"src/**/*.scss\"",
     "analyze": "ANALYZE=1 npm run build",
     "lhci": "lhci autorun",
-    "build:carbon-ai": "VITE_ASISTAN_CARBON_AI=1 npm run build",
     "test:birim": "node --test tests/*.test.ts"
   },
   "dependencies": {
     "@carbon/ai-chat": "1.22.0",
+    "@carbon/colors": "^11.60.0",
     "@carbon/icons-react": "^11.86.0",
     "@carbon/react": "^1.114.0",
     "@carbon/web-components": "^2.65.0",
@@ -37,6 +37,7 @@
     "@vitejs/plugin-react": "^5.1.1",
     "accessibility-checker-engine": "^4.0.34",
     "eslint": "^9.39.1",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",

@@ -1,7 +1,11 @@
 - main:
   - heading "Duyurular" [level=1]
   - heading "Okul duyuruları" [level=2]
-  - heading "Diğer" [level=3]
+  - paragraph: 2 yeni duyuru
   - list:
     - listitem:
-      - button "title"
+      - button /Yeni Veli toplantısı \d+ Eyl \d+ \d+:\d+/ [expanded]
+      - paragraph: /Birinci dönem veli toplantısı 2 Ekim Cuma \d+:\d+'de okul konferans salonunda\./
+    - listitem:
+      - button /Yeni Kütüphane çalışma saatleri \d+ Eyl \d+ \d+:\d+/ [expanded]
+      - paragraph: /Kütüphane hafta içi \d+:\d+–\d+:\d+ arasında açıktır\./

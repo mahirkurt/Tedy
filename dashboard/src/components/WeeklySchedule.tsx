@@ -9,6 +9,7 @@ import { useFocusMode } from '../contexts/focusMode'
 import { cleanTeacherNames, normalizeCourseDisplayName } from '../utils/formatters'
 import { dayColumns } from '../utils/schedule'
 import { EmptyLine } from './patterns/EmptyLine'
+import { dersIceriginiAc } from '../utils/dersSecimi'
 
 interface ScheduleWeek {
   week_label?: string
@@ -35,6 +36,13 @@ function formatTime(cell: string): string {
   return justTime ? justTime[1] : cell
 }
 
+/** "1. 08:00": the period word stays Sans, only the time is mono and tabular (S22, B36). */
+function SaatHucresi({ deger }: { deger: string }) {
+  const m = deger.match(/^(\d+\.)\s+(\d{2}:\d{2})$/)
+  if (!m) return <span className="schedule-time tedy-time">{deger}</span>
+  return <span className="schedule-time">{m[1]} <span className="tedy-time">{m[2]}</span></span>
+}
+
 function isCurrentPeriod(timeCell: string): boolean {
   const timeMatch = timeCell.match(/(\d{2}):(\d{2})\s*-\s*(\d{2}):(\d{2})/)
   if (!timeMatch) return false
@@ -46,7 +54,7 @@ function isCurrentPeriod(timeCell: string): boolean {
 }
 
 export default function WeeklySchedule() {
-  const { data, loading } = useApi<ScheduleData>(
+  const { data, loading, iskelet } = useApi<ScheduleData>(
     '/api/schedule',
     { latest: {}, today: '' }
   )
@@ -82,8 +90,10 @@ export default function WeeklySchedule() {
   // Carbon's skeleton in the content's shape (surface designs §2.4), not a
   // bare "Yükleniyor..." line.
   if (loading) {
+    // Nothing for a load under 400 ms (S36, B48).
+    if (!iskelet) return null
     return (
-      <div className="dashboard-card">
+      <div className="dashboard-card" aria-busy="true">
         <SkeletonText heading width="40%" />
         <SkeletonText paragraph lineCount={6} />
       </div>
@@ -149,7 +159,9 @@ export default function WeeklySchedule() {
           </span>
         }
       >
-        <DataTable rows={tableRows} headers={headers} size="xs">
+        {/* B50: Carbon's xl row (64px) fits a two-line cell — lesson and teacher — at the table's own type
+            (body-compact-01); the xs table was patched to 52px rows with 12px text. */}
+        <DataTable rows={tableRows} headers={headers} size="xl">
           {({ rows: dtRows, headers: dtHeaders, getTableProps, getHeaderProps, getRowProps }) => (
             <Table {...getTableProps()}>
               <TableHead>
@@ -188,15 +200,19 @@ export default function WeeklySchedule() {
                             className={isToday ? 'today-column' : ''}
                           >
                             {isTime ? (
-                              <span className="schedule-time">{cellValue}</span>
+                              <SaatHucresi deger={cellValue} />
                             ) : lines[0] ? (
                               <>
                                 {kaynak?.[`${cell.info.header}__saat`] && (
-                                  <span className="schedule-own-time">
+                                  <span className="schedule-own-time tedy-time">
                                     {kaynak[`${cell.info.header}__saat`]}
                                   </span>
                                 )}
-                                <span className="schedule-lesson">{normalizeCourseDisplayName(lines[0].trim())}</span>
+                                {/* B64 (§4.3): the lesson opens its own content below, on this page. */}
+                                <button type="button" className="schedule-lesson"
+                                  onClick={() => dersIceriginiAc(normalizeCourseDisplayName(lines[0].trim()))}>
+                                  {normalizeCourseDisplayName(lines[0].trim())}
+                                </button>
                                 {!focusMode && lines[1] && (
                                   <span className="schedule-detail">
                                     {cleanTeacherNames(lines.slice(1).join('\n'))}
