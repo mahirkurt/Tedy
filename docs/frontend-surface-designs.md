@@ -470,9 +470,9 @@ Boş alan gizlenmez, **boş olduğu söylenir** (D3).
 
 **Arayüz değişti (2026-10-10 notu).** 2026-10-09'dan beri asistan IBM'in `@carbon/ai-chat`
 (1.22.0) bileşeni üzerinde çalışır: `/asistan` sayfasında ve ≥ 672px'te her sayfadaki başlatıcıda;
-uyarlayıcı `dashboard/src/asistan/` (`39e3573`; derleme bayrağı `VITE_ASISTAN_CARBON_AI`). Bu
+uyarlayıcı `dashboard/src/asistan/` (`39e3573`). Bu
 bölümün aşağıdaki metni 2026-08-31 ile 2026-09-25 arasındaki eski `AssistantChat` arayüzünü anlatır;
-o bileşen bayrak kapalıyken geri dönüş olarak kodda duruyor ve metin tarih kaydı olarak kalır.
+o bileşen ve derleme bayrağı Görev 21'de (2026-10-11) koddan kaldırıldı, metin tarih kaydı olarak kalır.
 `.ac-msg--writing`, `ac-md__*`, `CitationChip` ve "tablo yok" kuralı Carbon AI Chat'te geçerli
 değildir (D1 artık en çok 4 sütun × 6 satır tablo, `:::` kutuları ve KaTeX tanır). Bugünkü
 kurallar, TEDY'nin Carbon onarımları (`Tablo.tsx`, `AiAciklama.tsx`, `carbonOnarimi.ts`) ve

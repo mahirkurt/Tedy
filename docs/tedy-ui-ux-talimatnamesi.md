@@ -1825,8 +1825,9 @@ Carbon'un kendi AI karışımlarına ve `$ai-*` token'larına tanınır.
   kabul eder, elle yazılmış değeri reddeder.
 
 Muafiyetin **ruhu** dardır: AI token'ı yalnız AI kökenli yüzeyde meşrudur. Düzenli ifade, AI token'ının AI
-olmayan bir yüzeye sürülmesini yakalamaz — bunu §6.6 K1 ve §6.7'deki testler yakalar. Ölçülmüş ihlal: eski
-`dashboard/src/components/AssistantChat.scss` hâlâ pakette (App.tsx onu statik içe aktarır) ve Carbon arayüzünün
+olmayan bir yüzeye sürülmesini yakalamaz — bunu §6.6 K1 ve §6.7'deki testler yakalar. Ölçülmüş ihlal (tarih; B54
+ile kapandı, dosya Görev 21'de 2026-10-11'de silindi): eski
+`dashboard/src/components/AssistantChat.scss` o gün pakette (App.tsx onu statik içe aktarır) ve Carbon arayüzünün
 yeniden kullandığı kaynak paneli `.ac__panel`'e AI kenar gradyanı ve `$ai-drop-shadow` (satır 565–572), atıf
 numarası `.ac__ref-path`'e `$ai-aura-hover-background` + `$ai-border-strong` (683–696), satır hover'ına aura
 (600–602), alıntı penceresi `.ac-cite__pop`'a `ai-popover-gradient()` (699–704) uygular (borç [B54](#13-bilinen-borçlar)).
@@ -1899,7 +1900,6 @@ geri bildirim — "not stated on the page"); kaynak paketin tür tanımları ve 
 
 | Dosya | Görev |
 |---|---|
-| `bayrak.ts` | Derleme zamanı bayrağı `VITE_ASISTAN_CARBON_AI` (canlıda `1`). Geri dönüş: bayrak commit'inin revert'i + `npm run build` + `ted-dashboard` restart. Dosyadaki "Görev 20'ye kadar kapalı" yorumu bayattır. |
 | `tedyChatConfig.ts` | Tek `PublicConfig`: sayfa ve panel aynı yapılandırmayı kullanır. |
 | `olayEslemesi.ts` | SSE olayı → Carbon mesaj parçası; saf, testli (`tests/olay-eslemesi.test.ts`). Araç adımları Carbon `reasoning` adımlarıdır (akışta açık, cevapla kapanır); her aracın okura dönük etiketi `ARAC_ETIKETI`'nde, `tests/test_asistan_adim_etiketleri.py` araç yüzeyiyle karşılaştırır. |
 | `atiflar.ts` | `[S1]` işaretleri metinden çıkar, Carbon `conversational_search` `ranges`'ına döner; aralık blok imini ve tablo satırını kapsamaz; kod içindeki işaret yazı kalır; çözülemeyen işaret görünür kalır (yutulmaz, D3). |
@@ -2008,7 +2008,7 @@ yazar (kod okunarak bulundu; e2e ile doğrulanmadı) — borç [B55](#13-bilinen
 | Araç adımı etiketleri | Her araç bir okur etiketine sahip | `tests/test_asistan_adim_etiketleri.py` |
 | Erişilebilirlik | axe + IBM Equal Access; tek muafiyet `aria_id_unique` (`cds--ai-label`/`cds--toggletip`) | `tasarim-denetimi.spec.ts`, `ibm-erisilebilirlik.spec.ts`, `carbon-asistan-zengin-cevap.spec.ts`, `carbon-asistan-cevap-bicimi.spec.ts` |
 | Öğretmen modu görseli | Mod × 1440/390 px ekran görüntüsü, axe, IBM | `carbon-asistan-ogretmen-gorsel.spec.ts` |
-| Telemetri ve tembel yükleme | Telemetri ucu yok; AI Chat ilk parçalarda değil | `dashboard/tests/paket-telemetri.test.ts` (önce `npm run build:carbon-ai`) |
+| Telemetri ve tembel yükleme | Telemetri ucu yok; AI Chat ilk parçalarda değil | `dashboard/tests/paket-telemetri.test.ts` (önce `npm run build`) |
 
 Çalıştırma: `cd dashboard && env -u ANTHROPIC_API_KEY npx playwright test carbon-asistan` — soru gönderen her test
 `/stream` **ve** `/chat`'i kendisi yanıtlar (yanıtsız akış gerçek çalışma zamanına düşer). Metin eşleşmeleri
@@ -3407,7 +3407,7 @@ ulaştı).
 | Kapı | Neyi korur | Komut |
 |---|---|---|
 | ESLint + stylelint | TS/React kuralları; renk, aralık, tip ve hareket token'dan (D1) | `cd dashboard && npm run lint` (yalnız stil: `npm run lint:css`); ikisi de temiz olmalı |
-| Derleme | Tipler; var olmayan ikon ya da bileşen adı (`tsc -b` adlandırılmış dışa aktarmayı reddeder) | `cd dashboard && npm run build` (Carbon AI Chat: `npm run build:carbon-ai`) |
+| Derleme | Tipler; var olmayan ikon ya da bileşen adı (`tsc -b` adlandırılmış dışa aktarmayı reddeder) | `cd dashboard && npm run build` |
 | Birim testleri (pano) | Asistan uyarlayıcısı, atıflar, markdown eklentileri, Carbon onarımları, öğretmen renkleri | `cd dashboard && npm run test:birim` |
 | Tasarım sistemi (Python) | D1 ve İ8 sabitleri, ders renginin üç çalışma zamanında eşliği, pano ↔ şablon ↔ otorite | `pytest tests/test_pano_tasarim_sistemi.py tests/test_ders_renkleri.py tests/test_tedy_tasarim_tutarliligi.py` |
 | Üreticiler | Ders renk dosyaları otoriteyle aynı | `python scripts/gen_subject_themes.py --check`; `.venv/bin/python src/mcp_server/vendor/scripts/sync_carbon_tokens.py --check` |
@@ -3698,3 +3698,4 @@ Carbon'un 43 bileşen girişi [Bileşen rehberi](carbon-bilesen-rehberi.md)'nde 
 | 1.3 | 2026-10-10 | Asistan yenilemesi (spec `docs/superpowers/specs/2026-10-10-asistan-yenileme-design.md`): S46 — sohbet yüzeyi AI yüzeyidir, panelin dışındaki ve içindeki TEDY öğeleri nötr (§11.1). Kapanan borçlar B53, B54, B55, B57, B59, B61, B68; kısmen kapanan B17, B23, B28, B32, B41, B42, B45, B70, B75 (satırlarında açık kalan yerler). Yeni ölçülmüş borçlar B76 (atıf kaydırıcısı vurgusu), B77 (geçmiş genişliği px ayrıştırması), B78 (açık ödev + B61), B79 (Carbon'un kendi denetimleri telefonda < 44 px). Carbon başlık AI etiketi yeniden denendi ve S13 sürdü (axe `nested-interactive`, IBM `label_name_visible`). |
 | 1.4 | 2026-10-10 | Asistan yenilemesi 2. tur (kullanıcı onayıyla açık kalemler): B28, B56, B76, B77, B78, B79 kapandı; B41 ve B42'nin asistan kısımları tamamlandı. S13 onarım tablosuna gölge kök kuralları (dokunma hedefi, 4K ikon, azaltılmış hareket) eklendi. B79 için S47 sapması gerekmedi: Carbon'un yoğunluk değişkeni gölge kökte ayarlanabiliyor. Açık kalan B17, B23, B32, B41, B42, B45, B70, B75 kısımları asistan dışındadır. |
 | 1.5 | 2026-10-10 | Açık kalemler 3. tur (kullanıcı: "kalan açık kısımları da kapat"): asistan dışındaki açık kısımlar ve §13'te panoda kapatılabilen satırlar. Kapandı: B10 (ölçüldü, Bugün yenilemesi kapatmıştı; kapı eklendi), B13, B17, B21, B22, B23, B27, B32, B41, B42 (modül şablonu `vendor_sync --pin` ile; 18 kapı değişmedi), B44, B45, B46, B47, B70 (pano + modül şablonu), B75. Kısmen: B14 (Books bloğu `stylelint-enable` ile kapanır), B34, B35, B38, B40, B43. Yeni kapı dosyası `tests/test_pano_talimatname_borclari.py`; `test_pano_tasarim_sistemi.py` bütün pano stillerini okur. §5.7'deki senkron etiketi sapması S45'e göre yeniden yazıldı. Bilerek açık bırakılanlar satırlarında gerekçesiyle durur. |
+| 1.6 | 2026-10-11 | Açık kalemler 4. tur (pano ön yüzü). Görev 21: eski asistan arayüzü (`components/AssistantChat.tsx`/`.scss`, `SohbetListesi`, `OgretmenSecici`, `CitationChip`) ve `VITE_ASISTAN_CARBON_AI` bayrağı (`asistan/bayrak.ts`, `.env.*`, `build:carbon-ai`) kaldırıldı; Carbon AI Chat tek yol, geri dönüş bir revert. Tasarım pytest'lerinden eski arayüz istisnaları kalktı. |

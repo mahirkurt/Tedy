@@ -29,7 +29,6 @@ kapalıdır (`$css--font-face: false`, Vite'ta `~@ibm/plex` yolu 404 veriyordu).
 IBM_TELEMETRY_DISABLED=true npm ci   # kurulum; IBM telemetrisi kapalı kalmak zorunda
 npm run dev                          # :3000, /api → http://localhost:8085
 npm run build                        # tsc -b + vite build → ../dashboard-dist/
-npm run build:carbon-ai              # VITE_ASISTAN_CARBON_AI=1 ile derleme
 npm run lint                         # ESLint + stylelint (stylelint-plugin-carbon-tokens); ikisi de temiz olmalı
 npm run lint:css                     # yalnız stylelint
 npm run test:birim                   # node:test birim testleri (tests/*.test.ts); dashboard-dist'te Carbon AI'lı demet ister
@@ -42,8 +41,8 @@ npm run analyze                      # derleme + paket-analizi.html (gitignored)
   bir akış `/chat`'e düşer ve test sunucusunda gerçek modele gider.
 - `capraz-tarayici` webkit ve firefox projelerinde koşar:
   `npx playwright install chromium webkit firefox`.
-- Asistan bayrağı (`VITE_ASISTAN_CARBON_AI`) `.env.production` ve
-  `.env.development`'ta `1`'dir; `src/asistan/bayrak.ts` okur.
+- Asistan tek arayüzdür (Carbon AI Chat, `src/asistan/`); eski `AssistantChat` ve
+  `VITE_ASISTAN_CARBON_AI` bayrağı Görev 21'de (2026-10-11) kaldırıldı. Geri dönüş: o commit'in revert'i.
 
 ## Derleme canlıdır
 

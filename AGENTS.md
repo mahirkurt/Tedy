@@ -29,7 +29,7 @@ manifest, giriş noktası ve testlerle doğrula. Kod ile dokümantasyon çelişi
 - `src/`: tarayıcılar, doğrulama, Flask API ve asistan.
 - `dashboard/src/`: TypeScript/React bileşenleri, hook'lar, context, `utils/` ve
   tema; `dashboard/src/asistan/` canlı asistan arayüzüdür (Carbon AI Chat
-  uyarlayıcısı, `VITE_ASISTAN_CARBON_AI` bayrağının arkasında).
+  uyarlayıcısı; tek asistan arayüzü budur).
 - `tests/`: Python birim, şema, idempotency, auth ve API testleri.
 - `dashboard/tests/e2e/`: Playwright API ve gerçek tarayıcı akışları; tasarım
   denetimleri (axe, IBM Equal Access, görsel, ARIA, 4K, dokunma hedefi) ve

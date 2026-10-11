@@ -19,7 +19,7 @@ const Ad = ({ s }: { s: Secenek }) => (s.aile ? <SubjectLabel course={null} fami
 /**
  * Öğretmen seçimi tek kontrol: Carbon Dropdown (lg, 48 px), satır içi etiket "Öğretmen"; seçenekler ders işaretiyle
  * (SubjectLabel — renk tek başına taşımaz, ad yanındadır, İ8). Sohbet başlığının altındaki satırda durur
- * (HEADER_BOTTOM_ELEMENT); telefonda tek satır. Eski radyo çip grubu (OgretmenSecici) yalnız eski arayüzde kalır.
+ * (HEADER_BOTTOM_ELEMENT); telefonda tek satır.
  */
 export default function OgretmenSecimi({ liste, secili, onSec, hata }: {
   liste: Ogretmen[]; secili: string; onSec: (id: string) => void; hata?: string | null

@@ -88,8 +88,7 @@ def test_module_index_imports_no_ticket_signer_mcp_sdk_or_flask():
 
 @pytest.mark.parametrize("rel", ["src/assistant_modules.py", "src/assistant_tools.py", "src/assistant_core.py",
                                  "dashboard/src/utils/moduleLink.ts", "dashboard/src/components/SourcePanel.tsx",
-                                 "dashboard/src/components/CitationChip.tsx",
-                                 "dashboard/src/components/AssistantChat.tsx"])
+                                 "dashboard/src/asistan/KaynakPaneli.tsx", "dashboard/src/asistan/atiflar.ts"])
 def test_assistant_sources_never_sign_or_fetch_tickets(rel):
     text = (PROJECT_ROOT / rel).read_text(encoding="utf-8")
     assert not TICKET_IMPORT.search(text)

@@ -2,12 +2,8 @@
 
 Each test names its debt. Tedy Books is out of scope throughout (its own world,
 surface designs §4.11): `BookReader*.scss`, the Books block at the end of
-`ted-theme.scss`, and the Books/reader TSX files.
-
-The old assistant UI (`components/AssistantChat.tsx` / `.scss`) is in the build
-only when `VITE_ASISTAN_CARBON_AI` is off and goes with plan Görev 21; the
-string checks skip it, the style checks hold it to the same rules where that
-costs nothing (no uppercase).
+`ted-theme.scss`, and the Books/reader TSX files. The old assistant UI went with
+plan Görev 21 (2026-10-11); nothing is excluded for it any more.
 """
 import re
 from pathlib import Path
@@ -16,7 +12,6 @@ ROOT = Path(__file__).resolve().parents[1]
 DASH = ROOT / "dashboard" / "src"
 THEME = DASH / "theme" / "ted-theme.scss"
 BOOKS_HEADER = "   Tedy Books\n"
-ESKI_ASISTAN = {"AssistantChat.tsx", "AssistantChat.scss"}
 
 
 def _yorumsuz_stil(metin: str) -> str:
@@ -24,11 +19,11 @@ def _yorumsuz_stil(metin: str) -> str:
     return re.sub(r"(?m)(^|[ \t])//[^\n]*", lambda m: " " * len(m.group(0)), metin)
 
 
-def _stiller(eski_asistan: bool = True) -> list[tuple[str, str]]:
+def _stiller() -> list[tuple[str, str]]:
     """Every dashboard stylesheet under src/, Books excluded (B13: rglob, not one folder)."""
     out = []
     for p in sorted(DASH.rglob("*.scss")):
-        if p.name.startswith("BookReader") or (not eski_asistan and p.name in ESKI_ASISTAN):
+        if p.name.startswith("BookReader"):
             continue
         metin = p.read_text(encoding="utf-8")
         if p == THEME:
@@ -42,7 +37,7 @@ def _stiller(eski_asistan: bool = True) -> list[tuple[str, str]]:
 def _kaynaklar() -> list[Path]:
     out = []
     for p in sorted(list(DASH.rglob("*.tsx")) + list(DASH.rglob("*.ts"))):
-        if "Book" in p.name or "Reader" in p.name or p.name in ESKI_ASISTAN or p.name.endswith(".d.ts"):
+        if "Book" in p.name or "Reader" in p.name or p.name.endswith(".d.ts"):
             continue
         out.append(p)
     return out
@@ -136,7 +131,7 @@ def test_b41_tek_cikis_fiili_ve_tek_tarih_bicimi():
 
 def test_b32_bilesen_tokeni_odunc_alinmaz():
     ihlal = []
-    for ad, metin in _stiller(eski_asistan=False):
+    for ad, metin in _stiller():
         for m in re.finditer(r"var\(--cds-(?:notification|button)-[a-z-]+", metin):
             ihlal.append(f"{ad}:{_satir(metin, m.start())}  {m.group(0)})")
     assert not ihlal, "bildirim/düğme token'ı bileşeni dışında (B32):\n" + "\n".join(ihlal)
