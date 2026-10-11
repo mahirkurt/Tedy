@@ -101,7 +101,7 @@ function formatTime(d: Date): string {
 
 export default function CalendarEvents() {
   const navigate = useNavigate()
-  const { data, loading } = useApi<{ events: UnifiedEvent[] }>('/api/calendar/unified', { events: [] })
+  const { data, loading, iskelet } = useApi<{ events: UnifiedEvent[] }>('/api/calendar/unified', { events: [] })
   const { data: health } = useApi<HealthData | null>('/api/health', null)
   const calendarClosed = Boolean(health?.unavailable?.takvim)
   const calendarClosedDetail = health?.unavailable?.takvim?.detail?.trim()
@@ -224,6 +224,8 @@ export default function CalendarEvents() {
   }, [eventsByDay])
 
   if (loading) {
+    // Nothing for a load under 400 ms (S36, B48).
+    if (!iskelet) return null
     return (
       <div className="dashboard-card">
         <h2 className="dashboard-card__title">

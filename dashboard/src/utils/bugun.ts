@@ -17,6 +17,47 @@ export const SCHOOL_END = 15 * 60 + 45
 export const FOCUS_END = 16 * 60
 export const BEDTIME = 22 * 60 + 30
 
+/**
+ * The household's focus window in minutes: last bell, the window's end,
+ * bedtime. Since 2026-10-11 it is read from the server (`/api/odak-penceresi`,
+ * stored in `output/odak_penceresi.json`, set on Profil — talimatname B29);
+ * the constants above are only its defaults, used until it loads and whenever
+ * what arrives is not a well-formed window.
+ */
+export interface OdakPenceresi { okulBitisi: number; odakSonu: number; yatma: number }
+
+export const VARSAYILAN_PENCERE: OdakPenceresi = { okulBitisi: SCHOOL_END, odakSonu: FOCUS_END, yatma: BEDTIME }
+
+const SAAT_RE = /^([01]\d|2[0-3]):([0-5]\d)$/
+
+/** "15:45" → 945, or null for anything that is not a 24-hour HH:MM. */
+export function saattenDakika(s: unknown): number | null {
+  const m = typeof s === 'string' ? SAAT_RE.exec(s.trim()) : null
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null
+}
+
+/** Whether three minutes form a window: the bell, then its end, then bedtime. */
+export function pencereGecerli(p: OdakPenceresi): boolean {
+  return p.okulBitisi <= p.odakSonu && p.odakSonu < p.yatma
+}
+
+/** The API's `{okul_bitisi, odak_sonu, yatma}` as minutes; the defaults otherwise. */
+export function pencereCoz(json: unknown): OdakPenceresi {
+  if (!json || typeof json !== 'object') return VARSAYILAN_PENCERE
+  const j = json as Record<string, unknown>
+  const okulBitisi = saattenDakika(j.okul_bitisi)
+  const odakSonu = saattenDakika(j.odak_sonu)
+  const yatma = saattenDakika(j.yatma)
+  if (okulBitisi === null || odakSonu === null || yatma === null) return VARSAYILAN_PENCERE
+  const p = { okulBitisi, odakSonu, yatma }
+  return pencereGecerli(p) ? p : VARSAYILAN_PENCERE
+}
+
+/** The body `PUT /api/odak-penceresi` takes. */
+export function pencereGovdesi(p: OdakPenceresi): { okul_bitisi: string; odak_sonu: string; yatma: string } {
+  return { okul_bitisi: clockOf(p.okulBitisi), odak_sonu: clockOf(p.odakSonu), yatma: clockOf(p.yatma) }
+}
+
 export const DAYS_TR = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
 export const MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
   'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
@@ -86,9 +127,11 @@ export interface Ses {
  * bedtime "Yarın". Before 08:00 it is "Bugün": "Şimdi" at 03:15 would pretend
  * the next ten minutes are the slot.
  */
-export function windowVoice(minutes: number, kind: 'work' | 'reading', okulGunu = true): Ses {
-  const afterBedtime = minutes >= BEDTIME
-  const afterWindow = minutes >= FOCUS_END
+export function windowVoice(
+  minutes: number, kind: 'work' | 'reading', okulGunu = true, pencere: OdakPenceresi = VARSAYILAN_PENCERE,
+): Ses {
+  const afterBedtime = minutes >= pencere.yatma
+  const afterWindow = minutes >= pencere.odakSonu
   const beforeSchool = minutes < SCHOOL_START
 
   if (!okulGunu) {
@@ -100,12 +143,12 @@ export function windowVoice(minutes: number, kind: 'work' | 'reading', okulGunu 
     return { eyebrow: 'Şimdi' }
   }
 
-  const beforeLastBell = !beforeSchool && minutes < SCHOOL_END
+  const beforeLastBell = !beforeSchool && minutes < pencere.okulBitisi
   if (kind === 'work') {
     if (afterBedtime) return { eyebrow: 'Yarın', hint: 'Bunu yarın okuldan sonra yapmak daha kolay' }
     if (afterWindow) return { eyebrow: 'Bu akşam' }
     if (beforeSchool || beforeLastBell) {
-      return { eyebrow: 'Okuldan sonra', hint: 'Bunu okuldan sonra yapmak daha kolay', anchorMin: SCHOOL_END }
+      return { eyebrow: 'Okuldan sonra', hint: 'Bunu okuldan sonra yapmak daha kolay', anchorMin: pencere.okulBitisi }
     }
     return { eyebrow: 'Şimdi' }
   }

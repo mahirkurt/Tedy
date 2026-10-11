@@ -16,7 +16,13 @@ import { EmptyLine } from './patterns/EmptyLine'
 import { EkBaglantisi } from './patterns/EkBaglantisi'
 import { useFocusMode } from '../contexts/focusMode'
 import YuklemeAlani from './YuklemeAlani'
-import { yaptimIsaretle } from '../utils/odevYaptim'
+import { yaptimIsaretle, yaptimGeriAl } from '../utils/odevYaptim'
+import { YaptinSatiri, type GeriAlDurumu } from './patterns/YaptinSatiri'
+
+const odevAdi = (hw: HomeworkItem) =>
+  [hw.normalized_course || hw['Ders Adı'], hw['Ödev Başlığı']].filter(Boolean).join(' — ')
+const eylemAnahtari = (hw: HomeworkItem) =>
+  hw.homework_key || `${hw['Ders Adı']}|${hw['Ödev Başlığı']}|${hw['Ödev Son Teslim Tarihi']}`
 
 type HomeworkGroupKey = 'aktif' | 'yapilan' | 'tamamlanan' | 'yapilmayan'
 
@@ -68,6 +74,14 @@ export default function HomeworkTracker() {
   // The row whose "Yaptım" could not be stored. It used to fail in silence —
   // the button simply came back, and nothing said the mark was not kept (D3).
   const [markErrorKey, setMarkErrorKey] = useState<string | null>(null)
+  // B63 (S40): the work "Yaptım" just recorded, said under the active list
+  // with "Geri al" on the same line, as on Bugün; and the row whose undo is
+  // in flight or failed in "Yapılan", where every mark of Işık's own can be
+  // taken back later too.
+  const [sonYapilan, setSonYapilan] = useState<HomeworkItem | null>(null)
+  const [sonGeriAl, setSonGeriAl] = useState<GeriAlDurumu>('bos')
+  const [geriAlinanKey, setGeriAlinanKey] = useState<string | null>(null)
+  const [geriAlHataKey, setGeriAlHataKey] = useState<string | null>(null)
   const [docBusy, setDocBusy] = useState(false)
   const [docError, setDocError] = useState('')
   // B23 (S40): silinecek belge. Ödev penceresi aynı yerde tehlike onayına döner; pencerenin üstüne ikinci bir
@@ -249,15 +263,43 @@ export default function HomeworkTracker() {
   }
 
   const handleMarkDone = async (hw: HomeworkItem) => {
-    const fallbackKey = `${hw["Ders Adı"]}|${hw["Ödev Başlığı"]}|${hw["Ödev Son Teslim Tarihi"]}`
-    const key = hw.homework_key || fallbackKey
+    const key = eylemAnahtari(hw)
     setMarkingKey(key)
     setMarkErrorKey(null)
     try {
-      if (await yaptimIsaretle(hw)) refreshHomework()
-      else setMarkErrorKey(key)
+      if (await yaptimIsaretle(hw)) {
+        setSonYapilan(hw)
+        setSonGeriAl('bos')
+        refreshHomework()
+      } else setMarkErrorKey(key)
     } finally {
       setMarkingKey(null)
+    }
+  }
+
+  // "Geri al" (S40, B63): the mark goes and the work is active again. The
+  // line under the list and a row in "Yapılan" use the same call.
+  const sonuGeriAl = async () => {
+    if (!sonYapilan) return
+    setSonGeriAl('aliniyor')
+    if (await yaptimGeriAl(sonYapilan)) {
+      setSonYapilan(null)
+      setSonGeriAl('bos')
+      refreshHomework()
+    } else setSonGeriAl('hata')
+  }
+
+  const satiriGeriAl = async (hw: HomeworkItem) => {
+    const key = eylemAnahtari(hw)
+    setGeriAlinanKey(key)
+    setGeriAlHataKey(null)
+    try {
+      if (await yaptimGeriAl(hw)) {
+        if (sonYapilan && eylemAnahtari(sonYapilan) === key) setSonYapilan(null)
+        refreshHomework()
+      } else setGeriAlHataKey(key)
+    } finally {
+      setGeriAlinanKey(null)
     }
   }
 
@@ -266,11 +308,13 @@ export default function HomeworkTracker() {
     title,
     items,
     showDoneAction,
+    showUndoAction,
   }: {
     keyName: HomeworkGroupKey
     title: string
     items: HomeworkItem[]
     showDoneAction?: boolean
+    showUndoAction?: boolean
   }) => {
     if (items.length === 0) return null
     return (
@@ -302,6 +346,9 @@ export default function HomeworkTracker() {
                   onDone={showDoneAction ? handleMarkDone : undefined}
                   doneLoading={isMarking}
                   doneError={markErrorKey === actionKey}
+                  onUndo={showUndoAction && hw.student_marked_done ? satiriGeriAl : undefined}
+                  undoLoading={geriAlinanKey === actionKey}
+                  undoError={geriAlHataKey === actionKey}
                 />
               )
             })}
@@ -340,6 +387,10 @@ export default function HomeworkTracker() {
 
       {aktif.length === 0 && (
         <EmptyLine>Şu an teslim bekleyen bir işin yok.</EmptyLine>
+      )}
+
+      {sonYapilan && (
+        <YaptinSatiri className="isler-yaptin" ad={odevAdi(sonYapilan)} durum={sonGeriAl} onGeriAl={sonuGeriAl} />
       )}
 
       {renderAccordionSection({
@@ -412,6 +463,7 @@ export default function HomeworkTracker() {
         keyName: 'yapilan',
         title: 'Yapılan',
         items: yapilan,
+        showUndoAction: true,
       })}
 
       {!focusMode && renderAccordionSection({
@@ -486,6 +538,9 @@ function HomeworkCard({
   onDone,
   doneLoading,
   doneError,
+  onUndo,
+  undoLoading,
+  undoError,
 }: {
   hw: HomeworkItem
   onOpen: (hw: HomeworkItem) => void
@@ -493,6 +548,9 @@ function HomeworkCard({
   onDone?: (hw: HomeworkItem) => void
   doneLoading?: boolean
   doneError?: boolean
+  onUndo?: (hw: HomeworkItem) => void
+  undoLoading?: boolean
+  undoError?: boolean
 }) {
   const deadline = parseDeadline(hw["Ödev Son Teslim Tarihi"])
   const countdown = getCountdown(deadline)
@@ -579,6 +637,27 @@ function HomeworkCard({
               {doneError && (
                 <span className="homework-item__error" role="alert">
                   Kaydedilemedi. Bağlantını kontrol edip yeniden dene.
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* B63 (S40): Işık's own "Yaptım" is taken back on its own row. Ghost,
+              because a settled row's action is a correction, not a next step (İ1).
+              The name carries the homework so a list of them is told apart. */}
+          {onUndo && (
+            <div className="homework-item__action">
+              {undoLoading ? (
+                <InlineLoading description="Geri alınıyor…" iconDescription="Geri alınıyor" status="active" />
+              ) : (
+                <Button size="sm" kind="ghost" aria-label={`Geri al: ${hw["Ödev Başlığı"]}`}
+                  onClick={() => onUndo(hw)}>
+                  Geri al
+                </Button>
+              )}
+              {undoError && (
+                <span className="homework-item__error" role="alert">
+                  Geri alınamadı. Bağlantını kontrol edip yeniden dene.
                 </span>
               )}
             </div>

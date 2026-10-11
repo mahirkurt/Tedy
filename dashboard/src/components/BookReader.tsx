@@ -93,7 +93,7 @@ export default function BookReader() {
   const { settings, update } = useReaderSettings()
   const { save, flush } = useProgressWriter(slug, chapterId)
 
-  const { data, loading, error } = useApi<BookChapterResponse | null>(
+  const { data, loading, iskelet, error } = useApi<BookChapterResponse | null>(
     `/api/books/${slug}/chapters/${chapterId}`, null
   )
   const { data: detail } = useApi<BookDetail | null>(`/api/books/${slug}`, null)
@@ -393,11 +393,11 @@ export default function BookReader() {
         onScroll={handleScroll}
         onClick={handleSurfaceClick}
       >
-        {loading && !chapter ? (
+        {loading && !chapter ? (iskelet ? (
           <div className="reader__skeleton">
             {Array.from({ length: 8 }).map((_, i) => <span key={i} />)}
           </div>
-        ) : chapter ? (
+        ) : null) : chapter ? (
           <article className="reader__page" ref={pageRef}>
             <header className="reader__opening">
               {chapter.partHeading && (

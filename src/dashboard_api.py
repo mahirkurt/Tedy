@@ -14,6 +14,7 @@ import threading
 import time
 import unicodedata
 from collections import OrderedDict
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
@@ -31,7 +32,7 @@ os.chdir(PROJECT_ROOT)
 
 from src.env_loader import load_env
 from src.json_utils import atomic_json_dump
-from src.course_names import normalize_course, COURSE_ALIASES
+from src.course_names import normalize_course, COURSE_ALIASES, OZEL_DERS
 from src.hafta_secici import guncel_hafta as _guncel_hafta
 from src.portal_susu import temiz_dersler, temiz_haftalar, temiz_metin
 from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.USER_ROLES etc.)
@@ -125,6 +126,9 @@ DIST_DIR = os.path.join(PROJECT_ROOT, "dashboard-dist")
 PHOTO_HOMEWORK_FILE = os.path.join(OUTPUT_DIR, "photo_homework.json")
 PRIVATE_LESSON_FILE = os.path.join(OUTPUT_DIR, "private_lessons.json")
 STUDENT_DONE_FILE = os.path.join(OUTPUT_DIR, "homework_student_done.json")
+# How private-lesson photo rows stored before 2026-10-11 spell the placeholder
+# (title case); read only to map it to OZEL_DERS at the API boundary.
+ESKI_OZEL_DERS = "Özel Ders"
 MAX_PHOTO_SIZE_BYTES = 12 * 1024 * 1024
 # Longest edge sent to the model. Claude downsizes past ~1568 px anyway and
 # refuses images over 5 MB; 2000 px JPEG keeps worksheet text legible and every
@@ -711,11 +715,13 @@ def _private_lessons_for_week(week_dates, lessons=None):
         if end_dt <= start_dt:
             end_dt = start_dt + timedelta(minutes=50)
 
-        title = f"{lesson.get('course', 'Özel Ders')} · {lesson.get('teacher', '').strip()}"
+        # Sentence case at the source (talimatname S38, B41): the status and
+        # the subtitle reach Takvim's popover and Bugün's timeline as text.
+        title = f"{lesson.get('course', OZEL_DERS)} · {lesson.get('teacher', '').strip()}"
         subtitle = (
-            f"Özel Ders • {lesson.get('teacher', '').strip()}"
+            f"{OZEL_DERS} • {lesson.get('teacher', '').strip()}"
             if lesson.get("teacher")
-            else "Özel Ders"
+            else OZEL_DERS
         )
         events.append({
             "id": _make_id("private_lesson", lesson.get("id", ""), start_dt.isoformat()),
@@ -724,7 +730,7 @@ def _private_lessons_for_week(week_dates, lessons=None):
             "start": start_dt.isoformat(),
             "end": end_dt.isoformat(),
             "course": lesson.get("course", ""),
-            "status": "Özel Ders",
+            "status": OZEL_DERS,
             "subtitle": subtitle,
             "private_lesson_id": lesson.get("id", ""),
         })
@@ -772,7 +778,7 @@ def _private_lessons_calendar_events(days_before=30, days_after=120):
                 "end": ev.get("end", ev.get("start", "")),
                 "extendedProps": {
                     "kind": "private_lesson",
-                    "badge": "Özel Ders",
+                    "badge": OZEL_DERS,
                     "course": ev.get("course", ""),
                     "description": ev.get("subtitle", ""),
                     "private_lesson_id": ev.get("private_lesson_id", ""),
@@ -892,6 +898,11 @@ def _combined_homework_rows(scraped_data):
         r = dict(row)
         if "Ders Adı" in r:
             r["normalized_course"] = normalize_course(r["Ders Adı"])
+        kaynak = r.get("Ödev Kaynağı")
+        if isinstance(kaynak, str) and kaynak.startswith(ESKI_OZEL_DERS):
+            # A private-lesson photo row stored before 2026-10-11 says it in
+            # title case; the reader gets sentence case (S38), the file stays.
+            r["Ödev Kaynağı"] = OZEL_DERS + kaynak[len(ESKI_OZEL_DERS):]
         detay = r.get("detail")
         if isinstance(detay, dict):
             r["detail"] = {**detay, "description": temiz_metin(detay.get("description")),
@@ -1426,9 +1437,9 @@ def _to_photo_homework_row(
 
     if source_type == "private" and not confirmed:
         # Before the reader has looked, the lesson they picked names the course.
-        course = lesson_course or extracted_course or selected_course or "Özel Ders"
+        course = lesson_course or extracted_course or selected_course or OZEL_DERS
     elif source_type == "private":
-        course = extracted_course or lesson_course or "Özel Ders"
+        course = extracted_course or lesson_course or OZEL_DERS
     else:
         # The words on the page win. The form's course only fills a blank,
         # so a default of "Matematik" cannot relabel a Türkçe worksheet.
@@ -1440,7 +1451,7 @@ def _to_photo_homework_row(
     )
 
     if source_type == "private":
-        source = f"Özel Ders ({lesson_teacher})" if lesson_teacher else "Özel Ders"
+        source = f"{OZEL_DERS} ({lesson_teacher})" if lesson_teacher else OZEL_DERS
     else:
         source = "Fotoğraf"
 
@@ -1613,10 +1624,11 @@ def _foto_odev_tamamla(anahtar, alan, deger, simdi=None):
     eski = anahtar
     yeni = _homework_row_key(hedef)
     if eski != yeni:
-        marks = _load_student_done_marks()
-        if eski in marks:
-            marks[yeni] = marks.pop(eski)
-            _save_student_done_marks(marks)
+        with _isaret_kilidi():
+            marks = _load_student_done_marks()
+            if eski in marks:
+                marks[yeni] = marks.pop(eski)
+                _save_student_done_marks(marks)
     _save_photo_homework_rows(rows)
     return cumle
 
@@ -1747,6 +1759,67 @@ def create_private_lesson():
     return jsonify({"ok": True, "lesson": item})
 
 
+# --- Focus window (anayasa §2, talimatname B29) ---
+# "The window is a parameter, not a constant; it is kept configurable in
+# output/." Until 2026-10-11 it was three constants in the dashboard's bundle
+# (utils/bugun.ts): changing the last bell or bedtime needed a rebuild. Today's
+# values are the defaults, so a household that never sets it sees no change.
+ODAK_PENCERESI_VARSAYILAN = {"okul_bitisi": "15:45", "odak_sonu": "16:00", "yatma": "22:30"}
+_SAAT_DAKIKA_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
+
+
+def _odak_penceresi_yolu():
+    return os.path.join(OUTPUT_DIR, "odak_penceresi.json")
+
+
+def _odak_penceresi_dogrula(govde):
+    """``(window, None)`` for a well-formed window, ``(None, sentence)`` otherwise.
+
+    Three HH:MM times in order: the last bell, then the window's end (it may
+    close at the bell itself), then bedtime strictly after it."""
+    if not isinstance(govde, dict):
+        return None, "Odak penceresi üç saat olarak gönderilmeli."
+    pencere = {}
+    for alan in ODAK_PENCERESI_VARSAYILAN:
+        deger = str(govde.get(alan) or "").strip()
+        if not _SAAT_DAKIKA_RE.match(deger):
+            return None, "Her saat SS:DD biçiminde olmalı (örneğin 15:45)."
+        pencere[alan] = deger
+    if not (pencere["okul_bitisi"] <= pencere["odak_sonu"] < pencere["yatma"]):
+        return None, "Saatler sırayla olmalı: son zil, odak penceresinin sonu, sonra yatma saati."
+    return pencere, None
+
+
+def _odak_penceresi_oku():
+    """The stored window, or the defaults when there is none or it is unreadable."""
+    try:
+        with open(_odak_penceresi_yolu(), "r", encoding="utf-8") as f:
+            pencere, _hata = _odak_penceresi_dogrula(json.load(f))
+    except (OSError, ValueError):
+        pencere = None
+    if pencere is None:
+        return {**ODAK_PENCERESI_VARSAYILAN, "varsayilan": True}
+    return {**pencere, "varsayilan": False}
+
+
+@app.route("/api/odak-penceresi")
+@require_auth
+def odak_penceresi():
+    """The household's focus window. Not in READER_ENDPOINTS: full role only."""
+    return jsonify(_odak_penceresi_oku())
+
+
+@app.route("/api/odak-penceresi", methods=["PUT"])
+@require_auth
+def odak_penceresi_kaydet():
+    """Replace the window. A whole-file replace, so atomic_json_dump suffices."""
+    pencere, hata = _odak_penceresi_dogrula(request.get_json(silent=True))
+    if hata:
+        return jsonify({"error": hata}), 400
+    atomic_json_dump({**pencere, "updated_at": datetime.now().isoformat()}, _odak_penceresi_yolu())
+    return jsonify({**pencere, "varsayilan": False})
+
+
 @app.route("/api/homework")
 @require_auth
 def homework():
@@ -1755,6 +1828,7 @@ def homework():
     rows = _combined_homework_rows(data)
     summary = hw.get("summary", "")
     student_done_marks = _load_student_done_marks()
+    onceki_isaretler = set(student_done_marks)
     student_done_changed = False
 
     # Track first-seen dates for homework items
@@ -1783,16 +1857,45 @@ def homework():
     if changed:
         atomic_json_dump(first_seen, first_seen_path)
     if student_done_changed:
-        _save_student_done_marks(student_done_marks)
+        # Drop only the marks the teacher's verdict made obsolete, from a fresh
+        # read under the lock: writing back this request's whole copy would
+        # lose a "Yaptım" or a "Geri al" another worker stored meanwhile.
+        budananlar = onceki_isaretler - set(student_done_marks)
+        with _isaret_kilidi():
+            guncel = _load_student_done_marks()
+            for anahtar in budananlar:
+                guncel.pop(anahtar, None)
+            _save_student_done_marks(guncel)
 
     _belgeleri_yapistir(rows)
     return jsonify({"summary": summary, "homework": rows})
 
 
-@app.route("/api/homework/mark-done", methods=["POST"])
-@require_auth
-def homework_mark_done():
-    payload = request.get_json(silent=True) or {}
+@contextmanager
+def _isaret_kilidi():
+    """Serialise every read-modify-write of the "Yaptım" marks.
+
+    gunicorn runs two worker processes, so mark-done, unmark-done, the
+    teacher-verdict pruning in /api/homework and odev_tamamla's key rename can
+    interleave; each holds this flock (as module_progress does) and still
+    writes through atomic_json_dump."""
+    import fcntl
+    yol = STUDENT_DONE_FILE + ".lock"
+    os.makedirs(os.path.dirname(yol), exist_ok=True)
+    with open(yol, "a+", encoding="utf-8") as kilit:
+        fcntl.flock(kilit, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(kilit, fcntl.LOCK_UN)
+
+
+def _istenen_odev(payload):
+    """The homework a mark-done / unmark-done request names.
+
+    Returns ``(row, key, None)`` or ``(None, "", (response, status))``. A key
+    alone is enough to unmark (the row may have left the list since), so the
+    caller decides whether a key with no row is an error."""
     requested_key = str(payload.get("homework_key") or "").strip()
     requested_title = str(
         payload.get("Ödev Başlığı") or payload.get("title") or ""
@@ -1805,19 +1908,15 @@ def homework_mark_done():
     )
 
     if not requested_key and (not requested_title or not requested_due):
-        return jsonify({
+        return None, "", (jsonify({
             "error": "homework_key veya (Ödev Başlığı + Ödev Son Teslim Tarihi) gerekli"
-        }), 400
+        }), 400)
 
     rows = _combined_homework_rows(_scraped())
-    target = None
-    target_key = ""
     for row in rows:
         row_key = _homework_row_key(row)
         if requested_key and row_key == requested_key:
-            target = row
-            target_key = row_key
-            break
+            return row, row_key, None
 
         if not requested_key:
             row_title = str(row.get("Ödev Başlığı", "")).strip()
@@ -1828,12 +1927,42 @@ def homework_mark_done():
                 and row_due == requested_due
                 and (not requested_course or row_course == requested_course)
             ):
-                target = row
-                target_key = row_key
-                break
+                return row, row_key, None
 
-    if not target:
-        return jsonify({"error": "Ödev bulunamadı"}), 404
+    return None, requested_key, (jsonify({"error": "Ödev bulunamadı"}), 404)
+
+
+@app.route("/api/homework/unmark-done", methods=["POST"])
+@require_auth
+def homework_unmark_done():
+    """Take a "Yaptım" back (talimatname S40, B63): the reader's own mark only.
+
+    Mirrors mark-done — same gate (require_auth, readers refused by default),
+    same identifiers, same lock and atomic write — and is idempotent: a mark
+    that is not there answers ``removed: false``, not an error. A key alone is
+    enough even when the row has left the list; the teacher's status is never
+    touched (only the portal sets it)."""
+    payload = request.get_json(silent=True) or {}
+    _row, target_key, hata = _istenen_odev(payload)
+    if hata and not target_key:
+        return hata
+
+    with _isaret_kilidi():
+        marks = _load_student_done_marks()
+        removed = marks.pop(target_key, None) is not None
+        if removed:
+            _save_student_done_marks(marks)
+
+    return jsonify({"ok": True, "homework_key": target_key, "removed": removed})
+
+
+@app.route("/api/homework/mark-done", methods=["POST"])
+@require_auth
+def homework_mark_done():
+    payload = request.get_json(silent=True) or {}
+    target, target_key, hata = _istenen_odev(payload)
+    if hata:
+        return hata
 
     normalized_status = _normalize_homework_status_text(target.get("Ödev Durumu", ""))
     if _is_teacher_resolved_homework_status(normalized_status):
@@ -1845,10 +1974,11 @@ def homework_mark_done():
             "status": normalized_status,
         })
 
-    marks = _load_student_done_marks()
-    if target_key not in marks:
-        marks[target_key] = datetime.now().isoformat()
-        _save_student_done_marks(marks)
+    with _isaret_kilidi():
+        marks = _load_student_done_marks()
+        if target_key not in marks:
+            marks[target_key] = datetime.now().isoformat()
+            _save_student_done_marks(marks)
 
     return jsonify({
         "ok": True,
@@ -1879,7 +2009,7 @@ def homework_from_photo():
     private_lesson = None
     if source_type == "private":
         if not private_lesson_id:
-            return jsonify({"error": "Özel Ders kaynağı için private_lesson_id gerekli"}), 400
+            return jsonify({"error": "Özel ders kaynağı için private_lesson_id gerekli"}), 400
         private_lesson = _find_private_lesson(private_lesson_id)
         if not private_lesson:
             return jsonify({"error": "Seçilen özel ders bulunamadı"}), 404

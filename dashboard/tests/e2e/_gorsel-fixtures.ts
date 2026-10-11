@@ -95,6 +95,6 @@ export const GORSEL: Record<string, unknown> = {
       color: '', course: 'Türkçe', courseFamily: 'magenta', status: '', subtitle: '' },
     { id: 'p1', type: 'private_lesson', title: 'Fen Bilimleri · Deneme Hoca',
       start: '2026-09-26T12:00:00', end: '2026-09-26T13:00:00', color: '', course: 'Fen Bilimleri',
-      courseFamily: 'teal', status: 'Özel Ders', subtitle: 'Özel Ders • Deneme Hoca' },
+      courseFamily: 'teal', status: 'Özel ders', subtitle: 'Özel ders • Deneme Hoca' },
   ] },
 }

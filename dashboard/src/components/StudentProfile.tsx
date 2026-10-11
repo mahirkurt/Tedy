@@ -5,6 +5,7 @@ import { useApi } from '../hooks/useApi'
 import { COURSE_CONTENT_ORDER } from '../utils/formatters'
 import type { PrivateLesson, StudentProfileData } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
+import OdakPenceresiAyari from './OdakPenceresiAyari'
 
 const DEFAULT_PROFILE: StudentProfileData = {
   name: '',
@@ -144,11 +145,13 @@ export default function StudentProfile() {
       </div>
 
       <div className="dashboard-card">
-        <h2 className="dashboard-card__title">
+        <h2 className="dashboard-card__title" id="ozel-ders-ekle-baslik">
           <AddAlt size={20} />
           Özel ders ekle
         </h2>
-        <form className="private-lesson-form" onSubmit={handleAddLesson}>
+        {/* Named by its heading: Profil has two forms now, and two unnamed form
+            landmarks cannot be told apart (IBM aria_form_label_unique). */}
+        <form className="private-lesson-form" onSubmit={handleAddLesson} aria-labelledby="ozel-ders-ekle-baslik">
           <label className="private-lesson-form__label">
             Ders
             <select value={course} onChange={e => setCourse(e.target.value)} className="private-lesson-form__input">
@@ -236,6 +239,8 @@ export default function StudentProfile() {
           )}
         </form>
       </div>
+
+      <OdakPenceresiAyari />
 
       <div className="dashboard-card">
         <h2 className="dashboard-card__title">Tanımlı özel dersler</h2>

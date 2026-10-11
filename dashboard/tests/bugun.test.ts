@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   windowVoice, okulGunuMu, yerSec, simdiUstu, bitenOzeti, sonrakiOkulGunu, yarinBasligi,
-  rakamParcala, SCHOOL_END, type AgendaSlot, type AgendaType,
+  rakamParcala, SCHOOL_END, VARSAYILAN_PENCERE, pencereCoz, pencereGovdesi,
+  type AgendaSlot, type AgendaType,
 } from '../src/utils/bugun.ts'
 
 const dk = (s: string) => { const [h, m] = s.split(':').map(Number); return h * 60 + m }
@@ -125,4 +126,30 @@ test('yalnız rakamlar mono parçaya ayrılır', () => {
     { metin: '4', rakam: true }, { metin: ' ders kaldı', rakam: false },
   ])
   assert.deepEqual(rakamParcala('Teslim'), [{ metin: 'Teslim', rakam: false }])
+})
+
+// B29 (2026-10-11): the focus window is read from the server (output/), today's
+// values being the defaults.
+test('odak penceresi sunucudan çözülür; bozuk ya da eksikse bugünkü değerler', () => {
+  assert.deepEqual(VARSAYILAN_PENCERE, { okulBitisi: dk('15:45'), odakSonu: dk('16:00'), yatma: dk('22:30') })
+  assert.deepEqual(pencereCoz({ okul_bitisi: '15:30', odak_sonu: '16:30', yatma: '21:45', varsayilan: false }),
+    { okulBitisi: dk('15:30'), odakSonu: dk('16:30'), yatma: dk('21:45') })
+  for (const bozuk of [{}, null, 'x', { okul_bitisi: '15:30', odak_sonu: '16:30' },
+    { okul_bitisi: '25:00', odak_sonu: '16:30', yatma: '21:45' },
+    { okul_bitisi: '17:00', odak_sonu: '16:30', yatma: '21:45' }]) {
+    assert.deepEqual(pencereCoz(bozuk), VARSAYILAN_PENCERE, JSON.stringify(bozuk))
+  }
+  assert.deepEqual(pencereGovdesi(VARSAYILAN_PENCERE), { okul_bitisi: '15:45', odak_sonu: '16:00', yatma: '22:30' })
+})
+
+test('pencere değişince kartın sesi de değişir', () => {
+  const gec = { okulBitisi: dk('16:30'), odakSonu: dk('17:00'), yatma: dk('21:30') }
+  // 16:10 is "Bu akşam" with today's window, still school with a later bell.
+  assert.equal(windowVoice(dk('16:10'), 'work', true).eyebrow, 'Bu akşam')
+  assert.deepEqual(windowVoice(dk('16:10'), 'work', true, gec), {
+    eyebrow: 'Okuldan sonra', hint: 'Bunu okuldan sonra yapmak daha kolay', anchorMin: dk('16:30'),
+  })
+  assert.equal(windowVoice(dk('16:40'), 'work', true, gec).eyebrow, 'Şimdi')
+  assert.equal(windowVoice(dk('21:40'), 'work', true, gec).eyebrow, 'Yarın')
+  assert.equal(windowVoice(dk('21:40'), 'reading', false, gec).eyebrow, 'Yarın')
 })

@@ -170,11 +170,13 @@ function ResumeBand({ books }: { books: BookSummary[] }) {
 /* ── Shelf: /kitaplar ──────────────────────────────────────────────────────── */
 
 export default function TedyBooks() {
-  const { data, loading } = useApi<{ books: BookSummary[] }>('/api/books', { books: [] })
+  const { data, loading, iskelet } = useApi<{ books: BookSummary[] }>('/api/books', { books: [] })
   const user = useSession()
   const isReader = user?.role === 'reader'
 
   if (loading) {
+    // Nothing for a load under 400 ms (S36, B48).
+    if (!iskelet) return null
     return (
       <div className="books-loading">
         <div className="books-loading__cover" />
@@ -329,7 +331,7 @@ function groupChapters(chapters: BookChapter[]): ChapterGroup[] {
 export function BookDetail() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
-  const { data: book, loading, error } = useApi<BookDetailType | null>(
+  const { data: book, loading, iskelet, error } = useApi<BookDetailType | null>(
     `/api/books/${slug}`, null
   )
   const progress = useBookProgress(slug)
@@ -341,6 +343,7 @@ export function BookDetail() {
   ) ? progress.lastChapterId : null
 
   if (loading) {
+    if (!iskelet) return null
     return (
       <div className="books-loading">
         <div className="books-loading__cover" />

@@ -20,14 +20,14 @@ const MODE_LABEL: Record<string, string> = {
 }
 
 export default function Modules() {
-  const { data, loading, error } = useApi<{ moduller: ModuleCard[] }>('/api/modules', { moduller: [] })
+  const { data, loading, iskelet, error } = useApi<{ moduller: ModuleCard[] }>('/api/modules', { moduller: [] })
   const navigate = useNavigate()
   const dar = useDar()
   const modules = Array.isArray(data.moduller) ? data.moduller : []
   return (
     <div className="dashboard-card modules">
       <h2 className="dashboard-card__title"><Education size={20} />Modüller</h2>
-      {loading && <SkeletonText paragraph lineCount={3} />}
+      {iskelet && <SkeletonText paragraph lineCount={3} />}
       {!loading && error && (
         // B43 (D3, D4): the raw fetch error ("HTTP 500", "Non-JSON response") never reaches the reader.
         <InlineNotification kind="error" role="alert" lowContrast hideCloseButton statusIconDescription="Hata"

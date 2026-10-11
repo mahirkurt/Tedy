@@ -165,8 +165,8 @@ test.describe('weekend', () => {
         color: '', course: 'Matematik', courseFamily: 'purple', status: '' },
       { id: 'p', type: 'private_lesson', title: 'Fen Bilimleri · Deneme Hoca',
         start: '2026-09-26T12:00:00', end: '2026-09-26T13:00:00',
-        color: '', course: 'Fen Bilimleri', courseFamily: 'teal', status: 'Özel Ders',
-        subtitle: 'Özel Ders • Deneme Hoca' },
+        color: '', course: 'Fen Bilimleri', courseFamily: 'teal', status: 'Özel ders',
+        subtitle: 'Özel ders • Deneme Hoca' },
     ] })))
     await page.clock.setFixedTime(new Date('2026-09-24T10:30:00+03:00'))
     await page.goto('/takvim')
@@ -200,12 +200,12 @@ test.describe('weekend', () => {
     await page.route('**/api/calendar/unified', r => r.fulfill(json({ events: [
       { id: 'p1', type: 'private_lesson', title: 'Fen Bilimleri · Deneme Hoca',
         start: '2026-09-26T12:00:00', end: '2026-09-26T13:00:00',
-        color: '', course: 'Fen Bilimleri', courseFamily: 'teal', status: 'Özel Ders',
-        subtitle: 'Özel Ders • Deneme Hoca' },
+        color: '', course: 'Fen Bilimleri', courseFamily: 'teal', status: 'Özel ders',
+        subtitle: 'Özel ders • Deneme Hoca' },
       { id: 'p2', type: 'private_lesson', title: 'Fen Bilimleri · Deneme Hoca',
         start: '2026-10-03T12:00:00', end: '2026-10-03T13:00:00',
-        color: '', course: 'Fen Bilimleri', courseFamily: 'teal', status: 'Özel Ders',
-        subtitle: 'Özel Ders • Deneme Hoca' },
+        color: '', course: 'Fen Bilimleri', courseFamily: 'teal', status: 'Özel ders',
+        subtitle: 'Özel ders • Deneme Hoca' },
     ] })))
     await page.clock.setFixedTime(new Date('2026-09-24T10:30:00+03:00'))
     await page.goto('/takvim')

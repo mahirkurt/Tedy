@@ -46,7 +46,7 @@ function isCurrentPeriod(timeCell: string): boolean {
 }
 
 export default function WeeklySchedule() {
-  const { data, loading } = useApi<ScheduleData>(
+  const { data, loading, iskelet } = useApi<ScheduleData>(
     '/api/schedule',
     { latest: {}, today: '' }
   )
@@ -82,6 +82,8 @@ export default function WeeklySchedule() {
   // Carbon's skeleton in the content's shape (surface designs §2.4), not a
   // bare "Yükleniyor..." line.
   if (loading) {
+    // Nothing for a load under 400 ms (S36, B48).
+    if (!iskelet) return null
     return (
       <div className="dashboard-card">
         <SkeletonText heading width="40%" />
