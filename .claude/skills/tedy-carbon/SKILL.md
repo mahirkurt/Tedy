@@ -20,7 +20,7 @@ description: TEDY overlay on carbon-builder. Use for any TEDY UI work — dashbo
 - **S6** "No tests, stop after files" is void: every change ships with tests and read visual diffs. "Don't restate tool output" stands.
 - **S7** `<Theme theme="g10">` + `:root` theme is deliberate (don't dedupe); never pass `injectCarbonTheme` to AI Chat.
 - **S9** Typography via `@include type.type-style('…')` in SCSS, never a `cds--*` class in TSX.
-- **S10** Radii: cards/panels 8px (`--ted-radius-card`), controls 0, tags pill. No new 2/4/12px.
+- **S10** Radii: cards 8px (`--ted-radius-card`), chips `--ted-radius-pill`, all else 0 (controls, marks, bars). Lint-pinned.
 - **S11** No static shadows; depth = layer token + 1px border. Shadows only on transient surfaces.
 - **S13** Carbon AI Chat a11y repairs (`asistan/carbonOnarimi.ts`, `Tablo.tsx`, `AiAciklama.tsx`) stay; re-run the IBM test on every `@carbon/ai-chat` bump.
 - **S35–S45** (Carbon-aligned): primary always `$button-primary`; sentence case, no all-caps; heading weight from its token; skeleton for content, one `InlineLoading` per action; grey never marks a failure; grades not colour-banded. Open code: §13 B68–B75.
