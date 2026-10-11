@@ -351,7 +351,8 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Create: `tests/test_mufredat_agaci_ayristirici.py`
 
 **Interfaces:**
-- Consumes: Görev 1'in `src.mufredat_agaci.KIMLIK_RE`.
+- Consumes: hiçbir şey (yalnız stdlib). `konu_slug` alfabesi Görev 1'in `KIMLIK_RE`'siyle
+  yapıca aynıdır ama import edilmez; uyumu Görev 1'in `dogrula`'sı zorlar.
 - Produces:
   - `nokta_onculu(satir: str) -> tuple[str, int] | None`
   - `baslik_duzeni(metin: str) -> str`
@@ -476,7 +477,7 @@ URI = "file:/home/mahirkurt/mcp-data/mufredat/mufredat.sqlite?mode=ro&immutable=
 # OCR_DUZELTME ile aynı gerekçe, ders kitabı başlıklarında ölçülen biçimler.
 OCR_DUZELTME = {"SOSY AL": "SOSYAL", "DÜNY A": "DÜNYA", "YAŞAY AN": "YAŞAYAN",
                 "KÜL TÜRÜ": "KÜLTÜRÜ", "ETK İSİ": "ETKİSİ", "ÜLKEM İZİN": "ÜLKEMİZİN",
-                "DEVLETİ ’NİN": "DEVLETİ’NİN", "MEDENİYETİ ": "MEDENİYETİ"}
+                "DEVLETİ ’NİN": "DEVLETİ’NİN"}
 # Başlık düzeninde küçük kalan bağlaçlar (Türkçe yazım).
 KUCUK_KALAN = {"ve", "ile", "veya", "ya", "da", "de", "ki"}
 NOKTA_ONCULU = re.compile(r"^(?P<ad>.*?[^\s.])\s*\.{4,}\s*(?P<s>\d{1,3})$")
@@ -795,6 +796,8 @@ Parçaları birleştirir, `src/mufredat_agaci.json`'ı yazar, kapsam raporunu ba
   - `gecersiz_sayfa(sayfa, sayfa_sayisi) -> bool`
   - `kimlik_ver(ders_slug, unite_no, ad, kullanilan: set[str]) -> tuple[str, bool]` — `(id, cakisti)`
   - `kazanim_esle(konu_metni, kazanimlar) -> tuple[list[str], str]`
+  - `kitap_kaymasi(baglanti, kitap_id) -> tuple[int | None, str]`
+  - `aparat_mi(ad) -> bool`
   - `ders_uret(baglanti, slug) -> tuple[dict | None, dict]` — `(ders kaydı | None, kapsam)`
   - `agac_uret(baglanti, sluglar) -> dict`
   - `main(argv) -> int`
@@ -1181,8 +1184,7 @@ def agac_dosyasi(tmp_path, monkeypatch):
         yol = tmp_path / "mufredat_agaci.json"
         yol.write_text(json.dumps(govde) if not isinstance(govde, str) else govde, encoding="utf-8")
         monkeypatch.setattr(dashboard_api, "MUFREDAT_AGACI_PATH", str(yol))
-        dashboard_api._mufredat_agaci.cache_clear() if hasattr(
-            dashboard_api._mufredat_agaci, "cache_clear") else None
+        # Önbellek stat imzalı: yol değişince imza da değişir, elle temizlemek gerekmez.
         return yol
     return yaz
 
