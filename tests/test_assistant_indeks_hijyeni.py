@@ -62,6 +62,9 @@ FORBIDDEN_FILES = (
     "output/page_structure.json",
     "output/sheets_id.txt",
     "output/book_progress.json",
+    # B29 (2026-10-11): the household's focus-window setting.
+    "output/odak_penceresi.json",
+    "output/homework_student_done.json.lock",
     "output/homework_first_seen.json",
     "output/run_sync.pid",
     "output/crontab",

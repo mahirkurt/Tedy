@@ -628,15 +628,9 @@ body {
   margin: 0 0 spacing.$spacing-03;
 }
 
-// What "Yaptım" recorded, said once and quietly under the card.
-.today-done-note {
-  display: flex;
-  align-items: center;
-  gap: var(--ted-space-xs);
-  margin: 0;
-  @include type.type-style('body-compact-01');
-  color: var(--cds-text-secondary);
-}
+// What "Yaptım" recorded, said once and quietly under the card, with "Geri al"
+// on the same line: components/patterns/YaptinSatiri.tsx owns the styling
+// (.yaptin-satiri in patterns.scss); .today-done-note only names Bugün's.
 
 // ── The day: fold of finished items, then the timeline ──
 
@@ -2790,6 +2784,21 @@ body {
   flex-direction: column;
   gap: var(--ted-space-sm);
   max-width: 30rem;   // a form is read down, not across a 912px card
+}
+
+// Profil's focus window (B29): Carbon TimePickers read down one column.
+.odak-penceresi-formu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ted-space-sm);
+  max-width: 30rem;
+}
+
+.odak-penceresi-formu__aciklama {
+  margin: 0;
+  @include type.type-style('body-01');
+  color: var(--cds-text-secondary);
 }
 
 .private-lesson-form__label {

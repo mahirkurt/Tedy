@@ -144,4 +144,9 @@ class TestNormalizeCourseUnknown:
     def test_sinif_ogretmeni(self):
         assert normalize_course("Sınıf Öğretmeni") == "Sınıf Öğretmeni"
 
+    def test_ozel_ders_placeholder_reaches_the_reader_in_sentence_case(self):
+        # Rows stored before 2026-10-11 say "Özel Ders" (talimatname S38, B41).
+        assert normalize_course("Özel Ders") == "Özel ders"
+        assert normalize_course("Özel ders") == "Özel ders"
+
 

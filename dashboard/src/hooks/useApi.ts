@@ -3,15 +3,30 @@ import { useState, useEffect, useCallback } from 'react'
 const REFRESH_INTERVAL = 5 * 60 * 1000
 const HOMEWORK_UPDATE_EVENT = 'tedy:homework-updated'
 
+/** A first load shorter than this shows nothing; a skeleton that blinks for a
+ *  frame is noise (yüzey tasarımları §2.4, talimatname S36, B48). The
+ *  threshold is TEDY's, not Carbon's. */
+export const YUKLEME_ESIGI_MS = 400
+
 export function useApi<T>(endpoint: string, defaultValue: T): {
   data: T
+  /** True until the first answer (or failure) arrives. */
   loading: boolean
+  /** True only while still loading once YUKLEME_ESIGI_MS has passed: draw the
+   *  skeleton on this, and nothing while `loading` is true without it. */
+  iskelet: boolean
   error: string | null
   refresh: () => void
 } {
   const [data, setData] = useState<T>(defaultValue)
   const [loading, setLoading] = useState(true)
+  const [esikGecti, setEsikGecti] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const t = setTimeout(() => setEsikGecti(true), YUKLEME_ESIGI_MS)
+    return () => clearTimeout(t)
+  }, [])
 
   const fetchData = useCallback(async () => {
     try {
@@ -50,5 +65,5 @@ export function useApi<T>(endpoint: string, defaultValue: T): {
     }
   }, [fetchData])
 
-  return { data, loading, error, refresh: fetchData }
+  return { data, loading, iskelet: loading && esikGecti, error, refresh: fetchData }
 }

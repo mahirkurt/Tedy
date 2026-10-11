@@ -322,7 +322,9 @@ def foto_eksik_alanlar(row: dict[str, Any]) -> list[str]:
     birakilan = {str(a) for a in (row.get("eksik_birakilan") or [])}
     eksik: list[str] = []
     ders = str(row.get("normalized_course") or row.get("Ders Adı") or "").strip()
-    if "ders" not in birakilan and ders in {"", "Genel", "Özel Ders"}:
+    # "Özel ders" is the placeholder since 2026-10-11; rows stored before
+    # still say "Özel Ders" when normalized_course is absent (raw rows).
+    if "ders" not in birakilan and ders in {"", "Genel", "Özel ders", "Özel Ders"}:
         eksik.append("ders")
     if "teslim" not in birakilan and _teslim(str(row.get("Ödev Son Teslim Tarihi") or "")) is None:
         eksik.append("teslim")

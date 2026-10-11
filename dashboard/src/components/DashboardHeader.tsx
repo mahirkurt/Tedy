@@ -50,7 +50,7 @@ interface Props {
 
 export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onClickSideNavExpand }: Props) {
   const { focusMode, toggleFocusMode } = useFocusMode()
-  const { data: health, loading, refresh } = useApi<HealthData>(
+  const { data: health, loading, iskelet, refresh } = useApi<HealthData>(
     '/api/health',
     { timestamp: '', success: false, scrape_errors: [], duration_seconds: 0 }
   )
@@ -141,7 +141,7 @@ export default function DashboardHeader({ user, onLogout, isSideNavExpanded, onC
               >
                 <span className="cds--visually-hidden">Senkron durumu: </span>
                 {loading ? (
-                  <SkeletonText width="72px" />
+                  iskelet ? <SkeletonText width="72px" /> : null
                 ) : (
                   <span className={`dashboard-header__sync dashboard-header__sync--${syncDurumu}`}>
                     {syncDurumu === 'hata' && <ErrorFilled size={16} aria-hidden="true" />}

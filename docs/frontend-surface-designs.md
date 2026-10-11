@@ -1,6 +1,6 @@
 # TEDY Yüzey Tasarımları
 
-**Sürüm 1.12 · 2026-10-10 · `docs/frontend-design-principles.md`'nin uygulaması**
+**Sürüm 1.13 · 2026-10-11 · `docs/frontend-design-principles.md`'nin uygulaması**
 
 İlkeler dokümanı *neye göre karar verileceğini* yazar. Bu doküman o kararların
 her yüzeyde ne olduğunu yazar. Çelişki hâlinde ilkeler dokümanı kazanır.
@@ -321,7 +321,9 @@ Geçmiş (14)                                   ›   ← kapalı
 - Özet satırı **silinir**. Sayı bölüm başlığındaki `(n)`'dedir.
 - Sınavlar ayrı sayfa olmaktan çıkıp burada bir bölüm olur.
 - Geçmiş kapalı başlar; açıldığında nötr, eylemsiz.
-- `Yaptım` geri alınabilir: işaretlemeden sonra 10 saniye `Geri al` (İ5).
+- `Yaptım` geri alınabilir: işaretlemeden sonra aynı satırda `Geri al` (İ5). (2026-10-11,
+  talimatname B63: 10 saniyelik süre kaldırıldı — kaybolan denetim okurun kaybedebileceği bir
+  yarıştır, WCAG 2.2.1; satır sayfa değişene dek kalır, "Yapılan" satırları da geri alır.)
 - Ham damga kaldırılır; gerekiyorsa "11 Mart'ta görüldü".
 
 **Kapılar:** ilk ekran testi · gri tonlama · sızıntı taraması · 2 saniye testi.
@@ -610,6 +612,8 @@ programı ve içeriği alt alta koyar), §4.6 tek satırlık öğeler (Takımlar
 §4.7 tek liste ve tek iskelet (İlerleme'de üç `AccordionItem`, her biri kendi iskeletiyle), §4.8
 okunmamış durumu (Duyurular haftaya göre katlanmış `AccordionItem`). Bunlar talimatname §13'te borç
 olarak izlenir: 400 ms B48, `Geri al` B63, Dersler B64, Takımlar B65, İlerleme B66, Duyurular B67. Satır 3, 4 ve 6 bu yüzden "kısmen" okunmalıdır.
+(2026-10-11: B48 ve B63 kapandı — `useApi`'nin `iskelet` bayrağı 400 ms kuralını, `POST
+/api/homework/unmark-done` ve "Yaptın: … · Geri al" satırı `Geri al`'ı kurar.)
 
 **Sıra değişikliği:** 4 ve 5 yer değiştirdi. Nav indirgemesi Dersler
 birleştirmesinden önce yapılırsa Program evsiz kalıyor; birleştirme önce gelmeli.
@@ -758,3 +762,4 @@ görüntüsüyle doğrulanır.
 | 1.10 | 2026-09-25 | Asistanın Kaynaklar paneli dört yeni öğrenci-verisi grubu (ders programı, sınavlar, birleşik takvim, ders içeriği/notlar), Tedy Books araması ve platform ilerlemesi/video önerisini gösterir; `figur_getir`'in ders kitabı görseli artık modele de gerçek resim olarak gidiyor ve panelde küçük önizleme olarak beliriyor; aileye özel `aile-kaynak` grubu Işık'ın oturumunda hiç görünmez. |
 | 1.11 | 2026-10-10 | Talimatname (`tedy-ui-ux-talimatnamesi.md`) altına bağlandı: Giriş notu ve öncelik sırası, §2'ye talimatname §5 ve bileşen rehberi bağlantısı; tarihli düzeltmeler: §1 yedi ikincil ve telefonda Tedy Books Daha fazla'da, §3.2 `BottomNav` (D3a), §4.1 sınav satırında ders işareti ve bekleyen D3b/İ8 C yönü işareti, §4.10 Carbon AI Chat notu (2026-10-09), §4.11 IBM Plex Serif, §6 kurulmayan alt tasarımların durum notu. Başlık sürümü düzeltildi. |
 | 1.12 | 2026-10-10 | Talimatname 1.1'in Ç1–Ç10 kararlarıyla (S35–S44) hizalandı: §2.4 "Dönen ikon yok" içerik yüklemesine daraltıldı, tek eylem tek `InlineLoading` (S36); §2.5 bölüm başlığı "Başlık (n)", büyük harf yok (S38); §2.6 "Yıkıcı eylem yok" yerine etkiye göre silme — düşük etki "Geri al", geri alınamaz silme nesneyi adlandıran danger modal (S40); §2.7 "Bozuk (sistem): Gri" yerine Carbon durum anlamı (S39; başlık etiketi gerilimi Ç11); §4.4 not rengi notu (S42). Tarihli notlarla; bölüm numaraları değişmedi. |
+| 1.13 | 2026-10-11 | Talimatname B48 ve B63 kapandı: §2.4'ün 400 ms kuralı `useApi`'de; §4.2'nin `Geri al`'ı kuruldu, 10 saniyelik süresi bilerek kaldırıldı (WCAG 2.2.1). §6 durum notuna tarihli ek. |

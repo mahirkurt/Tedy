@@ -39,11 +39,11 @@ const OGRETMEN_ADLARI: Record<string, string> = { genel: 'Genel', turkce: 'Türk
 const DUZEY_ADLARI = { baslangic: 'Başlangıç', gelisiyor: 'Gelişiyor', yeterli: 'Yeterli' }
 
 function OgrenmeGunlugu() {
-  const { data, loading, error } = useApi<Gunluk | null>('/api/assistant/ogrenme-gunlugu', null)
+  const { data, loading, iskelet, error } = useApi<Gunluk | null>('/api/assistant/ogrenme-gunlugu', null)
   if (error === 'HTTP 403') return null
   return <section className="ogrenme-gunlugu" aria-labelledby="ogrenme-gunlugu-baslik">
     <h3 id="ogrenme-gunlugu-baslik">Öğrenme günlüğü</h3>
-    {loading ? <SkeletonText paragraph lineCount={3} /> : error ? <p role="alert">Öğrenme günlüğü alınamadı.</p> : data && <>
+    {loading ? (iskelet ? <SkeletonText paragraph lineCount={3} /> : null) : error ? <p role="alert">Öğrenme günlüğü alınamadı.</p> : data && <>
       <div>
         <h4>Bu hafta</h4>
         {data.hafta.sohbet.length === 0 ? <p>Sohbet · 0</p> : data.hafta.sohbet.map(s =>
@@ -89,9 +89,9 @@ function DifficultyTag({ level }: { level: number }) {
 
 
 export default function PlatformProgress() {
-  const { data: ec, loading: ecLoading } = useApi<ECData>('/api/progress/ec', {})
-  const { data: a3k, loading: a3kLoading } = useApi<A3KData>('/api/progress/a3k', {})
-  const { data: sebit, loading: sebitLoading } = useApi<SebitData>('/api/sebit', {})
+  const { data: ec, loading: ecLoading, iskelet: ecIskelet } = useApi<ECData>('/api/progress/ec', {})
+  const { data: a3k, loading: a3kLoading, iskelet: a3kIskelet } = useApi<A3KData>('/api/progress/a3k', {})
+  const { data: sebit, loading: sebitLoading, iskelet: sebitIskelet } = useApi<SebitData>('/api/sebit', {})
   const { focusMode } = useFocusMode()
 
   const platforms = [
@@ -168,7 +168,7 @@ export default function PlatformProgress() {
                 </div>
               ) : (
                 ecLoading ? (
-                  <SkeletonText paragraph lineCount={3} />
+                  ecIskelet ? <SkeletonText paragraph lineCount={3} /> : null
                 ) : (
                   <EmptyLine>Henüz izlenmiş video yok.</EmptyLine>
                 )
@@ -223,7 +223,7 @@ export default function PlatformProgress() {
                 </div>
               ) : (
                 a3kLoading ? (
-                  <SkeletonText paragraph lineCount={3} />
+                  a3kIskelet ? <SkeletonText paragraph lineCount={3} /> : null
                 ) : (
                   <EmptyLine>Henüz tamamlanmış ders yok.</EmptyLine>
                 )
@@ -286,7 +286,7 @@ export default function PlatformProgress() {
                 </div>
               ) : (
                 sebitLoading ? (
-                  <SkeletonText paragraph lineCount={3} />
+                  sebitIskelet ? <SkeletonText paragraph lineCount={3} /> : null
                 ) : (
                   <EmptyLine>Henüz ödev yok.</EmptyLine>
                 )
