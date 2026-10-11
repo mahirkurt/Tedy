@@ -36,6 +36,9 @@ Bu bölümdeki her değer spec §0'daki ölçüm tablosundan birebir alınmışt
 - Telefonda (md kırılımı 672 px altı) her TEDY denetimi ≥ 44 px. Carbon'un ağaç düğümü sm 32 / xs 24 px olduğu için örtme zorunlu (sapma S48).
 - Yeni ölçüler **`rem`**; ikonlar `size={…}` ile mevcut kuralı olan boylardan (4K kuralı).
 - Görünür etiketler cümle düzeninde; `text-transform: uppercase` ve büyük harf kaynak dizgisi yasak.
+- Playwright **anahtar ortamda yokken** koşar. Worktree-izole oturumda `env -u ANTHROPIC_API_KEY npx
+  playwright test …` biçimi koruma tarafından reddedilir (ölçüldü, bu worktree'de); çalışan biçim alt
+  kabuktur: `(unset ANTHROPIC_API_KEY; npx playwright test …)`. Ana checkout'ta `env -u` de çalışır.
 - Hiçbir Carbon adı (bileşen, prop, ikon, içe aktarma yolu) ezberden yazılmaz: Carbon MCP ya da `dashboard/node_modules` ile doğrulanır (talimatname §10).
 
 ## Review Focus
@@ -1592,7 +1595,7 @@ test.describe('Modüller — müfredat ağacı', () => {
 
 - [ ] **Step 3: Run tests to verify they fail**
 
-Run: `cd dashboard && env -u ANTHROPIC_API_KEY npx playwright test moduller-agac`
+Run: `cd dashboard && (unset ANTHROPIC_API_KEY; npx playwright test moduller-agac)`
 Expected: FAIL — `getByRole('tree')` bulunamıyor
 
 - [ ] **Step 4: Add the tree types**
@@ -1909,7 +1912,7 @@ vardır** (doğrulandı); yeniden eklenmez.
 
 - [ ] **Step 9: Run the tests to verify they pass**
 
-Run: `cd dashboard && env -u ANTHROPIC_API_KEY npx playwright test moduller-agac`
+Run: `cd dashboard && (unset ANTHROPIC_API_KEY; npx playwright test moduller-agac)`
 Expected: PASS (6 test)
 
 Run: `cd dashboard && npx tsc --noEmit && npm run lint && npm run lint:css`
@@ -1944,7 +1947,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: 390 px'te yana kaydırmayı ölç**
 
-Run: `cd dashboard && env -u ANTHROPIC_API_KEY npx playwright test tasarim-denetimi d3b-dokunma --grep-invert nothing`
+Run: `cd dashboard && (unset ANTHROPIC_API_KEY; npx playwright test tasarim-denetimi d3b-dokunma)`
 
 Üç düzey açıkken 390 px'te `document.scrollingElement.scrollWidth > clientWidth` oluyor mu, ve her ağaç düğümü ≥ 44 px mi? Sonucu not et.
 
@@ -2040,7 +2043,7 @@ talimatname S48–S50.
 
 - [ ] **Step 6: Anlık görüntüleri ve ARIA ağacını güncelle**
 
-Run: `cd dashboard && env -u ANTHROPIC_API_KEY npx playwright test gorsel-regresyon aria-yapisi --update-snapshots`
+Run: `cd dashboard && (unset ANTHROPIC_API_KEY; npx playwright test gorsel-regresyon aria-yapisi --update-snapshots)`
 
 **Farkı oku.** Beklenen: yalnız `/moduller` 1440 ve 390 değişmiş, `.aria.yml`'de `tree`/`treeitem` rolleri eklenmiş. Başka bir sayfa değişmişse dur ve nedenini bul — başka sayfanın değişmesi bu işin kapsamında değil.
 
@@ -2050,7 +2053,7 @@ Run: `cd dashboard && env -u ANTHROPIC_API_KEY npx playwright test gorsel-regres
 cd /mnt/thunderbolt/workspaces/TED
 unshare -rn .venv/bin/python -m pytest -q
 cd dashboard && npx tsc --noEmit && npm run lint && npm run lint:css && npm run test:birim
-env -u ANTHROPIC_API_KEY npx playwright test
+(unset ANTHROPIC_API_KEY; npx playwright test)
 ```
 Expected: hepsi PASS. `tests/test_mufredat_agaci_db.py` ve canlı üretim testleri DB'siz makinede SKIPPED.
 
