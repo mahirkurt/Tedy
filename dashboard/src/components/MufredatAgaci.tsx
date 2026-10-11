@@ -30,9 +30,26 @@ function ustVeri(konu: MufredatKonu, kitapAdi: string): string {
   return parcalar.join(' · ')
 }
 
+/** Olay klavyeden mi geldi (React'in sentetik klavye olayı `key` taşır, fare olayı taşımaz). */
+function klavyeden(olay: React.MouseEvent | React.KeyboardEvent): boolean {
+  return 'key' in olay
+}
+
 export default function MufredatAgaci({ dersler }: { dersler: MufredatDers[] }) {
   const gezin = useNavigate()
   const { acik, degistir } = useAcikDallar()
+
+  /**
+   * Dalın satır tıklamasıyla açılması.
+   *
+   * Carbon `Enter`'da HEM `onToggle` HEM `handleClick` (→ `onSelect`) tetikliyor; ikisi de
+   * aynı toggle'a bağlıyken dal açılıp hemen kapanıyor ve `localStorage` boş kalıyordu
+   * (ölçüldü). Klavye yolunu `onToggle` zaten doğru yürütüyor, bu yüzden `onSelect`
+   * yalnız fare tıklamasına karşılık verir.
+   */
+  function dalaTiklandi(olay: React.MouseEvent | React.KeyboardEvent, dalId: string) {
+    if (!klavyeden(olay)) degistir(dalId)
+  }
 
   // Yaprağın tek eylemi düğümün etkinleştirilmesidir: ARIA ağacında treeitem içine düğme
   // konmaz. Modülü olan yaprak gezinir (B58), olmayan konu asistana bağlam olur (B78).
@@ -63,8 +80,8 @@ export default function MufredatAgaci({ dersler }: { dersler: MufredatDers[] }) 
           onToggle={() => degistir(ders.slug)}
           // Carbon'da yalnız chevron açar (`handleToggleClick`, stopPropagation'lı); satırın
           // kendi `onClick`'i yalnız seçer. Dalı satırın tamamı açar: telefonda 16 px'lik
-          // chevron dokunma hedefi değildir ve `Enter` de böylece dalı açar.
-          onSelect={() => degistir(ders.slug)}
+          // chevron dokunma hedefi değildir.
+          onSelect={(olay: React.MouseEvent | React.KeyboardEvent) => dalaTiklandi(olay, ders.slug)}
         >
           {ders.uniteler.length === 0 ? (
             // D3: eşiğe takılıp üretilmeyen ders sessizce eksilmez, bir cümle söyler.
@@ -85,9 +102,12 @@ export default function MufredatAgaci({ dersler }: { dersler: MufredatDers[] }) 
                 }
                 isExpanded={acik.has(dalId)}
                 onToggle={() => degistir(dalId)}
-                onSelect={() => degistir(dalId)}
+                onSelect={(olay: React.MouseEvent | React.KeyboardEvent) => dalaTiklandi(olay, dalId)}
               >
-                {unite.konular.map(konu => {
+                {/* D3: konusu olmayan ünite açılıp boş bir gruba inmez, bir cümle söyler. */}
+                {unite.konular.length === 0 ? (
+                  <TreeNode id={`${dalId}-yok`} label="Bu ünitenin konuları henüz eşlenmedi." />
+                ) : unite.konular.map(konu => {
                   const kitap = ders.kitaplar.find(k => k.document_id === konu.kitap)
                   return (
                     <TreeNode
@@ -105,6 +125,11 @@ export default function MufredatAgaci({ dersler }: { dersler: MufredatDers[] }) 
                         ? `/moduller/${konu.modul.slug}/v${konu.modul.version}`
                         : undefined}
                       onSelect={(olay: React.MouseEvent | React.KeyboardEvent) => {
+                        // Carbon `Enter`'da href'li düğüm için önce düğümün kendi `click()`'ini
+                        // çağırıyor, sonra `handleClick`'i — yani `onSelect` iki kez gelir ve
+                        // iki `navigate` bir geri tuşunu yutuyordu (ölçüldü). Sentetik tıklama
+                        // işi zaten yaptığı için klavye çağrısı yoksayılır.
+                        if (konu.modul && klavyeden(olay)) return
                         olay.preventDefault()
                         konuyaGit(ders, konu)
                       }}

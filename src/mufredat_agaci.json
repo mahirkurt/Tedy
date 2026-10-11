@@ -23,7 +23,7 @@
       "slug": "matematik",
       "uniteler": [
         {
-          "ad": "Sayılar ve Nicelikler (1)",
+          "ad": "Sayılar ve Nicelikler",
           "konular": [
             {
               "ad": "Tam Sayılar",
@@ -34,8 +34,7 @@
                 "MAT.7.1.1",
                 "MAT.7.1.2",
                 "MAT.7.1.3",
-                "MAT.7.1.4",
-                "MAT.7.2.3"
+                "MAT.7.1.4"
               ],
               "kitap": 346,
               "sayfa": [
@@ -166,8 +165,7 @@
               "id": "matematik-u2-esitsizlikler",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
-                "MAT.7.2.2",
-                "MAT.7.7.2"
+                "MAT.7.2.2"
               ],
               "kitap": 506,
               "sayfa": [
@@ -234,7 +232,7 @@
           "program_sayfa": 137
         },
         {
-          "ad": "Geometrik Nicelikler (1)",
+          "ad": "Geometrik Nicelikler",
           "konular": [
             {
               "ad": "Dikdörtgenler Prizmasının Açınımı ve Yüzey Alanı",
@@ -319,8 +317,7 @@
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
                 "MAT.7.4.10",
-                "MAT.7.4.7",
-                "MAT.7.4.9"
+                "MAT.7.4.7"
               ],
               "kitap": 506,
               "sayfa": [
@@ -350,8 +347,7 @@
               "id": "matematik-u4-eskenar-dortgenin-alani",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
-                "MAT.7.4.10",
-                "MAT.7.4.9"
+                "MAT.7.4.10"
               ],
               "kitap": 506,
               "sayfa": [
@@ -366,28 +362,12 @@
               "id": "matematik-u4-yamugun-alani",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
-                "MAT.7.4.10",
-                "MAT.7.4.9"
+                "MAT.7.4.10"
               ],
               "kitap": 506,
               "sayfa": [
                 191,
                 197
-              ],
-              "sayfa_kaynak": "icindekiler"
-            },
-            {
-              "ad": "Daire, Daire Dilimi, Eşkenar Dörtgen ve Yamuğun Alanına İlişkin Problemler",
-              "ad_kaynak": "DAİRE, DAİRE DİLİMİ, EŞKENAR DÖRTGEN VE YAMUĞUN ALANINA İLİŞKİN PROBLEMLER",
-              "id": "matematik-u4-daire-daire-dilimi-eskenar-dortgen-ve-yamugun-alanina-iliskin-problemler",
-              "kazanim_kaynak": "metin-ortusmesi",
-              "kazanimlar": [
-                "MAT.7.4.10"
-              ],
-              "kitap": 506,
-              "sayfa": [
-                200,
-                203
               ],
               "sayfa_kaynak": "icindekiler"
             }
@@ -442,8 +422,7 @@
               "id": "matematik-u6-kategorik-ve-nicel-veri-dagilimlari",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
-                "MAT.7.6.1",
-                "MAT.7.6.2"
+                "MAT.7.6.1"
               ],
               "kitap": 346,
               "sayfa": [
@@ -459,21 +438,6 @@
         {
           "ad": "Veriden Olasılığa",
           "konular": [
-            {
-              "ad": "Tümleyen Olay",
-              "ad_kaynak": "TÜMLEYEN OLAY",
-              "id": "matematik-u7-tumleyen-olay",
-              "kazanim_kaynak": "metin-ortusmesi",
-              "kazanimlar": [
-                "MAT.7.7.1"
-              ],
-              "kitap": 506,
-              "sayfa": [
-                79,
-                80
-              ],
-              "sayfa_kaynak": "icindekiler"
-            },
             {
               "ad": "Eşit Olasılıklı Olaylar",
               "ad_kaynak": "EŞİT OLASILIKLI OLAYLAR",
@@ -536,7 +500,7 @@
           "ad": "Uzay Çağı",
           "konular": [
             {
-              "ad": "Teknoloji İle Uzay Araştırmaları Arasındaki İlişki",
+              "ad": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
               "ad_kaynak": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
               "id": "fen-u1-teknoloji-ile-uzay-arastirmalari-arasindaki-iliski",
               "kazanim_kaynak": "metin-ortusmesi",
@@ -737,9 +701,9 @@
           "ad": "Işığın Kırılması ve Mercekler",
           "konular": [
             {
-              "ad": "1. Işığın Kırılması",
+              "ad": "Işığın Kırılması",
               "ad_kaynak": "1. Işığın Kırılması",
-              "id": "fen-u4-1-isigin-kirilmasi",
+              "id": "fen-u4-isigin-kirilmasi",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
                 "FB.7.4.1"
@@ -804,9 +768,9 @@
               "sayfa_kaynak": "icindekiler"
             },
             {
-              "ad": "2. Saf Maddeler",
+              "ad": "Saf Maddeler",
               "ad_kaynak": "2. Saf Maddeler",
-              "id": "fen-u5-2-saf-maddeler",
+              "id": "fen-u5-saf-maddeler",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
                 "FB.7.5.4"
@@ -819,9 +783,9 @@
               "sayfa_kaynak": "icindekiler"
             },
             {
-              "ad": "3. Karışımlar",
+              "ad": "Karışımlar",
               "ad_kaynak": "3. Karışımlar",
-              "id": "fen-u5-3-karisimlar",
+              "id": "fen-u5-karisimlar",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
                 "FB.7.5.10",
@@ -857,9 +821,9 @@
           "ad": "Elektriklenme",
           "konular": [
             {
-              "ad": "1. Elektrik Yükleri ve Elektriklenme",
+              "ad": "Elektrik Yükleri ve Elektriklenme",
               "ad_kaynak": "1. Elektrik Yükleri ve Elektriklenme",
-              "id": "fen-u6-1-elektrik-yukleri-ve-elektriklenme",
+              "id": "fen-u6-elektrik-yukleri-ve-elektriklenme",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
                 "FB.7.6.3"
@@ -1011,9 +975,9 @@
           "ad": "Yaşayan Demokrasimiz",
           "konular": [
             {
-              "ad": "Türkiye Cumhuriyeti’nin temel niteliklerini",
+              "ad": "Türkiye Cumhuriyeti’nin Nitelikleri",
               "ad_kaynak": "TÜRKIYE CUMHURIYETI’NIN NITELIKLERI",
-              "id": "sosyal-u4-turkiye-cumhuriyeti-nin-temel-niteliklerini",
+              "id": "sosyal-u4-turkiye-cumhuriyeti-nin-nitelikleri",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
                 "SB.7.4.1"
@@ -1033,9 +997,9 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Ülkemizdeki demokrasinin gelişimini, demokrasinin temel ilkeleri açısından",
+              "ad": "Ülkemizde Demokrasinin Gelişimi",
               "ad_kaynak": "ÜLKEMIZDE DEMOKRASININ GELIŞIMI",
-              "id": "sosyal-u4-ulkemizdeki-demokrasinin-gelisimini-demokrasinin-temel-ilkeleri-acisindan",
+              "id": "sosyal-u4-ulkemizde-demokrasinin-gelisimi",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
                 "SB.7.4.3"
@@ -1044,9 +1008,9 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Demokrasinin uygulama sürecinde karşılaşılan sorunları",
+              "ad": "Demokrasinin Uygulanma Sürecinde Karşılaşılan Sorunlar",
               "ad_kaynak": "DEMOKRASININ UYGULANMA SÜRECINDE KARŞILAŞILAN SORUNLAR",
-              "id": "sosyal-u4-demokrasinin-uygulama-surecinde-karsilasilan-sorunlari",
+              "id": "sosyal-u4-demokrasinin-uygulanma-surecinde-karsilasilan-sorunlar",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
                 "SB.7.4.4"
@@ -1059,12 +1023,12 @@
           "program_sayfa": 107
         },
         {
-          "ad": "Hay Atımızdaki Ekonomi",
+          "ad": "Hayatımızdaki Ekonomi",
           "konular": [
             {
-              "ad": "Millî kalkınma hamlelerini neden ve sonuçlarıyla",
+              "ad": "Millî Kalkınma Hamleleri",
               "ad_kaynak": "MILLÎ KALKINMA HAMLELERI",
-              "id": "sosyal-u5-milli-kalkinma-hamlelerini-neden-ve-sonuclariyla",
+              "id": "sosyal-u5-milli-kalkinma-hamleleri",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
                 "SB.7.5.1"
@@ -1073,9 +1037,9 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Ekonomik gelişmişlik ile üretim, dağıtım ve tüketim döngüsü arasındaki ilişkiyi",
+              "ad": "Tüketim Arasındaki Döngü",
               "ad_kaynak": "TÜKETIM ARASINDAKI DÖNGÜ",
-              "id": "sosyal-u5-ekonomik-gelismislik-ile-uretim-dagitim-ve-tuketim-dongusu-arasindaki-iliskiyi",
+              "id": "sosyal-u5-tuketim-arasindaki-dongu",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
                 "SB.7.5.2"
@@ -1102,9 +1066,9 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Örnek metinler üzerinden sosyal bilimlerin çalışma alanlarına dair genelleme",
+              "ad": "Sosyal Bilimlerin Çalışma Alanları",
               "ad_kaynak": "SOSYAL BILIMLERIN ÇALIŞMA ALANLARI",
-              "id": "sosyal-u6-ornek-metinler-uzerinden-sosyal-bilimlerin-calisma-alanlarina-dair-genelleme",
+              "id": "sosyal-u6-sosyal-bilimlerin-calisma-alanlari",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
                 "SB.7.6.2"
@@ -1173,7 +1137,7 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Sen Sor O Yanıtlasın-sporda ve Yaşamda Hedefe Odaklan (dinleme/izleme)",
+              "ad": "Sen Sor O Yanıtlasın-Sporda ve Yaşamda Hedefe Odaklan (Dinleme/İzleme)",
               "ad_kaynak": "Sen Sor O Yanıtlasın-Sporda ve Yaşamda Hedefe Odaklan (Dinleme/İzleme)",
               "id": "turkce-u1-sen-sor-o-yanitlasin-sporda-ve-yasamda-hedefe-odaklan-dinleme-izleme",
               "kazanim_kaynak": "eslenmedi",
@@ -1191,7 +1155,7 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Ağaç ve Sen (serbest Okuma Metni)",
+              "ad": "Ağaç ve Sen (Serbest Okuma Metni)",
               "ad_kaynak": "Ağaç ve Sen (Serbest Okuma Metni)",
               "id": "turkce-u1-agac-ve-sen-serbest-okuma-metni",
               "kazanim_kaynak": "eslenmedi",
@@ -1225,7 +1189,7 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Milli Mücadele Sergisi Kahraman Çocuklar (dinleme/izleme)",
+              "ad": "Milli Mücadele Sergisi Kahraman Çocuklar (Dinleme/İzleme)",
               "ad_kaynak": "Milli Mücadele Sergisi Kahraman Çocuklar (Dinleme/İzleme)",
               "id": "turkce-u2-milli-mucadele-sergisi-kahraman-cocuklar-dinleme-izleme",
               "kazanim_kaynak": "eslenmedi",
@@ -1243,27 +1207,9 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Gözüm Arkada Kalmayacak (serbest Okuma Metni)",
+              "ad": "Gözüm Arkada Kalmayacak (Serbest Okuma Metni)",
               "ad_kaynak": "Gözüm Arkada Kalmayacak (Serbest Okuma Metni)",
               "id": "turkce-u2-gozum-arkada-kalmayacak-serbest-okuma-metni",
-              "kazanim_kaynak": "eslenmedi",
-              "kazanimlar": [],
-              "kitap": 460,
-              "sayfa_kaynak": "yok"
-            },
-            {
-              "ad": "Türkiye’nin Mülki İdare Bölümleri İle Kara ve Deniz Komşuları Haritası",
-              "ad_kaynak": "Türkiye’nin Mülki İdare Bölümleri ile Kara ve Deniz Komşuları Haritası",
-              "id": "turkce-u2-turkiye-nin-mulki-idare-bolumleri-ile-kara-ve-deniz-komsulari-haritasi",
-              "kazanim_kaynak": "eslenmedi",
-              "kazanimlar": [],
-              "kitap": 460,
-              "sayfa_kaynak": "yok"
-            },
-            {
-              "ad": "Türk Dünyası Haritası",
-              "ad_kaynak": "Türk Dünyası Haritası",
-              "id": "turkce-u2-turk-dunyasi-haritasi",
               "kazanim_kaynak": "eslenmedi",
               "kazanimlar": [],
               "kitap": 460,
@@ -1286,7 +1232,7 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Dijital Tayfa - Komik Mi Şimdi? (dinleme/izleme)",
+              "ad": "Dijital Tayfa - Komik mi Şimdi? (Dinleme/İzleme)",
               "ad_kaynak": "Dijital Tayfa - Komik mi Şimdi? (Dinleme/İzleme)",
               "id": "turkce-u3-dijital-tayfa-komik-mi-simdi-dinleme-izleme",
               "kazanim_kaynak": "eslenmedi",
@@ -1295,7 +1241,7 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Sevgilerde (serbest Okuma Metni)",
+              "ad": "Sevgilerde (Serbest Okuma Metni)",
               "ad_kaynak": "Sevgilerde (Serbest Okuma Metni)",
               "id": "turkce-u3-sevgilerde-serbest-okuma-metni",
               "kazanim_kaynak": "eslenmedi",
@@ -1329,7 +1275,7 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Ebru: Türk Kağıt Süsleme Sanatı (dinleme/izleme)",
+              "ad": "Ebru: Türk Kağıt Süsleme Sanatı (Dinleme/İzleme)",
               "ad_kaynak": "Ebru: Türk Kağıt Süsleme Sanatı (Dinleme/İzleme)",
               "id": "turkce-u4-ebru-turk-kagit-susleme-sanati-dinleme-izleme",
               "kazanim_kaynak": "eslenmedi",
@@ -1347,7 +1293,7 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Atatürk ve Sanat Eğitimi (serbest Okuma Metni)",
+              "ad": "Atatürk ve Sanat Eğitimi (Serbest Okuma Metni)",
               "ad_kaynak": "Atatürk ve Sanat Eğitimi (Serbest Okuma Metni)",
               "id": "turkce-u4-ataturk-ve-sanat-egitimi-serbest-okuma-metni",
               "kazanim_kaynak": "eslenmedi",
@@ -1372,7 +1318,7 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Küçük Şeylerin Hikâyesi: Kütüphaneler (dinleme/izleme)",
+              "ad": "Küçük Şeylerin Hikâyesi: Kütüphaneler (Dinleme/İzleme)",
               "ad_kaynak": "Küçük Şeylerin Hikâyesi: Kütüphaneler (Dinleme/İzleme)",
               "id": "turkce-u5-kucuk-seylerin-hikayesi-kutuphaneler-dinleme-izleme",
               "kazanim_kaynak": "eslenmedi",
@@ -1390,7 +1336,7 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Canım Kitap (serbest Okuma Metni)",
+              "ad": "Canım Kitap (Serbest Okuma Metni)",
               "ad_kaynak": "Canım Kitap (Serbest Okuma Metni)",
               "id": "turkce-u5-canim-kitap-serbest-okuma-metni",
               "kazanim_kaynak": "eslenmedi",
@@ -1424,7 +1370,7 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Çocuk Hakları Sözleşmesi (dinleme/izleme)",
+              "ad": "Çocuk Hakları Sözleşmesi (Dinleme/İzleme)",
               "ad_kaynak": "Çocuk Hakları Sözleşmesi (Dinleme/İzleme)",
               "id": "turkce-u6-cocuk-haklari-sozlesmesi-dinleme-izleme",
               "kazanim_kaynak": "eslenmedi",
@@ -1433,45 +1379,9 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Memleket İsterim (serbest Okuma Metni)",
+              "ad": "Memleket İsterim (Serbest Okuma Metni)",
               "ad_kaynak": "Memleket İsterim (Serbest Okuma Metni)",
               "id": "turkce-u6-memleket-isterim-serbest-okuma-metni",
-              "kazanim_kaynak": "eslenmedi",
-              "kazanimlar": [],
-              "kitap": 340,
-              "sayfa_kaynak": "yok"
-            },
-            {
-              "ad": "Türkiye’nin Mülki İdare Bölümleri İle Kara ve Deniz Komşuları Haritası",
-              "ad_kaynak": "Türkiye’nin Mülki İdare Bölümleri ile Kara ve Deniz Komşuları Haritası",
-              "id": "turkce-u6-turkiye-nin-mulki-idare-bolumleri-ile-kara-ve-deniz-komsulari-haritasi",
-              "kazanim_kaynak": "eslenmedi",
-              "kazanimlar": [],
-              "kitap": 340,
-              "sayfa_kaynak": "yok"
-            },
-            {
-              "ad": "Türk Dünyası Haritası",
-              "ad_kaynak": "Türk Dünyası Haritası",
-              "id": "turkce-u6-turk-dunyasi-haritasi",
-              "kazanim_kaynak": "eslenmedi",
-              "kazanimlar": [],
-              "kitap": 340,
-              "sayfa_kaynak": "yok"
-            },
-            {
-              "ad": "— Anladığıma Göre Sen Kızını, İstemediği Birisiyle Evlendirmek İstiyorsun. Kızın Gönlü Başkasında",
-              "ad_kaynak": "— Anladığıma göre sen kızını, istemediği birisiyle evlendirmek istiyorsun. Kızın gönlü başkasında",
-              "id": "turkce-u6-anladigima-gore-sen-kizini-istemedigi-birisiyle-evlendirmek-istiyorsun-kizin-gonlu-baskasinda",
-              "kazanim_kaynak": "eslenmedi",
-              "kazanimlar": [],
-              "kitap": 340,
-              "sayfa_kaynak": "yok"
-            },
-            {
-              "ad": "Anadolu’da Kilim Demek, Hayata Renk Vermek ve Tabiata Hâkim Olmak Demek",
-              "ad_kaynak": "Anadolu’da kilim demek, hayata renk vermek ve tabiata hâkim olmak demek",
-              "id": "turkce-u6-anadolu-da-kilim-demek-hayata-renk-vermek-ve-tabiata-hakim-olmak-demek",
               "kazanim_kaynak": "eslenmedi",
               "kazanimlar": [],
               "kitap": 340,
@@ -1486,7 +1396,7 @@
   ],
   "kapsam": {
     "fen": {
-      "aday": 43,
+      "aday": 39,
       "kazanim": 35,
       "kazanimi_eslenen": 22,
       "kimlik_cakismasi": 0,
@@ -1494,12 +1404,12 @@
       "sayfasi_olan": 21
     },
     "matematik": {
-      "aday": 49,
+      "aday": 44,
       "kazanim": 30,
-      "kazanimi_eslenen": 26,
+      "kazanimi_eslenen": 22,
       "kimlik_cakismasi": 0,
-      "konu": 28,
-      "sayfasi_olan": 28
+      "konu": 26,
+      "sayfasi_olan": 26
     },
     "sosyal": {
       "aday": 19,
@@ -1510,11 +1420,11 @@
       "sayfasi_olan": 0
     },
     "turkce": {
-      "aday": 32,
+      "aday": 26,
       "kazanim": 121,
       "kazanimi_eslenen": 0,
       "kimlik_cakismasi": 0,
-      "konu": 32,
+      "konu": 26,
       "sayfasi_olan": 0
     }
   },

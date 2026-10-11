@@ -3570,6 +3570,8 @@ ayrıca sayılır, pano borcu sayılmaz.
 
 ---
 
+| **B80** | Ctrl/Cmd-tık bir ağaç yaprağını yeni sekmede açmıyor: `onSelect` her tıklamada `preventDefault()` çağırıp `navigate()` ediyor, değiştirici tuşa bakmıyor (ölçüldü 2026-10-11, sekme sayısı 1 → 1). Sağ tuş → "yeni sekmede aç" çalışıyor. Kalıp pano genelinde aynı (`Modules.tsx`, `ModuleViewerRoute`, `TodaySchedule`), yani bu satır ağaca özel değil | B58 bağlantı davranışı | `metaKey/ctrlKey/shiftKey` ya da orta tık varsa `preventDefault` atlanır; düzeltme pano genelinde tek yerde yapılır | `moduller-agac.spec.ts`'e sekme sayısı ölçen bir satır |
+
 ## 14. Süreç
 
 ### 14.1 Yeni yüzey ya da yeniden tasarım

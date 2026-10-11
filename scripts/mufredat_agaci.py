@@ -29,7 +29,10 @@ URI ="file:/home/mahirkurt/mcp-data/mufredat/mufredat.sqlite?mode=ro&immutable=1
 # OCR_DUZELTME ile aynı gerekçe, ders kitabı başlıklarında ölçülen biçimler.
 OCR_DUZELTME = {"SOSY AL": "SOSYAL", "DÜNY A": "DÜNYA", "YAŞAY AN": "YAŞAYAN",
                 "KÜL TÜRÜ": "KÜLTÜRÜ", "ETK İSİ": "ETKİSİ", "ÜLKEM İZİN": "ÜLKEMİZİN",
-                "DEVLETİ ’NİN": "DEVLETİ’NİN", "KÜRESELLEŞMEN İN": "KÜRESELLEŞMENİN"}
+                "DEVLETİ ’NİN": "DEVLETİ’NİN", "KÜRESELLEŞMEN İN": "KÜRESELLEŞMENİN",
+                "HAY ATIMIZDAKİ": "HAYATIMIZDAKİ"}
+# Kitap arka maddesi ve gövde metni: içindekiler sayfasında başlık gibi görünürler.
+KONU_AD_SINIRI = 70
 # Başlık düzeninde küçük kalan bağlaçlar (Türkçe yazım).
 KUCUK_KALAN = {"ve", "ile", "veya", "ya", "da", "de", "ki"}
 KUCUK = "a-zçğıöşüâîû"
@@ -54,7 +57,7 @@ APARAT = ("on degerlendirme", "unite sonu degerlendirme", "neler biliyoruz", "ne
           "baslayalim", "ogrenelim", "kitabimizi taniyalim", "sozluk", "kaynakca",
           "cevap anahtari", "cevap anahtarlari", "icindekiler", "iz birakanlar",
           "kendimi degerlendiriyorum", "olcme ve degerlendirme sorulari", "uretim vakti",
-          "oz degerlendirme formlari", "gorsel kaynakcasi", "genel ag")
+          "oz degerlendirme formlari", "gorsel kaynakcasi", "genel ag", "haritasi")
 KONU_ESIGI = 0.60
 
 
@@ -145,18 +148,54 @@ def _sozcuk_duzeni(sozcuk: str) -> str:
     return (bas if bas.isupper() or not bas.isalpha() else bas.upper()) + govde
 
 
+def _cogunlukla_buyuk(metin: str) -> bool:
+    """Metnin harfleri ağırlıkla büyük mü (kitapta bağıran başlık)."""
+    harfler = [ch for ch in metin if ch.isalpha()]
+    if not harfler:
+        return False
+    return sum(1 for ch in harfler if ch.isupper()) / len(harfler) > 0.6
+
+
 def baslik_duzeni(metin: str) -> str:
-    """Kitaptaki büyük harfli başlığı okunabilir başlık düzenine çevirir (spec §2.3)."""
+    """Kitaptaki büyük harfli başlığı okunabilir başlık düzenine çevirir (spec §2.3).
+
+    Dönüşüm YALNIZ ağırlıkla büyük harfli başlığa uygulanır. Koşulsuz uygulandığında
+    ölçüldü: zaten doğru yazılmış 17 başlık bozuluyordu — "ile" → "İle" (`'İ'.lower()`
+    iki kod noktası verdiği için küçük kalma koruması hiç tutmuyor), "(Serbest" →
+    "(serbest" (ilk karakter noktalama olduğunda büyütme kayboluyor), "Komik mi" →
+    "Komik Mi" (soru eki). Fen ve Türkçe içindekileri zaten doğru yazılmıştır; orada
+    dönüşüm yalnız bilgi yok eder.
+    """
     metin = " ".join((metin or "").split())
     for yanlis, dogru in OCR_DUZELTME.items():
         metin = metin.replace(yanlis, dogru)
+    if not _cogunlukla_buyuk(metin):
+        return metin
     cikti = []
     for sira, sozcuk in enumerate(metin.split(" ")):
         duzenli = _sozcuk_duzeni(sozcuk)
-        if sira and duzenli.lower() in KUCUK_KALAN:
+        if sira and harf_katla(duzenli) in {harf_katla(k) for k in KUCUK_KALAN}:
             duzenli = duzenli.lower()
         cikti.append(duzenli)
     return " ".join(cikti)
+
+
+BOLUM_ISARETI = re.compile(r"\s*\(\d+\)\s*$")
+
+
+def unite_adi_duzelt(ad: str) -> str:
+    """Ünite adından bölüm işaretini atar: "Sayılar ve Nicelikler (1)" → "…Nicelikler".
+
+    Program bazı temaları iki sayfa dizisine bölüyor ((1) s.115, (2) s.122). Ünite
+    numarasına göre tekilleştirmek doğru, ama "(1)" işaretini okura taşımak hiç gelmeyecek
+    bir "(2)" vaat eder (ölçüldü).
+    """
+    return BOLUM_ISARETI.sub("", " ".join((ad or "").split()))
+
+
+def numara_at(ad: str) -> str:
+    """Korunan grup başlığının önündeki içindekiler numarasını atar."""
+    return GRUP_BASLIGI.sub("", (ad or "").strip(), count=1).strip()
 
 
 def konu_slug(ad: str) -> str:
@@ -233,8 +272,11 @@ def program_uniteleri(baglanti: sqlite3.Connection, ders: Ders) -> list[dict]:
                 continue
             no = int(eslesme.group(1))
             if no not in gorulen:
-                gorulen[no] = {"no": no, "ad": baslik_duzeni(eslesme.group(2).strip(" :")),
-                               "program_sayfa": sayfa_no}
+                gorulen[no] = {
+                    "no": no,
+                    "ad": unite_adi_duzelt(baslik_duzeni(eslesme.group(2).strip(" :"))),
+                    "program_sayfa": sayfa_no,
+                }
     return [gorulen[no] for no in sorted(gorulen)]
 
 
@@ -303,9 +345,15 @@ def _icerik_sozcukleri(metin: str) -> set[str]:
 
 
 def _ayni_kok(a: str, b: str) -> bool:
-    """Türkçe ek budaması: biri ötekinin öneki ya da ilk ONEK harfi eşit."""
-    return a.startswith(b) or b.startswith(a) or (
-        len(a) >= ONEK and len(b) >= ONEK and a[:ONEK] == b[:ONEK])
+    """Türkçe ek budaması: iki katlanmış sözcük aynı kökten mi.
+
+    Her iki dal da en az ONEK harf paylaşım ister. Korumasız `startswith` ölçüldü ve
+    yanlış eşleşme üretiyordu: "esitsizlikler" ile "esit", "dairenin" ile "dair" (ilgili)
+    aynı kökten sayılıyordu ve tek sözcüklü bir başlık böyle bir tesadüfle 1.0 alıyordu.
+    """
+    if min(len(a), len(b)) < ONEK:
+        return a == b
+    return a.startswith(b) or b.startswith(a) or a[:ONEK] == b[:ONEK]
 
 
 def _ortusme_orani(ad: str, kazanim_metni: str) -> float:
@@ -331,6 +379,51 @@ def kazanim_esle(konu_metni: str, kazanimlar: list[dict]) -> tuple[list[str], st
 
 
 BILME_SONU = re.compile(r"(?:[ae]bilme|bilme)$", re.IGNORECASE)
+I_HARFLERI = frozenset("IıİiÎî")
+
+
+def _i_aktar(baslik_sozcuk: str, kazanim_sozcuk: str) -> tuple[str, bool]:
+    """Noktalı/noktasız I ayrımını kazanımdan konum konum aktarır; başka harfe dokunmaz.
+
+    `(onarılmış sözcük, çözülemeyen I kaldı mı)`. Boş kaynak harfi bir KÜME ile denetlenir:
+    `"" in "Iıİi"` boş alt dize olduğu için True döner ve harfi silerdi.
+    """
+    cikti, cozulmeyen = [], False
+    for sira, harf in enumerate(baslik_sozcuk):
+        kaynak = kazanim_sozcuk[sira] if sira < len(kazanim_sozcuk) else ""
+        if harf not in I_HARFLERI:
+            cikti.append(harf)
+        elif kaynak in I_HARFLERI:
+            cikti.append(kaynak)
+        else:
+            cikti.append(harf)
+            cozulmeyen = True
+    return "".join(cikti), cozulmeyen
+
+
+def baslik_onar(ad: str, kazanim_metni: str) -> tuple[str, bool]:
+    """Hasarlı başlığı kazanımın temiz metninden onarır: `(ad, tamamen çözüldü mü)`.
+
+    Yalnız kökü eşleşen sözcükte ve yalnız I ayrımında çalışır. Ölçüldü 2026-10-11, doc 361'in
+    dokuz başlığı: sekizi tam onarıldı ("TÜRKIYE CUMHURIYETI'NIN NITELIKLERI" → "Türkiye
+    Cumhuriyeti'nin Nitelikleri"), biri çözülemeyen bir I bıraktı. Kitabın kendi başlığı,
+    kazanımın fiilsiz tamlamasından çok daha okunur bir addır.
+    """
+    katli = [(harf_katla(s), s.strip(".,;:")) for s in (kazanim_metni or "").split()
+             if harf_katla(s)]
+    cikti, tam = [], True
+    for parca in (ad or "").split():
+        anahtar = harf_katla(parca)
+        karsilik = next((ham for kat, ham in katli if _ayni_kok(anahtar, kat)), None)
+        if karsilik is None:
+            cikti.append(parca)
+            if any(harf in I_HARFLERI for harf in parca):
+                tam = False
+            continue
+        onarilmis, cozulmeyen = _i_aktar(parca, karsilik)
+        cikti.append(onarilmis)
+        tam = tam and not cozulmeyen
+    return " ".join(cikti), tam
 
 
 def i_hasarli_mi(basliklar: list[str]) -> bool:
@@ -449,6 +542,7 @@ def ders_uret(baglanti: sqlite3.Connection, slug: str) -> tuple[dict | None, dic
     # gelir. Bu, ders adından değil kazanım kodlarından türetilir (spec §3).
     tema_sirasi_kullan = bool(kazanimlar) and all(k["unite_no"] is None for k in kazanimlar)
     kullanilan: set[str] = set()
+    gorulen_adlar: set[str] = set()
     cakisma = aday = 0
 
     for kitap in kitaplar:
@@ -466,26 +560,45 @@ def ders_uret(baglanti: sqlite3.Connection, slug: str) -> tuple[dict | None, dic
             ad = baslik_duzelt(ham_ad)
             if ad is None or aparat_mi(ad):
                 continue
+            # Gövde metninden kopmuş cümle konu adı olmaz (ölçüldü: Türkçe kitaplarının
+            # içindekiler sayfasında okuma metinlerinden cümleler nokta öncülüyle duruyor).
+            if len(ad) > KONU_AD_SINIRI:
+                continue
             aday += 1
             kodlar, kaynak = kazanim_esle(baslik_duzeni(ad), kazanimlar)
             kazanim_metni = next((k["metin"] for k in kazanimlar if k["kod"] in kodlar), "")
             # Numarasız yolda (Türkçe, Sosyal) iki sütunlu düzenin bıraktığı kuyruk başlık düşer.
             if basili is None and kazanim_metni and parca_basligi_mi(ad, kazanim_metni):
                 continue
-            # I ayrımını yitirmiş kitapta ad programın temiz metninden gelir; kazanımı
-            # eşleşmeyen başlık o kitapta hiç yazılmaz — harf uydurulmaz (D4).
+            # I ayrımını yitirmiş kitapta başlık programın temiz metninden ONARILIR; onarım
+            # bir I'yı çözemezse ad kazanımdan gelir — harf uydurulmaz (D4). Kazanımı
+            # eşleşmeyen başlık o kitapta hiç yazılmaz.
             if kitap["_i_hasarli"]:
                 if not kazanim_metni:
                     continue
-                duzgun = kazanimdan_ad(kazanim_metni)
+                onarilmis, tam = baslik_onar(ad, kazanim_metni)
+                duzgun = (numara_at(baslik_duzeni(onarilmis)) if tam
+                          else kazanimdan_ad(kazanim_metni))
             else:
-                duzgun = baslik_duzeni(ad)
+                duzgun = numara_at(baslik_duzeni(ad))
             unite_no = next((kazanim_unitesi[kod] for kod in kodlar
                              if kazanim_unitesi.get(kod) is not None), None)
             if unite_no is None and tema_sirasi_kullan:
                 unite_no = acik_tema
             if unite_no not in unite_konulari:
                 continue
+            # Bir konunun kazanımı kendi ünitesinden olmalı. Ölçüldü: "Eşitsizlikler"
+            # (ünite 2) olasılık kazanımı MAT.7.7.2'yi taşıyordu ve o kazanıma sahip bir
+            # modül yanlış üniteye bağlanıyordu.
+            kodlar = [kod for kod in kodlar
+                      if kazanim_unitesi.get(kod) in (None, unite_no)]
+            if not kodlar:
+                kaynak = "eslenmedi"
+            # Aynı ad iki ünitede görünürse kimlik çakışmaz ve kopya gizli kalır
+            # (ölçüldü: kitap arka maddesi iki temada birden çıkıyordu).
+            if harf_katla(duzgun) in gorulen_adlar:
+                continue
+            gorulen_adlar.add(harf_katla(duzgun))
             kimlik, cakisti = kimlik_ver(slug, unite_no, duzgun, kullanilan)
             cakisma += int(cakisti)
             konu = {"id": kimlik, "ad": duzgun, "ad_kaynak": " ".join(ham_ad.split()),

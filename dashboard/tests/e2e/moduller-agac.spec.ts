@@ -53,7 +53,7 @@ test.describe('Modüller — müfredat ağacı', () => {
     await expect(yaprak).not.toContainText('s.')
   })
 
-  test('modülü olan konu bağlantıdır (yeni sekme, geçmiş çalışır)', async ({ page }) => {
+  test('modülü olan konu gerçek bir bağlantıdır (adres, sağ tuş, geçmiş)', async ({ page }) => {
     await sabitAc(page, '/moduller', 1440, 900)
     await konulariAc(page)
     // Carbon 1.114.0: href'li düğümde role="treeitem" <a>'nın üzerindedir, <li> role="none".
@@ -131,6 +131,66 @@ test.describe('Modüller — müfredat ağacı', () => {
         .filter(o => o.h < 44)
     })
     expect(dusukler).toEqual([])
+  })
+
+  // I6: Carbon'un `handleKeyDown`'u Enter'da hem `onToggle` hem `onSelect` tetikliyor; ikisi de
+  // aynı toggle'a bağlıyken dal açılıp hemen kapanıyordu ve `localStorage` boş kalıyordu.
+  test('Enter dalı açıyor (klavye)', async ({ page }) => {
+    await sabitAc(page, '/moduller', 1440, 900)
+    const ders = page.getByRole('treeitem', { name: /Matematik/ })
+    await ders.focus()
+    await page.keyboard.press('Enter')
+    await expect(ders).toHaveAttribute('aria-expanded', 'true')
+    await expect.poll(() => page.evaluate(
+      () => window.localStorage.getItem('tedy-mufredat-acik'),
+    )).toBe('["matematik"]')
+  })
+
+  // I7: Carbon Enter'da hem düğümün kendi `click()`'ini hem `handleClick`'i çağırıyor; iki
+  // `navigate` bir geri tuşunu yutuyordu.
+  test('Enter hazır konuda tek geçmiş kaydı bırakıyor', async ({ page }) => {
+    await sabitAc(page, '/moduller', 1440, 900)
+    await konulariAc(page)
+    const once = await page.evaluate(() => history.length)
+    const yaprak = page.getByRole('treeitem', { name: /Tam Sayılar/ })
+    await yaprak.focus()
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL(/\/moduller\/mat7-tam-sayilar\/v1$/)
+    expect(await page.evaluate(() => history.length)).toBe(once + 1)
+  })
+
+  test('Enter hazır olmayan konuyu bir kez asistana soruyor', async ({ page }) => {
+    await sabitAc(page, '/moduller', 1440, 900)
+    await page.evaluate(() => {
+      ;(window as unknown as { __kez?: number }).__kez = 0
+      window.addEventListener('tedy:asistana-sor', () => {
+        const w = window as unknown as { __kez?: number }
+        w.__kez = (w.__kez ?? 0) + 1
+      })
+    })
+    await konulariAc(page)
+    const yaprak = page.getByRole('treeitem', { name: /Mutlak Değer/ })
+    await yaprak.focus()
+    await page.keyboard.press('Enter')
+    await expect.poll(() => page.evaluate(
+      () => (window as unknown as { __kez?: number }).__kez,
+    )).toBe(1)
+  })
+
+  // I5: konusu olmayan ünite açılıp boş bir gruba iniyordu ("Empty is never blank", D3).
+  test('konusu olmayan ünite bir cümle söylüyor', async ({ page }) => {
+    await baskaGovdeyleAc(page, {
+      hazir: [], kapsam: {}, hata: null,
+      dersler: [{
+        ders: 'Fen Bilimleri', slug: 'fen', program: { document_id: 54, sayfa: '146-183' },
+        kitaplar: [], konu_sayisi: 0, hazir_sayisi: 0,
+        uniteler: [{ no: 7, ad: 'Sürdürülebilir Yaşam ve Enerji', program_sayfa: 180,
+          konular: [], hazir_sayisi: 0 }],
+      }],
+    })
+    await page.getByRole('treeitem', { name: /Fen Bilimleri/ }).click()
+    await page.getByRole('treeitem', { name: /Sürdürülebilir Yaşam/ }).click()
+    await expect(page.getByRole('treeitem', { name: /henüz eşlenmedi/ })).toBeVisible()
   })
 
   test('haritası olmayan ders tek cümleyle açıklanıyor (D3)', async ({ page }) => {

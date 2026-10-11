@@ -1627,3 +1627,82 @@ def test_istek_sayfasi_bilinmeyen_konuda_sayfa_satirini_koruyor(agac_dosyasi):
         satir, hata = dashboard_api._istek_sayfasi(
             {"sayfa": {"ad": "moduller", "oge": {"tur": "konu", "id": "matematik-u9-olmayan"}}})
     assert hata is None and satir == "Bulunduğu sayfa: Modüller"
+
+
+# ── Denetim turu: eşiğe takılan ders ve bozuk katalog ────────────────────────
+
+
+def test_agac_ucu_esige_takilan_dersi_yine_listeliyor(client, agac_dosyasi):
+    """I2 (D3): üretilmeyen ders sessizce eksilmez.
+
+    Spec §5.5, yüzey tasarımı §4.12 ve CLAUDE.md aynı sözü veriyor: eşiğe takılan ders
+    ağaçta YİNE listelenir ve bir cümle söyler. `ders_uret` böyle bir ders için kayıt
+    döndürmüyor, o yüzden kaydı uç `kapsam`daki `yazilmadi` işaretinden kurar.
+    """
+    govde = json.loads(json.dumps(_AGAC_GOVDESI))
+    govde["kapsam"]["turkce"] = {"konu": 3, "kazanim": 121, "yazilmadi": "konu_esigi"}
+    agac_dosyasi(govde)
+    dersler = client.get("/api/modules/agac").get_json()["dersler"]
+    turkce = next((d for d in dersler if d["slug"] == "turkce"), None)
+    assert turkce is not None, "eşiğe takılan ders ağaçtan düşmüş"
+    assert turkce["uniteler"] == [] and turkce["konu_sayisi"] == 0
+    assert turkce["ders"] == "Türkçe"
+
+
+def test_agac_ucu_bilinmeyen_slugu_ders_adi_olarak_uydurmuyor(client, agac_dosyasi):
+    """Ad bilinmiyorsa slug okura gitmez; ders adı tablodan gelir, uydurulmaz (D4)."""
+    govde = json.loads(json.dumps(_AGAC_GOVDESI))
+    govde["kapsam"]["bilinmeyen"] = {"yazilmadi": "konu_esigi"}
+    agac_dosyasi(govde)
+    sluglar = {d["slug"] for d in client.get("/api/modules/agac").get_json()["dersler"]}
+    assert "bilinmeyen" not in sluglar
+
+
+def test_agac_ucu_bozuk_katalogu_bos_liste_gibi_gostermiyor(client, agac_dosyasi, tmp_path):
+    """I8: yarım yazılmış katalog "hiç modül yok" diye okunmaz ("empty is never blank")."""
+    agac_dosyasi(_AGAC_GOVDESI)
+    (tmp_path / "modules" / "index.json").write_text("{ yarim", encoding="utf-8")
+    payload = client.get("/api/modules/agac").get_json()
+    assert payload["hazir"] == [] and payload["hata"] == "katalog_okunamadi"
+    # Harita okunabildiği için ağaç yine gelir.
+    assert [d["slug"] for d in payload["dersler"]] == ["matematik"]
+
+
+def test_agac_ucu_modulu_baska_kitaptaki_konuya_baglamiyor(client, agac_dosyasi):
+    """C1: sayfa örtüşmesi kitap kimliğini de denetler.
+
+    İki kitabın sayfa numaraları aynı aralıkta olabilir; `frame_source.document_id`
+    bakılmazsa 2. kitaptaki bir modül 1. kitabın konusuna bağlanır.
+    """
+    govde = json.loads(json.dumps(_AGAC_GOVDESI))
+    ders = govde["dersler"][0]
+    ders["kitaplar"].append({"document_id": 506, "kisa": "2. Kitap",
+                             "sayfa_kaymasi": 0, "kayma_uyumu": "32/32"})
+    konular = ders["uniteler"][0]["konular"]
+    konular[1]["kitap"] = 506
+    konular[1]["sayfa"] = [17, 24]
+    konular[1]["sayfa_kaynak"] = "icindekiler"
+    konular[1]["kazanimlar"] = ["MAT.7.1.1"]
+    konular[1]["kazanim_kaynak"] = "metin-ortusmesi"
+    agac_dosyasi(govde, moduller=[_modul_satiri(
+        "mat7-tam-sayilar", ["MAT.7.1.1"],
+        frame_source={"kind": "textbook", "document_id": 506, "pages": "18-20"})])
+    cevap = client.get("/api/modules/agac").get_json()["dersler"][0]["uniteler"][0]["konular"]
+    bagli = next(k["id"] for k in cevap if k["modul"])
+    assert bagli == "matematik-u1-mutlak-deger"
+
+
+def test_agac_ucu_program_cercevesini_sayfa_kaniti_saymiyor(client, agac_dosyasi):
+    """`kind: "program"` çerçevesinin sayfaları PROGRAMın sayfalarıdır, kitabın değil."""
+    govde = json.loads(json.dumps(_AGAC_GOVDESI))
+    konular = govde["dersler"][0]["uniteler"][0]["konular"]
+    konular[1]["kazanimlar"] = ["MAT.7.1.1"]
+    konular[1]["kazanim_kaynak"] = "metin-ortusmesi"
+    konular[1]["sayfa"] = [110, 120]
+    konular[1]["sayfa_kaynak"] = "icindekiler"
+    agac_dosyasi(govde, moduller=[_modul_satiri(
+        "mat7-tam-sayilar", ["MAT.7.1.1"],
+        frame_source={"kind": "program", "document_id": 24, "pages": "110"})])
+    cevap = client.get("/api/modules/agac").get_json()["dersler"][0]["uniteler"][0]["konular"]
+    # Program sayfası kanıt sayılmaz; sıradaki ilk konu kazanır.
+    assert next(k["id"] for k in cevap if k["modul"]) == "matematik-u1-tam-sayilar"

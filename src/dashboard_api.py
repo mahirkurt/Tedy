@@ -4754,7 +4754,10 @@ def modules_list():
 MUFREDAT_AGACI_PATH = str(mufredat_agaci.agac_yolu(os.path.dirname(os.path.abspath(__file__))))
 _AGAC_ONBELLEGI = {"imza": None, "durum": "yok", "agac": None}
 _AGAC_KILIDI = threading.Lock()
-_FRAME_SAYFA_RE = re.compile(r"^(\d+)(?:\s*-\s*(\d+))?$")
+_FRAME_SAYFA_RE = re.compile(r"^(\d+)(?:\s*[-–—]\s*(\d+))?$")
+# Eşiğe takılıp üretilmeyen dersin adı: `kapsam` yalnız slug taşır, ad uydurulmaz (D4).
+_AGAC_DERS_ADLARI = {"turkce": "Türkçe", "matematik": "Matematik",
+                     "fen": "Fen Bilimleri", "sosyal": "Sosyal Bilgiler"}
 
 
 def _agac_imzasi(yol):
@@ -4787,11 +4790,19 @@ def _mufredat_agaci():
 
 
 def _modul_sayfa_ortusmesi(row, konu):
-    """Modülün frame_source sayfalarıyla konunun sayfa aralığının kesişim uzunluğu."""
+    """Modülün frame_source sayfalarıyla konunun sayfa aralığının kesişim uzunluğu.
+
+    Sayfa numarası yalnız AYNI ders kitabı içinde kanıttır: iki kitabın sayfaları aynı
+    aralıkta olabilir ve `kind: "program"` çerçevesinin sayfaları programın sayfalarıdır,
+    kitabın değil. Kitap kimliği ya da tür uyuşmuyorsa örtüşme 0'dır.
+    """
     sayfa = konu.get("sayfa")
     if not isinstance(sayfa, list) or len(sayfa) != 2:
         return 0
-    eslesme = _FRAME_SAYFA_RE.match(str((row.get("frame_source") or {}).get("pages") or "").strip())
+    cerceve = row.get("frame_source") or {}
+    if cerceve.get("kind") != "textbook" or cerceve.get("document_id") != konu.get("kitap"):
+        return 0
+    eslesme = _FRAME_SAYFA_RE.match(str(cerceve.get("pages") or "").strip())
     if not eslesme:
         return 0
     bas = int(eslesme.group(1))
@@ -4820,12 +4831,16 @@ def _agac_modul_eslemesi(agac, rows):
 @app.route("/api/modules/agac")
 @require_auth
 def modules_agac():
-    rows = module_store.latest_active(module_store.read_catalog(OUTPUT_DIR))
+    # Bozuk katalog "hiç modül yok" diye okunmaz ("empty is never blank", D3): durum okunur.
+    katalog_durumu, katalog = module_store.read_catalog_with_status(OUTPUT_DIR)
+    rows = module_store.latest_active(katalog)
     hazir = [{key: row.get(key) for key in _MODULE_CARD_FIELDS} for row in rows]
+    hata = "katalog_okunamadi" if katalog_durumu == module_store.CATALOG_UNREADABLE else None
     durum, agac = _mufredat_agaci()
     if durum != "ok" or agac is None:
         # D3: harita okunamazsa hazır modül listesi çalışmaya devam eder, 500 verilmez.
-        return jsonify({"hazir": hazir, "dersler": [], "kapsam": {}, "hata": "harita_okunamadi"})
+        return jsonify({"hazir": hazir, "dersler": [], "kapsam": {},
+                        "hata": hata or "harita_okunamadi"})
     eslesme = _agac_modul_eslemesi(agac, rows)
     dersler = []
     for ders in agac["dersler"]:
@@ -4837,7 +4852,19 @@ def modules_agac():
         dersler.append({**ders, "uniteler": uniteler,
                         "konu_sayisi": sum(len(u["konular"]) for u in uniteler),
                         "hazir_sayisi": sum(u["hazir_sayisi"] for u in uniteler)})
-    return jsonify({"hazir": hazir, "dersler": dersler, "kapsam": agac["kapsam"], "hata": None})
+    # Eşiğe takılıp üretilmeyen ders ağaçta YİNE listelenir ve yüzey bir cümle söyler;
+    # sessizce eksilmez (D3, spec §5.5). `ders_uret` böyle bir ders için kayıt döndürmez,
+    # bu yüzden kayıt `kapsam`daki `yazilmadi` işaretinden kurulur.
+    yazili = {ders["slug"] for ders in dersler}
+    for slug, kapsam in (agac.get("kapsam") or {}).items():
+        if not isinstance(kapsam, dict) or not kapsam.get("yazilmadi") or slug in yazili:
+            continue
+        ad = _AGAC_DERS_ADLARI.get(slug)
+        if ad is None:  # adı bilinmeyen slug okura gitmez
+            continue
+        dersler.append({"ders": ad, "slug": slug, "kitaplar": [], "uniteler": [],
+                        "konu_sayisi": 0, "hazir_sayisi": 0})
+    return jsonify({"hazir": hazir, "dersler": dersler, "kapsam": agac["kapsam"], "hata": hata})
 
 
 @app.route("/api/modules/<slug>/v<int:version>/ticket")

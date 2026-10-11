@@ -2,6 +2,7 @@
 
 Canlı iddialardaki sayılar 2026-10-11'de ölçüldü; eşleme bozulursa bu testler düşer.
 """
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -138,13 +139,15 @@ def test_uretilen_agac_semaya_uyar(agac):
 
 
 @canli
-@pytest.mark.parametrize("slug,en_az", [("matematik", 26), ("fen", 22), ("sosyal", 15)])
+@pytest.mark.parametrize("slug,en_az", [("matematik", 22), ("fen", 22), ("sosyal", 15)])
 def test_kazanim_kapsamasi_olculen_degerin_altina_dusmez(agac, slug, en_az):
-    """Ölçüldü 2026-10-11, son hâl: matematik 26/30, fen 22/35, sosyal 15/17.
+    """Ölçüldü 2026-10-11, denetim turundan sonra: matematik 22/30, fen 22/35, sosyal 15/17.
 
-    İlk sonda fen 25 ve sosyal 17 saymıştı; o sayım grup başlıklarını (aynı konunun kopyası)
-    ve iki sütunlu düzenin bıraktığı kuyruk başlıkları da içeriyordu. İkisi de kasten düşüyor,
-    bu yüzden gerçek kapsama daha düşük.
+    Sayı iki kez düştü ve ikisi de kasıtlı. İlk sonda fen 25 / sosyal 17 saymıştı; o sayım
+    grup başlıklarını (aynı konunun kopyası) ve iki sütunlu düzenin kuyruk başlıklarını
+    içeriyordu. Denetim turunda matematik 26 → 22 oldu: eşleme kesinliği sıkılaştırıldı ve
+    bir konunun kendi ünitesi dışından gelen kazanımı artık reddediliyor — "Eşitsizlikler"
+    ünite 2'de olup olasılık kazanımı MAT.7.7.2'yi taşıyordu. Kapsama düştü, doğruluk arttı.
     """
     assert agac["kapsam"][slug]["kazanimi_eslenen"] >= en_az
 
@@ -197,3 +200,123 @@ def test_sosyal_duzen_parcasi_konu_olmaz(agac):
 def test_depodaki_dosya_semaya_uyar():
     durum, agac = ma.oku(ma.agac_yolu(KOK / "src"))
     assert durum == "ok" and agac is not None
+
+
+# ── Denetim turu: eşleme kesinliği ve ad kalitesi ────────────────────────────
+
+
+def test_ayni_kok_kisa_onekte_eslesmez():
+    """Gevşek `startswith` en az paylaşılan uzunluk istemeli.
+
+    Denetimde ölçüldü: `_ayni_kok("esitsizlikler", "esit")` True dönüyordu ve "Eşitsizlikler"
+    başlığı MAT.7.7.2 (olasılık) kazanımına 1.0 skorla eşleşiyordu; "dair" (ilgili) ile
+    "dairenin" de aynı kökten sayılıyordu.
+    """
+    assert u._ayni_kok("esitsizlikler", "esit") is False
+    assert u._ayni_kok("dairenin", "dair") is False
+    # Gerçek ek budaması sürmeli.
+    assert u._ayni_kok("organlar", "organlarin") is True
+    assert u._ayni_kok("nitelikleri", "niteliklerini") is True
+
+
+def test_tek_sozcuklu_baslik_tesadufi_kokle_eslesmez():
+    """Tek içerik sözcüğü olan başlık bir tesadüfle 1.0 almamalı."""
+    kodlar, kaynak = u.kazanim_esle("Eşitsizlikler", [
+        {"kod": "MAT.7.7.2", "unite_no": 7,
+         "metin": "Aynı deneye ait olayların eşit olasılıklı olma durumlarını değerlendirebilme"}])
+    assert kodlar == [] and kaynak == "eslenmedi"
+
+
+@pytest.mark.parametrize("ham,beklenen", [
+    # Zaten doğru büyük-küçük yazılmış başlığa dokunulmaz (denetimde 17 başlık bozulmuştu).
+    ("Sen Sor O Yanıtlasın-Sporda ve Yaşamda Hedefe Odaklan", None),
+    ("Ağaç ve Sen (Serbest Okuma Metni)", None),
+    ("Milli Mücadele Sergisi Kahraman Çocuklar (Dinleme/İzleme)", None),
+    ("Komik mi Komik", None),
+    ("Dünya Komşuları ile Birlikte", None),
+])
+def test_baslik_duzeni_dogru_yazilmis_basligi_bozmaz(ham, beklenen):
+    assert u.baslik_duzeni(ham) == (beklenen or ham)
+
+
+def test_baslik_duzeni_buyuk_harfli_basligi_duzenler():
+    assert u.baslik_duzeni("TAM SAYILAR") == "Tam Sayılar"
+
+
+def test_unite_adindan_bolum_isareti_atilir():
+    """Program bir temayı iki sayfa dizisine bölüyor: "SAYILAR VE NİCELİKLER (1)" ve "(2)".
+
+    Ünite numarasına göre tekilleştirmek doğru, ama "(1)" işaretini okura taşımak
+    hiç gelmeyecek bir "(2)" vaat eder (denetimde ölçüldü).
+    """
+    assert u.unite_adi_duzelt("Sayılar ve Nicelikler (1)") == "Sayılar ve Nicelikler"
+    assert u.unite_adi_duzelt("Geometrik Nicelikler (2)") == "Geometrik Nicelikler"
+    assert u.unite_adi_duzelt("Uzay Çağı") == "Uzay Çağı"
+
+
+def test_ocr_duzeltmesi_olculen_bozulmayi_kapsar():
+    assert u.baslik_duzeni("HAY ATIMIZDAKİ EKONOMİ") == "Hayatımızdaki Ekonomi"
+
+
+def test_grup_basligi_numarasi_okura_gitmez():
+    assert u.numara_at("1. Işığın Kırılması") == "Işığın Kırılması"
+    assert u.numara_at("Işığın Kırılması") == "Işığın Kırılması"
+
+
+@canli
+def test_hicbir_kazanim_konunun_unitesi_disindan_gelmez(agac):
+    """C1: bir konunun kazanımı kendi ünitesine ait olmalı.
+
+    Denetimde ölçüldü: "Eşitsizlikler" (ünite 2) MAT.7.7.2'yi (ünite 7) taşıyordu ve
+    o kazanıma sahip bir modül yanlış üniteye bağlanıyordu.
+    """
+    ihlal = []
+    for ders in agac["dersler"]:
+        for unite in ders["uniteler"]:
+            for konu in unite["konular"]:
+                for kod in konu["kazanimlar"]:
+                    eslesme = re.search(r"\.(\d+)\.\d+$", kod)
+                    if eslesme and int(eslesme.group(1)) != unite["no"]:
+                        ihlal.append(f"{konu['id']} (ünite {unite['no']}) ← {kod}")
+    assert ihlal == [], "ünite dışı kazanım:\n" + "\n".join(ihlal)
+
+
+@canli
+def test_hicbir_konu_adi_iki_kez_gecmez(agac):
+    """I4: aynı ad iki ayrı ünitede görünürse kimlik çakışması sayılmaz ve kopya gizli kalır.
+
+    Denetimde ölçüldü: Türkçe'de kitap arka maddesi haritaları iki temada birden çıkıyordu.
+    """
+    for ders in agac["dersler"]:
+        adlar = [konu["ad"] for unite in ders["uniteler"] for konu in unite["konular"]]
+        yineleyen = sorted({ad for ad in adlar if adlar.count(ad) > 1})
+        assert yineleyen == [], f"{ders['slug']}: yinelenen ad {yineleyen}"
+
+
+@canli
+def test_kitaptan_gelen_ad_cumle_degil(agac):
+    """I4: gövde metninden kopmuş cümleler konu adı olmaz.
+
+    Kural kitabın başlığına (`ad_kaynak`) uygulanır; programdan onarılan ad meşru olarak
+    daha uzun olabilir (I ayrımını yitirmiş kitapta kazanım metnine düşülüyor).
+    """
+    uzun = []
+    for ders in agac["dersler"]:
+        for unite in ders["uniteler"]:
+            for konu in unite["konular"]:
+                ham = konu["ad_kaynak"]
+                if len(ham) > u.KONU_AD_SINIRI or ham.rstrip().endswith((",", ".")):
+                    uzun.append(f"{konu['id']}: {ham[:60]}")
+    assert uzun == [], "cümle gibi konu adı:\n" + "\n".join(uzun)
+
+
+@canli
+def test_hasarli_kitapta_cozulemeyen_i_programa_duser(agac):
+    """Onarım bir I'yı çözemezse ad kazanımdan gelir; yanlış harf okura gitmez (D4)."""
+    sosyal = next(d for d in agac["dersler"] if d["slug"] == "sosyal")
+    adlar = [konu["ad"] for unite in sosyal["uniteler"] for konu in unite["konular"]]
+    # Onarımın tuttuğu başlıklar kitabın kendi adıdır.
+    assert "Türkiye Cumhuriyeti’nin Nitelikleri" in adlar
+    assert "Millî Kalkınma Hamleleri" in adlar
+    # Hiçbir ad, onarılmamış noktasız I kalıbını taşımaz.
+    assert not [ad for ad in adlar if "ı" in ad and "Karşılaşılabılecek" in ad]

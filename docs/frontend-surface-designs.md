@@ -613,8 +613,10 @@ Odak kipinde ağaç çizilmez (İ1). Dal etiketi "N konu · M hazır" sayacını
 düzeni).
 
 Yaprağın **tek** eylemi düğümün etkinleştirilmesidir — ARIA ağacında `treeitem` içine düğme
-konmaz: modülü olan yaprak bağlantıdır (B58), olmayan konu asistana bağlam olarak sabitlenir
-(B78, `tur: 'konu'`; sunucu başlığı kendi verisinden çözer). Dal, chevron'a ek olarak satırın
+konmaz: modülü olan yaprak bağlantıdır (B58; adres çubuğuna taşınır ve sağ tuşla yeni sekmede
+açılır — Ctrl/Cmd-tık panonun her yerinde olduğu gibi aynı sekmede gezinir, talimatname B80),
+olmayan konu asistana bağlam olarak sabitlenir (B78, `tur: 'konu'`; sunucu başlığı kendi
+verisinden çözer). Dal, chevron'a ek olarak satırın
 tamamıyla açılır — Carbon'da satır tıklaması dalı açmaz ve telefonda 16 px'lik chevron dokunma
 hedefi değildir.
 
