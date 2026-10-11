@@ -64,10 +64,8 @@ belirler (https://carbondesignsystem.com/building-blocks/foundations/color/guide
 - Üst bant düz `--tedy-brand` zemindir; solda Tedy işareti (beyaz disk, yarı saydam beyaz
   hilal, lacivert onay; renkler token, `aria-hidden`), üzerinde `text-on-color` başlık.
   Gradyan, radyal parıltı, ham hex ve cam (`rgba`) yüzey yoktur.
-- Bant üstündeki XP ve seri çipleri Carbon Tag'dir: `--tedy-brand-hover` zemin,
-  `text-on-color` metin. XP yıldızı `--cds-support-warning` (lacivert üstünde 7,3:1).
-  2026-10-10'dan beri (talimatname S43) seri çipi kalkar, XP kalırsa hareketsiz sessiz metindir;
-  bu satır bugünkü şablonu tarif eder (borç B73).
+- Bantta XP sayacı, seri çipi ve rozet kasası yoktur (2026-10-11, talimatname S43, B73 kapandı):
+  bant başlık, ilerleme rayı ve araç düğmelerini taşır.
 - Ders rengi bantta **değildir**; yalnız odak çapalarında yaşar: bölüm ikon karosu (`.seg-ic`),
   `kicker`, seçili seçenek halkası, anlatım kutularının 4 px sol çizgisi, tanım etiketi, zaman
   çizelgesi düğümü, piktogramlar ve küçük işaretler. Anlatım kutuları (`.lead`, `.hook-card`,
@@ -160,7 +158,7 @@ Tabloda olmayan iki yer: tanım popover'ı `--cds-border-radius-04`, satır içi
 ve Tedy köşe dilinde 4 px yoktur; ikisi de adlı sapmadır. `.topbar`/`.stage` gölgesi Carbon'un
 "statik karoda gölge yok" kuralına adlı Tedy istisnasıdır (`carbon-excellence.md` madde 4).
 
-## 5. Oyunlaştırma (yumuşatılmış)
+## 5. Oyunlaştırma — yok (S43)
 
 **Karar (2026-10-10, talimatname S43, Ç9'un kararı):** modülde kutlama ya da ödül animasyonu
 (XP/seri nabzı, "+N XP" yükselişi, rozet belirişi, ödül sesi) ve seri sayacı yoktur. İlerleme sessiz,
@@ -169,19 +167,21 @@ daha azında düz metin, ör. "Adım 3/7"). Anında geri bildirim metinle kalır
 hareketsiz sessiz metindir ve özet ekranında büyük sayı olmaz. Kazanılan rozet kalırsa sessiz bir
 listedir. Dayanak: anayasa §9 ("kutlama", "seri sayacı"), İ6 (aynı anda tek hareket), Carbon productive
 hareket (https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#productive-motion).
-Aşağıdaki maddeler bugünkü şablonu tarif eder; şablon, SKILL §11.4–§11.6, `gamified-flows.md` ve
-G-FLOW kapısı bu karara göre değişene dek borçtur (talimatname B73).
+Şablon bu kararı uygular (2026-10-11, talimatname B73 kapandı):
 
-Bugünkü şablon — XP, rozet ve seri korunur; dilleri Tedy'nin "kutlama yok" ilkesine yaklaştırıldı:
-
-- Renk: ayrı altın ham-hex yoktur. `--reward` = `--tedy-text-warning` (Carbon sarısının
-  metin-güvenli karşılığı), `--reward-bg` = `--cds-notification-background-warning`.
-- Hareket: ölçek sıçraması yok. XP ve seri vurgusu kısa bir opaklık nabzıdır
-  (`duration-moderate-02`, productive); "+N XP" 10 px yükselip söner (`duration-slow-02`);
-  yeni rozet yalnız belirir. Hepsi `prefers-reduced-motion` altında kapalıdır.
-- Kazanılan rozet sessiz "seçili" çiptir (`--cds-layer-selected-01`, `text-primary`):
-  bitmiş iş öne çıkmaz, rozet avına dönüşmez.
-- Dil: seri çipi "Seri 3" yazar; ünlem yok.
+- **XP** iç ilerleme sayısıdır: ilerleme köprüsü panoya bildirir (`edupedia:progress` `xp`), okur
+  görmez. Üst bantta sayaç, "+N XP" yükselişi ve nabız yoktur. `rewards.xpPerCorrect` /
+  `firstTryBonus` yalnız bu iç sayıyı besler.
+- **Seri sayacı yoktur.** G-FLOW, işaretlemede seri sayacı öğesi (`id="streakChip"`) bulursa FAIL verir.
+- **Rozet gösterilmez** (kararın "kalırsa" seçeneği kullanılmadı: kilitli rozet "rozet avı"dır, kazanılan
+  rozet de ilerleme etiketinin taşımadığı bir bilgi taşımaz — anayasa §9, İ6). `rewards.badges`
+  geriye uyum için kabul edilir, ekranda yer almaz.
+- **Ödül sesi yoktur**; doğru cevabın kısa `correct` earcon'u anında geri bildirim olarak kalır
+  (isteğe bağlı, `audio-system.md`).
+- **Özet ekranı sessizdir:** "Modülü tamamladın", tamamlanan alıştırma sayısı düz metinle
+  ("8 / 10 alıştırmayı doğru tamamladın"), hedefler ve tekrar önerisi; büyük sayı, halka grafik,
+  "Toplam XP", rozet sayısı ve "En uzun seri" yoktur.
+- `--reward` / `--reward-bg` rolü kalktı; sarı yalnız uyarıdır.
 
 ## 6. Doğrulama
 
@@ -218,11 +218,11 @@ Bugünkü şablon — XP, rozet ve seri korunur; dilleri Tedy'nin "kutlama yok" 
   anı" biçiminde marka bölgesi
   (https://carbondesignsystem.com/building-blocks/foundations/color/overview/#high-contrast-moments)
   ve tek g10 pano (§2, S14). 2026-10-10'da istisna olmaktan çıkanlar: 700 ms "+N XP" yükselişi
-  (S43, kalkar; B73) ve panodaki asistanın öğretmen modunda `--cds-button-primary` /
+  (S43; 2026-10-11'de kalktı, B73) ve panodaki asistanın öğretmen modunda `--cds-button-primary` /
   `--cds-interactive`'in ders aksanına yönlenmesi (S35: birincil eylem her yerde Carbon mavisi; B68).
 - **Bilinen, çözülmemiş:** pano 1920 px üstünde kök puntoyu büyütür, modül çerçevesi 16 px kökte ve
   px boyutlarda kalır. (Kilometre taşı cevabında XP nabzı, "+N XP" ve seri vuruşunun aynı anda koşması
-  2026-10-10'da S43 ile karara bağlandı: ödül hareketi kalkar; borç B73.)
+  2026-10-10'da S43 ile karara bağlandı ve 2026-10-11'de kalktı; B73 kapandı.)
 - **AI etiketi — karar (2026-10-10, talimatname S41, Ç7'nin kararı).** Panoda gösterilen her modül
   `ModuleViewer`'ın çerçeve başlığında Carbon `AILabel` taşır; açıklama penceresi neyin yapay zekâyla
   üretildiğini (anlatım, sorular, görseller) ve dayandığı kaynakları (kazanım, ders kitabı sayfaları,

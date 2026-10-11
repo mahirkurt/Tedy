@@ -4642,6 +4642,96 @@ def module_draft_ticket_issue(taslak_id):
     return _no_store(ticket)
 
 
+_MODULE_RUN_ID_RE = re.compile(r"^[0-9a-f]{12}\Z")
+_MODULE_ASSET_ID_RE = re.compile(r"^[0-9a-f]{16}\Z")
+_MODULE_MEDIA_KIND = {"mufredat": "ders_kitabi", "pexels": "fotograf_arsivi"}
+_MODULE_EXPLAIN_CLAIMS = 5
+
+
+def _module_text(value, limit):
+    return value.strip()[:limit] if isinstance(value, str) and value.strip() else None
+
+
+def _module_media(run_id, asset_ids):
+    """Count a module's embedded media by where it came from: the curriculum textbook, the photo
+    archive, or a generative model (anything else ted-mcp's media tools stored)."""
+    counts = {"yapay_zeka": 0, "ders_kitabi": 0, "fotograf_arsivi": 0}
+    if not isinstance(run_id, str) or not _MODULE_RUN_ID_RE.match(run_id) or not isinstance(asset_ids, list):
+        return counts
+    folder = os.path.join(OUTPUT_DIR, "edupedia_runs", run_id, "assets")
+    for asset_id in asset_ids[:64]:
+        if not isinstance(asset_id, str) or not _MODULE_ASSET_ID_RE.match(asset_id):
+            continue
+        try:
+            with open(os.path.join(folder, f"{asset_id}.json"), encoding="utf-8") as handle:
+                record = json.load(handle)
+        except (OSError, ValueError):
+            continue
+        kaynak = record.get("kaynak") if isinstance(record, dict) else None
+        if isinstance(kaynak, str) and kaynak:
+            counts[_MODULE_MEDIA_KIND.get(kaynak, "yapay_zeka")] += 1
+    return counts
+
+
+def _module_explanation(record, draft):
+    """What the module frame's AI label says (talimatname S41, B71): what was written with AI help and
+    what it rests on — outcomes, the textbook pages, the verified claims (only when the draft is the
+    build that was published) and where the media came from. No internal id reaches the reader (D4)."""
+    draft = draft if isinstance(draft, dict) else {}
+    meta = draft.get("meta") if isinstance(draft.get("meta"), dict) else {}
+    source = record if record is not None else meta
+    outcomes = (record or draft).get("outcomes")
+    frame = draft.get("frame_source") if isinstance(draft.get("frame_source"), dict) else {}
+    if record is not None and isinstance(record.get("frame_source"), dict):
+        frame = {**frame, **{k: v for k, v in record["frame_source"].items() if v is not None}}
+    book = None
+    if frame.get("kind") == "textbook" or frame.get("pages"):
+        book = {"ad": _module_text(frame.get("title"), 120), "sayfalar": _module_text(frame.get("pages"), 20)}
+    summary = draft.get("dogrulama") if isinstance(draft.get("dogrulama"), dict) else None
+    claims, status = [], "kayit_yok"
+    if summary is not None:
+        if record is not None and (not isinstance(record.get("sha256"), str) or draft.get("sha256") != record["sha256"]):
+            status = "uyusmazlik"
+        else:
+            status = "ok"
+            for item in summary.get("iddialar") if isinstance(summary.get("iddialar"), list) else []:
+                text = _module_text(item.get("iddia") if isinstance(item, dict) else None, 200)
+                if not text:
+                    continue
+                dayanak = item.get("dayanak") if isinstance(item.get("dayanak"), dict) else {}
+                page = dayanak.get("page")
+                claims.append({"iddia": text,
+                               "sayfa": page if isinstance(page, int) and not isinstance(page, bool) and page > 0 else None,
+                               "kaynak": _module_text(dayanak.get("kaynak"), 160)})
+                if len(claims) == _MODULE_EXPLAIN_CLAIMS:
+                    break
+    return {
+        "baslik": _module_text(source.get("title"), 120), "ders": _module_text(source.get("subject"), 60),
+        "sinif": _module_text(source.get("gradeLevel"), 30),
+        "kazanimlar": [o for o in (_module_text(x, 40) for x in (outcomes if isinstance(outcomes, list) else [])) if o][:8],
+        "kitap": book, "iddia_durumu": status, "iddialar": claims,
+        "medya": _module_media(draft.get("run_id") or (record or {}).get("run_id"), draft.get("assets")),
+    }
+
+
+@app.route("/api/modules/<slug>/v<int:version>/aciklama")
+@require_auth
+def module_explanation(slug, version):
+    record = _module_active_record(slug, version)
+    if record is None:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(_module_explanation(record, module_store.read_draft(OUTPUT_DIR, record.get("taslak_id"))))
+
+
+@app.route("/api/modules/taslak/<taslak_id>/aciklama")
+@require_auth
+def module_draft_explanation(taslak_id):
+    draft = module_store.read_draft(OUTPUT_DIR, taslak_id)
+    if draft is None:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(_module_explanation(None, draft))
+
+
 @app.route("/api/modules/<slug>/progress")
 @require_auth
 def module_progress_get(slug):

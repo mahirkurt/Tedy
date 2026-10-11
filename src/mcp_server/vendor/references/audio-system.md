@@ -9,9 +9,9 @@ başına hiçbir bilgi taşımaz (erişilebilirlik + işitme engeli + sessizde t
 
 1. **Kısa, ayrık olay-earcon'ları** — sürekli müzik/gürültü YOK. Her ses < ~300 ms, yumuşak
    zarf (attack/decay), düşük tepe kazancı (~0.06–0.11).
-2. **Pozitif değerlik** — başarı/ödül sesleri hoş, yükselen motifler; "yanlış" sesi alçak,
+2. **Pozitif değerlik** — doğru cevap sesi hoş, yükselen bir motif; "yanlış" sesi alçak,
    nazik ve **cezalandırıcı değil** (sert/alçak-değerlikli ses gerilim artırır → kaçınılır).
-3. **Görselle eşli** — earcon, görsel geri bildirimin (işaret, XP patlaması, rozet) yanında.
+3. **Görselle eşli** — earcon, görsel geri bildirimin (işaret ve geri bildirim metni) yanında.
 4. **Opsiyonel ve susturulabilir** — üst çubukta hoparlör düğmesi; durum bellekte tutulur.
 5. **Reduced-motion duyarlı** — `prefers-reduced-motion: reduce` ise ses **varsayılan kapalı**
    (duyusal yükü azaltma tercihinin makul bir vekili); kullanıcı dilerse açar.
@@ -23,22 +23,18 @@ başına hiçbir bilgi taşımaz (erişilebilirlik + işitme engeli + sessizde t
 
 | Olay | Earcon | Karakter | Tetikleyici |
 | --- | --- | --- | --- |
-| `correct` | E5→B5, iki nota, sine | kısa, yükselen, hoş | her doğru/ödüllendirme (`addXP`) |
+| `correct` | E5→B5, iki nota, sine | kısa, yükselen, hoş | her doğru cevap (`addXP`) |
 | `retry`   | tek alçak nota (Eb4), sine | yumuşak, nazik, **cezasız** | yanlış cevap dalları |
-| `reward`  | E5→Ab5→Eb6 arpej, triangle | kutlama (2026-10-10, talimatname S43: kalkar; B73) | modül tamamlama / özet |
 | `notify`  | iki notalı nazik çan | bilgilendirici | mola hatırlatıcı; ses açılınca onay |
 
 Tüm tepe kazançları düşük tutulur; sesler kısa ve örtüşmesiz tasarlanır. "Yanlış" sesi
 bilinçli olarak alçak ve kısa — başarısızlığı vurgulamaz, yeniden denemeye davet eder.
 
-## 3. Görsel oyunlaştırma geri bildirimi (ses ile eşli)
+## 3. Görsel geri bildirim (ses ile eşli)
 
-- **XP onayı** — doğru cevapta XP sayacının yanında kısa yükselip sönen "+N XP" etiketi + sayaçta
-  kısa opaklık nabzı (`pulseEl`; ölçek sıçraması yok). Reduced-motion'da yalnız sayı güncellenir.
-  2026-10-10'dan beri (talimatname S43) ödül hareketi yok: XP kalırsa yalnız sayı güncellenir, her
-  kipte; yükseliş ve nabız borçtur (B73).
-- **Yeni rozet** — `badge--new` ile yalnız belirir (opaklık; ölçeklenme yok). Tedy dili: kutlama
-  yok, sessiz onay (`tedy-integration.md` §5).
+- **Ödül sesi ve ödül hareketi yoktur** (2026-10-11, talimatname S43, B73): modül tamamlamada
+  kutlama arpeji (`reward`), "+N XP" yükselişi, sayaç nabzı, rozet belirişi ve seri vuruşu kalktı.
+  XP iç ilerleme sayısıdır, ekranda gösterilmez (`tedy-integration.md` §5).
 - **Doğru/yanlış işaretleri** — mevcut `feedback--ok/--no` + seçenek vurguları (renk DAİMA
   ikon/metinle birlikte; CVD-güvenli).
 - Tüm animasyonlar `@media (prefers-reduced-motion: no-preference)` altında; aksi hâlde statik.

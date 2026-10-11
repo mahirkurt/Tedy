@@ -49,6 +49,9 @@ CORE = {
     "--cds-skeleton-background": "skeletonBackground", "--cds-skeleton-element": "skeletonElement",
     "--cds-support-success": "supportSuccess", "--cds-support-error": "supportError",
     "--cds-support-warning": "supportWarning", "--cds-support-info": "supportInfo",
+    # devre dışı (talimatname S24, B34 — 2026-10-11)
+    "--cds-text-disabled": "textDisabled", "--cds-icon-disabled": "iconDisabled",
+    "--cds-text-on-color-disabled": "textOnColorDisabled",
 }
 COMPONENT = {  # @carbon/themes generated component-token haritaları
     "--cds-button-primary": ("componentTokens", "buttonPrimary"),

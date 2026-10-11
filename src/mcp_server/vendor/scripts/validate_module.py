@@ -39,7 +39,7 @@ Kapılar:
     G-VERIFY        (FAIL) — koşullu: müfredat-temelli modülde kapsam+doğruluk denetiminin KAYDI
                     (her iddia dayanağıyla). Yargı modelin; kapı yalnız dayanağın GÖSTERİLDİĞİNİ
                     ölçer — doğruluğu, belgenin varlığını, sayfayı DOĞRULAYAMAZ (MCP erişimi yok)
-    G-FLOW          (FAIL) — koşullu: gamification imzası varsa merak-boşluğu kapanışı, gain-only streak,
+    G-FLOW          (FAIL) — koşullu: gamification imzası varsa merak-boşluğu kapanışı, seri sayacı yok (S43),
                     kaygısız pacingDisk, etiketlemeyen uyarlanır zorluk
     G-CARBON-GRID   (FAIL) — statik kartta (gerçek/non-inset) drop-shadow (layer-elevation ihlali);
                     (WARN) 2x-grid konteyneri, en-boy oranı (aspect-ratio), koreografi >500ms
@@ -2160,8 +2160,11 @@ def gate_exam(html, R):
 
 FLOW_LOSS_RE = re.compile(r"(seri(n|ni)?\s*(kaybett|sıfırla|bozdu)|kaybettin|streak\s*lost|başarısız oldun)", re.I)
 FLOW_LABEL_RE = re.compile(r"(zorlan[ıi]yorsun|çok kolay geliyor|seviyen düştü)", re.I)
+# Seri sayacı öğesi (işaretleme; CSS/JS anılması değil). TEDY talimatnamesi S43 (2026-10-10):
+# modülde seri sayacı ve ödül animasyonu yoktur — dışsal ödül, anayasa §9.
+FLOW_STREAK_COUNTER_RE = re.compile(r'id="streakChip"|class="streak-chip[\s"]')
 def gate_flow(html, R):
-    """Koşullu: gamification akış değişmezleri (merak-boşluğu kapanır, gain-only streak,
+    """Koşullu: gamification akış değişmezleri (merak-boşluğu kapanır, seri sayacı yok — S43,
     kaygısız pacingDisk, uyarlanır-zorluk etiketlemez). İmza yoksa uygulanmaz."""
     has_hook = 'data-seg="hook"' in html or "data-hook" in html
     has_streak = "streakChip" in html or "streak-chip" in html
@@ -2173,11 +2176,13 @@ def gate_flow(html, R):
     n_hook = html.count('data-seg="hook"')
     n_res  = html.count("data-hook-resolved")
     if n_hook and n_res < n_hook: issues.append(f"{n_hook - n_res} merak-boşluğu kapanmıyor (data-hook-resolved eksik)")
+    if FLOW_STREAK_COUNTER_RE.search(html):
+        issues.append("seri sayacı var (S43: modülde seri sayacı ve ödül animasyonu yok)")
     if FLOW_LOSS_RE.search(html): issues.append("streak/kayıp cezalandırıcı dili (gain-only olmalı)")
     if FLOW_LABEL_RE.search(html): issues.append("uyarlanır-zorluk kullanıcıyı etiketliyor")
     if has_disk and re.search(r"pacing-?[Dd]isk[^>]*data-countdown", html): issues.append("tempo diski geri-sayım (kaygısız/kesintisiz olmalı)")
     if issues: R.add("G-FLOW","FAIL","; ".join(issues))
-    else: R.add("G-FLOW","PASS","Akış değişmezleri: merak-boşluğu kapanıyor, gain-only streak, kaygısız disk.")
+    else: R.add("G-FLOW","PASS","Akış değişmezleri: merak-boşluğu kapanıyor, seri sayacı yok, kaygısız disk.")
 
 # item 3/4 (carbon-excellence.md §3): statik kart/segment/tile/teach seçicisinde GERÇEK
 # (non-inset) box-shadow = layer-elevation ihlali. `inset` gölgeler kasıtlı olarak dışlanır:

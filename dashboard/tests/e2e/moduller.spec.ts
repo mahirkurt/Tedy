@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
 import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -18,6 +20,14 @@ const SPEC_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'uns
   "font-src data:; media-src data:; connect-src 'none'; frame-ancestors https://tedy.online; base-uri 'none'; form-action 'none'"
 const FRAME_CSP = 'frame-src https://modul.tedy.online https://accounts.google.com'
 const json = (b: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(b) })
+const ACE = createRequire(import.meta.url).resolve('accessibility-checker-engine/ace.js')
+// The shape /api/modules/…/aciklama answers (src/dashboard_api.py _module_explanation).
+const ACIKLAMA = {
+  baslik: 'Maddenin Hâlleri', ders: 'Fen Bilimleri', sinif: '5. Sınıf', kazanimlar: ['FB.5.4.1.1'],
+  kitap: { ad: 'Fen Bilimleri 5', sayfalar: '112-120' }, iddia_durumu: 'ok',
+  iddialar: [{ iddia: 'Madde katı, sıvı ve gaz hâllerinde bulunur.', sayfa: 112, kaynak: null }],
+  medya: { yapay_zeka: 1, ders_kitabi: 2, fotograf_arsivi: 0 },
+}
 
 type Segment = { id: string; type: string; questions?: { correctIndex: number }[] }
 let moduleHtml = ''
@@ -55,6 +65,9 @@ async function serveModule(page: Page, framePath = '/m/fen5-su/v1', body = modul
   await page.route('**/api/modules/fen5-su/v1/ticket', r => r.fulfill(json({
     url: `https://modul.tedy.online${framePath}?t=${'a'.repeat(64)}&e=1&u=${'b'.repeat(32)}`, exp: 1,
   })))
+  await page.route('**/api/modules/fen5-su/v1/aciklama', r => r.fulfill(json(ACIKLAMA)))
+  await page.route('**/api/modules/taslak/0123456789abcdef/aciklama', r => r.fulfill(json({ ...ACIKLAMA,
+    iddia_durumu: 'kayit_yok', iddialar: [] })))
   await page.route('**/api/modules/taslak/0123456789abcdef/ticket', r => r.fulfill(json({
     url: `https://modul.tedy.online/taslak/0123456789abcdef?t=${'a'.repeat(64)}&e=1&u=${'b'.repeat(32)}`, exp: 1,
   })))
@@ -145,13 +158,97 @@ test('the module opens sandboxed and an answer is recorded through the bridge', 
 })
 
 test('restore brings back earned progress and resumes at the first unfinished segment', async ({ page }) => {
-  await recordProgress(page, { answers: [`${segment('mcq').id}#0`], done: [segment('teach').id], xp: 15 })
+  const progress = await recordProgress(page, { answers: [`${segment('mcq').id}#0`], done: [segment('teach').id], xp: 15 })
   await serveModule(page)
   await page.goto('/moduller/fen5-su/v1')
   const frame = page.frameLocator('iframe.module-frame')
   await expect(frame.locator('#titleText')).toHaveText(quiz.meta.title)
-  await expect(frame.locator('#xpValue')).toHaveText('15')
   await expect(frame.locator('.q-stem')).toBeVisible()
+  // XP is an internal number since S43 (B73): the bridge still carries the restored value, the reader never sees it.
+  await frame.locator(`.opt[data-i="${segment('mcq').questions![0].correctIndex}"]`).click()
+  await expect.poll(() => progress.events()).toContain('answer')
+  expect(Number(progress.posts.find(p => p.event === 'answer')!.xp)).toBeGreaterThanOrEqual(15)
+})
+
+// B73 (S43, anayasa §9): no XP counter, streak chip, badge case or "+N XP" — a correct answer is acknowledged in
+// words, nothing moves.
+test('a correct answer moves nothing and counts nothing on screen', async ({ page }) => {
+  await recordProgress(page)
+  await serveModule(page)
+  await page.goto('/moduller/fen5-su/v1')
+  const frame = page.frameLocator('iframe.module-frame')
+  await expect(frame.locator('#titleText')).toHaveText(quiz.meta.title)
+  await frame.locator('#nextBtn').click()
+  await frame.locator(`.opt[data-i="${segment('mcq').questions![0].correctIndex}"]`).click()
+  await expect(frame.locator('.feedback--ok')).toBeVisible()
+  for (const iz of ['#xpValue', '.xp', '#streakChip', '.streak-chip', '#badgeCase', '.badge', '.xp-float'])
+    await expect(frame.locator(iz)).toHaveCount(0)
+  await expect(frame.locator('header.topbar')).not.toContainText('XP')
+})
+
+// B71 (S41, §6.2): every module the dashboard shows carries Carbon's AI label in its frame header; it explains
+// what was written with AI help and what it rests on, opens by keyboard and passes axe and IBM Equal Access.
+test('the module frame carries an AI label that explains itself', async ({ page }) => {
+  await recordProgress(page)
+  await serveModule(page)
+  await page.goto('/moduller/fen5-su/v1')
+  const ust = page.locator('.module-viewer__ust')
+  const etiket = ust.getByRole('button', { name: 'AI Yapay zekâ hakkında bilgi', exact: true })
+  await expect(etiket).toBeVisible()
+  await expect(ust).toContainText('Yapay zekâ yardımıyla hazırlanmış modül')
+  // the label sits above the frame, at its upper right
+  const [e, f] = [await etiket.boundingBox(), await page.locator('iframe.module-frame').boundingBox()]
+  expect(e!.y + e!.height).toBeLessThanOrEqual(f!.y + 1)
+  expect(e!.x + e!.width).toBeGreaterThan(f!.x + f!.width * 0.75)
+  await etiket.focus()
+  await page.keyboard.press('Enter')
+  const pencere = page.locator('.modul-ai')
+  await expect(pencere).toBeVisible()
+  await expect(pencere).toContainText('Bu modül yapay zekâ yardımıyla hazırlandı')
+  await expect(pencere).toContainText('Kazanım: FB.5.4.1.1')
+  await expect(pencere).toContainText('Dayandığı kitap: Fen Bilimleri 5, s. 112–120')
+  await expect(pencere).toContainText('Madde katı, sıvı ve gaz hâllerinde bulunur.')
+  await expect(pencere).toContainText('ders kitabı s. 112')
+  await expect(pencere).toContainText('1 görsel ya da ses yapay zekâyla üretildi.')
+  await expect(pencere).toContainText('2 görsel ders kitabından alındı.')
+  await expect(etiket).toBeFocused()
+  const { violations } = await new AxeBuilder({ page }).include('.module-viewer__ust')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']).analyze()
+  expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target).join(' ')}`)).toEqual([])
+  await page.addScriptTag({ path: ACE })
+  const ibm: string[] = await page.evaluate(async () => {
+    // @ts-expect-error — `ace` is the injected engine's global
+    const rapor = await new window.ace.Checker().check(document.querySelector('.module-viewer__ust'), ['IBM_Accessibility'])
+    return (rapor.results as { ruleId: string; value: string[]; snippet: string; path: { dom: string } }[])
+      .filter(s => s.value[0] === 'VIOLATION' && s.value[1] === 'FAIL')
+      // Carbon's Toggletip points aria-controls at a popover it renders only when open (ibm-erisilebilirlik).
+      .filter(s => !(s.ruleId === 'aria_id_unique' && /cds--ai-label|cds--toggletip/.test(s.snippet + s.path.dom)))
+      .map(s => `${s.ruleId}: ${s.snippet.slice(0, 120)}`)
+  })
+  expect(ibm).toEqual([])
+  await page.keyboard.press('Escape')
+  await expect(pencere).toBeHidden()
+  await expect(etiket).toBeFocused()
+})
+
+test('a draft preview carries the AI label too and says when there is no check on record', async ({ page }) => {
+  await recordProgress(page)
+  await serveModule(page)
+  await page.goto('/moduller/taslak/0123456789abcdef')
+  const etiket = page.locator('.module-viewer__ust').getByRole('button', { name: 'AI Yapay zekâ hakkında bilgi', exact: true })
+  await etiket.click()
+  await expect(page.locator('.modul-ai')).toContainText('Bu sürüm için kayıtlı bir karşılaştırma yok.')
+})
+
+test('the AI label still explains the module when its details cannot be fetched', async ({ page }) => {
+  await recordProgress(page)
+  await serveModule(page)
+  await page.route('**/api/modules/fen5-su/v1/aciklama', r => r.fulfill({ status: 500, body: 'x' }))
+  await page.goto('/moduller/fen5-su/v1')
+  await page.locator('.module-viewer__ust').getByRole('button', { name: 'AI Yapay zekâ hakkında bilgi', exact: true }).click()
+  const pencere = page.locator('.modul-ai')
+  await expect(pencere).toContainText('Bu modül yapay zekâ yardımıyla hazırlandı')
+  await expect(pencere).toContainText('Ayrıntılar şu an alınamadı.')
 })
 
 test('a message the page posts to itself is ignored', async ({ page }) => {

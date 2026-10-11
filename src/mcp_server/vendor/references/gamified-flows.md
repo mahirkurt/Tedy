@@ -104,7 +104,7 @@ selfAssess → sağlıklı kapanış.
 | 3 | SVG mini-harita | `meta.quest.stations` — nesne dizisi: `id`, `label`, `completed?` | **[YENİ]** spec §5.1 | N istasyon düğümü SVG üzerinde dizilir. İlk istasyon **`completed: true`** ile baştan işaretlenir — öğrenci henüz hiçbir şey yapmadan **bahşedilmiş ilerleme** (endowed progress) kazanır. |
 | 4 | N istasyon | N × Keşif Döngüsü (§2.1) | **[MEVCUT]+[YENİ]** karışık | Her istasyon bir önceki istasyondan **farklı** etkileşim tipi kullanır (mcq→match→fillblank→… dönüşümlü) — düşük-dış-yük/yüksek-uyarılma dengesini yenilik yoluyla korur (`adhd-pedagogy.md` İlke 5/Sergeant 2005), tekdüzelik yaratmadan. |
 | 5 | Kamp molası | `brainbreak` (her ~3 istasyonda bir) | **[MEVCUT]**, anlatı çerçevesi yeni | Var olan `brainbreak` segmenti; sunumda "kamp molası" olarak adlandırılır. Mola dozu/sıklığı için bkz. `adhd-pedagogy.md` §10.1 (Broad ve ark. 2021). |
-| 6 | Kapanış | `checkpoint` (recap + mixedQuestions + selfAssess) + `rewards.badges` koleksiyonu | **[MEVCUT]** | Modül-sonu özeti motor tarafından otomatik üretilir (ustalık, rozet kasası, öz-değerlendirme — `adhd-pedagogy.md` §6). |
+| 6 | Kapanış | `checkpoint` (recap + mixedQuestions + selfAssess) | **[MEVCUT]** | Modül-sonu özeti motor tarafından otomatik ve sessiz üretilir (tamamlanan alıştırma sayısı düz metinle, hedefler, öz-değerlendirme — `adhd-pedagogy.md` §6). Rozet koleksiyonu gösterilmez (talimatname S43, 2026-10-11). |
 | 7 | Sağlıklı kapanış | özet ekranı metni | **[MEVCUT]** segment, metin kuralı yeni | Özet **"başka modül" baskısı içermez**; "bugünlük bu kadarı yeterli" tonuyla biter (`adhd-pedagogy.md` Ö1). |
 
 `meta.quest` şeması (avatar + istasyon):
@@ -146,17 +146,17 @@ Tek bir beceriyi tekrarlı, uyarlanır-zorlukta pratikle pekiştiren drill
 içinde kullanılır.
 
 **Akış:** ısınma (1 kolay soru) → uyarlanır item merdiveni (yuvarlanan pencere;
-2 yanlışta ipucu-önce; güçlü seride opsiyonel "meydan okuma") → gain-only
-streak → öğe-başına açıklama → öz-rekor özeti (liderlik tablosu YOK) →
+2 yanlışta ipucu-önce; güçlü seride opsiyonel "meydan okuma") → öğe-başına
+açıklama → sessiz özet (liderlik tablosu, seri sayacı ve rekor YOK — talimatname S43) →
 opsiyonel tempo diski (varsayılan KAPALI).
 
 | # | Adım | Segment/alan | Durum | Not |
 |---|---|---|---|---|
 | 1 | Isınma | tek `mcq`/`fillblank`, `tier: 1` | **[MEVCUT]** segment, **[YENİ]** `tier` alanı (spec §5.2) | Garanti-kolay ilk soru (erken başarı, İlke 6). |
 | 2 | Uyarlanır merdiven | ardışık sorular, `tier?: 1/2/3` | **[YENİ]** spec §5.2 | Yuvarlanan pencere: **2 ardışık yanlış → ipucu-önce** sunulur (soru zorlaşmaz, destek artar); **2 ardışık doğru → opsiyonel "meydan okuma"** (tier 3, öğrencinin **kendi seçtiği**, dayatılmayan). Taban her zaman `tier: 1`'e kilitli (asla daha kolayın altına düşmez) ve geçiş **görünmez** (bkz. §3.3). |
-| 3 | Gain-only streak | mevcut `streak` sayacı, kayıp-dili kaldırılmış | **[MEVCUT]** sayaç, **[YENİ]** dil kısıtı (spec §5.1) | Yanlışta seri **sıfırlanmaz**, nötr "korundu" diliyle **tutulur**. `adhd-pedagogy.md` §3 (ceza yok) ilkesinin doğrudan uzantısı. **2026-10-10 (talimatname S43):** seri sayacı modülde kalkar (anayasa §9 "seri sayacı"); bu satır ve G-FLOW'un seri kolu borç kapanana dek bugünkü şablonu tarif eder (B73). |
+| 3 | ~~Gain-only streak~~ | — | **KALDIRILDI** (2026-10-11, talimatname S43, B73) | Cezasız bir seri sayacı bile dışsal ödüldür (anayasa §9 "seri sayacı"); şablonda seri yoktur ve G-FLOW seri sayacı öğesinde (`id="streakChip"`) FAIL verir. Ceza dili kara listesi (kural 2) kalır. |
 | 4 | Öğe-başına açıklama | `explanation` alanı | **[MEVCUT]** (genel G-INTERACT'ta WARN) | Bu şablonda **fiilen zorunlu** — Antrenman'ın öğretici çekirdeği budur (drill = yalnız ölçme değil öğretim, `adhd-pedagogy.md` İlke 8). Genel G-INTERACT kapısının şiddetini değiştirmez; yalnızca bu şablonun yazım disiplinini yükseltir. |
-| 5 | Öz-rekor özeti | özet ekranı, önceki-en-iyi karşılaştırması | **[YENİ]** kalıcılık deseni (spec §5.4'ün `localStorage` desenini yeniden kullanır — bkz. `content-enrichment.md` §2.4) | Özet öğrencinin **kendi** önceki en iyi skoruna kıyaslanır; **küresel/akran liderlik tablosu asla yok** (bkz. §4 madde 2). `localStorage` yoksa/bloklu ise sessizce oturum-içi karşılaştırmaya düşülür (yalnız bu oturumun geçmişi). |
+| 5 | ~~Öz-rekor özeti~~ (yapılmaz — S43: kişisel rekor de dışsal ödüldür) | özet ekranı, önceki-en-iyi karşılaştırması | **[YAPILMAZ]** — tarihî tasarım: (spec §5.4'ün `localStorage` desenini yeniden kullanır — bkz. `content-enrichment.md` §2.4) | Özet öğrencinin **kendi** önceki en iyi skoruna kıyaslanır; **küresel/akran liderlik tablosu asla yok** (bkz. §4 madde 2). `localStorage` yoksa/bloklu ise sessizce oturum-içi karşılaştırmaya düşülür (yalnız bu oturumun geçmişi). |
 | 6 | Tempo diski | `learner.pacingDisk?: false` | **[YENİ]** spec §5.1 | Varsayılan **KAPALI**; açılırsa sayısız/kesintisiz SVG disk (§3.4). |
 
 **Kanıt:** uyarlanır zorluk, seviye-ilerleme RCT'sinin bir parçası olarak
@@ -368,7 +368,8 @@ sözleşmesidir:
 | # | Kural | Kontrol (marker/regex) | Sonuç sınıfı |
 |---|---|---|---|
 | 1 | **Kanca kapanışı.** Her `hook` segmentinin `resolvesIn`'i `segments[]` içinde var olan bir `id`'ye karşılık gelir. | Render edilmiş HTML'de her `[data-seg="hook"]` öğesinin karşılığında bir `data-hook-resolved="<hookId>"` markeri var mı taraması (§3.1'deki motor tezahürüyle aynı marker çifti). | **FAIL** (karşılık gelen marker yoksa = hiç kapanmayan kanca, §4 madde 8) |
-| 2 | **Gain-only streak dili.** Streak/XP metinlerinde kayıp-çerçeveli/ceza dili yok. | Regex kara liste: "kaybettin", "serin bozuldu", "sıfırlandı", "-XP", "canını kaybet" vb. | **FAIL** (eşleşirse) |
+| 2 | **Kayıp/ceza dili yok.** Metinlerde kayıp-çerçeveli/ceza dili yok. | Regex kara liste: "kaybettin", "serin bozuldu", "sıfırlandı", "-XP", "canını kaybet" vb. | **FAIL** (eşleşirse) |
+| 2a | **Seri sayacı yok** (talimatname S43, 2026-10-11). | İşaretlemede seri sayacı öğesi: `id="streakChip"` ya da `class="streak-chip"` (CSS/JS'te adın geçmesi sayılmaz). | **FAIL** (bulunursa) |
 | 3 | **`pacingDisk` sayısız + kesintisiz.** Etkin bir tempo-diski öğesi sayısal geri-sayım/hard-stop taşımaz. | Render edilmiş HTML'de tempo-diski öğesi bir `data-countdown` attribute'u **taşımaz** (ve yanında sayısal geri-sayım/hard-stop deseni yoktur). | **FAIL** (bulunursa) |
 | 4 | **Etiketlemeyen uyarlanır zorluk.** `tier` geçişiyle ilişkili ikinci-tekil etiketleyici/yargılayıcı dil yok ("zorlanıyorsun" vb. yok). | Regex kara liste: "zorlanıyorsun", "yavaşsın", "başarısızsın", "kolay geldi çünkü…" vb. | **FAIL** (eşleşirse) |
 | — | **İlgili alan yokluğu.** Modülde `hook`/`pacingDisk`/`tier`/`meta.quest`/`meta.milestones` alanlarının hiçbiri yoksa. | Alan taraması boş döner. | Kapı **atlanır** (geriye uyum — mevcut modüller kırılmaz) |
