@@ -62,6 +62,11 @@ const CARD = {
 
 async function serveModule(page: Page, framePath = '/m/fen5-su/v1', body = moduleHtml) {
   await page.route('**/api/modules', r => r.fulfill(json({ moduller: [CARD] })))
+  // Modüller sayfası tek uçtan okur: hazır modüller + müfredat ağacı (2026-10-11).
+  // Bu spec yalnız hazır listeyi ve görüntüleyiciyi sınar, ağacı boş bırakır.
+  await page.route('**/api/modules/agac', r => r.fulfill(json({
+    hazir: [CARD], dersler: [], kapsam: {}, hata: null,
+  })))
   await page.route('**/api/modules/fen5-su/v1/ticket', r => r.fulfill(json({
     url: `https://modul.tedy.online${framePath}?t=${'a'.repeat(64)}&e=1&u=${'b'.repeat(32)}`, exp: 1,
   })))
@@ -100,24 +105,26 @@ test('Modüller lists the published module under the frame-src policy', async ({
   await serveModule(page)
   const response = await page.goto('/moduller')
   expect(response?.headers()['content-security-policy']).toBe(FRAME_CSP)
-  const card = page.locator('.module-card')
-  await expect(card).toHaveCount(1)
-  await expect(card).toContainText('Maddenin Hâlleri')
-  await expect(card).toContainText('Yarışma')
-  // The internal mode code must not reach the reader; the card has rendered (above) before this absence.
-  await expect(card).not.toContainText('QUIZ')
+  const satir = page.locator('.module-hazir .cds--contained-list-item')
+  await expect(satir).toHaveCount(1)
+  await expect(satir).toContainText('Maddenin Hâlleri')
+  await expect(satir).toContainText('Yarışma')
+  // The internal mode code must not reach the reader; the row has rendered (above) before this absence.
+  await expect(satir).not.toContainText('QUIZ')
 })
 
-// B17 (S12): the row action is not the page's primary button; B58: opening a module is navigation, so it is a
-// real link that names its module (B41: every "Aç" on the list is told apart).
-test('each module opens through a tertiary link that names it', async ({ page }) => {
+// B58: opening a module is navigation, so it is a real link that names its module. Since 2026-10-11 the
+// row's own title IS that link (the separate tertiary "Aç" button is gone); B17/S12 still holds — the
+// page has no primary button.
+test('each module opens through a link that names it', async ({ page }) => {
   await serveModule(page)
   await page.goto('/moduller')
-  const ac = page.getByRole('link', { name: 'Aç: Maddenin Hâlleri', exact: true })
+  const ac = page.getByRole('link', { name: 'Maddenin Hâlleri', exact: true })
   await expect(ac).toBeVisible()
   await expect(ac).toHaveAttribute('href', '/moduller/fen5-su/v1')
-  await expect(ac).toHaveClass(/cds--btn--tertiary/)
   await expect(page.locator('.modules .cds--btn--primary')).toHaveCount(0)
+  // İ8: the subject's colour is never its only carrier — its name is printed too.
+  await expect(page.locator('.module-hazir .cds--contained-list-item')).toContainText('Fen Bilimleri')
   await ac.click()
   await expect(page).toHaveURL(/\/moduller\/fen5-su\/v1$/)
   await expect(page.getByRole('link', { name: 'Modüllere dön' })).toHaveAttribute('href', '/moduller')
@@ -125,7 +132,7 @@ test('each module opens through a tertiary link that names it', async ({ page })
 
 // B43 (D3, D4): a failed catalogue says what happened in a sentence, never the raw HTTP text, and as an alert.
 test('a failed catalogue is a sentence, not a status code', async ({ page }) => {
-  await page.route('**/api/modules', r => r.fulfill({ status: 500, contentType: 'text/html', body: 'Internal Server Error' }))
+  await page.route('**/api/modules/agac', r => r.fulfill({ status: 500, contentType: 'text/html', body: 'Internal Server Error' }))
   await page.goto('/moduller')
   const hata = page.locator('.modules .cds--inline-notification[role="alert"]')
   await expect(hata).toContainText('Modüller yüklenemedi.')
@@ -134,7 +141,9 @@ test('a failed catalogue is a sentence, not a status code', async ({ page }) => 
 })
 
 test('an empty catalogue says so', async ({ page }) => {
-  await page.route('**/api/modules', r => r.fulfill(json({ moduller: [] })))
+  await page.route('**/api/modules/agac', r => r.fulfill(json({
+    hazir: [], dersler: [], kapsam: {}, hata: null,
+  })))
   await page.goto('/moduller')
   await expect(page.locator('.modules .tedy-empty')).toContainText('Henüz yayınlanmış modül yok.')
 })

@@ -144,11 +144,23 @@
   margin-block-end: spacing.$spacing-06;
 }
 
+.module-hazir__metin {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .module-hazir__bag {
   display: inline-flex;
   min-width: 0;
   color: theme.$link-primary;
   text-decoration: none;
+}
+
+.module-hazir__ust-veri {
+  @include type.type-style('label-01');
+
+  color: theme.$text-secondary;
 }
 
 // S17/B3: dokunmatik cihazda `:hover` dokunduktan sonra yapışık kalır; hover kuralı
@@ -194,13 +206,16 @@
 
 // S49: etiket kırpılmaz, sarar. Kırpılan bir konu adı satırın anlamını yok eder (D4);
 // bileşen rehberi Carbon'un üç nokta taşmasını kendisi "tercih edilmez" diye işaretler.
-.module-tree :where(.cds--tree-node__label) {
+// `:where()` KULLANILMAZ: sıfır özgüllük Carbon'un kendi `.cds--tree-node__label` kuralıyla
+// eşitlikte kalıp kaynak sırasına düşüyor ve uygulanmıyordu (ölçüldü: 390 px'te dal satırı
+// 32.78 px kalmıştı). Biçim S18 yamasıyla aynı: `.kap .cds--…`.
+.module-tree .cds--tree-node__label {
   white-space: normal;
 }
 
 @media (max-width: 671px) {
-  // S48: telefonda dokunma hedefi ≥ 44 px; Carbon'un iki boyu 32 ve 24 px (B79).
-  .module-tree :where(.cds--tree-node__label) {
+  // S48: telefonda dokunma hedefi ≥ 44 px; Carbon 32 px'i `padding-block: 7px` ile kuruyor (B79).
+  .module-tree .cds--tree-node__label {
     min-height: 2.75rem;
   }
 

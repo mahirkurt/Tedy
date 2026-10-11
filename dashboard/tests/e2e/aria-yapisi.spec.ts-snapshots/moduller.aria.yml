@@ -1,9 +1,12 @@
 - main:
   - heading "Modüller" [level=1]
   - heading "Modüller" [level=2]
-  - list:
+  - text: Hazır olanlar
+  - list "Hazır olanlar":
     - listitem:
-      - text: "Tam Sayılar: Sıfırın İki Yanı Matematik · 7. Sınıf Modül"
-      - 'link "Aç: Tam Sayılar: Sıfırın İki Yanı"':
+      - 'link "Tam Sayılar: Sıfırın İki Yanı"':
         - /url: /moduller/mat7-tam-sayilar/v1
-        - text: ""
+      - text: Matematik · 7. Sınıf Modül
+  - text: Tüm müfredat
+  - tree "Tüm müfredat":
+    - treeitem "Matematik 2 konu · 1 hazır"

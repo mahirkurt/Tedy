@@ -600,6 +600,34 @@ Borç yokken tek-iş yuvasına girer (uygulandı).
 
 ---
 
+### 4.12 Modüller
+
+İki bölüm. **Hazır olanlar**: `ContainedList kind="on-page" size="lg"`, katalogdaki *bütün*
+yayınlanmış modüller — ağaca eşlenmeyen biri (başka sınıf, dört ders dışı, kazanımı eşlenmemiş)
+de görünür, yoksa yayınlanmış bir modül yüzeyden kaybolur. **Tüm müfredat**: `TreeView size="sm"`,
+ders → ünite → ders kitabı alt başlığı. Carbon tek düzey iç içelikte ağacı dışlar; buradaki
+hiyerarşi iki düzeydir ve bileşen rehberi §1.39 bu vakayı adıyla karara bağlamıştır.
+
+Hepsi kapalı başlar; okurun açtığı dallar `localStorage` `tedy-mufredat-acik` ile kalır (İ5).
+Odak kipinde ağaç çizilmez (İ1). Dal etiketi "N konu · M hazır" sayacını taşır (§2.5, cümle
+düzeni).
+
+Yaprağın **tek** eylemi düğümün etkinleştirilmesidir — ARIA ağacında `treeitem` içine düğme
+konmaz: modülü olan yaprak bağlantıdır (B58), olmayan konu asistana bağlam olarak sabitlenir
+(B78, `tur: 'konu'`; sunucu başlığı kendi verisinden çözer). Dal, chevron'a ek olarak satırın
+tamamıyla açılır — Carbon'da satır tıklaması dalı açmaz ve telefonda 16 px'lik chevron dokunma
+hedefi değildir.
+
+Sayfa aralığı yalnız kaynağı varsa yazılır; yoksa yalnız kitap adı görünür ve sayfa uydurulmaz
+(D4). "Hazır değil" düz ikincil metindir — `Tag` değil (B45), durum rengi değil: yokluk hata
+değildir. Harita okunamazsa hazır modül listesi kalır ve ağaç yerine bir cümle durur; eşiğe
+takılıp üretilmeyen ders ağaçta yine listelenir ve "Bu dersin haritası henüz hazır değil." der
+— sessizce eksilmez (D3).
+
+Veri: `src/mufredat_agaci.json` (üretilir, elle düzenlenmez) + `/api/modules/agac`. Tasarım:
+[`superpowers/specs/2026-10-11-moduller-mufredat-agaci-design.md`](superpowers/specs/2026-10-11-moduller-mufredat-agaci-design.md).
+Sapmalar: talimatname S48, S49.
+
 ## 5. Odak kipi
 
 Bugün `FocusModeContext` var ve bir localStorage anahtarı tutuyor. İlkelere
@@ -792,3 +820,4 @@ görüntüsüyle doğrulanır.
 | 1.12 | 2026-10-10 | Talimatname 1.1'in Ç1–Ç10 kararlarıyla (S35–S44) hizalandı: §2.4 "Dönen ikon yok" içerik yüklemesine daraltıldı, tek eylem tek `InlineLoading` (S36); §2.5 bölüm başlığı "Başlık (n)", büyük harf yok (S38); §2.6 "Yıkıcı eylem yok" yerine etkiye göre silme — düşük etki "Geri al", geri alınamaz silme nesneyi adlandıran danger modal (S40); §2.7 "Bozuk (sistem): Gri" yerine Carbon durum anlamı (S39; başlık etiketi gerilimi Ç11); §4.4 not rengi notu (S42). Tarihli notlarla; bölüm numaraları değişmedi. |
 | 1.13 | 2026-10-11 | Talimatname B48 ve B63 kapandı: §2.4'ün 400 ms kuralı `useApi`'de; §4.2'nin `Geri al`'ı kuruldu, 10 saniyelik süresi bilerek kaldırıldı (WCAG 2.2.1). §6 durum notuna tarihli ek. |
 | 1.14 | 2026-10-11 | Talimatname açık kalemler 4. tur: §4.3 (B64, B50), §4.4 (B72, B51), §4.5 (B49, B34), §4.6 (B65), §4.7 (B51, B66), §4.8 (B67), §4.9 (B60) uygulandı notları; §6 durum notu tamamlandı. |
+| 1.15 | 2026-10-11 | **§4.12 Modüller** eklendi (bugüne dek yüzey tasarımı yoktu): hazır modül listesi + müfredat ağacı (ders → ünite → ders kitabı alt başlığı), yaprağın tek eylemi, sayfa uydurmama ve haritasız dersin cümlesi. Tasarım `superpowers/specs/2026-10-11-moduller-mufredat-agaci-design.md`; sapmalar talimatname S48, S49. |

@@ -112,6 +112,27 @@ test.describe('Modüller — müfredat ağacı', () => {
     await expect(page.getByRole('tree')).toHaveCount(0)
   })
 
+  // Telefon ölçümü: `tasarim-denetimi` ağacı kapalı gezer, yana kaydırma riski ise üç düzey
+  // açıkken doğar. S48 (düğüm ≥ 44 px) ve S50 (girinti) kapısı burada.
+  test('390 px: üç düzey açıkken yana kaydırma yok ve düğümler ≥ 44 px', async ({ page }) => {
+    await sabitAc(page, '/moduller', 390, 844)
+    await konulariAc(page)
+    await expect(page.getByRole('treeitem', { name: /Mutlak Değer/ })).toBeVisible()
+    const kayma = await page.evaluate(() => {
+      const kok = document.scrollingElement
+      return kok ? kok.scrollWidth - kok.clientWidth : 0
+    })
+    expect(kayma).toBeLessThanOrEqual(0)
+    const dusukler = await page.evaluate(() => {
+      const etiketler = [...document.querySelectorAll('.module-tree .cds--tree-node__label')]
+      return etiketler
+        .filter(e => (e as HTMLElement).offsetParent !== null)
+        .map(e => ({ metin: (e.textContent ?? '').slice(0, 28), h: e.getBoundingClientRect().height }))
+        .filter(o => o.h < 44)
+    })
+    expect(dusukler).toEqual([])
+  })
+
   test('haritası olmayan ders tek cümleyle açıklanıyor (D3)', async ({ page }) => {
     await baskaGovdeyleAc(page, {
       hazir: [], kapsam: {}, hata: null,

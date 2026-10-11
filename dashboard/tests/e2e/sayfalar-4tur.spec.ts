@@ -167,7 +167,8 @@ test('B40: one navigation name, a named grade table, an event says its kind, ÖG
 })
 
 test('B40: every skeleton says the region is busy', async ({ page }) => {
-  for (const uc of ['schedule', 'modules']) {
+  // Modüller artık `/api/modules/agac` okuyor (müfredat ağacı, 2026-10-11).
+  for (const uc of ['schedule', 'modules/agac']) {
     await page.route(`**/api/${uc}`, async r => { await new Promise(t => setTimeout(t, 1500)); await r.fulfill(json({})) })
   }
   await page.goto('/dersler')

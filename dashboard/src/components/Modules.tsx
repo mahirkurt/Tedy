@@ -53,14 +53,20 @@ export default function Modules() {
                 {hazir.map(m => (
                   <ContainedListItem key={`${m.slug}-${m.version}`}>
                     {/* B58: modül açmak gezinmedir — bağlantı olur, geçmiş ve yeni sekme çalışır. */}
-                    <a className="module-hazir__bag" href={`/moduller/${m.slug}/v${m.version}`}
-                      onClick={(e: React.MouseEvent) => {
-                        e.preventDefault(); navigate(`/moduller/${m.slug}/v${m.version}`)
-                      }}>
-                      <SubjectLabel course={m.subject}>
-                        <span className="module-hazir__ad">{m.title ?? m.slug}</span>
-                      </SubjectLabel>
-                    </a>
+                    <span className="module-hazir__metin">
+                      <a className="module-hazir__bag" href={`/moduller/${m.slug}/v${m.version}`}
+                        onClick={(e: React.MouseEvent) => {
+                          e.preventDefault(); navigate(`/moduller/${m.slug}/v${m.version}`)
+                        }}>
+                        <SubjectLabel course={m.subject}>
+                          <span className="module-hazir__ad">{m.title ?? m.slug}</span>
+                        </SubjectLabel>
+                      </a>
+                      {/* İ8: ders rengi onun TEK taşıyıcısı olamaz — adı da yazılır. */}
+                      <span className="module-hazir__ust-veri">
+                        {[m.subject, m.gradeLevel].filter(Boolean).join(' · ')}
+                      </span>
+                    </span>
                     {m.mode && MODE_LABEL[m.mode] && (
                       <Tag type="cool-gray" size={dar ? 'md' : 'sm'}>{MODE_LABEL[m.mode]}</Tag>
                     )}
