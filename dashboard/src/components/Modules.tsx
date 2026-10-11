@@ -1,12 +1,17 @@
-import { Button, InlineNotification, SkeletonText, Tag } from '@carbon/react'
+import {
+  Button, ContainedList, ContainedListItem, InlineNotification, SkeletonText, Tag,
+} from '@carbon/react'
 import { useDar } from '../asistan/useDar'
 import { Education } from '@carbon/icons-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { apiHataCumlesi } from '../utils/apiHatasi'
-import type { ModuleCard } from '../types'
+import { useFocusMode } from '../contexts/focusMode'
+import type { MufredatAgacYaniti } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
 import ModuleViewer from './ModuleViewer'
+import MufredatAgaci from './MufredatAgaci'
+import SubjectLabel from './SubjectLabel'
 import './patterns/patterns.scss'
 import './Modules.scss'
 
@@ -21,42 +26,53 @@ const MODE_LABEL: Record<string, string> = {
 }
 
 export default function Modules() {
-  const { data, loading, iskelet, error, hataTuru } = useApi<{ moduller: ModuleCard[] }>('/api/modules', { moduller: [] })
+  const { data, loading, iskelet, error, hataTuru } = useApi<MufredatAgacYaniti>(
+    '/api/modules/agac', { hazir: [], dersler: [], kapsam: {}, hata: null })
   const hata = apiHataCumlesi(hataTuru ?? 'sunucu', 'Modüller')
   const navigate = useNavigate()
   const dar = useDar()
-  const modules = Array.isArray(data.moduller) ? data.moduller : []
+  const { focusMode } = useFocusMode()
+  const hazir = Array.isArray(data.hazir) ? data.hazir : []
+  const dersler = Array.isArray(data.dersler) ? data.dersler : []
   return (
     <div className="dashboard-card modules">
       <h2 className="dashboard-card__title"><Education size={20} />Modüller</h2>
+      {/* S36/B48: eşik geçmeden iskelet çizilmez — bir kare yanıp sönen iskelet gürültüdür. */}
       {iskelet && <div aria-busy="true"><SkeletonText paragraph lineCount={3} /></div>}
       {!loading && error && (
         // B43 (D3, D4): the raw fetch error ("HTTP 500", "Non-JSON response") never reaches the reader.
         <InlineNotification kind="error" role="alert" lowContrast hideCloseButton statusIconDescription="Hata"
           title={hata.baslik} subtitle={hata.ayrinti} />
       )}
-      {!loading && !error && modules.length === 0 && (
-        <EmptyLine label="Modüller">Henüz yayınlanmış modül yok.</EmptyLine>
-      )}
-      {modules.length > 0 && (
-        <ul className="module-list">
-          {modules.map(m => (
-            <li key={m.slug} className="module-card">
-              <div className="module-card__text">
-                <span className="module-card__title">{m.title ?? m.slug}</span>
-                <span className="module-card__meta">{[m.subject, m.gradeLevel].filter(Boolean).join(' · ')}</span>
-              </div>
-              {m.mode && MODE_LABEL[m.mode] && <Tag type="cool-gray" size="sm">{MODE_LABEL[m.mode]}</Tag>}
-              {/* B17 (S12): the row action is tertiary — the page has no primary. B58: opening a module is
-                  navigation, so it is a link (history, new tab); its name carries the module (B41). */}
-              <Button kind="tertiary" size={dar ? 'lg' : 'md'} href={`/moduller/${m.slug}/v${m.version}`}
-                aria-label={`Aç: ${m.title ?? m.slug}`}
-                onClick={(e: React.MouseEvent) => { e.preventDefault(); navigate(`/moduller/${m.slug}/v${m.version}`) }}>
-                Aç
-              </Button>
-            </li>
-          ))}
-        </ul>
+      {!loading && !error && (
+        <>
+          {hazir.length === 0
+            ? <EmptyLine label="Hazır olanlar">Henüz yayınlanmış modül yok.</EmptyLine>
+            : (
+              <ContainedList className="module-hazir" kind="on-page" size="lg" label="Hazır olanlar">
+                {hazir.map(m => (
+                  <ContainedListItem key={`${m.slug}-${m.version}`}>
+                    {/* B58: modül açmak gezinmedir — bağlantı olur, geçmiş ve yeni sekme çalışır. */}
+                    <a className="module-hazir__bag" href={`/moduller/${m.slug}/v${m.version}`}
+                      onClick={(e: React.MouseEvent) => {
+                        e.preventDefault(); navigate(`/moduller/${m.slug}/v${m.version}`)
+                      }}>
+                      <SubjectLabel course={m.subject}>
+                        <span className="module-hazir__ad">{m.title ?? m.slug}</span>
+                      </SubjectLabel>
+                    </a>
+                    {m.mode && MODE_LABEL[m.mode] && (
+                      <Tag type="cool-gray" size={dar ? 'md' : 'sm'}>{MODE_LABEL[m.mode]}</Tag>
+                    )}
+                  </ContainedListItem>
+                ))}
+              </ContainedList>
+            )}
+          {/* Odak kipinde ağaç çizilmez: yalnız yapılabilen iş kalır (İ1). */}
+          {!focusMode && (data.hata === 'harita_okunamadi'
+            ? <EmptyLine label="Tüm müfredat">Müfredat haritası şu an okunamıyor.</EmptyLine>
+            : dersler.length > 0 && <MufredatAgaci dersler={dersler} />)}
+        </>
       )}
     </div>
   )

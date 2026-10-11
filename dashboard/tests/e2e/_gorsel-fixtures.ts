@@ -60,6 +60,33 @@ export const GORSEL: Record<string, unknown> = {
   books: {"books": [{"author": "J.R.R. Tolkien", "availableChapters": 6, "availableWords": 11411, "cover": {"monogram": "H", "palette": "midnight"}, "description": "Bilbo Baggins'in macerasını İngilizce okuma pratiğiyle birlikte keşfet.", "edition": "Enhanced Edition (2011)", "epigraph": "", "language": "en", "publisher": "", "readingMinutes": 63, "slug": "hobbit-eng", "subtitle": "English Reader", "title": "The Hobbit", "totalChapters": 19, "totalSourceWords": 0, "translator": "", "year": "2011"}, {"author": "J.R.R. Tolkien", "availableChapters": 6, "availableWords": 37390, "cover": {"monogram": "YE", "palette": "forest"}, "description": "Bilbo Baggins'in yüz on birinci yaş günü davetiyle başlayan yolculuk, Frodo'yu Shire'dan Hüküm Dağı'na taşır. Üç cilt — Yüzük Kardeşliği, İki Kule ve Kralın Dönüşü — burada tek bir okuma akışında birleşiyor.", "edition": "14 yaş uyarlaması", "epigraph": "Gezgin olan herkes yolunu kaybetmiş değildir.", "language": "tr", "publisher": "Metis Yayıncılık", "readingMinutes": 208, "slug": "yuzuklerin-efendisi", "subtitle": "Üç cilt bir arada", "title": "Yüzüklerin Efendisi", "totalChapters": 67, "totalSourceWords": 366073, "translator": "Çiğdem Erkal İpek", "year": "2026"}]},
   'books/progress': { books: {} },
   modules: {"moduller": [{"created_at": "2026-09-19T19:32:46+00:00", "gates": {"fail": 0, "pass": 17, "warn": 0}, "gradeLevel": "7. Sınıf", "mode": "MODULE", "outcomes": ["MAT.7.1.1"], "slug": "mat7-tam-sayilar", "subject": "Matematik", "ted_link": null, "title": "Tam Sayılar: Sıfırın İki Yanı", "version": 1}]},
+  'modules/agac': {
+    hazir: [{ created_at: '2026-09-19T19:32:46+00:00', gates: { fail: 0, pass: 17, warn: 0 },
+      gradeLevel: '7. Sınıf', mode: 'MODULE', outcomes: ['MAT.7.1.1'], slug: 'mat7-tam-sayilar',
+      subject: 'Matematik', ted_link: null, title: 'Tam Sayılar: Sıfırın İki Yanı', version: 1 }],
+    dersler: [{
+      ders: 'Matematik', slug: 'matematik', program: { document_id: 24, sayfa: '115-172' },
+      kitaplar: [{ document_id: 346, kisa: '1. Kitap', sayfa_kaymasi: 0, kayma_uyumu: '35/35' }],
+      konu_sayisi: 2, hazir_sayisi: 1,
+      uniteler: [{
+        no: 1, ad: 'Sayılar ve Nicelikler', program_sayfa: 115, hazir_sayisi: 1,
+        konular: [
+          { id: 'matematik-u1-tam-sayilar', ad: 'Tam Sayılar', ad_kaynak: 'TAM SAYILAR',
+            kitap: 346, sayfa: [17, 24], sayfa_kaynak: 'icindekiler',
+            kazanimlar: ['MAT.7.1.1'], kazanim_kaynak: 'metin-ortusmesi',
+            modul: { slug: 'mat7-tam-sayilar', version: 1, title: 'Tam Sayılar: Sıfırın İki Yanı',
+              subject: 'Matematik', gradeLevel: '7. Sınıf', mode: 'MODULE',
+              outcomes: ['MAT.7.1.1'], ted_link: null, created_at: null,
+              gates: { pass: 17, warn: 0, fail: 0 } } },
+          { id: 'matematik-u1-mutlak-deger', ad: 'Mutlak Değer', ad_kaynak: 'MUTLAK DEĞER',
+            kitap: 346, sayfa_kaynak: 'yok', kazanimlar: [], kazanim_kaynak: 'eslenmedi',
+            modul: null },
+        ],
+      }],
+    }],
+    kapsam: { matematik: { konu: 2, sayfasi_olan: 1, kazanimi_eslenen: 1 } },
+    hata: null,
+  },
   'student/profile': {
     auth: { email: 'test@tedy.online', name: 'Test User', picture: '' },
     name: 'Deneme Öğrenci', student_no: '100', class_name: '7-D', branch: 'D',

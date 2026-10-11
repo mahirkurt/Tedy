@@ -137,3 +137,76 @@
   // Full-bleed: the module owns the page, so no competing card/box chrome.
   background: transparent;
 }
+
+// ── Hazır olanlar (ContainedList) ───────────────────────────────────────────
+
+.module-hazir {
+  margin-block-end: spacing.$spacing-06;
+}
+
+.module-hazir__bag {
+  display: inline-flex;
+  min-width: 0;
+  color: theme.$link-primary;
+  text-decoration: none;
+}
+
+// S17/B3: dokunmatik cihazda `:hover` dokunduktan sonra yapışık kalır; hover kuralı
+// yalnız gerçekten hover'ı olan girdilerde geçerlidir.
+@media (any-hover: hover) {
+  .module-hazir__bag:hover .module-hazir__ad {
+    text-decoration: underline;
+  }
+}
+
+// ── Müfredat ağacı (spec §5) ────────────────────────────────────────────────
+// Carbon'un ağaç düğümü sm 32 px ve etiketi üç noktayla keser; ikisi de TEDY'de örtülür —
+// sapmalar talimatname §11 S48 ve S49.
+
+.module-tree__dal,
+.module-tree__yaprak {
+  display: flex;
+  min-width: 0;
+}
+
+.module-tree__dal {
+  align-items: baseline;
+  gap: spacing.$spacing-04;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.module-tree__yaprak {
+  flex-direction: column;
+}
+
+.module-tree__sayac,
+.module-tree__ust-veri {
+  @include type.type-style('label-01');
+
+  color: theme.$text-secondary;
+  white-space: nowrap;
+}
+
+.module-tree__ust-veri {
+  white-space: normal;
+}
+
+// S49: etiket kırpılmaz, sarar. Kırpılan bir konu adı satırın anlamını yok eder (D4);
+// bileşen rehberi Carbon'un üç nokta taşmasını kendisi "tercih edilmez" diye işaretler.
+.module-tree :where(.cds--tree-node__label) {
+  white-space: normal;
+}
+
+@media (max-width: 671px) {
+  // S48: telefonda dokunma hedefi ≥ 44 px; Carbon'un iki boyu 32 ve 24 px (B79).
+  .module-tree :where(.cds--tree-node__label) {
+    min-height: 2.75rem;
+  }
+
+  .module-tree__dal {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+  }
+}
