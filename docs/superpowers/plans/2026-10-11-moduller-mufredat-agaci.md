@@ -10,6 +10,14 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-11-moduller-mufredat-agaci-design.md`
 
+**Spec'ten sonra inen merge'e göre güncellendi (342d452).** Üç şey değişti ve plan buna uyarlandı:
+`useApi` artık `{ data, loading, iskelet, error, hataTuru }` döndürüyor ve yüzeyler hatayı
+`apiHataCumlesi(hataTuru, '<ad>')` ile cümleye çeviriyor (B43); `Modules.tsx` bunu zaten
+kullanıyor, Görev 7 o kullanımı **korur**. Talimatname §11.1 tablosu artık S1–S46 ve
+değişiklik kaydı S47'yi "gerekmedi" diye anıyor, bu yüzden bu işin sapmaları **S48–S50**.
+`Modules.scss` zaten `spacing`, `theme`, `type` `@use` satırlarını taşıyor — Görev 7'de
+yeniden eklenmez.
+
 ## Global Constraints
 
 Bu bölümdeki her değer spec §0'daki ölçüm tablosundan birebir alınmıştır; gerekçeleri ve kaynakları orada.
@@ -25,7 +33,7 @@ Bu bölümdeki her değer spec §0'daki ölçüm tablosundan birebir alınmışt
 - Türkçe konuları **kazanım kodu taşımaz** (kazanım beceriye kodlu).
 - `id` biçimi `<ders slug>-u<ünite no>-<konu slug'ı>`; **sırasal sayı kullanılmaz**; alfabe `src/module_store.py` `SLUG_RE` ile aynı.
 - Carbon: `TreeView size="sm"` + `TreeNode`; `TreeNode.label` ReactNode, `href` prop'u vardır (yerel 1.114.0 `.d.ts`). `preview__*` / `unstable_*` API kullanılmaz.
-- Telefonda (md kırılımı 672 px altı) her TEDY denetimi ≥ 44 px. Carbon'un ağaç düğümü sm 32 / xs 24 px olduğu için örtme zorunlu (sapma S46).
+- Telefonda (md kırılımı 672 px altı) her TEDY denetimi ≥ 44 px. Carbon'un ağaç düğümü sm 32 / xs 24 px olduğu için örtme zorunlu (sapma S48).
 - Yeni ölçüler **`rem`**; ikonlar `size={…}` ile mevcut kuralı olan boylardan (4K kuralı).
 - Görünür etiketler cümle düzeninde; `text-transform: uppercase` ve büyük harf kaynak dizgisi yasak.
 - Hiçbir Carbon adı (bileşen, prop, ikon, içe aktarma yolu) ezberden yazılmaz: Carbon MCP ya da `dashboard/node_modules` ile doğrulanır (talimatname §10).
@@ -1789,8 +1797,10 @@ export default function MufredatAgaci({ dersler }: { dersler: MufredatDers[] }) 
 
 ```tsx
 export default function Modules() {
-  const { data, loading, error } = useApi<MufredatAgacYaniti>(
+  const { data, loading, iskelet, error, hataTuru } = useApi<MufredatAgacYaniti>(
     '/api/modules/agac', { hazir: [], dersler: [], kapsam: {}, hata: null })
+  // B43: ham fetch metni okura gitmez; tür cümleye çevrilir (merge 342d452 ile gelen kalıp).
+  const hata = apiHataCumlesi(hataTuru ?? 'sunucu', 'Modüller')
   const navigate = useNavigate()
   const dar = useDar()
   const { focusMode } = useFocusMode()
@@ -1799,11 +1809,11 @@ export default function Modules() {
   return (
     <div className="dashboard-card modules">
       <h2 className="dashboard-card__title"><Education size={20} />Modüller</h2>
-      {loading && <SkeletonText paragraph lineCount={3} />}
+      {/* S36/B48: eşik geçmeden iskelet çizilmez — bir kare yanıp sönen iskelet gürültüdür. */}
+      {iskelet && <div aria-busy="true"><SkeletonText paragraph lineCount={3} /></div>}
       {!loading && error && (
-        // B43 (D3, D4): the raw fetch error ("HTTP 500", "Non-JSON response") never reaches the reader.
         <InlineNotification kind="error" role="alert" lowContrast hideCloseButton statusIconDescription="Hata"
-          title="Modüller yüklenemedi." subtitle="Sayfayı birkaç dakika sonra yeniden aç." />
+          title={hata.baslik} subtitle={hata.ayrinti} />
       )}
       {!loading && !error && (
         <>
@@ -1842,7 +1852,8 @@ export default function Modules() {
 İçe aktarmaları güncelle: `ContainedList`, `ContainedListItem` `@carbon/react`'ten;
 `import { useFocusMode } from '../contexts/focusMode'` (`HomeworkTracker.tsx:18` ile aynı yol);
 `import MufredatAgaci from './MufredatAgaci'`; `import SubjectLabel from './SubjectLabel'`
-(varsayılan dışa aktarım); `MufredatAgacYaniti` `../types`'tan. `EmptyLine`'ın imzası
+(varsayılan dışa aktarım); `MufredatAgacYaniti` `../types`'tan;
+`import { apiHataCumlesi } from '../utils/apiHatasi'` (`Modules.tsx` bunu zaten içe aktarıyor). `EmptyLine`'ın imzası
 `{ children, label? }` — `label` bölümü adlandırır.
 
 - [ ] **Step 8: Write the stylesheet**
@@ -1851,7 +1862,7 @@ export default function Modules() {
 
 ```scss
 // Müfredat ağacı (spec §5). Carbon'un ağaç düğümü sm 32 px ve etiketi üç noktayla keser;
-// ikisi de TEDY'de örtülür — sapmalar talimatname §11 S46 ve S47.
+// ikisi de TEDY'de örtülür — sapmalar talimatname §11 S48 ve S49.
 .module-tree {
   margin-block-start: spacing.$spacing-06;
 }
@@ -1880,20 +1891,21 @@ export default function Modules() {
   color: theme.$text-secondary;
 }
 
-// S47: etiket kırpılmaz, sarar. Kırpılan bir konu adı satırın anlamını yok eder (D4).
+// S49: etiket kırpılmaz, sarar. Kırpılan bir konu adı satırın anlamını yok eder (D4).
 .module-tree :where(.cds--tree-node__label) {
   white-space: normal;
 }
 
 @media (max-width: 671px) {
-  // S46: telefonda dokunma hedefi ≥ 44 px; Carbon'un iki boyu 32 ve 24 px (B79).
+  // S48: telefonda dokunma hedefi ≥ 44 px; Carbon'un iki boyu 32 ve 24 px (B79).
   .module-tree :where(.cds--tree-node__label) {
     min-height: 2.75rem;
   }
 }
 ```
 
-`theme`, `spacing`, `type` `@use` satırları dosyanın başında yoksa, komşu `.scss` dosyalarındaki biçimle eklenir.
+`spacing`, `theme`, `type` `@use` satırları `Modules.scss`'in ilk üç satırında **zaten
+vardır** (doğrulandı); yeniden eklenmez.
 
 - [ ] **Step 9: Run the tests to verify they pass**
 
@@ -1920,8 +1932,8 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ### Task 8: Telefon ölçümü, sapmalar ve belge kapıları
 
 **Files:**
-- Modify: `dashboard/src/components/Modules.scss` (ölçüm S48'i gerektirirse)
-- Modify: `docs/tedy-ui-ux-talimatnamesi.md` (§11'e S46–S48)
+- Modify: `dashboard/src/components/Modules.scss` (ölçüm S50'yi gerektirirse)
+- Modify: `docs/tedy-ui-ux-talimatnamesi.md` (§11.1 tablosuna S48–S50)
 - Modify: `docs/frontend-surface-designs.md` (§4.12 Modüller)
 - Modify: `CLAUDE.md` ("Modüller (edupedia)" maddesi)
 - Modify: `dashboard/tests/e2e/*.aria.yml`, `*-snapshots/` (fark okunarak)
@@ -1942,7 +1954,7 @@ Yana kaydırma **varsa** `Modules.scss`'e ekle ve ölçülen değeri yaz:
 
 ```scss
 @media (max-width: 671px) {
-  // S48: Carbon'un düzey başına girintisi 390 px'te üçüncü düzeyde yana kaydırma yapıyordu
+  // S50: Carbon'un düzey başına girintisi 390 px'te üçüncü düzeyde yana kaydırma yapıyordu
   // (ölçüldü). Girinti telefonda daraltılır; masaüstünde Carbon'un kendi değeri kalır.
   .module-tree :where(.cds--tree-node) {
     --cds-tree-node-indent: #{spacing.$spacing-05};
@@ -1950,26 +1962,32 @@ Yana kaydırma **varsa** `Modules.scss`'e ekle ve ölçülen değeri yaz:
 }
 ```
 
-Yana kaydırma **yoksa** bu adım atlanır ve S48 yazılmaz — spec §5.4 bunu açıkça izin veriyor. Hangisi olduğunu commit mesajında yaz.
+Yana kaydırma **yoksa** bu adım atlanır ve S50 yazılmaz — spec §5.4 bunu açıkça izin veriyor. Hangisi olduğunu commit mesajında yaz.
 
 - [ ] **Step 3: Sapmaları talimatnameye yaz**
 
-`docs/tedy-ui-ux-talimatnamesi.md` §11'in sonuna, mevcut S satırlarının biçimiyle:
+Numaralar **S48, S49, S50**: §11.1 tablosu bugün S1–S46'dır ve değişiklik kaydı S47'yi
+"B79 için gerekmedi" diye anar, bu yüzden S47 atlanır. Yazmadan önce tablonun son satırına
+bak — araya başka bir sapma indiyse numaraları kaydır ve bu plandaki her geçişi düzelt.
+
+`docs/tedy-ui-ux-talimatnamesi.md` §11.1 tablosunun sonuna, mevcut satırların biçimiyle
+(tablo satırı, madde değil) ve §11.1'in girişindeki "Tablo 46 satırdır (S1–S46)" cümlesini
+güncelleyerek:
 
 ```markdown
-- **S46 — ağaç düğümü telefonda 44 px.** Carbon'un ağaç düğümü sm 32 / xs 24 px
+- **S48 — ağaç düğümü telefonda 44 px.** Carbon'un ağaç düğümü sm 32 / xs 24 px
   (bileşen rehberi §1.39); TEDY telefonda ≥ 44 px istiyor (B79). `md` altında
   `.module-tree .cds--tree-node__label` örtülür. Kapı: `d3b-dokunma.spec.ts`.
-- **S47 — ağaç etiketi kırpılmaz, sarar.** Carbon taşmayı üç nokta ile keser ve bileşen
+- **S49 — ağaç etiketi kırpılmaz, sarar.** Carbon taşmayı üç nokta ile keser ve bileşen
   rehberi bunu "tercih edilmez" diye işaretler; kırpılan bir konu adı satırın anlamını yok
   eder (D4). `white-space: normal`. Kapı: `moduller-agac.spec.ts`.
-- **S48 — ağaç girintisi telefonda daraltılır.** Carbon'un düzey başına girintisi 390 px'te
+- **S50 — ağaç girintisi telefonda daraltılır.** Carbon'un düzey başına girintisi 390 px'te
   üçüncü düzeyde yana kaydırma yapıyordu (ölçüldü, Adım 1); `md` altında girinti
   `$spacing-05`'e çekilir, masaüstünde Carbon'un kendi değeri kalır. Kapı:
   `tasarim-denetimi.spec.ts` (yana kaydırma yok).
 ```
 
-**Adım 1'in ölçümü yana kaydırma göstermediyse** S48 satırı hiç yazılmaz ve Adım 2 atlanır;
+**Adım 1'in ölçümü yana kaydırma göstermediyse** S50 satırı hiç yazılmaz ve Adım 2 atlanır;
 spec §5.4 bunu açıkça izin veriyor. Hangi dalın geçerli olduğunu commit mesajına yaz.
 
 - [ ] **Step 4: Yüzey tasarımına §4.12 ekle**
@@ -1996,7 +2014,7 @@ değil." der — sessizce eksilmez.
 
 Veri: `src/mufredat_agaci.json` (üretilir, elle düzenlenmez) + `/api/modules/agac`.
 Tasarım: `superpowers/specs/2026-10-11-moduller-mufredat-agaci-design.md`. Sapmalar:
-talimatname S46–S48.
+talimatname S48–S50.
 ```
 
 `docs/frontend-surface-designs.md` §1'deki ikincil sayfa listesini ve "Değişiklik kaydı"nı da güncelle.
@@ -2009,7 +2027,7 @@ talimatname S46–S48.
 - **Modüller (edupedia)**: `/moduller` iki bölümdür — yayınlanmış modüllerin listesi ve
   `src/mufredat_agaci.json`'dan çizilen müfredat ağacı (7. sınıf, dört ders: ders → ünite →
   ders kitabı alt başlığı), `/api/modules/agac` ile birlikte sunulur (Carbon `TreeView
-  size="sm"`; sapmalar S46–S48). Ağaç `scripts/mufredat_agaci.py tumu --sinif 7` ile sabitlenmiş
+  size="sm"`; sapmalar S48–S50). Ağaç `scripts/mufredat_agaci.py tumu --sinif 7` ile sabitlenmiş
   salt-okunur müfredat DB'sinden üretilir, elle düzenlenmez ve `output/modules/` altına
   yazılmaz. Ölçüldü 2026-10-11: içindekiler nokta öncüllü satırları Fen'de 37+35,
   Matematik'te 33+33 tutuyor, Türkçe ve Sosyal'de 0 (iki sütunlu düzen) — bu yüzden
@@ -2041,7 +2059,7 @@ Expected: hepsi PASS. `tests/test_mufredat_agaci_db.py` ve canlı üretim testle
 ```bash
 git add docs/tedy-ui-ux-talimatnamesi.md docs/frontend-surface-designs.md CLAUDE.md \
   dashboard/src/components/Modules.scss dashboard/tests/e2e
-git commit -m "docs(moduller): S46-S48 sapmaları, yüzey tasarımı §4.12 ve anlık görüntüler
+git commit -m "docs(moduller): S48-S50 sapmaları, yüzey tasarımı §4.12 ve anlık görüntüler
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```

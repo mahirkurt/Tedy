@@ -238,19 +238,19 @@ Okurun açtığı dallar `localStorage` `tedy-mufredat-acik` ile **kalır** (İ5
 sürer), Carbon'un denetimli `isExpanded`'ı ile. **Odak kipinde "Tüm müfredat" hiç çizilmez** — yalnız hazır
 olanlar kalır (İ1).
 
-### 5.4 Üç yeni bilinçli sapma (talimatname §11 → S46, S47, S48)
+### 5.4 Üç yeni bilinçli sapma (talimatname §11 → S48, S49, S50)
 
 Sessizce yapılmaz; aynı commit'te §11'e yazılır.
 
-1. **S46 — telefonda düğüm yüksekliği.** Carbon'un iki boyu 32 ve 24 px; TEDY telefonda ≥ 44 px istiyor.
+1. **S48 — telefonda düğüm yüksekliği.** Carbon'un iki boyu 32 ve 24 px; TEDY telefonda ≥ 44 px istiyor.
    `md` altında `.module-tree .cds--tree-node` en az 44 px. Akordeondaki S18 yamasıyla aynı biçim
    (`.cds--` seçicisi: S3'ün izin verdiği kategori).
-2. **S47 — etiket kırpılmaz, sarar.** Carbon taşmayı üç nokta ile kesiyor; bileşen rehberi bunu kendisi
+2. **S49 — etiket kırpılmaz, sarar.** Carbon taşmayı üç nokta ile kesiyor; bileşen rehberi bunu kendisi
    "tercih edilmez" diye işaretlemiş. "Sindirim Sistemini Oluşturan Yapı ve Organlar"ı "Sindirim Sistemini
    Olu…" yapmak satırın anlamını yok eder (D4). `white-space: normal`, üst veri alt satırda.
-3. **S48 — derinlik girintisi.** 390 px'te üçüncü düzey girinti + sarma ile yana kaydırma çıkabilir;
+3. **S50 — derinlik girintisi.** 390 px'te üçüncü düzey girinti + sarma ile yana kaydırma çıkabilir;
    `tasarim-denetimi.spec.ts` yana kaydırmada hata verir. Girintinin `md` altında daraltılması **ölçülerek**
-   karara bağlanır; sayı şimdi uydurulmaz, ölçüm sonucu S48'e yazılır. Ölçümde yana kaydırma çıkmazsa S48
+   karara bağlanır; sayı şimdi uydurulmaz, ölçüm sonucu S50'ye yazılır. Ölçümde yana kaydırma çıkmazsa S50
    yazılmaz ve bu madde düşer.
 
 ### 5.5 Hata, boşluk, yükleme (D3)
@@ -301,7 +301,9 @@ denetliyor, Modüller onlardan biri.
 ### 6.3 Belge kapıları (aynı commit)
 
 - `docs/frontend-surface-designs.md`'e **§4.12 Modüller** (bugün yok; §4 listesi 4.11'de bitiyor).
-- `docs/tedy-ui-ux-talimatnamesi.md` §11'e S46–S48 (S48 yalnız ölçüm gerektirirse).
+- `docs/tedy-ui-ux-talimatnamesi.md` §11.1 tablosuna S48–S50 (S50 yalnız ölçüm gerektirirse).
+  Numaralar 2026-10-11'de kontrol edildi: tablo S1–S46 ve değişiklik kaydı S47'yi "gerekmedi"
+  diye anıyor, bu yüzden S47 atlanır.
 - `CLAUDE.md`'nin "Modüller (edupedia)" maddesi ağaç, üretici ve yeni uçla güncellenir.
 
 ---
@@ -312,7 +314,7 @@ denetliyor, Modüller onlardan biri.
 |---|---|
 | Türkçe/Sosyal içindekileri iki sütunlu; başlık sırası bozuk çıkabilir | Sıra bozulursa o ders §2.2 eşiğine takılır ve yazılmaz; yüzey "haritası henüz hazır değil" der |
 | Korpus sürümü değişince ağaç bayatlar | `korpus_surumu` dosyada; üretici elle koşulur, `unite-haritasi.md` ile aynı kural |
-| Üç düzey ağaç telefonda dar | S46–S48; `tasarim-denetimi` ve `d3b-dokunma` kapıları ölçer |
+| Üç düzey ağaç telefonda dar | S48–S50; `tasarim-denetimi` ve `d3b-dokunma` kapıları ölçer |
 | Başlık düzeni çevirisi kısaltmaları bozabilir | Ham metin `ad_kaynak`'ta kalır; dönüşüm testle sabitlenir |
 | Yeniden üretim okurun açık dallarını kaydırır | `id` sırasal değil, konu adının slug'ı (§2.1) |
 | Yüzeyin çoğu "Hazır değil" | Hepsi kapalı başlar; "Hazır olanlar" üstte; odak kipinde ağaç yok; her yaprağın "Asistana sor"u var |
