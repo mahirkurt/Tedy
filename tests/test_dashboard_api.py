@@ -1418,3 +1418,161 @@ class TestOzelDersCumleDuzeni:
         row = {"source": "photo_ai_private", "Ders Adı": ders,
                "Ödev Son Teslim Tarihi": "25.09.2026 12:00"}
         assert foto_eksik_alanlar(row) == ["ders"]
+
+
+# ── Müfredat ağacı ucu (spec §4) ────────────────────────────────────────────
+
+_AGAC_GOVDESI = {
+    "surum": 1, "korpus_surumu": "1.6", "sinif": "7. Sınıf",
+    "dersler": [{
+        "ders": "Matematik", "slug": "matematik",
+        "program": {"document_id": 24, "sayfa": "115-172"},
+        "kitaplar": [{"document_id": 346, "kisa": "1. Kitap",
+                      "sayfa_kaymasi": 0, "kayma_uyumu": "35/35"}],
+        "uniteler": [{
+            "no": 1, "ad": "Sayılar ve Nicelikler", "program_sayfa": 115,
+            "konular": [
+                {"id": "matematik-u1-tam-sayilar", "ad": "Tam Sayılar",
+                 "ad_kaynak": "TAM SAYILAR", "kitap": 346, "sayfa": [17, 24],
+                 "sayfa_kaynak": "icindekiler", "kazanimlar": ["MAT.7.1.1"],
+                 "kazanim_kaynak": "metin-ortusmesi"},
+                {"id": "matematik-u1-mutlak-deger", "ad": "Mutlak Değer",
+                 "ad_kaynak": "MUTLAK DEĞER", "kitap": 346,
+                 "sayfa_kaynak": "yok", "kazanimlar": [],
+                 "kazanim_kaynak": "eslenmedi"},
+            ],
+        }],
+    }],
+    "kapsam": {"matematik": {"konu": 2, "sayfasi_olan": 1, "kazanimi_eslenen": 1}},
+}
+
+
+def _modul_satiri(slug, outcomes, **ustune):
+    satir = {"slug": slug, "version": 1, "status": "active", "title": slug,
+             "subject": "Matematik", "gradeLevel": "7. Sınıf", "mode": "MODULE",
+             "outcomes": outcomes, "ted_link": None,
+             "gates": {"pass": 17, "warn": 0, "fail": 0},
+             "created_at": "2026-09-19T19:32:46+00:00"}
+    satir.update(ustune)
+    return satir
+
+
+@pytest.fixture
+def agac_dosyasi(tmp_path, monkeypatch):
+    """Ağaç dosyasını ve modül kataloğunu testin kendisi kurar.
+
+    Worktree'de `output/` yok (gitignore'lu) ve canlı kataloğa dayanan bir test başka bir
+    makinede sessizce başka bir şey ölçer.
+    """
+    def yaz(govde, moduller=None):
+        yol = tmp_path / "mufredat_agaci.json"
+        yol.write_text(json.dumps(govde) if not isinstance(govde, str) else govde,
+                       encoding="utf-8")
+        monkeypatch.setattr(dashboard_api, "MUFREDAT_AGACI_PATH", str(yol))
+        katalog = tmp_path / "modules"
+        katalog.mkdir(exist_ok=True)
+        satirlar = moduller if moduller is not None else [
+            _modul_satiri("mat7-tam-sayilar", ["MAT.7.1.1"],
+                          title="Tam Sayılar: Sıfırın İki Yanı"),
+            _modul_satiri("fen7-turkiye-ve-uzay-arastirmalari", ["FB.7.1.1"],
+                          subject="Fen Bilimleri", mode="CURRICULUM"),
+        ]
+        (katalog / "index.json").write_text(
+            json.dumps({"surum": 1, "moduller": satirlar}), encoding="utf-8")
+        monkeypatch.setattr(dashboard_api, "OUTPUT_DIR", str(tmp_path))
+        return yol
+    return yaz
+
+
+def test_agac_ucu_dersleri_ve_kapsami_dondurur(client, agac_dosyasi):
+    agac_dosyasi(_AGAC_GOVDESI)
+    govde = client.get("/api/modules/agac").get_json()
+    assert govde["hata"] is None
+    assert [d["slug"] for d in govde["dersler"]] == ["matematik"]
+    assert govde["kapsam"]["matematik"]["konu"] == 2
+
+
+def test_agac_ucu_yayinlanmis_modulu_kazanimiyla_konuya_bagliyor(client, agac_dosyasi):
+    agac_dosyasi(_AGAC_GOVDESI)
+    govde = client.get("/api/modules/agac").get_json()
+    konular = govde["dersler"][0]["uniteler"][0]["konular"]
+    tam_sayilar = next(k for k in konular if k["id"] == "matematik-u1-tam-sayilar")
+    mutlak = next(k for k in konular if k["id"] == "matematik-u1-mutlak-deger")
+    assert tam_sayilar["modul"]["slug"] == "mat7-tam-sayilar"
+    assert mutlak["modul"] is None
+
+
+def test_agac_ucu_hazir_sayaclarini_veriyor(client, agac_dosyasi):
+    agac_dosyasi(_AGAC_GOVDESI)
+    ders = client.get("/api/modules/agac").get_json()["dersler"][0]
+    assert (ders["konu_sayisi"], ders["hazir_sayisi"]) == (2, 1)
+    assert ders["uniteler"][0]["hazir_sayisi"] == 1
+
+
+def test_agac_ucu_hazir_listesinde_agaca_eslenmeyen_modul_de_var(client, agac_dosyasi):
+    """Katalogdaki her yayınlanmış modül listede görünür; ağaca eşlenmeyen de (spec §4)."""
+    agac_dosyasi(_AGAC_GOVDESI)
+    sluglar = {m["slug"] for m in client.get("/api/modules/agac").get_json()["hazir"]}
+    assert sluglar == {"mat7-tam-sayilar", "fen7-turkiye-ve-uzay-arastirmalari"}
+
+
+def test_agac_ucu_ayni_modulu_iki_konuya_baglamaz(client, agac_dosyasi):
+    """Bir kazanım birkaç konuya düşerse modül TEK konuya bağlanır (spec §3.1)."""
+    govde = json.loads(json.dumps(_AGAC_GOVDESI))
+    konular = govde["dersler"][0]["uniteler"][0]["konular"]
+    konular[1]["kazanimlar"] = ["MAT.7.1.1"]
+    konular[1]["kazanim_kaynak"] = "metin-ortusmesi"
+    agac_dosyasi(govde, moduller=[_modul_satiri("mat7-tam-sayilar", ["MAT.7.1.1"])])
+    cevap = client.get("/api/modules/agac").get_json()["dersler"][0]["uniteler"][0]["konular"]
+    bagli = [k["id"] for k in cevap if k["modul"]]
+    assert len(bagli) == 1
+
+
+def test_agac_ucu_sayfa_ortusmesine_gore_en_iyi_konuya_bagliyor(client, agac_dosyasi):
+    """Aynı kazanımı taşıyan iki konudan, frame_source sayfalarıyla örtüşeni kazanır."""
+    govde = json.loads(json.dumps(_AGAC_GOVDESI))
+    konular = govde["dersler"][0]["uniteler"][0]["konular"]
+    konular[1]["kazanimlar"] = ["MAT.7.1.1"]
+    konular[1]["kazanim_kaynak"] = "metin-ortusmesi"
+    konular[1]["sayfa"] = [40, 48]
+    konular[1]["sayfa_kaynak"] = "icindekiler"
+    agac_dosyasi(govde, moduller=[_modul_satiri(
+        "mat7-tam-sayilar", ["MAT.7.1.1"],
+        frame_source={"kind": "textbook", "document_id": 346, "pages": "41-45"})])
+    cevap = client.get("/api/modules/agac").get_json()["dersler"][0]["uniteler"][0]["konular"]
+    bagli = next(k["id"] for k in cevap if k["modul"])
+    assert bagli == "matematik-u1-mutlak-deger"
+
+
+# Review Focus 1: geçerli JSON ama şema dışı → 500 değil.
+@pytest.mark.parametrize("govde", ['{ bu json degil', '{"surum": 1, "dersler": {}}', '{}'])
+def test_agac_ucu_bozuk_dosyada_500_vermiyor(client, agac_dosyasi, govde):
+    agac_dosyasi(govde)
+    yanit = client.get("/api/modules/agac")
+    assert yanit.status_code == 200
+    payload = yanit.get_json()
+    assert payload["dersler"] == [] and payload["hata"] == "harita_okunamadi"
+    assert payload["kapsam"] == {}
+
+
+def test_agac_ucu_dosya_yokken_de_hazir_listesi_veriyor(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(dashboard_api, "MUFREDAT_AGACI_PATH", str(tmp_path / "yok.json"))
+    payload = client.get("/api/modules/agac").get_json()
+    assert payload["hata"] == "harita_okunamadi" and isinstance(payload["hazir"], list)
+
+
+# Review Focus 4: yetkisiz çağrı.
+def test_agac_ucu_oturumsuz_cagriyi_reddediyor(client_no_auth):
+    assert client_no_auth.get("/api/modules/agac").status_code in (401, 403)
+
+
+def test_agac_ucu_okur_rolunde_reddediyor(monkeypatch):
+    """Varsayılan-reddet: ucun adı READER_ENDPOINTS'te olmadığı için okur 403 alır."""
+    monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS", False)
+    okur = next(e for e, r in dashboard_api.USER_ROLES.items() if r == dashboard_api.ROLE_READER)
+    with app.test_client() as c:
+        assert c.get("/api/modules/agac").status_code == 401
+        with c.session_transaction() as oturum:
+            oturum["user_email"] = okur
+        assert c.get("/api/modules/agac").status_code == 403
+    assert "modules_agac" not in dashboard_api.READER_ENDPOINTS

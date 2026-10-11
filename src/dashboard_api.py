@@ -45,7 +45,8 @@ from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.US
     USER_ROLES,
     okur_turu,
 )
-from src import assistant_skills, module_progress, module_store, module_ticket, subject_themes
+from src import (assistant_skills, module_progress, module_store, module_ticket,
+                 mufredat_agaci, subject_themes)
 from src import claude_api
 
 load_env()
@@ -4739,6 +4740,97 @@ def _no_store(payload, status=200):
 def modules_list():
     rows = module_store.latest_active(module_store.read_catalog(OUTPUT_DIR))
     return jsonify({"moduller": [{key: row.get(key) for key in _MODULE_CARD_FIELDS} for row in rows]})
+
+
+# ── Müfredat ağacı (spec §4) ────────────────────────────────────────────────
+# Dosya depoda izlenir ve `scripts/mufredat_agaci.py` üretir; burada yalnız okunur.
+MUFREDAT_AGACI_PATH = str(mufredat_agaci.agac_yolu(os.path.dirname(os.path.abspath(__file__))))
+_AGAC_ONBELLEGI = {"imza": None, "durum": "yok", "agac": None}
+_AGAC_KILIDI = threading.Lock()
+_FRAME_SAYFA_RE = re.compile(r"^(\d+)(?:\s*-\s*(\d+))?$")
+
+
+def _agac_imzasi(yol):
+    """src.assistant_modules._stat ile aynı desen: atomik değiştirilen dosyayı stat ile izler."""
+    try:
+        st = os.stat(yol)
+    except OSError:
+        return None
+    return (st.st_ino, st.st_size, st.st_mtime_ns)
+
+
+def _mufredat_agaci():
+    """("ok", ağaç) | ("yok", None) | ("bozuk", None).
+
+    Dosya değişince kendini yeniler — gunicorn'un iki işçisi de yeniden başlatılmadan yeni
+    ağacı görür. Dosya yokken imza None'dır ve her istekte yeniden denenir (üretici onu
+    yazdığı anda görünür).
+    """
+    yol = MUFREDAT_AGACI_PATH
+    imza = _agac_imzasi(yol)
+    if imza is not None and _AGAC_ONBELLEGI["imza"] == imza:
+        return _AGAC_ONBELLEGI["durum"], _AGAC_ONBELLEGI["agac"]
+    with _AGAC_KILIDI:
+        imza = _agac_imzasi(yol)
+        if imza is not None and _AGAC_ONBELLEGI["imza"] == imza:
+            return _AGAC_ONBELLEGI["durum"], _AGAC_ONBELLEGI["agac"]
+        durum, agac = mufredat_agaci.oku(yol)
+        _AGAC_ONBELLEGI.update({"imza": imza, "durum": durum, "agac": agac})
+        return durum, agac
+
+
+def _modul_sayfa_ortusmesi(row, konu):
+    """Modülün frame_source sayfalarıyla konunun sayfa aralığının kesişim uzunluğu."""
+    sayfa = konu.get("sayfa")
+    if not isinstance(sayfa, list) or len(sayfa) != 2:
+        return 0
+    eslesme = _FRAME_SAYFA_RE.match(str((row.get("frame_source") or {}).get("pages") or "").strip())
+    if not eslesme:
+        return 0
+    bas = int(eslesme.group(1))
+    son = int(eslesme.group(2) or bas)
+    return max(0, min(son, sayfa[1]) - max(bas, sayfa[0]) + 1)
+
+
+def _agac_modul_eslemesi(agac, rows):
+    """Konu kimliği → modül kartı. Bir modül yalnız BİR konuya bağlanır: sayfa örtüşmesi en iyi
+    olana, o da yoksa sıradaki ilkine (spec §3.1). Aynı modül iki satırda görünmez."""
+    eslesme = {}
+    konular = [konu for _, _, konu in mufredat_agaci.konular(agac)]
+    for row in rows:
+        kodlar = {k for k in (row.get("outcomes") or []) if isinstance(k, str)}
+        if not kodlar:
+            continue
+        adaylar = [konu for konu in konular
+                   if konu["id"] not in eslesme and kodlar & set(konu.get("kazanimlar") or [])]
+        if not adaylar:
+            continue
+        en_iyi = max(adaylar, key=lambda konu: _modul_sayfa_ortusmesi(row, konu))
+        eslesme[en_iyi["id"]] = {key: row.get(key) for key in _MODULE_CARD_FIELDS}
+    return eslesme
+
+
+@app.route("/api/modules/agac")
+@require_auth
+def modules_agac():
+    rows = module_store.latest_active(module_store.read_catalog(OUTPUT_DIR))
+    hazir = [{key: row.get(key) for key in _MODULE_CARD_FIELDS} for row in rows]
+    durum, agac = _mufredat_agaci()
+    if durum != "ok" or agac is None:
+        # D3: harita okunamazsa hazır modül listesi çalışmaya devam eder, 500 verilmez.
+        return jsonify({"hazir": hazir, "dersler": [], "kapsam": {}, "hata": "harita_okunamadi"})
+    eslesme = _agac_modul_eslemesi(agac, rows)
+    dersler = []
+    for ders in agac["dersler"]:
+        uniteler = []
+        for unite in ders["uniteler"]:
+            konular = [{**konu, "modul": eslesme.get(konu["id"])} for konu in unite["konular"]]
+            uniteler.append({**unite, "konular": konular,
+                             "hazir_sayisi": sum(1 for konu in konular if konu["modul"])})
+        dersler.append({**ders, "uniteler": uniteler,
+                        "konu_sayisi": sum(len(u["konular"]) for u in uniteler),
+                        "hazir_sayisi": sum(u["hazir_sayisi"] for u in uniteler)})
+    return jsonify({"hazir": hazir, "dersler": dersler, "kapsam": agac["kapsam"], "hata": None})
 
 
 @app.route("/api/modules/<slug>/v<int:version>/ticket")
