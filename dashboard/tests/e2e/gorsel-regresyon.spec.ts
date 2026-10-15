@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { SAYFALAR, sabitAc } from './_gorsel-yardim'
+import { girisAc } from './_gsi-sahte'
 
 // Visual regression: every surface at a desktop and a phone width, compared
 // pixel by pixel with a stored baseline. On 2026-09-25 a Playwright + axe
@@ -31,16 +32,15 @@ for (const [boy, w, h] of [['masaustu', 1440, 900], ['telefon', 390, 844]] as co
   }
 }
 
-test('the sign-in page looks as it did', async ({ page }) => {
-  await page.route('**/api/auth/me', r => r.fulfill({ status: 401, body: '{}' }))
-  await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Hoş geldiniz' })).toBeVisible()
-  await page.evaluate(() => document.fonts.ready.then(() => undefined))
-  await expect(page).toHaveScreenshot('giris-masaustu.png', {
-    animations: 'disabled',
-    // The Google button is Google's iframe; it renders when and how Google likes.
-    mask: [page.locator('iframe')],
-    maxDiffPixelRatio: 0.002,
+// Giriş sayfası yenilemesi (2026-10-15): Google's script is a deterministic stand-in (_gsi-sahte.ts) — the real
+// one rendered when and how Google liked and had to be masked; now the button's size and place are the shot.
+for (const [boy, w, h] of [['masaustu', 1440, 900], ['telefon', 390, 844]] as const) {
+  test(`the sign-in page looks as it did (${boy})`, async ({ page }) => {
+    await girisAc(page, w, h)
+    await expect(page).toHaveScreenshot(`giris-${boy}.png`, {
+      fullPage: true,
+      animations: 'disabled',
+      maxDiffPixelRatio: 0.002,
+    })
   })
-})
+}

@@ -1296,131 +1296,6 @@ body {
   outline-offset: -2px;
 }
 
-// ─── Login Page ──────────────────────────────────────────────────────────────
-@keyframes login-hero-shift {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-.login-page {
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-}
-
-// Hero panel (left)
-.login-page__hero {
-  position: relative;
-  overflow: hidden;
-  background: var(--ted-color-brand-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: spacing.$spacing-09;
-  color: var(--cds-text-on-color);
-}
-
-// Geometric CSS-only decoration
-.login-page__hero-geo {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-
-  &::before {
-    content: '';
-    position: absolute;
-    width: 26.25rem;
-    height: 26.25rem;
-    border-radius: 50%;
-    border: 1px solid var(--ted-color-brand-primary-hover);
-    /* stylelint-disable-next-line carbon/layout-use -- the login hero's decorative rings sit by position, not spacing */
-    top: -120px;
-    right: calc(-1 * #{spacing.$spacing-11});
-  }
-
-  &::after {
-    content: '';
-    position: absolute;
-    width: 17.5rem;
-    height: 17.5rem;
-    border-radius: 50%;
-    border: 1px solid var(--ted-color-brand-primary-hover);
-    /* stylelint-disable-next-line carbon/layout-use -- as above */
-    bottom: -60px;
-    left: calc(-1 * #{spacing.$spacing-08});
-  }
-}
-
-.login-page__hero-content {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--ted-space-sm);
-  text-align: center;
-}
-
-.login-page__hero-logo {
-  height: 3.5rem;
-  margin-bottom: var(--ted-space-xs);
-}
-
-.login-page__hero-school {
-  @include type.type-style('heading-02');
-  margin: 0;
-  color: var(--cds-text-on-color);
-}
-
-.login-page__hero-subtitle {
-  @include type.type-style('body-01');
-  color: var(--ted-color-brand-text-secondary);
-  margin: 0;
-}
-
-// Form panel (right)
-.login-page__panel {
-  background-color: var(--cds-layer-01);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: spacing.$spacing-08;
-}
-
-.login-page__panel-inner {
-  width: 100%;
-  max-width: 21.25rem;
-}
-
-.login-page__heading {
-  @include type.type-style('heading-04');
-  color: var(--ted-color-text-primary);
-  margin: 0 0 var(--ted-space-sm);
-}
-
-.login-page__intro {
-  @include type.type-style('body-01');
-  color: var(--ted-color-text-secondary);
-  margin: 0 0 var(--ted-space-lg);
-}
-
-.login-page__google-button-wrap {
-  display: flex;
-  justify-content: center;
-  margin-bottom: var(--ted-space-md);
-}
-
-.login-page__error {
-  margin-top: var(--ted-space-md);
-}
-
-.login-page__footnote {
-  @include type.type-style('label-01');
-  color: var(--ted-color-text-secondary);
-  margin-top: var(--ted-space-xl);
-  text-align: center;
-}
-
 // ─── Dashboard Footer ─────────────────────────────────────────────────────────
 .dashboard-footer {
   padding: var(--ted-space-md) var(--ted-space-lg);
@@ -2484,31 +2359,6 @@ body {
 
   // No private 22rem breakpoint (B37): at 320px — Carbon's smallest — the band holds the logo, Odak and
   // two 48px actions without shrinking them under the 44px phone target (d3b-dokunma.spec.ts, 320px).
-
-  .login-page {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
-  }
-
-  .login-page__hero {
-    padding: var(--ted-space-lg) var(--ted-space-md);
-    min-height: 8.75rem;
-    align-items: center;
-  }
-
-  .login-page__hero-logo {
-    height: 2.25rem;
-  }
-
-  .login-page__hero-school {
-    @include type.type-style('body-01');
-  }
-
-  .login-page__panel {
-    padding: var(--ted-space-xl) var(--ted-space-lg);
-    align-items: flex-start;
-    padding-top: spacing.$spacing-07;
-  }
 
   .cds--data-table-container {
     overflow-x: auto;
@@ -4882,8 +4732,7 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 //     opacity 0 and blank the card entirely.
 @media (prefers-reduced-motion: reduce) {
   .tag-urgent,
-  .hw-countdown-bar__fill--critical,
-  .login-page__hero {
+  .hw-countdown-bar__fill--critical {
     animation: none;
   }
 
