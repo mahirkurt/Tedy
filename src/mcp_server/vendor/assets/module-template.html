@@ -532,7 +532,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .lead{font-family:var(--font-serif);font-size:1.25rem;line-height:1.55;color:var(--cds-text-primary);
   background:var(--cds-layer-02);border-left:4px solid var(--accent);border-radius:var(--cds-radius);
   padding:var(--sp-05) var(--sp-06);margin:0 0 var(--sp-06)}
-mark.term{background:var(--accent-tint);color:var(--accent-on);padding:0 .25em;border-radius:4px;font-weight:600}
+mark.term{background:var(--accent-tint);color:var(--accent-on);padding:0 .25em;border-radius:var(--cds-border-radius-00);font-weight:600}
 /* Anahtar kavramlar — Carbon DefinitionTooltip tetikleyicileri */
 .terms{display:flex;flex-direction:column;gap:var(--sp-04);margin:var(--sp-06) 0;
   background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);
@@ -550,7 +550,7 @@ mark.term{background:var(--accent-tint);color:var(--accent-on);padding:0 .25em;b
 .def-term[aria-describedby] .cds-icon{opacity:1}
 /* tanım popover — tema-duyarlı, oklu kart; ekran kenarına flip+clamp (JS konumlu) */
 .def-pop{position:fixed;z-index:9999;width:max-content;max-width:300px;
-  padding:var(--sp-04) var(--sp-05);border-radius:var(--cds-border-radius-04);font-family:var(--font-sans);
+  padding:var(--sp-04) var(--sp-05);border-radius:var(--cds-border-radius-02);font-family:var(--font-sans);
   background:var(--def-pop-bg);color:var(--def-pop-fg);
   box-shadow:0 2px 6px var(--cds-shadow);pointer-events:none;
   opacity:0;transform:translateY(3px);
@@ -594,7 +594,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .viz .viz-grid{stroke:var(--viz-grid)}
 .viz-legend{display:flex;flex-wrap:wrap;gap:var(--sp-03) var(--sp-05);justify-content:center;margin-top:var(--sp-05)}
 .viz-legend span{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-label);color:var(--cds-text-secondary)}
-.viz-legend i{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
+.viz-legend i{width:12px;height:12px;border-radius:var(--cds-border-radius-00);display:inline-block;flex:none}
 /* v3.0.0 — Task 19: numberLine(spec) `interactive:true` iken üretilen sürüklenebilir/
    klavye-adımlı nokta. Gölge yok (yalnız inset — G-CARBON-GRID); ok-renkli dolgu
    token'lı (ham hex yok — G-SVG). Geçiş yalnızca hareket-azaltma TERCİH EDİLMEDİĞİNDE

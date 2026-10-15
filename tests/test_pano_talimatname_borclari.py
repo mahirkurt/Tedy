@@ -721,3 +721,17 @@ def test_d1_modulde_alfa_rengi_yok():
             for ad, deger in re.findall(r"(--[-a-z0-9]+|[-a-z]+)\s*:\s*([^;}\n]*)", stil)
             if "rgba(" in deger and not ad.startswith("--cds-")]
     assert not kotu, f"D1: TEDY'nin yazdigi bildirimde alfa rengi: {kotu}"
+
+
+def test_s10_modulde_yaricap_token_referansi():
+    metin = SABLON.read_text(encoding="utf-8")
+    stil = metin[metin.index("<style>"):metin.index("</style>")]
+    duz = [d for d in re.findall(r"border-radius\s*:\s*([^;}\n]+)", stil)
+           if "var(" not in d and d.strip() not in {"0", "50%", "inherit"}]
+    assert not duz, f"token'a baglanmamis yaricap: {duz}"
+    bas = stil.index(".def-pop{")
+    assert "border-radius:var(--cds-border-radius-02)" in stil[bas:stil.index("}", bas)], \
+        "popover Carbon'un 2 px'ine inmemis"
+    bas = stil.index("mark.term{")
+    assert "border-radius:var(--cds-border-radius-00)" in stil[bas:stil.index("}", bas)], \
+        "satir ici terim vurgusu S10'un 'geri kalan 0' kovasinda degil"
