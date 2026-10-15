@@ -735,3 +735,36 @@ def test_s10_modulde_yaricap_token_referansi():
     bas = stil.index("mark.term{")
     assert "border-radius:var(--cds-border-radius-00)" in stil[bas:stil.index("}", bas)], \
         "satir ici terim vurgusu S10'un 'geri kalan 0' kovasinda degil"
+
+
+# ── 4K eşliği (spec §10): şablon ölçüleri rem, kök ölçek panodan ───────────────
+# Kenarlık/saç çizgisi ve @media kırılma noktaları px kalır (medya sorgusunda rem kök boyunu değil
+# tarayıcı varsayılanını kullanır); viewBox birimsizdir.
+PX_IZINLI_OZELLIK = re.compile(r"(border(-[a-z]+)?|outline(-[a-z]+)?|text-decoration-thickness"
+                               r"|text-underline-offset|box-shadow|stroke-width)\s*:")
+
+
+def test_4k_sablon_olculeri_rem():
+    metin = SABLON.read_text(encoding="utf-8")
+    stil = metin[metin.index("<style>"):metin.index("</style>")]
+    stil = re.sub(r"@media[^{]*\{", "{", stil)          # kırılma noktaları hariç
+    stil = re.sub(r"/\*.*?\*/", "", stil, flags=re.S)    # yorumlar hariç
+    kotu = []
+    for bildirim in re.findall(r"[-a-z]+\s*:[^;}\n]*", stil):
+        if "px" not in bildirim or PX_IZINLI_OZELLIK.match(bildirim):
+            continue
+        # Carbon'un kendi otorite degerleri (orn. --cds-border-radius-max:999999px, "pill" deyimi)
+        # TEDY'nin olcusu degildir ve G-TOKEN onlari @carbon/themes'e karsi denetler.
+        if bildirim.startswith("--cds-"):
+            continue
+        for deger in re.findall(r"(\d*\.?\d+)px", bildirim):
+            if float(deger) > 3:
+                kotu.append(bildirim.strip())
+                break
+    assert not kotu, f"rem'e cevrilmemis olcu ({len(kotu)}): {kotu[:8]}"
+
+
+def test_4k_okuma_sutunu_rem():
+    metin = SABLON.read_text(encoding="utf-8")
+    bas = metin.index(".wrap{")
+    assert "max-width:55rem" in metin[bas:metin.index("}", bas)], "okuma sutunu hala px"
