@@ -77,7 +77,9 @@ def test_arac_yalniz_kaynak_verilince_sunulur():
 
 
 def test_arac_sonucu_okunur_atifla_doner():
-    reg = build_registry(lambda q, k: [], odev_kaynagi=lambda: ROWS)
+    # Saat enjekte edilir: veri sabit tarihlidir ve `odev_listesi` teslimi 14 günden eski
+    # ödevi listelemez, yani gerçek saatle bu test 2026-10-13'te sessizce düşmüştü.
+    reg = build_registry(lambda q, k: [], odev_kaynagi=lambda: ROWS, saat=lambda: SIMDI)
     out = reg.dispatch(ODEV_TOOL, {})
     assert out.ok and "S1 Les verbes" in out.text
     atif = out.citations[0]
@@ -200,3 +202,20 @@ def test_uzun_aciklama_kesildigini_belli_eder():
     uzun = _hw("Türkçe", "Test", "28.09.2026 12:00", aciklama="kelime " * 100)
     satir = _bolum(odev_listesi_metni([uzun], SIMDI), "YAPILACAK")
     assert satir.rstrip().endswith("…")
+
+
+def test_arac_kayit_defterinin_saatini_kullanir():
+    """`odev_listesi` kendi saatini değil kayıt defterinin saatini okur.
+
+    Satır 2598 `datetime.now()` çağırıyordu: kayıt defteri 2490, 2535 ve 2684'te enjekte
+    edilebilir `self.saat`'i kullanırken bu çağrı onu yoksayıyordu. İki sonucu vardı —
+    (1) araç yolundan geçen testler gerçek saate bağlı kalıyor ve veri 14 günlük pencereden
+    çıktığında sessizce düşüyordu (2026-10-13'te oldu), (2) `datetime.now()` host yerel
+    saatidir ve host Etc/UTC'dir, yani TZ kurulumunu atlayan bir giriş noktasında liste
+    İstanbul'un üç saat gerisini "bugün" sayardı (CLAUDE.md saat dilimi kuralı).
+    """
+    reg = build_registry(lambda q, k: [], odev_kaynagi=lambda: ROWS, saat=lambda: SIMDI)
+    out = reg.dispatch(ODEV_TOOL, {})
+    assert out.ok
+    assert out.text.startswith("Bugün: Perşembe 24.09.2026 16:10")
+    assert "S1 Les verbes" in out.text

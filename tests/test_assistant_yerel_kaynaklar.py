@@ -100,15 +100,18 @@ def test_odev_listesi_bos_olsa_bile_sebit_eklenir():
 
 
 def test_arac_sebit_kaynagiyla_baglanir_ve_kaynak_hatasi_ana_listeyi_bozmaz():
+    # Saat enjekte edilir: ROWS'un teslimi 28.09.2026 ve `odev_listesi` teslimi 14 günden
+    # eski ödevi listelemez, yani gerçek saatle bu test 2026-10-13'te sessizce düşmüştü.
     reg = build_registry(lambda q, k: [], odev_kaynagi=lambda: ROWS,
-                         sebit_kaynagi=lambda: SEBIT_VERI)
+                         sebit_kaynagi=lambda: SEBIT_VERI, saat=lambda: SIMDI)
     out = reg.dispatch(at.ODEV_TOOL, {})
     assert out.ok, out.error
     assert "SEBİT — AÇIK" in out.text and "Test 1" in out.text
 
     def patlar():
         raise RuntimeError("sebit kırık")
-    reg2 = build_registry(lambda q, k: [], odev_kaynagi=lambda: ROWS, sebit_kaynagi=patlar)
+    reg2 = build_registry(lambda q, k: [], odev_kaynagi=lambda: ROWS, sebit_kaynagi=patlar,
+                          saat=lambda: SIMDI)
     out2 = reg2.dispatch(at.ODEV_TOOL, {})
     assert out2.ok, out2.error                 # SEBİT's own failure is soft
     assert "Test 1" in out2.text and "SEBİT" not in out2.text
