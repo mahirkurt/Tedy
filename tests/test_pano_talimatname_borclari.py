@@ -603,3 +603,78 @@ def test_b52_seriler_viz_paletinde():
         svg = _grafik_calistir(ifade)
         assert "var(--accent" not in svg, f"grafik serisi ders aksanında (S19): {ifade}"
         assert "var(--viz-1)" in svg, ifade
+
+
+# ── S19 (§7.5 P5, §8): kategoriyi biçim taşır, hue değil ──────────────────────
+VIZ_DERS_AILESI = {  # tagPairs ders aileleri (carbon-v11-authority.json) — viz yuvasında olmamalı
+    "#6929c4", "#002d9c", "#1192e8", "#007d79", "#9f1853",
+    "#be95ff", "#78a9ff", "#33b1ff", "#08bdba", "#ff7eb6",
+}
+
+
+def _viz_bloklari():
+    """Her tema seçicisi için o blokta bildirilen --viz-* değerleri."""
+    metin = SABLON.read_text(encoding="utf-8")
+    bloklar = {}
+    for eslesme in re.finditer(r"(?m)^(:root[^{\n]*|\[data-theme=\"[a-z0-9]+\"\])\{", metin):
+        bas = eslesme.end()
+        son = metin.index("}", bas)
+        govde = metin[bas:son]
+        viz = dict(re.findall(r"--viz-([1-5])\s*:\s*(#[0-9a-fA-F]{6})", govde))
+        if viz:
+            bloklar.setdefault(eslesme.group(1), {}).update(viz)
+    return bloklar
+
+
+def test_s19_viz_yuvalari_ders_ailesi_degil():
+    for secici, viz in _viz_bloklari().items():
+        for yuva, deger in viz.items():
+            assert deger.lower() not in VIZ_DERS_AILESI, f"{secici} --viz-{yuva} ders ailesi tonu: {deger}"
+
+
+def test_s19_viz_ciplak_rootta_bildirilmez():
+    """Kaskad: ciplak :root, [data-theme=g100]'den SONRA gelir ve esit ozgullukte oldugu icin
+    onu ezer. Bu yuzden --viz-* yalniz tema bloklarinda bildirilir."""
+    bloklar = _viz_bloklari()
+    assert ":root" not in bloklar, "--viz-* ciplak :root'ta bildirilmis; koyu tema paletini ezer"
+    assert '[data-theme="g100"]' in bloklar, "koyu tema --viz-* bildirmiyor"
+
+
+def _kontrast(a: str, b: str) -> float:
+    def kanal(c):
+        c /= 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    def parlaklik(h):
+        h = h.lstrip("#")
+        r, g, bl = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+        return 0.2126 * kanal(r) + 0.7152 * kanal(g) + 0.0722 * kanal(bl)
+    la, lb = parlaklik(a), parlaklik(b)
+    return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+
+
+# Temanın kendi --cds-layer-01 zemini: grafik .stage içinde çizilir.
+VIZ_ZEMIN = {':root,[data-theme="g10"]': "#ffffff",
+             '[data-theme="white"]': "#f4f4f4",
+             '[data-theme="g100"]': "#262626"}
+
+
+def test_s19_viz_zemine_karsi_3_1():
+    bloklar = _viz_bloklari()
+    for secici, zemin in VIZ_ZEMIN.items():
+        viz = bloklar.get(secici)
+        assert viz, f"{secici} --viz-* bildirmiyor"
+        for yuva, deger in viz.items():
+            oran = _kontrast(deger, zemin)
+            assert oran >= 3.0, f"{secici} --viz-{yuva} {deger} zemin {zemin}: {oran:.2f}:1 < 3:1"
+
+
+def test_s19_yazarin_gecirdigi_renk_grafigi_bozmaz():
+    """Palet ders ailesi sunmasa da yazar p.color ile elle gecirebilir: grafik yine cizilir.
+
+    Karakterizasyon testi (Review Focus): davranis zaten vardi, bu degisiklik onu bozmamali.
+    """
+    svg = _grafik_calistir(
+        "vizChart({legend:true,data:[{label:'A',value:3,color:'#9f1853'},{label:'B',value:5}]})")
+    assert svg.count("<rect") == 2
+    assert "#9f1853" in svg, "yazarin degeri dusurulmus"
+    assert "var(--viz-1)" in svg, "varsayilan yuva kullanilmamis"
