@@ -947,14 +947,20 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 /* dil: satır-arası çözümleme; rol/cinsiyet renk-kodu DAİMA etiketle birlikte (CVD-güvenli) */
 .gloss{display:flex;flex-wrap:wrap;gap:var(--sp-04) var(--sp-05);align-items:flex-end;font-size:1.2rem;padding:var(--sp-04) 0}
 .tok{display:inline-flex;flex-direction:column;align-items:center;gap:3px}
-.tok .w{font-weight:600;padding-bottom:3px;border-bottom:3px solid transparent}
+.tok .w{font-weight:600;padding-bottom:3px;
+  text-decoration-line:underline;text-decoration-color:var(--cds-border-strong);
+  text-decoration-thickness:3px;text-underline-offset:3px}
 .tok .tg{font-size:.72rem;font-weight:600;color:var(--cds-text-secondary)}
-.tok[data-role="masc"] .w{border-bottom-color:var(--viz-1)}
-.tok[data-role="fem"] .w{border-bottom-color:var(--viz-3)}
-.tok[data-role="verb"] .w{border-bottom-color:var(--viz-2)}
-.tok[data-role="noun"] .w{border-bottom-color:var(--viz-4)}
-.tok[data-role="adj"] .w{border-bottom-color:var(--viz-5)}
-.tok[data-role="art"] .w{border-bottom-color:var(--accent)}
+/* Rol BİÇİMLE ayrılır, renkle değil (S19): ders aileleri ders işaretine ayrılmıştır. Taşıyıcı
+   zaten .tg etiketidir (yukarıdaki yorum: "DAİMA etiketle birlikte"); biçim ikincil, CVD-güvenli
+   ipuçtur. border-style'da `wavy` yok; sözcük işaretlemenin doğru özelliği text-decoration'dır. */
+.tok[data-role="masc"] .w{text-decoration-style:solid}
+.tok[data-role="fem"]  .w{text-decoration-style:double}
+.tok[data-role="verb"] .w{text-decoration-style:dotted}
+.tok[data-role="noun"] .w{text-decoration-style:dashed}
+.tok[data-role="adj"]  .w{text-decoration-style:wavy}
+/* art: işlev sözcüğü, işaretsiz — altıncı ayrı biçim yerine işaretin yokluğu. */
+.tok[data-role="art"]  .w{text-decoration-line:none}
 .gloss-tr{margin:var(--sp-04) 0 0;color:var(--cds-text-secondary);font-family:var(--font-serif);font-style:italic}
 /* dil: iki konuşmacılı diyalog */
 .dialogue{display:flex;flex-direction:column;gap:var(--sp-05)}

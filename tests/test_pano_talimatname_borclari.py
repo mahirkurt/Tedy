@@ -678,3 +678,18 @@ def test_s19_yazarin_gecirdigi_renk_grafigi_bozmaz():
     assert svg.count("<rect") == 2
     assert "#9f1853" in svg, "yazarin degeri dusurulmus"
     assert "var(--viz-1)" in svg, "varsayilan yuva kullanilmamis"
+
+
+def test_s19_dilbilgisi_rolleri_renkle_ayrilmaz():
+    metin = SABLON.read_text(encoding="utf-8")
+    kurallar = re.findall(r'\.tok\[data-role="([a-z]+)"\][^{]*\{([^}]*)\}', metin)
+    assert kurallar, ".tok rol kurallari bulunamadi"
+    biciminden = {}
+    for rol, govde in kurallar:
+        assert "var(--viz-" not in govde, f"{rol} rolu viz paletinden renk aliyor"
+        assert "var(--accent" not in govde, f"{rol} rolu ders aksanindan renk aliyor"
+        bicim = re.search(r"text-decoration-style\s*:\s*([a-z]+)", govde)
+        if bicim:
+            biciminden[rol] = bicim.group(1)
+    assert len(set(biciminden.values())) == len(biciminden), f"iki rol ayni bicimi paylasiyor: {biciminden}"
+    assert len(biciminden) >= 5, f"bes isaretli rol bekleniyordu: {biciminden}"
