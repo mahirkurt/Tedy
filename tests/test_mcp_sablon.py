@@ -86,7 +86,11 @@ def test_appearance_listener_is_gated_on_the_parent_and_never_restores():
     # source and origin checks precede both message kinds; restore still needs an active (slug) frame
     assert listener.index("e.source!==window.parent") < listener.index('"edupedia:appearance"')
     assert listener.index("e.origin!==EDUPEDIA_PARENT_ORIGIN") < listener.index('"edupedia:appearance"')
-    assert 'if(d.type === "edupedia:appearance"){ adoptHostTheme(d.theme); return; }' in listener
+    assert 'if(d.type === "edupedia:appearance"){ adoptHostTheme(d.theme); adoptHostRootSize(d.rootPx); return; }' in listener
+    # The root-size applier the branch calls must exist and must validate what it is given:
+    # the frame is opaque-origin, so a non-number is ignored and the value is clamped (§10.2).
+    assert "function adoptHostRootSize(rootPx){" in html
+    assert 'Math.min(48, Math.max(12, n))' in html
     assert 'if(!active || d.type !== "edupedia:restore") return;' in listener
 
 
