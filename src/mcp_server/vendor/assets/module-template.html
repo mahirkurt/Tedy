@@ -251,7 +251,6 @@
   --tedy-page-background:#f2f4f8;
   --tedy-text-success:#0e6027; --tedy-text-error:#a2191f;
   --tedy-text-info:#0043ce; --tedy-text-warning:#8a3800;
-  --tedy-shadow-card:0 1px 3px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.08);
 }
 /* ===== IBM Carbon v11 — WHITE teması (geriye uyum: eski kayıtlı tercih) ===== */
 [data-theme="white"]{
@@ -284,7 +283,6 @@
   --tedy-page-background:#ffffff;
   --tedy-text-success:#0e6027; --tedy-text-error:#a2191f;
   --tedy-text-info:#0043ce; --tedy-text-warning:#8a3800;
-  --tedy-shadow-card:0 1px 3px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.08);
 }
 /* ===== IBM Carbon v11 — GRAY-100 (dark) teması ===== */
 [data-theme="g100"]{
@@ -321,7 +319,6 @@
   --tedy-page-background:#121619;
   --tedy-text-success:#6fdc8c; --tedy-text-error:#ffb3b8;
   --tedy-text-info:#a6c8ff; --tedy-text-warning:#ffb784;
-  --tedy-shadow-card:none;
 }
 /* Tema-bağımsız katman: kanonik Carbon adlarının eski kısa adları (geriye uyum; yeni kodda
    kanonik adı kullanın) + Tedy marka/aciliyet + ödül vurgusu. Takma adlar her tema öğesinde
@@ -431,7 +428,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
    tanımları geçersiz kılar.
    ============================================================ */
 .topbar{position:relative;margin-bottom:var(--sp-06);border-radius:var(--cds-radius);overflow:hidden;
-  border:1px solid var(--cds-border-subtle);box-shadow:var(--tedy-shadow-card)}
+  border:1px solid var(--cds-border-subtle)}
 
 /* --- KATMAN 1 · Kimlik bandı (Tedy laciverti, açık içerik) --- */
 .topbar__hero{position:relative;color:var(--cds-text-on-color);padding:var(--sp-05) var(--sp-06);
@@ -517,9 +514,10 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .quest-map__node{fill:var(--cds-layer-02);stroke:var(--cds-border-strong);stroke-width:2}
 .quest-map__node--done{fill:var(--cds-interactive);stroke:var(--cds-interactive)}
 .quest-map__label{font-family:var(--font-sans);font-size:10px;fill:var(--cds-text-secondary)}
-/* sahne — sayfa düzeyindeki tek içerik kartı: Tedy pano kartı kuralı (border-radius-08 +
-   tedy-shadow-card; koyu temada gölge yok). İçindeki kutular gölgesiz kalır (G-CARBON-GRID). */
-.stage{background:var(--cds-layer-01);border:1px solid var(--cds-border-subtle);box-shadow:var(--tedy-shadow-card);
+/* sahne — sayfa düzeyindeki tek içerik kartı. Derinlik katman token'ı ve 1 px kenarla kurulur;
+   statik yüzey gölge almaz (S11, P4). Gölge yalnız geçici yüzeyde (tanım popover'ı) kalır.
+   İçindeki kutular da gölgesizdir (G-CARBON-GRID). */
+.stage{background:var(--cds-layer-01);border:1px solid var(--cds-border-subtle);
   border-radius:var(--cds-radius);padding:var(--sp-07);flex:1;min-width:0;max-width:100%}
 .seg-head{display:flex;align-items:center;gap:var(--sp-05);margin-bottom:var(--sp-06);padding-bottom:var(--sp-05);border-bottom:1px solid var(--cds-border-subtle)}
 .seg-head>div{min-width:0}

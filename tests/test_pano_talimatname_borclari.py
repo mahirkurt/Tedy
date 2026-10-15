@@ -693,3 +693,31 @@ def test_s19_dilbilgisi_rolleri_renkle_ayrilmaz():
             biciminden[rol] = bicim.group(1)
     assert len(set(biciminden.values())) == len(biciminden), f"iki rol ayni bicimi paylasiyor: {biciminden}"
     assert len(biciminden) >= 5, f"bes isaretli rol bekleniyordu: {biciminden}"
+
+
+def test_s11_modulde_statik_yuzey_golgesiz():
+    metin = SABLON.read_text(encoding="utf-8")
+    assert "--tedy-shadow-card" not in metin, "statik kart golgesi token'i hala tanimli (S11)"
+    for secici in (".topbar{", ".stage{"):
+        bas = metin.index(secici)
+        govde = metin[bas:metin.index("}", bas)]
+        assert "box-shadow" not in govde, f"{secici} hala golge tasiyor (S11)"
+    # Geçici yüzey gölgesi Carbon'da ve S11'de meşrudur: kalmalı.
+    bas = metin.index(".def-pop{")
+    assert "box-shadow:0 2px 6px var(--cds-shadow)" in metin[bas:metin.index("}", bas)]
+
+
+def test_d1_modulde_alfa_rengi_yok():
+    """D1 renk aritmetigi yasagi TEDY'nin YAZDIGI bildirimler icindir.
+
+    Carbon'un kendi token degerleri (--cds-overlay, --cds-shadow, --cds-text-placeholder,
+    --cds-*-disabled) ustte rgba() tasir ve G-TOKEN bu degerleri @carbon/themes otoritesine
+    karsi denetler; onlari yasaklamak Carbon'dan sapmayi zorunlu kilardi. Bu yuzden test
+    yalnizca --cds-* tanimi OLMAYAN bildirimlere bakar.
+    """
+    metin = SABLON.read_text(encoding="utf-8")
+    stil = metin[metin.index("<style>"):metin.index("</style>")]
+    kotu = [f"{ad}:{deger.strip()}"
+            for ad, deger in re.findall(r"(--[-a-z0-9]+|[-a-z]+)\s*:\s*([^;}\n]*)", stil)
+            if "rgba(" in deger and not ad.startswith("--cds-")]
+    assert not kotu, f"D1: TEDY'nin yazdigi bildirimde alfa rengi: {kotu}"
