@@ -1,6 +1,6 @@
 # TEDY Yüzey Tasarımları
 
-**Sürüm 1.16 · 2026-10-19 · `docs/frontend-design-principles.md`'nin uygulaması**
+**Sürüm 1.19 · 2026-10-20 · `docs/frontend-design-principles.md`'nin uygulaması**
 
 İlkeler dokümanı *neye göre karar verileceğini* yazar. Bu doküman o kararların
 her yüzeyde ne olduğunu yazar. Çelişki hâlinde ilkeler dokümanı kazanır.
@@ -329,6 +329,38 @@ Geçmiş (14)                                   ›   ← kapalı
 - Ham damga kaldırılır; gerekiyorsa "11 Mart'ta görüldü".
 
 **Kapılar:** ilk ekran testi · gri tonlama · sızıntı taraması · 2 saniye testi.
+
+**Yenileme (2026-10-15'te yapıldı, 2026-10-20'de ana dala taşındı; spec
+`docs/superpowers/specs/2026-10-15-isler-yenileme-design.md`).** Yukarıdaki taslak bugünkü hâle şöyle indi:
+
+```
+Sıradaki                                                  ← ders paneli, sayfanın tek birincili
+■ Matematik — 2. HAFTA MATEMATİK HAFTA İÇİ ÖDEVİ   [ Başla → ]
+Teslim yarın 12:00 · 10 dakikayla başla
+
+Ayrıca (2)                                         ⌃     ← kalan aktif iş; sıradaki burada tekrar edilmez
+■ Fransızca — S1 Les verbes        Pazartesi 08:55   Yaptım
+■ Fen Bilimleri — Ödev (Hibrit…)        Salı 12:00   Yaptım
+
+Yaklaşan Sınavlar (2)                   Tüm sınavlar
+■ Matematik 1. Yazılı      1 Eki 09:00 · 7 gün sonra
+
+Yapılan (1) ⌄   Tamamlandı (1) ⌄   Yapılmayan (2) ⌄     ← kapalı
+```
+
+- **Sıradaki bir kez adlandırılır** (İ1): panel aktif işin başıdır, liste ("Ayrıca", Bugün'ün sözcüğü) geri kalanı.
+- Sayfada kart yok; her bölüm Carbon on-page `ContainedList` (lg, 48 px), başlıkları `h2`. Satırın tamamı işin
+  penceresini açan tek düğme; tek eylemi yanında ("Yaptım", "Geri al: …", "Modülü aç"; talimatname S52).
+- Teslim gün + saat ("Yarın 12:00", "Pazartesi 08:55"; haftadan uzaksa "· N gün sonra"). Kırmızı yalnız **bugün**
+  teslimde, ikon + sözcük + renk (§2.7). Geri sayım etiketi, "7 günlük pencere" çubuğu ve renkli kenar kalktı.
+- "Başla" pencereyi açar; aktif işte pencerenin birincili "Yaptım"dır (Başla → Yaptım → "Yaptın: … · Geri al").
+  Pencerenin ilk odağı Kapat (talimatname S53).
+- Portal başlığı kendi yazımıyla kalır, kalınlaşmaz (talimatname [3.3-6]).
+- 400 ms sonra sayfanın şeklinde iskelet; yükleme hatası "boş" cümlesine dönmez (D3).
+- Sınav satırı ana dalın 2026-10-15'ten sonraki eklerini taşır: son 48 saatte bulunan ya da değişen sınavda gri
+  "Yeni"/"Değişti" etiketi; tüm gün sınavda yalnız gün ("Pazartesi", saat uydurulmaz), yalnız haftası bilinende
+  "28 Eyl haftası"; okunamayan duyuru varsa listenin altında (liste boşsa tek başına) "Bazı ders duyuruları
+  incelenemedi; sınav listesi eksik olabilir." Bölüm başlığı bir addır, başlık düzeninde (talimatname S38).
 
 ---
 
@@ -830,3 +862,4 @@ görüntüsüyle doğrulanır.
 | 1.14 | 2026-10-11 | Talimatname açık kalemler 4. tur: §4.3 (B64, B50), §4.4 (B72, B51), §4.5 (B49, B34), §4.6 (B65), §4.7 (B51, B66), §4.8 (B67), §4.9 (B60) uygulandı notları; §6 durum notu tamamlandı. |
 | 1.15 | 2026-10-11 | **§4.12 Modüller** eklendi (bugüne dek yüzey tasarımı yoktu): hazır modül listesi + müfredat ağacı (ders → ünite → ders kitabı alt başlığı), yaprağın tek eylemi, sayfa uydurmama ve haritasız dersin cümlesi. Tasarım `superpowers/specs/2026-10-11-moduller-mufredat-agaci-design.md`; sapmalar talimatname S48, S49. |
 | 1.16 | 2026-10-19 | Modül Tasarım Kanunu (`tedy-modul-tasarim-kanunu.md` 1.0) öncelik sırasına girdi: modül yüzeylerinde İ1–İ9'dan sonra, talimatnameden önce (kanun §0.2, KB-34). §4.12 modül sayfasını (baş, çerçeve, akış) kanuna bağlar. Başlık sürümü düzeltildi (1.13'te kalmıştı). |
+| 1.19 | 2026-10-20 | **§4.2 İşler yenilemesi** ana dala taşındı (2026-10-15'te yapılmış, birleşmemişti): sıradaki iş bir kez, "Ayrıca (n)" kalanı; kartsız Carbon contained list'ler, satır tek düğme + tek eylem; gün + saat teslim, kırmızı yalnız bugün; pencerede "Yaptım". Sınav satırı ana dalın eklerini korur (etiket, tüm gün ve hafta zamanı, incelenemedi notu); "Yaklaşan Sınavlar" başlık düzeninde. Talimatname S52, S53, B82. 1.17 ve 1.18 ana dala henüz birleşmemiş akşam çalışma planı dalındadır. |

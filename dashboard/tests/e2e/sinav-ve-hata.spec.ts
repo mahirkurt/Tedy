@@ -100,8 +100,11 @@ test.describe('İstanbul saatindeki tarayıcı', () => {
 
 test('İşler: Yaptım kaydedilemezse satır bunu söyler', async ({ page }) => {
   // It used to do nothing at all: `if (res.ok) {…}` and no else (D3).
+  // The first homework is the next thing (yenileme 2026-10-15); the row is the second, and its error is said
+  // right under it. The window's own "Yaptım" failing is pinned in isler-yenileme.spec.ts.
   await mock(page, { ...LIVE, homework: { summary: '', homework: [
     HW('Fransızca', 'S1 Les verbes', '28.09.2026 08:55'),
+    HW('Fen Bilimleri', 'Ödev (Hibrit 10-16)', '29.09.2026 12:00'),
   ] } })
   await page.route('**/api/homework/mark-done', r => r.fulfill({ status: 500, body: '{}' }))
   await page.clock.setFixedTime(new Date('2026-09-24T16:40:00'))
@@ -109,7 +112,8 @@ test('İşler: Yaptım kaydedilemezse satır bunu söyler', async ({ page }) => 
   await page.waitForLoadState('networkidle')
 
   await page.locator('.homework-item').getByRole('button', { name: 'Yaptım' }).click()
-  await expect(page.locator('.homework-item')).toContainText('Kaydedilemedi')
+  await expect(page.locator('.homework-item + .homework-item__error').getByRole('alert'))
+    .toContainText('Kaydedilemedi')
 })
 
 test('Bugün: uzak sınavlar yakın ödevlerin altında', async ({ page }) => {

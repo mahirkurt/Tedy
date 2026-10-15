@@ -229,9 +229,6 @@ body {
   }
 }
 
-.tag-urgent {
-}
-
 // ─── Reduced motion ──────────────────────────────────────────────────────────
 // The design system allows one entrance and turns it off under this
 // preference (color-system.md §2.5); until 2026-09-25 only Tedy Books listened.
@@ -834,112 +831,6 @@ body {
   color: var(--ted-color-text-secondary);
 }
 
-// ─── Homework ────────────────────────────────────────────────────────────────
-.homework-item.cds--tile {
-  padding: spacing.$spacing-04 var(--ted-space-md);
-  border-radius: var(--ted-radius-card);
-  transition: background-color var(--ted-transition-fast);
-}
-
-.homework-item--clickable.cds--tile {
-  cursor: pointer;
-}
-
-@media (any-hover: hover) {
-  .homework-item--clickable.cds--tile:hover {
-    background-color: var(--ted-color-layer-hover);
-  }
-}
-
-.homework-item__row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--ted-space-md);
-}
-
-.homework-item__main {
-  flex: 1;
-  min-width: 0;
-}
-
-.homework-item__course {
-  @include type.type-style('heading-compact-01');
-  margin-bottom: var(--ted-space-2xs);
-  color: var(--ted-color-text-primary);
-}
-
-.homework-item__title {
-  @include type.type-style('body-01');
-  color: var(--ted-color-text-secondary);
-}
-
-// B46: the title is the row's keyboard handle; it looks like the text it was.
-.homework-item__open {
-  display: block;
-  padding: 0;
-  border: 0;
-  background: none;
-  text-align: start;
-  cursor: pointer;
-
-  &:focus-visible {
-    outline: 2px solid var(--cds-focus);
-    outline-offset: 2px;
-  }
-}
-
-.homework-item__deadline {
-  @include type.type-style('label-01');
-  color: var(--ted-color-text-helper);
-  margin-top: var(--ted-space-2xs);
-}
-
-.homework-item__status-badge {
-  margin-left: var(--ted-space-xs);
-  vertical-align: middle;
-}
-
-.homework-item__countdown {
-  text-align: right;
-  min-width: 5rem;
-  flex-shrink: 0;
-}
-
-.homework-item__action {
-  margin-top: var(--ted-space-xs);
-  display: flex;
-  justify-content: flex-end;
-
-  // Carbon reserves 3rem at the end of a button for an icon; "Yaptım" has
-  // none, so the button was 124px wide and on a phone pushed "İlk görülme"
-  // apart from its own time. The end padding matches the start.
-  .cds--btn:not(.cds--btn--icon-only) {
-    padding-inline-end: spacing.$spacing-05;
-  }
-}
-
-// ─── Homework Countdown Bar ─────────────────────────────────────────────
-.hw-countdown-bar {
-  height: 0.25rem;
-  background: var(--cds-layer-accent-01);
-  overflow: hidden;
-  margin-top: var(--ted-space-xs);
-}
-
-.hw-countdown-bar__fill {
-  height: 100%;
-  transition: width motion.$duration-slow-02 motion.motion(entrance, productive);
-
-  &--normal { background: var(--status-info); }
-  &--soon { background: var(--cds-border-strong-01); }
-  &--urgent { background: var(--status-error); }
-  &--critical {
-    background: var(--status-error);
-  }
-  &--expired { background: var(--cds-layer-active-01); }
-}
-
 // ─── Homework Modal ──────────────────────────────────────────────────────────
 .homework-modal__description {
   @include type.type-style('body-01');
@@ -1006,118 +897,13 @@ body {
   }
 }
 
-// ─── Homework Sections ───────────────────────────────────────────────────────
-// Exams ahead, on the İşler surface. Same row rhythm as a homework item so the
-// two kinds of owed work read as one list rather than two systems.
-.exams-ahead__list { list-style: none; margin: 0; padding: 0; }
-
-.exams-ahead__row {
-  display: flex;
-  align-items: baseline;
-  gap: var(--ted-space-sm, 0.5rem);
-  padding: spacing.$spacing-03 0;
-  border-bottom: 1px solid var(--ted-color-border-subtle);
-}
-
-.exams-ahead__row:last-child { border-bottom: 0; }
-
-.exams-ahead__course { font-weight: 600; color: var(--ted-color-text-primary); }
-
-.exams-ahead__title {
-  flex: 1 1 auto;
-  min-width: 0;
-  color: var(--ted-color-text-secondary);
-  // Wraps rather than cuts: on a phone "7. Sınıf MEB Ülke Geneli Türk…" hid
-  // which exam it was, with no way to read the rest.
-  overflow-wrap: anywhere;
-}
-
-.exams-ahead__all {
-  display: inline-flex;
-  align-items: center;
-  min-block-size: 1.5rem;   // WCAG 2.5.8: a 24px target, not an 18px line
-  margin-block-start: var(--ted-space-xs);
-}
-
-.exams-ahead__when {
-  @include type.type-style('body-compact-01');
-  flex: 0 0 auto;
-  color: var(--ted-color-text-secondary);
-}
-
+// ─── Exam list note ──────────────────────────────────────────────────────────
+// "Bazı ders duyuruları incelenemedi …" under an exam list (SinavKarti `IncelenmediNotu`): Sınavlar and İşler.
+// İşler's own rows and headings live in components/HomeworkTracker.scss since its redesign.
 .exams-ahead__not {
   @include type.type-style('helper-text-01');
   color: var(--cds-text-secondary);
   margin-block-start: spacing.$spacing-03;
-}
-
-.hw-section {
-  margin-top: var(--ted-space-md);
-
-  &:first-child { margin-top: var(--ted-space-sm); }
-}
-
-.hw-section__header {
-  display: flex;
-  align-items: center;
-  gap: var(--ted-space-xs);
-  margin-bottom: var(--ted-space-xs);
-  padding: 0;
-}
-
-.hw-section__header--toggle {
-  background: none;
-  border: none;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-  padding: var(--ted-space-2xs) 0;
-  border-radius: 0;   // a Carbon control is square
-}
-
-@media (any-hover: hover) {
-  .hw-section__header--toggle:hover {
-    background-color: var(--ted-color-layer-hover);
-
-    .hw-section__label { color: var(--ted-color-text-primary); }
-  }
-}
-
-.hw-section__label {
-  @include type.type-style('label-01');
-  font-weight: 600;
-  color: var(--ted-color-text-helper);
-  flex: 1;
-
-}
-
-.hw-section__count {
-  @include type.type-style('label-01');
-  font-weight: 600;
-  // Helper grey (gray-60) measured 4.24:1 here on 2026-09-21 — label-01 is
-  // 12px, so it needs 4.5. The secondary text token clears it at 5.92 on
-  // Carbon's own accent layer, which also retires a raw hex (D1).
-  color: var(--cds-text-secondary);
-  background: var(--cds-layer-accent-01);
-  padding: 1px spacing.$spacing-03;
-  border-radius: var(--ted-radius-pill);   // a count is a chip (S10)
-}
-
-// ─── Homework Left Border Status Colors ──────────────────────────────────────
-.homework-item--border-success.cds--tile {
-  border-left: 3px solid var(--status-success);
-}
-
-.homework-item--border-error.cds--tile {
-  border-left: 3px solid var(--status-error);
-}
-
-.homework-item--border-info.cds--tile {
-  border-left: 3px solid var(--status-info);
-}
-
-.homework-item--border-gray.cds--tile {
-  border-left: 3px solid var(--cds-border-subtle-00);
 }
 
 // ─── Homework Modal Enhanced ──────────────────────────────────────────────────
@@ -4738,11 +4524,6 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 //     because `both`/`forwards` fills would otherwise strand an element at
 //     opacity 0 and blank the card entirely.
 @media (prefers-reduced-motion: reduce) {
-  .tag-urgent,
-  .hw-countdown-bar__fill--critical {
-    animation: none;
-  }
-
   .dashboard-card,
   .health-popover,
   .calendar-popover {
@@ -4822,13 +4603,6 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 // The takvim card anchors its event popover.
 .calendar-card { position: relative; }
 
-// When the portal first showed a homework: quiet metadata under the deadline (B4: was an inline style).
-.homework-item__first-seen {
-  @include type.type-style('label-01');
-  color: var(--cds-text-secondary);
-  margin-top: spacing.$spacing-01;
-}
-
 // The health popover's per-section icons (B4: were inline colours). Status words, not support marks: the
 // icon sits beside text on the popover's white layer.
 .durum-ikonu { flex: none; }
@@ -4837,14 +4611,6 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 .durum-ikonu--hata { color: var(--status-error); }
 .durum-ikonu--kapali { color: var(--cds-support-caution-undefined); }
 .durum-ikonu--atlandi { color: var(--cds-text-helper); }
-
-// A "Yaptım" that could not be stored says so under its own button.
-.homework-item__error {
-  display: block;
-  @include type.type-style('helper-text-01');
-  color: var(--cds-text-error);
-  margin-top: var(--ted-space-2xs);
-}
 
 // D3b phone gate: a control the reader taps is at least 44px. spacing-09 is
 // 48px. Desktop sizes stay as they were.
@@ -4867,12 +4633,6 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
 
   // Accordion headings use the density height, measured 40px on Dersler.
   .course-content .cds--accordion__heading {
-    min-block-size: spacing.$spacing-09;
-  }
-
-  // İşler group headers (Tamamlandı, Yapılmayan) measured 26px. The toggle
-  // is the control; the plain "Yaklaşan Sınavlar" label is not one.
-  .hw-section__header--toggle {
     min-block-size: spacing.$spacing-09;
   }
 }

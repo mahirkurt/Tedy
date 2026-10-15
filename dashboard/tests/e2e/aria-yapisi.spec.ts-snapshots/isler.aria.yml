@@ -2,24 +2,20 @@
   - heading "İşler" [level=1]
   - text: Sıradaki
   - heading "Matematik — 2. HAFTA MATEMATİK HAFTA İÇİ ÖDEVİ" [level=2]
-  - text: /\d+ dakikayla başla/
+  - text: /Teslim yarın \d+:\d+ \d+ dakikayla başla/
   - button "Başla"
-  - button "Aktif ödevler 3" [expanded]
-  - text: Matematik
-  - button "2. HAFTA MATEMATİK HAFTA İÇİ ÖDEVİ"
-  - text: "/Teslim: \\d+ Eyl \\d+ \\d+:\\d+ 1g \\d+[hmsp]+/"
-  - button "Yaptım"
-  - text: Fransızca
-  - button "S1 Les verbes"
-  - text: "/Teslim: \\d+ Eyl \\d+ \\d+:\\d+ 3g \\d+[hmsp]+/"
-  - button "Yaptım"
-  - text: Fen Bilimleri
-  - button /Ödev \(Hibrit \d+-\d+\)/
-  - text: "/Teslim: \\d+ Eyl \\d+ \\d+:\\d+ 5g \\d+[hmsp]+/"
-  - button "Yaptım"
-  - text: Yaklaşan sınavlar 2
+  - heading "Ayrıca 2" [level=2]:
+    - button "Ayrıca 2" [expanded]
   - list:
-    - listitem: Matematik 1. Yazılı 7 gün sonra
-    - listitem: /Özdebir Gelişim İzleme Sınavı GİS · İzleme Sınavı \d+ gün sonra/
+    - listitem:
+      - button /Fransızca — S1 Les verbes Pazartesi \d+:\d+/
+      - button "Yaptım"
+    - listitem:
+      - button /Fen Bilimleri — Ödev \(Hibrit \d+-\d+\) Salı \d+:\d+/
+      - button "Yaptım"
+  - heading "Yaklaşan Sınavlar 2" [level=2]
   - link "Tüm sınavlar":
     - /url: /sinavlar
+  - list "Yaklaşan Sınavlar 2":
+    - listitem: /Matematik 1\. Yazılı 1 Eki \d+:\d+ · 7 gün sonra/
+    - listitem: /Özdebir Gelişim İzleme Sınavı GİS · İzleme Sınavı \d+ Eki \d+:\d+ · \d+ gün sonra/

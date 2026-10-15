@@ -19,7 +19,8 @@ for (const [ad, w, h] of [['masaüstü', 1440, 900], ['telefon', 390, 844]] as c
 
 // B2 (S11): a card is a layer and a hairline, not a shadow; B37: Carbon's tile padding at every width.
 test('a dashboard card has a border, no shadow and 16px padding', async ({ page }) => {
-  await sabitAc(page, '/isler', 1440, 900)
+  // On Notlar: İşler has no card since its redesign (2026-10-15).
+  await sabitAc(page, '/notlar', 1440, 900)
   const kart = await page.locator('.dashboard-card').first().evaluate(el => {
     const cs = getComputedStyle(el)
     return { golge: cs.boxShadow, kenar: cs.borderTopWidth, dolgu: cs.paddingTop }
@@ -29,14 +30,13 @@ test('a dashboard card has a border, no shadow and 16px padding', async ({ page 
   expect(kart.dolgu).toBe('16px')
 })
 
-// B31 ([3.1-2]): a block set inside a card sits one layer up — Carbon's <Layer>, not a hand-paired colour.
-test('İşler: the next-thing block is one Carbon layer above its card', async ({ page }) => {
+// B31 ([3.1-3]) answered by removal (İşler yenilemesi 2026-10-15, S52): the next thing and the lists stand on
+// the page, so no block sits inside a card — nothing on İşler is a card in a card.
+test('İşler: no card in a card — the panel and the lists stand on the page', async ({ page }) => {
   await sabitAc(page, '/isler', 1440, 900)
-  const katman = page.locator('.dashboard-card .cds--layer-two')
-  await expect(katman).toHaveCount(1)
-  await expect(katman.locator('.next-thing')).toHaveCount(1)
-  const zemin = await katman.evaluate(el => getComputedStyle(el).getPropertyValue('--cds-layer').trim())
-  expect(zemin).toBe('#f4f4f4')   // layer-02 in g10; the card is layer-01 (#ffffff)
+  await expect(page.locator('.isler > .next-thing')).toHaveCount(1)
+  await expect(page.locator('.isler .dashboard-card, .isler .cds--tile, .isler .cds--layer-two')).toHaveCount(0)
+  await expect(page.locator('.isler > .isler-bolum, .isler > .isler-liste')).not.toHaveCount(0)
 })
 
 // B11 (WCAG 2.4.1, 2.4.11): the first Tab stop skips to the content; a focused element is never under the

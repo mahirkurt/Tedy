@@ -37,11 +37,10 @@ test('work owed lives on one surface: homework and the exams ahead', async ({ pa
   // Assert the surface, not just the strings: Bugün also lists homework and
   // upcoming exams, so an unrouted /isler falling back to it would pass a test
   // that only looked for the text.
-  // The label is sentence case, in the DOM and on screen (S38). Waiting on it
-  // first is also what makes the URL read meaningful: the fallback would be a
-  // client-side redirect, which happens only after the app has mounted — and
-  // page.url() does not retry.
-  await expect(page.getByText('Aktif ödevler', { exact: true })).toBeVisible()
+  // İşler's own root (yenileme 2026-10-15: the one homework is the next thing, so no list heading is drawn).
+  // Waiting on it first is also what makes the URL read meaningful: the fallback would be a client-side
+  // redirect, which happens only after the app has mounted — and page.url() does not retry.
+  await expect(page.locator('.isler .next-thing')).toBeVisible()
   expect(new URL(page.url()).pathname).toBe('/isler')
 
   await expect(page.getByText('3 soru', { exact: false }).first()).toBeVisible()
@@ -94,14 +93,18 @@ test('the homework window close control is named Kapat', async ({ page }) => {
   await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0)
 })
 
-// B46 (D2): a homework row opens from the keyboard — its title is a real button, not a clickable Tile.
+// B46 (D2): a homework row opens from the keyboard — the row is Carbon's clickable contained-list item, a real
+// button (İşler yenilemesi 2026-10-15; it was the title inside a clickable Tile). The first homework is the next
+// thing, so the row is the second.
 test('a homework row opens by keyboard', async ({ page }) => {
   await mock(page)
+  await page.route('**/api/homework', r => r.fulfill(json({ summary: '', homework: [HW,
+    { ...HW, 'Ders Adı': 'Türkçe', 'Ödev Başlığı': 'Okuma', 'Ödev Son Teslim Tarihi': '18.09.2026 23:59' }] })))
   await page.goto('/isler')
-  const ac = page.locator('.homework-item').getByRole('button', { name: '3 soru', exact: true })
+  const ac = page.locator('.homework-item').getByRole('button', { name: /Okuma/ })
   await ac.focus()
   await expect(ac).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(page.getByRole('dialog')).toBeVisible()
-  await expect(page.getByRole('dialog').getByRole('heading', { name: '3 soru' })).toBeVisible()
+  await expect(page.getByRole('dialog').getByRole('heading', { name: 'Okuma' })).toBeVisible()
 })

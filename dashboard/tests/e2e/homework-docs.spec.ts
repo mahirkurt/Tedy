@@ -39,7 +39,8 @@ test('a document added on the homework is named there', async ({ page }) => {
 
   await page.clock.setFixedTime(new Date('2026-10-01T10:00:00Z'))
   await page.goto('/isler')
-  await page.getByText('Kesirler', { exact: true }).click()
+  // The one homework is the next thing (İşler yenilemesi 2026-10-15): "Başla" opens its window.
+  await page.getByRole('button', { name: 'Başla', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Kesirler', exact: true })).toBeVisible()
   await expect(page.getByText('yalnız bu ödev sorulurken')).toBeVisible()
 
@@ -89,7 +90,7 @@ test('removing a document asks first, names it and deletes only after confirmati
   })
   await page.clock.setFixedTime(new Date('2026-10-01T10:00:00Z'))
   await page.goto('/isler')
-  await page.getByText('Kesirler', { exact: true }).click()
+  await page.getByRole('button', { name: 'Başla', exact: true }).click()
   await expect(page.getByRole('link', { name: 'not.txt' })).toBeVisible()
 
   const kaldir = page.getByRole('button', { name: 'Kaldır: not.txt' })

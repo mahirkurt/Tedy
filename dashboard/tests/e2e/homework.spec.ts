@@ -52,7 +52,7 @@ async function open(page: Page, homework: Row[], summary = '') {
   // race under parallel load — the assertions then read an empty list.
   // Wait for the surface to have settled into one of its two states instead.
   await page.waitForURL('**/isler')
-  await page.locator('.homework-item, .tedy-empty, .hw-section').first()
+  await page.locator('.homework-item, .tedy-empty, .next-thing').first()
     .waitFor({ state: 'attached', timeout: 15000 })
 }
 
@@ -128,8 +128,9 @@ test('the work due soonest is at the top of the list, not the bottom', async ({ 
               'Ödev Son Teslim Tarihi': '20.09.2026 23:59' }),
   ])
 
-  const courses = await page.locator('.homework-item__course, .homework-item strong')
-    .allInnerTexts()
-  const seen = courses.map(c => c.trim()).filter(Boolean)
-  expect(seen.slice(0, 3)).toEqual(['Fen Bilimleri', 'Matematik', 'Türkçe'])
+  // İşler yenilemesi (2026-10-15): the soonest leads as the next thing, named once; the list is the rest, in
+  // the same order.
+  await expect(page.locator('.next-thing')).toContainText('Fen Bilimleri — 3 soru')
+  const rows = await page.locator('.isler-liste--sonra .homework-item .ted-subject-label__name').allInnerTexts()
+  expect(rows.map(c => c.trim())).toEqual(['Matematik — Sayfa 165', 'Türkçe — Okuma'])
 })
