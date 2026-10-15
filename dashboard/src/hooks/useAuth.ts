@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { girisHatasi } from '../utils/girisHatasi'
+import { girisBildirimi, type GirisBildirimi } from '../utils/girisHatasi'
 
 export type UserRole = 'full' | 'reader'
 
@@ -13,6 +13,9 @@ export interface User {
    *  addresses everyone else as family. */
   student: boolean
 }
+
+/** A sign-in either lets the person in or says why not, in the page's own words (B43). */
+export type GirisSonucu = { ok: true } | { ok: false; bildirim: GirisBildirimi }
 
 /** Anything the API does not label explicitly is treated as least privilege. */
 function toUser(data: Partial<User> | null | undefined): User {
@@ -49,7 +52,7 @@ export function useAuth() {
     checkSession()
   }, [checkSession])
 
-  const login = useCallback(async (credential: string): Promise<{ ok: boolean; error?: string }> => {
+  const login = useCallback(async (credential: string): Promise<GirisSonucu> => {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -61,9 +64,9 @@ export function useAuth() {
         setUser(toUser(await res.json()))
         return { ok: true }
       }
-      return { ok: false, error: girisHatasi(res.status) }
+      return { ok: false, bildirim: girisBildirimi(res.status) }
     } catch {
-      return { ok: false, error: girisHatasi(null) }
+      return { ok: false, bildirim: girisBildirimi(null) }
     }
   }, [])
 
