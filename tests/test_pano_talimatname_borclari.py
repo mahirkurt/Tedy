@@ -612,22 +612,26 @@ VIZ_DERS_AILESI = {  # tagPairs ders aileleri (carbon-v11-authority.json) — vi
 }
 
 
-def _viz_bloklari():
-    """Her tema seçicisi için o blokta bildirilen --viz-* değerleri."""
+def _viz_bloklari(ad_deseni: str = r"[a-z0-9-]+"):
+    """Her tema seçicisi için o blokta bildirilen --viz-* değerleri.
+
+    Varsayılan desen BÜTÜN `--viz-*` adlarını alır: kaskad hatası yalnız sayılı yuvaları değil
+    kardeş token'ları (grid, axis, track, sun, water, cloud) da vuruyordu.
+    """
     metin = SABLON.read_text(encoding="utf-8")
     bloklar = {}
     for eslesme in re.finditer(r"(?m)^(:root[^{\n]*|\[data-theme=\"[a-z0-9]+\"\])\{", metin):
         bas = eslesme.end()
         son = metin.index("}", bas)
         govde = metin[bas:son]
-        viz = dict(re.findall(r"--viz-([1-5])\s*:\s*(#[0-9a-fA-F]{6})", govde))
+        viz = dict(re.findall(rf"--viz-({ad_deseni})\s*:\s*(#[0-9a-fA-F]{{6}})", govde))
         if viz:
             bloklar.setdefault(eslesme.group(1), {}).update(viz)
     return bloklar
 
 
 def test_s19_viz_yuvalari_ders_ailesi_degil():
-    for secici, viz in _viz_bloklari().items():
+    for secici, viz in _viz_bloklari("[1-5]").items():
         for yuva, deger in viz.items():
             assert deger.lower() not in VIZ_DERS_AILESI, f"{secici} --viz-{yuva} ders ailesi tonu: {deger}"
 
@@ -659,7 +663,7 @@ VIZ_ZEMIN = {':root,[data-theme="g10"]': "#ffffff",
 
 
 def test_s19_viz_zemine_karsi_3_1():
-    bloklar = _viz_bloklari()
+    bloklar = _viz_bloklari("[1-5]")
     for secici, zemin in VIZ_ZEMIN.items():
         viz = bloklar.get(secici)
         assert viz, f"{secici} --viz-* bildirmiyor"
@@ -768,3 +772,52 @@ def test_4k_okuma_sutunu_rem():
     metin = SABLON.read_text(encoding="utf-8")
     bas = metin.index(".wrap{")
     assert "max-width:55rem" in metin[bas:metin.index("}", bas)], "okuma sutunu hala px"
+
+
+def test_s19_rol_alt_cizgisi_inise_bolunmez():
+    """`text-decoration-skip-ink` varsayilani `auto`: alt cizgiyi iniste (g, y, p, ç, ş) keser.
+
+    Turkce'de bu kural degil istisna: "gunaydin" solid iken ucte bolunup dashed gibi, "yesil" wavy
+    iken iki yaya dusup dash gibi okunuyordu. Rol isaretini renkten BICIME tasidiysak bicimin
+    glifden bagimsiz olmasi gerekir — eski `border-bottom` kesintisiz bir cizgiydi.
+    """
+    metin = SABLON.read_text(encoding="utf-8")
+    bas = metin.index(".tok .w{")
+    govde = metin[bas:metin.index("}", bas)]
+    assert "text-decoration-skip-ink:none" in govde.replace(" ", ""), \
+        "rol alt cizgisi iniste kesilir; text-decoration-skip-ink:none gerekli"
+
+
+def test_s19_oran_cubugunda_grup_siniri_gorunur():
+    """Notr rampada komsu yuvalar 1,25:1'dir; grup sinirini RENK tasiyamaz.
+
+    `vizChart` kategoriyi yerinde etiketle tasir, ama `fractionBar` bitisik <rect>'ler cizer ve
+    grup kimligini yalnizca dolgu tasiyordu: oran cubugunda "Kiz" nerede bitip "Erkek" nerede
+    basliyor gorunmuyordu. Cozum yapisal: gruplar rampanin UCLARINA yayilir ve sinira zemin
+    renginde bir ayirici konur (her iki temada bosluk gibi okunur).
+    """
+    svg = _grafik_calistir("fractionBar({kind:'ratio',ratio:[2,3],labels:['Kız','Erkek']})")
+    assert 'class="fb-sep"' in svg, "grup sinirinda ayirici yok"
+    kullanilan = [y for y in ("1", "2", "3", "4", "5") if f"var(--viz-{y})" in svg]
+    assert kullanilan == ["1", "5"], f"iki grup rampanin uclarina yayilmamis: {kullanilan}"
+
+    uc = _grafik_calistir("fractionBar({kind:'ratio',ratio:[1,1,1]})")
+    kullanilan3 = [y for y in ("1", "2", "3", "4", "5") if f"var(--viz-{y})" in uc]
+    assert kullanilan3 == ["1", "3", "5"], f"uc grup komsu yuva kullaniyor: {kullanilan3}"
+    assert uc.count('class="fb-sep"') == 2, "uc grupta iki ayirici olmali"
+
+
+def test_4k_oznitelikli_svgler_css_boyutu_tasir():
+    """Oznitelikle boyutlanan SVG rem'e cevrilmez: CSS boyutu olmazsa 4K'da yerinde kalir.
+
+    Panonun cozumu `:where(svg[width='N'][height='N'])` kurallariydi; spec §10.3 onlari
+    tasimamayi `icon()`'un CSS ile boyutlanmasina dayandirdi. Olculdu: iki yerde dayanak tutmuyor —
+    `.pacing-disk__ring` (width="28", kurali yalnizca `flex:none`) ve bolum resmi
+    (`icon(ref,"pic",96)`, `.pic`'in boyutu yok). Ikisi de 3840 px'te yerinde kalirdi.
+    """
+    metin = SABLON.read_text(encoding="utf-8")
+    for secici in (".pacing-disk__ring{", "figure.viz > .pic{"):
+        bas = metin.find(secici)
+        assert bas != -1, f"{secici} kurali yok"
+        govde = metin[bas:metin.index("}", bas)]
+        assert "width:" in govde and "rem" in govde, f"{secici} rem boyutu tasimiyor"

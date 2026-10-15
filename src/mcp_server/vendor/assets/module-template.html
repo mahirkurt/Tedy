@@ -220,6 +220,8 @@
      her tema kendi zeminine karşı ≥ 3:1 taşır. Tema bloklarında bildirilir: çıplak :root g100'ü ezer
      (eşit özgüllük, sonra gelen kazanır) ve koyu paleti ölü koda çevirirdi. */
   --viz-1:#161616; --viz-2:#262626; --viz-3:#393939; --viz-4:#525252; --viz-5:#6f6f6f;
+  --viz-grid:#e0e0e0; --viz-axis:#8d8d8d; --viz-track:#e0e0e0;
+  --viz-sun:#f1c21b; --viz-water:#1192e8; --viz-cloud:#c1c7cd;
   --cds-layer-hover-01:#e8e8e8; --cds-layer-active-01:#c6c6c6; --cds-layer-selected-01:#e0e0e0;
   --cds-layer-hover-02:#e8e8e8; --cds-layer-selected-02:#e0e0e0;
   --cds-layer-accent-01:#e0e0e0; --cds-layer-accent-hover-01:#d1d1d1;
@@ -257,6 +259,8 @@
   /* yüzeyler (@carbon/themes white) */
   --cds-background:#ffffff; --cds-layer-01:#f4f4f4; --cds-layer-02:#ffffff; --cds-layer-03:#f4f4f4;
   --viz-1:#161616; --viz-2:#262626; --viz-3:#393939; --viz-4:#525252; --viz-5:#6f6f6f;
+  --viz-grid:#e0e0e0; --viz-axis:#8d8d8d; --viz-track:#e0e0e0;
+  --viz-sun:#f1c21b; --viz-water:#1192e8; --viz-cloud:#c1c7cd;
   --cds-layer-hover-01:#e8e8e8; --cds-layer-active-01:#c6c6c6; --cds-layer-selected-01:#e0e0e0;
   --cds-layer-hover-02:#e8e8e8; --cds-layer-selected-02:#e0e0e0;
   --cds-layer-accent-01:#e0e0e0; --cds-layer-accent-hover-01:#d1d1d1;
@@ -378,8 +382,6 @@
   /* ders aksanı: rolleri aşağıdaki üretilmiş tedy:ders-renkleri bloğundan gelir (data-subject-family) */
   --accent:var(--subject-accent); --accent-strong:var(--subject-text);
   --accent-tint:var(--subject-surface); --accent-on:var(--subject-on-surface);
-  --viz-grid:#e0e0e0; --viz-axis:#8d8d8d; --viz-track:#e0e0e0;
-  --viz-sun:#f1c21b; --viz-water:#1192e8; --viz-cloud:#c1c7cd;
 }
 /* tedy:ders-renkleri */
 /* Üretilir: scripts/sync_carbon_tokens.py --write-subjects — elle düzenlemeyin. Kaynak:
@@ -453,7 +455,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .pacing-disk{display:inline-flex;align-items:center;gap:var(--sp-02);
   background:var(--tedy-brand-hover);border-radius:var(--radius-tag);padding:2px 2px 2px var(--sp-03)}
 .pacing-disk[hidden]{display:none}
-.pacing-disk__ring{flex:none}
+.pacing-disk__ring{flex:none;width:1.75rem;height:1.75rem}  /* öznitelikte 28 px: CSS boyutu olmadan 4K'da yerinde kalırdı */
 .pacing-disk__track{fill:none;stroke:var(--tedy-brand-rule);stroke-width:3}
 .pacing-disk__arc{fill:none;stroke:var(--cds-text-on-color);stroke-width:3;stroke-linecap:round}
 .pacing-disk__dismiss{width:1.375rem;height:1.375rem;border:none;background:transparent;color:var(--cds-text-on-color);
@@ -587,6 +589,8 @@ mark.term{background:var(--accent-tint);color:var(--accent-on);padding:0 .25em;b
 figure.viz{margin:var(--sp-06) 0;background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);
   border-radius:var(--cds-radius);padding:var(--sp-06);text-align:center}
 figure.viz svg{max-width:100%;height:auto;display:block;margin:0 auto}
+/* piktogram görseli öznitelikte 96 px gelir; .pic boyut vermediği için 4K'da yerinde kalırdı */
+figure.viz > .pic{width:6rem;height:6rem}
 figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:var(--cds-text-secondary)}
 .viz text{fill:var(--cds-text-primary);font-family:var(--font-sans)}
 .viz .viz-muted{fill:var(--cds-text-secondary)}
@@ -947,7 +951,11 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .tok{display:inline-flex;flex-direction:column;align-items:center;gap:3px}
 .tok .w{font-weight:600;padding-bottom:3px;
   text-decoration-line:underline;text-decoration-color:var(--cds-border-strong);
-  text-decoration-thickness:3px;text-underline-offset:3px}
+  text-decoration-thickness:3px;text-underline-offset:3px;
+  /* `skip-ink:auto` (varsayılan) alt çizgiyi inişlerde keser; Türkçe'de g, y, p, ç, ş, ğ yüzünden
+     bu kural, istisna değil — "günaydın" üçe bölünüp solid yerine dashed, "yeşil" iki yaya düşüp
+     wavy yerine dash okunuyordu. Biçim glifden bağımsız olmalı (eski border-bottom kesintisizdi). */
+  text-decoration-skip-ink:none}
 .tok .tg{font-size:.72rem;font-weight:600;color:var(--cds-text-secondary)}
 /* Rol BİÇİMLE ayrılır, renkle değil (S19): ders aileleri ders işaretine ayrılmıştır. Taşıyıcı
    zaten .tg etiketidir (yukarıdaki yorum: "DAİMA etiketle birlikte"); biçim ikincil, CVD-güvenli
@@ -3000,20 +3008,35 @@ const MODULE_DATA = {
     // seriler --viz-* paletinde; ders aksanı grafik serisi değildir (S19, B52)
     const PAL=["var(--viz-1)","var(--viz-2)","var(--viz-3)","var(--viz-4)","var(--viz-5)"];
     const EMPTY="var(--cds-layer-01)";
-    let cells=[], total=0, eq="", desc="", legend="";
+    /* Nötr rampada komşu adımlar 1,25:1'dir: grup sınırını RENK taşıyamaz (S19). vizChart
+       kategoriyi yerinde etiketle taşır, fractionBar ise bitişik <rect>'ler çizer — bu yüzden
+       gruplar rampanın uçlarına yayılır VE sınıra zemin renginde bir ayırıcı konur. Ayırıcı her
+       iki temada boşluk gibi okunur: açık temada dolgular koyu (gray100–60), koyuda açık
+       (gray10–50), zemin ise tersi. Sınırı yapı taşır, renk yalnız süsler. */
+    const yuvaSirasi = n => n<=1 ? [0]
+      : Array.from({length:n},(_,i)=>Math.round(i*(PAL.length-1)/(n-1))%PAL.length);
+    let cells=[], total=0, eq="", desc="", legend="", sinirlar=[];
     if(kind==="ratio"){
       const r=(spec.ratio||[]).map(n=>Math.max(0,Math.round(+n||0)));
       total=r.reduce((a,b)=>a+b,0)||1;
-      r.forEach((cnt,g)=>{ for(let k=0;k<cnt;k++) cells.push(PAL[g%PAL.length]); });
+      const sira=yuvaSirasi(r.length);
+      r.forEach((cnt,g)=>{
+        if(cnt>0 && cells.length) sinirlar.push(cells.length);
+        for(let k=0;k<cnt;k++) cells.push(PAL[sira[g]]);
+      });
       eq=r.join(" : ");
       const labs=spec.labels||[];
       desc="Oran çubuğu: "+(labs.length?labs.join(", ")+" olmak üzere ":"")+"gruplar "+r.join(" ye ")+" oranında bölünmüş.";
-      if(labs.length){ legend=`<div class="viz-legend">`+labs.map((l,i)=>`<span><i style="background:${PAL[i%PAL.length]}"></i>${esc(l)}</span>`).join("")+`</div>`; }
+      if(labs.length){ legend=`<div class="viz-legend">`+labs.map((l,i)=>`<span><i style="background:${PAL[sira[i%sira.length]]}"></i>${esc(l)}</span>`).join("")+`</div>`; }
     } else if(kind==="sum"){
       const den=Math.max(1,Math.round(+spec.den||1));
       const ad=(spec.addends||[]).map(n=>Math.max(0,Math.round(+n||0)));
       total=den; let placed=0;
-      ad.forEach((cnt,g)=>{ for(let k=0;k<cnt && placed<den;k++){ cells.push(PAL[g%PAL.length]); placed++; } });
+      const sira=yuvaSirasi(ad.length);
+      ad.forEach((cnt,g)=>{
+        if(cnt>0 && cells.length) sinirlar.push(cells.length);
+        for(let k=0;k<cnt && placed<den;k++){ cells.push(PAL[sira[g]]); placed++; }
+      });
       while(placed<den){ cells.push(EMPTY); placed++; }
       const sum=ad.reduce((a,b)=>a+b,0);
       const rhs = sum===den ? "1" : (sum+"\u2044"+den);
@@ -3032,12 +3055,14 @@ const MODULE_DATA = {
     for(let i=0;i<cells.length;i++){
       rects+=`<rect x="${(BARX+i*cw).toFixed(2)}" y="${BARY}" width="${cw.toFixed(2)}" height="${BARH}" fill="${cells[i]}" stroke="var(--cds-border-subtle)" stroke-width="1"/>`;
     }
+    const SEPW=3;
+    const seps=sinirlar.map(i=>`<rect class="fb-sep" x="${(BARX+i*cw-SEPW/2).toFixed(2)}" y="${BARY}" width="${SEPW}" height="${BARH}" fill="var(--cds-layer-01)"/>`).join("");
     const frame=`<rect x="${BARX}" y="${BARY}" width="${BARW}" height="${BARH}" fill="none" stroke="var(--cds-border-strong)" stroke-width="1.5"/>`;
     const eqTxt=`<text class="fb-eq" x="${W/2}" y="${EQY}" text-anchor="middle" font-size="22">${eq}</text>`;
     const title = kind==="ratio" ? "Oran modeli" : (kind==="sum" ? "Kesir toplamı modeli" : "Kesir modeli");
     const svg=`<svg class="viz fraction-bar" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="${tid} ${did}">`
       +`<title id="${tid}">${esc(title)}</title><desc id="${did}">${esc(spec.desc||desc)}</desc>`
-      +`${rects}${frame}${eqTxt}</svg>`;
+      +`${rects}${seps}${frame}${eqTxt}</svg>`;
     return `<figure class="viz viz--plain">${svg}${legend}${spec.caption?`<figcaption>${esc(spec.caption)}</figcaption>`:""}</figure>`;
   }
 

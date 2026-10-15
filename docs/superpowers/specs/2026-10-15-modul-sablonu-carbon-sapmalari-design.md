@@ -263,8 +263,11 @@ Sözleşme ayrıntıları:
    `:where(svg[width='N'][height='N'])` kuralı, Carbon React ikonlarının öznitelikle gelen 16 px'ini
    yakalamak içindir. Şablonun ikonları ise CSS ile boyutlanır: `icon()` (`module-template.html:1297`)
    `class="cds-icon"` yazar ve `size` verilmedikçe `width`/`height` özniteliği **koymaz**. Öznitelikli
-   tek tek SVG'ler (`120`, `32`, `28`) durağan işaretlemededir ve rem'e çevrilen `.cds-icon`
-   boyutlandırmasıyla ölçeklenir. Bu yüzden kural taşınmaz.
+   tek tek SVG'ler (`120`, `32`, `28`) durağan işaretlemededir. **Denetim turunda (2026-10-15) bu
+   dayanağın iki yerde tutmadığı ölçüldü** ve ikisine CSS boyutu verildi: `.pacing-disk__ring`
+   (`width="28"`, kuralı yalnız `flex:none`) ve bölüm resmi (`icon(ref,"pic",96)`, `.pic` boyut
+   vermiyor) — ikisi de 3840 px'te yerinde kalırdı. Kural yine taşınmadı, çünkü kalan öznitelikli
+   SVG'lerin sınıfları CSS boyutu taşıyor; kapı `test_4k_oznitelikli_svgler_css_boyutu_tasir`.
 4. `--sp-*` ve tipografi değişkenleri rem tabanlı olmalı; px olan varsa çevrilir.
 5. SVG `viewBox` değerleri birimsizdir, dokunulmaz; `font-size:10px` gibi SVG içi mutlak değerler
    rem'e çevrilir (`.quest-map__label`, `module-template.html:514`).
