@@ -963,3 +963,27 @@ def test_mukerrer_ders_satirinda_kimlik_formulu_degismez():
     grades = [_grade_row("Müzik", s1="90"), _grade_row("Müzik", s1="70")]
     [sinav] = [e for e in _sentetikler(_scraped_with_exams(grades=grades)) if e["course"] == "Müzik"]
     assert sinav["id"] == hashlib.md5("Müzik|1. Sınav|synthetic".encode()).hexdigest()[:12]
+
+
+def test_not_arama_tablosu_mukerrer_satirda_ilk_gercek_deger_kazanir():
+    grades = [_grade_row("Müzik", s1="90", s2="-"), _grade_row("Müzik", s1="70", s2="60")]
+    arama = dashboard_api._build_grade_lookup(grades)
+    assert arama["Müzik"] == {"1": "90", "2": "60"}
+
+
+def test_not_arama_tablosu_sonraki_bos_hucre_notu_silmez():
+    grades = [_grade_row("Müzik", s1="90"), _grade_row("Müzik", s1="-")]
+    assert dashboard_api._build_grade_lookup(grades)["Müzik"] == {"1": "90"}
+
+
+def test_mukerrer_satir_takvim_sinavinin_notunu_korur_ve_kimlikler_tekil():
+    grades = [_grade_row("Müzik", s1="90", s2="-"), _grade_row("Müzik", s1="-", s2="60")]
+    veri = _scraped_with_exams(
+        takvim=[_exam_event("5-6-7-8. SINIFLAR MÜZİK – 2. DÖNEM 1. YAZILI SINAVI", "2026-10-05T09:00:00")], grades=grades)
+    sinavlar = dashboard_api._sinav_listesi(veri, now=datetime(2026, 10, 16, 10))["exams"]
+    muzik1 = [e for e in sinavlar if e["course"] == "Müzik" and e["examNumber"] == 1]
+    assert len(muzik1) == 1 and muzik1[0]["grade"] == "90" and muzik1[0]["date"] is not None
+    muzik2 = [e for e in sinavlar if e["course"] == "Müzik" and e["examNumber"] == 2]
+    assert [e["grade"] for e in muzik2] == ["60"]
+    kimlikler = [e["id"] for e in sinavlar]
+    assert len(kimlikler) == len(set(kimlikler))

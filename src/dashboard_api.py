@@ -2605,12 +2605,14 @@ def _build_grade_lookup(grades_list):
         course = normalize_course(row.get("Ders", ""))
         if not course:
             continue
-        entry = {}
+        # A course can sit on two rows: the first real value per cell wins,
+        # a later row only fills a cell the earlier ones left "-" (same rule
+        # as the synthetic exams, so the two paths never disagree).
+        entry = lookup.setdefault(course, {})
         for col_num in ("1", "2", "3"):
             val = row.get(f"{col_num}. Sınav", "-")
-            if val and val != "-":
+            if val and val != "-" and col_num not in entry:
                 entry[col_num] = val
-        lookup[course] = entry
     return lookup
 
 
