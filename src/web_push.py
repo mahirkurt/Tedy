@@ -194,6 +194,11 @@ class AbonelikDeposu:
     def ekle(self, email: str, abonelik: dict) -> EkleSonucu:
         with self._kilitli():
             kisiler = self._oku_yazmak_icin()
+            # One endpoint is one device: a tablet shared by two people belongs to whoever
+            # subscribed on it last, or it would ring once per person who ever used it.
+            for baska, cihazlari in list(kisiler.items()):
+                if baska != email:
+                    kisiler[baska] = [c for c in cihazlari if _endpoint(c) != abonelik["endpoint"]]
             onceki = kisiler.get(email, [])
             cihazlar = [c for c in onceki if _endpoint(c) != abonelik["endpoint"]]
             sonuc = EkleSonucu(len(cihazlar) == len(onceki), not onceki)

@@ -99,11 +99,26 @@ def test_depo_iki_ornek_birbirini_ezmez(tmp_path):
 
 
 def test_depo_endpoint_sil_her_kisiden(tmp_path):
+    # A store written before a device had one owner can still list it under two people.
+    cihaz = {"abonelik": {"endpoint": "https://fcm.googleapis.com/fcm/send/abc", "keys": {"p256dh": P256, "auth": AUTH}},
+             "cihaz": "Tablet", "eklendi": "2026-10-17T09:00:00"}
+    (tmp_path / "a.json").write_text(json.dumps({"kisiler": {"isik@x": [cihaz], "anne@x": [cihaz]}}), encoding="utf-8")
     d = AbonelikDeposu(tmp_path / "a.json")
-    d.ekle("isik@x", abonelik_dogrula(abonelik()))
-    d.ekle("anne@x", abonelik_dogrula(abonelik()))
     assert d.endpoint_sil("https://fcm.googleapis.com/fcm/send/abc") == 2
     assert d.hepsi() == {}
+
+
+def test_depo_ortak_cihaz_son_abone_olana_gecer(tmp_path):
+    """A shared tablet signed in by two people is one device: it rings once, for whoever subscribed
+    last (final review, Minor 2)."""
+    d = AbonelikDeposu(tmp_path / "a.json")
+    d.ekle("isik@x", abonelik_dogrula(abonelik(cihaz="Tablet")))
+    d.ekle("isik@x", abonelik_dogrula(abonelik("https://web.push.apple.com/Z", cihaz="iPhone")))
+    assert d.ekle("anne@x", abonelik_dogrula(abonelik(cihaz="Tablet"))) == (True, True)
+    assert [c["cihaz"] for c in d.kisinin("isik@x")] == ["iPhone"]
+    assert [c["cihaz"] for c in d.kisinin("anne@x")] == ["Tablet"]
+    d.ekle("anne@x", abonelik_dogrula(abonelik("https://web.push.apple.com/Z", cihaz="iPhone")))
+    assert set(d.hepsi()) == {"anne@x"}        # isik@x has no device left: dropped from the store
 
 
 def test_depo_bozuk_dosya_bos_sayilir(tmp_path):
