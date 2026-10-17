@@ -89,7 +89,7 @@ Komut kalıpları (worktree kökünden):
 
 - Python testleri: `unshare -rn .venv/bin/python -m pytest -q <dosyalar>` (ağsız; tüm süit için dosya vermeden).
 - Birim (pano): `cd dashboard && node --test tests/<dosya>.test.ts`
-- e2e: `cd dashboard && npm run build:carbon-ai && TEDY_E2E_PORT=8391 env -u ANTHROPIC_API_KEY npx playwright test <spec> --retries=0`
+- e2e: `cd dashboard && npm run build && TEDY_E2E_PORT=8391 env -u ANTHROPIC_API_KEY npx playwright test <spec> --retries=0` (main ad9cc03 ile birleşmeden önceki görevler `npm run build:carbon-ai` kullandı; o betik main'de yok)
 
 ---
 
@@ -4637,9 +4637,11 @@ cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/sinav-uyari    # worktree'n
 
 Kod worktree'den, veri canlı `output/scraped_data.json` ve portal eklerinden okunur; önbellek (`sinav_cikarim_onbellegi.json`) ve bütçe defteri **canlı** `output/`'a yazılır (bir sonraki gerçek tespit aynı metinler için ücret ödemez), `sinavlar.json` yazılmaz — bu, onay sorusunda kullanıcıya söylenir. Sonucu kullanıcıya göster: bulunan sınavlar, tarihleri, konuları, kaynakları; Matematik KTT (15 Ekim, beş konu), Fen quiz (5 Ekim haftası), İngilizce quiz'ler, GİS-1/GİS-2, Türkçe Ortak Yazılı, Sebit TM/FS beklenir. Kaçan ya da yanlış varsa kural/istem düzeltilir (yeni TDD döngüsü), kuru koşu tekrarlanır.
 
-- [ ] **Adım 2: Dalı birleştir ve panoyu dağıt** — kullanıcıya sor. Onayla: paylaşılan checkout kuralı (ancestry-guarded fast-forward, `main`'i başka oturum ilerletmişse rebase) ile `main`'e al; canlı checkout'ta `cd dashboard && npm run build:carbon-ai` (asistan bayrağı `.env.production`'da) ve `systemctl --user restart ted-dashboard`. Bir sonraki senkronda `sinavlar.json` oluşur; `/api/exams` ve panoyu kontrol et. Bildirim hâlâ kapalı.
+- [ ] **Adım 2: Dalı birleştir ve panoyu dağıt** — kullanıcıya sor. Onayla: paylaşılan checkout kuralı (ancestry-guarded fast-forward, `main`'i başka oturum ilerletmişse rebase) ile `main`'e al; canlı checkout'ta `cd dashboard && npm ci` (yalnız `package-lock.json` değiştiyse; `IBM_TELEMETRY_DISABLED=true`) `&& npm run build` (main'in tek derleme komutu: `build:carbon-ai` ve `.env.production` Görev 21'de, 2026-10-11, kalktı) ve `systemctl --user restart ted-dashboard`. Bir sonraki senkronda `sinavlar.json` oluşur; `/api/exams` ve panoyu kontrol et. Bildirim hâlâ kapalı.
 
 - [ ] **Adım 3: VAPID, pywebpush, zamanlayıcı** — kullanıcıya sor. Onayla (canlı checkout'ta):
+
+**Uyarı:** `anahtar-uret` yalnız bir kez ve `--degistir`'siz koşulur. `--degistir` VAPID çiftini değiştirir ve **bütün abonelikleri geçersiz kılar** (push servisi eski anahtara bağlı aboneliği reddeder; ölü diye silinir); cihazlar ancak pano yeniden açılınca yeni anahtarla abone olur (açılışta yeniden abonelik). Değişiklikten sonra da `ted-dashboard` yeniden başlatılır.
 
 ```bash
 .venv/bin/python -m src.web_push anahtar-uret
@@ -4652,7 +4654,13 @@ systemctl --user list-timers | grep sinav
 
 Kullanıcı ve bir aile üyesi kendi telefonlarında Sınavlar → "Sınav uyarıları" → "Bu cihazda aç" → "Deneme bildirimi gönder" yapar (iPhone'da önce Ana Ekrana Ekle).
 
-- [ ] **Adım 4: Bildirimleri aç** — kullanıcıya sor. Onayla:
+- [ ] **Adım 4: Bildirimleri aç** — kullanıcıya sor. Önce tohumlama kapısı: son tespit turu bütün adayları incelemiş olmalı — incelenemeyen bir duyuru sonradan okunursa tohumlanmamış "yeni" sayılır ve sel olur. `0` değilse bir sonraki senkronu bekle (bütçe/süre yetmemiş olabilir) ya da `hatalar`'a bak; tohumlama yapılmaz.
+
+```bash
+.venv/bin/python -c "import json; o = json.load(open('output/sinavlar.json'))['ozet']; print(o); raise SystemExit(o['incelenmedi'] != 0)"
+```
+
+Kapı geçince onayla:
 
 ```bash
 .venv/bin/python -m src.sinav_uyari tohumla          # bilinen sınavlar için sel yok
@@ -4661,6 +4669,6 @@ systemctl --user restart ted-dashboard
 systemctl --user start tedy-sinav-uyari.service && cat output/sinav_uyari_durumu.json
 ```
 
-Geri dönüş: `systemctl --user disable --now tedy-sinav-uyari.timer` ve `env_prep ayarla TEDY_SINAV_UYARI --stdin --degistir <<< "0"`.
+Geri dönüş: `systemctl --user disable --now tedy-sinav-uyari.timer`, `env_prep ayarla TEDY_SINAV_UYARI --stdin --degistir <<< "0"` ve `systemctl --user restart ted-dashboard` (pano bayrağı süreç açılışında okur; yeniden başlatılmazsa kart "açık" demeye devam eder).
 
 - [ ] **Adım 5: Belleği güncelle** — `~/.claude/projects/-mnt-thunderbolt-workspaces/memory/` altında TEDY sınav uyarısı durumu (tarih, commit, açık/kapalı, geri dönüş) tek dosya + `MEMORY.md` satırı.
