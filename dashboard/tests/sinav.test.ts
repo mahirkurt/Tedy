@@ -7,7 +7,8 @@ import { execFileSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 import type { ExamItem } from '../src/types.ts'
 
-const SIMDI = new Date('2026-10-16T10:00:00').getTime()
+// İstanbul saatiyle sabit an: etiket damgaları +03:00 okunur (C18), test her TZ'de aynı sonucu verir.
+const SIMDI = Date.parse('2026-10-16T10:00:00+03:00')
 const s = (kw: Partial<ExamItem>): ExamItem => ({
   id: 'x', course: 'Matematik', title: 'Matematik KTT', rawTitle: 'Matematik KTT', courseColor: '#000',
   examNumber: null, date: '2026-10-20', endDate: null, allDay: true, status: 'upcoming', grade: null,
