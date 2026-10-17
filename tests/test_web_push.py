@@ -62,6 +62,8 @@ def test_dogrula_bilinen_servisler(endpoint):
     abonelik("https://fcm.googleapis.com/a\nb"), abonelik("https://fcm.googleapis.com/ü"),
     {**abonelik(), "keys": {"p256dh": P256 + "!", "auth": AUTH}},
     {**abonelik(), "keys": {"p256dh": P256, "auth": AUTH + "+"}},
+    {**abonelik(), "keys": {"p256dh": P256 + "=\n", "auth": AUTH}},         # `$` used to let a trailing newline pass
+    {**abonelik(), "keys": {"p256dh": P256, "auth": AUTH + "==\n"}},
     {**abonelik(), "keys": {"p256dh": "kısa", "auth": AUTH}},
     {**abonelik(), "keys": {"p256dh": P256}},
     {**abonelik(), "endpoint": "https://fcm.googleapis.com/" + "x" * 2100},
@@ -116,6 +118,28 @@ def test_depo_bozuk_dosya_yazarken_kenara_alinir(tmp_path):
     assert d.hepsi() == {} and yol.read_text(encoding="utf-8") == "{bozuk"       # reading never touches it
     assert d.ekle("isik@x", abonelik_dogrula(abonelik())) == (True, True)
     assert (tmp_path / "a.json.bozuk-20261017090807").read_text(encoding="utf-8") == "{bozuk"
+    assert [c["cihaz"] for c in d.kisinin("isik@x")] == ["Android"]
+
+
+def test_depo_gecersiz_utf8_okurken_bos_yazarken_kenara(tmp_path):
+    yol = tmp_path / "a.json"
+    yol.write_bytes(b"\xff\xfe{bozuk")
+    d = AbonelikDeposu(yol, simdi=lambda: datetime(2026, 10, 17, 9, 8, 7))
+    assert d.hepsi() == {} and d.kisinin("isik@x") == [] and yol.read_bytes() == b"\xff\xfe{bozuk"
+    assert d.ekle("isik@x", abonelik_dogrula(abonelik())) == (True, True)
+    assert (tmp_path / "a.json.bozuk-20261017090807").read_bytes() == b"\xff\xfe{bozuk"
+    assert [c["cihaz"] for c in d.kisinin("isik@x")] == ["Android"]
+
+
+@pytest.mark.parametrize("icerik", [[], {}, {"kisiler": []}, {"kisiler": "x"}, "x", 5])
+def test_depo_yanlis_ust_sekil_yazarken_kenara(tmp_path, icerik):
+    yol = tmp_path / "a.json"
+    yol.write_text(json.dumps(icerik), encoding="utf-8")
+    d = AbonelikDeposu(yol, simdi=lambda: datetime(2026, 10, 17, 9, 8, 7))
+    assert d.hepsi() == {}
+    assert json.loads(yol.read_text(encoding="utf-8")) == icerik                 # reading leaves it alone
+    assert d.ekle("isik@x", abonelik_dogrula(abonelik())) == (True, True)
+    assert json.loads((tmp_path / "a.json.bozuk-20261017090807").read_text(encoding="utf-8")) == icerik
     assert [c["cihaz"] for c in d.kisinin("isik@x")] == ["Android"]
 
 

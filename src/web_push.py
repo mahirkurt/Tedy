@@ -30,7 +30,7 @@ ABONELIKLER = PurePosixPath("output/bildirim_abonelikleri.json")
 _ENDPOINT_SINIRI = 2000
 _CIHAZ_SINIRI = 80
 CIHAZ_SINIRI = 10          # devices kept per person; the oldest goes when an 11th arrives
-_B64URL = re.compile(r"^[A-Za-z0-9_-]+={0,2}$")
+_B64URL = re.compile(r"[A-Za-z0-9_-]+={0,2}")
 
 
 def _b64(veri: bytes) -> str:
@@ -38,7 +38,7 @@ def _b64(veri: bytes) -> str:
 
 
 def _b64_bayt(deger: Any) -> bytes | None:
-    if not isinstance(deger, str) or not deger or len(deger) > 200 or not _B64URL.match(deger):
+    if not isinstance(deger, str) or not deger or len(deger) > 200 or not _B64URL.fullmatch(deger):
         return None
     try:
         return base64.urlsafe_b64decode(deger + "=" * (-len(deger) % 4))
@@ -138,9 +138,12 @@ class AbonelikDeposu:
             yield
 
     def _oku_ham(self) -> tuple[dict[str, list[dict]], bool]:
-        """(people, unreadable). Unreadable means the file exists but is not JSON."""
+        """(people, unreadable). Unreadable means the file exists but is not what we wrote:
+        not UTF-8, not JSON, or JSON of the wrong top-level shape."""
         try:
             metin = self.yol.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            return {}, True
         except OSError:
             return {}, False
         try:
@@ -149,7 +152,7 @@ class AbonelikDeposu:
             return {}, True
         kisiler = veri.get("kisiler") if isinstance(veri, dict) else None
         if not isinstance(kisiler, dict):
-            return {}, False
+            return {}, True
         return {e: [c for c in v if _gecerli_cihaz(c)] for e, v in kisiler.items()
                 if isinstance(e, str) and isinstance(v, list)}, False
 
