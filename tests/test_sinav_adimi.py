@@ -228,3 +228,39 @@ def test_a22_eski_surum_onceki_dosya_ilk_kurulum_sayilmaz(tmp_path):
     belge = GERCEK_TESPIT(tmp_path, haftalar_verisi(), [], simdi, time.monotonic() + 60,
                           okuyucu=_sahte_okuyucu())
     assert belge["sinavlar"][0]["ilk_tespit"] == simdi.isoformat(timespec="seconds")
+
+
+def test_a21_bozuk_sinav_suresi_varsayilana_duser(monkeypatch):
+    monkeypatch.delenv("TEDY_SINAV_SURE_DENEME", raising=False)
+    assert run_sync._ortam_saniyesi("TEDY_SINAV_SURE_DENEME", 45) == 45
+    for deger, beklenen in (("30", 30), (" 60 ", 60), ("abc", 45), ("", 45), ("4.5", 45), ("-5", 45)):
+        monkeypatch.setenv("TEDY_SINAV_SURE_DENEME", deger)
+        assert run_sync._ortam_saniyesi("TEDY_SINAV_SURE_DENEME", 45) == beklenen, deger
+
+
+def test_a21_bozuk_sinav_suresiyle_ice_aktarma_dusmez():
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    kok = Path(__file__).resolve().parents[1]
+    sonuc = subprocess.run([sys.executable, "-c", "import src.run_sync as r; print(r.SINAV_SURE)"],
+                           cwd=kok, env={**os.environ, "TEDY_SINAV_SURE": "kırk beş"},
+                           capture_output=True, text=True, timeout=120)
+    assert sonuc.returncode == 0, sonuc.stderr[-500:]
+    assert sonuc.stdout.strip().splitlines()[-1] == "45"
+
+
+def test_a22_main_saglikta_sinav_anahtarlarini_yazar(tmp_path, monkeypatch):
+    from tests.test_portal_ekleri_sync import _basarili_main
+
+    def sahte_tespit(kok_, veri, taban, simdi, bitis, okuyucu=None):
+        # The alert timer's last round, as src/sinav_uyari.py leaves it beside the sync's output.
+        (tmp_path / "output/sinav_uyari_durumu.json").write_text(
+            '{"son_tur": "2026-10-16T10:00:00", "gonderilen": 1}', encoding="utf-8")
+        return BELGE
+    monkeypatch.setattr(st, "tespit_et", sahte_tespit)
+    out = _basarili_main(tmp_path, monkeypatch, lambda *a, **k: {"toplam": 0}, lambda project_root: {})
+    saglik = json.loads((out / "health.json").read_text(encoding="utf-8"))
+    assert saglik["sinav_tespiti"]["sinav"] == 1 and saglik["sinav_tespiti"]["aday"] == 3
+    assert saglik["sinav_uyari"] == {"son_tur": "2026-10-16T10:00:00", "gonderilen": 1}

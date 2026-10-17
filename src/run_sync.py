@@ -180,7 +180,18 @@ def _kisa_hata(e):
     return ilk[:160]
 
 
-SINAV_SURE = int(os.environ.get("TEDY_SINAV_SURE", "45"))
+def _ortam_saniyesi(ad, varsayilan):
+    """A whole number of seconds from the environment; anything else (a typo, a
+    decimal, a negative) is the default. Read at import: a bad value must not
+    stop every sync before it starts."""
+    try:
+        deger = int(str(os.environ.get(ad, "")).strip())
+    except ValueError:
+        return varsayilan
+    return deger if deger >= 0 else varsayilan
+
+
+SINAV_SURE = _ortam_saniyesi("TEDY_SINAV_SURE", 45)
 # Health and the reindex still have to fit after the step.
 SINAV_YEDEK_SURE = 120
 
