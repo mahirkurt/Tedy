@@ -66,7 +66,16 @@ export type ModuleTheme = 'g10' | 'g100' | 'white'
  */
 export const DASHBOARD_THEME: ModuleTheme = 'g10'
 
-/** Parent → module: which Carbon theme to render in. Carries no progress and is never stored. */
-export function appearanceMessage(theme: ModuleTheme) {
-  return { type: 'edupedia:appearance', v: 1, theme } as const
+/** Parent → module: which Carbon theme to render in, and the host's computed root font size.
+ *  Carries no progress and is never stored.
+ *
+ *  `rootPx` is optional on purpose (spec §10.2): the module clamps it to 12–48px and ignores a
+ *  non-number, and without the field it stays at 16px — so a standalone module at
+ *  modul.tedy.online and an older host both keep working. The module cannot derive the scale
+ *  itself: inside the frame `100vw` is the frame's width, which is the dashboard's column minus
+ *  its page padding, so a CSS rule would couple module type size to dashboard layout. */
+export function appearanceMessage(theme: ModuleTheme, rootPx?: number) {
+  return rootPx === undefined
+    ? ({ type: 'edupedia:appearance', v: 1, theme } as const)
+    : ({ type: 'edupedia:appearance', v: 1, theme, rootPx } as const)
 }

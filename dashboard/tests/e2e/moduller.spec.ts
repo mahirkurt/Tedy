@@ -348,6 +348,58 @@ test('a theme the student picks in the module is not overridden', async ({ page 
   await expect(frame.locator('html')).toHaveAttribute('data-theme', 'g100')
 })
 
+test('the dashboard tells the module its root font size, and the module clamps it', async ({ page }) => {
+  // 4K (spec §10.2): the frame is a separate document and does not inherit the host's clamp(), so
+  // the host reports its computed root size. The module validates it the way it validates the
+  // theme — the frame is opaque-origin, so the value is never trusted as sent.
+  await recordProgress(page)
+  await serveModule(page)
+  await page.goto('/moduller/fen5-su/v1')
+  const frame = page.frameLocator('iframe.module-frame')
+  await expect(frame.locator('html')).toHaveAttribute('data-theme', 'g10')
+
+  const bildir = (rootPx: unknown) => page.evaluate((px) => {
+    const f = document.querySelector('iframe.module-frame') as HTMLIFrameElement
+    f.contentWindow!.postMessage({ type: 'edupedia:appearance', v: 1, theme: 'g10', rootPx: px }, '*')
+  }, rootPx)
+  const kokBoyu = () => frame.locator('html').evaluate(e => (e as HTMLElement).style.fontSize)
+
+  await bildir(32)
+  await expect.poll(kokBoyu).toBe('32px')
+
+  // Aralık dışı: kıstırılır, olduğu gibi uygulanmaz.
+  await bildir(999)
+  await expect.poll(kokBoyu).toBe('48px')
+
+  // Sayı değil: yok sayılır — NaNpx yazılmaz, son geçerli değer kalır.
+  await bildir('otuziki')
+  await expect.poll(kokBoyu).toBe('48px')
+})
+
+test('the module inside the frame scales with the dashboard at 4K', async ({ page }) => {
+  // The thin frame-geometry assertion: ekran-4k.spec.ts iterates SAYFALAR, which has /moduller
+  // (the catalogue) but never /moduller/<slug>/v<N>, and never enters iframe.module-frame — so
+  // nothing else measures geometry INSIDE the module. This walks the whole chain: host clamp →
+  // rootPx message → module root → rem-sized reading column.
+  await recordProgress(page)
+  await serveModule(page)
+  const olc = async (w: number, h: number) => {
+    await page.setViewportSize({ width: w, height: h })
+    await page.goto('/moduller/fen5-su/v1')
+    const frame = page.frameLocator('iframe.module-frame')
+    await expect(frame.locator('html')).toHaveAttribute('data-theme', 'g10')
+    return frame.locator('.wrap').evaluate(e => ({
+      kok: parseFloat(getComputedStyle(document.documentElement).fontSize),
+      wrap: e.getBoundingClientRect().width,
+    }))
+  }
+  const kucuk = await olc(1920, 1080)
+  const buyuk = await olc(3840, 2160)
+  expect(kucuk.kok).toBeCloseTo(16, 1)
+  expect(buyuk.kok).toBeCloseTo(32, 1)
+  expect(buyuk.wrap / kucuk.wrap).toBeGreaterThan(1.9)
+})
+
 test('a refused ticket is explained, not blank', async ({ page }) => {
   await page.route('**/api/modules/fen5-su/v1/ticket', r => r.fulfill({ status: 403, contentType: 'application/json',
     body: JSON.stringify({ error: 'session_required' }) }))

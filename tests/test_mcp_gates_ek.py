@@ -63,7 +63,9 @@ def test_appearance_message_is_allowed_but_not_required():
     # before it existed carry only progress/restore and must still pass.
     assert '"edupedia:appearance"' in ENGINE
     assert _run(gates_ek.gate_bridge, ENGINE)["G-BRIDGE"]["status"] == "PASS"
-    line = 'if(d.type === "edupedia:appearance"){ adoptHostTheme(d.theme); return; }'
+    # 2026-10-15: the branch also adopts the host's root font size (spec §10.2). rootPx is a
+    # FIELD, not a new message type, so G-BRIDGE is unchanged — this test is what proves that.
+    line = 'if(d.type === "edupedia:appearance"){ adoptHostTheme(d.theme); adoptHostRootSize(d.rootPx); return; }'
     assert line in ENGINE
     assert _run(gates_ek.gate_bridge, ENGINE.replace(line, "", 1))["G-BRIDGE"]["status"] == "PASS"
 

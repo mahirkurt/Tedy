@@ -73,12 +73,16 @@ Tema, kimlik bandı, köşe, gölge ve oyunlaştırma kuralları: `tedy-integrat
 
 ## 7. Veri görselleştirme renkleri (`--viz`)
 
-- **Ne oldukları.** `--viz-1..5` Carbon'un kategorik tonlarından Tedy anlam renklerini
-  (kırmızı, yeşil, sarı, turuncu) dışarıda bırakan bir **TEDY alt kümesidir** (S19): açık temada
-  purple70 · blue80 · cyan50 · teal60 · magenta70, g100'de aynı ailelerin 40 adımı. Resmî Carbon
-  5-renk gruplarından hiçbirine uymazlar; açık temanın resmî 5'li grupları Red 90 içerdiği için
-  olduğu gibi alınamaz. Yuvaların bir Carbon grubuna yaklaştırılması şablon değişikliğidir — **açık madde**
-  (`carbon-sources.md` §4).
+- **Ne oldukları (2026-10-15'ten beri).** `--viz-1..5` bir **nötr gri rampadır** ve kategori
+  taşıyıcısı **değildir** (S19): açık temada gray100 · gray90 · gray80 · gray70 · gray60, g100'de
+  gray10 · gray20 · gray30 · gray40 · gray50. Kategoriyi yazı taşır — grafikte her çubuğun/noktanın
+  yanındaki yerinde etiket, dilbilgisi çözümlemesinde alt çizginin biçimi.
+  **Neden renk değil:** ders aileleri ders işaretine, kırmızı/yeşil/sarı/turuncu anlama ayrılmıştır
+  (İ8); ikisini çıkarınca kategorik palete yedek hue kalmaz. Önceki beş yuva
+  (purple70 · blue80 · cyan50 · teal70 · magenta70 ve g100'de aynı ailelerin 40 adımı) tam olarak
+  ders aileleriydi, yani grafik kategorisi ile ders işareti aynı görünüme düşüyordu (§7.5 P5).
+  Her yuva kendi temasının `--cds-layer-01` zeminine karşı ≥ 3:1 taşır; kapı
+  `test_s19_viz_zemine_karsi_3_1`.
 - **Sıra.** Seriler `--viz-1`'den başlayarak sırayla atanır; sıra keyfi değiştirilmez. Tek seri
   `--accent` kullanır. 5 seriyi aşan veri doğrudan etiket ya da desenle ayrışır; anlam renkleri
   hiçbir zaman seri rengi olmaz.

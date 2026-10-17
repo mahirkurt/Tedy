@@ -33,6 +33,19 @@ A3K_PASSWORD = os.environ.get("A3K_PASSWORD", "")
 CORE_STEPS = {"Ready", "Read", "Respond", "Reflect", "Write"}
 
 
+class LevelSetBekliyor(RuntimeError):
+    """The account is parked on its unfinished LevelSet reading test.
+
+    Measured 2026-10-10: the login completes and the portal lands on
+    /kb/levelset/welcome ("We need you to complete the reading test you
+    started the last time you were using Achieve3000 Literacy"), and from
+    there /api/v1/student/my-lessons answers 200 with the login page's HTML
+    rather than JSON. Nothing can be read until a human finishes that test,
+    so this is reported as itself — not as a login that "may have failed",
+    which sent the reader looking at the password.
+    """
+
+
 def create_driver():
     opts = Options()
     opts.add_argument("--headless=new")
@@ -80,8 +93,13 @@ def a3k_login(driver):
     if "/home" in driver.current_url:
         print("[A3K] Login successful")
         return True
-    print(f"[A3K] Login may have failed: {driver.current_url}")
     driver.save_screenshot(os.path.join(OUTPUT_DIR, "a3k_login_fail.png"))
+    if "/kb/levelset/" in driver.current_url:
+        raise LevelSetBekliyor(
+            "LevelSet okuma testi yarım kalmış; Işık portalda testi bitirene "
+            "kadar ders verisi okunamıyor"
+        )
+    print(f"[A3K] Login may have failed: {driver.current_url}")
     return False
 
 
@@ -230,7 +248,11 @@ def scrape():
 
 
 def main():
-    progress = scrape()
+    try:
+        progress = scrape()
+    except LevelSetBekliyor as e:
+        print(f"[A3K] {e}")
+        sys.exit(1)
     if not progress:
         print("[A3K] Scraping failed")
         sys.exit(1)

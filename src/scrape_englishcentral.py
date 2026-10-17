@@ -7,6 +7,7 @@ output/englishcentral_progress.json.
 """
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime
@@ -15,8 +16,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.chdir(os.path.join(os.path.dirname(__file__), ".."))
 
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
 
 from src.json_utils import atomic_json_dump
 from src.env_loader import load_env
@@ -28,7 +31,14 @@ PROGRESS_FILE = os.path.join(OUTPUT_DIR, "englishcentral_progress.json")
 
 EC_EMAIL = os.environ.get("EC_EMAIL", "")
 EC_PASSWORD = os.environ.get("EC_PASSWORD", "")
-CLASS_ID = os.environ.get("EC_CLASS_ID", "204944")
+
+# Submitting the login form starts a redirect chain, not a single navigation.
+# Measured 2026-10-10: tr.englishcentral.com/browse/videos →
+# www.englishcentral.com/browse/videos?enableInitialSteps=1 at t+3.6s →
+# www.englishcentral.com/myclass/<id>/0 at t+6.7s. The class address is the
+# one that means "logged in", and it carries the class id.
+LOGIN_TIMEOUT = 30
+MYCLASS_PATTERN = re.compile(r"/myclass/(\d+)")
 
 # Activity type IDs → human-readable names
 ACTIVITY_TYPES = {
@@ -113,7 +123,15 @@ def create_driver():
 
 
 def ec_login(driver):
-    """Login to English Central via the modal dialog."""
+    """Login to English Central via the modal dialog.
+
+    Returns the class id the portal redirects to, or None if it never gets
+    there. The id is read from the landing URL rather than configured: the
+    student moves to a new class every school year (204944 in 6C, 239635 in
+    7D as of 2026-10-10) and the old id now redirects to /dashboard/myfeed,
+    where the class video API is never called — measured 0 video ids against
+    2 for the live class, with no error anywhere.
+    """
     driver.get("https://tr.englishcentral.com/browse/videos")
     time.sleep(3)
     driver.find_element(By.ID, "sign-in-button").click()
@@ -129,15 +147,19 @@ def ec_login(driver):
         if "giriş" in btn.text.strip().lower():
             btn.click()
             break
-    time.sleep(5)
-    if "/myclass/" in driver.current_url:
-        print("[EC] Login successful")
-        return True
-    print(f"[EC] Login may have failed: {driver.current_url}")
-    driver.save_screenshot(
-        os.path.join(OUTPUT_DIR, "ec_login_fail.png")
-    )
-    return False
+    try:
+        eslesme = WebDriverWait(driver, LOGIN_TIMEOUT).until(
+            lambda d: MYCLASS_PATTERN.search(d.current_url)
+        )
+    except TimeoutException:
+        print(f"[EC] Login failed: {driver.current_url}")
+        driver.save_screenshot(
+            os.path.join(OUTPUT_DIR, "ec_login_fail.png")
+        )
+        return None
+    class_id = eslesme.group(1)
+    print(f"[EC] Login successful (class {class_id})")
+    return class_id
 
 
 def collect_responses(driver):
@@ -228,7 +250,8 @@ def scrape():
     driver = create_driver()
 
     try:
-        if not ec_login(driver):
+        class_id = ec_login(driver)
+        if not class_id:
             return None
 
         all_video_ids = []
@@ -240,7 +263,7 @@ def scrape():
         # all API responses automatically.
         myclass_url = (
             f"https://www.englishcentral.com/myclass/"
-            f"{CLASS_ID}/0/videos"
+            f"{class_id}/0/videos"
         )
         driver.get(myclass_url)
         time.sleep(8)
@@ -322,8 +345,7 @@ def scrape():
         completed_count = sum(1 for v in videos if v["completed"])
         progress = {
             "scraped_at": datetime.now().isoformat(),
-            "class_name": "6C",
-            "class_id": int(CLASS_ID),
+            "class_id": int(class_id),
             "total_videos": len(videos),
             "completed_videos": completed_count,
             "videos": videos,

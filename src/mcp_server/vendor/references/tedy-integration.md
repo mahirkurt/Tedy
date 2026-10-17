@@ -28,7 +28,6 @@ ve birkaç `opacity` (.6 / .78 / .85) kullanımı.
 | `--tedy-page-background` | `#f2f4f8` | `#ffffff` | `#121619` | `body` zemini (cool-gray: "okul" hissi). `--cds-background` Carbon değerinde kalır. |
 | `--tedy-text-success/-error/-info/-warning` | `#0e6027` `#a2191f` `#0043ce` `#8a3800` | aynı | `#6fdc8c` `#ffb3b8` `#a6c8ff` `#ffb784` | Okunması gereken durum metni. `support-*` yalnız ikon/kenar/çubuk içindir. |
 | `--tedy-accent-urgent` | `var(--cds-support-error)` | aynı | aynı | Kırmızı yalnız gerçek aciliyettir. |
-| `--tedy-shadow-card` | `0 1px 3px rgba(0,0,0,.05), 0 1px 2px rgba(0,0,0,.08)` | aynı | `none` | Yalnız sayfa düzeyindeki iki kart: `.topbar` ve `.stage`. |
 
 Kanonik Carbon adları birincildir: `--cds-border-strong-01`, `--cds-border-tile-01`,
 `--cds-notification-background-{success,info,warning,error}`, `--cds-background-inverse`,
@@ -51,11 +50,21 @@ belirler (https://carbondesignsystem.com/building-blocks/foundations/color/guide
 - Carbon, kullanıcı seçimi yoksa işletim sistemi temasına uyar
   (https://carbondesignsystem.com/building-blocks/foundations/themes/code/#system-preferences).
   Tek g10 pano ve bu öncelik onunla çelişir; koyu tema kullanıcıya ait açık ürün kararıdır (S14).
-- **Pano → modül mesajı:** `{"type": "edupedia:appearance", "v": 1, "theme": "g10"}`.
+- **Pano → modül mesajı:** `{"type": "edupedia:appearance", "v": 1, "theme": "g10", "rootPx": 32}`.
   `ModuleViewer` bunu çerçevenin `load` olayında gönderir (taslak önizleme dahil;
   taslaklar `ready` üretmez). Modül mesajı yalnız `e.source === window.parent` ve
   `e.origin === EDUPEDIA_PARENT_ORIGIN` iken işler; `adoptHostTheme()` yalnız
   `g10 | g100 | white` değerlerini kabul eder. Mesaj ilerleme taşımaz ve saklanmaz.
+- **`rootPx` (isteğe bağlı, 2026-10-15).** Panonun o andaki hesaplanmış kök yazı boyu. Pano
+  1920 px üstünde kök puntoyu pencereyle büyütür (`clamp(100%, calc(100vw / 120), 250%)`); çerçeve
+  ayrı bir belge olduğu için o kuralı devralmaz **ve kendisi türetemez**: içeride `100vw`
+  çerçevenin genişliğidir, yani panonun sütunu eksi sayfa dolgusu — CSS'ten türetmek modülün yazı
+  boyunu pano yerleşimine bağlar ve `modul.tedy.online`'da tek başına açılan modülü yanlış
+  ölçekler. Bu yüzden değeri pano bildirir. `adoptHostRootSize()` yalnız sayı kabul eder ve
+  **12–48 px**'e kıstırır; alan yoksa modül 16 px'te kalır (tek başına açılış ve eski pano aynen
+  çalışır, bu yüzden `v` 1'de kaldı). Okurun tarayıcı yazı boyu tercihi panonun `clamp()`
+  tabanında (`100%`) zaten vardır, yani hesaplanmış değer onu taşır. Pano kökü değişen her
+  yeniden boyutlamada yeniden gönderilir; değişmediyse gönderilmez.
 - `G-BRIDGE` bu tipi **izinli ama zorunlu değil** sayar; bu tipten önce derlenmiş modüller
   geçerli kalır. `sablon.py`, şablonda `adoptHostTheme` yoksa `TemplateDriftError` verir.
 
@@ -148,15 +157,21 @@ görünmez; etiketler durum ve üst veri içindir ve geri sayım ölçeği yaln�
 | Tablo | 0 | `--cds-border-radius-00` |
 | Etiket/çip (XP, seri, rozet, tanım etiketi) | tam | `--radius-tag` = `--cds-border-radius-max` |
 
-Gölge yalnız `.topbar` ve `.stage`'de (`--tedy-shadow-card`); iç kutular gölgesiz kalır
-(`G-CARBON-GRID`). Tanım popover'ı Carbon ters yüzeydir (`background-inverse`,
+**Statik yüzey gölge almaz** (S11, P4; 2026-10-15). `.topbar` ve `.stage`'in
+`--tedy-shadow-card`'ı kalktı — ikisinde de 1 px `var(--cds-border-subtle)` zaten vardı ve derinlik
+katman token'ı ile kenarla kurulur. Token iki `rgba()` katmanı taşıdığı için D1'in renk aritmetiği
+yasağını da ihlal ediyordu. İç kutular eskiden olduğu gibi gölgesizdir (`G-CARBON-GRID`). Gölge
+yalnız **geçici** yüzeyde kalır: tanım popover'ı Carbon ters yüzeydir (`background-inverse`,
 `text-inverse`) ve `0 2px 6px var(--cds-shadow)` (shadow-menu) taşır.
 
-Tabloda olmayan iki yer: tanım popover'ı `--cds-border-radius-04`, satır içi terim vurgusu
-(`mark.term`) düz `4px` — ikisi de 4 px köşe kullanır. Carbon popover köşesi 2 px'tir
-(https://carbondesignsystem.com/building-blocks/core/components/popover/guidelines/#corners)
-ve Tedy köşe dilinde 4 px yoktur; ikisi de adlı sapmadır. `.topbar`/`.stage` gölgesi Carbon'un
-"statik karoda gölge yok" kuralına adlı Tedy istisnasıdır (`carbon-excellence.md` madde 4).
+Tabloda olmayan üç yer 2026-10-15'te token'a bağlandı ve 4 px sapması kapandı: tanım popover'ı
+`--cds-border-radius-04`'ten **`-02`**'ye indi (Carbon popover köşesi 2 px'tir,
+https://carbondesignsystem.com/building-blocks/core/components/popover/guidelines/#corners);
+satır içi terim vurgusu (`mark.term`) düz `4px` yazıyordu, yani token sözlüğünü atlıyordu →
+**`-00`** (S10: kart/panel 8, çip/etiket tam, geri kalan 0 — satır içi vurgu "geri kalan"dır);
+lejant yuvarlağı (`.viz-legend i`) düz `3px` yazıyordu → **`-00`** (işaretler 0'a girer).
+`.topbar`/`.stage` gölgesi de kalktı; Carbon'un "statik karoda gölge yok" kuralına adlı Tedy
+istisnası artık **yok** (`carbon-excellence.md` madde 4, S11).
 
 ## 5. Oyunlaştırma — yok (S43)
 

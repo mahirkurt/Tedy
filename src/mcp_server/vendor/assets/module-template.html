@@ -215,6 +215,13 @@
 :root,[data-theme="g10"]{
   /* yüzeyler (@carbon/themes g10) */
   --cds-background:#f4f4f4; --cds-layer-01:#ffffff; --cds-layer-02:#f4f4f4; --cds-layer-03:#ffffff;
+  /* --viz-*: kategoriyi BİÇİM taşır, hue değil (S19). Ders aileleri ders işaretine, kırmızı/yeşil/
+     sarı/turuncu anlama ayrılmıştır; kategorik palete yedek hue kalmaz. Yuvalar nötr gri rampadır ve
+     her tema kendi zeminine karşı ≥ 3:1 taşır. Tema bloklarında bildirilir: çıplak :root g100'ü ezer
+     (eşit özgüllük, sonra gelen kazanır) ve koyu paleti ölü koda çevirirdi. */
+  --viz-1:#161616; --viz-2:#262626; --viz-3:#393939; --viz-4:#525252; --viz-5:#6f6f6f;
+  --viz-grid:#e0e0e0; --viz-axis:#8d8d8d; --viz-track:#e0e0e0;
+  --viz-sun:#f1c21b; --viz-water:#1192e8; --viz-cloud:#c1c7cd;
   --cds-layer-hover-01:#e8e8e8; --cds-layer-active-01:#c6c6c6; --cds-layer-selected-01:#e0e0e0;
   --cds-layer-hover-02:#e8e8e8; --cds-layer-selected-02:#e0e0e0;
   --cds-layer-accent-01:#e0e0e0; --cds-layer-accent-hover-01:#d1d1d1;
@@ -246,12 +253,14 @@
   --tedy-page-background:#f2f4f8;
   --tedy-text-success:#0e6027; --tedy-text-error:#a2191f;
   --tedy-text-info:#0043ce; --tedy-text-warning:#8a3800;
-  --tedy-shadow-card:0 1px 3px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.08);
 }
 /* ===== IBM Carbon v11 — WHITE teması (geriye uyum: eski kayıtlı tercih) ===== */
 [data-theme="white"]{
   /* yüzeyler (@carbon/themes white) */
   --cds-background:#ffffff; --cds-layer-01:#f4f4f4; --cds-layer-02:#ffffff; --cds-layer-03:#f4f4f4;
+  --viz-1:#161616; --viz-2:#262626; --viz-3:#393939; --viz-4:#525252; --viz-5:#6f6f6f;
+  --viz-grid:#e0e0e0; --viz-axis:#8d8d8d; --viz-track:#e0e0e0;
+  --viz-sun:#f1c21b; --viz-water:#1192e8; --viz-cloud:#c1c7cd;
   --cds-layer-hover-01:#e8e8e8; --cds-layer-active-01:#c6c6c6; --cds-layer-selected-01:#e0e0e0;
   --cds-layer-hover-02:#e8e8e8; --cds-layer-selected-02:#e0e0e0;
   --cds-layer-accent-01:#e0e0e0; --cds-layer-accent-hover-01:#d1d1d1;
@@ -278,7 +287,6 @@
   --tedy-page-background:#ffffff;
   --tedy-text-success:#0e6027; --tedy-text-error:#a2191f;
   --tedy-text-info:#0043ce; --tedy-text-warning:#8a3800;
-  --tedy-shadow-card:0 1px 3px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.08);
 }
 /* ===== IBM Carbon v11 — GRAY-100 (dark) teması ===== */
 [data-theme="g100"]{
@@ -305,7 +313,7 @@
   --cds-button-disabled:rgba(141,141,141,.3);
   --cds-support-success:#42be65; --cds-support-error:#fa4d56;
   --cds-support-warning:#f1c21b; --cds-support-info:#4589ff;
-  --viz-1:#be95ff; --viz-2:#78a9ff; --viz-3:#33b1ff; --viz-4:#08bdba; --viz-5:#ff7eb6;
+  --viz-1:#f4f4f4; --viz-2:#e0e0e0; --viz-3:#c6c6c6; --viz-4:#a8a8a8; --viz-5:#8d8d8d;
   --viz-grid:#393939; --viz-axis:#8d8d8d; --viz-track:#393939;
   --viz-sun:#fddc69; --viz-water:#33b1ff; --viz-cloud:#a8a8a8;
   /* Carbon koyu bildirim: zemin layer-01, anlamı 3px durum çubuğu + ikon taşır */
@@ -315,7 +323,6 @@
   --tedy-page-background:#121619;
   --tedy-text-success:#6fdc8c; --tedy-text-error:#ffb3b8;
   --tedy-text-info:#a6c8ff; --tedy-text-warning:#ffb784;
-  --tedy-shadow-card:none;
 }
 /* Tema-bağımsız katman: kanonik Carbon adlarının eski kısa adları (geriye uyum; yeni kodda
    kanonik adı kullanın) + Tedy marka/aciliyet + ödül vurgusu. Takma adlar her tema öğesinde
@@ -368,16 +375,13 @@
   --cds-border-radius-08:.5rem; --cds-border-radius-max:999999px;
   --cds-radius:var(--cds-border-radius-08); --radius-btn:var(--cds-border-radius-00);
   --radius-field:var(--cds-border-radius-00); --radius-tag:var(--cds-border-radius-max);
-  --tap:48px; /* tap = Carbon size Large (3rem) */
+  --tap:3rem; /* tap = Carbon size Large (3rem) */
   --font-sans:'IBM Plex Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
   --font-serif:'IBM Plex Serif',Georgia,Times,serif;
   --font-mono:'IBM Plex Mono',Menlo,'DejaVu Sans Mono',ui-monospace,monospace;
   /* ders aksanı: rolleri aşağıdaki üretilmiş tedy:ders-renkleri bloğundan gelir (data-subject-family) */
   --accent:var(--subject-accent); --accent-strong:var(--subject-text);
   --accent-tint:var(--subject-surface); --accent-on:var(--subject-on-surface);
-  --viz-1:#6929c4; --viz-2:#002d9c; --viz-3:#1192e8; --viz-4:#007d79; --viz-5:#9f1853;
-  --viz-grid:#e0e0e0; --viz-axis:#8d8d8d; --viz-track:#e0e0e0;
-  --viz-sun:#f1c21b; --viz-water:#1192e8; --viz-cloud:#c1c7cd;
 }
 /* tedy:ders-renkleri */
 /* Üretilir: scripts/sync_carbon_tokens.py --write-subjects — elle düzenlemeyin. Kaynak:
@@ -409,7 +413,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
   color:var(--cds-text-primary);background:var(--tedy-page-background,var(--cds-background));-webkit-font-smoothing:antialiased;
   overflow-wrap:anywhere;
   transition:background var(--dur-mod) var(--ease-std),color var(--dur-mod) var(--ease-std)}
-.wrap{width:100%;max-width:880px;min-width:0;margin:0 auto;padding:var(--sp-05);min-height:100vh;display:flex;flex-direction:column}
+.wrap{width:100%;max-width:55rem;min-width:0;margin:0 auto;padding:var(--sp-05);min-height:100vh;display:flex;flex-direction:column}
 .cds-icon{display:inline-block;width:1.25rem;height:1.25rem;fill:currentColor;vertical-align:middle;flex:none}
 .pic{display:inline-block;fill:currentColor;color:var(--accent-strong)}
 /* ============================================================
@@ -426,17 +430,17 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
    tanımları geçersiz kılar.
    ============================================================ */
 .topbar{position:relative;margin-bottom:var(--sp-06);border-radius:var(--cds-radius);overflow:hidden;
-  border:1px solid var(--cds-border-subtle);box-shadow:var(--tedy-shadow-card)}
+  border:1px solid var(--cds-border-subtle)}
 
 /* --- KATMAN 1 · Kimlik bandı (Tedy laciverti, açık içerik) --- */
 .topbar__hero{position:relative;color:var(--cds-text-on-color);padding:var(--sp-05) var(--sp-06);
   background:var(--tedy-brand)}
 .topbar__row{position:relative;display:flex;align-items:center;justify-content:space-between;
   gap:var(--sp-04) var(--sp-05);flex-wrap:wrap}
-.topbar__l{display:flex;align-items:center;gap:var(--sp-05);min-width:0;max-width:100%;flex:1 1 260px}
+.topbar__l{display:flex;align-items:center;gap:var(--sp-05);min-width:0;max-width:100%;flex:1 1 16.25rem}
 .topbar__l>div{min-width:0}
 /* Tedy işareti (on-brand): beyaz disk, yarı saydam beyaz hilal, lacivert onay; renkler token */
-.tedy-mark{flex:none;width:32px;height:32px;display:block}
+.tedy-mark{flex:none;width:2rem;height:2rem;display:block}
 .tedy-mark__disc{fill:var(--cds-text-on-color)}
 .tedy-mark__moon{fill:var(--cds-text-on-color);fill-opacity:.5}
 .tedy-mark__check{fill:none;stroke:var(--tedy-brand);stroke-width:8.2;stroke-linecap:round;stroke-linejoin:round}
@@ -451,10 +455,10 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .pacing-disk{display:inline-flex;align-items:center;gap:var(--sp-02);
   background:var(--tedy-brand-hover);border-radius:var(--radius-tag);padding:2px 2px 2px var(--sp-03)}
 .pacing-disk[hidden]{display:none}
-.pacing-disk__ring{flex:none}
+.pacing-disk__ring{flex:none;width:1.75rem;height:1.75rem}  /* öznitelikte 28 px: CSS boyutu olmadan 4K'da yerinde kalırdı */
 .pacing-disk__track{fill:none;stroke:var(--tedy-brand-rule);stroke-width:3}
 .pacing-disk__arc{fill:none;stroke:var(--cds-text-on-color);stroke-width:3;stroke-linecap:round}
-.pacing-disk__dismiss{width:22px;height:22px;border:none;background:transparent;color:var(--cds-text-on-color);
+.pacing-disk__dismiss{width:1.375rem;height:1.375rem;border:none;background:transparent;color:var(--cds-text-on-color);
   cursor:pointer;display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius-btn)}
 .pacing-disk__dismiss:hover{background:var(--tedy-brand)}
 .pacing-disk__dismiss:focus-visible{outline:2px solid var(--cds-text-on-color);outline-offset:2px}
@@ -462,7 +466,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 /* yardımcı düğmeler — Carbon ghost ikon düğme dili (kare), ince ayraçla */
 .topbar__tools{display:inline-flex;align-items:center;gap:var(--sp-02);max-width:100%;flex-wrap:wrap;
   padding-left:var(--sp-03);border-left:1px solid var(--tedy-brand-rule)}
-.icon-btn{width:40px;height:40px;border:none;background:transparent;cursor:pointer;color:var(--cds-text-on-color);
+.icon-btn{width:2.5rem;height:2.5rem;border:none;background:transparent;cursor:pointer;color:var(--cds-text-on-color);
   display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius-btn);
   transition:background var(--dur-fast) var(--ease-std)}
 .icon-btn:hover,.icon-btn:active{background:var(--tedy-brand-hover)}
@@ -481,7 +485,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .stepper{display:flex;align-items:center;gap:0;overflow-x:auto;scrollbar-width:thin;
   flex:1 1 auto;min-width:0;padding-bottom:2px}
 .step{display:flex;align-items:center;flex:none}
-.step__btn{width:28px;height:28px;border-radius:50%;border:none;cursor:default;flex:none;
+.step__btn{width:1.75rem;height:1.75rem;border-radius:50%;border:none;cursor:default;flex:none;
   display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-mono);
   font-size:.8rem;font-weight:600;background:transparent;color:var(--cds-text-secondary);
   box-shadow:inset 0 0 0 1.5px var(--cds-border-strong);
@@ -490,12 +494,12 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .step__btn .cds-icon{width:1rem;height:1rem}
 .step--done .step__btn{background:var(--cds-button-primary);color:var(--cds-text-on-color);box-shadow:none;cursor:pointer}
 .step--current .step__btn{background:transparent;color:var(--cds-link-primary);box-shadow:inset 0 0 0 2px var(--cds-interactive)}
-.step__line{width:20px;height:1.5px;background:var(--cds-border-subtle);flex:none}
+.step__line{width:1.25rem;height:1.5px;background:var(--cds-border-subtle);flex:none}
 .step--done .step__line{background:var(--cds-interactive)}
 /* v3.0.0 — kilometre taşı (milestone) işareti: aksan nokta, gölgesiz (G-CARBON-GRID) */
 .step--milestone .step__btn{position:relative}
-.step--milestone .step__btn::after{content:"";position:absolute;left:50%;bottom:-5px;
-  transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--cds-interactive)}
+.step--milestone .step__btn::after{content:"";position:absolute;left:50%;bottom:-0.3125rem;
+  transform:translateX(-50%);width:0.3125rem;height:0.3125rem;border-radius:50%;background:var(--cds-interactive)}
 .rail-label{font-size:.8125rem;color:var(--cds-text-secondary);display:flex;align-items:center;
   gap:var(--sp-03);flex:none;white-space:nowrap}
 .rail-label #railText{color:var(--cds-text-primary);font-weight:600}
@@ -506,20 +510,21 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
    İlk istasyon completed:true ile bahşedilmiş ilerleme (gamified-flows.md §3.2); gölgesiz düğümler. */
 .quest-map{margin:0 0 var(--sp-06)}
 .quest-map[hidden]{display:none}
-.quest-map__svg{display:block;width:100%;height:auto;max-width:280px;margin:0 auto}
+.quest-map__svg{display:block;width:100%;height:auto;max-width:17.5rem;margin:0 auto}
 .quest-map__line{stroke:var(--cds-border-strong);stroke-width:2}
 .quest-map__line--done{stroke:var(--cds-interactive)}
 .quest-map__node{fill:var(--cds-layer-02);stroke:var(--cds-border-strong);stroke-width:2}
 .quest-map__node--done{fill:var(--cds-interactive);stroke:var(--cds-interactive)}
-.quest-map__label{font-family:var(--font-sans);font-size:10px;fill:var(--cds-text-secondary)}
-/* sahne — sayfa düzeyindeki tek içerik kartı: Tedy pano kartı kuralı (border-radius-08 +
-   tedy-shadow-card; koyu temada gölge yok). İçindeki kutular gölgesiz kalır (G-CARBON-GRID). */
-.stage{background:var(--cds-layer-01);border:1px solid var(--cds-border-subtle);box-shadow:var(--tedy-shadow-card);
+.quest-map__label{font-family:var(--font-sans);font-size:0.625rem;fill:var(--cds-text-secondary)}
+/* sahne — sayfa düzeyindeki tek içerik kartı. Derinlik katman token'ı ve 1 px kenarla kurulur;
+   statik yüzey gölge almaz (S11, P4). Gölge yalnız geçici yüzeyde (tanım popover'ı) kalır.
+   İçindeki kutular da gölgesizdir (G-CARBON-GRID). */
+.stage{background:var(--cds-layer-01);border:1px solid var(--cds-border-subtle);
   border-radius:var(--cds-radius);padding:var(--sp-07);flex:1;min-width:0;max-width:100%}
 .seg-head{display:flex;align-items:center;gap:var(--sp-05);margin-bottom:var(--sp-06);padding-bottom:var(--sp-05);border-bottom:1px solid var(--cds-border-subtle)}
 .seg-head>div{min-width:0}
-.seg-ic{flex:none;width:56px;height:56px;border-radius:var(--cds-radius);background:var(--accent-tint);display:inline-flex;align-items:center;justify-content:center}
-.seg-ic .pic{color:var(--accent-on);width:32px;height:32px}
+.seg-ic{flex:none;width:3.5rem;height:3.5rem;border-radius:var(--cds-radius);background:var(--accent-tint);display:inline-flex;align-items:center;justify-content:center}
+.seg-ic .pic{color:var(--accent-on);width:2rem;height:2rem}
 .seg-head h2{font-size:var(--fs-h-seg);font-weight:400;margin:0;line-height:1.25}
 .kicker{font-size:var(--fs-label);font-weight:600;color:var(--accent-strong);
   margin-bottom:2px}
@@ -529,7 +534,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .lead{font-family:var(--font-serif);font-size:1.25rem;line-height:1.55;color:var(--cds-text-primary);
   background:var(--cds-layer-02);border-left:4px solid var(--accent);border-radius:var(--cds-radius);
   padding:var(--sp-05) var(--sp-06);margin:0 0 var(--sp-06)}
-mark.term{background:var(--accent-tint);color:var(--accent-on);padding:0 .25em;border-radius:4px;font-weight:600}
+mark.term{background:var(--accent-tint);color:var(--accent-on);padding:0 .25em;border-radius:var(--cds-border-radius-00);font-weight:600}
 /* Anahtar kavramlar — Carbon DefinitionTooltip tetikleyicileri */
 .terms{display:flex;flex-direction:column;gap:var(--sp-04);margin:var(--sp-06) 0;
   background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);
@@ -539,22 +544,22 @@ mark.term{background:var(--accent-tint);color:var(--accent-on);padding:0 .25em;b
 .def-term{font-family:var(--font-sans);font-size:var(--fs-compact);font-weight:600;
   background:var(--accent-tint);color:var(--accent-on);border-radius:var(--radius-tag);
   border:1px solid var(--subject-border);
-  padding:var(--sp-02) var(--sp-05);cursor:help;display:inline-flex;align-items:center;gap:6px;
+  padding:var(--sp-02) var(--sp-05);cursor:help;display:inline-flex;align-items:center;gap:0.375rem;
   transition:background var(--dur-fast) var(--ease-std),box-shadow var(--dur-fast) var(--ease-std)}
 .def-term:hover{background:var(--subject-surface-hover)}
 .def-term:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
 .def-term .cds-icon{width:.9rem;height:.9rem;color:var(--accent-on);opacity:.85;flex:none}
 .def-term[aria-describedby] .cds-icon{opacity:1}
 /* tanım popover — tema-duyarlı, oklu kart; ekran kenarına flip+clamp (JS konumlu) */
-.def-pop{position:fixed;z-index:9999;width:max-content;max-width:300px;
-  padding:var(--sp-04) var(--sp-05);border-radius:var(--cds-border-radius-04);font-family:var(--font-sans);
+.def-pop{position:fixed;z-index:9999;width:max-content;max-width:18.75rem;
+  padding:var(--sp-04) var(--sp-05);border-radius:var(--cds-border-radius-02);font-family:var(--font-sans);
   background:var(--def-pop-bg);color:var(--def-pop-fg);
   box-shadow:0 2px 6px var(--cds-shadow);pointer-events:none;
   opacity:0;transform:translateY(3px);
   transition:opacity var(--dur-fast) var(--ease-std),transform var(--dur-fast) var(--ease-std)}
 .def-pop:not([hidden]){opacity:1;transform:none}
 .def-pop[hidden]{display:none}
-.def-pop__head{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.def-pop__head{display:flex;align-items:center;gap:0.375rem;margin-bottom:0.25rem}
 .def-pop__ic{display:inline-flex;flex:none}
 .def-pop__ic .cds-icon{width:1.05rem;height:1.05rem;color:var(--def-pop-accent)}
 .def-pop__term{font-weight:700;font-size:.875rem;color:var(--def-pop-accent)}
@@ -562,13 +567,13 @@ mark.term{background:var(--accent-tint);color:var(--accent-on);padding:0 .25em;b
   border-top:1px solid var(--def-pop-rule);font-size:.78rem;line-height:1.45}
 .def-pop__ex[hidden]{display:none}
 .def-pop__ex-lbl{font-family:var(--font-sans);font-weight:700;font-size:.6875rem;
-  color:var(--def-pop-accent);margin-right:6px}
+  color:var(--def-pop-accent);margin-right:0.375rem}
 .def-pop__ex-t{color:var(--def-pop-fg);opacity:.92}
 .def-pop__def{display:block;font-weight:400;font-size:.8125rem;line-height:1.5;color:var(--def-pop-fg)}
-.def-pop__arrow{position:absolute;left:var(--arrow-x,50%);width:11px;height:11px;
+.def-pop__arrow{position:absolute;left:var(--arrow-x,50%);width:0.6875rem;height:0.6875rem;
   background:var(--def-pop-bg);transform:translateX(-50%) rotate(45deg)}
-.def-pop[data-place="top"] .def-pop__arrow{bottom:-5px}
-.def-pop[data-place="bottom"] .def-pop__arrow{top:-5px}
+.def-pop[data-place="top"] .def-pop__arrow{bottom:-0.3125rem}
+.def-pop[data-place="bottom"] .def-pop__arrow{top:-0.3125rem}
 @media (prefers-reduced-motion: reduce){.def-pop{transition:none}}
 /* tanım popover'ı Carbon ters (inverse) yüzeydir: background-inverse + text-inverse */
 [data-theme]{--def-pop-bg:var(--cds-background-inverse);--def-pop-fg:var(--cds-text-inverse)}
@@ -584,14 +589,16 @@ mark.term{background:var(--accent-tint);color:var(--accent-on);padding:0 .25em;b
 figure.viz{margin:var(--sp-06) 0;background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);
   border-radius:var(--cds-radius);padding:var(--sp-06);text-align:center}
 figure.viz svg{max-width:100%;height:auto;display:block;margin:0 auto}
+/* piktogram görseli öznitelikte 96 px gelir; .pic boyut vermediği için 4K'da yerinde kalırdı */
+figure.viz > .pic{width:6rem;height:6rem}
 figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:var(--cds-text-secondary)}
 .viz text{fill:var(--cds-text-primary);font-family:var(--font-sans)}
 .viz .viz-muted{fill:var(--cds-text-secondary)}
 .viz .viz-axis{stroke:var(--viz-axis)}
 .viz .viz-grid{stroke:var(--viz-grid)}
 .viz-legend{display:flex;flex-wrap:wrap;gap:var(--sp-03) var(--sp-05);justify-content:center;margin-top:var(--sp-05)}
-.viz-legend span{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-label);color:var(--cds-text-secondary)}
-.viz-legend i{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
+.viz-legend span{display:inline-flex;align-items:center;gap:0.375rem;font-size:var(--fs-label);color:var(--cds-text-secondary)}
+.viz-legend i{width:0.75rem;height:0.75rem;border-radius:var(--cds-border-radius-00);display:inline-block;flex:none}
 /* v3.0.0 — Task 19: numberLine(spec) `interactive:true` iken üretilen sürüklenebilir/
    klavye-adımlı nokta. Gölge yok (yalnız inset — G-CARBON-GRID); ok-renkli dolgu
    token'lı (ham hex yok — G-SVG). Geçiş yalnızca hareket-azaltma TERCİH EDİLMEDİĞİNDE
@@ -607,7 +614,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
   color:var(--accent-strong);font-variant-numeric:tabular-nums}
 /* yüksek-etki ama sakin: segment başına tek, reduced-motion ile kapalı giriş */
 @media (prefers-reduced-motion:no-preference){
-  @keyframes segIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @keyframes segIn{from{opacity:0;transform:translateY(0.375rem)}to{opacity:1;transform:none}}
   .stage[data-seg]{animation:segIn var(--cds-duration-moderate-02) var(--ease-entrance) both}
 }
 .instructions{font-size:var(--fs-compact);color:var(--cds-text-secondary);margin-bottom:var(--sp-05);
@@ -668,13 +675,13 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .match__col h3{font-size:var(--fs-label);color:var(--cds-text-secondary);margin:0 0 var(--sp-02)}
 /* flashcard */
 .flash{display:flex;flex-direction:column;align-items:center;gap:var(--sp-05);margin:var(--sp-06) 0}
-.card{width:100%;max-width:540px;min-height:180px;border-radius:var(--cds-radius);background:var(--cds-layer-02);
+.card{width:100%;max-width:33.75rem;min-height:11.25rem;border-radius:var(--cds-radius);background:var(--cds-layer-02);
   box-shadow:inset 0 0 0 2px var(--accent);display:flex;align-items:center;justify-content:center;text-align:center;
   padding:var(--sp-07);font-size:var(--fs-h-sub);font-weight:400;color:var(--cds-text-primary)}
 .card--back{background:var(--cds-layer-02);box-shadow:inset 0 0 0 1px var(--cds-border-subtle);color:var(--cds-text-primary);font-weight:400;font-size:var(--fs-body)}
 /* boşluk doldurma */
 .cloze{font-size:var(--fs-body);line-height:2;margin:var(--sp-05) 0}
-.blank{display:inline-block;min-width:96px;border-bottom:2px solid var(--accent);text-align:center;font-weight:600;color:var(--accent-strong);padding:0 var(--sp-03)}
+.blank{display:inline-block;min-width:6rem;border-bottom:2px solid var(--accent);text-align:center;font-weight:600;color:var(--accent-strong);padding:0 var(--sp-03)}
 .pool{display:flex;flex-wrap:wrap;gap:var(--sp-04);margin:var(--sp-05) 0}
 .chip-btn{font-family:var(--font-sans);font-size:var(--fs-compact);min-height:var(--tap);padding:0 var(--sp-05);border:0;
   border-radius:var(--radius-btn);cursor:pointer;background:var(--cds-layer-02);box-shadow:inset 0 0 0 1px var(--cds-border-strong);color:var(--cds-text-primary)}
@@ -689,16 +696,16 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .worked-step{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-04) var(--sp-05);
   background:var(--cds-layer-02);border-radius:var(--cds-radius);padding:var(--sp-05) var(--sp-06);
   box-shadow:inset 0 0 0 1px var(--cds-border-tile)}
-.worked-step__num{flex:none;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;
+.worked-step__num{flex:none;width:1.75rem;height:1.75rem;border-radius:50%;display:inline-flex;align-items:center;
   justify-content:center;font-family:var(--font-mono);font-weight:600;font-size:.8rem;
   background:var(--accent-tint);color:var(--accent-on)}
 .worked-step--solved .worked-step__num{background:transparent;color:var(--cds-text-secondary);
   box-shadow:inset 0 0 0 1.5px var(--cds-border-strong)}
-.worked-step__text{flex:1 1 160px;font-size:var(--fs-body);color:var(--cds-text-primary)}
+.worked-step__text{flex:1 1 10rem;font-size:var(--fs-body);color:var(--cds-text-primary)}
 .worked-step--solved .worked-step__text{color:var(--cds-text-secondary)}
 .worked-step__field{display:flex;align-items:center;gap:var(--sp-03);flex:none}
 .worked-input{font-family:var(--font-sans);font-size:var(--fs-body);font-variant-numeric:tabular-nums;border:0;
-  min-height:var(--tap);width:140px;padding:0 var(--sp-05);border-radius:var(--radius-field);
+  min-height:var(--tap);width:8.75rem;padding:0 var(--sp-05);border-radius:var(--radius-field);
   background:var(--cds-field-01);color:var(--cds-text-primary);
   box-shadow:inset 0 0 0 1px var(--cds-border-strong);
   transition:box-shadow var(--dur-fast) var(--ease-std)}
@@ -759,13 +766,13 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .se-model__body{font-size:var(--fs-body);color:var(--cds-text-primary);line-height:1.6}
 /* mola */
 .break{text-align:center;padding:var(--sp-08) var(--sp-05)}
-.break .pic,.break .cds-icon{color:var(--accent-strong);margin-bottom:var(--sp-05);width:72px;height:72px}
+.break .pic,.break .cds-icon{color:var(--accent-strong);margin-bottom:var(--sp-05);width:4.5rem;height:4.5rem}
 .break h2{font-size:var(--fs-h-seg);font-weight:400;margin:0 0 var(--sp-04)}
 .break p{font-size:var(--fs-h-sub);font-weight:400;margin:0 0 var(--sp-06)}
 .countdown{font-family:var(--font-mono);font-size:var(--fs-display);color:var(--accent-strong);margin-bottom:var(--sp-06)}
 /* özet — tamamlanma sessiz ve net (talimatname S43, anayasa §9): büyük sayı, kutlama yok */
 .summary{text-align:center;padding:var(--sp-06) var(--sp-05)}
-.summary>.pic{color:var(--accent-strong);margin-bottom:var(--sp-05);width:80px;height:80px}
+.summary>.pic{color:var(--accent-strong);margin-bottom:var(--sp-05);width:5rem;height:5rem}
 .summary h2{font-size:var(--fs-display);font-weight:600;margin:0 0 var(--sp-05);font-family:var(--font-serif)}
 .summary__ozet{font-size:var(--fs-body);color:var(--cds-text-primary);margin:var(--sp-05) 0 var(--sp-06)}
 .summary__ozet b{font-family:var(--font-mono);font-weight:400;font-variant-numeric:tabular-nums}
@@ -775,15 +782,15 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .objectives ul{margin:0;padding-left:1.35em}
 .objectives li{margin:0 0 var(--sp-03)}
 .objectives li:last-child{margin-bottom:0}
-.self-assess{text-align:left;max-width:540px;margin:var(--sp-06) auto;background:var(--cds-layer-02);border-radius:var(--cds-radius);padding:var(--sp-06)}
+.self-assess{text-align:left;max-width:33.75rem;margin:var(--sp-06) auto;background:var(--cds-layer-02);border-radius:var(--cds-radius);padding:var(--sp-06)}
 .self-assess h3{font-size:var(--fs-h-sub);font-weight:400;margin:0 0 var(--sp-05);color:var(--cds-text-primary)}
 .check-row{display:flex;align-items:center;gap:var(--sp-04);margin-bottom:var(--sp-04);font-size:var(--fs-compact);cursor:pointer;color:var(--cds-text-primary)}
-.check-row input{width:22px;height:22px;accent-color:var(--accent);cursor:pointer}
+.check-row input{width:1.375rem;height:1.375rem;accent-color:var(--accent);cursor:pointer}
 /* alt yönlendirme */
 .nav{display:flex;justify-content:space-between;gap:var(--sp-05);margin-top:var(--sp-05);
   padding-top:var(--sp-05);flex-wrap:wrap;min-width:0;max-width:100%}
 .nav .btn{min-width:0;max-width:100%}
-.adim-sayaci{display:inline-flex;align-items:center;gap:6px;width:fit-content;
+.adim-sayaci{display:inline-flex;align-items:center;gap:0.375rem;width:fit-content;
   font-family:var(--font-sans);font-size:.8125rem;font-weight:500;
   color:var(--cds-text-secondary);background:var(--cds-layer-01);
   border:1px solid var(--cds-border-subtle);
@@ -794,8 +801,8 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 /* zaman çizelgesi (display materyali) */
 .timeline{list-style:none;margin:var(--sp-05) 0;padding:0;position:relative}
 .tl-item{display:flex;gap:var(--sp-05);padding-bottom:var(--sp-06);position:relative}
-.tl-item:not(:last-child)::before{content:"";position:absolute;left:15px;top:34px;bottom:0;width:2px;background:var(--cds-border-subtle)}
-.tl-node{flex:none;width:32px;height:32px;border-radius:50%;background:var(--accent-tint);color:var(--accent-on);
+.tl-item:not(:last-child)::before{content:"";position:absolute;left:0.9375rem;top:2.125rem;bottom:0;width:2px;background:var(--cds-border-subtle)}
+.tl-node{flex:none;width:2rem;height:2rem;border-radius:50%;background:var(--accent-tint);color:var(--accent-on);
   display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:600;
   box-shadow:inset 0 0 0 2px var(--accent);z-index:1}
 .tl-card{background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);border-radius:var(--cds-radius);padding:var(--sp-05) var(--sp-06);flex:1}
@@ -805,7 +812,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 /* hotspot */
 .hotspot-wrap [data-spot]{cursor:pointer}
 .hotspot-wrap [data-spot]:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
-.flash .btn{min-width:160px}
+.flash .btn{min-width:10rem}
 /* yeniden kullanılabilir çağrı kutusu (Carbon aside/notification deseni) */
 .callout{margin:var(--sp-05) 0;padding:var(--sp-05) var(--sp-06);border-radius:var(--cds-radius);
   border-left:4px solid var(--accent);background:var(--cds-layer-02);display:flex;gap:var(--sp-04);align-items:flex-start}
@@ -827,10 +834,10 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .sim-param{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-04);
   background:var(--cds-layer-02);border-radius:var(--cds-radius);
   padding:var(--sp-04) var(--sp-05);box-shadow:inset 0 0 0 1px var(--cds-border-tile)}
-.sim-param__lbl{flex:1 1 160px;font-size:var(--fs-compact);font-weight:500;color:var(--cds-text-primary)}
-.sim-param input[type="range"]{flex:2 1 200px;accent-color:var(--accent);cursor:pointer}
+.sim-param__lbl{flex:1 1 10rem;font-size:var(--fs-compact);font-weight:500;color:var(--cds-text-primary)}
+.sim-param input[type="range"]{flex:2 1 12.5rem;accent-color:var(--accent);cursor:pointer}
 .sim-param input[type="range"]:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
-.sim-val{flex:none;min-width:64px;text-align:right;font-family:var(--font-mono);
+.sim-val{flex:none;min-width:4rem;text-align:right;font-family:var(--font-mono);
   font-variant-numeric:tabular-nums;font-weight:600;color:var(--accent-strong)}
 /* v3.0.0 — Task 18: kavram haritası kurucu (conceptMap). Düğümler gerçek <button>
    (DOM katmanı, absolute + yüzde-konum); kenarlar SALT GÖRSEL bir SVG çizgi
@@ -846,7 +853,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .cmap-line{stroke:var(--cds-border-strong);stroke-width:2.5}
 .cmap-line--correct{stroke:var(--cds-support-success)}
 .cmap-line--extra{stroke:var(--cds-support-info)}
-.cmap-node{position:absolute;transform:translate(-50%,-50%);max-width:136px;border:0;
+.cmap-node{position:absolute;transform:translate(-50%,-50%);max-width:8.5rem;border:0;
   font-family:var(--font-sans);font-size:var(--fs-label);font-weight:600;text-align:center;
   min-height:var(--tap);padding:var(--sp-03) var(--sp-05);border-radius:var(--radius-btn);
   cursor:pointer;background:var(--cds-layer-01);color:var(--cds-text-primary);
@@ -866,13 +873,13 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
   border-radius:var(--radius-btn);padding:var(--sp-03) var(--sp-04);
   box-shadow:inset 0 0 0 1px var(--cds-border-tile)}
 .cmap-edge__mark{flex:none;width:1.2rem;height:1.2rem;display:inline-flex;align-items:center;justify-content:center;color:var(--cds-text-secondary)}
-.cmap-edge__mark:empty::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--cds-border-strong)}
+.cmap-edge__mark:empty::before{content:"";width:0.5rem;height:0.5rem;border-radius:50%;background:var(--cds-border-strong)}
 .cmap-edge--correct{box-shadow:inset 0 0 0 1.5px var(--cds-support-success)}
 .cmap-edge--correct .cmap-edge__mark{color:var(--cds-support-success)}
 .cmap-edge--extra{box-shadow:inset 0 0 0 1.5px var(--cds-support-info)}
 .cmap-edge--extra .cmap-edge__mark{color:var(--cds-support-info)}
 .cmap-edge__text{flex:1;font-size:var(--fs-compact);color:var(--cds-text-primary)}
-.cmap-edge__remove{flex:none;width:40px;height:40px;border:none;background:transparent;cursor:pointer;
+.cmap-edge__remove{flex:none;width:2.5rem;height:2.5rem;border:none;background:transparent;cursor:pointer;
   color:var(--cds-icon-secondary);display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius-btn);
   transition:background var(--dur-fast) var(--ease-std)}
 .cmap-edge__remove:hover:not([disabled]){background:var(--cds-background-hover);color:var(--cds-support-error)}
@@ -922,7 +929,7 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .viz-legend-list li::marker{color:var(--accent-strong);font-weight:700}
 /* ilişki akışı: sebep-sonuç / kavram zinciri (Sosyal/Yurttaşlık) */
 .flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:var(--sp-04)}
-.flow-node{flex:1 1 140px;min-width:120px;background:var(--cds-layer-02);
+.flow-node{flex:1 1 8.75rem;min-width:7.5rem;background:var(--cds-layer-02);
   border:1px solid var(--cds-border-subtle);border-left:4px solid var(--accent);
   border-radius:var(--cds-radius);padding:var(--sp-05)}
 .flow-node__t{font-weight:600}
@@ -931,25 +938,35 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .flow-arrow .cds-icon{width:1.4rem;height:1.4rem}
 @media (max-width:560px){ .flow{flex-direction:column} .flow-arrow{transform:rotate(90deg);align-self:center} }
 /* kavram/değer kartları (Din/Yurttaşlık/genel) */
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--sp-05)}
-.cards--2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-.cards--4{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(13.75rem,1fr));gap:var(--sp-05)}
+.cards--2{grid-template-columns:repeat(auto-fit,minmax(16.25rem,1fr))}
+.cards--4{grid-template-columns:repeat(auto-fit,minmax(11.25rem,1fr))}
 .card{background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);
   border-top:3px solid var(--accent);border-radius:var(--cds-radius);padding:var(--sp-06)}
-.card .pic{width:30px;height:30px;color:var(--accent-strong);margin-bottom:var(--sp-04)}
+.card .pic{width:1.875rem;height:1.875rem;color:var(--accent-strong);margin-bottom:var(--sp-04)}
 .card__t{font-size:var(--fs-h-sub);font-weight:400;margin:0 0 var(--sp-03)}
 .card__d{margin:0;color:var(--cds-text-secondary);font-size:var(--fs-compact)}
 /* dil: satır-arası çözümleme; rol/cinsiyet renk-kodu DAİMA etiketle birlikte (CVD-güvenli) */
 .gloss{display:flex;flex-wrap:wrap;gap:var(--sp-04) var(--sp-05);align-items:flex-end;font-size:1.2rem;padding:var(--sp-04) 0}
 .tok{display:inline-flex;flex-direction:column;align-items:center;gap:3px}
-.tok .w{font-weight:600;padding-bottom:3px;border-bottom:3px solid transparent}
+.tok .w{font-weight:600;padding-bottom:3px;
+  text-decoration-line:underline;text-decoration-color:var(--cds-border-strong);
+  text-decoration-thickness:3px;text-underline-offset:3px;
+  /* `skip-ink:auto` (varsayılan) alt çizgiyi inişlerde keser; Türkçe'de g, y, p, ç, ş, ğ yüzünden
+     bu kural, istisna değil — "günaydın" üçe bölünüp solid yerine dashed, "yeşil" iki yaya düşüp
+     wavy yerine dash okunuyordu. Biçim glifden bağımsız olmalı (eski border-bottom kesintisizdi). */
+  text-decoration-skip-ink:none}
 .tok .tg{font-size:.72rem;font-weight:600;color:var(--cds-text-secondary)}
-.tok[data-role="masc"] .w{border-bottom-color:var(--viz-1)}
-.tok[data-role="fem"] .w{border-bottom-color:var(--viz-3)}
-.tok[data-role="verb"] .w{border-bottom-color:var(--viz-2)}
-.tok[data-role="noun"] .w{border-bottom-color:var(--viz-4)}
-.tok[data-role="adj"] .w{border-bottom-color:var(--viz-5)}
-.tok[data-role="art"] .w{border-bottom-color:var(--accent)}
+/* Rol BİÇİMLE ayrılır, renkle değil (S19): ders aileleri ders işaretine ayrılmıştır. Taşıyıcı
+   zaten .tg etiketidir (yukarıdaki yorum: "DAİMA etiketle birlikte"); biçim ikincil, CVD-güvenli
+   ipuçtur. border-style'da `wavy` yok; sözcük işaretlemenin doğru özelliği text-decoration'dır. */
+.tok[data-role="masc"] .w{text-decoration-style:solid}
+.tok[data-role="fem"]  .w{text-decoration-style:double}
+.tok[data-role="verb"] .w{text-decoration-style:dotted}
+.tok[data-role="noun"] .w{text-decoration-style:dashed}
+.tok[data-role="adj"]  .w{text-decoration-style:wavy}
+/* art: işlev sözcüğü, işaretsiz — altıncı ayrı biçim yerine işaretin yokluğu. */
+.tok[data-role="art"]  .w{text-decoration-line:none}
 .gloss-tr{margin:var(--sp-04) 0 0;color:var(--cds-text-secondary);font-family:var(--font-serif);font-style:italic}
 /* dil: iki konuşmacılı diyalog */
 .dialogue{display:flex;flex-direction:column;gap:var(--sp-05)}
@@ -977,7 +994,7 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
   .topbar__tools{margin-left:auto;padding-left:var(--sp-02)}
   .stage{padding:var(--sp-05) var(--sp-04)}
   .seg-head{align-items:flex-start;gap:var(--sp-04)}
-  .seg-ic{width:48px;height:48px}
+  .seg-ic{width:3rem;height:3rem}
   .opt,.worked-step,.sim-param{padding:var(--sp-04)}
   .worked-step__field,.worked-input{width:100%;min-width:0}
   .nav .btn{flex:1 1 100%;padding-inline:var(--sp-04)}
@@ -992,7 +1009,7 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .fc-hint .cds-icon{color:var(--accent-strong);flex:none;margin-top:2px;width:1.1rem;height:1.1rem}
 .fc-hint b{color:var(--cds-text-primary);font-weight:600}
 /* ===== v1.8.0 — kesir/oran çubuğu (bar modeli; daire değil) ===== */
-.fraction-bar{width:100%;max-width:560px}
+.fraction-bar{width:100%;max-width:35rem}
 .fraction-bar .fb-eq{fill:var(--cds-text-primary);font-family:var(--font-serif);
   font-variant-numeric:lining-nums tabular-nums;font-weight:600}
 .fraction-bar .fb-cap{fill:var(--cds-text-secondary);font-family:var(--font-sans)}
@@ -1002,7 +1019,7 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .tts-row{margin:var(--sp-04) 0 0}
 [data-tts="off"] .tts-row{display:none}
 .tts-oku{display:none;align-items:center;gap:var(--sp-03);font-family:var(--font-sans);font-size:var(--fs-label);
-  min-height:36px;padding:0 var(--sp-05);border:none;border-radius:var(--radius-btn);cursor:pointer;
+  min-height:2.25rem;padding:0 var(--sp-05);border:none;border-radius:var(--radius-btn);cursor:pointer;
   background:var(--cds-layer-02);box-shadow:inset 0 0 0 1px var(--cds-border-strong);color:var(--cds-text-primary)}
 [data-tts="on"] .tts-oku{display:inline-flex}
 .tts-oku:hover{background:var(--cds-layer-hover-01);box-shadow:inset 0 0 0 1px var(--cds-border-strong-01)}
@@ -2991,20 +3008,35 @@ const MODULE_DATA = {
     // seriler --viz-* paletinde; ders aksanı grafik serisi değildir (S19, B52)
     const PAL=["var(--viz-1)","var(--viz-2)","var(--viz-3)","var(--viz-4)","var(--viz-5)"];
     const EMPTY="var(--cds-layer-01)";
-    let cells=[], total=0, eq="", desc="", legend="";
+    /* Nötr rampada komşu adımlar 1,25:1'dir: grup sınırını RENK taşıyamaz (S19). vizChart
+       kategoriyi yerinde etiketle taşır, fractionBar ise bitişik <rect>'ler çizer — bu yüzden
+       gruplar rampanın uçlarına yayılır VE sınıra zemin renginde bir ayırıcı konur. Ayırıcı her
+       iki temada boşluk gibi okunur: açık temada dolgular koyu (gray100–60), koyuda açık
+       (gray10–50), zemin ise tersi. Sınırı yapı taşır, renk yalnız süsler. */
+    const yuvaSirasi = n => n<=1 ? [0]
+      : Array.from({length:n},(_,i)=>Math.round(i*(PAL.length-1)/(n-1))%PAL.length);
+    let cells=[], total=0, eq="", desc="", legend="", sinirlar=[];
     if(kind==="ratio"){
       const r=(spec.ratio||[]).map(n=>Math.max(0,Math.round(+n||0)));
       total=r.reduce((a,b)=>a+b,0)||1;
-      r.forEach((cnt,g)=>{ for(let k=0;k<cnt;k++) cells.push(PAL[g%PAL.length]); });
+      const sira=yuvaSirasi(r.length);
+      r.forEach((cnt,g)=>{
+        if(cnt>0 && cells.length) sinirlar.push(cells.length);
+        for(let k=0;k<cnt;k++) cells.push(PAL[sira[g]]);
+      });
       eq=r.join(" : ");
       const labs=spec.labels||[];
       desc="Oran çubuğu: "+(labs.length?labs.join(", ")+" olmak üzere ":"")+"gruplar "+r.join(" ye ")+" oranında bölünmüş.";
-      if(labs.length){ legend=`<div class="viz-legend">`+labs.map((l,i)=>`<span><i style="background:${PAL[i%PAL.length]}"></i>${esc(l)}</span>`).join("")+`</div>`; }
+      if(labs.length){ legend=`<div class="viz-legend">`+labs.map((l,i)=>`<span><i style="background:${PAL[sira[i%sira.length]]}"></i>${esc(l)}</span>`).join("")+`</div>`; }
     } else if(kind==="sum"){
       const den=Math.max(1,Math.round(+spec.den||1));
       const ad=(spec.addends||[]).map(n=>Math.max(0,Math.round(+n||0)));
       total=den; let placed=0;
-      ad.forEach((cnt,g)=>{ for(let k=0;k<cnt && placed<den;k++){ cells.push(PAL[g%PAL.length]); placed++; } });
+      const sira=yuvaSirasi(ad.length);
+      ad.forEach((cnt,g)=>{
+        if(cnt>0 && cells.length) sinirlar.push(cells.length);
+        for(let k=0;k<cnt && placed<den;k++){ cells.push(PAL[sira[g]]); placed++; }
+      });
       while(placed<den){ cells.push(EMPTY); placed++; }
       const sum=ad.reduce((a,b)=>a+b,0);
       const rhs = sum===den ? "1" : (sum+"\u2044"+den);
@@ -3023,12 +3055,14 @@ const MODULE_DATA = {
     for(let i=0;i<cells.length;i++){
       rects+=`<rect x="${(BARX+i*cw).toFixed(2)}" y="${BARY}" width="${cw.toFixed(2)}" height="${BARH}" fill="${cells[i]}" stroke="var(--cds-border-subtle)" stroke-width="1"/>`;
     }
+    const SEPW=3;
+    const seps=sinirlar.map(i=>`<rect class="fb-sep" x="${(BARX+i*cw-SEPW/2).toFixed(2)}" y="${BARY}" width="${SEPW}" height="${BARH}" fill="var(--cds-layer-01)"/>`).join("");
     const frame=`<rect x="${BARX}" y="${BARY}" width="${BARW}" height="${BARH}" fill="none" stroke="var(--cds-border-strong)" stroke-width="1.5"/>`;
     const eqTxt=`<text class="fb-eq" x="${W/2}" y="${EQY}" text-anchor="middle" font-size="22">${eq}</text>`;
     const title = kind==="ratio" ? "Oran modeli" : (kind==="sum" ? "Kesir toplamı modeli" : "Kesir modeli");
     const svg=`<svg class="viz fraction-bar" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="${tid} ${did}">`
       +`<title id="${tid}">${esc(title)}</title><desc id="${did}">${esc(spec.desc||desc)}</desc>`
-      +`${rects}${frame}${eqTxt}</svg>`;
+      +`${rects}${seps}${frame}${eqTxt}</svg>`;
     return `<figure class="viz viz--plain">${svg}${legend}${spec.caption?`<figcaption>${esc(spec.caption)}</figcaption>`:""}</figure>`;
   }
 

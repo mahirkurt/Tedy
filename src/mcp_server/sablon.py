@@ -78,6 +78,17 @@ BRIDGE_JS = r"""  /* ---- edupedia köprüsü ve varlıklar (ted-mcp sablon.py y
       persistSession();
       render();
     }
+  /* Panonun kök yazı boyu (spec §10.2). İsteğe bağlıdır: mesaj yoksa modül 16 px'te kalır,
+     yani tek başına açılış ve eski pano bugünkü gibi çalışır. Okurun tarayıcı tercihi panonun
+     clamp() tabanında (100%) zaten var, hesaplanmış değer onu taşır. Çerçeve opak kökenli
+     olduğu için gelen değer yine de doğrulanır: sayı değilse yok sayılır, 12-48 px'e kıstırılır. */
+  function adoptHostRootSize(rootPx){
+    const n = typeof rootPx === "number" ? rootPx : NaN;
+    if(!isFinite(n)) return false;
+    const kistirilmis = Math.min(48, Math.max(12, n));
+    document.documentElement.style.fontSize = kistirilmis + "px";
+    return true;
+  }
     if(embedded){
       window.addEventListener("message", function(e){
         if(e.source!==window.parent) return;
@@ -85,7 +96,7 @@ BRIDGE_JS = r"""  /* ---- edupedia köprüsü ve varlıklar (ted-mcp sablon.py y
         const d = e.data;
         if(!d || d.v !== 1) return;
         // Görünüm: pano kendi Carbon temasını bildirir (taslak önizleme dahil); ilerleme yazmaz.
-        if(d.type === "edupedia:appearance"){ adoptHostTheme(d.theme); return; }
+        if(d.type === "edupedia:appearance"){ adoptHostTheme(d.theme); adoptHostRootSize(d.rootPx); return; }
         if(!active || d.type !== "edupedia:restore") return;
         applyRestore(d.state);
       });

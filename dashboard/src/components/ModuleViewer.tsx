@@ -7,6 +7,12 @@ import {
 import ModulAiEtiketi from './ModulAiEtiketi'
 import './Modules.scss'
 
+// The dashboard's computed root font size. The frame is a separate document, so it does not
+// inherit the host's clamp() and cannot derive the scale itself: inside the frame `100vw` is the
+// frame's width (the column minus the page padding), which would couple module type size to
+// dashboard layout and mis-scale a standalone module. So the host reports the value (spec §10.2).
+const kokPx = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+
 type TicketState = { status: 'loading' } | { status: 'ready'; url: string } | { status: 'error'; message: string }
 
 const TICKET_ERRORS: Record<number, string> = {
@@ -88,11 +94,32 @@ export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress
   }, [onMessage])
 
   // On load (drafts included — they send no 'ready'), tell the module which Carbon theme the
-  // dashboard renders in so the two read as one surface. As with restore, '*' is the only target
-  // that reaches the opaque-origin frame; the contentWindow reference addresses it.
-  const onFrameLoad = useCallback(() => {
-    frameRef.current?.contentWindow?.postMessage(appearanceMessage(DASHBOARD_THEME), '*')
+  // dashboard renders in, and at what root font size, so the two read as one surface. As with
+  // restore, '*' is the only target that reaches the opaque-origin frame; the contentWindow
+  // reference addresses it.
+  const gonderGorunum = useCallback(() => {
+    frameRef.current?.contentWindow?.postMessage(appearanceMessage(DASHBOARD_THEME, kokPx()), '*')
   }, [])
+  const onFrameLoad = gonderGorunum
+
+  // Above 1920px the dashboard's root font size grows with the window (ted-theme.scss clamp), so
+  // a resize changes it. Re-announce only when the value actually changed: an unchanged resend
+  // would make the module rewrite its root font size on every resize frame.
+  useEffect(() => {
+    let son = kokPx()
+    let bekleyen = 0
+    const olcVeGonder = () => {
+      bekleyen = 0
+      const simdi = kokPx()
+      if (simdi !== son) { son = simdi; gonderGorunum() }
+    }
+    const onResize = () => { if (!bekleyen) bekleyen = requestAnimationFrame(olcVeGonder) }
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      if (bekleyen) cancelAnimationFrame(bekleyen)
+    }
+  }, [gonderGorunum])
 
   if (ticket.status === 'loading') {
     return <div className="module-viewer" aria-busy="true"><SkeletonText paragraph lineCount={3} /></div>
