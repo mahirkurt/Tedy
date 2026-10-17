@@ -159,3 +159,19 @@ def test_tam_ay_adi_kisaltma_kurali_disinda():
 def test_gecmis_acik_tarih_gun_adini_ileriye_cozmez():
     c = tarih_coz("15 Ekim Perşembe günü yapılan KTT sonuçları açıklandı", date(2026, 10, 16), YIL)
     assert c == TarihCozumu(None, None, True)
+
+
+# --- yayını bilinmeyen metin: yalnız açık tarihler (son inceleme, Important 2) ---------
+
+def test_goreli_kapaliyken_gun_adi_ve_goreli_ifade_tarih_uydurmaz():
+    bugun = date(2026, 10, 16)
+    for metin in ("Cuma günü quiz", "yarın kısa sınav", "bugün quiz", "haftaya yazılı",
+                  "next week exam on Monday", "bu hafta quiz"):
+        assert tarih_coz(metin, bugun, YIL, goreli=False) == TarihCozumu(None, None, False), metin
+
+
+def test_goreli_kapaliyken_acik_tarih_bugune_gore_cozulur():
+    bugun = date(2026, 10, 16)
+    assert tarih_coz("20 Kasım Cuma quiz", bugun, YIL, goreli=False) == TarihCozumu(date(2026, 11, 20), None, False)
+    # An explicit date already past today is not an upcoming exam.
+    assert tarih_coz("15 Ekim quiz", bugun, YIL, goreli=False) == TarihCozumu(None, None, True)

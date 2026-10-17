@@ -202,3 +202,17 @@ def test_kaynak_verisi_bad_records_ve_encoding_hatalari(tmp_path):
     (tmp_path / "output/homework_first_seen.json").write_text("{}", encoding="utf-8")
     ekler2, ilk2 = kaynak_verisi(tmp_path)
     assert ekler2 == ekler
+
+
+def test_odev_gecen_yilin_ilk_gorulmesi_yayin_sayilmaz():
+    """homework_first_seen.json is keyed by title: last year's "Quiz" must not date this year's."""
+    veri = haftalar_verisi()
+    veri["odevlerim"]["homework"]["rows"] = [
+        {"Ders Adı": "Matematik", "Ödev Başlığı": "Quiz", "Ödev Son Teslim Tarihi": "",
+         "detail": {"description": "Cuma günü quiz var."}},
+        {"Ders Adı": "Fen Bilimleri", "Ödev Başlığı": "Fen quiz", "Ödev Son Teslim Tarihi": "",
+         "detail": {"description": "Fen quiz Cuma."}}]
+    sonuc = adaylar(veri, BUGUN, odev_ilk_gorulme={"Quiz": "2026-03-02T09:00:00",
+                                                   "Fen quiz": "2026-09-02T09:00:00"})
+    odevler = {a.ders: a.yayin for a in sonuc if a.tur == "odev"}
+    assert odevler == {"Matematik": None, "Fen Bilimleri": date(2026, 9, 2)}

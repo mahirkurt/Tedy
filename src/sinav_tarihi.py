@@ -139,13 +139,18 @@ def _acik_tarihler(k: str, baslangic_yili: int) -> list[tuple[int, date]]:
     return sorted(bulunan)
 
 
-def tarih_coz(metin: str, yayin: date, okul_araligi: tuple[date, date]) -> TarihCozumu:
+def tarih_coz(metin: str, yayin: date, okul_araligi: tuple[date, date], goreli: bool = True) -> TarihCozumu:
+    """`goreli=False` when the text's publication date is unknown: only explicit dates count
+    ("Cuma günü", "yarın", "haftaya" are relative to a day we do not know — resolving them
+    against today would move the exam to a new date every week). `yayin` is then today."""
     k = katla(metin)
     bas, son = okul_araligi
     acik = _acik_tarihler(k, bas.year)
     for _, g in acik:
         if bas <= g <= son and g >= yayin:
             return TarihCozumu(g, None, False)
+    if not goreli:
+        return TarihCozumu(None, None, bool(acik))
 
     gun_adi = _GUN_ADI.search(k)
     if _YARIN.search(k):

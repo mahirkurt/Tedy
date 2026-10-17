@@ -87,7 +87,7 @@ def _ders_parcalari(bolum: Any, etiket: str | None, aralik: tuple[date, date] | 
     return sonuc
 
 
-def _odevler(veri: dict, ilk_gorulme: dict[str, str]) -> list[Aday]:
+def _odevler(veri: dict, ilk_gorulme: dict[str, str], yil_basi: date | None = None) -> list[Aday]:
     satirlar = ((veri.get("odevlerim") or {}).get("homework") or {}).get("rows") or []
     sonuc = []
     for r in satirlar:
@@ -98,8 +98,11 @@ def _odevler(veri: dict, ilk_gorulme: dict[str, str]) -> list[Aday]:
         metin = "\n".join(x for x in (baslik, aciklama) if x)
         if not metin:
             continue
-        sonuc.append(Aday(metin, normalize_course(r.get("Ders Adı") or "") or None,
-                          _gun(ilk_gorulme.get(baslik)), "odev",
+        # first_seen is keyed by title, so last year's "Quiz" would date this year's: ignored.
+        ilk = _gun(ilk_gorulme.get(baslik))
+        if ilk is not None and yil_basi is not None and ilk < yil_basi:
+            ilk = None
+        sonuc.append(Aday(metin, normalize_course(r.get("Ders Adı") or "") or None, ilk, "odev",
                           [{"bolum": "odev", "baslik": baslik, "teslim": r.get("Ödev Son Teslim Tarihi")}]))
     return sonuc
 
@@ -143,14 +146,15 @@ def adaylar(veri: dict, bugun: date, ek_metinleri: dict[str, tuple[str, date | N
     """Every pre-filtered candidate, newest first. No age limit by default: an exam announced
     weeks ahead must keep its (cached) finding until the exam is past — the age limit bounds
     only new model calls, in `SinavCikarici.cikar`. `en_eski_gun` exists for ad-hoc reads."""
-    bas_yil = okul_yili(bugun)[0].year
+    yil_basi = okul_yili(bugun)[0]
+    bas_yil = yil_basi.year
     ham: list[Aday] = []
     haftalar = veri.get("ders_icerikleri_haftalar") or {}
     if isinstance(haftalar, dict):
         for etiket, bolum in haftalar.items():
             ham += _ders_parcalari(bolum, etiket, hafta_etiketi_araligi(etiket, bas_yil), "ders_icerikleri_haftalar")
     ham += _ders_parcalari(veri.get("ders_icerikleri"), None, None, "ders_icerikleri")
-    ham += _odevler(veri, odev_ilk_gorulme or {})
+    ham += _odevler(veri, odev_ilk_gorulme or {}, yil_basi)
     ham += _duyurular(veri)
     for ek_id, (metin, ilk) in (ek_metinleri or {}).items():
         ham.append(Aday(metin, None, ilk, "ek", [{"bolum": "ek", "id": ek_id}]))

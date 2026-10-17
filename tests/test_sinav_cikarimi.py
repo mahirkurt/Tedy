@@ -336,3 +336,46 @@ def test_cikarici_yas_siniri_ayarlanabilir(tmp_path):
     okuyucu = SahteOkuyucu()
     _cikarici(tmp_path, okuyucu).cikar([ESKI], BUGUN, bitis=2000, yeni_cagri_sinir_gun=60)
     assert len(okuyucu.cagrilar) == 1
+
+
+# --- yayını bilinmeyen aday göreli tarih uydurmaz (son inceleme, Important 2) ----------
+
+CUMA_QUIZ = "Matematik: Cuma günü quiz olacak."
+
+
+def _cuma_satiri():
+    return _satir(tarih_ifadesi="Cuma günü", tarih="", konular=[], baslik="Matematik quiz",
+                  alinti="Matematik: Cuma günü quiz olacak.")
+
+
+def test_kapi_yayinsiz_adayda_gun_adi_tarih_vermez():
+    yayinsiz = Aday(CUMA_QUIZ, "Matematik", None, "odev", [])
+    [b] = uydurma_kapisi([_cuma_satiri()], yayinsiz, BUGUN)
+    assert (b.tarih, b.hafta) == (None, None)
+    # The same text with a known publication date resolves to that week's Friday.
+    yayinli = Aday(CUMA_QUIZ, "Matematik", date(2026, 10, 13), "odev", [])
+    [b] = uydurma_kapisi([_cuma_satiri()], yayinli, BUGUN)
+    assert b.tarih == date(2026, 10, 16)
+
+
+def test_cikarici_onbellek_zamani_yayindan_erkense_o_kullanilir(tmp_path):
+    """The dashboard writes a homework's first_seen only when it is opened: a late opening must
+    not move "Cuma günü" to the next week. The cache's first reading is an earlier, true bound."""
+    gec = Aday(CUMA_QUIZ, "Matematik", date(2026, 10, 17), "odev", [])   # first_seen Saturday
+    yol = tmp_path / "output/sinav_cikarim_onbellegi.json"
+    yol.parent.mkdir(parents=True)
+    yol.write_text(json.dumps({f"{sc.ISTEM_SURUMU}:{gec.anahtar}": {
+        "satirlar": [_cuma_satiri()], "zaman": "2026-10-13T16:00:00"}}), encoding="utf-8")
+    okuyucu = SahteOkuyucu()
+    [b] = _cikarici(tmp_path, okuyucu).cikar([gec], date(2026, 10, 17), bitis=2000).bulgular
+    assert okuyucu.cagrilar == [] and b.tarih == date(2026, 10, 16)
+
+
+def test_cikarici_onbellek_zamani_yayinsiz_adaya_tarih_vermez(tmp_path):
+    yayinsiz = Aday(CUMA_QUIZ, "Matematik", None, "duyuru", [])
+    yol = tmp_path / "output/sinav_cikarim_onbellegi.json"
+    yol.parent.mkdir(parents=True)
+    yol.write_text(json.dumps({f"{sc.ISTEM_SURUMU}:{yayinsiz.anahtar}": {
+        "satirlar": [_cuma_satiri()], "zaman": "2026-10-13T16:00:00"}}), encoding="utf-8")
+    [b] = _cikarici(tmp_path, SahteOkuyucu()).cikar([yayinsiz], BUGUN, bitis=2000).bulgular
+    assert (b.tarih, b.hafta) == (None, None)

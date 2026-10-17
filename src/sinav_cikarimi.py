@@ -177,9 +177,13 @@ def _saat(ham: Any, alinti: str) -> str | None:
     return None
 
 
-def uydurma_kapisi(satirlar: list[dict], aday: Aday, bugun: date) -> list[Bulgu]:
+def uydurma_kapisi(satirlar: list[dict], aday: Aday, bugun: date, yayin: date | None = None) -> list[Bulgu]:
+    """`yayin` overrides the candidate's publication date (an earlier, known reading of the same
+    text). With no publication date at all only explicit dates are resolved (`goreli=False`)."""
     kaynak = katla(aday.metin)
-    yayin = aday.yayin or bugun
+    yayin = yayin or aday.yayin
+    goreli = yayin is not None
+    yayin = yayin or bugun
     aralik = okul_yili(bugun)
     sonuc = []
     for s in satirlar:
@@ -191,7 +195,7 @@ def uydurma_kapisi(satirlar: list[dict], aday: Aday, bugun: date) -> list[Bulgu]
         # Tarih ifadesi ancak alıntının içindeyse kullanılır: aynı metnin başka bir cümlesindeki
         # tarih (ör. veli toplantısı) sınava bağlanmaz.
         ifade = str(s.get("tarih_ifadesi") or "").strip()
-        cozum = tarih_coz(ifade if ifade and katla(ifade) in katla(alinti) else alinti, yayin, aralik)
+        cozum = tarih_coz(ifade if ifade and katla(ifade) in katla(alinti) else alinti, yayin, aralik, goreli=goreli)
         if cozum.gun is None and cozum.hafta is None and cozum.gecersiz:
             continue
         saat = _saat(s.get("saat"), alinti)
@@ -206,6 +210,20 @@ def uydurma_kapisi(satirlar: list[dict], aday: Aday, bugun: date) -> list[Bulgu]
         sonuc.append(Bulgu(ders, tur, _baslik(s.get("baslik"), ders, tur, kaynak), cozum.gun, cozum.hafta,
                            saat, konular, alinti[:300], aday))
     return sonuc
+
+
+def _ilk_okuma(kayit: dict, aday: Aday) -> date | None:
+    """The cache's first reading of this text, when it is earlier than the candidate's publication
+    date: the text certainly existed then (a homework's first_seen is written only when the
+    dashboard is opened, so it can be late). Never for a candidate with no publication date —
+    the first reading may be weeks after the post, and a relative "Cuma günü" would be invented."""
+    if aday.yayin is None:
+        return None
+    try:
+        zaman = datetime.fromisoformat(str(kayit.get("zaman") or "")[:19]).date()
+    except ValueError:
+        return None
+    return zaman if zaman < aday.yayin else None
 
 
 @dataclass
@@ -224,6 +242,7 @@ class SinavCikarici:
         self.kok = Path(kok)
         self.okuyucu = okuyucu
         self.saat = saat
+        self._simdi = simdi
         self.defter = OcrDefteri(self.kok / DEFTER, tavan=tavan, simdi=simdi)
         self._onbellek_yolu = self.kok / ONBELLEK
         try:
@@ -249,7 +268,9 @@ class SinavCikarici:
                         hatalar.append(str(kayit["hata"])[:120])
                         continue
                     satirlar = kayit["satirlar"]
+                    onceki_okuma = _ilk_okuma(kayit, aday)
                 else:
+                    onceki_okuma = None
                     if aday.yayin is not None and aday.yayin < sinir:
                         # Too old to ask about for the first time: skipped silently, not "unread"
                         # (nothing was missed that the list could still have shown).
@@ -267,17 +288,17 @@ class SinavCikarici:
                         if e.faturalandi:
                             self.defter.yaz(self.okuyucu.model, e.girdi, e.cikti)
                             self._onbellek[anahtar] = {"satirlar": [], "hata": str(e)[:120],
-                                                       "zaman": datetime.now().isoformat(timespec="seconds")}
+                                                       "zaman": self._simdi().isoformat(timespec="seconds")}
                             degisti = True
                         continue
                     # Defter OcrDefteri'nin Haiku fiyatıyla hesaplar: TEDY_SINAV_MODEL daha pahalı
                     # bir modele çevrilirse harcama eksik sayılır ve tavan gevşer.
                     self.defter.yaz(self.okuyucu.model, okuma.girdi, okuma.cikti)
                     satirlar = okuma.satirlar
-                    self._onbellek[anahtar] = {"satirlar": satirlar, "zaman": datetime.now().isoformat(timespec="seconds")}
+                    self._onbellek[anahtar] = {"satirlar": satirlar, "zaman": self._simdi().isoformat(timespec="seconds")}
                     degisti = True
                 incelenen += 1
-                bulgular.extend(uydurma_kapisi(satirlar, aday, bugun))
+                bulgular.extend(uydurma_kapisi(satirlar, aday, bugun, yayin=onceki_okuma))
         finally:  # ücreti ödenmiş sonuçlar bir istisnada bile kaybolmasın
             if degisti or not self._onbellek_yolu.exists():
                 atomic_json_dump(self._onbellek, str(self._onbellek_yolu))
