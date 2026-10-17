@@ -35,6 +35,8 @@ NOTLU = dict(taban("not1", "Matematik", "Matematik · 1. Sınav", None), status=
     ("Özdebir GİS · İzleme Sınavı", "deneme"), ("Türkçe · Ortak Yazılı", "ortak_sinav"),
     ("Matematik KTT", "konu_tarama"), ("Fen · Yazılı", "yazili"), ("Irregular Verbs Quiz", "kisa_sinav"),
     ("Sebit Vcloud Kazanım Değerlendirme Uygulaması-1_TM", "deneme"), ("Okul gezisi", "diger"),
+    ("Bilgisayar Yazılı", "yazili"), ("GİS-1", "deneme"), ("Özdebir GİS-2 Sınavı", "deneme"),
+    ("Deneme Sınavı", "deneme"), ("Bilişim KTT-2", "konu_tarama"),
 ])
 def test_takvim_turu(baslik, tur):
     assert takvim_turu(baslik) == tur
@@ -71,7 +73,7 @@ def test_ayni_ders_ayni_gun_iki_bulgu_tek_kayit():
     b2 = bulgu(tarih=date(2026, 10, 15), konular=["Mutlak değer", "Tam sayılar"],
                konum={"bolum": "odev", "baslik": "KTT", "teslim": None}, aday_tur="odev")
     [k] = birlestir([], [b1, b2], None, SIMDI)
-    assert k["id"] == hashlib.md5("Matematik|konu_tarama|2026-10-15".encode()).hexdigest()[:12]
+    assert k["id"] == hashlib.md5("Matematik|2026-10-15".encode()).hexdigest()[:12]
     assert k["konular"] == ["Mutlak değer", "Tam sayılar"]
     assert [x["tur"] for x in k["kaynaklar"]] == ["ders_karti", "odev"]
     assert (k["tarih"], k["saat"], k["baslik"]) == ("2026-10-15", None, "Matematik KTT")
@@ -87,7 +89,7 @@ def test_hafta_yalniz_bulgu_haftadaki_tek_sinava_baglanir():
 def test_hafta_yalniz_bulgu_eslesme_yoksa_ayri_kayit():
     [k] = birlestir([], [bulgu("İngilizce", "kisa_sinav", hafta=date(2026, 10, 19))], None, SIMDI)
     assert (k["tarih"], k["hafta"]) == (None, "2026-10-19")
-    assert k["id"] == hashlib.md5("İngilizce|kisa_sinav|hafta:2026-10-19".encode()).hexdigest()[:12]
+    assert k["id"] == hashlib.md5("İngilizce|hafta:2026-10-19".encode()).hexdigest()[:12]
 
 
 def test_tarihsiz_bulgu_konu_ortusmesiyle_baglanir():
@@ -144,3 +146,44 @@ def test_yaz_oku_ve_gecersiz_belge(tmp_path):
     assert gecerli_belge({"surum": SURUM, "sinavlar": "x"}) is None
     (tmp_path / "output/sinavlar.json").write_text("{bozuk", encoding="utf-8")
     assert oku(tmp_path) is None
+
+
+def test_bozuk_takvim_tarihi_birlestirmeyi_dusurmez():
+    bozuk = taban("bozuk1", "Fen", "Fen · Yazılı", "23.10.2026")
+    kayitlar = birlestir([bozuk, GIS], [], None, SIMDI)
+    assert {k["id"] for k in kayitlar} == {"bozuk1", "gis1"}
+    k = next(k for k in kayitlar if k["id"] == "bozuk1")
+    assert (k["tarih"], k["saat"], k["sentetik"], k["kaynaklar"][0]["tur"]) == (None, None, False, "takvim")
+    assert k["taban"] == bozuk
+
+
+def test_yayin_tarihsiz_tarihsiz_haftasiz_bulgu_ayni_cagrida_dusmez():
+    [k] = birlestir([], [bulgu("Fen", "diger", konular=["Hücre"], yayin=None)], None, SIMDI)
+    assert (k["tarih"], k["hafta"], k["son_yayin"]) == (None, None, "2026-10-16")
+
+
+def test_konu_sirasi_icerik_surumunu_degistirmez():
+    def surum(*konular):
+        return birlestir([], [bulgu(tarih=date(2026, 10, 20), konular=list(konular))], None, SIMDI)[0]["icerik_surumu"]
+    assert surum("Mutlak değer", "Oran", "Tam sayılar") == surum("Tam sayılar", "Mutlak değer", "Oran")
+    assert surum("Mutlak değer", "Oran") != surum("Mutlak değer", "Oran", "Tam sayılar")
+
+
+@pytest.mark.parametrize("ters", [False, True])
+def test_bulgu_turu_metin_kaydi_kimligini_degistirmez(ters):
+    b1 = bulgu(tur="konu_tarama", tarih=date(2026, 10, 15), konular=["Oran"])
+    b2 = bulgu(tur="kisa_sinav", tarih=date(2026, 10, 15), konular=["Tam sayılar"], metin="başka")
+    [k] = birlestir([], [b2, b1] if ters else [b1, b2], None, SIMDI)
+    assert k["id"] == hashlib.md5("Matematik|2026-10-15".encode()).hexdigest()[:12]
+
+
+def test_tarihsiz_kayit_kimligi_turden_bagimsiz():
+    a = birlestir([], [bulgu("Fen", "diger", konular=["Hücre"])], None, SIMDI)[0]["id"]
+    b = birlestir([], [bulgu("Fen", "kisa_sinav", konular=["Hücre"])], None, SIMDI)[0]["id"]
+    assert a == b
+
+
+def test_kisa_konular_baglamayi_tetiklemez():
+    tarihli = bulgu(tarih=date(2026, 10, 20), konular=["A"])
+    tarihsiz = bulgu(konular=["a"], yayin=date(2026, 10, 12), metin="başka")
+    assert [k["tarih"] for k in birlestir([], [tarihli, tarihsiz], None, SIMDI)] == ["2026-10-20", None]

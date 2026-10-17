@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import date, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -21,20 +22,30 @@ TARIHSIZ_OMUR_GUN = 21
 BAGLAMA_GUN = 14
 KONU_SINIRI = 15
 KAYNAK_SINIRI = 6
+KONU_EN_AZ = 4
+
+
+# Anahtar sözcükler katlanmış başlıkta sözcük sınırıyla aranır ("bilgisayar" içindeki "gis" deneme sayılmaz).
+# Kısa kökler (<= 4 harf) tam sözcük olmalı; uzun kökler Türkçe ek alabilir ("denemesi", "yazılısı").
+_TUR_KURALLARI = (
+    ("ortak_sinav", ("ortak",)),
+    ("konu_tarama", ("ktt", "konu tarama")),
+    ("deneme", ("deneme", "gis", "izleme", "hazirbulunusluk", "kazanim degerlendirme")),
+    ("yazili", ("yazili",)),
+    ("kisa_sinav", ("quiz", "kisa sinav")),
+)
+
+
+def _sozcuk_var(katli: str, anahtar: str) -> bool:
+    son = r"(?![a-z0-9])" if len(anahtar) <= 4 else r""
+    return re.search(rf"(?<![a-z0-9]){re.escape(anahtar)}{son}", katli) is not None
 
 
 def takvim_turu(baslik: str) -> str:
     k = katla(baslik)
-    if "ortak" in k:
-        return "ortak_sinav"
-    if "ktt" in k or "konu tarama" in k:
-        return "konu_tarama"
-    if any(s in k for s in ("deneme", "gis", "izleme", "hazirbulunusluk", "kazanim degerlendirme")):
-        return "deneme"
-    if "yazili" in k:
-        return "yazili"
-    if "quiz" in k or "kisa sinav" in k:
-        return "kisa_sinav"
+    for tur, anahtarlar in _TUR_KURALLARI:
+        if any(_sozcuk_var(k, a) for a in anahtarlar):
+            return tur
     return "diger"
 
 
@@ -45,6 +56,11 @@ def _md5(metin: str) -> str:
 def _tabandan(e: dict) -> dict:
     tarih_saat = str(e.get("date") or "")
     sentetik = not tarih_saat
+    if tarih_saat:
+        try:
+            date.fromisoformat(tarih_saat[:10])
+        except ValueError:
+            tarih_saat = ""   # bozuk tarih: tarihsiz takvim sınavı (sentetik değil; takvim kaynağı ve kimliği var)
     saat = tarih_saat[11:16] if len(tarih_saat) >= 16 and not e.get("allDay") else None
     kaynak = ({"tur": "not_tablosu", "konum": {"id": e.get("id")}, "alinti": str(e.get("rawTitle") or "")[:300]}
               if sentetik else
@@ -77,8 +93,9 @@ def _ekle(kayit: dict, b: Bulgu) -> None:
 
 
 def _konu_ortusur(a: list[str], b: list[str]) -> bool:
-    ka, kb = [katla(x) for x in a], [katla(x) for x in b]
-    return any(x and y and (x in y or y in x) for x in ka for y in kb)
+    ka = [x for x in (katla(t) for t in a) if len(x) >= KONU_EN_AZ]
+    kb = [y for y in (katla(t) for t in b) if len(y) >= KONU_EN_AZ]
+    return any(x in y or y in x for x in ka for y in kb)
 
 
 def _tek(adaylar: list[dict]) -> dict | None:
@@ -86,7 +103,8 @@ def _tek(adaylar: list[dict]) -> dict | None:
 
 
 def _surum(k: dict) -> str:
-    govde = f"{k['tarih']}|{k['saat']}|{k['hafta']}|" + "|".join(k["konular"])
+    konular = sorted({katla(x) for x in k["konular"]})
+    govde = f"{k['tarih']}|{k['saat']}|{k['hafta']}|" + "|".join(konular)
     return hashlib.sha256(govde.encode("utf-8")).hexdigest()[:12]
 
 
@@ -100,7 +118,7 @@ def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, sim
         eslesen = next((k for k in kayitlar if not k["sentetik"] and k["tarih"] == gun
                         and (katla(k["ders"]) == katla(b.ders) or (b.ders == "Genel" and k["taban"]))), None)
         if eslesen is None:
-            eslesen = _bulgudan(b, _md5(f"{b.ders}|{b.tur}|{gun}"))
+            eslesen = _bulgudan(b, _md5(f"{b.ders}|{gun}"))
             kayitlar.append(eslesen)
         _ekle(eslesen, b)
 
@@ -116,7 +134,7 @@ def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, sim
                           and _konu_ortusur(k["konular"], b.konular)])
         if hedef is None:
             ek = f"hafta:{b.hafta.isoformat()}" if b.hafta else b.aday.anahtar[:12]
-            kimlik = _md5(f"{b.ders}|{b.tur}|{ek}")
+            kimlik = _md5(f"{b.ders}|{ek}")
             hedef = next((k for k in kayitlar if k["id"] == kimlik), None)
             if hedef is None:
                 hedef = _bulgudan(b, kimlik)
@@ -124,6 +142,9 @@ def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, sim
         _ekle(hedef, b)
 
     bugun = simdi.date()
+    for k in kayitlar:   # kaynağın yayın tarihi yoksa kayıt bu çalıştırmada görüldü sayılır, hemen düşmez
+        if not k["sentetik"] and not k["tarih"] and not k["hafta"] and not k["son_yayin"]:
+            k["son_yayin"] = bugun.isoformat()
     kalan = []
     for k in kayitlar:
         if k["sentetik"]:
