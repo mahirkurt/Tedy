@@ -303,6 +303,8 @@ def _taban(veri: dict) -> list[dict]:
 
 def main(argv: list[str] | None = None) -> int:
     import argparse
+    import fcntl
+    import sys
     import time
 
     from src.env_loader import load_env
@@ -312,11 +314,21 @@ def main(argv: list[str] | None = None) -> int:
                    help="bulunanları sinavlar.json'a yazmadan (model önbelleği ve bütçe defteri yine yazılır) yazdır")
     p.add_argument("--sure", type=float, default=300.0, help="model çağrıları için saniye")
     a = p.parse_args(argv)
-    veri = json.loads((PROJE_KOKU / "output/scraped_data.json").read_text(encoding="utf-8"))
-    belge = tespit_et(PROJE_KOKU, veri, _taban(veri), datetime.now(), time.monotonic() + a.sure)
-    print(kuru_rapor(belge))
-    if not a.kuru:
-        yaz(PROJE_KOKU, belge)
+    # The sync runs this step under output/.sync.lock and writes the same model cache and budget
+    # ledger: by hand it waits for nobody — if a sync holds the lock, it says so and stops.
+    kilit_yolu = PROJE_KOKU / "output" / ".sync.lock"
+    kilit_yolu.parent.mkdir(parents=True, exist_ok=True)
+    with open(kilit_yolu, "a") as kilit:
+        try:
+            fcntl.flock(kilit, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            print("senkron çalışıyor, sonra deneyin", file=sys.stderr)
+            return 2
+        veri = json.loads((PROJE_KOKU / "output/scraped_data.json").read_text(encoding="utf-8"))
+        belge = tespit_et(PROJE_KOKU, veri, _taban(veri), datetime.now(), time.monotonic() + a.sure)
+        print(kuru_rapor(belge))
+        if not a.kuru:
+            yaz(PROJE_KOKU, belge)
     return 0
 
 

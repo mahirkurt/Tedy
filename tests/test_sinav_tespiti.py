@@ -345,3 +345,52 @@ def test_d6_yerel_saat_portal_yerel_ile_ayni():
     for ham in ("2026-10-23T09:00:00+03:00", "2026-10-23T09:00:00Z", "2026-10-23T06:00:00+00:00",
                 "2026-10-23", "2026-10-23T09:00:00", "bozuk", "", "2026-10-23T09:00:00+99:00"):
         assert yerel_saat(ham) == api._portal_yerel(ham), ham
+
+
+# --- temizlik B: CLI senkron kilidini engellemeden dener ---------------------------------
+
+@pytest.fixture
+def cli_kok(tmp_path, monkeypatch):
+    import src.env_loader as el
+    import src.sinav_tespiti as st
+    monkeypatch.setattr(el, "load_env", lambda *a, **k: None)
+    monkeypatch.setattr(st, "PROJE_KOKU", tmp_path)
+    (tmp_path / "output").mkdir()
+    (tmp_path / "output/scraped_data.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(st, "_taban", lambda veri: [])
+    return tmp_path
+
+
+def _kilidi_dene(yol):
+    import fcntl
+    with open(yol, "a") as f:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return False
+        return True
+
+
+@pytest.mark.parametrize("argv", [["--kuru"], []])
+def test_b15_senkron_calisirken_cikis_2(cli_kok, monkeypatch, capsys, argv):
+    import fcntl
+    import src.sinav_tespiti as st
+    monkeypatch.setattr(st, "tespit_et", lambda *a, **k: pytest.fail("kilit tutulurken model çağrılmamalı"))
+    with open(cli_kok / "output/.sync.lock", "a") as kilit:
+        fcntl.flock(kilit, fcntl.LOCK_EX)
+        assert st.main(argv) == 2
+    assert "senkron çalışıyor, sonra deneyin" in capsys.readouterr().err
+    assert not (cli_kok / "output/sinavlar.json").exists()
+
+
+def test_b15_kilit_bossa_alinir_ve_is_boyunca_tutulur(cli_kok, monkeypatch, capsys):
+    import src.sinav_tespiti as st
+    gorulen = []
+
+    def tespit_et(kok, veri, taban, simdi, bitis, okuyucu=None):
+        gorulen.append(_kilidi_dene(cli_kok / "output/.sync.lock"))
+        return {"uretildi": "x", "surum": SURUM, "sinavlar": [], "ozet": {}}
+    monkeypatch.setattr(st, "tespit_et", tespit_et)
+    assert st.main(["--kuru"]) == 0
+    assert gorulen == [False]                                   # held by main while it works
+    assert _kilidi_dene(cli_kok / "output/.sync.lock") is True   # and released after
