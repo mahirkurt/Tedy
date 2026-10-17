@@ -13,7 +13,7 @@ from typing import Any
 
 from src.json_utils import atomic_json_dump
 from src.sinav_cikarimi import Bulgu
-from src.sinav_tarihi import katla
+from src.sinav_tarihi import katla, kati_gun, kati_tarih_saat
 
 SURUM = 1
 SINAVLAR = PurePosixPath("output/sinavlar.json")
@@ -24,11 +24,11 @@ KONU_SINIRI = 15
 KAYNAK_SINIRI = 6
 KONU_EN_AZ = 4
 ORTAK_TURLER = ("deneme", "ortak_sinav")
-_GUN_DESENI = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 # Anahtar sözcükler katlanmış başlıkta sözcük sınırıyla aranır ("bilgisayar" içindeki "gis" deneme sayılmaz).
-# Kısa kökler (<= 4 harf) tam sözcük olmalı; uzun kökler Türkçe ek alabilir ("denemesi", "yazılısı").
+# Kısa kökler (<= 4 harf) ve "ortak" tam sözcük olmalı — ardından harf gelemez, rakam gelebilir ("KTT2",
+# "GİS2"; "Ortaklık" ortak sınav değildir); uzun kökler Türkçe ek alabilir ("denemesi", "yazılısı").
 _TUR_KURALLARI = (
     ("ortak_sinav", ("ortak",)),
     ("konu_tarama", ("ktt", "konu tarama")),
@@ -38,8 +38,11 @@ _TUR_KURALLARI = (
 )
 
 
+_TAM_SOZCUK = frozenset({"ortak"})
+
+
 def _sozcuk_var(katli: str, anahtar: str) -> bool:
-    son = r"(?![a-z0-9])" if len(anahtar) <= 4 else r""
+    son = r"(?![a-z])" if len(anahtar) <= 4 or anahtar in _TAM_SOZCUK else r""
     return re.search(rf"(?<![a-z0-9]){re.escape(anahtar)}{son}", katli) is not None
 
 
@@ -56,19 +59,19 @@ def _md5(metin: str) -> str:
 
 
 def _tabandan(e: dict) -> dict:
-    tarih_saat = str(e.get("date") or "")
-    sentetik = not tarih_saat
-    if tarih_saat:
-        try:
-            date.fromisoformat(tarih_saat[:10])
-        except ValueError:
-            tarih_saat = ""   # bozuk tarih: tarihsiz takvim sınavı (sentetik değil; takvim kaynağı ve kimliği var)
-    saat = tarih_saat[11:16] if len(tarih_saat) >= 16 and not e.get("allDay") else None
+    ham = str(e.get("date") or "")
+    sentetik = not ham
+    # Bozuk tarih (katı biçim dışı): tarihsiz takvim sınavı — sentetik değil, takvim kaynağı ve kimliği var.
+    an = kati_tarih_saat(ham)
+    tarih = an.date().isoformat() if an else None
+    saat = an.strftime("%H:%M") if an and "T" in ham and not e.get("allDay") else None
     kaynak = ({"tur": "not_tablosu", "konum": {"id": e.get("id")}, "alinti": str(e.get("rawTitle") or "")[:300]}
               if sentetik else
               {"tur": "takvim", "konum": {"id": e.get("id")}, "alinti": str(e.get("rawTitle") or "")[:300]})
-    return {"id": e.get("id"), "ders": e.get("course") or "Genel", "tur": takvim_turu(e.get("title") or ""),
-            "baslik": e.get("title") or e.get("rawTitle") or "Sınav", "tarih": tarih_saat[:10] or None,
+    # The kind reads the raw title: the cleaned one drops words ("Ortak", "MEB Ülke Geneli").
+    return {"id": e.get("id"), "ders": e.get("course") or "Genel",
+            "tur": takvim_turu(e.get("rawTitle") or e.get("title") or ""),
+            "baslik": e.get("title") or e.get("rawTitle") or "Sınav", "tarih": tarih,
             "saat": saat, "hafta": None, "konular": [], "kaynaklar": [kaynak], "sentetik": sentetik,
             "taban": e, "son_yayin": None}
 
@@ -81,6 +84,10 @@ def _bulgudan(b: Bulgu, kimlik: str) -> dict:
 
 
 def _ekle(kayit: dict, b: Bulgu) -> None:
+    # A text record takes the first finding's kind that says something ("diger" says nothing);
+    # a takvim or grade-table base keeps its own kind and title.
+    if kayit["taban"] is None and kayit["tur"] == "diger" and b.tur != "diger":
+        kayit["tur"], kayit["baslik"] = b.tur, b.baslik
     for k in b.konular:
         if katla(k) not in {katla(x) for x in kayit["konular"]}:
             kayit["konular"].append(k)
@@ -104,6 +111,15 @@ def _tek(adaylar: list[dict]) -> dict | None:
     return adaylar[0] if len(adaylar) == 1 else None
 
 
+def _metin_konumlari(k: dict) -> set[str]:
+    """The portal positions of a record's text sources (not takvim / grade table)."""
+    sonuc = set()
+    for x in k.get("kaynaklar") or []:
+        if isinstance(x, dict) and x.get("tur") not in ("takvim", "not_tablosu") and isinstance(x.get("konum"), dict):
+            sonuc.add(json.dumps(x["konum"], sort_keys=True))
+    return sonuc
+
+
 def _surum(k: dict) -> str:
     konular = sorted({katla(x) for x in k["konular"]})
     govde = f"{k['tarih']}|{k['saat']}|{k['hafta']}|" + "|".join(konular)
@@ -121,10 +137,10 @@ def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, sim
                         and (katla(k["ders"]) == katla(b.ders) or (b.ders == "Genel" and k["taban"]))), None)
         if eslesen is None and b.tur in ORTAK_TURLER:
             # A shared exam (GİS, a common written) is often announced in one course's tab: its
-            # takvim record carries another course name. Same day is enough — preferring a takvim
-            # record of a shared kind, then any takvim record of that day.
+            # takvim record carries another course name. Same day is enough when it is unambiguous.
+            # Only when the day is unambiguous: one takvim record of a shared kind, else the day's only one.
             gunun = [k for k in kayitlar if k["taban"] and not k["sentetik"] and k["tarih"] == gun]
-            eslesen = next((k for k in gunun if k["tur"] in ORTAK_TURLER), gunun[0] if gunun else None)
+            eslesen = _tek([k for k in gunun if k["tur"] in ORTAK_TURLER]) or _tek(gunun)
         if eslesen is None:
             eslesen = _bulgudan(b, _md5(f"{b.ders}|{gun}"))
             kayitlar.append(eslesen)
@@ -168,14 +184,24 @@ def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, sim
 
     eski = {k.get("id"): k for k in ((onceki or {}).get("sinavlar") or []) if isinstance(k, dict)}
     an = simdi.isoformat(timespec="seconds")
+    # A text exam whose date changed gets a new id. If the previous file has a record that is no
+    # longer produced and was found at the same portal position, it is the same exam: its first
+    # sighting carries over and it reads as changed, not new.
+    uretilen = {k["id"] for k in kalan}
+    yetim = [o for i, o in eski.items() if i not in uretilen and _metin_konumlari(o)]
     for k in kalan:
         k["konular"] = k["konular"][:KONU_SINIRI]
         k["kaynaklar"] = k["kaynaklar"][:KAYNAK_SINIRI]
         k["icerik_surumu"] = _surum(k)
         o = eski.get(k["id"])
+        ata = None if o is not None or k["taban"] else next(
+            (y for y in yetim if _metin_konumlari(y) & _metin_konumlari(k)), None)
         if o is not None:
             k["ilk_tespit"] = o.get("ilk_tespit")
             k["degisti"] = an if o.get("icerik_surumu") != k["icerik_surumu"] else o.get("degisti")
+        elif ata is not None:
+            yetim.remove(ata)
+            k["ilk_tespit"], k["degisti"] = ata.get("ilk_tespit"), an
         else:
             k["ilk_tespit"] = None if onceki is None else an
             k["degisti"] = None
@@ -209,15 +235,6 @@ def yaz(kok: Path, belge: dict) -> None:
 PROJE_KOKU = Path(__file__).resolve().parents[1]
 
 
-def _gun(deger: Any) -> date | None:
-    if not isinstance(deger, str) or not _GUN_DESENI.fullmatch(deger):
-        return None
-    try:
-        return date.fromisoformat(deger)
-    except ValueError:
-        return None
-
-
 def korunan_konumlar(onceki: dict | None, bugun: date) -> set[str]:
     """Portal positions (json.dumps(konum, sort_keys=True)) of the previous file's exams still
     ahead — dated today or later, or a week not yet over. A candidate there is read even past the
@@ -226,7 +243,7 @@ def korunan_konumlar(onceki: dict | None, bugun: date) -> set[str]:
     for k in (onceki or {}).get("sinavlar") or []:
         if not isinstance(k, dict):
             continue
-        tarih, hafta = _gun(k.get("tarih")), _gun(k.get("hafta"))
+        tarih, hafta = kati_gun(k.get("tarih")), kati_gun(k.get("hafta"))
         if not ((tarih and tarih >= bugun) or (hafta and hafta + timedelta(days=6) >= bugun)):
             continue
         for x in k.get("kaynaklar") or []:

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from src.assistant_core import turkce_kucult_katla
 
@@ -58,6 +58,32 @@ _YARIN = re.compile(r"\b(yarin|tomorrow)\b")
 _BUGUN = re.compile(r"\b(bugun|today)\b")
 _IMZA = re.compile(r"\|\s*(\d{2})\.(\d{2})\.(\d{4})")
 _ETIKET = re.compile(rf"(\d{{1,2}})\s+({_AY})\.?\s*-\s*(\d{{1,2}})\s+({_AY})\.?")
+
+
+# Stored dates are read strictly: Python's fromisoformat also takes "20261023" and "2026-W43-5",
+# which no TEDY writer produces — such a value is an unreadable date, never a day.
+GUN_DESENI = re.compile(r"\d{4}-\d{2}-\d{2}")
+TARIH_SAAT_DESENI = re.compile(r"\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?)?")
+
+
+def kati_gun(deger: object) -> date | None:
+    """Exactly YYYY-MM-DD as a date, else None."""
+    if not isinstance(deger, str) or not GUN_DESENI.fullmatch(deger):
+        return None
+    try:
+        return date.fromisoformat(deger)
+    except ValueError:
+        return None
+
+
+def kati_tarih_saat(deger: object) -> datetime | None:
+    """Exactly YYYY-MM-DD or YYYY-MM-DDTHH:MM[:SS[.ffffff]] as a naive datetime, else None."""
+    if not isinstance(deger, str) or not TARIH_SAAT_DESENI.fullmatch(deger):
+        return None
+    try:
+        return datetime.fromisoformat(deger)
+    except ValueError:
+        return None
 
 
 @dataclass(frozen=True)

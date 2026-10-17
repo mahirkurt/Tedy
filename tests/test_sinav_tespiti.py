@@ -222,3 +222,98 @@ def test_a7_tarihsiz_kayit_kimligi_metin_ozetinden_degismedi():
     [k] = birlestir([], [bulgu("Fen", "diger", konular=["Hücre"], metin="Fen quiz yakında")], None, SIMDI)
     metin_ozeti = hashlib.sha256(katla("Fen quiz yakında").encode()).hexdigest()
     assert k["id"] == hashlib.md5(f"Fen|{metin_ozeti[:12]}".encode()).hexdigest()[:12]
+
+
+TR_ORTAK_HAM = ("7. Sınıf MEB Ülke Geneli Türkçe 1. Dönem 2. Ortak Yazılı Sınavı / 7th Grade MEB "
+                "Nationwide Turkish 1st Term 2nd Common Written Exam")
+
+
+def test_a2_taban_turu_ham_basliktan():
+    e = dict(taban("trm", "Türkçe", "Türkçe · 2. Yazılı", "2027-01-05T10:30:00"), rawTitle=TR_ORTAK_HAM)
+    [k] = birlestir([e], [], None, SIMDI)
+    assert k["tur"] == "ortak_sinav"
+    assert birlestir([dict(e, rawTitle="")], [], None, SIMDI)[0]["tur"] == "yazili"   # no raw: title
+
+
+@pytest.mark.parametrize("baslik,tur", [
+    ("KTT2", "konu_tarama"), ("GİS2 Sınavı", "deneme"), ("Quiz3", "kisa_sinav"),
+    ("Ortaklık Haftası", "diger"), ("Okul ortaklığı semineri", "diger"), ("Ortak sınav", "ortak_sinav"),
+])
+def test_a15_kisa_anahtar_rakamla_ortak_tam_sozcuk(baslik, tur):
+    assert takvim_turu(baslik) == tur
+
+
+@pytest.mark.parametrize("bozuk", ["20261023", "2026-W43-5", "2026-10-23T25:00:00", "2026-10-23 sabah"])
+def test_a16_taban_tarihi_kati_bicim(bozuk):
+    [k] = birlestir([taban("b1", "Fen", "Fen · Yazılı", bozuk)], [], None, SIMDI)
+    assert (k["tarih"], k["saat"], k["sentetik"]) == (None, None, False)
+
+
+def test_a16_taban_tarihi_gecerli_bicimler():
+    saatli = birlestir([taban("s1", "Fen", "Fen · Yazılı", "2026-10-23T09:05:00")], [], None, SIMDI)[0]
+    gunluk = birlestir([taban("g1", "Fen", "Fen · Yazılı", "2026-10-23", all_day=True)], [], None, SIMDI)[0]
+    assert (saatli["tarih"], saatli["saat"]) == ("2026-10-23", "09:05")
+    assert (gunluk["tarih"], gunluk["saat"]) == ("2026-10-23", None)
+
+
+def test_a17_ortak_sinav_gunde_birden_cok_takvim_kaydi_varsa_ayri_kayit():
+    mat = taban("mat1", "Matematik", "Matematik · Yazılı", "2026-10-23T09:00:00")
+    tr = taban("tr2", "Türkçe", "Türkçe · Yazılı", "2026-10-23T11:00:00")
+    fen = bulgu("Fen Bilimleri", "deneme", tarih=date(2026, 10, 23), konular=["Uzay Çağı"])
+    kayitlar = {k["id"]: k for k in birlestir([mat, tr], [fen], None, SIMDI)}
+    assert len(kayitlar) == 3
+    assert kayitlar["mat1"]["konular"] == [] and kayitlar["tr2"]["konular"] == []
+    # With a single takvim record that day it still binds (the GİS case).
+    assert len(birlestir([mat], [fen], None, SIMDI)) == 1
+
+
+def test_a18_tarihi_degisen_metin_sinavi_ilk_tespiti_tasir():
+    konum = {"bolum": "ders_icerikleri_haftalar", "hafta": "5. Hafta", "ders": "Matematik", "sira": 2}
+    onceki = {"surum": SURUM, "sinavlar": birlestir(
+        [], [bulgu(tarih=date(2026, 10, 20), konular=["Oran"], konum=konum)],
+        {"surum": SURUM, "sinavlar": []}, datetime(2026, 10, 10, 9))}
+    eski_id = onceki["sinavlar"][0]["id"]
+    [k] = birlestir([], [bulgu(tarih=date(2026, 10, 22), konular=["Oran"], konum=konum)], onceki, SIMDI)
+    assert k["id"] != eski_id
+    assert (k["ilk_tespit"], k["degisti"]) == ("2026-10-10T09:00:00", "2026-10-16T10:00:00")
+
+
+def test_a18_hala_uretilen_kaydin_konumu_tasinmaz():
+    konum = {"bolum": "odev", "baslik": "KTT", "teslim": None}
+    onceki = {"surum": SURUM, "sinavlar": birlestir(
+        [], [bulgu(tarih=date(2026, 10, 20), konular=["Oran"], konum=konum)],
+        {"surum": SURUM, "sinavlar": []}, datetime(2026, 10, 10, 9))}
+    # The same post now names two exams: the old one is still produced, the new one is new.
+    kayitlar = birlestir([], [bulgu(tarih=date(2026, 10, 20), konular=["Oran"], konum=konum),
+                              bulgu(tarih=date(2026, 10, 27), konular=["Kesir"], konum=konum)], onceki, SIMDI)
+    yeni = next(k for k in kayitlar if k["tarih"] == "2026-10-27")
+    assert (yeni["ilk_tespit"], yeni["degisti"]) == ("2026-10-16T10:00:00", None)
+
+
+def test_a19_tur_ve_baslik_ilk_bulguya_bagli_degil():
+    diger = bulgu(tur="diger", tarih=date(2026, 10, 20), baslik="Matematik Sınav")
+    yazili = bulgu(tur="yazili", tarih=date(2026, 10, 20), baslik="Matematik yazılısı", metin="başka")
+    kisa = bulgu(tur="kisa_sinav", tarih=date(2026, 10, 20), baslik="Matematik quiz", metin="üçüncü")
+    [k] = birlestir([], [diger, yazili, kisa], None, SIMDI)
+    assert (k["tur"], k["baslik"]) == ("yazili", "Matematik yazılısı")
+    # A takvim base keeps its own kind and title whatever the text says.
+    fen = taban("fen9", "Fen Bilimleri", "Fen · Yazılı", "2026-10-21T09:00:00")
+    [k] = birlestir([fen], [bulgu("Fen Bilimleri", "kisa_sinav", tarih=date(2026, 10, 21), baslik="Fen quiz")],
+                    None, SIMDI)
+    assert (k["tur"], k["baslik"]) == ("yazili", "Fen · Yazılı")
+
+
+def test_a20_konu_ve_kaynak_siniri():
+    from src.sinav_tespiti import KAYNAK_SINIRI, KONU_SINIRI
+    bulgular = [bulgu(tarih=date(2026, 10, 20), konular=[f"Konu numarası {i}"], metin=f"metin {i}",
+                      konum={"bolum": "odev", "baslik": f"Ödev {i}", "teslim": None}) for i in range(20)]
+    [k] = birlestir([], bulgular, None, SIMDI)
+    assert len(k["konular"]) == KONU_SINIRI and k["konular"][0] == "Konu numarası 0"
+    assert len(k["kaynaklar"]) == KAYNAK_SINIRI and k["kaynaklar"][0]["konum"]["baslik"] == "Ödev 0"
+
+
+def test_a20_genel_bulgu_takvimsiz_gunde_ayri_kayit():
+    mat = bulgu(tarih=date(2026, 10, 20), konular=["Oran"])
+    genel = bulgu("Genel", "deneme", tarih=date(2026, 10, 20), konular=["Tüm konular"], metin="genel")
+    kayitlar = birlestir([], [mat, genel], None, SIMDI)
+    assert sorted(k["ders"] for k in kayitlar) == ["Genel", "Matematik"]
