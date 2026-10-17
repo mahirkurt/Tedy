@@ -260,7 +260,8 @@ def main(argv: list[str] | None = None) -> int:
     from src.env_loader import load_env
     load_env()
     p = argparse.ArgumentParser(description="Sınav tespiti: sinavlar.json üretir")
-    p.add_argument("--kuru", action="store_true", help="dosyaya yazmadan bulunanları yazdır")
+    p.add_argument("--kuru", action="store_true",
+                   help="bulunanları sinavlar.json'a yazmadan (model önbelleği ve bütçe defteri yine yazılır) yazdır")
     p.add_argument("--sure", type=float, default=300.0, help="model çağrıları için saniye")
     a = p.parse_args(argv)
     veri = json.loads((PROJE_KOKU / "output/scraped_data.json").read_text(encoding="utf-8"))

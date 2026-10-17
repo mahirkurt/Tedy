@@ -87,6 +87,18 @@ def test_cli_kuru_dosya_yazmaz(tmp_path, monkeypatch, capsys):
     assert (tmp_path / "output/sinavlar.json").exists()
 
 
+def test_cli_kuru_yardimi_neyin_yine_yazildigini_soyler(capsys, monkeypatch):
+    """--kuru skips only sinavlar.json: model calls still happen, so cache and ledger are written."""
+    import pytest as _pytest
+
+    import src.env_loader
+    monkeypatch.setattr(src.env_loader, "load_env", lambda *a, **k: None)
+    with _pytest.raises(SystemExit):
+        st.main(["--help"])
+    yardim = " ".join(capsys.readouterr().out.split())
+    assert "sinavlar.json'a yazmadan (model önbelleği ve bütçe defteri yine yazılır)" in yardim
+
+
 def _sahte_okuyucu():
     from src.sinav_cikarimi import OkumaSonucu
 
