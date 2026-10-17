@@ -24,6 +24,7 @@ KONU_SINIRI = 15
 KAYNAK_SINIRI = 6
 KONU_EN_AZ = 4
 ORTAK_TURLER = ("deneme", "ortak_sinav")
+_GUN_DESENI = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 # Anahtar sözcükler katlanmış başlıkta sözcük sınırıyla aranır ("bilgisayar" içindeki "gis" deneme sayılmaz).
@@ -208,6 +209,32 @@ def yaz(kok: Path, belge: dict) -> None:
 PROJE_KOKU = Path(__file__).resolve().parents[1]
 
 
+def _gun(deger: Any) -> date | None:
+    if not isinstance(deger, str) or not _GUN_DESENI.fullmatch(deger):
+        return None
+    try:
+        return date.fromisoformat(deger)
+    except ValueError:
+        return None
+
+
+def korunan_konumlar(onceki: dict | None, bugun: date) -> set[str]:
+    """Portal positions (json.dumps(konum, sort_keys=True)) of the previous file's exams still
+    ahead — dated today or later, or a week not yet over. A candidate there is read even past the
+    age limit for new model calls: an early post the teacher edited must not lose its exam (A14)."""
+    sonuc: set[str] = set()
+    for k in (onceki or {}).get("sinavlar") or []:
+        if not isinstance(k, dict):
+            continue
+        tarih, hafta = _gun(k.get("tarih")), _gun(k.get("hafta"))
+        if not ((tarih and tarih >= bugun) or (hafta and hafta + timedelta(days=6) >= bugun)):
+            continue
+        for x in k.get("kaynaklar") or []:
+            if isinstance(x, dict) and isinstance(x.get("konum"), dict):
+                sonuc.add(json.dumps(x["konum"], sort_keys=True))
+    return sonuc
+
+
 def tespit_et(kok: Path, veri: dict, taban: list[dict], simdi: datetime, bitis: float,
               okuyucu: Any = None) -> dict:
     from src.sinav_cikarimi import ClaudeSinavOkuyucu, SinavCikarici
@@ -216,8 +243,9 @@ def tespit_et(kok: Path, veri: dict, taban: list[dict], simdi: datetime, bitis: 
     kok = Path(kok)
     ekler, ilk_gorulme = kaynak_verisi(kok)
     liste = adaylar(veri, simdi.date(), ek_metinleri=ekler, odev_ilk_gorulme=ilk_gorulme)
-    sonuc = SinavCikarici(kok, okuyucu or ClaudeSinavOkuyucu()).cikar(liste, simdi.date(), bitis)
     onceki = oku(kok)
+    sonuc = SinavCikarici(kok, okuyucu or ClaudeSinavOkuyucu()).cikar(
+        liste, simdi.date(), bitis, korunan_konumlar=korunan_konumlar(onceki, simdi.date()))
     if onceki is None and (kok / SINAVLAR).exists():
         # A file that is there but unreadable (torn, an older SURUM) is not a first
         # install: None would stamp every record "already there" and swallow its alert.

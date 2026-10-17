@@ -22,7 +22,7 @@ from src.course_names import normalize_course
 from src.json_utils import atomic_json_dump
 from src.ocr_katmani import OcrDefteri
 from src.sinav_kaynaklari import Aday, on_suzgec
-from src.sinav_tarihi import katla, okul_yili, tarih_coz
+from src.sinav_tarihi import TarihCozumu, katla, okul_yili, tarih_coz
 
 ISTEM_SURUMU = 1
 SINAV_VARSAYILAN_MODEL = "claude-haiku-4-5"
@@ -34,7 +34,13 @@ DEFTER = PurePosixPath("output/sinav_cikarim_defteri.json")
 YENI_CAGRI_SINIR_GUN = 45
 CAGRI_EN_AZ_SURE = 8.0
 CAGRI_EN_COK_SURE = 30.0
+# A longer text is read in overlapping parts, each its own request and cache entry: an exam
+# announced past the first 6,000 characters is not cut off.
 METIN_SINIRI = 6000
+PARCA_ORTUSME = 500
+# A billed but unusable answer is not asked again for a week (then once more: a refusal or a
+# cut-off answer may not repeat).
+HATA_YENIDEN_DENEME_GUN = 7
 SINAV_TURLERI = ["yazili", "kisa_sinav", "konu_tarama", "deneme", "ortak_sinav", "diger"]
 TUR_ADI = {"yazili": "Yazılı", "kisa_sinav": "Kısa sınav", "konu_tarama": "KTT", "deneme": "Deneme",
            "ortak_sinav": "Ortak sınav", "diger": "Sınav"}
@@ -51,9 +57,13 @@ CIKARIM_SEMASI = {
         }}}},
 }
 _SAAT = re.compile(r"^(\d{1,2})[:.](\d{2})$")
-_SAAT_ONCE = re.compile(r"[\d./:]$")
-_SAAT_SONRA = re.compile(r"^[\d./:]\d?")
+# Part of a date or decimal chain only when a digit touches it, directly or across one of ./: —
+# a sentence's full stop, comma, bracket or "Saat:" leaves the time standing.
+_SAAT_ONCE = re.compile(r"\d[./:]?$")
+_SAAT_SONRA = re.compile(r"^[./:]?\d")
 _SOZCUK = re.compile(r"[0-9a-z]{3,}")
+_RAKAM = re.compile(r"\d+")
+_PARAGRAF = re.compile(r"\n\s*\n")
 
 ISTEM = """Sen bir okul duyurusu okuyucususun. Aşağıdaki metin 7. sınıf öğrencisi Işık'ın okul portalından.
 Metinde DUYURULAN, yapılacak ya da yakında yapılacak sınavları çıkar: yazılı, kısa sınav/quiz,
@@ -158,7 +168,9 @@ def _ders(aday: Aday, model_dersi: Any, kaynak: str) -> str:
 def _baslik(model_basligi: Any, ders: str, tur: str, kaynak: str) -> str:
     baslik = " ".join(str(model_basligi or "").split())[:80]
     sozcukler = _SOZCUK.findall(katla(baslik))
-    if sozcukler and all(s in kaynak or s in katla(ders) for s in sozcukler):
+    # A number ("3. yazılı") must be in the source as a number of its own, not inside "2026".
+    rakamlar_kaynakta = all(re.search(rf"(?<!\d){r}(?!\d)", kaynak) for r in _RAKAM.findall(baslik))
+    if sozcukler and rakamlar_kaynakta and all(s in kaynak or s in katla(ders) for s in sozcukler):
         return baslik
     return f"{ders} {TUR_ADI[tur]}" if ders != "Genel" else TUR_ADI[tur]
 
@@ -175,6 +187,12 @@ def _saat(ham: Any, alinti: str) -> str | None:
             continue
         return f"{int(m.group(1)):02d}:{m.group(2)}"
     return None
+
+
+def _ayni_paragraf(metin: str, alinti: str, ifade: str) -> bool:
+    """Whether the quote and the date phrase sit in one paragraph (a block between blank lines)."""
+    ka, ki = katla(alinti), katla(ifade)
+    return any(ka in katla(p) and ki in katla(p) for p in _PARAGRAF.split(metin))
 
 
 def uydurma_kapisi(satirlar: list[dict], aday: Aday, bugun: date, yayin: date | None = None) -> list[Bulgu]:
@@ -195,7 +213,15 @@ def uydurma_kapisi(satirlar: list[dict], aday: Aday, bugun: date, yayin: date | 
         # Tarih ifadesi ancak alıntının içindeyse kullanılır: aynı metnin başka bir cümlesindeki
         # tarih (ör. veli toplantısı) sınava bağlanmaz.
         ifade = str(s.get("tarih_ifadesi") or "").strip()
-        cozum = tarih_coz(ifade if ifade and katla(ifade) in katla(alinti) else alinti, yayin, aralik, goreli=goreli)
+        alintida = bool(ifade) and katla(ifade) in katla(alinti)
+        cozum = tarih_coz(ifade if alintida else alinti, yayin, aralik, goreli=goreli)
+        if (ifade and not alintida and cozum == TarihCozumu(None, None, False)
+                and _ayni_paragraf(aday.metin, alinti, ifade)):
+            # "This week …. You will also have a short quiz": a week phrase in the quote's own
+            # paragraph dates it. One that names a day does not (the day may be another event's).
+            disari = tarih_coz(ifade, yayin, aralik, goreli=goreli)
+            if disari.gun is None and disari.hafta is not None:
+                cozum = disari
         if cozum.gun is None and cozum.hafta is None and cozum.gecersiz:
             continue
         saat = _saat(s.get("saat"), alinti)
@@ -226,6 +252,22 @@ def _ilk_okuma(kayit: dict, aday: Aday) -> date | None:
     return zaman if zaman < aday.yayin else None
 
 
+def _parcalar(aday: Aday) -> list[Aday]:
+    """The candidate itself, or — past METIN_SINIRI — overlapping parts of it (same course,
+    publication date and positions; each its own cache key, since the text differs)."""
+    if len(aday.metin) <= METIN_SINIRI:
+        return [aday]
+    adim = METIN_SINIRI - PARCA_ORTUSME
+    parcalar = []
+    bas = 0
+    while True:
+        parcalar.append(Aday(aday.metin[bas:bas + METIN_SINIRI], aday.ders, aday.yayin, aday.tur,
+                             list(aday.konumlar)))
+        if bas + METIN_SINIRI >= len(aday.metin):
+            return parcalar
+        bas += adim
+
+
 @dataclass
 class CikarimSonucu:
     bulgular: list[Bulgu]
@@ -251,8 +293,24 @@ class SinavCikarici:
             veri = {}
         self._onbellek: dict[str, Any] = veri if isinstance(veri, dict) else {}
 
+    def _anahtar(self, aday: Aday) -> str:
+        # The model is part of the key: another model's reading is not this one's (temizlik A12).
+        return f"{ISTEM_SURUMU}:{self.okuyucu.model}:{aday.anahtar}"
+
+    def _hata_tazelendi(self, kayit: dict) -> bool:
+        """A billed failure is retried once it is a week old; an unreadable stamp is retried."""
+        try:
+            zaman = datetime.fromisoformat(str(kayit.get("zaman") or "")[:19])
+        except ValueError:
+            return True
+        return self._simdi() - zaman >= timedelta(days=HATA_YENIDEN_DENEME_GUN)
+
     def cikar(self, adaylar: list[Aday], bugun: date, bitis: float,
-              yeni_cagri_sinir_gun: int = YENI_CAGRI_SINIR_GUN) -> CikarimSonucu:
+              yeni_cagri_sinir_gun: int = YENI_CAGRI_SINIR_GUN,
+              korunan_konumlar: set[str] | frozenset[str] = frozenset()) -> CikarimSonucu:
+        """`korunan_konumlar` (json.dumps(konum, sort_keys=True)): portal positions of exams still
+        ahead in the previous sinavlar.json. A candidate there is asked about even past the age
+        limit — the teacher edited an early post, and the edit must not drop the exam (A14)."""
         bulgular: list[Bulgu] = []
         incelenen = incelenmedi = atlanan = 0
         sinir = bugun - timedelta(days=yeni_cagri_sinir_gun)
@@ -260,30 +318,39 @@ class SinavCikarici:
         degisti = False
         try:
             for aday in adaylar:
-                anahtar = f"{ISTEM_SURUMU}:{aday.anahtar}"
-                kayit = self._onbellek.get(anahtar)
-                if isinstance(kayit, dict) and isinstance(kayit.get("satirlar"), list):
-                    if kayit.get("hata"):  # ücreti ödenmiş, kullanılamaz yanıt: ISTEM_SURUMU değişene dek sorulmaz
-                        incelenmedi += 1
-                        hatalar.append(str(kayit["hata"])[:120])
-                        continue
-                    satirlar = kayit["satirlar"]
-                    onceki_okuma = _ilk_okuma(kayit, aday)
-                else:
-                    onceki_okuma = None
-                    if aday.yayin is not None and aday.yayin < sinir:
+                korunan = any(json.dumps(k, sort_keys=True) in korunan_konumlar for k in aday.konumlar)
+                eski = aday.yayin is not None and aday.yayin < sinir and not korunan
+                satirlar: list = []
+                okunan = okunamayan = 0
+                onceki_okuma: date | None = None
+                for parca in _parcalar(aday):
+                    anahtar = self._anahtar(parca)
+                    kayit = self._onbellek.get(anahtar)
+                    if isinstance(kayit, dict) and isinstance(kayit.get("satirlar"), list):
+                        if not kayit.get("hata"):
+                            satirlar += kayit["satirlar"]
+                            okunan += 1
+                            ilk = _ilk_okuma(kayit, aday)
+                            if ilk is not None and (onceki_okuma is None or ilk < onceki_okuma):
+                                onceki_okuma = ilk
+                            continue
+                        if not self._hata_tazelendi(kayit):
+                            # Billed, unusable answer: not asked again for a week (or a new ISTEM_SURUMU).
+                            okunamayan += 1
+                            hatalar.append(str(kayit["hata"])[:120])
+                            continue
+                    if eski:
                         # Too old to ask about for the first time: skipped silently, not "unread"
                         # (nothing was missed that the list could still have shown).
-                        atlanan += 1
                         continue
                     kalan = bitis - self.saat()
                     if kalan < CAGRI_EN_AZ_SURE or not self.defter.izin_var():
-                        incelenmedi += 1
+                        okunamayan += 1
                         continue
                     try:
-                        okuma = self.okuyucu.oku(aday, bugun, zaman_asimi=min(CAGRI_EN_COK_SURE, kalan))
+                        okuma = self.okuyucu.oku(parca, bugun, zaman_asimi=min(CAGRI_EN_COK_SURE, kalan))
                     except CikarimHatasi as e:
-                        incelenmedi += 1
+                        okunamayan += 1
                         hatalar.append(str(e)[:120])
                         if e.faturalandi:
                             self.defter.yaz(self.okuyucu.model, e.girdi, e.cikti)
@@ -294,11 +361,24 @@ class SinavCikarici:
                     # Defter OcrDefteri'nin Haiku fiyatıyla hesaplar: TEDY_SINAV_MODEL daha pahalı
                     # bir modele çevrilirse harcama eksik sayılır ve tavan gevşer.
                     self.defter.yaz(self.okuyucu.model, okuma.girdi, okuma.cikti)
-                    satirlar = okuma.satirlar
-                    self._onbellek[anahtar] = {"satirlar": satirlar, "zaman": self._simdi().isoformat(timespec="seconds")}
+                    self._onbellek[anahtar] = {"satirlar": okuma.satirlar,
+                                               "zaman": self._simdi().isoformat(timespec="seconds")}
                     degisti = True
-                incelenen += 1
-                bulgular.extend(uydurma_kapisi(satirlar, aday, bugun, yayin=onceki_okuma))
+                    satirlar += okuma.satirlar
+                    okunan += 1
+                if okunamayan:
+                    incelenmedi += 1
+                elif okunan:
+                    incelenen += 1
+                else:
+                    atlanan += 1
+                    continue
+                # The gate reads the whole text: a part's quote and topics are checked against it,
+                # and every finding names the candidate itself (its key, its positions).
+                yeni_bulgular = uydurma_kapisi(satirlar, aday, bugun, yayin=onceki_okuma)
+                for b in yeni_bulgular:   # overlapping parts may report the same exam twice
+                    if b not in bulgular:
+                        bulgular.append(b)
         finally:  # ücreti ödenmiş sonuçlar bir istisnada bile kaybolmasın
             if degisti or not self._onbellek_yolu.exists():
                 atomic_json_dump(self._onbellek, str(self._onbellek_yolu))

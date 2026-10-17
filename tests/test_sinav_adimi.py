@@ -197,3 +197,34 @@ def test_erken_ilan_edilen_sinav_45_gun_sonra_silinmez(tmp_path, taban):
     assert k2["id"] == k1["id"]
     assert k2["konular"] == ["Tam sayılar", "Rasyonel sayılar"]
     assert k2["icerik_surumu"] == k1["icerik_surumu"] and k2["degisti"] is None
+
+
+# --- temizlik A (2026-10-17) -------------------------------------------------------
+
+def test_a14_45_gun_sonra_duzenlenen_ilan_bir_kez_yeniden_okunur(tmp_path):
+    """The teacher edits the 01.10 post on 16.11 (a topic added): new text, same position, the
+    signature date still 01.10. Past the age limit it would never be read and the exam would
+    vanish four days before it is sat; the previous sinavlar.json's future record protects it."""
+    okuyucu = _ErkenOkuyucu()
+    ilk = GERCEK_TESPIT(tmp_path, _erken_veri(), [], datetime(2026, 10, 2, 10), time.monotonic() + 60,
+                        okuyucu=okuyucu)
+    st.yaz(tmp_path, ilk)
+    duzenli = _erken_veri()
+    kart = duzenli["ders_icerikleri_haftalar"]["4. Hafta 28 Eyl. - 04 Eki."]["Matematik"]
+    kart["cards"] = [ERKEN_KART + "\nNot: Kesirler de konulara eklendi."]
+    son = GERCEK_TESPIT(tmp_path, duzenli, [], datetime(2026, 11, 16, 18), time.monotonic() + 60,
+                        okuyucu=okuyucu)
+    assert okuyucu.cagrilar == 2
+    [k] = [k for k in son["sinavlar"] if k["tarih"] == "2026-11-20"]
+    assert k["konular"] == ["Tam sayılar", "Rasyonel sayılar"]
+
+
+def test_a22_eski_surum_onceki_dosya_ilk_kurulum_sayilmaz(tmp_path):
+    from tests.sinav_fikstur import haftalar_verisi
+    simdi = datetime(2026, 10, 16, 10)
+    (tmp_path / "output").mkdir()
+    (tmp_path / "output/sinavlar.json").write_text(
+        json.dumps({"surum": st.SURUM - 1, "sinavlar": []}), encoding="utf-8")
+    belge = GERCEK_TESPIT(tmp_path, haftalar_verisi(), [], simdi, time.monotonic() + 60,
+                          okuyucu=_sahte_okuyucu())
+    assert belge["sinavlar"][0]["ilk_tespit"] == simdi.isoformat(timespec="seconds")

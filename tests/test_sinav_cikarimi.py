@@ -364,7 +364,7 @@ def test_cikarici_onbellek_zamani_yayindan_erkense_o_kullanilir(tmp_path):
     gec = Aday(CUMA_QUIZ, "Matematik", date(2026, 10, 17), "odev", [])   # first_seen Saturday
     yol = tmp_path / "output/sinav_cikarim_onbellegi.json"
     yol.parent.mkdir(parents=True)
-    yol.write_text(json.dumps({f"{sc.ISTEM_SURUMU}:{gec.anahtar}": {
+    yol.write_text(json.dumps({f"{sc.ISTEM_SURUMU}:claude-haiku-4-5:{gec.anahtar}": {
         "satirlar": [_cuma_satiri()], "zaman": "2026-10-13T16:00:00"}}), encoding="utf-8")
     okuyucu = SahteOkuyucu()
     [b] = _cikarici(tmp_path, okuyucu).cikar([gec], date(2026, 10, 17), bitis=2000).bulgular
@@ -375,7 +375,146 @@ def test_cikarici_onbellek_zamani_yayinsiz_adaya_tarih_vermez(tmp_path):
     yayinsiz = Aday(CUMA_QUIZ, "Matematik", None, "duyuru", [])
     yol = tmp_path / "output/sinav_cikarim_onbellegi.json"
     yol.parent.mkdir(parents=True)
-    yol.write_text(json.dumps({f"{sc.ISTEM_SURUMU}:{yayinsiz.anahtar}": {
+    yol.write_text(json.dumps({f"{sc.ISTEM_SURUMU}:claude-haiku-4-5:{yayinsiz.anahtar}": {
         "satirlar": [_cuma_satiri()], "zaman": "2026-10-13T16:00:00"}}), encoding="utf-8")
     [b] = _cikarici(tmp_path, SahteOkuyucu()).cikar([yayinsiz], BUGUN, bitis=2000).bulgular
     assert (b.tarih, b.hafta) == (None, None)
+
+
+# --- temizlik A (2026-10-17) -------------------------------------------------------
+
+from datetime import datetime  # noqa: E402
+
+KATHERINE = ("Dear students,\nThis week we will continue with our Overcoming Obstacles unit. "
+             "You will also have a short quiz about Katherine Johnson.")
+KATHERINE_ALINTI = "You will also have a short quiz about Katherine Johnson."
+
+
+def _katherine_satiri(ifade="This week"):
+    return _satir(ders="İngilizce", tur="kisa_sinav", baslik="Katherine Johnson quiz", tarih_ifadesi=ifade,
+                  tarih="", konular=[], alinti=KATHERINE_ALINTI)
+
+
+def test_a1_alinti_disi_hafta_ifadesi_ayni_paragrafta_kabul():
+    aday = Aday(KATHERINE, "İngilizce", date(2026, 10, 12), "ders_karti", [])
+    [b] = uydurma_kapisi([_katherine_satiri()], aday, BUGUN)
+    assert (b.tarih, b.hafta) == (None, date(2026, 10, 12))
+
+
+def test_a1_baska_paragraftaki_hafta_ifadesi_baglanmaz():
+    aday = Aday(KATHERINE.replace("unit. ", "unit.\n\n"), "İngilizce", date(2026, 10, 12), "ders_karti", [])
+    [b] = uydurma_kapisi([_katherine_satiri()], aday, BUGUN)
+    assert (b.tarih, b.hafta) == (None, None)
+
+
+def test_a1_alinti_disi_gun_veren_ifade_yine_reddedilir():
+    metin = "Dear students,\nOn Friday we finish the unit. You will also have a short quiz about Katherine Johnson."
+    aday = Aday(metin, "İngilizce", date(2026, 10, 12), "ders_karti", [])
+    [b] = uydurma_kapisi([_katherine_satiri("On Friday")], aday, BUGUN)
+    assert (b.tarih, b.hafta) == (None, None)
+
+
+@pytest.mark.parametrize("metin", [
+    "Matematik yazılısı 20 Ekim saat 10.30.", "Matematik yazılısı 20 Ekim Saat:10.30",
+    "Matematik yazılısı 20 Ekim (saat 10.30)", "Matematik yazılısı 20 Ekim saat 10.30, sınıfta",
+])
+def test_a9_cumle_sonu_noktalamasindan_sonra_saat_kabul(metin):
+    aday = Aday(metin, "Matematik", date(2026, 10, 12), "ders_karti", [])
+    [b] = uydurma_kapisi([_satir(tur="yazili", baslik="Matematik yazılısı", tarih_ifadesi="20 Ekim",
+                                 saat="10.30", konular=[], alinti=metin)], aday, BUGUN)
+    assert (b.tarih, b.saat) == (date(2026, 10, 20), "10:30")
+
+
+def test_a11_baslik_rakami_kaynakta_yoksa_turden_baslik():
+    aday = Aday("Matematik yazılısı 20 Ekim", "Matematik", date(2026, 10, 12), "ders_karti", [])
+    satir = _satir(tur="yazili", baslik="Matematik 3. yazılı", tarih_ifadesi="20 Ekim", konular=[],
+                   alinti="Matematik yazılısı 20 Ekim")
+    [b] = uydurma_kapisi([satir], aday, BUGUN)
+    assert b.baslik == "Matematik Yazılı"
+    aday3 = Aday("Matematik 3. yazılısı 20 Ekim", "Matematik", date(2026, 10, 12), "ders_karti", [])
+    [b] = uydurma_kapisi([dict(satir, alinti="Matematik 3. yazılısı 20 Ekim")], aday3, BUGUN)
+    assert b.baslik == "Matematik 3. yazılı"
+
+
+SIMDI_A = datetime(2026, 10, 16, 10, 0)
+
+
+def _zamanli(tmp_path, okuyucu, simdi=SIMDI_A):
+    return SinavCikarici(tmp_path, okuyucu, tavan=2.0, saat=Saat(), simdi=lambda: simdi)
+
+
+def _onbellek(tmp_path):
+    return json.loads((tmp_path / "output/sinav_cikarim_onbellegi.json").read_text(encoding="utf-8"))
+
+
+def test_a12_onbellek_anahtari_modeli_icerir_zaman_enjekte(tmp_path):
+    okuyucu = SahteOkuyucu()
+    _zamanli(tmp_path, okuyucu).cikar([KTT], BUGUN, bitis=2000)
+    kayit = _onbellek(tmp_path)[f"{sc.ISTEM_SURUMU}:claude-haiku-4-5:{KTT.anahtar}"]
+    assert kayit["zaman"] == "2026-10-16T10:00:00"
+    baska = SahteOkuyucu()
+    baska.model = "claude-sonnet-x"
+    _zamanli(tmp_path, baska).cikar([KTT], BUGUN, bitis=2000)
+    assert len(baska.cagrilar) == 1   # another model's reading is not this one's
+
+
+def _hata_kaydi(tmp_path, aday, zaman):
+    yol = tmp_path / "output/sinav_cikarim_onbellegi.json"
+    yol.parent.mkdir(parents=True, exist_ok=True)
+    yol.write_text(json.dumps({f"{sc.ISTEM_SURUMU}:claude-haiku-4-5:{aday.anahtar}": {
+        "satirlar": [], "hata": "model reddetti", "zaman": zaman}}), encoding="utf-8")
+
+
+def test_a10_olumsuz_onbellek_7_gun_sonra_yeniden_denenir(tmp_path):
+    _hata_kaydi(tmp_path, KTT, "2026-10-09T09:59:00")   # 7 days and a minute ago
+    okuyucu = SahteOkuyucu()
+    sonuc = _zamanli(tmp_path, okuyucu).cikar([KTT], BUGUN, bitis=2000)
+    assert len(okuyucu.cagrilar) == 1 and (sonuc.incelenen, sonuc.incelenmedi) == (1, 0)
+    assert "hata" not in _onbellek(tmp_path)[f"{sc.ISTEM_SURUMU}:claude-haiku-4-5:{KTT.anahtar}"]
+
+
+def test_a10_olumsuz_onbellek_7_gunden_once_sorulmaz(tmp_path):
+    _hata_kaydi(tmp_path, KTT, "2026-10-10T10:00:00")   # six days ago
+    okuyucu = SahteOkuyucu()
+    sonuc = _zamanli(tmp_path, okuyucu).cikar([KTT], BUGUN, bitis=2000)
+    assert okuyucu.cagrilar == [] and (sonuc.incelenen, sonuc.incelenmedi) == (0, 1)
+
+
+UZUN_CUMLE = "Matematik KTT 20 Ekim günü yapılacak."
+
+
+class ParcaOkuyucu(SahteOkuyucu):
+    def oku(self, aday, bugun, zaman_asimi):
+        self.cagrilar.append(len(aday.metin))
+        satirlar = ([_satir(tarih_ifadesi="20 Ekim", konular=[], alinti=UZUN_CUMLE)]
+                    if UZUN_CUMLE in aday.metin else [])
+        return OkumaSonucu(satirlar, 2000, 300)
+
+
+def test_a13_uzun_metin_ortusen_parcalarla_okunur(tmp_path):
+    metin = "Ders notları burada. " * 300 + UZUN_CUMLE   # the exam sits past METIN_SINIRI
+    assert len(metin) > sc.METIN_SINIRI and metin.index(UZUN_CUMLE) > sc.METIN_SINIRI
+    aday = Aday(metin, "Matematik", date(2026, 10, 12), "ders_karti", [])
+    okuyucu = ParcaOkuyucu()
+    sonuc = _zamanli(tmp_path, okuyucu).cikar([aday], BUGUN, bitis=2000)
+    assert okuyucu.cagrilar == [6000, len(metin) - 5500]
+    [b] = sonuc.bulgular
+    assert (b.tarih, b.aday) == (date(2026, 10, 20), aday)
+    assert (sonuc.aday, sonuc.incelenen, sonuc.incelenmedi) == (1, 1, 0)
+    assert len(_onbellek(tmp_path)) == 2   # each part is its own cache entry
+    tekrar = ParcaOkuyucu()
+    assert len(_zamanli(tmp_path, tekrar).cikar([aday], BUGUN, bitis=2000).bulgular) == 1
+    assert tekrar.cagrilar == []
+
+
+def test_a14_korunan_konumdaki_eski_aday_bir_kez_sorulur(tmp_path):
+    konum = {"bolum": "ders_icerikleri_haftalar", "hafta": "4. Hafta", "ders": "Matematik", "sira": 1}
+    eski = Aday(KTT_KARTI + "\nNot: düzenlendi.", "Matematik", date(2026, 8, 27), "ders_karti", [konum])
+    okuyucu = SahteOkuyucu()
+    assert _zamanli(tmp_path, okuyucu).cikar([eski], BUGUN, bitis=2000).bulgular == []
+    assert okuyucu.cagrilar == []
+    korunan = {json.dumps(konum, sort_keys=True)}
+    sonuc = _zamanli(tmp_path, okuyucu).cikar([eski], BUGUN, bitis=2000, korunan_konumlar=korunan)
+    assert len(okuyucu.cagrilar) == 1 and len(sonuc.bulgular) == 1
+    _zamanli(tmp_path, okuyucu).cikar([eski], BUGUN, bitis=2000, korunan_konumlar=korunan)
+    assert len(okuyucu.cagrilar) == 1   # cached now: asked once
