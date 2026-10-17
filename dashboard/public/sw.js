@@ -72,7 +72,8 @@ self.addEventListener('pushsubscriptionchange', event => {
     })
     await fetch('/api/bildirim/abonelik', {
       method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...abonelik.toJSON(), cihaz: cihazAdi((self.navigator && self.navigator.userAgent) || '') }),
+      // `yenile`: a silent path like the page's opening — an endpoint another member holds is not moved.
+      body: JSON.stringify({ ...abonelik.toJSON(), cihaz: cihazAdi((self.navigator && self.navigator.userAgent) || ''), yenile: true }),
     })
   })().catch(() => {}))
 })

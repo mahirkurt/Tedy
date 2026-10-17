@@ -61,6 +61,9 @@ export const PUSH_ULASILAMADI_METNI =
 export const SUNUCU_SILINEMEDI_METNI =
   'Sunucudaki kayıt silinemedi; bildirimler bu cihaza gelmeye devam edebilir.'
 export const BANA_GECTI_METNI = 'Bu cihaz artık sizin hesabınıza kayıtlı.'
+// DELETE 404: this person's list has no such device — another member's. Kept subscribed on purpose.
+export const SAHIBI_DEGIL_METNI =
+  'Bu cihaz sizin adınıza kayıtlı değil; bildirimler onun sahibine gitmeye devam eder.'
 
 /** `POST /api/bildirim/deneme` yanıtı: `cihaz` toplam, `basarisiz` geçici hata, `olu` silinen kayıt. */
 export interface DenemeYaniti { gonderilen: number; basarisiz: number; olu: number; cihaz: number }
@@ -135,6 +138,27 @@ async function jsonOku<T>(yanit: Response, hata: string): Promise<T> {
   }
 }
 
+/** The card's first state must not wait on the network for ever (the flag, the silent re-registration):
+ *  past this budget the answer counts as unknown and the card decides from the browser's own state. */
+export const AG_BEKLEME_MS = 5000
+
+function sureli<T>(p: Promise<T>, ms: number, yedek: T): Promise<T> {
+  let saat: ReturnType<typeof setTimeout> | undefined
+  const sure = new Promise<T>(coz => { saat = setTimeout(() => coz(yedek), ms) })
+  return Promise.race([p.catch(() => yedek), sure]).finally(() => clearTimeout(saat))
+}
+
+/** Several readings can be in flight (mount, permission event, tab return, after an action): only the
+ *  last one started may set the state, so an older answer arriving late cannot overwrite a newer one. */
+export function sonIstekKazanir() {
+  let sira = 0
+  return async <T>(p: Promise<T>): Promise<{ guncel: boolean; deger: T }> => {
+    const benim = ++sira
+    const deger = await p
+    return { guncel: benim === sira, deger }
+  }
+}
+
 async function sunucuBayragi(): Promise<boolean | undefined> {
   try {
     const yanit = await fetch('/api/bildirim/anahtar', { credentials: 'include' })
@@ -151,21 +175,30 @@ export type TazelemeSonucu = 'yok' | 'bildirildi' | 'yenilendi' | 'baska-sahip' 
 // The last silent re-registration of this page load (App.tsx starts it once). The card awaits it:
 // "this device belongs to another member" is known only from its 409.
 let sonTazeleme: Promise<TazelemeSonucu> | null = null
+// The server's alert flag changes only with a restart: a tab return or a permission event reuses it.
+let bilinenBayrak: boolean | undefined
 
-export async function ortamiOku(): Promise<BildirimOrtami> {
+export interface OkumaSecenegi {
+  // 'oku': ask the server (opening, after an action); 'onbellek': reuse the last known flag.
+  bayrak?: 'oku' | 'onbellek'
+  beklemeMs?: number
+}
+
+export async function ortamiOku({ bayrak = 'oku', beklemeMs = AG_BEKLEME_MS }: OkumaSecenegi = {}): Promise<BildirimOrtami> {
   const destek = destekVar()
   const abone = destek ? (await mevcutAbonelik()) !== null : false
   const izin = destek ? Notification.permission : 'default'
-  return {
-    destek,
-    izin,
-    abone,
-    ios: iosMu(),
-    ekranda: ekrandaMi(),
-    // Bayrak yalnız abone cihazda anlamlı; okunamazsa "açık" varsayılır.
-    sunucuAcik: abone ? await sunucuBayragi() : undefined,
-    baskaSahip: abone && izin === 'granted' && sonTazeleme ? (await sonTazeleme) === 'baska-sahip' : false,
-  }
+  // Bayrak yalnız abone cihazda anlamlı; okunamazsa ya da süre dolarsa "açık" varsayılır. The two
+  // waits run side by side, so the card's first state is never more than one budget away.
+  const bayrakOku = abone && (bayrak === 'oku' || bilinenBayrak === undefined)
+  const [okunanBayrak, tazeleme] = await Promise.all([
+    bayrakOku ? sureli(sunucuBayragi(), beklemeMs, undefined) : Promise.resolve(bilinenBayrak),
+    abone && izin === 'granted' && sonTazeleme
+      ? sureli(sonTazeleme, beklemeMs, 'hata' as TazelemeSonucu) : Promise.resolve(null),
+  ])
+  if (bayrakOku) bilinenBayrak = okunanBayrak
+  const sunucuAcik = abone ? okunanBayrak : undefined
+  return { destek, izin, abone, ios: iosMu(), ekranda: ekrandaMi(), sunucuAcik, baskaSahip: tazeleme === 'baska-sahip' }
 }
 
 // `yenile: true` is the silent re-registration: the server keeps a device another full-role member
@@ -244,6 +277,8 @@ export async function bildirimiAc(): Promise<void> {
     await abonelik.unsubscribe()
     throw new BildirimHatasi('sunucu', 'Abonelik kaydedilemedi')
   }
+  // Without `yenile` the server moved the device to this person: an earlier 409 no longer holds.
+  sonTazeleme = Promise.resolve('bildirildi')
 }
 
 /** "Bu cihazda bana geçir": the silent path was refused (another member holds this device); the
@@ -256,10 +291,12 @@ export async function bildirimiBanaGecir(): Promise<void> {
   sonTazeleme = Promise.resolve('bildirildi')
 }
 
-export type KapatmaSonucu = 'tamam' | 'sunucu-silinemedi'
+export type KapatmaSonucu = 'tamam' | 'sunucu-silinemedi' | 'sahibi-degil'
 
-// The browser's subscription is released whatever the server says. A 404 is "already gone" — fine;
-// a network failure or a 5xx leaves the record on the server, and the card says so.
+// A network failure or a 5xx leaves the record on the server: the browser's subscription is released
+// anyway and the card says so. A 404 means this person's list holds no such device — it belongs to
+// another member (the silent re-registration may have failed and missed the 409): unsubscribing would
+// cut that member off without a word, so the subscription stays and the card says whose it is.
 export async function bildirimiKapat(): Promise<KapatmaSonucu> {
   const abonelik = await mevcutAbonelik()
   if (!abonelik) return 'tamam'
@@ -269,11 +306,16 @@ export async function bildirimiKapat(): Promise<KapatmaSonucu> {
       method: 'DELETE', credentials: 'include', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ endpoint: abonelik.endpoint }),
     })
-    if (!yanit.ok && yanit.status !== 404) sonuc = 'sunucu-silinemedi'
+    if (yanit.status === 404) {
+      sonTazeleme = Promise.resolve('baska-sahip')
+      return 'sahibi-degil'
+    }
+    if (!yanit.ok) sonuc = 'sunucu-silinemedi'
   } catch {
     sonuc = 'sunucu-silinemedi'
   }
   await abonelik.unsubscribe()
+  sonTazeleme = null
   return sonuc
 }
 

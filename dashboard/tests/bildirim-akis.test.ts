@@ -2,16 +2,17 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   aboneligiTazele, bildirimDurumu, bildirimiAc, bildirimiBanaGecir, bildirimiKapat, BildirimHatasi, CIHAZ_YOK_METNI,
-  denemeBilgisi, denemeGonder, DURUM_METNI, ortamiOku, PUSH_ULASILAMADI_METNI,
+  denemeBilgisi, denemeGonder, DURUM_METNI, ortamiOku, PUSH_ULASILAMADI_METNI, SAHIBI_DEGIL_METNI, sonIstekKazanir,
 } from '../src/utils/bildirim.ts'
 
 // Tarayıcı akışları (bildirim.ts'in fetch kullanan yarısı) sahte globallerle: navigator.serviceWorker,
 // Notification, PushManager ve fetch. Sunucu yanıtları tek tek verilir; istekler sırayla kaydedilir.
 
-type Yanit = { status: number; govde?: unknown; bozuk?: boolean } | Error
+// 'asili': yanıt hiç gelmez (ağ takıldı).
+type Yanit = { status: number; govde?: unknown; bozuk?: boolean } | Error | 'asili'
 type Istek = { url: string; method: string; govde: Record<string, unknown> | null }
 
-function yanitKur(y: Yanit): Response {
+function yanitKur(y: Exclude<Yanit, 'asili'>): Response {
   if (y instanceof Error) throw y
   return {
     ok: y.status >= 200 && y.status < 300,
@@ -63,9 +64,10 @@ function ortamKur(o: {
     if (Array.isArray(y)) {
       const i = sira[anahtar] ?? 0
       sira[anahtar] = i + 1
-      return yanitKur(y[Math.min(i, y.length - 1)])
+      const secilen = y[Math.min(i, y.length - 1)]
+      return secilen === 'asili' ? new Promise<Response>(() => {}) : yanitKur(secilen)
     }
-    return yanitKur(y)
+    return y === 'asili' ? new Promise<Response>(() => {}) : yanitKur(y)
   }
   return { istekler, olaylar, abone: () => abone }
 }
@@ -107,11 +109,9 @@ test('C3 kapat: DELETE ağda düşerse yerel abonelik yine bırakılır, sonuç 
   assert.equal(o.istekler[0].govde?.endpoint, 'https://fcm.googleapis.com/fcm/send/test')
 })
 
-test('C3 kapat: 5xx de "sunucu silinemedi"; 404 (zaten yok) ve 200 tamam', async () => {
+test('C3 kapat: 5xx de "sunucu silinemedi"; 200 tamam', async () => {
   ortamKur({ abone: true, yanitlar: { 'DELETE /api/bildirim/abonelik': { status: 503, govde: {} } } })
   assert.equal(await bildirimiKapat(), 'sunucu-silinemedi')
-  ortamKur({ abone: true, yanitlar: { 'DELETE /api/bildirim/abonelik': { status: 404, govde: {} } } })
-  assert.equal(await bildirimiKapat(), 'tamam')
   const o = ortamKur({ abone: true, yanitlar: { 'DELETE /api/bildirim/abonelik': { status: 200, govde: { ok: true } } } })
   assert.equal(await bildirimiKapat(), 'tamam')
   assert.deepEqual(o.olaylar, ['unsubscribe'])
@@ -188,4 +188,69 @@ test('C5 deneme bilgisi: başarı, kayıt yok, push servisi', () => {
   assert.deepEqual(denemeBilgisi({ gonderilen: 0, basarisiz: 2, olu: 0, cihaz: 2 }), { tur: 'error', metin: PUSH_ULASILAMADI_METNI })
   assert.match(PUSH_ULASILAMADI_METNI, /push servisine ulaşılamadı/)
   assert.match(PUSH_ULASILAMADI_METNI, /sonra yeniden deneyin/i)
+})
+
+// Düzeltme turu 1 — 6: DELETE 404 bu kişinin listesinde böyle bir cihaz olmadığı demektir (başka bir üyenin
+// cihazı). Yerel abonelik bırakılmaz: bırakılsa o üyenin bildirimleri sessizce kesilirdi.
+test('T1-6 kapat: DELETE 404 → yerel abonelik bırakılmaz, sonuç "sahibi-degil", kart başka üye der', async () => {
+  const o = ortamKur({ abone: true, yanitlar: {
+    'GET /api/bildirim/anahtar': ANAHTAR, 'DELETE /api/bildirim/abonelik': { status: 404, govde: { error: 'yok' } } } })
+  assert.equal(await bildirimiKapat(), 'sahibi-degil')
+  assert.deepEqual(o.olaylar, [])
+  assert.equal(o.abone(), true)
+  assert.equal(bildirimDurumu(await ortamiOku()), 'baska-sahip')
+  assert.equal(SAHIBI_DEGIL_METNI, 'Bu cihaz sizin adınıza kayıtlı değil; bildirimler onun sahibine gitmeye devam eder.')
+})
+
+// Düzeltme turu 1 — 2: 409'dan sonra "Bu cihazda aç" cihazı taşır; kart artık başka üye demez. Kapatma da
+// eski sonucu unutur.
+test('T1-2 aç: 409 sonrası başarılı açma kartı "açık"a döndürür; kapatma tazeleme sonucunu unutur', async () => {
+  ortamKur({ abone: true, yanitlar: {
+    'GET /api/bildirim/anahtar': ANAHTAR, 'POST /api/bildirim/abonelik': { status: 409, govde: { sahip_baska: true } } } })
+  assert.equal(await aboneligiTazele(), 'baska-sahip')
+  ortamKur({ abone: false, yanitlar: {
+    'GET /api/bildirim/anahtar': ANAHTAR, 'POST /api/bildirim/abonelik': { status: 201, govde: { ok: true } } } })
+  await bildirimiAc()
+  assert.equal(bildirimDurumu(await ortamiOku()), 'acik')
+
+  ortamKur({ abone: true, yanitlar: {
+    'GET /api/bildirim/anahtar': ANAHTAR, 'POST /api/bildirim/abonelik': { status: 409, govde: { sahip_baska: true } },
+    'DELETE /api/bildirim/abonelik': { status: 200, govde: { ok: true } } } })
+  assert.equal(await aboneligiTazele(), 'baska-sahip')
+  assert.equal(await bildirimiKapat(), 'tamam')
+  // Aynı tarayıcıda yeniden abone olunursa (sayfa yenilenmeden) eski 409 kartı yanıltmaz.
+  ortamKur({ abone: true, yanitlar: { 'GET /api/bildirim/anahtar': ANAHTAR } })
+  assert.equal(bildirimDurumu(await ortamiOku()), 'acik')
+})
+
+// Düzeltme turu 1 — 4: sekmeye dönüş ve izin olayı sunucu bayrağını yeniden istemez; bilinen bayrak kullanılır.
+test('T1-4 ortam: bayrak önbellekten okunursa anahtar ucu çağrılmaz', async () => {
+  const o = ortamKur({ abone: true, yanitlar: { 'GET /api/bildirim/anahtar': { status: 200, govde: { anahtar: 'BAAA', acik: false } } } })
+  assert.equal(bildirimDurumu(await ortamiOku()), 'acik-bekliyor')
+  const once = o.istekler.length
+  assert.equal(bildirimDurumu(await ortamiOku({ bayrak: 'onbellek' })), 'acik-bekliyor')
+  assert.equal(o.istekler.length, once)
+})
+
+// Düzeltme turu 1 — 4: sıra sayacı: eski bir okumanın yanıtı yenisinin üstüne yazmaz.
+test('T1-4 sıra: önce başlayıp sonra biten okuma düşer', async () => {
+  const sira = sonIstekKazanir()
+  let bitir1!: (v: string) => void, bitir2!: (v: string) => void
+  const eski = sira(new Promise<string>(r => { bitir1 = r }))
+  const yeni = sira(new Promise<string>(r => { bitir2 = r }))
+  bitir2('yeni')
+  bitir1('eski')
+  assert.deepEqual(await Promise.all([eski, yeni]), [{ guncel: false, deger: 'eski' }, { guncel: true, deger: 'yeni' }])
+})
+
+// Düzeltme turu 1 — 5: ilk durum iki ağ isteğini sonsuza dek beklemez; süre dolarsa bilinmeyen sayılır.
+test('T1-5 ortam: bayrak ve sessiz kayıt yanıt vermezse süre dolunca yerel duruma göre karar verilir', async () => {
+  ortamKur({ abone: true, yanitlar: { 'GET /api/bildirim/anahtar': 'asili' } })
+  void aboneligiTazele()   // takılı: anahtar isteği hiç dönmez
+  const t0 = Date.now()
+  const ortam = await ortamiOku({ beklemeMs: 50 })
+  assert.ok(Date.now() - t0 < 1000, 'süre sınırı uygulanmalı')
+  assert.equal(ortam.sunucuAcik, undefined)
+  assert.equal(ortam.baskaSahip, false)
+  assert.equal(bildirimDurumu(ortam), 'acik')
 })

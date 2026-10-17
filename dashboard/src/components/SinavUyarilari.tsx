@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button, InlineNotification } from '@carbon/react'
 import {
   BANA_GECTI_METNI, BILDIRIM_DEGISTI, bildirimDurumu, bildirimiAc, bildirimiBanaGecir, bildirimiKapat, BildirimHatasi,
-  denemeBilgisi, denemeGonder, DURUM_METNI, hataMetni, ortamiOku, SUNUCU_SILINEMEDI_METNI,
+  denemeBilgisi, denemeGonder, DURUM_METNI, hataMetni, ortamiOku, SAHIBI_DEGIL_METNI, sonIstekKazanir,
+  SUNUCU_SILINEMEDI_METNI,
 } from '../utils/bildirim'
 import type { BildirimDurumu, Bilgi } from '../utils/bildirim'
 import './SinavUyarilari.scss'
@@ -23,13 +24,12 @@ export default function SinavUyarilari() {
 
   // Never rejects: a browser that cannot read its own registration must not lock the buttons or
   // leave an unhandled rejection. The last known state stays; with none, the card says "kapalı".
-  const yenile = useCallback(async () => {
-    try {
-      setDurum(bildirimDurumu(await ortamiOku()))
-    } catch {
-      setDurum(d => d ?? 'kapali')
-    }
-  }, [])
+  // Only the last reading started may set the state (an older answer arriving late is dropped).
+  const [sira] = useState(sonIstekKazanir)
+  const yenile = useCallback(async (bayrak: 'oku' | 'onbellek' = 'oku') => {
+    const { guncel, deger } = await sira(ortamiOku({ bayrak }).then(bildirimDurumu, () => null))
+    if (guncel) setDurum(d => deger ?? d ?? 'kapali')
+  }, [sira])
   useEffect(() => { void yenile() }, [yenile])
 
   // The permission can change outside the card — the browser's site settings, another tab — and the
@@ -37,8 +37,9 @@ export default function SinavUyarilari() {
   useEffect(() => {
     let iptal = false
     let izinDurumu: PermissionStatus | null = null
-    const degisti = () => { void yenile() }
-    const gorunur = () => { if (document.visibilityState === 'visible') void yenile() }
+    // These refreshes reuse the server's flag (it changes only with a restart): no request per tab return.
+    const degisti = () => { void yenile('onbellek') }
+    const gorunur = () => { if (document.visibilityState === 'visible') void yenile('onbellek') }
     navigator.permissions?.query({ name: 'notifications' as PermissionName })
       .then(d => {
         if (iptal) return
@@ -104,7 +105,9 @@ export default function SinavUyarilari() {
             )}
             <Button size="sm" kind="ghost" disabled={mesgul}
               onClick={() => yap(async () => {
-                if ((await bildirimiKapat()) === 'sunucu-silinemedi') return { tur: 'warning', metin: SUNUCU_SILINEMEDI_METNI }
+                const sonuc = await bildirimiKapat()
+                if (sonuc === 'sunucu-silinemedi') return { tur: 'warning', metin: SUNUCU_SILINEMEDI_METNI }
+                if (sonuc === 'sahibi-degil') return { tur: 'warning', metin: SAHIBI_DEGIL_METNI }
               })}>
               Bu cihazda kapat
             </Button>

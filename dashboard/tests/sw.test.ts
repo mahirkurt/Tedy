@@ -153,6 +153,8 @@ test('abonelik değişti: anahtar alınır, yeniden abone olunur, sunucuya bildi
   const govde = JSON.parse(kayit.secenek?.body ?? '{}')
   assert.equal(govde.endpoint, 'https://fcm.googleapis.com/fcm/send/yeni')
   assert.equal(govde.cihaz, 'Android')
+  // Düzeltme turu 1 — 3: sessiz yol; başka bir üyenin tuttuğu ucu taşımaz (sunucu 409 der).
+  assert.equal(govde.yenile, true)
 })
 
 test('abonelik değişti: anahtar yoksa abone olunmaz, hata fırlatılmaz', async () => {
