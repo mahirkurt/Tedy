@@ -816,3 +816,70 @@ def test_d4_yayinsiz_metinde_goreli_hafta_konu_paragrafinin_kendi_tarihidir():
                                  konular=["Fiilimsiler"])], aday, BUGUN)
     assert b.tarih == date(2026, 10, 20)
     assert b.konular == []
+
+
+# --- temizlik B düzeltme 5: zamir n'si, kaydın kanonik olmayan dersi, -yle/-si ---------------
+
+@pytest.mark.parametrize("bicim,ders", [
+    ("Din Kültürüne", "Din Kültürü"), ("Din Kültüründe", "Din Kültürü"), ("Din Kültürünü", "Din Kültürü"),
+    ("Din Kültüründen", "Din Kültürü"), ("Din Kültürünün", "Din Kültürü"), ("Din Kültürüyle", "Din Kültürü"),
+    ("Beden Eğitimine", "Beden Eğitimi"), ("Beden Eğitiminde", "Beden Eğitimi"),
+    ("Beden Eğitimini", "Beden Eğitimi"), ("Beden Eğitiminden", "Beden Eğitimi"),
+    ("Beden Eğitiminin", "Beden Eğitimi"), ("Beden Eğitimiyle", "Beden Eğitimi"),
+])
+def test_d5_iyelikli_adin_zamir_n_li_bicimi_taninir(bicim, ders):
+    assert sc._anilan_dersler(katla(bicim)) == {ders}
+
+
+@pytest.mark.parametrize("bicim", ["Din Kültürüne", "Din Kültüründe", "Din Kültürünü", "Din Kültüründen",
+                                   "Beden Eğitimine", "Beden Eğitiminde", "Beden Eğitimini", "Beden Eğitiminden"])
+def test_d5_iyelikli_adin_konu_paragrafi_matematige_girmez(bicim):
+    [b] = _tek_kapi(f"Matematik yazılısı 20 Ekim\n\n{bicim} ait yazılı konuları: Voleybol",
+                    "Matematik yazılısı 20 Ekim", "20 Ekim", ["Voleybol"])
+    assert b.konular == []
+
+
+@pytest.mark.parametrize("bicim,ders", [
+    ("Türkçeyle", "Türkçe"), ("Türkçesi", "Türkçe"), ("İngilizceyle", "İngilizce"), ("İngilizcesi", "İngilizce"),
+    ("Fransızcayla", "Fransızca"), ("Fransızcası", "Fransızca"),
+    ("Matematikle", "Matematik"), ("Müzikle", "Müzik"),
+])
+def test_d5_vasita_ve_iyelik_bicimi_taninir(bicim, ders):
+    assert sc._anilan_dersler(katla(f"{bicim} ilgili yazılı konuları")) == {ders}
+
+
+@pytest.mark.parametrize("bicim", ["Türkçeyle", "Türkçesi", "İngilizceyle", "İngilizcesi", "Fransızcayla",
+                                   "Fransızcası"])
+def test_d5_vasita_ve_iyelik_konu_paragrafi_matematige_girmez(bicim):
+    [b] = _tek_kapi(f"Matematik yazılısı 20 Ekim\n\n{bicim} ilgili yazılı konuları: Fiilimsiler",
+                    "Matematik yazılısı 20 Ekim", "20 Ekim", ["Fiilimsiler"])
+    assert b.konular == []
+
+
+@pytest.mark.parametrize("metin", ["Fener konular", "Sosyalist konular", "Müzikali konular",
+                                   "Türkçesiz konular", "Matematiksel konular"])
+def test_d5_yeni_bicimler_yanlis_eslesmez(metin):
+    assert sc._anilan_dersler(katla(metin)) == set()
+
+
+@pytest.mark.parametrize("model_dersi,metin,konu", [
+    ("Fen", "Fen yazılısı 21 Ekim\n\nFen yazılı konuları: Hücre", "Hücre"),
+    ("Sosyal", "Sosyal yazılısı 21 Ekim\n\nSosyal Bilgiler yazılı konuları: Göç", "Göç"),
+    ("Din", "Din yazılısı 21 Ekim\n\nDin Kültürü yazılı konuları: İbadet", "İbadet"),
+])
+def test_d5_kanonik_olmayan_ders_kendi_konu_paragrafini_alir(model_dersi, metin, konu):
+    aday = Aday(metin, None, date(2026, 10, 5), "duyuru", [])
+    alinti = metin.split("\n\n")[0]
+    [b] = uydurma_kapisi([_satir(ders=model_dersi, tur="yazili", baslik=alinti, tarih_ifadesi="21 Ekim",
+                                 tarih="2026-10-21", alinti=alinti, konular=[konu])], aday, BUGUN)
+    assert b.ders == model_dersi
+    assert b.konular == [konu]
+
+
+def test_d5_kanonik_olmayan_ders_baska_dersin_paragrafini_almaz():
+    metin = "Fen yazılısı 21 Ekim\n\nTürkçe yazılı konuları: Fiilimsiler"
+    aday = Aday(metin, None, date(2026, 10, 5), "duyuru", [])
+    [b] = uydurma_kapisi([_satir(ders="Fen", tur="yazili", baslik="Fen yazılısı", tarih_ifadesi="21 Ekim",
+                                 tarih="2026-10-21", alinti="Fen yazılısı 21 Ekim", konular=["Fiilimsiler"])],
+                         aday, BUGUN)
+    assert b.konular == []

@@ -230,22 +230,30 @@ _DERS_ADLARI = [
     ("Ahlak ve Yurttaşlık", "Ahlak ve Yurttaşlık", True),
 ]
 _UNLULER = "aeıioöuü"
+# Names whose last word already ends in the possessive -(s)I ("Kültür-ü", "Eğitim-i"): a case suffix
+# takes the pronominal n ("Din Kültürüne", "Beden Eğitiminden"), never y.
+_IYELIKLI_ADLAR = {"Din Kültürü", "Beden Eğitimi"}
 
 
 def _ekli_bicimler(ad: str) -> list[str]:
-    """The name and its genitive, dative, accusative, locative and ablative forms, by vowel
-    harmony on the unfolded name, then folded: "Müzik" → müziğin, müziğe, müziği, müzikte,
-    müzikten. A final k softens before a vowel (müziğ-), so "müzikal" stays out."""
+    """The name and its genitive, dative, accusative, locative, ablative and instrumental forms
+    (a vowel-final name also its possessive: "Türkçesi"), by vowel harmony on the unfolded name,
+    then folded: "Müzik" → müziğin, müziğe, müziği, müzikte, müzikten, müzikle. A final k softens
+    before a vowel (müziğ-), so "müzikal" stays out."""
     son = next(c for c in reversed(ad.lower()) if c in _UNLULER)
     i4 = {"e": "i", "i": "i", "ö": "ü", "ü": "ü", "a": "ı", "ı": "ı", "o": "u", "u": "u"}[son]
     e2 = "e" if son in "eiöü" else "a"
-    if ad[-1].lower() in _UNLULER:
-        ekler = [f"n{i4}n", f"y{e2}", f"y{i4}", f"d{e2}", f"d{e2}n"]
+    if ad in _IYELIKLI_ADLAR:
+        ekler = [f"n{i4}n", f"n{e2}", f"n{i4}", f"nd{e2}", f"nd{e2}n", f"yl{e2}"]
+        bicimler = [ad + e for e in ekler]
+    elif ad[-1].lower() in _UNLULER:
+        ekler = [f"n{i4}n", f"y{e2}", f"y{i4}", f"d{e2}", f"d{e2}n", f"yl{e2}", f"s{i4}"]
         bicimler = [ad + e for e in ekler]
     else:
         d = "t" if ad[-1].lower() in "fstkçşhp" else "d"
         kok = ad[:-1] + "ğ" if ad[-1].lower() == "k" else ad
-        bicimler = [kok + e for e in (f"{i4}n", e2, i4)] + [ad + f"{d}{e2}", ad + f"{d}{e2}n"]
+        bicimler = ([kok + e for e in (f"{i4}n", e2, i4)]
+                    + [ad + f"{d}{e2}", ad + f"{d}{e2}n", ad + f"l{e2}"])
     return [ad] + bicimler
 
 
@@ -259,6 +267,16 @@ _KONU_SOZU = re.compile(r"(?<![0-9a-z])(?:konu(?:lar(?:i|in)?|su)?|topics?)(?![0
 
 def _anilan_dersler(katli: str) -> set[str]:
     return {ders for desen, ders in _DERS_DESENLERI if desen.search(katli)}
+
+
+def _kaydin_dersleri(ders: str) -> set[str]:
+    """A record's own course, as every name it may go by: the model may answer "Fen", "Sosyal" or
+    "Din" for "Fen Bilimleri", "Sosyal Bilgiler", "Din Kültürü" — a short form that is the start
+    of a course's name, word for word, is that course."""
+    katli = katla(ders)
+    kanonik = {d for _, d, _ in _DERS_ADLARI}
+    return ({normalize_course(ders)} | _anilan_dersler(katli)
+            | {d for d in kanonik if katli and (katla(d) + " ").startswith(katli + " ")})
 
 
 def _konu_paragrafi(paragraf: str, dersler: set[str], tarihle: Callable[[str], TarihCozumu]) -> bool:
@@ -288,7 +306,7 @@ def _konu_bolgesi(metin: str, alinti: str, ders: str = "Genel",
     butun, hedef = " ".join(paragraflar), katla(alinti)
     # The courses this exam may name: its own; a "Genel" record (a shared announcement) any its
     # quote names. "Matematik ve Türkçe yazılıları": the Matematik record takes no Türkçe topics.
-    dersler = {normalize_course(ders)} if ders and ders != "Genel" else _anilan_dersler(hedef)
+    dersler = _kaydin_dersleri(ders) if ders and ders != "Genel" else _anilan_dersler(hedef)
     tarihle = tarihle or (lambda _: TarihCozumu(None, None, False))
 
     def sinav_disi(p: str) -> bool:
