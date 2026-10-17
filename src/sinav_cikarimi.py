@@ -12,6 +12,7 @@ import json
 import os
 import re
 import time
+from bisect import bisect_right
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path, PurePosixPath
@@ -201,6 +202,26 @@ def _ayni_paragraf(metin: str, alinti: str, ifade: str) -> bool:
     return any(katla(alinti) in katla(p) and _sozcukle_gecer(ifade, p) for p in _PARAGRAF.split(metin))
 
 
+def _konu_bolgesi(metin: str, alinti: str) -> str:
+    """Where a quote's topics may come from (folded): the paragraph(s) holding the quote and the
+    one after them. A text announcing two exams must not lend the second one's topics to the
+    first; a list under its announcement (the KTT card's five lines) stays in reach."""
+    paragraflar = [p for p in (katla(x) for x in _PARAGRAF.split(metin)) if p]
+    bitisler, konum = [], 0
+    for p in paragraflar:
+        konum += len(p)
+        bitisler.append(konum)      # paragraph k ends here; one joining space follows
+        konum += 1
+    butun, hedef = " ".join(paragraflar), katla(alinti)
+    bolge = []
+    bas = butun.find(hedef) if hedef else -1
+    while bas != -1:
+        ilk, son = bisect_right(bitisler, bas), bisect_right(bitisler, bas + len(hedef) - 1)
+        bolge.append(" ".join(paragraflar[ilk:son + 2]))
+        bas = butun.find(hedef, bas + 1)
+    return "\n".join(bolge)
+
+
 def uydurma_kapisi(satirlar: list[dict], aday: Aday, bugun: date, yayin: date | None = None) -> list[Bulgu]:
     """`yayin` overrides the candidate's publication date (an earlier, known reading of the same
     text). With no publication date at all only explicit dates are resolved (`goreli=False`)."""
@@ -233,9 +254,10 @@ def uydurma_kapisi(satirlar: list[dict], aday: Aday, bugun: date, yayin: date | 
         saat = _saat(s.get("saat"), alinti)
         konular: list[str] = []
         ham_konular = s.get("konular")
+        bolge = _konu_bolgesi(aday.metin, alinti)
         for k in ham_konular if isinstance(ham_konular, list) else []:
             k = " ".join(str(k).split())
-            if k and katla(k) in kaynak and k not in konular:
+            if k and katla(k) in bolge and k not in konular:
                 konular.append(k)
         tur = s.get("tur") if s.get("tur") in SINAV_TURLERI else "diger"
         ders = _ders(aday, s.get("ders"), kaynak)

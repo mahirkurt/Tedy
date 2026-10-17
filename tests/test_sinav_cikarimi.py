@@ -586,3 +586,44 @@ def test_d4_ayni_metin_bir_kez_sorulur(tmp_path):
     okuyucu = SahteOkuyucu()
     _zamanli(tmp_path, okuyucu).cikar([KTT, fen], BUGUN, bitis=2000)
     assert len(okuyucu.cagrilar) == 1
+
+
+# --- temizlik B: konu yakınlığı ------------------------------------------------------
+
+IKI_SINAV = ("Sevgili veliler,\n\nMatematik yazılısı 20 Ekim Salı günü yapılacak.\n"
+             "Konular: Tam sayılar, Rasyonel sayılar\n\n"
+             "Hatırlatma: veli toplantısı cuma günü.\n\n"
+             "Türkçe yazılısı 22 Ekim Perşembe günü olacak.\n\nKonular: Fiilimsiler, Söz sanatları")
+
+
+def test_b14_ikinci_sinavin_konulari_birinciye_gecmez():
+    aday = Aday(IKI_SINAV, None, date(2026, 10, 12), "duyuru", [])
+    satirlar = [
+        _satir(ders="Matematik", tur="yazili", baslik="Matematik yazılısı", tarih_ifadesi="20 Ekim Salı",
+               tarih="2026-10-20", alinti="Matematik yazılısı 20 Ekim Salı günü yapılacak.",
+               konular=["Tam sayılar", "Rasyonel sayılar", "Fiilimsiler", "Söz sanatları"]),
+        _satir(ders="Türkçe", tur="yazili", baslik="Türkçe yazılısı", tarih_ifadesi="22 Ekim Perşembe",
+               tarih="2026-10-22", alinti="Türkçe yazılısı 22 Ekim Perşembe günü olacak.",
+               konular=["Fiilimsiler", "Söz sanatları", "Tam sayılar"]),
+    ]
+    mat, tr = uydurma_kapisi(satirlar, aday, BUGUN)
+    assert mat.konular == ["Tam sayılar", "Rasyonel sayılar"]
+    assert tr.konular == ["Fiilimsiler", "Söz sanatları"]        # the next paragraph after the quote counts
+
+
+def test_b14_ktt_kartinin_bes_konusu_korunur():
+    konular = ["TAM SAYILAR FARKLI GÖSTERİMLERİ", "RASYONEL SAYILAR VE FARKLI GÖSTERİMLERİ",
+               "RASYONEL SAYILARIN SAYI DOĞRUSU ÜZERİNDE GÖSTERİMİ", "MUTLAK DEĞER",
+               "RASYONEL SAYILARDA KARŞILAŞTIRMA VE SIRALAMA"]
+    [b] = uydurma_kapisi([_satir(konular=konular)], KTT, BUGUN)
+    assert b.konular == konular
+
+
+def test_b14_paragraflara_yayilan_alinti_konulari_korur():
+    metin = "Fen yazılısı 21 Ekim Çarşamba\n\ngünü yapılacak.\n\nKonular: Hücre"
+    aday = Aday(metin, "Fen Bilimleri", date(2026, 10, 12), "ders_karti", [])
+    [b] = uydurma_kapisi([_satir(ders="Fen Bilimleri", tur="yazili", baslik="Fen yazılısı",
+                                 tarih_ifadesi="21 Ekim Çarşamba", tarih="2026-10-21",
+                                 alinti="Fen yazılısı 21 Ekim Çarşamba günü yapılacak.", konular=["Hücre"])],
+                         aday, BUGUN)
+    assert b.konular == ["Hücre"]
