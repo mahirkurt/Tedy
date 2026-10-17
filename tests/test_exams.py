@@ -914,3 +914,23 @@ def test_sinav_listesi_takvim_etiketli_kaydi_alir():
     assert any("GİS-1" in b for b in basliklar)
     assert not any("Başlangıcı" in b for b in basliklar)
     assert not any("Grade 7 English" in b for b in basliklar)
+
+
+# --- temizlik B16: tüm gün sınavı gün sonuna dek yaklaşan --------------------------------
+
+@pytest.mark.parametrize("simdi,beklenen", [
+    (datetime(2026, 10, 20, 0, 0), "upcoming"),
+    (datetime(2026, 10, 20, 15, 0), "upcoming"),
+    (datetime(2026, 10, 20, 23, 59), "upcoming"),
+    (datetime(2026, 10, 21, 0, 0), "past"),
+])
+def test_b16_tum_gun_sinavi_gun_sonuna_dek_yaklasan(simdi, beklenen):
+    veri = {"takvim": [_exam_event("Matematik 1. Yazılı", "2026-10-20", all_day=True)]}
+    [sinav] = dashboard_api._sinav_listesi(veri, now=simdi)["exams"]
+    assert sinav["status"] == beklenen
+
+
+def test_b16_saatli_sinav_saatinde_gecmise_duser():
+    veri = {"takvim": [_exam_event("Matematik 1. Yazılı", "2026-10-20T09:00:00")]}
+    [sinav] = dashboard_api._sinav_listesi(veri, now=datetime(2026, 10, 20, 9, 30))["exams"]
+    assert sinav["status"] == "past"

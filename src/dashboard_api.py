@@ -2935,7 +2935,11 @@ def _sinav_listesi(data, now=None):
         # Local clock on both sides (see _portal_yerel). An unreadable date
         # is still "past", but no longer because the comparison itself threw.
         evt_dt = _portal_zamani(date_str)
-        status = "upcoming" if evt_dt is not None and evt_dt > now else "past"
+        if evt_dt is not None and evt.get("allDay"):
+            # An all-day exam is ahead for the whole of its day, not past from 00:00 on.
+            status = "upcoming" if evt_dt.date() >= now.date() else "past"
+        else:
+            status = "upcoming" if evt_dt is not None and evt_dt > now else "past"
 
         # Match grade
         grade = None
