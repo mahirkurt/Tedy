@@ -21,8 +21,8 @@ from src.sinav_tarihi import hafta_etiketi_araligi, katla, okul_yili, yayin_tari
 
 EK_KARAKTER_SINIRI = 4000
 _SUZGEC = re.compile(
-    r"\b(sinav\w*|yazili\w*|quiz(?:zes)?|ktt|konu tarama\w*|deneme\w*|test(?:i|ler|leri|s)?"
-    r"|exam\w*|degerlendirme\b|gis)\b")
+    r"\b(sinav\w*|yazili(?!m)\w*|quiz(?:zes)?|ktt|konu tarama\w*|deneme\w*|test(?:i|ler|leri|s)?"
+    r"|exam(?:s|ination\w*)?|degerlendirme\b|gis)\b")
 _TARIH = re.compile(r"\b(\d{2})\.(\d{2})\.(\d{4})\b")
 
 
@@ -122,6 +122,9 @@ def _birlestir(liste: list[Aday]) -> list[Aday]:
     for a in liste:
         if a.anahtar in tekil:
             tekil[a.anahtar].konumlar.extend(k for k in a.konumlar if k not in tekil[a.anahtar].konumlar)
+            # Keep earliest non-None yayin
+            if a.yayin is not None and (tekil[a.anahtar].yayin is None or a.yayin < tekil[a.anahtar].yayin):
+                tekil[a.anahtar].yayin = a.yayin
         else:
             tekil[a.anahtar] = Aday(a.metin, a.ders, a.yayin, a.tur, list(a.konumlar))
     kalan = list(tekil.values())
@@ -167,12 +170,16 @@ def kaynak_verisi(kok: Path) -> tuple[dict[str, tuple[str, date | None]], dict[s
     dizin = _json(kok / "output/portal_ekleri.json")
     kayitlar = (dizin or {}).get("ekler") if isinstance(dizin, dict) else None
     for ek_id, kayit in (kayitlar or {}).items():
+        # Skip non-dict records
+        if not isinstance(kayit, dict):
+            continue
         yol = kok / "content/portal-ekleri" / f"{ek_id}.txt"
         try:
-            metin = yol.read_text(encoding="utf-8")[:EK_KARAKTER_SINIRI]
-        except OSError:
+            with open(yol, encoding="utf-8") as f:
+                metin = f.read(EK_KARAKTER_SINIRI)
+        except (OSError, UnicodeDecodeError):
             continue
         if metin.strip():
-            ekler[ek_id] = (metin, _gun((kayit or {}).get("first_seen")))
+            ekler[ek_id] = (metin, _gun(kayit.get("first_seen")))
     ilk = _json(kok / "output/homework_first_seen.json")
     return ekler, (ilk if isinstance(ilk, dict) else {})
