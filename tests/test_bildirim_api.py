@@ -129,12 +129,35 @@ def test_bypass_kimligi_current_user_email_ile_ayni(monkeypatch):
         assert api._bildirim_kisisi() == api._current_user_email() == "test@tedy.online"
 
 
-def test_tohum_ilk_cihaz_kilit_icinde_belirlenir(ortam, monkeypatch):
+def test_tohumlama_eklemeden_once(ortam, monkeypatch):
+    """Seed first, then add: if the device were added first and seeding then failed, the next try
+    would no longer be a first device and the whole backlog would flood in (final review, Minor 1).
+    Two workers may both seed a first device: harmless, the ledger skips what is already there."""
+    c, kok, _, _ = ortam
+    _giris(c, TAM)
+    sira = []
+    import src.sinav_uyari as su
+    monkeypatch.setattr(su, "kisiyi_tohumla", lambda k, email, simdi: sira.append(
+        ("tohum", len(wp.AbonelikDeposu(kok / wp.ABONELIKLER).kisinin(email)))) or 0)
+    gercek_ekle = wp.AbonelikDeposu.ekle
+    monkeypatch.setattr(wp.AbonelikDeposu, "ekle", lambda self, e, a: sira.append(("ekle", 0)) or gercek_ekle(self, e, a))
+    assert c.post("/api/bildirim/abonelik", json=GOVDE).status_code == 201
+    assert sira == [("tohum", 0), ("ekle", 0)]
+
+
+def test_tohumlama_hatasinda_cihaz_eklenmez_sonraki_deneme_ilk_sayilir(ortam, monkeypatch):
     c, kok, tohum, _ = ortam
     _giris(c, TAM)
-    monkeypatch.setattr(wp.AbonelikDeposu, "kisinin", lambda self, email: [])     # a stale pre-read must not matter
+    import src.sinav_uyari as su
+    gercek = su.kisiyi_tohumla
+
+    def bozuk(k, email, simdi):
+        raise OSError("defter yazılamadı")
+    monkeypatch.setattr(su, "kisiyi_tohumla", bozuk)
+    assert c.post("/api/bildirim/abonelik", json=GOVDE).status_code == 503
+    assert wp.AbonelikDeposu(kok / wp.ABONELIKLER).kisinin(TAM) == []
+    monkeypatch.setattr(su, "kisiyi_tohumla", gercek)
     assert c.post("/api/bildirim/abonelik", json=GOVDE).status_code == 201
-    assert c.post("/api/bildirim/abonelik", json={**GOVDE, "endpoint": GOVDE["endpoint"] + "2"}).status_code == 201
     assert tohum == [TAM]
 
 

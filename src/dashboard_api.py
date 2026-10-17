@@ -2777,11 +2777,19 @@ def bildirim_abonelik():
     abonelik = web_push.abonelik_dogrula(govde)
     if abonelik is None:
         return jsonify({"error": "geçersiz abonelik"}), 400
-    if depo.ekle(email, abonelik).ilk_cihaz:       # decided under the store's lock, not by a read beforehand
-        # A person who turns alerts on gets what happens from now on, not a
-        # notification for every exam already known (plan Review Focus 3).
+    # A person who turns alerts on gets what happens from now on, not a notification for every
+    # exam already known (plan Review Focus 3). Seeded *before* the device is added: added first,
+    # a failed seeding would leave a device whose next try is no longer "first" — and the backlog
+    # would flood in. Two workers may both see a first device and both seed: harmless, the
+    # ledger skips what it already holds.
+    if not depo.kisinin(email):
         from src import sinav_uyari
-        sinav_uyari.kisiyi_tohumla(Path(PROJECT_ROOT), email, datetime.now())
+        try:
+            sinav_uyari.kisiyi_tohumla(Path(PROJECT_ROOT), email, datetime.now())
+        except Exception:  # noqa: BLE001 - nothing added: the browser's next try seeds again
+            app.logger.exception("sınav uyarısı tohumlanamadı")
+            return jsonify({"error": "uyarılar hazırlanamadı"}), 503
+    depo.ekle(email, abonelik)
     return jsonify({"ok": True}), 201
 
 
