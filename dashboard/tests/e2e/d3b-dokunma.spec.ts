@@ -3,7 +3,7 @@ import type { Locator } from '@playwright/test'
 import { mock } from './_audit-fixtures'
 import { GORSEL } from './_gorsel-fixtures'
 import { sabitAc } from './_gorsel-yardim'
-import { bugunAc, HOMEWORK, HW } from './_bugun-fixtures'
+import { bugunAc, HOMEWORK, HW, SINAV } from './_bugun-fixtures'
 
 // D3b page gate after the audit: on a phone, a control the reader taps is at
 // least 44px. spacing-09 is 48px. The English library defaults named in the
@@ -38,12 +38,18 @@ test('every Bugün control is at least 44px on a phone', async ({ page }) => {
     ...HOMEWORK.homework,
     HW('Türkçe', 'Okuma günlüğü', '24.09.2026 18:00'),
     HW('Müzik', 'Nota çalışması', '30.09.2026 12:00'),
-  ] } })
+  ] }, exams: { exams: [{
+    ...SINAV('ktt', 'Matematik KTT', '2026-09-29T09:00:00'), course: 'Matematik', konular: ['Oran'],
+    kaynaklar: [{ tur: 'ders_karti', etiket: 'Matematik ders içeriği', alinti: 'KTT', baglanti: '/dersler' }],
+  }], stats: { upcoming: 1, past: 0, averageGrade: null } } })
   await enAz(page.locator('.next-thing').getByRole('button', { name: 'Başla' }))
   await enAz(page.locator('.today-also li button'))
   await enAz(page.locator('.today-also').getByRole('link', { name: /iş daha/ }))
   await enAz(page.locator('.today-past-fold'))
   await enAz(page.locator('.today-tl').getByRole('link'))
+  // C21: the exam preview's row and its links (source, alerts) are tapped too.
+  await enAz(page.locator('.sinav-onizleme li button'))
+  await enAz(page.locator('.sinav-onizleme').getByRole('link'))
   await page.getByRole('button', { name: 'Sonraki gün', exact: true }).click()
   await enAz(page.getByRole('button', { name: 'Bugüne dön', exact: true }))
 })

@@ -178,8 +178,11 @@ export default function CourseContent() {
     window.addEventListener(DERS_AC_OLAYI, dinle)
     return () => window.removeEventListener(DERS_AC_OLAYI, dinle)
   }, [])
-  useEffect(() => (secilenHafta ? acikOgeAc({ tur: 'ders_haftasi', id: secilenHafta, etiket: secilenHafta }) : undefined),
-    [secilenHafta])
+  // Only a week the portal still carries becomes the assistant's context: an unknown `?hafta=` (an old
+  // exam source, a hand-typed address) falls back to the current week on the page and is not named (C14).
+  const bilinenHafta = secilenHafta && haftalik.weeks?.[secilenHafta] ? secilenHafta : null
+  useEffect(() => (bilinenHafta ? acikOgeAc({ tur: 'ders_haftasi', id: bilinenHafta, etiket: bilinenHafta }) : undefined),
+    [bilinenHafta])
 
   const haftaAdlari = useMemo(
     () => Object.keys(haftalik.weeks || {}).sort((a, b) => weekNo(a) - weekNo(b)),

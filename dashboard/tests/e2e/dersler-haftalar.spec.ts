@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { mock, LIVE } from './_audit-fixtures'
+import { mock, LIVE, FULL } from './_audit-fixtures'
 
 // The timetable arrived from the portal with lessons in it and rendered as a
 // bare column of times: the day columns never matched, so nothing was shown
@@ -159,4 +159,25 @@ test('the timetable shows no week picker', async ({ page }) => {
 
   await expect(page.locator('.schedule-lesson').first()).toHaveText('Türkçe')
   await expect(page.getByLabel('Sonraki hafta')).toHaveCount(0)
+})
+
+// C14: only a week the portal carries becomes the assistant's context. An unknown `?hafta=` falls back
+// to the current week on the page and the context chip names the page alone.
+test('an unknown ?hafta= is not written into the assistant context', async ({ page }) => {
+  await mock(page, { ...FULL, content: HAFTALAR.weeks['1. Hafta 14 Eyl. - 20 Eyl.'], 'content/weeks': HAFTALAR })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/dersler?hafta=99.%20Hafta')
+  await page.waitForLoadState('networkidle')
+  await page.getByRole('button', { name: 'Sohbet penceresini aç' }).click()
+  await expect(page.getByText('Bu sayfa: Dersler', { exact: true })).toBeVisible()
+  await expect(page.getByText(/^Bu sayfa: Dersler — /)).toHaveCount(0)
+})
+
+test('a known ?hafta= names its week in the assistant context', async ({ page }) => {
+  await mock(page, { ...FULL, content: HAFTALAR.weeks['1. Hafta 14 Eyl. - 20 Eyl.'], 'content/weeks': HAFTALAR })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/dersler?hafta=2.%20Hafta%2021%20Eyl.%20-%2027%20Eyl.')
+  await page.waitForLoadState('networkidle')
+  await page.getByRole('button', { name: 'Sohbet penceresini aç' }).click()
+  await expect(page.getByText('Bu sayfa: Dersler — 2. Hafta 21 Eyl. - 27 Eyl.', { exact: true })).toBeVisible()
 })

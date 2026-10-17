@@ -31,6 +31,13 @@
   }
 }
 
+// D3b phone gate (d3b-dokunma.spec.ts): a tapped control is at least 44px; spacing-09 is 48px.
+@media (max-width: 671px) {
+  .sinav-onizleme__baglantilar a {
+    min-block-size: spacing.$spacing-09;
+  }
+}
+
 .sinav-etiketi {
   margin-inline-start: spacing.$spacing-03;
 }

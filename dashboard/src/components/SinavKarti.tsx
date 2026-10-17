@@ -1,11 +1,25 @@
+import type { MouseEvent, ReactNode } from 'react'
 import { ContainedList, ContainedListItem, Link as CarbonLink, Tag } from '@carbon/react'
 import { useNavigate } from 'react-router-dom'
 import type { ExamItem } from '../types'
 import { kisaGun, kisaTeslim } from '../utils/formatters'
-import { konuOzeti, sinavAni, sinavEtiketi, zamanMetni } from '../utils/sinav'
+import { uygulamaIcindeAc } from '../utils/gezinme'
+import { konuAnahtarlari, konuOzeti, sinavAni, sinavEtiketi, zamanMetni } from '../utils/sinav'
 import SubjectLabel from './SubjectLabel'
 import { Rakamli } from './patterns/Rakamli'
 import './SinavKarti.scss'
+
+/** A Carbon link that stays in the app on a plain click and leaves every other click — a new tab,
+ *  a new window, an outside address — to the browser (C13). */
+function IcBaglanti({ href, children, size }: { href: string; children: ReactNode; size?: 'sm' }) {
+  const navigate = useNavigate()
+  const tikla = (e: MouseEvent<HTMLAnchorElement>) => {
+    if (!uygulamaIcindeAc(e, href, e.currentTarget.getAttribute('target'))) return
+    e.preventDefault()
+    navigate(href)
+  }
+  return <CarbonLink href={href} size={size} onClick={tikla}>{children}</CarbonLink>
+}
 
 /** Bugün: 7 gün içindeki en yakın sınav — sessiz, tek satırlık özet (İ1, İ6).
  *  "Ayrıca" ve "Sınavlar" gibi Carbon'un sayfa içi listesi; başlık cümle düzeninde (S38, B70). */
@@ -30,9 +44,9 @@ export function SinavOnizleme({ exam, now, onAc }: { exam: ExamItem; now: Date; 
       {konu && <p className="sinav-onizleme__konular">Konular: {konu}</p>}
       <p className="sinav-onizleme__baglantilar">
         {kaynak?.baglanti && (
-          <CarbonLink href={kaynak.baglanti} size="sm">Kaynak: {kaynak.etiket}</CarbonLink>
+          <IcBaglanti href={kaynak.baglanti} size="sm">Kaynak: {kaynak.etiket}</IcBaglanti>
         )}
-        <CarbonLink href="/sinavlar#uyarilar" size="sm">Sınav uyarıları</CarbonLink>
+        <IcBaglanti href="/sinavlar#uyarilar" size="sm">Sınav uyarıları</IcBaglanti>
       </p>
     </div>
   )
@@ -52,7 +66,6 @@ export function SinavEtiketi({ exam, nowMs }: { exam: ExamItem; nowMs: number })
 
 /** Sınavlar: kaynaktaki konular ve kaynaklar, kısa alıntıyla (spec §8). */
 export function SinavAyrintisi({ exam }: { exam: ExamItem }) {
-  const navigate = useNavigate()
   const konular = exam.konular ?? []
   const kaynaklar = exam.kaynaklar ?? []
   if (konular.length === 0 && kaynaklar.length === 0 && !exam.tarihBelirsiz) return null
@@ -62,7 +75,9 @@ export function SinavAyrintisi({ exam }: { exam: ExamItem }) {
       {konular.length > 0 && (
         <div className="exam-card__section">
           <div className="exam-card__section-title">Konular</div>
-          <ul className="exam-card__list">{konular.map(k => <li key={k}><span>{k}</span></li>)}</ul>
+          <ul className="exam-card__list">
+            {konuAnahtarlari(konular).map(({ anahtar, konu }) => <li key={anahtar}><span>{konu}</span></li>)}
+          </ul>
         </div>
       )}
       {kaynaklar.length > 0 && (
@@ -71,13 +86,7 @@ export function SinavAyrintisi({ exam }: { exam: ExamItem }) {
           <ul className="sinav-ayrinti__kaynaklar">
             {kaynaklar.map((k, i) => (
               <li key={i}>
-                {k.baglanti ? (
-                  <CarbonLink href={k.baglanti} onClick={e => {
-                    if (k.baglanti?.startsWith('/') && !k.baglanti.startsWith('/api/')) {
-                      e.preventDefault(); navigate(k.baglanti)
-                    }
-                  }}>{k.etiket}</CarbonLink>
-                ) : <span>{k.etiket}</span>}
+                {k.baglanti ? <IcBaglanti href={k.baglanti}>{k.etiket}</IcBaglanti> : <span>{k.etiket}</span>}
                 {k.alinti && <blockquote className="sinav-ayrinti__alinti">{k.alinti}</blockquote>}
               </li>
             ))}
