@@ -55,9 +55,13 @@ _GUN_ADI = re.compile(rf"\b({_GUN})\b")
 # "pazar" is also the market ("pazar araştırması"): alone it is a weekday only with a day suffix.
 _PAZAR_EKI = re.compile(r"(?:\s+gunu\b|['\u2019](?:dan|da|a|i)\b)")
 _GELECEK_HAFTA = re.compile(r"\b(haftaya|gelecek hafta|onumuzdeki hafta|next week)\b")
-_BU_HAFTA = re.compile(r"\b(bu hafta|this week)\b")
-# "(bu) hafta sonu", "hafta sonunda": the weekend of the post's own week.
-_HAFTA_SONU = re.compile(r"\bhafta ?sonu\w*\b")
+# "hafta sonu" with its case endings only — "sonuçları", "sonucu" are results, not the weekend.
+_SONU = r"sonu(?:nda|ndan|ndaki|na|nu)?\b"
+_BU_HAFTA = re.compile(rf"\b(bu hafta(?! ?{_SONU})|this week)\b")
+# "(bu) hafta sonu", "hafta sonunda": the weekend of the post's own week. A past weekend
+# ("geçen / geçtiğimiz / evvelki hafta sonu") is no date at all.
+_HAFTA_SONU = re.compile(rf"\bhafta ?{_SONU}")
+_GECMIS_HAFTA_SONU = re.compile(rf"\b(?:gecen|gectigimiz|evvelki) hafta ?{_SONU}")
 _YARIN = re.compile(r"\b(yarin|tomorrow)\b")
 _BUGUN = re.compile(r"\b(bugun|today)\b")
 _IMZA = re.compile(r"\|\s*(\d{2})\.(\d{2})\.(\d{4})")
@@ -231,9 +235,13 @@ def tarih_coz(metin: str, yayin: date, okul_araligi: tuple[date, date], goreli: 
         return TarihCozumu(None, haftabasi, False)
     # Açık tarih var ama hiçbiri geçerli değilse (geçmiş sınav anlatısı) yalnız gün adı
     # ileriye çözülmez: "15 Ekim Perşembe günü yapılan KTT" bir sonraki Perşembe'yi göstermez.
-    if _HAFTA_SONU.search(k) and not acik:
+    if _GECMIS_HAFTA_SONU.search(k) and not acik:
+        return TarihCozumu(None, None, False)
+    hafta_sonu_gunu = gun_adi is None or _GUNLER[gun_adi.group(1)] >= 5
+    if _HAFTA_SONU.search(k) and not acik and hafta_sonu_gunu:
         # Never shifted to the next week like "bu hafta" at the weekend: a Saturday post's
-        # "bu hafta sonu Pazar" is tomorrow. With no day name it is the post's own week.
+        # "bu hafta sonu Pazar" is tomorrow. With no day name it is the post's own week. A
+        # weekday name ("Hafta sonu ödevi var, Salı sınav") is resolved by the weekday rule.
         if gun_adi:
             return TarihCozumu(pazartesi(yayin) + timedelta(days=_GUNLER[gun_adi.group(1)]), None, False)
         return TarihCozumu(None, pazartesi(yayin), False)

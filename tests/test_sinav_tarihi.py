@@ -244,3 +244,28 @@ def test_d2_1_hafta_sonu_yayinin_kendi_haftasinin_hafta_sonudur():
     # Plain "bu hafta" at the weekend still means the coming week.
     assert tarih_coz("Bu hafta quiz olacak", cmt, YIL).hafta == date(2026, 10, 19)
     assert tarih_coz("Bu hafta Cuma günü quiz olacak", paz, YIL).gun == date(2026, 10, 23)
+
+
+# --- düzeltme turu 3 ---------------------------------------------------------------
+
+def test_d3_1_gecen_hafta_sonu_tarih_vermez():
+    for metin in ("Geçen hafta sonu deneme sınavı yapıldı", "Geçtiğimiz hafta sonu deneme yapıldı",
+                  "Evvelki hafta sonunda quiz oldu"):
+        assert tarih_coz(metin, date(2026, 10, 15), YIL) == TarihCozumu(None, None, False), metin
+
+
+def test_d3_1_hafta_ici_gun_adiyla_hafta_sonu_kurali_uygulanmaz():
+    persembe = date(2026, 10, 15)
+    assert tarih_coz("Hafta sonu ödevi var, Salı günü sınav", persembe, YIL).gun == date(2026, 10, 20)
+    assert tarih_coz("Hafta sonu çalışın, Çarşamba quiz", persembe, YIL).gun == date(2026, 10, 21)
+    assert tarih_coz("Bu hafta sonu ödevi var, Salı sınav", persembe, YIL).gun == date(2026, 10, 20)
+    # Saturday / Sunday names still anchor to the post's own weekend.
+    assert tarih_coz("Hafta sonu ödevi var, Pazar günü deneme", persembe, YIL).gun == date(2026, 10, 18)
+
+
+def test_d3_1_sonuclari_hafta_sonu_degildir():
+    persembe = date(2026, 10, 15)
+    assert tarih_coz("Bu hafta sonuçları açıklandı, quiz yok", persembe, YIL) == \
+        TarihCozumu(None, date(2026, 10, 12), False)   # plain "bu hafta"
+    assert tarih_coz("Hafta sonucu quiz", persembe, YIL) == TarihCozumu(None, None, False)
+    assert tarih_coz("Bu hafta sonundan önce quiz", persembe, YIL).hafta == date(2026, 10, 12)
