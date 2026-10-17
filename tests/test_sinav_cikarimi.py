@@ -641,3 +641,43 @@ def test_d1_bos_satirli_konu_listesi_tum_unitelerle_kalir():
                                  konular=["Ünite 1 Hücre", "Ünite 2 Kuvvet", "Ünite 3 Madde", "Ünite 4 Enerji"])],
                          aday, BUGUN)
     assert b.konular == ["Ünite 1 Hücre", "Ünite 2 Kuvvet", "Ünite 3 Madde"]   # stops at the prose paragraph
+
+
+# --- temizlik B düzeltme 2: sınav sözcüğü taşıyan paragraf bölgeyi keser -------------------
+
+def _iki_sinav_kapisi(metin, mat_alinti, tr_alinti, mat_konular, tr_konular):
+    aday = Aday(metin, None, date(2026, 10, 12), "duyuru", [])
+    return uydurma_kapisi([
+        _satir(ders="Matematik", tur="yazili", baslik="Matematik yazılısı", tarih_ifadesi="20 Ekim Salı",
+               tarih="2026-10-20", alinti=mat_alinti, konular=mat_konular + tr_konular),
+        _satir(ders="Türkçe", tur="yazili", baslik="Türkçe yazılısı", tarih_ifadesi="22 Ekim Perşembe",
+               tarih="2026-10-22", alinti=tr_alinti, konular=tr_konular + mat_konular),
+    ], aday, BUGUN)
+
+
+def test_d2_kisa_sinav_basligi_liste_maddesi_sayilmaz():
+    metin = ("Matematik yazılısı 20 Ekim Salı\n\nKesirler\n\nOndalık sayılar\n\n"
+             "Türkçe yazılısı 22 Ekim Perşembe\n\nFiilimsiler\n\nSöz sanatları")
+    mat, tr = _iki_sinav_kapisi(metin, "Matematik yazılısı 20 Ekim Salı", "Türkçe yazılısı 22 Ekim Perşembe",
+                                ["Kesirler", "Ondalık sayılar"], ["Fiilimsiler", "Söz sanatları"])
+    assert mat.konular == ["Kesirler", "Ondalık sayılar"]
+    assert tr.konular == ["Fiilimsiler", "Söz sanatları"]
+
+
+def test_d2_hemen_sonraki_paragraf_sinav_basligiysa_alinmaz():
+    metin = ("Matematik yazılısı 20 Ekim Salı günü yapılacak.\n\nKonular: Kesirler\n\n"
+             "Türkçe yazılısı 22 Ekim Perşembe\n\nKonular: Fiilimsiler")
+    mat, tr = _iki_sinav_kapisi(metin, "Matematik yazılısı 20 Ekim Salı günü yapılacak.",
+                                "Türkçe yazılısı 22 Ekim Perşembe", ["Kesirler"], ["Fiilimsiler"])
+    assert mat.konular == ["Kesirler"]
+    assert tr.konular == ["Fiilimsiler"]
+
+
+def test_d2_alintinin_hemen_ardindaki_sinav_paragrafi_bolgeye_girmez():
+    metin = "Matematik yazılısı 20 Ekim Salı\n\nTürkçe yazılısı 22 Ekim Perşembe: Fiilimsiler"
+    aday = Aday(metin, None, date(2026, 10, 12), "duyuru", [])
+    [mat] = uydurma_kapisi([_satir(ders="Matematik", tur="yazili", baslik="Matematik yazılısı",
+                                   tarih_ifadesi="20 Ekim Salı", tarih="2026-10-20",
+                                   alinti="Matematik yazılısı 20 Ekim Salı", konular=["Fiilimsiler"])],
+                           aday, BUGUN)
+    assert mat.konular == []

@@ -215,8 +215,9 @@ def _liste_satiri(paragraf: str) -> bool:
 def _konu_bolgesi(metin: str, alinti: str) -> str:
     """Where a quote's topics may come from (folded): the paragraph(s) holding the quote and the
     one after them, then any run of list-item paragraphs ("Konular:\n\nÜnite 1\n\nÜnite 2"),
-    stopping at the first prose paragraph. A text announcing two exams must not lend the second
-    one's topics to the first; a list under its announcement stays in reach."""
+    stopping at the first prose paragraph or the first paragraph carrying an exam word. A text
+    announcing two exams must not lend the second one's topics to the first; a list under its
+    announcement stays in reach."""
     ham = [x for x in _PARAGRAF.split(metin) if katla(x)]
     paragraflar = [katla(x) for x in ham]
     bitisler, konum = [], 0
@@ -229,9 +230,13 @@ def _konu_bolgesi(metin: str, alinti: str) -> str:
     bas = butun.find(hedef) if hedef else -1
     while bas != -1:
         ilk, son = bisect_right(bitisler, bas), bisect_right(bitisler, bas + len(hedef) - 1)
-        sinir = son + 2
-        while sinir < len(ham) and _liste_satiri(ham[sinir]):
+        # The next paragraph, then list items — never a paragraph that names an exam of its own
+        # (on_suzgec): that is where the next exam's announcement, and its topics, begin.
+        sinir = son + 1
+        if sinir < len(ham) and not on_suzgec(ham[sinir]):
             sinir += 1
+            while sinir < len(ham) and _liste_satiri(ham[sinir]) and not on_suzgec(ham[sinir]):
+                sinir += 1
         bolge.append(" ".join(paragraflar[ilk:sinir]))
         bas = butun.find(hedef, bas + 1)
     return "\n".join(bolge)
