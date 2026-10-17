@@ -10,12 +10,15 @@ self.addEventListener('push', event => {
   } catch {
     veri = { govde: event.data ? event.data.text() : '' }
   }
+  // `json()` may parse to null or a bare value ("null", "42"): the payload is then empty, not a crash.
+  if (!veri || typeof veri !== 'object' || Array.isArray(veri)) veri = {}
   event.waitUntil(self.registration.showNotification(veri.baslik || 'TEDY', {
     body: veri.govde || '',
     tag: veri.etiket || 'tedy',
     renotify: true,
     icon: '/tedy-192.png',
-    badge: '/tedy-192.png',
+    // Android draws the badge from its alpha channel alone: a white silhouette on a clear ground.
+    badge: '/tedy-rozet-96.png',
     data: { url: veri.url || '/sinavlar' },
   }))
 })

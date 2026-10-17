@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
+import { inflateSync } from 'node:zlib'
 
 // public/sw.js'i sahte bir `self` ile çalıştırır: tarayıcı olmadan push ve
 // bildirim tıklaması davranışını sınar.
@@ -159,4 +160,85 @@ test('abonelik değişti: anahtar yoksa abone olunmaz, hata fırlatılmaz', asyn
   await sw.abonelikDegisti()
   assert.equal(sw.abonelikler.length, 0)
   assert.equal(sw.istekler.length, 1)
+})
+
+// C7: `json()` null ya da ilkel bir değer dönerse yük boş nesnedir; bildirim yine gösterilir.
+for (const [ad, deger] of [['null', null], ['sayı', 42], ['metin', 'yalnız metin'], ['dizi', ['a']]] as const) {
+  test(`push: json() ${ad} dönerse varsayılan bildirim`, async () => {
+    const sw = kur()
+    await sw.push({ json: () => deger })
+    assert.equal(sw.gosterilen.length, 1)
+    const { baslik, secenek } = sw.gosterilen[0]
+    assert.equal(baslik, 'TEDY')
+    assert.equal(secenek.body, '')
+    assert.equal(secenek.tag, 'tedy')
+    assert.equal((secenek.data as { url: string }).url, '/sinavlar')
+  })
+}
+
+// C8: rozet tek renkli, saydam zeminli 96 px; simge 192 px kalır.
+test('push: rozet tek renkli 96 px dosya, simge 192', async () => {
+  const sw = kur()
+  await sw.push({ json: () => ({ baslik: 'x' }) })
+  const { secenek } = sw.gosterilen[0]
+  assert.equal(secenek.icon, '/tedy-192.png')
+  assert.equal(secenek.badge, '/tedy-rozet-96.png')
+})
+
+// PNG'yi çözer (yalnız 8 bit RGBA/gri+alfa, taramasız): rozet yalnız beyaz ve saydam piksellerden oluşur.
+function pngPikselleri(veri: Buffer): { en: number; boy: number; kanal: number; satirlar: Buffer[] } {
+  assert.equal(veri.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
+  let i = 8
+  let en = 0, boy = 0, tur = 0
+  const idat: Buffer[] = []
+  while (i < veri.length) {
+    const uzunluk = veri.readUInt32BE(i)
+    const ad = veri.subarray(i + 4, i + 8).toString('latin1')
+    const govde = veri.subarray(i + 8, i + 8 + uzunluk)
+    if (ad === 'IHDR') {
+      en = govde.readUInt32BE(0); boy = govde.readUInt32BE(4)
+      assert.equal(govde[8], 8, 'bit derinliği 8')
+      tur = govde[9]
+      assert.equal(govde[12], 0, 'taramasız')
+    }
+    if (ad === 'IDAT') idat.push(govde)
+    i += 12 + uzunluk
+  }
+  const kanal = ({ 4: 2, 6: 4 } as Record<number, number>)[tur]
+  assert.ok(kanal, `saydam zeminli renk türü (4 ya da 6) bekleniyordu, gelen ${tur}`)
+  const ham = inflateSync(Buffer.concat(idat))
+  const satir = en * kanal
+  const satirlar: Buffer[] = []
+  let onceki = Buffer.alloc(satir)
+  for (let y = 0; y < boy; y++) {
+    const filtre = ham[y * (satir + 1)]
+    const s = Buffer.from(ham.subarray(y * (satir + 1) + 1, (y + 1) * (satir + 1)))
+    for (let x = 0; x < satir; x++) {
+      const a = x >= kanal ? s[x - kanal] : 0, b = onceki[x], c = x >= kanal ? onceki[x - kanal] : 0
+      const tahmin = filtre === 0 ? 0 : filtre === 1 ? a : filtre === 2 ? b : filtre === 3 ? (a + b) >> 1
+        : (() => { const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c)
+          return pa <= pb && pa <= pc ? a : pb <= pc ? b : c })()
+      s[x] = (s[x] + tahmin) & 0xff
+    }
+    satirlar.push(s)
+    onceki = s
+  }
+  return { en, boy, kanal, satirlar }
+}
+
+test('rozet dosyası: 96×96, saydam zemin, yalnız beyaz siluet', () => {
+  const { en, boy, kanal, satirlar } = pngPikselleri(readFileSync(new URL('../public/tedy-rozet-96.png', import.meta.url)))
+  assert.deepEqual([en, boy], [96, 96])
+  let saydam = 0, dolu = 0
+  for (const s of satirlar) {
+    for (let x = 0; x < en; x++) {
+      const p = s.subarray(x * kanal, (x + 1) * kanal)
+      const alfa = p[kanal - 1]
+      if (alfa === 0) { saydam++; continue }
+      dolu++
+      for (let k = 0; k < kanal - 1; k++) assert.equal(p[k], 255, 'görünen her piksel beyaz')
+    }
+  }
+  assert.ok(saydam > 96 * 96 * 0.2, 'zemin saydam')
+  assert.ok(dolu > 96 * 96 * 0.2, 'siluet var')
 })
