@@ -13,7 +13,7 @@ test.describe('C1 — Yarın', () => {
   test('son zilden sonra yarının ilk dersi ve dersleri görünür', async ({ page }) => {
     await bugunAc(page, '2026-09-24T16:40')
     const yarin = page.locator('.today-tomorrow')
-    await expect(yarin).toContainText('YARIN · CUMA')
+    await expect(yarin).toContainText('Yarın · Cuma')
     await expect(yarin).toContainText('İlk ders 08:00 · Sosyal Bilgiler')
     await expect(yarin).toContainText('5 ders')
     await expect(yarin).toContainText('Müzik')
@@ -29,8 +29,8 @@ test.describe('C1 — Yarın', () => {
   test('cuma akşamı sıradaki okul günü pazartesidir', async ({ page }) => {
     await bugunAc(page, '2026-09-25T17:00')
     const yarin = page.locator('.today-tomorrow')
-    await expect(yarin).toContainText('PAZARTESİ')
-    await expect(yarin).not.toContainText('YARIN')
+    await expect(yarin).toContainText('Pazartesi')
+    await expect(yarin).not.toContainText('Yarın')
     await expect(yarin).toContainText('İlk ders 08:00 · Türkçe')
   })
 
@@ -79,7 +79,7 @@ test.describe('C3 — Bugün\'den Yaptım', () => {
     // The loop closes here: the next work steps up, the box is gone, and the
     // page says what it recorded (İ9 — "Yaptım" answers with "yaptın").
     await expect(kart).toContainText('Fransızca')
-    await expect(kart.locator('.next-thing__eyebrow')).not.toContainText('BAŞLADIN')
+    await expect(kart.locator('.next-thing__eyebrow')).not.toContainText('Başladın')
     await expect(page.locator('.today-done-note')).toContainText('Matematik')
   })
 
@@ -103,7 +103,7 @@ test.describe('C3 — Bugün\'den Yaptım', () => {
 
     // D3: a failure says what happened and what to do, and loses nothing.
     await expect(kart).toContainText('Kaydedilemedi')
-    await expect(kart.locator('.next-thing__eyebrow')).toContainText('BAŞLADIN')
+    await expect(kart.locator('.next-thing__eyebrow')).toContainText('Başladın')
     await expect(kart).toContainText('Matematik')
   })
 

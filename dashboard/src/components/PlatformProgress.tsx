@@ -1,4 +1,4 @@
-import { ProgressBar, Tag, InlineNotification, Accordion, AccordionItem, Link, SkeletonText } from '@carbon/react'
+import { Tag, Accordion, AccordionItem, Link, SkeletonText, ContainedList, ContainedListItem } from '@carbon/react'
 import { ChartBar, CheckmarkFilled, CloseFilled, Launch } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
@@ -39,11 +39,11 @@ const OGRETMEN_ADLARI: Record<string, string> = { genel: 'Genel', turkce: 'Türk
 const DUZEY_ADLARI = { baslangic: 'Başlangıç', gelisiyor: 'Gelişiyor', yeterli: 'Yeterli' }
 
 function OgrenmeGunlugu() {
-  const { data, loading, error } = useApi<Gunluk | null>('/api/assistant/ogrenme-gunlugu', null)
+  const { data, loading, iskelet, error } = useApi<Gunluk | null>('/api/assistant/ogrenme-gunlugu', null)
   if (error === 'HTTP 403') return null
   return <section className="ogrenme-gunlugu" aria-labelledby="ogrenme-gunlugu-baslik">
     <h3 id="ogrenme-gunlugu-baslik">Öğrenme günlüğü</h3>
-    {loading ? <SkeletonText paragraph lineCount={3} /> : error ? <p>Öğrenme günlüğü alınamadı.</p> : data && <>
+    {loading ? (iskelet ? <div aria-busy="true"><SkeletonText paragraph lineCount={3} /></div> : null) : error ? <p role="alert">Öğrenme günlüğü alınamadı.</p> : data && <>
       <div>
         <h4>Bu hafta</h4>
         {data.hafta.sohbet.length === 0 ? <p>Sohbet · 0</p> : data.hafta.sohbet.map(s =>
@@ -83,193 +83,134 @@ function OgrenmeGunlugu() {
 }
 
 function DifficultyTag({ level }: { level: number }) {
-  const type = level <= 2 ? 'green' : level <= 4 ? 'blue' : level <= 6 ? 'warm-gray' : 'red'
-  return <Tag type={type} size="sm">Seviye {level}</Tag>
+  // B21: sıralı veri durum ya da ders rengiyle boyanmaz; seviye sayının kendisidir.
+  return <Tag type="gray" size="sm">Seviye {level}</Tag>
 }
 
 
+type Platform = { ad: string; birim: string; done: number; total: number }
+
+/** One line per platform, said in words (B51, §8.7): a Carbon ProgressBar is for progress the system makes,
+ *  not a count of what the reader finished — and a finished platform is a fact, not a celebration. */
+function platformDurumu(p: Platform): string {
+  if (p.total === 0) return 'Atanmış iş yok'
+  if (p.done >= p.total) return `Tamamlandı · ${p.done}/${p.total} ${p.birim}`
+  return `${p.done}/${p.total} ${p.birim}`
+}
+
+function Durum({ tamam }: { tamam: boolean }) {
+  return tamam
+    ? <CheckmarkFilled size={16} className="platform-detail-row__icon--done" aria-label="Tamamlandı" />
+    : <CloseFilled size={16} className="platform-detail-row__icon--pending" aria-label="Bekliyor" />
+}
+
 export default function PlatformProgress() {
-  const { data: ec, loading: ecLoading } = useApi<ECData>('/api/progress/ec', {})
-  const { data: a3k, loading: a3kLoading } = useApi<A3KData>('/api/progress/a3k', {})
-  const { data: sebit, loading: sebitLoading } = useApi<SebitData>('/api/sebit', {})
+  const { data: ec, loading: ecLoading, iskelet: ecIskelet } = useApi<ECData>('/api/progress/ec', {})
+  const { data: a3k, loading: a3kLoading, iskelet: a3kIskelet } = useApi<A3KData>('/api/progress/a3k', {})
+  const { data: sebit, loading: sebitLoading, iskelet: sebitIskelet } = useApi<SebitData>('/api/sebit', {})
   const { focusMode } = useFocusMode()
 
-  const platforms = [
-    { name: 'EnglishCentral', done: ec.completed_videos || 0, total: ec.total_videos || 0 },
-    { name: 'Achieve3000', done: a3k.teacher_assigned_completed || 0, total: a3k.teacher_assigned_count || 0 },
-    { name: 'SEBIT', done: sebit.completed_count || 0, total: sebit.total_homework || 0 }
+  const platforms: Platform[] = [
+    { ad: 'EnglishCentral', birim: 'video', done: ec.completed_videos || 0, total: ec.total_videos || 0 },
+    { ad: 'Achieve3000', birim: 'ders', done: a3k.teacher_assigned_completed || 0, total: a3k.teacher_assigned_count || 0 },
+    { ad: 'SEBIT', birim: 'ödev', done: sebit.completed_count || 0, total: sebit.total_homework || 0 },
   ]
-
-  const allComplete = platforms.every(p => p.total > 0 && p.done >= p.total)
+  // Focus mode keeps what is still owed.
+  const gorunur = (p: Platform) => !focusMode || p.total === 0 || p.done < p.total
 
   const ecVideos = ec.videos || []
   const a3kLessons = (a3k.lessons || []).filter(l => l.is_teacher_assigned !== false)
   const sebitItems = sebit.homework || []
+  // B66 (§4.7, İ6): one list and one skeleton — three panels each loading on their own drew three at once.
+  const yukleniyor = ecLoading || a3kLoading || sebitLoading
+  const iskelet = ecIskelet || a3kIskelet || sebitIskelet
 
   return (
     <div className="dashboard-card">
       <h2 className="dashboard-card__title">
         <ChartBar size={20} />
-        Platform İlerleme
+        Platform ilerlemesi
       </h2>
-
-      {allComplete && (
-        <InlineNotification
-          kind="success"
-          title="Tüm platformlar tamamlandı!"
-          hideCloseButton
-          lowContrast
-          className="platform-complete-notification"
-        />
-      )}
 
       <OgrenmeGunlugu />
 
-      <Accordion className="platform-accordion">
-        {/* EnglishCentral */}
-        {(!focusMode || platforms[0].done < platforms[0].total || platforms[0].total === 0) && (() => {
-          const p = platforms[0]
-          const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0
-          return (
-            <AccordionItem
-              title={
-                <span className="platform-accordion__header">
-                  <span className="platform-accordion__name">{p.name}</span>
-                  <span className="platform-accordion__count">{p.done}/{p.total}</span>
-                </span> as unknown as string
-              }
-            >
-              <div className="platform-accordion__progress">
-                <ProgressBar label={p.name} value={pct} status={pct === 100 ? 'finished' : 'active'} size="small" hideLabel />
-              </div>
+      {yukleniyor ? (
+        iskelet ? <div aria-busy="true"><SkeletonText paragraph lineCount={3} /></div> : null
+      ) : (<>
+        <ContainedList label="Platformlar" kind="on-page" size="lg" className="platform-list">
+          {platforms.filter(gorunur).map(p => (
+            <ContainedListItem key={p.ad}>
+              <span className="platform-list__row">
+                <span className="platform-list__name">{p.ad}</span>
+                <span className="platform-list__state">{platformDurumu(p)}</span>
+              </span>
+            </ContainedListItem>
+          ))}
+        </ContainedList>
+
+        {/* The detail, one accordion, closed (§4.7). */}
+        <Accordion className="platform-accordion">
+          {gorunur(platforms[0]) && (
+            <AccordionItem title="EnglishCentral videoları">
               {ecVideos.length > 0 ? (
-                <div className="platform-detail-list">
+                <ul className="platform-detail-list">
                   {ecVideos.map((v, i) => (
-                    <div key={i} className="platform-detail-row">
-                      <span className="platform-detail-row__status">
-                        {v.completed
-                          ? <CheckmarkFilled size={16} className="platform-detail-row__icon--done" />
-                          : <CloseFilled size={16} className="platform-detail-row__icon--pending" />
-                        }
-                      </span>
-                      <span className="platform-detail-row__title">
+                    <li key={i} className="platform-detail-row">
+                      <span className="platform-detail-row__status"><Durum tamam={!!v.completed} /></span>
+                      <span className="platform-detail-row__title" title={v.title}>
                         {v.url
                           ? <Link href={v.url} target="_blank" rel="noopener" renderIcon={Launch}>{v.title}</Link>
-                          : v.title
-                        }
+                          : v.title}
                       </span>
                       <span className="platform-detail-row__tags">
                         {v.difficulty > 0 && <DifficultyTag level={v.difficulty} />}
-                        {v.duration && <span className="platform-detail-row__duration">{v.duration}</span>}
+                        {v.duration && <span className="platform-detail-row__duration tedy-time">{v.duration}</span>}
                       </span>
-                    </div>
+                    </li>
                   ))}
-                </div>
-              ) : (
-                ecLoading ? (
-                  <SkeletonText paragraph lineCount={3} />
-                ) : (
-                  <EmptyLine>Henüz izlenmiş video yok.</EmptyLine>
-                )
-              )}
+                </ul>
+              ) : <EmptyLine>Henüz izlenmiş video yok.</EmptyLine>}
             </AccordionItem>
-          )
-        })()}
+          )}
 
-        {/* Achieve3000 */}
-        {(!focusMode || platforms[1].done < platforms[1].total || platforms[1].total === 0) && (() => {
-          const p = platforms[1]
-          const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0
-          return (
-            <AccordionItem
-              title={
-                <span className="platform-accordion__header">
-                  <span className="platform-accordion__name">{p.name}</span>
-                  <span className="platform-accordion__count">{p.done}/{p.total}</span>
-                </span> as unknown as string
-              }
-            >
-              <div className="platform-accordion__progress">
-                <ProgressBar label={p.name} value={pct} status={pct === 100 ? 'finished' : 'active'} size="small" hideLabel />
-              </div>
+          {gorunur(platforms[1]) && (
+            <AccordionItem title="Achieve3000 dersleri">
               {a3kLessons.length > 0 ? (
-                <div className="platform-detail-list">
+                <ul className="platform-detail-list">
                   {a3kLessons.map((l, i) => (
-                    <div key={i} className="platform-detail-row">
-                      <span className="platform-detail-row__status">
-                        {l.completed
-                          ? <CheckmarkFilled size={16} className="platform-detail-row__icon--done" />
-                          : <CloseFilled size={16} className="platform-detail-row__icon--pending" />
-                        }
-                      </span>
-                      <span className="platform-detail-row__title">
+                    <li key={i} className="platform-detail-row">
+                      <span className="platform-detail-row__status"><Durum tamam={!!l.completed} /></span>
+                      <span className="platform-detail-row__title" title={l.title}>
                         {l.url
                           ? <Link href={l.url} target="_blank" rel="noopener" renderIcon={Launch}>{l.title}</Link>
-                          : l.title
-                        }
+                          : l.title}
                       </span>
                       <span className="platform-detail-row__tags">
                         {l.category && <Tag type="cool-gray" size="sm">{l.category}</Tag>}
-                        <span className="platform-detail-row__steps">
-                          {l.completed_steps}/{l.total_steps} adım
-                        </span>
-                        {l.score > 0 && (
-                          <span className="platform-detail-row__score">{l.score}%</span>
-                        )}
+                        <span className="platform-detail-row__steps">{l.completed_steps}/{l.total_steps} adım</span>
+                        {l.score > 0 && <span className="platform-detail-row__score">{l.score}%</span>}
                       </span>
-                    </div>
+                    </li>
                   ))}
-                </div>
-              ) : (
-                a3kLoading ? (
-                  <SkeletonText paragraph lineCount={3} />
-                ) : (
-                  <EmptyLine>Henüz tamamlanmış ders yok.</EmptyLine>
-                )
-              )}
+                </ul>
+              ) : <EmptyLine>Henüz tamamlanmış ders yok.</EmptyLine>}
+              {/* A score, said as a figure (B51): the gauge drew a bar beside the number it repeated. */}
               {a3k.dashboard_stats?.firstTryScore != null && (
-                <div className="platform-a3k-score">
-                  <span className="platform-a3k-score__label">A3K İlk Deneme Skoru</span>
-                  <div className="platform-a3k-score__gauge">
-                    <div
-                      className="platform-a3k-score__gauge-fill"
-                      style={{ width: `${Math.min(100, a3k.dashboard_stats.firstTryScore)}%` }}
-                    />
-                  </div>
-                  <span className="platform-a3k-score__value">{a3k.dashboard_stats.firstTryScore}</span>
-                </div>
+                <p className="platform-a3k-score">
+                  Achieve3000 ilk deneme puanı <span className="tedy-time">{a3k.dashboard_stats.firstTryScore}</span>
+                </p>
               )}
             </AccordionItem>
-          )
-        })()}
+          )}
 
-        {/* SEBIT */}
-        {(!focusMode || platforms[2].done < platforms[2].total || platforms[2].total === 0) && (() => {
-          const p = platforms[2]
-          const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0
-          return (
-            <AccordionItem
-              title={
-                <span className="platform-accordion__header">
-                  <span className="platform-accordion__name">{p.name}</span>
-                  <span className="platform-accordion__count">{p.done}/{p.total}</span>
-                </span> as unknown as string
-              }
-            >
-              <div className="platform-accordion__progress">
-                <ProgressBar label={p.name} value={pct} status={pct === 100 ? 'finished' : 'active'} size="small" hideLabel />
-              </div>
+          {gorunur(platforms[2]) && (
+            <AccordionItem title="SEBIT ödevleri">
               {sebitItems.length > 0 ? (
-                <div className="platform-detail-list">
+                <ul className="platform-detail-list">
                   {sebitItems.map((s, i) => (
-                    <div key={i} className="platform-detail-row platform-detail-row--sebit">
-                      <span className="platform-detail-row__status">
-                        {s.completed
-                          ? <CheckmarkFilled size={16} className="platform-detail-row__icon--done" />
-                          : <CloseFilled size={16} className="platform-detail-row__icon--pending" />
-                        }
-                      </span>
-                      <span className="platform-detail-row__title">{s.title}</span>
+                    <li key={i} className="platform-detail-row platform-detail-row--sebit">
+                      <span className="platform-detail-row__status"><Durum tamam={!!s.completed} /></span>
+                      <span className="platform-detail-row__title" title={s.title}>{s.title}</span>
                       <span className="platform-detail-row__tags">
                         {s.course && <SubjectLabel className="platform-detail-row__course" course={s.course} />}
                         <span className="platform-detail-row__steps">{s.progress}%</span>
@@ -280,20 +221,14 @@ export default function PlatformProgress() {
                           <span className="platform-detail-row__dates">{s.start_date} – {s.end_date}</span>
                         )}
                       </div>
-                    </div>
+                    </li>
                   ))}
-                </div>
-              ) : (
-                sebitLoading ? (
-                  <SkeletonText paragraph lineCount={3} />
-                ) : (
-                  <EmptyLine>Henüz ödev yok.</EmptyLine>
-                )
-              )}
+                </ul>
+              ) : <EmptyLine>Henüz ödev yok.</EmptyLine>}
             </AccordionItem>
-          )
-        })()}
-      </Accordion>
+          )}
+        </Accordion>
+      </>)}
     </div>
   )
 }

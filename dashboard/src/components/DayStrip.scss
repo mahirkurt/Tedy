@@ -1,12 +1,22 @@
 @use '@carbon/react/scss/theme' as theme;
 @use '@carbon/react/scss/type' as type;
 @use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/breakpoint' as bp;
 
 // The Day Strip shows the part of today that is still spendable, to scale.
 // Spent hours are never drawn: they are not actionable, and drawing them costs
 // the reader attention for nothing (principle İ7). Because the track always
 // starts at "now", it shortens through the day on its own — the shape of the
 // component carries the time signal, so no countdown has to shout it (İ2).
+//
+// Neutral since 2026-10-10 (talimatname §8.8, B9, İ8): yellow is a status
+// colour, and the strip's marks measured 1.10–2.17:1. Every mark that carries
+// information is now opaque and at least 3:1 against what it sits on:
+//   now    — border-inverse (#161616): 18.1:1 on the rail, 13.7:1 on the window
+//   anchor — border-interactive (#0f62fe): 5.0:1 on the rail, 3.8:1 on the window
+//   window edge — border-strong-01 (#8d8d8d): 3.3:1 on the rail
+// The window's own fill (layer-accent-01) is a ground, not a mark: its edge and
+// its "Odak sonu" label say where it ends.
 
 .day-strip {
   margin-block-end: $spacing-05;
@@ -20,12 +30,9 @@
   margin-block-end: $spacing-03;
 }
 
-
 .day-strip__now-label {
-  @include type.type-style('label-01');
+  @include type.type-style('heading-compact-01');
   color: theme.$text-primary;
-  font-weight: 600;
-  letter-spacing: 0.04em;
 }
 
 .day-strip__left {
@@ -35,44 +42,44 @@
 
 .day-strip__end-label {
   @include type.type-style('label-01');
-  color: theme.$text-helper;
+  color: theme.$text-secondary;
 }
 
+// The rail: a layer with a hairline, square like every Carbon track.
 .day-strip__track {
   position: relative;
   height: 1.75rem;
   background: theme.$layer-01;
-  border-radius: 2px;
+  border: 1px solid theme.$border-subtle-01;
   overflow: hidden;
 }
 
-// The focus window is a calm warm field, not an alarm. It says "there is fuel
-// here", so it must never read as urgency — urgency has its own colour and
-// there is only one attention-grabbing field per screen (İ6).
+// The focus window is a calm neutral field, not an alarm: it says "there is
+// fuel here", so it must never read as urgency (İ6).
 .day-strip__window {
   position: absolute;
   inset-block: 0;
-  background: var(--ted-day-window);
-  border-inline-end: 2px solid var(--ted-day-window-edge);
+  background: theme.$layer-accent-01;
+  border-inline-end: 2px solid theme.$border-strong-01;
 }
 
-// "Now" is the only thing on the page allowed to move.
+// "Now" is the only thing on the page allowed to move — once a minute, as the
+// page redraws; there is no animation (§8.8).
 .day-strip__now {
   position: absolute;
   inset-block: 0;
   inset-inline-start: 0;
-  width: 3px;
-  background: theme.$interactive;
+  width: 2px;
+  background: theme.$border-inverse;
 }
 
 // Where the next thing sits. Tied to the card below, so work is anchored to
-// when it happens rather than to a date.
+// when it happens rather than to a date. Opaque: at 50% it was 2.17:1 (B9).
 .day-strip__anchor {
   position: absolute;
   inset-block: 0;
   width: 2px;
-  background: theme.$interactive;
-  opacity: 0.5;
+  background: theme.$border-interactive;
 }
 
 // Labels live below the track, never on top of the window fill.
@@ -87,7 +94,7 @@
   position: absolute;
   inset-block-start: 0;
   transform: translateX(-50%);
-  // label-01 is Carbon's smallest step (12px); the marks were set at 11px.
+  // label-01 is Carbon's smallest step (12px).
   @include type.type-style('label-01');
   white-space: nowrap;
 }
@@ -95,8 +102,7 @@
 .day-strip__tick { color: theme.$text-helper; }
 
 .day-strip__boundary {
-  color: var(--ted-day-window-text);
-  font-weight: 600;
+  color: theme.$text-primary;
 }
 
 .day-strip__boundary--start {
@@ -104,7 +110,7 @@
   margin-inline-start: $spacing-02;
 }
 
-@media (max-width: 42rem) {
+@include bp.breakpoint-down('md') {
   .day-strip__head { flex-wrap: wrap; }
   // On a narrow screen the hour marks become texture; the boundary is the one
   // that carries a decision, so it is the one that stays.

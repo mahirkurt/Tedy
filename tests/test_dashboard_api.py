@@ -1195,3 +1195,514 @@ def test_assistant_stream_emits_tool_events_then_the_answer(client, monkeypatch)
 def test_assistant_stream_requires_auth(client_no_auth):
     res = client_no_auth.post("/api/assistant/stream", json={"messages": []})
     assert res.status_code in (401, 403)
+
+
+# ── B63: "Yaptım" can be taken back (talimatname §13, S40) ───────────────────
+
+class TestHomeworkUnmarkDoneEndpoint:
+    def _isaretle(self, client, scraped, key):
+        with patch("src.dashboard_api._scraped", return_value=scraped):
+            assert client.post("/api/homework/mark-done", json={"homework_key": key}).status_code == 200
+
+    def test_requires_identifier(self, client, isolated_output):
+        resp = client.post("/api/homework/unmark-done", json={})
+        assert resp.status_code == 400
+        assert "gerekli" in resp.get_json()["error"]
+
+    def test_unmarks_by_key_and_listing_shows_it_active_again(self, client, isolated_output):
+        scraped = _sample_scraped_homework()
+        key = dashboard_api._homework_row_key(scraped["odevlerim"]["homework"]["rows"][0])
+        self._isaretle(client, scraped, key)
+
+        with patch("src.dashboard_api._scraped", return_value=scraped):
+            resp = client.post("/api/homework/unmark-done", json={"homework_key": key})
+            assert resp.status_code == 200
+            payload = resp.get_json()
+            assert payload == {"ok": True, "homework_key": key, "removed": True}
+            listing = client.get("/api/homework").get_json()
+        assert listing["homework"][0]["student_marked_done"] is False
+        stored = json.loads((isolated_output / "homework_student_done.json").read_text("utf-8"))
+        assert key not in stored["marks"]
+
+    def test_is_idempotent(self, client, isolated_output):
+        scraped = _sample_scraped_homework()
+        key = dashboard_api._homework_row_key(scraped["odevlerim"]["homework"]["rows"][0])
+        self._isaretle(client, scraped, key)
+        with patch("src.dashboard_api._scraped", return_value=scraped):
+            first = client.post("/api/homework/unmark-done", json={"homework_key": key})
+            second = client.post("/api/homework/unmark-done", json={"homework_key": key})
+        assert first.status_code == second.status_code == 200
+        assert first.get_json()["removed"] is True
+        assert second.get_json() == {"ok": True, "homework_key": key, "removed": False}
+
+    def test_unmarks_by_title_and_due_like_mark_done(self, client, isolated_output):
+        scraped = _sample_scraped_homework()
+        row = scraped["odevlerim"]["homework"]["rows"][0]
+        key = dashboard_api._homework_row_key(row)
+        self._isaretle(client, scraped, key)
+        with patch("src.dashboard_api._scraped", return_value=scraped):
+            resp = client.post("/api/homework/unmark-done", json={
+                "Ödev Başlığı": row["Ödev Başlığı"],
+                "Ödev Son Teslim Tarihi": row["Ödev Son Teslim Tarihi"],
+                "Ders Adı": row["Ders Adı"],
+            })
+        assert resp.status_code == 200
+        assert resp.get_json()["homework_key"] == key
+        assert resp.get_json()["removed"] is True
+
+    def test_unknown_title_is_404(self, client, isolated_output):
+        with patch("src.dashboard_api._scraped", return_value=_sample_scraped_homework()):
+            resp = client.post("/api/homework/unmark-done", json={
+                "Ödev Başlığı": "Bilinmeyen", "Ödev Son Teslim Tarihi": "20.03.2026 12:00"})
+        assert resp.status_code == 404
+
+    def test_other_marks_are_kept(self, client, isolated_output):
+        dashboard_api._save_student_done_marks({"baska|is|x": "2026-10-01T10:00:00"})
+        scraped = _sample_scraped_homework()
+        key = dashboard_api._homework_row_key(scraped["odevlerim"]["homework"]["rows"][0])
+        self._isaretle(client, scraped, key)
+        with patch("src.dashboard_api._scraped", return_value=scraped):
+            client.post("/api/homework/unmark-done", json={"homework_key": key})
+        assert dashboard_api._load_student_done_marks() == {"baska|is|x": "2026-10-01T10:00:00"}
+
+    def test_unmark_by_key_works_after_the_row_left_the_list(self, client, isolated_output):
+        dashboard_api._save_student_done_marks({"gecmis|is|x": "2026-10-01T10:00:00"})
+        with patch("src.dashboard_api._scraped", return_value={}):
+            resp = client.post("/api/homework/unmark-done", json={"homework_key": "gecmis|is|x"})
+        assert resp.status_code == 200 and resp.get_json()["removed"] is True
+        assert dashboard_api._load_student_done_marks() == {}
+
+    def test_teacher_verdict_pruning_keeps_a_mark_written_meanwhile(
+        self, client, isolated_output, monkeypatch
+    ):
+        # /api/homework drops a mark the teacher's verdict made obsolete. It
+        # used to write back its own copy of the marks, losing a "Yaptım"
+        # another worker stored between its read and its write.
+        scraped = _sample_scraped_homework(status="Yaptı")
+        cozulen = dashboard_api._homework_row_key(scraped["odevlerim"]["homework"]["rows"][0])
+        dashboard_api._save_student_done_marks({cozulen: "2026-10-01T10:00:00"})
+        gercek_kilit = dashboard_api._isaret_kilidi
+
+        def araya_giren_kilit():
+            dashboard_api._save_student_done_marks({
+                **dashboard_api._load_student_done_marks(), "yeni|is|y": "2026-10-11T09:00:00"})
+            return gercek_kilit()
+
+        monkeypatch.setattr(dashboard_api, "_isaret_kilidi", araya_giren_kilit)
+        with patch("src.dashboard_api._scraped", return_value=scraped):
+            client.get("/api/homework")
+        assert dashboard_api._load_student_done_marks() == {"yeni|is|y": "2026-10-11T09:00:00"}
+
+    def test_requires_auth_and_refuses_a_reader(self, isolated_output, monkeypatch):
+        monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS", False)
+        okur = next(e for e, r in dashboard_api.USER_ROLES.items() if r == dashboard_api.ROLE_READER)
+        with app.test_client() as c:
+            assert c.post("/api/homework/unmark-done", json={"homework_key": "k"}).status_code == 401
+            with c.session_transaction() as s:
+                s["user_email"] = okur
+            assert c.post("/api/homework/unmark-done", json={"homework_key": "k"}).status_code == 403
+        assert "homework_unmark_done" not in dashboard_api.READER_ENDPOINTS
+
+
+# ── B29: the focus window is a parameter in output/ (anayasa §2) ─────────────
+
+class TestOdakPenceresiEndpoint:
+    def test_defaults_are_todays_values(self, client, isolated_output):
+        resp = client.get("/api/odak-penceresi")
+        assert resp.status_code == 200
+        assert resp.get_json() == {
+            "okul_bitisi": "15:45", "odak_sonu": "16:00", "yatma": "22:30", "varsayilan": True}
+
+    def test_put_stores_atomically_and_get_reads_it(self, client, isolated_output):
+        resp = client.put("/api/odak-penceresi", json={
+            "okul_bitisi": "15:30", "odak_sonu": "16:15", "yatma": "22:00"})
+        assert resp.status_code == 200
+        assert resp.get_json() == {
+            "okul_bitisi": "15:30", "odak_sonu": "16:15", "yatma": "22:00", "varsayilan": False}
+        stored = json.loads((isolated_output / "odak_penceresi.json").read_text("utf-8"))
+        assert stored["okul_bitisi"] == "15:30" and stored["yatma"] == "22:00"
+        assert not list(isolated_output.glob("*.tmp"))
+        assert client.get("/api/odak-penceresi").get_json()["odak_sonu"] == "16:15"
+
+    @pytest.mark.parametrize("govde", [
+        {"okul_bitisi": "15:45", "odak_sonu": "16:00"},                     # missing
+        {"okul_bitisi": "25:00", "odak_sonu": "16:00", "yatma": "22:30"},   # not a time
+        {"okul_bitisi": "15:45", "odak_sonu": "4pm", "yatma": "22:30"},
+        {"okul_bitisi": "16:30", "odak_sonu": "16:00", "yatma": "22:30"},   # window ends before school
+        {"okul_bitisi": "15:45", "odak_sonu": "23:00", "yatma": "22:30"},   # bedtime before window
+        ["15:45"],
+    ])
+    def test_put_rejects_a_bad_window_with_a_sentence(self, client, isolated_output, govde):
+        resp = client.put("/api/odak-penceresi", json=govde)
+        assert resp.status_code == 400
+        assert resp.get_json()["error"].endswith(".")
+        assert not (isolated_output / "odak_penceresi.json").exists()
+
+    def test_unreadable_file_reads_as_defaults(self, client, isolated_output):
+        (isolated_output / "odak_penceresi.json").write_text("{bozuk", "utf-8")
+        assert client.get("/api/odak-penceresi").get_json()["varsayilan"] is True
+        (isolated_output / "odak_penceresi.json").write_text(
+            json.dumps({"okul_bitisi": "99:00", "odak_sonu": "16:00", "yatma": "22:30"}), "utf-8")
+        assert client.get("/api/odak-penceresi").get_json()["okul_bitisi"] == "15:45"
+
+    def test_requires_auth_and_refuses_a_reader(self, isolated_output, monkeypatch):
+        monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS", False)
+        okur = next(e for e, r in dashboard_api.USER_ROLES.items() if r == dashboard_api.ROLE_READER)
+        govde = {"okul_bitisi": "15:45", "odak_sonu": "16:00", "yatma": "22:30"}
+        with app.test_client() as c:
+            assert c.get("/api/odak-penceresi").status_code == 401
+            assert c.put("/api/odak-penceresi", json=govde).status_code == 401
+            with c.session_transaction() as s:
+                s["user_email"] = okur
+            assert c.get("/api/odak-penceresi").status_code == 403
+            assert c.put("/api/odak-penceresi", json=govde).status_code == 403
+        assert not (isolated_output / "odak_penceresi.json").exists()
+
+
+# ── B41 (backend half): "Özel ders" in sentence case at the source (S38) ─────
+
+class TestOzelDersCumleDuzeni:
+    DERS = {"id": "pl1", "course": "Fen Bilimleri", "teacher": "Deneme Hoca",
+            "is_recurring": True, "weekday": "Cumartesi",
+            "start_time": "12:00", "end_time": "13:00", "active": True}
+
+    def test_week_events_say_ozel_ders(self):
+        from datetime import date, timedelta
+        pzt = date(2026, 9, 21)
+        gunler = [pzt + timedelta(days=i) for i in range(7)]
+        olaylar = dashboard_api._private_lessons_for_week(gunler, [self.DERS])
+        assert olaylar and olaylar[0]["status"] == "Özel ders"
+        assert olaylar[0]["subtitle"] == "Özel ders • Deneme Hoca"
+        isimsiz = dashboard_api._private_lessons_for_week(gunler, [{**self.DERS, "teacher": ""}])
+        assert isimsiz[0]["subtitle"] == "Özel ders"
+
+    def test_bugun_calendar_badge_and_description(self, client, monkeypatch):
+        monkeypatch.setattr(dashboard_api, "_load_private_lessons", lambda: [self.DERS])
+        olaylar = client.get("/api/calendar").get_json()["events"]
+        ozel = [e for e in olaylar if e["extendedProps"].get("kind") == "private_lesson"]
+        assert ozel
+        assert {e["extendedProps"]["badge"] for e in ozel} == {"Özel ders"}
+        assert {e["extendedProps"]["description"] for e in ozel} == {"Özel ders • Deneme Hoca"}
+
+    def test_no_title_case_left_in_the_api_source(self):
+        kaynak = open(dashboard_api.__file__, encoding="utf-8").read()
+        satirlar = [s for s in kaynak.splitlines() if "Özel Ders" in s and "ESKI_OZEL_DERS" not in s]
+        assert satirlar == []
+
+    def test_photo_row_from_a_private_lesson_says_ozel_ders(self):
+        ders = {"id": "abc", "course": "", "teacher": "Ayşe"}
+        aday = {"ders_adi": "", "odev_basligi": "Okuma", "son_teslim_tarihi": ""}
+        row = dashboard_api._to_photo_homework_row(
+            aday, image_hash="h", source_type="private", private_lesson=ders)
+        assert row["Ders Adı"] == "Özel ders"
+        assert row["Ödev Kaynağı"] == "Özel ders (Ayşe)"
+
+    def test_stored_title_case_rows_are_mapped_at_the_boundary(self, client, isolated_output):
+        eski = {"Ders Adı": "Özel Ders", "Ödev Başlığı": "Okuma", "Ödev Kaynağı": "Özel Ders (Ayşe)",
+                "Ödev Son Teslim Tarihi": "", "Ödev Durumu": "Değerlendirilmemiş",
+                "source": "photo_ai_private", "detail": {"description": "", "attachments": []}}
+        dashboard_api._save_photo_homework_rows([eski])
+        with patch("src.dashboard_api._scraped", return_value={}):
+            rows = client.get("/api/homework").get_json()["homework"]
+        assert rows[0]["normalized_course"] == "Özel ders"
+        assert rows[0]["Ödev Kaynağı"] == "Özel ders (Ayşe)"
+        # The file itself is not rewritten.
+        stored = json.loads((isolated_output / "photo_homework.json").read_text("utf-8"))
+        assert stored["homework"][0]["Ders Adı"] == "Özel Ders"
+        # And the key a "Yaptım" mark is stored under does not move.
+        assert rows[0]["homework_key"] == dashboard_api._homework_row_key(eski)
+
+    @pytest.mark.parametrize("ders", ["Özel ders", "Özel Ders"])
+    def test_assistant_still_asks_for_the_course_of_a_placeholder_row(self, ders):
+        from src.assistant_tools import foto_eksik_alanlar
+        row = {"source": "photo_ai_private", "Ders Adı": ders,
+               "Ödev Son Teslim Tarihi": "25.09.2026 12:00"}
+        assert foto_eksik_alanlar(row) == ["ders"]
+
+
+# ── Müfredat ağacı ucu (spec §4) ────────────────────────────────────────────
+
+_AGAC_GOVDESI = {
+    "surum": 1, "korpus_surumu": "1.6", "sinif": "7. Sınıf",
+    "dersler": [{
+        "ders": "Matematik", "slug": "matematik",
+        "program": {"document_id": 24, "sayfa": "115-172"},
+        "kitaplar": [{"document_id": 346, "kisa": "1. Kitap",
+                      "sayfa_kaymasi": 0, "kayma_uyumu": "35/35"}],
+        "uniteler": [{
+            "no": 1, "ad": "Sayılar ve Nicelikler", "program_sayfa": 115,
+            "konular": [
+                {"id": "matematik-u1-tam-sayilar", "ad": "Tam Sayılar",
+                 "ad_kaynak": "TAM SAYILAR", "kitap": 346, "sayfa": [17, 24],
+                 "sayfa_kaynak": "icindekiler", "kazanimlar": ["MAT.7.1.1"],
+                 "kazanim_kaynak": "metin-ortusmesi"},
+                {"id": "matematik-u1-mutlak-deger", "ad": "Mutlak Değer",
+                 "ad_kaynak": "MUTLAK DEĞER", "kitap": 346,
+                 "sayfa_kaynak": "yok", "kazanimlar": [],
+                 "kazanim_kaynak": "eslenmedi"},
+            ],
+        }],
+    }],
+    "kapsam": {"matematik": {"konu": 2, "sayfasi_olan": 1, "kazanimi_eslenen": 1}},
+}
+
+
+def _modul_satiri(slug, outcomes, **ustune):
+    satir = {"slug": slug, "version": 1, "status": "active", "title": slug,
+             "subject": "Matematik", "gradeLevel": "7. Sınıf", "mode": "MODULE",
+             "outcomes": outcomes, "ted_link": None,
+             "gates": {"pass": 17, "warn": 0, "fail": 0},
+             "created_at": "2026-09-19T19:32:46+00:00"}
+    satir.update(ustune)
+    return satir
+
+
+@pytest.fixture
+def agac_dosyasi(tmp_path, monkeypatch):
+    """Ağaç dosyasını ve modül kataloğunu testin kendisi kurar.
+
+    Worktree'de `output/` yok (gitignore'lu) ve canlı kataloğa dayanan bir test başka bir
+    makinede sessizce başka bir şey ölçer.
+    """
+    def yaz(govde, moduller=None):
+        yol = tmp_path / "mufredat_agaci.json"
+        yol.write_text(json.dumps(govde) if not isinstance(govde, str) else govde,
+                       encoding="utf-8")
+        monkeypatch.setattr(dashboard_api, "MUFREDAT_AGACI_PATH", str(yol))
+        katalog = tmp_path / "modules"
+        katalog.mkdir(exist_ok=True)
+        satirlar = moduller if moduller is not None else [
+            _modul_satiri("mat7-tam-sayilar", ["MAT.7.1.1"],
+                          title="Tam Sayılar: Sıfırın İki Yanı"),
+            _modul_satiri("fen7-turkiye-ve-uzay-arastirmalari", ["FB.7.1.1"],
+                          subject="Fen Bilimleri", mode="CURRICULUM"),
+        ]
+        (katalog / "index.json").write_text(
+            json.dumps({"surum": 1, "moduller": satirlar}), encoding="utf-8")
+        monkeypatch.setattr(dashboard_api, "OUTPUT_DIR", str(tmp_path))
+        return yol
+    return yaz
+
+
+def test_agac_ucu_dersleri_ve_kapsami_dondurur(client, agac_dosyasi):
+    agac_dosyasi(_AGAC_GOVDESI)
+    govde = client.get("/api/modules/agac").get_json()
+    assert govde["hata"] is None
+    assert [d["slug"] for d in govde["dersler"]] == ["matematik"]
+    assert govde["kapsam"]["matematik"]["konu"] == 2
+
+
+def test_agac_ucu_yayinlanmis_modulu_kazanimiyla_konuya_bagliyor(client, agac_dosyasi):
+    agac_dosyasi(_AGAC_GOVDESI)
+    govde = client.get("/api/modules/agac").get_json()
+    konular = govde["dersler"][0]["uniteler"][0]["konular"]
+    tam_sayilar = next(k for k in konular if k["id"] == "matematik-u1-tam-sayilar")
+    mutlak = next(k for k in konular if k["id"] == "matematik-u1-mutlak-deger")
+    assert tam_sayilar["modul"]["slug"] == "mat7-tam-sayilar"
+    assert mutlak["modul"] is None
+
+
+def test_agac_ucu_hazir_sayaclarini_veriyor(client, agac_dosyasi):
+    agac_dosyasi(_AGAC_GOVDESI)
+    ders = client.get("/api/modules/agac").get_json()["dersler"][0]
+    assert (ders["konu_sayisi"], ders["hazir_sayisi"]) == (2, 1)
+    assert ders["uniteler"][0]["hazir_sayisi"] == 1
+
+
+def test_agac_ucu_hazir_listesinde_agaca_eslenmeyen_modul_de_var(client, agac_dosyasi):
+    """Katalogdaki her yayınlanmış modül listede görünür; ağaca eşlenmeyen de (spec §4)."""
+    agac_dosyasi(_AGAC_GOVDESI)
+    sluglar = {m["slug"] for m in client.get("/api/modules/agac").get_json()["hazir"]}
+    assert sluglar == {"mat7-tam-sayilar", "fen7-turkiye-ve-uzay-arastirmalari"}
+
+
+def test_agac_ucu_ayni_modulu_iki_konuya_baglamaz(client, agac_dosyasi):
+    """Bir kazanım birkaç konuya düşerse modül TEK konuya bağlanır (spec §3.1)."""
+    govde = json.loads(json.dumps(_AGAC_GOVDESI))
+    konular = govde["dersler"][0]["uniteler"][0]["konular"]
+    konular[1]["kazanimlar"] = ["MAT.7.1.1"]
+    konular[1]["kazanim_kaynak"] = "metin-ortusmesi"
+    agac_dosyasi(govde, moduller=[_modul_satiri("mat7-tam-sayilar", ["MAT.7.1.1"])])
+    cevap = client.get("/api/modules/agac").get_json()["dersler"][0]["uniteler"][0]["konular"]
+    bagli = [k["id"] for k in cevap if k["modul"]]
+    assert len(bagli) == 1
+
+
+def test_agac_ucu_sayfa_ortusmesine_gore_en_iyi_konuya_bagliyor(client, agac_dosyasi):
+    """Aynı kazanımı taşıyan iki konudan, frame_source sayfalarıyla örtüşeni kazanır."""
+    govde = json.loads(json.dumps(_AGAC_GOVDESI))
+    konular = govde["dersler"][0]["uniteler"][0]["konular"]
+    konular[1]["kazanimlar"] = ["MAT.7.1.1"]
+    konular[1]["kazanim_kaynak"] = "metin-ortusmesi"
+    konular[1]["sayfa"] = [40, 48]
+    konular[1]["sayfa_kaynak"] = "icindekiler"
+    agac_dosyasi(govde, moduller=[_modul_satiri(
+        "mat7-tam-sayilar", ["MAT.7.1.1"],
+        frame_source={"kind": "textbook", "document_id": 346, "pages": "41-45"})])
+    cevap = client.get("/api/modules/agac").get_json()["dersler"][0]["uniteler"][0]["konular"]
+    bagli = next(k["id"] for k in cevap if k["modul"])
+    assert bagli == "matematik-u1-mutlak-deger"
+
+
+# Review Focus 1: geçerli JSON ama şema dışı → 500 değil.
+@pytest.mark.parametrize("govde", ['{ bu json degil', '{"surum": 1, "dersler": {}}', '{}'])
+def test_agac_ucu_bozuk_dosyada_500_vermiyor(client, agac_dosyasi, govde):
+    agac_dosyasi(govde)
+    yanit = client.get("/api/modules/agac")
+    assert yanit.status_code == 200
+    payload = yanit.get_json()
+    assert payload["dersler"] == [] and payload["hata"] == "harita_okunamadi"
+    assert payload["kapsam"] == {}
+
+
+def test_agac_ucu_dosya_yokken_de_hazir_listesi_veriyor(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(dashboard_api, "MUFREDAT_AGACI_PATH", str(tmp_path / "yok.json"))
+    payload = client.get("/api/modules/agac").get_json()
+    assert payload["hata"] == "harita_okunamadi" and isinstance(payload["hazir"], list)
+
+
+# Review Focus 4: yetkisiz çağrı.
+def test_agac_ucu_oturumsuz_cagriyi_reddediyor(client_no_auth):
+    assert client_no_auth.get("/api/modules/agac").status_code in (401, 403)
+
+
+def test_agac_ucu_okur_rolunde_reddediyor(monkeypatch):
+    """Varsayılan-reddet: ucun adı READER_ENDPOINTS'te olmadığı için okur 403 alır."""
+    monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS", False)
+    okur = next(e for e, r in dashboard_api.USER_ROLES.items() if r == dashboard_api.ROLE_READER)
+    with app.test_client() as c:
+        assert c.get("/api/modules/agac").status_code == 401
+        with c.session_transaction() as oturum:
+            oturum["user_email"] = okur
+        assert c.get("/api/modules/agac").status_code == 403
+    assert "modules_agac" not in dashboard_api.READER_ENDPOINTS
+
+
+# ── Asistan bağlamında konu öğesi (spec §4.1) ───────────────────────────────
+
+
+def test_konu_turu_sayfa_oge_turlerinde():
+    assert "konu" in dashboard_api.SAYFA_OGE_TURLERI
+
+
+def test_konu_basligi_dersi_ve_konuyu_adlandiriyor(agac_dosyasi):
+    agac_dosyasi(_AGAC_GOVDESI)
+    baslik = dashboard_api._sayfa_ogesi_basligi("konu", "matematik-u1-tam-sayilar")
+    assert baslik == "Matematik · Tam Sayılar"
+
+
+# Review Focus 5: kötü konu kimliği.
+def test_konu_basligi_bilinmeyen_kimlikte_bos(agac_dosyasi):
+    agac_dosyasi(_AGAC_GOVDESI)
+    assert dashboard_api._sayfa_ogesi_basligi("konu", "matematik-u9-olmayan") == ""
+
+
+def test_konu_basligi_harita_okunamazken_bos(tmp_path, monkeypatch):
+    monkeypatch.setattr(dashboard_api, "MUFREDAT_AGACI_PATH", str(tmp_path / "yok.json"))
+    assert dashboard_api._sayfa_ogesi_basligi("konu", "matematik-u1-tam-sayilar") == ""
+
+
+def test_istek_sayfasi_konu_ogesini_kabul_ediyor(agac_dosyasi):
+    agac_dosyasi(_AGAC_GOVDESI)
+    # `_istek_sayfasi` hata demetini koşulsuz kurduğu için her çağrı uygulama bağlamı ister.
+    with app.test_request_context():
+        satir, hata = dashboard_api._istek_sayfasi(
+            {"sayfa": {"ad": "moduller",
+                       "oge": {"tur": "konu", "id": "matematik-u1-tam-sayilar"}}})
+    assert hata is None and "Matematik · Tam Sayılar" in satir
+
+
+@pytest.mark.parametrize("kimlik", ["x" * 401, "konu\nid", ""])
+def test_istek_sayfasi_bozuk_konu_kimligini_400_yapiyor(kimlik):
+    with app.test_request_context():
+        _, hata = dashboard_api._istek_sayfasi(
+            {"sayfa": {"ad": "moduller", "oge": {"tur": "konu", "id": kimlik}}})
+    assert hata is not None and hata[1] == 400
+
+
+def test_istek_sayfasi_bilinmeyen_konuda_sayfa_satirini_koruyor(agac_dosyasi):
+    """Bağlam satırı hiçbir zaman cevabı düşürmez: başlık çözülemese de sayfa adı kalır."""
+    agac_dosyasi(_AGAC_GOVDESI)
+    with app.test_request_context():
+        satir, hata = dashboard_api._istek_sayfasi(
+            {"sayfa": {"ad": "moduller", "oge": {"tur": "konu", "id": "matematik-u9-olmayan"}}})
+    assert hata is None and satir == "Bulunduğu sayfa: Modüller"
+
+
+# ── Denetim turu: eşiğe takılan ders ve bozuk katalog ────────────────────────
+
+
+def test_agac_ucu_esige_takilan_dersi_yine_listeliyor(client, agac_dosyasi):
+    """I2 (D3): üretilmeyen ders sessizce eksilmez.
+
+    Spec §5.5, yüzey tasarımı §4.12 ve CLAUDE.md aynı sözü veriyor: eşiğe takılan ders
+    ağaçta YİNE listelenir ve bir cümle söyler. `ders_uret` böyle bir ders için kayıt
+    döndürmüyor, o yüzden kaydı uç `kapsam`daki `yazilmadi` işaretinden kurar.
+    """
+    govde = json.loads(json.dumps(_AGAC_GOVDESI))
+    govde["kapsam"]["turkce"] = {"konu": 3, "kazanim": 121, "yazilmadi": "konu_esigi"}
+    agac_dosyasi(govde)
+    dersler = client.get("/api/modules/agac").get_json()["dersler"]
+    turkce = next((d for d in dersler if d["slug"] == "turkce"), None)
+    assert turkce is not None, "eşiğe takılan ders ağaçtan düşmüş"
+    assert turkce["uniteler"] == [] and turkce["konu_sayisi"] == 0
+    assert turkce["ders"] == "Türkçe"
+
+
+def test_agac_ucu_bilinmeyen_slugu_ders_adi_olarak_uydurmuyor(client, agac_dosyasi):
+    """Ad bilinmiyorsa slug okura gitmez; ders adı tablodan gelir, uydurulmaz (D4)."""
+    govde = json.loads(json.dumps(_AGAC_GOVDESI))
+    govde["kapsam"]["bilinmeyen"] = {"yazilmadi": "konu_esigi"}
+    agac_dosyasi(govde)
+    sluglar = {d["slug"] for d in client.get("/api/modules/agac").get_json()["dersler"]}
+    assert "bilinmeyen" not in sluglar
+
+
+def test_agac_ucu_bozuk_katalogu_bos_liste_gibi_gostermiyor(client, agac_dosyasi, tmp_path):
+    """I8: yarım yazılmış katalog "hiç modül yok" diye okunmaz ("empty is never blank")."""
+    agac_dosyasi(_AGAC_GOVDESI)
+    (tmp_path / "modules" / "index.json").write_text("{ yarim", encoding="utf-8")
+    payload = client.get("/api/modules/agac").get_json()
+    assert payload["hazir"] == [] and payload["hata"] == "katalog_okunamadi"
+    # Harita okunabildiği için ağaç yine gelir.
+    assert [d["slug"] for d in payload["dersler"]] == ["matematik"]
+
+
+def test_agac_ucu_modulu_baska_kitaptaki_konuya_baglamiyor(client, agac_dosyasi):
+    """C1: sayfa örtüşmesi kitap kimliğini de denetler.
+
+    İki kitabın sayfa numaraları aynı aralıkta olabilir; `frame_source.document_id`
+    bakılmazsa 2. kitaptaki bir modül 1. kitabın konusuna bağlanır.
+    """
+    govde = json.loads(json.dumps(_AGAC_GOVDESI))
+    ders = govde["dersler"][0]
+    ders["kitaplar"].append({"document_id": 506, "kisa": "2. Kitap",
+                             "sayfa_kaymasi": 0, "kayma_uyumu": "32/32"})
+    konular = ders["uniteler"][0]["konular"]
+    konular[1]["kitap"] = 506
+    konular[1]["sayfa"] = [17, 24]
+    konular[1]["sayfa_kaynak"] = "icindekiler"
+    konular[1]["kazanimlar"] = ["MAT.7.1.1"]
+    konular[1]["kazanim_kaynak"] = "metin-ortusmesi"
+    agac_dosyasi(govde, moduller=[_modul_satiri(
+        "mat7-tam-sayilar", ["MAT.7.1.1"],
+        frame_source={"kind": "textbook", "document_id": 506, "pages": "18-20"})])
+    cevap = client.get("/api/modules/agac").get_json()["dersler"][0]["uniteler"][0]["konular"]
+    bagli = next(k["id"] for k in cevap if k["modul"])
+    assert bagli == "matematik-u1-mutlak-deger"
+
+
+def test_agac_ucu_program_cercevesini_sayfa_kaniti_saymiyor(client, agac_dosyasi):
+    """`kind: "program"` çerçevesinin sayfaları PROGRAMın sayfalarıdır, kitabın değil."""
+    govde = json.loads(json.dumps(_AGAC_GOVDESI))
+    konular = govde["dersler"][0]["uniteler"][0]["konular"]
+    konular[1]["kazanimlar"] = ["MAT.7.1.1"]
+    konular[1]["kazanim_kaynak"] = "metin-ortusmesi"
+    konular[1]["sayfa"] = [110, 120]
+    konular[1]["sayfa_kaynak"] = "icindekiler"
+    agac_dosyasi(govde, moduller=[_modul_satiri(
+        "mat7-tam-sayilar", ["MAT.7.1.1"],
+        frame_source={"kind": "program", "document_id": 24, "pages": "110"})])
+    cevap = client.get("/api/modules/agac").get_json()["dersler"][0]["uniteler"][0]["konular"]
+    # Program sayfası kanıt sayılmaz; sıradaki ilk konu kazanır.
+    assert next(k["id"] for k in cevap if k["modul"]) == "matematik-u1-tam-sayilar"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { AssistantCitation, Netlestirme } from '../types'
+import type { Netlestirme } from '../types'
 import type { OdevOnerisi } from '../components/OdevOnayKarti'
 import type { Yukleme } from '../components/YuklenenEk'
 import type { Alistirma } from '../components/AlistirmaKarti'
@@ -29,10 +29,6 @@ export interface SohbetIcerigi {
   sohbet: Sohbet
   mesajlar: KayitliMesaj[]
   read_only?: boolean
-}
-
-export function kayitliAtiflar(mesaj: KayitliMesaj): AssistantCitation[] {
-  return JSON.parse(mesaj.atiflar_json || '[]') as AssistantCitation[]
 }
 
 async function istek<T>(path: string, method = 'GET', body?: object): Promise<T> {

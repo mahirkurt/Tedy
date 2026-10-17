@@ -369,6 +369,18 @@ Tam token tablosu ve çocuk-dostu uyarlama için `references/carbon-child-system
    `get_variable_defs` ile değer teyidi yapılabilir. Token değerinin kaynağı
    **asla** Figma değildir.
 
+### 10.2 Kanonik kılavuz ve Carbon MCP (2026-10-10)
+
+- Pano ile modülün tasarım bağı, öncelik sırası ve bilinçli sapmalar
+  `docs/tedy-ui-ux-talimatnamesi.md` §9'dadır; Carbon MCP ile çalışma protokolü §10'dadır.
+  Modülün yetkili kuralları bu dizinde kalır (`references/tedy-integration.md` §7).
+- Her Carbon iddiası kaynakla yazılır: güncel `https://carbondesignsystem.com/building-blocks/...`
+  URL'si ya da Carbon MCP `docs_search` `anchor_url`'ı. Kanonik ikon/piktogram/bileşen kodu
+  `code_search`, grafik `get_charts`, token ve erişilebilirlik denetimi `code_audit` ile
+  doğrulanır; değer yine npm `@carbon/*`'tır (§10.1, `references/carbon-sources.md` §5).
+- Düzeltme: Carbon 2x Grid'in temel birimi 8 px mini birimdir; 2 px yalnız en küçük aralık
+  adımıdır (yukarıdaki "2px tabanlı" ifadesi ölçeğin adımını anlatır).
+
 ## 11. İkon, piktogram ve SVG stratejisi (özet)
 
 Tam rehber: `references/icon-pictogram-svg.md`.
@@ -429,11 +441,11 @@ orkestre giriş animasyonu (`prefers-reduced-motion` ile kapalı); öngörüleme
 
 ### 11.4 İşitsel geri bildirim ve oyunlaştırma sesi
 - **Earcon katmanı** (`references/audio-system.md`): Web Audio ile sentezlenen kısa, hoş-değerlikli,
-  düşük sesli olay-earcon'ları — `correct` (doğru/XP), `retry` (yanlış; nazik, **cezasız**),
-  `reward` (modül tamamlama), `notify` (mola/onay). Sürekli arka plan müziği/gürültüsü **yoktur**.
+  düşük sesli olay-earcon'ları — `correct` (doğru cevap), `retry` (yanlış; nazik, **cezasız**),
+  `notify` (mola/onay). Ödül/kutlama sesi ve sürekli arka plan müziği/gürültüsü **yoktur**.
 - **Daima görselle eşli**: ses tek başına bilgi taşımaz; sessizde/işitme engelinde tam işlevsellik.
-  Doğru cevapta **XP onayı** (kısa yükselen "+N XP" + sayaçta opaklık nabzı), yeni rozet `badge--new`
-  ile sessizce belirir — ölçek sıçraması ve konfeti yok (Tedy "kutlama yok").
+  Geri bildirim metin ve işarettir; **ödül hareketi yoktur** — "+N XP" yükselişi, sayaç nabzı, rozet
+  belirişi, seri vuruşu, konfeti yok (TEDY talimatnamesi S43, 2026-10-11).
 - **Opsiyonel & güvenli**: üst çubukta hoparlör düğmesi; `prefers-reduced-motion: reduce` ise ses
   **varsayılan kapalı**; düşük ses; ilk etkileşimde `AudioContext` devreye alınır. Tüm animasyonlar
   reduced-motion duyarlı.
@@ -441,8 +453,9 @@ orkestre giriş animasyonu (`prefers-reduced-motion` ile kapalı); öngörüleme
   ses ödülde gerilim artırır (kaçınılır); DEHB'de **kısa yeni sesler** uyarılmaya yardımcı olabilirken
   **sürekli ses** dağıtıcıdır (`adhd-pedagogy.md` §14). Doğrulama: **G-AUDIO** kapısı.
 
-### 11.5 v1.8.0 yenilikleri — kesir/oran çubuğu · seri · sesli oku (TTS)
-Üç ek, hepsi kanıt-temelli ve mevcut güvenlik kapılarıyla uyumlu:
+### 11.5 v1.8.0 yenilikleri — kesir/oran çubuğu · sesli oku (TTS)
+İki ek (v1.8.0'ın üçüncüsü, seri göstergesi, 2026-10-11'de kalktı — aşağıda), kanıt-temelli ve
+mevcut güvenlik kapılarıyla uyumlu:
 
 - **Kesir/oran çubuğu (`fractionBar`)** — daire (pasta) yerine **alan/uzunluk modeli** olan bir bar.
   Üç mod: `kind:"fraction"` ({num,den}) tek kesir; `kind:"sum"` ({addends:[],den}) paydaları eşit
@@ -452,12 +465,10 @@ orkestre giriş animasyonu (`prefers-reduced-motion` ile kapalı); öngörüleme
   `fraction` segment tipi olarak kullanılabilir. Kanıt temeli `references/subject-packs.md` §2 (alan
   modeli daireden üstündür; bar modeli kesir-toplamı ve oranı görselleştirmede etkilidir — uyarı:
   yapısal görsel yalnızca dikkatli öğretimle işe yarar).
-- **Seri / combo göstergesi** — ardışık doğru yanıtlarda üst çubukta CVD-güvenli bir **seri çipi**
-  (`--reward-bg` zemin + metin-birincil sayı + `ic-flash`); kilometre taşlarında (3·5·8·13·21·34)
-  **mütevazı** sessiz XP bonusu + kutlama earcon'u + sessiz görsel onay ("Seri 3"; ünlem yok). Yanlışta seri **sıfırlanır**
-  (cezalandırıcı dil **yok**; flashcard "tekrar et" seriyi düşürmez). Tüm kutlama animasyonları
-  `prefers-reduced-motion` duyarlıdır. Kanıt: oyunlaştırma öğesi olarak ilerleme/seri geri bildirimi
-  motivasyonu destekler (Sailer 2019, `adhd-pedagogy.md` §13).
+- **Seri / combo göstergesi — kaldırıldı** (2026-10-11, TEDY talimatnamesi S43, borç B73). Seri
+  sayacı dışsal ödüldür ve TEDY anayasası §9 onu açıkça reddeder; kilometre taşında üç ödül hareketinin
+  aynı anda koşması İ6'yı (aynı anda tek hareket) çiğniyordu. Şablonda seri yoktur; G-FLOW işaretlemede
+  seri sayacı öğesi bulursa FAIL verir. İlerleme sessiz ve etiketlidir ("Soru 2 / 5", "Bölüm 3 / 7").
 - **Sesli oku (TTS)** — `teach`, soru kökü, `gloss`, `dialogue` ve `flashcard` arkasında **opsiyonel**
   "Oku" düğmeleri; `speechSynthesis` ile. **Varsayılan KAPALI**, üst çubuk kulaklık düğmesiyle açılır;
   **otomatik okuma yoktur**; aynı düğmeye yeniden basınca durur, mod kapanınca konuşma iptal edilir
@@ -467,7 +478,17 @@ orkestre giriş animasyonu (`prefers-reduced-motion` ile kapalı); öngörüleme
   `references/audio-system.md` (metin-konuşma/TTS bölümü; Wood 2017 meta-analiz, Keelor 2023) ve
   `adhd-pedagogy.md` §15. Doğrulama: genişletilmiş **G-AUDIO** kapısı (earcon + TTS iki katman).
 
-### 11.6 Rozet ekonomisi — modüle özel, çeşitlendirilmiş, Carbon-ikonlu
+### 11.6 Rozet ve XP — ekranda yok (TEDY talimatnamesi S43, 2026-10-11)
+
+**Bugünkü kural:** modülde rozet kasası, kilitli rozet, rozet belirişi, XP sayacı ve özet ekranında
+"Toplam XP" / rozet sayısı / "En uzun seri" **yoktur**. XP iç ilerleme sayısıdır — ilerleme köprüsü
+panoya bildirir, okur görmez; `rewards.xpPerCorrect` / `firstTryBonus` yalnız onu besler. Rozet,
+S43'ün "kazanılan rozet kalırsa sessiz liste" seçeneğiyle de tutulmadı: kilitli rozet rozet avıdır,
+kazanılan rozet ilerleme etiketinin vermediği bir bilgi vermez (anayasa §9, İ6). `rewards.badges`
+geriye uyum için kabul edilir ve yok sayılır; yeni modülde yazılmaz. Özet ekranı sessizdir: tamamlanan
+alıştırma sayısı düz metinle, hedefler, tekrar önerisi. Geri almak isteyen: talimatname §11 S43 ve §13 B73.
+
+Aşağısı tarihî tasarımdır (v1.8.0–v3.0.0); TEDY'de uygulanmaz:
 
 Üst çubuktaki rozet kasası DEHB için kritik bir **somut hedef/ödül** katmanıdır.
 Her modül `rewards.badges`'te **2–3 adet modüle özel rozet** tanımlamalıdır —

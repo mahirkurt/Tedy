@@ -1,27 +1,32 @@
-import { Link as CarbonLink, Tag } from '@carbon/react'
+import { ContainedList, ContainedListItem, Link as CarbonLink, Tag } from '@carbon/react'
 import { useNavigate } from 'react-router-dom'
 import type { ExamItem } from '../types'
 import { kisaGun, kisaTeslim } from '../utils/formatters'
 import { konuOzeti, sinavAni, sinavEtiketi, zamanMetni } from '../utils/sinav'
 import SubjectLabel from './SubjectLabel'
+import { Rakamli } from './patterns/Rakamli'
 import './SinavKarti.scss'
 
-/** Bugün: 7 gün içindeki en yakın sınav — sessiz, tek satırlık özet (İ1, İ6). */
+/** Bugün: 7 gün içindeki en yakın sınav — sessiz, tek satırlık özet (İ1, İ6).
+ *  "Ayrıca" ve "Sınavlar" gibi Carbon'un sayfa içi listesi; başlık cümle düzeninde (S38, B70). */
 export function SinavOnizleme({ exam, now, onAc }: { exam: ExamItem; now: Date; onAc: () => void }) {
   const konu = konuOzeti(exam.konular)
   const kaynak = exam.kaynaklar?.find(k => k.tur !== 'takvim')
   const ani = sinavAni(exam)
   return (
-    <section className="sinav-onizleme" aria-label="Yaklaşan sınav">
-      <div className="today-also__head">
-        <span className="today-also__title">YAKLAŞAN SINAV</span>
-      </div>
-      <button type="button" className="today-also__item" onClick={onAc}>
-        <span className="today-also__name">
-          <SubjectLabel course={exam.course} family={exam.courseFamily}>{exam.title || exam.rawTitle}</SubjectLabel>
-        </span>
-        <span className="today-also__due">{ani ? (exam.allDay ? kisaGun(ani, now) : kisaTeslim(ani, now)) : zamanMetni(exam)}</span>
-      </button>
+    <div className="sinav-onizleme">
+      <ContainedList kind="on-page" size="lg" label="Yaklaşan sınav">
+        <ContainedListItem onClick={onAc}>
+          <span className="today-also__row">
+            <span className="today-also__name">
+              <SubjectLabel course={exam.course} family={exam.courseFamily}>{exam.title || exam.rawTitle}</SubjectLabel>
+            </span>
+            <span className="today-also__due">
+              <Rakamli metin={ani ? (exam.allDay ? kisaGun(ani, now) : kisaTeslim(ani, now)) : zamanMetni(exam)} />
+            </span>
+          </span>
+        </ContainedListItem>
+      </ContainedList>
       {konu && <p className="sinav-onizleme__konular">Konular: {konu}</p>}
       <p className="sinav-onizleme__baglantilar">
         {kaynak?.baglanti && (
@@ -29,7 +34,7 @@ export function SinavOnizleme({ exam, now, onAc }: { exam: ExamItem; now: Date; 
         )}
         <CarbonLink href="/sinavlar#uyarilar" size="sm">Sınav uyarıları</CarbonLink>
       </p>
-    </section>
+    </div>
   )
 }
 

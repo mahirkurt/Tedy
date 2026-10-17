@@ -13,12 +13,17 @@ import { subjectClass } from '../utils/subject'
  * course — an exam's title, "Matematik — Test 2" — while the mark still
  * resolves from the course.
  */
-export default function SubjectLabel({ course, family, className, children }: {
+export interface SubjectLabelProps {
+  /** The course name; it also picks the mark when `family` is absent. */
   course: string | null | undefined
+  /** The subject family when the API already resolved it (`courseFamily`). */
   family?: SubjectFamily | null
   className?: string
+  /** Printed instead of the course name; the mark still comes from the course. */
   children?: ReactNode
-}) {
+}
+
+export default function SubjectLabel({ course, family, className, children }: SubjectLabelProps) {
   return (
     <span className={['ted-subject-label', subjectClass(course, family), className].filter(Boolean).join(' ')}>
       <span className="ted-subject-label__mark" aria-hidden="true" />

@@ -431,6 +431,51 @@ export interface ModuleCard {
   gates: { pass: number; warn: number; fail: number }
 }
 
+/** Müfredat ağacının yaprağı: bir ders kitabı alt başlığı (spec §2). */
+export interface MufredatKonu {
+  id: string
+  ad: string
+  ad_kaynak: string
+  kitap: number
+  /** Yalnız `sayfa_kaynak === 'icindekiler'` iken bulunur; yoksa sayfa uydurulmaz (D4). */
+  sayfa?: [number, number]
+  sayfa_kaynak: 'icindekiler' | 'yok'
+  kazanimlar: string[]
+  kazanim_kaynak: 'metin-ortusmesi' | 'eslenmedi'
+  modul: ModuleCard | null
+}
+
+export interface MufredatUnite {
+  no: number
+  ad: string
+  program_sayfa: number
+  konular: MufredatKonu[]
+  hazir_sayisi: number
+}
+
+export interface MufredatKitap {
+  document_id: number
+  kisa: string
+  sayfa_kaymasi: number | null
+  kayma_uyumu: string
+}
+
+export interface MufredatDers {
+  ders: string
+  slug: string
+  kitaplar: MufredatKitap[]
+  uniteler: MufredatUnite[]
+  konu_sayisi: number
+  hazir_sayisi: number
+}
+
+export interface MufredatAgacYaniti {
+  hazir: ModuleCard[]
+  dersler: MufredatDers[]
+  kapsam: Record<string, Record<string, number | string>>
+  hata: 'harita_okunamadi' | null
+}
+
 export interface ModuleTicket {
   url: string
   exp: number

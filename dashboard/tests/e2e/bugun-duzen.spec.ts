@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { bugunAc } from './_bugun-fixtures'
+import { bugunAc, HOMEWORK, HW, CALENDAR } from './_bugun-fixtures'
 
 // Bugün, judged against its own spec (docs/frontend-surface-designs.md §4.1):
 // "Gün Şeridi + tek adlandırılmış adım + altında sessiz 'bugün ayrıca'".
@@ -59,7 +59,7 @@ test.describe('B — günün saatine göre tek ana kart', () => {
   test('okuldan önce ana kart ilk ders', async ({ page }) => {
     await ac(page, '07:30')
     const simdi = page.locator('.today-now')
-    await expect(simdi).toContainText('İLK DERS')
+    await expect(simdi).toContainText('İlk ders')
     await expect(simdi).toContainText('Matematik')
   })
 
@@ -110,7 +110,7 @@ test.describe('B — Başla gerçekten başlatır', () => {
     await page.locator('.next-thing').getByRole('button', { name: 'Başla' }).click()
 
     const kutu = page.locator('.next-thing')
-    await expect(kutu.locator('.next-thing__eyebrow')).toContainText('BAŞLADIN')
+    await expect(kutu.locator('.next-thing__eyebrow')).toContainText('Başladın')
     await expect(kutu).toContainText('10 dk kaldı')
     // What to do for those ten minutes, in the teacher's own words.
     await expect(kutu).toContainText('sayfa 165')
@@ -124,7 +124,7 @@ test.describe('B — Başla gerçekten başlatır', () => {
     await page.clock.setFixedTime(new Date('2026-09-24T16:44:00'))
     await page.reload()
     await page.waitForLoadState('networkidle')
-    await expect(page.locator('.next-thing__eyebrow')).toContainText('BAŞLADIN')
+    await expect(page.locator('.next-thing__eyebrow')).toContainText('Başladın')
     await expect(page.locator('.next-thing')).toContainText('6 dk kaldı')
   })
 
@@ -138,7 +138,109 @@ test.describe('B — Başla gerçekten başlatır', () => {
     const kutu = page.locator('.next-thing')
     await expect(kutu).toContainText('10 dakika doldu')
     await kutu.getByRole('button', { name: '10 dakika daha' }).click()
-    await expect(kutu.locator('.next-thing__eyebrow')).toContainText('BAŞLADIN')
+    await expect(kutu.locator('.next-thing__eyebrow')).toContainText('Başladın')
     await expect(kutu).toContainText('10 dk kaldı')
+  })
+})
+
+// The 2026-10-10 redesign (docs/superpowers/specs/2026-10-10-bugun-yenileme-design.md):
+// the voice knows whether there is school, calendar events never take the card,
+// a deadline row is reachable by keyboard, a failed fetch says so, and the Day
+// Strip's marks can be seen.
+
+/** WCAG relative-luminance contrast of two computed `rgb(…)` colours. */
+function kontrast(a: string, b: string): number {
+  const lum = (c: string) => {
+    const [r, g, bl] = (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).map(v => {
+      const s = v / 255
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+    })
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl
+  }
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p)
+  return (x + 0.05) / (y + 0.05)
+}
+
+test.describe('D — yenileme', () => {
+  test('okul olmayan gün kart "Okuldan sonra" demez', async ({ page }) => {
+    // Saturday: the grid publishes an empty column, so there is no school.
+    await bugunAc(page, '2026-09-26T10:00')
+    const kart = page.locator('.next-thing')
+    await expect(kart.locator('.next-thing__eyebrow')).toHaveText('Şimdi')
+    await expect(kart).not.toContainText(/okuldan sonra/i)
+  })
+
+  test('gün boyu süren takvim etkinliği şimdi kartını almaz', async ({ page }) => {
+    await bugunAc(page, '2026-09-24T10:15', { calendar: { events: [
+      ...CALENDAR.events,
+      { allDay: false, start: '2026-09-24T08:00:00', end: '2026-09-24T15:45:00',
+        title: 'Okul Meclisi Seçimi', extendedProps: { description: '' } },
+    ] } })
+    const simdi = page.locator('.today-now')
+    await expect(simdi).toContainText('İngilizce')
+    await expect(simdi).not.toContainText('Okul Meclisi Seçimi')
+    // It is still on the day's line.
+    await expect(page.locator('.today-tl')).toContainText('Okul Meclisi Seçimi')
+  })
+
+  test('bugünkü teslim satırı klavyeyle İşler\'e götürür', async ({ page }) => {
+    await bugunAc(page, '2026-09-24T16:40', { homework: { summary: '', homework: [
+      ...HOMEWORK.homework,
+      HW('Türkçe', 'Okuma günlüğü', '24.09.2026 18:00'),
+    ] } })
+    const satir = page.locator('.today-tl').getByRole('link', { name: /Okuma günlüğü/ })
+    await expect(satir).toBeVisible()
+    await satir.focus()
+    await expect(satir).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL(/\/isler$/)
+  })
+
+  test('alınamayan bilgi sessiz geçmez, ham hata metni basmaz', async ({ page }) => {
+    await page.route('**/api/homework', r => r.fulfill({ status: 500, body: 'boom' }))
+    await bugunAc(page, '2026-09-24T16:40', { homework: null })
+    const bant = page.locator('.today-ariza')
+    await expect(bant).toContainText('Bazı bilgiler şu an alınamadı')
+    await expect(bant).toContainText('Sayfa birkaç dakika içinde kendini yeniler.')
+    await expect(bant).not.toContainText(/HTTP|JSON|Fetch|500/)
+  })
+
+  test('her şey geldiğinde arıza bandı yok', async ({ page }) => {
+    await bugunAc(page, '2026-09-24T16:40')
+    await expect(page.locator('.today-ariza')).toHaveCount(0)
+  })
+
+  test('geçmiş katlaması zaman çizelgesini adıyla açar', async ({ page }) => {
+    await bugunAc(page, '2026-09-24T16:40')
+    const katlanan = page.locator('.today-past-fold')
+    await expect(katlanan).toHaveAttribute('aria-expanded', 'false')
+    const hedef = await katlanan.getAttribute('aria-controls')
+    expect(hedef).toBeTruthy()
+    await katlanan.click()
+    await expect(katlanan).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.locator(`#${hedef}`)).toBeVisible()
+  })
+
+  test('Gün Şeridi\'nin işaretleri zemine karşı en az 3:1', async ({ page }) => {
+    await bugunAc(page, '2026-09-24T10:15')
+    const renk = await page.evaluate(() => {
+      const cs = (s: string) => getComputedStyle(document.querySelector(s)!)
+      return {
+        ray: cs('.day-strip__track').backgroundColor,
+        pencere: cs('.day-strip__window').backgroundColor,
+        sayfa: getComputedStyle(document.body).backgroundColor,
+        simdi: cs('.day-strip__now').backgroundColor,
+        capa: cs('.day-strip__anchor').backgroundColor,
+        capaOpak: cs('.day-strip__anchor').opacity,
+        sinir: cs('.day-strip__window').borderInlineEndColor,
+      }
+    })
+    expect(renk.capaOpak).toBe('1')
+    for (const zemin of [renk.ray, renk.pencere]) {
+      expect(kontrast(renk.simdi, zemin), `şimdi / ${zemin}`).toBeGreaterThanOrEqual(3)
+      expect(kontrast(renk.capa, zemin), `çapa / ${zemin}`).toBeGreaterThanOrEqual(3)
+    }
+    // The window's edge separates the window from the rest of the rail.
+    expect(kontrast(renk.sinir, renk.ray)).toBeGreaterThanOrEqual(3)
   })
 })

@@ -37,11 +37,11 @@ test('work owed lives on one surface: homework and the exams ahead', async ({ pa
   // Assert the surface, not just the strings: Bugün also lists homework and
   // upcoming exams, so an unrouted /isler falling back to it would pass a test
   // that only looked for the text.
-  // The label is title case in the DOM; the shouting is CSS. Waiting on it
+  // The label is sentence case, in the DOM and on screen (S38). Waiting on it
   // first is also what makes the URL read meaningful: the fallback would be a
   // client-side redirect, which happens only after the app has mounted — and
   // page.url() does not retry.
-  await expect(page.getByText('Aktif Ödevler', { exact: false })).toBeVisible()
+  await expect(page.getByText('Aktif ödevler', { exact: true })).toBeVisible()
   expect(new URL(page.url()).pathname).toBe('/isler')
 
   await expect(page.getByText('3 soru', { exact: false }).first()).toBeVisible()
@@ -92,4 +92,16 @@ test('the homework window close control is named Kapat', async ({ page }) => {
   // default is still the accessible name.
   await expect(dialog.getByRole('button', { name: 'Kapat', exact: true })).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0)
+})
+
+// B46 (D2): a homework row opens from the keyboard — its title is a real button, not a clickable Tile.
+test('a homework row opens by keyboard', async ({ page }) => {
+  await mock(page)
+  await page.goto('/isler')
+  const ac = page.locator('.homework-item').getByRole('button', { name: '3 soru', exact: true })
+  await ac.focus()
+  await expect(ac).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('dialog').getByRole('heading', { name: '3 soru' })).toBeVisible()
 })

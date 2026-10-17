@@ -51,7 +51,7 @@ test('the fifth file is not posted', async ({ page }) => {
   const input = page.locator('.ac__dosya-girdi')
   for (let i = 0; i < 4; i += 1) {
     await input.setInputFiles({ name: `n${i}.txt`, mimeType: 'text/plain', buffer: Buffer.from('a') })
-    await expect(page.getByText(`n${i + 1}.txt`)).toBeVisible()
+    await expect(page.getByText(`n${i + 1}.txt`, { exact: true })).toBeVisible()
   }
   await input.setInputFiles({ name: 'bes.txt', mimeType: 'text/plain', buffer: Buffer.from('b') })
   await expect(page.getByText('Bir mesaja en fazla 4 dosya eklenebilir.', { exact: true })).toBeVisible()
@@ -78,7 +78,7 @@ test('chat sends ekler and the plan button does not', async ({ page }) => {
   await page.locator('.ac__dosya-girdi').setInputFiles({ name: 'not.png', mimeType: 'image/png', buffer: Buffer.from('x') })
   await soruAlani(page).fill('plan')
   const plan = page.waitForRequest('**/api/assistant/plan')
-  await page.getByRole('button', { name: 'Çalışma Planı', exact: true }).click()
+  await page.getByRole('button', { name: 'Çalışma planı iste', exact: true }).click()
   const planGovde = (await plan).postDataJSON() as { messages: { ekler?: string[] }[] }
   expect(planGovde.messages.every(m => m.ekler === undefined)).toBe(true)
 })

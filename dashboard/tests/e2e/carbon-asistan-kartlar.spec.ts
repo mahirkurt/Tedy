@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { PAYLOAD, asistanAc, cevapla, sor } from './_asistan-carbon'
+import { PAYLOAD, asistanAc, cevapla, ogretmenSecimi, sor } from './_asistan-carbon'
 import { OGRETMENLER } from './_gorsel-fixtures'
 
 const QUIZ = { id: 'q1', baslik: 'Kesirler', ders: 'Matematik', konu: 'Kesir', kazanim_kodu: null, zorluk: 'kolay',
@@ -46,7 +46,8 @@ test('mod önerisi yalnız Genel modda, tıklanınca öğretmen değişir', asyn
   await asistanAc(page)
   await sor(page, 'Kesir nedir?')
   await page.getByRole('button', { name: 'Matematik öğretmenine geçelim mi?' }).click()
-  await expect(page.getByRole('radio', { name: 'Matematik' })).toBeChecked()
+  await expect(ogretmenSecimi(page)).toContainText('Matematik')
+  await expect(page.locator('section.asistan')).toHaveAttribute('data-ogretmen', 'matematik')
   await expect(page.getByRole('button', { name: 'Matematik öğretmenine geçelim mi?' })).toHaveCount(0)
 })
 

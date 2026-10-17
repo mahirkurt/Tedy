@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect, type CSSProperties } from 'react'
-import { Button, SkeletonPlaceholder, Tag } from '@carbon/react'
+import { Button, Popover, PopoverContent, SkeletonPlaceholder, Tag } from '@carbon/react'
 import {
-  Bookmark, ChevronLeft, ChevronRight, Close, Education, EventSchedule, Group, Task, UserAvatar, Video,
+  Bookmark, Checkmark, ChevronLeft, ChevronRight, Close, Education, EventSchedule, Group, Task, UserAvatar, Video,
 } from '@carbon/icons-react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
@@ -22,7 +22,7 @@ const HOURS = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_S
 const TYPE_LABELS: Record<string, string> = {
   lesson: 'Ders',
   homework: 'Ödev',
-  private_lesson: 'Özel Ders',
+  private_lesson: 'Özel ders',
   ogep: 'ÖGEP',
   team: 'Takım',
   sebit: 'SEBIT',
@@ -101,14 +101,13 @@ function formatTime(d: Date): string {
 
 export default function CalendarEvents() {
   const navigate = useNavigate()
-  const { data, loading } = useApi<{ events: UnifiedEvent[] }>('/api/calendar/unified', { events: [] })
+  const { data, loading, iskelet } = useApi<{ events: UnifiedEvent[] }>('/api/calendar/unified', { events: [] })
   const { data: health } = useApi<HealthData | null>('/api/health', null)
   const calendarClosed = Boolean(health?.unavailable?.takvim)
   const calendarClosedDetail = health?.unavailable?.takvim?.detail?.trim()
   const [weekOffset, setWeekOffset] = useState(0)
   const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set())
   const [selectedEvent, setSelectedEvent] = useState<UnifiedEvent | null>(null)
-  const popoverRef = useRef<HTMLDivElement>(null)
 
   const today = useMemo(() => new Date(), [])
   const monday = useMemo(() => {
@@ -141,17 +140,6 @@ export default function CalendarEvents() {
     [acikEtkinlik, acikEtkinlikAdi])
 
   // Close popover on outside click — not on a click in the assistant panel, which is asking about this event.
-  useEffect(() => {
-    if (!selectedEvent) return
-    function handleClick(e: MouseEvent) {
-      if ((e.target as Element | null)?.closest?.('.asistan-paneli')) return
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setSelectedEvent(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [selectedEvent])
 
   // Filter and bucket events into day/hour cells
   const eventsInWeek = useMemo(() => {
@@ -224,13 +212,15 @@ export default function CalendarEvents() {
   }, [eventsByDay])
 
   if (loading) {
+    // Nothing for a load under 400 ms (S36, B48).
+    if (!iskelet) return null
     return (
       <div className="dashboard-card">
         <h2 className="dashboard-card__title">
           <EventSchedule size={20} />
-          Haftalık Takvim
+          Haftalık takvim
         </h2>
-        <div className="today-loading">
+        <div className="today-loading" aria-busy="true">
           <SkeletonPlaceholder className="today-loading__block" />
           <SkeletonPlaceholder className="today-loading__block today-loading__block--short" />
         </div>
@@ -243,7 +233,7 @@ export default function CalendarEvents() {
       <div className="dashboard-card">
         <h2 className="dashboard-card__title">
           <EventSchedule size={20} />
-          Haftalık Takvim
+          Haftalık takvim
         </h2>
         <EmptyLine>
           {calendarClosedDetail || 'Portal şu an takvimi sunmuyor.'}
@@ -256,10 +246,10 @@ export default function CalendarEvents() {
   }
 
   return (
-    <div className="dashboard-card" style={{ position: 'relative' }}>
+    <div className="dashboard-card calendar-card">
       <h2 className="dashboard-card__title">
         <EventSchedule size={20} />
-        Haftalık Takvim
+        Haftalık takvim
       </h2>
 
       {/* Navigation */}
@@ -298,12 +288,18 @@ export default function CalendarEvents() {
           .map(([type, label]) => {
           const Icon = TYPE_ICONS[type] ?? EventSchedule
           return (
+          // B34 (S24, S31): shown or hidden is said by a checkmark and aria-pressed, never by fading the chip —
+          // at opacity 0.35 its label measured 2.24:1.
           <button
+            type="button"
             key={type}
             className={`calendar-legend__chip${hiddenTypes.has(type) ? ' calendar-legend__chip--hidden' : ''}`}
+            aria-pressed={!hiddenTypes.has(type)}
             onClick={() => toggleType(type)}
             title={`${label} ${hiddenTypes.has(type) ? 'göster' : 'gizle'}`}
           >
+            {!hiddenTypes.has(type) &&
+              <Checkmark size={16} className="calendar-legend__icon calendar-legend__icon--secili" aria-hidden="true" />}
             <Icon size={16} className="calendar-legend__icon" aria-hidden="true" />
             {label}
           </button>
@@ -359,25 +355,53 @@ export default function CalendarEvents() {
                     // Only show title in the first hour of a block event
                     const isFirstHour = ev._start ? ev._start.getHours() === hour : true
                     if (!isFirstHour && isBlock) {
-                      // Continuation block — thin colored bar
+                      // Continuation block — a thin coloured bar, drawn only; the event's first hour is its button.
                       return (
                         <div
                           key={ev.id}
+                          aria-hidden="true"
                           className={`calendar-event calendar-event--continuation ${ders}`}
-                          onClick={() => setSelectedEvent(ev)}
                         />
                       )
                     }
+                    const acik = selectedEvent?.id === ev.id
+                    const detayId = `etkinlik-${ev.id}`
+                    // B49 (§5.4): Carbon's Popover, anchored to its event — Esc, a click outside and Tab
+                    // past the box close it, focus goes into it on open and back to the event on Esc.
                     return (
-                      <div
+                      <Popover
                         key={ev.id}
-                        className={`calendar-event ${ders}`}
-                        onClick={() => setSelectedEvent(ev)}
-                        title={`${TYPE_LABELS[ev.type] ?? ''}: ${ev.title}`}
+                        open={acik}
+                        autoAlign
+                        align="bottom"
+                        className="calendar-event-popover"
+                        onRequestClose={() => setSelectedEvent(null)}
+                        onKeyDown={e => {
+                          if (e.key !== 'Escape' || !acik) return
+                          e.preventDefault()
+                          setSelectedEvent(null)
+                          ;(e.currentTarget.querySelector('.calendar-event') as HTMLElement | null)?.focus()
+                        }}
                       >
-                        <Icon size={12} className="calendar-event__icon" aria-hidden="true" />
-                        <span className="calendar-event__title">{ev.title}</span>
-                      </div>
+                        <button
+                          type="button"
+                          className={`calendar-event ${ders}`}
+                          aria-expanded={acik}
+                          aria-controls={acik ? detayId : undefined}
+                          onClick={() => setSelectedEvent(acik ? null : ev)}
+                          title={`${TYPE_LABELS[ev.type] ?? ''}: ${ev.title}`}
+                        >
+                          <Icon size={16} className="calendar-event__icon" aria-hidden="true" />
+                          {/* B40: the kind is said, not only drawn. */}
+                          <span className="cds--visually-hidden">{TYPE_LABELS[ev.type] ?? ''}: </span>
+                          <span className="calendar-event__title">{ev.title}</span>
+                        </button>
+                        {acik && (
+                          <PopoverContent id={detayId} className="calendar-popover" role="dialog" aria-label={ev.title}>
+                            <EtkinlikAyrintisi ev={ev} kapat={() => setSelectedEvent(null)} />
+                          </PopoverContent>
+                        )}
+                      </Popover>
                     )
                   })}
                 </div>
@@ -386,45 +410,40 @@ export default function CalendarEvents() {
           </>
         ))}
       </div>
-
-      {/* Event detail popover */}
-      {selectedEvent && (
-        <div className="calendar-popover" ref={popoverRef}>
-          <div className="calendar-popover__header">
-            <Tag type="gray" size="sm" renderIcon={TYPE_ICONS[selectedEvent.type] ?? EventSchedule}>
-              {TYPE_LABELS[selectedEvent.type] ?? selectedEvent.type}
-            </Tag>
-            <button
-              className="calendar-popover__close"
-              onClick={() => setSelectedEvent(null)}
-              aria-label="Kapat"
-            >
-              <Close size={16} />
-            </button>
-          </div>
-          <h5 className="calendar-popover__title">{selectedEvent.title}</h5>
-          {selectedEvent._start && (
-            <p className="calendar-popover__time">
-              {formatTime(selectedEvent._start)}
-              {selectedEvent._end && selectedEvent._end.getTime() !== selectedEvent._start.getTime()
-                ? ` - ${formatTime(selectedEvent._end)}`
-                : ''}
-            </p>
-          )}
-          {selectedEvent.course && (
-            <p className="calendar-popover__meta">
-              <SubjectLabel course={selectedEvent.course} family={selectedEvent.courseFamily} />
-            </p>
-          )}
-          {selectedEvent.subtitle && (
-            <p className="calendar-popover__meta">{selectedEvent.subtitle}</p>
-          )}
-          {selectedEvent.status && (
-            <p className="calendar-popover__meta">Durum: {selectedEvent.status}</p>
-          )}
-        </div>
-      )}
     </div>
+  )
+}
+
+function EtkinlikAyrintisi({ ev, kapat }: { ev: UnifiedEvent; kapat: () => void }) {
+  const kapatRef = useRef<HTMLButtonElement>(null)
+  // Focus moves into the box when it opens (B49), onto its one control.
+  useEffect(() => { kapatRef.current?.focus() }, [])
+  return (
+    <>
+      <div className="calendar-popover__header">
+        {/* B45: Carbon draws renderIcon only from md up. */}
+        <Tag type="gray" size="md" renderIcon={TYPE_ICONS[ev.type] ?? EventSchedule}>
+          {TYPE_LABELS[ev.type] ?? ev.type}
+        </Tag>
+        <button ref={kapatRef} type="button" className="calendar-popover__close" onClick={kapat} aria-label="Kapat">
+          <Close size={16} />
+        </button>
+      </div>
+      <h3 className="calendar-popover__title">{ev.title}</h3>
+      {ev._start && (
+        <p className="calendar-popover__time tedy-time">
+          {formatTime(ev._start)}
+          {ev._end && ev._end.getTime() !== ev._start.getTime() ? ` - ${formatTime(ev._end)}` : ''}
+        </p>
+      )}
+      {ev.course && (
+        <p className="calendar-popover__meta">
+          <SubjectLabel course={ev.course} family={ev.courseFamily} />
+        </p>
+      )}
+      {ev.subtitle && <p className="calendar-popover__meta">{ev.subtitle}</p>}
+      {ev.status && <p className="calendar-popover__meta">Durum: {ev.status}</p>}
+    </>
   )
 }
 

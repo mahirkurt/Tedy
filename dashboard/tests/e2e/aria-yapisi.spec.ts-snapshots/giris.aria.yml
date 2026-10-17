@@ -1,0 +1,14 @@
+- banner:
+  - img "TEDY"
+  - paragraph: TED Rönesans Koleji
+  - paragraph: Okul günü tek bakışta.
+  - paragraph: TEDY okulun portalını düzenli okur; dersi, ödevi ve sınavı sırayla önüne koyar.
+- main "TEDY'ye giriş yap":
+  - heading "TEDY'ye giriş yap" [level=1]
+  - paragraph: Derslerini, ödevlerini ve sınavlarını görmek için Google hesabınla devam et.
+  - button "Google ile oturum açın"
+  - status
+  - paragraph: Yalnız ailenin tanımlı Google hesaplarıyla giriş yapılır.
+- contentinfo:
+  - paragraph: Giriş Google ile yapılır; şifren TEDY'ye gelmez. TEDY bu girişten yalnız adını, e-posta adresini ve profil fotoğrafını alır.
+  - paragraph: /TED Rönesans Koleji · \d+/

@@ -2,6 +2,13 @@
 @use '@carbon/react/scss/type' as type;
 
 .sinav-onizleme {
+  // The topics and links read as part of the row above: they start where the
+  // contained list's row text starts (Carbon pads its items by spacing-05).
+  &__konular,
+  &__baglantilar {
+    padding-inline: spacing.$spacing-05;
+  }
+
   &__konular {
     @include type.type-style('body-compact-01');
     margin: spacing.$spacing-02 0 0;

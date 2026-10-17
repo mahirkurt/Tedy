@@ -1,0 +1,1434 @@
+{
+  "dersler": [
+    {
+      "ders": "Matematik",
+      "kitaplar": [
+        {
+          "document_id": 346,
+          "kayma_uyumu": "59/59",
+          "kisa": "1. Kitap",
+          "sayfa_kaymasi": 0
+        },
+        {
+          "document_id": 506,
+          "kayma_uyumu": "63/63",
+          "kisa": "2. Kitap",
+          "sayfa_kaymasi": 0
+        }
+      ],
+      "program": {
+        "document_id": 24,
+        "sayfa": "115-172"
+      },
+      "slug": "matematik",
+      "uniteler": [
+        {
+          "ad": "Sayılar ve Nicelikler",
+          "konular": [
+            {
+              "ad": "Tam Sayılar",
+              "ad_kaynak": "TAM SAYILAR",
+              "id": "matematik-u1-tam-sayilar",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.1.1",
+                "MAT.7.1.2",
+                "MAT.7.1.3",
+                "MAT.7.1.4"
+              ],
+              "kitap": 346,
+              "sayfa": [
+                17,
+                24
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Rasyonel Sayılar",
+              "ad_kaynak": "RASYONEL SAYILAR",
+              "id": "matematik-u1-rasyonel-sayilar",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.1.1",
+                "MAT.7.1.2",
+                "MAT.7.1.3",
+                "MAT.7.1.4"
+              ],
+              "kitap": 346,
+              "sayfa": [
+                25,
+                34
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Rasyonel Sayılarda Karşılaştırma ve Sıralama",
+              "ad_kaynak": "RASYONEL SAYILARDA KARŞILAŞTIRMA VE SIRALAMA",
+              "id": "matematik-u1-rasyonel-sayilarda-karsilastirma-ve-siralama",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.1.3"
+              ],
+              "kitap": 346,
+              "sayfa": [
+                50,
+                59
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Tam Sayılarla İşlemler ve Problem Çözme",
+              "ad_kaynak": "TAM SAYILARLA İŞLEMLER VE PROBLEM ÇÖZME",
+              "id": "matematik-u1-tam-sayilarla-islemler-ve-problem-cozme",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.1.4"
+              ],
+              "kitap": 346,
+              "sayfa": [
+                62,
+                81
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Rasyonel Sayılarla İşlemler ve Problem Çözme",
+              "ad_kaynak": "RASYONEL SAYILARLA İŞLEMLER VE PROBLEM ÇÖZME",
+              "id": "matematik-u1-rasyonel-sayilarla-islemler-ve-problem-cozme",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.1.4"
+              ],
+              "kitap": 346,
+              "sayfa": [
+                82,
+                107
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Doğru Orantı Problemleri",
+              "ad_kaynak": "DOĞRU ORANTI PROBLEMLERİ",
+              "id": "matematik-u1-dogru-oranti-problemleri",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.1.7"
+              ],
+              "kitap": 506,
+              "sayfa": [
+                62,
+                67
+              ],
+              "sayfa_kaynak": "icindekiler"
+            }
+          ],
+          "no": 1,
+          "program_sayfa": 115
+        },
+        {
+          "ad": "İşlemlerle Cebirsel Düşünme ve Değişimler",
+          "konular": [
+            {
+              "ad": "Cebirsel İfadelerle İşlemler",
+              "ad_kaynak": "CEBİRSEL İFADELERLE İŞLEMLER",
+              "id": "matematik-u2-cebirsel-ifadelerle-islemler",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.2.1",
+                "MAT.7.2.4"
+              ],
+              "kitap": 506,
+              "sayfa": [
+                95,
+                107
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Denklemler",
+              "ad_kaynak": "DENKLEMLER",
+              "id": "matematik-u2-denklemler",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.2.2"
+              ],
+              "kitap": 506,
+              "sayfa": [
+                110,
+                130
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Eşitsizlikler",
+              "ad_kaynak": "EŞİTSİZLİKLER",
+              "id": "matematik-u2-esitsizlikler",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.2.2"
+              ],
+              "kitap": 506,
+              "sayfa": [
+                131,
+                147
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Algoritmayı Yapılandırma",
+              "ad_kaynak": "ALGORİTMAYI YAPILANDIRMA",
+              "id": "matematik-u2-algoritmayi-yapilandirma",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.2.4"
+              ],
+              "kitap": 506,
+              "sayfa": [
+                158,
+                165
+              ],
+              "sayfa_kaynak": "icindekiler"
+            }
+          ],
+          "no": 2,
+          "program_sayfa": 130
+        },
+        {
+          "ad": "Dönüşüm",
+          "konular": [
+            {
+              "ad": "Yansıma Dönüşümü",
+              "ad_kaynak": "YANSIMA DÖNÜŞÜMÜ",
+              "id": "matematik-u3-yansima-donusumu",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.3.1",
+                "MAT.7.3.2"
+              ],
+              "kitap": 346,
+              "sayfa": [
+                204,
+                209
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Orta Dikme ve Açıortay İnşası",
+              "ad_kaynak": "ORTA DİKME VE AÇIORTAY İNŞASI",
+              "id": "matematik-u3-orta-dikme-ve-aciortay-insasi",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.3.2"
+              ],
+              "kitap": 346,
+              "sayfa": [
+                211,
+                214
+              ],
+              "sayfa_kaynak": "icindekiler"
+            }
+          ],
+          "no": 3,
+          "program_sayfa": 137
+        },
+        {
+          "ad": "Geometrik Nicelikler",
+          "konular": [
+            {
+              "ad": "Dikdörtgenler Prizmasının Açınımı ve Yüzey Alanı",
+              "ad_kaynak": "DİKDÖRTGENLER PRİZMASININ AÇINIMI VE YÜZEY ALANI",
+              "id": "matematik-u4-dikdortgenler-prizmasinin-acinimi-ve-yuzey-alani",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.4.2",
+                "MAT.7.4.6"
+              ],
+              "kitap": 346,
+              "sayfa": [
+                125,
+                131
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Hacmi Eş Nesneler Aracılığıyla Yorumlama",
+              "ad_kaynak": "HACMİ EŞ NESNELER ARACILIĞIYLA YORUMLAMA",
+              "id": "matematik-u4-hacmi-es-nesneler-araciligiyla-yorumlama",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.4.3"
+              ],
+              "kitap": 346,
+              "sayfa": [
+                134,
+                136
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Dikdörtgenler Prizmasının Hacim Bağıntısını Elde Etme",
+              "ad_kaynak": "DİKDÖRTGENLER PRİZMASININ HACİM BAĞINTISINI ELDE ETME",
+              "id": "matematik-u4-dikdortgenler-prizmasinin-hacim-bagintisini-elde-etme",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.4.4"
+              ],
+              "kitap": 346,
+              "sayfa": [
+                138,
+                142
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Hacim Ölçme Birimleri",
+              "ad_kaynak": "HACİM ÖLÇME BİRİMLERİ",
+              "id": "matematik-u4-hacim-olcme-birimleri",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.4.5"
+              ],
+              "kitap": 346,
+              "sayfa": [
+                144,
+                150
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Birimli Birimsiz Oran",
+              "ad_kaynak": "BİRİMLİ BİRİMSİZ ORAN",
+              "id": "matematik-u4-birimli-birimsiz-oran",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.4.5"
+              ],
+              "kitap": 506,
+              "sayfa": [
+                43,
+                46
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Dairenin Alanı",
+              "ad_kaynak": "DAİRENİN ALANI",
+              "id": "matematik-u4-dairenin-alani",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.4.10",
+                "MAT.7.4.7"
+              ],
+              "kitap": 506,
+              "sayfa": [
+                174,
+                176
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Daire Diliminin Alanı",
+              "ad_kaynak": "DAİRE DİLİMİNİN ALANI",
+              "id": "matematik-u4-daire-diliminin-alani",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.4.10"
+              ],
+              "kitap": 506,
+              "sayfa": [
+                179,
+                183
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Eşkenar Dörtgenin Alanı",
+              "ad_kaynak": "EŞKENAR DÖRTGENİN ALANI",
+              "id": "matematik-u4-eskenar-dortgenin-alani",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.4.10"
+              ],
+              "kitap": 506,
+              "sayfa": [
+                186,
+                190
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Yamuğun Alanı",
+              "ad_kaynak": "YAMUĞUN ALANI",
+              "id": "matematik-u4-yamugun-alani",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.4.10"
+              ],
+              "kitap": 506,
+              "sayfa": [
+                191,
+                197
+              ],
+              "sayfa_kaynak": "icindekiler"
+            }
+          ],
+          "no": 4,
+          "program_sayfa": 142
+        },
+        {
+          "ad": "Geometrik Şekiller",
+          "konular": [
+            {
+              "ad": "Üçgende Açıortay, Yükseklik, Kenar Orta Dikme ve Kenarortay",
+              "ad_kaynak": "ÜÇGENDE AÇIORTAY, YÜKSEKLİK, KENAR ORTA DİKME VE KENARORTAY",
+              "id": "matematik-u5-ucgende-aciortay-yukseklik-kenar-orta-dikme-ve-kenarortay",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.5.1",
+                "MAT.7.5.2"
+              ],
+              "kitap": 506,
+              "sayfa": [
+                16,
+                26
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Üçgende Kenarortay ve İnşası",
+              "ad_kaynak": "ÜÇGENDE KENARORTAY VE İNŞASI",
+              "id": "matematik-u5-ucgende-kenarortay-ve-insasi",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.5.2"
+              ],
+              "kitap": 506,
+              "sayfa": [
+                28,
+                29
+              ],
+              "sayfa_kaynak": "icindekiler"
+            }
+          ],
+          "no": 5,
+          "program_sayfa": 156
+        },
+        {
+          "ad": "İstatistiksel Araştırma Süreci",
+          "konular": [
+            {
+              "ad": "Kategorik ve Nicel Veri Dağılımları",
+              "ad_kaynak": "KATEGORİK VE NİCEL VERİ DAĞILIMLARI",
+              "id": "matematik-u6-kategorik-ve-nicel-veri-dagilimlari",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.6.1"
+              ],
+              "kitap": 346,
+              "sayfa": [
+                162,
+                164
+              ],
+              "sayfa_kaynak": "icindekiler"
+            }
+          ],
+          "no": 6,
+          "program_sayfa": 160
+        },
+        {
+          "ad": "Veriden Olasılığa",
+          "konular": [
+            {
+              "ad": "Eşit Olasılıklı Olaylar",
+              "ad_kaynak": "EŞİT OLASILIKLI OLAYLAR",
+              "id": "matematik-u7-esit-olasilikli-olaylar",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.7.2"
+              ],
+              "kitap": 506,
+              "sayfa": [
+                82,
+                83
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Ayrık ve Ayrık Olmayan Olaylar",
+              "ad_kaynak": "AYRIK VE AYRIK OLMAYAN OLAYLAR",
+              "id": "matematik-u7-ayrik-ve-ayrik-olmayan-olaylar",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "MAT.7.7.3"
+              ],
+              "kitap": 506,
+              "sayfa": [
+                85,
+                86
+              ],
+              "sayfa_kaynak": "icindekiler"
+            }
+          ],
+          "no": 7,
+          "program_sayfa": 168
+        }
+      ]
+    },
+    {
+      "ders": "Fen Bilimleri",
+      "kitaplar": [
+        {
+          "document_id": 439,
+          "kayma_uyumu": "25/28",
+          "kisa": "1. Kitap",
+          "sayfa_kaymasi": 1
+        },
+        {
+          "document_id": 473,
+          "kayma_uyumu": "27/29",
+          "kisa": "2. Kitap",
+          "sayfa_kaymasi": 1
+        }
+      ],
+      "program": {
+        "document_id": 54,
+        "sayfa": "146-183"
+      },
+      "slug": "fen",
+      "uniteler": [
+        {
+          "ad": "Uzay Çağı",
+          "konular": [
+            {
+              "ad": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
+              "ad_kaynak": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
+              "id": "fen-u1-teknoloji-ile-uzay-arastirmalari-arasindaki-iliski",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.1.1"
+              ],
+              "kitap": 439,
+              "sayfa": [
+                25,
+                35
+              ],
+              "sayfa_kaynak": "icindekiler"
+            }
+          ],
+          "no": 1,
+          "program_sayfa": 146
+        },
+        {
+          "ad": "Kuvvet ve Enerjiyi Keşfedelim",
+          "konular": [
+            {
+              "ad": "Enerji ve Enerji Çeşitleri",
+              "ad_kaynak": "Enerji ve Enerji Çeşitleri",
+              "id": "fen-u2-enerji-ve-enerji-cesitleri",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.2.2"
+              ],
+              "kitap": 439,
+              "sayfa": [
+                65,
+                72
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Enerjinin Korunumu",
+              "ad_kaynak": "Enerjinin Korunumu",
+              "id": "fen-u2-enerjinin-korunumu",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.2.3"
+              ],
+              "kitap": 439,
+              "sayfa": [
+                73,
+                80
+              ],
+              "sayfa_kaynak": "icindekiler"
+            }
+          ],
+          "no": 2,
+          "program_sayfa": 151
+        },
+        {
+          "ad": "Vücudumuzdaki Sistemler",
+          "konular": [
+            {
+              "ad": "Sindirim Sistemini Oluşturan Yapı ve Organlar",
+              "ad_kaynak": "Sindirim Sistemini Oluşturan Yapı ve Organlar",
+              "id": "fen-u3-sindirim-sistemini-olusturan-yapi-ve-organlar",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.3.1"
+              ],
+              "kitap": 439,
+              "sayfa": [
+                91,
+                96
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Sindirim Sisteminin Sağlığı",
+              "ad_kaynak": "Sindirim Sisteminin Sağlığı",
+              "id": "fen-u3-sindirim-sisteminin-sagligi",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.3.2"
+              ],
+              "kitap": 439,
+              "sayfa": [
+                97,
+                101
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Dolaşım Sistemini Oluşturan Yapı ve Organlar",
+              "ad_kaynak": "Dolaşım Sistemini Oluşturan Yapı ve Organlar",
+              "id": "fen-u3-dolasim-sistemini-olusturan-yapi-ve-organlar",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.3.3"
+              ],
+              "kitap": 439,
+              "sayfa": [
+                103,
+                109
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Kan Bağışının Toplum Açısından Önemi",
+              "ad_kaynak": "Kan Bağışının Toplum Açısından Önemi",
+              "id": "fen-u3-kan-bagisinin-toplum-acisindan-onemi",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.3.4"
+              ],
+              "kitap": 439,
+              "sayfa": [
+                110,
+                113
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Dolaşım Sisteminin Sağlığı",
+              "ad_kaynak": "Dolaşım Sisteminin Sağlığı",
+              "id": "fen-u3-dolasim-sisteminin-sagligi",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.3.5"
+              ],
+              "kitap": 439,
+              "sayfa": [
+                114,
+                117
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Solunum Sistemini Oluşturan Yapı ve Organlar",
+              "ad_kaynak": "Solunum Sistemini Oluşturan Yapı ve Organlar",
+              "id": "fen-u3-solunum-sistemini-olusturan-yapi-ve-organlar",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.3.6"
+              ],
+              "kitap": 439,
+              "sayfa": [
+                119,
+                123
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Solunum Sisteminin Sağlığı",
+              "ad_kaynak": "Solunum Sisteminin Sağlığı",
+              "id": "fen-u3-solunum-sisteminin-sagligi",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.3.7"
+              ],
+              "kitap": 439,
+              "sayfa": [
+                124,
+                129
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Boşaltım Sistemini Oluşturan Yapı ve Organlar",
+              "ad_kaynak": "Boşaltım Sistemini Oluşturan Yapı ve Organlar",
+              "id": "fen-u3-bosaltim-sistemini-olusturan-yapi-ve-organlar",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.3.8"
+              ],
+              "kitap": 439,
+              "sayfa": [
+                131,
+                135
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Boşaltım Sisteminin Sağlığı",
+              "ad_kaynak": "Boşaltım Sisteminin Sağlığı",
+              "id": "fen-u3-bosaltim-sisteminin-sagligi",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.3.9"
+              ],
+              "kitap": 439,
+              "sayfa": [
+                136,
+                140
+              ],
+              "sayfa_kaynak": "icindekiler"
+            }
+          ],
+          "no": 3,
+          "program_sayfa": 155
+        },
+        {
+          "ad": "Işığın Kırılması ve Mercekler",
+          "konular": [
+            {
+              "ad": "Işığın Kırılması",
+              "ad_kaynak": "1. Işığın Kırılması",
+              "id": "fen-u4-isigin-kirilmasi",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.4.1"
+              ],
+              "kitap": 473,
+              "sayfa": [
+                16,
+                19
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Merceklerin Günlük Hayatta Kullanım Alanları",
+              "ad_kaynak": "Merceklerin Günlük Hayatta Kullanım Alanları",
+              "id": "fen-u4-merceklerin-gunluk-hayatta-kullanim-alanlari",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.4.3"
+              ],
+              "kitap": 473,
+              "sayfa": [
+                30,
+                34
+              ],
+              "sayfa_kaynak": "icindekiler"
+            }
+          ],
+          "no": 4,
+          "program_sayfa": 164
+        },
+        {
+          "ad": "Maddenin Doğasına Yolculuk",
+          "konular": [
+            {
+              "ad": "Atomun Yapısı ve Atomdaki Temel Parçacıklar",
+              "ad_kaynak": "Atomun Yapısı ve Atomdaki Temel Parçacıklar",
+              "id": "fen-u5-atomun-yapisi-ve-atomdaki-temel-parcaciklar",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.5.1"
+              ],
+              "kitap": 473,
+              "sayfa": [
+                47,
+                50
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Geçmişten Günümüze Atom",
+              "ad_kaynak": "Geçmişten Günümüze Atom",
+              "id": "fen-u5-gecmisten-gunumuze-atom",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.5.2"
+              ],
+              "kitap": 473,
+              "sayfa": [
+                51,
+                58
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Saf Maddeler",
+              "ad_kaynak": "2. Saf Maddeler",
+              "id": "fen-u5-saf-maddeler",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.5.4"
+              ],
+              "kitap": 473,
+              "sayfa": [
+                59,
+                79
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Karışımlar",
+              "ad_kaynak": "3. Karışımlar",
+              "id": "fen-u5-karisimlar",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.5.10",
+                "FB.7.5.8"
+              ],
+              "kitap": 473,
+              "sayfa": [
+                80,
+                84
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Çözünme Hızına Etki Eden Faktörler",
+              "ad_kaynak": "Çözünme Hızına Etki Eden Faktörler",
+              "id": "fen-u5-cozunme-hizina-etki-eden-faktorler",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.5.9"
+              ],
+              "kitap": 473,
+              "sayfa": [
+                85,
+                89
+              ],
+              "sayfa_kaynak": "icindekiler"
+            }
+          ],
+          "no": 5,
+          "program_sayfa": 168
+        },
+        {
+          "ad": "Elektriklenme",
+          "konular": [
+            {
+              "ad": "Elektrik Yükleri ve Elektriklenme",
+              "ad_kaynak": "1. Elektrik Yükleri ve Elektriklenme",
+              "id": "fen-u6-elektrik-yukleri-ve-elektriklenme",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.6.3"
+              ],
+              "kitap": 473,
+              "sayfa": [
+                106,
+                109
+              ],
+              "sayfa_kaynak": "icindekiler"
+            },
+            {
+              "ad": "Elektriklenme Çeşitleri",
+              "ad_kaynak": "Elektriklenme Çeşitleri",
+              "id": "fen-u6-elektriklenme-cesitleri",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "FB.7.6.2"
+              ],
+              "kitap": 473,
+              "sayfa": [
+                117,
+                122
+              ],
+              "sayfa_kaynak": "icindekiler"
+            }
+          ],
+          "no": 6,
+          "program_sayfa": 176
+        },
+        {
+          "ad": "Sürdürülebilir Yaşam ve Enerji",
+          "konular": [],
+          "no": 7,
+          "program_sayfa": 180
+        }
+      ]
+    },
+    {
+      "ders": "Sosyal Bilgiler",
+      "kitaplar": [
+        {
+          "document_id": 491,
+          "kayma_uyumu": "0/0",
+          "kisa": "1. Kitap",
+          "sayfa_kaymasi": null
+        },
+        {
+          "document_id": 361,
+          "kayma_uyumu": "0/0",
+          "kisa": "2. Kitap",
+          "sayfa_kaymasi": null
+        }
+      ],
+      "program": {
+        "document_id": 100,
+        "sayfa": "93-122"
+      },
+      "slug": "sosyal",
+      "uniteler": [
+        {
+          "ad": "Birlikte Yaşamak",
+          "konular": [
+            {
+              "ad": "Gruplarda ve Sosyal Hayatta İletişimin Önemi",
+              "ad_kaynak": "GRUPLARDA VE SOSYAL HAYATTA İLETİŞİMİN ÖNEMİ",
+              "id": "sosyal-u1-gruplarda-ve-sosyal-hayatta-iletisimin-onemi",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.1.1"
+              ],
+              "kitap": 491,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Özel Gereksinimli Bireyler İçin Fırsat Eşitliği",
+              "ad_kaynak": "ÖZEL GEREKSİNİMLİ BİREYLER İÇİN FIRSAT EŞİTLİĞİ",
+              "id": "sosyal-u1-ozel-gereksinimli-bireyler-icin-firsat-esitligi",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.1.2"
+              ],
+              "kitap": 491,
+              "sayfa_kaynak": "yok"
+            }
+          ],
+          "no": 1,
+          "program_sayfa": 93
+        },
+        {
+          "ad": "Evimiz Dünya",
+          "konular": [
+            {
+              "ad": "Küreselleşmenin İnsan ve Toplum Hayatına Etkisi",
+              "ad_kaynak": "KÜRESELLEŞMEN İN İNSAN VE TOPLUM HAYATINA ETK İSİ",
+              "id": "sosyal-u2-kuresellesmenin-insan-ve-toplum-hayatina-etkisi",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.2.1"
+              ],
+              "kitap": 491,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Bölgesel ve Küresel Sorunların Çözümünde Ülkemizin Rolü",
+              "ad_kaynak": "BÖLGESEL VE KÜRESEL SORUNLARIN ÇÖZÜMÜNDE ÜLKEM İZİN ROLÜ",
+              "id": "sosyal-u2-bolgesel-ve-kuresel-sorunlarin-cozumunde-ulkemizin-rolu",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.2.2"
+              ],
+              "kitap": 491,
+              "sayfa_kaynak": "yok"
+            }
+          ],
+          "no": 2,
+          "program_sayfa": 98
+        },
+        {
+          "ad": "Ortak Mirasımız",
+          "konular": [
+            {
+              "ad": "Osmanlı Devleti’nin Uygulamaya Koyduğu Yenilikler",
+              "ad_kaynak": "OSMANLI DEVLETİ ’NİN UYGULAMAYA KOYDUĞU YENİLİKLER",
+              "id": "sosyal-u3-osmanli-devleti-nin-uygulamaya-koydugu-yenilikler",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.3.2"
+              ],
+              "kitap": 491,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Osmanlı Kültür ve Medeniyeti",
+              "ad_kaynak": "OSMANLI KÜLTÜR VE MEDENİYETİ",
+              "id": "sosyal-u3-osmanli-kultur-ve-medeniyeti",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.3.3"
+              ],
+              "kitap": 491,
+              "sayfa_kaynak": "yok"
+            }
+          ],
+          "no": 3,
+          "program_sayfa": 102
+        },
+        {
+          "ad": "Yaşayan Demokrasimiz",
+          "konular": [
+            {
+              "ad": "Türkiye Cumhuriyeti’nin Nitelikleri",
+              "ad_kaynak": "TÜRKIYE CUMHURIYETI’NIN NITELIKLERI",
+              "id": "sosyal-u4-turkiye-cumhuriyeti-nin-nitelikleri",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.4.1"
+              ],
+              "kitap": 361,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Türkiye Cumhuriyeti Devleti’nin yönetim yapısını",
+              "ad_kaynak": "TÜRKIYE CUMHURIYETI’NIN YÖNETIM YAPISI",
+              "id": "sosyal-u4-turkiye-cumhuriyeti-devleti-nin-yonetim-yapisini",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.4.2"
+              ],
+              "kitap": 361,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Ülkemizde Demokrasinin Gelişimi",
+              "ad_kaynak": "ÜLKEMIZDE DEMOKRASININ GELIŞIMI",
+              "id": "sosyal-u4-ulkemizde-demokrasinin-gelisimi",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.4.3"
+              ],
+              "kitap": 361,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Demokrasinin Uygulanma Sürecinde Karşılaşılan Sorunlar",
+              "ad_kaynak": "DEMOKRASININ UYGULANMA SÜRECINDE KARŞILAŞILAN SORUNLAR",
+              "id": "sosyal-u4-demokrasinin-uygulanma-surecinde-karsilasilan-sorunlar",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.4.4"
+              ],
+              "kitap": 361,
+              "sayfa_kaynak": "yok"
+            }
+          ],
+          "no": 4,
+          "program_sayfa": 107
+        },
+        {
+          "ad": "Hayatımızdaki Ekonomi",
+          "konular": [
+            {
+              "ad": "Millî Kalkınma Hamleleri",
+              "ad_kaynak": "MILLÎ KALKINMA HAMLELERI",
+              "id": "sosyal-u5-milli-kalkinma-hamleleri",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.5.1"
+              ],
+              "kitap": 361,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Tüketim Arasındaki Döngü",
+              "ad_kaynak": "TÜKETIM ARASINDAKI DÖNGÜ",
+              "id": "sosyal-u5-tuketim-arasindaki-dongu",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.5.2"
+              ],
+              "kitap": 361,
+              "sayfa_kaynak": "yok"
+            }
+          ],
+          "no": 5,
+          "program_sayfa": 112
+        },
+        {
+          "ad": "Teknoloji ve Sosyal Bilimler",
+          "konular": [
+            {
+              "ad": "Bilimsel ve teknolojik gelişmelerin gelecekteki toplum hayatına etkilerine ilişkin öngörüde",
+              "ad_kaynak": "GELECEKTEKI HAYATA ETKISI",
+              "id": "sosyal-u6-bilimsel-ve-teknolojik-gelismelerin-gelecekteki-toplum-hayatina-etkilerine-iliskin-ongorude",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.6.1"
+              ],
+              "kitap": 361,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Sosyal Bilimlerin Çalışma Alanları",
+              "ad_kaynak": "SOSYAL BILIMLERIN ÇALIŞMA ALANLARI",
+              "id": "sosyal-u6-sosyal-bilimlerin-calisma-alanlari",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.6.2"
+              ],
+              "kitap": 361,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Toplumsal hayatta karşılaşabileceği bir probleme yönelik bilimsel sorgulama",
+              "ad_kaynak": "TOPLUMSAL HAYATTA KARŞILAŞILABILECEK PROBLEMLERE ÇÖZÜM ÜRETME",
+              "id": "sosyal-u6-toplumsal-hayatta-karsilasabilecegi-bir-probleme-yonelik-bilimsel-sorgulama",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.6.3"
+              ],
+              "kitap": 361,
+              "sayfa_kaynak": "yok"
+            }
+          ],
+          "no": 6,
+          "program_sayfa": 116
+        }
+      ]
+    },
+    {
+      "ders": "Türkçe",
+      "kitaplar": [
+        {
+          "document_id": 460,
+          "kayma_uyumu": "0/0",
+          "kisa": "1. Kitap",
+          "sayfa_kaymasi": null
+        },
+        {
+          "document_id": 340,
+          "kayma_uyumu": "0/0",
+          "kisa": "2. Kitap",
+          "sayfa_kaymasi": null
+        }
+      ],
+      "program": {
+        "document_id": 51,
+        "sayfa": "126-161"
+      },
+      "slug": "turkce",
+      "uniteler": [
+        {
+          "ad": "Hayat Boyu Gelişim",
+          "konular": [
+            {
+              "ad": "Martı Jonathan Livingston",
+              "ad_kaynak": "Martı Jonathan Livingston",
+              "id": "turkce-u1-marti-jonathan-livingston",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 460,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Gençliğin Kıymeti",
+              "ad_kaynak": "Gençliğin Kıymeti",
+              "id": "turkce-u1-gencligin-kiymeti",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 460,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Sen Sor O Yanıtlasın-Sporda ve Yaşamda Hedefe Odaklan (Dinleme/İzleme)",
+              "ad_kaynak": "Sen Sor O Yanıtlasın-Sporda ve Yaşamda Hedefe Odaklan (Dinleme/İzleme)",
+              "id": "turkce-u1-sen-sor-o-yanitlasin-sporda-ve-yasamda-hedefe-odaklan-dinleme-izleme",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 460,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Adını Göklere Yazdıran Çocuk",
+              "ad_kaynak": "Adını Göklere Yazdıran Çocuk",
+              "id": "turkce-u1-adini-goklere-yazdiran-cocuk",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 460,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Ağaç ve Sen (Serbest Okuma Metni)",
+              "ad_kaynak": "Ağaç ve Sen (Serbest Okuma Metni)",
+              "id": "turkce-u1-agac-ve-sen-serbest-okuma-metni",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 460,
+              "sayfa_kaynak": "yok"
+            }
+          ],
+          "no": 1,
+          "program_sayfa": 126
+        },
+        {
+          "ad": "Bir Hilal Uğruna",
+          "konular": [
+            {
+              "ad": "Bayrağımızın Altında",
+              "ad_kaynak": "Bayrağımızın Altında",
+              "id": "turkce-u2-bayragimizin-altinda",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 460,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Mustafa 1881-1920 Tarihe Atılan İmza",
+              "ad_kaynak": "Mustafa 1881-1920 Tarihe Atılan İmza",
+              "id": "turkce-u2-mustafa-1881-1920-tarihe-atilan-imza",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 460,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Milli Mücadele Sergisi Kahraman Çocuklar (Dinleme/İzleme)",
+              "ad_kaynak": "Milli Mücadele Sergisi Kahraman Çocuklar (Dinleme/İzleme)",
+              "id": "turkce-u2-milli-mucadele-sergisi-kahraman-cocuklar-dinleme-izleme",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 460,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Mustafa Kemal’in Kağnısı",
+              "ad_kaynak": "Mustafa Kemal’in Kağnısı",
+              "id": "turkce-u2-mustafa-kemal-in-kagnisi",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 460,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Gözüm Arkada Kalmayacak (Serbest Okuma Metni)",
+              "ad_kaynak": "Gözüm Arkada Kalmayacak (Serbest Okuma Metni)",
+              "id": "turkce-u2-gozum-arkada-kalmayacak-serbest-okuma-metni",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 460,
+              "sayfa_kaynak": "yok"
+            }
+          ],
+          "no": 2,
+          "program_sayfa": 132
+        },
+        {
+          "ad": "İletişim ve Sosyal İlişkiler",
+          "konular": [
+            {
+              "ad": "Ya Hayır Söyle",
+              "ad_kaynak": "Ya Hayır Söyle",
+              "id": "turkce-u3-ya-hayir-soyle",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 460,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Dijital Tayfa - Komik mi Şimdi? (Dinleme/İzleme)",
+              "ad_kaynak": "Dijital Tayfa - Komik mi Şimdi? (Dinleme/İzleme)",
+              "id": "turkce-u3-dijital-tayfa-komik-mi-simdi-dinleme-izleme",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 460,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Sevgilerde (Serbest Okuma Metni)",
+              "ad_kaynak": "Sevgilerde (Serbest Okuma Metni)",
+              "id": "turkce-u3-sevgilerde-serbest-okuma-metni",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 460,
+              "sayfa_kaynak": "yok"
+            }
+          ],
+          "no": 3,
+          "program_sayfa": 138
+        },
+        {
+          "ad": "Türk Sanatı",
+          "konular": [
+            {
+              "ad": "Anadolu’da Kilim Demek",
+              "ad_kaynak": "Anadolu’da Kilim Demek",
+              "id": "turkce-u4-anadolu-da-kilim-demek",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 340,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Geleneksel Türk Tiyatrosu",
+              "ad_kaynak": "Geleneksel Türk Tiyatrosu",
+              "id": "turkce-u4-geleneksel-turk-tiyatrosu",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 340,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Ebru: Türk Kağıt Süsleme Sanatı (Dinleme/İzleme)",
+              "ad_kaynak": "Ebru: Türk Kağıt Süsleme Sanatı (Dinleme/İzleme)",
+              "id": "turkce-u4-ebru-turk-kagit-susleme-sanati-dinleme-izleme",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 340,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Süleymaniye",
+              "ad_kaynak": "Süleymaniye",
+              "id": "turkce-u4-suleymaniye",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 340,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Atatürk ve Sanat Eğitimi (Serbest Okuma Metni)",
+              "ad_kaynak": "Atatürk ve Sanat Eğitimi (Serbest Okuma Metni)",
+              "id": "turkce-u4-ataturk-ve-sanat-egitimi-serbest-okuma-metni",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 340,
+              "sayfa_kaynak": "yok"
+            }
+          ],
+          "no": 4,
+          "program_sayfa": 144
+        },
+        {
+          "ad": "Okuma Kültürü",
+          "konular": [
+            {
+              "ad": "Çocuklar Soruyor İlber Hoca Cevaplıyor Gazi Mustafa Kemal Atatürk",
+              "ad_kaynak": "Çocuklar Soruyor İlber Hoca Cevaplıyor Gazi Mustafa Kemal Atatürk",
+              "id": "turkce-u5-cocuklar-soruyor-ilber-hoca-cevapliyor-gazi-mustafa-kemal-ataturk",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 340,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Küçük Şeylerin Hikâyesi: Kütüphaneler (Dinleme/İzleme)",
+              "ad_kaynak": "Küçük Şeylerin Hikâyesi: Kütüphaneler (Dinleme/İzleme)",
+              "id": "turkce-u5-kucuk-seylerin-hikayesi-kutuphaneler-dinleme-izleme",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 340,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Kitaplarla Kurulan Dostluk",
+              "ad_kaynak": "Kitaplarla Kurulan Dostluk",
+              "id": "turkce-u5-kitaplarla-kurulan-dostluk",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 340,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Canım Kitap (Serbest Okuma Metni)",
+              "ad_kaynak": "Canım Kitap (Serbest Okuma Metni)",
+              "id": "turkce-u5-canim-kitap-serbest-okuma-metni",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 340,
+              "sayfa_kaynak": "yok"
+            }
+          ],
+          "no": 5,
+          "program_sayfa": 150
+        },
+        {
+          "ad": "Hak ve Sorumluluklar",
+          "konular": [
+            {
+              "ad": "Kutadgu Bilig",
+              "ad_kaynak": "Kutadgu Bilig",
+              "id": "turkce-u6-kutadgu-bilig",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 340,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Siyah İnci",
+              "ad_kaynak": "Siyah İnci",
+              "id": "turkce-u6-siyah-inci",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 340,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Çocuk Hakları Sözleşmesi (Dinleme/İzleme)",
+              "ad_kaynak": "Çocuk Hakları Sözleşmesi (Dinleme/İzleme)",
+              "id": "turkce-u6-cocuk-haklari-sozlesmesi-dinleme-izleme",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 340,
+              "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Memleket İsterim (Serbest Okuma Metni)",
+              "ad_kaynak": "Memleket İsterim (Serbest Okuma Metni)",
+              "id": "turkce-u6-memleket-isterim-serbest-okuma-metni",
+              "kazanim_kaynak": "eslenmedi",
+              "kazanimlar": [],
+              "kitap": 340,
+              "sayfa_kaynak": "yok"
+            }
+          ],
+          "no": 6,
+          "program_sayfa": 156
+        }
+      ]
+    }
+  ],
+  "kapsam": {
+    "fen": {
+      "aday": 39,
+      "kazanim": 35,
+      "kazanimi_eslenen": 22,
+      "kimlik_cakismasi": 0,
+      "konu": 21,
+      "sayfasi_olan": 21
+    },
+    "matematik": {
+      "aday": 44,
+      "kazanim": 30,
+      "kazanimi_eslenen": 22,
+      "kimlik_cakismasi": 0,
+      "konu": 26,
+      "sayfasi_olan": 26
+    },
+    "sosyal": {
+      "aday": 19,
+      "kazanim": 17,
+      "kazanimi_eslenen": 15,
+      "kimlik_cakismasi": 0,
+      "konu": 15,
+      "sayfasi_olan": 0
+    },
+    "turkce": {
+      "aday": 26,
+      "kazanim": 121,
+      "kazanimi_eslenen": 0,
+      "kimlik_cakismasi": 0,
+      "konu": 26,
+      "sayfasi_olan": 0
+    }
+  },
+  "korpus_surumu": "1.6",
+  "sinif": "7. Sınıf",
+  "surum": 1
+}

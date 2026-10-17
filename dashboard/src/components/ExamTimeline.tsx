@@ -1,13 +1,13 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Tag, Tile, Button } from '@carbon/react'
-import { ChevronDown, ChevronUp, Task as TaskIcon } from '@carbon/icons-react'
+import { CheckmarkOutline, ChevronDown, ChevronUp, CircleDash, Task as TaskIcon, Time, Timer } from '@carbon/icons-react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import type { ExamItem, ExamsApiResponse } from '../types'
 import { countdownTagType, getExamCountdown } from '../utils/countdown'
 import { subjectClass } from '../utils/subject'
-import { MONTHS_SHORT, gradeColor } from '../utils/formatters'
+import { MONTHS_SHORT } from '../utils/formatters'
 import { EmptyLine } from './patterns/EmptyLine'
 import { acikOgeAc } from '../asistan/sayfaBaglami'
 import SinavUyarilari from './SinavUyarilari'
@@ -61,8 +61,6 @@ function ExamCard({ exam, showCountdown, focusMode, baslangicAcik }: {
     || (exam.kaynaklar?.length ?? 0) > 0 || !!exam.tarihBelirsiz
   )
 
-  const gradeStyle = !showCountdown && exam.grade ? gradeColor(exam.grade) : ''
-
   const cardClass = [
     'exam-card',
     showCountdown ? 'exam-card--upcoming' : 'exam-card--past',
@@ -93,16 +91,15 @@ function ExamCard({ exam, showCountdown, focusMode, baslangicAcik }: {
         <div className="exam-card__badges">
           {showCountdown && countdown && (
             <Tag type={countdownTagType(countdown.urgency)} size="sm">
-              {countdown.text}
+              <Timer size={16} /> {countdown.text}
             </Tag>
           )}
           {!showCountdown && exam.grade && (
-            <span className="exam-card__grade" style={gradeStyle ? { color: gradeStyle } : undefined}>
-              {exam.grade}
-            </span>
+            // A grade is information, not a verdict: one neutral colour, mono figures (S42, B72).
+            <span className="exam-card__grade tedy-time">{exam.grade}</span>
           )}
           {!showCountdown && !exam.grade && (
-            <Tag type="gray" size="sm">Henüz girilmedi</Tag>
+            <Tag type="gray" size="sm"><CircleDash size={16} /> Henüz girilmedi</Tag>
           )}
         </div>
       </div>
@@ -135,13 +132,15 @@ function ExamCard({ exam, showCountdown, focusMode, baslangicAcik }: {
           {exam.relatedHomework.length > 0 && (
             <div className="exam-card__section">
               <div className="exam-card__section-title">
-                <TaskIcon size={14} /> İlgili Ödevler
+                <TaskIcon size={16} /> İlgili ödevler
               </div>
               <ul className="exam-card__list">
                 {exam.relatedHomework.map((hw, i) => (
                   <li key={i}>
                     <span>{hw.title}</span>
-                    <Tag type={hw.status === 'Yaptı' ? 'green' : 'gray'} size="sm">{hw.status || 'Bekliyor'}</Tag>
+                    <Tag type={hw.status === 'Yaptı' ? 'green' : 'gray'} size="sm">
+                      {hw.status === 'Yaptı' ? <CheckmarkOutline size={16} /> : <Time size={16} />} {hw.status || 'Bekliyor'}
+                    </Tag>
                   </li>
                 ))}
               </ul>
@@ -189,28 +188,11 @@ export default function ExamTimeline() {
     <div className="exam-timeline">
       <SinavUyarilari />
       <IncelenmediNotu tespit={data.tespit} />
-      <div className="exam-stats" role="region" aria-label="Sınav istatistikleri">
-        <div className="exam-stats__item">
-          <span className="exam-stats__value">{data.stats.upcoming}</span>
-          <span className="exam-stats__label">Yaklaşan</span>
-        </div>
-        <div className="exam-stats__item">
-          <span className="exam-stats__value">{data.stats.past}</span>
-          <span className="exam-stats__label">Geçmiş</span>
-        </div>
-        {data.stats.averageGrade !== null && (
-          <div className="exam-stats__item">
-            <span className="exam-stats__value exam-stats__value--grade">
-              {data.stats.averageGrade}
-            </span>
-            <span className="exam-stats__label">Ortalama</span>
-          </div>
-        )}
-      </div>
-
+      {/* B25 (İ3, S15): no number strip. The page's largest figures were totals; the counts now sit in the
+          section headings as "Başlık (n)" (S38), and the average is a quiet line under the past exams. */}
       {upcoming.length > 0 && (
         <div className="exam-section">
-          <h2 className="exam-section__title">Yaklaşan Sınavlar</h2>
+          <h2 className="exam-section__title">Yaklaşan sınavlar ({upcoming.length})</h2>
           <div className="exam-section__list">
             {upcoming.map(exam => (
               <ExamCard key={exam.id} exam={exam} showCountdown focusMode={focusMode} baslangicAcik={exam.id === acilacak} />
@@ -222,9 +204,12 @@ export default function ExamTimeline() {
       {past.length > 0 && (
         <>
           <div className="exam-divider">
-            <span>Geçmiş Sınavlar</span>
+            <h2 className="exam-divider__title">Geçmiş sınavlar ({past.length})</h2>
           </div>
           <div className="exam-section">
+            {data.stats.averageGrade !== null && (
+              <p className="exam-section__note">Ortalama <span className="tedy-time">{data.stats.averageGrade}</span></p>
+            )}
             <div className="exam-section__list">
               {past.map(exam => (
                 <ExamCard key={exam.id} exam={exam} showCountdown={false} focusMode={focusMode} baslangicAcik={exam.id === acilacak} />

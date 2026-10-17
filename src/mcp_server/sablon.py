@@ -76,7 +76,6 @@ BRIDGE_JS = r"""  /* ---- edupedia köprüsü ve varlıklar (ted-mcp sablon.py y
       const next = segs.findIndex(seg => !state.done.has(seg.id));
       state.idx = next < 0 ? segs.length : next;
       persistSession();
-      const xpNode = $("#xpValue"); if(xpNode) xpNode.textContent = state.xp;
       render();
     }
     if(embedded){
@@ -109,7 +108,9 @@ PATCHES: tuple[tuple[str, str, str, str], ...] = (
      "          tried.n=(tried.n||0)+1; EDUPEDIA_BRIDGE.answer(s.id, oi, correct, tried.n);\n", "after"),
     ("segment", "    if(state.idx<segs.length){ state.done.add(segs[state.idx].id); }\n",
      "    if(state.idx<segs.length){ EDUPEDIA_BRIDGE.segmentComplete(segs[state.idx].id); }\n", "after"),
-    ("complete", '    awardByCondition("module-complete"); playSound("reward");\n',
+    # The summary segment is where a module completes (it no longer awards a badge or plays a
+    # reward sound — talimatname S43, B73 — so the anchor is the segment marker itself).
+    ("complete", '    stage.setAttribute("data-seg","summary");\n',
      "    EDUPEDIA_BRIDGE.moduleComplete();\n", "after"),
     ("ready", "\n  init();\n", "  EDUPEDIA_BRIDGE.ready();\n", "after"),
     ("visual", '    if(s.visual && s.visual.kind==="svg") html+=svgFigure(s.visual.ref, s.visual.caption);\n',

@@ -3,6 +3,7 @@ import { ArrowLeft } from '@carbon/icons-react'
 import type { ChatInstance } from '@carbon/ai-chat'
 import SourcePanel from '../components/SourcePanel'
 import { asistanDeposu, useAsistanDurumu } from './asistanDeposu.ts'
+import { useDar } from './useDar.ts'
 
 /** Workspace panelinin içeriği: bugünkü kaynak paneli, son açılan cevabın atıflarıyla. Dar alanda Carbon paneli
  *  sohbetin üstüne açar ve kendi dönüş düğmesini göstermez: kapatma düğmesi buradadır, odak açan düğmeye döner. */
@@ -17,6 +18,7 @@ function odagiGeriVer(el: HTMLElement, kalan = 60) {
 
 export default function KaynakPaneli({ inst }: { inst: () => ChatInstance | null }) {
   const acik = useAsistanDurumu(d => d.acikAtif)
+  const dar = useDar()
   if (!acik) return null
   const kapat = async () => {
     const donus = acik.donus
@@ -25,7 +27,7 @@ export default function KaynakPaneli({ inst }: { inst: () => ChatInstance | null
     if (donus) odagiGeriVer(donus)
   }
   return <div className="asistan__kaynaklar">
-    <Button kind="ghost" size="sm" renderIcon={ArrowLeft} onClick={() => void kapat()}>Kaynakları kapat</Button>
+    <Button kind="ghost" size={dar ? 'lg' : 'sm'} renderIcon={ArrowLeft} onClick={() => void kapat()}>Kaynakları kapat</Button>
     <SourcePanel citations={acik.atiflar} activeId={acik.etkin} />
   </div>
 }

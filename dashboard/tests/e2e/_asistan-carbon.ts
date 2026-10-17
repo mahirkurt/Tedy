@@ -51,12 +51,41 @@ export const eklentiler = (page: Page) => page.locator('cds-aichat-react > [slot
  *  kökünde; belgeye eklenen stil (toHaveScreenshot `style`) oraya ulaşmaz. */
 export async function kayanlariGizle(page: Page) {
   await page.evaluate(() => {
+    // Var olan düğme gizlenir; her gölge köke bir kural da eklenir — düğme ekran görüntüsünden hemen önce yeniden
+    // oluşturulursa da gizli kalır (genişletilmiş girişle mesaj alanı kısaldı, düğme daha sık beliriyor).
+    const kural = new CSSStyleSheet()
+    kural.replaceSync('.cds-aichat__scroll-to-bottom-button { visibility: hidden !important; }')
     const gez = (k: ParentNode) => {
       for (const el of k.querySelectorAll<HTMLElement>('*')) {
         if (el.classList.contains('cds-aichat__scroll-to-bottom-button')) el.style.setProperty('visibility', 'hidden', 'important')
-        if (el.shadowRoot) gez(el.shadowRoot)
+        if (el.shadowRoot) {
+          if (!el.shadowRoot.adoptedStyleSheets.includes(kural)) el.shadowRoot.adoptedStyleSheets = [...el.shadowRoot.adoptedStyleSheets, kural]
+          gez(el.shadowRoot)
+        }
       }
     }
     gez(document)
   })
+}
+
+/** Sohbet geçmişi kapalı başlar (history.startClosed); başlıktaki "Sohbetler" eylemiyle açılır. */
+export async function gecmisiAc(page: Page) {
+  await page.getByRole('button', { name: 'Sohbetler', exact: true }).first().click()
+  await expect(page.getByRole('heading', { name: 'Sohbetler', exact: true })).toBeVisible()
+}
+/** Öğretmen seçimi: başlığın altındaki Carbon Dropdown (combobox). */
+export const ogretmenSecimi = (page: Page) => page.locator('#asistan-ogretmen').getByRole('combobox')
+/** Öğretmeni Dropdown'dan seçer (fareyle, okurun yaptığı gibi). */
+export async function ogretmenSec(page: Page, ad: string) {
+  await ogretmenSecimi(page).click()
+  await page.getByRole('option', { name: ad, exact: true }).click()
+  await expect(ogretmenSecimi(page)).toContainText(ad)
+}
+
+/** Carbon'un atıf kaydırıcısı hazır mı: `cds-aichat-carousel` `firstUpdated`'da 100 ms bekleyip ancak sonra
+ *  `initCarousel` kurar; o ana dek "Sonraki slayt" `this.carousel?.next()` ile hiçbir şey yapmaz (yük altında daha
+ *  uzun — B76'nın kökü). Tıklamadan önce bu koşul beklenir. */
+export async function kaydiriciHazir(page: Page) {
+  await expect.poll(() => page.locator('cds-aichat-carousel').filter({ visible: true }).last()
+    .evaluate(el => Boolean((el as unknown as { carousel?: unknown }).carousel))).toBe(true)
 }

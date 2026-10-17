@@ -165,3 +165,77 @@ def test_concurrent_progress_posts_keep_every_answer(client, tmp_path):
 def test_frame_src_policy_on_api_and_spa(client):
     assert client.get("/api/modules").headers["Content-Security-Policy"] == FRAME_CSP
     assert client.get("/").headers["Content-Security-Policy"] == FRAME_CSP
+
+
+# ── B71 (S41): what the module frame's AI label explains ─────────────────────
+
+RUN = "a1b2c3d4e5f6"
+YAYIN_TASLAK = "fedcba9876543210"
+
+
+def _asset(tmp_path, asset_id, tur, kaynak):
+    folder = tmp_path / "edupedia_runs" / RUN / "assets"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / f"{asset_id}.json").write_text(json.dumps({"asset_id": asset_id, "tur": tur, "kaynak": kaynak}),
+                                             encoding="utf-8")
+
+
+def _published_with_draft(tmp_path, sha="s" * 64, draft_sha="s" * 64):
+    rows = [{**_row("fen5-su", 2), "sha256": sha, "taslak_id": YAYIN_TASLAK, "run_id": RUN,
+             "frame_source": {"kind": "textbook", "document_id": 439, "pages": "112-120"}}]
+    ms.catalog_path(tmp_path).write_text(json.dumps({"surum": 1, "moduller": rows}), encoding="utf-8")
+    folder = ms.drafts_root(tmp_path) / YAYIN_TASLAK
+    folder.mkdir(parents=True)
+    (folder / "taslak.json").write_text(json.dumps({
+        "taslak_id": YAYIN_TASLAK, "run_id": RUN, "sha256": draft_sha,
+        "frame_source": {"kind": "textbook", "document_id": 439, "pages": "112-120", "title": "Fen Bilimleri 5"},
+        "dogrulama": {"surum": 1, "iddialar": [
+            {"iddia": "Madde katı, sıvı ve gaz hâllerinde bulunur.", "karar": "supported",
+             "dayanak": {"document_id": 439, "page": 112}},
+            {"iddia": "Isı alan buz erir.", "karar": "supported",
+             "dayanak": {"kaynak": "OpenStax Kimya", "lisans": "CC BY 4.0"}}]},
+        "assets": ["00000000000000a1", "00000000000000a2", "00000000000000a3", "0000000000000bad"],
+    }), encoding="utf-8")
+    _asset(tmp_path, "00000000000000a1", "image", "minimax")
+    _asset(tmp_path, "00000000000000a2", "image", "mufredat")
+    _asset(tmp_path, "00000000000000a3", "image", "pexels")
+
+
+def test_module_explanation_names_what_ai_wrote_and_what_it_rests_on(client, tmp_path):
+    _published_with_draft(tmp_path)
+    assert client.get("/api/modules/fen5-su/v2/aciklama").status_code == 401
+    sign_in(client, READER)
+    assert client.get("/api/modules/fen5-su/v2/aciklama").status_code == 403
+    sign_in(client, FULL)
+    body = client.get("/api/modules/fen5-su/v2/aciklama").get_json()
+    assert body["baslik"] == "fen5-su v2"
+    assert body["ders"] == "Fen Bilimleri" and body["sinif"] == "5. Sınıf"
+    assert body["kazanimlar"] == ["FB.5.4.1.1"]
+    assert body["kitap"] == {"ad": "Fen Bilimleri 5", "sayfalar": "112-120"}
+    assert body["iddia_durumu"] == "ok"
+    assert body["iddialar"] == [
+        {"iddia": "Madde katı, sıvı ve gaz hâllerinde bulunur.", "sayfa": 112, "kaynak": None},
+        {"iddia": "Isı alan buz erir.", "sayfa": None, "kaynak": "OpenStax Kimya"}]
+    assert body["medya"] == {"yapay_zeka": 1, "ders_kitabi": 1, "fotograf_arsivi": 1}
+    # internal identifiers never reach the reader (D4)
+    metin = json.dumps(body)
+    for ic in ("439", RUN, YAYIN_TASLAK, "sha256", "document_id", "minimax", "pexels"):
+        assert ic not in metin
+
+
+def test_module_explanation_drops_claims_of_a_different_build(client, tmp_path):
+    _published_with_draft(tmp_path, sha="s" * 64, draft_sha="d" * 64)
+    sign_in(client, FULL)
+    body = client.get("/api/modules/fen5-su/v2/aciklama").get_json()
+    assert body["iddia_durumu"] == "uyusmazlik" and body["iddialar"] == []
+
+
+def test_module_explanation_for_drafts_and_refusals(client, tmp_path):
+    sign_in(client, FULL)
+    assert client.get("/api/modules/eski/v1/aciklama").status_code == 404
+    assert client.get("/api/modules/yok/v1/aciklama").status_code == 404
+    assert client.get("/api/modules/taslak/ffffffffffffffff/aciklama").status_code == 404
+    body = client.get(f"/api/modules/taslak/{TASLAK}/aciklama").get_json()
+    assert body["iddia_durumu"] == "kayit_yok" and body["medya"] == {"yapay_zeka": 0, "ders_kitabi": 0,
+                                                                     "fotograf_arsivi": 0}
+    assert not {"module_explanation", "module_draft_explanation"} & dashboard_api.READER_ENDPOINTS

@@ -234,6 +234,9 @@
   --cds-focus:#0f62fe; --cds-focus-inset:#ffffff;
   --cds-highlight:#d0e2ff; --cds-overlay:rgba(0,0,0,.6); --cds-shadow:rgba(0,0,0,.3);
   --cds-skeleton-background:#e8e8e8; --cds-skeleton-element:#c6c6c6;
+  /* devre dışı (@carbon/themes: text/icon/border/text-on-color-disabled; button-disabled bileşen token'ı) */
+  --cds-text-disabled:rgba(22,22,22,.25); --cds-icon-disabled:rgba(22,22,22,.25);
+  --cds-text-on-color-disabled:#8d8d8d; --cds-border-disabled:#c6c6c6; --cds-button-disabled:#c6c6c6;
   /* durum (status-token: info açık temada Blue 70) */
   --cds-support-success:#24a148; --cds-support-error:#da1e28;
   --cds-support-warning:#f1c21b; --cds-support-info:#0043ce;
@@ -265,6 +268,9 @@
   --cds-focus:#0f62fe; --cds-focus-inset:#ffffff;
   --cds-highlight:#d0e2ff; --cds-overlay:rgba(0,0,0,.6); --cds-shadow:rgba(0,0,0,.3);
   --cds-skeleton-background:#e8e8e8; --cds-skeleton-element:#c6c6c6;
+  /* devre dışı (@carbon/themes: text/icon/border/text-on-color-disabled; button-disabled bileşen token'ı) */
+  --cds-text-disabled:rgba(22,22,22,.25); --cds-icon-disabled:rgba(22,22,22,.25);
+  --cds-text-on-color-disabled:#8d8d8d; --cds-border-disabled:#c6c6c6; --cds-button-disabled:#c6c6c6;
   --cds-support-success:#24a148; --cds-support-error:#da1e28;
   --cds-support-warning:#f1c21b; --cds-support-info:#0043ce;
   --cds-notification-background-success:#defbe6; --cds-notification-background-info:#edf5ff;
@@ -293,6 +299,10 @@
   --cds-focus:#ffffff; --cds-focus-inset:#161616;
   --cds-highlight:#001d6c; --cds-overlay:rgba(0,0,0,.6); --cds-shadow:rgba(0,0,0,.8);
   --cds-skeleton-background:#292929; --cds-skeleton-element:#393939;
+  /* devre dışı (@carbon/themes g100; button-disabled bileşen token'ı) */
+  --cds-text-disabled:rgba(244,244,244,.25); --cds-icon-disabled:rgba(244,244,244,.25);
+  --cds-text-on-color-disabled:rgba(255,255,255,.25); --cds-border-disabled:rgba(141,141,141,.5);
+  --cds-button-disabled:rgba(141,141,141,.3);
   --cds-support-success:#42be65; --cds-support-error:#fa4d56;
   --cds-support-warning:#f1c21b; --cds-support-info:#4589ff;
   --viz-1:#be95ff; --viz-2:#78a9ff; --viz-3:#33b1ff; --viz-4:#08bdba; --viz-5:#ff7eb6;
@@ -322,8 +332,6 @@
   /* bant üstü ikincil metin (blue-20, lacivert üstünde 9,3:1) ve ince ayraç/iz (blue-60) */
   --tedy-brand-text-secondary:#d0e2ff; --tedy-brand-rule:#0f62fe;
   --tedy-accent-urgent:var(--cds-support-error);
-  /* ödül (XP, seri): ayrı altın ham-hex yok — Carbon'un metin-güvenli sıcak adımı */
-  --reward:var(--tedy-text-warning); --reward-bg:var(--cds-notification-background-warning);
 }
 :root{
   /* Carbon spacing ölçeği — @carbon/layout (2px mini-unit) */
@@ -413,8 +421,8 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
    Ders aksanı bantta DEĞİL; yalnız odak çapalarında yaşar (bölüm
    ikonu, bölüm başlığı çizgisi, seçili seçenek). Gradyan, ham hex ve
    cam (rgba) yüzey yok. Köşe border-radius-08 (Tedy kart kuralı).
-   Motor sınıfları korunur (step--done/current, badge--earned,
-   icon-btn--on, streak-chip); ".topbar X" override'ları temel
+   Motor sınıfları korunur (step--done/current, icon-btn--on);
+   ".topbar X" override'ları temel
    tanımları geçersiz kılar.
    ============================================================ */
 .topbar{position:relative;margin-bottom:var(--sp-06);border-radius:var(--cds-radius);overflow:hidden;
@@ -438,20 +446,6 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
   color:var(--tedy-brand-text-secondary);overflow-wrap:anywhere}
 .topbar__r{display:flex;align-items:center;justify-content:flex-end;gap:var(--sp-04);
   flex:1 1 auto;flex-wrap:wrap;min-width:0;max-width:100%}
-/* XP / seri — Carbon Tag (bant üstünde: brand-hover zemin, text-on-color) */
-.xp{font-family:var(--font-sans);font-weight:600;font-size:.8125rem;display:inline-flex;align-items:center;
-  gap:6px;background:var(--tedy-brand-hover);color:var(--cds-text-on-color);
-  border-radius:var(--radius-tag);padding:var(--sp-02) var(--sp-04);white-space:nowrap}
-.xp .cds-icon{width:1rem;height:1rem}
-.xp #xpValue{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-weight:700}
-/* bant üstünde ödül yıldızı Carbon support-warning (yellow-30; lacivert üstünde 7,3:1) */
-.topbar .xp .cds-icon{color:var(--cds-support-warning)}
-.topbar .xp-float{color:var(--cds-text-on-color)}
-.topbar .streak-chip{font-family:var(--font-sans);font-weight:600;font-size:.8125rem;display:inline-flex;
-  align-items:center;gap:5px;background:var(--tedy-brand-hover);color:var(--cds-text-on-color);
-  border-radius:var(--radius-tag);padding:var(--sp-02) var(--sp-04)}
-.topbar .streak-chip .cds-icon{color:var(--cds-text-on-color);width:1rem;height:1rem}
-.topbar .streak-float{color:var(--cds-text-on-color)}
 /* v3.0.0 — Task 10: kaygısız tempo diski (opsiyonel/varsayılan KAPALI; gamified-flows.md §3.4).
    Sayısız + kesintisiz: yalnız bir SVG yay, hiçbir sayısal metin/geri-sayım yok. */
 .pacing-disk{display:inline-flex;align-items:center;gap:var(--sp-02);
@@ -508,18 +502,6 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 /* v3.0.0 — hedef-gradyanı: "son N durak" etiketi, yalnız dolu iken görünür */
 .rail-label #railGoal{color:var(--cds-link-primary);font-weight:600}
 .rail-label #railGoal:empty{display:none}
-/* Carbon Tag rozetleri — kilitli=soluk nötr çip + kilit, kazanılan=layer-selected çip (sessiz;
-   Tedy İ7 "bitmiş iş öne çıkmaz" — rozet avına dönüşmez) */
-.badges{display:flex;gap:var(--sp-03);flex-wrap:wrap}
-.badges:empty{display:none}
-.badge{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;font-weight:500;
-  border:1px solid var(--cds-border-subtle);border-radius:var(--radius-tag);padding:var(--sp-02) var(--sp-04);
-  color:var(--cds-text-secondary);background:var(--cds-layer-02)}
-.badge .pic,.badge .cds-icon{width:.95rem;height:.95rem;color:var(--cds-icon-secondary)}
-.badge__lock{width:.8rem;height:.8rem;fill:currentColor;color:var(--cds-icon-secondary);opacity:.6;margin-left:1px;flex:none}
-.badge--locked{opacity:.78}
-.badge--earned{border-color:transparent;color:var(--cds-text-primary);background:var(--cds-layer-selected-01);font-weight:600}
-.badge--earned .pic,.badge--earned .cds-icon{color:var(--cds-icon-primary)}
 /* v3.0.0 — Task 10: Sefer mini-haritası (opsiyonel; meta.quest.stations, üst-çubuk altında şerit).
    İlk istasyon completed:true ile bahşedilmiş ilerleme (gamified-flows.md §3.2); gölgesiz düğümler. */
 .quest-map{margin:0 0 var(--sp-06)}
@@ -538,9 +520,9 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .seg-head>div{min-width:0}
 .seg-ic{flex:none;width:56px;height:56px;border-radius:var(--cds-radius);background:var(--accent-tint);display:inline-flex;align-items:center;justify-content:center}
 .seg-ic .pic{color:var(--accent-on);width:32px;height:32px}
-.seg-head h2{font-size:var(--fs-h-seg);font-weight:600;margin:0;line-height:1.25}
+.seg-head h2{font-size:var(--fs-h-seg);font-weight:400;margin:0;line-height:1.25}
 .kicker{font-size:var(--fs-label);font-weight:600;color:var(--accent-strong);
-  text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+  margin-bottom:2px}
 .seg-body p{margin:0 0 var(--sp-05)}
 .seg-body ul,.seg-body ol{margin:0 0 var(--sp-05);padding-left:1.4em}
 .seg-body li{margin-bottom:var(--sp-03)}
@@ -579,8 +561,8 @@ mark.term{background:var(--accent-tint);color:var(--accent-on);padding:0 .25em;b
 .def-pop__ex{display:block;margin-top:var(--sp-04);padding-top:var(--sp-04);
   border-top:1px solid var(--def-pop-rule);font-size:.78rem;line-height:1.45}
 .def-pop__ex[hidden]{display:none}
-.def-pop__ex-lbl{font-family:var(--font-sans);font-weight:700;font-size:.6875rem;letter-spacing:.06em;
-  text-transform:uppercase;color:var(--def-pop-accent);margin-right:6px}
+.def-pop__ex-lbl{font-family:var(--font-sans);font-weight:700;font-size:.6875rem;
+  color:var(--def-pop-accent);margin-right:6px}
 .def-pop__ex-t{color:var(--def-pop-fg);opacity:.92}
 .def-pop__def{display:block;font-weight:400;font-size:.8125rem;line-height:1.5;color:var(--def-pop-fg)}
 .def-pop__arrow{position:absolute;left:var(--arrow-x,50%);width:11px;height:11px;
@@ -644,7 +626,9 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .btn--ghost{background:transparent;color:var(--cds-link-primary);box-shadow:inset 0 0 0 1px var(--cds-border-strong)}
 .btn--ghost:hover{background:var(--cds-background-hover)}
 .btn--ghost:active{background:var(--cds-background-active)}
-.btn[disabled]{opacity:.45;cursor:not-allowed}
+/* devre dışı: Carbon'un devre dışı token'ları, opaklık değil (talimatname S24, B34) */
+.btn[disabled]{cursor:not-allowed;background:var(--cds-button-disabled);color:var(--cds-text-on-color-disabled)}
+.btn--ghost[disabled]{background:transparent;color:var(--cds-text-disabled);box-shadow:inset 0 0 0 1px var(--cds-border-disabled)}
 .btn .cds-icon{width:1.15rem;height:1.15rem}
 .btn--center{justify-content:center}
 /* Carbon selectable Tile */
@@ -681,12 +665,12 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 /* eşleştirme */
 .match{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-05);margin:var(--sp-05) 0}
 .match__col{display:flex;flex-direction:column;gap:var(--sp-04)}
-.match__col h3{font-size:var(--fs-label);color:var(--cds-text-secondary);margin:0 0 var(--sp-02);text-transform:uppercase;letter-spacing:.03em}
+.match__col h3{font-size:var(--fs-label);color:var(--cds-text-secondary);margin:0 0 var(--sp-02)}
 /* flashcard */
 .flash{display:flex;flex-direction:column;align-items:center;gap:var(--sp-05);margin:var(--sp-06) 0}
 .card{width:100%;max-width:540px;min-height:180px;border-radius:var(--cds-radius);background:var(--cds-layer-02);
   box-shadow:inset 0 0 0 2px var(--accent);display:flex;align-items:center;justify-content:center;text-align:center;
-  padding:var(--sp-07);font-size:var(--fs-h-sub);font-weight:600;color:var(--cds-text-primary)}
+  padding:var(--sp-07);font-size:var(--fs-h-sub);font-weight:400;color:var(--cds-text-primary)}
 .card--back{background:var(--cds-layer-02);box-shadow:inset 0 0 0 1px var(--cds-border-subtle);color:var(--cds-text-primary);font-weight:400;font-size:var(--fs-body)}
 /* boşluk doldurma */
 .cloze{font-size:var(--fs-body);line-height:2;margin:var(--sp-05) 0}
@@ -694,9 +678,11 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .pool{display:flex;flex-wrap:wrap;gap:var(--sp-04);margin:var(--sp-05) 0}
 .chip-btn{font-family:var(--font-sans);font-size:var(--fs-compact);min-height:var(--tap);padding:0 var(--sp-05);border:0;
   border-radius:var(--radius-btn);cursor:pointer;background:var(--cds-layer-02);box-shadow:inset 0 0 0 1px var(--cds-border-strong);color:var(--cds-text-primary)}
-.chip-btn:hover:not([disabled]){background:var(--cds-layer-hover-02);box-shadow:inset 0 0 0 2px var(--accent)}
+.chip-btn:hover:not([disabled]):not([aria-disabled="true"]){background:var(--cds-layer-hover-02);box-shadow:inset 0 0 0 2px var(--accent)}
 .chip-btn:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
-.chip-btn[disabled]{opacity:.4;cursor:default}
+.chip-btn[disabled]{cursor:default;background:var(--cds-layer-01);color:var(--cds-text-disabled);box-shadow:inset 0 0 0 1px var(--cds-border-disabled)}
+/* denenmiş yanlış kelime okunacak içeriktir (talimatname B42): odakta ve ekran okuyucuda kalır, soluklaştırılmaz */
+.chip-btn[aria-disabled="true"]{cursor:default;background:var(--cds-layer-01);box-shadow:inset 0 0 0 1px var(--cds-border-subtle);color:var(--cds-text-secondary);text-decoration:line-through}
 /* soluk-çözümlü örnek (worked, fading worked example) — math g=0.48, fading en güçlü
    alt-özellik (Barbieri 2023); katman+inset kenarlık, gölge yok (G-CARBON-GRID) */
 .worked-steps{list-style:none;margin:var(--sp-05) 0;padding:0;display:flex;flex-direction:column;gap:var(--sp-04)}
@@ -717,7 +703,8 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
   box-shadow:inset 0 0 0 1px var(--cds-border-strong);
   transition:box-shadow var(--dur-fast) var(--ease-std)}
 .worked-input:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
-.worked-input[disabled]{opacity:.75;cursor:default}
+/* çözülmüş adımın cevabı okunacak içeriktir: salt okunur, devre dışı değil (S24, §5.9) */
+.worked-input[readonly]{cursor:default;background:transparent;color:var(--cds-text-primary);box-shadow:inset 0 -1px 0 0 var(--cds-border-subtle)}
 .worked-mark{flex:none;width:1.4rem;height:1.4rem;display:inline-flex;align-items:center;justify-content:center;color:var(--cds-text-secondary)}
 .worked-step--correct{box-shadow:inset 0 0 0 2px var(--cds-support-success);
   background:var(--cds-notification-background-success)}
@@ -729,7 +716,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .hook-card{margin:var(--sp-06) 0;padding:var(--sp-06) var(--sp-07);border-radius:var(--cds-radius);
   background:var(--cds-layer-02);border-left:4px solid var(--accent)}
 .hook-q{display:flex;align-items:flex-start;gap:var(--sp-04);margin:0 0 var(--sp-04);
-  font-size:var(--fs-h-sub);font-weight:600;color:var(--cds-text-primary);line-height:1.35}
+  font-size:var(--fs-h-sub);font-weight:400;color:var(--cds-text-primary);line-height:1.35}
 .hook-q .cds-icon{color:var(--accent-strong);flex:none;margin-top:2px;width:1.3rem;height:1.3rem}
 .hook-predict{display:flex;flex-wrap:wrap;gap:var(--sp-04);margin:var(--sp-05) 0}
 .hook-opt{font-family:var(--font-sans);font-size:var(--fs-compact);font-weight:500;min-height:var(--tap);border:0;
@@ -750,7 +737,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
    isteğiyle model karşılaştırma; puanlama yok, ilerleme asla bloklanmaz (G-WELLBEING).
    Katman + inset kenarlık / tint zemin, gölge yok (G-CARBON-GRID) */
 .se-prompt{display:flex;align-items:flex-start;gap:var(--sp-04);margin:0 0 var(--sp-04);
-  font-size:var(--fs-h-sub);font-weight:600;color:var(--cds-text-primary);line-height:1.35}
+  font-size:var(--fs-h-sub);font-weight:400;color:var(--cds-text-primary);line-height:1.35}
 .se-prompt .cds-icon{color:var(--accent-strong);flex:none;margin-top:2px;width:1.3rem;height:1.3rem}
 .se-field{margin:var(--sp-05) 0}
 .se-field__lbl{font-size:var(--fs-label);color:var(--cds-text-secondary);margin:0 0 var(--sp-03)}
@@ -773,46 +760,36 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 /* mola */
 .break{text-align:center;padding:var(--sp-08) var(--sp-05)}
 .break .pic,.break .cds-icon{color:var(--accent-strong);margin-bottom:var(--sp-05);width:72px;height:72px}
-.break h2{font-size:var(--fs-h-seg);font-weight:600;margin:0 0 var(--sp-04)}
-.break p{font-size:var(--fs-h-sub);font-weight:500;margin:0 0 var(--sp-06)}
+.break h2{font-size:var(--fs-h-seg);font-weight:400;margin:0 0 var(--sp-04)}
+.break p{font-size:var(--fs-h-sub);font-weight:400;margin:0 0 var(--sp-06)}
 .countdown{font-family:var(--font-mono);font-size:var(--fs-display);color:var(--accent-strong);margin-bottom:var(--sp-06)}
-/* özet + donut */
+/* özet — tamamlanma sessiz ve net (talimatname S43, anayasa §9): büyük sayı, kutlama yok */
 .summary{text-align:center;padding:var(--sp-06) var(--sp-05)}
 .summary>.pic{color:var(--accent-strong);margin-bottom:var(--sp-05);width:80px;height:80px}
 .summary h2{font-size:var(--fs-display);font-weight:600;margin:0 0 var(--sp-05);font-family:var(--font-serif)}
-.summary__row{display:flex;align-items:center;justify-content:center;gap:var(--sp-08);flex-wrap:wrap;margin:var(--sp-06) 0}
+.summary__ozet{font-size:var(--fs-body);color:var(--cds-text-primary);margin:var(--sp-05) 0 var(--sp-06)}
+.summary__ozet b{font-family:var(--font-mono);font-weight:400;font-variant-numeric:tabular-nums}
 .objectives{margin:0 0 var(--sp-06);padding:var(--sp-05) var(--sp-06);text-align:left;
   background:var(--cds-layer-02);border-left:4px solid var(--accent);border-radius:var(--cds-radius)}
-.objectives h3{font-size:var(--fs-h-sub);font-weight:600;margin:0 0 var(--sp-04)}
+.objectives h3{font-size:var(--fs-h-sub);font-weight:400;margin:0 0 var(--sp-04)}
 .objectives ul{margin:0;padding-left:1.35em}
 .objectives li{margin:0 0 var(--sp-03)}
 .objectives li:last-child{margin-bottom:0}
-.donut{position:relative;width:160px;height:160px;flex:none}
-.donut svg{transform:rotate(-90deg)}
-.donut__center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.donut__pct{font-family:var(--font-mono);font-size:2rem;font-weight:600;color:var(--cds-text-primary)}
-.donut__lbl{font-size:var(--fs-label);color:var(--cds-text-secondary)}
-.stat-col{display:flex;flex-direction:column;gap:var(--sp-04)}
-.stat{background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);border-radius:var(--cds-radius);
-  padding:var(--sp-05) var(--sp-06);min-width:160px;text-align:left;display:flex;align-items:center;gap:var(--sp-04)}
-.stat .pic,.stat .cds-icon{color:var(--accent-strong);width:1.6rem;height:1.6rem}
-.stat__num{font-family:var(--font-mono);font-size:1.5rem;font-weight:600;color:var(--cds-text-primary)}
-.stat__lbl{font-size:var(--fs-label);color:var(--cds-text-secondary)}
 .self-assess{text-align:left;max-width:540px;margin:var(--sp-06) auto;background:var(--cds-layer-02);border-radius:var(--cds-radius);padding:var(--sp-06)}
-.self-assess h3{font-size:var(--fs-h-sub);margin:0 0 var(--sp-05);color:var(--cds-text-primary)}
+.self-assess h3{font-size:var(--fs-h-sub);font-weight:400;margin:0 0 var(--sp-05);color:var(--cds-text-primary)}
 .check-row{display:flex;align-items:center;gap:var(--sp-04);margin-bottom:var(--sp-04);font-size:var(--fs-compact);cursor:pointer;color:var(--cds-text-primary)}
 .check-row input{width:22px;height:22px;accent-color:var(--accent);cursor:pointer}
 /* alt yönlendirme */
 .nav{display:flex;justify-content:space-between;gap:var(--sp-05);margin-top:var(--sp-05);
   padding-top:var(--sp-05);flex-wrap:wrap;min-width:0;max-width:100%}
 .nav .btn{min-width:0;max-width:100%}
-.streak{display:inline-flex;align-items:center;gap:6px;width:fit-content;
+.adim-sayaci{display:inline-flex;align-items:center;gap:6px;width:fit-content;
   font-family:var(--font-sans);font-size:.8125rem;font-weight:500;
   color:var(--cds-text-secondary);background:var(--cds-layer-01);
   border:1px solid var(--cds-border-subtle);
   border-radius:var(--radius-tag);padding:3px var(--sp-04);margin-bottom:var(--sp-05)}
-.streak b{font-family:var(--font-mono);color:var(--cds-text-primary);font-weight:600;font-variant-numeric:tabular-nums}
-.q-stem{font-size:var(--fs-h-sub);font-weight:600;margin:0 0 var(--sp-05);color:var(--cds-text-primary);line-height:1.3}
+.adim-sayaci b{font-family:var(--font-mono);color:var(--cds-text-primary);font-weight:600;font-variant-numeric:tabular-nums}
+.q-stem{font-size:var(--fs-h-sub);font-weight:400;margin:0 0 var(--sp-05);color:var(--cds-text-primary);line-height:1.3}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
 /* zaman çizelgesi (display materyali) */
 .timeline{list-style:none;margin:var(--sp-05) 0;padding:0;position:relative}
@@ -878,10 +855,10 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .cmap-node:hover:not([disabled]){box-shadow:inset 0 0 0 2px var(--accent);background:var(--cds-layer-hover-01)}
 .cmap-node:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
 .cmap-node--sel{box-shadow:inset 0 0 0 2.5px var(--accent);background:var(--accent-tint);color:var(--accent-on)}
-.cmap-node[disabled]{cursor:default;opacity:.85}
+.cmap-node[disabled]{cursor:default}
 .cmap-edges{margin:var(--sp-05) 0}
 .cmap-edges__lbl{font-size:var(--fs-label);color:var(--cds-text-secondary);font-weight:600;
-  text-transform:uppercase;letter-spacing:.03em;margin:0 0 var(--sp-03)}
+  margin:0 0 var(--sp-03)}
 .cmap-edges__empty{font-size:var(--fs-compact);color:var(--cds-text-helper);margin:0 0 var(--sp-04)}
 .cmap-edges__empty[hidden]{display:none}
 .cmap-edges__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--sp-03)}
@@ -900,7 +877,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
   transition:background var(--dur-fast) var(--ease-std)}
 .cmap-edge__remove:hover:not([disabled]){background:var(--cds-background-hover);color:var(--cds-support-error)}
 .cmap-edge__remove:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
-.cmap-edge__remove[disabled]{opacity:.4;cursor:default}
+.cmap-edge__remove[disabled]{cursor:default;color:var(--cds-icon-disabled)}
 .cmap-edge__remove .cds-icon{width:1rem;height:1rem}
 .cmap-check{margin:var(--sp-05) 0}
 /* ===== işlevsel renk: etkinlik-tipine göre wayfinding (signaling) — tek modül, tek renk =====
@@ -912,11 +889,6 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 .seg-ic{background:var(--seg-ic-bg,var(--accent-tint))}
 .seg-ic .pic{color:var(--seg-ic-fg,var(--accent-on))}
 .kicker{color:var(--seg-kicker,var(--accent-strong))}
-/* ===== ödül/ilerleme: sakin sıcak vurgu (XP, yıldız) — --reward = tedy-text-warning (Carbon
-   sarısının metin-güvenli karşılığı, orange-70/30); ham altın hex yok ===== */
-.xp .cds-icon{color:var(--reward)}
-.stat--xp .stat__num{color:var(--reward)}
-.stat--xp .cds-icon{color:var(--reward)}
 /* ===== Carbon DataTable (anlamsal tablo) ===== */
 .viz-table-wrap{margin:var(--sp-06) 0;overflow-x:auto;border:1px solid var(--cds-border-subtle);border-radius:var(--cds-border-radius-00)}
 table.viz-table{border-collapse:collapse;width:100%;font-size:var(--fs-compact);background:var(--cds-layer-02)}
@@ -965,13 +937,13 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .card{background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);
   border-top:3px solid var(--accent);border-radius:var(--cds-radius);padding:var(--sp-06)}
 .card .pic{width:30px;height:30px;color:var(--accent-strong);margin-bottom:var(--sp-04)}
-.card__t{font-size:var(--fs-h-sub);font-weight:600;margin:0 0 var(--sp-03)}
+.card__t{font-size:var(--fs-h-sub);font-weight:400;margin:0 0 var(--sp-03)}
 .card__d{margin:0;color:var(--cds-text-secondary);font-size:var(--fs-compact)}
 /* dil: satır-arası çözümleme; rol/cinsiyet renk-kodu DAİMA etiketle birlikte (CVD-güvenli) */
 .gloss{display:flex;flex-wrap:wrap;gap:var(--sp-04) var(--sp-05);align-items:flex-end;font-size:1.2rem;padding:var(--sp-04) 0}
 .tok{display:inline-flex;flex-direction:column;align-items:center;gap:3px}
 .tok .w{font-weight:600;padding-bottom:3px;border-bottom:3px solid transparent}
-.tok .tg{font-size:.72rem;font-weight:600;color:var(--cds-text-secondary);text-transform:uppercase;letter-spacing:.02em}
+.tok .tg{font-size:.72rem;font-weight:600;color:var(--cds-text-secondary)}
 .tok[data-role="masc"] .w{border-bottom-color:var(--viz-1)}
 .tok[data-role="fem"] .w{border-bottom-color:var(--viz-3)}
 .tok[data-role="verb"] .w{border-bottom-color:var(--viz-2)}
@@ -988,19 +960,6 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .turn__b{background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);border-radius:var(--cds-radius);padding:var(--sp-04) var(--sp-05)}
 .turn--b .turn__b{background:var(--cds-layer-accent-01);border-color:transparent}
 .turn__g{display:block;margin-top:3px;font-size:var(--fs-label);color:var(--cds-text-secondary)}
-/* oyunlaştırma görsel geri bildirimi (earcon ile eşli; hareket-açık modda). Tedy dili: kutlama
-   yok, yalnız sessiz onay — küçük yükselme, ölçek sıçraması yok; süreler Carbon productive
-   (moderate-02 / slow-01), eğriler productive. Aynı anda tek öğe hareket eder. */
-.xp{position:relative}
-.xp-float{position:absolute;right:0;top:-2px;font-size:var(--fs-label);font-weight:600;color:var(--reward);pointer-events:none;white-space:nowrap}
-@media (prefers-reduced-motion:no-preference){
-  @keyframes xpRise{0%{opacity:0;transform:translateY(2px)}25%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
-  .xp-float{animation:xpRise var(--cds-duration-slow-02) var(--cds-easing-exit-productive) forwards}
-  @keyframes xpPulse{0%,100%{opacity:1}40%{opacity:.72}}
-  .xp.pulse{animation:xpPulse var(--cds-duration-moderate-02) var(--ease-std)}
-  @keyframes badgePop{from{opacity:.35}to{opacity:1}}
-  .badge--new{animation:badgePop var(--cds-duration-moderate-02) var(--cds-easing-entrance-productive)}
-}
 #wellbeing:empty{display:none}
 #wellbeing{margin:0 0 var(--sp-05)}
 /* segment türüne göre yüzey ritmi — tek-düzeliği kıran anlamlı mod ipuçları */
@@ -1037,22 +996,6 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .fraction-bar .fb-eq{fill:var(--cds-text-primary);font-family:var(--font-serif);
   font-variant-numeric:lining-nums tabular-nums;font-weight:600}
 .fraction-bar .fb-cap{fill:var(--cds-text-secondary);font-family:var(--font-sans)}
-/* ===== v1.8.0 — seri/combo göstergesi (üst çubuk çipi) ===== */
-.streak-chip{position:relative;font-family:var(--font-sans);font-weight:600;display:inline-flex;align-items:center;
-  gap:var(--sp-03);background:var(--reward-bg);color:var(--cds-text-primary);border-radius:var(--radius-tag);
-  padding:var(--sp-03) var(--sp-05);white-space:nowrap}
-.streak-chip[hidden]{display:none}
-/* v3.0.0 — gain-only: yanlış cevaptan sonra sıfırlanmaz, yalnız nötr "korundu" görünümü (opacity; ceza dili yok) */
-.streak-chip[data-held="true"]{opacity:.6}
-.streak-chip .cds-icon{color:var(--reward);width:1.1rem;height:1.1rem}
-.streak-chip__n{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
-.streak-float{position:absolute;left:50%;top:-6px;transform:translateX(-50%);font-family:var(--font-sans);
-  font-size:var(--fs-label);font-weight:600;color:var(--reward);white-space:nowrap;pointer-events:none}
-@media (prefers-reduced-motion:no-preference){
-  @keyframes streakHit{0%,100%{opacity:1}40%{opacity:.72}}
-  .streak-chip--hit{animation:streakHit var(--cds-duration-moderate-02) var(--ease-std)}
-  .streak-float{animation:xpRise var(--cds-duration-slow-02) var(--cds-easing-exit-productive) forwards}
-}
 /* ===== v1.8.0 — sesli oku (TTS) kontrolleri ===== */
 .icon-btn--on{background:var(--cds-layer-selected-01);color:var(--cds-icon-primary)}
 .icon-btn--on .cds-icon{color:var(--cds-icon-primary)}
@@ -1084,14 +1027,6 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
           </div>
         </div>
         <div class="topbar__r">
-          <div class="xp" aria-label="Puan">
-            <svg class="cds-icon" aria-hidden="true"><use href="#ic-star"></use></svg>
-            <span id="xpValue">0</span> XP
-          </div>
-          <div class="streak-chip" id="streakChip" aria-label="Doğru cevap serisi" hidden>
-            <svg class="cds-icon" aria-hidden="true"><use href="#ic-flash"></use></svg>
-            <span class="streak-chip__n">0</span>
-          </div>
           <div class="pacing-disk" id="pacingDisk" role="img" aria-label="Tempo diski — temponu görmen için, baskı yok" hidden>
             <svg class="pacing-disk__ring" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
               <circle class="pacing-disk__track" cx="14" cy="14" r="11"></circle>
@@ -1120,7 +1055,6 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
         <div class="stepper" id="stepper" role="list" aria-label="Bölüm ilerlemesi"></div>
         <div class="rail-label"><span id="railText">Bölüm 0 / 0</span><span id="railGoal"></span><span id="railTime"></span></div>
       </div>
-      <div class="badges" id="badgeCase" aria-label="Rozetler"></div>
     </div>
   </header>
 
@@ -1163,13 +1097,7 @@ const MODULE_DATA = {
     "Hâl değişimlerini doğru adlarıyla eşleştireceksin.",
     "Su döngüsünün aşamalarını sırayla açıklayacaksın."
   ],
-  rewards:{
-    xpPerCorrect:10, firstTryBonus:5,
-    badges:[
-      {id:"explorer", label:"Madde Kâşifi", icon:"ic-compass", condition:"module-complete"},
-      {id:"sharp", label:"Keskin Göz", pictogram:"pic-trophy", condition:"flawless-mcq"}
-    ]
-  },
+  rewards:{ xpPerCorrect:10, firstTryBonus:5 },  // iç ilerleme sayısı; ekranda yok (S43)
   segments:[
     { type:"hook", id:"h1", title:"Merak Anı", pictogram:"pic-idea",
       question:"Bir buz küpü güneşte bir süre kalırsa ne olur dersin?",
@@ -1429,8 +1357,8 @@ const MODULE_DATA = {
   const prefersReduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
   /* ---- depolama izin listesi.
-     Kalıcı (localStorage): yalnız tema + Leitner. Oturumluk (sessionStorage): XP,
-     seri, rozet ve yanıt kümeleri. Her erişim private mod / kota / file:// engeline
+     Kalıcı (localStorage): yalnız tema + Leitner. Oturumluk (sessionStorage): iç
+     ilerleme sayısı (xp; ekranda gösterilmez, köprü bildirir) ve yanıt kümeleri. Her erişim private mod / kota / file:// engeline
      karşı try/catch ile degrade-safe; depolama yoksa motor bellekte çalışmayı sürdürür. */
   function lsGet(key){
     try { const v = localStorage.getItem(key); return v==null ? null : JSON.parse(v); }
@@ -1476,29 +1404,24 @@ const MODULE_DATA = {
     const number=x=>Number.isFinite(x)&&x>=0?x:0;
     return {
       xp:number(obj.xp), mastered:number(obj.mastered),
-      awarded:list(obj.answers||obj.awarded), done:list(obj.done), earnedBadges:list(obj.earnedBadges),
-      flawlessMcq:obj.flawlessMcq!==false,
-      streak:number(obj.streak), bestStreak:number(obj.bestStreak),
+      awarded:list(obj.answers||obj.awarded), done:list(obj.done),
       perf:Array.isArray(obj.perf)?obj.perf.filter(x=>typeof x==="boolean").slice(-5):[]
     };
   }
   const savedSession=normalizeSession(ssGet(SESSION_STORE_KEY));
   const state = { idx:0, xp:savedSession.xp, mastered:savedSession.mastered,
     awarded:new Set(savedSession.awarded), done:new Set(savedSession.done),
-    earnedBadges:new Set(savedSession.earnedBadges), flawlessMcq:savedSession.flawlessMcq,
-    sound:!prefersReduceMotion, streak:savedSession.streak, bestStreak:savedSession.bestStreak,
+    sound:!prefersReduceMotion,
     tts:false, perf:savedSession.perf,
     leitner: normalizeLeitner(lsGet(LEITNER_STORE_KEY)) };
   function persistSession(){
     ssSet(SESSION_STORE_KEY,{
       xp:state.xp, mastered:state.mastered,
       answers:Array.from(state.awarded), done:Array.from(state.done),
-      earnedBadges:Array.from(state.earnedBadges), flawlessMcq:state.flawlessMcq,
-      streak:state.streak, bestStreak:state.bestStreak, perf:state.perf.slice()
+      perf:state.perf.slice()
     });
   }
-  // v1.8.0 — seri kilometre taşları (Fibonacci ritmi) ve TTS yetenek bayrağı
-  const STREAK_MILESTONES=[3,5,8,13,21,34];
+  // v1.8.0 — TTS yetenek bayrağı
   const TTS_OK = (typeof window!=="undefined") && ("speechSynthesis" in window) && ("SpeechSynthesisUtterance" in window);
   const sectionTimeouts=new Set(), sectionIntervals=new Set();
   function sectionTimeout(fn,ms){
@@ -1553,9 +1476,7 @@ const MODULE_DATA = {
     $("#metaLine").textContent =
       [m.subject,m.gradeLevel,(m.estimatedMinutes?`~${m.estimatedMinutes} dk`:null)]
       .filter(Boolean).join("  ·  ");
-    $("#xpValue").textContent=state.xp;
     startSessionTimer();
-    renderBadges();
     $("#backBtn").addEventListener("click", goBack);
     $("#nextBtn").addEventListener("click", goNext);
     $("#themeBtn").addEventListener("click", toggleTheme);
@@ -1574,7 +1495,6 @@ const MODULE_DATA = {
       const txt=decodeURIComponent(b.getAttribute("data-speak")||"");
       speakText(txt, b.getAttribute("data-lang")||defLang(), b);
     });
-    renderStreak();
     renderPacingDisk();
     scheduleBreakReminder();
     render();
@@ -1611,7 +1531,6 @@ const MODULE_DATA = {
     const SEQ={
       correct:[[659.25,0,0.13,0.10,"sine"],[987.77,0.10,0.16,0.10,"sine"]],
       retry:[[311.13,0,0.20,0.06,"sine"]],
-      reward:[[659.25,0,0.12,0.10,"triangle"],[830.61,0.10,0.12,0.10,"triangle"],[1244.51,0.20,0.24,0.11,"triangle"]],
       notify:[[880,0,0.16,0.08,"sine"],[1318.51,0.12,0.22,0.07,"sine"]]
     };
     return { play:function(name){
@@ -1632,13 +1551,6 @@ const MODULE_DATA = {
     if(state.sound) playSound("notify");
   }
   function reduceMotion(){ return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }
-  function pulseEl(node){ if(!node||reduceMotion()) return; node.classList.remove("pulse"); void node.offsetWidth; node.classList.add("pulse"); sectionTimeout(function(){ if(node) node.classList.remove("pulse"); },420); }
-  function xpFloat(n,anchor){
-    if(!anchor||reduceMotion()||!n) return;
-    const f=document.createElement("span"); f.className="xp-float"; f.textContent="+"+n+" XP";
-    anchor.appendChild(f);
-    sectionTimeout(function(){ if(f.parentNode) f.parentNode.removeChild(f); },1100);
-  }
   /* ---- tema: g10 (açık, Tedy panosu) ↔ g100 (koyu); "white" yalnız eski kayıt ---- */
   const THEMES=["g10","g100","white"];
   let themeChosenHere=false;
@@ -1667,58 +1579,10 @@ const MODULE_DATA = {
     return applyTheme(theme);
   }
 
-  let justEarnedBadge=null;
-  function renderBadges(){
-    const box=$("#badgeCase"); box.innerHTML="";
-    (D.rewards.badges||[]).forEach(b=>{
-      const earned=state.earnedBadges.has(b.id);
-      const node=el("span","badge"+(earned?" badge--earned":" badge--locked")+(earned&&b.id===justEarnedBadge?" badge--new":""));
-      const bic=(b.icon||b.pictogram||"ic-star");
-      node.innerHTML = icon(bic)+`<span>${esc(b.label)}</span>`+(earned?"":icon("ic-locked","badge__lock"));
-      node.setAttribute("aria-label", b.label+(earned?" — kazanıldı":" — henüz kilitli"));
-      box.appendChild(node);
-    });
-  }
-  function awardBadge(id){ if(!state.earnedBadges.has(id)){state.earnedBadges.add(id);justEarnedBadge=id;renderBadges();justEarnedBadge=null;persistSession();} }
-  function awardByCondition(cond){ (D.rewards.badges||[]).forEach(b=>{ if(b.condition===cond) awardBadge(b.id); }); }
-  function addXP(n, opts){ state.xp+=n; const v=$("#xpValue"); if(v){ v.textContent=state.xp; pulseEl(v.parentNode); xpFloat(n, v.parentNode); } persistSession(); if(!(opts&&opts.silent)) playSound("correct"); }
+  /* XP iç ilerleme sayısıdır: köprü panoya bildirir, ekranda gösterilmez; ödül hareketi,
+     seri sayacı ve rozet yoktur (talimatname S43, anayasa §9). Doğru cevabın earcon'u kalır. */
+  function addXP(n){ state.xp+=n; persistSession(); playSound("correct"); }
   function markMastered(){ state.mastered++; persistSession(); }
-
-  /* ---- v1.8.0: seri/combo göstergesi (öz-rekabet; cezasız) ---- */
-  function renderStreak(){
-    const chip=$("#streakChip"); if(!chip) return;
-    if(state.streak>=2){
-      chip.hidden=false;
-      chip.removeAttribute("data-held"); // aktif gösterim: nötr "korundu" durumu temizlenir
-      const n=chip.querySelector(".streak-chip__n"); if(n) n.textContent=state.streak;
-      chip.setAttribute("aria-label","Üst üste "+state.streak+" doğru");
-      chip.setAttribute("title","Üst üste "+state.streak+" doğru");
-    } else { chip.hidden=true; }
-  }
-  function streakFloat(n){
-    const chip=$("#streakChip"); if(!chip||reduceMotion()) return;
-    const f=document.createElement("span"); f.className="streak-float"; f.textContent="Seri "+n;
-    chip.appendChild(f); sectionTimeout(function(){ if(f.parentNode) f.parentNode.removeChild(f); },1250);
-  }
-  function bumpStreak(){
-    state.streak++;
-    if(state.streak>state.bestStreak) state.bestStreak=state.streak;
-    renderStreak();
-    if(STREAK_MILESTONES.indexOf(state.streak)>=0){
-      // kilometre taşı: mütevazı bonus (sessiz) + kutlama earcon + görsel kutlama
-      addXP((D.rewards&&D.rewards.streakBonus)||2, {silent:true});
-      playSound("reward");
-      const chip=$("#streakChip");
-      if(chip && !reduceMotion()){ chip.classList.remove("streak-chip--hit"); void chip.offsetWidth; chip.classList.add("streak-chip--hit"); sectionTimeout(function(){ if(chip) chip.classList.remove("streak-chip--hit"); },620); }
-      streakFloat(state.streak);
-    }
-    persistSession();
-  }
-  function resetStreak(){
-    // v3.0.0 — gain-only (G-FLOW): seri hiçbir zaman 0'a inmez; yalnız nötr "korundu"
-    // işaretine alınır (sayı yerinde kalır). Ceza/kaybetme dili YOK.
-    const chip=$("#streakChip"); if(chip) chip.setAttribute("data-held","true");
-  }
 
   /* ---- v3.0.0 — Task 13: görünmez, taban-korumalı uyarlanır zorluk (mcq/fillblank).
      gamified-flows.md §2.3/§3.3'ün motor tezahürü. state.perf: son PERF_WINDOW
@@ -1930,7 +1794,7 @@ const MODULE_DATA = {
     if(target&&typeof target.focus==="function") target.focus({preventScroll:true});
   }
   function focusFirstUsableOption(stage){
-    const target=stage.querySelector(".opt:not([disabled]),.chip-btn:not([disabled]),.hook-opt:not([disabled])");
+    const target=stage.querySelector(".opt:not([disabled]),.chip-btn:not([disabled]):not([aria-disabled=\"true\"]),.hook-opt:not([disabled])");
     if(target) target.focus({preventScroll:true}); else focusStageHeading(stage);
   }
   function focusActionButton(button){
@@ -2055,7 +1919,7 @@ const MODULE_DATA = {
       const tried={v:false};
       const hintFirst = missSignal && !!q.explanation;
       let html=segHead(s,kicker||"Yarışma")+instr(s);
-      html+=`<div class="streak">Soru <b>${qi+1}</b> / <b>${questions.length}</b></div>`;
+      html+=`<div class="adim-sayaci">Soru <b>${qi+1}</b> / <b>${questions.length}</b></div>`;
       html+=`<p class="q-stem">${q.stem}</p>`;
       html+=ttsRow(stripTags(q.stem), defLang());
       if(hintFirst) html+=`<div class="callout callout--info" data-adaptive="hint">${icon("ic-info")}<div><span class="callout__t">İpucu</span>${q.explanation}</div></div>`;
@@ -2079,7 +1943,6 @@ const MODULE_DATA = {
               state.awarded.add(gradeKey);
               addXP(D.rewards.xpPerCorrect + (tried.v?0:(D.rewards.firstTryBonus||0)));
               markMastered();
-              bumpStreak();
               perfPush(!tried.v);
             }
             const fb=$("#qfb"); fb.className="feedback feedback--ok";
@@ -2102,7 +1965,7 @@ const MODULE_DATA = {
             }
             focusActionButton(nb);
           } else {
-            tried.v=true; state.flawlessMcq=false; resetStreak();
+            tried.v=true;
             btn.classList.add("opt--wrong");
             btn.querySelector(".opt__mark").innerHTML=icon("ic-close");
             btn.disabled=true;
@@ -2118,7 +1981,7 @@ const MODULE_DATA = {
     showQ();
   }
   function renderMCQ(stage,s){
-    runQuestionSet(stage,s,s.questions,()=>{ if(state.flawlessMcq) awardByCondition("flawless-mcq"); goNext(); },"Mini Yarışma");
+    runQuestionSet(stage,s,s.questions,()=>{ goNext(); },"Mini Yarışma");
   }
 
   /* ---- match ---- */
@@ -2148,7 +2011,7 @@ const MODULE_DATA = {
           selL.querySelector(".opt__mark").innerHTML=icon("ic-check");
           selL.disabled=true; b.classList.add("opt--correct"); b.disabled=true;
           const gk=s.id+"#"+li;
-          if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(D.rewards.xpPerCorrect);markMastered();bumpStreak();}
+          if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(D.rewards.xpPerCorrect);markMastered();}
           selL=null; matched++;
           if(matched===pairs.length){
             const fb=$("#mfb"); fb.className="feedback feedback--ok";
@@ -2161,7 +2024,7 @@ const MODULE_DATA = {
         } else {
           b.classList.add("opt--wrong");
           const bb=b; sectionTimeout(()=>bb.classList.remove("opt--wrong"),600);
-          const fb=$("#mfb"); fb.className="feedback feedback--no"; playSound("retry"); resetStreak();
+          const fb=$("#mfb"); fb.className="feedback feedback--no"; playSound("retry");
           fb.innerHTML=icon("ic-close")+`<div><b>Bu eşleşme değil.</b> Tekrar dene.</div>`;
           clearSel();
           focusFirstUsableOption(stage);
@@ -2185,8 +2048,8 @@ const MODULE_DATA = {
       const sentence = it.text.replace("___",`<span class="blank" id="blankSpot">?</span>`);
       let pool = it.choices ? it.choices.slice() : s.items.map(x=>x.answer[0]);
       for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
-      let html=segHead(s,"Boşluğu Doldur")+instr(s);
-      html+=`<div class="streak">Cümle <b>${ii+1}</b> / <b>${s.items.length}</b></div>`;
+      let html=segHead(s,"Boşluğu doldur")+instr(s);
+      html+=`<div class="adim-sayaci">Cümle <b>${ii+1}</b> / <b>${s.items.length}</b></div>`;
       html+=`<p class="cloze">${sentence}</p>`;
       if(missSignal && it.hint) html+=`<div class="callout callout--info" data-adaptive="hint">${icon("ic-info")}<div><span class="callout__t">İpucu</span>${it.hint}</div></div>`;
       html+=`<div class="pool" role="group" aria-label="Kelime havuzu">`;
@@ -2197,6 +2060,7 @@ const MODULE_DATA = {
       const gk=s.id+"#"+oi; let tried=false;
       stage.querySelectorAll(".chip-btn").forEach(btn=>{
         btn.addEventListener("click",()=>{
+          if(btn.getAttribute("aria-disabled")==="true") return;
           const w=btn.dataset.w;
           const ok=it.answer.map(norm).includes(norm(w));
           const blank=$("#blankSpot");
@@ -2204,7 +2068,7 @@ const MODULE_DATA = {
             blank.textContent=w; blank.style.color="var(--cds-support-success)"; blank.style.borderColor="var(--cds-support-success)";
             stage.querySelectorAll(".chip-btn").forEach(b=>b.disabled=true);
             if(!state.awarded.has(gk)){state.awarded.add(gk);
-              addXP(D.rewards.xpPerCorrect+(tried?0:(D.rewards.firstTryBonus||0)));markMastered();bumpStreak();
+              addXP(D.rewards.xpPerCorrect+(tried?0:(D.rewards.firstTryBonus||0)));markMastered();
               perfPush(!tried);}
             const fb=$("#ffb"); fb.className="feedback feedback--ok";
             fb.innerHTML=icon("ic-check")+`<div><b>Doğru!</b></div>`;
@@ -2226,8 +2090,9 @@ const MODULE_DATA = {
             }
             focusActionButton(nb);
           } else {
-            tried=true; btn.disabled=true; btn.style.opacity=".4";
-            const fb=$("#ffb"); fb.className="feedback feedback--no"; playSound("retry"); resetStreak();
+            tried=true; btn.setAttribute("aria-disabled","true");
+            btn.insertAdjacentHTML("beforeend",`<span class="sr-only"> (denendi, doğru değil)</span>`);
+            const fb=$("#ffb"); fb.className="feedback feedback--no"; playSound("retry");
             fb.innerHTML=icon("ic-close")+`<div><b>Bu değil.</b> İpucu: ${it.hint||"cümleyi yeniden oku."}</div>`;
             focusFirstUsableOption(stage);
           }
@@ -2247,7 +2112,7 @@ const MODULE_DATA = {
     const steps=s.steps||[];
     const fadeFrom=(typeof s.fadeFrom==="number")?Math.max(0,s.fadeFrom):steps.length;
     const blankIdx=steps.map((_,i)=>i).filter(i=>i>=fadeFrom);
-    let html=segHead(s,"Çözümlü Örnek")+instr(s);
+    let html=segHead(s,"Çözümlü örnek")+instr(s);
     html+=ttsRow(stripTags((steps[0]&&steps[0].text)||""), defLang());
     html+=`<ol class="worked-steps">`;
     steps.forEach((st,i)=>{
@@ -2284,7 +2149,7 @@ const MODULE_DATA = {
       li.classList.remove("worked-step--correct","worked-step--wrong");
       if(ok){
         li.classList.add("worked-step--correct");
-        input.disabled=true; input.setAttribute("aria-invalid","false");
+        input.readOnly=true; input.setAttribute("aria-invalid","false");
         mark.innerHTML=icon("ic-check"); solvedSet.add(i);
       } else {
         li.classList.add("worked-step--wrong");
@@ -2304,11 +2169,11 @@ const MODULE_DATA = {
         if(!state.awarded.has(gk)){
           state.awarded.add(gk);
           addXP(D.rewards.xpPerCorrect+(everWrong?0:(D.rewards.firstTryBonus||0)));
-          markMastered(); bumpStreak();
+          markMastered();
         }
         setNav({nextLabel: state.idx===segs.length-1?"Bitir":"Devam"});
       } else {
-        fb.className="feedback feedback--no"; playSound("retry"); resetStreak();
+        fb.className="feedback feedback--no"; playSound("retry");
         fb.innerHTML=icon("ic-close")+`<div><b>Neredeyse.</b> İşaretli adımları tekrar dene.</div>`;
       }
     }
@@ -2326,7 +2191,7 @@ const MODULE_DATA = {
      PUANLAMA/XP/CEZA YOK — setNav next HER ZAMAN etkin; yazsa da yazmasa da, modeli açsa
      da açmasa da ilerleme asla bloklanmaz (G-WELLBEING). */
   function renderSelfExplain(stage,s){
-    stage.innerHTML = segHead(s,"Öz-Açıklama") + instr(s)
+    stage.innerHTML = segHead(s,"Öz-açıklama") + instr(s)
       + `<p class="se-prompt">${icon("ic-help")}<span>${esc(s.prompt||"")}</span></p>`
       + ttsRow(stripTags(s.prompt||""), defLang())
       + `<div class="se-field">`
@@ -2372,7 +2237,7 @@ const MODULE_DATA = {
     const qs=s.mixedQuestions||[];
     showRecap();
     function showRecap(){
-      let html=segHead(s,"Kontrol Noktası");
+      let html=segHead(s,"Kontrol noktası");
       html+=`<div class="feedback feedback--info">${icon("ic-info")}
         <div><b>Kısa özet</b><ul style="margin:var(--sp-03) 0 0;padding-left:1.2em">`+
         (s.recap||[]).map(r=>`<li>${r}</li>`).join("")+`</ul></div></div>`;
@@ -2385,7 +2250,7 @@ const MODULE_DATA = {
     }
     function startQs(){ runQuestionSet(stage,s,qs,showSelfAssess,"Karma Geri-Getirme"); }
     function showSelfAssess(){
-      let h=segHead(s,"Kontrol Noktası");
+      let h=segHead(s,"Kontrol noktası");
       h+=`<div class="self-assess"><h3>Kendini değerlendir</h3>`;
       (s.selfAssess||["Bunu öğrendim","Tekrar etmeliyim"]).forEach((t,i)=>{
         h+=`<label class="check-row"><input type="radio" name="sa" value="${i}"> ${t}</label>`;
@@ -2396,53 +2261,73 @@ const MODULE_DATA = {
     }
   }
 
-  /* ---- summary + Carbon data-viz donut ---- */
-  function donutSvg(pct,color){
-    const r=64, c=2*Math.PI*r, off=c*(1-Math.max(0,Math.min(100,pct))/100);
-    return `<svg width="160" height="160" viewBox="0 0 160 160" role="img" aria-label="Ustalık ${pct} yüzde">
-      <circle cx="80" cy="80" r="${r}" fill="none" stroke="var(--cds-layer-accent-01)" stroke-width="14"/>
-      <circle cx="80" cy="80" r="${r}" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round"
-        stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg>`;
-  }
   /* ---- tema-duyarlı SVG figür + grafik araçları ---- */
   function vizId(){ return "v"+Math.random().toString(36).slice(2,8); }
   function svgFigure(inner, caption){
     return `<figure class="viz">${inner}${caption?`<figcaption>${esc(caption)}</figcaption>`:""}</figure>`;
   }
-  // Çubuk/çizgi grafik — viewBox responsive, currentColor/--viz-* ile tema-duyarlı,
-  // role="img" + <title>/<desc> ile erişilebilir, animasyonsuz (sakin).
+  // Eksen ölçeği: 1·2·5×10^k adımla en çok 5 eşit aralık; üst değer adımın katı ("nice" eksen,
+  // talimatname §8.2, B52). Etiketler eşit adımlı ve tekrar etmez.
+  function vizNice(max){
+    const m=(Number.isFinite(max)&&max>0)?max:1;
+    const p=Math.pow(10,Math.floor(Math.log10(m)));
+    let step=p*10;
+    for(const k of [0.1,0.2,0.5,1,2,5,10]){ if(Math.ceil(m/(p*k)-1e-9)<=5){ step=p*k; break; } }
+    const n=Math.max(1,Math.ceil(m/step-1e-9));
+    const dec=Math.max(0,-Math.floor(Math.log10(step)+1e-9));
+    return { top:step*n, step:step, n:n, fmt:v=>v.toFixed(dec).replace(".",",") };
+  }
+  // Çubuk/çizgi grafik — viewBox responsive, --viz-* ile tema-duyarlı (S19: seri ders aksanını
+  // almaz), role="img" + <title>/<desc> ile erişilebilir, animasyonsuz (sakin). Eksik değer 0
+  // olarak çizilmez: yerinde "veri yok" yazar, çizgi o noktada kesilir (Carbon: veri uydurulmaz).
   function vizChart(spec){
     const id=vizId(), tid=id+"t", did=id+"d";
     const data=spec.data||[];
     const W=480,H=260,PADL=46,PADB=42,PADT=16,PADR=14;
     const plotW=W-PADL-PADR, plotH=H-PADT-PADB;
-    const max=spec.max||Math.max(1,...data.map(p=>+p.value||0));
-    let grid="",ticks=4;
-    for(let i=0;i<=ticks;i++){ const gy=PADT+plotH*i/ticks, val=max*(1-i/ticks);
+    const has=p=>!!p && p.value!==null && p.value!==undefined && p.value!=="" && Number.isFinite(+p.value);
+    const val=p=>Math.max(0,+p.value);
+    const scale=vizNice(Math.max(+spec.max||0, ...data.filter(has).map(val), 0));
+    const max=scale.top;
+    let grid="";
+    for(let i=0;i<=scale.n;i++){ const gy=PADT+plotH*i/scale.n, v=scale.step*(scale.n-i);
       grid+=`<line class="viz-grid" x1="${PADL}" y1="${gy.toFixed(1)}" x2="${W-PADR}" y2="${gy.toFixed(1)}" stroke-width="1"/>`
-        +`<text class="viz-muted" x="${PADL-8}" y="${(gy+4).toFixed(1)}" text-anchor="end" font-size="11">${Math.round(val)}</text>`; }
+        +`<text class="viz-muted" x="${PADL-8}" y="${(gy+4).toFixed(1)}" text-anchor="end" font-size="11">${scale.fmt(v)}</text>`; }
     const axis=`<line class="viz-axis" x1="${PADL}" y1="${PADT}" x2="${PADL}" y2="${PADT+plotH}" stroke-width="1.5"/>`
       +`<line class="viz-axis" x1="${PADL}" y1="${PADT+plotH}" x2="${W-PADR}" y2="${PADT+plotH}" stroke-width="1.5"/>`;
     const n=data.length, step=plotW/Math.max(1,n);
+    const xAt=i=>PADL+step*(i+0.5);
+    const label=(p,i)=>`<text class="viz-muted" x="${xAt(i).toFixed(1)}" y="${H-PADB+18}" text-anchor="middle" font-size="11">${esc(p.label||"")}</text>`;
+    const gap=i=>`<text class="viz-muted" x="${xAt(i).toFixed(1)}" y="${(PADT+plotH-6).toFixed(1)}" text-anchor="middle" font-size="11">veri yok</text>`;
     let body;
     if(spec.kind==="line"){
-      const pts=data.map((p,i)=>[PADL+step*(i+0.5), PADT+plotH*(1-(+p.value||0)/max)]);
-      const path=pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ");
-      body=grid+axis+`<path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`
-        +pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4" fill="var(--accent)"/>`).join("")
-        +data.map((p,i)=>`<text class="viz-muted" x="${(PADL+step*(i+0.5)).toFixed(1)}" y="${H-PADB+18}" text-anchor="middle" font-size="11">${esc(p.label||"")}</text>`).join("");
+      const color=spec.color||"var(--viz-1)";
+      let path="", prev=false;
+      data.forEach((p,i)=>{
+        if(!has(p)){ prev=false; return; }
+        path+=(path?" ":"")+(prev?"L":"M")+xAt(i).toFixed(1)+" "+(PADT+plotH*(1-val(p)/max)).toFixed(1);
+        prev=true;
+      });
+      body=grid+axis+(path?`<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`:"")
+        +data.map((p,i)=>has(p)
+          ?`<circle cx="${xAt(i).toFixed(1)}" cy="${(PADT+plotH*(1-val(p)/max)).toFixed(1)}" r="4" fill="${color}"/>`
+          :gap(i)).join("")
+        +data.map(label).join("");
     } else {
       const bw=Math.min(52, step*0.62);
       body=grid+axis+data.map((p,i)=>{
-        const cx=PADL+step*(i+0.5), bh=plotH*((+p.value||0)/max), by=PADT+plotH-bh, fill=p.color||"var(--accent)";
+        if(!has(p)) return gap(i)+label(p,i);
+        const cx=xAt(i), bh=plotH*(val(p)/max), by=PADT+plotH-bh, fill=p.color||"var(--viz-1)";
         return `<rect x="${(cx-bw/2).toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,bh).toFixed(1)}" rx="2" fill="${fill}"/>`
-          +`<text class="viz-muted" x="${cx.toFixed(1)}" y="${H-PADB+18}" text-anchor="middle" font-size="11">${esc(p.label||"")}</text>`;
+          +label(p,i);
       }).join("");
     }
-    const svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="${tid} ${did}"><title id="${tid}">${esc(spec.title||"Grafik")}</title><desc id="${did}">${esc(spec.desc||spec.title||"")}</desc>${body}</svg>`;
+    const missing=data.filter(p=>!has(p)).map(p=>(p&&p.label?p.label:"?")+": veri yok");
+    const desc=(spec.desc||spec.title||"")+(missing.length?(spec.desc||spec.title?" · ":"")+missing.join(", "):"");
+    const svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="${tid} ${did}"><title id="${tid}">${esc(spec.title||"Grafik")}</title><desc id="${did}">${esc(desc)}</desc>${body}</svg>`;
     let legend="";
     if(spec.legend && data.some(p=>p.color)){
-      legend=`<div class="viz-legend">`+data.map(p=>`<span><i style="background:${p.color||"var(--accent)"}"></i>${esc(p.label||"")}</span>`).join("")+`</div>`;
+      legend=`<div class="viz-legend">`+data.map(p=>`<span><i style="background:${p.color||"var(--viz-1)"}"></i>${esc(p.label||"")}</span>`).join("")+`</div>`;
     }
     return svgFigure(svg+legend, spec.caption);
   }
@@ -2791,8 +2676,8 @@ const MODULE_DATA = {
      step,default,label}], labels?}. Kaydırıcı klavye-erişilebilirliği YERLEŞİKTİR
      (native input type=range: ok tuşları step kadar değiştirir, Home/End
      min/max'a atlar) — ayrı bir klavye-işleyici yazılmadı/gerekmiyor. Segment
-     KEŞFEDİCİDİR/puanlanmaz: setNav next hep etkin, addXP/markMastered/
-     bumpStreak YOK, totalGradeable paydasına katkısı yok (selfExplain'le aynı
+     KEŞFEDİCİDİR/puanlanmaz: setNav next hep etkin, addXP/markMastered
+     YOK, totalGradeable paydasına katkısı yok (selfExplain'le aynı
      ilke — bkz. yukarıdaki totalGradeable reduce, "sim" orada yok). */
   function renderSim(stage,s){
     const params = s.params||[];
@@ -2877,7 +2762,7 @@ const MODULE_DATA = {
   function renderConceptMap(stage,s){
     const nodes = s.nodes||[];
     const targets = (s.targetEdges||[]).map(e=>[String(e[0]),String(e[1])]);
-    let html = segHead(s,"Kavram Haritası") + instr(s);
+    let html = segHead(s,"Kavram haritası") + instr(s);
     html += ttsRow(stripTags(s.instructions||s.title||""), defLang());
     if(nodes.length<2 || !targets.length){
       html += `<div class="feedback feedback--info">${icon("ic-info")}<div>`
@@ -3004,7 +2889,7 @@ const MODULE_DATA = {
         if(!state.awarded.has(gk)){
           state.awarded.add(gk);
           addXP(D.rewards.xpPerCorrect+(everImperfect?0:(D.rewards.firstTryBonus||0)));
-          markMastered(); bumpStreak();
+          markMastered();
         }
         setNav({nextLabel: state.idx===segs.length-1?"Bitir":"Devam"});
       } else {
@@ -3012,7 +2897,7 @@ const MODULE_DATA = {
         const bits=[];
         if(missing.length) bits.push("Henüz eklenmedi: "+missing.map(m=>esc(labelOf(m[0]))+" ↔ "+esc(labelOf(m[1]))).join(", ")+".");
         if(extra.length) bits.push("Hedef yapıda olmayan bağlantı(lar): "+extra.map(m=>esc(labelOf(m[0]))+" ↔ "+esc(labelOf(m[1]))).join(", ")+".");
-        fb.className="feedback feedback--info"; playSound("retry"); resetStreak();
+        fb.className="feedback feedback--info"; playSound("retry");
         fb.innerHTML=icon("ic-info")+`<div><b>Neredeyse!</b> ${bits.join(" ")} Listeden düzenleyip tekrar kontrol edebilirsin.</div>`;
       }
     });
@@ -3103,7 +2988,8 @@ const MODULE_DATA = {
     const kind = spec.kind || (spec.ratio ? "ratio" : (spec.addends ? "sum" : "fraction"));
     const id=vizId(), tid=id+"t", did=id+"d";
     const W=480, BARX=20, BARY=16, BARW=440, BARH=44, EQY=88, H=104;
-    const PAL=["var(--accent)","var(--viz-2)","var(--viz-3)","var(--viz-4)","var(--viz-5)"];
+    // seriler --viz-* paletinde; ders aksanı grafik serisi değildir (S19, B52)
+    const PAL=["var(--viz-1)","var(--viz-2)","var(--viz-3)","var(--viz-4)","var(--viz-5)"];
     const EMPTY="var(--cds-layer-01)";
     let cells=[], total=0, eq="", desc="", legend="";
     if(kind==="ratio"){
@@ -3128,7 +3014,7 @@ const MODULE_DATA = {
       const den=Math.max(1,Math.round(+spec.den||1));
       const num=Math.max(0,Math.min(den,Math.round(+spec.num||0)));
       total=den;
-      for(let k=0;k<den;k++) cells.push(k<num ? "var(--accent)" : EMPTY);
+      for(let k=0;k<den;k++) cells.push(k<num ? PAL[0] : EMPTY);
       eq=num+"\u2044"+den;
       desc="Kesir çubuğu: bütün "+den+" eşit parçaya bölünmüş, "+num+" parça dolu; kesir "+num+" bölü "+den+".";
     }
@@ -3159,21 +3045,11 @@ const MODULE_DATA = {
     clearSessionTimer();
     if(pacingFrame!=null){ cancelAnimationFrame(pacingFrame); pacingFrame=null; }
     const wb=$("#wellbeing"); if(wb) wb.innerHTML="";
-    awardByCondition("module-complete"); playSound("reward");
     const masteryPct = totalGradeable? Math.round((state.mastered/totalGradeable)*100):100;
-    const dcolor = masteryPct>=70? "var(--cds-support-success)":"var(--accent)";
-    let html=`<div class="summary">${icon(D.meta.coverPictogram||"pic-trophy","pic",80)}
-      <h2 data-stage-heading="true" tabindex="-1">Tebrikler${D.learner&&D.learner.name?", "+D.learner.name:""}!</h2>
-      <p style="color:var(--cds-text-secondary)">«${D.meta.title}» modülünü tamamladın.</p>
-      <div class="summary__row">
-        <div class="donut">${donutSvg(masteryPct,dcolor)}
-          <div class="donut__center"><span class="donut__pct">%${masteryPct}</span><span class="donut__lbl">Ustalık</span></div></div>
-        <div class="stat-col">
-          <div class="stat stat--xp">${icon("ic-star")}<div><div class="stat__num">${state.xp}</div><div class="stat__lbl">Toplam XP</div></div></div>
-          <div class="stat">${icon("pic-trophy","pic")}<div><div class="stat__num">${state.earnedBadges.size}/${(D.rewards.badges||[]).length}</div><div class="stat__lbl">Rozet</div></div></div>
-          ${state.bestStreak>=2?`<div class="stat">${icon("ic-flash")}<div><div class="stat__num">${state.bestStreak}</div><div class="stat__lbl">En uzun seri</div></div></div>`:""}
-        </div>
-      </div>`;
+    let html=`<div class="summary">${icon(D.meta.coverPictogram||"pic-education","pic",80)}
+      <h2 data-stage-heading="true" tabindex="-1">Modülü tamamladın${D.learner&&D.learner.name?", "+esc(D.learner.name):""}</h2>
+      <p style="color:var(--cds-text-secondary)">«${D.meta.title}» modülünün sonuna geldin.</p>
+      ${totalGradeable?`<p class="summary__ozet"><b>${state.mastered}</b> / <b>${totalGradeable}</b> alıştırmayı doğru tamamladın.</p>`:""}`;
     html+=objectivesBlock("Tamamladığın hedefler");
     if(masteryPct<70){
       html+=`<div class="feedback feedback--info" style="text-align:left">${icon("ic-info")}
@@ -3189,9 +3065,7 @@ const MODULE_DATA = {
     restart.innerHTML=icon("ic-restart")+" Baştan başla";
     restart.addEventListener("click",()=>{
       state.idx=0;state.xp=0;state.mastered=0;state.awarded.clear();state.done.clear();
-      state.earnedBadges.clear();state.flawlessMcq=true;state.streak=0;state.bestStreak=0;
       state.perf=[]; persistSession();
-      $("#xpValue").textContent=0; renderBadges(); renderStreak();
       startSessionTimer(); scheduleBreakReminder(); renderPacingDisk(); render();
     });
     stage.querySelector(".summary").appendChild(restart);
@@ -3220,8 +3094,8 @@ const MODULE_DATA = {
     function show(){
       if(queue.length===0){ goNext(); return; }
       const card = queue[0]; let flipped=false;
-      let html = segHead(s,"Kart Destesi")+instr(s);
-      html += `<div class="streak">Öğrenilen <b>${learned.size}</b> / <b>${total}</b> · Destede <b>${queue.length}</b> kart</div>`;
+      let html = segHead(s,"Kart destesi")+instr(s);
+      html += `<div class="adim-sayaci">Öğrenilen <b>${learned.size}</b> / <b>${total}</b> · Destede <b>${queue.length}</b> kart</div>`;
       html += `<div class="flash"><div class="card" id="fcard">${card.front}</div><div id="fctrl"></div></div>`;
       stage.innerHTML=html;
       setNav({next:false});
@@ -3244,7 +3118,7 @@ const MODULE_DATA = {
           const know=el("button","btn btn--primary"); know.innerHTML=icon("ic-check")+" Biliyorum";
           const again=el("button","btn btn--ghost"); again.innerHTML=icon("ic-renew")+" Tekrar et";
           know.addEventListener("click",()=>{
-            if(!learned.has(card.idx)){ learned.add(card.idx); addXP(D.rewards.xpPerCorrect); markMastered(); bumpStreak(); }
+            if(!learned.has(card.idx)){ learned.add(card.idx); addXP(D.rewards.xpPerCorrect); markMastered(); }
             persistBox(s.id+"#"+card.idx, Math.min(5, boxOf(s.id+"#"+card.idx)+1));
             queue.shift(); show();
           });
@@ -3267,7 +3141,7 @@ const MODULE_DATA = {
     const shown = s.items.map((t,i)=>({t,correct:i}));
     for(let i=shown.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[shown[i],shown[j]]=[shown[j],shown[i]];}
     let expected=0;
-    let html=segHead(s,"Sıraya Diz")+instr(s);
+    let html=segHead(s,"Sıraya diz")+instr(s);
     if(s.prompt) html+=`<p class="q-stem">${s.prompt}</p>`;
     html+=`<div class="opt-list" role="group" aria-label="Sıralanacak öğeler">`;
     shown.forEach(it=>{ html+=`<button class="opt" type="button" data-c="${it.correct}"><span class="opt__mark"></span><span>${it.t}</span></button>`; });
@@ -3281,7 +3155,7 @@ const MODULE_DATA = {
           btn.classList.add("opt--correct"); btn.disabled=true;
           btn.querySelector(".opt__mark").innerHTML=`<span style="font-family:var(--font-mono);font-weight:700;color:var(--cds-support-success)">${expected+1}</span>`;
           const gk=s.id+"#"+expected;
-          if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(D.rewards.xpPerCorrect);markMastered();bumpStreak();}
+          if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(D.rewards.xpPerCorrect);markMastered();}
           expected++;
           if(expected===shown.length){
             const fb=$("#ofb"); fb.className="feedback feedback--ok";
@@ -3292,7 +3166,7 @@ const MODULE_DATA = {
             focusFirstUsableOption(stage);
           }
         } else {
-          const fb=$("#ofb"); fb.className="feedback feedback--no"; resetStreak();
+          const fb=$("#ofb"); fb.className="feedback feedback--no";
           fb.innerHTML=icon("ic-close")+`<div><b>Sıradaki bu değil.</b> ${expected+1}. sırada gelecek öğeyi seç.</div>`;
           const b=btn; b.classList.add("opt--wrong"); sectionTimeout(()=>b.classList.remove("opt--wrong"),500);
         }
@@ -3305,9 +3179,9 @@ const MODULE_DATA = {
     let ii=0;
     function show(){
       const it=s.items[ii];
-      let html=segHead(s,"Gruplara Ayır")+instr(s);
+      let html=segHead(s,"Gruplara ayır")+instr(s);
       if(s.prompt) html+=`<p class="q-stem">${s.prompt}</p>`;
-      html+=`<div class="streak">Öğe <b>${ii+1}</b> / <b>${s.items.length}</b></div>`;
+      html+=`<div class="adim-sayaci">Öğe <b>${ii+1}</b> / <b>${s.items.length}</b></div>`;
       html+=`<div class="card" style="min-height:auto;padding:var(--sp-06);font-size:var(--fs-h-sub)">${it.label}</div>`;
       html+=`<div class="opt-list" role="group" aria-label="Kategoriler">`;
       s.bins.forEach((b,bi)=>{ html+=`<button class="opt" type="button" data-bin="${bi}"><span class="opt__mark"></span><span>${b}</span></button>`; });
@@ -3321,7 +3195,7 @@ const MODULE_DATA = {
           if(+btn.dataset.bin===it.bin){
             btn.classList.add("opt--correct"); btn.querySelector(".opt__mark").innerHTML=icon("ic-check");
             stage.querySelectorAll(".opt").forEach(b=>b.disabled=true);
-            if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(D.rewards.xpPerCorrect);markMastered();bumpStreak();}
+            if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(D.rewards.xpPerCorrect);markMastered();}
             const fb=$("#sfb"); fb.className="feedback feedback--ok";
             fb.innerHTML=icon("ic-check")+`<div><b>Doğru!</b> «${it.label}» &#8594; ${s.bins[it.bin]}</div>`;
             const last=ii===s.items.length-1;
@@ -3332,7 +3206,7 @@ const MODULE_DATA = {
             focusActionButton(nb);
           } else {
             btn.classList.add("opt--wrong"); btn.disabled=true;
-            const fb=$("#sfb"); fb.className="feedback feedback--no"; resetStreak();
+            const fb=$("#sfb"); fb.className="feedback feedback--no";
             fb.innerHTML=icon("ic-close")+`<div><b>Bu kategori değil.</b> Tekrar dene.</div>`;
             focusFirstUsableOption(stage);
           }
@@ -3348,8 +3222,8 @@ const MODULE_DATA = {
     let pi=0;
     function show(){
       const sp=s.spots[pi];
-      let html=segHead(s,"Görseli Keşfet")+instr(s);
-      html+=`<div class="streak">İpucu <b>${pi+1}</b> / <b>${s.spots.length}</b></div>`;
+      let html=segHead(s,"Görseli keşfet")+instr(s);
+      html+=`<div class="adim-sayaci">İpucu <b>${pi+1}</b> / <b>${s.spots.length}</b></div>`;
       html+=`<p class="q-stem">Bul ve tıkla: <span style="color:var(--accent-strong)">${sp.label}</span></p>`;
       html+=`<div class="visual hotspot-wrap">${s.svg}</div><div id="hfb" aria-live="polite"></div>`;
       stage.innerHTML=html;
@@ -3386,7 +3260,7 @@ const MODULE_DATA = {
 
   /* ---- timeline (zaman çizelgesi — display materyali, notsuz) ---- */
   function renderTimeline(stage,s){
-    let html=segHead(s,"Zaman Çizelgesi")+instr(s);
+    let html=segHead(s,"Zaman çizelgesi")+instr(s);
     if(s.prompt) html+=`<p class="lead">${s.prompt}</p>`;
     html+=`<ol class="timeline">`;
     (s.events||[]).forEach((e,i)=>{

@@ -1,17 +1,10 @@
 - main:
   - heading "Takımlar" [level=1]
-  - heading "Takım Çalışmaları & ÖGEP" [level=2]
-  - heading "Academy+" [level=3]
-  - table "Structured list section":
-    - rowgroup:
-      - row "Etkinlik Tarih Durum Konum":
-        - columnheader "Etkinlik"
-        - columnheader "Tarih"
-        - columnheader "Durum"
-        - columnheader "Konum"
-    - rowgroup:
-      - row "Bekliyor":
-        - cell
-        - cell
-        - cell "Bekliyor"
-        - cell
+  - heading "Takım çalışmaları & ÖGEP" [level=2]
+  - text: Academy+ (2)
+  - list "Academy+ (2)":
+    - listitem: /Robotik kulübü Teams \d+\.\d+ \d+:\d+ Bekliyor/
+    - listitem: /Münazara Teams \d+\.\d+ \d+:\d+ Katıldı/
+  - text: ÖGEP oturumları (1)
+  - list "ÖGEP oturumları (1)":
+    - listitem: /Hedef belirleme \d+\.\d+ \d+:\d+ Bekliyor/

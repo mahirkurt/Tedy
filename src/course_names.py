@@ -39,6 +39,14 @@ for _canonical, _aliases in COURSE_ALIASES.items():
     _ALIAS_LOOKUP[_canonical] = _canonical
     for _alias in _aliases:
         _ALIAS_LOOKUP[_alias] = _canonical
+# The placeholder a photographed private-lesson homework gets when no course is
+# known. It is not a course (no subject colour, so it stays out of
+# COURSE_ALIASES), but it reaches the reader like one. Rows stored before
+# 2026-10-11 carry it in title case; the reader sees sentence case (talimatname
+# S38, B41) without the stored file being rewritten.
+OZEL_DERS = "Özel ders"
+_ALIAS_LOOKUP[OZEL_DERS] = OZEL_DERS
+_ALIAS_LOOKUP["Özel Ders"] = OZEL_DERS
 _ALIAS_LONGEST_FIRST = sorted(_ALIAS_LOOKUP.keys(), key=len, reverse=True)
 
 

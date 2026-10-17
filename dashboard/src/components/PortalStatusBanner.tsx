@@ -92,6 +92,34 @@ export function PortalStatusBanner({ pathname = '' }: { pathname?: string }) {
     ? kisaZaman(sonOkumalar.map(String).sort()[0])
     : ''
 
+  const kapaliBaslik = names.length > 1
+    ? `Portal şu an ${names.join(' ve ')} bölümlerini sunmuyor`
+    : `Portal şu an ${names[0]} bölümünü sunmuyor`
+  const kapaliAlt = details.join(' · ') + (health?.academic_year ? ` — ${health.academic_year} öğretim yılı` : '')
+  const okunamadiBaslik = unreadNames.length > 1
+    ? `${unreadNames.join(', ')} bu turda okunamadı`
+    : `${unreadNames[0]} bu turda okunamadı`
+  const okunamadiAlt = tutulan
+    ? `Son başarılı okuma gösteriliyor (${tutulan}) — bir sonraki senkronda yeniden denenecek.`
+    : 'Boş görünmeleri veri olmadığı anlamına gelmiyor — bir sonraki senkronda yeniden denenecek.'
+
+  // B62 (§5.3, S23): two states in one region are one notification, at the higher attention (warning) — Dersler
+  // drew an info band and a warning band one under the other. The portal's closure rides along as the second
+  // sentence; the combined band is not dismissible, because its unread part goes away by itself.
+  if (showClosed && unreadKeys.length > 0) {
+    return (
+      <InlineNotification
+        className="portal-unread portal-status--birlesik"
+        kind="warning"
+        lowContrast
+        statusIconDescription="Uyarı"
+        hideCloseButton
+        title={okunamadiBaslik}
+        subtitle={`${okunamadiAlt} ${kapaliBaslik}${kapaliAlt ? ` (${kapaliAlt})` : ''}.`}
+      />
+    )
+  }
+
   return (
     <>
       {showClosed && (
@@ -99,19 +127,14 @@ export function PortalStatusBanner({ pathname = '' }: { pathname?: string }) {
           className="portal-status"
           kind="info"
           lowContrast
+          statusIconDescription="Bilgi"
+          aria-label="Kapat"
           onClose={() => {
             try { sessionStorage.setItem(DISMISS_KEY, todayKey()) } catch { /* ignore */ }
             setDismissed(true)
           }}
-          title={
-            names.length > 1
-              ? `Portal şu an ${names.join(' ve ')} bölümlerini sunmuyor`
-              : `Portal şu an ${names[0]} bölümünü sunmuyor`
-          }
-          subtitle={
-            details.join(' · ')
-            + (health?.academic_year ? ` — ${health.academic_year} öğretim yılı` : '')
-          }
+          title={kapaliBaslik}
+          subtitle={kapaliAlt}
         />
       )}
       {/* A different sentence, because it is a different fact. "The school
@@ -126,15 +149,10 @@ export function PortalStatusBanner({ pathname = '' }: { pathname?: string }) {
           className="portal-unread"
           kind="warning"
           lowContrast
+          statusIconDescription="Uyarı"
           hideCloseButton
-          title={
-            unreadNames.length > 1
-              ? `${unreadNames.join(', ')} bu turda okunamadı`
-              : `${unreadNames[0]} bu turda okunamadı`
-          }
-          subtitle={tutulan
-            ? `Son başarılı okuma gösteriliyor (${tutulan}) — bir sonraki senkronda yeniden denenecek.`
-            : 'Boş görünmeleri veri olmadığı anlamına gelmiyor — bir sonraki senkronda yeniden denenecek.'}
+          title={okunamadiBaslik}
+          subtitle={okunamadiAlt}
         />
       )}
     </>

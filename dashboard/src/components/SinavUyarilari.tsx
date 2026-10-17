@@ -68,6 +68,7 @@ export default function SinavUyarilari() {
       </div>
       {bilgi && (
         <InlineNotification lowContrast hideCloseButton kind={bilgi.tur} title={bilgi.metin}
+          statusIconDescription={bilgi.tur === 'success' ? 'Başarılı' : 'Hata'}
           className="sinav-uyarilari__bilgi" />
       )}
     </section>

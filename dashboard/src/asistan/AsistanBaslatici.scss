@@ -1,6 +1,9 @@
 @use '@carbon/styles/scss/spacing';
 
-// Her sayfadaki sohbet başlatıcısı; Carbon'un kendi başlatıcısıyla aynı köşe.
+// Her sayfadaki sohbet başlatıcısı; Carbon'un kendi başlatıcısıyla aynı köşe. Kap ve açık panel ödev penceresinin
+// (Carbon Modal, z 9000) altında kalır: aynı anda iki diyalog üst üste binmez (§5.5, B61). Kap sabit konumlu ve
+// z-index'li olduğu için kendi yığın bağlamıdır; Carbon'un yüzen paneli ne kadar yüksek z-index verse de kabın
+// düzeyinde (8000) kalır.
 .asistan-baslatici {
   position: fixed;
   inset-block-end: spacing.$spacing-07;
@@ -8,15 +11,9 @@
   z-index: 8000;
 }
 
-// Açık panel sabit kabın yığın bağlamında kalır: Carbon'un yüzen katmanıyla aynı düzeye çıkar ki ödev
-// penceresi (z 9000) açıkken de panele yazılabilsin (eskiden olduğu gibi).
-.asistan-baslatici--acik {
-  z-index: 99999;
-}
-
-// Tam ekran: Carbon'un yüzen paneli float özellikleriyle pencereyi kaplar; kap da üstte durur.
+// Tam ekran: Carbon'un yüzen paneli float özellikleriyle pencereyi kaplar; kap da yine modalın altında.
 .asistan-paneli--tam {
   position: fixed;
   inset: 0;
-  z-index: 9000;
+  z-index: 8000;
 }

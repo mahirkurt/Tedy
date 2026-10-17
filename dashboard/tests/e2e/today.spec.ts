@@ -48,7 +48,7 @@ test('the day strip shows the time that is left, with a now marker', async ({ pa
   await expect(strip.locator('.day-strip__now')).toBeVisible()
   // The strip starts at now, not at the beginning of the day: spent hours are
   // not actionable and must not take up room (İ7).
-  await expect(strip).toContainText('ŞİMDİ')
+  await expect(strip).toContainText('Şimdi')
 })
 
 test('one named next step leads the page, and the agenda follows it', async ({ page }) => {
@@ -93,7 +93,7 @@ test('before the window opens, ŞİMDİ is not the voice', async ({ page }) => {
   const next = page.locator('.next-thing')
   await expect(next).toBeVisible()
   await expect(next).toContainText('Matematik')
-  await expect(next.locator('.next-thing__eyebrow')).not.toHaveText('ŞİMDİ')
+  await expect(next.locator('.next-thing__eyebrow')).not.toHaveText('Şimdi')
   await expect(next).toContainText('okuldan sonra')
 })
 
@@ -123,8 +123,8 @@ test.describe('saturday', () => {
       status: 200, contentType: 'application/json', body: JSON.stringify({ events: [{
         id: 'p1', title: 'Fen Bilimleri · Deneme Hoca', allDay: false,
         start: '2026-09-26T12:00:00', end: '2026-09-26T13:00:00',
-        extendedProps: { kind: 'private_lesson', badge: 'Özel Ders', course: 'Fen Bilimleri',
-          description: 'Özel Ders • Deneme Hoca', private_lesson_id: 'p1' },
+        extendedProps: { kind: 'private_lesson', badge: 'Özel ders', course: 'Fen Bilimleri',
+          description: 'Özel ders • Deneme Hoca', private_lesson_id: 'p1' },
       }] }),
     }))
     await page.clock.setFixedTime(new Date('2026-09-26T10:00:00+03:00'))   // a Saturday
@@ -133,7 +133,7 @@ test.describe('saturday', () => {
     const ders = page.locator('.today-tl__item', { hasText: 'Fen Bilimleri · Deneme Hoca' })
     await expect(ders).toBeVisible()
     await expect(ders.locator('.today-tl__time')).toHaveText('12:00')
-    await expect(ders).toContainText('Özel Ders')
+    await expect(ders).toContainText('Özel ders')
     // The empty line is for a day with nothing on it; this day has something.
     await expect(page.getByText('için planlı ders, ödev teslimi veya etkinlik yok')).toHaveCount(0)
   })

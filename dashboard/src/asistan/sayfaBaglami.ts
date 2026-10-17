@@ -29,7 +29,11 @@ export function baslaticiGorunur(yol: string, rol: UserRole, odak: boolean, geni
   return rol === 'full' && !odak && genis && !GIZLI.some(r => r.test(yol)) && sayfaAdi(yol) !== null
 }
 
-export interface AcikOge { tur: 'odev' | 'sinav' | 'etkinlik' | 'ders_haftasi'; id: string; etiket: string }
+export interface AcikOge {
+  tur: 'odev' | 'sinav' | 'etkinlik' | 'ders_haftasi' | 'konu'
+  id: string
+  etiket: string
+}
 
 // Açık öğeler yığın olarak tutulur: en son açılan bağlamdır; her kayıt yalnız kendi öğesini bırakır (iki sınav kartı
 // açıkken biri kapanınca öbürü bağlam olarak kalır).
@@ -49,6 +53,21 @@ export function acikOgeAc(oge: AcikOge): () => void {
   return () => { yigin = yigin.filter(k => k !== kayit); yay() }
 }
 export const acikOgeSimdi = (): AcikOge | null => acik
+
+/** "Asistana sor" (B78): öğe, kendi penceresi kapandıktan sonra da sonraki sorunun bağlamı kalır; soru gidince ya da
+ *  çip kaldırılınca bırakılır (sabitOgeyiBirak). */
+let sabit: (() => void) | null = null
+export function sabitOgeyiBirak(): boolean { const b = sabit; sabit = null; b?.(); return !!b }
+
+/** Bir öğeyi asistana sorar: öğeyi bağlam olarak sabitler ve `tedy:asistana-sor` yayar. Başlatıcı olayı karşılarsa
+ *  (geniş ekran, odak kipi kapalı) paneli açar ve `true` döner; karşılayan yoksa çağıran /asistan'a gider. */
+export const ASISTANA_SOR = 'tedy:asistana-sor'
+export function asistanaSor(oge: AcikOge): boolean {
+  sabitOgeyiBirak()
+  sabit = acikOgeAc(oge)
+  const olay = new CustomEvent(ASISTANA_SOR, { cancelable: true, detail: oge })
+  return !window.dispatchEvent(olay)
+}
 export function useAcikOge(): AcikOge | null {
   return useSyncExternalStore(f => { dinleyenler.add(f); return () => { dinleyenler.delete(f) } }, () => acik)
 }

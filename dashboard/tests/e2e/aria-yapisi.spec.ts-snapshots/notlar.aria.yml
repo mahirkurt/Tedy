@@ -13,27 +13,51 @@
         - columnheader "P2"
         - columnheader "P3"
     - rowgroup:
-      - row /Ayrıntı Matematik \d+ \d+ - \d+ - -/:
+      - row /Ayrıntı Matematik \d+ \d+ Not girilmedi \d+ Not girilmedi Not girilmedi/:
         - cell "Ayrıntı":
           - button "Ayrıntı"
         - cell "Matematik"
         - cell /\d+/
         - cell /\d+/
-        - cell "-"
+        - cell "Not girilmedi"
         - cell /\d+/
-        - cell "-"
-        - cell "-"
-      - row /1\. Sınav \d+ 2\. Sınav \d+ 3\. Sınav - DİKP\/Performans-1 \d+ DİKP\/Performans-2 - DİKP\/Performans-3 -/:
-        - cell /1\. Sınav \d+ 2\. Sınav \d+ 3\. Sınav - DİKP\/Performans-1 \d+ DİKP\/Performans-2 - DİKP\/Performans-3 -/
-      - row /Ayrıntı Türkçe \d+ - - - - -/:
+        - cell "Not girilmedi"
+        - cell "Not girilmedi"
+      - row /1\. Sınav \d+ 2\. Sınav \d+ 3\. Sınav Not girilmedi DİKP\/Performans-1 \d+ DİKP\/Performans-2 Not girilmedi DİKP\/Performans-3 Not girilmedi/:
+        - cell /1\. Sınav \d+ 2\. Sınav \d+ 3\. Sınav Not girilmedi DİKP\/Performans-1 \d+ DİKP\/Performans-2 Not girilmedi DİKP\/Performans-3 Not girilmedi/:
+          - term: 1. Sınav
+          - definition: /\d+/
+          - term: 2. Sınav
+          - definition: /\d+/
+          - term: 3. Sınav
+          - definition: Not girilmedi
+          - term: DİKP/Performans-1
+          - definition: /\d+/
+          - term: DİKP/Performans-2
+          - definition: Not girilmedi
+          - term: DİKP/Performans-3
+          - definition: Not girilmedi
+      - row /Ayrıntı Türkçe \d+ Not girilmedi Not girilmedi Not girilmedi Not girilmedi Not girilmedi/:
         - cell "Ayrıntı":
           - button "Ayrıntı"
         - cell "Türkçe"
         - cell /\d+/
-        - cell "-"
-        - cell "-"
-        - cell "-"
-        - cell "-"
-        - cell "-"
-      - row /1\. Sınav \d+ 2\. Sınav - 3\. Sınav - DİKP\/Performans-1 - DİKP\/Performans-2 - DİKP\/Performans-3 -/:
-        - cell /1\. Sınav \d+ 2\. Sınav - 3\. Sınav - DİKP\/Performans-1 - DİKP\/Performans-2 - DİKP\/Performans-3 -/
+        - cell "Not girilmedi"
+        - cell "Not girilmedi"
+        - cell "Not girilmedi"
+        - cell "Not girilmedi"
+        - cell "Not girilmedi"
+      - row /1\. Sınav \d+ 2\. Sınav Not girilmedi 3\. Sınav Not girilmedi DİKP\/Performans-1 Not girilmedi DİKP\/Performans-2 Not girilmedi DİKP\/Performans-3 Not girilmedi/:
+        - cell /1\. Sınav \d+ 2\. Sınav Not girilmedi 3\. Sınav Not girilmedi DİKP\/Performans-1 Not girilmedi DİKP\/Performans-2 Not girilmedi DİKP\/Performans-3 Not girilmedi/:
+          - term: 1. Sınav
+          - definition: /\d+/
+          - term: 2. Sınav
+          - definition: Not girilmedi
+          - term: 3. Sınav
+          - definition: Not girilmedi
+          - term: DİKP/Performans-1
+          - definition: Not girilmedi
+          - term: DİKP/Performans-2
+          - definition: Not girilmedi
+          - term: DİKP/Performans-3
+          - definition: Not girilmedi

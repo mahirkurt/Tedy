@@ -1,9 +1,19 @@
 # TEDY Arayüz Tasarım İlkeleri
 
-**Sürüm 1.0 · 2026-08-31 · Kapsam: `dashboard/` (React 19 + Carbon v11)**
+**Sürüm 1.2 · 2026-10-10 · Kapsam: `dashboard/` (React 19 + Carbon v11)**
 
 Bu doküman TEDY panosunun neye benzeyeceğini değil, **neye göre karar verileceğini**
 yazar. Bir ekran tasarlarken "bu doğru mu?" sorusunun cevabı buradan çıkmalı.
+
+**Giriş (2026-10-10).** Arayüz işine başlayan herkesin ön kapısı
+[`docs/tedy-ui-ux-talimatnamesi.md`](tedy-ui-ux-talimatnamesi.md)'dir (talimatname); kimin hangi iş
+için neyi hangi sırayla okuyacağını onun §0'ı söyler. Bu doküman talimatnamenin **üstündedir**:
+değişmezler (D1–D4) ve ilkeler (İ1–İ9) burada yaşar ve burada değişir. Talimatname onları kopyalamaz;
+kural · test · kapı tablosunda (§2) bağlantıyla toplar, Carbon temellerini, kalıpları, bilinçli sapmaları
+ve otomatik kapıları bu kuralların altına yerleştirir. Öncelik sırası: D1–D4 → İ1–İ9 → talimatname →
+yüzey tasarımları (`frontend-surface-designs.md`) → bileşen rehberi (`carbon-bilesen-rehberi.md`) →
+`tedy-carbon` katmanı → carbon-builder → Carbon'un genel rehberi. Çelişkide üstteki kazanır; ölçüm,
+kaynak göstermeyen genellemeyi yener.
 
 ---
 
@@ -83,7 +93,9 @@ hareket süreleri Carbon token'larından (`--cds-*`) veya onlardan türetilmiş
 karşılığı olmayan bir kalıp için **özel bileşen yazılabilir**, ama o bileşen de
 token'larla boyanır.
 
-**D2 — Erişilebilirlik tabanı.** WCAG 2.1 AA kontrast; klavyeyle ulaşılabilir ve
+**D2 — Erişilebilirlik tabanı.** WCAG 2.2 AA (kontrast dahil; güncellendi 2026-10-10:
+`dashboard/tests/e2e/tasarim-denetimi.spec.ts` axe'i `wcag22aa` etiketiyle koşar, 2.2 AA 2.1 AA'nın
+kontrast ölçütlerini içerir); klavyeyle ulaşılabilir ve
 **görünür** odak; `prefers-reduced-motion` gerçekten uygulanır; her etkileşimli
 öğe bir isme sahiptir. Ekran okuyucuya giden metin ham token olamaz.
 
@@ -194,7 +206,8 @@ Tamamlanan, süresi geçen, artık eylem gerektirmeyen hiçbir şey, eylem gerek
 
 *Neden:* şu anki Ödevler sayfası Mart'tan kalma 12 bitmiş ödevle açılıyor ve
 yapılacak iş yokken 1500 piksel ölü geçmiş gösteriyor. Bu, dikkati tam olarak
-işe yaramaz yere harcatır.
+işe yaramaz yere harcatır. (Güncellendi 2026-10-10: bu durum 2026-08-31'de giderildi,
+`53cc021`; sayfa artık İşler, bitmiş gruplar kapalı başlar. Gerekçe ölçüm kaydı olarak kalır.)
 
 *Test:* Sayfayı aç. İlk ekranda görünen öğelerin kaçı **bugün eylem gerektiriyor**?
 Yarıdan azsa ilke ihlal edilmiştir.
@@ -255,6 +268,11 @@ Yeniden yapılandırma yönü:
 
 Bugünkü yedi `--ted-cat-*` rengi bu şemaya indirgenir. Hangi kategorinin renk
 hakkını koruyacağı §7'deki bilgi mimarisiyle birlikte kararlaştırılır.
+(Güncellendi 2026-10-10: indirgeme yapıldı. `--ted-cat-*` 2026-09-24'te kaldırıldı, `ac0b12b`;
+taksonomi Tedy ders renk sistemiyle (`subjectThemes`, Carbon Tag aileleri) çözüldü, etkinlik türü
+ikonla gösterilir, ders renginin yüzeye çıkışını İ8 düzenler.)
+
+Ayrıntı: talimatname §3.1 (tema ve katman) ve §3.2 (renk).
 
 ### 5.2 Tipografi — iki dünya
 
@@ -262,8 +280,11 @@ TEDY'de iki farklı iş var ve ikisi aynı sesle konuşmamalı:
 
 - **Yapma yüzeyi** (pano, ödev, program, asistan): **IBM Plex Sans** — Carbon'un
   kendi sesi. Nötr, yoğun bilgi taşıyan, tarayarak okunan.
-- **Okuma yüzeyi** (Tedy Books): **Cormorant Garamond + Literata** — kitap sesi.
-  Sürekli okuma için, uzun satır, sakin ritim.
+- **Okuma yüzeyi** (Tedy Books): **IBM Plex Serif** — kitap sesi.
+  Sürekli okuma için, uzun satır, sakin ritim. (Güncellendi 2026-10-10: Cormorant
+  Garamond + Literata 2026-09-24'te, `393c13f`, IBM Plex Serif ile değişti; okuma odası tip
+  sisteminin içinde kalsın diye. Kitabın arayüz parçaları `--book-sans` ile Plex Sans; bkz.
+  `ted-theme.scss` `--book-display` / `--book-serif`, `index.html`.)
 
 Bu ayrım **zaten var ve doğrudur**; icat edilmesi değil korunması gerekir. Bir
 kullanıcı okuma dünyasına girdiğinde bunu tipografiden anlar. Yapma yüzeyine
@@ -271,11 +292,15 @@ kitap tipografisi, okuma yüzeyine arayüz tipografisi sızmaz.
 
 Ölçek Carbon type token'larından gelir (`type-style`). Yeni punto icat edilmez.
 
+Ayrıntı: talimatname §3.3.
+
 ### 5.3 Yoğunluk
 
 Işık'ın yüzeyi **seyrek**, veli görünümü **yoğun** olabilir. Aynı bileşenin iki
 yoğunlukta yaşaması Carbon'da doğaldır; hangi yoğunluğun kullanılacağı
 kullanıcıya göre değil **role** göre seçilir.
+
+Ayrıntı: talimatname §3.4.
 
 ### 5.4 Hareket
 
@@ -283,14 +308,32 @@ Hareket üç işe yarar: **konum değişimini anlatmak**, **yeni geleni işaret 
 **bekleyişi katlanılır kılmak**. Bunların dışındaki hareket İ6'ya göre vergidir.
 
 Süreler Carbon `motion` token'larından. Aynı anda tek hareket (İ6).
-`prefers-reduced-motion` yalnız süreyi kısaltmaz; hareketin **bilgi taşıdığı**
-yerde hareketi kaldırmaz, taşımadığı yerde tamamen kaldırır.
+**Hiçbir bilgi yalnız hareketle taşınmaz:** her hareketin önce durağan eşdeğeri
+vardır (konum + metin, iskelet + durum mesajı). `prefers-reduced-motion` altında
+temel olmayan **her** hareket durur — animasyon, geçiş, gecikme, yumuşak kaydırma;
+durağan eşdeğeri olan hareket temel değildir.
+(Değiştirildi 2026-10-10, talimatname S37: bu paragrafın eski cümlesi "hareketin
+bilgi taşıdığı yerde hareketi kaldırmaz, taşımadığı yerde tamamen kaldırır"
+diyordu. Bu bir gevşetme değil, sıkılaştırmadır: korunan şey bilgidir, hareket
+değil — bilgi hareketteyse reduce'u açan okur onu kaybederdi. Kod
+(`ted-theme.scss` azaltılmış hareket bloğu) ve `gorunum-kipleri.spec.ts` zaten
+böyleydi; metin onlara hizalandı. Carbon'un "durağan yol her zaman olsun" kuralı ve
+WCAG 2.2 SC 2.3.3 aynı şeyi ister.)
+
+Ayrıntı: talimatname §3.6.
 
 ### 5.5 Dil
 
-Türkçe, sen diliyle, cümle düzeninde (Başlık Her Kelime Büyük değil).
+Türkçe, sen diliyle, cümle düzeninde (Başlık Her Kelime Büyük değil; TÜMÜ BÜYÜK
+HARF de değil — kaşlar, Tag'ler ve durum dizgeleri dahil, ne kaynakta ne CSS'te;
+2026-10-10, talimatname S38).
+(Güncellendi 2026-10-10: 2026-09-24'ten beri Işık'a "sen", aileye "siz"; asistanda ve sayfa
+metinlerinde, Carbon AI Chat'te `asistan/dilPaketi.ts` `AILE` ile. Bkz. yüzey tasarımları
+değişiklik kaydı 1.5.)
 Emir kipi net yönlendirmede kullanılır (İ1) ama suçlayıcı olmaz.
 "Yapmadın" değil "henüz yapılmadı". Ham token yasak (D4).
+
+Ayrıntı: talimatname §3.9.
 
 ---
 
@@ -315,6 +358,9 @@ Neden bu:
    kullanıcıda "ne zaman başlayacağım" sorusunu ortadan kaldırır (İ3).
 
 Şerit **Bugün**'ün omurgasıdır ve diğer sayfalarda daraltılmış hâliyle bulunur.
+(Güncellendi 2026-10-10: bugünkü `DayStrip` yalnız şimdiden uykuya kalan aralığı çizer, okul bloğu
+çizmez, işi sıradaki işin tek çapa işaretine indirir ve yalnız Bugün'de bulunur, `TodaySchedule.tsx`
+tek tüketicisi. Yukarıdaki tam tasarım hedef olarak kalır; ayrıntı talimatname §8.)
 
 Bu, panonun tek gösterişli öğesidir. Etrafındaki her şey sakin ve disiplinli
 kalır (İ6).
@@ -323,8 +369,15 @@ kalır (İ6).
 
 ## 7. Bilgi mimarisi — öneri
 
-Bugün **13 nav öğesi** var ve hepsi **ikon, etiketsiz**. Çalışma belleği zayıf bir
+2026-08-31'de **13 nav öğesi** vardı ve hepsi **ikon, etiketsiz**di. Çalışma belleği zayıf bir
 kullanıcı için bu, iş yapmadan önce 13 hatırlama kararıdır.
+
+(Güncellendi 2026-10-10: öneri kabul edildi ve uygulandı, `4348128`, 2026-08-31. Masaüstünde 5
+birincil öğe görünür etiketle, 7 ikincil "Daha fazla" `SideNavMenu`'sünün altında; Modüller
+sonradan eklendi, Sınavlar gezinmede görünmeyen bir rota. Telefonda (< 672px, D3a, `b9cdfb9`,
+2026-10-02) `BottomNav`: Bugün · İşler · Asistan · Dersler · Daha fazla; Tedy Books `/daha-fazla`
+sayfasına geçer, odak kipi Daha fazla sekmesini düşürür. Kaynak: `routes.ts`, `BottomNav.tsx`,
+`DahaFazla.tsx`; ayrıntı talimatname §5, kabuk ve gezinme.)
 
 Önerilen indirgeme — **5 birincil**:
 
@@ -342,7 +395,9 @@ Duyurular, Takvim, Takımlar, Profil.
 **Nav etiketlenir.** İkon tek başına taşıyıcı olamaz.
 
 Bu bir öneridir, karar değil. Kabul edilirse rota değişikliği ve yönlendirme
-gerektirir; eski yollar kırılmaz, yeni yerlerine yönlendirilir.
+gerektirir; eski yollar kırılmaz, yeni yerlerine yönlendirilir. (2026-10-10: karara bağlandı;
+yukarıdaki not ve yüzey tasarımları §1. `/odevler` → `/isler`, `/program` → `/dersler`
+yönlendirilir.)
 
 ---
 
@@ -351,23 +406,36 @@ gerektirir; eski yollar kırılmaz, yeni yerlerine yönlendirilir.
 Aşağıdakiler varsayım değil; 2026-08-31'de canlı panodan alınmış ekran
 görüntülerinden çıkarıldı.
 
+(Güncellendi 2026-10-10: sekizin yedisi giderildi, biri kısmen. Liste ölçüm kaydı olarak kalır; her
+maddenin sonunda durumu ve düzelten iş yazılı. Bugünün açık borçları talimatname §13'tedir.)
+
 **Bugün sayfası**
 1. Sayfadaki en gürültülü öğe **Tedy Books** bandı (koyu zemin, altın, büyük) ve
    okul ajandasının üstünde duruyor. Opsiyonel olan, zorunlu olandan yüksek sesle
-   konuşuyor. → İ1, İ6 ihlali.
-2. Sol ray 13 ikon, etiketsiz. → §7.
+   konuşuyor. → İ1, İ6 ihlali. → **Giderildi** (`e3bedc0`): bant kalktı; kitap, borç yokken
+   tek-iş yuvasına girer.
+2. Sol ray 13 ikon, etiketsiz. → §7. → **Giderildi** (`4348128`; telefonda `b9cdfb9`): 5 birincil,
+   görünür etiket.
 3. İçerik ~530px'te bitiyor, altında ~350px boşluk. Katlama altı bilgi taşımıyor.
+   → **Giderildi**: Bugün yeniden kuruldu (`e3bedc0`, sonra 2026-09-24; yüzey tasarımları §4.1),
+   kabuk görüntü alanını doldurur (`dc8152a`).
 
 **Ödevler sayfası**
 4. Özet satırı: "Toplam Ödev: 0 Yaptı: 0 Geç: 0 Eksik: 0 Değerlendirilmemiş: 0
    Teslim Edilmeyen: 0" — altı sıfır, tek satırda, hiçbir şey söylemeden. → İ3, İ6.
+   → **Giderildi** (`53cc021`): satır silindi, sayılar bölüm başlıklarında.
 5. Sayfa **Mart'tan kalma 12 bitmiş ödevle** açılıyor; hepsi "YAPILAN", hepsinde
    "Süresi doldu". Yapılacak iş yokken 1500px ölü geçmiş. → İ7 ihlali.
+   → **Giderildi** (`53cc021`): sayfa artık İşler; bitmiş gruplar kapalı başlar.
 6. `İlk görülme: 2026-03-11T23:29:16.752613` — mikrosaniyeli ham ISO damgası
-   ekranda. → **D4 ihlali.**
+   ekranda. → **D4 ihlali.** → **Giderildi** (`53cc021`): `formatTurkishDate` ISO'yu çözer,
+   çözemezse girdiyi değil boş dize döndürür.
 7. Bitmiş ödev ile bekleyen ödev **aynı görsel ağırlıkta**. → İ7, İ8.
+   → **Giderildi** (`53cc021`): bitmiş gruplar katlanmış başlar, aktif liste önde.
 8. Bitmiş işte "Süresi doldu" rozeti — teknik olarak doğru, anlamca yanlış ve
-   gereksiz alarm. → İ9.
+   gereksiz alarm. → İ9. → **Kısmen giderildi** (`53cc021`): öğrencinin "Yaptım" dediği işte artık
+   çıkmaz; öğretmenin "Yaptı" dediği, teslimi geçmiş satırda "Tamamlandı" grubunda hâlâ çıkar
+   (`HomeworkTracker.tsx`, `countdown.urgency === 'expired' && !hw.student_marked_done`).
 
 ---
 
@@ -377,7 +445,8 @@ görüntülerinden çıkarıldı.
   cevabıdır ve İ3'ü doğrudan ihlal eder (toplamı öne çıkarır).
 - **Kutlama.** Konfeti, rozet avı, seri sayacı. Dışsal ödül, bu profilde içsel
   motivasyonu aşındırma riski taşır ve İ6'nın bütçesini harcar. Tamamlanma
-  **sessizce ve net** gösterilir.
+  **sessizce ve net** gösterilir. (2026-10-10, talimatname S43: edupedia modüllerine
+  de uygulanır — ödül animasyonu ve seri sayacı yok, ilerleme sessiz ve etiketli.)
 - **Bildirim yağmuru.** Hatırlatma, kalıcı görünürlüğün yerini tutmaz. Kalıcı
   görünürlük (şerit) tercih edilir.
 - **Suçlayıcı dil.** "Yapmadın", "geciktin", kırmızı ünlem. Gecikme bilgi olarak
@@ -400,8 +469,10 @@ Bir ekran "bitti" sayılmadan önce:
 - [ ] **Sızıntı taraması** (D4): ekranda ham token, ISO damgası, iç kod yok.
 - [ ] **Klavye turu** (D2): her etkileşimli öğeye ulaşılıyor, odak görünür.
 - [ ] **Kontrast** (D2): AA sağlanıyor.
-- [ ] **Reduced motion** (5.4): kapalıyken bilgi kaybı yok.
+- [ ] **Reduced motion** (5.4): açıkken hiçbir şey hareket etmez ve bilgi kaybı yok.
 - [ ] **Boş durum** (D3): boşsa nedeni yazıyor.
+
+Otomatik kapılar ve komutlar: talimatname §12.
 
 ---
 
@@ -410,3 +481,5 @@ Bir ekran "bitti" sayılmadan önce:
 | Sürüm | Tarih | Not |
 |---|---|---|
 | 1.0 | 2026-08-31 | İlk sürüm. Işık'ın profili, ölçülmüş mevcut durum ve Carbon v11 tabanı üzerine. |
+| 1.1 | 2026-10-10 | Talimatname (`tedy-ui-ux-talimatnamesi.md`) altına bağlandı: Giriş notu ve öncelik sırası, §5 alt bölümlerine ve §10'a talimatname bağlantıları; bayat iddialar tarihli notla düzeltildi (D2 WCAG 2.2 AA, İ7 ve §8 kusurları giderildi/kısmen, §5.1 `--ted-cat-*` kalktı, §5.2 Books IBM Plex Serif, §5.5 aileye "siz", §6 Gün Şeridi'nin bugünkü kapsamı, §7 gezinme kararı ve D3a alt çubuğu). Hiçbir D/İ kuralı değişmedi. |
+| 1.2 | 2026-10-10 | Talimatname 1.1'in Ç1–Ç10 kararlarıyla (S35–S44) hizalandı. §5.4 azaltılmış hareket yeniden yazıldı (S37): eski "bilgi taşıyan hareket kalır" cümlesi yerine "hiçbir bilgi yalnız hareketle taşınmaz; reduce altında temel olmayan her hareket durur" — tarihli düzeltme, gevşetme değil; §10 kapısı buna göre. §5.5'e tümü büyük harf yasağı (S38), §9 "Kutlama"ya modüller (S43) eklendi. Hiçbir D/İ kimliği ve bölüm numarası değişmedi. |

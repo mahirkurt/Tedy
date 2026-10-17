@@ -98,7 +98,7 @@ export function parseDeadline(dateStr?: string | null): Date | null {
 }
 
 export function getHomeworkStatus(status: string): {
-  label: string; type: 'green' | 'red' | 'blue' | 'gray' | 'warm-gray'
+  label: string; type: 'green' | 'red' | 'gray' | 'warm-gray'
 } {
   switch (status) {
     case 'Yaptı':
@@ -107,18 +107,9 @@ export function getHomeworkStatus(status: string): {
     case 'Yapmadi': return { label: 'Yapmadı', type: 'red' }
     case 'Eksik': return { label: 'Eksik', type: 'warm-gray' }
     case 'Değerlendirilmemiş':
-    case 'Degerlendirilmemis': return { label: 'Bekliyor', type: 'blue' }
+    case 'Degerlendirilmemis': return { label: 'Bekliyor', type: 'gray' }
     default: return { label: status, type: 'gray' }
   }
-}
-
-export function gradeColor(score: string): string {
-  const n = parseInt(score)
-  if (isNaN(n)) return ''
-  if (n >= 85) return 'var(--status-success)'
-  if (n >= 70) return 'var(--status-info)'
-  if (n >= 50) return 'var(--status-warning)'
-  return 'var(--status-error)'
 }
 
 /** Strips trailing " ," from each line then joins with ', '.
@@ -175,26 +166,28 @@ export function kisaGun(gun: Date, now: Date): string {
 /** Turkish names for the scrape sections health.json reports on. Shared so the
  *  header popover and the portal-status banner cannot drift apart. */
 export const SECTION_LABELS: Record<string, string> = {
-  ogrenci_profili: 'Öğrenci Profili',
+  ogrenci_profili: 'Öğrenci profili',
   odevlerim: 'Ödevler',
-  ders_programi: 'Ders Programı',
+  ders_programi: 'Ders programı',
   takvim: 'Takvim',
   gelisim_raporu: 'Notlar',
-  ders_icerikleri: 'Ders İçerikleri',
+  ders_icerikleri: 'Ders içerikleri',
   takim_calismalari: 'Takımlar',
   ogep: 'ÖGEP',
   duyurular: 'Duyurular',
 }
 
 /** A model identifier as a person would say it: "claude-sonnet-5" →
- *  "Claude Sonnet 5", "claude-opus-4-8" → "Claude Opus 4.8". The AI label
+ *  "Claude Sonnet 5", "claude-opus-4-8" → "Claude Opus 4.8", the house model
+ *  ("gemma…", CLAUDE.md "Evdeki model") → "Evdeki model (Gemma)". The AI label
  *  names the model that wrote the answer; an API identifier there is internal
- *  representation reaching the reader (D4). Anything unrecognised passes
- *  through unchanged rather than being guessed at. */
+ *  representation reaching the reader (D4, B55). An unrecognised identifier is
+ *  not shown at all: '' rather than the raw id. */
 export function modelAdi(id?: string | null): string {
   if (!id) return ''
+  if (/^gemma/i.test(id)) return 'Evdeki model (Gemma)'
   const m = id.match(/^claude-([a-z]+)-(\d+)(?:-(\d+))?$/)
-  if (!m) return id
+  if (!m) return ''
   const aile = m[1].charAt(0).toUpperCase() + m[1].slice(1)
   return `Claude ${aile} ${m[2]}${m[3] ? `.${m[3]}` : ''}`
 }

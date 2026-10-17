@@ -64,12 +64,19 @@ def test_hook_segment_renders_and_closes():
     assert 'data-seg="hook"' in html and "data-hook-resolved" in html
     rows = run_gate(vm.gate_flow, html); assert status_of(rows, "G-FLOW") == "PASS"
 
-def test_gain_only_streak_no_reset_language():
-    # v3.0.0 Task 9: resetStreak() artık state.streak'i sıfırlamaz (gain-only);
-    # yalnızca nötr "korundu" (data-held) işaretine alır — kayıp/ceza dili yok.
+def test_streak_counter_fails_s43():
+    # TEDY talimatnamesi S43 (2026-10-10, borç B73): modülde seri sayacı yoktur — cezasız
+    # "gain-only" bir seri çipi bile dışsal ödüldür (anayasa §9). Seri sayacı öğesi G-FLOW FAIL.
     html = open("tests/fixtures/streak_gainonly.html").read()
+    rows = run_gate(vm.gate_flow, html); assert status_of(rows, "G-FLOW") == "FAIL"
+    msg = next(m for g, s, m in rows if g == "G-FLOW")
+    assert "S43" in msg
+
+
+def test_streak_mentions_without_counter_do_not_fail():
+    # Yalnız işaretleme sayılır: CSS ya da JS'te "streak-chip" adının geçmesi sayaç değildir.
+    html = '<style>.streak-chip{display:none}</style><div data-seg="hook"></div><div data-hook-resolved="h"></div>'
     rows = run_gate(vm.gate_flow, html); assert status_of(rows, "G-FLOW") == "PASS"
-    assert "streak=0" not in html.lower().replace(" ", "")  # resetStreak artık 0'a set etmez
 
 def test_pacingdisk_no_countdown():
     # Task 10: pacing-disk render edilir, data-countdown YOK (sayısız/kesintisiz disk) → G-FLOW PASS
@@ -159,10 +166,10 @@ def test_adaptive_difficulty_fixture_has_signature():
 
 def test_adaptive_difficulty_gflow_pass_no_labeling():
     # Taban-korumalı uyarlanır zorluk kullanıcıyı ASLA etiketlemez. Fixture kasıtlı olarak
-    # streakChip imzası taşır ki G-FLOW "imza yok → uygulanmaz" atlama dalına değil, gerçek
+    # pacingDisk imzası taşır ki G-FLOW "imza yok → uygulanmaz" atlama dalına değil, gerçek
     # FLOW_LABEL_RE/FLOW_LOSS_RE taramasına girsin — yalnızca o zaman bu test anlamlıdır.
     html = open("tests/fixtures/adaptive_pass.html").read()
-    assert "streakChip" in html  # gate_flow'un gerçek tarama dalına girdiğini garanti eder
+    assert "pacingDisk" in html  # gate_flow'un gerçek tarama dalına girdiğini garanti eder
     rows = run_gate(vm.gate_flow, html)
     assert status_of(rows, "G-FLOW") == "PASS"
     assert not vm.FLOW_LABEL_RE.search(html)

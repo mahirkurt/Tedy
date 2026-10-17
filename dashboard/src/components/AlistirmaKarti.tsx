@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react'
-import { Button, RadioButton, RadioButtonGroup, TextInput } from '@carbon/react'
+import { Button, InlineLoading, RadioButton, RadioButtonGroup, TextInput } from '@carbon/react'
 import './AlistirmaKarti.scss'
 
 export interface Alistirma {
@@ -34,14 +34,19 @@ export default function AlistirmaKarti({ alistirma, saltOkunur = false, disabled
   const [sonuclar, setSonuclar] = useState<Sonuc[]>([])
   const [bekliyor, setBekliyor] = useState(false)
   const [hata, setHata] = useState('')
+  const [bosDenendi, setBosDenendi] = useState(false)
   const gonderiliyor = useRef(false)
   const tamam = sonuclar.length === alistirma.sorular.length
   const soru = alistirma.sorular[sira]
   const sonuc = sonuclar[sira]
-  const kapali = saltOkunur || disabled || bekliyor || Boolean(sonuc)
+  // B42: okunacak içerik devre dışı değil salt okunur (cevaplanmış soru, salt okunur sohbet); yapılamayacak eylem
+  // gizlenir; `disabled` yalnız geçici durumdur (akış sürerken, yanıt beklenirken).
+  const salt = saltOkunur || Boolean(sonuc)
+  const kapali = salt || disabled || bekliyor
 
   async function gonder() {
-    if (kapali || gonderiliyor.current || !cevap.trim()) return
+    if (kapali || gonderiliyor.current) return
+    if (!cevap.trim()) { setBosDenendi(true); return }
     gonderiliyor.current = true
     setBekliyor(true)
     setHata('')
@@ -72,7 +77,9 @@ export default function AlistirmaKarti({ alistirma, saltOkunur = false, disabled
     setSira(sira + 1)
     setCevap('')
     setHata('')
+    setBosDenendi(false)
   }
+  const bosUyari = bosDenendi && !cevap.trim()
 
   const yanlislar = alistirma.sorular.filter((_, i) => sonuclar[i] && !sonuclar[i].dogru)
   return <section className="ac-alistirma" aria-labelledby={`${id}-baslik`}>
@@ -84,16 +91,18 @@ export default function AlistirmaKarti({ alistirma, saltOkunur = false, disabled
       <form onSubmit={event => { event.preventDefault(); void gonder() }}>
         {soru.tur === 'coktan_secmeli' && soru.secenekler
           ? <RadioButtonGroup name={`${id}-secenek`} legendText="Cevabın" valueSelected={cevap}
-            disabled={kapali} onChange={value => setCevap(String(value ?? ''))}>
+            readOnly={salt} disabled={!salt && (disabled || bekliyor)} invalid={bosUyari} invalidText="Önce bir seçenek seç."
+            onChange={value => { setCevap(String(value ?? '')); setBosDenendi(false) }}>
             {soru.secenekler.map((secenek, i) => <RadioButton key={i}
               id={`${id}-secenek-${i}`} value={secenek} labelText={secenek} />)}
           </RadioButtonGroup>
           : <TextInput id={`${id}-cevap`} labelText="Cevabın" value={cevap}
-            aria-describedby={`${id}-soru`} disabled={kapali}
-            onChange={event => setCevap(event.target.value)} />}
-        {!sonuc && <Button type="submit" disabled={kapali || !cevap.trim()}>
-          {bekliyor ? 'Cevap gönderiliyor' : 'Cevabı gönder'}
-        </Button>}
+            aria-describedby={`${id}-soru`} readOnly={salt} disabled={!salt && (disabled || bekliyor)}
+            invalid={bosUyari} invalidText="Önce cevabını yaz."
+            onChange={event => { setCevap(event.target.value); setBosDenendi(false) }} />}
+        {!salt && (bekliyor
+          ? <InlineLoading description="Cevap gönderiliyor…" iconDescription="Gönderiliyor" />
+          : <Button type="submit" disabled={disabled}>Cevabı gönder</Button>)}
       </form>
       {hata && <p role="alert">{hata}</p>}
       {sonuc && <div className="ac-alistirma__sonuc" role="status">
@@ -102,15 +111,15 @@ export default function AlistirmaKarti({ alistirma, saltOkunur = false, disabled
         <p>{sonuc.aciklama}</p>
       </div>}
       {saltOkunur ? <>
-        <Button kind="tertiary" disabled={disabled || sira === 0}
-          onClick={() => setSira(sira - 1)}>Önceki soru</Button>
-        <Button kind="tertiary" disabled={disabled || sira === alistirma.sorular.length - 1}
-          onClick={sonraki}>Sonraki soru</Button>
+        {sira > 0 && <Button kind="tertiary" disabled={disabled}
+          onClick={() => setSira(sira - 1)}>Önceki soru</Button>}
+        {sira < alistirma.sorular.length - 1 && <Button kind="tertiary" disabled={disabled}
+          onClick={sonraki}>Sonraki soru</Button>}
       </> : sonuc && !tamam && <Button kind="tertiary" onClick={sonraki}>Sonraki soru</Button>}
     </>}
     {tamam && <div className="ac-alistirma__puan" aria-live="polite">
       <p><strong>Puan</strong> · {sonuclar.filter(s => s.dogru).length}/{alistirma.sorular.length}</p>
-      {yanlislar.length > 0 && <Button kind="tertiary" disabled={saltOkunur || disabled}
+      {yanlislar.length > 0 && !saltOkunur && <Button kind="tertiary" disabled={disabled}
         onClick={() => onYanlislar(yanlislar.map(s => s.soru).join('\n'))}>Yanlışlarımı anlat</Button>}
     </div>}
   </section>

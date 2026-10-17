@@ -49,3 +49,39 @@ test('a profile with no fields says so', async ({ page }) => {
   await expect(page.getByText('Portaldan öğrenci bilgisi gelmedi', { exact: false }))
     .toBeVisible()
 })
+
+// B22 (D3, D4): the private-lesson form answers on the page, never in a browser alert, and never with the
+// server's raw error text.
+test('adding a private lesson answers inline, not in an alert', async ({ page }) => {
+  const uyarilar: string[] = []
+  page.on('dialog', d => { uyarilar.push(d.message()); void d.dismiss() })
+  await page.route('**/api/student/profile', r => r.fulfill(json({
+    name: 'Işık', student_no: '', class_name: '', branch: '', photo_data_url: '', fields: {}, scraped_at: '',
+  })))
+  let sonuc = 500
+  await page.route('**/api/private-lessons', r => {
+    if (r.request().method() === 'POST') {
+      return sonuc === 200 ? r.fulfill(json({ ok: true }))
+        : r.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'KeyError: weekday' }) })
+    }
+    return r.fulfill(json({ lessons: [] }))
+  })
+  await page.goto('/profil')
+  const ekle = page.getByRole('button', { name: 'Özel ders ekle' })
+
+  // An empty teacher name is said under the field.
+  await page.getByLabel('Öğretmen adı').fill(' ')
+  await ekle.click()
+  await expect(page.getByText('Öğretmen adını yaz.', { exact: true })).toBeVisible()
+
+  await page.getByLabel('Öğretmen adı').fill('Ayşe Hanım')
+  await ekle.click()
+  const hata = page.locator('.private-lesson-form__sonuc[role="alert"]')
+  await expect(hata).toContainText('Özel ders eklenemedi.')
+  await expect(page.getByText('KeyError')).toHaveCount(0)
+
+  sonuc = 200
+  await ekle.click()
+  await expect(page.locator('.private-lesson-form__sonuc[role="status"]')).toContainText('Özel ders eklendi.')
+  expect(uyarilar).toEqual([])
+})

@@ -4,6 +4,7 @@ import type { ModuleTicket } from '../types'
 import {
   acceptProgressMessage, appearanceMessage, DASHBOARD_THEME, restoreMessage, type RestoreState,
 } from '../utils/moduleBridge'
+import ModulAiEtiketi from './ModulAiEtiketi'
 import './Modules.scss'
 
 type TicketState = { status: 'loading' } | { status: 'ready'; url: string } | { status: 'error'; message: string }
@@ -17,11 +18,13 @@ const TICKET_ERRORS: Record<number, string> = {
 export interface ModuleViewerProps {
   ticketPath: string
   title: string
+  /** What the frame's AI label explains (talimatname S41, B71). */
+  aciklamaPath: string
   /** Absent for draft previews: a draft never writes progress. */
   progress?: { slug: string; version: number }
 }
 
-export default function ModuleViewer({ ticketPath, title, progress }: ModuleViewerProps) {
+export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress }: ModuleViewerProps) {
   const frameRef = useRef<HTMLIFrameElement>(null)
   // Reset to loading during render when ticketPath changes, rather than with a
   // synchronous setState at the top of the effect below (React's "adjusting
@@ -41,12 +44,14 @@ export default function ModuleViewer({ ticketPath, title, progress }: ModuleView
     let cancelled = false
     fetch(ticketPath, { credentials: 'include' })
       .then(async res => {
-        if (!res.ok) throw new Error(TICKET_ERRORS[res.status] ?? `Modül açılamadı (HTTP ${res.status}).`)
+        if (!res.ok) throw new Error(TICKET_ERRORS[res.status] ?? 'Modül şu an açılamadı. Birkaç dakika sonra yeniden dene.')
         const body = (await res.json()) as ModuleTicket
         if (!cancelled) setTicket({ status: 'ready', url: body.url })
       })
       .catch((e: unknown) => {
-        if (!cancelled) setTicket({ status: 'error', message: e instanceof Error ? e.message : 'Modül açılamadı.' })
+        // B43 (D4): only our own sentences reach the page; a network failure's text ("Failed to fetch") does not.
+        const bizim = e instanceof Error && Object.values(TICKET_ERRORS).concat('Modül şu an açılamadı. Birkaç dakika sonra yeniden dene.').includes(e.message)
+        if (!cancelled) setTicket({ status: 'error', message: bizim ? (e as Error).message : 'Modül açılamadı. Bağlantını kontrol edip yeniden dene.' })
       })
     return () => { cancelled = true }
   }, [ticketPath])
@@ -90,21 +95,27 @@ export default function ModuleViewer({ ticketPath, title, progress }: ModuleView
   }, [])
 
   if (ticket.status === 'loading') {
-    return <div className="module-viewer"><SkeletonText paragraph lineCount={3} /></div>
+    return <div className="module-viewer" aria-busy="true"><SkeletonText paragraph lineCount={3} /></div>
   }
   if (ticket.status === 'error') {
     return (
       <div className="module-viewer">
-        <InlineNotification kind="error" lowContrast hideCloseButton title="Modül açılamadı" subtitle={ticket.message} />
+        <InlineNotification kind="error" role="alert" lowContrast hideCloseButton statusIconDescription="Hata" title="Modül açılamadı" subtitle={ticket.message} />
       </div>
     )
   }
   return (
     <div className="module-viewer">
       {saveFailed && (
-        <InlineNotification kind="warning" lowContrast hideCloseButton title="İlerleme kaydedilemedi"
+        <InlineNotification kind="warning" lowContrast hideCloseButton statusIconDescription="Uyarı" title="İlerleme kaydedilemedi"
           subtitle="Modül çalışmaya devam ediyor; sayfayı yenileyince kayıt yeniden denenir." />
       )}
+      {/* Frame header (S41, B71): every module shown on the dashboard carries a broad AI label, upper right of
+          its container; the module inside is untouched (G-VOICE). */}
+      <div className="module-viewer__ust">
+        <p className="module-viewer__not">Yapay zekâ yardımıyla hazırlanmış modül</p>
+        <ModulAiEtiketi aciklamaPath={aciklamaPath} />
+      </div>
       <iframe ref={frameRef} className="module-frame" title={title} src={ticket.url}
         sandbox="allow-scripts" referrerPolicy="no-referrer" onLoad={onFrameLoad} />
     </div>

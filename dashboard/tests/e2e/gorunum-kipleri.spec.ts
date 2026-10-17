@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { SAYFALAR, sabitAc } from './_gorsel-yardim'
+import { carbonSabitAc } from './_asistan-carbon'
 
 // The operating system's display preferences, which the dashboard used to
 // ignore outside Tedy Books (measured 2026-09-25):
@@ -50,4 +51,31 @@ test('Bugün in Windows high contrast looks as it did', async ({ page }) => {
   await page.emulateMedia({ forcedColors: 'active' })
   await sabitAc(page, '/', 1440, 900)
   await expect(page).toHaveScreenshot('bugun-yuksek-kontrast.png', { fullPage: true, animations: 'disabled', maxDiffPixelRatio: 0.002 })
+})
+
+// B28 (görünüm kipleri, 2026-10-10): Carbon AI Chat'in gölge köklerinde de hiçbir şey hareket etmez; kural
+// carbonOnarimi.ts'te her gölge köke eklenir. Önce gölge kökte öğe olduğu kanıtlanır.
+test('Asistan: nothing animates inside Carbon AI Chat’s shadow roots under reduced motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await carbonSabitAc(page, '/asistan', 1440, 900)
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
+  const { sayi, hareketli } = await page.evaluate(() => {
+    const sn = (v: string) => Math.max(...v.split(',').map(x => parseFloat(x) * (x.trim().endsWith('ms') ? 0.001 : 1)))
+    const out: string[] = []
+    let sayi = 0
+    const gez = (k: ParentNode) => {
+      for (const el of k.querySelectorAll('*')) {
+        sayi += 1
+        const cs = getComputedStyle(el)
+        if (cs.animationName !== 'none' && sn(cs.animationDuration) > 0.01) out.push(`${el.tagName.toLowerCase()} animation ${cs.animationName}`)
+        if (sn(cs.transitionDuration) > 0.01) out.push(`${el.tagName.toLowerCase()} transition ${cs.transitionProperty}`)
+        const sr = (el as HTMLElement).shadowRoot
+        if (sr) gez(sr)
+      }
+    }
+    gez(document.querySelector('cds-aichat-react')!.shadowRoot!)
+    return { sayi, hareketli: [...new Set(out)] }
+  })
+  expect(sayi).toBeGreaterThan(50)
+  expect(hareketli).toEqual([])
 })

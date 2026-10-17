@@ -5,7 +5,7 @@ import { Button } from '@carbon/react'
 import { Chat } from '@carbon/icons-react'
 import { useFocusMode } from '../contexts/focusMode'
 import type { UserRole } from '../hooks/useAuth'
-import { baslaticiGorunur } from './sayfaBaglami.ts'
+import { ASISTANA_SOR, baslaticiGorunur } from './sayfaBaglami.ts'
 
 // Kabuğun ilk parçasında durur ve Carbon AI Chat'i içe aktarmaz: panel ilk tıklamada tembel yüklenir.
 const AsistanPaneli = lazy(() => import('./AsistanPaneli.tsx'))
@@ -22,14 +22,23 @@ export default function AsistanBaslatici({ rol }: { rol: UserRole }) {
     mq.addEventListener('change', f)
     return () => mq.removeEventListener('change', f)
   }, [])
-  if (!baslaticiGorunur(pathname, rol, focusMode, genis)) return null
+  const gorunur = baslaticiGorunur(pathname, rol, focusMode, genis)
+  // "Asistana sor" (B78): görünürken olayı karşılar ve paneli açar; açıksa panel kendi görünümünü öne alır.
+  useEffect(() => {
+    if (!gorunur) return
+    const ac = (e: Event) => { e.preventDefault(); setAcildi(true) }
+    window.addEventListener(ASISTANA_SOR, ac)
+    return () => window.removeEventListener(ASISTANA_SOR, ac)
+  }, [gorunur])
+  if (!gorunur) return null
   // İlk tıklamadan sonra Carbon'un kendi başlatıcısı aynı yerde devralır (ad yine "Sohbet penceresini aç").
+  // Birincil değil (S12, B17): sayfanın kendi birincil eylemi ("Başla" gibi) tek kalır; ikincil düğme.
   // Adlandırılmış bölge: içerik bir işaret bölgesinde (IBM aria_content_in_landmark) ve düğmenin ipucu
   // sarmalayıcısı sayfa akışına girmez (sabit konum kapta).
-  return <aside className={`asistan-baslatici${acildi ? ' asistan-baslatici--acik' : ''}`} aria-label="TEDY Asistan">
+  return <aside className="asistan-baslatici" aria-label="TEDY Asistan">
     {acildi
       ? <Suspense fallback={null}><AsistanPaneli /></Suspense>
-      : <Button kind="primary" size="lg" hasIconOnly renderIcon={Chat} iconDescription="Sohbet penceresini aç"
+      : <Button kind="secondary" size="lg" hasIconOnly renderIcon={Chat} iconDescription="Sohbet penceresini aç"
           tooltipPosition="left" onClick={() => setAcildi(true)} />}
   </aside>
 }

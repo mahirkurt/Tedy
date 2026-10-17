@@ -1,17 +1,20 @@
-import { Button } from '@carbon/react'
+import { Button, InlineLoading, InlineNotification } from '@carbon/react'
 import { ArrowRight } from '@carbon/icons-react'
 import type { PortalEki } from '../types'
 import { EkBaglantisi } from './patterns/EkBaglantisi'
+import { Rakamli } from './patterns/Rakamli'
 import './patterns/patterns.scss'
 import './NextThing.scss'
 import SubjectLabel from './SubjectLabel'
+import { subjectClass } from '../utils/subject'
 
 export interface NextThingProps {
-  /** When this happens — "ŞİMDİ", "BU AKŞAM". */
+  /** When this happens — "Şimdi", "Bu akşam" (sentence case, S38). */
   eyebrow: string
   /** What it is, named the way Işık would name it. */
   title: string
-  /** The course the work belongs to: its mark leads the title (Tedy İ8). */
+  /** The course the work belongs to: its mark leads the title, and its panel
+   *  is the card's ground (Tedy İ8 — the view's one subject surface). */
   course?: string
   /** The opening move. A box to start inside, not a claim about length. */
   stepMinutes: number
@@ -50,9 +53,14 @@ export interface NextThingProps {
  * that makes an over-estimated task startable (principle İ3).
  *
  * "Başla" opens that box in place when the caller passes one: the card says
- * "BAŞLADIN" (İ9 — the action keeps its name through the flow), counts the
+ * "Başladın" (İ9 — the action keeps its name through the flow), counts the
  * minutes down, and shows the teacher's instructions. When the box runs out it
  * offers one more, never a verdict on how much got done.
+ *
+ * The card is the view's one subject panel (İ8.3): the course's step-10 ground,
+ * its step-30 border and a 4px accent edge — the edge, not the ground, is what
+ * separates a grey family's panel from the page (talimatname [3.2-15]). Without
+ * a course (reading) it is a neutral layer with a strong edge.
  */
 export function NextThing({
   eyebrow, title, stepMinutes, stepSuffix = 'başla',
@@ -67,7 +75,7 @@ export function NextThing({
         <div className="next-thing__body">
           <span className="next-thing__eyebrow">{eyebrow}</span>
           <p className="next-thing__title">{baslik}</p>
-          {due && <span className="next-thing__due">{due}</span>}
+          {due && <span className="next-thing__due"><Rakamli metin={due} /></span>}
         </div>
       </section>
     )
@@ -76,25 +84,37 @@ export function NextThing({
   const suruyor = box?.durum === 'suruyor'
   const doldu = box?.durum === 'doldu'
   const ust = suruyor
-    ? `BAŞLADIN · ${box.kalanDk} dk kaldı`
-    : doldu ? 'SÜRE DOLDU' : eyebrow
+    ? `Başladın · ${box.kalanDk} dk kaldı`
+    : doldu ? 'Süre doldu' : eyebrow
+  const kaydediliyor = doneState === 'kaydediliyor'
+
+  // Saving replaces the button that started it (S36): one InlineLoading, in
+  // place, and nothing else on the card moves.
+  // While the box runs "Yaptım" is the card's only forward action, so it is the
+  // primary; once the box has run out "10 dakika daha" is, and "Yaptım" steps
+  // down to tertiary. Carbon keeps secondary for the negative action beside a
+  // primary, and allows one primary per view (talimatname §4.1, S12).
+  const yaptimDugmesi = onDone && (kaydediliyor
+    ? <InlineLoading className="next-thing__saving" description="Kaydediliyor…" iconDescription="Kaydediliyor" />
+    : <Button kind={doldu ? 'tertiary' : 'primary'} size="lg" onClick={onDone}>Yaptım</Button>)
 
   return (
     <section
       className={[
         'next-thing',
+        course ? subjectClass(course) : 'next-thing--neutral',
         variant === 'reading' && 'next-thing--reading',
         suruyor && 'next-thing--running',
       ].filter(Boolean).join(' ')}
     >
       <div className="next-thing__body">
-        <span className="next-thing__eyebrow">{ust}</span>
+        <span className="next-thing__eyebrow"><Rakamli metin={ust} /></span>
         <h2 className="next-thing__title">{baslik}</h2>
-        {due && <span className="next-thing__due">{due}</span>}
+        {due && <span className="next-thing__due"><Rakamli metin={due} /></span>}
 
         {!box && (
           <span className="next-thing__step">
-            <span className="next-thing__step-time tedy-time">{stepMinutes} dakikayla</span> {stepSuffix}
+            <span className="next-thing__step-time"><Rakamli metin={String(stepMinutes)} /> dakikayla</span> {stepSuffix}
           </span>
         )}
         {!box && hint && <p className="next-thing__hint">{hint}</p>}
@@ -114,13 +134,22 @@ export function NextThing({
 
         {doldu && (
           <p className="next-thing__hint">
-            {stepMinutes} dakika doldu. Devam etmek istersen bir {stepMinutes} dakika daha.
+            <Rakamli metin={`${stepMinutes} dakika doldu. Devam etmek istersen bir ${stepMinutes} dakika daha.`} />
           </p>
         )}
+        {/* A failed "Yaptım" says so on the card it was pressed on, and the box
+            stays open: nothing the reader did is lost to a network error (D3). */}
         {box && doneState === 'hata' && (
-          <p className="next-thing__error" role="alert">
-            Kaydedilemedi. Bağlantını kontrol edip yeniden dene.
-          </p>
+          <InlineNotification
+            className="next-thing__error"
+            kind="error"
+            lowContrast
+            hideCloseButton
+            role="alert"
+            statusIconDescription="Hata"
+            title="Kaydedilemedi"
+            subtitle="Bağlantını kontrol edip yeniden dene."
+          />
         )}
       </div>
 
@@ -132,11 +161,7 @@ export function NextThing({
         )}
         {suruyor && (
           <>
-            {onDone && (
-              <Button kind="secondary" size="lg" onClick={onDone} disabled={doneState === 'kaydediliyor'}>
-                {doneState === 'kaydediliyor' ? 'Kaydediliyor…' : 'Yaptım'}
-              </Button>
-            )}
+            {yaptimDugmesi}
             {onStop && <Button kind="ghost" size="lg" onClick={onStop}>Bırak</Button>}
           </>
         )}
@@ -147,11 +172,7 @@ export function NextThing({
                 {stepMinutes} dakika daha
               </Button>
             )}
-            {onDone && (
-              <Button kind="secondary" size="lg" onClick={onDone} disabled={doneState === 'kaydediliyor'}>
-                {doneState === 'kaydediliyor' ? 'Kaydediliyor…' : 'Yaptım'}
-              </Button>
-            )}
+            {yaptimDugmesi}
             {onStop && (
               <Button kind="ghost" size="lg" onClick={onStop}>Şimdilik bu kadar</Button>
             )}

@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { mockSohbetler } from './_audit-fixtures'
-import { asistanAc, sor, sonCevap, soruAlani } from './_asistan-carbon'
+import { asistanAc, kaydiriciHazir, sor, sonCevap, soruAlani } from './_asistan-carbon'
 
 test.beforeEach(async ({ page }) => { await mockSohbetler(page) })
 
@@ -114,15 +114,16 @@ test('risk and warning safety flags render with different severity, not as raw t
     safety_flags: ['risk:mental_health_crisis', 'warning:limited_confidence'] })
   await asistanAc(page)
   await sor(page, 'zor bir gün geçiriyorum')
-  const flags = altbilgi(page).locator('.cds--tag')
+  const flags = altbilgi(page).locator('.asistan__durum')
   await expect(flags).toHaveCount(2)
   const riskTag = flags.filter({ hasText: 'mental_health_crisis' })
   const warningTag = flags.filter({ hasText: 'Kaynaksız cevap' })
   await expect(riskTag).toHaveCount(1)
   await expect(warningTag).toHaveCount(1)
-  await expect(riskTag).toHaveClass(/cds--tag--red/)
-  await expect(warningTag).not.toHaveClass(/cds--tag--red/)
-  await expect(warningTag).toHaveClass(/cds--tag--gray/)
+  // S45: risk is an error (icon + text); "Kaynaksız cevap" is information — never grey.
+  await expect(riskTag).toHaveClass(/asistan__durum--hata/)
+  await expect(warningTag).toHaveClass(/asistan__durum--bilgi/)
+  await expect(altbilgi(page).locator('.cds--tag--gray')).toHaveCount(0)
   await expect(sonCevap(page)).not.toContainText('warning:limited_confidence')
   await expect(altbilgi(page)).not.toContainText('warning:limited_confidence')
 })
@@ -131,7 +132,7 @@ test('every degraded source surfaces, not just the first', async ({ page }) => {
   await klasik(page, { answer: 'Kısmi yanıt.', meta: { ...meta, degraded: ['maarif-mufredat', 'some-other-server'] } })
   await asistanAc(page)
   await sor(page, 'kesir')
-  await expect(altbilgi(page).locator('.cds--tag')).toHaveCount(2)
+  await expect(altbilgi(page).locator('.asistan__durum')).toHaveCount(2)
   await expect(altbilgi(page)).toContainText('Müfredat kaynağına ulaşılamadı')
   await expect(altbilgi(page)).toContainText('some-other-server')
 })
@@ -153,6 +154,8 @@ test('citations with an unknown kind get their own group, not folded into ogrenc
   await page.getByRole('button', { name: 'Kaynakları kapat' }).click()
   await page.getByRole('button', { name: 'Kaynaklar', exact: true }).click()
   await expect(sonCevap(page).locator('mark')).toContainText('Bilinen kaynak')
+  // B76: kaydırıcı kurulmadan gelen tıklama yutuluyordu (Carbon 100 ms sonra kurar); önce kurulması beklenir.
+  await kaydiriciHazir(page)
   await page.getByRole('button', { name: 'Sonraki slayt.' }).click()
   await expect(page.getByText('Bilinmeyen kaynak', { exact: true }).filter({ visible: true })).toHaveCount(1)
   await expect(sonCevap(page).locator('mark')).toContainText('tanınmayan kaynak')
@@ -343,9 +346,9 @@ test('local fallback answer is labelled, not shown as a raw flag', async ({ page
     meta: { model: 'gemma4-e4b-cpu', provider: 'yerel', degraded: [], dropped_citations: 0 } })
   await asistanAc(page)
   await sor(page, 'kesir nasıl toplanır')
-  const yedek = altbilgi(page).locator('.cds--tag').filter({ hasText: 'Yedek modelden' })
+  const yedek = altbilgi(page).locator('.asistan__durum').filter({ hasText: 'Yedek modelden' })
   await expect(yedek).toHaveCount(1)
-  await expect(yedek).toHaveClass(/cds--tag--gray/)
+  await expect(yedek).toHaveClass(/asistan__durum--uyari/)
   await expect(sonCevap(page)).not.toContainText('warning:yerel_yedek')
   await expect(altbilgi(page)).not.toContainText('warning:yerel_yedek')
 })

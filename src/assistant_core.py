@@ -288,6 +288,8 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     "sheets_id.txt",
     # Per-person Tedy Books reading position (emails, reading location).
     "book_progress.json",
+    # The household's focus-window setting (B29): a dashboard parameter, not school data.
+    "odak_penceresi.json",
     # Process/cron bookkeeping: pid files, crontab dumps, the sync scheduler state.
     "*.pid",
     "crontab*",

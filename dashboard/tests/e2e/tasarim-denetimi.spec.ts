@@ -15,7 +15,7 @@ import { mock, FULL } from './_audit-fixtures'
 //     and its sideways scroll region was unreachable by keyboard.
 
 const SAYFALAR = ['/', '/isler', '/asistan', '/dersler', '/kitaplar', '/notlar', '/takvim',
-  '/takimlar', '/ilerleme', '/duyurular', '/profil', '/moduller', '/sinavlar']
+  '/takimlar', '/ilerleme', '/duyurular', '/profil', '/moduller', '/sinavlar', '/daha-fazla']  // B27
 const BOYUTLAR = [['masaüstü', 1440, 900], ['telefon', 390, 844]] as const
 
 async function ac(page: import('@playwright/test').Page, yol: string, w: number, h: number) {
@@ -62,8 +62,8 @@ test('a phone page begins under the header, as a desktop one does', async ({ pag
 
 test('opening Asistan on a phone does not scroll the page', async ({ page }) => {
   await ac(page, '/asistan', 390, 844)
-  // Carbon AI Chat'in başlığı bir başlık öğesi değil; adı ve giriş alanı ekranda olmalı.
-  await expect(page.getByText('TEDY Asistan', { exact: true }).first()).toBeInViewport()
+  // Carbon AI Chat'in başlığı bir başlık öğesi değil; başlığı (o anki öğretmen) ve giriş alanı ekranda olmalı.
+  await expect(page.getByText('Genel asistan', { exact: true }).first()).toBeInViewport()
   await expect(page.getByRole('textbox', { name: /^Sorunu(zu)? yaz/ })).toBeInViewport()
   expect(await page.evaluate(() => window.scrollY)).toBe(0)
 })

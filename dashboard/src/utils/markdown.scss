@@ -12,8 +12,8 @@
   display: block;
   margin-block-end: spacing.$spacing-02;
   color: var(--cds-text-secondary);
-  @include type.type-style('label-01');
-  text-transform: uppercase;
+  // Cümle düzeni (S38, B70): büyük harf ne kaynakta ne CSS'te; etiket ağırlığı token'dan.
+  @include type.type-style('heading-compact-01');
 }
 
 .ac-kutu--ornek {
@@ -21,32 +21,19 @@
   background: var(--cds-layer-01);
 }
 
+// Sonuç ve sık yapılan hata: anlam rengi kenarda, zemin nötr katman — bildirim token'ı bileşeni dışında
+// ödünç alınmaz (B32, [3.2-2]).
 .ac-kutu--sonuc {
   border-inline-start-color: var(--cds-support-success);
-  background: var(--cds-notification-background-success);
   @include type.type-style('heading-compact-01');
 }
 
 .ac-kutu--hata {
   border-inline-start-color: var(--cds-support-warning);
-  background: var(--cds-notification-background-warning);
 }
 
-// .ac eski sohbet kökü, .asistan Carbon AI sayfası (eklenti çıktısı onun ışık DOM'unda).
-:is(.ac, .asistan)[data-ogretmen]:not([data-ogretmen='genel']) {
-  .ac-kutu--kavram {
-    border-inline-start-color: var(--ted-subject-accent, var(--cds-border-strong-01));
-    background: var(--ted-subject-panel, var(--cds-layer-02));
-  }
-
-  .ac-kutu--kavram .ac-kutu__etiket {
-    color: var(--ted-subject-text, var(--cds-text-primary));
-  }
-
-  .ac-adim__no {
-    background: var(--ted-subject-accent, var(--cds-button-primary));
-  }
-}
+// Öğretmen kipinde kutular nötr kalır: ders rengi yalnız sohbet çerçevesinde ve okurun balonundadır
+// (Asistan yenilemesi 2026-10-10, spec madde 8; İ8.3 bir görünümde tek büyük ders paneli).
 
 .ac-adimlar {
   display: grid;
@@ -89,8 +76,10 @@
   justify-content: center;
   inline-size: spacing.$spacing-06;
   block-size: spacing.$spacing-06;
-  background: var(--cds-button-primary);
-  color: var(--cds-text-on-color);
+  // Adım numarası nötr işaret: düğme rengi ya da ders aksanı değil (B32; eylem rengi yalnız eylemde, S35).
+  border: 1px solid var(--cds-border-strong-01);
+  border-radius: 999px;
+  color: var(--cds-text-primary);
   @include type.type-style('label-02');
 }
 

@@ -1,22 +1,40 @@
 @use '@carbon/react/scss/theme' as theme;
 @use '@carbon/react/scss/type' as type;
 @use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/breakpoint' as bp;
 
 // The one thing. Everything else on the page is quieter than this by design:
 // a reader who wants direction and stalls in front of choices needs exactly one
 // named next step (principle İ1), and the entry to it has to look small enough
 // to begin (İ3).
+//
+// It is the view's one subject panel (İ8.3, talimatname [3.2-13]): the course's
+// step-10 ground, its step-30 border and a 4px accent edge. The edge carries
+// the separation — every family's panel is 1.00–1.01:1 against the page ground,
+// and cool-gray's is the page ground itself ([3.2-15]). No shadow (S11), the
+// card corner (S10).
 
 .next-thing {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: $spacing-05;
-  padding: $spacing-05 $spacing-06;
-  background: theme.$layer-01;
-  border-inline-start: 3px solid theme.$interactive;
-  border-radius: 2px;
+  padding: $spacing-06;
+  background: var(--ted-subject-panel);
+  border: 1px solid var(--ted-subject-panel-border);
+  border-inline-start: 4px solid var(--ted-subject-accent);
+  border-radius: var(--ted-radius-card);
   margin-block-end: $spacing-06;
+}
+
+// No course (Tedy Books, an event): a neutral layer with a strong edge, so the
+// card keeps its shape without borrowing a subject's colour. Contextual tokens
+// (B31): inside İşler's card the block sits in a Carbon <Layer>, one step up —
+// it was layer-01 on layer-01, white on white.
+.next-thing--neutral {
+  background: var(--cds-layer);
+  border-color: var(--cds-border-subtle);
+  border-inline-start-color: theme.$border-strong-01;
 }
 
 .next-thing__body {
@@ -24,19 +42,25 @@
   min-width: 0;
 }
 
+// Sentence case (S38): "Bu akşam", "Başladın · 9 dk kaldı".
 .next-thing__eyebrow {
   display: block;
   @include type.type-style('label-01');
   color: theme.$text-secondary;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   margin-block-end: $spacing-02;
 }
 
+// The largest text on the page (P1), at the token's own weight (S44).
 .next-thing__title {
-  @include type.type-style('heading-03');
+  @include type.type-style('heading-04');
   color: theme.$text-primary;
   margin: 0;
+}
+
+// A title that wraps keeps the subject mark on its first line, not centred
+// against two or three lines of 28px type.
+.next-thing__title .ted-subject-label {
+  align-items: baseline;
 }
 
 // The proposal, not an estimate: we do not know how long the work takes, and
@@ -50,10 +74,10 @@
 }
 
 .next-thing__step-time {
-  font-weight: 600;
   color: theme.$text-primary;
 }
 
+// On the panel the helper grey falls to ≈ 4.6:1; the secondary text keeps 7:1.
 .next-thing__hint {
   @include type.type-style('helper-text-01');
   color: theme.$text-secondary;
@@ -88,46 +112,46 @@
   gap: $spacing-02;
 }
 
-// A failed "Yaptım" says so on the card it was pressed on, and the box stays
-// open: nothing the reader did is lost to a network error (D3).
+// A failed "Yaptım" is a Carbon inline notification on the card it was pressed
+// on (§5.3); the box stays open.
 .next-thing__error {
-  @include type.type-style('helper-text-01');
-  color: theme.$text-error;
-  margin: $spacing-03 0 0;
+  margin-block-start: $spacing-05;
 }
 
 .next-thing__action {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: $spacing-03;
   flex: 0 0 auto;
 }
 
+// The saving indicator takes the button's place at the button's height, so
+// nothing below it moves while the request runs (P8).
+.next-thing__saving {
+  inline-size: auto;
+  min-block-size: $spacing-09;
+}
+
 // Before the last bell the homework is a preview under the lesson — named and
-// dated on one quiet line, not a second hero competing with it (İ1, İ6).
+// dated on one quiet line, not a second panel competing with it (İ1, İ6).
 .next-thing--quiet {
-  padding: $spacing-03 0;
+  // Its text on the same left line as the Carbon lists under it ("Ayrıca", "Sınavlar"), whose labels and rows
+  // sit 16px in (B37, P3): one keyline, not three.
+  padding: 0 $spacing-05;
   background: transparent;
-  border-inline-start: none;
-  margin-block-end: $spacing-05;
+  border: none;
+  border-radius: 0;
 
   .next-thing__title {
-    @include type.type-style('body-compact-01');
-    font-weight: 600;
+    @include type.type-style('heading-compact-01');
   }
 }
 
-// The reading variant. Books is not louder than school work — it becomes the
-// one thing only when nothing is owed, and wears the same shape when it does.
-.next-thing--reading {
-  border-inline-start-color: theme.$support-info;
-}
-
-@media (max-width: 42rem) {
+@include bp.breakpoint-down('md') {
+  // Carbon steps the panel padding down one stop on a phone ([3.4-3]).
   .next-thing { padding: $spacing-05; }
-  // The quiet variant is a line in the page, not a card: it keeps the page's
-  // edge. The rule above, later in the file, indented it 16px on phones.
-  .next-thing--quiet { padding-inline: 0; }
+  .next-thing--quiet { padding: 0 $spacing-05; }
   .next-thing__action { flex: 1 1 100%; }
   .next-thing__action .cds--btn--primary { width: 100%; }
 }

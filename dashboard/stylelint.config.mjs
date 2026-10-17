@@ -45,5 +45,20 @@ export default {
     // 0s is the focus mode's switch that turns motion off, not a duration.
     'carbon/motion-duration-use': [true, { ...ortak, acceptValues: [...kabul, '0s', '0ms'] }],
     'carbon/motion-easing-use': [true, ortak],
+    // B14 (S10, B1, B39): what carbon/layout-use does not see.
+    //   * A corner is a card (--ted-radius-card, 8px), a pill (--ted-radius-pill / 999px), a circle (50%) or
+    //     square (0) — no 2/3/4/12px in between.
+    //   * A delay is zero: no staggered entrance (S26, B24), so nothing waits at its start state.
+    'declaration-property-value-allowed-list': [{
+      '/^border(-(top|bottom|start|end)-(left|right|start|end))?-radius$/':
+        ['0', '50%', '999px', '/^var\\(--ted-radius-(card|pill)\\)$/', '/^var\\(--ted-radius-card\\) var\\(--ted-radius-card\\) 0 0$/'],
+      '/^(animation|transition)-delay$/': ['0s', '0ms'],
+    }, { severity: 'error' }],
+    // B14 (4K, S25): a size grows with the root on a 4K screen only in rem. Hairlines and marks up to 3px
+    // stay px (CLAUDE.md "4K screens"); anything larger is rem.
+    'declaration-property-value-disallowed-list': [{
+      '/^(min-|max-)?(width|height|inline-size|block-size)$|^(min-|max-)(inline|block)-size$/':
+        ['/(^|[^\\d.])([4-9]|\\d{2,})px\\b/'],
+    }, { severity: 'error' }],
   },
 }

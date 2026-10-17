@@ -1,3 +1,7 @@
+@use '@carbon/react/scss/spacing';
+@use '@carbon/react/scss/theme';
+@use '@carbon/react/scss/type';
+
 .module-list {
   list-style: none;
   margin: 0;
@@ -59,6 +63,69 @@
   width: 100%;
   min-width: 0;
   display: flex;
+  flex-direction: column;
+}
+
+// Frame header (S41, B71): a broad AI label for the whole module, upper right, never flush to the edge.
+.module-viewer__ust {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: spacing.$spacing-03;
+  padding-block: spacing.$spacing-02;
+  padding-inline-end: spacing.$spacing-03;
+}
+
+.module-viewer__not {
+  @include type.type-style('label-01');
+
+  margin: 0;
+  color: theme.$text-secondary;
+}
+
+// ── the AI label's explanation window: Carbon paints the window; only the words' order here (§6.2) ──
+.modul-ai {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+  max-inline-size: 22rem;
+}
+
+.modul-ai__baslik {
+  @include type.type-style('heading-04');
+
+  margin: 0;
+  color: theme.$text-primary;
+}
+
+.modul-ai__alt-baslik {
+  @include type.type-style('heading-compact-01');
+
+  margin: spacing.$spacing-03 0 0;
+  color: theme.$text-primary;
+}
+
+.modul-ai__govde {
+  @include type.type-style('body-01');
+
+  margin: 0;
+  color: theme.$text-secondary;
+}
+
+.modul-ai__ayrintilar {
+  @include type.type-style('label-02');
+
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-02;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: theme.$text-primary;
+}
+
+.modul-ai__dayanak {
+  color: theme.$text-secondary;
 }
 
 .module-frame {
@@ -69,4 +136,92 @@
   border: 0;
   // Full-bleed: the module owns the page, so no competing card/box chrome.
   background: transparent;
+}
+
+// ── Hazır olanlar (ContainedList) ───────────────────────────────────────────
+
+.module-hazir {
+  margin-block-end: spacing.$spacing-06;
+}
+
+.module-hazir__metin {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.module-hazir__bag {
+  display: inline-flex;
+  min-width: 0;
+  color: theme.$link-primary;
+  text-decoration: none;
+}
+
+.module-hazir__ust-veri {
+  @include type.type-style('label-01');
+
+  color: theme.$text-secondary;
+}
+
+// S17/B3: dokunmatik cihazda `:hover` dokunduktan sonra yapışık kalır; hover kuralı
+// yalnız gerçekten hover'ı olan girdilerde geçerlidir.
+@media (any-hover: hover) {
+  .module-hazir__bag:hover .module-hazir__ad {
+    text-decoration: underline;
+  }
+}
+
+// ── Müfredat ağacı (spec §5) ────────────────────────────────────────────────
+// Carbon'un ağaç düğümü sm 32 px ve etiketi üç noktayla keser; ikisi de TEDY'de örtülür —
+// sapmalar talimatname §11 S48 ve S49.
+
+.module-tree__dal,
+.module-tree__yaprak {
+  display: flex;
+  min-width: 0;
+}
+
+.module-tree__dal {
+  align-items: baseline;
+  gap: spacing.$spacing-04;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.module-tree__yaprak {
+  flex-direction: column;
+}
+
+.module-tree__sayac,
+.module-tree__ust-veri {
+  @include type.type-style('label-01');
+
+  color: theme.$text-secondary;
+  white-space: nowrap;
+}
+
+.module-tree__ust-veri {
+  white-space: normal;
+}
+
+// S49: etiket kırpılmaz, sarar. Kırpılan bir konu adı satırın anlamını yok eder (D4);
+// bileşen rehberi Carbon'un üç nokta taşmasını kendisi "tercih edilmez" diye işaretler.
+// `:where()` KULLANILMAZ: sıfır özgüllük Carbon'un kendi `.cds--tree-node__label` kuralıyla
+// eşitlikte kalıp kaynak sırasına düşüyor ve uygulanmıyordu (ölçüldü: 390 px'te dal satırı
+// 32.78 px kalmıştı). Biçim S18 yamasıyla aynı: `.kap .cds--…`.
+.module-tree .cds--tree-node__label {
+  white-space: normal;
+}
+
+@media (max-width: 671px) {
+  // S48: telefonda dokunma hedefi ≥ 44 px; Carbon 32 px'i `padding-block: 7px` ile kuruyor (B79).
+  .module-tree .cds--tree-node__label {
+    min-height: 2.75rem;
+  }
+
+  .module-tree__dal {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+  }
 }

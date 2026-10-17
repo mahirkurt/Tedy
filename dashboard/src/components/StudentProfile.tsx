@@ -1,10 +1,14 @@
 import { useMemo, useState } from 'react'
-import { Button, Tag } from '@carbon/react'
+import {
+  Button, Checkbox, DatePicker, DatePickerInput, InlineLoading, InlineNotification, Layer, Select, SelectItem, Tag,
+  TextInput, TimePicker,
+} from '@carbon/react'
 import { UserAvatar, UserProfile, AddAlt } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import { COURSE_CONTENT_ORDER } from '../utils/formatters'
 import type { PrivateLesson, StudentProfileData } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
+import OdakPenceresiAyari from './OdakPenceresiAyari'
 
 const DEFAULT_PROFILE: StudentProfileData = {
   name: '',
@@ -18,6 +22,13 @@ const DEFAULT_PROFILE: StudentProfileData = {
 }
 
 const DAYS = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar']
+
+/** Local calendar date as the API takes it (YYYY-MM-DD); DatePicker hands back Date objects. */
+function isoTarih(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+const SAAT = /^([01]\d|2[0-3]):[0-5]\d$/
 
 export default function StudentProfile() {
   const { data: profile } = useApi<StudentProfileData>('/api/student/profile', DEFAULT_PROFILE)
@@ -34,6 +45,10 @@ export default function StudentProfile() {
   const [startTime, setStartTime] = useState('17:00')
   const [endTime, setEndTime] = useState('18:00')
   const [saving, setSaving] = useState(false)
+  // B22 (D3, D4): the form answers on the page — a field's own error under it, the result under the form —
+  // never in a browser alert and never with the server's raw error text.
+  const [alanHatasi, setAlanHatasi] = useState<{ ogretmen?: string; saat?: string; tarih?: string }>({})
+  const [sonuc, setSonuc] = useState<{ tur: 'basari' | 'hata'; metin: string } | null>(null)
 
   const courseOptions = useMemo(() => {
     const dynamicCourses = new Set<string>()
@@ -52,18 +67,14 @@ export default function StudentProfile() {
 
   async function handleAddLesson(e: React.FormEvent) {
     e.preventDefault()
-    if (!teacher.trim()) {
-      window.alert('Öğretmen adı gerekli.')
-      return
-    }
-    if (!startTime || !endTime) {
-      window.alert('Başlangıç ve bitiş saatleri gerekli.')
-      return
-    }
-    if (!isRecurring && !singleDate) {
-      window.alert('Tek seferlik ders için tarih seçin.')
-      return
-    }
+    const hatalar: typeof alanHatasi = {}
+    if (!teacher.trim()) hatalar.ogretmen = 'Öğretmen adını yaz.'
+    if (!SAAT.test(startTime) || !SAAT.test(endTime)) hatalar.saat = 'Saati SS:DD biçiminde yaz (örneğin 17:00).'
+    else if (startTime >= endTime) hatalar.saat = 'Bitiş saati başlangıçtan sonra olmalı.'
+    if (!isRecurring && !singleDate) hatalar.tarih = 'Tek seferlik ders için tarihi seç.'
+    setAlanHatasi(hatalar)
+    setSonuc(null)
+    if (Object.keys(hatalar).length) return
 
     setSaving(true)
     try {
@@ -81,15 +92,14 @@ export default function StudentProfile() {
           end_time: endTime,
         }),
       })
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(payload?.error || `HTTP ${res.status}`)
+      if (!res.ok) throw new Error('kaydedilemedi')
       setTeacher('')
       if (!isRecurring) setSingleDate('')
       refreshLessons()
       window.dispatchEvent(new CustomEvent('tedy:homework-updated'))
-      window.alert('Özel ders eklendi. Takvimde "Özel Ders" badge’iyle görünecek.')
-    } catch (err) {
-      window.alert(`Özel ders eklenemedi: ${err instanceof Error ? err.message : 'Bilinmeyen hata'}`)
+      setSonuc({ tur: 'basari', metin: 'Özel ders eklendi. Takvimde ve Bugün\'de görünecek.' })
+    } catch {
+      setSonuc({ tur: 'hata', metin: 'Özel ders eklenemedi. Bağlantını kontrol edip yeniden dene.' })
     } finally {
       setSaving(false)
     }
@@ -100,7 +110,7 @@ export default function StudentProfile() {
       <div className="dashboard-card student-profile-card">
         <h2 className="dashboard-card__title">
           <UserProfile size={20} />
-          Öğrenci Profili
+          Öğrenci profili
         </h2>
         <div className="student-profile">
           <div className="student-profile__photo-wrap">
@@ -108,7 +118,7 @@ export default function StudentProfile() {
               <img className="student-profile__photo" src={displayPhoto} alt={displayName} />
             ) : (
               <div className="student-profile__photo-fallback" aria-hidden>
-                <UserAvatar size={36} />
+                <UserAvatar size={32} />
               </div>
             )}
           </div>
@@ -146,91 +156,99 @@ export default function StudentProfile() {
       </div>
 
       <div className="dashboard-card">
-        <h2 className="dashboard-card__title">
+        <h2 className="dashboard-card__title" id="ozel-ders-ekle-baslik">
           <AddAlt size={20} />
-          Özel Ders Ekle
+          Özel ders ekle
         </h2>
-        <form className="private-lesson-form" onSubmit={handleAddLesson}>
-          <label className="private-lesson-form__label">
-            Ders
-            <select value={course} onChange={e => setCourse(e.target.value)} className="private-lesson-form__input">
-              {courseOptions.map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-          </label>
+        {/* Named by its heading: Profil has two forms now, and two unnamed form
+            landmarks cannot be told apart (IBM aria_form_label_unique). */}
+        {/* B60 (§5.6): Carbon's own controls in a <Layer> one step above the card (B31), sentence-case labels,
+            the date format said as help, today as the earliest date, and on a phone one column. Every field is
+            required, so none is marked; an optional one would say "(isteğe bağlı)". */}
+        <Layer>
+        <form className="private-lesson-form" onSubmit={handleAddLesson} noValidate aria-labelledby="ozel-ders-ekle-baslik">
+          <Select id="ozel-ders-ders" labelText="Ders" value={course} onChange={e => setCourse(e.target.value)}>
+            {courseOptions.map(opt => <SelectItem key={opt} value={opt} text={opt} />)}
+          </Select>
 
-          <label className="private-lesson-form__label">
-            Öğretmen Adı
-            <input
-              value={teacher}
-              onChange={e => setTeacher(e.target.value)}
-              className="private-lesson-form__input"
-              placeholder="Örn: Ayşe Yılmaz"
-              required
-            />
-          </label>
+          <TextInput
+            id="ozel-ders-ogretmen"
+            labelText="Öğretmen adı"
+            placeholder="Örn: Ayşe Yılmaz"
+            value={teacher}
+            onChange={e => setTeacher(e.target.value)}
+            invalid={Boolean(alanHatasi.ogretmen)}
+            invalidText={alanHatasi.ogretmen}
+          />
 
-          <label className="private-lesson-form__checkbox">
-            <input
-              type="checkbox"
-              checked={isRecurring}
-              onChange={e => setIsRecurring(e.target.checked)}
-            />
-            <span>Ders tekrar ediyor</span>
-          </label>
+          <Checkbox
+            id="ozel-ders-tekrar"
+            labelText="Ders her hafta tekrar ediyor"
+            checked={isRecurring}
+            onChange={(_, { checked }) => setIsRecurring(checked)}
+          />
 
           {isRecurring ? (
-            <label className="private-lesson-form__label">
-              Haftanın Günü
-              <select value={weekday} onChange={e => setWeekday(e.target.value)} className="private-lesson-form__input">
-                {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </label>
+            <Select id="ozel-ders-gun" labelText="Haftanın günü" value={weekday} onChange={e => setWeekday(e.target.value)}>
+              {DAYS.map(d => <SelectItem key={d} value={d} text={d} />)}
+            </Select>
           ) : (
-            <label className="private-lesson-form__label">
-              Tarih
-              <input
-                type="date"
-                value={singleDate}
-                onChange={e => setSingleDate(e.target.value)}
-                className="private-lesson-form__input"
-                required={!isRecurring}
+            <DatePicker
+              datePickerType="single"
+              dateFormat="d.m.Y"
+              locale="tr"
+              minDate={new Date(new Date().setHours(0, 0, 0, 0))}
+              onChange={(tarihler: Date[]) => setSingleDate(tarihler[0] ? isoTarih(tarihler[0]) : '')}
+            >
+              <DatePickerInput
+                id="ozel-ders-tarih"
+                labelText="Tarih"
+                placeholder="gg.aa.yyyy"
+                helperText="Bugünden sonraki bir gün, gg.aa.yyyy biçiminde."
+                invalid={Boolean(alanHatasi.tarih)}
+                invalidText={alanHatasi.tarih}
               />
-            </label>
+            </DatePicker>
           )}
 
           <div className="private-lesson-form__time-row">
-            <label className="private-lesson-form__label">
-              Başlangıç
-              <input
-                type="time"
-                value={startTime}
-                onChange={e => setStartTime(e.target.value)}
-                className="private-lesson-form__input"
-                required
-              />
-            </label>
-            <label className="private-lesson-form__label">
-              Bitiş
-              <input
-                type="time"
-                value={endTime}
-                onChange={e => setEndTime(e.target.value)}
-                className="private-lesson-form__input"
-                required
-              />
-            </label>
+            <TimePicker
+              id="ozel-ders-baslangic"
+              labelText="Başlangıç"
+              placeholder="ss:dd"
+              maxLength={5}
+              value={startTime}
+              onChange={e => setStartTime(e.target.value)}
+              invalid={Boolean(alanHatasi.saat)}
+              invalidText={alanHatasi.saat}
+            />
+            <TimePicker
+              id="ozel-ders-bitis"
+              labelText="Bitiş"
+              placeholder="ss:dd"
+              maxLength={5}
+              value={endTime}
+              onChange={e => setEndTime(e.target.value)}
+              invalid={Boolean(alanHatasi.saat)}
+            />
           </div>
 
-          <Button kind="tertiary" size="sm" type="submit" disabled={saving}>
-            {saving ? 'Ekleniyor...' : 'Özel Ders Ekle'}
-          </Button>
+          {saving
+            ? <InlineLoading description="Ekleniyor…" iconDescription="Ekleniyor" status="active" />
+            : <Button kind="tertiary" size="md" type="submit">Özel ders ekle</Button>}
+          {sonuc && (
+            <InlineNotification className="private-lesson-form__sonuc" lowContrast hideCloseButton
+              kind={sonuc.tur === 'basari' ? 'success' : 'error'} role={sonuc.tur === 'basari' ? 'status' : 'alert'}
+              statusIconDescription={sonuc.tur === 'basari' ? 'Başarılı' : 'Hata'} title={sonuc.metin} />
+          )}
         </form>
+        </Layer>
       </div>
 
+      <OdakPenceresiAyari />
+
       <div className="dashboard-card">
-        <h2 className="dashboard-card__title">Tanımlı Özel Dersler</h2>
+        <h2 className="dashboard-card__title">Tanımlı özel dersler</h2>
         {(lessonData.lessons || []).length === 0 ? (
           <EmptyLine>Tanımlı özel ders yok.</EmptyLine>
         ) : (
@@ -239,7 +257,7 @@ export default function StudentProfile() {
               <div key={lesson.id} className="dashboard-list-tile cds--tile student-private-lesson-item">
                 <div className="student-private-lesson-item__top">
                   <strong>{lesson.course}</strong>
-                  <Tag type="warm-gray" size="sm">Özel Ders</Tag>
+                  <Tag type="warm-gray" size="sm">Özel ders</Tag>
                 </div>
                 <div className="student-private-lesson-item__meta">
                   Öğretmen: {lesson.teacher}

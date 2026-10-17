@@ -14,6 +14,7 @@ import threading
 import time
 import unicodedata
 from collections import OrderedDict
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
@@ -33,7 +34,7 @@ os.chdir(PROJECT_ROOT)
 
 from src.env_loader import load_env
 from src.json_utils import atomic_json_dump
-from src.course_names import normalize_course, COURSE_ALIASES
+from src.course_names import normalize_course, COURSE_ALIASES, OZEL_DERS
 from src.hafta_secici import guncel_hafta as _guncel_hafta
 from src.portal_susu import temiz_dersler, temiz_haftalar, temiz_metin
 from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.USER_ROLES etc.)
@@ -46,7 +47,8 @@ from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.US
     USER_ROLES,
     okur_turu,
 )
-from src import assistant_skills, module_progress, module_store, module_ticket, subject_themes
+from src import (assistant_skills, module_progress, module_store, module_ticket,
+                 mufredat_agaci, subject_themes)
 from src import claude_api
 
 load_env()
@@ -127,6 +129,9 @@ DIST_DIR = os.path.join(PROJECT_ROOT, "dashboard-dist")
 PHOTO_HOMEWORK_FILE = os.path.join(OUTPUT_DIR, "photo_homework.json")
 PRIVATE_LESSON_FILE = os.path.join(OUTPUT_DIR, "private_lessons.json")
 STUDENT_DONE_FILE = os.path.join(OUTPUT_DIR, "homework_student_done.json")
+# How private-lesson photo rows stored before 2026-10-11 spell the placeholder
+# (title case); read only to map it to OZEL_DERS at the API boundary.
+ESKI_OZEL_DERS = "Özel Ders"
 MAX_PHOTO_SIZE_BYTES = 12 * 1024 * 1024
 # Longest edge sent to the model. Claude downsizes past ~1568 px anyway and
 # refuses images over 5 MB; 2000 px JPEG keeps worksheet text legible and every
@@ -713,11 +718,13 @@ def _private_lessons_for_week(week_dates, lessons=None):
         if end_dt <= start_dt:
             end_dt = start_dt + timedelta(minutes=50)
 
-        title = f"{lesson.get('course', 'Özel Ders')} · {lesson.get('teacher', '').strip()}"
+        # Sentence case at the source (talimatname S38, B41): the status and
+        # the subtitle reach Takvim's popover and Bugün's timeline as text.
+        title = f"{lesson.get('course', OZEL_DERS)} · {lesson.get('teacher', '').strip()}"
         subtitle = (
-            f"Özel Ders • {lesson.get('teacher', '').strip()}"
+            f"{OZEL_DERS} • {lesson.get('teacher', '').strip()}"
             if lesson.get("teacher")
-            else "Özel Ders"
+            else OZEL_DERS
         )
         events.append({
             "id": _make_id("private_lesson", lesson.get("id", ""), start_dt.isoformat()),
@@ -726,7 +733,7 @@ def _private_lessons_for_week(week_dates, lessons=None):
             "start": start_dt.isoformat(),
             "end": end_dt.isoformat(),
             "course": lesson.get("course", ""),
-            "status": "Özel Ders",
+            "status": OZEL_DERS,
             "subtitle": subtitle,
             "private_lesson_id": lesson.get("id", ""),
         })
@@ -774,7 +781,7 @@ def _private_lessons_calendar_events(days_before=30, days_after=120):
                 "end": ev.get("end", ev.get("start", "")),
                 "extendedProps": {
                     "kind": "private_lesson",
-                    "badge": "Özel Ders",
+                    "badge": OZEL_DERS,
                     "course": ev.get("course", ""),
                     "description": ev.get("subtitle", ""),
                     "private_lesson_id": ev.get("private_lesson_id", ""),
@@ -894,6 +901,11 @@ def _combined_homework_rows(scraped_data):
         r = dict(row)
         if "Ders Adı" in r:
             r["normalized_course"] = normalize_course(r["Ders Adı"])
+        kaynak = r.get("Ödev Kaynağı")
+        if isinstance(kaynak, str) and kaynak.startswith(ESKI_OZEL_DERS):
+            # A private-lesson photo row stored before 2026-10-11 says it in
+            # title case; the reader gets sentence case (S38), the file stays.
+            r["Ödev Kaynağı"] = OZEL_DERS + kaynak[len(ESKI_OZEL_DERS):]
         detay = r.get("detail")
         if isinstance(detay, dict):
             r["detail"] = {**detay, "description": temiz_metin(detay.get("description")),
@@ -1009,7 +1021,7 @@ SAYFA_ADLARI = {
     "takvim": "Takvim", "takimlar": "Takımlar", "ilerleme": "İlerleme", "duyurular": "Duyurular",
     "profil": "Profil", "moduller": "Modüller", "kitaplar": "Tedy Books", "sinavlar": "Sınavlar",
 }
-SAYFA_OGE_TURLERI = ("odev", "sinav", "etkinlik", "ders_haftasi")
+SAYFA_OGE_TURLERI = ("odev", "sinav", "etkinlik", "ders_haftasi", "konu")
 
 
 def _sayfa_ogesi_basligi(tur, kimlik):
@@ -1030,6 +1042,13 @@ def _sayfa_ogesi_basligi(tur, kimlik):
         elif tur == "ders_haftasi":
             if kimlik in _icerik_haftalari(_scraped())["weeks"]:
                 return kimlik
+        elif tur == "konu":
+            # Sunucu istemcinin etiketine güvenmez, kendi verisinden çözer (spec §4.1).
+            durum, agac = _mufredat_agaci()
+            bulunan = mufredat_agaci.konu_bul(agac, kimlik) if durum == "ok" and agac else None
+            if bulunan:
+                ders, _, konu = bulunan
+                return f"{ders['ders']} · {konu['ad']}"
     except Exception as exc:  # noqa: BLE001 — bağlam satırı hiçbir zaman cevabı düşürmez
         app.logger.warning("Sayfa öğesi çözülemedi (%s)", type(exc).__name__)
     return ""
@@ -1428,9 +1447,9 @@ def _to_photo_homework_row(
 
     if source_type == "private" and not confirmed:
         # Before the reader has looked, the lesson they picked names the course.
-        course = lesson_course or extracted_course or selected_course or "Özel Ders"
+        course = lesson_course or extracted_course or selected_course or OZEL_DERS
     elif source_type == "private":
-        course = extracted_course or lesson_course or "Özel Ders"
+        course = extracted_course or lesson_course or OZEL_DERS
     else:
         # The words on the page win. The form's course only fills a blank,
         # so a default of "Matematik" cannot relabel a Türkçe worksheet.
@@ -1442,7 +1461,7 @@ def _to_photo_homework_row(
     )
 
     if source_type == "private":
-        source = f"Özel Ders ({lesson_teacher})" if lesson_teacher else "Özel Ders"
+        source = f"{OZEL_DERS} ({lesson_teacher})" if lesson_teacher else OZEL_DERS
     else:
         source = "Fotoğraf"
 
@@ -1615,10 +1634,11 @@ def _foto_odev_tamamla(anahtar, alan, deger, simdi=None):
     eski = anahtar
     yeni = _homework_row_key(hedef)
     if eski != yeni:
-        marks = _load_student_done_marks()
-        if eski in marks:
-            marks[yeni] = marks.pop(eski)
-            _save_student_done_marks(marks)
+        with _isaret_kilidi():
+            marks = _load_student_done_marks()
+            if eski in marks:
+                marks[yeni] = marks.pop(eski)
+                _save_student_done_marks(marks)
     _save_photo_homework_rows(rows)
     return cumle
 
@@ -1749,6 +1769,67 @@ def create_private_lesson():
     return jsonify({"ok": True, "lesson": item})
 
 
+# --- Focus window (anayasa §2, talimatname B29) ---
+# "The window is a parameter, not a constant; it is kept configurable in
+# output/." Until 2026-10-11 it was three constants in the dashboard's bundle
+# (utils/bugun.ts): changing the last bell or bedtime needed a rebuild. Today's
+# values are the defaults, so a household that never sets it sees no change.
+ODAK_PENCERESI_VARSAYILAN = {"okul_bitisi": "15:45", "odak_sonu": "16:00", "yatma": "22:30"}
+_SAAT_DAKIKA_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
+
+
+def _odak_penceresi_yolu():
+    return os.path.join(OUTPUT_DIR, "odak_penceresi.json")
+
+
+def _odak_penceresi_dogrula(govde):
+    """``(window, None)`` for a well-formed window, ``(None, sentence)`` otherwise.
+
+    Three HH:MM times in order: the last bell, then the window's end (it may
+    close at the bell itself), then bedtime strictly after it."""
+    if not isinstance(govde, dict):
+        return None, "Odak penceresi üç saat olarak gönderilmeli."
+    pencere = {}
+    for alan in ODAK_PENCERESI_VARSAYILAN:
+        deger = str(govde.get(alan) or "").strip()
+        if not _SAAT_DAKIKA_RE.match(deger):
+            return None, "Her saat SS:DD biçiminde olmalı (örneğin 15:45)."
+        pencere[alan] = deger
+    if not (pencere["okul_bitisi"] <= pencere["odak_sonu"] < pencere["yatma"]):
+        return None, "Saatler sırayla olmalı: son zil, odak penceresinin sonu, sonra yatma saati."
+    return pencere, None
+
+
+def _odak_penceresi_oku():
+    """The stored window, or the defaults when there is none or it is unreadable."""
+    try:
+        with open(_odak_penceresi_yolu(), "r", encoding="utf-8") as f:
+            pencere, _hata = _odak_penceresi_dogrula(json.load(f))
+    except (OSError, ValueError):
+        pencere = None
+    if pencere is None:
+        return {**ODAK_PENCERESI_VARSAYILAN, "varsayilan": True}
+    return {**pencere, "varsayilan": False}
+
+
+@app.route("/api/odak-penceresi")
+@require_auth
+def odak_penceresi():
+    """The household's focus window. Not in READER_ENDPOINTS: full role only."""
+    return jsonify(_odak_penceresi_oku())
+
+
+@app.route("/api/odak-penceresi", methods=["PUT"])
+@require_auth
+def odak_penceresi_kaydet():
+    """Replace the window. A whole-file replace, so atomic_json_dump suffices."""
+    pencere, hata = _odak_penceresi_dogrula(request.get_json(silent=True))
+    if hata:
+        return jsonify({"error": hata}), 400
+    atomic_json_dump({**pencere, "updated_at": datetime.now().isoformat()}, _odak_penceresi_yolu())
+    return jsonify({**pencere, "varsayilan": False})
+
+
 @app.route("/api/homework")
 @require_auth
 def homework():
@@ -1757,6 +1838,7 @@ def homework():
     rows = _combined_homework_rows(data)
     summary = hw.get("summary", "")
     student_done_marks = _load_student_done_marks()
+    onceki_isaretler = set(student_done_marks)
     student_done_changed = False
 
     # Track first-seen dates for homework items
@@ -1785,16 +1867,45 @@ def homework():
     if changed:
         atomic_json_dump(first_seen, first_seen_path)
     if student_done_changed:
-        _save_student_done_marks(student_done_marks)
+        # Drop only the marks the teacher's verdict made obsolete, from a fresh
+        # read under the lock: writing back this request's whole copy would
+        # lose a "Yaptım" or a "Geri al" another worker stored meanwhile.
+        budananlar = onceki_isaretler - set(student_done_marks)
+        with _isaret_kilidi():
+            guncel = _load_student_done_marks()
+            for anahtar in budananlar:
+                guncel.pop(anahtar, None)
+            _save_student_done_marks(guncel)
 
     _belgeleri_yapistir(rows)
     return jsonify({"summary": summary, "homework": rows})
 
 
-@app.route("/api/homework/mark-done", methods=["POST"])
-@require_auth
-def homework_mark_done():
-    payload = request.get_json(silent=True) or {}
+@contextmanager
+def _isaret_kilidi():
+    """Serialise every read-modify-write of the "Yaptım" marks.
+
+    gunicorn runs two worker processes, so mark-done, unmark-done, the
+    teacher-verdict pruning in /api/homework and odev_tamamla's key rename can
+    interleave; each holds this flock (as module_progress does) and still
+    writes through atomic_json_dump."""
+    import fcntl
+    yol = STUDENT_DONE_FILE + ".lock"
+    os.makedirs(os.path.dirname(yol), exist_ok=True)
+    with open(yol, "a+", encoding="utf-8") as kilit:
+        fcntl.flock(kilit, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(kilit, fcntl.LOCK_UN)
+
+
+def _istenen_odev(payload):
+    """The homework a mark-done / unmark-done request names.
+
+    Returns ``(row, key, None)`` or ``(None, "", (response, status))``. A key
+    alone is enough to unmark (the row may have left the list since), so the
+    caller decides whether a key with no row is an error."""
     requested_key = str(payload.get("homework_key") or "").strip()
     requested_title = str(
         payload.get("Ödev Başlığı") or payload.get("title") or ""
@@ -1807,19 +1918,15 @@ def homework_mark_done():
     )
 
     if not requested_key and (not requested_title or not requested_due):
-        return jsonify({
+        return None, "", (jsonify({
             "error": "homework_key veya (Ödev Başlığı + Ödev Son Teslim Tarihi) gerekli"
-        }), 400
+        }), 400)
 
     rows = _combined_homework_rows(_scraped())
-    target = None
-    target_key = ""
     for row in rows:
         row_key = _homework_row_key(row)
         if requested_key and row_key == requested_key:
-            target = row
-            target_key = row_key
-            break
+            return row, row_key, None
 
         if not requested_key:
             row_title = str(row.get("Ödev Başlığı", "")).strip()
@@ -1830,12 +1937,42 @@ def homework_mark_done():
                 and row_due == requested_due
                 and (not requested_course or row_course == requested_course)
             ):
-                target = row
-                target_key = row_key
-                break
+                return row, row_key, None
 
-    if not target:
-        return jsonify({"error": "Ödev bulunamadı"}), 404
+    return None, requested_key, (jsonify({"error": "Ödev bulunamadı"}), 404)
+
+
+@app.route("/api/homework/unmark-done", methods=["POST"])
+@require_auth
+def homework_unmark_done():
+    """Take a "Yaptım" back (talimatname S40, B63): the reader's own mark only.
+
+    Mirrors mark-done — same gate (require_auth, readers refused by default),
+    same identifiers, same lock and atomic write — and is idempotent: a mark
+    that is not there answers ``removed: false``, not an error. A key alone is
+    enough even when the row has left the list; the teacher's status is never
+    touched (only the portal sets it)."""
+    payload = request.get_json(silent=True) or {}
+    _row, target_key, hata = _istenen_odev(payload)
+    if hata and not target_key:
+        return hata
+
+    with _isaret_kilidi():
+        marks = _load_student_done_marks()
+        removed = marks.pop(target_key, None) is not None
+        if removed:
+            _save_student_done_marks(marks)
+
+    return jsonify({"ok": True, "homework_key": target_key, "removed": removed})
+
+
+@app.route("/api/homework/mark-done", methods=["POST"])
+@require_auth
+def homework_mark_done():
+    payload = request.get_json(silent=True) or {}
+    target, target_key, hata = _istenen_odev(payload)
+    if hata:
+        return hata
 
     normalized_status = _normalize_homework_status_text(target.get("Ödev Durumu", ""))
     if _is_teacher_resolved_homework_status(normalized_status):
@@ -1847,10 +1984,11 @@ def homework_mark_done():
             "status": normalized_status,
         })
 
-    marks = _load_student_done_marks()
-    if target_key not in marks:
-        marks[target_key] = datetime.now().isoformat()
-        _save_student_done_marks(marks)
+    with _isaret_kilidi():
+        marks = _load_student_done_marks()
+        if target_key not in marks:
+            marks[target_key] = datetime.now().isoformat()
+            _save_student_done_marks(marks)
 
     return jsonify({
         "ok": True,
@@ -1881,7 +2019,7 @@ def homework_from_photo():
     private_lesson = None
     if source_type == "private":
         if not private_lesson_id:
-            return jsonify({"error": "Özel Ders kaynağı için private_lesson_id gerekli"}), 400
+            return jsonify({"error": "Özel ders kaynağı için private_lesson_id gerekli"}), 400
         private_lesson = _find_private_lesson(private_lesson_id)
         if not private_lesson:
             return jsonify({"error": "Seçilen özel ders bulunamadı"}), 404
@@ -4811,6 +4949,124 @@ def modules_list():
     return jsonify({"moduller": [{key: row.get(key) for key in _MODULE_CARD_FIELDS} for row in rows]})
 
 
+# ── Müfredat ağacı (spec §4) ────────────────────────────────────────────────
+# Dosya depoda izlenir ve `scripts/mufredat_agaci.py` üretir; burada yalnız okunur.
+MUFREDAT_AGACI_PATH = str(mufredat_agaci.agac_yolu(os.path.dirname(os.path.abspath(__file__))))
+_AGAC_ONBELLEGI = {"imza": None, "durum": "yok", "agac": None}
+_AGAC_KILIDI = threading.Lock()
+_FRAME_SAYFA_RE = re.compile(r"^(\d+)(?:\s*[-–—]\s*(\d+))?$")
+# Eşiğe takılıp üretilmeyen dersin adı: `kapsam` yalnız slug taşır, ad uydurulmaz (D4).
+_AGAC_DERS_ADLARI = {"turkce": "Türkçe", "matematik": "Matematik",
+                     "fen": "Fen Bilimleri", "sosyal": "Sosyal Bilgiler"}
+
+
+def _agac_imzasi(yol):
+    """src.assistant_modules._stat ile aynı desen: atomik değiştirilen dosyayı stat ile izler."""
+    try:
+        st = os.stat(yol)
+    except OSError:
+        return None
+    return (st.st_ino, st.st_size, st.st_mtime_ns)
+
+
+def _mufredat_agaci():
+    """("ok", ağaç) | ("yok", None) | ("bozuk", None).
+
+    Dosya değişince kendini yeniler — gunicorn'un iki işçisi de yeniden başlatılmadan yeni
+    ağacı görür. Dosya yokken imza None'dır ve her istekte yeniden denenir (üretici onu
+    yazdığı anda görünür).
+    """
+    yol = MUFREDAT_AGACI_PATH
+    imza = _agac_imzasi(yol)
+    if imza is not None and _AGAC_ONBELLEGI["imza"] == imza:
+        return _AGAC_ONBELLEGI["durum"], _AGAC_ONBELLEGI["agac"]
+    with _AGAC_KILIDI:
+        imza = _agac_imzasi(yol)
+        if imza is not None and _AGAC_ONBELLEGI["imza"] == imza:
+            return _AGAC_ONBELLEGI["durum"], _AGAC_ONBELLEGI["agac"]
+        durum, agac = mufredat_agaci.oku(yol)
+        _AGAC_ONBELLEGI.update({"imza": imza, "durum": durum, "agac": agac})
+        return durum, agac
+
+
+def _modul_sayfa_ortusmesi(row, konu):
+    """Modülün frame_source sayfalarıyla konunun sayfa aralığının kesişim uzunluğu.
+
+    Sayfa numarası yalnız AYNI ders kitabı içinde kanıttır: iki kitabın sayfaları aynı
+    aralıkta olabilir ve `kind: "program"` çerçevesinin sayfaları programın sayfalarıdır,
+    kitabın değil. Kitap kimliği ya da tür uyuşmuyorsa örtüşme 0'dır.
+    """
+    sayfa = konu.get("sayfa")
+    if not isinstance(sayfa, list) or len(sayfa) != 2:
+        return 0
+    cerceve = row.get("frame_source") or {}
+    if cerceve.get("kind") != "textbook" or cerceve.get("document_id") != konu.get("kitap"):
+        return 0
+    eslesme = _FRAME_SAYFA_RE.match(str(cerceve.get("pages") or "").strip())
+    if not eslesme:
+        return 0
+    bas = int(eslesme.group(1))
+    son = int(eslesme.group(2) or bas)
+    return max(0, min(son, sayfa[1]) - max(bas, sayfa[0]) + 1)
+
+
+def _agac_modul_eslemesi(agac, rows):
+    """Konu kimliği → modül kartı. Bir modül yalnız BİR konuya bağlanır: sayfa örtüşmesi en iyi
+    olana, o da yoksa sıradaki ilkine (spec §3.1). Aynı modül iki satırda görünmez."""
+    eslesme = {}
+    konular = [konu for _, _, konu in mufredat_agaci.konular(agac)]
+    for row in rows:
+        kodlar = {k for k in (row.get("outcomes") or []) if isinstance(k, str)}
+        if not kodlar:
+            continue
+        adaylar = [konu for konu in konular
+                   if konu["id"] not in eslesme and kodlar & set(konu.get("kazanimlar") or [])]
+        if not adaylar:
+            continue
+        en_iyi = max(adaylar, key=lambda konu: _modul_sayfa_ortusmesi(row, konu))
+        eslesme[en_iyi["id"]] = {key: row.get(key) for key in _MODULE_CARD_FIELDS}
+    return eslesme
+
+
+@app.route("/api/modules/agac")
+@require_auth
+def modules_agac():
+    # Bozuk katalog "hiç modül yok" diye okunmaz ("empty is never blank", D3): durum okunur.
+    katalog_durumu, katalog = module_store.read_catalog_with_status(OUTPUT_DIR)
+    rows = module_store.latest_active(katalog)
+    hazir = [{key: row.get(key) for key in _MODULE_CARD_FIELDS} for row in rows]
+    hata = "katalog_okunamadi" if katalog_durumu == module_store.CATALOG_UNREADABLE else None
+    durum, agac = _mufredat_agaci()
+    if durum != "ok" or agac is None:
+        # D3: harita okunamazsa hazır modül listesi çalışmaya devam eder, 500 verilmez.
+        return jsonify({"hazir": hazir, "dersler": [], "kapsam": {},
+                        "hata": hata or "harita_okunamadi"})
+    eslesme = _agac_modul_eslemesi(agac, rows)
+    dersler = []
+    for ders in agac["dersler"]:
+        uniteler = []
+        for unite in ders["uniteler"]:
+            konular = [{**konu, "modul": eslesme.get(konu["id"])} for konu in unite["konular"]]
+            uniteler.append({**unite, "konular": konular,
+                             "hazir_sayisi": sum(1 for konu in konular if konu["modul"])})
+        dersler.append({**ders, "uniteler": uniteler,
+                        "konu_sayisi": sum(len(u["konular"]) for u in uniteler),
+                        "hazir_sayisi": sum(u["hazir_sayisi"] for u in uniteler)})
+    # Eşiğe takılıp üretilmeyen ders ağaçta YİNE listelenir ve yüzey bir cümle söyler;
+    # sessizce eksilmez (D3, spec §5.5). `ders_uret` böyle bir ders için kayıt döndürmez,
+    # bu yüzden kayıt `kapsam`daki `yazilmadi` işaretinden kurulur.
+    yazili = {ders["slug"] for ders in dersler}
+    for slug, kapsam in (agac.get("kapsam") or {}).items():
+        if not isinstance(kapsam, dict) or not kapsam.get("yazilmadi") or slug in yazili:
+            continue
+        ad = _AGAC_DERS_ADLARI.get(slug)
+        if ad is None:  # adı bilinmeyen slug okura gitmez
+            continue
+        dersler.append({"ders": ad, "slug": slug, "kitaplar": [], "uniteler": [],
+                        "konu_sayisi": 0, "hazir_sayisi": 0})
+    return jsonify({"hazir": hazir, "dersler": dersler, "kapsam": agac["kapsam"], "hata": hata})
+
+
 @app.route("/api/modules/<slug>/v<int:version>/ticket")
 @require_auth
 def module_ticket_issue(slug, version):
@@ -4840,6 +5096,96 @@ def module_draft_ticket_issue(taslak_id):
     except module_ticket.TicketConfigError:
         return jsonify({"error": "ticket_unconfigured"}), 503
     return _no_store(ticket)
+
+
+_MODULE_RUN_ID_RE = re.compile(r"^[0-9a-f]{12}\Z")
+_MODULE_ASSET_ID_RE = re.compile(r"^[0-9a-f]{16}\Z")
+_MODULE_MEDIA_KIND = {"mufredat": "ders_kitabi", "pexels": "fotograf_arsivi"}
+_MODULE_EXPLAIN_CLAIMS = 5
+
+
+def _module_text(value, limit):
+    return value.strip()[:limit] if isinstance(value, str) and value.strip() else None
+
+
+def _module_media(run_id, asset_ids):
+    """Count a module's embedded media by where it came from: the curriculum textbook, the photo
+    archive, or a generative model (anything else ted-mcp's media tools stored)."""
+    counts = {"yapay_zeka": 0, "ders_kitabi": 0, "fotograf_arsivi": 0}
+    if not isinstance(run_id, str) or not _MODULE_RUN_ID_RE.match(run_id) or not isinstance(asset_ids, list):
+        return counts
+    folder = os.path.join(OUTPUT_DIR, "edupedia_runs", run_id, "assets")
+    for asset_id in asset_ids[:64]:
+        if not isinstance(asset_id, str) or not _MODULE_ASSET_ID_RE.match(asset_id):
+            continue
+        try:
+            with open(os.path.join(folder, f"{asset_id}.json"), encoding="utf-8") as handle:
+                record = json.load(handle)
+        except (OSError, ValueError):
+            continue
+        kaynak = record.get("kaynak") if isinstance(record, dict) else None
+        if isinstance(kaynak, str) and kaynak:
+            counts[_MODULE_MEDIA_KIND.get(kaynak, "yapay_zeka")] += 1
+    return counts
+
+
+def _module_explanation(record, draft):
+    """What the module frame's AI label says (talimatname S41, B71): what was written with AI help and
+    what it rests on — outcomes, the textbook pages, the verified claims (only when the draft is the
+    build that was published) and where the media came from. No internal id reaches the reader (D4)."""
+    draft = draft if isinstance(draft, dict) else {}
+    meta = draft.get("meta") if isinstance(draft.get("meta"), dict) else {}
+    source = record if record is not None else meta
+    outcomes = (record or draft).get("outcomes")
+    frame = draft.get("frame_source") if isinstance(draft.get("frame_source"), dict) else {}
+    if record is not None and isinstance(record.get("frame_source"), dict):
+        frame = {**frame, **{k: v for k, v in record["frame_source"].items() if v is not None}}
+    book = None
+    if frame.get("kind") == "textbook" or frame.get("pages"):
+        book = {"ad": _module_text(frame.get("title"), 120), "sayfalar": _module_text(frame.get("pages"), 20)}
+    summary = draft.get("dogrulama") if isinstance(draft.get("dogrulama"), dict) else None
+    claims, status = [], "kayit_yok"
+    if summary is not None:
+        if record is not None and (not isinstance(record.get("sha256"), str) or draft.get("sha256") != record["sha256"]):
+            status = "uyusmazlik"
+        else:
+            status = "ok"
+            for item in summary.get("iddialar") if isinstance(summary.get("iddialar"), list) else []:
+                text = _module_text(item.get("iddia") if isinstance(item, dict) else None, 200)
+                if not text:
+                    continue
+                dayanak = item.get("dayanak") if isinstance(item.get("dayanak"), dict) else {}
+                page = dayanak.get("page")
+                claims.append({"iddia": text,
+                               "sayfa": page if isinstance(page, int) and not isinstance(page, bool) and page > 0 else None,
+                               "kaynak": _module_text(dayanak.get("kaynak"), 160)})
+                if len(claims) == _MODULE_EXPLAIN_CLAIMS:
+                    break
+    return {
+        "baslik": _module_text(source.get("title"), 120), "ders": _module_text(source.get("subject"), 60),
+        "sinif": _module_text(source.get("gradeLevel"), 30),
+        "kazanimlar": [o for o in (_module_text(x, 40) for x in (outcomes if isinstance(outcomes, list) else [])) if o][:8],
+        "kitap": book, "iddia_durumu": status, "iddialar": claims,
+        "medya": _module_media(draft.get("run_id") or (record or {}).get("run_id"), draft.get("assets")),
+    }
+
+
+@app.route("/api/modules/<slug>/v<int:version>/aciklama")
+@require_auth
+def module_explanation(slug, version):
+    record = _module_active_record(slug, version)
+    if record is None:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(_module_explanation(record, module_store.read_draft(OUTPUT_DIR, record.get("taslak_id"))))
+
+
+@app.route("/api/modules/taslak/<taslak_id>/aciklama")
+@require_auth
+def module_draft_explanation(taslak_id):
+    draft = module_store.read_draft(OUTPUT_DIR, taslak_id)
+    if draft is None:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(_module_explanation(None, draft))
 
 
 @app.route("/api/modules/<slug>/progress")

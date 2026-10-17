@@ -70,12 +70,30 @@ test('öğrenciye sen, aileye siz: karşılama ve hızlı sorular', async ({ pag
   await expect(page.getByRole('button', { name: 'Işık bugün neye öncelik vermeli?' })).toBeVisible()
 })
 
+/** Belgede ve her gölge kökte src'si x/y/z olan img sayısı: ham HTML çizildiyse onerror'lu img burada olurdu. */
+async function imgSay(page: import('@playwright/test').Page) {
+  return page.evaluate(() => {
+    let n = 0
+    const gez = (k: ParentNode) => {
+      for (const el of k.querySelectorAll('*')) {
+        if (el.tagName === 'IMG' && /^(x|y|z)$/.test(el.getAttribute('src') ?? '')) n += 1
+        if ((el as HTMLElement).shadowRoot) gez((el as HTMLElement).shadowRoot!)
+      }
+    }
+    gez(document)
+    return n
+  })
+}
+
 test('cevaptaki ve kutudaki ham HTML çalışmaz (XSS)', async ({ page }) => {
   await cevapla(page, PAYLOAD({ answer: 'Metin <img src=x onerror="window.__xss=1"> son.\n\n:::kavram\n<img src=y onerror="window.__xss2=1">\n:::' }))
   await asistanAc(page)
   await sor(page, 'Soru')
   await expect(page.locator('p', { hasText: /son\.$/ }).first()).toBeVisible()
-  await page.waitForTimeout(500)
+  // Süre değil koşul: ham HTML düz yazı olarak çizildi (etiket metni görünür) ve sayfada hiçbir <img src=x|y> öğesi
+  // yok — çizilmemiş bir img'nin onerror'u hiç çalışamaz. Gölge kökler de taranır.
+  await expect(page.getByText('<img src=y onerror="window.__xss2=1">', { exact: false }).first()).toBeAttached()
+  expect(await imgSay(page)).toBe(0)
   expect(await page.evaluate(() => (window as unknown as { __xss?: number; __xss2?: number }).__xss ?? (window as unknown as { __xss2?: number }).__xss2)).toBeUndefined()
 })
 
@@ -88,16 +106,18 @@ test('atıflı cevaptaki ham HTML de çalışmaz (Carbon atıflı cevapta temizl
   await sor(page, 'Soru')
   await expect(page.getByRole('button', { name: 'Kaynaklar', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Kaynaklar', exact: true }).click()
-  await page.waitForTimeout(500)
+  // Kaynak listesi açıldı (atıf etiketi görünür); ardından çizilmiş img sayısı ölçülür (süre değil koşul).
+  await expect(page.getByText('Kesirler', { exact: true }).filter({ visible: true }).first()).toBeVisible()
+  expect(await imgSay(page)).toBe(0)
   expect(await page.evaluate(() => { const w = window as unknown as Record<string, number | undefined>; return [w.__xss, w.__xss3] })).toEqual([undefined, undefined])
 })
 
-test('giriş satırındaki mikrofon ve plan düğmeleri yan yana durur (eski giriş alanı gibi)', async ({ page }) => {
+test('giriş satırındaki mikrofon ve plan düğmeleri yan yana durur (eylem satırı)', async ({ page }) => {
   await page.addInitScript(() => Object.assign(window, { webkitSpeechRecognition: class { start() {} stop() {} abort() {} } }))
   await asistanAc(page)
   const [mik, plan] = await Promise.all([
-    page.getByRole('button', { name: 'Sesle sor', exact: true }).boundingBox(),
-    page.getByRole('button', { name: 'Çalışma Planı', exact: true }).boundingBox(),
+    page.getByRole('button', { name: 'Mikrofonu aç', exact: true }).boundingBox(),
+    page.getByRole('button', { name: 'Çalışma planı iste', exact: true }).boundingBox(),
   ])
   expect(Math.abs(mik!.y - plan!.y)).toBeLessThan(2)
   expect(plan!.x).toBeGreaterThan(mik!.x)
@@ -181,9 +201,9 @@ test('Tekrar dene ile başlayan istek durdur düğmesiyle kesilir', async ({ pag
   await expect(soruAlani(page)).toBeEditable()
 })
 
-test('Çalışma Planı düğmesi giriş boşken devre dışı, yazınca etkin (eski giriş alanı gibi)', async ({ page }) => {
+test('Çalışma planı düğmesi giriş boşken devre dışı, yazınca etkin (eski giriş alanı gibi)', async ({ page }) => {
   await asistanAc(page)
-  const plan = page.getByRole('button', { name: 'Çalışma Planı', exact: true })
+  const plan = page.getByRole('button', { name: 'Çalışma planı iste', exact: true })
   await expect(plan).toBeDisabled()
   await soruAlani(page).fill('Haftalık plan')
   await expect(plan).toBeEnabled()

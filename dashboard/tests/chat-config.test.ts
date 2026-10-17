@@ -4,7 +4,7 @@ import { tedyChatConfig } from '../src/asistan/tedyChatConfig.ts'
 import type { ConfigGirdisi } from '../src/asistan/tedyChatConfig.ts'
 
 const G: ConfigGirdisi = { bicim: 'sayfa', okur: 'ogrenci',
-  saltOkunur: false, altBaslik: 'Kaynaklı soru-cevap', gonder: async () => {} }
+  saltOkunur: false, baslik: 'Genel asistan', gonder: async () => {} }
 
 test('güvenlik ve görünüm kararları (Görev 1 raporu, güvenlik incelemesi)', () => {
   const c = tedyChatConfig(G)
@@ -15,7 +15,23 @@ test('güvenlik ve görünüm kararları (Görev 1 raporu, güvenlik incelemesi)
   assert.equal(c.header?.showAiLabel, false)            // kendi AILabel'ımız (axe nested-interactive)
   assert.equal(c.upload?.isOn, false)
   assert.equal(c.injectCarbonTheme, undefined)   // tema sayfadan miras; aksi ders rengini ezer
-  assert.equal(c.strings?.input_placeholder, 'Bir soru sor veya çalışma planı iste...')
+  assert.equal(c.strings?.input_placeholder, 'Bir soru sor ya da çalışma planı iste…')
+})
+
+test('başlık o anki öğretmendir, ürün adı tekrarlanmaz; geçmiş kapalı başlar, mobil menü yok (Asistan yenilemesi)', () => {
+  const c = tedyChatConfig({ ...G, baslik: 'Matematik öğretmeni' })
+  assert.equal(c.header?.title, 'Matematik öğretmeni')
+  assert.equal(c.header?.name, undefined)
+  assert.deepEqual(c.history, { isOn: true, showMobileMenu: false, startClosed: true })
+  assert.equal(c.input?.expanded, true)
+  // Mesaj sütunu rem ile: 4K'da kök yazıyla büyür (Carbon'un varsayılanı 672 px sabit).
+  assert.equal(c.layout?.customProperties?.['messages-max-width'], '42rem')
+})
+
+test('başlık eylemleri yapılandırmaya geçer ("Sohbetler")', () => {
+  const eylem = { text: 'Sohbetler', icon: (() => null) as never, onClick: () => {} }
+  assert.deepEqual(tedyChatConfig({ ...G, eylemler: [eylem] }).header?.actions, [eylem])
+  assert.equal(tedyChatConfig(G).header?.actions, undefined)
 })
 
 test('gömülü sayfa açık başlar ve başlatıcısızdır; panel başlatıcılı', () => {
@@ -28,7 +44,7 @@ test('salt okunur: hızlı soru ve yeniden başlatma yok; aileye siz', () => {
   const c = tedyChatConfig({ ...G, saltOkunur: true, okur: 'aile' })
   assert.equal(c.isReadonly, true)
   assert.equal(c.header?.showRestartButton, false)
-  assert.equal(c.strings?.input_placeholder, 'Bir soru sorun veya çalışma planı isteyin...')
+  assert.equal(c.strings?.input_placeholder, 'Bir soru sorun ya da çalışma planı isteyin…')
 })
 
 test('Carbon başlangıç ekranı kapalı, karşılama isteği gönderilmez: tek giriş alanı (karşılama ve hızlı sorular bizim)', () => {

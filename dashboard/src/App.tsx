@@ -17,12 +17,10 @@ import { PortalStatusBanner } from './components/PortalStatusBanner'
 import TodaySchedule from './components/TodaySchedule'
 import WeeklySchedule from './components/WeeklySchedule'
 import HomeworkTracker from './components/HomeworkTracker'
-import AssistantChat from './components/AssistantChat'
 import { lazy, Suspense } from 'react'
-import { CARBON_AI_ACIK } from './asistan/bayrak'
 import AsistanBaslatici from './asistan/AsistanBaslatici'
 
-// Yeni asistan (Carbon AI Chat) yalnız açıldığında yüklenir; bayrak kapalıyken eski bileşen çizilir.
+// Asistan (Carbon AI Chat) yalnız açıldığında yüklenir: AI Chat parçası ilk yüklemeye girmez.
 const AsistanSayfasi = lazy(() => import('./asistan/AsistanSayfasi'))
 function AsistanGirisi() {
   return <Suspense fallback={<p className="app-shell-loading__text">Asistan yükleniyor…</p>}><AsistanSayfasi /></Suspense>
@@ -56,7 +54,7 @@ function matchRoute(pathname: string, list: ReturnType<typeof routesFor>) {
 
 const COMPONENTS: Record<string, React.ComponentType> = {
   Lessons,
-  TodaySchedule, WeeklySchedule, HomeworkTracker, AssistantChat: CARBON_AI_ACIK ? AsistanGirisi : AssistantChat, GradeTable, ExamTimeline,
+  TodaySchedule, WeeklySchedule, HomeworkTracker, AssistantChat: AsistanGirisi, GradeTable, ExamTimeline,
   PlatformProgress, CalendarEvents, TeamActivities, CourseContent, Announcements, StudentProfile,
   TedyBooks, BookDetail, BookReader,
   Modules, ModuleViewerRoute, DraftViewerRoute,
@@ -137,7 +135,8 @@ export default function App() {
       )}
       {navItems.length > 1 && (
       <SideNav
-        aria-label="Navigasyon"
+        // B40: one navigation, one name — the phone's bottom bar is "Ana gezinme" too.
+        aria-label="Ana gezinme"
         expanded={sideNavExpanded}
         onOverlayClick={() => setSideNavExpanded(false)}
         onSideNavBlur={() => setSideNavExpanded(false)}
@@ -190,6 +189,8 @@ export default function App() {
         />
       )}
       <Content
+        id="main-content"
+        tabIndex={-1}
         className={[
           'app-shell-content',
           focusMode ? 'app-shell-content--focus' : '',
@@ -222,7 +223,7 @@ export default function App() {
         </RouteBoundary>
       </Content>
       {!isReader && navItems.length > 1 && <BottomNav role={user.role} />}
-      {CARBON_AI_ACIK && !isReader && <AsistanBaslatici rol={user.role} />}
+      {!isReader && <AsistanBaslatici rol={user.role} />}
       {isReader ? <ReaderFooter /> : <DashboardFooter />}
     </SessionContext.Provider>
   )

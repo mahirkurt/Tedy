@@ -42,8 +42,8 @@ test('the timetable and the lesson content share one page', async ({ page }) => 
   await page.waitForLoadState('networkidle')
 
   expect(new URL(page.url()).pathname).toBe('/dersler')
-  await expect(page.getByText('Haftalık Program', { exact: false })).toBeVisible()
-  await expect(page.getByText('Ders İçerikleri', { exact: false })).toBeVisible()
+  await expect(page.getByText('Haftalık program', { exact: false })).toBeVisible()
+  await expect(page.getByText('Ders içerikleri', { exact: false })).toBeVisible()
 })
 
 test('the old timetable path still lands somewhere', async ({ page }) => {
@@ -76,4 +76,23 @@ test('five things to choose between, the rest one level down', async ({ page }) 
   // under one entry rather than competing for the same glance.
   await expect(nav.getByText('Daha fazla', { exact: true })).toBeVisible()
   await expect(nav.getByText('Notlar', { exact: true })).toHaveCount(1)
+})
+
+// B47 (İ5, the return test): the course tab Işık chose is still chosen after a reload.
+test('the chosen course tab survives a reload', async ({ page }) => {
+  await page.route('**/api/schedule', r => r.fulfill(json(SCHEDULE)))
+  await page.route('**/api/content', r => r.fulfill(json({
+    'Matematik': { text: 'Kesirler konusu işlendi.', cards: [], items: [] },
+    'Türkçe': { text: 'Okuma günlüğü.', cards: [], items: [] },
+  })))
+  await page.route('**/api/health', r => r.fulfill(json({
+    timestamp: '', success: true, scrape_errors: [], duration_seconds: 1,
+  })))
+  await page.goto('/dersler')
+  const turkce = page.getByRole('tab', { name: 'Türkçe' })
+  await turkce.click()
+  await expect(turkce).toHaveAttribute('aria-selected', 'true')
+  await page.reload()
+  await expect(page.getByRole('tab', { name: 'Türkçe' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByText('Okuma günlüğü.')).toBeVisible()
 })

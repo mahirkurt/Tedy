@@ -322,7 +322,9 @@ def foto_eksik_alanlar(row: dict[str, Any]) -> list[str]:
     birakilan = {str(a) for a in (row.get("eksik_birakilan") or [])}
     eksik: list[str] = []
     ders = str(row.get("normalized_course") or row.get("Ders Adı") or "").strip()
-    if "ders" not in birakilan and ders in {"", "Genel", "Özel Ders"}:
+    # "Özel ders" is the placeholder since 2026-10-11; rows stored before
+    # still say "Özel Ders" when normalized_course is absent (raw rows).
+    if "ders" not in birakilan and ders in {"", "Genel", "Özel ders", "Özel Ders"}:
         eksik.append("ders")
     if "teslim" not in birakilan and _teslim(str(row.get("Ödev Son Teslim Tarihi") or "")) is None:
         eksik.append("teslim")
@@ -2601,7 +2603,11 @@ class McpRegistry:
             except Exception as exc:  # noqa: BLE001 — SEBİT is a bonus section; its failure must not blank the TED portal list
                 logger.error("sebit_odevleri source failed: %s", type(exc).__name__)
                 sebit = None
-        metin = _kirp(odev_listesi_metni(rows, datetime.now(), sebit=sebit), GOVDE_SINIRI)
+        # Kayıt defterinin saati kullanılır (2490, 2535 ve 2684 ile aynı kalıp). `datetime.now()`
+        # host yerel saatidir ve host Etc/UTC'dir: TZ kurulumunu atlayan bir giriş noktasında
+        # liste İstanbul'un üç saat gerisini "bugün" sayardı (CLAUDE.md saat dilimi kuralı).
+        simdi = istanbul_simdi(self.saat() if self.saat is not None else None)
+        metin = _kirp(odev_listesi_metni(rows, simdi, sebit=sebit), GOVDE_SINIRI)
         return ToolOutcome(ok=True, text=metin, citations=[{
             "kind": "ogrenci",
             "label": ODEV_ATIF,

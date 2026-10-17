@@ -11,6 +11,8 @@ export const SAYFALAR: [string, string][] = [
   ['kitaplar', '/kitaplar'], ['notlar', '/notlar'], ['takvim', '/takvim'], ['takimlar', '/takimlar'],
   ['ilerleme', '/ilerleme'], ['duyurular', '/duyurular'], ['profil', '/profil'],
   ['moduller', '/moduller'], ['sinavlar', '/sinavlar'],
+  // B27: the phone's "Daha fazla" page is a surface like the others — axe, IBM, pixels and ARIA tree.
+  ['daha-fazla', '/daha-fazla'],
 ]
 
 // "No request in flight for half a second", counted from the page's own
@@ -33,6 +35,13 @@ export async function sabitAc(page: Page, yol: string, w: number, h: number) {
   await page.clock.setFixedTime(new Date(SABIT_SAAT))
   // Sınav uyarıları kartı tarayıcının izin durumunu okur; taban çizgisi ortamdan bağımsız olsun.
   await bildirimTaklidi(page, { izin: 'default', abone: false })
+  // Duyurular remembers what was read (B67); a fixed opening always sees them unread, so a second opening in
+  // the same test (4K: 1920 then 3840) draws the same page.
+  await page.addInitScript(() => {
+    try {
+      for (const k of Object.keys(localStorage)) if (k.startsWith('tedy-duyurular-okundu::')) localStorage.removeItem(k)
+    } catch { /* storage blocked: nothing remembered anyway */ }
+  })
   await mock(page, GORSEL)
   await page.setViewportSize({ width: w, height: h })
   const acik = new Set<unknown>()

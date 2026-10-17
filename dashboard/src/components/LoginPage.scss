@@ -1,0 +1,205 @@
+@use '@carbon/react/scss/spacing' as spacing;
+@use '@carbon/react/scss/type' as type;
+@use '@carbon/react/scss/breakpoint' as bp;
+
+// ─── Giriş sayfası (2026-10-15) ───────────────────────────────────────────────
+// Spec docs/superpowers/specs/2026-10-15-giris-sayfasi-yenileme-design.md. Carbon's login pattern in its
+// split-screen form: the brand band is the page's one high-contrast moment ([3.2-9]: the navy lives on the
+// header band and here only), the form hangs on one keyline of the 2x grid (P3). No rings, no gradient, no
+// motion of its own; every size in rem so the 4K root scale reaches it (S25).
+
+// Phone and tablet: a short band, the form, the footer — one column, 16 px gutter (Carbon sm/md padding).
+.login-page {
+  display: grid;
+  grid-template-areas: 'bant' 'ana' 'alt';
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  // dvh, not vh: a phone's 100vh counts the browser bar it hides, so the footer would sit under it.
+  min-block-size: 100dvh;
+  background-color: var(--cds-layer-01);
+}
+
+// The phone shell keeps room for the bottom bar under every page (ted-theme.scss, `.app-root`); the sign-in
+// page has no bar, and that room was the 48 px a 390 px phone scrolled (measured 2026-10-15).
+.app-root:has(> .login-page) {
+  padding-block-end: 0;
+}
+
+.login-page__hero {
+  grid-area: bant;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: spacing.$spacing-05;
+  padding: spacing.$spacing-05;
+  background-color: var(--ted-color-brand-primary);
+  color: var(--cds-text-on-color);
+}
+
+.login-page__hero-logo {
+  display: block;
+  /* stylelint-disable-next-line carbon/layout-use -- the logo's own height, not spacing */
+  block-size: 2rem;
+  inline-size: auto;
+}
+
+.login-page__hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+}
+
+.login-page__hero-school {
+  @include type.type-style('label-01');
+  margin: 0;
+  color: var(--ted-color-brand-text-secondary);
+}
+
+// The value line belongs to the wide band; on a phone the sign-in is the one thing (Carbon: keep extra
+// content minimal next to a login form).
+.login-page__hero-value,
+.login-page__hero-support {
+  display: none;
+  margin: 0;
+}
+
+.login-page__hero-value {
+  // Expressive, outside any container (S16), and a step under the sign-in heading: P1 keeps the page's one
+  // thing its largest text.
+  @include type.type-style('fluid-heading-03', true);
+  color: var(--cds-text-on-color);
+}
+
+.login-page__hero-support {
+  @include type.type-style('body-01');
+  color: var(--ted-color-brand-text-secondary);
+}
+
+.login-page__main {
+  grid-area: ana;
+  display: flex;
+  flex-direction: column;
+  padding: spacing.$spacing-07 spacing.$spacing-05;
+}
+
+.login-page__form {
+  display: flex;
+  flex-direction: column;
+  inline-size: 100%;
+  /* stylelint-disable-next-line carbon/layout-use -- the form column's width, not spacing */
+  max-inline-size: 24rem;
+}
+
+.login-page__title {
+  @include type.type-style('heading-04');
+  margin: 0 0 spacing.$spacing-03;
+  color: var(--cds-text-primary);
+}
+
+.login-page__intro {
+  @include type.type-style('body-01');
+  margin: 0 0 spacing.$spacing-07;
+  color: var(--cds-text-secondary);
+}
+
+// Spans the form column at every width: Carbon caps an inline notification at 18rem below md, which left it
+// 70 px short of the column's right edge on a 390 px phone (measured). Same choice as the portal banner.
+.login-page__form .login-page__notification {
+  max-inline-size: none;
+  margin: 0 0 spacing.$spacing-05;
+}
+
+// One slot, one height (Carbon lg, 48 px): the skeleton, the retry button, the InlineLoading and Google's
+// button take turns in it, so nothing below jumps (P8).
+.login-page__gsi {
+  display: flex;
+  align-items: center;
+  block-size: spacing.$spacing-09;
+}
+
+.login-page__gsi .login-page__gsi-iskelet {
+  inline-size: 100%;
+  block-size: spacing.$spacing-09;
+}
+
+.login-page__helper {
+  @include type.type-style('helper-text-01');
+  margin: spacing.$spacing-03 0 0;
+  color: var(--cds-text-helper);
+}
+
+.login-page__footer {
+  grid-area: alt;
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-02;
+  padding: 0 spacing.$spacing-05 spacing.$spacing-05;
+}
+
+.login-page__footer-text {
+  @include type.type-style('label-01');
+  /* stylelint-disable-next-line carbon/layout-use -- the form column's width: the footer ends where the form does */
+  max-inline-size: 24rem;
+  margin: 0;
+  color: var(--cds-text-secondary);
+}
+
+// "e-posta" broke at its hyphen at 1440 px (measured); a compound stays on one line.
+.login-page__nobr {
+  white-space: nowrap;
+}
+
+// lg and up: split screen on the 16-column 2x grid — the band takes 10 columns, the form 6. Text starts 2rem
+// inside both (16 px margin + 16 px padding); the band's last line and the footer share the bottom keyline.
+@include bp.breakpoint('lg') {
+  .login-page {
+    grid-template-areas: 'bant ana' 'bant alt';
+    grid-template-columns: minmax(0, 10fr) minmax(0, 6fr);
+    grid-template-rows: 1fr auto;
+  }
+
+  .login-page__hero {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: spacing.$spacing-07;
+  }
+
+  .login-page__hero-logo {
+    /* stylelint-disable-next-line carbon/layout-use -- the logo's own height, not spacing */
+    block-size: 3rem;
+  }
+
+  .login-page__hero-text {
+    /* stylelint-disable-next-line carbon/layout-use -- a reading measure, not spacing */
+    max-inline-size: 36rem;
+  }
+
+  .login-page__hero-value,
+  .login-page__hero-support {
+    display: block;
+  }
+
+  .login-page__main {
+    justify-content: center;
+    padding: spacing.$spacing-07;
+  }
+
+  .login-page__footer {
+    padding: 0 spacing.$spacing-07 spacing.$spacing-07;
+  }
+}
+
+// Windows high contrast removes the band's fill; a real edge keeps the two halves apart ([3.8-5]).
+@media (forced-colors: active) {
+  .login-page__hero {
+    border-block-end: 1px solid CanvasText;
+  }
+
+  @include bp.breakpoint('lg') {
+    .login-page__hero {
+      border-block-end: 0;
+      border-inline-end: 1px solid CanvasText;
+    }
+  }
+}

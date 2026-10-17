@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { SAYFALAR, sabitAc } from './_gorsel-yardim'
+import { carbonSabitAc } from './_asistan-carbon'
 
 // 4K (2026-10-06): above 1920 px the root font size grows with the window (ted-theme.scss `html`),
 // so a 3840 px screen shows the full-HD layout at twice the sharpness. Before, every page was a
@@ -59,4 +60,54 @@ test('up to 1920 px nothing changes', async ({ page }) => {
     expect(m.kok).toBe(16)
     expect(m.kolon).toBeLessThanOrEqual(960)
   }
+})
+
+// Asistan yenilemesi (2026-10-10, B28'in genişlik kısmı): Carbon AI Chat'in mesaj sütunu (42rem) ve geçmiş paneli
+// (20rem) rem ile verilir; 4K'da kök yazıyla birlikte iki katına çıkar (Carbon'un varsayılanları 672/320 px sabitti).
+// Gölge kökteki Carbon ikonları 16 px kalır — B28'in açık kalan kısmı (talimatname §13).
+test('Asistan: the message column and the history panel scale with the text on a 4K screen', async ({ page }) => {
+  const olcAsistan = async (w: number, h: number) => {
+    await carbonSabitAc(page, '/asistan', w, h)
+    const giris = (await page.getByRole('textbox', { name: /^Sorunu(zu)? yaz/ }).boundingBox())!.width
+    await page.getByRole('button', { name: 'Sohbetler', exact: true }).first().click()
+    await expect(page.locator('.asistan-gecmis')).toBeVisible()
+    const gecmis = (await page.locator('.asistan-gecmis').boundingBox())!.width
+    return { giris, gecmis }
+  }
+  const hd = await olcAsistan(1920, 1080)
+  const uhd = await olcAsistan(3840, 2160)
+  expect(uhd.giris / hd.giris).toBeGreaterThan(1.8)
+  expect(uhd.gecmis / hd.gecmis).toBeGreaterThan(1.8)
+})
+
+// B28 ikon kısmı (2026-10-10): Carbon AI Chat'in gölge kökündeki ikonlar da kökle ölçeklenir (carbonOnarimi.ts
+// IKON_KURALI her gölge köke eklenir). Önce ikonların var olduğu kanıtlanır; yokluk boş sayfada da doğrudur.
+test('Asistan: icons inside Carbon AI Chat’s shadow roots scale with the text on a 4K screen', async ({ page }) => {
+  const golgeIkonlari = async (w: number, h: number) => {
+    await carbonSabitAc(page, '/asistan', w, h)
+    await expect(page.getByRole('button', { name: 'Gönder', exact: true })).toBeVisible()
+    // Lit öğeleri kökü bağlandıktan sonra çizer; kural bir kare sonra eklenir — boyut oturana dek beklenir.
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
+    return page.evaluate(() => {
+      const out: number[] = []
+      const gez = (k: ParentNode, golgede: boolean) => {
+        for (const el of k.querySelectorAll('*')) {
+          if (golgede && el.tagName === 'svg') {
+            const r = el.getBoundingClientRect()
+            if (r.width >= 4 && getComputedStyle(el).visibility !== 'hidden') out.push(r.width)
+          }
+          const sr = (el as HTMLElement).shadowRoot
+          if (sr) gez(sr, true)
+        }
+      }
+      gez(document.querySelector('cds-aichat-react')!.shadowRoot!, true)
+      return out
+    })
+  }
+  const hd = await golgeIkonlari(1920, 1080)
+  const uhd = await golgeIkonlari(3840, 2160)
+  expect(hd.length).toBeGreaterThan(0)
+  expect(uhd.length).toBe(hd.length)
+  const sabitKalan = hd.filter((g, i) => uhd[i] / g < 1.8 || uhd[i] / g > 2.2)
+  expect(sabitKalan, 'gölge kökte kökle ölçeklenmeyen ikonlar').toEqual([])
 })

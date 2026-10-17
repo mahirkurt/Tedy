@@ -1,30 +1,14 @@
 - main:
   - heading "Asistan" [level=1]
-  - group "Öğretmen":
-    - text: /^(Öğretmen)?$/
-    - radio "Genel" [checked]
-    - text: /^(Genel)?$/
-    - radio "Türkçe"
-    - text: /^(Türkçe)?$/
-    - radio "Fen"
-    - text: /^(Fen)?$/
-    - radio "Sosyal"
-    - text: /^(Sosyal)?$/
-    - radio "Matematik"
-    - text: Matematik
   - region "Sohbet":
-    - text: TEDY Asistan Kaynaklı soru-cevap ve kişisel çalışma planı
+    - text: Genel asistan
+    - button "Sohbetler"
     - button "Sohbeti yeniden başlat"
-    - button "AI bilgisi"
-    - region "Sohbet geçmişi":
-      - complementary "Sohbet geçmişi":
-        - heading "Sohbetler" [level=2]
-        - button "Yeni sohbet"
-        - paragraph: Henüz sohbet yok — bir soru sorarak başla
-        - heading "Işık'ın sohbetleri" [level=2]
-        - paragraph: Henüz sohbet yok — bir soru sorarak başla
-        - heading "Asistanın notları" [level=2]
-        - list
+    - button "AI Yapay zekâ hakkında bilgi"
+    - text: Öğretmen
+    - combobox "Öğretmen":
+      - text: ""
+      - img "Listeyi aç"
     - region "Sohbet mesajları":
       - button "Sohbetin başı. İlk mesaja gitmek için bu düğmeyi seçin, mesajlar arasında ok tuşlarıyla gezinin. Listeden çıkmak için Esc'ye basın. Mesaj listesi ile giriş alanı arasında geçmek için F6 tuşuna basın."
       - button "Sohbetin sonu. Son mesaja gitmek için bu düğmeyi seçin, mesajlar arasında ok tuşlarıyla gezinin. Listeden çıkmak için Esc'ye basın. Mesaj listesi ile giriş alanı arasında geçmek için F6 tuşuna basın."
@@ -32,13 +16,11 @@
       - button "Işık bugün neye öncelik vermeli?"
       - button "Işık için çalışma planı hazırla"
       - button "Işık'ın eksik konularını özetle"
-      - button "Dosya ekle"
-      - text: /^(Ödev)?$/
-      - combobox "Ödev":
-        - option "Seçilmedi — genel soru" [selected]
+      - paragraph: /Görsel en çok \d+ MB, PDF \d+ MB ve \d+ sayfa, Word ve metin 5 MB; bir mesaja en çok 4 dosya\./
       - textbox "Sorunuzu yazın":
-        - /placeholder: Bir soru sorun veya çalışma planı isteyin...
-      - button "Sesle sor"
-      - button "Çalışma Planı"
+        - /placeholder: Bir soru sorun ya da çalışma planı isteyin…
+      - button "Dosya ekle"
+      - button "Mikrofonu aç"
+      - button "Çalışma planı iste" [disabled]
       - button "Gönder" [disabled]
   - text: Sohbet penceresi açıldı Mesaj listesi ile giriş alanı arasında geçmek için F6 tuşuna basın.

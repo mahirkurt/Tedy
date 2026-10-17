@@ -18,3 +18,32 @@
   @include type.type-style('body-compact-01');
   color: theme.$text-secondary;
 }
+
+// "Yaptın: …" with "Geri al" on the same line (YaptinSatiri.tsx, B63). A
+// footnote in the secondary text colour; the error drops to its own line.
+.yaptin-satiri {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-03;
+}
+
+.yaptin-satiri__metin {
+  display: flex;
+  align-items: center;
+  gap: $spacing-02;
+  margin: 0;
+  @include type.type-style('body-compact-01');
+  color: theme.$text-secondary;
+}
+
+.yaptin-satiri__yukleniyor {
+  inline-size: auto;
+}
+
+.yaptin-satiri__hata {
+  flex-basis: 100%;
+  margin: 0;
+  @include type.type-style('body-compact-01');
+  color: theme.$text-error;
+}

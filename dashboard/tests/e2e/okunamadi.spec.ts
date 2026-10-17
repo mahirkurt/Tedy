@@ -45,7 +45,7 @@ test('a held reading says from when it is, not that the page is blank', async ({
   await page.waitForLoadState('networkidle')
 
   const uyari = page.locator('.portal-unread')
-  await expect(uyari).toContainText('Ders Programı bu turda okunamadı')
+  await expect(uyari).toContainText('Ders programı bu turda okunamadı')
   await expect(uyari).toContainText('Son başarılı okuma gösteriliyor (23.09 18:30)')
   await expect(uyari).not.toContainText('veri olmadığı anlamına gelmiyor')
 })
@@ -66,7 +66,7 @@ test('several unread sections are named together where both belong', async ({ pa
 
   const uyari = page.locator('.portal-unread')
   await expect(uyari).toContainText('Ödevler')
-  await expect(uyari).toContainText('Program')
+  await expect(uyari).toContainText('Ders programı')
 })
 
 test('an unread section is not announced on a page that never showed it', async ({ page }) => {
