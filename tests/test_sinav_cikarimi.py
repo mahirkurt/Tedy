@@ -723,3 +723,96 @@ def test_d3_ayni_dersin_konu_paragrafi_alinir():
     [b] = _tek_kapi("Matematik yazılısı 20 Ekim\n\nMatematik yazılısı konuları: Kesirler",
                     "Matematik yazılısı 20 Ekim", "20 Ekim", ["Kesirler"])
     assert b.konular == ["Kesirler"]
+
+
+# --- temizlik B düzeltme 4: ders adları, ekler, ortak alıntı, göreli hafta ------------------
+
+from src.course_names import normalize_course  # noqa: E402
+from src.sinav_tarihi import katla  # noqa: E402
+
+# Course tabs seen in live data. PDR and Sınıf Öğretmeni are no exam courses (guidance and the
+# homeroom teacher's tab): naming them must not mark a topic paragraph as another course's.
+CANLI_DERS_SEKMELERI = ["Türkçe", "Matematik", "Fen Bilimleri", "Sosyal Bilgiler", "DKAB", "Görsel Sanatlar",
+                        "Müzik", "Beden Eğitimi", "İngilizce", "2. Yabancı Dil (F)", "Bilişim Teknolojileri",
+                        "İngilizce Language", "İngilizce (2)", "Ahlak ve Yurttaşlık", "Teknoloji ve Tasarım"]
+
+
+@pytest.mark.parametrize("sekme", CANLI_DERS_SEKMELERI)
+def test_d4_canli_ders_sekmesi_kendi_dersine_esler(sekme):
+    assert sc._anilan_dersler(katla(sekme)) == {normalize_course(sekme)}
+
+
+@pytest.mark.parametrize("sekme", ["Genel", "PDR", "Sınıf Öğretmeni"])
+def test_d4_ders_disi_sekmeler_ders_sayilmaz(sekme):
+    assert sc._anilan_dersler(katla(sekme)) == set()
+
+
+@pytest.mark.parametrize("paragraf", [
+    "Teknoloji ve Tasarım yazılısı konuları: Tasarım süreci",
+    "Teknoloji Tasarım yazılısı konuları: Tasarım süreci",
+    "Ahlak ve Yurttaşlık yazılısı konuları: Tasarım süreci",
+])
+def test_d4_eksik_dersin_konu_paragrafi_matematige_girmez(paragraf):
+    [b] = _tek_kapi(f"Matematik yazılısı 20 Ekim\n\n{paragraf}", "Matematik yazılısı 20 Ekim", "20 Ekim",
+                    ["Tasarım süreci"])
+    assert b.konular == []
+
+
+@pytest.mark.parametrize("metin,ders", [
+    ("Türkçenin yazılı konuları: Fiilimsiler", "Türkçe"),
+    ("Türkçeden yazılı konuları: Fiilimsiler", "Türkçe"),
+    ("İngilizcenin quiz konuları: Verbs", "İngilizce"),
+    ("Din Kültürünün yazılı konuları: İbadet", "Din Kültürü"),
+    ("Görsel Sanatların yazılı konuları: Renk", "Görsel Sanatlar"),
+    ("Müziğin yazılı konuları: Nota", "Müzik"),
+    ("Fransızcanın yazılı konuları: Verbes", "Fransızca"),
+    ("Matematiğin yazılı konuları: Kesirler", "Matematik"),
+    ("Matematikten yazılı konuları: Kesirler", "Matematik"),
+    ("Teknoloji ve Tasarımın yazılı konuları: Süreç", "Teknoloji ve Tasarım"),
+    ("Ahlak ve Yurttaşlığın yazılı konuları: Demokrasi", "Ahlak ve Yurttaşlık"),
+    ("Bilişimin yazılı konuları: Algoritma", "Bilişim"),
+    ("Fenin yazılı konuları: Hücre", "Fen Bilimleri"),
+])
+def test_d4_ekli_ders_adi_taninir(metin, ders):
+    assert sc._anilan_dersler(katla(metin)) == {ders}
+
+
+@pytest.mark.parametrize("metin", [
+    "Sosyalleşme konuları: Aile", "Fenomen konuları: Işık", "Müzikal konuları: Sahne",
+    "Fena değil, konular: Kesirler", "Matematiksel konular: Kesirler", "Türkçeci konular",
+])
+def test_d4_ekli_ders_adi_yanlis_eslesmez(metin):
+    assert sc._anilan_dersler(katla(metin)) == set()
+
+
+def test_d4_din_kulturu_ve_ahlak_bilgisi_ahlak_ve_yurttaslik_sayilmaz():
+    assert sc._anilan_dersler(katla("Din Kültürü ve Ahlak Bilgisi")) == {"Din Kültürü"}
+
+
+def test_d4_ekli_baska_ders_konu_paragrafi_matematige_girmez():
+    [b] = _tek_kapi("Matematik yazılısı 20 Ekim\n\nTürkçenin yazılı konuları: Fiilimsiler",
+                    "Matematik yazılısı 20 Ekim", "20 Ekim", ["Fiilimsiler"])
+    assert b.konular == []
+
+
+def test_d4_ortak_alintida_kayit_yalniz_kendi_dersinin_konularini_alir():
+    metin = "Matematik ve Türkçe yazılıları 20 Ekim\n\nTürkçe yazılısı konuları: Fiilimsiler"
+    aday = Aday(metin, None, date(2026, 10, 5), "duyuru", [])
+    alinti = "Matematik ve Türkçe yazılıları 20 Ekim"
+    mat, tr, genel = uydurma_kapisi([
+        _satir(ders=d, tur="yazili", baslik="Yazılılar", tarih_ifadesi="20 Ekim", tarih="2026-10-20",
+               alinti=alinti, konular=["Fiilimsiler"]) for d in ("Matematik", "Türkçe", "Genel")], aday, BUGUN)
+    assert (mat.ders, tr.ders, genel.ders) == ("Matematik", "Türkçe", "Genel")
+    assert mat.konular == []
+    assert tr.konular == ["Fiilimsiler"]
+    assert genel.konular == ["Fiilimsiler"]          # Genel keeps every course its quote names
+
+
+def test_d4_yayinsiz_metinde_goreli_hafta_konu_paragrafinin_kendi_tarihidir():
+    metin = "Matematik yazılısı 20 Ekim\n\nYazılı konuları gelecek hafta: Fiilimsiler"
+    aday = Aday(metin, None, None, "duyuru", [])
+    [b] = uydurma_kapisi([_satir(ders="Matematik", tur="yazili", baslik="Matematik yazılısı",
+                                 tarih_ifadesi="20 Ekim", tarih="2026-10-20", alinti="Matematik yazılısı 20 Ekim",
+                                 konular=["Fiilimsiler"])], aday, BUGUN)
+    assert b.tarih == date(2026, 10, 20)
+    assert b.konular == []

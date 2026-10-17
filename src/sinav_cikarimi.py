@@ -212,19 +212,53 @@ def _liste_satiri(paragraf: str) -> bool:
             and not re.search(r"[.!?…]$", p))
 
 
-# Course names as they appear in announcements (folded), for "this paragraph is another course's".
-_DERS_SOZCUKLERI = {
-    "turkce": "Türkçe", "matematik": "Matematik", "fen": "Fen Bilimleri", "sosyal": "Sosyal Bilgiler",
-    "ingilizce": "İngilizce", "english": "İngilizce", "fransizca": "Fransızca", "din kulturu": "Din Kültürü",
-    "dkab": "Din Kültürü", "bilisim": "Bilişim", "beden egitimi": "Beden Eğitimi",
-    "gorsel sanatlar": "Görsel Sanatlar", "muzik": "Müzik",
-}
+# Course names as they appear in announcements, for "this paragraph is another course's". Each
+# maps to what `normalize_course` gives that course's portal tab. PDR and "Sınıf Öğretmeni" are
+# tabs too, but no exam courses (guidance, the homeroom teacher): a topic paragraph that names
+# them is not another course's. A bare "Ahlak" is not a key: it sits inside "Din Kültürü ve
+# Ahlak Bilgisi". `ekli`: the name may carry a case suffix ("Türkçenin", "Müziğin"); "Sosyal"
+# and "English" stay bare ("sosyalleşme"), and "Sosyal Bilgilerin" still names "sosyal".
+_DERS_ADLARI = [
+    # (name as written, canonical course, takes a Turkish case suffix)
+    ("Türkçe", "Türkçe", True), ("Matematik", "Matematik", True), ("Fen", "Fen Bilimleri", True),
+    ("Sosyal", "Sosyal Bilgiler", False), ("İngilizce", "İngilizce", True), ("English", "İngilizce", False),
+    ("Fransızca", "Fransızca", True), ("İkinci Yabancı Dil", "Fransızca", True),
+    ("2. Yabancı Dil", "Fransızca", True), ("Din Kültürü", "Din Kültürü", True),
+    ("DKAB", "Din Kültürü", False), ("Bilişim", "Bilişim", True), ("Beden Eğitimi", "Beden Eğitimi", True),
+    ("Görsel Sanatlar", "Görsel Sanatlar", True), ("Müzik", "Müzik", True),
+    ("Teknoloji ve Tasarım", "Teknoloji ve Tasarım", True), ("Teknoloji Tasarım", "Teknoloji ve Tasarım", True),
+    ("Ahlak ve Yurttaşlık", "Ahlak ve Yurttaşlık", True),
+]
+_UNLULER = "aeıioöuü"
+
+
+def _ekli_bicimler(ad: str) -> list[str]:
+    """The name and its genitive, dative, accusative, locative and ablative forms, by vowel
+    harmony on the unfolded name, then folded: "Müzik" → müziğin, müziğe, müziği, müzikte,
+    müzikten. A final k softens before a vowel (müziğ-), so "müzikal" stays out."""
+    son = next(c for c in reversed(ad.lower()) if c in _UNLULER)
+    i4 = {"e": "i", "i": "i", "ö": "ü", "ü": "ü", "a": "ı", "ı": "ı", "o": "u", "u": "u"}[son]
+    e2 = "e" if son in "eiöü" else "a"
+    if ad[-1].lower() in _UNLULER:
+        ekler = [f"n{i4}n", f"y{e2}", f"y{i4}", f"d{e2}", f"d{e2}n"]
+        bicimler = [ad + e for e in ekler]
+    else:
+        d = "t" if ad[-1].lower() in "fstkçşhp" else "d"
+        kok = ad[:-1] + "ğ" if ad[-1].lower() == "k" else ad
+        bicimler = [kok + e for e in (f"{i4}n", e2, i4)] + [ad + f"{d}{e2}", ad + f"{d}{e2}n"]
+    return [ad] + bicimler
+
+
+_DERS_DESENLERI = [
+    (re.compile(r"(?<![0-9a-z])(?:"
+                + "|".join(re.escape(katla(b)) for b in (_ekli_bicimler(ad) if ekli else [ad]))
+                + r")(?![0-9a-z])"), ders)
+    for ad, ders, ekli in _DERS_ADLARI]
 _KONU_SOZU = re.compile(r"(?<![0-9a-z])(?:konu(?:lar(?:i|in)?|su)?|topics?)(?![0-9a-z])")
 
 
 def _anilan_dersler(katli: str) -> set[str]:
-    return {ders for sozcuk, ders in _DERS_SOZCUKLERI.items()
-            if re.search(rf"(?<![0-9a-z]){re.escape(sozcuk)}(?![0-9a-z])", katli)}
+    return {ders for desen, ders in _DERS_DESENLERI if desen.search(katli)}
 
 
 def _konu_paragrafi(paragraf: str, dersler: set[str], tarihle: Callable[[str], TarihCozumu]) -> bool:
@@ -252,8 +286,9 @@ def _konu_bolgesi(metin: str, alinti: str, ders: str = "Genel",
         bitisler.append(konum)      # paragraph k ends here; one joining space follows
         konum += 1
     butun, hedef = " ".join(paragraflar), katla(alinti)
-    # The courses this exam may name: its own, and any its announcement names (a shared one).
-    dersler = _anilan_dersler(hedef) | ({normalize_course(ders)} if ders and ders != "Genel" else set())
+    # The courses this exam may name: its own; a "Genel" record (a shared announcement) any its
+    # quote names. "Matematik ve Türkçe yazılıları": the Matematik record takes no Türkçe topics.
+    dersler = {normalize_course(ders)} if ders and ders != "Genel" else _anilan_dersler(hedef)
     tarihle = tarihle or (lambda _: TarihCozumu(None, None, False))
 
     def sinav_disi(p: str) -> bool:
@@ -308,8 +343,10 @@ def uydurma_kapisi(satirlar: list[dict], aday: Aday, bugun: date, yayin: date | 
         ders = _ders(aday, s.get("ders"), kaynak)
         konular: list[str] = []
         ham_konular = s.get("konular")
+        # "Has a date of its own" reads relative phrases even with no publication date: "gelecek
+        # hafta" in a topic paragraph is another exam's time, whatever week it would resolve to.
         bolge = _konu_bolgesi(aday.metin, alinti, ders,
-                              lambda p: tarih_coz(p, yayin, aralik, goreli=goreli))
+                              lambda p: tarih_coz(p, yayin, aralik, goreli=True))
         for k in ham_konular if isinstance(ham_konular, list) else []:
             k = " ".join(str(k).split())
             if k and katla(k) in bolge and k not in konular:
