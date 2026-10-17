@@ -27,10 +27,14 @@ self.addEventListener('notificationclick', event => {
   event.waitUntil((async () => {
     const pencereler = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     for (const p of pencereler) {
-      if (new URL(p.url).origin === self.location.origin && 'focus' in p) {
+      if (new URL(p.url).origin !== self.location.origin || !('focus' in p)) continue
+      try {
         await p.focus()
-        if ('navigate' in p) await p.navigate(hedef)
+        // Denetlenmeyen pencerede navigate() reddedilir; o zaman yeni pencere açılır.
+        if (p.url !== hedef && 'navigate' in p) await p.navigate(hedef)
         return
+      } catch {
+        break // pencere kullanılamadı: aşağıda yeni pencere açılır
       }
     }
     await self.clients.openWindow(hedef)

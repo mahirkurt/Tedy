@@ -3,6 +3,7 @@
 import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { mock } from './_audit-fixtures'
+import { bildirimTaklidi } from './_bildirim-taklidi'
 import { GORSEL, SABIT_SAAT } from './_gorsel-fixtures'
 
 export const SAYFALAR: [string, string][] = [
@@ -30,6 +31,8 @@ async function agSakinlesir(page: Page, acik: Set<unknown>, sakin = 500, sinir =
 
 export async function sabitAc(page: Page, yol: string, w: number, h: number) {
   await page.clock.setFixedTime(new Date(SABIT_SAAT))
+  // Sınav uyarıları kartı tarayıcının izin durumunu okur; taban çizgisi ortamdan bağımsız olsun.
+  await bildirimTaklidi(page, { izin: 'default', abone: false })
   await mock(page, GORSEL)
   await page.setViewportSize({ width: w, height: h })
   const acik = new Set<unknown>()

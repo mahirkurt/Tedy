@@ -2,7 +2,7 @@
 // Saf kısım (durum, metin, anahtar çözme, cihaz adı) node:test ile; tarayıcı
 // akışları e2e ile sınanır. Servis çalışanı yalnız bildirim içindir.
 
-export type BildirimDurumu = 'acik' | 'kapali' | 'reddedildi' | 'desteklenmiyor' | 'ios-ana-ekran'
+export type BildirimDurumu = 'acik' | 'acik-bekliyor' | 'kapali' | 'reddedildi' | 'desteklenmiyor' | 'ios-ana-ekran'
 
 export interface BildirimOrtami {
   destek: boolean
@@ -10,6 +10,8 @@ export interface BildirimOrtami {
   abone: boolean
   ios: boolean
   ekranda: boolean
+  // Sunucunun uyarı bayrağı (/api/bildirim/anahtar `acik`); bilinmiyorsa undefined.
+  sunucuAcik?: boolean
 }
 
 export class BildirimHatasi extends Error {
@@ -22,6 +24,7 @@ export class BildirimHatasi extends Error {
 
 export const DURUM_METNI: Record<BildirimDurumu, string> = {
   acik: 'Bu cihazda açık. Sınav duyurulunca ve yaklaşınca bildirim gelir.',
+  'acik-bekliyor': 'Bu cihazda açık; sınav uyarıları henüz başlatılmadı.',
   kapali: 'Bu cihazda kapalı.',
   reddedildi: 'Bildirim izni reddedilmiş. Tarayıcı ayarlarından bu siteye bildirim izni verilmeli.',
   desteklenmiyor: 'Bu tarayıcı bildirim desteklemiyor.',
@@ -32,7 +35,19 @@ export function bildirimDurumu(o: BildirimOrtami): BildirimDurumu {
   if (o.ios && !o.ekranda) return 'ios-ana-ekran'
   if (!o.destek) return 'desteklenmiyor'
   if (o.izin === 'denied') return 'reddedildi'
-  return o.izin === 'granted' && o.abone ? 'acik' : 'kapali'
+  if (o.izin === 'granted' && o.abone) return o.sunucuAcik === false ? 'acik-bekliyor' : 'acik'
+  return 'kapali'
+}
+
+export const IZIN_VERILMEDI_METNI = 'İzin verilmedi; bildirimler kapalı kaldı.'
+export const GENEL_HATA_METNI = 'İşlem tamamlanamadı; biraz sonra yeniden denenebilir.'
+
+// İzin penceresi kapatılırsa (requestPermission → 'default') sunucu hatası değil,
+// yalnızca "izin verilmedi" söylenir.
+export function hataMetni(kod: string): string {
+  if (kod === 'reddedildi') return DURUM_METNI.reddedildi
+  if (kod === 'kapali') return IZIN_VERILMEDI_METNI
+  return GENEL_HATA_METNI
 }
 
 // ArrayBuffer-destekli dönüş tipi: pushManager.subscribe SharedArrayBuffer kabul etmez.
@@ -70,14 +85,28 @@ async function mevcutAbonelik(): Promise<PushSubscription | null> {
   return kayit ? kayit.pushManager.getSubscription() : null
 }
 
+async function sunucuBayragi(): Promise<boolean | undefined> {
+  try {
+    const yanit = await fetch('/api/bildirim/anahtar', { credentials: 'include' })
+    if (!yanit.ok) return undefined
+    const { acik } = (await yanit.json()) as { acik?: boolean }
+    return typeof acik === 'boolean' ? acik : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export async function ortamiOku(): Promise<BildirimOrtami> {
   const destek = destekVar()
+  const abone = destek ? (await mevcutAbonelik()) !== null : false
   return {
     destek,
     izin: destek ? Notification.permission : 'default',
-    abone: destek ? (await mevcutAbonelik()) !== null : false,
+    abone,
     ios: iosMu(),
     ekranda: ekrandaMi(),
+    // Bayrak yalnız abone cihazda anlamlı; okunamazsa "açık" varsayılır.
+    sunucuAcik: abone ? await sunucuBayragi() : undefined,
   }
 }
 

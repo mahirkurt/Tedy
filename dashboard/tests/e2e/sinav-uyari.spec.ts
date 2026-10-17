@@ -1,40 +1,14 @@
 import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { mock, LIVE } from './_audit-fixtures'
+import { bildirimTaklidi, type Taklit } from './_bildirim-taklidi'
 
 // Sınav uyarıları kartı: tarayıcının bildirim API'leri taklit edilir; sunucu
 // uçları route ile karşılanır. Gerçek push servisine gidilmez.
 
-type Taklit = { izin: 'default' | 'granted' | 'denied'; abone: boolean; destek?: boolean; ios?: boolean }
-
-async function bildirimTaklidi(page: Page, t: Taklit) {
-  await page.addInitScript((t: Taklit) => {
-    const w = window as unknown as Record<string, unknown>
-    if (t.ios) Object.defineProperty(navigator, 'userAgent', { value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X)' })
-    if (t.destek === false) { delete w.PushManager; return }
-    let abone = t.abone
-    const abonelik = {
-      endpoint: 'https://fcm.googleapis.com/fcm/send/test',
-      toJSON: () => ({ endpoint: 'https://fcm.googleapis.com/fcm/send/test', keys: { p256dh: 'p', auth: 'a' } }),
-      unsubscribe: async () => { abone = false; return true },
-    }
-    const pushManager = {
-      getSubscription: async () => (abone ? abonelik : null),
-      subscribe: async () => { abone = true; return abonelik },
-    }
-    const kayit = { pushManager }
-    Object.defineProperty(navigator, 'serviceWorker', { value: {
-      getRegistration: async () => kayit, register: async () => kayit, ready: Promise.resolve(kayit),
-    } })
-    w.PushManager = function PushManager() {}
-    let izin = t.izin
-    w.Notification = { get permission() { return izin }, requestPermission: async () => { izin = 'granted'; return izin } }
-  }, t)
-}
-
-async function sinavlarAc(page: Page, t: Taklit) {
+async function sinavlarAc(page: Page, t: Taklit, sunucuAcik = true) {
   await bildirimTaklidi(page, t)
-  await mock(page, { ...LIVE, 'bildirim/anahtar': { anahtar: 'BAAA', acik: true } })
+  await mock(page, { ...LIVE, 'bildirim/anahtar': { anahtar: 'BAAA', acik: sunucuAcik } })
   await page.route('**/api/bildirim/abonelik', r => r.fulfill({ status: 201, json: { ok: true } }))
   await page.route('**/api/bildirim/deneme', r => r.fulfill({ json: { gonderilen: 1 } }))
   await page.goto('/sinavlar')
@@ -52,6 +26,8 @@ test.describe('Sınav uyarıları kartı', () => {
     expect(govde.endpoint).toBe('https://fcm.googleapis.com/fcm/send/test')
     expect(govde.cihaz).toBeTruthy()
     await expect(kart.getByText(/^Bu cihazda açık\./)).toBeVisible()
+    // Tıklanan düğme kalktı; odak gövdeye düşmemeli, durum satırına geçmeli.
+    await expect(page.locator('.sinav-uyarilari__durum')).toBeFocused()
     await kart.getByRole('button', { name: 'Deneme bildirimi gönder' }).click()
     await expect(kart.getByText('Deneme bildirimi 1 cihaza gönderildi.')).toBeVisible()
     await kart.getByRole('button', { name: 'Bu cihazda kapat' }).click()
@@ -62,6 +38,23 @@ test.describe('Sınav uyarıları kartı', () => {
     await sinavlarAc(page, { izin: 'denied', abone: false })
     await expect(page.locator('#uyarilar')).toContainText('Tarayıcı ayarlarından')
     await expect(page.locator('#uyarilar').getByRole('button')).toHaveCount(0)
+  })
+
+  test('abone ama sunucu uyarıları başlatmamış', async ({ page }) => {
+    await sinavlarAc(page, { izin: 'granted', abone: true }, false)
+    const kart = page.locator('#uyarilar')
+    await expect(kart).toContainText('Bu cihazda açık; sınav uyarıları henüz başlatılmadı.')
+    await expect(kart.getByRole('button', { name: 'Deneme bildirimi gönder' })).toHaveCount(0)
+    await expect(kart.getByRole('button', { name: 'Bu cihazda kapat' })).toBeVisible()
+  })
+
+  test('kapatılan izin penceresi: genel hata değil, "izin verilmedi"', async ({ page }) => {
+    await sinavlarAc(page, { izin: 'default', abone: false, istemYaniti: 'default' })
+    const kart = page.locator('#uyarilar')
+    await kart.getByRole('button', { name: 'Bu cihazda aç' }).click()
+    await expect(kart.getByText('İzin verilmedi; bildirimler kapalı kaldı.')).toBeVisible()
+    await expect(kart.getByText('Bu cihazda kapalı.', { exact: true })).toBeVisible()
+    await expect(kart).not.toContainText('İşlem tamamlanamadı')
   })
 
   test('desteklenmiyor', async ({ page }) => {

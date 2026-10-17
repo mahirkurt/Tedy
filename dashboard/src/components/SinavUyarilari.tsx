@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button, InlineNotification } from '@carbon/react'
 import {
-  bildirimDurumu, bildirimiAc, bildirimiKapat, BildirimHatasi, denemeGonder, DURUM_METNI, ortamiOku,
+  bildirimDurumu, bildirimiAc, bildirimiKapat, BildirimHatasi, denemeGonder, DURUM_METNI, hataMetni, ortamiOku,
 } from '../utils/bildirim'
 import type { BildirimDurumu } from '../utils/bildirim'
 import './SinavUyarilari.scss'
@@ -13,18 +13,29 @@ export default function SinavUyarilari() {
   const [mesgul, setMesgul] = useState(false)
   const [bilgi, setBilgi] = useState<{ tur: 'success' | 'error'; metin: string } | null>(null)
 
+  const durumRef = useRef<HTMLParagraphElement>(null)
+  // Tıklanan düğme durum değişince kaldırılır; odak gövdeye düşmesin diye bir
+  // eylemden sonra durum satırına taşınır (açılışta değil).
+  const odakBekliyor = useRef(false)
+
   const yenile = useCallback(async () => setDurum(bildirimDurumu(await ortamiOku())), [])
   useEffect(() => { void yenile() }, [yenile])
+  useEffect(() => {
+    if (odakBekliyor.current && !mesgul) {
+      odakBekliyor.current = false
+      durumRef.current?.focus()
+    }
+  }, [durum, mesgul, bilgi])
 
   const yap = async (is: () => Promise<string | void>) => {
     setMesgul(true)
     setBilgi(null)
+    odakBekliyor.current = true
     try {
       const metin = await is()
       if (metin) setBilgi({ tur: 'success', metin })
     } catch (e) {
-      const kod = e instanceof BildirimHatasi ? e.kod : ''
-      setBilgi({ tur: 'error', metin: kod === 'reddedildi' ? DURUM_METNI.reddedildi : 'İşlem tamamlanamadı; biraz sonra yeniden denenebilir.' })
+      setBilgi({ tur: 'error', metin: hataMetni(e instanceof BildirimHatasi ? e.kod : '') })
     } finally {
       await yenile()
       setMesgul(false)
@@ -34,19 +45,21 @@ export default function SinavUyarilari() {
   return (
     <section id="uyarilar" className="sinav-uyarilari" aria-labelledby="sinav-uyarilari-baslik">
       <h2 id="sinav-uyarilari-baslik" className="sinav-uyarilari__baslik">Sınav uyarıları</h2>
-      <p className="sinav-uyarilari__durum" aria-live="polite">{durum ? DURUM_METNI[durum] : 'Denetleniyor…'}</p>
+      <p ref={durumRef} tabIndex={-1} className="sinav-uyarilari__durum" aria-live="polite">{durum ? DURUM_METNI[durum] : 'Denetleniyor…'}</p>
       <div className="sinav-uyarilari__dugmeler">
         {durum === 'kapali' && (
           <Button size="sm" kind="primary" disabled={mesgul} onClick={() => yap(async () => { await bildirimiAc() })}>
             Bu cihazda aç
           </Button>
         )}
-        {durum === 'acik' && (
+        {(durum === 'acik' || durum === 'acik-bekliyor') && (
           <>
-            <Button size="sm" kind="tertiary" disabled={mesgul}
-              onClick={() => yap(async () => `Deneme bildirimi ${await denemeGonder()} cihaza gönderildi.`)}>
-              Deneme bildirimi gönder
-            </Button>
+            {durum === 'acik' && (
+              <Button size="sm" kind="tertiary" disabled={mesgul}
+                onClick={() => yap(async () => `Deneme bildirimi ${await denemeGonder()} cihaza gönderildi.`)}>
+                Deneme bildirimi gönder
+              </Button>
+            )}
             <Button size="sm" kind="ghost" disabled={mesgul} onClick={() => yap(async () => { await bildirimiKapat() })}>
               Bu cihazda kapat
             </Button>
