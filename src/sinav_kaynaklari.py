@@ -139,16 +139,23 @@ def _birlestir(liste: list[Aday]) -> list[Aday]:
     # the gate takes the course from the model when its word is in the text. Posted on different
     # dates it is two exams ("Yarın quiz" on Monday and on Wednesday) and stays two candidates —
     # still one model call, since the cache is keyed by the text.
+    # A copy whose date is unknown (an announcement, an attachment with no first_seen) is the
+    # same post as a dated copy: it joins the earliest dated one, lending its locations; it has
+    # no course of its own to dissolve the dated copy's course with.
     gruplar: dict[str, list[Aday]] = {}
-    for a in liste:
+    for a in sorted(liste, key=lambda x: x.yayin is None):   # dated copies first (stable)
         grup = gruplar.setdefault(a.metin_anahtari, [])
-        o = next((x for x in grup if x.ders == a.ders), None) or next(
-            (x for x in grup if x.yayin == a.yayin), None)
+        tarihliler = [x for x in grup if x.yayin is not None]
+        if a.yayin is None and tarihliler:
+            o = min(tarihliler, key=lambda x: x.yayin)
+        else:
+            o = next((x for x in grup if x.ders == a.ders), None) or next(
+                (x for x in grup if x.yayin == a.yayin), None)
         if o is None:
             grup.append(Aday(a.metin, a.ders, a.yayin, a.tur, list(a.konumlar)))
             continue
         o.konumlar.extend(k for k in a.konumlar if k not in o.konumlar)
-        if o.ders != a.ders:
+        if o.ders != a.ders and not (a.yayin is None and o.yayin is not None and a.ders is None):
             o.ders = None
         if a.yayin is not None and (o.yayin is None or a.yayin < o.yayin):   # earliest known date
             o.yayin = a.yayin

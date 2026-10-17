@@ -304,3 +304,40 @@ def test_d2_2_ayni_yayinli_ayni_metin_ortak_aday():
     hafta["Sosyal Bilgiler"] = {"cards": [YARIN_QUIZ], "items": [], "text": ""}
     [ortak] = [a for a in adaylar(veri, date(2026, 10, 20)) if a.metin == YARIN_QUIZ]
     assert (ortak.ders, ortak.yayin, len(ortak.konumlar)) == (None, date(2026, 10, 12), 2)
+
+
+# --- düzeltme turu 3 ---------------------------------------------------------------
+
+KTT_KISA = "Matematik KTT 15 Ekim Perşembe yapılacak."
+
+
+def _kartli(veri, hafta, ders, metin=KTT_KISA):
+    veri["ders_icerikleri_haftalar"].setdefault(hafta, {})[ders] = {"cards": [metin], "items": [], "text": ""}
+
+
+def test_d3_2_yayini_bilinmeyen_duyuru_kartla_birlesir():
+    veri = haftalar_verisi()
+    _kartli(veri, "5. Hafta 12 Eki. - 18 Eki.", "Türkçe")
+    veri["duyurular"]["announcements"] = [{"Başlık": KTT_KISA}]
+    [a] = [x for x in adaylar(veri, BUGUN) if x.metin == KTT_KISA]
+    assert (a.ders, a.yayin, a.tur) == ("Türkçe", date(2026, 10, 12), "ders_karti")
+    assert sorted(k["bolum"] for k in a.konumlar) == ["ders_icerikleri_haftalar", "duyuru"]
+
+
+def test_d3_2_yayini_bilinmeyen_ek_kartla_birlesir():
+    veri = haftalar_verisi()
+    _kartli(veri, "5. Hafta 12 Eki. - 18 Eki.", "Türkçe")
+    [a] = [x for x in adaylar(veri, BUGUN, ek_metinleri={"abcdef0123456789": (KTT_KISA, None)})
+           if x.metin == KTT_KISA]
+    assert (a.ders, a.yayin) == ("Türkçe", date(2026, 10, 12))
+    assert {"bolum": "ek", "id": "abcdef0123456789"} in a.konumlar
+
+
+def test_d3_2_yayini_bilinmeyen_kopya_en_erken_bilinene_katilir():
+    veri = haftalar_verisi()
+    _kartli(veri, "6. Hafta 19 Eki. - 25 Eki.", "Sosyal Bilgiler")
+    _kartli(veri, "5. Hafta 12 Eki. - 18 Eki.", "Türkçe")
+    veri["duyurular"]["announcements"] = [{"Başlık": KTT_KISA}]
+    sonuc = {a.ders: a for a in adaylar(veri, date(2026, 10, 20)) if a.metin == KTT_KISA}
+    assert set(sonuc) == {"Türkçe", "Sosyal Bilgiler"}
+    assert len(sonuc["Türkçe"].konumlar) == 2 and len(sonuc["Sosyal Bilgiler"].konumlar) == 1
