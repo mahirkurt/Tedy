@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from src.course_names import normalize_course
+from src.portal_ekleri import KIMLIK_DESENI
 from src.portal_susu import temiz_metin
 from src.sinav_tarihi import hafta_etiketi_araligi, katla, okul_yili, yayin_tarihi
 
@@ -177,8 +178,8 @@ def kaynak_verisi(kok: Path) -> tuple[dict[str, tuple[str, date | None]], dict[s
     dizin = _json(kok / "output/portal_ekleri.json")
     kayitlar = (dizin or {}).get("ekler") if isinstance(dizin, dict) else None
     for ek_id, kayit in (kayitlar or {}).items():
-        # Skip non-dict records
-        if not isinstance(kayit, dict):
+        # The key becomes a file name: only portal_ekleri's own id shape is read (no traversal).
+        if not isinstance(kayit, dict) or not KIMLIK_DESENI.fullmatch(str(ek_id)):
             continue
         yol = kok / "content/portal-ekleri" / f"{ek_id}.txt"
         try:

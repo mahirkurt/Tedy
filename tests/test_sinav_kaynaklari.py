@@ -115,13 +115,14 @@ def test_kaynak_verisi_dosyalardan(tmp_path):
     (tmp_path / "output").mkdir()
     (tmp_path / "content/portal-ekleri").mkdir(parents=True)
     (tmp_path / "output/portal_ekleri.json").write_text(json.dumps(
-        {"ekler": {"abc": {"id": "abc", "first_seen": "2026-10-10T08:00:00"},
-                   "yok": {"id": "yok", "first_seen": "2026-10-11T08:00:00"}}}), encoding="utf-8")
-    (tmp_path / "content/portal-ekleri/abc.txt").write_text("x" * 5000, encoding="utf-8")
+        {"ekler": {"0123456789abcdef": {"id": "0123456789abcdef", "first_seen": "2026-10-10T08:00:00"},
+                   "fedcba9876543210": {"id": "fedcba9876543210", "first_seen": "2026-10-11T08:00:00"}}}),
+        encoding="utf-8")
+    (tmp_path / "content/portal-ekleri/0123456789abcdef.txt").write_text("x" * 5000, encoding="utf-8")
     (tmp_path / "output/homework_first_seen.json").write_text('{"Ödev": "2026-10-12T09:00:00"}', encoding="utf-8")
     ekler, ilk = kaynak_verisi(tmp_path)
-    assert list(ekler) == ["abc"]
-    assert ekler["abc"] == ("x" * 4000, date(2026, 10, 10))
+    assert list(ekler) == ["0123456789abcdef"]
+    assert ekler["0123456789abcdef"] == ("x" * 4000, date(2026, 10, 10))
     assert ilk == {"Ödev": "2026-10-12T09:00:00"}
 
 
@@ -177,26 +178,26 @@ def test_kaynak_verisi_bad_records_ve_encoding_hatalari(tmp_path):
     # Tracker with one string (bad), one dict (good), one dict without file
     (tmp_path / "output/portal_ekleri.json").write_text(json.dumps({
         "ekler": {
-            "bad_string": "not a dict",  # Should be skipped
-            "good": {"id": "good", "first_seen": "2026-10-10T08:00:00"},
-            "bad_encoding": {"id": "bad_encoding", "first_seen": "2026-10-11T08:00:00"},
-            "missing": {"id": "missing", "first_seen": "2026-10-12T08:00:00"},
+            "aaaaaaaaaaaaaaaa": "not a dict",  # Should be skipped
+            "bbbbbbbbbbbbbbbb": {"id": "bbbbbbbbbbbbbbbb", "first_seen": "2026-10-10T08:00:00"},
+            "cccccccccccccccc": {"id": "cccccccccccccccc", "first_seen": "2026-10-11T08:00:00"},
+            "dddddddddddddddd": {"id": "dddddddddddddddd", "first_seen": "2026-10-12T08:00:00"},
         }
     }), encoding="utf-8")
 
     # One file with valid UTF-8
-    (tmp_path / "content/portal-ekleri/good.txt").write_text("valid text", encoding="utf-8")
+    (tmp_path / "content/portal-ekleri/bbbbbbbbbbbbbbbb.txt").write_text("valid text", encoding="utf-8")
 
     # One file with invalid UTF-8 bytes
-    (tmp_path / "content/portal-ekleri/bad_encoding.txt").write_bytes(b"\xff\xfe\xfa")
+    (tmp_path / "content/portal-ekleri/cccccccccccccccc.txt").write_bytes(b"\xff\xfe\xfa")
 
-    # "missing" file doesn't exist
+    # "dddddddddddddddd" file doesn't exist
 
     ekler, ilk = kaynak_verisi(tmp_path)
 
     # Only the good record should be returned
-    assert list(ekler.keys()) == ["good"]
-    assert ekler["good"] == ("valid text", date(2026, 10, 10))
+    assert list(ekler.keys()) == ["bbbbbbbbbbbbbbbb"]
+    assert ekler["bbbbbbbbbbbbbbbb"] == ("valid text", date(2026, 10, 10))
 
     # No exception should have been raised
     (tmp_path / "output/homework_first_seen.json").write_text("{}", encoding="utf-8")
@@ -216,3 +217,17 @@ def test_odev_gecen_yilin_ilk_gorulmesi_yayin_sayilmaz():
                                                    "Fen quiz": "2026-09-02T09:00:00"})
     odevler = {a.ders: a.yayin for a in sonuc if a.tur == "odev"}
     assert odevler == {"Matematik": None, "Fen Bilimleri": date(2026, 9, 2)}
+
+
+def test_kaynak_verisi_ek_kimligi_desene_uymazsa_atlanir(tmp_path):
+    """The tracker key becomes a path: only portal_ekleri's own id shape (16 hex) is read."""
+    (tmp_path / "output").mkdir()
+    (tmp_path / "content/portal-ekleri").mkdir(parents=True)
+    (tmp_path / "content/gizli.txt").write_text("Fen sınavı yarın", encoding="utf-8")
+    (tmp_path / "content/portal-ekleri/ABCDEF0123456789.txt").write_text("Fen sınavı yarın", encoding="utf-8")
+    (tmp_path / "output/portal_ekleri.json").write_text(json.dumps({"ekler": {
+        "../gizli": {"first_seen": "2026-10-10T08:00:00"},
+        "ABCDEF0123456789": {"first_seen": "2026-10-10T08:00:00"},     # upper case: not ours
+    }}), encoding="utf-8")
+    ekler, _ = kaynak_verisi(tmp_path)
+    assert ekler == {}
