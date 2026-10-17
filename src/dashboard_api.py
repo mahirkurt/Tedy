@@ -2751,12 +2751,14 @@ _KAYNAK_ETIKETI = {"takvim": "Okul takvimi", "duyuru": "Okul duyurusu", "ek": "P
 
 
 def _sinav_kaynagi(k):
-    """A source as the dashboard shows it: a label, a short quote and where it opens."""
+    """A source as the dashboard shows it: a label, a short quote and where it opens.
+    The file is data, not code: every position value is taken as text."""
     tur = str(k.get("tur") or "")
     konum = k.get("konum") if isinstance(k.get("konum"), dict) else {}
     if tur == "ders_karti":
-        hafta = konum.get("hafta")
-        etiket = f"{normalize_course(konum.get('ders') or '') or konum.get('ders') or 'Ders'} ders içeriği"
+        hafta = str(konum.get("hafta") or "")
+        ders = str(konum.get("ders") or "")
+        etiket = f"{normalize_course(ders) or ders or 'Ders'} ders içeriği"
         etiket += f" · {hafta}" if hafta else ""
         baglanti = f"/dersler?hafta={quote(hafta)}" if hafta else "/dersler"
     elif tur == "odev":
@@ -2765,22 +2767,43 @@ def _sinav_kaynagi(k):
         etiket = _KAYNAK_ETIKETI.get(tur, "Kaynak")
         baglanti = {"takvim": "/takvim", "duyuru": "/duyurular", "not_tablosu": "/notlar"}.get(tur)
         if tur == "ek" and konum.get("id"):
-            baglanti = f"/api/ekler/{konum['id']}"
+            baglanti = f"/api/ekler/{quote(str(konum['id']))}"
     return {"tur": tur, "etiket": etiket, "alinti": str(k.get("alinti") or "")[:300], "baglanti": baglanti}
+
+
+def _sinav_gunu(deger):
+    """A record's YYYY-MM-DD as a datetime at midnight, or None: an unreadable day is an absent day."""
+    if not isinstance(deger, str) or len(deger) != 10:
+        return None
+    try:
+        return datetime.fromisoformat(deger)
+    except ValueError:
+        return None
+
+
+def _sinav_saati(deger):
+    """A record's HH:MM as (hour, minute), or None."""
+    if not isinstance(deger, str) or len(deger) != 5:
+        return None
+    try:
+        an = datetime.strptime(deger, "%H:%M")
+    except ValueError:
+        return None
+    return an.hour, an.minute
 
 
 def _sinav_durumu(k, taban, now):
     if k.get("sentetik"):
         return "past"
-    if taban and taban.get("date"):
-        an = _portal_zamani(taban["date"])
-        return "upcoming" if an is not None and an > now else "past"
-    if k.get("tarih"):
-        saat = k.get("saat") or "23:59"
-        return "upcoming" if datetime.fromisoformat(f"{k['tarih']}T{saat}") > now else "past"
-    if k.get("hafta"):
-        son = datetime.fromisoformat(k["hafta"]) + timedelta(days=6, hours=23, minutes=59)
-        return "upcoming" if son > now else "past"
+    if taban and taban.get("date") and _portal_zamani(taban["date"]) is not None:
+        return "upcoming" if _portal_zamani(taban["date"]) > now else "past"
+    gun = _sinav_gunu(k.get("tarih"))
+    if gun is not None:
+        saat, dakika = _sinav_saati(k.get("saat")) or (23, 59)
+        return "upcoming" if gun.replace(hour=saat, minute=dakika) > now else "past"
+    hafta = _sinav_gunu(k.get("hafta"))
+    if hafta is not None:
+        return "upcoming" if hafta + timedelta(days=6, hours=23, minutes=59) > now else "past"
     return "upcoming"
 
 
@@ -2788,19 +2811,32 @@ def _kayittan_sinav(k, now):
     taban = k.get("taban") if isinstance(k.get("taban"), dict) else None
     if taban:
         e = {key: v for key, v in taban.items() if key not in ("aiSummary", "studyGuide")}
+        # A takvim date the portal wrote unreadably is no date: undated, not "past".
+        if e.get("date") and _portal_zamani(e["date"]) is None:
+            e["date"] = None
+        if e.get("endDate") and _portal_zamani(e["endDate"]) is None:
+            e["endDate"] = None
     else:
-        ders = k.get("ders") or "Genel"
-        tarih_saat = f"{k['tarih']}T{k['saat']}:00" if k.get("tarih") and k.get("saat") else k.get("tarih")
-        e = {"id": k.get("id"), "course": ders, "title": k.get("baslik") or "Sınav",
-             "rawTitle": k.get("baslik") or "Sınav", "courseColor": _course_color(ders),
+        ders = str(k.get("ders") or "Genel")
+        gun = _sinav_gunu(k.get("tarih"))
+        saat = _sinav_saati(k.get("saat")) if gun is not None else None
+        tarih_saat = None
+        if gun is not None:
+            tarih_saat = f"{k['tarih']}T{saat[0]:02d}:{saat[1]:02d}:00" if saat else k["tarih"]
+        e = {"id": k.get("id"), "course": ders, "title": str(k.get("baslik") or "Sınav"),
+             "rawTitle": str(k.get("baslik") or "Sınav"), "courseColor": _course_color(ders),
              "courseFamily": subject_themes.family_of(ders), "examNumber": None, "date": tarih_saat,
-             "endDate": None, "allDay": bool(k.get("tarih") and not k.get("saat")), "grade": None,
+             "endDate": None, "allDay": bool(gun is not None and not saat), "grade": None,
              "relatedHomework": [], "relatedContent": []}
     e["status"] = _sinav_durumu(k, taban, now)
+    hafta = _sinav_gunu(k.get("hafta"))
+    konular = k.get("konular") if isinstance(k.get("konular"), list) else []
+    kaynaklar = k.get("kaynaklar") if isinstance(k.get("kaynaklar"), list) else []
     e.update({
-        "tur": k.get("tur"), "konular": list(k.get("konular") or []),
-        "kaynaklar": [_sinav_kaynagi(x) for x in (k.get("kaynaklar") or []) if isinstance(x, dict)],
-        "ilkTespit": k.get("ilk_tespit"), "degisti": k.get("degisti"), "hafta": k.get("hafta"),
+        "tur": k.get("tur"), "konular": [str(x) for x in konular],
+        "kaynaklar": [_sinav_kaynagi(x) for x in kaynaklar if isinstance(x, dict)],
+        "ilkTespit": k.get("ilk_tespit"), "degisti": k.get("degisti"),
+        "hafta": k["hafta"] if hafta is not None else None,
         "tarihBelirsiz": not e.get("date") and not k.get("sentetik"),
     })
     return e
@@ -2820,7 +2856,8 @@ def _sinavlar_belgesi():
 def _sinav_api_listesi(data, now=None):
     """/api/exams: output/sinavlar.json when it is readable (the sync step's
     single source, spec 2026-10-16 §4), else today's takvim + grade-table
-    computation — the list is never empty for want of the file."""
+    computation — the list is never empty for want of the file. A record that
+    cannot be shown is skipped and logged; it never fails the response."""
     now = now or datetime.now()
     belge = _sinavlar_belgesi()
     if belge is None:
@@ -2829,18 +2866,31 @@ def _sinav_api_listesi(data, now=None):
             e.update({"tur": None, "konular": [], "kaynaklar": [], "ilkTespit": None, "degisti": None,
                       "hafta": None, "tarihBelirsiz": False})
         return {**eski, "tespit": None}
-    sinavlar = [_kayittan_sinav(k, now) for k in belge["sinavlar"] if isinstance(k, dict) and k.get("id")]
+    sinavlar = []
+    for k in belge["sinavlar"]:
+        if not isinstance(k, dict) or not k.get("id"):
+            continue
+        try:
+            sinavlar.append(_kayittan_sinav(k, now))
+        except Exception as hata:  # noqa: BLE001 - one bad record must not take the page down
+            app.logger.warning("sinavlar.json: kayıt atlandı (%r): %s", k.get("id"), hata)
 
     def anahtar(e):
-        return e.get("date") or (e.get("hafta") or "9999") + "T99"
+        return str(e.get("date") or (e.get("hafta") or "9999") + "T99")
     upcoming = sorted([e for e in sinavlar if e["status"] == "upcoming"], key=anahtar)
-    past = sorted([e for e in sinavlar if e["status"] == "past"], key=lambda e: e.get("date") or "", reverse=True)
-    notlar = [int(e["grade"]) for e in sinavlar if str(e.get("grade") or "").isdigit()]
+    past = sorted([e for e in sinavlar if e["status"] == "past"],
+                  key=lambda e: str(e.get("date") or e.get("hafta") or ""), reverse=True)
+    notlar = [int(e["grade"]) for e in sinavlar
+              if str(e.get("grade") or "").isascii() and str(e.get("grade") or "").isdigit()]
     ozet = belge.get("ozet") if isinstance(belge.get("ozet"), dict) else {}
+    try:
+        incelenmedi = int(ozet.get("incelenmedi") or 0)
+    except (TypeError, ValueError, OverflowError):
+        incelenmedi = 0
     return {"exams": upcoming + past,
             "stats": {"upcoming": len(upcoming), "past": len(past),
                       "averageGrade": round(sum(notlar) / len(notlar), 1) if notlar else None},
-            "tespit": {"uretildi": belge.get("uretildi"), "incelenmedi": int(ozet.get("incelenmedi") or 0)}}
+            "tespit": {"uretildi": belge.get("uretildi"), "incelenmedi": incelenmedi}}
 
 
 @app.route("/api/health")

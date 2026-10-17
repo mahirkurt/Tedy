@@ -853,7 +853,7 @@ def sinavlar_metni(sinavlar: Any, simdi: datetime) -> str:
     if len(gecmis) > _GECMIS_SINAV_SINIRI:
         govde += f"\n(+{len(gecmis) - _GECMIS_SINAV_SINIRI} eski sınav daha)"
     parcalar.append(f"GEÇMİŞ SINAVLAR ({len(gecmis)}, en yenisi önce):\n{govde}")
-    if any(not e.get("date") for e in gecmis):
+    if any(not e.get("date") and not e.get("hafta") and not e.get("tarihBelirsiz") for e in gecmis):
         # /api/exams synthesises these from graded columns; measured
         # 2026-09-25 the grade table was still 2025-2026's.
         parcalar.append("Not (okura aktarma): tarihi olmayan sınavlar not tablosundan türetildi; "

@@ -151,3 +151,79 @@ def test_asistan_tarih_belirsiz():
          "tarihBelirsiz": True}
     metin = sinavlar_metni([e], SIMDI)
     assert "tarih belirsiz (19.10 haftası)" in metin and "Konular: yok" in metin
+
+
+# --- Fix round 1: sinavlar.json is data; nothing in it may turn /api/exams into a 500 ---
+
+def _ders_karti(**konum):
+    return {"tur": "ders_karti", "konum": konum, "alinti": "x"}
+
+
+def test_bozuk_kayitlar_500_vermez(monkeypatch, caplog):
+    kotu = [
+        kayit(id="b1", tarih="abc"),
+        kayit(id="b2", tarih="2026-10-20", saat="9:00"),
+        kayit(id="b3", tarih=None, hafta="xx"),
+        kayit(id="b4", tarih=None, hafta=5),
+        kayit(id="b5", kaynaklar=[_ders_karti(hafta=3, ders="Matematik")]),
+        kayit(id="b6", kaynaklar=[_ders_karti(hafta="1. Hafta", ders=5)]),
+        kayit(id="b7", konular="metin", kaynaklar=7),
+        kayit(id="b8", kaynaklar=[{"tur": "ek", "konum": {"id": 5}, "alinti": 3}]),
+        kayit(id="b9", kaynaklar=[{"tur": "patla", "konum": {}, "alinti": "patla"}]),
+    ]
+    belge = _belge(*kotu, kayit(id="iyi"))
+    belge["ozet"]["incelenmedi"] = "x"
+    _dosya(monkeypatch, belge)
+
+    gercek = api._sinav_kaynagi
+
+    def _kaynak(k):
+        if k.get("alinti") == "patla":
+            raise RuntimeError("beklenmedik")
+        return gercek(k)
+    monkeypatch.setattr(api, "_sinav_kaynagi", _kaynak)
+
+    api.app.config["TESTING"] = True
+    with caplog.at_level("WARNING"), api.app.test_client() as c:
+        yanit = c.get("/api/exams")
+    assert yanit.status_code == 200
+    veri = yanit.get_json()
+    kimlikler = {e["id"]: e for e in veri["exams"]}
+    assert "iyi" in kimlikler and kimlikler["iyi"]["status"] == "upcoming"
+    assert "b9" not in kimlikler and "b9" in caplog.text           # skipped and logged, not fatal
+    assert veri["tespit"]["incelenmedi"] == 0
+    for kimlik in ("b1", "b3", "b4"):                              # unreadable day/week = no day/week
+        assert (kimlikler[kimlik]["date"], kimlikler[kimlik]["tarihBelirsiz"], kimlikler[kimlik]["status"]) == \
+            (None, True, "upcoming")
+        assert kimlikler[kimlik]["hafta"] is None
+    assert kimlikler["b2"]["date"] == "2026-10-20" and kimlikler["b2"]["allDay"] is True
+    assert kimlikler["b7"]["konular"] == [] and kimlikler["b7"]["kaynaklar"] == []
+
+
+def test_okunamayan_taban_tarihi_tarihsiz_olur(monkeypatch):
+    taban = {"id": "t1", "course": "Matematik", "title": "Matematik KTT", "rawTitle": "KTT", "courseColor": "#111",
+             "courseFamily": "blue", "examNumber": None, "date": "bozuk", "endDate": "bozuk2", "allDay": False,
+             "status": "past", "grade": None, "relatedHomework": [], "relatedContent": []}
+    _dosya(monkeypatch, _belge(kayit(id="t1", taban=taban, tarih=None, saat=None,
+                                     kaynaklar=[{"tur": "takvim", "konum": {"id": "t1"}, "alinti": "KTT"}])))
+    [e] = api._sinav_api_listesi(api._scraped(), SIMDI)["exams"]
+    assert (e["status"], e["date"], e["tarihBelirsiz"]) == ("upcoming", None, True)
+    assert e["endDate"] is None
+
+
+def test_gecmis_siralama_haftaya_bakar(monkeypatch):
+    _dosya(monkeypatch, _belge(
+        kayit(id="a", tarih=None, hafta="2026-09-21"),
+        kayit(id="b", tarih="2026-10-01"),
+        kayit(id="c", tarih=None, hafta="2026-09-28")))
+    sonuc = api._sinav_api_listesi(api._scraped(), SIMDI)["exams"]
+    assert [e["id"] for e in sonuc] == ["b", "c", "a"]
+
+
+def test_asistan_dipnotu_haftali_gecmiste_yok_sentetikte_var():
+    haftali = {"course": "Fen", "title": "Fen KTT", "status": "past", "date": None, "hafta": "2026-10-05",
+               "tarihBelirsiz": False, "konular": [], "kaynaklar": []}
+    sentetik = {"course": "Türkçe", "title": "Türkçe · 1. Sınav", "status": "past", "date": None, "hafta": None,
+                "tarihBelirsiz": False, "grade": "80"}
+    assert "not tablosundan türetildi" not in sinavlar_metni([haftali], SIMDI)
+    assert "not tablosundan türetildi" in sinavlar_metni([haftali, sentetik], SIMDI)
