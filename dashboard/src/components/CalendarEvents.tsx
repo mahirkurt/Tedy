@@ -11,6 +11,7 @@ import { EmptyLine } from './patterns/EmptyLine'
 import SubjectLabel from './SubjectLabel'
 import { subjectClass } from '../utils/subject'
 import { acikOgeAc } from '../asistan/sayfaBaglami'
+import { yerelAni } from '../utils/sinav'
 
 // ── Constants ──
 
@@ -84,9 +85,9 @@ function weekLabel(first: Date, last: Date): string {
 
 function parseEventDate(s: string): Date | null {
   if (!s) return null
-  // ISO format
-  const d = new Date(s)
-  if (!isNaN(d.getTime())) return d
+  // ISO format; a date-only start ("2026-09-24", an all-day event) is the local day (C20).
+  const d = yerelAni(s)
+  if (d) return d
   // DD.MM.YYYY HH:MM
   const m = s.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/)
   if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5])

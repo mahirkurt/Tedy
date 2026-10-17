@@ -1,4 +1,6 @@
 import type { ExamItem } from '../types.ts'
+import { getExamCountdown } from './countdown.ts'
+import type { CountdownResult } from './countdown.ts'
 import { MONTHS_SHORT } from './formatters.ts'
 
 const SAAT_48 = 48 * 3600 * 1000
@@ -19,8 +21,26 @@ export function sinavAni(e: Pick<ExamItem, 'date'>): Date | null {
   return yerelAni(e.date)
 }
 
+/** When an exam is over for "upcoming" purposes: a timed exam at its start, an all-day (or
+ *  date-only) exam at the end of that local day, 23:59 — on the exam day it has not passed yet. */
+export function sinavBitisi(e: Pick<ExamItem, 'date' | 'allDay'>): Date | null {
+  const d = sinavAni(e)
+  if (!d) return null
+  if (!e.allDay && !/^\d{4}-\d{2}-\d{2}$/.test(e.date ?? '')) return d
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59)
+}
+
+export function sinavGeriSayimi(e: Pick<ExamItem, 'date' | 'allDay'>, nowMs: number): CountdownResult {
+  return getExamCountdown(sinavBitisi(e), nowMs)
+}
+
+// `ilkTespit` / `degisti` are written by the server as naive Istanbul wall-clock time. Read in a
+// browser elsewhere they would shift by the zone difference and the 48-hour window with them, so a
+// stamp without an offset is read as +03:00 (Turkey has no DST since 2016). One with Z/offset as is.
 function an(s?: string | null): number {
-  return s ? new Date(s).getTime() : NaN
+  if (!s) return NaN
+  const ofsetsiz = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(s)
+  return new Date(ofsetsiz ? `${s}+03:00` : s).getTime()
 }
 
 /** "Yeni"/"Değişti" — metinli etiket; renk tek başına anlam taşımaz (spec §8). */
@@ -32,13 +52,21 @@ export function sinavEtiketi(e: ExamItem, nowMs: number): 'Yeni' | 'Değişti' |
   return null
 }
 
+// An exam that has begun (timed: its hour has passed; all-day: its day is over) is not "the nearest
+// exam" even while the list still files it as upcoming.
 export function enYakinSinav(exams: ExamItem[], nowMs: number, haric: Set<string>): ExamItem | null {
   const adaylar = exams
     .filter(e => e.status === 'upcoming' && e.date && !haric.has(e.id))
+    .filter(e => (sinavBitisi(e)?.getTime() ?? NaN) > nowMs)
     .map(e => ({ e, t: sinavAni(e)?.getTime() ?? NaN }))
     .filter(x => !isNaN(x.t) && x.t - nowMs <= GUN_7)
     .sort((a, b) => a.t - b.t)
   return adaylar[0]?.e ?? null
+}
+
+/** List keys for topics: a topic the source names twice still gets its own key. */
+export function konuAnahtarlari(konular: string[] | undefined): { anahtar: string; konu: string }[] {
+  return (konular ?? []).map((konu, i) => ({ anahtar: `${i}:${konu}`, konu }))
 }
 
 export function konuOzeti(konular: string[] | undefined, n = 3): string {

@@ -223,3 +223,24 @@ test.describe('weekend', () => {
     await expect(page.locator('.calendar-event', { hasText: 'Fen Bilimleri' })).toBeVisible()
   })
 })
+
+// C20: an all-day event's start is a bare date and means that local day. Read as UTC midnight, a
+// browser west of Greenwich drew Saturday's event on Friday and gave the weekend no column.
+test.describe('New York', () => {
+  test.use({ timezoneId: 'America/New_York' })
+
+  test('a date-only Saturday event stays on Saturday', async ({ page }) => {
+    await page.route('**/api/health', r => r.fulfill(json({
+      timestamp: '', success: true, scrape_errors: [], duration_seconds: 1,
+    })))
+    await page.route('**/api/calendar/unified', r => r.fulfill(json({ events: [
+      { id: 'g', type: 'event', title: 'Okul gezisi', start: '2026-09-26', end: '2026-09-26', allDay: true,
+        color: '', course: '', courseFamily: '', status: '' },
+    ] })))
+    await page.clock.setFixedTime(new Date('2026-09-24T10:30:00-04:00'))
+    await page.goto('/takvim')
+    const heads = page.locator('.calendar-grid__header')
+    await expect(heads).toHaveCount(7)
+    await expect(heads.nth(6)).toContainText('26 Eyl')
+  })
+})

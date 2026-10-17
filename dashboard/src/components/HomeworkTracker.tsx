@@ -62,7 +62,8 @@ export default function HomeworkTracker() {
     setSelectedHw(null)
     if (!karsilandi) gezin('/asistan?sayfa=isler')
   }
-  const [, setTick] = useState(0)
+  // The page's minute clock: the exam tags read it instead of calling Date.now() during render (C16).
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const { focusMode } = useFocusMode()
   const [collapsed, setCollapsed] = useState<Record<HomeworkGroupKey, boolean>>({
     aktif: false,
@@ -104,7 +105,7 @@ export default function HomeworkTracker() {
     return () => cancelAnimationFrame(kare)
   }, [silinecekBelge])
   useEffect(() => {
-    const t = setInterval(() => setTick(n => n + 1), 60000)
+    const t = setInterval(() => setNowMs(Date.now()), 60000)
     return () => clearInterval(t)
   }, [])
 
@@ -430,7 +431,7 @@ export default function HomeworkTracker() {
                       <SubjectLabel course={e.course} family={e.courseFamily}>{e.title}</SubjectLabel>
                     </span>
                   )}
-                  <SinavEtiketi exam={e} nowMs={Date.now()} />
+                  <SinavEtiketi exam={e} nowMs={nowMs} />
                   {when ? (
                     // B36: only the figure is mono ("7 gün sonra"), the words stay Sans.
                     <span className="exams-ahead__when"><Rakamli metin={describeDaysAhead(when)} /></span>

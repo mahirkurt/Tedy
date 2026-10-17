@@ -29,7 +29,7 @@ import { EmptyLine } from './patterns/EmptyLine'
 import { Rakamli } from './patterns/Rakamli'
 import SubjectLabel from './SubjectLabel'
 import { subjectClass } from '../utils/subject'
-import { enYakinSinav, sinavAni } from '../utils/sinav'
+import { enYakinSinav, sinavAni, yerelAni } from '../utils/sinav'
 import { SinavOnizleme } from './SinavKarti'
 
 interface ScheduleData {
@@ -191,9 +191,10 @@ function buildAgenda(
 
   for (const ev of calData.events || []) {
     if (ev.allDay) continue
-    const d = new Date(ev.start)
-    if (!isSameDay(d, targetDate)) continue
-    const end = new Date(ev.end)
+    // A date-only start ("2026-09-24") is that local day, not UTC midnight (C20).
+    const d = yerelAni(ev.start)
+    if (!d || !isSameDay(d, targetDate)) continue
+    const end = yerelAni(ev.end) ?? d
     const startMin = toMinutes(d.getHours(), d.getMinutes())
     const endMin = toMinutes(end.getHours(), end.getMinutes())
     const timeState = getTemporalState(startMin, endMin)

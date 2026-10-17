@@ -55,6 +55,35 @@ test.describe('C4 — sınavlar', () => {
   })
 })
 
+// C19: with a second exam inside the week, the preview shows that one — never the exam the evening's
+// "Yarın" already leads with.
+test('yarınki sınav Yarın’da; önizleme haftanın öbür sınavını gösterir', async ({ page }) => {
+  await bugunAc(page, '2026-09-24T16:40', { exams: { ...SINAVLAR, exams: [
+    ...SINAVLAR.exams, SINAV('fen', 'Fen Bilimleri KTT', '2026-09-29T09:00:00'),
+  ] } })
+  await expect(page.locator('.today-tomorrow p').first()).toContainText('Özdebir GİS-1')
+  const onizleme = page.locator('.sinav-onizleme')
+  await expect(onizleme).toHaveCount(1)
+  await expect(onizleme).toContainText('Fen Bilimleri KTT')
+  await expect(onizleme).not.toContainText('Özdebir GİS-1')
+  await expect(page.locator('.today-exams')).not.toContainText('Fen Bilimleri KTT')
+})
+
+// C20: a calendar event whose start is a bare date is that local day. Read as UTC midnight, a browser
+// west of Greenwich put it on the day before.
+test.describe('New York saatindeki tarayıcı', () => {
+  test.use({ timezoneId: 'America/New_York' })
+
+  test('yalnız tarihli takvim olayı kendi gününde', async ({ page }) => {
+    await bugunAc(page, '2026-09-24T13:00:00Z', { calendar: { events: [{
+      allDay: false, start: '2026-09-25', end: '2026-09-25', title: 'Veli toplantısı', extendedProps: {},
+    }] } })
+    await expect(page.locator('.today-tl__item', { hasText: 'Veli toplantısı' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Sonraki gün', exact: true }).click()
+    await expect(page.locator('.today-tl__item', { hasText: 'Veli toplantısı' })).toBeVisible()
+  })
+})
+
 test.describe('İstanbul saatindeki tarayıcı', () => {
   test.use({ timezoneId: 'Europe/Istanbul' })
 

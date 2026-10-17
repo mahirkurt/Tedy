@@ -5,14 +5,14 @@ import { useLocation, useSearchParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { useFocusMode } from '../contexts/focusMode'
 import type { ExamItem, ExamsApiResponse } from '../types'
-import { countdownTagType, getExamCountdown } from '../utils/countdown'
+import { countdownTagType } from '../utils/countdown'
 import { subjectClass } from '../utils/subject'
 import { MONTHS_SHORT } from '../utils/formatters'
 import { EmptyLine } from './patterns/EmptyLine'
 import { acikOgeAc } from '../asistan/sayfaBaglami'
 import SinavUyarilari from './SinavUyarilari'
 import { SinavAyrintisi, IncelenmediNotu } from './SinavKarti'
-import { yerelAni, zamanMetni } from '../utils/sinav'
+import { sinavGeriSayimi, yerelAni, zamanMetni } from '../utils/sinav'
 
 const EMPTY_RESPONSE: ExamsApiResponse = { exams: [], stats: { upcoming: 0, past: 0, averageGrade: null } }
 
@@ -41,19 +41,29 @@ function formatExamDate(dateStr: string | null): string {
   }
 }
 
-function ExamCard({ exam, showCountdown, focusMode, baslangicAcik }: {
+function ExamCard({ exam, showCountdown, focusMode, baslangicAcik, nowMs }: {
   exam: ExamItem
   showCountdown: boolean
   focusMode: boolean
   baslangicAcik?: boolean
+  nowMs: number
 }) {
   const [expanded, setExpanded] = useState(baslangicAcik ?? false)
+  // `?sinav=` can change while the page stays mounted (a notification click, the Bugün preview):
+  // the card it names opens then too, not only on first render. Adjusted during render, the
+  // React-documented way to follow a prop, rather than in an effect.
+  const [oncekiAcik, setOncekiAcik] = useState(baslangicAcik ?? false)
+  if ((baslangicAcik ?? false) !== oncekiAcik) {
+    setOncekiAcik(baslangicAcik ?? false)
+    if (baslangicAcik) setExpanded(true)
+  }
   // Her kart kendi kaydını bırakır: iki kart açıkken biri kapanınca öbürü bağlam olarak kalır.
   useEffect(() => (expanded ? acikOgeAc({ tur: 'sinav', id: exam.id, etiket: exam.title }) : undefined),
     [expanded, exam.id, exam.title])
+  // An all-day exam counts down to the end of its day (C11), from the page's minute clock (C16).
   const countdown = useMemo(
-    () => showCountdown && exam.date ? getExamCountdown(yerelAni(exam.date)) : null,
-    [exam.date, showCountdown]
+    () => showCountdown && exam.date ? sinavGeriSayimi(exam, nowMs) : null,
+    [exam, showCountdown, nowMs]
   )
 
   const hasDetails = !focusMode && (
@@ -156,13 +166,13 @@ function ExamCard({ exam, showCountdown, focusMode, baslangicAcik }: {
 export default function ExamTimeline() {
   const { data } = useApi<ExamsApiResponse>('/api/exams', EMPTY_RESPONSE)
   const { focusMode } = useFocusMode()
-  const [, setTick] = useState(0)
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const [searchParams] = useSearchParams()
   const acilacak = searchParams.get('sinav')
   const { hash } = useLocation()
 
   useEffect(() => {
-    const t = setInterval(() => setTick(n => n + 1), 60000)
+    const t = setInterval(() => setNowMs(Date.now()), 60000)
     return () => clearInterval(t)
   }, [])
 
@@ -195,7 +205,7 @@ export default function ExamTimeline() {
           <h2 className="exam-section__title">Yaklaşan sınavlar ({upcoming.length})</h2>
           <div className="exam-section__list">
             {upcoming.map(exam => (
-              <ExamCard key={exam.id} exam={exam} showCountdown focusMode={focusMode} baslangicAcik={exam.id === acilacak} />
+              <ExamCard key={exam.id} exam={exam} showCountdown focusMode={focusMode} baslangicAcik={exam.id === acilacak} nowMs={nowMs} />
             ))}
           </div>
         </div>
@@ -212,7 +222,8 @@ export default function ExamTimeline() {
             )}
             <div className="exam-section__list">
               {past.map(exam => (
-                <ExamCard key={exam.id} exam={exam} showCountdown={false} focusMode={focusMode} baslangicAcik={exam.id === acilacak} />
+                <ExamCard key={exam.id} exam={exam} showCountdown={false} focusMode={focusMode} baslangicAcik={exam.id === acilacak}
+                  nowMs={nowMs} />
               ))}
             </div>
           </div>
