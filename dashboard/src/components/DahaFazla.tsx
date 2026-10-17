@@ -1,5 +1,6 @@
 import { useContext } from 'react'
 import { Link } from 'react-router-dom'
+import { Notification } from '@carbon/icons-react'
 import { SessionContext } from '../contexts/session'
 import { routes, secondaryNavRoutes } from '../routes'
 
@@ -27,6 +28,14 @@ export default function DahaFazla() {
             </li>
           )
         })}
+        {user.role === 'full' && (
+          <li>
+            <Link to="/sinavlar#uyarilar" className="daha-fazla__oge">
+              <Notification aria-hidden="true" />
+              <span>Sınav uyarıları</span>
+            </Link>
+          </li>
+        )}
       </ul>
     </section>
   )

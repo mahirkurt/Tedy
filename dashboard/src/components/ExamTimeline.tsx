@@ -9,6 +9,7 @@ import { subjectClass } from '../utils/subject'
 import { MONTHS_SHORT, gradeColor } from '../utils/formatters'
 import { EmptyLine } from './patterns/EmptyLine'
 import { acikOgeAc } from '../asistan/sayfaBaglami'
+import SinavUyarilari from './SinavUyarilari'
 
 const EMPTY_RESPONSE: ExamsApiResponse = { exams: [], stats: { upcoming: 0, past: 0, averageGrade: null } }
 
@@ -171,12 +172,16 @@ export default function ExamTimeline() {
 
   if (data.exams.length === 0) {
     return (
-      <EmptyLine>Takvimde henüz sınav yok.</EmptyLine>
+      <>
+        <SinavUyarilari />
+        <EmptyLine>Takvimde henüz sınav yok.</EmptyLine>
+      </>
     )
   }
 
   return (
     <div className="exam-timeline">
+      <SinavUyarilari />
       <div className="exam-stats" role="region" aria-label="Sınav istatistikleri">
         <div className="exam-stats__item">
           <span className="exam-stats__value">{data.stats.upcoming}</span>
