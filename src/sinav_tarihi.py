@@ -45,7 +45,8 @@ _AY_GUN = re.compile(rf"\b({_AY})\b(\.)?\s+(\d{{1,2}})(?:st|nd|rd|th)?\b(?:,?\s+
 # Kod/ondalık zincirinin (FB.7.1.4, 2.5, 3/4,5) parçası olan sayılar tarih sayılmaz.
 _SAYISAL = re.compile(r"(?<![\w./])(\d{1,2})[./](\d{1,2})(?:[./](\d{4}|\d{2}))?(?!\w)(?![./,]\d)")
 # Kısa gün adları ("15 Eki Per") yalnız kısa ay korumasında gün adı sayılır; tek başına tarih çözmez.
-_KISA_GUN = "pzt|sal|car|per|cum|cmt|paz"
+# "sal", "çar" ve "paz" gündelik sözcüklerle çakıştığı için ("15 Mar sal") korumayı açmaz.
+_KISA_GUN = "pzt|per|cum|cmt"
 _GUN_ADI_SONRA = re.compile(rf"\s*(?:{_GUN}|{_KISA_GUN})\b")
 # Yılsız d.m / d/m için tarih ipucu: kesme ekli ('de/'da/'te/'ta), "tarih", "günü" ya da gün adı.
 _TARIH_IPUCU = re.compile(rf"\s*(?:['\u2019](?:de|da|te|ta)|tarih|gunu\b|(?:{_GUN})\b)")
@@ -176,6 +177,12 @@ def _gun_adi(k: str) -> re.Match | None:
     return None
 
 
+def bu_haftanin_pazartesisi(yayin: date) -> date:
+    """"Bu hafta" in a post: its own week on a weekday, the coming week at the weekend (a Sunday
+    post's "bu hafta Cuma" is five days ahead, never two days back)."""
+    return pazartesi(yayin) + timedelta(days=7 if yayin.weekday() >= 5 else 0)
+
+
 def tarih_coz(metin: str, yayin: date, okul_araligi: tuple[date, date], goreli: bool = True) -> TarihCozumu:
     """`goreli=False` when the text's publication date is unknown: only explicit dates count
     ("Cuma günü", "yarın", "haftaya" are relative to a day we do not know — resolving them
@@ -203,10 +210,10 @@ def tarih_coz(metin: str, yayin: date, okul_araligi: tuple[date, date], goreli: 
     # ileriye çözülmez: "15 Ekim Perşembe günü yapılan KTT" bir sonraki Perşembe'yi göstermez.
     if gun_adi and not acik and _BU_HAFTA.search(k):
         # "bu hafta Cuma" on a Friday is that Friday, not the next one.
-        return TarihCozumu(pazartesi(yayin) + timedelta(days=_GUNLER[gun_adi.group(1)]), None, False)
+        return TarihCozumu(bu_haftanin_pazartesisi(yayin) + timedelta(days=_GUNLER[gun_adi.group(1)]), None, False)
     if gun_adi and not acik:
         fark = (_GUNLER[gun_adi.group(1)] - yayin.weekday()) % 7 or 7
         return TarihCozumu(yayin + timedelta(days=fark), None, False)
     if _BU_HAFTA.search(k):
-        return TarihCozumu(None, pazartesi(yayin), False)
+        return TarihCozumu(None, bu_haftanin_pazartesisi(yayin), False)
     return TarihCozumu(None, None, bool(acik))

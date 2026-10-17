@@ -201,7 +201,6 @@ def test_a5_kisa_gun_adi_kisa_ay_korumasinda():
     yayin = date(2026, 10, 5)
     assert tarih_coz("15 Eki Per sınav", yayin, YIL).gun == date(2026, 10, 15)
     assert tarih_coz("16 Eki Cum quiz", yayin, YIL).gun == date(2026, 10, 16)
-    assert tarih_coz("14 Eki Çar yazılı", yayin, YIL).gun == date(2026, 10, 14)
     # Alone a short weekday resolves nothing.
     assert tarih_coz("Per quiz", yayin, YIL) == TarihCozumu(None, None, False)
     assert tarih_coz("sal quiz", yayin, YIL) == TarihCozumu(None, None, False)
@@ -210,3 +209,23 @@ def test_a5_kisa_gun_adi_kisa_ay_korumasinda():
 def test_a6_cok_imzali_metinde_ilk_imza():
     metin = "Öğretmen A | 05.10.2026\nKTT konuları\nÖğretmen B | 12.10.2026\nEk duyuru"
     assert yayin_tarihi(metin) == date(2026, 10, 5)
+
+
+# --- düzeltme turu (temizlik A inceleme) ---------------------------------------------
+
+def test_d1_hafta_sonu_yayininda_bu_hafta_sonraki_haftadir():
+    for yayin in (date(2026, 10, 17), date(2026, 10, 18)):   # Cumartesi, Pazar
+        assert tarih_coz("Bu hafta Cuma günü quiz olacak", yayin, YIL) == \
+            TarihCozumu(date(2026, 10, 23), None, False), yayin
+        assert tarih_coz("This week on Friday we will have a quiz", yayin, YIL).gun == date(2026, 10, 23)
+        assert tarih_coz("Bu hafta quiz olacak", yayin, YIL) == TarihCozumu(None, date(2026, 10, 19), False)
+    # A weekday publication keeps its own week.
+    assert tarih_coz("Bu hafta quiz olacak", date(2026, 10, 16), YIL).hafta == date(2026, 10, 12)
+
+
+def test_d7_belirsiz_kisa_gun_adlari_ay_korumasini_acmaz():
+    yayin = date(2026, 10, 5)
+    for metin in ("15 Mar sal quiz", "15 Eki car sınav", "15 Eki paz deneme"):
+        assert tarih_coz(metin, yayin, YIL) == TarihCozumu(None, None, False), metin
+    assert tarih_coz("12 Eki Pzt quiz", yayin, YIL).gun == date(2026, 10, 12)
+    assert tarih_coz("17 Eki Cmt deneme", yayin, YIL).gun == date(2026, 10, 17)
