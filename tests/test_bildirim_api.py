@@ -121,3 +121,28 @@ def test_deneme_vapid_yoksa_503(ortam, monkeypatch):
 
 def test_okuyucu_uc_listesinde_degil():
     assert not any("bildirim" in e for e in api.READER_ENDPOINTS)
+
+
+def test_bypass_kimligi_current_user_email_ile_ayni(monkeypatch):
+    monkeypatch.setattr(api, "TEST_AUTH_BYPASS", True)
+    with api.app.test_request_context("/api/bildirim/anahtar"):
+        assert api._bildirim_kisisi() == api._current_user_email() == "test@tedy.online"
+
+
+def test_tohum_ilk_cihaz_kilit_icinde_belirlenir(ortam, monkeypatch):
+    c, kok, tohum, _ = ortam
+    _giris(c, TAM)
+    monkeypatch.setattr(wp.AbonelikDeposu, "kisinin", lambda self, email: [])     # a stale pre-read must not matter
+    assert c.post("/api/bildirim/abonelik", json=GOVDE).status_code == 201
+    assert c.post("/api/bildirim/abonelik", json={**GOVDE, "endpoint": GOVDE["endpoint"] + "2"}).status_code == 201
+    assert tohum == [TAM]
+
+
+def test_deneme_bozuk_kayitla_patlamaz(ortam):
+    c, kok, _, gonderilen = ortam
+    (kok / "output").mkdir()
+    (kok / wp.ABONELIKLER).write_text('{"kisiler": {"%s": [{"abonelik": "x"}, {"abonelik": %s}]}}' % (
+        TAM, __import__("json").dumps(wp.abonelik_dogrula(GOVDE) and {"endpoint": GOVDE["endpoint"], "keys": GOVDE["keys"]})),
+        encoding="utf-8")
+    _giris(c, TAM)
+    assert c.post("/api/bildirim/deneme").get_json() == {"gonderilen": 1}

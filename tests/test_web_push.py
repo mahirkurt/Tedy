@@ -2,11 +2,12 @@
 No network: sending goes through a fake webpush callable."""
 import base64
 import json
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
 
-from src.web_push import (AbonelikDeposu, GonderimSonucu, VapidAyarlari, abonelik_dogrula, anahtar_uret, gonder,
+from src.web_push import (CIHAZ_SINIRI, AbonelikDeposu, GonderimSonucu, VapidAyarlari, abonelik_dogrula, anahtar_uret, gonder,
                           vapid_ayarlari)
 
 P256 = base64.urlsafe_b64encode(b"\x04" + b"a" * 64).rstrip(b"=").decode()
@@ -53,6 +54,14 @@ def test_dogrula_bilinen_servisler(endpoint):
 @pytest.mark.parametrize("govde", [
     None, "x", {}, abonelik("http://fcm.googleapis.com/x"), abonelik("https://evil.example.com/x"),
     abonelik("https://fcm.googleapis.com.evil.com/x"),
+    abonelik("https://evil.example\\@fcm.googleapis.com/x"),        # urlsplit says fcm, urllib3 dials evil.example
+    abonelik("https://127.0.0.1\\@fcm.googleapis.com/x"),
+    abonelik("https://user@fcm.googleapis.com/x"), abonelik("https://user:pw@fcm.googleapis.com/x"),
+    abonelik("https://fcm.googleapis.com:8443/x"), abonelik("https://fcm.googleapis.com:/x"),
+    abonelik("https://fcm.googleapis.com/a b"), abonelik("https://fcm.googleapis.com/a\tb"),
+    abonelik("https://fcm.googleapis.com/a\nb"), abonelik("https://fcm.googleapis.com/ü"),
+    {**abonelik(), "keys": {"p256dh": P256 + "!", "auth": AUTH}},
+    {**abonelik(), "keys": {"p256dh": P256, "auth": AUTH + "+"}},
     {**abonelik(), "keys": {"p256dh": "kısa", "auth": AUTH}},
     {**abonelik(), "keys": {"p256dh": P256}},
     {**abonelik(), "endpoint": "https://fcm.googleapis.com/" + "x" * 2100},
@@ -68,8 +77,10 @@ def test_dogrula_cihaz_adi_kirpilir():
 
 def test_depo_ekle_sil_kisinin(tmp_path):
     d = AbonelikDeposu(tmp_path / "a.json")
-    assert d.ekle("isik@x", abonelik_dogrula(abonelik())) is True
-    assert d.ekle("isik@x", abonelik_dogrula(abonelik(cihaz="Yeni ad"))) is False   # same endpoint: replaced
+    assert d.ekle("isik@x", abonelik_dogrula(abonelik())) == (True, True)             # new device, first device
+    assert d.ekle("isik@x", abonelik_dogrula(abonelik(cihaz="Yeni ad"))) == (False, False)   # same endpoint: replaced
+    assert d.ekle("isik@x", abonelik_dogrula(abonelik("https://web.push.apple.com/Z"))) == (True, False)
+    d.sil("isik@x", "https://web.push.apple.com/Z")
     assert [c["cihaz"] for c in d.kisinin("isik@x")] == ["Yeni ad"]
     d.ekle("anne@x", abonelik_dogrula(abonelik("https://web.push.apple.com/Q")))
     assert set(d.hepsi()) == {"isik@x", "anne@x"}
@@ -96,6 +107,40 @@ def test_depo_endpoint_sil_her_kisiden(tmp_path):
 def test_depo_bozuk_dosya_bos_sayilir(tmp_path):
     (tmp_path / "a.json").write_text("{bozuk", encoding="utf-8")
     assert AbonelikDeposu(tmp_path / "a.json").hepsi() == {}
+
+
+def test_depo_bozuk_dosya_yazarken_kenara_alinir(tmp_path):
+    yol = tmp_path / "a.json"
+    yol.write_text("{bozuk", encoding="utf-8")
+    d = AbonelikDeposu(yol, simdi=lambda: datetime(2026, 10, 17, 9, 8, 7))
+    assert d.hepsi() == {} and yol.read_text(encoding="utf-8") == "{bozuk"       # reading never touches it
+    assert d.ekle("isik@x", abonelik_dogrula(abonelik())) == (True, True)
+    assert (tmp_path / "a.json.bozuk-20261017090807").read_text(encoding="utf-8") == "{bozuk"
+    assert [c["cihaz"] for c in d.kisinin("isik@x")] == ["Android"]
+
+
+@pytest.mark.parametrize("icerik", [
+    {"kisiler": []}, {"kisiler": "x"}, [], {"kisiler": {"isik@x": "x"}},
+    {"kisiler": {"isik@x": [{"abonelik": "x"}, {"abonelik": {}}, {"abonelik": {"endpoint": 5}}, "y", None]}},
+])
+def test_depo_beklenmedik_sekil_patlamaz(tmp_path, icerik):
+    yol = tmp_path / "a.json"
+    yol.write_text(json.dumps(icerik), encoding="utf-8")
+    d = AbonelikDeposu(yol)
+    assert d.hepsi() == {} and d.kisinin("isik@x") == []
+    assert d.sil("isik@x", "https://fcm.googleapis.com/fcm/send/abc") is False
+    assert d.endpoint_sil("https://fcm.googleapis.com/fcm/send/abc") == 0
+    assert d.ekle("isik@x", abonelik_dogrula(abonelik())) == (True, True)       # junk does not count as a device
+
+
+def test_depo_cihaz_siniri_en_eskiyi_atar(tmp_path):
+    saat = iter(range(100))
+    d = AbonelikDeposu(tmp_path / "a.json", simdi=lambda: datetime(2026, 10, 17, 9, 0, next(saat)))
+    for i in range(CIHAZ_SINIRI + 1):
+        d.ekle("isik@x", abonelik_dogrula(abonelik(f"https://web.push.apple.com/{i}")))
+    uclar = [c["abonelik"]["endpoint"] for c in d.kisinin("isik@x")]
+    assert len(uclar) == CIHAZ_SINIRI
+    assert "https://web.push.apple.com/0" not in uclar and "https://web.push.apple.com/10" in uclar
 
 
 VAPID = VapidAyarlari("pub", "priv", "https://tedy.online")

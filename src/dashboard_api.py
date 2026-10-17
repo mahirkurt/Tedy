@@ -2601,7 +2601,7 @@ def exams():
 
 def _bildirim_kisisi():
     if TEST_AUTH_BYPASS:
-        return "test@tedy"
+        return _current_user_email()
     email = str(session.get("user_email", "") or "").lower().strip()
     return email if email and USER_ROLES.get(email) == ROLE_FULL else None
 
@@ -2639,9 +2639,7 @@ def bildirim_abonelik():
     abonelik = web_push.abonelik_dogrula(govde)
     if abonelik is None:
         return jsonify({"error": "geçersiz abonelik"}), 400
-    ilk_cihaz = not depo.kisinin(email)
-    depo.ekle(email, abonelik)
-    if ilk_cihaz:
+    if depo.ekle(email, abonelik).ilk_cihaz:       # decided under the store's lock, not by a read beforehand
         # A person who turns alerts on gets what happens from now on, not a
         # notification for every exam already known (plan Review Focus 3).
         from src import sinav_uyari
@@ -2671,7 +2669,7 @@ def bildirim_deneme():
         if sonuc.durum == "ok":
             gonderilen += 1
         elif sonuc.durum == "olu":
-            depo.endpoint_sil(c["abonelik"]["endpoint"])
+            depo.endpoint_sil(c.get("abonelik", {}).get("endpoint", ""))
     return jsonify({"gonderilen": gonderilen})
 
 

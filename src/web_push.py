@@ -10,12 +10,13 @@ import base64
 import fcntl
 import json
 import os
+import re
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Iterator, NamedTuple
 from urllib.parse import urlsplit
 
 from src.json_utils import atomic_json_dump
@@ -28,6 +29,8 @@ VAPID_KONU_VARSAYILAN = "https://tedy.online"
 ABONELIKLER = PurePosixPath("output/bildirim_abonelikleri.json")
 _ENDPOINT_SINIRI = 2000
 _CIHAZ_SINIRI = 80
+CIHAZ_SINIRI = 10          # devices kept per person; the oldest goes when an 11th arrives
+_B64URL = re.compile(r"^[A-Za-z0-9_-]+={0,2}$")
 
 
 def _b64(veri: bytes) -> str:
@@ -35,7 +38,7 @@ def _b64(veri: bytes) -> str:
 
 
 def _b64_bayt(deger: Any) -> bytes | None:
-    if not isinstance(deger, str) or not deger or len(deger) > 200:
+    if not isinstance(deger, str) or not deger or len(deger) > 200 or not _B64URL.match(deger):
         return None
     try:
         return base64.urlsafe_b64decode(deger + "=" * (-len(deger) % 4))
@@ -70,14 +73,34 @@ def _bilinen_alan(host: str) -> bool:
     return any(host == a or host.endswith("." + a) for a in BILINEN_PUSH_ALANLARI)
 
 
+def _endpoint_guvenli(endpoint: Any) -> bool:
+    """The host must be the same to every parser that may later connect to it.
+    urlsplit and urllib3 (what requests uses) disagree on `https://evil\\@fcm.googleapis.com/`,
+    so anything that makes the authority ambiguous is refused outright, and the
+    host urllib3 would dial must equal the one the allow-list checked."""
+    if not isinstance(endpoint, str) or len(endpoint) > _ENDPOINT_SINIRI or not endpoint.isascii():
+        return False
+    if "\\" in endpoint or any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in endpoint):
+        return False
+    try:
+        parca = urlsplit(endpoint)
+        if parca.scheme != "https" or not parca.hostname:
+            return False
+        if parca.username is not None or parca.password is not None or "@" in parca.netloc or ":" in parca.netloc:
+            return False
+        if not _bilinen_alan(parca.hostname.lower()):
+            return False
+        from urllib3.util import parse_url
+        return (parse_url(endpoint).host or "").lower() == parca.hostname.lower()
+    except ValueError:      # urlsplit, port parsing and urllib3's LocationParseError are all ValueErrors
+        return False
+
+
 def abonelik_dogrula(govde: Any) -> dict | None:
     if not isinstance(govde, dict):
         return None
     endpoint = govde.get("endpoint")
-    if not isinstance(endpoint, str) or len(endpoint) > _ENDPOINT_SINIRI:
-        return None
-    parca = urlsplit(endpoint)
-    if parca.scheme != "https" or not parca.hostname or not _bilinen_alan(parca.hostname.lower()):
+    if not _endpoint_guvenli(endpoint):
         return None
     anahtarlar = govde.get("keys") if isinstance(govde.get("keys"), dict) else {}
     p256 = _b64_bayt(anahtarlar.get("p256dh"))
@@ -87,6 +110,19 @@ def abonelik_dogrula(govde: Any) -> dict | None:
     cihaz = " ".join(str(govde.get("cihaz") or "").split())[:_CIHAZ_SINIRI] or "Tarayıcı"
     return {"endpoint": endpoint, "keys": {"p256dh": anahtarlar["p256dh"], "auth": anahtarlar["auth"]},
             "cihaz": cihaz}
+
+
+class EkleSonucu(NamedTuple):
+    yeni_cihaz: bool    # this endpoint was not among the person's devices
+    ilk_cihaz: bool     # the person had no device at all before this call (decided under the lock)
+
+
+def _gecerli_cihaz(c: Any) -> bool:
+    return isinstance(c, dict) and isinstance(c.get("abonelik"), dict) and isinstance(c["abonelik"].get("endpoint"), str)
+
+
+def _endpoint(c: dict) -> str:
+    return c["abonelik"]["endpoint"]
 
 
 class AbonelikDeposu:
@@ -101,34 +137,60 @@ class AbonelikDeposu:
             fcntl.flock(kilit, fcntl.LOCK_EX)
             yield
 
-    def _oku(self) -> dict[str, list[dict]]:
+    def _oku_ham(self) -> tuple[dict[str, list[dict]], bool]:
+        """(people, unreadable). Unreadable means the file exists but is not JSON."""
         try:
-            veri = json.loads(self.yol.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return {}
+            metin = self.yol.read_text(encoding="utf-8")
+        except OSError:
+            return {}, False
+        try:
+            veri = json.loads(metin)
+        except ValueError:
+            return {}, True
         kisiler = veri.get("kisiler") if isinstance(veri, dict) else None
-        return {e: [c for c in v if isinstance(c, dict)] for e, v in (kisiler or {}).items() if isinstance(v, list)}
+        if not isinstance(kisiler, dict):
+            return {}, False
+        return {e: [c for c in v if _gecerli_cihaz(c)] for e, v in kisiler.items()
+                if isinstance(e, str) and isinstance(v, list)}, False
+
+    def _oku(self) -> dict[str, list[dict]]:
+        return self._oku_ham()[0]
+
+    def _oku_yazmak_icin(self) -> dict[str, list[dict]]:
+        """Under the lock: an unreadable file is moved aside, never silently overwritten."""
+        kisiler, bozuk = self._oku_ham()
+        if bozuk:
+            yedek = self.yol.with_name(f"{self.yol.name}.bozuk-{self.simdi().strftime('%Y%m%d%H%M%S')}")
+            try:
+                os.replace(self.yol, yedek)
+            except OSError:
+                pass
+        return kisiler
 
     def _yaz(self, kisiler: dict[str, list[dict]]) -> None:
         atomic_json_dump({"kisiler": {e: v for e, v in kisiler.items() if v}}, str(self.yol))
 
-    def ekle(self, email: str, abonelik: dict) -> bool:
+    def ekle(self, email: str, abonelik: dict) -> EkleSonucu:
         with self._kilitli():
-            kisiler = self._oku()
-            cihazlar = [c for c in kisiler.get(email, []) if c.get("abonelik", {}).get("endpoint") != abonelik["endpoint"]]
-            yeni = len(cihazlar) == len(kisiler.get(email, []))
+            kisiler = self._oku_yazmak_icin()
+            onceki = kisiler.get(email, [])
+            cihazlar = [c for c in onceki if _endpoint(c) != abonelik["endpoint"]]
+            sonuc = EkleSonucu(len(cihazlar) == len(onceki), not onceki)
             cihazlar.append({"abonelik": {"endpoint": abonelik["endpoint"], "keys": abonelik["keys"]},
                              "cihaz": abonelik.get("cihaz") or "Tarayıcı",
                              "eklendi": self.simdi().isoformat(timespec="seconds")})
+            if len(cihazlar) > CIHAZ_SINIRI:
+                cihazlar.sort(key=lambda c: str(c.get("eklendi", "")))     # stable: the new one stays last on a tie
+                cihazlar = cihazlar[-CIHAZ_SINIRI:]
             kisiler[email] = cihazlar
             self._yaz(kisiler)
-            return yeni
+            return sonuc
 
     def sil(self, email: str, endpoint: str) -> bool:
         with self._kilitli():
-            kisiler = self._oku()
+            kisiler = self._oku_yazmak_icin()
             once = kisiler.get(email, [])
-            sonra = [c for c in once if c.get("abonelik", {}).get("endpoint") != endpoint]
+            sonra = [c for c in once if _endpoint(c) != endpoint]
             if len(sonra) == len(once):
                 return False
             kisiler[email] = sonra
@@ -137,10 +199,10 @@ class AbonelikDeposu:
 
     def endpoint_sil(self, endpoint: str) -> int:
         with self._kilitli():
-            kisiler = self._oku()
+            kisiler = self._oku_yazmak_icin()
             silinen = 0
             for email, cihazlar in list(kisiler.items()):
-                kalan = [c for c in cihazlar if c.get("abonelik", {}).get("endpoint") != endpoint]
+                kalan = [c for c in cihazlar if _endpoint(c) != endpoint]
                 silinen += len(cihazlar) - len(kalan)
                 kisiler[email] = kalan
             if silinen:
