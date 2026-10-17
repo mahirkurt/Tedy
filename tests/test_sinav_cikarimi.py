@@ -681,3 +681,45 @@ def test_d2_alintinin_hemen_ardindaki_sinav_paragrafi_bolgeye_girmez():
                                    alinti="Matematik yazılısı 20 Ekim Salı", konular=["Fiilimsiler"])],
                            aday, BUGUN)
     assert mat.konular == []
+
+
+# --- temizlik B düzeltme 3: ayrı "KTT konuları: …" paragrafı konu bölgesinde kalır ----------
+
+def _tek_kapi(metin, alinti, ifade, konular, tarih="2026-10-20"):
+    aday = Aday(metin, None, date(2026, 10, 5), "duyuru", [])
+    return uydurma_kapisi([_satir(ders="Matematik", tur="yazili", baslik="Matematik yazılısı",
+                                  tarih_ifadesi=ifade, tarih=tarih, alinti=alinti, konular=konular)],
+                          aday, BUGUN)
+
+
+def test_d3_ayri_ktt_konulari_paragrafi_korunur():
+    [b] = _tek_kapi("Matematik KTT 15 Ekim Perşembe\n\nKTT konuları: Tam sayılar, Mutlak değer",
+                    "Matematik KTT 15 Ekim Perşembe", "15 Ekim Perşembe", ["Tam sayılar", "Mutlak değer"],
+                    tarih="2026-10-15")
+    assert b.konular == ["Tam sayılar", "Mutlak değer"]
+
+
+def test_d3_konu_paragrafi_bolgeyi_surdurur_duzyazi_keser():
+    [b] = _tek_kapi("Matematik KTT 15 Ekim Perşembe\n\nKTT konuları:\n\nTam sayılar\n\nMutlak değer\n\n"
+                    "Hepinize başarılar dilerim, iyi çalışmalar.\n\nÜslü sayılar",
+                    "Matematik KTT 15 Ekim Perşembe", "15 Ekim Perşembe",
+                    ["Tam sayılar", "Mutlak değer", "Üslü sayılar"], tarih="2026-10-15")
+    assert b.konular == ["Tam sayılar", "Mutlak değer"]
+
+
+def test_d3_baska_dersin_konu_paragrafi_alinmaz():
+    [b] = _tek_kapi("Matematik yazılısı 20 Ekim\n\nTürkçe yazılısı konuları: Fiilimsiler",
+                    "Matematik yazılısı 20 Ekim", "20 Ekim", ["Fiilimsiler"])
+    assert b.konular == []
+
+
+def test_d3_kendi_tarihi_olan_konu_paragrafi_alinmaz():
+    [b] = _tek_kapi("Matematik yazılısı 20 Ekim\n\nYazılı konuları 22 Ekim için: Fiilimsiler",
+                    "Matematik yazılısı 20 Ekim", "20 Ekim", ["Fiilimsiler"])
+    assert b.konular == []
+
+
+def test_d3_ayni_dersin_konu_paragrafi_alinir():
+    [b] = _tek_kapi("Matematik yazılısı 20 Ekim\n\nMatematik yazılısı konuları: Kesirler",
+                    "Matematik yazılısı 20 Ekim", "20 Ekim", ["Kesirler"])
+    assert b.konular == ["Kesirler"]

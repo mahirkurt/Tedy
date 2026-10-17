@@ -212,10 +212,36 @@ def _liste_satiri(paragraf: str) -> bool:
             and not re.search(r"[.!?…]$", p))
 
 
-def _konu_bolgesi(metin: str, alinti: str) -> str:
+# Course names as they appear in announcements (folded), for "this paragraph is another course's".
+_DERS_SOZCUKLERI = {
+    "turkce": "Türkçe", "matematik": "Matematik", "fen": "Fen Bilimleri", "sosyal": "Sosyal Bilgiler",
+    "ingilizce": "İngilizce", "english": "İngilizce", "fransizca": "Fransızca", "din kulturu": "Din Kültürü",
+    "dkab": "Din Kültürü", "bilisim": "Bilişim", "beden egitimi": "Beden Eğitimi",
+    "gorsel sanatlar": "Görsel Sanatlar", "muzik": "Müzik",
+}
+_KONU_SOZU = re.compile(r"(?<![0-9a-z])(?:konu(?:lar(?:i|in)?|su)?|topics?)(?![0-9a-z])")
+
+
+def _anilan_dersler(katli: str) -> set[str]:
+    return {ders for sozcuk, ders in _DERS_SOZCUKLERI.items()
+            if re.search(rf"(?<![0-9a-z]){re.escape(sozcuk)}(?![0-9a-z])", katli)}
+
+
+def _konu_paragrafi(paragraf: str, dersler: set[str], tarihle: Callable[[str], TarihCozumu]) -> bool:
+    """A paragraph with an exam word that only lists this exam's topics ("KTT konuları: …"): it
+    mentions topics, carries no date or week of its own and names no other course."""
+    katli = katla(paragraf)
+    if not _KONU_SOZU.search(katli) or not _anilan_dersler(katli) <= dersler:
+        return False
+    return tarihle(paragraf) == TarihCozumu(None, None, False)
+
+
+def _konu_bolgesi(metin: str, alinti: str, ders: str = "Genel",
+                  tarihle: Callable[[str], TarihCozumu] | None = None) -> str:
     """Where a quote's topics may come from (folded): the paragraph(s) holding the quote and the
     one after them, then any run of list-item paragraphs ("Konular:\n\nÜnite 1\n\nÜnite 2"),
-    stopping at the first prose paragraph or the first paragraph carrying an exam word. A text
+    stopping at the first prose paragraph or the first paragraph carrying an exam word — unless
+    that paragraph only lists this exam's topics (`_konu_paragrafi`: "KTT konuları: …"). A text
     announcing two exams must not lend the second one's topics to the first; a list under its
     announcement stays in reach."""
     ham = [x for x in _PARAGRAF.split(metin) if katla(x)]
@@ -226,6 +252,13 @@ def _konu_bolgesi(metin: str, alinti: str) -> str:
         bitisler.append(konum)      # paragraph k ends here; one joining space follows
         konum += 1
     butun, hedef = " ".join(paragraflar), katla(alinti)
+    # The courses this exam may name: its own, and any its announcement names (a shared one).
+    dersler = _anilan_dersler(hedef) | ({normalize_course(ders)} if ders and ders != "Genel" else set())
+    tarihle = tarihle or (lambda _: TarihCozumu(None, None, False))
+
+    def sinav_disi(p: str) -> bool:
+        return not on_suzgec(p) or _konu_paragrafi(p, dersler, tarihle)
+
     bolge = []
     bas = butun.find(hedef) if hedef else -1
     while bas != -1:
@@ -233,9 +266,9 @@ def _konu_bolgesi(metin: str, alinti: str) -> str:
         # The next paragraph, then list items — never a paragraph that names an exam of its own
         # (on_suzgec): that is where the next exam's announcement, and its topics, begin.
         sinir = son + 1
-        if sinir < len(ham) and not on_suzgec(ham[sinir]):
+        if sinir < len(ham) and sinav_disi(ham[sinir]):
             sinir += 1
-            while sinir < len(ham) and _liste_satiri(ham[sinir]) and not on_suzgec(ham[sinir]):
+            while sinir < len(ham) and _liste_satiri(ham[sinir]) and sinav_disi(ham[sinir]):
                 sinir += 1
         bolge.append(" ".join(paragraflar[ilk:sinir]))
         bas = butun.find(hedef, bas + 1)
@@ -272,15 +305,16 @@ def uydurma_kapisi(satirlar: list[dict], aday: Aday, bugun: date, yayin: date | 
         if cozum.gun is None and cozum.hafta is None and cozum.gecersiz:
             continue
         saat = _saat(s.get("saat"), alinti)
+        ders = _ders(aday, s.get("ders"), kaynak)
         konular: list[str] = []
         ham_konular = s.get("konular")
-        bolge = _konu_bolgesi(aday.metin, alinti)
+        bolge = _konu_bolgesi(aday.metin, alinti, ders,
+                              lambda p: tarih_coz(p, yayin, aralik, goreli=goreli))
         for k in ham_konular if isinstance(ham_konular, list) else []:
             k = " ".join(str(k).split())
             if k and katla(k) in bolge and k not in konular:
                 konular.append(k)
         tur = s.get("tur") if s.get("tur") in SINAV_TURLERI else "diger"
-        ders = _ders(aday, s.get("ders"), kaynak)
         sonuc.append(Bulgu(ders, tur, _baslik(s.get("baslik"), ders, tur, kaynak), cozum.gun, cozum.hafta,
                            saat, konular, alinti[:300], aday))
     return sonuc
