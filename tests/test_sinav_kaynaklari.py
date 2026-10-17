@@ -280,3 +280,27 @@ def test_a8_none_ve_dict_kart_dayanikli():
     tr = [a for a in adaylar(veri, BUGUN) if a.ders == "Türkçe"]
     assert {a.metin for a in tr} == {"Türkçe yazılı sınavı Cuma günü", '{"baslik": "Türkçe quiz Cuma"}'}
     assert {a.konumlar[0]["sira"] for a in tr} == {1, 2}
+
+
+# --- düzeltme turu 2 ---------------------------------------------------------------
+
+YARIN_QUIZ = "Yarın quiz olacak, hazırlıklı gelin."
+
+
+def test_d2_2_farkli_yayinli_ayni_metin_derslere_ayri_kalir():
+    veri = haftalar_verisi()
+    veri["ders_icerikleri_haftalar"]["5. Hafta 12 Eki. - 18 Eki."]["Türkçe"] = {
+        "cards": [YARIN_QUIZ], "items": [], "text": ""}
+    veri["ders_icerikleri_haftalar"]["6. Hafta 19 Eki. - 25 Eki."] = {
+        "Sosyal Bilgiler": {"cards": [YARIN_QUIZ], "items": [], "text": ""}}
+    iki = sorted((a.ders, a.yayin) for a in adaylar(veri, date(2026, 10, 20)) if a.metin == YARIN_QUIZ)
+    assert iki == [("Sosyal Bilgiler", date(2026, 10, 19)), ("Türkçe", date(2026, 10, 12))]
+
+
+def test_d2_2_ayni_yayinli_ayni_metin_ortak_aday():
+    veri = haftalar_verisi()
+    hafta = veri["ders_icerikleri_haftalar"]["5. Hafta 12 Eki. - 18 Eki."]
+    hafta["Türkçe"] = {"cards": [YARIN_QUIZ], "items": [], "text": ""}
+    hafta["Sosyal Bilgiler"] = {"cards": [YARIN_QUIZ], "items": [], "text": ""}
+    [ortak] = [a for a in adaylar(veri, date(2026, 10, 20)) if a.metin == YARIN_QUIZ]
+    assert (ortak.ders, ortak.yayin, len(ortak.konumlar)) == (None, date(2026, 10, 12), 2)

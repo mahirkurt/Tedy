@@ -134,20 +134,25 @@ def _duyurular(veri: dict) -> list[Aday]:
 
 
 def _birlestir(liste: list[Aday]) -> list[Aday]:
-    # One candidate per text. The same text in two course tabs is a shared announcement: its
-    # course is None, so the gate takes the course from the model when its word is in the text.
-    tekil: dict[str, Aday] = {}
+    # One candidate per text and course (copies across weeks keep the earliest date). The same
+    # text in two course tabs on the same date is a shared announcement: its course is None, so
+    # the gate takes the course from the model when its word is in the text. Posted on different
+    # dates it is two exams ("Yarın quiz" on Monday and on Wednesday) and stays two candidates —
+    # still one model call, since the cache is keyed by the text.
+    gruplar: dict[str, list[Aday]] = {}
     for a in liste:
-        o = tekil.get(a.metin_anahtari)
+        grup = gruplar.setdefault(a.metin_anahtari, [])
+        o = next((x for x in grup if x.ders == a.ders), None) or next(
+            (x for x in grup if x.yayin == a.yayin), None)
         if o is None:
-            tekil[a.metin_anahtari] = Aday(a.metin, a.ders, a.yayin, a.tur, list(a.konumlar))
+            grup.append(Aday(a.metin, a.ders, a.yayin, a.tur, list(a.konumlar)))
             continue
         o.konumlar.extend(k for k in a.konumlar if k not in o.konumlar)
         if o.ders != a.ders:
             o.ders = None
         if a.yayin is not None and (o.yayin is None or a.yayin < o.yayin):   # earliest known date
             o.yayin = a.yayin
-    kalan = list(tekil.values())
+    kalan = [a for grup in gruplar.values() for a in grup]
     katli = {id(a): katla(a.metin) for a in kalan}
     sonuc = []
     for a in kalan:

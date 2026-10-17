@@ -283,3 +283,26 @@ def test_d4_iki_ders_sekmesindeki_ayni_ilan_tek_cagri_tek_kayit(tmp_path):
     [k] = belge["sinavlar"]
     assert (k["ders"], k["tarih"]) == ("Matematik", "2026-10-15")
     assert sorted(x["konum"]["ders"] for x in k["kaynaklar"]) == ["Fen Bilimleri", "Matematik"]
+
+
+def test_d2_2_farkli_yayinli_ayni_ilan_tek_cagri_iki_sinav(tmp_path):
+    from src.sinav_cikarimi import OkumaSonucu
+    metin = "Yarın quiz olacak, hazırlıklı gelin."
+
+    class Okuyucu:
+        model = "claude-haiku-4-5"
+        cagrilar = 0
+
+        def oku(self, aday, bugun, zaman_asimi):
+            Okuyucu.cagrilar += 1
+            return OkumaSonucu([{"ders": "", "tur": "kisa_sinav", "baslik": "Quiz", "tarih_ifadesi": "Yarın",
+                                 "tarih": "", "saat": "", "konular": [], "alinti": metin}], 10, 1)
+    veri = {"ders_icerikleri_haftalar": {
+                "5. Hafta 12 Eki. - 18 Eki.": {"Matematik": {"cards": [metin], "items": [], "text": ""}},
+                "6. Hafta 19 Eki. - 25 Eki.": {"Fen Bilimleri": {"cards": [metin], "items": [], "text": ""}}},
+            "ders_icerikleri": {}, "odevlerim": {"homework": {"rows": []}},
+            "duyurular": {"announcements": []}, "takvim": []}
+    belge = GERCEK_TESPIT(tmp_path, veri, [], datetime(2026, 10, 19, 10), time.monotonic() + 60, okuyucu=Okuyucu())
+    assert Okuyucu.cagrilar == 1
+    assert sorted((k["ders"], k["tarih"]) for k in belge["sinavlar"]) == \
+        [("Fen Bilimleri", "2026-10-20"), ("Matematik", "2026-10-13")]
