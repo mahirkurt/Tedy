@@ -394,3 +394,10 @@ def test_b15_kilit_bossa_alinir_ve_is_boyunca_tutulur(cli_kok, monkeypatch, caps
     assert st.main(["--kuru"]) == 0
     assert gorulen == [False]                                   # held by main while it works
     assert _kilidi_dene(cli_kok / "output/.sync.lock") is True   # and released after
+
+
+def test_birlestir_ayni_kimlikli_taban_kaydini_bir_kez_alir():
+    ikinci = dict(GIS, title="Özdebir GİS · tekrar", rawTitle="Özdebir GİS · tekrar")
+    kayitlar = birlestir([GIS, ikinci, TR], [], None, SIMDI)
+    assert sorted(k["id"] for k in kayitlar) == ["gis1", "tr1"]
+    assert next(k for k in kayitlar if k["id"] == "gis1")["taban"] == GIS   # ilk kayıt kazanır

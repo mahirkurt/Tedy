@@ -2998,6 +2998,10 @@ def _sinav_listesi(data, now=None):
         })
 
     # --- Synthetic exams from grades without takvim events ---
+    # The grade table can list one course on two rows (the live report has two
+    # "Müzik" rows); the id hashes only course+column, so a second row would
+    # repeat the first row's ids. First row wins; a later row only fills a "-".
+    grade_cells: dict[tuple[str, str], str] = {}
     for row in ([] if onceki_yil else grades_list):
         if not isinstance(row, dict):
             continue
@@ -3006,28 +3010,31 @@ def _sinav_listesi(data, now=None):
             continue
         for col_num in ("1", "2", "3"):
             val = row.get(f"{col_num}. Sınav", "-")
-            if val and val != "-" and (course, col_num) not in seen_course_nums:
-                exam_id = hashlib.md5(
-                    f"{course}|{col_num}. Sınav|synthetic".encode()
-                ).hexdigest()[:12]
-                raw = f"{course} {col_num}. Sınav"
-                exams_list.append({
-                    "id": exam_id,
-                    "course": course,
-                    "title": _clean_exam_title(
-                        course, int(col_num), raw),
-                    "rawTitle": raw,
-                    "courseColor": _course_color(course),
-                    "courseFamily": subject_themes.family_of(course),
-                    "examNumber": int(col_num),
-                    "date": None,
-                    "endDate": None,
-                    "allDay": False,
-                    "status": "past",
-                    "grade": val,
-                    "relatedHomework": [],
-                    "relatedContent": [],
-                })
+            if val and val != "-" and (course, col_num) not in grade_cells:
+                grade_cells[(course, col_num)] = val
+    for (course, col_num), val in grade_cells.items():
+        if (course, col_num) not in seen_course_nums:
+            exam_id = hashlib.md5(
+                f"{course}|{col_num}. Sınav|synthetic".encode()
+            ).hexdigest()[:12]
+            raw = f"{course} {col_num}. Sınav"
+            exams_list.append({
+                "id": exam_id,
+                "course": course,
+                "title": _clean_exam_title(
+                    course, int(col_num), raw),
+                "rawTitle": raw,
+                "courseColor": _course_color(course),
+                "courseFamily": subject_themes.family_of(course),
+                "examNumber": int(col_num),
+                "date": None,
+                "endDate": None,
+                "allDay": False,
+                "status": "past",
+                "grade": val,
+                "relatedHomework": [],
+                "relatedContent": [],
+            })
 
     # --- Sort: upcoming by date asc, past by date desc ---
     upcoming = sorted(

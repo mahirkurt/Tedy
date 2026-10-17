@@ -128,7 +128,13 @@ def _surum(k: dict) -> str:
 
 
 def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, simdi: datetime) -> list[dict]:
-    kayitlar = [_tabandan(e) for e in taban if isinstance(e, dict) and e.get("id")]
+    kayitlar = []
+    gorulen: set = set()
+    for e in taban:
+        if not isinstance(e, dict) or not e.get("id") or e["id"] in gorulen:
+            continue   # a repeated id (duplicate grade rows) would break keys, ?sinav= and ledgers
+        gorulen.add(e["id"])
+        kayitlar.append(_tabandan(e))
     tarihliler = [b for b in bulgular if b.tarih]
     tarihsizler = [b for b in bulgular if not b.tarih]
 

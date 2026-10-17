@@ -934,3 +934,32 @@ def test_b16_saatli_sinav_saatinde_gecmise_duser():
     veri = {"takvim": [_exam_event("Matematik 1. Yazılı", "2026-10-20T09:00:00")]}
     [sinav] = dashboard_api._sinav_listesi(veri, now=datetime(2026, 10, 20, 9, 30))["exams"]
     assert sinav["status"] == "past"
+
+
+# --- mükerrer not satırı: aynı ders iki satırda gelirse sentetik kimlikler tekrarlanmaz --------
+
+def _sentetikler(veri):
+    return dashboard_api._sinav_listesi(veri, now=datetime(2026, 10, 16, 10))["exams"]
+
+
+def test_mukerrer_ders_satiri_tek_sentetik_sinav_uretir():
+    grades = [_grade_row("Müzik", s1="90", s2="85"), _grade_row("Müzik", s1="70", s2="60")]
+    sinavlar = _sentetikler(_scraped_with_exams(grades=grades))
+    muzik = [e for e in sinavlar if e["course"] == "Müzik"]
+    assert sorted(e["rawTitle"] for e in muzik) == ["Müzik 1. Sınav", "Müzik 2. Sınav"]
+    kimlikler = [e["id"] for e in sinavlar]
+    assert len(kimlikler) == len(set(kimlikler))
+    # ilk satır kazanır
+    assert {e["rawTitle"]: e["grade"] for e in muzik} == {"Müzik 1. Sınav": "90", "Müzik 2. Sınav": "85"}
+
+
+def test_mukerrer_ders_ilk_satir_bossa_sonraki_satirin_notu_alinir():
+    grades = [_grade_row("Müzik", s1="-", s2="85"), _grade_row("Müzik", s1="70", s2="60")]
+    muzik = [e for e in _sentetikler(_scraped_with_exams(grades=grades)) if e["course"] == "Müzik"]
+    assert {e["rawTitle"]: e["grade"] for e in muzik} == {"Müzik 1. Sınav": "70", "Müzik 2. Sınav": "85"}
+
+
+def test_mukerrer_ders_satirinda_kimlik_formulu_degismez():
+    grades = [_grade_row("Müzik", s1="90"), _grade_row("Müzik", s1="70")]
+    [sinav] = [e for e in _sentetikler(_scraped_with_exams(grades=grades)) if e["course"] == "Müzik"]
+    assert sinav["id"] == hashlib.md5("Müzik|1. Sınav|synthetic".encode()).hexdigest()[:12]
