@@ -16,7 +16,7 @@ const RENK: Record<string, string> = { purple: '#8a3ffc', magenta: '#d02670', gr
 const sinav = (id: string, title: string, course: string, courseFamily: string, date: string,
   status: 'upcoming' | 'past', grade: string | null = null) => ({
   id, title, rawTitle: title, course, courseFamily, courseColor: RENK[courseFamily], date, endDate: date,
-  allDay: false, status, grade, examNumber: null, aiSummary: null, studyGuide: null,
+  allDay: false, status, grade, examNumber: null,
   relatedContent: [], relatedHomework: [],
 })
 

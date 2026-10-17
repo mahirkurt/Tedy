@@ -17,7 +17,7 @@ const HW = {
 const EXAM = {
   id: 'e1', course: 'Matematik', title: 'Matematik 1. yazılı', rawTitle: '',
   courseColor: '', examNumber: 1, date: '2026-09-25T09:00:00', endDate: null,
-  allDay: false, status: 'upcoming', grade: null, studyGuide: null,
+  allDay: false, status: 'upcoming', grade: null,
 }
 
 async function mock(page: Page) {

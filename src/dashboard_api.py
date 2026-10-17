@@ -16,6 +16,8 @@ import unicodedata
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from pathlib import Path
+from urllib.parse import quote
 
 import requests as http_requests
 from flask import Flask, Response, jsonify, request, send_file, send_from_directory, session
@@ -1071,7 +1073,7 @@ def _canli_sinavlar():
     event time against it misclassifies anything within the ~3-hour skew.
     The route's own behaviour is intentionally left unchanged."""
     from src.assistant_tools import istanbul_simdi
-    return _sinav_listesi(_scraped(), now=istanbul_simdi())["exams"]
+    return _sinav_api_listesi(_scraped(), now=istanbul_simdi())["exams"]
 
 
 # How many weeks ahead (from the current Monday) private lessons are
@@ -2590,7 +2592,7 @@ def portal_eki(ek_id):
 @app.route("/api/exams")
 @require_auth
 def exams():
-    return jsonify(_sinav_listesi(_scraped()))
+    return jsonify(_sinav_api_listesi(_scraped()))
 
 
 def _sinav_listesi(data, now=None):
@@ -2627,16 +2629,6 @@ def _sinav_listesi(data, now=None):
     # --- Course content ---
     ders_icerikleri = data.get("ders_icerikleri", {})
 
-    # --- AI content map ---
-    content_map = _load_json("exam_content_map.json")
-    if not isinstance(content_map, dict):
-        content_map = {}
-
-    # --- Enrichment cache for study guides ---
-    enrichment = _load_json("enrichment_cache.json")
-    if not isinstance(enrichment, dict):
-        enrichment = {}
-
     exams_list = []
     seen_course_nums = set()  # track which course+examNumber combos we've seen from takvim
 
@@ -2670,25 +2662,6 @@ def _sinav_listesi(data, now=None):
         related_hw = _find_related_homework(display_course, date_str, hw_rows)
         related_content = _find_related_content(display_course, ders_icerikleri)
 
-        # AI content map: try the legacy key first (existing
-        # exam_content_map.json entries were written before this fix and
-        # must not be orphaned), then the resolved course.
-        date10 = date_str[:10] if date_str else ""
-        ai_summary = None
-        map_entry = content_map.get(f"{course}|{title}|{date10}")
-        if map_entry is None and display_course != course:
-            map_entry = content_map.get(f"{display_course}|{title}|{date10}")
-        if isinstance(map_entry, dict):
-            ai_summary = map_entry.get("summary")
-
-        # Study guide from enrichment cache
-        study_guide = None
-        for ek, ev in enrichment.items():
-            if isinstance(ev, dict) and ev.get("type") == "sinav":
-                if course in ek or title in ek:
-                    study_guide = ev.get("note")
-                    break
-
         # The id hashes the legacy course — see the "Critical constraint"
         # note in the 2026-09-28 sınav-ders plan: it must not move.
         exam_id = hashlib.md5(f"{course}|{title}|{_kimlik_zamani(date_str)}".encode()).hexdigest()[:12]
@@ -2710,8 +2683,6 @@ def _sinav_listesi(data, now=None):
             "allDay": evt.get("allDay", False),
             "status": status,
             "grade": grade,
-            "studyGuide": study_guide,
-            "aiSummary": ai_summary,
             "relatedHomework": related_hw,
             "relatedContent": related_content,
         })
@@ -2744,8 +2715,6 @@ def _sinav_listesi(data, now=None):
                     "allDay": False,
                     "status": "past",
                     "grade": val,
-                    "studyGuide": None,
-                    "aiSummary": None,
                     "relatedHomework": [],
                     "relatedContent": [],
                 })
@@ -2775,6 +2744,103 @@ def _sinav_listesi(data, now=None):
             "averageGrade": avg_grade,
         },
     }
+
+
+_KAYNAK_ETIKETI = {"takvim": "Okul takvimi", "duyuru": "Okul duyurusu", "ek": "Portal eki",
+                   "not_tablosu": "Not tablosu"}
+
+
+def _sinav_kaynagi(k):
+    """A source as the dashboard shows it: a label, a short quote and where it opens."""
+    tur = str(k.get("tur") or "")
+    konum = k.get("konum") if isinstance(k.get("konum"), dict) else {}
+    if tur == "ders_karti":
+        hafta = konum.get("hafta")
+        etiket = f"{normalize_course(konum.get('ders') or '') or konum.get('ders') or 'Ders'} ders içeriği"
+        etiket += f" · {hafta}" if hafta else ""
+        baglanti = f"/dersler?hafta={quote(hafta)}" if hafta else "/dersler"
+    elif tur == "odev":
+        etiket, baglanti = f"Ödev · {konum.get('baslik') or ''}".rstrip(" ·"), "/isler"
+    else:
+        etiket = _KAYNAK_ETIKETI.get(tur, "Kaynak")
+        baglanti = {"takvim": "/takvim", "duyuru": "/duyurular", "not_tablosu": "/notlar"}.get(tur)
+        if tur == "ek" and konum.get("id"):
+            baglanti = f"/api/ekler/{konum['id']}"
+    return {"tur": tur, "etiket": etiket, "alinti": str(k.get("alinti") or "")[:300], "baglanti": baglanti}
+
+
+def _sinav_durumu(k, taban, now):
+    if k.get("sentetik"):
+        return "past"
+    if taban and taban.get("date"):
+        an = _portal_zamani(taban["date"])
+        return "upcoming" if an is not None and an > now else "past"
+    if k.get("tarih"):
+        saat = k.get("saat") or "23:59"
+        return "upcoming" if datetime.fromisoformat(f"{k['tarih']}T{saat}") > now else "past"
+    if k.get("hafta"):
+        son = datetime.fromisoformat(k["hafta"]) + timedelta(days=6, hours=23, minutes=59)
+        return "upcoming" if son > now else "past"
+    return "upcoming"
+
+
+def _kayittan_sinav(k, now):
+    taban = k.get("taban") if isinstance(k.get("taban"), dict) else None
+    if taban:
+        e = {key: v for key, v in taban.items() if key not in ("aiSummary", "studyGuide")}
+    else:
+        ders = k.get("ders") or "Genel"
+        tarih_saat = f"{k['tarih']}T{k['saat']}:00" if k.get("tarih") and k.get("saat") else k.get("tarih")
+        e = {"id": k.get("id"), "course": ders, "title": k.get("baslik") or "Sınav",
+             "rawTitle": k.get("baslik") or "Sınav", "courseColor": _course_color(ders),
+             "courseFamily": subject_themes.family_of(ders), "examNumber": None, "date": tarih_saat,
+             "endDate": None, "allDay": bool(k.get("tarih") and not k.get("saat")), "grade": None,
+             "relatedHomework": [], "relatedContent": []}
+    e["status"] = _sinav_durumu(k, taban, now)
+    e.update({
+        "tur": k.get("tur"), "konular": list(k.get("konular") or []),
+        "kaynaklar": [_sinav_kaynagi(x) for x in (k.get("kaynaklar") or []) if isinstance(x, dict)],
+        "ilkTespit": k.get("ilk_tespit"), "degisti": k.get("degisti"), "hafta": k.get("hafta"),
+        "tarihBelirsiz": not e.get("date") and not k.get("sentetik"),
+    })
+    return e
+
+
+def _sinavlar_belgesi():
+    """output/sinavlar.json, validated; None when absent, unreadable or of another
+    version. Its own function so tests can stand in for the live file
+    (tests/conftest.py `_canli_sinavlar_dosyasi_yok`)."""
+    from src.sinav_tespiti import gecerli_belge
+    try:
+        return gecerli_belge(_load_json("sinavlar.json"))
+    except (OSError, ValueError):
+        return None
+
+
+def _sinav_api_listesi(data, now=None):
+    """/api/exams: output/sinavlar.json when it is readable (the sync step's
+    single source, spec 2026-10-16 §4), else today's takvim + grade-table
+    computation — the list is never empty for want of the file."""
+    now = now or datetime.now()
+    belge = _sinavlar_belgesi()
+    if belge is None:
+        eski = _sinav_listesi(data, now=now)
+        for e in eski["exams"]:
+            e.update({"tur": None, "konular": [], "kaynaklar": [], "ilkTespit": None, "degisti": None,
+                      "hafta": None, "tarihBelirsiz": False})
+        return {**eski, "tespit": None}
+    sinavlar = [_kayittan_sinav(k, now) for k in belge["sinavlar"] if isinstance(k, dict) and k.get("id")]
+
+    def anahtar(e):
+        return e.get("date") or (e.get("hafta") or "9999") + "T99"
+    upcoming = sorted([e for e in sinavlar if e["status"] == "upcoming"], key=anahtar)
+    past = sorted([e for e in sinavlar if e["status"] == "past"], key=lambda e: e.get("date") or "", reverse=True)
+    notlar = [int(e["grade"]) for e in sinavlar if str(e.get("grade") or "").isdigit()]
+    ozet = belge.get("ozet") if isinstance(belge.get("ozet"), dict) else {}
+    return {"exams": upcoming + past,
+            "stats": {"upcoming": len(upcoming), "past": len(past),
+                      "averageGrade": round(sum(notlar) / len(notlar), 1) if notlar else None},
+            "tespit": {"uretildi": belge.get("uretildi"), "incelenmedi": int(ozet.get("incelenmedi") or 0)}}
 
 
 @app.route("/api/health")

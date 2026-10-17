@@ -85,5 +85,5 @@ export async function bugunAc(page: Page, anlik: string, ek: Record<string, unkn
 export const SINAV = (id: string, title: string, date: string) => ({
   id, course: title, title, rawTitle: title, courseColor: '#9f1853',
   examNumber: null, date, endDate: null, allDay: false, status: 'upcoming',
-  grade: null, studyGuide: null, aiSummary: null, relatedHomework: [], relatedContent: [],
+  grade: null, relatedHomework: [], relatedContent: [],
 })

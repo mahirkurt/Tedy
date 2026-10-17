@@ -824,19 +824,27 @@ def sinavlar_metni(sinavlar: Any, simdi: datetime) -> str:
         ders = str(e.get("course") or "").strip() or "Ders belirsiz"
         baslik = str(e.get("title") or "").strip()
         tur = baslik.split(" · ", 1)[1] if " · " in baslik else (baslik or "Sınav")
-        metin = f"- {ders} — {tur} · {_tarih_yaz(e.get('date'), simdi, bool(e.get('allDay')))}"
+        if e.get("tarihBelirsiz"):
+            hafta = _zaman_oku(e.get("hafta")) if e.get("hafta") else None
+            zaman = f"tarih belirsiz ({hafta.strftime('%d.%m')} haftası)" if hafta else "tarih belirsiz"
+        else:
+            zaman = _tarih_yaz(e.get("date"), simdi, bool(e.get("allDay")))
+        metin = f"- {ders} — {tur} · {zaman}"
         if str(e.get("grade") or "").strip():
             metin += f" · not {e['grade']}"
         ham = " ".join(str(e.get("rawTitle") or "").split())
         if ham_ad and ham and ham != baslik:
             metin += f"\n  Portaldaki adı: {_kirp(ham, 140)}"
         if ham_ad:
-            konular = [str(r.get("title") or "").strip()
-                       for r in (e.get("relatedContent") or []) if isinstance(r, dict)]
-            metin += "\n  Konular: " + ("; ".join([k for k in konular if k][:10])[:2000] if any(konular) else "yok")
+            konular = [str(k).strip() for k in (e.get("konular") or []) if str(k).strip()]
+            metin += "\n  Konular: " + ("; ".join(konular[:10])[:2000] if konular else "yok")
+            kaynak = next((k for k in (e.get("kaynaklar") or [])
+                           if isinstance(k, dict) and k.get("tur") != "takvim"), None)
+            if kaynak:
+                metin += f"\n  Kaynak: {kaynak.get('etiket')} — “{_kirp(str(kaynak.get('alinti') or ''), 160)}”"
         return metin
 
-    parcalar = [bas + " (Sınavlar sayfasının listesi: portal takvimi ve not tablosu)"]
+    parcalar = [bas + " (Sınavlar sayfasının listesi: portal takvimi, ders duyuruları ve not tablosu)"]
     govde = "\n".join(satir(e, True) for e in yaklasan[:_YAKLASAN_SINIRI]) or "- yok"
     if len(yaklasan) > _YAKLASAN_SINIRI:
         govde += f"\n(+{len(yaklasan) - _YAKLASAN_SINIRI} sınav daha)"

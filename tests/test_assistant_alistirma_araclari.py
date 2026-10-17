@@ -91,12 +91,12 @@ def test_degerlendirme_kendi_eki_ve_rubrik_duzeyi_ister(baglam, tmp_path):
 
 def test_sinav_konulari_yalniz_yaklasanlarda_ve_en_fazla_on():
     metin = sinavlar_metni([
-        {"course": "Matematik", "status": "upcoming", "relatedContent": [{"title": "Rasyonel sayılar"}, {"title": "Kesirler"}]},
+        {"course": "Matematik", "status": "upcoming", "konular": ["Rasyonel sayılar", "Kesirler"]},
         {"course": "Fen", "status": "upcoming"},
-        {"course": "Sosyal", "status": "past", "relatedContent": [{"title": "Eski konu"}]},
+        {"course": "Sosyal", "status": "past", "konular": ["Eski konu"]},
     ], SIMDI.replace(tzinfo=None))
     assert "Konular: Rasyonel sayılar; Kesirler" in metin
     assert "Konular: yok" in metin
     assert "Konular:" not in metin.split("GEÇMİŞ SINAVLAR", 1)[1]
-    cok = sinavlar_metni([{"course": "Matematik", "status": "upcoming", "relatedContent": [{"title": f"Konu-{i}"} for i in range(12)]}], SIMDI.replace(tzinfo=None))
+    cok = sinavlar_metni([{"course": "Matematik", "status": "upcoming", "konular": [f"Konu-{i}" for i in range(12)]}], SIMDI.replace(tzinfo=None))
     assert "Konu-9" in cok and "Konu-10" not in cok

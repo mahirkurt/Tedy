@@ -209,8 +209,8 @@ test('a module linked to an upcoming exam is offered on İşler', async ({ page 
   const pad = (n: number) => String(n).padStart(2, '0')
   const exam = (id: string, course: string) => ({
     id, course, title: `${course} 1. yazılı`, rawTitle: `${course} 1. yazılı`, courseColor: '#0f62fe', examNumber: 1,
-    date: inDays(2).toISOString(), endDate: null, allDay: true, status: 'upcoming', grade: null, studyGuide: null,
-    aiSummary: null, relatedHomework: [],
+    date: inDays(2).toISOString(), endDate: null, allDay: true, status: 'upcoming', grade: null,
+    relatedHomework: [],
   })
   await page.route('**/api/homework', r => r.fulfill(json({ summary: '', homework: [{
     'Ders Adı': 'Türkçe', 'Ödev Başlığı': 'Okuma günlüğü', 'Ödev Durumu': '', first_seen: '2026-09-01T09:00',

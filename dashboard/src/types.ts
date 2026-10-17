@@ -309,6 +309,14 @@ export interface AssistantResponse {
   }
 }
 
+export interface SinavKaynagi {
+  tur: string
+  etiket: string
+  alinti: string
+  /** Pano içi yol ya da ek indirme adresi; yoksa null. */
+  baglanti: string | null
+}
+
 export interface ExamItem {
   id: string
   course: string
@@ -324,15 +332,25 @@ export interface ExamItem {
   allDay: boolean
   status: 'upcoming' | 'past'
   grade: string | null
-  studyGuide: string | null
-  aiSummary: string | null
   relatedHomework: { title: string; deadline: string; status: string }[]
   relatedContent: { title: string; type: string }[]
+  /** sinavlar.json (2026-10-16): yazili | kisa_sinav | konu_tarama | deneme | ortak_sinav | diger */
+  tur?: string | null
+  /** Kaynakta sınavın konusu olarak sayılanlar — "bu haftanın kartları" değil. */
+  konular?: string[]
+  kaynaklar?: SinavKaynagi[]
+  ilkTespit?: string | null
+  degisti?: string | null
+  /** Gün değil yalnız hafta biliniyorsa haftanın pazartesisi (YYYY-MM-DD). */
+  hafta?: string | null
+  tarihBelirsiz?: boolean
 }
 
 export interface ExamsApiResponse {
   exams: ExamItem[]
   stats: { upcoming: number; past: number; averageGrade: number | null }
+  /** Son tespit turu; sinavlar.json okunamadıysa null. */
+  tespit?: { uretildi: string; incelenmedi: number } | null
 }
 
 /* ── Tedy Books ─────────────────────────────────────────────────────────── */

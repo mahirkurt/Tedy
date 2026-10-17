@@ -51,7 +51,6 @@ function ExamCard({ exam, showCountdown, focusMode }: {
   )
 
   const hasDetails = !focusMode && (
-    exam.aiSummary || exam.studyGuide ||
     exam.relatedHomework.length > 0 || exam.relatedContent.length > 0
   )
 
@@ -124,18 +123,6 @@ function ExamCard({ exam, showCountdown, focusMode }: {
 
       {expanded && hasDetails && (
         <div className="exam-card__details" id={detailsId} role="region" aria-label={`${exam.rawTitle} detayları`}>
-          {exam.aiSummary && (
-            <div className="exam-card__section">
-              <div className="exam-card__section-title">🤖 Çalışma Özeti</div>
-              <p className="exam-card__section-text">{exam.aiSummary}</p>
-            </div>
-          )}
-          {exam.studyGuide && (
-            <div className="exam-card__section">
-              <div className="exam-card__section-title">🤖 Sınav Rehberi</div>
-              <p className="exam-card__section-text">{exam.studyGuide}</p>
-            </div>
-          )}
           {exam.relatedHomework.length > 0 && (
             <div className="exam-card__section">
               <div className="exam-card__section-title">

@@ -93,3 +93,14 @@ def _canli_sinav_tespiti_yok(monkeypatch):
     def _yasak(*a, **k):
         raise RuntimeError("testte gerçek sınav tespiti yok")
     monkeypatch.setattr(tespit, "tespit_et", _yasak)
+
+
+@pytest.fixture(autouse=True)
+def _canli_sinavlar_dosyasi_yok(monkeypatch):
+    """/api/exams reads output/sinavlar.json since 2026-10-16 (plan sinav-uyari,
+    Görev 6). In the live checkout that file exists, and a test that patches
+    _scraped would get the live exams instead of its own. Every test sees "no
+    file" — the takvim fallback — unless it patches _sinavlar_belgesi itself."""
+    api = sys.modules.get("src.dashboard_api")
+    if api is not None:
+        monkeypatch.setattr(api, "_sinavlar_belgesi", lambda: None)

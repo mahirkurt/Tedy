@@ -338,9 +338,9 @@ class TestExamsEndpoint:
                           return_value=_scraped_with_exams(takvim=takvim)):
             exam = client.get("/api/exams").get_json()["exams"][0]
             required = ("id", "course", "rawTitle", "examNumber",
-                        "date", "status", "grade", "studyGuide",
-                        "aiSummary", "relatedHomework",
-                        "relatedContent")
+                        "date", "status", "grade", "relatedHomework",
+                        "relatedContent", "tur", "konular", "kaynaklar",
+                        "tarihBelirsiz")
             for key in required:
                 assert key in exam, f"Missing key: {key}"
 
@@ -655,41 +655,6 @@ class TestRealPortalExamTitles:
             exam = client.get("/api/exams").get_json()["exams"][0]
         assert exam["grade"] == "90"
         assert [hw["title"] for hw in exam["relatedHomework"]] == ["Şiir tekrarı"]
-
-    def test_content_map_key_tries_legacy_then_resolved(self, client):
-        """exam_content_map.json entries were written keyed on the *old*
-        course value (course_names.py never invented one before this fix);
-        they must not be orphaned."""
-        past = "2026-03-31T10:00:00Z"
-        takvim = [_exam_event(self.TURKCE_ORTAK, past)]
-        legacy_course, _, _ = dashboard_api._extract_exam_info(self.TURKCE_ORTAK)
-        legacy_key = f"{legacy_course}|{self.TURKCE_ORTAK}|{past[:10]}"
-        content_map = {legacy_key: {"summary": "Eski özet"}}
-
-        def _load_json_yerine(name):
-            return content_map if name == "exam_content_map.json" else {}
-
-        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
-                takvim=takvim, ders_icerikleri=self.DERS)), \
-             patch.object(dashboard_api, "_load_json", side_effect=_load_json_yerine):
-            exam = client.get("/api/exams").get_json()["exams"][0]
-        assert exam["aiSummary"] == "Eski özet"
-
-    def test_content_map_key_also_tries_resolved_course(self, client):
-        """A future entry keyed on the resolved course must also be found."""
-        past = "2026-03-31T10:00:00Z"
-        takvim = [_exam_event(self.TURKCE_ORTAK, past)]
-        resolved_key = f"Türkçe|{self.TURKCE_ORTAK}|{past[:10]}"
-        content_map = {resolved_key: {"summary": "Yeni özet"}}
-
-        def _load_json_yerine(name):
-            return content_map if name == "exam_content_map.json" else {}
-
-        with patch.object(dashboard_api, "_scraped", return_value=_scraped_with_exams(
-                takvim=takvim, ders_icerikleri=self.DERS)), \
-             patch.object(dashboard_api, "_load_json", side_effect=_load_json_yerine):
-            exam = client.get("/api/exams").get_json()["exams"][0]
-        assert exam["aiSummary"] == "Yeni özet"
 
     def test_no_duplicate_synthetic_exam_after_course_resolution(self, client):
         """Once the takvim exam's course resolves to the real "Türkçe", the
