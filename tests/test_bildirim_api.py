@@ -187,8 +187,9 @@ def test_b2_depo_yedeklenemezse_503_ve_depo_ezilmez(ortam, monkeypatch):
     assert (kok / wp.ABONELIKLER).read_text(encoding="utf-8") == "{bozuk"
 
 
-def test_b6_sessiz_yenileme_baskasinin_cihazini_tasimaz(ortam):
+def test_b6_sessiz_yenileme_baskasinin_cihazini_tasimaz(ortam, monkeypatch):
     c, kok, tohum, _ = ortam
+    monkeypatch.setitem(api.USER_ROLES, "baska@x", api.ROLE_FULL)
     depo = wp.AbonelikDeposu(kok / wp.ABONELIKLER)
     depo.ekle("baska@x", wp.abonelik_dogrula(GOVDE))
     once = (kok / wp.ABONELIKLER).read_bytes()
@@ -313,3 +314,42 @@ def test_b5_deneme_gecersiz_kayitli_ucu_gondermez_siler(ortam):
     assert [e for e, _ in gonderilen] == [GOVDE["endpoint"]]
     assert [d["abonelik"]["endpoint"] for d in wp.AbonelikDeposu(kok / wp.ABONELIKLER).kisinin(TAM)] == [
         GOVDE["endpoint"]]
+
+
+# --- temizlik B düzeltme 1 -------------------------------------------------------------------
+
+def test_d1_rolden_cikmis_sahip_sessiz_yenilemeyi_engellemez(ortam, monkeypatch):
+    c, kok, tohum, _ = ortam
+    monkeypatch.delitem(api.USER_ROLES, "eski@x", raising=False)
+    depo = wp.AbonelikDeposu(kok / wp.ABONELIKLER)
+    depo.ekle("eski@x", wp.abonelik_dogrula(GOVDE))
+    _giris(c, TAM)
+    assert c.post("/api/bildirim/abonelik", json={**GOVDE, "yenile": True}).status_code == 201
+    assert depo.kisinin("eski@x") == [] and len(depo.kisinin(TAM)) == 1
+
+
+def test_d1_deneme_tek_sinirli_havuzu_kullanir(ortam, monkeypatch):
+    import threading
+    import time as _time
+    c, kok, *_ = ortam
+    _giris(c, TAM)
+    for i in range(wp.CIHAZ_SINIRI):
+        c.post("/api/bildirim/abonelik", json={**GOVDE, "endpoint": f"https://web.push.apple.com/{i}"})
+    kilit, simdi, en_cok, isimler = threading.Lock(), [0], [0], set()
+
+    def gonder(abonelik, yuk, vapid, webpush_fn=None):
+        with kilit:
+            simdi[0] += 1
+            en_cok[0] = max(en_cok[0], simdi[0])
+            isimler.add(threading.current_thread().name)
+        _time.sleep(0.05)
+        with kilit:
+            simdi[0] -= 1
+        return wp.GonderimSonucu("ok", 201, "")
+    monkeypatch.setattr(wp, "gonder", gonder)
+    havuz = api._DENEME_HAVUZU
+    for _ in range(2):
+        assert c.post("/api/bildirim/deneme").get_json()["gonderilen"] == wp.CIHAZ_SINIRI
+    assert api._DENEME_HAVUZU is havuz
+    assert 1 < en_cok[0] <= api._DENEME_ESZAMANLI == 8
+    assert len(isimler) <= 8 and all(n.startswith("bildirim-deneme") for n in isimler)

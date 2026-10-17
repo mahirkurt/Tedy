@@ -211,22 +211,29 @@ class AbonelikDeposu:
         kisiler, hasar = self._oku_ham()
         if hasar:
             os.replace(self.yol, self._yedek_yolu())
+            # Written at once: a mutation that turns out to change nothing (a no-op sil) would
+            # otherwise leave no store at all, and every valid device would read as gone.
+            self._yaz(kisiler)
+            self.son_okuma_bozuk = False
         return kisiler
 
     def _yaz(self, kisiler: dict[str, list[dict]]) -> None:
         atomic_json_dump({"kisiler": {e: v for e, v in kisiler.items() if v}}, str(self.yol))
 
-    def sahibi(self, endpoint: str) -> str | None:
-        return next((e for e, cihazlar in self._oku().items() if any(_endpoint(c) == endpoint for c in cihazlar)),
-                    None)
+    def sahibi(self, endpoint: str, gecerli_sahip: Callable[[str], bool] = lambda e: True) -> str | None:
+        """Who holds this endpoint. `gecerli_sahip` filters out holders that no longer count (a member
+        taken off the roster): their stale claim must not keep the device from everyone else."""
+        return next((e for e, cihazlar in self._oku().items()
+                     if gecerli_sahip(e) and any(_endpoint(c) == endpoint for c in cihazlar)), None)
 
-    def ekle(self, email: str, abonelik: dict, yenile: bool = False) -> EkleSonucu:
+    def ekle(self, email: str, abonelik: dict, yenile: bool = False,
+             gecerli_sahip: Callable[[str], bool] = lambda e: True) -> EkleSonucu:
         """`yenile` is the dashboard's silent re-registration on page load: it never takes a
-        device from another person (SahipBaska, nothing written). Without it — the reader pressed
-        "Bu cihazda aç" — the device moves to whoever subscribed on it last."""
+        device from another (counting) person (SahipBaska, nothing written). Without it — the reader
+        pressed "Bu cihazda aç" — the device moves to whoever subscribed on it last."""
         with self._kilitli():
             if yenile:
-                sahip = self.sahibi(abonelik["endpoint"])
+                sahip = self.sahibi(abonelik["endpoint"], gecerli_sahip)
                 if sahip is not None and sahip != email:
                     raise SahipBaska(sahip)
             kisiler = self._oku_yazmak_icin()

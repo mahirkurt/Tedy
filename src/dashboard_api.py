@@ -2744,6 +2744,10 @@ def _bildirim_kisisi():
     return email if email and USER_ROLES.get(email) == ROLE_FULL else None
 
 
+def _tam_rolde(email):
+    return USER_ROLES.get(email) == ROLE_FULL
+
+
 def _abonelik_deposu():
     from src import web_push
     return web_push.AbonelikDeposu(Path(PROJECT_ROOT) / web_push.ABONELIKLER)
@@ -2787,7 +2791,8 @@ def bildirim_abonelik():
     # moves it. Checked before seeding, so a refused device seeds nothing; ekle checks again
     # under the lock.
     yenile = govde.get("yenile") is True
-    sahip = depo.sahibi(abonelik["endpoint"]) if yenile else None
+    # A holder taken off the roster no longer counts: their stale claim must not 409 everyone.
+    sahip = depo.sahibi(abonelik["endpoint"], _tam_rolde) if yenile else None
     if sahip is not None and sahip != email:
         return jsonify({"sahip_baska": True}), 409
     # A person who turns alerts on gets what happens from now on, not a notification for every
@@ -2803,7 +2808,7 @@ def bildirim_abonelik():
             app.logger.exception("sınav uyarısı tohumlanamadı")
             return jsonify({"error": "uyarılar hazırlanamadı"}), 503
     try:
-        depo.ekle(email, abonelik, yenile=yenile)
+        depo.ekle(email, abonelik, yenile=yenile, gecerli_sahip=_tam_rolde)
     except web_push.SahipBaska:
         return jsonify({"sahip_baska": True}), 409
     except OSError:
@@ -2814,14 +2819,26 @@ def bildirim_abonelik():
 
 # The test notification goes to every device at once and the request ends within this budget
 # whatever the push services do (gunicorn's --timeout is 360 s; one hung service must not hold a
-# gthread worker). web_push.gonder itself gives each device a 10 s request timeout.
+# gthread worker). web_push.gonder itself gives each device a 10 s request timeout. One bounded
+# pool for the whole process: repeated test sends queue on it instead of piling up threads.
 _DENEME_TOPLAM_SN = 15
-_DENEME_ESZAMANLI = 10
+_DENEME_ESZAMANLI = 8
+_DENEME_HAVUZU = None
+_DENEME_HAVUZU_KILIDI = threading.Lock()
+
+
+def _deneme_havuzu():
+    global _DENEME_HAVUZU
+    from concurrent.futures import ThreadPoolExecutor
+    with _DENEME_HAVUZU_KILIDI:
+        if _DENEME_HAVUZU is None:
+            _DENEME_HAVUZU = ThreadPoolExecutor(max_workers=_DENEME_ESZAMANLI, thread_name_prefix="bildirim-deneme")
+        return _DENEME_HAVUZU
 
 
 def _deneme_gonder(cihazlar, yuk, vapid):
     """{"gonderilen", "basarisiz", "olu", "cihaz"} and the endpoints to drop (dead or invalid)."""
-    from concurrent.futures import ThreadPoolExecutor, wait
+    from concurrent.futures import wait
     from src import web_push
     sayim = {"gonderilen": 0, "basarisiz": 0, "olu": 0, "cihaz": len(cihazlar)}
     silinecek = []
@@ -2833,24 +2850,23 @@ def _deneme_gonder(cihazlar, yuk, vapid):
             sayim["olu"] += 1
             silinecek.append(c["abonelik"]["endpoint"])
     if gidecek:
-        havuz = ThreadPoolExecutor(max_workers=min(len(gidecek), _DENEME_ESZAMANLI))
-        try:
-            isler = {havuz.submit(web_push.gonder, c["abonelik"], yuk, vapid): c for c in gidecek}
-            biten, _ = wait(isler, timeout=_DENEME_TOPLAM_SN)
-            for is_, c in isler.items():
-                if is_ not in biten or is_.exception() is not None:
-                    sayim["basarisiz"] += 1
-                    continue
-                sonuc = is_.result()
-                if sonuc.durum == "ok":
-                    sayim["gonderilen"] += 1
-                elif sonuc.durum == "olu":
-                    sayim["olu"] += 1
-                    silinecek.append(c["abonelik"]["endpoint"])
-                else:
-                    sayim["basarisiz"] += 1
-        finally:
-            havuz.shutdown(wait=False, cancel_futures=True)
+        havuz = _deneme_havuzu()
+        isler = {havuz.submit(web_push.gonder, c["abonelik"], yuk, vapid): c for c in gidecek}
+        biten, kalan = wait(isler, timeout=_DENEME_TOPLAM_SN)
+        for is_ in kalan:
+            is_.cancel()        # not started yet: never sent; a running one finishes on its own timeout
+        for is_, c in isler.items():
+            if is_ not in biten or is_.exception() is not None:
+                sayim["basarisiz"] += 1
+                continue
+            sonuc = is_.result()
+            if sonuc.durum == "ok":
+                sayim["gonderilen"] += 1
+            elif sonuc.durum == "olu":
+                sayim["olu"] += 1
+                silinecek.append(c["abonelik"]["endpoint"])
+            else:
+                sayim["basarisiz"] += 1
     return sayim, silinecek
 
 

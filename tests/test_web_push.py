@@ -304,3 +304,49 @@ def test_b4_cok_derin_json_bozuk_sayilir(tmp_path):
     assert d.hepsi() == {} and d.son_okuma_bozuk is True
     d.ekle("isik@x", abonelik_dogrula(abonelik()))
     assert (tmp_path / "a.json.bozuk-20261017090807").read_text(encoding="utf-8") == "[" * 200000
+
+
+# --- temizlik B düzeltme 1 -----------------------------------------------------------------
+
+def _kirli_depo(tmp_path):
+    yol = tmp_path / "a.json"
+    gecerli = {"abonelik": {"endpoint": "https://web.push.apple.com/Q", "keys": {"p256dh": P256, "auth": AUTH}},
+               "cihaz": "iPhone", "eklendi": "2026-10-01T10:00:00"}
+    yol.write_text(json.dumps({"kisiler": {"anne@x": [gecerli, {"abonelik": "x"}]}}), encoding="utf-8")
+    return yol, gecerli
+
+
+def test_d1_kirli_depo_islemsiz_silde_kaybolmaz(tmp_path):
+    yol, gecerli = _kirli_depo(tmp_path)
+    d = AbonelikDeposu(yol, simdi=lambda: SABIT)
+    assert d.sil("anne@x", "https://fcm.googleapis.com/fcm/send/yok") is False
+    assert d.kisinin("anne@x") == [gecerli]
+    assert (tmp_path / "a.json.bozuk-20261017090807").exists()
+
+
+def test_d1_kirli_depo_islemsiz_endpoint_silde_kaybolmaz(tmp_path):
+    yol, gecerli = _kirli_depo(tmp_path)
+    d = AbonelikDeposu(yol, simdi=lambda: SABIT)
+    assert d.endpoint_sil("https://fcm.googleapis.com/fcm/send/yok") == 0
+    assert d.kisinin("anne@x") == [gecerli]
+    assert (tmp_path / "a.json.bozuk-20261017090807").exists()
+
+
+def test_d1_bozuk_depo_islemsiz_silde_bos_temiz_dosya_kalir(tmp_path):
+    yol = tmp_path / "a.json"
+    yol.write_text("{bozuk", encoding="utf-8")
+    d = AbonelikDeposu(yol, simdi=lambda: SABIT)
+    assert d.sil("anne@x", "https://web.push.apple.com/Q") is False
+    assert json.loads(yol.read_text(encoding="utf-8")) == {"kisiler": {}} and d.son_okuma_bozuk is False
+
+
+def test_d1_sahiplik_gecerli_sahip_suzgeci(tmp_path):
+    import src.web_push as wp
+    d = AbonelikDeposu(tmp_path / "a.json")
+    d.ekle("eski@x", abonelik_dogrula(abonelik()))
+    assert d.sahibi("https://fcm.googleapis.com/fcm/send/abc") == "eski@x"
+    assert d.sahibi("https://fcm.googleapis.com/fcm/send/abc", gecerli_sahip=lambda e: e != "eski@x") is None
+    with pytest.raises(wp.SahipBaska):
+        d.ekle("isik@x", abonelik_dogrula(abonelik()), yenile=True)
+    d.ekle("isik@x", abonelik_dogrula(abonelik()), yenile=True, gecerli_sahip=lambda e: e != "eski@x")
+    assert d.kisinin("eski@x") == [] and len(d.kisinin("isik@x")) == 1
