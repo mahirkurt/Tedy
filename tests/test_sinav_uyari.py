@@ -550,3 +550,62 @@ def test_b12_servis_birimi():
 
 def test_b12_zamanlayici_on_dakikada_bir():
     assert "OnCalendar=*:0/10" in _birim("tedy-sinav-uyari.timer")
+
+
+# --- temizlik B düzeltme 1 -------------------------------------------------------------------
+
+def test_d1_olu_cihaz_silinemezse_basarili_cihaz_tekrar_almaz(kok, monkeypatch):
+    _ikinci_cihaz(kok)
+
+    def patla(self, endpoint):
+        raise OSError("salt okunur")
+    monkeypatch.setattr(wp.AbonelikDeposu, "endpoint_sil", patla)
+    olu = {"https://fcm.googleapis.com/a": wp.GonderimSonucu("olu", 410, "gone")}
+    g = Gonderici(olu)
+    durum = su.gonder_turu(kok, datetime(2026, 10, 19, 18, 0), gonderici=g)
+    assert (ISIK, "s1", "tespit", "v1") in su.BildirimDefteri(kok / su.DEFTER).anahtarlar()
+    assert durum["olumcul"] is True and any("salt okunur" in h for h in durum["hatalar"])
+    g2 = Gonderici(olu)
+    su.gonder_turu(kok, datetime(2026, 10, 19, 18, 10), gonderici=g2)
+    assert [e for e, _ in g.cagrilar + g2.cagrilar].count(ISIK_2) == 1
+
+
+def test_d1_bekleyen_ve_yeni_plan_ayni_turda_tek_bildirim(kok):
+    _ikinci_cihaz(kok)
+    su.gonder_turu(kok, datetime(2026, 10, 24, 17, 50), gonderici=Gonderici(
+        {"https://fcm.googleapis.com/a": wp.GonderimSonucu("hata", 503, "geçici")}))
+    assert _bekleyen(kok)[0]["turler"] == ["tespit", "gun_7"]
+    g = Gonderici()
+    su.gonder_turu(kok, datetime(2026, 10, 24, 18, 0), gonderici=g)      # gun_2 falls due now
+    assert [e for e, _ in g.cagrilar].count("https://fcm.googleapis.com/a") == 1
+    assert _bekleyen(kok) == []
+
+
+def test_d1_yeni_plan_cihaza_ulasmazsa_yeniden_kuyruga_girer(kok):
+    _ikinci_cihaz(kok)
+    hata = {"https://fcm.googleapis.com/a": wp.GonderimSonucu("hata", 503, "geçici")}
+    su.gonder_turu(kok, datetime(2026, 10, 24, 17, 50), gonderici=Gonderici(hata))
+    su.gonder_turu(kok, datetime(2026, 10, 24, 18, 0), gonderici=Gonderici(hata))
+    [k] = _bekleyen(kok)
+    assert (k["turler"], k["deneme"]) == (["gun_2"], 1)                 # the newer alert, a fresh budget
+
+
+def test_d1_bekleyen_istisnasinda_kayit_kalir_deneme_artar(kok, monkeypatch):
+    _ikinci_cihaz(kok)
+    su.gonder_turu(kok, datetime(2026, 10, 19, 18, 0), gonderici=Gonderici(
+        {"https://fcm.googleapis.com/a": wp.GonderimSonucu("hata", 503, "geçici")}))
+    monkeypatch.setattr(su, "vadesi_gelen_turler", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bozuk")))
+    durum = su.gonder_turu(kok, datetime(2026, 10, 19, 18, 10), gonderici=Gonderici())
+    [k] = _bekleyen(kok)
+    assert k["deneme"] == 2 and any("bekleyen s1" in h for h in durum["hatalar"])
+
+
+def test_d1_kuyruk_birlesmesi_yeni_turleri_ve_taze_butceyi_alir(tmp_path):
+    kuyruk = su.BekleyenKuyruk(tmp_path / "b.json")
+    temel = {"email": ISIK, "endpoint": "https://fcm.googleapis.com/a", "sinav_id": "s1", "icerik_surumu": "v1"}
+    kuyruk.ekle([{**temel, "turler": ["tespit", "gun_7"], "deneme": 1}])
+    kayitlar = kuyruk.oku()
+    kayitlar[0]["deneme"] = 4
+    kuyruk._yaz(kayitlar)
+    kuyruk.ekle([{**temel, "turler": ["gun_2"], "deneme": 1}])
+    assert kuyruk.oku() == [{**temel, "turler": ["gun_2"], "deneme": 1}]

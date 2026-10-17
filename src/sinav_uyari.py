@@ -241,8 +241,8 @@ class BekleyenKuyruk:
                 eski = next((k for k in kayitlar if _bekleyen_anahtari(k) == anahtar), None)
                 if eski is None:
                     kayitlar.append(y)
-                else:
-                    eski["turler"] = list(dict.fromkeys([*eski["turler"], *y["turler"]]))
+                else:       # the newer alert covers the exam; its retries get a fresh budget
+                    eski["turler"], eski["deneme"] = list(y["turler"]), y["deneme"]
             self._yaz(kayitlar)
 
 
@@ -281,12 +281,22 @@ def _yuk(sinav: dict, email: str, turler: tuple[str, ...], simdi: datetime) -> d
     return {"baslik": baslik, "govde": govde, "etiket": sinav["id"], "url": f"/sinavlar?sinav={sinav['id']}"}
 
 
+def _sil(depo: web_push.AbonelikDeposu, endpoint: str, durum: dict) -> int:
+    """Removing a dead device must not cost the person's other devices their ledger line: a store
+    that cannot be written is reported as fatal, and the device's outcome stands."""
+    try:
+        return depo.endpoint_sil(endpoint)
+    except OSError as exc:
+        _olumcul(durum, f"abonelik silinemedi: {exc}")
+        return 0
+
+
 def _cihaza_gonder(abonelik: dict, yuk: dict, vapid: Any, gonderici: Callable[..., web_push.GonderimSonucu],
                    depo: web_push.AbonelikDeposu, durum: dict) -> str:
     """One device: "ok", "olu" (removed), "gecersiz" (removed, never dialled) or "hata". A sender
     that raises instead of returning is a failed device, not a failed round."""
     if not web_push.kayitli_abonelik_gecerli(abonelik):
-        durum["gecersiz_silinen"] += depo.endpoint_sil(abonelik["endpoint"])
+        durum["gecersiz_silinen"] += _sil(depo, abonelik["endpoint"], durum)
         return "gecersiz"
     try:
         sonuc = gonderici(abonelik, yuk, vapid)
@@ -296,7 +306,7 @@ def _cihaza_gonder(abonelik: dict, yuk: dict, vapid: Any, gonderici: Callable[..
     if sonuc.durum == "ok":
         return "ok"
     if sonuc.durum == "olu":
-        durum["olu_silinen"] += depo.endpoint_sil(abonelik["endpoint"])
+        durum["olu_silinen"] += _sil(depo, abonelik["endpoint"], durum)
         return "olu"
     durum["hatalar"].append(f"{sonuc.kod}: {sonuc.mesaj}"[:160])
     return "hata"
@@ -322,13 +332,16 @@ def _bildirim_gonder(b: Bildirim, depo: web_push.AbonelikDeposu, defter: Bildiri
             _olumcul(durum, f"bekleyen kuyruk yazılamadı: {exc}")
 
 
-def _bekleyen_dene(k: dict, sinavlar: dict[str, dict], alicilar: set[str], depo: web_push.AbonelikDeposu,
-                   vapid: Any, gonderici: Callable[..., web_push.GonderimSonucu], simdi: datetime,
-                   durum: dict) -> bool:
+def _bekleyen_dene(k: dict, sinavlar: dict[str, dict], alicilar: set[str], planli: set[tuple[str, str]],
+                   depo: web_push.AbonelikDeposu, vapid: Any, gonderici: Callable[..., web_push.GonderimSonucu],
+                   simdi: datetime, durum: dict) -> bool:
     """One pending record; True keeps it for the next round."""
     s = sinavlar.get(k["sinav_id"])
     if s is None or s.get("icerik_surumu") != k["icerik_surumu"] or k["email"] not in alicilar:
         return False        # the exam is gone or changed (the new version reaches everyone), or the person
+    if (k["email"], k["sinav_id"]) in planli:
+        return False        # a newer alert for this exam goes to all the person's devices this round;
+        #                     if it misses this device, it enters the queue again
     if _sessiz(simdi):
         return True         # quiet hours: wait, the attempt is not counted
     if not vadesi_gelen_turler(s, simdi):
@@ -350,8 +363,9 @@ def _bekleyen_dene(k: dict, sinavlar: dict[str, dict], alicilar: set[str], depo:
     return True
 
 
-def _bekleyenler(kuyruk: BekleyenKuyruk, belge: dict, alicilar: list[str], depo: web_push.AbonelikDeposu,
-                 vapid: Any, gonderici: Callable[..., web_push.GonderimSonucu], simdi: datetime, durum: dict) -> None:
+def _bekleyenler(kuyruk: BekleyenKuyruk, belge: dict, alicilar: list[str], planli: set[tuple[str, str]],
+                 depo: web_push.AbonelikDeposu, vapid: Any, gonderici: Callable[..., web_push.GonderimSonucu],
+                 simdi: datetime, durum: dict) -> None:
     sinavlar = {s["id"]: s for s in belge["sinavlar"] if isinstance(s, dict) and isinstance(s.get("id"), str)}
     with kuyruk.kilitli():
         kayitlar = kuyruk.oku()
@@ -360,10 +374,12 @@ def _bekleyenler(kuyruk: BekleyenKuyruk, belge: dict, alicilar: list[str], depo:
         kalan = []
         for k in kayitlar:
             try:
-                tut = _bekleyen_dene(k, sinavlar, set(alicilar), depo, vapid, gonderici, simdi, durum)
+                tut = _bekleyen_dene(k, sinavlar, set(alicilar), planli, depo, vapid, gonderici, simdi, durum)
             except Exception as exc:  # noqa: BLE001 - one bad record must not stop the others
+                # Kept and counted as an attempt: an unexpected error is not a reason to lose the alert.
                 durum["hatalar"].append(f"bekleyen {k.get('sinav_id', '?')}: {exc}"[:160])
-                tut = False
+                k["deneme"] += 1
+                tut = k["deneme"] < BEKLEYEN_DENEME_SINIRI
             if tut:
                 kalan.append(k)
         try:
@@ -404,8 +420,10 @@ def _tur(kok: Path, simdi: datetime, gonderici: Callable[..., web_push.GonderimS
     alicilar = _alicilar(depo)
     durum["abone_kisi"] = len(alicilar)
     _depo_sagligi(depo, simdi, durum)
-    _bekleyenler(kuyruk, belge, alicilar, depo, vapid, gonderici, simdi, durum)
-    for b in planla(belge["sinavlar"], alicilar, defter.anahtarlar(), simdi, durum["hatalar"]):
+    plan = planla(belge["sinavlar"], alicilar, defter.anahtarlar(), simdi, durum["hatalar"])
+    _bekleyenler(kuyruk, belge, alicilar, {(b.email, b.sinav["id"]) for b in plan}, depo, vapid, gonderici,
+                 simdi, durum)
+    for b in plan:
         try:
             _bildirim_gonder(b, depo, defter, kuyruk, vapid, gonderici, simdi, durum)
         except Exception as exc:  # noqa: BLE001 - one failing notification must not stop the round
