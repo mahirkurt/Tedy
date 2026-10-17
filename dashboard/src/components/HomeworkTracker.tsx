@@ -11,9 +11,11 @@ import { describeDaysAhead } from './patterns/time'
 import './patterns/patterns.scss'
 import { useNavigate } from 'react-router-dom'
 import { acikOgeAc } from '../asistan/sayfaBaglami'
-import type { ExamItem, ModuleCard } from '../types'
+import type { ExamsApiResponse, ModuleCard } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
 import { EkBaglantisi } from './patterns/EkBaglantisi'
+import { SinavEtiketi } from './SinavKarti'
+import { zamanMetni } from '../utils/sinav'
 import { useFocusMode } from '../contexts/focusMode'
 import YuklemeAlani from './YuklemeAlani'
 import { yaptimIsaretle } from '../utils/odevYaptim'
@@ -199,7 +201,7 @@ export default function HomeworkTracker() {
   // Exams share this surface because they are the same thing to Işık: work she
   // owes with a date on it. Only the ones still ahead — the settled ones are
   // history and belong on the exam page (İ7).
-  const { data: examData } = useApi<{ exams: ExamItem[] }>('/api/exams', { exams: [] })
+  const { data: examData } = useApi<ExamsApiResponse>('/api/exams', { exams: [], stats: { upcoming: 0, past: 0, averageGrade: null } })
   const upcomingExams = useMemo(
     () => examData.exams.filter(e => e.status === 'upcoming'),
     [examData.exams])
@@ -346,10 +348,13 @@ export default function HomeworkTracker() {
                       <SubjectLabel course={e.course} family={e.courseFamily}>{e.title}</SubjectLabel>
                     </span>
                   )}
-                  {when && (
+                  <SinavEtiketi exam={e} nowMs={Date.now()} />
+                  {when ? (
                     <span className="exams-ahead__when tedy-time">
                       {describeDaysAhead(when)}
                     </span>
+                  ) : (e.hafta || e.tarihBelirsiz) && (
+                    <span className="exams-ahead__when tedy-time">{zamanMetni(e)}</span>
                   )}
                   {moduleByExam.has(e.id) && (
                     <Button kind="ghost" size="sm" className="exams-ahead__module"
@@ -364,6 +369,9 @@ export default function HomeworkTracker() {
               )
             })}
           </ul>}
+          {(examData.tespit?.incelenmedi ?? 0) > 0 && (
+            <p className="exams-ahead__not">Bazı ders duyuruları incelenemedi; sınav listesi eksik olabilir.</p>
+          )}
           {/* A link, not a ghost button: it goes to a page, and the button's
               padding set its text 16px off the list's edge. */}
           {!focusMode && (

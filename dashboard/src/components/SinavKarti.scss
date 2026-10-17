@@ -1,0 +1,55 @@
+@use '@carbon/react/scss/spacing' as spacing;
+@use '@carbon/react/scss/type' as type;
+
+.sinav-onizleme {
+  &__konular {
+    @include type.type-style('body-compact-01');
+    margin: spacing.$spacing-02 0 0;
+    color: var(--cds-text-secondary);
+  }
+
+  &__baglantilar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: spacing.$spacing-05;
+    margin: spacing.$spacing-02 0 0;
+
+    // WCAG 2.5.8: a 24px target, not a 16px line — the link sits right under
+    // the preview's button, and IBM's spacing rule counts them as neighbours.
+    a {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: spacing.$spacing-06;
+    }
+  }
+}
+
+.sinav-etiketi {
+  margin-inline-start: spacing.$spacing-03;
+}
+
+.sinav-ayrinti {
+  &__not {
+    @include type.type-style('body-compact-01');
+    margin: 0 0 spacing.$spacing-03;
+    color: var(--cds-text-secondary);
+  }
+
+  &__kaynaklar {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li + li {
+      margin-block-start: spacing.$spacing-03;
+    }
+  }
+
+  &__alinti {
+    @include type.type-style('helper-text-01');
+    margin: spacing.$spacing-02 0 0;
+    padding-inline-start: spacing.$spacing-03;
+    border-inline-start: 2px solid var(--cds-border-subtle);
+    color: var(--cds-text-secondary);
+  }
+}

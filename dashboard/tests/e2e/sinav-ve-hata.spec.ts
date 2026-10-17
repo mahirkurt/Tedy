@@ -36,12 +36,19 @@ test.describe('C4 — sınavlar', () => {
 
   test('sınav listesi sessiz: renkli etiket ve ders rengi yok', async ({ page }) => {
     await bugunAc(page, '2026-09-24T10:15', { exams: SINAVLAR })
+    // The nearest exam within a week now has its own preview (Görev 10) and
+    // leaves the list; both speak in the same quiet voice.
+    const onizleme = page.locator('.sinav-onizleme')
+    await expect(onizleme).toContainText('Özdebir GİS-1')
+    await expect(onizleme).toContainText('yarın 09:00')
     const liste = page.locator('.today-exams')
-    await expect(liste).toContainText('Özdebir GİS-1')
-    await expect(liste).toContainText('yarın 09:00')
-    await expect(liste.locator('.cds--tag')).toHaveCount(0)
-    const renkli = await liste.locator('[style*="color"]').count()
-    expect(renkli).toBe(0)
+    await expect(liste).not.toContainText('Özdebir GİS-1')
+    await expect(liste).toContainText('Türkçe Ortak Yazılı')
+    for (const bolum of [onizleme, liste]) {
+      await expect(bolum.locator('.cds--tag')).toHaveCount(0)
+      const renkli = await bolum.locator('[style*="color"]').count()
+      expect(renkli).toBe(0)
+    }
   })
 })
 

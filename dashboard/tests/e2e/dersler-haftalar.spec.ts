@@ -100,6 +100,23 @@ test('course content opens on the current week and can move to another', async (
   await expect(govde('Birinci hafta metni')).toHaveCount(0)
 })
 
+test('?hafta= opens that week; an unknown name falls back to the current one', async ({ page }) => {
+  // A sınav source links here ("/dersler?hafta=…"): the week it was read from
+  // opens directly, and a name the portal no longer carries is not an error.
+  const veri = { ...LIVE, content: HAFTALAR.weeks['1. Hafta 14 Eyl. - 20 Eyl.'], 'content/weeks': HAFTALAR }
+  const govde = (t: string) => page.locator('.course-content-text').filter({ hasText: t })
+
+  await mock(page, veri)
+  await page.goto('/dersler?hafta=2.%20Hafta%2021%20Eyl.%20-%2027%20Eyl.')
+  await page.waitForLoadState('networkidle')
+  await expect(govde('İkinci hafta metni')).toHaveCount(1)
+  await expect(govde('Birinci hafta metni')).toHaveCount(0)
+
+  await page.goto('/dersler?hafta=99.%20Hafta')
+  await page.waitForLoadState('networkidle')
+  await expect(govde('Birinci hafta metni')).toHaveCount(1)
+})
+
 test('no week picker when the portal has given only one week', async ({ page }) => {
   // İ6: a control with one option is something to read past for nothing.
   await mock(page, {

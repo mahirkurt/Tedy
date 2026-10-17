@@ -1151,6 +1151,12 @@ body {
   color: var(--ted-color-text-secondary);
 }
 
+.exams-ahead__not {
+  @include type.type-style('helper-text-01');
+  color: var(--cds-text-secondary);
+  margin-block-start: spacing.$spacing-03;
+}
+
 .hw-section {
   margin-top: var(--ted-space-md);
 
@@ -2114,6 +2120,7 @@ body {
   .today-tl__card-tags,
   .dashboard-summary-text,
   .today-exams,
+  .sinav-onizleme,
   .today-also,
   .today-tomorrow,
   .today-past-fold,
@@ -3244,7 +3251,8 @@ body {
 // ── Today page: Yaklaşan Sınavlar card ──
 
 // Exams share "Ayrıca"'s rows (.today-also__*): same voice, same weight.
-.today-exams {
+.today-exams,
+.sinav-onizleme {
   margin-bottom: var(--ted-space-md);
 }
 

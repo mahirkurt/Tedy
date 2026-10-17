@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Tabs, TabList, Tab, TabPanels, TabPanel, Accordion, AccordionItem, Tag, Dropdown } from '@carbon/react'
 import { Education } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
@@ -136,7 +137,8 @@ export default function CourseContent() {
   // chosen instead.
   const { data: haftalik } = useApi<WeeksData>('/api/content/weeks', { weeks: {}, current: '' })
   const { focusMode } = useFocusMode()
-  const [secilenHafta, setSecilenHafta] = useState<string | null>(null)
+  const [searchParams] = useSearchParams()
+  const [secilenHafta, setSecilenHafta] = useState<string | null>(() => searchParams.get('hafta'))
   useEffect(() => (secilenHafta ? acikOgeAc({ tur: 'ders_haftasi', id: secilenHafta, etiket: secilenHafta }) : undefined),
     [secilenHafta])
 

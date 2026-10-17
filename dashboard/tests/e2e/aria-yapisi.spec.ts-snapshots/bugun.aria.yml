@@ -17,9 +17,14 @@
     - text: AYRICA
     - button /Fransızca — S1 Les verbes Pazartesi \d+:\d+/
     - button /Fen Bilimleri — Ödev \(Hibrit \d+-\d+\) Salı \d+:\d+/
+  - region "Yaklaşan sınav":
+    - text: YAKLAŞAN SINAV
+    - button /Matematik 1\. Yazılı 1 Eki \d+:\d+/
+    - paragraph:
+      - link "Sınav uyarıları":
+        - /url: /sinavlar#uyarilar
   - region "Sınavlar":
     - text: SINAVLAR
-    - button /Matematik 1\. Yazılı 1 Eki \d+:\d+/
     - button /Özdebir Gelişim İzleme Sınavı GİS · İzleme Sınavı \d+ Eki \d+:\d+/
   - button "3 ders bitti Göster"
   - text: /\d+:\d+ \d+:\d+ Matematik 4\. Elif Özge Şener \d+:\d+ Fen Bilimleri 5\. Yasemin Kuzucu \d+:\d+ Türkçe 8\. Eda Şen \d+:\d+ Kültür ve Medeniyetimize Yön Verenler 9\. Eda Şen/

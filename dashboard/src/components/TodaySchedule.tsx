@@ -27,6 +27,8 @@ import type { HomeworkItem, CalendarEvent, OgepSession, ExamsApiResponse } from 
 import { EmptyLine } from './patterns/EmptyLine'
 import SubjectLabel from './SubjectLabel'
 import { subjectClass } from '../utils/subject'
+import { enYakinSinav } from '../utils/sinav'
+import { SinavOnizleme } from './SinavKarti'
 
 interface ScheduleData {
   latest: { schedule?: { rows: string[][] } }
@@ -540,7 +542,12 @@ export default function TodaySchedule() {
   const yarinSinavlari = yarinGoster && sonrakiGun
     ? yaklasanSinavlar.filter(x => isSameDay(x.d, sonrakiGun.tarih))
     : []
-  const listeSinavlari = yaklasanSinavlar.filter(x => !yarinSinavlari.includes(x)).slice(0, 3)
+  // The nearest exam within a week gets a line of its own with its topics — the
+  // same quiet voice as "Ayrıca"; one the evening's "Yarın" already leads with
+  // is not said twice (İ4), and it leaves the list below.
+  const onizleme = enYakinSinav(examData.exams || [], nowMs, new Set(yarinSinavlari.map(x => x.e.id)))
+  const listeSinavlari = yaklasanSinavlar
+    .filter(x => !yarinSinavlari.includes(x) && x.e.id !== onizleme?.id).slice(0, 3)
   const saatDk = (d: Date) =>
     `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 
@@ -683,6 +690,8 @@ export default function TodaySchedule() {
           the system's quiet form (the name stays neutral text), as on İşler.
           They follow "Ayrıca": exams weeks away sat above homework due in four
           days. */}
+      {onizleme && <SinavOnizleme exam={onizleme} now={now} onAc={() => navigate(`/sinavlar?sinav=${onizleme.id}`)} />}
+
       {listeSinavlari.length > 0 && (
         <section className="today-exams" aria-label="Sınavlar">
           <div className="today-also__head">
