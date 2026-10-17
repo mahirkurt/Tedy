@@ -2996,13 +2996,23 @@ def _sinav_kaynagi(k):
 
 
 def _sinav_gunu(deger):
-    """A record's YYYY-MM-DD as a datetime at midnight, or None: an unreadable day is an absent day."""
-    if not isinstance(deger, str) or len(deger) != 10:
-        return None
-    try:
-        return datetime.fromisoformat(deger)
-    except ValueError:
-        return None
+    """A record's YYYY-MM-DD as a datetime at midnight, or None: an unreadable day is an absent day.
+    Strict (the detector's own reading): fromisoformat alone also takes "2026-W43-5"."""
+    from src.sinav_tarihi import kati_gun
+    gun = kati_gun(deger)
+    return datetime(gun.year, gun.month, gun.day) if gun else None
+
+
+def _kanonik_portal_tarihi(deger):
+    """A stored takvim time as the API writes it — "YYYY-MM-DDTHH:MM:SS" or "YYYY-MM-DD" — or None.
+    "Z" and offsets go through _portal_yerel (Istanbul wall clock); anything not strictly a
+    date or a date-time is no date (D4: never echo an unreadable value)."""
+    from src.sinav_tarihi import kati_gun, kati_tarih_saat
+    s = _portal_yerel(deger) if isinstance(deger, str) else ""
+    if kati_gun(s):
+        return s
+    an = kati_tarih_saat(s)
+    return an.strftime("%Y-%m-%dT%H:%M:%S") if an else None
 
 
 def _sinav_saati(deger):
@@ -3016,11 +3026,12 @@ def _sinav_saati(deger):
     return an.hour, an.minute
 
 
-def _sinav_durumu(k, taban, now):
+def _sinav_durumu(k, taban_tarihi, now):
+    """`taban_tarihi`: the takvim base's canonical date (_kanonik_portal_tarihi), or None."""
     if k.get("sentetik"):
         return "past"
-    if taban and taban.get("date") and _portal_zamani(taban["date"]) is not None:
-        return "upcoming" if _portal_zamani(taban["date"]) > now else "past"
+    if taban_tarihi:
+        return "upcoming" if datetime.fromisoformat(taban_tarihi) > now else "past"
     gun = _sinav_gunu(k.get("tarih"))
     if gun is not None:
         saat, dakika = _sinav_saati(k.get("saat")) or (23, 59)
@@ -3035,11 +3046,10 @@ def _kayittan_sinav(k, now):
     taban = k.get("taban") if isinstance(k.get("taban"), dict) else None
     if taban:
         e = {key: v for key, v in taban.items() if key not in ("aiSummary", "studyGuide")}
-        # A takvim date the portal wrote unreadably is no date: undated, not "past".
-        if e.get("date") and _portal_zamani(e["date"]) is None:
-            e["date"] = None
-        if e.get("endDate") and _portal_zamani(e["endDate"]) is None:
-            e["endDate"] = None
+        # A takvim date the portal wrote unreadably is no date: undated, not "past". A readable
+        # one leaves in one shape, whatever shape the file kept it in.
+        e["date"] = _kanonik_portal_tarihi(e.get("date"))
+        e["endDate"] = _kanonik_portal_tarihi(e.get("endDate"))
     else:
         ders = str(k.get("ders") or "Genel")
         gun = _sinav_gunu(k.get("tarih"))
@@ -3052,7 +3062,7 @@ def _kayittan_sinav(k, now):
              "courseFamily": subject_themes.family_of(ders), "examNumber": None, "date": tarih_saat,
              "endDate": None, "allDay": bool(gun is not None and not saat), "grade": None,
              "relatedHomework": [], "relatedContent": []}
-    e["status"] = _sinav_durumu(k, taban, now)
+    e["status"] = _sinav_durumu(k, e.get("date") if taban else None, now)
     hafta = _sinav_gunu(k.get("hafta"))
     konular = k.get("konular") if isinstance(k.get("konular"), list) else []
     kaynaklar = k.get("kaynaklar") if isinstance(k.get("kaynaklar"), list) else []
@@ -3097,7 +3107,7 @@ def _sinav_api_listesi(data, now=None):
         try:
             sinavlar.append(_kayittan_sinav(k, now))
         except Exception as hata:  # noqa: BLE001 - one bad record must not take the page down
-            app.logger.warning("sinavlar.json: kayıt atlandı (%r): %s", k.get("id"), hata)
+            app.logger.warning("sinavlar.json: kayıt atlandı (%r): %s", k.get("id"), hata, exc_info=True)
 
     def anahtar(e):
         return str(e.get("date") or (e.get("hafta") or "9999") + "T99")

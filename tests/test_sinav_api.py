@@ -227,3 +227,58 @@ def test_asistan_dipnotu_haftali_gecmiste_yok_sentetikte_var():
                 "tarihBelirsiz": False, "grade": "80"}
     assert "not tablosundan türetildi" not in sinavlar_metni([haftali], SIMDI)
     assert "not tablosundan türetildi" in sinavlar_metni([haftali, sentetik], SIMDI)
+
+
+# --- temizlik A (2026-10-17) -------------------------------------------------------
+
+def test_a24_atlanan_kayit_uyarisi_istisnayi_tasir(monkeypatch, caplog):
+    _dosya(monkeypatch, _belge(kayit(id="patlak"), kayit(id="iyi")))
+    gercek = api._kayittan_sinav
+
+    def _kayit(k, now):
+        if k.get("id") == "patlak":
+            raise RuntimeError("beklenmedik")
+        return gercek(k, now)
+    monkeypatch.setattr(api, "_kayittan_sinav", _kayit)
+    with caplog.at_level("WARNING"):
+        [e] = api._sinav_api_listesi(api._scraped(), SIMDI)["exams"]
+    assert e["id"] == "iyi"
+    [kayitli] = [r for r in caplog.records if "patlak" in r.getMessage()]
+    assert kayitli.exc_info is not None and kayitli.exc_info[0] is RuntimeError
+
+
+@pytest.mark.parametrize("kw", [{"tarih": "2026-W43-5"}, {"tarih": None, "hafta": "2026-W43-1"},
+                                {"tarih": "20261023xx"}])
+def test_a24_sinav_gunu_kati_bicim(monkeypatch, kw):
+    _dosya(monkeypatch, _belge(kayit(**kw)))
+    [e] = api._sinav_api_listesi(api._scraped(), SIMDI)["exams"]
+    assert (e["date"], e["hafta"], e["tarihBelirsiz"], e["status"]) == (None, None, True, "upcoming")
+
+
+def _tabanli(date_, end=None, all_day=False):
+    taban = {"id": "t9", "course": "Matematik", "title": "Matematik Yazılı", "rawTitle": "Yazılı",
+             "courseColor": "#111", "courseFamily": "blue", "examNumber": None, "date": date_, "endDate": end,
+             "allDay": all_day, "status": "upcoming", "grade": None, "relatedHomework": [], "relatedContent": []}
+    return kayit(id="t9", taban=taban, tarih=None, saat=None,
+                 kaynaklar=[{"tur": "takvim", "konum": {"id": "t9"}, "alinti": "Yazılı"}])
+
+
+@pytest.mark.parametrize("ham,kanonik", [
+    ("2026-10-23T09:00:00", "2026-10-23T09:00:00"),
+    ("2026-10-23T09:00", "2026-10-23T09:00:00"),
+    ("2026-10-23T09:00:00Z", "2026-10-23T09:00:00"),
+    ("2026-10-23T06:00:00+00:00", "2026-10-23T09:00:00"),
+    ("2026-10-23T09:00:00.250000", "2026-10-23T09:00:00"),
+    ("2026-10-23", "2026-10-23"),
+])
+def test_a24_taban_tarihi_kanonik_cikar(monkeypatch, ham, kanonik):
+    _dosya(monkeypatch, _belge(_tabanli(ham, end=ham)))
+    [e] = api._sinav_api_listesi(api._scraped(), SIMDI)["exams"]
+    assert (e["date"], e["endDate"], e["status"]) == (kanonik, kanonik, "upcoming")
+
+
+@pytest.mark.parametrize("ham", ["2026-W43-5", "20261023", "2026-10-23T25:00:00"])
+def test_a24_taban_tarihi_kati_degilse_tarihsiz(monkeypatch, ham):
+    _dosya(monkeypatch, _belge(_tabanli(ham, end=ham)))
+    [e] = api._sinav_api_listesi(api._scraped(), SIMDI)["exams"]
+    assert (e["date"], e["endDate"], e["tarihBelirsiz"], e["status"]) == (None, None, True, "upcoming")
