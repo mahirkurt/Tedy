@@ -125,20 +125,32 @@ def test_kaynak_verisi_dosya_yoksa_bos(tmp_path):
 def test_birlestir_en_eski_yayin_alinir():
     """Fix: _birlestir must use earliest non-None yayin, not first copy's.
 
-    When an unsigned card moves from week 4 to week 5, dict iteration may
-    hit week 5 first. Without the fix, merged candidate gets week 5's date
-    and sorts wrong or survives the 45-day cutoff incorrectly.
+    Dict iteration order matters: if week 5 is iterated before week 4, the
+    old code (keeping first copy's yayin) would set 2026-10-12 instead of
+    2026-10-05, causing incorrect sorting and 45-day cutoff behavior.
     """
     veri = haftalar_verisi()
-    # Insert unsigned exam card into week 5 BEFORE week 4 in the dict
+    # Rebuild ders_icerikleri_haftalar dict to have week 5 BEFORE week 4
     # (dicts maintain insertion order in Python 3.7+)
-    veri["ders_icerikleri_haftalar"]["5. Hafta 12 Eki. - 18 Eki."]["Türkçe"] = {
-        "cards": ["Türkçe yazılı sınavı Cuma günü"], "items": [], "text": ""}
-    veri["ders_icerikleri_haftalar"]["4. Hafta 05 Eki. - 11 Eki."]["Türkçe"] = {
-        "cards": ["Türkçe yazılı sınavı Cuma günü"], "items": [], "text": ""}
+    old_haftalar = veri["ders_icerikleri_haftalar"]
+    new_haftalar = {}
+    # Add week 5 first (with unsigned Türkçe card)
+    new_haftalar["5. Hafta 12 Eki. - 18 Eki."] = {
+        "Türkçe": {"cards": ["Türkçe yazılı sınavı Cuma günü"], "items": [], "text": ""}}
+    # Then add other weeks in original order (except week 5)
+    for week, content in old_haftalar.items():
+        if week != "5. Hafta 12 Eki. - 18 Eki.":
+            if week == "4. Hafta 05 Eki. - 11 Eki.":
+                # Add unsigned Türkçe card to week 4 too
+                new_haftalar[week] = dict(content)
+                new_haftalar[week]["Türkçe"] = {"cards": ["Türkçe yazılı sınavı Cuma günü"], "items": [], "text": ""}
+            else:
+                new_haftalar[week] = content
+    veri["ders_icerikleri_haftalar"] = new_haftalar
+
     sonuc = adaylar(veri, BUGUN)
     tr = next(a for a in sonuc if a.ders == "Türkçe")
-    # Must use earliest date (05.10), not the second occurrence (12.10)
+    # Must use earliest date (05.10), not the first-iterated occurrence (12.10)
     assert tr.yayin == date(2026, 10, 5)
     # Both locations must be preserved
     assert len(tr.konumlar) == 2
