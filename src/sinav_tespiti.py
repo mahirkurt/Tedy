@@ -13,7 +13,7 @@ from typing import Any
 
 from src.json_utils import atomic_json_dump
 from src.sinav_cikarimi import Bulgu
-from src.sinav_tarihi import katla, kati_gun, kati_tarih_saat
+from src.sinav_tarihi import katla, kati_gun, kati_tarih_saat, yerel_saat
 
 SURUM = 1
 SINAVLAR = PurePosixPath("output/sinavlar.json")
@@ -59,8 +59,9 @@ def _md5(metin: str) -> str:
 
 
 def _tabandan(e: dict) -> dict:
-    ham = str(e.get("date") or "")
-    sentetik = not ham
+    sentetik = not e.get("date")
+    # _sinav_listesi already writes local time; an offset or "Z" kept anyway is converted, not dropped.
+    ham = yerel_saat(e.get("date"))
     # Bozuk tarih (katı biçim dışı): tarihsiz takvim sınavı — sentetik değil, takvim kaynağı ve kimliği var.
     an = kati_tarih_saat(ham)
     tarih = an.date().isoformat() if an else None

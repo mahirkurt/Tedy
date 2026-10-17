@@ -329,3 +329,19 @@ def test_a18_baska_dersin_yeniden_kullanilan_konumu_tasinmaz():
     [k] = birlestir([], [bulgu("Türkçe", "yazili", tarih=date(2026, 10, 22), konum=konum, aday_tur="duyuru")],
                     onceki, SIMDI)
     assert (k["ilk_tespit"], k["degisti"]) == ("2026-10-16T10:00:00", None)
+
+
+# --- düzeltme turu (temizlik A inceleme) ---------------------------------------------
+
+@pytest.mark.parametrize("ham", ["2026-10-23T09:00:00+03:00", "2026-10-23T09:00:00Z", "2026-10-23T06:00:00+00:00"])
+def test_d6_taban_tarihi_ofsetli_ya_da_z_ile_istanbul_saatine_cevrilir(ham):
+    [k] = birlestir([taban("o1", "Fen", "Fen · Yazılı", ham)], [], None, SIMDI)
+    assert (k["tarih"], k["saat"]) == ("2026-10-23", "09:00")
+
+
+def test_d6_yerel_saat_portal_yerel_ile_ayni():
+    import src.dashboard_api as api
+    from src.sinav_tarihi import yerel_saat
+    for ham in ("2026-10-23T09:00:00+03:00", "2026-10-23T09:00:00Z", "2026-10-23T06:00:00+00:00",
+                "2026-10-23", "2026-10-23T09:00:00", "bozuk", "", "2026-10-23T09:00:00+99:00"):
+        assert yerel_saat(ham) == api._portal_yerel(ham), ham

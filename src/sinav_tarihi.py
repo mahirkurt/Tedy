@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from src.assistant_core import turkce_kucult_katla
 
@@ -65,6 +66,26 @@ _ETIKET = re.compile(rf"(\d{{1,2}})\s+({_AY})\.?\s*-\s*(\d{{1,2}})\s+({_AY})\.?"
 # which no TEDY writer produces — such a value is an unreadable date, never a day.
 GUN_DESENI = re.compile(r"\d{4}-\d{2}-\d{2}")
 TARIH_SAAT_DESENI = re.compile(r"\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?)?")
+
+
+_ISTANBUL = ZoneInfo("Europe/Istanbul")
+_OFSET = re.compile(r"T.*[+-]\d{2}:\d{2}$")
+
+
+def yerel_saat(deger: object) -> str:
+    """A takvim time as naive Istanbul wall clock — the rule of dashboard_api._portal_yerel, kept
+    here so the sync step need not import the Flask app for it (a test holds the two equal):
+    "Z" is the old UTC-browser artefact (the digits are already local) and is dropped; a real
+    offset is converted to Istanbul time; anything else is returned as it is."""
+    s = str(deger or "").strip()
+    if s.endswith("Z"):
+        return s[:-1]
+    if _OFSET.search(s):
+        try:
+            return datetime.fromisoformat(s).astimezone(_ISTANBUL).replace(tzinfo=None).isoformat()
+        except ValueError:
+            return s
+    return s
 
 
 def kati_gun(deger: object) -> date | None:
