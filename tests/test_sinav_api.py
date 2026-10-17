@@ -282,3 +282,45 @@ def test_a24_taban_tarihi_kati_degilse_tarihsiz(monkeypatch, ham):
     _dosya(monkeypatch, _belge(_tabanli(ham, end=ham)))
     [e] = api._sinav_api_listesi(api._scraped(), SIMDI)["exams"]
     assert (e["date"], e["endDate"], e["tarihBelirsiz"], e["status"]) == (None, None, True, "upcoming")
+
+
+# --- temizlik B düzeltme 1: tüm gün takvim sınavı sinavlar.json yolunda da gün sonuna dek yaklaşan ---
+
+def _tum_gun_tabani(tarih):
+    from src.sinav_tespiti import _tabandan
+    veri = {"takvim": [{"title": "Matematik 1. Yazılı", "start": tarih, "end": "", "allDay": True,
+                        "backgroundColor": "", "extendedProps": {}}]}
+    [e] = api._sinav_listesi(veri, now=datetime(2026, 10, 1, 9, 0))["exams"]
+    k = _tabandan(e)
+    k.update({"ilk_tespit": None, "icerik_surumu": "t", "degisti": None})
+    return k
+
+
+@pytest.mark.parametrize("tarih", ["2026-10-20", "2026-10-20T00:00:00"])
+@pytest.mark.parametrize("simdi,durum", [
+    (datetime(2026, 10, 20, 0, 1), "upcoming"),
+    (datetime(2026, 10, 20, 23, 0), "upcoming"),
+    (datetime(2026, 10, 21, 0, 1), "past"),
+])
+def test_b16_tum_gun_takvim_sinavi_dosya_yolunda(monkeypatch, tarih, simdi, durum):
+    _dosya(monkeypatch, _belge(_tum_gun_tabani(tarih)))
+    [e] = api._sinav_api_listesi(api._scraped(), simdi)["exams"]
+    assert e["allDay"] is True and e["status"] == durum
+
+
+def test_b16_saatli_takvim_sinavi_dosya_yolunda_saatinde_gecer(monkeypatch):
+    from src.sinav_tespiti import _tabandan
+    veri = {"takvim": [{"title": "Matematik 1. Yazılı", "start": "2026-10-20T09:00:00", "end": "",
+                        "allDay": False, "backgroundColor": "", "extendedProps": {}}]}
+    [e] = api._sinav_listesi(veri, now=datetime(2026, 10, 1, 9, 0))["exams"]
+    k = _tabandan(e)
+    k.update({"ilk_tespit": None, "icerik_surumu": "t", "degisti": None})
+    _dosya(monkeypatch, _belge(k))
+    [e] = api._sinav_api_listesi(api._scraped(), datetime(2026, 10, 20, 9, 30))["exams"]
+    assert e["status"] == "past"
+
+
+def test_b16_tarihli_saatsiz_metin_kaydi_gun_boyu_yaklasan(monkeypatch):
+    _dosya(monkeypatch, _belge(kayit()))
+    [e] = api._sinav_api_listesi(api._scraped(), datetime(2026, 10, 20, 23, 0))["exams"]
+    assert e["status"] == "upcoming"

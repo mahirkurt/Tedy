@@ -3090,12 +3090,16 @@ def _sinav_saati(deger):
     return an.hour, an.minute
 
 
-def _sinav_durumu(k, taban_tarihi, now):
-    """`taban_tarihi`: the takvim base's canonical date (_kanonik_portal_tarihi), or None."""
+def _sinav_durumu(k, taban_tarihi, now, tum_gun=False):
+    """`taban_tarihi`: the takvim base's canonical date (_kanonik_portal_tarihi), or None.
+    An all-day or date-only base is ahead for the whole of its day, not past from 00:00 on."""
     if k.get("sentetik"):
         return "past"
     if taban_tarihi:
-        return "upcoming" if datetime.fromisoformat(taban_tarihi) > now else "past"
+        an = datetime.fromisoformat(taban_tarihi)
+        if tum_gun or "T" not in taban_tarihi:
+            return "upcoming" if an.date() >= now.date() else "past"
+        return "upcoming" if an > now else "past"
     gun = _sinav_gunu(k.get("tarih"))
     if gun is not None:
         saat, dakika = _sinav_saati(k.get("saat")) or (23, 59)
@@ -3126,7 +3130,7 @@ def _kayittan_sinav(k, now):
              "courseFamily": subject_themes.family_of(ders), "examNumber": None, "date": tarih_saat,
              "endDate": None, "allDay": bool(gun is not None and not saat), "grade": None,
              "relatedHomework": [], "relatedContent": []}
-    e["status"] = _sinav_durumu(k, e.get("date") if taban else None, now)
+    e["status"] = _sinav_durumu(k, e.get("date") if taban else None, now, tum_gun=bool(taban and e.get("allDay")))
     hafta = _sinav_gunu(k.get("hafta"))
     konular = k.get("konular") if isinstance(k.get("konular"), list) else []
     kaynaklar = k.get("kaynaklar") if isinstance(k.get("kaynaklar"), list) else []
