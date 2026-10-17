@@ -22,6 +22,17 @@ export async function izinDegistir(page: Page, izin: 'default' | 'granted' | 'de
   }, [izin, olay] as const)
 }
 
+// Taklidin kaç kez getRegistration() okuduğu (window.__kayitOkuma): kart ve sessiz kayıt her okumada
+// buradan geçer, yani "olay işlendi" kanıtı budur — "hiçbir şey olmadı" iddiası süreye değil buna dayanır.
+export async function kayitOkumaSayisi(page: Page): Promise<number> {
+  return page.evaluate(() => (window as unknown as { __kayitOkuma?: () => number }).__kayitOkuma?.() ?? 0)
+}
+
+// İki kare: kanıtlanmış bir okumadan sonra onun eşzamanlı tepkileri (render, yakalanmamış ret) yüzeye çıkar.
+export async function karelerGecsin(page: Page) {
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
+}
+
 // Taklidin gördüğü abone olma/çıkma adımları, sırasıyla (window.__bildirimOlaylari).
 export async function bildirimOlaylari(page: Page): Promise<string[]> {
   return page.evaluate(() => [...((window as unknown as { __bildirimOlaylari?: string[] }).__bildirimOlaylari ?? [])])
@@ -53,6 +64,7 @@ export async function bildirimTaklidi(page: Page, t: Taklit) {
     }
     const kayit = { pushManager }
     let okuma = 0
+    w.__kayitOkuma = () => okuma
     Object.defineProperty(navigator, 'serviceWorker', { value: {
       getRegistration: async () => {
         okuma += 1

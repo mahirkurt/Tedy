@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { mock, LIVE } from './_audit-fixtures'
-import { bildirimOlaylari, bildirimTaklidi, izinDegistir, type Taklit } from './_bildirim-taklidi'
+import { bildirimOlaylari, bildirimTaklidi, izinDegistir, karelerGecsin, kayitOkumaSayisi, type Taklit } from './_bildirim-taklidi'
 import { bugunAc, SINAV } from './_bugun-fixtures'
 
 // Sınav uyarıları kartı: tarayıcının bildirim API'leri taklit edilir; sunucu
@@ -102,7 +102,9 @@ test.describe('Sınav uyarıları kartı', () => {
     const ac = kart.getByRole('button', { name: 'Bu cihazda aç' })
     await ac.click()
     await expect(ac).toBeEnabled()
-    await page.waitForTimeout(300)
+    // Eylemden sonraki okuma (ikinci getRegistration) reddedildi: yakalanmamış ret olsaydı şimdi yüzeye çıkardı.
+    await expect.poll(() => kayitOkumaSayisi(page)).toBeGreaterThanOrEqual(2)
+    await karelerGecsin(page)
     expect(hatalar).toEqual([])
   })
 
@@ -175,14 +177,17 @@ test.describe('Sınav uyarıları kartı', () => {
       })
     })
     const durum = page.locator('#uyarilar .sinav-uyarilari__durum')
+    // İlk durum hem bayrağı hem sessiz kaydı bekler: açılışın istekleri burada bitmiştir.
     await expect(durum).toHaveText(/^Bu cihazda açık\./)
-    await page.waitForTimeout(500)
     const once = anahtarIstegi
     for (let i = 0; i < 5; i++) await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
     await izinDegistir(page, 'granted')
-    await page.waitForTimeout(500)
-    expect(anahtarIstegi).toBe(once)
     await expect(durum).toHaveText(/^Bu cihazda açık\./)
+    // Kanıt: son bir izin değişikliği görünür biçimde işlenir. Okumalar sırayla başlar (son başlayan kazanır),
+    // yani bu metin göründüğünde öncekiler de başlamış ve bir bayrak istekleri olsaydı yola çıkmıştı.
+    await izinDegistir(page, 'denied')
+    await expect(durum).toHaveText(/^Bildirim izni reddedilmiş\./)
+    expect(anahtarIstegi).toBe(once)
   })
 
   // Düzeltme turu 1 — 5: ağ takılırsa kart "Denetleniyor"da kalmaz; ~5 s sonra yerel duruma göre karar verir.
@@ -229,8 +234,11 @@ test.describe('Sınav uyarıları kartı', () => {
     await sinavlarAc(page, { izin: 'granted', abone: true })
     const durum = page.locator('#uyarilar .sinav-uyarilari__durum')
     await expect(durum).toHaveText(/^Bu cihazda açık\./)
+    const okuma = await kayitOkumaSayisi(page)
     await izinDegistir(page, 'denied', false)
-    await page.waitForTimeout(200)
+    await karelerGecsin(page)
+    // Olaysız değişiklik kendiliğinden okunmaz: yeni okuma yok, metin aynı.
+    expect(await kayitOkumaSayisi(page)).toBe(okuma)
     await expect(durum).toHaveText(/^Bu cihazda açık\./)
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
     await expect(durum).toHaveText(/^Bildirim izni reddedilmiş\./)
@@ -512,7 +520,9 @@ test.describe('Açılışta abonelik tazeleme', () => {
     const kayitlar = await bugunTaklitle(page, { izin: 'granted', abone: false })
     await page.goto('/bugun')
     await page.locator('.today').first().waitFor()
-    await page.waitForTimeout(500)
+    // Sessiz kayıt tarayıcının kaydını okudu ve abonelik bulamadı: göndereceği bir şey olsaydı yola çıkmıştı.
+    await expect.poll(() => kayitOkumaSayisi(page)).toBeGreaterThanOrEqual(1)
+    await karelerGecsin(page)
     expect(kayitlar).toEqual([])
   })
 })
