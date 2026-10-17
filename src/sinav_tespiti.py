@@ -23,6 +23,7 @@ BAGLAMA_GUN = 14
 KONU_SINIRI = 15
 KAYNAK_SINIRI = 6
 KONU_EN_AZ = 4
+ORTAK_TURLER = ("deneme", "ortak_sinav")
 
 
 # Anahtar sözcükler katlanmış başlıkta sözcük sınırıyla aranır ("bilgisayar" içindeki "gis" deneme sayılmaz).
@@ -117,6 +118,12 @@ def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, sim
         gun = b.tarih.isoformat()
         eslesen = next((k for k in kayitlar if not k["sentetik"] and k["tarih"] == gun
                         and (katla(k["ders"]) == katla(b.ders) or (b.ders == "Genel" and k["taban"]))), None)
+        if eslesen is None and b.tur in ORTAK_TURLER:
+            # A shared exam (GİS, a common written) is often announced in one course's tab: its
+            # takvim record carries another course name. Same day is enough — preferring a takvim
+            # record of a shared kind, then any takvim record of that day.
+            gunun = [k for k in kayitlar if k["taban"] and not k["sentetik"] and k["tarih"] == gun]
+            eslesen = next((k for k in gunun if k["tur"] in ORTAK_TURLER), gunun[0] if gunun else None)
         if eslesen is None:
             eslesen = _bulgudan(b, _md5(f"{b.ders}|{gun}"))
             kayitlar.append(eslesen)

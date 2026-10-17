@@ -187,3 +187,27 @@ def test_kisa_konular_baglamayi_tetiklemez():
     tarihli = bulgu(tarih=date(2026, 10, 20), konular=["A"])
     tarihsiz = bulgu(konular=["a"], yayin=date(2026, 10, 12), metin="başka")
     assert [k["tarih"] for k in birlestir([], [tarihli, tarihsiz], None, SIMDI)] == ["2026-10-20", None]
+
+
+# --- ortak sınav ders kartında da takvime bağlanır (son inceleme, Minor 3) ---------------
+
+@pytest.mark.parametrize("tur", ["deneme", "ortak_sinav"])
+def test_ortak_sinavin_ders_karti_bulgusu_ayni_gundeki_takvime_baglanir(tur):
+    """The GİS is announced in the Fen tab ("Fen Bilimleri" ≠ "Özdebir GİS"): still one exam."""
+    fen = bulgu("Fen Bilimleri", tur, tarih=date(2026, 10, 23), konular=["Uzay Çağı"])
+    kayitlar = birlestir([GIS], [fen], None, SIMDI)
+    assert len(kayitlar) == 1
+    assert kayitlar[0]["id"] == "gis1" and kayitlar[0]["konular"] == ["Uzay Çağı"]
+
+
+def test_ortak_sinav_once_ayni_dersin_sonra_ortak_turun_takvimine():
+    mat = taban("mat1", "Matematik", "Matematik · Yazılı", "2026-10-23T11:00:00")
+    fen = bulgu("Fen Bilimleri", "deneme", tarih=date(2026, 10, 23), konular=["Uzay Çağı"])
+    kayitlar = {k["id"]: k for k in birlestir([mat, GIS], [fen], None, SIMDI)}
+    assert set(kayitlar) == {"mat1", "gis1"}
+    assert kayitlar["gis1"]["konular"] == ["Uzay Çağı"] and kayitlar["mat1"]["konular"] == []
+
+
+def test_ders_yazilisi_baska_dersin_takvimine_baglanmaz():
+    fen = bulgu("Fen Bilimleri", "yazili", tarih=date(2026, 10, 23), konular=["Uzay Çağı"])
+    assert len(birlestir([GIS], [fen], None, SIMDI)) == 2
