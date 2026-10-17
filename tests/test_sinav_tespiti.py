@@ -211,3 +211,14 @@ def test_ortak_sinav_once_ayni_dersin_sonra_ortak_turun_takvimine():
 def test_ders_yazilisi_baska_dersin_takvimine_baglanmaz():
     fen = bulgu("Fen Bilimleri", "yazili", tarih=date(2026, 10, 23), konular=["Uzay Çağı"])
     assert len(birlestir([GIS], [fen], None, SIMDI)) == 2
+
+
+# --- temizlik A (2026-10-17) -------------------------------------------------------
+
+def test_a7_tarihsiz_kayit_kimligi_metin_ozetinden_degismedi():
+    """Aday.anahtar took the course in (A7); an undated record's id still hashes the text
+    alone beside the course, so no id moved and no alert fires twice."""
+    from src.sinav_tarihi import katla
+    [k] = birlestir([], [bulgu("Fen", "diger", konular=["Hücre"], metin="Fen quiz yakında")], None, SIMDI)
+    metin_ozeti = hashlib.sha256(katla("Fen quiz yakında").encode()).hexdigest()
+    assert k["id"] == hashlib.md5(f"Fen|{metin_ozeti[:12]}".encode()).hexdigest()[:12]

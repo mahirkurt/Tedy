@@ -140,7 +140,7 @@ def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, sim
             hedef = _tek([k for k in ayni_ders if b.aday.yayin.isoformat() <= k["tarih"] <= son.isoformat()
                           and _konu_ortusur(k["konular"], b.konular)])
         if hedef is None:
-            ek = f"hafta:{b.hafta.isoformat()}" if b.hafta else b.aday.anahtar[:12]
+            ek = f"hafta:{b.hafta.isoformat()}" if b.hafta else b.aday.metin_anahtari[:12]
             kimlik = _md5(f"{b.ders}|{ek}")
             hedef = next((k for k in kayitlar if k["id"] == kimlik), None)
             if hedef is None:

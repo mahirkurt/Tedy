@@ -37,6 +37,14 @@ class Aday:
 
     @property
     def anahtar(self) -> str:
+        """The candidate's identity (de-duplication, model cache): the same text posted in two
+        courses is two candidates — each is read with its own course."""
+        return hashlib.sha256(f"{self.ders or ''}\x1f{katla(self.metin)}".encode("utf-8")).hexdigest()
+
+    @property
+    def metin_anahtari(self) -> str:
+        """The folded text alone. An undated record's id hashes this beside the course, so the
+        id did not move when `anahtar` took the course in (temizlik A7)."""
         return hashlib.sha256(katla(self.metin).encode("utf-8")).hexdigest()
 
 
@@ -70,13 +78,17 @@ def _ders_parcalari(bolum: Any, etiket: str | None, aralik: tuple[date, date] | 
         if not isinstance(icerik, dict):
             continue
         ders = normalize_course(sekme) or sekme
-        kartlar = icerik.get("cards") or []
-        parcalar = [("kart", c) for c in kartlar] + [("oge", o) for o in icerik.get("items") or []]
+        # Only a list is a list of cards: a string would be read letter by letter, a dict by its keys.
+        kartlar = icerik.get("cards") if isinstance(icerik.get("cards"), list) else []
+        ogeler = icerik.get("items") if isinstance(icerik.get("items"), list) else []
+        parcalar = [("kart", c) for c in kartlar] + [("oge", o) for o in ogeler]
         # `text` is every card of the tab run together: with cards it would only
         # swallow them (and their locations); without cards it is the only text.
         if not kartlar and isinstance(icerik.get("text"), str):
             parcalar.append(("metin", icerik["text"]))
         for sira, (tip, ham) in enumerate(parcalar):
+            if ham is None:
+                continue
             metin = temiz_metin(ham if isinstance(ham, str) else json.dumps(ham, ensure_ascii=False))
             if not metin.strip():
                 continue

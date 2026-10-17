@@ -231,3 +231,45 @@ def test_kaynak_verisi_ek_kimligi_desene_uymazsa_atlanir(tmp_path):
     }}), encoding="utf-8")
     ekler, _ = kaynak_verisi(tmp_path)
     assert ekler == {}
+
+
+# --- temizlik A (2026-10-17) -------------------------------------------------------
+
+def test_a7_anahtar_dersi_icerir_ayni_metin_iki_derste_iki_aday():
+    a = Aday("Cuma günü quiz", "Matematik", None, "ders_karti", [])
+    b = Aday("Cuma günü quiz", "Fen Bilimleri", None, "ders_karti", [])
+    assert a.anahtar != b.anahtar and len(a.anahtar) == 64
+    # The record id of an undated finding hashes the text alone (it already carries the course).
+    assert a.metin_anahtari == b.metin_anahtari
+    veri = haftalar_verisi()
+    hafta = veri["ders_icerikleri_haftalar"]["4. Hafta 05 Eki. - 11 Eki."]
+    hafta["Türkçe"] = {"cards": ["Cuma günü quiz"], "items": [], "text": ""}
+    hafta["Sosyal Bilgiler"] = {"cards": ["Cuma günü quiz"], "items": [], "text": ""}
+    iki = [x for x in adaylar(veri, BUGUN) if x.metin == "Cuma günü quiz"]
+    assert sorted(x.ders for x in iki) == ["Sosyal Bilgiler", "Türkçe"]
+
+
+@pytest.mark.parametrize("bozuk", ["Matematik quiz Cuma", None, {"x": "Matematik quiz"}, 7])
+def test_a8_liste_olmayan_cards_items_yok_sayilir(bozuk):
+    veri = haftalar_verisi()
+    veri["ders_icerikleri_haftalar"]["4. Hafta 05 Eki. - 11 Eki."]["Türkçe"] = {
+        "cards": bozuk, "items": bozuk, "text": ""}
+    assert not [a for a in adaylar(veri, BUGUN) if a.ders == "Türkçe"]
+
+
+def test_a8_liste_olmayan_cards_metne_duser():
+    veri = haftalar_verisi()
+    veri["ders_icerikleri_haftalar"]["4. Hafta 05 Eki. - 11 Eki."]["Türkçe"] = {
+        "cards": "Türkçe", "items": None, "text": "Türkçe yazılı sınavı haftaya"}
+    [tr] = [a for a in adaylar(veri, BUGUN) if a.ders == "Türkçe"]
+    assert tr.metin == "Türkçe yazılı sınavı haftaya" and tr.konumlar[0]["metin"] is True
+
+
+def test_a8_none_ve_dict_kart_dayanikli():
+    veri = haftalar_verisi()
+    veri["ders_icerikleri_haftalar"]["4. Hafta 05 Eki. - 11 Eki."]["Türkçe"] = {
+        "cards": [None, {"baslik": "Türkçe quiz Cuma"}, "Türkçe yazılı sınavı Cuma günü"],
+        "items": [None], "text": ""}
+    tr = [a for a in adaylar(veri, BUGUN) if a.ders == "Türkçe"]
+    assert {a.metin for a in tr} == {"Türkçe yazılı sınavı Cuma günü", '{"baslik": "Türkçe quiz Cuma"}'}
+    assert {a.konumlar[0]["sira"] for a in tr} == {1, 2}
