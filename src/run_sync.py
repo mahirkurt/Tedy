@@ -3,6 +3,7 @@
 
 Designed to run via crontab every 15 minutes.
 """
+import importlib
 import json
 import os
 import re
@@ -324,6 +325,29 @@ def _tek_kosu_kilidi():
     return kilit
 
 
+def _platform_adimi(ad, modul_adi, hatalar):
+    """Run one side-platform scraper and record what actually happened.
+
+    These three return None instead of raising when their own login fails,
+    and only a raised exception was ever recorded. Measured 2026-10-10:
+    EnglishCentral's login had been reported failed on 94 consecutive runs
+    while health.json said "success": true, "scrape_errors": [] — the
+    progress file simply stopped moving on 2026-09-02 and nothing said so.
+
+    The module is imported here, inside the guard, as it was when each step
+    carried its own try: these modules import Selenium at import time, and
+    an import that raises is this platform's failure, not the sync's.
+    """
+    try:
+        modul = importlib.import_module(modul_adi)
+        if modul.scrape() is None:
+            hatalar.append(f"{ad}: veri okunamadı (giriş başarısız olabilir)")
+            print(f"[WARN] {ad} scrape returned no data")
+    except Exception as e:
+        hatalar.append(f"{ad}: {e}")
+        print(f"[WARN] {ad} scrape failed: {e}")
+
+
 def main(zamanla=False):
     os.chdir(PROJECT_ROOT)
     # Checked before anything else and silent when it is not this tick's turn:
@@ -505,28 +529,13 @@ def main(zamanla=False):
         driver.quit()
 
     # 3. English Central scrape (separate Selenium session)
-    try:
-        from src.scrape_englishcentral import scrape as scrape_ec
-        scrape_ec()
-    except Exception as e:
-        scrape_errors.append(f"englishcentral: {e}")
-        print(f"[WARN] English Central scrape failed: {e}")
+    _platform_adimi("englishcentral", "src.scrape_englishcentral", scrape_errors)
 
     # 4. Achieve3000 scrape (separate Selenium session)
-    try:
-        from src.scrape_achieve3000 import scrape as scrape_a3k
-        scrape_a3k()
-    except Exception as e:
-        scrape_errors.append(f"achieve3000: {e}")
-        print(f"[WARN] Achieve3000 scrape failed: {e}")
+    _platform_adimi("achieve3000", "src.scrape_achieve3000", scrape_errors)
 
     # 5. SEBİT homework scrape (separate Selenium session)
-    try:
-        from src.scrape_sebit_homework import scrape as scrape_sebit_hw
-        scrape_sebit_hw()
-    except Exception as e:
-        scrape_errors.append(f"sebit_homework: {e}")
-        print(f"[WARN] SEBİT homework scrape failed: {e}")
+    _platform_adimi("sebit_homework", "src.scrape_sebit_homework", scrape_errors)
 
     # 5b. Portal attachments — after every scraper, before health and the
     # reindex (so a new attachment's text is indexed this run), in a budget.
