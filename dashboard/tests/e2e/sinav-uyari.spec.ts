@@ -133,23 +133,36 @@ test.describe('Sınav uyarıları kartı', () => {
     expect(await bildirimOlaylari(page)).toEqual([])
   })
 
-  // Düzeltme turu 1 — 6: sessiz kayıt düştüyse (409'u göremedi) kart "açık" der; kapatmada DELETE 404 gelir.
-  // Cihaz başka bir üyenin: tarayıcı aboneliği bırakılmaz, kart bunu söyler.
-  test('T1-6: DELETE 404 → abonelik bırakılmaz, kart sahibinin başkası olduğunu söyler', async ({ page }) => {
+  // Düzeltme turu 2: sessiz kayıt düştüyse (409'u göremedi) kart "açık" der. Kapatmada sunucu sahibe göre
+  // yanıt verir: 409 başka bir üyenin cihazı — tarayıcı aboneliği bırakılmaz, kart bunu söyler.
+  test('T2: DELETE 409 → abonelik bırakılmaz, kart sahibinin başkası olduğunu söyler', async ({ page }) => {
     await sinavlarAc(page, { izin: 'granted', abone: true }, true, async () => {
       await page.route('**/api/bildirim/abonelik', r => r.request().method() === 'DELETE'
-        ? r.fulfill({ status: 404, json: { error: 'abonelik bulunamadı' } })
+        ? r.fulfill({ status: 409, json: { sahip_baska: true } })
         : r.fulfill({ status: 503, contentType: 'text/html', body: '<!doctype html>' }))
     })
     const kart = page.locator('#uyarilar')
     await expect(kart.locator('.sinav-uyarilari__durum')).toHaveText(/^Bu cihazda açık\./)
     await kart.getByRole('button', { name: 'Bu cihazda kapat' }).click()
     const bilgi = kart.locator('.cds--inline-notification')
-    await expect(bilgi).toContainText('Bu cihaz sizin adınıza kayıtlı değil; bildirimler onun sahibine gitmeye devam eder.')
+    await expect(bilgi).toContainText('Bu cihaz başka bir aile üyesine kayıtlı; bildirimler onun sahibine gitmeye devam eder.')
     await expect(bilgi).toHaveClass(/cds--inline-notification--warning/)
     await expect(kart.locator('.sinav-uyarilari__durum')).toHaveText(/^Bu cihaz başka bir aile üyesine kayıtlı/)
     await expect(kart.getByRole('button', { name: 'Bu cihazda bana geçir' })).toBeVisible()
     expect(await bildirimOlaylari(page)).toEqual([])
+  })
+
+  test('T2: DELETE 404 (kimsenin değil) → abonelik bırakılır, kart kapalı der', async ({ page }) => {
+    await sinavlarAc(page, { izin: 'granted', abone: true }, true, async () => {
+      await page.route('**/api/bildirim/abonelik', r => r.request().method() === 'DELETE'
+        ? r.fulfill({ status: 404, json: { error: 'abonelik bulunamadı' } })
+        : r.fulfill({ status: 201, json: { ok: true } }))
+    })
+    const kart = page.locator('#uyarilar')
+    await kart.getByRole('button', { name: 'Bu cihazda kapat' }).click()
+    await expect(kart.locator('.sinav-uyarilari__durum')).toHaveText('Bu cihazda kapalı.')
+    await expect(kart.locator('.cds--inline-notification')).toHaveCount(0)
+    expect(await bildirimOlaylari(page)).toEqual(['unsubscribe'])
   })
 
   // Düzeltme turu 1 — 4: sekmeye dönüş ve izin olayı sunucu bayrağını yeniden istemez.

@@ -354,3 +354,44 @@ def test_d1_deneme_tek_sinirli_havuzu_kullanir(ortam, monkeypatch):
     assert api._DENEME_HAVUZU is havuz
     assert 1 < en_cok[0] <= api._DENEME_ESZAMANLI == 8
     assert len(isimler) <= 8 and all(n.startswith("bildirim-deneme") for n in isimler)
+
+
+# Temizlik C, düzeltme turu 2: DELETE sahibe göre yanıt verir. Başka bir tam rol üyesinin cihazı 409
+# `sahip_baska` (pano aboneliği bırakmaz), kimsenin değilse 404 (pano bırakır), kendininse 200.
+def test_c2_sil_baska_tam_rol_uyenin_cihazi_409_depo_degismez(ortam, monkeypatch):
+    c, kok, *_ = ortam
+    monkeypatch.setitem(api.USER_ROLES, "baska@x", api.ROLE_FULL)
+    wp.AbonelikDeposu(kok / wp.ABONELIKLER).ekle("baska@x", wp.abonelik_dogrula(GOVDE))
+    once = (kok / wp.ABONELIKLER).read_bytes()
+    _giris(c, TAM)
+    r = c.delete("/api/bildirim/abonelik", json={"endpoint": GOVDE["endpoint"]})
+    assert r.status_code == 409 and r.get_json() == {"sahip_baska": True}
+    assert (kok / wp.ABONELIKLER).read_bytes() == once
+
+
+def test_c2_sil_kimsenin_degilse_404(ortam):
+    c, kok, *_ = ortam
+    _giris(c, TAM)
+    r = c.delete("/api/bildirim/abonelik", json={"endpoint": GOVDE["endpoint"]})
+    assert r.status_code == 404
+
+
+def test_c2_sil_rolden_cikmis_uyenin_kaydi_kimsenin_sayilir_404(ortam, monkeypatch):
+    c, kok, *_ = ortam
+    monkeypatch.delitem(api.USER_ROLES, "eski@x", raising=False)
+    depo = wp.AbonelikDeposu(kok / wp.ABONELIKLER)
+    depo.ekle("eski@x", wp.abonelik_dogrula(GOVDE))
+    _giris(c, TAM)
+    assert c.delete("/api/bildirim/abonelik", json={"endpoint": GOVDE["endpoint"]}).status_code == 404
+    assert len(depo.kisinin("eski@x")) == 1
+
+
+def test_c2_sil_kendi_cihazi_200(ortam, monkeypatch):
+    c, kok, *_ = ortam
+    monkeypatch.setitem(api.USER_ROLES, "baska@x", api.ROLE_FULL)
+    depo = wp.AbonelikDeposu(kok / wp.ABONELIKLER)
+    _giris(c, TAM)
+    c.post("/api/bildirim/abonelik", json=GOVDE)
+    r = c.delete("/api/bildirim/abonelik", json={"endpoint": GOVDE["endpoint"]})
+    assert r.status_code == 200 and r.get_json() == {"ok": True}
+    assert depo.kisinin(TAM) == []

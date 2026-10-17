@@ -61,9 +61,9 @@ export const PUSH_ULASILAMADI_METNI =
 export const SUNUCU_SILINEMEDI_METNI =
   'Sunucudaki kayıt silinemedi; bildirimler bu cihaza gelmeye devam edebilir.'
 export const BANA_GECTI_METNI = 'Bu cihaz artık sizin hesabınıza kayıtlı.'
-// DELETE 404: this person's list has no such device — another member's. Kept subscribed on purpose.
+// DELETE 409 `sahip_baska`: another full-role member holds this device. Kept subscribed on purpose.
 export const SAHIBI_DEGIL_METNI =
-  'Bu cihaz sizin adınıza kayıtlı değil; bildirimler onun sahibine gitmeye devam eder.'
+  'Bu cihaz başka bir aile üyesine kayıtlı; bildirimler onun sahibine gitmeye devam eder.'
 
 /** `POST /api/bildirim/deneme` yanıtı: `cihaz` toplam, `basarisiz` geçici hata, `olu` silinen kayıt. */
 export interface DenemeYaniti { gonderilen: number; basarisiz: number; olu: number; cihaz: number }
@@ -293,10 +293,11 @@ export async function bildirimiBanaGecir(): Promise<void> {
 
 export type KapatmaSonucu = 'tamam' | 'sunucu-silinemedi' | 'sahibi-degil'
 
-// A network failure or a 5xx leaves the record on the server: the browser's subscription is released
-// anyway and the card says so. A 404 means this person's list holds no such device — it belongs to
-// another member (the silent re-registration may have failed and missed the 409): unsubscribing would
-// cut that member off without a word, so the subscription stays and the card says whose it is.
+// The server answers by owner. 200: it was this person's, removed. 404: nobody's (a removed member's
+// stale claim counts as nobody) — letting go of it is safe. 409 `sahip_baska`: another full-role
+// member holds it (the silent re-registration may have failed and missed its own 409) — unsubscribing
+// would cut that member off without a word, so the subscription stays and the card says whose it is.
+// A network failure or a 5xx leaves the record on the server: released anyway, and the card says so.
 export async function bildirimiKapat(): Promise<KapatmaSonucu> {
   const abonelik = await mevcutAbonelik()
   if (!abonelik) return 'tamam'
@@ -306,11 +307,11 @@ export async function bildirimiKapat(): Promise<KapatmaSonucu> {
       method: 'DELETE', credentials: 'include', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ endpoint: abonelik.endpoint }),
     })
-    if (yanit.status === 404) {
+    if (await sahipBaskaMi(yanit)) {
       sonTazeleme = Promise.resolve('baska-sahip')
       return 'sahibi-degil'
     }
-    if (!yanit.ok) sonuc = 'sunucu-silinemedi'
+    if (!yanit.ok && yanit.status !== 404) sonuc = 'sunucu-silinemedi'
   } catch {
     sonuc = 'sunucu-silinemedi'
   }

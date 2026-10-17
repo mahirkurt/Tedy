@@ -350,3 +350,24 @@ def test_d1_sahiplik_gecerli_sahip_suzgeci(tmp_path):
         d.ekle("isik@x", abonelik_dogrula(abonelik()), yenile=True)
     d.ekle("isik@x", abonelik_dogrula(abonelik()), yenile=True, gecerli_sahip=lambda e: e != "eski@x")
     assert d.kisinin("eski@x") == [] and len(d.kisinin("isik@x")) == 1
+
+
+# Temizlik C, düzeltme turu 2: kapatma uç noktanın kime ait olduğunu söyler. Kendisininse silinir;
+# hâlâ sayılan başka birininse dokunulmaz ("baska"); kimsenin değilse — listeden çıkmış üyenin eski
+# kaydı da sayılmaz, `gecerli_sahip` ile — "yok".
+def _abonelik(uc):
+    return abonelik_dogrula({"endpoint": uc, "keys": {"p256dh": P256, "auth": base64.urlsafe_b64encode(b"b" * 16).rstrip(b"=").decode()}})
+
+
+def test_c2_sahibine_gore_sil(tmp_path):
+    uc = "https://fcm.googleapis.com/fcm/send/abc"
+    d = AbonelikDeposu(tmp_path / "a.json")
+    d.ekle("anne@x", _abonelik(uc))
+    once = (tmp_path / "a.json").read_bytes()
+    assert d.sahibine_gore_sil("isik@x", uc, lambda e: True) == "baska"
+    assert (tmp_path / "a.json").read_bytes() == once
+    assert d.sahibine_gore_sil("isik@x", uc, lambda e: e != "anne@x") == "yok"      # anne listeden çıktı
+    assert (tmp_path / "a.json").read_bytes() == once
+    assert d.sahibine_gore_sil("isik@x", "https://fcm.googleapis.com/fcm/send/yok", lambda e: True) == "yok"
+    assert d.sahibine_gore_sil("anne@x", uc, lambda e: True) == "silindi"
+    assert d.kisinin("anne@x") == []

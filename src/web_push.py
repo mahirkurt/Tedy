@@ -266,6 +266,23 @@ class AbonelikDeposu:
             self._yaz(kisiler)
             return True
 
+    def sahibine_gore_sil(self, email: str, endpoint: str,
+                          gecerli_sahip: Callable[[str], bool] = lambda e: True) -> str:
+        """Turning a device off: "silindi" when it was this person's (removed); "baska" when another
+        person who still counts holds it (nothing written — the browser must keep it, or that person
+        is cut off); "yok" when nobody does (a removed member's stale claim counts as nobody)."""
+        with self._kilitli():
+            kisiler = self._oku_yazmak_icin()
+            once = kisiler.get(email, [])
+            sonra = [c for c in once if _endpoint(c) != endpoint]
+            if len(sonra) != len(once):
+                kisiler[email] = sonra
+                self._yaz(kisiler)
+                return "silindi"
+            baska = any(e != email and gecerli_sahip(e) and any(_endpoint(c) == endpoint for c in cihazlar)
+                        for e, cihazlar in kisiler.items())
+            return "baska" if baska else "yok"
+
     def endpoint_sil(self, endpoint: str) -> int:
         with self._kilitli():
             kisiler = self._oku_yazmak_icin()

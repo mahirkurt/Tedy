@@ -2774,12 +2774,18 @@ def bildirim_abonelik():
     depo = _abonelik_deposu()
     if request.method == "DELETE":
         endpoint = govde.get("endpoint") if isinstance(govde, dict) else None
+        if not isinstance(endpoint, str):
+            return jsonify({"error": "abonelik bulunamadı"}), 404
         try:
-            silindi = isinstance(endpoint, str) and depo.sil(email, endpoint)
+            sonuc = depo.sahibine_gore_sil(email, endpoint, _tam_rolde)
         except OSError:      # a damaged store that cannot be moved aside is never overwritten
             app.logger.exception("abonelik deposu yazılamadı")
             return jsonify({"error": "abonelik deposu şu an yazılamıyor"}), 503
-        if not silindi:
+        # Another full-role member's device: the store is untouched and the page keeps the browser's
+        # subscription (unsubscribing would cut that member off). Nobody's: the page may let go of it.
+        if sonuc == "baska":
+            return jsonify({"sahip_baska": True}), 409
+        if sonuc == "yok":
             return jsonify({"error": "abonelik bulunamadı"}), 404
         return jsonify({"ok": True})
     from src import web_push

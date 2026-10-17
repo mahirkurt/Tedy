@@ -190,16 +190,29 @@ test('C5 deneme bilgisi: başarı, kayıt yok, push servisi', () => {
   assert.match(PUSH_ULASILAMADI_METNI, /sonra yeniden deneyin/i)
 })
 
-// Düzeltme turu 1 — 6: DELETE 404 bu kişinin listesinde böyle bir cihaz olmadığı demektir (başka bir üyenin
-// cihazı). Yerel abonelik bırakılmaz: bırakılsa o üyenin bildirimleri sessizce kesilirdi.
-test('T1-6 kapat: DELETE 404 → yerel abonelik bırakılmaz, sonuç "sahibi-degil", kart başka üye der', async () => {
+// Düzeltme turu 2: DELETE sahibe göre yanıt verir. 409 `sahip_baska`: cihaz başka bir üyenin — yerel abonelik
+// bırakılmaz (bırakılsa o üyenin bildirimleri sessizce kesilirdi). 404: kimsenin değil — bırakılır. 200: silindi.
+test('T2 kapat: DELETE 409 sahip_baska → abonelik kalır, sonuç "sahibi-degil", kart başka üye der', async () => {
   const o = ortamKur({ abone: true, yanitlar: {
-    'GET /api/bildirim/anahtar': ANAHTAR, 'DELETE /api/bildirim/abonelik': { status: 404, govde: { error: 'yok' } } } })
+    'GET /api/bildirim/anahtar': ANAHTAR, 'DELETE /api/bildirim/abonelik': { status: 409, govde: { sahip_baska: true } } } })
   assert.equal(await bildirimiKapat(), 'sahibi-degil')
   assert.deepEqual(o.olaylar, [])
   assert.equal(o.abone(), true)
   assert.equal(bildirimDurumu(await ortamiOku()), 'baska-sahip')
-  assert.equal(SAHIBI_DEGIL_METNI, 'Bu cihaz sizin adınıza kayıtlı değil; bildirimler onun sahibine gitmeye devam eder.')
+  assert.equal(SAHIBI_DEGIL_METNI, 'Bu cihaz başka bir aile üyesine kayıtlı; bildirimler onun sahibine gitmeye devam eder.')
+})
+
+test('T2 kapat: DELETE 404 (kimsenin değil) → abonelik bırakılır, tamam', async () => {
+  const o = ortamKur({ abone: true, yanitlar: { 'DELETE /api/bildirim/abonelik': { status: 404, govde: { error: 'yok' } } } })
+  assert.equal(await bildirimiKapat(), 'tamam')
+  assert.deepEqual(o.olaylar, ['unsubscribe'])
+  assert.equal(o.abone(), false)
+})
+
+test('T2 kapat: DELETE 200 → abonelik bırakılır, tamam', async () => {
+  const o = ortamKur({ abone: true, yanitlar: { 'DELETE /api/bildirim/abonelik': { status: 200, govde: { ok: true } } } })
+  assert.equal(await bildirimiKapat(), 'tamam')
+  assert.deepEqual(o.olaylar, ['unsubscribe'])
 })
 
 // Düzeltme turu 1 — 2: 409'dan sonra "Bu cihazda aç" cihazı taşır; kart artık başka üye demez. Kapatma da
