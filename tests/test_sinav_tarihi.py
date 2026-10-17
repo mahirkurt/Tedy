@@ -229,3 +229,18 @@ def test_d7_belirsiz_kisa_gun_adlari_ay_korumasini_acmaz():
         assert tarih_coz(metin, yayin, YIL) == TarihCozumu(None, None, False), metin
     assert tarih_coz("12 Eki Pzt quiz", yayin, YIL).gun == date(2026, 10, 12)
     assert tarih_coz("17 Eki Cmt deneme", yayin, YIL).gun == date(2026, 10, 17)
+
+
+# --- düzeltme turu 2 ---------------------------------------------------------------
+
+def test_d2_1_hafta_sonu_yayinin_kendi_haftasinin_hafta_sonudur():
+    cmt, paz, cars = date(2026, 10, 17), date(2026, 10, 18), date(2026, 10, 14)
+    for yayin in (cmt, paz, cars):
+        assert tarih_coz("Bu hafta sonu Pazar günü deneme sınavı", yayin, YIL).gun == date(2026, 10, 18), yayin
+        assert tarih_coz("Bu hafta sonu deneme sınavı yapılacak", yayin, YIL) == \
+            TarihCozumu(None, date(2026, 10, 12), False), yayin
+        assert tarih_coz("Hafta sonunda Cumartesi deneme var", yayin, YIL).gun == date(2026, 10, 17), yayin
+        assert tarih_coz("Hafta sonu deneme olacak", yayin, YIL).hafta == date(2026, 10, 12), yayin
+    # Plain "bu hafta" at the weekend still means the coming week.
+    assert tarih_coz("Bu hafta quiz olacak", cmt, YIL).hafta == date(2026, 10, 19)
+    assert tarih_coz("Bu hafta Cuma günü quiz olacak", paz, YIL).gun == date(2026, 10, 23)

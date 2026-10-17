@@ -56,6 +56,8 @@ _GUN_ADI = re.compile(rf"\b({_GUN})\b")
 _PAZAR_EKI = re.compile(r"(?:\s+gunu\b|['\u2019](?:dan|da|a|i)\b)")
 _GELECEK_HAFTA = re.compile(r"\b(haftaya|gelecek hafta|onumuzdeki hafta|next week)\b")
 _BU_HAFTA = re.compile(r"\b(bu hafta|this week)\b")
+# "(bu) hafta sonu", "hafta sonunda": the weekend of the post's own week.
+_HAFTA_SONU = re.compile(r"\bhafta ?sonu\w*\b")
 _YARIN = re.compile(r"\b(yarin|tomorrow)\b")
 _BUGUN = re.compile(r"\b(bugun|today)\b")
 _IMZA = re.compile(r"\|\s*(\d{2})\.(\d{2})\.(\d{4})")
@@ -229,6 +231,12 @@ def tarih_coz(metin: str, yayin: date, okul_araligi: tuple[date, date], goreli: 
         return TarihCozumu(None, haftabasi, False)
     # Açık tarih var ama hiçbiri geçerli değilse (geçmiş sınav anlatısı) yalnız gün adı
     # ileriye çözülmez: "15 Ekim Perşembe günü yapılan KTT" bir sonraki Perşembe'yi göstermez.
+    if _HAFTA_SONU.search(k) and not acik:
+        # Never shifted to the next week like "bu hafta" at the weekend: a Saturday post's
+        # "bu hafta sonu Pazar" is tomorrow. With no day name it is the post's own week.
+        if gun_adi:
+            return TarihCozumu(pazartesi(yayin) + timedelta(days=_GUNLER[gun_adi.group(1)]), None, False)
+        return TarihCozumu(None, pazartesi(yayin), False)
     if gun_adi and not acik and _BU_HAFTA.search(k):
         # "bu hafta Cuma" on a Friday is that Friday, not the next one.
         return TarihCozumu(bu_haftanin_pazartesisi(yayin) + timedelta(days=_GUNLER[gun_adi.group(1)]), None, False)
