@@ -175,3 +175,38 @@ def test_goreli_kapaliyken_acik_tarih_bugune_gore_cozulur():
     assert tarih_coz("20 Kasım Cuma quiz", bugun, YIL, goreli=False) == TarihCozumu(date(2026, 11, 20), None, False)
     # An explicit date already past today is not an upcoming exam.
     assert tarih_coz("15 Ekim quiz", bugun, YIL, goreli=False) == TarihCozumu(None, None, True)
+
+
+# --- temizlik A (2026-10-17) -------------------------------------------------------
+
+def test_a3_bu_hafta_gun_adi_o_haftanin_gunu():
+    # Published on Friday: "bu hafta Cuma" is that same Friday, not the next one.
+    assert tarih_coz("Bu hafta Cuma quiz var", date(2026, 10, 16), YIL) == \
+        TarihCozumu(date(2026, 10, 16), None, False)
+    assert tarih_coz("This week on Wednesday we will have a quiz", date(2026, 10, 12), YIL).gun == \
+        date(2026, 10, 14)
+
+
+def test_a4_pazar_yalniz_gun_ekiyle_gun_adi():
+    yayin = date(2026, 10, 12)
+    assert tarih_coz("pazar araştırması quiz", yayin, YIL) == TarihCozumu(None, None, False)
+    assert tarih_coz("Pazar günü deneme", yayin, YIL).gun == date(2026, 10, 18)
+    assert tarih_coz("Deneme Pazar'a ertelendi", yayin, YIL).gun == date(2026, 10, 18)
+    assert tarih_coz("Pazar'dan sonra quiz yok", yayin, YIL).gun == date(2026, 10, 18)
+    # Beside an explicit date it is the weekday (short-month guard).
+    assert tarih_coz("18 Eki Pazar deneme", yayin, YIL).gun == date(2026, 10, 18)
+
+
+def test_a5_kisa_gun_adi_kisa_ay_korumasinda():
+    yayin = date(2026, 10, 5)
+    assert tarih_coz("15 Eki Per sınav", yayin, YIL).gun == date(2026, 10, 15)
+    assert tarih_coz("16 Eki Cum quiz", yayin, YIL).gun == date(2026, 10, 16)
+    assert tarih_coz("14 Eki Çar yazılı", yayin, YIL).gun == date(2026, 10, 14)
+    # Alone a short weekday resolves nothing.
+    assert tarih_coz("Per quiz", yayin, YIL) == TarihCozumu(None, None, False)
+    assert tarih_coz("sal quiz", yayin, YIL) == TarihCozumu(None, None, False)
+
+
+def test_a6_cok_imzali_metinde_ilk_imza():
+    metin = "Öğretmen A | 05.10.2026\nKTT konuları\nÖğretmen B | 12.10.2026\nEk duyuru"
+    assert yayin_tarihi(metin) == date(2026, 10, 5)

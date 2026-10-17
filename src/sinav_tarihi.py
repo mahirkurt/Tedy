@@ -44,10 +44,14 @@ _GUN_AY = re.compile(rf"\b(\d{{1,2}})\s+({_AY})\b(\.)?(?:\s+(\d{{4}}))?")
 _AY_GUN = re.compile(rf"\b({_AY})\b(\.)?\s+(\d{{1,2}})(?:st|nd|rd|th)?\b(?:,?\s+(\d{{4}}))?")
 # Kod/ondalık zincirinin (FB.7.1.4, 2.5, 3/4,5) parçası olan sayılar tarih sayılmaz.
 _SAYISAL = re.compile(r"(?<![\w./])(\d{1,2})[./](\d{1,2})(?:[./](\d{4}|\d{2}))?(?!\w)(?![./,]\d)")
-_GUN_ADI_SONRA = re.compile(rf"\s*(?:{_GUN})\b")
+# Kısa gün adları ("15 Eki Per") yalnız kısa ay korumasında gün adı sayılır; tek başına tarih çözmez.
+_KISA_GUN = "pzt|sal|car|per|cum|cmt|paz"
+_GUN_ADI_SONRA = re.compile(rf"\s*(?:{_GUN}|{_KISA_GUN})\b")
 # Yılsız d.m / d/m için tarih ipucu: kesme ekli ('de/'da/'te/'ta), "tarih", "günü" ya da gün adı.
 _TARIH_IPUCU = re.compile(rf"\s*(?:['\u2019](?:de|da|te|ta)|tarih|gunu\b|(?:{_GUN})\b)")
 _GUN_ADI = re.compile(rf"\b({_GUN})\b")
+# "pazar" is also the market ("pazar araştırması"): alone it is a weekday only with a day suffix.
+_PAZAR_EKI = re.compile(r"(?:\s+gunu\b|['\u2019](?:dan|da|a|i)\b)")
 _GELECEK_HAFTA = re.compile(r"\b(haftaya|gelecek hafta|onumuzdeki hafta|next week)\b")
 _BU_HAFTA = re.compile(r"\b(bu hafta|this week)\b")
 _YARIN = re.compile(r"\b(yarin|tomorrow)\b")
@@ -139,6 +143,13 @@ def _acik_tarihler(k: str, baslangic_yili: int) -> list[tuple[int, date]]:
     return sorted(bulunan)
 
 
+def _gun_adi(k: str) -> re.Match | None:
+    for m in _GUN_ADI.finditer(k):
+        if m.group(1) != "pazar" or _PAZAR_EKI.match(k, m.end()):
+            return m
+    return None
+
+
 def tarih_coz(metin: str, yayin: date, okul_araligi: tuple[date, date], goreli: bool = True) -> TarihCozumu:
     """`goreli=False` when the text's publication date is unknown: only explicit dates count
     ("Cuma günü", "yarın", "haftaya" are relative to a day we do not know — resolving them
@@ -152,7 +163,7 @@ def tarih_coz(metin: str, yayin: date, okul_araligi: tuple[date, date], goreli: 
     if not goreli:
         return TarihCozumu(None, None, bool(acik))
 
-    gun_adi = _GUN_ADI.search(k)
+    gun_adi = _gun_adi(k)
     if _YARIN.search(k):
         return TarihCozumu(yayin + timedelta(days=1), None, False)
     if _BUGUN.search(k):
@@ -164,6 +175,9 @@ def tarih_coz(metin: str, yayin: date, okul_araligi: tuple[date, date], goreli: 
         return TarihCozumu(None, haftabasi, False)
     # Açık tarih var ama hiçbiri geçerli değilse (geçmiş sınav anlatısı) yalnız gün adı
     # ileriye çözülmez: "15 Ekim Perşembe günü yapılan KTT" bir sonraki Perşembe'yi göstermez.
+    if gun_adi and not acik and _BU_HAFTA.search(k):
+        # "bu hafta Cuma" on a Friday is that Friday, not the next one.
+        return TarihCozumu(pazartesi(yayin) + timedelta(days=_GUNLER[gun_adi.group(1)]), None, False)
     if gun_adi and not acik:
         fark = (_GUNLER[gun_adi.group(1)] - yayin.weekday()) % 7 or 7
         return TarihCozumu(yayin + timedelta(days=fark), None, False)
