@@ -80,3 +80,16 @@ def _yerel_llm_kapali(monkeypatch):
     def _yasak(*a, **k):
         raise RuntimeError("testte gerçek yerel model çağrısı yok")
     monkeypatch.setattr(yerel_llm, "_istek", _yasak)
+
+
+@pytest.fixture(autouse=True)
+def _canli_sinav_tespiti_yok(monkeypatch):
+    """run_sync.main() runs exam detection since 2026-10-16 (plan sinav-uyari,
+    Görev 5). A test that drives main() must not reach Claude nor write the live
+    output/sinavlar.json; the step turns this refusal into {"hata": …}. Tests of
+    the step patch tespit_et again on purpose."""
+    import src.sinav_tespiti as tespit
+
+    def _yasak(*a, **k):
+        raise RuntimeError("testte gerçek sınav tespiti yok")
+    monkeypatch.setattr(tespit, "tespit_et", _yasak)

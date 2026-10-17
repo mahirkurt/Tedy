@@ -10,6 +10,7 @@ import sys
 import time
 import traceback
 from datetime import datetime, timedelta
+from pathlib import Path
 
 # Ensure project root for imports
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -177,6 +178,43 @@ def _kisa_hata(e):
     if not ilk or ilk.lower().startswith(("message", "stacktrace", "#")):
         return "sayfa beklenen içeriği vermedi"
     return ilk[:160]
+
+
+SINAV_SURE = int(os.environ.get("TEDY_SINAV_SURE", "45"))
+# Health and the reindex still have to fit after the step.
+SINAV_YEDEK_SURE = 120
+
+
+def _sinav_tespiti_adimi(start_time, simdi=None):
+    """Build output/sinavlar.json (spec 2026-10-16 §4). Never raises. With no
+    time left the step still runs — takvim, grade table and cached findings cost
+    nothing — and only the model calls wait for the next run."""
+    simdi = time.time() if simdi is None else simdi
+    sure = max(0, int(min(SINAV_SURE, start_time + SYNC_SURE_SINIRI - SINAV_YEDEK_SURE - simdi)))
+    try:
+        from src import sinav_tespiti
+        with open(os.path.join(OUTPUT_DIR, "scraped_data.json"), encoding="utf-8") as f:
+            veri = json.load(f)
+        taban = sinav_tespiti._taban(veri)
+        belge = sinav_tespiti.tespit_et(Path(PROJECT_ROOT), veri, taban, datetime.now(), time.monotonic() + sure)
+        sinav_tespiti.yaz(Path(PROJECT_ROOT), belge)
+        ozet = {**belge["ozet"], "sinav": len(belge["sinavlar"]), "sure": sure}
+        print(f"[SINAV] sinav={ozet['sinav']} aday={ozet['aday']} incelenen={ozet['incelenen']}"
+              f" incelenmedi={ozet['incelenmedi']} butce={ozet['butce_usd']} (süre {sure} s)")
+        return ozet
+    except Exception as e:
+        print(f"[WARN] Sınav tespiti: {_kisa_hata(e)}")
+        return {"hata": _kisa_hata(e)}
+
+
+def _sinav_uyari_durumu():
+    """The alert timer's last round (src/sinav_uyari.py writes it), for health.json."""
+    try:
+        with open(os.path.join(OUTPUT_DIR, "sinav_uyari_durumu.json"), encoding="utf-8") as f:
+            veri = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return veri if isinstance(veri, dict) else {}
 
 
 # Sections whose empty value is a list rather than a dict.
@@ -532,6 +570,10 @@ def main(zamanla=False):
     # reindex (so a new attachment's text is indexed this run), in a budget.
     ekler_ozeti = _ekleri_esitle_adimi(start_time, portal_cerezleri)
 
+    # 5c. Exam detection — after attachments (their text is a source), before
+    # health (which reports it) and the reindex.
+    sinav_ozeti = _sinav_tespiti_adimi(start_time)
+
     # 6. Write health check
     from src.json_utils import atomic_json_dump
     from src.data_validator import _count_section
@@ -566,6 +608,8 @@ def main(zamanla=False):
         "unavailable": unavailable,
         "okunamadi": okunamadi,
         "ekler": ekler_ozeti,
+        "sinav_tespiti": sinav_ozeti,
+        "sinav_uyari": _sinav_uyari_durumu(),
         "academic_year": year_info["year"],
         "year_detection": year_info["status"],
         "year_archived": year_info["archived"],

@@ -176,6 +176,17 @@ class TestIsExamEvent:
     def test_empty_string(self):
         assert not dashboard_api._is_exam_event("")
 
+    def test_takvim_sinav_etiketi_baslik_sozcugu_olmadan(self):
+        assert dashboard_api._is_exam_event(
+            "5-6-7-8. Sınıflar Sebit Vcloud Kazanım Değerlendirme Uygulaması-1_TM", "sinav")
+
+    def test_takvim_sinav_etiketi_baslangic_bitis_disarida(self):
+        assert not dashboard_api._is_exam_event(
+            "MEB 1. Dönem 2. Yazılı Sınav Haftası Başlangıcı", "sinav")
+
+    def test_baska_etiket_eski_kural(self):
+        assert not dashboard_api._is_exam_event("Grade 7 English", "kisisel")
+
 
 # ---------------------------------------------------------------------------
 # _extract_exam_info
@@ -928,3 +939,13 @@ class TestPriorYearGrades:
     def test_unknown_year_still_grades_takvim_exam(self, client):
         data = self._exams(client, "2025-2026 4. Arakarne", None)
         assert data["exams"][0]["grade"] == "85"
+
+
+def test_sinav_listesi_takvim_etiketli_kaydi_alir():
+    from tests.sinav_fikstur import TAKVIM_SINAV
+    sonuc = dashboard_api._sinav_listesi({"takvim": TAKVIM_SINAV}, now=datetime(2026, 10, 16, 10))
+    basliklar = [e["rawTitle"] for e in sonuc["exams"]]
+    assert any("Sebit Vcloud" in b for b in basliklar)
+    assert any("GİS-1" in b for b in basliklar)
+    assert not any("Başlangıcı" in b for b in basliklar)
+    assert not any("Grade 7 English" in b for b in basliklar)

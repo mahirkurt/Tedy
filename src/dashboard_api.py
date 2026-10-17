@@ -2291,10 +2291,15 @@ def _clean_exam_title(course, exam_number, raw_title):
     return f"{course} · {suffix}"
 
 
-def _is_exam_event(title):
+def _is_exam_event(title, takvim_turu=None):
+    """A takvim event is an exam when the portal tags it "sinav" (its own
+    calendar field — "Sebit Vcloud Kazanım Değerlendirme Uygulaması" carries
+    no exam word) or its title says so; week start/end markers never are."""
     lower = _turkish_lower(title)
     if any(ex in lower for ex in _SINAV_EXCLUDE):
         return False
+    if takvim_turu == "sinav":
+        return True
     if any(kw in lower for kw in _SINAV_KEYWORDS):
         return True
     return bool(_SINAV_WORD_RE.search(title))
@@ -2639,7 +2644,8 @@ def _sinav_listesi(data, now=None):
         if not isinstance(evt, dict):
             continue
         title = evt.get("title", "")
-        if not _is_exam_event(title):
+        props = evt.get("extendedProps") if isinstance(evt.get("extendedProps"), dict) else {}
+        if not _is_exam_event(title, props.get("calendar")):
             continue
 
         course, raw_course, exam_number = _extract_exam_info(title)

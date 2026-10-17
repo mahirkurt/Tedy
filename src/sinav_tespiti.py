@@ -196,3 +196,73 @@ def oku(kok: Path) -> dict | None:
 
 def yaz(kok: Path, belge: dict) -> None:
     atomic_json_dump(belge, str(Path(kok) / SINAVLAR))
+
+
+PROJE_KOKU = Path(__file__).resolve().parents[1]
+
+
+def tespit_et(kok: Path, veri: dict, taban: list[dict], simdi: datetime, bitis: float,
+              okuyucu: Any = None) -> dict:
+    from src.sinav_cikarimi import ClaudeSinavOkuyucu, SinavCikarici
+    from src.sinav_kaynaklari import adaylar, kaynak_verisi
+
+    kok = Path(kok)
+    ekler, ilk_gorulme = kaynak_verisi(kok)
+    liste = adaylar(veri, simdi.date(), ek_metinleri=ekler, odev_ilk_gorulme=ilk_gorulme)
+    sonuc = SinavCikarici(kok, okuyucu or ClaudeSinavOkuyucu()).cikar(liste, simdi.date(), bitis)
+    onceki = oku(kok)
+    if onceki is None and (kok / SINAVLAR).exists():
+        # A file that is there but unreadable (torn, an older SURUM) is not a first
+        # install: None would stamp every record "already there" and swallow its alert.
+        onceki = {"surum": SURUM, "sinavlar": []}
+    kayitlar = birlestir(taban, sonuc.bulgular, onceki, simdi)
+    return {"uretildi": simdi.isoformat(timespec="seconds"), "surum": SURUM, "sinavlar": kayitlar,
+            "ozet": {"aday": sonuc.aday, "incelenen": sonuc.incelenen, "incelenmedi": sonuc.incelenmedi,
+                     "butce_usd": sonuc.butce_usd, "hatalar": sonuc.hatalar[:5]}}
+
+
+def kuru_rapor(belge: dict) -> str:
+    satirlar = []
+    for k in belge.get("sinavlar") or []:
+        zaman = k.get("tarih") or (f"{k['hafta']} haftası" if k.get("hafta") else "tarih belirsiz")
+        if k.get("saat"):
+            zaman += f" {k['saat']}"
+        satirlar.append(f"- {k.get('ders')} · {k.get('tur')} · {zaman} · {k.get('baslik')}"
+                        + (" (not tablosu)" if k.get("sentetik") else ""))
+        if k.get("konular"):
+            satirlar.append("  Konular: " + "; ".join(k["konular"]))
+        for x in k.get("kaynaklar") or []:
+            satirlar.append(f"  Kaynak: {x.get('tur')} {json.dumps(x.get('konum'), ensure_ascii=False)}"
+                            f" — {str(x.get('alinti') or '')[:120]}")
+    o = belge.get("ozet") or {}
+    satirlar.append(f"Özet: {len(belge.get('sinavlar') or [])} sınav · aday {o.get('aday', 0)} · incelenen "
+                    f"{o.get('incelenen', 0)} · incelenmedi {o.get('incelenmedi', 0)} · bütçe "
+                    f"{o.get('butce_usd', 0)} USD")
+    return "\n".join(satirlar)
+
+
+def _taban(veri: dict) -> list[dict]:
+    from src.dashboard_api import _sinav_listesi  # Flask app: imported only where it is needed
+    return _sinav_listesi(veri)["exams"]
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+    import time
+
+    from src.env_loader import load_env
+    load_env()
+    p = argparse.ArgumentParser(description="Sınav tespiti: sinavlar.json üretir")
+    p.add_argument("--kuru", action="store_true", help="dosyaya yazmadan bulunanları yazdır")
+    p.add_argument("--sure", type=float, default=300.0, help="model çağrıları için saniye")
+    a = p.parse_args(argv)
+    veri = json.loads((PROJE_KOKU / "output/scraped_data.json").read_text(encoding="utf-8"))
+    belge = tespit_et(PROJE_KOKU, veri, _taban(veri), datetime.now(), time.monotonic() + a.sure)
+    print(kuru_rapor(belge))
+    if not a.kuru:
+        yaz(PROJE_KOKU, belge)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
