@@ -5,7 +5,12 @@ systemd zamanlayıcısıyla 10 dakikada bir koşar; senkron kilidini almaz,
 sinavlar.json'u yalnız okur. Bir kişiye bir sınav için aynı turda vadesi gelen
 uyarılar tek bildirimde birleşir; defter anahtarı (email, sinav_id, tur,
 icerik_surumu) olduğundan aynı uyarı iki kez gitmez, sınav değişirse yeni
-sürüm yeniden "tespit" doğurur. 22:00–07:30 arası hiçbir şey gitmez."""
+sürüm yeniden "tespit" doğurur. 22:00–07:30 arası hiçbir şey gitmez.
+
+Bir kişinin bir cihazı alıp öbürü geçici hata verirse defter yine yazılır (anahtar
+kişi başınadır) ve hatalı cihaz `output/bildirim_bekleyen.json`'a girer: sonraki
+turlar onu yalnız o cihaza, aynı uyarıyla dener; başarıda, altıncı denemede, cihaz
+ölünce, sınav başlayınca ya da sürümü değişince kayıt silinir."""
 from __future__ import annotations
 
 import fcntl
@@ -29,6 +34,9 @@ OKUL_BASI = time(8, 0)
 HATIRLATMA = {"gun_7": (7, time(18, 0)), "gun_2": (2, time(18, 0)), "aksam": (1, time(19, 0))}
 DEFTER = PurePosixPath("output/bildirim_defteri.jsonl")
 DURUM = PurePosixPath("output/sinav_uyari_durumu.json")
+BEKLEYEN = PurePosixPath("output/bildirim_bekleyen.json")
+BEKLEYEN_DENEME_SINIRI = 6      # the first try counts: 1 + 5 retries, one per round
+HATA_LISTESI_SINIRI = 5
 BASLIK_SINIRI = 80
 GOVDE_SINIRI = 300
 GUN_ADLARI = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
@@ -200,6 +208,55 @@ class BildirimDefteri:
                                     "icerik_surumu": sinav["icerik_surumu"]}, ensure_ascii=False) + "\n")
 
 
+class BekleyenKuyruk:
+    """Devices that missed an alert the rest of the person's devices got (B9). One record per
+    (email, endpoint, sinav_id, icerik_surumu); written under flock and atomically."""
+
+    def __init__(self, yol: str | Path):
+        self.yol = Path(yol)
+
+    @contextmanager
+    def kilitli(self) -> Iterator[None]:
+        self.yol.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.yol.with_name(self.yol.name + ".lock"), "a") as kilit:
+            fcntl.flock(kilit, fcntl.LOCK_EX)
+            yield
+
+    def oku(self) -> list[dict]:
+        try:
+            veri = json.loads(self.yol.read_text(encoding="utf-8"))
+        except (OSError, ValueError, RecursionError):
+            return []
+        kayitlar = veri.get("kayitlar") if isinstance(veri, dict) else None
+        return [k for k in kayitlar if _gecerli_bekleyen(k)] if isinstance(kayitlar, list) else []
+
+    def _yaz(self, kayitlar: list[dict]) -> None:
+        atomic_json_dump({"kayitlar": kayitlar}, str(self.yol))
+
+    def ekle(self, yeniler: list[dict]) -> None:
+        with self.kilitli():
+            kayitlar = self.oku()
+            for y in yeniler:
+                anahtar = _bekleyen_anahtari(y)
+                eski = next((k for k in kayitlar if _bekleyen_anahtari(k) == anahtar), None)
+                if eski is None:
+                    kayitlar.append(y)
+                else:
+                    eski["turler"] = list(dict.fromkeys([*eski["turler"], *y["turler"]]))
+            self._yaz(kayitlar)
+
+
+def _gecerli_bekleyen(k: Any) -> bool:
+    return (isinstance(k, dict) and all(isinstance(k.get(a), str) for a in ("email", "endpoint", "sinav_id",
+                                                                            "icerik_surumu"))
+            and isinstance(k.get("turler"), list) and k["turler"] and all(isinstance(t, str) for t in k["turler"])
+            and isinstance(k.get("deneme"), int))
+
+
+def _bekleyen_anahtari(k: dict) -> tuple[str, str, str, str]:
+    return k["email"], k["endpoint"], k["sinav_id"], k["icerik_surumu"]
+
+
 def _alicilar(depo: web_push.AbonelikDeposu) -> list[str]:
     return sorted(e for e in depo.hepsi() if is_full(e))
 
@@ -214,22 +271,105 @@ KOK_VAPID_YOK = "VAPID ayarlı değil"
 CALISMAYAN_TUR = (KOK_SINAVLAR_YOK, KOK_VAPID_YOK)
 
 
-def _bildirim_gonder(b: Bildirim, depo: web_push.AbonelikDeposu, defter: BildirimDefteri, vapid: Any,
-                     gonderici: Callable[..., web_push.GonderimSonucu], simdi: datetime, durum: dict) -> None:
-    baslik, govde = metin_kur(b.sinav, okur_turu(b.email), b.turler, simdi)
-    yuk = {"baslik": baslik, "govde": govde, "etiket": b.sinav["id"], "url": f"/sinavlar?sinav={b.sinav['id']}"}
-    basarili = False
-    for cihaz in depo.kisinin(b.email):
-        sonuc = gonderici(cihaz["abonelik"], yuk, vapid)
-        if sonuc.durum == "ok":
-            basarili = True
-        elif sonuc.durum == "olu":
-            durum["olu_silinen"] += depo.endpoint_sil(cihaz["abonelik"]["endpoint"])
-        else:
-            durum["hatalar"].append(f"{sonuc.kod}: {sonuc.mesaj}"[:160])
-    if basarili:
-        defter.yaz(b.email, b.sinav, b.turler, simdi)
-        durum["gonderilen"] += 1
+def _olumcul(durum: dict, mesaj: str) -> None:
+    """A round that could not do its job: listed first, and `main` exits 1 for systemd."""
+    durum["_olumcul"].append(mesaj[:160])
+
+
+def _yuk(sinav: dict, email: str, turler: tuple[str, ...], simdi: datetime) -> dict:
+    baslik, govde = metin_kur(sinav, okur_turu(email), turler, simdi)
+    return {"baslik": baslik, "govde": govde, "etiket": sinav["id"], "url": f"/sinavlar?sinav={sinav['id']}"}
+
+
+def _cihaza_gonder(abonelik: dict, yuk: dict, vapid: Any, gonderici: Callable[..., web_push.GonderimSonucu],
+                   depo: web_push.AbonelikDeposu, durum: dict) -> str:
+    """One device: "ok", "olu" (removed), "gecersiz" (removed, never dialled) or "hata". A sender
+    that raises instead of returning is a failed device, not a failed round."""
+    if not web_push.kayitli_abonelik_gecerli(abonelik):
+        durum["gecersiz_silinen"] += depo.endpoint_sil(abonelik["endpoint"])
+        return "gecersiz"
+    try:
+        sonuc = gonderici(abonelik, yuk, vapid)
+    except Exception as exc:  # noqa: BLE001 - one device must not stop the others
+        durum["hatalar"].append(f"gönderim: {type(exc).__name__}: {exc}"[:160])
+        return "hata"
+    if sonuc.durum == "ok":
+        return "ok"
+    if sonuc.durum == "olu":
+        durum["olu_silinen"] += depo.endpoint_sil(abonelik["endpoint"])
+        return "olu"
+    durum["hatalar"].append(f"{sonuc.kod}: {sonuc.mesaj}"[:160])
+    return "hata"
+
+
+def _bildirim_gonder(b: Bildirim, depo: web_push.AbonelikDeposu, defter: BildirimDefteri, kuyruk: BekleyenKuyruk,
+                     vapid: Any, gonderici: Callable[..., web_push.GonderimSonucu], simdi: datetime,
+                     durum: dict) -> None:
+    yuk = _yuk(b.sinav, b.email, b.turler, simdi)
+    sonuclar = [(c["abonelik"]["endpoint"], _cihaza_gonder(c["abonelik"], yuk, vapid, gonderici, depo, durum))
+                for c in depo.kisinin(b.email)]
+    if not any(s == "ok" for _, s in sonuclar):
+        return      # nothing reached the person: no ledger, the whole alert is planned again next round
+    defter.yaz(b.email, b.sinav, b.turler, simdi)
+    durum["gonderilen"] += 1
+    hatali = [e for e, s in sonuclar if s == "hata"]
+    if hatali:
+        # The ledger is per person (spec): without this the failed device would never get it.
+        try:
+            kuyruk.ekle([{"email": b.email, "endpoint": e, "sinav_id": b.sinav["id"], "turler": list(b.turler),
+                          "icerik_surumu": b.sinav["icerik_surumu"], "deneme": 1} for e in hatali])
+        except OSError as exc:
+            _olumcul(durum, f"bekleyen kuyruk yazılamadı: {exc}")
+
+
+def _bekleyen_dene(k: dict, sinavlar: dict[str, dict], alicilar: set[str], depo: web_push.AbonelikDeposu,
+                   vapid: Any, gonderici: Callable[..., web_push.GonderimSonucu], simdi: datetime,
+                   durum: dict) -> bool:
+    """One pending record; True keeps it for the next round."""
+    s = sinavlar.get(k["sinav_id"])
+    if s is None or s.get("icerik_surumu") != k["icerik_surumu"] or k["email"] not in alicilar:
+        return False        # the exam is gone or changed (the new version reaches everyone), or the person
+    if _sessiz(simdi):
+        return True         # quiet hours: wait, the attempt is not counted
+    if not vadesi_gelen_turler(s, simdi):
+        return False        # the exam has begun, or its week is over
+    cihaz = next((c for c in depo.kisinin(k["email"]) if c["abonelik"]["endpoint"] == k["endpoint"]), None)
+    if cihaz is None:
+        return False        # the device left the store (removed, dead or moved to someone else)
+    sonuc = _cihaza_gonder(cihaz["abonelik"], _yuk(s, k["email"], tuple(k["turler"]), simdi), vapid, gonderici,
+                           depo, durum)
+    if sonuc == "ok":
+        durum["bekleyen_gonderilen"] += 1
+        return False
+    if sonuc != "hata":
+        return False
+    k["deneme"] += 1
+    if k["deneme"] >= BEKLEYEN_DENEME_SINIRI:
+        durum["hatalar"].append(f"{k['sinav_id']}: bir cihaza {BEKLEYEN_DENEME_SINIRI} denemede gönderilemedi")
+        return False
+    return True
+
+
+def _bekleyenler(kuyruk: BekleyenKuyruk, belge: dict, alicilar: list[str], depo: web_push.AbonelikDeposu,
+                 vapid: Any, gonderici: Callable[..., web_push.GonderimSonucu], simdi: datetime, durum: dict) -> None:
+    sinavlar = {s["id"]: s for s in belge["sinavlar"] if isinstance(s, dict) and isinstance(s.get("id"), str)}
+    with kuyruk.kilitli():
+        kayitlar = kuyruk.oku()
+        if not kayitlar:
+            return
+        kalan = []
+        for k in kayitlar:
+            try:
+                tut = _bekleyen_dene(k, sinavlar, set(alicilar), depo, vapid, gonderici, simdi, durum)
+            except Exception as exc:  # noqa: BLE001 - one bad record must not stop the others
+                durum["hatalar"].append(f"bekleyen {k.get('sinav_id', '?')}: {exc}"[:160])
+                tut = False
+            if tut:
+                kalan.append(k)
+        try:
+            kuyruk._yaz(kalan)
+        except OSError as exc:
+            _olumcul(durum, f"bekleyen kuyruk yazılamadı: {exc}")
 
 
 YEDEK_HABER_SURESI = timedelta(hours=24)
@@ -255,35 +395,49 @@ def _tur(kok: Path, simdi: datetime, gonderici: Callable[..., web_push.GonderimS
     belge = sinav_tespiti.oku(kok)
     vapid = web_push.vapid_ayarlari()
     if belge is None or vapid is None:
-        durum["hatalar"].append(KOK_SINAVLAR_YOK if belge is None else KOK_VAPID_YOK)
+        _olumcul(durum, KOK_SINAVLAR_YOK if belge is None else KOK_VAPID_YOK)
         return
     gonderici = gonderici or web_push.gonder
     depo = web_push.AbonelikDeposu(kok / web_push.ABONELIKLER)
     defter = BildirimDefteri(kok / DEFTER)
+    kuyruk = BekleyenKuyruk(kok / BEKLEYEN)
     alicilar = _alicilar(depo)
     durum["abone_kisi"] = len(alicilar)
     _depo_sagligi(depo, simdi, durum)
+    _bekleyenler(kuyruk, belge, alicilar, depo, vapid, gonderici, simdi, durum)
     for b in planla(belge["sinavlar"], alicilar, defter.anahtarlar(), simdi, durum["hatalar"]):
         try:
-            _bildirim_gonder(b, depo, defter, vapid, gonderici, simdi, durum)
+            _bildirim_gonder(b, depo, defter, kuyruk, vapid, gonderici, simdi, durum)
         except Exception as exc:  # noqa: BLE001 - one failing notification must not stop the round
             durum["hatalar"].append(_hata_satiri(b.sinav, exc))
+    durum["bekleyen"] = len(kuyruk.oku())
+
+
+def _hatalari_kes(durum: dict) -> None:
+    """Fatal errors first, then the rest; at most five distinct messages, `hata_sayisi` the total."""
+    olumcul = durum.pop("_olumcul")
+    tum = olumcul + durum["hatalar"]
+    durum["hata_sayisi"] = len(tum)
+    durum["hatalar"] = list(dict.fromkeys(tum))[:HATA_LISTESI_SINIRI]
+    durum["olumcul"] = bool(olumcul)
 
 
 def gonder_turu(kok: Path, simdi: datetime, gonderici: Callable[..., web_push.GonderimSonucu] | None = None) -> dict:
     kok = Path(kok)
     durum = {"son_tur": simdi.isoformat(timespec="seconds"), "kapali": False, "gonderilen": 0,
-             "olu_silinen": 0, "hatalar": [], "abone_kisi": 0}
+             "olu_silinen": 0, "gecersiz_silinen": 0, "bekleyen_gonderilen": 0, "bekleyen": 0, "hatalar": [],
+             "abone_kisi": 0, "_olumcul": []}
     try:
         _tur(kok, simdi, gonderici, durum)
     except Exception as exc:  # noqa: BLE001 - the status file must still say what happened
-        durum["hatalar"].append(f"tur: {type(exc).__name__}: {exc}"[:160])
+        _olumcul(durum, f"tur: {type(exc).__name__}: {exc}")
     finally:
-        durum["hatalar"] = durum["hatalar"][:5]
+        _hatalari_kes(durum)
         try:
             _durum_yaz(kok, durum)
         except OSError as exc:
-            durum["hatalar"] = (durum["hatalar"] + [f"durum yazılamadı: {exc}"[:160]])[:5]
+            durum["hatalar"] = (durum["hatalar"] + [f"durum yazılamadı: {exc}"[:160]])[:HATA_LISTESI_SINIRI]
+            durum["hata_sayisi"] += 1
     return durum
 
 
@@ -327,8 +481,11 @@ def main(argv: list[str] | None = None) -> int:
     if komut == ["gonder"]:
         durum = gonder_turu(kok, datetime.now())
         print(json.dumps(durum, ensure_ascii=False))
-        # A round that could not run at all is a failure for systemd; flag-off ("kapali") is not.
-        return 1 if any(h in CALISMAYAN_TUR for h in durum.get("hatalar", [])) else 0
+        # A round that could not do its job (no exams file, no VAPID, an unexpected error, a pending
+        # queue it could not write) is a failure for systemd; flag-off ("kapali") and a device's
+        # own error are not.
+        olumcul = durum.get("olumcul") or any(h in CALISMAYAN_TUR for h in durum.get("hatalar", []))
+        return 1 if olumcul else 0
     if komut == ["tohumla"]:
         print(f"tohumlanan uyarı: {tohumla(kok, datetime.now())}")
         return 0
