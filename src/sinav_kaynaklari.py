@@ -141,13 +141,14 @@ def _birlestir(liste: list[Aday]) -> list[Aday]:
     # still one model call, since the cache is keyed by the text.
     # A copy whose date is unknown (an announcement, an attachment with no first_seen) is the
     # same post as a dated copy: it joins the earliest dated one, lending its locations; it has
-    # no course of its own to dissolve the dated copy's course with.
+    # no course of its own to dissolve the dated copy's course with. One with a course (an
+    # assignment with no first_seen) joins the dated copy of its own course first.
     gruplar: dict[str, list[Aday]] = {}
     for a in sorted(liste, key=lambda x: x.yayin is None):   # dated copies first (stable)
         grup = gruplar.setdefault(a.metin_anahtari, [])
         tarihliler = [x for x in grup if x.yayin is not None]
         if a.yayin is None and tarihliler:
-            o = min(tarihliler, key=lambda x: x.yayin)
+            o = next((x for x in tarihliler if x.ders == a.ders), None) or min(tarihliler, key=lambda x: x.yayin)
         else:
             o = next((x for x in grup if x.ders == a.ders), None) or next(
                 (x for x in grup if x.yayin == a.yayin), None)

@@ -341,3 +341,16 @@ def test_d3_2_yayini_bilinmeyen_kopya_en_erken_bilinene_katilir():
     sonuc = {a.ders: a for a in adaylar(veri, date(2026, 10, 20)) if a.metin == KTT_KISA}
     assert set(sonuc) == {"Türkçe", "Sosyal Bilgiler"}
     assert len(sonuc["Türkçe"].konumlar) == 2 and len(sonuc["Sosyal Bilgiler"].konumlar) == 1
+
+
+# --- temizlik B ----------------------------------------------------------------------
+
+def test_b0_tarihsiz_kopya_once_ayni_dersli_tarihliye_katilir():
+    from src.sinav_kaynaklari import _birlestir
+    turkce = Aday(KTT_KISA, "Türkçe", date(2026, 10, 12), "ders_karti", [{"bolum": "t"}])
+    sosyal = Aday(KTT_KISA, "Sosyal Bilgiler", date(2026, 10, 14), "ders_karti", [{"bolum": "s"}])
+    odev = Aday(KTT_KISA, "Sosyal Bilgiler", None, "odev", [{"bolum": "odev"}])
+    sonuc = {a.ders: a for a in _birlestir([turkce, sosyal, odev])}
+    assert set(sonuc) == {"Türkçe", "Sosyal Bilgiler"}
+    assert sonuc["Sosyal Bilgiler"].konumlar == [{"bolum": "s"}, {"bolum": "odev"}]
+    assert sonuc["Türkçe"].konumlar == [{"bolum": "t"}]
