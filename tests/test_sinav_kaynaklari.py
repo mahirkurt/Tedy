@@ -53,11 +53,18 @@ def test_ders_adi_normalize_ve_quizlet_suzulur():
     assert ing.metin == ING_KARTI and ing.yayin == date(2026, 9, 21)
 
 
-def test_en_yeni_once_ve_eski_yayin_atlanir():
+def test_en_yeni_once_ve_eski_yayin_aday_kalir():
     sonuc = adaylar(haftalar_verisi(), BUGUN)
     assert [a.yayin for a in sonuc] == sorted([a.yayin for a in sonuc], reverse=True)
-    # 2026-11-10 − 45 gün = 2026-09-26: 21.09'daki İngilizce kartı düşer, 05.10'dakiler kalır.
-    assert {a.ders for a in adaylar(haftalar_verisi(), date(2026, 11, 10))} == {"Matematik", "Fen Bilimleri"}
+    # An exam announced early (21.09 for a date weeks ahead) must stay a candidate however old the
+    # post is: the age limit only bounds new model calls (SinavCikarici), never the cached findings.
+    assert {a.ders for a in adaylar(haftalar_verisi(), date(2026, 11, 10))} == \
+        {"Matematik", "Fen Bilimleri", "İngilizce"}
+
+
+def test_yas_suzgeci_yalniz_acikca_istenirse():
+    eski = adaylar(haftalar_verisi(), date(2026, 11, 10), en_eski_gun=45)
+    assert {a.ders for a in eski} == {"Matematik", "Fen Bilimleri"}
 
 
 def test_imzasiz_kart_hafta_baslangicini_yayin_sayar():

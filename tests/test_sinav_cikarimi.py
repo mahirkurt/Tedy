@@ -301,3 +301,38 @@ def test_cikarici_istisnada_odenmis_sonuclar_onbellekte_kalir(tmp_path):
     okuyucu = SahteOkuyucu()
     sonuc = _cikarici(tmp_path, okuyucu).cikar([KTT], BUGUN, bitis=2000)
     assert (okuyucu.cagrilar, sonuc.incelenen) == ([], 1)
+
+
+# --- yaş sınırı yalnız yeni model çağrısı için (son inceleme, Critical) ----------------
+
+ESKI = Aday(KTT_KARTI, "Matematik", date(2026, 8, 27), "ders_karti", [])   # BUGUN − 50 gün
+
+
+def test_cikarici_eski_onbelleksiz_aday_sessizce_atlanir(tmp_path):
+    okuyucu = SahteOkuyucu()
+    sonuc = _cikarici(tmp_path, okuyucu).cikar([ESKI], BUGUN, bitis=2000)
+    assert okuyucu.cagrilar == []
+    assert (sonuc.aday, sonuc.incelenen, sonuc.incelenmedi, sonuc.bulgular) == (0, 0, 0, [])
+
+
+def test_cikarici_eski_onbellekli_aday_her_turda_kapidan_gecer(tmp_path):
+    okuyucu = SahteOkuyucu()
+    taze = Aday(KTT_KARTI, "Matematik", date(2026, 10, 5), "ders_karti", [])
+    _cikarici(tmp_path, okuyucu).cikar([taze], date(2026, 10, 6), bitis=2000)
+    # The same text, 50 days on: cached, so it is read again without a call.
+    sonuc = _cikarici(tmp_path, okuyucu).cikar([ESKI], BUGUN, bitis=2000)
+    assert len(okuyucu.cagrilar) == 1
+    assert (sonuc.incelenen, sonuc.incelenmedi, len(sonuc.bulgular)) == (1, 0, 1)
+
+
+def test_cikarici_yayini_bilinmeyen_aday_yas_sinirina_takilmaz(tmp_path):
+    okuyucu = SahteOkuyucu()
+    yayinsiz = Aday(KTT_KARTI, "Matematik", None, "duyuru", [])
+    sonuc = _cikarici(tmp_path, okuyucu).cikar([yayinsiz], BUGUN, bitis=2000)
+    assert len(okuyucu.cagrilar) == 1 and sonuc.incelenen == 1
+
+
+def test_cikarici_yas_siniri_ayarlanabilir(tmp_path):
+    okuyucu = SahteOkuyucu()
+    _cikarici(tmp_path, okuyucu).cikar([ESKI], BUGUN, bitis=2000, yeni_cagri_sinir_gun=60)
+    assert len(okuyucu.cagrilar) == 1

@@ -130,3 +130,58 @@ def test_dosya_yok_ilk_kurulum_dosya_bozuk_ilk_kurulum_degil(tmp_path):
     belge = GERCEK_TESPIT(tmp_path, haftalar_verisi(), [], simdi, time.monotonic() + 60,
                           okuyucu=_sahte_okuyucu())
     assert belge["sinavlar"][0]["ilk_tespit"] == simdi.isoformat(timespec="seconds")
+
+
+# --- erken ilan edilen sınav 45 günden sonra da kalır (son inceleme, Critical) ----------
+
+ERKEN_KART = ("1. YAZILI\nÖğretmen A | 01.10.2026\nSevgili öğrenciler,\n"
+              "Matematik 1. yazılı sınavı 20 Kasım Cuma günü yapılacaktır.\n"
+              "Konular: Tam sayılar, Rasyonel sayılar.")
+ERKEN_ALINTI = "Matematik 1. yazılı sınavı 20 Kasım Cuma günü yapılacaktır."
+
+
+def _erken_veri():
+    return {"ders_icerikleri_haftalar": {"4. Hafta 28 Eyl. - 04 Eki.": {
+                "Matematik": {"cards": [ERKEN_KART], "items": [], "text": ""}}},
+            "ders_icerikleri": {}, "odevlerim": {"homework": {"rows": []}},
+            "duyurular": {"announcements": []}, "takvim": []}
+
+
+class _ErkenOkuyucu:
+    model = "claude-haiku-4-5"
+
+    def __init__(self):
+        self.cagrilar = 0
+
+    def oku(self, aday, bugun, zaman_asimi):
+        from src.sinav_cikarimi import OkumaSonucu
+        self.cagrilar += 1
+        return OkumaSonucu([{"ders": "Matematik", "tur": "yazili", "baslik": "Matematik 1. yazılı",
+                             "tarih_ifadesi": "20 Kasım Cuma", "tarih": "", "saat": "",
+                             "konular": ["Tam sayılar", "Rasyonel sayılar"], "alinti": ERKEN_ALINTI}], 100, 10)
+
+
+TAKVIM_YAZILI = {"id": "tk-yazili", "course": "Matematik", "title": "Matematik 1. Yazılı",
+                 "rawTitle": "Matematik 1. Yazılı", "date": "2026-11-20T09:00:00", "allDay": False}
+
+
+import pytest  # noqa: E402
+
+
+@pytest.mark.parametrize("taban", [[], [TAKVIM_YAZILI]], ids=["metin-kaydi", "takvime-bagli"])
+def test_erken_ilan_edilen_sinav_45_gun_sonra_silinmez(tmp_path, taban):
+    okuyucu = _ErkenOkuyucu()
+    ilk = GERCEK_TESPIT(tmp_path, _erken_veri(), taban, datetime(2026, 10, 2, 10), time.monotonic() + 60,
+                        okuyucu=okuyucu)
+    st.yaz(tmp_path, ilk)
+    [k1] = [k for k in ilk["sinavlar"] if k["tarih"] == "2026-11-20"]
+    assert k1["konular"] == ["Tam sayılar", "Rasyonel sayılar"]
+
+    # 16 Kasım: the post is 46 days old, the exam four days ahead.
+    son = GERCEK_TESPIT(tmp_path, _erken_veri(), taban, datetime(2026, 11, 16, 18), time.monotonic() + 60,
+                        okuyucu=okuyucu)
+    assert okuyucu.cagrilar == 1   # read from the cache, no second call
+    [k2] = [k for k in son["sinavlar"] if k["tarih"] == "2026-11-20"]
+    assert k2["id"] == k1["id"]
+    assert k2["konular"] == ["Tam sayılar", "Rasyonel sayılar"]
+    assert k2["icerik_surumu"] == k1["icerik_surumu"] and k2["degisti"] is None

@@ -139,7 +139,10 @@ def _birlestir(liste: list[Aday]) -> list[Aday]:
 
 
 def adaylar(veri: dict, bugun: date, ek_metinleri: dict[str, tuple[str, date | None]] | None = None,
-            odev_ilk_gorulme: dict[str, str] | None = None, en_eski_gun: int = 45) -> list[Aday]:
+            odev_ilk_gorulme: dict[str, str] | None = None, en_eski_gun: int | None = None) -> list[Aday]:
+    """Every pre-filtered candidate, newest first. No age limit by default: an exam announced
+    weeks ahead must keep its (cached) finding until the exam is past — the age limit bounds
+    only new model calls, in `SinavCikarici.cikar`. `en_eski_gun` exists for ad-hoc reads."""
     bas_yil = okul_yili(bugun)[0].year
     ham: list[Aday] = []
     haftalar = veri.get("ders_icerikleri_haftalar") or {}
@@ -152,8 +155,8 @@ def adaylar(veri: dict, bugun: date, ek_metinleri: dict[str, tuple[str, date | N
     for ek_id, (metin, ilk) in (ek_metinleri or {}).items():
         ham.append(Aday(metin, None, ilk, "ek", [{"bolum": "ek", "id": ek_id}]))
 
-    sinir = bugun - timedelta(days=en_eski_gun)
-    suzulmus = [a for a in ham if on_suzgec(a.metin) and (a.yayin is None or a.yayin >= sinir)]
+    sinir = bugun - timedelta(days=en_eski_gun) if en_eski_gun is not None else None
+    suzulmus = [a for a in ham if on_suzgec(a.metin) and (sinir is None or a.yayin is None or a.yayin >= sinir)]
     sonuc = _birlestir(suzulmus)
     return sorted(sonuc, key=lambda a: a.yayin or bugun, reverse=True)
 

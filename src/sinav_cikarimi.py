@@ -13,7 +13,7 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable
 
@@ -29,6 +29,9 @@ SINAV_VARSAYILAN_MODEL = "claude-haiku-4-5"
 AYLIK_TAVAN_USD = float(os.environ.get("TEDY_SINAV_AYLIK_USD", "2"))
 ONBELLEK = PurePosixPath("output/sinav_cikarim_onbellegi.json")
 DEFTER = PurePosixPath("output/sinav_cikarim_defteri.json")
+# A text older than this is never sent to the model for the first time (its exam is most likely
+# past, and a backlog would spend the budget on history). A cached reading is used whatever its age.
+YENI_CAGRI_SINIR_GUN = 45
 CAGRI_EN_AZ_SURE = 8.0
 CAGRI_EN_COK_SURE = 30.0
 METIN_SINIRI = 6000
@@ -229,9 +232,11 @@ class SinavCikarici:
             veri = {}
         self._onbellek: dict[str, Any] = veri if isinstance(veri, dict) else {}
 
-    def cikar(self, adaylar: list[Aday], bugun: date, bitis: float) -> CikarimSonucu:
+    def cikar(self, adaylar: list[Aday], bugun: date, bitis: float,
+              yeni_cagri_sinir_gun: int = YENI_CAGRI_SINIR_GUN) -> CikarimSonucu:
         bulgular: list[Bulgu] = []
-        incelenen = incelenmedi = 0
+        incelenen = incelenmedi = atlanan = 0
+        sinir = bugun - timedelta(days=yeni_cagri_sinir_gun)
         hatalar: list[str] = []
         degisti = False
         try:
@@ -245,6 +250,11 @@ class SinavCikarici:
                         continue
                     satirlar = kayit["satirlar"]
                 else:
+                    if aday.yayin is not None and aday.yayin < sinir:
+                        # Too old to ask about for the first time: skipped silently, not "unread"
+                        # (nothing was missed that the list could still have shown).
+                        atlanan += 1
+                        continue
                     kalan = bitis - self.saat()
                     if kalan < CAGRI_EN_AZ_SURE or not self.defter.izin_var():
                         incelenmedi += 1
@@ -271,5 +281,5 @@ class SinavCikarici:
         finally:  # ücreti ödenmiş sonuçlar bir istisnada bile kaybolmasın
             if degisti or not self._onbellek_yolu.exists():
                 atomic_json_dump(self._onbellek, str(self._onbellek_yolu))
-        return CikarimSonucu(bulgular, len(adaylar), incelenen, incelenmedi,
+        return CikarimSonucu(bulgular, len(adaylar) - atlanan, incelenen, incelenmedi,
                              round(self.defter.harcanan(), 6), hatalar)
