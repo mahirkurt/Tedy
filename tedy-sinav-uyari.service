@@ -6,8 +6,8 @@ After=network-online.target
 Type=oneshot
 WorkingDirectory=/mnt/thunderbolt/workspaces/TED
 Environment=PATH=/mnt/thunderbolt/workspaces/TED/.venv/bin:/usr/bin:/bin
-# Istanbul time, not the host's UTC: see src/env_loader.py. Before any
-# EnvironmentFile line, which would override it if .env ever set TZ.
+# Istanbul time, not the host's UTC: see src/env_loader.py. TZ must never be
+# put in .env: EnvironmentFile= overrides Environment= whatever the line order.
 Environment=TZ=Europe/Istanbul
 EnvironmentFile=/mnt/thunderbolt/workspaces/TED/.env
 ExecStart=/mnt/thunderbolt/workspaces/TED/.venv/bin/python -m src.sinav_uyari gonder

@@ -204,3 +204,69 @@ def test_tohumla_herkesi_isaretler(kok):
     g = Gonderici()
     su.gonder_turu(kok, datetime(2026, 10, 20, 9, 0), gonderici=g)
     assert g.cagrilar == []
+
+
+# --- kayıt başına yalıtım, durum dosyası, çıkış kodu ----------------------------
+
+def test_bozuk_kayit_turu_durdurmaz(kok):
+    sinavlari_yaz(kok, {"uretildi": "x", "surum": SURUM, "ozet": {}, "sinavlar": [
+        sinav(id="bozuk", saat="9.30"), sinav(id="bozuk2", tarih="bozuk"), sinav(id="bozuk3", tarih=None, hafta="x"),
+        {k: v for k, v in sinav().items() if k != "id"}, sinav()]})
+    g = Gonderici()
+    durum = su.gonder_turu(kok, datetime(2026, 10, 19, 18, 0), gonderici=g)
+    assert sorted(e for e, _ in g.cagrilar) == ["https://fcm.googleapis.com/a", "https://web.push.apple.com/b"]
+    assert all(y["etiket"] == "s1" for _, y in g.cagrilar)
+    assert durum["gonderilen"] == 2
+    metin = " | ".join(durum["hatalar"])
+    assert "bozuk:" in metin and "bozuk2:" in metin and "bozuk3:" in metin and "?:" in metin
+    assert json.loads((kok / su.DURUM).read_text(encoding="utf-8"))["hatalar"] == durum["hatalar"]
+
+
+def test_planla_bozuk_kaydi_atlar_ve_bildirir():
+    hatalar = []
+    plan = su.planla([sinav(id="x", saat="9.30"), sinav()], [ISIK], set(), datetime(2026, 10, 19, 18, 0), hatalar)
+    assert [b.sinav["id"] for b in plan] == ["s1"]
+    assert len(hatalar) == 1 and hatalar[0].startswith("x: ") and len(hatalar[0]) <= 160
+    assert [b.sinav["id"] for b in su.planla([sinav(id="x", saat="9.30"), sinav()], [ISIK], set(),
+                                             datetime(2026, 10, 19, 18, 0))] == ["s1"]   # hatalar=None
+
+
+def test_tohumla_bozuk_kaydi_atlar(kok):
+    sinavlari_yaz(kok, {"uretildi": "x", "surum": SURUM, "ozet": {}, "sinavlar": [sinav(id="bozuk", saat="9.30"), sinav()]})
+    assert su.tohumla(kok, datetime(2026, 10, 19, 18, 0)) == 4
+    assert {a[1] for a in su.BildirimDefteri(kok / su.DEFTER).anahtarlar()} == {"s1"}
+
+
+def test_bildirim_istisnasi_dongu_surer_ve_durum_yazilir(kok, monkeypatch):
+    def patla(self, *a, **k):
+        raise OSError("disk dolu")
+    monkeypatch.setattr(su.BildirimDefteri, "yaz", patla)
+    durum = su.gonder_turu(kok, datetime(2026, 10, 19, 18, 0), gonderici=Gonderici())   # raises nothing
+    assert durum["gonderilen"] == 0
+    assert any("disk dolu" in h for h in durum["hatalar"])
+    kayit = json.loads((kok / su.DURUM).read_text(encoding="utf-8"))
+    assert any("disk dolu" in h for h in kayit["hatalar"])
+
+
+def test_tur_disi_istisna_da_duruma_yazilir(kok, monkeypatch):
+    def patla(*a, **k):
+        raise RuntimeError("depo bozuk")
+    monkeypatch.setattr(su, "_alicilar", patla)
+    durum = su.gonder_turu(kok, datetime(2026, 10, 19, 18, 0), gonderici=Gonderici())
+    kayit = json.loads((kok / su.DURUM).read_text(encoding="utf-8"))
+    assert kayit == durum and any("depo bozuk" in h for h in kayit["hatalar"])
+
+
+@pytest.mark.parametrize("durum,kod", [
+    ({"hatalar": ["sinavlar.json yok"]}, 1),
+    ({"hatalar": ["VAPID ayarlı değil"]}, 1),
+    ({"hatalar": [], "kapali": True}, 0),
+    ({"hatalar": ["500: boom"]}, 0),
+    ({"hatalar": []}, 0),
+])
+def test_main_calismayan_tur_icin_hata_kodu(durum, kod, monkeypatch, capsys):
+    import src.env_loader as el
+    monkeypatch.setattr(el, "load_env", lambda *a, **k: None)
+    monkeypatch.setattr(su, "gonder_turu", lambda kok, simdi, gonderici=None: durum)
+    assert su.main(["gonder"]) == kod
+    assert json.loads(capsys.readouterr().out) == durum

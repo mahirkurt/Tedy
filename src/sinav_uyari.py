@@ -83,14 +83,26 @@ class Bildirim:
     turler: tuple[str, ...]
 
 
-def planla(sinavlar: list[dict], alicilar: list[str], gonderilmis: set[tuple], simdi: datetime) -> list[Bildirim]:
+def _hata_satiri(sinav: Any, exc: Exception) -> str:
+    sid = sinav.get("id") if isinstance(sinav, dict) else None
+    return f"{sid or '?'}: {exc}"[:160]
+
+
+def planla(sinavlar: list[dict], alicilar: list[str], gonderilmis: set[tuple], simdi: datetime,
+           hatalar: list[str] | None = None) -> list[Bildirim]:
+    """A malformed exam record is skipped and named in `hatalar`; it never stops the others."""
     plan = []
     for s in sinavlar:
-        vadeli = vadesi_gelen_turler(s, simdi)
-        for email in alicilar:
-            yeni = tuple(t for t in vadeli if (email, s["id"], t, s["icerik_surumu"]) not in gonderilmis)
-            if yeni:
-                plan.append(Bildirim(email, s, yeni))
+        try:
+            vadeli = vadesi_gelen_turler(s, simdi)
+            sid, surum = s["id"], s["icerik_surumu"]
+            yeni_by_email = [(email, tuple(t for t in vadeli if (email, sid, t, surum) not in gonderilmis))
+                             for email in alicilar]
+        except Exception as exc:  # noqa: BLE001 - one bad record must not stop the round
+            if hatalar is not None:
+                hatalar.append(_hata_satiri(s, exc))
+            continue
+        plan.extend(Bildirim(email, s, yeni) for email, yeni in yeni_by_email if yeni)
     return plan
 
 
@@ -197,38 +209,65 @@ def _durum_yaz(kok: Path, durum: dict) -> dict:
     return durum
 
 
-def gonder_turu(kok: Path, simdi: datetime, gonderici: Callable[..., web_push.GonderimSonucu] | None = None) -> dict:
-    kok = Path(kok)
-    durum = {"son_tur": simdi.isoformat(timespec="seconds"), "kapali": False, "gonderilen": 0,
-             "olu_silinen": 0, "hatalar": [], "abone_kisi": 0}
+KOK_SINAVLAR_YOK = "sinavlar.json yok"
+KOK_VAPID_YOK = "VAPID ayarlı değil"
+CALISMAYAN_TUR = (KOK_SINAVLAR_YOK, KOK_VAPID_YOK)
+
+
+def _bildirim_gonder(b: Bildirim, depo: web_push.AbonelikDeposu, defter: BildirimDefteri, vapid: Any,
+                     gonderici: Callable[..., web_push.GonderimSonucu], simdi: datetime, durum: dict) -> None:
+    baslik, govde = metin_kur(b.sinav, okur_turu(b.email), b.turler, simdi)
+    yuk = {"baslik": baslik, "govde": govde, "etiket": b.sinav["id"], "url": f"/sinavlar?sinav={b.sinav['id']}"}
+    basarili = False
+    for cihaz in depo.kisinin(b.email):
+        sonuc = gonderici(cihaz["abonelik"], yuk, vapid)
+        if sonuc.durum == "ok":
+            basarili = True
+        elif sonuc.durum == "olu":
+            durum["olu_silinen"] += depo.endpoint_sil(cihaz["abonelik"]["endpoint"])
+        else:
+            durum["hatalar"].append(f"{sonuc.kod}: {sonuc.mesaj}"[:160])
+    if basarili:
+        defter.yaz(b.email, b.sinav, b.turler, simdi)
+        durum["gonderilen"] += 1
+
+
+def _tur(kok: Path, simdi: datetime, gonderici: Callable[..., web_push.GonderimSonucu] | None, durum: dict) -> None:
     if os.environ.get("TEDY_SINAV_UYARI", "0") != "1":
-        return _durum_yaz(kok, {**durum, "kapali": True})
+        durum["kapali"] = True
+        return
     belge = sinav_tespiti.oku(kok)
     vapid = web_push.vapid_ayarlari()
     if belge is None or vapid is None:
-        return _durum_yaz(kok, {**durum, "hatalar": ["sinavlar.json yok" if belge is None else "VAPID ayarlı değil"]})
+        durum["hatalar"].append(KOK_SINAVLAR_YOK if belge is None else KOK_VAPID_YOK)
+        return
     gonderici = gonderici or web_push.gonder
     depo = web_push.AbonelikDeposu(kok / web_push.ABONELIKLER)
     defter = BildirimDefteri(kok / DEFTER)
     alicilar = _alicilar(depo)
     durum["abone_kisi"] = len(alicilar)
-    for b in planla(belge["sinavlar"], alicilar, defter.anahtarlar(), simdi):
-        baslik, govde = metin_kur(b.sinav, okur_turu(b.email), b.turler, simdi)
-        yuk = {"baslik": baslik, "govde": govde, "etiket": b.sinav["id"], "url": f"/sinavlar?sinav={b.sinav['id']}"}
-        basarili = False
-        for cihaz in depo.kisinin(b.email):
-            sonuc = gonderici(cihaz["abonelik"], yuk, vapid)
-            if sonuc.durum == "ok":
-                basarili = True
-            elif sonuc.durum == "olu":
-                durum["olu_silinen"] += depo.endpoint_sil(cihaz["abonelik"]["endpoint"])
-            else:
-                durum["hatalar"].append(f"{sonuc.kod}: {sonuc.mesaj}"[:160])
-        if basarili:
-            defter.yaz(b.email, b.sinav, b.turler, simdi)
-            durum["gonderilen"] += 1
-    durum["hatalar"] = durum["hatalar"][:5]
-    return _durum_yaz(kok, durum)
+    for b in planla(belge["sinavlar"], alicilar, defter.anahtarlar(), simdi, durum["hatalar"]):
+        try:
+            _bildirim_gonder(b, depo, defter, vapid, gonderici, simdi, durum)
+        except Exception as exc:  # noqa: BLE001 - one failing notification must not stop the round
+            durum["hatalar"].append(_hata_satiri(b.sinav, exc))
+
+
+def gonder_turu(kok: Path, simdi: datetime, gonderici: Callable[..., web_push.GonderimSonucu] | None = None) -> dict:
+    kok = Path(kok)
+    durum = {"son_tur": simdi.isoformat(timespec="seconds"), "kapali": False, "gonderilen": 0,
+             "olu_silinen": 0, "hatalar": [], "abone_kisi": 0}
+    try:
+        _tur(kok, simdi, gonderici, durum)
+    except Exception as exc:  # noqa: BLE001 - the status file must still say what happened
+        durum["hatalar"].append(f"tur: {type(exc).__name__}: {exc}"[:160])
+    finally:
+        durum["hatalar"] = durum["hatalar"][:5]
+        try:
+            _durum_yaz(kok, durum)
+        except OSError as exc:
+            durum["hatalar"] = (durum["hatalar"] + [f"durum yazılamadı: {exc}"[:160]])[:5]
+    return durum
 
 
 def _tohum(kok: Path, emails: list[str], simdi: datetime) -> int:
@@ -239,9 +278,13 @@ def _tohum(kok: Path, emails: list[str], simdi: datetime) -> int:
     eski = defter.anahtarlar()
     sayi = 0
     for s in belge["sinavlar"]:
-        vadeli = vadesi_gelen_turler(s, simdi, sessiz_saat=False)
+        try:
+            vadeli = vadesi_gelen_turler(s, simdi, sessiz_saat=False)
+            sid, surum = s["id"], s["icerik_surumu"]
+        except Exception:  # noqa: BLE001 - a malformed record is skipped, the rest is still seeded
+            continue
         for email in emails:
-            yeni = tuple(t for t in vadeli if (email, s["id"], t, s["icerik_surumu"]) not in eski)
+            yeni = tuple(t for t in vadeli if (email, sid, t, surum) not in eski)
             if yeni:
                 defter.yaz(email, s, yeni, simdi)
                 sayi += len(yeni)
@@ -267,7 +310,8 @@ def main(argv: list[str] | None = None) -> int:
     if komut == ["gonder"]:
         durum = gonder_turu(kok, datetime.now())
         print(json.dumps(durum, ensure_ascii=False))
-        return 0
+        # A round that could not run at all is a failure for systemd; flag-off ("kapali") is not.
+        return 1 if any(h in CALISMAYAN_TUR for h in durum.get("hatalar", [])) else 0
     if komut == ["tohumla"]:
         print(f"tohumlanan uyarı: {tohumla(kok, datetime.now())}")
         return 0
