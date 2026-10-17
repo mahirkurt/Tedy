@@ -627,3 +627,17 @@ def test_b14_paragraflara_yayilan_alinti_konulari_korur():
                                  alinti="Fen yazılısı 21 Ekim Çarşamba günü yapılacak.", konular=["Hücre"])],
                          aday, BUGUN)
     assert b.konular == ["Hücre"]
+
+
+# --- temizlik B düzeltme 1: boş satırlı konu listesi ---------------------------------------
+
+def test_d1_bos_satirli_konu_listesi_tum_unitelerle_kalir():
+    metin = ("Fen yazılısı 21 Ekim Çarşamba günü yapılacak. Konular:\n\nÜnite 1 Hücre\n\nÜnite 2 Kuvvet\n\n"
+             "Ünite 3 Madde\n\nHepinize iyi çalışmalar dilerim, sorularınızı bekliyorum.\n\nÜnite 4 Enerji")
+    aday = Aday(metin, "Fen Bilimleri", date(2026, 10, 12), "ders_karti", [])
+    [b] = uydurma_kapisi([_satir(ders="Fen Bilimleri", tur="yazili", baslik="Fen yazılısı",
+                                 tarih_ifadesi="21 Ekim Çarşamba", tarih="2026-10-21",
+                                 alinti="Fen yazılısı 21 Ekim Çarşamba günü yapılacak.",
+                                 konular=["Ünite 1 Hücre", "Ünite 2 Kuvvet", "Ünite 3 Madde", "Ünite 4 Enerji"])],
+                         aday, BUGUN)
+    assert b.konular == ["Ünite 1 Hücre", "Ünite 2 Kuvvet", "Ünite 3 Madde"]   # stops at the prose paragraph

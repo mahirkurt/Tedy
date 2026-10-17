@@ -202,11 +202,23 @@ def _ayni_paragraf(metin: str, alinti: str, ifade: str) -> bool:
     return any(katla(alinti) in katla(p) and _sozcukle_gecer(ifade, p) for p in _PARAGRAF.split(metin))
 
 
+_LISTE_SATIRI_SINIRI = 80
+
+
+def _liste_satiri(paragraf: str) -> bool:
+    """A paragraph that reads as one item of a list: a single short line, not a sentence."""
+    p = paragraf.strip()
+    return ("\n" not in p and len(p) <= _LISTE_SATIRI_SINIRI and ". " not in p
+            and not re.search(r"[.!?…]$", p))
+
+
 def _konu_bolgesi(metin: str, alinti: str) -> str:
     """Where a quote's topics may come from (folded): the paragraph(s) holding the quote and the
-    one after them. A text announcing two exams must not lend the second one's topics to the
-    first; a list under its announcement (the KTT card's five lines) stays in reach."""
-    paragraflar = [p for p in (katla(x) for x in _PARAGRAF.split(metin)) if p]
+    one after them, then any run of list-item paragraphs ("Konular:\n\nÜnite 1\n\nÜnite 2"),
+    stopping at the first prose paragraph. A text announcing two exams must not lend the second
+    one's topics to the first; a list under its announcement stays in reach."""
+    ham = [x for x in _PARAGRAF.split(metin) if katla(x)]
+    paragraflar = [katla(x) for x in ham]
     bitisler, konum = [], 0
     for p in paragraflar:
         konum += len(p)
@@ -217,7 +229,10 @@ def _konu_bolgesi(metin: str, alinti: str) -> str:
     bas = butun.find(hedef) if hedef else -1
     while bas != -1:
         ilk, son = bisect_right(bitisler, bas), bisect_right(bitisler, bas + len(hedef) - 1)
-        bolge.append(" ".join(paragraflar[ilk:son + 2]))
+        sinir = son + 2
+        while sinir < len(ham) and _liste_satiri(ham[sinir]):
+            sinir += 1
+        bolge.append(" ".join(paragraflar[ilk:sinir]))
         bas = butun.find(hedef, bas + 1)
     return "\n".join(bolge)
 
