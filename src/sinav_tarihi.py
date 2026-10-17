@@ -32,11 +32,21 @@ def _alternatif(sozluk: dict[str, int]) -> str:
     return "|".join(sorted(sozluk, key=len, reverse=True))
 
 
+# Kısa biçimler ("ara", "may", "eki"...) gündelik sözcükle çakışır; yalnızca nokta, yıl ya da
+# gün adı eşlik ederse ay sayılır. Hafta etiketleri (_ETIKET) kısaltmaları olduğu gibi kabul eder.
+_KISA_AYLAR = frozenset({
+    "oca", "sub", "mar", "nis", "may", "haz", "tem", "agu", "eyl", "eki", "kas", "ara",
+    "jan", "feb", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
+})
 _AY = _alternatif(_AYLAR)
 _GUN = _alternatif(_GUNLER)
-_GUN_AY = re.compile(rf"\b(\d{{1,2}})\s+({_AY})\b\.?(?:\s+(\d{{4}}))?")
-_AY_GUN = re.compile(rf"\b({_AY})\s+(\d{{1,2}})(?:st|nd|rd|th)?\b(?:,?\s+(\d{{4}}))?")
-_SAYISAL = re.compile(r"\b(\d{1,2})[./](\d{1,2})(?:[./](\d{4}|\d{2}))?\b")
+_GUN_AY = re.compile(rf"\b(\d{{1,2}})\s+({_AY})\b(\.)?(?:\s+(\d{{4}}))?")
+_AY_GUN = re.compile(rf"\b({_AY})\b(\.)?\s+(\d{{1,2}})(?:st|nd|rd|th)?\b(?:,?\s+(\d{{4}}))?")
+# Kod/ondalık zincirinin (FB.7.1.4, 2.5, 3/4,5) parçası olan sayılar tarih sayılmaz.
+_SAYISAL = re.compile(r"(?<![\w./])(\d{1,2})[./](\d{1,2})(?:[./](\d{4}|\d{2}))?(?!\w)(?![./,]\d)")
+_GUN_ADI_SONRA = re.compile(rf"\s*(?:{_GUN})\b")
+# Yılsız d.m / d/m için tarih ipucu: kesme ekli ('de/'da/'te/'ta), "tarih", "günü" ya da gün adı.
+_TARIH_IPUCU = re.compile(rf"\s*(?:['\u2019](?:de|da|te|ta)|tarih|gunu\b|(?:{_GUN})\b)")
 _GUN_ADI = re.compile(rf"\b({_GUN})\b")
 _GELECEK_HAFTA = re.compile(r"\b(haftaya|gelecek hafta|onumuzdeki hafta|next week)\b")
 _BU_HAFTA = re.compile(r"\b(bu hafta|this week)\b")
@@ -93,7 +103,7 @@ def yayin_tarihi(metin: str) -> date | None:
 
 
 def _acik_tarihler(k: str, baslangic_yili: int) -> list[tuple[int, date]]:
-    """Every explicit date in the folded text, with its position."""
+    """Katlanmış metindeki her açık tarih, konumuyla birlikte."""
     bulunan: list[tuple[int, date]] = []
 
     def yil_sec(ham: str | None, ay: int) -> int:
@@ -103,17 +113,25 @@ def _acik_tarihler(k: str, baslangic_yili: int) -> list[tuple[int, date]]:
         return _yil(ay, baslangic_yili)
 
     for m in _GUN_AY.finditer(k):
+        if (m.group(2) in _KISA_AYLAR and not m.group(3) and not m.group(4)
+                and not _GUN_ADI_SONRA.match(k, m.end())):
+            continue
         ay = _AYLAR[m.group(2)]
-        g = _gun_kur(yil_sec(m.group(3), ay), ay, int(m.group(1)))
+        g = _gun_kur(yil_sec(m.group(4), ay), ay, int(m.group(1)))
         if g:
             bulunan.append((m.start(), g))
     for m in _AY_GUN.finditer(k):
+        if (m.group(1) in _KISA_AYLAR and not m.group(2) and not m.group(4)
+                and not _GUN_ADI_SONRA.match(k, m.end())):
+            continue
         ay = _AYLAR[m.group(1)]
-        g = _gun_kur(yil_sec(m.group(3), ay), ay, int(m.group(2)))
+        g = _gun_kur(yil_sec(m.group(4), ay), ay, int(m.group(3)))
         if g:
             bulunan.append((m.start(), g))
     for m in _SAYISAL.finditer(k):
         gun, ay = int(m.group(1)), int(m.group(2))
+        if not m.group(3) and not _TARIH_IPUCU.match(k, m.end()):
+            continue
         if 1 <= ay <= 12:
             g = _gun_kur(yil_sec(m.group(3), ay), ay, gun)
             if g:

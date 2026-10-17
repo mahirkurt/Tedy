@@ -111,3 +111,46 @@ def test_ara_sozcugu_ay_sanilmaz():
 
 def test_cozulemeyen_ifade_tarih_uydurmaz():
     assert tarih_coz("Yakında bir quiz olacak", date(2026, 10, 12), YIL) == TarihCozumu(None, None, False)
+
+
+def test_kesir_ondalik_kod_ve_saat_tarih_sayilmaz():
+    yayin = date(2026, 10, 5)
+    bos = TarihCozumu(None, None, False)
+    assert tarih_coz("Kesirler 3/4 ve 1/2 konulari KTT", yayin, YIL) == bos
+    assert tarih_coz("FB.7.1.4 kazanımı quiz", yayin, YIL) == bos
+    assert tarih_coz("Sınav saat 9.10 da", yayin, YIL) == bos
+
+
+def test_ondalik_gun_adini_bozmaz():
+    assert tarih_coz("Cuma günü 2.5 saat sınav", date(2026, 10, 5), YIL) \
+        == TarihCozumu(date(2026, 10, 9), None, False)
+
+
+def test_kesir_gercek_tarihi_golgelemez():
+    c = tarih_coz("Sınav 1/2 kesir, 15 Ekim Perşembe", date(2026, 10, 5), YIL)
+    assert c == TarihCozumu(date(2026, 10, 15), None, False)
+
+
+def test_ipuculu_yilsiz_sayisal_tarih_calisir():
+    assert tarih_coz("15.10 Perşembe quiz", date(2026, 10, 5), YIL).gun == date(2026, 10, 15)
+    assert tarih_coz("Sınav 15.10.26 günü", date(2026, 10, 5), YIL).gun == date(2026, 10, 15)
+
+
+def test_ay_kisaltmasi_tek_basina_ay_sayilmaz():
+    yayin = date(2026, 10, 5)
+    assert tarih_coz("Unit 2 may 3 include", yayin, YIL) == TarihCozumu(None, None, False)
+    assert tarih_coz("2 ara sınav", yayin, YIL) == TarihCozumu(None, None, False)
+
+
+def test_ay_kisaltmasi_nokta_yil_ya_da_gun_adiyla_ay_sayilir():
+    yayin = date(2026, 10, 5)
+    assert tarih_coz("Sınav 15 Eki. günü", yayin, YIL).gun == date(2026, 10, 15)
+    assert tarih_coz("15 eki 2026 sınav", yayin, YIL).gun == date(2026, 10, 15)
+    assert tarih_coz("15 eki perşembe sınav", yayin, YIL).gun == date(2026, 10, 15)
+    assert tarih_coz("Quiz Oct. 21", date(2026, 10, 12), YIL).gun == date(2026, 10, 21)
+    assert tarih_coz("Quiz oct 21 Wednesday", date(2026, 10, 12), YIL).gun == date(2026, 10, 21)
+
+
+def test_tam_ay_adi_kisaltma_kurali_disinda():
+    assert tarih_coz("15 Mart sınav", date(2026, 10, 5), YIL).gun == date(2027, 3, 15)
+    assert tarih_coz("March 15 exam", date(2026, 10, 5), YIL).gun == date(2027, 3, 15)
