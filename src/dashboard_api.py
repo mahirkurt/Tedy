@@ -2770,13 +2770,26 @@ def bildirim_abonelik():
     depo = _abonelik_deposu()
     if request.method == "DELETE":
         endpoint = govde.get("endpoint") if isinstance(govde, dict) else None
-        if not isinstance(endpoint, str) or not depo.sil(email, endpoint):
+        try:
+            silindi = isinstance(endpoint, str) and depo.sil(email, endpoint)
+        except OSError:      # a damaged store that cannot be moved aside is never overwritten
+            app.logger.exception("abonelik deposu yazılamadı")
+            return jsonify({"error": "abonelik deposu şu an yazılamıyor"}), 503
+        if not silindi:
             return jsonify({"error": "abonelik bulunamadı"}), 404
         return jsonify({"ok": True})
     from src import web_push
     abonelik = web_push.abonelik_dogrula(govde)
     if abonelik is None:
         return jsonify({"error": "geçersiz abonelik"}), 400
+    # `yenile` is the page's silent re-registration on load. On a shared tablet it must not
+    # take the device from whoever turned alerts on there: only "Bu cihazda aç" (no `yenile`)
+    # moves it. Checked before seeding, so a refused device seeds nothing; ekle checks again
+    # under the lock.
+    yenile = govde.get("yenile") is True
+    sahip = depo.sahibi(abonelik["endpoint"]) if yenile else None
+    if sahip is not None and sahip != email:
+        return jsonify({"sahip_baska": True}), 409
     # A person who turns alerts on gets what happens from now on, not a notification for every
     # exam already known (plan Review Focus 3). Seeded *before* the device is added: added first,
     # a failed seeding would leave a device whose next try is no longer "first" — and the backlog
@@ -2789,8 +2802,56 @@ def bildirim_abonelik():
         except Exception:  # noqa: BLE001 - nothing added: the browser's next try seeds again
             app.logger.exception("sınav uyarısı tohumlanamadı")
             return jsonify({"error": "uyarılar hazırlanamadı"}), 503
-    depo.ekle(email, abonelik)
+    try:
+        depo.ekle(email, abonelik, yenile=yenile)
+    except web_push.SahipBaska:
+        return jsonify({"sahip_baska": True}), 409
+    except OSError:
+        app.logger.exception("abonelik deposu yazılamadı")
+        return jsonify({"error": "abonelik deposu şu an yazılamıyor"}), 503
     return jsonify({"ok": True}), 201
+
+
+# The test notification goes to every device at once and the request ends within this budget
+# whatever the push services do (gunicorn's --timeout is 360 s; one hung service must not hold a
+# gthread worker). web_push.gonder itself gives each device a 10 s request timeout.
+_DENEME_TOPLAM_SN = 15
+_DENEME_ESZAMANLI = 10
+
+
+def _deneme_gonder(cihazlar, yuk, vapid):
+    """{"gonderilen", "basarisiz", "olu", "cihaz"} and the endpoints to drop (dead or invalid)."""
+    from concurrent.futures import ThreadPoolExecutor, wait
+    from src import web_push
+    sayim = {"gonderilen": 0, "basarisiz": 0, "olu": 0, "cihaz": len(cihazlar)}
+    silinecek = []
+    gidecek = []
+    for c in cihazlar:
+        if web_push.kayitli_abonelik_gecerli(c.get("abonelik")):
+            gidecek.append(c)
+        else:                   # stored by older rules or by hand: never dialled, dropped
+            sayim["olu"] += 1
+            silinecek.append(c["abonelik"]["endpoint"])
+    if gidecek:
+        havuz = ThreadPoolExecutor(max_workers=min(len(gidecek), _DENEME_ESZAMANLI))
+        try:
+            isler = {havuz.submit(web_push.gonder, c["abonelik"], yuk, vapid): c for c in gidecek}
+            biten, _ = wait(isler, timeout=_DENEME_TOPLAM_SN)
+            for is_, c in isler.items():
+                if is_ not in biten or is_.exception() is not None:
+                    sayim["basarisiz"] += 1
+                    continue
+                sonuc = is_.result()
+                if sonuc.durum == "ok":
+                    sayim["gonderilen"] += 1
+                elif sonuc.durum == "olu":
+                    sayim["olu"] += 1
+                    silinecek.append(c["abonelik"]["endpoint"])
+                else:
+                    sayim["basarisiz"] += 1
+        finally:
+            havuz.shutdown(wait=False, cancel_futures=True)
+    return sayim, silinecek
 
 
 @app.route("/api/bildirim/deneme", methods=["POST"])
@@ -2809,14 +2870,13 @@ def bildirim_deneme():
         return jsonify({"error": "bu hesapta açık cihaz yok"}), 404
     yuk = {"baslik": "TEDY deneme bildirimi", "govde": "Sınav uyarıları bu cihazda çalışıyor.",
            "etiket": "deneme", "url": "/sinavlar#uyarilar"}
-    gonderilen = 0
-    for c in cihazlar:
-        sonuc = web_push.gonder(c["abonelik"], yuk, vapid)
-        if sonuc.durum == "ok":
-            gonderilen += 1
-        elif sonuc.durum == "olu":
-            depo.endpoint_sil(c.get("abonelik", {}).get("endpoint", ""))
-    return jsonify({"gonderilen": gonderilen})
+    sayim, silinecek = _deneme_gonder(cihazlar, yuk, vapid)
+    for endpoint in silinecek:
+        try:
+            depo.endpoint_sil(endpoint)
+        except OSError:
+            app.logger.exception("ölü abonelik silinemedi")
+    return jsonify(sayim)
 
 
 def _sinav_listesi(data, now=None):

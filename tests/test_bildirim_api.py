@@ -106,7 +106,7 @@ def test_deneme_yalniz_kendi_cihazlarina(ortam):
     assert c.post("/api/bildirim/deneme").status_code == 404           # no device yet
     c.post("/api/bildirim/abonelik", json=GOVDE)
     r = c.post("/api/bildirim/deneme")
-    assert r.get_json() == {"gonderilen": 1}
+    assert r.get_json() == {"gonderilen": 1, "basarisiz": 0, "olu": 0, "cihaz": 1}
     assert [e for e, _ in gonderilen] == [GOVDE["endpoint"]]
     assert gonderilen[0][1]["url"] == "/sinavlar#uyarilar"
 
@@ -140,7 +140,7 @@ def test_tohumlama_eklemeden_once(ortam, monkeypatch):
     monkeypatch.setattr(su, "kisiyi_tohumla", lambda k, email, simdi: sira.append(
         ("tohum", len(wp.AbonelikDeposu(kok / wp.ABONELIKLER).kisinin(email)))) or 0)
     gercek_ekle = wp.AbonelikDeposu.ekle
-    monkeypatch.setattr(wp.AbonelikDeposu, "ekle", lambda self, e, a: sira.append(("ekle", 0)) or gercek_ekle(self, e, a))
+    monkeypatch.setattr(wp.AbonelikDeposu, "ekle", lambda self, e, a, **kw: sira.append(("ekle", 0)) or gercek_ekle(self, e, a, **kw))
     assert c.post("/api/bildirim/abonelik", json=GOVDE).status_code == 201
     assert sira == [("tohum", 0), ("ekle", 0)]
 
@@ -168,4 +168,148 @@ def test_deneme_bozuk_kayitla_patlamaz(ortam):
         TAM, __import__("json").dumps(wp.abonelik_dogrula(GOVDE) and {"endpoint": GOVDE["endpoint"], "keys": GOVDE["keys"]})),
         encoding="utf-8")
     _giris(c, TAM)
-    assert c.post("/api/bildirim/deneme").get_json() == {"gonderilen": 1}
+    assert c.post("/api/bildirim/deneme").get_json() == {"gonderilen": 1, "basarisiz": 0, "olu": 0, "cihaz": 1}
+
+
+# --- temizlik B: depo hatası, ortak tablet, deneme yanıtı ---------------------------------
+
+IKINCI = {**GOVDE, "endpoint": "https://web.push.apple.com/IKI"}
+
+
+def test_b2_depo_yedeklenemezse_503_ve_depo_ezilmez(ortam, monkeypatch):
+    c, kok, *_ = ortam
+    (kok / "output").mkdir()
+    (kok / wp.ABONELIKLER).write_text("{bozuk", encoding="utf-8")
+    monkeypatch.setattr(wp.os, "replace", lambda *a, **k: (_ for _ in ()).throw(PermissionError("ro")))
+    _giris(c, TAM)
+    assert c.post("/api/bildirim/abonelik", json=GOVDE).status_code == 503
+    assert c.delete("/api/bildirim/abonelik", json={"endpoint": GOVDE["endpoint"]}).status_code == 503
+    assert (kok / wp.ABONELIKLER).read_text(encoding="utf-8") == "{bozuk"
+
+
+def test_b6_sessiz_yenileme_baskasinin_cihazini_tasimaz(ortam):
+    c, kok, tohum, _ = ortam
+    depo = wp.AbonelikDeposu(kok / wp.ABONELIKLER)
+    depo.ekle("baska@x", wp.abonelik_dogrula(GOVDE))
+    once = (kok / wp.ABONELIKLER).read_bytes()
+    _giris(c, TAM)
+    r = c.post("/api/bildirim/abonelik", json={**GOVDE, "yenile": True})
+    assert r.status_code == 409 and r.get_json() == {"sahip_baska": True}
+    assert (kok / wp.ABONELIKLER).read_bytes() == once            # store untouched
+    assert tohum == []                                             # nothing added: nothing seeded
+
+
+def test_b6_acikca_acmak_son_aboneye_gecirir(ortam):
+    c, kok, tohum, _ = ortam
+    depo = wp.AbonelikDeposu(kok / wp.ABONELIKLER)
+    depo.ekle("baska@x", wp.abonelik_dogrula(GOVDE))
+    _giris(c, TAM)
+    assert c.post("/api/bildirim/abonelik", json=GOVDE).status_code == 201     # "Bu cihazda aç"
+    assert depo.kisinin("baska@x") == [] and len(depo.kisinin(TAM)) == 1
+    assert tohum == [TAM]
+
+
+def test_b6_sessiz_yenileme_kendi_ya_da_sahipsiz_cihazda_calisir(ortam):
+    c, kok, tohum, _ = ortam
+    depo = wp.AbonelikDeposu(kok / wp.ABONELIKLER)
+    _giris(c, TAM)
+    assert c.post("/api/bildirim/abonelik", json={**GOVDE, "yenile": True}).status_code == 201
+    assert c.post("/api/bildirim/abonelik", json={**GOVDE, "yenile": True}).status_code == 201
+    assert len(depo.kisinin(TAM)) == 1 and tohum == [TAM]
+
+
+def test_b6_yaris_kilit_altinda_da_reddedilir(tmp_path):
+    depo = wp.AbonelikDeposu(tmp_path / "a.json")
+    depo.ekle("baska@x", wp.abonelik_dogrula(GOVDE))
+    with pytest.raises(wp.SahipBaska):
+        depo.ekle(TAM, wp.abonelik_dogrula(GOVDE), yenile=True)
+    assert len(depo.kisinin("baska@x")) == 1 and depo.kisinin(TAM) == []
+
+
+def _iki_cihaz(c, kok):
+    _giris(c, TAM)
+    c.post("/api/bildirim/abonelik", json=GOVDE)
+    c.post("/api/bildirim/abonelik", json=IKINCI)
+
+
+def test_b7_deneme_sayimlari_gecici_hata_ve_olu(ortam, monkeypatch):
+    c, kok, *_ = ortam
+    _iki_cihaz(c, kok)
+    sonuc = {GOVDE["endpoint"]: wp.GonderimSonucu("hata", 503, "geçici"),
+             IKINCI["endpoint"]: wp.GonderimSonucu("olu", 410, "gone")}
+    monkeypatch.setattr(wp, "gonder", lambda abonelik, yuk, vapid, webpush_fn=None: sonuc[abonelik["endpoint"]])
+    r = c.post("/api/bildirim/deneme")
+    assert r.status_code == 200
+    assert r.get_json() == {"gonderilen": 0, "basarisiz": 1, "olu": 1, "cihaz": 2}
+    kalan = [d["abonelik"]["endpoint"] for d in wp.AbonelikDeposu(kok / wp.ABONELIKLER).kisinin(TAM)]
+    assert kalan == [GOVDE["endpoint"]]                            # the dead one is gone, the 5xx one stays
+
+
+def test_b7_deneme_istisna_basarisiz_sayilir(ortam, monkeypatch):
+    c, kok, *_ = ortam
+    _iki_cihaz(c, kok)
+
+    def gonder(abonelik, yuk, vapid, webpush_fn=None):
+        if abonelik["endpoint"] == IKINCI["endpoint"]:
+            raise RuntimeError("beklenmedik")
+        return wp.GonderimSonucu("ok", 201, "")
+    monkeypatch.setattr(wp, "gonder", gonder)
+    assert c.post("/api/bildirim/deneme").get_json() == {"gonderilen": 1, "basarisiz": 1, "olu": 0, "cihaz": 2}
+
+
+def test_b7_deneme_cihazlara_paralel_gider(ortam, monkeypatch):
+    import threading
+    c, kok, *_ = ortam
+    _iki_cihaz(c, kok)
+    engel = threading.Barrier(2, timeout=3)
+
+    def gonder(abonelik, yuk, vapid, webpush_fn=None):
+        engel.wait()                   # sequential sending would break the barrier
+        return wp.GonderimSonucu("ok", 201, "")
+    monkeypatch.setattr(wp, "gonder", gonder)
+    assert c.post("/api/bildirim/deneme").get_json() == {"gonderilen": 2, "basarisiz": 0, "olu": 0, "cihaz": 2}
+
+
+def test_b7_deneme_toplam_sureyi_asmaz(ortam, monkeypatch):
+    import threading
+    import time as _time
+    c, kok, *_ = ortam
+    _iki_cihaz(c, kok)
+    serbest = threading.Event()
+    monkeypatch.setattr(api, "_DENEME_TOPLAM_SN", 0.3)
+
+    def gonder(abonelik, yuk, vapid, webpush_fn=None):
+        if abonelik["endpoint"] == IKINCI["endpoint"]:
+            serbest.wait(5)                # a push service that hangs
+        return wp.GonderimSonucu("ok", 201, "")
+    monkeypatch.setattr(wp, "gonder", gonder)
+    bas = _time.monotonic()
+    try:
+        r = c.post("/api/bildirim/deneme")
+        sure = _time.monotonic() - bas
+    finally:
+        serbest.set()
+    assert r.get_json() == {"gonderilen": 1, "basarisiz": 1, "olu": 0, "cihaz": 2}
+    assert sure < 2
+
+
+def test_b7_toplam_sure_gunicorn_zaman_asimindan_kisa():
+    import re as _re
+    from pathlib import Path as _P
+    birim = (_P(__file__).resolve().parents[1] / "ted-dashboard.service").read_text(encoding="utf-8")
+    zaman_asimi = int(_re.search(r"--timeout (\d+)", birim).group(1))
+    assert api._DENEME_TOPLAM_SN <= 15 < zaman_asimi
+
+
+def test_b5_deneme_gecersiz_kayitli_ucu_gondermez_siler(ortam):
+    import json as _json
+    c, kok, _, gonderilen = ortam
+    (kok / "output").mkdir()
+    kotu = {"abonelik": {"endpoint": "https://evil.example/x", "keys": GOVDE["keys"]}, "cihaz": "?"}
+    iyi = {"abonelik": {"endpoint": GOVDE["endpoint"], "keys": GOVDE["keys"]}, "cihaz": "Android"}
+    (kok / wp.ABONELIKLER).write_text(_json.dumps({"kisiler": {TAM: [kotu, iyi]}}), encoding="utf-8")
+    _giris(c, TAM)
+    assert c.post("/api/bildirim/deneme").get_json() == {"gonderilen": 1, "basarisiz": 0, "olu": 1, "cihaz": 2}
+    assert [e for e, _ in gonderilen] == [GOVDE["endpoint"]]
+    assert [d["abonelik"]["endpoint"] for d in wp.AbonelikDeposu(kok / wp.ABONELIKLER).kisinin(TAM)] == [
+        GOVDE["endpoint"]]

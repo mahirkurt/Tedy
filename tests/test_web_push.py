@@ -229,3 +229,78 @@ def test_depo_bozuk_yedekler_zamaniyla(tmp_path):
     d.ekle("isik@x", abonelik_dogrula(abonelik()))
     (tmp_path / "a.json.bozuk-xyz").write_text("", encoding="utf-8")     # a name we did not write: ignored
     assert d.bozuk_yedekler() == [datetime(2026, 10, 17, 9, 8, 7)]
+
+
+# --- temizlik B: depo yedeği ---------------------------------------------------------
+
+SABIT = datetime(2026, 10, 17, 9, 8, 7)
+
+
+def test_b1_yedek_adi_cakisirsa_ek_alir(tmp_path):
+    yol = tmp_path / "a.json"
+    d = AbonelikDeposu(yol, simdi=lambda: SABIT)
+    yol.write_text("{bozuk1", encoding="utf-8")
+    d.ekle("isik@x", abonelik_dogrula(abonelik()))
+    yol.write_text("{bozuk2", encoding="utf-8")
+    d.ekle("isik@x", abonelik_dogrula(abonelik()))
+    yol.write_text("{bozuk3", encoding="utf-8")
+    d.sil("isik@x", "https://fcm.googleapis.com/fcm/send/abc")
+    assert (tmp_path / "a.json.bozuk-20261017090807").read_text(encoding="utf-8") == "{bozuk1"
+    assert (tmp_path / "a.json.bozuk-20261017090807-1").read_text(encoding="utf-8") == "{bozuk2"
+    assert (tmp_path / "a.json.bozuk-20261017090807-2").read_text(encoding="utf-8") == "{bozuk3"
+    assert d.bozuk_yedekler() == [SABIT, SABIT, SABIT]
+
+
+def test_b2_yedeklenemezse_depo_ezilmez(tmp_path, monkeypatch):
+    import src.web_push as wp
+    yol = tmp_path / "a.json"
+    yol.write_text("{bozuk", encoding="utf-8")
+    d = AbonelikDeposu(yol, simdi=lambda: SABIT)
+
+    def bozuk_replace(*a, **k):
+        raise PermissionError("salt okunur")
+    monkeypatch.setattr(wp.os, "replace", bozuk_replace)
+    with pytest.raises(OSError):
+        d.ekle("isik@x", abonelik_dogrula(abonelik()))
+    with pytest.raises(OSError):
+        d.endpoint_sil("https://fcm.googleapis.com/fcm/send/abc")
+    with pytest.raises(OSError):
+        d.sil("isik@x", "https://fcm.googleapis.com/fcm/send/abc")
+    assert yol.read_text(encoding="utf-8") == "{bozuk"
+    assert list(tmp_path.glob("a.json.bozuk-*")) == []
+
+
+@pytest.mark.parametrize("ic", [
+    {"isik@x": [{"abonelik": "x"}]},                                   # device not a subscription dict
+    {"isik@x": [{"abonelik": {"keys": {}}}]},                          # no endpoint
+    {"isik@x": ["y"]},                                                  # device not a dict
+    {"isik@x": "x"},                                                    # person's devices not a list
+])
+def test_b3_gecersiz_ic_kayit_mutasyondan_once_yedeklenir(tmp_path, ic):
+    yol = tmp_path / "a.json"
+    gecerli = {"abonelik": {"endpoint": "https://web.push.apple.com/Q", "keys": {"p256dh": P256, "auth": AUTH}},
+               "cihaz": "iPhone", "eklendi": "2026-10-01T10:00:00"}
+    icerik = {"kisiler": {"anne@x": [gecerli], **ic}}
+    yol.write_text(json.dumps(icerik), encoding="utf-8")
+    d = AbonelikDeposu(yol, simdi=lambda: SABIT)
+    assert d.hepsi() == {"anne@x": [gecerli]} and d.son_okuma_bozuk is False   # still readable
+    d.ekle("isik@x", abonelik_dogrula(abonelik()))
+    assert json.loads((tmp_path / "a.json.bozuk-20261017090807").read_text(encoding="utf-8")) == icerik
+    assert set(d.hepsi()) == {"anne@x", "isik@x"}
+
+
+def test_b3_temiz_depo_yedeklenmez(tmp_path):
+    yol = tmp_path / "a.json"
+    d = AbonelikDeposu(yol, simdi=lambda: SABIT)
+    d.ekle("isik@x", abonelik_dogrula(abonelik()))
+    d.ekle("anne@x", abonelik_dogrula(abonelik("https://web.push.apple.com/Q")))
+    assert list(tmp_path.glob("a.json.bozuk-*")) == []
+
+
+def test_b4_cok_derin_json_bozuk_sayilir(tmp_path):
+    yol = tmp_path / "a.json"
+    yol.write_text("[" * 200000, encoding="utf-8")
+    d = AbonelikDeposu(yol, simdi=lambda: SABIT)
+    assert d.hepsi() == {} and d.son_okuma_bozuk is True
+    d.ekle("isik@x", abonelik_dogrula(abonelik()))
+    assert (tmp_path / "a.json.bozuk-20261017090807").read_text(encoding="utf-8") == "[" * 200000

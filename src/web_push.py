@@ -112,6 +112,18 @@ def abonelik_dogrula(govde: Any) -> dict | None:
             "cihaz": cihaz}
 
 
+def kayitli_abonelik_gecerli(abonelik: Any) -> bool:
+    """A stored subscription is checked again before every send: the store may hold a record
+    written by older rules or by hand, and its endpoint is a URL the server would dial."""
+    if not isinstance(abonelik, dict):
+        return False
+    return abonelik_dogrula({"endpoint": abonelik.get("endpoint"), "keys": abonelik.get("keys")}) is not None
+
+
+class SahipBaska(Exception):
+    """A silent re-registration found the endpoint registered to someone else: it is not moved."""
+
+
 class EkleSonucu(NamedTuple):
     yeni_cihaz: bool    # this endpoint was not among the person's devices
     ilk_cihaz: bool     # the person had no device at all before this call (decided under the lock)
@@ -140,36 +152,44 @@ class AbonelikDeposu:
             fcntl.flock(kilit, fcntl.LOCK_EX)
             yield
 
-    def _oku_ham(self) -> tuple[dict[str, list[dict]], bool]:
-        """(people, unreadable). Unreadable means the file exists but is not what we wrote:
-        not UTF-8, not JSON, or JSON of the wrong top-level shape."""
-        kisiler, bozuk = self._coz()
-        self.son_okuma_bozuk = bozuk
-        return kisiler, bozuk
+    def _oku_ham(self) -> tuple[dict[str, list[dict]], str | None]:
+        """(people, damage). Damage is "bozuk" when the file exists but is not what we wrote
+        (not UTF-8, not JSON, too deeply nested to parse, or the wrong top-level shape), and
+        "kirli" when the shape is right but some inner records are not (a device that is not a
+        subscription): those are left out of the reading, so a write must keep the original."""
+        kisiler, hasar = self._coz()
+        self.son_okuma_bozuk = hasar == "bozuk"
+        return kisiler, hasar
 
-    def _coz(self) -> tuple[dict[str, list[dict]], bool]:
+    def _coz(self) -> tuple[dict[str, list[dict]], str | None]:
         try:
             metin = self.yol.read_text(encoding="utf-8")
         except UnicodeDecodeError:
-            return {}, True
+            return {}, "bozuk"
         except OSError:
-            return {}, False
+            return {}, None
         try:
             veri = json.loads(metin)
-        except ValueError:
-            return {}, True
+        except (ValueError, RecursionError):
+            return {}, "bozuk"
         kisiler = veri.get("kisiler") if isinstance(veri, dict) else None
         if not isinstance(kisiler, dict):
-            return {}, True
-        return {e: [c for c in v if _gecerli_cihaz(c)] for e, v in kisiler.items()
-                if isinstance(e, str) and isinstance(v, list)}, False
+            return {}, "bozuk"
+        temiz = {e: [c for c in v if _gecerli_cihaz(c)] for e, v in kisiler.items()
+                 if isinstance(e, str) and isinstance(v, list)}
+        kirli = len(temiz) != len(kisiler) or any(len(temiz[e]) != len(kisiler[e]) for e in temiz)
+        return temiz, ("kirli" if kirli else None)
 
     def bozuk_yedekler(self) -> list[datetime]:
-        """When each unreadable store was moved aside (from the `.bozuk-<stamp>` names), oldest first."""
+        """When each damaged store was moved aside (from the `.bozuk-<stamp>[-n]` names), oldest first."""
+        desen = re.compile(re.escape(self.yol.name) + r"\.bozuk-(\d{14})(?:-\d+)?")
         zamanlar = []
         for yol in self.yol.parent.glob(f"{self.yol.name}.bozuk-*"):
+            eslesme = desen.fullmatch(yol.name)
+            if not eslesme:
+                continue
             try:
-                zamanlar.append(datetime.strptime(yol.name.rsplit("-", 1)[1], "%Y%m%d%H%M%S"))
+                zamanlar.append(datetime.strptime(eslesme.group(1), "%Y%m%d%H%M%S"))
             except ValueError:
                 continue
         return sorted(zamanlar)
@@ -177,22 +197,38 @@ class AbonelikDeposu:
     def _oku(self) -> dict[str, list[dict]]:
         return self._oku_ham()[0]
 
+    def _yedek_yolu(self) -> Path:
+        temel = f"{self.yol.name}.bozuk-{self.simdi().strftime('%Y%m%d%H%M%S')}"
+        yedek, n = self.yol.with_name(temel), 0
+        while yedek.exists():      # under the lock: a second damage in the same second keeps the first copy
+            n += 1
+            yedek = self.yol.with_name(f"{temel}-{n}")
+        return yedek
+
     def _oku_yazmak_icin(self) -> dict[str, list[dict]]:
-        """Under the lock: an unreadable file is moved aside, never silently overwritten."""
-        kisiler, bozuk = self._oku_ham()
-        if bozuk:
-            yedek = self.yol.with_name(f"{self.yol.name}.bozuk-{self.simdi().strftime('%Y%m%d%H%M%S')}")
-            try:
-                os.replace(self.yol, yedek)
-            except OSError:
-                pass
+        """Under the lock: a damaged file is moved aside, never silently overwritten. If it cannot
+        be moved aside the OSError propagates and nothing is written (the caller fails loudly)."""
+        kisiler, hasar = self._oku_ham()
+        if hasar:
+            os.replace(self.yol, self._yedek_yolu())
         return kisiler
 
     def _yaz(self, kisiler: dict[str, list[dict]]) -> None:
         atomic_json_dump({"kisiler": {e: v for e, v in kisiler.items() if v}}, str(self.yol))
 
-    def ekle(self, email: str, abonelik: dict) -> EkleSonucu:
+    def sahibi(self, endpoint: str) -> str | None:
+        return next((e for e, cihazlar in self._oku().items() if any(_endpoint(c) == endpoint for c in cihazlar)),
+                    None)
+
+    def ekle(self, email: str, abonelik: dict, yenile: bool = False) -> EkleSonucu:
+        """`yenile` is the dashboard's silent re-registration on page load: it never takes a
+        device from another person (SahipBaska, nothing written). Without it — the reader pressed
+        "Bu cihazda aç" — the device moves to whoever subscribed on it last."""
         with self._kilitli():
+            if yenile:
+                sahip = self.sahibi(abonelik["endpoint"])
+                if sahip is not None and sahip != email:
+                    raise SahipBaska(sahip)
             kisiler = self._oku_yazmak_icin()
             # One endpoint is one device: a tablet shared by two people belongs to whoever
             # subscribed on it last, or it would ring once per person who ever used it.
