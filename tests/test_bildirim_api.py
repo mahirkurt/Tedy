@@ -347,9 +347,10 @@ def test_d1_deneme_tek_sinirli_havuzu_kullanir(ortam, monkeypatch):
             simdi[0] -= 1
         return wp.GonderimSonucu("ok", 201, "")
     monkeypatch.setattr(wp, "gonder", gonder)
+    assert c.post("/api/bildirim/deneme").get_json()["gonderilen"] == wp.CIHAZ_SINIRI
     havuz = api._DENEME_HAVUZU
-    for _ in range(2):
-        assert c.post("/api/bildirim/deneme").get_json()["gonderilen"] == wp.CIHAZ_SINIRI
+    assert havuz is not None
+    assert c.post("/api/bildirim/deneme").get_json()["gonderilen"] == wp.CIHAZ_SINIRI
     assert api._DENEME_HAVUZU is havuz
     assert 1 < en_cok[0] <= api._DENEME_ESZAMANLI == 8
     assert len(isimler) <= 8 and all(n.startswith("bildirim-deneme") for n in isimler)
