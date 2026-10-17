@@ -90,8 +90,9 @@ test('anahtar aynı mı: tarayıcı anahtarı göstermiyorsa abonelik yenilenmez
 })
 
 test('deneme: 0 cihaz başarı gibi söylenmez', () => {
-  assert.deepEqual(denemeBilgisi(2), { tur: 'success', metin: 'Deneme bildirimi 2 cihaza gönderildi.' })
-  const sifir = denemeBilgisi(0)
+  assert.deepEqual(denemeBilgisi({ gonderilen: 2, basarisiz: 0, olu: 0, cihaz: 2 }),
+    { tur: 'success', metin: 'Deneme bildirimi 2 cihaza gönderildi.' })
+  const sifir = denemeBilgisi({ gonderilen: 0, basarisiz: 0, olu: 0, cihaz: 0 })
   assert.equal(sifir.tur, 'error')
   assert.equal(sifir.metin, CIHAZ_YOK_METNI)
   assert.match(CIHAZ_YOK_METNI, /hiçbir cihaza ulaşmadı/)

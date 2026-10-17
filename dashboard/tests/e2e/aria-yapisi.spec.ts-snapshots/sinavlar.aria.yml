@@ -1,5 +1,9 @@
 - main:
   - heading "Sınavlar" [level=1]
+  - region "Sınav uyarıları":
+    - heading "Sınav uyarıları" [level=2]
+    - paragraph: Bu cihazda kapalı.
+    - button "Bu cihazda aç"
   - heading "Yaklaşan sınavlar (2)" [level=2]
   - text: /Matematik 1\. Yazılı 1 Eki \d+:\d+ 6g \d+[hmsp]+ Özdebir Gelişim İzleme Sınavı GİS · İzleme Sınavı \d+ Eki \d+:\d+ 28g \d+[hmsp]+/
   - heading "Geçmiş sınavlar (1)" [level=2]
