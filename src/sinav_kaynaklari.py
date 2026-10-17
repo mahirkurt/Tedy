@@ -37,14 +37,14 @@ class Aday:
 
     @property
     def anahtar(self) -> str:
-        """The candidate's identity (de-duplication, model cache): the same text posted in two
-        courses is two candidates — each is read with its own course."""
+        """Course + folded text. De-duplication and the model cache go by `metin_anahtari`
+        (one reading per text); this names a candidate together with its course."""
         return hashlib.sha256(f"{self.ders or ''}\x1f{katla(self.metin)}".encode("utf-8")).hexdigest()
 
     @property
     def metin_anahtari(self) -> str:
-        """The folded text alone. An undated record's id hashes this beside the course, so the
-        id did not move when `anahtar` took the course in (temizlik A7)."""
+        """The folded text alone: the candidate's identity (de-duplication, model cache) and,
+        beside the course, an undated record's id."""
         return hashlib.sha256(katla(self.metin).encode("utf-8")).hexdigest()
 
 
@@ -134,15 +134,19 @@ def _duyurular(veri: dict) -> list[Aday]:
 
 
 def _birlestir(liste: list[Aday]) -> list[Aday]:
+    # One candidate per text. The same text in two course tabs is a shared announcement: its
+    # course is None, so the gate takes the course from the model when its word is in the text.
     tekil: dict[str, Aday] = {}
     for a in liste:
-        if a.anahtar in tekil:
-            tekil[a.anahtar].konumlar.extend(k for k in a.konumlar if k not in tekil[a.anahtar].konumlar)
-            # Keep earliest non-None yayin
-            if a.yayin is not None and (tekil[a.anahtar].yayin is None or a.yayin < tekil[a.anahtar].yayin):
-                tekil[a.anahtar].yayin = a.yayin
-        else:
-            tekil[a.anahtar] = Aday(a.metin, a.ders, a.yayin, a.tur, list(a.konumlar))
+        o = tekil.get(a.metin_anahtari)
+        if o is None:
+            tekil[a.metin_anahtari] = Aday(a.metin, a.ders, a.yayin, a.tur, list(a.konumlar))
+            continue
+        o.konumlar.extend(k for k in a.konumlar if k not in o.konumlar)
+        if o.ders != a.ders:
+            o.ders = None
+        if a.yayin is not None and (o.yayin is None or a.yayin < o.yayin):   # earliest known date
+            o.yayin = a.yayin
     kalan = list(tekil.values())
     katli = {id(a): katla(a.metin) for a in kalan}
     sonuc = []

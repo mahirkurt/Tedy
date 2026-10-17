@@ -189,10 +189,16 @@ def _saat(ham: Any, alinti: str) -> str | None:
     return None
 
 
+def _sozcukle_gecer(parca: str, butun: str) -> bool:
+    """`parca` in `butun` on word boundaries, both folded: "this week" is not in "this weekend",
+    "bu hafta" is not in "bu haftaki"."""
+    k = katla(parca)
+    return bool(k) and re.search(rf"(?<![0-9a-z]){re.escape(k)}(?![0-9a-z])", katla(butun)) is not None
+
+
 def _ayni_paragraf(metin: str, alinti: str, ifade: str) -> bool:
     """Whether the quote and the date phrase sit in one paragraph (a block between blank lines)."""
-    ka, ki = katla(alinti), katla(ifade)
-    return any(ka in katla(p) and ki in katla(p) for p in _PARAGRAF.split(metin))
+    return any(katla(alinti) in katla(p) and _sozcukle_gecer(ifade, p) for p in _PARAGRAF.split(metin))
 
 
 def uydurma_kapisi(satirlar: list[dict], aday: Aday, bugun: date, yayin: date | None = None) -> list[Bulgu]:
@@ -213,7 +219,7 @@ def uydurma_kapisi(satirlar: list[dict], aday: Aday, bugun: date, yayin: date | 
         # Tarih ifadesi ancak alıntının içindeyse kullanılır: aynı metnin başka bir cümlesindeki
         # tarih (ör. veli toplantısı) sınava bağlanmaz.
         ifade = str(s.get("tarih_ifadesi") or "").strip()
-        alintida = bool(ifade) and katla(ifade) in katla(alinti)
+        alintida = bool(ifade) and _sozcukle_gecer(ifade, alinti)
         cozum = tarih_coz(ifade if alintida else alinti, yayin, aralik, goreli=goreli)
         if (ifade and not alintida and cozum == TarihCozumu(None, None, False)
                 and _ayni_paragraf(aday.metin, alinti, ifade)):
@@ -292,10 +298,25 @@ class SinavCikarici:
         except (OSError, ValueError):
             veri = {}
         self._onbellek: dict[str, Any] = veri if isinstance(veri, dict) else {}
+        self._tasindi = False
 
     def _anahtar(self, aday: Aday) -> str:
         # The model is part of the key: another model's reading is not this one's (temizlik A12).
-        return f"{ISTEM_SURUMU}:{self.okuyucu.model}:{aday.anahtar}"
+        # The text, not the course: the same post read once, wherever it is pinned.
+        return f"{ISTEM_SURUMU}:{self.okuyucu.model}:{aday.metin_anahtari}"
+
+    def _onbellekten(self, parca: Aday, tek_parca: bool) -> dict | None:
+        """The cache entry for a part. Before the model joined the key it was
+        `ISTEM_SURUMU:<text hash>` and covered the first METIN_SINIRI characters only: a
+        single-part candidate reuses such an entry and moves it under the new key."""
+        anahtar = self._anahtar(parca)
+        kayit = self._onbellek.get(anahtar)
+        if kayit is None and tek_parca:
+            eski = self._onbellek.get(f"{ISTEM_SURUMU}:{parca.metin_anahtari}")
+            if isinstance(eski, dict) and isinstance(eski.get("satirlar"), list):
+                self._onbellek[anahtar] = kayit = dict(eski)
+                self._tasindi = True
+        return kayit
 
     def _hata_tazelendi(self, kayit: dict) -> bool:
         """A billed failure is retried once it is a week old; an unreadable stamp is retried."""
@@ -323,10 +344,12 @@ class SinavCikarici:
                 satirlar: list = []
                 okunan = okunamayan = 0
                 onceki_okuma: date | None = None
-                for parca in _parcalar(aday):
+                parcalar = _parcalar(aday)
+                for parca in parcalar:
                     anahtar = self._anahtar(parca)
-                    kayit = self._onbellek.get(anahtar)
-                    if isinstance(kayit, dict) and isinstance(kayit.get("satirlar"), list):
+                    kayit = self._onbellekten(parca, len(parcalar) == 1)
+                    gecerli = isinstance(kayit, dict) and isinstance(kayit.get("satirlar"), list)
+                    if gecerli:
                         if not kayit.get("hata"):
                             satirlar += kayit["satirlar"]
                             okunan += 1
@@ -339,9 +362,10 @@ class SinavCikarici:
                             okunamayan += 1
                             hatalar.append(str(kayit["hata"])[:120])
                             continue
-                    if eski:
+                    if eski and not gecerli:
                         # Too old to ask about for the first time: skipped silently, not "unread"
-                        # (nothing was missed that the list could still have shown).
+                        # (nothing was missed that the list could still have shown). A failure whose
+                        # week is over was asked before, so it is asked again whatever its age.
                         continue
                     kalan = bitis - self.saat()
                     if kalan < CAGRI_EN_AZ_SURE or not self.defter.izin_var():
@@ -380,7 +404,7 @@ class SinavCikarici:
                     if b not in bulgular:
                         bulgular.append(b)
         finally:  # ücreti ödenmiş sonuçlar bir istisnada bile kaybolmasın
-            if degisti or not self._onbellek_yolu.exists():
+            if degisti or self._tasindi or not self._onbellek_yolu.exists():
                 atomic_json_dump(self._onbellek, str(self._onbellek_yolu))
         return CikarimSonucu(bulgular, len(adaylar) - atlanan, incelenen, incelenmedi,
                              round(self.defter.harcanan(), 6), hatalar)

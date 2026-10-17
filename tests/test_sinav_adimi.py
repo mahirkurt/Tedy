@@ -264,3 +264,22 @@ def test_a22_main_saglikta_sinav_anahtarlarini_yazar(tmp_path, monkeypatch):
     saglik = json.loads((out / "health.json").read_text(encoding="utf-8"))
     assert saglik["sinav_tespiti"]["sinav"] == 1 and saglik["sinav_tespiti"]["aday"] == 3
     assert saglik["sinav_uyari"] == {"son_tur": "2026-10-16T10:00:00", "gonderilen": 1}
+
+
+
+def test_d4_iki_ders_sekmesindeki_ayni_ilan_tek_cagri_tek_kayit(tmp_path):
+    from tests.sinav_fikstur import KTT_KARTI
+    veri = {"ders_icerikleri_haftalar": {"4. Hafta 05 Eki. - 11 Eki.": {
+                "Matematik": {"cards": [KTT_KARTI], "items": [], "text": ""},
+                "Fen Bilimleri": {"cards": [KTT_KARTI], "items": [], "text": ""}}},
+            "ders_icerikleri": {}, "odevlerim": {"homework": {"rows": []}},
+            "duyurular": {"announcements": []}, "takvim": []}
+    okuyucu = _sahte_okuyucu()
+    cagrilar = []
+    gercek_oku = okuyucu.oku
+    okuyucu.oku = lambda aday, bugun, zaman_asimi: cagrilar.append(aday) or gercek_oku(aday, bugun, zaman_asimi)
+    belge = GERCEK_TESPIT(tmp_path, veri, [], datetime(2026, 10, 6, 10), time.monotonic() + 60, okuyucu=okuyucu)
+    assert len(cagrilar) == 1
+    [k] = belge["sinavlar"]
+    assert (k["ders"], k["tarih"]) == ("Matematik", "2026-10-15")
+    assert sorted(x["konum"]["ders"] for x in k["kaynaklar"]) == ["Fen Bilimleri", "Matematik"]

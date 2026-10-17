@@ -241,12 +241,19 @@ def test_a7_anahtar_dersi_icerir_ayni_metin_iki_derste_iki_aday():
     assert a.anahtar != b.anahtar and len(a.anahtar) == 64
     # The record id of an undated finding hashes the text alone (it already carries the course).
     assert a.metin_anahtari == b.metin_anahtari
+
+
+
+def test_d4_ayni_metin_iki_ders_sekmesinde_ortak_duyuru():
+    """The same post in two course tabs is one announcement: one candidate, every position, no
+    course of its own (the gate takes the course from the model when its word is in the text)."""
     veri = haftalar_verisi()
     hafta = veri["ders_icerikleri_haftalar"]["4. Hafta 05 Eki. - 11 Eki."]
     hafta["Türkçe"] = {"cards": ["Cuma günü quiz"], "items": [], "text": ""}
     hafta["Sosyal Bilgiler"] = {"cards": ["Cuma günü quiz"], "items": [], "text": ""}
-    iki = [x for x in adaylar(veri, BUGUN) if x.metin == "Cuma günü quiz"]
-    assert sorted(x.ders for x in iki) == ["Sosyal Bilgiler", "Türkçe"]
+    [ortak] = [x for x in adaylar(veri, BUGUN) if x.metin == "Cuma günü quiz"]
+    assert ortak.ders is None and ortak.tur == "ders_karti"
+    assert sorted(k["ders"] for k in ortak.konumlar) == ["Sosyal Bilgiler", "Türkçe"]
 
 
 @pytest.mark.parametrize("bozuk", ["Matematik quiz Cuma", None, {"x": "Matematik quiz"}, 7])
