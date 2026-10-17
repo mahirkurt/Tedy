@@ -4632,8 +4632,10 @@ Bu görevde kod yazılmaz; her adım **kullanıcının açık onayını** bekler
 
 ```bash
 cd /mnt/thunderbolt/workspaces/TED/.claude/worktrees/sinav-uyari    # worktree'nin kodu, canlı veri
-.venv/bin/python -c "import pathlib, src.sinav_tespiti as st; st.PROJE_KOKU = pathlib.Path('/mnt/thunderbolt/workspaces/TED'); raise SystemExit(st.main(['--kuru', '--sure', '300']))" > /tmp/sinav-kuru.txt 2>&1; tail -60 /tmp/sinav-kuru.txt
+.venv/bin/python -c "import pathlib, src.dashboard_api as api, src.sinav_tespiti as st; api.OUTPUT_DIR = '/mnt/thunderbolt/workspaces/TED/output'; st.PROJE_KOKU = pathlib.Path('/mnt/thunderbolt/workspaces/TED'); raise SystemExit(st.main(['--kuru', '--sure', '300']))" > /tmp/sinav-kuru.txt 2>&1; tail -60 /tmp/sinav-kuru.txt
 ```
+
+`api.OUTPUT_DIR` de canlı `output/`'a yönlendirilir: aksi halde `_guncel_ogretim_yili()` worktree'nin boş `output/`'unu okur ve geçen yılın not raporu bu yılın sentetik sınavları gibi görünür. `--kuru` bir senkron kilidi tutarken 2 koduyla çıkar (senkron bitince yeniden dene).
 
 Kod worktree'den, veri canlı `output/scraped_data.json` ve portal eklerinden okunur; önbellek (`sinav_cikarim_onbellegi.json`) ve bütçe defteri **canlı** `output/`'a yazılır (bir sonraki gerçek tespit aynı metinler için ücret ödemez), `sinavlar.json` yazılmaz — bu, onay sorusunda kullanıcıya söylenir. Sonucu kullanıcıya göster: bulunan sınavlar, tarihleri, konuları, kaynakları; Matematik KTT (15 Ekim, beş konu), Fen quiz (5 Ekim haftası), İngilizce quiz'ler, GİS-1/GİS-2, Türkçe Ortak Yazılı, Sebit TM/FS beklenir. Kaçan ya da yanlış varsa kural/istem düzeltilir (yeni TDD döngüsü), kuru koşu tekrarlanır.
 
