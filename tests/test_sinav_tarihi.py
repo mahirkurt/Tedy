@@ -154,3 +154,8 @@ def test_ay_kisaltmasi_nokta_yil_ya_da_gun_adiyla_ay_sayilir():
 def test_tam_ay_adi_kisaltma_kurali_disinda():
     assert tarih_coz("15 Mart sınav", date(2026, 10, 5), YIL).gun == date(2027, 3, 15)
     assert tarih_coz("March 15 exam", date(2026, 10, 5), YIL).gun == date(2027, 3, 15)
+
+
+def test_gecmis_acik_tarih_gun_adini_ileriye_cozmez():
+    c = tarih_coz("15 Ekim Perşembe günü yapılan KTT sonuçları açıklandı", date(2026, 10, 16), YIL)
+    assert c == TarihCozumu(None, None, True)

@@ -21,7 +21,7 @@ from src import claude_api
 from src.course_names import normalize_course
 from src.json_utils import atomic_json_dump
 from src.ocr_katmani import OcrDefteri
-from src.sinav_kaynaklari import Aday
+from src.sinav_kaynaklari import Aday, on_suzgec
 from src.sinav_tarihi import katla, okul_yili, tarih_coz
 
 ISTEM_SURUMU = 1
@@ -48,6 +48,8 @@ CIKARIM_SEMASI = {
         }}}},
 }
 _SAAT = re.compile(r"^(\d{1,2})[:.](\d{2})$")
+_SAAT_ONCE = re.compile(r"[\d./:]$")
+_SAAT_SONRA = re.compile(r"^[\d./:]\d?")
 _SOZCUK = re.compile(r"[0-9a-z]{3,}")
 
 ISTEM = """Sen bir okul duyurusu okuyucususun. Aşağıdaki metin 7. sınıf öğrencisi Işık'ın okul portalından.
@@ -79,7 +81,13 @@ METİN:
 
 
 class CikarimHatasi(RuntimeError):
-    """The model call failed or answered something unusable; nothing is cached."""
+    """The model call failed or answered something unusable. `faturalandi` means a response
+    came back (so it was billed): `girdi`/`cikti` carry its tokens and the caller must book
+    them and remember the failure; a network/config error carries 0 and is simply retried."""
+
+    def __init__(self, mesaj: str, girdi: int = 0, cikti: int = 0, faturalandi: bool = False):
+        super().__init__(mesaj)
+        self.girdi, self.cikti, self.faturalandi = girdi, cikti, faturalandi
 
 
 @dataclass
@@ -105,16 +113,20 @@ class ClaudeSinavOkuyucu:
                 output_config={"format": {"type": "json_schema", "schema": CIKARIM_SEMASI}})
         except Exception as e:  # anthropic.APIError, ClaudeYapilandirilmamis, timeouts
             raise CikarimHatasi(str(e)[:120] or type(e).__name__) from e
-        if getattr(yanit, "stop_reason", "") == "refusal":
-            raise CikarimHatasi("model reddetti")
+        kullanim = getattr(yanit, "usage", None)
+        girdi = int(getattr(kullanim, "input_tokens", 0) or 0)
+        cikti = int(getattr(kullanim, "output_tokens", 0) or 0)
+        durus = getattr(yanit, "stop_reason", "")
+        if durus == "refusal":
+            raise CikarimHatasi("model reddetti", girdi, cikti, True)
+        if durus == "max_tokens":
+            raise CikarimHatasi("model çıktısı kesildi", girdi, cikti, True)
         try:
             veri = json.loads(claude_api.metin(yanit))
         except ValueError as e:
-            raise CikarimHatasi("model çıktısı JSON değil") from e
+            raise CikarimHatasi("model çıktısı JSON değil", girdi, cikti, True) from e
         satirlar = [s for s in (veri.get("sinavlar") or []) if isinstance(s, dict)] if isinstance(veri, dict) else []
-        kullanim = getattr(yanit, "usage", None)
-        return OkumaSonucu(satirlar, int(getattr(kullanim, "input_tokens", 0) or 0),
-                           int(getattr(kullanim, "output_tokens", 0) or 0))
+        return OkumaSonucu(satirlar, girdi, cikti)
 
 
 @dataclass
@@ -148,23 +160,41 @@ def _baslik(model_basligi: Any, ders: str, tur: str, kaynak: str) -> str:
     return f"{ders} {TUR_ADI[tur]}" if ders != "Genel" else TUR_ADI[tur]
 
 
+def _saat(ham: Any, alinti: str) -> str | None:
+    """SS:DD ya da SS.DD; yalnız alıntının içinde bağımsız bir saat olarak geçiyorsa (tarih ya da
+    ondalık zincirinin parçası değilse) ve aralıktaysa kabul edilir."""
+    ham = str(ham or "").strip()
+    m = _SAAT.match(ham)
+    if not m or not (int(m.group(1)) < 24 and int(m.group(2)) < 60):
+        return None
+    for y in re.finditer(re.escape(ham), alinti):
+        if _SAAT_ONCE.search(alinti[:y.start()]) or _SAAT_SONRA.match(alinti[y.end():]):
+            continue
+        return f"{int(m.group(1)):02d}:{m.group(2)}"
+    return None
+
+
 def uydurma_kapisi(satirlar: list[dict], aday: Aday, bugun: date) -> list[Bulgu]:
     kaynak = katla(aday.metin)
     yayin = aday.yayin or bugun
     aralik = okul_yili(bugun)
     sonuc = []
     for s in satirlar:
-        alinti = " ".join(str(s.get("alinti") or "").split())
-        if not alinti or katla(alinti) not in kaynak:
+        if not isinstance(s, dict):
             continue
+        alinti = " ".join(str(s.get("alinti") or "").split())
+        if not alinti or katla(alinti) not in kaynak or not on_suzgec(alinti):
+            continue
+        # Tarih ifadesi ancak alıntının içindeyse kullanılır: aynı metnin başka bir cümlesindeki
+        # tarih (ör. veli toplantısı) sınava bağlanmaz.
         ifade = str(s.get("tarih_ifadesi") or "").strip()
-        cozum = tarih_coz(ifade if ifade and katla(ifade) in kaynak else alinti, yayin, aralik)
+        cozum = tarih_coz(ifade if ifade and katla(ifade) in katla(alinti) else alinti, yayin, aralik)
         if cozum.gun is None and cozum.hafta is None and cozum.gecersiz:
             continue
-        m = _SAAT.match(str(s.get("saat") or "").strip())
-        saat = f"{int(m.group(1)):02d}:{m.group(2)}" if m and str(s.get("saat")).strip() in aday.metin else None
+        saat = _saat(s.get("saat"), alinti)
         konular: list[str] = []
-        for k in s.get("konular") or []:
+        ham_konular = s.get("konular")
+        for k in ham_konular if isinstance(ham_konular, list) else []:
             k = " ".join(str(k).split())
             if k and katla(k) in kaynak and k not in konular:
                 konular.append(k)
@@ -204,29 +234,42 @@ class SinavCikarici:
         incelenen = incelenmedi = 0
         hatalar: list[str] = []
         degisti = False
-        for aday in adaylar:
-            anahtar = f"{ISTEM_SURUMU}:{aday.anahtar}"
-            kayit = self._onbellek.get(anahtar)
-            if isinstance(kayit, dict) and isinstance(kayit.get("satirlar"), list):
-                satirlar = kayit["satirlar"]
-            else:
-                kalan = bitis - self.saat()
-                if kalan < CAGRI_EN_AZ_SURE or not self.defter.izin_var():
-                    incelenmedi += 1
-                    continue
-                try:
-                    okuma = self.okuyucu.oku(aday, bugun, zaman_asimi=min(CAGRI_EN_COK_SURE, kalan))
-                except CikarimHatasi as e:
-                    incelenmedi += 1
-                    hatalar.append(str(e)[:120])
-                    continue
-                self.defter.yaz(self.okuyucu.model, okuma.girdi, okuma.cikti)
-                satirlar = okuma.satirlar
-                self._onbellek[anahtar] = {"satirlar": satirlar, "zaman": datetime.now().isoformat(timespec="seconds")}
-                degisti = True
-            incelenen += 1
-            bulgular.extend(uydurma_kapisi(satirlar, aday, bugun))
-        if degisti or not self._onbellek_yolu.exists():
-            atomic_json_dump(self._onbellek, str(self._onbellek_yolu))
+        try:
+            for aday in adaylar:
+                anahtar = f"{ISTEM_SURUMU}:{aday.anahtar}"
+                kayit = self._onbellek.get(anahtar)
+                if isinstance(kayit, dict) and isinstance(kayit.get("satirlar"), list):
+                    if kayit.get("hata"):  # ücreti ödenmiş, kullanılamaz yanıt: ISTEM_SURUMU değişene dek sorulmaz
+                        incelenmedi += 1
+                        hatalar.append(str(kayit["hata"])[:120])
+                        continue
+                    satirlar = kayit["satirlar"]
+                else:
+                    kalan = bitis - self.saat()
+                    if kalan < CAGRI_EN_AZ_SURE or not self.defter.izin_var():
+                        incelenmedi += 1
+                        continue
+                    try:
+                        okuma = self.okuyucu.oku(aday, bugun, zaman_asimi=min(CAGRI_EN_COK_SURE, kalan))
+                    except CikarimHatasi as e:
+                        incelenmedi += 1
+                        hatalar.append(str(e)[:120])
+                        if e.faturalandi:
+                            self.defter.yaz(self.okuyucu.model, e.girdi, e.cikti)
+                            self._onbellek[anahtar] = {"satirlar": [], "hata": str(e)[:120],
+                                                       "zaman": datetime.now().isoformat(timespec="seconds")}
+                            degisti = True
+                        continue
+                    # Defter OcrDefteri'nin Haiku fiyatıyla hesaplar: TEDY_SINAV_MODEL daha pahalı
+                    # bir modele çevrilirse harcama eksik sayılır ve tavan gevşer.
+                    self.defter.yaz(self.okuyucu.model, okuma.girdi, okuma.cikti)
+                    satirlar = okuma.satirlar
+                    self._onbellek[anahtar] = {"satirlar": satirlar, "zaman": datetime.now().isoformat(timespec="seconds")}
+                    degisti = True
+                incelenen += 1
+                bulgular.extend(uydurma_kapisi(satirlar, aday, bugun))
+        finally:  # ücreti ödenmiş sonuçlar bir istisnada bile kaybolmasın
+            if degisti or not self._onbellek_yolu.exists():
+                atomic_json_dump(self._onbellek, str(self._onbellek_yolu))
         return CikarimSonucu(bulgular, len(adaylar), incelenen, incelenmedi,
                              round(self.defter.harcanan(), 6), hatalar)

@@ -157,7 +157,9 @@ def tarih_coz(metin: str, yayin: date, okul_araligi: tuple[date, date]) -> Tarih
         if gun_adi:
             return TarihCozumu(haftabasi + timedelta(days=_GUNLER[gun_adi.group(1)]), None, False)
         return TarihCozumu(None, haftabasi, False)
-    if gun_adi:
+    # Açık tarih var ama hiçbiri geçerli değilse (geçmiş sınav anlatısı) yalnız gün adı
+    # ileriye çözülmez: "15 Ekim Perşembe günü yapılan KTT" bir sonraki Perşembe'yi göstermez.
+    if gun_adi and not acik:
         fark = (_GUNLER[gun_adi.group(1)] - yayin.weekday()) % 7 or 7
         return TarihCozumu(yayin + timedelta(days=fark), None, False)
     if _BU_HAFTA.search(k):

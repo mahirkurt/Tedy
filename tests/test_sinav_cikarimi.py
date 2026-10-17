@@ -213,3 +213,91 @@ def test_cikarici_model_hatasi_digerlerini_durdurmaz(tmp_path):
     sonuc = _cikarici(tmp_path, okuyucu).cikar([KTT, ING], BUGUN, bitis=2000)
     assert (sonuc.incelenen, sonuc.incelenmedi, sonuc.hatalar) == (1, 1, ["ağ"])
     assert not (tmp_path / "output/sinav_cikarim_onbellegi.json").read_text(encoding="utf-8").count(KTT.anahtar)
+
+
+# --- düzeltme turu 1 ---------------------------------------------------------------
+
+def _gercek_cikarici(tmp_path, istemci):
+    okuyucu = ClaudeSinavOkuyucu(istemci_fabrikasi=lambda timeout, max_retries: istemci)
+    return SinavCikarici(tmp_path, okuyucu, tavan=2.0, saat=Saat()), okuyucu
+
+
+@pytest.mark.parametrize("yanit", [
+    _yanit([], stop="refusal"),
+    _yanit([], stop="max_tokens"),
+    SimpleNamespace(content=[SimpleNamespace(type="text", text="json değil")],
+                    stop_reason="end_turn", usage=SimpleNamespace(input_tokens=2000, output_tokens=300)),
+])
+def test_faturalanan_hatali_yanit_deftere_yazilir_ve_tekrar_sorulmaz(tmp_path, yanit):
+    istemci = SahteIstemci(yanit)
+    cikarici, _ = _gercek_cikarici(tmp_path, istemci)
+    ilk = cikarici.cikar([KTT], BUGUN, bitis=2000)
+    assert (ilk.incelenen, ilk.incelenmedi, ilk.bulgular, len(ilk.hatalar)) == (0, 1, [], 1)
+    assert ilk.butce_usd == pytest.approx((2000 * 1.0 + 300 * 5.0) / 1_000_000)
+    ikinci, _ = _gercek_cikarici(tmp_path, istemci)
+    sonuc = ikinci.cikar([KTT], BUGUN, bitis=2000)
+    assert len(istemci.cagrilar) == 1
+    assert (sonuc.incelenen, sonuc.incelenmedi, sonuc.bulgular) == (0, 1, [])
+    assert sonuc.butce_usd == pytest.approx(ilk.butce_usd)
+
+
+def test_ag_hatasi_deftere_yazmaz_ve_yeniden_denenir(tmp_path):
+    istemci = SahteIstemci(hata=OSError("bağlantı koptu"))
+    cikarici, _ = _gercek_cikarici(tmp_path, istemci)
+    ilk = cikarici.cikar([KTT], BUGUN, bitis=2000)
+    assert (ilk.incelenmedi, ilk.butce_usd) == (1, 0)
+    ikinci, _ = _gercek_cikarici(tmp_path, istemci)
+    ikinci.cikar([KTT], BUGUN, bitis=2000)
+    assert len(istemci.cagrilar) == 2
+
+
+def test_kapi_saat_tarih_ya_da_baska_saatin_parcasi_olamaz():
+    aday = Aday("Matematik KTT 16.10.2026 günü. Veli toplantısı 19:00", "Matematik", date(2026, 10, 12),
+                "ders_karti", [])
+    alinti = "Matematik KTT 16.10.2026 günü. Veli toplantısı 19:00"
+    for ham in ("16.10", "10.20", "9:00", "25:00", "19:60"):
+        [b] = uydurma_kapisi([_satir(saat=ham, tarih_ifadesi="16.10.2026 günü", alinti=alinti)], aday, BUGUN)
+        assert b.saat is None, ham
+    [b] = uydurma_kapisi([_satir(saat="19:00", tarih_ifadesi="16.10.2026 günü", alinti=alinti)], aday, BUGUN)
+    assert b.saat == "19:00"
+
+
+def test_kapi_saat_kaynakta_olsa_da_alintida_degilse_atilir():
+    aday = Aday("Matematik KTT 15 Ekim. Veli toplantısı 19:00", "Matematik", date(2026, 10, 12), "ders_karti", [])
+    [b] = uydurma_kapisi([_satir(saat="19:00", tarih_ifadesi="15 Ekim", alinti="Matematik KTT 15 Ekim")],
+                         aday, BUGUN)
+    assert b.saat is None
+
+
+def test_kapi_baska_cumledeki_tarih_sinava_baglanmaz():
+    aday = Aday("Matematik KTT yapılacaktır. Veli toplantısı 20 Ekim.", "Matematik", date(2026, 10, 12),
+                "ders_karti", [])
+    [b] = uydurma_kapisi([_satir(tarih_ifadesi="20 Ekim", tarih="2026-10-20", konular=[],
+                                 alinti="Matematik KTT yapılacaktır")], aday, BUGUN)
+    assert (b.tarih, b.hafta) == (None, None)
+
+
+def test_kapi_sinav_duyurmayan_alinti_atilir():
+    aday = Aday("Quizlet uygulamasında kelime çalışın", "İngilizce", date(2026, 10, 12), "ders_karti", [])
+    satir = _satir(ders="İngilizce", tur="kisa_sinav", baslik="Quiz", tarih_ifadesi="", tarih="", konular=[],
+                   alinti="Quizlet uygulamasında kelime çalışın")
+    assert uydurma_kapisi([satir], aday, BUGUN) == []
+
+
+def test_kapi_dict_olmayan_satir_ve_dizge_konular():
+    sonuc = uydurma_kapisi(["metin", None, 3, _satir(konular="Mutlak değer")], KTT, BUGUN)
+    assert [b.konular for b in sonuc] == [[]]
+
+
+def test_cikarici_istisnada_odenmis_sonuclar_onbellekte_kalir(tmp_path):
+    class Patlayan(SahteOkuyucu):
+        def oku(self, aday, bugun, zaman_asimi):
+            if aday is ING:
+                raise RuntimeError("beklenmeyen")
+            return super().oku(aday, bugun, zaman_asimi)
+
+    with pytest.raises(RuntimeError):
+        _cikarici(tmp_path, Patlayan()).cikar([KTT, ING], BUGUN, bitis=2000)
+    okuyucu = SahteOkuyucu()
+    sonuc = _cikarici(tmp_path, okuyucu).cikar([KTT], BUGUN, bitis=2000)
+    assert (okuyucu.cagrilar, sonuc.incelenen) == ([], 1)
