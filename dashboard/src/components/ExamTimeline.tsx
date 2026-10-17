@@ -11,8 +11,8 @@ import { MONTHS_SHORT, gradeColor } from '../utils/formatters'
 import { EmptyLine } from './patterns/EmptyLine'
 import { acikOgeAc } from '../asistan/sayfaBaglami'
 import SinavUyarilari from './SinavUyarilari'
-import { SinavAyrintisi } from './SinavKarti'
-import { zamanMetni } from '../utils/sinav'
+import { SinavAyrintisi, IncelenmediNotu } from './SinavKarti'
+import { yerelAni, zamanMetni } from '../utils/sinav'
 
 const EMPTY_RESPONSE: ExamsApiResponse = { exams: [], stats: { upcoming: 0, past: 0, averageGrade: null } }
 
@@ -28,7 +28,8 @@ function urgencyModifier(urgency: string): string {
 function formatExamDate(dateStr: string | null): string {
   if (!dateStr) return 'Tarih bilinmiyor'
   try {
-    const d = new Date(dateStr)
+    const d = yerelAni(dateStr)
+    if (!d) return dateStr
     const day = d.getDate()
     const month = MONTHS_SHORT[d.getMonth()]
     const hours = d.getHours().toString().padStart(2, '0')
@@ -51,7 +52,7 @@ function ExamCard({ exam, showCountdown, focusMode, baslangicAcik }: {
   useEffect(() => (expanded ? acikOgeAc({ tur: 'sinav', id: exam.id, etiket: exam.title }) : undefined),
     [expanded, exam.id, exam.title])
   const countdown = useMemo(
-    () => showCountdown && exam.date ? getExamCountdown(new Date(exam.date)) : null,
+    () => showCountdown && exam.date ? getExamCountdown(yerelAni(exam.date)) : null,
     [exam.date, showCountdown]
   )
 
@@ -86,7 +87,7 @@ function ExamCard({ exam, showCountdown, focusMode, baslangicAcik }: {
               the grade table, which carries none, and "Tarih bilinmiyor" under
               every one of 25 cards was the same sentence 25 times (İ6). */}
           {exam.date
-            ? <span className="exam-card__date">{formatExamDate(exam.date)}</span>
+            ? <span className="exam-card__date">{exam.allDay ? zamanMetni(exam) : formatExamDate(exam.date)}</span>
             : (exam.hafta || exam.tarihBelirsiz) && <span className="exam-card__date">{zamanMetni(exam)}</span>}
         </div>
         <div className="exam-card__badges">
@@ -178,6 +179,7 @@ export default function ExamTimeline() {
     return (
       <>
         <SinavUyarilari />
+        <IncelenmediNotu tespit={data.tespit} />
         <EmptyLine>Takvimde henüz sınav yok.</EmptyLine>
       </>
     )
@@ -186,6 +188,7 @@ export default function ExamTimeline() {
   return (
     <div className="exam-timeline">
       <SinavUyarilari />
+      <IncelenmediNotu tespit={data.tespit} />
       <div className="exam-stats" role="region" aria-label="Sınav istatistikleri">
         <div className="exam-stats__item">
           <span className="exam-stats__value">{data.stats.upcoming}</span>

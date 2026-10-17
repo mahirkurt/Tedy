@@ -25,6 +25,9 @@ test.describe('C4 — sınavlar', () => {
     await expect(ilkSatir).toContainText('09:00')
     await expect(ilkSatir).toContainText('Özdebir GİS-1')
 
+    // Said once: the exam leading "Yarın" is neither in the list nor a preview
+    // (the only other exam is weeks away, so there is no preview at all).
+    await expect(page.locator('.sinav-onizleme')).toHaveCount(0)
     const liste = page.locator('.today-exams')
     await expect(liste).not.toContainText('Özdebir GİS-1')
     await expect(liste).toContainText('Türkçe Ortak Yazılı')

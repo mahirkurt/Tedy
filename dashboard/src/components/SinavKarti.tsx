@@ -1,8 +1,8 @@
 import { Link as CarbonLink, Tag } from '@carbon/react'
 import { useNavigate } from 'react-router-dom'
 import type { ExamItem } from '../types'
-import { kisaTeslim } from '../utils/formatters'
-import { konuOzeti, sinavEtiketi, zamanMetni } from '../utils/sinav'
+import { kisaGun, kisaTeslim } from '../utils/formatters'
+import { konuOzeti, sinavAni, sinavEtiketi, zamanMetni } from '../utils/sinav'
 import SubjectLabel from './SubjectLabel'
 import './SinavKarti.scss'
 
@@ -10,6 +10,7 @@ import './SinavKarti.scss'
 export function SinavOnizleme({ exam, now, onAc }: { exam: ExamItem; now: Date; onAc: () => void }) {
   const konu = konuOzeti(exam.konular)
   const kaynak = exam.kaynaklar?.find(k => k.tur !== 'takvim')
+  const ani = sinavAni(exam)
   return (
     <section className="sinav-onizleme" aria-label="Yaklaşan sınav">
       <div className="today-also__head">
@@ -19,7 +20,7 @@ export function SinavOnizleme({ exam, now, onAc }: { exam: ExamItem; now: Date; 
         <span className="today-also__name">
           <SubjectLabel course={exam.course} family={exam.courseFamily}>{exam.title || exam.rawTitle}</SubjectLabel>
         </span>
-        <span className="today-also__due">{exam.date ? kisaTeslim(new Date(exam.date), now) : zamanMetni(exam)}</span>
+        <span className="today-also__due">{ani ? (exam.allDay ? kisaGun(ani, now) : kisaTeslim(ani, now)) : zamanMetni(exam)}</span>
       </button>
       {konu && <p className="sinav-onizleme__konular">Konular: {konu}</p>}
       <p className="sinav-onizleme__baglantilar">
@@ -30,6 +31,12 @@ export function SinavOnizleme({ exam, now, onAc }: { exam: ExamItem; now: Date; 
       </p>
     </section>
   )
+}
+
+/** Son tespit turunda okunamayan duyuru varsa liste eksik olabilir; sessizce eksik kalmaz. */
+export function IncelenmediNotu({ tespit }: { tespit?: { incelenmedi: number } | null }) {
+  if ((tespit?.incelenmedi ?? 0) <= 0) return null
+  return <p className="exams-ahead__not">Bazı ders duyuruları incelenemedi; sınav listesi eksik olabilir.</p>
 }
 
 /** İşler: son 48 saatte bulunan ya da değişen sınav için gri, metinli etiket. */

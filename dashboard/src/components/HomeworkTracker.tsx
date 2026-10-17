@@ -14,8 +14,8 @@ import { acikOgeAc } from '../asistan/sayfaBaglami'
 import type { ExamsApiResponse, ModuleCard } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
 import { EkBaglantisi } from './patterns/EkBaglantisi'
-import { SinavEtiketi } from './SinavKarti'
-import { zamanMetni } from '../utils/sinav'
+import { SinavEtiketi, IncelenmediNotu } from './SinavKarti'
+import { sinavAni, zamanMetni } from '../utils/sinav'
 import { useFocusMode } from '../contexts/focusMode'
 import YuklemeAlani from './YuklemeAlani'
 import { yaptimIsaretle } from '../utils/odevYaptim'
@@ -329,7 +329,7 @@ export default function HomeworkTracker() {
           </div>
           {!focusMode && <ul className="exams-ahead__list">
             {upcomingExams.map(e => {
-              const when = e.date ? new Date(e.date) : null
+              const when = sinavAni(e)
               return (
                 <li key={e.id} className="exams-ahead__row">
                   {/* Live titles often carry the course already ("Özdebir …
@@ -369,9 +369,7 @@ export default function HomeworkTracker() {
               )
             })}
           </ul>}
-          {(examData.tespit?.incelenmedi ?? 0) > 0 && (
-            <p className="exams-ahead__not">Bazı ders duyuruları incelenemedi; sınav listesi eksik olabilir.</p>
-          )}
+          <IncelenmediNotu tespit={examData.tespit} />
           {/* A link, not a ghost button: it goes to a page, and the button's
               padding set its text 16px off the list's edge. */}
           {!focusMode && (
@@ -383,6 +381,13 @@ export default function HomeworkTracker() {
               Tüm sınavlar
             </Link>
           )}
+        </div>
+      )}
+
+      {/* Even with nothing ahead the list can be incomplete: say so. */}
+      {!focusMode && upcomingExams.length === 0 && (
+        <div className="hw-section exams-ahead">
+          <IncelenmediNotu tespit={examData.tespit} />
         </div>
       )}
 

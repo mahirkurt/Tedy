@@ -13,7 +13,7 @@ import {
 } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
 import {
-  parseDeadline, cleanTeacherNames, normalizeCourseDisplayName, htmlToText, kisaTeslim,
+  parseDeadline, cleanTeacherNames, normalizeCourseDisplayName, htmlToText, kisaTeslim, kisaGun,
 } from '../utils/formatters'
 import { getCountdown } from '../utils/countdown'
 import { dayColumns } from '../utils/schedule'
@@ -27,7 +27,7 @@ import type { HomeworkItem, CalendarEvent, OgepSession, ExamsApiResponse } from 
 import { EmptyLine } from './patterns/EmptyLine'
 import SubjectLabel from './SubjectLabel'
 import { subjectClass } from '../utils/subject'
-import { enYakinSinav } from '../utils/sinav'
+import { enYakinSinav, sinavAni } from '../utils/sinav'
 import { SinavOnizleme } from './SinavKarti'
 
 interface ScheduleData {
@@ -536,8 +536,8 @@ export default function TodaySchedule() {
   // takes the card — at 20:00 the page must not say "start revising" (İ4).
   const yaklasanSinavlar = (examData.exams || [])
     .filter(e => e.status === 'upcoming' && e.date)
-    .map(e => ({ e, d: new Date(e.date as string) }))
-    .filter(x => !isNaN(x.d.getTime()))
+    .map(e => ({ e, d: sinavAni(e) }))
+    .filter((x): x is { e: typeof x.e; d: Date } => x.d !== null)
     .sort((a, b) => a.d.getTime() - b.d.getTime())
   const yarinSinavlari = yarinGoster && sonrakiGun
     ? yaklasanSinavlar.filter(x => isSameDay(x.d, sonrakiGun.tarih))
@@ -707,7 +707,7 @@ export default function TodaySchedule() {
               <span className="today-also__name">
                 <SubjectLabel course={e.course} family={e.courseFamily}>{e.title || e.rawTitle}</SubjectLabel>
               </span>
-              <span className="today-also__due">{kisaTeslim(d, now)}</span>
+              <span className="today-also__due">{e.allDay ? kisaGun(d, now) : kisaTeslim(d, now)}</span>
             </button>
           ))}
         </section>
@@ -720,7 +720,7 @@ export default function TodaySchedule() {
           </span>
           {yarinSinavlari.map(({ e, d }) => (
             <p key={e.id} className="today-tomorrow__exam">
-              SINAV · {saatDk(d)} · <SubjectLabel course={e.course} family={e.courseFamily}>{e.title || e.rawTitle}</SubjectLabel>
+              SINAV · {e.allDay ? '' : `${saatDk(d)} · `}<SubjectLabel course={e.course} family={e.courseFamily}>{e.title || e.rawTitle}</SubjectLabel>
             </p>
           ))}
           <p className="today-tomorrow__first">

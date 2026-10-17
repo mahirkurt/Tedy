@@ -139,3 +139,51 @@ test.describe('Sınavlar panoda', () => {
     expect(sonuc.violations).toEqual([])
   })
 })
+
+// Tüm gün sınav ("2026-09-28", saat yok) tarayıcının bölgesinden bağımsız
+// olarak o yerel gündür: UTC gece yarısı olarak okununca İstanbul'da 03:00
+// görünüyordu.
+test.describe('Tüm gün sınav, İstanbul tarayıcısı', () => {
+  test.use({ timezoneId: 'Europe/Istanbul' })
+  const GUN = { ...SINAV('gun', 'Fen Bilimleri KTT', '2026-09-28'), course: 'Fen Bilimleri', allDay: true,
+    konular: ['Hücre'], kaynaklar: [], ilkTespit: '2026-09-01T08:00:00', degisti: null, tarihBelirsiz: false }
+  const VERI = { exams: [GUN], stats: { upcoming: 1, past: 0, averageGrade: null }, tespit: null }
+
+  test('Bugün: önizleme günü yazar, saat uydurmaz', async ({ page }) => {
+    await bugunAc(page, '2026-09-24T07:30:00+03:00', { exams: VERI })
+    const onizleme = page.locator('.sinav-onizleme')
+    await expect(onizleme).toContainText('Fen Bilimleri KTT')
+    await expect(onizleme.locator('.today-also__due')).toHaveText('Pazartesi')
+    await expect(onizleme).not.toContainText('03:00')
+    await expect(onizleme.locator('.today-also__due')).not.toHaveText(/\d{2}:\d{2}/)
+  })
+
+  test('Sınavlar: kart tarihi "28 Eyl", saatsiz', async ({ page }) => {
+    await bildirimTaklidi(page, { izin: 'default', abone: false })
+    await page.clock.setFixedTime(new Date('2026-09-24T07:30:00+03:00'))
+    await mock(page, { ...LIVE, exams: VERI, 'bildirim/anahtar': { anahtar: 'BAAA', acik: true } })
+    await page.goto('/sinavlar')
+    await expect(page.locator('#sinav-gun .exam-card__date')).toHaveText('28 Eyl')
+  })
+})
+
+test.describe('İncelenemedi notu liste boşken de görünür', () => {
+  const BOS = { exams: [], stats: { upcoming: 0, past: 0, averageGrade: null },
+    tespit: { uretildi: '2026-09-24T10:00:00', incelenmedi: 2 } }
+  const NOT = 'Bazı ders duyuruları incelenemedi; sınav listesi eksik olabilir.'
+
+  test('İşler', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-09-24T10:30:00'))
+    await mock(page, { ...LIVE, exams: BOS })
+    await page.goto('/isler')
+    await expect(page.getByText(NOT)).toBeVisible()
+  })
+
+  test('Sınavlar', async ({ page }) => {
+    await bildirimTaklidi(page, { izin: 'default', abone: false })
+    await page.clock.setFixedTime(new Date('2026-09-24T10:30:00'))
+    await mock(page, { ...LIVE, exams: BOS, 'bildirim/anahtar': { anahtar: 'BAAA', acik: true } })
+    await page.goto('/sinavlar')
+    await expect(page.getByText(NOT)).toBeVisible()
+  })
+})

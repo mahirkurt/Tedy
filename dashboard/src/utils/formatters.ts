@@ -161,6 +161,17 @@ export function kisaTeslim(deadline: Date, now: Date): string {
   return `${deadline.getDate()} ${MONTHS_SHORT[deadline.getMonth()]} ${saat}`
 }
 
+/** `kisaTeslim` without the clock — for an all-day event ("yarın", "Pazartesi",
+ *  "3 Eki"): printing 00:00 (or a zone-shifted 03:00) would invent an hour. */
+export function kisaGun(gun: Date, now: Date): string {
+  const yerel = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const fark = Math.round((yerel(gun) - yerel(now)) / 86_400_000)
+  if (fark === 0) return 'bugün'
+  if (fark === 1) return 'yarın'
+  if (fark > 1 && fark < 7) return GUNLER[gun.getDay()]
+  return `${gun.getDate()} ${MONTHS_SHORT[gun.getMonth()]}`
+}
+
 /** Turkish names for the scrape sections health.json reports on. Shared so the
  *  header popover and the portal-status banner cannot drift apart. */
 export const SECTION_LABELS: Record<string, string> = {
