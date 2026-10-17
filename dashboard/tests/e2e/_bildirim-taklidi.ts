@@ -6,7 +6,15 @@ import type { Page } from '@playwright/test'
 
 export type Taklit = { izin: 'default' | 'granted' | 'denied'; abone: boolean; destek?: boolean; ios?: boolean
   // requestPermission() yanıtı; varsayılan 'granted'. 'default' kapatılan izin penceresidir.
-  istemYaniti?: 'default' | 'granted' | 'denied' }
+  istemYaniti?: 'default' | 'granted' | 'denied'
+  // Var olan aboneliğin bağlı olduğu VAPID anahtarı (options.applicationServerKey); verilmezse
+  // sunucu fikstürünün 'BAAA' anahtarı ([4, 0, 0]).
+  abonelikAnahtari?: number[] }
+
+// Taklidin gördüğü abone olma/çıkma adımları, sırasıyla (window.__bildirimOlaylari).
+export async function bildirimOlaylari(page: Page): Promise<string[]> {
+  return page.evaluate(() => [...((window as unknown as { __bildirimOlaylari?: string[] }).__bildirimOlaylari ?? [])])
+}
 
 export async function bildirimTaklidi(page: Page, t: Taklit) {
   await page.addInitScript((t: Taklit) => {
@@ -14,14 +22,23 @@ export async function bildirimTaklidi(page: Page, t: Taklit) {
     if (t.ios) Object.defineProperty(navigator, 'userAgent', { value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X)' })
     if (t.destek === false) { delete w.PushManager; return }
     let abone = t.abone
+    const olaylar: string[] = []
+    w.__bildirimOlaylari = olaylar
+    let anahtar = Uint8Array.from(t.abonelikAnahtari ?? [4, 0, 0]).buffer
     const abonelik = {
       endpoint: 'https://fcm.googleapis.com/fcm/send/test',
+      get options() { return { applicationServerKey: anahtar, userVisibleOnly: true } },
       toJSON: () => ({ endpoint: 'https://fcm.googleapis.com/fcm/send/test', keys: { p256dh: 'p', auth: 'a' } }),
-      unsubscribe: async () => { abone = false; return true },
+      unsubscribe: async () => { abone = false; olaylar.push('unsubscribe'); return true },
     }
     const pushManager = {
       getSubscription: async () => (abone ? abonelik : null),
-      subscribe: async () => { abone = true; return abonelik },
+      subscribe: async (s: { applicationServerKey: Uint8Array }) => {
+        abone = true
+        anahtar = Uint8Array.from(s.applicationServerKey).buffer
+        olaylar.push(`subscribe ${[...s.applicationServerKey].join(',')}`)
+        return abonelik
+      },
     }
     const kayit = { pushManager }
     Object.defineProperty(navigator, 'serviceWorker', { value: {

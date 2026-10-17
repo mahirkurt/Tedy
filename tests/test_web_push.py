@@ -193,3 +193,24 @@ def test_gonder_hata_siniflari(kod, durum):
         raise hata
     sonuc = gonder({"endpoint": "https://e", "keys": {}}, {}, VAPID, webpush_fn=sahte)
     assert (sonuc.durum, sonuc.kod) == (durum, kod)
+
+
+# --- bozuk depo sessiz kalmaz (son inceleme, Important 3) ---------------------------
+
+def test_depo_bozuk_okuma_bayragi(tmp_path):
+    yol = tmp_path / "a.json"
+    d = AbonelikDeposu(yol)
+    assert d.hepsi() == {} and d.son_okuma_bozuk is False        # no file: a fresh install, not damage
+    yol.write_text("{bozuk", encoding="utf-8")
+    assert d.hepsi() == {} and d.son_okuma_bozuk is True
+    yol.write_text(json.dumps({"kisiler": {}}), encoding="utf-8")
+    assert d.hepsi() == {} and d.son_okuma_bozuk is False
+
+
+def test_depo_bozuk_yedekler_zamaniyla(tmp_path):
+    yol = tmp_path / "a.json"
+    yol.write_text("{bozuk", encoding="utf-8")
+    d = AbonelikDeposu(yol, simdi=lambda: datetime(2026, 10, 17, 9, 8, 7))
+    d.ekle("isik@x", abonelik_dogrula(abonelik()))
+    (tmp_path / "a.json.bozuk-xyz").write_text("", encoding="utf-8")     # a name we did not write: ignored
+    assert d.bozuk_yedekler() == [datetime(2026, 10, 17, 9, 8, 7)]

@@ -8,6 +8,7 @@ import DashboardFooter from './components/DashboardFooter'
 import LoginPage from './components/LoginPage'
 import { SessionContext } from './contexts/session'
 import { useAuth } from './hooks/useAuth'
+import { aboneligiTazele } from './utils/bildirim'
 import { useFocusMode } from './contexts/focusMode'
 import { activateReaderProfile, useBookProgressSync } from './hooks/useBookReader'
 import { routesFor, navRoutesFor, ROLE_HOME, redirects } from './routes'
@@ -80,6 +81,12 @@ export default function App() {
     else delete root.dataset.role
     return () => { delete root.dataset.role }
   }, [user])
+
+  // Sınav uyarıları: the server may have dropped this device's subscription without the browser
+  // knowing; it is posted again once per signed-in full-role opening (utils/bildirim.ts).
+  useEffect(() => {
+    if (user?.role === 'full') void aboneligiTazele()
+  }, [user?.email, user?.role])
 
   useEffect(() => {
     const root = document.documentElement

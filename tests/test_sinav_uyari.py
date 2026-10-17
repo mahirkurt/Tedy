@@ -270,3 +270,24 @@ def test_main_calismayan_tur_icin_hata_kodu(durum, kod, monkeypatch, capsys):
     monkeypatch.setattr(su, "gonder_turu", lambda kok, simdi, gonderici=None: durum)
     assert su.main(["gonder"]) == kod
     assert json.loads(capsys.readouterr().out) == durum
+
+
+# --- bozuk abonelik deposu durum dosyasında görünür (son inceleme, Important 3) -------------
+
+def test_bozuk_depo_durumda_hata(kok):
+    (kok / wp.ABONELIKLER).write_text("{bozuk", encoding="utf-8")
+    durum = su.gonder_turu(kok, datetime(2026, 10, 19, 18, 0), gonderici=Gonderici())
+    assert durum["abone_kisi"] == 0
+    assert any("abonelik deposu okunamadı" in h for h in durum["hatalar"])
+    assert any("abonelik deposu okunamadı" in h
+               for h in json.loads((kok / su.DURUM).read_text(encoding="utf-8"))["hatalar"])
+
+
+def test_yakinda_kenara_alinan_depo_durumda_hata(kok):
+    (kok / "output/bildirim_abonelikleri.json.bozuk-20261019093000").write_text("{bozuk", encoding="utf-8")
+    durum = su.gonder_turu(kok, datetime(2026, 10, 19, 18, 0), gonderici=Gonderici())
+    assert durum["gonderilen"] == 2          # the round itself still runs
+    assert any("kenara alındı" in h and "19.10 09:30" in h for h in durum["hatalar"])
+    # A day later the old backup no longer reads as news.
+    durum = su.gonder_turu(kok, datetime(2026, 10, 20, 18, 0), gonderici=Gonderici())
+    assert not any("kenara alındı" in h for h in durum["hatalar"])

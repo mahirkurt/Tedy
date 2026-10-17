@@ -232,6 +232,22 @@ def _bildirim_gonder(b: Bildirim, depo: web_push.AbonelikDeposu, defter: Bildiri
         durum["gonderilen"] += 1
 
 
+YEDEK_HABER_SURESI = timedelta(hours=24)
+
+
+def _depo_sagligi(depo: web_push.AbonelikDeposu, simdi: datetime, durum: dict) -> None:
+    """An unreadable store means "no subscribers" to this round; the dashboard moves such a file
+    aside on its next write and starts afresh. Either way devices were lost silently: say so in the
+    status file (health.json `sinav_uyari` reads it). Browsers re-post their subscription when the
+    dashboard is opened, so the list fills again by itself."""
+    if depo.son_okuma_bozuk:
+        durum["hatalar"].append("abonelik deposu okunamadı (bozuk); cihazlar pano açılınca yeniden kaydolur")
+    yakin = [z for z in depo.bozuk_yedekler() if timedelta(0) <= simdi - z <= YEDEK_HABER_SURESI]
+    if yakin:
+        durum["hatalar"].append(f"abonelik deposu bozuk bulundu, {yakin[-1]:%d.%m %H:%M}'de kenara alındı; "
+                                "cihazlar pano açılınca yeniden kaydolur")
+
+
 def _tur(kok: Path, simdi: datetime, gonderici: Callable[..., web_push.GonderimSonucu] | None, durum: dict) -> None:
     if os.environ.get("TEDY_SINAV_UYARI", "0") != "1":
         durum["kapali"] = True
@@ -246,6 +262,7 @@ def _tur(kok: Path, simdi: datetime, gonderici: Callable[..., web_push.GonderimS
     defter = BildirimDefteri(kok / DEFTER)
     alicilar = _alicilar(depo)
     durum["abone_kisi"] = len(alicilar)
+    _depo_sagligi(depo, simdi, durum)
     for b in planla(belge["sinavlar"], alicilar, defter.anahtarlar(), simdi, durum["hatalar"]):
         try:
             _bildirim_gonder(b, depo, defter, vapid, gonderici, simdi, durum)

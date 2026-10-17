@@ -129,6 +129,9 @@ class AbonelikDeposu:
     def __init__(self, yol: str | Path, simdi: Callable[[], datetime] = datetime.now):
         self.yol = Path(yol)
         self.simdi = simdi
+        # True when the last read found the file there but unreadable: the alert round reports it
+        # (an unreadable store reads as "no subscribers", which must not look like a quiet day).
+        self.son_okuma_bozuk = False
 
     @contextmanager
     def _kilitli(self) -> Iterator[None]:
@@ -140,6 +143,11 @@ class AbonelikDeposu:
     def _oku_ham(self) -> tuple[dict[str, list[dict]], bool]:
         """(people, unreadable). Unreadable means the file exists but is not what we wrote:
         not UTF-8, not JSON, or JSON of the wrong top-level shape."""
+        kisiler, bozuk = self._coz()
+        self.son_okuma_bozuk = bozuk
+        return kisiler, bozuk
+
+    def _coz(self) -> tuple[dict[str, list[dict]], bool]:
         try:
             metin = self.yol.read_text(encoding="utf-8")
         except UnicodeDecodeError:
@@ -155,6 +163,16 @@ class AbonelikDeposu:
             return {}, True
         return {e: [c for c in v if _gecerli_cihaz(c)] for e, v in kisiler.items()
                 if isinstance(e, str) and isinstance(v, list)}, False
+
+    def bozuk_yedekler(self) -> list[datetime]:
+        """When each unreadable store was moved aside (from the `.bozuk-<stamp>` names), oldest first."""
+        zamanlar = []
+        for yol in self.yol.parent.glob(f"{self.yol.name}.bozuk-*"):
+            try:
+                zamanlar.append(datetime.strptime(yol.name.rsplit("-", 1)[1], "%Y%m%d%H%M%S"))
+            except ValueError:
+                continue
+        return sorted(zamanlar)
 
     def _oku(self) -> dict[str, list[dict]]:
         return self._oku_ham()[0]

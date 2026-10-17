@@ -11,11 +11,21 @@ const KOK = 'https://tedy.online'
 
 interface SahteIstemci { url: string; focus: () => Promise<void>; navigate?: (u: string) => Promise<void> }
 
-function kur(istemciler: SahteIstemci[] = []) {
+interface Istek { url: string; secenek?: { method?: string; credentials?: string; body?: string } }
+
+function kur(istemciler: SahteIstemci[] = [], anahtarYaniti: { ok: boolean; anahtar: string | null } = { ok: true, anahtar: 'BAAA' }) {
   const dinleyiciler: Record<string, (e: unknown) => void> = {}
   const gosterilen: { baslik: string; secenek: Record<string, unknown> }[] = []
   const acilan: string[] = []
+  const istekler: Istek[] = []
+  const abonelikler: { userVisibleOnly: boolean; applicationServerKey: Uint8Array }[] = []
+  const fetch = async (url: string, secenek?: Istek['secenek']) => {
+    istekler.push({ url, secenek })
+    if (url === '/api/bildirim/anahtar') return { ok: anahtarYaniti.ok, json: async () => ({ anahtar: anahtarYaniti.anahtar }) }
+    return { ok: true, json: async () => ({ ok: true }) }
+  }
   const self = {
+    navigator: { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8)' },
     addEventListener: (ad: string, fn: (e: unknown) => void) => { dinleyiciler[ad] = fn },
     skipWaiting: () => {},
     clients: {
@@ -25,14 +35,24 @@ function kur(istemciler: SahteIstemci[] = []) {
     },
     registration: {
       showNotification: async (baslik: string, secenek: Record<string, unknown>) => { gosterilen.push({ baslik, secenek }) },
+      pushManager: {
+        subscribe: async (s: { userVisibleOnly: boolean; applicationServerKey: Uint8Array }) => {
+          abonelikler.push(s)
+          return { toJSON: () => ({ endpoint: 'https://fcm.googleapis.com/fcm/send/yeni', keys: { p256dh: 'p', auth: 'a' } }) }
+        },
+      },
     },
     location: { origin: KOK },
   }
-  vm.runInNewContext(KAYNAK, { self, URL })
+  vm.runInNewContext(KAYNAK, { self, URL, fetch, atob })
   const bekleyen: Promise<unknown>[] = []
   const olay = (ek: Record<string, unknown>) => ({ ...ek, waitUntil: (p: Promise<unknown>) => { bekleyen.push(p) } })
   return {
-    gosterilen, acilan,
+    gosterilen, acilan, istekler, abonelikler,
+    async abonelikDegisti() {
+      dinleyiciler.pushsubscriptionchange(olay({}))
+      await Promise.all(bekleyen)
+    },
     async push(veri: { json?: () => unknown; text?: () => string } | null) {
       dinleyiciler.push(olay({ data: veri }))
       await Promise.all(bekleyen)
@@ -115,4 +135,28 @@ test('tıklama: başka sayfadaki pencere odaklanır ve hedefe gider', async () =
   await sw.tikla('/sinavlar')
   assert.deepEqual(olaylar, ['focus', `navigate ${KOK}/sinavlar`])
   assert.deepEqual(sw.acilan, [])
+})
+
+test('abonelik değişti: anahtar alınır, yeniden abone olunur, sunucuya bildirilir', async () => {
+  const sw = kur()
+  await sw.abonelikDegisti()
+  assert.equal(sw.abonelikler.length, 1)
+  assert.equal(sw.abonelikler[0].userVisibleOnly, true)
+  assert.deepEqual([...sw.abonelikler[0].applicationServerKey], [4, 0, 0])
+  const [anahtar, kayit] = sw.istekler
+  assert.equal(anahtar.url, '/api/bildirim/anahtar')
+  assert.equal(anahtar.secenek?.credentials, 'same-origin')
+  assert.equal(kayit.url, '/api/bildirim/abonelik')
+  assert.equal(kayit.secenek?.method, 'POST')
+  assert.equal(kayit.secenek?.credentials, 'same-origin')
+  const govde = JSON.parse(kayit.secenek?.body ?? '{}')
+  assert.equal(govde.endpoint, 'https://fcm.googleapis.com/fcm/send/yeni')
+  assert.equal(govde.cihaz, 'Android')
+})
+
+test('abonelik değişti: anahtar yoksa abone olunmaz, hata fırlatılmaz', async () => {
+  const sw = kur([], { ok: true, anahtar: null })
+  await sw.abonelikDegisti()
+  assert.equal(sw.abonelikler.length, 0)
+  assert.equal(sw.istekler.length, 1)
 })

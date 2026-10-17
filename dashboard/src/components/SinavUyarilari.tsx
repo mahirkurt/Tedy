@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button, InlineNotification } from '@carbon/react'
 import {
-  bildirimDurumu, bildirimiAc, bildirimiKapat, BildirimHatasi, denemeGonder, DURUM_METNI, hataMetni, ortamiOku,
+  bildirimDurumu, bildirimiAc, bildirimiKapat, BildirimHatasi, denemeBilgisi, denemeGonder, DURUM_METNI, hataMetni,
+  ortamiOku,
 } from '../utils/bildirim'
 import type { BildirimDurumu } from '../utils/bildirim'
 import './SinavUyarilari.scss'
@@ -27,13 +28,13 @@ export default function SinavUyarilari() {
     }
   }, [durum, mesgul, bilgi])
 
-  const yap = async (is: () => Promise<string | void>) => {
+  const yap = async (is: () => Promise<{ tur: 'success' | 'error'; metin: string } | void>) => {
     setMesgul(true)
     setBilgi(null)
     odakBekliyor.current = true
     try {
-      const metin = await is()
-      if (metin) setBilgi({ tur: 'success', metin })
+      const sonuc = await is()
+      if (sonuc) setBilgi(sonuc)
     } catch (e) {
       setBilgi({ tur: 'error', metin: hataMetni(e instanceof BildirimHatasi ? e.kod : '') })
     } finally {
@@ -56,7 +57,7 @@ export default function SinavUyarilari() {
           <>
             {durum === 'acik' && (
               <Button size="sm" kind="tertiary" disabled={mesgul}
-                onClick={() => yap(async () => `Deneme bildirimi ${await denemeGonder()} cihaza gönderildi.`)}>
+                onClick={() => yap(async () => denemeBilgisi(await denemeGonder()))}>
                 Deneme bildirimi gönder
               </Button>
             )}

@@ -41,12 +41,23 @@ export function bildirimDurumu(o: BildirimOrtami): BildirimDurumu {
 
 export const IZIN_VERILMEDI_METNI = 'İzin verilmedi; bildirimler kapalı kaldı.'
 export const GENEL_HATA_METNI = 'İşlem tamamlanamadı; biraz sonra yeniden denenebilir.'
+// The server keeps no device for this account (a dead or replaced subscription was dropped):
+// a test that reached nobody is not a success.
+export const CIHAZ_YOK_METNI =
+  'Deneme bildirimi hiçbir cihaza ulaşmadı: bu cihazın kaydı sunucuda yok. Bildirimleri kapatıp yeniden açın.'
+
+export function denemeBilgisi(gonderilen: number): { tur: 'success' | 'error'; metin: string } {
+  return gonderilen > 0
+    ? { tur: 'success', metin: `Deneme bildirimi ${gonderilen} cihaza gönderildi.` }
+    : { tur: 'error', metin: CIHAZ_YOK_METNI }
+}
 
 // İzin penceresi kapatılırsa (requestPermission → 'default') sunucu hatası değil,
 // yalnızca "izin verilmedi" söylenir.
 export function hataMetni(kod: string): string {
   if (kod === 'reddedildi') return DURUM_METNI.reddedildi
   if (kod === 'kapali') return IZIN_VERILMEDI_METNI
+  if (kod === 'cihaz-yok') return CIHAZ_YOK_METNI
   return GENEL_HATA_METNI
 }
 
@@ -55,6 +66,14 @@ export function anahtarBaytlari(b64url: string): Uint8Array<ArrayBuffer> {
   const b64 = (b64url + '='.repeat((4 - (b64url.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/')
   const ham = atob(b64)
   return Uint8Array.from(ham, c => c.charCodeAt(0))
+}
+
+// Is the browser's subscription bound to the server's current VAPID key? A browser that does
+// not expose the key (null) counts as the same: resubscribing on every opening would churn.
+export function anahtarAyni(abonelikAnahtari: ArrayBuffer | null, sunucuAnahtari: Uint8Array): boolean {
+  if (!abonelikAnahtari) return true
+  const a = new Uint8Array(abonelikAnahtari)
+  return a.length === sunucuAnahtari.length && a.every((b, i) => b === sunucuAnahtari[i])
 }
 
 export function cihazAdi(ua: string): string {
@@ -110,6 +129,43 @@ export async function ortamiOku(): Promise<BildirimOrtami> {
   }
 }
 
+async function aboneligiKaydet(abonelik: PushSubscription): Promise<Response> {
+  return fetch('/api/bildirim/abonelik', {
+    method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...abonelik.toJSON(), cihaz: cihazAdi(navigator.userAgent) }),
+  })
+}
+
+export type TazelemeSonucu = 'yok' | 'bildirildi' | 'yenilendi' | 'hata'
+
+// On opening the dashboard (once, full role): the server may have dropped this device without
+// the browser knowing — a 403/404/410 from the push service, a VAPID key change, an unreadable
+// store. If the browser still holds a subscription with permission granted, it is resubscribed
+// when bound to another key, then posted again silently (the server replaces the same endpoint;
+// a first device is seeded). Nothing is shown; a failure is retried at the next opening.
+export async function aboneligiTazele(): Promise<TazelemeSonucu> {
+  try {
+    if (!destekVar() || Notification.permission !== 'granted') return 'yok'
+    const kayit = await navigator.serviceWorker.getRegistration('/')
+    let abonelik = kayit ? await kayit.pushManager.getSubscription() : null
+    if (!kayit || !abonelik) return 'yok'
+    const yanit = await fetch('/api/bildirim/anahtar', { credentials: 'include' })
+    const { anahtar } = (yanit.ok ? await yanit.json() : {}) as { anahtar?: string | null }
+    if (!anahtar) return 'hata'
+    const baytlar = anahtarBaytlari(anahtar)
+    let sonuc: TazelemeSonucu = 'bildirildi'
+    const mevcutAnahtar = (abonelik.options?.applicationServerKey ?? null) as ArrayBuffer | null
+    if (!anahtarAyni(mevcutAnahtar, baytlar)) {
+      await abonelik.unsubscribe()
+      abonelik = await kayit.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: baytlar })
+      sonuc = 'yenilendi'
+    }
+    return (await aboneligiKaydet(abonelik)).ok ? sonuc : 'hata'
+  } catch {
+    return 'hata'
+  }
+}
+
 export async function bildirimiAc(): Promise<void> {
   const izin = await Notification.requestPermission()
   if (izin !== 'granted') throw new BildirimHatasi(izin === 'denied' ? 'reddedildi' : 'kapali', 'İzin verilmedi')
@@ -121,10 +177,7 @@ export async function bildirimiAc(): Promise<void> {
   const abonelik = await kayit.pushManager.subscribe({
     userVisibleOnly: true, applicationServerKey: anahtarBaytlari(anahtar),
   })
-  const kayitYaniti = await fetch('/api/bildirim/abonelik', {
-    method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...abonelik.toJSON(), cihaz: cihazAdi(navigator.userAgent) }),
-  })
+  const kayitYaniti = await aboneligiKaydet(abonelik)
   if (!kayitYaniti.ok) {
     await abonelik.unsubscribe()
     throw new BildirimHatasi('sunucu', 'Abonelik kaydedilemedi')
@@ -143,6 +196,7 @@ export async function bildirimiKapat(): Promise<void> {
 
 export async function denemeGonder(): Promise<number> {
   const yanit = await fetch('/api/bildirim/deneme', { method: 'POST', credentials: 'include' })
+  if (yanit.status === 404) throw new BildirimHatasi('cihaz-yok', 'Bu hesapta kayıtlı cihaz yok')
   if (!yanit.ok) throw new BildirimHatasi('sunucu', 'Deneme bildirimi gönderilemedi')
   return ((await yanit.json()) as { gonderilen: number }).gonderilen
 }

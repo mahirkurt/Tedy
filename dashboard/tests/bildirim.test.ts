@@ -1,6 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { anahtarBaytlari, bildirimDurumu, cihazAdi, DURUM_METNI, GENEL_HATA_METNI, hataMetni, IZIN_VERILMEDI_METNI } from '../src/utils/bildirim.ts'
+import {
+  anahtarAyni, anahtarBaytlari, bildirimDurumu, cihazAdi, CIHAZ_YOK_METNI, denemeBilgisi, DURUM_METNI, GENEL_HATA_METNI,
+  hataMetni, IZIN_VERILMEDI_METNI,
+} from '../src/utils/bildirim.ts'
 import type { BildirimOrtami } from '../src/utils/bildirim.ts'
 
 const TAM: BildirimOrtami = { destek: true, izin: 'granted', abone: true, ios: false, ekranda: false }
@@ -73,4 +76,28 @@ test('hata metni: kapatılan izin penceresi genel hata sayılmaz', () => {
   assert.equal(hataMetni('reddedildi'), DURUM_METNI.reddedildi)
   assert.equal(hataMetni('sunucu'), GENEL_HATA_METNI)
   assert.equal(hataMetni(''), GENEL_HATA_METNI)
+})
+
+test('anahtar aynı mı: aboneliğin anahtarı sunucununkiyle bayt bayt karşılaştırılır', () => {
+  const sunucu = Uint8Array.from([4, 1, 2, 3])
+  assert.equal(anahtarAyni(Uint8Array.from([4, 1, 2, 3]).buffer, sunucu), true)
+  assert.equal(anahtarAyni(Uint8Array.from([4, 1, 2, 9]).buffer, sunucu), false)
+  assert.equal(anahtarAyni(Uint8Array.from([4, 1, 2]).buffer, sunucu), false)
+})
+
+test('anahtar aynı mı: tarayıcı anahtarı göstermiyorsa abonelik yenilenmez (her açılışta çalkalanmasın)', () => {
+  assert.equal(anahtarAyni(null, Uint8Array.from([4, 1])), true)
+})
+
+test('deneme: 0 cihaz başarı gibi söylenmez', () => {
+  assert.deepEqual(denemeBilgisi(2), { tur: 'success', metin: 'Deneme bildirimi 2 cihaza gönderildi.' })
+  const sifir = denemeBilgisi(0)
+  assert.equal(sifir.tur, 'error')
+  assert.equal(sifir.metin, CIHAZ_YOK_METNI)
+  assert.match(CIHAZ_YOK_METNI, /hiçbir cihaza ulaşmadı/)
+  assert.match(CIHAZ_YOK_METNI, /kapatıp yeniden açın/i)
+})
+
+test('hata metni: sunucuda cihaz yoksa nedeni söylenir', () => {
+  assert.equal(hataMetni('cihaz-yok'), CIHAZ_YOK_METNI)
 })

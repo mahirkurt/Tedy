@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { mock, LIVE } from './_audit-fixtures'
-import { bildirimTaklidi, type Taklit } from './_bildirim-taklidi'
+import { bildirimOlaylari, bildirimTaklidi, type Taklit } from './_bildirim-taklidi'
 import { bugunAc, SINAV } from './_bugun-fixtures'
 
 // Sınav uyarıları kartı: tarayıcının bildirim API'leri taklit edilir; sunucu
@@ -67,6 +67,18 @@ test.describe('Sınav uyarıları kartı', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await sinavlarAc(page, { izin: 'default', abone: false, ios: true })
     await expect(page.locator('#uyarilar')).toContainText('Paylaş → Ana Ekrana Ekle')
+  })
+
+  test('deneme hiçbir cihaza ulaşmadıysa başarı denmez', async ({ page }) => {
+    await sinavlarAc(page, { izin: 'granted', abone: true })
+    await page.unroute('**/api/bildirim/deneme')
+    await page.route('**/api/bildirim/deneme', r => r.fulfill({ json: { gonderilen: 0 } }))
+    const kart = page.locator('#uyarilar')
+    await kart.getByRole('button', { name: 'Deneme bildirimi gönder' }).click()
+    const bilgi = kart.locator('.cds--inline-notification')
+    await expect(bilgi).toContainText('hiçbir cihaza ulaşmadı')
+    await expect(bilgi).toHaveClass(/cds--inline-notification--error/)
+    await expect(kart).not.toContainText('0 cihaza gönderildi')
   })
 
   test('axe: kart ihlalsiz', async ({ page }) => {
@@ -185,5 +197,43 @@ test.describe('İncelenemedi notu liste boşken de görünür', () => {
     await mock(page, { ...LIVE, exams: BOS, 'bildirim/anahtar': { anahtar: 'BAAA', acik: true } })
     await page.goto('/sinavlar')
     await expect(page.getByText(NOT)).toBeVisible()
+  })
+})
+
+// Açılışta abonelik sessizce yeniden bildirilir (son inceleme, Important 3): sunucu cihazı
+// düşürmüş olabilir; tarayıcıda abonelik ve izin varsa pano onu bir kez yeniden gönderir.
+test.describe('Açılışta abonelik tazeleme', () => {
+  async function bugunTaklitle(page: Page, t: Taklit) {
+    await bildirimTaklidi(page, t)
+    const kayitlar: { endpoint: string }[] = []
+    await page.route('**/api/bildirim/abonelik', async r => {
+      if (r.request().method() === 'POST') kayitlar.push(r.request().postDataJSON())
+      await r.fulfill({ status: 201, json: { ok: true } })
+    })
+    await mock(page, { ...LIVE, 'bildirim/anahtar': { anahtar: 'BAAA', acik: true } })
+    return kayitlar
+  }
+
+  test('izin ve abonelik varken açılışta bir kez yeniden gönderilir', async ({ page }) => {
+    const kayitlar = await bugunTaklitle(page, { izin: 'granted', abone: true })
+    await page.goto('/bugun')
+    await expect.poll(() => kayitlar.length).toBe(1)
+    expect(kayitlar[0].endpoint).toBe('https://fcm.googleapis.com/fcm/send/test')
+    expect(await bildirimOlaylari(page)).toEqual([])   // aynı anahtar: yeniden abone olunmaz
+  })
+
+  test('anahtar değişmişse çıkılır, sunucunun anahtarıyla yeniden abone olunur, sonra gönderilir', async ({ page }) => {
+    const kayitlar = await bugunTaklitle(page, { izin: 'granted', abone: true, abonelikAnahtari: [4, 9, 9] })
+    await page.goto('/bugun')
+    await expect.poll(() => kayitlar.length).toBe(1)
+    expect(await bildirimOlaylari(page)).toEqual(['unsubscribe', 'subscribe 4,0,0'])
+  })
+
+  test('izin yoksa ya da abonelik yoksa hiçbir şey gönderilmez', async ({ page }) => {
+    const kayitlar = await bugunTaklitle(page, { izin: 'granted', abone: false })
+    await page.goto('/bugun')
+    await page.locator('.today').first().waitFor()
+    await page.waitForTimeout(500)
+    expect(kayitlar).toEqual([])
   })
 })
