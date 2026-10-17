@@ -317,3 +317,15 @@ def test_a20_genel_bulgu_takvimsiz_gunde_ayri_kayit():
     genel = bulgu("Genel", "deneme", tarih=date(2026, 10, 20), konular=["Tüm konular"], metin="genel")
     kayitlar = birlestir([], [mat, genel], None, SIMDI)
     assert sorted(k["ders"] for k in kayitlar) == ["Genel", "Matematik"]
+
+
+def test_a18_baska_dersin_yeniden_kullanilan_konumu_tasinmaz():
+    """Announcement positions are list indexes: a new post shifts them. Another course's exam at
+    the old index is a new exam, not the old one moved."""
+    konum = {"bolum": "duyuru", "sira": 0}
+    onceki = {"surum": SURUM, "sinavlar": birlestir(
+        [], [bulgu("Fen Bilimleri", "yazili", tarih=date(2026, 10, 20), konum=konum, aday_tur="duyuru")],
+        {"surum": SURUM, "sinavlar": []}, datetime(2026, 10, 10, 9))}
+    [k] = birlestir([], [bulgu("Türkçe", "yazili", tarih=date(2026, 10, 22), konum=konum, aday_tur="duyuru")],
+                    onceki, SIMDI)
+    assert (k["ilk_tespit"], k["degisti"]) == ("2026-10-16T10:00:00", None)

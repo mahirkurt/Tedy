@@ -184,9 +184,10 @@ def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, sim
 
     eski = {k.get("id"): k for k in ((onceki or {}).get("sinavlar") or []) if isinstance(k, dict)}
     an = simdi.isoformat(timespec="seconds")
-    # A text exam whose date changed gets a new id. If the previous file has a record that is no
-    # longer produced and was found at the same portal position, it is the same exam: its first
-    # sighting carries over and it reads as changed, not new.
+    # A text exam whose date changed gets a new id. If the previous file has a record of the same
+    # course that is no longer produced and was found at the same portal position, it is the same
+    # exam: its first sighting carries over and it reads as changed, not new. (Same course, since
+    # an announcement's position is a list index that a newer post shifts.)
     uretilen = {k["id"] for k in kalan}
     yetim = [o for i, o in eski.items() if i not in uretilen and _metin_konumlari(o)]
     for k in kalan:
@@ -195,7 +196,8 @@ def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, sim
         k["icerik_surumu"] = _surum(k)
         o = eski.get(k["id"])
         ata = None if o is not None or k["taban"] else next(
-            (y for y in yetim if _metin_konumlari(y) & _metin_konumlari(k)), None)
+            (y for y in yetim if katla(str(y.get("ders") or "")) == katla(k["ders"])
+             and _metin_konumlari(y) & _metin_konumlari(k)), None)
         if o is not None:
             k["ilk_tespit"] = o.get("ilk_tespit")
             k["degisti"] = an if o.get("icerik_surumu") != k["icerik_surumu"] else o.get("degisti")
