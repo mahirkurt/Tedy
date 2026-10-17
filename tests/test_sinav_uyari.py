@@ -529,3 +529,24 @@ def test_b13_bu_haftaki_hafta_yalniz_sinav(kok):
     g2 = Gonderici()
     su.gonder_turu(kok, datetime(2026, 10, 26, 9, 0), gonderici=g2)       # the week is over
     assert g2.cagrilar == []
+
+
+# --- B12: birim dosyaları ------------------------------------------------------------
+
+def _birim(ad):
+    from pathlib import Path
+    satirlar = (Path(__file__).resolve().parents[1] / ad).read_text(encoding="utf-8").splitlines()
+    return [s.strip() for s in satirlar if s.strip() and not s.strip().startswith("#")]
+
+
+def test_b12_servis_birimi():
+    birim = _birim("tedy-sinav-uyari.service")
+    assert "Type=oneshot" in birim
+    assert "Environment=TZ=Europe/Istanbul" in birim
+    assert "TimeoutStartSec=600" in birim
+    [calistir] = [s for s in birim if s.startswith("ExecStart=")]
+    assert calistir.endswith(" -m src.sinav_uyari gonder") and "/.venv/bin/python" in calistir
+
+
+def test_b12_zamanlayici_on_dakikada_bir():
+    assert "OnCalendar=*:0/10" in _birim("tedy-sinav-uyari.timer")

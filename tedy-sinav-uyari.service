@@ -11,4 +11,6 @@ Environment=PATH=/mnt/thunderbolt/workspaces/TED/.venv/bin:/usr/bin:/bin
 Environment=TZ=Europe/Istanbul
 EnvironmentFile=/mnt/thunderbolt/workspaces/TED/.env
 ExecStart=/mnt/thunderbolt/workspaces/TED/.venv/bin/python -m src.sinav_uyari gonder
-TimeoutStartSec=120
+# Devices are sent to one by one, each with a 10 s request timeout (plus the
+# pending retries): a round with many devices and slow push services needs room.
+TimeoutStartSec=600
