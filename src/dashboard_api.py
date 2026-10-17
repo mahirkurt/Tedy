@@ -2595,6 +2595,86 @@ def exams():
     return jsonify(_sinav_api_listesi(_scraped()))
 
 
+# --- Sınav uyarıları: web push abonelikleri (spec 2026-10-16 §7) ---
+# Session and full role only: require_auth lets an API key through, so each
+# route also wants a session email — a key has no person and no device.
+
+def _bildirim_kisisi():
+    if TEST_AUTH_BYPASS:
+        return "test@tedy"
+    email = str(session.get("user_email", "") or "").lower().strip()
+    return email if email and USER_ROLES.get(email) == ROLE_FULL else None
+
+
+def _abonelik_deposu():
+    from src import web_push
+    return web_push.AbonelikDeposu(Path(PROJECT_ROOT) / web_push.ABONELIKLER)
+
+
+@app.route("/api/bildirim/anahtar", methods=["GET"])
+@require_auth
+def bildirim_anahtar():
+    if not _bildirim_kisisi():
+        return jsonify({"error": "yalnız oturumla"}), 403
+    from src import web_push
+    vapid = web_push.vapid_ayarlari()
+    return jsonify({"anahtar": vapid.public if vapid else None,
+                    "acik": os.environ.get("TEDY_SINAV_UYARI", "0") == "1"})
+
+
+@app.route("/api/bildirim/abonelik", methods=["POST", "DELETE"])
+@require_auth
+def bildirim_abonelik():
+    email = _bildirim_kisisi()
+    if not email:
+        return jsonify({"error": "yalnız oturumla"}), 403
+    govde = request.get_json(silent=True)
+    depo = _abonelik_deposu()
+    if request.method == "DELETE":
+        endpoint = govde.get("endpoint") if isinstance(govde, dict) else None
+        if not isinstance(endpoint, str) or not depo.sil(email, endpoint):
+            return jsonify({"error": "abonelik bulunamadı"}), 404
+        return jsonify({"ok": True})
+    from src import web_push
+    abonelik = web_push.abonelik_dogrula(govde)
+    if abonelik is None:
+        return jsonify({"error": "geçersiz abonelik"}), 400
+    ilk_cihaz = not depo.kisinin(email)
+    depo.ekle(email, abonelik)
+    if ilk_cihaz:
+        # A person who turns alerts on gets what happens from now on, not a
+        # notification for every exam already known (plan Review Focus 3).
+        from src import sinav_uyari
+        sinav_uyari.kisiyi_tohumla(Path(PROJECT_ROOT), email, datetime.now())
+    return jsonify({"ok": True}), 201
+
+
+@app.route("/api/bildirim/deneme", methods=["POST"])
+@require_auth
+def bildirim_deneme():
+    email = _bildirim_kisisi()
+    if not email:
+        return jsonify({"error": "yalnız oturumla"}), 403
+    from src import web_push
+    vapid = web_push.vapid_ayarlari()
+    if vapid is None:
+        return jsonify({"error": "bildirim anahtarı ayarlı değil"}), 503
+    depo = _abonelik_deposu()
+    cihazlar = depo.kisinin(email)
+    if not cihazlar:
+        return jsonify({"error": "bu hesapta açık cihaz yok"}), 404
+    yuk = {"baslik": "TEDY deneme bildirimi", "govde": "Sınav uyarıları bu cihazda çalışıyor.",
+           "etiket": "deneme", "url": "/sinavlar#uyarilar"}
+    gonderilen = 0
+    for c in cihazlar:
+        sonuc = web_push.gonder(c["abonelik"], yuk, vapid)
+        if sonuc.durum == "ok":
+            gonderilen += 1
+        elif sonuc.durum == "olu":
+            depo.endpoint_sil(c["abonelik"]["endpoint"])
+    return jsonify({"gonderilen": gonderilen})
+
+
 def _sinav_listesi(data, now=None):
     """{"exams", "stats"} as /api/exams serves them: takvim exam events
     classified upcoming/past on the local clock, plus synthetic exams from

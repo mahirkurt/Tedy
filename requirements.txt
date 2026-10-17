@@ -22,3 +22,5 @@ uvicorn==0.51.0
 python-multipart==0.0.32
 httpx==0.28.1
 anthropic>=1.8,<2
+# Web push (sınav uyarıları, plan 2026-10-16-sinav-tespiti-ve-uyari Görev 7)
+pywebpush>=2,<3
