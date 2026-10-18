@@ -39,6 +39,24 @@ def check_session_valid(cookies: list[dict]) -> bool:
         return False
 
 
+def oturumu_tazele(cookies: list[dict], current_url: str, path: str = DEFAULT_COOKIE_PATH) -> bool:
+    """Keep the ticket the portal renewed during a run, while the session still holds.
+
+    `.AUTH` is an ASP.NET forms ticket with a 30-minute sliding expiry: a
+    request with a ticket past half its life is answered with a new one
+    (measured 2026-10-19). Writing cookies only at the CAPTCHA login kept the
+    login's own ticket on disk, and every third run started with seconds left
+    on it. Nothing is written from the login page (a dropped session) or
+    without a ticket.
+    """
+    if not cookies or "/login" in (current_url or ""):
+        return False
+    if not any(c.get("name") == ".AUTH" and c.get("value") for c in cookies):
+        return False
+    save_cookies(cookies, path)
+    return True
+
+
 def apply_cookies_to_driver(driver, cookies: list[dict]) -> None:
     """Load cookies into Selenium driver. Must navigate to domain first."""
     driver.get(PORTAL_BASE)

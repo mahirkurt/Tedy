@@ -44,6 +44,7 @@ from src.academic_year import (  # noqa: E402
 )
 from src.archive_year import archive_year_local  # noqa: E402
 from src.portal_susu import temiz_dersler, temiz_haftalar  # noqa: E402
+from src.session_manager import oturumu_tazele  # noqa: E402
 
 _YEAR_RE = re.compile(r"^\d{4}-\d{4}$")
 
@@ -559,6 +560,15 @@ def main(zamanla=False):
             portal_cerezleri = driver.get_cookies() or []
         except Exception:
             portal_cerezleri = []
+        # The same cookies carry the ticket the portal renewed during this run;
+        # without them on disk the next-but-one run starts on a dying ticket.
+        try:
+            son_adres = driver.current_url
+        except Exception:
+            son_adres = ""
+        if oturumu_tazele(portal_cerezleri, son_adres,
+                          os.path.join(OUTPUT_DIR, "portal_cookies.json")):
+            print("[LOGIN] Portal oturumu tazelendi")
 
         _icerik_birlestir(data, onceki)
         print(f"[HAFTA] program={len(data['ders_programi'])} hafta,"
