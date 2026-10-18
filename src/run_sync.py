@@ -397,6 +397,21 @@ def _platform_adimi(ad, modul_adi, hatalar):
         print(f"[WARN] {ad} scrape failed: {e}")
 
 
+def _yan_platformlar(hatalar):
+    """EnglishCentral, Achieve3000 and SEBİT homework; returns the platforms
+    switched off. A platform that is off is not a failure: SEBİT off
+    (TEDY_SEBIT=0) makes no login and leaves `hatalar` alone."""
+    from src.platform_ayarlari import sebit_aktif
+
+    _platform_adimi("englishcentral", "src.scrape_englishcentral", hatalar)
+    _platform_adimi("achieve3000", "src.scrape_achieve3000", hatalar)
+    if sebit_aktif():
+        _platform_adimi("sebit_homework", "src.scrape_sebit_homework", hatalar)
+        return []
+    print("[SEBIT-HW] pasif (TEDY_SEBIT=0), atlandı")
+    return ["sebit_homework"]
+
+
 def main(zamanla=False):
     os.chdir(PROJECT_ROOT)
     # Checked before anything else and silent when it is not this tick's turn:
@@ -577,14 +592,8 @@ def main(zamanla=False):
     finally:
         driver.quit()
 
-    # 3. English Central scrape (separate Selenium session)
-    _platform_adimi("englishcentral", "src.scrape_englishcentral", scrape_errors)
-
-    # 4. Achieve3000 scrape (separate Selenium session)
-    _platform_adimi("achieve3000", "src.scrape_achieve3000", scrape_errors)
-
-    # 5. SEBİT homework scrape (separate Selenium session)
-    _platform_adimi("sebit_homework", "src.scrape_sebit_homework", scrape_errors)
+    # 3–5. Side platforms, each in its own Selenium session.
+    pasif_platformlar = _yan_platformlar(scrape_errors)
 
     # 5b. Portal attachments — after every scraper, before health and the
     # reindex (so a new attachment's text is indexed this run), in a budget.
@@ -627,6 +636,7 @@ def main(zamanla=False):
         "validation_warnings": validation.get("warnings", []),
         "unavailable": unavailable,
         "okunamadi": okunamadi,
+        "pasif_platformlar": pasif_platformlar,
         "ekler": ekler_ozeti,
         "sinav_tespiti": sinav_ozeti,
         "sinav_uyari": _sinav_uyari_durumu(),

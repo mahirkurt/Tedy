@@ -21,6 +21,8 @@ interface A3KData {
 }
 
 interface SebitData {
+  /** SEBİT is switched off (TEDY_SEBIT=0): nothing is read, the old reading is not shown. */
+  pasif?: boolean
   total_homework?: number
   completed_count?: number
   homework?: SebitHomework[]
@@ -88,11 +90,12 @@ function DifficultyTag({ level }: { level: number }) {
 }
 
 
-type Platform = { ad: string; birim: string; done: number; total: number }
+type Platform = { ad: string; birim: string; done: number; total: number; durum?: string }
 
 /** One line per platform, said in words (B51, §8.7): a Carbon ProgressBar is for progress the system makes,
  *  not a count of what the reader finished — and a finished platform is a fact, not a celebration. */
 function platformDurumu(p: Platform): string {
+  if (p.durum) return p.durum
   if (p.total === 0) return 'Atanmış iş yok'
   if (p.done >= p.total) return `Tamamlandı · ${p.done}/${p.total} ${p.birim}`
   return `${p.done}/${p.total} ${p.birim}`
@@ -113,7 +116,9 @@ export default function PlatformProgress() {
   const platforms: Platform[] = [
     { ad: 'EnglishCentral', birim: 'video', done: ec.completed_videos || 0, total: ec.total_videos || 0 },
     { ad: 'Achieve3000', birim: 'ders', done: a3k.teacher_assigned_completed || 0, total: a3k.teacher_assigned_count || 0 },
-    { ad: 'SEBIT', birim: 'ödev', done: sebit.completed_count || 0, total: sebit.total_homework || 0 },
+    sebit.pasif
+      ? { ad: 'SEBIT', birim: 'ödev', done: 0, total: 0, durum: 'Takip edilmiyor' }
+      : { ad: 'SEBIT', birim: 'ödev', done: sebit.completed_count || 0, total: sebit.total_homework || 0 },
   ]
   // Focus mode keeps what is still owed.
   const gorunur = (p: Platform) => !focusMode || p.total === 0 || p.done < p.total
@@ -203,7 +208,7 @@ export default function PlatformProgress() {
             </AccordionItem>
           )}
 
-          {gorunur(platforms[2]) && (
+          {!sebit.pasif && gorunur(platforms[2]) && (
             <AccordionItem title="SEBIT ödevleri">
               {sebitItems.length > 0 ? (
                 <ul className="platform-detail-list">

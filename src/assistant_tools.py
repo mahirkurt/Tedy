@@ -380,6 +380,8 @@ def _sebit_bolumu_metni(veri: Any, simdi: datetime) -> str:
     their own section: a different platform with its own progress percentage
     and end date, not the TED portal's homework the sections above cover."""
     veri = veri if isinstance(veri, dict) else {}
+    if veri.get("pasif"):
+        return "SEBİT: şu an takip edilmiyor; SEBİT ödevleri okunmuyor."
     rows = [r for r in (veri.get("homework") or []) if isinstance(r, dict)]
     if not rows:
         return "SEBİT (0): şu an SEBİT'te kayıtlı ödev yok."

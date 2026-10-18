@@ -35,6 +35,7 @@ os.chdir(PROJECT_ROOT)
 from src.env_loader import load_env
 from src.json_utils import atomic_json_dump
 from src.course_names import normalize_course, COURSE_ALIASES, OZEL_DERS
+from src.platform_ayarlari import sebit_aktif
 from src.hafta_secici import guncel_hafta as _guncel_hafta
 from src.portal_susu import temiz_dersler, temiz_haftalar, temiz_metin
 from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.USER_ROLES etc.)
@@ -2178,7 +2179,11 @@ def homework_document_download(doc_id):
 def _sebit_verisi():
     """SEBİT homework rows, in the file's own shape (scraped_at,
     total_homework, completed_count, courses, homework[]). Shared with the
-    assistant's odev_listesi (plan Görev 3, _canli_sebit_odevleri)."""
+    assistant's odev_listesi (plan Görev 3, _canli_sebit_odevleri).
+    While SEBİT is off (TEDY_SEBIT=0) it is {"pasif": True}: the last
+    reading must not read as current on any surface."""
+    if not sebit_aktif():
+        return {"pasif": True}
     return _load_json("sebit_homework.json")
 
 
@@ -4319,7 +4324,7 @@ def _birlesik_takvim(data):
         })
 
     # 6. SEBIT homework
-    sebit_data = _load_json("sebit_homework.json")
+    sebit_data = _sebit_verisi()
     sebit_hw = sebit_data.get("homework", []) if isinstance(sebit_data, dict) else []
     for s in sebit_hw:
         title = s.get("title", "SEBIT")

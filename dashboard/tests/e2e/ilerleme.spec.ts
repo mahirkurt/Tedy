@@ -40,3 +40,14 @@ test('an empty platform says it is empty, not that it is loading', async ({ page
   const body = await page.locator('body').innerText()
   expect(body).not.toContain('yükleniyor')
 })
+
+test('SEBİT switched off says "Takip edilmiyor" and shows no old homework', async ({ page }) => {
+  await mock(page)
+  // The old reading still sits on disk; while SEBİT is off the API never serves it.
+  await page.route('**/api/sebit', r => r.fulfill(json({ pasif: true })))
+  await page.goto('/ilerleme')
+
+  const satir = page.locator('.platform-list__row', { hasText: 'SEBIT' })
+  await expect(satir.locator('.platform-list__state')).toHaveText('Takip edilmiyor')
+  await expect(page.getByRole('button', { name: 'SEBIT ödevleri' })).toHaveCount(0)
+})
