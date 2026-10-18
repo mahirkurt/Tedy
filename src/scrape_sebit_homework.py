@@ -3,12 +3,21 @@
 
 Logs in via Selenium, fetches homework list from the internal API,
 and saves progress to output/sebit_homework.json.
+
+The login (2026-10-18) solves the page's image captcha with ddddocr, posts
+the form's own fields to /login and reads the XML answer; a refused password
+or a closed account is recorded in output/.sebit_giris.json and not retried
+with the same credentials for 24 hours. Every failure raises a
+`SebitGirisHatasi` whose message is the sentence health.json carries.
 """
+import hashlib
 import json
 import os
+import re
 import sys
-import time
-from datetime import datetime
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta
+from urllib.parse import urljoin
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.chdir(os.path.join(os.path.dirname(__file__), ".."))
@@ -16,14 +25,20 @@ os.chdir(os.path.join(os.path.dirname(__file__), ".."))
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 from src.json_utils import atomic_json_dump
 from src.env_loader import load_env
+from src.login import captcha_oku, ocr_olustur
 
 load_env()
 
 OUTPUT_DIR = "output"
 PROGRESS_FILE = os.path.join(OUTPUT_DIR, "sebit_homework.json")
+# The last refused login (outcome, time, credential fingerprint) — never the
+# password. Read before a browser starts; see `giris_denensin_mi`.
+GIRIS_DURUMU = os.path.join(OUTPUT_DIR, ".sebit_giris.json")
 
 SEBIT_TC = os.environ.get("SEBIT_TC", "")
 SEBIT_PASSWORD = os.environ.get("SEBIT_PASSWORD", "")
@@ -54,22 +69,234 @@ def create_driver():
     return webdriver.Chrome(options=opts)
 
 
-def sebit_login(driver):
-    """Login to SEBİT VCloud."""
-    driver.get(f"{BASE}/tr/giris.jsp")
-    time.sleep(3)
-    driver.find_element(By.NAME, "l_un").send_keys(SEBIT_TC)
-    driver.find_element(By.NAME, "l_pw").send_keys(SEBIT_PASSWORD)
-    btns = driver.find_elements(By.CSS_SELECTOR, "button[type='submit']")
-    if btns:
-        btns[0].click()
-    time.sleep(8)
+class SebitGirisHatasi(RuntimeError):
+    """SEBİT refused or could not complete the login. The message is the
+    sentence `run_sync._platform_adimi` writes into health.json."""
 
-    if "index.html" in driver.current_url:
-        print("[SEBIT-HW] Login successful")
+
+class SebitSifreHatali(SebitGirisHatasi):
+    """`login.incorrect`: the stored user name or password is not accepted."""
+
+
+class SebitHesapKapali(SebitGirisHatasi):
+    """`login.userblocked`: the account is closed; only the school reopens it."""
+
+
+KOD_DENEME_SINIRI = 3
+SAYFA_BEKLEME = 20
+GIRIS_BETIK_SURESI = 30
+ERTELEME = timedelta(hours=24)
+# Outcomes a retry cannot change. The same credentials wait ERTELEME before
+# the next attempt, so a cron every 15 minutes does not walk the failed-
+# attempt counter (`csidValue`) into a locked account.
+ERTELENEN = ("sifre_hatali", "hesap_kapali")
+KOD_HATASI_MESAJI = "Geçersiz bir güvenlik kodu girdiniz, lütfen tekrar deneyin."
+_BOS_HEDEF = ("", "null", "undefined")
+
+# The page's own submitHandler without jQuery: the same fields in the same
+# order and encoding, posted to /login from the login page so the session
+# cookie and the captchaId belong together. The answer text comes back to
+# Python instead of to the page's afterLogin, which only shows a toast.
+GIRIS_BETIGI = """
+var cb = arguments[arguments.length - 1];
+var un = String(arguments[0]).trim(), pw = String(arguments[1]).trim(),
+    kod = String(arguments[2]);
+var idAlani = document.getElementById('captchaId');
+var ruAlani = document.getElementById('l_ru');
+var ga = (typeof gaUserId !== 'undefined' && gaUserId) ? gaUserId : '';
+var govde = 'captchaId=' + encodeURIComponent(idAlani ? idAlani.value : '')
+  + '&captchaResponse=' + encodeURIComponent(kod)
+  + '&gaCode=' + encodeURIComponent(ga)
+  + '&l_op=tibeslogin&l_un=' + encodeURIComponent(un)
+  + '&l_pw=' + encodeURIComponent(pw).replace(/'/g, '%27')
+  + '&l_kmli=false&l_ru=' + encodeURIComponent(ruAlani ? ruAlani.value : undefined);
+fetch('/login', {
+  method: 'POST', credentials: 'same-origin', cache: 'no-store',
+  headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest'},
+  body: govde
+}).then(function (r) {
+  return r.text().then(function (t) { cb({s: r.status, b: t}); });
+}).catch(function (e) { cb({s: -1, b: String(e)}); });
+"""
+
+
+def _kisalt(metin, sinir=160):
+    metin = " ".join(str(metin).split())
+    return metin if len(metin) <= sinir else metin[: sinir - 1] + "…"
+
+
+def giris_sonucu(xml_metni):
+    """Read the `/login` XML answer the way the page's `afterLogin` does.
+
+    Returns `(durum, ayrinti)`:
+      basarili      `message` "100"; ayrinti is the URL to open next —
+                    `afterLoginUrl`, or `redirectURL` when that is empty,
+                    "null" or "undefined" — possibly "".
+      hesap_kapali  `key` login.userblocked.
+      kod_hatali    the captcha message.
+      sifre_hatali  `key` login.incorrect.
+      bilinmiyor    anything else, with the server's own words.
+    An empty, truncated or non-XML answer is `bilinmiyor`, never a success.
+    """
+    if not isinstance(xml_metni, str) or not xml_metni.strip():
+        return "bilinmiyor", "boş yanıt"
+    # The answer is five flat fields. A DTD has no business in it, and
+    # refusing one keeps entity tricks away from the stdlib parser (no
+    # defusedxml in .venv; ElementTree resolves no external entities anyway).
+    if re.search(r"<!(DOCTYPE|ENTITY)", xml_metni, re.IGNORECASE):
+        return "bilinmiyor", "çözülemeyen yanıt: DTD taşıyor"
+    try:
+        kok = ET.fromstring(xml_metni.strip())
+    except ET.ParseError:
+        return "bilinmiyor", "çözülemeyen yanıt: " + _kisalt(xml_metni, 80)
+
+    def alan(ad):
+        oge = next(kok.iter(ad), None)
+        return (oge.text or "").strip() if oge is not None else ""
+
+    anahtar, mesaj = alan("key"), alan("message")
+    if mesaj == "100":
+        hedef = alan("afterLoginUrl")
+        if hedef in _BOS_HEDEF:
+            hedef = alan("redirectURL")
+        return "basarili", "" if hedef in _BOS_HEDEF else hedef
+    if anahtar == "login.userblocked":
+        return "hesap_kapali", _kisalt(mesaj or anahtar)
+    if mesaj == KOD_HATASI_MESAJI:
+        return "kod_hatali", mesaj
+    if anahtar == "login.incorrect":
+        return "sifre_hatali", _kisalt(mesaj or anahtar)
+    if not anahtar and not mesaj:
+        return "bilinmiyor", "çözülemeyen yanıt: " + _kisalt(xml_metni, 80)
+    return "bilinmiyor", _kisalt(mesaj or anahtar)
+
+
+def parmak_izi(kullanici, sifre):
+    """Which credentials a refusal was about: a truncated hash, so a change
+    in .env is noticed without the password being written down."""
+    return hashlib.sha256(f"{kullanici}\n{sifre}".encode("utf-8")).hexdigest()[:16]
+
+
+def _kayit_zamani(kayit):
+    try:
+        return datetime.fromisoformat(kayit["zaman"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def giris_denensin_mi(kayit, iz, simdi):
+    """Should this run log in? Only a refusal of these same credentials in
+    the last ERTELEME says no; anything unreadable says yes — a broken state
+    file must never stop the login for good."""
+    if not isinstance(kayit, dict) or kayit.get("sonuc") not in ERTELENEN:
         return True
-    print(f"[SEBIT-HW] Login may have failed: {driver.current_url}")
-    return False
+    if kayit.get("parmak_izi") != iz:
+        return True
+    zaman = _kayit_zamani(kayit)
+    if zaman is None:
+        return True
+    return not (timedelta(0) <= simdi - zaman < ERTELEME)
+
+
+def _durum_oku():
+    try:
+        with open(GIRIS_DURUMU, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def _durumu_sil():
+    try:
+        os.remove(GIRIS_DURUMU)
+    except FileNotFoundError:
+        pass
+
+
+def _ret_hatasi(sonuc, zaman):
+    """The health.json sentence for a refusal, fresh or remembered."""
+    saat = (f"son deneme {zaman:%d.%m %H:%M}, "
+            f"sonraki deneme {zaman + ERTELEME:%d.%m %H:%M}")
+    if sonuc == "hesap_kapali":
+        return SebitHesapKapali(f"SEBİT hesabı kapalı; okulla iletişime geçin ({saat})")
+    return SebitSifreHatali(
+        "SEBİT kullanıcı adı ya da şifresi kabul edilmedi; .env'deki "
+        f"SEBIT_TC/SEBIT_PASSWORD güncellenmeli ({saat})")
+
+
+def giris_kontrolu():
+    """Raise, before any browser starts, when this run must not log in."""
+    if not SEBIT_TC or not SEBIT_PASSWORD:
+        raise SebitGirisHatasi(
+            "SEBİT kimlik bilgileri .env'de yok (SEBIT_TC/SEBIT_PASSWORD)")
+    kayit = _durum_oku()
+    if not giris_denensin_mi(kayit, parmak_izi(SEBIT_TC, SEBIT_PASSWORD),
+                             datetime.now()):
+        print("[SEBIT-HW] Giriş denenmedi: aynı kimlik bilgileri son 24 saatte reddedildi")
+        raise _ret_hatasi(kayit["sonuc"], _kayit_zamani(kayit))
+
+
+def _kod_satiri_gorunur(driver):
+    return any(oge.is_displayed()
+               for oge in driver.find_elements(By.CSS_SELECTOR, ".captcha-rows"))
+
+
+def sebit_login(driver, ocr=None):
+    """Log in to SEBİT VCloud and open the page the server sends us to.
+
+    The page posts the form by AJAX and answers XML; that answer is read
+    (`giris_sonucu`) instead of guessing from `current_url` after a fixed
+    sleep. A wrong captcha is retried with a fresh one, at most
+    KOD_DENEME_SINIRI times; a refused password or a closed account stops at
+    once and is recorded, so the next runs do not feed the lockout counter.
+    """
+    driver.set_script_timeout(GIRIS_BETIK_SURESI)
+    for deneme in range(1, KOD_DENEME_SINIRI + 1):
+        driver.get(f"{BASE}/tr/giris.jsp")
+        WebDriverWait(driver, SAYFA_BEKLEME).until(
+            EC.presence_of_element_located((By.ID, "l_un")))
+
+        kod = ""
+        if _kod_satiri_gorunur(driver):
+            if ocr is None:
+                ocr = ocr_olustur()
+            kod = captcha_oku(ocr, driver.find_element(By.ID, "captchaImg"))
+            if not re.fullmatch(r"\d{5}", kod):
+                # not submitted: a wrong code would feed the counter too
+                print(f"[SEBIT-HW] Güvenlik kodu okunamadı "
+                      f"({deneme}/{KOD_DENEME_SINIRI})")
+                continue
+
+        yanit = driver.execute_async_script(
+            GIRIS_BETIGI, SEBIT_TC, SEBIT_PASSWORD, kod) or {}
+        durum, ayrinti = giris_sonucu(yanit.get("b"))
+
+        if durum == "basarili":
+            _durumu_sil()
+            driver.get(urljoin(f"{BASE}/login", ayrinti or "/"))
+            print("[SEBIT-HW] Login successful")
+            return True
+        if durum == "kod_hatali":
+            print(f"[SEBIT-HW] Güvenlik kodu kabul edilmedi "
+                  f"({deneme}/{KOD_DENEME_SINIRI})")
+            continue
+        if durum in ERTELENEN:
+            zaman = datetime.now().replace(microsecond=0)
+            atomic_json_dump({
+                "sonuc": durum,
+                "zaman": zaman.isoformat(),
+                "parmak_izi": parmak_izi(SEBIT_TC, SEBIT_PASSWORD),
+                "mesaj": ayrinti,
+            }, GIRIS_DURUMU)
+            raise _ret_hatasi(durum, zaman)
+        raise SebitGirisHatasi(
+            f"SEBİT girişi tanınmayan bir yanıt verdi "
+            f"(HTTP {yanit.get('s')}): {ayrinti}")
+
+    raise SebitGirisHatasi(
+        f"SEBİT güvenlik kodu {KOD_DENEME_SINIRI} denemede de kabul edilmedi; "
+        "sonraki senkronda yeniden denenecek")
 
 
 def xhr_get(driver, url):
@@ -181,11 +408,11 @@ def parse_homework(hw, course_names):
 def scrape():
     """Scrape SEBİT homework and return progress data."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+    giris_kontrolu()
     driver = create_driver()
 
     try:
-        if not sebit_login(driver):
-            return None
+        sebit_login(driver)
 
         course_names = fetch_homework_courses(driver)
         all_hw = fetch_all_homework(driver)
@@ -220,7 +447,11 @@ def scrape():
 
 
 def main():
-    progress = scrape()
+    try:
+        progress = scrape()
+    except SebitGirisHatasi as e:
+        print(f"[SEBIT-HW] {e}")
+        sys.exit(1)
     if not progress:
         print("[SEBIT-HW] Scraping failed")
         sys.exit(1)

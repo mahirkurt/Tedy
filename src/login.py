@@ -2,7 +2,6 @@
 import os
 import time
 
-import ddddocr
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -24,14 +23,32 @@ def create_driver():
     return webdriver.Chrome(options=opts)
 
 
+def ocr_olustur():
+    """The captcha reader every TEDY login shares: ddddocr, banner off.
+
+    Imported here rather than at module level so a scraper that only needs
+    `captcha_oku` does not pay for onnxruntime until it meets a captcha.
+    """
+    import ddddocr
+    return ddddocr.DdddOcr(show_ad=False)
+
+
+def captcha_oku(ocr, goruntu):
+    """OCR a captcha <img> element from its own screenshot.
+
+    The element's screenshot, not a fresh download of its src: the image is
+    bound to the session that rendered it, and a second request would be a
+    different code.
+    """
+    return ocr.classification(goruntu.screenshot_as_png).strip()
+
+
 def solve_captcha(driver, ocr):
     """Screenshot the captcha image element and OCR it."""
     captcha_img = driver.find_element(
         By.CSS_SELECTOR, 'img[src*="CaptchaHandler"]'
     )
-    png_bytes = captcha_img.screenshot_as_png
-    result = ocr.classification(png_bytes)
-    return result.strip()
+    return captcha_oku(ocr, captcha_img)
 
 
 def login(username: str, password: str, role: str = "ogrenci"):
@@ -41,7 +58,7 @@ def login(username: str, password: str, role: str = "ogrenci"):
     role: "ogrenci" | "veli" | "ogretmen"
     """
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    ocr = ddddocr.DdddOcr(show_ad=False)
+    ocr = ocr_olustur()
     driver = create_driver()
 
     button_map = {
