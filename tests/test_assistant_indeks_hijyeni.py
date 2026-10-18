@@ -70,6 +70,8 @@ FORBIDDEN_FILES = (
     "output/crontab",
     "output/crontab.bak",
     "output/.sync_zamanlama.json",
+    # SEBİT login backoff state (2026-10-18): a credential fingerprint, not school data.
+    "output/.sebit_giris.json",
     # Fix round 1 (controller, Görev 6): raw per-platform progress JSON,
     # readable only through `platform_ilerlemesi` (Görev 3) now — the audit
     # named these "raw JSON in the index" as noise (§1).

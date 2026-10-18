@@ -294,6 +294,8 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     "*.pid",
     "crontab*",
     ".sync_zamanlama.json",
+    # SEBİT login backoff state: a credential fingerprint, never school data.
+    ".sebit_giris.json",
     "*.lock",
     "edupedia_media_ledger.json",
     "ted_mcp_oauth.sqlite3*",
