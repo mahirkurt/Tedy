@@ -9,6 +9,24 @@ PROFILE_URL = f"{PORTAL_BASE}/pages/ogrenci_istekler/p_temel_bilgiler"
 DEFAULT_COOKIE_PATH = os.path.join(os.path.dirname(__file__), "..", "output", "portal_cookies.json")
 
 
+def tekillestir(cookies: list[dict]) -> list[dict]:
+    """One cookie per name; the host-only one wins.
+
+    The portal sets every cookie host-only. A `.portal…` domain cookie of the
+    same name is one an older sync injected with `add_cookie(domain=…)`, which
+    the server's renewal never overwrote — measured 2026-10-19: the file held
+    the renewed `.AUTH` and the login's own, and the stale one won on load.
+    """
+    secilen: dict[str, dict] = {}
+    for c in cookies:
+        ad = c.get("name")
+        onceki = secilen.get(ad)
+        if onceki is None or (str(onceki.get("domain", "")).startswith(".")
+                              and not str(c.get("domain", "")).startswith(".")):
+            secilen[ad] = c
+    return list(secilen.values())
+
+
 def save_cookies(cookies: list[dict], path: str = DEFAULT_COOKIE_PATH) -> None:
     """Save browser cookies to disk as JSON."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -22,7 +40,7 @@ def load_cookies(path: str = DEFAULT_COOKIE_PATH) -> list[dict] | None:
         return None
     try:
         with open(path, encoding="utf-8") as f:
-            return json.load(f)
+            return tekillestir(json.load(f))
     except (json.JSONDecodeError, OSError):
         return None
 
@@ -53,17 +71,21 @@ def oturumu_tazele(cookies: list[dict], current_url: str, path: str = DEFAULT_CO
         return False
     if not any(c.get("name") == ".AUTH" and c.get("value") for c in cookies):
         return False
-    save_cookies(cookies, path)
+    save_cookies(tekillestir(cookies), path)
     return True
 
 
 def apply_cookies_to_driver(driver, cookies: list[dict]) -> None:
-    """Load cookies into Selenium driver. Must navigate to domain first."""
+    """Load cookies into Selenium driver. Must navigate to domain first.
+
+    No `domain` is passed: with one, Chrome stores a separate `.portal…` domain
+    cookie beside the host-only cookie the portal sets, and the ticket the
+    server renews lands in the host-only one while the stale copy keeps being
+    sent. Host-only, the renewal replaces the injected cookie in place.
+    """
     driver.get(PORTAL_BASE)
-    for c in cookies:
+    for c in tekillestir(cookies):
         cookie = {"name": c["name"], "value": c["value"]}
-        if "domain" in c:
-            cookie["domain"] = c["domain"]
         try:
             driver.add_cookie(cookie)
         except Exception:

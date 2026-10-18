@@ -128,3 +128,65 @@ def test_senkron_oturumu_dusmusse_kayda_dokunmaz(senkron):
     _yaz(yol, _cerezler("girisin-bileti"))
     kos(_OturumSurucusu(GIRIS, _cerezler("anonim")))
     assert _oku(yol) == _cerezler("girisin-bileti")
+
+
+# Measured 2026-10-19 01:20: the fix above kept the renewed ticket, and the run
+# still died. The browser had held two `.AUTH` cookies: the one the server
+# renewed (host-only, as the portal sets every cookie) and the one the sync had
+# injected — `add_cookie` with a `domain` makes a separate `.portal…` domain
+# cookie, which the server's Set-Cookie never overwrites. Both were saved; on
+# the next load the file order let the login's own ticket win, and it expired
+# exactly 30 minutes after that login.
+from src.session_manager import apply_cookies_to_driver, load_cookies  # noqa: E402
+
+
+def _ciftli():
+    return [
+        {"name": ".AUTH", "value": "yenilenmis", "domain": "portal.tedronesans.k12.tr", "path": "/"},
+        {"name": "ASP.NET_SessionId", "value": "eski-oturum", "domain": ".portal.tedronesans.k12.tr", "path": "/"},
+        {"name": "ASP.NET_SessionId", "value": "oturum", "domain": "portal.tedronesans.k12.tr", "path": "/"},
+        {"name": ".AUTH", "value": "girisin-bileti", "domain": ".portal.tedronesans.k12.tr", "path": "/"},
+    ]
+
+
+def test_kayitli_cift_bilet_tekillesir_sunucununki_kazanir(tmp_path):
+    yol = str(tmp_path / "portal_cookies.json")
+    _yaz(yol, _ciftli())
+    cerezler = {c["name"]: c["value"] for c in load_cookies(yol)}
+    assert len(load_cookies(yol)) == 2
+    assert cerezler == {".AUTH": "yenilenmis", "ASP.NET_SessionId": "oturum"}
+
+
+class _CerezKaydedici:
+    def __init__(self):
+        self.eklenen = []
+
+    def get(self, url):
+        pass
+
+    def add_cookie(self, cerez):
+        self.eklenen.append(dict(cerez))
+
+    def refresh(self):
+        pass
+
+
+def test_cerezler_tarayiciya_alan_adi_verilmeden_eklenir():
+    # Without a domain the cookie is host-only — the same cookie the server's
+    # renewal replaces in place, so the browser never holds two tickets.
+    surucu = _CerezKaydedici()
+    apply_cookies_to_driver(surucu, _cerezler("bilet"))
+    assert surucu.eklenen and all("domain" not in c for c in surucu.eklenen)
+
+
+def test_tarayiciya_her_addan_tek_cerez_gider():
+    surucu = _CerezKaydedici()
+    apply_cookies_to_driver(surucu, _ciftli())
+    assert {c["name"]: c["value"] for c in surucu.eklenen} == {".AUTH": "yenilenmis", "ASP.NET_SessionId": "oturum"}
+    assert len(surucu.eklenen) == 2
+
+
+def test_tazelenen_kayitta_tek_bilet_kalir(tmp_path):
+    yol = str(tmp_path / "portal_cookies.json")
+    assert oturumu_tazele(_ciftli(), PROFIL, yol) is True
+    assert [c["value"] for c in _oku(yol) if c["name"] == ".AUTH"] == ["yenilenmis"]
