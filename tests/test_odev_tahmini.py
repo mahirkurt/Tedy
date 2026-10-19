@@ -157,8 +157,9 @@ def test_okuyucu_hata_nedeni_ozette(tmp_path):
 
 def test_yazma_hatasi_isit_disina_cikmaz(tmp_path, monkeypatch):
     from src import odev_tahmini as m
-    def patla(*a, **k):
-        raise OSError("disk dolu")
+    def patla(yol, degisiklik):
+        if degisiklik:  # ön sınama (boş yazım) geçer, asıl kayıt düşer
+            raise OSError("disk dolu")
     monkeypatch.setattr(m, "_birlestir_yaz", patla)
     sahte = SahteOkuyucu(OdevTahmini(40, "zor", "Yönergeyi oku", [], "model"))
     satir2 = dict(SATIR, homework_key="baska")
@@ -176,3 +177,33 @@ def test_kapi_kesmeden_sonra_sinar():
     s = uydurma_kapisi(t, "sayfa 7")
     assert s.ilk_adim == YEDEK_ILK_ADIM and s.parcalar == []
     assert len(s.ilk_adim) <= 80
+
+
+def test_yazilamayan_onbellek_model_cagirmaz(tmp_path, monkeypatch):
+    from src import odev_tahmini as m
+    def patla(*a, **k):
+        raise OSError("salt okunur")
+    monkeypatch.setattr(m, "_birlestir_yaz", patla)
+    sahte = SahteOkuyucu(OdevTahmini(40, "zor", "Yönergeyi oku", [], "model"))
+    ozet = TahminDeposu(tmp_path, sahte).isit([SATIR], BUGUN, bitis=time.monotonic() + 30)
+    assert sahte.cagri == 0 and ozet["durdu"] == "yazma" and "salt okunur" in ozet["son_hata"]
+
+
+def test_onbellek_okuma_hatasi_isit_disina_cikmaz(tmp_path, monkeypatch):
+    sahte = SahteOkuyucu(OdevTahmini(40, "zor", "Yönergeyi oku", [], "model"))
+    d = TahminDeposu(tmp_path, sahte)
+    def patla():
+        raise ValueError("bozuk")
+    monkeypatch.setattr(d, "_onbellek", patla)
+    ozet = d.isit([SATIR], BUGUN, bitis=time.monotonic() + 30)
+    assert sahte.cagri == 0 and "bozuk" in ozet["son_hata"]
+
+
+def test_defter_hatasi_isit_disina_cikmaz(tmp_path, monkeypatch):
+    sahte = SahteOkuyucu(OdevTahmini(40, "zor", "Yönergeyi oku", [], "model"))
+    d = TahminDeposu(tmp_path, sahte)
+    def patla():
+        raise OSError("kilit")
+    monkeypatch.setattr(d.defter, "izin_var", patla)
+    ozet = d.isit([SATIR], BUGUN, bitis=time.monotonic() + 30)
+    assert sahte.cagri == 0 and ozet["durdu"] == "defter" and "kilit" in ozet["son_hata"]

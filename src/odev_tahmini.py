@@ -270,7 +270,15 @@ class TahminDeposu:
         """Önbellekte olmayan ödevler için modeli çağırır; `bitis` time.monotonic() cinsinden son an.
         Bütçe ya da süre bitince durur, hata ödevi yuttur (yedek kalır)."""
         ozet = {"cagri": 0, "onbellekte": 0, "hata": 0, "durdu": None, "son_hata": None}
-        onbellek = self._onbellek()
+        # Ücretli çağrıdan önce önbelleğin yazılabildiğini sına (kilit + atomik yazım, içerik aynı):
+        # yazılamayan önbellek her senkronda aynı ödevi yeniden faturalandırırdı.
+        try:
+            onbellek = self._onbellek()
+            _birlestir_yaz(self.kok / ONBELLEK, {})
+        except Exception as w:
+            self._hata(ozet, w, "yazma")
+            ozet["durdu"] = "yazma"
+            return ozet
         for satir in satirlar:
             anahtar = self._anahtar(satir)
             if anahtar in onbellek:
@@ -283,7 +291,13 @@ class TahminDeposu:
             if kalan < CAGRI_EN_AZ_SURE:
                 ozet["durdu"] = "sure"
                 break
-            if not self.defter.izin_var():
+            try:
+                izin = self.defter.izin_var()
+            except Exception as w:
+                self._hata(ozet, w, "defter")
+                ozet["durdu"] = "defter"
+                break
+            if not izin:
                 ozet["durdu"] = "butce"
                 break
             try:
