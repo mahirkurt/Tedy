@@ -1,9 +1,13 @@
 """Akşam düzeni ayarı: saf doğrulama/okuma ve uçlar."""
 import json
+import os
 
 import pytest
 
-from src.aksam_duzeni import VARSAYILAN, dakika, dogrula, oku
+os.environ.setdefault("TEST_AUTH_BYPASS", "1")
+os.environ.setdefault("DASHBOARD_SECRET_KEY", "test-only")
+
+from src.aksam_duzeni import VARSAYILAN, dakika, dogrula, oku  # noqa: E402
 
 
 def test_varsayilan_aksam(tmp_path):
