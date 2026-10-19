@@ -448,23 +448,71 @@ def test_bozuk_anlik_goruntu_plani_dusurmez(ortam):
 
 # ── düzeltme turu 1 ──────────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("carpan, tahmin", [(1.0, 10), (1.6, 16)])
-def test_kayit_ham_pay_kalibrasyondan_bagimsiz(ortam, monkeypatch, carpan, tahmin):
-    """R12: aynı gerçek süre, kalibrasyon 1,0 ya da 1,6 iken aynı oranı verir."""
-    monkeypatch.setattr(CalismaKayitlari, "kalibrasyon", lambda self, ders: carpan)
+@pytest.mark.parametrize("carpan", [1.0, 1.6])
+@pytest.mark.parametrize("dakika", [7, 8, 13, 25])
+def test_ham_pay_kalibrasyondan_bagimsiz_ve_kalibrasyon_oranini_verir(tmp_path, dakika, carpan):
+    """R12: normal parçaların ham payları toplamı tahmindir, çarpan ne olursa olsun; kayıtlardan
+    kalibrasyon gerçek/ham oranını verir; ek parça ölçüme girmez."""
+    from datetime import timedelta
+    from src.aksam_duzeni import VARSAYILAN
+    from src.aksam_plani import plan_kur
+    satir = {"homework_key": "k", "Ders Adı": "Matematik", "Ödev Başlığı": "P", "Ödev Son Teslim Tarihi": YARIN,
+             "detail": {"description": "x", "attachments": []}, "teacher_resolved": False,
+             "student_marked_done": False}
+    tahmin = lambda s: OdevTahmini(dakika, "orta", "Başla", ["a", "b"], "model")  # noqa: E731
+    p = plan_kur([satir], tahmin, VARSAYILAN, SIMDI_1630, [], {"ek_parca": {"k": 2}}, True,
+                 kalibrasyon=lambda d: carpan)
+    parcalar = [b for b in p.bloklar if b.tur == "calisma"]
+    normal, ek = parcalar[:-2], parcalar[-2:]
+    assert sum(b.ham_dk for b in normal) == pytest.approx(dakika, abs=1e-6)
+    assert [b.ham_dk for b in ek] == [0.0, 0.0]
+    k = CalismaKayitlari(tmp_path)
+    basla = datetime(2026, 10, 19, 17, 0)
+    for b in parcalar:                                            # her parça ham payının 1,5 katı sürdü
+        for _ in range(3):
+            k.ekle({"gun": "g", "odev_anahtari": "k", "ders": "Matematik", "tahmin_dk": b.tahmin_dk,
+                    "ham_dk": b.ham_dk, "basla": basla.isoformat(),
+                    "bitti": (basla + timedelta(seconds=90 * b.ham_dk + 900 * (b.ham_dk == 0))).isoformat(),
+                    "durum": "bitti"})
+    assert k.kalibrasyon("Matematik") == pytest.approx(1.5, abs=1e-6)
+
+
+def test_ham_pay_sureyle_ayni_gerceginde_ayni_oran(tmp_path):
+    """Aynı gerçek süre, 1,0 ve 1,6 çarpanıyla aynı oranı kaydeder (tek parçalı 8 dk)."""
+    from src.aksam_duzeni import VARSAYILAN
+    from src.aksam_plani import plan_kur
+    satir = {"homework_key": "k", "Ders Adı": "Matematik", "Ödev Başlığı": "P", "Ödev Son Teslim Tarihi": YARIN,
+             "detail": {"description": "x", "attachments": []}, "teacher_resolved": False,
+             "student_marked_done": False}
+    ham = []
+    for c in (1.0, 1.6):
+        p = plan_kur([satir], lambda s: OdevTahmini(8, "orta", "Başla", [], "model"), VARSAYILAN, SIMDI_1630,
+                     [], {}, True, kalibrasyon=lambda d, c=c: c)
+        [b] = [x for x in p.bloklar if x.tur == "calisma"]
+        ham.append(b.ham_dk)
+    assert ham[0] == pytest.approx(ham[1], abs=1e-9) == pytest.approx(8.0)
+
+
+def test_kayit_ham_pay_api_ucunda(ortam):
     ortam.depo.dakika = 8
     ilk = ortam.calisma()[0]
-    assert ilk["tahmin_dk"] == tahmin and ilk["ham_dk"] == 8.0
     ortam.c.post(f"/api/plan/blok/{ilk['id']}/basla")
-    ortam.saat = datetime(2026, 10, 19, 17, 22)               # 12 dk sonra
+    ortam.saat = datetime(2026, 10, 19, 17, 22)
     ortam.c.post(f"/api/plan/blok/{ilk['id']}/bitti", json={"tamamlandi": False})
     satir = json.loads((ortam.out / "calisma_kayitlari.jsonl").read_text().splitlines()[-1])
-    assert satir["tahmin_dk"] == tahmin and satir["ham_dk"] == 8.0
-    k = CalismaKayitlari(ortam.out.parent)
-    for _ in range(2):
-        k.ekle(satir)
-    gercek_oran = 12 / satir["ham_dk"]
-    assert gercek_oran == 1.5
+    assert satir["tahmin_dk"] == 10 and satir["ham_dk"] == pytest.approx(8.0)
+
+
+def test_listeden_dusen_suren_blok_simdiki_olur_ve_bitirilebilir(ortam):
+    a, b = ortam.calisma()
+    ortam.c.post(f"/api/plan/blok/{a['id']}/basla")
+    ortam.veri["odevlerim"]["homework"]["rows"] = [r for r in ortam.veri["odevlerim"]["homework"]["rows"]
+                                                   if a["baslik"] != r["Ödev Başlığı"]]
+    p = ortam.plan()
+    assert p["simdiki"]["id"] == a["id"] and p["simdiki"]["durum"] == "suruyor"
+    r = ortam.c.post(f"/api/plan/blok/{a['id']}/bitti", json={"tamamlandi": True})
+    assert r.status_code == 200 and ortam.plan()["simdiki"] is None
+    assert ortam.c.post(f"/api/plan/blok/{b['id']}/basla").status_code == 200
 
 
 def test_baslamadan_bitti_kalibrasyona_girmez(ortam):

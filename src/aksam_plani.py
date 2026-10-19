@@ -53,7 +53,7 @@ class Blok:
     tahmin_dk: int = 0
     zorluk: str = "orta"
     durum: Literal["bekliyor", "suruyor", "bitti", "ertelendi"] = "bekliyor"
-    ham_dk: float = 0.0   # bloğun ham tahmin payı: kalibrasyondan ve %25 tampondan önce (R12)
+    ham_dk: float = 0.0   # ham tahmin payı (R12): normal parçalarda toplamı tahmin dakikası, ek parçada 0
 
 
 @dataclass
@@ -241,14 +241,14 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
             ek = max(0, min(20, _tam(ek_parca.get(anahtar)) or 0))
         except (TypeError, ValueError):
             ek = 0
-        normal = len(sureler)
+        normal, normal_toplam = len(sureler), sum(sureler)
         sureler += [EK_PARCA_DK] * ek
         adimlar += [DEVAM_ADIMI] * ek
         for i, (dk, adim) in enumerate(zip(sureler, adimlar)):
             parcalar.append(_Parca(_kimlik(gun_s, anahtar, i), anahtar, ders, str(satir.get("Ödev Başlığı") or ""),
                                    adim, i, len(sureler), dk, zorluk, sira,
                                    str(satir.get("Ödev Son Teslim Tarihi") or ""), teslim[0] if teslim else None,
-                                   round(dk / (carpan * TAMPON), 1) if i < normal else float(EK_PARCA_DK)))
+                                   t.dakika * dk / normal_toplam if i < normal else 0.0))   # ek parça ölçüme girmez
 
     # ---- sabit bloklar
     yemek_bas = dakika(duzen["yemek"])
