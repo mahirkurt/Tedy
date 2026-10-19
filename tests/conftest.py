@@ -96,6 +96,15 @@ def _canli_sinav_tespiti_yok(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _canli_tahmin_isitma_yok(monkeypatch):
+    """run_sync.main() warms the evening plan's homework estimates since 2026-10-19 (Görev 6).
+    A test that drives main() must not reach Claude nor write the live estimate cache; the real
+    step is replaced by a stub. Tests of the step hold the real function from collection time."""
+    import src.run_sync as rs
+    monkeypatch.setattr(rs, "_tahmin_isitma_adimi", lambda *a, **k: {"atlandi": "test"})
+
+
+@pytest.fixture(autouse=True)
 def _canli_odev_tahmini_yok(monkeypatch):
     """The evening plan (2026-10-19) estimates homework with Claude Haiku. A test that reaches the
     real reader would make a billed call; every test fails loudly instead. Tests of the store pass
