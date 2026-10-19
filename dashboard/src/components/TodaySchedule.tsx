@@ -21,7 +21,7 @@ import { NextThing } from './NextThing'
 import { useBookProgress } from '../hooks/useBookReader'
 import { useZamanKutusu } from '../hooks/useZamanKutusu'
 import { yaptimIsaretle, yaptimGeriAl } from '../utils/odevYaptim'
-import { useOdakPenceresi } from '../hooks/useOdakPenceresi'
+import { useAksamDuzeni } from '../hooks/useAksamDuzeni'
 import { YaptinSatiri, type GeriAlDurumu } from './patterns/YaptinSatiri'
 import type { BookSummary } from '../types'
 import type { HomeworkItem, CalendarEvent, OgepSession, ExamsApiResponse } from '../types'
@@ -241,8 +241,8 @@ export default function TodaySchedule() {
   // The work "Yaptım" just recorded, kept so "Geri al" can send the same record (B63).
   const [sonYapilan, setSonYapilan] = useState<{ ad: string; hw: HomeworkItem } | null>(null)
   const [geriAlDurumu, setGeriAlDurumu] = useState<GeriAlDurumu>('bos')
-  // The household's focus window (B29): today's values until it loads.
-  const { pencere, loading: pencereYukleniyor, iskelet: pencereIskeleti } = useOdakPenceresi()
+  // The household's evening (B29): the family's defaults until it loads.
+  const { duzen, loading: duzenYukleniyor, iskelet: duzenIskeleti } = useAksamDuzeni()
 
   // Reference time for every countdown on this page, refreshed each minute.
   const [nowMs, setNowMs] = useState(() => Date.now())
@@ -335,9 +335,9 @@ export default function TodaySchedule() {
     if (!okulGunu) return null
     const dersler = bugunAjandasi.filter(a => a.type === 'lesson')
     const bas = dersler.length ? Math.min(...dersler.map(a => a.startMin)) : SCHOOL_START
-    const bit = dersler.length ? Math.max(...dersler.map(a => a.endMin)) : pencere.okulBitisi
+    const bit = dersler.length ? Math.max(...dersler.map(a => a.endMin)) : duzen.okulBitisi
     return { bas, bit }
-  }, [okulGunu, bugunAjandasi, pencere.okulBitisi])
+  }, [okulGunu, bugunAjandasi, duzen.okulBitisi])
 
   // The ten minutes behind "10 dakikayla başla", kept on this card and across
   // a reload. Keyed by the work, so a different top item finds no box.
@@ -357,7 +357,7 @@ export default function TodaySchedule() {
       // The normalised name, as "Ayrıca" and İşler print it (İ9).
       const course = String(top.hw.normalized_course || top.hw['Ders Adı'] || '').trim()
       const title = String(top.hw['Ödev Başlığı'] || '').trim()
-      const voice = windowVoice(minutes, 'work', okulGunu, pencere)
+      const voice = windowVoice(minutes, 'work', okulGunu, duzen)
       return {
         anchorMin: voice.anchorMin,
         props: {
@@ -380,7 +380,7 @@ export default function TodaySchedule() {
     const target = firstBook
       ? (resumeId ? `/kitaplar/${firstBook.slug}/${resumeId}` : `/kitaplar/${firstBook.slug}`)
       : '/kitaplar'
-    const voice = windowVoice(minutes, 'reading', okulGunu, pencere)
+    const voice = windowVoice(minutes, 'reading', okulGunu, duzen)
     return {
       anchorMin: voice.anchorMin,
       props: {
@@ -395,7 +395,7 @@ export default function TodaySchedule() {
         due: undefined,
       },
     }
-  }, [top, nowMs, okulGunu, pencere, firstBook, bookProgress.lastChapterId, navigate, baslat])
+  }, [top, nowMs, okulGunu, duzen, firstBook, bookProgress.lastChapterId, navigate, baslat])
 
   // "Yaptım" from inside the box. On success the homework reloads everywhere
   // (tedy:homework-updated), the card steps to the next work, and a quiet line
@@ -467,7 +467,7 @@ export default function TodaySchedule() {
   // Once today's last bell has gone — or, on a day without school, from the
   // usual end of the day — the evening turns to tomorrow's bag.
   const yarinGoster = selectedIsToday && !okulModu && sonrakiGun != null
-    && nowMin >= (yer.dersSayisi > 0 ? yer.sonZil : pencere.okulBitisi)
+    && nowMin >= (yer.dersSayisi > 0 ? yer.sonZil : duzen.okulBitisi)
 
   // Upcoming exams, soonest first. One that falls on the next school day leads
   // the evening's "Yarın" and leaves the list, so it is said once; it never
@@ -502,12 +502,12 @@ export default function TodaySchedule() {
     navigate(yol)
   }
 
-  if (loading || pencereYukleniyor) {
+  if (loading || duzenYukleniyor) {
     // A load shorter than 400 ms shows nothing (S36, B48): a skeleton that
     // blinks for a frame is noise. Past it, the page's own shape in Carbon
     // skeletons (§5.2, B5): day line, strip, card and a few rows. One set,
     // nothing else moves.
-    if (!programIskeleti && !pencereIskeleti) return null
+    if (!programIskeleti && !duzenIskeleti) return null
     return (
       <div className="today today--yukleniyor" aria-busy="true">
         <span className="cds--visually-hidden" role="status">Bugün yükleniyor</span>
@@ -572,9 +572,9 @@ export default function TodaySchedule() {
 
       <DayStrip
         nowMin={nowMin}
-        bedtimeMin={pencere.yatma}
-        focusEndMin={pencere.odakSonu}
-        dayStartMin={SCHOOL_START}
+        bedtimeMin={duzen.yatma}
+        homeworkStartMin={duzen.odeveHazir}
+        focusEndMin={duzen.zorIsSonu}
         school={seritOkulu}
       />
 

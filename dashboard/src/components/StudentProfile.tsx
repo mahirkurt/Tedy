@@ -8,7 +8,7 @@ import { useApi } from '../hooks/useApi'
 import { COURSE_CONTENT_ORDER } from '../utils/formatters'
 import type { PrivateLesson, StudentProfileData } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
-import OdakPenceresiAyari from './OdakPenceresiAyari'
+import AksamDuzeniAyari from './AksamDuzeniAyari'
 
 const DEFAULT_PROFILE: StudentProfileData = {
   name: '',
@@ -245,7 +245,7 @@ export default function StudentProfile() {
         </Layer>
       </div>
 
-      <OdakPenceresiAyari />
+      <AksamDuzeniAyari />
 
       <div className="dashboard-card">
         <h2 className="dashboard-card__title">Tanımlı özel dersler</h2>

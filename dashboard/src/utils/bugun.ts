@@ -7,26 +7,48 @@
  * "OKULDAN SONRA". Capitals belong to CSS, and this page uses none.
  */
 
-/** First bell, last bell, the end of the focus window, bedtime — minutes. */
+/** First bell and the last bell's default — minutes. */
 export const SCHOOL_START = 8 * 60
 export const SCHOOL_END = 15 * 60 + 45
-// Işık's sustained-attention window closes before homework hours begin, so the
-// stretch between the last bell and the window's edge is the most valuable time
-// in the day and the interface spends it on one demanding thing. See §2 of
-// docs/frontend-design-principles.md — this is a parameter, not a fact of life.
-export const FOCUS_END = 16 * 60
-export const BEDTIME = 22 * 60 + 30
 
 /**
- * The household's focus window in minutes: last bell, the window's end,
- * bedtime. Since 2026-10-11 it is read from the server (`/api/odak-penceresi`,
- * stored in `output/odak_penceresi.json`, set on Profil — talimatname B29);
- * the constants above are only its defaults, used until it loads and whenever
- * what arrives is not a well-formed window.
+ * The household's evening in minutes (spec 2026-10-19, akşam çalışma planı):
+ * the last bell, when Işık is ready for homework, where the hard work ends and
+ * the light work ends, dinner, getting ready and bedtime, plus the two
+ * "tell the family" thresholds and who is told. Read from the server
+ * (`/api/aksam-duzeni`, stored in `output/aksam_duzeni.json`, set on Profil —
+ * talimatname B29); the defaults below are the family's own evening, used
+ * until it loads and whenever what arrives is not a well-formed one. Işık's
+ * sustained-attention window is a parameter, not a fact of life (§2 of
+ * docs/frontend-design-principles.md).
  */
-export interface OdakPenceresi { okulBitisi: number; odakSonu: number; yatma: number }
+export interface AksamDuzeni {
+  okulBitisi: number
+  odeveHazir: number
+  zorIsSonu: number
+  hafifIsSonu: number
+  yemek: number
+  yemekDk: number
+  hazirlik: number
+  yatma: number
+  baslamadiEsikDk: number
+  takildiEsikDk: number
+  haberAlacaklar: string[]
+}
 
-export const VARSAYILAN_PENCERE: OdakPenceresi = { okulBitisi: SCHOOL_END, odakSonu: FOCUS_END, yatma: BEDTIME }
+export const VARSAYILAN_DUZEN: AksamDuzeni = {
+  okulBitisi: SCHOOL_END,
+  odeveHazir: 17 * 60,
+  zorIsSonu: 19 * 60,
+  hafifIsSonu: 19 * 60 + 30,
+  yemek: 18 * 60 + 30,
+  yemekDk: 30,
+  hazirlik: 20 * 60 + 30,
+  yatma: 21 * 60,
+  baslamadiEsikDk: 15,
+  takildiEsikDk: 15,
+  haberAlacaklar: [],
+}
 
 const SAAT_RE = /^([01]\d|2[0-3]):([0-5]\d)$/
 
@@ -36,26 +58,58 @@ export function saattenDakika(s: unknown): number | null {
   return m ? Number(m[1]) * 60 + Number(m[2]) : null
 }
 
-/** Whether three minutes form a window: the bell, then its end, then bedtime. */
-export function pencereGecerli(p: OdakPenceresi): boolean {
-  return p.okulBitisi <= p.odakSonu && p.odakSonu < p.yatma
+/** The server's own sentences (src/aksam_duzeni.py), so the form can say them before sending. */
+export const SIRA_HATASI = 'Saatler sırayla olmalı: okul bitişi, ödeve hazır, zor işlerin sonu, hafif işlerin sonu, hazırlık, sonra yatma.'
+export const YEMEK_HATASI = 'Yemek, ödeve hazır olma saati ile hazırlık arasında kalmalı ve süresi sığmalı.'
+export const YEMEK_SURESI_HATASI = 'Yemek süresi 10 ile 60 dakika arasında olmalı.'
+export const ESIK_HATASI = 'Haber verme süreleri 5 ile 60 dakika arasında olmalı.'
+
+const aralikta = (n: number, alt: number, ust: number) => Number.isInteger(n) && n >= alt && n <= ust
+
+/** The first rule the evening breaks, in the server's wording; null when it holds. */
+export function duzenHatasi(d: AksamDuzeni): string | null {
+  if (!aralikta(d.yemekDk, 10, 60)) return YEMEK_SURESI_HATASI
+  if (!aralikta(d.baslamadiEsikDk, 5, 60) || !aralikta(d.takildiEsikDk, 5, 60)) return ESIK_HATASI
+  if (!(d.okulBitisi <= d.odeveHazir && d.odeveHazir < d.zorIsSonu && d.zorIsSonu <= d.hafifIsSonu
+    && d.hafifIsSonu <= d.hazirlik && d.hazirlik < d.yatma)) return SIRA_HATASI
+  if (!(d.odeveHazir <= d.yemek && d.yemek <= d.hazirlik - d.yemekDk)) return YEMEK_HATASI
+  return null
 }
 
-/** The API's `{okul_bitisi, odak_sonu, yatma}` as minutes; the defaults otherwise. */
-export function pencereCoz(json: unknown): OdakPenceresi {
-  if (!json || typeof json !== 'object') return VARSAYILAN_PENCERE
+/** The API's snake_case evening as minutes; the defaults otherwise. */
+export function duzenCoz(json: unknown): AksamDuzeni {
+  if (!json || typeof json !== 'object') return VARSAYILAN_DUZEN
   const j = json as Record<string, unknown>
-  const okulBitisi = saattenDakika(j.okul_bitisi)
-  const odakSonu = saattenDakika(j.odak_sonu)
-  const yatma = saattenDakika(j.yatma)
-  if (okulBitisi === null || odakSonu === null || yatma === null) return VARSAYILAN_PENCERE
-  const p = { okulBitisi, odakSonu, yatma }
-  return pencereGecerli(p) ? p : VARSAYILAN_PENCERE
+  const saat = (k: string) => saattenDakika(j[k])
+  const okulBitisi = saat('okul_bitisi'), odeveHazir = saat('odeve_hazir'), zorIsSonu = saat('zor_is_sonu')
+  const hafifIsSonu = saat('hafif_is_sonu'), yemek = saat('yemek'), hazirlik = saat('hazirlik'), yatma = saat('yatma')
+  if (okulBitisi === null || odeveHazir === null || zorIsSonu === null || hafifIsSonu === null
+    || yemek === null || hazirlik === null || yatma === null) return VARSAYILAN_DUZEN
+  const sayi = (k: string) => (typeof j[k] === 'number' ? (j[k] as number) : NaN)
+  const haber = Array.isArray(j.haber_alacaklar)
+    ? j.haber_alacaklar.filter((e): e is string => typeof e === 'string') : []
+  const d: AksamDuzeni = {
+    okulBitisi, odeveHazir, zorIsSonu, hafifIsSonu, yemek, yemekDk: sayi('yemek_dk'), hazirlik, yatma,
+    baslamadiEsikDk: sayi('baslamadi_esik_dk'), takildiEsikDk: sayi('takildi_esik_dk'), haberAlacaklar: haber,
+  }
+  return duzenHatasi(d) === null ? d : VARSAYILAN_DUZEN
 }
 
-/** The body `PUT /api/odak-penceresi` takes. */
-export function pencereGovdesi(p: OdakPenceresi): { okul_bitisi: string; odak_sonu: string; yatma: string } {
-  return { okul_bitisi: clockOf(p.okulBitisi), odak_sonu: clockOf(p.odakSonu), yatma: clockOf(p.yatma) }
+/** The body `PUT /api/aksam-duzeni` takes. */
+export function duzenGovdesi(d: AksamDuzeni) {
+  return {
+    okul_bitisi: clockOf(d.okulBitisi),
+    odeve_hazir: clockOf(d.odeveHazir),
+    zor_is_sonu: clockOf(d.zorIsSonu),
+    hafif_is_sonu: clockOf(d.hafifIsSonu),
+    yemek: clockOf(d.yemek),
+    yemek_dk: d.yemekDk,
+    hazirlik: clockOf(d.hazirlik),
+    yatma: clockOf(d.yatma),
+    baslamadi_esik_dk: d.baslamadiEsikDk,
+    takildi_esik_dk: d.takildiEsikDk,
+    haber_alacaklar: d.haberAlacaklar,
+  }
 }
 
 export const DAYS_TR = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
@@ -117,9 +171,9 @@ export interface Ses {
 /**
  * When the card's work happens, said in one or two words (İ4).
  *
- * On a school day the focus window is 08:00–16:00 and "Şimdi" only belongs in
- * the quarter hour between the last bell and the window's edge: before school
- * and during lessons the work waits for "Okuldan sonra", anchored at 15:45.
+ * On a school day "Şimdi" belongs to [ödeve hazır, zor işlerin sonu) — 17:00 to
+ * 19:00 by default: before it, through school and the way home, the work waits
+ * for "Okuldan sonra", anchored at the hour Işık is ready for homework.
  *
  * A day without school has no "after school" to point at — measured
  * 2026-10-10, a Saturday morning's reading card said "OKULDAN SONRA". There the
@@ -128,10 +182,10 @@ export interface Ses {
  * the next ten minutes are the slot.
  */
 export function windowVoice(
-  minutes: number, kind: 'work' | 'reading', okulGunu = true, pencere: OdakPenceresi = VARSAYILAN_PENCERE,
+  minutes: number, kind: 'work' | 'reading', okulGunu = true, duzen: AksamDuzeni = VARSAYILAN_DUZEN,
 ): Ses {
-  const afterBedtime = minutes >= pencere.yatma
-  const afterWindow = minutes >= pencere.odakSonu
+  const afterBedtime = minutes >= duzen.yatma
+  const afterWindow = minutes >= duzen.zorIsSonu
   const beforeSchool = minutes < SCHOOL_START
 
   if (!okulGunu) {
@@ -143,12 +197,14 @@ export function windowVoice(
     return { eyebrow: 'Şimdi' }
   }
 
-  const beforeLastBell = !beforeSchool && minutes < pencere.okulBitisi
+  // "Şimdi" belongs to [ödeve hazır, zor işlerin sonu); the walk home and the
+  // snack before it are still "Okuldan sonra", anchored where homework starts.
+  const beforeLastBell = !beforeSchool && minutes < duzen.odeveHazir
   if (kind === 'work') {
     if (afterBedtime) return { eyebrow: 'Yarın', hint: 'Bunu yarın okuldan sonra yapmak daha kolay' }
     if (afterWindow) return { eyebrow: 'Bu akşam' }
     if (beforeSchool || beforeLastBell) {
-      return { eyebrow: 'Okuldan sonra', hint: 'Bunu okuldan sonra yapmak daha kolay', anchorMin: pencere.okulBitisi }
+      return { eyebrow: 'Okuldan sonra', hint: 'Bunu okuldan sonra yapmak daha kolay', anchorMin: duzen.odeveHazir }
     }
     return { eyebrow: 'Şimdi' }
   }

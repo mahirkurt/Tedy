@@ -246,10 +246,12 @@ test.describe('D — yenileme', () => {
   test('Gün Şeridi günü adlı parçalara böler, saat cetveli yok', async ({ page }) => {
     await bugunAc(page, '2026-09-24T10:15')
     const serit = page.locator('.day-strip')
-    await expect(serit.locator('.day-strip__part')).toHaveCount(3)
+    await expect(serit.locator('.day-strip__part')).toHaveCount(4)
     await expect(serit.locator('.day-strip__part--okul')).toContainText('Okul')
+    await expect(serit.locator('.day-strip__part--yol')).toContainText('Yol')
     await expect(serit.locator('.day-strip__part--aksam')).toContainText('Akşam')
-    await expect(serit.locator('.day-strip__homework')).toHaveText(/Ödev zamanı 15:\d\d–16:00/)
+    await expect(serit.locator('.day-strip__homework')).toHaveText('Ödev zamanı 17:00–19:00')
+    await expect(serit.locator('.day-strip__end-label')).toHaveText('Yatma 21:00')
     await expect(serit.locator('.day-strip__tick')).toHaveCount(0)
     // The parts fill the rail exactly: no gap, nothing pushed past its end.
     const { ray, toplam } = await serit.evaluate(el => {

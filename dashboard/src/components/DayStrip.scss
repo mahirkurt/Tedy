@@ -8,7 +8,7 @@
 // starts at "now", it shortens through the day on its own — the shape of the
 // component carries the time signal, so no countdown has to shout it (İ2).
 //
-// Since 2026-10-19 the track is cut into named parts — Sabah, Okul, Ödev zamanı,
+// Since 2026-10-19 the track is cut into named parts — Sabah, Okul, Yol, Ödev zamanı,
 // Akşam — instead of an unnamed window, an anchor line and eight hour ticks,
 // which the family found unreadable. A part names itself, so there is no legend
 // and no hour scale (talimatname §8.8). Contrast, every mark opaque:
@@ -77,6 +77,9 @@
 }
 
 .day-strip__part--okul { background: theme.$layer-accent-01; }
+
+// "Yol" (last bell to the hour homework starts) is neutral like Sabah and
+// Akşam: it keeps the rail's own ground and only the part edge sets it apart.
 
 // The one slot the card points at. Never narrower than a mark, so a fifteen-
 // minute slot stays visible at the scale of a whole evening.

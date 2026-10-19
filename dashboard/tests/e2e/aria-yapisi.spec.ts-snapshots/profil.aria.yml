@@ -41,21 +41,43 @@
       - /placeholder: ss:dd
       - text: /\d+:\d+/
     - button "Özel ders ekle"
-  - heading "Odak penceresi" [level=2]
-  - form "Odak penceresi":
-    - paragraph: Son zilden pencerenin sonuna kadar Bugün tek bir zor iş önerir; sonrasında kısa işler. Yatma saatinden sonra işi yarına bırakır.
-    - text: ""
-    - textbox "Son zil":
+  - heading "Akşam düzeni" [level=2]
+  - form "Akşam düzeni":
+    - paragraph: Bugün, ödeve hazır olduğun saatten zor işlerin sonuna kadar tek bir zor iş önerir; sonrasında hafif işler. Yemek ve hazırlık için yer ayırır, yatma saatinden sonra işi yarına bırakır.
+    - text: Ödeve hazır olduğun saat
+    - textbox "Ödeve hazır olduğun saat":
       - /placeholder: ss:dd
       - text: ""
-    - text: Odak penceresinin sonu
-    - textbox "Odak penceresinin sonu":
+    - text: Zor işlerin sonu
+    - textbox "Zor işlerin sonu":
+      - /placeholder: ss:dd
+      - text: ""
+    - text: Hafif işlerin sonu
+    - textbox "Hafif işlerin sonu":
+      - /placeholder: ss:dd
+      - text: ""
+    - text: ""
+    - textbox "Yemek saati":
+      - /placeholder: ss:dd
+      - text: ""
+    - text: Hazırlık saati
+    - textbox "Hazırlık saati":
       - /placeholder: ss:dd
       - text: ""
     - text: ""
     - textbox "Yatma saati":
       - /placeholder: ss:dd
       - text: ""
-    - button "Pencereyi kaydet"
+    - text: Yemek süresi (dakika)
+    - spinbutton "Yemek süresi (dakika)"
+    - button "Decrement number"
+    - button "Increment number"
+    - group "Haber alacaklar":
+      - text: ""
+      - checkbox "anne@example.com"
+      - text: anne@example.com
+      - checkbox "baba@example.com"
+      - text: baba@example.com Liste boşken TEDY kimseye haber vermez. Işık'ın bildirimleri yalnız onun hesabıyla açılmış cihazlara gider.
+    - button "Akşam düzenini kaydet"
   - heading "Tanımlı özel dersler" [level=2]
   - paragraph: Tanımlı özel ders yok.

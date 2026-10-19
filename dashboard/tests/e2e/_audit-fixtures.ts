@@ -22,7 +22,16 @@ export const LIVE_HEALTH = {
 const d = (day: number, h = 23, m = 59) =>
   `${String(day).padStart(2, '0')}.09.2026 ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 
+/** What /api/aksam-duzeni serves when the household has set nothing (spec 2026-10-19). */
+export const AKSAM_VARSAYILAN = {
+  odeve_hazir: '17:00', zor_is_sonu: '19:00', hafif_is_sonu: '19:30', yemek: '18:30', yemek_dk: 30,
+  hazirlik: '20:30', yatma: '21:00', okul_bitisi: '15:45', baslamadi_esik_dk: 15, takildi_esik_dk: 15,
+  haber_alacaklar: [], varsayilan: true,
+  aile_uyeleri: [{ email: 'anne@example.com', ad: 'anne' }, { email: 'baba@example.com', ad: 'baba' }],
+}
+
 export const FULL: Record<string, unknown> = {
+  'aksam-duzeni': AKSAM_VARSAYILAN,
   health: { ...LIVE_HEALTH, validation_warnings: [], unavailable: {} },
   homework: {
     summary: '', homework: [
@@ -135,6 +144,7 @@ export async function mock(page: Page, data: Record<string, unknown>) {
 // The shapes the API actually returns today: every section empty but
 // well-formed, with health naming the two the portal refused.
 export const LIVE: Record<string, unknown> = {
+  'aksam-duzeni': AKSAM_VARSAYILAN,
   health: LIVE_HEALTH,
   schedule: { weeks: [], latest: null, today: null },
   homework: { summary: '', homework: [] },
