@@ -79,7 +79,7 @@ export default function Announcements() {
   }, [sirali, okunanlar, user?.email])
 
   if (data.announcements.length === 0) {
-    return <EmptyLine label="Okul duyuruları">Okuldan yeni bir duyuru yok.</EmptyLine>
+    return <EmptyLine label="Okul Duyuruları">Okuldan yeni bir duyuru yok.</EmptyLine>
   }
 
   const okunmamis = sirali.filter(a => !okunanlar.has(duyuruAnahtari(a)))
@@ -90,7 +90,7 @@ export default function Announcements() {
     <div className="dashboard-card">
       <h2 className="dashboard-card__title">
         <Notification size={20} />
-        Okul duyuruları
+        Okul Duyuruları
       </h2>
       {okunmamis.length > 0 && (
         <p className="announcements__ozet">{okunmamis.length} yeni duyuru</p>

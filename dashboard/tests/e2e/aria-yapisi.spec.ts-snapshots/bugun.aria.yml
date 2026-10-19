@@ -19,8 +19,8 @@
       - button /Fransızca — S1 Les verbes Pazartesi \d+:\d+/
     - listitem:
       - button /Fen Bilimleri — Ödev \(Hibrit \d+-\d+\) Salı \d+:\d+/
-  - text: Yaklaşan sınav
-  - list "Yaklaşan sınav":
+  - text: Yaklaşan Sınav
+  - list "Yaklaşan Sınav":
     - listitem:
       - button /Matematik 1\. Yazılı 1 Eki \d+:\d+/
   - paragraph:

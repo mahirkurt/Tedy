@@ -1,7 +1,7 @@
 - main:
   - heading "Sınavlar" [level=1]
-  - region "Sınav uyarıları":
-    - heading "Sınav uyarıları" [level=2]
+  - region "Sınav Uyarıları":
+    - heading "Sınav Uyarıları" [level=2]
     - paragraph: Bu cihazda kapalı.
     - button "Bu cihazda aç"
   - heading "Yaklaşan sınavlar (2)" [level=2]

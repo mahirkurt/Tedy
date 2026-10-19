@@ -219,7 +219,7 @@ export default function CalendarEvents() {
       <div className="dashboard-card">
         <h2 className="dashboard-card__title">
           <EventSchedule size={20} />
-          Haftalık takvim
+          Haftalık Takvim
         </h2>
         <div className="today-loading" aria-busy="true">
           <SkeletonPlaceholder className="today-loading__block" />
@@ -234,7 +234,7 @@ export default function CalendarEvents() {
       <div className="dashboard-card">
         <h2 className="dashboard-card__title">
           <EventSchedule size={20} />
-          Haftalık takvim
+          Haftalık Takvim
         </h2>
         <EmptyLine>
           {calendarClosedDetail || 'Portal şu an takvimi sunmuyor.'}
@@ -250,7 +250,7 @@ export default function CalendarEvents() {
     <div className="dashboard-card calendar-card">
       <h2 className="dashboard-card__title">
         <EventSchedule size={20} />
-        Haftalık takvim
+        Haftalık Takvim
       </h2>
 
       {/* Navigation */}

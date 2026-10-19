@@ -29,7 +29,7 @@ export default function OdakPenceresiAyari() {
     <div className="dashboard-card">
       <h2 className="dashboard-card__title" id="odak-penceresi-baslik">
         <Time size={20} />
-        Odak penceresi
+        Odak Penceresi
       </h2>
       {loading
         ? (iskelet ? <div aria-busy="true"><SkeletonText paragraph lineCount={3} /></div> : null)

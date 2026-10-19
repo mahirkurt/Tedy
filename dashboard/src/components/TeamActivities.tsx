@@ -72,14 +72,14 @@ export default function TeamActivities() {
   // Returning null left the page blank, which reads the same as a page that
   // failed to load (D3).
   if (activities.length === 0 && ogep.length === 0) {
-    return <EmptyLine label="Takım çalışmaları &amp; ÖGEP">Kayıtlı takım etkinliği veya ÖGEP oturumu yok.</EmptyLine>
+    return <EmptyLine label="Takım Çalışmaları &amp; ÖGEP">Kayıtlı takım etkinliği veya ÖGEP oturumu yok.</EmptyLine>
   }
 
   return (
     <div className="dashboard-card">
       <h2 className="dashboard-card__title">
         <GroupPresentation size={20} />
-        Takım çalışmaları & <abbr title="Öğrenci Gelişim Programı">ÖGEP</abbr>
+        Takım Çalışmaları & <abbr title="Öğrenci Gelişim Programı">ÖGEP</abbr>
       </h2>
 
       {/* B65 (§4.6, §2.2): one-line work rows, not a three-column table — the name leads, the time sits on
@@ -96,7 +96,7 @@ export default function TeamActivities() {
       )}
 
       {ogep.length > 0 && (
-        <ContainedList label={`ÖGEP oturumları (${ogep.length})`} kind="on-page" size="lg" className="team-list">
+        <ContainedList label={`ÖGEP Oturumları (${ogep.length})`} kind="on-page" size="lg" className="team-list">
           {ogep.map((s, i) => (
             <ContainedListItem key={i}>
               <IsSatiri ad={s["ÖGEP (Öğrenci Gelişim Programı)"]} zaman={formatShortDate(s["Çalışma Başlangıç"])}

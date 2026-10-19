@@ -238,7 +238,7 @@ export default function CourseContent() {
   const istenenVar = istenen ? courses.some(([ad]) => ad === istenen.ders) : false
 
   if (courses.length === 0) {
-    return <EmptyLine label="Ders içerikleri">Derslere ait içerik henüz yok.</EmptyLine>
+    return <EmptyLine label="Ders İçerikleri">Derslere ait içerik henüz yok.</EmptyLine>
   }
 
   return (
@@ -248,7 +248,7 @@ export default function CourseContent() {
       <div className="course-content__header">
         <h2 className="dashboard-card__title">
           <Education size={20} />
-          Ders içerikleri
+          Ders İçerikleri
         </h2>
         {istenen && !istenenVar && (
           <p className="course-content__istenen" role="status">{istenen.ders} için bu hafta içerik yok.</p>

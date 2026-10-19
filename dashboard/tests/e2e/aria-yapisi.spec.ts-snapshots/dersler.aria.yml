@@ -1,7 +1,7 @@
 - main:
   - heading "Dersler" [level=1]
-  - heading /Haftalık program — 2\. Hafta \d+ Eyl\. - \d+ Eyl\./ [level=2]
-  - table /Haftalık program — 2\. Hafta \d+ Eyl\. - \d+ Eyl\./:
+  - heading /Haftalık Program — 2\. Hafta \d+ Eyl\. - \d+ Eyl\./ [level=2]
+  - table /Haftalık Program — 2\. Hafta \d+ Eyl\. - \d+ Eyl\./:
     - rowgroup:
       - row "Saat Pazartesi Salı Çarşamba Perşembe Cuma":
         - columnheader "Saat"
@@ -13,39 +13,69 @@
     - rowgroup:
       - row /1\. \d+:\d+ Türkçe Eda Şen Matematik Nagihan Özdemir Sosyal Bilgiler Emre Angıç/:
         - cell /1\. \d+:\d+/
-        - cell "Türkçe Eda Şen"
+        - cell "Türkçe Eda Şen":
+          - button "Türkçe"
+          - text: ""
         - cell
         - cell
-        - cell "Matematik Nagihan Özdemir"
-        - cell "Sosyal Bilgiler Emre Angıç"
+        - cell "Matematik Nagihan Özdemir":
+          - button "Matematik"
+          - text: ""
+        - cell "Sosyal Bilgiler Emre Angıç":
+          - button "Sosyal Bilgiler"
+          - text: ""
       - row /2\. \d+:\d+ Fransızca Harika Ebru Kalkan İngilizce Merima Gueller \d+:\d+ Fen Bilimleri Yasemin Kuzucu/:
         - cell /2\. \d+:\d+/
-        - cell "Fransızca Harika Ebru Kalkan"
+        - cell "Fransızca Harika Ebru Kalkan":
+          - button "Fransızca"
+          - text: ""
         - cell
         - cell
-        - cell "İngilizce Merima Gueller"
-        - cell /\d+:\d+ Fen Bilimleri Yasemin Kuzucu/
+        - cell "İngilizce Merima Gueller":
+          - button "İngilizce"
+          - text: ""
+        - cell /\d+:\d+ Fen Bilimleri Yasemin Kuzucu/:
+          - text: ""
+          - button "Fen Bilimleri"
+          - text: ""
       - row /3\. \d+:\d+ İngilizce İpek Pehlevan İngilizce Merima Gueller \d+:\d+ Türkçe Eda Şen/:
         - cell /3\. \d+:\d+/
-        - cell "İngilizce İpek Pehlevan"
+        - cell "İngilizce İpek Pehlevan":
+          - button "İngilizce"
+          - text: ""
         - cell
         - cell
-        - cell "İngilizce Merima Gueller"
-        - cell /\d+:\d+ Türkçe Eda Şen/
+        - cell "İngilizce Merima Gueller":
+          - button "İngilizce"
+          - text: ""
+        - cell /\d+:\d+ Türkçe Eda Şen/:
+          - text: ""
+          - button "Türkçe"
+          - text: ""
       - row /4\. \d+:\d+ Matematik Elif Özge Şener \d+:\d+ Müzik Ayşe Kaya/:
         - cell /4\. \d+:\d+/
         - cell
         - cell
         - cell
-        - cell "Matematik Elif Özge Şener"
-        - cell /\d+:\d+ Müzik Ayşe Kaya/
+        - cell "Matematik Elif Özge Şener":
+          - button "Matematik"
+          - text: ""
+        - cell /\d+:\d+ Müzik Ayşe Kaya/:
+          - text: ""
+          - button "Müzik"
+          - text: ""
       - row /5\. \d+:\d+ Fen Bilimleri Yasemin Kuzucu \d+:\d+ İngilizce İpek Pehlevan/:
         - cell /5\. \d+:\d+/
         - cell
         - cell
         - cell
-        - cell "Fen Bilimleri Yasemin Kuzucu"
-        - cell /\d+:\d+ İngilizce İpek Pehlevan/
+        - cell "Fen Bilimleri Yasemin Kuzucu":
+          - button "Fen Bilimleri"
+          - text: ""
+        - cell /\d+:\d+ İngilizce İpek Pehlevan/:
+          - text: ""
+          - button "İngilizce"
+          - text: ""
       - row /6\. \d+:\d+/:
         - cell /6\. \d+:\d+/
         - cell
@@ -65,16 +95,20 @@
         - cell
         - cell
         - cell
-        - cell "Türkçe Eda Şen"
+        - cell "Türkçe Eda Şen":
+          - button "Türkçe"
+          - text: ""
         - cell
       - row /9\. \d+:\d+ Kültür ve Medeniyetimize Yön Verenler Eda Şen/:
         - cell /9\. \d+:\d+/
         - cell
         - cell
         - cell
-        - cell "Kültür ve Medeniyetimize Yön Verenler Eda Şen"
+        - cell "Kültür ve Medeniyetimize Yön Verenler Eda Şen":
+          - button "Kültür ve Medeniyetimize Yön Verenler"
+          - text: ""
         - cell
-  - heading "Ders içerikleri" [level=2]
+  - heading "Ders İçerikleri" [level=2]
   - tablist "Ders içerikleri":
     - tab "Matematik" [selected]
     - tab "Fen Bilimleri"

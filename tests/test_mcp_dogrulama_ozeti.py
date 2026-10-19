@@ -55,3 +55,18 @@ def test_derle_writes_the_summary_into_the_immutable_draft_record(tmp_path):
     record = ms.read_draft(tmp_path, body["taslak_id"])
     assert record["dogrulama"] == derleme.dogrulama_ozeti(ornekler.ornek("QUIZ"))
     assert [row["dayanak"].get("page") for row in record["dogrulama"]["iddialar"]] == [112, 114]
+
+
+def test_kazanim_ozeti_kod_metin_beceri_tasir_ve_sinirlar():
+    data = {"curriculum": {"outcomes": [
+        {"code": "MAT.7.1.1", "text": "  Tam   sayıları inceler. ", "skill": "KB2.14 Yorumlama Becerisi"},
+        {"code": "<script>", "text": "x"},
+        {"code": "FB.7.1.1"},
+        "bozuk",
+    ] + [{"code": f"SB.7.1.{i}"} for i in range(20)]}}
+    ozet = derleme.kazanim_ozeti(data)
+    assert ozet[0] == {"kod": "MAT.7.1.1", "metin": "Tam sayıları inceler.", "beceri": "KB2.14 Yorumlama Becerisi"}
+    assert ozet[1] == {"kod": "FB.7.1.1", "metin": None, "beceri": None}
+    assert all(r["kod"] != "<script>" for r in ozet)
+    assert len(ozet) == derleme.KAZANIM_MAX
+    assert derleme.kazanim_ozeti({}) == [] and derleme.kazanim_ozeti({"curriculum": {"outcomes": "x"}}) == []

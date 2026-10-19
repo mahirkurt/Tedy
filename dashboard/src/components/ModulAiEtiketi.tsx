@@ -1,20 +1,6 @@
-import { useEffect, useState } from 'react'
 import { AILabel, AILabelContent } from '@carbon/react'
 import { useDar } from '../asistan/useDar'
-
-/** `/api/modules/…/aciklama`: what was written with AI help and what it rests on (talimatname S41, B71). */
-export interface ModulAciklamasi {
-  baslik: string | null
-  ders: string | null
-  sinif: string | null
-  kazanimlar: string[]
-  kitap: { ad: string | null; sayfalar: string | null } | null
-  iddia_durumu: 'ok' | 'kayit_yok' | 'uyusmazlik'
-  iddialar: { iddia: string; sayfa: number | null; kaynak: string | null }[]
-  medya: { yapay_zeka: number; ders_kitabi: number; fotograf_arsivi: number }
-}
-
-type Durum = { tur: 'yukleniyor' } | { tur: 'hazir'; veri: ModulAciklamasi } | { tur: 'hata' }
+import type { ModulAciklamaDurumu, ModulAciklamasi } from '../hooks/useModulAciklamasi'
 
 const aralik = (s: string) => s.replace(/-/g, '–')
 
@@ -27,7 +13,7 @@ function medyaSatirlari(m: ModulAciklamasi['medya']): string[] {
 }
 
 /** The explanation window: Carbon's four-part template (§6.2) — overview, details, what it rests on. */
-export function ModulAiAciklamasi({ durum }: { durum: Durum }) {
+export function ModulAiAciklamasi({ durum }: { durum: ModulAciklamaDurumu }) {
   const veri = durum.tur === 'hazir' ? durum.veri : null
   const kitap = veri?.kitap
   const kitapMetni = kitap
@@ -50,7 +36,7 @@ export function ModulAiAciklamasi({ durum }: { durum: Durum }) {
             {kitapMetni && <li>Dayandığı kitap: {kitapMetni}</li>}
             {medyaSatirlari(veri.medya).map(s => <li key={s}>{s}</li>)}
           </ul>
-          <h3 className="modul-ai__alt-baslik">Kaynağıyla karşılaştırılan bilgiler</h3>
+          <h3 className="modul-ai__alt-baslik">Kaynağıyla Karşılaştırılan Bilgiler</h3>
           {veri.iddia_durumu === 'ok' && veri.iddialar.length > 0 ? (
             <ul className="modul-ai__ayrintilar">
               {veri.iddialar.map(c => (
@@ -74,17 +60,8 @@ export function ModulAiAciklamasi({ durum }: { durum: Durum }) {
 /** The AI label in the module frame's header (S41): a broad label for the whole module, upper right of
  *  the container. Name per B53: `slugLabel=""` + Turkish aria-label → "AI Yapay zekâ hakkında bilgi". The
  *  module itself is untouched (G-VOICE). */
-export default function ModulAiEtiketi({ aciklamaPath }: { aciklamaPath: string }) {
+export default function ModulAiEtiketi({ durum }: { durum: ModulAciklamaDurumu }) {
   const dar = useDar()
-  const [durum, setDurum] = useState<Durum>({ tur: 'yukleniyor' })
-  useEffect(() => {
-    let iptal = false
-    fetch(aciklamaPath, { credentials: 'include' })
-      .then(res => (res.ok ? (res.json() as Promise<ModulAciklamasi>) : Promise.reject(new Error(String(res.status)))))
-      .then(veri => { if (!iptal) setDurum({ tur: 'hazir', veri }) })
-      .catch(() => { if (!iptal) setDurum({ tur: 'hata' }) })
-    return () => { iptal = true }
-  }, [aciklamaPath])
   return (
     <AILabel kind="default" size={dar ? 'lg' : 'xs'} autoAlign aiText="AI" slugLabel=""
       aria-label="Yapay zekâ hakkında bilgi" align="bottom-right" className="module-viewer__ai">

@@ -1,11 +1,12 @@
 import {
-  Button, ContainedList, ContainedListItem, InlineNotification, SkeletonText, Tag,
+  ContainedList, ContainedListItem, InlineNotification, SkeletonText, Tag,
 } from '@carbon/react'
 import { useDar } from '../asistan/useDar'
 import { Education } from '@carbon/icons-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { apiHataCumlesi } from '../utils/apiHatasi'
+import { basliga } from '../utils/baslik'
 import { useFocusMode } from '../contexts/focusMode'
 import type { MufredatAgacYaniti } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
@@ -47,9 +48,9 @@ export default function Modules() {
       {!loading && !error && (
         <>
           {hazir.length === 0
-            ? <EmptyLine label="Hazır olanlar">Henüz yayınlanmış modül yok.</EmptyLine>
+            ? <EmptyLine label="Hazır Olanlar">Henüz yayınlanmış modül yok.</EmptyLine>
             : (
-              <ContainedList className="module-hazir" kind="on-page" size="lg" label="Hazır olanlar">
+              <ContainedList className="module-hazir" kind="on-page" size="lg" label="Hazır Olanlar">
                 {hazir.map(m => (
                   <ContainedListItem key={`${m.slug}-${m.version}`}>
                     {/* B58: modül açmak gezinmedir — bağlantı olur, geçmiş ve yeni sekme çalışır. */}
@@ -59,7 +60,7 @@ export default function Modules() {
                           e.preventDefault(); navigate(`/moduller/${m.slug}/v${m.version}`)
                         }}>
                         <SubjectLabel course={m.subject}>
-                          <span className="module-hazir__ad">{m.title ?? m.slug}</span>
+                          <span className="module-hazir__ad">{m.title ? basliga(m.title) : m.slug}</span>
                         </SubjectLabel>
                       </a>
                       {/* İ8: ders rengi onun TEK taşıyıcısı olamaz — adı da yazılır. */}
@@ -76,7 +77,7 @@ export default function Modules() {
             )}
           {/* Odak kipinde ağaç çizilmez: yalnız yapılabilen iş kalır (İ1). */}
           {!focusMode && (data.hata === 'harita_okunamadi'
-            ? <EmptyLine label="Tüm müfredat">Müfredat haritası şu an okunamıyor.</EmptyLine>
+            ? <EmptyLine label="Tüm Müfredat">Müfredat haritası şu an okunamıyor.</EmptyLine>
             : dersler.length > 0 && <MufredatAgaci dersler={dersler} />)}
         </>
       )}
@@ -86,7 +87,6 @@ export default function Modules() {
 
 export function ModuleViewerRoute() {
   const { slug = '', version = '' } = useParams<{ slug: string; version: string }>()
-  const navigate = useNavigate()
   const match = VERSION.exec(version)
   if (!SLUG.test(slug) || !match) {
     return <div className="dashboard-card modules"><EmptyLine>Bu modül bağlantısı geçersiz.</EmptyLine></div>
@@ -94,8 +94,6 @@ export function ModuleViewerRoute() {
   const n = Number(match[1])
   return (
     <div className="module-page">
-      <Button className="module-page__back" kind="ghost" size="md" href="/moduller"
-        onClick={(e: React.MouseEvent) => { e.preventDefault(); navigate('/moduller') }}>Modüllere dön</Button>
       <ModuleViewer ticketPath={`/api/modules/${slug}/v${n}/ticket`} aciklamaPath={`/api/modules/${slug}/v${n}/aciklama`}
         title="Öğrenme modülü" progress={{ slug, version: n }} />
     </div>
@@ -109,11 +107,11 @@ export function DraftViewerRoute() {
   }
   return (
     <div className="module-page">
-      {/* B45 (§4.4): a sentence is not a Tag. */}
-      <InlineNotification className="module-page__back module-page__taslak" kind="info" lowContrast hideCloseButton
-        statusIconDescription="Bilgi" title="Taslak önizleme" subtitle="İlerleme kaydedilmez." />
       <ModuleViewer ticketPath={`/api/modules/taslak/${taslakId}/ticket`}
-        aciklamaPath={`/api/modules/taslak/${taslakId}/aciklama`} title="Taslak modül önizlemesi" />
+        aciklamaPath={`/api/modules/taslak/${taslakId}/aciklama`} title="Taslak modül önizlemesi"
+        ust={/* B45 (§4.4): a sentence is not a Tag. */
+          <InlineNotification className="module-page__taslak" kind="info" lowContrast hideCloseButton
+            statusIconDescription="Bilgi" title="Taslak önizleme" subtitle="İlerleme kaydedilmez." />} />
     </div>
   )
 }

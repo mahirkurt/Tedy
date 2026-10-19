@@ -127,8 +127,8 @@ test('the journal shows week counts, weak topics and rubric levels', async ({ pa
     hafta: { baslangic: '2026-09-28', sohbet: [{ ogretmen: 'matematik', sayi: 2 }], alistirma: 1, puan: { dogru: 1, toplam: 3 } },
   })))
   await page.goto('/ilerleme')
-  const gunluk = page.getByRole('region', { name: 'Öğrenme günlüğü' })
-  for (const metin of ['Bu hafta', 'Matematik · 2', 'Alıştırma · 1', 'Puan · 1/3', 'Kesir', 'Yeterli', 'Kesirler sayfa 12']) {
+  const gunluk = page.getByRole('region', { name: 'Öğrenme Günlüğü' })
+  for (const metin of ['Bu Hafta', 'Matematik · 2', 'Alıştırma · 1', 'Puan · 1/3', 'Kesir', 'Yeterli', 'Kesirler sayfa 12']) {
     await expect(gunluk.getByText(metin, { exact: true })).toBeVisible()
   }
 })
@@ -138,7 +138,7 @@ test('the empty journal explains when it fills; a denied journal is hidden', asy
   await page.route('**/api/assistant/ogrenme-gunlugu', r => r.fulfill(json({ zayif: [], calisilan: [], degerlendirmeler: [],
     hafta: { baslangic: '2026-09-28', sohbet: [], alistirma: 0, puan: { dogru: 0, toplam: 0 } } })))
   await page.goto('/ilerleme')
-  const gunluk = page.getByRole('region', { name: 'Öğrenme günlüğü' })
+  const gunluk = page.getByRole('region', { name: 'Öğrenme Günlüğü' })
   await expect(gunluk.getByText('Henüz deneme yok. Bir alıştırma bitince burada görünür.')).toBeVisible()
   await expect(gunluk.getByText('Sohbet · 0')).toBeVisible()
   await expect(gunluk.getByText('Alıştırma · 0')).toBeVisible()
