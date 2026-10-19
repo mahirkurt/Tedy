@@ -65,14 +65,36 @@ belirler (https://carbondesignsystem.com/building-blocks/foundations/color/guide
   çalışır, bu yüzden `v` 1'de kaldı). Okurun tarayıcı yazı boyu tercihi panonun `clamp()`
   tabanında (`100%`) zaten vardır, yani hesaplanmış değer onu taşır. Pano kökü değişen her
   yeniden boyutlamada yeniden gönderilir; değişmediyse gönderilmez.
-- `G-BRIDGE` bu tipi **izinli ama zorunlu değil** sayar; bu tipten önce derlenmiş modüller
-  geçerli kalır. `sablon.py`, şablonda `adoptHostTheme` yoksa `TemplateDriftError` verir.
+- **`layout: "flow"` (isteğe bağlı, 2026-10-19) — modül panonun bir bölümüdür, çerçevedeki ayrı
+  bir sayfa değil.** Pano bu alanı gönderince köprü `<html data-host-layout="flow">` yazar ve gövde
+  yüksekliğini **modül → pano** `{"type": "edupedia:size", "v": 1, "height": 1840}` mesajıyla
+  bildirir (`ResizeObserver`; aynı boy yeniden gönderilmez). Pano çerçeveyi o boya büyütür, çerçevenin
+  kendi kaydırma çubuğu olmaz, sayfa tek parça kayar. Bölüm değişince modülün `window.scrollTo`'su
+  boş bir pencereyi kaydırır; köprü aynı mesajı `"top": true` ile gönderir ve pano çerçevenin üstü
+  okurun gördüğü alanın üstünde kaldıysa onu görünüme getirir (modülü açmak sayfayı kaydırmaz).
+  Akışta modül kendi sayfa kabuğunu bırakır (şablondaki `data-host-layout="flow"` bloğu): 55rem
+  sütun, dolgu ve `.wrap`'in `100vh` tabanı kalkar — taban kalsaydı çerçeve boyu içeriği, içerik
+  çerçeveyi büyütürdü. Kimlik bandı nötr sayfa başlığı olur (§3), ilerleme rayı panonun kart
+  diliyle tek kart olur; araç düğmeleri kalır (koyu tema öğrencinin kararıdır, S14). Mesaj yalnız
+  `window.parent`'a ve `EDUPEDIA_PARENT_ORIGIN`'e gider; pano onu yalnız açtığı çerçeveden
+  (`event.source`, origin `"null"`) ve `1–200000` tam sayı boyla kabul eder (`acceptSizeMessage`).
+  Alan yoksa (eski pano, tek başına açılış) bu yol hiç kurulmaz; bu tarihten önce derlenmiş modül
+  alanı tanımaz, pano o zaman çerçevenin sabit asgari boyunu ve modülün kendi kaydırmasını korur.
+- `G-BRIDGE` `edupedia:appearance` ve `edupedia:size` tiplerini **izinli ama zorunlu değil** sayar;
+  bu tiplerden önce derlenmiş modüller geçerli kalır. `sablon.py`, şablonda `adoptHostTheme` yoksa
+  `TemplateDriftError` verir.
 
 ## 3. Kimlik bandı ve ders rengi
 
 - Üst bant düz `--tedy-brand` zemindir; solda Tedy işareti (beyaz disk, yarı saydam beyaz
   hilal, lacivert onay; renkler token, `aria-hidden`), üzerinde `text-on-color` başlık.
   Gradyan, radyal parıltı, ham hex ve cam (`rgba`) yüzey yoktur.
+- **Bant yalnız tek başına açılışta vardır.** Panonun akış yerleşiminde (§2, `layout: "flow"`)
+  Tedy laciverti panonun kendi üst bandındadır; sayfanın içinde ikinci bir lacivert bant başka bir
+  uygulama gibi okunur (2026-10-19, ölçüldü: kullanıcı modülü "başka bir sayfadan çerçeveye
+  konmuş" diye tarif etti). Orada başlık sayfa zemininde nötr bir sayfa başlığıdır (Carbon
+  `heading-04`: 1.75rem / 400, `text-primary`), Tedy işareti gizlenir, araç düğmeleri ghost
+  `icon-primary` dilini alır.
 - Bantta XP sayacı, seri çipi ve rozet kasası yoktur (2026-10-11, talimatname S43, B73 kapandı):
   bant başlık, ilerleme rayı ve araç düğmelerini taşır.
 - Ders rengi bantta **değildir**; yalnız odak çapalarında yaşar: bölüm ikon karosu (`.seg-ic`),

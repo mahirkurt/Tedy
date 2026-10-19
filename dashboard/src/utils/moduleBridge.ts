@@ -66,7 +66,8 @@ export type ModuleTheme = 'g10' | 'g100' | 'white'
  */
 export const DASHBOARD_THEME: ModuleTheme = 'g10'
 
-/** Parent → module: which Carbon theme to render in, and the host's computed root font size.
+/** Parent → module: which Carbon theme to render in, the host's computed root font size and
+ *  the host's layout (`ModuleLayout`).
  *  Carries no progress and is never stored.
  *
  *  `rootPx` is optional on purpose (spec §10.2): the module clamps it to 12–48px and ignores a
@@ -74,8 +75,42 @@ export const DASHBOARD_THEME: ModuleTheme = 'g10'
  *  modul.tedy.online and an older host both keep working. The module cannot derive the scale
  *  itself: inside the frame `100vw` is the frame's width, which is the dashboard's column minus
  *  its page padding, so a CSS rule would couple module type size to dashboard layout. */
-export function appearanceMessage(theme: ModuleTheme, rootPx?: number) {
-  return rootPx === undefined
-    ? ({ type: 'edupedia:appearance', v: 1, theme } as const)
-    : ({ type: 'edupedia:appearance', v: 1, theme, rootPx } as const)
+export function appearanceMessage(theme: ModuleTheme, rootPx?: number, layout?: ModuleLayout) {
+  return {
+    type: 'edupedia:appearance', v: 1, theme,
+    ...(rootPx === undefined ? {} : { rootPx }),
+    ...(layout === undefined ? {} : { layout }),
+  } as const
+}
+
+/** `flow`: the dashboard grows the frame to the module's content, so the page scrolls as one and
+ *  the module drops its own page shell (ground, padding, brand band) — it reads as a part of the
+ *  page, not a page inside a frame. A module compiled before the field ignores it and keeps its
+ *  own scroll; the viewer then keeps the frame's fixed minimum height. */
+export type ModuleLayout = 'flow'
+
+export interface SizeMessage {
+  type: 'edupedia:size'
+  v: 1
+  height: number
+  /** The module changed section: bring the frame's top into view if it has scrolled away. */
+  top?: true
+}
+
+const SIZE_KEYS = new Set<string>(['type', 'v', 'height', 'top'])
+
+/** Accept a size message only from the frame this page opened (opaque origin "null", the same
+ *  window). Drafts send it too — it carries no progress. The height is bounded so a broken
+ *  module cannot make the page millions of pixels tall. */
+export function acceptSizeMessage(
+  event: Pick<MessageEvent, 'data' | 'origin' | 'source'>,
+  frame: Window | null,
+): SizeMessage | null {
+  if (!frame || event.source !== frame || event.origin !== 'null') return null
+  const d = event.data as Record<string, unknown> | null
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return null
+  if (Object.keys(d).some(k => !SIZE_KEYS.has(k))) return null
+  if (d.type !== 'edupedia:size' || d.v !== 1 || !isInt(d.height, 1, 200_000)) return null
+  if (d.top !== undefined && d.top !== true) return null
+  return d as unknown as SizeMessage
 }

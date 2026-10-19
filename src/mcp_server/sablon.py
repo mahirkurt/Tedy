@@ -89,14 +89,41 @@ BRIDGE_JS = r"""  /* ---- edupedia köprüsü ve varlıklar (ted-mcp sablon.py y
     document.documentElement.style.fontSize = kistirilmis + "px";
     return true;
   }
+  /* Panoda akış yerleşimi (layout:"flow", 2026-10-19). Pano çerçeveyi içeriğin boyuna büyütür,
+     sayfa tek parça kayar: modül kendi kabuğunu bırakır (şablondaki data-host-layout="flow"
+     bloğu) ve gövde yüksekliğini bildirir. Yükseklik yalnız ebeveyne ve sabit origin'e gider;
+     alan yoksa (eski pano) ya da tek başına açılışta bu yol hiç kurulmaz. .wrap'in 100vh tabanı
+     akışta kalkar — yoksa çerçeve boyu içerik boyunu, içerik boyu çerçeve boyunu büyütürdü. */
+  let flowOn = false, lastHeight = 0;
+  function postSize(top){
+    const h = Math.ceil(document.body.getBoundingClientRect().height);
+    if(!top && h === lastHeight) return;
+    lastHeight = h;
+    const msg = {type:"edupedia:size", v:1, height:h};
+    if(top) msg.top = true;
+    try { window.parent.postMessage(msg, EDUPEDIA_PARENT_ORIGIN); } catch(e){ /* ebeveyn yoksa sessiz */ }
+  }
+  function adoptHostLayout(layout){
+    if(layout !== "flow" || flowOn) return false;
+    flowOn = true;
+    document.documentElement.setAttribute("data-host-layout", "flow");
+    if(typeof ResizeObserver === "function"){
+      new ResizeObserver(function(){ postSize(false); }).observe(document.body);
+    }
+    postSize(false);
+    return true;
+  }
     if(embedded){
       window.addEventListener("message", function(e){
         if(e.source!==window.parent) return;
         if(e.origin!==EDUPEDIA_PARENT_ORIGIN) return;
         const d = e.data;
         if(!d || d.v !== 1) return;
-        // Görünüm: pano kendi Carbon temasını bildirir (taslak önizleme dahil); ilerleme yazmaz.
-        if(d.type === "edupedia:appearance"){ adoptHostTheme(d.theme); adoptHostRootSize(d.rootPx); return; }
+        // Görünüm: pano kendi Carbon temasını, kök puntosunu ve yerleşimini bildirir (taslak
+        // önizleme dahil); ilerleme yazmaz.
+        if(d.type === "edupedia:appearance"){
+          adoptHostTheme(d.theme); adoptHostRootSize(d.rootPx); adoptHostLayout(d.layout); return;
+        }
         if(!active || d.type !== "edupedia:restore") return;
         applyRestore(d.state);
       });
@@ -107,6 +134,8 @@ BRIDGE_JS = r"""  /* ---- edupedia köprüsü ve varlıklar (ted-mcp sablon.py y
       },
       segmentComplete: function(segmentId){ emit("segment_complete", {segmentId:segmentId}); },
       moduleComplete: function(){ if(completed) return; completed = true; emit("module_complete", {}); },
+      // Bölüm değişti: çerçevenin içi zaten başta; akışta sayfayı kaydıran panodur.
+      toTop: function(){ if(flowOn) postSize(true); },
       ready: function(){ emit("ready", {}); }
     };
   })();
@@ -124,6 +153,9 @@ PATCHES: tuple[tuple[str, str, str, str], ...] = (
     ("complete", '    stage.setAttribute("data-seg","summary");\n',
      "    EDUPEDIA_BRIDGE.moduleComplete();\n", "after"),
     ("ready", "\n  init();\n", "  EDUPEDIA_BRIDGE.ready();\n", "after"),
+    # A segment change scrolls the module's own window to the top; in the dashboard's flow
+    # layout the frame has no scroll of its own, so the bridge asks the host to do it.
+    ("top", '    window.scrollTo({top:0,behavior:"instant"});\n', "    EDUPEDIA_BRIDGE.toTop();\n", "after"),
     ("visual", '    if(s.visual && s.visual.kind==="svg") html+=svgFigure(s.visual.ref, s.visual.caption);\n',
      '    if(s.visual && (s.visual.kind==="image"||s.visual.kind==="video")) html+=edupediaAssetFigure(s.visual);\n    else',
      "before"),

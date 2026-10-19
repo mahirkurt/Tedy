@@ -5,7 +5,7 @@
     "assets/carbon-v11-authority.json": "d6958862826c8b36adae53781724b0447b06045d7853602984c85a48c32aa5ce",
     "assets/fonts-manifest.json": "23153bf47b3c0b1859eca6ffccae83ff0365e673b2e4f1ad7eb32353af47a7e0",
     "assets/ibm-plex-OFL.txt": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f",
-    "assets/module-template.html": "685e2179fea09da2487b003eeb45bda0499ba5063c62fdca86956c2a73dfe120",
+    "assets/module-template.html": "a68fa255a3f39b4b59e6c76d4bc4cd0e7aae05061bfd3918090333f403ffe6ee",
     "references/adhd-pedagogy.md": "33ddba2449dd81440c219b5d9353b65e714a899143da3205f5116c8547bac5db",
     "references/audio-system.md": "8c162308f24f24d3d1d31822f97f909ef5b35a7dbb7635b3be102cd5b8500628",
     "references/carbon-child-system.md": "085aae7232d7bd83eef16dccf2077f22a87fc90fd0173ff4ad8aca0924d50e23",
@@ -23,7 +23,7 @@
     "references/newgen-question-design.md": "068243dfe11d052d7570f0201eb79744616072e7d8b2e8ca1bf3848d72db28ba",
     "references/subject-packs.md": "f12d51a6cbe94f34fa88a8cc20d9a734614a8eadc0d155690431ca5c1296002e",
     "references/svg-authoring.md": "5a6cbb73bebc202ed11a059cb0ebd97dcaf4f202f3d85c09f092af6751080ae5",
-    "references/tedy-integration.md": "438d832a153fcdd27eb3ed5cf4bfe1954f3c1bcdf057f92090885abd359058f6",
+    "references/tedy-integration.md": "b228b5b5fb2ccb29c8474c6c8730fde97f6e7f06afc68fd62bf46ca7056b2dc2",
     "scripts/embed_ibm_plex_fonts.py": "40330439feafc64792460062111b4aefe88c7a79af5f73fd11498f005036f0f0",
     "scripts/sync_carbon_tokens.py": "889f2184c23d361968a076728890f827e6960294e13f434b441116340cd0e99a",
     "scripts/validate_module.py": "a80ec705ab22a4e96df6d0853976b6044211e9cf73fd2f763d60163e95623c74",
@@ -54,7 +54,7 @@
     "repo": "https://github.com/mahirkurt/CureoPrivate",
     "retired_in": "edupedia 1.0.0"
   },
-  "pinned_at": "2026-10-15T21:43:16+00:00",
+  "pinned_at": "2026-10-19T04:16:56+00:00",
   "source_commit": "1aee3845efffb103a0e4e5b489f4477c0b3017b0",
   "synced_at": "2026-09-18T10:43:35+00:00"
 }

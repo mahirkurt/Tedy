@@ -2846,6 +2846,15 @@ gösterilir (§9.6).
 - Modül panoda `ModuleViewer`'ın tam genişlikli `iframe.module-frame`'inde açılır: `sandbox="allow-scripts"`
   (asla `allow-same-origin`), 10 dakikalık HMAC bileti, pano CSP'sinde `frame-src https://modul.tedy.online`
   (CLAUDE.md, Modüller maddesi; `dashboard/src/components/ModuleViewer.tsx`).
+- **Modül sayfanın bir bölümüdür, çerçevedeki ikinci bir sayfa değil (akış yerleşimi, 2026-10-19).** Pano
+  `edupedia:appearance` ile `layout: "flow"` bildirir; modül kendi kabuğunu (55rem sütun, dolgu, `100vh`
+  tabanı, lacivert kimlik bandı, Tedy işareti) bırakır ve gövde yüksekliğini `edupedia:size` ile bildirir;
+  pano çerçeveyi o boya büyütür, sayfa tek parça kayar, çerçevenin kendi kaydırma çubuğu yoktur. Lacivert
+  yalnız panonun üst bandındadır (marka laciverti yalnız üst bant ve giriş sayfası); modül başlığı sayfa zemininde `heading-04`, ilerleme
+  rayı ve sahne panonun kart dilindedir. Bölüm değişince pano çerçevenin üstünü yalnız okur onu geçmişse
+  görünüme getirir. Bu tarihten önce derlenmiş modül alanı tanımaz ve eskisi gibi kendi içinde kayar —
+  yeniden derlenip yayınlanınca akışa geçer (tedy-integration §2–§3; `tests/test_modul_akis_yerlesimi.py`,
+  `moduller.spec.ts` "the module sits in the page flow…").
 - Bağı sabitleyen testler: `tests/test_tedy_tasarim_tutarliligi.py` (pano `ted-theme.scss` ↔ şablon ↔
   otorite), `tests/test_ders_renkleri.py` (üç çalışma zamanının eşliği, kontrast, palet dışı renk yok),
   `dashboard/tests/e2e/moduller.spec.ts` (tema devri).
