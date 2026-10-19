@@ -1311,18 +1311,18 @@ class TestOdakPenceresiEndpoint:
         resp = client.get("/api/odak-penceresi")
         assert resp.status_code == 200
         assert resp.get_json() == {
-            "okul_bitisi": "15:45", "odak_sonu": "16:00", "yatma": "22:30", "varsayilan": True}
+            "okul_bitisi": "15:45", "odak_sonu": "19:00", "yatma": "21:00", "varsayilan": True}
 
     def test_put_stores_atomically_and_get_reads_it(self, client, isolated_output):
         resp = client.put("/api/odak-penceresi", json={
-            "okul_bitisi": "15:30", "odak_sonu": "16:15", "yatma": "22:00"})
+            "okul_bitisi": "15:30", "odak_sonu": "19:15", "yatma": "21:00"})
         assert resp.status_code == 200
         assert resp.get_json() == {
-            "okul_bitisi": "15:30", "odak_sonu": "16:15", "yatma": "22:00", "varsayilan": False}
-        stored = json.loads((isolated_output / "odak_penceresi.json").read_text("utf-8"))
-        assert stored["okul_bitisi"] == "15:30" and stored["yatma"] == "22:00"
+            "okul_bitisi": "15:30", "odak_sonu": "19:15", "yatma": "21:00", "varsayilan": False}
+        stored = json.loads((isolated_output / "aksam_duzeni.json").read_text("utf-8"))
+        assert stored["okul_bitisi"] == "15:30" and stored["zor_is_sonu"] == "19:15"
         assert not list(isolated_output.glob("*.tmp"))
-        assert client.get("/api/odak-penceresi").get_json()["odak_sonu"] == "16:15"
+        assert client.get("/api/odak-penceresi").get_json()["odak_sonu"] == "19:15"
 
     @pytest.mark.parametrize("govde", [
         {"okul_bitisi": "15:45", "odak_sonu": "16:00"},                     # missing
@@ -1336,7 +1336,7 @@ class TestOdakPenceresiEndpoint:
         resp = client.put("/api/odak-penceresi", json=govde)
         assert resp.status_code == 400
         assert resp.get_json()["error"].endswith(".")
-        assert not (isolated_output / "odak_penceresi.json").exists()
+        assert not (isolated_output / "aksam_duzeni.json").exists()
 
     def test_unreadable_file_reads_as_defaults(self, client, isolated_output):
         (isolated_output / "odak_penceresi.json").write_text("{bozuk", "utf-8")
@@ -1356,7 +1356,7 @@ class TestOdakPenceresiEndpoint:
                 s["user_email"] = okur
             assert c.get("/api/odak-penceresi").status_code == 403
             assert c.put("/api/odak-penceresi", json=govde).status_code == 403
-        assert not (isolated_output / "odak_penceresi.json").exists()
+        assert not (isolated_output / "aksam_duzeni.json").exists()
 
 
 # ── B41 (backend half): "Özel ders" in sentence case at the source (S38) ─────

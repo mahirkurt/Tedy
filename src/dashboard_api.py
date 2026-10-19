@@ -48,7 +48,7 @@ from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.US
     USER_ROLES,
     okur_turu,
 )
-from src import (assistant_skills, module_progress, module_store, module_ticket,
+from src import (aksam_duzeni, assistant_skills, module_progress, module_store, module_ticket,
                  mufredat_agaci, subject_themes)
 from src import claude_api
 
@@ -1801,16 +1801,51 @@ def _odak_penceresi_dogrula(govde):
     return pencere, None
 
 
+def _aksam_duzeni_yolu():
+    return os.path.join(OUTPUT_DIR, "aksam_duzeni.json")
+
+
+def _aksam_duzeni_oku():
+    """The household's evening plan settings; the old focus-window file seeds it."""
+    return aksam_duzeni.oku(Path(_aksam_duzeni_yolu()), eski=Path(_odak_penceresi_yolu()))
+
+
+def _aile_uyeleri():
+    """Full-role family members (not the student) who may receive evening news."""
+    return [
+        {"email": e, "ad": e.split("@")[0]}
+        for e in sorted(USER_ROLES)
+        if okur_turu(e) == "aile"
+    ]
+
+
 def _odak_penceresi_oku():
-    """The stored window, or the defaults when there is none or it is unreadable."""
-    try:
-        with open(_odak_penceresi_yolu(), "r", encoding="utf-8") as f:
-            pencere, _hata = _odak_penceresi_dogrula(json.load(f))
-    except (OSError, ValueError):
-        pencere = None
-    if pencere is None:
-        return {**ODAK_PENCERESI_VARSAYILAN, "varsayilan": True}
-    return {**pencere, "varsayilan": False}
+    """The old three-field view of the evening plan (old clients keep working)."""
+    d = _aksam_duzeni_oku()
+    return {
+        "okul_bitisi": d["okul_bitisi"],
+        "odak_sonu": d["zor_is_sonu"],
+        "yatma": d["yatma"],
+        "varsayilan": d["varsayilan"],
+    }
+
+
+@app.route("/api/aksam-duzeni")
+@require_auth
+def aksam_duzeni_getir():
+    """The evening plan settings. Full role only (not in READER_ENDPOINTS)."""
+    return jsonify({**_aksam_duzeni_oku(), "aile_uyeleri": _aile_uyeleri()})
+
+
+@app.route("/api/aksam-duzeni", methods=["PUT"])
+@require_auth
+def aksam_duzeni_kaydet():
+    uyeler = {u["email"] for u in _aile_uyeleri()}
+    duzen, hata = aksam_duzeni.dogrula(request.get_json(silent=True), uyeler)
+    if hata:
+        return jsonify({"error": hata}), 400
+    atomic_json_dump({**duzen, "updated_at": datetime.now().isoformat()}, _aksam_duzeni_yolu())
+    return jsonify({**duzen, "varsayilan": False, "aile_uyeleri": _aile_uyeleri()})
 
 
 @app.route("/api/odak-penceresi")
@@ -1823,12 +1858,30 @@ def odak_penceresi():
 @app.route("/api/odak-penceresi", methods=["PUT"])
 @require_auth
 def odak_penceresi_kaydet():
-    """Replace the window. A whole-file replace, so atomic_json_dump suffices."""
+    """Old clients: fold the three fields into the evening plan."""
     pencere, hata = _odak_penceresi_dogrula(request.get_json(silent=True))
     if hata:
         return jsonify({"error": hata}), 400
-    atomic_json_dump({**pencere, "updated_at": datetime.now().isoformat()}, _odak_penceresi_yolu())
-    return jsonify({**pencere, "varsayilan": False})
+    mevcut = _aksam_duzeni_oku()
+    mevcut.pop("varsayilan", None)
+    yeni = {**mevcut, "okul_bitisi": pencere["okul_bitisi"], "zor_is_sonu": pencere["odak_sonu"],
+            "yatma": pencere["yatma"]}
+    # Eski pencere "ödeve hazır"ı bilmez: zor işlerden en az 15 dk önce, okul bitişinden önce değil.
+    yeni["odeve_hazir"] = min(
+        mevcut["odeve_hazir"],
+        _dakika_saat(max(aksam_duzeni.dakika(pencere["okul_bitisi"]),
+                         aksam_duzeni.dakika(pencere["odak_sonu"]) - 15)),
+    )
+    duzen, hata = aksam_duzeni.dogrula(yeni, set(yeni.get("haber_alacaklar") or []))
+    if hata:
+        return jsonify({"error": hata}), 400
+    atomic_json_dump({**duzen, "updated_at": datetime.now().isoformat()}, _aksam_duzeni_yolu())
+    return jsonify({"okul_bitisi": duzen["okul_bitisi"], "odak_sonu": duzen["zor_is_sonu"],
+                    "yatma": duzen["yatma"], "varsayilan": False})
+
+
+def _dakika_saat(dk):
+    return f"{dk // 60:02d}:{dk % 60:02d}"
 
 
 @app.route("/api/homework")

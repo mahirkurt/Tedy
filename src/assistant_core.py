@@ -290,6 +290,7 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     "book_progress.json",
     # The household's focus-window setting (B29): a dashboard parameter, not school data.
     "odak_penceresi.json",
+    "aksam_duzeni.json",
     # Process/cron bookkeeping: pid files, crontab dumps, the sync scheduler state.
     "*.pid",
     "crontab*",
