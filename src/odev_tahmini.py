@@ -214,6 +214,27 @@ def _oku_json(yol: Path) -> dict:
     return v if isinstance(v, dict) else {}
 
 
+def _oku_siki(yol: Path) -> dict:
+    """Yoksa {}; var ama okunamıyor ya da bozuksa istisna: sessizce boş sayıp yeniden faturalandırmayız."""
+    try:
+        ham = yol.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {}
+    v = json.loads(ham)
+    if not isinstance(v, dict):
+        raise ValueError(f"{yol.name} sözlük değil")
+    return v
+
+
+def _yazilabilir_mi(yol: Path) -> None:
+    """Dosyaya DOKUNMADAN yazılabilirliği sına: aynı kilit altında yanına bir sınama dosyası
+    yaz ve sil. Başarısızlıkta istisna fırlatır."""
+    with _kilitli(yol):
+        sinama = yol.with_name(yol.name + ".sinama")
+        sinama.write_text("ok", encoding="utf-8")
+        sinama.unlink()
+
+
 def _birlestir_yaz(yol: Path, degisiklik: dict) -> None:
     """Kilit altında diske bak, değişikliği ekle, atomik yaz: başka işçinin satırı ezilmez."""
     with _kilitli(yol):
@@ -235,11 +256,12 @@ class TahminDeposu:
         return f"{ISTEM_SURUMU}:{self.okuyucu.model}:{_anahtar_kimligi(satir)}:{ozet}"
 
     def _onbellek(self) -> dict:
-        return _oku_json(self.kok / ONBELLEK)
+        """isit için sıkı okuma (bozuk/okunamaz -> istisna)."""
+        return _oku_siki(self.kok / ONBELLEK)
 
     def tahmin(self, satir: dict, bugun: date) -> OdevTahmini:
         """Önbellekten (diskten, her çağrıda: işçiler birbirinin yazdığını görür); yoksa yedek. Modeli çağırmaz."""
-        kayit = self._onbellek().get(self._anahtar(satir))
+        kayit = _oku_json(self.kok / ONBELLEK).get(self._anahtar(satir))
         t = None
         if isinstance(kayit, dict) and not kayit.get("yok"):
             try:
@@ -270,15 +292,13 @@ class TahminDeposu:
         """Önbellekte olmayan ödevler için modeli çağırır; `bitis` time.monotonic() cinsinden son an.
         Bütçe ya da süre bitince durur, hata ödevi yuttur (yedek kalır)."""
         ozet = {"cagri": 0, "onbellekte": 0, "hata": 0, "durdu": None, "son_hata": None}
-        # Ücretli çağrıdan önce önbelleğin yazılabildiğini sına (kilit + atomik yazım, içerik aynı):
-        # yazılamayan önbellek her senkronda aynı ödevi yeniden faturalandırırdı.
         try:
             onbellek = self._onbellek()
-            _birlestir_yaz(self.kok / ONBELLEK, {})
         except Exception as w:
-            self._hata(ozet, w, "yazma")
-            ozet["durdu"] = "yazma"
+            self._hata(ozet, w, "okuma")
+            ozet["durdu"] = "okuma"
             return ozet
+        sinandi = False
         for satir in satirlar:
             anahtar = self._anahtar(satir)
             if anahtar in onbellek:
@@ -300,6 +320,17 @@ class TahminDeposu:
             if not izin:
                 ozet["durdu"] = "butce"
                 break
+            if not sinandi:
+                # Ücretli çağrıdan önce yazılabilirlik: yazılamayan çıktı her senkronda aynı ödevi
+                # yeniden faturalandırırdı. Dosyalara dokunulmaz (yalnız sınama dosyası).
+                try:
+                    _yazilabilir_mi(self.kok / ONBELLEK)
+                    _yazilabilir_mi(self.kok / DEFTER)
+                except Exception as w:
+                    self._hata(ozet, w, "yazma")
+                    ozet["durdu"] = "yazma"
+                    break
+                sinandi = True
             try:
                 sonuc = self.okuyucu.oku(metin, bugun, min(kalan, CAGRI_EN_COK_SURE))
             except TahminHatasi as e:

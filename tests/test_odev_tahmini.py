@@ -157,9 +157,9 @@ def test_okuyucu_hata_nedeni_ozette(tmp_path):
 
 def test_yazma_hatasi_isit_disina_cikmaz(tmp_path, monkeypatch):
     from src import odev_tahmini as m
-    def patla(yol, degisiklik):
-        if degisiklik:  # ön sınama (boş yazım) geçer, asıl kayıt düşer
-            raise OSError("disk dolu")
+    def patla(*a, **k):
+        raise OSError("disk dolu")
+    monkeypatch.setattr(m, "_yazilabilir_mi", lambda yol: None)  # sınama geçer; asıl kayıt düşer
     monkeypatch.setattr(m, "_birlestir_yaz", patla)
     sahte = SahteOkuyucu(OdevTahmini(40, "zor", "Yönergeyi oku", [], "model"))
     satir2 = dict(SATIR, homework_key="baska")
@@ -179,14 +179,36 @@ def test_kapi_kesmeden_sonra_sinar():
     assert len(s.ilk_adim) <= 80
 
 
-def test_yazilamayan_onbellek_model_cagirmaz(tmp_path, monkeypatch):
+def test_sinama_hatasi_model_cagirmaz(tmp_path, monkeypatch):
     from src import odev_tahmini as m
-    def patla(*a, **k):
+    def patla(yol):
         raise OSError("salt okunur")
-    monkeypatch.setattr(m, "_birlestir_yaz", patla)
+    monkeypatch.setattr(m, "_yazilabilir_mi", patla)
     sahte = SahteOkuyucu(OdevTahmini(40, "zor", "Yönergeyi oku", [], "model"))
     ozet = TahminDeposu(tmp_path, sahte).isit([SATIR], BUGUN, bitis=time.monotonic() + 30)
     assert sahte.cagri == 0 and ozet["durdu"] == "yazma" and "salt okunur" in ozet["son_hata"]
+
+
+def test_cagri_yoksa_onbellek_dosyasina_dokunulmaz(tmp_path):
+    import os
+    sahte = SahteOkuyucu(OdevTahmini(40, "zor", "Yönergeyi oku", [], "model"))
+    d = TahminDeposu(tmp_path, sahte)
+    d.isit([SATIR], BUGUN, bitis=time.monotonic() + 30)
+    yol = tmp_path / "output/odev_tahmin_onbellegi.json"
+    os.utime(yol, (1_000_000, 1_000_000))
+    once = (yol.read_bytes(), yol.stat().st_mtime_ns)
+    ozet = d.isit([SATIR], BUGUN, bitis=time.monotonic() + 30)
+    assert ozet["cagri"] == 0 and (yol.read_bytes(), yol.stat().st_mtime_ns) == once
+    assert not list((tmp_path / "output").glob("*.sinama"))
+
+
+def test_okunamayan_onbellek_okuma_der_ve_silinmez(tmp_path):
+    yol = tmp_path / "output/odev_tahmin_onbellegi.json"
+    yol.parent.mkdir(parents=True)
+    yol.write_text("{bozuk", encoding="utf-8")
+    sahte = SahteOkuyucu(OdevTahmini(40, "zor", "Yönergeyi oku", [], "model"))
+    ozet = TahminDeposu(tmp_path, sahte).isit([SATIR], BUGUN, bitis=time.monotonic() + 30)
+    assert sahte.cagri == 0 and ozet["durdu"] == "okuma" and yol.read_text() == "{bozuk"
 
 
 def test_onbellek_okuma_hatasi_isit_disina_cikmaz(tmp_path, monkeypatch):
@@ -196,7 +218,7 @@ def test_onbellek_okuma_hatasi_isit_disina_cikmaz(tmp_path, monkeypatch):
         raise ValueError("bozuk")
     monkeypatch.setattr(d, "_onbellek", patla)
     ozet = d.isit([SATIR], BUGUN, bitis=time.monotonic() + 30)
-    assert sahte.cagri == 0 and "bozuk" in ozet["son_hata"]
+    assert sahte.cagri == 0 and ozet["durdu"] == "okuma" and "bozuk" in ozet["son_hata"]
 
 
 def test_defter_hatasi_isit_disina_cikmaz(tmp_path, monkeypatch):
