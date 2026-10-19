@@ -119,4 +119,28 @@ test.describe('Profil', () => {
     await bolum.getByRole('button', { name: 'Akşam düzenini kaydet' }).click()
     await expect(bolum.getByRole('alert')).toContainText('Haber yalnız aile üyelerine gönderilebilir.')
   })
+
+  test('bağlantı kopunca ham İngilizce hata değil sabit Türkçe cümle gösterilir', async ({ page }) => {
+    await profilAc(page)
+    await page.route('**/api/aksam-duzeni', r => r.request().method() === 'PUT'
+      ? r.abort('failed')
+      : r.fulfill(json(AKSAM_VARSAYILAN)))
+    await page.goto('/profil')
+    const bolum = page.locator('.aksam-duzeni-formu')
+    await bolum.getByRole('button', { name: 'Akşam düzenini kaydet' }).click()
+    await expect(bolum.getByRole('alert')).toContainText('Akşam düzeni kaydedilemedi. Bağlantını kontrol edip yeniden dene.')
+    await expect(bolum).not.toContainText('Failed to fetch')
+  })
+
+  test('JSON olmayan ret gövdesi de sabit cümleyle gösterilir', async ({ page }) => {
+    await profilAc(page)
+    await page.route('**/api/aksam-duzeni', r => r.request().method() === 'PUT'
+      ? r.fulfill({ status: 500, contentType: 'text/html', body: '<html>Internal Server Error</html>' })
+      : r.fulfill(json(AKSAM_VARSAYILAN)))
+    await page.goto('/profil')
+    const bolum = page.locator('.aksam-duzeni-formu')
+    await bolum.getByRole('button', { name: 'Akşam düzenini kaydet' }).click()
+    await expect(bolum.getByRole('alert')).toContainText('Akşam düzeni kaydedilemedi.')
+    await expect(bolum).not.toContainText('Internal Server Error')
+  })
 })

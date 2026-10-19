@@ -88,6 +88,7 @@ function Form({ ilk, uyeler, onKaydedildi }: { ilk: AksamDuzeni; uyeler: AileUye
     // Fields this card does not show (the last bell, the two "tell us" waits) go back as they came.
     const govde = duzenGovdesi({ ...ilk, ...(dk as Record<SaatAlani, number>), yemekDk, haberAlacaklar: haber })
     setKaydediliyor(true)
+    const SABIT = 'Akşam düzeni kaydedilemedi. Bağlantını kontrol edip yeniden dene.'
     try {
       const res = await fetch('/api/aksam-duzeni', {
         method: 'PUT',
@@ -96,14 +97,17 @@ function Form({ ilk, uyeler, onKaydedildi }: { ilk: AksamDuzeni; uyeler: AileUye
         body: JSON.stringify(govde),
       })
       if (!res.ok) {
+        // Only the server's own sentence (a string `error` on a refused save) reaches the reader;
+        // a network failure, a non-JSON body or any other shape gets the fixed Turkish one (D3, D4).
         const g = await res.json().catch(() => null) as { error?: unknown } | null
-        throw new Error(typeof g?.error === 'string' ? g.error : '')
+        const cumle = typeof g?.error === 'string' && g.error.trim() ? g.error : SABIT
+        setSonuc({ tur: 'hata', metin: cumle })
+        return
       }
       onKaydedildi()
       setSonuc({ tur: 'basari', metin: 'Akşam düzeni kaydedildi. Bugün bu saatlerle konuşur.' })
-    } catch (err) {
-      const sunucu = err instanceof Error ? err.message : ''
-      setSonuc({ tur: 'hata', metin: sunucu || 'Akşam düzeni kaydedilemedi. Bağlantını kontrol edip yeniden dene.' })
+    } catch {
+      setSonuc({ tur: 'hata', metin: SABIT })
     } finally {
       setKaydediliyor(false)
     }
