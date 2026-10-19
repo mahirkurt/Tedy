@@ -14,6 +14,7 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import json
+import logging
 import os
 import re
 import time
@@ -26,6 +27,8 @@ from typing import Any, Callable, Iterator, Literal
 from src import claude_api
 from src.json_utils import atomic_json_dump
 from src.ocr_katmani import OcrDefteri
+
+logger = logging.getLogger(__name__)
 
 ISTEM_SURUMU = 1
 VARSAYILAN_MODEL = "claude-haiku-4-5"
@@ -141,10 +144,11 @@ def uydurma_kapisi(t: OdevTahmini, metin: str) -> OdevTahmini:
     def temiz(s: str) -> bool:
         return all(n in metindeki for n in re.findall(r"\d+", s))
 
-    ilk = t.ilk_adim.strip()[:80]
+    ilk = t.ilk_adim.strip()[:80]  # önce kes, sonra sına: kesilmiş "320" -> "32" geçemez
     if not ilk or not temiz(ilk):
         ilk = YEDEK_ILK_ADIM
-    parcalar = [p.strip()[:60] for p in t.parcalar[:4] if isinstance(p, str) and p.strip() and temiz(p)]
+    kesik = [p.strip()[:60] for p in t.parcalar if isinstance(p, str) and p.strip()]
+    parcalar = [p for p in kesik if temiz(p)][:4]
     return OdevTahmini(_kisitla(t.dakika), t.zorluk if t.zorluk in ZORLUKLAR else "orta",
                        ilk, parcalar, t.kaynak)
 
@@ -253,10 +257,19 @@ class TahminDeposu:
     def okur_suresi_yaz(self, anahtar: str, dakika: int) -> None:
         _birlestir_yaz(self.kok / OKUR, {anahtar: _kisitla(dakika)})
 
+    @staticmethod
+    def _hata(ozet: dict, e: BaseException, ne: str = "okuma") -> None:
+        """Nedeni günlüğe yaz, ilkini özete koy (kısa; anahtar/gövde yok)."""
+        neden = f"{ne}: {type(e).__name__}: {str(e)[:100]}"
+        logger.warning("ödev tahmini %s", neden)
+        ozet["hata"] += 1
+        if not ozet.get("son_hata"):
+            ozet["son_hata"] = neden
+
     def isit(self, satirlar: list[dict], bugun: date, bitis: float) -> dict:
         """Önbellekte olmayan ödevler için modeli çağırır; `bitis` time.monotonic() cinsinden son an.
         Bütçe ya da süre bitince durur, hata ödevi yuttur (yedek kalır)."""
-        ozet = {"cagri": 0, "onbellekte": 0, "hata": 0, "durdu": None}
+        ozet = {"cagri": 0, "onbellekte": 0, "hata": 0, "durdu": None, "son_hata": None}
         onbellek = self._onbellek()
         for satir in satirlar:
             anahtar = self._anahtar(satir)
@@ -276,19 +289,30 @@ class TahminDeposu:
             try:
                 sonuc = self.okuyucu.oku(metin, bugun, min(kalan, CAGRI_EN_COK_SURE))
             except TahminHatasi as e:
-                ozet["hata"] += 1
+                self._hata(ozet, e)
                 if e.faturalandi:
-                    self.defter.yaz(self.okuyucu.model, e.girdi, e.cikti)
-                    _birlestir_yaz(self.kok / ONBELLEK, {anahtar: {"yok": True, "neden": str(e)[:80]}})
+                    try:
+                        self.defter.yaz(self.okuyucu.model, e.girdi, e.cikti)
+                        _birlestir_yaz(self.kok / ONBELLEK, {anahtar: {"yok": True, "neden": str(e)[:80]}})
+                    except Exception as w:
+                        self._hata(ozet, w, "yazma")
+                        ozet["durdu"] = "yazma"
+                        break
                 continue
-            except Exception:
-                ozet["hata"] += 1
+            except Exception as e:
+                self._hata(ozet, e)
                 continue
             ozet["cagri"] += 1
-            self.defter.yaz(self.okuyucu.model, sonuc.girdi, sonuc.cikti)
-            temiz = uydurma_kapisi(sonuc.tahmin, metin)
-            kayit = asdict(temiz)
-            kayit.pop("kaynak", None)
-            kayit["zaman"] = self._simdi().isoformat(timespec="seconds")
-            _birlestir_yaz(self.kok / ONBELLEK, {anahtar: kayit})
+            # Ücret ödendi: sonucu kaybetme. Yazma düşerse döngü temiz durur, isit çağırana fırlatmaz.
+            try:
+                self.defter.yaz(self.okuyucu.model, sonuc.girdi, sonuc.cikti)
+                temiz = uydurma_kapisi(sonuc.tahmin, metin)
+                kayit = asdict(temiz)
+                kayit.pop("kaynak", None)
+                kayit["zaman"] = self._simdi().isoformat(timespec="seconds")
+                _birlestir_yaz(self.kok / ONBELLEK, {anahtar: kayit})
+            except Exception as w:
+                self._hata(ozet, w, "yazma")
+                ozet["durdu"] = "yazma"
+                break
         return ozet

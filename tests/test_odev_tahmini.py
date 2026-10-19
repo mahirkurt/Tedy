@@ -123,7 +123,7 @@ def test_okuyucu_hatasi_yedege_duser_ve_yutulur(tmp_path):
             raise RuntimeError("ağ")
     d = TahminDeposu(tmp_path, Bozuk())
     ozet = d.isit([SATIR], BUGUN, bitis=time.monotonic() + 30)
-    assert d.tahmin(SATIR, BUGUN).kaynak == "yedek" and ozet["hata"] == 1
+    assert d.tahmin(SATIR, BUGUN).kaynak == "yedek" and ozet["hata"] == 1 and ozet["son_hata"]
 
 
 def test_gercek_okuyucu_testte_yasak():
@@ -144,3 +144,35 @@ def test_claude_okuyucu_yaniti_ayristirir(monkeypatch):
     o = m.ClaudeTahminOkuyucu(istemci_fabrikasi=lambda **k: istemci)
     s = o.oku("Ders: Fen", BUGUN, 10)
     assert (s.tahmin.dakika, s.tahmin.kaynak, s.girdi, s.cikti) == (35, "model", 300, 40)
+
+
+def test_okuyucu_hata_nedeni_ozette(tmp_path):
+    class Bozuk:
+        model = "x"
+        def oku(self, *a):
+            raise RuntimeError("401 anahtar geçersiz")
+    ozet = TahminDeposu(tmp_path, Bozuk()).isit([SATIR], BUGUN, bitis=time.monotonic() + 30)
+    assert "RuntimeError" in ozet["son_hata"] and "401" in ozet["son_hata"]
+
+
+def test_yazma_hatasi_isit_disina_cikmaz(tmp_path, monkeypatch):
+    from src import odev_tahmini as m
+    def patla(*a, **k):
+        raise OSError("disk dolu")
+    monkeypatch.setattr(m, "_birlestir_yaz", patla)
+    sahte = SahteOkuyucu(OdevTahmini(40, "zor", "Yönergeyi oku", [], "model"))
+    satir2 = dict(SATIR, homework_key="baska")
+    ozet = TahminDeposu(tmp_path, sahte).isit([SATIR, satir2], BUGUN, bitis=time.monotonic() + 30)
+    assert ozet["durdu"] == "yazma" and "disk dolu" in ozet["son_hata"] and sahte.cagri == 1
+
+
+def test_kapi_kesmeden_sonra_sinar():
+    # Sınanan, saklanan metindir. Kesilen kuyruktaki sayı saklanmaz, o yüzden reddetmez...
+    t = OdevTahmini(25, "orta", "a" * 80 + " 99", ["b" * 60 + " 99"], "model")
+    s = uydurma_kapisi(t, "sayfa 32")
+    assert s.ilk_adim == "a" * 80 and s.parcalar == ["b" * 60]
+    # ...ve kesim sayıyı bölerse ("320" -> "32") saklanan "32" ya da "3" metinde aranır.
+    t = OdevTahmini(25, "orta", "a" * 77 + " 320", ["b" * 57 + " 320"], "model")
+    s = uydurma_kapisi(t, "sayfa 7")
+    assert s.ilk_adim == YEDEK_ILK_ADIM and s.parcalar == []
+    assert len(s.ilk_adim) <= 80
