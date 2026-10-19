@@ -13,8 +13,9 @@ from typing import Any
 
 BRIDGE_TYPES = frozenset({"edupedia:progress", "edupedia:restore"})
 # Allowed but not required: the dashboard's appearance message (parent → module, the Carbon theme
-# the module adopts). Modules compiled before it existed stay valid without it.
-OPTIONAL_BRIDGE_TYPES = frozenset({"edupedia:appearance"})
+# the module adopts) and the module's content height in the dashboard's flow layout (module →
+# parent, so the frame grows to its content). Modules compiled before either existed stay valid.
+OPTIONAL_BRIDGE_TYPES = frozenset({"edupedia:appearance", "edupedia:size"})
 # The vendored template's THEME_STORE_KEY localStorage key (not a bridge message type).
 STORAGE_KEYS = frozenset({"edupedia:theme"})
 _SCRIPT_RE = re.compile(r"<script(?P<attrs>[^>]*)>(?P<body>.*?)</script>", re.S | re.I)

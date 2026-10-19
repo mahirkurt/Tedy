@@ -35,7 +35,10 @@ def test_vendored_file_stays_byte_identical():
 
 def test_patched_engine_carries_bridge_assets_and_slots():
     html = sablon.engine_template(ORIGIN)
-    assert html.count("window.parent.postMessage(msg, EDUPEDIA_PARENT_ORIGIN)") == 1
+    # Two senders — progress (emit) and the flow layout's content height (postSize) — and both
+    # address only the parent at the fixed origin; no other postMessage exists.
+    assert html.count("window.parent.postMessage(msg, EDUPEDIA_PARENT_ORIGIN)") == 2
+    assert html.count(".postMessage(") == 2
     assert 'const EDUPEDIA_PARENT_ORIGIN = "https://tedy.online";' in html
     assert sablon.ORIGIN_TOKEN not in html
     assert html.count(sablon.ASSETS_SLOT) == 1 and html.count(sablon.ATTRIB_SLOT) == 1
@@ -44,6 +47,7 @@ def test_patched_engine_carries_bridge_assets_and_slots():
     assert "EDUPEDIA_BRIDGE.segmentComplete(segs[state.idx].id);" in html
     assert "EDUPEDIA_BRIDGE.moduleComplete();" in html
     assert "\n  init();\n  EDUPEDIA_BRIDGE.ready();\n" in html
+    assert 'window.scrollTo({top:0,behavior:"instant"});\n    EDUPEDIA_BRIDGE.toTop();\n' in html
     assert "html+=edupediaAssetFigure(s.visual);" in html
     assert "html+=edupediaAudio(s.audio);" in html
     assert not re.search(r"postMessage\([^)]*[\"']\*[\"']", html)
@@ -86,7 +90,9 @@ def test_appearance_listener_is_gated_on_the_parent_and_never_restores():
     # source and origin checks precede both message kinds; restore still needs an active (slug) frame
     assert listener.index("e.source!==window.parent") < listener.index('"edupedia:appearance"')
     assert listener.index("e.origin!==EDUPEDIA_PARENT_ORIGIN") < listener.index('"edupedia:appearance"')
-    assert 'if(d.type === "edupedia:appearance"){ adoptHostTheme(d.theme); adoptHostRootSize(d.rootPx); return; }' in listener
+    assert ('if(d.type === "edupedia:appearance"){\n'
+            '          adoptHostTheme(d.theme); adoptHostRootSize(d.rootPx); adoptHostLayout(d.layout); return;\n'
+            '        }') in listener
     # The root-size applier the branch calls must exist and must validate what it is given:
     # the frame is opaque-origin, so a non-number is ignored and the value is clamped (§10.2).
     assert "function adoptHostRootSize(rootPx){" in html

@@ -138,6 +138,13 @@
   background: transparent;
 }
 
+// Flow layout: the module reported its content height, so the frame is exactly that tall and the
+// page scrolls as one — the module reads as a section of the page, not a page in a box.
+.module-frame--akis {
+  flex: none;
+  min-height: 0;
+}
+
 // ── Hazır olanlar (ContainedList) ───────────────────────────────────────────
 
 .module-hazir {

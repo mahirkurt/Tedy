@@ -1026,6 +1026,44 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .tts-oku:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
 .tts-oku .cds-icon{width:1.05rem;height:1.05rem;color:var(--cds-icon-primary)}
 .tts-oku--on{background:var(--cds-layer-selected-01);box-shadow:inset 0 0 0 2px var(--cds-border-interactive);color:var(--cds-text-primary)}
+/* ============================================================
+   PANODA AKIŞ YERLEŞİMİ (2026-10-19) — pano edupedia:appearance ile layout:"flow" bildirince
+   köprü <html data-host-layout="flow"> yazar. Modül o zaman panonun bir bölümüdür, ayrı bir
+   sayfa değil: kendi sayfa kabuğunu (55rem sütun, dolgu, 100vh tabanı) bırakır, pano sütununu
+   doldurur; yüksekliği içerik kadardır ve köprü onu panoya bildirir (çerçevenin kendi kaydırma
+   çubuğu olmaz). Tedy laciverti panonun üst bandında zaten var — ikinci bir bant sayfanın içinde
+   başka bir uygulama gibi okunur ve "marka laciverti yalnız üst bant" kuralını bozar. Bu yüzden
+   başlık nötr sayfa başlığıdır (Carbon heading-04), Tedy işareti panonunkiyle yinelenmez, ilerleme
+   rayı panonun kart diliyle (layer-01, 1 px border-subtle, 8 px köşe) tek kart olur. Araç düğmeleri
+   (ses, sesli okuma, tema) kalır, yalnız nötr ghost dilini alır: koyu tema öğrencinin kararıdır (S14).
+   Tek başına açılışta bu blok hiç devreye girmez.
+   ============================================================ */
+:root[data-host-layout="flow"] body{background:var(--cds-background)}
+:root[data-host-layout="flow"] .wrap{max-width:none;padding:0;min-height:0}
+:root[data-host-layout="flow"] .topbar{border:0;border-radius:0;overflow:visible;margin-bottom:var(--sp-06)}
+:root[data-host-layout="flow"] .topbar__hero{background:transparent;color:var(--cds-text-primary);
+  padding:0 0 var(--sp-05)}
+:root[data-host-layout="flow"] .tedy-mark{display:none}
+:root[data-host-layout="flow"] .topbar__title{color:var(--cds-text-primary);font-size:1.75rem;
+  line-height:1.28572;font-weight:400;letter-spacing:0}
+:root[data-host-layout="flow"] .meta-line{color:var(--cds-text-secondary);font-size:.875rem;line-height:1.28572;
+  letter-spacing:.16px}
+:root[data-host-layout="flow"] .topbar__tools{border-left-color:var(--cds-border-subtle)}
+:root[data-host-layout="flow"] .icon-btn{color:var(--cds-icon-primary)}
+:root[data-host-layout="flow"] .icon-btn:hover,:root[data-host-layout="flow"] .icon-btn:active{background:var(--cds-layer-hover-01)}
+:root[data-host-layout="flow"] .icon-btn:focus-visible{outline-color:var(--cds-focus)}
+:root[data-host-layout="flow"] .topbar .icon-btn--on,
+:root[data-host-layout="flow"] .topbar .icon-btn--on .cds-icon{background:var(--cds-layer-selected-01);color:var(--cds-icon-primary)}
+:root[data-host-layout="flow"] .pacing-disk{background:var(--cds-layer-01)}
+:root[data-host-layout="flow"] .pacing-disk__track{stroke:var(--cds-border-subtle)}
+:root[data-host-layout="flow"] .pacing-disk__arc{stroke:var(--cds-interactive)}
+:root[data-host-layout="flow"] .pacing-disk__dismiss{color:var(--cds-icon-primary)}
+:root[data-host-layout="flow"] .pacing-disk__dismiss:hover{background:var(--cds-layer-hover-01)}
+:root[data-host-layout="flow"] .pacing-disk__dismiss:focus-visible{outline-color:var(--cds-focus)}
+:root[data-host-layout="flow"] .topbar__status{border:1px solid var(--cds-border-subtle);border-radius:var(--cds-radius)}
+@media (max-width:400px){
+  :root[data-host-layout="flow"] .topbar__hero{padding:0 0 var(--sp-04)}
+}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none !important;transition:none !important}}
 </style>
 </head>

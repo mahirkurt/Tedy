@@ -400,6 +400,58 @@ test('the module inside the frame scales with the dashboard at 4K', async ({ pag
   expect(buyuk.wrap / kucuk.wrap).toBeGreaterThan(1.9)
 })
 
+// Flow layout (2026-10-19): the module is a section of the page, not a page in a box. The frame
+// grows to the module's content (no scrollbar of its own), the page scrolls as one, the module
+// drops its own shell — no second brand band, no page padding — and a section change brings the
+// frame's top back into view only when the reader has scrolled past it.
+test('the module sits in the page flow: one scroll, no inner shell', async ({ page }) => {
+  await recordProgress(page)
+  await serveModule(page)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/moduller/fen5-su/v1')
+  const iframe = page.locator('iframe.module-frame')
+  const frame = page.frameLocator('iframe.module-frame')
+  await expect(frame.locator('html')).toHaveAttribute('data-host-layout', 'flow')
+  await expect(iframe).toHaveClass(/module-frame--akis/)
+  await expect(iframe).toHaveAttribute('scrolling', 'no')
+
+  // The frame is exactly as tall as the module's content: nothing scrolls inside it.
+  await expect.poll(() => frame.locator('html').evaluate(e => e.scrollHeight - e.clientHeight)).toBeLessThanOrEqual(1)
+  // The brand band lives in the dashboard header only; the module's head is a plain page heading.
+  const hero = await frame.locator('.topbar__hero').evaluate(e => getComputedStyle(e).backgroundColor)
+  expect(hero).toBe('rgba(0, 0, 0, 0)')
+  await expect(frame.locator('.tedy-mark')).toBeHidden()
+  // The module fills the dashboard's column rather than centring its own narrower one.
+  const [kutu, sarmal] = [await iframe.boundingBox(), await frame.locator('.wrap').boundingBox()]
+  expect(Math.abs(sarmal!.width - kutu!.width)).toBeLessThanOrEqual(1)
+
+  // The page owns the scroll. Opening the module did not move it; after scrolling past the
+  // frame's top, the next section brings that top back into view.
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  const sayfaKayar = await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight)
+  if (sayfaKayar) {
+    await frame.locator('#nextBtn').scrollIntoViewIfNeeded()
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+    await frame.locator('#nextBtn').click()
+    await expect.poll(async () => (await iframe.boundingBox())!.y).toBeGreaterThanOrEqual(0)
+  }
+})
+
+test('a module compiled before the flow layout keeps its own scroll', async ({ page }) => {
+  // A module compiled before 2026-10-19 never reports its height: the frame keeps its minimum
+  // height and the module scrolls inside it, as before — nothing collapses to zero.
+  const eski = moduleHtml.replace('adoptHostLayout(d.layout); ', '')
+  expect(eski).not.toBe(moduleHtml)
+  await recordProgress(page)
+  await serveModule(page, '/m/fen5-su/v1', eski)
+  await page.goto('/moduller/fen5-su/v1')
+  const frame = page.frameLocator('iframe.module-frame')
+  await expect(frame.locator('#titleText')).toHaveText(quiz.meta.title)
+  await expect(frame.locator('html')).not.toHaveAttribute('data-host-layout', 'flow')
+  await expect(page.locator('iframe.module-frame')).not.toHaveClass(/module-frame--akis/)
+  expect((await page.locator('iframe.module-frame').boundingBox())!.height).toBeGreaterThan(300)
+})
+
 test('a refused ticket is explained, not blank', async ({ page }) => {
   await page.route('**/api/modules/fen5-su/v1/ticket', r => r.fulfill({ status: 403, contentType: 'application/json',
     body: JSON.stringify({ error: 'session_required' }) }))
