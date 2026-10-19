@@ -1,6 +1,6 @@
 - main:
   - heading "Profil" [level=1]
-  - heading "Öğrenci profili" [level=2]
+  - heading "Öğrenci Profili" [level=2]
   - heading "Deneme Öğrenci" [level=3]
   - text: "/No: \\d+ Sınıf: 7-D Şube: D Okul No \\d+ Doğum Tarihi \\d+\\.\\d+\\.\\d+ İkinci Yabancı Dil Fransızca Servis No \\d+/"
   - heading "Özel ders ekle" [level=2]
@@ -41,8 +41,8 @@
       - /placeholder: ss:dd
       - text: /\d+:\d+/
     - button "Özel ders ekle"
-  - heading "Odak penceresi" [level=2]
-  - form "Odak penceresi":
+  - heading "Odak Penceresi" [level=2]
+  - form "Odak Penceresi":
     - paragraph: Son zilden pencerenin sonuna kadar Bugün tek bir zor iş önerir; sonrasında kısa işler. Yatma saatinden sonra işi yarına bırakır.
     - text: ""
     - textbox "Son zil":
@@ -57,5 +57,5 @@
       - /placeholder: ss:dd
       - text: ""
     - button "Pencereyi kaydet"
-  - heading "Tanımlı özel dersler" [level=2]
+  - heading "Tanımlı Özel Dersler" [level=2]
   - paragraph: Tanımlı özel ders yok.

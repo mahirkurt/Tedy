@@ -53,9 +53,157 @@
   }
 }
 
-.module-page__back {
-  align-self: flex-start;
-  margin-bottom: var(--cds-spacing-03);
+// ── the module page's head (2026-10-19): breadcrumb, then the view's one subject panel (İ8.3) ──
+// The same panel language as NextThing: step-10 ground, step-30 border, a 4px accent edge (the edge
+// separates a grey family from the page), the card corner, no shadow (S10, S11).
+.modul-baslik {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-04;
+  margin-block-end: spacing.$spacing-06;
+}
+
+.modul-baslik__panel {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-04;
+  padding: spacing.$spacing-06;
+  background: var(--ted-subject-panel);
+  border: 1px solid var(--ted-subject-panel-border);
+  border-inline-start: 4px solid var(--ted-subject-accent);
+  border-radius: var(--ted-radius-card);
+}
+
+// No subject yet (a draft without one, or the explanation not loaded): a neutral layer, same shape.
+.modul-baslik--notr .modul-baslik__panel {
+  background: theme.$layer-01;
+  border-color: theme.$border-subtle-01;
+  border-inline-start-color: theme.$border-strong-01;
+}
+
+.modul-baslik__ust {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: spacing.$spacing-03 spacing.$spacing-05;
+}
+
+.modul-baslik__kas {
+  @include type.type-style('label-02');
+
+  margin: 0;
+  color: theme.$text-secondary;
+}
+
+// S41: the broad AI label sits upper right of its container, its plain-words note beside it.
+.modul-baslik__ai {
+  display: flex;
+  align-items: center;
+  gap: spacing.$spacing-03;
+  margin-inline-start: auto;
+}
+
+.modul-baslik__ai-not {
+  @include type.type-style('label-01');
+
+  margin: 0;
+  color: theme.$text-secondary;
+}
+
+// The largest text on the page (P1), at the token's own weight (S44); title case (S38 revision).
+.modul-baslik__baslik {
+  @include type.type-style('heading-05');
+
+  margin: 0;
+  color: theme.$text-primary;
+}
+
+.modul-baslik__alt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: spacing.$spacing-03 spacing.$spacing-05;
+}
+
+.modul-baslik__kazanimlar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: spacing.$spacing-03;
+}
+
+.modul-baslik__kazanimlar .cds--tag {
+  margin: 0;
+}
+
+.modul-baslik__kitap {
+  @include type.type-style('label-02');
+
+  margin: 0;
+  color: theme.$text-secondary;
+}
+
+// The outcome dialog: the wording first, then what it belongs to.
+.modul-kazanim__metin {
+  @include type.type-style('body-02');
+
+  margin: 0 0 spacing.$spacing-05;
+  color: theme.$text-primary;
+}
+
+// It takes focus only so the dialog opens on what it says; it is not a control.
+.modul-kazanim__metin:focus {
+  outline: none;
+}
+
+.modul-kazanim__ayrinti {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: spacing.$spacing-03 spacing.$spacing-05;
+  margin: 0;
+}
+
+.modul-kazanim__ayrinti dt {
+  @include type.type-style('label-02');
+
+  color: theme.$text-secondary;
+}
+
+.modul-kazanim__ayrinti dd {
+  @include type.type-style('body-01');
+
+  margin: 0;
+  color: theme.$text-primary;
+}
+
+.module-page__taslak {
+  margin-block-end: spacing.$spacing-05;
+}
+
+@media (max-width: 671px) {
+  .modul-baslik__panel {
+    padding: spacing.$spacing-05;
+  }
+
+  // Phone: every control is a 44px target (d3b-dokunma). The tag keeps its drawn height and its
+  // hit area grows past it, so it does not turn into a tall capsule.
+  .modul-baslik__kazanimlar .cds--tag {
+    position: relative;
+  }
+
+  .modul-baslik__kazanimlar .cds--tag::after {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * #{spacing.$spacing-03}) 0;
+  }
+
+  .modul-baslik__ai {
+    margin-inline-start: 0;
+  }
+
+  .modul-kazanim__ayrinti {
+    grid-template-columns: 1fr;
+  }
 }
 
 .module-viewer {
@@ -64,23 +212,6 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-}
-
-// Frame header (S41, B71): a broad AI label for the whole module, upper right, never flush to the edge.
-.module-viewer__ust {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: spacing.$spacing-03;
-  padding-block: spacing.$spacing-02;
-  padding-inline-end: spacing.$spacing-03;
-}
-
-.module-viewer__not {
-  @include type.type-style('label-01');
-
-  margin: 0;
-  color: theme.$text-secondary;
 }
 
 // ── the AI label's explanation window: Carbon paints the window; only the words' order here (§6.2) ──

@@ -629,3 +629,29 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+KAZANIM_MAX = 8
+KAZANIM_KOD_RE = re.compile(r"^[A-ZÇĞİÖŞÜ]{1,6}(?:\.[A-Z0-9]{1,6}){1,5}$")
+
+
+def kazanim_ozeti(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """The outcomes a module teaches, as plain JSON for taslak.json (2026-10-19).
+
+    The dashboard shows each outcome as a chip that opens its wording in a dialog; it cannot
+    evaluate the compiled JS literal, so the compiler — the only writer of drafts — keeps the
+    code, the outcome text and the skill it gated. Anything else in `curriculum` stays inside.
+    """
+    outcomes = ((data.get("curriculum") or {}) if isinstance(data, dict) else {}).get("outcomes")
+    rows: list[dict[str, Any]] = []
+    for row in outcomes if isinstance(outcomes, list) else []:
+        if not isinstance(row, dict):
+            continue
+        kod = _dogrulama_metni(row.get("code"), 40)
+        if kod is None or not KAZANIM_KOD_RE.match(kod):
+            continue
+        rows.append({"kod": kod, "metin": _dogrulama_metni(row.get("text"), 400),
+                     "beceri": _dogrulama_metni(row.get("skill"), 120)})
+        if len(rows) == KAZANIM_MAX:
+            break
+    return rows

@@ -5,7 +5,7 @@
     "assets/carbon-v11-authority.json": "d6958862826c8b36adae53781724b0447b06045d7853602984c85a48c32aa5ce",
     "assets/fonts-manifest.json": "23153bf47b3c0b1859eca6ffccae83ff0365e673b2e4f1ad7eb32353af47a7e0",
     "assets/ibm-plex-OFL.txt": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f",
-    "assets/module-template.html": "a68fa255a3f39b4b59e6c76d4bc4cd0e7aae05061bfd3918090333f403ffe6ee",
+    "assets/module-template.html": "f1cdffa003694f1b8c05d676fea183e0be76f059f6d9260c448b088e61fca6b7",
     "references/adhd-pedagogy.md": "33ddba2449dd81440c219b5d9353b65e714a899143da3205f5116c8547bac5db",
     "references/audio-system.md": "8c162308f24f24d3d1d31822f97f909ef5b35a7dbb7635b3be102cd5b8500628",
     "references/carbon-child-system.md": "085aae7232d7bd83eef16dccf2077f22a87fc90fd0173ff4ad8aca0924d50e23",
@@ -46,7 +46,7 @@
     "tests/fixtures/sim_pass.html": "e352690c2126f4ab75c296f8cb977ca0c7b3f46d181e1f9babd76f188531e246",
     "tests/fixtures/streak_gainonly.html": "e5bd831e0918bbbdf1aee25f6ad2558436e7c409d1ba071484786095484eff7c",
     "tests/fixtures/worked_pass.html": "786a0b71caef541f3f8bfd0e95e5d034a8bf8857e521e5fe6bd84c7ea07bbda8",
-    "tests/test_gates.py": "e386c98971cf89a9bd6a941f88d983be6d003d05b9f29f59ad1e762d1f4d7384"
+    "tests/test_gates.py": "22dd050aee82986267f4031ef981840f1e999590916e90581eccdc42f3c92655"
   },
   "origin": {
     "last_commit": "3ef6a26ef415ed9765377d225be04b33834db428",
@@ -54,7 +54,7 @@
     "repo": "https://github.com/mahirkurt/CureoPrivate",
     "retired_in": "edupedia 1.0.0"
   },
-  "pinned_at": "2026-10-19T04:16:56+00:00",
+  "pinned_at": "2026-10-19T05:40:45+00:00",
   "source_commit": "1aee3845efffb103a0e4e5b489f4477c0b3017b0",
   "synced_at": "2026-09-18T10:43:35+00:00"
 }

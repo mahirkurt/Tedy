@@ -42,8 +42,8 @@ test('the timetable and the lesson content share one page', async ({ page }) => 
   await page.waitForLoadState('networkidle')
 
   expect(new URL(page.url()).pathname).toBe('/dersler')
-  await expect(page.getByText('Haftalık program', { exact: false })).toBeVisible()
-  await expect(page.getByText('Ders içerikleri', { exact: false })).toBeVisible()
+  await expect(page.getByText('Haftalık Program', { exact: false })).toBeVisible()
+  await expect(page.getByText('Ders İçerikleri', { exact: false })).toBeVisible()
 })
 
 test('the old timetable path still lands somewhere', async ({ page }) => {

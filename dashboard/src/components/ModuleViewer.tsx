@@ -5,6 +5,8 @@ import {
   acceptProgressMessage, acceptSizeMessage, appearanceMessage, DASHBOARD_THEME, restoreMessage, type RestoreState,
 } from '../utils/moduleBridge'
 import ModulAiEtiketi from './ModulAiEtiketi'
+import { useModulAciklamasi } from '../hooks/useModulAciklamasi'
+import ModulBasligi from './ModulBasligi'
 import './Modules.scss'
 
 // The dashboard's computed root font size. The frame is a separate document, so it does not
@@ -31,10 +33,14 @@ export interface ModuleViewerProps {
   aciklamaPath: string
   /** Absent for draft previews: a draft never writes progress. */
   progress?: { slug: string; version: number }
+  /** Shown between the head and the frame (the draft preview's notice). */
+  ust?: React.ReactNode
 }
 
-export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress }: ModuleViewerProps) {
+export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress, ust }: ModuleViewerProps) {
   const frameRef = useRef<HTMLIFrameElement>(null)
+  const aciklama = useModulAciklamasi(aciklamaPath)
+  const bas = <ModulBasligi durum={aciklama} taslak={!progress} aiEtiketi={<ModulAiEtiketi durum={aciklama} />} />
   // Reset to loading during render when ticketPath changes, rather than with a
   // synchronous setState at the top of the effect below (React's "adjusting
   // state when a prop changes" pattern) — the fetch itself still runs in the effect.
@@ -141,27 +147,24 @@ export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress
   }, [gonderGorunum])
 
   if (ticket.status === 'loading') {
-    return <div className="module-viewer" aria-busy="true"><SkeletonText paragraph lineCount={3} /></div>
+    return <div className="module-viewer">{bas}{ust}<div aria-busy="true"><SkeletonText paragraph lineCount={3} /></div></div>
   }
   if (ticket.status === 'error') {
     return (
       <div className="module-viewer">
+        {bas}{ust}
         <InlineNotification kind="error" role="alert" lowContrast hideCloseButton statusIconDescription="Hata" title="Modül açılamadı" subtitle={ticket.message} />
       </div>
     )
   }
   return (
     <div className="module-viewer">
+      {bas}
+      {ust}
       {saveFailed && (
         <InlineNotification kind="warning" lowContrast hideCloseButton statusIconDescription="Uyarı" title="İlerleme kaydedilemedi"
           subtitle="Modül çalışmaya devam ediyor; sayfayı yenileyince kayıt yeniden denenir." />
       )}
-      {/* Frame header (S41, B71): every module shown on the dashboard carries a broad AI label, upper right of
-          its container; the module inside is untouched (G-VOICE). */}
-      <div className="module-viewer__ust">
-        <p className="module-viewer__not">Yapay zekâ yardımıyla hazırlanmış modül</p>
-        <ModulAiEtiketi aciklamaPath={aciklamaPath} />
-      </div>
       <iframe ref={frameRef} className={yukseklik ? 'module-frame module-frame--akis' : 'module-frame'}
         style={yukseklik ? { height: yukseklik } : undefined} scrolling={yukseklik ? 'no' : undefined}
         title={title} src={ticket.url} sandbox="allow-scripts" referrerPolicy="no-referrer" onLoad={onFrameLoad} />

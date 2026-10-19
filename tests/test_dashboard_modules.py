@@ -239,3 +239,29 @@ def test_module_explanation_for_drafts_and_refusals(client, tmp_path):
     assert body["iddia_durumu"] == "kayit_yok" and body["medya"] == {"yapay_zeka": 0, "ders_kitabi": 0,
                                                                      "fotograf_arsivi": 0}
     assert not {"module_explanation", "module_draft_explanation"} & dashboard_api.READER_ENDPOINTS
+
+
+# ── 2026-10-19: the module page's head shows each outcome's wording in a dialog ──────────────
+
+def test_module_explanation_carries_outcome_wording_and_time_from_the_draft(client, tmp_path):
+    _published_with_draft(tmp_path)
+    taslak = ms.drafts_root(tmp_path) / YAYIN_TASLAK / "taslak.json"
+    kayit = json.loads(taslak.read_text(encoding="utf-8"))
+    kayit["sure_dk"] = 20
+    kayit["kazanim_ayrintilari"] = [
+        {"kod": "FB.5.4.1.1", "metin": "Maddenin hâllerini açıklar.", "beceri": "KB2.7 Karşılaştırma Becerisi"},
+        {"kod": "XX.9.9.9", "metin": "Kataloğun kazanımlarında olmayan kod yazılmaz."}]
+    taslak.write_text(json.dumps(kayit), encoding="utf-8")
+    sign_in(client, FULL)
+    body = client.get("/api/modules/fen5-su/v2/aciklama").get_json()
+    assert body["sure_dk"] == 20
+    assert body["kazanim_ayrintilari"] == [
+        {"kod": "FB.5.4.1.1", "metin": "Maddenin hâllerini açıklar.", "beceri": "KB2.7 Karşılaştırma Becerisi"}]
+
+
+def test_module_explanation_for_an_older_build_has_codes_without_wording(client, tmp_path):
+    _published_with_draft(tmp_path)
+    sign_in(client, FULL)
+    body = client.get("/api/modules/fen5-su/v2/aciklama").get_json()
+    assert body["sure_dk"] is None
+    assert body["kazanim_ayrintilari"] == [{"kod": "FB.5.4.1.1", "metin": None, "beceri": None}]

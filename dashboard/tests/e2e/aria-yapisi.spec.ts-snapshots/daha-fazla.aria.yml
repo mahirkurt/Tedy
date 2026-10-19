@@ -1,7 +1,7 @@
 - main:
   - heading "Daha fazla" [level=1]
-  - region "Daha fazla":
-    - heading "Daha fazla" [level=2]
+  - region "Daha Fazla":
+    - heading "Daha Fazla" [level=2]
     - list:
       - listitem:
         - link "Tedy Books":
@@ -27,3 +27,6 @@
       - listitem:
         - link "Modüller":
           - /url: /moduller
+      - listitem:
+        - link "Sınav uyarıları":
+          - /url: /sinavlar#uyarilar

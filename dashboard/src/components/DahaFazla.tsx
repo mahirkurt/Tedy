@@ -15,7 +15,7 @@ export default function DahaFazla() {
   const liste = [...(kitaplar ? [kitaplar] : []), ...secondaryNavRoutes(user.role)]
   return (
     <section className="daha-fazla" aria-labelledby="daha-fazla-baslik">
-      <h2 id="daha-fazla-baslik" className="daha-fazla__baslik">Daha fazla</h2>
+      <h2 id="daha-fazla-baslik" className="daha-fazla__baslik">Daha Fazla</h2>
       <ul className="daha-fazla__liste">
         {liste.map(r => {
           const Icon = r.icon

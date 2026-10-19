@@ -127,7 +127,9 @@ test('each module opens through a link that names it', async ({ page }) => {
   await expect(page.locator('.module-hazir .cds--contained-list-item')).toContainText('Fen Bilimleri')
   await ac.click()
   await expect(page).toHaveURL(/\/moduller\/fen5-su\/v1$/)
-  await expect(page.getByRole('link', { name: 'Modüllere dön' })).toHaveAttribute('href', '/moduller')
+  // The way back is a Carbon breadcrumb above the module's head (2026-10-19).
+  await expect(page.getByRole('navigation', { name: 'Konum' }).getByRole('link', { name: 'Modüller', exact: true }))
+    .toHaveAttribute('href', '/moduller')
 })
 
 // B43 (D3, D4): a failed catalogue says what happened in a sentence, never the raw HTTP text, and as an alert.
@@ -201,14 +203,16 @@ test('the module frame carries an AI label that explains itself', async ({ page 
   await recordProgress(page)
   await serveModule(page)
   await page.goto('/moduller/fen5-su/v1')
-  const ust = page.locator('.module-viewer__ust')
+  const ust = page.locator('.modul-baslik__ai')
   const etiket = ust.getByRole('button', { name: 'AI Yapay zekâ hakkında bilgi', exact: true })
   await expect(etiket).toBeVisible()
   await expect(ust).toContainText('Yapay zekâ yardımıyla hazırlanmış modül')
-  // the label sits above the frame, at its upper right
-  const [e, f] = [await etiket.boundingBox(), await page.locator('iframe.module-frame').boundingBox()]
+  // the label sits upper right of its container — the module's head panel — above the frame
+  const [e, k, f] = [await etiket.boundingBox(), await page.locator('.modul-baslik__panel').boundingBox(),
+    await page.locator('iframe.module-frame').boundingBox()]
   expect(e!.y + e!.height).toBeLessThanOrEqual(f!.y + 1)
-  expect(e!.x + e!.width).toBeGreaterThan(f!.x + f!.width * 0.75)
+  expect(e!.y).toBeLessThan(k!.y + k!.height / 2)
+  expect(e!.x + e!.width).toBeGreaterThan(k!.x + k!.width * 0.75)
   await etiket.focus()
   await page.keyboard.press('Enter')
   const pencere = page.locator('.modul-ai')
@@ -221,13 +225,13 @@ test('the module frame carries an AI label that explains itself', async ({ page 
   await expect(pencere).toContainText('1 görsel ya da ses yapay zekâyla üretildi.')
   await expect(pencere).toContainText('2 görsel ders kitabından alındı.')
   await expect(etiket).toBeFocused()
-  const { violations } = await new AxeBuilder({ page }).include('.module-viewer__ust')
+  const { violations } = await new AxeBuilder({ page }).include('.modul-baslik')
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']).analyze()
   expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target).join(' ')}`)).toEqual([])
   await page.addScriptTag({ path: ACE })
   const ibm: string[] = await page.evaluate(async () => {
     // @ts-expect-error — `ace` is the injected engine's global
-    const rapor = await new window.ace.Checker().check(document.querySelector('.module-viewer__ust'), ['IBM_Accessibility'])
+    const rapor = await new window.ace.Checker().check(document.querySelector('.modul-baslik'), ['IBM_Accessibility'])
     return (rapor.results as { ruleId: string; value: string[]; snippet: string; path: { dom: string } }[])
       .filter(s => s.value[0] === 'VIOLATION' && s.value[1] === 'FAIL')
       // Carbon's Toggletip points aria-controls at a popover it renders only when open (ibm-erisilebilirlik).
@@ -244,7 +248,7 @@ test('a draft preview carries the AI label too and says when there is no check o
   await recordProgress(page)
   await serveModule(page)
   await page.goto('/moduller/taslak/0123456789abcdef')
-  const etiket = page.locator('.module-viewer__ust').getByRole('button', { name: 'AI Yapay zekâ hakkında bilgi', exact: true })
+  const etiket = page.locator('.modul-baslik__ai').getByRole('button', { name: 'AI Yapay zekâ hakkında bilgi', exact: true })
   await etiket.click()
   await expect(page.locator('.modul-ai')).toContainText('Bu sürüm için kayıtlı bir karşılaştırma yok.')
 })
@@ -254,7 +258,7 @@ test('the AI label still explains the module when its details cannot be fetched'
   await serveModule(page)
   await page.route('**/api/modules/fen5-su/v1/aciklama', r => r.fulfill({ status: 500, body: 'x' }))
   await page.goto('/moduller/fen5-su/v1')
-  await page.locator('.module-viewer__ust').getByRole('button', { name: 'AI Yapay zekâ hakkında bilgi', exact: true }).click()
+  await page.locator('.modul-baslik__ai').getByRole('button', { name: 'AI Yapay zekâ hakkında bilgi', exact: true }).click()
   const pencere = page.locator('.modul-ai')
   await expect(pencere).toContainText('Bu modül yapay zekâ yardımıyla hazırlandı')
   await expect(pencere).toContainText('Ayrıntılar şu an alınamadı.')
@@ -315,7 +319,8 @@ test('the draft preview says so in a notification, not a tag', async ({ page }) 
   const not_ = page.locator('.module-page .cds--inline-notification--info')
   await expect(not_).toContainText('Taslak önizleme')
   await expect(not_).toContainText('İlerleme kaydedilmez.')
-  await expect(page.locator('.module-page .cds--tag')).toHaveCount(0)
+  // The draft is said in a notification; the only tags on the page are the outcome chips.
+  await expect(page.locator('.module-page .cds--tag').filter({ hasText: /taslak/i })).toHaveCount(0)
 })
 
 test('the module takes on the dashboard theme, drafts included', async ({ page }) => {
@@ -450,6 +455,44 @@ test('a module compiled before the flow layout keeps its own scroll', async ({ p
   await expect(frame.locator('html')).not.toHaveAttribute('data-host-layout', 'flow')
   await expect(page.locator('iframe.module-frame')).not.toHaveClass(/module-frame--akis/)
   expect((await page.locator('iframe.module-frame').boundingBox())!.height).toBeGreaterThan(300)
+})
+
+// The module's head (2026-10-19): the dashboard names the module in the subject's panel, in title
+// case; each outcome is an operational tag that opens its wording in a passive modal, and Escape
+// returns focus to the tag. A build compiled before the wording was kept says so instead.
+test('the module head names the module and opens each outcome in a dialog', async ({ page }) => {
+  await recordProgress(page)
+  await serveModule(page)
+  await page.route('**/api/modules/fen5-su/v1/aciklama', r => r.fulfill(json({ ...ACIKLAMA, baslik: 'Maddenin hâlleri',
+    sure_dk: 15, kazanim_ayrintilari: [{ kod: 'FB.5.4.1.1', metin: 'Maddenin hâllerini açıklar.', beceri: 'KB2.7 Karşılaştırma Becerisi' }] })))
+  await page.goto('/moduller/fen5-su/v1')
+  const bas = page.locator('.modul-baslik')
+  await expect(bas.getByRole('heading', { level: 2, name: 'Maddenin Hâlleri', exact: true })).toBeVisible()
+  await expect(bas).toHaveClass(/ted-subject--/)
+  await expect(bas.locator('.modul-baslik__kas')).toContainText('Fen Bilimleri · 5. Sınıf · ~15 dk')
+  await expect(bas).toContainText('Fen Bilimleri 5, s. 112–120')
+  // the module does not repeat its own title in the flow layout
+  await expect(page.frameLocator('iframe.module-frame').locator('.topbar__l')).toBeHidden()
+  const cip = bas.getByRole('group', { name: 'Kazanımlar' }).getByRole('button', { name: 'FB.5.4.1.1' })
+  await cip.click()
+  const pencere = page.getByRole('dialog')
+  await expect(pencere).toBeVisible()
+  await expect(pencere).toContainText('Maddenin hâllerini açıklar.')
+  await expect(pencere).toContainText('KB2.7 Karşılaştırma Becerisi')
+  const { violations } = await new AxeBuilder({ page }).include('.modul-kazanim')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
+  expect(violations.map(v => v.id)).toEqual([])
+  await page.keyboard.press('Escape')
+  await expect(pencere).toBeHidden()
+  await expect(cip).toBeFocused()
+})
+
+test('an outcome without kept wording says so, not a blank dialog', async ({ page }) => {
+  await recordProgress(page)
+  await serveModule(page)
+  await page.goto('/moduller/fen5-su/v1')
+  await page.locator('.modul-baslik').getByRole('button', { name: 'FB.5.4.1.1' }).click()
+  await expect(page.getByRole('dialog')).toContainText('Bu kazanımın metni bu sürümde kayıtlı değil.')
 })
 
 test('a refused ticket is explained, not blank', async ({ page }) => {

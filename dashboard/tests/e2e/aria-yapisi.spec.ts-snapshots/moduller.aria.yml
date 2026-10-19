@@ -1,8 +1,8 @@
 - main:
   - heading "Modüller" [level=1]
   - heading "Modüller" [level=2]
-  - text: Hazır olanlar
-  - list "Hazır olanlar":
+  - text: Hazır Olanlar
+  - list "Hazır Olanlar":
     - listitem:
       - 'link "Tam Sayılar: Sıfırın İki Yanı"':
         - /url: /moduller/mat7-tam-sayilar/v1

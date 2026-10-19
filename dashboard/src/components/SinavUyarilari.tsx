@@ -81,7 +81,7 @@ export default function SinavUyarilari() {
 
   return (
     <section id="uyarilar" className="sinav-uyarilari" aria-labelledby="sinav-uyarilari-baslik">
-      <h2 id="sinav-uyarilari-baslik" className="sinav-uyarilari__baslik">Sınav uyarıları</h2>
+      <h2 id="sinav-uyarilari-baslik" className="sinav-uyarilari__baslik">Sınav Uyarıları</h2>
       <p ref={durumRef} tabIndex={-1} className="sinav-uyarilari__durum" aria-live="polite">{durum ? DURUM_METNI[durum] : 'Denetleniyor…'}</p>
       <div className="sinav-uyarilari__dugmeler">
         {durum === 'kapali' && (

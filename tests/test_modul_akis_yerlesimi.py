@@ -100,3 +100,9 @@ def test_akis_blogu_kabugu_kaldirir_ve_yalniz_token_kullanir():
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(", blok), \
         "akış bloğunda ham renk var"
     assert not re.search(r"box-shadow", blok), "statik yüzeye gölge (S11)"
+
+
+def test_akista_baslik_bloku_panoya_birakilir():
+    """Başlık, ders ve kazanımlar panonun ders panelinde (ModulBasligi); modülde yinelenmez."""
+    blok = _akis_blogu()
+    assert re.search(r"\.topbar__l\{display:none\}", blok)

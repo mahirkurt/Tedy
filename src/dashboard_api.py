@@ -5283,10 +5283,21 @@ def _module_explanation(record, draft):
                                "kaynak": _module_text(dayanak.get("kaynak"), 160)})
                 if len(claims) == _MODULE_EXPLAIN_CLAIMS:
                     break
+    kodlar = [o for o in (_module_text(x, 40) for x in (outcomes if isinstance(outcomes, list) else [])) if o][:8]
+    # The outcome chips' dialog (2026-10-19): wording and skill as the compiler kept them. A draft
+    # compiled before that has codes only; the dialog then says so instead of inventing wording.
+    ayrinti = {}
+    for row in draft.get("kazanim_ayrintilari") if isinstance(draft.get("kazanim_ayrintilari"), list) else []:
+        kod = _module_text(row.get("kod") if isinstance(row, dict) else None, 40)
+        if kod in kodlar and kod not in ayrinti:
+            ayrinti[kod] = {"metin": _module_text(row.get("metin"), 400), "beceri": _module_text(row.get("beceri"), 120)}
+    sure = draft.get("sure_dk")
     return {
         "baslik": _module_text(source.get("title"), 120), "ders": _module_text(source.get("subject"), 60),
         "sinif": _module_text(source.get("gradeLevel"), 30),
-        "kazanimlar": [o for o in (_module_text(x, 40) for x in (outcomes if isinstance(outcomes, list) else [])) if o][:8],
+        "sure_dk": sure if isinstance(sure, int) and not isinstance(sure, bool) and 0 < sure <= 240 else None,
+        "kazanimlar": kodlar,
+        "kazanim_ayrintilari": [{"kod": k, **ayrinti.get(k, {"metin": None, "beceri": None})} for k in kodlar],
         "kitap": book, "iddia_durumu": status, "iddialar": claims,
         "medya": _module_media(draft.get("run_id") or (record or {}).get("run_id"), draft.get("assets")),
     }

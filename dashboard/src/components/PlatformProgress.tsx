@@ -44,30 +44,30 @@ function OgrenmeGunlugu() {
   const { data, loading, iskelet, error } = useApi<Gunluk | null>('/api/assistant/ogrenme-gunlugu', null)
   if (error === 'HTTP 403') return null
   return <section className="ogrenme-gunlugu" aria-labelledby="ogrenme-gunlugu-baslik">
-    <h3 id="ogrenme-gunlugu-baslik">Öğrenme günlüğü</h3>
+    <h3 id="ogrenme-gunlugu-baslik">Öğrenme Günlüğü</h3>
     {loading ? (iskelet ? <div aria-busy="true"><SkeletonText paragraph lineCount={3} /></div> : null) : error ? <p role="alert">Öğrenme günlüğü alınamadı.</p> : data && <>
       <div>
-        <h4>Bu hafta</h4>
+        <h4>Bu Hafta</h4>
         {data.hafta.sohbet.length === 0 ? <p>Sohbet · 0</p> : data.hafta.sohbet.map(s =>
           <p key={s.ogretmen}>{OGRETMEN_ADLARI[s.ogretmen] || s.ogretmen} · {s.sayi}</p>)}
         <p>Alıştırma · {data.hafta.alistirma}</p>
         {data.hafta.puan.toplam > 0 && <p>Puan · {data.hafta.puan.dogru}/{data.hafta.puan.toplam}</p>}
       </div>
       <div>
-        <h4>Zorlanılan konular</h4>
+        <h4>Zorlanılan Konular</h4>
         {data.zayif.length === 0 ? <p>Henüz deneme yok. Bir alıştırma bitince burada görünür.</p> :
           <ul>{data.zayif.map(s => <li key={`${s.konu}-${s.kazanim_kodu || ''}`}>
             <span>{s.konu}</span> · {s.dogru}/{s.toplam}{s.kazanim_kodu && ` · ${s.kazanim_kodu}`}
           </li>)}</ul>}
       </div>
       {data.calisilan.length > 0 && <div>
-        <h4>Son çalışılan konular</h4>
+        <h4>Son Çalışılan Konular</h4>
         <ul>{data.calisilan.map((s, i) => <li key={s.id || i}>
           {s.kazanim_kodu || s.sayfa_basligi}
         </li>)}</ul>
       </div>}
       {data.degerlendirmeler.length > 0 && <div>
-        <h4>Çalışma değerlendirmeleri</h4>
+        <h4>Çalışma Değerlendirmeleri</h4>
         <ul>{data.degerlendirmeler.map(s => <li key={s.id}>
           <p><strong>{DUZEY_ADLARI[s.duzeyler]}</strong></p>
           <p>{s.guclu_yanlar}</p>
@@ -75,7 +75,7 @@ function OgrenmeGunlugu() {
         </li>)}</ul>
       </div>}
       {data.geri_bildirim && <div className="ogrenme-gunlugu__geri-bildirim">
-        <h4>Asistana geri bildirim</h4>
+        <h4>Asistana Geri Bildirim</h4>
         <p>Asistan cevapları: {data.geri_bildirim.hafta.olumlu} beğenildi, {data.geri_bildirim.hafta.olumsuz} beğenilmedi</p>
         {data.geri_bildirim.son_olumsuz.length > 0 && <ul>{data.geri_bildirim.son_olumsuz.map(n => (
           <li key={n.zaman}>{[n.kategori, n.metin].filter(Boolean).join(' — ')}</li>))}</ul>}
@@ -134,7 +134,7 @@ export default function PlatformProgress() {
     <div className="dashboard-card">
       <h2 className="dashboard-card__title">
         <ChartBar size={20} />
-        Platform ilerlemesi
+        Platform İlerlemesi
       </h2>
 
       <OgrenmeGunlugu />

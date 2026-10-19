@@ -10,7 +10,7 @@ test('the calendar copy is spelled in Turkish', async ({ page }) => {
   await page.goto('/takvim')
   await page.waitForLoadState('networkidle')
   const text = await page.locator('.app-shell-content').innerText()
-  expect(text).toContain('Haftalık takvim')
+  expect(text).toContain('Haftalık Takvim')
   expect(text).not.toContain('Haftalik')
 })
 
@@ -47,10 +47,11 @@ test('the two empty sections on Dersler say which is which', async ({ page }) =>
   // rendered returns a short array. Wait for both labels to exist.
   await expect(page.locator('.tedy-empty__label')).toHaveCount(2)
 
-  // Sentence case, as rendered (S38, B70): innerText reports what is on screen, and no CSS upper-cases it.
+  // Title case for a heading that names a section (S38, revised 2026-10-19), as rendered: innerText
+  // reports what is on screen, and no CSS changes the case.
   const labels = await page.locator('.tedy-empty__label').allInnerTexts()
   expect(labels.map(s => s.trim()))
-    .toEqual(['Haftalık program', 'Ders içerikleri'])
+    .toEqual(['Haftalık Program', 'Ders İçerikleri'])
 })
 
 test('an empty grade table says it is empty instead of showing a bare header', async ({ page }) => {

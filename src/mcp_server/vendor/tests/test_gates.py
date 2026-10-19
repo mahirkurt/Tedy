@@ -1933,7 +1933,10 @@ def test_runtime_focus_handoff_and_retry_contract_is_explicit():
     source = _template_source()
     assert 'data-stage-heading="true"' in source
     assert "function focusStageHeading(" in source
-    assert re.search(r"\(fn\|\|renderTeach\)\(stage,s\);\s*focusStageHeading\(stage\)", source)
+    # 2026-10-19: the heading takes focus only after the reader moves (Devam, Geri, a done step) —
+    # never on open or restore, so a module embedded in the dashboard does not pull focus on load.
+    assert re.search(r"\(fn\|\|renderTeach\)\(stage,s\);\s*if\(odakla\) focusStageHeading\(stage\)", source)
+    assert "const odakla = okurGecti; okurGecti = false;" in source
     assert "focusFirstUsableOption(stage)" in source
     assert "focusActionButton(" in source
 
