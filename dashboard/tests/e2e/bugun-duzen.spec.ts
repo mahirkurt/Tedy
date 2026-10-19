@@ -227,20 +227,36 @@ test.describe('D — yenileme', () => {
       const cs = (s: string) => getComputedStyle(document.querySelector(s)!)
       return {
         ray: cs('.day-strip__track').backgroundColor,
-        pencere: cs('.day-strip__window').backgroundColor,
-        sayfa: getComputedStyle(document.body).backgroundColor,
+        okul: cs('.day-strip__part--okul').backgroundColor,
+        odev: cs('.day-strip__part--odev').backgroundColor,
         simdi: cs('.day-strip__now').backgroundColor,
-        capa: cs('.day-strip__anchor').backgroundColor,
-        capaOpak: cs('.day-strip__anchor').opacity,
-        sinir: cs('.day-strip__window').borderInlineEndColor,
+        kenar: cs('.day-strip__part--odev').borderInlineStartColor,
+        ad: cs('.day-strip__part--okul .day-strip__part-name').color,
       }
     })
-    expect(renk.capaOpak).toBe('1')
-    for (const zemin of [renk.ray, renk.pencere]) {
+    for (const zemin of [renk.ray, renk.okul]) {
       expect(kontrast(renk.simdi, zemin), `şimdi / ${zemin}`).toBeGreaterThanOrEqual(3)
-      expect(kontrast(renk.capa, zemin), `çapa / ${zemin}`).toBeGreaterThanOrEqual(3)
+      expect(kontrast(renk.odev, zemin), `ödev zamanı / ${zemin}`).toBeGreaterThanOrEqual(3)
     }
-    // The window's edge separates the window from the rest of the rail.
-    expect(kontrast(renk.sinir, renk.ray)).toBeGreaterThanOrEqual(3)
+    // A part's edge separates it from the rest of the rail; its name is text.
+    expect(kontrast(renk.kenar, renk.ray)).toBeGreaterThanOrEqual(3)
+    expect(kontrast(renk.ad, renk.okul)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  test('Gün Şeridi günü adlı parçalara böler, saat cetveli yok', async ({ page }) => {
+    await bugunAc(page, '2026-09-24T10:15')
+    const serit = page.locator('.day-strip')
+    await expect(serit.locator('.day-strip__part')).toHaveCount(3)
+    await expect(serit.locator('.day-strip__part--okul')).toContainText('Okul')
+    await expect(serit.locator('.day-strip__part--aksam')).toContainText('Akşam')
+    await expect(serit.locator('.day-strip__homework')).toHaveText(/Ödev zamanı 15:\d\d–16:00/)
+    await expect(serit.locator('.day-strip__tick')).toHaveCount(0)
+    // The parts fill the rail exactly: no gap, nothing pushed past its end.
+    const { ray, toplam } = await serit.evaluate(el => {
+      const r = el.querySelector('.day-strip__track')!.getBoundingClientRect()
+      const parcalar = [...el.querySelectorAll('.day-strip__part')].map(p => p.getBoundingClientRect())
+      return { ray: r.width - 2, toplam: parcalar.reduce((t, p) => t + p.width, 0) }
+    })
+    expect(Math.abs(ray - toplam)).toBeLessThan(1.5)
   })
 })

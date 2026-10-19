@@ -17,7 +17,7 @@ test.describe('Bugün', () => {
     await bugunAc(page, '2026-09-24T16:10')
     await expect(page.locator('.next-thing .next-thing__eyebrow')).toHaveText('Şimdi')
     const serit = page.locator('.day-strip')
-    await expect(serit).toContainText('Odak sonu 16:30')
+    await expect(serit).toContainText('Ödev zamanı 15:45–16:30')
     await expect(serit).toContainText('Yatma 21:45')
   })
 
@@ -26,6 +26,10 @@ test.describe('Bugün', () => {
     await bugunAc(page, '2026-09-24T16:10')
     await expect(page.locator('.next-thing .next-thing__eyebrow')).toHaveText('Bu akşam')
     await expect(page.locator('.day-strip')).toContainText('Yatma 22:30')
+    // The homework slot is behind; only the evening is left on the strip.
+    await expect(page.locator('.day-strip__homework')).toHaveCount(0)
+    await expect(page.locator('.day-strip__part')).toHaveCount(1)
+    await expect(page.locator('.day-strip__part--aksam')).toBeVisible()
   })
 
   test('okunamayan pencere sayfayı durdurmaz; bugünkü değerler geçer', async ({ page }) => {

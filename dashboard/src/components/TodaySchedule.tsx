@@ -328,6 +328,17 @@ export default function TodaySchedule() {
     (scheduleData.latest?.schedule?.rows?.length ?? 0) > 1,
   ), [bugunAjandasi, nowMs, scheduleData])
 
+  // Today's school for the Day Strip, whatever day the page is showing: the
+  // strip is always today. The last bell is the timetable's when there is one
+  // (Friday runs later), the household setting otherwise.
+  const seritOkulu = useMemo(() => {
+    if (!okulGunu) return null
+    const dersler = bugunAjandasi.filter(a => a.type === 'lesson')
+    const bas = dersler.length ? Math.min(...dersler.map(a => a.startMin)) : SCHOOL_START
+    const bit = dersler.length ? Math.max(...dersler.map(a => a.endMin)) : pencere.okulBitisi
+    return { bas, bit }
+  }, [okulGunu, bugunAjandasi, pencere.okulBitisi])
+
   // The ten minutes behind "10 dakikayla başla", kept on this card and across
   // a reload. Keyed by the work, so a different top item finds no box.
   const isAnahtari = top
@@ -563,7 +574,8 @@ export default function TodaySchedule() {
         nowMin={nowMin}
         bedtimeMin={pencere.yatma}
         focusEndMin={pencere.odakSonu}
-        anchorMin={nextThing.anchorMin}
+        dayStartMin={SCHOOL_START}
+        school={seritOkulu}
       />
 
       {okulModu && simdikiYer && (

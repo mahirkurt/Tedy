@@ -2761,57 +2761,53 @@ sakin kalır (İ6). Bu bölüm şeridin neyi kodladığını, hangi Carbon kural
 çizildiğini yazar. Kod: `dashboard/src/components/DayStrip.tsx`, `DayStrip.scss`; tek kullanım yeri
 `TodaySchedule.tsx` (Bugün).
 
-**Neyi kodlar.**
+**Neyi kodlar** (2026-10-19'dan beri; aile eski şeridi "anlaşılmaz ve kompleks" buldu: adsız gri pencere, açıklamasız
+mavi çapa çizgisi ve sekiz saat işareti. Şerit artık günün parçalarını öğrencinin zaten bildiği adlarla böler; açıklama
+kutusu ve saat cetveli yoktur. Mantık saftır ve testlidir: `utils/gunSeridi.ts`, `tests/gunSeridi.test.ts`).
 
 | Öğe | Anlam | Kodlama |
 |---|---|---|
 | İz (track) | **Günün kalan kısmı**, şimdiden yatma saatine (22:30) | Genişlik ölçekli; harcanmış saatler çizilmez (İ7). İz "şimdi"ye bağlı olduğu için gün ilerledikçe **kendiliğinden kısalır** — zaman sinyali bileşenin şeklindedir, geri sayım bağırmaz (İ2). |
-| Odak penceresi | Sürdürülebilir dikkatin bittiği yer (16:00) | Sıcak, opak alan + 2 px kenar + "odak sonu HH:MM" etiketi. Pencere kapandıysa alan ve etiket hiç çizilmez. Bir alarm değil "burada yakıt var" der. |
-| Şimdi | Gerçek, şu anki konum | 3 px `interactive` çizgi, izin solunda. Etikette "ŞİMDİ HH:MM". |
-| Çapa | Sıradaki işin yapılacağı an | 2 px çizgi; işi teslim tarihine değil yapılacağı ana bağlar (İ3). |
-| Saat işaretleri | Ölçek | Kalan süre 8 saati aşarsa 120, değilse 60 dakikada bir; pencere sınırına 45 dakikadan yakın işaret düşer (sınırın kendi etiketi daha yararlı). |
-| Baş satır | Şimdi · kalan süre · yatma | "ŞİMDİ 10:30" · "12 saatin var" · "yatma 22:30". |
+| Parçalar | Sabah · Okul · Ödev zamanı · Akşam | Yan yana, dakikayla ölçekli; aralarında 2 px `border-strong-01` kenar. Adı sığan parça adını içinde taşır (`label-01`; sığmazsa ad düşer, kesilmez — kap sorgusu). Okul yalnız okul günü çizilir: ilk dersten son zile (ders programı yoksa ayardaki son zil). Okulsuz günde ödev zamanı 08:00'de başlar. |
+| Ödev zamanı | Odak penceresinin okul sonrasındaki dilimi (son zil → odak sonu) | Şeridin tek rengi: `border-interactive` dolgu, en az 0,375 rem. Kartın işinin bağlandığı dilimdir (İ3) — eski çapa çizgisinin yerini alır. Şeridin altında "Ödev zamanı 15:45–16:00" adıyla ve renk karesiyle yazılır; dilim geçince satır kalkar. |
+| Şimdi | Gerçek, şu anki konum | İzin sol kenarı, 3 px `border-inverse`. Baş satırda "Şimdi HH:MM". |
+| Baş ve alt satır | Şimdi · kalan süre / ödev zamanı · yatma | "Şimdi 10:15" · "12 saat 15 dakikan var"; altta "Ödev zamanı 15:45–16:00" · "Yatma 22:30". |
 
 **Neden ilerleme çubuğu değildir.** Carbon'un belirli `ProgressBar`'ı 0'dan 100'e dolar ve hiç azalmaz; şerit
 kısalır ve tamamlanan bir şey yoktur
 (https://carbondesignsystem.com/building-blocks/core/components/progress-bar/guidelines/#indeterminate-progress-bar).
-Bu yüzden `role="progressbar"`, `aria-valuenow` taşımaz; erişilebilir adı tek cümledir: "Şimdi 10:30. 12 saatin
-var. Odak penceresi 16:00'da kapanıyor. Gün 22:30'da bitiyor." Daraltılmış şerit başka sayfaya taşınırsa kural
+Bu yüzden `role="progressbar"`, `aria-valuenow` taşımaz; erişilebilir adı tek cümledir: "Şimdi 10:15. Okul
+10:15–15:45. Ödev zamanı 15:45–16:00. Akşam 16:00–22:30. 12 saat 15 dakikan var." Daraltılmış şerit başka sayfaya taşınırsa kural
 aynıdır.
 
 **Uyduğu Carbon kuralları.**
 
-- *Açıklama (annotation)*: eşik adıyla ve değeriyle etiketlenir, eğilimi açıklar, veriyi örtmez
-  (https://carbondesignsystem.com/building-blocks/data-visualization/dashboards/#annotation). "odak sonu 16:00"
-  iz **altında** durur, pencere dolgusunun üstünde asla; pencere kısaysa etiket sınırda ortalanmaz, başlangıçtan
-  sağa akar ki kesilmesin.
-- *Doğrudan etiket, legend yok* (https://carbondesignsystem.com/building-blocks/data-visualization/legends/#usage).
-- *Sabit işaret aralığı* (https://carbondesignsystem.com/building-blocks/data-visualization/axes-and-labels/#consistent-increments).
+- *Doğrudan etiket, legend yok* (https://carbondesignsystem.com/building-blocks/data-visualization/legends/#usage):
+  her parça adını kendi içinde taşır; tek istisna dar ödev dilimidir — adı ve saati izin **altında**, dilimin rengiyle
+  aynı küçük kareyle yazılır, dolgunun üstünde asla.
+- *Saat cetveli yok*: parçaların adları ve iki satırdaki saatler zamanı söyler; 2026-10-19'a kadar duran 60/120 dakikalık
+  işaretler kalktı.
 - *Yerel saat biçimi*: 24 saat, `clock()` (`components/patterns/time.ts`), `.tedy-time` mono ve tabular.
-- *Metin karşılığı*: tek cümlelik ad (§8.4).
-- *Grafik kontrastı ≥ 3:1* (https://carbondesignsystem.com/building-blocks/foundations/accessibility/color/):
-  **bugün sağlanmıyor — borç B9.** Çapa `interactive` rengindedir ama `opacity: 0.5` taşır: beyaz `layer-01`
-  üzerinde 2,17:1, pencere alanı `yellow-10` üzerinde 2,11:1 ölçüldü (tam opaklıkta 5,00:1 ve 4,54:1). B9'un
-  ölçtüğü aralık 1,10–2,17:1'dir. Düzeltme opaklık değil, ölçülmüş bir palet adımı ya da tam opak işarettir;
-  `test_pano_tasarim_sistemi.py`'nin renk aritmetiği taraması `opacity:`'yi yakalamadığı için bu kaçtı.
+- *Metin karşılığı*: tek cümlelik ad (§8.4); iz `aria-hidden`, çünkü cümle onu bütünüyle söyler.
+- *Grafik kontrastı ≥ 3:1* (https://carbondesignsystem.com/building-blocks/foundations/accessibility/color/): ödev
+  dilimi `border-interactive` iz üzerinde 5,0:1, okul üzerinde 3,8:1; parça kenarı `border-strong-01` iz üzerinde
+  3,3:1; şimdi `border-inverse` 18,1:1; parça adları `text-secondary` okul üzerinde 5,9:1 (`bugun-duzen.spec.ts`
+  "D — yenileme" sabitler).
 
 **Renk ve token'lar.**
 
 | Öğe | Token | Değer |
 |---|---|---|
-| İz zemini | `theme.$layer-01` | — |
-| Pencere alanı | `theme.$layer-accent-01` | nötr (2026-10-10) |
-| Pencere sınırı | `theme.$border-strong-01`, 2px | 3,3:1 |
-| Sınır etiketi | `text-primary`, `label-01` | — |
-| Şimdi | `theme.$border-inverse`, 2px | 18,1:1 |
-| Çapa | `theme.$border-interactive`, 2px, opak | 5,0:1 (B9 kapandı) |
-| Baş etiketleri | `label-01` / `body-compact-01`; `text-primary`, `text-secondary`, `text-helper` | — |
-| İşaretler | `label-01`, `text-helper` | Carbon'un en küçük adımı (12 px) |
+| İz zemini (Sabah, Akşam) | `theme.$layer-01` + 1px `border-subtle-01` | — |
+| Okul | `theme.$layer-accent-01` | nötr |
+| Ödev zamanı | `theme.$border-interactive`, opak; adı `text-on-color` | 5,0:1 iz, 3,8:1 okul |
+| Parça kenarı | `theme.$border-strong-01`, 2px | 3,3:1 |
+| Şimdi | `theme.$border-inverse`, 3px | 18,1:1 |
+| Parça adları, alt satır | `label-01`; `text-secondary`, `text-primary` | 5,9:1 okul üzerinde |
+| Baş satır | `heading-compact-01` / `body-compact-01` | — |
 
-Sarı, durum renklerinden biridir (İ8, `subjectThemes.reserved`). Pencere sarının **durum dışındaki tek
-kullanımıdır** ve yalnız opak açık adımlarla (10/30/80) çizilir; ekranın tek dikkat rengi alanını (İ6) aciliyetle
-paylaşmaz, aciliyetin kendi rengi kırmızıdır. Bu ayrım şeridin yorumunda yazılıdır (`DayStrip.scss`) ve
-değiştirilirse yeniden ölçülür. İzin `border-radius: 2px` değeri S10'un dışındadır (B1 köşe literalleri).
+Sarı, durum renklerinden biridir (İ8, `subjectThemes.reserved`) ve şeritte yoktur. Şeridin tek rengi ödev diliminin
+mavisidir — kartın işinin bağlandığı yer, eski çapa çizgisinin rengi. Köşe 0 (S10).
 
 **Hareket bütçesi.** Anayasa: "Şimdi" sayfada hareket etmesine izin verilen **tek** öğedir (İ6, `DayStrip.scss`
 yorumu). Hareket bir animasyon değildir: `TodaySchedule.tsx` saati 60 saniyede bir okur ve iz yeniden çizilir;
@@ -2819,14 +2815,14 @@ geçiş (transition) ve animasyon yoktur. Bu yüzden `prefers-reduced-motion` al
 dakikaki atlama bilgidir (anayasa §5.4: hareketin bilgi taşıdığı yerde kaldırılmaz). Şeride animasyon eklenmez;
 eklenirse ekrandaki ikinci hareket olur.
 
-**Dar ekran.** 42 rem altında saat işaretleri gizlenir; karar taşıyan sınır etiketi kalır. Bu eşik temanın 671 px
-kırılımından 1 px ayrıktır (B10).
+**Dar ekran.** Saat cetveli olmadığı için gizlenecek işaret yoktur; dar parçada ad, kap sorgusuyla (`@container`)
+kendiliğinden düşer, kesilmez.
 
 **Sınama.** `gorsel-regresyon.spec.ts` (Bugün 1440/390 ve yüksek kontrast tabanları), `aria-yapisi.spec.ts`
-(`bugun.aria.yml`), `gorunum-kipleri.spec.ts`, `bugun-duzen.spec.ts`; önerilen — `.day-strip` içinde
-`[role=progressbar]` yok ve adı "Şimdi HH:MM." ile başlayıp "bitiyor." ile biter; "odak sonu" etiketinin kutusu
-`.day-strip__track`'in altında ve `.day-strip__window` ile kesişmez; şeridin her işareti opaklık sonrası rengiyle
-`layer-01`, `background` ve pencere alanına karşı ≥ 3:1 (bugün çapa düşer).
+(`bugun.aria.yml`), `gorunum-kipleri.spec.ts`; `bugun-duzen.spec.ts` kontrastı, parçaların adını, saat cetvelinin
+yokluğunu ve parçaların izi tam doldurduğunu sabitler; `odak-penceresi.spec.ts` ayardaki ödev zamanını; parça
+hesabı `tests/gunSeridi.test.ts` (okul sabahı, ders sırası, ödev dilimi içi, akşam, yatma sonrası, okulsuz gün,
+odak sonu son zilden önce, cuma).
 
 ## 9. edupedia modülleri
 
