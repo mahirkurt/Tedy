@@ -53,6 +53,8 @@ export interface PlanYaniti {
   planda_olmayan: number
   /** "17:15'e kadar başlamazsan ailene haber gider." — or null, then nothing is drawn. */
   haber_metni: string | null
+  /** The family's "Bu akşam plan yok" switch for today (R18). A holiday is also `kapali`, with this false. */
+  aksam_yok: boolean
 }
 
 export type KartTuru = 'onizleme' | 'calisma' | 'mola' | 'bekliyor' | 'bitti' | 'kapali' | 'yok'
@@ -70,6 +72,9 @@ export interface KartDurumu {
   /** The block the card's buttons act on. */
   blok?: PlanBlogu
 }
+
+/** A holiday closes the evening's plan; said once, quietly. */
+export const TATIL_METNI = 'Bugün tatil, akşam planı yok.'
 
 const iki = (n: number) => String(n).padStart(2, '0')
 
@@ -156,7 +161,10 @@ export function kartDurumu(plan: PlanYaniti, simdiMin: number): KartDurumu {
       blok: simdiki,
     }
   }
-  if (plan.durum === 'kapali') return { tur: 'kapali', ust: '', baslik: 'Bu akşam plan yok', alt: '' }
+  if (plan.durum === 'kapali') {
+    // Off by the family's switch, or by a holiday on the school calendar: the switch tells them apart.
+    return { tur: 'kapali', ust: '', baslik: plan.aksam_yok ? 'Bu akşam plan yok' : TATIL_METNI, alt: '' }
+  }
   if (plan.durum === 'bitti') return { tur: 'bitti', ust: '', baslik: 'Bugünlük bu kadar', alt: '' }
   if (plan.durum !== 'onizleme' && plan.durum !== 'akis') return { tur: 'yok', ust: '', baslik: '', alt: '' }
 
@@ -284,6 +292,7 @@ export function planCoz(v: unknown): PlanYaniti | null {
     tasinan: liste(o.tasinan, kayitCoz), sigmayan: liste(o.sigmayan, kayitCoz),
     planda_olmayan: Math.max(0, sayi(o.planda_olmayan)),
     haber_metni: typeof o.haber_metni === 'string' && o.haber_metni.trim() ? o.haber_metni : null,
+    aksam_yok: o.aksam_yok === true,
   }
 }
 
@@ -293,12 +302,19 @@ export interface PlanHatasi {
   alt?: string
 }
 
-/** What the card says when a touch is refused: the server's own sentence for a 4xx that carries one
- *  ("Önce süren bloğu bitir."), otherwise a calm general one — never the HTTP status or body (D3, D4). */
+/** The plan routes' own refusals the reader may see, by status (src/dashboard_api.py, /api/plan/*).
+ *  Only these: the app's other handlers answer in English ("Unauthorized", "forbidden", Flask's
+ *  "Not Found"), and an expired session must not put that on the card (D3, D4). */
+const BILINEN_RETLER: Record<number, readonly string[]> = {
+  409: ['Önce süren bloğu bitir.', 'Bu bloğu bir kez erteledin.', 'Süren ya da biten bir blok ertelenemez.'],
+  403: ['Bunu yalnız aile değiştirebilir.'],
+}
+
+/** What the card says when a touch is refused: one of the plan routes' own Turkish sentences, word for
+ *  word, or a calm general one — never the HTTP status or body (D3, D4). */
 export function planHataCumlesi(durum: number | null, govde: unknown): PlanHatasi {
   const hata = nesne(govde)?.error
-  if (durum !== null && durum >= 400 && durum < 500 && typeof hata === 'string' && hata.trim()) {
-    return { tur: 'uyari', baslik: hata.trim() }
-  }
+  const cumle = typeof hata === 'string' ? hata.trim() : ''
+  if (durum !== null && BILINEN_RETLER[durum]?.includes(cumle)) return { tur: 'uyari', baslik: cumle }
   return { tur: 'hata', baslik: 'Kaydedilemedi', alt: 'Bağlantını kontrol edip yeniden dene.' }
 }

@@ -56,27 +56,41 @@ export function AksamPlani({ plan, kart, aile, islemler }: {
   const [duzeltilen, setDuzeltilen] = useState<string | null>(null)
   const [dakika, setDakika] = useState(20)
   const basliRef = useRef<HTMLHeadingElement>(null)
+  const satirRef = useRef<HTMLParagraphElement>(null)
   const blok = kart.blok
-  const oncekiBlok = useRef(blok?.id)
+  // One touch at a time: a double click in the same frame, before React re-renders the button away,
+  // must post once (a state flag would still read "free" in that frame).
+  const mesgul = useRef(false)
+  // Focus follows the reader's own touch only: a successful one counts here, a poll never does.
+  const [odakIstegi, setOdakIstegi] = useState(0)
+  const islenenOdak = useRef(0)
 
   const duzelt = blok != null && duzeltilen === blok.id
 
-  // When the card steps on, focus lands on the new title, so the keyboard is not left on a button that
-  // went away (D2).
+  // After a touch the button pressed is usually gone (Başla becomes Bitti, the card steps on, the
+  // evening ends): focus lands on the card's title, or on the quiet "Bugünlük bu kadar" line, so the
+  // keyboard is not left on nothing (D2). A minute's poll changes the card without moving focus.
   useEffect(() => {
-    if (oncekiBlok.current === blok?.id) return
-    const vardi = oncekiBlok.current !== undefined
-    oncekiBlok.current = blok?.id
-    if (vardi) basliRef.current?.focus()
-  }, [blok?.id])
+    if (odakIstegi === islenenOdak.current) return
+    islenenOdak.current = odakIstegi
+    if (kart.tur === 'bitti') satirRef.current?.focus()
+    else basliRef.current?.focus()
+  }, [odakIstegi, kart.tur])
 
   async function calistir(ad: Islem, f: () => Promise<PlanSonucu>) {
+    if (mesgul.current) return false
+    mesgul.current = true
     setIslem(ad)
     setHata(null)
-    const s = await f()
-    setIslem(null)
-    if (!s.ok) setHata(s.hata)
-    return s.ok
+    try {
+      const s = await f()
+      if (!s.ok) setHata(s.hata)
+      else if (ad !== 'aksam-yok') setOdakIstegi(n => n + 1)
+      return s.ok
+    } finally {
+      mesgul.current = false
+      setIslem(null)
+    }
   }
 
   const bitirmeyeBas = () => {
@@ -131,7 +145,7 @@ export function AksamPlani({ plan, kart, aile, islemler }: {
       labelText="Bu akşam plan yok"
       labelA="Hayır"
       labelB="Evet"
-      toggled={plan.durum === 'kapali'}
+      toggled={plan.aksam_yok}
       disabled={islem !== null}
       onToggle={aktif => { calistir('aksam-yok', () => islemler.aksamYok(aktif)) }}
     />
@@ -161,9 +175,17 @@ export function AksamPlani({ plan, kart, aile, islemler }: {
     </Accordion>
   )
 
-  // The family can turn tonight off and back on; with the plan off, only that switch is left here.
+  // The family can turn tonight off and back on; with the plan off, only that switch is left here. A
+  // holiday closes it too (the switch stays off): one quiet line says so.
   if (kart.tur === 'kapali') {
-    return aksamYokAnahtari ? <div className="aksam-plani__ek">{aksamYokAnahtari}{bildirim}</div> : null
+    if (!aksamYokAnahtari && plan.aksam_yok) return null
+    return (
+      <div className="aksam-plani__ek">
+        {!plan.aksam_yok && <p className="aksam-plani__satir aksam-plani__tatil">{kart.baslik}</p>}
+        {aksamYokAnahtari}
+        {bildirim}
+      </div>
+    )
   }
 
   // Before 17:00, and once the evening is over: one quiet line, not a second panel (İ1, İ6).
@@ -171,7 +193,9 @@ export function AksamPlani({ plan, kart, aile, islemler }: {
     return (
       <>
         <section className={`aksam-plani aksam-plani--sessiz aksam-plani--${kart.tur}`} aria-label="Akşam planı">
-          <p className="aksam-plani__baslik aksam-plani__baslik--sessiz"><Rakamli metin={kart.baslik} /></p>
+          <p className="aksam-plani__baslik aksam-plani__baslik--sessiz" tabIndex={-1} ref={satirRef}>
+            <Rakamli metin={kart.baslik} />
+          </p>
           {kart.alt && <p className="aksam-plani__alt">{kart.alt}</p>}
           {plan.haber_metni && <p className="aksam-plani__haber"><Rakamli metin={plan.haber_metni} /></p>}
         </section>

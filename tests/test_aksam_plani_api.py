@@ -215,7 +215,7 @@ def test_oturumsuz_401(ortam):
 def test_get_plan_sekli(ortam):
     p = ortam.plan()
     assert set(p) == {"gun", "durum", "bloklar", "simdiki", "siradaki", "tasinan", "sigmayan",
-                      "planda_olmayan", "haber_metni"}
+                      "planda_olmayan", "haber_metni", "aksam_yok"}
     assert p["gun"] == "2026-10-19" and p["durum"] == "akis" and p["simdiki"] is None
     c = [b for b in p["bloklar"] if b["tur"] == "calisma"]
     assert len(c) == 2 and p["siradaki"]["id"] == c[0]["id"]
@@ -368,6 +368,19 @@ def test_aksam_yok_aile_kapatir_ve_acar(ortam):
     assert ortam.c.post("/api/plan/aksam-yok", json={"aktif": "evet"}).status_code == 400
 
 
+def test_aksam_yok_anahtari_yanitta(ortam):
+    # R18: kart anahtarı `durum`dan değil bu alandan okur; tatil `kapali` ama anahtar kapalı.
+    assert ortam.plan()["aksam_yok"] is False
+    r = ortam.c.post("/api/plan/aksam-yok", json={"aktif": True}).get_json()
+    assert r["aksam_yok"] is True and r["durum"] == "kapali"
+    assert ortam.plan()["aksam_yok"] is True
+    ortam.c.post("/api/plan/aksam-yok", json={"aktif": False})
+    ortam.veri["takvim"] = [{"title": "Cumhuriyet Bayramı Tatili", "start": "2026-10-19", "end": "2026-10-20",
+                             "allDay": True}]
+    p = ortam.plan()
+    assert p["durum"] == "kapali" and p["aksam_yok"] is False
+
+
 def test_takvim_tatili_plani_kapatir(ortam):
     ortam.veri["takvim"] = [{"title": "Cumhuriyet Bayramı Tatili", "start": "2026-10-19", "end": "2026-10-20",
                              "allDay": True}]
@@ -417,7 +430,11 @@ def test_haber_metni_kosullari(ortam, monkeypatch):
     assert ortam.plan()["haber_metni"] is None                     # bildirim bayrağı yok
     monkeypatch.setenv("TEDY_AKSAM_BILDIRIM", "1")
     p = ortam.plan()
-    assert p["durum"] == "onizleme" and p["haber_metni"] == "17:15'e kadar başlamazsan ailene haber gider."
+    # Aile okurken kişisiz cümle; Işık okurken "sen" (R19).
+    assert p["durum"] == "onizleme" and p["haber_metni"] == "17:15'e kadar başlanmazsa haber gider."
+    ortam.giris(OGRENCI)
+    assert ortam.plan()["haber_metni"] == "17:15'e kadar başlamazsan ailene haber gider."
+    ortam.giris(AILE)
     (ortam.out / "aksam_duzeni.json").write_text(json.dumps({"haber_alacaklar": []}), encoding="utf-8")
     assert ortam.plan()["haber_metni"] is None                     # alıcı yok
     (ortam.out / "aksam_duzeni.json").write_text(json.dumps({"haber_alacaklar": [AILE]}), encoding="utf-8")

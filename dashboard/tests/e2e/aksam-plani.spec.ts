@@ -55,6 +55,8 @@ class PlanSunucu {
   plandaOlmayan = 0
   istekler: { yol: string; govde: unknown }[] = []
   basla409 = false
+  aksamYok = false
+  okumalar = 0
   constructor(durum: string, bloklar: Blok[]) { this.durum = durum; this.bloklar = bloklar }
 
   yanit() {
@@ -65,6 +67,7 @@ class PlanSunucu {
       simdiki: calisma.find(b => b.durum === 'suruyor') ?? null,
       siradaki: calisma.find(b => b.durum === 'bekliyor' || b.durum === 'ertelendi') ?? null,
       tasinan: this.tasinan, sigmayan: [], planda_olmayan: this.plandaOlmayan, haber_metni: this.haber,
+      aksam_yok: this.aksamYok,
     }
   }
 
@@ -88,7 +91,10 @@ class PlanSunucu {
     await page.route('**/api/plan/**', async route => {
       const r: Request = route.request()
       const yol = new URL(r.url()).pathname.replace('/api/plan/', '')
-      if (r.method() === 'GET') return route.fulfill(json(this.yanit()))
+      if (r.method() === 'GET') {
+        this.okumalar++
+        return route.fulfill(json(this.yanit()))
+      }
       const govde = r.postDataJSON?.() ?? null
       this.istekler.push({ yol: decodeURIComponent(yol), govde })
       const m = /^blok\/([^/]+)\/(basla|bitti|simdi-degil)$/.exec(yol)
@@ -106,7 +112,8 @@ class PlanSunucu {
           b.durum = 'ertelendi'
         }
       } else if (yol === 'aksam-yok') {
-        this.durum = (govde as { aktif: boolean }).aktif ? 'kapali' : 'akis'
+        this.aksamYok = (govde as { aktif: boolean }).aktif
+        this.durum = this.aksamYok ? 'kapali' : 'akis'
       }
       return route.fulfill(json({ ok: true, ...this.yanit() }))
     })
@@ -114,7 +121,9 @@ class PlanSunucu {
 }
 
 async function planAc(page: Page, anlik: string, sunucu: PlanSunucu | null,
-  { w = 1440, h = 900, ogrenci = true }: { w?: number; h?: number; ogrenci?: boolean } = {}) {
+  { w = 1440, h = 900, ogrenci = true, rotalar }: {
+    w?: number; h?: number; ogrenci?: boolean; rotalar?: (page: Page) => Promise<void>
+  } = {}) {
   await page.clock.setFixedTime(new Date(`2026-09-24T${anlik}:00+03:00`))
   await bildirimTaklidi(page, { izin: 'default', abone: false })
   await mock(page, {
@@ -122,6 +131,7 @@ async function planAc(page: Page, anlik: string, sunucu: PlanSunucu | null,
     'auth/me': { email: 'test@tedy.online', name: 'Test User', picture: '', role: 'full', student: ogrenci },
   })
   if (sunucu) await sunucu.kur(page, dk(anlik))
+  if (rotalar) await rotalar(page)
   await page.setViewportSize({ width: w, height: h })
   await page.goto('/')
   await page.waitForLoadState('networkidle')
@@ -223,10 +233,42 @@ test('reddedilen dokunuş sunucunun cümlesini söyler, HTTP metnini değil', as
   const sunucu = new PlanSunucu('akis', AKSAM())
   sunucu.basla409 = true
   await planAc(page, '17:05', sunucu)
+  const once = sunucu.okumalar
   await kart(page).getByRole('button', { name: 'Başla' }).click()
   const not = kart(page).locator('.aksam-plani__bildirim')
   await expect(not).toContainText('Önce süren bloğu bitir.')
   await expect(not).not.toContainText('409')
+  // A refusal reads the plan again, so the card catches up with what the server holds.
+  await expect.poll(() => sunucu.okumalar).toBeGreaterThan(once)
+})
+
+test('süresi dolmuş oturumun İngilizce cevabı karta düşmez', async ({ page }) => {
+  const sunucu = new PlanSunucu('akis', AKSAM())
+  await planAc(page, '17:05', sunucu)
+  await page.route('**/api/plan/blok/**', r => r.fulfill(json({ error: 'Unauthorized' }, 401)))
+  await kart(page).getByRole('button', { name: 'Başla' }).click()
+  const not = kart(page).locator('.aksam-plani__bildirim')
+  await expect(not).toContainText('Kaydedilemedi')
+  await expect(not).not.toContainText('Unauthorized')
+})
+
+test('aynı anda iki tık tek istek gönderir', async ({ page }) => {
+  const sunucu = new PlanSunucu('akis', AKSAM())
+  await planAc(page, '17:05', sunucu)
+  await kart(page).getByRole('button', { name: 'Başla' }).dblclick()
+  await expect(kart(page).getByRole('button', { name: 'Bitti' })).toBeVisible()
+  expect(sunucu.istekler.map(i => i.yol)).toEqual(['blok/mat0/basla'])
+})
+
+test('kullanıcının dokunuşu odağı başlığa taşır; akşam bitince sessiz satıra', async ({ page }) => {
+  const bloklar = [is('son', '17:00', '17:20', { durum: 'suruyor' })]
+  const sunucu = new PlanSunucu('akis', bloklar)
+  await planAc(page, '17:10', sunucu)
+  await kart(page).getByRole('button', { name: 'Bitti' }).click()
+  await kart(page).getByRole('button', { name: 'Evet' }).click()
+  const satir = page.locator('.aksam-plani--bitti .aksam-plani__baslik')
+  await expect(satir).toHaveText('Bugünlük bu kadar')
+  await expect(satir).toBeFocused()
 })
 
 test('süre düzeltme: tahmin metninden açılır, PUT dakikayı gönderir', async ({ page }) => {
@@ -282,6 +324,20 @@ test('"Bu akşam plan yok" anahtarı yalnız aileye', async ({ page }) => {
   await expect(page.getByRole('switch', { name: 'Bu akşam plan yok' })).toHaveAttribute('aria-checked', 'true')
 })
 
+test('tatil: anahtar kapalı görünür, tek sessiz satır', async ({ page }) => {
+  await planAc(page, '17:05', new PlanSunucu('kapali', []), { ogrenci: false })
+  await expect(page.locator('.aksam-plani__tatil')).toHaveText('Bugün tatil, akşam planı yok.')
+  await expect(page.getByRole('switch', { name: 'Bu akşam plan yok' })).toHaveAttribute('aria-checked', 'false')
+  await expect(page.locator('.next-thing')).toBeVisible()
+})
+
+test('JSON\'suz 404 de bayrak kapalı sayılır, arıza değil', async ({ page }) => {
+  await planAc(page, '17:05', null, { rotalar: p => p.route('**/api/plan/bugun',
+    r => r.fulfill({ status: 404, contentType: 'text/html', body: '<h1>Not Found</h1>' })) })
+  await expect(page.locator('.next-thing')).toBeVisible()
+  await expect(page.locator('.today-ariza')).toHaveCount(0)
+})
+
 test('uç 404 (bayrak kapalı): NextThing görünür, plan kartı yok', async ({ page }) => {
   await bugunAc(page, '2026-09-24T17:05')
   await expect(page.locator('.next-thing')).toBeVisible()
@@ -306,7 +362,7 @@ test('odak kipi yalnız kartı bırakır', async ({ page }) => {
 for (const [boy, w, h] of [['masaustu', 1440, 900], ['telefon', 390, 844]] as const) {
   test(`plan kartı axe ve IBM denetiminden temiz geçer (${boy})`, async ({ page }) => {
     const sunucu = new PlanSunucu('akis', AKSAM())
-    sunucu.haber = "17:15'e kadar başlamazsan ailene haber gider."
+    sunucu.haber = "17:15'e kadar başlanmazsa haber gider."
     sunucu.plandaOlmayan = 1
     await planAc(page, '17:05', sunucu, { w, h, ogrenci: false })
     await page.getByRole('button', { name: 'Bu akşamın tamamı' }).click()
@@ -356,7 +412,7 @@ test('telefonda yatay kayma yok, her denetim en az 44 px', async ({ page }) => {
 for (const [boy, w, h] of [['masaustu', 1440, 900], ['telefon', 390, 844]] as const) {
   test(`plan kartı görünüşü (${boy})`, async ({ page }) => {
     const sunucu = new PlanSunucu('akis', AKSAM())
-    sunucu.haber = "17:15'e kadar başlamazsan ailene haber gider."
+    sunucu.haber = "17:15'e kadar başlanmazsa haber gider."
     sunucu.plandaOlmayan = 1
     await planAc(page, '17:05', sunucu, { w, h, ogrenci: false })
     await expect(page).toHaveScreenshot(`aksam-plani-${boy}.png`, {

@@ -14,7 +14,8 @@ export type PlanSonucu = { ok: true } | { ok: false; hata: PlanHatasi }
  * Tonight's study plan (spec 2026-10-19 §6.7), read from `/api/plan/bugun`.
  *
  * The flag off answers 404 `{"kapali": true}`: that is not a failure, it is "no
- * plan card", and Bugün keeps its old flow (`kapali`). Any other failure is
+ * plan card", and Bugün keeps its old flow (`kapali`). Bugün does not wait for this
+ * read: the page paints, and the card takes its slot when the plan arrives. Any other failure is
  * `hata` — the page says it could not read everything, never the HTTP text.
  * Every touch answers with the whole plan, which replaces the one on screen.
  */
@@ -51,7 +52,9 @@ export function useAksamPlani(): {
       const govde: unknown = (res.headers.get('content-type') || '').includes('application/json')
         ? await res.json().catch(() => null) : null
       if (benim !== surum.current) return
-      if (res.status === 404 && govde && typeof govde === 'object' && (govde as { kapali?: unknown }).kapali === true) {
+      // The flag answers 404 `{"kapali": true}`; any 404 (a proxy's page, an older server without the
+      // route) means the same thing for the page — no plan card — and is not a failure.
+      if (res.status === 404) {
         setKapali(true)
         setPlan(null)
         setHata(false)
@@ -90,11 +93,17 @@ export function useAksamPlani(): {
         body: JSON.stringify(govde ?? {}),
       })
     } catch {
+      window.dispatchEvent(new Event(PLAN_OLAYI))
       return { ok: false, hata: planHataCumlesi(null, null) }
     }
     const json: unknown = (res.headers.get('content-type') || '').includes('application/json')
       ? await res.json().catch(() => null) : null
-    if (!res.ok) return { ok: false, hata: planHataCumlesi(res.status, json) }
+    if (!res.ok) {
+      // A refusal means the card was showing something the server no longer holds (another device
+      // started a block, the block left the plan): read the plan again so the card catches up.
+      window.dispatchEvent(new Event(PLAN_OLAYI))
+      return { ok: false, hata: planHataCumlesi(res.status, json) }
+    }
     const p = planCoz(json)
     if (p) {
       surum.current++

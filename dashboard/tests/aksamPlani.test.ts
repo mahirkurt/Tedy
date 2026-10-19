@@ -28,7 +28,7 @@ function plan(durum: PlanYaniti['durum'], bloklar: PlanBlogu[], ek: Partial<Plan
     gun: '2026-09-24', durum, bloklar,
     simdiki: calisma.find(b => b.durum === 'suruyor') ?? null,
     siradaki: calisma.find(b => b.durum === 'bekliyor' || b.durum === 'ertelendi') ?? null,
-    tasinan: [], sigmayan: [], planda_olmayan: 0, haber_metni: null, ...ek,
+    tasinan: [], sigmayan: [], planda_olmayan: 0, haber_metni: null, aksam_yok: false, ...ek,
   }
 }
 
@@ -140,6 +140,9 @@ test('akışta bütün bloklar bittiyse de "Bugünlük bu kadar"', () => {
 
 test('kapalı, plansız ve okulsuz', () => {
   assert.equal(kartDurumu(plan('kapali', []), dk('17:10')).tur, 'kapali')
+  // The family's switch and a holiday are both "kapali"; the switch tells them apart (R18).
+  assert.equal(kartDurumu(plan('kapali', [], { aksam_yok: true }), dk('17:10')).baslik, 'Bu akşam plan yok')
+  assert.equal(kartDurumu(plan('kapali', []), dk('17:10')).baslik, 'Bugün tatil, akşam planı yok.')
   assert.equal(kartDurumu(plan('plansiz', []), dk('17:10')).tur, 'yok')
   assert.equal(kartDurumu(plan('okulsuz', []), dk('17:10')).tur, 'yok')
 })
@@ -242,6 +245,8 @@ test('planCoz yanlış şekli reddeder, doğru şekli geçirir', () => {
   assert.deepEqual(eksik?.tasinan, [])
   assert.equal(eksik?.haber_metni, null)
   assert.equal(eksik?.simdiki, null)
+  assert.equal(eksik?.aksam_yok, false)
+  assert.equal(planCoz({ gun: '', durum: 'kapali', bloklar: [], aksam_yok: true })?.aksam_yok, true)
 })
 
 test('hata cümlesi: sunucunun cümlesi, yoksa sakin bir genel cümle; ham HTTP asla', () => {
@@ -249,10 +254,17 @@ test('hata cümlesi: sunucunun cümlesi, yoksa sakin bir genel cümle; ham HTTP 
     { tur: 'uyari', baslik: 'Önce süren bloğu bitir.' })
   assert.deepEqual(planHataCumlesi(403, { error: 'Bunu yalnız aile değiştirebilir.' }),
     { tur: 'uyari', baslik: 'Bunu yalnız aile değiştirebilir.' })
-  for (const [durum, govde] of [[500, { error: 'Traceback' }], [502, null], [null, null], [404, '<html>']] as const) {
+  assert.deepEqual(planHataCumlesi(409, { error: 'Bu bloğu bir kez erteledin.' }),
+    { tur: 'uyari', baslik: 'Bu bloğu bir kez erteledin.' })
+  // The app's own handlers answer in English; none of it reaches the card (D3, D4).
+  for (const [durum, govde] of [
+    [401, { error: 'Unauthorized' }], [403, { error: 'forbidden' }], [404, { error: 'Not Found' }],
+    [404, { error: 'Bu blok bulunamadı.' }], [400, { error: 'Bad Request' }], [409, { error: 'Conflict' }],
+    [500, { error: 'Traceback' }], [502, null], [null, null], [404, '<html>'],
+  ] as const) {
     const c = planHataCumlesi(durum, govde)
     assert.equal(c.tur, 'hata')
     assert.equal(c.baslik, 'Kaydedilemedi')
-    assert.doesNotMatch(`${c.baslik} ${c.alt ?? ''}`, /HTTP|\d{3}|Traceback|html/)
+    assert.doesNotMatch(`${c.baslik} ${c.alt ?? ''}`, /HTTP|\d{3}|Traceback|html|Unauthorized|forbidden|Not Found|Bad|Conflict/)
   }
 })

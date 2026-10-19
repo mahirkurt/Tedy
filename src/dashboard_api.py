@@ -2017,10 +2017,11 @@ def _blok_json(blok):
     return d
 
 
-def _haber_metni(plan, duzen):
-    """Işık'a gösterilen sakin cümle: ilk çalışma bloğunun saati + eşik geçince aileye haber gider.
+def _haber_metni(plan, duzen, okur="ogrenci"):
+    """Kartta gösterilen sakin cümle: ilk çalışma bloğunun saati + eşik geçince aileye haber gider.
     Yalnız bildirim bayrağı açık ve haber alacak biri varken, plan akıyor ya da önizlemedeyken ve
-    hiçbir çalışma bloğu başlamamışken; yoksa None (R10)."""
+    hiçbir çalışma bloğu başlamamışken; yoksa None (R10). Hitap okura göre (R19): Işık'a "sen",
+    aileye (ve kim olduğu bilinmeyene) kişisiz cümle."""
     if os.environ.get("TEDY_AKSAM_BILDIRIM") != "1" or not duzen.get("haber_alacaklar"):
         return None
     if plan.durum not in ("akis", "onizleme"):
@@ -2029,10 +2030,14 @@ def _haber_metni(plan, duzen):
     if not calisma or any(b.durum in ("suruyor", "bitti") for b in calisma):
         return None
     dk = calisma[0].bas + int(duzen["baslamadi_esik_dk"])
-    return f"{saat_hali(_dakika_saat(dk))} kadar başlamazsan ailene haber gider."
+    if okur == "ogrenci":
+        return f"{saat_hali(_dakika_saat(dk))} kadar başlamazsan ailene haber gider."
+    return f"{saat_hali(_dakika_saat(dk))} kadar başlanmazsa haber gider."
 
 
-def _plan_yaniti(plan, duzen):
+def _plan_yaniti(plan, duzen, okur="ogrenci", aksam_yok=False):
+    """`aksam_yok`: ailenin o günkü "Bu akşam plan yok" anahtarı (R18). Tatil de `kapali` yapar ama
+    anahtarı açmaz; kart ikisini bundan ayırır."""
     bloklar = [_blok_json(b) for b in plan.bloklar]
     calisma = [b for b in bloklar if b["tur"] == "calisma"]
     return {
@@ -2040,12 +2045,16 @@ def _plan_yaniti(plan, duzen):
         "simdiki": next((b for b in calisma if b["durum"] == "suruyor"), None),
         "siradaki": next((b for b in calisma if b["durum"] in ("bekliyor", "ertelendi")), None),
         "tasinan": plan.tasinan, "sigmayan": plan.sigmayan, "planda_olmayan": plan.planda_olmayan,
-        "haber_metni": _haber_metni(plan, duzen),
+        "haber_metni": _haber_metni(plan, duzen, okur),
+        "aksam_yok": bool(aksam_yok),
     }
 
 
 def _plan_yaniti_simdi(simdi):
-    return _plan_yaniti(bugunku_plan(simdi), _aksam_duzeni_oku())
+    """İstek içinde çağrılır: okur türü oturumdan okunur."""
+    gunluk = PlanDeposu(_plan_koku()).gunluk(simdi.date().isoformat())
+    return _plan_yaniti(bugunku_plan(simdi), _aksam_duzeni_oku(), _assistant_okur(),
+                        bool(gunluk.get("aksam_yok")))
 
 
 def _plan_ucu(f):

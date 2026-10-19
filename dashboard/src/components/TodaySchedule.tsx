@@ -512,18 +512,22 @@ export default function TodaySchedule() {
   const planKarti = selectedIsToday && aksamPlani.plan ? kartDurumu(aksamPlani.plan, nowMin) : null
   const planAkiyor = planKarti != null && ['calisma', 'mola', 'bekliyor'].includes(planKarti.tur)
   const planSatiri = planKarti != null && (planKarti.tur === 'onizleme' || planKarti.tur === 'bitti')
+  // The page does not wait for the plan. Until it answers, the slot it may take — the one thing and
+  // "Ayrıca" under it — stays empty (a skeleton after 400 ms, S36), so nothing is drawn only to be
+  // replaced; the rest of the page paints at once.
+  const planBekleniyor = aksamPlani.yukleniyor
 
   const git = (yol: string) => (e: MouseEvent) => {
     e.preventDefault()
     navigate(yol)
   }
 
-  if (loading || duzenYukleniyor || aksamPlani.yukleniyor) {
+  if (loading || duzenYukleniyor) {
     // A load shorter than 400 ms shows nothing (S36, B48): a skeleton that
     // blinks for a frame is noise. Past it, the page's own shape in Carbon
     // skeletons (§5.2, B5): day line, strip, card and a few rows. One set,
     // nothing else moves.
-    if (!programIskeleti && !duzenIskeleti && !aksamPlani.iskelet) return null
+    if (!programIskeleti && !duzenIskeleti) return null
     return (
       <div className="today today--yukleniyor" aria-busy="true">
         <span className="cds--visually-hidden" role="status">Bugün yükleniyor</span>
@@ -604,11 +608,15 @@ export default function TodaySchedule() {
         />
       )}
 
+      {planBekleniyor && aksamPlani.iskelet && (
+        <SkeletonPlaceholder className="today-skeleton__card" aria-hidden="true" />
+      )}
+
       {planKarti && aksamPlani.plan && planKarti.tur !== 'yok' && (planAkiyor || planSatiri) && (
         <AksamPlani plan={aksamPlani.plan} kart={planKarti} aile={oturum?.student === false} islemler={aksamPlani} />
       )}
 
-      {!planAkiyor && !planSatiri && <NextThing
+      {!planBekleniyor && !planAkiyor && !planSatiri && <NextThing
         {...nextThing.props}
         quiet={okulModu}
         box={isKarti && kutu.durum !== 'bos' ? kutu : undefined}
@@ -631,7 +639,7 @@ export default function TodaySchedule() {
       {/* The rest of what is owed, said quietly: names and days, no coloured
           countdown chips competing with the card above (İ6). Carbon's on-page
           contained list at lg, so every row is a 48px target (B8). */}
-      {ayricaGoster.length > 0 && !planAkiyor && (
+      {ayricaGoster.length > 0 && !planBekleniyor && !planAkiyor && (
         <ContainedList
           className="today-also"
           kind="on-page"
