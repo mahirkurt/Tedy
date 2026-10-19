@@ -32,6 +32,10 @@ OCR_DUZELTME = {"SOSY AL": "SOSYAL", "DÜNY A": "DÜNYA", "YAŞAY AN": "YAŞAYAN
                 "DEVLETİ ’NİN": "DEVLETİ’NİN", "KÜRESELLEŞMEN İN": "KÜRESELLEŞMENİN",
                 "HAY ATIMIZDAKİ": "HAYATIMIZDAKİ"}
 # Kitap arka maddesi ve gövde metni: içindekiler sayfasında başlık gibi görünürler.
+# İki satıra bölünmüş başlıkta sınır her satıra ayrı uygulanır (2026-10-19): birleşik başlığın
+# en uzunu 71 harf ("OSMANLI DEVLETİ’NİN CİHAN DEVLETİ HÂLİNE GELMESİNİ SAĞLAYAN POLİTİKALAR").
+# Sınırı 80'e çıkarmak ölçüldü ve Türkçe kitabından 71 harflik bir okuma metni cümlesini
+# ("Anadolu’da kilim demek, hayata renk vermek …") konu yapıyordu.
 KONU_AD_SINIRI = 70
 # Başlık düzeninde küçük kalan bağlaçlar (Türkçe yazım).
 KUCUK_KALAN = {"ve", "ile", "veya", "ya", "da", "de", "ki"}
@@ -50,7 +54,9 @@ ORTUSME_ESIGI = 0.60
 # ('organlar' ↔ 'organların'). Ek budanmadan Fen'de 5/35 kazanım eşleşiyordu, budamayla 25/35.
 ONEK = 5
 # Eşlemede taşıyıcılığı olmayan sözcükler.
-DURAK = {"ve", "ile", "icin", "bir", "bu", "veya", "gibi", "olan", "daha"}
+# "sen", "cok", "her", "ait": üç harfli sözcükler sayılmaya başlayınca (2026-10-19) başlıklarda ve
+# kazanımlarda ölçülen işlev sözcükleri.
+DURAK = {"ve", "ile", "icin", "bir", "bu", "veya", "gibi", "olan", "daha", "sen", "cok", "her", "ait"}
 # Kitap aparatı: ünite içi konu değil. Katlanmış ad bunlardan birini İÇERİYORSA düşer
 # ("1. Tema Ölçme ve Değerlendirme Soruları" gibi numaralı biçimleri de yakalamak için).
 APARAT = ("on degerlendirme", "unite sonu degerlendirme", "neler biliyoruz", "neler ogrendik",
@@ -175,7 +181,8 @@ def baslik_duzeni(metin: str) -> str:
     for sira, sozcuk in enumerate(metin.split(" ")):
         duzenli = _sozcuk_duzeni(sozcuk)
         if sira and harf_katla(duzenli) in {harf_katla(k) for k in KUCUK_KALAN}:
-            duzenli = duzenli.lower()
+            # Türkçe küçültme: 'İ'.lower() iki kod noktası verir ("i̇le", ölçüldü doc 361).
+            duzenli = duzenli.replace("İ", "i").replace("I", "ı").lower()
         cikti.append(duzenli)
     return " ".join(cikti)
 
@@ -319,20 +326,48 @@ def icindekiler_satirlari(baglanti: sqlite3.Connection, document_id: int) -> lis
     return cikti
 
 
-def icindekiler_basliklari(baglanti: sqlite3.Connection, document_id: int) -> list[str]:
+def _baslik_basi_mi(satir: str, haric: frozenset[str]) -> bool:
+    """Nokta öncülsüz bir satır, alt satırına bölünmüş bir başlığın başı olabilir mi.
+
+    Yalnız büyük harfli, en az 8 harflik ve bir ünite adı olmayan satır sayılır: ünite adları
+    ("ORTAK MİRASIMIZ") içindekilerde konu başlıklarının hemen üstünde durur ve birleştirilirse
+    sonraki başlığın önüne yapışırdı.
+    """
+    if not satir or SADECE_BASLIK.match(satir) or TEMA_ISARETI.match(satir):
+        return False
+    harfler = [c for c in satir if c.isalpha()]
+    return (len(harf_katla(satir)) >= 8 and bool(harfler) and all(c.isupper() for c in harfler)
+            and harf_katla(satir) not in haric)
+
+
+def icindekiler_basliklari(baglanti: sqlite3.Connection, document_id: int,
+                           haric: frozenset[str] = frozenset()) -> list[str]:
     """Numarasız içindekiler başlıkları, görüldükleri sırada.
 
     Türkçe ve Sosyal kitaplarının içindekileri iki sütunlu: başlık okunur ama sayfa numarası
     ondan kopuk düşer (ölçüldü 2026-10-11, doc 460/340/491/361 → 0 nokta öncüllü satır).
+    Satıra sığmayan başlık iki satıra bölünür ve nokta öncülünü yalnız ikinci satır taşır
+    (ölçüldü 2026-10-19, doc 491: "MİLLÎ MESELELER KARŞISINDA TÜRK TOPLUMUNUN TUTUM VE" /
+    "DAVRANIŞLARI ....", "… CİHAN DEVLETİ HÂLİNE GELMESİNİ" / "SAĞLAYAN POLİTİKALAR ...."):
+    başlık başı olabilecek bir satır nokta öncüllü alt satırıyla birleştirilir. Birleştirilmeden
+    yalnız kuyruk kalıyordu ve SB.7.1.3 ile SB.7.3.1'in konusu ağaçta hiç yoktu. `haric`
+    katlanmış ünite adlarıdır (`_baslik_basi_mi`).
     """
     cikti: list[str] = []
     for _, metin in baglanti.execute(
             "select page_no, text from document_page where document_id=? and page_no<=?"
             " order by page_no", (document_id, ICINDEKILER_ARAMA_SINIRI)):
+        bekleyen: str | None = None
         for satir in (metin or "").splitlines():
-            eslesme = SADECE_BASLIK.match(" ".join(satir.split()))
+            duz = " ".join(satir.split())
+            eslesme = SADECE_BASLIK.match(duz)
             if eslesme and len(harf_katla(eslesme.group("ad"))) >= 8:
-                cikti.append(eslesme.group("ad"))
+                ad = eslesme.group("ad")
+                # Satır sonu korunur: ders_uret uzunluk sınırını her satıra ayrı uygular.
+                cikti.append(f"{bekleyen}\n{ad}" if bekleyen else ad)
+                bekleyen = None
+                continue
+            bekleyen = duz if _baslik_basi_mi(duz, haric) else None
     return cikti
 
 
@@ -340,8 +375,12 @@ def icindekiler_basliklari(baglanti: sqlite3.Connection, document_id: int) -> li
 
 
 def _icerik_sozcukleri(metin: str) -> set[str]:
+    """Başlığın ve kazanımın taşıyıcı sözcükleri. Üç harfli sözcükler de sayılır (2026-10-19):
+    dört harf sınırı "Tam Sayılar"ı yalnız "sayılar"a indiriyordu ve "sayı" geçen dört kazanım
+    (MAT.7.1.1–7.1.4) aynı 1.0 skorla yaprağa düşüyordu. Kısa kök `_ayni_kok`'ta tam eşitlik
+    ister, yani "tam" "tamamlar"la eşleşmez."""
     sozcukler = {harf_katla(s) for s in (metin or "").split()}
-    return {s for s in sozcukler if len(s) >= 4 and s not in _durak_katli()}
+    return {s for s in sozcukler if len(s) >= 3 and s not in _durak_katli()}
 
 
 def _ayni_kok(a: str, b: str) -> bool:
@@ -363,6 +402,31 @@ def _ortusme_orani(ad: str, kazanim_metni: str) -> float:
     hedef = _icerik_sozcukleri(kazanim_metni)
     tutan = sum(1 for s in basliktaki if any(_ayni_kok(s, h) for h in hedef))
     return tutan / len(basliktaki)
+
+
+def _eslesen_sozcuk_sayisi(ad: str, kazanim_metni: str) -> int:
+    """Başlığın kazanımda geçen içerik sözcüğü sayısı: oranın eşit kaldığı yerde kanıtın miktarı."""
+    hedef = _icerik_sozcukleri(kazanim_metni)
+    return sum(1 for s in _icerik_sozcukleri(ad) if any(_ayni_kok(s, h) for h in hedef))
+
+
+def kazanimi_en_guclu_yaprakta_birak(konular: list[dict], metinler: dict[str, str]) -> None:
+    """Bir ünitede birden çok yaprağa düşen kazanım, onu en çok sözcükle karşılayan yaprakta kalır.
+
+    Ölçüldü 2026-10-19: "Rasyonel Sayılar" iki sözcüğüyle MAT.7.1.1–7.1.4'ün dördünde de 1.0
+    alıyordu; oysa MAT.7.1.3'ü "Rasyonel Sayılarda Karşılaştırma ve Sıralama" (4 sözcük),
+    MAT.7.1.4'ü "Rasyonel Sayılarla İşlemler ve Problem Çözme" (5 sözcük) karşılıyor. Eşit
+    kanıtlı yapraklar kazanımı birlikte tutar; hiçbir yaprak son kazanımını kaybetmez.
+    """
+    for kod in sorted({kod for konu in konular for kod in konu["kazanimlar"]}):
+        sahipler = [konu for konu in konular if kod in konu["kazanimlar"]]
+        if len(sahipler) < 2 or kod not in metinler:
+            continue
+        kanit = [_eslesen_sozcuk_sayisi(konu["ad"], metinler[kod]) for konu in sahipler]
+        en_cok = max(kanit)
+        for konu, sayi in zip(sahipler, kanit):
+            if sayi < en_cok and len(konu["kazanimlar"]) > 1:
+                konu["kazanimlar"].remove(kod)
 
 
 def kazanim_esle(konu_metni: str, kazanimlar: list[dict]) -> tuple[list[str], str]:
@@ -505,10 +569,11 @@ def kitap_kaymasi(baglanti: sqlite3.Connection, kitap_id: int) -> tuple[int | No
 
 def _kitap_kayitlari(baglanti: sqlite3.Connection, ders: Ders) -> list[dict]:
     kayitlar = []
+    uniteler = frozenset(harf_katla(u["ad"]) for u in program_uniteleri(baglanti, ders))
     for sira, kitap_id in enumerate(ders.kitaplar, start=1):
         kayma, uyum = kitap_kaymasi(baglanti, kitap_id)
         nokta = icindekiler_satirlari(baglanti, kitap_id)
-        basliklar = icindekiler_basliklari(baglanti, kitap_id)
+        basliklar = icindekiler_basliklari(baglanti, kitap_id, uniteler)
         kayitlar.append({
             "document_id": kitap_id, "kisa": f"{sira}. Kitap",
             "sayfa_kaymasi": kayma, "kayma_uyumu": uyum,
@@ -562,7 +627,7 @@ def ders_uret(baglanti: sqlite3.Connection, slug: str) -> tuple[dict | None, dic
                 continue
             # Gövde metninden kopmuş cümle konu adı olmaz (ölçüldü: Türkçe kitaplarının
             # içindekiler sayfasında okuma metinlerinden cümleler nokta öncülüyle duruyor).
-            if len(ad) > KONU_AD_SINIRI:
+            if max(len(" ".join(parca.split())) for parca in ham_ad.split("\n")) > KONU_AD_SINIRI:
                 continue
             aday += 1
             kodlar, kaynak = kazanim_esle(baslik_duzeni(ad), kazanimlar)
@@ -601,7 +666,7 @@ def ders_uret(baglanti: sqlite3.Connection, slug: str) -> tuple[dict | None, dic
             gorulen_adlar.add(harf_katla(duzgun))
             kimlik, cakisti = kimlik_ver(slug, unite_no, duzgun, kullanilan)
             cakisma += int(cakisti)
-            konu = {"id": kimlik, "ad": duzgun, "ad_kaynak": " ".join(ham_ad.split()),
+            konu = {"id": kimlik, "ad": duzgun, "ad_kaynak": " / ".join(" ".join(s.split()) for s in ham_ad.split("\n")),
                     "kitap": kitap["document_id"], "kazanimlar": kodlar,
                     "kazanim_kaynak": kaynak, "_grup": grup_basligi_mi(ad)}
             sayfa = None
@@ -629,6 +694,9 @@ def ders_uret(baglanti: sqlite3.Connection, slug: str) -> tuple[dict | None, dic
     for liste in unite_konulari.values():
         for konu in liste:
             konu.pop("_grup", None)
+    metinler = {k["kod"]: k["metin"] for k in kazanimlar}
+    for liste in unite_konulari.values():
+        kazanimi_en_guclu_yaprakta_birak(liste, metinler)
 
     tum_konular = [konu for liste in unite_konulari.values() for konu in liste]
     kapsanan = {kod for konu in tum_konular for kod in konu["kazanimlar"]}
