@@ -31,10 +31,7 @@
               "id": "matematik-u1-tam-sayilar",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
-                "MAT.7.1.1",
-                "MAT.7.1.2",
-                "MAT.7.1.3",
-                "MAT.7.1.4"
+                "MAT.7.1.1"
               ],
               "kitap": 346,
               "sayfa": [
@@ -50,9 +47,7 @@
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
                 "MAT.7.1.1",
-                "MAT.7.1.2",
-                "MAT.7.1.3",
-                "MAT.7.1.4"
+                "MAT.7.1.2"
               ],
               "kitap": 346,
               "sayfa": [
@@ -202,8 +197,7 @@
               "id": "matematik-u3-yansima-donusumu",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
-                "MAT.7.3.1",
-                "MAT.7.3.2"
+                "MAT.7.3.1"
               ],
               "kitap": 346,
               "sayfa": [
@@ -316,7 +310,6 @@
               "id": "matematik-u4-dairenin-alani",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
-                "MAT.7.4.10",
                 "MAT.7.4.7"
               ],
               "kitap": 506,
@@ -908,6 +901,17 @@
               ],
               "kitap": 491,
               "sayfa_kaynak": "yok"
+            },
+            {
+              "ad": "Millî Meseleler Karşısında Türk Toplumunun Tutum ve Davranışları",
+              "ad_kaynak": "MİLLÎ MESELELER KARŞISINDA TÜRK TOPLUMUNUN TUTUM VE / DAVRANIŞLARI",
+              "id": "sosyal-u1-milli-meseleler-karsisinda-turk-toplumunun-tutum-ve-davranislari",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.1.3"
+              ],
+              "kitap": 491,
+              "sayfa_kaynak": "yok"
             }
           ],
           "no": 1,
@@ -945,6 +949,17 @@
         {
           "ad": "Ortak Mirasımız",
           "konular": [
+            {
+              "ad": "Osmanlı Devleti’nin Cihan Devleti Hâline Gelmesini Sağlayan Politikalar",
+              "ad_kaynak": "OSMANLI DEVLETİ ’NİN CİHAN DEVLETİ HÂLİNE GELMESİNİ / SAĞLAYAN POLİTİKALAR",
+              "id": "sosyal-u3-osmanli-devleti-nin-cihan-devleti-haline-gelmesini-saglayan-politikalar",
+              "kazanim_kaynak": "metin-ortusmesi",
+              "kazanimlar": [
+                "SB.7.3.1"
+              ],
+              "kitap": 491,
+              "sayfa_kaynak": "yok"
+            },
             {
               "ad": "Osmanlı Devleti’nin Uygulamaya Koyduğu Yenilikler",
               "ad_kaynak": "OSMANLI DEVLETİ ’NİN UYGULAMAYA KOYDUĞU YENİLİKLER",
@@ -1037,9 +1052,9 @@
               "sayfa_kaynak": "yok"
             },
             {
-              "ad": "Tüketim Arasındaki Döngü",
-              "ad_kaynak": "TÜKETIM ARASINDAKI DÖNGÜ",
-              "id": "sosyal-u5-tuketim-arasindaki-dongu",
+              "ad": "Ekonomik Gelişmişlik ile Üretim, Dağıtım ve Tüketim Arasındaki Döngü",
+              "ad_kaynak": "EKONOMIK GELIŞMIŞLIK ILE ÜRETIM, DAĞITIM VE / TÜKETIM ARASINDAKI DÖNGÜ",
+              "id": "sosyal-u5-ekonomik-gelismislik-ile-uretim-dagitim-ve-tuketim-arasindaki-dongu",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
                 "SB.7.5.2"
@@ -1056,7 +1071,7 @@
           "konular": [
             {
               "ad": "Bilimsel ve teknolojik gelişmelerin gelecekteki toplum hayatına etkilerine ilişkin öngörüde",
-              "ad_kaynak": "GELECEKTEKI HAYATA ETKISI",
+              "ad_kaynak": "BILIMSEL VE TEKNOLOJIK GELIŞMELERIN / GELECEKTEKI HAYATA ETKISI",
               "id": "sosyal-u6-bilimsel-ve-teknolojik-gelismelerin-gelecekteki-toplum-hayatina-etkilerine-iliskin-ongorude",
               "kazanim_kaynak": "metin-ortusmesi",
               "kazanimlar": [
@@ -1414,9 +1429,9 @@
     "sosyal": {
       "aday": 19,
       "kazanim": 17,
-      "kazanimi_eslenen": 15,
+      "kazanimi_eslenen": 17,
       "kimlik_cakismasi": 0,
-      "konu": 15,
+      "konu": 17,
       "sayfasi_olan": 0
     },
     "turkce": {

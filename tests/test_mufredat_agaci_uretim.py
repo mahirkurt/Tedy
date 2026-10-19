@@ -139,9 +139,10 @@ def test_uretilen_agac_semaya_uyar(agac):
 
 
 @canli
-@pytest.mark.parametrize("slug,en_az", [("matematik", 22), ("fen", 22), ("sosyal", 15)])
+@pytest.mark.parametrize("slug,en_az", [("matematik", 22), ("fen", 22), ("sosyal", 17)])
 def test_kazanim_kapsamasi_olculen_degerin_altina_dusmez(agac, slug, en_az):
     """Ölçüldü 2026-10-11, denetim turundan sonra: matematik 22/30, fen 22/35, sosyal 15/17.
+    2026-10-19: sosyal 17/17 — iki satıra bölünmüş iki başlık (SB.7.1.3, SB.7.3.1) birleştirildi.
 
     Sayı iki kez düştü ve ikisi de kasıtlı. İlk sonda fen 25 / sosyal 17 saymıştı; o sayım
     grup başlıklarını (aynı konunun kopyası) ve iki sütunlu düzenin kuyruk başlıklarını
@@ -194,6 +195,69 @@ def test_sosyal_duzen_parcasi_konu_olmaz(agac):
     sosyal = next(d for d in agac["dersler"] if d["slug"] == "sosyal")
     adlar = {konu["ad"] for unite in sosyal["uniteler"] for konu in unite["konular"]}
     assert "Davranışları" not in adlar and "Sağlayan Politikalar" not in adlar
+    assert "Tüketim Arasındaki Döngü" not in adlar
+
+
+@canli
+def test_sosyalde_bolunmus_basliklar_tam_adla_konu_olur(agac):
+    """Ölçüldü 2026-10-19 (doc 491): iki satıra bölünmüş başlığın yalnız kuyruğu okunuyordu ve
+    SB.7.1.3 ile SB.7.3.1'in konusu ağaçta yoktu — "Millî Meseleler" modülü hiçbir yaprağa
+    bağlanamıyordu."""
+    sosyal = next(d for d in agac["dersler"] if d["slug"] == "sosyal")
+    konular = {konu["ad"]: konu["kazanimlar"] for unite in sosyal["uniteler"] for konu in unite["konular"]}
+    assert konular["Millî Meseleler Karşısında Türk Toplumunun Tutum ve Davranışları"] == ["SB.7.1.3"]
+    assert konular["Osmanlı Devleti’nin Cihan Devleti Hâline Gelmesini Sağlayan Politikalar"] == ["SB.7.3.1"]
+    assert all("i\u0307" not in ad for ad in konular), "Türkçe küçültme 'i̇' bıraktı"
+
+
+@canli
+def test_matematik_sayilar_yapraklari_kendi_kazanimini_tasir(agac):
+    """Ölçüldü 2026-10-19: "Tam Sayılar" ve "Rasyonel Sayılar" MAT.7.1.1–7.1.4'ün dördünü de
+    taşıyordu ("Tam" dört harften kısa diye sayılmıyordu; eşit skorlu her kazanım yazılıyordu)."""
+    mat = next(d for d in agac["dersler"] if d["slug"] == "matematik")
+    konular = {konu["ad"]: konu["kazanimlar"] for unite in mat["uniteler"] for konu in unite["konular"]}
+    assert konular["Tam Sayılar"] == ["MAT.7.1.1"]
+    assert konular["Rasyonel Sayılar"] == ["MAT.7.1.1", "MAT.7.1.2"]
+    assert konular["Rasyonel Sayılarda Karşılaştırma ve Sıralama"] == ["MAT.7.1.3"]
+    assert konular["Yansıma Dönüşümü"] == ["MAT.7.3.1"]
+
+
+def test_kazanim_en_guclu_yaprakta_kalir_ve_yaprak_bos_kalmaz():
+    metinler = {"K1": "rasyonel sayıları karşılaştırma ve sıralama", "K2": "rasyonel sayılar yorumlama"}
+    genel = {"ad": "Rasyonel Sayılar", "kazanimlar": ["K1", "K2"]}
+    ozel = {"ad": "Rasyonel Sayılarda Karşılaştırma ve Sıralama", "kazanimlar": ["K1"]}
+    tek = {"ad": "Rasyonel Sayılar Örnekleri", "kazanimlar": ["K1"]}
+    u.kazanimi_en_guclu_yaprakta_birak([genel, ozel, tek], metinler)
+    assert genel["kazanimlar"] == ["K2"] and ozel["kazanimlar"] == ["K1"]
+    assert tek["kazanimlar"] == ["K1"], "son kazanımını kaybeden yaprak boş kalırdı"
+
+
+def test_uc_harfli_icerik_sozcugu_sayilir_kisa_kok_tam_esitlik_ister():
+    assert "tam" in u._icerik_sozcukleri("Tam Sayılar")
+    assert u._ortusme_orani("Tam Sayılar", "rasyonel sayıların ondalık gösterimi") == 0.5
+    assert u._ortusme_orani("Tam Sayılar", "tamamlanan sayılar") == 0.5
+    assert "her" not in u._icerik_sozcukleri("her durumda")
+
+
+def test_bolunmus_icindekiler_basligi_birlesir_unite_adi_yapismaz():
+    db = sqlite3.connect(":memory:")
+    db.execute("create table document_page (document_id int, page_no int, text text)")
+    db.execute("insert into document_page values (1, 7, ?)", ("\n".join([
+        "ORTAK MİRASIMIZ",
+        "KÜRESELLEŞMENİN ETKİSİ ...............",
+        "MİLLÎ MESELELER KARŞISINDA TÜRK TOPLUMUNUN TUTUM VE",
+        " DAVRANIŞLARI ..............................",
+        "30",
+        "KİTABIMIZI TANIYALIM .......",
+    ]),))
+    basliklar = u.icindekiler_basliklari(db, 1, frozenset({u.harf_katla("Ortak Mirasımız")}))
+    assert basliklar == ["KÜRESELLEŞMENİN ETKİSİ",
+                         "MİLLÎ MESELELER KARŞISINDA TÜRK TOPLUMUNUN TUTUM VE\nDAVRANIŞLARI",
+                         "KİTABIMIZI TANIYALIM"]
+
+
+def test_baslik_duzeni_kucuk_kalan_baglaci_turkce_kucultur():
+    assert u.baslik_duzeni("EKONOMİK GELİŞMİŞLİK İLE ÜRETİM") == "Ekonomik Gelişmişlik ile Üretim"
 
 
 @canli
@@ -298,14 +362,16 @@ def test_kitaptan_gelen_ad_cumle_degil(agac):
     """I4: gövde metninden kopmuş cümleler konu adı olmaz.
 
     Kural kitabın başlığına (`ad_kaynak`) uygulanır; programdan onarılan ad meşru olarak
-    daha uzun olabilir (I ayrımını yitirmiş kitapta kazanım metnine düşülüyor).
+    daha uzun olabilir (I ayrımını yitirmiş kitapta kazanım metnine düşülüyor). İçindekilerde
+    iki satıra bölünmüş başlık " / " ile yazılır ve sınır her satıra ayrı uygulanır (2026-10-19).
     """
     uzun = []
     for ders in agac["dersler"]:
         for unite in ders["uniteler"]:
             for konu in unite["konular"]:
                 ham = konu["ad_kaynak"]
-                if len(ham) > u.KONU_AD_SINIRI or ham.rstrip().endswith((",", ".")):
+                if (max(len(satir) for satir in ham.split(" / ")) > u.KONU_AD_SINIRI
+                        or ham.rstrip().endswith((",", "."))):
                     uzun.append(f"{konu['id']}: {ham[:60]}")
     assert uzun == [], "cümle gibi konu adı:\n" + "\n".join(uzun)
 
