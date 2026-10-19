@@ -96,6 +96,18 @@ def _canli_sinav_tespiti_yok(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _canli_odev_tahmini_yok(monkeypatch):
+    """The evening plan (2026-10-19) estimates homework with Claude Haiku. A test that reaches the
+    real reader would make a billed call; every test fails loudly instead. Tests of the store pass
+    their own fake reader."""
+    import src.odev_tahmini as tahmin
+
+    def _yasak(*a, **k):
+        raise AssertionError("testte gerçek ödev tahmini (Claude) çağrısı yok")
+    monkeypatch.setattr(tahmin.ClaudeTahminOkuyucu, "oku", _yasak)
+
+
+@pytest.fixture(autouse=True)
 def _canli_sinavlar_dosyasi_yok(monkeypatch):
     """/api/exams reads output/sinavlar.json since 2026-10-16 (plan sinav-uyari,
     Görev 6). In the live checkout that file exists, and a test that patches
