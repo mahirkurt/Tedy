@@ -10,6 +10,7 @@ import pytest
 
 os.environ.setdefault("TEST_AUTH_BYPASS", "1")
 import src.dashboard_api as api  # noqa: E402
+import fnmatch
 from src.aksam_plani import Blok, CalismaKayitlari, PlanDeposu, anlik_goruntu, saat_hali  # noqa: E402
 from src.odev_tahmini import OdevTahmini  # noqa: E402
 
@@ -107,7 +108,7 @@ def test_kayit_ve_kalibrasyon(tmp_path):
     k = CalismaKayitlari(tmp_path)
 
     def satir(gun, ders, dk, durum="bitti"):
-        return {"gun": gun, "odev_anahtari": f"{ders}-{gun}", "ders": ders, "tahmin_dk": 20,
+        return {"gun": gun, "odev_anahtari": f"{ders}-{gun}", "ders": ders, "tahmin_dk": 20, "ham_dk": 20,
                 "basla": f"2026-10-{gun}T17:00:00", "bitti": f"2026-10-{gun}T17:{dk:02d}:00", "durum": durum}
     assert k.kalibrasyon("Matematik") == 1.0                      # kayıt yok
     k.ekle(satir("12", "Matematik", 40))
@@ -126,11 +127,11 @@ def test_kayit_ve_kalibrasyon(tmp_path):
 def test_kalibrasyon_sinirli_ve_hizli_bitirmeyi_bilir(tmp_path):
     k = CalismaKayitlari(tmp_path)
     for g in range(3):
-        k.ekle({"gun": f"2026-10-{g + 10}", "odev_anahtari": f"a{g}", "ders": "Türkçe", "tahmin_dk": 20,
+        k.ekle({"gun": f"2026-10-{g + 10}", "odev_anahtari": f"a{g}", "ders": "Türkçe", "tahmin_dk": 20, "ham_dk": 20,
                 "basla": "2026-10-12T17:00:00", "bitti": "2026-10-12T17:02:00", "durum": "bitti"})
     assert k.kalibrasyon("Türkçe") == 0.5                         # 0,1 → 0,5'e kıstırılır
     for g in range(3):
-        k.ekle({"gun": "x", "odev_anahtari": f"b{g}", "ders": "Fen Bilimleri", "tahmin_dk": 20,
+        k.ekle({"gun": "x", "odev_anahtari": f"b{g}", "ders": "Fen Bilimleri", "tahmin_dk": 20, "ham_dk": 20,
                 "basla": "2026-10-12T17:00:00", "bitti": "2026-10-12T19:00:00", "durum": "bitti"})
     assert k.kalibrasyon("Fen Bilimleri") == 2.0                  # 6,0 → 2,0
     # bozuk satır turu düşürmez
@@ -141,10 +142,10 @@ def test_kalibrasyon_sinirli_ve_hizli_bitirmeyi_bilir(tmp_path):
 def test_kalibrasyon_son_on_kayda_bakar(tmp_path):
     k = CalismaKayitlari(tmp_path)
     for i in range(10):                                           # eskiler 2×
-        k.ekle({"gun": "g", "odev_anahtari": f"e{i}", "ders": "Matematik", "tahmin_dk": 20,
+        k.ekle({"gun": "g", "odev_anahtari": f"e{i}", "ders": "Matematik", "tahmin_dk": 20, "ham_dk": 20,
                 "basla": "2026-10-12T17:00:00", "bitti": "2026-10-12T17:40:00", "durum": "bitti"})
     for i in range(10):                                           # son 10'u tam tahmin
-        k.ekle({"gun": "g", "odev_anahtari": f"y{i}", "ders": "Matematik", "tahmin_dk": 20,
+        k.ekle({"gun": "g", "odev_anahtari": f"y{i}", "ders": "Matematik", "tahmin_dk": 20, "ham_dk": 20,
                 "basla": "2026-10-12T17:00:00", "bitti": "2026-10-12T17:20:00", "durum": "bitti"})
     assert k.kalibrasyon("Matematik") == 1.0
 
@@ -181,7 +182,7 @@ def test_anlik_goruntu_sinir_denetimi(bas, bit, gecerli):
         assert g is None
     else:
         assert g == {"odev_anahtari": "k", "ders": "Matematik", "baslik": "Problemler", "parca": 0,
-                     "parca_sayisi": 2, "tahmin_dk": 20, "zorluk": "zor", "adim": "Başla", "bas": bas, "bit": bit}
+                     "parca_sayisi": 2, "tahmin_dk": 20, "ham_dk": 0.0, "zorluk": "zor", "adim": "Başla", "bas": bas, "bit": bit}
 
 
 # ── uçlar ────────────────────────────────────────────────────────────────────────
@@ -443,3 +444,71 @@ def test_bozuk_anlik_goruntu_plani_dusurmez(ortam):
     PlanDeposu(ortam.out.parent).degistir("2026-10-19", lambda g: g.update(
         {"bozuk": {"durum": "suruyor", "odev_anahtari": "x", "bas": "yok", "bit": None}}))
     assert ortam.c.get("/api/plan/bugun").status_code == 200
+
+
+# ── düzeltme turu 1 ──────────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("carpan, tahmin", [(1.0, 10), (1.6, 16)])
+def test_kayit_ham_pay_kalibrasyondan_bagimsiz(ortam, monkeypatch, carpan, tahmin):
+    """R12: aynı gerçek süre, kalibrasyon 1,0 ya da 1,6 iken aynı oranı verir."""
+    monkeypatch.setattr(CalismaKayitlari, "kalibrasyon", lambda self, ders: carpan)
+    ortam.depo.dakika = 8
+    ilk = ortam.calisma()[0]
+    assert ilk["tahmin_dk"] == tahmin and ilk["ham_dk"] == 8.0
+    ortam.c.post(f"/api/plan/blok/{ilk['id']}/basla")
+    ortam.saat = datetime(2026, 10, 19, 17, 22)               # 12 dk sonra
+    ortam.c.post(f"/api/plan/blok/{ilk['id']}/bitti", json={"tamamlandi": False})
+    satir = json.loads((ortam.out / "calisma_kayitlari.jsonl").read_text().splitlines()[-1])
+    assert satir["tahmin_dk"] == tahmin and satir["ham_dk"] == 8.0
+    k = CalismaKayitlari(ortam.out.parent)
+    for _ in range(2):
+        k.ekle(satir)
+    gercek_oran = 12 / satir["ham_dk"]
+    assert gercek_oran == 1.5
+
+
+def test_baslamadan_bitti_kalibrasyona_girmez(ortam):
+    ilk = ortam.calisma()[0]
+    r = ortam.c.post(f"/api/plan/blok/{ilk['id']}/bitti", json={"tamamlandi": False})
+    assert r.status_code == 200
+    satir = json.loads((ortam.out / "calisma_kayitlari.jsonl").read_text().splitlines()[-1])
+    assert satir["durum"] == "bitti" and satir["basla"] is None
+    assert "basladi" not in ortam.gunluk()
+    k = CalismaKayitlari(ortam.out.parent)
+    for _ in range(2):
+        k.ekle(satir)
+    assert k.kalibrasyon(satir["ders"]) == 1.0                # 3 başlatılmamış kayıt 0,5'e çekmez
+
+
+def test_basla_baska_blok_surerken_409(ortam):
+    a, b = ortam.calisma()
+    ortam.c.post(f"/api/plan/blok/{a['id']}/basla")
+    r = ortam.c.post(f"/api/plan/blok/{b['id']}/basla")
+    assert r.status_code == 409 and r.get_json()["error"] == "Önce süren bloğu bitir."
+    assert ortam.gunluk().get(b["id"]) is None
+    assert ortam.c.post(f"/api/plan/blok/{a['id']}/basla").status_code == 200   # aynı blok: idempotent
+
+
+def test_yeni_dosyalar_bm25_disinda():
+    from src.assistant_core import DEFAULT_EXCLUDED_FILE_PATTERNS as P
+    for ad in ("aksam_plani.json", "aksam_plani.json.bozuk-20261019170000", "aksam_plani.json.lock",
+               "calisma_kayitlari.jsonl", "calisma_kayitlari.jsonl.lock"):
+        assert any(fnmatch.fnmatch(ad, d) for d in P), ad
+
+
+def test_api_anahtari_plan_post_403(ortam, monkeypatch):
+    monkeypatch.setattr(api, "_validate_api_key", lambda k: "etiket")
+    with api.app.test_client() as anahtarli:
+        r = anahtarli.post("/api/plan/aksam-yok", json={"aktif": True},
+                           headers={"Authorization": "Bearer tdyK_x"})
+        assert r.status_code == 403
+        assert anahtarli.get("/api/plan/bugun", headers={"Authorization": "Bearer tdyK_x"}).status_code == 403
+    assert "aksam_yok" not in ortam.gunluk()
+
+
+def test_aksam_ozel_dersi_engel_olur():
+    ev = [{"start": "2026-10-19T18:00:00", "end": "2026-10-19T19:00:00", "title": "Özel ders"},
+          {"start": "2026-10-19T10:00:00", "end": "2026-10-19T11:00:00", "title": "Sabah dersi"},
+          {"start": "2026-10-20T18:00:00", "end": "2026-10-20T19:00:00", "title": "Yarın"}]
+    o = api._plan_olaylari({"takvim": []}, date(2026, 10, 19), ev, 17 * 60, 21 * 60)
+    assert o == [(18 * 60, 19 * 60, "Özel ders")]

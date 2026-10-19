@@ -2071,6 +2071,7 @@ def _plan_blok_yok():
 def _calisma_kaydi(gun, blok, durum, basla=None, bitti=None):
     CalismaKayitlari(_plan_koku()).ekle({
         "gun": gun, "odev_anahtari": blok.odev_anahtari, "ders": blok.ders, "tahmin_dk": blok.tahmin_dk,
+        "ham_dk": blok.ham_dk,
         "basla": basla, "bitti": bitti, "durum": durum})
 
 
@@ -2099,16 +2100,21 @@ def plan_blok_basla(blok_id):
     blok = _plan_blogu(bugunku_plan(simdi), blok_id)
     if blok is None:
         return _plan_blok_yok()
-    gun, damga, yazildi = simdi.date().isoformat(), simdi.isoformat(timespec="seconds"), []
+    gun, damga, yazildi, mesgul = simdi.date().isoformat(), simdi.isoformat(timespec="seconds"), [], []
 
     def yaz(g):
         k = g.get(blok.id)
         if isinstance(k, dict) and k.get("durum") in ("suruyor", "bitti"):
             return                                       # ikinci Başla: hiçbir şey değişmez
+        if any(isinstance(v, dict) and v.get("durum") == "suruyor" for v in g.values()):
+            mesgul.append(True)                          # tek süren blok
+            return
         g[blok.id] = {**(anlik_goruntu(blok) or {}), "durum": "suruyor", "basla": damga}
         g.setdefault("basladi", damga)
         yazildi.append(True)
     PlanDeposu(_plan_koku()).degistir(gun, yaz)
+    if mesgul:
+        return jsonify({"error": "Önce süren bloğu bitir."}), 409
     if yazildi:
         _calisma_kaydi(gun, blok, "suruyor", basla=damga)
     return jsonify({"ok": True, **_plan_yaniti_simdi(simdi)})
@@ -2138,13 +2144,14 @@ def plan_blok_bitti(blok_id):
         if k.get("durum") == "bitti":
             kayit["tamamlandi"] = k.get("tamamlandi")
             return
-        basla = k.get("basla") or damga
+        basla = k.get("basla")                           # başlatılmadan bitirildiyse None: kalibrasyona girmez
         goruntu = anlik_goruntu(blok) or {}
         if goruntu:                                      # gerçek bitiş: sıradaki blok ve mola buradan sayılır
             goruntu["bit"] = min(1440, max(goruntu["bas"], simdi_dk))
         g[blok.id] = {**goruntu, "durum": "bitti", "basla": basla, "bitti": damga,
                       "tamamlandi": tamamlandi if son_parca else None}
-        g.setdefault("basladi", basla)
+        if basla:
+            g.setdefault("basladi", basla)
         if son_parca and tamamlandi is False:
             ek = g.get("ek_parca") if isinstance(g.get("ek_parca"), dict) else {}
             ek[blok.odev_anahtari] = min(20, int(ek.get(blok.odev_anahtari) or 0) + 1)

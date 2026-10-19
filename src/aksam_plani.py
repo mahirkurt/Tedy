@@ -53,6 +53,7 @@ class Blok:
     tahmin_dk: int = 0
     zorluk: str = "orta"
     durum: Literal["bekliyor", "suruyor", "bitti", "ertelendi"] = "bekliyor"
+    ham_dk: float = 0.0   # bloğun ham tahmin payı: kalibrasyondan ve %25 tampondan önce (R12)
 
 
 @dataclass
@@ -172,6 +173,7 @@ class _Parca:
     sira: int           # ödev sırası (puan sırası)
     teslim_ham: str
     teslim_gunu: date | None
+    ham_dk: float = 0.0
 
 
 def _bos_baslangic(t: int, d: int, sabit: list[tuple[int, int]]) -> int:
@@ -239,12 +241,14 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
             ek = max(0, min(20, _tam(ek_parca.get(anahtar)) or 0))
         except (TypeError, ValueError):
             ek = 0
+        normal = len(sureler)
         sureler += [EK_PARCA_DK] * ek
         adimlar += [DEVAM_ADIMI] * ek
         for i, (dk, adim) in enumerate(zip(sureler, adimlar)):
             parcalar.append(_Parca(_kimlik(gun_s, anahtar, i), anahtar, ders, str(satir.get("Ödev Başlığı") or ""),
                                    adim, i, len(sureler), dk, zorluk, sira,
-                                   str(satir.get("Ödev Son Teslim Tarihi") or ""), teslim[0] if teslim else None))
+                                   str(satir.get("Ödev Son Teslim Tarihi") or ""), teslim[0] if teslim else None,
+                                   round(dk / (carpan * TAMPON), 1) if i < normal else float(EK_PARCA_DK)))
 
     # ---- sabit bloklar
     yemek_bas = dakika(duzen["yemek"])
@@ -366,16 +370,18 @@ def _anlik_bloklar(gunluk: dict, hazir: int) -> dict[str, Blok]:
         sayi = _tam(k.get("parca_sayisi"))
         sayi = sayi if sayi is not None and sayi >= 1 else 1
         zorluk = k.get("zorluk") if k.get("zorluk") in ZORLUKLAR else "orta"
+        ham = k.get("ham_dk")
+        ham = float(ham) if isinstance(ham, (int, float)) and not isinstance(ham, bool) and math.isfinite(ham) and ham >= 0 else 0.0
         ders = k.get("ders")
         sonuc[str(kimlik)] = Blok(str(kimlik), "calisma", bas, bit, str(k["odev_anahtari"]),
                                   ders if isinstance(ders, str) else None, str(k.get("baslik") or ""),
-                                  str(k.get("adim") or ""), parca, sayi, dk, zorluk, k["durum"])
+                                  str(k.get("adim") or ""), parca, sayi, dk, zorluk, k["durum"], ham)
     return sonuc
 
 
 def _blok_calisma(p: _Parca, bas: int, bit: int, durum: str) -> Blok:
     return Blok(p.id, "calisma", bas, bit, p.anahtar, p.ders, p.baslik, p.adim,
-                p.parca, p.parca_sayisi, p.dk, p.zorluk, durum)  # type: ignore[arg-type]
+                p.parca, p.parca_sayisi, p.dk, p.zorluk, durum, p.ham_dk)  # type: ignore[arg-type]
 
 
 # ----------------------------------------------------------------------------- depo (Görev 5)
@@ -425,7 +431,7 @@ def anlik_goruntu(blok: Blok) -> dict | None:
         return None
     return {"odev_anahtari": blok.odev_anahtari, "ders": blok.ders, "baslik": blok.baslik,
             "parca": blok.parca, "parca_sayisi": blok.parca_sayisi, "tahmin_dk": blok.tahmin_dk,
-            "zorluk": blok.zorluk, "adim": blok.adim, "bas": bas, "bit": bit}
+            "zorluk": blok.zorluk, "adim": blok.adim, "bas": bas, "bit": bit, "ham_dk": blok.ham_dk}
 
 
 @contextmanager
@@ -498,7 +504,7 @@ class PlanDeposu:
 class CalismaKayitlari:
     """`output/calisma_kayitlari.jsonl`: her dokunuş (başla, bitti, ertelendi) bir satır, eklemeli.
 
-    Kalibrasyon yalnız `bitti` satırlarından: ders başına son 10 kaydın gerçek/tahmin oranının
+    Kalibrasyon yalnız başlatılıp `bitti` denen satırlardan: ders başına son 10 kaydın gerçek/ham (`ham_dk`) oranının
     medyanı, [0,5; 2,0]'ya kıstırılır; 3'ten az kayıtta 1,0 (öğrenme başlamadı)."""
 
     def __init__(self, kok: Path):
@@ -521,13 +527,15 @@ class CalismaKayitlari:
                         k = json.loads(satir)
                         if not isinstance(k, dict) or k.get("durum") != "bitti" or k.get("ders") != ders:
                             continue
-                        tahmin = _tam(k.get("tahmin_dk"))
+                        ham = k.get("ham_dk")      # ham pay (R12): kalibrasyon ve tampon girmez
+                        if not k.get("basla") or isinstance(ham, bool) or not isinstance(ham, (int, float)):
+                            continue                # başlatılmadan bitirilen blok ölçüm değildir (R14)
                         gercek = (datetime.fromisoformat(k["bitti"]) - datetime.fromisoformat(k["basla"])
                                   ).total_seconds() / 60
                     except (ValueError, KeyError, TypeError):
                         continue
-                    if tahmin and tahmin > 0 and gercek >= 0:
-                        oranlar.append(gercek / tahmin)
+                    if ham > 0 and gercek >= 0:
+                        oranlar.append(gercek / ham)
         except OSError:
             return 1.0
         oranlar = oranlar[-KALIBRASYON_SON:]
