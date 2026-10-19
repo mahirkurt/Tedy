@@ -1,0 +1,230 @@
+@use '@carbon/react/scss/theme' as theme;
+@use '@carbon/react/scss/type' as type;
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/breakpoint' as bp;
+
+// Tonight's study plan (spec 2026-10-19 §6.7). From 17:00 it is Bugün's one
+// thing, so it is NextThing's panel exactly (İ8.3, talimatname [3.2-13]): the
+// course's step-10 ground, its step-30 border and a 4px accent edge; no shadow
+// (S11), the card corner (S10). Its title is the page's largest text (P1).
+
+.aksam-plani {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-05;
+  padding: $spacing-06;
+  background: var(--ted-subject-panel);
+  border: 1px solid var(--ted-subject-panel-border);
+  border-inline-start: 4px solid var(--ted-subject-accent);
+  border-radius: var(--ted-radius-card);
+}
+
+// A break has no course: a neutral layer with a strong edge (as NextThing's reading card).
+.aksam-plani--notr {
+  background: var(--cds-layer);
+  border-color: var(--cds-border-subtle);
+  border-inline-start-color: theme.$border-strong-01;
+}
+
+.aksam-plani__govde {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.aksam-plani__ust {
+  display: block;
+  @include type.type-style('label-01');
+  color: theme.$text-secondary;
+  margin-block-end: $spacing-02;
+}
+
+// The largest text on the page (P1), at the token's own weight (S44).
+.aksam-plani__baslik {
+  @include type.type-style('heading-04');
+  color: theme.$text-primary;
+  margin: 0;
+
+  &:focus { outline: none; }
+}
+
+.aksam-plani__odev {
+  @include type.type-style('body-compact-01');
+  color: theme.$text-secondary;
+  margin: $spacing-03 0 0;
+}
+
+.aksam-plani__odev .ted-subject-label {
+  align-items: baseline;
+}
+
+// "tahmin 20 dk" is the button that opens the correction; a ghost lg button keeps
+// it a 48px target (B8) while it reads as a quiet line on the panel.
+// Carbon's own `.cds--btn` margin rule loads after this file, so the selector is one step stronger; the
+// negative margin puts the button's text on the panel's keyline.
+.aksam-plani .aksam-plani__tahmin {
+  margin-block-start: $spacing-02;
+  margin-inline-start: calc(-1 * #{$spacing-05});
+}
+
+.aksam-plani__duzelt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: $spacing-03;
+  margin-block-start: $spacing-04;
+  max-inline-size: 30rem;
+}
+
+.aksam-plani__duzelt-eylem {
+  display: flex;
+  gap: $spacing-03;
+}
+
+.aksam-plani__alt {
+  @include type.type-style('body-compact-01');
+  color: theme.$text-secondary;
+  margin: $spacing-03 0 0;
+}
+
+// The family's calm sentence, in the helper tone (§5.3); on the panel the
+// secondary text keeps 7:1 where helper grey would fall to ≈ 4.6:1.
+.aksam-plani__haber {
+  @include type.type-style('helper-text-01');
+  color: theme.$text-secondary;
+  margin: $spacing-03 0 0;
+}
+
+.aksam-plani__soru {
+  margin: $spacing-05 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.aksam-plani__soru-metni {
+  @include type.type-style('heading-compact-01');
+  color: theme.$text-primary;
+  margin-block-end: $spacing-03;
+}
+
+.aksam-plani__soru-eylem,
+.aksam-plani__eylem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-03;
+}
+
+.aksam-plani__eylem {
+  flex: 0 0 auto;
+}
+
+.aksam-plani__ertelendi {
+  @include type.type-style('body-compact-01');
+  color: theme.$text-secondary;
+  margin: 0;
+  max-inline-size: 14rem;
+}
+
+// One InlineLoading stands in the place of the button it replaced (S36, P8).
+.aksam-plani__yukleniyor {
+  inline-size: auto;
+  min-block-size: $spacing-09;
+}
+
+.aksam-plani__bildirim {
+  margin-block-start: $spacing-05;
+}
+
+// ── Before 17:00 and after the evening: one quiet line ──
+// On the same keyline as the Carbon lists under it (B37, P3).
+.aksam-plani--sessiz {
+  display: block;
+  padding: 0 $spacing-05;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+.aksam-plani__baslik--sessiz {
+  @include type.type-style('heading-compact-01');
+}
+
+// ── What is under the card: quiet lines, the whole evening, the family's switch ──
+.aksam-plani__ek {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-03;
+}
+
+.aksam-plani__satir {
+  @include type.type-style('body-compact-01');
+  color: theme.$text-secondary;
+  margin: 0;
+  padding: 0 $spacing-05;
+}
+
+.aksam-plani__not {
+  @include type.type-style('helper-text-01');
+  color: theme.$text-secondary;
+  margin: 0 0 $spacing-03;
+}
+
+.aksam-plani__liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.aksam-plani__liste-satir {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: $spacing-02 $spacing-04;
+  padding: $spacing-03 0;
+  border-block-end: 1px solid theme.$border-subtle;
+  @include type.type-style('body-compact-01');
+  color: theme.$text-primary;
+}
+
+// Finished blocks recede by colour, not opacity (contrast stays AA).
+.aksam-plani__liste-satir--bitti {
+  color: theme.$text-secondary;
+}
+
+.aksam-plani__liste-saat {
+  min-inline-size: 6.5rem;
+  color: theme.$text-secondary;
+}
+
+.aksam-plani__liste-ad {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.aksam-plani__liste-sure,
+.aksam-plani__liste-durum {
+  color: theme.$text-secondary;
+}
+
+.aksam-plani__yok {
+  padding: 0 $spacing-05;
+}
+
+// Focus mode leaves only the card (§6.7, İ1): the lines, the whole evening and
+// the switch are one click away once it is off, and the preview line before
+// 17:00 goes with the homework preview it replaces.
+.app-shell-content--focus {
+  .aksam-plani__ek,
+  .aksam-plani--onizleme {
+    display: none;
+  }
+}
+
+@include bp.breakpoint-down('md') {
+  // Carbon steps the panel padding down one stop on a phone ([3.4-3]).
+  .aksam-plani { padding: $spacing-05; }
+  .aksam-plani--sessiz { padding: 0 $spacing-05; }
+  .aksam-plani__eylem { flex: 1 1 100%; }
+  .aksam-plani__eylem .cds--btn--primary { width: 100%; }
+}

@@ -133,6 +133,13 @@ export async function mock(page: Page, data: Record<string, unknown>) {
     }
     await route.abort()
   })
+  // The evening plan (spec 2026-10-19) answers as with its flag off unless a spec
+  // gives it a plan: every page and baseline built on these fixtures is the page
+  // without the plan card (R17). Registered first, so a `plan/bugun` entry in
+  // `data` (or a spec's own route) wins — Playwright checks the newest route first.
+  await page.route('**/api/plan/bugun', r => r.fulfill({
+    status: 404, contentType: 'application/json', body: JSON.stringify({ kapali: true }),
+  }))
   for (const [ep, body] of Object.entries(data)) {
     await page.route(`**/api/${ep}`, r => r.fulfill(json(body)))
   }

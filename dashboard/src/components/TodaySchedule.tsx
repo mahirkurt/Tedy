@@ -31,6 +31,10 @@ import SubjectLabel from './SubjectLabel'
 import { subjectClass } from '../utils/subject'
 import { enYakinSinav, sinavAni, yerelAni } from '../utils/sinav'
 import { SinavOnizleme } from './SinavKarti'
+import { AksamPlani } from './AksamPlani'
+import { useAksamPlani } from '../hooks/useAksamPlani'
+import { kartDurumu } from '../utils/aksamPlani'
+import { useSession } from '../contexts/session'
 
 interface ScheduleData {
   latest: { schedule?: { rows: string[][] } }
@@ -243,6 +247,10 @@ export default function TodaySchedule() {
   const [geriAlDurumu, setGeriAlDurumu] = useState<GeriAlDurumu>('bos')
   // The household's evening (B29): the family's defaults until it loads.
   const { duzen, loading: duzenYukleniyor, iskelet: duzenIskeleti } = useAksamDuzeni()
+  // Tonight's study plan (spec 2026-10-19 §6.7). The flag off answers 404 and
+  // the page is exactly what it was before the plan existed.
+  const aksamPlani = useAksamPlani()
+  const oturum = useSession()
 
   // Reference time for every countdown on this page, refreshed each minute.
   const [nowMs, setNowMs] = useState(() => Date.now())
@@ -495,19 +503,27 @@ export default function TodaySchedule() {
 
   // D3: a fetch that failed must not look like an empty day. The sentence is
   // the reader's, never the HTTP status (D4).
-  const arizali = Boolean(programHatasi || odevHatasi || takvimHatasi || sinavHatasi)
+  const arizali = Boolean(programHatasi || odevHatasi || takvimHatasi || sinavHatasi || aksamPlani.hata)
+
+  // The plan's card speaks about today only. From 17:00 (a block waiting,
+  // running or a break) it is the one thing and takes NextThing's and "Ayrıca"'s
+  // place; before it, and once the evening is over, one quiet line stands where
+  // NextThing was. The school card is untouched before 17:00.
+  const planKarti = selectedIsToday && aksamPlani.plan ? kartDurumu(aksamPlani.plan, nowMin) : null
+  const planAkiyor = planKarti != null && ['calisma', 'mola', 'bekliyor'].includes(planKarti.tur)
+  const planSatiri = planKarti != null && (planKarti.tur === 'onizleme' || planKarti.tur === 'bitti')
 
   const git = (yol: string) => (e: MouseEvent) => {
     e.preventDefault()
     navigate(yol)
   }
 
-  if (loading || duzenYukleniyor) {
+  if (loading || duzenYukleniyor || aksamPlani.yukleniyor) {
     // A load shorter than 400 ms shows nothing (S36, B48): a skeleton that
     // blinks for a frame is noise. Past it, the page's own shape in Carbon
     // skeletons (§5.2, B5): day line, strip, card and a few rows. One set,
     // nothing else moves.
-    if (!programIskeleti && !duzenIskeleti) return null
+    if (!programIskeleti && !duzenIskeleti && !aksamPlani.iskelet) return null
     return (
       <div className="today today--yukleniyor" aria-busy="true">
         <span className="cds--visually-hidden" role="status">Bugün yükleniyor</span>
@@ -578,7 +594,7 @@ export default function TodaySchedule() {
         school={seritOkulu}
       />
 
-      {okulModu && simdikiYer && (
+      {okulModu && simdikiYer && !planAkiyor && (
         <SimdiKarti
           yer={simdikiYer}
           sonraki={yer.sonraki}
@@ -588,7 +604,11 @@ export default function TodaySchedule() {
         />
       )}
 
-      <NextThing
+      {planKarti && aksamPlani.plan && planKarti.tur !== 'yok' && (planAkiyor || planSatiri) && (
+        <AksamPlani plan={aksamPlani.plan} kart={planKarti} aile={oturum?.student === false} islemler={aksamPlani} />
+      )}
+
+      {!planAkiyor && !planSatiri && <NextThing
         {...nextThing.props}
         quiet={okulModu}
         box={isKarti && kutu.durum !== 'bos' ? kutu : undefined}
@@ -598,7 +618,11 @@ export default function TodaySchedule() {
         onStop={() => { kutu.birak(); setKayitDurumu('bos') }}
         onDone={isKarti ? yaptim : undefined}
         doneState={kayitDurumu}
-      />
+      />}
+
+      {planKarti?.tur === 'kapali' && aksamPlani.plan && (
+        <AksamPlani plan={aksamPlani.plan} kart={planKarti} aile={oturum?.student === false} islemler={aksamPlani} />
+      )}
 
       {sonYapilan && (
         <YaptinSatiri className="today-done-note" ad={sonYapilan.ad} durum={geriAlDurumu} onGeriAl={geriAl} />
@@ -607,7 +631,7 @@ export default function TodaySchedule() {
       {/* The rest of what is owed, said quietly: names and days, no coloured
           countdown chips competing with the card above (İ6). Carbon's on-page
           contained list at lg, so every row is a 48px target (B8). */}
-      {ayricaGoster.length > 0 && (
+      {ayricaGoster.length > 0 && !planAkiyor && (
         <ContainedList
           className="today-also"
           kind="on-page"
