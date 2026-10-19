@@ -66,7 +66,7 @@ def test_bloklar_20_dk_mola_5_ve_10():
     assert (c[0].parca, c[0].parca_sayisi) == (0, 3)
     assert c[0].adim == "Defterini aç ve ilk soruyu oku"
     assert c[1].adim == "Soru 4-6"                   # parcalar[i] (i >= 1)
-    assert c[2].adim in ("Kaldığın yerden devam et", "Soru 4-6", "Soru 1-3")
+    assert c[2].adim == "Kaldığın yerden devam et"
 
 
 def test_yaptim_planlanacaktan_cikarir():
@@ -274,3 +274,62 @@ def test_blok_tipi_alanlari():
     b = calisma(kur())[0]
     assert isinstance(b, Blok) and b.ders == "Matematik" and b.baslik == "Problemler Çalışma Kâğıdı"
     assert b.zorluk == "zor" and b.durum == "bekliyor" and len(b.id) == 10
+
+
+def _goruntu(b, durum, **ek):
+    """Task 5'in yazacağı anlık görüntü: bloğun kendisi + dokunuş zamanları."""
+    return {"durum": durum, "odev_anahtari": b.odev_anahtari, "ders": b.ders, "baslik": b.baslik,
+            "parca": b.parca, "parca_sayisi": b.parca_sayisi, "tahmin_dk": b.tahmin_dk,
+            "zorluk": b.zorluk, "adim": b.adim, "bas": b.bas, "bit": b.bit, **ek}
+
+
+def test_yaptim_sonrasi_biten_blok_kalir_ve_plansiz_olmaz():
+    b0 = calisma(kur())[0]
+    gunluk = {b0.id: _goruntu(b0, "bitti", basla=17 * 60 + 2, bitti=17 * 60 + 18, bas=17 * 60 + 2, bit=17 * 60 + 18)}
+    biten = {**DORT_ODEV[0], "student_marked_done": True}
+    p = kur(simdi="2026-10-19 17:30", satirlar=[biten], gunluk=gunluk)
+    s = [b for b in p.bloklar if b.id == b0.id]
+    assert len(s) == 1 and (s[0].bas, s[0].bit, s[0].durum) == (17 * 60 + 2, 17 * 60 + 18, "bitti")
+    assert s[0].odev_anahtari == "yarin-zor" and s[0].ders == "Matematik" and s[0].parca_sayisi == 3
+    assert p.durum == "akis" and p.durum != "plansiz"
+    assert [b for b in calisma(p) if b.durum == "bekliyor"] == []
+
+
+def test_secilmeyen_odevin_suren_blogu_korunur_ve_imleci_ilerletir():
+    b0 = calisma(kur())[0]
+    gunluk = {b0.id: _goruntu(b0, "suruyor", basla=17 * 60 + 5, bas=17 * 60 + 5, bit=17 * 60 + 25)}
+    biten = {**DORT_ODEV[0], "teacher_resolved": True}
+    p = kur(simdi="2026-10-19 17:10", satirlar=[biten, DORT_ODEV[1]], gunluk=gunluk)
+    s = [b for b in p.bloklar if b.id == b0.id][0]
+    assert (s.bas, s.bit, s.durum) == (17 * 60 + 5, 17 * 60 + 25, "suruyor")
+    sonraki = [b for b in calisma(p) if b.id != b0.id][0]
+    assert sonraki.odev_anahtari == "iki-gun-orta" and sonraki.bas >= 17 * 60 + 30   # bit + 5 dk mola
+
+
+def test_secili_odevin_goruntulu_parcasi_iki_kez_planlanmaz():
+    b0 = calisma(kur())[0]
+    gunluk = {b0.id: _goruntu(b0, "bitti", basla=17 * 60 + 2, bitti=17 * 60 + 18, bas=17 * 60 + 2, bit=17 * 60 + 18)}
+    p = kur(simdi="2026-10-19 17:30", gunluk=gunluk)
+    ilk_parcalar = [b for b in calisma(p) if b.odev_anahtari == "yarin-zor" and b.parca == 0]
+    assert len(ilk_parcalar) == 1 and ilk_parcalar[0].durum == "bitti"
+    assert len({b.id for b in p.bloklar}) == len(p.bloklar)
+
+
+def test_biten_bloktan_sonra_mola_kadar_beklenir():
+    b0 = calisma(kur())[0]
+    gunluk = {b0.id: {"durum": "bitti", "basla": "17:02", "bitti": "17:18"}}
+    p = kur(simdi="2026-10-19 17:19", gunluk=gunluk)
+    sonraki = [b for b in calisma(p) if b.durum == "bekliyor"][0]
+    assert sonraki.bas == 17 * 60 + 23          # 17:18 + 5 dk mola
+    mola = [b for b in p.bloklar if b.tur == "mola"][0]
+    assert (mola.bas, mola.bit) == (17 * 60 + 18, 17 * 60 + 23)
+
+
+def test_mola_sabit_blogun_ustune_binmez():
+    olay = (17 * 60 + 21, 17 * 60 + 23, "Kısa ziyaret")
+    p = kur(olaylar=[olay])
+    for b in p.bloklar:
+        if b.tur == "mola":
+            assert b.bit <= olay[0] or b.bas >= olay[1], b
+            assert b.bit <= 18 * 60 + 30 or b.bas >= 19 * 60
+    assert [b for b in calisma(p)][1].bas >= 17 * 60 + 25

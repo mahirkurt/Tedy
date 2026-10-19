@@ -185,7 +185,8 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
     hazir, hazirlik = dakika(duzen["odeve_hazir"]), dakika(duzen["hazirlik"])
     if simdi_dk >= hazirlik:
         return Plan(gun_s, [], [], [], eski, "bitti")
-    if not secilen:
+    anlik = _anlik_bloklar(gunluk, hazir)
+    if not secilen and not anlik:
         return Plan(gun_s, [], [], [], eski, "plansiz")
 
     # ---- puan sırası
@@ -236,12 +237,14 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
         if e > hazir and b < yatma:
             bloklar.append(Blok(_kimlik(gun_s, "olay", ad, b), "olay", int(b), int(e), baslik=str(ad)))
 
-    # ---- dokunuşla belirlenmiş parçalar (bitmiş / sürmekte) yerinde kalır
-    imlec = max(hazir, simdi_dk)
-    calisma_sayisi = 0
-    mola_oncesi = 0
+    # ---- dokunuşla belirlenmiş bloklar (bitmiş / sürmekte) yerinde kalır
+    # Anlık görüntüsü olan kayıt ödev seçilmese de (ör. "Yaptım" sonrası) aynen çıkar (R9);
+    # görüntüsüz kayıt yalnız ödevi hâlâ seçiliyse korunur (eski davranış).
+    baslangic = max(hazir, simdi_dk)
     bekleyen: list[_Parca] = []
     for p in parcalar:
+        if p.id in anlik:
+            continue
         kayit = gunluk.get(p.id) if isinstance(gunluk.get(p.id), dict) else {}
         durum = kayit.get("durum")
         if durum in ("bitti", "suruyor"):
@@ -249,13 +252,19 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
             bas = hazir if bas is None else bas
             bit = _dk(kayit.get("bitti")) if durum == "bitti" else None
             bit = bas + p.dk if bit is None else bit
-            bloklar.append(_blok_calisma(p, bas, bit, durum))
-            calisma_sayisi += 1
-            if durum == "suruyor":
-                imlec = max(imlec, bit)
-                mola_oncesi = MOLA_UZUN if calisma_sayisi % 2 == 0 else MOLA_KISA
+            anlik[p.id] = _blok_calisma(p, bas, bit, durum)
         else:
             bekleyen.append(p)
+    yapilanlar = sorted(anlik.values(), key=lambda b: (b.bas, b.bit))
+    bloklar.extend(yapilanlar)
+    calisma_sayisi = len(yapilanlar)
+    imlec, mola_oncesi = baslangic, 0
+    if yapilanlar:
+        son = max(yapilanlar, key=lambda b: (b.bit, b.bas))
+        sira = yapilanlar.index(son) + 1
+        kazanilan = MOLA_UZUN if sira % 2 == 0 else MOLA_KISA
+        if son.bit + kazanilan > baslangic:
+            imlec, mola_oncesi = son.bit, kazanilan
 
     # ---- ertelenen: parça ve aynı ödevin sonrakileri kuyruğun sonuna, bir kez
     ertelenen = set(gunluk.get("ertelenen") or [])
@@ -290,7 +299,8 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
             dusen.add(p.anahtar)
             kuyruk_disi.append(p)
             continue
-        if mola_oncesi and bas == ilk:        # sabit blok araya girmediyse mola görünür
+        if mola_oncesi and bas == ilk and not any(b < ilk and e > imlec for b, e in sabit):
+            # sabit blok (yemek, olay) araya girmediyse mola görünür; girdiyse o blok molanın yerini tutar
             bloklar.append(Blok(_kimlik(gun_s, "mola", p.id), "mola", imlec, ilk, baslik="Mola"))
         durum = "ertelendi" if p.id in ertelenen else "bekliyor"
         bloklar.append(_blok_calisma(p, bas, bas + p.dk, durum))
@@ -315,6 +325,28 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
 
     bloklar.sort(key=lambda b: (b.bas, b.bit, b.id))
     return Plan(gun_s, bloklar, tasinan, sigmayan, eski, "akis" if simdi_dk >= hazir else "onizleme")
+
+
+def _anlik_bloklar(gunluk: dict, hazir: int) -> dict[str, Blok]:
+    """gunluk'ta anlık görüntüsü (odev_anahtari + bas/bit...) olan bitti/suruyor kayıtları (R9)."""
+    sonuc: dict[str, Blok] = {}
+    for kimlik, k in gunluk.items():
+        if not isinstance(k, dict) or k.get("durum") not in ("bitti", "suruyor") or not k.get("odev_anahtari"):
+            continue
+        bas = _dk(k.get("bas"))
+        if bas is None:
+            bas = _dk(k.get("basla"))
+        bas = hazir if bas is None else bas
+        dk = int(k.get("tahmin_dk") or 0)
+        bit = _dk(k.get("bit"))
+        if bit is None:
+            bit = _dk(k.get("bitti")) if k["durum"] == "bitti" else None
+        bit = bas + dk if bit is None else bit
+        zorluk = k.get("zorluk") if k.get("zorluk") in ZORLUKLAR else "orta"
+        sonuc[str(kimlik)] = Blok(str(kimlik), "calisma", bas, bit, str(k["odev_anahtari"]), k.get("ders"),
+                                  str(k.get("baslik") or ""), str(k.get("adim") or ""), int(k.get("parca") or 0),
+                                  int(k.get("parca_sayisi") or 1), dk, zorluk, k["durum"])
+    return sonuc
 
 
 def _blok_calisma(p: _Parca, bas: int, bit: int, durum: str) -> Blok:
