@@ -121,8 +121,8 @@ class PlanSunucu {
 }
 
 async function planAc(page: Page, anlik: string, sunucu: PlanSunucu | null,
-  { w = 1440, h = 900, ogrenci = true, rotalar }: {
-    w?: number; h?: number; ogrenci?: boolean; rotalar?: (page: Page) => Promise<void>
+  { w = 1440, h = 900, ogrenci = true, rotalar, bekleme = true }: {
+    w?: number; h?: number; ogrenci?: boolean; rotalar?: (page: Page) => Promise<void>; bekleme?: boolean
   } = {}) {
   await page.clock.setFixedTime(new Date(`2026-09-24T${anlik}:00+03:00`))
   await bildirimTaklidi(page, { izin: 'default', abone: false })
@@ -134,6 +134,7 @@ async function planAc(page: Page, anlik: string, sunucu: PlanSunucu | null,
   if (rotalar) await rotalar(page)
   await page.setViewportSize({ width: w, height: h })
   await page.goto('/')
+  if (!bekleme) return
   await page.waitForLoadState('networkidle')
   await page.evaluate(() => document.fonts.ready.then(() => undefined))
 }
@@ -336,6 +337,22 @@ test('JSON\'suz 404 de bayrak kapalı sayılır, arıza değil', async ({ page }
     r => r.fulfill({ status: 404, contentType: 'text/html', body: '<h1>Not Found</h1>' })) })
   await expect(page.locator('.next-thing')).toBeVisible()
   await expect(page.locator('.today-ariza')).toHaveCount(0)
+})
+
+test('plan yanıtı gecikirken NextThing ve "Ayrıca" baştan görünür (bayrak kapalı)', async ({ page }) => {
+  // R17: the flag-off path is the page as it was; a slow plan answer must not empty the slot.
+  let yanitlandi = false
+  await planAc(page, '17:05', null, { rotalar: p => p.route('**/api/plan/bugun', async r => {
+    await new Promise(c => setTimeout(c, 1000))
+    yanitlandi = true
+    await r.fulfill(json({ kapali: true }, 404))
+  }), bekleme: false })
+  await expect(page.locator('.next-thing')).toBeVisible()
+  await expect(page.locator('.today-also')).toBeVisible()
+  expect(yanitlandi).toBe(false)
+  await expect.poll(() => yanitlandi).toBe(true)
+  await expect(page.locator('.next-thing')).toBeVisible()
+  await expect(page.locator('.aksam-plani')).toHaveCount(0)
 })
 
 test('uç 404 (bayrak kapalı): NextThing görünür, plan kartı yok', async ({ page }) => {

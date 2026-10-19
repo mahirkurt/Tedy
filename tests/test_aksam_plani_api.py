@@ -577,3 +577,22 @@ def test_aksam_ozel_dersi_engel_olur():
           {"start": "2026-10-20T18:00:00", "end": "2026-10-20T19:00:00", "title": "Yarın"}]
     o = api._plan_olaylari({"takvim": []}, date(2026, 10, 19), ev, 17 * 60, 21 * 60)
     assert o == [(18 * 60, 19 * 60, "Özel ders")]
+
+
+def test_kartin_ret_listesi_arka_ucun_cumleleriyle_ayni():
+    # The card shows a refusal only when it is on BILINEN_RETLER (D3, D4). Pinned to the plan routes'
+    # own sentences: a reworded route sentence must not silently fall back to "Kaydedilemedi".
+    from pathlib import Path
+    import re
+    kok = Path(__file__).resolve().parents[1]
+    ts = (kok / "dashboard" / "src" / "utils" / "aksamPlani.ts").read_text(encoding="utf-8")
+    blok = re.search(r"const BILINEN_RETLER[^{]*\{(.*?)\n\}", ts, re.S)
+    assert blok, "BILINEN_RETLER bulunamadı"
+    satirlar = dict(re.findall(r"(\d{3}):\s*\[([^\]]*)\]", blok.group(1)))
+    assert set(satirlar) == {"409", "403"}
+    py = (kok / "src" / "dashboard_api.py").read_text(encoding="utf-8")
+    for durum, liste in satirlar.items():
+        cumleler = re.findall(r"'([^']+)'", liste)
+        assert cumleler, durum
+        for c in cumleler:
+            assert re.search(r'jsonify\(\{"error": "' + re.escape(c) + r'"\}\), ' + durum, py), (durum, c)

@@ -512,10 +512,9 @@ export default function TodaySchedule() {
   const planKarti = selectedIsToday && aksamPlani.plan ? kartDurumu(aksamPlani.plan, nowMin) : null
   const planAkiyor = planKarti != null && ['calisma', 'mola', 'bekliyor'].includes(planKarti.tur)
   const planSatiri = planKarti != null && (planKarti.tur === 'onizleme' || planKarti.tur === 'bitti')
-  // The page does not wait for the plan. Until it answers, the slot it may take — the one thing and
-  // "Ayrıca" under it — stays empty (a skeleton after 400 ms, S36), so nothing is drawn only to be
-  // replaced; the rest of the page paints at once.
-  const planBekleniyor = aksamPlani.yukleniyor
+  // The page does not wait for the plan: until it answers, NextThing and "Ayrıca" are drawn as they
+  // always were, and they give way only to a plan that takes the slot. With the flag off (404) they are
+  // never hidden, not even for a frame (R17).
 
   const git = (yol: string) => (e: MouseEvent) => {
     e.preventDefault()
@@ -608,15 +607,11 @@ export default function TodaySchedule() {
         />
       )}
 
-      {planBekleniyor && aksamPlani.iskelet && (
-        <SkeletonPlaceholder className="today-skeleton__card" aria-hidden="true" />
-      )}
-
       {planKarti && aksamPlani.plan && planKarti.tur !== 'yok' && (planAkiyor || planSatiri) && (
         <AksamPlani plan={aksamPlani.plan} kart={planKarti} aile={oturum?.student === false} islemler={aksamPlani} />
       )}
 
-      {!planBekleniyor && !planAkiyor && !planSatiri && <NextThing
+      {!planAkiyor && !planSatiri && <NextThing
         {...nextThing.props}
         quiet={okulModu}
         box={isKarti && kutu.durum !== 'bos' ? kutu : undefined}
@@ -639,7 +634,7 @@ export default function TodaySchedule() {
       {/* The rest of what is owed, said quietly: names and days, no coloured
           countdown chips competing with the card above (İ6). Carbon's on-page
           contained list at lg, so every row is a 48px target (B8). */}
-      {ayricaGoster.length > 0 && !planBekleniyor && !planAkiyor && (
+      {ayricaGoster.length > 0 && !planAkiyor && (
         <ContainedList
           className="today-also"
           kind="on-page"
