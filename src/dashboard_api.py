@@ -15,7 +15,8 @@ import time
 import unicodedata
 from collections import OrderedDict
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from dataclasses import asdict
+from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
 from urllib.parse import quote
@@ -51,6 +52,9 @@ from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.US
 from src import (aksam_duzeni, assistant_skills, module_progress, module_store, module_ticket,
                  mufredat_agaci, subject_themes)
 from src import claude_api
+from src.aksam_plani import (CalismaKayitlari, PlanDeposu, anlik_goruntu, plan_kur,
+                             saat_hali)
+from src.odev_tahmini import ClaudeTahminOkuyucu, TahminDeposu
 
 load_env()
 
@@ -1884,6 +1888,336 @@ def _dakika_saat(dk):
     return f"{dk // 60:02d}:{dk % 60:02d}"
 
 
+# --- Akşam çalışma planı (spec 2026-10-19, Görev 5) ---
+# Motor src/aksam_plani.py'de saftır; burada ona veri verilir (ödevler, takvim, düzen, günün
+# dokunuşları), dokunuşlar yazılır ve /api/plan/* uçları sunulur. `TEDY_AKSAM_PLANI=1` kapalıyken
+# uçlar 404 {"kapali": true} döner; oturum + tam rol ister, okuyucu `READER_ENDPOINTS`'te olmadığı
+# için varsayılan olarak reddedilir (o listeye eklenmez).
+
+def _simdi():
+    """Plan saati (İstanbul, naive); testler yamalar."""
+    return datetime.now()
+
+
+def _plan_koku():
+    return Path(OUTPUT_DIR).parent
+
+
+def _tahmin_deposu():
+    return TahminDeposu(_plan_koku(), ClaudeTahminOkuyucu())
+
+
+def _ilk_tarih(deger):
+    m = re.match(r"\s*(\d{4})-(\d{2})-(\d{2})", str(deger or ""))
+    if not m:
+        return None
+    try:
+        return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return None
+
+
+def _tatil_mi(gun, olaylar):
+    """O güne düşen tüm gün takvim olayının başlığında "tatil" ya da "bayram" geçiyor mu?
+    Tüm gün olayın bitişi dışlayıcıdır (FullCalendar); saatli olay tatil sayılmaz."""
+    from src.assistant_core import turkce_kucult_katla
+    for ev in olaylar if isinstance(olaylar, list) else []:
+        if not isinstance(ev, dict) or not ev.get("allDay"):
+            continue
+        baslik = turkce_kucult_katla(str(ev.get("title") or ""))
+        if "tatil" not in baslik and "bayram" not in baslik:
+            continue
+        bas = _ilk_tarih(ev.get("start"))
+        if bas is None:
+            continue
+        bit = _ilk_tarih(ev.get("end"))
+        if bit is not None and bit > bas:
+            if bas <= gun < bit:
+                return True
+        elif bas == gun:
+            return True
+    return False
+
+
+def _plan_olaylari(data, gun, ozel_dersler, hazir, yatma):
+    """Günün saatli takvim olayları ve özel dersler, [ödeve hazır, yatma] ile kesişenler:
+    (bas_dk, bit_dk, başlık). Tüm gün olaylar engel değildir (yalnız `_tatil_mi`'yi besler)."""
+    adaylar = []
+    takvim = data.get("takvim") if isinstance(data, dict) else None
+    for ev in takvim if isinstance(takvim, list) else []:
+        if not isinstance(ev, dict) or ev.get("allDay"):
+            continue
+        adaylar.append((_portal_zamani(ev.get("start")), _portal_zamani(ev.get("end")), ev.get("title")))
+    for ev in ozel_dersler:
+        try:
+            adaylar.append((datetime.fromisoformat(ev["start"]), datetime.fromisoformat(ev["end"]),
+                            ev.get("title")))
+        except (KeyError, TypeError, ValueError):
+            continue
+    olaylar = []
+    for b, e, baslik in adaylar:
+        if b is None or e is None or b.date() != gun or e <= b:
+            continue
+        bas = b.hour * 60 + b.minute
+        bit = 1440 if e.date() > gun else e.hour * 60 + e.minute
+        if bit > hazir and bas < yatma:
+            olaylar.append((bas, bit, str(baslik or "Etkinlik")))
+    return sorted(olaylar)
+
+
+def _plan_sinav_dersleri(data, simdi):
+    """Önümüzdeki 7 gün içinde sınavı olan derslerin adları (puan sırasında bir kademe öne alır)."""
+    gun = simdi.date()
+    try:
+        liste = _sinav_api_listesi(data, simdi).get("exams", [])
+    except Exception as hata:  # noqa: BLE001 - sınav listesi plana engel olmaz
+        app.logger.warning("plan: sınav listesi okunamadı: %s", hata)
+        return frozenset()
+    dersler = set()
+    for e in liste:
+        if not isinstance(e, dict) or e.get("status") != "upcoming":
+            continue
+        t = _ilk_tarih(e.get("date") or e.get("hafta"))
+        if t is not None and 0 <= (t - gun).days <= 7 and e.get("course"):
+            dersler.add(str(e["course"]))
+    return frozenset(dersler)
+
+
+def bugunku_plan(simdi=None):
+    """Bugünün akşam planı: kart, asistan ve bildirim turu bu tek yerden okur (spec §6.7)."""
+    simdi = simdi or _simdi()
+    gun = simdi.date()
+    data = _scraped()
+    duzen = _aksam_duzeni_oku()
+    hazir, yatma = aksam_duzeni.dakika(duzen["odeve_hazir"]), aksam_duzeni.dakika(duzen["yatma"])
+    takvim = data.get("takvim") if isinstance(data, dict) else []
+    haftalar = data.get("ders_programi", []) if isinstance(data, dict) else []
+    satirlar_tablo = ((_guncel_hafta(haftalar).get("schedule") or {}).get("rows")) or []
+    if satirlar_tablo:
+        from src.assistant_tools import gunun_dersleri
+        okul_gunu = bool(gunun_dersleri(satirlar_tablo, DAY_NAMES[gun.weekday()]))
+    else:
+        okul_gunu = gun.weekday() < 5
+    olaylar = _plan_olaylari(data, gun, _private_lessons_for_day(gun), hazir, yatma)
+    kayitlar = CalismaKayitlari(_plan_koku())
+    depo = _tahmin_deposu()
+    return plan_kur(
+        _canli_odevler(), lambda satir: depo.tahmin(satir, gun), duzen, simdi, olaylar,
+        PlanDeposu(_plan_koku()).gunluk(gun.isoformat()), okul_gunu, _tatil_mi(gun, takvim),
+        kalibrasyon=kayitlar.kalibrasyon, sinav_dersleri=_plan_sinav_dersleri(data, simdi))
+
+
+def _saat_yaz(dk):
+    return _dakika_saat(min(dk, 1439))
+
+
+def _blok_json(blok):
+    d = asdict(blok)
+    d["bas_saat"], d["bit_saat"] = _saat_yaz(blok.bas), _saat_yaz(blok.bit)
+    return d
+
+
+def _haber_metni(plan, duzen):
+    """Işık'a gösterilen sakin cümle: ilk çalışma bloğunun saati + eşik geçince aileye haber gider.
+    Yalnız bildirim bayrağı açık ve haber alacak biri varken, plan akıyor ya da önizlemedeyken ve
+    hiçbir çalışma bloğu başlamamışken; yoksa None (R10)."""
+    if os.environ.get("TEDY_AKSAM_BILDIRIM") != "1" or not duzen.get("haber_alacaklar"):
+        return None
+    if plan.durum not in ("akis", "onizleme"):
+        return None
+    calisma = sorted((b for b in plan.bloklar if b.tur == "calisma"), key=lambda b: (b.bas, b.bit))
+    if not calisma or any(b.durum in ("suruyor", "bitti") for b in calisma):
+        return None
+    dk = calisma[0].bas + int(duzen["baslamadi_esik_dk"])
+    return f"{saat_hali(_dakika_saat(dk))} kadar başlamazsan ailene haber gider."
+
+
+def _plan_yaniti(plan, duzen):
+    bloklar = [_blok_json(b) for b in plan.bloklar]
+    calisma = [b for b in bloklar if b["tur"] == "calisma"]
+    return {
+        "gun": plan.gun, "durum": plan.durum, "bloklar": bloklar,
+        "simdiki": next((b for b in calisma if b["durum"] == "suruyor"), None),
+        "siradaki": next((b for b in calisma if b["durum"] in ("bekliyor", "ertelendi")), None),
+        "tasinan": plan.tasinan, "sigmayan": plan.sigmayan, "planda_olmayan": plan.planda_olmayan,
+        "haber_metni": _haber_metni(plan, duzen),
+    }
+
+
+def _plan_yaniti_simdi(simdi):
+    return _plan_yaniti(bugunku_plan(simdi), _aksam_duzeni_oku())
+
+
+def _plan_ucu(f):
+    """Bayrak kapalıyken 404 {"kapali": true}; yalnız oturum açmış tam rollü kişi (API anahtarı değil)."""
+    @wraps(f)
+    def sarmal(*args, **kwargs):
+        if os.environ.get("TEDY_AKSAM_PLANI") != "1":
+            return jsonify({"kapali": True}), 404
+        if not _bildirim_kisisi():
+            return jsonify({"error": "Plan yalnız oturum açmış aile üyeleri içindir."}), 403
+        return f(*args, **kwargs)
+    return sarmal
+
+
+def _plan_blogu(plan, blok_id):
+    return next((b for b in plan.bloklar if b.id == blok_id and b.tur == "calisma"), None)
+
+
+def _plan_blok_yok():
+    return jsonify({"error": "Bu blok bulunamadı."}), 404
+
+
+def _calisma_kaydi(gun, blok, durum, basla=None, bitti=None):
+    CalismaKayitlari(_plan_koku()).ekle({
+        "gun": gun, "odev_anahtari": blok.odev_anahtari, "ders": blok.ders, "tahmin_dk": blok.tahmin_dk,
+        "basla": basla, "bitti": bitti, "durum": durum})
+
+
+def _plan_yaptim(odev_anahtari):
+    """Son parça bitince "Yaptım": mark-done'ın yazma yolu, aynı anahtar. Satır listeden düşmüşse
+    işaret yazılamaz (anahtar yetmez: öğretmen kararı satırdan okunur); günlüğe düşer."""
+    satir, anahtar, hata = _istenen_odev({"homework_key": odev_anahtari})
+    if hata:
+        app.logger.warning("plan: Yaptım yazılamadı, ödev satırı yok: %s", odev_anahtari)
+        return
+    _yaptim_yaz(satir, anahtar)
+
+
+@app.route("/api/plan/bugun")
+@require_auth
+@_plan_ucu
+def plan_bugun():
+    return jsonify(_plan_yaniti_simdi(_simdi()))
+
+
+@app.route("/api/plan/blok/<blok_id>/basla", methods=["POST"])
+@require_auth
+@_plan_ucu
+def plan_blok_basla(blok_id):
+    simdi = _simdi()
+    blok = _plan_blogu(bugunku_plan(simdi), blok_id)
+    if blok is None:
+        return _plan_blok_yok()
+    gun, damga, yazildi = simdi.date().isoformat(), simdi.isoformat(timespec="seconds"), []
+
+    def yaz(g):
+        k = g.get(blok.id)
+        if isinstance(k, dict) and k.get("durum") in ("suruyor", "bitti"):
+            return                                       # ikinci Başla: hiçbir şey değişmez
+        g[blok.id] = {**(anlik_goruntu(blok) or {}), "durum": "suruyor", "basla": damga}
+        g.setdefault("basladi", damga)
+        yazildi.append(True)
+    PlanDeposu(_plan_koku()).degistir(gun, yaz)
+    if yazildi:
+        _calisma_kaydi(gun, blok, "suruyor", basla=damga)
+    return jsonify({"ok": True, **_plan_yaniti_simdi(simdi)})
+
+
+@app.route("/api/plan/blok/<blok_id>/bitti", methods=["POST"])
+@require_auth
+@_plan_ucu
+def plan_blok_bitti(blok_id):
+    simdi = _simdi()
+    blok = _plan_blogu(bugunku_plan(simdi), blok_id)
+    if blok is None:
+        return _plan_blok_yok()
+    govde = request.get_json(silent=True)
+    tamamlandi = govde.get("tamamlandi") if isinstance(govde, dict) else None
+    son_parca = blok.parca >= blok.parca_sayisi - 1      # yalnız son parça ödevin kaderini belirler
+    depo, gun = PlanDeposu(_plan_koku()), simdi.date().isoformat()
+    onceki = depo.gunluk(gun).get(blok.id)
+    zaten = isinstance(onceki, dict) and onceki.get("durum") == "bitti"
+    if son_parca and not zaten and not isinstance(tamamlandi, bool):
+        return jsonify({"error": "Son parçada ödevin tamamının bitip bitmediği belirtilmeli."}), 400
+    damga, simdi_dk, yazildi = simdi.isoformat(timespec="seconds"), simdi.hour * 60 + simdi.minute, []
+    kayit = {}
+
+    def yaz(g):
+        k = g.get(blok.id) if isinstance(g.get(blok.id), dict) else {}
+        if k.get("durum") == "bitti":
+            kayit["tamamlandi"] = k.get("tamamlandi")
+            return
+        basla = k.get("basla") or damga
+        goruntu = anlik_goruntu(blok) or {}
+        if goruntu:                                      # gerçek bitiş: sıradaki blok ve mola buradan sayılır
+            goruntu["bit"] = min(1440, max(goruntu["bas"], simdi_dk))
+        g[blok.id] = {**goruntu, "durum": "bitti", "basla": basla, "bitti": damga,
+                      "tamamlandi": tamamlandi if son_parca else None}
+        g.setdefault("basladi", basla)
+        if son_parca and tamamlandi is False:
+            ek = g.get("ek_parca") if isinstance(g.get("ek_parca"), dict) else {}
+            ek[blok.odev_anahtari] = min(20, int(ek.get(blok.odev_anahtari) or 0) + 1)
+            g["ek_parca"] = ek
+            for v in g.values():                         # kardeş parçalar yeni toplamı gösterir
+                if isinstance(v, dict) and v.get("odev_anahtari") == blok.odev_anahtari:
+                    v["parca_sayisi"] = max(int(v.get("parca_sayisi") or 1), blok.parca_sayisi + 1)
+        kayit["tamamlandi"] = g[blok.id]["tamamlandi"]
+        kayit["basla"] = basla
+        yazildi.append(True)
+    depo.degistir(gun, yaz)
+    if yazildi:
+        _calisma_kaydi(gun, blok, "bitti", basla=kayit["basla"], bitti=damga)
+    if son_parca and kayit.get("tamamlandi") is True:    # günlük yazıldıktan sonra: tekrar çağrı eksik işareti tamamlar
+        _plan_yaptim(blok.odev_anahtari)
+    return jsonify({"ok": True, **_plan_yaniti_simdi(simdi)})
+
+
+@app.route("/api/plan/blok/<blok_id>/simdi-degil", methods=["POST"])
+@require_auth
+@_plan_ucu
+def plan_blok_simdi_degil(blok_id):
+    simdi = _simdi()
+    blok = _plan_blogu(bugunku_plan(simdi), blok_id)
+    if blok is None:
+        return _plan_blok_yok()
+    gun, zaten, yazildi = simdi.date().isoformat(), [], []
+    if blok.durum in ("suruyor", "bitti"):
+        return jsonify({"error": "Süren ya da biten bir blok ertelenemez."}), 409
+
+    def yaz(g):
+        liste = g.get("ertelenen") if isinstance(g.get("ertelenen"), list) else []
+        if blok.id in liste:
+            zaten.append(True)
+            return
+        g["ertelenen"] = [*liste, blok.id]
+        yazildi.append(True)
+    PlanDeposu(_plan_koku()).degistir(gun, yaz)
+    if zaten:
+        return jsonify({"error": "Bu bloğu bir kez erteledin."}), 409
+    _calisma_kaydi(gun, blok, "ertelendi")
+    return jsonify({"ok": True, **_plan_yaniti_simdi(simdi)})
+
+
+@app.route("/api/plan/odev/<path:odev_anahtari>/sure", methods=["PUT"])
+@require_auth
+@_plan_ucu
+def plan_odev_sure(odev_anahtari):
+    govde = request.get_json(silent=True)
+    dakika = govde.get("dakika") if isinstance(govde, dict) else None
+    if isinstance(dakika, bool) or not isinstance(dakika, int) or not 5 <= dakika <= 120:
+        return jsonify({"error": "Süre 5 ile 120 dakika arasında olmalı."}), 400
+    if not any(r.get("homework_key") == odev_anahtari for r in _canli_odevler()):
+        return jsonify({"error": "Ödev bulunamadı."}), 404
+    _tahmin_deposu().okur_suresi_yaz(odev_anahtari, dakika)
+    return jsonify({"ok": True, "dakika": dakika, **_plan_yaniti_simdi(_simdi())})
+
+
+@app.route("/api/plan/aksam-yok", methods=["POST"])
+@require_auth
+@_plan_ucu
+def plan_aksam_yok():
+    if _assistant_okur() != "aile":
+        return jsonify({"error": "Bunu yalnız aile değiştirebilir."}), 403
+    govde = request.get_json(silent=True)
+    aktif = govde.get("aktif") if isinstance(govde, dict) else None
+    if not isinstance(aktif, bool):
+        return jsonify({"error": "aktif doğru ya da yanlış olmalı."}), 400
+    simdi = _simdi()
+    PlanDeposu(_plan_koku()).degistir(simdi.date().isoformat(), lambda g: g.update(aksam_yok=aktif))
+    return jsonify({"ok": True, "aksam_yok": aktif, **_plan_yaniti_simdi(simdi)})
+
+
 @app.route("/api/homework")
 @require_auth
 def homework():
@@ -2027,16 +2361,23 @@ def homework_mark_done():
     target, target_key, hata = _istenen_odev(payload)
     if hata:
         return hata
+    return jsonify(_yaptim_yaz(target, target_key))
 
+
+def _yaptim_yaz(target, target_key):
+    """Write Işık's "Yaptım" mark for one row: the one write path, shared by
+    mark-done and the evening plan's "Bitti" on a homework's last part (spec
+    §6.8), so İşler, the assistant and the plan read the same record. Idempotent;
+    the teacher's verdict is never overridden. Returns the response body."""
     normalized_status = _normalize_homework_status_text(target.get("Ödev Durumu", ""))
     if _is_teacher_resolved_homework_status(normalized_status):
-        return jsonify({
+        return {
             "ok": True,
             "skipped": True,
             "reason": "teacher_status_resolved",
             "homework_key": target_key,
             "status": normalized_status,
-        })
+        }
 
     with _isaret_kilidi():
         marks = _load_student_done_marks()
@@ -2044,12 +2385,12 @@ def homework_mark_done():
             marks[target_key] = datetime.now().isoformat()
             _save_student_done_marks(marks)
 
-    return jsonify({
+    return {
         "ok": True,
         "homework_key": target_key,
         "marked_at": marks.get(target_key, ""),
         "status": "YAPILAN",
-    })
+    }
 
 
 @app.route("/api/homework/photo", methods=["POST"])

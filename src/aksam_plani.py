@@ -1,20 +1,28 @@
-"""Akşam çalışma planı (Görev 4): saf plan motoru.
+"""Akşam çalışma planı (Görev 4–5): saf plan motoru ve (dosyanın sonunda) günün durum/kayıt deposu.
 
 Dosya, saat ve ağ yok: ödev satırları, tahminler, akşam düzeni, "şimdi", takvim olayları ve
 günün dokunuş durumu (`gunluk`) girer; bloklar çıkar. Aynı girdi aynı planı verir, aynı ödev
-parçası yeniden dizilince aynı kimliği taşır. Depolama, uçlar ve bildirim sonraki görevlerdedir.
+parçası yeniden dizilince aynı kimliği taşır. Depo (`PlanDeposu`, `CalismaKayitlari`) en altta; uçlar `dashboard_api`'de, bildirim sonraki görevdedir.
 """
 from __future__ import annotations
 
+import copy
+import fcntl
 import hashlib
+import json
 import math
+import os
 import re
+import statistics
+from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date, datetime
-from typing import Any, Callable, Literal
+from datetime import date, datetime, timedelta
+from pathlib import Path
+from typing import Any, Callable, Iterator, Literal
 
 from src.aksam_duzeni import dakika
 from src.course_names import normalize_course
+from src.json_utils import atomic_json_dump
 from src.odev_tahmini import OdevTahmini
 
 BLOK_DK = 20
@@ -368,3 +376,162 @@ def _anlik_bloklar(gunluk: dict, hazir: int) -> dict[str, Blok]:
 def _blok_calisma(p: _Parca, bas: int, bit: int, durum: str) -> Blok:
     return Blok(p.id, "calisma", bas, bit, p.anahtar, p.ders, p.baslik, p.adim,
                 p.parca, p.parca_sayisi, p.dk, p.zorluk, durum)  # type: ignore[arg-type]
+
+
+# ----------------------------------------------------------------------------- depo (Görev 5)
+# Günün dokunuş durumu (`PlanDeposu`) ve çalışma kayıtları (`CalismaKayitlari`): ikisi de paylaşılan,
+# `fcntl.flock` altında yazılan dosyalardır (gunicorn iki işçi çalıştırır). Motor bunları bilmez;
+# uçlar (`dashboard_api`) okur, yazar ve motora `gunluk` olarak verir.
+
+PLAN_DOSYASI = "output/aksam_plani.json"
+KAYIT_DOSYASI = "output/calisma_kayitlari.jsonl"
+GUN_SAKLAMA = 14
+KALIBRASYON_SON, KALIBRASYON_EN_AZ = 10, 3
+KALIBRASYON_ARALIK = (0.5, 2.0)
+
+_BIRIMLER = {1: "bir", 2: "iki", 3: "üç", 4: "dört", 5: "beş", 6: "altı", 7: "yedi", 8: "sekiz", 9: "dokuz"}
+_ONLAR = {10: "on", 20: "yirmi", 30: "otuz", 40: "kırk", 50: "elli"}
+_ON_UNLU = "eiöü"
+_UNLULER = "aeıioöuü"
+
+
+def saat_hali(saat: str) -> str:
+    """``"17:15"`` → ``"17:15'e"``: yönelme eki, sayının okunuşundaki son sözcüğe göre.
+
+    Okunuşta son sözcük dakikadır ("on yedi on beş" → beş → "beşe"); dakika 00 ise saattir
+    ("on yedi" → "on yediye" → "17:00'ye"). Son ünlü ince (e, i, ö, ü) ise "e", kalın ise "a";
+    sözcük ünlüyle bitiyorsa kaynaştırma "y" gelir. Kod tabanında başka biçim yok; burada tek yerde."""
+    s, d = (int(x) for x in saat.split(":"))
+    n = d if d else s
+    if n == 0:
+        kelime = "sıfır"
+    elif n % 10:
+        kelime = _BIRIMLER[n % 10]
+    else:
+        kelime = _ONLAR[n]
+    son_unlu = next(h for h in reversed(kelime) if h in _UNLULER)
+    ek = "e" if son_unlu in _ON_UNLU else "a"
+    return f"{saat}'{'y' if kelime[-1] in _UNLULER else ''}{ek}"
+
+
+def anlik_goruntu(blok: Blok) -> dict | None:
+    """Bloğun `gunluk` kaydına yazılacak anlık görüntüsü (R9): ödev "Yaptım" olsa ya da listeden
+    düşse de motor bloğu aynen çıkarsın diye. 0 <= bas <= bit <= 1440 değilse None: motor sınır
+    dışı görüntüyü zaten atlar, hiç yazmamak onu en baştan önler."""
+    bas, bit = blok.bas, blok.bit
+    if not (isinstance(bas, int) and isinstance(bit, int)) or isinstance(bas, bool) or isinstance(bit, bool):
+        return None
+    if not 0 <= bas <= bit <= 1440:
+        return None
+    return {"odev_anahtari": blok.odev_anahtari, "ders": blok.ders, "baslik": blok.baslik,
+            "parca": blok.parca, "parca_sayisi": blok.parca_sayisi, "tahmin_dk": blok.tahmin_dk,
+            "zorluk": blok.zorluk, "adim": blok.adim, "bas": bas, "bit": bit}
+
+
+@contextmanager
+def _kilit(yol: Path) -> Iterator[None]:
+    yol.parent.mkdir(parents=True, exist_ok=True)
+    with open(yol.with_name(yol.name + ".lock"), "a") as kilit:
+        fcntl.flock(kilit, fcntl.LOCK_EX)
+        yield
+
+
+class PlanDeposu:
+    """`output/aksam_plani.json`: gün (YYYY-MM-DD) → o günün dokunuş durumu (`plan_kur`'un `gunluk`'u).
+
+    14 günden eski günler her yazımda budanır. Bozuk dosya yazımda kenara alınır (`.bozuk-<damga>`),
+    okumada yok sayılır: plan yeniden kurulabilir durumdur, bozuk bir dosya akşamı kilitlemez."""
+
+    def __init__(self, kok: Path):
+        self.yol = Path(kok) / PLAN_DOSYASI
+
+    def _oku(self) -> dict:
+        try:
+            ham = self.yol.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return {}
+        veri = json.loads(ham)
+        if not isinstance(veri, dict):
+            raise ValueError("aksam_plani.json sözlük değil")
+        return veri
+
+    def gunluk(self, gun: str) -> dict:
+        try:
+            g = self._oku().get(gun)
+        except (OSError, ValueError):
+            return {}
+        return copy.deepcopy(g) if isinstance(g, dict) else {}
+
+    def degistir(self, gun: str, fn: Callable[[dict], None]) -> dict:
+        """Kilit altında yeniden oku → `fn` günü yerinde değiştirir → atomik yaz; yeni günü döner."""
+        with _kilit(self.yol):
+            try:
+                veri = self._oku()
+            except (OSError, ValueError):
+                self._kenara_al()
+                veri = {}
+            g = veri.get(gun)
+            g = g if isinstance(g, dict) else {}
+            fn(g)
+            veri[gun] = g
+            try:
+                sinir = date.fromisoformat(gun) - timedelta(days=GUN_SAKLAMA)
+            except ValueError:
+                sinir = None
+            if sinir is not None:
+                for k in list(veri):
+                    try:
+                        if date.fromisoformat(k) < sinir:
+                            del veri[k]
+                    except ValueError:
+                        pass
+            atomic_json_dump(veri, str(self.yol))
+            return copy.deepcopy(g)
+
+    def _kenara_al(self) -> None:
+        try:
+            self.yol.rename(self.yol.with_name(f"{self.yol.name}.bozuk-{datetime.now():%Y%m%d%H%M%S}"))
+        except OSError:
+            pass
+
+
+class CalismaKayitlari:
+    """`output/calisma_kayitlari.jsonl`: her dokunuş (başla, bitti, ertelendi) bir satır, eklemeli.
+
+    Kalibrasyon yalnız `bitti` satırlarından: ders başına son 10 kaydın gerçek/tahmin oranının
+    medyanı, [0,5; 2,0]'ya kıstırılır; 3'ten az kayıtta 1,0 (öğrenme başlamadı)."""
+
+    def __init__(self, kok: Path):
+        self.yol = Path(kok) / KAYIT_DOSYASI
+
+    def ekle(self, kayit: dict) -> None:
+        satir = json.dumps(kayit, ensure_ascii=False) + "\n"
+        with _kilit(self.yol):
+            with open(self.yol, "a", encoding="utf-8") as f:
+                f.write(satir)
+                f.flush()
+                os.fsync(f.fileno())
+
+    def kalibrasyon(self, ders: str) -> float:
+        oranlar: list[float] = []
+        try:
+            with open(self.yol, "r", encoding="utf-8") as f:
+                for satir in f:
+                    try:
+                        k = json.loads(satir)
+                        if not isinstance(k, dict) or k.get("durum") != "bitti" or k.get("ders") != ders:
+                            continue
+                        tahmin = _tam(k.get("tahmin_dk"))
+                        gercek = (datetime.fromisoformat(k["bitti"]) - datetime.fromisoformat(k["basla"])
+                                  ).total_seconds() / 60
+                    except (ValueError, KeyError, TypeError):
+                        continue
+                    if tahmin and tahmin > 0 and gercek >= 0:
+                        oranlar.append(gercek / tahmin)
+        except OSError:
+            return 1.0
+        oranlar = oranlar[-KALIBRASYON_SON:]
+        if len(oranlar) < KALIBRASYON_EN_AZ:
+            return 1.0
+        alt, ust = KALIBRASYON_ARALIK
+        return min(ust, max(alt, statistics.median(oranlar)))

@@ -291,6 +291,9 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     # The household's focus-window setting (B29): a dashboard parameter, not school data.
     "odak_penceresi.json",
     "aksam_duzeni.json",
+    # Evening-plan day state and study records: plan internals (the .lock sidecar is covered by "*.lock").
+    "aksam_plani.json",
+    "calisma_kayitlari.jsonl",
     # Evening-plan homework estimates, their spend ledger and the reader's own minutes: plan internals.
     "odev_tahmin_*",
     # Process/cron bookkeeping: pid files, crontab dumps, the sync scheduler state.
