@@ -333,3 +333,46 @@ def test_mola_sabit_blogun_ustune_binmez():
             assert b.bit <= olay[0] or b.bas >= olay[1], b
             assert b.bit <= 18 * 60 + 30 or b.bas >= 19 * 60
     assert [b for b in calisma(p)][1].bas >= 17 * 60 + 25
+
+
+import pytest
+
+
+@pytest.mark.parametrize("ad,degisiklik", [
+    ("tahmin_yazi", {"tahmin_dk": "abc"}),
+    ("tahmin_nan", {"tahmin_dk": float("nan")}),
+    ("tahmin_liste", {"tahmin_dk": [20]}),
+    ("tahmin_none", {"tahmin_dk": None}),
+    ("parca_yazi", {"parca": "x"}),
+    ("parca_nan", {"parca": float("nan")}),
+    ("sayi_liste", {"parca_sayisi": [3]}),
+    ("sayi_none", {"parca_sayisi": None}),
+    ("bas_yazi", {"bas": "abc"}),
+    ("bas_nan", {"bas": float("nan")}),
+    ("bit_none", {"bit": None}),
+    ("bit_liste", {"bit": [1, 2]}),
+    ("bit_bastan_once", {"bas": 17 * 60 + 20, "bit": 17 * 60}),
+])
+def test_bozuk_goruntu_plan_kurmayi_dusurmez(ad, degisiklik):
+    b0 = calisma(kur())[0]
+    kayit = {**_goruntu(b0, "bitti", basla=17 * 60 + 2, bitti=17 * 60 + 18), **degisiklik}
+    biten = {**DORT_ODEV[0], "student_marked_done": True}
+    p = kur(simdi="2026-10-19 17:30", satirlar=[biten, DORT_ODEV[1]], gunluk={b0.id: kayit})
+    assert all(b.bit >= b.bas for b in p.bloklar)
+    assert all(b.tahmin_dk >= 0 and b.parca >= 0 and b.parca_sayisi >= 1 for b in calisma(p))
+
+
+def test_bozuk_ertelenen_ve_ek_parca_dusurmez():
+    p = kur(gunluk={"ertelenen": [["x"], 5, None], "ek_parca": {"yarin-zor": "abc"}})
+    assert calisma(p)
+    assert kur(gunluk={"ertelenen": "yok", "ek_parca": [1]}).bloklar
+
+
+def test_son_blok_zamana_gore_secilir():
+    # ikinci parça (bas 17:30, bit 17:50) ile uzun ilk parça (bas 17:00, bit 18:00): zamanca sonuncu ikincisi
+    ilk, ikinci = calisma(kur())[:2]
+    gunluk = {ilk.id: _goruntu(ilk, "bitti", bas=17 * 60, bit=18 * 60),
+              ikinci.id: _goruntu(ikinci, "bitti", bas=17 * 60 + 30, bit=17 * 60 + 50)}
+    p = kur(simdi="2026-10-19 17:51", gunluk=gunluk)
+    sonraki = [b for b in calisma(p) if b.durum == "bekliyor"][0]
+    assert sonraki.bas == 17 * 60 + 50 + 10     # iki bitmiş blok -> 10 dk mola, son = 17:50

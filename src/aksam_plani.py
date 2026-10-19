@@ -101,17 +101,28 @@ def _kimlik(*parcalar: Any) -> str:
     return hashlib.sha1("|".join(str(p) for p in parcalar).encode("utf-8")).hexdigest()[:10]
 
 
-def _dk(deger: Any) -> int | None:
-    """Dokunuş kaydındaki zaman: dakika (int), "HH:MM" ya da ISO tarih-saat."""
+def _tam(deger: Any) -> int | None:
+    """Yalnız sonlu tam sayı: int, tam değerli float ya da rakamdan oluşan metin; gerisi None."""
     if isinstance(deger, bool):
         return None
-    if isinstance(deger, (int, float)):
+    if isinstance(deger, int):
+        return deger
+    if isinstance(deger, float):
+        return int(deger) if math.isfinite(deger) and deger == int(deger) else None
+    if isinstance(deger, str) and re.fullmatch(r"\s*-?\d{1,9}\s*", deger):
         return int(deger)
+    return None
+
+
+def _dk(deger: Any) -> int | None:
+    """Dokunuş kaydındaki zaman: dakika (sonlu sayı), "HH:MM" ya da ISO tarih-saat; okunamazsa None."""
     if isinstance(deger, str):
         m = re.search(r"(\d{1,2}):(\d{2})", deger)
         if m:
             return int(m.group(1)) * 60 + int(m.group(2))
-    return None
+    if isinstance(deger, float) and math.isfinite(deger):
+        return int(deger)
+    return _tam(deger)
 
 
 def _kademe(teslim: tuple[date, int] | None, bugun: date) -> int:
@@ -191,7 +202,7 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
 
     # ---- puan sırası
     sinavli = {normalize_course(d) for d in sinav_dersleri}
-    ek_parca = gunluk.get("ek_parca") or {}
+    ek_parca = gunluk.get("ek_parca") if isinstance(gunluk.get("ek_parca"), dict) else {}
     kayitlar = []
     for satir in secilen:
         t = tahmin(satir)
@@ -217,7 +228,7 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
         adimlar = [t.ilk_adim] + [t.parcalar[i] if i < len(t.parcalar) else DEVAM_ADIMI
                                   for i in range(1, len(sureler))]
         try:
-            ek = max(0, int(ek_parca.get(anahtar) or 0))
+            ek = max(0, min(20, _tam(ek_parca.get(anahtar)) or 0))
         except (TypeError, ValueError):
             ek = 0
         sureler += [EK_PARCA_DK] * ek
@@ -251,7 +262,7 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
             bas = _dk(kayit.get("basla"))
             bas = hazir if bas is None else bas
             bit = _dk(kayit.get("bitti")) if durum == "bitti" else None
-            bit = bas + p.dk if bit is None else bit
+            bit = bas + p.dk if bit is None or bit < bas else bit
             anlik[p.id] = _blok_calisma(p, bas, bit, durum)
         else:
             bekleyen.append(p)
@@ -260,14 +271,14 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
     calisma_sayisi = len(yapilanlar)
     imlec, mola_oncesi = baslangic, 0
     if yapilanlar:
-        son = max(yapilanlar, key=lambda b: (b.bit, b.bas))
-        sira = yapilanlar.index(son) + 1
-        kazanilan = MOLA_UZUN if sira % 2 == 0 else MOLA_KISA
+        son = yapilanlar[-1]       # zamana göre sonuncu
+        kazanilan = MOLA_UZUN if len(yapilanlar) % 2 == 0 else MOLA_KISA
         if son.bit + kazanilan > baslangic:
             imlec, mola_oncesi = son.bit, kazanilan
 
     # ---- ertelenen: parça ve aynı ödevin sonrakileri kuyruğun sonuna, bir kez
-    ertelenen = set(gunluk.get("ertelenen") or [])
+    ham_ertelenen = gunluk.get("ertelenen")
+    ertelenen = {e for e in ham_ertelenen if isinstance(e, str)} if isinstance(ham_ertelenen, (list, tuple, set)) else set()
     ilk_ertelenen: dict[str, int] = {}
     for p in bekleyen:
         if p.id in ertelenen and p.anahtar not in ilk_ertelenen:
@@ -328,24 +339,29 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
 
 
 def _anlik_bloklar(gunluk: dict, hazir: int) -> dict[str, Blok]:
-    """gunluk'ta anlık görüntüsü (odev_anahtari + bas/bit...) olan bitti/suruyor kayıtları (R9)."""
+    """gunluk'ta anlık görüntüsü (odev_anahtari + bas/bit...) olan bitti/suruyor kayıtları (R9).
+
+    Paylaşılan, elle düzenlenebilir durum: kullanılamayan görüntü (okunamayan bas/bit, bit < bas)
+    atlanır; plan_kur bu yüzden asla düşmez."""
     sonuc: dict[str, Blok] = {}
     for kimlik, k in gunluk.items():
         if not isinstance(k, dict) or k.get("durum") not in ("bitti", "suruyor") or not k.get("odev_anahtari"):
             continue
         bas = _dk(k.get("bas"))
-        if bas is None:
-            bas = _dk(k.get("basla"))
-        bas = hazir if bas is None else bas
-        dk = int(k.get("tahmin_dk") or 0)
         bit = _dk(k.get("bit"))
-        if bit is None:
-            bit = _dk(k.get("bitti")) if k["durum"] == "bitti" else None
-        bit = bas + dk if bit is None else bit
+        if bas is None or bit is None or bit < bas:
+            continue
+        dk = _tam(k.get("tahmin_dk"))
+        dk = dk if dk is not None and dk >= 0 else 0
+        parca = _tam(k.get("parca"))
+        parca = parca if parca is not None and parca >= 0 else 0
+        sayi = _tam(k.get("parca_sayisi"))
+        sayi = sayi if sayi is not None and sayi >= 1 else 1
         zorluk = k.get("zorluk") if k.get("zorluk") in ZORLUKLAR else "orta"
-        sonuc[str(kimlik)] = Blok(str(kimlik), "calisma", bas, bit, str(k["odev_anahtari"]), k.get("ders"),
-                                  str(k.get("baslik") or ""), str(k.get("adim") or ""), int(k.get("parca") or 0),
-                                  int(k.get("parca_sayisi") or 1), dk, zorluk, k["durum"])
+        ders = k.get("ders")
+        sonuc[str(kimlik)] = Blok(str(kimlik), "calisma", bas, bit, str(k["odev_anahtari"]),
+                                  ders if isinstance(ders, str) else None, str(k.get("baslik") or ""),
+                                  str(k.get("adim") or ""), parca, sayi, dk, zorluk, k["durum"])
     return sonuc
 
 
