@@ -22,17 +22,25 @@ ESIK = 0.6
 GOVDE_SINIRI = 3900
 
 _DONEM_SINAV = re.compile(r"(?<![\d.])([12])\s*\.\s*([12])(?![\d.])")
-_SINAV_NO = re.compile(r"\b([12])\s*\.?\s*(?:ortak\s+)?(?:yazili|sinav)")
+_SINAV_NO = re.compile(r"\b([12])\s*\.\s*(?:ortak\s+)?(?:yazili|sinav)")
 _SOZCUK_NO = re.compile(r"\b(birinci|ikinci)\s+(?:ortak\s+)?(?:yazili|sinav)")
 _DONEM = re.compile(r"\b([12])\s*\.?\s*donem")
 _SIRA = {"birinci": 1, "ikinci": 2, "ucuncu": 3, "dorduncu": 4, "besinci": 5, "altinci": 6,
          "yedinci": 7, "sekizinci": 8, "dokuzuncu": 9, "onuncu": 10}
-_LISTE = r"\d{1,2}\s*\.?(?:\s*(?:,|ve|veya|ile)\s*\d{1,2}\s*\.?)*"
+# "senaryo"dan önce yalnız noktalı sıra sayısı sayılır ("4. senaryo", "3., 4. senaryolar"); "6 senaryo" bir
+# adettir. Sonra yalnız bitişik "senaryo 3" biçimi sayılır ("senaryoda 3 soru" değil).
+_LISTE = r"\d{1,2}\s*\.(?:\s*(?:,|\bve\b|\bveya\b|\bile\b)\s*\d{1,2}\s*\.)*"
 _ONCE = re.compile(rf"(?<![\d.])({_LISTE})\s*senaryo")
-_SONRA = re.compile(r"senaryo\w*\s+(\d{1,2}(?:\s*(?:,|ve|veya)\s*\d{1,2})*)(?![\d.])")
+_SONRA = re.compile(r"\bsenaryo\s*(\d{1,2})(?!\d|\.\d)")
 _SOZCUK = re.compile(r"\b(" + "|".join(_SIRA) + r")\s+senaryo")
-_TARIH_IFADESI = re.compile(r"\b\d{1,2}\s+(ocak|subat|mart|nisan|mayis|haziran|temmuz|agustos|eylul|ekim|kasim|aralik)\b"
-                            r"|\b\d{1,2}[./]\d{1,2}[./]\d{2,4}\b")
+# Pencere sınırları (katlanmış metinde): başka bir tarih ifadesi ya da başka bir sınav numarası.
+_AYLAR = "ocak|subat|mart|nisan|mayis|haziran|temmuz|agustos|eylul|ekim|kasim|aralik"
+_SINIRLAR = (
+    re.compile(rf"\b\d{{1,2}}\s+(?:{_AYLAR})\w*"),
+    re.compile(r"(?<![\d.])\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?(?!\d)"),
+    _DONEM_SINAV,
+    _SINAV_NO,
+)
 # Cümle sonu: rakam olmayan bir karakterden sonra gelen nokta/ünlem/soru + boşluk + büyük harf ya da
 # rakam; ya da satır sonu. "4. Senaryo"daki nokta rakamdan sonra geldiği için bölmez.
 _CUMLE_AYIR = re.compile(r"(?<=\D[.!?])\s+(?=[A-ZÇĞİÖŞÜ0-9])|\n+")
@@ -98,45 +106,75 @@ def sutun_coz(kayit: dict, tablo: dict, bugun: date) -> tuple[str, int] | None:
     return ders, no
 
 
-def _sayilar(katli: str) -> list[int]:
-    bulunan: list[int] = []
-    for m in _ONCE.finditer(katli):
-        bulunan += [int(x) for x in re.findall(r"\d{1,2}", m.group(1))]
-    for m in _SONRA.finditer(katli):
-        bulunan += [int(x) for x in re.findall(r"\d{1,2}", m.group(1))]
-    for m in _SOZCUK.finditer(katli):
-        bulunan.append(_SIRA[m.group(1)])
-    return [s for s in dict.fromkeys(bulunan) if 1 <= s <= 10]
+def _sayilar(katli: str, bas: int = 0, son: int | None = None) -> list[tuple[int, int]]:
+    """Katlanmış metinde anılan senaryo numaraları: (numara, bulunduğu konum), görünüş sırasıyla, tekrarsız."""
+    son = len(katli) if son is None else son
+    bulunan: list[tuple[int, int]] = []
+    for m in _ONCE.finditer(katli, bas, son):
+        bulunan += [(int(x), m.start()) for x in re.findall(r"\d{1,2}", m.group(1))]
+    for m in _SONRA.finditer(katli, bas, son):
+        bulunan.append((int(m.group(1)), m.start()))
+    for m in _SOZCUK.finditer(katli, bas, son):
+        bulunan.append((_SIRA[m.group(1)], m.start()))
+    sonuc: dict[int, int] = {}
+    for sayi, konum in sorted(bulunan, key=lambda t: t[1]):
+        if 1 <= sayi <= 10:
+            sonuc.setdefault(sayi, konum)
+    return list(sonuc.items())
 
 
 def _cumleler(metin: str) -> list[str]:
     return [c.strip() for c in _CUMLE_AYIR.split(metin or "") if c and c.strip()]
 
 
+def _katli_cumleler(metin: str) -> tuple[str, list[tuple[int, int, str]]]:
+    """Metni cümlelere böler; katlanmış hâli (katla(metin) ile aynı) ve her cümlenin bu metindeki aralığı."""
+    katli = ""
+    parcalar: list[tuple[int, int, str]] = []
+    for c in _cumleler(metin):
+        k = katla(c)
+        if not k:
+            continue
+        bas = len(katli) + 1 if katli else 0
+        katli = f"{katli} {k}" if katli else k
+        parcalar.append((bas, len(katli), c))
+    return katli, parcalar
+
+
+def _pencere(katli: str, alinti_katli: str, tek: bool) -> tuple[int, int] | None:
+    """Alıntının başladığı yerden, alıntıdan sonraki ilk sınıra (tarih ya da başka sınav numarası) ya da
+    alıntı sonu + PENCERE karaktere kadar. Alıntı bulunamazsa: tek bulguda bütün metin, değilse None."""
+    bas = katli.find(alinti_katli) if alinti_katli else -1
+    if bas < 0:
+        return (0, len(katli)) if tek else None
+    son = bas + len(alinti_katli)
+    bitis = min(len(katli), son + PENCERE)
+    for desen in _SINIRLAR:
+        m = desen.search(katli, son, bitis)
+        if m:
+            bitis = min(bitis, m.start())
+    return bas, bitis
+
+
+def _senaryo_cumleleri(metin: str, alinti: str, tek: bool) -> dict[int, str]:
+    """Pencerede anılan her senaryo numarası -> onu anan özgün cümle (≤ CUMLE_SINIRI), görünüş sırasıyla."""
+    katli, parcalar = _katli_cumleler(metin)
+    pencere = _pencere(katli, katla(alinti), tek)
+    if pencere is None:
+        katli, parcalar = _katli_cumleler(alinti)
+        pencere = (0, len(katli))
+    sonuc: dict[int, str] = {}
+    for sayi, konum in _sayilar(katli, *pencere):
+        cumle = next((c for bas, son, c in parcalar if bas <= konum < son), None)
+        if cumle is not None:
+            sonuc[sayi] = cumle[:CUMLE_SINIRI]
+    return sonuc
+
+
 def senaryo_cumlesi(metin: str, alinti: str, tek: bool) -> tuple[list[int], str | None]:
-    cumleler = _cumleler(metin)
-    if tek:
-        aday = cumleler
-    else:
-        ilk = katla((_cumleler(alinti) or [""])[0])[:40]
-        bas = next((i for i, c in enumerate(cumleler) if ilk and ilk in katla(c)), None)
-        if bas is None:
-            aday = _cumleler(alinti)
-        else:
-            aday, uzunluk = [], 0
-            for i, c in enumerate(cumleler[bas:]):
-                if i > 0 and (_TARIH_IFADESI.search(katla(c)) or uzunluk >= PENCERE):
-                    break
-                aday.append(c)
-                uzunluk += len(c)
-    sayilar: list[int] = []
-    cumle = None
-    for c in aday:
-        bulunan = _sayilar(katla(c))
-        if bulunan:
-            sayilar += [s for s in bulunan if s not in sayilar]
-            cumle = cumle or c[:CUMLE_SINIRI]
-    return sorted(sayilar), cumle
+    bulunan = _senaryo_cumleleri(metin, alinti, tek)
+    sayilar = sorted(bulunan)
+    return sayilar, (bulunan[sayilar[0]] if sayilar else None)
 
 
 def _kokler(metin: str) -> set[str]:
@@ -157,23 +195,20 @@ def konu_eslestir(konu: str, ciktilar: list[dict]) -> list[str]:
               if re.search(rf"(?<![\w.]){re.escape(katla(c['kod']))}(?!\d)", k)]
     if kodlar:
         return kodlar
-    en, puan = None, 0.0
-    for c in ciktilar:
-        p = _puan(konu, c["metin"])
-        if p > puan:
-            en, puan = [c["kod"]], p
-    if en and puan >= ESIK:
-        return en
+    # Eşit puanlı çıktıların hepsi; konu adı, en az eşiği ve en iyi çıktı puanını tutuyorsa çıktıdan önce gelir.
+    puanlar = [(c["kod"], _puan(konu, c["metin"])) for c in ciktilar]
+    en_cikti = max((p for _, p in puanlar), default=0.0)
     gruplar: dict[str, list[str]] = {}
     for c in ciktilar:
         if c.get("konu"):
             gruplar.setdefault(c["konu"], []).append(c["kod"])
-    en, puan = None, 0.0
-    for ad, kodlar in gruplar.items():
-        p = _puan(konu, ad)
-        if p > puan:
-            en, puan = kodlar, p
-    return list(en) if en and puan >= ESIK else []
+    konu_puanlari = {ad: _puan(konu, ad) for ad in gruplar}
+    en_konu = max(konu_puanlari.values(), default=0.0)
+    if en_konu >= ESIK and en_konu >= en_cikti:
+        return [kod for ad, p in konu_puanlari.items() if abs(p - en_konu) < 1e-9 for kod in gruplar[ad]]
+    if en_cikti >= ESIK:
+        return [kod for kod, p in puanlar if abs(p - en_cikti) < 1e-9]
+    return []
 
 
 def senaryo_blogu(kayit: dict, metinler: list[tuple[str, str, bool]], tablo: dict, bugun: date) -> dict | None:
@@ -183,17 +218,15 @@ def senaryo_blogu(kayit: dict, metinler: list[tuple[str, str, bool]], tablo: dic
     ders, no = sutun
     dt = tablo["dersler"][ders]
     sinav = dt["sinavlar"][str(no)]
-    anilan: list[int] = []
-    cumle = None
+    cumleler: dict[int, str] = {}
     for metin, alinti, tek in metinler:
-        sayilar, c = senaryo_cumlesi(metin, alinti, tek)
-        anilan += [s for s in sayilar if s not in anilan]
-        cumle = cumle or c
-    anilan.sort()
+        for sayi, c in _senaryo_cumleleri(metin, alinti, tek).items():
+            cumleler.setdefault(sayi, c)
+    anilan = sorted(cumleler)
     eslesme = {konu: konu_eslestir(konu, dt["ciktilar"]) for konu in kayit.get("konular") or []}
     eslesen = {konu: set(kodlar) for konu, kodlar in eslesme.items() if kodlar}
     blok = {"durum": None, "ders": ders, "sinav_no": no, "donem": tablo["kaynak"]["donem"], "anilan": anilan,
-            "cumle": cumle, "senaryo": None, "toplam": None, "dagilim": [],
+            "cumle": cumleler[anilan[0]] if anilan else None, "senaryo": None, "toplam": None, "dagilim": [],
             "eslesen_konu_sayisi": len(eslesen),
             "eslesmeyen_konular": [k for k, kodlar in eslesme.items() if not kodlar],
             "senaryo_disi_konular": [], "adaylar": [], "senaryo_sayisi": 0,
@@ -211,7 +244,7 @@ def senaryo_blogu(kayit: dict, metinler: list[tuple[str, str, bool]], tablo: dic
         n = gecerli[0]
         dagilim = senaryolar[str(n)]
         duyuruda = set().union(*eslesen.values()) if eslesen else set()
-        blok.update(senaryo=n, toplam=sum(dagilim.values()),
+        blok.update(senaryo=n, cumle=cumleler[n], toplam=sum(dagilim.values()),
                     dagilim=[{"kod": c["kod"], "metin": c["metin"], "soru": dagilim[c["kod"]],
                               "duyuruda": c["kod"] in duyuruda} for c in dt["ciktilar"] if c["kod"] in dagilim])
         blok["senaryo_disi_konular"] = [k for k, kodlar in eslesen.items() if not kodlar & set(dagilim)]
@@ -231,6 +264,11 @@ def _liste(sayilar: list[int]) -> str:
 
 def ozet(blok: dict) -> str:
     d = blok.get("durum")
+    anilan = blok.get("anilan") or []
+    if d in ("dogrulandi", "kismen") and len(anilan) > 1:
+        kismen = " · bazı konular senaryoda yok" if d == "kismen" else ""
+        return (f"duyuru {_liste(anilan)} senaryo diyor; {blok['senaryo']}. senaryo tabloda var · "
+                f"{blok['toplam']} soru{kismen}")
     if d == "dogrulandi":
         return f"{blok['senaryo']}. senaryo doğrulandı · {blok['toplam']} soru"
     if d == "kismen":
@@ -279,6 +317,9 @@ def arac_metni(tablo: dict, sinavlar: list[dict], args: dict) -> tuple[str, str]
     if sinav:
         satirlar.append(f"Sınav: {sinav.get('title')} · {str(sinav.get('date') or 'tarih belirsiz')[:10]}")
         satirlar.append(f"Durum: {ozet(blok)}.")
+        if len(blok.get("anilan") or []) > 1:
+            satirlar.append(f"Duyuru birden çok senaryo anıyor ({_liste(blok['anilan'])}); örnek sınav yazmadan "
+                            f"önce hangisiyle hazırlanacağını sor.")
         if blok.get("cumle"):
             satirlar.append(f"Duyurunun cümlesi: “{blok['cumle']}”")
         if blok.get("eslesmeyen_konular"):

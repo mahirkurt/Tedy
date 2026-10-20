@@ -156,3 +156,160 @@ def test_ozet_ve_arac_metni():
         ss.arac_metni(TABLO, [], {"ders": "Fen Bilimleri"})
     with pytest.raises(ValueError, match="tablosunda yok"):
         ss.arac_metni(TABLO, [], {"ders": "Bilişim", "sinav_no": 1})
+
+
+# --- Düzeltme turu 1 ---------------------------------------------------------------------------
+
+# Bulgu 1: pencere alıntıdan başlar, alıntıdan sonraki ilk sınır (tarih ya da başka sınav no) ya da
+# 400 karakterde biter; başka sınavın senaryosu bu sınava yazılmaz.
+@pytest.mark.parametrize("metin,alinti,tek,beklenen", [
+    ("12 Kasım'da Matematik 1.1 sınavı 3. senaryodan, 14 Kasım'da Fen 1.1 sınavı 2. senaryodan yapılacaktır.",
+     "12 Kasım'da Matematik 1.1 sınavı 3. senaryodan", False, [3]),
+    ("Türkçe 1.1 sınavı 22.10'da yapılacak. Matematik 1.1 sınavı 24.10'da yapılacak, 3. senaryo ağırlıklı olacak.",
+     "Türkçe 1.1 sınavı 22.10'da yapılacak.", False, []),
+    ("Türkçe 1.1 sınavı 22.10'da yapılacak. Matematik 1.1 sınavı 24 Ekimde yapılacak, 3. senaryo ağırlıklı olacak.",
+     "Türkçe 1.1 sınavı 22.10'da yapılacak.", False, []),
+    ("Perşembe günü Türkçe 1.1 sınavı var. Perşembe günü de Matematik 1.1 sınavı var, 2. senaryo ağırlıklı.",
+     "Perşembe günü Türkçe 1.1 sınavı var.", False, []),
+    ("Geçen haftaki Fen sınavı 2. senaryodan yapılmıştı. Bu hafta Türkçe 1.1 sınavımız 22 Ekim Perşembe günü.",
+     "Bu hafta Türkçe 1.1 sınavımız 22 Ekim Perşembe günü.", True, []),
+    # alıntıdan sonraki, tarihe kadarki cümle pencerededir
+    ("Türkçe 1.1 sınavı 22 Ekim'de yapılacak. Sınav 4. senaryo ağırlıklı olacak, telafisi 29 Ekim'de.",
+     "Türkçe 1.1 sınavı 22 Ekim'de yapılacak.", False, [4]),
+])
+def test_pencere_baska_sinavin_senaryosunu_almaz(metin, alinti, tek, beklenen):
+    sayilar, cumle = ss.senaryo_cumlesi(metin, alinti, tek)
+    assert sayilar == beklenen
+    assert (cumle is None) == (not beklenen)
+
+
+def test_pencere_alinti_bulunamazsa():
+    metin = "Sınav 3. senaryo ağırlıklı olacak. Başka bir şey."
+    # tek bulgu: alıntı metinde yoksa tüm metin; çok bulgu: yalnız alıntının kendisi
+    assert ss.senaryo_cumlesi(metin, "Metinde olmayan bir cümle.", True)[0] == [3]
+    assert ss.senaryo_cumlesi(metin, "Metinde olmayan bir cümle.", False) == ([], None)
+    assert ss.senaryo_cumlesi(metin, "Sınav 3. senaryo olacak.", False)[0] == [3]
+
+
+def test_pencere_400_karakterde_biter():
+    uzun = " ".join(["Bu cümle dolgudur ve hiçbir sınır içermez."] * 12)        # > 400 karakter
+    metin = f"Türkçe 1.1 sınavı yapılacak. {uzun} Sınav 3. senaryo olacak."
+    assert ss.senaryo_cumlesi(metin, "Türkçe 1.1 sınavı yapılacak.", False) == ([], None)
+    kisa = "Türkçe 1.1 sınavı yapılacak. Sınav 3. senaryo olacak."
+    assert ss.senaryo_cumlesi(kisa, "Türkçe 1.1 sınavı yapılacak.", False)[0] == [3]
+
+
+# Bulgu 2: "senaryo"dan önce yalnız noktalı sıra sayısı, sonra yalnız "senaryo N" bitişik biçimi.
+@pytest.mark.parametrize("metin,beklenen", [
+    ("Sınavınız 4. senaryo ağırlıklı olacaktır. Bu senaryoda 3 açık uçlu soru yer alacak.", [4]),
+    ("Sınav, tablodaki senaryolardan 2 tanesinin karışımı olacak.", []),
+    ("Sınavınız MEB'in yayımladığı 6 senaryodan birine göre hazırlanacak.", []),
+    ("Sınav 3., 4. senaryolardan olacak.", [3, 4]),
+    ("Sınav 3. ve 4. senaryolardan olacak.", [3, 4]),
+    ("Sınav senaryo 3 ile yapılacak.", [3]),
+    ("Sınav senaryoda 3 soru içerecek.", []),
+])
+def test_senaryo_sayisi_ile_sira_sayisi_karismaz(metin, beklenen):
+    assert ss.senaryo_cumlesi(metin, metin, True)[0] == beklenen
+
+
+# Bulgu 3: birden çok numara anılınca blok ilk geçerliyi kurar ve cümle o numarayı anar; ozet/arac_metni söyler.
+IKI_KAYNAK = [("Türkçe 1.1 sınavı 22 Ekim'de. Sınav 4. senaryo ağırlıklı olacak.",
+               "Türkçe 1.1 sınavı 22 Ekim'de. Sınav 4. senaryo ağırlıklı olacak.", True),
+              ("Veli notu: 2. senaryo da olabilir.", "Veli notu: 2. senaryo da olabilir.", True)]
+
+
+def test_cok_numara_cumle_secilen_numarayi_anar():
+    blok = ss.senaryo_blogu(kayit(), IKI_KAYNAK, TABLO, BUGUN)
+    assert blok["anilan"] == [2, 4] and blok["senaryo"] == 2 and blok["durum"] == "dogrulandi"
+    assert "2. senaryo" in blok["cumle"] and "4. senaryo" not in blok["cumle"]
+    assert blok["toplam"] == 6
+
+
+def test_cok_numara_ozet_ve_arac_metni():
+    blok = ss.senaryo_blogu(kayit(), IKI_KAYNAK, TABLO, BUGUN)
+    assert ss.ozet(blok) == "duyuru 2. ve 4. senaryo diyor; 2. senaryo tabloda var · 6 soru"
+    assert ss.ozet({**blok, "durum": "kismen"}) == \
+        "duyuru 2. ve 4. senaryo diyor; 2. senaryo tabloda var · 6 soru · bazı konular senaryoda yok"
+    sinav = {"id": "x", "course": "Türkçe", "title": "1.1 Ara Değerlendirme Sınavı", "date": "2026-10-22",
+             "status": "upcoming", "senaryo": blok}
+    govde, _ = ss.arac_metni(TABLO, [sinav], {"ders": "Türkçe"})
+    satirlar = govde.split("\n")
+    i = next(n for n, s in enumerate(satirlar) if s.startswith("Durum:"))
+    assert satirlar[i] == "Durum: duyuru 2. ve 4. senaryo diyor; 2. senaryo tabloda var · 6 soru."
+    assert satirlar[i + 1] == ("Duyuru birden çok senaryo anıyor (2. ve 4.); örnek sınav yazmadan önce "
+                               "hangisiyle hazırlanacağını sor.")
+    tek = ss.senaryo_blogu(kayit(konular=TR_KONULAR), [(TR_METIN, TR_ALINTI, True)], TABLO, BUGUN)
+    govde, _ = ss.arac_metni(TABLO, [{**sinav, "senaryo": tek}], {"ders": "Türkçe"})
+    assert "birden çok senaryo" not in govde
+
+
+# Bulgu 4: eşit puanlı çıktıların hepsi; konu adı çıktı eşleşmesinden önce gelir (≥ eşik ve ≥ çıktı puanı).
+def _konu_kodlari(ders, konu):
+    return {c["kod"] for c in TABLO["dersler"][ders]["ciktilar"] if c.get("konu") == konu}
+
+
+def _kodlar_metinde(ders, parca):
+    return {c["kod"] for c in TABLO["dersler"][ders]["ciktilar"] if parca in ss.katla(c["metin"])}
+
+
+def test_konu_adi_butun_cikti_kodlarini_dondurur():
+    fen = _konu_kodlari("Fen Bilimleri", "Dolaşım Sistemi")
+    assert fen == {"FB.7.3.3", "FB.7.3.4", "FB.7.3.5"}
+    assert set(ss.konu_eslestir("Dolaşım Sistemi", TABLO["dersler"]["Fen Bilimleri"]["ciktilar"])) == fen
+    ad = "Dikdörtgenler Prizmasının Hacmi ve Yüzey Alanı"
+    mat = _konu_kodlari("Matematik", ad)
+    assert {"MAT.7.4.2", "MAT.7.4.3", "MAT.7.4.4", "MAT.7.4.6"} == mat
+    assert set(ss.konu_eslestir(ad, TABLO["dersler"]["Matematik"]["ciktilar"])) == mat
+
+
+def test_esit_puanli_cikti_kodlari_birlikte_gelir():
+    tr = TABLO["dersler"]["Türkçe"]["ciktilar"]
+    derin = _kodlar_metinde("Türkçe", "metnin derin anlami")
+    assert derin == {"T.O.7.7", "T.O.7.8"}
+    assert set(ss.konu_eslestir("Metnin derin anlamı", tr)) == derin
+    soz = _kodlar_metinde("Türkçe", "soz varligi")
+    assert soz == {"T.O.7.4", "T.O.7.21", "T.Y.7.18"}
+    assert set(ss.konu_eslestir("Söz varlığı", tr)) == soz
+
+
+def test_esit_puanli_konu_gruplari_birlikte_gelir():
+    # konu iki grup adını da içeriyor (ikisi de 1.0): hangisinin olduğu bilinemez, ikisi de döner
+    ciktilar = [{"kod": "A.1", "metin": "Kuvvet ve hareket ilişkisini çözümleyebilme", "konu": "Madde ve Isı"},
+                {"kod": "A.2", "metin": "Elektrik devresini tasarlayabilme", "konu": "Madde ve Isı"},
+                {"kod": "B.1", "metin": "Gezegenlerin özelliklerini karşılaştırabilme", "konu": "Isı Etkileşimi"}]
+    assert set(ss.konu_eslestir("Madde ve Isı Etkileşimi", ciktilar)) == {"A.1", "A.2", "B.1"}
+
+
+@pytest.mark.parametrize("ders,baslik,sen,konu", [
+    ("Fen Bilimleri", "1.2 Ara Değerlendirme", 3, "Dolaşım Sistemi"),
+    ("Matematik", "1.2 Ara Değerlendirme", 4, "Dikdörtgenler Prizmasının Hacmi ve Yüzey Alanı"),
+    ("Matematik", "1.2 Ara Değerlendirme", 5, "Dikdörtgenler Prizmasının Hacmi ve Yüzey Alanı"),
+    ("Türkçe", "1.1 Ara Değerlendirme", 1, "Metnin derin anlamı"),
+    ("Türkçe", "1.1 Ara Değerlendirme", 1, "Söz varlığı"),
+])
+def test_konu_adiyla_duyuru_senaryoda_yok_denmez(ders, baslik, sen, konu):
+    metin = f"{baslik} sınavı {sen}. senaryo ağırlıklı olacak."
+    k = kayit(ders=ders, baslik=baslik, tarih="2026-12-10" if baslik.startswith("1.2") else "2026-10-22",
+              konular=[konu])
+    blok = ss.senaryo_blogu(k, [(metin, metin, True)], TABLO, BUGUN)
+    assert blok["senaryo"] == sen
+    assert blok["durum"] == "dogrulandi" and blok["senaryo_disi_konular"] == []
+
+
+def test_soz_varligi_senaryo_2_gercekten_yok():
+    # T.O.7.4, T.O.7.21 ve T.Y.7.18'in üçü de Senaryo 2'de yok: "kismen" doğru ve kalır.
+    metin = "1.1 sınavı 2. senaryo ağırlıklı olacak."
+    blok = ss.senaryo_blogu(kayit(konular=["Söz varlığı"]), [(metin, metin, True)], TABLO, BUGUN)
+    assert blok["durum"] == "kismen" and blok["senaryo_disi_konular"] == ["Söz varlığı"]
+
+
+# Bulgu 5: sınav no başlıktan yalnız noktalı "N. yazılı/sınav" biçiminde okunur.
+@pytest.mark.parametrize("baslik", ["Tema 1 Sınavı", "Ünite 2 Sınavı", "Bölüm 1 Yazılısı", "Hafta 2 sınav"])
+@pytest.mark.parametrize("tur", ["yazili", "diger"])
+def test_noktasiz_numara_sinav_no_sayilmaz(baslik, tur):
+    assert ss.sutun_coz(kayit(tur=tur, baslik=baslik, tarih="2026-11-03"), TABLO, BUGUN) is None
+
+
+def test_proje_sinavi_diger_sinav_no_sayilmaz():
+    assert ss.sutun_coz(kayit(tur="diger", baslik="Proje 1 sınavı", tarih="2026-11-03"), TABLO, BUGUN) is None
