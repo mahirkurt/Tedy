@@ -335,6 +335,9 @@ def arac_metni(tablo: dict, sinavlar: list[dict], args: dict) -> tuple[str, str]
     sinav_tablosu = dt["sinavlar"][str(no)]
     if sinav_tablosu["tur"] == "ulke_geneli":
         satirlar.append("Bu sınav ülke genelinde ortak yapılır; MEB bu sınav için senaryo vermiyor.")
+        satirlar.append("Soru sayısı ya da dağılımı yok, uydurma. Örnek sınav istenirse duyurudaki konulardan "
+                        "hazırla (duyuru konu vermiyorsa dersin güncel ünitesinden) ve bunun bir MEB senaryosu "
+                        "olmadığını okura açıkça söyle.")
         return "\n".join(satirlar), f"MEB konu-soru dağılım tablosu · {ders} 7 · {no}. yazılı"
     senaryolar = sinav_tablosu["senaryolar"]
     duyuruda = {d["kod"] for d in (blok or {}).get("dagilim", []) if d.get("duyuruda")}

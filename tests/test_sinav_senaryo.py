@@ -139,6 +139,14 @@ def test_belirtilmedi_adaylarla_ve_adaysiz():
     assert blok["adaylar"] == [] and blok["eslesmeyen_konular"] == ["Osmanlı'nın kuruluşu"]
 
 
+def test_ulke_geneli_arac_metni_konulardan_hazirlamayi_ve_senaryo_olmadigini_soyletir():
+    govde, etiket = ss.arac_metni(TABLO, [], {"ders": "Türkçe", "sinav_no": 2})
+    assert "ülke genelinde ortak" in govde and "senaryo vermiyor" in govde
+    assert "duyurudaki konulardan" in govde and "MEB senaryosu olmadığını" in govde
+    assert "Toplam" not in govde and "Senaryo " not in govde        # dağılım yok, uydurulmaz
+    assert etiket == "MEB konu-soru dağılım tablosu · Türkçe 7 · 2. yazılı"
+
+
 def test_ozet_ve_arac_metni():
     blok = ss.senaryo_blogu(kayit(konular=TR_KONULAR), [(TR_METIN, TR_ALINTI, True)], TABLO, BUGUN)
     assert ss.ozet(blok) == "4. senaryo doğrulandı · 7 soru"

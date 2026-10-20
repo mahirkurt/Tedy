@@ -184,3 +184,12 @@ def test_turkce_unite_haritasi_yanlis_govdeyi_secmez(skiller):
 def test_dort_ogretmen_secici_sirasiyla():
     assert list(sk.yukle()) == ["turkce", "fen", "sosyal", "matematik"]
     assert list(sk.varsayilan()) == ["turkce", "fen", "sosyal", "matematik"]
+
+
+@pytest.mark.parametrize("ad", DIZINLER)
+def test_sinirlar_kendi_orneksinavin_cevap_anahtarini_yasaklamaz(skiller, ad):
+    # B6 denetçisi yalnız bu bölümü görür; "cevap anahtarı üretmezsin" yasağı genel istemin "Örnek sınav"
+    # kuralındaki "Cevapları göster" anahtarını kendi başına bulgu saymasın.
+    bolum = sk.govde_bolumleri(skiller[ad])["Sınırlar"].lower()
+    assert "cevap anahtar" in bolum
+    assert "örnek sınav" in bolum and "ayrı bir mesajda" in bolum

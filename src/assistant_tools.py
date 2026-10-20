@@ -2763,6 +2763,9 @@ class McpRegistry:
             metin, etiket = sinav_senaryo.arac_metni(tablo, sinavlar, args)
         except ValueError as exc:
             return ToolOutcome(ok=False, error=str(exc))
+        except Exception as exc:  # noqa: BLE001 — a malformed exam block must not drop the whole answer
+            logger.error("%s formatting failed: %s", SENARYO_TOOL, type(exc).__name__)
+            return ToolOutcome(ok=False, error="MEB senaryo bilgisi okunamadı")
         metin = _kirp(metin, GOVDE_SINIRI)
         return ToolOutcome(ok=True, text=metin, citations=[{
             "kind": "meb-tablo", "label": etiket,

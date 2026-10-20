@@ -2606,7 +2606,8 @@ class AssistantRuntime:
         "- Senaryo belli değilse: tek uyumlu aday varsa onu kullan ve söyle; 2–4 aday varsa "
         "`netlestir` ile sor; aday yoksa hangi senaryoyu istediğini sor, kendin seçme.\n"
         "- Duyurunun andığı senaryo tabloda yoksa ya da sınav ülke genelinde ortaksa bunu açıkça söyle; "
-        "senaryo uydurma.\n"
+        "senaryo uydurma. Ülke genelinde ortak sınavda örnek sınavı duyurudaki konulardan hazırla, duyuru "
+        "konu vermiyorsa dersin güncel ünitesinden; bunun bir MEB senaryosu olmadığını açıkça söyle.\n"
         "- Senaryonun duyuruda geçmeyen çıktılarını öğretmenin sözü gibi değil, 'MEB senaryosu ayrıca "
         "şunları kapsıyor' diye sun.\n\n"
 
