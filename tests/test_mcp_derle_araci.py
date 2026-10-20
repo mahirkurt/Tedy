@@ -65,7 +65,8 @@ def _budget_sized_quiz():
 
 
 def test_sp4_fleet_and_settings(tmp_path):
-    assert {"pexels", "minimax", "comfyui", "tr-literatur", "openalex"} <= set(SERVER_DEFAULTS)
+    assert {"pexels", "minimax", "tr-literatur", "openalex"} <= set(SERVER_DEFAULTS)
+    assert "comfyui" not in SERVER_DEFAULTS  # sağlayıcı 2026-10-20'de emekli
     s = load_settings({"TR_LITERATUR_MCP_URL": "http://127.0.0.1:9999/mcp", "EDUPEDIA_TICKET_SECRET": "s" * 40,
                        "EDUPEDIA_MEDIA_MONTHLY_USD": "abc",
                        "TED_MCP_VIEWER_HOSTS": "modul.tedy.online, modul.test"}, project_root=tmp_path)

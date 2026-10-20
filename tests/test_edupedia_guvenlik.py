@@ -79,7 +79,7 @@ def test_identifier_fuzz_never_resolves_a_path(tmp_path):
 def test_settings_repr_never_contains_secrets(tmp_path):
     env = {"EDUPEDIA_TICKET_SECRET": "ticket-" + "x" * 40, "TED_DASHBOARD_API_KEY": "tdyK_gizli"}
     env.update({k: f"key-{k}" for k in ("MUFREDAT_MCP_API_KEY", "EGITIM_KAYNAK_MCP_API_KEY", "ANAMNESIS_MCP_API_KEY",
-                                         "PEXELS_MCP_API_KEY", "MINIMAX_MCP_API_KEY", "COMFYUI_MCP_API_KEY",
+                                         "PEXELS_MCP_API_KEY", "MINIMAX_MCP_API_KEY",
                                          "TR_LITERATUR_MCP_API_KEY", "OPENALEX_MCP_API_KEY")})
     text = repr(load_settings(env, project_root=tmp_path))
     for value in env.values():

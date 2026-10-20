@@ -24,7 +24,6 @@ BEKLENEN: dict[str, set[str]] = {
     "pexels": {"search_photos"},
     "minimax": {"text_to_audio", "text_to_image", "music_generation", "generate_video", "query_video_generation",
                 "list_voices"},
-    "comfyui": {"generate_song", "wan_i2v", "get_job"},
     "tr-literatur": {"tr_literatur_search_articles", "tr_literatur_server_info"},
     "openalex": {"openalex_search_entities"},
 }

@@ -18,7 +18,6 @@ EGITIM_KAYNAK = "egitim-kaynak"
 ANAMNESIS = "anamnesis"
 PEXELS = "pexels"
 MINIMAX = "minimax"
-COMFYUI = "comfyui"
 TR_LITERATUR = "tr-literatur"
 OPENALEX = "openalex"
 

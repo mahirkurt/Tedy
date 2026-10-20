@@ -49,7 +49,7 @@ def test_probe_reports_ok_missing_and_absent_keys(tmp_path):
     results = filo.yokla(load_settings(env, project_root=tmp_path), client_factory=FakeClient, session=session)
     assert results["maarif-mufredat"] == "ok" and results["pexels"] == "ok"
     assert results["minimax"].startswith("eksik: ") and "text_to_image" in results["minimax"]
-    assert results["comfyui"] == "anahtar yok" and results["openalex"] == "anahtar yok"
+    assert results["openalex"] == "anahtar yok" and "comfyui" not in results
     assert results["eric"] == "ok" and session.calls[0]["rows"] == 1
 
 

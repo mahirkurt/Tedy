@@ -21,7 +21,6 @@ SERVER_DEFAULTS: dict[str, tuple[str, str]] = {
     "anamnesis": ("https://anamnesis-mcp.cureonics.workers.dev/mcp", "ANAMNESIS_MCP_API_KEY"),
     "pexels": ("https://pexels-mcp.cureonics.workers.dev/mcp", "PEXELS_MCP_API_KEY"),
     "minimax": ("https://minimax-mcp.cureonics.workers.dev/mcp", "MINIMAX_MCP_API_KEY"),
-    "comfyui": ("https://comfyui-mcp.cureonics.workers.dev/mcp", "COMFYUI_MCP_API_KEY"),
     # No public hostname; ted-mcp runs on the same host and tr-literatur accepts loopback + static bearer.
     "tr-literatur": ("http://127.0.0.1:8327/mcp", "TR_LITERATUR_MCP_API_KEY"),
     "openalex": ("https://openalex.cureonics.com/mcp", "OPENALEX_MCP_API_KEY"),

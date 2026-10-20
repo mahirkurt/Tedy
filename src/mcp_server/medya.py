@@ -1,8 +1,8 @@
 """edupedia_medya (spec §8; plan K-P12, K-P13, K-P22).
 
 Narration is automatic only when its price is verified and the run stays under 3,000 characters;
-music and video always need the approval token the estimate step returns. Async jobs (video,
-comfyui) are started once, recorded in the ledger with their job id and polled with is_kimligi.
+music and video always need the approval token the estimate step returns. Async jobs (video)
+are started once, recorded in the ledger with their job id and polled with is_kimligi.
 Provider free text is never echoed. Voice cloning and voice design are not reachable from here.
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Any, Callable
 from src.mcp_server.butce import (BELIRSIZ_NEDENLER, ONAY_TTL_SECONDS, TAHMIN_NOTU, Butce, ButceAsildi,
                                   DefterBozuk, OnayKullanildi)
 from src.mcp_server.coverage import Coverage
-from src.mcp_server.federation import COMFYUI, MINIMAX, TOOL_BUDGET_SECONDS, Federation, FederationError
+from src.mcp_server.federation import MINIMAX, TOOL_BUDGET_SECONDS, Federation, FederationError
 from src.mcp_server.runs import RUN_ID_RE, RunStore
 from src.mcp_server.varliklar import AssetStore, GuvenliIndirici, VarlikHatasi
 
@@ -25,16 +25,14 @@ CREDITS = {
     "minimax.ses": "Seslendirme: yapay zekâ ile üretildi (MiniMax speech-2.8-hd)",
     "minimax.muzik": "Müzik: yapay zekâ ile üretildi (MiniMax music-2.6)",
     "minimax.video": "Video: yapay zekâ ile üretildi (MiniMax Hailuo)",
-    "comfyui.muzik": "Müzik: yapay zekâ ile üretildi (ComfyUI)",
-    "comfyui.video": "Video: yapay zekâ ile üretildi (ComfyUI Wan)",
 }
 SLOT = {"ses": "<teachSegmentId>.audio", "muzik": "<teachSegmentId>.audio", "video": "<teachSegmentId>.visual"}
 ONAY_NOTU = ("Tahmini tutarı kullanıcıya göster ve açık onay al; sonra aynı tür ve istekle onay_belirteci "
              "vererek tekrar çağır. " + TAHMIN_NOTU)
 
-# T14-3: async jobs (video, comfyui) are started once and remembered by job id; only a job id
+# T14-3: async jobs (video) are started once and remembered by job id; only a job id
 # fullmatching this closed, conservative pattern is ever recorded or echoed back to the caller.
-_JOB_KEYS = ("minimax.video", "comfyui.muzik", "comfyui.video")
+_JOB_KEYS = ("minimax.video",)
 JOB_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 # T14-3: the polled `durum` field is from a closed set of known waiting states; anything else
 # (including the raw provider string) becomes "bilinmiyor" rather than being echoed.
@@ -62,8 +60,6 @@ class MedyaUretici:
     def _provider_key(self, tur: str) -> str | None:
         if self.federation.configured(MINIMAX):
             return f"minimax.{tur}"
-        if tur != "ses" and self.federation.configured(COMFYUI):
-            return f"comfyui.{tur}"
         return None
 
     def uret(self, email: str, run_id: str, tur: str, istek: str, tahmin: bool = False,
@@ -97,8 +93,6 @@ class MedyaUretici:
             if key is None:
                 cov = Coverage()
                 cov.skipped(MINIMAX, "anahtar yok")
-                if tur != "ses":
-                    cov.skipped(COMFYUI, "anahtar yok")
                 return {**base, "status": "atlandi", "coverage": cov.as_dict()}
             if key == "minimax.muzik" and _song_parts(istek) is None:
                 return {**base, "status": "gecersiz_istek",
@@ -155,16 +149,10 @@ class MedyaUretici:
                 prompt, lyrics = _song_parts(istek)
                 found = self.federation.call(MINIMAX, "music_generation", {"prompt": prompt, "lyrics": lyrics},
                                              beklenen="nesne", deadline=deadline)
-            elif key == "minimax.video":
+            else:
                 found = self.federation.call(MINIMAX, "generate_video",
                                              {"prompt": istek, "duration": 6, "resolution": "768P"},
                                              beklenen="nesne", deadline=deadline)
-            elif key == "comfyui.muzik":
-                found = self.federation.call(COMFYUI, "generate_song", {"prompt": istek}, beklenen="nesne",
-                                             deadline=deadline)
-            else:
-                found = self.federation.call(COMFYUI, "wan_i2v", {"prompt": istek}, beklenen="nesne",
-                                             deadline=deadline)
         except FederationError as exc:
             # T14-1: an ambiguous provider failure (timeout, malformed/undecodable result, ...)
             # cannot be proven un-billed, so it still counts against the cap ("belirsiz"); only a
@@ -220,43 +208,25 @@ class MedyaUretici:
         if entry is None or entry.get("tur") != tur:
             return {**base, "status": "is_bulunamadi"}
         key, provider, cov = entry["kalem"], entry["server"], Coverage()
+        if provider != MINIMAX:
+            # A job recorded by a provider that has since been retired (comfyui, 2026-10-20) can
+            # no longer be polled; report it as not found rather than calling a dead server.
+            return {**base, "status": "is_bulunamadi"}
         try:
-            if provider == MINIMAX:
-                found = self.federation.call(MINIMAX, "query_video_generation", {"task_id": job}, beklenen="nesne",
-                                             deadline=deadline)
-                # T14-4: dict-guard every nested field the fleet returns — a shape surprise on
-                # `query` means the state cannot be determined at all, so it fails immediately
-                # rather than falling through to "is_suruyor" with a fabricated state.
-                query_field = found.get("query")
-                if not isinstance(query_field, dict):
-                    cov.degraded(provider, "unexpected_shape")
-                    return {**base, "status": "saglayici_hatasi", "is_kimligi": job, "coverage": cov.as_dict()}
-                state = str(query_field.get("status") or "")
-                file_field = found.get("file")
-                inner = file_field.get("file") if isinstance(file_field, dict) else None
-                url = inner.get("download_url") if isinstance(inner, dict) else None
-                success, failed = state == "Success", state == "Fail"
-            else:
-                found = self.federation.call(COMFYUI, "get_job", {"prompt_id": job}, beklenen="nesne",
-                                             deadline=deadline)
-                # T14-4/F2: dict-guard `outputs` the same way minimax's `query` is guarded above —
-                # a present-but-wrong-shaped `outputs` (not a list, or a non-dict first item) is a
-                # shape surprise independent of whatever `status` says, so it fails immediately
-                # rather than falling through to "is_suruyor"/"bilinmiyor" with a fabricated read.
-                # A missing/None `outputs` (still processing, nothing produced yet) is not a
-                # surprise and falls through normally.
-                outputs_field = found.get("outputs")
-                if outputs_field is not None and not isinstance(outputs_field, list):
-                    cov.degraded(provider, "unexpected_shape")
-                    return {**base, "status": "saglayici_hatasi", "is_kimligi": job, "coverage": cov.as_dict()}
-                outputs = outputs_field if isinstance(outputs_field, list) else []
-                if outputs and not isinstance(outputs[0], dict):
-                    cov.degraded(provider, "unexpected_shape")
-                    return {**base, "status": "saglayici_hatasi", "is_kimligi": job, "coverage": cov.as_dict()}
-                state = str(found.get("status") or "")
-                first = outputs[0] if outputs else None
-                url = first.get("url") if isinstance(first, dict) else None
-                success, failed = state == "completed", state in ("failed", "error", "cancelled")
+            found = self.federation.call(MINIMAX, "query_video_generation", {"task_id": job}, beklenen="nesne",
+                                         deadline=deadline)
+            # T14-4: dict-guard every nested field the fleet returns — a shape surprise on
+            # `query` means the state cannot be determined at all, so it fails immediately
+            # rather than falling through to "is_suruyor" with a fabricated state.
+            query_field = found.get("query")
+            if not isinstance(query_field, dict):
+                cov.degraded(provider, "unexpected_shape")
+                return {**base, "status": "saglayici_hatasi", "is_kimligi": job, "coverage": cov.as_dict()}
+            state = str(query_field.get("status") or "")
+            file_field = found.get("file")
+            inner = file_field.get("file") if isinstance(file_field, dict) else None
+            url = inner.get("download_url") if isinstance(inner, dict) else None
+            success, failed = state == "Success", state == "Fail"
         except FederationError as exc:
             cov.degraded(provider, exc.reason)
             return {**base, "status": "saglayici_hatasi", "is_kimligi": job, "coverage": cov.as_dict()}
