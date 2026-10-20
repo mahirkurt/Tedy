@@ -1,0 +1,937 @@
+{
+  "surum": 1,
+  "kaynak": {
+    "sayfa": "https://odsgm.meb.gov.tr/www/1donem-konu-soru-dagilim-tablolari-2026-2027/icerik/1724",
+    "baslik": "1. Dönem Konu Soru Dağılım Tabloları (2026-2027)",
+    "meb_guncelleme": "2026-09-10T17:27",
+    "alindi": "2026-10-20",
+    "ogretim_yili": "2026-2027",
+    "donem": 1,
+    "sinif": 7
+  },
+  "dersler": {
+    "Din Kültürü": {
+      "adres": "https://meb.ai/ankmeb1",
+      "sha256": "aca55d5eb6eb0ddc472a91cda8d3c6baee6218ac04b0e7b6607ff6de6e9e2189",
+      "ciktilar": [
+        {
+          "kod": "DKAB.7.1.1",
+          "metin": "Melekleri sınıflandırabilme",
+          "alan": null,
+          "konu": "Varlıklar Âlemi"
+        },
+        {
+          "kod": "DKAB.7.1.2",
+          "metin": "Ahiret hayatının aşamalarını çözümleyebilme",
+          "alan": null,
+          "konu": "Dünya ve Ahiret Hayatı"
+        },
+        {
+          "kod": "DKAB.7.1.3",
+          "metin": "Melek ve ahiret inancının insana kazandırdıkları konusunda analitik düşünebilme",
+          "alan": null,
+          "konu": "Melek ve Ahiret İnancının İnsana Kazandırdıkları"
+        },
+        {
+          "kod": "DKAB.7.1.4",
+          "metin": "Nâs suresini ve bu surenin anlamını okuyarak yorumlayabilme",
+          "alan": null,
+          "konu": "Bir Sure Öğreniyorum: Nâs Suresi"
+        },
+        {
+          "kod": "DKAB.7.2.1",
+          "metin": "Hac ve umre ibadetlerini çözümleyebilme",
+          "alan": null,
+          "konu": "Hac ve Umre İbadeti"
+        },
+        {
+          "kod": "DKAB.7.2.2",
+          "metin": "Kurban ibadetini yapılandırabilme",
+          "alan": null,
+          "konu": "Kurban İbadeti"
+        },
+        {
+          "kod": "DKAB.7.2.3",
+          "metin": "Hac ve kurban ibadetinin kültürümüze yansımalarını müşahede edebilme",
+          "alan": null,
+          "konu": "Hac ve Kurban İbadetinin Kültürümüze Yansımaları"
+        },
+        {
+          "kod": "DKAB.7.2.4",
+          "metin": "Kâfirun suresini ve bu surenin anlamını okuyarak yorumlayabilme",
+          "alan": null,
+          "konu": "Bir Sure Öğreniyorum: Kâfirun Suresi"
+        },
+        {
+          "kod": "DKAB.7.3.1",
+          "metin": "Din anlayışındaki yorum farklılıklarının sebeplerini anlayabilme",
+          "alan": null,
+          "konu": "Din Anlayışındaki Yorum Farklılıkları"
+        }
+      ],
+      "sinavlar": {
+        "1": {
+          "tur": "senaryolu",
+          "senaryolar": {
+            "1": {
+              "DKAB.7.1.1": 1,
+              "DKAB.7.1.2": 2,
+              "DKAB.7.1.3": 3,
+              "DKAB.7.1.4": 1,
+              "DKAB.7.2.1": 1
+            },
+            "2": {
+              "DKAB.7.1.1": 1,
+              "DKAB.7.1.2": 2,
+              "DKAB.7.1.3": 2,
+              "DKAB.7.1.4": 1,
+              "DKAB.7.2.1": 1
+            },
+            "3": {
+              "DKAB.7.1.1": 1,
+              "DKAB.7.1.2": 2,
+              "DKAB.7.1.3": 2,
+              "DKAB.7.1.4": 1
+            },
+            "4": {
+              "DKAB.7.1.2": 2,
+              "DKAB.7.1.3": 3,
+              "DKAB.7.1.4": 1
+            },
+            "5": {
+              "DKAB.7.1.1": 1,
+              "DKAB.7.1.2": 2,
+              "DKAB.7.1.3": 3
+            }
+          }
+        },
+        "2": {
+          "tur": "senaryolu",
+          "senaryolar": {
+            "1": {
+              "DKAB.7.1.2": 1,
+              "DKAB.7.1.3": 1,
+              "DKAB.7.2.2": 1,
+              "DKAB.7.2.3": 2,
+              "DKAB.7.2.4": 1,
+              "DKAB.7.3.1": 1
+            },
+            "2": {
+              "DKAB.7.1.1": 1,
+              "DKAB.7.1.3": 1,
+              "DKAB.7.2.1": 1,
+              "DKAB.7.2.2": 2,
+              "DKAB.7.2.3": 1,
+              "DKAB.7.2.4": 1,
+              "DKAB.7.3.1": 1
+            },
+            "3": {
+              "DKAB.7.1.2": 1,
+              "DKAB.7.1.4": 1,
+              "DKAB.7.2.1": 2,
+              "DKAB.7.2.2": 2,
+              "DKAB.7.2.3": 1,
+              "DKAB.7.2.4": 1
+            },
+            "4": {
+              "DKAB.7.1.1": 1,
+              "DKAB.7.1.4": 1,
+              "DKAB.7.2.1": 2,
+              "DKAB.7.2.2": 1,
+              "DKAB.7.2.3": 2
+            },
+            "5": {
+              "DKAB.7.1.3": 2,
+              "DKAB.7.2.1": 1,
+              "DKAB.7.2.2": 1,
+              "DKAB.7.2.3": 2
+            }
+          }
+        }
+      }
+    },
+    "Fen Bilimleri": {
+      "adres": "https://meb.ai/ankmeb2",
+      "sha256": "ac1282782a45571172f1748641a5da501e8f44def0c384cc652998585190c806",
+      "ciktilar": [
+        {
+          "kod": "FB.7.1.1",
+          "metin": "Uzay araştırmaları için geliştirilen teknolojileri karşılaştırabilme",
+          "alan": null,
+          "konu": "Türkiye ve Uzay Araştırmaları"
+        },
+        {
+          "kod": "FB.7.1.2",
+          "metin": "Uzay gözlem araçları ile ilgili bilimsel model oluşturabilme",
+          "alan": null,
+          "konu": "Türkiye ve Uzay Araştırmaları"
+        },
+        {
+          "kod": "FB.7.1.3",
+          "metin": "Uzay araştırmalarının yol açabileceği problemleri çözebilme",
+          "alan": null,
+          "konu": "Türkiye ve Uzay Araştırmaları"
+        },
+        {
+          "kod": "FB.7.1.4",
+          "metin": "Yıldızların yaşamını açıklayarak yapılandırabilme",
+          "alan": null,
+          "konu": "Uzayda Neler Var?"
+        },
+        {
+          "kod": "FB.7.1.5",
+          "metin": "Yıldız, galaksi ve evren kavramlarını açıklayarak yapılandırabilme",
+          "alan": null,
+          "konu": "Uzayda Neler Var?"
+        },
+        {
+          "kod": "FB.7.2.1",
+          "metin": "Fiziksel anlamda yapılan işin bağlı olduğu faktörlere ilişkin bilimsel çıkarım yapabilme",
+          "alan": null,
+          "konu": "Kuvvet, İş ve Enerji İlişkisi"
+        },
+        {
+          "kod": "FB.7.2.2",
+          "metin": "Enerji çeşitlerinden kinetik ve potansiyel enerjiyi karşılaştırabilme",
+          "alan": null,
+          "konu": "Kuvvet, İş ve Enerji İlişkisi"
+        },
+        {
+          "kod": "FB.7.2.3",
+          "metin": "Enerji dönüşümünden hareketle enerjinin korunduğuna tümevarımsal akıl yürütebilme",
+          "alan": null,
+          "konu": "Enerji Dönüşümleri"
+        },
+        {
+          "kod": "FB.7.3.1",
+          "metin": "Sindirim sistemini oluşturan yapı ve organların görevlerini model üzerinde gözlemleyebilme",
+          "alan": null,
+          "konu": "Sindirim Sistemi"
+        },
+        {
+          "kod": "FB.7.3.2",
+          "metin": "Sindirim sisteminin sağlığı için yapılması gerekenler konusunda bilgi toplayabilme",
+          "alan": null,
+          "konu": "Sindirim Sistemi"
+        },
+        {
+          "kod": "FB.7.3.3",
+          "metin": "Dolaşım sistemini oluşturan yapı ve organların görevlerini model üzerinde bilimsel olarak gözlemleyebilme",
+          "alan": null,
+          "konu": "Dolaşım Sistemi"
+        },
+        {
+          "kod": "FB.7.3.4",
+          "metin": "Kan bağışının toplumsal dayanışma açısından önemini tartışabilme",
+          "alan": null,
+          "konu": "Dolaşım Sistemi"
+        },
+        {
+          "kod": "FB.7.3.5",
+          "metin": "Dolaşım sisteminin sağlığı için yapılması gerekenler konusunda bilgi toplayabilme",
+          "alan": null,
+          "konu": "Dolaşım Sistemi"
+        },
+        {
+          "kod": "FB.7.3.6",
+          "metin": "Solunum sistemini oluşturan yapı ve organların görevlerini model üzerinde bilimsel olarak gözlemleyebilme",
+          "alan": null,
+          "konu": "Solunum Sistemi"
+        }
+      ],
+      "sinavlar": {
+        "1": {
+          "tur": "senaryolu",
+          "senaryolar": {
+            "1": {
+              "FB.7.1.1": 2,
+              "FB.7.1.4": 1,
+              "FB.7.1.5": 1,
+              "FB.7.2.1": 3,
+              "FB.7.2.2": 2
+            },
+            "2": {
+              "FB.7.1.1": 2,
+              "FB.7.1.3": 1,
+              "FB.7.1.5": 1,
+              "FB.7.2.1": 3
+            },
+            "3": {
+              "FB.7.1.1": 2,
+              "FB.7.1.3": 1,
+              "FB.7.1.4": 1,
+              "FB.7.2.1": 2,
+              "FB.7.2.2": 2
+            },
+            "4": {
+              "FB.7.1.3": 1,
+              "FB.7.1.4": 1,
+              "FB.7.1.5": 1,
+              "FB.7.2.1": 2,
+              "FB.7.2.2": 1
+            },
+            "5": {
+              "FB.7.1.1": 2,
+              "FB.7.1.3": 1,
+              "FB.7.1.5": 1,
+              "FB.7.2.1": 3
+            }
+          }
+        },
+        "2": {
+          "tur": "senaryolu",
+          "senaryolar": {
+            "1": {
+              "FB.7.2.2": 1,
+              "FB.7.2.3": 2,
+              "FB.7.3.1": 2,
+              "FB.7.3.3": 1,
+              "FB.7.3.6": 1
+            },
+            "2": {
+              "FB.7.2.1": 1,
+              "FB.7.2.3": 2,
+              "FB.7.3.1": 2,
+              "FB.7.3.3": 2,
+              "FB.7.3.4": 1,
+              "FB.7.3.6": 1
+            },
+            "3": {
+              "FB.7.2.2": 1,
+              "FB.7.2.3": 2,
+              "FB.7.3.1": 1,
+              "FB.7.3.4": 1,
+              "FB.7.3.6": 2
+            },
+            "4": {
+              "FB.7.1.3": 1,
+              "FB.7.2.1": 1,
+              "FB.7.2.3": 2,
+              "FB.7.3.1": 2,
+              "FB.7.3.3": 2
+            },
+            "5": {
+              "FB.7.2.2": 1,
+              "FB.7.2.3": 1,
+              "FB.7.3.1": 2,
+              "FB.7.3.3": 2,
+              "FB.7.3.4": 1
+            }
+          }
+        }
+      }
+    },
+    "Matematik": {
+      "adres": "https://meb.ai/ankmeb3",
+      "sha256": "f54f40d908fcd145456e508e54f4f3b98d728b0367399205c4506d555e718534",
+      "ciktilar": [
+        {
+          "kod": "MAT.7.1.1",
+          "metin": "Gerçek yaşam ya da matematiksel durumlarda doğal sayı, tam sayı ve rasyonel sayıları yorumlayabilme",
+          "alan": null,
+          "konu": "Tam Sayılar Rasyonel Sayılar ve Farklı Temsilleri"
+        },
+        {
+          "kod": "MAT.7.1.2",
+          "metin": "Gerçek yaşam durumlarında rasyonel sayıların ondalık gösterimlerini yansıtabilmea) Bölme işlemini kullanarak her rasyonel sayının bir ondalık gösterimi olduğunu inceler..",
+          "alan": null,
+          "konu": "Rasyonel Sayılar ve Farklı Temsilleri"
+        },
+        {
+          "kod": "MAT.7.1.3",
+          "metin": "Rasyonel sayıların karşılaştırma ve sıralama ilişkilerini yorumlayabilme",
+          "alan": null,
+          "konu": "Rasyonel Sayılar ve Farklı Temsilleri"
+        },
+        {
+          "kod": "MAT.7.1.4",
+          "metin": "Rasyonel sayılar ve işlemler içeren gerçek yaşam problemlerini çözebilme",
+          "alan": null,
+          "konu": "Rasyonel Sayılarla İşlemler ve Problem Çözme"
+        },
+        {
+          "kod": "MAT.7.4.1",
+          "metin": "Eş küplerle oluşturulan yapılar ile görünümleri arasındaki ilişkiyi çözümleyebilme",
+          "alan": null,
+          "konu": "Cisimlerin Farklı Yönlerden Görünümleri"
+        },
+        {
+          "kod": "MAT.7.4.2",
+          "metin": "Dikdörtgenler prizmasının yüzey alanını yorumlayabilme",
+          "alan": null,
+          "konu": "Dikdörtgenler Prizmasının Hacmi ve Yüzey Alanı"
+        },
+        {
+          "kod": "MAT.7.4.3",
+          "metin": "Dikdörtgenler prizmasının hacmini eş nesneler aracılığıyla yorumlayabilme",
+          "alan": null,
+          "konu": "Dikdörtgenler Prizmasının Hacmi ve Yüzey Alanı"
+        },
+        {
+          "kod": "MAT.7.4.4",
+          "metin": "Dikdörtgenler prizmasının hacim bağıntısını değerlendirebilme",
+          "alan": null,
+          "konu": "Dikdörtgenler Prizmasının Hacmi ve Yüzey Alanı"
+        },
+        {
+          "kod": "MAT.7.4.5",
+          "metin": "Hacim ölçme birimleri arasındaki ilişkileri değerlendirebilme",
+          "alan": null,
+          "konu": "Hacim Ölçme Birimleri"
+        },
+        {
+          "kod": "MAT.7.4.6",
+          "metin": "Günlük hayat durumlarında dikdörtgenler prizmaları ile modellenen cisimlerin yüzey alanı ve hacmine yönelik problem çözebilme",
+          "alan": null,
+          "konu": "Dikdörtgenler Prizmasının Hacmi ve Yüzey Alanı"
+        },
+        {
+          "kod": "MAT.7.6.1",
+          "metin": "Kategorik veya nicel (sürekli) veri ile çalışabilme ve veriye dayalı karar verebilme",
+          "alan": null,
+          "konu": "Kategorik ve Nicel (Sürekli) Veri Dağılımları"
+        },
+        {
+          "kod": "MAT.7.6.2",
+          "metin": "Başkaları tarafından oluşturulan kategorik veya nicel (sürekli) veriye dayalı istatistiksel sonuç veya yorumları tartışabilme",
+          "alan": null,
+          "konu": "Kategorik ve Nicel (Sürekli) Veri Dağılımları"
+        }
+      ],
+      "sinavlar": {
+        "1": {
+          "tur": "senaryolu",
+          "senaryolar": {
+            "1": {
+              "MAT.7.1.1": 1,
+              "MAT.7.1.2": 2,
+              "MAT.7.1.3": 2,
+              "MAT.7.1.4": 2
+            },
+            "2": {
+              "MAT.7.1.1": 1,
+              "MAT.7.1.2": 1,
+              "MAT.7.1.3": 1,
+              "MAT.7.1.4": 2
+            },
+            "3": {
+              "MAT.7.1.1": 2,
+              "MAT.7.1.2": 2,
+              "MAT.7.1.3": 2,
+              "MAT.7.1.4": 1
+            },
+            "4": {
+              "MAT.7.1.1": 2,
+              "MAT.7.1.2": 2,
+              "MAT.7.1.3": 2
+            }
+          }
+        },
+        "2": {
+          "tur": "senaryolu",
+          "senaryolar": {
+            "1": {
+              "MAT.7.4.1": 1,
+              "MAT.7.4.2": 1,
+              "MAT.7.4.4": 1,
+              "MAT.7.4.5": 1,
+              "MAT.7.4.6": 2,
+              "MAT.7.6.1": 2,
+              "MAT.7.6.2": 1
+            },
+            "2": {
+              "MAT.7.1.4": 1,
+              "MAT.7.4.2": 2,
+              "MAT.7.4.4": 1,
+              "MAT.7.4.5": 1,
+              "MAT.7.4.6": 2,
+              "MAT.7.6.1": 2
+            },
+            "3": {
+              "MAT.7.4.2": 2,
+              "MAT.7.4.4": 1,
+              "MAT.7.4.5": 1,
+              "MAT.7.4.6": 1,
+              "MAT.7.6.1": 2
+            },
+            "4": {
+              "MAT.7.1.4": 1,
+              "MAT.7.4.1": 1,
+              "MAT.7.4.3": 1,
+              "MAT.7.4.5": 1,
+              "MAT.7.4.6": 2,
+              "MAT.7.6.1": 1
+            },
+            "5": {
+              "MAT.7.1.4": 2,
+              "MAT.7.4.3": 1,
+              "MAT.7.4.4": 1,
+              "MAT.7.4.5": 1,
+              "MAT.7.4.6": 2
+            }
+          }
+        }
+      }
+    },
+    "Türkçe": {
+      "adres": "https://meb.ai/ankmeb4",
+      "sha256": "add6c418da074c37ab3200c455e3e4d5b6dae0aa025e10d6b38fe77d23775973",
+      "ciktilar": [
+        {
+          "kod": "T.O.7.1",
+          "metin": "Okumada materyal seçimini yönetebilme",
+          "alan": "OKUMA",
+          "konu": null
+        },
+        {
+          "kod": "T.O.7.2",
+          "metin": "Okumada strateji ve yöntem seçimlerini yönetebilme",
+          "alan": "OKUMA",
+          "konu": null
+        },
+        {
+          "kod": "T.O.7.3",
+          "metin": "Okuyacağı metnin içeriğine yönelik tahminde bulunabilme",
+          "alan": "OKUMA",
+          "konu": null
+        },
+        {
+          "kod": "T.O.7.4",
+          "metin": "Metinde geçen anlamını bilmediği söz varlığı unsurlarının anlamını tahmin edebilme",
+          "alan": "OKUMA",
+          "konu": null
+        },
+        {
+          "kod": "T.O.7.5",
+          "metin": "Metnin yüzey anlamını belirleyebilme",
+          "alan": "OKUMA",
+          "konu": null
+        },
+        {
+          "kod": "T.O.7.7",
+          "metin": "Metnin derin anlamını belirlemeye yönelik basit çıkarımlar yapabilme",
+          "alan": "OKUMA",
+          "konu": null
+        },
+        {
+          "kod": "T.O.7.8",
+          "metin": "Metnin derin anlamını belirlemeye yönelik üst düzey çıkarımlar yapabilme",
+          "alan": "OKUMA",
+          "konu": null
+        },
+        {
+          "kod": "T.O.7.14",
+          "metin": "Bilgilendirici metinlerde metin yapılarından hareketle önemli bilgileri belirlemeye yönelik çözümleme yapabilme",
+          "alan": "OKUMA",
+          "konu": null
+        },
+        {
+          "kod": "T.O.7.15",
+          "metin": "Bilgilendirici metinde anahtar kelimeleri belirlemeye yönelik çözümleme yapabilme",
+          "alan": "OKUMA",
+          "konu": null
+        },
+        {
+          "kod": "T.O.7.21",
+          "metin": "Metinden hareketle söz varlığını geliştirmeye yönelik çözümleme yapabilme",
+          "alan": "OKUMA",
+          "konu": null
+        },
+        {
+          "kod": "T.O.7.28",
+          "metin": "Okuma sürecine yönelik öz yansıtma yapabilme/kendini uyarlayabilme",
+          "alan": "OKUMA",
+          "konu": null
+        },
+        {
+          "kod": "T.Y.7.1",
+          "metin": "Yazma sürecini yönetebilme",
+          "alan": "YAZMA",
+          "konu": null
+        },
+        {
+          "kod": "T.Y.7.2",
+          "metin": "Yazma strateji, yöntem ve tekniklerine yönelik seçimlerini yönetebilme",
+          "alan": "YAZMA",
+          "konu": null
+        },
+        {
+          "kod": "T.Y.7.3",
+          "metin": "Yazısında içerik ve yapıya yönelik seçimlerini yönetebilme",
+          "alan": "YAZMA",
+          "konu": null
+        },
+        {
+          "kod": "T.Y.7.18",
+          "metin": "Yazısını zenginleştirecek biçimde söz varlığını kullanabilme",
+          "alan": "YAZMA",
+          "konu": null
+        },
+        {
+          "kod": "T.Y.7.21",
+          "metin": "Yazım kuralları ve noktalama işaretlerini uygulayabilme",
+          "alan": "YAZMA",
+          "konu": null
+        },
+        {
+          "kod": "T.Y.7.22",
+          "metin": "Yazma sürecine yönelik öz yansıtma yapabilme/kendini uyarlayabilme",
+          "alan": "YAZMA",
+          "konu": null
+        }
+      ],
+      "sinavlar": {
+        "1": {
+          "tur": "senaryolu",
+          "senaryolar": {
+            "1": {
+              "T.O.7.4": 1,
+              "T.O.7.5": 1,
+              "T.O.7.8": 1,
+              "T.O.7.21": 1,
+              "T.Y.7.3": 1,
+              "T.Y.7.18": 1,
+              "T.Y.7.21": 1
+            },
+            "2": {
+              "T.O.7.5": 1,
+              "T.O.7.7": 1,
+              "T.O.7.14": 1,
+              "T.O.7.15": 1,
+              "T.Y.7.3": 1,
+              "T.Y.7.21": 1
+            },
+            "3": {
+              "T.O.7.4": 1,
+              "T.O.7.5": 2,
+              "T.O.7.7": 1,
+              "T.O.7.21": 1,
+              "T.Y.7.3": 1,
+              "T.Y.7.21": 1
+            },
+            "4": {
+              "T.O.7.4": 1,
+              "T.O.7.5": 2,
+              "T.O.7.7": 1,
+              "T.O.7.21": 1,
+              "T.Y.7.18": 1,
+              "T.Y.7.21": 1
+            },
+            "5": {
+              "T.O.7.4": 1,
+              "T.O.7.5": 2,
+              "T.O.7.21": 1,
+              "T.Y.7.3": 1,
+              "T.Y.7.21": 1
+            },
+            "6": {
+              "T.O.7.4": 1,
+              "T.O.7.5": 2,
+              "T.O.7.21": 1,
+              "T.Y.7.18": 1,
+              "T.Y.7.21": 1
+            }
+          }
+        },
+        "2": {
+          "tur": "ulke_geneli",
+          "not": "1. Dönem 2. Ortak Yazılı Sınav Ülke Geneli Ortak Yazılı Sınav şeklinde yapılacaktır. Konu Soru Dağılım Tablosu sınav öncesi kılavuz ile birlikte yayımlanacaktır."
+        }
+      }
+    },
+    "Sosyal Bilgiler": {
+      "adres": "https://meb.ai/ankmeb5",
+      "sha256": "8a3816dfd79e47d5e17cc12f12321e9a342fbe9a3404b68e466c564342488b54",
+      "ciktilar": [
+        {
+          "kod": "SB.7.1.1",
+          "metin": "Dâhil olduğu gruplarda ve sosyal hayatta etkili iletişimin önemini sorgulayabilme",
+          "alan": null,
+          "konu": "Gruplarda ve Sosyal Hayatta İletişimin Önemi"
+        },
+        {
+          "kod": "SB.7.1.2",
+          "metin": "Özel gereksinimli bireyler için fırsat eşitliğini sürdürmeye yönelik fikir üretebilme",
+          "alan": null,
+          "konu": "Özel Gereksinimli Bireyler İçin Fırsat Eşitliği"
+        },
+        {
+          "kod": "SB.7.1.3",
+          "metin": "Türk toplumunun millî meseleler karşısında gösterdiği tutum ve davranışlara ilişkin çıkarım yapabilme",
+          "alan": null,
+          "konu": "Millî Meseleler Karşısında Türk Toplumunun Tutum ve Davranışları"
+        },
+        {
+          "kod": "SB.7.2.1",
+          "metin": "Küreselleşmenin insan ve toplum hayatında meydana getirdiği değişimi yorumlayabilme",
+          "alan": null,
+          "konu": "Küreselleşmenin İnsan ve Toplum Hayatına Etkisi"
+        },
+        {
+          "kod": "SB.7.2.2",
+          "metin": "Bölgesel ve küresel sorunların çözümünde ülkemizin rolünü özetleyebilme",
+          "alan": null,
+          "konu": "Bölgesel ve Küresel Sorunların Çözümünde Ülkemizin Rolü"
+        },
+        {
+          "kod": "SB.7.3.1",
+          "metin": "Osmanlı Devleti’nin cihan devleti hâline gelmesini sağlayan politikaları sorgulayabilme",
+          "alan": null,
+          "konu": "Osmanlı Devleti’nin Cihan Devleti Hâline Gelmesini Sağlayan Politikalar"
+        },
+        {
+          "kod": "SB.7.3.2",
+          "metin": "Değişen dünya dengeleri karşısında Osmanlı Devleti’nin uyguladığı yenilikleri neden ve sonuçlarıyla yorumlayabilme",
+          "alan": null,
+          "konu": "Osmanlı Devleti’nin Uygulamaya Koyduğu Yenilikler"
+        }
+      ],
+      "sinavlar": {
+        "1": {
+          "tur": "senaryolu",
+          "senaryolar": {
+            "1": {
+              "SB.7.1.1": 2,
+              "SB.7.1.2": 1,
+              "SB.7.1.3": 2,
+              "SB.7.2.1": 2
+            },
+            "2": {
+              "SB.7.1.1": 2,
+              "SB.7.1.2": 2,
+              "SB.7.1.3": 2,
+              "SB.7.2.1": 1
+            },
+            "3": {
+              "SB.7.1.1": 2,
+              "SB.7.1.2": 1,
+              "SB.7.1.3": 3,
+              "SB.7.2.1": 2
+            },
+            "4": {
+              "SB.7.1.1": 2,
+              "SB.7.1.2": 2,
+              "SB.7.1.3": 3
+            },
+            "5": {
+              "SB.7.1.1": 1,
+              "SB.7.1.2": 2,
+              "SB.7.1.3": 2,
+              "SB.7.2.1": 1
+            }
+          }
+        },
+        "2": {
+          "tur": "senaryolu",
+          "senaryolar": {
+            "1": {
+              "SB.7.2.1": 1,
+              "SB.7.2.2": 2,
+              "SB.7.3.1": 2,
+              "SB.7.3.2": 1
+            },
+            "2": {
+              "SB.7.1.3": 1,
+              "SB.7.2.2": 2,
+              "SB.7.3.1": 2,
+              "SB.7.3.2": 2
+            },
+            "3": {
+              "SB.7.1.2": 1,
+              "SB.7.1.3": 1,
+              "SB.7.2.2": 2,
+              "SB.7.3.1": 2,
+              "SB.7.3.2": 2
+            },
+            "4": {
+              "SB.7.1.3": 1,
+              "SB.7.2.1": 1,
+              "SB.7.2.2": 2,
+              "SB.7.3.1": 2
+            },
+            "5": {
+              "SB.7.1.2": 1,
+              "SB.7.2.1": 1,
+              "SB.7.2.2": 2,
+              "SB.7.3.1": 2
+            },
+            "6": {
+              "SB.7.1.3": 1,
+              "SB.7.2.1": 1,
+              "SB.7.2.2": 2,
+              "SB.7.3.1": 2,
+              "SB.7.3.2": 2
+            },
+            "7": {
+              "SB.7.1.1": 1,
+              "SB.7.2.1": 1,
+              "SB.7.2.2": 2,
+              "SB.7.3.1": 2,
+              "SB.7.3.2": 2
+            }
+          }
+        }
+      }
+    },
+    "İngilizce": {
+      "adres": "https://meb.ai/ankmeb6",
+      "sha256": "6308a5e168603d3894584ef9bd008a9d79a80fc78a73343cb56645f631fd9df0",
+      "ciktilar": [
+        {
+          "kod": "E7.1.R1",
+          "metin": "Students will be able to understand a simple text about appearances, ersonalities, and comparisons including explanations and reasons.",
+          "alan": null,
+          "konu": null
+        },
+        {
+          "kod": "E7.1.W1",
+          "metin": "Students will be able to write simple pieces to compare people.",
+          "alan": null,
+          "konu": null
+        },
+        {
+          "kod": "E7.2.R1",
+          "metin": "Students will be able to understand short and simple texts on sports.",
+          "alan": null,
+          "konu": null
+        },
+        {
+          "kod": "E7.2.W1",
+          "metin": "Students will be able to write pieces about routines/daily activities by using frequency adverbs.",
+          "alan": null,
+          "konu": null
+        },
+        {
+          "kod": "E7.3.R1",
+          "metin": "Students will be able to spot specific information about names and dates in past events in written texts.",
+          "alan": null,
+          "konu": null
+        },
+        {
+          "kod": "E7.3.W1",
+          "metin": "Students will be able to write a short and simple report about past events.",
+          "alan": null,
+          "konu": null
+        },
+        {
+          "kod": "E7.4.R1",
+          "metin": "Students will be able to understand past and present events in simple texts including explanations and reasons.",
+          "alan": null,
+          "konu": null
+        },
+        {
+          "kod": "E7.4.R2",
+          "metin": "Students will be able to spot the names of wild animals in simple texts.",
+          "alan": null,
+          "konu": null
+        },
+        {
+          "kod": "E7.4.W1",
+          "metin": "Students will be able to write pieces describing wildlife.",
+          "alan": null,
+          "konu": null
+        },
+        {
+          "kod": "E7.5.R1",
+          "metin": "Students will be able to understand simple texts about daily routines and preferences.",
+          "alan": null,
+          "konu": null
+        },
+        {
+          "kod": "E7.5.R2",
+          "metin": "Students will be able to understand simple texts about past events.",
+          "alan": null,
+          "konu": null
+        },
+        {
+          "kod": "E7.5.W1",
+          "metin": "Students will be able to write pieces about daily routines and preferences.",
+          "alan": null,
+          "konu": null
+        }
+      ],
+      "sinavlar": {
+        "1": {
+          "tur": "senaryolu",
+          "senaryolar": {
+            "1": {
+              "E7.1.R1": 1,
+              "E7.1.W1": 1,
+              "E7.2.R1": 1,
+              "E7.2.W1": 1
+            },
+            "2": {
+              "E7.1.R1": 2,
+              "E7.1.W1": 1,
+              "E7.2.R1": 2
+            },
+            "3": {
+              "E7.1.R1": 2,
+              "E7.1.W1": 1,
+              "E7.2.R1": 2,
+              "E7.2.W1": 1
+            },
+            "4": {
+              "E7.1.R1": 2,
+              "E7.1.W1": 2,
+              "E7.2.R1": 2,
+              "E7.2.W1": 1
+            },
+            "5": {
+              "E7.1.R1": 2,
+              "E7.1.W1": 2,
+              "E7.2.R1": 3,
+              "E7.2.W1": 1
+            }
+          }
+        },
+        "2": {
+          "tur": "senaryolu",
+          "senaryolar": {
+            "1": {
+              "E7.2.R1": 1,
+              "E7.3.R1": 1,
+              "E7.3.W1": 1,
+              "E7.4.R1": 1,
+              "E7.4.W1": 1
+            },
+            "2": {
+              "E7.1.R1": 1,
+              "E7.2.W1": 1,
+              "E7.3.R1": 1,
+              "E7.3.W1": 1,
+              "E7.4.R2": 1
+            },
+            "3": {
+              "E7.1.W1": 1,
+              "E7.2.R1": 1,
+              "E7.3.R1": 1,
+              "E7.3.W1": 1,
+              "E7.4.R1": 1,
+              "E7.4.W1": 1
+            },
+            "4": {
+              "E7.1.R1": 1,
+              "E7.3.R1": 1,
+              "E7.3.W1": 1,
+              "E7.4.R1": 1,
+              "E7.4.R2": 1,
+              "E7.4.W1": 1,
+              "E7.5.R1": 1
+            },
+            "5": {
+              "E7.1.R1": 1,
+              "E7.2.W1": 1,
+              "E7.3.R1": 1,
+              "E7.3.W1": 1,
+              "E7.4.R1": 1,
+              "E7.4.R2": 1,
+              "E7.4.W1": 1,
+              "E7.5.R2": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}
