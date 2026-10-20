@@ -1,10 +1,13 @@
-import type { MouseEvent, ReactNode } from 'react'
-import { ContainedList, ContainedListItem, Link as CarbonLink, Tag } from '@carbon/react'
+import { useId, useState, type MouseEvent, type ReactNode } from 'react'
+import { Button, ContainedList, ContainedListItem, Link as CarbonLink, Tag } from '@carbon/react'
+import { CheckmarkFilled, WarningAltFilled } from '@carbon/icons-react'
 import { useNavigate } from 'react-router-dom'
+import { asistanaSor } from '../asistan/sayfaBaglami'
 import type { ExamItem } from '../types'
 import { kisaGun, kisaTeslim } from '../utils/formatters'
 import { uygulamaIcindeAc } from '../utils/gezinme'
 import { konuAnahtarlari, konuOzeti, sinavAni, sinavEtiketi, zamanMetni } from '../utils/sinav'
+import { senaryoGorunumu } from '../utils/sinavSenaryosu'
 import SubjectLabel from './SubjectLabel'
 import { Rakamli } from './patterns/Rakamli'
 import './SinavKarti.scss'
@@ -64,11 +67,57 @@ export function SinavEtiketi({ exam, nowMs }: { exam: ExamItem; nowMs: number })
   return etiket ? <Tag type="gray" size="sm" className="sinav-etiketi">{etiket}</Tag> : null
 }
 
+/** MEB konu-soru dağılımı (spec 2026-10-19 §5): senaryo doğrulaması ya da tahmini; durum ikon + metin. */
+function MebSenaryoBolumu({ exam }: { exam: ExamItem }) {
+  const [acik, setAcik] = useState(false)
+  const listeId = useId()
+  const gezin = useNavigate()
+  if (!exam.senaryo) return null
+  const g = senaryoGorunumu(exam.senaryo)
+  const sor = () => {
+    const karsilandi = asistanaSor({ tur: 'sinav', id: exam.id, etiket: `${exam.course} — ${exam.title}` })
+    if (!karsilandi) gezin('/asistan?sayfa=sinavlar')
+  }
+  return (
+    <div className="exam-card__section meb-senaryo">
+      <div className="exam-card__section-title">MEB konu-soru dağılımı</div>
+      {g.cumleler.map((c, i) => (
+        <p key={i} className="meb-senaryo__cumle">
+          {i === 0 && g.ikon === 'onay' && <CheckmarkFilled size={16} aria-label="Doğrulandı" className="meb-senaryo__ikon" />}
+          {i === 0 && g.ikon === 'uyari' && <WarningAltFilled size={16} aria-label="Uyarı" className="meb-senaryo__ikon" />}
+          {c}
+        </p>
+      ))}
+      {g.dugme && (
+        <>
+          <Button kind="ghost" size="sm" aria-expanded={acik} aria-controls={listeId} onClick={() => setAcik(!acik)}>
+            {acik ? 'Çıktıları gizle' : g.dugme}
+          </Button>
+          {acik && (
+            <ul id={listeId} className="meb-senaryo__liste">
+              {g.satirlar.map(s => (
+                <li key={s.metin}>
+                  <span>{s.metin}</span>
+                  {s.duyuruda && <Tag type="gray" size="sm" className="meb-senaryo__etiket">duyuruda</Tag>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+      <p className="meb-senaryo__alt">
+        <CarbonLink href={exam.senaryo.kaynak} target="_blank" rel="noreferrer" size="sm">MEB tablosu ({g.kaynak})</CarbonLink>
+      </p>
+      <Button kind="ghost" size="sm" onClick={sor}>Örnek sınav için asistana sor</Button>
+    </div>
+  )
+}
+
 /** Sınavlar: kaynaktaki konular ve kaynaklar, kısa alıntıyla (spec §8). */
 export function SinavAyrintisi({ exam }: { exam: ExamItem }) {
   const konular = exam.konular ?? []
   const kaynaklar = exam.kaynaklar ?? []
-  if (konular.length === 0 && kaynaklar.length === 0 && !exam.tarihBelirsiz) return null
+  if (konular.length === 0 && kaynaklar.length === 0 && !exam.tarihBelirsiz && !exam.senaryo) return null
   return (
     <div className="sinav-ayrinti">
       {exam.tarihBelirsiz && <p className="sinav-ayrinti__not">Tarih belirsiz: duyuruda gün yazmıyor.</p>}
@@ -80,6 +129,7 @@ export function SinavAyrintisi({ exam }: { exam: ExamItem }) {
           </ul>
         </div>
       )}
+      <MebSenaryoBolumu exam={exam} />
       {kaynaklar.length > 0 && (
         <div className="exam-card__section">
           <div className="exam-card__section-title">Kaynaklar</div>

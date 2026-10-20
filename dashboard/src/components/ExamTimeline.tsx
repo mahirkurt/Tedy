@@ -68,7 +68,7 @@ function ExamCard({ exam, showCountdown, focusMode, baslangicAcik, nowMs }: {
 
   const hasDetails = !focusMode && (
     exam.relatedHomework.length > 0 || (exam.konular?.length ?? 0) > 0
-    || (exam.kaynaklar?.length ?? 0) > 0 || !!exam.tarihBelirsiz
+    || (exam.kaynaklar?.length ?? 0) > 0 || !!exam.tarihBelirsiz || !!exam.senaryo
   )
 
   const cardClass = [
