@@ -164,12 +164,17 @@ olayları ve özel dersler blok değildir, plandan önce yer kaplar.
 - "Şimdi değil": blok bir kez sona/öne gider; ikinci kez basılamaz (düğme yerine "Bu bloğu bir kez erteledin").
 - Sığmayan iş yarına taşınır: yarınki planın başına girer, Bugün'de "Yarına kaldı: …" diye tek satır görünür.
   Teslimi yarın olan iş sığmıyorsa taşınmaz; plan "Bu akşama sığmıyor" der ve ebeveyne tek bildirim gider.
+  *(Not, 2026-10-20, son inceleme: "yarınki planın başına girer" ayrı bir devir listesiyle yapılmaz — öyle bir liste
+  yoktur. Taşınan iş ertesi gün teslimi yaklaştığı için daha yüksek puan alır (§6.3) ve planın başına kendiliğinden
+  çıkar. Karar değişmedi; nasıl gerçekleştiği yazıldı.)*
 
 ### 6.5 Veri (benim kararım)
 - `output/aksam_plani.json`: gün → `{bloklar[], olusturma, son_yeniden_dizme}`; flock ile.
 - `output/calisma_kayitlari.jsonl`: her blok için `{gun, odev_anahtari, tahmin_dk, basla, bitti, durum}`;
   eklemeli, flock. Öğrenme: ders başına son 10 kaydın gerçek/tahmin oranının medyanı, [0,5; 2,0] aralığına
-  kıstırılır.
+  kıstırılır. *(Not, 2026-10-20, son inceleme: "tahmin" burada kalibrasyonsuz istenen süredir, ham tahmin × %25
+  tampon. Oran gerçek / (ham × tampon): tam istenen sürede biten iş çarpanı yerinde tutar; gerçek/ham çarpanı her
+  akşam dörtte bir büyütüyordu.)*
 - Dokunuşlar yeni uçlardan gelir: `POST /api/plan/blok/<id>/basla|bitti|simdi-degil`, `PUT /api/plan/odev/<key>/sure`.
   Hepsi oturum + tam rol; okuyucu reddedilir (default-deny). Aile planı görür ve değiştirebilir; asistan ve
   bildirim metni hitabı `okur_turu`'na uyar ("sen" / "siz").
@@ -222,6 +227,11 @@ deseni; bayrak `TEDY_AKSAM_PLANI=1` kapalıyken hiçbir şey göndermez. Sessiz 
 ## 8. Ölçüm ve geri dönüş
 - `health.json`'a `aksam_plani` özeti (bugünün blok sayısı, model/yedek, son tur hatası).
 - Bayrak kapatılınca bildirimler durur; plan kartı Bugün'den kalkar ve eski NextThing akışı döner.
+  *(Not, 2026-10-20, son inceleme: bayraklar yalnız plan kartını, `/api/plan/*` uçlarını, iki asistan aracını ve
+  bildirimleri açıp kapatır. Akşam düzeni (§5.1) ve ona bağlı Gün Şeridi, kartın sesi, Profil'deki "Akşam Düzeni"
+  kartı, `/api/odak-penceresi` varsayılanları, `health.json`'daki iki anahtar, asistan istemindeki bir satır ve
+  "Çalışma planı" düğmesinin motoru okuması birleştirmeyle bayraktan bağımsız gelir; bunlar ancak birleştirmenin
+  geri alınmasıyla döner.)*
 
 ## 9. Açık sorular — onayda varsayılanla kapandı
 
