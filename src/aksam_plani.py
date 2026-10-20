@@ -197,18 +197,21 @@ def sabit_araliklar(bloklar: list[Blok]) -> list[tuple[int, int]]:
 
 
 def baslamadi_esigi(duzen: dict, sabitler: list[tuple[int, int]]) -> int | None:
-    """"Başlamadı" eşiği: ödeve hazır saatinden sonraki, yemeğin ya da bir sabit bloğun (takvim olayı,
-    özel ders) kaplamadığı ilk dakika + `baslamadi_esik_dk`. Kartın "…'e kadar başlamazsan ailene
-    haber gider." cümlesi ve bildirim turunun "başlamadı" olayı bu tek yerden okur; saat şimdiye göre
-    kaymaz (17:00–18:00 özel ders varsa eşik ikisi için de 18:15). Hazırlığa kadar boş dakika yoksa
-    None: o akşam "başlamadı" haberi yoktur."""
+    """"Başlamadı" eşiği: ödeve hazır saatinden sonra, yemeğin ya da bir sabit bloğun (takvim olayı,
+    özel ders) kaplamadığı ve en az `baslamadi_esik_dk` süren ilk boş aralığın başı + `baslamadi_esik_dk`.
+    Kartın "…'e kadar başlamazsan ailene haber gider." cümlesi ve bildirim turunun "başlamadı" olayı bu
+    tek yerden okur; saat şimdiye göre kaymaz (17:00–18:00 özel ders varsa eşik ikisi için de 18:15).
+    Aralık eşik kadar uzun olmalı: 17:10'da başlayan yemekten önce 10 dakika vardır, başlamak için yetmez;
+    eşik yemekten sonraya düşer ve haber Işık yemekteyken gitmez. Eşik hazırlığa ulaşırsa None: o akşam
+    "başlamadı" haberi yoktur (hazırlıktan sonra tur zaten susar)."""
     hazir = dakika(duzen["odeve_hazir"])
     yemek = dakika(duzen["yemek"])
+    esik = int(duzen["baslamadi_esik_dk"])
     tum = [(yemek, yemek + int(duzen["yemek_dk"]))] + [(int(b), int(e)) for b, e in sabitler]
-    ilk = _bos_baslangic(hazir, 1, tum)
-    if ilk >= dakika(duzen["hazirlik"]):
+    ilk = _bos_baslangic(hazir, max(1, esik), tum)
+    if ilk + esik >= dakika(duzen["hazirlik"]):
         return None
-    return ilk + int(duzen["baslamadi_esik_dk"])
+    return ilk + esik
 
 
 # ----------------------------------------------------------------------------- motor
@@ -329,44 +332,71 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
     # Öne alınan (aile/asistan) en başa; sonra zor dilime puan sırasıyla zor/orta işler, kolaylar onlardan
     # sonra (§6.3): kolay iş zor işin sonundan sonraki hafif dilime, ondan önceki boşluğa ancak hiçbir
     # zor/orta parça sığmadığında girer — puanı yüksek bir kolay iş zor bir işi yarına itmez. Bir ödevin
-    # bütün parçaları aynı zorluktadır; kararlı bölme parça sırasını korur.
-    on = ([p for p in on if p.anahtar in one_al]
-          + [p for p in on if p.anahtar not in one_al and p.zorluk != "kolay"]
-          + [p for p in on if p.anahtar not in one_al and p.zorluk == "kolay"])
+    # bütün parçaları aynı zorluktadır; kararlı bölme parça sırasını korur. Bu sıra yarın teslim (ya da
+    # geçmiş) bir işi akşamın dışında bırakırsa — taşınamaz, "sığmıyor" olur — taşınamayan işler öne alınarak
+    # yeniden dizilir ve daha az taşınamaz iş bırakan dizilim seçilir (§6.4: taşınan iş, teslimi uzak olandır).
+    def _tasinamaz(p: _Parca) -> bool:
+        return p.teslim_gunu is not None and (p.teslim_gunu - gun).days <= 1
+
+    def _zor_once(ps: list[_Parca]) -> list[_Parca]:
+        return [p for p in ps if p.zorluk != "kolay"] + [p for p in ps if p.zorluk == "kolay"]
+
+    onde = [p for p in on if p.anahtar in one_al]
+    geri = [p for p in on if p.anahtar not in one_al]
+    sira_zor = onde + _zor_once(geri)
+    sira_teslim = (onde + _zor_once([p for p in geri if _tasinamaz(p)])
+                   + _zor_once([p for p in geri if not _tasinamaz(p)]))
     sona = [p for p in bekleyen if p.anahtar in ilk_ertelenen and p.parca >= ilk_ertelenen[p.anahtar]]
 
     # ---- yerleştirme
     zor_sonu, hafif_sonu = dakika(duzen["zor_is_sonu"]), dakika(duzen["hafif_is_sonu"])
     son_bitis = hazirlik - HAZIRLIK_ONCESI_BOS
-    kuyruk_disi: list[_Parca] = []
-    dusen: set[str] = set()
-    kuyruk_sonu_kullanildi = any(b.tur == "calisma" and b.bas >= hafif_sonu for b in bloklar)
-    for p in on + sona:
-        if p.anahtar in dusen:
-            kuyruk_disi.append(p)
-            continue
-        ilk = imlec + mola_oncesi
-        bas = _bos_baslangic(ilk, p.dk, sabit)
-        sinir = zor_sonu if p.zorluk != "kolay" else hafif_sonu
-        if bas + p.dk > sinir:
-            bas = None
-            if p.dk <= KUCUK_IS_DK and not kuyruk_sonu_kullanildi:
-                aday = _bos_baslangic(max(ilk, hafif_sonu), p.dk, sabit)
-                if aday + p.dk <= son_bitis:
-                    bas = aday
-                    kuyruk_sonu_kullanildi = True
-        if bas is None:
-            dusen.add(p.anahtar)
-            kuyruk_disi.append(p)
-            continue
-        if mola_oncesi and bas == ilk and not any(b < ilk and e > imlec for b, e in sabit):
-            # sabit blok (yemek, olay) araya girmediyse mola görünür; girdiyse o blok molanın yerini tutar
-            bloklar.append(Blok(_kimlik(gun_s, "mola", p.id), "mola", imlec, ilk, baslik="Mola"))
-        durum = "ertelendi" if p.id in ertelenen else "bekliyor"
-        bloklar.append(_blok_calisma(p, bas, bas + p.dk, durum))
-        calisma_sayisi += 1
-        imlec = bas + p.dk
-        mola_oncesi = MOLA_UZUN if calisma_sayisi % 2 == 0 else MOLA_KISA
+    kuyruk_basta_dolu = any(b.tur == "calisma" and b.bas >= hafif_sonu for b in bloklar)
+
+    def yerlestir(sira: list[_Parca]) -> tuple[list[Blok], list[_Parca]]:
+        """Bir sırayı imleçten dizer; başlangıç durumunu değiştirmez, aynı sırayla aynı sonucu verir."""
+        eklenen: list[Blok] = []
+        disari: list[_Parca] = []
+        dusen: set[str] = set()
+        sayi, im, mola = calisma_sayisi, imlec, mola_oncesi
+        kuyruk_sonu_kullanildi = kuyruk_basta_dolu
+        for p in sira:
+            if p.anahtar in dusen:
+                disari.append(p)
+                continue
+            ilk = im + mola
+            bas = _bos_baslangic(ilk, p.dk, sabit)
+            sinir = zor_sonu if p.zorluk != "kolay" else hafif_sonu
+            if bas + p.dk > sinir:
+                bas = None
+                if p.dk <= KUCUK_IS_DK and not kuyruk_sonu_kullanildi:
+                    aday = _bos_baslangic(max(ilk, hafif_sonu), p.dk, sabit)
+                    if aday + p.dk <= son_bitis:
+                        bas = aday
+                        kuyruk_sonu_kullanildi = True
+            if bas is None:
+                dusen.add(p.anahtar)
+                disari.append(p)
+                continue
+            if mola and bas == ilk and not any(b < ilk and e > im for b, e in sabit):
+                # sabit blok (yemek, olay) araya girmediyse mola görünür; girdiyse o blok molanın yerini tutar
+                eklenen.append(Blok(_kimlik(gun_s, "mola", p.id), "mola", im, ilk, baslik="Mola"))
+            durum = "ertelendi" if p.id in ertelenen else "bekliyor"
+            eklenen.append(_blok_calisma(p, bas, bas + p.dk, durum))
+            sayi += 1
+            im = bas + p.dk
+            mola = MOLA_UZUN if sayi % 2 == 0 else MOLA_KISA
+        return eklenen, disari
+
+    def _disarida_kalan_tasinamaz(disari: list[_Parca]) -> int:
+        return sum(p.dk for p in disari if _tasinamaz(p))
+
+    eklenen, kuyruk_disi = yerlestir(sira_zor + sona)
+    if sira_teslim != sira_zor and _disarida_kalan_tasinamaz(kuyruk_disi):
+        eklenen2, kuyruk_disi2 = yerlestir(sira_teslim + sona)
+        if _disarida_kalan_tasinamaz(kuyruk_disi2) < _disarida_kalan_tasinamaz(kuyruk_disi):
+            eklenen, kuyruk_disi = eklenen2, kuyruk_disi2
+    bloklar.extend(eklenen)
 
     # ---- sığmayanlar: teslimi yarından sonraysa taşınır, değilse sığmaz
     yarin = 1

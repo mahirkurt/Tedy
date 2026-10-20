@@ -450,3 +450,24 @@ def test_hazirliktan_sonra_suren_ve_biten_bloklar_planda_kalir():
     assert [(b.id, b.durum) for b in p.bloklar] == [(b0.id, "bitti"), (b1.id, "suruyor")]
     assert p.tasinan == [] and p.sigmayan == []
     assert kur(simdi="2026-10-19 20:35").bloklar == []               # dokunuş yoksa eskisi gibi boş
+
+
+ALTI_GUN = "25.10.2026 23:59"
+
+
+def test_zor_once_sirasi_yarin_teslim_isi_sigmayana_itmez():
+    """Son inceleme (R28 sonrası): zor-önce sırası yarın teslim kolay işi (40 dk → 50 dk) 6 gün sonraki zor
+    işin (60 dk → 75 dk) arkasına atıyor, kolay iş akşama sığmıyor ve aileye "sığmıyor" gidiyordu — oysa
+    akşamda yer vardı. Taşınamaz iş dışarıda kalınca taşınamazlar önde yeniden dizilir: kolay iş akşama
+    tam sığar, taşınan zor işin kalanıdır."""
+    TAHMINLER["z6"] = OdevTahmini(60, "zor", "Başla", [], "model")
+    TAHMINLER["k1"] = OdevTahmini(40, "kolay", "Listeyi oku", [], "model")
+    try:
+        satirlar = [satir("z6", "Matematik", "Proje", ALTI_GUN), satir("k1", "İngilizce", "Okuma", YARIN)]
+        p = kur(simdi="2026-10-19 16:30", satirlar=satirlar)
+        assert p.sigmayan == []
+        k = [b for b in calisma(p) if b.odev_anahtari == "k1"]
+        assert sum(b.bit - b.bas for b in k) == 50 and k[0].bas == 17 * 60
+        assert [t["odev_anahtari"] for t in p.tasinan] == ["z6"]
+    finally:
+        del TAHMINLER["z6"], TAHMINLER["k1"]

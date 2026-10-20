@@ -68,6 +68,9 @@ def test_baslamadi_esigi_ilk_bos_dakikadan():
     assert baslamadi_esigi(d, [(dk("16:00"), dk("17:10"))]) == dk("17:25")         # hazırdan önce başlayan olay
     assert baslamadi_esigi(d, [(dk("17:30"), dk("18:00"))]) == dk("17:15")         # sonraki olay eşiği itmez
     assert baslamadi_esigi(d, [(dk("16:00"), dk("21:00"))]) is None                # akşamda boş dakika yok
+    # Son inceleme: boş aralık eşik kadar uzun olmalı; 10 dakikada başlanmaz, haber yemekte/derste gitmez
+    assert baslamadi_esigi({**d, "yemek": "17:10"}, []) == dk("17:55")             # yemek 17:10–17:40
+    assert baslamadi_esigi(d, [(dk("17:10"), dk("18:00"))]) == dk("18:15")         # olay 17:10–18:00
     assert baslamadi_esigi({**d, "baslamadi_esik_dk": 30}, []) == dk("17:30")
 
 
