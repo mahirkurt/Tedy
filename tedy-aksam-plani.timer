@@ -1,0 +1,9 @@
+[Unit]
+Description=TEDY akşam çalışma planı bildirimleri — her dakika
+
+[Timer]
+OnCalendar=*:*:00
+Persistent=false
+
+[Install]
+WantedBy=timers.target

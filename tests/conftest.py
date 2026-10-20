@@ -125,3 +125,14 @@ def _canli_sinavlar_dosyasi_yok(monkeypatch):
     api = sys.modules.get("src.dashboard_api")
     if api is not None:
         monkeypatch.setattr(api, "_sinavlar_belgesi", lambda: None)
+
+
+@pytest.fixture(autouse=True)
+def _canli_push_gondericisi_yok(monkeypatch):
+    """The evening-plan round (2026-10-19, Görev 9) sends web pushes to the family's phones. No
+    test may reach a push service: the real sender fails loudly; tests pass their own fake."""
+    import src.web_push as wp
+
+    def _yasak(*a, **k):
+        raise AssertionError("testte gerçek web push gönderimi yok")
+    monkeypatch.setattr(wp, "gonder", _yasak)

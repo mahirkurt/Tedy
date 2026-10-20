@@ -266,6 +266,16 @@ def _sinav_uyari_durumu():
     return veri if isinstance(veri, dict) else {}
 
 
+def _aksam_bildirim_durumu():
+    """The evening-plan notification round's last status (src/aksam_bildirim.py writes it)."""
+    try:
+        with open(os.path.join(OUTPUT_DIR, "aksam_bildirim_durumu.json"), encoding="utf-8") as f:
+            veri = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return veri if isinstance(veri, dict) else {}
+
+
 # Sections whose empty value is a list rather than a dict.
 _LISTE_BOLUMLER = ("takvim", "ders_programi")
 
@@ -690,6 +700,7 @@ def main(zamanla=False):
         "sinav_tespiti": sinav_ozeti,
         "aksam_plani": aksam_plani_ozeti,
         "sinav_uyari": _sinav_uyari_durumu(),
+        "aksam_bildirim": _aksam_bildirim_durumu(),
         "academic_year": year_info["year"],
         "year_detection": year_info["status"],
         "year_archived": year_info["archived"],
