@@ -28,7 +28,7 @@ from xml.etree import ElementTree
 from xml.parsers import expat as _expat
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -2536,9 +2536,9 @@ class AssistantRuntime:
         "- Okur bir ödev kâğıdının ya da tahtanın fotoğrafını yükleyip ödev eklemek ister gibiyse "
         "`odev_fotograftan` aracını o ekin kimliğiyle çağır; ödevi sen kaydetmezsin, okur kartta "
         "onaylar. Teslim tarihi okunamadıysa bunu sor; tarih uydurma.\n"
-        "- Bu akşamın çalışma planı (şimdi ne var, sırada ne var, saatler) → `aksam_plani`; "
-        "süreler tahmindir, öyle söyle. Okur planda bir şeyin değişmesini açıkça isterse "
-        "(sona al, öne al, süreyi düzelt, yarına at) → `plani_degistir`; reddederse nedenini "
+        "- Araç listende `aksam_plani` varsa bu akşamın çalışma planı (şimdi ne var, sırada ne var, "
+        "saatler) için onu kullan; süreler tahmindir, öyle söyle. Okur planda bir şeyin değişmesini açıkça "
+        "isterse (sona al, öne al, süreyi düzelt, yarına at) ve listende `plani_degistir` varsa onu kullan; reddederse nedenini "
         "olduğu gibi aktar, başka yoldan değiştirmeye çalışma.\n"
         "- Işık'a özel diğer sorular (duyuru, eski ödev, portalın ek sayfaları) ve bir "
         "ödevin ayrıntısı → `ogrenci_verisi_ara`.\n"
@@ -3335,20 +3335,23 @@ class AssistantRuntime:
             odev_anahtari=odev_anahtari,
         )
         out["intent"] = "study_plan"
-        out["plan_blocks"] = self._motor_plan_bloklari()
+        out["plan_blocks"], out["plan_durumu"] = self._motor_plan_bloklari(okur)
         return out
 
-    def _motor_plan_bloklari(self) -> list[dict[str, Any]]:
-        """Eski plan kartı için bu akşamın planı: bloklar akşam planı motorundan (bugunku_plan) gelir,
-        kural tabanlı ikinci bir plan yoktur. Bayrak kapalıysa ya da kaynak yoksa boş."""
-        if os.environ.get("TEDY_AKSAM_PLANI") != "1" or self.plan_kaynagi is None:
-            return []
+    def _motor_plan_bloklari(self, okur: str = "bilinmiyor") -> tuple[list[dict[str, Any]], str]:
+        """"Çalışma planı" düğmesi için bu akşamın planı: bloklar akşam planı motorundan (bugunku_plan) gelir,
+        kural tabanlı ikinci bir plan yoktur. Bayrak yalnız kartı, /api/plan/* uçlarını ve asistan araçlarını
+        kapatır; bu düğme bayraktan bağımsız çalışır (R22). Blok yoksa ikinci değer okura söylenen cümledir
+        (plan_durumu); plan asla boş kalmaz."""
+        from src.assistant_tools import plan_durumu_cumlesi
+        if self.plan_kaynagi is None:
+            return [], "Akşam planı şu an hazırlanamadı."
         try:
             plan = self.plan_kaynagi()
         except Exception as exc:  # noqa: BLE001 — plan kartı cevabı düşürmez
             logger.warning("study_plan: akşam planı okunamadı: %s", type(exc).__name__)
-            return []
-        return [{
+            return [], "Akşam planı şu an okunamadı."
+        bloklar = [{
             "type": "homework",
             "title": f"{b.ders or 'Ders'}: {b.baslik}",
             "day": plan.gun,
@@ -3356,6 +3359,7 @@ class AssistantRuntime:
             "actions": [b.adim] if b.adim else [],
             "rationale": "tahmin",
         } for b in plan.bloklar if b.tur == "calisma" and b.durum != "bitti"]
+        return bloklar, ("" if bloklar else plan_durumu_cumlesi(plan, okur))
 
     def models(self) -> list[dict[str, Any]]:
         return [
@@ -3532,18 +3536,6 @@ class AssistantRuntime:
             return 0
         return max(1, int(len(text) / 4))
 
-    def _parse_tr_datetime(self, value: str) -> datetime | None:
-        value = value.strip()
-        for fmt in ("%d.%m.%Y %H:%M", "%d.%m.%Y", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
-            try:
-                dt = datetime.strptime(value, fmt)
-                if fmt in ("%d.%m.%Y", "%Y-%m-%d"):
-                    dt = dt.replace(hour=23, minute=59)
-                return dt
-            except ValueError:
-                continue
-        return None
-
     def _vektor_deposu(self, config: "AssistantConfig") -> "assistant_vektor.VektorDeposu":
         return assistant_vektor.VektorDeposu(config.chunks_path.parent)
 
@@ -3633,9 +3625,6 @@ class AssistantRuntime:
         self._aile_retriever = self._vektorlu_retriever(chunks, self.aile_config, self.vektor_ayar.agirlik_aile)
         self._aile_retriever_cache_mtime = chunks_mtime
         return self._aile_retriever
-
-    def _load_scraped_data(self) -> dict[str, Any]:
-        return self._load_json(self.config.output_dir / "scraped_data.json", {})
 
     def _load_json(self, path: Path, default: Any) -> Any:
         if not path.exists():

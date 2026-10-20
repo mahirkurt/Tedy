@@ -148,3 +148,12 @@ test('son yanıt öğeleri akıştaki kimlikleri taşır (kart iki kez çizilmez
   assert.equal(g[0].streaming_metadata.id, 'metin-1')
   assert.equal(g.find(x => x.user_defined?.tedy.tur === 'alistirma')!.streaming_metadata.id, 'kart-alistirma-0')
 })
+
+test('blok yokken plan_durumu cümlesi kart olur, plan asla boş görünmez', () => {
+  const m = sonYanit(akisBaslat('y1'), yuk({ plan_blocks: [], plan_durumu: 'Planlanacak açık ödevin yok.' }), SEC)
+  const g = m.output.generic as Record<string, any>[]
+  const kart = g.find(x => x.user_defined?.tedy.tur === 'plan_durumu')!
+  assert.equal(kart.user_defined.tedy.veri, 'Planlanacak açık ödevin yok.')
+  const bos = sonYanit(akisBaslat('y2'), yuk(), SEC).output.generic as Record<string, any>[]
+  assert.equal(bos.some(x => x.user_defined?.tedy.tur === 'plan_durumu'), false)
+})

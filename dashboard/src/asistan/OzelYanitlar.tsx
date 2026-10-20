@@ -39,6 +39,8 @@ export default function TedyKarti({ kart, state, inst, ogretmenSec }: { kart: Oz
           <span className="asistan-plan__baslik">{b.title}</span>
           <p className="asistan-plan__adimlar">{b.actions.join(' • ')}</p>
         </li>))}</ul>
+    case 'plan_durumu':
+      return <p className="asistan-plan__adimlar">{kart.veri}</p>
     case 'hata':
       // Hata bir bildirimdir (B45): cümle kırmızı Tag'de değil, Carbon InlineNotification'da; eylem altında.
       return <div className="asistan__hata">

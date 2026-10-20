@@ -824,9 +824,36 @@ def test_study_plan_bloklari_motordan_gelir_yaptim_isaretli_odev_yok(tmp_path: P
     assert out["plan_blocks"] == [{
         "type": "homework", "title": "Matematik: Problemler", "day": "2026-10-19",
         "estimated_minutes": 20, "actions": ["Soru 1'i oku"], "rationale": "tahmin"}]
-    monkeypatch.setenv("TEDY_AKSAM_PLANI", "0")
-    assert runtime.study_plan(messages=[{"role": "user", "content": "plan"}])["plan_blocks"] == []
+    assert out["plan_durumu"] == ""
     assert not hasattr(runtime, "_build_rule_based_plan")
+
+
+def test_study_plan_bayrak_kapaliyken_de_motor_bloklarini_verir(tmp_path: Path, monkeypatch):
+    """R22: TEDY_AKSAM_PLANI kartı, /api/plan/* uçlarını ve araçları kapatır; "Çalışma planı" düğmesini değil."""
+    from src.aksam_plani import Blok, Plan
+    plan = Plan("2026-10-19", [Blok("a", "calisma", 1020, 1040, "mat", "Matematik", "Problemler", "Başla", 0, 1, 20)],
+                [], [], 0, "akis")
+    runtime = AssistantRuntime(tmp_path, plan_kaynagi=lambda: plan)
+    monkeypatch.setattr(runtime, "chat", lambda **kw: {"answer": "x"})
+    monkeypatch.setenv("TEDY_AKSAM_PLANI", "0")
+    out = runtime.study_plan(messages=[{"role": "user", "content": "plan"}])
+    assert [b["title"] for b in out["plan_blocks"]] == ["Matematik: Problemler"]
+
+
+def test_study_plan_blok_yokken_cumle_doner_okura_gore(tmp_path: Path, monkeypatch):
+    from src.aksam_plani import Plan
+    monkeypatch.setattr(AssistantRuntime, "chat", lambda self, **kw: {"answer": "x"})
+    for durum, okur, beklenen in (("plansiz", "ogrenci", "Planlanacak açık ödevin yok."),
+                                  ("plansiz", "aile", "Planlanacak açık ödev yok."),
+                                  ("okulsuz", "ogrenci", "Bugün okul günü değil; akşam planı kurulmaz."),
+                                  ("kapali", "aile", "Bu akşam için plan yok (aile kapattı ya da tatil).")):
+        rt = AssistantRuntime(tmp_path, plan_kaynagi=lambda d=durum: Plan("2026-10-19", [], [], [], 0, d))
+        out = rt.study_plan(messages=[{"role": "user", "content": "plan"}], okur=okur)
+        assert out["plan_blocks"] == [] and out["plan_durumu"] == beklenen
+    def bozuk():
+        raise RuntimeError("x")
+    out = AssistantRuntime(tmp_path, plan_kaynagi=bozuk).study_plan(messages=[{"role": "user", "content": "plan"}])
+    assert out["plan_durumu"]
 
 
 def test_guncel_ogretim_yili_dosyadan_okunur(tmp_path: Path):

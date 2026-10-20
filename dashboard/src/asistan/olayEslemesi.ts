@@ -39,6 +39,7 @@ export type OzelKart =
   | { tur: 'netlestirme'; veri: Netlestirme }
   | { tur: 'mod_onerisi'; veri: ModOnerisi }
   | { tur: 'plan'; veri: AssistantPlanBlock[] }
+  | { tur: 'plan_durumu'; veri: string }
   | { tur: 'hata'; veri: HataKarti }
 
 export interface Adim { arac: string; baslik: string; durum: 'processing' | 'success' | 'failure'; ozet?: string }
@@ -180,7 +181,8 @@ export function sonYanit(d: AkisDurumu, payload: AssistantResponse, sec: SonYani
     ...((payload.odev_onerisi ?? d.odevOnerisi) ? [{ tur: 'odev_onerisi' as const, veri: (payload.odev_onerisi ?? d.odevOnerisi)! }] : []),
     ...((payload.netlestirme ?? d.netlestirme) ? [{ tur: 'netlestirme' as const, veri: (payload.netlestirme ?? d.netlestirme)! }] : []),
     ...((payload.mode_suggestion ?? d.modOnerisi) ? [{ tur: 'mod_onerisi' as const, veri: (payload.mode_suggestion ?? d.modOnerisi)! }] : []),
-    ...(payload.plan_blocks?.length ? [{ tur: 'plan' as const, veri: payload.plan_blocks }] : []),
+    ...(payload.plan_blocks?.length ? [{ tur: 'plan' as const, veri: payload.plan_blocks }]
+      : payload.plan_durumu ? [{ tur: 'plan_durumu' as const, veri: payload.plan_durumu }] : []),
   ]
   return {
     id: d.yanitId,

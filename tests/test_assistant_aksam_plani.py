@@ -169,3 +169,12 @@ def test_yaptim_isaretli_odev_plan_metninde_yok(kur):
 
 def test_bilinmeyen_islem_reddedilir(kur):
     assert not _cagri(kur.registry(), "ogrenci", islem="sil", odev="fen").ok
+
+
+def test_aile_one_al_zaten_uygulanmissa_asim_yazmaz(kur):
+    reg = kur.registry()
+    assert _cagri(reg, "aile", islem="one_al", odev="tur").ok
+    assert "asimlar" not in kur.depo.gunluk(GUN)          # ilk uygulama kural aşmaz
+    r = _cagri(reg, "aile", islem="one_al", odev="tur")
+    assert r.ok and "zaten" in r.text
+    assert "asimlar" not in kur.depo.gunluk(GUN) and kur.depo.gunluk(GUN)["one_al"] == ["tur"]

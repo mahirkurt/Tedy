@@ -1506,6 +1506,16 @@ _PLAN_DURUMU = {
 }
 
 
+def plan_durumu_cumlesi(plan: Any, okur: str = "bilinmiyor") -> str:
+    """Plan kartında gösterilecek blok yokken okura söylenen cümle (kart asla boş kalmaz).
+    Hitap okura göre: Işık'a "sen", aileye ve bilinmeyene kişisiz."""
+    if plan.durum == "plansiz":
+        return "Planlanacak açık ödevin yok." if okur == "ogrenci" else "Planlanacak açık ödev yok."
+    if plan.durum in _PLAN_DURUMU:
+        return _PLAN_DURUMU[plan.durum]
+    return "Bu akşam için kalan çalışma bloğu yok."
+
+
 def aksam_plani_metni(plan: Any) -> str:
     """Planın model için okunur hâli: şimdi, sırada, bloklar saatleriyle, taşınan ve sığmayanlar.
     Süreler tahmindir; saatler blokların bitişine göre kayabilir."""
@@ -2037,12 +2047,12 @@ class McpRegistry:
                         "(okurun söylediği süreyi dakika olarak kaydet), yarina_at (ödevi bu akşamdan "
                         "çıkarıp yarına taşı). Okur istemeden çağırma. sona_al/one_al bir ödev için akşamda "
                         "bir kez yapılır; yarın teslim ödev yarına atılamaz. Çağırmadan önce `aksam_plani` ile "
-                        "planı gör; odev, ödevin anahtarı ya da ders ve başlığından bir parçadır."),
+                        "planı gör; odev, ödev anahtarı ya da ders ve başlıktır."),
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "islem": {"type": "string", "enum": list(PLAN_ISLEMLERI)},
-                            "odev": {"type": "string", "description": "Ödev anahtarı ya da 'ders başlık' parçası."},
+                            "odev": {"type": "string", "description": "Ödev anahtarı ya da ders ve başlık (ya da başlıktan bir parça)."},
                             "dakika": {"type": "integer", "description": "Yalnız sure için: 5–120."},
                         },
                         "required": ["islem", "odev"],
@@ -2803,6 +2813,9 @@ class McpRegistry:
                     return
                 g["yarina"] = [*liste, anahtar]
             else:
+                if islem == "one_al" and anahtar in one:
+                    sonuc["zaten_onde"] = "1"     # zaten uygulanmış: hiçbir şey değişmez, aşım kaydı yok
+                    return
                 kullanildi = anahtar in one or bool(ids & ert)
                 if kullanildi and not aile:
                     sonuc["red"] = "1"
@@ -2831,6 +2844,8 @@ class McpRegistry:
             return ToolOutcome(ok=True, text=BIR_KEZ_REDDI + f" ({ad})")
         if sonuc.get("hedef_yok"):
             return ToolOutcome(ok=True, text=f"{ad} için sona alınabilecek başlamamış bir blok yok; hiçbir şey değişmedi.")
+        if sonuc.get("zaten_onde"):
+            return bitir(f"{ad} zaten başlamamış işlerin başında.")
         if sonuc.get("zaten"):
             return bitir(f"{ad} zaten yarına alınmış.")
         olumlu = {"sona_al": "sıradaki parçası kuyruğun sonuna alındı",
