@@ -82,19 +82,21 @@ Saf işlevler; ağ ve dosya yazımı yok. Tablo dosyası `tablo_oku()` ile okunu
 ### 3.1 Sınav → tablo sütunu
 
 - **Ders:** sınavın `ders`'i (zaten kanonik) tablo dosyasında yoksa blok yazılmaz.
-- **Sınav no:** başlıktan, sırayla: dönem.sınav çifti (`1.1`, `1.2`, `2.1`, `2.2` — "1.1 Ara Değerlendirme"; daha uzun bir sayının parçası olan "10.12" ya da "1.1.1" sayılmaz); "N. yazılı", "N. sınav", "N. ortak yazılı/sınav" (yalnız sınav no); "birinci/ikinci [ortak] yazılı/sınav". Dönem başlıkta yoksa ("N. dönem") sınav tarihinden (`tarih` ya da `hafta`): Eylül–Ocak → 1, Şubat–Haziran → 2 (Temmuz–Ağustos dönemsizdir, blok yazılmaz). Tarih de yoksa bugünün dönemi.
+- **Sınav no:** kaydın başlığından (`baslik`), okunamazsa takvim sınavının ham başlığından (`taban.rawTitle`; temiz başlık "Ortak" ve "N. Yazılı" gibi sözcükleri düşürür) — numara okunan ilk başlık kazanır; kaynak alıntılarından (`kaynaklar[].alinti`) numara **okunmaz** (C1 sınıfı yanlış eşleşmeyi tabana taşırdı). Başlıkta, sırayla: dönem.sınav çifti (`1.1`, `1.2`, `2.1`, `2.2` — "1.1 Ara Değerlendirme"; daha uzun bir sayının parçası olan "10.12" ya da "1.1.1" sayılmaz); "N. yazılı", "N. sınav", "N. ortak yazılı/sınav" (yalnız sınav no); "birinci/ikinci [ortak] yazılı/sınav". Dönem başlıkta yoksa ("N. dönem") sınav tarihinden (`tarih` ya da `hafta`): Eylül–Ocak → 1, Şubat–Ağustos → 2. Tarih de yoksa bugünün dönemi.
 - **"N. yazılı / N. sınav" biçimi noktayı şart koşar:** "Tema 1 Sınavı", "1 Yazılı" ya da "Ünite 2 sınavı" sınav no değildir; yalnız 1 ve 2 numarası kabul edilir.
-- **Tür:** yalnız `ortak_sinav`, `yazili`, `deneme` türleri ve `diger` türünde başlığı sınav no taşıyanlar; `kisa_sinav` ve `konu_tarama` hiç eşleştirilmez (MEB tablosu ortak yazılı içindir).
+- **Tür:** yalnız `ortak_sinav`, `yazili`, `deneme` türleri ve `diger` türünde başlığı sınav no taşıyanlar; `kisa_sinav` ve `konu_tarama` hiç eşleştirilmez (MEB tablosu ortak yazılı içindir). Not tablosundan türeyen (`sentetik`) kayıtlar da eşleştirilmez: geçmiş, notlanmış kartta "duyuruda senaryo belirtilmedi" yazmasın.
+- **Öğretim yılı ve dönem tabloyla eşleşmeli (son inceleme, 2026-10-20):** sınav tarihinin (yoksa haftanın, yoksa bugünün) öğretim yılı — Eylül'de başlar: Eylül–Aralık Y → "Y-(Y+1)", Ocak–Ağustos Y → "(Y-1)-Y" — `kaynak.ogretim_yili`'ne ve dönemi `kaynak.donem`'e eşit olmalı; başlık ayrıca dönem söylüyorsa ("1.1") o da tablonunkine eşit olmalı. Aksi hâlde blok yazılmaz. Bedeli: Şubat başında yapılan bir 1. dönem telafi yazılısı blok almaz (kaçırmak güvenli yön); kazancı: Eylül 2027'de gelen "1.1" 2026-2027 tablosuna bağlanıp yanlış "doğrulandı" demez.
 - Dönem tablo dosyasının `donem`'i değilse ya da sınav no çözülemezse **blok yazılmaz**: dayanak yokken tahmin yürütülmez ve kart bölümü çizilmez.
-- **Bilinen sınır (2026-10-20):** sütun, kaydın `baslik` alanından çözülür. Takvim kaydında bu, portalın temizlenmiş başlığıdır ("Türkçe · 1. Dönem Yazılı"); ham başlıktaki "2. Ortak Yazılı" temizlikte düşer. Bu yüzden canlı takvimdeki ülke geneli Türkçe 2. yazılı (05.01.2027) bugün `ulke_geneli` bloğu almaz. Asistan aracı bundan etkilenmez (`ders` + `sinav_no` ile tabloya doğrudan bakar). Ham başlığı (`taban.rawTitle`) da okumak küçük bir ek olur; bu işe alınmadı.
+- **Bilinen sınır (2026-10-20, son inceleme):** takvim sınavı için sütun `baslik`'ten, o numara taşımıyorsa `taban.rawTitle`'dan çözülür; canlı takvimdeki ülke geneli Türkçe 2. yazılı (05.01.2027, ham başlıkta "1. Dönem 2. Ortak Yazılı") böylece `ulke_geneli` bloğu alır. Kayıt, birleşen bulguların başlığını tutmaz (yalnız `kaynaklar[].alinti`, ≤ 300 karakter) ve alıntıdan numara okunmaz; bu yüzden **takvim kaydına birleşen bir duyurunun "1.1"i bloğa ulaşmaz**: takvim başlığı numara taşımıyorsa blok yazılmaz.
 
 ### 3.2 Duyurudaki senaryo
 
 - Arama penceresi (Türkçe **katlanmış** metinde): sınavın her bulgusu için aday metninde alıntının geçtiği yerden başlar ve alıntının sonundan sonraki ilk **sınıra** ya da alıntı sonu + 400 karaktere (hangisi önceyse) kadar sürer. Sınır, başka bir tarih ifadesi (gün + ay adı ve ekleri: "22 Ekim", "22 Ekim'de"; `dd.mm`; `dd.mm.yyyy`) ya da başka bir sınav numarasıdır (`1.1` gibi dönem.sınav çifti ya da "N. yazılı / N. sınav"). Başka sınavın senaryo cümlesi bu sınava yazılmasın diye.
 - **Tek bulgulu metin bütün olarak aranmaz.** Pencere her durumda alıntıdan başlar; alıntı katlanmış metinde bulunamazsa ve metin tek bulgu verdiyse bütün metin yedek olarak aranır, çok bulgulu metinde yalnız alıntının kendisi.
-- Kalıplar (katlanmış metinde, yalnız pencerede): "senaryo"dan önce gelen sayı **yalnız noktalı sıra sayısı** olarak sayılır ("4. senaryo", "3., 4. senaryolar", "3. ve 4. senaryo"); "senaryo"dan sonra gelen sayı yalnız bitişik "senaryo N" biçimindedir. Sözcükle yazılan sıra sayıları (birinci … onuncu + "senaryo") sayılır. **Adet bildiren sayılar sayılmaz:** "senaryoda 3 soru", "6 senaryodan birine", "6 senaryo". Numara aralığı 1–10.
+- Kalıplar (katlanmış metinde, yalnız pencerede): "senaryo"dan önce gelen sayı **yalnız noktalı sıra sayısı** olarak sayılır ("4. senaryo", "3., 4. senaryolar", "3. ve 4. senaryo"); "senaryo"dan sonra gelen sayı yalnız bitişik "senaryo N" biçimindedir. Sözcükle yazılan sıra sayıları (birinci … onuncu + "senaryo") sayılır. **Adet bildiren sayılar sayılmaz:** "senaryoda 3 soru", "6 senaryodan birine", "6 senaryo". Numara aralığı 1–10. **Bir "senaryo" sözcüğü tek numara taşır** (son inceleme): öndeki sıra sayısı ya da sözcük ("4. senaryo", "dördüncü senaryo") onu numaralamışsa hemen arkasındaki sayı ("4. senaryo 7 soru", "3. Senaryo 2. kısım") soru adedi ya da kısım numarasıdır, ikinci bir senaryo sayılmaz; "Senaryo 4 ve senaryo 5" ise iki sözcük, iki numaradır.
 - Sonuç: numaralar (küçükten büyüğe, tekrarsız) ve eşleşen **cümle** (duyurunun kendi sözleri, ≤ 300 karakter) — "ağırlıklı" gibi nüans kartta kaybolmasın.
 - Bir sınavın birden fazla kaynağı farklı numaralar verirse hepsi alınır; durum her numara için ayrı değerlendirilir (§3.4).
+- **Bilinen sınır (son inceleme):** pencere yalnız başka bir tarih ifadesinde ya da başka bir sınav numarasında kesilir; başka bir dersin sınavını tarih ya da numara vermeden anan bir cümle pencereye girebilir. "Türkçe yazılısı 22 Ekim'de. Ayrıca Fen yazılısı da var, o sınav 2. senaryo ağırlıklı." → Türkçe `dogrulandi`, 2. senaryo. Kart duyurunun cümlesini gösterdiği için aile bunu görür (§5); kesin ayrım için ders adını da sınır saymak ayrı bir iştir.
 
 ### 3.3 Konular ↔ çıktılar
 
@@ -107,6 +109,8 @@ Duyurudaki her konu için, sırayla:
 3. Konu adı ("Konu (İçerik Çerçevesi)", Fen/Mat/Sosyal) puanı ≥ 0,6 **ve** en iyi çıktı puanından düşük değilse konunun bütün çıktıları (eşit puanlı konu adlarının hepsi).
 4. Aksi hâlde en iyi çıktı puanı ≥ 0,6 ise o puanda **eşit olan bütün** çıktılar.
 5. Hiçbiri: konu **eşleşmedi** olarak kalır. "Sınavda yok" denmez; "MEB tablosunda karşılığı bulunamadı" denir.
+
+**Kapsam birleşimi (son inceleme, 2026-10-20):** yukarıdaki sıra konunun **en iyi** eşleşmesini verir ve bloktaki "duyuruda" etiketi bunu taşır. Ama bir konunun senaryoda olup olmadığı (`senaryo_disi_konular`) ve `adaylar` süzgeci, en iyi eşleşmeye değil **kapsama** bakar: kesin eşleşme (1–2) varsa o; yoksa puanı ≥ 0,6 olan **her** çıktı ile puanı ≥ 0,6 olan **her** konu grubunun çıktılarının birleşimi. "Dolaşım ve solunum sistemi" hem "Solunum Sistemi" (1,0) hem "Dolaşım Sistemi" (0,8) grubunu geçer; yalnız en iyiye bakmak Fen 1.2'nin 4. senaryosunu (FB.7.3.3 Dolaşım içerir, Solunum içermez) yanlışlıkla `kismen` yapıyordu. Bedeli: geniş bir konu adı daha çok senaryoyu uyumlu sayar.
 
 ### 3.4 Durumlar
 
@@ -132,12 +136,14 @@ Sınav kaydına `senaryo` bloğu:
 | `belirtilmedi` | duyuru senaryo anmıyor; `adaylar` = eşleşen konuların hepsini içeren senaryolar (eşleşen konu yoksa boş) |
 
 - **Duyuru birden çok numara anıyorsa** (`anilan` uzunluğu > 1) blok **ilk geçerli** numarayla (sütunda var olan) kurulur; `anilan` hepsini taşır; `cumle` bu numarayı anan cümledir. Kart "Duyuru 3. ve 4. senaryo diyor; …" der ve dağılım ilk geçerliyi gösterir. `ozet` ve asistan aracının gövdesi **bütün numaraları adıyla** yazar ve aracın gövdesi asistana örnek sınav yazmadan önce hangisinin istendiğini sormasını söyler.
+- "Eşleşen konu N'nin dağılımında" ve `adaylar` süzgeci **kapsama** göre verilir (§3.3 "Kapsam birleşimi").
 - `eslesmeyen_konular`: tabloda hiç karşılığı bulunamayanlar (her durumda). `eslesen_konu_sayisi`: tabloda karşılığı bulunan konu sayısı (kart "Duyurudaki N konu bu senaryoda" derken kullanır). `ulke_geneli` bloğu ayrıca `not` taşır.
 - Takvimden gelen sınavlarda aday metni yok: ancak `belirtilmedi` (aday listesiz) ya da `ulke_geneli` çıkabilir (sütun çözümü için §3.1 "Bilinen sınır").
 
 ### 3.5 Tespite bağlanış
 
 - `sinav_tespiti.birlestir` sınavları kurduktan sonra her kayda `senaryo` bloğu eklenir (tablo yoksa ya da sütun çözülemezse anahtar hiç yazılmaz). Bulguların aday metinleri bu adımda elde; ayrı bir ağ ya da model çağrısı yok.
+- **Kayıt başına koruma (son inceleme):** `birlestir` her kaydın eşleştirmesini ayrı ayrı korur. Bir kayıtta istisna olursa o kayda blok yazılmaz, öteki kayıtlar bloğunu alır, belge yine üretilir ve tespit özetinin `hatalar` listesine "senaryo eşleştirilemedi: <ders> <başlık>" yazılır. İsteğe bağlı zenginleştirme tespit turunu (dosya yazımı, yeni sınav uyarısı) durdurmaz. "Senaryo tablosu okunamadı" davranışı aynen sürer.
 - `senaryo` bloğu `icerik_surumu`'na **girmez**: bildirim davranışı değişmez (ne yeni "güncellendi" bildirimi ne sessizleşme).
 - `sinavlar.json` `surum` 1'de kalır; blok isteğe bağlıdır, eski dosyalarda yoktur.
 - Kuru koşu raporu (`--kuru`) bloğu olan her sınav için bir `Senaryo:` satırı yazar (durum · ders ve sınav no · senaryo ve soru sayısı, belirtilmediyse uyumlu adaylar).
@@ -163,6 +169,7 @@ Sınav kaydına `senaryo` bloğu:
 | `belirtilmedi` | "Duyuruda senaryo belirtilmedi · MEB tablosunda 5 senaryo var." + adaylar varsa "Duyurudaki konular 3. ve 4. senaryolarla uyumlu (TEDY'nin tahmini)." |
 
 - `dogrulandi`/`kismen`: "Senaryonun N çıktısını göster" ghost düğme (`aria-expanded`, `aria-controls`), varsayılan kapalı. Liste satırı: "2 soru · T.O.7.5 Metnin yüzey anlamını belirleyebilme"; duyuruda geçen çıktılar gri `Tag` "duyuruda" taşır. Birden çok numara anıldıysa ilk cümle "Duyuru 3. ve 4. senaryo diyor; …".
+- `dogrulandi`, `kismen` ve `senaryo_yok`'ta, `cumle` doluysa, bölümde duyurunun kendi sözleri ayrı bir satırdır: "Duyuru: «Sınavınızın içeriği, MEB konu soru dağılım tablosu 4. senaryo ağırlıklı olacaktır.»" (son inceleme; "ağırlıklı" gibi nüans kaybolmasın, eşleştirici yanılırsa aile cümleyi görsün). `belirtilmedi` ve `ulke_geneli`'nde bu satır yoktur.
 - `eslesmeyen_konular` doluysa: "MEB tablosunda karşılığı bulunamayan konu: …".
 - Bölüm sonu: "MEB tablosu" dış bağlantısı (`Launch` ikonlu; "MEB tablosu (MEB, 10.09.2026)", adres bloğun `kaynak`ı, tarih `meb_guncelleme`) ve "Örnek sınav için asistana sor" ghost düğmesi (`asistanaSor({ tur: 'sinav', id })`, ödev penceresindeki yolla aynı; başlatıcı yoksa `/asistan?sayfa=sinavlar`).
 - Kurallar: durum ikon + metin, renk değil; ikonların Türkçe adı (B44); yeni renk, gölge ya da hex yok; cümle düzeni (S38/B41); telefonda denetimler ≥ 44 px. Biçimlendirme saf işlev olarak `utils/sinavSenaryosu.ts`'te.
@@ -173,20 +180,20 @@ Sınav kaydına `senaryo` bloğu:
 
 **Uygulama kararları (2026-10-20):**
 
-- **Girdi `ders` + `sinav_no` (1/2) + isteğe bağlı `senaryo`'dur; `sinav_id` yoktur.** Model sınav kimliklerini hiç görmez (`sinavlar` aracı kimlik yazmaz); araç, derse (ve verildiyse sınav no'ya) uyan yaklaşan sınavı listeden kendisi bulur. `ders` kanonik ada çevrilir ("Fen" → Fen Bilimleri); tabloda olmayan ders kısa bir araç hatasıdır.
+- **Girdi `ders` + `sinav_no` (1/2) + isteğe bağlı `senaryo`'dur; `sinav_id` yoktur.** Model sınav kimliklerini hiç görmez (`sinavlar` aracı kimlik yazmaz); araç, derse (ve verildiyse sınav no'ya) uyan yaklaşan sınavı listeden kendisi bulur. `ders` tablo anahtarına çevrilir: büyük-küçük harf ve aksan duyarsız ("türkçe", "FEN BİLİMLERİ"), tek anlamlı ilk sözcük yeter ("Fen" → Fen Bilimleri, "Sosyal" → Sosyal Bilgiler); tabloda olmayan ders kısa bir araç hatasıdır.
 - `sinav_no` ve `senaryo` **tam sayıya çevrilir** (bir JSON araç çağrısı "1" gönderebilir; çevrilemeyen değer "bir tam sayı olmalı" hatasıdır).
 - **Beklenmedik bir istisna cevabı düşürmez:** bozuk bir sınav bloğu gibi durumlarda araç **kısa bir araç hatası** ("MEB senaryo bilgisi okunamadı") döner, ayrıntı günlüğe yazılır; model hatayı görür ve cevabı yine yazar.
 - **Sapma (kayıtlı):** atıf ÖDSGM adresini taşımaz. `SourcePanel` atıfların `locator` adreslerini çizmez; adrese bağlantıyı Sınavlar kartı verir (§5).
 
-- **Çıktı (model için gövde, ≤ 3.900 karakter):** başlık ("Türkçe · 7. sınıf · 1. Dönem 1. Ortak Yazılı (MEB konu-soru dağılım tablosu, güncelleme 10.09.2026)"); yaklaşan sınav varsa onun adı ve tarihi, durum cümlesi (`ozet`), duyurunun cümlesi ve tabloda karşılığı bulunamayan konular; seçilen senaryo için **kontrol listesi** ("Senaryo 4 · 7 soru. Yazılacak dağılım: - T.O.7.4 → 1 soru · … (duyuruda) … Toplam 7 soru."); senaryo belli değilse `belirtilmedi`'de uyumlu adaylar (tahmin) ve her senaryonun bir satırlık özeti (senaryo → toplam, çıktı kodları); ülke genelinde ortak sınavda senaryo ve soru sayısı olmadığı, uydurulmaması gerektiği. **Duyuru birden çok senaryo anıyorsa** gövde bütün numaraları yazar ve örnek sınav yazmadan önce hangisinin istendiğinin sorulmasını söyler (§3.4).
+- **Çıktı (model için gövde, ≤ 3.900 karakter):** başlık ("Türkçe · 7. sınıf · 1. Dönem 1. Ortak Yazılı (MEB konu-soru dağılım tablosu, güncelleme 10.09.2026)"; sınıf tablonun `kaynak.sinif`'inden); ardından "Bu tablo 2026-2027 1. dönem ortak yazılıları içindir." satırı, bugün öbür dönemdeyse (ör. Şubat) "Şu an 2. dönemdeyiz; bu tablo yalnız 1. dönem ortak yazılılarını kapsar, bugünkü dönemin sınavları için dağılım vermez." satırı; yaklaşan sınav varsa onun adı ve tarihi, durum cümlesi (`ozet`), duyurunun cümlesi ve tabloda karşılığı bulunamayan konular; seçilen senaryo için **kontrol listesi** ("Senaryo 4 · 7 soru. Yazılacak dağılım: - T.O.7.4 → 1 soru · … (duyuruda) … Toplam 7 soru."); senaryo belli değilse `belirtilmedi`'de uyumlu adaylar (tahmin) ve her senaryonun bir satırlık özeti (senaryo → toplam, çıktı kodları) ile "Senaryo seçilince sinav_senaryosu'nu senaryo=N ile yeniden çağır; kontrol listesi ve çıktı adları o çağrıda gelir." satırı (model adları uydurmasın); ülke genelinde ortak sınavda senaryo ve soru sayısı olmadığı, uydurulmaması gerektiği. **Duyuru birden çok senaryo anıyorsa** gövde bütün numaraları yazar ve örnek sınav yazmadan önce hangisinin istendiğinin sorulmasını söyler (§3.4).
 - **Atıf:** tür `meb-tablo`, etiket "MEB konu-soru dağılım tablosu · Türkçe 7 · 1. yazılı", `locator` `{tool, args}`; ÖDSGM bağlantısı yok (yukarıdaki sapma), güncelleme tarihi gövdenin başlık satırında. `SourcePanel` için grup adı "MEB tabloları".
-- **Bildirim koşulu:** `sinavlar` aracının bildirildiği her durumda (Genel ve dört öğretmen modu); tablo dosyası okunamazsa araç bildirilmez ve tespit `sinavlar.json` özetinin `hatalar` listesine "senaryo tablosu okunamadı" yazar (§7). `/v1` ve API anahtarları `sinavlar` ile aynı kurala tabidir. `sinavlar` aracı, bloğu olan her yaklaşan sınavın altına "MEB senaryosu: <özet> — ayrıntı için sinav_senaryosu" satırı ekler.
+- **Bildirim koşulu:** `sinavlar` aracının bildirildiği her durumda (Genel ve dört öğretmen modu); tablo dosyası okunamazsa **ya da bugün tablonun öğretim yılı dışındaysa** (Eylül'de başlayan öğretim yılı, `kaynak.ogretim_yili`) araç bildirilmez (2027-2028 sınavlarına 2026-2027 dağılımı örnek diye yazılmasın); tablo okunamazsa tespit `sinavlar.json` özetinin `hatalar` listesine "senaryo tablosu okunamadı" yazar (§7). `/v1` ve API anahtarları `sinavlar` ile aynı kurala tabidir. `sinavlar` aracı, bloğu olan her yaklaşan sınavın altına "MEB senaryosu: <özet> — ayrıntı için sinav_senaryosu" satırı ekler.
 
 ### 6.2 İstem kuralı: örnek sınav
 
 Taban istemde (önbellekli, tek blok; "## Örnek sınav" bölümü) ve öğretmen becerilerinin "Araç kullanımı" bölümlerinde ("Yazılı provası" maddesi, genel istemin kuralına gönderir):
 
-1. "örnek sınav", "deneme sınavı", "prova", "yazılıya hazırla" istendiğinde önce `sinav_senaryosu`.
+1. "örnek sınav", "deneme sınavı", "yazılı provası", "yazılıya hazırla" istendiğinde önce `sinav_senaryosu`. Yalın "deneme" tetikleyici değildir (son inceleme): bu evde "deneme" TEDY'nin kendi sınav türüdür ve "küçük bir deneme öner", "mini deneme çöz" gibi sözlerde de geçer. **LGS/GİS türü çoktan seçmeli denemeler bu kuralın ve aracın kapsamı dışındadır**; istem bölümü, yönlendirme satırı ve araç açıklaması bunu yazar.
 2. **Yazılı kâğıdı:** soru sayısı senaryonun toplamı, her çıktıdan tam kontrol listesindeki kadar soru; her sorunun altında ölçtüğü çıktı (kod + kısa ad); MEB ortak yazılı biçimi, çoğu açık uçlu; öğretmen modunda o öğretmenin soru kalıpları. **Cevap anahtarı yazılmaz.**
 3. Kâğıdın sonunda iki öneri: "Cevapları göster" (istenince anahtar ayrı mesajda) ve "Aynı konulardan hızlı alıştırma" (`alistirma_olustur`, aynı çıktılardan). Kâğıda yazılan cevabın fotoğrafı yüklenirse mevcut `calisma_degerlendir`.
 4. Senaryo belli değilse: tek aday → onu kullanır ve söyler; 2–4 aday → `netlestir`; aday yok → hangi senaryoyu kullanacağını sorar (tek başına seçmez).
@@ -205,6 +212,8 @@ Kâğıdın dağılıma uyması istem ve kontrol listesiyle sağlanır; serbest 
 ## 7. Hata ve boş durumlar
 
 - Tablo dosyası yok/bozuk: tespit `senaryo` yazmaz, `sinav_tespiti` özeti `hatalar`'a "senaryo tablosu okunamadı" ekler; kart bölümü çizilmez; araç bildirilmez. Sessiz düşüş yok.
+- Bir kaydın eşleştirmesi patlarsa: o kayıtta blok yok, tespit özeti "senaryo eşleştirilemedi: <ders> <başlık>" der, tur sürer (§3.5).
+- Tablonun öğretim yılı bitmişse: sütun çözülmez (§3.1) ve asistan aracı bildirilmez (§6.1); yeni yılın tablosu üretilene dek sessiz bir düşüş değil, bilinçli bir kapıdır.
 - Duyurudaki numara tabloda yok: `senaryo_yok`, kart ve asistan bunu söyler.
 - Konu eşleşmedi: "karşılığı bulunamadı" — "yok" değil.
 - Betik yapı denetimini geçemezse dosya yazılmaz, eski dosya kalır.
