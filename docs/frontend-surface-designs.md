@@ -1,6 +1,6 @@
 # TEDY Yüzey Tasarımları
 
-**Sürüm 1.16 · 2026-10-19 · `docs/frontend-design-principles.md`'nin uygulaması**
+**Sürüm 1.17 · 2026-10-20 · `docs/frontend-design-principles.md`'nin uygulaması**
 
 İlkeler dokümanı *neye göre karar verileceğini* yazar. Bu doküman o kararların
 her yüzeyde ne olduğunu yazar. Çelişki hâlinde ilkeler dokümanı kazanır.
@@ -227,9 +227,10 @@ iner**, ve son senkron zamanını taşır — o, bakılabilir bir bilgidir.
 **Ne için var:** "Şimdi ne yapmalıyım?"
 
 **Tasarım (yürürlükte):** Gün Şeridi + tek adlandırılmış adım + altında sessiz
-"bugün ayrıca". Şerit yalnız kalanı çizer; odak penceresi sıcak alanla gösterilir
-ve sınır `odak sonu 16:00` etiketini taşır; okul sürerken iş son zilden sonraki
-dilime çapalanır.
+"bugün ayrıca". Şerit yalnız kalanı çizer ve günü adlı parçalara böler (Sabah ·
+Okul · Yol · Ödev zamanı · Akşam; ödev zamanı akşam düzeninden, varsayılan
+17:00–19:00, yatma 21:00 — talimatname §8.8); okul sürerken iş ödev zamanının
+başlangıcına çapalanır.
 
 **Tek şey günün saatine göre değişir** (2026-09-24):
 
@@ -273,6 +274,30 @@ dilime çapalanır.
   ertele" kuralı. §2'ye göre ev ödevi zaten büyük ölçüde pencere dışında
   yapılıyor. Her işi 15:45–16:00 arasındaki 15 dakikalık dilime itmek dürüst olmaz.
   Pencere dışında kart yalnız kısa ve tek adımlı kalır ("10 dakikayla").
+
+**Akşam kipi — çalışma planı (2026-10-20, `TEDY_AKSAM_PLANI=1`; spec `superpowers/specs/2026-10-19-aksam-calisma-plani-design.md`, talimatname S51).**
+Okul günlerinde akşam, saatin ilerleyişine göre Bugün'ün tek kartı yer değiştirir; bayrak kapalıyken Bugün yukarıdaki
+tablodaki gibidir, hiçbir şey değişmez (görsel tabanlar bayt bayt aynı kalır).
+
+| Ne zaman | Bugün'de ne var |
+|---|---|
+| Ödeve hazır saatinden önce (17:00) | Sessiz bir satır, kart değil: "Bu akşam 3 iş · 17:00'de başlıyor" ve altında "İlk iş: Matematik · …". Okul kartı (`.today-now`) olduğu gibi kalır |
+| Ödeve hazırdan yatma hazırlığına | Tek kart plan kartıdır (`AksamPlani.tsx`), `NextThing`'in ve "Ayrıca"nın yerini alır: başlık şimdiki adım (sayfanın en büyük metni, P1), üstünde "Şimdi" ya da "Sürüyor · tahminen N dk kaldı", altında "Sırada: …". Eylemler: **Başla**, **Bitti**, **Şimdi değil** (bir kez; sonra "Bu blok bir kez ertelendi"). Blok bitince "Mola · 5 dk" kartı ve moladan sonra sıradaki. Son parçanın "Bitti"si "Ödevin tamamı bitti mi?" diye sorar: "Evet" mevcut "Yaptım" kaydını yazar (Geri al dahil), "Biraz kaldı" 10 dakikalık ek parça açar |
+| Plan bitince | Tek sakin satır: "Bugünlük bu kadar". Kart ve düğmeler kalkar |
+| Aile "Bu akşam plan yok" dedi ya da tatil | Tek satır: "Bu akşam plan yok" / "Bugün tatil, akşam planı yok." Plan ve bildirimler durur |
+
+- **Süre yalnız burada ve "tahmin"le yazılır** (S51): "tahmin 20 dk"; planın altında "Saatler tahmindir; sıradaki iş, bir önceki
+  bitince başlar." Saatler dokunuşla yürür, saat yalnız öngörüdür. Başka hiçbir Bugün öğesi süre yazmaz.
+- **Alarm dili yok.** Süre dolunca "Tahmin doldu · bitti mi?"; "geç kaldın", kırmızı sayaç, puan, seri, rozet yok (S43).
+- **Haber açıkça yazılır.** Bildirimler açıksa kart, ilk bloğun saati ile "başlamadı" eşiğinin toplamında (varsayılan 17:15) "17:15'e kadar başlamazsan ailene haber gider." der;
+  aile okuyunca "17:15'e kadar başlanmazsa haber gider." (gizli gözetim yok). Cümle ilk blok başlayana dek durur. Alıcı listesi yoksa ya da bildirim bayrağı kapalıysa bu cümle
+  hiç görünmez, çünkü gitmeyecek bir haberi söylemek yanlış olur (D4).
+- **Sığmayan iş saklanmaz:** "Yarına kaldı: …" ve "Bu akşama sığmıyor: …" tek satır; teslimi uzak iş yarının planının başına
+  girer. 3 günden eski açık ödev planda değildir ama "Planda olmayan N eski ödev · İşler'de" satırı vardır.
+- **Gün Şeridi plan çizmez** (tek gösterişli öğe kart, İ6); şerit yalnız ödev zamanını gösterir (talimatname §8.8).
+- **Okur:** Işık "sen", aile "siz"; aile ayrıca "Bu akşam plan yok" anahtarını görür (Işık için kaçış yolu olmasın).
+- **Kapılar:** `aksam-plani.spec.ts` (kart ve önizleme durumları, dokunuşlar, 1440/390 görsel tabanı, axe ve IBM temiz, telefonda
+  yatay kayma yok ve her denetim ≥ 44 px, bayrak kapalıyken `NextThing` yerinde), `utils/aksamPlani.ts` saf kart mantığı.
 
 **Bekleyen: İ8 C yönü (2026-10-10 notu).** 2026-10-02'de kullanıcı Bugün'ün üç taslağından "ders
 renkleri yüzeyde" yönünü (C) seçti ve İ8 buna göre yeniden yazıldı. Bugün henüz o hâlde değil:
@@ -830,3 +855,4 @@ görüntüsüyle doğrulanır.
 | 1.14 | 2026-10-11 | Talimatname açık kalemler 4. tur: §4.3 (B64, B50), §4.4 (B72, B51), §4.5 (B49, B34), §4.6 (B65), §4.7 (B51, B66), §4.8 (B67), §4.9 (B60) uygulandı notları; §6 durum notu tamamlandı. |
 | 1.15 | 2026-10-11 | **§4.12 Modüller** eklendi (bugüne dek yüzey tasarımı yoktu): hazır modül listesi + müfredat ağacı (ders → ünite → ders kitabı alt başlığı), yaprağın tek eylemi, sayfa uydurmama ve haritasız dersin cümlesi. Tasarım `superpowers/specs/2026-10-11-moduller-mufredat-agaci-design.md`; sapmalar talimatname S48, S49. |
 | 1.16 | 2026-10-19 | Modül Tasarım Kanunu (`tedy-modul-tasarim-kanunu.md` 1.0) öncelik sırasına girdi: modül yüzeylerinde İ1–İ9'dan sonra, talimatnameden önce (kanun §0.2, KB-34). §4.12 modül sayfasını (baş, çerçeve, akış) kanuna bağlar. Başlık sürümü düzeltildi (1.13'te kalmıştı). |
+| 1.17 | 2026-10-20 | **§4.1 Bugün'e akşam kipi** eklendi (akşam çalışma planı, `TEDY_AKSAM_PLANI=1`): ödeve hazırdan önce sessiz önizleme satırı, 17:00'den yatma hazırlığına tek plan kartı, plan bitince sessiz satır, "Bu akşam plan yok"/tatil; bayrak kapalıyken Bugün değişmez. Süre yalnız plan bloğunda ve "tahmin" sözcüğüyle (talimatname S51). Gün Şeridi'ne "Yol" parçası ve ödev zamanı 17:00–19:00 (talimatname §8.8). |

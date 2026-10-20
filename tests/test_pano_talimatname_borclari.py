@@ -891,3 +891,30 @@ def test_4k_oznitelikli_svgler_css_boyutu_tasir():
         assert bas != -1, f"{secici} kurali yok"
         govde = metin[bas:metin.index("}", bas)]
         assert "width:" in govde and "rem" in govde, f"{secici} rem boyutu tasimiyor"
+
+
+# ── S51: a duration is written only in the evening plan's block, and always as "tahmin" ──
+
+def test_s51_sure_yalniz_plan_blogunda_ve_tahmin_sozcuguyle():
+    """S51 (talimatname §11): the estimate is allowed in the evening plan card and nowhere else; NextThing's
+    ban on a duration stands. The row, the counts and the one place that writes a duration are pinned."""
+    tali = (ROOT / "docs" / "tedy-ui-ux-talimatnamesi.md").read_text(encoding="utf-8")
+    assert re.search(r"^\| \*\*S51\*\*", tali, re.M), "talimatname §11'de S51 satırı yok"
+    assert "S1–S46, S48–S51" in tali, "S51 sayımlara girmemiş"
+
+    # The one writer of a duration is tahminMetni, and it always carries the word.
+    yardimci = (DASH / "utils" / "aksamPlani.ts").read_text(encoding="utf-8")
+    govde = re.search(r"export function tahminMetni\([^)]*\)[^{]*\{(.*?)\n\}", yardimci, re.S)
+    assert govde and "tahmin" in govde.group(1), "tahminMetni 'tahmin' sözcüğünü taşımıyor"
+
+    # Nobody outside the plan card and its helpers formats a plan duration; NextThing never mentions one.
+    izinli = {Path("components/AksamPlani.tsx"), Path("utils/aksamPlani.ts")}
+    ihlal = []
+    for p in _kaynaklar():
+        goreli = p.relative_to(DASH)
+        temiz = _yorumsuz_kod(p.read_text(encoding="utf-8"))
+        if goreli not in izinli and re.search(r"tahminMetni|tahmin_dk|odevTahminDk", temiz):
+            ihlal.append(str(goreli))
+    assert not ihlal, "plan süresi plan bloğu dışında yazılıyor (S51):\n" + "\n".join(ihlal)
+    nextthing = _yorumsuz_kod((DASH / "components" / "NextThing.tsx").read_text(encoding="utf-8"))
+    assert not re.search(r"tahmin", nextthing, re.I), "NextThing süre/tahmin yazamaz (S51: yasak değişmedi)"
