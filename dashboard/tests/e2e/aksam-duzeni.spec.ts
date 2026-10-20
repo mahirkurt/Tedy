@@ -1,4 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
+import { createRequire } from 'node:module'
 import { bugunAc } from './_bugun-fixtures'
 import { AKSAM_VARSAYILAN } from './_audit-fixtures'
 
@@ -9,6 +11,7 @@ import { AKSAM_VARSAYILAN } from './_audit-fixtures'
 // bed at 21:00.
 
 const json = (b: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(b) })
+const ACE = createRequire(import.meta.url).resolve('accessibility-checker-engine/ace.js')
 
 const AYARLI = {
   ...AKSAM_VARSAYILAN, odeve_hazir: '16:00', zor_is_sonu: '17:30', hafif_is_sonu: '18:00',
@@ -131,6 +134,66 @@ test.describe('Profil', () => {
     await bolum.getByRole('button', { name: 'Akşam düzenini kaydet' }).click()
     await expect(bolum.getByRole('alert')).toContainText('Akşam düzeni kaydedilemedi. Bağlantını kontrol edip yeniden dene.')
     await expect(bolum).not.toContainText('Failed to fetch')
+  })
+
+  test('Işık için salt okunur: değerler görünür, aile ayarlar, kaydetme yok (R28 I2)', async ({ page }) => {
+    // The server sends Işık the setting without the family roster; the card shows who is told, read-only.
+    const ayar: Record<string, unknown> = { ...AKSAM_VARSAYILAN, haber_alacaklar: ['anne@example.com'], varsayilan: false }
+    delete ayar.aile_uyeleri
+    const gelen = await profilAc(page, ayar)
+    await page.route('**/api/auth/me', r => r.fulfill(json({
+      email: 'isik@example.com', name: 'Işık', picture: '', role: 'full', student: true })))
+    await page.goto('/profil')
+    const bolum = page.locator('.aksam-duzeni-formu')
+
+    await expect(bolum).toContainText('Bu saatleri ailen ayarlar.')
+    const hazir = bolum.getByLabel('Ödeve hazır olduğun saat', { exact: true })
+    await expect(hazir).toHaveValue('17:00')
+    // readOnly, not disabled (B42): legible, focusable, not editable.
+    await expect(hazir).toHaveAttribute('readonly', '')
+    await expect(hazir).toBeEnabled()
+    await expect(bolum.getByLabel('Yemek süresi (dakika)')).toHaveAttribute('readonly', '')
+    const kutu = bolum.getByRole('checkbox', { name: 'anne@example.com' })
+    await expect(kutu).toBeChecked()
+    await expect(kutu).toHaveAttribute('aria-readonly', 'true')
+    await expect(bolum.getByRole('checkbox')).toHaveCount(1)
+    await expect(bolum.getByRole('button', { name: 'Akşam düzenini kaydet' })).toHaveCount(0)
+
+    await hazir.press('End')
+    await hazir.pressSequentially('9')
+    await expect(hazir).toHaveValue('17:00')
+    await kutu.click({ force: true })
+    await expect(kutu).toBeChecked()
+    await bolum.evaluate(f => (f as HTMLFormElement).requestSubmit())
+    expect(gelen).toEqual([])
+    // The read-only view is as clean as the family's (Carbon's group-level readOnly is not, see the card).
+    const { violations } = await new AxeBuilder({ page }).include('.aksam-duzeni-formu')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']).analyze()
+    expect(violations.map(v => `${v.impact} ${v.id}`)).toEqual([])
+    await page.addScriptTag({ path: ACE })
+    const ihlal: string[] = await page.evaluate(async () => {
+      // @ts-expect-error — `ace` is the injected engine's global
+      const rapor = await new window.ace.Checker().check(document.querySelector('.aksam-duzeni-formu'), ['IBM_Accessibility'])
+      return (rapor.results as { ruleId: string; value: string[]; snippet: string }[])
+        .filter(s => s.value[0] === 'VIOLATION' && s.value[1] === 'FAIL').map(s => `${s.ruleId} — ${s.snippet.slice(0, 120)}`)
+    })
+    expect(ihlal).toEqual([])
+  })
+
+  test('okunamayan düzen: sabit cümle, form yok, kaydetme yok (R28 I3)', async ({ page }) => {
+    const gelen = await profilAc(page)
+    await page.route('**/api/aksam-duzeni', r => r.request().method() === 'PUT'
+      ? r.fulfill(json({}))
+      : r.fulfill({ status: 500, contentType: 'text/html', body: '<html>Internal Server Error</html>' }))
+    await page.goto('/profil')
+    const kart = page.locator('.dashboard-card', { has: page.getByRole('heading', { name: 'Akşam Düzeni', exact: true }) })
+    await expect(kart.getByRole('alert')).toContainText('Akşam düzeni şu an okunamadı')
+    await expect(kart.getByRole('alert')).toContainText('Kayıtlı ayarların üzerine yazılmasın diye kaydetme kapalı.')
+    await expect(kart).not.toContainText('Internal Server Error')
+    // The defaults must not pass for the household's evening, nor a save made from them wipe the list.
+    await expect(kart.locator('.aksam-duzeni-formu')).toHaveCount(0)
+    await expect(kart.getByRole('button', { name: 'Akşam düzenini kaydet' })).toHaveCount(0)
+    expect(gelen).toEqual([])
   })
 
   test('JSON olmayan ret gövdesi de sabit cümleyle gösterilir', async ({ page }) => {

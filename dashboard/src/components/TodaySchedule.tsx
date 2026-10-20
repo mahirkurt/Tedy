@@ -507,11 +507,12 @@ export default function TodaySchedule() {
 
   // The plan's card speaks about today only. From 17:00 (a block waiting,
   // running or a break) it is the one thing and takes NextThing's and "Ayrıca"'s
-  // place; before it, and once the evening is over, one quiet line stands where
+  // place; before it, once the evening is over, and when no work block is left but
+  // something moved, did not fit or was left out ('bos'), one quiet line stands where
   // NextThing was. The school card is untouched before 17:00.
   const planKarti = selectedIsToday && aksamPlani.plan ? kartDurumu(aksamPlani.plan, nowMin) : null
   const planAkiyor = planKarti != null && ['calisma', 'mola', 'bekliyor'].includes(planKarti.tur)
-  const planSatiri = planKarti != null && (planKarti.tur === 'onizleme' || planKarti.tur === 'bitti')
+  const planSatiri = planKarti != null && ['onizleme', 'bitti', 'bos'].includes(planKarti.tur)
   // The page does not wait for the plan: until it answers, NextThing and "Ayrıca" are drawn as they
   // always were, and they give way only to a plan that takes the slot. With the flag off (404) they are
   // never hidden, not even for a frame (R17).

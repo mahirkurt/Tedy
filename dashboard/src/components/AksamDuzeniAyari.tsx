@@ -4,6 +4,7 @@ import {
 } from '@carbon/react'
 import { Time } from '@carbon/icons-react'
 import { useAksamDuzeni, type AileUyesi } from '../hooks/useAksamDuzeni'
+import { useSession } from '../contexts/session'
 import {
   clockOf, duzenGovdesi, duzenHatasi, saattenDakika, YEMEK_HATASI, YEMEK_SURESI_HATASI, type AksamDuzeni,
 } from '../utils/bugun'
@@ -39,9 +40,18 @@ function hataAlani(d: AksamDuzeni, hata: string): Alan {
  * hour Işık is ready for homework to bedtime, kept in `output/`, so changing it
  * is a setting, not a rebuild. Bugün reads it for the card's voice and for the
  * Day Strip; the evening plan reads it for what fits before dinner and bed.
+ *
+ * Only the family changes it (R28 I2): it decides when they are told Işık has
+ * not started, so on her own account the card shows the values read-only —
+ * Carbon's `readOnly`, not `disabled`, so they stay legible (B42) — with no save
+ * button. The form appears only once the server's evening has been read: the
+ * defaults must never stand in for the real setting, nor a save made from them
+ * overwrite the family's "Haber alacaklar" (R28 I3); a failed read says so and
+ * saving waits for the next good one.
  */
 export default function AksamDuzeniAyari() {
-  const { duzen, aileUyeleri, loading, iskelet, refresh } = useAksamDuzeni()
+  const { duzen, aileUyeleri, okundu, okunamadi, loading, iskelet, refresh } = useAksamDuzeni()
+  const salt = useSession()?.student === true
   return (
     <div className="dashboard-card">
       <h2 className="dashboard-card__title" id="aksam-duzeni-baslik">
@@ -50,13 +60,43 @@ export default function AksamDuzeniAyari() {
       </h2>
       {loading
         ? (iskelet ? <div aria-busy="true"><SkeletonText paragraph lineCount={3} /></div> : null)
-        // One layer above the card, like every form set in a card (B31): Carbon's field-02 on layer-01.
-        : <Layer><Form ilk={duzen} uyeler={aileUyeleri} onKaydedildi={refresh} /></Layer>}
+        : (
+          <>
+            {okunamadi && (
+              <InlineNotification
+                className="aksam-duzeni-formu__okunamadi"
+                kind="error"
+                lowContrast
+                hideCloseButton
+                role="alert"
+                statusIconDescription="Hata"
+                title="Akşam düzeni şu an okunamadı"
+                subtitle={salt
+                  ? 'Sayfa birkaç dakika içinde yeniden dener.'
+                  : 'Kayıtlı ayarların üzerine yazılmasın diye kaydetme kapalı. Sayfa birkaç dakika içinde yeniden dener.'}
+              />
+            )}
+            {/* One layer above the card, like every form set in a card (B31): Carbon's field-02 on layer-01. */}
+            {okundu && (
+              <Layer>
+                <Form ilk={duzen} uyeler={aileUyeleri} salt={salt} kaydedilebilir={!okunamadi} onKaydedildi={refresh} />
+              </Layer>
+            )}
+          </>
+        )}
     </div>
   )
 }
 
-function Form({ ilk, uyeler, onKaydedildi }: { ilk: AksamDuzeni; uyeler: AileUyesi[]; onKaydedildi: () => void }) {
+function Form({ ilk, uyeler, salt, kaydedilebilir, onKaydedildi }: {
+  ilk: AksamDuzeni
+  uyeler: AileUyesi[]
+  /** Işık's own account: the values, read-only, and who sets them (R28 I2). */
+  salt: boolean
+  /** The latest read succeeded; a save made after a failed one could overwrite what it did not see. */
+  kaydedilebilir: boolean
+  onKaydedildi: () => void
+}) {
   const [saatler, setSaatler] = useState<Record<SaatAlani, string>>({
     odeveHazir: clockOf(ilk.odeveHazir), zorIsSonu: clockOf(ilk.zorIsSonu), hafifIsSonu: clockOf(ilk.hafifIsSonu),
     yemek: clockOf(ilk.yemek), hazirlik: clockOf(ilk.hazirlik), yatma: clockOf(ilk.yatma),
@@ -69,6 +109,7 @@ function Form({ ilk, uyeler, onKaydedildi }: { ilk: AksamDuzeni; uyeler: AileUye
 
   async function kaydet(e: React.FormEvent) {
     e.preventDefault()
+    if (salt || !kaydedilebilir) return
     setSonuc(null)
     const dk: Partial<Record<SaatAlani, number>> = {}
     const yeni: Partial<Record<Alan, string>> = {}
@@ -86,7 +127,8 @@ function Form({ ilk, uyeler, onKaydedildi }: { ilk: AksamDuzeni; uyeler: AileUye
     if (Object.keys(yeni).length) return
 
     // Fields this card does not show (the last bell, the two "tell us" waits) go back as they came.
-    const govde = duzenGovdesi({ ...ilk, ...(dk as Record<SaatAlani, number>), yemekDk, haberAlacaklar: haber })
+    // The form exists only after a good read, so the list it holds is the server's own (R28 I3).
+    const govde = duzenGovdesi({ ...ilk, ...(dk as Record<SaatAlani, number>), yemekDk, haberAlacaklar: haber }, true)
     setKaydediliyor(true)
     const SABIT = 'Akşam düzeni kaydedilemedi. Bağlantını kontrol edip yeniden dene.'
     try {
@@ -115,6 +157,8 @@ function Form({ ilk, uyeler, onKaydedildi }: { ilk: AksamDuzeni; uyeler: AileUye
 
   const haberDegisti = (email: string, secili: boolean) =>
     setHaber(onceki => (secili ? [...onceki.filter(e => e !== email), email] : onceki.filter(e => e !== email)))
+  // The family chooses from the roster; Işık, who is not sent it, sees who is chosen.
+  const kutular = salt ? haber : uyeler.map(u => u.email)
 
   return (
     <form className="aksam-duzeni-formu" onSubmit={kaydet} noValidate aria-labelledby="aksam-duzeni-baslik">
@@ -122,6 +166,7 @@ function Form({ ilk, uyeler, onKaydedildi }: { ilk: AksamDuzeni; uyeler: AileUye
         Bugün, ödeve hazır olduğun saatten zor işlerin sonuna kadar tek bir zor iş önerir; sonrasında hafif işler.
         Yemek ve hazırlık için yer ayırır, yatma saatinden sonra işi yarına bırakır.
       </p>
+      {salt && <p className="aksam-duzeni-formu__salt">Bu saatleri ailen ayarlar.</p>}
       {ALANLAR.map(({ alan, id, etiket }) => (
         <TimePicker
           key={alan}
@@ -131,6 +176,7 @@ function Form({ ilk, uyeler, onKaydedildi }: { ilk: AksamDuzeni; uyeler: AileUye
           maxLength={5}
           size="md"
           value={saatler[alan]}
+          readOnly={salt}
           onChange={e => setSaatler(v => ({ ...v, [alan]: e.target.value }))}
           invalid={Boolean(hatalar[alan])}
           invalidText={hatalar[alan]}
@@ -144,27 +190,32 @@ function Form({ ilk, uyeler, onKaydedildi }: { ilk: AksamDuzeni; uyeler: AileUye
         step={5}
         size="md"
         value={yemekDk}
+        readOnly={salt}
         onChange={(_e, { value }) => setYemekDk(Number(value))}
         invalid={Boolean(hatalar.yemekDk)}
         invalidText={hatalar.yemekDk}
       />
+      {/* readOnly goes on each Checkbox, never the group: Carbon writes the group's `readOnly` (false
+          too) as aria-readonly on its <fieldset>, which ARIA does not allow on a group (axe
+          aria-allowed-attr, IBM aria_attribute_valid; measured 2026-10-20). */}
       <CheckboxGroup
         legendText="Haber alacaklar"
         helperText="Liste boşken TEDY kimseye haber vermez. Işık'ın bildirimleri yalnız onun hesabıyla açılmış cihazlara gider."
       >
-        {uyeler.map(u => (
+        {kutular.map(email => (
           <Checkbox
-            key={u.email}
-            id={`aksam-haber-${u.email}`}
-            labelText={u.email}
-            checked={haber.includes(u.email)}
-            onChange={(_e, { checked }) => haberDegisti(u.email, checked)}
+            key={email}
+            id={`aksam-haber-${email}`}
+            labelText={email}
+            checked={haber.includes(email)}
+            readOnly={salt}
+            onChange={(_e, { checked }) => haberDegisti(email, checked)}
           />
         ))}
       </CheckboxGroup>
-      {kaydediliyor
+      {!salt && (kaydediliyor
         ? <InlineLoading description="Kaydediliyor…" iconDescription="Kaydediliyor" status="active" />
-        : <Button kind="tertiary" size="md" type="submit">Akşam düzenini kaydet</Button>}
+        : <Button kind="tertiary" size="md" type="submit" disabled={!kaydedilebilir}>Akşam düzenini kaydet</Button>)}
       {sonuc && (
         <InlineNotification lowContrast hideCloseButton
           kind={sonuc.tur === 'basari' ? 'success' : 'error'} role={sonuc.tur === 'basari' ? 'status' : 'alert'}

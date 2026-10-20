@@ -76,15 +76,16 @@ export function duzenHatasi(d: AksamDuzeni): string | null {
   return null
 }
 
-/** The API's snake_case evening as minutes; the defaults otherwise. */
-export function duzenCoz(json: unknown): AksamDuzeni {
-  if (!json || typeof json !== 'object') return VARSAYILAN_DUZEN
+/** The API's snake_case evening as minutes, or null when what arrived is not a well-formed one
+ *  (a failed read, a malformed body): then nothing is known about the household's evening. */
+export function duzenOku(json: unknown): AksamDuzeni | null {
+  if (!json || typeof json !== 'object') return null
   const j = json as Record<string, unknown>
   const saat = (k: string) => saattenDakika(j[k])
   const okulBitisi = saat('okul_bitisi'), odeveHazir = saat('odeve_hazir'), zorIsSonu = saat('zor_is_sonu')
   const hafifIsSonu = saat('hafif_is_sonu'), yemek = saat('yemek'), hazirlik = saat('hazirlik'), yatma = saat('yatma')
   if (okulBitisi === null || odeveHazir === null || zorIsSonu === null || hafifIsSonu === null
-    || yemek === null || hazirlik === null || yatma === null) return VARSAYILAN_DUZEN
+    || yemek === null || hazirlik === null || yatma === null) return null
   const sayi = (k: string) => (typeof j[k] === 'number' ? (j[k] as number) : NaN)
   const haber = Array.isArray(j.haber_alacaklar)
     ? j.haber_alacaklar.filter((e): e is string => typeof e === 'string') : []
@@ -92,11 +93,18 @@ export function duzenCoz(json: unknown): AksamDuzeni {
     okulBitisi, odeveHazir, zorIsSonu, hafifIsSonu, yemek, yemekDk: sayi('yemek_dk'), hazirlik, yatma,
     baslamadiEsikDk: sayi('baslamadi_esik_dk'), takildiEsikDk: sayi('takildi_esik_dk'), haberAlacaklar: haber,
   }
-  return duzenHatasi(d) === null ? d : VARSAYILAN_DUZEN
+  return duzenHatasi(d) === null ? d : null
 }
 
-/** The body `PUT /api/aksam-duzeni` takes. */
-export function duzenGovdesi(d: AksamDuzeni) {
+/** The API's snake_case evening as minutes; the defaults otherwise (Bugün speaks with them meanwhile). */
+export function duzenCoz(json: unknown): AksamDuzeni {
+  return duzenOku(json) ?? VARSAYILAN_DUZEN
+}
+
+/** The body `PUT /api/aksam-duzeni` takes. `haber_alacaklar` goes only when the list was read from the
+ *  server (`haberOkundu`): the defaults' empty list must never overwrite the family's real one — the
+ *  server keeps the stored list when the field is absent. */
+export function duzenGovdesi(d: AksamDuzeni, haberOkundu: boolean) {
   return {
     okul_bitisi: clockOf(d.okulBitisi),
     odeve_hazir: clockOf(d.odeveHazir),
@@ -108,7 +116,7 @@ export function duzenGovdesi(d: AksamDuzeni) {
     yatma: clockOf(d.yatma),
     baslamadi_esik_dk: d.baslamadiEsikDk,
     takildi_esik_dk: d.takildiEsikDk,
-    haber_alacaklar: d.haberAlacaklar,
+    ...(haberOkundu ? { haber_alacaklar: d.haberAlacaklar } : {}),
   }
 }
 

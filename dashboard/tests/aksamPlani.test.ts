@@ -147,6 +147,26 @@ test('kapalı, plansız ve okulsuz', () => {
   assert.equal(kartDurumu(plan('okulsuz', []), dk('17:10')).tur, 'yok')
 })
 
+test('iş bloğu kalmadı ama taşınan, sığmayan ya da planda olmayan var: sakin satırlar yine çizilir (R28)', () => {
+  const kayit = { odev_anahtari: 'k', ders: 'Fen Bilimleri', baslik: 'Proje', teslim: '24.10.2026 23:59', kalan_dk: 40 }
+  for (const ek of [{ tasinan: [kayit] }, { sigmayan: [kayit] }, { planda_olmayan: 2 }]) {
+    for (const durum of ['onizleme', 'akis'] as const) {
+      const k = kartDurumu(plan(durum, [], ek), dk('17:30'))
+      assert.equal(k.tur, 'bos', `${durum} ${JSON.stringify(ek)}`)
+      assert.equal(k.baslik, 'Bu akşam planda iş yok')
+      assert.equal(k.blok, undefined)
+    }
+  }
+  // A day with nothing selected still points at the old work it left out (§6.8).
+  assert.equal(kartDurumu(plan('plansiz', [], { planda_olmayan: 3 }), dk('16:00')).tur, 'bos')
+  // Nothing to say: no card, as before; a weekend says nothing either.
+  assert.equal(kartDurumu(plan('akis', []), dk('17:30')).tur, 'yok')
+  assert.equal(kartDurumu(plan('plansiz', []), dk('17:30')).tur, 'yok')
+  assert.equal(kartDurumu(plan('okulsuz', [], { planda_olmayan: 3 }), dk('17:30')).tur, 'yok')
+  // Blocks left: the card as before, the lines under it.
+  assert.equal(kartDurumu(plan('akis', UC_IS, { tasinan: [kayit] }), dk('17:05')).tur, 'bekliyor')
+})
+
 test('süre metni her zaman "tahmin N dk" biçiminde', () => {
   assert.equal(tahminMetni(20), 'tahmin 20 dk')
   assert.equal(tahminMetni(7), 'tahmin 7 dk')

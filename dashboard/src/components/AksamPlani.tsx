@@ -188,8 +188,9 @@ export function AksamPlani({ plan, kart, aile, islemler }: {
     )
   }
 
-  // Before 17:00, and once the evening is over: one quiet line, not a second panel (İ1, İ6).
-  if (kart.tur === 'onizleme' || kart.tur === 'bitti') {
+  // Before 17:00, once the evening is over, and on an evening with no work block left but something
+  // moved, too big or left out: one quiet line, not a second panel (İ1, İ6), and the lines that say what.
+  if (kart.tur === 'onizleme' || kart.tur === 'bitti' || kart.tur === 'bos') {
     return (
       <>
         <section className={`aksam-plani aksam-plani--sessiz aksam-plani--${kart.tur}`} aria-label="Akşam planı">

@@ -57,7 +57,7 @@ export interface PlanYaniti {
   aksam_yok: boolean
 }
 
-export type KartTuru = 'onizleme' | 'calisma' | 'mola' | 'bekliyor' | 'bitti' | 'kapali' | 'yok'
+export type KartTuru = 'onizleme' | 'calisma' | 'mola' | 'bekliyor' | 'bitti' | 'bos' | 'kapali' | 'yok'
 
 export interface KartDurumu {
   tur: KartTuru
@@ -75,6 +75,10 @@ export interface KartDurumu {
 
 /** A holiday closes the evening's plan; said once, quietly. */
 export const TATIL_METNI = 'Bugün tatil, akşam planı yok.'
+
+/** No work block tonight, yet something moved to tomorrow, did not fit or was left out: the line above
+ *  the quiet lines that say what (§6.4, §6.8) — they are never dropped silently (R28). */
+export const BOS_METNI = 'Bu akşam planda iş yok'
 
 const iki = (n: number) => String(n).padStart(2, '0')
 
@@ -166,9 +170,12 @@ export function kartDurumu(plan: PlanYaniti, simdiMin: number): KartDurumu {
     return { tur: 'kapali', ust: '', baslik: plan.aksam_yok ? 'Bu akşam plan yok' : TATIL_METNI, alt: '' }
   }
   if (plan.durum === 'bitti') return { tur: 'bitti', ust: '', baslik: 'Bugünlük bu kadar', alt: '' }
-  if (plan.durum !== 'onizleme' && plan.durum !== 'akis') return { tur: 'yok', ust: '', baslik: '', alt: '' }
-
   const isler = calismalar(plan)
+  if (!isler.length && (plan.durum === 'onizleme' || plan.durum === 'akis' || plan.durum === 'plansiz')
+    && (plan.tasinan.length > 0 || plan.sigmayan.length > 0 || plan.planda_olmayan > 0)) {
+    return { tur: 'bos', ust: '', baslik: BOS_METNI, alt: '' }
+  }
+  if (plan.durum !== 'onizleme' && plan.durum !== 'akis') return { tur: 'yok', ust: '', baslik: '', alt: '' }
   if (!isler.length) return { tur: 'yok', ust: '', baslik: '', alt: '' }
 
   if (plan.durum === 'onizleme') {

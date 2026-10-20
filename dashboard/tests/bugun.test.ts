@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   windowVoice, okulGunuMu, yerSec, simdiUstu, bitenOzeti, sonrakiOkulGunu, yarinBasligi,
-  rakamParcala, VARSAYILAN_DUZEN, duzenCoz, duzenGovdesi, duzenHatasi,
+  rakamParcala, VARSAYILAN_DUZEN, duzenCoz, duzenGovdesi, duzenHatasi, duzenOku,
   type AgendaSlot, type AgendaType,
 } from '../src/utils/bugun.ts'
 
@@ -153,11 +153,25 @@ test('akşam düzeni sunucudan çözülür; bozuk ya da eksikse varsayılanlar',
     assert.deepEqual(duzenCoz(bozuk), VARSAYILAN_DUZEN, JSON.stringify(bozuk))
   }
   // Gövde sunucunun anahtarlarıyla, saatler SS:DD.
-  assert.deepEqual(duzenGovdesi(duzenCoz(sunucu)), {
+  assert.deepEqual(duzenGovdesi(duzenCoz(sunucu), true), {
     okul_bitisi: '15:30', odeve_hazir: '16:30', zor_is_sonu: '18:30', hafif_is_sonu: '19:00',
     yemek: '18:00', yemek_dk: 40, hazirlik: '20:00', yatma: '21:30',
     baslamadi_esik_dk: 10, takildi_esik_dk: 20, haber_alacaklar: ['anne@example.com'],
   })
+})
+
+test('okunamayan düzen bilinmez sayılır; alıcı listesi okunmadan asla gönderilmez (R28 I3)', () => {
+  // A failed read or a malformed body is "nothing known", not the defaults: Profil draws no form from it.
+  for (const bozuk of [null, undefined, 'x', {}, { odeve_hazir: '17:00' }]) {
+    assert.equal(duzenOku(bozuk), null, JSON.stringify(bozuk))
+  }
+  assert.deepEqual(duzenOku({ ...duzenGovdesi(VARSAYILAN_DUZEN, true) }), VARSAYILAN_DUZEN)
+  // The defaults' empty list must never overwrite the family's: unread, the field is left out and the
+  // server keeps what it stores.
+  const govde = duzenGovdesi(VARSAYILAN_DUZEN, false)
+  assert.equal('haber_alacaklar' in govde, false)
+  assert.equal(govde.odeve_hazir, '17:00')
+  assert.deepEqual(duzenGovdesi({ ...VARSAYILAN_DUZEN, haberAlacaklar: [] }, true).haber_alacaklar, [])
 })
 
 test('akşam düzeni sırası sunucununkiyle aynı denetlenir', () => {

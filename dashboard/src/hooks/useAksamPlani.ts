@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { YUKLEME_ESIGI_MS } from './useApi'
 import { planCoz, planHataCumlesi, type PlanHatasi, type PlanYaniti } from '../utils/aksamPlani'
 
 /** Fired after a touch changed tonight's plan, so every reader of it reloads. */
@@ -15,16 +14,15 @@ export type PlanSonucu = { ok: true } | { ok: false; hata: PlanHatasi }
  *
  * The flag off answers 404 `{"kapali": true}`: that is not a failure, it is "no
  * plan card", and Bugün keeps its old flow (`kapali`). Bugün does not wait for this
- * read: the page paints, and the card takes its slot when the plan arrives. Any other failure is
- * `hata` — the page says it could not read everything, never the HTTP text.
+ * read and draws no skeleton for it: the page paints, and the card takes its slot when the plan
+ * arrives (R17). Any other failure is `hata` — the page says it could not read everything, never
+ * the HTTP text.
  * Every touch answers with the whole plan, which replaces the one on screen.
  */
 export function useAksamPlani(): {
   plan: PlanYaniti | null
   /** The flag is off: no card at all. */
   kapali: boolean
-  yukleniyor: boolean
-  iskelet: boolean
   hata: boolean
   basla: (id: string) => Promise<PlanSonucu>
   bitti: (id: string, tamamlandi?: boolean) => Promise<PlanSonucu>
@@ -34,16 +32,9 @@ export function useAksamPlani(): {
 } {
   const [plan, setPlan] = useState<PlanYaniti | null>(null)
   const [kapali, setKapali] = useState(false)
-  const [yukleniyor, setYukleniyor] = useState(true)
-  const [esikGecti, setEsikGecti] = useState(false)
   const [hata, setHata] = useState(false)
   // A read that started before a touch must not overwrite the plan the touch returned.
   const surum = useRef(0)
-
-  useEffect(() => {
-    const t = setTimeout(() => setEsikGecti(true), YUKLEME_ESIGI_MS)
-    return () => clearTimeout(t)
-  }, [])
 
   const oku = useCallback(async () => {
     const benim = ++surum.current
@@ -66,17 +57,18 @@ export function useAksamPlani(): {
       if (p) setPlan(p)
     } catch {
       if (benim === surum.current) setHata(true)
-    } finally {
-      if (benim === surum.current) setYukleniyor(false)
     }
   }, [])
 
   useEffect(() => {
-    oku()
+    // The first read starts on the next tick, like every later one (the timer, the events): the effect
+    // itself changes no state.
+    const ilk = setTimeout(oku, 0)
     const t = setInterval(oku, YENILEME_MS)
     window.addEventListener(ODEV_OLAYI, oku)
     window.addEventListener(PLAN_OLAYI, oku)
     return () => {
+      clearTimeout(ilk)
       clearInterval(t)
       window.removeEventListener(ODEV_OLAYI, oku)
       window.removeEventListener(PLAN_OLAYI, oku)
@@ -117,7 +109,7 @@ export function useAksamPlani(): {
 
   const kodla = encodeURIComponent
   return {
-    plan, kapali, yukleniyor, iskelet: yukleniyor && esikGecti, hata,
+    plan, kapali, hata,
     basla: id => gonder(`/api/plan/blok/${kodla(id)}/basla`, 'POST'),
     bitti: (id, tamamlandi) => gonder(`/api/plan/blok/${kodla(id)}/bitti`, 'POST',
       tamamlandi === undefined ? {} : { tamamlandi }, tamamlandi === true),
