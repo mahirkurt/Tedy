@@ -49,7 +49,7 @@ from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.US
     okur_turu,
 )
 from src import (assistant_skills, module_progress, module_store, module_ticket,
-                 mufredat_agaci, subject_themes)
+                 mufredat_agaci, sinav_senaryo, subject_themes)
 from src import claude_api
 
 load_env()
@@ -348,6 +348,7 @@ def _assistant_runtime():
                 odev_kaynagi=_canli_odevler,
                 program_kaynagi=_canli_program,
                 sinav_kaynagi=_canli_sinavlar,
+                senaryo_tablosu=sinav_senaryo.tablo_oku,
                 takvim_kaynagi=_canli_takvim,
                 icerik_kaynagi=_canli_ders_icerikleri,
                 not_kaynagi=_canli_notlar,

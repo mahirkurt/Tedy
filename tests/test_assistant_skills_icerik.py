@@ -18,6 +18,7 @@ DIZINLER = sorted(p.name for p in sk.SKILL_DIZINI.iterdir()
                   if p.is_dir() and not p.name.startswith(("_", ".")))
 GERCEK_ARACLAR = {at.LOCAL_TOOL, at.ODEV_TOOL, at.PROGRAM_TOOL, at.SINAV_TOOL, at.TAKVIM_TOOL,
                   at.ICERIK_TOOL, at.NOT_TOOL, at.PLATFORM_TOOL, at.KITAP_TOOL, at.VIDEO_TOOL,
+                  at.SENARYO_TOOL,
                   assistant_modules.TOOL_NAME, at.SKILL_TOOL, "alistirma_olustur",
                   "ogrenme_gunlugu", "calisma_degerlendir", *at.TOOL_ALLOWLIST}
 ZORUNLU_ARACLAR = {"kitap_listele", "kitap_sayfa", "mufredat_ara", "figur_ara", "figur_getir",

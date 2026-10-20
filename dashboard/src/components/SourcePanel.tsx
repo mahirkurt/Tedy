@@ -6,14 +6,16 @@ import { DocumentView } from '@carbon/icons-react'
 import type { AssistantCitation, CitationKind, FigureLocator } from '../types'
 import { moduleRoute } from '../utils/moduleLink'
 
-// The uploaded source first, then school data, published modules and Tedy Books,
+// The uploaded source first, then school data, MEB's scenario table (`meb-tablo`, the ministry's own
+// question-distribution table — exact, but not Işık's data), published modules and Tedy Books,
 // then the external authorities. `aile-kaynak` (Görev 5) is family-only material — an answer to
 // Işık never carries it, but it sits last regardless, alongside the other external sources.
-const GROUP_ORDER: CitationKind[] = ['yuklenen-dosya', 'ogrenci', 'modul', 'tedy-kitap', 'mufredat', 'kitap', 'oer', 'aile-kaynak']
+const GROUP_ORDER: CitationKind[] = ['yuklenen-dosya', 'ogrenci', 'meb-tablo', 'modul', 'tedy-kitap', 'mufredat', 'kitap', 'oer', 'aile-kaynak']
 const KNOWN_KINDS = new Set<string>(GROUP_ORDER)
 
 const GROUP_TITLE: Record<CitationKind, string> = {
   ogrenci: 'Işık’ın okul verisi',
+  'meb-tablo': 'MEB tabloları',
   modul: 'Yayınlanmış modül',
   'tedy-kitap': 'Tedy Books',
   mufredat: 'MEB müfredatı',

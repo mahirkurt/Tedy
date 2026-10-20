@@ -216,7 +216,7 @@ export interface HealthData {
   okunamadi?: Record<string, { detail?: string; son_okuma?: string }>
 }
 
-export type CitationKind = 'ogrenci' | 'mufredat' | 'kitap' | 'oer' | 'modul' | 'tedy-kitap' | 'aile-kaynak' | 'yuklenen-dosya'
+export type CitationKind = 'ogrenci' | 'mufredat' | 'kitap' | 'oer' | 'modul' | 'tedy-kitap' | 'aile-kaynak' | 'yuklenen-dosya' | 'meb-tablo'
 
 export interface AssistantCitation {
   id: string

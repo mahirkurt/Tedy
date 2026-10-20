@@ -1467,6 +1467,21 @@ _OGRENCI_BILDIRIMLERI: dict[str, dict[str, Any]] = {
     },
 }
 
+_SENARYO_BILDIRIMI = {
+    "name": SENARYO_TOOL,
+    "description": (
+        "MEB'in 7. sınıf 1. dönem ortak yazılı konu-soru dağılım tablosu: bir dersin 1. ya da 2. "
+        "yazılısında senaryoların hangi öğrenme çıktısından kaç soru içerdiği; yaklaşan sınav o derse "
+        "aitse duyurunun andığı senaryonun doğrulaması. Örnek sınav, deneme ya da yazılıya hazırlık "
+        "istendiğinde ÖNCE bu aracı çağır ve dönen dağılıma birebir uy."
+    ),
+    "parameters": {"type": "object", "properties": {
+        "ders": {"type": "string", "description": "Ders adı (ör. 'Türkçe', 'Fen Bilimleri')."},
+        "sinav_no": {"type": "integer", "description": "1 ya da 2 (okulun 1.1 sınavı 1, 1.2 sınavı 2)."},
+        "senaryo": {"type": "integer", "description": "Senaryo numarası; verilmezse duyurununki ya da hepsi."}},
+        "required": ["ders"]},
+}
+
 
 MCP_SERVERS = {
     "maarif-mufredat": ("https://mufredat.cureonics.com/mcp",
@@ -1566,6 +1581,20 @@ def sanitize_schema(schema: dict[str, Any]) -> dict[str, Any]:
 # ChatClient.chat_with_tools slices tool_result content to [:4000]).
 _YEREL_ISABET_SINIRI = 1200
 _YEREL_TOPLAM_SINIRI = 3900
+
+
+def _tam_sayi(deger: Any) -> int:
+    """A tool argument as an int: 4, 4.0 and "4" read as 4. A bool, a fraction, an empty or
+    non-numeric string raise ValueError."""
+    if isinstance(deger, bool):
+        raise ValueError("tam sayı değil")
+    if isinstance(deger, int):
+        return deger
+    if isinstance(deger, float) and deger.is_integer():
+        return int(deger)
+    if isinstance(deger, str):
+        return int(deger.strip())
+    raise ValueError("tam sayı değil")
 
 
 def _kirp(metin: str, sinir: int) -> str:
@@ -1827,6 +1856,7 @@ class McpRegistry:
                  sinif: Callable[[], str | None] | None = None,
                  program_kaynagi: Callable[[], Any] | None = None,
                  sinav_kaynagi: Callable[[], Any] | None = None,
+                 senaryo_tablosu: Callable[[], Any] | None = None,
                  takvim_kaynagi: Callable[[], Any] | None = None,
                  icerik_kaynagi: Callable[[], Any] | None = None,
                  not_kaynagi: Callable[[], Any] | None = None,
@@ -1885,6 +1915,9 @@ class McpRegistry:
             NOT_TOOL: not_kaynagi,
             PLATFORM_TOOL: platform_kaynagi,
         }
+        # MEB scenario table (src/sinav_senaryo.tablo_oku); None or an unreadable table leaves
+        # sinav_senaryosu undeclared.
+        self.senaryo_tablosu = senaryo_tablosu
         # Tedy Books' matched chapters (dashboard_api._canli_kitaplar) and the
         # MEBİ/SEBİTV discovery catalogs (dashboard_api._canli_videolar).
         # Neither fits ogrenci_kaynaklari's one-citation-per-call shape — a
@@ -2005,6 +2038,8 @@ class McpRegistry:
         for ad, kaynak in self.ogrenci_kaynaklari.items():
             if kaynak is not None:
                 decls.append(copy.deepcopy(_OGRENCI_BILDIRIMLERI[ad]))
+        if self._senaryo_tablosu() is not None:
+            decls.append(copy.deepcopy(_SENARYO_BILDIRIMI))
         if self.kitap_kaynagi is not None:
             decls.append(dict(assistant_kitaplar.DECLARATION))
         if self.video_kaynagi is not None:
@@ -2231,6 +2266,8 @@ class McpRegistry:
             return self._dispatch_odev_tamamla(args or {}, okur_sozu)
         if name == EK_TOOL and self.ek_deposu is not None:
             return self._dispatch_ek(args or {})
+        if name == SENARYO_TOOL and self._senaryo_tablosu() is not None:
+            return self._dispatch_senaryo(args or {})
         if self.ogrenci_kaynaklari.get(name) is not None:
             return self._dispatch_ogrenci(name, args or {})
         if name == KITAP_TOOL and self.kitap_kaynagi is not None:
@@ -2695,6 +2732,43 @@ class McpRegistry:
             return ToolOutcome(ok=False, error=f"video araması hatası: {type(exc).__name__}")
         return ToolOutcome(ok=True, text=metin, citations=citations)
 
+    def _senaryo_tablosu(self) -> dict | None:
+        if self.senaryo_tablosu is None or self.ogrenci_kaynaklari.get(SINAV_TOOL) is None:
+            return None
+        try:
+            return self.senaryo_tablosu()
+        except Exception as exc:  # noqa: BLE001 — an unreadable table is "no tool", never a crash
+            logger.error("senaryo tablosu okunamadı: %s", type(exc).__name__)
+            return None
+
+    def _dispatch_senaryo(self, args: dict[str, Any]) -> ToolOutcome:
+        # A JSON tool call may send the numbers as "1"; arac_metni compares them with ints.
+        args = dict(args)
+        for alan in ("sinav_no", "senaryo"):
+            if args.get(alan) is None:
+                continue
+            try:
+                args[alan] = _tam_sayi(args[alan])
+            except ValueError:
+                return ToolOutcome(ok=False, error=f"{alan} bir tam sayı olmalı (ör. 1).")
+        tablo = self._senaryo_tablosu()
+        if tablo is None:
+            return ToolOutcome(ok=False, error="MEB senaryo tablosu okunamadı")
+        try:
+            sinavlar = self.ogrenci_kaynaklari[SINAV_TOOL]() or []
+        except Exception as exc:  # noqa: BLE001 — the table alone still answers
+            logger.error("%s source failed: %s", SINAV_TOOL, type(exc).__name__)
+            sinavlar = []
+        try:
+            metin, etiket = sinav_senaryo.arac_metni(tablo, sinavlar, args)
+        except ValueError as exc:
+            return ToolOutcome(ok=False, error=str(exc))
+        metin = _kirp(metin, GOVDE_SINIRI)
+        return ToolOutcome(ok=True, text=metin, citations=[{
+            "kind": "meb-tablo", "label": etiket,
+            "locator": {"tool": SENARYO_TOOL, "args": dict(args)},
+            "snippet": metin[:400], "confidence": 1.0}])
+
     def _dispatch_ogrenci(self, name: str, args: dict[str, Any]) -> ToolOutcome:
         try:
             veri = self.ogrenci_kaynaklari[name]()
@@ -2784,6 +2858,7 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                    sinif: Callable[[], str | None] | None = None,
                    program_kaynagi: Callable[[], Any] | None = None,
                    sinav_kaynagi: Callable[[], Any] | None = None,
+                   senaryo_tablosu: Callable[[], Any] | None = None,
                    takvim_kaynagi: Callable[[], Any] | None = None,
                    icerik_kaynagi: Callable[[], Any] | None = None,
                    not_kaynagi: Callable[[], Any] | None = None,
@@ -2816,6 +2891,7 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                        unconfigured=unconfigured, module_index=module_index,
                        odev_kaynagi=odev_kaynagi, sinif=sinif,
                        program_kaynagi=program_kaynagi, sinav_kaynagi=sinav_kaynagi,
+                       senaryo_tablosu=senaryo_tablosu,
                        takvim_kaynagi=takvim_kaynagi, icerik_kaynagi=icerik_kaynagi,
                        not_kaynagi=not_kaynagi, sebit_kaynagi=sebit_kaynagi,
                        platform_kaynagi=platform_kaynagi, kitap_kaynagi=kitap_kaynagi,
