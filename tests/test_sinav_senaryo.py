@@ -22,8 +22,8 @@ TR_KONULAR = ["Metnin yüzey anlamını belirleyebilme",
 
 
 def kayit(ders="Türkçe", tur="ortak_sinav", baslik="1.1 Ara Değerlendirme Sınavı", tarih="2026-10-22",
-          konular=()):
-    return {"id": "x", "ders": ders, "tur": tur, "baslik": baslik, "tarih": tarih, "hafta": None,
+          konular=(), hafta=None):
+    return {"id": "x", "ders": ders, "tur": tur, "baslik": baslik, "tarih": tarih, "hafta": hafta,
             "konular": list(konular)}
 
 
@@ -366,3 +366,157 @@ def test_cikti_ifadesi_kural_onceki_tur_kararlarini_bozmaz():
     tr = TABLO["dersler"]["Türkçe"]["ciktilar"]
     assert set(ss.konu_eslestir("Metnin derin anlamı", tr)) == {"T.O.7.7", "T.O.7.8"}
     assert set(ss.konu_eslestir("Söz varlığı", tr)) == {"T.O.7.4", "T.O.7.21", "T.Y.7.18"}
+
+
+# --- Son düzeltme turu -------------------------------------------------------------------------
+
+# C1: bir "senaryo" sözcüğü tek numara taşır. "N. senaryo M soru" ya da "N. Senaryo M. kısım" cümlesinde
+# öndeki sıra sayısı numaradır; sondaki sayı soru adedi/kısım numarasıdır, ikinci bir senaryo değildir.
+@pytest.mark.parametrize("metin,beklenen", [
+    ("Sınav 5. senaryo 3 açık uçlu sorudan oluşacak.", [5]),
+    ("Sınavımız 4. senaryo 7 sorudan oluşacaktır.", [4]),
+    ("Sınav 3. Senaryo 2. kısım.", [3]),
+    ("Sınav dördüncü senaryo 2 soru içerir.", [4]),
+    ("Sınav 3., 4. senaryolar 2 kısım.", [3, 4]),
+    ("Senaryo 4 ve senaryo 5 olabilir.", [4, 5]),
+    ("Sınav senaryo 3 ile 4. senaryo arasında seçilecek.", [3, 4]),
+])
+def test_senaryo_sozcugu_tek_numara_tasir(metin, beklenen):
+    assert ss.senaryo_cumlesi(metin, metin, True)[0] == beklenen
+
+
+def test_c1_blok_yanlis_senaryoyu_dogrulamaz():
+    metin = "1.1 sınavı yapılacak. Sınav 5. senaryo 3 açık uçlu sorudan oluşacak."
+    blok = ss.senaryo_blogu(kayit(), [(metin, metin, True)], TABLO, BUGUN)
+    assert blok["anilan"] == [5] and blok["senaryo"] == 5
+
+
+# I1: takvim kaydının temiz başlığı numara taşımıyorsa ham başlık (taban.rawTitle) okunur. Gerçek kayıt
+# ef69baff7d96 (canlı output/sinavlar.json, 2026-10-20) bu biçimdedir. Alıntıdan (kaynaklar[].alinti) numara okunmaz.
+EF69_HAM = ("7. Sınıf MEB Ülke Geneli Türkçe 1. Dönem 2. Ortak Yazılı Sınavı / "
+            "7th Grade MEB Türkiye-wide Turkish 1st Term 2nd Common Written Exam")
+
+
+def ef69(**degisen):
+    k = {"id": "ef69baff7d96", "ders": "Türkçe", "tur": "ortak_sinav", "baslik": "Türkçe · 1. Dönem Yazılı",
+         "tarih": "2027-01-05", "saat": "10:30", "hafta": None, "konular": [], "sentetik": False,
+         "kaynaklar": [{"tur": "takvim", "konum": {"id": "ef69baff7d96"}, "alinti": EF69_HAM}],
+         "taban": {"id": "ef69baff7d96", "course": "Türkçe", "title": "Türkçe · 1. Dönem Yazılı",
+                   "rawTitle": EF69_HAM, "examNumber": None, "date": "2027-01-05T10:30:00",
+                   "endDate": "2027-01-05T11:10:00", "allDay": False, "status": "upcoming"}}
+    k.update(degisen)
+    return k
+
+
+def test_i1_temiz_baslikta_numara_yoksa_ham_baslik_okunur():
+    assert ss.sutun_coz(ef69(), TABLO, BUGUN) == ("Türkçe", 2)
+    blok = ss.senaryo_blogu(ef69(), [], TABLO, BUGUN)
+    assert blok["durum"] == "ulke_geneli" and blok["sinav_no"] == 2
+
+
+def test_i1_temiz_baslik_cozulurse_o_kazanir():
+    k = ef69(baslik="1.1 Ara Değerlendirme Sınavı", tarih="2026-10-22")
+    k["taban"]["rawTitle"] = EF69_HAM       # ham başlık 2 diyor ama ilk çözülen temiz başlıktır
+    assert ss.sutun_coz(k, TABLO, BUGUN) == ("Türkçe", 1)
+
+
+def test_i1_alintidan_numara_okunmaz():
+    # Birleşen duyurunun "1.1"i kaynaklar[].alinti'de kalır; oradan sütun seçmek C1 sınıfı yanlış eşleşmedir.
+    k = ef69()
+    k["taban"] = None
+    k["kaynaklar"] = [{"tur": "ders_karti", "konum": {}, "alinti": "22 Ekim 1.1 Ara Değerlendirme Sınavı"}]
+    assert ss.sutun_coz(k, TABLO, BUGUN) is None
+    k = ef69()
+    k["taban"] = {"rawTitle": ""}
+    assert ss.sutun_coz(k, TABLO, BUGUN) is None
+
+
+# I4: sınav tarihinin (yoksa haftanın, yoksa bugünün) öğretim yılı tablonunkiyle, dönemi tablonun dönemiyle
+# eşleşmeli. Öğretim yılı Eylül'de başlar; Eylül–Ocak 1. dönem, Şubat–Ağustos 2. dönem.
+@pytest.mark.parametrize("baslik,tarih,beklenen", [
+    ("1.1 Ara Değerlendirme Sınavı", "2027-10-21", None),          # gelecek yılın 1. dönemi
+    ("1.1 Ara Değerlendirme Sınavı", "2025-10-21", None),          # geçen yıl
+    ("1.1 Ara Değerlendirme Sınavı", "2027-02-15", None),          # başlık 1. dönem ama tarih 2. dönemde
+    ("2. Yazılı", "2027-02-15", None),                              # tarihten 2. dönem
+    ("1. Yazılı", "2027-07-01", None),                              # Temmuz 2. dönemdir
+    ("Türkçe 2. Yazılı", "2027-01-05", ("Türkçe", 2)),              # Ocak 1. dönem, 2026-2027
+    ("1.1 Ara Değerlendirme Sınavı", "2026-09-01", ("Türkçe", 1)),  # öğretim yılının ilk günleri
+    ("1.1 Ara Değerlendirme Sınavı", "2026-08-31", None),           # önceki öğretim yılı
+])
+def test_i4_ogretim_yili_ve_donem_tabloyla_eslesmeli(baslik, tarih, beklenen):
+    assert ss.sutun_coz(kayit(baslik=baslik, tarih=tarih), TABLO, BUGUN) == beklenen
+
+
+def test_i4_tarih_yoksa_hafta_sonra_bugun_belirler():
+    b = "1.1 Ara Değerlendirme Sınavı"
+    assert ss.sutun_coz(kayit(baslik=b, tarih=None, hafta="2027-10-18"), TABLO, BUGUN) is None
+    assert ss.sutun_coz(kayit(baslik=b, tarih=None, hafta="2026-10-19"), TABLO, BUGUN) == ("Türkçe", 1)
+    assert ss.sutun_coz(kayit(baslik=b, tarih=None), TABLO, date(2027, 10, 19)) is None
+    assert ss.sutun_coz(kayit(baslik=b, tarih=None), TABLO, date(2027, 2, 15)) is None
+    assert ss.sutun_coz(kayit(baslik=b, tarih=None), TABLO, BUGUN) == ("Türkçe", 1)
+
+
+def test_i4_blok_gelecek_yilin_sinavina_yazilmaz():
+    metin = "1.1 sınavı 4. senaryo ağırlıklı olacak."
+    k = kayit(tarih="2027-10-21")
+    assert ss.senaryo_blogu(k, [(metin, metin, True)], TABLO, BUGUN) is None
+
+
+# M1: not tablosundan türeyen (sentetik) kayıt MEB senaryo bloğu almaz.
+def test_m1_sentetik_kayit_blok_almaz():
+    k = {**kayit(), "sentetik": True}
+    metin = "1.1 sınavı 4. senaryo ağırlıklı olacak."
+    assert ss.sutun_coz(k, TABLO, BUGUN) is None
+    assert ss.senaryo_blogu(k, [(metin, metin, True)], TABLO, BUGUN) is None
+    assert ss.senaryo_blogu({**k, "sentetik": False}, [(metin, metin, True)], TABLO, BUGUN) is not None
+
+
+# I3: konu kapsamı (senaryo dışı kararı ve aday süzgeci) eşiği geçen bütün çıktı ve konu gruplarının
+# birleşimiyle verilir; "duyuruda" etiketi en iyi eşleşmede kalır.
+DOLASIM_SOLUNUM = "Dolaşım ve solunum sistemi"
+
+
+def _fen_12(konu, senaryo=None):
+    metin = f"1.2 sınavı {senaryo}. senaryo ağırlıklı olacak." if senaryo else "1.2 sınavı yapılacak."
+    k = kayit(ders="Fen Bilimleri", baslik="1.2 Ara Değerlendirme", tarih="2026-12-10", konular=[konu])
+    return ss.senaryo_blogu(k, [(metin, metin, True)], TABLO, BUGUN)
+
+
+def test_i3_baglacli_konu_dolasim_senaryo_4te_kismen_degil():
+    # FB.7.3.3 (Dolaşım Sistemi) senaryo 4'te var; yalnız en iyi grup (Solunum → FB.7.3.6) bakılınca "kismen" çıkıyordu.
+    fen = TABLO["dersler"]["Fen Bilimleri"]
+    assert "FB.7.3.3" in fen["sinavlar"]["2"]["senaryolar"]["4"]
+    blok = _fen_12(DOLASIM_SOLUNUM, senaryo=4)
+    assert blok["senaryo"] == 4
+    assert blok["durum"] == "dogrulandi" and blok["senaryo_disi_konular"] == []
+
+
+def test_i3_duyuruda_etiketi_en_iyi_eslesmede_kalir():
+    blok = _fen_12(DOLASIM_SOLUNUM, senaryo=3)
+    assert blok["durum"] == "dogrulandi"
+    assert {d["kod"] for d in blok["dagilim"] if d["duyuruda"]} == {"FB.7.3.6"}
+
+
+def test_i3_gercekten_olmayan_konu_yine_kismen():
+    # Sindirim (FB.7.3.1/2) ve Solunum senaryo 4'te: Uzay konusunun hiçbir çıktısı senaryo 4'te yok.
+    blok = _fen_12("Uzayda Neler Var?", senaryo=4)
+    fen = TABLO["dersler"]["Fen Bilimleri"]["sinavlar"]["2"]["senaryolar"]["4"]
+    assert not ({"FB.7.1.4", "FB.7.1.5"} & set(fen))
+    assert blok["durum"] == "kismen" and blok["senaryo_disi_konular"] == ["Uzayda Neler Var?"]
+
+
+def test_i3_adaylar_birlesimle_suzulur():
+    blok = _fen_12(DOLASIM_SOLUNUM)
+    senaryolar = TABLO["dersler"]["Fen Bilimleri"]["sinavlar"]["2"]["senaryolar"]
+    umulan = sorted(int(n) for n, d in senaryolar.items() if set(d) & {"FB.7.3.3", "FB.7.3.4", "FB.7.3.5", "FB.7.3.6"})
+    assert blok["durum"] == "belirtilmedi" and blok["adaylar"] == umulan
+    assert 4 in blok["adaylar"] and 5 in blok["adaylar"]
+
+
+def test_i3_konu_kapsami_birlesimdir_en_iyi_kume_degil():
+    fen = TABLO["dersler"]["Fen Bilimleri"]["ciktilar"]
+    assert ss.konu_eslestir(DOLASIM_SOLUNUM, fen) == ["FB.7.3.6"]                  # en iyi: Solunum (1.0)
+    assert set(ss.konu_kapsami(DOLASIM_SOLUNUM, fen)) == {"FB.7.3.3", "FB.7.3.4", "FB.7.3.5", "FB.7.3.6"}
+    tr = TABLO["dersler"]["Türkçe"]["ciktilar"]
+    assert ss.konu_kapsami("T.O.7.21 söz varlığı", tr) == ["T.O.7.21"]               # kod eşleşmesi daralmaz
+    assert ss.konu_kapsami("Osmanlı Devleti'nin kuruluşu", tr) == []

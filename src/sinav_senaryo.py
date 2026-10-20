@@ -66,42 +66,61 @@ def _gun(deger: Any) -> date | None:
         return None
 
 
-def _donem_ayi(ay: int) -> int | None:
-    if ay >= 9 or ay == 1:
-        return 1
-    if 2 <= ay <= 6:
-        return 2
-    return None
+def ogretim_yili_adi(gun: date) -> str:
+    """Öğretim yılı Eylül'de başlar: Eylül–Aralık Y → "Y-(Y+1)", Ocak–Ağustos Y → "(Y-1)-Y"."""
+    yil = gun.year if gun.month >= 9 else gun.year - 1
+    return f"{yil}-{yil + 1}"
+
+
+def donem_no(gun: date) -> int:
+    """Eylül–Ocak 1. dönem, Şubat–Ağustos 2. dönem."""
+    return 1 if gun.month >= 9 or gun.month == 1 else 2
+
+
+def _baslik_coz(baslik: str) -> tuple[int | None, int | None]:
+    """Bir başlıktan (dönem, sınav no); sınav no okunamıyorsa (None, None)."""
+    b = katla(baslik or "")
+    m = _DONEM_SINAV.search(b)
+    if m:
+        return int(m.group(1)), int(m.group(2))
+    no = None
+    m = _SINAV_NO.search(b)
+    if m:
+        no = int(m.group(1))
+    else:
+        m = _SOZCUK_NO.search(b)
+        if m:
+            no = 1 if m.group(1) == "birinci" else 2
+    if no is None:
+        return None, None
+    d = _DONEM.search(b)
+    return (int(d.group(1)) if d else None), no
 
 
 def sutun_coz(kayit: dict, tablo: dict, bugun: date) -> tuple[str, int] | None:
-    if kayit.get("tur") in HARIC_TURLER:
+    if kayit.get("tur") in HARIC_TURLER or kayit.get("sentetik"):
         return None
     ders = kayit.get("ders")
     if ders not in tablo["dersler"]:
         return None
-    b = katla(kayit.get("baslik") or "")
+    # Önce kaydın temiz başlığı, sonra takvim sınavının ham başlığı (temiz başlık "Ortak", "N. Yazılı" gibi
+    # sözcükleri düşürebilir); numara okunan ilk başlık kazanır. Kaynak alıntılarından numara okunmaz.
     donem = no = None
-    m = _DONEM_SINAV.search(b)
-    if m:
-        donem, no = int(m.group(1)), int(m.group(2))
-    else:
-        m = _SINAV_NO.search(b)
-        if m:
-            no = int(m.group(1))
-        else:
-            m = _SOZCUK_NO.search(b)
-            if m:
-                no = 1 if m.group(1) == "birinci" else 2
-        d = _DONEM.search(b)
-        if d:
-            donem = int(d.group(1))
+    for baslik in (kayit.get("baslik"), (kayit.get("taban") or {}).get("rawTitle")):
+        donem, no = _baslik_coz(baslik or "")
+        if no is not None:
+            break
     if no is None:
         return None
-    if donem is None:
-        gun = _gun(kayit.get("tarih")) or _gun(kayit.get("hafta")) or bugun
-        donem = _donem_ayi(gun.month)
-    if donem != tablo["kaynak"]["donem"] or str(no) not in tablo["dersler"][ders]["sinavlar"]:
+    k = tablo["kaynak"]
+    gun = _gun(kayit.get("tarih")) or _gun(kayit.get("hafta")) or bugun
+    # Tablo tek bir öğretim yılının tek bir dönemine aittir: başka yılın ya da dönemin sınavı bu sütunlara
+    # bağlanmaz (kaçırmak güvenli yön). Başlık dönemi söylüyorsa ("1.1") tarihin dönemiyle de çelişmemeli.
+    if ogretim_yili_adi(gun) != k["ogretim_yili"] or donem_no(gun) != k["donem"]:
+        return None
+    if donem is not None and donem != k["donem"]:
+        return None
+    if str(no) not in tablo["dersler"][ders]["sinavlar"]:
         return None
     return ders, no
 
@@ -110,12 +129,18 @@ def _sayilar(katli: str, bas: int = 0, son: int | None = None) -> list[tuple[int
     """Katlanmış metinde anılan senaryo numaraları: (numara, bulunduğu konum), görünüş sırasıyla, tekrarsız."""
     son = len(katli) if son is None else son
     bulunan: list[tuple[int, int]] = []
+    # Bir "senaryo" sözcüğü tek numara taşır: öndeki sıra sayısı ("4. senaryo") onu numaralamışsa sondaki sayı
+    # ("4. senaryo 7 soru") soru adedi ya da kısım numarasıdır, ikinci bir senaryo değildir.
+    numaralanan: set[int] = set()
     for m in _ONCE.finditer(katli, bas, son):
         bulunan += [(int(x), m.start()) for x in re.findall(r"\d{1,2}", m.group(1))]
-    for m in _SONRA.finditer(katli, bas, son):
-        bulunan.append((int(m.group(1)), m.start()))
+        numaralanan.add(m.end() - len("senaryo"))
     for m in _SOZCUK.finditer(katli, bas, son):
         bulunan.append((_SIRA[m.group(1)], m.start()))
+        numaralanan.add(m.end() - len("senaryo"))
+    for m in _SONRA.finditer(katli, bas, son):
+        if m.start() not in numaralanan:
+            bulunan.append((int(m.group(1)), m.start()))
     sonuc: dict[int, int] = {}
     for sayi, konum in sorted(bulunan, key=lambda t: t[1]):
         if 1 <= sayi <= 10:
@@ -189,7 +214,8 @@ def _puan(a: str, b: str) -> float:
     return 2 * len(ka & kb) / (len(ka) + len(kb)) if ka and kb else 0.0
 
 
-def konu_eslestir(konu: str, ciktilar: list[dict]) -> list[str]:
+def _kesin_eslesme(konu: str, ciktilar: list[dict]) -> list[str]:
+    """Konu çıktı kodunu ya da bir/birkaç çıktının tam ifadesini anıyorsa o çıktılar; yoksa []."""
     k = katla(konu)
     kodlar = [c["kod"] for c in ciktilar
               if re.search(rf"(?<![\w.]){re.escape(katla(c['kod']))}(?!\d)", k)]
@@ -201,22 +227,49 @@ def konu_eslestir(konu: str, ciktilar: list[dict]) -> list[str]:
         metin = _KOD_ONEKI.sub("", katla(c["metin"]))
         if len(metin) >= 10 and metin in k:
             kodlar.append(c["kod"])
-    if kodlar:
-        return kodlar
-    # Eşit puanlı çıktıların hepsi; konu adı, en az eşiği ve en iyi çıktı puanını tutuyorsa çıktıdan önce gelir.
+    return kodlar
+
+
+def _puanlar(konu: str, ciktilar: list[dict]) -> tuple[list[tuple[str, float]], dict[str, list[str]], dict[str, float]]:
     puanlar = [(c["kod"], _puan(konu, c["metin"])) for c in ciktilar]
-    en_cikti = max((p for _, p in puanlar), default=0.0)
     gruplar: dict[str, list[str]] = {}
     for c in ciktilar:
         if c.get("konu"):
             gruplar.setdefault(c["konu"], []).append(c["kod"])
-    konu_puanlari = {ad: _puan(konu, ad) for ad in gruplar}
+    return puanlar, gruplar, {ad: _puan(konu, ad) for ad in gruplar}
+
+
+def konu_eslestir(konu: str, ciktilar: list[dict]) -> list[str]:
+    """Duyurudaki konunun EN İYİ eşleşmesi ("duyuruda" etiketi bunu taşır). Senaryo kapsamı kararı için
+    `konu_kapsami` kullanılır."""
+    kodlar = _kesin_eslesme(konu, ciktilar)
+    if kodlar:
+        return kodlar
+    # Eşit puanlı çıktıların hepsi; konu adı, en az eşiği ve en iyi çıktı puanını tutuyorsa çıktıdan önce gelir.
+    puanlar, gruplar, konu_puanlari = _puanlar(konu, ciktilar)
+    en_cikti = max((p for _, p in puanlar), default=0.0)
     en_konu = max(konu_puanlari.values(), default=0.0)
     if en_konu >= ESIK and en_konu >= en_cikti:
         return [kod for ad, p in konu_puanlari.items() if abs(p - en_konu) < 1e-9 for kod in gruplar[ad]]
     if en_cikti >= ESIK:
         return [kod for kod, p in puanlar if abs(p - en_cikti) < 1e-9]
     return []
+
+
+def konu_kapsami(konu: str, ciktilar: list[dict]) -> list[str]:
+    """Konunun kapsadığı bütün çıktılar: kesin eşleşme varsa o; yoksa eşiği (ESIK) geçen her çıktı ile her konu
+    grubunun çıktılarının birleşimi, tablo sırasıyla. "Dolaşım ve solunum sistemi" iki gruba da eşiği geçer;
+    yalnız en iyisine (Solunum) bakmak Dolaşım'ın senaryoda olduğunu görmezdi. Senaryo dışı kararı ve aday süzgeci
+    bunu kullanır."""
+    kodlar = _kesin_eslesme(konu, ciktilar)
+    if kodlar:
+        return kodlar
+    puanlar, gruplar, konu_puanlari = _puanlar(konu, ciktilar)
+    secilen = {kod for kod, p in puanlar if p >= ESIK}
+    for ad, p in konu_puanlari.items():
+        if p >= ESIK:
+            secilen.update(gruplar[ad])
+    return [c["kod"] for c in ciktilar if c["kod"] in secilen]
 
 
 def senaryo_blogu(kayit: dict, metinler: list[tuple[str, str, bool]], tablo: dict, bugun: date) -> dict | None:
@@ -233,6 +286,9 @@ def senaryo_blogu(kayit: dict, metinler: list[tuple[str, str, bool]], tablo: dic
     anilan = sorted(cumleler)
     eslesme = {konu: konu_eslestir(konu, dt["ciktilar"]) for konu in kayit.get("konular") or []}
     eslesen = {konu: set(kodlar) for konu, kodlar in eslesme.items() if kodlar}
+    # "duyuruda" etiketi en iyi eşleşmede kalır; senaryo dışı kararı ve aday süzgeci eşiği geçen her çıktı ve
+    # konu grubunun birleşimiyle verilir.
+    kapsam = {konu: set(konu_kapsami(konu, dt["ciktilar"])) for konu in eslesen}
     blok = {"durum": None, "ders": ders, "sinav_no": no, "donem": tablo["kaynak"]["donem"], "anilan": anilan,
             "cumle": cumleler[anilan[0]] if anilan else None, "senaryo": None, "toplam": None, "dagilim": [],
             "eslesen_konu_sayisi": len(eslesen),
@@ -255,12 +311,12 @@ def senaryo_blogu(kayit: dict, metinler: list[tuple[str, str, bool]], tablo: dic
         blok.update(senaryo=n, cumle=cumleler[n], toplam=sum(dagilim.values()),
                     dagilim=[{"kod": c["kod"], "metin": c["metin"], "soru": dagilim[c["kod"]],
                               "duyuruda": c["kod"] in duyuruda} for c in dt["ciktilar"] if c["kod"] in dagilim])
-        blok["senaryo_disi_konular"] = [k for k, kodlar in eslesen.items() if not kodlar & set(dagilim)]
+        blok["senaryo_disi_konular"] = [k for k, kodlar in kapsam.items() if not kodlar & set(dagilim)]
         blok["durum"] = "kismen" if blok["senaryo_disi_konular"] else "dogrulandi"
         return blok
     if eslesen:
         blok["adaylar"] = sorted(int(n) for n, d in senaryolar.items()
-                                 if all(kodlar & set(d) for kodlar in eslesen.values()))
+                                 if all(kodlar & set(d) for kodlar in kapsam.values()))
     blok["durum"] = "belirtilmedi"
     return blok
 
@@ -298,12 +354,26 @@ def _dagilim_satirlari(dt: dict, dagilim: dict[str, int], duyuruda: set[str]) ->
     return satirlar
 
 
-def arac_metni(tablo: dict, sinavlar: list[dict], args: dict) -> tuple[str, str]:
+def _ders_coz(ham: str, tablo: dict) -> str | None:
+    """Model/kullanıcı ders adını tablo anahtarına çevirir: büyük-küçük harf ve aksan duyarsız; tek anlamlı ilk
+    sözcük de yeter ("Fen" → Fen Bilimleri, "Sosyal" → Sosyal Bilgiler)."""
+    for ad in (normalize_course(ham) or ham, ham):
+        k = katla(ad)
+        if not k:
+            continue
+        for anahtar in tablo["dersler"]:
+            if katla(anahtar) == k:
+                return anahtar
+        ilk = [a for a in tablo["dersler"] if katla(a).split()[0] == k]
+        if len(ilk) == 1:
+            return ilk[0]
+    return None
+
+
+def arac_metni(tablo: dict, sinavlar: list[dict], args: dict, bugun: date | None = None) -> tuple[str, str]:
     ham = str(args.get("ders") or "").strip()
-    ders = normalize_course(ham) or ham
-    if ders == "Fen":
-        ders = "Fen Bilimleri"
-    if ders not in tablo["dersler"]:
+    ders = _ders_coz(ham, tablo)
+    if ders is None:
         raise ValueError(f"'{ham}' MEB senaryo tablosunda yok; bu ders için senaryo verilemez. "
                          f"Tabloda olanlar: {', '.join(tablo['dersler'])}.")
     dt = tablo["dersler"][ders]
@@ -320,8 +390,12 @@ def arac_metni(tablo: dict, sinavlar: list[dict], args: dict) -> tuple[str, str]
         raise ValueError(f"{ders} için {no}. yazılı tabloda yok.")
     k = tablo["kaynak"]
     gun = k["meb_guncelleme"][:10].split("-")
-    satirlar = [f"{ders} · 7. sınıf · {k['donem']}. Dönem {no}. Ortak Yazılı "
-                f"(MEB konu-soru dağılım tablosu, güncelleme {gun[2]}.{gun[1]}.{gun[0]})"]
+    satirlar = [f"{ders} · {k['sinif']}. sınıf · {k['donem']}. Dönem {no}. Ortak Yazılı "
+                f"(MEB konu-soru dağılım tablosu, güncelleme {gun[2]}.{gun[1]}.{gun[0]})",
+                f"Bu tablo {k['ogretim_yili']} {k['donem']}. dönem ortak yazılıları içindir."]
+    if bugun is not None and donem_no(bugun) != k["donem"]:
+        satirlar.append(f"Şu an {donem_no(bugun)}. dönemdeyiz; bu tablo yalnız {k['donem']}. dönem ortak "
+                        f"yazılılarını kapsar, bugünkü dönemin sınavları için dağılım vermez.")
     if sinav:
         satirlar.append(f"Sınav: {sinav.get('title')} · {str(sinav.get('date') or 'tarih belirsiz')[:10]}")
         satirlar.append(f"Durum: {ozet(blok)}.")
@@ -338,7 +412,7 @@ def arac_metni(tablo: dict, sinavlar: list[dict], args: dict) -> tuple[str, str]
         satirlar.append("Soru sayısı ya da dağılımı yok, uydurma. Örnek sınav istenirse duyurudaki konulardan "
                         "hazırla (duyuru konu vermiyorsa dersin güncel ünitesinden) ve bunun bir MEB senaryosu "
                         "olmadığını okura açıkça söyle.")
-        return "\n".join(satirlar), f"MEB konu-soru dağılım tablosu · {ders} 7 · {no}. yazılı"
+        return "\n".join(satirlar), f"MEB konu-soru dağılım tablosu · {ders} {k['sinif']} · {no}. yazılı"
     senaryolar = sinav_tablosu["senaryolar"]
     duyuruda = {d["kod"] for d in (blok or {}).get("dagilim", []) if d.get("duyuruda")}
     secilen = senaryo or (blok or {}).get("senaryo")
@@ -359,7 +433,9 @@ def arac_metni(tablo: dict, sinavlar: list[dict], args: dict) -> tuple[str, str]
             satirlar.append(f"- Senaryo {n} · {sum(d.values())} soru: "
                             + ", ".join(f"{kod}" + (f" ({s})" if s > 1 else "") for kod, s in d.items()))
         satirlar.append("Toplam soru sayıları yukarıda; hangi senaryonun kullanılacağı belli değil.")
+        satirlar.append("Senaryo seçilince sinav_senaryosu'nu senaryo=N ile yeniden çağır; kontrol listesi ve "
+                        "çıktı adları o çağrıda gelir.")
     govde = "\n".join(satirlar)
     if len(govde) > GOVDE_SINIRI:
         govde = govde[:GOVDE_SINIRI - 1] + "…"
-    return govde, f"MEB konu-soru dağılım tablosu · {ders} 7 · {no}. yazılı"
+    return govde, f"MEB konu-soru dağılım tablosu · {ders} {k['sinif']} · {no}. yazılı"
