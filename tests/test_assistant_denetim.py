@@ -136,11 +136,11 @@ def test_altin_soru_semasi():
     dusen = {"nedir", "nelerdir", "nasil", "neden", "nicin", "kim", "kimdir",
              "hangi", "kac", "mi", "mu"}
     for ders, sorular in dersler.items():
-        assert len(sorular) == 3
+        assert len(sorular) >= 3
         for i, soru in enumerate(sorular, 1):
             assert soru["id"] == f"{ders}-{i}"
             assert set(soru) == {"id", "soru", "arac", "kaynak", "noktalar"}
-            assert soru["arac"] in {"kazanim_ara", "kitap_sayfa", "skill_kaynagi"}
+            assert soru["arac"] in {"kazanim_ara", "kitap_sayfa", "skill_kaynagi", "sinav_senaryosu"}
             assert soru["kaynak"] and soru["soru"] and soru["noktalar"]
             for nokta in soru["noktalar"]:
                 katli = turkce_kucult_katla(nokta)
@@ -236,8 +236,8 @@ def test_eval_kosu_bir_hatayla_durmaz(tmp_path):
     runtime = SahteRuntime()
     yol = asistan_eval.kos(runtime=runtime, kok=tmp_path)
     sonuc = json.loads(yol.read_text())
-    assert len(runtime.cagrilar) == 12
-    assert sonuc["ozet"]["soru"] == 12
+    assert len(runtime.cagrilar) == 14
+    assert sonuc["ozet"]["soru"] == 14
     assert len(sonuc["sorular_sha256"]) == 64
     ilk, ikinci = sonuc["sorular"][:2]
     assert ilk["cevap"] == ""

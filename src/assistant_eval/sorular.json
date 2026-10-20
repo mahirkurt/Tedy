@@ -9,12 +9,14 @@
     "fen": [
       {"id": "fen-1", "soru": "Sindirim nerede başlar?", "arac": "kazanim_ara", "kaynak": "sindirim", "noktalar": ["ağız"]},
       {"id": "fen-2", "soru": "Enerji harcanınca yok olur mu?", "arac": "kitap_sayfa", "kaynak": "enerji", "noktalar": ["dönüş"]},
-      {"id": "fen-3", "soru": "Tuzlu su bir bileşik midir?", "arac": "kazanim_ara", "kaynak": "karışım", "noktalar": ["karışım"]}
+      {"id": "fen-3", "soru": "Tuzlu su bir bileşik midir?", "arac": "kazanim_ara", "kaynak": "karışım", "noktalar": ["karışım"]},
+      {"id": "fen-4", "soru": "Fen Bilimleri 1. yazılı için örnek sınav hazırla.", "arac": "sinav_senaryosu", "kaynak": "MEB konu-soru", "noktalar": ["senaryo"]}
     ],
     "turkce": [
       {"id": "turkce-1", "soru": "Bağlaç olan de bitişik mi yazılır?", "arac": "skill_kaynagi", "kaynak": "bağlaç", "noktalar": ["ayrı"]},
       {"id": "turkce-2", "soru": "Konu ile ana fikir aynı mıdır?", "arac": "kazanim_ara", "kaynak": "ana fikir", "noktalar": ["ana fikir"]},
-      {"id": "turkce-3", "soru": "Fiilimsi kip eki alır mı?", "arac": "kitap_sayfa", "kaynak": "fiilimsi", "noktalar": ["fiilimsi"]}
+      {"id": "turkce-3", "soru": "Fiilimsi kip eki alır mı?", "arac": "kitap_sayfa", "kaynak": "fiilimsi", "noktalar": ["fiilimsi"]},
+      {"id": "turkce-4", "soru": "Türkçe 1. yazılı için 4. senaryoya uygun örnek sınav hazırla.", "arac": "sinav_senaryosu", "kaynak": "MEB konu-soru", "noktalar": ["T.O.7.5"]}
     ],
     "sosyal": [
       {"id": "sosyal-1", "soru": "Kanunları kim yapar?", "arac": "kazanim_ara", "kaynak": "kanun", "noktalar": ["TBMM"]},
