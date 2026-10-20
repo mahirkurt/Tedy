@@ -19,7 +19,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
@@ -1469,11 +1469,13 @@ _OGRENCI_BILDIRIMLERI: dict[str, dict[str, Any]] = {
 
 _SENARYO_BILDIRIMI = {
     "name": SENARYO_TOOL,
+    # {sinif} ve {donem} bildirilirken tablodan doldurulur (McpRegistry.declarations).
     "description": (
-        "MEB'in 7. sınıf 1. dönem ortak yazılı konu-soru dağılım tablosu: bir dersin 1. ya da 2. "
+        "MEB'in {sinif}. sınıf {donem}. dönem ortak yazılı konu-soru dağılım tablosu: bir dersin 1. ya da 2. "
         "yazılısında senaryoların hangi öğrenme çıktısından kaç soru içerdiği; yaklaşan sınav o derse "
-        "aitse duyurunun andığı senaryonun doğrulaması. Örnek sınav, deneme ya da yazılıya hazırlık "
-        "istendiğinde ÖNCE bu aracı çağır ve dönen dağılıma birebir uy."
+        "aitse duyurunun andığı senaryonun doğrulaması. Örnek sınav, deneme sınavı ya da yazılı provası "
+        "istendiğinde ÖNCE bu aracı çağır ve dönen dağılıma birebir uy. LGS/GİS türü çoktan seçmeli "
+        "denemeler bu aracın kapsam dışıdır: onlar için çağırma."
     ),
     "parameters": {"type": "object", "properties": {
         "ders": {"type": "string", "description": "Ders adı (ör. 'Türkçe', 'Fen Bilimleri')."},
@@ -2038,8 +2040,12 @@ class McpRegistry:
         for ad, kaynak in self.ogrenci_kaynaklari.items():
             if kaynak is not None:
                 decls.append(copy.deepcopy(_OGRENCI_BILDIRIMLERI[ad]))
-        if self._senaryo_tablosu() is not None:
-            decls.append(copy.deepcopy(_SENARYO_BILDIRIMI))
+        tablo = self._senaryo_tablosu()
+        if tablo is not None:
+            bildirim = copy.deepcopy(_SENARYO_BILDIRIMI)
+            bildirim["description"] = bildirim["description"].format(
+                sinif=tablo["kaynak"]["sinif"], donem=tablo["kaynak"]["donem"])
+            decls.append(bildirim)
         if self.kitap_kaynagi is not None:
             decls.append(dict(assistant_kitaplar.DECLARATION))
         if self.video_kaynagi is not None:
@@ -2733,13 +2739,25 @@ class McpRegistry:
         return ToolOutcome(ok=True, text=metin, citations=citations)
 
     def _senaryo_tablosu(self) -> dict | None:
+        """Okunabilir tablo; yalnız bugün tablonun öğretim yılı içindeyse. Yıl bitince araç bildirilmez: 2027-2028
+        sınavlarına 2026-2027 dağılımı örnek diye yazılmasın."""
         if self.senaryo_tablosu is None or self.ogrenci_kaynaklari.get(SINAV_TOOL) is None:
             return None
         try:
-            return self.senaryo_tablosu()
+            tablo = self.senaryo_tablosu()
+            if tablo is None:
+                return None
+            kaynak = tablo["kaynak"]
+            if (sinav_senaryo.ogretim_yili_adi(self._senaryo_bugunu()) != kaynak["ogretim_yili"]
+                    or not isinstance(kaynak["sinif"], int) or not isinstance(kaynak["donem"], int)):
+                return None
+            return tablo
         except Exception as exc:  # noqa: BLE001 — an unreadable table is "no tool", never a crash
             logger.error("senaryo tablosu okunamadı: %s", type(exc).__name__)
             return None
+
+    def _senaryo_bugunu(self) -> date:
+        return istanbul_simdi(self.saat() if self.saat is not None else None).date()
 
     def _dispatch_senaryo(self, args: dict[str, Any]) -> ToolOutcome:
         # A JSON tool call may send the numbers as "1"; arac_metni compares them with ints.
@@ -2760,7 +2778,7 @@ class McpRegistry:
             logger.error("%s source failed: %s", SINAV_TOOL, type(exc).__name__)
             sinavlar = []
         try:
-            metin, etiket = sinav_senaryo.arac_metni(tablo, sinavlar, args)
+            metin, etiket = sinav_senaryo.arac_metni(tablo, sinavlar, args, self._senaryo_bugunu())
         except ValueError as exc:
             return ToolOutcome(ok=False, error=str(exc))
         except Exception as exc:  # noqa: BLE001 — a malformed exam block must not drop the whole answer
