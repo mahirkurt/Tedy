@@ -1837,18 +1837,40 @@ def _odak_penceresi_oku():
     }
 
 
+AYAR_YALNIZ_AILE = "Bu ayarı yalnız aile değiştirebilir."
+
+
+def _aile_oturumu():
+    """A signed-in family member (full role, not the student) — the only one who may change the
+    evening. Işık, an API key and the test bypass are not: the setting decides when the family is
+    told she has not started, so the person it watches must not be able to silence it (R28 I2)."""
+    return _assistant_okur() == "aile"
+
+
 @app.route("/api/aksam-duzeni")
 @require_auth
 def aksam_duzeni_getir():
-    """The evening plan settings. Full role only (not in READER_ENDPOINTS)."""
-    return jsonify({**_aksam_duzeni_oku(), "aile_uyeleri": _aile_uyeleri()})
+    """The evening plan settings. Full role only (not in READER_ENDPOINTS). The roster the
+    "Haber alacaklar" boxes are drawn from goes only to a signed-in family member."""
+    duzen = _aksam_duzeni_oku()
+    if not _aile_oturumu():
+        return jsonify(duzen)
+    return jsonify({**duzen, "aile_uyeleri": _aile_uyeleri()})
 
 
 @app.route("/api/aksam-duzeni", methods=["PUT"])
 @require_auth
 def aksam_duzeni_kaydet():
+    if not _aile_oturumu():
+        return jsonify({"error": AYAR_YALNIZ_AILE}), 403
+    govde = request.get_json(silent=True)
     uyeler = {u["email"] for u in _aile_uyeleri()}
-    duzen, hata = aksam_duzeni.dogrula(request.get_json(silent=True), uyeler)
+    if isinstance(govde, dict) and "haber_alacaklar" not in govde:
+        # A client that could not read the list does not send it; the stored list stays (never wiped),
+        # less anyone who has since left the family (they would only make the save fail).
+        kayitli = _aksam_duzeni_oku()["haber_alacaklar"]
+        govde = {**govde, "haber_alacaklar": [e for e in kayitli if e in uyeler]}
+    duzen, hata = aksam_duzeni.dogrula(govde, uyeler)
     if hata:
         return jsonify({"error": hata}), 400
     atomic_json_dump({**duzen, "updated_at": datetime.now().isoformat()}, _aksam_duzeni_yolu())
@@ -1865,7 +1887,9 @@ def odak_penceresi():
 @app.route("/api/odak-penceresi", methods=["PUT"])
 @require_auth
 def odak_penceresi_kaydet():
-    """Old clients: fold the three fields into the evening plan."""
+    """Old clients: fold the three fields into the evening plan. Family only, like the new route."""
+    if not _aile_oturumu():
+        return jsonify({"error": AYAR_YALNIZ_AILE}), 403
     pencere, hata = _odak_penceresi_dogrula(request.get_json(silent=True))
     if hata:
         return jsonify({"error": hata}), 400

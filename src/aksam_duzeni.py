@@ -88,8 +88,12 @@ def oku(yol: Path, eski: Path | None = None) -> dict:
             ham = json.load(f)
         if isinstance(ham, dict):
             tam = {**VARSAYILAN, **{k: v for k, v in ham.items() if k in VARSAYILAN}}
+            # Elle düzenlenmiş dosyada yazı olmayan alıcı (sayı, null, sözlük) ya da liste olmayan değer
+            # düşer; düzenin geri kalanı (saatler) bu yüzden varsayılana dönmez, okuma da patlamaz.
+            kisiler = tam.get("haber_alacaklar")
+            tam["haber_alacaklar"] = [e for e in kisiler if isinstance(e, str)] if isinstance(kisiler, list) else []
             # Kayıtlı e-postalar sonradan aileden çıkmış olabilir; burada yalnız biçim denetlenir.
-            d, _hata = dogrula(tam, set(tam.get("haber_alacaklar") or []) if isinstance(tam.get("haber_alacaklar"), list) else set())
+            d, _hata = dogrula(tam, set(tam["haber_alacaklar"]))
             if d is not None:
                 return {**d, "varsayilan": False}
     except (OSError, ValueError):
