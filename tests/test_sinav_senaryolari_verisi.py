@@ -51,6 +51,8 @@ def test_olculmus_turkce_dorduncu_senaryo():
 
 def test_olculmus_fen():
     fen = VERI["dersler"]["Fen Bilimleri"]
-    assert len(fen["sinavlar"]["1"]["senaryolar"]) == 5
+    # MEB fen3_2.xlsx'i 2026-10-20'de düzeltti: önceki belgedeki 5. senaryo 2. senaryonun kopyasıydı ve kalktı.
+    assert len(fen["sinavlar"]["1"]["senaryolar"]) == 4
+    assert len(fen["sinavlar"]["2"]["senaryolar"]) == 5
     assert fen["sinavlar"]["1"]["senaryolar"]["1"]["FB.7.2.1"] == 3
     assert next(c for c in fen["ciktilar"] if c["kod"] == "FB.7.1.1")["konu"] == "Türkiye ve Uzay Araştırmaları"

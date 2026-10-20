@@ -152,7 +152,7 @@
     },
     "Fen Bilimleri": {
       "adres": "https://meb.ai/ankmeb2",
-      "sha256": "ac1282782a45571172f1748641a5da501e8f44def0c384cc652998585190c806",
+      "sha256": "c1ec40327eb8712d005553ec3e8510c438712b1c0d051f96956a637970b0bb7a",
       "ciktilar": [
         {
           "kod": "FB.7.1.1",
@@ -269,12 +269,6 @@
               "FB.7.1.5": 1,
               "FB.7.2.1": 2,
               "FB.7.2.2": 1
-            },
-            "5": {
-              "FB.7.1.1": 2,
-              "FB.7.1.3": 1,
-              "FB.7.1.5": 1,
-              "FB.7.2.1": 3
             }
           }
         },
@@ -323,7 +317,7 @@
     },
     "Matematik": {
       "adres": "https://meb.ai/ankmeb3",
-      "sha256": "f54f40d908fcd145456e508e54f4f3b98d728b0367399205c4506d555e718534",
+      "sha256": "ba944ca80f5a7bad7e881142a8bb7509a0b251c7c5f2f204d1bf9a83b8ae8e69",
       "ciktilar": [
         {
           "kod": "MAT.7.1.1",

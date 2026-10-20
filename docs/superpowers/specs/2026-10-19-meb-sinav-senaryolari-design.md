@@ -221,7 +221,7 @@ Kâğıdın dağılıma uyması istem ve kontrol listesiyle sağlanır; serbest 
 ## 8. Testler
 
 - **Betik:** küçük, elle yazılmış bir LibreOffice biçimli HTML fikstürüyle (birleşik hücreler, boş hücreler, ülke geneli birleşik sütunu) ızgara ve yapı denetimi; ret nedenleri.
-- **Veri dosyası:** yapı değişmezleri (kod biçimi, toplam ≥ 1, ders anahtarları kanonik) ve ölçülmüş gerçekler kapı olarak: Türkçe 1. yazılı Senaryo 4 = 7 soru, T.O.7.5 = 2; Türkçe 2. yazılı `ulke_geneli`; Fen 1. yazılı 5 senaryo, FB.7.2.1 S1 = 3.
+- **Veri dosyası:** yapı değişmezleri (kod biçimi, toplam ≥ 1, ders anahtarları kanonik) ve ölçülmüş gerçekler kapı olarak: Türkçe 1. yazılı Senaryo 4 = 7 soru, T.O.7.5 = 2; Türkçe 2. yazılı `ulke_geneli`; Fen 1. yazılı 4 senaryo (2026-10-20 MEB düzeltmesinden önce 5'ti; 5. senaryo 2.'nin kopyasıydı), Fen 2. yazılı 5 senaryo, FB.7.2.1 S1 = 3.
 - **Eşleştirici:** sütun çözümü (1.1/1.2, "2. yazılı", tarihten dönem, `kisa_sinav` hariç), senaryo kalıpları (sayı, sözcük, çoklu, pencere dışı başka sınavın senaryosu alınmaz), konu eşleşmesi (kod, metin, konu adı, eşleşmeme), beş durum; gerçek Türkçe vakası uçtan uca `dogrulandi`.
 - **Tespit:** blok `icerik_surumu`'nu değiştirmez; tablo yokken anahtar yazılmaz ve `hatalar`'a not düşer.
 - **API:** alan geçişi, `null`.
@@ -241,7 +241,7 @@ Kâğıdın dağılıma uyması istem ve kontrol listesiyle sağlanır; serbest 
 | Risk | Karşılık |
 |---|---|
 | Jina Reader kapanır/değişir | `--dosya` ile tarayıcıdan kaydedilmiş HTML; veri dosyası repoda, senkron ona bağlı değil |
-| MEB tabloyu dönem içinde günceller | `meb_guncelleme` kartta görünür; betik yeniden koşulunca sha256 değişir ve diff okunur |
+| MEB tabloyu dönem içinde günceller | Betik yeniden koşulunca sha256 değişir ve diff okunur. **Ölçüldü (2026-10-20):** MEB `fen3_2.xlsx`'i ÖDSGM sayfasının "Güncelleme" damgasını (10.09.2026) değiştirmeden değiştirdi — `meb.ai/ankmebN` kısa bağlantıları `cdn.eba.gov.tr/yardimcikaynaklar/2026/09/KSDT/*.xlsx`'e yönlenir ve değişikliği yalnız dosyanın `Last-Modified`'ı gösterir (Fen 2026-10-20 07:52 UTC, öbür beşi 2026-09-08). Kartın `meb_guncelleme`'si sayfanın damgasıdır, dosyanınki değil; değişiklik kendiliğinden fark edilmez |
 | Öğretmen senaryoyu tablo dışı bir anlamda kullanır ("ağırlıklı") | Kart duyurunun cümlesini aynen taşır; doğrulama "senaryo var ve konular içinde" der, "sınav tam olarak budur" demez |
 | Konu metni eşleşmesi yanlış pozitif | Kod önce; metinde %60 eşiği ve en yüksek ortaklık; eşleşmeyen konu açıkça listelenir |
 | Başka sınavın senaryo cümlesi bu sınava yazılır | Alıntıdan başlayan, sonraki tarihte biten pencere; test edilir |
