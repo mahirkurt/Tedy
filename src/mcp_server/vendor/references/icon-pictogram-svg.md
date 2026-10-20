@@ -148,6 +148,7 @@ estetiğiyle tutarlıdır ve doğru render olur. Şablonun sprite'ında bulunur:
 | `ic-flag` | hedef | öğrenme hedefi |
 | `ic-pause` | mola | brain-break |
 | `ic-view` | göster | flashcard çevir |
+| `ic-checkmark-outline` · `ic-incomplete` · `ic-circle-dash` | aşama durumu | yalnız motorun ilerleme göstergesi (Kanun M2.4); yazar kullanmaz |
 
 (Path tanımları `assets/module-template.html` sprite'ında. Yazar yalnız sprite'taki
 `id`'leri yazar; ödül ikonları kullanılmaz (Kanun M3.10). Yeni ikon şablon değişikliğidir.)

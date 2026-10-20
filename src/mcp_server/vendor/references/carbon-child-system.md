@@ -390,7 +390,7 @@ HTML/CSS karşılıkları) sadık biçimde uygular. Eşleme:
 | Carbon bileşeni | edupedia karşılığı | Token bağı |
 |---|---|---|
 | **Header (Tedy bandı)** | `.topbar__hero` — yalnız tek başına açılışta (Kanun M1.1): düz `tedy-brand` + Tedy işareti + `text-on-color` başlık; ikon düğmesi hover'ı `tedy-brand-hover` | `tedy-brand`, `text-on-color` |
-| **ProgressIndicator** (stepper) | `.stepper` — tamamlanana tıklanıp geri dönülür. Kanun M2.4: tamamlanan ve geçerli adım `$interactive`, bekleyen `$icon-primary`, etiket `$text-primary`; adımlar 3–7 aşamadır (M2.5). Bugünkü `button-primary` dolgulu, etiketsiz segment adımları borç KB-2 | `button-primary`, `interactive`, `border-strong-01` |
+| **ProgressIndicator** (aşama göstergesi) | `ol.asamalar` — Carbon anatomisi (Kanun M2.4, M2.5, M5.4; 2026-10-20): adımlar `meta.milestones`'un 3–7 aşamasıdır; tamamlanan `CheckmarkOutline`, geçerli `Incomplete`, başlanmamış `CircleDash`; çizgi ve ikon `$interactive`, başlanmamış ikon `$icon-primary`, çizgi `$border-subtle`; adım en az 8rem, yalnız tamamlanan aşama 48 px'lik düğmedir. Satır sığmadığında (kapsayıcı sorgusu) ve aşama yoksa yerine konum metni: "Aşama 2/5 · Uygula · Bölüm 7/18" ya da "Bölüm 7 / 18" | `interactive`, `icon-primary`, `border-subtle`, `text-primary`, `text-secondary` |
 | **Selectable Tile** | `.opt` — kare (`border-radius-00`); 1px `border-tile-01`; hover `layer-hover`, seçili `border-inverse` kenar, odak `focus`; ders rengi almaz (Kanun M1.6; şablonun aksan halkası ve ders tag zemini borç KB-17); doğru/yanlış: `notification-background-success/error` + durum halkası | `border-tile-01`, `layer-hover-02`, `border-inverse`, `focus` |
 | **Inline notification** | `.feedback--ok/no/info` — 3px sol durum çubuğu + durum ikonu; koyu temada 1px `border-subtle-01` çerçeve | `support-*`, `notification-background-*` |
 | **Tag** | `.def-term` (ders ailesinin tag çifti + `tag-border`, hover `tag-hover`), `.adim-sayaci` (nötr adım etiketi) — `border-radius-max` | `--subject-surface/on-surface/border`, `layer-01` |
@@ -409,7 +409,7 @@ gömülür, `currentColor` ile tema/aksan rengini alır.
 Tema **token-tabanlıdır**: `<html data-theme="g10|g100">` özniteliği tema
 bloğunu seçer; tüm bileşenler değişken okuduğu için yeniden render gerekmez. Modül temayı
 yalnız panodan alır (`edupedia:appearance`); tema düğmesi ve öğrencinin seçimi yoktur (Kanun
-M4.1; şablondaki düğme borç KB-1). g100 bloğu panonun bir gün geçeceği hedefin token
+M4.1; şablonun düğmesi 2026-10-20'de kalktı, KB-1). g100 bloğu panonun bir gün geçeceği hedefin token
 eşlemesidir (M4.3; ölü `white` bloğu borç KB-22). Kanonik blok (`@carbon/themes@11.75.0` g100 ile birebir; `tedy-*`
 satırları Tedy katmanıdır):
 

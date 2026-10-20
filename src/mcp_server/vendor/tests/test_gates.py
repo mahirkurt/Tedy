@@ -1884,20 +1884,19 @@ def test_font_embed_helper_check_mode_is_deterministic():
 def test_runtime_persistence_uses_local_allowlist_and_session_state():
     source = _template_source()
     assert "sessionStorage" in source
-    assert "THEME_STORE_KEY" in source
+    assert "THEME_STORE_KEY" not in source  # Kanun M4.1: the module stores no theme
     assert "LEITNER_STORE_KEY" in source
     assert "SESSION_STORE_KEY" in source
     assert "function persistSession(" in source
     assert "ssGet(SESSION_STORE_KEY)" in source
     assert "answers:Array.from(state.awarded)" in source.replace(" ", "")
-    assert "lsSet(THEME_STORE_KEY" in source
     assert "lsSet(LEITNER_STORE_KEY" in source
     assert "lsSet(SESSION_STORE_KEY" not in source
 
     local_calls = re.findall(r"(?<!function )lsSet\(\s*([A-Z_]+)", source)
-    assert set(local_calls) == {"THEME_STORE_KEY", "LEITNER_STORE_KEY"}
+    assert set(local_calls) == {"LEITNER_STORE_KEY"}
     local_reads = re.findall(r"(?<!function )lsGet\(\s*([A-Z_]+)", source)
-    assert set(local_reads) == {"THEME_STORE_KEY", "LEITNER_STORE_KEY"}
+    assert set(local_reads) == {"LEITNER_STORE_KEY"}
     session_calls = re.findall(r"(?<!function )ssSet\(\s*([A-Z_]+)", source)
     session_reads = re.findall(r"(?<!function )ssGet\(\s*([A-Z_]+)", source)
     assert set(session_calls) == {"SESSION_STORE_KEY"}

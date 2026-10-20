@@ -51,11 +51,14 @@ def test_json_asset_block_is_not_scanned_as_script():
     assert _run(gates_ek.gate_bridge, ENGINE.replace(sablon.ASSETS_SLOT, block))["G-BRIDGE"]["status"] == "PASS"
 
 
-def test_vendored_storage_key_is_not_a_message_type():
-    # THEME_STORE_KEY is a localStorage key from the vendored template, not a bridge message
-    # type (ruling T6-2); it must not trip G-BRIDGE's foreign-message-type check.
-    assert '"edupedia:theme"' in ENGINE
+def test_tema_kaydi_yok_ve_kapidan_gecmez():
+    # Modül Tasarım Kanunu M4.1 (KB-1, 2026-10-20): the template keeps no theme of its own, so
+    # its old localStorage key is gone and is no longer allow-listed — a module that still
+    # stores a theme fails G-BRIDGE's foreign-type check and has to be recompiled.
+    assert '"edupedia:theme"' not in ENGINE
     assert _run(gates_ek.gate_bridge, ENGINE)["G-BRIDGE"]["status"] == "PASS"
+    eski = ENGINE.replace("const LEITNER_STORE_KEY", 'const THEME_STORE_KEY="edupedia:theme";\n  const LEITNER_STORE_KEY', 1)
+    assert _run(gates_ek.gate_bridge, eski)["G-BRIDGE"]["status"] == "FAIL"
 
 
 def test_appearance_message_is_allowed_but_not_required():

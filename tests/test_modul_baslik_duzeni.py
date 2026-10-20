@@ -48,5 +48,7 @@ def test_acilista_odak_tasinmaz_okur_gecince_tasinir():
     assert "const odakla = okurGecti; okurGecti = false;" in govde
     assert "focusStageHeading(stage);" not in govde.replace("if(odakla) focusStageHeading(stage);", "")
     for yer in ("state.idx++; persistSession(); okurGecti=true; render();",
-                "state.idx--; okurGecti=true; render();", "state.idx=i; okurGecti=true; render();"):
+                "state.idx--; okurGecti=true; render();",
+                # The progress indicator's finished stage (Kanun M2.4, 2026-10-20) is a reader move too.
+                "state.idx=st.start; okurGecti=true; render();"):
         assert yer in kaynak

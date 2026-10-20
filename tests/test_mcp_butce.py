@@ -31,8 +31,8 @@ def _butce(tmp_path, cap=1.0, clock=lambda: SEPT, verified=True):
 
 def test_shipped_pricing_is_unverified_and_has_no_forbidden_tools():
     table = butce.load_pricing()
-    assert {"minimax.ses", "minimax.gorsel", "minimax.muzik", "minimax.video",
-            "comfyui.muzik", "comfyui.video"} <= set(table)
+    assert {"minimax.ses", "minimax.gorsel", "minimax.muzik", "minimax.video"} <= set(table)
+    assert not any(k.startswith("comfyui.") for k in table)  # sağlayıcı 2026-10-20'de emekli
     assert all(k.dogrulandi is False for k in table.values())
     assert not {k.arac for k in table.values()} & butce.YASAK_ARACLAR
     assert table["minimax.ses"].otomatik and not table["minimax.muzik"].otomatik
@@ -96,7 +96,7 @@ def test_approval_token_binds_user_run_kind_item_and_request(tmp_path):
     for args in [("isikkurtx@gmail.com", RUN, "muzik", "minimax.muzik", "neşeli bir şarkı"),
                  (EMAIL, "ffffffffffff", "muzik", "minimax.muzik", "neşeli bir şarkı"),
                  (EMAIL, RUN, "video", "minimax.muzik", "neşeli bir şarkı"),
-                 (EMAIL, RUN, "muzik", "comfyui.muzik", "neşeli bir şarkı"),
+                 (EMAIL, RUN, "muzik", "minimax.video", "neşeli bir şarkı"),
                  (EMAIL, RUN, "muzik", "minimax.muzik", "hüzünlü bir şarkı")]:
         assert b.onay_dogrula(token, *args) is None
     assert b.onay_dogrula("bozuk", EMAIL, RUN, "muzik", "minimax.muzik", "neşeli bir şarkı") is None
@@ -352,7 +352,7 @@ def test_load_pricing_rejects_a_row_that_is_a_string(tmp_path):
 
 def test_shipped_pricing_still_loads_under_strict_typing():
     table = butce.load_pricing()
-    assert len(table) >= 6
+    assert len(table) >= 4
 
 
 # --- F3: rezerve() reads the clock exactly once and reuses it for both the cap-check month and

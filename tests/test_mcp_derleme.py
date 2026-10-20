@@ -662,3 +662,43 @@ def test_f12_golden_sweep_stays_fail_free_with_g_svg_pass(mode):
     report = gates.run_gates(derleme.derle(ornekler.ornek(mode), {}, ORIGIN))
     assert _fails(report) == []
     assert report["G-SVG"]["status"] == "PASS"
+
+
+# Modül Tasarım Kanunu M2.5 (KB-2, 2026-10-20): the progress indicator's steps are stages, not
+# segments. The compiler holds the author's `meta.milestones` to the law's shape.
+def _asamali(milestones):
+    data = ornekler.ornek("QUIZ")
+    data["meta"]["milestones"] = milestones
+    return [e for e in derleme.sema_dogrula(data) if e.startswith("meta.milestones")]
+
+
+def test_asamalar_gecerli_listeyi_kabul_eder():
+    assert _asamali([{"atSegmentId": "t1", "title": "Keşfet"}, {"atSegmentId": "q1", "title": "Uygula"},
+                     {"atSegmentId": "cp1", "title": "Pekiştir"}]) == []
+
+
+@pytest.mark.parametrize("milestones, parca", [
+    ([{"atSegmentId": "t1", "title": "Keşfet"}, {"atSegmentId": "q1", "title": "Uygula"}], "3–7 aşamalık"),
+    ("t1,q1,cp1", "3–7 aşamalık"),
+    ([{"atSegmentId": "q1", "title": "A"}, {"atSegmentId": "cp1", "title": "B"}, {"atSegmentId": "t1", "title": "C"}],
+     "ilk segmentte başlamalı"),
+    ([{"atSegmentId": "t1", "title": "A"}, {"atSegmentId": "cp1", "title": "B"}, {"atSegmentId": "q1", "title": "C"}],
+     "segment sırasını izlemeli"),
+    ([{"atSegmentId": "t1", "title": "A"}, {"atSegmentId": "yok", "title": "B"}, {"atSegmentId": "cp1", "title": "C"}],
+     "bir segment kimliği olmalı"),
+    ([{"atSegmentId": "t1", "title": "Bütün kavramları keşfet"}, {"atSegmentId": "q1", "title": "B"},
+      {"atSegmentId": "cp1", "title": "C"}], "en çok 16 karakter"),
+    ([{"atSegmentId": "t1", "title": "Değerlendirmeyi yap"}, {"atSegmentId": "q1", "title": "B"},
+      {"atSegmentId": "cp1", "title": "C"}], "en çok 16 karakter"),
+    (["t1", {"atSegmentId": "q1", "title": "B"}, {"atSegmentId": "cp1", "title": "C"}], "nesnesi olmalı"),
+])
+def test_asamalar_kanuna_uymayan_listeyi_reddeder(milestones, parca):
+    hatalar = _asamali(milestones)
+    assert hatalar and any(parca in h for h in hatalar), hatalar
+
+
+def test_asamasiz_modul_gecerlidir():
+    """No milestones is valid: the indicator is then the position line alone ("Bölüm n / N")."""
+    data = ornekler.ornek("QUIZ")
+    assert "milestones" not in data["meta"]
+    assert not [e for e in derleme.sema_dogrula(data) if e.startswith("meta.milestones")]

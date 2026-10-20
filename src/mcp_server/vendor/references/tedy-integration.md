@@ -48,8 +48,8 @@ belirler (https://carbondesignsystem.com/building-blocks/foundations/color/guide
 
 - Varsayılan **g10**'dur (`<html data-theme="g10">`), çünkü pano `<Theme theme="g10">`
   altında çalışır. **Modül temayı yalnız panodan alır** ve koşulsuz uygular (Kanun M4.1):
-  tema düğmesi, tema kaydı ve "öğrencinin seçimi > pano" önceliği yoktur. Şablon bugün tema
-  düğmesini, kaydı ve bu önceliği hâlâ taşır: borç KB-1. g100 bloğu yalnız otoriteden üretilen
+  tema düğmesi, tema kaydı ve "öğrencinin seçimi > pano" önceliği yoktur. Şablonun tema
+  düğmesi, kaydı ve bu önceliği 2026-10-20'de kalktı (KB-1). g100 bloğu yalnız otoriteden üretilen
   token eşlemesidir; `white` ölü bir temadır (M4.3, borç KB-22).
 - Pano bir gün koyu mod eklerse bu panonun Profil'deki ayarıdır; modül onu bu mesajla devralır
   (Kanun M4.2).
@@ -81,8 +81,9 @@ belirler (https://carbondesignsystem.com/building-blocks/foundations/color/guide
   Akışta modül kendi sayfa kabuğunu bırakır (şablondaki `data-host-layout="flow"` bloğu): 55rem
   sütun, dolgu ve `.wrap`'in `100vh` tabanı kalkar — taban kalsaydı çerçeve boyu içeriği, içerik
   çerçeveyi büyütürdü. Kimlik bandı ve modülün başlık bloğu gizlenir; sayfanın başı panonundur
-  (§3, Kanun M1.1). İlerleme rayı panonun kart diliyle tek kart olur; araç düğmeleri (ses, sesli
-  okuma) kalır, tema düğmesi yoktur (Kanun M4.1; şablonda borç KB-1). Mesaj yalnız
+  (§3, Kanun M1.1). İlerleme göstergesi kutu değil sayfanın bir öğesidir: aşama satırı çerçevenin
+  bütün genişliğini alır, konum metni ve araç düğmeleri (ses, sesli okuma) onun altında tek satırdadır
+  (Kanun M5.4); tema düğmesi yoktur (Kanun M4.1). Mesaj yalnız
   `window.parent`'a ve `EDUPEDIA_PARENT_ORIGIN`'e gider; pano onu yalnız açtığı çerçeveden
   (`event.source`, origin `"null"`) ve `1–200000` tam sayı boyla kabul eder (`acceptSizeMessage`).
   Alan yoksa (eski pano, tek başına açılış) bu yol hiç kurulmaz; bu tarihten önce derlenmiş modül
@@ -209,7 +210,7 @@ istisnası artık **yok** (`carbon-excellence.md` madde 4, S11).
 **Karar (2026-10-10, talimatname S43, Ç9'un kararı):** modülde kutlama ya da ödül animasyonu
 (XP/seri nabzı, "+N XP" yükselişi, rozet belirişi, ödül sesi) ve seri sayacı yoktur. İlerleme sessiz,
 etiketli tek bir göstergedir; adımları 3–7 aşamadır, segment değil (`meta.milestones`, Kanun M2.4,
-M2.5; şablonda borç KB-2). Anında geri bildirim metinle kalır. XP ve rozet ekranda hiç yoktur
+M2.5; 2026-10-20'den beri şablonda, KB-2 kapandı). Anında geri bildirim metinle kalır. XP ve rozet ekranda hiç yoktur
 (Kanun M2.7). Dayanak: anayasa §9 ("kutlama", "seri sayacı"), İ6 (aynı anda tek hareket), Carbon productive
 hareket (https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#productive-motion).
 Şablon bu kararı uygular (2026-10-11, talimatname B73 kapandı):
