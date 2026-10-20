@@ -273,6 +273,8 @@ başlangıcına çapalanır.
 - **Önerilmeyen ve nedeni:** "teslim yarından sonraysa işi yarının penceresine
   ertele" kuralı. §2'ye göre ev ödevi zaten büyük ölçüde pencere dışında
   yapılıyor. Her işi 15:45–16:00 arasındaki 15 dakikalık dilime itmek dürüst olmaz.
+  (Tarihçe: bu gerekçe eski odak penceresi içindir; 2026-10-20'den beri akşamın
+  dizilimini akşam planı yapar, hemen aşağıdaki "Akşam kipi — çalışma planı".)
   Pencere dışında kart yalnız kısa ve tek adımlı kalır ("10 dakikayla").
 
 **Akşam kipi — çalışma planı (2026-10-20, `TEDY_AKSAM_PLANI=1`; spec `superpowers/specs/2026-10-19-aksam-calisma-plani-design.md`, talimatname S51).**

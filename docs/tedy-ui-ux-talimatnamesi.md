@@ -2835,7 +2835,7 @@ kendiliğinden düşer, kesilmez.
 
 **Sınama.** `gorsel-regresyon.spec.ts` (Bugün 1440/390 ve yüksek kontrast tabanları), `aria-yapisi.spec.ts`
 (`bugun.aria.yml`), `gorunum-kipleri.spec.ts`; `bugun-duzen.spec.ts` kontrastı, parçaların adını, saat cetvelinin
-yokluğunu ve parçaların izi tam doldurduğunu sabitler; `odak-penceresi.spec.ts` ayardaki ödev zamanını; parça
+yokluğunu ve parçaların izi tam doldurduğunu sabitler; `aksam-duzeni.spec.ts` ayardaki ödev zamanını; parça
 hesabı `tests/gunSeridi.test.ts` (okul sabahı ve Yol, ders sırası, son zilden sonra Yol, ödev dilimi içi, akşam,
 yatma sonrası, okulsuz gün, odak sonu son zilden önce, cuma: geç zil ödev zamanını kaydırır ve Yol çizilmez).
 
