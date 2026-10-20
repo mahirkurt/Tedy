@@ -1,6 +1,6 @@
 # TEDY Arayüz Tasarım İlkeleri
 
-**Sürüm 1.2 · 2026-10-10 · Kapsam: `dashboard/` (React 19 + Carbon v11)**
+**Sürüm 1.3 · 2026-10-19 · Kapsam: `dashboard/` (React 19 + Carbon v11)**
 
 Bu doküman TEDY panosunun neye benzeyeceğini değil, **neye göre karar verileceğini**
 yazar. Bir ekran tasarlarken "bu doğru mu?" sorusunun cevabı buradan çıkmalı.
@@ -12,8 +12,10 @@ değişmezler (D1–D4) ve ilkeler (İ1–İ9) burada yaşar ve burada değişir
 kural · test · kapı tablosunda (§2) bağlantıyla toplar, Carbon temellerini, kalıpları, bilinçli sapmaları
 ve otomatik kapıları bu kuralların altına yerleştirir. Öncelik sırası: D1–D4 → İ1–İ9 → talimatname →
 yüzey tasarımları (`frontend-surface-designs.md`) → bileşen rehberi (`carbon-bilesen-rehberi.md`) →
-`tedy-carbon` katmanı → carbon-builder → Carbon'un genel rehberi. Çelişkide üstteki kazanır; ölçüm,
-kaynak göstermeyen genellemeyi yener.
+`tedy-carbon` katmanı → carbon-builder → Carbon'un genel rehberi. Modül yüzeylerinde
+`docs/tedy-modul-tasarim-kanunu.md` İ1–İ9'dan sonra, talimatnameden önce; edupedia vendor ve
+eklentisi `tedy-carbon`'dan sonra, carbon-builder'dan önce gelir (kanun §0.2). Çelişkide üstteki
+kazanır; ölçüm, kaynak göstermeyen genellemeyi yener.
 
 ---
 
@@ -324,9 +326,10 @@ Ayrıntı: talimatname §3.6.
 
 ### 5.5 Dil
 
-Türkçe, sen diliyle, cümle düzeninde (Başlık Her Kelime Büyük değil; TÜMÜ BÜYÜK
-HARF de değil — kaşlar, Tag'ler ve durum dizgeleri dahil, ne kaynakta ne CSS'te;
-2026-10-10, talimatname S38).
+Türkçe, sen diliyle. Bir şeyi adlandıran başlık başlık düzenindedir; etiket, kaş, düğme,
+Tag, durum dizgesi ve cümle ya da emir olan başlık cümle düzenindedir. TÜMÜ BÜYÜK HARF hiçbir
+yerde yok, ne kaynakta ne CSS'te (talimatname S38: 2026-10-10, ad başlıkları 2026-10-19
+revizyonu).
 (Güncellendi 2026-10-10: 2026-09-24'ten beri Işık'a "sen", aileye "siz"; asistanda ve sayfa
 metinlerinde, Carbon AI Chat'te `asistan/dilPaketi.ts` `AILE` ile. Bkz. yüzey tasarımları
 değişiklik kaydı 1.5.)
@@ -483,3 +486,4 @@ Otomatik kapılar ve komutlar: talimatname §12.
 | 1.0 | 2026-08-31 | İlk sürüm. Işık'ın profili, ölçülmüş mevcut durum ve Carbon v11 tabanı üzerine. |
 | 1.1 | 2026-10-10 | Talimatname (`tedy-ui-ux-talimatnamesi.md`) altına bağlandı: Giriş notu ve öncelik sırası, §5 alt bölümlerine ve §10'a talimatname bağlantıları; bayat iddialar tarihli notla düzeltildi (D2 WCAG 2.2 AA, İ7 ve §8 kusurları giderildi/kısmen, §5.1 `--ted-cat-*` kalktı, §5.2 Books IBM Plex Serif, §5.5 aileye "siz", §6 Gün Şeridi'nin bugünkü kapsamı, §7 gezinme kararı ve D3a alt çubuğu). Hiçbir D/İ kuralı değişmedi. |
 | 1.2 | 2026-10-10 | Talimatname 1.1'in Ç1–Ç10 kararlarıyla (S35–S44) hizalandı. §5.4 azaltılmış hareket yeniden yazıldı (S37): eski "bilgi taşıyan hareket kalır" cümlesi yerine "hiçbir bilgi yalnız hareketle taşınmaz; reduce altında temel olmayan her hareket durur" — tarihli düzeltme, gevşetme değil; §10 kapısı buna göre. §5.5'e tümü büyük harf yasağı (S38), §9 "Kutlama"ya modüller (S43) eklendi. Hiçbir D/İ kimliği ve bölüm numarası değişmedi. |
+| 1.3 | 2026-10-19 | Modül Tasarım Kanunu (`tedy-modul-tasarim-kanunu.md` 1.0) öncelik sırasına girdi: modül yüzeylerinde İ1–İ9'dan sonra, talimatnameden önce (kanun §0.2, KB-34). §5.5 S38'in 2026-10-19 revizyonuyla hizalandı: ad başlıkları başlık düzeninde; etiket, düğme ve cümle başlıkları cümle düzeninde. Hiçbir D/İ kimliği ve bölüm numarası değişmedi. |

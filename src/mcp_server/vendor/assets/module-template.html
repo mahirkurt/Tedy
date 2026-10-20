@@ -526,6 +526,9 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .seg-ic{flex:none;width:3.5rem;height:3.5rem;border-radius:var(--cds-radius);background:var(--accent-tint);display:inline-flex;align-items:center;justify-content:center}
 .seg-ic .pic{color:var(--accent-on);width:2rem;height:2rem}
 .seg-head h2{font-size:var(--fs-h-seg);font-weight:400;margin:0;line-height:1.25}
+/* Başlık etkileşimli değildir; okur bölüm değiştirince odak yalnız okuma yerini bildirmek için
+   ona taşınır — çerçeve halkası düğme sanılır. */
+[data-stage-heading="true"]:focus{outline:none}
 .kicker{font-size:var(--fs-label);font-weight:600;color:var(--accent-strong);
   margin-bottom:2px}
 .seg-body p{margin:0 0 var(--sp-05)}
@@ -1026,6 +1029,50 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .tts-oku:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
 .tts-oku .cds-icon{width:1.05rem;height:1.05rem;color:var(--cds-icon-primary)}
 .tts-oku--on{background:var(--cds-layer-selected-01);box-shadow:inset 0 0 0 2px var(--cds-border-interactive);color:var(--cds-text-primary)}
+/* ============================================================
+   PANODA AKIŞ YERLEŞİMİ (2026-10-19) — pano edupedia:appearance ile layout:"flow" bildirince
+   köprü <html data-host-layout="flow"> yazar. Modül o zaman panonun bir bölümüdür, ayrı bir
+   sayfa değil: kendi sayfa kabuğunu (55rem sütun, dolgu, 100vh tabanı) bırakır, pano sütununu
+   doldurur; yüksekliği içerik kadardır ve köprü onu panoya bildirir (çerçevenin kendi kaydırma
+   çubuğu olmaz). Tedy laciverti panonun üst bandında zaten var — ikinci bir bant sayfanın içinde
+   başka bir uygulama gibi okunur ve "marka laciverti yalnız üst bant" kuralını bozar. Bu yüzden
+   başlık nötr sayfa başlığıdır (Carbon heading-04), Tedy işareti panonunkiyle yinelenmez, ilerleme
+   rayı panonun kart diliyle (layer-01, 1 px border-subtle, 8 px köşe) tek kart olur. Araç düğmeleri
+   (ses, sesli okuma, tema) kalır, yalnız nötr ghost dilini alır: koyu tema öğrencinin kararıdır (S14).
+   Tek başına açılışta bu blok hiç devreye girmez.
+   ============================================================ */
+:root[data-host-layout="flow"] body{background:var(--cds-background)}
+:root[data-host-layout="flow"] .wrap{max-width:none;padding:0;min-height:0}
+:root[data-host-layout="flow"] .topbar{border:0;border-radius:0;overflow:visible;margin-bottom:var(--sp-06)}
+:root[data-host-layout="flow"] .topbar__hero{background:transparent;color:var(--cds-text-primary);
+  padding:0 0 var(--sp-05)}
+:root[data-host-layout="flow"] .tedy-mark{display:none}
+/* Başlığı, dersi ve kazanımları pano kendi ders panelinde gösterir (ModulBasligi); modülde
+   yinelenmez. Araç düğmeleri sağda kalır. */
+:root[data-host-layout="flow"] .topbar__l{display:none}
+/* Araç düğmeleri ilerleme rayıyla aynı satırda, onun sağında; dar ekranda rayın altına sağa iner. */
+:root[data-host-layout="flow"] .topbar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-03) var(--sp-04)}
+:root[data-host-layout="flow"] .topbar__status{order:1;flex:1 1 20rem;min-width:0}
+:root[data-host-layout="flow"] .topbar__hero{order:2;flex:none;padding:0;margin-inline-start:auto}
+:root[data-host-layout="flow"] .topbar__r{justify-content:flex-end}
+:root[data-host-layout="flow"] .topbar__tools{border-left:0;padding-left:0}
+:root[data-host-layout="flow"] .topbar__title{color:var(--cds-text-primary);font-size:1.75rem;
+  line-height:1.28572;font-weight:400;letter-spacing:0}
+:root[data-host-layout="flow"] .meta-line{color:var(--cds-text-secondary);font-size:.875rem;line-height:1.28572;
+  letter-spacing:.16px}
+:root[data-host-layout="flow"] .topbar__tools{border-left-color:var(--cds-border-subtle)}
+:root[data-host-layout="flow"] .icon-btn{color:var(--cds-icon-primary)}
+:root[data-host-layout="flow"] .icon-btn:hover,:root[data-host-layout="flow"] .icon-btn:active{background:var(--cds-layer-hover-01)}
+:root[data-host-layout="flow"] .icon-btn:focus-visible{outline-color:var(--cds-focus)}
+:root[data-host-layout="flow"] .topbar .icon-btn--on,
+:root[data-host-layout="flow"] .topbar .icon-btn--on .cds-icon{background:var(--cds-layer-selected-01);color:var(--cds-icon-primary)}
+:root[data-host-layout="flow"] .pacing-disk{background:var(--cds-layer-01)}
+:root[data-host-layout="flow"] .pacing-disk__track{stroke:var(--cds-border-subtle)}
+:root[data-host-layout="flow"] .pacing-disk__arc{stroke:var(--cds-interactive)}
+:root[data-host-layout="flow"] .pacing-disk__dismiss{color:var(--cds-icon-primary)}
+:root[data-host-layout="flow"] .pacing-disk__dismiss:hover{background:var(--cds-layer-hover-01)}
+:root[data-host-layout="flow"] .pacing-disk__dismiss:focus-visible{outline-color:var(--cds-focus)}
+:root[data-host-layout="flow"] .topbar__status{border:1px solid var(--cds-border-subtle);border-radius:var(--cds-radius)}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none !important;transition:none !important}}
 </style>
 </head>
@@ -1486,6 +1533,10 @@ const MODULE_DATA = {
     document.documentElement.setAttribute("data-subject-family", subjectFamily());
     document.documentElement.setAttribute("data-subject-domain", dom.id);
     document.documentElement.setAttribute("data-subject", subjectKey());
+    // Başlık düzeni (2026-10-19): modül ve bölüm adları ad öbeğidir — her sözcük büyük harfle,
+    // bağlaç ve soru eki küçük; yalnız ilk harf büyür, hiçbir harf küçülmez (pano: utils/baslik.ts).
+    if(typeof D.meta.title==="string" && D.meta.title.indexOf("<")<0) D.meta.title=basliga(D.meta.title);
+    segs.forEach(function(s){ if(s && typeof s.title==="string" && s.title.indexOf("<")<0) s.title=basliga(s.title); });
     $("#titleText").textContent = D.meta.title || "Modül";
     // Kapak piktogramı bantta değil (orada Tedy işareti durur); özet segmentinde yaşar.
     const coverPic=$("#coverPic"); if(coverPic){ const u=coverPic.querySelector("use"); if(u) u.setAttribute("href","#"+(D.meta.coverPictogram||"pic-education")); }
@@ -1746,7 +1797,7 @@ const MODULE_DATA = {
       btn.title = s.title || ("Bölüm "+(i+1));
       btn.innerHTML = done? icon("ic-check") : String(i+1);
       if(current) btn.setAttribute("aria-current","step");
-      if(done){ btn.addEventListener("click",()=>{ state.idx=i; render(); }); }
+      if(done){ btn.addEventListener("click",()=>{ state.idx=i; okurGecti=true; render(); }); }
       else { btn.disabled = true; }
       wrap.appendChild(btn);
       box.appendChild(wrap);
@@ -1796,9 +1847,9 @@ const MODULE_DATA = {
   /* ---- navigasyon ---- */
   function goNext(){
     if(state.idx<segs.length){ state.done.add(segs[state.idx].id); }
-    state.idx++; persistSession(); render();
+    state.idx++; persistSession(); okurGecti=true; render();
   }
-  function goBack(){ if(state.idx>0){ state.idx--; render(); } }
+  function goBack(){ if(state.idx>0){ state.idx--; okurGecti=true; render(); } }
   function setNav({back=true, next=true, nextLabel="Devam", nextEnabled=true}={}){
     const b=$("#backBtn"), n=$("#nextBtn");
     b.style.visibility = back && state.idx>0 ? "visible":"hidden";
@@ -1806,6 +1857,24 @@ const MODULE_DATA = {
     n.disabled = !nextEnabled;
     n.innerHTML = nextLabel+" "+icon("ic-arrow-right");
   }
+  const BASLIK_KUCUK = ["ve","ile","ya","veya","de","da","ki","mı","mi","mu","mü"];
+  function basliga(metin){
+    let ilk = true;
+    return String(metin).split(/(\s+)/).map(function(parca){
+      if(!parca || /^\s+$/.test(parca)) return parca;
+      const cekirdek = parca.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "").toLocaleLowerCase("tr");
+      const buyut = ilk || BASLIK_KUCUK.indexOf(cekirdek) < 0;
+      ilk = false;
+      if(!buyut) return parca;
+      const i = parca.search(/\p{L}/u);
+      if(i < 0) return parca;
+      const harf = parca[i];
+      return harf === harf.toLocaleLowerCase("tr") ? parca.slice(0, i) + harf.toLocaleUpperCase("tr") + parca.slice(i + 1) : parca;
+    }).join("");
+  }
+  /* Odak yalnız okur bölüm değiştirince başlığa taşınır (2026-10-19): açılışta ve geri yüklemede
+     taşınmaz — panoya gömülü modül, sayfa açılır açılmaz odağı çerçeveye çekmesin. */
+  let okurGecti = false;
   function focusStageHeading(stage){
     const target=stage.querySelector('[data-stage-heading="true"]')||stage;
     if(target&&typeof target.focus==="function") target.focus({preventScroll:true});
@@ -1840,7 +1909,8 @@ const MODULE_DATA = {
     const stage=$("#stage"); stage.innerHTML=""; stage.removeAttribute("data-seg");
     stage.removeAttribute("data-hook-resolved"); // her render'da temizlenir; yalnız çözen teach yeniden yazar
     updateRail();
-    if(state.idx>=segs.length){ renderSummary(stage); focusStageHeading(stage); return; }
+    const odakla = okurGecti; okurGecti = false;
+    if(state.idx>=segs.length){ renderSummary(stage); if(odakla) focusStageHeading(stage); return; }
     const s=segs[state.idx];
     stage.setAttribute("data-seg", s.type);
     const fn = ({hook:renderHook,teach:renderTeach,mcq:renderMCQ,flashcards:renderFlashcards,
@@ -1851,7 +1921,7 @@ const MODULE_DATA = {
       table:renderTable,numberline:renderNumberline,fraction:renderFraction,
       diagram:renderDiagram,flow:renderFlow,cards:renderCards,gloss:renderGloss,dialogue:renderDialogue})[s.type];
     (fn||renderTeach)(stage,s);
-    focusStageHeading(stage);
+    if(odakla) focusStageHeading(stage);
     if(state.idx===0) mountObjectives(stage);
     window.scrollTo({top:0,behavior:"instant"});
   }

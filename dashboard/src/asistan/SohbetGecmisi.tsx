@@ -75,9 +75,9 @@ export default function SohbetGecmisi({ depo, ogrenci, kilitli, onAc, onYeni, on
       statusIconDescription="Hata" />}
     {satirlar(depo.liste, ogrenci ? 'Henüz sohbetin yok.' : 'Henüz sohbetiniz yok.')}
     {!ogrenci && <>
-      <h3 className="asistan-gecmis__alt-baslik">Işık'ın sohbetleri</h3>
+      <h3 className="asistan-gecmis__alt-baslik">Işık'ın Sohbetleri</h3>
       {satirlar(depo.isikListe, "Işık'ın henüz sohbeti yok.", true)}
-      <h3 className="asistan-gecmis__alt-baslik">Asistanın notları</h3>
+      <h3 className="asistan-gecmis__alt-baslik">Asistanın Notları</h3>
       {depo.notlar.length ? <ul className="asistan-gecmis__liste">{depo.notlar.map(n => <li key={n.id} className="asistan-gecmis__satir">
         <div className="asistan-gecmis__satir-ust">
           <p className="asistan-gecmis__not">{n.metin}</p>

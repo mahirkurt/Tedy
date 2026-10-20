@@ -1,6 +1,6 @@
 - main:
   - heading "Profil" [level=1]
-  - heading "Öğrenci profili" [level=2]
+  - heading "Öğrenci Profili" [level=2]
   - heading "Deneme Öğrenci" [level=3]
   - text: "/No: \\d+ Sınıf: 7-D Şube: D Okul No \\d+ Doğum Tarihi \\d+\\.\\d+\\.\\d+ İkinci Yabancı Dil Fransızca Servis No \\d+/"
   - heading "Özel ders ekle" [level=2]
@@ -41,8 +41,8 @@
       - /placeholder: ss:dd
       - text: /\d+:\d+/
     - button "Özel ders ekle"
-  - heading "Akşam düzeni" [level=2]
-  - form "Akşam düzeni":
+  - heading "Akşam Düzeni" [level=2]
+  - form "Akşam Düzeni":
     - paragraph: Bugün, ödeve hazır olduğun saatten zor işlerin sonuna kadar tek bir zor iş önerir; sonrasında hafif işler. Yemek ve hazırlık için yer ayırır, yatma saatinden sonra işi yarına bırakır.
     - text: Ödeve hazır olduğun saat
     - textbox "Ödeve hazır olduğun saat":
@@ -79,5 +79,5 @@
       - checkbox "baba@example.com"
       - text: baba@example.com Liste boşken TEDY kimseye haber vermez. Işık'ın bildirimleri yalnız onun hesabıyla açılmış cihazlara gider.
     - button "Akşam düzenini kaydet"
-  - heading "Tanımlı özel dersler" [level=2]
+  - heading "Tanımlı Özel Dersler" [level=2]
   - paragraph: Tanımlı özel ders yok.

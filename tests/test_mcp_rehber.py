@@ -9,7 +9,7 @@ from src.mcp_server import rehber, vendor_sync
 def test_every_mapped_heading_exists_in_vendor():
     for bolum, sources in rehber.SECTIONS.items():
         for filename, numbers in sources:
-            text = (vendor_sync.VENDOR_DIR / filename).read_text(encoding="utf-8")
+            text = rehber.read_source(filename)
             present = {h for h, _ in rehber.split_sections(text)}
             for number in numbers:
                 assert any(re.match(rf"##\s+{re.escape(number)}(\.|\s)", h) for h in present), (bolum, filename, number)
@@ -83,3 +83,49 @@ def test_search_reaches_preamble_text():
         h["kaynak"] == "references/carbon-sources.md" and h["baslik"] == "(giriş)"
         for h in hits["sonuclar"]
     )
+
+
+def test_kanun_rehberin_onunde_okunur():
+    """The design law (docs/, not vendor/) leads the two sections an author reads first (2026-10-19)."""
+    kanun = rehber.read_source(rehber.KANUN)
+    ozet = next(f"{h}\n\n{b}\n" for h, b in rehber.split_sections(kanun) if re.match(r"##\s+1\.\s", h))
+    for bolum in ("akis", "carbon"):
+        first = rehber.guide(bolum)
+        assert first["metin"].startswith(ozet.strip().splitlines()[0]), bolum
+        assert first["kaynaklar"][0].startswith(rehber.KANUN), bolum
+    # Room for the summary and SKILL §8 in the first akis part: the build workflow must stay there.
+    assert len(ozet.encode("utf-8")) <= 3300
+    assert "İnşa iş akışı" in rehber.guide("akis")["metin"]
+    assert "kanun" in rehber.UYARI
+    # The guide picks sections by number, so every top-level heading of the law carries one.
+    assert all(re.match(r"##\s+\d+\.\s", h) for h, _ in rehber.split_sections(kanun))
+    whole = rehber.guide("kanun")
+    assert whole["status"] == "ok" and whole["metin"].startswith(rehber.preamble(kanun).splitlines()[0])
+
+
+def test_kanun_vendor_icine_kopyalanmaz():
+    """One source: the law lives in docs/ and is served from there, never duplicated into vendor/."""
+    assert not list(vendor_sync.VENDOR_DIR.rglob("*kanun*"))
+    assert rehber.KANUN_YOLU.is_file()
+
+
+def test_kb35_vendor_bolumleri_kanunla_celismez():
+    """KB-35 closed (2026-10-19): the vendored sections an author reads no longer carry what the law overrode."""
+    kanun = rehber.read_source(rehber.KANUN)
+    ozet = next(f"{h}\n\n{b}\n" for h, b in rehber.split_sections(kanun) if re.match(r"##\s+1\.\s", h)).strip()
+    yasak = [
+        r"fetch_figure\.py", r"(?<![\w-])ic-(idea|flip|trophy|star)\b", r"pic-trophy",
+        r"meta\.accent`?'i derse göre", r'accent: "teal"', r"rozet kasası", r"XP/rozet ekonomisi",
+        r"g10 ↔ g100", r"öğrencinin kendi seçimi önceliklidir", r"tema \+ Leitner", r"rozet kalırsa",
+        r"orkestre", r"donutSvg", r"sıcak altın", r"otomatik `var\(--accent\)`", r'fill="#[0-9a-fA-F]',
+        r"SVG \*\*yedektir\*\*", r"avatarOptions", r"Meydan Oku", r"meydan okuma", r"Yarışma varyantı",
+    ]
+    for bolum in ("akis", "carbon", "segmentler", "pedagoji", "etkilesim", "svg"):
+        toplam = rehber.guide(bolum)["toplam_parca"]
+        metin = "\n".join(rehber.guide(bolum, parca=n)["metin"] for n in range(1, toplam + 1))
+        metin = metin.replace(ozet, "")  # the law's own §1 names the keys it forbids
+        kalan = [d for d in yasak if re.search(d, metin)]
+        assert not kalan, (bolum, kalan)
+        # "tema düğmesi" may appear only where the text says it is gone or a debt (izinli bağlam).
+        dugme = [s for s in metin.splitlines() if "tema düğmesi" in s and not re.search(r"yok|kalk|borç", s)]
+        assert not dugme, (bolum, dugme)

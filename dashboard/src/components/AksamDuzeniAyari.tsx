@@ -46,7 +46,7 @@ export default function AksamDuzeniAyari() {
     <div className="dashboard-card">
       <h2 className="dashboard-card__title" id="aksam-duzeni-baslik">
         <Time size={20} />
-        Akşam düzeni
+        Akşam Düzeni
       </h2>
       {loading
         ? (iskelet ? <div aria-busy="true"><SkeletonText paragraph lineCount={3} /></div> : null)

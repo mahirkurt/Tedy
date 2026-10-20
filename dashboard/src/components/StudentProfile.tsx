@@ -110,7 +110,7 @@ export default function StudentProfile() {
       <div className="dashboard-card student-profile-card">
         <h2 className="dashboard-card__title">
           <UserProfile size={20} />
-          Öğrenci profili
+          Öğrenci Profili
         </h2>
         <div className="student-profile">
           <div className="student-profile__photo-wrap">
@@ -248,7 +248,7 @@ export default function StudentProfile() {
       <AksamDuzeniAyari />
 
       <div className="dashboard-card">
-        <h2 className="dashboard-card__title">Tanımlı özel dersler</h2>
+        <h2 className="dashboard-card__title">Tanımlı Özel Dersler</h2>
         {(lessonData.lessons || []).length === 0 ? (
           <EmptyLine>Tanımlı özel ders yok.</EmptyLine>
         ) : (

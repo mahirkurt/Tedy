@@ -5,6 +5,7 @@ surface designs §4.11): `BookReader*.scss`, the Books block at the end of
 `ted-theme.scss`, and the Books/reader TSX files. The old assistant UI went with
 plan Görev 21 (2026-10-11); nothing is excluded for it any more.
 """
+import html as html_lib
 import re
 from pathlib import Path
 
@@ -105,11 +106,55 @@ def _gorunur_metinler(temiz: str):
         yield m.start(1), m.group(1)
 
 
+# S38, revised 2026-10-19 (the family asked for it): a heading that NAMES something — a page, a card,
+# a section, a module — is title case (`utils/baslik.ts`); a heading that is a sentence or an
+# instruction stays sentence case, and so does every label, button, tag and line of text.
+_BASLIK_ALANI = re.compile(
+    r"<h[1-4]\b[^>]*>.*?</h[1-4]>"                                 # a heading element
+    r"|className=\"dashboard-card__title[^\"]*\">.*?</span>"       # a card title that is a span (in a table)
+    r"|<EmptyLine\s+label=\"[^\"]*\""                               # an empty section's title
+    r"|<ContainedList\b[^>]*?\blabel=(?:\"[^\"]*\"|\{`[^`]*`\})",       # a list's title
+    re.S)
+# Headings that are a sentence or an instruction: sentence case on purpose.
+CUMLE_BASLIKLARI = {"Bu bölüm açılamadı", "TEDY'ye giriş yap", "Ödevleri kontrol et", "Özel ders ekle",
+                    "Bu modül yapay zekâ yardımıyla hazırlandı", "Bu yanıtları bir yapay zekâ yazıyor"}
+_KUCUK_KALIR = {"ve", "ile", "ya", "veya", "de", "da", "ki", "mı", "mi", "mu", "mü"}
+
+
+def _tr_kucuk(s: str) -> str:
+    return s.replace("I", "ı").replace("İ", "i").lower()
+
+
+def _basliga(metin: str) -> str:
+    """Python twin of dashboard/src/utils/baslik.ts (only a first letter is raised)."""
+    out, ilk = [], True
+    for parca in re.split(r"(\s+)", metin):
+        if not parca or parca.isspace():
+            out.append(parca)
+            continue
+        cekirdek = _tr_kucuk(re.sub(r"^[^\w]+|[^\w]+$", "", parca))
+        buyut = ilk or cekirdek not in _KUCUK_KALIR
+        ilk = False
+        i = next((k for k, c in enumerate(parca) if c.isalpha()), -1)
+        if buyut and i >= 0 and parca[i] == _tr_kucuk(parca[i]):
+            harf = {"i": "İ", "ı": "I"}.get(parca[i], parca[i].upper())
+            parca = parca[:i] + harf + parca[i + 1:]
+        out.append(parca)
+    return "".join(out)
+
+
+def _baslik_alanlari(temiz: str) -> list[tuple[int, int]]:
+    return [(m.start(), m.end()) for m in _BASLIK_ALANI.finditer(temiz)]
+
+
 def test_b41_gorunur_etiketler_cumle_duzeninde():
     ihlal = []
     for p in _kaynaklar():
         temiz = _yorumsuz_kod(p.read_text(encoding="utf-8"))
+        alanlar = _baslik_alanlari(temiz)
         for konum, metin in _gorunur_metinler(temiz):
+            if any(bas <= konum < son for bas, son in alanlar):
+                continue  # a heading: test_s38_ad_basliklari_baslik_duzeninde decides
             for m in _BASLIK_DUZENI.finditer(metin):
                 if any(m.group(0) in ad or ad in metin for ad in OZEL_AD):
                     continue
@@ -117,6 +162,31 @@ def test_b41_gorunur_etiketler_cumle_duzeninde():
                 # alone; "Öğretmen Adı" is two capitalised words.
                 ihlal.append(f"{p.relative_to(DASH)}:{_satir(temiz, konum)}  {m.group(0)}")
     assert not ihlal, "başlık düzeninde görünür etiket (S38, B41):\n" + "\n".join(ihlal)
+
+
+def test_s38_ad_basliklari_baslik_duzeninde():
+    """Every hand-written multi-word heading is title case, unless it is a sentence (CUMLE_BASLIKLARI)."""
+    ihlal = []
+    for p in _kaynaklar():
+        temiz = _yorumsuz_kod(p.read_text(encoding="utf-8"))
+        for bas, son in _baslik_alanlari(temiz):
+            alan = re.sub(r"<Tag\b.*?</Tag>", "", temiz[bas:son], flags=re.S)  # a Tag in a heading is a label
+            parcalar = re.findall(r">([^<>{}]+)<", alan) + re.findall(r"label=\"([^\"]+)\"", alan) \
+                + re.findall(r"label=\{`([^`$]+)", alan)
+            for ham in parcalar:
+                metin = html_lib.unescape(" ".join(ham.split())).strip(" &(")
+                if " " not in metin or not re.search(r"[a-zçğıöşü]", metin) or metin in CUMLE_BASLIKLARI:
+                    continue
+                if metin != _basliga(metin):
+                    ihlal.append(f"{p.relative_to(DASH)}:{_satir(temiz, bas)}  {metin!r} → {_basliga(metin)!r}")
+    assert not ihlal, "ad başlığı başlık düzeninde değil (S38, 2026-10-19):\n" + "\n".join(ihlal)
+
+
+def test_basliga_panodaki_esiyle_ayni():
+    from pathlib import Path as _P
+    tablo = _P("dashboard/tests/baslik.test.ts").read_text(encoding="utf-8")
+    for girdi, beklenen in re.findall(r"\['((?:[^'\\]|\\.)*)', '((?:[^'\\]|\\.)*)'\]", tablo):
+        assert _basliga(girdi) == beklenen, girdi
 
 
 def test_b41_tek_cikis_fiili_ve_tek_tarih_bicimi():

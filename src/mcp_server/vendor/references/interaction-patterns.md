@@ -1,6 +1,6 @@
 # Etkileşim Deseni Kataloğu — Mekanikler, Veri Şeması, Erişilebilirlik
 
-> Her oyun/quiz/yarışma/flashcard türü için: ne işe yarar, hangi pedagoji
+> Her oyun/quiz/flashcard türü için: ne işe yarar, hangi pedagoji
 > ilkesine hizmet eder, `MODULE_DATA` segment şeması, erişilebilirlik kuralları.
 > Şablon (`assets/module-template.html`) çekirdek desenleri (teach, mcq,
 > flashcards, match, fillblank, brainbreak, summary) hazır içerir; gelişmiş
@@ -11,9 +11,9 @@ Her segment şu temel alanları taşır:
 ```js
 { type, id, title, pictogram /* icon-pictogram-svg.md'den anahtar */, instructions /* kısa TR yönerge */ }
 ```
-Her etkileşim segmenti **anında geri bildirim** (doğru/yanlış + açıklama) ve
-**XP** üretir (ped İlke 3). XP varsayılan: doğru = +10, ilk denemede doğru = +5
-bonus; **yanlış ceza yok** (§3 etik).
+Her etkileşim segmenti **anında geri bildirim** (doğru/yanlış + açıklama) verir
+(ped İlke 3). XP yalnız iç ilerleme sayısıdır, okur görmez (S43, Kanun M2.7): doğru = +10,
+ilk denemede doğru = +5; **yanlış ceza yok** (§3 etik).
 
 ---
 
@@ -45,8 +45,8 @@ sanitize edilmeyen ham HTML olduğundan, bu disiplin yeni bir XSS yüzeyi
 açmamak için yazar sorumluluğundadır). Ayrıntı: `subject-packs.md` §2(f),
 `content-enrichment.md` §2.3.
 
-## 2. `mcq` — Çoktan seçmeli quiz / yarışma
-**Pedagoji:** Geri-getirme pratiği (İlke 8), OTR (İlke 2), anında ödül (İlke 3).
+## 2. `mcq` — Çoktan seçmeli quiz
+**Pedagoji:** Geri-getirme pratiği (İlke 8), OTR (İlke 2), anında geri bildirim (İlke 3).
 ```js
 {
   type: "mcq", id, title, pictogram,
@@ -65,13 +65,13 @@ açmamak için yazar sorumluluğundadır). Ayrıntı: `subject-packs.md` §2(f),
 **Erişilebilirlik:** Seçenekler `role="radio"` benzeri buton listesi; klavyeyle
 seçilebilir (Tab + Enter/Space); seçim sonrası doğru yeşil+onay ikonu, yanlış
 kırmızı+ikon ve doğru olan işaretlenir; açıklama `aria-live="polite"` ile okunur.
-**Yarışma varyantı:** Soru sayacı ("Soru 2 / 5"); süre **opsiyonel** (varsayılan kapalı). Ceza yok;
+**Soru seti varyantı:** Soru sayacı ("Soru 2 / 5"); süre **opsiyonel** (varsayılan kapalı). Ceza yok;
 yanlışta açıklama + devam. Seri sayacı, kişisel rekor ve ödül animasyonu yoktur (talimatname S43;
 şablondan 2026-10-11'de kalktı, B73; G-FLOW seri sayacı öğesinde FAIL verir).
 
 > **✓ Motorda uygulandı (v3.0.0 — Task 13, görünmez taban-korumalı uyarlanır zorluk,
 > gamified-flows.md §2.3/§3.3).** `questions[].tier?: 1|2|3` opsiyoneldir (1=kolay
-> taban, 3=meydan okuma); **alan yoksa/geçersizse motor 1 varsayar** — mevcut
+> taban, 3=zor); **alan yoksa/geçersizse motor 1 varsayar** — mevcut
 > (tier'sız) modüllerde davranış **birebir korunur**: uyarlama katmanı yalnız bir
 > segmentte **en az bir** soru gerçek `tier:2`/`tier:3` taşıdığında etkinleşir
 > (`runQuestionSet`'teki `hasTiers` muhafızı). Etkinleştiğinde `state.perf`
@@ -80,8 +80,9 @@ yanlışta açıklama + devam. Seri sayacı, kişisel rekor ve ödül animasyonu
 > kalan sıradaki **en düşük** tier'a kayar + `explanation` yanıttan **önce** nötr
 > bir "İpucu" kutusunda gösterilir (soru zorlaşmaz, destek artar); **2 ardışık
 > ilk-denemede-doğru** → kalan sırada bir `tier:3` öğe varsa, doğru cevabın
-> yanında **opsiyonel/atlanabilir** bir "Meydan Oku" düğmesi belirir (öğrencinin
-> kendi seçimi; yoksayıp normal "Sonraki soru"ya tıklamak geçerli bir atlamadır).
+> yanında **opsiyonel/atlanabilir** bir zor soru düğmesi belirir (öğrencinin kendi
+> seçimi; yoksayıp normal "Sonraki soru"ya tıklamak geçerli bir atlamadır). Düğmenin
+> bugünkü rekabet çerçeveli etiketi Kanun M2.7 ile kalkar (borç KB-21).
 > Toplam soru sayısı ve `gradeKey` kimliği **değişmez** (yalnız kalan sıradaki
 > konumlar takas edilir — hiçbir soru atlanmaz/yinelenmez). Kullanıcıya görünür
 > **hiçbir** zorluk-etiketi/duyuru yazılmaz (G-FLOW `FLOW_LABEL_RE`). Aynı mekanik
@@ -121,7 +122,8 @@ ekran okuyucuya açık; renk dışı durum (ikon+metin).
 > `null`/no-op döner; bu durumda tüm kutular varsayılan `1` sayılır ve sıralama no-op'tur
 > (eşit anahtarlarda orijinal indeks kırılımı sırayı korur) — segment **birebir eski
 > in-session davranışına** düşer, hiçbir kart kaybolmaz/çökme olmaz. Kalıcı depolama
-> izin listesi yalnız **tema + Leitner**'dır; iç ilerleme sayısı (xp) ve yanıt kümeleri
+> izin listesi yalnız **Leitner**'dır; tema kaydı Kanun M4.1 ile kalkar (şablonda borç KB-1).
+> İç ilerleme sayısı (xp) ve yanıt kümeleri
 > `sessionStorage` ile sekme oturumuna sınırlandırılır. Tüm sarmalayıcılar try/catch
 > ile degrade-safe'tir.
 
@@ -162,8 +164,8 @@ ilişkili; choice havuzu buton listesi; ipucu `aria-live`.
 > modüllerde davranış birebir korunur). 2 ardışık yanlıştan-sonra-doğru → bir
 > sonraki cümle en düşük kalan tier'a kayar + `hint` alanı (varsa) yanıttan önce
 > nötr bir "İpucu" kutusunda gösterilir; 2 ardışık ilk-denemede-doğru → kalan
-> sırada bir `tier:3` öğe varsa opsiyonel/atlanabilir "Meydan Oku" düğmesi
-> belirir. Motor ayrıntısı: `renderFillblank` (module-template.html).
+> sırada bir `tier:3` öğe varsa opsiyonel/atlanabilir zor soru düğmesi belirir
+> (etiketi borç KB-21). Motor ayrıntısı: `renderFillblank` (module-template.html).
 
 ## 6. `brainbreak` — Mola noktası
 **Pedagoji:** Aşağı-uyarılma yönetimi, oturum-içi mola (ped §4; her ~8–10 dk).
@@ -262,9 +264,9 @@ tek başına anlam taşımaz).
 > `ttsRow`)+opsiyonel tahmin kartı+kapanış notu; `setNav({nextLabel:"Öğren"})`.
 > `renderTeach`, kendi `id`'sini `resolvesIn` ile hedefleyen bir `hook` bulursa
 > `#stage`'e `data-hook-resolved="<hookId>"` işaretini yazar — Keşif
-> Döngüsü'nün kapanış yarısı. `.hook-card`/`.hook-opt` mevcut Carbon
-> token'larıyla (accent-tint, layer-01/02, accent-strong) biçimlenir; statik
-> kartta **gölge yok** (yalnız sol kenarlık + katman rengi).
+> Döngüsü'nün kapanış yarısı. `.hook-card` katman token'ıyla ve ders renginin 4 px
+> kenarıyla biçimlenir (Kanun M1.5 çapası); `.hook-opt` seçimi Carbon etkileşim
+> token'ıdır, ders rengi almaz (M1.6; şablonda borç KB-17). Statik kartta **gölge yok**.
 
 ## 13. `conceptMap` — Kavram haritası kurucu
 **Pedagoji:** İlişkisel/yapısal bilgi kurma. Kavram haritaları ve grafik
@@ -368,7 +370,8 @@ içindedir, blok dışında hiçbir koşulsuz katkı yoktur.
 - **Mola kuralı:** Toplam ≥6 segmentlik modülde ≥1 `brainbreak`.
 - **Erken başarı:** İlk etkileşim kolay; zorluk kademeli artar.
 - **Geri-getirme:** Modül sonunda `checkpoint` (karma sorular) önerilir.
-- Her etkileşim XP üretir; ilerleme rayı her segment tamamında dolar.
+- Her etkileşim iç XP sayısını besler (okur görmez); ilerleme göstergesi her segment
+  tamamında ilerler, adımları aşamadır (Kanun M2.5).
 
 ## Genel erişilebilirlik (tüm etkileşimler)
 - Klavye: Tab ile gez, Enter/Space ile etkinleştir; sürükle-bırak için daima

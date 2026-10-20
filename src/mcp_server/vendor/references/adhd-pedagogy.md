@@ -72,13 +72,14 @@ Council for Exceptional Children — yüksek-kaldıraçlı uygulamalar]
 - **Modül kararı:** İki `teach` segmenti arasına **mutlaka** en az bir etkileşim
   segmenti girer; saf okuma zinciri yasaktır.
 
-### İlke 3 — Anında ve sık geri bildirim + ödül
+### İlke 3 — Anında ve sık geri bildirim
 Gecikme itimi ve dopaminerjik ödül farklılığı nedeniyle geri bildirim **anında**
-verilmeli; ödül (XP, rozet, ilerleme) gecikmesiz ve görünür olmalı. Anında
+verilmeli; geri bildirim ve ilerleme gecikmesiz ve görünür olmalı. Anında
 düzeltici geri bildirim hatayı kalıcı öğrenmeye çevirir. [Sonuga-Barke 2003;
 retrieval+feedback: Roediger & Karpicke 2006]
 - **Modül kararı:** Her yanıttan sonra anında doğru/yanlış + **açıklama** göster;
-  XP'yi o anda artır; ilerleme rayını güncelle. Toplu/sonda geri bildirim yetmez.
+  ilerleme göstergesini güncelle. Toplu/sonda geri bildirim yetmez. TEDY'de ödül (XP,
+  rozet, kutlama) yoktur; XP yalnız iç sayıdır (S43, Kanun M2.7).
 
 ### İlke 4 — Yürütücü işlev dışsallaştırma
 DEHB bir performans bozukluğu olduğundan, yürütücü desteği ortama göm: açık
@@ -86,26 +87,28 @@ DEHB bir performans bozukluğu olduğundan, yürütücü desteği ortama göm: a
 **görünür zaman** (DEHB'de zaman algısı bozuktur — opsiyonel sayaç), adım-adım
 yapı, "sonraki adım" yönlendirmesi. [Barkley 2015; Meltzer 2018 — yürütücü
 işlev ve öğrenme]
-- **Modül kararı:** Üstte sabit ilerleme rayı + segment sayacı; başta hedef
-  listesi ("Bu modülde…"); her segment sonunda net "Devam" eylemi.
+- **Modül kararı:** Üstte tek ilerleme göstergesi (adımları aşama, Kanun M2.4, M2.5) +
+  "Bölüm n / N" metni; başta hedef listesi ("Bu modülde…"); her segment sonunda net
+  "Devam" eylemi.
 
 ### İlke 5 — Düşük dış yük ↔ yüksek uyarılma dengesi
 Dikkat dağıtıcı öğeleri (gereksiz süs, yanıp sönme, kalabalık ekran) azalt;
 **aynı anda tek görev** göster. Ama monotonluktan kaçın: yenilik, kategori-renk,
 piktogram, ölçülü hareket ile uyarılmayı koru. [Zentall 1975; Sergeant 2005;
 çoklu temsil için aşağıda İlke 7]
-- **Modül kararı:** Ekran başına tek odak; Carbon beyaz/katman zemini; aksan
-  rengi anlam taşır (kategori/durum), dekor değil; hareket `prefers-reduced-motion`
-  ile kapatılabilir.
+- **Modül kararı:** Ekran başına tek odak; Carbon katman zemini; ders rengi yalnız
+  Kanun M1.5 çapalarında, dekor değil; bölüm girişinde hareket yok, hareket yalnız
+  okurun eylemine cevap (M2.10); azaltılmış harekette hiç yok.
 
 ### İlke 6 — Özerklik, yeterlik, ilişkililik (Öz-belirleme kuramı)
 İçsel motivasyon üç ihtiyacın doyumuyla artar: **özerklik** (seçim),
 **yeterlik** (ulaşılabilir başarı), **ilişkililik** (sıcak, teşvik edici ton).
-Dışsal ödül (XP/rozet) içsel motivasyonu desteklemeli, yerine geçmemeli — bu
-yüzden ödül *bilgilendirici* (ilerleme/ustalık geri bildirimi) olmalı, *kontrol
-edici* değil. [Deci & Ryan 1985, 2000; Ryan & Deci 2020]
+Dışsal ödül içsel motivasyonun yerine geçebilir; bu yüzden geri bildirim
+*bilgilendirici* (ilerleme/ustalık geri bildirimi) olmalı, *kontrol edici* değil.
+TEDY'de XP ve rozet gösterilmez (S43, Kanun M2.7). [Deci & Ryan 1985, 2000; Ryan &
+Deci 2020]
 - **Modül kararı:** Mümkünse yol/konu seçtir (SERIES/menü); zorluğu kademeli
-  yükselt (erken başarı garanti); ton teşvik edici; rozet "ustalık" anlatır.
+  yükselt (erken başarı garanti); ton teşvik edici; ustalık metinle söylenir.
 
 ### İlke 7 — Çoklu temsil ve ikili kodlama (UDL + Dual Coding)
 Bilgi hem **görsel** hem **sözel** kodlandığında daha iyi hatırlanır (ikili
@@ -137,14 +140,13 @@ tasarıma bağlıdır; "rozet/puan/sıralama" üçlüsü tek başına garanti de
 meta-analiz: olumlu ama orta etkili, tasarıma duyarlı]
 
 **Kurallar:**
-- **Öz-rekabet önceliklidir.** Yarışma kişisel rekora (önceki skoru geçme) veya
-  düşük-baskılı, isteğe bağlı sıralamaya dayanır. Akran utandıran küresel
-  liderlik tablosu **varsayılan değildir**.
+- **Rekabet yok.** TEDY'de yarışma, sıralama, liderlik tablosu ve kişisel rekor
+  yoktur; arayüz metni rekabet çerçevesi kullanmaz (S43, Kanun M2.7).
 - **Ceza yok.** Yanlış yanıt XP düşürmez/"can" almaz biçimde cezalandırılmaz;
   düzeltici açıklama + tekrar fırsatı sunulur. (Gecikme itimi olan çocukta ceza
   kaçınma davranışını tetikler.)
-- **Ödül bilgilendiricidir.** Rozet/XP ilerleme ve ustalığı anlatır; performansı
-  "kontrol" eden bir sopa-havuç değildir (Öz-belirleme kuramı, İlke 6).
+- **Ödül yok.** Rozet ve XP ekonomisi S43 ve Kanun M2.7 ile kalktı; XP yalnız iç
+  sayıdır. İlerleme ve ustalık metinle anlatılır (Öz-belirleme kuramı, İlke 6).
 - **Erken başarı garanti.** İlk etkileşimler kolaydır (yeterlik duygusu); zorluk
   kademeli artar (akış / Zone of Proximal Development). [Vygotsky 1978;
   Csikszentmihalyi 1990 — akış]
@@ -193,8 +195,9 @@ DEHB-dostu tasarım, daha geniş erişilebilirlikle örtüşür ve onu zorunlu k
 - **Öz-izleme / üstbiliş.** Modül sonunda öğrenci kendi öğrenmesini işaretler
   ("Bunu öğrendim / tekrar etmeliyim"); bu üstbilişsel beceri DEHB'de zayıftır,
   dolayısıyla *dışsal* desteklenmelidir. [Meltzer 2018; Dunlosky 2013]
-- **Çıktı:** Özet ekranı: ulaşılan ustalık, kazanılan rozetler, tekrar önerisi,
-  öz-değerlendirme. Skor *bilgilendirici* sunulur, etiketleyici değil.
+- **Çıktı:** Özet ekranı: ulaşılan ustalık (düz metinle), tekrar önerisi,
+  öz-değerlendirme; rozet ve büyük sayı yok (S43). Skor *bilgilendirici* sunulur,
+  etiketleyici değil.
 
 ---
 
@@ -202,7 +205,7 @@ DEHB-dostu tasarım, daha geniş erişilebilirlikle örtüşür ve onu zorunlu k
 
 - **Bilgi duvarı:** Uzun, bölünmemiş metin blokları. → Parçala (İlke 1).
 - **Pasif zincir:** Arka arkaya okuma, etkileşimsiz. → OTR ekle (İlke 2).
-- **Gecikmiş ödül:** Geri bildirim/ödülü sona saklamak. → Anında ver (İlke 3).
+- **Gecikmiş geri bildirim:** Geri bildirimi sona saklamak. → Anında ver (İlke 3).
 - **Ceza mekaniği:** Can kaybı, XP düşürme, "kaybettin" ekranı. → Yasak (§3).
 - **Aşırı uyaran:** Yanıp sönen, kalabalık, parlak kaos. → Temiz + ölçülü (İlke 5).
 - **Emoji bağımlılığı:** Anlamı emojiyle taşımak. → Carbon ikon/piktogram/SVG.
@@ -287,13 +290,13 @@ DEHB-dostu tasarım, daha geniş erişilebilirlikle örtüşür ve onu zorunlu k
 |---|---|
 | 1 Parçalama | `teach` segmentleri kısa; uzun konu çok segmente bölünür |
 | 2 OTR | `teach`–`teach` arası ≥1 etkileşim; saf okuma zinciri yok |
-| 3 Anında ödül | Yanıt sonrası anında doğru/yanlış+açıklama; XP/ray güncellenir |
-| 4 Yürütücü destek | Üstte ilerleme rayı + sayaç; başta hedefler; net "Devam" |
-| 5 Yük/uyarılma | Tek-odak ekran; aksan=anlam; reduced-motion; yanıp sönme yok |
-| 6 Özerklik/yeterlik | Yol/konu seçimi; kademeli zorluk; bilgilendirici rozet |
+| 3 Anında geri bildirim | Yanıt sonrası anında doğru/yanlış+açıklama; ilerleme göstergesi ilerler (XP yalnız iç sayı) |
+| 4 Yürütücü destek | Üstte tek aşama göstergesi + "Bölüm n / N"; başta hedefler; net "Devam" |
+| 5 Yük/uyarılma | Tek-odak ekran; ders rengi yalnız çapalarda; giriş hareketi yok; yanıp sönme yok |
+| 6 Özerklik/yeterlik | Yol/konu seçimi; kademeli zorluk; ustalık metinle (rozet yok) |
 | 7 İkili kodlama | Her kavram görsel+sözel; etiketli SVG/piktogram |
 | 8 Geri-getirme | Quiz=öğretim aracı; FLASHCARDS aralıklı tekrar; sonda karma kontrol |
-| §3 Etik | Ceza yok; öz-rekabet; erken başarı; süre opsiyonel |
+| §3 Etik | Ceza yok; rekabet ve ödül yok; erken başarı; süre opsiyonel |
 | §5 Erişilebilirlik | Klavye+ARIA; kontrast AA; ≥44px hedef; renk tek başına anlam değil |
 
 ## 10. Klinik kanıt temelli özen ilkeleri (medical-research ile derlenen)
@@ -397,15 +400,15 @@ katılımı destekler, ama aynı görevde renk **alakasızsa** güçlü bir çel
 
 **Politika (tasarım kuralları):**
 1. **Renk işlevle atanır, süslemeyle değil.** Her renk bir işi temsil eder: eylem
-   (mavi buton/bağlantı), durum (Carbon support: başarı/bilgi/uyarı/hata), kategori
-   (veri-viz `--viz-1..5`), ilerleme/ödül (sıcak altın `--reward`), **odak çıpası**
-   (geçerli adım/seçim/etkin başlık için tek aksan tonu).
+   (mavi buton/bağlantı), durum (Carbon support: başarı/bilgi/uyarı/hata), grafik
+   (`--viz-1..5` nötr rampa, kategoriyi etiket taşır), ilerleme (Carbon `interactive`),
+   **ders** (yalnız Kanun M1.5 çapaları; seçim ve geçerli adım Carbon token'ı, M1.6).
 2. **Nötr tuval.** Zemin ve yüzeyler Carbon layer token'larıdır; büyük doygun alan yok.
 3. **Artıklık (redundancy) + CVD güvenliği.** Renk **tek** ayırt edici olamaz; daima
    metin/ikon/şekil ile birlikte (UDL — çoklu temsil; CAST).
-4. **Wayfinding aksanı.** Etkinlik türü (anlatım/quiz/mola/grafik) başlıkta tutarlı bir
-   renkle imlenir; çocuk "burada ne yapacağım"ı renkten de okur (sinyalleme).
-5. **Sakinlik korunur.** Animasyon tek ve `prefers-reduced-motion` ile kapalı; doygunluk
+4. **Wayfinding.** Etkinlik türü (anlatım/quiz/mola/grafik) başlıkta tutarlı bir ikon ve
+   kicker metniyle imlenir; segment ikonu ders renginin tint zeminidir (sinyalleme; Kanun M1.4).
+5. **Sakinlik korunur.** Bölüm girişinde animasyon yok (Kanun M2.10); doygunluk
    ölçülü; kontrast WCAG AA. Renk **daha etkin** ama **daha gürültülü değil**.
 
 ## 13. Derse-özel görsel güçlerin kanıt temeli

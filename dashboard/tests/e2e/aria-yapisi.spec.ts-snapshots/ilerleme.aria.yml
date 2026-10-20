@@ -1,12 +1,12 @@
 - main:
   - heading "İlerleme" [level=1]
-  - heading "Platform ilerlemesi" [level=2]
-  - region "Öğrenme günlüğü":
-    - heading "Öğrenme günlüğü" [level=3]
-    - heading "Bu hafta" [level=4]
+  - heading "Platform İlerlemesi" [level=2]
+  - region "Öğrenme Günlüğü":
+    - heading "Öğrenme Günlüğü" [level=3]
+    - heading "Bu Hafta" [level=4]
     - paragraph: Sohbet · 0
     - paragraph: Alıştırma · 0
-    - heading "Zorlanılan konular" [level=4]
+    - heading "Zorlanılan Konular" [level=4]
     - paragraph: Henüz deneme yok. Bir alıştırma bitince burada görünür.
   - text: Platformlar
   - list "Platformlar":

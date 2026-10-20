@@ -19,7 +19,7 @@ belgedeki 4 şablon ise seçilen modun **içindeki segmentlerin ritmini ve
 motivasyonel örgüsünü** belirler — ikisi ortogonaldir, birbirinin yerine
 geçmez. Sefer şablonu tipik olarak MODULE/SERIES modunda tüm-modül iskeleti
 olarak; Antrenman tipik olarak QUIZ/ASSESSMENT modunda veya bir Sefer
-istasyonunun içinde uygulanır; ama hiçbir şablon belirli bir moda kilitli
+döngüsünün içinde uygulanır; ama hiçbir şablon belirli bir moda kilitli
 değildir ve bir modül birden fazla şablonu (ör. Sefer'in içinde Antrenman)
 iç içe kullanabilir.
 
@@ -29,9 +29,8 @@ sütunu iki değerden birini taşır:
   tanımlı ve motorun bugün desteklediği segment tipi/alan.
 - **[YENİ]** — tasarım spec'i §5.1/§5.2'de tanımlı, motor+şema yükseltmesinde
   (bu belgeden sonraki görev) uygulanacak segment tipi/alan. Bu belge onların
-  **davranışsal ve pedagojik sözleşmesidir**; bazı alanlar (avatar seçimi gibi)
-  spec'in bıraktığı boşluğu bu belge somutlaştırır — ilgili yerde açıkça
-  belirtilir.
+  **davranışsal ve pedagojik sözleşmesidir**; bazı alanlarda spec'in bıraktığı
+  boşluğu bu belge somutlaştırır — ilgili yerde açıkça belirtilir.
 
 **Değişmez ilke — ekleyici, gevşetici değil.** Aşağıdaki dört şablon ve
 mekanikler, bu skill'in mevcut `adhd-pedagogy.md` §3 (yarışma/ödül etiği) ve
@@ -68,8 +67,8 @@ içinde** kapatır.
 |---|---|---|---|---|
 | 1 | Kanca (hook) | `type:"hook"`, alanlar: `id`, `question`, `predict?`, `resolvesIn` | **[YENİ]** spec §5.1 | Bir merak boşluğu açar ("Sence hücrenin enerji santrali hangisi?"); opsiyonel notsuz `predict` tahmin kartı. `resolvesIn` **zorunlu** ve aynı `segments[]` dizisindeki bir sonraki `teach`'in `id`'sini gösterir. |
 | 2 | Öğretim (teach) | mevcut `teach` şeması | **[MEVCUT]** | Hook'un sorusunu doğrudan yanıtlayan kısa anlatım (İlke 1, ≤4–6 birim). Bu segmente ulaşıldığında hook **kapanır** (bkz. §3.1). |
-| 3 | Etkileşim | `mcq`/`match`/`fillblank` | **[MEVCUT]** | Anında geri bildirim + XP (İlke 3); ton her zaman sakin/nötr (G-WELLBEING). |
-| 4 | Mikro-kazanım | üst-düzey `meta.milestones[]` rayı bir artar | **[YENİ]** spec §5.1 (rayın genişlemesi) | Döngü kendi başına yeni alan taşımaz — paylaşılan ilerleme rayını görünür biçimde ilerletir (hedef-gradyanı, bkz. §3.2). |
+| 3 | Etkileşim | `mcq`/`match`/`fillblank` | **[MEVCUT]** | Anında geri bildirim (İlke 3); XP yalnız iç sayıdır, okur görmez (Kanun M2.7); ton her zaman sakin/nötr (G-WELLBEING). |
+| 4 | İlerleme | tek ilerleme göstergesi; aşamalar `meta.milestones[]` | **[MEVCUT]** (Kanun M2.4, M2.5) | Döngü kendi başına yeni alan taşımaz — paylaşılan ilerleme göstergesini ilerletir (hedef-gradyanı, bkz. §3.2). |
 
 Hook segmentinin şeması:
 
@@ -89,39 +88,30 @@ gerekçesi hedef-gradyanı etkisidir (§3.2).
 
 ### 2.2 Sefer (modül omurgası)
 
-Tüm modülü bir görev anlatısına oturtan omurga şablonu; N adet Keşif Döngüsü'nü
-bir "yolculuk" çerçevesinde zincirler.
+Tüm modülü N adet Keşif Döngüsü'nün zinciri olarak kuran omurga şablonu. TEDY'de sefer
+haritası, avatar, istasyon düğümleri ve "son N durak" hedef metni yoktur (Kanun M2.6, S43):
+harita ikinci bir ilerleme göstergesidir ve ödül çerçevesi taşır. Yolculuğun yerini tek
+ilerleme göstergesinin aşamaları alır (`meta.milestones`, M2.5); `meta.quest` yazılmaz.
 
-**Akış:** görev-girişi + avatar seçimi + SVG mini-harita (N istasyon,
-istasyon-1 bahşedilmiş) → N × Keşif Döngüsü (istasyon başına dönüşümlü
-etkileşim türü) → her ~3 istasyonda kamp molası → checkpoint + koleksiyon +
-selfAssess → sağlıklı kapanış.
+**Akış:** hedefler → N × Keşif Döngüsü (döngü başına dönüşümlü etkileşim türü) → her ~3
+döngüde mola → checkpoint + selfAssess → sağlıklı kapanış.
 
 | # | Adım | Segment/alan | Durum | Not |
 |---|---|---|---|---|
-| 1 | Görev girişi | `objectives[]` + kısa görev cümlesi | **[MEVCUT]** (objectives) | "Bu modülde…" yerine görev çerçevesi: "Görevin: hücrenin gizli şehrini keşfetmek." |
-| 2 | Avatar seçimi | `meta.quest.avatarOptions?` — nesne dizisi: `id`, `label`, `pictogram` | **[YENİ]** — bu belgenin `meta.quest`'e önerdiği ek alan (spec §5.1'in `meta.quest?:{stations[]}` şemasını somutlaştıran genişleme, çelişmez) | Opsiyonel; seçilen seçeneğin `pictogram`'ı üst çubukta öğrenciyi temsil eder. Yokluğunda Sefer avatar'sız çalışır — akış bozulmaz, yalnızca özerklik/temsil kazanımı azalır. |
-| 3 | SVG mini-harita | `meta.quest.stations` — nesne dizisi: `id`, `label`, `completed?` | **[YENİ]** spec §5.1 | N istasyon düğümü SVG üzerinde dizilir. İlk istasyon **`completed: true`** ile baştan işaretlenir — öğrenci henüz hiçbir şey yapmadan **bahşedilmiş ilerleme** (endowed progress) kazanır. |
-| 4 | N istasyon | N × Keşif Döngüsü (§2.1) | **[MEVCUT]+[YENİ]** karışık | Her istasyon bir önceki istasyondan **farklı** etkileşim tipi kullanır (mcq→match→fillblank→… dönüşümlü) — düşük-dış-yük/yüksek-uyarılma dengesini yenilik yoluyla korur (`adhd-pedagogy.md` İlke 5/Sergeant 2005), tekdüzelik yaratmadan. |
-| 5 | Kamp molası | `brainbreak` (her ~3 istasyonda bir) | **[MEVCUT]**, anlatı çerçevesi yeni | Var olan `brainbreak` segmenti; sunumda "kamp molası" olarak adlandırılır. Mola dozu/sıklığı için bkz. `adhd-pedagogy.md` §10.1 (Broad ve ark. 2021). |
-| 6 | Kapanış | `checkpoint` (recap + mixedQuestions + selfAssess) | **[MEVCUT]** | Modül-sonu özeti motor tarafından otomatik ve sessiz üretilir (tamamlanan alıştırma sayısı düz metinle, hedefler, öz-değerlendirme — `adhd-pedagogy.md` §6). Rozet koleksiyonu gösterilmez (talimatname S43, 2026-10-11). |
-| 7 | Sağlıklı kapanış | özet ekranı metni | **[MEVCUT]** segment, metin kuralı yeni | Özet **"başka modül" baskısı içermez**; "bugünlük bu kadarı yeterli" tonuyla biter (`adhd-pedagogy.md` Ö1). |
-
-`meta.quest` şeması (avatar + istasyon):
+| 1 | Hedefler | `objectives[]` | **[MEVCUT]** | "Bu modülde…" — öğrenci dilinde hedef listesi; kazanım kodu taşımaz (Kanun M1.10). |
+| 2 | Aşamalar | `meta.milestones[]` — nesne dizisi: `atSegmentId`, `title` | **[MEVCUT]** alan, `title` yeni (Kanun M2.5; şema borç KB-2) | 3–7 aşama; aşama o segmentte başlar, ilk öğe ilk segmenttedir; ad 1–2 sözcük, en çok 16 karakter, cümle düzeninde ("Keşfet", "Uygula"). Okur nerede olduğunu ve sonunu görür (hedef-gradyanı, §3.2). |
+| 3 | N döngü | N × Keşif Döngüsü (§2.1) | **[MEVCUT]+[YENİ]** karışık | Her döngü bir öncekinden **farklı** etkileşim tipi kullanır (mcq→match→fillblank→… dönüşümlü) — düşük-dış-yük/yüksek-uyarılma dengesini yenilik yoluyla korur (`adhd-pedagogy.md` İlke 5/Sergeant 2005), tekdüzelik yaratmadan. |
+| 4 | Mola | `brainbreak` (her ~3 döngüde bir) | **[MEVCUT]** | Var olan `brainbreak` segmenti. Mola dozu/sıklığı için bkz. `adhd-pedagogy.md` §10.1 (Broad ve ark. 2021). |
+| 5 | Kapanış | `checkpoint` (recap + mixedQuestions + selfAssess) | **[MEVCUT]** | Modül-sonu özeti motor tarafından otomatik ve sessiz üretilir (tamamlanan alıştırma sayısı düz metinle, hedefler, öz-değerlendirme — `adhd-pedagogy.md` §6). Rozet gösterilmez (S43, Kanun M2.7). |
+| 6 | Sağlıklı kapanış | özet ekranı metni | **[MEVCUT]** segment, metin kuralı yeni | Özet **"başka modül" baskısı içermez**; "bugünlük bu kadarı yeterli" tonuyla biter (`adhd-pedagogy.md` Ö1). |
 
 ```js
 meta: {
-  quest: {
-    avatarOptions: [                          // opsiyonel genişleme (bu belge)
-      { id: "explorer", label: "Kâşif", pictogram: "pic-rocket" },
-      { id: "scholar", label: "Bilge", pictogram: "pic-idea" }
-    ],
-    stations: [                               // spec §5.1
-      { id: "s1", label: "Giriş Kapısı", completed: true },   // bahşedilmiş ilerleme
-      { id: "s2", label: "Enerji Odası" },
-      { id: "s3", label: "Çekirdek Kalesi" }
-    ]
-  }
+  milestones: [                               // 3–7 aşama (Kanun M2.5)
+    { atSegmentId: "h1", title: "Keşfet" },
+    { atSegmentId: "t2", title: "Öğren" },
+    { atSegmentId: "c1", title: "Uygula" }
+  ]
 }
 ```
 
@@ -130,30 +120,27 @@ uygulandığında 8 haftalık bir DEHB RCT'sinde dikkat ve akademik kazanımlard
 **büyük etki büyüklükleri (d>0.9) ve 8 hafta sonunda korunan kazanımlar**
 saptanmıştır
 ([Dai, Wufue & Zhang 2025, *Front. Educ.*](https://doi.org/10.3389/feduc.2025.1668260)).
-Bahşedilmiş ilerleme hedef-gradyanı etkisinin bir uzantısıdır — hedef-gradyanı
-temeli için [Kivetz, Urminsky & Zheng 2006](https://www.researchgate.net/publication/239776073),
-bahşedilmiş ilerlemenin birincil kaynağı için Nunes & Drèze 2006 (*Journal of
-Consumer Research*), ikincil açıklama için
-[LogRocket](https://blog.logrocket.com/ux-design/goal-gradient-effect/).
-Avatar seçimi Proteus etkisiyle gerekçelenir — bir temsilci seçmek/kullanmak
-küçük-orta düzeyde davranış/motivasyon etkisi taşır (Yee & Bailenson 2007;
-[Ratan ve ark. 2020 meta-analiz](https://www.tandfonline.com/doi/full/10.1080/15213269.2019.1623698)).
+Aşamalı ilerleme hedef-gradyanı etkisine dayanır
+([Kivetz, Urminsky & Zheng 2006](https://www.researchgate.net/publication/239776073)).
+Bahşedilmiş ilerleme (Nunes & Drèze 2006) ve avatar seçimi (Proteus etkisi; Yee &
+Bailenson 2007; [Ratan ve ark. 2020 meta-analiz](https://www.tandfonline.com/doi/full/10.1080/15213269.2019.1623698))
+TEDY'de uygulanmaz: ikisi de ikinci bir ilerleme ya da ödül çerçevesi kurar (Kanun M2.6).
 
 ### 2.3 Antrenman (uyarlanır pratik)
 
 Tek bir beceriyi tekrarlı, uyarlanır-zorlukta pratikle pekiştiren drill
-şablonu. Tipik olarak QUIZ/ASSESSMENT modunda veya bir Sefer istasyonunun
+şablonu. Tipik olarak QUIZ/ASSESSMENT modunda veya bir Sefer döngüsünün
 içinde kullanılır.
 
 **Akış:** ısınma (1 kolay soru) → uyarlanır item merdiveni (yuvarlanan pencere;
-2 yanlışta ipucu-önce; güçlü seride opsiyonel "meydan okuma") → öğe-başına
+2 yanlışta ipucu-önce; art arda iki doğruda opsiyonel zor soru) → öğe-başına
 açıklama → sessiz özet (liderlik tablosu, seri sayacı ve rekor YOK — talimatname S43) →
 opsiyonel tempo diski (varsayılan KAPALI).
 
 | # | Adım | Segment/alan | Durum | Not |
 |---|---|---|---|---|
 | 1 | Isınma | tek `mcq`/`fillblank`, `tier: 1` | **[MEVCUT]** segment, **[YENİ]** `tier` alanı (spec §5.2) | Garanti-kolay ilk soru (erken başarı, İlke 6). |
-| 2 | Uyarlanır merdiven | ardışık sorular, `tier?: 1/2/3` | **[YENİ]** spec §5.2 | Yuvarlanan pencere: **2 ardışık yanlış → ipucu-önce** sunulur (soru zorlaşmaz, destek artar); **2 ardışık doğru → opsiyonel "meydan okuma"** (tier 3, öğrencinin **kendi seçtiği**, dayatılmayan). Taban her zaman `tier: 1`'e kilitli (asla daha kolayın altına düşmez) ve geçiş **görünmez** (bkz. §3.3). |
+| 2 | Uyarlanır merdiven | ardışık sorular, `tier?: 1/2/3` | **[YENİ]** spec §5.2 | Yuvarlanan pencere: **2 ardışık yanlış → ipucu-önce** sunulur (soru zorlaşmaz, destek artar); **2 ardışık doğru → opsiyonel zor soru** (tier 3, öğrencinin **kendi seçtiği**, dayatılmayan; rekabet çerçevesi yok, Kanun M2.7). Taban her zaman `tier: 1`'e kilitli (asla daha kolayın altına düşmez) ve geçiş **görünmez** (bkz. §3.3). |
 | 3 | ~~Gain-only streak~~ | — | **KALDIRILDI** (2026-10-11, talimatname S43, B73) | Cezasız bir seri sayacı bile dışsal ödüldür (anayasa §9 "seri sayacı"); şablonda seri yoktur ve G-FLOW seri sayacı öğesinde (`id="streakChip"`) FAIL verir. Ceza dili kara listesi (kural 2) kalır. |
 | 4 | Öğe-başına açıklama | `explanation` alanı | **[MEVCUT]** (genel G-INTERACT'ta WARN) | Bu şablonda **fiilen zorunlu** — Antrenman'ın öğretici çekirdeği budur (drill = yalnız ölçme değil öğretim, `adhd-pedagogy.md` İlke 8). Genel G-INTERACT kapısının şiddetini değiştirmez; yalnızca bu şablonun yazım disiplinini yükseltir. |
 | 5 | ~~Öz-rekor özeti~~ (yapılmaz — S43: kişisel rekor de dışsal ödüldür) | özet ekranı, önceki-en-iyi karşılaştırması | **[YAPILMAZ]** — tarihî tasarım: (spec §5.4'ün `localStorage` desenini yeniden kullanır — bkz. `content-enrichment.md` §2.4) | Özet öğrencinin **kendi** önceki en iyi skoruna kıyaslanır; **küresel/akran liderlik tablosu asla yok** (bkz. §4 madde 2). `localStorage` yoksa/bloklu ise sessizce oturum-içi karşılaştırmaya düşülür (yalnız bu oturumun geçmişi). |
@@ -238,23 +225,21 @@ sabırsızlıktan çok daha maliyetlidir.
 
 ### 3.2 Hedef-gradyanı + bahşedilmiş ilerleme
 
-**Ne:** İlerleme rayı hedefe yaklaştıkça motivasyonu artıracak biçimde sunulur
-("son iki durak" yakın-hedef etiketi) ve bir Sefer'in ilk istasyonu öğrenci
-henüz hiçbir şey yapmadan **önceden tamamlanmış** işaretlenir.
+**Ne:** Okur ilerleme göstergesinde nerede olduğunu ve sonunu görür; adımlar 3–7 aşamadır
+(Kanun M2.5). TEDY'de "son iki durak" gibi yakın-hedef metni ve önceden tamamlanmış
+(bahşedilmiş) ilk düğüm yoktur (M2.6).
 
 **Gerekçe:** Hedef-gradyanı hipotezi, bir hedefe yaklaşıldıkça çabanın
-arttığını gösterir ([Kivetz, Urminsky & Zheng 2006](https://www.researchgate.net/publication/239776073)).
-**Bahşedilmiş ilerleme** (endowed progress) bu etkinin bir uzantısıdır:
-kullanıcıya henüz hak etmediği bir baş-ilerleme verildiğinde tamamlama
-olasılığı artar. Birincil kaynak Nunes & Drèze 2006'dır (*Journal of Consumer
-Research*; bkz. §6 Kaynakça); [LogRocket açıklaması](https://blog.logrocket.com/ux-design/goal-gradient-effect/)
-ikincil bir anlatı özetidir.
+arttığını gösterir ([Kivetz, Urminsky & Zheng 2006](https://www.researchgate.net/publication/239776073));
+okurun yaklaştığını görmesi için sonun görünmesi yeter. **Bahşedilmiş ilerleme**
+(endowed progress; Nunes & Drèze 2006, *Journal of Consumer Research*; bkz. §6 Kaynakça;
+[LogRocket açıklaması](https://blog.logrocket.com/ux-design/goal-gradient-effect/)) bu etkinin
+bir uzantısıdır ama hak edilmemiş bir baş-ilerleme verir; TEDY'de kullanılmaz.
 
-**HTML/motor tezahürü:** `meta.milestones[]` üst-düzey ilerleme rayında
-düğümler olarak render edilir; son iki düğüme yaklaşıldığında ray "son iki
-durak" etiketiyle vurgulanır. Sefer'de `meta.quest.stations[0].completed`
-başlangıçta `true` yazılarak ilk düğüm dolu render edilir — bu bir hata değil,
-kasıtlı tasarımdır (§2.2).
+**HTML/motor tezahürü:** `meta.milestones[]` (`{atSegmentId, title}`) segmentleri
+aşamalara gruplar; gösterge aşamaları etiketli çizer, dar kapta tek satır metne döner
+("Aşama 2/5 · Uygula · Bölüm 7/18"; Kanun M5.4). Şablon bugün aşamayı yalnız küçük bir
+noktayla işaretler ve "son N durak" metni yazar: borç KB-2, KB-21.
 
 ### 3.3 Görünmez taban-korumalı uyarlanır zorluk
 
@@ -312,19 +297,17 @@ sınırlar) ve `G-WELLBEING` kapısına **eklenir**, onların yerini almaz.
    devreye sokar — kullanıcı ilerlemekten çok **kaybetmemek** için geri döner;
    bu içsel değil dışsal-kaygı-güdümlü bir bağlılıktır
    ([Duolingo vaka incelemesi](https://trophy.so/blog/duolingo-gamification-case-study)).
-   Bu skill'in streak'i (§2.3) **oturum-içi ve gain-only** kalır; gün-aşırı
-   "serini bozma" baskısı kurulmaz.
+   TEDY'de seri hiç yoktur, oturum içinde de (S43, Kanun M2.7; §2.3).
 2. **Liderlik tablosu (leaderboard).** Akran karşılaştırması/sıralaması,
    oyunlaştırma unsurları arasında tutarsız ve bazen olumsuz etkili
    bulunmuştur, özellikle düşük-performans algılayan öğrencilerde
    ([Hanus & Fox 2015](https://www.sciencedirect.com/science/article/abs/pii/S0360131514002000)).
-   Varsayılan **yok**; §2.3'teki özet daima öğrencinin **kendi** geçmişine
-   kıyaslanır.
+   TEDY'de **hiç yok**; kişisel rekor karşılaştırması da yoktur (S43, Kanun M2.7).
 3. **Değişken-oran ödül / loot-box.** Öngörülemez (variable-ratio) ödül
    çizelgesi kumar mekaniğiyle aynı pekiştirme yapısını taşır ve DEHB'nin
    gecikmeli-pekiştirme duyarlılığını sömürme riski taşır (`adhd-pedagogy.md`
-   Ö3, Tripp & Wickens 2009). Ödül her zaman **sabit-cetvel** (doğru = +10,
-   ilk-deneme bonus = +5) kalır — asla rastgele/gizli bir dağılımdan çekilmez.
+   Ö3, Tripp & Wickens 2009). TEDY'de ödül hiç yoktur; iç XP sayısı sabit
+   cetveldir (doğru = +10, ilk deneme = +5) ve okura gösterilmez (S43, Kanun M2.7).
 4. **Geri-sayım / sert-süre baskısı.** Sayısal geri-sayım ve sert zaman
    sınırı kaygı üretir; bunun yerine test edilmiş, kaygı-azaltan biçim
    sayısız/kesintisiz disktir (§3.4, Hallez & Vallier 2025). Süre her zaman
@@ -338,9 +321,8 @@ sınırlar) ve `G-WELLBEING` kapısına **eklenir**, onların yerini almaz.
 6. **Overjustification (aşırı-gerekçelendirme).** Zaten içsel ilgi duyulan bir
    etkinliğe güçlü dışsal ödül eklemek, ödül kaldırıldığında içsel motivasyonu
    **azaltabilir** (Deci, Koestner & Ryan 1999, klasik meta-analiz). Bu
-   yüzden ödül her zaman **bilgilendirici** çerçevede kalır (ustalık/ilerleme
-   anlatır), performansı "satın alan" bir sopa-havuç değil (`adhd-pedagogy.md`
-   İlke 6).
+   yüzden TEDY'de dışsal ödül yoktur (S43, Kanun M2.7); ilerleme ve ustalık metinle
+   anlatılır (`adhd-pedagogy.md` İlke 6).
 7. **Hyperfocus-sömürüsü.** Mekanikleri, DEHB'nin hiper-odaklanma eğilimini
    sömürüp oturumu sağlıksız biçimde uzatacak "bir istasyon daha" çekişi
    üretecek şekilde tasarlamak, ihtiyaç-ihmaline (uyku, sosyal, dinlenme) yol

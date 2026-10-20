@@ -1,6 +1,6 @@
 - main:
   - heading "Duyurular" [level=1]
-  - heading "Okul duyuruları" [level=2]
+  - heading "Okul Duyuruları" [level=2]
   - paragraph: 2 yeni duyuru
   - list:
     - listitem:

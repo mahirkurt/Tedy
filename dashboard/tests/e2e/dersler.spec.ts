@@ -42,8 +42,8 @@ test('the timetable and the lesson content share one page', async ({ page }) => 
   await page.waitForLoadState('networkidle')
 
   expect(new URL(page.url()).pathname).toBe('/dersler')
-  await expect(page.getByText('Haftalık program', { exact: false })).toBeVisible()
-  await expect(page.getByText('Ders içerikleri', { exact: false })).toBeVisible()
+  await expect(page.getByText('Haftalık Program', { exact: false })).toBeVisible()
+  await expect(page.getByText('Ders İçerikleri', { exact: false })).toBeVisible()
 })
 
 test('the old timetable path still lands somewhere', async ({ page }) => {
@@ -85,6 +85,9 @@ test('the chosen course tab survives a reload', async ({ page }) => {
     'Matematik': { text: 'Kesirler konusu işlendi.', cards: [], items: [] },
     'Türkçe': { text: 'Okuma günlüğü.', cards: [], items: [] },
   })))
+  // Without its own answer the page read the live weeks and showed this week's real cards
+  // instead of the fixture's (seen 2026-10-19: "6. Hafta 19 Eki." in place of "Okuma günlüğü.").
+  await page.route('**/api/content/weeks', r => r.fulfill(json({ weeks: {}, current: '' })))
   await page.route('**/api/health', r => r.fulfill(json({
     timestamp: '', success: true, scrape_errors: [], duration_seconds: 1,
   })))

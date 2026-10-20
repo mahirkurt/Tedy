@@ -1,10 +1,10 @@
 - main:
   - heading "Takımlar" [level=1]
-  - heading "Takım çalışmaları & ÖGEP" [level=2]
+  - heading "Takım Çalışmaları & ÖGEP" [level=2]
   - text: Academy+ (2)
   - list "Academy+ (2)":
     - listitem: /Robotik kulübü Teams \d+\.\d+ \d+:\d+ Bekliyor/
     - listitem: /Münazara Teams \d+\.\d+ \d+:\d+ Katıldı/
-  - text: ÖGEP oturumları (1)
-  - list "ÖGEP oturumları (1)":
+  - text: ÖGEP Oturumları (1)
+  - list "ÖGEP Oturumları (1)":
     - listitem: /Hedef belirleme \d+\.\d+ \d+:\d+ Bekliyor/

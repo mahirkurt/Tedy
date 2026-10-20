@@ -48,7 +48,7 @@ dosyaya veya çalışma-zamanı ağ isteğine bağımlı değildir (`G-SELFCONTA
 | Kaynak / Teknik | Lisans / Durum | Build-zamanı entegrasyon | Zorunlu kısıt |
 |---|---|---|---|
 | Wikidata olgu-çipleri | **CC0** (kamu malına eşdeğer, atıf gerekmez) | Derleme anında sorgulanır → sonuç `MODULE_DATA`'ya donmuş değer olarak yazılır | QID + çekim tarihi provenans; kazanım metnine **uzlaştırma zorunlu** (no-fabrication) |
-| Wikimedia Commons görseli | Karışık: PD / CC BY / CC BY-SA (dosya bazında değişir) | Yalnız **PD veya CC BY** dosyalar statik gömülür (inline SVG/PNG) | **CC BY-SA'dan kaçının**; atıf satırı zorunlu; seyrek kullanım, Tier-1 yazar-SVG doktrini birincil kalır |
+| Wikimedia Commons görseli | Karışık: PD / CC BY / CC BY-SA (dosya bazında değişir) | Yalnız **PD veya CC BY** dosyalar statik gömülür (inline SVG/PNG) | **CC BY-SA'dan kaçının**; atıf satırı zorunlu; seyrek kullanım. TEDY'de görsel `edupedia_gorsel` zinciriyle gelir (Kanun M3.1) |
 | Native MathML | Yok — tarayıcı-yerli özellik | `<math>` düğümü doğrudan HTML'e yazılır | Sıfır JS/font/payload; yalnız `mathExpr` yetersiz kaldığında tamamlayıcı |
 | Çapraz-oturum aralıklı tekrar (spaced-rep) | Yok — istemci-taraf teknik, telif konusu değil | Leitner/kutu durumu modül-başına anahtarla `localStorage`'a yazılır | `localStorage` bazı `file://` kökenlerinde tutarsız/bloklu → **feature-detect + zarif düşüş** zorunlu; **IndexedDB kullanılmaz** |
 
@@ -78,11 +78,11 @@ veya base64 PNG) gömülür.
 de aynı lisans altına girmek zorunda kalır — bu, tek bir görsel yüzünden
 **tüm modülü CC BY-SA'ya sürükler**, ki bu istenen bir sonuç değildir.
 Kullanılan her CC BY görsel için atıf satırı (yazar + lisans + kaynak URL)
-görselin hemen yanına eklenir. Kullanım **seyrek** kalmalı: bu skill'in
-birincil ve **garantili** görsel-dayanak yolu her zaman yazar-üretimli
-tema-duyarlı SVG'dir (`svg-authoring.md` Tier-1 doktrini) — Wikimedia yalnız
-SVG ile ifade edilemeyen belgesel/fotoğrafik durumlarda tamamlayıcı olarak
-düşünülür.
+görselin hemen yanına eklenir. Kullanım **seyrek** kalmalı. TEDY'de görseli `edupedia_gorsel` getirir (kitap
+figürü → Pexels → MiniMax; Kanun M3.1); kitap figürü ve yazar görseli birlikte
+kullanılır: her modülde en az bir yazar görseli vardır ve kitap figürü onun yerini
+almaz (M3.5). Zincirin dışındaki bir Wikimedia görseli TEDY modülüne gömülmez; zincir
+sonuç vermezse yazar görseli çizilir.
 
 ### 2.3 Native MathML
 `mathExpr` yetersiz kaldığı (karmaşık kesir, kök, toplam/entegral gösterimi
@@ -139,9 +139,9 @@ Kaynak sayfaları: [PhET HTML Licensing](https://phet.colorado.edu/en/licensing/
 
 **Genel ilke:** Hiçbir "yapılamaz" kaynak zorla bakeable hale getirilmeye
 çalışılmaz (örn. bir `iframe`'i gömüp "çevrimdışı" diye sunmak — bu hem
-G-SELFCONTAINED'i hem lisansı ihlal eder). Şüpheli durumda varsayılan davranış
-her zaman Tier-1 yazar-SVG'ye dönmektir (`svg-authoring.md`) — bu skill'in
-**tek garantili** görsel-dayanak yoludur.
+G-SELFCONTAINED'i hem lisansı ihlal eder). Şüpheli durumda kaynak gömülmez;
+görsel `edupedia_gorsel` zincirinden ya da bir yazar görselinden gelir (`svg-authoring.md`;
+Kanun M3.1, M3.5).
 
 ## 4. Dyslexia-font miti → ispatlı kaldıraçlar
 

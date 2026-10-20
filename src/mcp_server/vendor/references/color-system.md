@@ -10,7 +10,7 @@ Carbon tuvali üzerinde. Amaç, DEHB-sakin sınırını korurken renkle **odak, 
 | --- | --- | --- |
 | **Kimlik** | `--tedy-brand` (Blue 80) + `--cds-text-on-color` | Yalnız üst kimlik bandı ve Tedy işareti (panoyla aynı). Eylem rengi değildir. |
 | **Eylem** | `--cds-button-primary` (Blue 60), `--cds-link-primary`, `--cds-interactive` | Birincil buton, bağlantı, ilerleme göstergesi. Kontrast için **mavi** sabittir (aksan değil). |
-| **Odak çıpası** | `--accent` / `--accent-tint` / `--accent-strong` | Seçili/hover şık, bölüm ikonu, bölüm başlığı çizgisi, anlatım kutusu sol çizgisi — "buraya bak" sinyali. Derse göre değişir; büyük yüzey boyamaz. |
+| **Ders çapası** | `--accent` / `--accent-tint` / `--accent-strong` | Yalnız Kanun M1.5'in çapaları: kavram yüzeylerinin (`.lead`, merak kartı) 4 px kenarı, vurgulu terimin ve kavram çipinin tint zemini, kavram çipinin ders kenarı, segment ikonunun tint zemini. Hover, seçili ve odak durumları ders rengi almaz (M1.6); şablonda borç KB-17. Büyük yüzey boyamaz. |
 | **Durum: başarı** | `--cds-support-success` + `--cds-notification-background-success` (+ metin `--tedy-text-success`) | Doğru yanıt, ustalık, tamamlama. |
 | **Durum: bilgi** | `--cds-support-info` + `--cds-notification-background-info` (+ `--tedy-text-info`) | İpucu, "hatırla", nötr geri bildirim. |
 | **Durum: uyarı** | `--cds-support-warning` + `--cds-notification-background-warning` (+ `--tedy-text-warning`) | Dikkat çekme (cezalandırıcı değil). |
@@ -27,19 +27,21 @@ Carbon tuvali üzerinde. Amaç, DEHB-sakin sınırını korurken renkle **odak, 
 2. **Nötr tuval.** Büyük doygun alan yok; sayfa `--tedy-page-background`, kartlar Carbon layer'ı.
    Tek doygun alan üst bandın Tedy laciverdidir.
 3. **Artıklık + CVD.** Renk tek ayırt edici olamaz; metin/ikon/şekil ile birlikte.
-4. **Wayfinding tonu.** Etkinlik türü renk ailesiyle değil, dersin kendi ailesinin tonuyla
-   imlenir: "senin sıran" segmentleri dolu aksan karo, anlatım/veri tag karosu, mola nötr.
-5. **Sakinlik.** Tek, `prefers-reduced-motion` ile kapalı giriş; doygunluk ölçülü; WCAG AA.
+4. **Wayfinding.** Etkinlik türünü ikon ve kicker metni taşır; segment ikonu ders renginin tint
+   zeminidir, mola nötr. Dolu ders rengi karo yoktur (Kanun M1.4).
+5. **Sakinlik.** Bölüm girişinde hareket yok (Kanun M2.10); doygunluk ölçülü; WCAG AA.
 
 ## 3. Wayfinding tonu (tek modül, tek renk)
-Motor, `.stage[data-seg="…"]` üzerinde bölüm ikon karosunun tonunu seçer; renk ailesi her
-segmentte dersin ailesidir:
+Kanun M1.4 ve M1.5'e göre segment ikon karosu her segmentte ders renginin tint zeminidir;
+dolu ders rengi karo ve renkli kicker yoktur. Etkinlik türünü ikon ve kicker metni taşır:
 
 | Segment | `.seg-ic` karo | İkon | `kicker` |
 |---|---|---|---|
-| Etkileşim ("senin sıran": `mcq`, `checkpoint`, `fillblank`, `match`, `order`, `sorting`, `hotspot`, `conceptMap`, `flashcards`) | `--subject-accent` (dolu) | `--subject-on-accent` | `--subject-text` |
-| Anlatım ve veri (`teach`, `chart`, `table`, diğerleri) | `--subject-surface` (Carbon tag zemini) | `--subject-on-surface` | `--subject-text` |
+| Etkileşim ve anlatım (`mcq`, `checkpoint`, `teach`, `chart` …) | `--subject-surface` (Carbon tag zemini) | `--subject-on-surface` | `--cds-text-secondary` |
 | Mola (`brainbreak`) | `--cds-layer-accent-01` (nötr) | `--cds-icon-secondary` | `--cds-text-secondary` |
+
+Şablon bugün etkileşim segmentlerinde dolu `--subject-accent` karo (borç KB-16) ve
+`--subject-text` kicker (borç KB-17) çizer.
 
 Eski `--seg-accent` eşlemesi (anlatım=info mavisi, mola=başarı yeşili) kaldırıldı: anlam renkleri
 kategori olarak kullanılınca "doğru" ve "bilgi" sinyalleri sulanıyordu, açık temada yeşil kicker
@@ -56,8 +58,8 @@ tema değişince CSS kendiliğinden geçer (JavaScript renk hesabı yok). Kırm�
 turuncu anlam renkleridir, ders rengi olamaz; Carbon'un uyarı paleti de aynı anlamları taşır
 (kırmızı hata, turuncu ciddi uyarı, sarı uyarı, yeşil başarı:
 https://carbondesignsystem.com/building-blocks/data-visualization/color-palettes/#alert-palette).
-Üst bant Tedy laciverdidir; modülde **butonlar ve ilerleme göstergesi Carbon mavisi kalır**
-(panodaki asistanın öğretmen modu bunun adlı istisnasıdır: `tedy-integration.md` §7).
+Üst bant Tedy laciverdidir; modülde **butonlar ve ilerleme göstergesi Carbon mavisi kalır**;
+istisnası yoktur (S35, Kanun M1.6).
 Otorite aile ve mod başına 9 rol taşır; `panel` ve `panelBorder` yalnız panonun tek büyük ders
 yüzeyi içindir (İ8), şablon 7 rol üretir.
 
@@ -69,7 +71,8 @@ yüzeyi içindir (İ8), şablon 7 rol üretir.
   emoji/animasyonla telafi edilmez.
 
 ## 6. Tedy ile bütünlük
-Tema, kimlik bandı, köşe, gölge ve oyunlaştırma kuralları: `tedy-integration.md`.
+Tema, kimlik bandı, köşe, gölge ve oyunlaştırma kuralları: `tedy-integration.md`. Tasarım
+kararında TEDY Modül Tasarım Kanunu (`edupedia_rehber('kanun')`) önceliklidir.
 
 ## 7. Veri görselleştirme renkleri (`--viz`)
 
@@ -84,8 +87,9 @@ Tema, kimlik bandı, köşe, gölge ve oyunlaştırma kuralları: `tedy-integrat
   Her yuva kendi temasının `--cds-layer-01` zeminine karşı ≥ 3:1 taşır; kapı
   `test_s19_viz_zemine_karsi_3_1`.
 - **Sıra.** Seriler `--viz-1`'den başlayarak sırayla atanır; sıra keyfi değiştirilmez. Tek seri
-  `--accent` kullanır. 5 seriyi aşan veri doğrudan etiket ya da desenle ayrışır; anlam renkleri
-  hiçbir zaman seri rengi olmaz.
+  `--viz-1` kullanır. 5 seriyi aşan veri doğrudan etiket ya da desenle ayrışır; anlam renkleri
+  hiçbir zaman seri rengi olmaz. Grafik verisinde `color` yazılmaz (Kanun M4.7; şablon ve G-SVG
+  bugün kabul ediyor: borç KB-25).
 - **Lejant.** Tek veri kategorisinde lejant yoktur; mümkünse veri doğrudan etiketlenir
   (https://carbondesignsystem.com/building-blocks/data-visualization/legends/#usage).
 - **Eksik veri.** Enterpolasyon ve sıfır yok; boşluğun başı ve sonu etiketlenir

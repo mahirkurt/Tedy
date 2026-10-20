@@ -107,7 +107,7 @@ export default function WeeklySchedule() {
   const week = data.latest || {}
   const rows = week.schedule?.rows || []
   if (rows.length === 0) {
-    return <EmptyLine label="Haftalık program">Bu hafta için ders programı yok.</EmptyLine>
+    return <EmptyLine label="Haftalık Program">Bu hafta için ders programı yok.</EmptyLine>
   }
 
   const dayHeaders = rows[0] || []
@@ -155,7 +155,7 @@ export default function WeeklySchedule() {
         title={
           <span className="dashboard-card__title dashboard-card__title--tight">
             <Calendar size={20} />
-            Haftalık program &mdash; {week.week_label || ''}
+            Haftalık Program &mdash; {week.week_label || ''}
           </span>
         }
       >

@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { InlineNotification, SkeletonText } from '@carbon/react'
 import type { ModuleTicket } from '../types'
 import {
-  acceptProgressMessage, appearanceMessage, DASHBOARD_THEME, restoreMessage, type RestoreState,
+  acceptProgressMessage, acceptSizeMessage, appearanceMessage, DASHBOARD_THEME, restoreMessage, type RestoreState,
 } from '../utils/moduleBridge'
 import ModulAiEtiketi from './ModulAiEtiketi'
+import { useModulAciklamasi } from '../hooks/useModulAciklamasi'
+import ModulBasligi from './ModulBasligi'
 import './Modules.scss'
 
 // The dashboard's computed root font size. The frame is a separate document, so it does not
@@ -12,6 +14,9 @@ import './Modules.scss'
 // frame's width (the column minus the page padding), which would couple module type size to
 // dashboard layout and mis-scale a standalone module. So the host reports the value (spec §10.2).
 const kokPx = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+// The band and the bottom bar are kept clear by the page's scroll-padding (ted-theme.scss); a
+// frame top inside it is as hidden as one above the viewport.
+const ustBosluk = () => parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0
 
 type TicketState = { status: 'loading' } | { status: 'ready'; url: string } | { status: 'error'; message: string }
 
@@ -28,22 +33,30 @@ export interface ModuleViewerProps {
   aciklamaPath: string
   /** Absent for draft previews: a draft never writes progress. */
   progress?: { slug: string; version: number }
+  /** Shown between the head and the frame (the draft preview's notice). */
+  ust?: React.ReactNode
 }
 
-export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress }: ModuleViewerProps) {
+export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress, ust }: ModuleViewerProps) {
   const frameRef = useRef<HTMLIFrameElement>(null)
+  const aciklama = useModulAciklamasi(aciklamaPath)
+  const bas = <ModulBasligi durum={aciklama} taslak={!progress} aiEtiketi={<ModulAiEtiketi durum={aciklama} />} />
   // Reset to loading during render when ticketPath changes, rather than with a
   // synchronous setState at the top of the effect below (React's "adjusting
   // state when a prop changes" pattern) — the fetch itself still runs in the effect.
   const [seenTicketPath, setSeenTicketPath] = useState(ticketPath)
   const [ticket, setTicket] = useState<TicketState>({ status: 'loading' })
   const [saveFailed, setSaveFailed] = useState(false)
+  // The module's content height once it reports one (flow layout). Until then — and for a module
+  // compiled before the flow layout existed — the frame keeps its fixed minimum and its own scroll.
+  const [yukseklik, setYukseklik] = useState<number | null>(null)
   const slug = progress?.slug
   const version = progress?.version
 
   if (seenTicketPath !== ticketPath) {
     setSeenTicketPath(ticketPath)
     setTicket({ status: 'loading' })
+    setYukseklik(null)
   }
 
   useEffect(() => {
@@ -63,8 +76,20 @@ export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress
   }, [ticketPath])
 
   const onMessage = useCallback((event: MessageEvent) => {
+    const frameEl = frameRef.current
+    const boy = acceptSizeMessage(event, frameEl?.contentWindow ?? null)
+    if (boy) {
+      setYukseklik(boy.height)
+      // A section change: the module scrolls its own window to the top, which in a frame without
+      // a scroll of its own moves nothing — so the page brings the frame's top into view, and only
+      // when the reader has scrolled past it (opening a module never moves the page).
+      if (boy.top && frameEl && frameEl.getBoundingClientRect().top < ustBosluk()) {
+        frameEl.scrollIntoView({ block: 'start' })
+      }
+      return
+    }
     if (!slug || !version) return
-    const frame = frameRef.current?.contentWindow ?? null
+    const frame = frameEl?.contentWindow ?? null
     const message = acceptProgressMessage(event, frame, slug, version)
     if (!message || !frame) return
     if (message.event === 'ready') {
@@ -94,11 +119,11 @@ export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress
   }, [onMessage])
 
   // On load (drafts included — they send no 'ready'), tell the module which Carbon theme the
-  // dashboard renders in, and at what root font size, so the two read as one surface. As with
-  // restore, '*' is the only target that reaches the opaque-origin frame; the contentWindow
-  // reference addresses it.
+  // dashboard renders in, at what root font size, and that it sits in the page's flow — so the two
+  // read as one surface. As with restore, '*' is the only target that reaches the opaque-origin
+  // frame; the contentWindow reference addresses it.
   const gonderGorunum = useCallback(() => {
-    frameRef.current?.contentWindow?.postMessage(appearanceMessage(DASHBOARD_THEME, kokPx()), '*')
+    frameRef.current?.contentWindow?.postMessage(appearanceMessage(DASHBOARD_THEME, kokPx(), 'flow'), '*')
   }, [])
   const onFrameLoad = gonderGorunum
 
@@ -122,29 +147,27 @@ export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress
   }, [gonderGorunum])
 
   if (ticket.status === 'loading') {
-    return <div className="module-viewer" aria-busy="true"><SkeletonText paragraph lineCount={3} /></div>
+    return <div className="module-viewer">{bas}{ust}<div aria-busy="true"><SkeletonText paragraph lineCount={3} /></div></div>
   }
   if (ticket.status === 'error') {
     return (
       <div className="module-viewer">
+        {bas}{ust}
         <InlineNotification kind="error" role="alert" lowContrast hideCloseButton statusIconDescription="Hata" title="Modül açılamadı" subtitle={ticket.message} />
       </div>
     )
   }
   return (
     <div className="module-viewer">
+      {bas}
+      {ust}
       {saveFailed && (
         <InlineNotification kind="warning" lowContrast hideCloseButton statusIconDescription="Uyarı" title="İlerleme kaydedilemedi"
           subtitle="Modül çalışmaya devam ediyor; sayfayı yenileyince kayıt yeniden denenir." />
       )}
-      {/* Frame header (S41, B71): every module shown on the dashboard carries a broad AI label, upper right of
-          its container; the module inside is untouched (G-VOICE). */}
-      <div className="module-viewer__ust">
-        <p className="module-viewer__not">Yapay zekâ yardımıyla hazırlanmış modül</p>
-        <ModulAiEtiketi aciklamaPath={aciklamaPath} />
-      </div>
-      <iframe ref={frameRef} className="module-frame" title={title} src={ticket.url}
-        sandbox="allow-scripts" referrerPolicy="no-referrer" onLoad={onFrameLoad} />
+      <iframe ref={frameRef} className={yukseklik ? 'module-frame module-frame--akis' : 'module-frame'}
+        style={yukseklik ? { height: yukseklik } : undefined} scrolling={yukseklik ? 'no' : undefined}
+        title={title} src={ticket.url} sandbox="allow-scripts" referrerPolicy="no-referrer" onLoad={onFrameLoad} />
     </div>
   )
 }

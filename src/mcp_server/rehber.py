@@ -1,4 +1,9 @@
-"""Serve the vendored edupedia guide as bounded sections for every web surface (spec §9.1)."""
+"""Serve the vendored edupedia guide as bounded sections for every web surface (spec §9.1).
+
+The TEDY Modül Tasarım Kanunu (`docs/tedy-modul-tasarim-kanunu.md`, 2026-10-19) outranks the vendored
+guide on every design decision, so it is served from its own file — never copied into `vendor/` — as the
+`kanun` section, and its "## 1. Yazar için kanun" summary leads `akis` and `carbon`: the author agent
+reads the law before the guide it overrides."""
 from __future__ import annotations
 
 import re
@@ -9,15 +14,18 @@ from src.mcp_server.vendor_sync import VENDOR_DIR
 
 PART_MAX_BYTES = 8000
 _R = "references/"
+KANUN_YOLU = Path(__file__).resolve().parents[2] / "docs" / "tedy-modul-tasarim-kanunu.md"
+KANUN = "docs/tedy-modul-tasarim-kanunu.md"  # a SECTIONS source outside vendor/, read from KANUN_YOLU
 
 # bölüm → ((file, heading numbers), ...); an empty tuple means the whole file.
 SECTIONS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
-    "akis": (("SKILL.md", ("8",)), (_R + "module-architecture.md", ("3", "4")), (_R + "curriculum-integration.md", ("3",))),
+    "kanun": ((KANUN, ()),),
+    "akis": ((KANUN, ("1",)), ("SKILL.md", ("8",)), (_R + "module-architecture.md", ("3", "4")), (_R + "curriculum-integration.md", ("3",))),
     "modlar": (("SKILL.md", ("3", "6")), (_R + "module-architecture.md", ("1",))),
     "segmentler": ((_R + "module-architecture.md", ("2",)), (_R + "interaction-patterns.md", ())),
     "etkilesim": (("SKILL.md", ("9",)), (_R + "gamified-flows.md", ("2", "3", "4"))),
     "pedagoji": (("SKILL.md", ("4",)), (_R + "adhd-pedagogy.md", ("2", "3", "6", "7", "9"))),
-    "carbon": (("SKILL.md", ("10",)), (_R + "tedy-integration.md", ()), (_R + "carbon-child-system.md", ()),
+    "carbon": ((KANUN, ("1",)), ("SKILL.md", ("10",)), (_R + "tedy-integration.md", ()), (_R + "carbon-child-system.md", ()),
                (_R + "carbon-excellence.md", ("2", "4")), (_R + "color-system.md", ())),
     "svg": (("SKILL.md", ("11",)), (_R + "svg-authoring.md", ()), (_R + "icon-pictogram-svg.md", ())),
     "ses": ((_R + "audio-system.md", ()),),
@@ -30,6 +38,7 @@ SECTIONS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
 }
 
 UYARI = (
+    "Tasarım kararında TEDY Modül Tasarım Kanunu (bolum='kanun') bu rehberin önündedir; çelişkide kanun kazanır. "
     "Bu rehber Claude Code plugin'i için yazıldı. Dosya yolu, script çalıştırma (validate_module.py) ve "
     "yerel teslim adımlarını UYGULAMA: HTML'i kendin yazma; MODULE_DATA'yı edupedia_derle ile derlet, "
     "edupedia_yayinla ile yayınla. Müfredat adımları için edupedia_kapsam ve edupedia_kaynak_oku kullan."
@@ -71,10 +80,16 @@ def _matches(heading: str, numbers: tuple[str, ...]) -> bool:
     return any(value == n or value.startswith(n + ".") for n in numbers)
 
 
+def read_source(filename: str, vendor: Path = VENDOR_DIR) -> str:
+    """A SECTIONS source: the law from docs/, everything else from the vendored guide."""
+    path = KANUN_YOLU if filename == KANUN else vendor / filename
+    return path.read_text(encoding="utf-8")
+
+
 def _blocks(bolum: str, vendor: Path) -> list[tuple[str, str]]:
     blocks: list[tuple[str, str]] = []
     for filename, numbers in SECTIONS[bolum]:
-        text = (vendor / filename).read_text(encoding="utf-8")
+        text = read_source(filename, vendor)
         if numbers == ():
             pre = preamble(text)
             if pre:
@@ -148,9 +163,9 @@ def search(q: str, limit: int = 5, vendor: Path = VENDOR_DIR) -> dict[str, Any]:
         for filename, _ in sources:
             owners.setdefault(filename, []).append(bolum)
     scored = []
-    files = ["SKILL.md", *sorted(str(p.relative_to(vendor)) for p in (vendor / "references").glob("*.md"))]
+    files = [KANUN, "SKILL.md", *sorted(str(p.relative_to(vendor)) for p in (vendor / "references").glob("*.md"))]
     for filename in files:
-        file_text = (vendor / filename).read_text(encoding="utf-8")
+        file_text = read_source(filename, vendor)
         sections = list(split_sections(file_text))
         pre = preamble(file_text)
         if pre:

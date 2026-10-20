@@ -3,7 +3,7 @@
 Bir ders seçildiğinde `carbon-edupedia`, o derse uygun **görsel/etkileşim güçlerini** etkinleştirir.
 Etkinleştirme `meta.subject` (veya `meta.subjectKey`) ile olur; motor bundan üç şey türetir:
 (1) **ders renk ailesi** (`data-subject-family`), (2) alan (`data-subject-domain`), (3) dil/konu
-anahtarı `data-subject` (derse-özel tipografi, sesli okuma dili).
+anahtarı `data-subject` (sesli okuma dili). Derse özel tipografi ya da düzen yoktur (Kanun M4.6).
 
 ## 1. Ders renk ailesi ve konu anahtarı
 Renk, Tedy ders renk sisteminden gelir (tek kaynak `tedyLayer.subjectThemes`, kurallar
@@ -23,13 +23,14 @@ Renk, Tedy ders renk sisteminden gelir (tek kaynak `tedyLayer.subjectThemes`, ku
 
 Sıra önemlidir: yabancı diller Türkçe'den, değerler sosyalden önce denetlenir ("Ahlak ve
 Yurttaşlık" → değerler; "İnsan Hakları, Yurttaşlık ve Demokrasi" → sosyal). `meta.accent`
-yalnız bir aile adıyla alanı ezebilir; en iyisi hiç yazmamak ve `meta.subject`'e dersin resmî
-adını yazmaktır. Renk yalnız **odak çıpası / başlık / yapı** tonunu etkiler; butonlar
-erişilebilirlik için Carbon mavisi kalır (bkz. `color-system.md`).
+yazılmaz (Kanun M4.5; derleyici bir aile adını bugün kabul ediyor, borç KB-24); `meta.subject`'e
+dersin resmî adı yazılır. Ders rengi yalnız Kanun M1.5'in çapalarında görünür; butonlar ve
+etkileşim durumları Carbon token'larıyla çizilir (M1.6; bkz. `color-system.md`).
 
 Konu anahtarı (`data-subject`: `math`, `science`, `religion`, `civics`, `history`, `geography`,
-`social`, `turkish`, `french`, `english`) renkten bağımsızdır; derse-özel biçim (ör. matematikte
-tablo rakamları) ve sesli okuma dili (Fransızca/İngilizce) onu kullanır.
+`social`, `turkish`, `french`, `english`) renkten bağımsızdır; yalnız sesli okuma dili
+(Fransızca/İngilizce) ve `lang` özniteliği onu kullanır (Kanun M5.16). Derse özel tipografi,
+font ya da düzen kuralı yazılmaz (M4.6; şablonda `data-subject` seçicisi borç KB-27).
 
 ## 2. Matematik paketi — sayı, sembol, geometri mükemmelliği
 Motor üç araç sunar:
@@ -66,7 +67,8 @@ ayrıntısı `interaction-patterns.md` §14, motor ayrıntısı `module-architec
 ### c) Geometri SVG (özgün, kurallı)
 `visual:{ kind:"svg", … }` ile `svg-authoring.md` kurallarına göre çiz:
 - Dik açı için **kare işaret**, açı için yay; köşe etiketleri (A/B/C), kenar etiketleri (a/b/c).
-- Renk: gövde `var(--accent-tint)` dolgu + `var(--accent)` kenar; yardımcı çizgiler `var(--viz-axis)`.
+- Renk: gövde `var(--cds-layer-02)` dolgu + `var(--viz-2)` kenar; yardımcı çizgiler `var(--viz-axis)`.
+  Ders rengi (`--accent`) yazar SVG'sine girmez (Kanun §1 madde 1, M1.5).
 - Metin rengini CSS verir; `class="viz"`, `role="img"`, `<title>`/`<desc>` zorunlu.
 
 ### d) Değer tablosu
@@ -164,7 +166,7 @@ Beş başlangıç preset'i:
 | `functionPlot` | `m`, `b` | `y = mx + b` doğrusu, orijinden geçen eksenler |
 
 Her preset yalnız token renk kullanır (`var(--accent)`, `var(--viz-axis)`,
-`var(--viz-2)` — ham hex yok) ve tek bir `svg#simSvg role="img" aria-labelledby`
+`var(--viz-2)` — ham hex yok; `--accent` Kanun M1.5 çapalarının dışındadır, motorda borç KB-17) ve tek bir `svg#simSvg role="img" aria-labelledby`
 öğesinin `innerHTML`'ini tam değiştirir; bu yüzden yeniden çizim her zaman
 anındadır (CSS transition yok — G-CARBON-GRID koreografi kontrolünü etkilemez).
 **Bilinmeyen `simType`** → nazik "hazır şablon yok" notu (uydurma/çökme yok).
@@ -190,7 +192,7 @@ süreçleri etiketle, rehberlik ekle**.
     labels:[{n?,x,y,text}],     // numaralı iğne + sıralı açıklama listesi
     title, desc, caption }
   ```
-  İğneler `var(--accent)`; numara `--cds-text-on-color`; açıklamalar figürün altında **okunur**
+  İğneler `var(--accent)` (Kanun M1.5 çapalarının dışında, motorda borç KB-17); numara `--cds-text-on-color`; açıklamalar figürün altında **okunur**
   sıralı liste (küçük SVG metni yerine). `role="img"` + `<title>`/`<desc>` zorunlu.
 - **`relationFlow(spec)`** — süreç/enerji zinciri (örn. Güneş ışığı → Yaprak → Glikoz → Oksijen).
 - **`vizChart` / `vizTable`** — deney verisi ve gözlem tabloları.
@@ -241,8 +243,8 @@ birlikte** verilir (CVD-güvenliği + sistematik tutarlılık).
 
 ## 6. Genişletme deseni
 Yeni bir ders için: (1) rengi gerekiyorsa `tedyLayer.subjectThemes.domains`'e kök ekle ve
-`scripts/sync_carbon_tokens.py --write-subjects` çalıştır; konu anahtarı gerekiyorsa `subjectKey`'e satır ekle; (2) gerekiyorsa
-`data-subject="…"` altında tipografi/biçim kuralı tanımla; (3) ilgili yapıcıyı
+`scripts/sync_carbon_tokens.py --write-subjects` çalıştır; konu anahtarı gerekiyorsa `subjectKey`'e satır ekle; (2) derse özel
+tipografi ya da biçim kuralı tanımlanmaz (Kanun M4.6); (3) ilgili yapıcıyı
 (`labeledFigure`/`relationFlow`/`infoCards`/`glossSentence`/`dialogue`) ya da `svg-authoring.md`
 arketipini kullan.
 

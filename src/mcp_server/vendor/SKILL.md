@@ -22,8 +22,9 @@ modülüne** dönüştürür. Modül iki katmanı iç içe örer:
 1. **Öğretim katmanı (teach)** — Kaynağa sadık, kapsamlı, izah edici, görsel
    açıdan zengin konu anlatımı. "Eğlenceli" olması derinlikten ödün vermez.
 2. **Etkileşim katmanı (engage)** — Anlatım parçaları arasına serpiştirilmiş
-   oyunlar, quizler, yarışmalar, flashcard'lar; XP/rozet ekonomisi, anında
-   geri bildirim, ilerleme rayı ve mola (brain-break) noktaları.
+   oyunlar, quizler ve flashcard'lar; anında geri bildirim, ilerleme göstergesi ve
+   mola (brain-break) noktaları. Ödül ekonomisi (XP, rozet, seri, kutlama) yoktur
+   (S43, Kanun M2.7).
 
 Çıktı tamamen **IBM Carbon Design System v11** token sistemiyle, IBM Plex
 tipografisiyle biçimlendirilir; **emoji içermez** ama Carbon ikonları,
@@ -113,12 +114,14 @@ okuyun. Çekirdek ilkeler (tam gerekçe ve kaynaklar referansta):
 - **Parçalama (chunking) / mikro-öğrenme** — anlatım 3–6 dakikalık birimlere
   bölünür (çalışma belleği + bilişsel yük kuramı).
 - **Sık aktif yanıtlama (high OTR)** — pasif okuma yerine sürekli tıklama/yanıt.
-- **Anında geri bildirim + ödül** — DEHB'de dopaminerjik ödül işleme ve gecikme
-  itimi (delay aversion); ödül gecikmeden verilir.
-- **Yürütücü işlev dışsallaştırma** — açık hedefler, ilerleme rayı, "neredeyim"
+- **Anında geri bildirim** — DEHB'de dopaminerjik ödül işleme ve gecikme
+  itimi (delay aversion); geri bildirim gecikmeden verilir. Ödül (XP, rozet,
+  kutlama) yoktur; XP yalnız iç sayıdır (S43, Kanun M2.7).
+- **Yürütücü işlev dışsallaştırma** — açık hedefler, ilerleme göstergesi, "neredeyim"
   yönelimi, görünür zaman (Barkley modeli).
 - **Düşük dış yük + yüksek uyarılma dengesi** — temiz Carbon düzeni (dikkat
-  dağıtıcıyı azaltır) + canlı aksan/hareket/piktogram (uyarılmayı korur).
+  dağıtıcıyı azaltır) + piktogram, görsel ve etkileşim çeşitliliği (uyarılmayı
+  korur). Ders rengi yalnız Kanun M1.5 çapalarındadır; giriş hareketi yoktur (M2.10).
 - **Özerklik ve seçim** — öz-belirleme kuramı; öğrenci yol/konu seçebilir.
 - **Çoklu temsil (UDL + ikili kodlama)** — görsel + sözel; bol piktogram/SVG.
 
@@ -137,10 +140,10 @@ hatalardır. İlgili referansı **emisyondan önce** okuyun.
 | `references/icon-pictogram-svg.md` | İkon/piktogram seçer veya özgün SVG çizim üretirken. |
 | `references/svg-authoring.md` | Tema-duyarlı/erişilebilir SVG figür ve grafik (`vizChart`, `svgFigure`) üretirken; SVG arketipleri. |
 | `references/color-system.md` | İşlevsel renk rolleri, wayfinding aksanı, kontrast/CVD kuralları. |
-| `references/tedy-integration.md` | **Her modülde geçerli (şablon v1.9.0):** modül Tedy panosunun içinde açılır — g10 varsayılan tema ve pano teması devri (`edupedia:appearance`), `tedy-*` katmanı, lacivert kimlik bandı + Tedy işareti, ders aksanının yalnız odak çapalarında kalması, köşe kuralı (kart 08 · eylem 00 · etiket max), yumuşatılmış oyunlaştırma. |
+| `references/tedy-integration.md` | **Her modülde geçerli:** modül Tedy panosunun içinde açılır — temayı yalnız panodan alır (`edupedia:appearance`, Kanun M4.1), akış yerleşimi, `tedy-*` katmanı, lacivert bant yalnız tek başına açılışta, ders rengi yalnız Kanun M1.5 çapalarında, köşe kuralı (kart 08 · eylem 00 · etiket max), oyunlaştırma yok (S43). Tasarım kararında TEDY Modül Tasarım Kanunu (`edupedia_rehber('kanun')`) önce gelir. |
 | `references/subject-packs.md` | Derse-özel güçler: kimlik aksanı + Matematik / Fen / Sosyal / Dil paketleri (etiketli diyagram, ilişki akışı, kavram kartları, satır-arası çözümleme, çekim tablosu). |
 | `references/audio-system.md` | İşitsel geri bildirim (earcon) tasarımı, kanıt ve sorumlu kullanım; ses + görsel oyunlaştırma. |
-| `references/curriculum-integration.md` | **Müfredat MCP entegrasyonu — CURRICULUM modunda ZORUNLU, §3 akışının TAMAMI** (kullanıcı sözleşmesi, 2026-07-17): 21 aracın orkestrasyonu; **Adım 0 sınıf+ders KAPISI** (koddan çıkarma — doğrula), kazanım çekme, **Adım 3 ÇERÇEVE: ders kitabını AÇ** (105'in 103'ü tam metin — çerçeve üretimin sınırıdır), **beceri (KB2.x) → etkileşim deseni haritalama tablosu**, `curriculum` şeması, **§2.1 görsel önceliği: kitabın figürü birincil / yazar-SVG yedek**, **Adım 5.5 + §6.1 `verification` bloğu** (kapsam + doğruluk dayanağı → G-VERIFY), **Adım 5.6 öğrenci yüzeyi nihai dil (G-VOICE)** — kitaba/sayfaya meta-atıf yok, provenans + G-CURRICULUM, hata/geri-dönüş. |
+| `references/curriculum-integration.md` | **Müfredat MCP entegrasyonu — CURRICULUM modunda ZORUNLU, §3 akışının TAMAMI** (kullanıcı sözleşmesi, 2026-07-17): 21 aracın orkestrasyonu; **Adım 0 sınıf+ders KAPISI** (koddan çıkarma — doğrula), kazanım çekme, **Adım 3 ÇERÇEVE: ders kitabını AÇ** (105'in 103'ü tam metin — çerçeve üretimin sınırıdır), **beceri (KB2.x) → etkileşim deseni haritalama tablosu**, `curriculum` şeması, **§2.1 görsel politikası: görseli `edupedia_gorsel` getirir, kitap figürü ve yazar görseli birlikte (Kanun M3.1–M3.5)**, **Adım 5.5 + §6.1 `verification` bloğu** (kapsam + doğruluk dayanağı → G-VERIFY), **Adım 5.6 öğrenci yüzeyi nihai dil (G-VOICE)** — kitaba/sayfaya meta-atıf yok, provenans + G-CURRICULUM, hata/geri-dönüş. |
 | `references/exam-solving.md` | **EXAM modunda ZORUNLU — akışın TAMAMI.** Fotoğrafı çekilen/yapıştırılan bir veya birden fazla sınav sorusunu çözen modül: K1–K8, transkripsiyon → kümeleme → sınıf/ders kapısı → konu başına zincir → çöz → kurgu → teslim; `exam:{}` (tek) veya `topics[]`+`exams[]` (çoklu); tek soruda 11 segment, çokluda sıkıştırılmış kurgu; D1–D5 öğe bazında. Yayın bu modda **teklif edilmez** (telif). |
 | `references/newgen-question-design.md` | Modüle **"yeni nesil" / LGS tarzı** soru bloğu eklerken — uyaran-temelli muhakeme taksonomisi, bilişsel eşleme, yazım reçetesi. Ön koşul: `adhd-pedagogy.md` + `interaction-patterns.md`. **Kapsam notu:** bu blok tema kazanımının **ötesinde** ileri bir katmandır, yerine geçmez — CURRICULUM modunda çerçeve kapısına (§6.1 `scope`) yine tabidir. |
 | `references/content-enrichment.md` | İçerik zenginleştirme kaynağı/tekniği seçerken (Wikidata olgu-çipi, Wikimedia PD/CC-BY görsel, native MathML, çapraz-oturum aralıklı-tekrar veri modeli) veya PhET/GeoGebra/Desmos/Khan/EBA/Açık Ders gibi bir kaynağı gömme isteği geldiğinde — lisans/entegrasyon kısıtları + dürüst "yapılamaz" listesi + dyslexia-font miti. |
@@ -154,7 +157,7 @@ Toplam **dokuz mod** vardır. Varsayılan **MODULE**. Kullanıcı talebine göre
 | Mod | Çıktı | Ne zaman |
 |---|---|---|
 | **MODULE** (varsayılan) | Tam modül: öğretim + etkileşim katmanları iç içe, özet ekranı | "şu konuyu öğret + oyunlaştır" |
-| **QUIZ** | Bağımsız quiz/yarışma; XP, süre, sıralama | "quiz/yarışma hazırla" |
+| **QUIZ** | Bağımsız quiz; süre isteğe bağlı; XP, sıralama ve yarışma çerçevesi yok (Kanun M2.7) | "quiz/yarışma hazırla" |
 | **FLASHCARDS** | Aralıklı tekrar (spaced repetition) flashcard destesi | "flashcard hazırla", "kelime/terim ezberi" |
 | **GAME** | Tek odaklı oyun (eşleştirme, sıralama, gruplama, vb.) | "şu konu için oyun" |
 | **EXPLAINER** | Görsel-ağırlıklı zengin anlatım; hafif oyunlaştırma | "detaylı konu anlatımı (görselli)" |
@@ -251,11 +254,10 @@ bir zenginleştirme değil:
 - **Adım 5.5 (DENETİM):** kapsam + doğruluk denetimini yap, `verification` bloğunu üret
   (§6.1). Dayanaksız iddia modülde kalmaz.
 
-Görselde **kitabın kendi figürleri önceliklidir**: `search_figures` +
-`get_figure` metadata/ImageContent ile Tier-2a gözlemi sağlar; yerel dosya sistemi+Python
-varsa `scripts/fetch_figure.py` Tier-2b binary çıkarımını yapar (native Claude Code/Cursor).
-`include_image=true` ham base64 metin vermez. Yazar-üretimli SVG **yedektir** (bkz. o
-belgede §2.1; öncelik 2026-07-17'de tersine çevrildi).
+Görseli `edupedia_gorsel` getirir: kitap figürü → Pexels → MiniMax; ücretli medya yalnız
+kullanıcı onayıyla (Kanun M3.1). Varlık `meta.assets` ile `<teachId>.visual` yuvasına
+bağlanır; script çalıştırılmaz. Her modülde en az bir yazar görseli vardır (chart, table,
+labeled, flow, cards, numberline); kitap figürü onun yerini almaz (M3.5).
 
 MCP erişilemezse offline yola dönün ve **kullanıcıya bildirin** — üretim bloke olmaz ama
 "kitaba dayandım" **denemez**. Müfredat sinyali yoksa bu adım atlanır (serbest kaynak modu).
@@ -267,18 +269,18 @@ MCP erişilemezse offline yola dönün ve **kullanıcıya bildirin** — üretim
 hedeflerine ayrıştırın. Her hedef için: 1 öğretim segmenti + en az 1 etkileşim
 segmenti + arada mola noktaları kurgulayın. Parçalama: hiçbir öğretim segmenti
 6 dakikalık okuma/etkileşim yükünü aşmamalı. Akış kalıbı:
-`teach → practice → reward → (brain-break) → teach → ...`
+`teach → practice → (brain-break) → teach → ...`
 
-**Adım 3 — Tasarım katmanını seç.** `carbon-child-system.md`'den bir aksan
-renk token'ı (derse göre, örn. fen=Teal 50, tarih=Magenta 60), tipografi ölçeği
-ve hareket profilini belirleyin. `icon-pictogram-svg.md`'den her segmente uygun
-piktogram/ikon seçin veya gereken kavram için özgün SVG çizin.
+**Adım 3 — Görselleri seç.** Renk, tema, tipografi ve hareket seçilmez: tema
+panodan, ders rengi `meta.subject`'ten gelir (Kanun M4.1, M4.5, M4.6). Her segmente
+sprite'tan bir piktogram seçin (izinli anahtarlar Kanun §1 madde 6) ve gereken kavram
+için özgün SVG çizin (yalnız `var(--cds-*)` ve `var(--viz-*)`).
 
 **Adım 4 — Şablondan derle.** `assets/module-template.html` dosyasını okuyun.
 Bu dosya, tüm Carbon stilini ve etkileşim motorunu (engine) içeren çalışan bir
 şablondur. **İçeriği üst kısımdaki `MODULE_DATA` JS nesnesini değiştirerek**
-yerleştirin; aksanı/temayı ayarlayın; gerekli ek piktogram/SVG'leri satır içi
-gömün. Motoru yeniden yazmayın; veriyi doldurun.
+yerleştirin; aksan ve tema yazılmaz (Kanun M4.5). Motoru yeniden yazmayın; veriyi
+doldurun.
 
 **Adım 5 — Doğrula.** `python scripts/validate_module.py
 <çıktı.html>` çalıştırın. Kapılar: emoji-yok, Carbon token kullanımı, IBM Plex yüklemesi,
@@ -309,7 +311,7 @@ Tüm yüzeylerde kısa bir özet + "nasıl kullanılır" notu ekleyin.
 Tam mekanik, veri şeması ve erişilebilirlik notları için
 `references/interaction-patterns.md`. Çekirdek desenler:
 
-- **MCQ Quiz / Yarışma** — 3–4 seçenek, anında doğru/yanlış + açıklama, XP.
+- **MCQ Quiz** — 3–4 seçenek, anında doğru/yanlış + açıklama.
 - **Flashcard (aralıklı tekrar)** — çevirmeli kart, "biliyorum/tekrar et".
 - **Eşleştirme (match)** — terim↔tanım, kavram↔görsel çiftleri.
 - **Boşluk doldurma (fill-blank)** — bağlamda eksik kelime; ipucu desteği.
@@ -317,40 +319,41 @@ Tam mekanik, veri şeması ve erişilebilirlik notları için
 - **Gruplama (sorting bins)** — öğeleri kategorilere ayırma.
 - **Zaman çizelgesi / etkileşimli görsel (hotspot)** — görsel üzerinde tıklama.
 - **Mola noktası (brain-break)** — kısa hareket/nefes yönergesi (DEHB için kritik).
-- **Kontrol noktası / özet** — ustalık göstergesi, rozet kasası, tekrar önerisi.
+- **Kontrol noktası / özet** — karma sorular, sessiz özet, tekrar önerisi; XP ve rozet
+  gösterilmez (Kanun M2.7).
 
 ## 10. Carbon tasarım token'ları (özet)
 
 Tam token tablosu ve çocuk-dostu uyarlama için `references/carbon-child-system.md`.
 - **Tipografi:** IBM Plex Sans (gövde/başlık/**tüm UI metni, etiket ve sayaç
-  sözcükleri**), IBM Plex Serif (vurgulu anlatım/matematik), IBM Plex Mono
+  sözcükleri**), IBM Plex Serif (yalnız matematik gösterimi, Kanun M1.9), IBM Plex Mono
   **yalnızca sayı, veri ve kod için** (sayaç/istatistik/yüzde/tablo rakamları,
   kod blokları). Mono font **düz metinde, etikette, eyebrow'da veya başlıkta
   asla kullanılmaz**; sayaçlarda yalnız **rakamlar** `<b>` ile sarılıp mono +
   `font-variant-numeric:tabular-nums` ile hizalanır, çevreleyen sözcükler Sans
   kalır. Ağ fontu/CDN kullanılmaz; gerekli font dosyası varsa `data:` URI olarak
   gömülür. Letter-spacing (`--ls-label:.32px`) `@carbon/type` ile birebir.
-- **Renk:** Carbon v11 **G10 (varsayılan; Tedy panosunun teması) + Gray-100** tema token'ları
-  CSS değişkeni olarak (White yalnız eski kayıtlı tercih için); üstüne yalnız `tedy-*` katmanı
-  eklenir (`references/tedy-integration.md`) —
+- **Renk:** Modül temayı yalnız panodan alır (bugün g10; Kanun M4.1). g10 ve g100 token
+  blokları otoriteden üretilir (M4.3; ölü `white` bloğu şablonda borç KB-22); üstüne yalnız
+  `tedy-*` katmanı eklenir (`references/tedy-integration.md`) —
   yüzey/metin/kenar çekirdeği **artı** etkileşim-durumu katmanı
   (`--cds-layer-hover/active/selected-01`, `--cds-background-hover/active`,
   `--cds-border-tile/interactive`, `--cds-highlight`, `--cds-skeleton-*` vb.).
   Durum: `--cds-support-info` açık temada **#0043ce** (Blue 70 — AA-doğru),
-  g100'de #4589ff. Ders rengi Tedy ders renk sisteminden (Carbon Tag aileleri; bkz.
-  `references/tedy-integration.md` §3); renkli metin ve yüzeyler **resmî tag token'larıyla** yazılır.
+  g100'de #4589ff. Ders rengi Tedy ders renk sisteminden gelir (Carbon Tag aileleri; bkz.
+  `references/tedy-integration.md` §3) ve modülün içinde yalnız Kanun M1.5'in çapalarında görünür.
 - **Spacing:** 2px tabanlı **tam** Carbon ölçeği (`--cds-spacing-01..13`);
   `--tap:48px` = Carbon size **Large**.
 - **İlerleme/durum çipleri nötr ve kompakt:** sayaç ve ilerleme göstergeleri
   (örn. "Soru 1/5", "Öğrenilen 0/4 · Destede 4 kart") **gri** Carbon
   token'larıyla yazılır (`layer-01` zemin · `border-subtle` kenar ·
-  `text-secondary` metin) ve küçük tutulur. Ders aksanı yalnız **odak
-  çapalarında** kalır (bölüm ikonu, başlık çizgisi, seçili seçenek); XP ve seri
-  çipleri Tedy bandında Carbon Tag, kazanılan rozet nötr seçili çiptir. Böylece
-  dikkat içerikte kalır; nötr durum göstergesi aksan-yük dağıtmaz.
+  `text-secondary` metin) ve küçük tutulur. Ders rengi yalnız Kanun M1.5'in
+  çapalarındadır; seçili seçenek gibi etkileşim durumları Carbon token'larıyla çizilir
+  (M1.6). XP, seri ve rozet çipi yoktur (M2.7). Böylece dikkat içerikte kalır.
 - **Hareket:** `@carbon/motion` tam matrisi — 6 süre (`fast-01..slow-02`) ×
-  6 easing (standard/entrance/exit × productive/expressive); her hareket
-  `prefers-reduced-motion` ile geçersiz kılınabilir.
+  6 easing (standard/entrance/exit × productive/expressive) token olarak tanımlı. Bölüm
+  girişinde hareket yoktur; hareket yalnız okurun eylemine cevaptır, productive easing ile
+  ve en çok `moderate-02` (Kanun M2.10); azaltılmış harekette hiç yoktur.
 - **Çocuk uyarlaması:** Carbon'un dikdörtgensel dilini korurken Tedy köşe kuralı
   (kart ve bant `border-radius-08`; düğme, seçenek, alan, tablo `border-radius-00`;
   etiket `border-radius-max`), büyük dokunma hedefleri ve odak çapalarında ders
@@ -371,9 +374,10 @@ Tam token tablosu ve çocuk-dostu uyarlama için `references/carbon-child-system
 
 ### 10.2 Kanonik kılavuz ve Carbon MCP (2026-10-10)
 
-- Pano ile modülün tasarım bağı, öncelik sırası ve bilinçli sapmalar
-  `docs/tedy-ui-ux-talimatnamesi.md` §9'dadır; Carbon MCP ile çalışma protokolü §10'dadır.
-  Modülün yetkili kuralları bu dizinde kalır (`references/tedy-integration.md` §7).
+- Bu dizin modülün yazım varlıklarının (şablon, otorite JSON'u, referanslar) tek kaynağıdır.
+  Tasarım kararında TEDY Modül Tasarım Kanunu (`docs/tedy-modul-tasarim-kanunu.md`,
+  `edupedia_rehber('kanun')`) önceliklidir; bu dosyaların kanunla çelişen yeri kanun lehine
+  okunur. Pano bağı `docs/tedy-ui-ux-talimatnamesi.md` §9'da, Carbon MCP protokolü §10'dadır.
 - Her Carbon iddiası kaynakla yazılır: güncel `https://carbondesignsystem.com/building-blocks/...`
   URL'si ya da Carbon MCP `docs_search` `anchor_url`'ı. Kanonik ikon/piktogram/bileşen kodu
   `code_search`, grafik `get_charts`, token ve erişilebilirlik denetimi `code_audit` ile
@@ -387,7 +391,8 @@ Tam rehber: `references/icon-pictogram-svg.md`.
 - **Carbon Icons** (`@carbon/icons`, MIT) — işlevsel UI ikonları (onay, ok,
   kapat). Şablona satır-içi SVG `<symbol>` spritetı olarak gömülür; `<use>` ile.
 - **Carbon Pictograms** (`@carbon/pictograms`, MIT) — kavramsal illüstrasyonlar
-  (kitap, fikir, roket, laboratuvar). Segment başlıklarını ve ödülleri süsler.
+  (kitap, fikir, roket, laboratuvar). Segment başlıklarını süsler; ödül piktogramı yoktur
+  (Kanun M3.10).
 - **Özgün SVG çizim** — kaynaktaki bir kavram bespoke şema gerektirdiğinde
   (etiketli hücre, su döngüsü, sayı doğrusu), Carbon görsel diline uygun
   (2px stroke, Carbon paleti, geometrik, gradyansız) elle SVG çizin.
@@ -397,34 +402,36 @@ Tam rehber: `references/icon-pictogram-svg.md`.
 ### 11.1 Tema-duyarlı SVG figür + grafik sistemi
 Tam rehber: `references/svg-authoring.md`. Motorun sunduğu en güçlü araçlar:
 - **`vizChart(spec)`** — veriden **çubuk/çizgi grafik** üretir; `viewBox` ile responsive,
-  `--accent`/`--viz-1..5` ile tema-duyarlı, `role="img"`+`<title>`/`<desc>` ile erişilebilir,
+  `--viz-1..5` nötr rampasıyla tema-duyarlı (kategoriyi yerinde etiket taşır, KS-3),
+  `role="img"`+`<title>`/`<desc>` ile erişilebilir,
   **animasyonsuz**. `{ type:"chart", chart:{…} }` görüntüleme segmenti veya `teach`
   içinde `visual:{ kind:"chart", … }` olarak kullanılır.
 - **`svgFigure(inner, caption)`** — herhangi bir özel SVG'yi başlıklı/çerçeveli `figure.viz`'e sarar.
 - **Renk token'ları** — kategorik `--viz-1..5`, anlamsal `--viz-sun/water/cloud`,
-  eksen/ızgara `--viz-axis/--viz-grid`; açık+koyu temada tanımlı. **Figür SVG'de ham hex yok.**
+  eksen/ızgara `--viz-axis/--viz-grid`; açık+koyu temada tanımlı. **Figür SVG'de ham hex yok;**
+  grafik verisinde `color` yazılmaz (Kanun M4.7).
   Metin rengini CSS verir (`.viz text` → primary; `.viz-muted` → secondary).
-- **Donut** ustalık göstergesi olarak yalnız özet ekranına ayrılmıştır.
+- Özet ekranında halka grafik ya da büyük sayı yoktur (S43); özet düz metindir.
 - **`vizTable(spec)`** — Carbon **DataTable** (anlamsal `<table>`: `<caption>`, `<th scope>`,
   zebra `--cds-layer-01/02`, başlık `--cds-layer-accent-01`, sayısal sütun sağa hizalı/tabular,
   satır vurgusu). `{ type:"table", table:{…} }` veya `visual:{ kind:"table", … }`.
 - **`numberLine(spec)`** + **`mathExpr(src)`** — matematik paketi (aşağıda §11.3).
 
 ### 11.2 Frontend ilkeleri (rafine minimalizm)
-`frontend-design` rehberiyle uyumlu, DEHB-sakin sınırı içinde: token-tabanlı renk +
-**keskin tek aksan**; ayırt edici **IBM Plex** tipografisi (Sans gövde, Serif/Mono vurgu —
-jenerik Inter/Arial yok); ölçülü derinlik (yüzey ritmi, ince kenarlık/gölge); **tek**
-orkestre giriş animasyonu (`prefers-reduced-motion` ile kapalı); öngörülemez değil,
-**niyetli ve tutarlı** kompozisyon. "AI-slop" estetiğinden (mor degrade, kalıp düzen) kaçınılır.
+`frontend-design` rehberiyle uyumlu, DEHB-sakin sınırı içinde: token-tabanlı renk; ders
+rengi yalnız Kanun M1.5 çapalarında; **IBM Plex** tipografisi (Sans gövde ve başlık, Serif
+yalnız matematikte, Mono yalnız sayı ve kodda); ölçülü derinlik (katman token'ı ve ince
+kenarlık; statik yüzeyde gölge yok, S11); giriş animasyonu yok (M2.10); **niyetli ve
+tutarlı** kompozisyon. "AI-slop" estetiğinden (mor degrade, kalıp düzen) kaçınılır.
 
 ### 11.3 İşlevsel renk ve derse-özel güçler
 - **İşlevsel renk** (`references/color-system.md`): renk **işlevle** atanır (eylem=mavi buton,
-  durum=Carbon support, kategori=`--viz-1..5`, ödül=`--reward`, **odak çıpası**=aksan), nötr
-  Carbon tuvali üzerinde, daima metin/ikon ile **artıklı** ve CVD-güvenli. Etkinlik türü
-  ikon karosunun tonuyla imlenir — etkileşim dolu aksan, anlatım tag zemini, mola nötr
-  (wayfinding/sinyalleme; renk ailesi her segmentte dersin ailesidir). Kanıt: `adhd-pedagogy.md` §12.
-- **Derse-özel güçler** (`references/subject-packs.md`): `meta.subject`/`meta.subjectKey` →
-  derse-özel **kimlik aksanı** + `data-subject`. Paketler:
+  durum=Carbon support, grafik=`--viz-1..5` nötr rampa, ders=Kanun M1.5 çapaları), nötr
+  Carbon tuvali üzerinde, daima metin/ikon ile **artıklı** ve CVD-güvenli. Segment ikonu ders
+  renginin tint zeminini alır; dolu ders rengi karo yoktur (Kanun M1.4; şablonda borç KB-16).
+  Etkinlik türünü ikon ve kicker metni taşır. Kanıt: `adhd-pedagogy.md` §12.
+- **Derse-özel güçler** (`references/subject-packs.md`): `meta.subject` → ders renk ailesi
+  ve derse uygun görsel araçlar; derse özel tipografi ya da düzen yoktur (Kanun M4.6). Paketler:
   - **Matematik:** `mathExpr` (üs/alt indis, kesir, kök, operatör glifleri; Plex Serif + tabular),
     `numberLine` (SVG sayı doğrusu), **`fractionBar`** (kanıta dayalı kesir/oran **çubuk** modeli —
     tek kesir · kesir toplamı · oran; daire değil, §11.5), geometri SVG kuralları, Carbon değer tablosu.
@@ -434,8 +441,8 @@ orkestre giriş animasyonu (`prefers-reduced-motion` ile kapalı); öngörüleme
   - **Sosyal Bilimler** (sosyal bilgiler · din kültürü ve ahlak · yurttaşlık/insan hakları):
     `relationFlow` (sebep-sonuç / kavram zinciri), `infoCards` (kavram/değer/hak kartları),
     `timeline`, `vizTable`.
-  - **Dil Bilimleri** (Türkçe · İngilizce · Fransızca): `glossSentence` (satır-arası çözümleme +
-    **rol/cinsiyet renk-kodu**, renk daima etiketle birlikte), `dialogue` (iki konuşmacılı),
+  - **Dil Bilimleri** (Türkçe · İngilizce · Fransızca): `glossSentence` (satır-arası çözümleme;
+    rol/cinsiyet alt çizgi biçimiyle, renkle değil — KS-3), `dialogue` (iki konuşmacılı),
     `infoCards` (artikel/kelime), `vizTable` (çekim), `flashcards`.
   - Kanıt temeli `adhd-pedagogy.md` §12–§13'te (renk-kodu, sinyalleme, kavram haritası, ikili kodlama).
 
@@ -446,9 +453,10 @@ orkestre giriş animasyonu (`prefers-reduced-motion` ile kapalı); öngörüleme
 - **Daima görselle eşli**: ses tek başına bilgi taşımaz; sessizde/işitme engelinde tam işlevsellik.
   Geri bildirim metin ve işarettir; **ödül hareketi yoktur** — "+N XP" yükselişi, sayaç nabzı, rozet
   belirişi, seri vuruşu, konfeti yok (TEDY talimatnamesi S43, 2026-10-11).
-- **Opsiyonel & güvenli**: üst çubukta hoparlör düğmesi; `prefers-reduced-motion: reduce` ise ses
-  **varsayılan kapalı**; düşük ses; ilk etkileşimde `AudioContext` devreye alınır. Tüm animasyonlar
-  reduced-motion duyarlı.
+- **Opsiyonel & güvenli**: ses ve sesli okuma akışta Carbon ghost ikon düğmesidir (lg 48 px,
+  ikon 20 px, araç ipucunda adı; Kanun M5.14). Bugün `prefers-reduced-motion: reduce` ise ses
+  varsayılan kapalıdır; varsayılan ses ayarı açık bir ürün kararıdır (M5.14). Düşük ses; ilk
+  etkileşimde `AudioContext` devreye alınır.
 - Kanıt: çok-duyulu (ses+görsel) geri bildirim tercih edilir ve akışı destekler; sert/alçak-değerlikli
   ses ödülde gerilim artırır (kaçınılır); DEHB'de **kısa yeni sesler** uyarılmaya yardımcı olabilirken
   **sürekli ses** dağıtıcıdır (`adhd-pedagogy.md` §14). Doğrulama: **G-AUDIO** kapısı.
@@ -460,7 +468,7 @@ mevcut güvenlik kapılarıyla uyumlu:
 - **Kesir/oran çubuğu (`fractionBar`)** — daire (pasta) yerine **alan/uzunluk modeli** olan bir bar.
   Üç mod: `kind:"fraction"` ({num,den}) tek kesir; `kind:"sum"` ({addends:[],den}) paydaları eşit
   kesir toplamı (otomatik denklem, örn. 3/4 + 1/4 = 1); `kind:"ratio"` ({ratio:[],labels?}) oran (örn.
-  2:3, opsiyonel renkli gösterge). Her bar `role="img"` + `<title>`/`<desc>` ve yalnız Carbon/`--viz-*`
+  2:3, opsiyonel gösterge). Her bar `role="img"` + `<title>`/`<desc>` ve yalnız Carbon/`--viz-*`
   token rengiyle çizilir (G-SVG uyumlu). Hem `teach` görseli (`visual.kind:"fraction"`) hem de bağımsız
   `fraction` segment tipi olarak kullanılabilir. Kanıt temeli `references/subject-packs.md` §2 (alan
   modeli daireden üstündür; bar modeli kesir-toplamı ve oranı görselleştirmede etkilidir — uyarı:
@@ -470,7 +478,7 @@ mevcut güvenlik kapılarıyla uyumlu:
   aynı anda koşması İ6'yı (aynı anda tek hareket) çiğniyordu. Şablonda seri yoktur; G-FLOW işaretlemede
   seri sayacı öğesi bulursa FAIL verir. İlerleme sessiz ve etiketlidir ("Soru 2 / 5", "Bölüm 3 / 7").
 - **Sesli oku (TTS)** — `teach`, soru kökü, `gloss`, `dialogue` ve `flashcard` arkasında **opsiyonel**
-  "Oku" düğmeleri; `speechSynthesis` ile. **Varsayılan KAPALI**, üst çubuk kulaklık düğmesiyle açılır;
+  "Oku" düğmeleri; `speechSynthesis` ile. **Varsayılan KAPALI**, kulaklık ikon düğmesiyle açılır (Kanun M5.14);
   **otomatik okuma yoktur**; aynı düğmeye yeniden basınca durur, mod kapanınca konuşma iptal edilir
   (`.cancel`). Dil otomatiktir: öğretim metni öğretim dilinde (varsayılan `tr-TR`), hedef-dil içeriği
   (gloss/diyalog/dil-flashcard'ları) ders konusundan türetilir (Fransızca→`fr-FR`, İngilizce→`en-US`)
@@ -480,39 +488,10 @@ mevcut güvenlik kapılarıyla uyumlu:
 
 ### 11.6 Rozet ve XP — ekranda yok (TEDY talimatnamesi S43, 2026-10-11)
 
-**Bugünkü kural:** modülde rozet kasası, kilitli rozet, rozet belirişi, XP sayacı ve özet ekranında
-"Toplam XP" / rozet sayısı / "En uzun seri" **yoktur**. XP iç ilerleme sayısıdır — ilerleme köprüsü
-panoya bildirir, okur görmez; `rewards.xpPerCorrect` / `firstTryBonus` yalnız onu besler. Rozet,
-S43'ün "kazanılan rozet kalırsa sessiz liste" seçeneğiyle de tutulmadı: kilitli rozet rozet avıdır,
-kazanılan rozet ilerleme etiketinin vermediği bir bilgi vermez (anayasa §9, İ6). `rewards.badges`
-geriye uyum için kabul edilir ve yok sayılır; yeni modülde yazılmaz. Özet ekranı sessizdir: tamamlanan
-alıştırma sayısı düz metinle, hedefler, tekrar önerisi. Geri almak isteyen: talimatname §11 S43 ve §13 B73.
-
-Aşağısı tarihî tasarımdır (v1.8.0–v3.0.0); TEDY'de uygulanmaz:
-
-Üst çubuktaki rozet kasası DEHB için kritik bir **somut hedef/ödül** katmanıdır.
-Her modül `rewards.badges`'te **2–3 adet modüle özel rozet** tanımlamalıdır —
-asla jenerik veya tek-tip değil:
-
-- **Şema:** `{id, label, icon, condition}`.
-  - `label` — konuya tematik, kısa, Türkçe (örn. "Alan Kâşifi", "Kesir Ustası",
-    "Hız Şampiyonu", "Keskin Göz", "Üçgen Avcısı", "Denklem Dedektifi").
-  - `icon` — rozete **anlamca uygun ve her rozette farklı** bir Carbon UI ikon
-    id'si. Palet: `ic-compass` (kâşif/keşif) · `ic-view` (keskin gözlem,
-    hatasızlık) · `ic-target` (isabet/doğruluk) · `ic-trophy` (tamamlama/zafer) ·
-    `ic-flag` (hedefe ulaşma) · `ic-flash` (hız) · `ic-star` (genel başarı) ·
-    `ic-light` (kavrayış) · `ic-check` (ustalık) · `ic-grid` / `ic-area` /
-    `ic-ruler` (ölçme, geometri).
-  - `condition` — kazanım tetikleyicisi. Mevcut: `"module-complete"` (modül
-    tamamlanır) · `"flawless-mcq"` (tüm çoktan seçmeli ilk denemede doğru).
-- **Görünüm (motor otomatik):** kilitli rozet **kendi ikonunu** gri tonda +
-  küçük bir kilit rozetiyle gösterir (jenerik yıldız **değil**); kazanılınca
-  nötr seçili çipe (`layer-selected-01`) döner ve `badge--new` ile sessizce belirir. Her rozetin kendi
-  ikonu olduğundan kasa **görsel olarak çeşitlidir** — çocuk "hangi rozetler
-  var, hangisini kazandım"ı bir bakışta ayırt eder.
-- **Gerekçe:** görünür, ulaşılabilir ve **çeşitlendirilmiş** hedef-temsilleri
-  içsel motivasyonu ve görev sürdürümünü güçlendirir; tek-tip/soyut rozetler bu
-  etkiyi zayıflatır (`adhd-pedagogy.md` §13; Sailer 2019).
+S43 ve Kanun M2.7 ile kalktı; XP yalnız iç sayıdır: ilerleme köprüsü panoya bildirir, okur
+görmez. Rozet, XP, seri, puan ve kutlama metni yazılmaz; `rewards.badges` yazılmaz. `rewards`
+bugün yalnız iç sayı olarak zorunludur: `{}` ya da `{xpPerCorrect, firstTryBonus}` (KB-21).
+Özet ekranı sessizdir: tamamlanan alıştırma sayısı düz metinle, hedefler, tekrar önerisi.
 
 ## 12. Kalite kapıları (Quality gates)
 
@@ -637,8 +616,8 @@ listeler (örn. `francais-coach → carbon-edupedia`,
 - **Statik baskı dokümanı değil** → `carbon-html-report`. Bu yetkinlik
   *etkileşimli* HTML üretir; baskıda etkileşimler kaybolur.
 - **Backend yok; tarayıcı depolaması sıkı izin listelidir.** `localStorage` yalnız
-  tema + Leitner kutularını kalıcı tutar (`meta.id` varsa Leitner anahtarına girer).
-  XP/seri/rozet/yanıt kümeleri yalnız `sessionStorage`'dadır; sekme oturumu dışında
+  Leitner kutularını kalıcı tutar (`meta.id` varsa anahtara girer); tema kaydı Kanun M4.1 ile
+  kalkar (şablonda borç KB-1). İç XP sayısı ve yanıt kümeleri yalnız `sessionStorage`'dadır; sekme oturumu dışında
   skor/ilerleme kalıcılığı yoktur. Her erişim try/catch ile degrade-safe'tir;
   depolama engelliyse çekirdek modül bellekte çalışmayı sürdürür.
 - **Gerçek-zamanlı veri yok; tek istisna Müfredat MCP.** Çıktı tek-dosya offline
@@ -659,15 +638,15 @@ listeler (örn. `francais-coach → carbon-edupedia`,
   klinik kanıtına göre (bkz. `references/adhd-pedagogy.md` §10–§11) oturumlar kısa ve
   günün erken saatinde tutulmalı (uyku/sosyal yaşam koruması). Motor **nazik mola
   hatırlatıcısı** (`learner.breakReminderMin`, vars. 20 dk; `0` = kapalı), **sağlıklı
-  kapanış** ve **sabit-cetvel (kumar-benzeri olmayan) ödül** ile bu ilkeleri uygular;
+  kapanış** ile bu ilkeleri uygular; ödül mekaniği yoktur (S43, Kanun M2.7);
   `G-WELLBEING` kapısı cezalandırıcı/süre-baskısı dilini engeller.
 
 ## 15. Çocuk güvenliği ve refahı
 
 - İçerik yaş-uygun, kapsayıcı, teşvik edici olmalı; başarısızlık "öğrenme
   fırsatı" olarak çerçevelenir (4:1 olumlu:düzeltici geri bildirim oranı).
-- Olumsuz öz-konuşma, utandırma, ceza mekaniği **kullanılmaz**. Yarışmalar
-  öz-rekabet (kişisel rekor) ya da düşük-baskılı sıralama üzerine kurulur.
+- Olumsuz öz-konuşma, utandırma, ceza mekaniği **kullanılmaz**. Yarışma, sıralama
+  ve kişisel rekor yoktur (S43, Kanun M2.7).
 - DEHB'ye duyarlı: aşırı uyaran/yanıp sönme yok; molalar yerleşik; başarı
   ulaşılabilir; ilerleme her zaman görünür.
 

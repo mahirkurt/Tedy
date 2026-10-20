@@ -5,6 +5,11 @@ açılır. Bu belge, modülün panoyla **tek bir yüzey** gibi okunması için �
 uyguladığı kuralları toplar (ders renk sistemi: şablon v2.1). Kural kaynağı Tedy Tasarım Sistemi v3'tür (Carbon v11'in
 kendisi + `tedy-*` katmanı); depodaki karşılığı `dashboard/src/theme/ted-theme.scss`'tir.
 
+**Öncelik.** Tasarım kararında TEDY Modül Tasarım Kanunu (`docs/tedy-modul-tasarim-kanunu.md`,
+`edupedia_rehber('kanun')`) bu dosyanın önündedir. Bu dosya yazım varlıklarını ve şablonun
+bugünkü davranışını anlatır; kanunla çelişen bir yeri kanun lehine okunur ve şablondaki farkı
+kanunun borç kaydı (KB-n) adlandırır.
+
 ## 1. Katman modeli
 
 Carbon token'larının **hiçbiri** yeniden tanımlanmaz veya anlamı değiştirilmez; `G-TOKEN`
@@ -17,7 +22,7 @@ panoda aynı rolü taşıyan `--ted-*` değişkeni (pano adları: `--ted-color-b
 aritmetiği (`color-mix`, yarı saydam beyaz/siyah katman, gradyan yıkama) yoktur: her renk bir
 Carbon token'ı ya da palet adımıdır. Bilinen istisnalar adlıdır: panoda Tedy Books ve Carbon AI
 Chat'in Carbon for AI gradyanları (test muafiyeti), şablonda Tedy işaretinin yarı saydam hilali
-ve birkaç `opacity` (.6 / .78 / .85) kullanımı.
+ve birkaç `opacity` (.6 / .78 / .85) kullanımı; kalıcı opaklık Kanun M4.7 ile kalkar (borç KB-41).
 
 | Token | g10 (varsayılan) | white (eski kayıt) | g100 | Kullanım |
 |---|---|---|---|---|
@@ -42,14 +47,15 @@ belirler (https://carbondesignsystem.com/building-blocks/foundations/color/guide
 ## 2. Tema
 
 - Varsayılan **g10**'dur (`<html data-theme="g10">`), çünkü pano `<Theme theme="g10">`
-  altında çalışır. Koyu tema **g100**; tema düğmesi g10 ↔ g100 arasında geçer.
-  `white` yalnız eski bir kayıtlı tercihi bozmamak için tanınır.
-- **Öncelik:** öğrencinin kendi seçimi (bu modülde düğmeye bastıysa ya da kayıtlı tercih
-  varsa) > panonun bildirdiği tema > g10. TEDY'de çerçeve `sandbox="allow-scripts"` ile opak
-  kökenlidir, Web Storage yoktur: kayıtlı tercih oluşmaz, her yüklemede panonun g10'u kazanır.
+  altında çalışır. **Modül temayı yalnız panodan alır** ve koşulsuz uygular (Kanun M4.1):
+  tema düğmesi, tema kaydı ve "öğrencinin seçimi > pano" önceliği yoktur. Şablon bugün tema
+  düğmesini, kaydı ve bu önceliği hâlâ taşır: borç KB-1. g100 bloğu yalnız otoriteden üretilen
+  token eşlemesidir; `white` ölü bir temadır (M4.3, borç KB-22).
+- Pano bir gün koyu mod eklerse bu panonun Profil'deki ayarıdır; modül onu bu mesajla devralır
+  (Kanun M4.2).
 - Carbon, kullanıcı seçimi yoksa işletim sistemi temasına uyar
   (https://carbondesignsystem.com/building-blocks/foundations/themes/code/#system-preferences).
-  Tek g10 pano ve bu öncelik onunla çelişir; koyu tema kullanıcıya ait açık ürün kararıdır (S14).
+  Modül sistem tercihine bakmaz; panonun bildirdiği temayı uygular (adlı sapma KS-7).
 - **Pano → modül mesajı:** `{"type": "edupedia:appearance", "v": 1, "theme": "g10", "rootPx": 32}`.
   `ModuleViewer` bunu çerçevenin `load` olayında gönderir (taslak önizleme dahil;
   taslaklar `ready` üretmez). Modül mesajı yalnız `e.source === window.parent` ve
@@ -65,20 +71,45 @@ belirler (https://carbondesignsystem.com/building-blocks/foundations/color/guide
   çalışır, bu yüzden `v` 1'de kaldı). Okurun tarayıcı yazı boyu tercihi panonun `clamp()`
   tabanında (`100%`) zaten vardır, yani hesaplanmış değer onu taşır. Pano kökü değişen her
   yeniden boyutlamada yeniden gönderilir; değişmediyse gönderilmez.
-- `G-BRIDGE` bu tipi **izinli ama zorunlu değil** sayar; bu tipten önce derlenmiş modüller
-  geçerli kalır. `sablon.py`, şablonda `adoptHostTheme` yoksa `TemplateDriftError` verir.
+- **`layout: "flow"` (isteğe bağlı, 2026-10-19) — modül panonun bir bölümüdür, çerçevedeki ayrı
+  bir sayfa değil.** Pano bu alanı gönderince köprü `<html data-host-layout="flow">` yazar ve gövde
+  yüksekliğini **modül → pano** `{"type": "edupedia:size", "v": 1, "height": 1840}` mesajıyla
+  bildirir (`ResizeObserver`; aynı boy yeniden gönderilmez). Pano çerçeveyi o boya büyütür, çerçevenin
+  kendi kaydırma çubuğu olmaz, sayfa tek parça kayar. Bölüm değişince modülün `window.scrollTo`'su
+  boş bir pencereyi kaydırır; köprü aynı mesajı `"top": true` ile gönderir ve pano çerçevenin üstü
+  okurun gördüğü alanın üstünde kaldıysa onu görünüme getirir (modülü açmak sayfayı kaydırmaz).
+  Akışta modül kendi sayfa kabuğunu bırakır (şablondaki `data-host-layout="flow"` bloğu): 55rem
+  sütun, dolgu ve `.wrap`'in `100vh` tabanı kalkar — taban kalsaydı çerçeve boyu içeriği, içerik
+  çerçeveyi büyütürdü. Kimlik bandı ve modülün başlık bloğu gizlenir; sayfanın başı panonundur
+  (§3, Kanun M1.1). İlerleme rayı panonun kart diliyle tek kart olur; araç düğmeleri (ses, sesli
+  okuma) kalır, tema düğmesi yoktur (Kanun M4.1; şablonda borç KB-1). Mesaj yalnız
+  `window.parent`'a ve `EDUPEDIA_PARENT_ORIGIN`'e gider; pano onu yalnız açtığı çerçeveden
+  (`event.source`, origin `"null"`) ve `1–200000` tam sayı boyla kabul eder (`acceptSizeMessage`).
+  Alan yoksa (eski pano, tek başına açılış) bu yol hiç kurulmaz; bu tarihten önce derlenmiş modül
+  alanı tanımaz, pano o zaman çerçevenin sabit asgari boyunu ve modülün kendi kaydırmasını korur.
+- `G-BRIDGE` `edupedia:appearance` ve `edupedia:size` tiplerini **izinli ama zorunlu değil** sayar;
+  bu tiplerden önce derlenmiş modüller geçerli kalır. `sablon.py`, şablonda `adoptHostTheme` yoksa
+  `TemplateDriftError` verir.
 
 ## 3. Kimlik bandı ve ders rengi
 
 - Üst bant düz `--tedy-brand` zemindir; solda Tedy işareti (beyaz disk, yarı saydam beyaz
   hilal, lacivert onay; renkler token, `aria-hidden`), üzerinde `text-on-color` başlık.
   Gradyan, radyal parıltı, ham hex ve cam (`rgba`) yüzey yoktur.
-- Bantta XP sayacı, seri çipi ve rozet kasası yoktur (2026-10-11, talimatname S43, B73 kapandı):
+- **Bant yalnız tek başına açılışta vardır.** Panonun akış yerleşiminde (§2, `layout: "flow"`)
+  Tedy laciverti panonun kendi üst bandındadır; sayfanın içinde ikinci bir lacivert bant başka bir
+  uygulama gibi okunur (2026-10-19, ölçüldü: kullanıcı modülü "başka bir sayfadan çerçeveye
+  konmuş" diye tarif etti). Orada modülün başlık bloğu (`.topbar__l`) ve Tedy işareti gizlenir;
+  modül adı, kazanım etiketleri ve AI etiketi panonun başındadır (`ModulBasligi`, Kanun M1.1,
+  M1.10). Araç düğmeleri Carbon ghost ikon düğmesidir (lg 48 px, araç ipucunda adı; M5.14).
+- Bantta XP sayacı, seri çipi ve rozet yoktur (2026-10-11, talimatname S43, B73 kapandı):
   bant başlık, ilerleme rayı ve araç düğmelerini taşır.
-- Ders rengi bantta **değildir**; yalnız odak çapalarında yaşar: bölüm ikon karosu (`.seg-ic`),
-  `kicker`, seçili seçenek halkası, anlatım kutularının 4 px sol çizgisi, tanım etiketi, zaman
-  çizelgesi düğümü, piktogramlar ve küçük işaretler. Anlatım kutuları (`.lead`, `.hook-card`,
-  `.se-model`, `.callout`, `.self-assess`) nötr `--cds-layer-02` yüzeydir.
+- Ders rengi bantta **değildir**. Modülün içinde yalnız Kanun M1.5'in çapalarında görünür:
+  kavram yüzeylerinin (`.lead`, merak kartı) 4 px kenarı, vurgulu terimin tint zemini, kavram
+  çipinin tint zemini ve ders kenarı, segment ikonunun tint zemini. Etkileşim durumları (hover,
+  seçili, işaretli, geçerli adım, odak) ders rengi almaz (M1.6). Şablon bugün daha geniş kullanır
+  (dolu ikon karosu, kicker, seçenek halkası): borç KB-16, KB-17. Anlatım kutuları (`.lead`,
+  `.hook-card`, `.se-model`, `.callout`, `.self-assess`) nötr `--cds-layer-02` yüzeydir.
 - İlerleme göstergesi ve düğmeler arayüz kabuğudur: Carbon `button-primary`/`interactive`.
   Bu kural panoda da istisnasızdır (2026-10-10, talimatname S35): asistanın öğretmen modu da birincil
   eylemi Carbon mavisinde tutar.
@@ -111,7 +142,7 @@ bir sözcüğün başında geçerse o alan seçilir, hiçbiri geçmezse `genel`.
 **Roller.** Otorite her aile ve mod için dokuz rol taşır; şablon bunların yedisini üretir
 (`panel` ve `panelBorder` yalnız panonun tek büyük ders yüzeyi içindir, aşağıda "Panoda").
 Şablonun yedi rolü, açık (white, g10) ve koyu (g90, g100) mod için:
-`accent` (palet 60 / 40: çizgi, halka, dolu karo), `text` (70 / 30: kicker, renkli ikon),
+`accent` (palet 60 / 40: çizgi ve kenar), `text` (70 / 30: renkli metin ve ikon),
 `surface`, `onSurface`, `surfaceHover`, `border` (Carbon `tag-background-X`, `tag-color-X`,
 `tag-hover-X`, `tag-border-X`) ve `onAccent` (white-0 / gray-100). Şablonda `--subject-*`
 değişkenleridir; `--accent`, `--accent-strong`, `--accent-tint`, `--accent-on` bunların takma
@@ -124,18 +155,18 @@ ve hiçbir ders diğerinden "yüksek sesle" konuşmaz: `accent` açık zeminlerd
 zeminlerde ≥ 4,8:1; `text` açıkta ≥ 6,9:1, koyuda ≥ 6,7:1; tag çifti ≥ 5,8:1; halka tag zemini
 üstünde ≥ 3,2:1. `tests/test_ders_renkleri.py` her aile ve her zemin için hesaplar.
 
-**Ayrılmış renkler.** Kırmızı (aciliyet), yeşil (doğru/tamamlandı), sarı (uyarı ve ödül) ve
+**Ayrılmış renkler.** Kırmızı (aciliyet), yeşil (doğru/tamamlandı), sarı (uyarı) ve
 turuncu (uyarı) anlam renkleridir; hiçbir derse verilmez. Önceki eşlemedeki yeşil Din, kırmızıya
 yakın tonlar ve hex aksanlar kaldırıldı.
 
-**Wayfinding.** Etkinlik tipi renk ailesiyle değil, dersin ailesinin tonuyla imlenir:
-etkileşim segmentlerinde ikon karosu dolu `accent` (`onAccent` ikon), anlatım/veri segmentlerinde
-`surface`, molada nötr `layer-accent-01` (color-system.md §3).
+**Wayfinding.** Etkinlik tipini ikon ve kicker metni taşır. Segment ikon karosu ders
+renginin tint zeminidir (`surface`), molada nötr `layer-accent-01`; dolu `accent` karo yoktur
+(Kanun M1.4; şablonda etkileşim segmentlerindeki dolu karo borç KB-16; color-system.md §3).
 
 **Yazar kuralı.** `meta.subject`'e dersin resmî adını yazın ("Fen Bilimleri"). `meta.accent`
-isteğe bağlıdır ve yalnız bir aile adı olabilir (`magenta`, `purple`, `teal`, `cyan`, `blue`,
-`warm-gray`, `cool-gray`, `gray`); derleyici hex'i ve anlam renklerini şema hatasıyla reddeder.
-MODULE_DATA'ya renk, tema ya da CSS yazılmaz.
+yazılmaz; `MODULE_DATA` renk, tema, CSS, font ve satır içi stil taşımaz (Kanun M4.5).
+Derleyici hex'i ve anlam renklerini reddeder ama bir aile adını bugün hâlâ kabul eder: borç
+KB-24.
 
 **Panoda.** İ8 2026-10-02'de yeniden yazıldı: ders rengi yüzeye ölçüyle çıkabilir. Bir görünümde
 **en çok bir büyük ders yüzeyi** vardır — o ekranın "tek şey"i (Bugün'de sıradaki ders ya da iş,
@@ -155,7 +186,7 @@ görünmez; etiketler durum ve üst veri içindir ve geri sayım ölçeği yaln�
 | Düğme, seçenek kutusu, ikon düğmesi, kavram-haritası düğümü | 0 | `--radius-btn` = `--cds-border-radius-00` |
 | Metin alanı, sayı alanı | 0 | `--radius-field` = `--cds-border-radius-00` |
 | Tablo | 0 | `--cds-border-radius-00` |
-| Etiket/çip (XP, seri, rozet, tanım etiketi) | tam | `--radius-tag` = `--cds-border-radius-max` |
+| Etiket/çip (tanım etiketi, kavram çipi) | tam | `--radius-tag` = `--cds-border-radius-max` |
 
 **Statik yüzey gölge almaz** (S11, P4; 2026-10-15). `.topbar` ve `.stage`'in
 `--tedy-shadow-card`'ı kalktı — ikisinde de 1 px `var(--cds-border-subtle)` zaten vardı ve derinlik
@@ -177,10 +208,9 @@ istisnası artık **yok** (`carbon-excellence.md` madde 4, S11).
 
 **Karar (2026-10-10, talimatname S43, Ç9'un kararı):** modülde kutlama ya da ödül animasyonu
 (XP/seri nabzı, "+N XP" yükselişi, rozet belirişi, ödül sesi) ve seri sayacı yoktur. İlerleme sessiz,
-etiketli bir göstergedir (doğrusal ≥ 3 adımda Carbon ProgressIndicator anlamı: mevcut adım ve toplam;
-daha azında düz metin, ör. "Adım 3/7"). Anında geri bildirim metinle kalır; XP değeri kalırsa
-hareketsiz sessiz metindir ve özet ekranında büyük sayı olmaz. Kazanılan rozet kalırsa sessiz bir
-listedir. Dayanak: anayasa §9 ("kutlama", "seri sayacı"), İ6 (aynı anda tek hareket), Carbon productive
+etiketli tek bir göstergedir; adımları 3–7 aşamadır, segment değil (`meta.milestones`, Kanun M2.4,
+M2.5; şablonda borç KB-2). Anında geri bildirim metinle kalır. XP ve rozet ekranda hiç yoktur
+(Kanun M2.7). Dayanak: anayasa §9 ("kutlama", "seri sayacı"), İ6 (aynı anda tek hareket), Carbon productive
 hareket (https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#productive-motion).
 Şablon bu kararı uygular (2026-10-11, talimatname B73 kapandı):
 
@@ -220,28 +250,29 @@ hareket (https://carbondesignsystem.com/building-blocks/foundations/motion/overv
 
 ## 7. Kanonik kılavuz, Carbon kaynakları ve adlı istisnalar
 
-- **Kanonik kılavuz:** `docs/tedy-ui-ux-talimatnamesi.md` (Talimatname, 2026-10-10). Modüller
-  için §9 (panodan farklar, kapılar, adlı çelişkiler), Carbon MCP protokolü için §10, bilinçli
-  sapmalar ve kararlaştırılmış çelişkiler için §11 (S1…S44), borçlar için §13. Bu dosya modülün yetkili kuralı olarak kalır;
-  Talimatname bağı ve öncelik sırasını verir. Kod ajanları için TEDY katmanı:
+- **Kanun ve kılavuz:** modül yüzeylerinde tasarım kararı TEDY Modül Tasarım Kanunu'nundur
+  (`docs/tedy-modul-tasarim-kanunu.md`, `edupedia_rehber('kanun')`); adlı sapmalar KS-1…KS-12,
+  borçlar KB-1…KB-46. Talimatname (`docs/tedy-ui-ux-talimatnamesi.md`) pano bağını verir: §9
+  modüller, §10 Carbon MCP protokolü, §11 sapmalar (S1…S50), §13 borçlar. Bu dosya yazım
+  varlıklarının tek kaynağı olarak kalır (şablon, otorite JSON'u, referanslar; `vendor_sync
+  --pin`); tasarım kararında kanun önceliklidir. Kod ajanları için TEDY katmanı:
   `.claude/skills/tedy-carbon/SKILL.md` (IBM'in `carbon-builder` becerisinin üstünde; çelişkide kazanır).
 - **Carbon iddiası kaynakla yazılır:** güncel `https://carbondesignsystem.com/building-blocks/...`
   URL'si ya da Carbon MCP `docs_search` `anchor_url`'ı; değer yine npm `@carbon/*`'tan
   (`carbon-sources.md`).
-- **Adlı Tedy istisnaları** (düzeltilecek değil, istisna): `.topbar`/`.stage` gölgesi (§4), 8 px
-  kart köşesi (§4), lacivert bant — Carbon'un "yüksek kontrast
+- **Adlı sapmalar** kanunun §7'sindedir (KS-1…KS-12). Burada kalan Tedy istisnaları: 8 px
+  kart köşesi (§4, KS-4), lacivert bant yalnız tek başına açılışta — Carbon'un "yüksek kontrast
   anı" biçiminde marka bölgesi
   (https://carbondesignsystem.com/building-blocks/foundations/color/overview/#high-contrast-moments)
-  ve tek g10 pano (§2, S14). 2026-10-10'da istisna olmaktan çıkanlar: 700 ms "+N XP" yükselişi
+  ve tek tema (§2, KS-7). Statik yüzey gölgesi 2026-10-15'te kalktı (§4, S11). 2026-10-10'da istisna olmaktan çıkanlar: 700 ms "+N XP" yükselişi
   (S43; 2026-10-11'de kalktı, B73) ve panodaki asistanın öğretmen modunda `--cds-button-primary` /
   `--cds-interactive`'in ders aksanına yönlenmesi (S35: birincil eylem her yerde Carbon mavisi; B68).
-- **Bilinen, çözülmemiş:** pano 1920 px üstünde kök puntoyu büyütür, modül çerçevesi 16 px kökte ve
-  px boyutlarda kalır. (Kilometre taşı cevabında XP nabzı, "+N XP" ve seri vuruşunun aynı anda koşması
-  2026-10-10'da S43 ile karara bağlandı ve 2026-10-11'de kalktı; B73 kapandı.)
+- **4K eşliği kapandı** (2026-10-15): şablon rem tabanlıdır ve kök boyunu `rootPx` ile panodan
+  alır (§2, Kanun M5.8).
 - **AI etiketi — karar (2026-10-10, talimatname S41, Ç7'nin kararı).** Panoda gösterilen her modül
   `ModuleViewer`'ın çerçeve başlığında Carbon `AILabel` taşır; açıklama penceresi neyin yapay zekâyla
   üretildiğini (anlatım, sorular, görseller) ve dayandığı kaynakları (kazanım, ders kitabı sayfaları,
   iddia dayanakları) söyler
   (https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/#in-containers).
   Etiket panonun çerçevesindedir, şablona eklenmez: modülün içinde G-VOICE aynen geçerlidir (öğrenci
-  yüzeyinde kaynak-meta atıf yok). Panodaki uygulama borcu B71.
+  yüzeyinde kaynak-meta atıf yok). Panoda uygulandı (`ModulAiEtiketi.tsx`; Kanun M1.10).

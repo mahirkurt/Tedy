@@ -29,7 +29,7 @@ export function SinavOnizleme({ exam, now, onAc }: { exam: ExamItem; now: Date; 
   const ani = sinavAni(exam)
   return (
     <div className="sinav-onizleme">
-      <ContainedList kind="on-page" size="lg" label="Yaklaşan sınav">
+      <ContainedList kind="on-page" size="lg" label="Yaklaşan Sınav">
         <ContainedListItem onClick={onAc}>
           <span className="today-also__row">
             <span className="today-also__name">

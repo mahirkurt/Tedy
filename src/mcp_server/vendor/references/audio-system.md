@@ -12,7 +12,8 @@ başına hiçbir bilgi taşımaz (erişilebilirlik + işitme engeli + sessizde t
 2. **Pozitif değerlik** — doğru cevap sesi hoş, yükselen bir motif; "yanlış" sesi alçak,
    nazik ve **cezalandırıcı değil** (sert/alçak-değerlikli ses gerilim artırır → kaçınılır).
 3. **Görselle eşli** — earcon, görsel geri bildirimin (işaret ve geri bildirim metni) yanında.
-4. **Opsiyonel ve susturulabilir** — üst çubukta hoparlör düğmesi; durum bellekte tutulur.
+4. **Opsiyonel ve susturulabilir** — akışta ses düğmesi Carbon ghost ikon düğmesidir (lg 48 px,
+   ikon 20 px, araç ipucunda adı; Kanun M5.14); durum bellekte tutulur.
 5. **Reduced-motion duyarlı** — `prefers-reduced-motion: reduce` ise ses **varsayılan kapalı**
    (duyusal yükü azaltma tercihinin makul bir vekili); kullanıcı dilerse açar.
 6. **Düşük ses + tarayıcı-yerel** — Web Audio ile sentezlenir (harici dosya yok, çevrimdışı,
@@ -87,7 +88,8 @@ Earcon katmanından ayrı, ikinci ve **tamamen opsiyonel** bir işitsel katman: 
 erişilebilirliği" sağlar; ikisi farklı amaçlara hizmet eder ve G-AUDIO'da ayrı denetlenir.
 
 ### 5.1 Tasarım ilkeleri
-- **Varsayılan KAPALI, talep-üzerine.** Üst çubukta kulaklık düğmesi (`#ttsBtn`); `data-tts="off"`
+- **Varsayılan KAPALI, talep-üzerine.** Kulaklık ikon düğmesi (`#ttsBtn`; Carbon ghost ikon düğmesi,
+  lg 48 px, araç ipucunda adı — Kanun M5.14, bugün 36–40 px, borç KB-44); `data-tts="off"`
   başlangıç değeriyle açılır. **Otomatik okuma yoktur** — hiçbir metin kullanıcı istemeden seslenmez.
 - **"Oku" düğmeleri** yalnız TTS açıkken görünür (`[data-tts="on"] .tts-oku`): `teach` anlatımı,
   soru kökü, `gloss`, `dialogue` ve `flashcard` arkası. Tek bir olay delegasyonu (`[data-speak]`).

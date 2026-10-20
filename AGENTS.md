@@ -107,9 +107,11 @@ bilinçli sapmalar §11 (S1…), "bitti" tanımı ve kapılar §12, ölçülmü�
   talimatname > yüzey tasarımları (`docs/frontend-surface-designs.md`) >
   bileşen rehberi (`docs/carbon-bilesen-rehberi.md`) >
   `.claude/skills/tedy-carbon/SKILL.md` > `.claude/skills/carbon-builder/`
-  (IBM, vendorlu, değiştirilmez) > Carbon'un genel rehberi. Bir Carbon önerisi
-  ölçülmüş ya da kullanıcının seçtiği TEDY kuralını sessizce ezmez; çelişkiyi
-  §11'e yaz.
+  (IBM, vendorlu, değiştirilmez) > Carbon'un genel rehberi. Modül yüzeylerinde
+  `docs/tedy-modul-tasarim-kanunu.md` İ1–İ9'dan sonra, talimatnameden önce;
+  edupedia vendor ve eklentisi `tedy-carbon`'dan sonra, carbon-builder'dan önce
+  gelir (kanun §0.2). Bir Carbon önerisi ölçülmüş ya da kullanıcının seçtiği TEDY
+  kuralını sessizce ezmez; çelişkiyi §11'e (modülde kanun §9'a) yaz.
 - Carbon'a ait bileşen, prop, ikon adı ya da içe aktarma yolunu ezberden yazma:
   `carbon` MCP'sine sor (`code_search` + `filters.component_type: "React"`,
   `docs_search` ve `anchor_url` ile atıf) ya da `dashboard/node_modules`'ta

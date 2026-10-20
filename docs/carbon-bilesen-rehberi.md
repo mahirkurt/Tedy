@@ -10,7 +10,9 @@ belgenin ikinci bölümündedir.
 
 - **Öncelik.** Bu rehber talimatnamenin öncelik sırasında 5. basamaktır: D1–D4 → İ1–İ9 →
   talimatname (sapmalar dahil) → yüzey tasarımları → **bu rehber** → `tedy-carbon` katmanı →
-  carbon-builder → Carbon'un genel rehberi. Bir kart talimatnameyle çelişirse **talimatname kazanır**;
+  carbon-builder → Carbon'un genel rehberi. Modül yüzeylerinde `docs/tedy-modul-tasarim-kanunu.md`
+  İ1–İ9'dan sonra, talimatnameden önce; edupedia vendor ve eklentisi `tedy-carbon`'dan sonra,
+  carbon-builder'dan önce gelir (kanun §0.2). Bir kart talimatnameyle çelişirse **talimatname kazanır**;
   çelişki kartta adıyla yazılır, sessizce düzeltilmez. Ölçüm varsayımı yener.
 - **Kaynak.** carbondesignsystem.com taraması, 2026-10-10. Erişilebilirlik sekmelerinin test ettiği
   sürüm `@carbon/react` 1.114.0'dır; panoda kurulu olan da budur (`@carbon/styles` 1.117.0,

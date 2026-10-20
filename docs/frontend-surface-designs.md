@@ -1,6 +1,6 @@
 # TEDY Yüzey Tasarımları
 
-**Sürüm 1.13 · 2026-10-11 · `docs/frontend-design-principles.md`'nin uygulaması**
+**Sürüm 1.16 · 2026-10-19 · `docs/frontend-design-principles.md`'nin uygulaması**
 
 İlkeler dokümanı *neye göre karar verileceğini* yazar. Bu doküman o kararların
 her yüzeyde ne olduğunu yazar. Çelişki hâlinde ilkeler dokümanı kazanır.
@@ -14,6 +14,8 @@ talimatname onları Carbon temelleri, kalıplar, bilinçli sapmalar ve kapılarl
 doküman yüzey yüzey uygulamadır**: her sayfada o kuralların ne olduğunu ve neden öyle olduğunu yazar.
 Öncelik sırası: D1–D4 → İ1–İ9 → talimatname → bu doküman → bileşen rehberi
 (`carbon-bilesen-rehberi.md`) → `tedy-carbon` katmanı → carbon-builder → Carbon'un genel rehberi.
+Modül yüzeylerinde `docs/tedy-modul-tasarim-kanunu.md` İ1–İ9'dan sonra, talimatnameden önce; edupedia
+vendor ve eklentisi `tedy-carbon`'dan sonra, carbon-builder'dan önce gelir (kanun §0.2).
 Çelişkide üstteki kazanır; ölçüm, kaynak göstermeyen genellemeyi yener. Aşağıdaki "Bugünkü kusur"
 listeleri ve §6 ölçüm günlüğü tarihli kayıttır; bugünün açık borçları talimatname §13'tedir.
 
@@ -630,6 +632,10 @@ Veri: `src/mufredat_agaci.json` (üretilir, elle düzenlenmez) + `/api/modules/a
 [`superpowers/specs/2026-10-11-moduller-mufredat-agaci-design.md`](superpowers/specs/2026-10-11-moduller-mufredat-agaci-design.md).
 Sapmalar: talimatname S48, S49.
 
+Modül sayfası (baş, çerçeve, akış) Modül Tasarım Kanunu'nun konusudur
+([`tedy-modul-tasarim-kanunu.md`](tedy-modul-tasarim-kanunu.md) §0.1); bu bölüm yalnız listeyi ve
+müfredat ağacını yazar.
+
 ## 5. Odak kipi
 
 Bugün `FocusModeContext` var ve bir localStorage anahtarı tutuyor. İlkelere
@@ -823,3 +829,4 @@ görüntüsüyle doğrulanır.
 | 1.13 | 2026-10-11 | Talimatname B48 ve B63 kapandı: §2.4'ün 400 ms kuralı `useApi`'de; §4.2'nin `Geri al`'ı kuruldu, 10 saniyelik süresi bilerek kaldırıldı (WCAG 2.2.1). §6 durum notuna tarihli ek. |
 | 1.14 | 2026-10-11 | Talimatname açık kalemler 4. tur: §4.3 (B64, B50), §4.4 (B72, B51), §4.5 (B49, B34), §4.6 (B65), §4.7 (B51, B66), §4.8 (B67), §4.9 (B60) uygulandı notları; §6 durum notu tamamlandı. |
 | 1.15 | 2026-10-11 | **§4.12 Modüller** eklendi (bugüne dek yüzey tasarımı yoktu): hazır modül listesi + müfredat ağacı (ders → ünite → ders kitabı alt başlığı), yaprağın tek eylemi, sayfa uydurmama ve haritasız dersin cümlesi. Tasarım `superpowers/specs/2026-10-11-moduller-mufredat-agaci-design.md`; sapmalar talimatname S48, S49. |
+| 1.16 | 2026-10-19 | Modül Tasarım Kanunu (`tedy-modul-tasarim-kanunu.md` 1.0) öncelik sırasına girdi: modül yüzeylerinde İ1–İ9'dan sonra, talimatnameden önce (kanun §0.2, KB-34). §4.12 modül sayfasını (baş, çerçeve, akış) kanuna bağlar. Başlık sürümü düzeltildi (1.13'te kalmıştı). |

@@ -51,7 +51,10 @@ def test_served_module_has_no_remote_resource_and_the_spec_csp(served):
         response = client.get(_url())
     assert response.headers["content-security-policy"] == CSP and "connect-src 'none'" in CSP
     assert not re.search(r"""\b(?:src|srcset|poster|action)\s*=\s*["']\s*(?:https?:)?//""", response.text)
-    assert response.text.count("postMessage(") == 1
+    # Two senders (progress, and the flow layout's content height), both only to the parent at the
+    # fixed origin — never another window, never '*'.
+    assert response.text.count("postMessage(") == 2
+    assert response.text.count("window.parent.postMessage(msg, EDUPEDIA_PARENT_ORIGIN)") == 2
 
 
 @pytest.mark.parametrize("path", ["/m/%2e%2e/v1", "/m/..%2f..%2foutput/v1", "/m/fen5-su/v1%00", "/m/fen5-su/v1/",
