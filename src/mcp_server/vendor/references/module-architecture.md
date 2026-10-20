@@ -29,8 +29,8 @@ modul.html
 ```
 
 **Tek-odak ilkesi:** Aynı anda yalnız bir segment görünür (ped İlke 5, dış yük).
-Üst çubuk yürütücü dışsallaştırmadır (ped İlke 4): nerede olduğum, ne kadar
-kaldığı, ne kazandığım hep görünür.
+Üst çubuk yürütücü dışsallaştırmadır (ped İlke 4): nerede olduğum ve ne kadar
+kaldığı görünür (tek aşama göstergesi, Kanun M2.4, M2.5); ödül göstergesi yoktur (M2.7).
 
 ## 2. Tam `MODULE_DATA` şeması
 
@@ -42,10 +42,12 @@ const MODULE_DATA = {
     subject: "Fen Bilimleri",            // ders
     gradeLevel: "7. Sınıf",              // sınıf düzeyi
     mode: "MODULE",                      // MODULE|QUIZ|FLASHCARDS|GAME|EXPLAINER|ASSESSMENT|SERIES
-    // accent: "teal",                 // İSTEĞE BAĞLI, genelde yazılmaz: renk subject'ten türetilir;
-                                         // yalnız ders renk ailesi adı (tedy-integration §3.1)
+    // accent yazılmaz: ders rengi subject'ten türetilir (Kanun M4.5)
+    milestones: [                        // 3–7 aşama; aşama o segmentte başlar (Kanun M2.5)
+      { atSegmentId: "t1", title: "Keşfet" }, { atSegmentId: "t2", title: "Uygula" }, /* … */
+    ],                                   // title 1–2 sözcük, ≤ 16 karakter, cümle düzeni
     estimatedMinutes: 18,                // tahmini süre (üst çubukta gösterilir)
-    coverPictogram: "ic-idea",           // kapak piktogram/ikon anahtarı
+    coverPictogram: "pic-idea",          // kapak piktogramı (izinli anahtarlar Kanun §1 madde 6)
     sourceCitation: "MEB Fen 7, Ünite 1 / kullanıcı ders notu" // KAYNAK (SKILL.md §7)
   },
 
@@ -60,16 +62,8 @@ const MODULE_DATA = {
     "Organellerin görevlerini eşleştireceksin."
   ],
 
-  rewards: {
-    xpPerCorrect: 10,
-    firstTryBonus: 5,
-    badges: [                            // ustalık rozetleri (bilgilendirici, ped İlke 6)
-      { id: "explorer", label: "Hücre Kâşifi", pictogram: "pic-rocket",
-        condition: "module-complete" },
-      { id: "sharp", label: "Keskin Göz", pictogram: "ic-trophy",
-        condition: "no-mistakes-segment" }
-    ]
-  },
+  rewards: { xpPerCorrect: 10, firstTryBonus: 5 },  // yalnız iç sayı, okur görmez; {} de olur.
+                                         // badges yazılmaz (S43, Kanun M2.7; KB-21)
 
   segments: [
     // 0) opsiyonel kanca (hook) — merak-boşluğu açar; hedeflediği teach render
@@ -148,7 +142,7 @@ const MODULE_DATA = {
       targetEdges: [ ["n1","n2"], ["n3","n4"] ] },
 
     // son) kontrol noktası (karma geri-getirme, ped İlke 8)
-    { type: "checkpoint", id: "c1", title: "Kontrol Noktası", pictogram: "ic-trophy",
+    { type: "checkpoint", id: "c1", title: "Kontrol Noktası", pictogram: "pic-growth",
       recap: ["...", "..."],
       mixedQuestions: [ /* mcq şeması */ ],
       selfAssess: ["Bunu öğrendim", "Tekrar etmeliyim"] }
@@ -163,8 +157,11 @@ const MODULE_DATA = {
   SKILL.md §7'ye göre işaretle.
 - `mcq` sorularında `sourceRef` doğrulanabilirlik kancası (validate_module.py).
 - `body` sade HTML; `<script>`/satır-içi olay yok (motor olayları bağlar).
-- `visual.ref` ya bir sprite ikon anahtarı (`"ic-idea"`) ya satır-içi `<svg>`.
-- Pictogram anahtarları sprite'taki `id`'ler veya gömülü Carbon piktogramı.
+- `visual.ref` ya bir sprite anahtarı (`"pic-idea"`) ya satır-içi `<svg>` (yalnız
+  `var(--cds-*)`/`var(--viz-*)` renkli). Kitap figürü ve fotoğraf `meta.assets` ile
+  `<teachId>.visual` yuvasına bağlanır (Kanun M3.1).
+- Piktogram anahtarları yalnız Kanun §1 madde 6'dakilerdir; `ic-*` piktogram yerine
+  yazılmaz, ödül ikonu kullanılmaz (M3.10). `meta.quest` yazılmaz (M2.6).
 - `hook` **opsiyoneldir** (yalnız Keşif Döngüsü kullanan modüllerde). Alanlar:
   `id`, `title?`, `question` (zorunlu), `predict?:{options:[...]}` (opsiyonel,
   notsuz ön-tahmin), `resolvesIn` (**zorunlu** — aynı `segments[]` içindeki bir
@@ -201,12 +198,12 @@ const MODULE_DATA = {
   notu — Barbieri 2023 çözümlü-örnek alt-özellik sıralaması); şema/motor
   ayrıntısı: `renderSelfExplain` (module-template.html).
 - `mcq.questions[]` ve `fillblank.items[]` **opsiyonel** bir `tier?: 1|2|3` alanı
-  taşıyabilir (1=kolay taban, 3=meydan okuma; yoksa/geçersizse 1 varsayılır —
+  taşıyabilir (1=kolay taban, 3=zor; yoksa/geçersizse 1 varsayılır —
   mevcut tier'sız modüllerde davranış **birebir korunur**). Görünmez taban-
   korumalı uyarlanır zorluk (v3.0.0 — Task 13, gamified-flows.md §2.3/§3.3):
   `state.perf` yuvarlanan penceresi 2 ardışık yanlıştan-sonra-doğruda ipucu-önce
   + en-düşük-kalan-tier tercihini, 2 ardışık ilk-denemede-doğruda opsiyonel/
-  atlanabilir bir "Meydan Oku" (tier 3) davetini tetikler; uyarlama yalnız
+  atlanabilir bir zor soru (tier 3) davetini tetikler (etiketi borç KB-21); uyarlama yalnız
   segmentte gerçek tier'lı bir soru/öğe varsa etkindir ve kullanıcıya **hiçbir**
   görünür zorluk-etiketi yazılmaz (G-FLOW `FLOW_LABEL_RE`). Tam şema/motor
   ayrıntısı: `interaction-patterns.md` §2/§5 + `runQuestionSet`/`renderFillblank`
@@ -304,6 +301,10 @@ const MODULE_DATA = {
    otomatik, sessiz bir **özet** ekranı (tamamlanan alıştırma sayısı düz metinle, hedefler,
    öz-değerlendirme; büyük sayı ve rozet yok) üretir.
 7. **Tek-odak:** Aynı anda tek segment (ped İlke 5).
+8. **Aşamalar:** `meta.milestones` segmentleri 3–7 aşamaya gruplar; ilk öğe ilk segmenttedir
+   (Kanun M2.5).
+9. **Görsel:** Çerçeve ders kitabıysa teach segmentlerinin en az %60'ı görsel taşır; her
+   modülde en az bir yazar görseli vardır, kitap figürü onun yerini almaz (Kanun M3.2, M3.5).
 
 ## 4. İskeleden doldurmaya — adım adım
 
@@ -312,8 +313,9 @@ const MODULE_DATA = {
    SKILL.md §7; G-VOICE) → ardından uygun etkileşim seç (interaction-patterns.md) ve
    **kaynaktan** soru/çift/cevap üret (öğrenci "kitabı hatırlasın" değil, bu modülde öğrensin).
 3. Akışı kur: teach→etkileşim→(mola)→teach→... → checkpoint.
-4. `meta.accent`'i derse göre seç (carbon-child-system §3); piktogramları seç
-   (icon-pictogram-svg); gereken kavram için özgün SVG çiz.
+4. `meta.subject`'e dersin resmî adını yaz; `meta.accent`, renk ve tema yazılmaz (Kanun
+   M4.5). Piktogramları seç (izinli anahtarlar Kanun §1 madde 6); görselleri `edupedia_gorsel`
+   ile getir ve en az bir yazar görseli çiz (M3.1, M3.5).
 5. `MODULE_DATA`'yı şablona yerleştir; motoru değiştirme.
 6. `validate_module.py` ile doğrula; ihlalleri gider.
 

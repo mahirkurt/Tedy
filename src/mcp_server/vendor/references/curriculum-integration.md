@@ -130,36 +130,40 @@ Araçlar dört işlevsel kümeye ayrılır. **Çoğu modül için 3–6 çağrı
 > kritik yol değil" diye tanımlıyordu. Bu, **"ders kitapları okunamaz" yanlış inancının**
 > bir sonucuydu (bkz. §3 Adım 3 kutusu). Ölçüldü: **22.414 figür ders+sınıf filtreli
 > aramaya açık** ve her biri caption + `page_no` taşır. Öğrencinin **kendi kitabındaki**
-> görsel, öğrenme transferi için yazar çizimine üstündür. Kullanıcı sözleşmesi (2026-07-17):
+> görsel öğrenme transferini güçlendirir. Kullanıcı sözleşmesi (2026-07-17):
 > "ders kitabı içeriğindeki eğitsel görseller hazırlanan içeriğe entegre edilmeli."
+>
+> **TEDY'de görsel kuralı Kanun M3.1–M3.5'tedir.** Görseli `edupedia_gorsel` getirir (kitap
+> figürü → Pexels → MiniMax; ücretli medya yalnız kullanıcı onayıyla); varlık `meta.assets` ile
+> `<teachId>.visual` yuvasına bağlanır, script çalıştırılmaz. Kitap figürü ile yazar görseli
+> birbirinin yedeği değildir: her modülde en az bir yazar görseli vardır ve kitap figürü onun
+> yerini almaz (M3.5).
 
 > Bu alt-bölüm, `edupedia` plugin sarmalayıcısının görüntü-dayanak sözleşmesini netleştirir.
 > Skill'in görsel arketipleri (`svgFigure`, `labeledFigure`, `vizTable`, `numberLine`,
 > `fractionBar`, `relationFlow`; bkz. `svg-authoring.md`) **MCP'siz akışta** ve resmî figür
-> bulunmayan kavramlarda yegâne yoldur. Tam normatif metin: `../../../CONNECTORS.md §3` +
+> bulunmayan kavramlarda teach görselinin de kaynağıdır; her modülde en az biri bulunur (Kanun M3.5). Tam normatif metin: `../../../CONNECTORS.md §3` +
 > `../../../shared/canonical-cache-contract.md §4`.
 
 | Katman | Tanım | Durum | Davranış |
 |---|---|---|---|
 | **Tier-2a** | `get_figure(..., include_image=false)` → **metadata**: `caption`, `page_no`, `bbox`, `pdf_url` | **ÖNCELİKLİ** (MCP bağlıyken) | `search_figures(query, subject, grade)` ile ara. `page_no` **en ucuz sayfa bulucudur** (§3 Adım 3). `include_image=true` ayrıca görseli **modelin GÖRMESİNİ** sağlar → yazar-SVG orijinale bakılarak çizilir. |
-| **Tier-2b** | `pdf_url` + `page_no` + `bbox` → PDF'ten yeniden çıkarma → base64 JPEG | **Best-effort, yerel dosya sistemi + Python** | `scripts/fetch_figure.py` (`figures` bloğu + `@@FIG:<key>@@`). Native yol Claude Code/Cursor'dadır; diğer hostlarda ancak script açıkça yerelde çalıştırılabiliyorsa mümkündür. Öğrenci o görseli kitabında görüyor. Hata → yer tutucu yerinde kalır, `tier2_status` **raporlanır — sessizce atlanmaz**. claude.ai'de native yol yoktur. |
-| **Tier-1** | Kazanım koduna/program metnine izlenebilir olgular + **yazar-üretimli tema-duyarlı SVG** (token-renkli, `role="img"`+başlık, WCAG 2.1 AA) | **Garanti — yedek** | Uygun resmî figür **yoksa**, MCP bağlı değilse, veya Tier-2 düşerse. `validate_module.py` G-SVG + G-CURRICULUM ile denetlenir. MCP'nin görsel çekememesi **başarısızlık değildir**: Tier-1 tek başına tam işlevseldir (`svg-authoring.md` doktrini) — üretim asla bloke olmaz. |
+| **Tier-2b** | Kitap figürünün görseli modüle gömülür | **TEDY'de `edupedia_gorsel`** | `edupedia_gorsel` figürü getirir, derleyici gömer ve atıfı yazar (Kanun M3.1). Eklentinin yerel script yolu TEDY'de kullanılmaz. Öğrenci o görseli kitabında görüyor. Hata → `tier2_status` **raporlanır — sessizce atlanmaz**. |
+| **Tier-1** | Kazanım koduna/program metnine izlenebilir olgular + **yazar-üretimli tema-duyarlı SVG** (token-renkli, `role="img"`+başlık, WCAG 2.1 AA) | **Her modülde zorunlu** (Kanun M3.5) | Her modülde en az bir yazar görseli (chart, table, labeled, flow, cards, numberline); kitap figürü onun yerini almaz. Resmî figür yoksa, MCP bağlı değilse ya da Tier-2 düşerse teach görseli de buradan gelir. `validate_module.py` G-SVG + G-CURRICULUM ile denetlenir. MCP'nin görsel çekememesi üretimi bloke etmez. |
 
 **Yetenek-probu (kanonik akış):**
 1. `get_figure` araç listesinde **yok** → Tier-2 devre dışı (`tier2_status: unavailable`); Tier-1'de kal.
 2. **Ara:** `search_figures(query=<konu>, subject=<slug>, grade=<sınıf>)` → aday `figure_id`'ler.
    Sonuçları **hedef ders+sınıfın kitabına** göre ele: `document_id` Adım 3'te açtığın kitapsa
    o figür birinci sınıf dayanaktır. Her sonuç `page_no` taşır → sayfa bulucu olarak da kullan.
-3. **Göm (Tier-2b, yerel dosya sistemi + Python):** `get_figure(figure_id, include_image=false)`'ın
-   verdiği `pdf_url` + `page_no` + `bbox` ile bir `figures` girdisi yaz ve görselin yerine
-   `@@FIG:<key>@@` koy; sonra `python3 scripts/fetch_figure.py <html> --in-place` çalıştır
-   (`tier2_status: embedded`; kaynak damgasına `pdf_url` + sayfa ekle). Hata → yer tutucu
-   yerinde kalır, Tier-1'e düş (`tier2_status: degraded`) ve **bunu raporla**.
+3. **Göm (Tier-2b):** figürü `edupedia_gorsel` getirir ve `meta.assets` ile `<teachId>.visual`
+   yuvasına bağlar (Kanun M3.1; `tier2_status: embedded`). Figürün `page_no`'su çerçeve
+   sayfalarında değilse gerekçe `meta.assets[i].pencere_disi_gerekce`'ye yazılır (M3.4).
+   Hata → Tier-1'e düş (`tier2_status: degraded`) ve **bunu raporla**.
    > **DİKKAT — `include_image=true` base64 VERMEZ.** Görseli MCP ImageContent olarak döndürür:
    > model onu **görür** (bu Tier-2a'nın değeridir) ama base64'ünü metin olarak **almaz**,
    > dolayısıyla HTML'e yazamaz. Bu belge eskiden "base64 göm" diyordu — 2026-07-31'de
-   > ölçülüp düzeltildi. Gerçek gömme yolu yukarıdaki script'tir
-   > (tam sözleşme: `../../../CONNECTORS.md §3.2`).
+   > ölçülüp düzeltildi. TEDY'de gerçek gömme yolu `edupedia_gorsel`'dir (Kanun M3.1).
 4. `include_image=false` varyantı **ucuz ön-eleme** içindir (başlık, sayfa, `caption`,
    kazanım-bağı) — figürün konuya uyup uymadığını gömme maliyetine girmeden ölç.
 

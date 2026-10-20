@@ -16,16 +16,16 @@ SVG**'dir (harici kütüphane/CDN bağımlılığı yok). Motor üç yol sunar:
 | Kural | Nasıl |
 | --- | --- |
 | **Responsive** | Sabit `width/height` yerine `viewBox="0 0 W H"`; CSS `max-width:100%`. |
-| **Tema-duyarlı** | Renkleri **asla ham hex** verme. `currentColor`, `var(--accent)`, `var(--accent-tint)`, kategorik `var(--viz-1..5)` veya anlamsal `var(--viz-sun/water/cloud)` kullan. Metin rengini hiç verme — `.viz text` otomatik `--cds-text-primary` yapar; ikincil etiket için `class="viz-muted"`. |
+| **Tema-duyarlı** | Renkleri **asla ham hex** verme. Yalnız `var(--cds-*)` ve `var(--viz-*)` kullan (Kanun §1 madde 1, M4.7): ör. `var(--cds-border-strong)`, nötr rampa `var(--viz-1..5)`, anlamsal `var(--viz-sun/water/cloud)`. Ders rengi (`--accent`) yazar SVG'sine girmez (M1.5). Metin rengini hiç verme — `.viz text` otomatik `--cds-text-primary` yapar; ikincil etiket için `class="viz-muted"`. |
 | **Erişilebilir** | Bilgi taşıyan SVG: `role="img"` + `<title id>` + (gerekirse) `<desc id>` + `aria-labelledby`. Salt-dekor SVG: `aria-hidden="true"`. |
-| **Sakin** | Otomatik/sürekli animasyon yok. Hareket gerekiyorsa `@media (prefers-reduced-motion:no-preference)` altında, tek ve kısa. |
+| **Sakin** | Animasyon yok; hareket yalnız okurun eylemine cevaptır ve motorun işidir (Kanun M2.10). Metin ekranda en az 12 px çizilir (M5.6). |
 
 İskelet:
 ```html
 <svg class="viz" viewBox="0 0 480 240" role="img" aria-labelledby="t1 d1">
   <title id="t1">Kısa başlık</title>
   <desc id="d1">Görseli sözle betimleyen bir-iki cümle.</desc>
-  <!-- şekiller: fill="var(--accent)" stroke="var(--viz-axis)" ... -->
+  <!-- şekiller: fill="var(--viz-2)" stroke="var(--viz-axis)" ... -->
   <text x="…" y="…">Etiket</text>            <!-- rengi CSS verir -->
   <text class="viz-muted" x="…" y="…">alt</text>
 </svg>
@@ -39,14 +39,13 @@ ile ver; motor `svgFigure` ile başlık/çerçeve/altyazıyı ekler.
 
 | Token | Açık | Koyu | Kullanım |
 | --- | --- | --- | --- |
-| `--accent` | Mavi 60 | Mavi 50 | Birincil/tek-seri vurgu |
-| `--accent-tint` | Mavi 10 | (koyu zemin) | Dolgu/zemin alanı |
-| `--viz-1..5` | cyan/teal/magenta/mor/kırmızı | açık karşılıkları | Kategorik çoklu seri |
+| `--viz-1..5` | gray100 · gray90 · gray80 · gray70 · gray60 | gray10 … gray50 | Seri ve parça dolgusu; nötr rampa, kategoriyi yerinde etiket taşır (S19, KS-3) |
 | `--viz-sun/water/cloud` | sarı/mavi/gri | açık karşılıkları | Doğa/illüstrasyon anlamsal |
 | `--viz-axis` / `--viz-grid` | gri | koyu gri | Eksen / ızgara çizgileri |
 
-Tek seriyse `var(--accent)`; çok seriyse `--viz-1..5` sırayla. Anlam taşıyan illüstrasyonda
-(güneş, su, bulut) anlamsal token'ları yeğle.
+Tek seri `var(--viz-1)`; çok seri `--viz-1..5` sırayla ve her seri yerinde etiketli. Anlam
+taşıyan illüstrasyonda (güneş, su, bulut) anlamsal token'ları yeğle. Ders rengi (`--accent`)
+motorun çapalarına aittir; yazar SVG'sinde kullanılmaz (Kanun M1.5).
 
 ---
 
@@ -63,7 +62,7 @@ Aşağıdaki desenler `viewBox` koordinatlarıyla, hep token-renkli kurulur.
    çerçeveler + içerik. Örnek: ana modüldeki tanecik düzeni.
 5. **Sayı doğrusu (number line):** Yatay eksen + işaretler; kesir/tam sayı/işlem.
 6. **Parça-bütün (part–whole):** Bölünmüş dikdörtgen ya da daire dilimleri (kesir, yüzde).
-   Daire-dilim için özet `donut` mantığı (yalnız özet ekranı) örnek alınabilir.
+   Kesir ve oranda daire yerine `fractionBar` çubuk modeli yeğlenir.
 7. **Çubuk/çizgi grafik (chart):** **`vizChart` kullan** — elle çizme. Veri okuryazarlığı,
    karşılaştırma, zaman serisi.
 8. **Zaman çizelgesi (timeline):** Olay dizisi — `timeline` segmenti (SVG değil, DOM) yeğlenir.
@@ -96,16 +95,17 @@ otomatik hizalama, otomatik renk. Eksen/sayı-doğrusu okları da aynı marker'�
 { kind:"bar"|"line",
   title:"...",            // <title> (erişilebilirlik + başlık)
   desc:"...",             // <desc> (ekran okuyucu betimi) — veriyi sözle özetle
-  data:[{label,value,color?}],  // color yalnız kategorik vurgu gerektiğinde (--viz-*)
+  data:[{label,value}],   // color yazılmaz (Kanun M4.7; motor bugün kabul ediyor, borç KB-25)
   max?:Number,            // y-ekseni tavanı (yoksa veriden)
-  legend?:true,           // color'lı veride lejant
+  legend?:true,           // çok seride lejant; mümkünse yerinde etiket
   caption?:"Şekil n — ..."} // figcaption
 ```
-- Tek seri → otomatik `var(--accent)`. Çok renkli → `data[].color: "var(--viz-2)"` vb.
+- Tek seri → otomatik `var(--viz-1)`; çok seri `--viz-1..5` sırayla. `data[].color` yazılmaz
+  (Kanun M4.7).
 - Eksen/ızgara/etiketler tema token'larıyla; **animasyon yok**.
 - `chart` **görüntüleme** segmenti olarak da kullanılabilir (puanlanmaz): `{ type:"chart", chart:{…} }`
   ya da `teach` içinde `visual:{ kind:"chart", … }`.
-- **Donut**: ustalık göstergesi olarak yalnız özet ekranına ayrılmıştır (`donutSvg`).
+- Özet ekranında halka grafik yoktur (S43); özet düz metindir.
 
 ---
 
