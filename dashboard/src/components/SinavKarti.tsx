@@ -88,6 +88,7 @@ function MebSenaryoBolumu({ exam }: { exam: ExamItem }) {
           {c}
         </p>
       ))}
+      {g.duyuru && <p className="meb-senaryo__duyuru">{g.duyuru}</p>}
       {g.dugme && (
         <>
           <Button kind="ghost" size="sm" aria-expanded={acik} aria-controls={listeId} onClick={() => setAcik(!acik)}>

@@ -38,6 +38,8 @@ test('doğrulandı: cümle, ikon adı, liste klavyeyle açılır', async ({ page
   const b = page.locator('.meb-senaryo')
   await expect(b).toContainText('Duyurudaki 4. senaryo MEB tablosunda var: 7 soru. Duyurudaki 2 konu bu senaryoda.')
   await expect(b.getByLabel('Doğrulandı')).toBeVisible()
+  // Spec §3.2/§10: öğretmenin sözü ("ağırlıklı" gibi nüans) aynen, tırnaklı satırda görünür.
+  await expect(b.locator('.meb-senaryo__duyuru')).toHaveText(`Duyuru: «${BLOK.cumle}»`)
   const dugme = b.getByRole('button', { name: 'Senaryonun 3 çıktısını göster' })
   await dugme.focus()
   await page.keyboard.press('Enter')
@@ -66,17 +68,21 @@ test('kısmen', async ({ page }) => {
   await ac(page, { ...BLOK, durum: 'kismen', eslesen_konu_sayisi: 3, senaryo_disi_konular: ['Derin anlam'] })
   await expect(page.locator('.meb-senaryo')).toContainText('Şu konu 4. senaryoda yok: Derin anlam.')
   await expect(page.locator('.meb-senaryo').getByLabel('Uyarı')).toBeVisible()
+  await expect(page.locator('.meb-senaryo__duyuru')).toHaveText(`Duyuru: «${BLOK.cumle}»`)
 })
 
 test('senaryo yok', async ({ page }) => {
-  await ac(page, { ...BLOK, durum: 'senaryo_yok', anilan: [9], senaryo: null, toplam: null, dagilim: [] })
+  await ac(page, { ...BLOK, durum: 'senaryo_yok', anilan: [9], cumle: 'Sınav 9. senaryo ağırlıklı olacak.',
+    senaryo: null, toplam: null, dagilim: [] })
   await expect(page.locator('.meb-senaryo')).toContainText('Duyuru 9. senaryo diyor; MEB tablosunda bu sınav için 1–6 var.')
+  await expect(page.locator('.meb-senaryo__duyuru')).toHaveText('Duyuru: «Sınav 9. senaryo ağırlıklı olacak.»')
   await expect(page.locator('.meb-senaryo').getByRole('button', { name: /çıktısını göster/ })).toHaveCount(0)
 })
 
 test('ülke geneli', async ({ page }) => {
   await ac(page, { ...BLOK, durum: 'ulke_geneli', anilan: [], senaryo: null, dagilim: [], senaryo_sayisi: 0, not: 'Ülke Geneli' })
   await expect(page.locator('.meb-senaryo')).toContainText('Bu sınav ülke genelinde ortak yapılır; senaryo yok.')
+  await expect(page.locator('.meb-senaryo__duyuru')).toHaveCount(0)
 })
 
 test('belirtilmedi: tahmin etiketli', async ({ page }) => {
@@ -84,6 +90,7 @@ test('belirtilmedi: tahmin etiketli', async ({ page }) => {
   const b = page.locator('.meb-senaryo')
   await expect(b).toContainText('Duyuruda senaryo belirtilmedi · MEB tablosunda 6 senaryo var.')
   await expect(b).toContainText('Duyurudaki konular 3. ve 4. senaryolarla uyumlu (TEDY’nin tahmini).')
+  await expect(b.locator('.meb-senaryo__duyuru')).toHaveCount(0)
 })
 
 test('telefonda asistana sor Asistan sayfasına götürür', async ({ page }) => {

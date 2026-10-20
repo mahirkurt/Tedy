@@ -65,3 +65,22 @@ test('eşleşmeyen konu cümlesi', () => {
   const g = senaryoGorunumu({ ...TABAN, eslesmeyen_konular: ['Osmanlı'] })
   assert.equal(g.cumleler.at(-1), 'MEB tablosunda karşılığı bulunamayan konu: Osmanlı.')
 })
+
+// Spec §3.2/§10: "ağırlıklı" gibi nüans kartta kaybolmasın — duyurunun cümlesi aynen gösterilir.
+test('duyurunun cümlesi doğrulandı, kısmen ve senaryo yok durumlarında "Duyuru: «…»" satırıdır', () => {
+  assert.equal(senaryoGorunumu(TABAN).duyuru, 'Duyuru: «4. senaryo ağırlıklı»')
+  const kismen = senaryoGorunumu({ ...TABAN, durum: 'kismen', eslesen_konu_sayisi: 3, senaryo_disi_konular: ['Derin anlam'] })
+  assert.equal(kismen.duyuru, 'Duyuru: «4. senaryo ağırlıklı»')
+  const yok = senaryoGorunumu({ ...TABAN, durum: 'senaryo_yok', anilan: [9], cumle: 'Sınav 9. senaryo ağırlıklı olacak.',
+    senaryo: null, toplam: null, dagilim: [] })
+  assert.equal(yok.duyuru, 'Duyuru: «Sınav 9. senaryo ağırlıklı olacak.»')
+})
+
+test('duyuru satırı yalnız cümle doluysa ve yalnız bu üç durumda çıkar', () => {
+  assert.equal(senaryoGorunumu({ ...TABAN, cumle: null }).duyuru, null)
+  assert.equal(senaryoGorunumu({ ...TABAN, cumle: '' }).duyuru, null)
+  assert.equal(senaryoGorunumu({ ...TABAN, cumle: '   ' }).duyuru, null)
+  const bos = { anilan: [], senaryo: null, toplam: null, dagilim: [] }
+  assert.equal(senaryoGorunumu({ ...TABAN, ...bos, durum: 'belirtilmedi', cumle: null }).duyuru, null)
+  assert.equal(senaryoGorunumu({ ...TABAN, ...bos, durum: 'ulke_geneli', cumle: 'Sınav 3. senaryo olacak.' }).duyuru, null)
+})

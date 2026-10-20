@@ -3,6 +3,8 @@ import type { SinavSenaryosu } from '../types'
 export interface SenaryoGorunumu {
   ikon: 'onay' | 'uyari' | null
   cumleler: string[]
+  /** Duyurunun kendi cümlesi: "Duyuru: «…»" (yalnız doğrulandı, kısmen ve senaryo yok durumlarında). */
+  duyuru: string | null
   satirlar: { metin: string; duyuruda: boolean }[]
   dugme: string | null
   kaynak: string
@@ -48,8 +50,12 @@ export function senaryoGorunumu(s: SinavSenaryosu): SenaryoGorunumu {
   if (s.eslesmeyen_konular.length > 0) {
     cumleler.push(`MEB tablosunda karşılığı bulunamayan konu: ${s.eslesmeyen_konular.join('; ')}.`)
   }
+  // "Ağırlıklı" gibi nüans kaybolmasın (spec §3.2/§10): öğretmenin sözü aynen, tırnaklı.
+  const sozu = s.cumle?.trim()
+  const duyuru = sozu && (s.durum === 'dogrulandi' || s.durum === 'kismen' || s.durum === 'senaryo_yok')
+    ? `Duyuru: «${sozu}»` : null
   return {
-    ikon, cumleler, dugme, kaynak: mebTarihi(s.meb_guncelleme),
+    ikon, cumleler, duyuru, dugme, kaynak: mebTarihi(s.meb_guncelleme),
     satirlar: s.dagilim.map(d => ({ metin: `${d.soru} soru · ${d.kod} ${d.metin}`, duyuruda: d.duyuruda })),
   }
 }
