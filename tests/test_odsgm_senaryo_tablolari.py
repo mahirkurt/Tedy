@@ -156,3 +156,17 @@ def test_ayrik_ust_nokta_bilesik_harfe_cevrilir():
     _, sayfa = ders_sayfasi(tablolar(html), 7)
     assert sayfa["ciktilar"][1]["metin"] == "Metnin yüzey anlamını belirleyebilme"
     assert chr(0x308) not in sayfa["ciktilar"][1]["metin"]
+
+
+# M3: hücre içindeki blok etiketleri (p, div, li, br) metinleri birbirine yapıştırmaz ("yansıtabilmea) Bölme");
+# satır içi etiketler (span, b) kelimeyi bölmez.
+def test_hucre_ici_blok_etiketleri_bosluk_olur():
+    html = ("<table><tr>"
+            "<td><p>Metni yansıtabilme</p><p>a) Bölme işlemini inceler.</p></td>"
+            "<td><div>Birinci</div><div>ikinci</div><ul><li>bir</li><li>iki</li></ul>x<br>y</td>"
+            "<td>yansıta<span>bil</span><b>me</b></td>"
+            "</tr></table>")
+    hucreler = tablolar(html)[0][0]
+    assert hucreler[0] == "Metni yansıtabilme a) Bölme işlemini inceler."
+    assert hucreler[1] == "Birinci ikinci bir iki x y"
+    assert hucreler[2] == "yansıtabilme"

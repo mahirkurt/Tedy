@@ -56,6 +56,11 @@ class YapiHatasi(ValueError):
     """Tablo beklenen yapıda değil; dosya yazılmaz."""
 
 
+# Hücre içinde satır/paragraf ayıran etiketler: metinleri birbirine yapıştırmasın ("yansıtabilmea) Bölme").
+# Satır içi etiketler (span, b, font) kelimeyi bölebilir; onlara boşluk eklenmez.
+_BLOK_ETIKETLERI = frozenset({"p", "div", "li", "br"})
+
+
 class _Tablolar(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
@@ -75,10 +80,12 @@ class _Tablolar(HTMLParser):
             self.tablolar[-1].append(self._satir)
         elif tag in ("td", "th") and self._satir is not None:
             self._hucre = ["", int(a.get("colspan") or 1), int(a.get("rowspan") or 1)]
-        elif tag == "br" and self._hucre is not None:
+        elif tag in _BLOK_ETIKETLERI and self._hucre is not None:
             self._hucre[0] += " "
 
     def handle_endtag(self, tag):
+        if tag in _BLOK_ETIKETLERI and self._hucre is not None:
+            self._hucre[0] += " "
         if tag == "table":
             self._derinlik -= 1
         elif tag in ("td", "th") and self._hucre is not None and self._satir is not None:
