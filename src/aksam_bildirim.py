@@ -34,6 +34,10 @@ DURUM = PurePosixPath("output/aksam_bildirim_durumu.json")
 DUZEN = PurePosixPath("output/aksam_duzeni.json")
 ODAK_ESKI = PurePosixPath("output/odak_penceresi.json")
 HATA_LISTESI_SINIRI = 5
+BASLIK_SINIRI = 80
+GOVDE_SINIRI = 300
+DERS_SINIRI = 30
+METIN_SINIRI = 80
 KOK_PLAN_YOK = "plan okunamadı"
 KOK_VAPID_YOK = "VAPID ayarlı değil"
 
@@ -51,8 +55,17 @@ def _sessiz(an: datetime) -> bool:
     return an.time() >= SESSIZ_BAS or an.time() < SESSIZ_SON
 
 
-def _saat(dk: int) -> str:
-    return f"{dk // 60:02d}:{dk % 60:02d}"
+def _kirp(metin: Any, sinir: int) -> str:
+    metin = " ".join(str(metin or "").split())
+    return metin if len(metin) <= sinir else metin[: sinir - 1].rstrip() + "…"
+
+
+def _ders(ders: Any, yedek: str) -> str:
+    return _kirp(ders, DERS_SINIRI) or yedek
+
+
+def _olay(tur: str, alici: str, blok_id: str | None, baslik: str, govde: str) -> "Olay":
+    return Olay(tur, alici, blok_id, _kirp(baslik, BASLIK_SINIRI), _kirp(govde, GOVDE_SINIRI))  # type: ignore[arg-type]
 
 
 def _basla(blok: Any, gunluk: dict) -> int:
@@ -78,12 +91,12 @@ def olaylar(plan: Any, gunluk: dict, duzen: dict, simdi: datetime) -> list[Olay]
     suruyor = [b for b in calisma if b.durum == "suruyor"]
     for b in suruyor:
         basla = _basla(b, gunluk)
-        ders = b.ders or "Bu iş"
+        ders = _ders(b.ders, "Bu iş")
         if simdi_dk >= basla + b.tahmin_dk:
-            sonuc.append(Olay("sure_doldu", "ogrenci", b.id, "Süre doldu",
+            sonuc.append(_olay("sure_doldu", "ogrenci", b.id, "Süre doldu",
                               f"{ders} için tahmin ettiğin süre bitti. Bitti mi, biraz daha mı?"))
         if simdi_dk > basla + b.tahmin_dk + int(duzen["takildi_esik_dk"]):     # "geçti": eşiğin kendisi değil
-            sonuc.append(Olay("takildi", "aile", b.id, f"{ders} bloğu uzadı",
+            sonuc.append(_olay("takildi", "aile", b.id, f"{ders} bloğu uzadı",
                               f"Başlayalı {simdi_dk - basla} dakika oldu, henüz bitti işaretlenmedi."))
 
     bitenler = [b for b in calisma if b.durum == "bitti"]
@@ -92,19 +105,22 @@ def olaylar(plan: Any, gunluk: dict, duzen: dict, simdi: datetime) -> list[Olay]
         son = max(bitenler, key=lambda b: (_bitis(b, gunluk), b.bas))
         mola = MOLA_UZUN if len(bitenler) % 2 == 0 else MOLA_KISA
         if simdi_dk >= _bitis(son, gunluk) + mola:
-            sonuc.append(Olay("mola_bitti", "ogrenci", son.id, "Mola bitti",
-                              f"Sırada {siradaki.ders or 'sıradaki iş'}: {siradaki.adim}."))
+            sonuc.append(_olay("mola_bitti", "ogrenci", son.id, "Mola bitti",
+                               f"Sırada {_ders(siradaki.ders, 'sıradaki iş')}: {_kirp(siradaki.adim, METIN_SINIRI)}."))
 
     hazir = aksam_duzeni.dakika(duzen["odeve_hazir"])
     esik = hazir + int(duzen["baslamadi_esik_dk"])
     if calisma and simdi_dk >= esik and not any(b.durum in ("suruyor", "bitti") for b in calisma):
-        sonuc.append(Olay("baslamadi", "aile", None, "Işık henüz başlamadı",
-                          f"Saat {_saat(esik)}; bu akşamın ilk işi {calisma[0].ders or 'ödev'}."))
+        # Saat gönderim anıdır, eşik değil: geciken bir tur bayat saat söylemesin (R25, D4).
+        sonuc.append(_olay("baslamadi", "aile", None, "Işık henüz başlamadı",
+                           f"Saat {simdi:%H:%M}; bu akşamın ilk işi {_ders(calisma[0].ders, 'ödev')}."))
 
     if plan.sigmayan:
         s = plan.sigmayan[0]
-        sonuc.append(Olay("sigmiyor", "aile", None, "Bu akşama sığmıyor",
-                          f"{s.get('ders') or 'Ödev'}: {s.get('baslik') or ''} yarın teslim; plana sığmadı."))
+        ders, baslik = _ders(s.get("ders"), "Ödev"), _kirp(s.get("baslik"), METIN_SINIRI)
+        ne = baslik or "bir ödev"
+        sonuc.append(_olay("sigmiyor", "aile", None, "Bu akşama sığmıyor",
+                           f"{ders}: {ne} yarın teslim; plana sığmadı."))
     return sonuc
 
 
@@ -135,10 +151,15 @@ class Defter:
                 continue
         return sonuc
 
-    def yaz(self, gun: str, olay: Olay, email: str, simdi: datetime) -> None:
-        with self._kilitli(), self.yol.open("a", encoding="utf-8") as f:
-            f.write(json.dumps({"zaman": simdi.isoformat(timespec="seconds"), "gun": gun, "tur": olay.tur,
-                                "blok_id": olay.blok_id, "email": email}, ensure_ascii=False) + "\n")
+    def yaz(self, gun: str, olay: Olay, email: str, simdi: datetime) -> bool:
+        """Kilit altında yeniden denetler: iki tur çakışırsa ikinci satır yazılmaz. Yazdıysa True."""
+        with self._kilitli():
+            if _gonderildi(self.satirlar(), gun, olay, email):
+                return False
+            with self.yol.open("a", encoding="utf-8") as f:
+                f.write(json.dumps({"zaman": simdi.isoformat(timespec="seconds"), "gun": gun, "tur": olay.tur,
+                                    "blok_id": olay.blok_id, "email": email}, ensure_ascii=False) + "\n")
+            return True
 
 
 def _gonderildi(satirlar: set, gun: str, olay: Olay, email: str) -> bool:
@@ -151,9 +172,13 @@ def _gonderildi(satirlar: set, gun: str, olay: Olay, email: str) -> bool:
 def alicilar(duzen: dict) -> dict[str, list[str]]:
     """Işık ve aile. Aile: ayardaki liste ∩ şu anki tam rollü, öğrenci olmayan üyeler (her turda
     yeniden denetlenir: kayıtlı bir e-posta aileden çıkmış olabilir)."""
-    ogrenci = sorted(OGRENCI_EMAILS)
-    aile = [e for e in duzen.get("haber_alacaklar") or []
-            if isinstance(e, str) and is_full(e) and e.strip().lower() not in OGRENCI_EMAILS]
+    ogr = {e.strip().lower() for e in OGRENCI_EMAILS}
+    aile = []
+    for e in duzen.get("haber_alacaklar") or []:
+        e = e.strip().lower() if isinstance(e, str) else ""
+        if e and e not in ogr and is_full(e) and e not in aile:
+            aile.append(e)
+    ogrenci = sorted(ogr)
     return {"ogrenci": ogrenci, "aile": aile}
 
 

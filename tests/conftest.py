@@ -127,6 +127,11 @@ def _canli_sinavlar_dosyasi_yok(monkeypatch):
         monkeypatch.setattr(api, "_sinavlar_belgesi", lambda: None)
 
 
+class GercekPushYasak(BaseException):
+    """BaseException on purpose: the rounds isolate devices with `except Exception`, which would
+    swallow the guard and let a test that reached the real sender pass."""
+
+
 @pytest.fixture(autouse=True)
 def _canli_push_gondericisi_yok(monkeypatch):
     """The evening-plan round (2026-10-19, Görev 9) sends web pushes to the family's phones. No
@@ -134,5 +139,5 @@ def _canli_push_gondericisi_yok(monkeypatch):
     import src.web_push as wp
 
     def _yasak(*a, **k):
-        raise AssertionError("testte gerçek web push gönderimi yok")
+        raise GercekPushYasak("testte gerçek web push gönderimi yok")
     monkeypatch.setattr(wp, "gonder", _yasak)

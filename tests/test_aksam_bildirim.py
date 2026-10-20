@@ -307,8 +307,68 @@ def test_main_cikis_kodlari(kok, monkeypatch):
 
 
 def test_varsayilan_gonderici_testte_yasak(kok):
-    with pytest.raises(AssertionError):
+    with pytest.raises(BaseException) as e:
         wp.gonder({}, {}, None)
+    assert type(e.value).__name__ == "GercekPushYasak" and not isinstance(e.value, Exception)
+
+
+def test_gercek_gondericiye_ulasan_tur_testi_dusurur(kok):
+    # gonderici verilmez: tur web_push.gonder'e düşer; koruma `except Exception`'a takılmaz.
+    with pytest.raises(BaseException) as e:
+        ab.tur(an(17, 15), None, kok=kok, plan_kaynagi=lambda s: plan([blok("a", 1020, 1040)]))
+    assert type(e.value).__name__ == "GercekPushYasak"
+
+
+def test_metinler_sinirlanir():
+    uzun = "Çok uzun ders adı " * 10
+    p = plan([blok("a", 1020, 1040, "suruyor", ders=uzun, adim=uzun)], sigmayan=[{"ders": uzun, "baslik": uzun}])
+    g = {"a": {"basla": "17:00"}}
+    for o in ab.olaylar(p, g, duzen(), an(17, 40)):
+        assert len(o.baslik) <= 80 and len(o.govde) <= 300 and "…" in (o.baslik + o.govde)
+    sirada = plan([blok("a", 1020, 1040, "bitti"), blok("b", 1045, 1065, ders=uzun, adim=uzun)])
+    (m,) = ab.olaylar(sirada, {"a": {"bitti": "17:20"}}, duzen(), an(17, 30))
+    assert len(m.govde) <= 300 and "…" in m.govde
+    assert len(ab._ders(uzun, "x")) <= 30
+
+
+def test_baslamadi_saati_gonderim_anidir():
+    p = plan([blok("a", 1020, 1040)])
+    (o,) = ab.olaylar(p, {}, duzen(), an(17, 42))
+    assert o.govde == "Saat 17:42; bu akşamın ilk işi Fen."
+
+
+def test_sigmiyor_bos_baslik_yedegi():
+    p = plan([blok("a", 1020, 1040, "suruyor")], sigmayan=[{"ders": "Türkçe", "baslik": "  "}])
+    (o,) = [o for o in ab.olaylar(p, {"a": {"basla": "17:00"}}, duzen(), an(17, 5)) if o.tur == "sigmiyor"]
+    assert o.govde == "Türkçe: bir ödev yarın teslim; plana sığmadı." and "  " not in o.govde
+
+
+def test_defter_kilit_altinda_yeniden_denetler(tmp_path):
+    d = ab.Defter(tmp_path / "d.jsonl")
+    o = ab.Olay("baslamadi", "aile", None, "b", "g")
+    assert d.yaz(GUN, o, ANNE, an(17, 15)) is True
+    assert d.yaz(GUN, o, ANNE, an(17, 16)) is False
+    assert len((tmp_path / "d.jsonl").read_text().splitlines()) == 1
+
+
+def test_alici_epostalari_normallestirilir(kok, monkeypatch):
+    monkeypatch.setattr(ab, "is_full", lambda e: e in (ISIK, ANNE))
+    a = ab.alicilar({"haber_alacaklar": ["  ANNE@x ", "anne@x", ISIK.upper(), 5]})
+    assert a == {"ogrenci": [ISIK], "aile": [ANNE]}
+
+
+def test_saglik_aksam_bildirim_durumu(tmp_path, monkeypatch):
+    import src.run_sync as rs
+    monkeypatch.setattr(rs, "OUTPUT_DIR", str(tmp_path))
+    assert rs._aksam_bildirim_durumu() == {}                       # dosya yok
+    (tmp_path / "aksam_bildirim_durumu.json").write_text("{bozuk", encoding="utf-8")
+    assert rs._aksam_bildirim_durumu() == {}
+    (tmp_path / "aksam_bildirim_durumu.json").write_text("[1]", encoding="utf-8")
+    assert rs._aksam_bildirim_durumu() == {}
+    (tmp_path / "aksam_bildirim_durumu.json").write_text('{"gonderilen": 2}', encoding="utf-8")
+    assert rs._aksam_bildirim_durumu() == {"gonderilen": 2}
+    import inspect
+    assert '"aksam_bildirim": _aksam_bildirim_durumu()' in inspect.getsource(rs)
 
 
 def test_birim_dosyalari():
