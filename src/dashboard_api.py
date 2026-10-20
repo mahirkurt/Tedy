@@ -3176,6 +3176,7 @@ def _kayittan_sinav(k, now):
         "ilkTespit": k.get("ilk_tespit"), "degisti": k.get("degisti"),
         "hafta": k["hafta"] if hafta is not None else None,
         "tarihBelirsiz": not e.get("date") and not k.get("sentetik"),
+        "senaryo": k["senaryo"] if isinstance(k.get("senaryo"), dict) else None,
     })
     return e
 
@@ -3202,7 +3203,8 @@ def _sinav_api_listesi(data, now=None):
         eski = _sinav_listesi(data, now=now)
         for e in eski["exams"]:
             e.update({"tur": None, "konular": [], "kaynaklar": [], "ilkTespit": None, "degisti": None,
-                      "hafta": None, "tarihBelirsiz": False})
+                      "hafta": None, "tarihBelirsiz": False,
+                      "senaryo": None})
         return {**eski, "tespit": None}
     sinavlar = []
     for k in belge["sinavlar"]:

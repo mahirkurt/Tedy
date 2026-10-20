@@ -25,7 +25,7 @@ from zoneinfo import ZoneInfo
 
 from src.course_names import normalize_course
 from src.mcp_client import McpClient, McpToolResult
-from src import assistant_kitaplar, assistant_modules
+from src import assistant_kitaplar, assistant_modules, sinav_senaryo
 from src.assistant_skills import GENEL
 from src.assistant_alistirma import DUZEYLER, alistirma_hata
 from src.portal_susu import temiz_metin
@@ -532,6 +532,9 @@ def odev_listesi_metni(rows: list[dict[str, Any]], simdi: datetime, sebit: Any =
 # (dashboard_api._canli_*). No callable, no declaration — as with odev_listesi.
 PROGRAM_TOOL = "ders_programi"
 SINAV_TOOL = "sinavlar"
+# MEB konu-soru dağılım senaryoları (spec 2026-10-19 §6): declared beside `sinavlar` when the
+# scenario table is readable.
+SENARYO_TOOL = "sinav_senaryosu"
 TAKVIM_TOOL = "takvim"
 ICERIK_TOOL = "ders_icerigi"
 NOT_TOOL = "notlar"
@@ -846,6 +849,9 @@ def sinavlar_metni(sinavlar: Any, simdi: datetime) -> str:
                            if isinstance(k, dict) and k.get("tur") != "takvim"), None)
             if kaynak:
                 metin += f"\n  Kaynak: {kaynak.get('etiket')} — “{_kirp(str(kaynak.get('alinti') or ''), 160)}”"
+            s = e.get("senaryo")
+            if isinstance(s, dict):
+                metin += f"\n  MEB senaryosu: {sinav_senaryo.ozet(s)} — ayrıntı için {SENARYO_TOOL}"
         return metin
 
     parcalar = [bas + " (Sınavlar sayfasının listesi: portal takvimi, ders duyuruları ve not tablosu)"]
