@@ -26,8 +26,8 @@
 
 | Kaynak | Ne | Boyut/karakter | Kullanım |
 |---|---|---|---|
-| **Carbon Icons** (`@carbon/icons`, MIT) | İşlevsel UI ikonu | 16/20/24/32px, tek renk, geometrik | Buton/durum/navigasyon: onay, kapat, ok, yıldız, fikir |
-| **Carbon Pictograms** (`@carbon/pictograms`, MIT) | Kavramsal illüstrasyon | ~48px+, ince çizgi, daha betimleyici | Segment başlığı, ödül, konu temsili: kitap, laboratuvar, roket |
+| **Carbon Icons** (`@carbon/icons`, MIT) | İşlevsel UI ikonu | 16/20/24/32px, tek renk, geometrik | Buton/durum/navigasyon: onay, kapat, ok, bilgi, yardım |
+| **Carbon Pictograms** (`@carbon/pictograms`, MIT) | Kavramsal illüstrasyon | en az 48px (Kanun M2.11), ince çizgi, daha betimleyici | Segment başlığı, konu temsili: kitap, laboratuvar, roket; ödül piktogramı yok (M3.10) |
 | **Özgün SVG** (elle) | Bespoke şema | Carbon görsel diline uygun | Kaynaktaki kavram diyagramı: etiketli hücre, su döngüsü, sayı doğrusu |
 
 **Karar kuralı:** İşlev → Carbon Icon. Kavram/konu temsili → Carbon Pictogram.
@@ -40,8 +40,8 @@ Kaynağa özgü açıklayıcı diyagram (mevcut piktogram yetmiyor) → özgün 
 https://unpkg.com/@carbon/icons/svg/32/<isim>.svg
 ```
 (örn. `.../svg/32/checkmark--filled.svg`, `.../svg/32/close.svg`,
-`.../svg/32/arrow--right.svg`, `.../svg/32/star--filled.svg`, `.../svg/32/idea.svg`,
-`.../svg/32/trophy.svg`, `.../svg/32/restart.svg`, `.../svg/32/information--filled.svg`,
+`.../svg/32/arrow--right.svg`, `.../svg/32/help.svg`, `.../svg/32/view.svg`,
+`.../svg/32/restart.svg`, `.../svg/32/information--filled.svg`,
 `.../svg/32/warning--filled.svg`, `.../svg/32/play--filled--alt.svg`).
 
 **Satır-içi sprite kalıbı (tercih edilen):** Tek-dosya güvenilirliği için ikonları
@@ -64,16 +64,15 @@ HTML başına bir gizli SVG sprite olarak göm, `<use>` ile çağır:
 > `web_fetch` ile gerçek SVG'yi çekip `<symbol>`'e göm. Erişim yoksa, §5'teki
 > hazır geometrik set güvenli yedektir.
 
-> **v1.1.0 — gömülü otantik sprite:** `assets/module-template.html` artık
-> **gerçek** Carbon varlıklarından üretilmiş tek bir satır-içi sprite taşır:
-> 15 ikon (`@carbon/icons`) + 8 piktogram (`@carbon/pictograms`), toplam 23 sembol.
+> **Gömülü otantik sprite:** `assets/module-template.html` **gerçek** Carbon
+> varlıklarından üretilmiş tek bir satır-içi sprite taşır (8 `pic-*`, 26 `ic-*`).
 > Üretim: `npm i @carbon/icons @carbon/pictograms` → her SVG'nin iç içeriği
-> `<symbol id="ic-*|pic-*" viewBox="0 0 32 32">` olarak çıkarılır. Tümü
-> `currentColor` ile çalışır (ikonlar fill-inherit; piktogramlar fill-inherit
-> ince-çizgi). Gömülü anahtarlar: `ic-check, ic-close, ic-arrow-right/left,
-> ic-chevron-right, ic-star, ic-info, ic-help, ic-restart, ic-renew, ic-flag,
-> ic-pause, ic-view, ic-light, ic-moon`; `pic-idea, pic-education, pic-rocket,
-> pic-growth, pic-trophy, pic-puzzle, pic-microscope, pic-magic`.
+> `<symbol id="ic-*|pic-*" viewBox="0 0 32 32">` olarak çıkarılır; tümü
+> `currentColor` ile çalışır. **Yazar piktogram olarak yalnız şu anahtarları yazar**
+> (Kanun §1 madde 6, M3.10): `pic-idea`, `pic-education`, `pic-rocket`, `pic-growth`,
+> `pic-puzzle`, `pic-microscope`, `pic-magic`. `ic-*` piktogram yerine yazılmaz; ödül
+> piktogramı ve ödül ikonları (kupa, yıldız) kullanılmaz. Bilinmeyen anahtar bugün
+> sessizce `pic-education`'a düşer (borç KB-32).
 
 ## 3. Carbon Pictograms — sourcing ve kullanım
 
@@ -82,10 +81,11 @@ HTML başına bir gizli SVG sprite olarak göm, `<use>` ile çağır:
 https://unpkg.com/@carbon/pictograms/svg/<isim>.svg
 ```
 (örn. `book`, `idea`, `rocket`, `microscope`, `chemistry`, `calculator`,
-`globe`, `notebook`, `trophy`, `puzzle`, `growth`, `education`, `magic_wand`).
+`globe`, `notebook`, `puzzle`, `growth`, `education`, `magic_wand`).
 
-**Karakter:** İnce çizgili (≈2px stroke), tek renk veya çift-ton; ~48–64px
-gösterilir. Segment başlığının yanında, ödül/rozet kartlarında, konu kapağında.
+**Karakter:** İnce çizgili (≈2px stroke), tek renk veya çift-ton; en az 48 px
+gösterilir (Kanun M2.11). Segment başlığının yanında ve konu kapağında; ödül ya da
+rozet kartı yoktur (M2.7).
 - Satır içi göm; renklendirmek için stroke/fill'i `currentColor`'a çevir ya da
   Carbon iki-ton kuralını koru.
 - Piktogram **dekoratif** ise `aria-hidden="true"`; **bilgi taşıyorsa**
@@ -103,27 +103,27 @@ Kaynaktaki bir kavram bespoke diyagram gerektirdiğinde (mevcut piktogram yetmez
 - **viewBox:** Net oran, örn. `0 0 480 320`; responsive `width:100%;height:auto`.
 - **Stroke:** Tutarlı **2px** ana çizgi (`stroke-width:2`), `stroke-linecap:round`,
   `stroke-linejoin:round`. İnce ayrıntı 1px.
-- **Renk:** Yalnız Carbon paletinden (`carbon-child-system.md` §2–3). Çizgi
-  `--cds-text-primary` (#161616) veya aksan; dolgu açık tint (`color-mix` veya
-  Gray 10/20). **Gradyan yok** (ya da çok ölçülü, Carbon data-viz tarzı).
+- **Renk:** Yalnız `var(--cds-*)` ve `var(--viz-*)` (Kanun §1 madde 1, M4.7). Çizgi
+  `var(--cds-text-primary)` ya da `var(--viz-axis)`; dolgu `var(--cds-layer-02)` ya da
+  `var(--viz-1..5)`. Ham hex, renk karıştırma ve gradyan yok; ders rengi yazar SVG'sine
+  girmez (M1.5).
 - **Geometri:** Geometrik, sade, kavramsal — fotogerçekçi değil. Carbon
   pictogram estetiğini taklit et (temiz formlar, yuvarlatılmış köşeler).
-- **Etiketler:** Diyagram parçaları IBM Plex Sans ile etiketlenir (`<text
-  font-family="IBM Plex Sans" font-size="14" fill="#161616">`); etiket çizgileri
-  ince (1px), aksan rengi.
+- **Etiketler:** Diyagram parçaları `<text>` ile etiketlenir; yazı tipini ve rengini CSS
+  verir (`.viz text`). Metin ekranda en az 12 px çizilir (Kanun M5.6); etiket çizgileri
+  ince (1px), `var(--viz-axis)`.
 - **Boşluk:** Ferah; öğeler kalabalık değil (dış yük, ped İlke 5).
 
 **Örnek iskelet (etiketli kavram diyagramı):**
 ```html
-<svg viewBox="0 0 480 320" role="img" aria-labelledby="t1 d1"
-     style="width:100%;height:auto" font-family="IBM Plex Sans">
+<svg class="viz" viewBox="0 0 480 320" role="img" aria-labelledby="t1 d1">
   <title id="t1">Bitki hücresi</title>
   <desc id="d1">Hücre duvarı, çekirdek ve kloroplastları gösteren basit şema.</desc>
   <rect x="40" y="40" width="400" height="240" rx="16"
-        fill="#e5f6f5" stroke="#009d9a" stroke-width="2"/>
-  <circle cx="240" cy="160" r="44" fill="#ffffff" stroke="#161616" stroke-width="2"/>
-  <text x="240" y="166" text-anchor="middle" font-size="14" fill="#161616">Çekirdek</text>
-  <!-- ek organeller + etiket çizgileri (1px, #009d9a) -->
+        fill="var(--cds-layer-02)" stroke="var(--viz-2)" stroke-width="2"/>
+  <circle cx="240" cy="160" r="44" fill="var(--cds-layer-01)" stroke="var(--cds-text-primary)" stroke-width="2"/>
+  <text x="240" y="166" text-anchor="middle">Çekirdek</text>
+  <!-- ek organeller + etiket çizgileri (1px, var(--viz-axis)) -->
 </svg>
 ```
 **Kural:** Çizilen şema kaynaktaki bilgiyi temsil eder; **kaynakta olmayan yapı/
@@ -142,17 +142,15 @@ estetiğiyle tutarlıdır ve doğru render olur. Şablonun sprite'ında bulunur:
 | `ic-close` | hata | yanlış cevap |
 | `ic-arrow-right` | ileri | devam butonu |
 | `ic-arrow-left` | geri | geri butonu |
-| `ic-star` | yıldız | XP/başarı |
-| `ic-idea` | fikir/ampul | ipucu |
-| `ic-trophy` | kupa | rozet/bitiş |
+| `ic-help` | yardım | ipucu |
 | `ic-restart` | yeniden | tekrar dene |
 | `ic-info` | bilgi | açıklama/ipucu |
 | `ic-flag` | hedef | öğrenme hedefi |
 | `ic-pause` | mola | brain-break |
-| `ic-flip` | çevir | flashcard |
+| `ic-view` | göster | flashcard çevir |
 
-(Path tanımları `assets/module-template.html` sprite'ında; oradan kopyalanır
-veya yeni ihtiyaç için aynı stilde — 32 grid, currentColor, geometrik — eklenir.)
+(Path tanımları `assets/module-template.html` sprite'ında. Yazar yalnız sprite'taki
+`id`'leri yazar; ödül ikonları kullanılmaz (Kanun M3.10). Yeni ikon şablon değişikliğidir.)
 
 ## 6. Erişilebilirlik ve renk
 
@@ -160,7 +158,8 @@ veya yeni ihtiyaç için aynı stilde — 32 grid, currentColor, geometrik — e
 - **Bilgi taşıyan** görsel (diyagram, hotspot): `role="img"` + `<title>` (+`<desc>`).
 - İkon **tek başına anlam taşımaz**: durum daima ikon **+ metin** (renk üçüncü
   kanal). Örn. yanlış = kırmızı + `ic-close` + "Tekrar dene".
-- İkon boyutu okunur: durum ikonları ≥20px; piktogramlar ≥48px.
+- İkon yalnız Carbon boylarındadır (16, 20, 24, 32 px; durum ikonu ≥ 20 px); piktogram
+  ≥ 48 px (Kanun M2.11).
 - Kontrast: ikon rengi zemine karşı ≥3:1; aksan ikonları açık zeminde test edilir.
 - Emoji **asla**; emoji görsel anlam taşımak için kullanılmaz (SKILL.md §3, kalite
   kapısı G-EMOJI).

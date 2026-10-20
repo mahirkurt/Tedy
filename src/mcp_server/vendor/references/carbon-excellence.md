@@ -98,6 +98,9 @@ Kaynak: [Motion — Overview](https://carbondesignsystem.com/building-blocks/fou
    geçişin süresi **100–300ms** bandında kalır (Carbon `moderate-01/02` = 150/240ms
    bu bandın içindedir). Daha uzun/daha stagger'sız bir "hepsi birden" geçiş, ya da
    500ms'yi aşan bir sahne-girişi, dikkat dağıtıcı ve DEHB için maliyetlidir.
+   TEDY modülünde bölüm ve liste girişinde hareket yoktur; bu bütçe yalnız okurun eylemine
+   cevap veren harekete uygulanır, productive easing ile ve en çok `moderate-02` (Kanun M2.10,
+   adlı sapma KS-10).
 
 ### 2.5 Tipografi (10)
 Kaynak: [Typography — Type Sets](https://carbondesignsystem.com/building-blocks/foundations/typography/type-sets/) ·
@@ -162,12 +165,10 @@ Kaynak: [Data Viz — Color Palettes](https://carbondesignsystem.com/building-bl
     tonları) bir palet kullanır; artı/eksi veya orta-noktalı veri (ör. bir eşiğin
     üstü/altı) **diverging** (iki uçtan orta-nötre giden) bir palet kullanır —
     kategorik paleti sıralı/diverging veri için kullanmak kategori-kodlama hatasıdır.
-    > **Motor notu:** motor bugün 5 `--viz-1..5` yuvası taşır (`color-system.md` §7).
-    > Bu yuvalar Carbon'un kategorik tonlarından **anlam renklerini dışarıda bırakan bir
-    > TEDY alt kümesidir** (S19), resmî bir Carbon grubu değildir: açık temada
-    > purple70 · blue80 · cyan50 · teal60 · magenta70, `@carbon/charts`'ın iki 5-renk
-    > grubundan hiçbirine uymaz (ikisi de Red 90 içerir). Yuvaların yeniden seçimi bir
-    > şablon değişikliğidir — **açık madde**; bu belge şablonu değiştirmez.
+    > **Motor notu:** motor 5 `--viz-1..5` yuvası taşır (`color-system.md` §7). 2026-10-15'ten
+    > beri bunlar kategori rengi değil **nötr gri rampadır** (S19, adlı sapma KS-3): açık temada
+    > gray100 · gray90 · gray80 · gray70 · gray60. Kategoriyi yerinde etiket ve alt çizgi biçimi
+    > taşır; ders aileleri ve anlam renkleri grafik rengi olmaz.
 13. **İçgörü-taşıyan başlık + tam anatomi.** Her grafik şu üç öğeyi eksiksiz taşır:
     (a) veriyi **özetleyen/içgörü-taşıyan** (qualitative) bir başlık — "Aylık Satışlar"
     gibi nötr bir etiket değil, "Satışlar Mart'ta %18 arttı" gibi bulguyu adlandıran
@@ -204,16 +205,17 @@ Aşağıdakiler 15 maddeyi Carbon'un güncel rehberiyle inceltir (Carbon MCP `do
 - **Madde 1 — kırılımlar ve mini birim.** Carbon kırılımları: sm 320 · md 672 · lg 1056 ·
   xlg 1312 · max 1584 px (…/foundations/2x-grid/overview/#breakpoints). 2x Grid'in temel
   birimi **8 px mini birimdir**; 2 px yalnız en küçük aralık adımıdır
-  (…/foundations/2x-grid/overview/#mini-unit). Bugün motor tek 880 px okuma sütunu ve özel
-  560/400 px kırılımları kullanır, pano 672 px'te geçer; motorun 16 sütuna geçmesi açık maddedir.
+  (…/foundations/2x-grid/overview/#mini-unit). Kanun M5.9'a göre modülün kırılımları `.wrap`
+  kapsayıcı sorgusudur (sm 20rem, md 42rem; adlı sapma KS-12) ve modülde `@media` genişlik sorgusu
+  yoktur; motorun bugünkü 560/400 px medya sorguları borç KB-28.
 - **Madde 2 — en-boy oranı.** Carbon uyarlanır ve seyrek oranlara da izin verir; oran kırılımda
   değişebilir (…/foundations/2x-grid/guidelines/#adaptive-aspect-ratios). "Serbest oran =
   jenerik" hükmü Carbon'dan **katıdır**; bilinçli bir edupedia sıkılaştırması olarak okunur.
 - **Madde 4 — yüzen yüzey.** Carbon gölgesi `0 2px 6px 0 rgba(0,0,0,.2)` yalnız üstte açılan
   menü/popover içindir (…/core/components/dropdown/guidelines/#elevation); popover köşesi
-  2 px'tir (…/core/components/popover/guidelines/#corners). *Adlı Tedy istisnaları:*
-  `.topbar` ve `.stage` açık temada `--tedy-shadow-card` taşır (G-CARBON-GRID seçici listesi
-  dışında, `tedy-integration.md` §4); tanım popover'ı ve satır içi terim vurgusu (`mark.term`) 4 px köşe kullanır.
+  2 px'tir (…/core/components/popover/guidelines/#corners). Statik yüzeyde gölge istisnası
+  yoktur: `.topbar` ve `.stage` gölgesi 2026-10-15'te kalktı (S11, `tedy-integration.md` §4);
+  tanım popover'ı 2 px, satır içi terim vurgusu (`mark.term`) 0 köşe kullanır.
 - **Madde 5 — bağlamsal token doğru okunuşu.** Carbon v11'de numarasız adlar (`--cds-layer`,
   `--cds-layer-hover`, `--cds-field`, `--cds-border-subtle`, `--cds-border-strong`) **bağlamsal
   token'dır**: değerlerini çevreleyen `Layer` iç içeliği belirler, numarayı düşürmek bir
@@ -225,14 +227,13 @@ Aşağıdakiler 15 maddeyi Carbon'un güncel rehberiyle inceltir (Carbon MCP `do
   ease-out (entrance) eğrisiyle, 90–120 ms statik sürede biter; `duration-fast-01` (70 ms)
   düğme/anahtar, `duration-fast-02` (110 ms) solma içindir
   (…/foundations/motion/overview/#duration-tokens). Motorun `--dur-fast` (110 ms) bandın
-  içindedir ama standard eğri kullanır. "+N XP" yükselişi `duration-slow-02` (700 ms) koşar ve
-  G-CARBON-GRID onu görmez (yalnız literal `Nms` okur); 2026-10-10'dan beri adlı istisna değil,
-  kalkacak bir ödül hareketidir (talimatname S43, borç B73).
+  içindedir ama standard eğri kullanır. "+N XP" yükselişi 2026-10-11'de kalktı (S43, B73);
+  modülde hareket yalnız okurun eylemine cevaptır (Kanun M2.10).
 - **Madde 10 — tip seti.** Productive set ürün arayüzü, expressive set editoryal sayfalar
   içindir (…/foundations/typography/style-strategies/#overview). Modülde expressive/fluid
   stil yalnız kap dışı, sayfa düzeyi başlıkta kullanılır; kart, seçenek ya da soru bloğu içinde
-  asla. `mathExpr` ve `.lead` çekme alıntısındaki Plex Serif bilinçli bir set harmanlamasıdır,
-  madde 10'un "MCQ şıkkında serif hero" anti-kalıbı değildir.
+  asla. Plex Serif yalnız `mathExpr` gösteriminde kalır (Kanun M1.9, KS-9; `.lead` serifi borç
+  KB-15); bu bilinçli set harmanlaması madde 10'un "MCQ şıkkında serif hero" anti-kalıbı değildir.
 - **Madde 11 — tek yüksek vurgulu düğme.** Bir düzen ya da düğme grubunda tek yüksek vurgulu
   (birincil) düğme bulunur; kalan eylemler daha düşük vurgudadır
   (…/core/components/button/guidelines/#multiple-button-emphasis). Kontrol + İleri çifti
@@ -253,23 +254,24 @@ Aşağıdakiler 15 maddeyi Carbon'un güncel rehberiyle inceltir (Carbon MCP `do
   4,5:1 sağlar (…/foundations/icons/guidelines/#color); etkileşimli ikonun dokunma hedefi
   ≥ 44 px'tir (…/foundations/icons/guidelines/#touch-targets; Tedy `--tap: 48px`).
   `icon-pictogram-svg.md` §6'daki 3:1 yalnız bilgi taşıyan grafik parçası içindir.
-  Motor ikonları bugün kesirli rem boyutlarındadır — açık madde.
+  Motor ikonları bugün kesirli rem boyutlarındadır — borç KB-32 (Kanun M2.11: 16, 20, 24, 32 px).
 - **Madde 15 — piktogram asgarisi.** Piktogram en az 48 px'tir
   (…/foundations/pictograms/guidelines/#sizing). Motorun bölüm başı (32 px) ve kart (30 px)
-  piktogramları bunun altındadır — borç, şablon değişikliği.
+  piktogramları bunun altındadır — borç KB-32 (Kanun M2.11).
 - **Durum göstergesi.** Carbon durumu dört öğeyle kurar (ikon, şekil, renk, etiket) ve WCAG
   için **en az üçünü** ister (…/core/patterns/status-indicators/#visual-guidance); renk tek
   başına durum söylemez (`color-system.md` §2 kural 3). Yükleniyor hâli iskelet kalıbıdır
   (…/core/patterns/loading/#skeleton-states).
 - **Callout ve ilerleme göstergesi.** Callout statik, bağlamsal ve kapatılamazdır; 3 px sol
   kenar, en az 48 px yükseklik (…/core/components/notification/guidelines/#callout).
-  Şablonun 4 px kenarı ve 8 px köşesi adlı Tedy sapmasıdır. İlerleme göstergesinde
+  Şablonun 4 px kenarı ve 8 px köşesi sapma değil borçtur (Kanun M2.3, KB-20). İlerleme göstergesinde
   tamamlanan ve geçerli adım `$interactive`, etkin olmayan çizgi `$border-subtle`'dır
   (…/core/components/progress-indicator/specifications/#color); stepper'ın `button-primary`
-  dolgusu g100'de farklı çizer.
+  dolgusu g100'de farklı çizer (Kanun M2.4, borç KB-2).
 - **Tema ve marka bölgesi.** Carbon, kullanıcı seçimi yoksa işletim sistemi temasına uyar
-  (…/foundations/themes/code/#system-preferences); Tedy panosu tek g10'dur ve modül panonun
-  temasını alır — kullanıcıya ait **açık ürün kararı** (S14). Lacivert Tedy bandı, açık sayfada
+  (…/foundations/themes/code/#system-preferences); modül sistem tercihine bakmaz, temayı yalnız
+  panodan alır (Kanun M4.1, adlı sapma KS-7). Lacivert Tedy bandı (yalnız tek başına açılışta,
+  M1.1), açık sayfada
   Carbon'un "yüksek kontrast anı" (…/foundations/color/overview/#high-contrast-moments)
   biçiminde adlı bir marka bölgesidir.
 
@@ -327,7 +329,7 @@ maddeyi listeler — küme zamanla genişleyebilir, daralmaz.
 | 6 | Gövde metni tam genişlik (edge-to-edge) | Gövde metni 8–10 sütun ölçüsünde, geniş gutter |
 | 7 | Sayfa yoğun bölümlerde duvardan-duvara | Bölümler arası düşey ritim (spacing-07..10) her zaman |
 | 8 | Her yerde aynı tek `ease-in-out` | Entrance/exit/standard — anlamla eşleşen 3 aile |
-| 9 | Liste tek seferde/gecikmesiz belirir ya da >500ms sürer | ~20ms/öğe stagger, toplam <500ms, tek geçiş 100–300ms |
+| 9 | Liste tek seferde/gecikmesiz belirir ya da >500ms sürer | TEDY modülünde bölüm ve liste girişi hareketsiz (Kanun M2.10); okur eylemine cevap productive, en çok 240ms |
 | 10 | Bir MCQ şıkkına akışkan/serif hero fontu | Gövde/quiz her zaman productive; expressive yalnız hero |
 | 11 | Kategori aksanı birincil butona da uygulanır | Birincil eylem her zaman Blue 60; aksan yalnız yapısal |
 | 12 | Grafik serileri keyfi/rastgele renk sırasında | Carbon kategorik sırası (anlam renkleri hariç, S19); sıralı=sequential, ±=diverging |

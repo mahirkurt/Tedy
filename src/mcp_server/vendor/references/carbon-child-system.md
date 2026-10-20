@@ -5,9 +5,10 @@
 > birebir hizalanmıştır. Çocuk-dostu uyarlamalar gerekçeleriyle işaretlenmiştir
 > (§7). Token'lar `assets/module-template.html` içindeki `:root` /
 > `[data-theme]` bloklarında uygulanır; **şablonu kullanın, yeniden
-> tanımlamayın** — yalnız aksan/temayı derse göre ayarlayın. v3 (şablon v1.9.0):
-> varsayılan tema **g10** (Tedy panosu), Tedy katmanı (`tedy-*`) ve Tedy köşe/bant/
-> oyunlaştırma kuralları — ayrıntı `tedy-integration.md`.
+> tanımlamayın**. Aksan ve tema yazar tarafından ayarlanmaz (Kanun M4.1, M4.5). v3: tema
+> panodan gelir (bugün **g10**), Tedy katmanı (`tedy-*`) ve Tedy köşe/bant kuralları;
+> oyunlaştırma yoktur — ayrıntı `tedy-integration.md`. Tasarım kararında TEDY Modül
+> Tasarım Kanunu (`edupedia_rehber('kanun')`) önceliklidir.
 
 **Provenans (otorite çıkarımı):**
 `@carbon/themes@11.75.0` · `@carbon/type@11.61.0` · `@carbon/motion@11.46.0` ·
@@ -192,12 +193,13 @@ bildirimlerinin kanonik kaynağıdır; `@carbon/themes@11.75.0` ile birebirdir:
 
 ## 3. Ders renk sistemi (Tedy, v2.1)
 
-Her ders bir **alana**, her alan bir **Carbon Tag ailesine** bağlanır; renk yalnız
-**odak çapalarında** görünür: bölüm ikon karosu, `kicker`, seçili seçenek halkası, anlatım
-kutularının sol çizgisi, tanım etiketi, zaman çizelgesi düğümü. Üst bant Tedy laciverdidir;
-ilerleme göstergesi Carbon `interactive`'dir. Seçim önceliği: `meta.accent` (yalnız bir aile
-adı: `magenta`, `purple`, `teal`, `cyan`, `blue`, `warm-gray`, `cool-gray`, `gray`) →
-`meta.subjectKey`/`meta.subject` üzerinden alan tablosu → `genel` (gri).
+Her ders bir **alana**, her alan bir **Carbon Tag ailesine** bağlanır; renk modülün içinde
+yalnız Kanun M1.5'in çapalarında görünür: kavram yüzeylerinin 4 px kenarı, vurgulu terimin ve
+kavram çipinin tint zemini, kavram çipinin ders kenarı, segment ikonunun tint zemini (şablondaki
+daha geniş kullanım borç KB-16, KB-17). Üst bant Tedy laciverdidir; ilerleme göstergesi Carbon
+`interactive`'dir. Ders `meta.subjectKey`/`meta.subject` üzerinden alan tablosuyla çözülür →
+`genel` (gri). `meta.accent` yazılmaz (Kanun M4.5); derleyici bir aile adını bugün hâlâ kabul
+eder (borç KB-24).
 
 | Alan | Aile | Örnek dersler |
 |---|---|---|
@@ -225,7 +227,7 @@ konuşmaz.
 > **v2.1 değişikliği:** `SUBJECT_ACCENT` (hex) tablosu, `ACCENT_STRONG` çiftleri ve
 > `setAccent()`'in `color-mix`/`mix()` türetmesi kaldırıldı. Yeşil (Din) ve kırmızı artık ders
 > rengi değildir; Türkçe magenta, sosyal camgöbeği, yabancı diller mavidir. Derleyici hex
-> `meta.accent`'i reddeder.
+> `meta.accent`'i reddeder; Kanun M4.5'e göre `meta.accent` hiç yazılmaz (borç KB-24).
 
 ## 4. Tipografi — IBM Plex + tip otoritesi
 
@@ -261,7 +263,7 @@ kanıtı sistemde tesadüfen kurulu bir Plex yüzüne değil gömülü bloba day
 | body-02 | 1rem | `--fs-body` gövde | **1.125rem (18px)** / lh 1.6 | boyut ↑ (bkz. §7) |
 | label-01 | .75rem / ls .32px | `--fs-label` etiket | **.875rem** / `--ls-label:.32px` | boyut ↑, letter-spacing otoriteyle aynı |
 | code-02 | .875rem / ls .32px | mono sayı/sayaç | 1rem mono / ls .32px | boyut ↑ |
-| display | — | `--fs-display` modül başlığı | 2.5rem / 600 / lh 1.2 | edupedia eklentisi |
+| display | — | `--fs-display` modül başlığı | 2.5rem / 600 / lh 1.2 | borç KB-14: Kanun M1.8 modülün içindeki en büyük yazıyı `heading-04` ile sınırlar |
 
 > **Başlık ağırlığı (2026-10-10, talimatname S44):** başlık ağırlığı Carbon tip token'ından değişmeden gelir —
 > `heading-01/02` ve `heading-compact-01/02` 600, `heading-03`–`heading-05` 400, `heading-06/07` 300
@@ -307,11 +309,11 @@ Bolca beyaz alan (negative space) DEHB'de dış yükü azaltır; ekranlar ferah 
 | `--cds-duration-fast-01` | 70ms | Mikro durum (hover rengi) |
 | `--cds-duration-fast-02` | 110ms | Buton/tile durum geçişi |
 | `--cds-duration-moderate-01` | 150ms | Küçük açılır öğe |
-| `--cds-duration-moderate-02` | 240ms | Segment girişi, panel |
+| `--cds-duration-moderate-02` | 240ms | Geri bildirim, tanım balonu (modülde üst sınır, Kanun M2.10) |
 | `--cds-duration-slow-01` | 400ms | Büyük panel geçişi |
 | `--cds-duration-slow-02` | 700ms | Büyük sahne geçişi (nadiren) |
 
-**Easing'ler (productive = fonksiyonel/kısa · expressive = ifadeli/ödül):**
+**Easing'ler (productive = fonksiyonel/kısa · expressive = ifadeli; modülde yalnız productive, Kanun M2.10):**
 | Token | Bezier |
 |---|---|
 | `--cds-easing-standard-productive` | `cubic-bezier(.2, 0, .38, .9)` |
@@ -326,7 +328,8 @@ Bolca beyaz alan (negative space) DEHB'de dış yükü azaltır; ekranlar ferah 
 `--ease-exit`→exit-expressive · `--dur-fast`→fast-02 ·
 `--dur-mod`→moderate-02 · `--dur-slow`→slow-01.
 
-**Animasyon eşlemesi:** segment girişi (`segIn`) moderate-02 + entrance.
+**Animasyon eşlemesi:** bölüm girişinde hareket yoktur; hareket yalnız okurun eylemine cevaptır
+(Kanun M2.10; şablonun `segIn` girişi borç KB-18).
 **Ödül hareketi yok** (2026-10-10, talimatname S43; şablondan 2026-10-11'de kalktı, B73): XP yükselişi,
 XP nabzı, rozet belirişi ve seri vuruşu yoktur. **Yanıp sönme, sürekli döngü,
 parıltı yok** (foto-duyarlılık + dikkat).
@@ -349,9 +352,9 @@ sapmalar** çocuk + DEHB için yapılır ve `adhd-pedagogy.md`'ye dayanır:
 | Gövde boyutu | body-02 = 16px | 18px | Okunabilirlik + disleksi (ped §5) |
 | Başlık ağırlığı | Token'ın kendi ağırlığı | Token'ın kendi ağırlığı (2026-10-10, S44; şablon 2026-10-11'den beri uyar, B74) | Hiyerarşi boy ve token seçimiyle; tek karar (Tedy İ9) |
 | Dokunma hedefi | size Medium 40px | ≥48px (= Carbon size **Large**) | Motor + dürtüsellik (WCAG 2.5.5; ped §5) |
-| Aksan yoğunluğu | Ölçülü | Kategori-renk yalnız odak çapalarında (ikon, çizgi, seçim) | Uyarılma (ped İlke 5) + Tedy İ6 "uyaran bir bütçedir" |
+| Aksan yoğunluğu | Ölçülü | Ders rengi yalnız Kanun M1.5 çapalarında; seçim ve hover Carbon token'ıyla (M1.6) | Uyarılma (ped İlke 5) + Tedy İ6 "uyaran bir bütçedir" |
 | Hareket | Productive ağırlıklı | Productive; ödül anında hareket yok (S43; şablondan 2026-10-11'de kalktı, B73); anında geri bildirim metinle | Ped İlke 3'ün anında geri bildirimi metinle korunur; Tedy "kutlama yok" (anayasa §9), İ6 |
-| Piktogram | Seçici | Bol (her segment) | İkili kodlama (ped İlke 7) |
+| Piktogram | Seçici | Bol (her segment), en az 48 px (Kanun M2.11) | İkili kodlama (ped İlke 7) |
 
 > Bu sapmalar Carbon'un **token disiplinini bozmaz** — yalnız değerleri çocuk
 > bağlamına ayarlar; sapmayan her şey (renk, durum, spacing, hareket, harf
@@ -386,15 +389,15 @@ HTML/CSS karşılıkları) sadık biçimde uygular. Eşleme:
 
 | Carbon bileşeni | edupedia karşılığı | Token bağı |
 |---|---|---|
-| **Header (Tedy bandı)** | `.topbar__hero` — düz `tedy-brand` + Tedy işareti + `text-on-color` başlık; Tag çipleri `tedy-brand-hover` | `tedy-brand`, `text-on-color` |
-| **ProgressIndicator** (stepper) | `.stepper` — tamamlanan (`button-primary` dolgu + onay), mevcut (`interactive` halka), bekleyen (nötr); tamamlanana tıklanıp geri dönülür | `button-primary`, `interactive`, `border-strong-01` |
-| **Selectable Tile** | `.opt` — kare (`border-radius-00`); 1px `border-tile-01` → hover: nötr `layer-hover-02` + 2px aksan halka; seçili: ders tag zemini + halka; doğru/yanlış: `notification-background-success/error` + durum halkası | `border-tile-01`, `--accent`, `layer-hover-02`, `--subject-surface` |
+| **Header (Tedy bandı)** | `.topbar__hero` — yalnız tek başına açılışta (Kanun M1.1): düz `tedy-brand` + Tedy işareti + `text-on-color` başlık; ikon düğmesi hover'ı `tedy-brand-hover` | `tedy-brand`, `text-on-color` |
+| **ProgressIndicator** (stepper) | `.stepper` — tamamlanana tıklanıp geri dönülür. Kanun M2.4: tamamlanan ve geçerli adım `$interactive`, bekleyen `$icon-primary`, etiket `$text-primary`; adımlar 3–7 aşamadır (M2.5). Bugünkü `button-primary` dolgulu, etiketsiz segment adımları borç KB-2 | `button-primary`, `interactive`, `border-strong-01` |
+| **Selectable Tile** | `.opt` — kare (`border-radius-00`); 1px `border-tile-01`; hover `layer-hover`, seçili `border-inverse` kenar, odak `focus`; ders rengi almaz (Kanun M1.6; şablonun aksan halkası ve ders tag zemini borç KB-17); doğru/yanlış: `notification-background-success/error` + durum halkası | `border-tile-01`, `layer-hover-02`, `border-inverse`, `focus` |
 | **Inline notification** | `.feedback--ok/no/info` — 3px sol durum çubuğu + durum ikonu; koyu temada 1px `border-subtle-01` çerçeve | `support-*`, `notification-background-*` |
 | **Tag** | `.def-term` (ders ailesinin tag çifti + `tag-border`, hover `tag-hover`), `.adim-sayaci` (nötr adım etiketi) — `border-radius-max` | `--subject-surface/on-surface/border`, `layer-01` |
 | **Definition tooltip** | `.def-pop` — Carbon ters yüzey popover, `shadow-menu` | `background-inverse`, `text-inverse`, `shadow` |
-| **Button (primary/ghost)** | `.btn--primary` (Blue 60), `.btn--ghost` (1px kenar); kare; hover/active `background-hover/active` | `button-primary-*`, `background-*` |
-| **Icon button (ghost)** | `.icon-btn` — kare; bantta hover `tedy-brand-hover`, açık durum beyaz zemin + lacivert ikon | `tedy-brand-hover`, `text-on-color` |
-| **Data-viz donut** | `donutSvg()` — Carbon Charts paletiyle uyumlu SVG halka | `--viz-*` |
+| **Button (primary/ghost)** | `.btn--primary` (Blue 60), `.btn--ghost`; kare, lg 48 px, expressive tür, etiket sola yaslı, ikon etiketten sonra, ghost çerçevesiz (Kanun M2.2; ghost'un 1 px kenarı ve soldaki ikon borç KB-19); hover/active `background-hover/active` | `button-primary-*`, `background-*` |
+| **Icon button (ghost)** | `.icon-btn` — kare, lg 48 px, ikon 20 px, araç ipucunda adı (Kanun M5.14; bugün 40 px, borç KB-44); bantta hover `tedy-brand-hover`, açık durum beyaz zemin + lacivert ikon | `tedy-brand-hover`, `text-on-color` |
+| **Data-viz** | `vizChart()` / `vizTable()` — `--viz-1..5` nötr rampa, kategoriyi yerinde etiket taşır (KS-3); özet ekranında halka grafik yok (S43) | `--viz-*` |
 | **Skeleton** | (rezerve) yüklenme iskeleti | `skeleton-*` |
 
 İkonlar **gerçek `@carbon/icons`**, piktogramlar **gerçek `@carbon/pictograms`**
@@ -404,10 +407,10 @@ gömülür, `currentColor` ile tema/aksan rengini alır.
 ## 10. Gray-100 (dark) teması token'ları
 
 Tema **token-tabanlıdır**: `<html data-theme="g10|g100">` özniteliği tema
-bloğunu seçer (`white` yalnız eski kayıt); tüm bileşenler değişken okuduğu için yeniden
-render gerekmez. Üst çubuktaki ikon-buton (`ic-moon`/`ic-light`) g10 ↔ g100 geçişi yapar;
-pano temayı `edupedia:appearance` mesajıyla bildirir (öğrencinin kendi seçimi önceliklidir,
-`tedy-integration.md` §2). Kanonik blok (`@carbon/themes@11.75.0` g100 ile birebir; `tedy-*`
+bloğunu seçer; tüm bileşenler değişken okuduğu için yeniden render gerekmez. Modül temayı
+yalnız panodan alır (`edupedia:appearance`); tema düğmesi ve öğrencinin seçimi yoktur (Kanun
+M4.1; şablondaki düğme borç KB-1). g100 bloğu panonun bir gün geçeceği hedefin token
+eşlemesidir (M4.3; ölü `white` bloğu borç KB-22). Kanonik blok (`@carbon/themes@11.75.0` g100 ile birebir; `tedy-*`
 satırları Tedy katmanıdır):
 
 ```css
@@ -430,7 +433,7 @@ satırları Tedy katmanıdır):
   --cds-skeleton-background:#292929; --cds-skeleton-element:#393939;
   --cds-support-success:#42be65; --cds-support-error:#fa4d56;
   --cds-support-warning:#f1c21b; --cds-support-info:#4589ff;
-  --viz-1:#be95ff; --viz-2:#78a9ff; --viz-3:#33b1ff; --viz-4:#08bdba; --viz-5:#ff7eb6;
+  --viz-1:#f4f4f4; --viz-2:#e0e0e0; --viz-3:#c6c6c6; --viz-4:#a8a8a8; --viz-5:#8d8d8d; /* nötr rampa, KS-3 */
   --viz-grid:#393939; --viz-axis:#8d8d8d; --viz-track:#393939;
   --viz-sun:#fddc69; --viz-water:#33b1ff; --viz-cloud:#a8a8a8;
   /* Carbon koyu bildirim: zemin layer-01, anlamı 3px durum çubuğu + ikon taşır */
@@ -440,7 +443,6 @@ satırları Tedy katmanıdır):
   --tedy-page-background:#121619;
   --tedy-text-success:#6fdc8c; --tedy-text-error:#ffb3b8;
   --tedy-text-info:#a6c8ff; --tedy-text-warning:#ffb784;
-  --tedy-shadow-card:none;
 }
 ```
 
@@ -460,10 +462,10 @@ geçer (bkz. §3).
 kontrastı ~2.9:1 — **AA başarısız**.
 
 **Carbon-doğru çözüm:** birincil eylemler **her zaman Blue 60**
-(`--cds-button-primary`, beyaz metinle ~4.6:1 ✓) kullanır; kategori aksanı yalnız
-**metin-taşımayan yapısal/dekoratif** öğelerde kullanılır: tile seçimi, bölüm ikon
-karosu, başlık ve anlatım kutusu çizgileri, tag zemini, piktogramlar (v1.9.0: stepper
-Carbon `interactive`, üst bant `tedy-brand` taşır). Aksan-renkli
+(`--cds-button-primary`, beyaz metinle ~4.6:1 ✓) kullanır; ders rengi yalnız
+**metin taşımayan** Kanun M1.5 çapalarında kullanılır (kavram yüzeyi kenarı, terim ve çip
+tint zemini, segment ikonunun tint zemini); tile seçimi gibi durumlar Carbon token'ıdır
+(M1.6). Stepper Carbon `interactive`, üst bant `tedy-brand` taşır. Aksan-renkli
 **metin** her zaman `--accent-strong` (resmî tag çifti — kontrast-güvenli) ile
 yazılır; tamamlandı/doğru göstergeleri `--cds-support-success` (yeşil) kullanır.
 Bu, hem Carbon'un eylem-rengi tutarlılığını hem WCAG AA'yı sağlar.
@@ -478,16 +480,16 @@ ritmi kurmak. DEHB için bu, dikkat-dağıtıcı süs değil; segment türünü 
 | Öğe | Yüzey | Token |
 |---|---|---|
 | Sahne (varsayılan) | nötr kart | `--cds-layer-01` |
-| Segment ikon karosu (`.seg-ic`) | kare (`border-radius-08`), içinde piktogram; etkileşimde dolu aksan, anlatımda tag zemini, molada nötr (bkz. color-system.md §3) | `--subject-accent`/`--subject-surface` + `--subject-on-*` |
-| Çekme-alıntı (`.lead`) | nötr **çağrı kutusu** + 4px aksan sol çizgi, serif, **metin `--text-primary`** (her temada AA) | `--cds-layer-02` + `--accent` |
+| Segment ikon karosu (`.seg-ic`) | kare (`border-radius-08`), içinde piktogram; her segmentte ders tint zemini, molada nötr (Kanun M1.4; etkileşimdeki dolu karo borç KB-16; color-system.md §3) | `--subject-surface` + `--subject-on-surface` |
+| Çekme-alıntı (`.lead`) | nötr **çağrı kutusu** + 4px aksan sol çizgi, Plex Sans (serifi borç KB-15, Kanun M1.9), **metin `--text-primary`** (her temada AA) | `--cds-layer-02` + `--accent` |
 | Görsel (`.visual`) / Kavramlar (`.terms`) | yükseltilmiş çerçeveli yüzey | `--cds-layer-02` + `--border-subtle` |
-| Çağrı kutusu (`.callout`, `--info`/`--success`/`--warning`) | varsayılan nötr + aksan çizgi; varyantlar Carbon bildirim zemini + durum bar + ikon | `--cds-layer-02` / `notification-background-*` |
+| Çağrı kutusu (`.callout`, `--info`/`--success`/`--warning`) | Carbon callout anatomisi: köşe 0, 3 px sol kenar, ikon + başlık + metin, kapatılamaz (Kanun M2.3; bugünkü aksan çizgisi borç KB-17, 8 px köşe ve 4 px kenar borç KB-20); varyantlar Carbon bildirim zemini + durum bar + ikon | `--cds-layer-02` / `notification-background-*` |
 | **brainbreak** sahnesi | nötr kart; "mola" sinyalini büyük piktogram + başlık taşır; ikon karosu da nötr (v2.1) | `.stage[data-seg="brainbreak"]` → `layer-accent-01` + `icon-secondary` |
-| **checkpoint** sahnesi | üst 4px aksan kenarı (kilometre taşı) | `.stage[data-seg="checkpoint"]` |
+| **checkpoint** sahnesi | üst 4px aksan kenarı (kilometre taşı; Kanun M1.5 çapası değildir, borç KB-17) | `.stage[data-seg="checkpoint"]` |
 | **summary** sahnesi | nötr kart (v1.9.0: gradyan kaldırıldı — Tedy "kutlama yok") | `.stage[data-seg="summary"]` |
 
 **Kontrast güvencesi:** Anlatım kutuları nötr Carbon katmanıdır, kalan tint zeminler
-(`.seg-ic`, seçili seçenek, tanım etiketi) `--accent-tint`'tir (temaya göre çok açık/çok
+(`.seg-ic`, vurgulu terim, kavram çipi) `--accent-tint`'tir (temaya göre çok açık/çok
 koyu); üzerine **`--text-primary`** ya da resmî tag metni yazılır → g10, White ve Gray-100'de AA.
 Aksan yalnız bar/ikon/karo gibi **dekoratif** yüzeylerde; metin asla düşük-kontrast
 aksan renginde değil. `data-seg` özniteliği motor tarafından her segmentte sahneye
