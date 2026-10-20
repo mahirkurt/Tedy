@@ -92,3 +92,67 @@ def test_toplam_satiri_atlanir():
     _, sayfa = ders_sayfasi(tablolar(_html()), 7)
     assert len(sayfa["ciktilar"]) == 4
     assert sayfa["sinavlar"]["1"]["senaryolar"]["1"] == {"T.O.7.4": 1, "T.O.7.5": 1, "T.Y.7.21": 1}
+
+
+# --- Gerçek tablolarda ölçülen üç biçim (2026-10-20, Görev 2): fikstür gercek_bicimler.html ---
+GERCEK = Path(__file__).parent / "fixtures" / "odsgm" / "gercek_bicimler.html"
+
+
+def _gercek(sira):
+    """gercek_bicimler.html'in tek tablosu (ders_sayfasi ilk eşleşeni aldığı için tek tek verilir)."""
+    return tablolar(GERCEK.read_text(encoding="utf-8"))[sira:sira + 1]
+
+
+def test_sinif_basligi_nokta_sonrasi_bosluksuz_olabilir():
+    # Din Kültürü ve Matematik: "7.SINIF …" (Fen/Türkçe/Sosyal/İngilizce "7. SINIF …")
+    ders, sayfa = ders_sayfasi(_gercek(0), 7)
+    assert ders == "Din Kültürü"
+    assert [c["kod"] for c in sayfa["ciktilar"]] == ["DKAB.7.1.1", "DKAB.7.1.2"]
+    assert sayfa["ciktilar"][0]["konu"] == "Varlıklar Âlemi"
+    assert sayfa["sinavlar"]["1"]["senaryolar"] == {"1": {"DKAB.7.1.1": 1, "DKAB.7.1.2": 2},
+                                                    "2": {"DKAB.7.1.1": 1, "DKAB.7.1.2": 2}}
+
+
+def test_sinif_basligindaki_baska_sinif_yine_secilmez():
+    with pytest.raises(YapiHatasi, match="8. sınıf"):
+        ders_sayfasi(_gercek(0), 8)
+
+
+def test_kod_nokta_yerine_bosluk_taniyabilir():
+    # Sosyal Bilgiler: ilk satır "SB 7.1.1." (kardeşleri "SB.7.1.2."); kod noktalı biçime çevrilir, hücre atlanmaz
+    ders, sayfa = ders_sayfasi(_gercek(1), 7)
+    assert ders == "Sosyal Bilgiler"
+    assert [c["kod"] for c in sayfa["ciktilar"]] == ["SB.7.1.1", "SB.7.1.2"]
+    assert sayfa["ciktilar"][0]["metin"] == "Dâhil olduğu gruplarda ve sosyal hayatta etkili iletişimin önemini sorgulayabilme"
+    assert sayfa["sinavlar"]["1"]["senaryolar"]["1"] == {"SB.7.1.1": 2, "SB.7.1.2": 1}
+    assert sayfa["sinavlar"]["2"]["senaryolar"]["2"] == {"SB.7.1.1": 1}
+
+
+def test_kod_sinif_rakami_harfe_bitisik_olabilir():
+    # İngilizce: "E7.1.R1." (sınıf rakamı harfe bitişik, son parça beceri harfi + sıra)
+    ders, sayfa = ders_sayfasi(_gercek(2), 7)
+    assert ders == "İngilizce"
+    assert [c["kod"] for c in sayfa["ciktilar"]] == ["E7.1.R1", "E7.1.W1"]
+    assert sayfa["ciktilar"][1]["metin"] == "Students will be able to write simple pieces to compare people."
+    assert sayfa["sinavlar"]["1"]["senaryolar"]["2"] == {"E7.1.R1": 2, "E7.1.W1": 1}
+
+
+def test_bitisik_sinif_rakami_baska_sinifta_reddedilir():
+    html = GERCEK.read_text(encoding="utf-8").replace("E7.1.R1.", "E8.1.R1.")
+    with pytest.raises(YapiHatasi, match=r"E8\.1\.R1: 7\. sınıf kodu değil"):
+        ders_sayfasi(tablolar(html)[2:3], 7)
+
+
+def test_bosluklu_kod_bitisik_metinle_hala_reddedilir():
+    html = GERCEK.read_text(encoding="utf-8").replace("SB 7.1.1. Dâhil", "SB 7.1.1.Dâhil")
+    with pytest.raises(YapiHatasi, match="kodu okunamayan"):
+        ders_sayfasi(tablolar(html)[1:2], 7)
+
+
+def test_ayrik_ust_nokta_bilesik_harfe_cevrilir():
+    # Türkçe tablosunda 9 hücre "ü"yü u + birleşik ünlem noktası (NFD) yazıyor; metin ve ders eşleşmeleri NFC ister
+    html = _html().replace("Metnin yüzey", "Metnin yu" + chr(0x308) + "zey")
+    assert html != _html() and chr(0x308) in html
+    _, sayfa = ders_sayfasi(tablolar(html), 7)
+    assert sayfa["ciktilar"][1]["metin"] == "Metnin yüzey anlamını belirleyebilme"
+    assert chr(0x308) not in sayfa["ciktilar"][1]["metin"]

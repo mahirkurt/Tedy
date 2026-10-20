@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import re
 import sys
+import unicodedata
 from datetime import date
 from html.parser import HTMLParser
 from pathlib import Path
@@ -40,7 +41,12 @@ _BASLIK_DERSLERI = (("DİN KÜLTÜRÜ", "Din Kültürü"), ("FEN BİLİMLERİ", 
                     ("MATEMATİK", "Matematik"), ("TÜRKÇE", "Türkçe"),
                     ("SOSYAL BİLGİLER", "Sosyal Bilgiler"), ("İNGİLİZCE", "İngilizce"))
 _CIKTI_BASLIKLARI = ("Öğrenme Çıktıları", "Kazanımlar", "Kazanım")
-_KOD = re.compile(r"^([A-ZÇĞİÖŞÜ]{1,5}(?:\.[A-ZÇĞİÖŞÜ]{1,5})*\.(\d{1,2})\.\d{1,2}(?:\.\d{1,2})?)\.?\s+(\S.*)$")
+# Çıktı kodunun gerçek tablolarda ölçülen iki biçimi (2026-10-20):
+#  - "DKAB.7.1.1." (ön ek.sınıf.sıra); Sosyal'in bir satırında nokta yerine boşluk var ("SB 7.1.1.", kardeşleri "SB.7.1.2."):
+#    noktalı biçime çevrilir.
+#  - "E7.1.R1." (İngilizce: sınıf rakamı harfe bitişik, son parça beceri harfi + sıra): olduğu gibi tutulur.
+_KOD = re.compile(r"^([A-ZÇĞİÖŞÜ]{1,5}(?:\.[A-ZÇĞİÖŞÜ]{1,5})*)[. ](\d{1,2})\.(\d{1,2}(?:\.\d{1,2})?)\.?\s+(\S.*)$")
+_KOD_BITISIK = re.compile(r"^([A-ZÇĞİÖŞÜ]{1,5}(\d{1,2})\.\d{1,2}\.[A-ZÇĞİÖŞÜ]\d{1,2})\.?\s+(\S.*)$")
 _SINAV = re.compile(r"Dönem\s*(\d)\s*\.\s*Ortak")
 _SENARYO = re.compile(r"^Senaryo\s*(\d{1,2})$")
 _GUNCELLEME = re.compile(r"Güncelleme\s*:\s*(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})")
@@ -77,7 +83,8 @@ class _Tablolar(HTMLParser):
             self._derinlik -= 1
         elif tag in ("td", "th") and self._hucre is not None and self._satir is not None:
             metin, cs, rs = self._hucre
-            self._satir.append((" ".join(metin.split()), cs, rs))
+            # NFC: Türkçe tablosunda 9 hücre "ü"yü u + birleşik ünlem noktası olarak yazıyor (ölçüldü 2026-10-20)
+            self._satir.append((unicodedata.normalize("NFC", " ".join(metin.split())), cs, rs))
             self._hucre = None
 
     def handle_data(self, data):
@@ -125,12 +132,23 @@ def _ders(baslik: str) -> str:
     raise YapiHatasi(f"tablo başlığındaki ders tanınmadı: {baslik!r}")
 
 
+def _kod_oku(hucre: str) -> tuple[str, str, str] | None:
+    """Çıktı hücresi → (kod, kodun sınıfı, metin); kod biçimi tanınmazsa None."""
+    m = _KOD.match(hucre)
+    if m:
+        return f"{m.group(1)}.{m.group(2)}.{m.group(3)}", m.group(2), m.group(4).strip()
+    m = _KOD_BITISIK.match(hucre)
+    if m:
+        return m.group(1), m.group(2), m.group(3).strip()
+    return None
+
+
 def ders_sayfasi(izgaralar: list[list[list[str]]], sinif: int) -> tuple[str, dict]:
-    isaret = f"{sinif}. SINIF"
-    izgara = next((g for g in izgaralar if any(isaret in h for r in g[:3] for h in r)), None)
+    isaret = re.compile(rf"(?<!\d){sinif}\.\s*SINIF")   # "7. SINIF" (Din Kültürü ve Matematik'te "7.SINIF")
+    izgara = next((g for g in izgaralar if any(isaret.search(h) for r in g[:3] for h in r)), None)
     if izgara is None:
         raise YapiHatasi(f"{sinif}. sınıf tablosu yok")
-    ders = _ders(next(h for r in izgara[:3] for h in r if isaret in h))
+    ders = _ders(next(h for r in izgara[:3] for h in r if isaret.search(h)))
     h = next((i for i, r in enumerate(izgara) if any(x in _CIKTI_BASLIKLARI for x in r)), None)
     if h is None or h + 1 >= len(izgara):
         raise YapiHatasi("başlık satırı (Öğrenme Çıktıları) bulunamadı")
@@ -163,15 +181,15 @@ def ders_sayfasi(izgaralar: list[list[list[str]]], sinif: int) -> tuple[str, dic
     for r in izgara[h + 2:]:
         if cikti_s >= len(r):
             continue
-        m = _KOD.match(r[cikti_s])
-        if not m:
+        okunan = _kod_oku(r[cikti_s])
+        if okunan is None:
             # Kodsuz satır: bölüm/ünite başlığı (senaryo hücreleri boş) ya da TOPLAM altbilgisi atlanır;
             # senaryo hücresi dolu başka bir kodsuz satır, okunamayan bir çıktıdır ve sayıları sessizce düşerdi.
             dolu = any(c < len(r) and r[c].strip() for c, (_, sen) in sutunlar.items() if sen is not None)
             if dolu and not any("TOPLAM" in x for x in r[:cikti_s + 1]):
                 raise YapiHatasi(f"kodu okunamayan satır: {r[cikti_s]!r}")
             continue
-        kod, kod_sinifi, metin = m.group(1), m.group(2), m.group(3).strip()
+        kod, kod_sinifi, metin = okunan
         if kod_sinifi != str(sinif):
             raise YapiHatasi(f"{kod}: {sinif}. sınıf kodu değil")
         if any(c["kod"] == kod for c in ciktilar):
