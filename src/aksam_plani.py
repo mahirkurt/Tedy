@@ -188,6 +188,29 @@ def _bos_baslangic(t: int, d: int, sabit: list[tuple[int, int]]) -> int:
     return t
 
 
+SABIT_TURLER = ("yemek", "olay")
+
+
+def sabit_araliklar(bloklar: list[Blok]) -> list[tuple[int, int]]:
+    """Planın sabit blokları (yemek, takvim olayı, özel ders): (bas, bit) dakika."""
+    return [(b.bas, b.bit) for b in bloklar if b.tur in SABIT_TURLER]
+
+
+def baslamadi_esigi(duzen: dict, sabitler: list[tuple[int, int]]) -> int | None:
+    """"Başlamadı" eşiği: ödeve hazır saatinden sonraki, yemeğin ya da bir sabit bloğun (takvim olayı,
+    özel ders) kaplamadığı ilk dakika + `baslamadi_esik_dk`. Kartın "…'e kadar başlamazsan ailene
+    haber gider." cümlesi ve bildirim turunun "başlamadı" olayı bu tek yerden okur; saat şimdiye göre
+    kaymaz (17:00–18:00 özel ders varsa eşik ikisi için de 18:15). Hazırlığa kadar boş dakika yoksa
+    None: o akşam "başlamadı" haberi yoktur."""
+    hazir = dakika(duzen["odeve_hazir"])
+    yemek = dakika(duzen["yemek"])
+    tum = [(yemek, yemek + int(duzen["yemek_dk"]))] + [(int(b), int(e)) for b, e in sabitler]
+    ilk = _bos_baslangic(hazir, 1, tum)
+    if ilk >= dakika(duzen["hazirlik"]):
+        return None
+    return ilk + int(duzen["baslamadi_esik_dk"])
+
+
 # ----------------------------------------------------------------------------- motor
 
 def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen: dict,
@@ -204,9 +227,11 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
         return Plan(gun_s, [], [], [], eski, "okulsuz")
     simdi_dk = simdi.hour * 60 + simdi.minute
     hazir, hazirlik = dakika(duzen["odeve_hazir"]), dakika(duzen["hazirlik"])
-    if simdi_dk >= hazirlik:
-        return Plan(gun_s, [], [], [], eski, "bitti")
     anlik = _anlik_bloklar(gunluk, hazir)
+    if simdi_dk >= hazirlik:
+        # Hazırlıktan sonra yeni iş yerleşmez, ama dokunuşla belirlenmiş bloklar planda kalır: süren
+        # blok "Bitti" ile kapanabilsin (son parçanın sorusu dahil), biten blok akşamın kaydında dursun.
+        return Plan(gun_s, sorted(anlik.values(), key=lambda b: (b.bas, b.bit, b.id)), [], [], eski, "bitti")
     if not secilen and not anlik:
         return Plan(gun_s, [], [], [], eski, "plansiz")
 

@@ -95,6 +95,28 @@ def test_mola_bitti_sonraki_basladiysa_yok():
     assert "mola_bitti" not in turler(ab.olaylar(plan([a, b]), g, duzen(), an(17, 30)))
 
 
+def test_mola_bitti_planin_siradaki_baslangicinda_yemekte_gitmez():
+    """R28 I1: mola, planın sıradaki iş için verdiği başlangıçta biter. 18:28'de biten bloktan sonra yemek
+    18:30–19:00; sıradaki 19:00'da. Eskiden "bitiş + 5 dk" 18:33'te yemeğin ortasında gidiyordu."""
+    a = blok("a", 18 * 60 + 8, 18 * 60 + 28, "bitti")
+    yemek = Blok("y", "yemek", 18 * 60 + 30, 19 * 60, baslik="Yemek")
+    b = blok("b", 19 * 60, 19 * 60 + 20, ders="Matematik", adim="3 soru")
+    p = plan([a, yemek, b])
+    g = {"a": {"durum": "bitti", "basla": "18:08", "bitti": "18:28"}}
+    for dakika in (28, 33, 45, 59):
+        assert ab.olaylar(p, g, duzen(), an(18, dakika)) == [], dakika
+    assert turler(ab.olaylar(p, g, duzen(), an(19, 0))) == ["mola_bitti"]
+
+
+def test_baslamadi_esigi_ozel_dersten_sonra():
+    """R28 C1: 17:00–18:00 özel ders hazır saatini kaplar; "başlamadı" eşiği 18:15 (kartla aynı)."""
+    ders = Blok("o", "olay", 17 * 60, 18 * 60, baslik="Özel ders")
+    p = plan([ders, blok("a", 18 * 60, 18 * 60 + 20)])
+    assert ab.olaylar(p, {}, duzen(), an(17, 15)) == []
+    assert ab.olaylar(p, {}, duzen(), an(18, 14)) == []
+    assert turler(ab.olaylar(p, {}, duzen(), an(18, 15))) == ["baslamadi"]
+
+
 def test_sigmiyor():
     p = plan([blok("a", 17 * 60, 17 * 60 + 20, "suruyor")],
              sigmayan=[{"ders": "Türkçe", "baslik": "Kompozisyon", "kalan_dk": 40}])

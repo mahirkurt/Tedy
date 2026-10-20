@@ -22,13 +22,12 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterator, Literal
 
 from src import aksam_duzeni, web_push
-from src.aksam_plani import PlanDeposu, _dk
+from src.aksam_plani import PlanDeposu, _dk, baslamadi_esigi, sabit_araliklar
 from src.json_utils import atomic_json_dump
 from src.roles import OGRENCI_EMAILS, is_full
 
 SESSIZ_BAS = time(21, 0)
 SESSIZ_SON = time(7, 30)
-MOLA_KISA, MOLA_UZUN = 5, 10          # aksam_plani'ndakiyle aynı: iki bloktan sonra uzun mola
 DEFTER = PurePosixPath("output/aksam_bildirim_defteri.jsonl")
 DURUM = PurePosixPath("output/aksam_bildirim_durumu.json")
 DUZEN = PurePosixPath("output/aksam_duzeni.json")
@@ -101,16 +100,18 @@ def olaylar(plan: Any, gunluk: dict, duzen: dict, simdi: datetime) -> list[Olay]
 
     bitenler = [b for b in calisma if b.durum == "bitti"]
     siradaki = next((b for b in calisma if b.durum in ("bekliyor", "ertelendi")), None)
-    if bitenler and not suruyor and siradaki is not None:
+    # Mola, planın sıradaki iş için verdiği başlangıçta biter: plan molayı, yemeği ve takvim
+    # olaylarını zaten hesaba katmıştır, kart da "Planda HH:MM" der. Yemek sürerken gitmez.
+    if bitenler and not suruyor and siradaki is not None and simdi_dk >= siradaki.bas:
         son = max(bitenler, key=lambda b: (_bitis(b, gunluk), b.bas))
-        mola = MOLA_UZUN if len(bitenler) % 2 == 0 else MOLA_KISA
-        if simdi_dk >= _bitis(son, gunluk) + mola:
-            sonuc.append(_olay("mola_bitti", "ogrenci", son.id, "Mola bitti",
-                               f"Sırada {_ders(siradaki.ders, 'sıradaki iş')}: {_kirp(siradaki.adim, METIN_SINIRI)}."))
+        sonuc.append(_olay("mola_bitti", "ogrenci", son.id, "Mola bitti",
+                           f"Sırada {_ders(siradaki.ders, 'sıradaki iş')}: {_kirp(siradaki.adim, METIN_SINIRI)}."))
 
-    hazir = aksam_duzeni.dakika(duzen["odeve_hazir"])
-    esik = hazir + int(duzen["baslamadi_esik_dk"])
-    if calisma and simdi_dk >= esik and not any(b.durum in ("suruyor", "bitti") for b in calisma):
+    # Eşik kartın cümlesiyle aynı yerden (aksam_plani.baslamadi_esigi): hazır saatinden sonraki ilk boş
+    # dakika + bekleme; yemek ya da özel ders o saati kaplıyorsa eşik onun bitişinden sayılır.
+    esik = baslamadi_esigi(duzen, sabit_araliklar(plan.bloklar))
+    if (calisma and esik is not None and simdi_dk >= esik
+            and not any(b.durum in ("suruyor", "bitti") for b in calisma)):
         # Saat gönderim anıdır, eşik değil: geciken bir tur bayat saat söylemesin (R25, D4).
         sonuc.append(_olay("baslamadi", "aile", None, "Işık henüz başlamadı",
                            f"Saat {simdi:%H:%M}; bu akşamın ilk işi {_ders(calisma[0].ders, 'ödev')}."))

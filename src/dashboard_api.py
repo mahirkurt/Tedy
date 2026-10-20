@@ -52,8 +52,8 @@ from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.US
 from src import (aksam_duzeni, assistant_skills, module_progress, module_store, module_ticket,
                  mufredat_agaci, subject_themes)
 from src import claude_api
-from src.aksam_plani import (CalismaKayitlari, PlanDeposu, anlik_goruntu, plan_kur,
-                             saat_hali)
+from src.aksam_plani import (CalismaKayitlari, PlanDeposu, anlik_goruntu, baslamadi_esigi,
+                             plan_kur, saat_hali, sabit_araliklar)
 from src.odev_tahmini import ClaudeTahminOkuyucu, TahminDeposu
 
 load_env()
@@ -2044,25 +2044,31 @@ def _blok_json(blok):
     return d
 
 
-def _haber_metni(plan, duzen, okur="ogrenci"):
-    """Kartta gösterilen sakin cümle: ilk çalışma bloğunun saati + eşik geçince aileye haber gider.
-    Yalnız bildirim bayrağı açık ve haber alacak biri varken, plan akıyor ya da önizlemedeyken ve
-    hiçbir çalışma bloğu başlamamışken; yoksa None (R10). Hitap okura göre (R19): Işık'a "sen",
-    aileye (ve kim olduğu bilinmeyene) kişisiz cümle."""
-    if os.environ.get("TEDY_AKSAM_BILDIRIM") != "1" or not duzen.get("haber_alacaklar"):
+def _haber_metni(plan, duzen, simdi, okur="ogrenci"):
+    """Kartta gösterilen sakin cümle: "başlamadı" eşiği geçince aileye haber gider. Eşik bildirim
+    turununkiyle aynıdır (`aksam_plani.baslamadi_esigi`: hazır saatinden sonraki ilk boş dakika +
+    bekleme; şimdiye göre kaymaz) ve cümle yalnız o eşikten önce görünür: eşik geçince haber gitmiştir
+    ya da gitmektedir, kart artık ileride bir saat vaat etmez (C1). Yalnız bildirim bayrağı açık ve
+    turun bugün haber vereceği biri varken (`aksam_bildirim.alicilar`, ayardaki liste ∩ şu anki aile),
+    plan akıyor ya da önizlemedeyken ve hiçbir çalışma bloğu başlamamışken; yoksa None (R10). Hitap
+    okura göre (R19): Işık'a "sen", aileye (ve kim olduğu bilinmeyene) kişisiz cümle."""
+    from src.aksam_bildirim import alicilar
+    if os.environ.get("TEDY_AKSAM_BILDIRIM") != "1" or not alicilar(duzen)["aile"]:
         return None
     if plan.durum not in ("akis", "onizleme"):
         return None
-    calisma = sorted((b for b in plan.bloklar if b.tur == "calisma"), key=lambda b: (b.bas, b.bit))
+    calisma = [b for b in plan.bloklar if b.tur == "calisma"]
     if not calisma or any(b.durum in ("suruyor", "bitti") for b in calisma):
         return None
-    dk = calisma[0].bas + int(duzen["baslamadi_esik_dk"])
+    esik = baslamadi_esigi(duzen, sabit_araliklar(plan.bloklar))
+    if esik is None or simdi.hour * 60 + simdi.minute >= esik:
+        return None
     if okur == "ogrenci":
-        return f"{saat_hali(_dakika_saat(dk))} kadar başlamazsan ailene haber gider."
-    return f"{saat_hali(_dakika_saat(dk))} kadar başlanmazsa haber gider."
+        return f"{saat_hali(_dakika_saat(esik))} kadar başlamazsan ailene haber gider."
+    return f"{saat_hali(_dakika_saat(esik))} kadar başlanmazsa haber gider."
 
 
-def _plan_yaniti(plan, duzen, okur="ogrenci", aksam_yok=False):
+def _plan_yaniti(plan, duzen, simdi, okur="ogrenci", aksam_yok=False):
     """`aksam_yok`: ailenin o günkü "Bu akşam plan yok" anahtarı (R18). Tatil de `kapali` yapar ama
     anahtarı açmaz; kart ikisini bundan ayırır."""
     bloklar = [_blok_json(b) for b in plan.bloklar]
@@ -2072,7 +2078,7 @@ def _plan_yaniti(plan, duzen, okur="ogrenci", aksam_yok=False):
         "simdiki": next((b for b in calisma if b["durum"] == "suruyor"), None),
         "siradaki": next((b for b in calisma if b["durum"] in ("bekliyor", "ertelendi")), None),
         "tasinan": plan.tasinan, "sigmayan": plan.sigmayan, "planda_olmayan": plan.planda_olmayan,
-        "haber_metni": _haber_metni(plan, duzen, okur),
+        "haber_metni": _haber_metni(plan, duzen, simdi, okur),
         "aksam_yok": bool(aksam_yok),
     }
 
@@ -2080,7 +2086,7 @@ def _plan_yaniti(plan, duzen, okur="ogrenci", aksam_yok=False):
 def _plan_yaniti_simdi(simdi):
     """İstek içinde çağrılır: okur türü oturumdan okunur."""
     gunluk = PlanDeposu(_plan_koku()).gunluk(simdi.date().isoformat())
-    return _plan_yaniti(bugunku_plan(simdi), _aksam_duzeni_oku(), _assistant_okur(),
+    return _plan_yaniti(bugunku_plan(simdi), _aksam_duzeni_oku(), simdi, _assistant_okur(),
                         bool(gunluk.get("aksam_yok")))
 
 
@@ -2137,6 +2143,7 @@ def plan_blok_basla(blok_id):
     if blok is None:
         return _plan_blok_yok()
     gun, damga, yazildi, mesgul = simdi.date().isoformat(), simdi.isoformat(timespec="seconds"), [], []
+    simdi_dk = simdi.hour * 60 + simdi.minute
 
     def yaz(g):
         k = g.get(blok.id)
@@ -2145,7 +2152,12 @@ def plan_blok_basla(blok_id):
         if any(isinstance(v, dict) and v.get("durum") == "suruyor" for v in g.values()):
             mesgul.append(True)                          # tek süren blok
             return
-        g[blok.id] = {**(anlik_goruntu(blok) or {}), "durum": "suruyor", "basla": damga}
+        goruntu = anlik_goruntu(blok) or {}
+        if goruntu:
+            # Çapa Başla anıdır, planın öngördüğü saat değil (C2): kartın geri sayımı (bit − şimdi),
+            # motorun sonraki işleri dizişi ve bildirimin "süre doldu"su (basla + tahmin) aynı dakikadan.
+            goruntu["bas"], goruntu["bit"] = simdi_dk, min(1440, simdi_dk + blok.tahmin_dk)
+        g[blok.id] = {**goruntu, "durum": "suruyor", "basla": damga}
         g.setdefault("basladi", damga)
         yazildi.append(True)
     PlanDeposu(_plan_koku()).degistir(gun, yaz)
@@ -2183,6 +2195,8 @@ def plan_blok_bitti(blok_id):
         basla = k.get("basla")                           # başlatılmadan bitirildiyse None: kalibrasyona girmez
         goruntu = anlik_goruntu(blok) or {}
         if goruntu:                                      # gerçek bitiş: sıradaki blok ve mola buradan sayılır
+            # Başlatılmadan, öngörülen saatinden önce bitirilen blok gelecekte bitmiş görünmesin: şimdi biter.
+            goruntu["bas"] = min(goruntu["bas"], simdi_dk)
             goruntu["bit"] = min(1440, max(goruntu["bas"], simdi_dk))
         g[blok.id] = {**goruntu, "durum": "bitti", "basla": basla, "bitti": damga,
                       "tamamlandi": tamamlandi if son_parca else None}

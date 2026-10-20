@@ -394,3 +394,18 @@ def test_one_al_odevi_baslamamis_isin_en_basina_koyar():
     assert onceki[0] != "iki-gun-orta"
     p = kur(gunluk={"one_al": ["iki-gun-orta"]})
     assert calisma(p)[0].odev_anahtari == "iki-gun-orta"
+
+
+# ── R28 düzeltme turu ────────────────────────────────────────────────────────────
+
+def test_hazirliktan_sonra_suren_ve_biten_bloklar_planda_kalir():
+    """R28 küçük 1: 20:30'dan sonra yeni iş yerleşmez, durum "bitti"; ama anlık görüntüsü olan süren ve
+    biten bloklar planda kalır (süren blok "Bitti" ile kapanabilsin)."""
+    b0, b1 = calisma(kur())[:2]
+    gunluk = {b0.id: _goruntu(b0, "bitti", basla="20:00", bitti="20:15", bas=20 * 60, bit=20 * 60 + 15),
+              b1.id: _goruntu(b1, "suruyor", basla="20:20", bas=20 * 60 + 20, bit=20 * 60 + 40)}
+    p = kur(simdi="2026-10-19 20:35", gunluk=gunluk)
+    assert p.durum == "bitti"
+    assert [(b.id, b.durum) for b in p.bloklar] == [(b0.id, "bitti"), (b1.id, "suruyor")]
+    assert p.tasinan == [] and p.sigmayan == []
+    assert kur(simdi="2026-10-19 20:35").bloklar == []               # dokunuş yoksa eskisi gibi boş
