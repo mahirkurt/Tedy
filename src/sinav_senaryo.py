@@ -286,8 +286,8 @@ def senaryo_blogu(kayit: dict, metinler: list[tuple[str, str, bool]], tablo: dic
     anilan = sorted(cumleler)
     eslesme = {konu: konu_eslestir(konu, dt["ciktilar"]) for konu in kayit.get("konular") or []}
     eslesen = {konu: set(kodlar) for konu, kodlar in eslesme.items() if kodlar}
-    # "duyuruda" etiketi en iyi eşleşmede kalır; senaryo dışı kararı ve aday süzgeci eşiği geçen her çıktı ve
-    # konu grubunun birleşimiyle verilir.
+    # "duyuruda" etiketi en iyi eşleşmede kalır (o senaryoda yoksa kapsamda); senaryo dışı kararı ve aday süzgeci
+    # eşiği geçen her çıktı ve konu grubunun birleşimiyle verilir.
     kapsam = {konu: set(konu_kapsami(konu, dt["ciktilar"])) for konu in eslesen}
     blok = {"durum": None, "ders": ders, "sinav_no": no, "donem": tablo["kaynak"]["donem"], "anilan": anilan,
             "cumle": cumleler[anilan[0]] if anilan else None, "senaryo": None, "toplam": None, "dagilim": [],
@@ -307,7 +307,11 @@ def senaryo_blogu(kayit: dict, metinler: list[tuple[str, str, bool]], tablo: dic
             return blok
         n = gecerli[0]
         dagilim = senaryolar[str(n)]
-        duyuruda = set().union(*eslesen.values()) if eslesen else set()
+        # Konunun en iyi eşleşmesi senaryoda yoksa onu senaryoya bağlayan kapsam satırları işaretlenir: konu
+        # "senaryoda" sayılıyorsa kart onu taşıyan satırı da göstermeli.
+        duyuruda: set[str] = set()
+        for konu, kodlar in eslesen.items():
+            duyuruda |= kodlar if kodlar & set(dagilim) else kapsam[konu]
         blok.update(senaryo=n, cumle=cumleler[n], toplam=sum(dagilim.values()),
                     dagilim=[{"kod": c["kod"], "metin": c["metin"], "soru": dagilim[c["kod"]],
                               "duyuruda": c["kod"] in duyuruda} for c in dt["ciktilar"] if c["kod"] in dagilim])

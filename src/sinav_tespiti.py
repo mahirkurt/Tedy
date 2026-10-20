@@ -307,10 +307,21 @@ def tespit_et(kok: Path, veri: dict, taban: list[dict], simdi: datetime, bitis: 
     tablo = sinav_senaryo.tablo_oku()
     senaryo_hatalari: list[str] = []
     kayitlar = birlestir(taban, sonuc.bulgular, onceki, simdi, senaryolar=tablo, senaryo_hatalari=senaryo_hatalari)
-    hatalar = (["senaryo tablosu okunamadı"] if tablo is None else []) + senaryo_hatalari + list(sonuc.hatalar)
+    hatalar = ozet_hatalari(tablo_okundu=tablo is not None, senaryo_hatalari=senaryo_hatalari,
+                            cikarim_hatalari=list(sonuc.hatalar))
     return {"uretildi": simdi.isoformat(timespec="seconds"), "surum": SURUM, "sinavlar": kayitlar,
             "ozet": {"aday": sonuc.aday, "incelenen": sonuc.incelenen, "incelenmedi": sonuc.incelenmedi,
-                     "butce_usd": sonuc.butce_usd, "hatalar": hatalar[:5]}}
+                     "butce_usd": sonuc.butce_usd, "hatalar": hatalar}}
+
+
+def ozet_hatalari(*, tablo_okundu: bool, senaryo_hatalari: list[str], cikarim_hatalari: list[str]) -> list[str]:
+    """En çok 5 satır. Senaryo notları çıkarım ve bütçe hatalarının arkasında ve tek satırdadır: tablo yapısı
+    değişince her kayıt patlar ve beş not asıl hataları özetten iterdi."""
+    senaryo = senaryo_hatalari[:1]
+    if len(senaryo_hatalari) > 1:
+        senaryo = [f"{senaryo_hatalari[0]} (+{len(senaryo_hatalari) - 1} kayıt daha)"]
+    hatalar = (["senaryo tablosu okunamadı"] if not tablo_okundu else []) + cikarim_hatalari
+    return (hatalar[:5 - len(senaryo)] + senaryo)[:5]
 
 
 def kuru_rapor(belge: dict) -> str:

@@ -497,6 +497,13 @@ def test_i3_duyuruda_etiketi_en_iyi_eslesmede_kalir():
     assert {d["kod"] for d in blok["dagilim"] if d["duyuruda"]} == {"FB.7.3.6"}
 
 
+def test_i3_en_iyi_eslesme_senaryoda_yoksa_etiket_kapsamdaki_satira_gecer():
+    # Senaryo 4'te Solunum (FB.7.3.6) yok, Dolaşım (FB.7.3.3) var: konu "senaryoda" sayılıyorsa kart onu taşıyan
+    # satırı da "duyuruda" diye göstermeli; yoksa "1 konu bu senaryoda" yazıp hiçbir satırı işaretlemez.
+    blok = _fen_12(DOLASIM_SOLUNUM, senaryo=4)
+    assert {d["kod"] for d in blok["dagilim"] if d["duyuruda"]} == {"FB.7.3.3"}
+
+
 def test_i3_gercekten_olmayan_konu_yine_kismen():
     # Sindirim (FB.7.3.1/2) ve Solunum senaryo 4'te: Uzay konusunun hiçbir çıktısı senaryo 4'te yok.
     blok = _fen_12("Uzayda Neler Var?", senaryo=4)

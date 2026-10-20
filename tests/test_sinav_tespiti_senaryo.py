@@ -104,3 +104,17 @@ def test_m1_not_tablosundan_turetilen_kayit_blok_almaz():
               "grade": 90}]
     kayit = birlestir(taban, [], None, SIMDI, senaryolar=TABLO)[0]
     assert kayit["sentetik"] is True and "senaryo" not in kayit
+
+
+def test_ozet_hatalari_cikarim_hatasini_senaryo_notlarina_gommez():
+    # Tablo yapısı surum artmadan değişirse her kayıt patlar; özet (5 satır) çıkarım ve bütçe hatalarını yine taşımalı.
+    from src.sinav_tespiti import ozet_hatalari
+
+    senaryo = [f"senaryo eşleştirilemedi: Türkçe {n}. Yazılı" for n in range(1, 7)]
+    hatalar = ozet_hatalari(tablo_okundu=True, senaryo_hatalari=senaryo, cikarim_hatalari=["aylık bütçe doldu"])
+    assert "aylık bütçe doldu" in hatalar and len(hatalar) <= 5
+    assert sum(h.startswith("senaryo eşleştirilemedi") for h in hatalar) == 1
+    assert hatalar[-1] == "senaryo eşleştirilemedi: Türkçe 1. Yazılı (+5 kayıt daha)"
+    assert ozet_hatalari(tablo_okundu=False, senaryo_hatalari=[], cikarim_hatalari=["x"]) == [
+        "senaryo tablosu okunamadı", "x"]
+    assert ozet_hatalari(tablo_okundu=True, senaryo_hatalari=senaryo[:1], cikarim_hatalari=[]) == senaryo[:1]

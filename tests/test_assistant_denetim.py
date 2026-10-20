@@ -1,5 +1,6 @@
 """B6 karar ve elle değerlendirme sözleşmesi; bütün testler çevrimdışıdır."""
 import json
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -157,6 +158,8 @@ def test_altin_sorunun_araci_kosunun_asistaninda_bildirilir(tmp_path):
     from src.assistant_tools import TOOL_ALLOWLIST
 
     runtime = asistan_eval.runtime_olustur(tmp_path)
+    # sinav_senaryosu yalnız tablonun öğretim yılında bildirilir; test gerçek saate bağlı kalırsa 2027-09-01'de kırılır.
+    runtime.registry.saat = lambda: datetime(2026, 10, 20, 12, 0)
     bildirilmeyen = []
     for ders, sorular in asistan_eval.sorulari_yukle().items():
         arg = asistan_eval.soru_argumanlari(ders)
