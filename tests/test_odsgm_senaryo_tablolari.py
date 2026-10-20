@@ -78,3 +78,17 @@ def test_bilinmeyen_ders_reddedilir():
     html = _html().replace("7. SINIF TÜRKÇE DERSİ", "7. SINIF SEÇMELİ ASTRONOMİ DERSİ")
     with pytest.raises(YapiHatasi, match="ders"):
         ders_sayfasi(tablolar(html), 7)
+
+
+def test_kodu_okunamayan_satir_reddedilir():
+    # kod ile metin arasında boşluk yok: satır sessizce atılırsa Senaryo 2/3 toplamları eksik kalırdı
+    html = _html().replace("T.O.7.5. Metnin", "T.O.7.5.Metnin")
+    with pytest.raises(YapiHatasi, match="kodu okunamayan"):
+        ders_sayfasi(tablolar(html), 7)
+
+
+def test_toplam_satiri_atlanir():
+    # fikstürün son satırı TOPLAM (kodsuz, senaryo sütunları dolu): çıktı sayılmaz, reddedilmez
+    _, sayfa = ders_sayfasi(tablolar(_html()), 7)
+    assert len(sayfa["ciktilar"]) == 4
+    assert sayfa["sinavlar"]["1"]["senaryolar"]["1"] == {"T.O.7.4": 1, "T.O.7.5": 1, "T.Y.7.21": 1}

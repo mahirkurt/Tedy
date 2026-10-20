@@ -165,6 +165,11 @@ def ders_sayfasi(izgaralar: list[list[list[str]]], sinif: int) -> tuple[str, dic
             continue
         m = _KOD.match(r[cikti_s])
         if not m:
+            # Kodsuz satır: bölüm/ünite başlığı (senaryo hücreleri boş) ya da TOPLAM altbilgisi atlanır;
+            # senaryo hücresi dolu başka bir kodsuz satır, okunamayan bir çıktıdır ve sayıları sessizce düşerdi.
+            dolu = any(c < len(r) and r[c].strip() for c, (_, sen) in sutunlar.items() if sen is not None)
+            if dolu and not any("TOPLAM" in x for x in r[:cikti_s + 1]):
+                raise YapiHatasi(f"kodu okunamayan satır: {r[cikti_s]!r}")
             continue
         kod, kod_sinifi, metin = m.group(1), m.group(2), m.group(3).strip()
         if kod_sinifi != str(sinif):
