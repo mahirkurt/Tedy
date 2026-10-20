@@ -107,9 +107,19 @@
     color: var(--cds-text-secondary);
   }
 
+  // D3b phone gate: a tapped control is at least 44px. Carbon's own density variable lifts the buttons (it
+  // sizes the padding too, so the label stays centred; a min-block-size override leaves it at the top, B8).
+  // It is set on the buttons, not on the section: the "duyuruda" Tag reads the same variable and grew to 48px.
+  // The link is not a Carbon layout component, so it takes the same rule as the preview's links above.
   @media (max-width: 671px) {
     .cds--btn {
-      min-block-size: 3rem;
+      --cds-layout-size-height-min: 3rem;
+    }
+
+    &__alt a {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: spacing.$spacing-09;
     }
   }
 }

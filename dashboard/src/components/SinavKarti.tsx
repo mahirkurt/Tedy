@@ -1,6 +1,6 @@
 import { useId, useState, type MouseEvent, type ReactNode } from 'react'
 import { Button, ContainedList, ContainedListItem, Link as CarbonLink, Tag } from '@carbon/react'
-import { CheckmarkFilled, WarningAltFilled } from '@carbon/icons-react'
+import { CheckmarkFilled, Launch, WarningAltFilled } from '@carbon/icons-react'
 import { useNavigate } from 'react-router-dom'
 import { asistanaSor } from '../asistan/sayfaBaglami'
 import type { ExamItem } from '../types'
@@ -106,7 +106,8 @@ function MebSenaryoBolumu({ exam }: { exam: ExamItem }) {
         </>
       )}
       <p className="meb-senaryo__alt">
-        <CarbonLink href={exam.senaryo.kaynak} target="_blank" rel="noreferrer" size="sm">MEB tablosu ({g.kaynak})</CarbonLink>
+        {/* B58: a link that leaves the page says so with Carbon's Launch icon. */}
+        <CarbonLink href={exam.senaryo.kaynak} target="_blank" rel="noreferrer" size="sm" renderIcon={Launch}>MEB tablosu ({g.kaynak})</CarbonLink>
       </p>
       <Button kind="ghost" size="sm" onClick={sor}>Örnek sınav için asistana sor</Button>
     </div>

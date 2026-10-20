@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import { createRequire } from 'node:module'
 import AxeBuilder from '@axe-core/playwright'
 import { mock, LIVE } from './_audit-fixtures'
@@ -45,7 +45,10 @@ test('doğrulandı: cümle, ikon adı, liste klavyeyle açılır', async ({ page
   await expect(b.locator('.meb-senaryo__liste li')).toHaveCount(3)
   await expect(b.locator('.meb-senaryo__liste li').nth(1)).toContainText('2 soru · T.O.7.5')
   await expect(b.locator('.meb-senaryo__liste .meb-senaryo__etiket')).toHaveCount(2)
-  await expect(b.getByRole('link', { name: 'MEB tablosu (MEB, 10.09.2026)' })).toBeVisible()
+  const mebBaglantisi = b.getByRole('link', { name: 'MEB tablosu (MEB, 10.09.2026)' })
+  await expect(mebBaglantisi).toBeVisible()
+  // B58: sayfadan çıkan bağlantı Carbon'un Launch ikonunu taşır.
+  await expect(mebBaglantisi.locator('.cds--link__icon svg')).toHaveCount(1)
   const axe = await new AxeBuilder({ page }).include('.meb-senaryo')
     .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa', 'best-practice']).analyze()
   expect(axe.violations).toEqual([])
@@ -90,6 +93,41 @@ test('telefonda asistana sor Asistan sayfasına götürür', async ({ page }) =>
   expect((await dugme.boundingBox())!.height).toBeGreaterThanOrEqual(44)
   await dugme.click()
   await expect(page).toHaveURL(/\/asistan\?sayfa=sinavlar/)
+})
+
+/** Düğmenin etiketinin dikey ortası, düğme kutusunun ortasına en çok 4 px uzakta: kutu büyürken etiket üstte kalmasın. */
+async function etiketOrtada(dugme: Locator) {
+  const { fark, yukseklik } = await dugme.evaluate(el => {
+    const aralik = document.createRange()
+    aralik.selectNodeContents(el)
+    const yazi = aralik.getBoundingClientRect()
+    const kutu = el.getBoundingClientRect()
+    return { fark: Math.abs((yazi.top + yazi.height / 2) - (kutu.top + kutu.height / 2)), yukseklik: kutu.height }
+  })
+  expect(yukseklik).toBeGreaterThanOrEqual(44)
+  expect(fark).toBeLessThanOrEqual(4)
+}
+
+test('telefonda bağlantı ve düğmeler ≥ 44 px, düğme etiketi ortada', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await ac(page, BLOK)
+  const b = page.locator('.meb-senaryo')
+  const baglanti = await b.getByRole('link', { name: /MEB tablosu/ }).boundingBox()
+  expect(baglanti!.height).toBeGreaterThanOrEqual(44)
+  const acKapa = b.getByRole('button', { name: 'Senaryonun 3 çıktısını göster' })
+  expect((await acKapa.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  await etiketOrtada(acKapa)
+  await etiketOrtada(b.getByRole('button', { name: 'Örnek sınav için asistana sor' }))
+  // Düğme yoğunluğu etiketlere de yayılmasın: liste açılınca "duyuruda" etiketi küçük kalır.
+  await acKapa.click()
+  expect((await b.locator('.meb-senaryo__etiket').first().boundingBox())!.height).toBeLessThan(32)
+})
+
+test('masaüstünde düğmeler sm boyunda kalır', async ({ page }) => {
+  await ac(page, BLOK)
+  const b = page.locator('.meb-senaryo')
+  expect((await b.getByRole('button', { name: 'Örnek sınav için asistana sor' }).boundingBox())!.height).toBeCloseTo(32, 0)
+  expect((await b.getByRole('button', { name: 'Senaryonun 3 çıktısını göster' }).boundingBox())!.height).toBeCloseTo(32, 0)
 })
 
 test('blok yoksa bölüm yok', async ({ page }) => {
