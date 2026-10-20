@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 from collections import Counter
 from datetime import date, datetime, timedelta
@@ -16,6 +17,8 @@ from src import sinav_senaryo
 from src.json_utils import atomic_json_dump
 from src.sinav_cikarimi import Bulgu
 from src.sinav_tarihi import katla, kati_gun, kati_tarih_saat, yerel_saat
+
+logger = logging.getLogger(__name__)
 
 SURUM = 1
 SINAVLAR = PurePosixPath("output/sinavlar.json")
@@ -130,7 +133,8 @@ def _surum(k: dict) -> str:
 
 
 def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, simdi: datetime,
-              senaryolar: dict | None = None) -> list[dict]:
+              senaryolar: dict | None = None, senaryo_hatalari: list[str] | None = None) -> list[dict]:
+    """`senaryo_hatalari` verilirse, MEB senaryosu eşleştirilemeyen her kayıt için bir not eklenir."""
     kayitlar = []
     # Each record's findings, for the MEB scenario sentence (spec 2026-10-19 §3.5): the full candidate
     # text is in hand only here. A text that yielded a single finding is searched whole.
@@ -213,7 +217,16 @@ def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, sim
         if senaryolar is not None:
             metinler = [(b.aday.metin, b.alinti, aday_sayisi[id(b.aday)] == 1)
                         for b in kayit_bulgulari.get(id(k), [])]
-            blok = sinav_senaryo.senaryo_blogu(k, metinler, senaryolar, bugun)
+            # The scenario block is optional enrichment: one record's failure must neither drop the other
+            # records' blocks nor stop the whole detection round (a thrown exception would skip the file write
+            # and the new-exam alert). No block for that record, a note in the summary.
+            try:
+                blok = sinav_senaryo.senaryo_blogu(k, metinler, senaryolar, bugun)
+            except Exception as exc:  # noqa: BLE001 — see above
+                logger.error("senaryo eşleştirilemedi (%s): %s", k.get("id"), type(exc).__name__)
+                blok = None
+                if senaryo_hatalari is not None:
+                    senaryo_hatalari.append(f"senaryo eşleştirilemedi: {k['ders']} {k['baslik']}")
             if blok is not None:
                 k["senaryo"] = blok   # not part of icerik_surumu: no new alert (spec §3.5)
         o = eski.get(k["id"])
@@ -292,8 +305,9 @@ def tespit_et(kok: Path, veri: dict, taban: list[dict], simdi: datetime, bitis: 
         # install: None would stamp every record "already there" and swallow its alert.
         onceki = {"surum": SURUM, "sinavlar": []}
     tablo = sinav_senaryo.tablo_oku()
-    kayitlar = birlestir(taban, sonuc.bulgular, onceki, simdi, senaryolar=tablo)
-    hatalar = (["senaryo tablosu okunamadı"] if tablo is None else []) + list(sonuc.hatalar)
+    senaryo_hatalari: list[str] = []
+    kayitlar = birlestir(taban, sonuc.bulgular, onceki, simdi, senaryolar=tablo, senaryo_hatalari=senaryo_hatalari)
+    hatalar = (["senaryo tablosu okunamadı"] if tablo is None else []) + senaryo_hatalari + list(sonuc.hatalar)
     return {"uretildi": simdi.isoformat(timespec="seconds"), "surum": SURUM, "sinavlar": kayitlar,
             "ozet": {"aday": sonuc.aday, "incelenen": sonuc.incelenen, "incelenmedi": sonuc.incelenmedi,
                      "butce_usd": sonuc.butce_usd, "hatalar": hatalar[:5]}}

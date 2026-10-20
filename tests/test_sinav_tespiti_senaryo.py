@@ -49,3 +49,58 @@ def test_tablo_yoksa_not_duser(tmp_path, monkeypatch):
 def test_kuru_rapor_senaryo_satiri():
     belge = {"sinavlar": birlestir([], [_bulgu()], None, SIMDI, senaryolar=TABLO), "ozet": {}}
     assert "  Senaryo: dogrulandi · Türkçe 1. yazılı · 4. senaryo · 7 soru" in kuru_rapor(belge).splitlines()
+
+
+# --- Son düzeltme turu -------------------------------------------------------------------------
+
+def _fen_bulgusu():
+    metin = "23 Ekim Cuma günü Fen 1.1 Ara Değerlendirme Sınavı olacak. Sınav 2. senaryo ağırlıklı."
+    aday = Aday(metin, "Fen Bilimleri", date(2026, 10, 19), "ders_karti",
+                [{"bolum": "ders_icerikleri_haftalar", "hafta": "6. Hafta", "ders": "Fen Bilimleri", "sira": 2}])
+    return Bulgu("Fen Bilimleri", "yazili", "1.1 Ara Değerlendirme Sınavı", date(2026, 10, 23), None, None, [],
+                 "23 Ekim Cuma günü Fen 1.1 Ara Değerlendirme Sınavı olacak.", aday)
+
+
+def test_i7_bir_kaydin_eslestirmesi_patlarsa_digerleri_blok_alir(monkeypatch):
+    gercek = sinav_senaryo.senaryo_blogu
+
+    def sahte(kayit, *a, **k):
+        if kayit["ders"] == "Fen Bilimleri":
+            raise RuntimeError("beklenmeyen tablo yapısı")
+        return gercek(kayit, *a, **k)
+
+    monkeypatch.setattr(sinav_senaryo, "senaryo_blogu", sahte)
+    hatalar = []
+    kayitlar = birlestir([], [_bulgu(), _fen_bulgusu()], None, SIMDI, senaryolar=TABLO, senaryo_hatalari=hatalar)
+    by = {k["ders"]: k for k in kayitlar}
+    assert set(by) == {"Türkçe", "Fen Bilimleri"}                   # belge yine üretilir, kayıt düşmez
+    assert by["Türkçe"]["senaryo"]["durum"] == "dogrulandi"
+    assert "senaryo" not in by["Fen Bilimleri"]
+    assert hatalar == ["senaryo eşleştirilemedi: Fen Bilimleri 1.1 Ara Değerlendirme Sınavı"]
+    # hata listesi verilmese de patlamaz
+    kayitlar = birlestir([], [_bulgu(), _fen_bulgusu()], None, SIMDI, senaryolar=TABLO)
+    assert len(kayitlar) == 2
+
+
+def test_i7_tespit_ozeti_hataya_senaryo_notunu_yazar(tmp_path, monkeypatch):
+    class Okuyucu:
+        def oku(self, *a, **k):
+            raise AssertionError("model çağrılmamalı")
+
+    def patlar(*a, **k):
+        raise RuntimeError("beklenmeyen tablo yapısı")
+
+    monkeypatch.setattr(sinav_senaryo, "senaryo_blogu", patlar)
+    taban = [{"id": "t1", "course": "Türkçe", "title": "1.1 Ara Değerlendirme Sınavı",
+              "rawTitle": "1.1 Ara Değerlendirme Sınavı", "date": "2026-10-22T08:00:00", "allDay": False}]
+    belge = GERCEK_TESPIT(tmp_path, {}, taban, SIMDI, bitis=0.0, okuyucu=Okuyucu())
+    assert "senaryo eşleştirilemedi: Türkçe 1.1 Ara Değerlendirme Sınavı" in belge["ozet"]["hatalar"]
+    assert [k["ders"] for k in belge["sinavlar"]] == ["Türkçe"] and "senaryo" not in belge["sinavlar"][0]
+
+
+def test_m1_not_tablosundan_turetilen_kayit_blok_almaz():
+    # Notlandırılmış geçmiş "1. Yazılı" kartında "Duyuruda senaryo belirtilmedi" yazmasın.
+    taban = [{"id": "n1", "course": "Türkçe", "title": "1. Yazılı", "rawTitle": "1. Yazılı", "date": None,
+              "grade": 90}]
+    kayit = birlestir(taban, [], None, SIMDI, senaryolar=TABLO)[0]
+    assert kayit["sentetik"] is True and "senaryo" not in kayit
