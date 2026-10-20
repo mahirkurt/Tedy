@@ -74,7 +74,8 @@ test.describe('Profil', () => {
     await page.goto('/profil')
 
     const bolum = page.locator('.aksam-duzeni-formu')
-    await expect(page.getByRole('heading', { name: 'Akşam düzeni' })).toBeVisible()
+    // A name heading is title case (S38, 2026-10-19); exact, because the default match ignores case.
+    await expect(page.getByRole('heading', { name: 'Akşam Düzeni', exact: true })).toBeVisible()
     await expect(bolum.getByLabel('Ödeve hazır olduğun saat', { exact: true })).toHaveValue('17:00')
     await expect(bolum.getByLabel('Yemek süresi (dakika)')).toHaveValue('30')
     await expect(bolum).toContainText('Liste boşken TEDY kimseye haber vermez.')
