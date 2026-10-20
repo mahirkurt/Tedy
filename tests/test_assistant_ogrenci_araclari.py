@@ -607,7 +607,9 @@ def test_panonun_asistani_butun_kaynaklarla_kurulur(api, monkeypatch):
                       "video_kaynagi": api._canli_videolar,
                       "odev_belge_ara": api._odev_belgesi_ara,
                       "odev_yazici": api._foto_odev_tamamla,
-                      "foto_odev_kaynagi": api._extract_homework_candidates_from_photo}
+                      "foto_odev_kaynagi": api._extract_homework_candidates_from_photo,
+                      "plan_kaynagi": api.bugunku_plan, "plan_yazici": alinan["plan_yazici"]}
+    assert type(alinan["plan_yazici"]).__name__ == "PlanYazici"
 
 
 def test_bozuk_skill_hatasi_log_hangi_skil_ve_nedeni_soyler(api, monkeypatch, caplog):

@@ -376,3 +376,21 @@ def test_son_blok_zamana_gore_secilir():
     p = kur(simdi="2026-10-19 17:51", gunluk=gunluk)
     sonraki = [b for b in calisma(p) if b.durum == "bekliyor"][0]
     assert sonraki.bas == 17 * 60 + 50 + 10     # iki bitmiş blok -> 10 dk mola, son = 17:50
+
+
+def test_yarina_listesi_odevi_yerlesimden_cikarir_ve_tasinana_yazar():
+    p = kur(gunluk={"yarina": ["iki-gun-orta"]})
+    assert any(b.odev_anahtari == "iki-gun-orta" for b in calisma(kur())) and all(b.odev_anahtari != "iki-gun-orta" for b in calisma(p))
+    assert any(t["odev_anahtari"] == "iki-gun-orta" for t in p.tasinan)
+
+
+def test_yarina_bozuk_deger_motoru_dusurmez():
+    p = kur(gunluk={"yarina": "yok", "one_al": [3, None]})
+    assert calisma(p)
+
+
+def test_one_al_odevi_baslamamis_isin_en_basina_koyar():
+    onceki = [b.odev_anahtari for b in calisma(kur())]
+    assert onceki[0] != "iki-gun-orta"
+    p = kur(gunluk={"one_al": ["iki-gun-orta"]})
+    assert calisma(p)[0].odev_anahtari == "iki-gun-orta"

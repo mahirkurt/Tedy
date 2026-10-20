@@ -19,7 +19,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
@@ -258,6 +258,14 @@ ODEV_BELGE = "odev_belgesi"
 ODEV_TAMAMLA = "odev_tamamla"
 ODEV_FOTO_TOOL = "odev_fotograftan"
 ODEV_ATIF = "Ödevlerim · güncel liste"
+
+# Akşam çalışma planı (Görev 8): okuma ve Işık'ın isteğiyle düzenleme. Yalnız TEDY_AKSAM_PLANI=1 iken ve
+# ödev kaynağı + plan kaynağı varken bildirilir; dispatch() bayrak kapalıyken de reddeder.
+AKSAM_TOOL = "aksam_plani"
+PLAN_DEGISTIR_TOOL = "plani_degistir"
+PLAN_ISLEMLERI = ("sona_al", "one_al", "sure", "yarina_at")
+YARIN_REDDI = "Bu ödev yarın teslim; bu akşamdan çıkaramam."
+BIR_KEZ_REDDI = "Bu ödevin sırası bu akşam bir kez değişti; bir daha değiştirilemez."
 
 # Portal attachments (plan 2026-09-28-portal-ekleri): ek_oku pages the text
 # TEDY extracted at download time; odev_listesi names each attachment with
@@ -1470,6 +1478,70 @@ MCP_SERVERS = {
 }
 
 
+class PlanYazici:
+    """Asistanın plana yazma yolu: günün dokunuş durumu (`PlanDeposu`, flock altında) ve okur süre
+    düzeltmesi (`TahminDeposu`). Plan kartının kullandığı aynı depolar."""
+
+    def __init__(self, plan_deposu: Any, tahmin_deposu: Any) -> None:
+        self.plan_deposu = plan_deposu
+        self.tahmin_deposu = tahmin_deposu
+
+    def degistir(self, gun: str, fn: Callable[[dict], None]) -> dict:
+        return self.plan_deposu.degistir(gun, fn)
+
+    def sure_yaz(self, anahtar: str, dakika: int) -> None:
+        self.tahmin_deposu.okur_suresi_yaz(anahtar, dakika)
+
+
+def _saat(dk: int) -> str:
+    dk = min(max(int(dk), 0), 1439)
+    return f"{dk // 60:02d}:{dk % 60:02d}"
+
+
+_PLAN_DURUMU = {
+    "kapali": "Bu akşam için plan yok (aile kapattı ya da tatil).",
+    "okulsuz": "Bugün okul günü değil; akşam planı kurulmaz.",
+    "bitti": "Akşam çalışma saati geçti; bugün için blok kalmadı.",
+    "plansiz": "Planlanacak açık ödev yok.",
+}
+
+
+def aksam_plani_metni(plan: Any) -> str:
+    """Planın model için okunur hâli: şimdi, sırada, bloklar saatleriyle, taşınan ve sığmayanlar.
+    Süreler tahmindir; saatler blokların bitişine göre kayabilir."""
+    if plan.durum in _PLAN_DURUMU:
+        satirlar = [_PLAN_DURUMU[plan.durum]]
+        if plan.planda_olmayan:
+            satirlar.append(f"Planda olmayan {plan.planda_olmayan} eski ödev İşler'de.")
+        return "\n".join(satirlar)
+    calisma = sorted((b for b in plan.bloklar if b.tur == "calisma"), key=lambda b: (b.bas, b.bit))
+
+    def ad(b: Any) -> str:
+        parca = f", parça {b.parca + 1}/{b.parca_sayisi}" if b.parca_sayisi > 1 else ""
+        return f"{b.ders or 'Ders'}: {b.baslik} — {b.adim} (tahmin {b.tahmin_dk} dk{parca})"
+
+    satirlar = [f"Akşam planı {plan.gun} (süreler tahmindir; saatler blok bitince kayabilir)"]
+    suren = next((b for b in calisma if b.durum == "suruyor"), None)
+    sirada = next((b for b in calisma if b.durum in ("bekliyor", "ertelendi")), None)
+    if suren:
+        satirlar.append(f"Şimdi: {ad(suren)}")
+    if sirada:
+        satirlar.append(f"Sırada: {_saat(sirada.bas)} {ad(sirada)}")
+    satirlar.append("Bloklar:")
+    for b in sorted(plan.bloklar, key=lambda b: (b.bas, b.bit)):
+        zaman = f"{_saat(b.bas)}–{_saat(b.bit)}"
+        if b.tur == "calisma":
+            satirlar.append(f"- {zaman} {ad(b)}" + ("" if b.durum == "bekliyor" else f" [{b.durum}]"))
+        else:
+            satirlar.append(f"- {zaman} {b.baslik or b.tur.capitalize()}")
+    for baslik, liste in (("Yarına taşınan", plan.tasinan), ("Bu akşama sığmayan", plan.sigmayan)):
+        for k in liste:
+            satirlar.append(f"{baslik}: {k['ders']}: {k['baslik']} (teslim {k['teslim']}, ~{k['kalan_dk']} dk)")
+    if plan.planda_olmayan:
+        satirlar.append(f"Planda olmayan {plan.planda_olmayan} eski ödev İşler'de.")
+    return "\n".join(satirlar)
+
+
 @dataclass
 class ToolOutcome:
     ok: bool
@@ -1835,9 +1907,14 @@ class McpRegistry:
                  not_deposu: Any = None,
                  odev_belge_ara: Callable[[str, str], str] | None = None,
                  odev_yazici: Callable[[str, str, str], str] | None = None,
-                 foto_odev_kaynagi: Callable[[bytes, str], list[dict]] | None = None) -> None:
+                 foto_odev_kaynagi: Callable[[bytes, str], list[dict]] | None = None,
+                 plan_kaynagi: Callable[[], Any] | None = None,
+                 plan_yazici: Any = None) -> None:
 
         self.clients = clients
+        # Akşam planı (bugunku_plan) ve yazma yolu; None: araçlar bildirilmez.
+        self.plan_kaynagi = plan_kaynagi
+        self.plan_yazici = plan_yazici
         # Öğretmen skill'leri (src/assistant_skills.py), id -> Skill. Empty: no
         # teacher tool is declared in any mode.
         self.skills: dict[str, Any] = dict(skills or {})
@@ -1943,6 +2020,34 @@ class McpRegistry:
                 ),
                 "parameters": {"type": "object", "properties": {}},
             })
+        if self._aksam_acik():
+            decls.append({
+                "name": AKSAM_TOOL,
+                "description": (
+                    "Bu akşamın çalışma planı: şimdi ne var, sırada ne var, blokların saatleri, yarına "
+                    "taşınanlar ve sığmayanlar. Süreler tahmindir. Akşam planı soruları için tek kaynak bu."),
+                "parameters": {"type": "object", "properties": {}},
+            })
+            if self.plan_yazici is not None and okur in ("ogrenci", "aile") and etkilesimli:
+                decls.append({
+                    "name": PLAN_DEGISTIR_TOOL,
+                    "description": (
+                        "Okurun açıkça istediği tek bir plan düzeltmesini yapar: sona_al (ödevin sıradaki "
+                        "parçasını kuyruğun sonuna al), one_al (ödevi başlamamış işlerin başına al), sure "
+                        "(okurun söylediği süreyi dakika olarak kaydet), yarina_at (ödevi bu akşamdan "
+                        "çıkarıp yarına taşı). Okur istemeden çağırma. sona_al/one_al bir ödev için akşamda "
+                        "bir kez yapılır; yarın teslim ödev yarına atılamaz. Çağırmadan önce `aksam_plani` ile "
+                        "planı gör; odev, ödevin anahtarı ya da ders ve başlığından bir parçadır."),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "islem": {"type": "string", "enum": list(PLAN_ISLEMLERI)},
+                            "odev": {"type": "string", "description": "Ödev anahtarı ya da 'ders başlık' parçası."},
+                            "dakika": {"type": "integer", "description": "Yalnız sure için: 5–120."},
+                        },
+                        "required": ["islem", "odev"],
+                    },
+                })
         if self.odev_belge_ara is not None:
             decls.append({
                 "name": ODEV_BELGE,
@@ -2218,6 +2323,10 @@ class McpRegistry:
             return self._dispatch_local(args)
         if name == ODEV_TOOL and self.odev_kaynagi is not None:
             return self._dispatch_odev()
+        if name == AKSAM_TOOL:
+            return self._dispatch_aksam()
+        if name == PLAN_DEGISTIR_TOOL:
+            return self._dispatch_plan_degistir(args or {}, okur, etkilesimli)
         if name == ODEV_BELGE and self.odev_belge_ara is not None:
             return self._dispatch_odev_belgesi(args or {}, odev_anahtari)
 
@@ -2592,6 +2701,143 @@ class McpRegistry:
             self.aile_kaynak_arama, query, kind="aile-kaynak",
             etiket_fn=_aile_kaynak_etiketi, hata_onek="aile kaynağı araması hatası")
 
+    def _aksam_acik(self) -> bool:
+        return (os.environ.get("TEDY_AKSAM_PLANI") == "1" and self.odev_kaynagi is not None
+                and self.plan_kaynagi is not None)
+
+    def _aksam_atfi(self, metin: str) -> list[dict[str, Any]]:
+        return [{"kind": "ogrenci", "label": "Akşam planı", "locator": {"tool": AKSAM_TOOL},
+                 "snippet": metin[:400], "confidence": 1.0}]
+
+    def _dispatch_aksam(self) -> ToolOutcome:
+        if not self._aksam_acik():
+            return ToolOutcome(ok=False, error="akşam planı şu an kapalı")
+        try:
+            metin = _kirp(aksam_plani_metni(self.plan_kaynagi()), GOVDE_SINIRI)
+        except Exception as exc:  # noqa: BLE001 — told to the model, never raised through the loop
+            logger.error("aksam_plani failed: %s", type(exc).__name__)
+            return ToolOutcome(ok=False, error=f"akşam planı okunamadı: {type(exc).__name__}")
+        return ToolOutcome(ok=True, text=metin, citations=self._aksam_atfi(metin))
+
+    def _plan_odevleri(self, plan: Any) -> dict[str, tuple[str, str]]:
+        """Bu akşamın planındaki ödevler: anahtar -> (ders, başlık); bloklar, taşınanlar, sığmayanlar."""
+        sonuc: dict[str, tuple[str, str]] = {}
+        for b in plan.bloklar:
+            if b.tur == "calisma" and b.odev_anahtari:
+                sonuc.setdefault(b.odev_anahtari, (b.ders or "", b.baslik))
+        for k in [*plan.tasinan, *plan.sigmayan]:
+            sonuc.setdefault(k["odev_anahtari"], (k["ders"], k["baslik"]))
+        return sonuc
+
+    def _dispatch_plan_degistir(self, args: dict[str, Any], okur: str, etkilesimli: bool) -> ToolOutcome:
+        from src.aksam_plani import _anahtar_kumesi, _teslim, parca_kimlikleri
+        if not self._aksam_acik() or self.plan_yazici is None:
+            return ToolOutcome(ok=False, error="akşam planı şu an kapalı")
+        if okur not in ("ogrenci", "aile") or not etkilesimli:
+            return ToolOutcome(ok=False, error="plan yalnız ödevin sahibi ya da aile tarafından düzenlenir")
+        islem = str(args.get("islem") or "")
+        if islem not in PLAN_ISLEMLERI:
+            return ToolOutcome(ok=False, error="islem sona_al, one_al, sure ya da yarina_at olmalı")
+        dakika = args.get("dakika")
+        if islem == "sure" and (isinstance(dakika, bool) or not isinstance(dakika, int) or not 5 <= dakika <= 120):
+            return ToolOutcome(ok=False, error="sure için dakika 5 ile 120 arasında bir tam sayı olmalı")
+        try:
+            plan = self.plan_kaynagi()
+            satirlar = self.odev_kaynagi() or []
+        except Exception as exc:  # noqa: BLE001
+            logger.error("plani_degistir read failed: %s", type(exc).__name__)
+            return ToolOutcome(ok=False, error=f"plan okunamadı: {type(exc).__name__}")
+        if plan.durum in _PLAN_DURUMU:
+            return ToolOutcome(ok=True, text=_PLAN_DURUMU[plan.durum] + " Değişiklik yapılmadı.")
+
+        # --- ödevi çöz: önce tam anahtar, sonra katlanmış "<ders> <başlık>" alt dizesi
+        adaylar = self._plan_odevleri(plan)
+        istek = str(args.get("odev") or "").strip()
+        if istek in adaylar:
+            anahtar = istek
+        else:
+            q = _katla(istek)
+            eslesen = [k for k, (d, b) in adaylar.items() if q and q in _katla(f"{d} {b}")]
+            if len(eslesen) != 1:
+                liste = "\n".join(f"- {d}: {b}" for d, b in adaylar.values()) or "- (planda ödev yok)"
+                neden = "Birden çok ödev eşleşti" if eslesen else "Planda bu adla bir ödev bulunamadı"
+                return ToolOutcome(ok=True, text=f"{neden}; hiçbir şey değişmedi. Planın ödevleri:\n{liste}\n"
+                                                 "Hangisi olduğunu okura sor.")
+            anahtar = eslesen[0]
+        ders, baslik = adaylar[anahtar]
+        ad = f"{ders}: {baslik}"
+        aile = okur == "aile"
+        simdi = istanbul_simdi(self.saat() if self.saat is not None else None).isoformat(timespec="seconds")
+
+        def bitir(mesaj: str) -> ToolOutcome:
+            metin = _kirp(mesaj + "\n\n" + aksam_plani_metni(self.plan_kaynagi()), GOVDE_SINIRI)
+            return ToolOutcome(ok=True, text=metin, citations=self._aksam_atfi(metin))
+
+        if islem == "sure":
+            try:
+                self.plan_yazici.sure_yaz(anahtar, dakika)
+            except Exception as exc:  # noqa: BLE001
+                logger.error("plani_degistir sure failed: %s", type(exc).__name__)
+                return ToolOutcome(ok=False, error=f"süre yazılamadı: {type(exc).__name__}")
+            return bitir(f"{ad} için süre {dakika} dk olarak kaydedildi (okurun düzeltmesi).")
+
+        asim: list[str] = []
+        sonuc: dict[str, str] = {}
+        ids = parca_kimlikleri(plan.gun, anahtar)
+        satir = next((r for r in satirlar if r.get("homework_key") == anahtar), None)
+        teslim = _teslim(satir) if satir else None
+        yarin_teslim = teslim is not None and (teslim[0] - date.fromisoformat(plan.gun)).days <= 1
+
+        if islem == "yarina_at" and yarin_teslim:
+            if not aile:
+                return ToolOutcome(ok=True, text=YARIN_REDDI)
+            asim.append(islem)
+
+        def yaz(g: dict) -> None:
+            ert = _anahtar_kumesi(g.get("ertelenen"))
+            one = _anahtar_kumesi(g.get("one_al"))
+            if islem == "yarina_at":
+                liste = [e for e in (g.get("yarina") or []) if isinstance(e, str)]
+                if anahtar in liste:
+                    sonuc["zaten"] = "1"
+                    return
+                g["yarina"] = [*liste, anahtar]
+            else:
+                kullanildi = anahtar in one or bool(ids & ert)
+                if kullanildi and not aile:
+                    sonuc["red"] = "1"
+                    return
+                if islem == "one_al":
+                    g["one_al"] = [*[e for e in (g.get("one_al") or []) if isinstance(e, str)], anahtar] \
+                        if anahtar not in one else list(g["one_al"])
+                else:
+                    hedef = next((b for b in sorted(plan.bloklar, key=lambda b: (b.bas, b.bit))
+                                  if b.odev_anahtari == anahtar and b.tur == "calisma"
+                                  and b.durum in ("bekliyor", "ertelendi") and b.id not in ert), None)
+                    if hedef is None:
+                        sonuc["hedef_yok"] = "1"
+                        return
+                    g["ertelenen"] = [*[e for e in (g.get("ertelenen") or []) if isinstance(e, str)], hedef.id]
+                if kullanildi:
+                    asim.append(islem)
+            if asim:
+                g.setdefault("asimlar", []).append({"islem": islem, "odev": anahtar, "zaman": simdi, "asan": "aile"})
+        try:
+            self.plan_yazici.degistir(plan.gun, yaz)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("plani_degistir write failed: %s", type(exc).__name__)
+            return ToolOutcome(ok=False, error=f"plan yazılamadı: {type(exc).__name__}")
+        if sonuc.get("red"):
+            return ToolOutcome(ok=True, text=BIR_KEZ_REDDI + f" ({ad})")
+        if sonuc.get("hedef_yok"):
+            return ToolOutcome(ok=True, text=f"{ad} için sona alınabilecek başlamamış bir blok yok; hiçbir şey değişmedi.")
+        if sonuc.get("zaten"):
+            return bitir(f"{ad} zaten yarına alınmış.")
+        olumlu = {"sona_al": "sıradaki parçası kuyruğun sonuna alındı",
+                  "one_al": "başlamamış işlerin başına alındı",
+                  "yarina_at": "bu akşamdan çıkarıldı ve yarına taşındı"}[islem]
+        return bitir(f"{ad} {olumlu}.")
+
     def _dispatch_odev(self) -> ToolOutcome:
         try:
             rows = self.odev_kaynagi() or []
@@ -2792,7 +3038,9 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                    not_deposu: Any = None,
                    odev_belge_ara: Callable[[str, str], str] | None = None,
                    odev_yazici: Callable[[str, str, str], str] | None = None,
-                   foto_odev_kaynagi: Callable[[bytes, str], list[dict]] | None = None) -> McpRegistry:
+                   foto_odev_kaynagi: Callable[[bytes, str], list[dict]] | None = None,
+                   plan_kaynagi: Callable[[], Any] | None = None,
+                   plan_yazici: Any = None) -> McpRegistry:
 
     """Wire the configured servers. A server with no key is simply absent —
     its tools are not declared — but it is still named by degraded(), so an
@@ -2816,4 +3064,5 @@ def build_registry(local_search: Callable[[str, int], list[dict[str, Any]]],
                        video_kaynagi=video_kaynagi, aile_kaynak_arama=aile_kaynak_arama,
                        saat=saat, skills=skills, not_deposu=not_deposu, odev_belge_ara=odev_belge_ara,
                        odev_yazici=odev_yazici, ek_deposu=ek_deposu,
-                       foto_odev_kaynagi=foto_odev_kaynagi)
+                       foto_odev_kaynagi=foto_odev_kaynagi,
+                       plan_kaynagi=plan_kaynagi, plan_yazici=plan_yazici)

@@ -346,6 +346,7 @@ def _assistant_runtime():
     if _ASSISTANT_RUNTIME is None:
         try:
             from src.assistant_core import AssistantRuntime
+            from src.assistant_tools import PlanYazici
 
             _ASSISTANT_RUNTIME = AssistantRuntime(
                 PROJECT_ROOT,
@@ -362,6 +363,8 @@ def _assistant_runtime():
                 odev_belge_ara=_odev_belgesi_ara,
                 odev_yazici=_foto_odev_tamamla,
                 foto_odev_kaynagi=_extract_homework_candidates_from_photo,
+                plan_kaynagi=bugunku_plan,
+                plan_yazici=PlanYazici(PlanDeposu(_plan_koku()), _tahmin_deposu()),
             )
         except Exception as exc:
             # SkillHatasi's own message names which skill and why (spec "Hata ve

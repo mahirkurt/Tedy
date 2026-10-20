@@ -265,6 +265,9 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
     # görüntüsüz kayıt yalnız ödevi hâlâ seçiliyse korunur (eski davranış).
     baslangic = max(hazir, simdi_dk)
     bekleyen: list[_Parca] = []
+    yarina_parcalar: list[_Parca] = []
+    yarina = _anahtar_kumesi(gunluk.get("yarina"))
+    one_al = _anahtar_kumesi(gunluk.get("one_al"))
     for p in parcalar:
         if p.id in anlik:
             continue
@@ -276,6 +279,8 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
             bit = _dk(kayit.get("bitti")) if durum == "bitti" else None
             bit = bas + p.dk if bit is None or bit < bas else bit
             anlik[p.id] = _blok_calisma(p, bas, bit, durum)
+        elif p.anahtar in yarina:
+            yarina_parcalar.append(p)       # asistan/aile yarına aldı: bu akşam yerleşmez, taşınır
         else:
             bekleyen.append(p)
     yapilanlar = sorted(anlik.values(), key=lambda b: (b.bas, b.bit))
@@ -296,6 +301,7 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
         if p.id in ertelenen and p.anahtar not in ilk_ertelenen:
             ilk_ertelenen[p.anahtar] = p.parca
     on = [p for p in bekleyen if p.anahtar not in ilk_ertelenen or p.parca < ilk_ertelenen[p.anahtar]]
+    on = [p for p in on if p.anahtar in one_al] + [p for p in on if p.anahtar not in one_al]  # öne al: kararlı bölme
     sona = [p for p in bekleyen if p.anahtar in ilk_ertelenen and p.parca >= ilk_ertelenen[p.anahtar]]
 
     # ---- yerleştirme
@@ -336,6 +342,14 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
     tasinan: list[dict] = []
     sigmayan: list[dict] = []
     gorulen: dict[str, dict] = {}
+    for p in yarina_parcalar:
+        kayit = gorulen.get(p.anahtar)
+        if kayit is None:
+            kayit = {"odev_anahtari": p.anahtar, "ders": p.ders, "baslik": p.baslik,
+                     "teslim": p.teslim_ham, "kalan_dk": 0}
+            gorulen[p.anahtar] = kayit
+            tasinan.append(kayit)
+        kayit["kalan_dk"] += p.dk
     for p in kuyruk_disi:
         kayit = gorulen.get(p.anahtar)
         if kayit is None:
@@ -348,6 +362,15 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
 
     bloklar.sort(key=lambda b: (b.bas, b.bit, b.id))
     return Plan(gun_s, bloklar, tasinan, sigmayan, eski, "akis" if simdi_dk >= hazir else "onizleme")
+
+
+def _anahtar_kumesi(ham: Any) -> set[str]:
+    return {e for e in ham if isinstance(e, str)} if isinstance(ham, (list, tuple, set)) else set()
+
+
+def parca_kimlikleri(gun: str, anahtar: str) -> set[str]:
+    """Bir ödevin o günkü olası parça kimlikleri (ertelenen kaydıyla eşlemek için; ek parçalar dahil)."""
+    return {_kimlik(gun, anahtar, i) for i in range(0, 40)}
 
 
 def _anlik_bloklar(gunluk: dict, hazir: int) -> dict[str, Blok]:

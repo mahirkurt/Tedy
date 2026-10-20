@@ -2419,7 +2419,9 @@ class AssistantRuntime:
                  skills: dict[str, Any] | None = None,
                  odev_belge_ara: Callable[[str, str], str] | None = None,
                  odev_yazici: Callable[[str, str, str], str] | None = None,
-                 foto_odev_kaynagi: Callable[[bytes, str], list[dict]] | None = None):
+                 foto_odev_kaynagi: Callable[[bytes, str], list[dict]] | None = None,
+                 plan_kaynagi: Callable[[], Any] | None = None,
+                 plan_yazici: Any = None):
         # First, before anything else is built: a broken teacher skill stops the
         # assistant from opening at all (spec "Hata ve boşluk durumları"), with
         # the skill and the reason in the error — never a silent fallback.
@@ -2482,7 +2484,9 @@ class AssistantRuntime:
                                        skills=self.skills,
                                        odev_belge_ara=odev_belge_ara,
                                        odev_yazici=odev_yazici,
-                                       foto_odev_kaynagi=foto_odev_kaynagi)
+                                       foto_odev_kaynagi=foto_odev_kaynagi,
+                                       plan_kaynagi=plan_kaynagi, plan_yazici=plan_yazici)
+        self.plan_kaynagi = plan_kaynagi
 
     def _local_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """The retriever, shaped as a tool the model can choose to call."""
@@ -2532,6 +2536,10 @@ class AssistantRuntime:
         "- Okur bir ödev kâğıdının ya da tahtanın fotoğrafını yükleyip ödev eklemek ister gibiyse "
         "`odev_fotograftan` aracını o ekin kimliğiyle çağır; ödevi sen kaydetmezsin, okur kartta "
         "onaylar. Teslim tarihi okunamadıysa bunu sor; tarih uydurma.\n"
+        "- Bu akşamın çalışma planı (şimdi ne var, sırada ne var, saatler) → `aksam_plani`; "
+        "süreler tahmindir, öyle söyle. Okur planda bir şeyin değişmesini açıkça isterse "
+        "(sona al, öne al, süreyi düzelt, yarına at) → `plani_degistir`; reddederse nedenini "
+        "olduğu gibi aktar, başka yoldan değiştirmeye çalışma.\n"
         "- Işık'a özel diğer sorular (duyuru, eski ödev, portalın ek sayfaları) ve bir "
         "ödevin ayrıntısı → `ogrenci_verisi_ara`.\n"
         "- Konu, kavram, müfredat, kazanım sorusu → `kazanim_ara`, `mufredat_ara`. MEB "
@@ -3327,9 +3335,27 @@ class AssistantRuntime:
             odev_anahtari=odev_anahtari,
         )
         out["intent"] = "study_plan"
-        out["plan_blocks"] = self._build_rule_based_plan(
-            self._latest_user_message(messages))
+        out["plan_blocks"] = self._motor_plan_bloklari()
         return out
+
+    def _motor_plan_bloklari(self) -> list[dict[str, Any]]:
+        """Eski plan kartı için bu akşamın planı: bloklar akşam planı motorundan (bugunku_plan) gelir,
+        kural tabanlı ikinci bir plan yoktur. Bayrak kapalıysa ya da kaynak yoksa boş."""
+        if os.environ.get("TEDY_AKSAM_PLANI") != "1" or self.plan_kaynagi is None:
+            return []
+        try:
+            plan = self.plan_kaynagi()
+        except Exception as exc:  # noqa: BLE001 — plan kartı cevabı düşürmez
+            logger.warning("study_plan: akşam planı okunamadı: %s", type(exc).__name__)
+            return []
+        return [{
+            "type": "homework",
+            "title": f"{b.ders or 'Ders'}: {b.baslik}",
+            "day": plan.gun,
+            "estimated_minutes": b.tahmin_dk,
+            "actions": [b.adim] if b.adim else [],
+            "rationale": "tahmin",
+        } for b in plan.bloklar if b.tur == "calisma" and b.durum != "bitti"]
 
     def models(self) -> list[dict[str, Any]]:
         return [
@@ -3408,125 +3434,6 @@ class AssistantRuntime:
             "intent": out.get("intent", "qa"),
             "meta": out.get("meta", {}),
         }
-
-    def _build_rule_based_plan(self, user_query: str) -> list[dict[str, Any]]:
-        scraped = self._load_scraped_data()
-        homework_rows = (
-            scraped.get("odevlerim", {})
-            .get("homework", {})
-            .get("rows", [])
-        )
-        if not isinstance(homework_rows, list):
-            homework_rows = []
-
-        due_items: list[tuple[datetime, dict[str, Any]]] = []
-        for row in homework_rows:
-            if not isinstance(row, dict):
-                continue
-            due_raw = str(row.get("Ödev Son Teslim Tarihi", "")).strip()
-            due_dt = self._parse_tr_datetime(due_raw)
-            if due_dt is None:
-                continue
-            due_items.append((due_dt, row))
-
-        due_items.sort(key=lambda x: x[0])
-
-        now = datetime.now()
-        seven_days = now + timedelta(days=7)
-        picked = [x for x in due_items if x[0] <= seven_days][:10]
-
-        blocks: list[dict[str, Any]] = []
-        for due_dt, row in picked:
-            ders = str(row.get("Ders Adı", "Genel")).strip() or "Genel"
-            title = str(row.get("Ödev Başlığı", "Ödev")).strip() or "Ödev"
-            days_left = max(0, (due_dt.date() - now.date()).days)
-            mins = 30 if days_left >= 5 else 45 if days_left >= 2 else 60
-            blocks.append({
-                "type": "homework",
-                "title": f"{ders}: {title}",
-                "day": due_dt.strftime("%Y-%m-%d"),
-                "estimated_minutes": mins,
-                "actions": [
-                    "Konu tekrarını tamamla",
-                    "Ödev çözümünü bitir",
-                    "Son 10 dk öz-kontrol yap",
-                ],
-                "rationale": "Teslim tarihine göre önceliklendirildi",
-            })
-
-        # Add practice blocks when grades exist, but never inferred from a
-        # gelişim report still on an earlier school year (final review of
-        # docs/superpowers/plans/2026-09-28-pano-eksiklikleri.md, Minor 5):
-        # such a report's "1. Sınav"/"DİKP" columns are last year's, not a
-        # weakness to build this week's plan around. `notlar`, `/api/exams`
-        # and the BM25 NOTLAR paragraph already share this same check.
-        from src.assistant_tools import onceki_yil_raporu_mu
-        gelisim = scraped.get("gelisim_raporu", {})
-        gelisim = gelisim if isinstance(gelisim, dict) else {}
-        grades = gelisim.get("grades", [])
-        onceki_yil = onceki_yil_raporu_mu(
-            gelisim.get("semester"), _guncel_ogretim_yili_dosyadan(self.config.output_dir))
-        if isinstance(grades, list) and grades and not onceki_yil:
-            weak_courses = self._infer_weak_courses(grades)
-            for course in weak_courses[:2]:
-                blocks.append({
-                    "type": "assessment",
-                    "title": f"{course} kısa ölçme-değerlendirme",
-                    "day": (now + timedelta(days=2)).strftime("%Y-%m-%d"),
-                    "estimated_minutes": 35,
-                    "actions": [
-                        "10 soru mini deneme çöz",
-                        "Yanlış analizini deftere çıkar",
-                        "Eksik kazanımı tekrar et",
-                    ],
-                    "rationale": "Not trendinde iyileştirme hedefi",
-                })
-
-        if not blocks:
-            # Fallback generic schedule.
-            for i in range(5):
-                d = now + timedelta(days=i)
-                blocks.append({
-                    "type": "generic",
-                    "title": "Günlük odak çalışma",
-                    "day": d.strftime("%Y-%m-%d"),
-                    "estimated_minutes": 45,
-                    "actions": [
-                        "20 dk konu tekrarı",
-                        "20 dk soru çözümü",
-                        "5 dk öz değerlendirme",
-                    ],
-                    "rationale": "Veri yetersizliğinde standart plan",
-                })
-
-        # Basic personalization from user query.
-        if "sınav" in user_query.lower() or "yazılı" in user_query.lower():
-            for b in blocks[:3]:
-                b["actions"].append("Günün sonunda 10 dk sınav provası yap")
-
-        return blocks[:12]
-
-    def _infer_weak_courses(self, grades: list[dict[str, Any]]) -> list[str]:
-        scored: list[tuple[str, float]] = []
-        for row in grades:
-            if not isinstance(row, dict):
-                continue
-            course = str(row.get("Ders", "")).strip()
-            if not course:
-                continue
-            vals: list[float] = []
-            for k in ["1. Sınav", "2. Sınav", "3. Sınav", "DİKP/Performans-1", "DİKP/Performans-2", "DİKP/Performans-3"]:
-                v = str(row.get(k, "")).strip().replace(",", ".")
-                if not v or v == "-":
-                    continue
-                try:
-                    vals.append(float(v))
-                except ValueError:
-                    continue
-            if vals:
-                scored.append((course, sum(vals) / len(vals)))
-        scored.sort(key=lambda x: x[1])
-        return [c for c, _ in scored]
 
     def _latest_user_message(self, messages: list[dict[str, Any]]) -> str:
         for msg in reversed(messages):
