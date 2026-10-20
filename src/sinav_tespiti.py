@@ -7,10 +7,12 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections import Counter
 from datetime import date, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from src import sinav_senaryo
 from src.json_utils import atomic_json_dump
 from src.sinav_cikarimi import Bulgu
 from src.sinav_tarihi import katla, kati_gun, kati_tarih_saat, yerel_saat
@@ -127,8 +129,13 @@ def _surum(k: dict) -> str:
     return hashlib.sha256(govde.encode("utf-8")).hexdigest()[:12]
 
 
-def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, simdi: datetime) -> list[dict]:
+def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, simdi: datetime,
+              senaryolar: dict | None = None) -> list[dict]:
     kayitlar = []
+    # Each record's findings, for the MEB scenario sentence (spec 2026-10-19 §3.5): the full candidate
+    # text is in hand only here. A text that yielded a single finding is searched whole.
+    kayit_bulgulari: dict[int, list[Bulgu]] = {}
+    aday_sayisi = Counter(id(b.aday) for b in bulgular)
     gorulen: set = set()
     for e in taban:
         if not isinstance(e, dict) or not e.get("id") or e["id"] in gorulen:
@@ -152,6 +159,7 @@ def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, sim
             eslesen = _bulgudan(b, _md5(f"{b.ders}|{gun}"))
             kayitlar.append(eslesen)
         _ekle(eslesen, b)
+        kayit_bulgulari.setdefault(id(eslesen), []).append(b)
 
     for b in tarihsizler:
         ayni_ders = [k for k in kayitlar if k["tarih"] and not k["sentetik"] and katla(k["ders"]) == katla(b.ders)]
@@ -171,6 +179,7 @@ def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, sim
                 hedef = _bulgudan(b, kimlik)
                 kayitlar.append(hedef)
         _ekle(hedef, b)
+        kayit_bulgulari.setdefault(id(hedef), []).append(b)
 
     bugun = simdi.date()
     for k in kayitlar:   # kaynağın yayın tarihi yoksa kayıt bu çalıştırmada görüldü sayılır, hemen düşmez
@@ -201,6 +210,12 @@ def birlestir(taban: list[dict], bulgular: list[Bulgu], onceki: dict | None, sim
         k["konular"] = k["konular"][:KONU_SINIRI]
         k["kaynaklar"] = k["kaynaklar"][:KAYNAK_SINIRI]
         k["icerik_surumu"] = _surum(k)
+        if senaryolar is not None:
+            metinler = [(b.aday.metin, b.alinti, aday_sayisi[id(b.aday)] == 1)
+                        for b in kayit_bulgulari.get(id(k), [])]
+            blok = sinav_senaryo.senaryo_blogu(k, metinler, senaryolar, bugun)
+            if blok is not None:
+                k["senaryo"] = blok   # not part of icerik_surumu: no new alert (spec §3.5)
         o = eski.get(k["id"])
         ata = None if o is not None or k["taban"] else next(
             (y for y in yetim if katla(str(y.get("ders") or "")) == katla(k["ders"])
@@ -276,10 +291,12 @@ def tespit_et(kok: Path, veri: dict, taban: list[dict], simdi: datetime, bitis: 
         # A file that is there but unreadable (torn, an older SURUM) is not a first
         # install: None would stamp every record "already there" and swallow its alert.
         onceki = {"surum": SURUM, "sinavlar": []}
-    kayitlar = birlestir(taban, sonuc.bulgular, onceki, simdi)
+    tablo = sinav_senaryo.tablo_oku()
+    kayitlar = birlestir(taban, sonuc.bulgular, onceki, simdi, senaryolar=tablo)
+    hatalar = (["senaryo tablosu okunamadı"] if tablo is None else []) + list(sonuc.hatalar)
     return {"uretildi": simdi.isoformat(timespec="seconds"), "surum": SURUM, "sinavlar": kayitlar,
             "ozet": {"aday": sonuc.aday, "incelenen": sonuc.incelenen, "incelenmedi": sonuc.incelenmedi,
-                     "butce_usd": sonuc.butce_usd, "hatalar": sonuc.hatalar[:5]}}
+                     "butce_usd": sonuc.butce_usd, "hatalar": hatalar[:5]}}
 
 
 def kuru_rapor(belge: dict) -> str:
@@ -295,6 +312,11 @@ def kuru_rapor(belge: dict) -> str:
         for x in k.get("kaynaklar") or []:
             satirlar.append(f"  Kaynak: {x.get('tur')} {json.dumps(x.get('konum'), ensure_ascii=False)}"
                             f" — {str(x.get('alinti') or '')[:120]}")
+        s = k.get("senaryo")
+        if isinstance(s, dict):
+            satirlar.append(f"  Senaryo: {s.get('durum')} · {s.get('ders')} {s.get('sinav_no')}. yazılı"
+                            + (f" · {s['senaryo']}. senaryo · {s['toplam']} soru" if s.get("senaryo") else "")
+                            + (f" · uyumlu {s['adaylar']}" if s.get("adaylar") else ""))
     o = belge.get("ozet") or {}
     satirlar.append(f"Özet: {len(belge.get('sinavlar') or [])} sınav · aday {o.get('aday', 0)} · incelenen "
                     f"{o.get('incelenen', 0)} · incelenmedi {o.get('incelenmedi', 0)} · bütçe "
