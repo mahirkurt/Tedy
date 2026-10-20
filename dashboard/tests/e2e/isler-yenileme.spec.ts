@@ -135,13 +135,17 @@ test('only figures are set in mono', async ({ page }) => {
   await expect(page.locator('.exams-ahead__row').first()).toContainText('1 Eki 09:00 · 7 gün sonra')
 })
 
-test('exams: the same list, and "Tüm sınavlar" in the list header', async ({ page }) => {
+test('exams: the same list, and "Tüm sınavlar" in the list header', async ({ page, context }) => {
   await sabitAc(page, '/isler', 1440, 900)
   const liste = page.locator('.isler-liste.exams-ahead')
   // A heading that names a section is title case (S38, revised 2026-10-19).
   await expect(liste.getByRole('heading', { name: 'Yaklaşan Sınavlar 2' })).toBeVisible()
   const tum = liste.locator('.cds--contained-list__header').getByRole('link', { name: 'Tüm sınavlar' })
   await expect(tum).toHaveClass(/cds--btn--ghost/)
+  // C13: a new-tab click is the browser's — the page stays where it is.
+  const [yeni] = await Promise.all([context.waitForEvent('page'), tum.click({ modifiers: ['ControlOrMeta'] })])
+  await yeni.close()
+  await expect(page).toHaveURL(/\/isler$/)
   await tum.click()
   await expect(page).toHaveURL(/\/sinavlar$/)
 })

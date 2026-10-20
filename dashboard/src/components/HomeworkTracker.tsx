@@ -22,6 +22,7 @@ import type { ExamsApiResponse, ModuleCard } from '../types'
 import { EmptyLine } from './patterns/EmptyLine'
 import { EkBaglantisi } from './patterns/EkBaglantisi'
 import { SinavEtiketi, IncelenmediNotu } from './SinavKarti'
+import { uygulamaIcindeAc } from '../utils/gezinme'
 import { useFocusMode } from '../contexts/focusMode'
 import YuklemeAlani from './YuklemeAlani'
 import { yaptimIsaretle, yaptimGeriAl } from '../utils/odevYaptim'
@@ -360,9 +361,14 @@ export default function HomeworkTracker() {
               <ContainedList className="isler-liste exams-ahead" kind="on-page" size="lg"
                 // A section's name is title case (S38, revised 2026-10-19); its count is "Başlık (n)".
                 label={<h2 className="isler-baslik__metin">Yaklaşan Sınavlar <Sayi n={upcomingExams.length} /></h2>}
-                // A page to go to, in the list's own action slot: a ghost button with an href (Bugün's "+N iş daha").
+                // A page to go to, in the list's own action slot: a ghost button with an href (Bugün's "+N iş
+                // daha"). A plain click stays in the app; a new-tab click is the browser's (C13).
                 action={<Button kind="ghost" size="lg" href="/sinavlar"
-                  onClick={e => { e.preventDefault(); navigate('/sinavlar') }}>Tüm sınavlar</Button>}>
+                  onClick={e => {
+                    if (!uygulamaIcindeAc(e, '/sinavlar')) return
+                    e.preventDefault()
+                    navigate('/sinavlar')
+                  }}>Tüm sınavlar</Button>}>
                 {upcomingExams.map(e => {
                   // A timed exam reads like a deadline; an all-day one is its day alone, a week-only or undated
                   // one as the exam page says it ("28 Eyl haftası", "Tarih belirsiz"; C11, C20).

@@ -174,6 +174,8 @@ dal 2026-10-15'ten sonra İşler'e ve kurallara şunları eklemişti; hepsi yeni
 - **Başlık düzeni** (S38, 2026-10-19 revizyonu): bölüm adı bir addır → "Yaklaşan Sınavlar (n)"; "Ayrıca", "Yapılan",
   "Tamamlandı", "Yapılmayan" tek sözcük. Cümle olan "Yaklaşan sınavlar şu an alınamadı." cümle düzeninde kalır.
   `test_s38_ad_basliklari_baslik_duzeninde` başlığı yakalar (küçük harfli hâliyle düştüğü denendi).
+- **Uygulama içi bağlantı** (C13, `utils/gezinme.ts`): "Tüm sınavlar" düz tıkta uygulama içinde gider, Ctrl/Cmd/orta
+  tık tarayıcıya kalır.
 - Fotoğraflı ödev ve belgeler (`YuklemeAlani`, belge silme onayı), "Asistana sor", "Yaptım/Geri al" akışı (S40, B63),
   odak kipi, 400 ms iskeleti ve hata bildirimi 2026-10-15 sürümünde zaten vardı; davranışları değişmedi.
 
