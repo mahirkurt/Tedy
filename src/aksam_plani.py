@@ -326,7 +326,13 @@ def plan_kur(satirlar: list[dict], tahmin: Callable[[dict], OdevTahmini], duzen:
         if p.id in ertelenen and p.anahtar not in ilk_ertelenen:
             ilk_ertelenen[p.anahtar] = p.parca
     on = [p for p in bekleyen if p.anahtar not in ilk_ertelenen or p.parca < ilk_ertelenen[p.anahtar]]
-    on = [p for p in on if p.anahtar in one_al] + [p for p in on if p.anahtar not in one_al]  # öne al: kararlı bölme
+    # Öne alınan (aile/asistan) en başa; sonra zor dilime puan sırasıyla zor/orta işler, kolaylar onlardan
+    # sonra (§6.3): kolay iş zor işin sonundan sonraki hafif dilime, ondan önceki boşluğa ancak hiçbir
+    # zor/orta parça sığmadığında girer — puanı yüksek bir kolay iş zor bir işi yarına itmez. Bir ödevin
+    # bütün parçaları aynı zorluktadır; kararlı bölme parça sırasını korur.
+    on = ([p for p in on if p.anahtar in one_al]
+          + [p for p in on if p.anahtar not in one_al and p.zorluk != "kolay"]
+          + [p for p in on if p.anahtar not in one_al and p.zorluk == "kolay"])
     sona = [p for p in bekleyen if p.anahtar in ilk_ertelenen and p.parca >= ilk_ertelenen[p.anahtar]]
 
     # ---- yerleştirme
@@ -552,8 +558,11 @@ class PlanDeposu:
 class CalismaKayitlari:
     """`output/calisma_kayitlari.jsonl`: her dokunuş (başla, bitti, ertelendi) bir satır, eklemeli.
 
-    Kalibrasyon yalnız başlatılıp `bitti` denen satırlardan: ders başına son 10 kaydın gerçek/ham (`ham_dk`) oranının
-    medyanı, [0,5; 2,0]'ya kıstırılır; 3'ten az kayıtta 1,0 (öğrenme başlamadı)."""
+    Kalibrasyon yalnız başlatılıp `bitti` denen satırlardan: ders başına son 10 kaydın
+    gerçek / (ham × tampon) oranının medyanı, [0,5; 2,0]'ya kıstırılır; 3'ten az kayıtta 1,0 (öğrenme
+    başlamadı). Payda tamponlu ham tahmindir (`ham_dk` × `TAMPON`), yani kalibrasyonsuz istenen süre:
+    çarpan c iken tam istenen sürede (ham × c × tampon) biten iş c oranını kaydeder, çarpan kendi
+    kendini büyütmez (R28; R12'nin "gerçek/ham" paydasının yerine)."""
 
     def __init__(self, kok: Path):
         self.yol = Path(kok) / KAYIT_DOSYASI
@@ -583,7 +592,7 @@ class CalismaKayitlari:
                     except (ValueError, KeyError, TypeError):
                         continue
                     if ham > 0 and gercek >= 0:
-                        oranlar.append(gercek / ham)
+                        oranlar.append(gercek / (ham * TAMPON))
         except OSError:
             return 1.0
         oranlar = oranlar[-KALIBRASYON_SON:]

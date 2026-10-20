@@ -4,7 +4,7 @@ Uçlar oturum + tam rol ister (okuyucu default-deny), bayrak kapalıyken 404 {"k
 saat `_simdi()` üzerinden gelir, tahmin deposu `_tahmin_deposu()` ile değiştirilir (model yok)."""
 import json
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -108,20 +108,34 @@ def test_kayit_ve_kalibrasyon(tmp_path):
     k = CalismaKayitlari(tmp_path)
 
     def satir(gun, ders, dk, durum="bitti"):
-        return {"gun": gun, "odev_anahtari": f"{ders}-{gun}", "ders": ders, "tahmin_dk": 20, "ham_dk": 20,
+        return {"gun": gun, "odev_anahtari": f"{ders}-{gun}", "ders": ders, "tahmin_dk": 25, "ham_dk": 20,
                 "basla": f"2026-10-{gun}T17:00:00", "bitti": f"2026-10-{gun}T17:{dk:02d}:00", "durum": durum}
     assert k.kalibrasyon("Matematik") == 1.0                      # kayıt yok
-    k.ekle(satir("12", "Matematik", 40))
+    k.ekle(satir("12", "Matematik", 50))
     assert k.kalibrasyon("Matematik") == 1.0                      # 1 kayıt < 3
-    k.ekle(satir("13", "Matematik", 40))
-    k.ekle(satir("14", "Matematik", 40))
-    assert k.kalibrasyon("Matematik") == 2.0                      # gerçek = 2 × tahmin
+    k.ekle(satir("13", "Matematik", 50))
+    k.ekle(satir("14", "Matematik", 50))
+    assert k.kalibrasyon("Matematik") == 2.0                      # gerçek = 2 × (ham × tampon)
     k.ekle(satir("15", "Fen Bilimleri", 59))                      # başka ders etkilemez
     assert k.kalibrasyon("Fen Bilimleri") == 1.0
     k.ekle(satir("16", "Matematik", 5, durum="suruyor"))          # yalnız bitti satırları
     assert k.kalibrasyon("Matematik") == 2.0
     satirlar = (tmp_path / "output/calisma_kayitlari.jsonl").read_text().splitlines()
     assert len(satirlar) == 5 and json.loads(satirlar[0])["ders"] == "Matematik"
+
+
+def test_kalibrasyon_istenen_surede_biten_is_sabit_noktadir(tmp_path):
+    """R28 küçük 7: oran gerçek / (ham × tampon). Çarpan c iken plan ham × c × tampon dakika ister;
+    tam o sürede biten iş c'yi kaydeder: çarpan kendini büyütmez (eski gerçek/ham paydası onu her akşam
+    %25 artırıyordu: 1,0 → 1,25 → 1,56 …)."""
+    for c in (1.0, 1.3, 0.8):
+        k = CalismaKayitlari(tmp_path / str(c))
+        for i in range(5):
+            istenen = 16 * c * 1.25                               # ham 16 dk'nın istenen süresi
+            k.ekle({"gun": "g", "odev_anahtari": f"a{i}", "ders": "Matematik", "tahmin_dk": round(istenen),
+                    "ham_dk": 16, "basla": "2026-10-12T17:00:00",
+                    "bitti": (datetime(2026, 10, 12, 17, 0) + timedelta(minutes=istenen)).isoformat(), "durum": "bitti"})
+        assert k.kalibrasyon("Matematik") == pytest.approx(c, abs=1e-6)
 
 
 def test_kalibrasyon_sinirli_ve_hizli_bitirmeyi_bilir(tmp_path):
@@ -144,9 +158,9 @@ def test_kalibrasyon_son_on_kayda_bakar(tmp_path):
     for i in range(10):                                           # eskiler 2×
         k.ekle({"gun": "g", "odev_anahtari": f"e{i}", "ders": "Matematik", "tahmin_dk": 20, "ham_dk": 20,
                 "basla": "2026-10-12T17:00:00", "bitti": "2026-10-12T17:40:00", "durum": "bitti"})
-    for i in range(10):                                           # son 10'u tam tahmin
-        k.ekle({"gun": "g", "odev_anahtari": f"y{i}", "ders": "Matematik", "tahmin_dk": 20, "ham_dk": 20,
-                "basla": "2026-10-12T17:00:00", "bitti": "2026-10-12T17:20:00", "durum": "bitti"})
+    for i in range(10):                                           # son 10'u tam istenen süre (20 × 1,25)
+        k.ekle({"gun": "g", "odev_anahtari": f"y{i}", "ders": "Matematik", "tahmin_dk": 25, "ham_dk": 20,
+                "basla": "2026-10-12T17:00:00", "bitti": "2026-10-12T17:25:00", "durum": "bitti"})
     assert k.kalibrasyon("Matematik") == 1.0
 
 
@@ -469,7 +483,7 @@ def test_bozuk_anlik_goruntu_plani_dusurmez(ortam):
 @pytest.mark.parametrize("dakika", [7, 8, 13, 25])
 def test_ham_pay_kalibrasyondan_bagimsiz_ve_kalibrasyon_oranini_verir(tmp_path, dakika, carpan):
     """R12: normal parçaların ham payları toplamı tahmindir, çarpan ne olursa olsun; kayıtlardan
-    kalibrasyon gerçek/ham oranını verir; ek parça ölçüme girmez."""
+    kalibrasyon gerçek / (ham × tampon) oranını verir (R28); ek parça ölçüme girmez."""
     from datetime import timedelta
     from src.aksam_duzeni import VARSAYILAN
     from src.aksam_plani import plan_kur
@@ -485,11 +499,11 @@ def test_ham_pay_kalibrasyondan_bagimsiz_ve_kalibrasyon_oranini_verir(tmp_path, 
     assert [b.ham_dk for b in ek] == [0.0, 0.0]
     k = CalismaKayitlari(tmp_path)
     basla = datetime(2026, 10, 19, 17, 0)
-    for b in parcalar:                                            # her parça ham payının 1,5 katı sürdü
+    for b in parcalar:                                            # her parça ham × tampon payının 1,5 katı sürdü
         for _ in range(3):
             k.ekle({"gun": "g", "odev_anahtari": "k", "ders": "Matematik", "tahmin_dk": b.tahmin_dk,
                     "ham_dk": b.ham_dk, "basla": basla.isoformat(),
-                    "bitti": (basla + timedelta(seconds=90 * b.ham_dk + 900 * (b.ham_dk == 0))).isoformat(),
+                    "bitti": (basla + timedelta(seconds=90 * 1.25 * b.ham_dk + 900 * (b.ham_dk == 0))).isoformat(),
                     "durum": "bitti"})
     assert k.kalibrasyon("Matematik") == pytest.approx(1.5, abs=1e-6)
 

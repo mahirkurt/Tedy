@@ -398,6 +398,47 @@ def test_one_al_odevi_baslamamis_isin_en_basina_koyar():
 
 # ── R28 düzeltme turu ────────────────────────────────────────────────────────────
 
+def test_zor_dilime_once_zor_ve_orta_isler_kolay_is_zor_isi_yarina_itmez():
+    """§6.3 (R28 küçük 5): zor dilime puan sırasıyla zor/orta işler, kolaylar sonra. Yarın teslim kolay
+    iş (puan 3) ile 5 gün sonra teslim zor iş (puan 3) eşit; tarih bağı eskiden kolayı öne alıyordu:
+    17:40'ta başlayan akşamda kolay iş 17:40'ı, zor işin ikinci parçası yemeğe çarpıp 19:00'u aşıyor ve
+    zor iş yarına taşınıyordu. Şimdi zor iş zor dilime sığar, kolay iş yemekten sonra hafif dilimde."""
+    TAHMINLER["z"] = OdevTahmini(32, "zor", "Başla", ["a", "b"], "model")    # 32 × 1,25 = 40 → 20 + 20
+    TAHMINLER["k"] = OdevTahmini(10, "kolay", "Listeyi oku", [], "model")    # 13 dk
+    try:
+        satirlar = [satir("z", "Matematik", "Problemler", BES_GUN), satir("k", "İngilizce", "Kelimeler", YARIN)]
+        p = kur(simdi="2026-10-19 17:40", satirlar=satirlar)
+        c = calisma(p)
+        assert [b.odev_anahtari for b in c] == ["z", "z", "k"]
+        assert all(b.bit <= 19 * 60 for b in c if b.odev_anahtari == "z")
+        k = c[-1]
+        assert k.bas >= 19 * 60 and k.bit <= 19 * 60 + 30                 # yemekten sonra, hafif dilimde
+        assert p.tasinan == [] and p.sigmayan == []
+    finally:
+        del TAHMINLER["z"], TAHMINLER["k"]
+
+
+def test_kolay_is_zor_dilimdeki_bosluga_yalniz_zor_is_sigmayinca_girer():
+    """18:12'de 20 dk'lık orta parça yemekten (18:30) önce sığmaz, yemekten sonra 19:00'u aşar: taşınır.
+    Önündeki boşluğa 13 dk'lık kolay iş girer (hiçbir zor/orta parça sığmadığında)."""
+    TAHMINLER["o"] = OdevTahmini(16, "orta", "Başla", [], "model")           # 20 dk
+    TAHMINLER["k"] = OdevTahmini(10, "kolay", "Listeyi oku", [], "model")    # 13 dk
+    try:
+        satirlar = [satir("o", "Fen Bilimleri", "Özet", BES_GUN), satir("k", "İngilizce", "Kelimeler", BES_GUN)]
+        p = kur(simdi="2026-10-19 18:12", satirlar=satirlar)
+        c = calisma(p)
+        assert [(b.odev_anahtari, b.bas) for b in c] == [("k", 18 * 60 + 12)]
+        assert [t["odev_anahtari"] for t in p.tasinan] == ["o"]
+    finally:
+        del TAHMINLER["o"], TAHMINLER["k"]
+
+
+def test_one_alinan_kolay_is_zor_islerden_once_gelir():
+    """Aile ya da asistan öne aldıysa (one_al) kolay iş de en başa gelir: aşma, zor dilim kuralından üstündür."""
+    p = kur(gunluk={"one_al": ["yarin-kolay"]})
+    assert calisma(p)[0].odev_anahtari == "yarin-kolay"
+
+
 def test_hazirliktan_sonra_suren_ve_biten_bloklar_planda_kalir():
     """R28 küçük 1: 20:30'dan sonra yeni iş yerleşmez, durum "bitti"; ama anlık görüntüsü olan süren ve
     biten bloklar planda kalır (süren blok "Bitti" ile kapanabilsin)."""
