@@ -15,6 +15,7 @@ import fcntl
 import hashlib
 import json
 import logging
+import math
 import os
 import re
 import time
@@ -32,7 +33,20 @@ logger = logging.getLogger(__name__)
 
 ISTEM_SURUMU = 1
 VARSAYILAN_MODEL = "claude-haiku-4-5"
-AYLIK_TAVAN_USD = float(os.environ.get("TEDY_PLAN_AYLIK_USD", "2"))
+VARSAYILAN_AYLIK_USD = 2.0
+
+
+def ortam_usd(ad: str, varsayilan: float = VARSAYILAN_AYLIK_USD) -> float:
+    """Ortamdaki aylık tavan (USD): sonlu, negatif olmayan bir sayı; gerisi (yazım hatası, "nan",
+    eksi) varsayılandır. İçe aktarmada okunur: bozuk bir değer panoyu ve senkronu düşürmemeli."""
+    try:
+        deger = float(str(os.environ.get(ad, "")).strip())
+    except ValueError:
+        return varsayilan
+    return deger if math.isfinite(deger) and deger >= 0 else varsayilan
+
+
+AYLIK_TAVAN_USD = ortam_usd("TEDY_PLAN_AYLIK_USD")
 ONBELLEK = "output/odev_tahmin_onbellegi.json"
 DEFTER = "output/odev_tahmin_defteri.json"
 OKUR = "output/odev_tahmin_okur.json"

@@ -229,3 +229,35 @@ def test_defter_hatasi_isit_disina_cikmaz(tmp_path, monkeypatch):
     monkeypatch.setattr(d.defter, "izin_var", patla)
     ozet = d.isit([SATIR], BUGUN, bitis=time.monotonic() + 30)
     assert sahte.cagri == 0 and ozet["durdu"] == "defter" and "kilit" in ozet["son_hata"]
+
+
+# ── R28 küçük 3: aylık tavan hoşgörüyle okunur ─────────────────────────────────────
+
+def test_aylik_tavan_bozuk_degerde_varsayilana_duser(monkeypatch):
+    """`TEDY_PLAN_AYLIK_USD` sınav çıkarımındaki gibi hoşgörüyle okunur: yazım hatası, "nan", sonsuz ya da
+    eksi değer varsayılan 2 USD'dir, içe aktarma düşmez."""
+    from src.odev_tahmini import VARSAYILAN_AYLIK_USD, ortam_usd
+    assert VARSAYILAN_AYLIK_USD == 2.0
+    for kotu in ("abc", "", "  ", "nan", "inf", "-1", "2,5", "1e400"):
+        monkeypatch.setenv("TEDY_PLAN_AYLIK_USD", kotu)
+        assert ortam_usd("TEDY_PLAN_AYLIK_USD") == 2.0, kotu
+    monkeypatch.delenv("TEDY_PLAN_AYLIK_USD")
+    assert ortam_usd("TEDY_PLAN_AYLIK_USD") == 2.0
+    for iyi, beklenen in (("3.5", 3.5), (" 0 ", 0.0), ("10", 10.0)):
+        monkeypatch.setenv("TEDY_PLAN_AYLIK_USD", iyi)
+        assert ortam_usd("TEDY_PLAN_AYLIK_USD") == beklenen
+
+
+def test_bozuk_aylik_tavan_ice_aktarmayi_dusurmez():
+    # Ayrı süreçte: modülü bu süreçte yeniden yüklemek conftest korumalarının yamaladığı sınıfları bozar.
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    kok = Path(__file__).resolve().parents[1]
+    ortam = {**os.environ, "TEDY_PLAN_AYLIK_USD": "iki dolar"}
+    ortam.pop("ANTHROPIC_API_KEY", None)
+    r = subprocess.run([sys.executable, "-c", "import src.odev_tahmini as o; print(o.AYLIK_TAVAN_USD)"],
+                       cwd=kok, env=ortam, capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == "2.0"

@@ -4485,8 +4485,10 @@ def assistant_plan():
         return jsonify(out)
     except AssistantUnavailableError:
         return jsonify({"error": "assistant_unavailable"}), 503
-    except Exception as e:
-        return jsonify({"error": f"assistant plan failed: {e}"}), 500
+    except Exception:
+        # The exception's text is internal (D4): logged here, never put on the page.
+        app.logger.exception("Assistant plan failed")
+        return jsonify({"error": "Çalışma planı şu an hazırlanamadı."}), 500
 
 
 @app.route("/api/assistant/reindex", methods=["POST"])

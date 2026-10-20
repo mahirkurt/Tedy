@@ -571,7 +571,9 @@ def test_basla_baska_blok_surerken_409(ortam):
 def test_yeni_dosyalar_bm25_disinda():
     from src.assistant_core import DEFAULT_EXCLUDED_FILE_PATTERNS as P
     for ad in ("aksam_plani.json", "aksam_plani.json.bozuk-20261019170000", "aksam_plani.json.lock",
-               "calisma_kayitlari.jsonl", "calisma_kayitlari.jsonl.lock"):
+               "calisma_kayitlari.jsonl", "calisma_kayitlari.jsonl.lock",
+               "aksam_bildirim_durumu.json", "aksam_bildirim_defteri.jsonl",      # R28 küçük 2
+               "aksam_bildirim_defteri.jsonl.lock"):
         assert any(fnmatch.fnmatch(ad, d) for d in P), ad
 
 

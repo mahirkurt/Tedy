@@ -297,6 +297,9 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     "calisma_kayitlari.jsonl",
     # Evening-plan homework estimates, their spend ledger and the reader's own minutes: plan internals.
     "odev_tahmin_*",
+    # Evening-plan alert round: its last-round status and the send ledger (e-mails, block ids).
+    "aksam_bildirim_durumu.json",
+    "aksam_bildirim_defteri.jsonl",
     # Process/cron bookkeeping: pid files, crontab dumps, the sync scheduler state.
     "*.pid",
     "crontab*",
