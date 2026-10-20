@@ -33,8 +33,12 @@ def test_api_blogu_gecirir(monkeypatch):
 def test_api_blok_yoksa_null(monkeypatch):
     monkeypatch.setattr(dashboard_api, "_sinavlar_belgesi", lambda: _belge(None))
     assert dashboard_api._sinav_api_listesi({}, now=datetime(2026, 10, 19, 10))["exams"][0]["senaryo"] is None
+    # Fallback branch (no sinavlar.json): fed a real takvim exam, so the list is not empty and the
+    # assertion below is not vacuously true.
+    from tests.sinav_fikstur import TAKVIM_SINAV
     monkeypatch.setattr(dashboard_api, "_sinavlar_belgesi", lambda: None)
-    eski = dashboard_api._sinav_api_listesi({"takvim": []}, now=datetime(2026, 10, 19, 10))
+    eski = dashboard_api._sinav_api_listesi({"takvim": TAKVIM_SINAV}, now=datetime(2026, 10, 19, 10))
+    assert eski["exams"]
     assert all(e["senaryo"] is None for e in eski["exams"])
 
 
