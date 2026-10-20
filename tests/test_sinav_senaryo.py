@@ -313,3 +313,48 @@ def test_noktasiz_numara_sinav_no_sayilmaz(baslik, tur):
 
 def test_proje_sinavi_diger_sinav_no_sayilmaz():
     assert ss.sutun_coz(kayit(tur="diger", baslik="Proje 1 sınavı", tarih="2026-11-03"), TABLO, BUGUN) is None
+
+
+# --- Düzeltme turu 2 ---------------------------------------------------------------------------
+
+# Konu çıktının tam ifadesini içeriyorsa (duyuru çıktıyı birebir anıyor) yalnız o çıktılar döner; konu grubuna
+# genişletilmez. Önceki tur kuralı (konu adı / eşit puanlı çıktılar) bunun dışında aynen geçerlidir.
+BES_DERS = ("Fen Bilimleri", "Türkçe", "Matematik", "Sosyal Bilgiler", "Din Kültürü")
+GENISLEYENLER = [("Fen Bilimleri", "FB.7.3.1"), ("Fen Bilimleri", "FB.7.3.2"), ("Fen Bilimleri", "FB.7.3.3"),
+                 ("Fen Bilimleri", "FB.7.3.5"), ("Din Kültürü", "DKAB.7.2.3")]
+
+
+def test_cikti_ifadesi_konuya_genisletilmez():
+    sorunlar = []
+    for ders in BES_DERS:
+        ciktilar = TABLO["dersler"][ders]["ciktilar"]
+        for c in ciktilar:
+            beklenen = [o["kod"] for o in ciktilar if ss.katla(o["metin"]) in ss.katla(c["metin"])]
+            sonuc = ss.konu_eslestir(c["metin"], ciktilar)
+            if c["kod"] not in sonuc or sonuc != beklenen:
+                sorunlar.append(f"{ders} {c['kod']}: {sonuc} (beklenen {beklenen})")
+    assert not sorunlar, "çıktı ifadesi kendi koduna eşleşmeli:\n" + "\n".join(sorunlar)
+
+
+@pytest.mark.parametrize("ders,kod", GENISLEYENLER)
+def test_cikti_ifadesi_tam_olarak_kendi_kodu(ders, kod):
+    ciktilar = TABLO["dersler"][ders]["ciktilar"]
+    metin = next(c["metin"] for c in ciktilar if c["kod"] == kod)
+    assert ss.konu_eslestir(metin, ciktilar) == [kod]
+
+
+def test_birden_cok_cikti_ifadesi_hepsi_doner():
+    fen = TABLO["dersler"]["Fen Bilimleri"]["ciktilar"]
+    metinler = {c["kod"]: c["metin"] for c in fen}
+    konu = f"{metinler['FB.7.3.3']} ve {metinler['FB.7.3.5']}"
+    assert ss.konu_eslestir(konu, fen) == ["FB.7.3.3", "FB.7.3.5"]
+
+
+def test_cikti_ifadesi_kural_onceki_tur_kararlarini_bozmaz():
+    fen = TABLO["dersler"]["Fen Bilimleri"]["ciktilar"]
+    assert set(ss.konu_eslestir("Dolaşım Sistemi", fen)) == _konu_kodlari("Fen Bilimleri", "Dolaşım Sistemi")
+    ad = "Dikdörtgenler Prizmasının Hacmi ve Yüzey Alanı"
+    assert set(ss.konu_eslestir(ad, TABLO["dersler"]["Matematik"]["ciktilar"])) == _konu_kodlari("Matematik", ad)
+    tr = TABLO["dersler"]["Türkçe"]["ciktilar"]
+    assert set(ss.konu_eslestir("Metnin derin anlamı", tr)) == {"T.O.7.7", "T.O.7.8"}
+    assert set(ss.konu_eslestir("Söz varlığı", tr)) == {"T.O.7.4", "T.O.7.21", "T.Y.7.18"}

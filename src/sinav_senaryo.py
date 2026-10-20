@@ -195,6 +195,14 @@ def konu_eslestir(konu: str, ciktilar: list[dict]) -> list[str]:
               if re.search(rf"(?<![\w.]){re.escape(katla(c['kod']))}(?!\d)", k)]
     if kodlar:
         return kodlar
+    # Konu bir ya da birkaç çıktının tam ifadesini içeriyorsa duyuru o çıktıları birebir anıyordur: yalnız onlar
+    # (konu grubuna genişletilmez).
+    for c in ciktilar:
+        metin = _KOD_ONEKI.sub("", katla(c["metin"]))
+        if len(metin) >= 10 and metin in k:
+            kodlar.append(c["kod"])
+    if kodlar:
+        return kodlar
     # Eşit puanlı çıktıların hepsi; konu adı, en az eşiği ve en iyi çıktı puanını tutuyorsa çıktıdan önce gelir.
     puanlar = [(c["kod"], _puan(konu, c["metin"])) for c in ciktilar]
     en_cikti = max((p for _, p in puanlar), default=0.0)
