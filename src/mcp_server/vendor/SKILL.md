@@ -616,8 +616,8 @@ listeler (örn. `francais-coach → carbon-edupedia`,
 - **Statik baskı dokümanı değil** → `carbon-html-report`. Bu yetkinlik
   *etkileşimli* HTML üretir; baskıda etkileşimler kaybolur.
 - **Backend yok; tarayıcı depolaması sıkı izin listelidir.** `localStorage` yalnız
-  Leitner kutularını kalıcı tutar (`meta.id` varsa anahtara girer); tema kaydı Kanun M4.1 ile
-  kalkar (şablonda borç KB-1). İç XP sayısı ve yanıt kümeleri yalnız `sessionStorage`'dadır; sekme oturumu dışında
+  Leitner kutularını kalıcı tutar (`meta.id` varsa anahtara girer); tema kaydı yoktur (Kanun M4.1;
+  2026-10-20'de kalktı, KB-1). İç XP sayısı ve yanıt kümeleri yalnız `sessionStorage`'dadır; sekme oturumu dışında
   skor/ilerleme kalıcılığı yoktur. Her erişim try/catch ile degrade-safe'tir;
   depolama engelliyse çekirdek modül bellekte çalışmayı sürdürür.
 - **Gerçek-zamanlı veri yok; tek istisna Müfredat MCP.** Çıktı tek-dosya offline

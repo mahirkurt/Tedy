@@ -1,6 +1,6 @@
 # TEDY UI-UX Tasarım Talimatnamesi
 
-**Sürüm 2.0 · 2026-10-19 · Kapsam: `dashboard/` (React 19, `@carbon/react` ^1.114.0, `@carbon/ai-chat` 1.22.0),
+**Sürüm 2.1 · 2026-10-20 · Kapsam: `dashboard/` (React 19, `@carbon/react` ^1.114.0, `@carbon/ai-chat` 1.22.0),
 Tedy Books ve edupedia modülleri (`src/mcp_server/vendor/`)**
 
 Bu belge TEDY'de bir arayüz kararının **nereden okunacağını** ve **hangi sırayla bağlayıcı olduğunu** yazar.
@@ -39,14 +39,21 @@ Liste sıralıdır: önce birinci satır okunur. "Talimatname §N" bu belgenin b
 
 ### 0.2 Öncelik sırası
 
-1. Değişmezler D1–D4 → 2. İlkeler İ1–İ9 (testleriyle) → 3. [Modül Tasarım Kanunu](tedy-modul-tasarim-kanunu.md)
-(yalnız modül yüzeylerinde) → 4. Talimatname (bu kurallar, sapmalar dahil) → 5. Yüzey tasarımları → 6. Bileşen
-rehberi → 7. `tedy-carbon` katmanı → 8. edupedia vendor (`src/mcp_server/vendor/SKILL.md`, `references/`) ve
-edupedia Claude eklentisi → 9. carbon-builder → 10. Carbon'un genel rehberi.
+1. Değişmezler D1–D4 → 2. İlkeler İ1–İ9 → 3. [Modül Tasarım Kanunu](tedy-modul-tasarim-kanunu.md) (yalnız
+kanun §0.1 kapsamında) → 4. Talimatname → 5. Yüzey tasarımları → 6. Bileşen rehberi → 7. `tedy-carbon` →
+8. edupedia vendor (`src/mcp_server/vendor/SKILL.md`, `references/` ve `edupedia_rehber` çıktısının bunlardan
+gelen kısmı) ve edupedia Claude eklentisi → 9. carbon-builder → 10. Carbon'un genel rehberi.
 
-Kanunun kapsamı modül yüzeyleridir: çerçevenin içi, modül sayfasının başı ve kabı, taslak önizleme ve
-`MODULE_DATA`'nın görünümü etkileyen alanları (kanun §0.1); `/moduller` listesi, müfredat ağacı ve panonun
-geri kalanı bu belgenindir.
+- Anayasanın D/İ dışındaki bölümleri (§5 Sistem, §9 Yapmayacaklarımız, §10 kapıları) D1–D4 ile İ1–İ9'un
+  açıklamasıdır ve onlarla aynı basamaktadır. İlkeler testleriyle bağlayıcıdır (§2); bu belgenin sapmaları ve
+  kararları (§11) 4. basamaktadır.
+
+Kanunun kapsamı modül yüzeyleridir (kanun §0.1): çerçevenin içi; modül sayfasının başı ve kabı; aynı yüzeylerin
+öteki açılışları (taslak önizleme ve bildirimi, `modul.tedy.online`'da tek başına açılış, bilet geçersiz sayfası);
+`MODULE_DATA`'nın görünümü etkileyen alanları ve `meta.assets`. `/moduller` listesi, müfredat ağacı ve panonun geri
+kalanı bu belgenindir. Modül yüzeylerinde kanunun düzenlemediği her konuda bu belge ve alttaki basamaklar
+uygulanır; kanunun düzenlediği bir konuda bu belgenin aynı konudaki kuralı modülde uygulanmaz ve modül için
+kanuna yönlendirir (kanun §0.1 aynı cümleyi taşır).
 
 Çelişkide üstteki kazanır. Ölçüm, varsayımı yener: "ölçüldü" diyen bir kural, kaynak belirtmeyen bir
 genellemeden üstündür.
@@ -64,7 +71,7 @@ kaydı, bugünün kanıtı değil.
 
 | Dosya | Rolü | Sahibi / nasıl değişir |
 |---|---|---|
-| `docs/tedy-ui-ux-talimatnamesi.md` (bu belge) | Giriş kapısı ve konsolide kurallar: 15 premium işçilik ilkesi (P1–P15, §7), 49 bilinçli sapma ve kararlaştırılmış çelişki (S1–S46, S48–S50; S47 kullanılmadı; S35–S45 2026-10-10'da Ç1–Ç11'den; karar bekleyen çelişki yok, §11), kapılar (§12) ve **borç kaydı** (§13: B1–B80; kapananlar satırlarında) | Elle; §14.2'deki kurala göre, değişiklik kaydıyla |
+| `docs/tedy-ui-ux-talimatnamesi.md` (bu belge) | Giriş kapısı ve konsolide kurallar: 15 premium işçilik ilkesi (P1–P15, §7), 49 bilinçli sapma ve kararlaştırılmış çelişki (S1–S46, S48–S50; S47 kullanılmadı; S35–S45 2026-10-10'da Ç1–Ç11'den; karar bekleyen çelişki yok, §11), kapılar (§12) ve **borç kaydı** (§13: B1–B81; kapananlar satırlarında; modül yüzeylerinin borçları kanun §9'da) | Elle; §14.2'deki kurala göre, değişiklik kaydıyla |
 | [`docs/tedy-modul-tasarim-kanunu.md`](tedy-modul-tasarim-kanunu.md) | Modül Tasarım Kanunu: modül yüzeylerinin bağlayıcı tasarım kuralları (M1–M5), adlı sapmalar (KS), kanun borçları (KB); öncelikte bu belgenin önünde, yalnız modül yüzeylerinde (§0.2) | Elle; kanunun kendi §10.1 usulüyle. `edupedia_rehber` onu `kanun` bölümü olarak bütünüyle servis eder ve §1'ini `akis` ile `carbon`'un başına koyar (`src/mcp_server/rehber.py`); `## N.` numaraları sabit, §1 ≤ 3300 bayt (`tests/test_mcp_rehber.py`); kopyası yoktur |
 | [`docs/frontend-design-principles.md`](frontend-design-principles.md) | Anayasa: kullanıcı, merkezî gerçek, D1–D4, İ1–İ9, yapmayacaklarımız, doğrulama kapıları | Elle; bölüm numaraları ve D/İ kimlikleri sabittir (testler, kod yorumları, vendor otoritesi onlara bağlanır) |
 | [`docs/frontend-surface-designs.md`](frontend-surface-designs.md) | Anayasanın yüzey yüzey uygulaması; ortak kalıplar §2, kabuk §3, yüzeyler §4 | Elle; bölüm numaraları sabit |
@@ -92,7 +99,11 @@ kaydı, bugünün kanıtı değil.
   da Carbon MCP `anchor_url`. Uydurma token, prop ya da sayı yazılmaz.
 - Repo iddiası `yol:satır` ile yazılır; satır numaraları kayabilir, dosya adı yetiyorsa dosya adı.
 - Anayasanın metni buraya kopyalanmaz; kuralın özü ve bağlantısı yazılır.
-- S (sapma) ve B (borç) numaraları yeniden kullanılmaz; kapanan satır silinmez, "kapandı" ve commit'iyle kalır.
+- S (sapma) ve B (borç) numaraları yeniden kullanılmaz; kapanan satır silinmez, "kapandı", tarihi ve commit'iyle
+  kalır. Kanun aynı kuralı M, KS ve KB için yazar (kanun §10.1).
+- Modül yüzeyine değen bir kural kanunun kimliğiyle anılır (M, KS, KB); metni buraya kopyalanmaz. Sözlük eşlemesi:
+  kanunun "Denetim" satırı bu belgenin *Test* satırıdır, "kurulacak: KB-n" bu belgenin "(eklenir)" + borcudur,
+  "Durum: uyuyor / borç KB-n" bu belgenin *Ölçülen:* … → B-n kalıbıdır.
 
 ---
 
@@ -135,7 +146,7 @@ elle denetlenir. Kapının kapsamadığı ölçülmüş açıklar §13'tedir.
 | Kural | Özü (bir satır) | Testi (bir satır) | Uygulayan kapı |
 |---|---|---|---|
 | **D1** Carbon token'ları zorunlu | Renk, tip, aralık, hareket `--cds-*` ya da onlardan türeyen `--ted-*`'dan; elle hex/px/ms yok | Stilde elle yazılmış değer var mı? | `npm run lint:css` (`carbon/theme-use`, `layout-use`, `type-use`, `motion-*`); `tests/test_pano_tasarim_sistemi.py` (aritmetik, hex, lacivert); `tests/test_ders_renkleri.py` (palet dışı renk); `tests/test_tedy_tasarim_tutarliligi.py`. Açık: TSX satır içi stil (B4, B12), yarıçap/boyut (B14) |
-| **D2** Erişilebilirlik tabanı | AA kontrast, klavye + görünür odak, azaltılmış hareket gerçekten uygulanır, her etkileşimli öğenin adı var | axe ve IBM Equal Access 0 ihlal; klavye turu tamam | `tasarim-denetimi.spec.ts` (axe `wcag2a…wcag22aa` + `best-practice`, 14 sayfa × 1440/390; `/daha-fazla` B27 ile); `ibm-erisilebilirlik.spec.ts`; `kontrast.spec.ts`; `d3b-dokunma.spec.ts` (44 px); `gorunum-kipleri.spec.ts` (azaltılmış hareket, zorunlu renk); `aria-yapisi.spec.ts`; `npm run lhci` (a11y ≥ 0.95). Klavye turu elle — §12 kapısı |
+| **D2** Erişilebilirlik tabanı | AA kontrast, klavye + görünür odak, azaltılmış hareket gerçekten uygulanır, her etkileşimli öğenin adı var | axe ve IBM Equal Access 0 ihlal; klavye turu tamam | `tasarim-denetimi.spec.ts` (axe `wcag2a…wcag22aa` + `best-practice`, 14 sayfa × 1440/390; `/daha-fazla` B27 ile); `ibm-erisilebilirlik.spec.ts`; `kontrast.spec.ts`; `d3b-dokunma.spec.ts` (44 px); `gorunum-kipleri.spec.ts` (azaltılmış hareket, zorunlu renk); `aria-yapisi.spec.ts`; `npm run lhci` (a11y ≥ 0.95). Klavye turu elle — §12 kapısı. Açık: modül rotası bu takımların hiçbirinde yok ([Kanun KB-33](tedy-modul-tasarim-kanunu.md)) |
 | **D3** Sessiz arıza yok | Boş bölüm nedenini söyler; "veri yok" ile "sistem bozuk" ayırt edilir | Boş ya da bozuk durumda ekran neden yazıyor mu? | `empty-surfaces.spec.ts`, `okunamadi.spec.ts`, `portal-status.spec.ts`, `polish.spec.ts` (boş tablo), `sinav-ve-hata.spec.ts` ve `bugun-yarin-yaptim.spec.ts` (Yaptım kaydedilemezse söyler). Açık: Bugün'ün API hataları (B6) |
 | **D4** İç temsil okura sızmaz | `reason`/`kind` alanlarında kalır; ekranda insan cümlesi | Ekranda ham token, ISO damgası, iç kod var mı? | `homework.spec.ts` ("no machine timestamp"), `bugun-duzen.spec.ts` A ("okura sızan": ham HTML, çıplak sayaç). Açık: `window.alert` + ham hata (B22). Sızıntı taraması elle — §12 kapısı |
 | **İ1** Tek şey, adı konmuş | Her ekranda tam bir sonraki eylem; gerisi ikincil | 2 saniye testi: "şimdi ne yapmalısın?" tek ve doğru cevap | `today.spec.ts` ("one named next step leads the page"), `homework.spec.ts` ("names one next step"), `bugun-duzen.spec.ts` B (günün saatine göre tek ana kart). 2 saniye testi elle — §12 kapısı. Açık: B17 |
@@ -199,7 +210,7 @@ Tedy Books bu bölümün kapsamı dışındadır: okuma odası kendi dünyasıd�
   | Tema | `$background` | `$layer-01` | `$layer-02` | `$layer-03` |
   |---|---|---|---|---|
   | g10 (TEDY) | Gray 10 `#f4f4f4` | White `#ffffff` | Gray 10 `#f4f4f4` | White `#ffffff` |
-  | g100 (modül koyu tema) | Gray 100 | Gray 90 | Gray 80 | Gray 70 |
+  | g100 (panonun olası koyu teması; modülde yalnız token eşlemesi, Kanun M4.3) | Gray 100 | Gray 90 | Gray 80 | Gray 70 |
 
 - Bir katmandaki bileşen o katmanın setini kullanır: `$layer-02` üstündeki alan `$field-03`, onun alt
   çizgisi `$border-strong-03`'tür; aynı setin token'ları birlikte kullanılır. Numarasız adlar (`$layer`,
@@ -245,7 +256,7 @@ Tedy Books bu bölümün kapsamı dışındadır: okuma odası kendi dünyasıd�
   *Test (eklenir):* pytest — `--cds-layer-accent-` yalnız `__header`, `thead`, `tab` içeren seçicilerde geçer.
 - **[3.1-6] Koyu tema açık bir ürün kararıdır.** Pano bugün yalnız g10; modül temayı yalnız panodan alır,
   kendi tema seçimi ve işletim sistemi tercihine bakan kuralı yoktur ([Kanun M4.1](tedy-modul-tasarim-kanunu.md);
-  şablondaki tema düğmesi borç KB-1). Açılırsa yol `usePrefersDarkScheme` + `GlobalTheme`, seçim Profil'de
+  şablonun tema düğmesi 2026-10-20'de kalktı, KB-1). Açılırsa yol `usePrefersDarkScheme` + `GlobalTheme`, seçim Profil'de
   kişi başına; o gün `--ted-text-*` dörtlüsü ve marka değerleri birlikte yeniden ölçülür (`ted-theme.scss`
   yorumu: "a dark theme would have to revisit all four together"). Karar verilene kadar her yeni renk
   önce bir **rol** token'ı olarak düşünülür; palet adımı yalnız rolü olmayan değerde yazılır. → [S14](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler)
@@ -329,6 +340,7 @@ kullanılmaz". AI token'ları yalnız özel AI bileşeni yazarken kullanılır.
 - **[3.2-4] Seçili ve basılı hâl hover'dan farklı bir adımdır** (`-selected` bir adım, `-active` iki adım).
   Bir ders ailesi etkileşimli bir öğeye renk verirse (ör. seçili öğretmen çipi) hover `colors.$<aile>-60-hover`,
   basılı `colors.$<aile>-80` olur (Carbon'un Blue 60 → Blue 80 mantığı); birincil eylem ders rengi almaz (S35).
+  Modülde etkileşim durumu (hover, seçili, işaretli, geçerli adım, odak) hiç ders rengi almaz ([Kanun M1.6](tedy-modul-tasarim-kanunu.md)).
 - **[3.2-5] Durum opaklıkla verilmez.** Devre dışı TEDY denetimi gri aile token'larını kullanır; geri çekilen
   geçmiş öğe `text-secondary` / `layer-02` ile çizilir; gizlenmiş süzgeç çipi seçilmemiş hâlde (çerçeve +
   nötr zemin) çizilir. Okunması gereken içerik devre dışı değil salt okunurdur. Carbon'un kendi bileşenleri
@@ -496,7 +508,8 @@ Panodaki roller (`.ted-subject--<aile>` kapsamında): `--ted-subject-accent` (60
   display stilleri "bir kabın içinde kullanılmaz". Başlık ile gövde eşlenir ki satır aralığı ortak olsun:
   `body-compact-01` ↔ `heading-compact-01`, `body-01` ↔ `heading-01`, `body-02` ↔ `heading-02`.
   Bir görev, bileşen ya da bölge içinde tek set.
-  — https://carbondesignsystem.com/building-blocks/foundations/typography/type-sets/
+  — https://carbondesignsystem.com/building-blocks/foundations/typography/type-sets/#base-type-sizes
+  · https://carbondesignsystem.com/building-blocks/foundations/typography/type-sets/#fluid-heading-styles
   · https://carbondesignsystem.com/building-blocks/foundations/typography/style-strategies/
 - Kod: boyut, satır aralığı, ağırlık ve aile tek tek yazılmaz; `type-style` karışımı kullanılır
   (`type-scale()` değil). Harf aralığı token'ın içindedir.
@@ -527,7 +540,8 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
 
 - **[3.3-1] Tip değeri yalnız `@include type.type-style('<token>')` ile gelir.** `font-size`, `line-height`,
   `font-weight`, `font-family` elle yazılmaz; TSX'te satır içi `fontSize`/`fontWeight` yoktur; düzeltme
-  sınıfla değil SCSS karışımıyla yapılır. Ağırlık yalnız 300/400/600. → [S9](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), [S5](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler)
+  sınıfla değil SCSS karışımıyla yapılır. Ağırlık yalnız 300/400/600; modül şablonunda da (Kanun M2.9; bugünkü 500/700
+  ve ölçek dışı punto borç KB-47). → [S9](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), [S5](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler)
   *Test:* `npm run lint:css` — `carbon/type-use` (`includeProps` dört özellik, ağırlık 300/400/600) (var).
   Boşluklar: Books bloğunun `stylelint-disable`'ı hiç kapanmıyor, ondan sonraki pano kuralları denetimsiz
   (`.route-boundary__title` 1rem/600 literal); TSX satır içi stil hiçbir kapıda değil → [B35](#13-bilinen-borçlar), [B12](#13-bilinen-borçlar).
@@ -549,7 +563,8 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
   hizalanır.
   *Ölçülen:* `heading-03` 400 (`.today-now__title`, `.next-thing__title`) ve 600 (`.today__day-name`,
   `.dashboard-event-date__day`; `ted-theme.scss:552-553, 952-953`); `heading-04` + 600 üç yerde (`:1504-1505,
-  3015-3016, 3151-3152`); modül şablonu `heading-03/04` karşılıklarını 600 yazıyor → [B74](#13-bilinen-borçlar). Hafta
+  3015-3016, 3151-3152`); modül şablonunun segment başlıkları 2026-10-11'den beri 400 (B74'ün şablon kısmı); `.summary h2` ve
+  `.topbar__title` hâlâ 600 → Kanun KB-14. Hafta
   başlığında `heading-compact-01` (18 px) `body-01` (20 px) yanında → [B35](#13-bilinen-borçlar).
   *Test (eklenir):* Playwright — `.course-content__week-header` çocuklarının computed `line-height`'ı eşit;
   `.today-now__title`, `.next-thing__title`, `.today__day-name` aynı ağırlıkta.
@@ -588,9 +603,11 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
   *Test (eklenir):* Playwright — computed `text-overflow: ellipsis` ya da `line-clamp` taşıyan her öğenin
   klavyeyle odaklanan bir tooltip tetikleyicisi ya da `aria-describedby`'ı var; hiçbiri `h1–h4`, `label`,
   `[role=alert|status]` değil.
-- **[3.3-8] Ölçü (satır uzunluğu).** Carbon bir karakter sayısı vermez. TEDY'de okuma bloğu `ch` ile sınırlanır;
-  başvuru değeri `.next-thing__instruction` 60ch'dir; Books `--reader-measure` (varsayılan 38rem) kendi
-  ayarıdır. Arayüz satırları sütunu doldurabilir.
+- **[3.3-8] Ölçü (satır uzunluğu).** Carbon bir karakter sayısı vermez. Okuma bloğu satırda en çok 80 karakterdir
+  ve ölçü `rem` ile verilir, `ch` ile değil: `ch` Plex Sans'ta "0"ın genişliğidir ve Türkçe düzyazının satır
+  kapasitesini yaklaşık %40 fazla gösterir (ölçüldü; modülde 36rem, [Kanun M5.5](tedy-modul-tasarim-kanunu.md)).
+  Panonun başvuru değeri `.next-thing__instruction` bugün 60ch'dir ve karakter sayısı ölçülmedi → [B81](#13-bilinen-borçlar).
+  Books `--reader-measure` (varsayılan 38rem) kendi ayarıdır. Arayüz satırları sütunu doldurabilir.
 - **[3.3-9] Font teslimi.** Plex Sans/Mono/Serif Google Fonts'tan gelir; Carbon'un `~@ibm/plex` yolu Vite'ta
   404 verdiği için `$css--font-face: false`. Yüklenen ağırlıklar yalnız 300/400/600 (+ 400 italik) olur;
   bugün Sans 700 ve Mono 500 boşuna indiriliyor, Sans 500'ü yalnız `GradeTable.tsx`'in satır içi stili kullanıyor (B4) → [B35](#13-bilinen-borçlar). → [S2](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler)
@@ -689,9 +706,11 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
   (±1 px).
 - **[3.4-5] Kırılımlar.** Carbon kırılımları kullanılır: md (`671px`/`672px`) ve lg (`66rem`). Yeni kuralda
   sınır elle değil Carbon'un breakpoint karışımıyla yazılır (`@include breakpoint-down('md')`,
-  `@include breakpoint('lg')`); başka her medya sorgusu adı ve gerekçesi olan özel kırılımdır. Bugünkü
-  belgelenmemiş özel kırılımlar (`420px`, `360px`, `22rem`) ve tema/bileşen arasındaki 1 px'lik ayrık
-  (`671px` / `42rem`) borçtur. → [B10](#13-bilinen-borçlar), [B37](#13-bilinen-borçlar)
+  `@include breakpoint('lg')`); başka her medya sorgusu adı ve gerekçesi olan özel kırılımdır. Belgelenmemiş
+  özel kırılımlar (`420px`, `360px`, `22rem`) ve tema/bileşen arasındaki 1 px'lik ayrık (`671px` / `42rem`) kalktı
+  ([B10](#13-bilinen-borçlar), [B37](#13-bilinen-borçlar) kapandı; K4-3). Modül çerçevesinde kırılım medya sorgusu değil
+  `.wrap` kapsayıcı sorgusudur: sm 20rem, md 42rem, lg yazılmaz ([Kanun M5.9, KS-12](tedy-modul-tasarim-kanunu.md);
+  şablonun 560/400 px sorguları borç KB-28).
   *Test (eklenir):* stil grep'i — Books dışında `@media (max-width|min-width:` yalnız izin listesindeki
   değerlerde.
 - **[3.4-6] rem ile boyutlama (4K).** Her bileşen genişliği, yüksekliği, ızgara izi ve font boyu `rem`'dir
@@ -775,7 +794,8 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
 - Carbon bileşenlerinin mikro etkileşim hareketi yerleşiktir; bileşenlerin birbirine ve sayfaya giriş-çıkış
   hareketi ürünün işidir. İki stil: **productive** ("verimli, duyarlı, göze batmayan"; düğme durumu, açılır
   menü, bilgi açma, tablo çizme) ve **expressive** (seyrek, önemli anlar: sayfa açılışı, birincil düğme,
-  sistem uyarısı). Tamamen doğrusal hareket yoktur. — https://carbondesignsystem.com/building-blocks/foundations/motion/overview/
+  sistem uyarısı). Tamamen doğrusal hareket yoktur. — https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#productive-motion
+  · https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#expressive-motion · https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#duration-tokens
 
   | Süre token'ı | Değer | Carbon'un dediği kullanım |
   |---|---|---|
@@ -812,7 +832,8 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
   kapanmıyor → [B35](#13-bilinen-borçlar), [B39](#13-bilinen-borçlar).
 - **[3.6-2] Panoda yalnız productive hareket.** Expressive eğri Işık'ın yüzeylerinde kullanılmaz; Carbon'un
   önerdiği "birincil düğme / bildirim kutusu için expressive" anayasa §5.4 ve §9 (kutlama yok) karşısında geçersizdir.
-  Carbon bileşenlerinin kendi yerleşik hareketi (ör. `ComposedModal`) olduğu gibi kalır. → [S26](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler)
+  Carbon bileşenlerinin kendi yerleşik hareketi (ör. `ComposedModal`) olduğu gibi kalır. Modülde de expressive hareket
+  ve bölüm girişi hareketi yoktur ([Kanun M2.10, KS-10](tedy-modul-tasarim-kanunu.md); şablondaki `segIn` borç KB-18). → [S26](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler)
   *Test (eklenir):* `grep -rn expressive dashboard/src` → 0 (bugün 0).
 - **[3.6-3] Hareket üç işe yarar** — konum değişimini anlatmak, yeneni işaret etmek, beklemeyi katlanılır kılmak
   — ve **aynı anda en fazla bir öğe hareket eder** ([anayasa İ6, §5.4](frontend-design-principles.md)).
@@ -855,7 +876,7 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
 
 - İkon artboard'ları **16, 20, 24, 32 px**; varsayılan 16. 16/20 px ikon 14/16 px Plex'le dengelenmiştir;
   24/32 yalnız daha büyük ikon gerektiğinde. Ürün boyunca tutarlı boy; ikon-metin oranı değiştirilmez.
-  — https://carbondesignsystem.com/building-blocks/foundations/icons/guidelines/#sizing
+  — https://carbondesignsystem.com/building-blocks/foundations/icons/guidelines/#sizing · https://carbondesignsystem.com/building-blocks/foundations/icons/code/#usage
 - Etkileşimli ikonun dokunma hedefi **≥ 44 px**; hedef CSS dolgusuyla büyütülür (Carbon örneği: 48 px hedefte
   22 px ikon). — https://carbondesignsystem.com/building-blocks/foundations/icons/guidelines/#touch-targets
 - İkon tek, düz renktir ve tipografinin kontrastını (**4,5:1**) sağlar; metinle eşlendiğinde metnin rengini
@@ -868,6 +889,7 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
   · https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#tooltips-for-icon-only-buttons
 - Piktogram illüstrasyondur, UI ikonunun yerine kullanılmaz; en küçük boy **48 px**; boşluk ölçeklenmiş ızgaranın
   1/4'ü; kap daire ya da kare. — https://carbondesignsystem.com/building-blocks/foundations/pictograms/guidelines/#sizing
+  · https://carbondesignsystem.com/building-blocks/foundations/pictograms/guidelines/#productive-versus-expressive
 
 **TEDY kuralı**
 
@@ -894,7 +916,9 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
   yalnız atıf işaretinde.
 - **[3.7-5] Piktogram panoda yoktur.** Boş durum dekoratif ikon ya da piktogram taşımaz
   ([yüzey tasarımları §2.3](frontend-surface-designs.md)); boş durum bir cümledir. Modül şablonundaki
-  piktogramlar (15–32 px; Carbon ve kendi referansı ≥ 48 px der) §9'un borcudur.
+  piktogramlar kanunun borcudur: `.seg-ic .pic` 2rem, `.card .pic` 1,875rem; `keyTerms[].icon`'a yazılan `pic-*`
+  `.def-term`'de 0,9rem, `.def-pop`'ta 1,05rem çizilir. Piktogram ≥ 48 px'tir, daha küçük işaret ikondur
+  ([Kanun M2.11, M3.10](tedy-modul-tasarim-kanunu.md); KB-32).
 
 ---
 
@@ -907,7 +931,8 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
   — https://carbondesignsystem.com/building-blocks/foundations/accessibility/overview/
 - Kontrast: standart metin **4,5:1**; büyük metin (≥ 24 px normal/ince ya da ≥ 19 px yarı kalın) **3:1**; bileşen
   durumu ve sınırı ile grafik öğe komşu renge **3:1**; renk tek başına anlam taşımaz.
-  — https://carbondesignsystem.com/building-blocks/foundations/accessibility/color/
+  — https://carbondesignsystem.com/building-blocks/foundations/accessibility/color/#color-contrast (MCP: #use-of-color-and-color-blindness)
+  · https://carbondesignsystem.com/building-blocks/foundations/accessibility/color/#use-of-color-and-color-blindness
 - Odak: çoğunlukla **2 px kenar**, tema başına tek renk `$focus` (açık temada Blue 60, koyuda White), 3:1;
   gerektiğinde halka ile öğe arasına `$focus-inset`; yüksek kontrast anında `$focus-inverse`. Odak göstergesi
   asla bastırılmaz. — https://carbondesignsystem.com/building-blocks/foundations/color/overview/
@@ -943,7 +968,8 @@ Panonun kullandığı token'lar (değerler `@carbon/type` 11.69.0, otorite JSON;
 - **[3.8-3] Dokunma hedefi.** Telefonda dokunulan her denetim ≥ 44 × 44 px; TEDY standardı
   `spacing.$spacing-09` (48 px). Masaüstünde alt sınır WCAG 2.5.8'in 24 × 24 px'idir; `(pointer: coarse)`
   cihazda (tablet) 44 px kuralı genişliğe bakmadan uygulanır. Hedef, glifi değil vuruş alanını büyüterek
-  sağlanır. → [S18](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), [B8](#13-bilinen-borçlar)
+  sağlanır. Modül yüzeylerinde ölçüt çerçevenin md altında olması ya da `pointer: coarse`'tur, 320 px kenar durum
+  dahil ([Kanun M5.3, KS-5](tedy-modul-tasarim-kanunu.md); KB-4). → [S18](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), [B8](#13-bilinen-borçlar)
   *Ölçülen açıklar:* asistan giriş `IconButton size="sm"` (32 px), Bugün gün okları tablette 28 px,
   popover kapatma ~20 px → B8.
   *Test:* `d3b-dokunma.spec.ts` (390 px'te ≥ 44 px, beş denetim; var). Eklenir: 390 px'te ve `pointer: coarse`
@@ -1083,13 +1109,13 @@ bütün `preview__Fluid*` alanları ve `unstable_Pagination`.
 | Farklı içerik alanları | `Tabs` + `TabList` + `Tab` + `TabPanels` + `TabPanel` | Seçim, kullanıcı değiştirene dek **kalır** (İ5). Sekme etiketi bir-iki sözcük; uzun ders adı veridir, kabul edilir. | `CourseContent.tsx` (`TabList contained`) | [tabs](carbon-bilesen-rehberi.md#tabs) |
 | Aynı içeriğin başka görünümü | `ContentSwitcher` + `Switch` | En az iki seçenek, eşit genişlik. Dar ekranda kesilecekse radyo çip grubu (ölçüldü). | Kullanılmıyor; eşdeğeri `OgretmenSecici.tsx` (yerel radyo grubu) | [content-switcher](carbon-bilesen-rehberi.md#content-switcher) |
 | İlerleme — sistem işi | `ProgressBar` | Yalnız sistem işi (yükleme, indirme, işleme), ~5 sn'den uzun. Kullanıcının kendi eylem sayısı için **kullanılmaz** (§4.7). | Aykırı: `PlatformProgress.tsx` (izlenen video / biten ders) | [progress-bar](carbon-bilesen-rehberi.md#progress-bar) |
-| İlerleme — çok adımlı akış | `ProgressIndicator` + `ProgressStep` | ≥ 3 doğrusal ve sayısı sabit adım. Toplamı ilk gösteren öğedir (İ3'e karşı; modüllerde yazılı istisna gerekir). | Panoda yok; modül şablonunda `.stepper` eşdeğeri | [progress-indicator](carbon-bilesen-rehberi.md#progress-indicator) |
+| İlerleme — çok adımlı akış | `ProgressIndicator` + `ProgressStep` | ≥ 3 doğrusal ve sayısı sabit adım. Toplamı ilk gösteren öğedir (İ3'e karşı). Modüldeki yazılı istisna: tek gösterge, 3–7 aşama, sığmazsa tek satır metin, toplam ikincil ([Kanun M2.4, M2.5, M5.4, KS-6](tedy-modul-tasarim-kanunu.md)). | Panoda yok; modül şablonunda `.stepper` eşdeğeri | [progress-indicator](carbon-bilesen-rehberi.md#progress-indicator) |
 | Geçici bildirim | `ToastNotification` | **Kullanılmaz** (§5.3). | Yok | [notification](carbon-bilesen-rehberi.md#notification) |
 | Eylem sonucu, satır içi uyarı | `InlineNotification` | `lowContrast`, Türkçe `statusIconDescription`, başlıkta nokta/ünlem yok, gövde ≤ 2 kısa cümle ve yapılacak şeyi söyler. | `PortalStatusBanner.tsx`, `LoginPage.tsx`, `ModuleViewer.tsx`, `asistan/GirisUyarisi.tsx` | [notification](carbon-bilesen-rehberi.md#notification) |
 | Kalıcı uyarı (sayfayla gelen) | `Callout` | Kapatılamaz, eylem düğmesi yok, ilgili denetimin üstünde, başarı/hata durumu yok. | Panoda `Callout` içe aktarılmıyor; `.homework-modal__enrichment` aynı biçimde elle kurulmuş | [notification](carbon-bilesen-rehberi.md#notification) |
 | Eylemli bildirim | `ActionableNotification` | **Kullanılmaz** — odağı hapseder (İ1, İ5). Eylem sayfada durur. | Yok; `RouteBoundary.tsx` sayfa içi "Yeniden dene" | [notification](carbon-bilesen-rehberi.md#notification) |
 | Açılır bilgi — kısa, etkileşimsiz | ipucu bileşenin içinde (`IconButton label`); tek başına gerekirse `Tooltip` | Görev için gereken bilgi ipucunda durmaz. | `IconButton` kullanılan her yer | [tooltip](carbon-bilesen-rehberi.md#tooltip) |
-| Açılır bilgi — metin içi terim | `DefinitionTooltip` | Tanım başka yerde de okunabilir; ipucu tek kaynak değildir. | Panoda yok; modülde `.def-pop` eşdeğeri | [tooltip](carbon-bilesen-rehberi.md#tooltip) |
+| Açılır bilgi — metin içi terim | `DefinitionTooltip` | Tanım başka yerde de okunabilir; ipucu tek kaynak değildir. | Panoda yok; modülde `.def-pop` eşdeğeri (Kanun M5.15; borç KB-45) | [tooltip](carbon-bilesen-rehberi.md#tooltip) |
 | Açılır bilgi — tıklamayla, içinde düğme/bağlantı olabilir | `Toggletip` + `ToggletipButton` + `ToggletipContent` | Kritik bilgi ya da zorunlu giriş taşımaz (o, `Modal`'dır). | Yok; senkron sağlık açılırı elle kurulmuş `role="dialog"` kart (`DashboardHeader.tsx`) | [toggletip](carbon-bilesen-rehberi.md#toggletip) |
 | Açılır katman tabanı | `Popover` + `PopoverContent` | Aynı anda bir tane, iç içe yok, ≤ 352 px; `Esc` kapatır. | `CitationChip.tsx` (eski sohbet yüzeyi) | [popover](carbon-bilesen-rehberi.md#popover) |
 | Etiket / rozet | `Tag` (salt okunur), `DismissibleTag`; `SelectableTag`, `OperationalTag` | §4.4'teki sınırlar. Durum ya da üst veri taşır, ders değil. | 40'tan çok yer (`HomeworkTracker.tsx`, `ExamTimeline.tsx`, `TodaySchedule.tsx`…); `asistan/BaglamCipi.tsx` `DismissibleTag` | [tag](carbon-bilesen-rehberi.md#tag) |
@@ -1108,7 +1134,12 @@ kaynak listesi.
 ### 4.2 Düğme hiyerarşisi
 
 Carbon kaynağı: https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/ ve
-https://carbondesignsystem.com/building-blocks/core/components/button/specifications/.
+https://carbondesignsystem.com/building-blocks/core/components/button/specifications/. Çapalar: boylar
+https://carbondesignsystem.com/building-blocks/core/components/button/specifications/#size; ikon boyu (16 px, expressive 20 px)
+https://carbondesignsystem.com/building-blocks/core/components/button/specifications/#button-structure; etiket solda, ikon sağda
+https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#anatomy (MCP: #4-icon-button) ·
+https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#label-alignment; görünüm başına tek birincil
+https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#a-single-high-emphasis-button.
 
 | Kural | Değer | TEDY sınaması |
 |---|---|---|
@@ -1118,7 +1149,7 @@ https://carbondesignsystem.com/building-blocks/core/components/button/specificat
 | Bir grupta tek boyut | "Düğme gruplarında farklı boyutları karıştırmayın." | Görsel taban okunarak. |
 | Grup | 2–3 eylem; fazlası menü düğmesi; aynı genişlik (ghost hariç); aralık 16 px (`$spacing-05`) | Satırda ≤ 2 eylem (bugün sağlanıyor). |
 | Etiket | Cümle düzeninde, sola yaslı, sığmazsa **sarar, kesilmez**; yalnız ad değil fiil ("Tamam" yasak, kabul edilen şey adlandırılır). | Büyük harfli/Her Kelime Büyük etiket yok (`asistan/GirisDugmeleri.tsx` "Çalışma Planı" aykırı). |
-| İkon | 16 px, etiketin sağında, etiketle aynı renk, çizgi (line) varyant; grupta hepsinde ya da hiçbirinde; başka sekmeye açan eylemde `Launch` | Görsel taban. |
+| İkon | 16 px, etiketin sağında, etiketle aynı renk, çizgi (line) varyant; grupta hepsinde ya da hiçbirinde; başka sekmeye açan eylemde `Launch` | Görsel taban. Modül düğmesi expressive lg'dir: etiket `body-compact-02` 16 px / 400, ikon 20 px, sağda ([Kanun M2.2](tedy-modul-tasarim-kanunu.md); borç KB-19). |
 | Yüklenirken | Düğme `InlineLoading` ile yer değiştirir ya da devre dışı kalır; ilişkili denetimler kapanır. | §5.2. |
 | Düğme eylem yapar, bağlantı gider | Yeni sayfaya götüren şey `Link`/`<Link>`; durum değiştiren şey `Button`. | Aykırı: `Modules.tsx` "Aç"/"Modüllere dön" ve İşler'deki modül kısayolu `useNavigate`'li düğme; doğru örnek `TedyBooks.tsx`, `BookReader.tsx`. Bağlantı gibi görünen durum düğmesi (`.today-also__all`) ghost düğme olur. |
 
@@ -1155,13 +1186,15 @@ bunlara dokunmaz ve dokunmamalıdır — gecikme hareket değildir.
 ### 4.4 Etiket (Tag) sınırları
 
 Kaynak: https://carbondesignsystem.com/building-blocks/core/components/tag/guidelines/,
-https://carbondesignsystem.com/building-blocks/core/components/tag/specifications/.
+https://carbondesignsystem.com/building-blocks/core/components/tag/specifications/. Boylar (sm 18 · md 24 · lg 32 px; md varsayılan):
+https://carbondesignsystem.com/building-blocks/core/components/tag/specifications/#size · https://carbondesignsystem.com/building-blocks/core/components/tag/guidelines/#sizing;
+başlık uzunluğu https://carbondesignsystem.com/building-blocks/core/components/tag/specifications/#typography.
 
 1. **Etiket bir sözcük grubudur, cümle değildir.** Carbon: başlık mümkünse 20 karakterin altında, **sarmaz**.
    Kurulu stil etiketi 208 px'te (13 rem) üç noktayla keser (`@carbon/styles/.../tag/_tag.scss`). Hata cümlesi,
    uyarı ya da yeniden deneme bildirimi etikete yazılmaz; `InlineNotification` olur. Aykırı: `OzelYanitlar.tsx`
-   (`<Tag type="red">{kart.veri.mesaj}</Tag>`), `Modules.tsx` ("Taslak önizleme — ilerleme kaydedilmez", 38
-   karakter), `MesajAltbilgisi.tsx`.
+   (`<Tag type="red">{kart.veri.mesaj}</Tag>`), taslak önizleme ve `MesajAltbilgisi.tsx` idi; B45 ile kapandı, taslak
+   önizleme cümlesi bugün `InlineNotification` (`Modules.tsx:111-114`).
 2. **Ders asla etiket değildir; etiket rengi ders ailesi olamaz.** `blue`, `teal`, `purple`, `magenta`, `cyan`
    derslere ayrılmıştır (İ8; `tedy-integration.md`). Durum etiketleri `red`, `green`, `gray`, `cool-gray`,
    `warm-gray` kullanır. `tests/test_pano_tasarim_sistemi.py` düz yazılmış türü yakalar, çalışma anında hesaplanan
@@ -1176,6 +1209,9 @@ https://carbondesignsystem.com/building-blocks/core/components/tag/specification
 7. **Durum göstergesi olarak etiket** S4'e uyar: mevcut metinli durum etiketleri kalır; yeni durum göstergesi
    ikon + metin (+ renk) taşır (B16, §5.7).
 8. Grupta etiketler arası 8 px (`$spacing-03`); `.today-tl__card-tags` 4 px'te (aykırı).
+9. **Boy.** Salt okunur etiket masaüstünde `sm`/`md` (ikon taşıyorsa `md`); tıklanan etiket (`OperationalTag`)
+   telefonda `lg`, masaüstünde `md`, vuruş alanı her boyda ≥ 44 px — modül sayfasının başında
+   [Kanun M2.8](tedy-modul-tasarim-kanunu.md) (`ModulBasligi.tsx:69`; ölçüm borç KB-4).
 
 ### 4.5 ContainedList, StructuredList, DataTable
 
@@ -1227,7 +1263,7 @@ https://carbondesignsystem.com/building-blocks/core/components/tabs/guidelines/.
 | Ne için | Sistem işi: yükleme, indirme, kaydetme, işleme | ≥ 3 doğrusal, sayısı sabit adımlı akış |
 | Ne için değil | Kullanıcı eylemiyle ilerleyen sayı ("tamamlanan eğitimler", depolama); 5 sn'den kısa iş (yükleme göstergesi); açılınca içerik gösterecek yük (iskelet) | < 3 adım; adımlar sırasız yapılabiliyorsa; adım sayısı koşula göre değişiyorsa |
 | Davranış | Belirli (determinate) çubuk 0→100 dolar, **hiç azalmaz ve sıfırlanmaz**; belirsiz çubuk soldan sağa sabit hızla akar | Toplam adım sayısını baştan gösterir |
-| Kaynak | https://carbondesignsystem.com/building-blocks/core/components/progress-bar/guidelines/ | https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/guidelines/ |
+| Kaynak | https://carbondesignsystem.com/building-blocks/core/components/progress-bar/guidelines/#when-not-to-use | https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/guidelines/#when-to-use · https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/specifications/#color · https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/specifications/#typography (etiket 1–2 sözcük, ≤ 16 karakter, cümle düzeni) · https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/specifications/#structure (adım en az 8rem) |
 
 **Zaman kutusu ikisi de değildir.** "10 dakikayla başla" bir **teklif**tir: portalda bir işin ne kadar sürdüğünü
 söyleyen hiçbir şey yoktur, bu yüzden tahmin uydurmak yasaktır (D4, İ3). Kutu açıldığında "BAŞLADIN · N dk
@@ -1280,7 +1316,7 @@ kapsar. "Yükleniyor" boş durum kılığına girmez (İlerleme'de ölçülmüş
 
 ### 5.2 Yükleniyor
 
-**Carbon** (https://carbondesignsystem.com/building-blocks/core/patterns/loading/,
+**Carbon** (https://carbondesignsystem.com/building-blocks/core/patterns/loading/#skeleton-states,
 https://carbondesignsystem.com/building-blocks/core/components/inline-loading/guidelines/): iskelet yalnız kap ve
 veri bileşenlerinde (karo, liste, tablo, kart), ilk yüklemede, birkaç saniye; düğme, alan, onay kutusu iskelet
 almaz; toast, taşma menüsü, açılır öğe, modal ve yükleyicinin kendisi asla iskeletle gösterilmez. Tek bir kısa
@@ -1302,7 +1338,8 @@ gösterilmez: `useApi`'nin `iskelet` bayrağı yalnız ilk yükleme 400 ms'yi ge
 - **Bileşenler:** `WeeklySchedule.tsx`, `CalendarEvents.tsx`, `PlatformProgress.tsx`, `Modules.tsx` (iskelet);
   `HomeworkTracker.tsx` (`InlineLoading description="Kaydediliyor"`, düğmenin yerinde). Aykırı: Bugün'ün
   iskeleti stilsiz (B5); `App.tsx`'in kabuk "Yükleniyor..." düz metni; `NextThing.tsx` düğme metnini değiştirip
-  canlı bölge duyurusu yapmıyor, `InlineLoading` kullanmıyor ([B69](#13-bilinen-borçlar)); yükleme metni beş yazımla ([B41](#13-bilinen-borçlar)).
+  canlı bölge duyurusu yapmıyor, `InlineLoading` kullanmıyor ([B69](#13-bilinen-borçlar)); yükleme metni beş yazımla ([B41](#13-bilinen-borçlar)) — hepsi kapandı (B5, B41, B69). Açık: modül
+  görüntüleyicisi bileti beklerken iskeleti 400 ms eşiksiz çiziyor (`ModuleViewer.tsx:150`; [Kanun M1.11](tedy-modul-tasarim-kanunu.md), KB-37).
 - **Sınama:** önerilen e2e — API 1 sn geciktirilince bölge şekilli `.cds--skeleton` görünür, 50 ms'de görünmez;
   bir görünümde aynı anda en çok bir iskelet kümesi; `Loading` içe aktarımı 0; İşler'de "Yaptım" sonrası
   `role="status"` "Yaptın" içerir (Bugün bunu yapıyor).
@@ -1310,12 +1347,13 @@ gösterilmez: `useApi`'nin `iskelet` bayrağı yalnız ilk yükleme 400 ms'yi ge
 ### 5.3 Bildirim ve hata
 
 **Carbon** (https://carbondesignsystem.com/building-blocks/core/patterns/notifications/,
-https://carbondesignsystem.com/building-blocks/core/components/notification/guidelines/):
+https://carbondesignsystem.com/building-blocks/core/components/notification/guidelines/; anatomi: https://carbondesignsystem.com/building-blocks/core/components/notification/specifications/#inline
+· https://carbondesignsystem.com/building-blocks/core/components/notification/specifications/#callout — en az 48 px, 3 px sol kenar):
 
 | Tür | Carbon'da | TEDY'de |
 |---|---|---|
 | Inline | Okurun kendi eyleminin sonucu ya da bölgesel durum; çözülene ya da kapatılana dek durur; ≤ 2 satır; yapılacak adımı söyler | **Kullanılır.** Eylemin yanında ya da sütunun başında. |
-| Callout | Sayfayla yüklenir, kalıcı, kapatılamaz, eylemsiz; başarı/hata durumu yok; ilgili denetimin üstünde | **Kullanılır.** Sayfayla gelen, kullanıcının eylemine bağlı olmayan durum. |
+| Callout | Sayfayla yüklenir, kalıcı, kapatılamaz; bağlantı içerebilir (https://carbondesignsystem.com/building-blocks/core/components/notification/accessibility/#callout); başarı/hata durumu yok; ilgili denetimin üstünde | **Kullanılır.** Sayfayla gelen, kullanıcının eylemine bağlı olmayan durum. |
 | Toast | Sağ üstten kayar, 288 px, birkaç saniyede kaybolabilir | **Kullanılmaz.** Kendiliğinden kaybolan bilgi Işık için kaybolan bilgidir (İ5); kayan öğe ikinci harekettir (İ6); "bildirim yağmuru" anayasa §9'da yasak. |
 | Actionable | Odağı alır ve hapseder; tek eylem, ≤ 2 sözcük | **Kullanılmaz.** Eylem sayfada durur; bildirim yalnız söyler (İ1). |
 | Banner | Sistem düzeyi; başlığın altında; kaydırmayla gider; aynı anda bir | Portal durum bandı bu yerde (yüzey tasarımları §3.3). |
@@ -1329,7 +1367,8 @@ ikisi karışmaz. Kritik mesaj zamanlayıcıyla kapanmaz (WCAG 2.2.4); okur krit
 **TEDY kuralları:**
 
 1. **Bütün bildirimler `lowContrast`** ([S27](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler)). Ekranda tek dikkat rengi alanı eyleme ayrılmıştır (İ6). Carbon'un
-   "acil olan yüksek kontrast" basamağından bilinçli sapma; kimse "düzeltmez".
+   "acil olan yüksek kontrast" basamağından bilinçli sapma; kimse "düzeltmez". Modülün geri bildirim ve bilgi kutusu
+   da düşük kontrastlı inline/callout anatomisindedir ([Kanun M2.3](tedy-modul-tasarim-kanunu.md); köşe ve kenar borcu KB-20).
 2. **Başarı bir eylemin ardından gelir, kalıcı bir bant değildir.** İlerleme'deki kalıcı yeşil "Tüm platformlar
    tamamlandı!" hem Carbon'un modeline hem İ7'ye ("Kutlama") aykırı ([B51](#13-bilinen-borçlar)); ünlemsiz tek cümle yeter.
 3. **Hata metni ne olmadığını ve ne yapılacağını söyler; makine dili ekrana çıkmaz (D4).** "HTTP 500",
@@ -1552,12 +1591,14 @@ bağlantıya gidince odak sayfanın başına döner; derin sayfa başlık üstü
 - **672 px altında** hamburger ve yan gezinme gizlenir; `BottomNav` gelir: Bugün · İşler · Asistan · Dersler ·
   Daha fazla (`/daha-fazla`, `DahaFazla.tsx`). Carbon'un hamburger modelinden ölçülmüş sapma (2026-10-02). 672–1055
   px arasında Carbon'un kendi geçici gezinmesi değişmeden geçerlidir.
-- **Atla bağlantısı yok** (B11): `SkipToContent` + `Content id="main-content"`; okur kabuğu ve modül şablonu da
-  alır. Sabit bant ve alt çubuk için `scroll-padding` ölçülmedi (WCAG 2.2 2.4.11).
+- **Atla bağlantısı** (B11 kapandı): Carbon `SkipToContent` `Header`'ın ilk çocuğu, `Content id="main-content"`;
+  bant ve alt çubuk `scroll-padding` ile odağı örtmez (`yerlesim.spec.ts`). Akıştaki modül çerçevesi kendi atlama
+  bağlantısını ve `banner`/`main` yer işaretini taşımaz; sayfanın iskeleti panonundur ([Kanun M1.10](tedy-modul-tasarim-kanunu.md), KB-40).
 - İki gezinme yer imi aynı gezinmenin iki adını taşıyor ("Navigasyon", "Ana gezinme"); aynı ada iner (İ9).
 - Başlık eylemleri 3 rem; 22 rem altında 2,5 rem'e inmesi geri alınır (S18).
-- Kırıntı yolu yok: her derin sayfa (modül, kitap) tek bir dönüş bağlantısı taşır; Carbon'un "iki kademeden derin"
-  eşiğine göre bilinçli tercih, kusur değil.
+- Kırıntı yolu: kitap sayfası tek bir dönüş bağlantısı taşır; modül sayfası 2026-10-19'dan beri Carbon `Breadcrumb`
+  ile Modüller'e döner (§9.1, `ModulBasligi.tsx:45-48`; dokunma hedefi borç Kanun KB-4, değiştirici tuşla yeni sekme
+  [B80](#13-bilinen-borçlar)).
 - **Bileşenler:** `DashboardHeader.tsx`, `App.tsx`, `BottomNav.tsx`, `DahaFazla.tsx`, `ReaderChrome.tsx` (okur
   kabuğu: başlık API'sine ihtiyaç duymaz, çünkü okur `/api/health`'e erişemez).
 - **Sınama:** `alt-gezinme.spec.ts`, `tasarim-denetimi.spec.ts` (tek sütun, telefon üst boşluğu), `ekran-4k.spec.ts`,
@@ -1611,7 +1652,7 @@ Carbon'un dört ilkesi, başlıklarıyla birebir
 | # | Carbon (alıntı) | TEDY'deki karşılığı | Test |
 |---|---|---|---|
 | C-AI1 | **"Use the AI label and styling to mark any instances of AI usage."** — "Transparency of AI presence is key to user trust." | Modelin yazdığı her yüzey AI etiketiyle işaretlenir (§6.2). | `carbon-asistan-ai.spec.ts` "the AI label explains itself instead of just marking" |
-| C-AI2 | **"Provide transparency of AI at each level of the experience."** — "Whether AI exists within a single word or across the entire page, users should clearly understand how pervasive an AI is implemented." | Sohbet yüzeyi geniş (broad) etiket; sohbet dışındaki AI kartları ve modüller kendi etiketlerini taşımalı — bugün taşımıyor (borç [B56](#13-bilinen-borçlar); modüller [S41](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler), borç [B71](#13-bilinen-borçlar)). | §6.7 |
+| C-AI2 | **"Provide transparency of AI at each level of the experience."** — "Whether AI exists within a single word or across the entire page, users should clearly understand how pervasive an AI is implemented." | Sohbet yüzeyi geniş (broad) etiket; sohbet dışındaki AI kartları ve modüller kendi etiketlerini taşır: `OdevOnayKarti` (B56 kapandı) ve modül çerçevesinin başı ([S41](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler); B71 kapandı; [Kanun M1.10](tedy-modul-tasarim-kanunu.md)). | §6.7 |
 | C-AI3 | **"Integrate explainability into the overall user workflow and experience."** — "minimize distractions and show explanations only when needed or requested by the user." | Açıklama ekranda sürekli durmaz; etiketin açılır penceresindedir (İ6). Model adı mesaj listesinde değil, pencerede. | "the model that answered is disclosed" |
 | C-AI4 | **"Don't use the Carbon for AI styling as decoration."** — "While these new styling elements are enticing, they are strictly intended to identify any instances of AI being used in an experience." | **AI aurası bir köken işaretidir, süs değil** (§6.6, K1). | "the AI aura marks what the model wrote, not what Işık wrote"; "…stays off the sources" |
 
@@ -2092,7 +2133,8 @@ Reddedilen süsler ve gerekçeleri §7.16'dadır.
 ### 7.1 P1 — Tipografik kontrast: tek şey en büyüktür
 
 **Kural.** Bir görünüm hiyerarşisini en çok üç tip basamağıyla kurar. Görünümün tek şeyi (İ1) ekrandaki en
-büyük metindir: `heading-03` (20 px); görünümde başka başlık yoksa `heading-04` (28 px). Kart ve bölüm
+büyük metindir: `heading-03` (20 px); görünümde başka başlık yoksa `heading-04` (28 px); modül sayfasında modülün
+adı `heading-05`'tir ve çerçevenin içi en çok `heading-04` çizer ([Kanun M1.8](tedy-modul-tasarim-kanunu.md); borç KB-14). Kart ve bölüm
 başlığı gövdenin bir basamak üstündedir: `heading-02` (16 px, 600); gövdeyle aynı puntoda olamaz,
 telefonda da düşürülmez. Gövde `body-compact-01` / `body-01` (14 px), üst veri `label-01` /
 `helper-text-01` (12 px). Tarih başlığı, kaş (eyebrow) ve altbilgi tek şeyden büyük olamaz, ona eşit de
@@ -2201,8 +2243,8 @@ x'i vardır (± 1 px). Altbilgi metin merkezi = ana sütun merkezi (± 2 px). **
 
 **Kural.** Kural ve Carbon dayanağı §3.5'tedir ([3.5-2] derinlik; kart içi katman [3.1-3], [3.1-4]; S11, B2):
 derinlik katman token'ı ve 1 px kenardır, gölge yalnız kullanıcının açtığı yüzen yüzeyde (`--ted-shadow-popover`);
-kartın içindeki blok kartla aynı katman renginde durmaz; tıklanmayan kart hover'da yükselmez. Modül şablonundaki
-`.topbar`/`.stage` gölgesi modülün kendi kararıdır (§9.3), panoya örnek olmaz.
+kartın içindeki blok kartla aynı katman renginde durmaz; tıklanmayan kart hover'da yükselmez. Modül şablonu aynı
+kurala uyar: `.topbar`/`.stage`'in statik gölgesi 2026-10-15'te kalktı (S11, §9.3).
 
 **Ölçülen gözlem.**
 - `.dashboard-card` statik `--ted-shadow-card` taşır ve hover'da `--ted-shadow-card-hover`'a yükselir; kart
@@ -2304,8 +2346,9 @@ metin taşır. Statik grep: `dashboard/src`'te `onClick`'li `<div` ve `onClick`'
 
 **Kural.** Kural ve Carbon dayanağı §3.6'dadır ([3.6-1]–[3.6-6]; S26): panoda yalnız productive süre ve eğri,
 sayfa yüklemesinde tek koreografi, öğe başı kademe yok (liste tek blok olarak girer), mikro etkileşim 90–120 ms,
-"şimdi" işaretçisi dışında döngüsel hareket yok; expressive hareket yalnız modülde bölüm geçişinde, aynı anda
-tek ve `prefers-reduced-motion` altında kapalı.
+"şimdi" işaretçisi dışında döngüsel hareket yok. Modülde de expressive hareket ve bölüm girişi hareketi yoktur;
+hareket yalnız okurun eylemine cevap verir, en çok `$duration-moderate-02` ([Kanun M2.10, KS-10](tedy-modul-tasarim-kanunu.md);
+şablondaki `segIn` borç KB-18).
 
 **Ölçülen gözlem.**
 - Doğru: süre token'ları köprülü, reduced-motion anahtarı `gorunum-kipleri` ile sabit; modül şablonu Carbon
@@ -2411,7 +2454,8 @@ MCP'de köşe yarıçapı ölçeği için rehber metni bulunamadı; `@carbon/lay
 - `bugun-masaustu-linux.png` / `bugun-telefon-linux.png`: kare Carbon düğmelerinin yanında yuvarlak tarih
   okları; 8 px zaman çizelgesi kartlarının üstünde 2 px tek-şey kartı.
 - Şeritler 3 px, ama `.exam-card` 4 px.
-- Karşı örnek: modül şablonu token kümesine uyar (`--cds-radius`, `--radius-btn`, `--radius-tag`).
+- Karşı örnek: modül şablonu köşede token kümesine uyar (`--cds-radius`, `--radius-btn`, `--radius-tag`); bildirim
+  kutuları hariç — `.feedback` ve `.callout` 8 px köşe, callout 4 px kenar taşır ([Kanun M2.3](tedy-modul-tasarim-kanunu.md), KB-20).
 
 **Test.** pytest, Books dışı pano SCSS: her `border-radius` değeri {0, `var(--ted-radius-card)`, Tag yarıçap
 token'ı, %50} içindedir; her `border-left` / `border-inline-start` şeridi 3 px; `--ted-radius-sm` silinmiştir.
@@ -2515,7 +2559,7 @@ kararıdır (S14); bu ilke yalnız o kapıyı açık tutar, karar vermez.
 **Ölçülen gözlem.**
 - Modüller token düzeyinde hazır: şablon g10 ve g100 token bloklarını taşır, `_subjects.scss` koyu adımları
   taşır. Modül temayı yalnız panodan alır ve kendi başına g100'e geçmez ([Kanun M4.1, M4.3](tedy-modul-tasarim-kanunu.md));
-  şablondaki tema düğmesi borç KB-1.
+  şablonun tema düğmesi 2026-10-20'de kalktı (KB-1).
 - Pano g10'a sabit (`main.tsx`) ve durum metni "tema g10'a sabit" gerekçesiyle literal.
 - 17 durum kuralı doğrudan palet adımı boyar: "bugün" ve "aktif" dolgularında `colors.$blue-10`, kenarlarda
   `$blue-30/$blue-40`, başlık etiketi kenarları, bir `colors.$gray-10` kenar. Bunların hepsi g100 altında
@@ -2575,7 +2619,7 @@ emoji değil aynı etiketi kullanır. Gradyan üstündeki her metin her noktada 
   https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/#dont-use-the-ai-label-as-decoration
   · https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/#default-sizes
 - Gradyan üstünde metin her yerde kontrastı karşılar:
-  https://carbondesignsystem.com/building-blocks/foundations/accessibility/color/#use-of-color-and-color-blindness
+  https://carbondesignsystem.com/building-blocks/foundations/accessibility/color/#color-contrast (MCP: #use-of-color-and-color-blindness)
 
 **Ölçülen gözlem.**
 - Doğru: pin testi yalnız Carbon for AI'ın kendi gradyanını muaf tutar ve TEDY SCSS'inde gradyanı yasaklar;
@@ -2618,8 +2662,8 @@ Anayasanın §10 gri tonlama ve 2 saniye testleri değişmeden kalır; yukarıda
 Panoda grafik kütüphanesi yoktur (`dashboard/package.json`: `@carbon/charts` yok). Bugünkü veri işaretleri
 elle kurulmuştur: Gün Şeridi (`DayStrip.tsx`), Notlar'ın sınav çubukları (`GradeTable.tsx`) ve İlerleme'nin
 `ProgressBar`'ı (`PlatformProgress.tsx`). Modüller elle SVG çizer (`vizChart`, `fractionBar`, `donutSvg`;
-`src/mcp_server/vendor/assets/module-template.html`). Bu bölümün kuralları her ikisine de uygulanır; modüle özgü
-ayrıntı vendor referanslarındadır (§9).
+`src/mcp_server/vendor/assets/module-template.html`). Bu bölümün kuralları her ikisine de uygulanır; modülde kanunun
+hükmü önce gelir (KS-3, M4.7, M5.6, M5.12; §0.2), yazım ayrıntısı vendor referanslarındadır (§9).
 
 Carbon'un veri görselleştirme sayfaları kendilerini "yapım aşamasında" diye işaretler
 (https://carbondesignsystem.com/building-blocks/data-visualization/color-palettes/ başındaki not). Yazılı olan
@@ -2628,18 +2672,19 @@ ayrı bir veri görselleştirme erişilebilirlik sayfası) Carbon MCP'de de bulu
 
 ### 8.1 Paletler
 
-Kaynak: https://carbondesignsystem.com/building-blocks/data-visualization/color-palettes/.
+Kaynak: https://carbondesignsystem.com/building-blocks/data-visualization/color-palettes/#categorical-palettes ·
+https://carbondesignsystem.com/building-blocks/data-visualization/color-palettes/#alert-palette.
 
 | Palet | Carbon kuralı | TEDY kuralı |
 |---|---|---|
 | **Kategorik** | Ortak ilişkisi olmayan ayrık kategoriler. 14 renk **kesin sırayla** uygulanır; sıra komşular arası farkı en yükseğe çıkarmak için kurulmuştur: Purple 70 `#6929c4`, Cyan 50 `#1192e8`, Teal 70 `#005d5d`, Magenta 70 `#9f1853`, Red 50 `#fa4d56`, Red 90 `#520408`, Green 60 `#198038`, Blue 80 `#002d9c`, Magenta 50 `#ee5396`, Yellow 50 `#b28600`, Teal 50 `#009d9a`, Cyan 90 `#012749`, Orange 70 `#8a3800`, Purple 50 `#a56eff`. Kategori sayısı önceden biliniyorsa sayıya göre seçeneklerden biri kullanılabilir. Onaltılık değerler `@carbon/colors`'tan alınır; site Red 90 ve Magenta 50'yi farklı basar (`#570408`, `#ee538b`), paket kazanır. | Kırmızı, yeşil, sarı, turuncu kategori rengi **olamaz** — bunlar durum renkleridir (İ8, `subjectThemes.reserved`). Bu yüzden 14'lü sıra kullanılmaz; **2026-10-15'ten beri modül kategorik grafikte hue hiç kullanmaz** (S19): `--viz-1…5` nötr gri rampadır ve kategoriyi etiket taşır. Önceki beş yuva (`#6929c4 #002d9c #1192e8 #007d79 #9f1853`) ders aileleriydi ve ders işaretiyle aynı görünüme düşüyordu; anlam renkleri (kırmızı/yeşil/sarı/turuncu) ile ders aileleri çıkarılınca kategorik palete yedek hue kalmadığı için çözüm renk değil biçim oldu. Ayrıntı ve paket kaynağı `src/mcp_server/vendor/references/carbon-sources.md` §4. Beşten çok kategori olursa grafik bölünür ya da doğrudan etiketle ayrışır; ayırıcı hiçbir durumda renk değildir. Hiçbir yuva ders aksanıyla değiştirilmez (ölçüldü: modül `fractionBar`'ı 1. yuvaya aksanı koyunca Fen'de iki grup iki temada da aynı renk çıkıyor). |
-| **Sayıya göre seçenekler** | Sayfa, kategori sayısı belli olduğunda kullanılacak seçenekleri gösterir; taramada her seçeneğin yalnız ilk rengi metin olarak geldi (Option 1 Purple 70, Option 2 Blue 80, Option 3 Cyan 50, Option 4 Teal 70). Seçeneklerin tam renk listesi Carbon MCP metninde de yok. | Değerler @carbon/charts kaynağından alınır, elle yazılmaz. Alınana dek beş yuvalı sıra geçerlidir. |
+| **Sayıya göre seçenekler** | Sayfa, kategori sayısı belli olduğunda kullanılacak seçenekleri gösterir; taramada her seçeneğin yalnız ilk rengi metin olarak geldi (Option 1 Purple 70, Option 2 Blue 80, Option 3 Cyan 50, Option 4 Teal 70). Seçeneklerin tam renk listesi Carbon MCP metninde de yok. | Değerler @carbon/charts kaynağından alınır, elle yazılmaz. Panoda grafik yoktur; modülde kategoriyi hue taşımaz (S19, Kanun KS-3), bu yüzden sayıya göre seçenek modülde kullanılmaz. |
 | **Sıralı (tek renk)** | İlişki ve eğilim grafikleri. Dört seçenek, her biri 10–100 adım: Blue, Purple, Cyan, Teal. Açık temada **en koyu = en büyük**, koyu temada **en açık = en büyük**. | Not, puan, ustalık gibi sıralı büyüklükler ya tek renkli rampayla ya da hiç renksiz çizilir; durum renkleriyle bantlanmaz. |
 | **Iraksak** | Bir orta noktanın üstü/altı. Üç renk ister: en küçük, en büyük, bükülme noktası. Palet 1 kırmızı–camgöbeği yalnız sıcak/soğuk verisi; Palet 2 mor–turkuaz performans ve değişim oranı. Iraksak paletler açık/koyu temayı ayırmaz. | Palet 1 kullanılmaz (kırmızı ucu durum rengidir). Palet 2'nin mor ve turkuaz uçları Matematik ve Fen ailesiyle aynıdır; bu derslerin grafiklerinde ıraksak ölçek doğrudan etiket ya da legend olmadan kullanılmaz. Panoda bugün ıraksak veri yok. |
 | **Uyarı** | Durum içindir: Red 60 `#da1e28` tehlike/hata, Orange 40 `#ff832b` ciddi uyarı, Yellow 30 `#f1c21b` olağan uyarı, Green 60 `#198038` normal/başarı. | Yalnız durum. Bir çocuğun geçmiş notu ya da ilerlemesi durum değildir (yüzey tasarımları §2.7: kırmızı yalnız gerçek aciliyet). |
 | **Gradyan** | Charts'ta desteklenmez; anlamlı bir ilerlemeyi ya da ayrışmayı göstermez; sıralı paletin yerine asla. | Yok (İ8, D1). `test_pano_tasarim_sistemi.py` `gradient(` arar; Carbon Charts benimsenirse `color.gradient.enabled` kapalı. |
 
-Modül grafiklerinin `--viz-1..5` dizisi kategorik paletin anlam renklerinden kaçınan 5 yuvalık alt kümesidir
+Modül grafiklerinin `--viz-1..5` dizisi 2026-10-15'ten beri nötr gri rampadır; kategoriyi yerinde etiket ve biçim taşır
 ([S19](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler)). Aynı veri kümesi her yerde aynı renktir (Carbon:
 https://carbondesignsystem.com/building-blocks/data-visualization/dashboards/#use-consistent-color-assignments).
 TEDY'de bir dizi ders ise rengi `subjectThemes`'ten gelir, kategorik sıradan değil — ders renk sistemi bu kuralın
@@ -2671,7 +2716,8 @@ https://carbondesignsystem.com/building-blocks/data-visualization/axes-and-label
 
 ### 8.3 Legend mi, doğrudan etiket mi?
 
-Kaynak: https://carbondesignsystem.com/building-blocks/data-visualization/legends/.
+Kaynak: https://carbondesignsystem.com/building-blocks/data-visualization/legends/#usage (doğrudan etiket; MCP: #color-and-texture) ·
+https://carbondesignsystem.com/building-blocks/data-visualization/legends/#color-and-texture (doku rengin yerine ya da yanında).
 
 - Mümkünse legend kullanılmaz; veri **doğrudan etiketlenir**. Tek kategorili ya da tek renkli grafikte legend
   olmaz.
@@ -2680,7 +2726,8 @@ Kaynak: https://carbondesignsystem.com/building-blocks/data-visualization/legend
   opaklık takvim başlıklarını 3,03:1'e düşürdü). Seçim ve gizleme Carbon'un tıklama davranışındaki gibi **onay
   işaretiyle** ve `aria-pressed` ile gösterilir; metin her durumda okunur kontrastta kalır. Aykırı: takvim legend
   çipleri gizli durumu yalnız `opacity: 0.35` ile gösteriyor (~2,2:1), `aria-pressed` yok (`CalendarEvents.tsx`) — [B34](#13-bilinen-borçlar); kural [S31](#11-bilinçli-sapmalar-ve-çözülmüş-çelişkiler).
-- Modül kuralı "her grafikte legend" (`carbon-excellence.md` 13(c)) bu biçimde yeniden yazılır (§9).
+- Modül kuralı "her grafikte legend" (`carbon-excellence.md` 13(c)) bu biçimde yeniden yazıldı: lejant yalnız çok
+  seride, kategori yerinde etiketle (§9, Kanun KS-3).
 
 ### 8.4 Erişilebilirlik
 
@@ -2794,14 +2841,14 @@ aynıdır.
 
 **Uyduğu Carbon kuralları.**
 
-- *Doğrudan etiket, legend yok* (https://carbondesignsystem.com/building-blocks/data-visualization/legends/#usage):
+- *Doğrudan etiket, legend yok* (https://carbondesignsystem.com/building-blocks/data-visualization/legends/#usage; MCP: #color-and-texture):
   her parça adını kendi içinde taşır; tek istisna dar ödev dilimidir — adı ve saati izin **altında**, dilimin rengiyle
   aynı küçük kareyle yazılır, dolgunun üstünde asla.
 - *Saat cetveli yok*: parçaların adları ve iki satırdaki saatler zamanı söyler; 2026-10-19'a kadar duran 60/120 dakikalık
   işaretler kalktı.
 - *Yerel saat biçimi*: 24 saat, `clock()` (`components/patterns/time.ts`), `.tedy-time` mono ve tabular.
 - *Metin karşılığı*: tek cümlelik ad (§8.4); iz `aria-hidden`, çünkü cümle onu bütünüyle söyler.
-- *Grafik kontrastı ≥ 3:1* (https://carbondesignsystem.com/building-blocks/foundations/accessibility/color/): ödev
+- *Grafik kontrastı ≥ 3:1* (https://carbondesignsystem.com/building-blocks/foundations/accessibility/color/#color-contrast (MCP: #use-of-color-and-color-blindness)): ödev
   dilimi `border-interactive` iz üzerinde 5,0:1, okul üzerinde 3,8:1; parça kenarı `border-strong-01` iz üzerinde
   3,3:1; şimdi `border-inverse` 18,1:1; parça adları `text-secondary` okul üzerinde 5,9:1 (`bugun-duzen.spec.ts`
   "D — yenileme" sabitler).
@@ -2846,7 +2893,7 @@ gösterilir (§9.6).
 **Bu bölümün modül yüzeylerindeki yetkili metni [Modül Tasarım Kanunu](tedy-modul-tasarim-kanunu.md)'dur**
 (2026-10-19, §0.2). Bu bölüm onun özeti ve tarihidir: bağı, nedenleri ve kapanan kararları anlatır. Bir cümlesi
 kanunla çelişirse kanun kazanır ve cümle aynı commit'te düzeltilir; kanunun hükmünden ayrılan bugünkü kod kanunun
-borç kaydındadır (KB-n, kanun §9).
+borç kaydındadır (KB-n, kanun §9). Kanunun söylemediği konuda bu belgenin kuralları (§3–§8) modülde de geçerlidir (§0.2).
 
 ### 9.1 Tek sistem, iki çalışma zamanı
 
@@ -2866,7 +2913,7 @@ borç kaydındadır (KB-n, kanun §9).
   pano çerçeveyi o boya büyütür, sayfa tek parça kayar, çerçevenin kendi kaydırma çubuğu yoktur. Lacivert
   yalnız panonun üst bandındadır (marka laciverti yalnız üst bant ve giriş sayfası); akışta modülün kendi başlık
   bloğu yoktur, sayfanın en büyük yazısı panonun `heading-05` modül adıdır ve modülün içi en çok `heading-04`
-  çizer (Kanun M1.1, M1.8; şablonda borç KB-14); ilerleme rayı ve sahne panonun kart dilindedir. Bölüm değişince pano çerçevenin üstünü yalnız okur onu geçmişse
+  çizer (Kanun M1.1, M1.8; şablonda borç KB-14); sahne panonun kart dilindedir; ilerleme göstergesi kutu değil sayfanın bir öğesidir (Kanun M5.4). Bölüm değişince pano çerçevenin üstünü yalnız okur onu geçmişse
   görünüme getirir. Bu tarihten önce derlenmiş modül alanı tanımaz ve eskisi gibi kendi içinde kayar —
   yeniden derlenip yayınlanınca akışa geçer (tedy-integration §2–§3; `tests/test_modul_akis_yerlesimi.py`,
   `moduller.spec.ts` "the module sits in the page flow…").
@@ -2910,16 +2957,22 @@ yerlerinde gerekçelidir; birinin kuralı ötekine taşınmaz.
 |---|---|---|---|
 | Sütun | Tek 60rem sütun (S1) | Akışta panonun sütunu: modül onu her genişlikte tam ve simetrik doldurur (Kanun M1.3; telefonda borç KB-31). `.wrap{max-width:55rem}` yalnız tek başına açılıştadır; şablon 2026-10-15'ten beri rem tabanlı | Kanun M1.3; `module-template.html` `.wrap` |
 | Gövde | Productive `body-01` 14 px | Kanun KS-1: 18 px / 1,6, tek token `--tedy-body-reading` (token adı borç KB-39); asla 16 px altı | Kanun KS-1; carbon-child-system §4, §7 |
-| Başlık ağırlığı | Carbon token'ı olduğu gibi (P1, S44) | Aynı kural (S44, 2026-10-10); şablon 2026-10-11'den beri 400 yazar (B74'ün şablon kısmı kapandı) | carbon-child-system §4 |
-| Dokunma hedefi | ≥ 44 px, standart 48 px (S18) | `--tap: 48px` (Carbon size Large) | carbon-child-system §5 |
-| Tema | Yalnız g10 (S14) | Yalnız panonun teması; modülde tema düğmesi, tema kaydı ve sistem tercihi kuralı yok (Kanun M4.1, KS-7; şablondaki düğme borç KB-1) | Kanun M4.1; tedy-integration §2 |
+| Başlık ağırlığı | Carbon token'ı olduğu gibi (P1, S44) | Aynı kural (S44; Kanun M2.9): segment başlıkları 2026-10-11'den beri 400 (B74'ün şablon kısmı); `.summary h2` ve `.topbar__title` 600 kaldı (borç KB-14); başlık dışında da yalnız 300/400/600 (borç KB-47) | Kanun M2.9; carbon-child-system §4 |
+| Dokunma hedefi | ≥ 44 px, standart 48 px (S18) | `pointer: coarse` ya da çerçeve md altında ≥ 44 × 44 px, standart 48 (`--tap: 3rem`) (Kanun M5.3, KS-5; borç KB-4) | Kanun M5.3; carbon-child-system §5 |
+| Tema | Yalnız g10 (S14) | Yalnız panonun teması; modülde tema düğmesi, tema kaydı ve sistem tercihi kuralı yok (Kanun M4.1, KS-7; şablonun düğmesi 2026-10-20'de kalktı, KB-1) | Kanun M4.1; tedy-integration §2 |
 | Gölge | Yeni statik gölge yok (S11, P4) | **Aynı kural** (2026-10-15): statik yüzey gölge almaz — `.topbar`/`.stage`'in `--tedy-shadow-card`'ı kalktı, derinlik 1 px `border-subtle` ile; gölge yalnız geçici yüzeyde (tanım popover'ı) | tedy-integration §1, §4 |
-| Köşe | 0 / 8 px / tam / %50 (S10, P10) | Aynı dil: bant, sahne, kart 8 px; düğme, seçenek, alan, tablo 0; etiket tam | tedy-integration §4 |
+| Köşe | 0 / 8 px / tam / %50 (S10, P10) | Kart ve sahne 8 px (`--cds-border-radius-08`); kontrol, seçenek, alan, tablo ve bildirim 0; etiket tam (Kanun KS-4; bildirim bugün 8 px, borç KB-20); bant yalnız tek başına açılışta | Kanun KS-4; tedy-integration §4 |
 | Hareket | Yalnız productive (P7) | Bölüm girişinde animasyon yok; hareket yalnız okurun eylemine cevap verir, productive, en çok `moderate-02` (Kanun M2.10, KS-10; şablondaki `segIn` borç KB-18) | Kanun M2.10; carbon-child-system §6 |
 | Oyunlaştırma | Yok (anayasa §9) | Yok (S43, 2026-10-10; şablon 2026-10-11'den beri uyar, B73 kapandı): kutlama/ödül animasyonu, seri sayacı, rozet ve ekranda XP yok; ilerleme sessiz, etiketli; özet düz metin | tedy-integration §5; SKILL §11.4–§11.6 |
 | Font teslimi | Google Fonts (S2) | Plex WOFF2 `data:` URI olarak gömülü; ağ yok (G-SELFCONTAINED) | carbon-child-system §4 |
 | Kök ölçek | 1920 px üstünde kök punto pencereyle büyür (`clamp`, 4K) | **Panodan gelir** (2026-10-15): çerçeve ayrı belge olduğu için `clamp`'i devralmaz; pano hesaplanmış kök boyunu `edupedia:appearance`'ın `rootPx` alanıyla bildirir, modül 12–48 px'e kıstırır. Mesaj yoksa 16 px | spec §10.2; §9.4 |
 | Emoji | Yok (P11) | Yok, G-EMOJI FAIL | SKILL §12 |
+| Kırılım | Carbon md/lg medya sorgusu ([3.4-5]) | `.wrap` kapsayıcı sorgusu sm 20rem, md 42rem; `@media` genişlik sorgusu yok, lg yazılmaz (Kanun M5.9, KS-12; borç KB-28) | Kanun M5.9 |
+| Serif | Yalnız Tedy Books (S16, anayasa §5.2) | Yalnız matematik gösterimi (`.math`, `.fb-eq`) (Kanun M1.9, KS-9; borç KB-15) | Kanun M1.9 |
+| Satır ölçüsü | ≤ 80 karakter, `rem` ([3.3-8]; panoda B81) | `max-width: 36rem`, satırda ≤ 80 karakter (Kanun M5.5; borç KB-29) | Kanun M5.5 |
+| İlerleme | `ProgressIndicator` yok (§4.1) | Tek gösterge, 3–7 aşama; sığmazsa tek satır metin, toplam ikincil (Kanun M2.4, M2.5, M5.4, KS-6, KS-11) | Kanun M2.4 |
+| Düğme | lg 48 px, productive, ikon 16 px (§4.2) | lg 48 px expressive: etiket 16 px / 400, ikon 20 px, etiket sola yaslı (Kanun M2.2; borç KB-19) | Kanun M2.2 |
+| Tablo | Satır = başlık boyu, zebra yok (§4.1, §4.5) | lg 48 px, her tabloda `caption`, zebra yok, sayı sağa ve tabular (Kanun M2.15; borç KB-43) | Kanun M2.15 |
 
 **Şablondaki oyunlaştırma** (tedy-integration §5; S43, [B73](#13-bilinen-borçlar) 2026-10-11'de kapandı): XP yalnız iç ilerleme sayısıdır — köprü panoya bildirir, okur görmez; seri sayacı, rozet kasası, "+N XP" yükselişi, nabız ve ödül sesi yoktur; `--reward` rolü kalktı. Doğru cevabın kısa `correct` earcon'u isteğe bağlı anında geri bildirim olarak kalır (G-AUDIO). Rozet, XP, seri, puan ve kutlama yoktur; `rewards.badges` hiç çizilmez (Kanun M2.7). S43'ün eski "kalırsa sessiz liste" seçeneği kalktı; geri getirmek kanun değişikliğidir.
 
@@ -2927,18 +2980,18 @@ yerlerinde gerekçelidir; birinin kuralı ötekine taşınmaz.
 
 | Yön | Mesaj | Ne taşır | Sınır |
 |---|---|---|---|
-| Pano → modül | `{"type": "edupedia:appearance", "v": 1, "theme": "g10", "rootPx": 32, "layout": "flow"}` | Panonun Carbon teması (`DASHBOARD_THEME = 'g10'`, `dashboard/src/utils/moduleBridge.ts`), hesaplanmış kök yazı boyu (`rootPx`, isteğe bağlı) **ve** yerleşim (`layout: "flow"`, isteğe bağlı; §9.1) | Çerçevenin `load` olayında, ayrıca pano kökü değişen her yeniden boyutlamada gönderilir (taslak önizleme dahil). Modül yalnız `e.source === window.parent` ve beklenen köken iken işler; `adoptHostTheme()` panonun temasını koşulsuz uygular ve yalnız `g10 \| g100` kabul eder (Kanun M4.1, M4.3; bugün modülün tema düğmesine basılmışsa pano temasını yok sayar ve `white`'ı da kabul eder, borç KB-1, KB-22); `adoptHostRootSize()` yalnız sayı kabul eder ve 12–48 px'e kıstırır. Alan yoksa modül 16 px'te kalır (tek başına açılış ve eski pano). İlerleme taşımaz, saklanmaz (tedy-integration §2). |
+| Pano → modül | `{"type": "edupedia:appearance", "v": 1, "theme": "g10", "rootPx": 32, "layout": "flow"}` | Panonun Carbon teması (`DASHBOARD_THEME = 'g10'`, `dashboard/src/utils/moduleBridge.ts`), hesaplanmış kök yazı boyu (`rootPx`, isteğe bağlı) **ve** yerleşim (`layout: "flow"`, isteğe bağlı; §9.1) | Çerçevenin `load` olayında, ayrıca pano kökü değişen her yeniden boyutlamada gönderilir (taslak önizleme dahil). Modül yalnız `e.source === window.parent` ve beklenen köken iken işler; `adoptHostTheme()` panonun temasını koşulsuz uygular ve yalnız `g10 \| g100` kabul eder (Kanun M4.1, M4.3; 2026-10-20'den beri, KB-1 kapandı; ölü `white` token bloğu şablonda hâlâ durur, KB-22); `adoptHostRootSize()` yalnız sayı kabul eder ve 12–48 px'e kıstırır. Alan yoksa modül 16 px'te kalır (tek başına açılış ve eski pano). İlerleme taşımaz, saklanmaz (tedy-integration §2). |
 | Pano → modül | `edupedia:restore` | Kişinin kayıtlı ilerleme durumu (`restoreMessage`) | Tasarım değeri taşımaz. |
 | Modül → pano | İlerleme `postMessage`'ı | Bölüm ve sonuç | `moduleBridge.ts` yalnız o çerçeveden, köken `"null"`, eşleşen slug/sürüm ve şema ile kabul eder; sunucu `POST /api/modules/<slug>/progress`'te yeniden doğrular. |
 
 Tasarım açısından akan **üç şey vardır**: tema, kök yazı ölçeği (2026-10-15) ve yerleşim (2026-10-19).
-Modül panonun katmanlarını alır; akışta sayfa zemini panonun cool-gray zeminidir (Kanun M1.2; bugün çerçeve
-`--cds-background` çiziyor, borç KB-3); 1920 px üstünde panonun kök puntosu
+Modül panonun katmanlarını alır; akışta sayfa zemini panonun cool-gray zeminidir (Kanun M1.2; KB-3 2026-10-20'de
+kapandı); 1920 px üstünde panonun kök puntosu
 pencereyle büyüdüğü için o değeri de alır, yoksa kabuk iki katına çıkarken çerçeve içindeki modül
 yarı ölçekte kalırdı. Panoya bir gün koyu tema eklenirse bu panonun Profil ayarıdır ve değişen tek değer `DASHBOARD_THEME` olur (S14, Kanun M4.2). Ölçülmüş bir
 sınır: çerçeve `allow-scripts` ile opak kökenlidir, Web Storage yoktur; tedy-integration §2'deki "öğrencinin
 kayıtlı tercihi" TEDY içinde hiç oluşmaz ve her yüklemede panonun g10'u kazanır. Oturum içinde ise modülün tema
-düğmesi panonun temasını ezer (ölçüldü); kanun düğmeyi kaldırır (M4.1, borç KB-1).
+düğmesi panonun temasını eziyordu (ölçüldü); düğme 2026-10-20'de kalktı (M4.1, KB-1).
 
 ### 9.5 Kalite kapıları
 
@@ -2956,7 +3009,7 @@ Kapılar 18'dir: vendored 16 (`vendor/scripts/validate_module.py`, SKILL §12) +
 | `G-SVG` | Figür SVG'lerinde `role="img"` + başlık; ham hex yerine token. Kanuna göre ham hex FAIL'dir (M4.7); kapı bugün yalnız WARN verir (borç KB-25) |
 | `G-EMOJI` | Çıktıda hiç emoji yok |
 | `G-WELLBEING`, `G-FLOW` | Cezalandırıcı ve süre baskılı dil yok (uyarı); kayıp-cezalandırıcı seri dili, etiketleyen uyarlanır zorluk, geri sayımlı tempo diski FAIL |
-| `G-AUDIO` | Ses isteğe bağlı, susturulabilir, varsayılan kapalı; autoplay ve otomatik okuma yok |
+| `G-AUDIO` | Ses isteğe bağlı ve susturulabilir; autoplay, döngü ve otomatik okuma yok; TTS varsayılan kapalı. Ses efektinin (earcon) varsayılanını kapı denetlemez (`validate_module.py` `_audio_earcon_issues`); bugün hareket azaltma kapalıysa açık, karar kullanıcınındır (Kanun M5.14) |
 | `G-BRIDGE` | Köprü mesaj tipleri; `edupedia:appearance` izinli ama zorunlu değil (tedy-integration §2) |
 
 `G-CARBON-GRID`, panodaki P4'ün (derinlik katmandır) modüldeki kapısıdır ve bugün panodan daha
@@ -2970,7 +3023,7 @@ Modülün yazım varlıkları (şablon, otorite JSON'u, referans dosyaları) `sr
 | Dosya | Ne için |
 |---|---|
 | `SKILL.md` §10 | Carbon token'ları özeti: tipografi (mono yalnız rakamda), renk (`tedy-*`; g10 ve g100 token blokları, tema panodan, Kanun M4.1, M4.3), aralık, hareket, çocuk uyarlaması; §10.1 token otorite zinciri |
-| `SKILL.md` §11 | İkon, piktogram, SVG; işlevsel renk; ses; §11.6 rozet ve XP ekranda yok (Kanun M2.7). Bölümde kalan eski rozet kasası metni vendor borcudur (KB-35) |
+| `SKILL.md` §11 | İkon, piktogram, SVG; işlevsel renk; ses; §11.6 rozet ve XP ekranda yok (Kanun M2.7; vendor metni KB-35 ile 2026-10-19'da düzeltildi) |
 | `SKILL.md` §12 | Kalite kapıları (otorite `validate_module.py`) |
 | `references/tedy-integration.md` | Panoyla bütünlük: katman, tema ve köprü, kimlik bandı, ders renk sistemi, köşe ve gölge, oyunlaştırma, doğrulama |
 | `references/color-system.md` | İşlevsel renk rolleri, beş kural, wayfinding tonu |
@@ -3013,8 +3066,9 @@ Sessizce "düzeltilmez"; vendor referanslarına adlı istisna ya da borç olarak
   türetemez (içeride `100vw` çerçevenin genişliğidir, yani panonun sütunu eksi sayfa dolgusu — CSS'ten
   türetmek modülün yazı boyunu pano yerleşimine bağlar ve tek başına açılan modülü yanlış ölçekler).
   Pano hesaplanmış değeri `edupedia:appearance`'ın `rootPx` alanıyla bildirir (§9.4).
-- **Motor kuralları kendi belgelerine uymuyor:** piktogramlar 32/30 px (Carbon asgarisi 48 px); ikonlar kesirli
-  rem boyutlarında (0,8–1,6rem); `var(--cds-layer-02)` bağlamsal token yerine 31 kez sabit.
+- **Motor kuralları kendi belgelerine uymuyor:** piktogram ve kesirli ikon boyları Kanun M2.11, M3.10'un borcudur
+  (KB-32). `var(--cds-layer-02)`'nin sabit kullanımı (2026-10-20'de 29 yer) kusur sayılırsa kanun §9'a KB olarak
+  yazılır; [3.1-3] kart içi blok için `layer-02` istediğinden bugün kusur sayılmaz (doğrulanmadı).
 
 ### 9.8 Bu güncellemenin vendor referanslarına eklediği Carbon bulguları
 
@@ -3035,39 +3089,40 @@ liste ne eklendiğini ya da ekleneceğini söyler. Kaynak: 2026-10-10 Carbon tar
    eklenir. Modülde kırılım `.wrap` üzerinde kapsayıcı sorgusudur (sm 20rem, md 42rem; `@media` genişlik
    sorgusu yok; Kanun M5.9, KS-12); motorun bugünkü 560/400 px medya sorguları borçtur (KB-28).
 5. **Yüzen yüzey özelliği:** gölge `0 2px 6px 0 rgba(0,0,0,.2)` yalnız üstte açılan menüde
-   (…/core/components/dropdown/guidelines/#elevation); popover köşesi 2 px
-   (…/core/components/popover/guidelines/#corners).
-6. **Tek yüksek vurgulu düğme** kuralı (…/core/components/button/guidelines/#multiple-button-emphasis)
+   (https://carbondesignsystem.com/building-blocks/core/components/dropdown/guidelines/#elevation); popover köşesi 2 px
+   (https://carbondesignsystem.com/building-blocks/core/components/popover/guidelines/#corners).
+6. **Tek yüksek vurgulu düğme** kuralı (https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#a-single-high-emphasis-button)
    15 maddeye eklenir.
-7. **Grafik dışı kontrast 3:1** (…/foundations/color/overview/#contrast-ratios); açık temada `--viz-sun`
+7. **Grafik dışı kontrast 3:1** (https://carbondesignsystem.com/building-blocks/foundations/accessibility/color/#color-contrast (MCP: #use-of-color-and-color-blindness)); açık temada `--viz-sun`
    (1,68:1) ve `--viz-cloud` (1,70:1) bunu geçemez.
-8. **Callout özelliği:** statik, bağlamsal, kapatılamaz; 3 px sol kenar, en az 48 px yükseklik
-   (…/core/components/notification/guidelines/#callout). Sapma yazılmaz: geri bildirim ve callout köşe 0 ve
+8. **Callout özelliği:** statik, bağlamsal, kapatılamaz
+   (https://carbondesignsystem.com/building-blocks/core/components/notification/guidelines/#callout); 3 px sol kenar, en az 48 px yükseklik
+   (https://carbondesignsystem.com/building-blocks/core/components/notification/specifications/#callout). Sapma yazılmaz: geri bildirim ve callout köşe 0 ve
    3 px kenarla Carbon anatomisine döner (Kanun M2.3); şablonun 4 px kenarı ve 8 px köşesi borçtur (KB-20).
-9. **İlerleme göstergesi token'ları:** tamamlanan ve geçerli `$interactive`, etkin olmayan çizgi
-   `$border-subtle` (…/core/components/progress-indicator/specifications/#color); stepper'ın `button-primary`
+9. **İlerleme göstergesi token'ları:** tamamlanan ve geçerli adım `$interactive`, başlanmamış adım `$icon-primary`,
+   etkin çizgi `$border-interactive`, etkin olmayan çizgi `$border-subtle`, etiket `$text-primary` (Kanun M2.4) (https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/specifications/#color); stepper'ın `button-primary`
    dolgusu g100'de farklı çizer.
-10. **Uyarlanır en-boy oranları serbesttir** (…/foundations/2x-grid/guidelines/#adaptive-aspect-ratios);
+10. **Uyarlanır en-boy oranları serbesttir** (https://carbondesignsystem.com/building-blocks/foundations/2x-grid/guidelines/#adaptive-aspect-ratios);
     carbon-excellence madde 2'nin "serbest oran = jenerik" hükmü Carbon'dan katıdır, öyle işaretlenir.
 11. **Kategorik palet kuralı:** renkler sırayla, kesin uygulanır; kategori sayısı öngörülebilirse sayıya
-    özel palet geçerlidir (…/data-visualization/color-palettes/#categorical-palettes). carbon-excellence §2.7
+    özel palet geçerlidir (https://carbondesignsystem.com/building-blocks/data-visualization/color-palettes/#categorical-palettes). carbon-excellence §2.7
     ile carbon-sources §4'ün çelişkisi bununla kapanır. Uyarı paleti anlamı (kırmızı hata, turuncu ciddi
-    uyarı, sarı uyarı, yeşil başarı; …/#alert-palette) Tedy'nin ayrılmış anlam renklerinin Carbon dayanağıdır.
-12. **İkon rengi komşu metnin rengidir**, tek renk, 4,5:1 (…/foundations/icons/guidelines/#color);
+    uyarı, sarı uyarı, yeşil başarı; https://carbondesignsystem.com/building-blocks/data-visualization/color-palettes/#alert-palette) Tedy'nin ayrılmış anlam renklerinin Carbon dayanağıdır.
+12. **İkon rengi komşu metnin rengidir**, tek renk, 4,5:1 (https://carbondesignsystem.com/building-blocks/foundations/icons/guidelines/#color);
     icon-pictogram-svg §6'daki 3:1 ile tutarlı hâle getirilir.
-13. **Piktogram asgarisi 48 px** (…/foundations/pictograms/guidelines/#sizing); motorun 32/30 px'i borç
-    olarak yazılır.
-14. **Tip seti harmanlama** (…/foundations/typography/style-strategies/#overview): `mathExpr`'teki Plex Serif
+13. **Piktogram asgarisi 48 px** (https://carbondesignsystem.com/building-blocks/foundations/pictograms/guidelines/#sizing); motorun 30–32 px'i ve ikon boyunda
+    çizilen `keyTerms[].icon` piktogramları Kanun M2.11, M3.10'un borcudur (KB-32).
+14. **Tip seti harmanlama** (https://carbondesignsystem.com/building-blocks/foundations/typography/style-strategies/#using-expressive-moments-within-product-designs): `mathExpr`'teki Plex Serif
     madde 10'un "MCQ şıkkında serif kahraman fontu" anti-kalıbı değildir. Serif modülde yalnız matematik
     gösterimindedir; `.lead` serifi kalkar (Kanun M1.9, KS-9; şablonda borç KB-15).
-15. **Durum göstergesi ve yükleniyor/iskelet kalıpları** (…/core/patterns/status-indicators/#icon-indicator,
-    …/core/patterns/loading/#skeleton-states) kontrol listesine girer.
-16. **Sistem tema tercihi** (…/foundations/themes/code/#system-preferences): Carbon, kullanıcı seçimi yoksa
+15. **Durum göstergesi ve yükleniyor/iskelet kalıpları** (https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#icon-indicator,
+    https://carbondesignsystem.com/building-blocks/core/patterns/loading/#skeleton-states) kontrol listesine girer.
+16. **Sistem tema tercihi** (https://carbondesignsystem.com/building-blocks/foundations/themes/code/#system-preferences): Carbon, kullanıcı seçimi yoksa
     işletim sistemi temasına uyar; tek g10 pano bununla çelişir (S14), modül sistem tercihine bakmaz ve
     panonun temasını uygular (Kanun KS-7, M4.1).
-17. **Yüksek kontrast anları** (…/foundations/color/overview/#high-contrast-moments): lacivert Tedy bandı
+17. **Yüksek kontrast anları** (https://carbondesignsystem.com/building-blocks/foundations/color/overview/#high-contrast-moments): lacivert Tedy bandı
     açık sayfada marka bölgesidir, adlı sapma olarak yazılır.
-18. **Carbon for AI etiketi** (…/foundations/carbon-for-ai/#when-to-use-the-ai-label) yapay zekâ yazımı
+18. **Carbon for AI etiketi** (https://carbondesignsystem.com/building-blocks/foundations/carbon-for-ai/#when-to-use-the-ai-label) yapay zekâ yazımı
     modüller için açık bir kullanıcı kararı olarak kaydedildi; 2026-10-10'da S41 ile karara bağlandı (etiket pano
     çerçevesinde, modülün içinde değil).
 19. **Adlı Tedy istisnaları** "düzeltilecek" değil istisna diye yazılır: 8 px kart köşesi (Kanun KS-4), tek
@@ -3265,7 +3320,7 @@ TEDY belgesine giren her Carbon dayanağı bir bağlantı taşır; kural ya da p
 
 | Kaynak | Biçim |
 |---|---|
-| `docs_search` | `anchor_url` aynen + sayfa başlığı + sekme (`page_type`) + indeks tarihi. Örnek: `AI label — Specifications · https://carbondesignsystem.com/building-blocks/core/components/ai-label/specifications/#ai-label (Carbon MCP docs_search, indeks 2026-09-30)` |
+| `docs_search` | `anchor_url` aynen + sayfa başlığı + sekme (`page_type`) + indeks tarihi. Örnek: `AI label — Specifications · Sizes · https://carbondesignsystem.com/building-blocks/core/components/ai-label/specifications/#sizes (Carbon MCP docs_search, indeks 2026-09-30)` |
 | `code_search` | `canonical_url` (Storybook) + `url` (GitHub, etikete sabit, ölçülen `v11.117.0`) + `last_updated`. Prop adı ancak `props_catalog`'da görüldüyse ve kurulu pakette varsa yazılır |
 | `get_charts` | `framework_components` yolu + `chosen_variant.import_hint` |
 | Yerel tarama (2026-10-10) | Dosya adı → URL: `__` → `/` (`building-blocks__core__components__tile__guidelines.md` ↔ `https://carbondesignsystem.com/building-blocks/core/components/tile/guidelines/`); başlık çapası sayfadaki `[](#…)`'ten |
@@ -3273,6 +3328,25 @@ TEDY belgesine giren her Carbon dayanağı bir bağlantı taşır; kural ya da p
 
 URL biçimi `/building-blocks/...`'tır; eski `/elements/...`, `/components/...`, `/data-visualization/...` yolları
 bayattır (B18).
+
+**Çapa kuralı** (canlı denetim 2026-10-20: §15'teki 107 sayfa açıldı, her çapa sayfanın `id`'leriyle karşılaştırıldı):
+
+- MCP'nin sayfa başlığı için döndürdüğü sözde bölüm (`section_rank` 1; ör. `ai-label/specifications/#ai-label`,
+  `progress-indicator/guidelines/#progress-indicator`) ve numaralı anatomi maddeleri (ör.
+  `button/guidelines/#4-icon-button`) canlı sayfada `id` değildir. Bunlarda çapasız sayfa URL'si ya da cümlenin canlı
+  başlığı yazılır.
+- MCP bazı cümleleri, canlı sayfada altında durmadıkları bir başlığın `anchor_url`'siyle döndürür (parçalama kayması).
+  Ölçüldü: legends'ta doğrudan etiket cümlesi canlıda `#usage`, MCP'de `#color-and-texture`; accessibility/color'da
+  kontrast tablosu canlıda `#color-contrast`, MCP'de `#use-of-color-and-color-blindness`; button'da etiket hizası ve
+  ikon yeri canlıda `#anatomy`, MCP'de `#4-icon-button`. Böyle yerde canlı başlık yazılır, yanına `(MCP: #…)` notu
+  düşülür. Talimatname ve [Modül Tasarım Kanunu](tedy-modul-tasarim-kanunu.md) aynı olgu için aynı çapayı kullanır
+  (§15.7).
+- MCP indeksi bazı uzun sayfaları kırpar: ai-label guidelines "Default sizes"ta, modal guidelines "Variants"ta, 2x Grid
+  overview "Fixed boxes"ta biter. Başlık MCP'nin `link_texts`'inde görünür ama `anchor_url` dönmez; çapa canlı
+  sayfadan doğrulanarak yazılır.
+- MCP veri görselleştirme sayfalarını ayrıca `data-visualization/chart-design/…`, `data-visualization/chart-types/…`
+  ve `data-visualization/undefined/…` yollarıyla da döndürür. Bu kopyalar canlıda 404'tür (2026-10-20) ve
+  kullanılmaz; doğru yol `/building-blocks/data-visualization/<sayfa>/`'dır.
 
 **Yerel tarama ile MCP birbirini tamamlar:** rehber ve kural taramadan tam sayfa olarak okunur (token harcamaz,
 tam metin); prop/varyant/import `code_search`'ten doğrulanır (taramanın kod sekmeleri ince); çapa MCP'den alınır ya
@@ -3326,7 +3400,10 @@ accept invented components or props": tanıdık gelmeyen bileşen ya da prop MCP
 
 ### 11.1 Sapma tablosu
 
-Her satır kapanmış bir karardır: TEDY'nin yaptığı korunur, "düzeltilmez". Bir `code_audit` bulgusu ya da
+Her satır kapanmış bir karardır: TEDY'nin yaptığı korunur, "düzeltilmez". Modül yüzeylerinin adlı sapmaları kanun
+§7'dedir; bir S satırının modüldeki hâli bir KS satırıysa S satırı ona yönlendirir ve KS kazanır. Karşılıklar: S2 ↔ KS-8;
+S10 ↔ KS-4; S14 ↔ KS-7; S16 ↔ KS-1, KS-9; S18 ↔ KS-5, KS-11; S19 ↔ KS-3; S26 ↔ KS-10; S38 ↔ KS-2; S43 ↔ KS-6, KS-11.
+KS-12'nin S karşılığı yoktur ([3.4-5]). Bir `code_audit` bulgusu ya da
 Carbon rehberi bu satırlardan birine düşüyorsa kabul edilmiş bulgudur; satırı değiştirmek §14.2'deki
 süreçle olur. carbon-builder kural kimlikleri (G, F, P, A, R) `.claude/skills/carbon-builder/` içindeki
 numaralandırmadır.
@@ -3338,8 +3415,8 @@ kaydındadır (B34, B39, B24; B68–B74 ve satırda anılanlar) — sapma ya da 
 
 | # | Carbon diyor | TEDY yapıyor | Neden | Ölçüm / kanıt | Kaynak |
 |---|---|---|---|---|---|
-| **S1** Izgara | Sayfa düzeni 2x Grid ile; sol gezinmeli ürün ekranı "product and docs" modeli (sola hizalı, en fazla genişlikli ızgara); carbon-builder ve `code_audit` `<Grid>`/`<Column>`/`<Stack>` ister | Tek 60rem sütun (gezinme yerleşikken `calc(100% − 16rem)`); sayfa iskeleti Carbon Grid kullanmaz; sayfa içi çok sütunlu bölgede `Grid`/`Column` ya da token aralıklı CSS grid serbest, aralık gutter token'ı (`$spacing-05` / `$spacing-07`) | İ1/İ6: tek şey, dikkat bütçesi; Carbon ortalanmış düşük yoğunluklu ekranları "editorial" modeliyle tanır | `ted-theme.scss` `.app-shell-content` (`max-width: 60rem`); `tasarim-denetimi.spec.ts` "every page has the same column"; ölçülen kusur: shrink-to-fit kabukta Bugün 736 px, İlerleme 290 px'e daralıyordu (CLAUDE.md "One column, audited"); repoda `Grid`/`Column`/`Stack` 0 kullanım | [2x Grid — editorial model](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/guidelines/#editorial-model), [#product-and-docs-model](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/guidelines/#product-and-docs-model); carbon-builder R1, G18 |
-| **S2** Font teslimi | carbon-builder: IBM Plex yalnız IBM kaynağından, asla Google Fonts; "Plex SCSS hattıyla gelir" | `$css--font-face: false` + Google Fonts (`dashboard/index.html:10-14`) | Vite Carbon'un `~@ibm/plex` yolunu çözemiyor; her `@font-face` 404 veriyordu | `ted-theme.scss:1-6` yorumu (ölçüldü). Modül şablonu Plex'i `@ibm/plex` 6.4.1'den öz-barındırır (`vendor/assets/fonts-manifest.json`) | carbon-builder G17, F6, P8. Alternatif: IBM CDN ya da `@ibm/plex` öz-barındırma — değişirse `gorsel-regresyon` ve Lighthouse yeniden |
+| **S1** Izgara | Sayfa düzeni 2x Grid ile; sol gezinmeli ürün ekranı "product and docs" modeli (sola hizalı, en fazla genişlikli ızgara); carbon-builder ve `code_audit` `<Grid>`/`<Column>`/`<Stack>` ister | Tek 60rem sütun (gezinme yerleşikken `calc(100% − 16rem)`); sayfa iskeleti Carbon Grid kullanmaz; sayfa içi çok sütunlu bölgede `Grid`/`Column` ya da token aralıklı CSS grid serbest, aralık gutter token'ı (`$spacing-05` / `$spacing-07`). Modül sayfası bu sütunu tam ve simetrik doldurur ([Kanun M1.3](tedy-modul-tasarim-kanunu.md); telefonda borç KB-31) | İ1/İ6: tek şey, dikkat bütçesi; Carbon ortalanmış düşük yoğunluklu ekranları "editorial" modeliyle tanır | `ted-theme.scss` `.app-shell-content` (`max-width: 60rem`); `tasarim-denetimi.spec.ts` "every page has the same column"; ölçülen kusur: shrink-to-fit kabukta Bugün 736 px, İlerleme 290 px'e daralıyordu (CLAUDE.md "One column, audited"); repoda `Grid`/`Column`/`Stack` 0 kullanım | [2x Grid — editorial model](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/guidelines/#editorial-model), [#product-and-docs-model](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/guidelines/#product-and-docs-model); carbon-builder R1, G18 |
+| **S2** Font teslimi | carbon-builder: IBM Plex yalnız IBM kaynağından, asla Google Fonts; "Plex SCSS hattıyla gelir" | `$css--font-face: false` + Google Fonts (`dashboard/index.html:10-14`) | Vite Carbon'un `~@ibm/plex` yolunu çözemiyor; her `@font-face` 404 veriyordu | `ted-theme.scss:1-6` yorumu (ölçüldü). Modül şablonu Plex'i `@ibm/plex` 6.4.1'den öz-barındırır (`vendor/assets/fonts-manifest.json`); modül yüzeylerinde [Kanun KS-8](tedy-modul-tasarim-kanunu.md) geçerlidir | carbon-builder G17, F6, P8. Alternatif: IBM CDN ya da `@ibm/plex` öz-barındırma — değişirse `gorsel-regresyon` ve Lighthouse yeniden |
 | **S3** `.cds--` seçicileri | carbon-builder: Carbon'un iç sınıfları hedeflenmez | 88 gerekçeli `.cds--` seçici satırı (`dashboard/src/**/*.scss`, ölçüldü 2026-10-10) | Her biri ölçülmüş bir boşluğu kapatır (Content dolgusu, karo, bant, odak) | Ders: `.cds--toggle__label-text` / `.cds--toggle__text` karışıklığı ([yüzey tasarımları](frontend-surface-designs.md) değişiklik kaydı) — "Carbon seçicisi yazarken DOM'a bakılır" | carbon-builder G13. Yeni seçici ancak (1) ölçüm yorumu, (2) `docs_search`/`code_search` ile prop/varyantın işi görmediği kanıtı, (3) görsel taban güncellemesiyle |
 | **S4** Durum göstergesi | Durum dört öğeden (ikon, şekil, renk, etiket) en az üçüyle anlatılır (aynı sayfanın erişilebilirlik bölümü "en az iki" der); kategori için çok renkli Tag önerilir | Metinli Tag (yüzey tasarımları §2.7), anlam renkleri ayrılmış (İ8); ders ailesi Tag'de yok | Gri tonlama testi; ders renkleri dersindir | `ExamTimeline.tsx`, `HomeworkTracker.tsx`, `TeamActivities.tsx` metinli Tag'ler; 40 `<Tag` kullanımının 1'i ikon taşıyor (ölçüldü 2026-10-10) | [Status indicators — visual guidance](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#visual-guidance), [#relying-only-on-color-is-insufficient](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#relying-only-on-color-is-insufficient); [Tag — tag colors](https://carbondesignsystem.com/building-blocks/core/components/tag/guidelines/#tag-colors). **Yeni** durum göstergesi ikon + metin (+ renk) taşır (B16); `preview__IconIndicator` kararlı olunca yeniden değerlendirilir |
 | **S5** Satır içi stil | carbon-builder G11 ve `code_audit`: satır içi stil yok | Kural, kendi istisnasıyla benimsenir: `style` yalnız çalışma anında hesaplanan değeri (yüzde, konum, CSS özel özelliği) taşır | Hesaplanan değer sınıfa yazılamaz; statik değer yazılabilir | 22 `style={{` yerinin çoğu hesaplanan (`DayStrip.tsx`, `GradeTable.tsx:188-194`, …); statik olanlar borç (B4) | carbon-builder G11; `code_audit` "NO INLINE STYLES" |
@@ -3349,22 +3426,22 @@ kaydındadır (B34, B39, B24; B68–B74 ve satırda anılanlar) — sapma ya da 
 | **S9** Tipografi düzeltme yolu | `code_audit` `cds--body-01` gibi sınıf önerir | Düzeltme SCSS'te `@include type.type-style('…')`, TSX'te sınıf değil; stylelint `type.type-scale()` değerini reddeder | Tek yol: 202 `type-style` kullanımı, 0 `cds--body-*` sınıfı | `stylelint.config.mjs` `carbon/type-use` | `code_audit` canlı açıklaması "TYPOGRAPHY"; [Typography — code](https://carbondesignsystem.com/building-blocks/foundations/typography/code/) |
 | **S10** Köşe | Carbon karedir; popover 2 px; Tile'da `hasRoundedCorners` yalnız `AILabel` varken | Kart/panel 8 px (`--ted-radius-card`, modülle aynı), kontrol/alan/tablo 0, etiket/çip tam yuvarlak (`--ted-radius-pill`); işaret (ders karesi, takvim çipi), çubuk ve odak halkası da 0 (4. tur kararı K4-1); 4 px ara değer yok; stylelint `declaration-property-value-allowed-list` sabitler. Modül yüzeylerinde [Kanun KS-4](tedy-modul-tasarim-kanunu.md) geçerlidir. | Tedy katmanının kullanıcı onaylı kimliği; yuvarlaklık "kart" demektir, AI'ı yalnız aura ve `AILabel` söyler | `ted-theme.scss:87`; `tedy-integration.md` §4; `code_audit`'in `--ted-radius-card: 8px` bulgusu bilinçli. Mevcut 2/3/4/12 px literalleri borç (B1) | [Popover — corners](https://carbondesignsystem.com/building-blocks/core/components/popover/guidelines/#corners) |
 | **S11** Derinlik | Karo yükseltisizdir; gölge yalnız geçici yüzeyde (menü, popover, modal, toast) | **Yeni** statik yüzey gölge almaz; derinlik katman token'ı (`layer-01/02`) ve 1 px kenarla; mevcut 7 yer borç | `carbon-excellence.md` madde 4: statik kart gölgesi "en güçlü jenerik sinyal" | `--ted-shadow-card` 7 statik yerde (B2, pano tarafı 2026-10-11'de kapandı). Modül şablonu 2026-10-15'ten beri uyar: `.topbar`/`.stage`'in `--tedy-shadow-card`'ı kalktı (ikisinde de 1 px `border-subtle` zaten vardı) ve token tanımı iki `rgba()` katmanı taşıdığı için D1'in renk aritmetiği yasağını da ihlal ediyordu; geçici yüzey gölgesi (`.def-pop`, `0 2px 6px var(--cds-shadow)`) kaldı. Eski gerekçe ("modülün kendi kararı") geri alındı | [Dropdown — elevation](https://carbondesignsystem.com/building-blocks/core/components/dropdown/guidelines/#elevation) |
-| **S12** Tek birincil düğme | Ekran başına bir birincil; geçici akış ayrı; "her sayfanın birincile ihtiyacı yok" | Yüzey tasarımları §2.6: ekranda bir tane; daha katı | İ1 | Gözden geçirilecek: yüzen asistan başlatıcısı her geniş sayfada `kind="primary"` (`asistan/AsistanBaslatici.tsx:32`), Modüller'de satır başına birincil (`Modules.tsx:44`) — B17 | [Button — primary button](https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#primary-button), [#not-every-page-needs-a-primary-button](https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#not-every-page-needs-a-primary-button) |
+| **S12** Tek birincil düğme | Ekran başına bir birincil; geçici akış ayrı; "her sayfanın birincile ihtiyacı yok" | Yüzey tasarımları §2.6: ekranda bir tane; daha katı. Modülde görünüm başına tek primary ([Kanun M2.2](tedy-modul-tasarim-kanunu.md)) | İ1 | Gözden geçirilecek: yüzen asistan başlatıcısı her geniş sayfada `kind="primary"` (`asistan/AsistanBaslatici.tsx:32`), Modüller'de satır başına birincil (`Modules.tsx:44`) — B17 | [Button — primary button](https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#primary-button), [#not-every-page-needs-a-primary-button](https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#not-every-page-needs-a-primary-button) |
 | **S13** Carbon AI Chat onarımları | "Carbon bunu yapar, ezme"; AI etiketi davranışı değiştirilmez | `asistan/carbonOnarimi.ts`, `Tablo.tsx`, `AiAciklama.tsx` Carbon'un kendi erişilebilirlik ihlallerini onarır | Ölçülmüş ihlal kuralı yener | axe/IBM Equal Access Carbon'un tablosunu ve başlık AI etiketini düşürdü (spec "Bilinen boşluklar" #1); `ibm-erisilebilirlik.spec.ts:22` Toggletip `aria_id_unique` muafiyeti. Her `@carbon/ai-chat` yükseltmesinde IBM testi yeniden | [AI label — guidelines](https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/); [Carbon for AI](https://carbondesignsystem.com/building-blocks/foundations/carbon-for-ai/) |
-| **S14** Koyu tema | Açık/koyu kip "zorunlu değil, şiddetle önerilir"; işletim sistemi tercihine uyulur; mod denetimi ürün düzeyinde bir son kullanıcı ayarıdır | Pano yalnız g10. Koyu mod gelirse panonun Profil'deki kişi başı ayarıdır; modül onu `edupedia:appearance` ile devralır ve değişen tek değer `DASHBOARD_THEME` olur. Modülde tema düğmesi, tema kaydı ve sistem tercihi kuralı yoktur ([Kanun M4.1, M4.2, KS-7](tedy-modul-tasarim-kanunu.md)) | Tema kararı tek yerde alınır; sayfanın ortasında koyu bir çerçeve organik bütünlüğü bozar (ölçüldü: akışta modülün düğmesiyle çerçeve g100, pano g10). Koyu modu açmak kullanıcının ürün kararıdır; talimatname karar vermez | Revize 2026-10-19 (Modül Tasarım Kanunu). `ted-theme.scss` `:root` g10; `utils/moduleBridge.ts` (`DASHBOARD_THEME`). Şablondaki tema düğmesi borç KB-1 (`moduller.spec.ts:339-354` tersine yazılacak). Açılırsa: `usePrefersDarkScheme` + `GlobalTheme`, seçim Profil'de kişi başına | [Color — when to use modes](https://carbondesignsystem.com/building-blocks/foundations/color/guidelines/#when-to-use-modes); [Color — creating a mode control](https://carbondesignsystem.com/building-blocks/foundations/color/guidelines/#creating-a-mode-control); [Themes — code, system preferences](https://carbondesignsystem.com/building-blocks/foundations/themes/code/#system-preferences) |
+| **S14** Koyu tema | Açık/koyu kip "zorunlu değil, şiddetle önerilir"; işletim sistemi tercihine uyulur; mod denetimi ürün düzeyinde bir son kullanıcı ayarıdır | Pano yalnız g10. Koyu mod gelirse panonun Profil'deki kişi başı ayarıdır; modül onu `edupedia:appearance` ile devralır ve değişen tek değer `DASHBOARD_THEME` olur. Modülde tema düğmesi, tema kaydı ve sistem tercihi kuralı yoktur ([Kanun M4.1, M4.2, KS-7](tedy-modul-tasarim-kanunu.md)) | Tema kararı tek yerde alınır; sayfanın ortasında koyu bir çerçeve organik bütünlüğü bozar (ölçüldü: akışta modülün düğmesiyle çerçeve g100, pano g10). Koyu modu açmak kullanıcının ürün kararıdır; talimatname karar vermez | Revize 2026-10-19 (Modül Tasarım Kanunu). `ted-theme.scss` `:root` g10; `utils/moduleBridge.ts` (`DASHBOARD_THEME`). Şablonun tema düğmesi 2026-10-20'de kalktı (KB-1; `moduller.spec.ts` "the module has no theme switch; the dashboard theme always wins"). Açılırsa: `usePrefersDarkScheme` + `GlobalTheme`, seçim Profil'de kişi başına | [Color — when to use modes](https://carbondesignsystem.com/building-blocks/foundations/color/guidelines/#when-to-use-modes); [Color — creating a mode control](https://carbondesignsystem.com/building-blocks/foundations/color/guidelines/#creating-a-mode-control); [Themes — code, system preferences](https://carbondesignsystem.com/building-blocks/foundations/themes/code/#system-preferences) |
 | **S15** Dashboard / KPI | Sunum panoları KPI'ların güncel durumunu gösterir; en önemli veri en yüksek kontrast, en büyük alan, en üstte | Anayasa §9 KPI karo ızgarasını yasaklar (İ3); Carbon'un hiyerarşi kuralı **tek-şey kartına** uygulanır | Toplam başlamayı engelleyen şeyin kendisidir | `today.spec.ts` "the total workload is never the loudest number"; aykırı yer `/sinavlar` `.exam-stats` (B25) | [Dashboards](https://carbondesignsystem.com/building-blocks/data-visualization/dashboards/) |
-| **S16** Tipografi seti | Productive stiller ürün işi içindir; expressive/fluid stiller editoryal anlar içindir | Yapma yüzeyi productive (-01 tabanı); expressive/fluid yalnız kap dışı sayfa düzeyi başlıkta (ör. gün satırı), kart içinde asla; Tedy Books ayrı dünya | Yoğun ama sakin yapma yüzeyi; okuma dünyası tipografiden tanınır | Anayasa §5.2; yüzey tasarımları §4.11 | [Typography — style strategies](https://carbondesignsystem.com/building-blocks/foundations/typography/style-strategies/#when-to-use-productive-type-styles) |
-| **S17** Hover | Carbon 1.113'ten beri kendi ui-shell ve pagination hover'larını `any-hover` arkasına aldı | Hover stilleri `@media (any-hover: hover)` içinde yazılır | Telefonda dokunulan kart hover zeminini bir sonraki dokunuşa kadar tutuyordu | `ted-theme.scss:351-357` (Carbon #22694, #22672); 47 `:hover` satırının 7'si korumalı — borç (B3) | `ted-theme.scss:351-356` yorumu (Carbon değişiklikleri #22694, #22672) |
-| **S18** Dokunma hedefi | Etkileşimli ikonların tüm dokunma hedefleri ≥ 44 px (22 px ikon, 48 px hedef örneği) | Telefonda her dokunulan denetim ≥ 44×44 px; standart `$spacing-09` (48 px). Modül yüzeylerinde [Kanun KS-5](tedy-modul-tasarim-kanunu.md) geçerlidir. | WCAG 2.5.8'in 24 px tabanından katı; Işık telefonda okur | `d3b-dokunma.spec.ts`; alt çubuk sekmeleri ≥ 48 px (`alt-gezinme.spec.ts`). Kapının dışında kalanlar B8 | [Icons — touch targets](https://carbondesignsystem.com/building-blocks/foundations/icons/guidelines/#touch-targets) |
+| **S16** Tipografi seti | Productive stiller ürün işi içindir; expressive/fluid stiller editoryal anlar içindir | Yapma yüzeyi productive (-01 tabanı); expressive/fluid yalnız kap dışı sayfa düzeyi başlıkta (ör. gün satırı), kart içinde asla; Tedy Books ayrı dünya. Modül yüzeylerinde [Kanun KS-1 ve KS-9](tedy-modul-tasarim-kanunu.md) geçerlidir: okuma gövdesi 18 px / 1,6, serif yalnız matematikte | Yoğun ama sakin yapma yüzeyi; okuma dünyası tipografiden tanınır | Anayasa §5.2; yüzey tasarımları §4.11 | [Typography — style strategies](https://carbondesignsystem.com/building-blocks/foundations/typography/style-strategies/#when-to-use-productive-type-styles) |
+| **S17** Hover | Carbon 1.113'ten beri kendi ui-shell ve pagination hover'larını `any-hover` arkasına aldı | Hover stilleri `@media (any-hover: hover)` içinde yazılır; modül şablonunda da ([Kanun M2.12](tedy-modul-tasarim-kanunu.md); borç KB-28) | Telefonda dokunulan kart hover zeminini bir sonraki dokunuşa kadar tutuyordu | `ted-theme.scss:351-357` (Carbon #22694, #22672); 47 `:hover` satırının 7'si korumalı — borç (B3) | `ted-theme.scss:351-356` yorumu (Carbon değişiklikleri #22694, #22672) |
+| **S18** Dokunma hedefi | Etkileşimli ikonların tüm dokunma hedefleri ≥ 44 px (22 px ikon, 48 px hedef örneği) | Telefonda her dokunulan denetim ≥ 44×44 px; standart `$spacing-09` (48 px). Modül yüzeylerinde [Kanun KS-5 ve KS-11](tedy-modul-tasarim-kanunu.md) geçerlidir. | WCAG 2.5.8'in 24 px tabanından katı; Işık telefonda okur | `d3b-dokunma.spec.ts`; alt çubuk sekmeleri ≥ 48 px (`alt-gezinme.spec.ts`). Kapının dışında kalanlar B8 | [Icons — touch targets](https://carbondesignsystem.com/building-blocks/foundations/icons/guidelines/#touch-targets) |
 | **S19** Grafik paleti | Kategorik palet 14 rengi kesin sırayla uygular; sayıya göre resmî 5'li gruplar Red 90 içerir | **Modülde kategoriyi hue hiç taşımaz** (2026-10-15): `--viz-1..5` nötr gri rampadır, kategoriyi yerinde etiket (grafik) ve alt çizgi biçimi (dilbilgisi rolleri) taşır; panoda grafik yok, gelirse aynı kural. Modül yüzeylerinde [Kanun KS-3](tedy-modul-tasarim-kanunu.md) geçerlidir. | İ8: kırmızı/sarı/yeşil/turuncu yalnız durum söyler; ders aileleri ders işaretine ayrılmıştır. İkisi çıkarılınca kategorik palete **yedek hue kalmaz** — bu yüzden çözüm renk değiştirmek değil, renkten vazgeçmekti (§7.5 P5) | Önceki beş yuva ders ailesi tonuydu (açık: purple-70, blue-80, cyan-50, teal-70, magenta-70; koyu: -40 adımları). Üstüne bir kaskad hatası: `--viz-*` çıplak `:root`'ta bildiriliyordu ve `[data-theme="g100"]` ile eşit özgüllükte olup sonra geldiği için onu eziyordu (`data-theme` `documentElement`'e yazılır), yani koyu palet ölü koddu ve g100 açık hue'ları `#262626` zemine çiziyordu: blue-80 **1,34:1**, purple-70 1,96:1, magenta-70 1,97:1. Palet artık üç tema bloğunda bildirilir — **sayılı yuvalar ve kardeş token'lar (`grid`, `axis`, `track`, `sun`, `water`, `cloud`) birlikte**; denetim turu kardeşlerin ilk düzeltmede atlandığını ve g100'de gridin `#393939` yerine `#e0e0e0` çizdiğini ölçtü — ve her yuva kendi zeminine karşı ≥ 3:1 (kapı: `test_s19_viz_zemine_karsi_3_1`). İki ölçülmüş kuyruk daha kapatıldı: nötr rampada komşu adımlar 1,25:1 olduğu için `fractionBar`'ın bitişik grupları yuvaları rampanın uçlarına yayar **ve** grup sınırına zemin renginde bir ayırıcı konur (sınırı renk değil yapı taşır); rol alt çizgisi `text-decoration-skip-ink:none` taşır, çünkü varsayılan `auto` Türkçe inişlerde (g, y, p, ç, ş, ğ) çizgiyi keserek `solid`'i `dashed` gibi okutuyordu | [Color palettes — categorical](https://carbondesignsystem.com/building-blocks/data-visualization/color-palettes/) |
-| **S20** Sayfa zemini | Sayfa zemini temanın `$background`'ıdır (g10 `#f4f4f4`) | `body` ve kabuk zemini `--ted-page-bg` = `colors.$cool-gray-10` `#f2f4f8`; Carbon bileşenleri için `$background` `#f4f4f4` kalır; renk ya da durum anlamı taşımaz ([3.1-2]) | Nötr gri pano bitmemiş görünüyordu; serin gri "okul" hissi (`ted-theme.scss:46-48` yorumu) | `ted-theme.scss:49` (`--ted-color-page-bg`), `:197`, `:281`; hover'ların sayfa zeminine boyanması ayrı borç (B31) | [Themes — overview](https://carbondesignsystem.com/building-blocks/foundations/themes/overview/) |
+| **S20** Sayfa zemini | Sayfa zemini temanın `$background`'ıdır (g10 `#f4f4f4`) | `body` ve kabuk zemini `--ted-page-bg` = `colors.$cool-gray-10` `#f2f4f8`; Carbon bileşenleri için `$background` `#f4f4f4` kalır; renk ya da durum anlamı taşımaz ([3.1-2]); akıştaki modül çerçevesi de bu zemini çizer ([Kanun M1.2](tedy-modul-tasarim-kanunu.md)) | Nötr gri pano bitmemiş görünüyordu; serin gri "okul" hissi (`ted-theme.scss:46-48` yorumu) | `ted-theme.scss:49` (`--ted-color-page-bg`), `:197`, `:281`; hover'ların sayfa zeminine boyanması ayrı borç (B31) | [Themes — overview](https://carbondesignsystem.com/building-blocks/foundations/themes/overview/) |
 | **S21** Durum metni | Hata metni `$text-error` (Red 60); uyarı cümlesi `text-primary` + sarı ikon | Okunan durum kelimesi -70 adımı (`--ted-text-success/-error/-info/-warning` = green/red/blue/orange-70); işaret (ikon, şerit, kenar) `--ted-support-*`; ikonsuz tek uyarı kelimesi turuncu-70, ikonlu uyarı cümlesi `text-primary` + sarı ikon ([3.2-6], [3.2-7]) | -60 ailesi açılmış satır zemininde (`layer-hover-01`) 4,08–4,10:1'e düşüyordu; sarının metin-güvenli adımı yok (`yellow-30` beyazda 1,68:1, `yellow-50` 3,33:1; `yellow-60` 4,99:1 ama zeytin okunur) | `ted-theme.scss:128-134, 144-147`; `kontrast.spec.ts` yerinde ölçer | [Status indicators — status color palette](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#status-color-palette) |
 | **S22** Saat ve süre | Mono yalnız kod içindir (`code-01`/`code-02`); veri tablosu satırı Sans `body-compact-01` | Saat, süre ve sayaç rakamı IBM Plex Mono + tabular rakam (`.tedy-time`); sınıf yalnız rakamı sarar, çevresindeki sözcük Sans kalır ([3.3-5]) | Çizelge bir alettir: hizalı rakam zamanı yer olarak okutur (yüzey tasarımları §2.1, İ2) | `components/patterns/patterns.scss:9-12`; uygulama boşlukları (`.schedule-time` Sans, sözcük saran `.tedy-time`) B36 | [Typography — type sets](https://carbondesignsystem.com/building-blocks/foundations/typography/type-sets/) |
 | **S23** Birleşik durum | Bir bölgedeki birden çok durum tek göstergede birleşir ve en yüksek dikkat rengini alır | Başlıktaki senkron etiketi tek göstergedir: arıza yokken nötr ve sayısız; kısmi/bayat okuma uyarı ikonu + metin; senkron hatası hata ikonu + metin (S45; 2026-10-10'a dek bölüm uyarılarını gri sayıyordu) | İ6: sürekli sarı "4 uyarı" hiç çözülmeyen bir alarmdır; sayı bilgidir, acil durum değil | `DashboardHeader.tsx:91-98` (`tagType` yalnız `gray` ya da `red`); bantta renk yalnız kenarda görünür (`ted-theme.scss:1368-1383`). S39 ile gerilim S45'le kapandı (2026-10-10) | [Status indicators](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/) |
-| **S24** Devre dışı ve gizli durum | Devre dışı ve seçilmemiş hâl opaklıkla (%50 / %25) çizilebilir | TEDY'nin yazdığı denetimde opaklık yok: devre dışı gri aile token'larıyla, gizlenmiş çip seçilmemiş hâlde (çerçeve + nötr zemin); okunacak içerik devre dışı değil salt okunurdur; Carbon bileşenlerinin yerleşik devre dışı görünümü kalır ([3.2-5]) | D1 renk aritmetiği yasağı; opaklık metni 3:1'in altına indiriyordu | Ölçüldü: opaklıklı öğeler 2,17–2,24:1. **Kural hedeftir:** modül şablonu 2026-10-11'den beri uyar; panoda B34'ün üç yeri açık (B42 kapandı) | [Disabled states](https://carbondesignsystem.com/building-blocks/core/patterns/disabled-states/) |
+| **S24** Devre dışı ve gizli durum | Devre dışı ve seçilmemiş hâl opaklıkla (%50 / %25) çizilebilir | TEDY'nin yazdığı denetimde opaklık yok: devre dışı gri aile token'larıyla, gizlenmiş çip seçilmemiş hâlde (çerçeve + nötr zemin); okunacak içerik devre dışı değil salt okunurdur; Carbon bileşenlerinin yerleşik devre dışı görünümü kalır ([3.2-5]) | D1 renk aritmetiği yasağı; opaklık metni 3:1'in altına indiriyordu | Ölçüldü: opaklıklı öğeler 2,17–2,24:1. Modül şablonunun devre dışı durumları 2026-10-11'den beri uyar (B42); panodaki üç yer B34 ile kapandı. Şablondaki kalıcı soldurma opaklığı (`fill-opacity:.5`, `opacity:.85`, `opacity:.92`) [Kanun M4.7](tedy-modul-tasarim-kanunu.md)'nin borcudur (KB-41) | [Disabled states](https://carbondesignsystem.com/building-blocks/core/patterns/disabled-states/) |
 | **S25** 1920 px üstü | Max kırılımının üstünde kenar boşlukları büyür ya da sütun eklenir; tip boyu sabittir | > 1920 px'te kök yazı boyu pencereyle büyür: `html { font-size: clamp(100%, calc(100vw / 120), 250%) }`; her ölçü `rem`; 3840 px tam HD düzeninin iki katı keskinlikte ([3.3-10], [3.4-6]) | 4K ekranda sayfa sol üst çeyrekte 960 px'lik, 14 px yazılı bir şeritti (ölçüldü 2026-10-06) | `ted-theme.scss:180`; `ekran-4k.spec.ts` (14 sayfada sütun, gezinme, başlık ve ikonlar 3840 px'te 2×) | [2x Grid — overview](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/overview/) |
-| **S26** Hareket stili | Productive ürün işi için; expressive önemli anlar için (sayfa açılışı, birincil düğme, sistem uyarısı); çok öğeli girişte ~20 ms kademe | Panoda yalnız productive; öğe başı kademe yok, liste tek blok olarak girer; Carbon bileşenlerinin yerleşik hareketi kalır ([3.6-2], [3.6-3]) | Anayasa İ6 (aynı anda tek hareket), §5.4, §9 (kutlama yok) | `expressive` panoda 0 kullanım. **Kademe kuralı hedeftir:** `ted-theme.scss:764-765` (`$i * 40ms`) ve `:1994-2003` (`.stack-sm`) bugün kademe yazıyor — B24, B39 | [Motion — overview](https://carbondesignsystem.com/building-blocks/foundations/motion/overview/), [choreography](https://carbondesignsystem.com/building-blocks/foundations/motion/choreography/#sequence-and-stagger) |
-| **S27** Bildirim türleri | Toast geçici bildirim, actionable eylem isteyen bildirim için; yüksek ve düşük kontrast seçilebilir | Toast ve `ActionableNotification` kullanılmaz; bütün `InlineNotification`'lar `lowContrast` | İ5: kendiliğinden kaybolan bilgi Işık için kaybolan bilgidir; İ1/İ6: actionable odağı kapar, tek dikkat çekici renk alanı eylemde kalır; anayasa §9 "bildirim yağmuru" | 0 `ToastNotification`, 0 `ActionableNotification`; 8 `InlineNotification`'ın 8'i `lowContrast` (`PlatformProgress.tsx:117`, `ModuleViewer.tsx:98, 105`, `LoginPage.tsx:126`, `PortalStatusBanner.tsx:98, 125`, `Modules.tsx:30`, `asistan/GirisUyarisi.tsx:10`) | [Notification — guidelines](https://carbondesignsystem.com/building-blocks/core/components/notification/guidelines/) |
+| **S26** Hareket stili | Productive ürün işi için; expressive önemli anlar için (sayfa açılışı, birincil düğme, sistem uyarısı); çok öğeli girişte ~20 ms kademe | Panoda yalnız productive; öğe başı kademe yok, liste tek blok olarak girer; Carbon bileşenlerinin yerleşik hareketi kalır ([3.6-2], [3.6-3]). Modül yüzeylerinde [Kanun KS-10](tedy-modul-tasarim-kanunu.md) geçerlidir: bölüm girişinde hareket yok, geri bildirim productive, en çok `$duration-moderate-02` | Anayasa İ6 (aynı anda tek hareket), §5.4, §9 (kutlama yok) | `expressive` panoda 0 kullanım. **Kademe kuralı hedeftir:** `ted-theme.scss:764-765` (`$i * 40ms`) ve `:1994-2003` (`.stack-sm`) kademe yazıyordu — B24 ve B39 2026-10-11'de kapandı (K4-2); şablondaki `segIn` borç KB-18 | [Motion — overview](https://carbondesignsystem.com/building-blocks/foundations/motion/overview/), [choreography](https://carbondesignsystem.com/building-blocks/foundations/motion/choreography/#sequence-and-stagger) |
+| **S27** Bildirim türleri | Toast geçici bildirim, actionable eylem isteyen bildirim için; yüksek ve düşük kontrast seçilebilir | Toast ve `ActionableNotification` kullanılmaz; bütün `InlineNotification`'lar `lowContrast`; modülün geri bildirim ve bilgi kutusu da düşük kontrastlı inline/callout anatomisindedir ([Kanun M2.3](tedy-modul-tasarim-kanunu.md)) | İ5: kendiliğinden kaybolan bilgi Işık için kaybolan bilgidir; İ1/İ6: actionable odağı kapar, tek dikkat çekici renk alanı eylemde kalır; anayasa §9 "bildirim yağmuru" | 0 `ToastNotification`, 0 `ActionableNotification`; 8 `InlineNotification`'ın 8'i `lowContrast` (`PlatformProgress.tsx:117`, `ModuleViewer.tsx:98, 105`, `LoginPage.tsx:126`, `PortalStatusBanner.tsx:98, 125`, `Modules.tsx:30`, `asistan/GirisUyarisi.tsx:10`) | [Notification — guidelines](https://carbondesignsystem.com/building-blocks/core/components/notification/guidelines/) |
 | **S28** Başlık bandı | UI kabuğu başlığı temanın zeminindedir | Başlık bandı marka laciverti (`--ted-color-brand-primary`, Blue 80); üzerindeki metin `text-on-color`, ikon `icon-on-color`, odak `focus-inverse`; iç `<Theme>` yok, kabuk seçicileriyle verilir | Tedy Tasarım Sistemi: marka rengi yalnız bant ve giriş kahramanında (CLAUDE.md "Tedy Tasarım Sistemi v3") | `ted-theme.scss:1549-1551` (bant), `:1368-1403` (etiket, ikon, odak); `tests/test_pano_tasarim_sistemi.py` laciverti banda sınırlar | [UI shell header](https://carbondesignsystem.com/building-blocks/core/components/ui-shell-header/guidelines/) |
 | **S29** Telefon gezinmesi | 1056 px altında başlıktaki menü düğmesi örtülü sol paneli açar; rail kipi tanımlı | 672 px altında hamburger ve yan menü gizli, yerine `BottomNav` (Bugün · İşler · Asistan · Dersler · Daha fazla; 48 px); 672–1055 px Carbon'un hamburger modeli; `isRail` asla | İ1: tek dokunuş, on iki öğe taraması yok; rail etiketi hover'a saklar (çalışma belleğine vergi, İ9). Kullanıcı kararı 2026-10-02 (D3a) | `App.tsx:139-145, 224`; `ted-theme.scss:2774-2778`; `alt-gezinme.spec.ts`. `.cds--side-nav--rail` kuralları (`:2497-2508`) ölü kod | [UI shell left panel](https://carbondesignsystem.com/building-blocks/core/components/ui-shell-left-panel/guidelines/) |
 | **S30** Senkron sağlık kutusu | Tıklamayla açılan kısa bilgi `Toggletip`'tir: ters zemin (`$background-inverse`), `body-01` | Başlıktaki senkron sağlık kutusu 20–23,75 rem genişliğinde bir karttır (`layer`, kart köşesi); klavye sözleşmesi toggletip'inkidir | D3: bölüm bölüm okunamayan alanlar ve zamanlar ters yüzeyin kısa metnine sığmaz | `DashboardHeader.tsx:159` (`role="dialog"`), `ted-theme.scss:1585-1590`. Klavye ve ilişki eksikleri B49 | [Toggletip — usage](https://carbondesignsystem.com/building-blocks/core/components/toggletip/guidelines/) |
@@ -3373,15 +3450,15 @@ kaydındadır (B34, B39, B24; B68–B74 ve satırda anılanlar) — sapma ya da 
 | **S33** Seçenek sırası | Açılır listede seçenekler alfabetik sıralanır | Seçenekler zaman ve aciliyet sırasındadır: hafta süzgeci kronolojik, ödev seçimi teslim sırasında | İ2/İ7: zaman bir yerdir, en yakın iş öndedir | `CourseContent.tsx:211-215` (hafta), `asistan/GirisEkleri.tsx` (ödev) | [Dropdown — usage](https://carbondesignsystem.com/building-blocks/core/components/dropdown/guidelines/) |
 | **S34** Akordeon başlangıcı | Akordeon panelleri varsayılan olarak kapalı başlar | Eylem gerektiren grup açık, geçmiş ve bitmiş gruplar kapalı başlar (yüzey tasarımları §2.5, İ7); eylem gerektiren hiçbir şey katlanmış başlamaz | İ7: bitmiş iş öne çıkmaz, yapılacak iş saklanmaz; Carbon'un açılır kalıbı da görevi bitirmek için gereken bilgiyi kapalı panelde saklamaz | `HomeworkTracker.tsx:48-55` (`aktif` açık; `yapilan`, `tamamlanan`, `yapilmayan` kapalı); Bugün'ün geçmiş öğeleri katlı (`TodaySchedule.tsx:317`). Odak kipinde `aktif` de katlanıyor (`HomeworkTracker.tsx:218`); bunun odak kipinin bilinçli daraltması olduğu yazılı değil | [Accordion — guidelines](https://carbondesignsystem.com/building-blocks/core/components/accordion/guidelines/), [Disclosures](https://carbondesignsystem.com/building-blocks/core/patterns/disclosures/) |
 | **S35** Birincil eylem rengi (Ç1) | Çekirdek mavi ailesi bütün ürünlerde birincil eylem rengidir; birincil düğmenin kabı `$button-primary`; token'ın rolü yeniden tanımlanmaz | Birincil eylem her kipte `$button-primary` / `$interactive` (Blue 60), öğretmen kipi dahil. Ders rengi yalnız yüzey rollerinde: panel yüzeyi, panel kenarı, 4 px aksan kenarı, okurun balonu (İ8); hiçbir kipte `--cds-button-*` / `--cds-interactive` yeniden atanmaz ([3.2-11]) | İ8: renk önce eylemi ve durumu söyler; İ9: "gönder" beş kipte beş renkte öğrenilmez; modül referansları ve Carbon aynı kuralı söylüyordu. Kullanıcı kararı 2026-10-10 | Kod henüz uymuyor: `asistan/ogretmenRenkleri.ts:9-13`, eski `AssistantChat.scss:999-1003, 1110-1113`; `carbon-asistan-ogretmen.spec.ts:14-21` kip başına dolguyu sabitliyor → B68 | [Color — color anatomy](https://carbondesignsystem.com/building-blocks/foundations/color/overview/#color-anatomy); [Button — primary button color](https://carbondesignsystem.com/building-blocks/core/components/button/specifications/#primary-button-color) |
-| **S36** Yükleniyor (Ç2) | İskelet, ilk yüklemede kap ve veri bileşenlerinin sadeleştirilmiş hâlidir; tek bir bileşen işlem yaparken satır içi yükleme kullanılır | İçerik yüklemesi = içeriğin şeklinde `SkeletonText`/`SkeletonPlaceholder`; sürmekte olan tek eylem = eylemi başlatan düğmenin yerinde tek `InlineLoading`; aynı anda en çok bir; tam ekran `Loading` yok. Yüzey tasarımları §2.4'ün "Dönen ikon yok"u içerik yüklemesine daraltıldı (§5.2) | İ6: eylemin satır içi yüklemesi o satırdaki tek hareket ve "kayıt sürüyor" bilgisidir; iskelet içeriğin yerini önceden tutar | Uyan: `HomeworkTracker.tsx:511`. Aykırı: `NextThing.tsx` düğme metnini değiştiriyor (B69); Bugün iskeleti stilsiz (B5); İlerleme'de üç iskelet kümesi (B66); 400 ms eşiği (B48) | [Loading — skeleton states](https://carbondesignsystem.com/building-blocks/core/patterns/loading/#skeleton-states), [#inline-loading](https://carbondesignsystem.com/building-blocks/core/patterns/loading/#inline-loading); [Inline loading — when to use](https://carbondesignsystem.com/building-blocks/core/components/inline-loading/guidelines/#when-to-use) |
+| **S36** Yükleniyor (Ç2) | İskelet, ilk yüklemede kap ve veri bileşenlerinin sadeleştirilmiş hâlidir; tek bir bileşen işlem yaparken satır içi yükleme kullanılır | İçerik yüklemesi = içeriğin şeklinde `SkeletonText`/`SkeletonPlaceholder`; sürmekte olan tek eylem = eylemi başlatan düğmenin yerinde tek `InlineLoading`; aynı anda en çok bir; tam ekran `Loading` yok. Yüzey tasarımları §2.4'ün "Dönen ikon yok"u içerik yüklemesine daraltıldı (§5.2) | İ6: eylemin satır içi yüklemesi o satırdaki tek hareket ve "kayıt sürüyor" bilgisidir; iskelet içeriğin yerini önceden tutar | Uyan: `HomeworkTracker.tsx:511`. Panodaki aykırılar kapandı (B5, B48, B66, B69). Açık: modül görüntüleyicisi bileti beklerken iskeleti 400 ms eşiksiz çiziyor (`ModuleViewer.tsx:150`; [Kanun M1.11](tedy-modul-tasarim-kanunu.md), KB-37) | [Loading — skeleton states](https://carbondesignsystem.com/building-blocks/core/patterns/loading/#skeleton-states), [#inline-loading](https://carbondesignsystem.com/building-blocks/core/patterns/loading/#inline-loading); [Inline loading — when to use](https://carbondesignsystem.com/building-blocks/core/components/inline-loading/guidelines/#when-to-use) |
 | **S37** Azaltılmış hareket (Ç3) | Durum geçişleri için her zaman alternatif sağlanır; benzer mesajı durağan olarak iletmenin her zaman bir yolu olur. (Carbon "her hareketi durdur" demez; durdurma ölçütü WCAG 2.3.3'tür) | `prefers-reduced-motion: reduce` altında temel olmayan her hareket durur (animasyon, geçiş, gecikme, yumuşak kaydırma); hiçbir bilgi yalnız hareketle taşınmaz, her hareketin önce durağan eşdeğeri vardır ([3.6-6]). Anayasa §5.4'ün "bilgi taşıyan hareket kalır" cümlesi bununla değiştirildi — tarihli düzeltme, gevşetme değil: korunan şey bilgidir | Bilgi hareketteyse reduce'u açan okur onu kaybeder; durağan eşdeğeri olan hareket temel değildir. Kod ve test zaten böyleydi; metin koda hizalandı | `ted-theme.scss:243-251` genel blok; `gorunum-kipleri.spec.ts`; açıklar B24 (gecikme sızıntısı), B39 (odak kipi `!important`, `SourcePanel` JS kaydırması) | [Motion — adaptive interface motion design](https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#adaptive-interface-motion-design); WCAG 2.2 SC 2.3.3 |
 | **S38** Büyük harf (Ç4) | Başlık, unvan, etiket, banner ve benzeri öğelerde cümle düzeni (IBM Style) | **Ad başlıkları başlık düzeninde (revizyon 2026-10-19, ailenin kararı):** bir şeyi adlandıran başlık — sayfa, kart, bölüm, liste başlığı, modül adı ve modül bölümü adı — her sözcüğü büyük harfle yazılır (Türkçe kural: `utils/baslik.ts`, şablonda `basliga`; ve/ile/ya/veya/de/da/ki ile mı/mi/mu/mü küçük; yalnız ilk harf büyür, hiçbir harf küçülmez; portaldan gelen ad — ödev, ders, etkinlik — dönüştürülmez). Cümle ya da emir olan başlık ("Bu bölüm açılamadı", "Özel ders ekle", "TEDY'ye giriş yap"), etiket, kaş, düğme, Tag, durum dizgesi cümle düzeninde kalır; kaynakta tümü büyük harf dizge yok, CSS `text-transform: uppercase` yok; bölüm başlığı "Başlık (n)"; kısaltmalar kendi yazımında; Books kapsam dışı ([3.3-6], [3.9-1]). Modül yüzeylerinde [Kanun KS-2](tedy-modul-tasarim-kanunu.md) geçerlidir. | İ9 tek ses; 1.0'daki "≤ 2 sözcüklük kaş" istisnası her yeni yüzeyde genişliyordu. Revizyon: aile, başlıkların Türkçe ders kitabı geleneğindeki gibi büyük harfle başlamasını istedi; ayrım ad ile cümle arasındadır, böylece tek ses kalır | Panoda 14 `text-transform: uppercase` (`ted-theme.scss:541, 961, 1184, 1657, 3023, 3030, 3059, 3129`; `NextThing.scss:32`; `AssistantChat.scss:259, 383, 711, 751`; `utils/markdown.scss:16`); kaynakta "ŞİMDİ", "YARIN", "SIRADAKİ", `'YAPILAN'` …; modül şablonunda 5 → B70, B41 (Bugün bu dalın yenilemesinde) | [Content — content foundations](https://carbondesignsystem.com/building-blocks/foundations/content/#content-foundations) |
 | **S39** Sistem arızasının şiddeti (Ç5) | Durum paleti: kırmızı tehlike/hata, turuncu ciddi uyarı, sarı uyarı, yeşil başarı, mavi bilgi; gri taslak ya da başlamamış iş. Yüksek dikkat: sistem arızası okurdan eylem isterken | Başarısız ya da reddedilmiş ve okur ilerleyemiyor → hata (kırmızı, `kind="error"`); bozulmuş, kısmi ya da bayat → uyarı; bilgilendirici → bilgi; gri yalnız başlamamış/taslak, arıza için asla; her durum metin + ikonla (S4, §5.3 kural 10). Yüzey tasarımları §2.7 "Bozuk (sistem): Gri" değiştirildi | D3: gri bir arıza "önemsiz/bitmiş" okunur; şiddet okurun ne yapacağını söyler | `PortalStatusBanner.tsx:100` kapalı modül `info` (okulun kararı), `:127` okunamadı `warning` (son okuma tutuluyor) — uyuyor. Başlıktaki senkron etiketinin gri uyarı sayısı (`DashboardHeader.tsx:94-96`, S23) → S45, B75 | [Status indicators — status color palette](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#status-color-palette), [#severity-levels](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#severity-levels) |
 | **S40** Silme (Ç6) | Silme etkisine göre: düşük (geri alması ya da yeniden oluşturması kolay) → uyarısız; orta (geri alınamaz, yeniden oluşturulamaz ya da birden çok öğe) → ne olacağını söyleyen onay; yüksek → diyalog + kaynağın adını yazdırma. Yıkıcı ya da geri alınamaz eylemde danger modal; başlık ve düğme eylemi söyler | Geri alınabilir düşük etkili eylem onaysız, aynı satırda "Geri al" ile (İ5; "Yaptım" → "Geri al"). Geri alınamaz silme (sohbet, not, yüklenen dosya) danger `Modal`: başlık ve birincil düğme nesneyi adlandırır ("Bu sohbet silinsin mi?" / "Sohbeti sil"), gövde birlikte gidenleri sayar, odak "Vazgeç"te; başarı bildirimi yok, hata satırda doğru fiille (§5.5) | İ5 dönüş bedavadır; geri alınamaz kayıp ayrı bir sorudur. Sohbet silme bağlı ekleri de götürür (Carbon'un yüksek etki ölçütüne değer); ad yazdırma yerine gövde birlikte gidenleri sayar — ad yazdırmak çalışma belleği vergisidir (İ1, İ9) | Bugün onaysız tek tık: `SohbetListesi.tsx:50, 72`, ödev belgesi "Kaldır" `HomeworkTracker.tsx:632` → B23; "Yaptım"ın geri alı yok → B63 | [Common actions — delete](https://carbondesignsystem.com/building-blocks/core/patterns/common-actions/#delete); [Modal — danger modal](https://carbondesignsystem.com/building-blocks/core/components/modal/guidelines/#danger-modal) |
 | **S41** Modüllerde AI etiketi (Ç7) | AI ile ya da AI yardımıyla üretilen her örnek AI etiketiyle işaretlenir; etiket açıklanabilirliğe giden yoldur; kapta yerleşir | Panoda gösterilen her modül `ModuleViewer`'ın çerçeve başlığında Carbon `AILabel` taşır; açıklama penceresi neyin yapay zekâyla üretildiğini (anlatım, sorular, görseller) ve dayandığı kaynakları (kazanım, ders kitabı sayfaları, iddia dayanakları) söyler. Modülün içi değişmez: G-VOICE (öğrenci yüzeyinde kaynak-meta atıf yok) aynen | Carbon for AI şeffaflığı (C-AI2) ve okurun yaşı; etiket kap düzeyinde olduğundan modülün anlatım sesi bozulmaz | Uygulandı 2026-10-11: `ModuleViewer` çerçeve başlığında `AILabel`, veri `/api/modules/…/aciklama` (katalog kaydı ve `sha256`'sı eşleşen taslağın `dogrulama` iddia özeti) — B71 kapandı | [AI label — mark AI-generated content](https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/#mark-ai-generated-content), [#in-containers](https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/#in-containers), [#explainability-template](https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/#explainability-template) |
 | **S42** Notların rengi (Ç8) | Durum paleti durumu söyler; renk tek başına bilgi taşımaz, metin ya da başka işaretle eşlenir | Not renk bandıyla boyanmaz: `text-primary`, mono + tabular nötr metin; çubuk varsa tek nötr ton; eşik rengi, sıralı rampa, "iyi/kötü" rengi yok (§8.7) | İ8 (not bir durum değil bilgidir), P5 ve yüzey tasarımları §4.4 ("not bir bilgidir, yargı değil"); mavi bant Yabancı diller ailesi ve bilgi rengiyle çakışıyordu | `utils/formatters.ts:115-122` `gradeColor` (≥ 85 yeşil, ≥ 70 mavi, ≥ 50 turuncu, < 50 kırmızı); `kontrast.spec.ts:79-88` dört rengi sabitliyor → B72 | [Status indicators — status color palette](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#status-color-palette), [#relying-only-on-color-is-insufficient](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#relying-only-on-color-is-insufficient) |
-| **S43** Modül oyunlaştırması (Ç9) | Productive hareket görev üzerindeyken göze batmaz, expressive seyrek önemli anlar içindir; ilerleme göstergesi doğrusal ve ≥ 3 adımlı süreçte mevcut adımı ve toplamı gösterir; ProgressBar kullanıcı eylemiyle belirlenen ilerleme için değildir | Modülde kutlama/ödül animasyonu ("+N XP" yükselişi, XP/seri nabzı, rozet belirişi), rozet, XP, seri, puan ve rekabet çerçevesi yok (Kanun M2.7); ilerleme sessiz, etiketli tek göstergedir ve adımları segment değil 3–7 aşamadır (`meta.milestones`, ProgressIndicator anlamı: mevcut aşama ve toplam; Kanun M2.4, M2.5); gösterge sığmazsa tek satır metin ("Aşama 2/5 · Uygula · Bölüm 7/18", Kanun M5.4); anında geri bildirim (modül pedagojisi İlke 3) kalır ama hareketsizdir — XP yalnız iç sayıdır, tamamlanma özetinde büyük sayı olmaz (§8.5) | Anayasa §9 (kutlama ve seri sayacı dışsal ödüldür), İ6 (kilometre taşında üç ödül hareketi birlikte koşuyor), İ7 | Uygulandı 2026-10-11: şablonda XP sayacı, seri, rozet ve ödül hareketi/sesi yok; G-FLOW seri sayacında FAIL — B73 kapandı (XP iç sayı olarak kaldı, rozet tutulmadı). Modülde açık kalanlar kanun borcudur: aşama göstergesi KB-2, sefer haritası, rekabet sözcükleri ve `rewards` zorunluluğu KB-21 | [Motion — productive motion](https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#productive-motion); [Progress indicator — when to use](https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/guidelines/#when-to-use); [Progress bar — when not to use](https://carbondesignsystem.com/building-blocks/core/components/progress-bar/guidelines/#when-not-to-use) |
-| **S44** Başlık ağırlığı (Ç10) | Başlık token'ı kendi ağırlığını taşır: `heading-01`, `heading-02`, `heading-compact-01/02` 600; `heading-03`–`heading-05` 400; `heading-06`, `heading-07` 300 (`@carbon/type` 11.69.0) | Başlık ağırlığı token'dan değişmeden gelir; başlık token'ına `font-weight` eklenmez; daha ağır başlık gerekiyorsa 600'lük daha küçük token; modüller aynı kurala hizalanır ([3.3-3]) | İ9 tek karar: aynı token iki ağırlıkta yaşıyordu; P1 hiyerarşi boyla kurulur | 5 yer: `ted-theme.scss:552-553, 952-953` (`heading-03` + 600), `:1504-1505, 3015-3016, 3151-3152` (`heading-04` + 600); modül şablonu 2026-10-11'den beri uyar (B74'ün şablon kısmı kapandı) | [Typography — type sets](https://carbondesignsystem.com/building-blocks/foundations/typography/type-sets/); npm `@carbon/type` |
+| **S43** Modül oyunlaştırması (Ç9) | Productive hareket görev üzerindeyken göze batmaz, expressive seyrek önemli anlar içindir; ilerleme göstergesi doğrusal ve ≥ 3 adımlı süreçte mevcut adımı ve toplamı gösterir; ProgressBar kullanıcı eylemiyle belirlenen ilerleme için değildir | Modülde kutlama/ödül animasyonu ("+N XP" yükselişi, XP/seri nabzı, rozet belirişi), rozet, XP, seri, puan ve rekabet çerçevesi yok (Kanun M2.7); ilerleme sessiz, etiketli tek göstergedir ve adımları segment değil 3–7 aşamadır (`meta.milestones`, ProgressIndicator anlamı: mevcut aşama ve toplam; Kanun M2.4, M2.5, KS-6; tıklanan adım ≥ 48 px, KS-11); gösterge sığmazsa tek satır metin ("Aşama 2/5 · Uygula · Bölüm 7/18", Kanun M5.4); anında geri bildirim (modül pedagojisi İlke 3) kalır ama hareketsizdir — XP yalnız iç sayıdır, tamamlanma özetinde büyük sayı olmaz (§8.5) | Anayasa §9 (kutlama ve seri sayacı dışsal ödüldür), İ6 (kilometre taşında üç ödül hareketi birlikte koşuyor), İ7 | Uygulandı 2026-10-11: şablonda XP sayacı, seri, rozet ve ödül hareketi/sesi yok; G-FLOW seri sayacında FAIL — B73 kapandı (XP iç sayı olarak kaldı, rozet tutulmadı). Modülde açık kalanlar kanun borcudur: aşama göstergesi KB-2, sefer haritası, rekabet sözcükleri ve `rewards` zorunluluğu KB-21 | [Motion — productive motion](https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#productive-motion); [Progress indicator — when to use](https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/guidelines/#when-to-use); [Progress bar — when not to use](https://carbondesignsystem.com/building-blocks/core/components/progress-bar/guidelines/#when-not-to-use) |
+| **S44** Başlık ağırlığı (Ç10) | Başlık token'ı kendi ağırlığını taşır: `heading-01`, `heading-02`, `heading-compact-01/02` 600; `heading-03`–`heading-05` 400; `heading-06`, `heading-07` 300 (`@carbon/type` 11.69.0) | Başlık ağırlığı token'dan değişmeden gelir; başlık token'ına `font-weight` eklenmez; daha ağır başlık gerekiyorsa 600'lük daha küçük token; modüller aynı kurala hizalanır ([3.3-3]) | İ9 tek karar: aynı token iki ağırlıkta yaşıyordu; P1 hiyerarşi boyla kurulur | 5 yer: `ted-theme.scss:552-553, 952-953` (`heading-03` + 600), `:1504-1505, 3015-3016, 3151-3152` (`heading-04` + 600); modül şablonunun segment başlıkları 2026-10-11'den beri uyar (B74'ün şablon kısmı); `.summary h2` ve `.topbar__title` 600 kaldı → [Kanun KB-14](tedy-modul-tasarim-kanunu.md) | [Typography — type sets](https://carbondesignsystem.com/building-blocks/foundations/typography/type-sets/); npm `@carbon/type` |
 | **S45** Gri durum işaretleri (Ç11) | Durum göstergesi en az üç öğe taşır (ikon, şekil, renk, etiket); birleşik durum en yüksek dikkat rengini alır; gri taslak/başlamamış demektir | Arıza yokken senkron etiketi nötr ve sayısızdır; gerçek kısmi/bayat okuma ya da yedek model cevabı **uyarı ikonu + metin** taşır (Carbon Tag'inde uyarı rengi yoktur, uyarı ikon göstergesiyle verilir); senkron hatası hata (kırmızı); doğrulama uyarıları sayıya girmez. Asistanın "Yedek modelden" ve "Veriler güncel olmayabilir" rozetleri uyarı ikonu + metin olur; "Kaynaksız cevap" bilgidir | S39'un uygulaması; İ6 korunur: sayı sürekli alarm olmaz, ama bozulmuş durum gri de olmaz | `DashboardHeader.tsx:85-96`, `asistan/MesajAltbilgisi.tsx` → B75 | [Status indicators — consolidated statuses](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#consolidated-statuses), [#icon-indicator](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#icon-indicator) |
 | **S46** Sohbet yüzeyi AI yüzeyidir (Asistan yenilemesi) | Carbon AI Chat `aiEnabled` AI degradesini sohbet panelinin mesaj yüzeyine uygular (`cds-aichat--ai-theme`, `.main-chat`); tür tanımı "Shows the AI gradient background on your panel"; gölge kökteki kural yüzey başına ya hep ya hiçtir, mesaj başına açılıp kapatılamaz | **Sohbet paneli Carbon'un AI yüzeyidir** ve öyle kalır. Panelin dışındaki ve panelin içindeki her TEDY öğesi nötrdür: öğretmen seçimi (başlık altı satırı, `$chat-header-background`), sohbet geçmişi (kendi `$background` zemini), kaynak paneli (`$layer-01` + 1 px kenar, gölgesiz; B54), okurun kendi balonu, kartlar, durum göstergeleri. K1 bu sınırla okunur: aura modelin yazdığı yüzeyin köken işaretidir, TEDY'nin kendi denetimlerine yayılmaz | Carbon en iyi pratiği: AI teması bileşenin kendisidir, kısmen kapatmak gölge kökte `.cds--`/iç sınıf ezmesi ister (S3); İ6: tek renkli işlem (mavi aura) yüzeyle sınırlı kalır | Keşif §2 (2026-10-10); `carbon-asistan-ai.spec.ts` "S46: the chat panel is the AI surface; the TEDY parts outside the messages carry no AI gradient"; `tedyChatConfig.ts` (`aiEnabled: true`) | [Carbon for AI · Style elements](https://carbondesignsystem.com/building-blocks/foundations/carbon-for-ai/#style-elements); `@carbon/ai-chat` 1.22.0 `PublicConfig.aiEnabled` |
 | **S48** Ağaç düğümü telefonda 44 px (Modüller müfredat ağacı) | Ağaç düğümü iki boydadır: sm 32 px, xs 24 px | `md` altında `.module-tree .cds--tree-node__label` en az **44 px**. `:where()` ile yazılmaz: sıfır özgüllük Carbon'un kendi `.cds--tree-node__label` kuralıyla eşitlikte kalıp kaynak sırasına düşüyor. Biçim S18 yamasıyla aynı (`.kap .cds--…`, S3) | D3b dokunma hedefi: telefonda her denetim ≥ 44 px (B79). Ölçüldü 2026-10-11, 390 px, üç düzey açık: örtme olmadan dal satırı 32.78 px; Carbon 32 px'i `padding-block: 7px` ile kuruyor, `height` ile değil | [Tree view · Formatting](https://carbondesignsystem.com/building-blocks/core/components/tree-view/guidelines/); `moduller-agac.spec.ts` "390 px: üç düzey açıkken…" |
@@ -3410,7 +3487,7 @@ durumu (1.0 sürümü) tarih olarak saklar.
 | **Ç6** | Yıkıcı silme | İ5 (geri al) ile Carbon'un etkisine göre derecelenmiş onayı (danger modal) arasında seçim; bugün ikisi de yok (B23) | [Modal — guidelines](https://carbondesignsystem.com/building-blocks/core/components/modal/guidelines/) | **→ S40 — düşük etki: onaysız + "Geri al"; geri alınamaz silme: nesneyi adlandıran danger modal (B23, B63)** |
 | **Ç7** | Modüllerde AI etiketi | Carbon: AI üretimi içerik AI etiketi taşır. edupedia G-VOICE kaynağı öğrenci yüzeyinden gizler; pano AI aurasını yalnız modelin yazdığına koyar | [AI label — guidelines](https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/) | **→ S41 — `ModuleViewer` çerçeve başlığında `AILabel` + açıklanabilirlik; modülün içi (G-VOICE) değişmez (B71)** |
 | **Ç8** | Not bantlarının rengi | Kod notu bantla boyar (`utils/formatters.ts:115-122`, mavi `--status-info` dahil) ve `kontrast.spec.ts` "50-69 bandı ayrı bir renk"i sabitler; yüzey tasarımları §4.4 renk kodu olmadığını söyler; mavi aynı zamanda Yabancı diller ailesi ve Carbon'un bilgi rengidir | `kontrast.spec.ts:79` | **→ S42 — not renk bandıyla boyanmaz, nötr metin; `kontrast.spec.ts` bant iddiası değişir (B72)** |
-| **Ç9** | Modülde oyunlaştırma | Modül şablonu XP, seri, rozet ve ödül animasyonu taşır (`vendor/assets/module-template.html`; `tedy-integration.md` §5 "yumuşatılmış"); anayasa §9 kutlamayı ve seri sayacını reddeder, İ6 tek hareket der | Anayasa §9 | **→ S43 — modülde ödül animasyonu ve seri sayacı yok; ilerleme sessiz ve etiketli; rozet kalırsa sessiz liste (B73)** |
+| **Ç9** | Modülde oyunlaştırma | Modül şablonu XP, seri, rozet ve ödül animasyonu taşır (`vendor/assets/module-template.html`; `tedy-integration.md` §5 "yumuşatılmış"); anayasa §9 kutlamayı ve seri sayacını reddeder, İ6 tek hareket der | Anayasa §9 | **→ S43 — modülde ödül animasyonu ve seri sayacı yok; ilerleme sessiz ve etiketli; rozet kalırsa sessiz liste (B73; seçenek kullanılmadı, 2026-10-19'da Kanun M2.7 ile kalktı)** |
 | **Ç10** | Başlık ağırlığı | `heading-03/04` panoda kimi yerde 400, kimi yerde 600 (`ted-theme.scss:551-557, 586-590, 951-955, 1504-1508`); Carbon modal ve veri tablosu başlığında Regular 400 kullanır, modüller 600 seçti. İ9 tek karar ister | [Typography — overview](https://carbondesignsystem.com/building-blocks/foundations/typography/overview/) | **→ S44 — başlık ağırlığı Carbon token'ından, `font-weight` eklenmez; modüller hizalanır (B74)** |
 
 **Karar bekleyen.**
@@ -3446,6 +3523,9 @@ her biri tersine çevrilebilir (karar satırı ve kapısı birlikte değişir). 
 
 ## 12. Doğrulama kapıları ve "bitti" tanımı
 
+Modül yüzeylerinde bu bölümün eki [kanun §8](tedy-modul-tasarim-kanunu.md)'dir: oradaki kapılar §12.2'nin "Modül
+yüzeyi" satırına, bitti tanımı §12.4'e eklenir.
+
 ### 12.1 Elle kapılar
 
 [Anayasa §10](frontend-design-principles.md#10-doğrulama-kapıları) listesi aynen geçerlidir; talimatname
@@ -3462,7 +3542,8 @@ her biri tersine çevrilebilir (karar satırı ve kapısı birlikte değişir). 
 - [ ] **Azaltılmış hareket** (anayasa §5.4): kapalıyken bilgi kaybı yok.
 - [ ] **Boş durum** (D3): boşsa nedeni yazıyor; hata durumu da yazıyor.
 - [ ] **Tek hareket** (İ6): aynı anda en çok bir öğe hareket ediyor.
-- [ ] **Telefon** (S18): 390 px'te her dokunulan denetim ≥ 44×44 px, yatay kaydırma yok.
+- [ ] **Telefon** (S18): 390 px'te her dokunulan denetim ≥ 44×44 px, yatay kaydırma yok. Modül yüzeyinde aynı soru
+  kanun §6.1'in bütün genişliklerinde ve 320 px kenar durumda sorulur (M5.1, M5.3).
 - [ ] **Carbon adları** (§10): değişiklikteki her Carbon bileşeni, prop'u, ikonu ve içe aktarma yolu bir Carbon MCP sonucuna ya da `node_modules` satırına dayanıyor.
 
 ### 12.2 Otomatik kapılar
@@ -3480,6 +3561,7 @@ ulaştı).
 | Tasarım sistemi (Python) | D1 ve İ8 sabitleri, ders renginin üç çalışma zamanında eşliği, pano ↔ şablon ↔ otorite | `pytest tests/test_pano_tasarim_sistemi.py tests/test_ders_renkleri.py tests/test_tedy_tasarim_tutarliligi.py` |
 | Üreticiler | Ders renk dosyaları otoriteyle aynı | `python scripts/gen_subject_themes.py --check`; `.venv/bin/python src/mcp_server/vendor/scripts/sync_carbon_tokens.py --check` |
 | edupedia vendor | Sabitlenmiş vendor dosyaları, `## N.` servis numaraları | `.venv/bin/python -m src.mcp_server.vendor_sync --check`; `pytest tests/test_mcp_rehber.py tests/test_mcp_vendor.py tests/test_mcp_vendor_otorite.py` |
+| Modül yüzeyi ([kanun §8](tedy-modul-tasarim-kanunu.md)) | Akış yerleşimi, kök ölçek, başlık düzeni, 18 derleme kapısı (G-BRIDGE, G-ATTRIB dahil), modül sayfası | `pytest tests/test_modul_akis_yerlesimi.py tests/test_modul_kok_olcegi.py tests/test_modul_baslik_duzeni.py tests/test_mcp_gates_ek.py src/mcp_server/vendor/tests`; `cd dashboard && env -u ANTHROPIC_API_KEY npx playwright test moduller` |
 | Erişilebilirlik tabanı | axe WCAG 2.2 AA + best practice, yatay kaydırma yok, eşit sütun; IBM Equal Access; kontrast; 44 px | `cd dashboard && env -u ANTHROPIC_API_KEY npx playwright test tasarim-denetimi ibm-erisilebilirlik kontrast d3b-dokunma` |
 | Görünüm | Piksel tabanları (13 sayfa × 1440/390 + giriş), ARIA ağaçları, azaltılmış hareket ve zorunlu renk, 4K ölçek | `cd dashboard && env -u ANTHROPIC_API_KEY npx playwright test gorsel-regresyon aria-yapisi gorunum-kipleri ekran-4k` |
 | Davranış spec'leri | İlkelerin davranış testleri (§2) ve asistan | `cd dashboard && env -u ANTHROPIC_API_KEY npx playwright test` (port 8286; `TEDY_E2E_PORT` ile değişir) |
@@ -3509,12 +3591,13 @@ Bir yüzey değişikliği şu koşulların hepsi sağlandığında bitmiştir:
 1. §12.1'deki her madde evet.
 2. §12.2'deki ilgili kapılar yeşil: en az `npm run lint`, `npm run build`, tasarım sistemi pytest'i ve
    değişen sayfanın Playwright spec'leri ile erişilebilirlik tabanı; asistan değiştiyse `npm run test:birim`
-   ve `carbon-asistan-*`; modül değiştiyse vendor kapıları.
+   ve `carbon-asistan-*`; modül yüzeyi değiştiyse vendor kapıları, "Modül yüzeyi" satırı ve kanun §8.3'ün koşulları.
 3. Davranış değişikliği önce kırmızı olan bir testle geldi (§14.1).
 4. Görsel fark okundu, tabanlar yalnız amaçlanan farkla güncellendi (§12.3).
-5. `code_audit` çalıştırıldı; her bulgu ya düzeltildi ya §11'deki bir satıra bağlandı ya da §13'e ölçümüyle yazıldı.
-6. Belgeler güncel: yüzey tasarımlarındaki ilgili bölüm ve değişiklik kaydı; kapanan borç §13'te "kapandı";
-   yeni bir sapma §11'de.
+5. `code_audit` çalıştırıldı; her bulgu ya düzeltildi ya §11'deki bir satıra (modülde kanun §7'deki bir KS satırına)
+   bağlandı ya da §13'e (modülde kanun §9'a) ölçümüyle yazıldı.
+6. Belgeler güncel: yüzey tasarımlarındaki ilgili bölüm ve değişiklik kaydı; kapanan borç §13'te (modülde kanun §9'da)
+   "kapandı"; yeni bir sapma §11'de (modülde kanun §7'de, kanun §10.1 usulüyle).
 7. Yayın: `cd dashboard && npm run build` ve `systemctl --user restart ted-dashboard`; ted-mcp'yi
    etkileyen değişiklikte `ted-mcp` de yeniden başlatılır.
 
@@ -3522,9 +3605,15 @@ Bir yüzey değişikliği şu koşulların hepsi sağlandığında bitmiştir:
 
 ## 13. Bilinen borçlar
 
-Bu tablo TEDY arayüzünün **borç kaydıdır**: ölçülmüş, henüz düzeltilmemiş kusurların tek listesi. Başka bir belge
-(bileşen rehberi, yüzey tasarımları, anayasa §8) bir kusuru anarsa buradaki B numarasıyla anar; yeni kusur önce
-buraya ölçümüyle yazılır. Bugün 80 satır (B1–B80); B10, B13, B15, B17, B18, B21, B22, B23, B27, B28, B30, B32, B41, B42, B44, B45, B46, B47, B52, B53, B54, B55, B56, B57, B59, B61, B68, B69, B70, B71, B73, B75, B76, B77, B78 ve B79 kapandı; B14, B34, B35, B38, B40, B43, B74 kısmen kapandı (açık kalan kısımları satırlarında; 2026-10-10, açık kalemler 3. tur; 2026-10-11, modül/vendor turu). Ölçüm tarihi aksi yazılmadıkça
+Bu tablo panonun ve modül dışındaki TEDY yüzeylerinin **borç kaydıdır**: ölçülmüş, henüz düzeltilmemiş kusurların
+tek listesi. Modül yüzeylerinin (kanun §0.1) kaydı [kanun §9](tedy-modul-tasarim-kanunu.md)'dur (KB-n); ikisi
+birlikte TEDY'nin borçlarının tamamıdır ve bir kusur yalnız birinde durur. Başka bir belge (bileşen rehberi, yüzey
+tasarımları, anayasa §8) bir kusuru anarsa buradaki B numarasıyla, modülde KB numarasıyla anar; yeni kusur önce ilgili
+kayda ölçümüyle yazılır. Eşleme (kapanmış B → modüldeki artık KB): B3 → KB-28, B8 → KB-4, B10/B37 → KB-28,
+B11 → KB-40, B34 → KB-41, B38 → KB-32, B39 → KB-18, B48 → KB-37, B73 → KB-21, B74 → KB-14 ve KB-47; B20'nin 320 px
+kısmı modülde KB-33'tür. B80 pano geneli tek düzeltme olduğu için burada kalır (modül sayfasının `Breadcrumb`'ı
+dahil). Bugün 81 satır (B1–B81); B20 kısmen kapandı, B80 ve B81 açık, geri kalanların hepsi kapandı (satırlarında
+tarihiyle; 2026-10-10 açık kalemler 3. tur, 2026-10-11 modül/vendor ve 4. tur). Ölçüm tarihi aksi yazılmadıkça
 2026-10-10'dur (B1–B67 HEAD `20a3c31`; B68–B74, §11.2'deki Ç1–Ç10 kararlarının kod borçları, HEAD `487bf3a`).
 Satır numaraları ölçüm günündendir. Bir borç kapandığında satır silinmez: "Kapandı" ve commit yazılır.
 Tedy Books (`ted-theme.scss`'te `Tedy Books` başlığından sonrası) kendi dünyasıdır; Books'taki değerler
@@ -3614,7 +3703,8 @@ ayrıca sayılır, pano borcu sayılmaz.
 
 ---
 
-| **B80** | Ctrl/Cmd-tık bir ağaç yaprağını yeni sekmede açmıyor: `onSelect` her tıklamada `preventDefault()` çağırıp `navigate()` ediyor, değiştirici tuşa bakmıyor (ölçüldü 2026-10-11, sekme sayısı 1 → 1). Sağ tuş → "yeni sekmede aç" çalışıyor. Kalıp pano genelinde aynı (`Modules.tsx`, `ModuleViewerRoute`, `TodaySchedule`), yani bu satır ağaca özel değil | B58 bağlantı davranışı | `metaKey/ctrlKey/shiftKey` ya da orta tık varsa `preventDefault` atlanır; düzeltme pano genelinde tek yerde yapılır | `moduller-agac.spec.ts`'e sekme sayısı ölçen bir satır |
+| **B80** | Ctrl/Cmd-tık bir ağaç yaprağını yeni sekmede açmıyor: `onSelect` her tıklamada `preventDefault()` çağırıp `navigate()` ediyor, değiştirici tuşa bakmıyor (ölçüldü 2026-10-11, sekme sayısı 1 → 1). Sağ tuş → "yeni sekmede aç" çalışıyor. Kalıp pano genelinde aynı (`Modules.tsx`, `ModuleViewerRoute`, `TodaySchedule`, modül sayfasının `Breadcrumb`'ı `ModulBasligi.tsx:46-47`), yani bu satır ağaca özel değil; modül sayfası kanun kapsamındadır ama düzeltme tek yerde olduğu için borç burada kalır | B58 bağlantı davranışı | `metaKey/ctrlKey/shiftKey` ya da orta tık varsa `preventDefault` atlanır; düzeltme pano genelinde tek yerde yapılır | `moduller-agac.spec.ts`'e sekme sayısı ölçen bir satır |
+| **B81** | `components/NextThing.scss:100` `.next-thing__instruction { max-width: 60ch }` | [3.3-8], Kanun M5.5 (`ch` Türkçe satır kapasitesini yaklaşık %40 fazla gösterir; ölçüldü 2026-10-19, modülde) | Panoda karakter sayısı ölçülmedi (doğrulanmadı; M5.5'in oranıyla ≈ 80–85 karakter) | Kanun M5.5'in Range ölçümü 14 px pano metninde tekrarlanır; satırda > 80 ise sınır `rem` olur |
 
 ## 14. Süreç
 
@@ -3646,6 +3736,8 @@ ayrıca sayılır, pano borcu sayılmaz.
 ### 14.2 Bu belgeyi değiştirmek
 
 - Her değişiklik değişiklik kaydına bir satır yazar: sürüm, tarih, ne değişti.
+- Kanunla ortak usul: kanunu değiştiren commit bu belgenin etkilenen satırlarını aynı commit'te düzeltir (kanun §10.1);
+  bu belgenin modül yüzeyine değen bir değişikliği kanunu ancak kanun §10.1 usulüyle değiştirir.
 - **Sürüm:** yazım, bağlantı ya da ölçüm sayısının güncellenmesi yama sürümüdür (1.0 → 1.0.1); bir
   kuralın anlamını değiştiren, S/Ç/B satırı ekleyen ya da kapatan değişiklik küçük sürümdür (1.0 → 1.1);
   öncelik sırasını (§0.2) ya da bir değişmezi değiştiren değişiklik büyük sürümdür (2.0) ve kullanıcı
@@ -3664,8 +3756,8 @@ ayrıca sayılır, pano borcu sayılmaz.
 | `ted-theme.scss`'te marka, zemin ya da durum metni rengi | `carbon-v11-authority.json` `tedyLayer` ve `vendor/assets/module-template.html`; `vendor_sync --pin` | `tests/test_tedy_tasarim_tutarliligi.py` |
 | `src/mcp_server/vendor/` altında herhangi bir dosya | `.venv/bin/python -m src.mcp_server.vendor_sync --pin` ve `PROVENANCE.json`; 18 referans dosyası ve `## N.` numaraları korunur; dış okurlar (egitim-kaynak, CureoHub'daki otorite kopyası) sabitli dışa aktarımı alır | `vendor_sync --check`, `tests/test_mcp_rehber.py`, `tests/test_mcp_vendor*.py` |
 | Anayasada bir D/İ maddesi | Talimatname §2 satırı, `tedy-carbon` SKILL.md'deki ilgili cümle, CLAUDE.md "Design constitution" maddesi gerekiyorsa | İlgili e2e/pytest kapısı |
-| Talimatname §11'de bir S satırı | `.claude/skills/tedy-carbon/SKILL.md` (≤ 4 KB) | — |
-| [`docs/tedy-modul-tasarim-kanunu.md`](tedy-modul-tasarim-kanunu.md) | Talimatname §0.2, §9 ve §11'deki ilgili S satırı (KS yönlendirmesi); `.claude/skills/tedy-carbon/SKILL.md`; CLAUDE.md Modüller maddesi; kanunla çelişen vendor metni (`vendor_sync --pin`, `PROVENANCE.json` ile); kanun §10.1'in saydığı öteki öncelik paragrafları (anayasa, yüzey tasarımları, bileşen rehberi, `AGENTS.md`) | `tests/test_mcp_rehber.py` (kanun §1 ≤ 3300 bayt, `akis` ve `carbon` başında); `vendor_sync --check` |
+| Talimatname §11'de bir S satırı | `.claude/skills/tedy-carbon/SKILL.md` (≤ 4 KB); satırın bir KS karşılığı varsa kanun §7'nin karşılıklar listesi (KS'nin kendisi ancak kanun §10.1 usulüyle değişir) | — |
+| [`docs/tedy-modul-tasarim-kanunu.md`](tedy-modul-tasarim-kanunu.md) | Talimatname §0.2, §0.3, §9, §11'deki ilgili S satırı (KS yönlendirmesi), §12 (kanun §8 eki), §13 (B ↔ KB eşlemesi) ve değişiklik kaydı; `.claude/skills/tedy-carbon/SKILL.md`; CLAUDE.md Modüller maddesi; kanunla çelişen vendor metni (`vendor_sync --pin`, `PROVENANCE.json` ile); kanun §10.1'in saydığı öteki öncelik paragrafları (anayasa, yüzey tasarımları, bileşen rehberi, `AGENTS.md`) | `tests/test_mcp_rehber.py` (kanun §1 ≤ 3300 bayt, `akis` ve `carbon` başında); `vendor_sync --check` |
 | Bilerek yapılmış görsel ya da yapısal değişiklik | Piksel ve ARIA tabanları (§12.3) | `gorsel-regresyon`, `aria-yapisi`, `gorunum-kipleri` |
 | `.claude/skills/carbon-builder/` | Değiştirilmez; yeni sürüm vendorlanırken `VENDORED.md` ve §11/§13 yeniden okunur | — |
 | `@carbon/ai-chat` sürümü | §6 ve S13 onarımları yeniden denetlenir | `ibm-erisilebilirlik.spec.ts`, `carbon-asistan-*.spec.ts`, `npm run test:birim` |
@@ -3677,12 +3769,23 @@ oradan çalışır).
 
 ## 15. Kaynakça
 
-Carbon sayfaları 2026-10-10'da yerel olarak tarandı (307 sayfa). Güncel yapı `building-blocks/` altındadır.
-`/elements/...`, `/components/...`, `/patterns/...` ve kök `/data-visualization/...` yolları bayattır;
-bu belgede ve yeni yazılan her belgede kullanılmaz (bayat bağlantılar §13 B18). `/guidelines/carbon-for-ai/`
-tarama günü hâlâ yanıt verdi; kanonik yol `building-blocks/foundations/carbon-for-ai/`dir.
+Bu bölüm talimatnamenin ve [Modül Tasarım Kanunu](tedy-modul-tasarim-kanunu.md)'nun ortak Carbon kaynakçasıdır.
+Kanun §10.2 dayandığı çapaları konuya göre kendi tablosunda tutar; sayfaların listesi ve ortak olguların çapası
+buradadır. Belgelere tam URL yazılır; atıf usulü §10.5'tir.
 
-**Temeller** — `https://carbondesignsystem.com/building-blocks/foundations/…`
+**Doğrulama künyesi.** Carbon MCP `docs_search` indeksi 2026-09-30 (veri görselleştirme sayfaları 2026-09-29);
+yerel tarama 2026-10-10 (307 sayfa); canlı denetim 2026-10-20 (aşağıdaki 107 sayfanın hepsi HTTP 200; her çapa
+sayfanın `id`'leriyle karşılaştırıldı, §10.5 çapa kuralı).
+
+**Bayat ve hayalet yollar.** `/elements/...`, `/components/...`, `/patterns/...` ve kök `/data-visualization/...`
+yolları bayattır; bu belgede ve yeni yazılan her belgede kullanılmaz (§13 B18). `/guidelines/carbon-for-ai/` tarama
+günü hâlâ yanıt verdi; kanonik yol `building-blocks/foundations/carbon-for-ai/`dir. MCP indeksinin taşıdığı
+`data-visualization/chart-design/…`, `data-visualization/chart-types/…` ve `data-visualization/undefined/…` kopyaları
+canlıda 404'tür (2026-10-20); kullanılmaz, düz `/building-blocks/data-visualization/<sayfa>/` yolu yazılır.
+
+### 15.1 Temeller
+
+Yol: `https://carbondesignsystem.com/building-blocks/foundations/…`
 
 - 2x Grid: [overview](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/overview/), [guidelines](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/guidelines/), [code](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/code/)
 - Spacing: [overview](https://carbondesignsystem.com/building-blocks/foundations/spacing/overview/), [code](https://carbondesignsystem.com/building-blocks/foundations/spacing/code/)
@@ -3696,21 +3799,45 @@ tarama günü hâlâ yanıt verdi; kanonik yol `building-blocks/foundations/carb
 - [Content](https://carbondesignsystem.com/building-blocks/foundations/content/)
 - [Carbon for AI](https://carbondesignsystem.com/building-blocks/foundations/carbon-for-ai/)
 
-**Bileşenler** — `https://carbondesignsystem.com/building-blocks/core/components/<bileşen>/{guidelines,specifications,code,accessibility}/`.
-Bu belgede anılanlar: [AI label](https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/),
-[Button](https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/),
-[Dropdown](https://carbondesignsystem.com/building-blocks/core/components/dropdown/guidelines/),
-[Inline loading](https://carbondesignsystem.com/building-blocks/core/components/inline-loading/guidelines/),
-[Modal](https://carbondesignsystem.com/building-blocks/core/components/modal/guidelines/),
-[Notification](https://carbondesignsystem.com/building-blocks/core/components/notification/guidelines/),
-[Popover](https://carbondesignsystem.com/building-blocks/core/components/popover/guidelines/),
-[Tag](https://carbondesignsystem.com/building-blocks/core/components/tag/guidelines/),
-[Tile](https://carbondesignsystem.com/building-blocks/core/components/tile/guidelines/),
-[UI shell header](https://carbondesignsystem.com/building-blocks/core/components/ui-shell-header/specifications/),
-[UI shell left panel](https://carbondesignsystem.com/building-blocks/core/components/ui-shell-left-panel/guidelines/).
+### 15.2 Bileşenler
+
+Yol: `https://carbondesignsystem.com/building-blocks/core/components/<bileşen>/{guidelines,specifications,code,accessibility}/`. Talimatnamede ve kanunda
+anılan sekmeler:
+
+- Accordion: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/accordion/guidelines/)
+- AI label: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/), [specifications](https://carbondesignsystem.com/building-blocks/core/components/ai-label/specifications/), [accessibility](https://carbondesignsystem.com/building-blocks/core/components/ai-label/accessibility/)
+- Button: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/), [specifications](https://carbondesignsystem.com/building-blocks/core/components/button/specifications/)
+- Contained list: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/contained-list/guidelines/)
+- Content switcher: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/content-switcher/guidelines/)
+- Data table: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/data-table/guidelines/), [specifications](https://carbondesignsystem.com/building-blocks/core/components/data-table/specifications/)
+- Date picker: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/date-picker/guidelines/)
+- Dropdown: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/dropdown/guidelines/), [specifications](https://carbondesignsystem.com/building-blocks/core/components/dropdown/specifications/)
+- Form: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/form/guidelines/), [specifications](https://carbondesignsystem.com/building-blocks/core/components/form/specifications/)
+- Inline loading: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/inline-loading/guidelines/)
+- Modal: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/modal/guidelines/)
+- Notification: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/notification/guidelines/), [specifications](https://carbondesignsystem.com/building-blocks/core/components/notification/specifications/), [accessibility](https://carbondesignsystem.com/building-blocks/core/components/notification/accessibility/)
+- Popover: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/popover/guidelines/)
+- Progress bar: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/progress-bar/guidelines/)
+- Progress indicator: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/guidelines/), [specifications](https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/specifications/)
+- Slider: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/slider/guidelines/)
+- Structured list: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/structured-list/guidelines/)
+- Tabs: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/tabs/guidelines/)
+- Tag: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/tag/guidelines/), [specifications](https://carbondesignsystem.com/building-blocks/core/components/tag/specifications/)
+- Text input: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/text-input/guidelines/), [specifications](https://carbondesignsystem.com/building-blocks/core/components/text-input/specifications/)
+- Tile: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/tile/guidelines/), [specifications](https://carbondesignsystem.com/building-blocks/core/components/tile/specifications/), [accessibility](https://carbondesignsystem.com/building-blocks/core/components/tile/accessibility/)
+- Toggle: [accessibility](https://carbondesignsystem.com/building-blocks/core/components/toggle/accessibility/)
+- Toggletip: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/toggletip/guidelines/)
+- Tooltip: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/tooltip/guidelines/), [accessibility](https://carbondesignsystem.com/building-blocks/core/components/tooltip/accessibility/)
+- Tree view: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/tree-view/guidelines/)
+- UI shell header: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/ui-shell-header/guidelines/), [specifications](https://carbondesignsystem.com/building-blocks/core/components/ui-shell-header/specifications/), [accessibility](https://carbondesignsystem.com/building-blocks/core/components/ui-shell-header/accessibility/)
+- UI shell left panel: [guidelines](https://carbondesignsystem.com/building-blocks/core/components/ui-shell-left-panel/guidelines/)
+- Bileşen genel bakışı: [overview](https://carbondesignsystem.com/building-blocks/core/components/overview/components/)
+
 Carbon'un 43 bileşen girişi [Bileşen rehberi](carbon-bilesen-rehberi.md)'nde 42 kartta toplanır.
 
-**Kalıplar** — `https://carbondesignsystem.com/building-blocks/core/patterns/…`:
+### 15.3 Kalıplar
+
+Yol: `https://carbondesignsystem.com/building-blocks/core/patterns/…`:
 [overview](https://carbondesignsystem.com/building-blocks/core/patterns/overview/),
 [common actions](https://carbondesignsystem.com/building-blocks/core/patterns/common-actions/),
 [dialogs](https://carbondesignsystem.com/building-blocks/core/patterns/dialogs/),
@@ -3730,7 +3857,9 @@ Carbon'un 43 bileşen girişi [Bileşen rehberi](carbon-bilesen-rehberi.md)'nde 
 [status indicators](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/),
 [text toolbar](https://carbondesignsystem.com/building-blocks/core/patterns/text-toolbar/).
 
-**Veri görselleştirme** — `https://carbondesignsystem.com/building-blocks/data-visualization/…`:
+### 15.4 Veri görselleştirme
+
+Yol: `https://carbondesignsystem.com/building-blocks/data-visualization/…`:
 [overview](https://carbondesignsystem.com/building-blocks/data-visualization/overview/),
 [chart anatomy](https://carbondesignsystem.com/building-blocks/data-visualization/chart-anatomy/),
 [axes and labels](https://carbondesignsystem.com/building-blocks/data-visualization/axes-and-labels/),
@@ -3742,14 +3871,105 @@ Carbon'un 43 bileşen girişi [Bileşen rehberi](carbon-bilesen-rehberi.md)'nde 
 [gantt charts](https://carbondesignsystem.com/building-blocks/data-visualization/gantt-charts/),
 [spatial charts](https://carbondesignsystem.com/building-blocks/data-visualization/spatial-charts/).
 
-**Carbon MCP** — `https://carbondesignsystem.com/getting-started/carbon-mcp/…`:
+### 15.5 Carbon MCP
+
+Yol: `https://carbondesignsystem.com/getting-started/carbon-mcp/…`:
 [overview](https://carbondesignsystem.com/getting-started/carbon-mcp/overview/),
 [concepts](https://carbondesignsystem.com/getting-started/carbon-mcp/concepts/),
 [onboarding and setup](https://carbondesignsystem.com/getting-started/carbon-mcp/onboarding-and-setup/),
 [prompts](https://carbondesignsystem.com/getting-started/carbon-mcp/prompts/),
 [token conservation](https://carbondesignsystem.com/getting-started/carbon-mcp/token-conservation/).
 
-**Diğer**
+### 15.6 Kanunun kullandığı sayfalar ve çapalar
+
+Kanunun dayandığı her sayfa ve çapa (kanun metninden çıkarıldı, 2026-10-20). (*) talimatnamenin gövdesinde
+anılmayan sayfadır.
+
+- `core/components/accordion/guidelines`: [#when-to-use](https://carbondesignsystem.com/building-blocks/core/components/accordion/guidelines/#when-to-use)
+- `core/components/ai-label/guidelines`: [#in-containers](https://carbondesignsystem.com/building-blocks/core/components/ai-label/guidelines/#in-containers)
+- `core/components/button/guidelines`: [#a-single-high-emphasis-button](https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#a-single-high-emphasis-button) · [#anatomy](https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#anatomy) · [#button-sizes](https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#button-sizes) · [#ghost-button](https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#ghost-button) · [#label-alignment](https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#label-alignment) · [#main-elements](https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#main-elements) · [#multiple-button-emphasis](https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#multiple-button-emphasis) · [#when-not-to-use](https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#when-not-to-use)
+- `core/components/button/specifications`: [#button-structure](https://carbondesignsystem.com/building-blocks/core/components/button/specifications/#button-structure) · [#ghost-button-color](https://carbondesignsystem.com/building-blocks/core/components/button/specifications/#ghost-button-color) · [#primary-button-interactive-state-color](https://carbondesignsystem.com/building-blocks/core/components/button/specifications/#primary-button-interactive-state-color) · [#size](https://carbondesignsystem.com/building-blocks/core/components/button/specifications/#size) · [#typography](https://carbondesignsystem.com/building-blocks/core/components/button/specifications/#typography)
+- `core/components/data-table/guidelines`: [#header-and-row-height](https://carbondesignsystem.com/building-blocks/core/components/data-table/guidelines/#header-and-row-height)
+- `core/components/data-table/specifications`: [#rows](https://carbondesignsystem.com/building-blocks/core/components/data-table/specifications/#rows)
+- `core/components/form/guidelines`: [#best-practices-for-labels](https://carbondesignsystem.com/building-blocks/core/components/form/guidelines/#best-practices-for-labels)
+- `core/components/notification/accessibility`: [#actionable](https://carbondesignsystem.com/building-blocks/core/components/notification/accessibility/#actionable) · [#callout](https://carbondesignsystem.com/building-blocks/core/components/notification/accessibility/#callout) · [#inline-and-toast](https://carbondesignsystem.com/building-blocks/core/components/notification/accessibility/#inline-and-toast)
+- `core/components/notification/guidelines`: [#callout](https://carbondesignsystem.com/building-blocks/core/components/notification/guidelines/#callout) · [#inline](https://carbondesignsystem.com/building-blocks/core/components/notification/guidelines/#inline)
+- `core/components/notification/specifications`: [#callout](https://carbondesignsystem.com/building-blocks/core/components/notification/specifications/#callout) · [#inline](https://carbondesignsystem.com/building-blocks/core/components/notification/specifications/#inline)
+- `core/components/popover/guidelines`: [#corners](https://carbondesignsystem.com/building-blocks/core/components/popover/guidelines/#corners)
+- `core/components/progress-bar/guidelines`: [#content](https://carbondesignsystem.com/building-blocks/core/components/progress-bar/guidelines/#content) · [#when-not-to-use](https://carbondesignsystem.com/building-blocks/core/components/progress-bar/guidelines/#when-not-to-use)
+- `core/components/progress-indicator/guidelines`: [#when-to-use](https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/guidelines/#when-to-use)
+- `core/components/progress-indicator/specifications`: [#color](https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/specifications/#color) · [#interactive-states](https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/specifications/#interactive-states) · [#structure](https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/specifications/#structure) · [#typography](https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/specifications/#typography)
+- `core/components/slider/guidelines` (*): [#default-slider-anatomy](https://carbondesignsystem.com/building-blocks/core/components/slider/guidelines/#default-slider-anatomy)
+- `core/components/tag/guidelines`: [#clickable-areas](https://carbondesignsystem.com/building-blocks/core/components/tag/guidelines/#clickable-areas) · [#operational-tag](https://carbondesignsystem.com/building-blocks/core/components/tag/guidelines/#operational-tag) · [#sizing](https://carbondesignsystem.com/building-blocks/core/components/tag/guidelines/#sizing) · [#tag-colors](https://carbondesignsystem.com/building-blocks/core/components/tag/guidelines/#tag-colors) · [#when-not-to-use](https://carbondesignsystem.com/building-blocks/core/components/tag/guidelines/#when-not-to-use) · [#when-to-use](https://carbondesignsystem.com/building-blocks/core/components/tag/guidelines/#when-to-use)
+- `core/components/tag/specifications`: [#size](https://carbondesignsystem.com/building-blocks/core/components/tag/specifications/#size) · [#structure](https://carbondesignsystem.com/building-blocks/core/components/tag/specifications/#structure) · [#typography](https://carbondesignsystem.com/building-blocks/core/components/tag/specifications/#typography)
+- `core/components/text-input/guidelines`: [#main-elements](https://carbondesignsystem.com/building-blocks/core/components/text-input/guidelines/#main-elements)
+- `core/components/text-input/specifications`: [#text-input-color](https://carbondesignsystem.com/building-blocks/core/components/text-input/specifications/#text-input-color)
+- `core/components/tile/specifications`: [#selectable-tile-interactive-state-color](https://carbondesignsystem.com/building-blocks/core/components/tile/specifications/#selectable-tile-interactive-state-color)
+- `core/components/tooltip/accessibility` (*): [#annotate-the-text-for-the-tooltip](https://carbondesignsystem.com/building-blocks/core/components/tooltip/accessibility/#annotate-the-text-for-the-tooltip) · [#keyboard-interactions](https://carbondesignsystem.com/building-blocks/core/components/tooltip/accessibility/#keyboard-interactions)
+- `core/patterns/loading`: [#skeleton-states](https://carbondesignsystem.com/building-blocks/core/patterns/loading/#skeleton-states)
+- `core/patterns/status-indicators`: [#badge-indicator](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#badge-indicator) · [#icon-indicator](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#icon-indicator) · [#status-color-palette](https://carbondesignsystem.com/building-blocks/core/patterns/status-indicators/#status-color-palette)
+- `data-visualization/color-palettes`: [#alert-palette](https://carbondesignsystem.com/building-blocks/data-visualization/color-palettes/#alert-palette) · [#categorical-palettes](https://carbondesignsystem.com/building-blocks/data-visualization/color-palettes/#categorical-palettes)
+- `data-visualization/legends`: [#color-and-texture](https://carbondesignsystem.com/building-blocks/data-visualization/legends/#color-and-texture) · [#usage](https://carbondesignsystem.com/building-blocks/data-visualization/legends/#usage)
+- `foundations/2x-grid/guidelines`: [#2x-grid-at-max-breakpoint](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/guidelines/#2x-grid-at-max-breakpoint) · [#adaptive-aspect-ratios](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/guidelines/#adaptive-aspect-ratios) · [#using-aspect-ratios](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/guidelines/#using-aspect-ratios)
+- `foundations/2x-grid/overview`: [#breakpoints](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/overview/#breakpoints) · [#fluid-columns](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/overview/#fluid-columns) · [#mini-unit](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/overview/#mini-unit)
+- `foundations/accessibility/color`: [#color-contrast](https://carbondesignsystem.com/building-blocks/foundations/accessibility/color/#color-contrast)
+- `foundations/accessibility/developers`: [#give-decorative-images-an-empty-alt-attribute](https://carbondesignsystem.com/building-blocks/foundations/accessibility/developers/#give-decorative-images-an-empty-alt-attribute) · [#style-focus-indicators](https://carbondesignsystem.com/building-blocks/foundations/accessibility/developers/#style-focus-indicators)
+- `foundations/color/guidelines`: [#consider-illustrations](https://carbondesignsystem.com/building-blocks/foundations/color/guidelines/#consider-illustrations) · [#creating-a-mode-control](https://carbondesignsystem.com/building-blocks/foundations/color/guidelines/#creating-a-mode-control) · [#designing-for-inline-theming](https://carbondesignsystem.com/building-blocks/foundations/color/guidelines/#designing-for-inline-theming) · [#inline-theming](https://carbondesignsystem.com/building-blocks/foundations/color/guidelines/#inline-theming)
+- `foundations/content`: [#content-foundations](https://carbondesignsystem.com/building-blocks/foundations/content/#content-foundations)
+- `foundations/icons/code`: [#usage](https://carbondesignsystem.com/building-blocks/foundations/icons/code/#usage)
+- `foundations/icons/guidelines`: [#color](https://carbondesignsystem.com/building-blocks/foundations/icons/guidelines/#color) · [#sizing](https://carbondesignsystem.com/building-blocks/foundations/icons/guidelines/#sizing) · [#touch-targets](https://carbondesignsystem.com/building-blocks/foundations/icons/guidelines/#touch-targets)
+- `foundations/motion/overview`: [#adaptive-interface-motion-design](https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#adaptive-interface-motion-design) · [#duration-tokens](https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#duration-tokens) · [#expressive-motion](https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#expressive-motion) · [#productive-motion](https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#productive-motion)
+- `foundations/pictograms/guidelines`: [#productive-versus-expressive](https://carbondesignsystem.com/building-blocks/foundations/pictograms/guidelines/#productive-versus-expressive) · [#sizing](https://carbondesignsystem.com/building-blocks/foundations/pictograms/guidelines/#sizing)
+- `foundations/themes/code`: [#system-preferences](https://carbondesignsystem.com/building-blocks/foundations/themes/code/#system-preferences)
+- `foundations/themes/overview`: [#theming-applied](https://carbondesignsystem.com/building-blocks/foundations/themes/overview/#theming-applied)
+- `foundations/typography/overview`: [#productive-and-expressive-type-sets](https://carbondesignsystem.com/building-blocks/foundations/typography/overview/#productive-and-expressive-type-sets)
+- `foundations/typography/style-strategies`: [#using-expressive-moments-within-product-designs](https://carbondesignsystem.com/building-blocks/foundations/typography/style-strategies/#using-expressive-moments-within-product-designs)
+- `foundations/typography/type-sets`: [#base-type-sizes](https://carbondesignsystem.com/building-blocks/foundations/typography/type-sets/#base-type-sizes) · [#body-styles](https://carbondesignsystem.com/building-blocks/foundations/typography/type-sets/#body-styles) · [#fluid-heading-styles](https://carbondesignsystem.com/building-blocks/foundations/typography/type-sets/#fluid-heading-styles)
+
+### 15.7 Ortak olgular: tek çapa
+
+İki belgenin birlikte yazdığı Carbon olguları. Bu olguyu yazan cümle bu ifadeyi ve bu çapayı kullanır; değer
+değişirse iki belge aynı commit'te değişir. MCP'nin çapası canlı başlıktan farklıysa satırda "MCP: #…" notu durur
+(§10.5).
+
+| Olgu | Ortak ifade | Çapa |
+|---|---|---|
+| Dokunma hedefi | Carbon: etkileşimli ikonun dokunma hedefi ≥ 44 px (örnek 48 px hedefte 22 px ikon); TEDY bunu her dokunulan denetime genişletir, standart 48 px (S18, Kanun KS-5) | https://carbondesignsystem.com/building-blocks/foundations/icons/guidelines/#touch-targets |
+| İlerleme göstergesi | ≥ 3 doğrusal adım; tamamlanan ve geçerli adım `$interactive`, başlanmamış `$icon-primary`, çizgiler `$border-interactive` / `$border-subtle`, etiket `$text-primary`; etiket 1–2 sözcük, ≤ 16 karakter, cümle düzeni; adım en az 8rem | https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/guidelines/#when-to-use · https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/specifications/#color · https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/specifications/#typography · https://carbondesignsystem.com/building-blocks/core/components/progress-indicator/specifications/#structure |
+| ProgressBar ne zaman kullanılmaz | Kullanıcı eylemiyle belirlenen ilerleme, elle ilerleyen adımlar (ProgressIndicator), 5 sn'den kısa iş (yükleme), açılınca içerik gösterecek yük (iskelet) | https://carbondesignsystem.com/building-blocks/core/components/progress-bar/guidelines/#when-not-to-use |
+| Tag boyları | sm 18 · md 24 (varsayılan) · lg 32 px; lg sayfanın odağında ya da 32 px'lik denetimlerin yanında; başlık mümkünse 20 karakterin altında | https://carbondesignsystem.com/building-blocks/core/components/tag/specifications/#size · https://carbondesignsystem.com/building-blocks/core/components/tag/guidelines/#sizing · https://carbondesignsystem.com/building-blocks/core/components/tag/specifications/#typography |
+| Inline ve callout anatomisi | En az 48 px yükseklik, 3 px sol kenar; callout kapatılamaz; inline etkileşimli öğe taşımaz ve odak almaz; Carbon callout'ta bağlantıya izin verir (köşe: MCP'de yok, §15.8) | https://carbondesignsystem.com/building-blocks/core/components/notification/specifications/#inline · https://carbondesignsystem.com/building-blocks/core/components/notification/specifications/#callout · https://carbondesignsystem.com/building-blocks/core/components/notification/guidelines/#callout · https://carbondesignsystem.com/building-blocks/core/components/notification/accessibility/#inline-and-toast · https://carbondesignsystem.com/building-blocks/core/components/notification/accessibility/#callout |
+| Düğme | Boylar xs 24 · sm 32 · md 40 · lg 48 · lg expressive 48 · xl 64 · 2xl 80 px; ikon 16 px, expressive 20 px; etiket solda, ikon sağda; görünüm başına tek yüksek vurgulu düğme | https://carbondesignsystem.com/building-blocks/core/components/button/specifications/#size · https://carbondesignsystem.com/building-blocks/core/components/button/specifications/#button-structure · https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#anatomy · https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#label-alignment · https://carbondesignsystem.com/building-blocks/core/components/button/guidelines/#a-single-high-emphasis-button |
+| Kırılımlar | sm 320/20 · md 672/42 · lg 1056/66 · xlg 1312/82 · max 1584/99 (px/rem) | https://carbondesignsystem.com/building-blocks/foundations/2x-grid/overview/#breakpoints |
+| Hareket | Productive görev üzerindeyken, expressive önemli anlarda; süreler 70 · 110 · 150 · 240 · 400 · 700 ms | https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#productive-motion · https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#expressive-motion · https://carbondesignsystem.com/building-blocks/foundations/motion/overview/#duration-tokens |
+| İkon boyları | 16, 20, 24, 32 px; 16/20 px ikon 14/16 px Plex'le dengeli | https://carbondesignsystem.com/building-blocks/foundations/icons/guidelines/#sizing · https://carbondesignsystem.com/building-blocks/foundations/icons/code/#usage |
+| Piktogram | En küçük 48 px; UI ikonunun yerine kullanılmaz | https://carbondesignsystem.com/building-blocks/foundations/pictograms/guidelines/#sizing · https://carbondesignsystem.com/building-blocks/foundations/pictograms/guidelines/#productive-versus-expressive |
+| Tipografi | Productive taban 14 px, expressive 16 px; akışkan başlık kabın içinde kullanılmaz | https://carbondesignsystem.com/building-blocks/foundations/typography/type-sets/#base-type-sizes · https://carbondesignsystem.com/building-blocks/foundations/typography/type-sets/#fluid-heading-styles |
+| Cümle düzeni | Başlık, unvan, etiket ve banner'da cümle düzeni (ad başlıkları adlı sapma: S38, Kanun KS-2) | https://carbondesignsystem.com/building-blocks/foundations/content/#content-foundations |
+| Tema ve mod | Mod kullanıcı ayarıdır, denetimi görüntü/profil/hesap alanındadır; kullanıcı tercihi yoksa sistem teması | https://carbondesignsystem.com/building-blocks/foundations/color/guidelines/#creating-a-mode-control · https://carbondesignsystem.com/building-blocks/foundations/themes/code/#system-preferences |
+| Kontrast | Metin 4,5:1; büyük metin (≥ 24 px normal, ≥ 19 px yarı kalın) 3:1; UI bileşeninin durum ve sınırı komşu renge 3:1 (MCP: #use-of-color-and-color-blindness) | https://carbondesignsystem.com/building-blocks/foundations/accessibility/color/#color-contrast |
+| En-boy oranı | Yaygın oranlar önerilir; uymayan yerde daha az yaygın oran serbest (oran listesi MCP'de yok, §15.8) | https://carbondesignsystem.com/building-blocks/foundations/2x-grid/guidelines/#using-aspect-ratios · https://carbondesignsystem.com/building-blocks/foundations/2x-grid/guidelines/#adaptive-aspect-ratios |
+| Veri görselleştirme paleti | Kategorik renkler kesin sırayla; kategori sayısı belliyse sayıya özel palet; uyarı paleti yalnız durum | https://carbondesignsystem.com/building-blocks/data-visualization/color-palettes/#categorical-palettes · https://carbondesignsystem.com/building-blocks/data-visualization/color-palettes/#alert-palette |
+| Doğrudan etiket | Mümkünse legend yerine veri doğrudan etiketlenir (MCP: #color-and-texture); doku rengin yerine ya da yanında | https://carbondesignsystem.com/building-blocks/data-visualization/legends/#usage · https://carbondesignsystem.com/building-blocks/data-visualization/legends/#color-and-texture |
+| İskelet | Yalnız kap ve veri bileşenlerinde, ilk yüklemede, birkaç saniye; 400 ms eşiği TEDY kararı (S36) | https://carbondesignsystem.com/building-blocks/core/patterns/loading/#skeleton-states |
+| Popover köşesi | 2 px (Tedy köşe dili: S10, Kanun KS-4) | https://carbondesignsystem.com/building-blocks/core/components/popover/guidelines/#corners |
+
+### 15.8 MCP'de bulunamayanlar
+
+Carbon MCP'de (ve sıralananlarda canlı sayfada da) kuralı bulunamayan olgular; iki belge bunları "Carbon dayanağı
+yok, belgenin kararı" diye ya da kod olgusuyla yazar:
+
+- Bildirim köşe yarıçapı: belge metninde yok; kod olgusu, v12 bayrağıyla `$border-radius-04`
+  (`@carbon/styles` `notification/_inline-notification.scss`).
+- En-boy oranı listesi: canlı 2x Grid overview sayfasında (`#aspect-ratio`) var, MCP indeksinde yok; kod olgusu
+  `@carbon/react` `AspectRatio` (16x9, 9x16, 2x1, 1x2, 4x3, 3x4, 3x2, 2x3, 1x1).
+- ProgressIndicator'ın en çok adım sayısı ve sığmayan göstergenin davranışı (adımın en az genişliği bulundu).
+- Satır uzunluğu kuralı.
+- 18 px'lik tip stili (tip ölçeğinde 18 px adımı var).
+- "Bir ürün tek tema" ilkesi.
+- Grafik içi metnin en küçük boyu.
+
+### 15.9 Diğer
 
 - carbon-builder 1.3.1: `https://github.com/carbon-design-system/carbon-mcp/raw/main/public/skills/carbon-builder.zip`
   (vendorlandı 2026-10-10, [`VENDORED.md`](../.claude/skills/carbon-builder/VENDORED.md))
@@ -3776,3 +3996,4 @@ Carbon'un 43 bileşen girişi [Bileşen rehberi](carbon-bilesen-rehberi.md)'nde 
 | 1.10 | 2026-10-15 | Giriş sayfası yenilemesi (spec `superpowers/specs/2026-10-15-giris-sayfasi-yenileme-design.md`; Carbon login kalıbı, bölünmüş ekran): §11.1'e **S50** (Google giriş düğmesi `zoom` ile Carbon lg 48 px'e, sütun enine ve 4K köküne getirilir). Bant 10/16, form 6/16 sütun ve tek sol çizgi (P3); başlık "TEDY'ye giriş yap" `heading-04`, bant değer cümlesi expressive `fluid-heading-03` — P1 nedeniyle başlıktan küçük (isteğin önerdiği büyük expressive tip yazılmadı; talimatname kazandı). Ses tek: **sen** (önceki sayfa "siz", hata cümleleri "sen" idi, İ9). Her durum görünür: 400 ms sonra iskelet, 10 sn sonra uyarı, engellenen betik hata + "Yeniden dene", doğrulanırken tek `InlineLoading`, 403 ve diğer hatalar adıyla (`girisBildirimi`). Altbilgi cümlesi koda göre yazıldı: `/api/auth/login` e-postayla birlikte adı ve profil fotoğrafını da okur. Telefonda kabuğun alt çubuk payı (48 px boş kayma) giriş sayfasında kalktı. Yeni kapılar: `giris-sayfasi.spec.ts` (20 test), `gsi-durumu.test.ts`; `gorsel-regresyon` giriş tabanı Google iframe'ini maskelemek yerine deterministik bir yedekle çekilir ve telefon tabanı eklendi; `aria-yapisi` giriş ağacı (`giris.aria.yml`). |
 | 1.11 | 2026-10-15 | Modül şablonu: 4K eşliği ve kalan Carbon sapmaları (spec `docs/superpowers/specs/2026-10-15-modul-sablonu-carbon-sapmalari-design.md`). **S19** yeniden yazıldı: modülde kategoriyi hue taşımaz, `--viz-1..5` nötr gri rampa, dilbilgisi rolleri alt çizgi biçimine geçti (`art`'ın ders aksanı kalktı); ayrıca ölçülmüş bir kaskad hatası onarıldı — çıplak `:root` koyu paleti eziyordu, g100'de blue-80 1,34:1 çiziliyordu. **S11** modül tarafı kapandı (`.topbar`/`.stage` gölgesi ve iki `rgba()` kalktı; D1'e de hizmet etti). **4 px** ve **4K** maddeleri kapandı: yarıçap token'a bağlandı (popover 2 px, satır içi vurgu ve lejant işareti 0), şablonun 73 px ölçüsü rem'e çevrildi ve kök ölçek `edupedia:appearance`'ın yeni isteğe bağlı `rootPx` alanıyla panodan gelir. §8.1 kategorik palet satırı, §9.3 Sütun/Gölge satırları ve yeni Kök ölçek satırı, §9.4 tablosu ve "akan tek şey" cümlesi buna göre yeniden yazıldı. `G-BRIDGE` değişmedi (kapı tipleri denetler, alanları değil). Kapılar: `test_s19_*`, `test_s11_modulde_statik_yuzey_golgesiz`, `test_d1_modulde_alfa_rengi_yok`, `test_s10_modulde_yaricap_token_referansi`, `test_4k_*`, `tests/test_modul_kok_olcegi.py`. |
 | 2.0 | 2026-10-19 | Büyük sürüm (§0.2 değişti; kullanıcının 2026-10-19 talebiyle; kanun KB-34). [Modül Tasarım Kanunu](tedy-modul-tasarim-kanunu.md) 1.0 öncelik zincirine girdi: 3. basamak, yalnız modül yüzeylerinde; edupedia vendor ve eklentisi `tedy-carbon`'dan sonra, carbon-builder'dan önce. §0.1 modül ve ajan satırları, §0.3 kanun satırı (vendor "yazım varlıklarının tek kaynağı; tasarım kararında kanunun altında"; sayılar S1–S50 ve B1–B80 olarak düzeltildi), §10.4 öncelik cümlesi, §14.3 kanun satırı. §9 kanuna bağlandı: giriş paragrafı (yetkili metin kanundur, bu bölüm özeti ve tarihidir), §9.1 akışta modül başlık bloğu yok, §9.2 çapa listesi ve `meta.accent` (M1.5, M1.6, M4.5), §9.3 Sütun/Gövde/Tema/Hareket satırları (M1.3, KS-1, M4.1, M2.10), §9.4 `layout` alanı, `adoptHostTheme()` ve zemin (M1.2, M4.1, M4.3), §9.5 G-SVG (KB-25), §9.6 tek kaynak cümlesi, §9.7 statik gölge kapandı, §9.8 #4, #8, #14, #16, #19. **S14** revize: pano yalnız g10, koyu mod gelirse panonun Profil ayarı, modül devralır, modülde tema düğmesi yok (M4.1, M4.2, KS-7; şablonda borç KB-1). S43 aşama göstergesi ve rozetsiz özetle (M2.5, M2.7, M5.4) uyumlandı; S10, S18, S19, S38 modül için KS-4, KS-5, KS-3, KS-2'ye yönlendirir. [3.1-6], [3.3-6] (S38'in 2026-10-19 revizyonu), [3.5-2] ve P13 ölçümü buna göre yeniden yazıldı. Başlıktaki sürüm 1.10'da kalmıştı; 1.11 kaydı geçerlidir. |
+| 2.1 | 2026-10-20 | Kanun 1.1 ile uyum turu (öncelik sırası değişmedi). §0.2 kanunun zincirini kanun §0.2'nin sözcükleriyle taşır, anayasanın D/İ dışı bölümlerinin basamağını yazar ve kanunun susduğu konuda bu belgenin modülde de geçtiğini söyler (kanun §0.1 aynı cümle); §0.3 B1–B81; §0.4 kimlik ve sözlük eşlemesi. Bayat ya da kanunla çelişen cümleler düzeltildi: P4 (modül gölgesi kalktı), P7 (modülde bölüm girişi hareketi yok, M2.10), P10 (bildirim köşesi, KB-20), [3.1] g100 satırı (M4.3), [3.3-3] ve S44 ile §9.3 (`.summary h2`/`.topbar__title` 600, KB-14), [3.3-8] (ölçü `rem`, `ch` değil; yeni B81), [3.4-5] (B10/B37 kapandı; modülde kapsayıcı sorgusu), §5.2 ve S36 (kapanan borçlar; KB-37), §5.10 (atlama bağlantısı ve modül sayfasının `Breadcrumb`'ı), C-AI2 (B71 kapandı), §8.1 (`--viz-*` gri rampa), §8.3, §9.5 G-AUDIO (earcon varsayılanı denetlenmiyor, M5.14), §9.6, §9.7, §9.8 #9 ve #13, S24 (KB-41), S26. Kanuna yönlendirmeler: [3.2-4] (M1.6), [3.3-1] (M2.9, KB-47), [3.6-2], [3.7-5] (KB-32), [3.8-3] (M5.3), P1 (M1.8), §4.1, §4.2, §4.4 madde 9 (etiket boyu, M2.8), §5.3, S1, S2, S12, S16, S17, S18, S20, S27, S43; §9.3'e kırılım, serif, satır ölçüsü, ilerleme, düğme ve tablo satırları; §11.1 KS ↔ S karşılıkları. §12 kanun §8'in modül ekini anar (girişi, §12.1 Telefon, §12.2 "Modül yüzeyi" satırı, §12.4 madde 2, 5, 6); §13 girişi iki kaydı ve B ↔ KB eşlemesini yazar; §14.2 ve §14.3 kanun usulüne bağlandı. Carbon bağlantı turu (Carbon MCP ve 2026-10-20 canlı denetimi, 107 sayfa): §9.8'in kısaltılmış `…/` başvuruları tam URL oldu, canlıda `id`'si olmayan ya da anlamca yanlış çapalar düzeldi (§10.5 örneği `#sizes`, kontrast `#color-contrast`, tek birincil `#a-single-high-emphasis-button`), ortak olgu bağlantıları çapa aldı, §5.3 Carbon callout'un bağlantı taşıyabildiğini yazar, §10.5'e çapa kuralı girdi ve §15 iki belgenin ortak kaynakçası oldu (15.6 kanunun sayfaları, 15.7 ortak olgular, 15.8 MCP'de bulunamayanlar). Aynı gün kanunun KB-1, KB-2 ve KB-3 borçları şablonda kapandı; modül anlatan cümleler buna göre geçmiş zamana alındı. |

@@ -62,6 +62,7 @@ her biri bir **kanonik Carbon ikonundan türetilmelidir** (SVG path kaynağı):
 | `ic-area` | `area` | ✓ birebir |
 | `ic-arrow-left` / `ic-arrow-right` | `arrow--left` / `arrow--right` | ✓ (kısa-tire alias) |
 | `ic-check` | `checkmark` | ✓ (Carbon adı "checkmark") |
+| `ic-checkmark-outline` · `ic-incomplete` · `ic-circle-dash` | `checkmark--outline` · `incomplete` · `circle-dash` | ✓ birebir (`@carbon/icons` svg/32; ilerleme göstergesinin tamamlanan / geçerli / başlanmamış adımı, Carbon `ProgressStep`'in ikonları; 2026-10-20) |
 | `ic-chevron-right` | `chevron--right` | ✓ |
 | `ic-close` · `ic-compass` · `ic-flag` · `ic-flash` · `ic-grid` · `ic-headphones` · `ic-help` · `ic-light` · `ic-locked` · `ic-moon` · `ic-pause` · `ic-renew` · `ic-restart` · `ic-ruler` · `ic-star` · `ic-trophy` · `ic-view` | aynı ad | ✓ birebir kanonik |
 | `ic-info` | **`information`** | SVG path'i kanonikten türetildi (2026-07-07); id kısa-alias korunur |

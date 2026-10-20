@@ -122,7 +122,7 @@ ekran okuyucuya açık; renk dışı durum (ikon+metin).
 > `null`/no-op döner; bu durumda tüm kutular varsayılan `1` sayılır ve sıralama no-op'tur
 > (eşit anahtarlarda orijinal indeks kırılımı sırayı korur) — segment **birebir eski
 > in-session davranışına** düşer, hiçbir kart kaybolmaz/çökme olmaz. Kalıcı depolama
-> izin listesi yalnız **Leitner**'dır; tema kaydı Kanun M4.1 ile kalkar (şablonda borç KB-1).
+> izin listesi yalnız **Leitner**'dır; tema kaydı yoktur (Kanun M4.1; 2026-10-20'de kalktı, KB-1).
 > İç ilerleme sayısı (xp) ve yanıt kümeleri
 > `sessionStorage` ile sekme oturumuna sınırlandırılır. Tüm sarmalayıcılar try/catch
 > ile degrade-safe'tir.

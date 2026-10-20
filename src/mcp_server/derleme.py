@@ -366,6 +366,38 @@ def izinli_aksanlar() -> tuple[str, ...]:
     return subject_themes.families()
 
 
+ASAMA_ADI_SINIRI = 16
+
+
+def asama_hatalari(milestones: Any, segments: Any) -> list[str]:
+    """Modül Tasarım Kanunu M2.5: `meta.milestones` segmentleri 3–7 aşamaya gruplar. Her öğe
+    `{atSegmentId, title}`; aşama o segmentte başlar ve sonrakine dek sürer, ilki ilk segmenttedir, sıra
+    segment sırasını izler; ad 1–2 sözcük, en çok 16 karakter (Carbon ProgressIndicator etiketi)."""
+    yol = "meta.milestones"
+    if not isinstance(milestones, list) or not 3 <= len(milestones) <= 7:
+        return [f"{yol} 3–7 aşamalık bir dizi olmalı (Kanun M2.5)"]
+    sira = [seg.get("id") for seg in segments if isinstance(seg, dict)] if isinstance(segments, list) else []
+    errors: list[str] = []
+    onceki = -1
+    for index, asama in enumerate(milestones):
+        if not isinstance(asama, dict):
+            errors.append(f"{yol}[{index}] {{atSegmentId, title}} nesnesi olmalı")
+            continue
+        sid, ad = asama.get("atSegmentId"), asama.get("title")
+        if sid not in sira:
+            errors.append(f"{yol}[{index}].atSegmentId bir segment kimliği olmalı")
+            continue
+        sira_no = sira.index(sid)
+        if index == 0 and sira_no != 0:
+            errors.append(f"{yol}[0] ilk segmentte başlamalı")
+        if sira_no <= onceki:
+            errors.append(f"{yol}[{index}] segment sırasını izlemeli")
+        onceki = sira_no
+        if not (isinstance(ad, str) and ad.strip() and len(ad.strip()) <= ASAMA_ADI_SINIRI and len(ad.split()) <= 2):
+            errors.append(f"{yol}[{index}].title 1–2 sözcük ve en çok {ASAMA_ADI_SINIRI} karakter olmalı")
+    return errors
+
+
 def sema_dogrula(data: Any) -> list[str]:
     if not isinstance(data, dict):
         return ["MODULE_DATA bir nesne olmalı"]
@@ -404,6 +436,8 @@ def sema_dogrula(data: Any) -> list[str]:
             if sid in seen:
                 errors.append(f"segments[{index}].id yinelenmiş: {sid}")
             seen.add(sid)
+    if "milestones" in meta:
+        errors.extend(asama_hatalari(meta["milestones"], segments))
     if not isinstance(data.get("curriculum"), dict):
         errors.append("curriculum bloğu zorunlu (müfredat dayanağı; spec §5.1 hibrit kuralı)")
     verification = data.get("verification")

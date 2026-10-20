@@ -33,6 +33,7 @@ type Segment = { id: string; type: string; questions?: { correctIndex: number }[
 let moduleHtml = ''
 let quiz: { meta: { title: string }; segments: Segment[] }
 let clozeHtml = ''
+let asamaliHtml = ''
 
 test.beforeAll(() => {
   const out = join(mkdtempSync(join(tmpdir(), 'tedy-modul-')), 'quiz.html')
@@ -49,6 +50,16 @@ test.beforeAll(() => {
   execFileSync(PYTHON, ['-m', 'src.mcp_server.derleme', '--girdi', join(dir, 'cloze.json'), '--cikti', join(dir, 'cloze.html'),
     '--ebeveyn-origin', ORIGIN], { cwd: REPO })
   clozeHtml = readFileSync(join(dir, 'cloze.html'), 'utf8')
+  // A module in three stages (Modül Tasarım Kanunu M2.5): the indicator's steps are stages, not segments.
+  execFileSync(PYTHON, ['-c', [
+    'import json, sys', 'from src.mcp_server.ornekler import ornek', "d = ornek('QUIZ')",
+    "d['meta']['milestones'] = [{'atSegmentId': 't1', 'title': 'Keşfet'}, {'atSegmentId': 'q1', 'title': 'Uygula'},"
+      + " {'atSegmentId': 'cp1', 'title': 'Pekiştir'}]",
+    "open(sys.argv[1], 'w').write(json.dumps(d, ensure_ascii=False))",
+  ].join('\n'), join(dir, 'asamali.json')], { cwd: REPO })
+  execFileSync(PYTHON, ['-m', 'src.mcp_server.derleme', '--girdi', join(dir, 'asamali.json'), '--cikti',
+    join(dir, 'asamali.html'), '--ebeveyn-origin', ORIGIN], { cwd: REPO })
+  asamaliHtml = readFileSync(join(dir, 'asamali.html'), 'utf8')
   quiz = JSON.parse(execFileSync(PYTHON, ['-c',
     'import json; from src.mcp_server.ornekler import ornek; print(json.dumps(ornek("QUIZ")))'],
   { cwd: REPO, encoding: 'utf8' }))
@@ -333,24 +344,29 @@ test('the module takes on the dashboard theme, drafts included', async ({ page }
   const frame = page.frameLocator('iframe.module-frame')
   await expect(frame.locator('#titleText')).toHaveText(quiz.meta.title)
   await expect(frame.locator('html')).toHaveAttribute('data-theme', 'g10')
-  await expect(frame.locator('#themeBtn')).toHaveAttribute('aria-label', 'Koyu temaya geç')
 })
 
-test('a theme the student picks in the module is not overridden', async ({ page }) => {
+// Modül Tasarım Kanunu M4.1 (KB-1, 2026-10-20): the module has no theme of its own — no switch,
+// no stored choice — so whatever theme the dashboard sends is the theme it renders in, every time.
+test('the module has no theme switch; the dashboard theme always wins', async ({ page }) => {
   await recordProgress(page)
   await serveModule(page)
   await page.goto('/moduller/fen5-su/v1')
   const frame = page.frameLocator('iframe.module-frame')
   await expect(frame.locator('html')).toHaveAttribute('data-theme', 'g10')
-  await frame.locator('#themeBtn').click()
-  await expect(frame.locator('html')).toHaveAttribute('data-theme', 'g100')
-  // Re-send the dashboard's theme the way the viewer does on load; the student's choice stands.
-  await page.evaluate(() => {
+  await expect(frame.locator('#themeBtn')).toHaveCount(0)
+  const gonder = (theme: string) => page.evaluate((t) => {
     const f = document.querySelector('iframe.module-frame') as HTMLIFrameElement
-    f.contentWindow!.postMessage({ type: 'edupedia:appearance', v: 1, theme: 'g10' }, '*')
-  })
-  await frame.locator('#nextBtn').click()
+    f.contentWindow!.postMessage({ type: 'edupedia:appearance', v: 1, theme: t }, '*')
+  }, theme)
+  await gonder('g100')
   await expect(frame.locator('html')).toHaveAttribute('data-theme', 'g100')
+  await gonder('g10')
+  await expect(frame.locator('html')).toHaveAttribute('data-theme', 'g10')
+  // A theme the template does not carry is ignored, not applied.
+  await gonder('white')
+  await frame.locator('#nextBtn').click()
+  await expect(frame.locator('html')).toHaveAttribute('data-theme', 'g10')
 })
 
 test('the dashboard tells the module its root font size, and the module clamps it', async ({ page }) => {
@@ -426,6 +442,9 @@ test('the module sits in the page flow: one scroll, no inner shell', async ({ pa
   const hero = await frame.locator('.topbar__hero').evaluate(e => getComputedStyle(e).backgroundColor)
   expect(hero).toBe('rgba(0, 0, 0, 0)')
   await expect(frame.locator('.tedy-mark')).toBeHidden()
+  // Kanun M1.2 (KB-3): the frame's ground is the dashboard's page ground, so no lighter box shows.
+  const zemin = await page.evaluate(() => getComputedStyle(document.body).backgroundColor)
+  expect(await frame.locator('body').evaluate(e => getComputedStyle(e).backgroundColor)).toBe(zemin)
   // The module fills the dashboard's column rather than centring its own narrower one.
   const [kutu, sarmal] = [await iframe.boundingBox(), await frame.locator('.wrap').boundingBox()]
   expect(Math.abs(sarmal!.width - kutu!.width)).toBeLessThanOrEqual(1)
@@ -440,6 +459,76 @@ test('the module sits in the page flow: one scroll, no inner shell', async ({ pa
     await frame.locator('#nextBtn').click()
     await expect.poll(async () => (await iframe.boundingBox())!.y).toBeGreaterThanOrEqual(0)
   }
+})
+
+// Modül Tasarım Kanunu M2.4, M2.5, M5.4 (KB-2, 2026-10-20): one progress indicator, whose steps are
+// stages. Where the stage row fits (frame ≥ 42rem and ≥ 8rem a stage) it is drawn in Carbon's
+// ProgressIndicator anatomy; where it does not, one line of text says the same. Nothing scrolls
+// sideways, a step a reader can press is at least 44 px tall, and 1920 and 3840 open the same branch.
+test('the progress indicator shows stages where they fit and one line where they do not', async ({ page }) => {
+  await recordProgress(page)
+  await serveModule(page, '/m/fen5-su/v1', asamaliHtml)
+  const ac = async (w: number, h: number) => {
+    await page.setViewportSize({ width: w, height: h })
+    await page.goto('/moduller/fen5-su/v1')
+    const frame = page.frameLocator('iframe.module-frame')
+    await expect(frame.locator('html')).toHaveAttribute('data-host-layout', 'flow')
+    await expect(frame.locator('.asama')).toHaveCount(3)
+    return frame
+  }
+  const durum = (frame: ReturnType<Page['frameLocator']>) => frame.locator('.topbar').evaluate(t => {
+    const ol = t.querySelector('.asamalar') as HTMLElement
+    const doc = document.documentElement
+    return {
+      satir: getComputedStyle(ol).display !== 'none',
+      tasma: Math.max(ol.scrollWidth - ol.clientWidth, doc.scrollWidth - doc.clientWidth),
+      metin: (t.querySelector('#railLabel') as HTMLElement).innerText.replace(/\s+/g, ' ').trim(),
+      genislik: ol.getBoundingClientRect().width,
+    }
+  })
+
+  let frame = await ac(1440, 900)
+  let d = await durum(frame)
+  expect(d.satir).toBe(true)
+  expect(d.tasma).toBeLessThanOrEqual(0)
+  expect(d.metin).toBe('Bölüm 1 / 3')
+  await expect(frame.locator('.asama').nth(0)).toHaveAttribute('aria-current', 'step')
+  await expect(frame.locator('.asama').nth(0)).toHaveClass(/asama--current/)
+  await expect(frame.locator('.asama').nth(1)).toHaveClass(/asama--incomplete/)
+  // Only a finished stage is a button; pressing it goes back to the stage's first section.
+  await expect(frame.locator('button.asama__btn')).toHaveCount(0)
+  await frame.locator('#nextBtn').click()
+  await expect(frame.locator('.asama').nth(0)).toHaveClass(/asama--complete/)
+  const geri = frame.locator('.asama').nth(0).locator('button.asama__btn')
+  expect((await geri.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  await geri.click()
+  await expect(frame.locator('.asama').nth(0)).toHaveAttribute('aria-current', 'step')
+
+  const genis = d.genislik
+  frame = await ac(3840, 2160)
+  d = await durum(frame)
+  expect(d.satir).toBe(true)
+  expect(d.genislik / genis).toBeGreaterThan(1.9)
+
+  // A phone: the row does not fit, so the line names the stage first and the totals second.
+  frame = await ac(390, 844)
+  d = await durum(frame)
+  expect(d.satir).toBe(false)
+  expect(d.tasma).toBeLessThanOrEqual(0)
+  expect(d.metin).toBe('Aşama 1/3 · Keşfet · Bölüm 1 / 3')
+  const agirlik = (sel: string) => frame.locator(sel).first().evaluate(e => getComputedStyle(e).fontWeight)
+  expect(Number(await agirlik('#railStage .rail-vurgu'))).toBeGreaterThan(Number(await agirlik('#railText .rail-n')))
+})
+
+test('a module without stages shows its position as one line', async ({ page }) => {
+  await recordProgress(page)
+  await serveModule(page)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/moduller/fen5-su/v1')
+  const frame = page.frameLocator('iframe.module-frame')
+  await expect(frame.locator('html')).toHaveAttribute('data-host-layout', 'flow')
+  await expect(frame.locator('.asama')).toHaveCount(0)
+  await expect(frame.locator('#railLabel')).toHaveText('Bölüm 1 / 3')
 })
 
 test('a module compiled before the flow layout keeps its own scroll', async ({ page }) => {

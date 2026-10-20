@@ -106,3 +106,17 @@ def test_akista_baslik_bloku_panoya_birakilir():
     """Başlık, ders ve kazanımlar panonun ders panelinde (ModulBasligi); modülde yinelenmez."""
     blok = _akis_blogu()
     assert re.search(r"\.topbar__l\{display:none\}", blok)
+
+
+def test_akista_zemin_panonun_sayfa_zeminidir():
+    """Kanun M1.2 (KB-3): akışta çerçevenin zemini panonun cool-gray sayfa zeminidir, Carbon'un gri
+    `--cds-background`'u değil — ölçüldü, #f4f4f4 çerçeve #f2f4f8 sayfada ayrı tonlu bir kutu gibi duruyordu."""
+    blok = _akis_blogu()
+    assert re.search(r"\bbody\{background:var\(--tedy-page-background\)\}", blok)
+    assert "--cds-background" not in blok
+    kaynak = SABLON_YOLU.read_text(encoding="utf-8")
+    g10 = kaynak[kaynak.index(':root,[data-theme="g10"]'):]
+    zemin = re.search(r"--tedy-page-background:(#[0-9a-fA-F]{6})", g10).group(1).lower()
+    pano = Path("dashboard/src/theme/ted-theme.scss").read_text(encoding="utf-8")
+    assert "--ted-color-page-bg: #{colors.$cool-gray-10};" in pano
+    assert zemin == "#f2f4f8"  # Carbon cool-gray-10 (@carbon/colors)

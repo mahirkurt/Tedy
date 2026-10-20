@@ -99,7 +99,7 @@ döngüde mola → checkpoint + selfAssess → sağlıklı kapanış.
 | # | Adım | Segment/alan | Durum | Not |
 |---|---|---|---|---|
 | 1 | Hedefler | `objectives[]` | **[MEVCUT]** | "Bu modülde…" — öğrenci dilinde hedef listesi; kazanım kodu taşımaz (Kanun M1.10). |
-| 2 | Aşamalar | `meta.milestones[]` — nesne dizisi: `atSegmentId`, `title` | **[MEVCUT]** alan, `title` yeni (Kanun M2.5; şema borç KB-2) | 3–7 aşama; aşama o segmentte başlar, ilk öğe ilk segmenttedir; ad 1–2 sözcük, en çok 16 karakter, cümle düzeninde ("Keşfet", "Uygula"). Okur nerede olduğunu ve sonunu görür (hedef-gradyanı, §3.2). |
+| 2 | Aşamalar | `meta.milestones[]` — nesne dizisi: `atSegmentId`, `title` | **[MEVCUT]** alan; `title` ve şema 2026-10-20'den beri derleyicide (Kanun M2.5, KB-2) | 3–7 aşama; aşama o segmentte başlar, ilk öğe ilk segmenttedir; ad 1–2 sözcük, en çok 16 karakter, cümle düzeninde ("Keşfet", "Uygula"). Okur nerede olduğunu ve sonunu görür (hedef-gradyanı, §3.2). |
 | 3 | N döngü | N × Keşif Döngüsü (§2.1) | **[MEVCUT]+[YENİ]** karışık | Her döngü bir öncekinden **farklı** etkileşim tipi kullanır (mcq→match→fillblank→… dönüşümlü) — düşük-dış-yük/yüksek-uyarılma dengesini yenilik yoluyla korur (`adhd-pedagogy.md` İlke 5/Sergeant 2005), tekdüzelik yaratmadan. |
 | 4 | Mola | `brainbreak` (her ~3 döngüde bir) | **[MEVCUT]** | Var olan `brainbreak` segmenti. Mola dozu/sıklığı için bkz. `adhd-pedagogy.md` §10.1 (Broad ve ark. 2021). |
 | 5 | Kapanış | `checkpoint` (recap + mixedQuestions + selfAssess) | **[MEVCUT]** | Modül-sonu özeti motor tarafından otomatik ve sessiz üretilir (tamamlanan alıştırma sayısı düz metinle, hedefler, öz-değerlendirme — `adhd-pedagogy.md` §6). Rozet gösterilmez (S43, Kanun M2.7). |
@@ -238,8 +238,8 @@ bir uzantısıdır ama hak edilmemiş bir baş-ilerleme verir; TEDY'de kullanıl
 
 **HTML/motor tezahürü:** `meta.milestones[]` (`{atSegmentId, title}`) segmentleri
 aşamalara gruplar; gösterge aşamaları etiketli çizer, dar kapta tek satır metne döner
-("Aşama 2/5 · Uygula · Bölüm 7/18"; Kanun M5.4). Şablon bugün aşamayı yalnız küçük bir
-noktayla işaretler ve "son N durak" metni yazar: borç KB-2, KB-21.
+("Aşama 2/5 · Uygula · Bölüm 7/18"; Kanun M5.4). Şablon bunu 2026-10-20'den beri böyle
+çizer (KB-2 kapandı; "son N durak" metni de kalktı). Sefer haritası hâlâ borçtur (KB-21).
 
 ### 3.3 Görünmez taban-korumalı uyarlanır zorluk
 

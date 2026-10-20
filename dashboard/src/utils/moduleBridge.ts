@@ -57,12 +57,13 @@ export function restoreMessage(state: RestoreState) {
 }
 
 /** Carbon themes a module can render in (the vendored template's theme blocks). */
-export type ModuleTheme = 'g10' | 'g100' | 'white'
+export type ModuleTheme = 'g10' | 'g100'
 
 /**
  * The dashboard renders under Carbon g10 (`<Theme theme="g10">` in main.tsx, ted-theme.scss).
- * The module adopts it — same layers, same cool-gray page ground — unless the student picked a
- * theme inside the module. A dashboard dark mode would change this one value.
+ * The module always adopts it — same layers, same cool-gray page ground — and has no theme switch
+ * of its own (Modül Tasarım Kanunu M4.1). A dashboard dark mode, a Profil setting, would change
+ * this one value (M4.2).
  */
 export const DASHBOARD_THEME: ModuleTheme = 'g10'
 

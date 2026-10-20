@@ -16,8 +16,6 @@ BRIDGE_TYPES = frozenset({"edupedia:progress", "edupedia:restore"})
 # the module adopts) and the module's content height in the dashboard's flow layout (module →
 # parent, so the frame grows to its content). Modules compiled before either existed stay valid.
 OPTIONAL_BRIDGE_TYPES = frozenset({"edupedia:appearance", "edupedia:size"})
-# The vendored template's THEME_STORE_KEY localStorage key (not a bridge message type).
-STORAGE_KEYS = frozenset({"edupedia:theme"})
 _SCRIPT_RE = re.compile(r"<script(?P<attrs>[^>]*)>(?P<body>.*?)</script>", re.S | re.I)
 # perf fix (controller ruling): the original _POST_RE captured the whole dotted receiver chain
 # via an unanchored finditer over the ENTIRE script body — a single long run of word characters
@@ -126,7 +124,7 @@ def gate_bridge(html: str, R: Any) -> None:
     if _has_star_target(js):
         issues.append("postMessage hedef origin'i '*' olamaz")
     types = set(_TYPE_RE.findall(js))
-    foreign = types - BRIDGE_TYPES - OPTIONAL_BRIDGE_TYPES - STORAGE_KEYS
+    foreign = types - BRIDGE_TYPES - OPTIONAL_BRIDGE_TYPES
     if foreign:
         issues.append("izinsiz mesaj tipi: " + ", ".join(sorted(foreign)))
     if not BRIDGE_TYPES <= types:

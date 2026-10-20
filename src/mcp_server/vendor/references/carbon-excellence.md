@@ -266,8 +266,8 @@ Aşağıdakiler 15 maddeyi Carbon'un güncel rehberiyle inceltir (Carbon MCP `do
   kenar, en az 48 px yükseklik (…/core/components/notification/guidelines/#callout).
   Şablonun 4 px kenarı ve 8 px köşesi sapma değil borçtur (Kanun M2.3, KB-20). İlerleme göstergesinde
   tamamlanan ve geçerli adım `$interactive`, etkin olmayan çizgi `$border-subtle`'dır
-  (…/core/components/progress-indicator/specifications/#color); stepper'ın `button-primary`
-  dolgusu g100'de farklı çizer (Kanun M2.4, borç KB-2).
+  (…/core/components/progress-indicator/specifications/#color); şablon 2026-10-20'den beri bu
+  anatomiyi aşamalarla çizer (Kanun M2.4, M2.5; KB-2 kapandı).
 - **Tema ve marka bölgesi.** Carbon, kullanıcı seçimi yoksa işletim sistemi temasına uyar
   (…/foundations/themes/code/#system-preferences); modül sistem tercihine bakmaz, temayı yalnız
   panodan alır (Kanun M4.1, adlı sapma KS-7). Lacivert Tedy bandı (yalnız tek başına açılışta,
