@@ -18,6 +18,7 @@ DIZINLER = sorted(p.name for p in sk.SKILL_DIZINI.iterdir()
                   if p.is_dir() and not p.name.startswith(("_", ".")))
 GERCEK_ARACLAR = {at.LOCAL_TOOL, at.ODEV_TOOL, at.PROGRAM_TOOL, at.SINAV_TOOL, at.TAKVIM_TOOL,
                   at.ICERIK_TOOL, at.NOT_TOOL, at.PLATFORM_TOOL, at.KITAP_TOOL, at.VIDEO_TOOL,
+                  at.SENARYO_TOOL,
                   assistant_modules.TOOL_NAME, at.SKILL_TOOL, "alistirma_olustur",
                   "ogrenme_gunlugu", "calisma_degerlendir", *at.TOOL_ALLOWLIST}
 ZORUNLU_ARACLAR = {"kitap_listele", "kitap_sayfa", "mufredat_ara", "figur_ara", "figur_getir",
@@ -183,3 +184,12 @@ def test_turkce_unite_haritasi_yanlis_govdeyi_secmez(skiller):
 def test_dort_ogretmen_secici_sirasiyla():
     assert list(sk.yukle()) == ["turkce", "fen", "sosyal", "matematik"]
     assert list(sk.varsayilan()) == ["turkce", "fen", "sosyal", "matematik"]
+
+
+@pytest.mark.parametrize("ad", DIZINLER)
+def test_sinirlar_kendi_orneksinavin_cevap_anahtarini_yasaklamaz(skiller, ad):
+    # B6 denetçisi yalnız bu bölümü görür; "cevap anahtarı üretmezsin" yasağı genel istemin "Örnek sınav"
+    # kuralındaki "Cevapları göster" anahtarını kendi başına bulgu saymasın.
+    bolum = sk.govde_bolumleri(skiller[ad])["Sınırlar"].lower()
+    assert "cevap anahtar" in bolum
+    assert "örnek sınav" in bolum and "ayrı bir mesajda" in bolum

@@ -216,7 +216,7 @@ export interface HealthData {
   okunamadi?: Record<string, { detail?: string; son_okuma?: string }>
 }
 
-export type CitationKind = 'ogrenci' | 'mufredat' | 'kitap' | 'oer' | 'modul' | 'tedy-kitap' | 'aile-kaynak' | 'yuklenen-dosya'
+export type CitationKind = 'ogrenci' | 'mufredat' | 'kitap' | 'oer' | 'modul' | 'tedy-kitap' | 'aile-kaynak' | 'yuklenen-dosya' | 'meb-tablo'
 
 export interface AssistantCitation {
   id: string
@@ -317,6 +317,26 @@ export interface SinavKaynagi {
   baglanti: string | null
 }
 
+/** MEB konu-soru dağılım senaryosu (spec 2026-10-19 §3.4); src/sinav_senaryo.py yazar. */
+export interface SinavSenaryosu {
+  durum: 'dogrulandi' | 'kismen' | 'senaryo_yok' | 'ulke_geneli' | 'belirtilmedi'
+  ders: string
+  sinav_no: number
+  anilan: number[]
+  cumle: string | null
+  senaryo: number | null
+  toplam: number | null
+  dagilim: { kod: string; metin: string; soru: number; duyuruda: boolean }[]
+  eslesen_konu_sayisi: number
+  eslesmeyen_konular: string[]
+  senaryo_disi_konular: string[]
+  adaylar: number[]
+  senaryo_sayisi: number
+  not?: string
+  kaynak: string
+  meb_guncelleme: string
+}
+
 export interface ExamItem {
   id: string
   course: string
@@ -344,6 +364,8 @@ export interface ExamItem {
   /** Gün değil yalnız hafta biliniyorsa haftanın pazartesisi (YYYY-MM-DD). */
   hafta?: string | null
   tarihBelirsiz?: boolean
+  /** MEB senaryo doğrulaması; sütun çözülemediyse null. */
+  senaryo?: SinavSenaryosu | null
 }
 
 export interface ExamsApiResponse {

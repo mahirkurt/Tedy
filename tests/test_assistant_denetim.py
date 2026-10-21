@@ -1,5 +1,6 @@
 """B6 karar ve elle değerlendirme sözleşmesi; bütün testler çevrimdışıdır."""
 import json
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -136,15 +137,38 @@ def test_altin_soru_semasi():
     dusen = {"nedir", "nelerdir", "nasil", "neden", "nicin", "kim", "kimdir",
              "hangi", "kac", "mi", "mu"}
     for ders, sorular in dersler.items():
-        assert len(sorular) == 3
+        assert len(sorular) >= 3
         for i, soru in enumerate(sorular, 1):
             assert soru["id"] == f"{ders}-{i}"
             assert set(soru) == {"id", "soru", "arac", "kaynak", "noktalar"}
-            assert soru["arac"] in {"kazanim_ara", "kitap_sayfa", "skill_kaynagi"}
+            assert soru["arac"] in {"kazanim_ara", "kitap_sayfa", "skill_kaynagi", "sinav_senaryosu"}
             assert soru["kaynak"] and soru["soru"] and soru["noktalar"]
             for nokta in soru["noktalar"]:
                 katli = turkce_kucult_katla(nokta)
                 assert len(katli) >= 4 and katli not in dusen
+
+
+def test_altin_sorunun_araci_kosunun_asistaninda_bildirilir(tmp_path):
+    """Koşu `AssistantRuntime`ı `runtime_olustur` ile kurar; araç ona bildirilmediyse model o aracı
+    çağıramaz ve `arac_tamam`/`kaynak_tamam` o soru için yapısal olarak yanlış çıkar (sinav_senaryosu,
+    sınav kaynağı ve tablo verilmeden bildirilmez). Her ders için `kos`un `chat`e verdiği öğretmen/okur
+    argümanlarıyla bildirilenlere bakılır. Yalnız MCP'den gelen araçlar (kazanim_ara, kitap_sayfa) ağsız
+    doğrulanamaz; onlar `TOOL_ALLOWLIST`'te olmalıdır."""
+    from scripts import asistan_eval
+    from src.assistant_tools import TOOL_ALLOWLIST
+
+    runtime = asistan_eval.runtime_olustur(tmp_path)
+    # sinav_senaryosu yalnız tablonun öğretim yılında bildirilir; test gerçek saate bağlı kalırsa 2027-09-01'de kırılır.
+    runtime.registry.saat = lambda: datetime(2026, 10, 20, 12, 0)
+    bildirilmeyen = []
+    for ders, sorular in asistan_eval.sorulari_yukle().items():
+        arg = asistan_eval.soru_argumanlari(ders)
+        bildirilen = {d["name"] for d in runtime.registry.declarations(
+            arg["okur"], ogretmen=arg["ogretmen"], etkilesimli=arg["etkilesimli"])}
+        bildirilmeyen += [f"{s['id']}: {s['arac']}" for s in sorular
+                          if s["arac"] not in bildirilen and s["arac"] not in TOOL_ALLOWLIST]
+    assert not bildirilmeyen, f"koşuda bildirilmeyen altın soru araçları: {bildirilmeyen}"
+    assert "sinav_senaryosu" not in TOOL_ALLOWLIST
 
 
 def test_eval_onaysiz_istemci_ve_dosya_yok(tmp_path, monkeypatch):
@@ -236,8 +260,8 @@ def test_eval_kosu_bir_hatayla_durmaz(tmp_path):
     runtime = SahteRuntime()
     yol = asistan_eval.kos(runtime=runtime, kok=tmp_path)
     sonuc = json.loads(yol.read_text())
-    assert len(runtime.cagrilar) == 12
-    assert sonuc["ozet"]["soru"] == 12
+    assert len(runtime.cagrilar) == 14
+    assert sonuc["ozet"]["soru"] == 14
     assert len(sonuc["sorular_sha256"]) == 64
     ilk, ikinci = sonuc["sorular"][:2]
     assert ilk["cevap"] == ""

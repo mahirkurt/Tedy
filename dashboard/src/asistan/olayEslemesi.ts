@@ -19,6 +19,7 @@ export const ARAC_ETIKETI: Record<string, string> = {
   odev_listesi: 'Ödev listesi okunuyor', odev_belgesi: 'Ödev belgesi aranıyor', odev_tamamla: 'Eksik alan kaydediliyor',
   odev_fotograftan: 'Fotoğraftaki ödev okunuyor', ek_oku: 'Portal eki okunuyor',
   ders_programi: 'Ders programı okunuyor', sinavlar: 'Sınav listesi okunuyor', takvim: 'Takvim okunuyor',
+  sinav_senaryosu: 'MEB senaryo tablosuna bakılıyor',
   ders_icerigi: 'Ders içeriği okunuyor', notlar: 'Notlar okunuyor', platform_ilerlemesi: 'Platform ilerlemesi okunuyor',
   aile_kaynak_ara: 'Aile kaynakları taranıyor',
   skill_kaynagi: 'Öğretmen notları açılıyor', mod_oner: 'Öğretmen önerisi hazırlanıyor',

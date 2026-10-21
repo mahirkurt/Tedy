@@ -49,7 +49,7 @@ from src.roles import (  # noqa: F401  (re-exported: tests read dashboard_api.US
     okur_turu,
 )
 from src import (assistant_skills, module_progress, module_store, module_ticket,
-                 mufredat_agaci, subject_themes)
+                 mufredat_agaci, sinav_senaryo, subject_themes)
 from src import claude_api
 
 load_env()
@@ -348,6 +348,7 @@ def _assistant_runtime():
                 odev_kaynagi=_canli_odevler,
                 program_kaynagi=_canli_program,
                 sinav_kaynagi=_canli_sinavlar,
+                senaryo_tablosu=sinav_senaryo.tablo_oku,
                 takvim_kaynagi=_canli_takvim,
                 icerik_kaynagi=_canli_ders_icerikleri,
                 not_kaynagi=_canli_notlar,
@@ -3176,6 +3177,7 @@ def _kayittan_sinav(k, now):
         "ilkTespit": k.get("ilk_tespit"), "degisti": k.get("degisti"),
         "hafta": k["hafta"] if hafta is not None else None,
         "tarihBelirsiz": not e.get("date") and not k.get("sentetik"),
+        "senaryo": k["senaryo"] if isinstance(k.get("senaryo"), dict) else None,
     })
     return e
 
@@ -3202,7 +3204,8 @@ def _sinav_api_listesi(data, now=None):
         eski = _sinav_listesi(data, now=now)
         for e in eski["exams"]:
             e.update({"tur": None, "konular": [], "kaynaklar": [], "ilkTespit": None, "degisti": None,
-                      "hafta": None, "tarihBelirsiz": False})
+                      "hafta": None, "tarihBelirsiz": False,
+                      "senaryo": None})
         return {**eski, "tespit": None}
     sinavlar = []
     for k in belge["sinavlar"]:

@@ -62,12 +62,27 @@ def sonuc_yaz(kok: Path, satirlar: list[dict], sha: str, *,
     return yol
 
 
-def kos(*, runtime=None, kok: Path | None = None) -> Path:
+def runtime_olustur(proje: Path):
+    """Değerlendirme koşusunun asistanı. Sınav kaynağı ve MEB senaryo tablosu verilmezse `sinavlar` ve
+    `sinav_senaryosu` araçları bildirilmez ve ilgili altın sorular yapısal olarak geçemez; canlı pano
+    sınav listesini `dashboard_api`'den verir, değerlendirme koşusunda sınav listesi boştur (tablo
+    yine de okunur)."""
+    from src import sinav_senaryo
     from src.assistant_core import AssistantRuntime
+
+    return AssistantRuntime(proje, sinav_kaynagi=lambda: [], senaryo_tablosu=sinav_senaryo.tablo_oku)
+
+
+def soru_argumanlari(ders: str) -> dict:
+    """`kos`un her altın soru için `runtime.chat`e verdiği öğretmen/okur/etkileşim argümanları."""
+    return {"ogretmen": ders, "okur": "ogrenci", "etkilesimli": False}
+
+
+def kos(*, runtime=None, kok: Path | None = None) -> Path:
     from src.assistant_denetim import puanla, sorgu_dar
 
     proje = Path(__file__).resolve().parents[1]
-    runtime = runtime if runtime is not None else AssistantRuntime(proje)
+    runtime = runtime if runtime is not None else runtime_olustur(proje)
     dersler = sorulari_yukle()
     sha = hashlib.sha256(SORULAR.read_bytes()).hexdigest()
     satirlar = []
@@ -77,10 +92,10 @@ def kos(*, runtime=None, kok: Path | None = None) -> Path:
             try:
                 sonuc = runtime.chat(
                     messages=[{"role": "user", "content": soru["soru"]}],
-                    ogretmen=ders, okur="ogrenci", etkilesimli=False,
+                    **soru_argumanlari(ders),
                 )
             except Exception:
-                # Bir sorunun hatası diğer on birini düşürmez; hata metni kayda girmez.
+                # Bir sorunun hatası diğerlerini düşürmez; hata metni kayda girmez.
                 sonuc = {"answer": "", "citations": [], "meta": {
                     "tool_calls": [], "denetim": {
                         "durum": "hata", "neden": "cagri", "sorun": [], "model": None,

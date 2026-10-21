@@ -587,6 +587,7 @@ def test_runtime_kaynaklari_registrye_iletir(tmp_path):
 
 def test_panonun_asistani_butun_kaynaklarla_kurulur(api, monkeypatch):
     import src.assistant_core as core
+    from src import sinav_senaryo
     alinan = {}
 
     class Sahte:
@@ -597,6 +598,7 @@ def test_panonun_asistani_butun_kaynaklarla_kurulur(api, monkeypatch):
     api._assistant_runtime()
     assert alinan == {"odev_kaynagi": api._canli_odevler, "program_kaynagi": api._canli_program,
                       "sinav_kaynagi": api._canli_sinavlar, "takvim_kaynagi": api._canli_takvim,
+                      "senaryo_tablosu": sinav_senaryo.tablo_oku,
                       "icerik_kaynagi": api._canli_ders_icerikleri,
                       "not_kaynagi": api._canli_notlar,
                       # plan Görev 3 (test_assistant_yerel_kaynaklar.py owns these sources' own
