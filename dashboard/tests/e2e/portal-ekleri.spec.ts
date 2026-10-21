@@ -38,8 +38,8 @@ async function islerModali(page: Page) {
   })))
   await page.clock.setFixedTime(new Date('2026-09-24T18:00:00'))
   await page.goto('/isler')
-  await page.locator('.homework-item').first().waitFor()
-  await page.locator('.homework-item').first().click()
+  // The one homework is the next thing (İşler yenilemesi 2026-10-15): "Başla" opens its window.
+  await page.getByRole('button', { name: 'Başla', exact: true }).click()
   const ekler = page.locator('.homework-modal__attachments')
   await ekler.waitFor()
   return ekler

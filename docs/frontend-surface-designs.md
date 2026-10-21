@@ -1,6 +1,6 @@
 # TEDY Yüzey Tasarımları
 
-**Sürüm 1.18 · 2026-10-20 · `docs/frontend-design-principles.md`'nin uygulaması**
+**Sürüm 1.19 · 2026-10-20 · `docs/frontend-design-principles.md`'nin uygulaması**
 
 İlkeler dokümanı *neye göre karar verileceğini* yazar. Bu doküman o kararların
 her yüzeyde ne olduğunu yazar. Çelişki hâlinde ilkeler dokümanı kazanır.
@@ -376,6 +376,38 @@ Geçmiş (14)                                   ›   ← kapalı
 - Ham damga kaldırılır; gerekiyorsa "11 Mart'ta görüldü".
 
 **Kapılar:** ilk ekran testi · gri tonlama · sızıntı taraması · 2 saniye testi.
+
+**Yenileme (2026-10-15'te yapıldı, 2026-10-20'de ana dala taşındı; spec
+`docs/superpowers/specs/2026-10-15-isler-yenileme-design.md`).** Yukarıdaki taslak bugünkü hâle şöyle indi:
+
+```
+Sıradaki                                                  ← ders paneli, sayfanın tek birincili
+■ Matematik — 2. HAFTA MATEMATİK HAFTA İÇİ ÖDEVİ   [ Başla → ]
+Teslim yarın 12:00 · 10 dakikayla başla
+
+Ayrıca (2)                                         ⌃     ← kalan aktif iş; sıradaki burada tekrar edilmez
+■ Fransızca — S1 Les verbes        Pazartesi 08:55   Yaptım
+■ Fen Bilimleri — Ödev (Hibrit…)        Salı 12:00   Yaptım
+
+Yaklaşan Sınavlar (2)                   Tüm sınavlar
+■ Matematik 1. Yazılı      1 Eki 09:00 · 7 gün sonra
+
+Yapılan (1) ⌄   Tamamlandı (1) ⌄   Yapılmayan (2) ⌄     ← kapalı
+```
+
+- **Sıradaki bir kez adlandırılır** (İ1): panel aktif işin başıdır, liste ("Ayrıca", Bugün'ün sözcüğü) geri kalanı.
+- Sayfada kart yok; her bölüm Carbon on-page `ContainedList` (lg, 48 px), başlıkları `h2`. Satırın tamamı işin
+  penceresini açan tek düğme; tek eylemi yanında ("Yaptım", "Geri al: …", "Modülü aç"; talimatname S52).
+- Teslim gün + saat ("Yarın 12:00", "Pazartesi 08:55"; haftadan uzaksa "· N gün sonra"). Kırmızı yalnız **bugün**
+  teslimde, ikon + sözcük + renk (§2.7). Geri sayım etiketi, "7 günlük pencere" çubuğu ve renkli kenar kalktı.
+- "Başla" pencereyi açar; aktif işte pencerenin birincili "Yaptım"dır (Başla → Yaptım → "Yaptın: … · Geri al").
+  Pencerenin ilk odağı Kapat (talimatname S53).
+- Portal başlığı kendi yazımıyla kalır, kalınlaşmaz (talimatname [3.3-6]).
+- 400 ms sonra sayfanın şeklinde iskelet; yükleme hatası "boş" cümlesine dönmez (D3).
+- Sınav satırı ana dalın 2026-10-15'ten sonraki eklerini taşır: son 48 saatte bulunan ya da değişen sınavda gri
+  "Yeni"/"Değişti" etiketi; tüm gün sınavda yalnız gün ("Pazartesi", saat uydurulmaz), yalnız haftası bilinende
+  "28 Eyl haftası"; okunamayan duyuru varsa listenin altında (liste boşsa tek başına) "Bazı ders duyuruları
+  incelenemedi; sınav listesi eksik olabilir." Bölüm başlığı bir addır, başlık düzeninde (talimatname S38).
 
 ---
 
@@ -886,3 +918,4 @@ görüntüsüyle doğrulanır.
 | 1.16 | 2026-10-19 | Modül Tasarım Kanunu (`tedy-modul-tasarim-kanunu.md` 1.0) öncelik sırasına girdi: modül yüzeylerinde İ1–İ9'dan sonra, talimatnameden önce (kanun §0.2, KB-34). §4.12 modül sayfasını (baş, çerçeve, akış) kanuna bağlar. Başlık sürümü düzeltildi (1.13'te kalmıştı). |
 | 1.17 | 2026-10-20 | **§4.1 Bugün'e akşam kipi** eklendi (akşam çalışma planı, `TEDY_AKSAM_PLANI=1`): ödeve hazırdan önce sessiz önizleme satırı, 17:00'den yatma hazırlığına tek plan kartı, plan bitince sessiz satır, "Bu akşam plan yok"/tatil; bayrak kapalıyken Bugün değişmez. Süre yalnız plan bloğunda ve "tahmin" sözcüğüyle (talimatname S51). Gün Şeridi'ne "Yol" parçası ve ödev zamanı 17:00–19:00 (talimatname §8.8). |
 | 1.18 | 2026-10-20 | Akşam planı son incelemesi: §4.1 akşam kipinde bayrak kapalıyken neyin değiştiği açıkça yazıldı (Gün Şeridi, kartın sesi, Profil kartı, `/api/odak-penceresi` varsayılanları, iki sağlık anahtarı, istem satırı, R22; geri dönüş yalnız kartı, uçları, araçları ve bildirimleri kaldırır); haber cümlesinin saati bildirim eşiğiyle aynı ve eşikte susar; Başla basıldığı dakikadan sayar; "Mola bitti" planın sıradaki saatinde; iş bloğu kalmayınca sakin satırlar yine çizilir; "yarının planının başına girer" düzeltildi (devir listesi yok, teslim yaklaşınca puan yükselir). §4.9'a Akşam Düzeni kartı (yalnız aile değiştirir, Işık'a salt okunur, okunamayınca kaydetme kapalı). |
+| 1.19 | 2026-10-20 | **§4.2 İşler yenilemesi** ana dala taşındı (2026-10-15'te yapılmış, birleşmemişti): sıradaki iş bir kez, "Ayrıca (n)" kalanı; kartsız Carbon contained list'ler, satır tek düğme + tek eylem; gün + saat teslim, kırmızı yalnız bugün; pencerede "Yaptım". Sınav satırı ana dalın eklerini korur (etiket, tüm gün ve hafta zamanı, incelenemedi notu); "Yaklaşan Sınavlar" başlık düzeninde. Talimatname S52, S53, B82. |

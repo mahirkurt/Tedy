@@ -42,9 +42,10 @@ test.describe('at 320px', () => {
     await bilesenDenetimi(page, '.next-thing:not(.next-thing--quiet)')
   })
 
-  test('NextThing inside İşler’s card, in its Carbon layer', async ({ page }) => {
+  // İşler yenilemesi (2026-10-15): the card stands on the page, not inside another card.
+  test('NextThing on İşler', async ({ page }) => {
     await sabitAc(page, '/isler', 320, 700)
-    await bilesenDenetimi(page, '.dashboard-card .next-thing')
+    await bilesenDenetimi(page, '.isler .next-thing')
   })
 
   test('EmptyLine says what is missing', async ({ page }) => {

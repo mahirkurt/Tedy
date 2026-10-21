@@ -49,8 +49,9 @@ test('focus mode never shows work it will not name', async ({ page }) => {
 })
 
 test('focus keeps the counts so nothing feels lost', async ({ page }) => {
+  // Two homework: the first is the next thing, the second is "Ayrıca" (İşler yenilemesi 2026-10-15).
   await page.route('**/api/homework', r => r.fulfill(json({
-    summary: '', homework: [HW('Fen Bilimleri', '3 soru', '16.09.2026 23:59')],
+    summary: '', homework: [HW('Fen Bilimleri', '3 soru', '16.09.2026 23:59'), HW('Türkçe', 'Okuma', '18.09.2026 23:59')],
   })))
   await page.route('**/api/enrichment', r => r.fulfill(json({})))
   await page.route('**/api/exams', r => r.fulfill(json({ exams: [] })))
@@ -65,8 +66,9 @@ test('focus keeps the counts so nothing feels lost', async ({ page }) => {
 
   // The list is closed, but its size is still on screen: focus puts the rest
   // one click away rather than pretending it is not there.
-  await expect(page.getByText('Aktif ödevler', { exact: false })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Ayrıca 1' })).toHaveAttribute('aria-expanded', 'false')
   await expect(page.locator('.hw-section__count').first()).toBeVisible()
+  await expect(page.getByText('Türkçe — Okuma')).toHaveCount(0)
 })
 
 test('focus hides finished work rather than leading with it', async ({ page }) => {

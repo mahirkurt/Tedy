@@ -93,25 +93,26 @@ test.describe('İşler', () => {
       timestamp: '', success: true, scrape_errors: [], duration_seconds: 1 })))
     await page.clock.setFixedTime(new Date('2026-09-24T16:40:00'))
     await page.goto('/isler')
-    await expect(page.getByText('Aktif ödevler', { exact: true })).toBeVisible()
+    await expect(page.locator('.isler .next-thing')).toBeVisible()
   }
 
   test('satırdaki Yaptım sonrası Geri al aynı kaydı gönderir', async ({ page }) => {
     const gelen = await odevSunucusu(page)
     await islerAc(page)
 
-    const satir = page.locator('.homework-item').filter({ hasText: 'MATEMATİK' })
+    // The nearest (Matematik) is the next thing, named once; the rows are the rest (yenileme 2026-10-15).
+    const satir = page.locator('.homework-item').filter({ hasText: 'S1 Les verbes' })
     await satir.getByRole('button', { name: 'Yaptım' }).click()
 
     const not = page.locator('.isler-yaptin')
-    await expect(not).toContainText('Yaptın: Matematik — 2. HAFTA MATEMATİK HAFTA İÇİ ÖDEVİ')
+    await expect(not).toContainText('Yaptın: Fransızca — S1 Les verbes')
     await not.getByRole('button', { name: 'Geri al', exact: true }).click()
 
     await expect.poll(() => gelen.map(k => k.yol)).toEqual(['mark-done', 'unmark-done'])
     expect(gelen[1].govde).toEqual(gelen[0].govde)
     await expect(not).toHaveCount(0)
     // Back among the active work, with its "Yaptım" again.
-    await expect(page.locator('.homework-item').filter({ hasText: 'MATEMATİK' })
+    await expect(page.locator('.homework-item').filter({ hasText: 'S1 Les verbes' })
       .getByRole('button', { name: 'Yaptım' })).toBeVisible()
   })
 

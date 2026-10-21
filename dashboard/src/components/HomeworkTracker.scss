@@ -1,0 +1,210 @@
+@use '@carbon/react/scss/theme' as theme;
+@use '@carbon/react/scss/type' as type;
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/breakpoint' as bp;   // [3.4-5]: Carbon's mixin, not a hand-written md
+
+// İşler (yenileme 2026-10-15; spec docs/superpowers/specs/2026-10-15-isler-yenileme-design.md).
+//
+// One column on the page itself — no card around the lists, so nothing is a card in a card (S1, S11). The
+// sections are separated by space and headings: the subject panel (the one thing, İ8.3), then Carbon on-page
+// contained lists of 48px rows. Every heading is drawn like Carbon's on-page list header, whether Carbon draws
+// it (exams) or the toggle does (the rest), so the page reads as one system.
+
+.isler {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-06;
+
+  // The panel's own bottom margin was for a card's inside; here the column's gap spaces it.
+  .next-thing {
+    margin: 0;
+  }
+
+  .tedy-empty {
+    margin: 0;
+  }
+}
+
+// ── Section headings ──
+// A real h2 (talimatname [3.8-9]) holding the toggle: "Başlık (n) ⌄" (surface designs §2.5). Carbon's on-page
+// header, line for line: heading-compact-01, the lg height (48px — also the phone's touch target, S18), a
+// subtle rule under it, and its 16px inline padding, so heading text and row text share one keyline (P3).
+.isler-baslik {
+  margin: 0;
+  @include type.type-style('heading-compact-01');
+  border-block-end: 1px solid theme.$border-subtle-01;
+}
+
+.isler-baslik__dugme {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  inline-size: 100%;
+  min-block-size: $spacing-09;
+  padding: 0 $spacing-05;
+  border: 0;
+  border-radius: 0;   // a Carbon control is square (S10)
+  background: none;
+  color: theme.$text-primary;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid theme.$focus;
+    outline-offset: -2px;
+  }
+}
+
+@media (any-hover: hover) {
+  .isler-baslik__dugme:hover {
+    background-color: var(--ted-color-layer-hover);
+  }
+}
+
+// The heading's words and its count; also the exam list's label, inside Carbon's own header.
+.isler-baslik__metin {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-03;
+  margin: 0;
+  @include type.type-style('heading-compact-01');
+}
+
+// A count is a chip (S10). Helper grey measured 4.24:1 here on 2026-09-21 — label-01 is 12px, so it needs
+// 4.5; the secondary text token clears it at 5.92 on Carbon's accent layer (kontrast.spec.ts).
+.hw-section__count {
+  @include type.type-style('label-01');
+  color: theme.$text-secondary;
+  background: theme.$layer-accent-01;
+  // stylelint-disable-next-line carbon/layout-use -- 1px optical trim inside a 16px chip, as before the redesign
+  padding: 1px $spacing-03;
+  border-radius: var(--ted-radius-pill);
+}
+
+// The exam list and its "incelenemedi" note are one section: the note stands under the rows, on their text
+// keyline (P3) — or alone, where the list would be, when nothing is ahead.
+.isler .exams-ahead__not {
+  padding-inline: $spacing-05;
+}
+
+.isler > .exams-ahead__not {
+  margin: 0;
+}
+
+// ── Rows ──
+// Carbon's clickable item: the whole row is the button that opens the work (B46). Inside it, the work's name
+// leads and the day it is due closes the line; on a phone everything stacks, the day under the name.
+// A grid whose line is the row's 20px text line (body-01): a one-line row is exactly Carbon's 48px, not 48.36 —
+// the baseline-aligned flex line it replaced came out fractional and pushed the page end past the bottom bar
+// by a sixty-fourth of a pixel (alt-gezinme.spec.ts, measured 2026-10-15).
+.isler-satir__ic {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-auto-rows: minmax(1.25rem, auto);
+  align-items: center;
+  gap: $spacing-02 $spacing-05;
+}
+
+.isler-satir__ad {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: $spacing-03;   // an exam's course and title, two spans
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+// The teacher's verdict and an exam's "Yeni"/"Değişti" (SinavKarti `SinavEtiketi`) take the grid's middle column;
+// the grid's gap spaces them, not the tag's own margin.
+.isler-satir__karar,
+.isler-satir__ic .sinav-etiketi {
+  margin: 0;
+}
+
+.isler-satir__teslim {
+  display: inline-flex;
+  grid-column: 3;
+  align-items: center;
+  gap: $spacing-02;
+  color: theme.$text-secondary;
+}
+
+// Due today: the one red on the page (§2.7, İ6). The word is the -70 text red ([3.2-6]), the icon the support
+// red; without colour the icon and "Bugün" still say it (S4, grey-scale test).
+.isler-satir__teslim--bugun {
+  color: var(--ted-text-error);
+
+  svg {
+    fill: var(--ted-support-error);
+  }
+}
+
+@include bp.breakpoint-down('md') {
+  .isler-satir__ic {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+  }
+
+  .isler-satir__teslim {
+    grid-column: auto;
+  }
+}
+
+// History reads quieter than the work still owed (İ7).
+.isler-liste--yapilan,
+.isler-liste--tamamlanan,
+.isler-liste--yapilmayan {
+  .isler-satir__ad {
+    color: theme.$text-secondary;
+  }
+}
+
+// S3 (new selector, measured 2026-10-15): Carbon reserves 4rem ($spacing-10) at a row's end for its action,
+// sized for an icon button. "Yaptım", "Geri al" and "Modülü aç" are ghost lg buttons with words (80–100px), and
+// their in-flight InlineLoading ("Kaydediliyor…", ~115px) is wider still; at 4rem they lay over the day. No
+// prop sets this (ContainedListItem takes action, children, className, disabled, onClick, renderIcon).
+.isler-liste .cds--contained-list-item--with-action .cds--contained-list-item__content {
+  padding-inline-end: $spacing-13;
+}
+
+@include bp.breakpoint-down('md') {
+  .isler-liste .cds--contained-list-item--with-action .cds--contained-list-item__content {
+    padding-inline-end: $spacing-12;
+  }
+}
+
+// The saving state stands where the button stood, one row high.
+.isler-satir__kaydediliyor.cds--inline-loading {
+  inline-size: auto;
+  min-block-size: $spacing-09;
+  padding-inline: $spacing-05;
+}
+
+// A "Yaptım" that could not be stored says so under its own row (D3).
+.isler-satir__hata {
+  padding: 0 $spacing-05 $spacing-03;
+  list-style: none;
+
+  p {
+    margin: 0;
+    @include type.type-style('helper-text-01');
+    color: theme.$text-error;
+  }
+}
+
+// ── Loading: the page's shape after 400 ms (S36, B48) ──
+.isler-iskelet {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-05;
+}
+
+.isler-iskelet__kart.cds--skeleton__placeholder {
+  inline-size: 100%;
+  block-size: $spacing-13;
+}
+
+// ── The homework window ──
+.homework-modal__hata {
+  margin-block-start: $spacing-05;
+}

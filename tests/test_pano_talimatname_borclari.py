@@ -900,7 +900,8 @@ def test_s51_sure_yalniz_plan_blogunda_ve_tahmin_sozcuguyle():
     ban on a duration stands. The row, the counts and the one place that writes a duration are pinned."""
     tali = (ROOT / "docs" / "tedy-ui-ux-talimatnamesi.md").read_text(encoding="utf-8")
     assert re.search(r"^\| \*\*S51\*\*", tali, re.M), "talimatname §11'de S51 satırı yok"
-    assert "S1–S46, S48–S51" in tali, "S51 sayımlara girmemiş"
+    aralik = re.search(r"S1–S46, S48–S(\d+)", tali)
+    assert aralik and int(aralik.group(1)) >= 51, "S51 sayımlara girmemiş"
 
     # The one writer of a duration is tahminMetni, and it always carries the word.
     yardimci = (DASH / "utils" / "aksamPlani.ts").read_text(encoding="utf-8")
