@@ -1,0 +1,15 @@
+[Unit]
+Description=TEDY akşam çalışma planı bildirimleri (dakikalık tur)
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/mnt/thunderbolt/workspaces/TED
+Environment=PATH=/mnt/thunderbolt/workspaces/TED/.venv/bin:/usr/bin:/bin
+# Istanbul time, not the host's UTC: see src/env_loader.py. TZ must never be
+# put in .env: EnvironmentFile= overrides Environment= whatever the line order.
+Environment=TZ=Europe/Istanbul
+EnvironmentFile=/mnt/thunderbolt/workspaces/TED/.env
+ExecStart=/mnt/thunderbolt/workspaces/TED/.venv/bin/python -m src.aksam_bildirim tur
+# A round runs every minute: it must end before the next one starts.
+TimeoutStartSec=50

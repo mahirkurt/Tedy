@@ -1307,22 +1307,29 @@ class TestHomeworkUnmarkDoneEndpoint:
 # ── B29: the focus window is a parameter in output/ (anayasa §2) ─────────────
 
 class TestOdakPenceresiEndpoint:
+    @pytest.fixture
+    def client(self, client):
+        """A family member signed in: since 2026-10-20 only the family may change the evening (R28 I2)."""
+        with client.session_transaction() as s:
+            s["user_email"] = "drmahirkurt@gmail.com"
+        return client
+
     def test_defaults_are_todays_values(self, client, isolated_output):
         resp = client.get("/api/odak-penceresi")
         assert resp.status_code == 200
         assert resp.get_json() == {
-            "okul_bitisi": "15:45", "odak_sonu": "16:00", "yatma": "22:30", "varsayilan": True}
+            "okul_bitisi": "15:45", "odak_sonu": "19:00", "yatma": "21:00", "varsayilan": True}
 
     def test_put_stores_atomically_and_get_reads_it(self, client, isolated_output):
         resp = client.put("/api/odak-penceresi", json={
-            "okul_bitisi": "15:30", "odak_sonu": "16:15", "yatma": "22:00"})
+            "okul_bitisi": "15:30", "odak_sonu": "19:15", "yatma": "21:00"})
         assert resp.status_code == 200
         assert resp.get_json() == {
-            "okul_bitisi": "15:30", "odak_sonu": "16:15", "yatma": "22:00", "varsayilan": False}
-        stored = json.loads((isolated_output / "odak_penceresi.json").read_text("utf-8"))
-        assert stored["okul_bitisi"] == "15:30" and stored["yatma"] == "22:00"
+            "okul_bitisi": "15:30", "odak_sonu": "19:15", "yatma": "21:00", "varsayilan": False}
+        stored = json.loads((isolated_output / "aksam_duzeni.json").read_text("utf-8"))
+        assert stored["okul_bitisi"] == "15:30" and stored["zor_is_sonu"] == "19:15"
         assert not list(isolated_output.glob("*.tmp"))
-        assert client.get("/api/odak-penceresi").get_json()["odak_sonu"] == "16:15"
+        assert client.get("/api/odak-penceresi").get_json()["odak_sonu"] == "19:15"
 
     @pytest.mark.parametrize("govde", [
         {"okul_bitisi": "15:45", "odak_sonu": "16:00"},                     # missing
@@ -1336,7 +1343,7 @@ class TestOdakPenceresiEndpoint:
         resp = client.put("/api/odak-penceresi", json=govde)
         assert resp.status_code == 400
         assert resp.get_json()["error"].endswith(".")
-        assert not (isolated_output / "odak_penceresi.json").exists()
+        assert not (isolated_output / "aksam_duzeni.json").exists()
 
     def test_unreadable_file_reads_as_defaults(self, client, isolated_output):
         (isolated_output / "odak_penceresi.json").write_text("{bozuk", "utf-8")
@@ -1356,7 +1363,28 @@ class TestOdakPenceresiEndpoint:
                 s["user_email"] = okur
             assert c.get("/api/odak-penceresi").status_code == 403
             assert c.put("/api/odak-penceresi", json=govde).status_code == 403
-        assert not (isolated_output / "odak_penceresi.json").exists()
+        assert not (isolated_output / "aksam_duzeni.json").exists()
+
+    def test_put_is_family_only(self, isolated_output, monkeypatch):
+        """The student, an API key and the test bypass may read the window but never change it: the
+        evening decides when the family is told she has not started (R28 I2)."""
+        govde = {"okul_bitisi": "15:30", "odak_sonu": "19:15", "yatma": "21:00"}
+        monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS", True)
+        with app.test_client() as c:                       # bypass, no session: not a person
+            r = c.put("/api/odak-penceresi", json=govde)
+            assert r.status_code == 403 and r.get_json() == {"error": "Bu ayarı yalnız aile değiştirebilir."}
+        monkeypatch.setattr(dashboard_api, "TEST_AUTH_BYPASS", False)
+        with app.test_client() as c:
+            with c.session_transaction() as s:
+                s["user_email"] = "isikkurtx@gmail.com"
+            assert c.get("/api/odak-penceresi").status_code == 200
+            r = c.put("/api/odak-penceresi", json=govde)
+            assert r.status_code == 403 and r.get_json()["error"] == "Bu ayarı yalnız aile değiştirebilir."
+        monkeypatch.setattr(dashboard_api, "_validate_api_key", lambda k: "etiket")
+        with app.test_client() as c:
+            r = c.put("/api/odak-penceresi", json=govde, headers={"Authorization": "Bearer tdyK_x"})
+            assert r.status_code == 403
+        assert not (isolated_output / "aksam_duzeni.json").exists()
 
 
 # ── B41 (backend half): "Özel ders" in sentence case at the source (S38) ─────

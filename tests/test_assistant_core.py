@@ -409,13 +409,13 @@ def test_system_prompt_routing_names_every_declared_tool_exactly_once():
 
     yerel_araclar = (
         "ders_programi", "sinavlar", "takvim", "ders_icerigi", "notlar",
-        "odev_listesi", "odev_belgesi", "odev_tamamla", "ek_oku", "odev_fotograftan", "ogrenci_verisi_ara", "kitap_ara",
+        "odev_listesi", "aksam_plani", "plani_degistir", "odev_belgesi", "odev_tamamla", "ek_oku", "odev_fotograftan", "ogrenci_verisi_ara", "kitap_ara",
         "platform_ilerlemesi", "video_oner", "modul_ara", "aile_kaynak_ara", "sinav_senaryosu",
     )
     tum_araclar = sorted(set(TOOL_ALLOWLIST) | set(yerel_araclar))
     # Sanity: this must be the full tool surface, not an accidentally
     # narrowed set (e.g. an empty TOOL_ALLOWLIST import would pass trivially).
-    assert len(tum_araclar) == 31
+    assert len(tum_araclar) == 33
 
     eksik = [arac for arac in tum_araclar if hangi.count(f"`{arac}`") != 1]
     assert not eksik, eksik
@@ -807,24 +807,53 @@ def _gelisim_projesi(tmp_path: Path, semester: str, ogretim_yili: str):
     }))
 
 
-def test_plan_zayif_ders_onceki_yil_raporundan_cikarilmaz(tmp_path: Path):
-    """A gelişim report still on last year's semester ("2025-2026 4.
-    Arakarne" while TEDY is in 2026-2027) must not produce a "kısa
-    ölçme-değerlendirme" block: its "1. Sınav" column is last year's grade,
-    not this year's weakness."""
-    _gelisim_projesi(tmp_path, "2025-2026 4. Arakarne", "2026-2027")
-    runtime = AssistantRuntime(tmp_path)
-    blocks = runtime._build_rule_based_plan("plan yap")
-    assert not any(b["type"] == "assessment" for b in blocks)
+def test_study_plan_bloklari_motordan_gelir_yaptim_isaretli_odev_yok(tmp_path: Path, monkeypatch):
+    """plan_blocks akşam planı motorundan (kural tabanlı ikinci plan silindi); "Yaptım" ödevi planda
+    olmadığı için kartta da yoktur; bayrak kapalıyken boş."""
+    from types import SimpleNamespace
+    from src.aksam_plani import Blok, Plan
+    plan = Plan("2026-10-19", [
+        Blok("a", "calisma", 1020, 1040, "mat", "Matematik", "Problemler", "Soru 1'i oku", 0, 1, 20),
+        Blok("b", "yemek", 1110, 1140, baslik="Yemek"),
+        Blok("c", "calisma", 1040, 1060, "fen", "Fen Bilimleri", "Hücre", "Aç", 0, 1, 20, durum="bitti")],
+        [], [], 0, "akis")
+    runtime = AssistantRuntime(tmp_path, plan_kaynagi=lambda: plan)
+    monkeypatch.setattr(runtime, "chat", lambda **kw: {"answer": "x"})
+    monkeypatch.setenv("TEDY_AKSAM_PLANI", "1")
+    out = runtime.study_plan(messages=[{"role": "user", "content": "plan"}])
+    assert out["plan_blocks"] == [{
+        "type": "homework", "title": "Matematik: Problemler", "day": "2026-10-19",
+        "estimated_minutes": 20, "actions": ["Soru 1'i oku"], "rationale": "tahmin"}]
+    assert out["plan_durumu"] == ""
+    assert not hasattr(runtime, "_build_rule_based_plan")
 
 
-def test_plan_zayif_ders_guncel_yil_raporundan_cikarilir(tmp_path: Path):
-    """The same report, but naming the current school year, still yields a
-    weak-course practice block — the gate must not hide current data too."""
-    _gelisim_projesi(tmp_path, "2026-2027 1. Dönem", "2026-2027")
-    runtime = AssistantRuntime(tmp_path)
-    blocks = runtime._build_rule_based_plan("plan yap")
-    assert any(b["type"] == "assessment" and "Matematik" in b["title"] for b in blocks)
+def test_study_plan_bayrak_kapaliyken_de_motor_bloklarini_verir(tmp_path: Path, monkeypatch):
+    """R22: TEDY_AKSAM_PLANI kartı, /api/plan/* uçlarını ve araçları kapatır; "Çalışma planı" düğmesini değil."""
+    from src.aksam_plani import Blok, Plan
+    plan = Plan("2026-10-19", [Blok("a", "calisma", 1020, 1040, "mat", "Matematik", "Problemler", "Başla", 0, 1, 20)],
+                [], [], 0, "akis")
+    runtime = AssistantRuntime(tmp_path, plan_kaynagi=lambda: plan)
+    monkeypatch.setattr(runtime, "chat", lambda **kw: {"answer": "x"})
+    monkeypatch.setenv("TEDY_AKSAM_PLANI", "0")
+    out = runtime.study_plan(messages=[{"role": "user", "content": "plan"}])
+    assert [b["title"] for b in out["plan_blocks"]] == ["Matematik: Problemler"]
+
+
+def test_study_plan_blok_yokken_cumle_doner_okura_gore(tmp_path: Path, monkeypatch):
+    from src.aksam_plani import Plan
+    monkeypatch.setattr(AssistantRuntime, "chat", lambda self, **kw: {"answer": "x"})
+    for durum, okur, beklenen in (("plansiz", "ogrenci", "Planlanacak açık ödevin yok."),
+                                  ("plansiz", "aile", "Planlanacak açık ödev yok."),
+                                  ("okulsuz", "ogrenci", "Bugün okul günü değil; akşam planı kurulmaz."),
+                                  ("kapali", "aile", "Bu akşam için plan yok (aile kapattı ya da tatil).")):
+        rt = AssistantRuntime(tmp_path, plan_kaynagi=lambda d=durum: Plan("2026-10-19", [], [], [], 0, d))
+        out = rt.study_plan(messages=[{"role": "user", "content": "plan"}], okur=okur)
+        assert out["plan_blocks"] == [] and out["plan_durumu"] == beklenen
+    def bozuk():
+        raise RuntimeError("x")
+    out = AssistantRuntime(tmp_path, plan_kaynagi=bozuk).study_plan(messages=[{"role": "user", "content": "plan"}])
+    assert out["plan_durumu"]
 
 
 def test_guncel_ogretim_yili_dosyadan_okunur(tmp_path: Path):

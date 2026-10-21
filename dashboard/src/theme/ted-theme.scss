@@ -2609,8 +2609,8 @@ body {
   max-width: 30rem;   // a form is read down, not across a 912px card
 }
 
-// Profil's focus window (B29): Carbon TimePickers read down one column.
-.odak-penceresi-formu {
+// Profil's evening (B29): Carbon TimePickers read down one column.
+.aksam-duzeni-formu {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -2618,10 +2618,17 @@ body {
   max-width: 30rem;
 }
 
-.odak-penceresi-formu__aciklama {
+.aksam-duzeni-formu__aciklama,
+.aksam-duzeni-formu__salt {
   margin: 0;
   @include type.type-style('body-01');
   color: var(--cds-text-secondary);
+}
+
+// A failed read says so above the form, across the card (Carbon caps the notification at 46rem).
+.aksam-duzeni-formu__okunamadi.cds--inline-notification {
+  max-width: none;
+  margin-block-end: spacing.$spacing-05;
 }
 
 .private-lesson-form__sonuc.cds--inline-notification { max-width: none; }

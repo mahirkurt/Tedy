@@ -3,7 +3,7 @@
   - button "Önceki gün"
   - paragraph: /Perşembe \d+ Eylül/
   - button "Sonraki gün"
-  - region /Şimdi \d+:\d+\. Okul \d+:\d+–\d+:\d+\. Ödev zamanı \d+:\d+–\d+:\d+\. Akşam \d+:\d+–\d+:\d+\. \d+ saatin var\./
+  - region /Şimdi \d+:\d+\. Okul \d+:\d+–\d+:\d+\. Yol \d+:\d+–\d+:\d+\. Ödev zamanı \d+:\d+–\d+:\d+\. Akşam \d+:\d+–\d+:\d+\. \d+ saat \d+ dakikan var\./
   - region "Şu anki ders":
     - text: Sıradaki · 5 dk sonra
     - heading "Matematik" [level=2]

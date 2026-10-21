@@ -96,6 +96,27 @@ def _canli_sinav_tespiti_yok(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _canli_tahmin_isitma_yok(monkeypatch):
+    """run_sync.main() warms the evening plan's homework estimates since 2026-10-19 (Görev 6).
+    A test that drives main() must not reach Claude nor write the live estimate cache; the real
+    step is replaced by a stub. Tests of the step hold the real function from collection time."""
+    import src.run_sync as rs
+    monkeypatch.setattr(rs, "_tahmin_isitma_adimi", lambda *a, **k: {"atlandi": "test"})
+
+
+@pytest.fixture(autouse=True)
+def _canli_odev_tahmini_yok(monkeypatch):
+    """The evening plan (2026-10-19) estimates homework with Claude Haiku. A test that reaches the
+    real reader would make a billed call; every test fails loudly instead. Tests of the store pass
+    their own fake reader."""
+    import src.odev_tahmini as tahmin
+
+    def _yasak(*a, **k):
+        raise AssertionError("testte gerçek ödev tahmini (Claude) çağrısı yok")
+    monkeypatch.setattr(tahmin.ClaudeTahminOkuyucu, "oku", _yasak)
+
+
+@pytest.fixture(autouse=True)
 def _canli_sinavlar_dosyasi_yok(monkeypatch):
     """/api/exams reads output/sinavlar.json since 2026-10-16 (plan sinav-uyari,
     Görev 6). In the live checkout that file exists, and a test that patches
@@ -104,3 +125,19 @@ def _canli_sinavlar_dosyasi_yok(monkeypatch):
     api = sys.modules.get("src.dashboard_api")
     if api is not None:
         monkeypatch.setattr(api, "_sinavlar_belgesi", lambda: None)
+
+
+class GercekPushYasak(BaseException):
+    """BaseException on purpose: the rounds isolate devices with `except Exception`, which would
+    swallow the guard and let a test that reached the real sender pass."""
+
+
+@pytest.fixture(autouse=True)
+def _canli_push_gondericisi_yok(monkeypatch):
+    """The evening-plan round (2026-10-19, Görev 9) sends web pushes to the family's phones. No
+    test may reach a push service: the real sender fails loudly; tests pass their own fake."""
+    import src.web_push as wp
+
+    def _yasak(*a, **k):
+        raise GercekPushYasak("testte gerçek web push gönderimi yok")
+    monkeypatch.setattr(wp, "gonder", _yasak)

@@ -9,10 +9,10 @@ export interface DayStripProps {
   nowMin: number
   /** When the day stops being spendable. */
   bedtimeMin: number
-  /** When sustained attention stops being available. */
+  /** When Işık is ready for homework: the "ödev zamanı" part starts here. */
+  homeworkStartMin: number
+  /** Where the hard work ends. */
   focusEndMin: number
-  /** Where homework time starts on a day without school. */
-  dayStartMin: number
   /** Today's school, or null on a day without school. */
   school: { bas: number; bit: number } | null
 }
@@ -25,12 +25,12 @@ export interface DayStripProps {
  * giving them width would spend the reader's attention on nothing (İ7) — and
  * because the track is anchored to "now", it shortens by itself as the day goes
  * on, which is the time signal a date string cannot give (İ2). Each part says
- * what it is in its own words — Sabah, Okul, Ödev zamanı, Akşam — so the strip
+ * what it is in its own words — Sabah, Okul, Yol, Ödev zamanı, Akşam — so the strip
  * reads without a legend and without an hour scale.
  */
-export function DayStrip({ nowMin, bedtimeMin, focusEndMin, dayStartMin, school }: DayStripProps) {
+export function DayStrip({ nowMin, bedtimeMin, homeworkStartMin, focusEndMin, school }: DayStripProps) {
   const girdi: GunGirdisi = {
-    simdi: nowMin, yatma: bedtimeMin, odakSonu: focusEndMin, gunBasi: dayStartMin, okul: school,
+    simdi: nowMin, yatma: bedtimeMin, odeveHazir: homeworkStartMin, zorIsSonu: focusEndMin, okul: school,
   }
   const parcalar = gunParcalari(girdi)
   const span = Math.max(bedtimeMin - nowMin, 1)

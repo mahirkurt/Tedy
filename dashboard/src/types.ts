@@ -287,6 +287,8 @@ export interface AssistantResponse {
   mesaj_id?: string
   safety_flags: string[]
   plan_blocks: AssistantPlanBlock[]
+  /** Blok yokken okura söylenen cümle (study_plan); plan asla boş görünmez. */
+  plan_durumu?: string
   intent: string
   session_id: string
   /** Set when the genel-mode answer suggested a subject teacher (B1). */

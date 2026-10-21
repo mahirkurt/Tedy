@@ -101,6 +101,21 @@ def test_assistant_plan_endpoint(client):
     assert _FakeRuntime.son_plan == {"secili_odev": "", "odev_anahtari": ""}
 
 
+def test_assistant_plan_failure_is_a_fixed_sentence_and_logged(client, monkeypatch, caplog):
+    """R28 küçük 9: the exception's text is internal (D4); the reader gets one Turkish sentence and the
+    server log keeps the exception."""
+    class _Patlak(_FakeRuntime):
+        def study_plan(self, *a, **k):
+            raise RuntimeError("iç ayrıntı /home/x/output")
+    monkeypatch.setattr(dashboard_api, "_assistant_runtime", lambda: _Patlak())
+    with caplog.at_level("ERROR"):
+        resp = client.post("/api/assistant/plan", json={"messages": [{"role": "user", "content": "plan"}]})
+    assert resp.status_code == 500
+    assert resp.get_json() == {"error": "Çalışma planı şu an hazırlanamadı."}
+    assert "iç ayrıntı" not in resp.get_data(as_text=True)
+    assert any("Assistant plan failed" in r.getMessage() and r.exc_info for r in caplog.records)
+
+
 def test_assistant_reindex_endpoint(client):
     resp = client.post("/api/assistant/reindex", json={"full": True})
     assert resp.status_code == 200

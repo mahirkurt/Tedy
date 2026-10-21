@@ -220,10 +220,56 @@ def _sinav_tespiti_adimi(start_time, simdi=None):
         return {"hata": _kisa_hata(e)}
 
 
+def _tahmin_isitma_adimi(start_time, simdi=None, depo=None, satirlar=None):
+    """Warm the homework time estimates the evening plan reads (spec 2026-10-19, Görev 6).
+    Never raises. Behind TEDY_AKSAM_PLANI; budget min(30 s, what is left of the run), skipped
+    under 5 s. The rows are the live ones the dashboard serves (marks and teacher verdicts
+    applied), so dashboard_api is imported lazily inside the guard: a missing
+    DASHBOARD_SECRET_KEY or any import failure becomes {"hata": …}, never a crashed sync."""
+    if os.environ.get("TEDY_AKSAM_PLANI") != "1":
+        return {"atlandi": "bayrak"}
+    simdi = time.time() if simdi is None else simdi
+    sure = min(30, start_time + SYNC_SURE_SINIRI - 150 - simdi)
+    if sure < 5:
+        print(f"[PLAN] Süre kalmadı ({max(sure, 0):.0f} s); tahminler sonraki eşitlemede.")
+        return {"atlandi": "sure"}
+    try:
+        from src.aksam_plani import planlanacak
+        if depo is None:
+            from src.odev_tahmini import ClaudeTahminOkuyucu, TahminDeposu
+            depo = TahminDeposu(Path(PROJECT_ROOT), ClaudeTahminOkuyucu())
+        if satirlar is None:
+            from src import dashboard_api
+            satirlar = dashboard_api._canli_odevler()
+        bugun = datetime.now().date()
+        secilen, _eski = planlanacak(satirlar, bugun)
+        isit = depo.isit(secilen, bugun, time.monotonic() + sure)
+        yedekte = sum(1 for s in secilen if depo.tahmin(s, bugun).kaynak == "yedek")
+        ozet = {"isitilan": isit["cagri"], "onbellekte": isit["onbellekte"], "yedekte": yedekte,
+                "harcanan_usd": round(depo.defter.harcanan(), 4), "durdu": isit["durdu"],
+                "hata": isit["son_hata"]}
+        print(f"[PLAN] isitilan={ozet['isitilan']} onbellekte={ozet['onbellekte']} yedekte={yedekte}"
+              f" harcanan={ozet['harcanan_usd']} (süre {sure:.0f} s)")
+        return ozet
+    except Exception as e:
+        print(f"[WARN] Tahmin ısıtma: {_kisa_hata(e)}")
+        return {"hata": _kisa_hata(e)}
+
+
 def _sinav_uyari_durumu():
     """The alert timer's last round (src/sinav_uyari.py writes it), for health.json."""
     try:
         with open(os.path.join(OUTPUT_DIR, "sinav_uyari_durumu.json"), encoding="utf-8") as f:
+            veri = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return veri if isinstance(veri, dict) else {}
+
+
+def _aksam_bildirim_durumu():
+    """The evening-plan notification round's last status (src/aksam_bildirim.py writes it)."""
+    try:
+        with open(os.path.join(OUTPUT_DIR, "aksam_bildirim_durumu.json"), encoding="utf-8") as f:
             veri = json.load(f)
     except (OSError, ValueError):
         return {}
@@ -613,6 +659,9 @@ def main(zamanla=False):
     # health (which reports it) and the reindex.
     sinav_ozeti = _sinav_tespiti_adimi(start_time)
 
+    # 5d. Evening plan: warm the homework estimates (flag-gated, 30 s at most).
+    aksam_plani_ozeti = _tahmin_isitma_adimi(start_time)
+
     # 6. Write health check
     from src.json_utils import atomic_json_dump
     from src.data_validator import _count_section
@@ -649,7 +698,9 @@ def main(zamanla=False):
         "pasif_platformlar": pasif_platformlar,
         "ekler": ekler_ozeti,
         "sinav_tespiti": sinav_ozeti,
+        "aksam_plani": aksam_plani_ozeti,
         "sinav_uyari": _sinav_uyari_durumu(),
+        "aksam_bildirim": _aksam_bildirim_durumu(),
         "academic_year": year_info["year"],
         "year_detection": year_info["status"],
         "year_archived": year_info["archived"],
