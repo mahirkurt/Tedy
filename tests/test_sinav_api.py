@@ -182,6 +182,10 @@ def test_bozuk_kayitlar_500_vermez(monkeypatch, caplog):
             raise RuntimeError("beklenmedik")
         return gercek(k)
     monkeypatch.setattr(api, "_sinav_kaynagi", _kaynak)
+    # The route reads the real clock; "iyi" is dated 2026-10-20, so pin the dashboard's "now" to SIMDI as the
+    # rest of this file does — otherwise the test turns red the day after (it did, 2026-10-21).
+    gercek_liste = api._sinav_api_listesi
+    monkeypatch.setattr(api, "_sinav_api_listesi", lambda data, now=None: gercek_liste(data, now or SIMDI))
 
     api.app.config["TESTING"] = True
     with caplog.at_level("WARNING"), api.app.test_client() as c:
