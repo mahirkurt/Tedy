@@ -89,10 +89,42 @@ def test_derleyici_yazarin_alt_metnini_kullanir_vlm_kesigini_degil():
     assert f'visual: {{kind: "image", asset: "{img.asset_id}", alt: "{ALT}", caption: "{BASLIK}"}}' in html
 
 
-def test_sus_gorseli_bos_alt_alir():
+def test_sus_gorseli_baslik_istemez_ve_altyazi_cizilmez():
+    # Son inceleme, Küçük 9 (karar): süs görseli (alt "") altyazı almaz; figcaption çizilmez, atıf satırı
+    # adsız künyedir.
     img = _varlik()
-    html = derleme.derle(_modul(_ref(alt="", baslik=BASLIK)), {img.asset_id: img}, ORIGIN)
-    assert f'alt: "", caption: "{BASLIK}"' in html
+    html = derleme.derle(_modul(_ref(alt="")), {img.asset_id: img}, ORIGIN)
+    assert f'visual: {{kind: "image", asset: "{img.asset_id}", alt: ""}}' in html
+    cizim = _gorselleri_ciz(html)
+    assert 'alt=""' in cizim and "<figcaption" not in cizim
+    assert _altbilgi_satirlari(html) == [MEB_CREDIT]
+
+
+def test_sus_gorseli_altyazi_tasimaz():
+    img = _varlik()
+    hatalar = _hatalar(_modul(_ref(alt="", baslik=BASLIK)), {img.asset_id: img})
+    assert any(h.startswith("meta.assets[0].baslik") and "süs görseli" in h for h in hatalar), hatalar
+
+
+@pytest.mark.parametrize("alt", [
+    '"Bu fotoğrafta askerler toprak bir yolda kağnıların yanında yürüyor."',
+    "«Bu çizimde askerler toprak bir yolda kağnıların yanında yürüyor.»",
+    "“Bu şema askerlerin toprak bir yolda kağnılarla nasıl yürüdüğünü gösterir.”",
+    "(Bu fotoğrafta) askerler toprak bir yolda kağnıların yanında yürüyor.",
+    "— Bu fotoğrafta askerler toprak bir yolda kağnıların yanında yürüyor.",
+    "BU FOTOG" + chr(0x306) + "RAFTA ASKERLER TOPRAK BİR YOLDA KAĞNILARIN YANINDA YÜRÜYOR.",
+])
+def test_tirnak_ayrac_ve_ayrisik_harf_yasak_acilisi_gizlemez(alt):
+    # Son inceleme, Küçük 8: tırnak, ayraç ya da tireyle açılan ve ayrışık (NFD) harfle yazılan
+    # "Bu fotoğraf…" da yakalanır.
+    img = _varlik()
+    hatalar = _hatalar(_modul(_ref(alt=alt, baslik=BASLIK)), {img.asset_id: img})
+    assert any(h.startswith("meta.assets[0].alt") and "Bu fotoğraf/çizim/şema" in h for h in hatalar), hatalar
+
+
+def test_turkce_kucult_ayrisik_harfi_birlestirir():
+    assert derleme.turkce_kucult("GO" + chr(0x308) + "RSEL") == "görsel"
+    assert derleme.turkce_kucult("I" + chr(0x307) + "STIKLAL") == "istıklal"
 
 
 @pytest.mark.parametrize("gerekce, parca", [("kısa", "en az 20"), ("", "en az 20"), ([], "metin")])
@@ -236,6 +268,36 @@ def test_iki_varlik_ayni_adi_tasiyamaz():
     data["meta"]["assets"].append(_ref("0123456789abcdef", slot="t2.visual", alt=ALT, baslik=BASLIK))
     hatalar = _hatalar(data, {a.asset_id: a, b.asset_id: b})
     assert any("meta.assets[1].baslik" in h and "aynı" in h for h in hatalar), hatalar
+
+
+def test_ayrisik_yazilmis_ayni_ad_da_ayni_addir():
+    a, b = _varlik(), _varlik("0123456789abcdef")
+    data = _modul(_ref(alt=ALT, baslik=BASLIK))
+    next(s for s in data["segments"] if s["id"] == "t2").pop("visual", None)
+    ayrisik = BASLIK.replace("ö", "o" + chr(0x308))
+    assert ayrisik != BASLIK
+    data["meta"]["assets"].append(_ref("0123456789abcdef", slot="t2.visual", alt=ALT, baslik=ayrisik))
+    hatalar = _hatalar(data, {a.asset_id: a, b.asset_id: b})
+    assert any("meta.assets[1].baslik" in h and "aynı" in h for h in hatalar), hatalar
+
+
+def test_ayni_varlik_iki_yuvada_farkli_adla_yazilamaz():
+    # Son inceleme, Küçük 10 (karar): aynı asset_id farklı baslik taşıyamaz — atıf satırı varlık başına tektir.
+    a = _varlik()
+    data = _modul(_ref(alt=ALT, baslik=BASLIK))
+    next(s for s in data["segments"] if s["id"] == "t2").pop("visual", None)
+    data["meta"]["assets"].append(_ref(a.asset_id, slot="t2.visual", alt=ALT, baslik="Görsel 1.31: Kağnı"))
+    hatalar = _hatalar(data, {a.asset_id: a})
+    assert any("meta.assets[1].baslik" in h and "aynı varlık" in h for h in hatalar), hatalar
+
+
+def test_ayni_varlik_iki_yuvada_ayni_adla_tek_atif_satiri_alir():
+    a = _varlik()
+    data = _modul(_ref(alt=ALT, baslik=BASLIK))
+    next(s for s in data["segments"] if s["id"] == "t2").pop("visual", None)
+    data["meta"]["assets"].append(_ref(a.asset_id, slot="t2.visual", alt=ALT, baslik=BASLIK))
+    html = derleme.derle(data, {a.asset_id: a}, ORIGIN)
+    assert _altbilgi_satirlari(html) == [f"{BASLIK} — {MEB_CREDIT}"]
 
 
 def test_g_attrib_yinelenen_satirda_duser():

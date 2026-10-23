@@ -167,13 +167,15 @@ const MODULE_DATA = {
 - `visual.ref` ya bir sprite anahtarı (`"pic-idea"`) ya satır-içi `<svg>` (yalnız
   `var(--cds-*)`/`var(--viz-*)` renkli). Kitap figürü ve fotoğraf `meta.assets` ile
   `<teachId>.visual` yuvasına bağlanır (Kanun M3.1). Raster görselin iki alanı zorunludur:
-  `alt` (60–150 karakterlik bitmiş cümle; "Bu fotoğraf/çizim/şema" ile başlamaz; süs görseli
-  `""`) ve `baslik` (figure + görünür figcaption; kitaptaki adıyla, en çok 120 karakter, tek
-  satır, sayfa numarası yok; her varlıkta ayrı). Alt metindeki özel ad ve sayılar figürün
-  açıklamasında (`edupedia_gorsel` → `kaynak_verisi.varlik.aciklama`, `etiket`) ya da çerçeve
-  sayfalarında geçer; geçmiyorsa `edupedia_derle` `alt_metin_dayanaksiz` döner, nedeni
-  `alt_gerekce`'ye yazılınca uyarıyla derler. Atıf satırını derleyici `baslik — atıf` olarak
-  yazar (M3.6–M3.8). Ses yuvası bu alanları almaz.
+  `alt` (60–150 karakterlik bitmiş cümle; "Bu fotoğraf/çizim/şema" ile başlamaz) ve `baslik`
+  (figure + görünür figcaption; kitaptaki adıyla, en çok 120 karakter, tek satır, sayfa numarası
+  yok; her varlıkta ayrı ve bir varlığın tek adı). Süs görseli `alt: ""` alır ve `baslik` almaz
+  (altyazı çizilmez). Alt metindeki özel ad ve sayılar kitabın kendi metninde geçer:
+  `edupedia_gorsel` → `kaynak_verisi.varlik.kitap_altyazisi` (figür altı yazısı), `etiket` ya da
+  çerçeve sayfaları; `betim` (yapay zekâ ya da sağlayıcı betimi) dayanak değildir. Geçmiyorsa
+  `edupedia_derle` `alt_metin_dayanaksiz` döner, nedeni `alt_gerekce`'ye yazılınca uyarıyla
+  derler. Atıf satırını derleyici `baslik — atıf` olarak yazar (M3.6–M3.8). Ses yuvası bu
+  alanları almaz.
 - Piktogram anahtarları yalnız Kanun §1 madde 6'dakilerdir; `ic-*` piktogram yerine
   yazılmaz, ödül ikonu kullanılmaz (M3.10). `meta.quest` yazılmaz (M2.6).
 - `hook` **opsiyoneldir** (yalnız Keşif Döngüsü kullanan modüllerde). Alanlar:
@@ -331,8 +333,8 @@ const MODULE_DATA = {
 4. `meta.subject`'e dersin resmî adını yaz; `meta.accent`, renk ve tema yazılmaz (Kanun
    M4.5). Piktogramları seç (izinli anahtarlar Kanun §1 madde 6); görselleri `edupedia_gorsel`
    ile getir ve en az bir yazar görseli çiz (M3.1, M3.5). Her raster görsele `meta.assets`'te
-   `alt` ve `baslik` yaz; `kaynak_verisi.varlik.aciklama`'yı kopyalama, ondan kendi cümleni kur
-   (M3.6, M3.7).
+   `alt` ve `baslik` yaz; `kaynak_verisi.varlik.betim`'i kopyalama, gördüğünü kendi cümlenle kur
+   ve adları kitabın altyazısından (`kitap_altyazisi`) al (M3.6, M3.7).
 5. `MODULE_DATA`'yı şablona yerleştir; motoru değiştirme.
 6. `validate_module.py` ile doğrula; ihlalleri gider.
 
@@ -348,5 +350,5 @@ const MODULE_DATA = {
 - [ ] `meta.sourceCitation` dolu; süre varsayılan kapalı.
 - [ ] Öğrenci yüzeyi nihai dil: kitaba/sayfaya/üniteye meta-atıf yok (SKILL.md §7; G-VOICE).
 - [ ] Her raster görselde `alt` ve `baslik` var; alt metnin adları ve sayıları kaynakta geçiyor (M3.6–M3.8).
-- [ ] Rekabet çerçevesi yok: "Yarışma", "Meydan oku" yazılmaz; `rewards.badges` ve `meta.quest` yok (M2.6, M2.7).
+- [ ] Rekabet çerçevesi yok: başlık, kicker, yönerge ve öz değerlendirmede "Yarışma", "Meydan oku", turnuva, liderlik tablosu yazılmaz; `rewards.badges` ve `meta.quest` yok (M2.6, M2.7).
 - [ ] Ton teşvik edici; ceza mekaniği yok (§3 etik).

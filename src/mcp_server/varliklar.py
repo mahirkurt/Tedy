@@ -34,8 +34,9 @@ IMAGE_MAX_EDGE = 1280
 IMAGE_MAX_PIXELS = 40_000_000
 DOWNLOAD_MAX_BYTES = 8_000_000
 TURLER = ("image", "video", "ses", "muzik")
-# Kaynağın tam açıklaması alt metnin dayanağıdır (Kanun M3.6, KB-10); `alt` alanı geriye uyum için kalır.
-ACIKLAMA_MAX = 2000
+# Kitabın figür altı yazısı ve etiketi alt metnin dayanağıdır (Kanun M3.6, KB-10); betim (VLM, Pexels açıklaması,
+# istem) yazara yardımdır. `alt` alanı (200 karakter) geriye uyum için kalır.
+METIN_MAX = 2000
 ETIKET_MAX = 120
 
 
@@ -104,7 +105,7 @@ class AssetStore:
         return self.runs.root / run_id / "assets"
 
     def save(self, run_id: str, data: bytes, tur: str, kaynak: str, lisans: str, credit: str, alt: str,
-             created_by: str, *, aciklama: str = "", etiket: str = "") -> dict[str, Any]:
+             created_by: str, *, betim: str = "", kitap_altyazisi: str = "", etiket: str = "") -> dict[str, Any]:
         if tur not in TURLER:
             raise VarlikHatasi("gecersiz_tur")
         folder = self._folder(run_id)
@@ -124,7 +125,8 @@ class AssetStore:
         record = {
             "asset_id": asset_id, "run_id": run_id, "tur": tur, "mime": mime, "bayt": len(data),
             "sha256": hashlib.sha256(data).hexdigest(), "kaynak": kaynak, "lisans": lisans,
-            "credit": credit, "alt": alt[:200], "aciklama": " ".join(aciklama.split())[:ACIKLAMA_MAX],
+            "credit": credit, "alt": alt[:200], "betim": " ".join(betim.split())[:METIN_MAX],
+            "kitap_altyazisi": " ".join(kitap_altyazisi.split())[:METIN_MAX],
             "etiket": " ".join(etiket.split())[:ETIKET_MAX], "created_by": created_by,
             "created_at": datetime.fromtimestamp(self.clock(), timezone.utc).isoformat(timespec="seconds"),
         }
@@ -165,8 +167,8 @@ class AssetStore:
                 asset_id=record["asset_id"], tur=record["tur"], mime=record["mime"],
                 data_uri=f"data:{record['mime']};base64," + base64.b64encode(data).decode("ascii"),
                 bayt=record["bayt"], credit=record["credit"], lisans=record["lisans"], alt=record["alt"],
-                kaynak=record["kaynak"], aciklama=str(record.get("aciklama") or ""),
-                etiket=str(record.get("etiket") or ""))
+                kaynak=record["kaynak"], betim=str(record.get("betim") or ""),
+                kitap_altyazisi=str(record.get("kitap_altyazisi") or ""), etiket=str(record.get("etiket") or ""))
         return out
 
 

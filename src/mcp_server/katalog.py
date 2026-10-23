@@ -87,6 +87,16 @@ def _refuses_for_fail(draft: dict[str, Any]) -> bool:
     return any(not isinstance(entry, dict) or entry.get("status") == "FAIL" for entry in kapilar.values())
 
 
+def _guncel_fail_kapilari(html: bytes) -> list[str]:
+    """Saklı taslak HTML'i bugünün kapılarından yeniden geçer (son inceleme, Küçük 11): kaydındaki PASS,
+    derlendiği günün kurallarıdır; birleşmeden önce derlenmiş bir taslak bugün yasak olan bir ifadeyle
+    yayınlanamaz. Kapılar düşerse istisna yükselir ve yayın kapalı kalır (sunucu_hatasi)."""
+    from src.mcp_server import gates
+
+    rapor = gates.run_gates(html.decode("utf-8"))
+    return sorted(g for g, v in rapor.items() if v.get("status") == "FAIL")
+
+
 def _fail_gate_names(draft: dict[str, Any]) -> list[str]:
     kapilar = draft.get("kapilar")
     if not isinstance(kapilar, dict):
@@ -225,6 +235,11 @@ class Yayinci:
             html = self.drafts.html_bytes(taslak_id)
             if html is None or hashlib.sha256(html).hexdigest() != draft.get("sha256"):
                 return {**base, "status": "taslak_bozuk"}
+            guncel = _guncel_fail_kapilari(html)
+            if guncel:
+                return {**base, "status": "kapi_fail_guncel", "fail_kapilari": guncel,
+                        "not": "Taslak bugünkü kapılardan geçmiyor (derlendikten sonra sıkılaşan kurallar): "
+                               f"{', '.join(guncel)}. Modül yayınlanmadı; edupedia_derle ile yeniden derle."}
             record = self.catalog.yayinla(email, draft, html, chosen, link)
         except ValueError as exc:
             # Fix round 1, F3: the three closed reasons CatalogWriter.yayinla itself raises

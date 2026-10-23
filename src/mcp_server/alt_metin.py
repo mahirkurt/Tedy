@@ -66,9 +66,11 @@ def dayanaksiz_adlar(alt: str, kaynak: str) -> list[str]:
 
 
 def varlik_kaynagi(varlik: GomuluVarlik, sayfa_metni: str) -> str:
-    """Bir varlığın alt metninin dayanabileceği metin: kendi açıklaması, kitaptaki etiketi ve çerçeve
-    sayfaları. Alanlardan önce kaydedilmiş varlıkta açıklama yoktur; o zaman kaydın `alt`'ı dayanaktır."""
-    return "\n".join(x for x in (varlik.aciklama or varlik.alt, varlik.etiket, sayfa_metni) if x)
+    """Bir varlığın alt metninin dayanabileceği metin: yalnız kitabın kendi metni — figür altı yazısı (Maarif
+    `nearby_text`), kitaptaki etiketi ve run'ın çerçeve sayfaları. Betim (Maarif `caption` = VLM, Pexels
+    açıklaması, üretim istemi) ve eski kayıtların 200 karakterlik `alt`'ı dayanak değildir: ölçüldü, figür 4189'un
+    VLM betimi KAAN'ı "F-35" diye adlandırıyor (son inceleme, Kritik 1)."""
+    return "\n".join(x for x in (varlik.kitap_altyazisi, varlik.etiket, sayfa_metni) if x)
 
 
 def alt_metin_dayanagi(data: Mapping[str, Any], varliklar: Mapping[str, GomuluVarlik],
@@ -91,11 +93,11 @@ def alt_metin_dayanagi(data: Mapping[str, Any], varliklar: Mapping[str, GomuluVa
             adlar = ", ".join(f"«{a}»" for a in eksik)
             gerekce = ref.get("alt_gerekce")
             if isinstance(gerekce, str) and duzle(gerekce):
-                uyarilar.append(f"{yol}.alt: {adlar} figürün açıklamasında ve çerçeve sayfalarında geçmiyor; "
-                                f"gerekçe: {duzle(gerekce)}")
+                uyarilar.append(f"{yol}.alt: {adlar} kitabın metninde (figür altı yazısı, etiket, çerçeve "
+                                f"sayfaları) geçmiyor; gerekçe: {duzle(gerekce)}")
             else:
-                hatalar.append(f"{yol}.alt: {adlar} figürün açıklamasında ve çerçeve sayfalarında geçmiyor; "
-                               "adı ve sayıyı kaynaktaki gibi yaz ya da gerekçeyi "
+                hatalar.append(f"{yol}.alt: {adlar} kitabın metninde (figür altı yazısı, etiket, çerçeve sayfaları) "
+                               "geçmiyor; adı ve sayıyı kitaptaki gibi yaz ya da gerekçeyi "
                                f"{yol}.alt_gerekce'ye yaz (Kanun M3.6)")
         etiket = duzle(varlik.etiket or "")
         baslik = ref.get("baslik")

@@ -898,12 +898,41 @@ def gate_contrast(html, R):
     else:
         R.add("G-CONTRAST","PASS","Metin rengi token'ı uygun; aksan büyük/dolgu öğelerinde.")
 
-# Rekabet / ödül çerçevesi (TEDY Modül Tasarım Kanunu M2.6, M2.7; KB-21, 2026-10-23): "Yarışma",
-# "Mini Yarışma", "Meydan oku", sefer haritası ve "Son N durak" hedef metni. Yalnız ad biçimleri
-# sayılır — anlatıdaki çekimli fiil ("işgale meydan okudu", "yarışmaya katıldı") bir çerçeve değildir.
+# Rekabet / ödül çerçevesi (TEDY Modül Tasarım Kanunu M2.6, M2.7; KB-21, 2026-10-23): "Yarışma" (ve
+# çekimleri), yalın "Yarış", "Meydan oku(ma)", turnuva, düello, liderlik/skor/sıralama tablosu, sefer haritası ve
+# "Son N durak". Yalnız ARAYÜZ METNİ taranır (`_arayuz_metni`): şablonun kromu ve MODULE_DATA'nın arayüz alanları
+# (title, kicker, instructions, selfAssess). Yazarın gövde anlatısı (body, stem, explanation, recap …) bir tarih ya da
+# fen anlatısıdır; "bir yarışma düzenlendi", Osmanlı'nın "sefer haritası" orada çerçeve değildir (son inceleme,
+# Küçük 5). Sınır: tarama yalnız bu adları bilir; eş anlamlısı yazılmış bir çerçeveyi kaçırabilir.
 WELLBEING_COMPETITION_RE = re.compile(
-    r"\byar[ıi]şma(?:lar)?\b|\bmeydan\s+oku(?:ma)?\b|\bsefer\s+haritas|\bson\s+\S+\s+durak\b",
+    r"\byar[ıi]şma\w*|\byar[ıi]ş\b|\bmeydan\s+oku(?:ma)?\b|\bturnuva\w*|\bdüello\w*"
+    r"|\b(?:liderlik|skor|sıralama)\s+tablo\w*|\bsefer\s+haritas\w*|\bson\s+\S+\s+durak\b",
     re.IGNORECASE)
+_MODULE_DATA_START_RE = re.compile(r"const\s+MODULE_DATA\s*=\s*\{")
+_ENGINE_MARKER_RE = re.compile(r"\n/\*\s*=+\s*\n\s*MOTOR \(ENGINE\)")
+_UI_FIELD_RE = re.compile(
+    r"\b(?:title|kicker|instructions)\s*:\s*(\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)")
+_SELF_ASSESS_RE = re.compile(r"\bselfAssess\s*:\s*\[([^\]]*)\]")
+
+
+def _arayuz_metni(html):
+    """Okurun arayüz olarak gördüğü metin: MODULE_DATA dışındaki şablon (yorum, atıf altbilgisi ve JSON
+    varlık bloğu çıkarılmış) + MODULE_DATA'nın arayüz alanları (title, kicker, instructions, selfAssess).
+    MODULE_DATA yoksa (statik fikstür) bütün sayfa kromdur."""
+    m = _MODULE_DATA_START_RE.search(html)
+    if m:
+        end = _ENGINE_MARKER_RE.search(html, m.end())
+        stop = end.start() if end else len(html)
+        data, chrome = html[m.start():stop], html[:m.start()] + "\n" + html[stop:]
+    else:
+        data, chrome = "", html
+    chrome = _strip_comments_for_svg_scan(chrome)
+    chrome = re.sub(r'<footer id="edupedia-atif".*?</footer>', " ", chrome, flags=re.S)
+    chrome = re.sub(r"<script[^>]*application/json[^>]*>.*?</script>", " ", chrome, flags=re.S | re.I)
+    for key in ("verification", "grounding", "frame_source", "curriculum"):
+        data = _blank_keyed_objects(data, key)
+    fields = [x.group(1) for x in _UI_FIELD_RE.finditer(data)] + [x.group(1) for x in _SELF_ASSESS_RE.finditer(data)]
+    return chrome + "\n" + "\n".join(fields)
 
 
 def gate_wellbeing(html, R):
@@ -912,8 +941,8 @@ def gate_wellbeing(html, R):
     - Cezalandırıcı / süre-baskısı dili → FAIL. DEHB'de duygu-düzenleme kırılganlığı
       (Groves 2021) ve oyun-bağımlılığı yatkınlığı (Rodrigo-Yanguas 2022) nedeniyle
       başarısızlık/zaman baskısı dili kullanılmaz.
-    - Öğrenci yüzeyinde rekabet/ödül çerçevesi → FAIL (TEDY Kanun M2.6, M2.7). Yazar katmanı
-      (verification, curriculum, sourceCitation) G-VOICE'taki gibi taranmaz.
+    - Arayüz metninde rekabet/ödül çerçevesi → FAIL (TEDY Kanun M2.6, M2.7): şablon kromu ve
+      MODULE_DATA'nın title/kicker/instructions/selfAssess alanları; gövde anlatısı ve yazar katmanı taranmaz.
     - >=6 segmentlik modülde beyin molası yoksa → WARN (Zhu 2023 NMA; ped §4).
     - prefers-reduced-motion yoksa → WARN (aşırı-uyarım; A11Y ile örtüşür).
     """
@@ -922,7 +951,7 @@ def gate_wellbeing(html, R):
         r"zaman doldu|game over|oyun bitti|ba\u015far\u0131s\u0131z oldun)", re.IGNORECASE)
     hits = sorted(set(m.group(0).lower() for m in punitive.finditer(html)))
     competition = sorted(set(re.sub(r"\s+", " ", m.group(0)).strip()
-                             for m in WELLBEING_COMPETITION_RE.finditer(_student_surface(html))))
+                             for m in WELLBEING_COMPETITION_RE.finditer(_arayuz_metni(html))))
     warns = []
     types = re.findall(r'type\s*:\s*"([a-z]+)"', html)
     total = len(types); breaks = types.count("brainbreak")

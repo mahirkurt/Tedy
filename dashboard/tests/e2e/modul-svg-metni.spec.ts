@@ -11,8 +11,10 @@ import { fileURLToPath } from 'node:url'
 // taller than the drawn type). The fixture is the real compiler's `ornekler.gorsel_ornegi()`: every SVG the
 // template draws (number line, bar and line chart, interactive number line, fraction bar, labelled diagram,
 // three simulations) plus a raster figure with its caption (M3.7). Frame widths 288 and 358 are §6.1's
-// post-KB-31 phone frames, opened directly; 320 (the edge case), 390 and 1440 are screen widths in the
-// dashboard's flow layout. TEDY_KB_GORUNTU=<dir> also writes the screenshots used for the eye check.
+// post-KB-31 phone frames, opened directly; 320 (the edge case), 390, 1440, 2560 and 3840 (root 21.33 and
+// 32) are screen widths in the dashboard's flow layout. On every segment no two SVG text boxes overlap, and
+// on the "Çekirgenin Sıçrayışları" number line every point's value is a visible label (the review's
+// decision for M5.6). TEDY_KB_GORUNTU=<dir> also writes the screenshots used for the eye check.
 
 const PORT = Number(process.env.TEDY_E2E_PORT ?? 8286)
 const ORIGIN = `http://127.0.0.1:${PORT}`
@@ -84,7 +86,31 @@ async function svgMetinleri(f: Frame | Page): Promise<Olcum[]> {
     }))
 }
 
-/** Walks every segment; on each, all SVG text is ≥ 12 px and something was measured on the SVG segments. */
+/** Pairs of SVG text boxes (leaf text or tspan) in the same SVG whose drawn boxes overlap. */
+async function cakisanMetinler(f: Frame | Page): Promise<string[]> {
+  return f.evaluate(() => {
+    const out: string[] = []
+    document.querySelectorAll('svg').forEach(svg => {
+      const kutular = Array.from(svg.querySelectorAll('text, tspan'))
+        .filter(t => t.tagName.toLowerCase() === 'tspan' || !t.querySelector('tspan'))
+        .map(t => ({ m: (t.textContent ?? '').trim(), r: t.getBoundingClientRect() }))
+        .filter(k => k.m && k.r.width > 0 && k.r.height > 0)
+      for (let i = 0; i < kutular.length; i++) {
+        for (let j = i + 1; j < kutular.length; j++) {
+          const a = kutular[i].r, b = kutular[j].r
+          const en = Math.min(a.right, b.right) - Math.max(a.left, b.left)
+          const boy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+          if (en > 0.5 && boy > 0.5) out.push(`${kutular[i].m} ↔ ${kutular[j].m} (${en.toFixed(1)} × ${boy.toFixed(1)})`)
+        }
+      }
+    })
+    return out
+  })
+}
+
+const CEKIRGE = ['-5', '-3', '-1', '1', '3', '5', '7']
+
+/** Walks every segment; on each, all SVG text is ≥ 12 px, no two text boxes overlap, and something was measured. */
 async function herBolumuOlc(f: Frame | Page, ad: string) {
   const olculen: Record<string, number> = {}
   for (let i = 0; i < segmentSayisi; i++) {
@@ -93,7 +119,12 @@ async function herBolumuOlc(f: Frame | Page, ad: string) {
     await expect.poll(async () => (await svgMetinleri(f)).filter(o => o.px < 12 - 1e-6), {
       message: `${ad}: ${bolum} bölümünde 12 px altında SVG metni`, timeout: 4000,
     }).toEqual([])
+    expect(await cakisanMetinler(f), `${ad}: ${bolum} bölümünde üst üste binen SVG metni`).toEqual([])
     const tumu = await svgMetinleri(f)
+    if ((await f.locator('#stage h2').textContent())?.includes('Çekirgenin')) {
+      const gorunen = tumu.map(o => o.metin)
+      expect(CEKIRGE.filter(d => !gorunen.includes(d)), `${ad}: nokta değeri okunmuyor`).toEqual([])
+    }
     olculen[`${i}:${bolum}`] = tumu.length
     if (i < segmentSayisi - 1) await f.locator('#nextBtn').click()
   }
@@ -114,7 +145,7 @@ for (const genislik of [288, 358]) {
   })
 }
 
-for (const genislik of [320, 390, 1440]) {
+for (const genislik of [320, 390, 1440, 2560, 3840]) {
   test(`SVG text is at least 12 px in the dashboard at ${genislik} px`, async ({ page }) => {
     await serveModule(page)
     await page.setViewportSize({ width: genislik, height: 900 })
@@ -122,6 +153,11 @@ for (const genislik of [320, 390, 1440]) {
     await expect.poll(() => page.frame({ url: /modul\.tedy\.online/ }) !== null).toBe(true)
     const f = page.frame({ url: /modul\.tedy\.online/ })!
     await expect(f.locator('html')).toHaveAttribute('data-host-layout', 'flow')
+    // 4K: the dashboard reports its root (21.33 / 32 px); the module re-lays out at the same rem width.
+    if (genislik >= 2560) {
+      await expect.poll(() => f.locator('html').evaluate(e => parseFloat(getComputedStyle(e).fontSize)))
+        .toBeCloseTo(genislik / 120, 0)
+    }
     await herBolumuOlc(f, `ekran ${genislik}`)
   })
 }
@@ -183,8 +219,8 @@ if (GORUNTU) {
       await expect.poll(() => page.frame({ url: /modul\.tedy\.online/ }) !== null).toBe(true)
       const f = page.frame({ url: /modul\.tedy\.online/ })!
       mkdirSync(GORUNTU, { recursive: true })
-      const adlar = ['sayi-dogrusu', 'figur', 'cubuk-grafik', 'cizgi-grafik', 'etkilesimli-sayi-dogrusu', 'kesir',
-        'sema', 'olcek', 'sarkac', 'atis']
+      const adlar = ['sayi-dogrusu', 'figur', 'cubuk-grafik', 'cizgi-grafik', 'etkilesimli-sayi-dogrusu', 'cekirge',
+        'kesir', 'sema', 'olcek', 'sarkac', 'atis']
       for (let i = 0; i < adlar.length; i++) {
         await expect.poll(async () => (await svgMetinleri(f)).filter(o => o.px < 12 - 1e-6)).toEqual([])
         await f.locator('#stage').scrollIntoViewIfNeeded()

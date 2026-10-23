@@ -148,6 +148,10 @@ def gorsel_ornegi() -> tuple[dict[str, Any], dict[str, Any]]:
         {"type": "numberline", "id": "n1", "title": "Sayıyı Yerleştir",
          "numberline": {"min": 0, "max": 20, "step": 1, "interactive": True, "value": 7,
                         "interactiveLabel": "Seçilen sayı", "title": "0 ile 20 arası"}},
+        # Yayındaki mat7 "Çekirgenin altı eşit sıçrayışı"na benzer: her noktanın değeri her genişlikte okunur.
+        {"type": "numberline", "id": "n2", "title": "Çekirgenin Sıçrayışları",
+         "numberline": {"min": -6, "max": 8, "step": 1, "title": "Çekirgenin konumları",
+                        "points": [{"value": v} for v in (-5, -3, -1, 1, 3, 5, 7)]}},
         {"type": "fraction", "id": "fr1", "title": "Kesirleri Topla", "kind": "sum", "addends": [1, 2, 3], "den": 8},
         {"type": "diagram", "id": "d1", "title": "Hücrenin Bölümleri", "viewBox": "0 0 480 300",
          "base": ('<ellipse cx="240" cy="150" rx="200" ry="120" fill="var(--cds-layer-01)" '
@@ -174,7 +178,8 @@ def gorsel_ornegi() -> tuple[dict[str, Any], dict[str, Any]]:
             data_uri="data:image/jpeg;base64," + base64.b64encode(gorsel).decode("ascii"), bayt=len(gorsel),
             credit="Görsel: T.C. Millî Eğitim Bakanlığı, Türkiye Yüzyılı Maarif Modeli yayını",
             lisans="MEB yayını — yalnız aile içi eğitim kullanımı", alt="", kaynak="mufredat",
-            aciklama="Kağnılarla cepheye cephane taşıyan halk toprak yolda yürüyor.", etiket="Görsel 1.30"),
+            betim="Fotoğraf: kağnılarla toprak yolda yürüyen kalabalık.",
+            kitap_altyazisi="Görsel 1.30: İstiklal Yolu yürüyüşü", etiket="Görsel 1.30"),
         "0f1e2d3c4b5a6978": GomuluVarlik(
             asset_id="0f1e2d3c4b5a6978", tur="ses", mime="audio/mpeg",
             data_uri="data:audio/mpeg;base64," + base64.b64encode(ses).decode("ascii"), bayt=len(ses),

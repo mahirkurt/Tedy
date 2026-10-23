@@ -223,8 +223,11 @@ hareket (https://carbondesignsystem.com/building-blocks/foundations/motion/overv
   rozet de ilerleme etiketinin taşımadığı bir bilgi taşımaz — anayasa §9, İ6). `rewards` isteğe bağlıdır;
   `rewards.badges` 2026-10-23'ten beri şema hatasıdır (Kanun M2.7, KB-21 kapandı).
 - **Rekabet çerçevesi yoktur** (M2.6, M2.7): soru seti "Alıştırma", zor soru seçeneği "Daha zor bir
-  soru"; sefer haritası ve `meta.quest` yok. G-WELLBEING öğrenci yüzeyinde "Yarışma", "Meydan oku",
-  sefer haritası ve "Son N durak" metninde FAIL verir.
+  soru"; sefer haritası ve `meta.quest` yok. G-WELLBEING arayüz metninde — şablonun kromu ve
+  MODULE_DATA'nın `title`, `kicker`, `instructions`, `selfAssess` alanları — "Yarışma" (ve çekimleri),
+  "Yarış", "Meydan oku", turnuva, düello, liderlik / skor / sıralama tablosu, sefer haritası ve
+  "Son N durak" metninde FAIL verir; gövde anlatısı (bir tarih metnindeki "yarışma", Osmanlı'nın
+  "sefer haritası") ve yazar katmanı taranmaz (Kanun M2.7, 1.3).
 - **Ödül sesi yoktur**; doğru cevabın kısa `correct` earcon'u anında geri bildirim olarak kalır
   (isteğe bağlı, `audio-system.md`).
 - **Özet ekranı sessizdir:** "Modülü tamamladın", tamamlanan alıştırma sayısı düz metinle

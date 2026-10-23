@@ -12,6 +12,7 @@ import json
 import math
 import re
 import sys
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -176,9 +177,11 @@ class GomuluVarlik:
     lisans: str
     alt: str
     kaynak: str
-    # Kaynağın kendi tam açıklaması (kitap figürünün caption'ı, Pexels açıklaması, üretim istemi) ve
-    # kitaptaki etiketi ("Görsel 1.30"). Okura gitmez; yazarın alt metninin dayanağıdır (Kanun M3.6).
-    aciklama: str = ""
+    # Kitabın kendi figür altı yazısı (Maarif `nearby_text`) ve kitaptaki etiketi ("Görsel 1.1.1"): yazarın alt
+    # metnindeki ad ve sayıların dayanağıdır (Kanun M3.6). `betim` kaynağın betimidir (Maarif `caption` = VLM,
+    # Pexels açıklaması, üretim istemi); yazara yardım eder, dayanak sayılmaz. Hiçbiri okura gitmez.
+    betim: str = ""
+    kitap_altyazisi: str = ""
     etiket: str = ""
 
 
@@ -409,6 +412,8 @@ GEREKCE_MIN, GEREKCE_MAX = 20, 400
 GORSEL_ALANLARI = ("alt", "baslik", "alt_gerekce")
 _CUMLE_SONU_RE = re.compile("[.!?…][\"'”’»)]*$")
 _YASAK_ACILIS_RE = re.compile(r"^bu\s+(?:fotoğraf|çizim|şema)")
+# Yasak açılışın önündeki tırnak, ayraç, tire ve boşluk açılışı gizlemez (son inceleme, Küçük 8).
+_ACILIS_ONU_RE = re.compile(r"^[\W_]+")
 ALT_ZORUNLU = ("raster görselin alt metni 60–150 karakterlik bitmiş bir cümledir; süs görseli için "
                'alt: "" yaz (Kanun M3.6)')
 BASLIK_ZORUNLU = ('raster görselin görünür altyazısıdır, kitaptaki adıyla (ör. "Görsel 1.30: İstiklal Yolu '
@@ -421,7 +426,9 @@ def duzle(metin: str) -> str:
 
 
 def turkce_kucult(metin: str) -> str:
-    return metin.replace("I", "ı").replace("İ", "i").lower()
+    """Türkçe küçültme (I→ı, İ→i). Önce NFC: ayrışık yazılmış "G + ˘" ile "Ğ" aynı harftir (son inceleme,
+    Küçük 8)."""
+    return unicodedata.normalize("NFC", metin).replace("I", "ı").replace("İ", "i").lower()
 
 
 def varlik_alani_hatalari(index: int, ref: Mapping[str, Any]) -> list[str]:
@@ -440,7 +447,7 @@ def varlik_alani_hatalari(index: int, ref: Mapping[str, Any]) -> list[str]:
                               "cümleyle anlat (Kanun M3.6)")
             if not _CUMLE_SONU_RE.search(metin):
                 errors.append(f"{yol}.alt bitmiş bir cümle olmalı: nokta, soru ya da ünlem işaretiyle biter")
-            if _YASAK_ACILIS_RE.match(turkce_kucult(metin)):
+            if _YASAK_ACILIS_RE.match(_ACILIS_ONU_RE.sub("", turkce_kucult(metin))):
                 errors.append(f'{yol}.alt "Bu fotoğraf/çizim/şema" ile başlamaz; görülen şeyi doğrudan anlat '
                               "(Kanun M3.6)")
             if voice.search(metin):
@@ -470,15 +477,17 @@ def varlik_alani_hatalari(index: int, ref: Mapping[str, Any]) -> list[str]:
 
 
 def varlik_zorunluluk_hatalari(data: Any, varliklar: Mapping[str, GomuluVarlik]) -> list[str]:
-    """Varlığın türü bilinince: raster görselde alt ve baslik zorunlu, ses yuvası görsel alanı almaz,
-    iki varlık aynı adı taşımaz (atıf satırı varlık başına tektir, Kanun M3.8). Bilinmeyen varlığı
-    `varlik_bagla` adlandırır."""
+    """Varlığın türü bilinince: raster görselde alt zorunlu, baslik bilgi taşıyan görselde zorunlu ve süs
+    görselinde (alt "") yasak (son inceleme, Küçük 9: süs görseli altyazı almaz); ses yuvası görsel alanı almaz;
+    iki varlık aynı adı, aynı varlık iki ayrı adı taşımaz (atıf satırı varlık başına tektir, Kanun M3.8; Küçük 10).
+    Bilinmeyen varlığı `varlik_bagla` adlandırır."""
     meta = data.get("meta") if isinstance(data, dict) else None
     refs = meta.get("assets") if isinstance(meta, dict) else None
     if not isinstance(refs, list):
         return []
     errors: list[str] = []
     adlar: dict[str, str] = {}
+    varlik_adlari: dict[str, str] = {}
     for index, ref in enumerate(refs):
         if not isinstance(ref, dict) or not isinstance(ref.get("asset_id"), str):
             continue
@@ -491,10 +500,14 @@ def varlik_zorunluluk_hatalari(data: Any, varliklar: Mapping[str, GomuluVarlik])
                 errors.append(f"{yol} ses yuvasına bağlı bir ses varlığı: alt, baslik ve alt_gerekce ses "
                               "varlığında yazılmaz")
             continue
+        sus = isinstance(ref.get("alt"), str) and not duzle(ref["alt"])
         if record.tur == "image":
             if "alt" not in ref:
                 errors.append(f"{yol}.alt zorunlu: {ALT_ZORUNLU}")
-            if "baslik" not in ref:
+            if sus and "baslik" in ref:
+                errors.append(f'{yol}.baslik süs görseli (alt "") altyazı almaz: görsel bilgi taşıyorsa alt metnini '
+                              "yaz, taşımıyorsa baslik'i sil (Kanun M3.7)")
+            elif not sus and "baslik" not in ref:
                 errors.append(f"{yol}.baslik zorunlu: {BASLIK_ZORUNLU}")
         baslik = ref.get("baslik")
         if isinstance(baslik, str) and duzle(baslik):
@@ -503,6 +516,10 @@ def varlik_zorunluluk_hatalari(data: Any, varliklar: Mapping[str, GomuluVarlik])
             if onceki != ref["asset_id"]:
                 errors.append(f"{yol}.baslik başka bir varlığınkiyle aynı («{duzle(baslik)}»); her figürün adı "
                               "ayrıdır ve atıfta kendi satırını alır (Kanun M3.8)")
+            onceki_ad = varlik_adlari.setdefault(ref["asset_id"], anahtar)
+            if onceki_ad != anahtar:
+                errors.append(f"{yol}.baslik aynı varlık başka bir yuvada başka adla yazılmış («{duzle(baslik)}»); "
+                              "bir varlığın tek adı ve tek atıf satırı vardır (Kanun M3.8)")
     return errors
 
 

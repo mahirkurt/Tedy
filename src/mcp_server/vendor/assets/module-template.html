@@ -2366,13 +2366,31 @@ const MODULE_DATA = {
      (480) bugünkü gibi büyür, 1920 ile 3840 arasında yerleşim aynı kalır, yalnız ölçek iki katıdır
      (M5.8). Kutunun genişliği değişince (döndürme, pencere) yalnız SVG yeniden kurulur; bölümün durumu
      (cevap, kaydırıcı, sayı doğrusundaki değer) korunur. Sığmayan eksen etiketi seyreltilir, sığmayan
-     çubuk etiketi çubuğun üstüne iner (yatay çubuk). Metin boyunu tahmin VIZ_HARF (Plex Sans'ta bir
-     harfin ortalama genişliği, em) ile yapılır; ölçüm e2e'dedir (moduller: modul-svg-metni.spec.ts). */
-  const VIZ_METIN=12, VIZ_W=480, VIZ_HARF=0.6;
+     çubuk etiketi önce iki satıra bölünür, yine sığmazsa çubuk yataylaşır (etiket üstünde). Etiket
+     genişliği gömülü IBM Plex Sans'ın ölçülmüş harf genişliklerinden (VIZ_EM) hesaplanır; çizimin
+     kendisi e2e'de ölçülür (dashboard/tests/e2e/modul-svg-metni.spec.ts). */
+  // Harf genişlikleri (em, IBM Plex Sans 400): Chromium'da gömülü yazıyla getComputedTextLength, 2026-10-23.
+  // 600 ağırlık ~%4 geniştir; tabloda olmayan karakter 0,6 em sayılır.
+  function vizEmTablosu(){
+    const t={}, ek=(harfler, w)=>{ for(const c of harfler) t[c]=w; };
+    ek("0123456789−+", 0.6); ek("-", 0.4); ek(".,", 0.267); ek(":", 0.3); ek("%", 0.933); ek("/", 0.383);
+    ek("()", 0.333); ek(" ", 0.25); ek("≈", 0.838);
+    ek("ıijî", 0.25); ek("l", 0.267); ek("f", 0.317); ek("t", 0.35); ek("r", 0.367); ek("z", 0.467); ek("sş", 0.483);
+    ek("cçvyx", 0.5); ek("agğkâ", 0.533); ek("e", 0.55); ek("hnoöuüû", 0.567); ek("bdpq", 0.583); ek("w", 0.767);
+    ek("m", 0.867); ek("Iİ", 0.4); ek("L", 0.5); ek("J", 0.517); ek("FT", 0.567); ek("ESŞZ", 0.583); ek("PY", 0.6);
+    ek("CÇVX", 0.617); ek("AKR", 0.633); ek("B", 0.65); ek("D", 0.667); ek("UÜ", 0.683); ek("GĞHNOÖQ", 0.7);
+    ek("M", 0.817); ek("W", 0.883);
+    return t;
+  }
+  const VIZ_METIN=12, VIZ_W=480, VIZ_BOSLUK=3, VIZ_SATIR=1.45, VIZ_EM=vizEmTablosu();
   const VIZ_CIZICI=new Map();
   let vizSonG=VIZ_W;
   function vizKaydet(id, ciz){ VIZ_CIZICI.set(id, ciz); return id; }
-  function vizMetinGenisligi(metin, fs){ return String(metin).length*(fs||VIZ_METIN)*VIZ_HARF; }
+  function vizMetinGenisligi(metin, fs, kalin){
+    let em=0;
+    for(const c of String(metin)) em+=(VIZ_EM[c]!=null?VIZ_EM[c]:0.6);
+    return em*(fs||VIZ_METIN)*(kalin?1.04:1);
+  }
   function vizGenislik(G){ return Math.max(120, Math.min(VIZ_W, Math.floor(G||vizSonG))); }
   function vizOznitelik(id, G){ return ` data-viz="${id}" data-viz-g="${Math.floor(G||vizSonG)}"`; }
   // Kutunun içerik genişliği, kök boyuna indirgenmiş px (rem × 16). clientWidth dönüşümden etkilenmez.
@@ -2402,14 +2420,30 @@ const MODULE_DATA = {
     if(satir) satirlar.push(satir);
     return satirlar.length?satirlar:[""];
   }
-  // Sayı ekseni etiketlerini seyreltir: k ∈ {1,2,4,5,10,…}, sıfır (yoksa ilk değer) her zaman etiketlidir;
-  // sığan adımlardan iki ucu da etiketleyen ilk adım seçilir (-10…10 → beşer; 0…20 → dörder).
-  function vizSeyrelt(degerler, aralik, fmt){
-    const genis=Math.max(0, ...degerler.map(v=>vizMetinGenisligi(fmt(v))))+6;
-    const sifir=degerler.findIndex(v=>Math.abs(v)<1e-9), a0=sifir<0?0:sifir, son=degerler.length-1;
-    const sigan=[1,2,4,5,10,20,25,50,100,200,250,500,1000].filter(c=>c*aralik>=genis);
-    const k=sigan.find(c=>a0%c===0 && (son-a0)%c===0)||sigan[0]||degerler.length;
-    return i=>((i-a0)%k+k)%k===0;
+  // Sayı ekseni etiketleri (Kanun M5.6): komşu iki etiket, ölçülmüş genişlikleriyle VIZ_BOSLUK'tan yakın değilse
+  // ikisi de yazılır. Önce zorunlular (sayı doğrusunda noktaların değerleri) yerleşir; birbiriyle çakışan ikinci
+  // satıra iner. Sonra düzenli adım: k ∈ {1,2,4,5,10,…}, sıfırı (yoksa ilk değeri) etiketler, sığıyorsa iki ucu
+  // da; zorunluyla çakışan düzenli etiket düşer. Dönüş: etiketli indis → satır (1 ya da 2).
+  function vizSayiEtiketleri(degerler, X, fmt, zorunlu){
+    const n=degerler.length, w=degerler.map(v=>vizMetinGenisligi(fmt(v)));
+    const cakisir=(i,j)=>Math.abs(X(degerler[j])-X(degerler[i])) < (w[i]+w[j])/2+VIZ_BOSLUK;
+    const satir=new Map();
+    let son1=-1, son2=-1;
+    Array.from(zorunlu||[]).sort((a,b)=>a-b).forEach(i=>{
+      if(son1<0 || !cakisir(son1,i)){ satir.set(i,1); son1=i; }
+      else if(son2<0 || !cakisir(son2,i)){ satir.set(i,2); son2=i; }
+      else { satir.set(i,1); son1=i; }
+    });
+    const sifir=degerler.findIndex(v=>Math.abs(v)<1e-9), a0=sifir<0?0:sifir;
+    const duzenli=k=>{ const s=[]; for(let i=0;i<n;i++) if(((i-a0)%k+k)%k===0) s.push(i); return s; };
+    const sigar=s=>s.every((i,j)=>j===0 || !cakisir(s[j-1],i));
+    const adimlar=[1,2,4,5,10,20,25,50,100,200,250,500,1000];
+    const k=adimlar.find(c=>a0%c===0 && (n-1-a0)%c===0 && sigar(duzenli(c))) || adimlar.find(c=>sigar(duzenli(c))) || n;
+    const birinciSatir=[...satir].filter(([,r])=>r===1).map(([i])=>i);
+    duzenli(k).forEach(i=>{
+      if(!satir.has(i) && !birinciSatir.some(j=>cakisir(i,j))) satir.set(i,1);
+    });
+    return satir;
   }
   // Bölüm içeriği değişince (aynı mikro görevde, boyamadan önce) ve sahne genişliği değişince (bir
   // sonraki karede, ResizeObserver döngüsüne girmeden) şablonun SVG'leri kutularına göre kurulur.
@@ -2454,7 +2488,7 @@ const MODULE_DATA = {
   function vizChartSvg(spec, id, G){
     const tid=id+"t", did=id+"d", fs=VIZ_METIN;
     const data=spec.data||[];
-    const W=vizGenislik(G),PADB=42,PADT=16,PADR=14;
+    const W=vizGenislik(G),PADT=16,PADR=14;
     const has=p=>!!p && p.value!==null && p.value!==undefined && p.value!=="" && Number.isFinite(+p.value);
     const val=p=>Math.max(0,+p.value);
     const scale=vizNice(Math.max(+spec.max||0, ...data.filter(has).map(val), 0));
@@ -2463,8 +2497,15 @@ const MODULE_DATA = {
     const PADL=Math.max(30, Math.ceil(Math.max(...yEtiketleri.map(e=>vizMetinGenisligi(e)))+14));
     const plotW=W-PADL-PADR;
     const n=data.length, step=plotW/Math.max(1,n);
-    const xGenis=Math.max(0, ...data.map(p=>vizMetinGenisligi(p.label||"")));
-    const yatay=spec.kind!=="line" && n>0 && xGenis>step-6;
+    // Çubuk etiketi kendi sütununa (ölçülmüş genişlikle) tek ya da iki satırda sığıyorsa çubuk dikey kalır;
+    // sığmıyorsa (tek sözcük sütundan geniş ya da üç satır) çubuk yataylaşır. "veri yok" da sütuna sığmalı.
+    const sutun=step-6;
+    const xSatirlari=data.map(p=>vizSatirla(p.label||"", Math.max(1, sutun), fs));
+    const dikeySigar=xSatirlari.every(s=>s.length<=2 && s.every(l=>vizMetinGenisligi(l)<=sutun))
+      && (data.every(has) || vizMetinGenisligi("veri yok")<=sutun);
+    const yatay=spec.kind!=="line" && n>0 && !dikeySigar;
+    const ikiSatir=!yatay && spec.kind!=="line" && xSatirlari.some(s=>s.length>1);
+    const PADB=ikiSatir?42+Math.round(fs*VIZ_SATIR):42;
     let body, H=260;
     if(yatay){
       // Yatay çubuk: etiket çubuğun üstünde, tam genişlikte; değer çubuğun ucunda.
@@ -2475,8 +2516,8 @@ const MODULE_DATA = {
       data.forEach(p=>{
         const satirlar=vizSatirla(p.label||"", W, fs);
         body+=`<text class="viz-muted" x="0" y="${(y+fs).toFixed(1)}" font-size="${fs}">`
-          +satirlar.map((s,i)=>`<tspan x="0" dy="${i?(fs*1.25).toFixed(1):0}">${esc(s)}</tspan>`).join("")+`</text>`;
-        const by=y+fs*1.25*satirlar.length+4;
+          +satirlar.map((s,i)=>`<tspan x="0" dy="${i?(fs*VIZ_SATIR).toFixed(1):0}">${esc(s)}</tspan>`).join("")+`</text>`;
+        const by=y+fs*VIZ_SATIR*satirlar.length+4;
         // Sıfır çizgisi yalnız çubuğun yanında: üstteki etiketi kesmez.
         body+=`<line class="viz-axis" x1="1" y1="${(by-3).toFixed(1)}" x2="1" y2="${(by+BAR+3).toFixed(1)}" stroke-width="1.5"/>`;
         if(has(p)){
@@ -2498,11 +2539,21 @@ const MODULE_DATA = {
       const axis=`<line class="viz-axis" x1="${PADL}" y1="${PADT}" x2="${PADL}" y2="${PADT+plotH}" stroke-width="1.5"/>`
         +`<line class="viz-axis" x1="${PADL}" y1="${PADT+plotH}" x2="${W-PADR}" y2="${PADT+plotH}" stroke-width="1.5"/>`;
       const xAt=i=>PADL+step*(i+0.5);
-      // Çizgi grafikte sığmayan x etiketi seyreltilir: her k'ıncı, ve sonuncu yeterince uzaksa o da.
-      const k=Math.max(1, Math.ceil((xGenis+6)/Math.max(1,step)));
+      // Çizgi grafikte komşusuyla (ölçülmüş genişlikle) çakışan x etiketi seyreltilir: her k'ıncı, ve sonuncu
+      // son yazılanla çakışmıyorsa o da. Dikey çubukta her etiket sütununa sığdığından k = 1'dir.
+      const xw=data.map(p=>vizMetinGenisligi(p.label||""));
+      const cak=(i,j)=>(j-i)*step < (xw[i]+xw[j])/2+VIZ_BOSLUK;
+      let k=1;
+      while(spec.kind==="line" && k<n){ let sigar=true; for(let i=0;i+k<n;i+=k){ if(cak(i,i+k)){ sigar=false; break; } } if(sigar) break; k++; }
       const sonGosterilen=Math.floor((n-1)/k)*k;
-      const etiketli=i=>i%k===0 || (i===n-1 && (n-1-sonGosterilen)*step>=xGenis+6);
-      const label=(p,i)=>etiketli(i)?`<text class="viz-muted" x="${xAt(i).toFixed(1)}" y="${H-PADB+18}" text-anchor="middle" font-size="${fs}">${esc(p.label||"")}</text>`:"";
+      const etiketli=i=>i%k===0 || (i===n-1 && !cak(sonGosterilen, n-1));
+      const label=(p,i)=>{
+        if(!etiketli(i)) return "";
+        const x=xAt(i).toFixed(1), satirlar=spec.kind==="line"?[p.label||""]:xSatirlari[i];
+        const icerik=satirlar.length<2 ? esc(satirlar[0]||"")
+          : satirlar.map((s,j)=>`<tspan x="${x}" dy="${j?(fs*VIZ_SATIR).toFixed(1):0}">${esc(s)}</tspan>`).join("");
+        return `<text class="viz-muted" x="${x}" y="${H-PADB+18}" text-anchor="middle" font-size="${fs}">${icerik}</text>`;
+      };
       const gap=i=>`<text class="viz-muted" x="${xAt(i).toFixed(1)}" y="${(PADT+plotH-6).toFixed(1)}" text-anchor="middle" font-size="${fs}">veri yok</text>`;
       if(spec.kind==="line"){
         const color=spec.color||"var(--viz-1)";
@@ -2609,16 +2660,19 @@ const MODULE_DATA = {
   function numberLineCiz(spec, id, G){
     const min=spec.min!=null?spec.min:0, max=spec.max!=null?spec.max:10;
     const step=spec.step||1, tid=id+"t", did=id+"d";
-    const W=Math.min(NL_W, vizGenislik(G)),H=110,PADX=NL_PADX,Y=64, plotW=W-2*PADX, span=(max-min)||1;
+    const W=Math.min(NL_W, vizGenislik(G)),PADX=NL_PADX,Y=64, plotW=W-2*PADX, span=(max-min)||1;
     const X=v=>PADX+plotW*((v-min)/span);
     const degerler=[];
     for(let v=min; v<=max+1e-9; v=+(v+step).toFixed(6)) degerler.push(v);
-    const etiketli=vizSeyrelt(degerler, degerler.length>1?plotW/(degerler.length-1):plotW, v=>+v.toFixed(6));
+    // Noktaların değeri her genişlikte okunur: değerine denk gelen tik zorunlu etiketlidir (Kanun M5.6).
+    const zorunlu=new Set((spec.points||[]).map(p=>degerler.findIndex(v=>Math.abs(v-numOr(p.value,NaN))<1e-9)).filter(i=>i>=0));
+    const etiketler=vizSayiEtiketleri(degerler, X, v=>+v.toFixed(6), zorunlu);
+    const ikinciSatir=[...etiketler.values()].includes(2), H=ikinciSatir?120:110;
     let ticks="";
     degerler.forEach((v,i)=>{
-      const x=X(v);
+      const x=X(v), satir=etiketler.get(i);
       ticks+=`<line class="viz-axis" x1="${x.toFixed(1)}" y1="${Y-6}" x2="${x.toFixed(1)}" y2="${Y+6}" stroke-width="1.5"/>`
-        +(etiketli(i)?`<text class="viz-muted" x="${x.toFixed(1)}" y="${Y+26}" text-anchor="middle" font-size="${VIZ_METIN}">${(+v.toFixed(6))}</text>`:"");
+        +(satir?`<text class="viz-muted" x="${x.toFixed(1)}" y="${(Y+26+(satir-1)*VIZ_METIN*VIZ_SATIR).toFixed(1)}" text-anchor="middle" font-size="${VIZ_METIN}">${(+v.toFixed(6))}</text>`:"");
     });
     let hi="";
     if(spec.highlight && spec.highlight.length===2){
@@ -2789,7 +2843,7 @@ const MODULE_DATA = {
       const bobY = pivotY + Lpx * Math.cos(rad);
       const title = (labels && labels.title) ? esc(labels.title)
         : "Sarkaç: uzunluk " + Lm.toFixed(2) + " m" + (hasAngle ? ", açı " + Math.round(rawAngle) + "°" : "");
-      const uzunluk = "L = " + Lm.toFixed(2) + " m", etiketYari = vizMetinGenisligi(uzunluk, 13)/2 + 2;
+      const uzunluk = "L = " + Lm.toFixed(2) + " m", etiketYari = vizMetinGenisligi(uzunluk, 13, true)/2 + 2;
       svg.innerHTML = `<title id="simSvgTitle">${title}</title>
         <desc id="simSvgDesc">Kaydırıcıyı hareket ettirerek sarkacın ${hasAngle?"uzunluğunu ve açısını":"uzunluğunu"} değiştir.</desc>
         <line x1="${pivotX}" y1="${pivotY}" x2="${pivotX}" y2="${(pivotY+Lpx).toFixed(1)}" class="viz-axis" stroke-width="1.5" stroke-dasharray="3 5"/>
@@ -2854,12 +2908,12 @@ const MODULE_DATA = {
       const stepTick = Math.max(1, Math.ceil((hi-lo)/10));
       const X = x => PADX+plotW*((x-lo)/span);
       const degerler=[]; for(let t=lo; t<=hi+1e-9; t+=stepTick) degerler.push(t);
-      const etiketli=vizSeyrelt(degerler, plotW*stepTick/span, t=>Math.round(t));
+      const etiketler=vizSayiEtiketleri(degerler, X, t=>Math.round(t), new Set());
       let ticks="";
       degerler.forEach((t,i)=>{
         const x=X(t);
         ticks += `<line class="viz-axis" x1="${x.toFixed(1)}" y1="${Y-6}" x2="${x.toFixed(1)}" y2="${Y+6}" stroke-width="1.5"/>`
-          + (etiketli(i)?`<text class="viz-muted" x="${x.toFixed(1)}" y="${Y+24}" text-anchor="middle" font-size="${VIZ_METIN}">${Math.round(t)}</text>`:"");
+          + (etiketler.has(i)?`<text class="viz-muted" x="${x.toFixed(1)}" y="${Y+24}" text-anchor="middle" font-size="${VIZ_METIN}">${Math.round(t)}</text>`:"");
       });
       const px=X(val);
       const title = (labels && labels.title) ? esc(labels.title) : "Sayı doğrusu: değer " + val;
@@ -3272,7 +3326,7 @@ const MODULE_DATA = {
     // VIZ_METIN'in altına inmez.
     const ciz=g=>{
       const W=vizGenislik(g), BARX=W>=VIZ_W?20:8, BARY=16, BARW=W-2*BARX, BARH=44;
-      const efs=Math.max(VIZ_METIN, Math.min(22, Math.floor((W-16)/Math.max(1, eq.length*VIZ_HARF))));
+      const efs=Math.max(VIZ_METIN, Math.min(22, Math.floor((W-16)/Math.max(0.1, vizMetinGenisligi(eq, 1)))));
       const EQY=BARY+BARH+6+Math.round(efs*0.82), H=EQY+Math.round(efs*0.73);
       const cw=BARW/(total||1);
       let rects="";

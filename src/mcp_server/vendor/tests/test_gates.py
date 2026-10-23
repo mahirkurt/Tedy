@@ -186,12 +186,24 @@ def test_gwellbeing_fails_on_competition_framing(cerceve):
     assert status_of(rows, "G-WELLBEING") == "FAIL"
     assert "rekabet" in next(m for g, s, m in rows if g == "G-WELLBEING")
 
+def _modul_verili(baslik, govde):
+    # Derlenmiş modülün biçimi: içerik MODULE_DATA'da, motor işaretinden önce.
+    return open("tests/fixtures/adaptive_pass.html").read() + (
+        '<script>\nconst MODULE_DATA = {meta:{title:"%s",sourceCitation:"Olimpiyat yarışma soruları"},'
+        'segments:[{type:"text",kicker:"Okuma",title:"Fetih",body:"%s"}]};\n'
+        '/* ==========\n   MOTOR (ENGINE) — DEĞİŞTİRMEYİN */\n</script>' % (baslik, govde))
+
 def test_gwellbeing_competition_scan_skips_prose_and_author_layer():
-    html = open("tests/fixtures/adaptive_pass.html").read().replace(
-        "7 x 6 kaçtır?", "Ordu işgale meydan okudu; yarışmaya kimler katıldı?")
-    html += '<script>const M={meta:{sourceCitation:"Olimpiyat yarışma soruları"}};</script>'
+    # M2.7 "arayüz metni" der (son inceleme, Küçük 5): gövde anlatısı ("bir yarışma düzenlendi",
+    # Osmanlı'nın "sefer haritası") ve yazar katmanı (sourceCitation) taranmaz.
+    html = _modul_verili("Fetih Yolu", "Ordu işgale meydan okudu; bir yarışma düzenlendi; sefer haritası çizildi.")
     rows = run_gate(vm.gate_wellbeing, html)
     assert status_of(rows, "G-WELLBEING") == "PASS"
+
+def test_gwellbeing_competition_scan_reads_module_data_interface_fields():
+    html = _modul_verili("Kesir Turnuvası", "Kesirleri karşılaştır.")
+    rows = run_gate(vm.gate_wellbeing, html)
+    assert status_of(rows, "G-WELLBEING") == "FAIL"
 
 def test_adaptive_difficulty_gwellbeing_pass():
     # Cezalandırıcı/süre-baskısı dili yok → G-WELLBEING gerçek PASS (yalnızca "uygulanmaz" değil).

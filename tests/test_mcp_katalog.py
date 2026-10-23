@@ -94,6 +94,30 @@ def test_tampered_draft_is_not_published(env):
     assert yayinci.yayinla(FULL, taslak_id)["status"] == "taslak_bozuk"
 
 
+def test_eski_taslak_bugunun_kapilarindan_gecmezse_yayinlanmaz(env):
+    # Son inceleme, Küçük 11 (karar): birleşmeden önce derlenmiş taslak, kaydında PASS yazsa da yayından önce
+    # bugünün kapılarından yeniden geçer; FAIL varsa yayınlanmaz ve hiçbir şey yazılmaz.
+    tmp_path, derleyici, yayinci = env
+    taslak_id = _taslak(derleyici)
+    yol = ms.draft_html_path(tmp_path, taslak_id)
+    baslik = ornekler.ornek("QUIZ")["meta"]["title"]
+    html = yol.read_text(encoding="utf-8")
+    assert baslik in html
+    eski = html.replace(baslik, "Mini Yarışma").encode("utf-8")
+    yol.write_bytes(eski)
+    kayit_yolu = yol.with_name(ms.DRAFT_RECORD)
+    kayit = json.loads(kayit_yolu.read_text(encoding="utf-8"))
+    assert kayit["gates"]["fail"] == 0
+    kayit.update(sha256=hashlib.sha256(eski).hexdigest(), bayt=len(eski))
+    atomic_json_dump(kayit, str(kayit_yolu))
+    body = yayinci.yayinla(FULL, taslak_id)
+    assert body["status"] == "kapi_fail_guncel", body
+    assert body["fail_kapilari"] == ["G-WELLBEING"]
+    assert "yayınlanmadı" in body["not"] and "edupedia_derle" in body["not"]
+    assert ms.read_catalog(tmp_path) == []
+    assert not ms.modules_root(tmp_path).exists() or not any(ms.modules_root(tmp_path).iterdir())
+
+
 def test_orphan_version_directory_is_skipped_not_overwritten(env):
     tmp_path, derleyici, yayinci = env
     orphan = ms.modules_root(tmp_path) / "fen5-su" / "v1"

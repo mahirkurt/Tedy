@@ -141,8 +141,10 @@ def test_rehber_ve_arac_yazara_gorsel_alanlarini_ve_odul_kuralini_soyler(tmp_pat
 
     toplam = rehber.guide("akis")["toplam_parca"]
     akis = "\n".join(rehber.guide("akis", parca=n)["metin"] for n in range(1, toplam + 1))
-    for alan in ("`alt`", "`baslik`", "alt_gerekce", "Görsel 1.30"):
+    for alan in ("`alt`", "`baslik`", "alt_gerekce", "kitap_altyazisi"):
         assert alan in akis, alan
+    # Son inceleme (Kritik 1): dayanak kitabın metnidir; rehber yazarı VLM betimine yönlendirmez.
+    assert "aciklama" not in akis
     assert "`rewards` isteğe bağlı" in akis
 
     class _Fed:
@@ -152,7 +154,8 @@ def test_rehber_ve_arac_yazara_gorsel_alanlarini_ve_odul_kuralini_soyler(tmp_pat
     mcp = server.build_server(tools.Tools(load_settings({}, project_root=tmp_path), _Fed()))
     listed = {t.name: t for t in anyio.run(mcp.list_tools)}
     derle = listed["edupedia_derle"].description
-    for parca in ("alt", "baslik", "alt_gerekce", "alt_metin_dayanaksiz", "rewards isteğe bağlı", "badges"):
+    for parca in ("alt", "baslik", "alt_gerekce", "alt_metin_dayanaksiz", "rewards isteğe bağlı", "badges",
+                  "kitap_altyazisi"):
         assert parca in derle, parca
     gorsel = listed["edupedia_gorsel"].description
-    assert "aciklama" in gorsel and "etiket" in gorsel and "baslik" in gorsel
+    assert "kitap_altyazisi" in gorsel and "etiket" in gorsel and "betim" in gorsel and "aciklama" not in gorsel

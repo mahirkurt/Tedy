@@ -110,3 +110,39 @@ def test_motor_rewards_olmadan_sonlu_ic_sayi_tutar(rewards):
     assert isinstance(xp, (int, float)) and xp > 0
     if isinstance(rewards, dict) and rewards:
         assert xp == 4 + 1 + 4
+
+
+# ── Son inceleme (Küçük 5): tarama arayüz metnine sınırlı ───────────────────
+
+def test_anlatidaki_yarisma_ve_sefer_haritasi_dusurmez():
+    """M2.7 "arayüz metni" der: yazarın gövde anlatısı (body, stem, explanation …) taranmaz. Eskiden Osmanlı'nın
+    "sefer haritası" ya da "bir yarışma düzenlendi" diyen bir tarih anlatısı G-WELLBEING'den düşüyordu."""
+    data = ornekler.ornek("QUIZ")
+    teach = next(s for s in data["segments"] if s["type"] == "teach")
+    teach["body"] = ["<p>Osmanlı ordusunun sefer haritası Mohaç'a uzanıyordu.</p>",
+                     "<p>Okulda bir yarışma düzenlendi; öğrenciler turnuva için hazırlandı.</p>"]
+    _mcq(data)["questions"][0]["explanation"] = "Meydan okuma bir cesaret örneğidir."
+    assert gates.run_gates(derleme.derle(data, {}, ORIGIN))["G-WELLBEING"]["status"] != "FAIL"
+
+
+@pytest.mark.parametrize("alan, deger", [
+    ("kicker", "Yarışma"), ("instructions", "Meydan oku: en hızlı sen ol!"), ("title", "Kesirler Yarışması"),
+    ("title", "Kesir Turnuvası"), ("title", "Liderlik tablosu"), ("title", "Yarış"),
+    ("title", "Skor tablosu"), ("kicker", "Sıralama tablosu"), ("title", "Kesir Düellosu"),
+])
+def test_arayuz_alanlarindaki_rekabet_cercevesi_duser(alan, deger):
+    data = ornekler.ornek("QUIZ")
+    _mcq(data)[alan] = deger
+    rapor = gates.run_gates(derleme.derle(data, {}, ORIGIN))
+    assert rapor["G-WELLBEING"]["status"] == "FAIL", (alan, deger)
+
+
+def test_asama_adi_ve_oz_degerlendirme_secenegi_arayuz_metnidir():
+    data = ornekler.ornek("QUIZ")
+    ids = [s["id"] for s in data["segments"]]
+    data["meta"]["milestones"] = [{"atSegmentId": ids[0], "title": "Keşfet"}, {"atSegmentId": ids[1], "title": "Yarış"},
+                                  {"atSegmentId": ids[2], "title": "Pekiştir"}]
+    assert gates.run_gates(derleme.derle(data, {}, ORIGIN))["G-WELLBEING"]["status"] == "FAIL"
+    data = ornekler.ornek("QUIZ")
+    next(s for s in data["segments"] if s["type"] == "checkpoint")["selfAssess"] = ["Yarışmayı kazandım", "Tekrar"]
+    assert gates.run_gates(derleme.derle(data, {}, ORIGIN))["G-WELLBEING"]["status"] == "FAIL"

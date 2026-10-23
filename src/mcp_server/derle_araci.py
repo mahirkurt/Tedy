@@ -18,9 +18,11 @@ logger = logging.getLogger(__name__)
 DETAIL_MAX = 300
 NEXT_OK = "Önizleme için edupedia_onizle(taslak_id); yayın için edupedia_yayinla(taslak_id, ted_link?)."
 NEXT_FAIL = "FAIL veren kapıları MODULE_DATA'da düzelt ve edupedia_derle'yi tekrar çağır; HTML'i kendin yazma."
-ALT_DAYANAK_NOTU = ("Alt metindeki özel ad ve sayılar figürün açıklamasında (edupedia_gorsel kaynak_verisi.varlik.aciklama) "
-                    "ya da çerçeve sayfalarında geçmeli. Kaynaktaki gibi yaz; bilerek farklı yazdıysan nedenini "
-                    "meta.assets[i].alt_gerekce'ye yaz (en az 20 karakter), derleme o zaman uyarıyla geçer.")
+ALT_DAYANAK_NOTU = ("Alt metindeki özel ad ve sayılar kitabın kendi metninde geçmeli: figür altı yazısı "
+                    "(edupedia_gorsel kaynak_verisi.varlik.kitap_altyazisi), etiket ya da çerçeve sayfaları. Yalnız "
+                    "betim'de (yapay zekâ ya da sağlayıcı betimi) geçmek yetmez. Kitaptaki gibi yaz; bilerek farklı "
+                    "yazdıysan nedenini meta.assets[i].alt_gerekce'ye yaz (en az 20 karakter), derleme o zaman "
+                    "uyarıyla geçer.")
 AssetLoader = Callable[[str], Mapping[str, GomuluVarlik]]
 
 

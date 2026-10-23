@@ -643,7 +643,7 @@ def _grafik_calistir(ifade: str) -> str:
     sabitler = [re.search(r"const VIZ_METIN=[^\n]*", metin).group(0), "const VIZ_CIZICI=new Map();",
                 "let vizSonG=VIZ_W;"]
     kod = "\n".join([esc] + sabitler + [_js_fonksiyon(metin, ad) for ad in (
-        "vizId", "svgFigure", "vizNice", "vizKaydet", "vizMetinGenisligi", "vizGenislik", "vizOznitelik",
+        "vizId", "svgFigure", "vizNice", "vizEmTablosu", "vizKaydet", "vizMetinGenisligi", "vizGenislik", "vizOznitelik",
         "vizSatirla", "vizChart", "vizChartSvg", "fractionBar")]
                     + [f"process.stdout.write(String({ifade}));"])
     return subprocess.run([node, "-e", kod], capture_output=True, text=True, check=True, timeout=30).stdout

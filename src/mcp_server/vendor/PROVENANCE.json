@@ -5,7 +5,7 @@
     "assets/carbon-v11-authority.json": "d6958862826c8b36adae53781724b0447b06045d7853602984c85a48c32aa5ce",
     "assets/fonts-manifest.json": "23153bf47b3c0b1859eca6ffccae83ff0365e673b2e4f1ad7eb32353af47a7e0",
     "assets/ibm-plex-OFL.txt": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f",
-    "assets/module-template.html": "7ed35020524dd0bec5de8378bc777caeba0171a2d2487d3d839780d724439b98",
+    "assets/module-template.html": "468198605d4dc55087bb39e606ec038fedebb1ed30e59497818333fd1217b858",
     "references/adhd-pedagogy.md": "500e62eb5af169a56fe118911ca15b38b92cc5b0286091ce67bf379081aba83d",
     "references/audio-system.md": "864bec9fada2e2e8c663dcebe14b0593b4ea1c661f32240253f370fd07df6d1e",
     "references/carbon-child-system.md": "3338cfb6e9ec2c51974c3729add9c9a117afe3169df1cf00a88e8f7e23dac28a",
@@ -13,20 +13,20 @@
     "references/carbon-sources.md": "bcb6c26fc0e38eecf8b0502068987610cfc1b40034b9075765aeaec71b296b0b",
     "references/color-system.md": "6b6cddd4627390eb3053df41e93b0249ba02391d35758f3967ca1a9f01779557",
     "references/content-enrichment.md": "9d906ca003fbed478df887ff45d38c1f631a4ace7110df68f0231985836e14f2",
-    "references/curriculum-integration.md": "5c438c48f9e3c831d1cb4476355a4bd178bea51a796fe9ec733396d7700578dc",
+    "references/curriculum-integration.md": "39516e865982efd1ad99fb373adf3346bd8c55dd98adf9ec6fe564b5a724a771",
     "references/exam-solving.md": "80b0334d866c8bc553c53cd584d390cb38039bf902d8cc4efe6aab46f667efde",
     "references/figma-carbon-interop.md": "713091c40e8627e14972fbe66da38c0827128911b1aa6caf6282cb447bc1f4b9",
     "references/gamified-flows.md": "bad436d05a67fd6ec96835ef304b04cfb0102eda765bcadeca066bc182bc364a",
     "references/icon-pictogram-svg.md": "833324ef2b282f19b28289ae5ced09620b4d7573bea19b6d4afd5fd10b195874",
     "references/interaction-patterns.md": "c9fbd67e9ba6af56b425adf0eba269c2a26755cb199433d9ce4bdddecb677292",
-    "references/module-architecture.md": "b0e2c1651fcef5ed4d8511eb767257eaeea8b1c2fbefdefab8c1cce4ec2b3eb5",
+    "references/module-architecture.md": "c6d748d07e7625dd62920109eadb3fa493d1b9e7f5bc0dad6e00b49ba9868a43",
     "references/newgen-question-design.md": "068243dfe11d052d7570f0201eb79744616072e7d8b2e8ca1bf3848d72db28ba",
     "references/subject-packs.md": "3782c67a60bfae68a8890a96f74e769b2e5397b0fa1699c0a07fb38c16c3e5b9",
     "references/svg-authoring.md": "387845914d8ad94111d073eb3dfd873eb6d99bac14766d291378dd90f6ee6c47",
-    "references/tedy-integration.md": "cede013bec78d7ee52dce07bfda78f01462caefddb55f9fac6fc5e17818ddb50",
+    "references/tedy-integration.md": "368c259ffa457c061d13c4dd3355e6dbc586ddeb6b63ae37092fac3d317aed8d",
     "scripts/embed_ibm_plex_fonts.py": "40330439feafc64792460062111b4aefe88c7a79af5f73fd11498f005036f0f0",
     "scripts/sync_carbon_tokens.py": "889f2184c23d361968a076728890f827e6960294e13f434b441116340cd0e99a",
-    "scripts/validate_module.py": "e46a5cf5c60c2e332f72338c95e6480d9dc7675f0732f4c14af6c03aa0530689",
+    "scripts/validate_module.py": "d984673afc64c7730f5d3fe4cbefab0556ee39149fe22300d351076f718bd992",
     "tests/conftest.py": "1ddc913ac540a0a9430819d8fb02445f6faf7f8fd77729f461dad500eaab7a6d",
     "tests/fixtures/adaptive_pass.html": "cd1692e0ea676ee41e07df138bd84aa2142517587e2ddee826ad71756b1dfe49",
     "tests/fixtures/conceptmap_pass.html": "2393d1614b39a2340eaefb57642b66fb3aea533d930e8bb66de004d8b01c6123",
@@ -46,7 +46,7 @@
     "tests/fixtures/sim_pass.html": "e352690c2126f4ab75c296f8cb977ca0c7b3f46d181e1f9babd76f188531e246",
     "tests/fixtures/streak_gainonly.html": "e5bd831e0918bbbdf1aee25f6ad2558436e7c409d1ba071484786095484eff7c",
     "tests/fixtures/worked_pass.html": "786a0b71caef541f3f8bfd0e95e5d034a8bf8857e521e5fe6bd84c7ea07bbda8",
-    "tests/test_gates.py": "189a5188c7dbb4351861c46431d25dec89ffd81e687a92297e2c729c89bab072"
+    "tests/test_gates.py": "7e9e93a2e3c5cbd422713c674790bfe6cd5fb0230d2c878e5d950536dc11ad25"
   },
   "origin": {
     "last_commit": "3ef6a26ef415ed9765377d225be04b33834db428",
@@ -54,7 +54,7 @@
     "repo": "https://github.com/mahirkurt/CureoPrivate",
     "retired_in": "edupedia 1.0.0"
   },
-  "pinned_at": "2026-10-23T15:47:08+00:00",
+  "pinned_at": "2026-10-23T16:39:29+00:00",
   "source_commit": "1aee3845efffb103a0e4e5b489f4477c0b3017b0",
   "synced_at": "2026-09-18T10:43:35+00:00"
 }

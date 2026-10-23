@@ -159,11 +159,14 @@ Araçlar dört işlevsel kümeye ayrılır. **Çoğu modül için 3–6 çağrı
 3. **Göm (Tier-2b):** figürü `edupedia_gorsel` getirir ve `meta.assets` ile `<teachId>.visual`
    yuvasına bağlar (Kanun M3.1; `tier2_status: embedded`). Figürün `page_no`'su çerçeve
    sayfalarında değilse gerekçe `meta.assets[i].pencere_disi_gerekce`'ye yazılır (M3.4).
-   Aynı kayda `alt` (60–150 karakterlik bitmiş cümle; süs görseli `""`) ve `baslik` (kitaptaki
-   adıyla görünür altyazı, ≤ 120 karakter; `kaynak_verisi.varlik.etiket` "Görsel 1.30" ise
-   "Görsel 1.30: İstiklal Yolu yürüyüşü") yazılır (M3.6, M3.7). Alt metindeki ad ve sayılar
-   `kaynak_verisi.varlik.aciklama`'da ya da çerçeve sayfalarında geçmeli; `edupedia_derle`
-   bunu denetler, geçmeyen için nedeni `alt_gerekce`'ye yaz.
+   Aynı kayda `alt` (60–150 karakterlik bitmiş cümle) ve `baslik` (kitaptaki adıyla görünür
+   altyazı, ≤ 120 karakter; `kaynak_verisi.varlik.kitap_altyazisi` "Görsel 1.30: İstiklal Yolu
+   yürüyüşü", `etiket` "Görsel 1.30" ise altyazı bu adı taşır) yazılır (M3.6, M3.7); süs görseli
+   `alt: ""` alır, `baslik` almaz. Alt metindeki ad ve sayılar kitabın kendi metninde —
+   `kitap_altyazisi`, `etiket` ya da çerçeve sayfaları — geçmeli; `betim` (Maarif'in VLM
+   betimi) dayanak değildir: figür 4189'un betimi KAAN'ı "F-35" diye adlandırır, kitabın
+   altyazısı "Görsel 1.1.1: Kaan" der. `edupedia_derle` bunu denetler, geçmeyen için nedeni
+   `alt_gerekce`'ye yaz.
    Hata → Tier-1'e düş (`tier2_status: degraded`) ve **bunu raporla**.
    > **DİKKAT — `include_image=true` base64 VERMEZ.** Görseli MCP ImageContent olarak döndürür:
    > model onu **görür** (bu Tier-2a'nın değeridir) ama base64'ünü metin olarak **almaz**,
