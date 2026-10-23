@@ -152,6 +152,14 @@ def gorsel_ornegi() -> tuple[dict[str, Any], dict[str, Any]]:
         {"type": "numberline", "id": "n2", "title": "Çekirgenin Sıçrayışları",
          "numberline": {"min": -6, "max": 8, "step": 1, "title": "Çekirgenin konumları",
                         "points": [{"value": v} for v in (-5, -3, -1, 1, 3, 5, 7)]}},
+        # İkinci inceleme: ardışık her tam sayı nokta ve yan yana harf adları; etiketler gerektiği kadar satıra
+        # iner, hiçbiri çakışmaz, her değer okunur.
+        {"type": "numberline", "id": "n3", "title": "Ardışık Noktalar",
+         "numberline": {"min": -10, "max": 10, "step": 1, "title": "Eksi beşten beşe her tam sayı",
+                        "points": [{"value": v, "label": h} for v, h in zip(range(-5, 6), "ABCDEFGHIJK")]}},
+        {"type": "numberline", "id": "n4", "title": "Dar Aralık",
+         "numberline": {"min": -3, "max": 3, "step": 1, "title": "Eksi üçten üçe her tam sayı",
+                        "points": [{"value": v} for v in range(-3, 4)]}},
         {"type": "fraction", "id": "fr1", "title": "Kesirleri Topla", "kind": "sum", "addends": [1, 2, 3], "den": 8},
         {"type": "diagram", "id": "d1", "title": "Hücrenin Bölümleri", "viewBox": "0 0 480 300",
          "base": ('<ellipse cx="240" cy="150" rx="200" ry="120" fill="var(--cds-layer-01)" '

@@ -2420,20 +2420,31 @@ const MODULE_DATA = {
     if(satir) satirlar.push(satir);
     return satirlar.length?satirlar:[""];
   }
+  // Ortalı etiketleri satırlara dağıtır (Kanun M5.6): soldan sağa her etiket, son etiketiyle ölçülmüş
+  // genişlikle VIZ_BOSLUK'tan yakın olmadığı ilk satıra; hiçbirine sığmazsa yeni satır açılır — üst üste
+  // yazılmaz. Satırda yalnız son etiketle karşılaştırmak yeter: x sıralı, öncekiler daha soldadır.
+  // ogeler: [{x, w}]; dönüş: aynı sırayla satır numaraları (1, 2, …).
+  function vizSatirAta(ogeler){
+    const sonlar=[], satir=new Array(ogeler.length);
+    ogeler.map((o,i)=>i).sort((a,b)=>ogeler[a].x-ogeler[b].x).forEach(i=>{
+      const o=ogeler[i];
+      let r=sonlar.findIndex(j=>Math.abs(o.x-ogeler[j].x) >= (o.w+ogeler[j].w)/2+VIZ_BOSLUK);
+      if(r<0){ sonlar.push(i); r=sonlar.length-1; } else sonlar[r]=i;
+      satir[i]=r+1;
+    });
+    return satir;
+  }
   // Sayı ekseni etiketleri (Kanun M5.6): komşu iki etiket, ölçülmüş genişlikleriyle VIZ_BOSLUK'tan yakın değilse
-  // ikisi de yazılır. Önce zorunlular (sayı doğrusunda noktaların değerleri) yerleşir; birbiriyle çakışan ikinci
-  // satıra iner. Sonra düzenli adım: k ∈ {1,2,4,5,10,…}, sıfırı (yoksa ilk değeri) etiketler, sığıyorsa iki ucu
-  // da; zorunluyla çakışan düzenli etiket düşer. Dönüş: etiketli indis → satır (1 ya da 2).
+  // ikisi de yazılır. Önce zorunlular (sayı doğrusunda noktaların değerleri) yerleşir: çakışan bir sonraki satıra
+  // iner, gerektiği kadar satır açılır (vizSatirAta). Sonra düzenli adım: k ∈ {1,2,4,5,10,…}, sıfırı (yoksa ilk
+  // değeri) etiketler, sığıyorsa iki ucu da; ilk satırdaki zorunluyla çakışan düzenli etiket düşer.
+  // Dönüş: etiketli indis → satır (1, 2, …).
   function vizSayiEtiketleri(degerler, X, fmt, zorunlu){
     const n=degerler.length, w=degerler.map(v=>vizMetinGenisligi(fmt(v)));
     const cakisir=(i,j)=>Math.abs(X(degerler[j])-X(degerler[i])) < (w[i]+w[j])/2+VIZ_BOSLUK;
     const satir=new Map();
-    let son1=-1, son2=-1;
-    Array.from(zorunlu||[]).sort((a,b)=>a-b).forEach(i=>{
-      if(son1<0 || !cakisir(son1,i)){ satir.set(i,1); son1=i; }
-      else if(son2<0 || !cakisir(son2,i)){ satir.set(i,2); son2=i; }
-      else { satir.set(i,1); son1=i; }
-    });
+    const zor=Array.from(zorunlu||[]).sort((a,b)=>a-b);
+    vizSatirAta(zor.map(i=>({x:X(degerler[i]), w:w[i]}))).forEach((r,j)=>satir.set(zor[j], r));
     const sifir=degerler.findIndex(v=>Math.abs(v)<1e-9), a0=sifir<0?0:sifir;
     const duzenli=k=>{ const s=[]; for(let i=0;i<n;i++) if(((i-a0)%k+k)%k===0) s.push(i); return s; };
     const sigar=s=>s.every((i,j)=>j===0 || !cakisir(s[j-1],i));
@@ -2660,30 +2671,34 @@ const MODULE_DATA = {
   function numberLineCiz(spec, id, G){
     const min=spec.min!=null?spec.min:0, max=spec.max!=null?spec.max:10;
     const step=spec.step||1, tid=id+"t", did=id+"d";
-    const W=Math.min(NL_W, vizGenislik(G)),PADX=NL_PADX,Y=64, plotW=W-2*PADX, span=(max-min)||1;
+    const W=Math.min(NL_W, vizGenislik(G)),PADX=NL_PADX, plotW=W-2*PADX, span=(max-min)||1;
     const X=v=>PADX+plotW*((v-min)/span);
     const degerler=[];
     for(let v=min; v<=max+1e-9; v=+(v+step).toFixed(6)) degerler.push(v);
     // Noktaların değeri her genişlikte okunur: değerine denk gelen tik zorunlu etiketlidir (Kanun M5.6).
     const zorunlu=new Set((spec.points||[]).map(p=>degerler.findIndex(v=>Math.abs(v-numOr(p.value,NaN))<1e-9)).filter(i=>i>=0));
     const etiketler=vizSayiEtiketleri(degerler, X, v=>+v.toFixed(6), zorunlu);
-    const ikinciSatir=[...etiketler.values()].includes(2), H=ikinciSatir?120:110;
+    // Noktaların harf adları da aynı kurala uyar: yan yana gelen adlar üst üste değil, üst satırlara yazılır.
+    const adli=(spec.points||[]).filter(p=>p.label);
+    const adSatiri=vizSatirAta(adli.map(p=>({x:X(p.value), w:vizMetinGenisligi(p.label, VIZ_METIN, true)})));
+    const SATIR=VIZ_METIN*VIZ_SATIR, ustSatir=Math.max(1, ...adSatiri), altSatir=Math.max(1, ...etiketler.values());
+    const Y=64+(ustSatir-1)*SATIR, H=Math.ceil(Y+46+(altSatir-1)*SATIR);
     let ticks="";
     degerler.forEach((v,i)=>{
       const x=X(v), satir=etiketler.get(i);
-      ticks+=`<line class="viz-axis" x1="${x.toFixed(1)}" y1="${Y-6}" x2="${x.toFixed(1)}" y2="${Y+6}" stroke-width="1.5"/>`
-        +(satir?`<text class="viz-muted" x="${x.toFixed(1)}" y="${(Y+26+(satir-1)*VIZ_METIN*VIZ_SATIR).toFixed(1)}" text-anchor="middle" font-size="${VIZ_METIN}">${(+v.toFixed(6))}</text>`:"");
+      ticks+=`<line class="viz-axis" x1="${x.toFixed(1)}" y1="${(Y-6).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(Y+6).toFixed(1)}" stroke-width="1.5"/>`
+        +(satir?`<text class="viz-muted" x="${x.toFixed(1)}" y="${(Y+26+(satir-1)*SATIR).toFixed(1)}" text-anchor="middle" font-size="${VIZ_METIN}">${(+v.toFixed(6))}</text>`:"");
     });
     let hi="";
     if(spec.highlight && spec.highlight.length===2){
       const a=X(spec.highlight[0]), b=X(spec.highlight[1]);
-      hi=`<rect x="${Math.min(a,b).toFixed(1)}" y="${Y-5}" width="${Math.abs(b-a).toFixed(1)}" height="10" rx="3" fill="var(--accent-tint)" stroke="var(--accent)" stroke-width="1.5"/>`;
+      hi=`<rect x="${Math.min(a,b).toFixed(1)}" y="${(Y-5).toFixed(1)}" width="${Math.abs(b-a).toFixed(1)}" height="10" rx="3" fill="var(--accent-tint)" stroke="var(--accent)" stroke-width="1.5"/>`;
     }
-    const axis=`<line class="viz-axis" x1="${PADX}" y1="${Y}" x2="${W-PADX}" y2="${Y}" stroke-width="2" marker-end="url(#vz-arrow)"/>`;
+    const axis=`<line class="viz-axis" x1="${PADX}" y1="${Y.toFixed(1)}" x2="${W-PADX}" y2="${Y.toFixed(1)}" stroke-width="2" marker-end="url(#vz-arrow)"/>`;
     const pts=(spec.points||[]).map(p=>{
-      const x=X(p.value), c=p.color||"var(--accent)";
-      return `<circle cx="${x.toFixed(1)}" cy="${Y}" r="6" fill="${c}"/>`
-        +(p.label?`<text x="${x.toFixed(1)}" y="${Y-14}" text-anchor="middle" font-size="${VIZ_METIN}" font-weight="600">${esc(p.label)}</text>`:"");
+      const x=X(p.value), c=p.color||"var(--accent)", r=p.label?adSatiri[adli.indexOf(p)]:0;
+      return `<circle cx="${x.toFixed(1)}" cy="${Y.toFixed(1)}" r="6" fill="${c}"/>`
+        +(p.label?`<text x="${x.toFixed(1)}" y="${(Y-14-(r-1)*SATIR).toFixed(1)}" text-anchor="middle" font-size="${VIZ_METIN}" font-weight="600">${esc(p.label)}</text>`:"");
     }).join("");
     let handle="", readout="", nlAttrs="";
     if(spec.interactive){

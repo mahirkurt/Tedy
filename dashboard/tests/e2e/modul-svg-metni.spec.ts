@@ -10,11 +10,13 @@ import { fileURLToPath } from 'node:url'
 // every width — measured the law's way, `fontSize × getScreenCTM().a`, never the text box (the box is ~36 %
 // taller than the drawn type). The fixture is the real compiler's `ornekler.gorsel_ornegi()`: every SVG the
 // template draws (number line, bar and line chart, interactive number line, fraction bar, labelled diagram,
-// three simulations) plus a raster figure with its caption (M3.7). Frame widths 288 and 358 are §6.1's
-// post-KB-31 phone frames, opened directly; 320 (the edge case), 390, 1440, 2560 and 3840 (root 21.33 and
-// 32) are screen widths in the dashboard's flow layout. On every segment no two SVG text boxes overlap, and
-// on the "Çekirgenin Sıçrayışları" number line every point's value is a visible label (the review's
-// decision for M5.6). TEDY_KB_GORUNTU=<dir> also writes the screenshots used for the eye check.
+// three simulations) plus a raster figure with its caption (M3.7). Frame widths 272 and 342 (today's frames at
+// screen 320 and 390) and 288 and 358 (§6.1's post-KB-31 phone frames) are opened directly; 320 (the edge
+// case), 390, 1440, 2560 and 3840 (root 21.33 and 32) are screen widths in the dashboard's flow layout. On every
+// segment no two SVG text boxes overlap, and on the number lines with points every point's value — and its
+// letter name — is a visible label (the review's decision for M5.6): "Çekirgenin Sıçrayışları", and the second
+// review's dense lines "Ardışık Noktalar" (−10…10, every integer −5…5 a lettered point) and "Dar Aralık"
+// (−3…3, every integer a point). TEDY_KB_GORUNTU=<dir> also writes the screenshots used for the eye check.
 
 const PORT = Number(process.env.TEDY_E2E_PORT ?? 8286)
 const ORIGIN = `http://127.0.0.1:${PORT}`
@@ -109,6 +111,13 @@ async function cakisanMetinler(f: Frame | Page): Promise<string[]> {
 }
 
 const CEKIRGE = ['-5', '-3', '-1', '1', '3', '5', '7']
+const ARALIK = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => String(a + i))
+/** Stage heading → the labels that must be visible on its number line. */
+const NOKTA_ETIKETLERI: Record<string, string[]> = {
+  'Çekirgenin': CEKIRGE,
+  'Ardışık Noktalar': [...ARALIK(-5, 5), ...'ABCDEFGHIJK'.split('')],
+  'Dar Aralık': ARALIK(-3, 3),
+}
 
 /** Walks every segment; on each, all SVG text is ≥ 12 px, no two text boxes overlap, and something was measured. */
 async function herBolumuOlc(f: Frame | Page, ad: string) {
@@ -121,9 +130,11 @@ async function herBolumuOlc(f: Frame | Page, ad: string) {
     }).toEqual([])
     expect(await cakisanMetinler(f), `${ad}: ${bolum} bölümünde üst üste binen SVG metni`).toEqual([])
     const tumu = await svgMetinleri(f)
-    if ((await f.locator('#stage h2').textContent())?.includes('Çekirgenin')) {
+    const baslik = (await f.locator('#stage h2').textContent()) ?? ''
+    for (const [anahtar, gerekli] of Object.entries(NOKTA_ETIKETLERI)) {
+      if (!baslik.includes(anahtar)) continue
       const gorunen = tumu.map(o => o.metin)
-      expect(CEKIRGE.filter(d => !gorunen.includes(d)), `${ad}: nokta değeri okunmuyor`).toEqual([])
+      expect(gerekli.filter(d => !gorunen.includes(d)), `${ad}: ${anahtar} — nokta değeri ya da adı okunmuyor`).toEqual([])
     }
     olculen[`${i}:${bolum}`] = tumu.length
     if (i < segmentSayisi - 1) await f.locator('#nextBtn').click()
@@ -132,7 +143,7 @@ async function herBolumuOlc(f: Frame | Page, ad: string) {
   expect(Object.values(olculen).filter(n => n > 0).length, JSON.stringify(olculen)).toBeGreaterThanOrEqual(8)
 }
 
-for (const genislik of [288, 358]) {
+for (const genislik of [272, 288, 342, 358]) {
   test(`SVG text is at least 12 px in a ${genislik} px module frame`, async ({ page }) => {
     const hatalar = hatalariTopla(page)
     await serveModule(page)
@@ -220,7 +231,7 @@ if (GORUNTU) {
       const f = page.frame({ url: /modul\.tedy\.online/ })!
       mkdirSync(GORUNTU, { recursive: true })
       const adlar = ['sayi-dogrusu', 'figur', 'cubuk-grafik', 'cizgi-grafik', 'etkilesimli-sayi-dogrusu', 'cekirge',
-        'kesir', 'sema', 'olcek', 'sarkac', 'atis']
+        'ardisik-noktalar', 'dar-aralik', 'kesir', 'sema', 'olcek', 'sarkac', 'atis']
       for (let i = 0; i < adlar.length; i++) {
         await expect.poll(async () => (await svgMetinleri(f)).filter(o => o.px < 12 - 1e-6)).toEqual([])
         await f.locator('#stage').scrollIntoViewIfNeeded()

@@ -44,7 +44,7 @@ def _calistir(govde: str):
     parcalar = [esc, _blok("function vizEmTablosu("), re.search(r"const VIZ_METIN=[^\n]*", SABLON).group(0),
                 "const VIZ_CIZICI=new Map();", "let vizSonG=VIZ_W;", "const NL_W=480, NL_PADX=28;"]
     for ad in ("vizId", "svgFigure", "vizNice", "vizKaydet", "vizMetinGenisligi", "vizGenislik", "vizOznitelik",
-               "vizSatirla", "vizSayiEtiketleri", "vizChart", "vizChartSvg", "numOr", "clampNum", "numberLine",
+               "vizSatirla", "vizSatirAta", "vizSayiEtiketleri", "vizChart", "vizChartSvg", "numOr", "clampNum", "numberLine",
                "numberLineCiz", "fractionBar", "labeledFigure"):
         parcalar.append(_blok(f"function {ad}("))
     parcalar.append(_blok("const SIM_PRESETS = {") + ";")
@@ -115,6 +115,15 @@ IFADELER = {
                         "{label:'Maden işleri',value:3},{label:'Ulaşım ağı',value:12}]}, G)"),
     # Yayındaki mat7 "Çekirgenin altı eşit sıçrayışı"na benzer: nokta değerleri her genişlikte okunur.
     "cekirge": "numberLine({min:-6,max:8,step:1,points:[-5,-3,-1,1,3,5,7].map(v=>({value:v}))}, G)",
+    # İkinci inceleme: ardışık her tam sayı nokta — üçüncü komşu eskiden ilk satırın üstüne yazılıyordu
+    # (çerçeve 288'de "−3 ↔ −2", 272'de "−1 ↔ 0").
+    "yogun_noktali": "numberLine({min:-10,max:10,step:1,points:[-5,-4,-3,-2,-1,0,1,2,3,4,5].map(v=>({value:v}))}, G)",
+    "yogun_dar": "numberLine({min:-3,max:3,step:1,points:[-3,-2,-1,0,1,2,3].map(v=>({value:v}))}, G)",
+    # Noktaların harf adları yan yana (−3 "A" ve −2 "C") ve yoğun harfli nokta dizisi.
+    "harfli_bitisik": ("numberLine({min:-10,max:10,step:1,points:[{value:-3,label:'A'},{value:-2,label:'C'},"
+                       "{value:4,label:'B'}]}, G)"),
+    "yogun_harfli": ("numberLine({min:-10,max:10,step:1,points:'ABCDEFGHIJK'.split('').map((h,i)=>"
+                     "({value:i-5,label:h}))}, G)"),
     "kesir": "fractionBar({addends:[1,2,3],den:8}, G)",
     "oran": "fractionBar({ratio:[2,3],labels:['Kız','Erkek']}, G)",
     "sema": "labeledFigure({viewBox:'0 0 480 300',labels:[{x:250,y:150,text:'a'},{x:110,y:110,text:'b'}]}, G)",
@@ -160,8 +169,9 @@ def _tik_etiketleri(svg: str) -> list[str]:
             if not kalin and re.fullmatch(r"-?\d+(?:\.\d+)?", m)]
 
 
-@pytest.mark.parametrize("ad", ["sayi_dogrusu", "etkilesimli_sayi_dogrusu", "cekirge", "cubuk", "cubuk_kisa",
-                                "cubuk_ornek", "cubuk_iki_satir", "cizgi", "sim_numberScale"])
+@pytest.mark.parametrize("ad", ["sayi_dogrusu", "etkilesimli_sayi_dogrusu", "cekirge", "yogun_noktali", "yogun_dar",
+                                "harfli_bitisik", "yogun_harfli", "cubuk", "cubuk_kisa", "cubuk_ornek",
+                                "cubuk_iki_satir", "cizgi", "sim_numberScale"])
 @pytest.mark.parametrize("kutu", KUTULAR)
 def test_ayni_satirdaki_etiketler_olculmus_genislikle_cakismaz(cizimler, kutu, ad):
     assert _cakisanlar(cizimler["em"], cizimler[str(kutu)][ad]) == []
@@ -189,6 +199,29 @@ def test_nokta_degerleri_her_genislikte_okunur(cizimler, kutu):
     assert {str(v) for v in (-5, -3, -1, 1, 3, 5, 7)} <= set(etiketler), (kutu, etiketler)
     a_b = _tik_etiketleri(cizimler[str(kutu)]["sayi_dogrusu"])
     assert {"-3", "4"} <= set(a_b), (kutu, a_b)
+    # Ardışık her tam sayı nokta olsa da (ikinci inceleme) her değer yazılı.
+    yogun = _tik_etiketleri(cizimler[str(kutu)]["yogun_noktali"])
+    assert {str(v) for v in range(-5, 6)} <= set(yogun), (kutu, yogun)
+    dar = _tik_etiketleri(cizimler[str(kutu)]["yogun_dar"])
+    assert {str(v) for v in range(-3, 4)} <= set(dar), (kutu, dar)
+    harfler = [m for etiketler in _satir_etiketleri(cizimler[str(kutu)]["yogun_harfli"]).values()
+               for m, _x, _f, kalin in etiketler if kalin]
+    assert sorted(harfler) == list("ABCDEFGHIJK"), (kutu, harfler)
+
+
+@pytest.mark.parametrize("ad", ["sayi_dogrusu", "cekirge", "yogun_noktali", "yogun_dar", "harfli_bitisik",
+                                "yogun_harfli", "etkilesimli_sayi_dogrusu"])
+@pytest.mark.parametrize("kutu", KUTULAR)
+def test_sayi_dogrusu_etiket_satirlari_viewboxa_sigar(cizimler, kutu, ad):
+    """Gerektiği kadar satır açılır ve SVG'nin yüksekliği ona göre büyür: hiçbir etiket viewBox'ın dışına
+    taşmaz (üstte harf adları, altta değerler); satırlar arası en az bir yazı boyu."""
+    svg = cizimler[str(kutu)][ad]
+    yukseklik = float(re.search(r'viewBox="[\d.\-]+ [\d.\-]+ [\d.]+ ([\d.]+)"', svg).group(1))
+    satirlar = sorted(_satir_etiketleri(svg))
+    for y in satirlar:
+        assert y - 0.8 * 12 >= 0 and y + 0.3 * 12 <= yukseklik, (ad, kutu, y, yukseklik)
+    for ust, alt in zip(satirlar, satirlar[1:]):
+        assert alt - ust >= 1.3 * 12 - 1e-6, (ad, kutu, ust, alt)
 
 
 @pytest.mark.parametrize("kutu", (180, 198, 214, 268))

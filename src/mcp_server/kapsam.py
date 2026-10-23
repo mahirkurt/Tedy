@@ -588,8 +588,11 @@ class KapsamBuilder:
             first, last = _pencere(skor[doc_id], page_count)
         pencere_figurleri = sorted((f for f in figs if f["_doc"] == doc_id and first <= f["page_no"] <= last),
                                    key=lambda f: (f["page_no"], f["figure_id"]))
+        # Aday kitaptaki adıyla görünür: `etiket` Maarif'in `label`'ı ("Görsel 1.1.1"); `betim` VLM caption'ıdır
+        # (yoksa arama parçası) ve alt metne dayanak değildir — kitabın altyazısı (nearby_text) edupedia_gorsel'in
+        # kitap_altyazisi'ndadır (ikinci inceleme, Küçük d).
         figures = [{"figure_id": f["figure_id"], "page_no": f["page_no"], "etiket": f.get("label") or "",
-                    "aciklama": (f.get("caption") or f.get("snippet") or "")[:200]}
+                    "betim": (f.get("caption") or f.get("snippet") or "")[:200]}
                    for f in pencere_figurleri[:FIGURE_MAX]]
         text = _mufredat(self.federation, "get_document_text",
                          {"document_id": doc_id, "page_range": f"{first}-{last}",

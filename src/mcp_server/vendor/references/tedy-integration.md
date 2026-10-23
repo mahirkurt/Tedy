@@ -224,7 +224,8 @@ hareket (https://carbondesignsystem.com/building-blocks/foundations/motion/overv
   `rewards.badges` 2026-10-23'ten beri şema hatasıdır (Kanun M2.7, KB-21 kapandı).
 - **Rekabet çerçevesi yoktur** (M2.6, M2.7): soru seti "Alıştırma", zor soru seçeneği "Daha zor bir
   soru"; sefer haritası ve `meta.quest` yok. G-WELLBEING arayüz metninde — şablonun kromu ve
-  MODULE_DATA'nın `title`, `kicker`, `instructions`, `selfAssess` alanları — "Yarışma" (ve çekimleri),
+  MODULE_DATA'nın `title`, `kicker`, `instructions`, `selfAssess`, `interactiveLabel` alanları ve
+  `bins` (kutu düğmeleri), `params` (kaydırıcı etiketleri), `columns` (sütun başlıkları) — "Yarışma" (ve çekimleri),
   "Yarış", "Meydan oku", turnuva, düello, liderlik / skor / sıralama tablosu, sefer haritası ve
   "Son N durak" metninde FAIL verir; gövde anlatısı (bir tarih metnindeki "yarışma", Osmanlı'nın
   "sefer haritası") ve yazar katmanı taranmaz (Kanun M2.7, 1.3).

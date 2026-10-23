@@ -146,3 +146,40 @@ def test_asama_adi_ve_oz_degerlendirme_secenegi_arayuz_metnidir():
     data = ornekler.ornek("QUIZ")
     next(s for s in data["segments"] if s["type"] == "checkpoint")["selfAssess"] = ["Yarışmayı kazandım", "Tekrar"]
     assert gates.run_gates(derleme.derle(data, {}, ORIGIN))["G-WELLBEING"]["status"] == "FAIL"
+
+
+# ── İkinci inceleme (Küçük c): etiket türü arayüz alanları da arayüz metnidir ──
+
+def _wellbeing(module_data: str) -> str:
+    """Yalnız G-WELLBEING, derlenmiş modülün biçiminde: içerik MODULE_DATA'da, motor işaretinden önce."""
+    vm = gates.validator()
+    html = (f"<!doctype html><html lang=\"tr\"><body><script>\nconst MODULE_DATA = {module_data};\n"
+            "/* ==========\n   MOTOR (ENGINE) — DEĞİŞTİRMEYİN */\n</script></body></html>")
+    sonuc = vm.Result()
+    vm.gate_wellbeing(html, sonuc)
+    return next(s for g, s, _ in sonuc.rows if g == "G-WELLBEING")
+
+
+@pytest.mark.parametrize("segment", [
+    # Etkileşimli sayı doğrusunun tutamaç etiketi ve okuması
+    '{type:"numberline",title:"Sayılar",numberline:{min:0,max:10,interactive:true,interactiveLabel:"Skor tablosu"}}',
+    # Simülasyon kaydırıcısının etiketi
+    '{type:"sim",title:"Sarkaç",simType:"pendulum",params:[{key:"v",label:"Yarış hızı",min:0,max:10}]}',
+    # Sınıflandırmanın kutu adları (düğmeler)
+    '{type:"sorting",title:"Ayır",bins:["Turnuva grubu","Antrenman"],items:[{label:"Koşu",bin:0}]}',
+    # Tablonun sütun başlığı
+    '{type:"teach",title:"Tablo",body:[],visual:{kind:"table",columns:[{label:"Liderlik tablosu"}],rows:[]}}',
+])
+def test_etiket_turu_arayuz_alanlari_taranir(segment):
+    assert _wellbeing("{meta:{title:\"Kesirler\"},segments:[" + segment + "]}") == "FAIL", segment
+
+
+@pytest.mark.parametrize("segment", [
+    # İçerik etiketleri anlatıdır: grafik verisi, sayı doğrusu noktasının adı, sıralanan öğe, seçenek.
+    '{type:"teach",title:"Spor",body:[],visual:{kind:"chart",data:[{label:"Yarışma katılımcıları",value:3}]}}',
+    '{type:"numberline",title:"Sayılar",numberline:{min:0,max:10,points:[{value:3,label:"Yarış"}]}}',
+    '{type:"sorting",title:"Ayır",bins:["Bireysel","Takım"],items:[{label:"Turnuva tenisi",bin:0}]}',
+    '{type:"mcq",title:"Soru",questions:[{stem:"Hangisi?",options:["Yarışma","Sergi"],correctIndex:1}]}',
+])
+def test_icerik_etiketleri_taranmaz(segment):
+    assert _wellbeing("{meta:{title:\"Kesirler\"},segments:[" + segment + "]}") != "FAIL", segment

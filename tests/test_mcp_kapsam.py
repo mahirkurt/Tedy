@@ -97,7 +97,9 @@ def test_happy_path_frames_textbook_pages_figures_oer_and_ingests(tmp_path):
     kaynak = body["kaynak_verisi"]
     assert [p["page_no"] for p in kaynak["kitap_sayfalari"]] == list(range(111, 117))
     assert [f["figure_id"] for f in kaynak["figur_adaylari"]] == [10, 11]
-    assert len(kaynak["figur_adaylari"][1]["aciklama"]) == 200
+    # İkinci inceleme (Küçük d): aday kitaptaki adıyla (etiket = Maarif label) görünür; VLM caption'ı `betim`dir.
+    assert len(kaynak["figur_adaylari"][1]["betim"]) == 200
+    assert all("aciklama" not in f and "etiket" in f for f in kaynak["figur_adaylari"])
     assert len(kaynak["oer"][0]["pasaj"]) == 300 and len(kaynak["oer"][1]["pasaj"]) == 160
     assert kaynak["oer"][1]["alinti_izni"] is False
 
@@ -663,7 +665,7 @@ def test_float_figure_id_with_integer_value_is_accepted_as_int(tmp_path):
 
     assert body["status"] == "ok"
     figs = body["kaynak_verisi"]["figur_adaylari"]
-    assert figs == [{"figure_id": 10, "page_no": 112, "etiket": "Görsel 4.1", "aciklama": "x"}]
+    assert figs == [{"figure_id": 10, "page_no": 112, "etiket": "Görsel 4.1", "betim": "x"}]
     assert isinstance(figs[0]["figure_id"], int) and not isinstance(figs[0]["figure_id"], bool)
     assert body["coverage"]["maarif-mufredat"] == "hit"
 

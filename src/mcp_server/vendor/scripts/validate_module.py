@@ -901,7 +901,8 @@ def gate_contrast(html, R):
 # Rekabet / ödül çerçevesi (TEDY Modül Tasarım Kanunu M2.6, M2.7; KB-21, 2026-10-23): "Yarışma" (ve
 # çekimleri), yalın "Yarış", "Meydan oku(ma)", turnuva, düello, liderlik/skor/sıralama tablosu, sefer haritası ve
 # "Son N durak". Yalnız ARAYÜZ METNİ taranır (`_arayuz_metni`): şablonun kromu ve MODULE_DATA'nın arayüz alanları
-# (title, kicker, instructions, selfAssess). Yazarın gövde anlatısı (body, stem, explanation, recap …) bir tarih ya da
+# (title, kicker, instructions, selfAssess, interactiveLabel; bins, params, columns etiketleri). Yazarın gövde
+# anlatısı (body, stem, explanation, recap …) bir tarih ya da
 # fen anlatısıdır; "bir yarışma düzenlendi", Osmanlı'nın "sefer haritası" orada çerçeve değildir (son inceleme,
 # Küçük 5). Sınır: tarama yalnız bu adları bilir; eş anlamlısı yazılmış bir çerçeveyi kaçırabilir.
 WELLBEING_COMPETITION_RE = re.compile(
@@ -910,15 +911,31 @@ WELLBEING_COMPETITION_RE = re.compile(
     re.IGNORECASE)
 _MODULE_DATA_START_RE = re.compile(r"const\s+MODULE_DATA\s*=\s*\{")
 _ENGINE_MARKER_RE = re.compile(r"\n/\*\s*=+\s*\n\s*MOTOR \(ENGINE\)")
-_UI_FIELD_RE = re.compile(
-    r"\b(?:title|kicker|instructions)\s*:\s*(\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)")
+_JS_STRING = r"\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`"
+_UI_FIELD_RE = re.compile(r"\b(?:title|kicker|instructions|interactiveLabel)\s*:\s*(" + _JS_STRING + ")")
 _SELF_ASSESS_RE = re.compile(r"\bselfAssess\s*:\s*\[([^\]]*)\]")
+_JS_STRING_RE = re.compile(_JS_STRING)
+# Etiket türü arayüz alanları (ikinci inceleme, Küçük c): okura düğme ya da etiket olarak görünen diziler —
+# sınıflandırmanın kutu adları (`bins`, düğme), simülasyon kaydırıcılarının etiketleri (`params[].label`) ve
+# tablonun sütun başlıkları (`columns`). Dizinin bütün dizgeleri taranır (anahtar adları da; onlar rekabet
+# sözcüğü taşımaz). İçerik etiketleri taranmaz: grafik verisi, sayı doğrusu noktasının adı, sıralanan öğe,
+# kavram haritası düğümü, zaman çizelgesi olayı, seçenekler ve anahtar terimler anlatının parçasıdır.
+_UI_LABEL_ARRAYS = ("bins", "params", "columns")
+
+
+def _anahtar_dizileri(text, key):
+    """`key: [ ... ]` dizilerinin iç metni (köşeli ayraç sayarak; `_slice_bracketed` sınırı geçerli)."""
+    out = []
+    for m in re.finditer(r"\b" + re.escape(key) + r"\s*:\s*\[", text):
+        out.append(_slice_bracketed(text, m.end() - 1, "[", "]"))
+    return out
 
 
 def _arayuz_metni(html):
     """Okurun arayüz olarak gördüğü metin: MODULE_DATA dışındaki şablon (yorum, atıf altbilgisi ve JSON
-    varlık bloğu çıkarılmış) + MODULE_DATA'nın arayüz alanları (title, kicker, instructions, selfAssess).
-    MODULE_DATA yoksa (statik fikstür) bütün sayfa kromdur."""
+    varlık bloğu çıkarılmış) + MODULE_DATA'nın arayüz alanları (title, kicker, instructions, selfAssess,
+    interactiveLabel) ve etiket dizileri (bins, params, columns). MODULE_DATA yoksa (statik fikstür) bütün
+    sayfa kromdur."""
     m = _MODULE_DATA_START_RE.search(html)
     if m:
         end = _ENGINE_MARKER_RE.search(html, m.end())
@@ -932,6 +949,9 @@ def _arayuz_metni(html):
     for key in ("verification", "grounding", "frame_source", "curriculum"):
         data = _blank_keyed_objects(data, key)
     fields = [x.group(1) for x in _UI_FIELD_RE.finditer(data)] + [x.group(1) for x in _SELF_ASSESS_RE.finditer(data)]
+    for key in _UI_LABEL_ARRAYS:
+        for dizi in _anahtar_dizileri(data, key):
+            fields += [x.group(0) for x in _JS_STRING_RE.finditer(dizi)]
     return chrome + "\n" + "\n".join(fields)
 
 

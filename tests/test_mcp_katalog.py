@@ -118,6 +118,25 @@ def test_eski_taslak_bugunun_kapilarindan_gecmezse_yayinlanmaz(env):
     assert not ms.modules_root(tmp_path).exists() or not any(ms.modules_root(tmp_path).iterdir())
 
 
+def test_kapilar_yeniden_kosamazsa_yayin_durur(env, monkeypatch):
+    """İkinci inceleme (Küçük a): yayından önceki kapı koşusu istisna atarsa yayın kapalı kalır — kapanmış
+    sunucu_hatasi döner, istisnanın metni sızmaz, katalog ve sürüm dizini yazılmaz."""
+    from src.mcp_server import gates
+
+    tmp_path, derleyici, yayinci = env
+    taslak_id = _taslak(derleyici)
+
+    def boom(html):
+        raise RuntimeError("kapı düzeni bozuk: gizli ayrıntı")
+
+    monkeypatch.setattr(gates, "run_gates", boom)
+    body = yayinci.yayinla(FULL, taslak_id)
+    assert body["status"] == "sunucu_hatasi", body
+    assert "gizli" not in json.dumps(body, ensure_ascii=False)
+    assert ms.read_catalog(tmp_path) == []
+    assert not ms.modules_root(tmp_path).exists() or not any(ms.modules_root(tmp_path).iterdir())
+
+
 def test_orphan_version_directory_is_skipped_not_overwritten(env):
     tmp_path, derleyici, yayinci = env
     orphan = ms.modules_root(tmp_path) / "fen5-su" / "v1"
