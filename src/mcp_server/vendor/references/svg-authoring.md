@@ -18,7 +18,7 @@ SVG**'dir (harici kütüphane/CDN bağımlılığı yok). Motor üç yol sunar:
 | **Responsive** | Sabit `width/height` yerine `viewBox="0 0 W H"`; CSS `max-width:100%`. |
 | **Tema-duyarlı** | Renkleri **asla ham hex** verme. Yalnız `var(--cds-*)` ve `var(--viz-*)` kullan (Kanun §1 madde 1, M4.7): ör. `var(--cds-border-strong)`, nötr rampa `var(--viz-1..5)`, anlamsal `var(--viz-sun/water/cloud)`. Ders rengi (`--accent`) yazar SVG'sine girmez (M1.5). Metin rengini hiç verme — `.viz text` otomatik `--cds-text-primary` yapar; ikincil etiket için `class="viz-muted"`. |
 | **Erişilebilir** | Bilgi taşıyan SVG: `role="img"` + `<title id>` + (gerekirse) `<desc id>` + `aria-labelledby`. Salt-dekor SVG: `aria-hidden="true"`. |
-| **Sakin** | Animasyon yok; hareket yalnız okurun eylemine cevaptır ve motorun işidir (Kanun M2.10). Metin ekranda en az 12 px çizilir (M5.6). |
+| **Sakin** | Animasyon yok; hareket yalnız okurun eylemine cevaptır ve motorun işidir (Kanun M2.10). Metin ekranda en az 12 px çizilir (M5.6): şablonun çizicileri (grafik, sayı doğrusu, kesir, etiketli şema, simülasyon) viewBox'ı kutunun genişliğine kurar; yazar SVG'si kuramaz (KB-48), bu yüzden etiketi SVG'nin içine yazma — `diagram` (numaralı iğne + liste) ya da gövde metni kullan. |
 
 İskelet:
 ```html

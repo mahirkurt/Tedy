@@ -220,8 +220,11 @@ hareket (https://carbondesignsystem.com/building-blocks/foundations/motion/overv
   `firstTryBonus` yalnız bu iç sayıyı besler.
 - **Seri sayacı yoktur.** G-FLOW, işaretlemede seri sayacı öğesi (`id="streakChip"`) bulursa FAIL verir.
 - **Rozet gösterilmez** (kararın "kalırsa" seçeneği kullanılmadı: kilitli rozet "rozet avı"dır, kazanılan
-  rozet de ilerleme etiketinin taşımadığı bir bilgi taşımaz — anayasa §9, İ6). `rewards.badges`
-  geriye uyum için kabul edilir, ekranda yer almaz.
+  rozet de ilerleme etiketinin taşımadığı bir bilgi taşımaz — anayasa §9, İ6). `rewards` isteğe bağlıdır;
+  `rewards.badges` 2026-10-23'ten beri şema hatasıdır (Kanun M2.7, KB-21 kapandı).
+- **Rekabet çerçevesi yoktur** (M2.6, M2.7): soru seti "Alıştırma", zor soru seçeneği "Daha zor bir
+  soru"; sefer haritası ve `meta.quest` yok. G-WELLBEING öğrenci yüzeyinde "Yarışma", "Meydan oku",
+  sefer haritası ve "Son N durak" metninde FAIL verir.
 - **Ödül sesi yoktur**; doğru cevabın kısa `correct` earcon'u anında geri bildirim olarak kalır
   (isteğe bağlı, `audio-system.md`).
 - **Özet ekranı sessizdir:** "Modülü tamamladın", tamamlanan alıştırma sayısı düz metinle
@@ -253,7 +256,7 @@ hareket (https://carbondesignsystem.com/building-blocks/foundations/motion/overv
 
 - **Kanun ve kılavuz:** modül yüzeylerinde tasarım kararı TEDY Modül Tasarım Kanunu'nundur
   (`docs/tedy-modul-tasarim-kanunu.md`, `edupedia_rehber('kanun')`); adlı sapmalar KS-1…KS-12,
-  borçlar KB-1…KB-46. Talimatname (`docs/tedy-ui-ux-talimatnamesi.md`) pano bağını verir: §9
+  borçlar KB-1…KB-48. Talimatname (`docs/tedy-ui-ux-talimatnamesi.md`) pano bağını verir: §9
   modüller, §10 Carbon MCP protokolü, §11 sapmalar (S1…S50), §13 borçlar. Bu dosya yazım
   varlıklarının tek kaynağı olarak kalır (şablon, otorite JSON'u, referanslar; `vendor_sync
   --pin`); tasarım kararında kanun önceliklidir. Kod ajanları için TEDY katmanı:

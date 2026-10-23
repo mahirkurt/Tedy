@@ -82,7 +82,7 @@ yanlışta açıklama + devam. Seri sayacı, kişisel rekor ve ödül animasyonu
 > ilk-denemede-doğru** → kalan sırada bir `tier:3` öğe varsa, doğru cevabın
 > yanında **opsiyonel/atlanabilir** bir zor soru düğmesi belirir (öğrencinin kendi
 > seçimi; yoksayıp normal "Sonraki soru"ya tıklamak geçerli bir atlamadır). Düğmenin
-> bugünkü rekabet çerçeveli etiketi Kanun M2.7 ile kalkar (borç KB-21).
+> etiketi "Daha zor bir soru"dur (Kanun M2.7: rekabet çerçevesi yok; KB-21 2026-10-23'te kapandı).
 > Toplam soru sayısı ve `gradeKey` kimliği **değişmez** (yalnız kalan sıradaki
 > konumlar takas edilir — hiçbir soru atlanmaz/yinelenmez). Kullanıcıya görünür
 > **hiçbir** zorluk-etiketi/duyuru yazılmaz (G-FLOW `FLOW_LABEL_RE`). Aynı mekanik
@@ -165,7 +165,7 @@ ilişkili; choice havuzu buton listesi; ipucu `aria-live`.
 > sonraki cümle en düşük kalan tier'a kayar + `hint` alanı (varsa) yanıttan önce
 > nötr bir "İpucu" kutusunda gösterilir; 2 ardışık ilk-denemede-doğru → kalan
 > sırada bir `tier:3` öğe varsa opsiyonel/atlanabilir zor soru düğmesi belirir
-> (etiketi borç KB-21). Motor ayrıntısı: `renderFillblank` (module-template.html).
+> ("Daha zor bir cümle"). Motor ayrıntısı: `renderFillblank` (module-template.html).
 
 ## 6. `brainbreak` — Mola noktası
 **Pedagoji:** Aşağı-uyarılma yönetimi, oturum-içi mola (ped §4; her ~8–10 dk).

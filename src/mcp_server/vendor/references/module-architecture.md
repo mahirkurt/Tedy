@@ -48,7 +48,14 @@ const MODULE_DATA = {
     ],                                   // title 1–2 sözcük, ≤ 16 karakter, cümle düzeni
     estimatedMinutes: 18,                // tahmini süre (üst çubukta gösterilir)
     coverPictogram: "pic-idea",          // kapak piktogramı (izinli anahtarlar Kanun §1 madde 6)
-    sourceCitation: "MEB Fen 7, Ünite 1 / kullanıcı ders notu" // KAYNAK (SKILL.md §7)
+    sourceCitation: "MEB Fen 7, Ünite 1 / kullanıcı ders notu", // KAYNAK (SKILL.md §7)
+    assets: [                            // edupedia_gorsel / edupedia_medya varlıkları (Kanun M3.1, M3.6–M3.8)
+      { asset_id: "a1b2c3d4e5f60718", slot: "t1.visual",           // raster görsel: alt ve baslik zorunlu
+        alt: "Kağnıların yanında yürüyen halk toprak bir yolda cepheye cephane taşıyor.", // 60–150, bitmiş cümle; süs: ""
+        baslik: "Görsel 1.30: İstiklal Yolu yürüyüşü",            // görünür altyazı, kitaptaki adıyla, ≤ 120, sayfa yok
+        alt_gerekce: "…" },                                        // isteğe bağlı, ≥ 20: kaynakta geçmeyen ad/sayının nedeni
+      { asset_id: "0f1e2d3c4b5a6978", slot: "t1.audio" }           // ses: alt/baslik yazılmaz
+    ]
   },
 
   learner: {                             // opsiyonel kişiselleştirme
@@ -62,8 +69,8 @@ const MODULE_DATA = {
     "Organellerin görevlerini eşleştireceksin."
   ],
 
-  rewards: { xpPerCorrect: 10, firstTryBonus: 5 },  // yalnız iç sayı, okur görmez; {} de olur.
-                                         // badges yazılmaz (S43, Kanun M2.7; KB-21)
+  rewards: { xpPerCorrect: 10, firstTryBonus: 5 },  // isteğe bağlı iç sayı (0–1000), okur görmez; yazılmazsa
+                                         // motor 10/5 kullanır. badges yazılmaz, şema hatası (Kanun M2.7)
 
   segments: [
     // 0) opsiyonel kanca (hook) — merak-boşluğu açar; hedeflediği teach render
@@ -80,7 +87,7 @@ const MODULE_DATA = {
       visual: { kind: "svg", ref: "<svg ...>...</svg>" } },          // opsiyonel
 
     // 2) etkileşim (OTR — teach'ten sonra zorunlu)
-    { type: "mcq", id: "q1", title: "Mini Yarışma", pictogram: "pic-rocket",
+    { type: "mcq", id: "q1", title: "Kısa Alıştırma", pictogram: "pic-rocket",
       instructions: "Doğru seçeneği işaretle.",
       questions: [
         { stem: "...", options: ["...","...","..."], correctIndex: 1,
@@ -159,7 +166,14 @@ const MODULE_DATA = {
 - `body` sade HTML; `<script>`/satır-içi olay yok (motor olayları bağlar).
 - `visual.ref` ya bir sprite anahtarı (`"pic-idea"`) ya satır-içi `<svg>` (yalnız
   `var(--cds-*)`/`var(--viz-*)` renkli). Kitap figürü ve fotoğraf `meta.assets` ile
-  `<teachId>.visual` yuvasına bağlanır (Kanun M3.1).
+  `<teachId>.visual` yuvasına bağlanır (Kanun M3.1). Raster görselin iki alanı zorunludur:
+  `alt` (60–150 karakterlik bitmiş cümle; "Bu fotoğraf/çizim/şema" ile başlamaz; süs görseli
+  `""`) ve `baslik` (figure + görünür figcaption; kitaptaki adıyla, en çok 120 karakter, tek
+  satır, sayfa numarası yok; her varlıkta ayrı). Alt metindeki özel ad ve sayılar figürün
+  açıklamasında (`edupedia_gorsel` → `kaynak_verisi.varlik.aciklama`, `etiket`) ya da çerçeve
+  sayfalarında geçer; geçmiyorsa `edupedia_derle` `alt_metin_dayanaksiz` döner, nedeni
+  `alt_gerekce`'ye yazılınca uyarıyla derler. Atıf satırını derleyici `baslik — atıf` olarak
+  yazar (M3.6–M3.8). Ses yuvası bu alanları almaz.
 - Piktogram anahtarları yalnız Kanun §1 madde 6'dakilerdir; `ic-*` piktogram yerine
   yazılmaz, ödül ikonu kullanılmaz (M3.10). `meta.quest` yazılmaz (M2.6).
 - `hook` **opsiyoneldir** (yalnız Keşif Döngüsü kullanan modüllerde). Alanlar:
@@ -203,7 +217,8 @@ const MODULE_DATA = {
   korumalı uyarlanır zorluk (v3.0.0 — Task 13, gamified-flows.md §2.3/§3.3):
   `state.perf` yuvarlanan penceresi 2 ardışık yanlıştan-sonra-doğruda ipucu-önce
   + en-düşük-kalan-tier tercihini, 2 ardışık ilk-denemede-doğruda opsiyonel/
-  atlanabilir bir zor soru (tier 3) davetini tetikler (etiketi borç KB-21); uyarlama yalnız
+  atlanabilir bir zor soru (tier 3) davetini tetikler ("Daha zor bir soru"; okuru etiketlemez,
+  yalnız seçeneği adlandırır; rekabet çerçevesi yok, Kanun M2.7); uyarlama yalnız
   segmentte gerçek tier'lı bir soru/öğe varsa etkindir ve kullanıcıya **hiçbir**
   görünür zorluk-etiketi yazılmaz (G-FLOW `FLOW_LABEL_RE`). Tam şema/motor
   ayrıntısı: `interaction-patterns.md` §2/§5 + `runQuestionSet`/`renderFillblank`
@@ -315,7 +330,9 @@ const MODULE_DATA = {
 3. Akışı kur: teach→etkileşim→(mola)→teach→... → checkpoint.
 4. `meta.subject`'e dersin resmî adını yaz; `meta.accent`, renk ve tema yazılmaz (Kanun
    M4.5). Piktogramları seç (izinli anahtarlar Kanun §1 madde 6); görselleri `edupedia_gorsel`
-   ile getir ve en az bir yazar görseli çiz (M3.1, M3.5).
+   ile getir ve en az bir yazar görseli çiz (M3.1, M3.5). Her raster görsele `meta.assets`'te
+   `alt` ve `baslik` yaz; `kaynak_verisi.varlik.aciklama`'yı kopyalama, ondan kendi cümleni kur
+   (M3.6, M3.7).
 5. `MODULE_DATA`'yı şablona yerleştir; motoru değiştirme.
 6. `validate_module.py` ile doğrula; ihlalleri gider.
 
@@ -330,4 +347,6 @@ const MODULE_DATA = {
 - [ ] Görseller satır içi; emoji yok; durum çift-kanal (renk+ikon+metin).
 - [ ] `meta.sourceCitation` dolu; süre varsayılan kapalı.
 - [ ] Öğrenci yüzeyi nihai dil: kitaba/sayfaya/üniteye meta-atıf yok (SKILL.md §7; G-VOICE).
+- [ ] Her raster görselde `alt` ve `baslik` var; alt metnin adları ve sayıları kaynakta geçiyor (M3.6–M3.8).
+- [ ] Rekabet çerçevesi yok: "Yarışma", "Meydan oku" yazılmaz; `rewards.badges` ve `meta.quest` yok (M2.6, M2.7).
 - [ ] Ton teşvik edici; ceza mekaniği yok (§3 etik).

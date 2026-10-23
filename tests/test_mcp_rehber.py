@@ -129,3 +129,30 @@ def test_kb35_vendor_bolumleri_kanunla_celismez():
         # "tema düğmesi" may appear only where the text says it is gone or a debt (izinli bağlam).
         dugme = [s for s in metin.splitlines() if "tema düğmesi" in s and not re.search(r"yok|kalk|borç", s)]
         assert not dugme, (bolum, dugme)
+
+
+def test_rehber_ve_arac_yazara_gorsel_alanlarini_ve_odul_kuralini_soyler(tmp_path):
+    """KB-10–KB-12, KB-21 (2026-10-23): yazar yeni alanları rehberin ilk okuduğu bölümde ve edupedia_derle'nin
+    açıklamasında bulur; rewards'ın isteğe bağlı olduğu ve badges'in yazılmadığı ikisinde de yazar."""
+    import anyio
+
+    from src.mcp_server import server, tools
+    from src.mcp_server.config import load_settings
+
+    toplam = rehber.guide("akis")["toplam_parca"]
+    akis = "\n".join(rehber.guide("akis", parca=n)["metin"] for n in range(1, toplam + 1))
+    for alan in ("`alt`", "`baslik`", "alt_gerekce", "Görsel 1.30"):
+        assert alan in akis, alan
+    assert "`rewards` isteğe bağlı" in akis
+
+    class _Fed:
+        def configured(self, name):
+            return False
+
+    mcp = server.build_server(tools.Tools(load_settings({}, project_root=tmp_path), _Fed()))
+    listed = {t.name: t for t in anyio.run(mcp.list_tools)}
+    derle = listed["edupedia_derle"].description
+    for parca in ("alt", "baslik", "alt_gerekce", "alt_metin_dayanaksiz", "rewards isteğe bağlı", "badges"):
+        assert parca in derle, parca
+    gorsel = listed["edupedia_gorsel"].description
+    assert "aciklama" in gorsel and "etiket" in gorsel and "baslik" in gorsel

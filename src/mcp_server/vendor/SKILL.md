@@ -256,7 +256,9 @@ bir zenginleştirme değil:
 
 Görseli `edupedia_gorsel` getirir: kitap figürü → Pexels → MiniMax; ücretli medya yalnız
 kullanıcı onayıyla (Kanun M3.1). Varlık `meta.assets` ile `<teachId>.visual` yuvasına
-bağlanır; script çalıştırılmaz. Her modülde en az bir yazar görseli vardır (chart, table,
+bağlanır; script çalıştırılmaz. Raster görselde `alt` (60–150 karakterlik bitmiş cümle, süs
+görseli `""`) ve `baslik` (kitaptaki adıyla görünür altyazı, ≤ 120 karakter) zorunludur;
+alt metnin adları ve sayıları kaynakta geçmezse nedeni `alt_gerekce`'ye yazılır (M3.6–M3.8). Her modülde en az bir yazar görseli vardır (chart, table,
 labeled, flow, cards, numberline); kitap figürü onun yerini almaz (M3.5).
 
 MCP erişilemezse offline yola dönün ve **kullanıcıya bildirin** — üretim bloke olmaz ama
@@ -489,8 +491,8 @@ mevcut güvenlik kapılarıyla uyumlu:
 ### 11.6 Rozet ve XP — ekranda yok (TEDY talimatnamesi S43, 2026-10-11)
 
 S43 ve Kanun M2.7 ile kalktı; XP yalnız iç sayıdır: ilerleme köprüsü panoya bildirir, okur
-görmez. Rozet, XP, seri, puan ve kutlama metni yazılmaz; `rewards.badges` yazılmaz. `rewards`
-bugün yalnız iç sayı olarak zorunludur: `{}` ya da `{xpPerCorrect, firstTryBonus}` (KB-21).
+görmez. Rozet, XP, seri, puan ve kutlama metni yazılmaz; `rewards.badges` yazılmaz (şema
+hatası). `rewards` isteğe bağlı iç sayıdır: `{xpPerCorrect, firstTryBonus}` (KB-21 kapandı).
 Özet ekranı sessizdir: tamamlanan alıştırma sayısı düz metinle, hedefler, tekrar önerisi.
 
 ## 12. Kalite kapıları (Quality gates)

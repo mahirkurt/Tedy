@@ -239,7 +239,8 @@ bir uzantısıdır ama hak edilmemiş bir baş-ilerleme verir; TEDY'de kullanıl
 **HTML/motor tezahürü:** `meta.milestones[]` (`{atSegmentId, title}`) segmentleri
 aşamalara gruplar; gösterge aşamaları etiketli çizer, dar kapta tek satır metne döner
 ("Aşama 2/5 · Uygula · Bölüm 7/18"; Kanun M5.4). Şablon bunu 2026-10-20'den beri böyle
-çizer (KB-2 kapandı; "son N durak" metni de kalktı). Sefer haritası hâlâ borçtur (KB-21).
+çizer (KB-2 kapandı; "son N durak" metni de kalktı). Sefer haritası 2026-10-23'te kalktı (KB-21);
+`meta.quest` şema hatasıdır.
 
 ### 3.3 Görünmez taban-korumalı uyarlanır zorluk
 
