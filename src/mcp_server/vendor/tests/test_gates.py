@@ -158,11 +158,13 @@ def test_selfexplain_engine_no_scoring_hooks():
 def test_adaptive_difficulty_fixture_has_signature():
     # Task 13: adaptive_pass.html hand-marked static — runQuestionSet()/renderFillblank()'ın
     # tier-uyarlamalı çıktısını taklit eder: ipucu-önce callout (data-adaptive="hint", nötr
-    # "İpucu" başlığı) + opsiyonel/atlanabilir meydan okuma butonu (data-adaptive="challenge").
+    # "İpucu" başlığı) + opsiyonel/atlanabilir "Daha zor bir soru" butonu (data-adaptive="challenge";
+    # TEDY Kanun M2.7: rekabet çerçevesi — "Meydan Oku" — yok).
     html = open("tests/fixtures/adaptive_pass.html").read()
     assert 'data-seg="mcq"' in html
     assert 'data-adaptive="hint"' in html and "İpucu" in html
-    assert 'data-adaptive="challenge"' in html and "Meydan Oku" in html
+    assert 'data-adaptive="challenge"' in html and "Daha zor bir soru" in html
+    assert not vm.WELLBEING_COMPETITION_RE.search(html)
 
 def test_adaptive_difficulty_gflow_pass_no_labeling():
     # Taban-korumalı uyarlanır zorluk kullanıcıyı ASLA etiketlemez. Fixture kasıtlı olarak
@@ -174,6 +176,22 @@ def test_adaptive_difficulty_gflow_pass_no_labeling():
     assert status_of(rows, "G-FLOW") == "PASS"
     assert not vm.FLOW_LABEL_RE.search(html)
     assert not vm.FLOW_LOSS_RE.search(html)
+
+@pytest.mark.parametrize("cerceve", ["Mini Yarışma", "Meydan Oku", "meydan okuma", "Son 3 durak", "Sefer haritası"])
+def test_gwellbeing_fails_on_competition_framing(cerceve):
+    # TEDY Modül Tasarım Kanunu M2.6, M2.7 (KB-21, 2026-10-23): öğrenci yüzeyinde rekabet/ödül
+    # çerçevesi FAIL. Anlatıdaki çekimli fiil ve yazar katmanı (sourceCitation) sayılmaz.
+    html = open("tests/fixtures/adaptive_pass.html").read().replace("Uyarlanır Antrenman", cerceve)
+    rows = run_gate(vm.gate_wellbeing, html)
+    assert status_of(rows, "G-WELLBEING") == "FAIL"
+    assert "rekabet" in next(m for g, s, m in rows if g == "G-WELLBEING")
+
+def test_gwellbeing_competition_scan_skips_prose_and_author_layer():
+    html = open("tests/fixtures/adaptive_pass.html").read().replace(
+        "7 x 6 kaçtır?", "Ordu işgale meydan okudu; yarışmaya kimler katıldı?")
+    html += '<script>const M={meta:{sourceCitation:"Olimpiyat yarışma soruları"}};</script>'
+    rows = run_gate(vm.gate_wellbeing, html)
+    assert status_of(rows, "G-WELLBEING") == "PASS"
 
 def test_adaptive_difficulty_gwellbeing_pass():
     # Cezalandırıcı/süre-baskısı dili yok → G-WELLBEING gerçek PASS (yalnızca "uygulanmaz" değil).

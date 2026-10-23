@@ -96,7 +96,7 @@
     {
       "type": "mcq",
       "id": "q1",
-      "title": "Mini Yarışma",
+      "title": "Kısa Alıştırma",
       "pictogram": "pic-rocket",
       "instructions": "Doğru seçeneği işaretle. Yanlışta tekrar deneyebilirsin.",
       "questions": [

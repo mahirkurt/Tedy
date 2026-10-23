@@ -119,7 +119,9 @@ test('Modüller lists the published module under the frame-src policy', async ({
   const satir = page.locator('.module-hazir .cds--contained-list-item')
   await expect(satir).toHaveCount(1)
   await expect(satir).toContainText('Maddenin Hâlleri')
-  await expect(satir).toContainText('Yarışma')
+  // QUIZ reads as the module's own word for a question set, never a competition (Kanun M2.7, İ9).
+  await expect(satir).toContainText('Alıştırma')
+  await expect(satir).not.toContainText('Yarışma')
   // The internal mode code must not reach the reader; the row has rendered (above) before this absence.
   await expect(satir).not.toContainText('QUIZ')
 })

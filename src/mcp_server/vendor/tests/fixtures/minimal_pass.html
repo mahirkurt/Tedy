@@ -684,7 +684,7 @@ const MODULE_DATA = {
   </g>
 </svg>` } },
 
-    { type:"mcq", id:"q1", title:"Mini Yarışma", pictogram:"pic-rocket",
+    { type:"mcq", id:"q1", title:"Kısa Alıştırma", pictogram:"pic-rocket",
       instructions:"Doğru seçeneği işaretle. Yanlışta tekrar deneyebilirsin.",
       questions:[
         { stem:"Hangi madde hâlinin belirli bir şekli vardır?",
@@ -1089,7 +1089,7 @@ const MODULE_DATA = {
     function showQ(){
       const q=questions[qi];
       const tried={v:false};
-      let html=segHead(s,kicker||"Yarışma")+instr(s);
+      let html=segHead(s,kicker||"Alıştırma")+instr(s);
       html+=`<div class="streak">Soru <b>${qi+1}</b> / <b>${questions.length}</b></div>`;
       html+=`<p class="q-stem">${q.stem}</p>`;
       html+=ttsRow(stripTags(q.stem), defLang());
@@ -1136,7 +1136,7 @@ const MODULE_DATA = {
     showQ();
   }
   function renderMCQ(stage,s){
-    runQuestionSet(stage,s,s.questions,()=>{ if(state.flawlessMcq) awardByCondition("flawless-mcq"); goNext(); },"Mini Yarışma");
+    runQuestionSet(stage,s,s.questions,()=>{ if(state.flawlessMcq) awardByCondition("flawless-mcq"); goNext(); },"Alıştırma");
   }
 
   /* ---- match ---- */
@@ -1258,7 +1258,7 @@ const MODULE_DATA = {
       nb.addEventListener("click",()=> qs.length? startQs() : showSelfAssess());
       stage.appendChild(nb);
     }
-    function startQs(){ runQuestionSet(stage,s,qs,showSelfAssess,"Karma Geri-Getirme"); }
+    function startQs(){ runQuestionSet(stage,s,qs,showSelfAssess,"Kontrol noktası"); }
     function showSelfAssess(){
       let h=segHead(s,"Kontrol Noktası");
       h+=`<div class="self-assess"><h3>Kendini değerlendir</h3>`;
@@ -1403,7 +1403,7 @@ const MODULE_DATA = {
     setNav({nextLabel: state.idx===segs.length-1?"Bitir":"Devam"});
   }
   function renderNumberline(stage,s){
-    let html=segHead(s, s.kicker||"Sayı Doğrusu")+instr(s);
+    let html=segHead(s, s.kicker||"Sayı doğrusu")+instr(s);
     if(s.prompt) html+=`<p class="lead">${s.prompt}</p>`;
     html+=numberLine(s.numberline||s);
     if(s.takeaway) html+=`<div class="callout">${icon("ic-info")}<div>${s.takeaway}</div></div>`;
@@ -1542,7 +1542,7 @@ const MODULE_DATA = {
   const renderDiagram  = displaySeg("Şema",            s=>labeledFigure(s.diagram||s));
   const renderFlow      = displaySeg("İlişki",          s=>relationFlow(s.flow||s));
   const renderCards     = displaySeg("Kavramlar",       s=>infoCards(s));
-  const renderGloss     = displaySeg("Cümle Çözümleme", s=>glossSentence(s.gloss||s));
+  const renderGloss     = displaySeg("Cümle çözümleme", s=>glossSentence(s.gloss||s));
   const renderDialogue  = displaySeg("Diyalog",         s=>dialogue(s.dialogue||s));
   const renderFraction  = displaySeg("Kesir",           s=>fractionBar(s.fraction||s));
 

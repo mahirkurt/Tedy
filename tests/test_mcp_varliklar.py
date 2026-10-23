@@ -74,7 +74,9 @@ def test_saved_asset_flows_into_derle_with_attribution(store, tmp_path):
     data = ornekler.ornek("QUIZ")
     teach = next(s for s in data["segments"] if s["type"] == "teach")
     teach.pop("visual", None)
-    data["meta"]["assets"] = [{"asset_id": rec["asset_id"], "slot": f"{teach['id']}.visual"}]
+    # Raster görsel yazarın alt metni ve altyazısıyla bağlanır (Kanun M3.6, M3.7).
+    data["meta"]["assets"] = [{"asset_id": rec["asset_id"], "slot": f"{teach['id']}.visual", "baslik": "Eriyen buz",
+                               "alt": "Güneşte bırakılmış bir buz kalıbı yavaş yavaş eriyerek su birikintisine dönüşüyor."}]
     derleyici = Derleyici(store.runs, DraftStore(tmp_path), "https://tedy.online", "https://tedy.online",
                           assets=store.gomulu)
     body = derleyici.derle(FULL, RUN, data)

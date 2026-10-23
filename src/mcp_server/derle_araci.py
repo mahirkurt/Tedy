@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Mapping
 
 from src import module_store as ms
-from src.mcp_server import derleme, gates
+from src.mcp_server import alt_metin, derleme, gates
 from src.mcp_server.derleme import DerlemeHatasi, GomuluVarlik
 from src.mcp_server.runs import RUN_ID_RE, RunStore
 from src.mcp_server.taslak import DraftStore
@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 DETAIL_MAX = 300
 NEXT_OK = "Önizleme için edupedia_onizle(taslak_id); yayın için edupedia_yayinla(taslak_id, ted_link?)."
 NEXT_FAIL = "FAIL veren kapıları MODULE_DATA'da düzelt ve edupedia_derle'yi tekrar çağır; HTML'i kendin yazma."
+ALT_DAYANAK_NOTU = ("Alt metindeki özel ad ve sayılar figürün açıklamasında (edupedia_gorsel kaynak_verisi.varlik.aciklama) "
+                    "ya da çerçeve sayfalarında geçmeli. Kaynaktaki gibi yaz; bilerek farklı yazdıysan nedenini "
+                    "meta.assets[i].alt_gerekce'ye yaz (en az 20 karakter), derleme o zaman uyarıyla geçer.")
 AssetLoader = Callable[[str], Mapping[str, GomuluVarlik]]
 
 
@@ -63,14 +66,21 @@ class Derleyici:
                 size = derleme.girdi_boyutu(module_data)
                 if size > derleme.MAX_INPUT_BYTES:
                     raise DerlemeHatasi("cok_buyuk", bayt=size, sinir=derleme.MAX_INPUT_BYTES)
-                errors = derleme.sema_dogrula(module_data) + (derleme.guvenlik_tara(module_data)
-                                                              if isinstance(module_data, dict) else [])
+                # Varlık kayıtları önce okunur: raster görselin alt/baslik zorunluluğu şema hatalarıyla tek
+                # listede döner (yazar iki turda düzeltmez).
+                varliklar = self.assets(run_id) if self.assets else {}
+                errors = derleme.girdi_hatalari(module_data, varliklar)
                 if errors:
                     raise DerlemeHatasi("sema_hatasi", hatalar=errors)
                 mismatch = _run_mismatch(run, module_data)
                 if mismatch:
                     return {**base, **mismatch}
-                varliklar = self.assets(run_id) if self.assets else {}
+                # Kanun M3.6 (KB-10): alt metnin adları ve sayıları figürün açıklamasında ya da çerçeve
+                # sayfalarında geçer; gerekçesiz dayanaksız ad derlemeyi durdurur, gerekçeli olan uyarıdır.
+                sayfa_metni = "\n".join(p["text"] for p in self.runs.pages(run_id))
+                dayanaksiz, uyarilar = alt_metin.alt_metin_dayanagi(module_data, varliklar, sayfa_metni)
+                if dayanaksiz:
+                    return {**base, "status": "alt_metin_dayanaksiz", "hatalar": dayanaksiz, "not": ALT_DAYANAK_NOTU}
                 html = derleme.derle(module_data, varliklar, self.parent_origin)
             except DerlemeHatasi as exc:
                 return {**base, "status": exc.status, **exc.detay}
@@ -99,6 +109,7 @@ class Derleyici:
                 "coverage": run.get("coverage") or {},
                 "assets": [ref["asset_id"] for ref in meta.get("assets") or []],
                 "gates": summary, "kapilar": report, "parent_origin": self.parent_origin,
+                **({"uyarilar": uyarilar} if uyarilar else {}),
             })
         except Exception:
             logger.exception("edupedia_derle iç hatası (run_id=%s)", run_id)
@@ -112,6 +123,7 @@ class Derleyici:
                 entry["detay"] = row["detail"][:DETAIL_MAX]
             kapilar[gate] = entry
         return {**base, "status": "ok", "taslak_id": taslak_id, "kapi_ozeti": summary, "kapilar": kapilar,
+                **({"uyarilar": uyarilar} if uyarilar else {}),
                 "bayt": record["bayt"], "sonraki_adim": NEXT_FAIL if summary["fail"] else NEXT_OK}
 
     def onizle(self, email: str, taslak_id: str) -> dict[str, Any]:

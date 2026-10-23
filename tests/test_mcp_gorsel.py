@@ -118,6 +118,26 @@ def test_textbook_figure_first_and_wrapped(ortam):
     assert body["kaynak_verisi"]["varlik"]["asset_id"] == body["varlik"]["asset_id"]
 
 
+def test_textbook_figure_keeps_full_caption_and_book_label(ortam):
+    """Kanun M3.6, M3.7 (KB-10, KB-11): kaynağın tam açıklaması ve kitaptaki etiketi yazara döner ve
+    varlık kaydında durur — alt metnin dayanağıdır; 200 karakterlik VLM kesiği değil."""
+    caption = "İstiklal Yolu'nda kağnılarla cephane taşıyan halk. " * 6
+    raw = McpToolResult(ok=True, text=json.dumps({"figure_id": 11, "document_id": 197, "page_no": 115,
+                                                  "caption": caption, "label": "Görsel 1.30"}),
+                        images=FIGURE_RAW.images)
+    fed = FakeFed(responses={("maarif-mufredat", "search_figures"): {"figures": [{"figure_id": 11, "document_id": 197}]}},
+                  raw={("maarif-mufredat", "get_figure"): raw}, configured={"maarif-mufredat"})
+    uretici, _ = _uretici(ortam, fed)
+    body = uretici.uret(FULL, RUN, "istiklal yolu")
+    varlik = body["kaynak_verisi"]["varlik"]
+    assert varlik["aciklama"] == " ".join(caption.split()) and len(varlik["aciklama"]) > 200
+    assert varlik["etiket"] == "Görsel 1.30" and "alt" not in varlik
+    runs, assets, _ = ortam
+    kayit = assets.load(RUN, body["varlik"]["asset_id"])
+    assert kayit["aciklama"] == varlik["aciklama"] and kayit["etiket"] == "Görsel 1.30"
+    assert "baslik" in body["caveat"] and "alt_gerekce" in body["caveat"]
+
+
 def test_figure_from_another_book_falls_through_to_pexels(ortam):
     other = McpToolResult(ok=True, text=json.dumps({"figure_id": 11, "document_id": 999, "caption": "x"}),
                           images=FIGURE_RAW.images)

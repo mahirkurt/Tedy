@@ -898,12 +898,22 @@ def gate_contrast(html, R):
     else:
         R.add("G-CONTRAST","PASS","Metin rengi token'ı uygun; aksan büyük/dolgu öğelerinde.")
 
+# Rekabet / ödül çerçevesi (TEDY Modül Tasarım Kanunu M2.6, M2.7; KB-21, 2026-10-23): "Yarışma",
+# "Mini Yarışma", "Meydan oku", sefer haritası ve "Son N durak" hedef metni. Yalnız ad biçimleri
+# sayılır — anlatıdaki çekimli fiil ("işgale meydan okudu", "yarışmaya katıldı") bir çerçeve değildir.
+WELLBEING_COMPETITION_RE = re.compile(
+    r"\byar[ıi]şma(?:lar)?\b|\bmeydan\s+oku(?:ma)?\b|\bsefer\s+haritas|\bson\s+\S+\s+durak\b",
+    re.IGNORECASE)
+
+
 def gate_wellbeing(html, R):
     """G-WELLBEING: DEHB klinik kanıtına dayalı sorumlu/etik kullanım kapısı.
 
     - Cezalandırıcı / süre-baskısı dili → FAIL. DEHB'de duygu-düzenleme kırılganlığı
       (Groves 2021) ve oyun-bağımlılığı yatkınlığı (Rodrigo-Yanguas 2022) nedeniyle
       başarısızlık/zaman baskısı dili kullanılmaz.
+    - Öğrenci yüzeyinde rekabet/ödül çerçevesi → FAIL (TEDY Kanun M2.6, M2.7). Yazar katmanı
+      (verification, curriculum, sourceCitation) G-VOICE'taki gibi taranmaz.
     - >=6 segmentlik modülde beyin molası yoksa → WARN (Zhu 2023 NMA; ped §4).
     - prefers-reduced-motion yoksa → WARN (aşırı-uyarım; A11Y ile örtüşür).
     """
@@ -911,6 +921,8 @@ def gate_wellbeing(html, R):
         r"(kaybettin|kaybettiniz|s\u00fcre doldu|s\u00fcren doldu|s\u00fcreniz doldu|"
         r"zaman doldu|game over|oyun bitti|ba\u015far\u0131s\u0131z oldun)", re.IGNORECASE)
     hits = sorted(set(m.group(0).lower() for m in punitive.finditer(html)))
+    competition = sorted(set(re.sub(r"\s+", " ", m.group(0)).strip()
+                             for m in WELLBEING_COMPETITION_RE.finditer(_student_surface(html))))
     warns = []
     types = re.findall(r'type\s*:\s*"([a-z]+)"', html)
     total = len(types); breaks = types.count("brainbreak")
@@ -918,8 +930,13 @@ def gate_wellbeing(html, R):
         warns.append(f"{total} segmentte beyin molası yok — uzun modülde en az 1 brainbreak önerilir")
     if "prefers-reduced-motion" not in html:
         warns.append("prefers-reduced-motion bildirimi yok")
+    fails = []
     if hits:
-        R.add("G-WELLBEING","FAIL","cezalandırıcı/süre-baskısı dili: "+", ".join(hits))
+        fails.append("cezalandırıcı/süre-baskısı dili: "+", ".join(hits))
+    if competition:
+        fails.append("rekabet/ödül çerçevesi (Kanun M2.7): "+", ".join("«%s»" % c for c in competition[:4]))
+    if fails:
+        R.add("G-WELLBEING","FAIL","; ".join(fails))
     elif warns:
         R.add("G-WELLBEING","WARN","; ".join(warns))
     else:

@@ -176,6 +176,10 @@ class GomuluVarlik:
     lisans: str
     alt: str
     kaynak: str
+    # Kaynağın kendi tam açıklaması (kitap figürünün caption'ı, Pexels açıklaması, üretim istemi) ve
+    # kitaptaki etiketi ("Görsel 1.30"). Okura gitmez; yazarın alt metninin dayanağıdır (Kanun M3.6).
+    aciklama: str = ""
+    etiket: str = ""
 
 
 def _double_quoted_string(text: str) -> str:
@@ -398,6 +402,139 @@ def asama_hatalari(milestones: Any, segments: Any) -> list[str]:
     return errors
 
 
+# Yazarın görsel alanları (Modül Tasarım Kanunu M3.6–M3.8; KB-10, KB-11, KB-12).
+ALT_MIN, ALT_MAX = 60, 150
+BASLIK_MAX = 120
+GEREKCE_MIN, GEREKCE_MAX = 20, 400
+GORSEL_ALANLARI = ("alt", "baslik", "alt_gerekce")
+_CUMLE_SONU_RE = re.compile("[.!?…][\"'”’»)]*$")
+_YASAK_ACILIS_RE = re.compile(r"^bu\s+(?:fotoğraf|çizim|şema)")
+ALT_ZORUNLU = ("raster görselin alt metni 60–150 karakterlik bitmiş bir cümledir; süs görseli için "
+               'alt: "" yaz (Kanun M3.6)')
+BASLIK_ZORUNLU = ('raster görselin görünür altyazısıdır, kitaptaki adıyla (ör. "Görsel 1.30: İstiklal Yolu '
+                  'yürüyüşü"), en çok 120 karakter (Kanun M3.7)')
+
+
+def duzle(metin: str) -> str:
+    """Boşlukları tek boşluğa indirir; alt metin ve altyazı okura bu biçimde gider."""
+    return " ".join(metin.split())
+
+
+def turkce_kucult(metin: str) -> str:
+    return metin.replace("I", "ı").replace("İ", "i").lower()
+
+
+def varlik_alani_hatalari(index: int, ref: Mapping[str, Any]) -> list[str]:
+    """Yazılmış görsel alanlarının kuralları; hangi varlıkta zorunlu olduklarını `varlik_zorunluluk_hatalari` söyler."""
+    yol = f"meta.assets[{index}]"
+    errors: list[str] = []
+    voice = gates.voice_pattern()
+    if "alt" in ref:
+        alt = ref["alt"]
+        if not isinstance(alt, str):
+            errors.append(f'{yol}.alt metin olmalı (süs görseli için "")')
+        elif duzle(alt):
+            metin = duzle(alt)
+            if not ALT_MIN <= len(metin) <= ALT_MAX:
+                errors.append(f"{yol}.alt {ALT_MIN}–{ALT_MAX} karakter olmalı (şu an {len(metin)}); görseli tek "
+                              "cümleyle anlat (Kanun M3.6)")
+            if not _CUMLE_SONU_RE.search(metin):
+                errors.append(f"{yol}.alt bitmiş bir cümle olmalı: nokta, soru ya da ünlem işaretiyle biter")
+            if _YASAK_ACILIS_RE.match(turkce_kucult(metin)):
+                errors.append(f'{yol}.alt "Bu fotoğraf/çizim/şema" ile başlamaz; görülen şeyi doğrudan anlat '
+                              "(Kanun M3.6)")
+            if voice.search(metin):
+                errors.append(f"{yol}.alt kitap ya da sayfa göndermesi taşımaz (G-VOICE)")
+    if "baslik" in ref:
+        baslik = ref["baslik"]
+        if not isinstance(baslik, str):
+            errors.append(f"{yol}.baslik metin olmalı")
+        elif not duzle(baslik):
+            errors.append(f"{yol}.baslik zorunlu: {BASLIK_ZORUNLU}")
+        else:
+            if "\n" in baslik or "\r" in baslik:
+                errors.append(f"{yol}.baslik tek satırdır")
+            if len(duzle(baslik)) > BASLIK_MAX:
+                errors.append(f"{yol}.baslik en çok {BASLIK_MAX} karakter olmalı (şu an {len(duzle(baslik))})")
+            if voice.search(duzle(baslik)):
+                errors.append(f"{yol}.baslik sayfa numarası ya da kitap göndermesi taşımaz; figürü kitaptaki "
+                              "adıyla yaz (Kanun M3.8, G-VOICE)")
+    if "alt_gerekce" in ref:
+        gerekce = ref["alt_gerekce"]
+        if not isinstance(gerekce, str):
+            errors.append(f"{yol}.alt_gerekce metin olmalı")
+        elif not GEREKCE_MIN <= len(duzle(gerekce)) <= GEREKCE_MAX:
+            errors.append(f"{yol}.alt_gerekce en az {GEREKCE_MIN}, en çok {GEREKCE_MAX} karakterlik bir açıklama "
+                          "olmalı: alt metindeki ad ya da sayının kaynakta neden öyle geçmediğini yaz")
+    return errors
+
+
+def varlik_zorunluluk_hatalari(data: Any, varliklar: Mapping[str, GomuluVarlik]) -> list[str]:
+    """Varlığın türü bilinince: raster görselde alt ve baslik zorunlu, ses yuvası görsel alanı almaz,
+    iki varlık aynı adı taşımaz (atıf satırı varlık başına tektir, Kanun M3.8). Bilinmeyen varlığı
+    `varlik_bagla` adlandırır."""
+    meta = data.get("meta") if isinstance(data, dict) else None
+    refs = meta.get("assets") if isinstance(meta, dict) else None
+    if not isinstance(refs, list):
+        return []
+    errors: list[str] = []
+    adlar: dict[str, str] = {}
+    for index, ref in enumerate(refs):
+        if not isinstance(ref, dict) or not isinstance(ref.get("asset_id"), str):
+            continue
+        record = varliklar.get(ref["asset_id"])
+        if record is None:
+            continue
+        yol = f"meta.assets[{index}]"
+        if record.tur in ("ses", "muzik"):
+            if any(key in ref for key in GORSEL_ALANLARI):
+                errors.append(f"{yol} ses yuvasına bağlı bir ses varlığı: alt, baslik ve alt_gerekce ses "
+                              "varlığında yazılmaz")
+            continue
+        if record.tur == "image":
+            if "alt" not in ref:
+                errors.append(f"{yol}.alt zorunlu: {ALT_ZORUNLU}")
+            if "baslik" not in ref:
+                errors.append(f"{yol}.baslik zorunlu: {BASLIK_ZORUNLU}")
+        baslik = ref.get("baslik")
+        if isinstance(baslik, str) and duzle(baslik):
+            anahtar = turkce_kucult(duzle(baslik))
+            onceki = adlar.setdefault(anahtar, ref["asset_id"])
+            if onceki != ref["asset_id"]:
+                errors.append(f"{yol}.baslik başka bir varlığınkiyle aynı («{duzle(baslik)}»); her figürün adı "
+                              "ayrıdır ve atıfta kendi satırını alır (Kanun M3.8)")
+    return errors
+
+
+def girdi_hatalari(data: Any, varliklar: Mapping[str, GomuluVarlik] | None = None) -> list[str]:
+    """Derlemeden önce MODULE_DATA'nın bütün hataları tek listede: şema, içerik güvenliği, varlık alanları."""
+    errors = sema_dogrula(data)
+    if isinstance(data, dict):
+        errors += guvenlik_tara(data)
+        errors += varlik_zorunluluk_hatalari(data, varliklar or {})
+    return errors
+
+
+ODUL_ALANLARI = ("xpPerCorrect", "firstTryBonus")
+ODUL_SAYI_SINIRI = 1000
+
+
+def odul_hatalari(rewards: Any) -> list[str]:
+    """Kanun M2.7 (KB-21): `rewards` isteğe bağlı bir iç sayıdır, okura hiç görünmez. Yazılırsa yalnız
+    `{xpPerCorrect, firstTryBonus}` taşır (0–1000 tam sayı); `badges` ve öteki alanlar şemada yoktur."""
+    if not isinstance(rewards, dict):
+        return ["rewards yazılırsa {xpPerCorrect, firstTryBonus} nesnesidir; isteğe bağlıdır (Kanun M2.7)"]
+    errors = []
+    for key, value in rewards.items():
+        if key == "badges":
+            errors.append("rewards.badges yazılmaz: modülde rozet yoktur (Kanun M2.7)")
+        elif key not in ODUL_ALANLARI:
+            errors.append(f"rewards.{key} tanımlı değil; yalnız xpPerCorrect ve firstTryBonus (iç sayı) yazılır")
+        elif not (isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= ODUL_SAYI_SINIRI):
+            errors.append(f"rewards.{key} 0–{ODUL_SAYI_SINIRI} arası bir tam sayı olmalı")
+    return errors
+
+
 def sema_dogrula(data: Any) -> list[str]:
     if not isinstance(data, dict):
         return ["MODULE_DATA bir nesne olmalı"]
@@ -417,8 +554,9 @@ def sema_dogrula(data: Any) -> list[str]:
             errors.append("meta.accent yalnız bir Tedy ders renk ailesi adı olabilir (" + ", ".join(allowed)
                           + ") ya da hiç yazılmamalı — renk meta.subject'ten türetilir; hex ve anlam renkleri "
                           "(kırmızı, yeşil, sarı, turuncu) ders rengi olamaz")
-    if not isinstance(data.get("rewards"), dict):
-        errors.append("rewards nesnesi zorunlu")
+    if "quest" in meta:
+        errors.append("meta.quest yazılmaz: sefer haritası yoktur, ilerlemeyi meta.milestones taşır (Kanun M2.6)")
+    errors.extend(odul_hatalari(data.get("rewards", {})))
     segments = data.get("segments")
     if not isinstance(segments, list) or not segments:
         errors.append("segments boş olmayan bir dizi olmalı")
@@ -476,6 +614,8 @@ def sema_dogrula(data: Any) -> list[str]:
                         and ASSET_ID_RE.fullmatch(ref["asset_id"]) and isinstance(ref.get("slot"), str)
                         and SLOT_RE.fullmatch(ref["slot"])):
                     errors.append(f"meta.assets[{index}] {{asset_id, slot: '<teachId>.visual|audio'}} olmalı")
+                    continue
+                errors.extend(varlik_alani_hatalari(index, ref))
     return errors
 
 
@@ -508,7 +648,13 @@ def varlik_bagla(data: dict[str, Any], varliklar: Mapping[str, GomuluVarlik]) ->
                 raise DerlemeHatasi("slot_tur_uyusmazligi", slot=ref["slot"], tur=record.tur)
             if segment.get("visual"):
                 raise DerlemeHatasi("slot_dolu", slot=ref["slot"])
-            segment["visual"] = {"kind": record.tur, "asset": record.asset_id, "alt": record.alt}
+            # Kanun M3.6, M3.7 (KB-10, KB-11): okura yazarın alt metni ve altyazısı gider, kaynağın
+            # açıklaması (VLM altyazısının 200 karakterlik kesiği) gitmez. Altyazısız eski video
+            # yuvası alt metni yoksa kaydın metnini aria-label olarak korur.
+            alt = duzle(ref["alt"]) if isinstance(ref.get("alt"), str) else ("" if record.tur == "image" else record.alt)
+            segment["visual"] = {"kind": record.tur, "asset": record.asset_id, "alt": alt}
+            if isinstance(ref.get("baslik"), str) and duzle(ref["baslik"]):
+                segment["visual"]["caption"] = duzle(ref["baslik"])
         else:
             if record.tur not in ("ses", "muzik"):
                 raise DerlemeHatasi("slot_tur_uyusmazligi", slot=ref["slot"], tur=record.tur)
@@ -517,6 +663,10 @@ def varlik_bagla(data: dict[str, Any], varliklar: Mapping[str, GomuluVarlik]) ->
             segment["audio"] = {"asset": record.asset_id, "label": "Seslendirme" if record.tur == "ses" else "Müzik"}
         if record not in used:
             used.append(record)
+    # Gerekçeler yazar katmanıdır (taslak kaydında durur); öğrenci yüzeyine (MODULE_DATA) girmez.
+    for ref in out["meta"].get("assets") or []:
+        for key in ("alt_gerekce", "pencere_disi_gerekce"):
+            ref.pop(key, None)
     total = sum(r.bayt for r in used)
     if total > ASSET_BUDGET_BYTES:
         raise DerlemeHatasi("varlik_butcesi_asildi", bayt=total, sinir=ASSET_BUDGET_BYTES)
@@ -571,8 +721,19 @@ def dogrulama_ozeti(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def atiflar(data: dict[str, Any], used: list[GomuluVarlik]) -> list[dict[str, str]]:
-    rows = [{"metin": r.credit, "lisans": r.lisans, "kaynak": r.kaynak, "asset_id": r.asset_id} for r in used]
-    seen = {row["metin"] for row in rows}
+    """Kanun M3.8 (KB-12): atıf varlık başına tek satırdır ve figürün adını (`meta.assets[i].baslik`) taşır,
+    sayfa yazmaz; aynı satır iki kez yazılmaz. Satır kaydın `credit`'ini aynen içerir (G-ATTRIB onu arar)."""
+    adlar: dict[str, str] = {}
+    for ref in (data.get("meta") or {}).get("assets") or []:
+        if isinstance(ref, dict) and isinstance(ref.get("baslik"), str) and duzle(ref["baslik"]):
+            adlar.setdefault(ref["asset_id"], duzle(ref["baslik"]))
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for r in used:
+        metin = f"{adlar[r.asset_id]} — {r.credit}" if r.asset_id in adlar else r.credit
+        if metin not in seen:
+            rows.append({"metin": metin, "lisans": r.lisans, "kaynak": r.kaynak, "asset_id": r.asset_id})
+            seen.add(metin)
     for claim in (data.get("verification") or {}).get("claims") or []:
         grounding = claim.get("grounding") if isinstance(claim, dict) else None
         if isinstance(grounding, dict) and _text(grounding.get("license")) and _text(grounding.get("source")):
@@ -616,9 +777,7 @@ def derle(data: Any, varliklar: Mapping[str, GomuluVarlik] | None, parent_origin
     size = girdi_boyutu(data)
     if size > MAX_INPUT_BYTES:
         raise DerlemeHatasi("cok_buyuk", bayt=size, sinir=MAX_INPUT_BYTES)
-    errors = sema_dogrula(data)
-    if isinstance(data, dict):
-        errors += guvenlik_tara(data)
+    errors = girdi_hatalari(data, varliklar)
     if errors:
         raise DerlemeHatasi("sema_hatasi", hatalar=errors)
     bound, used = varlik_bagla(data, varliklar or {})

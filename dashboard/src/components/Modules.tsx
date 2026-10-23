@@ -20,9 +20,10 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const VERSION = /^v([1-9][0-9]{0,3})$/
 const TASLAK = /^[0-9a-f]{16}$/
 
-/** Internal mode codes never reach the reader (design constitution D4). */
+/** Internal mode codes never reach the reader (design constitution D4). QUIZ is "Alıştırma", the word the
+ * module itself uses for its question sets: no competition framing (Modül Tasarım Kanunu M2.7, İ9). */
 const MODE_LABEL: Record<string, string> = {
-  MODULE: 'Modül', QUIZ: 'Yarışma', FLASHCARDS: 'Kartlar', GAME: 'Oyun', EXPLAINER: 'Anlatım',
+  MODULE: 'Modül', QUIZ: 'Alıştırma', FLASHCARDS: 'Kartlar', GAME: 'Oyun', EXPLAINER: 'Anlatım',
   ASSESSMENT: 'Değerlendirme', SERIES: 'Seri', CURRICULUM: 'Müfredat', EXAM: 'Sınav sorusu',
 }
 

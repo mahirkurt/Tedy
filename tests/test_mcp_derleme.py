@@ -11,6 +11,9 @@ from src.mcp_server import derleme, gates, ornekler, sablon
 from src.mcp_server.derleme import DerlemeHatasi, GomuluVarlik
 
 ORIGIN = "https://tedy.online"
+# Raster görselin yazar alanları (Modül Tasarım Kanunu M3.6, M3.7; KB-10, KB-11).
+GORSEL_ALANLARI = {"alt": "Güneşte bırakılmış bir buz kalıbı yavaş yavaş eriyerek su birikintisine dönüşüyor.",
+                   "baslik": "Eriyen buz kalıbı"}
 
 
 def _fails(report):
@@ -119,7 +122,7 @@ def test_asset_block_escapes_lt_so_a_credit_cannot_swallow_the_engine_script():
     teach = _teach(data)
     teach.pop("visual", None)
     img = _varlik(credit="Foto: <!--<script> Ayşe / Pexels")
-    data["meta"]["assets"] = [{"asset_id": img.asset_id, "slot": f"{teach['id']}.visual"}]
+    data["meta"]["assets"] = [{"asset_id": img.asset_id, "slot": f"{teach['id']}.visual", **GORSEL_ALANLARI}]
     html = derleme.derle(data, {img.asset_id: img}, ORIGIN)
     start = html.index('id="edupedia-varliklar">') + len('id="edupedia-varliklar">')
     end = html.index("</script>", start)
@@ -208,7 +211,7 @@ def test_template_literal_html_fragment_round_trips_through_node():
     (lambda d: d["meta"].__setitem__("attributions", []), "attributions"),
     (lambda d: d.pop("curriculum"), "curriculum"),
     (lambda d: d.pop("verification"), "verification"),
-    (lambda d: d.pop("rewards"), "rewards"),
+    (lambda d: d.__setitem__("rewards", {"badges": []}), "rewards.badges"),  # rewards isteğe bağlı (KB-21)
     (lambda d: d.__setitem__("segments", []), "segments"),
     (lambda d: d["segments"].append(dict(d["segments"][0])), "yinelenmiş"),
     (lambda d: d["segments"][0].__setitem__("id", "a b"), "id geçersiz"),
@@ -450,14 +453,15 @@ def test_visual_and_audio_slots_bind_and_attributions_render():
     teach.pop("visual", None)
     img = _varlik()
     ses = _varlik("ses", credit="Seslendirme: yapay zekâ ile üretildi (MiniMax speech-2.8-hd)", asset_id="0f1e2d3c4b5a6978")
-    data["meta"]["assets"] = [{"asset_id": img.asset_id, "slot": f"{teach['id']}.visual"},
+    data["meta"]["assets"] = [{"asset_id": img.asset_id, "slot": f"{teach['id']}.visual", **GORSEL_ALANLARI},
                               {"asset_id": ses.asset_id, "slot": f"{teach['id']}.audio"}]
     html = derleme.derle(data, {img.asset_id: img, ses.asset_id: ses}, ORIGIN)
     report = gates.run_gates(html)
     assert _fails(report) == [] and report["G-ATTRIB"]["status"] == "PASS"
-    assert f'visual: {{kind: "image", asset: "{img.asset_id}", alt: "Buz kalıbı"}}' in html
+    assert (f'visual: {{kind: "image", asset: "{img.asset_id}", alt: "{GORSEL_ALANLARI['alt']}", '
+            f'caption: "{GORSEL_ALANLARI['baslik']}"}}') in html
     assert html.index('id="edupedia-varliklar"') < html.index("const MODULE_DATA = {")
-    assert '<footer id="edupedia-atif"' in html and "<p>Fotoğraf: Ayşe Yılmaz / Pexels</p>" in html
+    assert '<footer id="edupedia-atif"' in html and "<p>Eriyen buz kalıbı — Fotoğraf: Ayşe Yılmaz / Pexels</p>" in html
 
 
 @pytest.mark.parametrize("slot_of,assets,status", [
@@ -470,7 +474,7 @@ def test_slot_errors(slot_of, assets, status):
     data = ornekler.ornek("MODULE")
     _teach(data).pop("visual", None)
     img = _varlik()
-    data["meta"]["assets"] = [{"asset_id": img.asset_id, "slot": slot_of(data)}]
+    data["meta"]["assets"] = [{"asset_id": img.asset_id, "slot": slot_of(data), **GORSEL_ALANLARI}]
     with pytest.raises(DerlemeHatasi) as exc:
         derleme.derle(data, {img.asset_id: img} if assets is None else assets, ORIGIN)
     assert exc.value.status == status
@@ -481,7 +485,7 @@ def test_occupied_slot_and_asset_budget():
     teach = _teach(data)
     teach["visual"] = {"kind": "pictogram", "ref": "pic-idea"}
     img = _varlik()
-    data["meta"]["assets"] = [{"asset_id": img.asset_id, "slot": f"{teach['id']}.visual"}]
+    data["meta"]["assets"] = [{"asset_id": img.asset_id, "slot": f"{teach['id']}.visual", **GORSEL_ALANLARI}]
     with pytest.raises(DerlemeHatasi) as exc:
         derleme.derle(data, {img.asset_id: img}, ORIGIN)
     assert exc.value.status == "slot_dolu"
@@ -497,7 +501,7 @@ def test_attribution_that_trips_g_voice_is_refused():
     teach = _teach(data)
     teach.pop("visual", None)
     img = _varlik(credit="Görsel: ders kitabı sayfa 12")
-    data["meta"]["assets"] = [{"asset_id": img.asset_id, "slot": f"{teach['id']}.visual"}]
+    data["meta"]["assets"] = [{"asset_id": img.asset_id, "slot": f"{teach['id']}.visual", **GORSEL_ALANLARI}]
     with pytest.raises(DerlemeHatasi) as exc:
         derleme.derle(data, {img.asset_id: img}, ORIGIN)
     assert exc.value.status == "atif_dil_kurali"

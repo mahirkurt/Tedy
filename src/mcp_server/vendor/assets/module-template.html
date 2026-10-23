@@ -529,16 +529,6 @@ button.asama__btn:focus-visible{outline:2px solid var(--cds-focus);outline-offse
   color:var(--cds-text-primary)}
 .rail-label--asamali .rail-n{font-size:inherit;line-height:inherit;letter-spacing:inherit;font-weight:400;color:inherit}
 #railTime:not(:empty)::before{content:"·";margin-inline-end:var(--sp-02)}
-/* v3.0.0 — Task 10: Sefer mini-haritası (opsiyonel; meta.quest.stations, üst-çubuk altında şerit).
-   İlk istasyon completed:true ile bahşedilmiş ilerleme (gamified-flows.md §3.2); gölgesiz düğümler. */
-.quest-map{margin:0 0 var(--sp-06)}
-.quest-map[hidden]{display:none}
-.quest-map__svg{display:block;width:100%;height:auto;max-width:17.5rem;margin:0 auto}
-.quest-map__line{stroke:var(--cds-border-strong);stroke-width:2}
-.quest-map__line--done{stroke:var(--cds-interactive)}
-.quest-map__node{fill:var(--cds-layer-02);stroke:var(--cds-border-strong);stroke-width:2}
-.quest-map__node--done{fill:var(--cds-interactive);stroke:var(--cds-interactive)}
-.quest-map__label{font-family:var(--font-sans);font-size:0.625rem;fill:var(--cds-text-secondary)}
 /* sahne — sayfa düzeyindeki tek içerik kartı. Derinlik katman token'ı ve 1 px kenarla kurulur;
    statik yüzey gölge almaz (S11, P4). Gölge yalnız geçici yüzeyde (tanım popover'ı) kalır.
    İçindeki kutular da gölgesizdir (G-CARBON-GRID). */
@@ -618,6 +608,16 @@ figure.viz svg{max-width:100%;height:auto;display:block;margin:0 auto}
 /* piktogram görseli öznitelikte 96 px gelir; .pic boyut vermediği için 4K'da yerinde kalırdı */
 figure.viz > .pic{width:6rem;height:6rem}
 figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:var(--cds-text-secondary)}
+/* ted-mcp'nin gömülü varlıkları (sablon.py): raster figür ve video sütunu aşmaz, görünür altyazısı
+   figcaption'dır (Kanun M3.7); ses oynatıcısı görünür adlı bir katmandır (M5.14). */
+figure.viz img,figure.viz video{display:block;max-width:100%;height:auto;margin:0 auto}
+.edupedia-audio{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-03) var(--sp-05);margin:var(--sp-06) 0;
+  padding:var(--sp-04) var(--sp-05);background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);
+  border-radius:var(--cds-radius)}
+.edupedia-audio__ad{display:inline-flex;align-items:center;gap:var(--sp-03);font-size:var(--fs-label);
+  color:var(--cds-text-secondary)}
+.edupedia-audio__ad .cds-icon{width:1.25rem;height:1.25rem;fill:var(--cds-icon-secondary)}
+.edupedia-audio audio{flex:1 1 16rem;inline-size:100%;min-block-size:3rem}
 .viz text{fill:var(--cds-text-primary);font-family:var(--font-sans)}
 .viz .viz-muted{fill:var(--cds-text-secondary)}
 .viz .viz-axis{stroke:var(--viz-axis)}
@@ -1146,8 +1146,6 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
     </div>
   </header>
 
-  <div class="quest-map" id="questMap" aria-label="Sefer haritası" hidden></div>
-
   <div id="wellbeing" role="status" aria-live="polite"></div>
 
   <main class="stage" id="stage" role="main" tabindex="-1"></main>
@@ -1231,7 +1229,7 @@ const MODULE_DATA = {
         {front:"Gaz", back:"Şekli ve hacmi belli olmayan, her yere yayılan hâl.", hint:"örnek: hava, su buharı"}
       ] },
 
-    { type:"mcq", id:"q1", title:"Mini Yarışma", pictogram:"pic-rocket",
+    { type:"mcq", id:"q1", title:"Kısa Alıştırma", pictogram:"pic-rocket",
       instructions:"Doğru seçeneği işaretle. Yanlışta tekrar deneyebilirsin.",
       questions:[
         { stem:"Hangi madde hâlinin belirli bir şekli vardır?",
@@ -1655,6 +1653,13 @@ const MODULE_DATA = {
 
   /* XP iç ilerleme sayısıdır: köprü panoya bildirir, ekranda gösterilmez; ödül hareketi,
      seri sayacı ve rozet yoktur (talimatname S43, anayasa §9). Doğru cevabın earcon'u kalır. */
+  /* İç ilerleme sayısı (Kanun M2.7, KB-21): rewards isteğe bağlıdır, okura hiç görünmez. Yoksa ya da
+     {} ise motor kendi değerini kullanır; sayı olmayan değer yok sayılır (eskiden {} NaN biriktiriyordu). */
+  const ODUL = (function(r){
+    const sayi = (v, varsayilan) => (typeof v === "number" && isFinite(v) && v >= 0) ? v : varsayilan;
+    r = (r && typeof r === "object") ? r : {};
+    return { xpPerCorrect: sayi(r.xpPerCorrect, 10), firstTryBonus: sayi(r.firstTryBonus, 5) };
+  })(D.rewards);
   function addXP(n){ state.xp+=n; persistSession(); playSound("correct"); }
   function markMastered(){ state.mastered++; persistSession(); }
 
@@ -1666,12 +1671,12 @@ const MODULE_DATA = {
      Sondan geriye ardışık aynı-değer sayısı (trailing run) iki sinyal üretir:
      2 ardışık "yanlıştan-sonra-doğru" → ipucu-önce + taban-koruyucu tier
      tercihi (soru zorlaşmaz, destek artar); 2 ardışık "ilk-denemede-doğru" →
-     opsiyonel "meydan okuma" (öğrencinin kendi seçtiği, dayatılmayan, atlanabilir).
+     opsiyonel "daha zor bir soru" seçeneği (öğrencinin kendi seçtiği, dayatılmayan, atlanabilir).
      UYARLAMA KATMANI YALNIZ `tier`'LI SEGMENTLERDE ETKİNDİR (hasTiers muhafızı,
      runQuestionSet/renderFillblank içinde) — hiçbir soruda/öğede `tier` yoksa
      (mevcut modüllerin tamamı) itemTier() her zaman 1 döner, tierAdaptSwap hep
      no-op'tur (aday zaten en düşük tier'da) ve hasTierAhead(...,3) hep false'tur
-     (meydan okuma düğmesi hiç render edilmez) — davranış BİREBİR korunur.
+     (zor soru düğmesi hiç render edilmez) — davranış BİREBİR korunur.
      Kullanıcıya görünür hiçbir zorluk-etiketi/duyuru YAZILMAZ (yalnız nötr
      "İpucu" başlıklı mevcut açıklama erken gösterilir) — G-FLOW FLOW_LABEL_RE. */
   const PERF_WINDOW=5;
@@ -1686,7 +1691,7 @@ const MODULE_DATA = {
   function itemTier(x){ const t=x&&x.tier; return (t===2||t===3)?t:1; }
   // Kalan sırayı (order[from..]) tier'a göre yeniden düzenler: preferMin=true → en
   // düşük tier'ı `from` konumuna getirir (taban-koruma); preferMin=false → en yüksek
-  // tier'ı getirir (meydan okuma). Toplam öğe sayısı ve gradeKey kimliği DEĞİŞMEZ —
+  // tier'ı getirir (daha zor bir soru). Toplam öğe sayısı ve gradeKey kimliği DEĞİŞMEZ —
   // yalnızca kalan sıradaki konumlar takas edilir (her orijinal indeks tam bir kez
   // gösterilir). Tier'sız kümede (hepsi=1) daima no-op.
   function tierAdaptSwap(order, list, from, preferMin){
@@ -1835,34 +1840,8 @@ const MODULE_DATA = {
         : "";
     }
   }
-  /* ---- v3.0.0 — Task 10: Sefer mini-haritası (opsiyonel; meta.quest.stations,
-     gamified-flows.md §2.2/§3.2 — istasyon[0].completed=bahşedilmiş ilerleme) ---- */
-  function renderQuestMap(){
-    const box=$("#questMap"); if(!box) return;
-    const stations = D.meta && D.meta.quest && D.meta.quest.stations;
-    if(!stations || !stations.length){ box.hidden=true; box.innerHTML=""; return; }
-    box.hidden=false;
-    const n=stations.length, W=Math.max(220,n*70), H=56, cy=22, r=9, gap=W/n;
-    let lines="", nodes="", doneCount=0;
-    stations.forEach((st,i)=>{
-      const cx=gap*(i+0.5);
-      const done = st.completed===true || state.done.has(st.id);
-      if(done) doneCount++;
-      if(i>0){
-        const px=gap*(i-0.5);
-        lines+=`<line x1="${px.toFixed(1)}" y1="${cy}" x2="${cx.toFixed(1)}" y2="${cy}" class="quest-map__line${done?" quest-map__line--done":""}"></line>`;
-      }
-      nodes+=`<circle cx="${cx.toFixed(1)}" cy="${cy}" r="${r}" class="quest-map__node${done?" quest-map__node--done":""}"></circle>`
-        +`<text x="${cx.toFixed(1)}" y="${cy+r+14}" text-anchor="middle" class="quest-map__label">${esc(st.label||"")}</text>`;
-    });
-    const tid="qm"+Math.random().toString(36).slice(2,8);
-    box.innerHTML=`<svg class="quest-map__svg" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="${tid}">`
-      +`<title id="${tid}">Sefer haritası: ${stations.length} istasyondan ${doneCount} tamamlandı</title>`
-      +lines+nodes+`</svg>`;
-  }
   function updateRail(){
     renderStepper();
-    renderQuestMap();
     $("#railText").innerHTML = state.idx>=segs.length
       ? `<span class="rail-n">Tamamlandı</span>`
       : `<span class="rail-n">Bölüm ${Math.min(state.idx,segs.length-1)+1}</span> / ${segs.length}`;
@@ -2029,7 +2008,7 @@ const MODULE_DATA = {
       const oi=order[qi], q=questions[oi];
       const tried={v:false};
       const hintFirst = missSignal && !!q.explanation;
-      let html=segHead(s,kicker||"Yarışma")+instr(s);
+      let html=segHead(s,kicker||"Alıştırma")+instr(s);
       html+=`<div class="adim-sayaci">Soru <b>${qi+1}</b> / <b>${questions.length}</b></div>`;
       html+=`<p class="q-stem">${q.stem}</p>`;
       html+=ttsRow(stripTags(q.stem), defLang());
@@ -2052,7 +2031,7 @@ const MODULE_DATA = {
             stage.querySelectorAll(".opt").forEach(b=>b.disabled=true);
             if(!state.awarded.has(gradeKey)){
               state.awarded.add(gradeKey);
-              addXP(D.rewards.xpPerCorrect + (tried.v?0:(D.rewards.firstTryBonus||0)));
+              addXP(ODUL.xpPerCorrect + (tried.v?0:ODUL.firstTryBonus));
               markMastered();
               perfPush(!tried.v);
             }
@@ -2070,7 +2049,7 @@ const MODULE_DATA = {
             if(!last && hasTiers && perfChallengeSignal() && hasTierAhead(order, questions, qi+1, 3)){
               const cb=el("button","btn btn--ghost"); cb.style.marginTop="var(--sp-03)";
               cb.setAttribute("data-adaptive","challenge");
-              cb.innerHTML=icon("ic-target")+" Meydan Oku";
+              cb.innerHTML=icon("ic-target")+" Daha zor bir soru";
               cb.addEventListener("click",()=>proceed(true));
               stage.appendChild(cb);
             }
@@ -2092,7 +2071,7 @@ const MODULE_DATA = {
     showQ();
   }
   function renderMCQ(stage,s){
-    runQuestionSet(stage,s,s.questions,()=>{ goNext(); },"Mini Yarışma");
+    runQuestionSet(stage,s,s.questions,()=>{ goNext(); },"Alıştırma");
   }
 
   /* ---- match ---- */
@@ -2122,7 +2101,7 @@ const MODULE_DATA = {
           selL.querySelector(".opt__mark").innerHTML=icon("ic-check");
           selL.disabled=true; b.classList.add("opt--correct"); b.disabled=true;
           const gk=s.id+"#"+li;
-          if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(D.rewards.xpPerCorrect);markMastered();}
+          if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(ODUL.xpPerCorrect);markMastered();}
           selL=null; matched++;
           if(matched===pairs.length){
             const fb=$("#mfb"); fb.className="feedback feedback--ok";
@@ -2179,7 +2158,7 @@ const MODULE_DATA = {
             blank.textContent=w; blank.style.color="var(--cds-support-success)"; blank.style.borderColor="var(--cds-support-success)";
             stage.querySelectorAll(".chip-btn").forEach(b=>b.disabled=true);
             if(!state.awarded.has(gk)){state.awarded.add(gk);
-              addXP(D.rewards.xpPerCorrect+(tried?0:(D.rewards.firstTryBonus||0)));markMastered();
+              addXP(ODUL.xpPerCorrect+(tried?0:ODUL.firstTryBonus));markMastered();
               perfPush(!tried);}
             const fb=$("#ffb"); fb.className="feedback feedback--ok";
             fb.innerHTML=icon("ic-check")+`<div><b>Doğru!</b></div>`;
@@ -2195,7 +2174,7 @@ const MODULE_DATA = {
             if(!last && hasTiers && perfChallengeSignal() && hasTierAhead(order, s.items, ii+1, 3)){
               const cb=el("button","btn btn--ghost"); cb.style.marginTop="var(--sp-03)";
               cb.setAttribute("data-adaptive","challenge");
-              cb.innerHTML=icon("ic-target")+" Meydan Oku";
+              cb.innerHTML=icon("ic-target")+" Daha zor bir cümle";
               cb.addEventListener("click",()=>proceed(true));
               stage.appendChild(cb);
             }
@@ -2279,7 +2258,7 @@ const MODULE_DATA = {
         checkBtn.disabled=true;
         if(!state.awarded.has(gk)){
           state.awarded.add(gk);
-          addXP(D.rewards.xpPerCorrect+(everWrong?0:(D.rewards.firstTryBonus||0)));
+          addXP(ODUL.xpPerCorrect+(everWrong?0:ODUL.firstTryBonus));
           markMastered();
         }
         setNav({nextLabel: state.idx===segs.length-1?"Bitir":"Devam"});
@@ -2302,7 +2281,7 @@ const MODULE_DATA = {
      PUANLAMA/XP/CEZA YOK — setNav next HER ZAMAN etkin; yazsa da yazmasa da, modeli açsa
      da açmasa da ilerleme asla bloklanmaz (G-WELLBEING). */
   function renderSelfExplain(stage,s){
-    stage.innerHTML = segHead(s,"Öz-açıklama") + instr(s)
+    stage.innerHTML = segHead(s,"Kendi sözlerinle") + instr(s)
       + `<p class="se-prompt">${icon("ic-help")}<span>${esc(s.prompt||"")}</span></p>`
       + ttsRow(stripTags(s.prompt||""), defLang())
       + `<div class="se-field">`
@@ -2359,7 +2338,7 @@ const MODULE_DATA = {
       nb.addEventListener("click",()=> qs.length? startQs() : showSelfAssess());
       stage.appendChild(nb);
     }
-    function startQs(){ runQuestionSet(stage,s,qs,showSelfAssess,"Karma Geri-Getirme"); }
+    function startQs(){ runQuestionSet(stage,s,qs,showSelfAssess,"Kontrol noktası"); }
     function showSelfAssess(){
       let h=segHead(s,"Kontrol noktası");
       h+=`<div class="self-assess"><h3>Kendini değerlendir</h3>`;
@@ -2628,7 +2607,7 @@ const MODULE_DATA = {
   }
   function renderNumberline(stage,s){
     const nlSpec = s.numberline||s;
-    let html=segHead(s, s.kicker||"Sayı Doğrusu")+instr(s);
+    let html=segHead(s, s.kicker||"Sayı doğrusu")+instr(s);
     if(s.prompt) html+=`<p class="lead">${s.prompt}</p>`;
     html+=numberLine(nlSpec);
     if(s.takeaway) html+=`<div class="callout">${icon("ic-info")}<div>${s.takeaway}</div></div>`;
@@ -2999,7 +2978,7 @@ const MODULE_DATA = {
         lockComplete();
         if(!state.awarded.has(gk)){
           state.awarded.add(gk);
-          addXP(D.rewards.xpPerCorrect+(everImperfect?0:(D.rewards.firstTryBonus||0)));
+          addXP(ODUL.xpPerCorrect+(everImperfect?0:ODUL.firstTryBonus));
           markMastered();
         }
         setNav({nextLabel: state.idx===segs.length-1?"Bitir":"Devam"});
@@ -3163,7 +3142,7 @@ const MODULE_DATA = {
   const renderDiagram  = displaySeg("Şema",            s=>labeledFigure(s.diagram||s));
   const renderFlow      = displaySeg("İlişki",          s=>relationFlow(s.flow||s));
   const renderCards     = displaySeg("Kavramlar",       s=>infoCards(s));
-  const renderGloss     = displaySeg("Cümle Çözümleme", s=>glossSentence(s.gloss||s));
+  const renderGloss     = displaySeg("Cümle çözümleme", s=>glossSentence(s.gloss||s));
   const renderDialogue  = displaySeg("Diyalog",         s=>dialogue(s.dialogue||s));
   const renderFraction  = displaySeg("Kesir",           s=>fractionBar(s.fraction||s));
 
@@ -3246,7 +3225,7 @@ const MODULE_DATA = {
           const know=el("button","btn btn--primary"); know.innerHTML=icon("ic-check")+" Biliyorum";
           const again=el("button","btn btn--ghost"); again.innerHTML=icon("ic-renew")+" Tekrar et";
           know.addEventListener("click",()=>{
-            if(!learned.has(card.idx)){ learned.add(card.idx); addXP(D.rewards.xpPerCorrect); markMastered(); }
+            if(!learned.has(card.idx)){ learned.add(card.idx); addXP(ODUL.xpPerCorrect); markMastered(); }
             persistBox(s.id+"#"+card.idx, Math.min(5, boxOf(s.id+"#"+card.idx)+1));
             queue.shift(); show();
           });
@@ -3283,7 +3262,7 @@ const MODULE_DATA = {
           btn.classList.add("opt--correct"); btn.disabled=true;
           btn.querySelector(".opt__mark").innerHTML=`<span style="font-family:var(--font-mono);font-weight:700;color:var(--cds-support-success)">${expected+1}</span>`;
           const gk=s.id+"#"+expected;
-          if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(D.rewards.xpPerCorrect);markMastered();}
+          if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(ODUL.xpPerCorrect);markMastered();}
           expected++;
           if(expected===shown.length){
             const fb=$("#ofb"); fb.className="feedback feedback--ok";
@@ -3323,7 +3302,7 @@ const MODULE_DATA = {
           if(+btn.dataset.bin===it.bin){
             btn.classList.add("opt--correct"); btn.querySelector(".opt__mark").innerHTML=icon("ic-check");
             stage.querySelectorAll(".opt").forEach(b=>b.disabled=true);
-            if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(D.rewards.xpPerCorrect);markMastered();}
+            if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(ODUL.xpPerCorrect);markMastered();}
             const fb=$("#sfb"); fb.className="feedback feedback--ok";
             fb.innerHTML=icon("ic-check")+`<div><b>Doğru!</b> «${it.label}» &#8594; ${s.bins[it.bin]}</div>`;
             const last=ii===s.items.length-1;
@@ -3365,7 +3344,7 @@ const MODULE_DATA = {
           if(r.getAttribute("data-spot")===sp.id){
             r.dataset.done="1"; r.style.outline="3px solid var(--cds-support-success)"; r.style.outlineOffset="2px";
             const gk=s.id+"#"+pi;
-            if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(D.rewards.xpPerCorrect);markMastered();}
+            if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(ODUL.xpPerCorrect);markMastered();}
             const fb=$("#hfb"); fb.className="feedback feedback--ok";
             fb.innerHTML=icon("ic-check")+`<div><b>Buldun!</b> ${sp.info||""}</div>`;
             const last=pi===s.spots.length-1;

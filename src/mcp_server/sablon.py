@@ -41,18 +41,23 @@ BRIDGE_JS = r"""  /* ---- edupedia köprüsü ve varlıklar (ted-mcp sablon.py y
     const uri = rec && typeof rec.uri === "string" ? rec.uri : "";
     return uri.indexOf(prefix) === 0 ? uri : "";
   }
+  /* Kanun M3.6, M3.7 (KB-10, KB-11): raster figür figure + görünür figcaption içindedir; alt metin ve
+     altyazı yazarındır (meta.assets[i].alt, .baslik). Boyutu şablonun CSS'i verir, satır içi stil yok. */
   function edupediaAssetFigure(v){
+    const cap = v.caption ? `<figcaption>${esc(v.caption)}</figcaption>` : "";
     if(v.kind === "image"){
       const img = edupediaAssetUri(v.asset, "data:image/");
-      return img ? `<figure class="viz"><img src="${esc(img)}" alt="${esc(v.alt||"")}" style="max-width:100%;height:auto"></figure>` : "";
+      return img ? `<figure class="viz viz--varlik"><img src="${esc(img)}" alt="${esc(v.alt||"")}">${cap}</figure>` : "";
     }
     const vid = edupediaAssetUri(v.asset, "data:video/");
-    return vid ? `<figure class="viz"><video controls preload="none" src="${esc(vid)}" aria-label="${esc(v.alt||"Video")}" style="max-width:100%"></video></figure>` : "";
+    return vid ? `<figure class="viz viz--varlik"><video controls preload="none" src="${esc(vid)}" aria-label="${esc(v.alt||v.caption||"Video")}"></video>${cap}</figure>` : "";
   }
+  /* Kanun M5.14 (KB-11): yazarın ses varlığı görünür adlı, Carbon katmanında bir oynatıcıdır. */
   function edupediaAudio(a){
     if(!a) return "";
     const aud = edupediaAssetUri(a.asset, "data:audio/");
-    return aud ? `<div class="edupedia-audio"><audio controls preload="none" src="${esc(aud)}" aria-label="${esc(a.label||"Seslendirme")}"></audio></div>` : "";
+    const ad = esc(a.label||"Seslendirme");
+    return aud ? `<div class="edupedia-audio"><span class="edupedia-audio__ad">${icon("ic-headphones")}${ad}</span><audio controls preload="none" src="${esc(aud)}" aria-label="${ad}"></audio></div>` : "";
   }
   const EDUPEDIA_BRIDGE = (function(){
     const embedded = window.parent !== window;

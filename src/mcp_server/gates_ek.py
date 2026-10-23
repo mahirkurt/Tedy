@@ -44,6 +44,7 @@ _JSON_TYPE_RE = re.compile(
 )
 _ASSETS_RE = re.compile(r'<script type="application/json" id="edupedia-varliklar">(.*?)</script>', re.S)
 _FOOTER_RE = re.compile(r'<footer id="edupedia-atif"[^>]*>(.*?)</footer>', re.S)
+_FOOTER_LINE_RE = re.compile(r"<p\b[^>]*>(.*?)</p>", re.S)
 _GROUNDING_RE = re.compile(r"\bgrounding:\s*\{([^{}]*)\}")
 _LICENSE_KEY_RE = re.compile(r"\blicense\s*:")
 _SOURCE_START_RE = re.compile(r"\bsource\s*:\s*(['\"`])")
@@ -299,5 +300,12 @@ def gate_attrib(html: str, R: Any) -> None:
     missing = [item for item in required if _collapse(item) not in text]
     if missing:
         R.add("G-ATTRIB", "FAIL", "Altbilgide eksik atıf: " + "; ".join(missing[:5]))
+        return
+    # Modül Tasarım Kanunu M3.8 (KB-12): atıf varlık başına tek satırdır; aynı satır iki kez yazılmaz.
+    satirlar = [_collapse(html_lib.unescape(re.sub(r"<[^>]+>", " ", p)))
+                for p in _FOOTER_LINE_RE.findall(footer.group(1))] if footer else []
+    yinelenen = sorted({s for s in satirlar if s and satirlar.count(s) > 1})
+    if yinelenen:
+        R.add("G-ATTRIB", "FAIL", "Altbilgide yinelenen atıf satırı (Kanun M3.8): " + "; ".join(yinelenen[:5]))
     else:
         R.add("G-ATTRIB", "PASS", f"{len(required)} lisanslı varlık/kaynağın atfı altbilgide.")
