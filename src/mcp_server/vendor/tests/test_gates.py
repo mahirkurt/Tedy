@@ -599,14 +599,16 @@ def test_numberline_interactive_ga11y_and_gsvg_pass():
 def test_numberline_engine_interactive_branch_gated_by_spec_interactive():
     # numberLine(spec)'in interactive üretimi TAMAMEN `if(spec.interactive){...}`
     # bloğunun içinde olmalı — bayrak yoksa handle/readout/nlAttrs boş dizge kalır.
+    # TEDY Kanun M5.6 (KB-5, 2026-10-23): numberLine(spec, G) kayıt + figür, numberLineCiz(spec, id, G)
+    # kutunun genişliğine göre SVG'yi kurar; interactive dalı yine yalnız spec.interactive'tedir.
     src = open("assets/module-template.html", encoding="utf-8").read()
-    i = src.index("function numberLine(spec)")
+    i = src.index("function numberLine(spec, G)")
     j = src.index("\n  function wireNumberlineInteractive", i)
     body = src[i:j]
     assert 'if(spec.interactive){' in body
     assert 'let handle="", readout="", nlAttrs="";' in body
-    # svg açılış etiketi interactive olmayanda hiçbir ek öznitelik almaz (nlAttrs="")
-    assert 'aria-labelledby="${tid} ${did}"${nlAttrs}>' in body
+    # svg açılış etiketi interactive olmayanda kayıt dışında ek öznitelik almaz (nlAttrs="")
+    assert 'aria-labelledby="${tid} ${did}"${vizOznitelik(id, G)}${nlAttrs}>' in body
     assert 'return svgFigure(svg, spec.caption) + readout;' in body
 
 def test_numberline_static_path_byte_unchanged_when_interactive_absent():
@@ -617,14 +619,14 @@ def test_numberline_static_path_byte_unchanged_when_interactive_absent():
     src = open("assets/module-template.html", encoding="utf-8").read()
     assert (
         'const svg=`<svg class="viz" viewBox="0 0 ${W} ${H}" role="img" '
-        'aria-labelledby="${tid} ${did}"${nlAttrs}><title id="${tid}">${esc(spec.title||"Sayı doğrusu")}</title>'
+        'aria-labelledby="${tid} ${did}"${vizOznitelik(id, G)}${nlAttrs}><title id="${tid}">${esc(spec.title||"Sayı doğrusu")}</title>'
         '<desc id="${did}">${esc(spec.desc||spec.title||"")}</desc>${hi}${axis}${ticks}${pts}${handle}</svg>`;'
     ) in src
     # handle/readout/nlAttrs `let ...="";` ile boş başlar ve YALNIZ aşağıdaki
     # `if(spec.interactive){...}` bloğunun İÇİNDE yeniden atanır — bloğun dışında
     # koşulsuz bir atama yoksa spec.interactive=false/absent iken üçü de "" kalır,
     # yani svg şablonuna hiçbir katkı yapmazlar (yukarıdaki şablon dizgesiyle kanıtlı).
-    i = src.index("function numberLine(spec)")
+    i = src.index("function numberLineCiz(spec, id, G)")
     j = src.index("\n  function wireNumberlineInteractive", i)
     body = src[i:j]
     assert 'let handle="", readout="", nlAttrs="";' in body
@@ -645,7 +647,7 @@ def test_numberline_engine_wired_and_keyboard_mandatory():
     src = open("assets/module-template.html", encoding="utf-8").read()
     assert "numberline:renderNumberline" in src
     assert "if(nlSpec.interactive) wireNumberlineInteractive(stage, nlSpec);" in src
-    start_idx = src.index("function wireNumberlineInteractive(stage, spec)")
+    start_idx = src.index("function wireNumberlineInteractive(stage, spec, id)")
     next_fn_start = src.index("\n  function ", start_idx + 1)
     body = src[start_idx:next_fn_start]
     for key in ("ArrowRight", "ArrowLeft", "Home", "End"):
@@ -658,7 +660,7 @@ def test_numberline_reduce_motion_instant():
     # anında ("none") ayarlanır (CSS'teki prefers-reduced-motion:no-preference geçiş
     # kısıtlamasının JS tarafındaki ikinci/açık garantisi).
     src = open("assets/module-template.html", encoding="utf-8").read()
-    start_idx = src.index("function wireNumberlineInteractive(stage, spec)")
+    start_idx = src.index("function wireNumberlineInteractive(stage, spec, id)")
     next_fn_start = src.index("\n  function ", start_idx + 1)
     body = src[start_idx:next_fn_start]
     assert 'if(reduceMotion()) handle.style.transition = "none";' in body
@@ -749,21 +751,24 @@ def test_gsvg_still_catches_real_inaccessible_svg_outside_comments():
 def test_numberline_w_padx_share_one_constant_source():
     # Deferred-minor Fix 4: wireNumberlineInteractive used to hardcode its own
     # W=480/PADX=28 literals, duplicating numberLine's X(v) scale constants — a
-    # silent-drift risk if one changes without the other. Both must now read a
-    # single shared source (NL_W/NL_PADX), and the scale itself must stay 480/28.
+    # silent-drift risk if one changes without the other. Both read a single shared
+    # source (NL_W/NL_PADX). TEDY Kanun M5.6 (KB-5): the width now follows the box
+    # (at most NL_W), so the binder reads the drawn SVG's own viewBox width — never
+    # a literal — and the two scales cannot drift.
     src = open("assets/module-template.html", encoding="utf-8").read()
     assert "const NL_W=480, NL_PADX=28;" in src, "paylaşımlı NL_W/NL_PADX sabiti bulunamadı"
 
-    i = src.index("function numberLine(spec)")
+    i = src.index("function numberLineCiz(spec, id, G)")
     j = src.index("\n  function wireNumberlineInteractive", i)
     numberline_body = src[i:j].replace(" ", "")
-    assert "W=NL_W" in numberline_body and "PADX=NL_PADX" in numberline_body
+    assert "W=Math.min(NL_W,vizGenislik(G))" in numberline_body and "PADX=NL_PADX" in numberline_body
     assert "W=480" not in numberline_body and "PADX=28" not in numberline_body
 
-    k = src.index("function wireNumberlineInteractive(stage, spec)")
+    k = src.index("function wireNumberlineInteractive(stage, spec, id)")
     next_fn = src.index("\n  function ", k + 1)
     wire_body = src[k:next_fn].replace(" ", "")
-    assert "W=NL_W" in wire_body and "PADX=NL_PADX" in wire_body
+    assert "W=(svg.viewBox&&svg.viewBox.baseVal&&svg.viewBox.baseVal.width)||NL_W" in wire_body
+    assert "PADX=NL_PADX" in wire_body
     assert "W=480" not in wire_body and "PADX=28" not in wire_body
 
 

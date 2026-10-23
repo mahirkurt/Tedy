@@ -639,8 +639,12 @@ def _grafik_calistir(ifade: str) -> str:
         pytest.skip("node yok")
     metin = SABLON.read_text(encoding="utf-8")
     esc = re.search(r"const esc = s => [^\n]*", metin).group(0)
-    kod = "\n".join([esc] + [_js_fonksiyon(metin, ad) for ad in ("vizId", "svgFigure", "vizNice", "vizChart",
-                                                                   "fractionBar")]
+    # Kanun M5.6 (KB-5): çiziciler kutunun genişliğine göre kurulur; kayıt ve ölçü yardımcıları da gelir.
+    sabitler = [re.search(r"const VIZ_METIN=[^\n]*", metin).group(0), "const VIZ_CIZICI=new Map();",
+                "let vizSonG=VIZ_W;"]
+    kod = "\n".join([esc] + sabitler + [_js_fonksiyon(metin, ad) for ad in (
+        "vizId", "svgFigure", "vizNice", "vizKaydet", "vizMetinGenisligi", "vizGenislik", "vizOznitelik",
+        "vizSatirla", "vizChart", "vizChartSvg", "fractionBar")]
                     + [f"process.stdout.write(String({ifade}));"])
     return subprocess.run([node, "-e", kod], capture_output=True, text=True, check=True, timeout=30).stdout
 

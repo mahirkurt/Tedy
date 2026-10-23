@@ -98,3 +98,91 @@ def ornek(mode: str) -> dict[str, Any]:
     data["curriculum"] = _curriculum(mapped)
     data["verification"] = _verification()
     return data
+
+
+GORSEL_ORNEGI_ALT = "Kağnıların yanında yürüyen halk toprak bir yolda cepheye cephane taşıyor."
+GORSEL_ORNEGI_BASLIK = "Görsel 1.30: İstiklal Yolu yürüyüşü"
+
+
+def _ornek_jpeg() -> bytes:
+    import io
+
+    from PIL import Image, ImageDraw
+
+    image = Image.new("RGB", (640, 400), (214, 222, 230))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((0, 260, 640, 400), fill=(160, 140, 110))
+    for x in range(40, 640, 120):
+        draw.rectangle((x, 200, x + 70, 260), fill=(90, 70, 50))
+        draw.ellipse((x + 5, 245, x + 30, 270), fill=(40, 40, 40))
+        draw.ellipse((x + 45, 245, x + 70, 270), fill=(40, 40, 40))
+    buf = io.BytesIO()
+    image.save(buf, format="JPEG", quality=80)
+    return buf.getvalue()
+
+
+def gorsel_ornegi() -> tuple[dict[str, Any], dict[str, Any]]:
+    """Şablonun çizdiği her SVG türü, bir raster figür ve bir ses varlığı (Modül Tasarım Kanunu M5.6,
+    M3.6–M3.8, M5.14; KB-5, KB-10–KB-12). (MODULE_DATA, varlıklar) döner; varlıklar derleyicinin
+    `GomuluVarlik` kayıtlarıdır. `dashboard/tests/e2e/modul-svg-metni.spec.ts` ve derleme testleri kullanır."""
+    import base64
+
+    from src.mcp_server.derleme import GomuluVarlik  # derleme bu modülü içe aktarır; döngü olmasın diye burada
+
+    data = ornek("MODULE")
+    ay = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+    data["meta"]["title"] = "Grafik, Sayı Doğrusu ve Figür"
+    data["segments"] = [
+        {"type": "teach", "id": "t1", "title": "Tam Sayılar", "pictogram": "pic-idea",
+         "body": ["<p>Sıfırın solundaki sayılar negatif, sağındakiler pozitiftir.</p>"],
+         "visual": {"kind": "numberline", "min": -10, "max": 10, "step": 1, "title": "Tam sayılar",
+                    "points": [{"value": -3, "label": "A"}, {"value": 4, "label": "B"}]}},
+        {"type": "teach", "id": "t2", "title": "İstiklal Yolu", "pictogram": "pic-idea",
+         "body": ["<p>Halk cepheye cephane taşıdı.</p>"]},
+        {"type": "chart", "id": "c1", "title": "Sektörlere Göre Çalışanlar", "kind": "bar",
+         "data": [{"label": "Tarım", "value": 18}, {"label": "Sanayi", "value": 27},
+                  {"label": "Hizmetler", "value": 41}, {"label": "Turizm", "value": 9},
+                  {"label": "Madencilik", "value": 3}, {"label": "Ulaştırma", "value": None}]},
+        {"type": "chart", "id": "c2", "title": "Aylık Yağış", "kind": "line",
+         "data": [{"label": a, "value": v} for a, v in zip(ay, [92, 78, 66, 51, 38, 21, 9, 7, 19, 44, 71, 95])]},
+        {"type": "numberline", "id": "n1", "title": "Sayıyı Yerleştir",
+         "numberline": {"min": 0, "max": 20, "step": 1, "interactive": True, "value": 7,
+                        "interactiveLabel": "Seçilen sayı", "title": "0 ile 20 arası"}},
+        {"type": "fraction", "id": "fr1", "title": "Kesirleri Topla", "kind": "sum", "addends": [1, 2, 3], "den": 8},
+        {"type": "diagram", "id": "d1", "title": "Hücrenin Bölümleri", "viewBox": "0 0 480 300",
+         "base": ('<ellipse cx="240" cy="150" rx="200" ry="120" fill="var(--cds-layer-01)" '
+                  'stroke="var(--cds-border-strong)" stroke-width="3"/>'
+                  '<circle cx="250" cy="150" r="48" fill="var(--cds-layer-accent-01)" '
+                  'stroke="var(--cds-border-strong)" stroke-width="2"/>'),
+         "labels": [{"x": 250, "y": 150, "text": "Çekirdek"}, {"x": 110, "y": 110, "text": "Sitoplazma"},
+                    {"x": 420, "y": 190, "text": "Hücre zarı"}]},
+        {"type": "sim", "id": "s1", "title": "Sayı Ölçeği", "simType": "numberScale",
+         "params": [{"key": "value", "label": "Değer", "min": 0, "max": 20, "step": 1, "default": 13}]},
+        {"type": "sim", "id": "s2", "title": "Sarkaç", "simType": "pendulum",
+         "params": [{"key": "length", "label": "Uzunluk (m)", "min": 0.2, "max": 2.2, "step": 0.1, "default": 2.2},
+                    {"key": "angle", "label": "Açı (derece)", "min": -60, "max": 60, "step": 5, "default": 60}]},
+        {"type": "sim", "id": "s3", "title": "Atış", "simType": "projectile",
+         "params": [{"key": "speed", "label": "Hız (m/sn)", "min": 5, "max": 40, "step": 1, "default": 20},
+                    {"key": "angle", "label": "Açı (derece)", "min": 10, "max": 80, "step": 5, "default": 45}]},
+    ]
+    data["curriculum"] = _curriculum(["t1", "c1"])
+    gorsel = _ornek_jpeg()
+    ses = b"ID3" + b"\0" * 64
+    varliklar = {
+        "a1b2c3d4e5f60718": GomuluVarlik(
+            asset_id="a1b2c3d4e5f60718", tur="image", mime="image/jpeg",
+            data_uri="data:image/jpeg;base64," + base64.b64encode(gorsel).decode("ascii"), bayt=len(gorsel),
+            credit="Görsel: T.C. Millî Eğitim Bakanlığı, Türkiye Yüzyılı Maarif Modeli yayını",
+            lisans="MEB yayını — yalnız aile içi eğitim kullanımı", alt="", kaynak="mufredat",
+            aciklama="Kağnılarla cepheye cephane taşıyan halk toprak yolda yürüyor.", etiket="Görsel 1.30"),
+        "0f1e2d3c4b5a6978": GomuluVarlik(
+            asset_id="0f1e2d3c4b5a6978", tur="ses", mime="audio/mpeg",
+            data_uri="data:audio/mpeg;base64," + base64.b64encode(ses).decode("ascii"), bayt=len(ses),
+            credit="Seslendirme: yapay zekâ ile üretildi (MiniMax speech-2.8-hd)", lisans="MiniMax üretimi",
+            alt="", kaynak="minimax"),
+    }
+    data["meta"]["assets"] = [
+        {"asset_id": "a1b2c3d4e5f60718", "slot": "t2.visual", "alt": GORSEL_ORNEGI_ALT, "baslik": GORSEL_ORNEGI_BASLIK},
+        {"asset_id": "0f1e2d3c4b5a6978", "slot": "t2.audio"},
+    ]
+    return data, varliklar

@@ -1909,6 +1909,7 @@ const MODULE_DATA = {
   function render(){
     clearSectionTimers();
     ttsCancel();
+    VIZ_CIZICI.clear(); // önceki bölümün SVG çizicileri (Kanun M5.6) yeni bölüme taşınmaz
     const stage=$("#stage"); stage.innerHTML=""; stage.removeAttribute("data-seg");
     stage.removeAttribute("data-hook-resolved"); // her render'da temizlenir; yalnız çözen teach yeniden yazar
     updateRail();
@@ -2356,6 +2357,75 @@ const MODULE_DATA = {
   function svgFigure(inner, caption){
     return `<figure class="viz">${inner}${caption?`<figcaption>${esc(caption)}</figcaption>`:""}</figure>`;
   }
+  /* ---- SVG metni okunur boyda (Modül Tasarım Kanunu M5.6, KB-5, 2026-10-23) ----
+     Ölçüldü: viewBox sabit 480 birim, metin 11 birim; çerçeve 288'de 4,9 px, 358'de 6,5 px. Şablonun
+     çizdiği SVG (grafik, sayı doğrusu, kesir çubuğu, etiketli şema, simülasyon) koordinat sistemini
+     kutusunun genişliğine kurar: viewBox genişliği, kutunun kök boyuna indirgenmiş (16 px'lik rem
+     cinsinden) genişliğidir ve tasarım genişliğini (VIZ_W) aşmaz. Böylece bir kullanıcı birimi ekranda
+     en az bir CSS px'tir ve VIZ_METIN birimlik metin her genişlikte ≥ 12 px çizilir; geniş ekranda
+     (480) bugünkü gibi büyür, 1920 ile 3840 arasında yerleşim aynı kalır, yalnız ölçek iki katıdır
+     (M5.8). Kutunun genişliği değişince (döndürme, pencere) yalnız SVG yeniden kurulur; bölümün durumu
+     (cevap, kaydırıcı, sayı doğrusundaki değer) korunur. Sığmayan eksen etiketi seyreltilir, sığmayan
+     çubuk etiketi çubuğun üstüne iner (yatay çubuk). Metin boyunu tahmin VIZ_HARF (Plex Sans'ta bir
+     harfin ortalama genişliği, em) ile yapılır; ölçüm e2e'dedir (moduller: modul-svg-metni.spec.ts). */
+  const VIZ_METIN=12, VIZ_W=480, VIZ_HARF=0.6;
+  const VIZ_CIZICI=new Map();
+  let vizSonG=VIZ_W;
+  function vizKaydet(id, ciz){ VIZ_CIZICI.set(id, ciz); return id; }
+  function vizMetinGenisligi(metin, fs){ return String(metin).length*(fs||VIZ_METIN)*VIZ_HARF; }
+  function vizGenislik(G){ return Math.max(120, Math.min(VIZ_W, Math.floor(G||vizSonG))); }
+  function vizOznitelik(id, G){ return ` data-viz="${id}" data-viz-g="${Math.floor(G||vizSonG)}"`; }
+  // Kutunun içerik genişliği, kök boyuna indirgenmiş px (rem × 16). clientWidth dönüşümden etkilenmez.
+  function vizKutuG(svg){
+    const p=svg.parentElement; if(!p) return 0;
+    const cs=getComputedStyle(p);
+    const w=p.clientWidth-(parseFloat(cs.paddingLeft)||0)-(parseFloat(cs.paddingRight)||0);
+    const kok=parseFloat(getComputedStyle(document.documentElement).fontSize)||16;
+    return Math.floor(w*16/Math.max(16,kok));
+  }
+  function vizUyarla(kok){
+    kok.querySelectorAll("svg[data-viz]").forEach(svg=>{
+      const ciz=VIZ_CIZICI.get(svg.getAttribute("data-viz"));
+      const G=vizKutuG(svg);
+      if(!ciz || !(G>0)) return;
+      vizSonG=G;
+      if(String(G)!==svg.getAttribute("data-viz-g")) ciz(svg, G);
+    });
+  }
+  // Metni çubuk/satır genişliğine sözcük sözcük böler (bölünemeyen tek sözcük olduğu gibi kalır).
+  function vizSatirla(metin, genislik, fs){
+    const satirlar=[]; let satir="";
+    String(metin).split(/\s+/).filter(Boolean).forEach(soz=>{
+      const aday=satir?satir+" "+soz:soz;
+      if(satir && vizMetinGenisligi(aday, fs)>genislik){ satirlar.push(satir); satir=soz; } else satir=aday;
+    });
+    if(satir) satirlar.push(satir);
+    return satirlar.length?satirlar:[""];
+  }
+  // Sayı ekseni etiketlerini seyreltir: k ∈ {1,2,4,5,10,…}, sıfır (yoksa ilk değer) her zaman etiketlidir;
+  // sığan adımlardan iki ucu da etiketleyen ilk adım seçilir (-10…10 → beşer; 0…20 → dörder).
+  function vizSeyrelt(degerler, aralik, fmt){
+    const genis=Math.max(0, ...degerler.map(v=>vizMetinGenisligi(fmt(v))))+6;
+    const sifir=degerler.findIndex(v=>Math.abs(v)<1e-9), a0=sifir<0?0:sifir, son=degerler.length-1;
+    const sigan=[1,2,4,5,10,20,25,50,100,200,250,500,1000].filter(c=>c*aralik>=genis);
+    const k=sigan.find(c=>a0%c===0 && (son-a0)%c===0)||sigan[0]||degerler.length;
+    return i=>((i-a0)%k+k)%k===0;
+  }
+  // Bölüm içeriği değişince (aynı mikro görevde, boyamadan önce) ve sahne genişliği değişince (bir
+  // sonraki karede, ResizeObserver döngüsüne girmeden) şablonun SVG'leri kutularına göre kurulur.
+  (function vizGozlemcileri(){
+    const sahne=document.getElementById("stage"); if(!sahne) return;
+    if(typeof MutationObserver==="function"){
+      new MutationObserver(function(){ vizUyarla(sahne); }).observe(sahne,{childList:true,subtree:true});
+    }
+    if(typeof ResizeObserver==="function"){
+      let son=-1;
+      new ResizeObserver(function(){
+        const w=sahne.clientWidth; if(w===son) return; son=w;
+        requestAnimationFrame(function(){ vizUyarla(sahne); });
+      }).observe(sahne);
+    }
+  })();
   // Eksen ölçeği: 1·2·5×10^k adımla en çok 5 eşit aralık; üst değer adımın katı ("nice" eksen,
   // talimatname §8.2, B52). Etiketler eşit adımlı ve tekrar etmez.
   function vizNice(max){
@@ -2367,59 +2437,98 @@ const MODULE_DATA = {
     const dec=Math.max(0,-Math.floor(Math.log10(step)+1e-9));
     return { top:step*n, step:step, n:n, fmt:v=>v.toFixed(dec).replace(".",",") };
   }
-  // Çubuk/çizgi grafik — viewBox responsive, --viz-* ile tema-duyarlı (S19: seri ders aksanını
-  // almaz), role="img" + <title>/<desc> ile erişilebilir, animasyonsuz (sakin). Eksik değer 0
-  // olarak çizilmez: yerinde "veri yok" yazar, çizgi o noktada kesilir (Carbon: veri uydurulmaz).
-  function vizChart(spec){
-    const id=vizId(), tid=id+"t", did=id+"d";
+  // Çubuk/çizgi grafik — viewBox kutunun genişliğine kurulur (Kanun M5.6), --viz-* ile tema-duyarlı (S19:
+  // seri ders aksanını almaz), role="img" + <title>/<desc> ile erişilebilir, animasyonsuz (sakin). Eksik
+  // değer 0 olarak çizilmez: yerinde "veri yok" yazar, çizgi o noktada kesilir (Carbon: veri uydurulmaz).
+  // Dar kutuda çubuk etiketleri sığmazsa çubuklar yataylaşır (etiket çubuğun üstünde, değer ucunda);
+  // çizgi grafiğin x etiketleri seyreltilir.
+  function vizChart(spec, G){
+    const id=vizKaydet(vizId(), (svg,g)=>{ svg.outerHTML=vizChartSvg(spec, id, g); });
     const data=spec.data||[];
-    const W=480,H=260,PADL=46,PADB=42,PADT=16,PADR=14;
-    const plotW=W-PADL-PADR, plotH=H-PADT-PADB;
-    const has=p=>!!p && p.value!==null && p.value!==undefined && p.value!=="" && Number.isFinite(+p.value);
-    const val=p=>Math.max(0,+p.value);
-    const scale=vizNice(Math.max(+spec.max||0, ...data.filter(has).map(val), 0));
-    const max=scale.top;
-    let grid="";
-    for(let i=0;i<=scale.n;i++){ const gy=PADT+plotH*i/scale.n, v=scale.step*(scale.n-i);
-      grid+=`<line class="viz-grid" x1="${PADL}" y1="${gy.toFixed(1)}" x2="${W-PADR}" y2="${gy.toFixed(1)}" stroke-width="1"/>`
-        +`<text class="viz-muted" x="${PADL-8}" y="${(gy+4).toFixed(1)}" text-anchor="end" font-size="11">${scale.fmt(v)}</text>`; }
-    const axis=`<line class="viz-axis" x1="${PADL}" y1="${PADT}" x2="${PADL}" y2="${PADT+plotH}" stroke-width="1.5"/>`
-      +`<line class="viz-axis" x1="${PADL}" y1="${PADT+plotH}" x2="${W-PADR}" y2="${PADT+plotH}" stroke-width="1.5"/>`;
-    const n=data.length, step=plotW/Math.max(1,n);
-    const xAt=i=>PADL+step*(i+0.5);
-    const label=(p,i)=>`<text class="viz-muted" x="${xAt(i).toFixed(1)}" y="${H-PADB+18}" text-anchor="middle" font-size="11">${esc(p.label||"")}</text>`;
-    const gap=i=>`<text class="viz-muted" x="${xAt(i).toFixed(1)}" y="${(PADT+plotH-6).toFixed(1)}" text-anchor="middle" font-size="11">veri yok</text>`;
-    let body;
-    if(spec.kind==="line"){
-      const color=spec.color||"var(--viz-1)";
-      let path="", prev=false;
-      data.forEach((p,i)=>{
-        if(!has(p)){ prev=false; return; }
-        path+=(path?" ":"")+(prev?"L":"M")+xAt(i).toFixed(1)+" "+(PADT+plotH*(1-val(p)/max)).toFixed(1);
-        prev=true;
-      });
-      body=grid+axis+(path?`<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`:"")
-        +data.map((p,i)=>has(p)
-          ?`<circle cx="${xAt(i).toFixed(1)}" cy="${(PADT+plotH*(1-val(p)/max)).toFixed(1)}" r="4" fill="${color}"/>`
-          :gap(i)).join("")
-        +data.map(label).join("");
-    } else {
-      const bw=Math.min(52, step*0.62);
-      body=grid+axis+data.map((p,i)=>{
-        if(!has(p)) return gap(i)+label(p,i);
-        const cx=xAt(i), bh=plotH*(val(p)/max), by=PADT+plotH-bh, fill=p.color||"var(--viz-1)";
-        return `<rect x="${(cx-bw/2).toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,bh).toFixed(1)}" rx="2" fill="${fill}"/>`
-          +label(p,i);
-      }).join("");
-    }
-    const missing=data.filter(p=>!has(p)).map(p=>(p&&p.label?p.label:"?")+": veri yok");
-    const desc=(spec.desc||spec.title||"")+(missing.length?(spec.desc||spec.title?" · ":"")+missing.join(", "):"");
-    const svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="${tid} ${did}"><title id="${tid}">${esc(spec.title||"Grafik")}</title><desc id="${did}">${esc(desc)}</desc>${body}</svg>`;
     let legend="";
     if(spec.legend && data.some(p=>p.color)){
       legend=`<div class="viz-legend">`+data.map(p=>`<span><i style="background:${p.color||"var(--viz-1)"}"></i>${esc(p.label||"")}</span>`).join("")+`</div>`;
     }
-    return svgFigure(svg+legend, spec.caption);
+    return svgFigure(vizChartSvg(spec, id, G)+legend, spec.caption);
+  }
+  function vizChartSvg(spec, id, G){
+    const tid=id+"t", did=id+"d", fs=VIZ_METIN;
+    const data=spec.data||[];
+    const W=vizGenislik(G),PADB=42,PADT=16,PADR=14;
+    const has=p=>!!p && p.value!==null && p.value!==undefined && p.value!=="" && Number.isFinite(+p.value);
+    const val=p=>Math.max(0,+p.value);
+    const scale=vizNice(Math.max(+spec.max||0, ...data.filter(has).map(val), 0));
+    const max=scale.top;
+    const yEtiketleri=[]; for(let i=0;i<=scale.n;i++) yEtiketleri.push(scale.fmt(scale.step*(scale.n-i)));
+    const PADL=Math.max(30, Math.ceil(Math.max(...yEtiketleri.map(e=>vizMetinGenisligi(e)))+14));
+    const plotW=W-PADL-PADR;
+    const n=data.length, step=plotW/Math.max(1,n);
+    const xGenis=Math.max(0, ...data.map(p=>vizMetinGenisligi(p.label||"")));
+    const yatay=spec.kind!=="line" && n>0 && xGenis>step-6;
+    let body, H=260;
+    if(yatay){
+      // Yatay çubuk: etiket çubuğun üstünde, tam genişlikte; değer çubuğun ucunda.
+      const degerMetni=p=>has(p)?scale.fmt(val(p)):"veri yok";
+      const degerGenis=Math.max(...data.map(p=>vizMetinGenisligi(degerMetni(p))))+8;
+      const cubukAlani=Math.max(24, W-2-degerGenis), BAR=18;
+      let y=PADT; body="";
+      data.forEach(p=>{
+        const satirlar=vizSatirla(p.label||"", W, fs);
+        body+=`<text class="viz-muted" x="0" y="${(y+fs).toFixed(1)}" font-size="${fs}">`
+          +satirlar.map((s,i)=>`<tspan x="0" dy="${i?(fs*1.25).toFixed(1):0}">${esc(s)}</tspan>`).join("")+`</text>`;
+        const by=y+fs*1.25*satirlar.length+4;
+        if(has(p)){
+          const w=Math.max(0, cubukAlani*val(p)/max), fill=p.color||"var(--viz-1)";
+          body+=`<rect x="2" y="${by.toFixed(1)}" width="${w.toFixed(1)}" height="${BAR}" rx="2" fill="${fill}"/>`
+            +`<text class="viz-muted" x="${(w+8).toFixed(1)}" y="${(by+BAR-5).toFixed(1)}" font-size="${fs}">${degerMetni(p)}</text>`;
+        } else {
+          body+=`<text class="viz-muted" x="2" y="${(by+BAR-5).toFixed(1)}" font-size="${fs}">veri yok</text>`;
+        }
+        y=by+BAR+14;
+      });
+      H=Math.ceil(y);
+      body=`<line class="viz-axis" x1="1" y1="${PADT}" x2="1" y2="${H-8}" stroke-width="1.5"/>`+body;
+    } else {
+      let grid="";
+      for(let i=0;i<=scale.n;i++){ const gy=PADT+(H-PADT-PADB)*i/scale.n;
+        grid+=`<line class="viz-grid" x1="${PADL}" y1="${gy.toFixed(1)}" x2="${W-PADR}" y2="${gy.toFixed(1)}" stroke-width="1"/>`
+          +`<text class="viz-muted" x="${PADL-8}" y="${(gy+4).toFixed(1)}" text-anchor="end" font-size="${fs}">${yEtiketleri[i]}</text>`; }
+      const plotH=H-PADT-PADB;
+      const axis=`<line class="viz-axis" x1="${PADL}" y1="${PADT}" x2="${PADL}" y2="${PADT+plotH}" stroke-width="1.5"/>`
+        +`<line class="viz-axis" x1="${PADL}" y1="${PADT+plotH}" x2="${W-PADR}" y2="${PADT+plotH}" stroke-width="1.5"/>`;
+      const xAt=i=>PADL+step*(i+0.5);
+      // Çizgi grafikte sığmayan x etiketi seyreltilir: her k'ıncı, ve sonuncu yeterince uzaksa o da.
+      const k=Math.max(1, Math.ceil((xGenis+6)/Math.max(1,step)));
+      const sonGosterilen=Math.floor((n-1)/k)*k;
+      const etiketli=i=>i%k===0 || (i===n-1 && (n-1-sonGosterilen)*step>=xGenis+6);
+      const label=(p,i)=>etiketli(i)?`<text class="viz-muted" x="${xAt(i).toFixed(1)}" y="${H-PADB+18}" text-anchor="middle" font-size="${fs}">${esc(p.label||"")}</text>`:"";
+      const gap=i=>`<text class="viz-muted" x="${xAt(i).toFixed(1)}" y="${(PADT+plotH-6).toFixed(1)}" text-anchor="middle" font-size="${fs}">veri yok</text>`;
+      if(spec.kind==="line"){
+        const color=spec.color||"var(--viz-1)";
+        let path="", prev=false;
+        data.forEach((p,i)=>{
+          if(!has(p)){ prev=false; return; }
+          path+=(path?" ":"")+(prev?"L":"M")+xAt(i).toFixed(1)+" "+(PADT+plotH*(1-val(p)/max)).toFixed(1);
+          prev=true;
+        });
+        body=grid+axis+(path?`<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`:"")
+          +data.map((p,i)=>has(p)
+            ?`<circle cx="${xAt(i).toFixed(1)}" cy="${(PADT+plotH*(1-val(p)/max)).toFixed(1)}" r="4" fill="${color}"/>`
+            :gap(i)).join("")
+          +data.map(label).join("");
+      } else {
+        const bw=Math.min(52, step*0.62);
+        body=grid+axis+data.map((p,i)=>{
+          if(!has(p)) return gap(i)+label(p,i);
+          const cx=xAt(i), bh=plotH*(val(p)/max), by=PADT+plotH-bh, fill=p.color||"var(--viz-1)";
+          return `<rect x="${(cx-bw/2).toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,bh).toFixed(1)}" rx="2" fill="${fill}"/>`
+            +label(p,i);
+        }).join("");
+      }
+    }
+    const missing=data.filter(p=>!has(p)).map(p=>(p&&p.label?p.label:"?")+": veri yok");
+    const desc=(spec.desc||spec.title||"")+(missing.length?(spec.desc||spec.title?" · ":"")+missing.join(", "):"");
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="${tid} ${did}"${vizOznitelik(id, G)}><title id="${tid}">${esc(spec.title||"Grafik")}</title><desc id="${did}">${esc(desc)}</desc>${body}</svg>`;
   }
 
   function renderChart(stage,s){
@@ -2479,17 +2588,37 @@ const MODULE_DATA = {
      iki fonksiyon aynı sabitleri BURADAN okur, böylece biri değişirse diğeri
      sessizce kaymaz (480/28 değişmeden kalmalı — regresyon testine bkz.). */
   const NL_W=480, NL_PADX=28;
-  function numberLine(spec){
+  /* Sayı doğrusu kutunun genişliğine kurulur (Kanun M5.6): viewBox genişliği en çok NL_W'dir; sayı
+     etiketleri sığmazsa seyreltilir (sıfır ve ondan k adımlık değerler; işaretler hep çizilir). Kutu
+     daralınca yeniden kurulur ve okurun seçtiği değer (aria-valuenow) korunur. */
+  function numberLine(spec, G){
+    const id=vizKaydet(vizId(), (svg,g)=>{
+      const eskiKol=svg.querySelector(".nl-handle"), odakta=eskiKol && document.activeElement===eskiKol;
+      const deger=eskiKol ? numOr(eskiKol.getAttribute("aria-valuenow"), spec.value) : spec.value;
+      svg.outerHTML=numberLineCiz(Object.assign({}, spec, {value:deger}), id, g).svg;
+      if(spec.interactive){
+        wireNumberlineInteractive(document, spec, id);
+        const yeniKol=document.querySelector(`svg[data-viz="${id}"] .nl-handle`);
+        if(odakta && yeniKol) yeniKol.focus();
+      }
+    });
+    const {svg, readout}=numberLineCiz(spec, id, G);
+    return svgFigure(svg, spec.caption) + readout;
+  }
+  function numberLineCiz(spec, id, G){
     const min=spec.min!=null?spec.min:0, max=spec.max!=null?spec.max:10;
-    const step=spec.step||1, id=vizId(), tid=id+"t", did=id+"d";
-    const W=NL_W,H=110,PADX=NL_PADX,Y=64, plotW=W-2*PADX, span=(max-min)||1;
+    const step=spec.step||1, tid=id+"t", did=id+"d";
+    const W=Math.min(NL_W, vizGenislik(G)),H=110,PADX=NL_PADX,Y=64, plotW=W-2*PADX, span=(max-min)||1;
     const X=v=>PADX+plotW*((v-min)/span);
+    const degerler=[];
+    for(let v=min; v<=max+1e-9; v=+(v+step).toFixed(6)) degerler.push(v);
+    const etiketli=vizSeyrelt(degerler, degerler.length>1?plotW/(degerler.length-1):plotW, v=>+v.toFixed(6));
     let ticks="";
-    for(let v=min; v<=max+1e-9; v=+(v+step).toFixed(6)){
+    degerler.forEach((v,i)=>{
       const x=X(v);
       ticks+=`<line class="viz-axis" x1="${x.toFixed(1)}" y1="${Y-6}" x2="${x.toFixed(1)}" y2="${Y+6}" stroke-width="1.5"/>`
-        +`<text class="viz-muted" x="${x.toFixed(1)}" y="${Y+26}" text-anchor="middle" font-size="12">${(+v.toFixed(6))}</text>`;
-    }
+        +(etiketli(i)?`<text class="viz-muted" x="${x.toFixed(1)}" y="${Y+26}" text-anchor="middle" font-size="${VIZ_METIN}">${(+v.toFixed(6))}</text>`:"");
+    });
     let hi="";
     if(spec.highlight && spec.highlight.length===2){
       const a=X(spec.highlight[0]), b=X(spec.highlight[1]);
@@ -2499,7 +2628,7 @@ const MODULE_DATA = {
     const pts=(spec.points||[]).map(p=>{
       const x=X(p.value), c=p.color||"var(--accent)";
       return `<circle cx="${x.toFixed(1)}" cy="${Y}" r="6" fill="${c}"/>`
-        +(p.label?`<text x="${x.toFixed(1)}" y="${Y-14}" text-anchor="middle" font-size="12" font-weight="600">${esc(p.label)}</text>`:"");
+        +(p.label?`<text x="${x.toFixed(1)}" y="${Y-14}" text-anchor="middle" font-size="${VIZ_METIN}" font-weight="600">${esc(p.label)}</text>`:"");
     }).join("");
     let handle="", readout="", nlAttrs="";
     if(spec.interactive){
@@ -2513,8 +2642,8 @@ const MODULE_DATA = {
         + `role="slider" aria-orientation="horizontal" aria-valuemin="${min}" aria-valuemax="${max}" aria-valuenow="${initVal}" aria-label="${label}"/>`;
       readout = `<div class="nl-readout" id="${hid}out">${label}: <span class="nl-readout__val">${initVal}</span></div>`;
     }
-    const svg=`<svg class="viz" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="${tid} ${did}"${nlAttrs}><title id="${tid}">${esc(spec.title||"Sayı doğrusu")}</title><desc id="${did}">${esc(spec.desc||spec.title||"")}</desc>${hi}${axis}${ticks}${pts}${handle}</svg>`;
-    return svgFigure(svg, spec.caption) + readout;
+    const svg=`<svg class="viz" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="${tid} ${did}"${vizOznitelik(id, G)}${nlAttrs}><title id="${tid}">${esc(spec.title||"Sayı doğrusu")}</title><desc id="${did}">${esc(spec.desc||spec.title||"")}</desc>${hi}${axis}${ticks}${pts}${handle}</svg>`;
+    return {svg, readout};
   }
   /* ---- sayı doğrusu: interactive el bağlama (Task 19) ----
      numberLine(spec) `spec.interactive` iken bir `<circle class="nl-handle"
@@ -2532,8 +2661,8 @@ const MODULE_DATA = {
      anında konumlanır (CSS tarafında da .nl-handle geçişi yalnızca
      prefers-reduced-motion:no-preference altında tanımlı — çift-katmanlı garanti,
      bkz. CSS bloğu). */
-  function wireNumberlineInteractive(stage, spec){
-    const svg = stage.querySelector("svg.viz[data-nl-handle]");
+  function wireNumberlineInteractive(stage, spec, id){
+    const svg = stage.querySelector(id ? `svg.viz[data-viz="${id}"][data-nl-handle]` : "svg.viz[data-nl-handle]");
     if(!svg) return;
     const handle = svg.querySelector(".nl-handle");
     if(!handle) return;
@@ -2542,7 +2671,7 @@ const MODULE_DATA = {
     const min = numOr(svg.getAttribute("data-nl-min"), 0);
     const max = numOr(svg.getAttribute("data-nl-max"), 10);
     const step = numOr(svg.getAttribute("data-nl-step"), 1) || 1;
-    const W=NL_W,PADX=NL_PADX,plotW=W-2*PADX, span=(max-min)||1;
+    const W=(svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width)||NL_W,PADX=NL_PADX,plotW=W-2*PADX, span=(max-min)||1;
     const X=v=>PADX+plotW*((v-min)/span);
     let val = numOr(handle.getAttribute("aria-valuenow"), (min+max)/2);
     function place(v){
@@ -2646,35 +2775,37 @@ const MODULE_DATA = {
     // Sarkaç: uzunluk (+ opsiyonel açı) → pivot + kol + top. Gerçek-zamanlı
     // fizik ANİMASYONU değil — seçilen değerlerdeki DURAĞAN konumu gösterir
     // (ör. "daha uzun sarkaç" karşılaştırması).
-    pendulum: (svg, v, labels) => {
+    pendulum: (svg, v, labels, W = VIZ_W) => {
       const Lm = clampNum(numOr(v.length, 1), 0.2, 2.2);
       const hasAngle = v.angle != null;
       const rawAngle = numOr(v.angle, 20);
       const A = clampNum(rawAngle, -75, 75);
-      const pivotX = 240, pivotY = 26, pxPerM = 72;
+      // Dar kutuda en uzun sarkaç en büyük açıda da çerçevede kalır (Kanun M5.6: viewBox kutuya göre).
+      const pivotX = W/2, pivotY = 26, pxPerM = Math.min(72, (W/2 - 22) / (2.2*Math.sin(75*Math.PI/180)));
       const Lpx = Lm * pxPerM;
       const rad = A * Math.PI / 180;
       const bobX = pivotX + Lpx * Math.sin(rad);
       const bobY = pivotY + Lpx * Math.cos(rad);
       const title = (labels && labels.title) ? esc(labels.title)
         : "Sarkaç: uzunluk " + Lm.toFixed(2) + " m" + (hasAngle ? ", açı " + Math.round(rawAngle) + "°" : "");
+      const uzunluk = "L = " + Lm.toFixed(2) + " m", etiketYari = vizMetinGenisligi(uzunluk, 13)/2 + 2;
       svg.innerHTML = `<title id="simSvgTitle">${title}</title>
         <desc id="simSvgDesc">Kaydırıcıyı hareket ettirerek sarkacın ${hasAngle?"uzunluğunu ve açısını":"uzunluğunu"} değiştir.</desc>
         <line x1="${pivotX}" y1="${pivotY}" x2="${pivotX}" y2="${(pivotY+Lpx).toFixed(1)}" class="viz-axis" stroke-width="1.5" stroke-dasharray="3 5"/>
         <line x1="${pivotX}" y1="${pivotY}" x2="${bobX.toFixed(1)}" y2="${bobY.toFixed(1)}" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/>
         <circle cx="${pivotX}" cy="${pivotY}" r="5" fill="var(--viz-axis)"/>
         <circle cx="${bobX.toFixed(1)}" cy="${bobY.toFixed(1)}" r="14" fill="var(--accent)"/>
-        <text class="viz-muted" x="${pivotX}" y="16" text-anchor="middle" font-size="12">Sabit nokta</text>
-        <text x="${bobX.toFixed(1)}" y="${(bobY+26).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="600">L = ${Lm.toFixed(2)} m</text>`;
+        <text class="viz-muted" x="${pivotX}" y="16" text-anchor="middle" font-size="${VIZ_METIN}">Sabit nokta</text>
+        <text x="${clampNum(bobX, etiketYari, W-etiketYari).toFixed(1)}" y="${(bobY+26).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="600">${uzunluk}</text>`;
     },
     // Mermi hareketi: hız + açı → yörünge yayı (klasik parabolik hareket formülü;
     // menzil/yükseklik SVG çerçevesine otomatik ölçeklenir).
-    projectile: (svg, v, labels) => {
+    projectile: (svg, v, labels, W = VIZ_W) => {
       const v0 = clampNum(numOr(v.speed, 20), 1, 60);
       const angDeg = clampNum(numOr(v.angle, 45), 1, 89);
       const g = 9.8, rad = angDeg * Math.PI / 180;
       const R = Math.max(0.01, (v0*v0*Math.sin(2*rad))/g);
-      const W=480,H=240,PADL=30,PADR=20,PADT=20,PADB=32;
+      const H=240,PADL=30,PADR=20,PADT=20,PADB=32;
       const plotW=W-PADL-PADR, plotH=H-PADT-PADB;
       const N=40, hMax = (v0*v0*Math.pow(Math.sin(rad),2))/(2*g) || 0.01;
       let d="";
@@ -2693,13 +2824,13 @@ const MODULE_DATA = {
         <desc id="simSvgDesc">Hız ve açı kaydırıcılarını değiştirerek menzilin nasıl değiştiğini gör.</desc>
         <line x1="${PADL}" y1="${groundY}" x2="${W-PADR}" y2="${groundY}" class="viz-axis" stroke-width="1.5"/>
         <path d="${d.trim()}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" marker-end="url(#vz-arrow)"/>
-        <text class="viz-muted" x="${W/2}" y="${H-8}" text-anchor="middle" font-size="12">menzil ≈ ${R.toFixed(1)} m</text>`;
+        <text class="viz-muted" x="${W/2}" y="${H-8}" text-anchor="middle" font-size="${VIZ_METIN}">menzil ≈ ${R.toFixed(1)} m</text>`;
     },
     // Dalga: genlik + frekans → sinüs eğrisi (sabit pencere üzerinde örneklenir).
-    wave: (svg, v, labels) => {
+    wave: (svg, v, labels, W = VIZ_W) => {
       const amp = clampNum(numOr(v.amplitude, 40), 2, 100);
       const freq = clampNum(numOr(v.frequency, 1.5), 0.2, 6);
-      const W=480,H=240,PADL=20,PADR=20, midY=H/2, plotW=W-PADL-PADR, N=80;
+      const H=240,PADL=20,PADR=20, midY=H/2, plotW=W-PADL-PADR, N=80;
       let d="";
       for(let i=0;i<=N;i++){
         const t=i/N, x=PADL+plotW*t, y=midY-amp*Math.sin(2*Math.PI*freq*t);
@@ -2714,19 +2845,21 @@ const MODULE_DATA = {
     },
     // Sayı doğrusu / ölçek: tek değer → eksen üzerinde işaretli nokta; eksen
     // alanı değer 0-10'un dışına taşarsa otomatik genişler.
-    numberScale: (svg, v, labels) => {
+    numberScale: (svg, v, labels, W = VIZ_W) => {
       const val = numOr(v.value, 5);
       const hi = Math.max(10, Math.ceil(val)+1);
       const lo = Math.min(0, Math.floor(val)-1);
-      const W=480,H=240,PADX=30,Y=H/2,plotW=W-2*PADX, span=(hi-lo)||1;
+      const H=240,PADX=30,Y=H/2,plotW=W-2*PADX, span=(hi-lo)||1;
       const stepTick = Math.max(1, Math.ceil((hi-lo)/10));
       const X = x => PADX+plotW*((x-lo)/span);
+      const degerler=[]; for(let t=lo; t<=hi+1e-9; t+=stepTick) degerler.push(t);
+      const etiketli=vizSeyrelt(degerler, plotW*stepTick/span, t=>Math.round(t));
       let ticks="";
-      for(let t=lo; t<=hi+1e-9; t+=stepTick){
+      degerler.forEach((t,i)=>{
         const x=X(t);
         ticks += `<line class="viz-axis" x1="${x.toFixed(1)}" y1="${Y-6}" x2="${x.toFixed(1)}" y2="${Y+6}" stroke-width="1.5"/>`
-          + `<text class="viz-muted" x="${x.toFixed(1)}" y="${Y+24}" text-anchor="middle" font-size="12">${Math.round(t)}</text>`;
-      }
+          + (etiketli(i)?`<text class="viz-muted" x="${x.toFixed(1)}" y="${Y+24}" text-anchor="middle" font-size="${VIZ_METIN}">${Math.round(t)}</text>`:"");
+      });
       const px=X(val);
       const title = (labels && labels.title) ? esc(labels.title) : "Sayı doğrusu: değer " + val;
       svg.innerHTML = `<title id="simSvgTitle">${title}</title>
@@ -2738,14 +2871,14 @@ const MODULE_DATA = {
     },
     // Fonksiyon grafiği: eğim (m) + kesişim (b) → y = mx + b doğrusu, sabit x
     // eksenine (-5..5) göre çizilir; eksenler her zaman orijinden geçer.
-    functionPlot: (svg, v, labels) => {
+    functionPlot: (svg, v, labels, W = VIZ_W) => {
       const m = clampNum(numOr(v.m, 1), -20, 20);
       const b = clampNum(numOr(v.b, 0), -20, 20);
       const xMin=-5, xMax=5;
       const y1=m*xMin+b, y2=m*xMax+b;
       let yLo=Math.min(y1,y2,0), yHi=Math.max(y1,y2,0);
       if(yHi-yLo<1){ yHi+=1; yLo-=1; }
-      const W=480,H=240,PADL=34,PADR=20,PADT=20,PADB=30;
+      const H=240,PADL=34,PADR=20,PADT=20,PADB=30;
       const plotW=W-PADL-PADR, plotH=H-PADT-PADB;
       const X = x => PADL+plotW*((x-xMin)/(xMax-xMin));
       const Y = y => PADT+plotH*(1-((y-yLo)/(yHi-yLo)));
@@ -2796,7 +2929,10 @@ const MODULE_DATA = {
         + `</div>`;
     });
     html += `</div>`;
-    html += `<div class="visual sim-canvas"><svg class="viz" id="simSvg" viewBox="0 0 480 240" role="img" aria-labelledby="simSvgTitle simSvgDesc"><title id="simSvgTitle">${esc(s.title||"Simülasyon")}</title><desc id="simSvgDesc">Kaydırıcıları hareket ettirerek görseli değiştir.</desc></svg></div>`;
+    // Kanun M5.6: kanvasın viewBox genişliği kutuya göredir; kutu değişince yalnız kare yeniden çizilir.
+    let simW = vizGenislik();
+    const simId = vizKaydet(vizId(), (svg,g)=>{ simW = vizGenislik(g); svg.setAttribute("data-viz-g", String(Math.floor(g))); redraw(); });
+    html += `<div class="visual sim-canvas"><svg class="viz" id="simSvg" viewBox="0 0 ${simW} 240" role="img" aria-labelledby="simSvgTitle simSvgDesc"${vizOznitelik(simId)}><title id="simSvgTitle">${esc(s.title||"Simülasyon")}</title><desc id="simSvgDesc">Kaydırıcıları hareket ettirerek görseli değiştir.</desc></svg></div>`;
     stage.innerHTML = html;
 
     const svgEl = stage.querySelector("#simSvg");
@@ -2810,7 +2946,7 @@ const MODULE_DATA = {
       // svg.innerHTML TAM değişim: reduced-motion'dan bağımsız her zaman ANINDA
       // (CSS transition/animasyon tanımlanmadı — eski düğümler her redraw'da yok
       // edilip yenileri kuruluyor, ara-kare interpolasyonu mimari olarak yok).
-      try{ preset(svgEl, currentValues(), s.labels||{}); }
+      try{ svgEl.setAttribute("viewBox", `0 0 ${simW} 240`); preset(svgEl, currentValues(), s.labels||{}, simW); }
       catch(e){ /* preset hata verirse canvas son geçerli kareyi korur — çökme yok */ }
     }
     sliders.forEach(inp=>{
@@ -3007,14 +3143,22 @@ const MODULE_DATA = {
   }
 
   // Fen/Coğrafya: numaralı çağrı-iğneli etiketli diyagram (SVG) + sıralı açıklama listesi.
-  function labeledFigure(spec){
+  function labeledFigure(spec, G){
     const vb=spec.viewBox||"0 0 480 300", id=vizId(), tid=id+"t", did=id+"d";
-    const pins=(spec.labels||[]).map((L,i)=>{
-      const n=L.n!=null?L.n:(i+1);
-      return `<g><circle class="pin" cx="${L.x}" cy="${L.y}" r="12"/>`
-        +`<text class="pin-n" x="${L.x}" y="${L.y}" text-anchor="middle" dominant-baseline="central" font-size="13">${esc(String(n))}</text></g>`;
-    }).join("");
-    const svg=`<svg class="viz" viewBox="${vb}" role="img" aria-labelledby="${tid} ${did}"><title id="${tid}">${esc(spec.title||"Etiketli şema")}</title><desc id="${did}">${esc(spec.desc||spec.title||"")}</desc>${spec.base||""}${pins}</svg>`;
+    // Kanun M5.6: şemanın viewBox'ı yazarındır; iğne numarası kutunun ölçeğinde ≥ VIZ_METIN px kalsın diye
+    // numara ve daire, kutu daraldıkça kullanıcı biriminde büyür.
+    const VW=(String(vb).trim().split(/[\s,]+/).map(Number)[2])||480;
+    const ciz=g=>{
+      const olcek=Math.max(1, Math.floor(g||vizSonG))/VW, fs=Math.max(13, Math.ceil(VIZ_METIN/olcek)), r=Math.max(12, Math.ceil(fs*0.8));
+      const pins=(spec.labels||[]).map((L,i)=>{
+        const n=L.n!=null?L.n:(i+1);
+        return `<g><circle class="pin" cx="${L.x}" cy="${L.y}" r="${r}"/>`
+          +`<text class="pin-n" x="${L.x}" y="${L.y}" text-anchor="middle" dominant-baseline="central" font-size="${fs}">${esc(String(n))}</text></g>`;
+      }).join("");
+      return `<svg class="viz" viewBox="${vb}" role="img" aria-labelledby="${tid} ${did}"${vizOznitelik(id, g)}><title id="${tid}">${esc(spec.title||"Etiketli şema")}</title><desc id="${did}">${esc(spec.desc||spec.title||"")}</desc>${spec.base||""}${pins}</svg>`;
+    };
+    vizKaydet(id, (svg,g)=>{ svg.outerHTML=ciz(g); });
+    const svg=ciz(G);
     const legend=(spec.labels||[]).length
       ? `<ol class="viz-legend-list">${(spec.labels||[]).map(L=>`<li>${esc(L.text||"")}</li>`).join("")}</ol>` : "";
     return `<figure class="viz">${svg}${legend}${spec.caption?`<figcaption>${esc(spec.caption)}</figcaption>`:""}</figure>`;
@@ -3074,10 +3218,9 @@ const MODULE_DATA = {
 
   // Matematik: kanıta dayalı KESİR/ORAN ÇUBUĞU (bar modeli — daire değil).
   //  kind:"fraction" {num,den} · kind:"sum" {addends:[],den} · kind:"ratio" {ratio:[],labels?:[]}
-  function fractionBar(spec){
+  function fractionBar(spec, G){
     const kind = spec.kind || (spec.ratio ? "ratio" : (spec.addends ? "sum" : "fraction"));
     const id=vizId(), tid=id+"t", did=id+"d";
-    const W=480, BARX=20, BARY=16, BARW=440, BARH=44, EQY=88, H=104;
     // seriler --viz-* paletinde; ders aksanı grafik serisi değildir (S19, B52)
     const PAL=["var(--viz-1)","var(--viz-2)","var(--viz-3)","var(--viz-4)","var(--viz-5)"];
     const EMPTY="var(--cds-layer-01)";
@@ -3123,20 +3266,28 @@ const MODULE_DATA = {
       eq=num+"\u2044"+den;
       desc="Kesir çubuğu: bütün "+den+" eşit parçaya bölünmüş, "+num+" parça dolu; kesir "+num+" bölü "+den+".";
     }
-    const cw=BARW/(total||1);
-    let rects="";
-    for(let i=0;i<cells.length;i++){
-      rects+=`<rect x="${(BARX+i*cw).toFixed(2)}" y="${BARY}" width="${cw.toFixed(2)}" height="${BARH}" fill="${cells[i]}" stroke="var(--cds-border-subtle)" stroke-width="1"/>`;
-    }
-    const SEPW=3;
-    const seps=sinirlar.map(i=>`<rect class="fb-sep" x="${(BARX+i*cw-SEPW/2).toFixed(2)}" y="${BARY}" width="${SEPW}" height="${BARH}" fill="var(--cds-layer-01)"/>`).join("");
-    const frame=`<rect x="${BARX}" y="${BARY}" width="${BARW}" height="${BARH}" fill="none" stroke="var(--cds-border-strong)" stroke-width="1.5"/>`;
-    const eqTxt=`<text class="fb-eq" x="${W/2}" y="${EQY}" text-anchor="middle" font-size="22">${eq}</text>`;
     const title = kind==="ratio" ? "Oran modeli" : (kind==="sum" ? "Kesir toplamı modeli" : "Kesir modeli");
-    const svg=`<svg class="viz fraction-bar" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="${tid} ${did}">`
-      +`<title id="${tid}">${esc(title)}</title><desc id="${did}">${esc(spec.desc||desc)}</desc>`
-      +`${rects}${seps}${frame}${eqTxt}</svg>`;
-    return `<figure class="viz viz--plain">${svg}${legend}${spec.caption?`<figcaption>${esc(spec.caption)}</figcaption>`:""}</figure>`;
+    // Kanun M5.6: çubuk kutunun genişliğine kurulur; eşitlik 22 birimden başlar, sığmazsa küçülür ama
+    // VIZ_METIN'in altına inmez.
+    const ciz=g=>{
+      const W=vizGenislik(g), BARX=W>=VIZ_W?20:8, BARY=16, BARW=W-2*BARX, BARH=44;
+      const efs=Math.max(VIZ_METIN, Math.min(22, Math.floor((W-16)/Math.max(1, eq.length*VIZ_HARF))));
+      const EQY=BARY+BARH+6+Math.round(efs*0.82), H=EQY+Math.round(efs*0.73);
+      const cw=BARW/(total||1);
+      let rects="";
+      for(let i=0;i<cells.length;i++){
+        rects+=`<rect x="${(BARX+i*cw).toFixed(2)}" y="${BARY}" width="${cw.toFixed(2)}" height="${BARH}" fill="${cells[i]}" stroke="var(--cds-border-subtle)" stroke-width="1"/>`;
+      }
+      const SEPW=3;
+      const seps=sinirlar.map(i=>`<rect class="fb-sep" x="${(BARX+i*cw-SEPW/2).toFixed(2)}" y="${BARY}" width="${SEPW}" height="${BARH}" fill="var(--cds-layer-01)"/>`).join("");
+      const frame=`<rect x="${BARX}" y="${BARY}" width="${BARW}" height="${BARH}" fill="none" stroke="var(--cds-border-strong)" stroke-width="1.5"/>`;
+      const eqTxt=`<text class="fb-eq" x="${W/2}" y="${EQY}" text-anchor="middle" font-size="${efs}">${eq}</text>`;
+      return `<svg class="viz fraction-bar" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="${tid} ${did}"${vizOznitelik(id, g)}>`
+        +`<title id="${tid}">${esc(title)}</title><desc id="${did}">${esc(spec.desc||desc)}</desc>`
+        +`${rects}${seps}${frame}${eqTxt}</svg>`;
+    };
+    vizKaydet(id, (svg,g)=>{ svg.outerHTML=ciz(g); });
+    return `<figure class="viz viz--plain">${ciz(G)}${legend}${spec.caption?`<figcaption>${esc(spec.caption)}</figcaption>`:""}</figure>`;
   }
 
   const renderDiagram  = displaySeg("Şema",            s=>labeledFigure(s.diagram||s));
