@@ -2477,17 +2477,18 @@ const MODULE_DATA = {
         body+=`<text class="viz-muted" x="0" y="${(y+fs).toFixed(1)}" font-size="${fs}">`
           +satirlar.map((s,i)=>`<tspan x="0" dy="${i?(fs*1.25).toFixed(1):0}">${esc(s)}</tspan>`).join("")+`</text>`;
         const by=y+fs*1.25*satirlar.length+4;
+        // Sıfır çizgisi yalnız çubuğun yanında: üstteki etiketi kesmez.
+        body+=`<line class="viz-axis" x1="1" y1="${(by-3).toFixed(1)}" x2="1" y2="${(by+BAR+3).toFixed(1)}" stroke-width="1.5"/>`;
         if(has(p)){
           const w=Math.max(0, cubukAlani*val(p)/max), fill=p.color||"var(--viz-1)";
           body+=`<rect x="2" y="${by.toFixed(1)}" width="${w.toFixed(1)}" height="${BAR}" rx="2" fill="${fill}"/>`
             +`<text class="viz-muted" x="${(w+8).toFixed(1)}" y="${(by+BAR-5).toFixed(1)}" font-size="${fs}">${degerMetni(p)}</text>`;
         } else {
-          body+=`<text class="viz-muted" x="2" y="${(by+BAR-5).toFixed(1)}" font-size="${fs}">veri yok</text>`;
+          body+=`<text class="viz-muted" x="8" y="${(by+BAR-5).toFixed(1)}" font-size="${fs}">veri yok</text>`;
         }
         y=by+BAR+14;
       });
       H=Math.ceil(y);
-      body=`<line class="viz-axis" x1="1" y1="${PADT}" x2="1" y2="${H-8}" stroke-width="1.5"/>`+body;
     } else {
       let grid="";
       for(let i=0;i<=scale.n;i++){ const gy=PADT+(H-PADT-PADB)*i/scale.n;

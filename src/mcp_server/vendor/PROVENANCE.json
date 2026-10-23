@@ -5,7 +5,7 @@
     "assets/carbon-v11-authority.json": "d6958862826c8b36adae53781724b0447b06045d7853602984c85a48c32aa5ce",
     "assets/fonts-manifest.json": "23153bf47b3c0b1859eca6ffccae83ff0365e673b2e4f1ad7eb32353af47a7e0",
     "assets/ibm-plex-OFL.txt": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f",
-    "assets/module-template.html": "e2187410d83ef284999bdac22cca0649df4956c35e1a2f28b47745bbf8823968",
+    "assets/module-template.html": "7ed35020524dd0bec5de8378bc777caeba0171a2d2487d3d839780d724439b98",
     "references/adhd-pedagogy.md": "500e62eb5af169a56fe118911ca15b38b92cc5b0286091ce67bf379081aba83d",
     "references/audio-system.md": "864bec9fada2e2e8c663dcebe14b0593b4ea1c661f32240253f370fd07df6d1e",
     "references/carbon-child-system.md": "3338cfb6e9ec2c51974c3729add9c9a117afe3169df1cf00a88e8f7e23dac28a",
@@ -54,7 +54,7 @@
     "repo": "https://github.com/mahirkurt/CureoPrivate",
     "retired_in": "edupedia 1.0.0"
   },
-  "pinned_at": "2026-10-23T15:28:27+00:00",
+  "pinned_at": "2026-10-23T15:47:08+00:00",
   "source_commit": "1aee3845efffb103a0e4e5b489f4477c0b3017b0",
   "synced_at": "2026-09-18T10:43:35+00:00"
 }
