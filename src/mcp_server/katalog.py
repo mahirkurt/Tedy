@@ -42,6 +42,13 @@ DURUMLAR = ("active", "archived", "removed", "hepsi")
 # be mapped to sunucu_hatasi instead of letting its Python text reach the tool caller.
 _KNOWN_REASONS = ("gecersiz_slug", "surum_siniri", "yol_reddedildi")
 _SUNUCU_HATASI_MESAJ = "Katalog işlemi sunucu tarafında tamamlanamadı; yöneticiye bildir."
+_KATALOG_OKUNAMADI_MESAJ = ("Modül kataloğu okunamıyor; hiçbir şey yazılmadı. Katalog onarılana dek yayın, kaldırma ve "
+                            "arşivleme yapılmaz; yöneticiye bildir.")
+
+
+class KatalogOkunamadi(Exception):
+    """Katalog dosyası var ama okunamıyor (inceleme turu 1, bulgu 8). Yazıcı onu boş katalog sayıp bütün satırları
+    ezmez; hiçbir şey yazmadan durur. Dosya hiç yoksa bu değil: boş katalogla başlanır."""
 
 
 def _fold(text: str) -> str:
@@ -68,6 +75,10 @@ def _iso(now: float) -> str:
 def _valid_ted_link(link: Any) -> bool:
     return (isinstance(link, dict) and set(link) == {"kind", "id"} and link["kind"] in ("exam", "homework")
             and isinstance(link["id"], str) and 0 < len(link["id"]) <= 128)
+
+
+def _katalog_okunamadi(base: dict[str, Any]) -> dict[str, Any]:
+    return {**base, "status": "katalog_okunamadi", "not": _KATALOG_OKUNAMADI_MESAJ}
 
 
 def _sunucu_hatasi(base: dict[str, Any]) -> dict[str, Any]:
@@ -152,6 +163,14 @@ class CatalogWriter:
             fcntl.flock(fd, fcntl.LOCK_UN)
             os.close(fd)
 
+    def _yazilacak_satirlar(self) -> list[dict[str, Any]]:
+        """Kilit altında, yazmadan önce okunan satırlar. Okunamayan katalog boş sayılmaz (`read_catalog` öyle sayar ve
+        bir yazıcı onunla bütün satırları ezerdi): `KatalogOkunamadi`. Dosya yoksa boş katalogla başlanır."""
+        durum, rows = ms.read_catalog_with_status(self.data_dir)
+        if durum == ms.CATALOG_UNREADABLE:
+            raise KatalogOkunamadi()
+        return rows
+
     def _write(self, rows: list[dict[str, Any]]) -> None:
         atomic_json_dump({"surum": 1, "moduller": rows}, str(ms.catalog_path(self.data_dir)))
 
@@ -183,7 +202,7 @@ class CatalogWriter:
         if not ms.publishable_slug(slug):
             raise ValueError("gecersiz_slug")
         with self._locked():
-            rows = ms.read_catalog(self.data_dir)
+            rows = self._yazilacak_satirlar()
             version = self._next_version(rows, slug)
             # Fix round 1, F2: two different failure modes used to share one raw ValueError
             # message. Check the version ceiling explicitly first (a real "no versions left"
@@ -220,7 +239,7 @@ class CatalogWriter:
     def arsivle(self, email: str, slug: str) -> tuple[int | None, int]:
         """En yenisi dışındaki `active` sürümleri arşivler: (güncel sürüm ya da yayında sürüm yoksa None, sayı)."""
         with self._locked():
-            rows = ms.read_catalog(self.data_dir)
+            rows = self._yazilacak_satirlar()
             yayinda = [r["version"] for r in rows if r.get("slug") == slug and r.get("status") == "active"
                        and ms.valid_version(r.get("version"))]
             if not yayinda:
@@ -233,7 +252,7 @@ class CatalogWriter:
 
     def kaldir(self, email: str, slug: str) -> int:
         with self._locked():
-            rows = ms.read_catalog(self.data_dir)
+            rows = self._yazilacak_satirlar()
             count = 0
             for row in rows:
                 if row.get("slug") == slug and row.get("status") == "active":
@@ -304,6 +323,8 @@ class Yayinci:
                         "not": "Taslak bugünkü kapılardan geçmiyor (derlendikten sonra sıkılaşan kurallar): "
                                f"{', '.join(guncel)}. Modül yayınlanmadı; edupedia_derle ile yeniden derle."}
             record, arsivlenen = self.catalog.yayinla(email, draft, html, chosen, link)
+        except KatalogOkunamadi:
+            return _katalog_okunamadi(base)
         except ValueError as exc:
             # Fix round 1, F3: the three closed reasons CatalogWriter.yayinla itself raises
             # pass through verbatim (surum_siniri also carries the current limit); anything
@@ -339,6 +360,8 @@ class Yayinci:
         base = {"slug": slug, "mcp_verified": False}
         try:
             count = self.catalog.kaldir(email, slug)
+        except KatalogOkunamadi:
+            return _katalog_okunamadi(base)
         except Exception:
             return _sunucu_hatasi(base)
         if not count:
@@ -352,6 +375,8 @@ class Yayinci:
         base = {"slug": slug, "mcp_verified": False}
         try:
             guncel, count = self.catalog.arsivle(email, slug)
+        except KatalogOkunamadi:
+            return _katalog_okunamadi(base)
         except Exception:
             return _sunucu_hatasi(base)
         if guncel is None:
