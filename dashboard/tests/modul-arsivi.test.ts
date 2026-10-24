@@ -55,3 +55,14 @@ test('yayında olmayan modülün sayfası başlığını korur ve Modüller sayf
   const ic = readFileSync(new URL('../src/components/patterns/IcBaglanti.tsx', import.meta.url), 'utf8')
   assert.match(ic, /uygulamaIcindeAc\(e, href, e\.currentTarget\.getAttribute\('target'\)\)/)
 })
+
+test('içerik çizilmeyen görünümde AI etiketi yok: yayında değil ve hata dalları (inceleme turu 3)', () => {
+  // Sayfada yapay zekâ yardımıyla yazılmış bir içerik yokken (çerçeve çizilmiyor) etiket ve "Yapay zekâ yardımıyla
+  // hazırlanmış modül" notu da çizilmez; etiketin penceresi yalnız "Ayrıntılar şu an alınamadı" derdi.
+  const kaynak = readFileSync(new URL('../src/components/ModuleViewer.tsx', import.meta.url), 'utf8')
+  assert.match(kaynak, /const icerikYok = ticket\.status === 'yayinda_degil' \|\| ticket\.status === 'error'/)
+  assert.match(kaynak, /aiEtiketi=\{icerikYok \? undefined : <ModulAiEtiketi durum=\{aciklama\} \/>\}/)
+  const baslik = readFileSync(new URL('../src/components/ModulBasligi.tsx', import.meta.url), 'utf8')
+  assert.match(baslik, /aiEtiketi\?: ReactNode/)
+  assert.match(baslik, /\{aiEtiketi && \(\s*<div className="modul-baslik__ai">/)
+})

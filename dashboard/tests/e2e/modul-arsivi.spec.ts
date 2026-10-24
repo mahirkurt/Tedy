@@ -73,6 +73,10 @@ test('güncel sürüm yoksa sayfa modülün artık yayında olmadığını söyl
   await expect(page.getByRole('navigation', { name: 'Konum' }).getByRole('link', { name: 'Modüller', exact: true }))
     .toHaveAttribute('href', '/moduller')
   await expect(page.locator('.module-viewer').getByRole('heading', { level: 2, name: 'Modül', exact: true })).toBeVisible()
+  // İnceleme turu 3: sayfada yapay zekâyla yazılmış içerik yok; AI etiketi ve notu da yok (başlık çizildikten sonra).
+  await expect(page.locator('.module-viewer .cds--ai-label')).toHaveCount(0)
+  await expect(page.locator('.module-viewer .modul-baslik__ai')).toHaveCount(0)
+  await expect(page.locator('.module-viewer')).not.toContainText('Yapay zekâ yardımıyla')
   // Bağlantı bildirimin altında: InlineNotification canlı bölgedir, Carbon içinde etkileşimli öğeye izin vermez.
   const cumle = page.locator('.module-viewer__yonlendirme')
   await expect(cumle).toHaveText('Yayındaki modüller Modüller sayfasında.')

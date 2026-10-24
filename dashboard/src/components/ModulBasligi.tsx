@@ -24,7 +24,8 @@ function kitapMetni(kitap: ModulAciklamasi['kitap']): string | null {
  */
 export default function ModulBasligi({ durum, aiEtiketi, taslak, yedekBaslik = 'Öğrenme Modülü' }: {
   durum: ModulAciklamaDurumu
-  aiEtiketi: ReactNode
+  /** Absent when the page draws no module content (no longer published, ticket error): no AI label, no AI note. */
+  aiEtiketi?: ReactNode
   taslak?: boolean
   /** The title when the explanation carries none (a module no longer published says "Modül"). */
   yedekBaslik?: string
@@ -55,10 +56,12 @@ export default function ModulBasligi({ durum, aiEtiketi, taslak, yedekBaslik = '
               ? <SubjectLabel course={ders}>{[ders, kas].filter(Boolean).join(' · ')}</SubjectLabel>
               : kas || (taslak ? 'Taslak' : '')}
           </p>
-          <div className="modul-baslik__ai">
-            <p className="modul-baslik__ai-not">Yapay zekâ yardımıyla hazırlanmış modül</p>
-            {aiEtiketi}
-          </div>
+          {aiEtiketi && (
+            <div className="modul-baslik__ai">
+              <p className="modul-baslik__ai-not">Yapay zekâ yardımıyla hazırlanmış modül</p>
+              {aiEtiketi}
+            </div>
+          )}
         </div>
         {durum.tur === 'yukleniyor'
           ? <SkeletonText heading width="60%" />

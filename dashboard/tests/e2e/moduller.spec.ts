@@ -592,6 +592,10 @@ test('a refused ticket is explained, not blank', async ({ page }) => {
   await page.goto('/moduller/fen5-su/v1')
   await expect(page.locator('.module-viewer .cds--inline-notification')).toContainText('Bu modülü açma yetkin yok.')
   await expect(page.locator('iframe.module-frame')).toHaveCount(0)
+  // Review round 3: no module content on the page, so no AI label either — the head itself is still drawn.
+  await expect(page.getByRole('navigation', { name: 'Konum' }).getByRole('link', { name: 'Modüller', exact: true })).toBeVisible()
+  await expect(page.locator('.module-viewer .cds--ai-label')).toHaveCount(0)
+  await expect(page.locator('.module-viewer .modul-baslik__ai')).toHaveCount(0)
 })
 
 test('a module linked to an upcoming exam is offered on İşler', async ({ page }) => {

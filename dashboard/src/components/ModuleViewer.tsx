@@ -57,8 +57,12 @@ export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress
   const slug = progress?.slug
   const version = progress?.version
   // A module no longer published keeps the page's head too (review round 1): the breadcrumb back to Modüller and
-  // the title — "Modül" when the archived version's explanation (410) cannot name it.
-  const bas = <ModulBasligi durum={aciklama} taslak={!progress} aiEtiketi={<ModulAiEtiketi durum={aciklama} />}
+  // the title — "Modül" when the archived version's explanation (410) cannot name it. When the page draws no module
+  // content (no longer published, ticket error) there is nothing written with AI help on it, so no AI label either
+  // (review round 3); its window could only say that the details are unavailable.
+  const icerikYok = ticket.status === 'yayinda_degil' || ticket.status === 'error'
+  const bas = <ModulBasligi durum={aciklama} taslak={!progress}
+    aiEtiketi={icerikYok ? undefined : <ModulAiEtiketi durum={aciklama} />}
     yedekBaslik={ticket.status === 'yayinda_degil' ? 'Modül' : undefined} />
 
   if (seenTicketPath !== ticketPath) {
