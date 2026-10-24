@@ -214,6 +214,14 @@
   flex-direction: column;
 }
 
+// A module no longer published: the sentence with the link to Modüller, under the info notification.
+.module-viewer__yonlendirme {
+  @include type.type-style('body-01');
+
+  margin: spacing.$spacing-05 0 0;
+  color: theme.$text-primary;
+}
+
 // ── the AI label's explanation window: Carbon paints the window; only the words' order here (§6.2) ──
 .modul-ai {
   display: flex;

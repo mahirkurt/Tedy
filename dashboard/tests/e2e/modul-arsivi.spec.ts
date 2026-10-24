@@ -68,10 +68,26 @@ test('güncel sürüm yoksa sayfa modülün artık yayında olmadığını söyl
   await expect(bilgi).toContainText('Bu modül artık yayında değil.')
   await expect(bilgi).toHaveAttribute('role', 'status')
   await expect(page).toHaveURL(/\/moduller\/fen5-su\/v1$/)
+  // İnceleme turu 1, bulgu 5: sayfa başlığını korur — Modüller'e dönen breadcrumb ve görünür başlık (adı bilinmediği
+  // için "Modül") — ve cümle /moduller'e giden gerçek bir bağlantı taşır.
+  await expect(page.getByRole('navigation', { name: 'Konum' }).getByRole('link', { name: 'Modüller', exact: true }))
+    .toHaveAttribute('href', '/moduller')
+  await expect(page.locator('.module-viewer').getByRole('heading', { level: 2, name: 'Modül', exact: true })).toBeVisible()
+  // Bağlantı bildirimin altında: InlineNotification canlı bölgedir, Carbon içinde etkileşimli öğeye izin vermez.
+  const cumle = page.locator('.module-viewer__yonlendirme')
+  await expect(cumle).toHaveText('Yayındaki modüller Modüller sayfasında.')
+  const bag = cumle.getByRole('link', { name: 'Modüller', exact: true })
+  await expect(bag).toHaveAttribute('href', '/moduller')
+  await expect(bilgi.getByRole('link')).toHaveCount(0)
   // Bir bilgi, hata değil; çerçeve de yok. Bilgi çizildikten sonra bakılır (boş sayfanın yokluğu sayılmaz).
   await expect(page.locator('.module-viewer [role="alert"]')).toHaveCount(0)
   await expect(page.locator('iframe.module-frame')).toHaveCount(0)
   expect(biletler).toEqual(['v1'])
   const { violations } = await new AxeBuilder({ page }).include('.module-page').analyze()
   expect(violations).toEqual([])
+  // Bağlantı uygulama içinde açılır (sayfa yeniden yüklenmez).
+  await page.evaluate(() => { (window as unknown as { ayniBelge: boolean }).ayniBelge = true })
+  await bag.click()
+  await expect(page).toHaveURL(/\/moduller$/)
+  expect(await page.evaluate(() => (window as unknown as { ayniBelge?: boolean }).ayniBelge)).toBe(true)
 })

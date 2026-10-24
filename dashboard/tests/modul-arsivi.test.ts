@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { arsivYonu } from '../src/utils/moduleLink.ts'
 
 // GET /api/modules/<slug>/v<N>/ticket → 410 {arsivlendi: true, guncel} (src/dashboard_api.py, 2026-10-24).
@@ -35,4 +36,22 @@ test('arşiv gövdesi değilse karar yok (genel hata cümlesi kalır)', () => {
   for (const govde of [null, undefined, 'x', {}, { error: 'not_found' }, { arsivlendi: 'true', guncel: 2 }]) {
     assert.equal(arsivYonu('fen5-su', 1, govde), null)
   }
+})
+
+test('yayında olmayan modülün sayfası başlığını korur ve Modüller sayfasına gerçek bağlantı verir (inceleme turu 1)', () => {
+  // Davranışın ölçümü e2e'dedir (modul-arsivi.spec.ts); burası yapıyı sabitler: breadcrumb ve başlık (bilinmiyorsa
+  // "Modül") yayında değil dalında da çizilir, cümle /moduller'e uygulama içi bağlantı (IcBaglanti) taşır.
+  const kaynak = readFileSync(new URL('../src/components/ModuleViewer.tsx', import.meta.url), 'utf8')
+  const bas = kaynak.indexOf("if (ticket.status === 'yayinda_degil')")
+  const dal = kaynak.slice(bas, kaynak.indexOf("if (ticket.status === 'error')", bas))
+  assert.ok(bas > 0 && dal.length > 0)
+  assert.match(dal, /\{bas\}/)
+  assert.match(dal, /<p className="module-viewer__yonlendirme">\s*Yayındaki modüller <IcBaglanti href="\/moduller" inline>Modüller<\/IcBaglanti> sayfasında\.\s*<\/p>/)
+  // InlineNotification canlı bölgedir; Carbon içinde etkileşimli öğe görünce hata fırlatır (useNoInteractiveChildren).
+  assert.match(dal, /title="Bu modül artık yayında değil\." \/>/)
+  assert.match(kaynak, /yedekBaslik=\{ticket\.status === 'yayinda_degil' \? 'Modül' : undefined\}/)
+  const baslik = readFileSync(new URL('../src/components/ModulBasligi.tsx', import.meta.url), 'utf8')
+  assert.match(baslik, /veri\?\.baslik \? basliga\(veri\.baslik\) : yedekBaslik/)
+  const ic = readFileSync(new URL('../src/components/patterns/IcBaglanti.tsx', import.meta.url), 'utf8')
+  assert.match(ic, /uygulamaIcindeAc\(e, href, e\.currentTarget\.getAttribute\('target'\)\)/)
 })

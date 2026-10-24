@@ -9,6 +9,7 @@ import ModulAiEtiketi from './ModulAiEtiketi'
 import { useModulAciklamasi } from '../hooks/useModulAciklamasi'
 import { arsivYonu } from '../utils/moduleLink'
 import ModulBasligi from './ModulBasligi'
+import IcBaglanti from './patterns/IcBaglanti'
 import './Modules.scss'
 
 // The dashboard's computed root font size. The frame is a separate document, so it does not
@@ -44,7 +45,6 @@ export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress
   const frameRef = useRef<HTMLIFrameElement>(null)
   const navigate = useNavigate()
   const aciklama = useModulAciklamasi(aciklamaPath)
-  const bas = <ModulBasligi durum={aciklama} taslak={!progress} aiEtiketi={<ModulAiEtiketi durum={aciklama} />} />
   // Reset to loading during render when ticketPath changes, rather than with a
   // synchronous setState at the top of the effect below (React's "adjusting
   // state when a prop changes" pattern) — the fetch itself still runs in the effect.
@@ -56,6 +56,10 @@ export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress
   const [yukseklik, setYukseklik] = useState<number | null>(null)
   const slug = progress?.slug
   const version = progress?.version
+  // A module no longer published keeps the page's head too (review round 1): the breadcrumb back to Modüller and
+  // the title — "Modül" when the archived version's explanation (410) cannot name it.
+  const bas = <ModulBasligi durum={aciklama} taslak={!progress} aiEtiketi={<ModulAiEtiketi durum={aciklama} />}
+    yedekBaslik={ticket.status === 'yayinda_degil' ? 'Modül' : undefined} />
 
   if (seenTicketPath !== ticketPath) {
     setSeenTicketPath(ticketPath)
@@ -165,8 +169,14 @@ export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress
   if (ticket.status === 'yayinda_degil') {
     return (
       <div className="module-viewer">
+        {bas}
         <InlineNotification kind="info" lowContrast hideCloseButton statusIconDescription="Bilgi"
-          title="Bu modül artık yayında değil." subtitle="Yayındaki modüller Modüller sayfasında." />
+          title="Bu modül artık yayında değil." />
+        {/* The link sits under the notification, not in it: InlineNotification is a live region and Carbon refuses
+            interactive children there (useNoInteractiveChildren throws). */}
+        <p className="module-viewer__yonlendirme">
+          Yayındaki modüller <IcBaglanti href="/moduller" inline>Modüller</IcBaglanti> sayfasında.
+        </p>
       </div>
     )
   }
