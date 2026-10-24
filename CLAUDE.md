@@ -349,15 +349,27 @@ unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
   isteğini reddederse günlükte `mcp_reddedildi durum=… surum=… mesaj=…` satırı çıkar (bearer ve gövde yazılmaz).
   Ana checkout'a birleştirmeden sonra `ted-dashboard` ve `ted-mcp` ikisi de yeniden başlatılır (ikisi de
   buradan çalışır; `src/mcp_client.py` ortaktır).
-- MCP SDK 2.x (`mcp==2.3.0`, 2026-10-24 dalı `mcp-sdk-2`): sunucu `MCPServer`'dır (`FastMCP` yok). 2026-07-28 tek
-  istek zarfını (initialize yok, `server/discover`, başlıkta `MCP-Protocol-Version`/`Mcp-Method`/`Mcp-Name`) ve
-  2025 el sıkışmasını (2025-06-18, 2025-11-25) aynı `/mcp`'den sunar; 1.x 2026-07-28'e 400 dönüyordu ve
-  claude.ai her bağlantıda önce onu deniyordu. Ulaşım ayarları kurucuda değil `http_app.build_app`'in
+- MCP SDK 2.x (`mcp==2.3.0`, 2026-10-24 dalı `mcp-sdk-2`): sunucu `MCPServer`'dır (`FastMCP` yok). SDK, 2026-07-28
+  tek istek zarfını (initialize yok, `server/discover`, başlıkta `MCP-Protocol-Version`/`Mcp-Method`/`Mcp-Name`) ve
+  initialize el sıkışmasını (2024-11-05, 2025-03-26, 2025-06-18, 2025-11-25) aynı `/mcp`'den sunar. **2026-07-28
+  bayrakla açılır:** `TED_MCP_PROTOKOL_2026` (yalnız `0`/`1`, varsayılan `0`, geçersiz değer açılışı durdurur;
+  `env_prep.UNIT_ONLY`'dedir, `.env`'e yazılmaz). `0` iken `http_app.Protokol2026Kapisi` (SDK'nın hemen önü,
+  BearerGate'in arkası) el sıkışma dışı bir sürüm başlığı taşıyan her `/mcp` isteğine 1.28.1'in 400 gövdesini bayt
+  bayt verir; claude.ai bu yanıttan sonra eski sürüme düşer, yani SDK yükseltmesi tek başına davranış değiştirmez.
+  Açmak: birimde `Environment=TED_MCP_PROTOKOL_2026=1` (ya da drop-in) + `daemon-reload` + restart; kapatmak `0`.
+  Modern her istek bir INFO satırı yazar: `mcp_modern yontem=… ad=… surum=… durum=… sure_ms=… sse=evet|hayır
+  koptu=evet|hayır` (gövde ve bearer yazılmaz). Ulaşım ayarları kurucuda değil `http_app.build_app`'in
   `streamable_http_app()` çağrısındadır (stateless, SDK DNS koruması kapalı — işi `HostGuardMiddleware` yapar —,
   gövde tavanı `TED_MCP_MAX_BODY_BYTES`); `json_response=True` yalnız testlerdir. `subscriptions=False`:
   `subscriptions/listen` sunulmaz, iki dönem de `listChanged=false` der. 2026-07-28'de `ping` ve `initialize`
-  yoktur (404, `mcp_reddedildi durum=404` satırı normaldir). Beklenmeyen istisnanın metni istemciye gitmez
-  ("Error executing tool <ad>"); `ToolError` metni gider.
+  yoktur (404, `mcp_reddedildi durum=404` satırı normaldir); 15 sn'yi aşan araç SSE'ye geçer, 15 sn'de bir
+  `: ping` yazar. Beklenmeyen istisnanın metni istemciye gitmez ("Error executing tool <ad>"); `ToolError` metni
+  gider. Paket geçişi ağsızdır: tekerlekler `.claude/worktrees/mcp-sdk-2-tekerlekler/` (sha256 `SHA256SUMS`);
+  sıra `systemctl --user stop ted-mcp` → `git merge --ff-only` → `.venv/bin/python -m pip install --no-index
+  --find-links <tekerlekler> mcp==2.3.0 mcp-types==2.3.0 opentelemetry-api==1.45.1` → `start`. pip düşerse servis
+  başlatılmaz: birleştirme geri alınır (`git reset --keep <önceki main>`; `--hard` değil, paylaşılan checkout'ta
+  başka oturumun kaydedilmemiş işi olabilir) ve 1.28.1 koduyla `start`. Geri dönüş: kod geri, `pip install --no-index --find-links
+  <tekerlekler> mcp==1.28.1`, restart. Ayrıntı: `.claude/worktrees/mcp-sdk-2-rapor.md`.
 - Ortam: `TED_MCP_FORM_SECRET` (zorunlu, ≥32 bayt, OAuth form imzası), `TED_MCP_PUBLIC_BASE_URL` (varsayılan
   `https://mcp.tedy.online`), `TED_MCP_ALLOWED_HOSTS` (Host başlığı allowlist'i), `TED_MCP_HOST`/`TED_MCP_PORT`
   (yalnız `python -m src.mcp_server.http_app` bind adresi), `TED_MCP_PROJECT_ROOT` (test/servis için proje kökünü
