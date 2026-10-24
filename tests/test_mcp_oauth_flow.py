@@ -138,6 +138,16 @@ def ctx(tmp_path):
         yield client, verifier, clock, store, _register(client)
 
 
+@pytest.fixture
+def ctx_2026(tmp_path):
+    """ctx ile aynı, TED_MCP_PROTOKOL_2026=1."""
+    clock, verifier = Clock(), Verifier()
+    store = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
+    app = _app(tmp_path, store, verifier, clock, TED_MCP_PROTOKOL_2026="1")
+    with TestClient(app, base_url=BASE, follow_redirects=False) as client:
+        yield client, verifier, clock, store, _register(client)
+
+
 def _authorize_params(registered_id, **over):
     params = {"response_type": "code", "client_id": registered_id, "redirect_uri": REDIRECT,
               "state": "st-123", "code_challenge": _challenge(VERIFIER), "code_challenge_method": "S256"}
@@ -300,8 +310,8 @@ def test_authorize_get_rejects_bad_requests(ctx, over, reason):
     assert "form_state" not in r.text
 
 
-def test_full_round_trip_to_mcp_and_refresh(ctx):
-    client, verifier, _, _, client_id = ctx
+def test_full_round_trip_to_mcp_and_refresh(ctx_2026):
+    client, verifier, _, _, client_id = ctx_2026
     form_state = _start(client, verifier, client_id)
     r = _approve(client, form_state, _credential(FULL))
     assert r.status_code == 302
@@ -327,6 +337,17 @@ def test_full_round_trip_to_mcp_and_refresh(ctx):
                                               "client_id": client_id})
     assert again.status_code == 200
     assert again.json()["access_token"] != body["access_token"]
+
+
+def test_bayrak_kapaliyken_oauth_jetonuyla_2026_cagrisi_eski_400_alir(ctx):
+    """Varsayılan: OAuth jetonu geçerli ama 2026-07-28 bugünkü 400'ü alır; el sıkışma yolu çalışır."""
+    client, verifier, _, _, client_id = ctx
+    code = _code_from(_approve(client, _start(client, verifier, client_id), _credential(FULL)))
+    token = _redeem(client, client_id, code).json()["access_token"]
+    modern = _modern_tool_call(client, token)
+    assert modern.status_code == 400
+    assert modern.json()["error"]["message"].startswith("Bad Request: Unsupported protocol version: 2026-07-28.")
+    assert _tool_call(client, token).status_code == 200
 
 
 def test_reader_role_is_refused_without_code(ctx):

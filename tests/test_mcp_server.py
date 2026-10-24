@@ -1,5 +1,6 @@
 """MCPServer wiring: identity-aware edupedia_durum, version single source, env entry."""
 import json
+import logging
 import threading
 import time
 
@@ -134,9 +135,9 @@ def test_durum_live_probe_builds_coverage(tmp_path):
     assert body["coverage"]["anamnesis"] == "skipped:anahtar yok"
 
 
-def _client(tmp_path, store):
-    settings = _settings(tmp_path)
-    mcp = server.build_server(tools.Tools(settings, FakeFederation()))
+def _client(tmp_path, store, tools_cls=tools.Tools, **env):
+    settings = _settings(tmp_path, **env)
+    mcp = server.build_server(tools_cls(settings, FakeFederation()))
     app = http_app.build_app(settings, store, mcp, form_secret=b"s" * 32)
     return TestClient(app, base_url=BASE)
 
@@ -200,7 +201,7 @@ def test_2026_07_28_discover_list_and_call(tmp_path):
     store = OAuthStore(tmp_path / "o.sqlite3")
     key = store.create_static_key("t", FULL)
     auth = {"authorization": f"Bearer {key}"}
-    with _client(tmp_path, store) as c:
+    with _client(tmp_path, store, TED_MCP_PROTOKOL_2026="1") as c:
         body, headers = _modern("server/discover")
         discover = c.post("/mcp", json=body, headers={**headers, **auth})
         body, headers = _modern("tools/list")
@@ -230,7 +231,7 @@ def test_tool_error_text_still_reaches_the_client(tmp_path, monkeypatch, donem):
     key = store.create_static_key("t", FULL)
     monkeypatch.setattr(store, "principal", lambda token: "murzogluhulya@gmail.com")
     auth = {"authorization": f"Bearer {key}"}
-    with _client(tmp_path, store) as c:
+    with _client(tmp_path, store, TED_MCP_PROTOKOL_2026="1") as c:
         if donem == "2026-07-28":
             body, headers = _modern("tools/call", {"name": "edupedia_durum", "arguments": {}}, ad="edupedia_durum")
             r = c.post("/mcp", json=body, headers={**headers, **auth})
@@ -243,6 +244,72 @@ def test_tool_error_text_still_reaches_the_client(tmp_path, monkeypatch, donem):
     # 1.28.1'deki metinle bayt bayt aynı: SDK öneki + ToolError'un kendi cümlesi.
     assert result["content"][0]["text"] == ("Error executing tool edupedia_durum: yetkisiz: bu araç yalnız TEDY "
                                             "aile listesindeki tam yetkili hesaplarla çalışır")
+
+
+def _durum_cagrisi(c, auth, donem):
+    if donem == "2026-07-28":
+        body, headers = _modern("tools/call", {"name": "edupedia_durum", "arguments": {}}, ad="edupedia_durum")
+        return c.post("/mcp", json=body, headers={**headers, **auth})
+    return c.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                                "params": {"name": "edupedia_durum", "arguments": {}}},
+                  headers={**MCP_HEADERS, **auth, "mcp-protocol-version": donem})
+
+
+@pytest.mark.parametrize("donem", ["2025-06-18", "2026-07-28"])
+def test_beklenmeyen_istisna_metni_istemciye_sizmaz(tmp_path, donem):
+    """mcp 2.1+: araç gövdesinden kaçan istisnanın metni (yol, sır, iç durum) modele gitmez."""
+    class PatlayanTools(tools.Tools):
+        def durum(self, email, canli=False):
+            raise RuntimeError("gizli-ayrinti /mnt/thunderbolt sk-xyz")
+
+    store = OAuthStore(tmp_path / "o.sqlite3")
+    key = store.create_static_key("t", FULL)
+    with _client(tmp_path, store, PatlayanTools, TED_MCP_PROTOKOL_2026="1") as c:
+        r = _durum_cagrisi(c, {"authorization": f"Bearer {key}"}, donem)
+    assert r.status_code == 200
+    assert "gizli-ayrinti" not in r.text and "sk-xyz" not in r.text
+    result = _sse_json(r)["result"]
+    assert result["isError"] is True
+    assert result["content"][0]["text"] == "Error executing tool edupedia_durum"
+
+
+def test_2026_07_28_uzun_arac_sse_ye_gecer_ve_ping_yazar(tmp_path, monkeypatch, caplog):
+    """Üretim kipi (json_response=False): pencereyi aşan araç SSE'ye geçer, ara ara ': ping' yazar, sonucu
+    son olayda verir; gözlem satırı sse=evet der. Pencere 15 sn yerine 0,05 sn'ye indirilir."""
+    import mcp.server._streamable_http_modern as modern
+
+    monkeypatch.setattr(modern, "_SSE_PING_INTERVAL", 0.05)
+
+    class YavasTools(tools.Tools):
+        def durum(self, email, canli=False):
+            time.sleep(0.4)
+            return super().durum(email, canli=canli)
+
+    store = OAuthStore(tmp_path / "o.sqlite3")
+    key = store.create_static_key("t", FULL)
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        with _client(tmp_path, store, YavasTools, TED_MCP_PROTOKOL_2026="1") as c:
+            r = _durum_cagrisi(c, {"authorization": f"Bearer {key}"}, "2026-07-28")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/event-stream")
+    assert ": ping" in r.text
+    durum = _sse_json(r)["result"]
+    assert json.loads(durum["content"][0]["text"])["kullanici"]["email"] == FULL
+    gozlem = [rec.getMessage() for rec in caplog.records if rec.getMessage().startswith("mcp_modern ")]
+    assert len(gozlem) == 1 and " durum=200 " in gozlem[0] and " sse=evet koptu=hayır" in gozlem[0]
+
+
+def test_2026_07_28_ping_yok_404_ve_ret_satiri(tmp_path, caplog):
+    store = OAuthStore(tmp_path / "o.sqlite3")
+    key = store.create_static_key("t", FULL)
+    body, headers = _modern("ping")
+    with caplog.at_level(logging.WARNING, logger="src.mcp_server.http_app"):
+        with _client(tmp_path, store, TED_MCP_PROTOKOL_2026="1") as c:
+            r = c.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
+    assert r.status_code == 404
+    assert r.json()["error"]["code"] == -32601
+    lines = [rec.getMessage() for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]
+    assert lines == ["mcp_reddedildi durum=404 surum='2026-07-28' mesaj='Method not found'"]
 
 
 def test_create_app_from_env_requires_form_secret(tmp_path):

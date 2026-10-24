@@ -53,6 +53,9 @@ class Settings:
     ticket_secret: bytes = field(default=b"", repr=False)
     media_monthly_usd: float = 10.0
     eric_api_url: str = "https://api.ies.ed.gov/eric/"
+    # 2026-07-28 tek istek protokolü (mcp 2.x). Kapalıyken /mcp, el sıkışma dışı bir sürüme 1.28.1'in
+    # bugünkü 400'ünü verir (http_app.Protokol2026Kapisi) ve istemci eski sürüme düşer.
+    protokol_2026: bool = False
 
 
 def _positive_int(env: Mapping[str, str], name: str, default: int) -> int:
@@ -62,6 +65,20 @@ def _positive_int(env: Mapping[str, str], name: str, default: int) -> int:
     if not (raw.isascii() and raw.isdigit()) or int(raw) <= 0:
         raise ValueError(f"{name} must be a positive integer number of bytes, got {raw!r}")
     return int(raw)
+
+
+PROTOKOL_2026_ENV = "TED_MCP_PROTOKOL_2026"
+
+
+def _protokol_2026(env: Mapping[str, str]) -> bool:
+    """TED_MCP_PROTOKOL_2026: yalnız "0" ya da "1"; yoksa ya da boşsa "0". Başka her değer açılışı durdurur
+    (TED_MCP_MAX_BODY_BYTES gibi): "true"/"yes" yazılıp sessizce kapalı kalan bir bayrak, açıldı sanılır."""
+    raw = (env.get(PROTOKOL_2026_ENV) or "").strip()
+    if raw in ("", "0"):
+        return False
+    if raw == "1":
+        return True
+    raise ValueError(f"{PROTOKOL_2026_ENV} must be 0 or 1, got {raw!r}")
 
 
 def _parent_origin(env: Mapping[str, str]) -> str:
@@ -127,4 +144,5 @@ def load_settings(env: Mapping[str, str] | None = None, project_root: Path | Non
         ticket_secret=(env.get("EDUPEDIA_TICKET_SECRET") or "").encode("utf-8"),
         media_monthly_usd=_money(env.get("EDUPEDIA_MEDIA_MONTHLY_USD"), 10.0),
         eric_api_url=(env.get("EDUPEDIA_ERIC_API_URL") or "https://api.ies.ed.gov/eric/").strip(),
+        protokol_2026=_protokol_2026(env),
     )

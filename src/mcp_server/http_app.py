@@ -18,6 +18,8 @@ from urllib.parse import urlencode, urlsplit
 import anyio
 from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import INVALID_REQUEST, ErrorData, JSONRPCError
+from mcp.types.version import HANDSHAKE_PROTOCOL_VERSIONS, MODERN_PROTOCOL_VERSIONS
 from starlette.applications import Starlette
 from starlette.datastructures import FormData
 from starlette.middleware import Middleware
@@ -212,10 +214,15 @@ def is_acceptable_client_name(name: object) -> bool:
 
 
 def _header(scope: Scope, name: bytes) -> str:
+    return _header_or_none(scope, name) or ""
+
+
+def _header_or_none(scope: Scope, name: bytes) -> str | None:
+    """İlk eşleşen başlık; hiç yoksa None (boş değerli başlık "" döner, yoklukla karışmaz)."""
     for key, value in scope.get("headers") or []:
         if key == name:
             return value.decode("latin-1")
-    return ""
+    return None
 
 
 async def _send_json(send: Send, status: int, body: dict[str, Any], extra: list[tuple[bytes, bytes]] | None = None) -> None:
@@ -247,6 +254,9 @@ class CorsMiddleware:
                 (b"access-control-allow-methods", b"GET, POST, DELETE, OPTIONS"),
                 # mcp-method / mcp-name: 2026-07-28 istemcileri her istekte gönderir (SDK bunları gövdeyle
                 # karşılaştırır); listede olmasalar tarayıcıdaki bir 2026 istemcisinin ön uçuşu düşerdi.
+                # Mcp-Param-<Ad> başlıkları bilerek yok: yalnız şemasında x-mcp-header taşıyan araçlar için
+                # gönderilir, adları araca göre değişir ve bizim araçlarımızda hiç yok. Böyle bir araç eklenirse
+                # başlık adları buraya tek tek yazılmalı (kimlik bilgili istekte "*" geçmez).
                 (b"access-control-allow-headers",
                  b"authorization, content-type, mcp-session-id, mcp-protocol-version, mcp-method, mcp-name"),
                 (b"access-control-max-age", b"600"),
@@ -341,6 +351,10 @@ class TransportRejectLogMiddleware:
 
     Measured 2026-10-03/04: every reconnect from claude.ai began with one unexplained
     "POST /mcp 400" before a normal session; uvicorn's access line alone could not say why.
+
+    2026-07-28 (modern) isteklerine ayrıca bir INFO gözlem satırı yazar: yöntem ve araç adı (başlıklardan;
+    gövde okunmaz), sürüm, durum, süre, SSE'ye geçilip geçilmediği ve yanıt tamamlanmadan istemcinin kopup
+    kopmadığı. Yeni protokolün canlıda ilk günlerini izlemek için; bearer ve gövde yazılmaz.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -350,23 +364,75 @@ class TransportRejectLogMiddleware:
         if scope["type"] != "http" or not scope["path"].startswith("/mcp"):
             await self.app(scope, receive, send)
             return
-        seen: dict[str, Any] = {"status": None, "body": b""}
+        seen: dict[str, Any] = {"status": None, "body": b"", "sse": False, "bitti": False, "koptu": False}
+        modern = _header_or_none(scope, b"mcp-protocol-version") in MODERN_PROTOCOL_VERSIONS
+        start = time.monotonic()
 
         async def capture(message: dict[str, Any]) -> None:
             if message["type"] == "http.response.start":
                 seen["status"] = message["status"]
-            elif (message["type"] == "http.response.body" and seen["status"] in _TRANSPORT_REJECT
-                  and len(seen["body"]) < _REJECT_BODY_CAP):
-                seen["body"] += message.get("body", b"")[:_REJECT_BODY_CAP]
+                seen["sse"] = any(k == b"content-type" and v.startswith(b"text/event-stream")
+                                  for k, v in message.get("headers") or [])
+            elif message["type"] == "http.response.body":
+                if seen["status"] in _TRANSPORT_REJECT and len(seen["body"]) < _REJECT_BODY_CAP:
+                    seen["body"] += message.get("body", b"")[:_REJECT_BODY_CAP]
+                if not message.get("more_body", False):
+                    seen["bitti"] = True
             await send(message)
 
+        # Yalnız modern isteklerde: istemcinin kopuşunu yanıt bitmeden görmek için.
+        async def watch() -> dict[str, Any]:
+            message = await receive()
+            if message["type"] == "http.disconnect" and not seen["bitti"]:
+                seen["koptu"] = True
+            return message
+
         try:
-            await self.app(scope, receive, capture)
+            await self.app(scope, watch if modern else receive, capture)
         finally:
             if seen["status"] in _TRANSPORT_REJECT:
                 version = _header(scope, b"mcp-protocol-version")[:40] or None
                 logger.warning("mcp_reddedildi durum=%s surum=%r mesaj=%r", seen["status"], version,
                                _reject_reason(seen["body"]))
+            if modern:
+                # Başlamış ama son parçası yazılmamış yanıt da kopuş sayılır (istemci ya da ara katman kesti).
+                koptu = seen["koptu"] or (seen["status"] is not None and not seen["bitti"])
+                ad = _header_or_none(scope, b"mcp-name")
+                logger.info("mcp_modern yontem=%r ad=%r surum=%r durum=%s sure_ms=%d sse=%s koptu=%s",
+                            _header(scope, b"mcp-method")[:40], ad[:64] if ad else None,
+                            _header(scope, b"mcp-protocol-version"), seen["status"],
+                            int((time.monotonic() - start) * 1000),
+                            "evet" if seen["sse"] else "hayır", "evet" if koptu else "hayır")
+
+
+def _eski_surum_reddi(surum: str) -> Response:
+    """mcp 1.28.1'in StreamableHTTPServerTransport._create_error_response gövdesi, bayt bayt."""
+    hata = JSONRPCError(jsonrpc="2.0", id="server-error", error=ErrorData(
+        code=INVALID_REQUEST,
+        message=f"Bad Request: Unsupported protocol version: {surum}. "
+                f"Supported versions: {', '.join(HANDSHAKE_PROTOCOL_VERSIONS)}"))
+    return Response(hata.model_dump_json(by_alias=True, exclude_none=True), status_code=400,
+                    headers={"Content-Type": "application/json"})
+
+
+class Protokol2026Kapisi:
+    """TED_MCP_PROTOKOL_2026=0 iken (varsayılan) SDK'nın hemen önünde durur: el sıkışma sürümleri dışında bir
+    mcp-protocol-version taşıyan her /mcp isteğine 1.28.1'in bugün canlıda verdiği 400'ü verir. claude.ai tam
+    bu yanıttan sonra eski sürüme düşüyor; böylece SDK 2.x'e geçiş tek başına davranış değiştirmez ve 2026-07-28
+    ayrı, bilinçli bir adımla (birimde bayrak 1) açılır. BearerGate'in arkasındadır: kimliksiz istek yine 401
+    alır. Gövde okunmaz; ret satırını dıştaki TransportRejectLogMiddleware bugünkü biçimde yazar.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope["path"].startswith("/mcp"):
+            surum = _header_or_none(scope, b"mcp-protocol-version")
+            if surum is not None and surum not in HANDSHAKE_PROTOCOL_VERSIONS:
+                await _eski_surum_reddi(surum)(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
 
 
 class BodyLimitMiddleware:
@@ -717,6 +783,8 @@ def build_app(
             Middleware(BearerGateMiddleware, store=store, base_url=base),
             Middleware(BodyLimitMiddleware, mcp_max_body_bytes=settings.mcp_max_body_bytes),
             Middleware(TransportRejectLogMiddleware),
+            # En içte, SDK'nın hemen önünde; bayrak açıkken hiç takılmaz.
+            *([] if settings.protokol_2026 else [Middleware(Protokol2026Kapisi)]),
         ],
     )
 

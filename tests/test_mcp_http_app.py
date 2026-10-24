@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import re
 
 import pytest
 from mcp.server.mcpserver import Context, MCPServer
@@ -36,6 +37,15 @@ def store(tmp_path):
 @pytest.fixture
 def client(tmp_path, store):
     settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
+    app = build_app(settings, store, _test_mcp(), json_response=True, form_secret=b"s" * 32)
+    with TestClient(app, base_url=BASE) as c:
+        yield c
+
+
+@pytest.fixture
+def client_2026(tmp_path, store):
+    """TED_MCP_PROTOKOL_2026=1: 2026-07-28 tek istek protokolü açık."""
+    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_PROTOKOL_2026": "1"}, project_root=tmp_path)
     app = build_app(settings, store, _test_mcp(), json_response=True, form_secret=b"s" * 32)
     with TestClient(app, base_url=BASE) as c:
         yield c
@@ -698,12 +708,12 @@ def test_successful_register_writes_no_rejection_line(client, caplog):
 
 # -- ted-mcp sağlık (2026-10-04): why the transport refused a request reaches the journal ---------
 
-def test_transport_rejection_logs_the_declared_version_and_reason(client, store, caplog):
+def test_transport_rejection_logs_the_declared_version_and_reason(client_2026, store, caplog):
     # mcp 2.x 2026-07-28'i sunar; reddi ölçmek için SDK'nın tanımadığı bir sürüm gerekir.
     key = store.create_static_key("surum", FULL)
     body, headers = _modern("tools/list", surum="2099-01-01")
     with caplog.at_level(logging.WARNING, logger="src.mcp_server.http_app"):
-        r = client.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
+        r = client_2026.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
     assert r.status_code == 400
     assert r.json()["error"]["data"]["supported"] == [MODERN]
     lines = [rec.getMessage() for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]
@@ -713,30 +723,30 @@ def test_transport_rejection_logs_the_declared_version_and_reason(client, store,
     assert key not in lines[0]
 
 
-def test_2026_07_28_request_is_served_with_identity_and_no_rejection(client, store, caplog):
+def test_2026_07_28_request_is_served_with_identity_and_no_rejection(client_2026, store, caplog):
     """claude.ai bağlayıcısı önce 2026-07-28 ister; 1.x bunu 400 ile reddediyordu (günlük 2026-10-23/24)."""
     key = store.create_static_key("modern", FULL)
     body, headers = _modern("tools/call", {"name": "kimim", "arguments": {}}, ad="kimim")
     with caplog.at_level(logging.WARNING, logger="src.mcp_server.http_app"):
-        r = client.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
+        r = client_2026.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
     assert r.status_code == 200
     assert "mcp-session-id" not in r.headers
     assert json.loads(r.json()["result"]["content"][0]["text"]) == {"email": FULL}
     assert not [rec for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]
 
 
-def test_2026_07_28_request_without_bearer_is_still_401(client):
+def test_2026_07_28_request_without_bearer_is_still_401(client_2026):
     body, headers = _modern("tools/list")
-    r = client.post("/mcp", json=body, headers=headers)
+    r = client_2026.post("/mcp", json=body, headers=headers)
     assert r.status_code == 401
     assert 'realm="ted-mcp"' in r.headers["www-authenticate"]
 
 
-def test_2026_07_28_header_body_mismatch_is_refused_and_logged(client, store, caplog):
+def test_2026_07_28_header_body_mismatch_is_refused_and_logged(client_2026, store, caplog):
     key = store.create_static_key("uyusmaz", FULL)
     body, headers = _modern("tools/call", {"name": "kimim", "arguments": {}}, ad="baska_arac")
     with caplog.at_level(logging.WARNING, logger="src.mcp_server.http_app"):
-        r = client.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
+        r = client_2026.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
     assert r.status_code == 400
     lines = [rec.getMessage() for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]
     assert len(lines) == 1 and "'2026-07-28'" in lines[0] and "mcp-name" in lines[0]
@@ -750,3 +760,129 @@ def test_accepted_requests_log_no_rejection(client, store, caplog):
                         headers={**MCP_HEADERS, "authorization": f"Bearer {key}"})
     assert r.status_code == 200
     assert not [rec for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]
+
+
+# -- Düzeltme turu (2026-10-24): TED_MCP_PROTOKOL_2026 anahtarı ve modern istek gözlemi ---------------
+
+ESKI_RET = ("Bad Request: Unsupported protocol version: {v}. "
+            "Supported versions: 2024-11-05, 2025-03-26, 2025-06-18, 2025-11-25")
+
+
+def _eski_ret_govdesi(v):
+    # mcp 1.28.1 StreamableHTTPServerTransport._create_error_response'un bugün canlıda verdiği gövde.
+    return ('{"jsonrpc":"2.0","id":"server-error","error":{"code":-32600,"message":"'
+            + ESKI_RET.format(v=v) + '"}}').encode()
+
+
+@pytest.mark.parametrize("method", ["server/discover", "tools/list", "tools/call"])
+def test_bayrak_kapaliyken_2026_07_28_bugunku_400_ile_reddedilir(client, store, caplog, method):
+    """Varsayılan (0): claude.ai'nin bugün eski sürüme düştüğü yanıtın aynısı, bayt bayt."""
+    key = store.create_static_key("kapali", FULL)
+    params = {"name": "kimim", "arguments": {}} if method == "tools/call" else None
+    body, headers = _modern(method, params, ad="kimim" if method == "tools/call" else None)
+    with caplog.at_level(logging.WARNING, logger="src.mcp_server.http_app"):
+        r = client.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
+    assert r.status_code == 400
+    assert r.headers["content-type"] == "application/json"
+    assert r.content == _eski_ret_govdesi(MODERN)
+    assert "mcp-session-id" not in r.headers
+    lines = [rec.getMessage() for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]
+    assert lines == ["mcp_reddedildi durum=400 surum='2026-07-28' mesaj=" + repr(ESKI_RET.format(v=MODERN))]
+
+
+def test_bayrak_kapaliyken_taninmayan_surum_de_eski_bicimde_reddedilir(client, store):
+    key = store.create_static_key("taninmayan", FULL)
+    r = client.post("/mcp", json=_rpc("tools/list"),
+                    headers={**MCP_HEADERS, "authorization": f"Bearer {key}", "mcp-protocol-version": "2099-01-01"})
+    assert r.status_code == 400
+    assert r.content == _eski_ret_govdesi("2099-01-01")
+
+
+@pytest.mark.parametrize("surum", ["2025-06-18", "2025-11-25"])
+def test_bayrak_kapaliyken_el_sikisma_surumleri_calisir(client, store, surum):
+    key = store.create_static_key("el-sikisma", FULL)
+    auth = {**MCP_HEADERS, "authorization": f"Bearer {key}"}
+    init = client.post("/mcp", json=_rpc("initialize", {"protocolVersion": surum, "capabilities": {},
+                                                         "clientInfo": {"name": "t", "version": "0"}}), headers=auth)
+    call = client.post("/mcp", json=_rpc("tools/call", {"name": "kimim", "arguments": {}}),
+                       headers={**auth, "mcp-protocol-version": surum})
+    assert init.status_code == 200 and init.json()["result"]["protocolVersion"] == surum
+    assert call.status_code == 200
+    assert json.loads(call.json()["result"]["content"][0]["text"]) == {"email": FULL}
+
+
+def test_bayrak_kapaliyken_kimliksiz_2026_istegi_yine_401(client):
+    body, headers = _modern("tools/list")
+    r = client.post("/mcp", json=body, headers=headers)
+    assert r.status_code == 401
+    assert 'realm="ted-mcp"' in r.headers["www-authenticate"]
+
+
+_GOZLEM = re.compile(r"^mcp_modern yontem='(?P<yontem>[^']*)' ad=(?P<ad>'[^']*'|None) surum='(?P<surum>[^']*)' "
+                     r"durum=(?P<durum>\d+|None) sure_ms=(?P<sure>\d+) sse=(?P<sse>evet|hayır) koptu=(?P<koptu>evet|hayır)$")
+
+
+def _gozlem_satirlari(caplog):
+    return [rec.getMessage() for rec in caplog.records if rec.getMessage().startswith("mcp_modern ")]
+
+
+def test_modern_istek_tek_bir_gozlem_satiri_yazar(client_2026, store, caplog):
+    key = store.create_static_key("gozlem", FULL)
+    body, headers = _modern("tools/call", {"name": "kimim", "arguments": {}}, ad="kimim")
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        r = client_2026.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
+    assert r.status_code == 200
+    lines = _gozlem_satirlari(caplog)
+    assert len(lines) == 1
+    m = _GOZLEM.match(lines[0])
+    assert m, lines[0]
+    assert (m["yontem"], m["ad"], m["surum"], m["durum"], m["sse"], m["koptu"]) == (
+        "tools/call", "'kimim'", MODERN, "200", "hayır", "hayır")
+    assert key not in lines[0] and "arguments" not in lines[0]
+    assert [rec.levelno for rec in caplog.records if rec.getMessage().startswith("mcp_modern ")] == [logging.INFO]
+
+
+def test_bayrak_kapaliyken_de_modern_deneme_gozlemlenir(client, store, caplog):
+    key = store.create_static_key("gozlem-kapali", FULL)
+    body, headers = _modern("server/discover")
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        client.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
+    lines = _gozlem_satirlari(caplog)
+    assert len(lines) == 1 and _GOZLEM.match(lines[0])["durum"] == "400"
+
+
+@pytest.mark.parametrize("surum", [None, "2025-06-18", "2025-11-25"])
+def test_el_sikisma_istekleri_gozlem_satiri_yazmaz(client_2026, store, caplog, surum):
+    key = store.create_static_key("eski", FULL)
+    headers = {**MCP_HEADERS, "authorization": f"Bearer {key}", **({"mcp-protocol-version": surum} if surum else {})}
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        r = client_2026.post("/mcp", json=_rpc("tools/call", {"name": "kimim", "arguments": {}}), headers=headers)
+    assert r.status_code == 200
+    assert _gozlem_satirlari(caplog) == []
+
+
+def test_gozlem_istemcinin_kopusunu_ve_sse_yi_gorur(caplog):
+    """İstemci yanıt bitmeden koparsa koptu=evet; text/event-stream başladıysa sse=evet."""
+    async def akis_uygulamasi(scope, receive, send):
+        await receive()  # gövde
+        await send({"type": "http.response.start", "status": 200,
+                    "headers": [(b"content-type", b"text/event-stream")]})
+        await send({"type": "http.response.body", "body": b": ping\r\n\r\n", "more_body": True})
+        assert (await receive())["type"] == "http.disconnect"  # istemci gitti; son olay hiç yazılmadı
+
+    gelenler = [{"type": "http.request", "body": b"{}", "more_body": False}, {"type": "http.disconnect"}]
+
+    async def receive():
+        return gelenler.pop(0)
+
+    async def send(message):
+        pass
+
+    scope = {"type": "http", "method": "POST", "path": "/mcp",
+             "headers": [(b"mcp-protocol-version", b"2026-07-28"), (b"mcp-method", b"tools/call"),
+                         (b"mcp-name", b"edupedia_kapsam")]}
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        asyncio.run(http_app.TransportRejectLogMiddleware(akis_uygulamasi)(scope, receive, send))
+    m = _GOZLEM.match(_gozlem_satirlari(caplog)[0])
+    assert (m["yontem"], m["ad"], m["durum"], m["sse"], m["koptu"]) == (
+        "tools/call", "'edupedia_kapsam'", "200", "evet", "evet")
