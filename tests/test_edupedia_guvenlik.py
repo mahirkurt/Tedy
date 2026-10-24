@@ -2,7 +2,7 @@
 import re
 
 import pytest
-from mcp.server.fastmcp.exceptions import ToolError
+from mcp.server.mcpserver.exceptions import ToolError
 from starlette.testclient import TestClient
 
 from src import module_store as ms

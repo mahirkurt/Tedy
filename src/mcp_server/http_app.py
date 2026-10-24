@@ -16,7 +16,8 @@ from typing import Any, Callable, Mapping
 from urllib.parse import urlencode, urlsplit
 
 import anyio
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.datastructures import FormData
 from starlette.middleware import Middleware
@@ -244,7 +245,10 @@ class CorsMiddleware:
         if scope["method"] == "OPTIONS" and _header(scope, b"access-control-request-method"):
             headers = cors + ([
                 (b"access-control-allow-methods", b"GET, POST, DELETE, OPTIONS"),
-                (b"access-control-allow-headers", b"authorization, content-type, mcp-session-id, mcp-protocol-version"),
+                # mcp-method / mcp-name: 2026-07-28 istemcileri her istekte gönderir (SDK bunları gövdeyle
+                # karşılaştırır); listede olmasalar tarayıcıdaki bir 2026 istemcisinin ön uçuşu düşerdi.
+                (b"access-control-allow-headers",
+                 b"authorization, content-type, mcp-session-id, mcp-protocol-version, mcp-method, mcp-name"),
                 (b"access-control-max-age", b"600"),
             ] if allowed else [])
             await send({"type": "http.response.start", "status": 204, "headers": headers})
@@ -440,11 +444,12 @@ async def _limited_form(request: Request) -> FormData:
 def build_app(
     settings: Settings,
     store: OAuthStore,
-    mcp: FastMCP,
+    mcp: MCPServer,
     verify_identity: IdentityVerifier = verify_google_credential,
     form_secret: bytes = b"",
     clock: Callable[[], float] = time.time,
     viewer: ASGIApp | None = None,
+    json_response: bool = False,
 ) -> Starlette:
     from src.mcp_server.goruntuleyici import ViewerHostRouter
 
@@ -668,7 +673,17 @@ def build_app(
                                               str(form.get("refresh_token", "")), client_id)
         return _token_response(pair) if pair else _grant_error("invalid_grant")
 
-    streamable = mcp.streamable_http_app()
+    # mcp 2.x ulaşım ayarlarını kurucudan değil buradan alır. stateless_http: her istek kendi taşımasıyla,
+    # oturum kimliği yok (1.x'teki gibi). SDK'nın DNS-rebinding koruması kapalı: o işi HostGuardMiddleware
+    # yapar ve SDK'nınki açıkken genel adı (mcp.tedy.online) 421 ile reddederdi. Gövde tavanı ayarla aynı:
+    # SDK'nın varsayılan 4 MiB tavanı TED_MCP_MAX_BODY_BYTES'ın altında kalıp kendi 413 biçimini yazmasın;
+    # dıştaki BodyLimitMiddleware her zaman önce keser. json_response yalnız testler içindir (üretim SSE).
+    streamable = mcp.streamable_http_app(
+        stateless_http=True,
+        json_response=json_response,
+        transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+        max_request_body_size=settings.mcp_max_body_bytes,
+    )
 
     @contextlib.asynccontextmanager
     async def lifespan(app: Starlette) -> Any:

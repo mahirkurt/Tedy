@@ -1,10 +1,11 @@
-"""FastMCP server wiring: identity-aware edupedia_durum, version single source, env entry."""
+"""MCPServer wiring: identity-aware edupedia_durum, version single source, env entry."""
 import json
 import threading
 import time
 
 import anyio
 import pytest
+from mcp.types import CLIENT_CAPABILITIES_META_KEY, CLIENT_INFO_META_KEY, PROTOCOL_VERSION_META_KEY
 from starlette.testclient import TestClient
 
 from src.mcp_server import __version__, http_app, server, tools
@@ -164,6 +165,84 @@ def test_tool_call_carries_caller_identity(tmp_path):
                              headers={**MCP_HEADERS, "authorization": f"Bearer {key}"}))
     body = json.loads(r["result"]["content"][0]["text"])
     assert body["kullanici"]["email"] == FULL
+
+
+def _modern(method, params=None, ad=None):
+    """2026-07-28 tek istek zarfı (gövdede _meta, başlıkta sürüm/yöntem/ad)."""
+    meta = {PROTOCOL_VERSION_META_KEY: "2026-07-28", CLIENT_CAPABILITIES_META_KEY: {},
+            CLIENT_INFO_META_KEY: {"name": "t", "version": "0"}}
+    headers = {**MCP_HEADERS, "mcp-protocol-version": "2026-07-28", "mcp-method": method}
+    if ad is not None:
+        headers["mcp-name"] = ad
+    return {"jsonrpc": "2.0", "id": 7, "method": method, "params": {**(params or {}), "_meta": meta}}, headers
+
+
+@pytest.mark.parametrize("surum", ["2025-06-18", "2025-11-25"])
+def test_handshake_versions_still_negotiate(tmp_path, surum):
+    """Claude Code ve öbür istemciler initialize el sıkışmasıyla bağlanır; mcp 2.x bunu korumalı."""
+    store = OAuthStore(tmp_path / "o.sqlite3")
+    key = store.create_static_key("t", FULL)
+    auth = {**MCP_HEADERS, "authorization": f"Bearer {key}"}
+    with _client(tmp_path, store) as c:
+        init = _sse_json(c.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+            "protocolVersion": surum, "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}}, headers=auth))
+        r = c.post("/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                                 "params": {"name": "edupedia_durum", "arguments": {}}},
+                   headers={**auth, "mcp-protocol-version": surum})
+    assert init["result"]["protocolVersion"] == surum
+    assert init["result"]["capabilities"]["tools"] == {"listChanged": False}
+    assert json.loads(_sse_json(r)["result"]["content"][0]["text"])["kullanici"]["email"] == FULL
+
+
+def test_2026_07_28_discover_list_and_call(tmp_path):
+    """claude.ai'nin ilk denediği sürüm: server/discover, tools/list ve araç çağrısı 200 döner;
+    araç yüzeyi el sıkışma dönemindekiyle aynıdır."""
+    store = OAuthStore(tmp_path / "o.sqlite3")
+    key = store.create_static_key("t", FULL)
+    auth = {"authorization": f"Bearer {key}"}
+    with _client(tmp_path, store) as c:
+        body, headers = _modern("server/discover")
+        discover = c.post("/mcp", json=body, headers={**headers, **auth})
+        body, headers = _modern("tools/list")
+        modern_list = c.post("/mcp", json=body, headers={**headers, **auth})
+        body, headers = _modern("tools/call", {"name": "edupedia_durum", "arguments": {}}, ad="edupedia_durum")
+        call = c.post("/mcp", json=body, headers={**headers, **auth})
+        legacy_list = _sse_json(c.post("/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+                                       headers={**MCP_HEADERS, **auth, "mcp-protocol-version": "2025-06-18"}))
+    assert discover.status_code == 200
+    found = _sse_json(discover)["result"]
+    assert "2026-07-28" in found["supportedVersions"]
+    assert found["capabilities"]["tools"] == {"listChanged": False}  # subscriptions/listen sunulmaz
+    assert modern_list.status_code == 200
+    assert _sse_json(modern_list)["result"]["tools"] == legacy_list["result"]["tools"]
+    assert len(legacy_list["result"]["tools"]) == 14
+    assert call.status_code == 200
+    durum = _sse_json(call)["result"]
+    assert durum.get("isError") is not True
+    assert json.loads(durum["content"][0]["text"])["kullanici"]["email"] == FULL
+
+
+@pytest.mark.parametrize("donem", ["2025-06-18", "2026-07-28"])
+def test_tool_error_text_still_reaches_the_client(tmp_path, monkeypatch, donem):
+    """mcp 2.1+ beklenmeyen istisnanın metnini istemciye göstermez; ToolError ise modele ulaşmalı
+    (caller_email'in 'yetkisiz' cevabı). Tam yetkisi olmayan bir kimliğin kapıyı geçtiği varsayılır."""
+    store = OAuthStore(tmp_path / "o.sqlite3")
+    key = store.create_static_key("t", FULL)
+    monkeypatch.setattr(store, "principal", lambda token: "murzogluhulya@gmail.com")
+    auth = {"authorization": f"Bearer {key}"}
+    with _client(tmp_path, store) as c:
+        if donem == "2026-07-28":
+            body, headers = _modern("tools/call", {"name": "edupedia_durum", "arguments": {}}, ad="edupedia_durum")
+            r = c.post("/mcp", json=body, headers={**headers, **auth})
+        else:
+            r = c.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                                     "params": {"name": "edupedia_durum", "arguments": {}}},
+                       headers={**MCP_HEADERS, **auth, "mcp-protocol-version": donem})
+    result = _sse_json(r)["result"]
+    assert result["isError"] is True
+    # 1.28.1'deki metinle bayt bayt aynı: SDK öneki + ToolError'un kendi cümlesi.
+    assert result["content"][0]["text"] == ("Error executing tool edupedia_durum: yetkisiz: bu araç yalnız TEDY "
+                                            "aile listesindeki tam yetkili hesaplarla çalışır")
 
 
 def test_create_app_from_env_requires_form_secret(tmp_path):

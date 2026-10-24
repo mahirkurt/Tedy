@@ -91,7 +91,7 @@ class Derleyici:
             # or a drifted vendored template — neither is a DerlemeHatasi, so the inner except
             # above never sees it. gates.run_gates() and drafts.save() have no per-call guard of
             # their own either. Anything that reaches here is closed to a non-leaking status
-            # instead of an uncaught exception reaching FastMCP's generic error handler (which
+            # instead of an uncaught exception reaching MCPServer's generic error handler (which
             # would return the raw Python exception text as the tool's error message).
             report = gates.run_gates(html)
             summary = derleme.kapi_ozeti(report)

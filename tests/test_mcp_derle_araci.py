@@ -205,8 +205,8 @@ def test_draft_save_crash_returns_a_closed_status(derleyici, monkeypatch):
 def test_derle_and_onizle_are_registered(tmp_path):
     mcp = server.build_server(tools.Tools(load_settings({}, project_root=tmp_path), _Fed()))
     listed = {t.name: t for t in anyio.run(mcp.list_tools)}
-    assert listed["edupedia_derle"].annotations.readOnlyHint is False
-    assert listed["edupedia_onizle"].annotations.readOnlyHint is True
+    assert listed["edupedia_derle"].annotations.read_only_hint is False
+    assert listed["edupedia_onizle"].annotations.read_only_hint is True
 
 
 def _http_env(tmp_path, **extra):

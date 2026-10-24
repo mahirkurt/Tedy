@@ -1,4 +1,4 @@
-"""Business logic for ted-mcp tools, kept free of FastMCP so it is unit-testable."""
+"""Business logic for ted-mcp tools, kept free of MCPServer so it is unit-testable."""
 from __future__ import annotations
 
 import subprocess
