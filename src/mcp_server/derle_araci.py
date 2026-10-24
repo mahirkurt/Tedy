@@ -91,8 +91,9 @@ class Derleyici:
             # or a drifted vendored template — neither is a DerlemeHatasi, so the inner except
             # above never sees it. gates.run_gates() and drafts.save() have no per-call guard of
             # their own either. Anything that reaches here is closed to a non-leaking status
-            # instead of an uncaught exception reaching MCPServer's generic error handler (which
-            # would return the raw Python exception text as the tool's error message).
+            # instead of an uncaught exception reaching MCPServer's generic error handler (mcp 1.x
+            # ham istisna metnini araç hatası olarak döndürürdü; 2.1'den beri yalnız "Error executing
+            # tool <ad>" der — iki durumda da modele işe yarar bir durum dönmezdi).
             report = gates.run_gates(html)
             summary = derleme.kapi_ozeti(report)
             meta = module_data["meta"]
