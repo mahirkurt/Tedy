@@ -4,6 +4,11 @@ Tool bodies run in worker threads, so every catalog read-modify-write holds fcnt
 output/modules/.lock (separate open() calls contend across threads and processes alike).
 Versions are immutable: the HTML is created with O_EXCL and the next version skips any
 orphan directory left by an interrupted publish.
+
+Arşivleme (2026-10-24): bir slug'ın yayında tek sürümü olur. Yeni sürüm yayınlanınca aynı kilit altında
+önceki `active` sürümler `archived` olur (`archived_at`, `archived_by`); dosya silinmez, ilerleme kaydı
+silinmez. Arşivlenmiş sürümün adresi panoda güncel sürüme yönlenir (dashboard_api 410 `{arsivlendi, guncel}`).
+`edupedia_arsivle` bu kuraldan önce yayınlanmış eski sürümleri aynı kuralla arşivler.
 """
 from __future__ import annotations
 
@@ -31,7 +36,7 @@ _ABBREVIATIONS = (
 )
 _CARD_FIELDS = ("slug", "version", "status", "title", "subject", "gradeLevel", "mode", "outcomes",
                 "ted_link", "gates", "created_at")
-DURUMLAR = ("active", "removed", "hepsi")
+DURUMLAR = ("active", "archived", "removed", "hepsi")
 # Closed statuses Yayinci.yayinla raises itself and must pass through verbatim (fix round 1, F3);
 # any other ValueError (or any other Exception at all) is an unclosed internal failure and must
 # be mapped to sunucu_hatasi instead of letting its Python text reach the tool caller.
@@ -161,8 +166,20 @@ class CatalogWriter:
         on_disk = [ms.parse_version_segment(p.name) or 0 for p in folder.iterdir()] if folder.is_dir() else []
         return max(known + on_disk + [0]) + 1
 
+    def _arsivle_eskileri(self, rows: list[dict[str, Any]], slug: str, guncel: int, email: str) -> list[int]:
+        """Kilit altında çağrılır: `slug`'ın `guncel`'den eski `active` sürümlerini `archived` yapar."""
+        arsivlenen = []
+        for row in rows:
+            version = row.get("version")
+            if (row.get("slug") == slug and row.get("status") == "active" and ms.valid_version(version)
+                    and version < guncel):
+                row.update(status="archived", archived_at=_iso(self.clock()), archived_by=email)
+                arsivlenen.append(version)
+        return sorted(arsivlenen)
+
     def yayinla(self, email: str, draft: dict[str, Any], html: bytes, slug: str,
-                ted_link: dict[str, str] | None) -> dict[str, Any]:
+                ted_link: dict[str, str] | None) -> tuple[dict[str, Any], list[int]]:
+        """Yeni sürümü yazar ve aynı kilit altında önceki `active` sürümleri arşivler: (kayıt, arşivlenen sürümler)."""
         if not ms.publishable_slug(slug):
             raise ValueError("gecersiz_slug")
         with self._locked():
@@ -195,9 +212,24 @@ class CatalogWriter:
                 "bytes": len(html), "sha256": hashlib.sha256(html).hexdigest(),
                 "created_by": email, "created_at": _iso(self.clock()),
             }
+            arsivlenen = self._arsivle_eskileri(rows, slug, version, email)
             rows.append(record)
             self._write(rows)
-            return record
+            return record, arsivlenen
+
+    def arsivle(self, email: str, slug: str) -> tuple[int | None, int]:
+        """En yenisi dışındaki `active` sürümleri arşivler: (güncel sürüm ya da yayında sürüm yoksa None, sayı)."""
+        with self._locked():
+            rows = ms.read_catalog(self.data_dir)
+            yayinda = [r["version"] for r in rows if r.get("slug") == slug and r.get("status") == "active"
+                       and ms.valid_version(r.get("version"))]
+            if not yayinda:
+                return None, 0
+            guncel = max(yayinda)
+            arsivlenen = self._arsivle_eskileri(rows, slug, guncel, email)
+            if arsivlenen:
+                self._write(rows)
+            return guncel, len(arsivlenen)
 
     def kaldir(self, email: str, slug: str) -> int:
         with self._locked():
@@ -271,7 +303,7 @@ class Yayinci:
                 return {**base, "status": "kapi_fail_guncel", "fail_kapilari": guncel,
                         "not": "Taslak bugünkü kapılardan geçmiyor (derlendikten sonra sıkılaşan kurallar): "
                                f"{', '.join(guncel)}. Modül yayınlanmadı; edupedia_derle ile yeniden derle."}
-            record = self.catalog.yayinla(email, draft, html, chosen, link)
+            record, arsivlenen = self.catalog.yayinla(email, draft, html, chosen, link)
         except ValueError as exc:
             # Fix round 1, F3: the three closed reasons CatalogWriter.yayinla itself raises
             # pass through verbatim (surum_siniri also carries the current limit); anything
@@ -288,7 +320,7 @@ class Yayinci:
         except Exception:
             return _sunucu_hatasi(base)
         return {"status": "ok", "slug": record["slug"], "version": record["version"], "url": self._url(record),
-                "mcp_verified": False}
+                "arsivlenen_surumler": arsivlenen, "mcp_verified": False}
 
     def katalog(self, ders: str | None = None, sinif: str | None = None, durum: str | None = None) -> dict[str, Any]:
         durum = durum or "active"
@@ -313,3 +345,17 @@ class Yayinci:
             return {**base, "status": "bulunamadi"}
         return {**base, "status": "ok", "kaldirilan_surum_sayisi": count,
                 "not": "Dosyalar silinmez; sürümler removed işaretlenir ve katalogdan düşer."}
+
+    def arsivle(self, email: str, slug: str) -> dict[str, Any]:
+        if not ms.valid_slug(slug):
+            return {"status": "gecersiz_slug", "slug": slug, "mcp_verified": False}
+        base = {"slug": slug, "mcp_verified": False}
+        try:
+            guncel, count = self.catalog.arsivle(email, slug)
+        except Exception:
+            return _sunucu_hatasi(base)
+        if guncel is None:
+            return {"status": "bulunamadi", **base}
+        return {"status": "ok", "slug": slug, "arsivlenen_surum_sayisi": count, "guncel_surum": guncel,
+                "not": "Dosyalar silinmez; eski sürümler archived işaretlenir, adresleri güncel sürüme yönlenir.",
+                "mcp_verified": False}

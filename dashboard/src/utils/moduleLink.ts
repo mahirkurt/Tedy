@@ -14,3 +14,15 @@ export function moduleRoute(locator: Record<string, unknown> | null | undefined)
   if (typeof version !== 'number' || !Number.isInteger(version) || version < 1 || version > VERSION_MAX) return null
   return `/moduller/${slug}/v${version}`
 }
+
+export type ArsivYonu = { tur: 'yonlendir'; yol: string } | { tur: 'yayinda_degil' }
+
+/** An archived version's ticket answers 410 `{arsivlendi: true, guncel}` (2026-10-24): the page moves to the
+ * current version, replacing the old address in history, or says the module is no longer published. Anything
+ * else is not an archive answer (null) and keeps the generic error sentence. */
+export function arsivYonu(slug: string, version: number, body: unknown): ArsivYonu | null {
+  if (typeof body !== 'object' || body === null || (body as { arsivlendi?: unknown }).arsivlendi !== true) return null
+  const guncel = (body as { guncel?: unknown }).guncel
+  const yol = guncel !== version ? moduleRoute({ slug, version: guncel }) : null
+  return yol ? { tur: 'yonlendir', yol } : { tur: 'yayinda_degil' }
+}

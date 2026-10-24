@@ -196,7 +196,7 @@ def test_rehber_tool_is_registered_and_returns_akis(tmp_path):
     assert body["bolum"] == "akis" and body["status"] == "ok"
 
 
-def test_all_fourteen_tools_are_listed(tmp_path):
+def test_all_fifteen_tools_are_listed(tmp_path):
     store = OAuthStore(tmp_path / "o.sqlite3")
     key = store.create_static_key("t", FULL)
     with _client(tmp_path, store) as c:
@@ -205,7 +205,7 @@ def test_all_fourteen_tools_are_listed(tmp_path):
     names = {t["name"] for t in listed["result"]["tools"]}
     assert names == {"edupedia_durum", "edupedia_rehber", "edupedia_baglam", "edupedia_kapsam", "edupedia_kaynak_oku",
                      "edupedia_derle", "edupedia_onizle", "edupedia_yayinla", "edupedia_katalog", "edupedia_kaldir",
-                     "edupedia_gorsel", "edupedia_medya", "edupedia_pedagoji_kaniti", "edupedia_ilerleme"}
+                     "edupedia_arsivle", "edupedia_gorsel", "edupedia_medya", "edupedia_pedagoji_kaniti", "edupedia_ilerleme"}
 
 
 def test_slow_tool_does_not_block_concurrent_requests(tmp_path):
@@ -277,6 +277,7 @@ TOOL_ARGUMENTS = {
     "edupedia_yayinla": {"taslak_id": "ffffffffffffffff"},
     "edupedia_katalog": {},
     "edupedia_kaldir": {"slug": "fen5-su"},
+    "edupedia_arsivle": {"slug": "fen5-su"},
     "edupedia_gorsel": {"run_id": "abcdef012345", "istek": "su döngüsü"},
     "edupedia_medya": {"run_id": "abcdef012345", "tur": "ses", "istek": "metin"},
     "edupedia_pedagoji_kaniti": {"konu": "geri getirme pratiği"},
@@ -327,6 +328,9 @@ def test_parked_tool_bodies_never_take_the_threads_auth_and_store_calls_need(tmp
             return park()
 
         def kaldir(self, email, slug):
+            return park()
+
+        def arsivle(self, email, slug):
             return park()
 
         def gorsel(self, email, run_id, istek, tercih=None):

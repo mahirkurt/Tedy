@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { InlineNotification, SkeletonText } from '@carbon/react'
+import { useNavigate } from 'react-router-dom'
 import type { ModuleTicket } from '../types'
 import {
   acceptProgressMessage, acceptSizeMessage, appearanceMessage, DASHBOARD_THEME, restoreMessage, type RestoreState,
 } from '../utils/moduleBridge'
 import ModulAiEtiketi from './ModulAiEtiketi'
 import { useModulAciklamasi } from '../hooks/useModulAciklamasi'
+import { arsivYonu } from '../utils/moduleLink'
 import ModulBasligi from './ModulBasligi'
 import './Modules.scss'
 
@@ -19,6 +21,7 @@ const kokPx = () => parseFloat(getComputedStyle(document.documentElement).fontSi
 const ustBosluk = () => parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0
 
 type TicketState = { status: 'loading' } | { status: 'ready'; url: string } | { status: 'error'; message: string }
+  | { status: 'yayinda_degil' }
 
 const TICKET_ERRORS: Record<number, string> = {
   403: 'Bu modülü açma yetkin yok.',
@@ -39,6 +42,7 @@ export interface ModuleViewerProps {
 
 export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress, ust }: ModuleViewerProps) {
   const frameRef = useRef<HTMLIFrameElement>(null)
+  const navigate = useNavigate()
   const aciklama = useModulAciklamasi(aciklamaPath)
   const bas = <ModulBasligi durum={aciklama} taslak={!progress} aiEtiketi={<ModulAiEtiketi durum={aciklama} />} />
   // Reset to loading during render when ticketPath changes, rather than with a
@@ -63,6 +67,15 @@ export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress
     let cancelled = false
     fetch(ticketPath, { credentials: 'include' })
       .then(async res => {
+        // An archived version (2026-10-24): its address moves to the current version, replacing itself in
+        // history so Back does not return to it; with no current version the page says so.
+        const yon = res.status === 410 && slug && version ? arsivYonu(slug, version, await res.json().catch(() => null)) : null
+        if (yon) {
+          if (cancelled) return
+          if (yon.tur === 'yonlendir') navigate(yon.yol, { replace: true })
+          else setTicket({ status: 'yayinda_degil' })
+          return
+        }
         if (!res.ok) throw new Error(TICKET_ERRORS[res.status] ?? 'Modül şu an açılamadı. Birkaç dakika sonra yeniden dene.')
         const body = (await res.json()) as ModuleTicket
         if (!cancelled) setTicket({ status: 'ready', url: body.url })
@@ -73,7 +86,7 @@ export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress
         if (!cancelled) setTicket({ status: 'error', message: bizim ? (e as Error).message : 'Modül açılamadı. Bağlantını kontrol edip yeniden dene.' })
       })
     return () => { cancelled = true }
-  }, [ticketPath])
+  }, [ticketPath, slug, version, navigate])
 
   const onMessage = useCallback((event: MessageEvent) => {
     const frameEl = frameRef.current
@@ -148,6 +161,14 @@ export default function ModuleViewer({ ticketPath, title, aciklamaPath, progress
 
   if (ticket.status === 'loading') {
     return <div className="module-viewer">{bas}{ust}<div aria-busy="true"><SkeletonText paragraph lineCount={3} /></div></div>
+  }
+  if (ticket.status === 'yayinda_degil') {
+    return (
+      <div className="module-viewer">
+        <InlineNotification kind="info" lowContrast hideCloseButton statusIconDescription="Bilgi"
+          title="Bu modül artık yayında değil." subtitle="Yayındaki modüller Modüller sayfasında." />
+      </div>
+    )
   }
   if (ticket.status === 'error') {
     return (

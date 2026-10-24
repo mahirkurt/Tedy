@@ -1,4 +1,4 @@
-"""SP4 integration: progress summary tool, durum budget and gates, fourteen tools over real HTTP wiring."""
+"""SP4 integration: progress summary tool, durum budget and gates, fifteen tools over real HTTP wiring."""
 import json
 
 import pytest
@@ -12,9 +12,9 @@ from src.mcp_server.oauth_store import OAuthStore
 
 BASE = "https://mcp.tedy.online"
 FULL = "drmahirkurt@gmail.com"
-FOURTEEN = {"edupedia_durum", "edupedia_rehber", "edupedia_baglam", "edupedia_kapsam", "edupedia_kaynak_oku",
+FIFTEEN = {"edupedia_durum", "edupedia_rehber", "edupedia_baglam", "edupedia_kapsam", "edupedia_kaynak_oku",
             "edupedia_derle", "edupedia_gorsel", "edupedia_medya", "edupedia_pedagoji_kaniti", "edupedia_onizle",
-            "edupedia_yayinla", "edupedia_katalog", "edupedia_ilerleme", "edupedia_kaldir"}
+            "edupedia_yayinla", "edupedia_katalog", "edupedia_ilerleme", "edupedia_kaldir", "edupedia_arsivle"}
 MCP_HEADERS = {"accept": "application/json, text/event-stream", "content-type": "application/json"}
 
 
@@ -68,7 +68,7 @@ def test_instructions_name_the_flow_and_kaynak_verisi():
         assert fragment in server.INSTRUCTIONS
 
 
-def test_fourteen_tools_and_budget_over_real_wiring(tmp_path):
+def test_fifteen_tools_and_budget_over_real_wiring(tmp_path):
     (tmp_path / "output").mkdir()
     key = OAuthStore(tmp_path / "output" / "ted_mcp_oauth.sqlite3").create_static_key("t", FULL)
     env = {"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_PROJECT_ROOT": str(tmp_path), "TED_MCP_FORM_SECRET": "f" * 40,
@@ -77,7 +77,7 @@ def test_fourteen_tools_and_budget_over_real_wiring(tmp_path):
     with TestClient(http_app.create_app_from_env(env), base_url=BASE) as client:
         listed = _sse_json(client.post("/mcp", headers=headers,
                                        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}))
-        assert {tool["name"] for tool in listed["result"]["tools"]} == FOURTEEN
+        assert {tool["name"] for tool in listed["result"]["tools"]} == FIFTEEN
         durum = _sse_json(client.post("/mcp", headers=headers, json={
             "jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "edupedia_durum", "arguments": {}}}))
     body = json.loads(durum["result"]["content"][0]["text"])

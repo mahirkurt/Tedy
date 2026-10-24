@@ -272,3 +272,34 @@ def test_contains_progress_detects_verbatim_progress_keys():
     assert am.contains_progress({"query": "dogru_orani 1.0"})
     assert am.contains_progress({"q": ["x", {"y": "İlerleme_Ozeti"}]})
     assert not am.contains_progress({"q": "maddenin hâlleri", "grade": "5.Sınıf"})
+
+
+# ── 2026-10-24: arşivlenmiş sürüm asistana görünmez, ilerleme kaydı silinmez ─────────────────
+
+def test_arsivlenmis_surum_modul_aramasinda_ve_ilerleme_ozetinde_yok(tmp_path):
+    from src.mcp_server.katalog import CatalogWriter
+
+    writer = CatalogWriter(tmp_path, clock=lambda: 1_800_000_000.0)
+    draft = {"meta": {"title": "Kesirler", "subject": "Matematik", "gradeLevel": "6. Sınıf", "mode": "QUIZ"},
+             "gates": {"pass": 18, "warn": 0, "fail": 0}, "outcomes": ["MAT.6.1.2.1"], "taslak_id": T1,
+             "sha256": SHA}
+    writer.yayinla(FULL, draft, HTML, "mat6-kesirler", None)
+    _answer(tmp_path, slug="mat6-kesirler", version=1)
+    index = am.ModuleIndex(tmp_path)
+    body = _ara(index, sorgu="kesirler", ilerleme_izni=True)[0]
+    assert body["moduller"][0]["surum"] == 1 and body["moduller"][0]["ilerleme_ozeti"]["durum"] == "ok"
+
+    _, arsivlenen = writer.yayinla(FULL, draft, HTML, "mat6-kesirler", None)
+    assert arsivlenen == [1] and ms.find_record(tmp_path, "mat6-kesirler", 1)["status"] == "archived"
+    body, cites, text = _ara(index, sorgu="kesirler", ilerleme_izni=True)
+    assert [(m["slug"], m["surum"]) for m in body["moduller"]] == [("mat6-kesirler", 2)]
+    assert body["moduller"][0]["ilerleme_ozeti"] == {"durum": "kayit_yok"}
+    assert [c["locator"]["version"] for c in cites] == [2]
+    # Arşivlenmiş sürümün ilerleme kaydı silinmez.
+    kayit = json.loads((tmp_path / am.PROGRESS_FILE).read_text(encoding="utf-8"))
+    assert kayit["moduller"]["mat6-kesirler"]["v1"]["kisiler"][U]["cevaplar"]
+
+
+def test_yalniz_arsivlenmis_surumu_kalan_modul_asistana_gorunmez(tmp_path):
+    _catalog(tmp_path, [_row(version=1, status="archived"), _row(version=2, status="removed")])
+    assert _ara(am.ModuleIndex(tmp_path), sorgu="madde")[0]["durum"] == "modul_yok"

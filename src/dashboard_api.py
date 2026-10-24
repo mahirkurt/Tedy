@@ -5505,6 +5505,18 @@ def _module_active_record(slug, version):
     return record if record and record.get("status") == "active" else None
 
 
+def _module_archived_response(slug, version):
+    """Arşivlenmiş sürüm (2026-10-24): bilet ve açıklama yerine 410 ve güncel sürümün numarası; yayında
+    sürüm kalmadıysa `guncel: null` (sayfa "Bu modül artık yayında değil." der). Arşiv değilse None."""
+    if not module_store.valid_slug(slug) or not module_store.valid_version(version):
+        return None
+    rows = module_store.read_catalog(OUTPUT_DIR)
+    if not any(r.get("slug") == slug and r.get("version") == version and r.get("status") == "archived" for r in rows):
+        return None
+    current = next((r["version"] for r in module_store.latest_active(rows) if r.get("slug") == slug), None)
+    return _no_store({"arsivlendi": True, "guncel": current}, 410)
+
+
 def _module_ticket_secret():
     return os.environ.get("EDUPEDIA_TICKET_SECRET", "").encode("utf-8")
 
@@ -5652,7 +5664,7 @@ def module_ticket_issue(slug, version):
     if not email:
         return jsonify({"error": "session_required"}), 403
     if _module_active_record(slug, version) is None:
-        return jsonify({"error": "not_found"}), 404
+        return _module_archived_response(slug, version) or (jsonify({"error": "not_found"}), 404)
     try:
         ticket = module_ticket.issue_module(_module_ticket_secret(), MODULE_VIEWER_BASE_URL, email, slug, version,
                                             time.time())
@@ -5764,7 +5776,7 @@ def _module_explanation(record, draft):
 def module_explanation(slug, version):
     record = _module_active_record(slug, version)
     if record is None:
-        return jsonify({"error": "not_found"}), 404
+        return _module_archived_response(slug, version) or (jsonify({"error": "not_found"}), 404)
     return jsonify(_module_explanation(record, module_store.read_draft(OUTPUT_DIR, record.get("taslak_id"))))
 
 

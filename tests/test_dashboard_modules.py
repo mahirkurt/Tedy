@@ -265,3 +265,51 @@ def test_module_explanation_for_an_older_build_has_codes_without_wording(client,
     body = client.get("/api/modules/fen5-su/v2/aciklama").get_json()
     assert body["sure_dk"] is None
     assert body["kazanim_ayrintilari"] == [{"kod": "FB.5.4.1.1", "metin": None, "beceri": None}]
+
+
+# ── 2026-10-24: arşivlenmiş sürüm bilet vermez, güncel sürümü söyler ─────────────────────────
+
+def _katalog(tmp_path, rows):
+    ms.catalog_path(tmp_path).write_text(json.dumps({"surum": 1, "moduller": rows}), encoding="utf-8")
+
+
+@pytest.mark.parametrize("uc", ["ticket", "aciklama"])
+def test_arsivlenmis_surum_410_ve_guncel_surumu_tasir(client, tmp_path, uc):
+    _katalog(tmp_path, [_row("fen5-su", 1, "archived"), _row("fen5-su", 2, "archived"), _row("fen5-su", 3),
+                        _row("fen5-baska", 7)])
+    sign_in(client, FULL)
+    response = client.get(f"/api/modules/fen5-su/v1/{uc}")
+    assert response.status_code == 410
+    assert response.get_json() == {"arsivlendi": True, "guncel": 3}
+    assert response.headers["Cache-Control"] == "no-store"
+    assert client.get(f"/api/modules/fen5-su/v3/{uc}").status_code == 200
+
+
+@pytest.mark.parametrize("uc", ["ticket", "aciklama"])
+def test_arsivlenmis_surumun_guncel_surumu_yoksa_guncel_null(client, tmp_path, uc):
+    _katalog(tmp_path, [_row("fen5-su", 1, "archived"), _row("fen5-su", 2, "removed"), _row("fen5-baska", 1)])
+    sign_in(client, FULL)
+    response = client.get(f"/api/modules/fen5-su/v1/{uc}")
+    assert response.status_code == 410 and response.get_json() == {"arsivlendi": True, "guncel": None}
+    # Kaldırılmış sürüm arşiv değildir: 404 kalır.
+    assert client.get(f"/api/modules/fen5-su/v2/{uc}").status_code == 404
+
+
+def test_arsiv_yaniti_oturum_ve_rol_kapisindan_sonra_gelir(client, tmp_path):
+    _katalog(tmp_path, [_row("fen5-su", 1, "archived"), _row("fen5-su", 2)])
+    assert client.get("/api/modules/fen5-su/v1/ticket").status_code == 401
+    assert client.get("/api/modules/fen5-su/v1/ticket", headers={"Authorization": "Bearer tdyK_test"}).get_json() == {
+        "error": "session_required"}
+    sign_in(client, READER)
+    assert client.get("/api/modules/fen5-su/v1/ticket").status_code == 403
+    assert client.get("/api/modules/fen5-su/v1/aciklama").status_code == 403
+
+
+def test_arsivlenmis_surume_ilerleme_yazilmaz_ama_eski_kayit_silinmez(client, tmp_path):
+    sign_in(client, FULL)
+    assert client.post("/api/modules/fen5-su/progress", json=_event(version=1)).status_code == 200
+    _katalog(tmp_path, [_row("fen5-su", 1, "archived"), _row("fen5-su", 2)])
+    assert client.post("/api/modules/fen5-su/progress", json=_event(version=1)).status_code == 404
+    assert client.get("/api/modules/fen5-su/progress?version=1").status_code == 404
+    data = json.loads((tmp_path / "module_progress.json").read_text(encoding="utf-8"))
+    assert data["moduller"]["fen5-su"]["v1"]["kisiler"][mt.email_hash(FULL)]["cevaplar"]

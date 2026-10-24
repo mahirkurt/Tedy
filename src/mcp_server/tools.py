@@ -207,6 +207,9 @@ class Tools:
     def kaldir(self, email: str, slug: str) -> dict[str, Any]:
         return self._yayinci().kaldir(email, slug)
 
+    def arsivle(self, email: str, slug: str) -> dict[str, Any]:
+        return self._yayinci().arsivle(email, slug)
+
     def gorsel(self, email: str, run_id: str, istek: str, tercih: str | None = None) -> dict[str, Any]:
         return GorselUretici(self.federation, self.runs, self.assets, self.butce, self.downloader).uret(
             email, run_id, istek, tercih=tercih)

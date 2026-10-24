@@ -55,7 +55,7 @@ def test_publish_writes_an_immutable_version_and_a_catalog_record(env):
     taslak_id = _taslak(derleyici)
     body = yayinci.yayinla(FULL, taslak_id, ted_link={"kind": "exam", "id": "ex-42"})
     assert body == {"status": "ok", "slug": SLUG, "version": 1,
-                    "url": f"https://tedy.online/moduller/{SLUG}/v1", "mcp_verified": False}
+                    "url": f"https://tedy.online/moduller/{SLUG}/v1", "arsivlenen_surumler": [], "mcp_verified": False}
     drafts = DraftStore(tmp_path)
     html = ms.module_html_path(tmp_path, SLUG, 1).read_bytes()
     record = ms.find_record(tmp_path, SLUG, 1)
@@ -152,7 +152,11 @@ def test_concurrent_publishes_get_distinct_versions(env):
     with ThreadPoolExecutor(max_workers=8) as pool:
         results = list(pool.map(lambda _: yayinci.yayinla(FULL, taslak_id, slug="fen5-su"), range(8)))
     assert sorted(r["version"] for r in results) == list(range(1, 9))
-    assert len([r for r in ms.read_catalog(tmp_path) if r["slug"] == "fen5-su"]) == 8
+    rows = [r for r in ms.read_catalog(tmp_path) if r["slug"] == "fen5-su"]
+    assert len(rows) == 8
+    # Arşivleme (2026-10-24) aynı kilit altında: eşzamanlı yayınların sonunda yalnız en yeni sürüm yayında.
+    assert [r["version"] for r in rows if r["status"] == "active"] == [8]
+    assert sorted(v for r in results for v in r["arsivlenen_surumler"]) == list(range(1, 8))
 
 
 def test_katalog_and_soft_removal(env):
@@ -161,16 +165,18 @@ def test_katalog_and_soft_removal(env):
     yayinci.yayinla(FULL, taslak_id, slug="fen5-su")
     yayinci.yayinla(FULL, taslak_id, slug="fen5-su")
     listed = yayinci.katalog(ders="fen", sinif="5")
-    assert listed["status"] == "ok" and listed["sayi"] == 2 and listed["mcp_verified"] is False
+    assert listed["status"] == "ok" and listed["sayi"] == 1 and listed["mcp_verified"] is False
     assert set(listed["moduller"][0]) == {"slug", "version", "status", "title", "subject", "gradeLevel", "mode",
                                           "outcomes", "ted_link", "gates", "created_at", "url"}
     assert yayinci.katalog(ders="matematik")["sayi"] == 0
     assert yayinci.katalog(durum="bilinmez")["status"] == "gecersiz_durum"
     removed = yayinci.kaldir(FULL, "fen5-su")
-    assert removed["status"] == "ok" and removed["kaldirilan_surum_sayisi"] == 2
-    assert yayinci.katalog()["sayi"] == 0 and yayinci.katalog(durum="removed")["sayi"] == 2
+    assert removed["status"] == "ok" and removed["kaldirilan_surum_sayisi"] == 1
+    assert yayinci.katalog()["sayi"] == 0 and yayinci.katalog(durum="removed")["sayi"] == 1
+    # Kaldırma yayındakini düşürür; arşivlenmiş sürüm arşivde kalır (adresi "artık yayında değil" der).
+    assert yayinci.katalog(durum="archived")["sayi"] == 1
     assert ms.module_html_path(tmp_path, "fen5-su", 1).is_file()
-    row = ms.find_record(tmp_path, "fen5-su", 1)
+    row = ms.find_record(tmp_path, "fen5-su", 2)
     assert row["removed_by"] == FULL and row["removed_at"]
     assert yayinci.kaldir(FULL, "fen5-su")["status"] == "bulunamadi"
     assert yayinci.kaldir(FULL, "../x")["status"] == "gecersiz_slug"
@@ -305,3 +311,108 @@ def test_tools_are_registered_with_honest_annotations(tmp_path):
     assert listed["edupedia_yayinla"].annotations.readOnlyHint is False
     assert listed["edupedia_kaldir"].annotations.destructiveHint is True
     assert listed["edupedia_katalog"].annotations.readOnlyHint is True
+    arsivle = listed["edupedia_arsivle"].annotations
+    assert arsivle.readOnlyHint is False and arsivle.destructiveHint is False and arsivle.openWorldHint is True
+    assert "arşiv" in listed["edupedia_arsivle"].description
+
+
+# -- Arşivleme (2026-10-24): eski sürümler yeni yayında arşivlenir ---------------------------------
+
+def _katalogu_yaz(tmp_path, durumlar):
+    """Arşivlemeden önceki katalog: aynı slug'ın birden çok `active` sürümü (canlıdaki hâl)."""
+    path = ms.catalog_path(tmp_path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    for row in data["moduller"]:
+        key = (row["slug"], row["version"])
+        if key in durumlar:
+            row["status"] = durumlar[key]
+            for alan in ("archived_at", "archived_by"):
+                row.pop(alan, None)
+    atomic_json_dump(data, str(path))
+
+
+def test_yeni_yayin_ayni_slugin_onceki_active_surumlerini_arsivler(env):
+    tmp_path, derleyici, yayinci = env
+    taslak_id = _taslak(derleyici)
+    assert yayinci.yayinla(FULL, taslak_id, slug="fen5-baska")["arsivlenen_surumler"] == []
+    assert yayinci.yayinla(FULL, taslak_id, slug="fen5-su")["arsivlenen_surumler"] == []
+    body = yayinci.yayinla("isikkurtx@gmail.com", taslak_id, slug="fen5-su")
+    assert body["status"] == "ok" and body["version"] == 2 and body["arsivlenen_surumler"] == [1]
+    eski, yeni = ms.find_record(tmp_path, "fen5-su", 1), ms.find_record(tmp_path, "fen5-su", 2)
+    assert eski["status"] == "archived" and eski["archived_by"] == "isikkurtx@gmail.com"
+    assert eski["archived_at"] == yeni["created_at"]
+    assert yeni["status"] == "active" and "archived_at" not in yeni
+    assert ms.find_record(tmp_path, "fen5-baska", 1)["status"] == "active"
+    # Dosya silinmez: arşivlenmiş sürümün HTML'i yerinde.
+    assert ms.module_html_path(tmp_path, "fen5-su", 1).is_file()
+    assert [(m["slug"], m["version"]) for m in yayinci.katalog()["moduller"]] == [("fen5-baska", 1), ("fen5-su", 2)]
+    arsiv = yayinci.katalog(durum="archived")
+    assert arsiv["status"] == "ok" and [(m["slug"], m["version"], m["status"]) for m in arsiv["moduller"]] == [
+        ("fen5-su", 1, "archived")]
+    assert yayinci.katalog(durum="hepsi")["sayi"] == 3
+
+
+def test_arsivleme_kaldirilmis_surume_dokunmaz(env):
+    tmp_path, derleyici, yayinci = env
+    taslak_id = _taslak(derleyici)
+    yayinci.yayinla(FULL, taslak_id, slug="fen5-su")
+    yayinci.kaldir(FULL, "fen5-su")
+    assert yayinci.yayinla(FULL, taslak_id, slug="fen5-su")["arsivlenen_surumler"] == []
+    assert ms.find_record(tmp_path, "fen5-su", 1)["status"] == "removed"
+
+
+def test_gecersiz_durum_arsivi_izinliler_arasinda_sayar(env):
+    _, _, yayinci = env
+    body = yayinci.katalog(durum="bilinmez")
+    assert body["status"] == "gecersiz_durum" and body["izinli"] == ["active", "archived", "removed", "hepsi"]
+
+
+def test_arsivle_en_yenisi_disindaki_active_surumleri_arsivler(env):
+    tmp_path, derleyici, yayinci = env
+    taslak_id = _taslak(derleyici)
+    for _ in range(3):
+        yayinci.yayinla(FULL, taslak_id, slug="fen5-su")
+    yayinci.yayinla(FULL, taslak_id, slug="fen5-baska")
+    _katalogu_yaz(tmp_path, {("fen5-su", 1): "active", ("fen5-su", 2): "active"})
+    assert yayinci.katalog(ders="fen")["sayi"] == 4
+
+    body = yayinci.arsivle("isikkurtx@gmail.com", "fen5-su")
+    assert body == {"status": "ok", "slug": "fen5-su", "arsivlenen_surum_sayisi": 2, "guncel_surum": 3,
+                    "not": "Dosyalar silinmez; eski sürümler archived işaretlenir, adresleri güncel sürüme yönlenir.",
+                    "mcp_verified": False}
+    for version in (1, 2):
+        row = ms.find_record(tmp_path, "fen5-su", version)
+        assert row["status"] == "archived" and row["archived_by"] == "isikkurtx@gmail.com" and row["archived_at"]
+    assert ms.find_record(tmp_path, "fen5-su", 3)["status"] == "active"
+    assert ms.find_record(tmp_path, "fen5-baska", 1)["status"] == "active"
+    # İkinci çağrı: arşivlenecek eski sürüm yok, sayı 0.
+    again = yayinci.arsivle(FULL, "fen5-su")
+    assert again["status"] == "ok" and again["arsivlenen_surum_sayisi"] == 0 and again["guncel_surum"] == 3
+
+
+def test_arsivle_reddeder_ve_hatayi_kapatir(env, monkeypatch):
+    tmp_path, derleyici, yayinci = env
+    assert yayinci.arsivle(FULL, "../x") == {"status": "gecersiz_slug", "slug": "../x", "mcp_verified": False}
+    assert yayinci.arsivle(FULL, "fen5-yok") == {"status": "bulunamadi", "slug": "fen5-yok", "mcp_verified": False}
+    yayinci.yayinla(FULL, _taslak(derleyici), slug="fen5-su")
+    yayinci.kaldir(FULL, "fen5-su")
+    assert yayinci.arsivle(FULL, "fen5-su")["status"] == "bulunamadi"
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("iç ayrıntı")
+
+    monkeypatch.setattr(ms, "read_catalog", boom)
+    body = yayinci.arsivle(FULL, "fen5-su")
+    assert body["status"] == "sunucu_hatasi" and "iç ayrıntı" not in json.dumps(body, ensure_ascii=False)
+
+
+def test_arsivle_araci_tools_uzerinden_calisir(tmp_path):
+    settings = load_settings({}, project_root=tmp_path)
+    writer = CatalogWriter(settings.data_dir, clock=lambda: NOW)
+    draft = {"meta": {"title": "t", "subject": "Fen Bilimleri", "gradeLevel": "5. Sınıf", "mode": "QUIZ"},
+             "gates": {"pass": 18, "warn": 0, "fail": 0}}
+    for _ in range(2):
+        writer.yayinla(FULL, draft, b"<html></html>", "fen5-su", None)
+    _katalogu_yaz(settings.data_dir, {("fen5-su", 1): "active"})
+    body = tools.Tools(settings, _Fed()).arsivle(FULL, "fen5-su")
+    assert body["status"] == "ok" and body["arsivlenen_surum_sayisi"] == 1 and body["guncel_surum"] == 2

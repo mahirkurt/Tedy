@@ -147,7 +147,8 @@ def build_server(tools: Tools) -> FastMCP:
         bugünün kapılarından yeniden geçer; derlendikten sonra sıkılaşan bir kapı düşerse durum
         kapi_fail_guncel döner ve taslak yayınlanmaz — edupedia_derle ile yeniden derle. Taslak bugünkü modül
         şablonundan önce derlendiyse sablon_eski, MODULE_DATA'sı yazar SVG'sinde metin taşıyorsa yazar_svg_metni
-        döner; ikisinde de yeniden derle. Bu aracın sonucu olmadan 'yayınlandı' deme."""
+        döner; ikisinde de yeniden derle. Yeni sürüm yayına girince aynı modülün önceki sürümleri arşivlenir
+        (arsivlenen_surumler; adresleri güncel sürüme yönlenir). Bu aracın sonucu olmadan 'yayınlandı' deme."""
         email = caller_email(ctx)
         return await anyio.to_thread.run_sync(functools.partial(tools.yayinla, email, taslak_id=taslak_id,
                                                                 ted_link=ted_link, slug=slug), limiter=_TOOL_LIMITER)
@@ -155,7 +156,7 @@ def build_server(tools: Tools) -> FastMCP:
     @mcp.tool(annotations=_RO)
     async def edupedia_katalog(ctx: Context, ders: str | None = None, sinif: str | None = None,
                                durum: str | None = None) -> dict[str, Any]:
-        """Yayınlanmış modüllerin künyesi. durum: active (varsayılan), removed, hepsi."""
+        """Yayınlanmış modüllerin künyesi. durum: active (varsayılan), archived, removed, hepsi."""
         email = caller_email(ctx)
         return await anyio.to_thread.run_sync(functools.partial(tools.katalog, email, ders=ders, sinif=sinif,
                                                                 durum=durum), limiter=_TOOL_LIMITER)
@@ -169,9 +170,20 @@ def build_server(tools: Tools) -> FastMCP:
 
     @mcp.tool(annotations=_DESTRUCTIVE)
     async def edupedia_kaldir(ctx: Context, slug: str) -> dict[str, Any]:
-        """Bir modülün tüm sürümlerini yumuşak kaldırır (dosya silinmez, katalogdan düşer)."""
+        """Bir modülün yayındaki sürümünü yumuşak kaldırır (dosya silinmez, katalogdan düşer). Arşivlenmiş eski
+        sürümler arşivde kalır; adresleri 'artık yayında değil' der."""
         email = caller_email(ctx)
         return await anyio.to_thread.run_sync(functools.partial(tools.kaldir, email, slug=slug),
+                                              limiter=_TOOL_LIMITER)
+
+    @mcp.tool(annotations=_OPEN_WRITE)
+    async def edupedia_arsivle(ctx: Context, slug: str) -> dict[str, Any]:
+        """Bir modülün en yeni sürümü dışındaki yayındaki (active) sürümlerini arşivler ve sayısını döner
+        (arsivlenen_surum_sayisi, guncel_surum). Dosya ve ilerleme kaydı silinmez; arşivlenmiş sürümün adresi
+        panoda güncel sürüme yönlenir. Yeni yayın bunu kendisi yapar; araç bu kuraldan önce yayınlanmış eski
+        sürümler içindir."""
+        email = caller_email(ctx)
+        return await anyio.to_thread.run_sync(functools.partial(tools.arsivle, email, slug=slug),
                                               limiter=_TOOL_LIMITER)
 
     @mcp.tool(annotations=_OPEN_WRITE)
