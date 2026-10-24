@@ -101,7 +101,7 @@ def read_catalog_with_status(data_dir: Path | str) -> tuple[str, list[dict[str, 
         raw = catalog_path(data_dir).read_text(encoding="utf-8")
     except FileNotFoundError:
         return CATALOG_MISSING, []
-    except OSError:
+    except (OSError, UnicodeDecodeError):  # UTF-8 olmayan dosya da okunamaz (ValueError'dır, OSError değil)
         return CATALOG_UNREADABLE, []
     try:
         data = json.loads(raw)

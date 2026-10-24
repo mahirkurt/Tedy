@@ -1,28 +1,17 @@
-import { useId, useState, type MouseEvent, type ReactNode } from 'react'
+import { useId, useState } from 'react'
 import { Button, ContainedList, ContainedListItem, Link as CarbonLink, Tag } from '@carbon/react'
 import { CheckmarkFilled, Launch, WarningAltFilled } from '@carbon/icons-react'
 import { useNavigate } from 'react-router-dom'
 import { asistanaSor } from '../asistan/sayfaBaglami'
 import type { ExamItem } from '../types'
 import { kisaGun, kisaTeslim } from '../utils/formatters'
-import { uygulamaIcindeAc } from '../utils/gezinme'
 import { konuAnahtarlari, konuOzeti, sinavAni, sinavEtiketi, zamanMetni } from '../utils/sinav'
 import { senaryoGorunumu } from '../utils/sinavSenaryosu'
 import SubjectLabel from './SubjectLabel'
+import IcBaglanti from './patterns/IcBaglanti'
 import { Rakamli } from './patterns/Rakamli'
 import './SinavKarti.scss'
 
-/** A Carbon link that stays in the app on a plain click and leaves every other click — a new tab,
- *  a new window, an outside address — to the browser (C13). */
-function IcBaglanti({ href, children, size }: { href: string; children: ReactNode; size?: 'sm' }) {
-  const navigate = useNavigate()
-  const tikla = (e: MouseEvent<HTMLAnchorElement>) => {
-    if (!uygulamaIcindeAc(e, href, e.currentTarget.getAttribute('target'))) return
-    e.preventDefault()
-    navigate(href)
-  }
-  return <CarbonLink href={href} size={size} onClick={tikla}>{children}</CarbonLink>
-}
 
 /** Bugün: 7 gün içindeki en yakın sınav — sessiz, tek satırlık özet (İ1, İ6).
  *  "Ayrıca" ve "Sınavlar" gibi Carbon'un sayfa içi listesi; başlık cümle düzeninde (S38, B70). */

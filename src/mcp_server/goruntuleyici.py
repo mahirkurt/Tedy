@@ -1,7 +1,8 @@
 """modul.tedy.online: ticketed, strictly CSP'd static module serving (spec §5.4; plan K-P2, K-P19).
 
 Order of checks: path shape -> ticket -> catalog record and file. A bad ticket always gets the same
-403 sentence, so existence is never revealed without a valid ticket. Every response, including
+403 sentence, so existence is never revealed without a valid ticket. An archived version behind a valid ticket
+(issued before the archiving) gets a plain 410 sentence, never its content and never a redirect. Every response, including
 404/405, carries the spec security headers.
 """
 from __future__ import annotations
@@ -32,6 +33,9 @@ SECURITY_HEADERS = {
     "x-robots-tag": "noindex",
 }
 NOT_FOUND_TEXT = "Modül bulunamadı"
+# İnceleme turu 1, bulgu 7: arşivlemeden önce alınmış geçerli biletle açılan arşiv sürümü. İçerik ve yönlendirme yok;
+# pano sayfası yenilenince bilet 410 alır ve güncel sürüme yönlenir.
+ARCHIVED_TEXT = "Bu sürüm arşivlendi; güncel sürüm için sayfayı yenileyin."
 
 
 def full_role_hashes() -> set[str]:
@@ -83,6 +87,8 @@ def build_viewer(data_dir: Path | str, secret: bytes, clock: Callable[[], float]
         if mt.verify(secret, "m", slug, version, q.get("t"), q.get("e"), q.get("u"), clock(), allowed_u()) is not None:
             return _plain(mt.EXPIRED_TEXT, 403)
         record = ms.find_record(data_dir, slug, version)
+        if record and record.get("status") == "archived":
+            return _plain(ARCHIVED_TEXT, 410)
         if not record or record.get("status") != "active":
             return _plain(NOT_FOUND_TEXT, 404)
         return await _serve(ms.module_html_path(data_dir, slug, version))

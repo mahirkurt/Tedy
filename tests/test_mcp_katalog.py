@@ -256,7 +256,7 @@ def test_catalog_read_failure_becomes_closed_sunucu_hatasi_for_katalog_and_kaldi
     def boom(*args, **kwargs):
         raise RuntimeError("iç ayrıntı")
 
-    monkeypatch.setattr(ms, "read_catalog", boom)
+    monkeypatch.setattr(ms, "read_catalog_with_status", boom)
 
     body_katalog = yayinci.katalog()
     assert body_katalog["status"] == "sunucu_hatasi"
@@ -403,7 +403,7 @@ def test_arsivle_reddeder_ve_hatayi_kapatir(env, monkeypatch):
     def boom(*args, **kwargs):
         raise RuntimeError("iç ayrıntı")
 
-    monkeypatch.setattr(ms, "read_catalog", boom)
+    monkeypatch.setattr(ms, "read_catalog_with_status", boom)
     body = yayinci.arsivle(FULL, "fen5-su")
     assert body["status"] == "sunucu_hatasi" and "iç ayrıntı" not in json.dumps(body, ensure_ascii=False)
 
@@ -418,3 +418,95 @@ def test_arsivle_araci_tools_uzerinden_calisir(tmp_path):
     _katalogu_yaz(settings.data_dir, {("fen5-su", 1): "active"})
     body = tools.Tools(settings, _Fed()).arsivle(FULL, "fen5-su")
     assert body["status"] == "ok" and body["arsivlenen_surum_sayisi"] == 1 and body["guncel_surum"] == 2
+
+
+# ── İnceleme turu 1, bulgu 8: okunamayan katalog boş sayılmaz ────────────────────────────────
+
+KATALOG_OKUNAMADI_NOTU = ("Modül kataloğu okunamıyor; hiçbir şey yazılmadı. Katalog onarılana dek yayın, kaldırma ve "
+                          "arşivleme yapılmaz; yöneticiye bildir.")
+
+
+@pytest.mark.parametrize("bozuk", [b'{"surum": 1, "moduller": [{"slug": "fen5-su", "vers', b'{"surum": 1}',
+                                   b'{"surum": 1, "moduller": "x"}', b"\xff\xfe bozuk"])
+def test_okunamayan_katalogda_yazicilar_hicbir_sey_yazmaz(env, bozuk):
+    """Kilit altındaki yazıcılar (`yayinla`, `kaldir`, `arsivle`) okunamayan kataloğu boş katalog sayıp bütün satırları
+    ezmez: `katalog_okunamadi` döner, katalog dosyasının baytları ve modül dizini değişmez."""
+    tmp_path, derleyici, yayinci = env
+    taslak_id = _taslak(derleyici)
+    path = ms.catalog_path(tmp_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(bozuk)
+
+    def dizin():  # kilidin kendi dosyası (.lock) yazı sayılmaz
+        return sorted(p.relative_to(tmp_path).as_posix() for p in ms.modules_root(tmp_path).rglob("*")
+                      if p.name != ".lock")
+
+    dizin_once = dizin()
+
+    assert yayinci.yayinla(FULL, taslak_id, slug="fen5-su") == {
+        "taslak_id": taslak_id, "status": "katalog_okunamadi", "not": KATALOG_OKUNAMADI_NOTU, "mcp_verified": False}
+    assert yayinci.kaldir(FULL, "fen5-su") == {
+        "slug": "fen5-su", "status": "katalog_okunamadi", "not": KATALOG_OKUNAMADI_NOTU, "mcp_verified": False}
+    assert yayinci.arsivle(FULL, "fen5-su") == {
+        "slug": "fen5-su", "status": "katalog_okunamadi", "not": KATALOG_OKUNAMADI_NOTU, "mcp_verified": False}
+    assert path.read_bytes() == bozuk
+    assert dizin() == dizin_once == ["modules/index.json"]
+    assert not (ms.modules_root(tmp_path) / "fen5-su").exists()
+
+
+def test_katalog_dosyasi_yoksa_yayin_bos_katalogla_baslar(env):
+    tmp_path, derleyici, yayinci = env
+    assert not ms.catalog_path(tmp_path).exists()
+    assert yayinci.kaldir(FULL, "fen5-su")["status"] == "bulunamadi"
+    assert yayinci.arsivle(FULL, "fen5-su")["status"] == "bulunamadi"
+    body = yayinci.yayinla(FULL, _taslak(derleyici), slug="fen5-su")
+    assert body["status"] == "ok" and body["version"] == 1
+    assert [r["slug"] for r in ms.read_catalog(tmp_path)] == ["fen5-su"]
+
+
+def test_catalog_writer_okunamayan_katalogu_kendisi_de_reddeder(tmp_path):
+    """Yayinci dışındaki çağıran (araç katmanı, betik) da ham boş listeyle yazamaz."""
+    from src.mcp_server.katalog import KatalogOkunamadi
+    writer = CatalogWriter(tmp_path, clock=lambda: NOW)
+    path = ms.catalog_path(tmp_path)
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"{bozuk")
+    draft = {"meta": {"title": "t", "subject": "Fen Bilimleri", "gradeLevel": "5. Sınıf", "mode": "QUIZ"},
+             "gates": {"pass": 18, "warn": 0, "fail": 0}}
+    for cagri in (lambda: writer.yayinla(FULL, draft, b"<html></html>", "fen5-su", None),
+                  lambda: writer.kaldir(FULL, "fen5-su"), lambda: writer.arsivle(FULL, "fen5-su")):
+        with pytest.raises(KatalogOkunamadi):
+            cagri()
+    assert path.read_bytes() == b"{bozuk"
+
+
+# ── İnceleme turu 3: okuyucu da okunamayan kataloğu "hiç modül yok" diye göstermez ──────────────
+
+@pytest.mark.parametrize("bozuk", [b'{"surum": 1, "moduller": [{"slug": "fen5-su"', b'{"surum": 1}', b"\xff\xfe bozuk"])
+def test_okunamayan_katalogda_katalog_araci_bos_liste_degil_katalog_okunamadi_doner(env, bozuk):
+    """`edupedia_katalog` okunamayan katalogda `status: ok, sayi: 0` dönüyordu; yazar ajan "hiç modül yok" sanıyordu.
+    Artık yazıcılardaki hata sözlüğüyle `katalog_okunamadi`; her durum değeri için aynı."""
+    tmp_path, _, yayinci = env
+    path = ms.catalog_path(tmp_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(bozuk)
+    for durum in (None, "active", "archived", "removed", "hepsi"):
+        assert yayinci.katalog(durum=durum) == {
+            "status": "katalog_okunamadi", "not": KATALOG_OKUNAMADI_NOTU, "mcp_verified": False}, durum
+    assert yayinci.katalog(ders="fen", sinif="5")["status"] == "katalog_okunamadi"
+    assert path.read_bytes() == bozuk
+
+
+def test_katalog_dosyasi_yoksa_katalog_araci_bos_ve_ok_doner(env):
+    tmp_path, _, yayinci = env
+    assert not ms.catalog_path(tmp_path).exists()
+    assert yayinci.katalog() == {"status": "ok", "sayi": 0, "moduller": [], "mcp_verified": False}
+
+
+def test_catalog_writer_listele_okunamayan_katalogda_yukseltir(tmp_path):
+    from src.mcp_server.katalog import KatalogOkunamadi
+    path = ms.catalog_path(tmp_path)
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"{bozuk")
+    with pytest.raises(KatalogOkunamadi):
+        CatalogWriter(tmp_path, clock=lambda: NOW).listele()

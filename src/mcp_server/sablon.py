@@ -56,7 +56,9 @@ BRIDGE_JS = r"""  /* ---- edupedia köprüsü ve varlıklar (ted-mcp sablon.py y
   /* Kanun M5.14 (KB-11, KB-49): yazarın ses varlığı görünür adlı, Carbon katmanında, şablonun kendi oynatıcısıyla çalar.
      Carbon'da ses oynatıcı yoktur; oynatıcı Carbon bileşenlerinden kurulur (davranış: şablonun sesOynatici'si):
      oynat/duraklat ve sessiz ghost ikon düğmeleri, konum için Slider anatomisi, mono süre, yükleniyor durumu ve
-     InlineNotification dilinde hata. <audio> denetimsiz ve görünmezdir; ses yalnız okurun eylemiyle başlar. */
+     InlineNotification dilinde hata. <audio> denetimsiz ve görünmezdir; ses yalnız okurun eylemiyle başlar.
+     İki canlı bölge (role="status" yükleniyor, role="alert" hata) hep DOM'dadır, gizlenmez ve boş başlar; durum
+     metnini (ve görsel kutusunu) sesOynatici yazar, durum bitince boşaltır (inceleme turu 1, bulgu 2). */
   function edupediaAudio(a){
     if(!a) return "";
     const aud = edupediaAssetUri(a.asset, "data:audio/");
@@ -73,9 +75,7 @@ BRIDGE_JS = r"""  /* ---- edupedia köprüsü ve varlıklar (ted-mcp sablon.py y
       + `<span class="ses-sure" aria-hidden="true"><span class="ses-sure__gecen">0:00</span> / <span class="ses-sure__toplam">0:00</span></span>`
       + `<button class="ses-dugme ses-sessiz" type="button" aria-label="Seslendirmenin sesini kapat">${icon("ic-volume")}</button>`
       + `</div>`
-      + `<p class="ses-yukleniyor" role="status" hidden><svg class="ses-donen" viewBox="0 0 16 16" aria-hidden="true" focusable="false">`
-      + `<circle cx="8" cy="8" r="6"></circle></svg><span>Yükleniyor</span></p>`
-      + `<div class="ses-hata" role="alert" hidden>${icon("ic-error-filled")}<span>Ses dosyası açılamadı</span></div>`
+      + `<div class="ses-duyuru" role="status"></div><div class="ses-uyari" role="alert"></div>`
       + `<audio class="edupedia-audio__kaynak" preload="metadata" src="${esc(aud)}"></audio></div>`;
   }
   const EDUPEDIA_BRIDGE = (function(){
