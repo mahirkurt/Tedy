@@ -17,7 +17,8 @@ import { fileURLToPath } from 'node:url'
 // The fixture is the real compiler's `ornekler.arac_ornegi()`: a 20-second silent WAV on the first section and a
 // broken file on the second. Measured at frame 390 directly and in the dashboard at 390, 1440 and 3840 (root 32).
 // Review round 1: the two live regions (role=status loading, role=alert error) are always in the document, rendered
-// and empty; a state writes its text into them and its end empties them.
+// and empty; a state writes its text into them and its end empties them. The slider's spoken value is written on the
+// reader's own action, on pause/ended/seeked and while playing at most every 10 s.
 
 const PORT = Number(process.env.TEDY_E2E_PORT ?? 8286)
 const ORIGIN = `http://127.0.0.1:${PORT}`
@@ -172,18 +173,22 @@ test('playing is the reader\'s act: the time advances, pause stops it, nothing s
   const f = await ac(page, 390, false)
   const k = oynatici(f)
   const kay = k.locator('[role="slider"]')
-  await page.waitForTimeout(600)
-  expect(await k.locator('audio').evaluate(a => (a as HTMLAudioElement).paused), 'kendiliğinden çalmamalı').toBe(true)
+  const audio = k.locator('audio')
+  // Enough data to play: an autoplaying element would have started by now (a condition, not a fixed wait).
+  await expect.poll(() => audio.evaluate(a => (a as HTMLAudioElement).readyState)).toBe(4)
+  expect(await audio.evaluate(a => (a as HTMLAudioElement).paused), 'kendiliğinden çalmamalı').toBe(true)
   await k.locator('.ses-oynat').click()
   await expect(k.locator('.ses-oynat')).toHaveAttribute('aria-label', 'Duraklat')
-  await expect.poll(async () => Number(await kay.getAttribute('aria-valuenow')), { timeout: 5000 }).toBeGreaterThanOrEqual(1)
-  await expect(k.locator('.ses-sure')).toHaveText(/^0:0[1-9] \/ 0:20$/)
+  await expect(k.locator('.ses-sure')).toHaveText(/^0:0[1-9] \/ 0:20$/, { timeout: 5000 })
   await expect(k.locator('[role="status"]')).toHaveText('')   // playing: the loading region is empty again
   await k.locator('.ses-oynat').click()
   await expect(k.locator('.ses-oynat')).toHaveAttribute('aria-label', 'Oynat')
-  const durdu = await kay.getAttribute('aria-valuenow')
-  await page.waitForTimeout(1300)
-  expect(await kay.getAttribute('aria-valuenow')).toBe(durdu)
+  await expect.poll(() => audio.evaluate(a => (a as HTMLAudioElement).paused)).toBe(true)
+  // Pause writes the slider's value: it is where playback stopped (review round 1, finding 3).
+  const yer = await audio.evaluate(a => Math.round((a as HTMLAudioElement).currentTime))
+  expect(yer).toBeGreaterThanOrEqual(1)
+  await expect(kay).toHaveAttribute('aria-valuenow', String(yer))
+  await expect(kay).toHaveAttribute('aria-valuetext', `${yer} saniye / 20 saniye`)
   // Mute is a toggle with its name.
   await k.locator('.ses-sessiz').click()
   await expect(k.locator('.ses-sessiz')).toHaveAttribute('aria-label', 'Seslendirmenin sesini aç')
@@ -218,6 +223,41 @@ test('a file that cannot be opened says so in an InlineNotification and disables
   await expect(k.locator('[role="slider"]')).toHaveAttribute('aria-disabled', 'true')
   await expect(k.locator('[role="status"]')).toHaveText('')
   await expect(k.locator('[role="status"]')).toBeAttached()
+})
+
+test('while playing the slider\'s spoken value is written at most every 10 s; the visual progress every tick', async ({ page }) => {
+  // Review round 1, finding 3: aria-valuetext was rewritten on every timeupdate (15 writes in 3.2 s), which a screen
+  // reader can read out over and over. Now: the reader's own slider action, pause/ended/seeked, and while playing at
+  // most once every 10 s. The fill, the handle and the time text still follow every timeupdate.
+  test.setTimeout(60000)
+  const f = await ac(page, 390, true)
+  const k = oynatici(f)
+  const kay = k.locator('[role="slider"]')
+  const audio = k.locator('audio')
+  await expect(kay).toHaveAttribute('aria-valuemax', '20')
+  await kay.evaluate(el => {
+    const w = window as unknown as { ariaYazim: number }
+    w.ariaYazim = 0
+    new MutationObserver(m => { w.ariaYazim += m.filter(x => x.attributeName === 'aria-valuetext').length })
+      .observe(el, { attributes: true, attributeFilter: ['aria-valuetext'] })
+  })
+  const yazim = () => f.evaluate(() => (window as unknown as { ariaYazim: number }).ariaYazim)
+  const oran = () => kay.evaluate(el => parseFloat((el as HTMLElement).style.getPropertyValue('--ses-oran')) || 0)
+  await k.locator('.ses-oynat').click()
+  await expect.poll(() => audio.evaluate(a => (a as HTMLAudioElement).currentTime), { timeout: 10000 }).toBeGreaterThanOrEqual(3.2)
+  expect(await yazim(), 'ilk 3,2 saniyede sözlü değer en çok bir kez yazılır').toBeLessThanOrEqual(1)
+  await expect(k.locator('.ses-sure__gecen')).toHaveText(/^0:0[3-9]$/)
+  expect(await oran()).toBeGreaterThan(0.15)
+  await expect.poll(() => audio.evaluate(a => (a as HTMLAudioElement).currentTime), { timeout: 20000 }).toBeGreaterThanOrEqual(11)
+  const onBirde = await yazim()
+  expect(onBirde, 'oynarken 10 saniyede bir yazılır: 11 saniyede 1 ya da 2').toBeGreaterThanOrEqual(1)
+  expect(onBirde).toBeLessThanOrEqual(2)
+  expect(await oran()).toBeGreaterThan(0.5)
+  await k.locator('.ses-oynat').click()
+  await expect.poll(() => audio.evaluate(a => (a as HTMLAudioElement).paused)).toBe(true)
+  const yer = await audio.evaluate(a => Math.round((a as HTMLAudioElement).currentTime))
+  await expect(kay).toHaveAttribute('aria-valuenow', String(yer))
+  await expect(kay).toHaveAttribute('aria-valuetext', `${yer} saniye / 20 saniye`)
 })
 
 for (const [genislik, dogrudan, ad] of [[390, true, 'çerçeve 390'], [1440, true, 'çerçeve 1440']] as const) {

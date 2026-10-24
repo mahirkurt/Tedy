@@ -93,12 +93,35 @@ def test_ses_oynaticisi_carbon_bilesenlerinden_kurulur():
         bas = SABLON.index(blok)
         assert f"--cds-layer-selected-inverse:{deger};" in SABLON[bas:SABLON.index("\n}", bas)], (blok, deger)
     # Davranış: ±5 sn, ±%10, Home/End; ipucu sistemi oynatıcı düğmelerini de kapsar; ses yalnız tıklamayla başlar.
-    for parca in ("const SES_ADIM_SN=5, SES_SAYFA_ORAN=.1;", "PageUp:t+top*SES_SAYFA_ORAN", "Home:0", "End:top",
+    for parca in ("const SES_ADIM_SN=5, SES_SAYFA_ORAN=.1, SES_ARIA_ARALIK_MS=10000;", "PageUp:t+top*SES_SAYFA_ORAN",
+                  "Home:0", "End:top",
                   'const IPUCU=".icon-btn,.pacing-disk__dismiss,.cmap-edge__remove,.ses-dugme";'):
         assert parca in SABLON, parca
     oynatici = SABLON[SABLON.index("(function sesOynatici(){"):]
     oynatici = oynatici[:oynatici.index("\n  })();")]
     assert oynatici.count(".play()") == 1 and "autoplay" not in oynatici
+
+
+def test_ses_kaydiricisinin_sozlu_degeri_oynarken_seyrek_yazilir():
+    """İnceleme turu 1, bulgu 3: aria-valuenow/-valuetext her timeupdate'te yazılıyordu (3,2 sn'de 15). Artık yalnız
+    okurun kaydırıcı eyleminde (klavye, sürükleme: `git`), duraklat/bitti/arama ve üst veride, oynarken en çok 10
+    saniyede bir. Görsel ilerleme (dolgu, tutamaç, süre metni) her timeupdate'te güncellenir."""
+    oynatici = SABLON[SABLON.index("(function sesOynatici(){"):]
+    oynatici = oynatici[:oynatici.index("\n  })();")]
+    assert '["loadedmetadata","durationchange","seeked","emptied","pause","ended"].forEach(function(tur){ medya(tur, guncelle); });' in oynatici
+    assert 'medya("timeupdate", oynarken);' in oynatici and oynatici.count('"timeupdate"') == 1
+    oynarken = oynatici[oynatici.index("function oynarken(p){"):]
+    oynarken = oynarken[:oynarken.index("\n    }\n")]
+    assert "gorsel(p);" in oynarken
+    assert "if(!p.a.paused && performance.now()-(sonAria.get(p.k)||0) >= SES_ARIA_ARALIK_MS) sozlu(p);" in oynarken
+    gorsel = oynatici[oynatici.index("function gorsel(p){"):]
+    gorsel = gorsel[:gorsel.index("\n    }\n")]
+    assert "aria-value" not in gorsel and "--ses-oran" in gorsel and "p.gecen.textContent" in gorsel
+    sozlu = oynatici[oynatici.index("function sozlu(p){"):]
+    sozlu = sozlu[:sozlu.index("\n    }\n")]
+    assert all(f'"aria-value{a}"' in sozlu for a in ("max", "now", "text")) and "sonAria.set(p.k, performance.now());" in sozlu
+    assert "p.a.currentTime=Math.max(0, Math.min(top, sn)); guncelle(p);" in oynatici   # okurun eylemi hemen yazar
+    assert oynatici.count("aria-valuenow") == 1   # sözlü değeri yalnız sozlu() yazar
 
 
 def test_hotspot_bolgesinin_adi_cevabi_sizdirmaz():

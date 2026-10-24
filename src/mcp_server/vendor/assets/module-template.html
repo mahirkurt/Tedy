@@ -1812,14 +1812,17 @@ const MODULE_DATA = {
      klavyesiyle sürülür: ← ↓ / → ↑ ±5 sn, PageDown/PageUp ±%10, Home/End başa/sona; işaretçiyle izin üstünde sürüklenir.
      Ad ve değer okunur: aria-valuetext "1 dakika 12 saniye / 3 dakika". Medya olayları köpürmez; belgeye yakalama
      aşamasında bağlanan dinleyiciler her oynatıcıyı (sonradan çizilenler dahil) tek yerden günceller.
-     İnceleme turu 1: canlı bölgeler hep vardır ve boştur; durum metnini durum() yazar, durum bitince boşaltır —
-     hidden açıp kapamak güvenilir duyuru vermez. */
+     İnceleme turu 1: sözlü değer (aria-valuenow/-valuetext) yalnız okurun kaydırıcı eyleminde, duraklat/bitti/arama
+     (seeked) ve üst veride, oynarken de en çok 10 saniyede bir yazılır (her timeupdate'te yazmak ekran okuyucuyu
+     boğar); dolgu, tutamaç ve süre metni her timeupdate'te güncellenir. Canlı bölgeler hep vardır ve boştur; durum
+     metnini durum() yazar, durum bitince boşaltır — hidden açıp kapamak güvenilir duyuru vermez. */
   (function sesOynatici(){
     const KOK=".edupedia-audio";
-    const SES_ADIM_SN=5, SES_SAYFA_ORAN=.1;
+    const SES_ADIM_SN=5, SES_SAYFA_ORAN=.1, SES_ARIA_ARALIK_MS=10000;
     const SES_YUKLENIYOR=`<p class="ses-yukleniyor"><svg class="ses-donen" viewBox="0 0 16 16" aria-hidden="true" focusable="false">`
       + `<circle cx="8" cy="8" r="6"></circle></svg><span>Yükleniyor</span></p>`;
     const SES_HATA=`<p class="ses-hata">${icon("ic-error-filled")}<span>Ses dosyası açılamadı</span></p>`;
+    const sonAria=new WeakMap();
     function parcalar(n){
       const k=n && n.closest ? n.closest(KOK) : null; if(!k) return null;
       const s=c=>k.querySelector(c);
@@ -1832,13 +1835,23 @@ const MODULE_DATA = {
       return [d?d+" dakika":"", (s||!d)?s+" saniye":""].filter(Boolean).join(" ");
     }
     function toplamSn(p){ return isFinite(p.a.duration) && p.a.duration>0 ? p.a.duration : 0; }
-    function guncelle(p){
-      const top=toplamSn(p), t=Math.min(p.a.currentTime||0, top||Infinity);
+    function konum(p){ const top=toplamSn(p); return {top, t:Math.min(p.a.currentTime||0, top||Infinity)}; }
+    function gorsel(p){
+      const {top, t}=konum(p);
+      p.kay.style.setProperty("--ses-oran", top ? String(Math.min(1, t/top)) : "0");
+      p.gecen.textContent=sure(t); p.toplam.textContent=sure(top);
+    }
+    function sozlu(p){
+      const {top, t}=konum(p);
       p.kay.setAttribute("aria-valuemax", String(Math.round(top)));
       p.kay.setAttribute("aria-valuenow", String(Math.round(t)));
       p.kay.setAttribute("aria-valuetext", sozle(t)+" / "+(top?sozle(top):"bilinmiyor"));
-      p.kay.style.setProperty("--ses-oran", top ? String(Math.min(1, t/top)) : "0");
-      p.gecen.textContent=sure(t); p.toplam.textContent=sure(top);
+      sonAria.set(p.k, performance.now());
+    }
+    function guncelle(p){ gorsel(p); sozlu(p); }
+    function oynarken(p){
+      gorsel(p);
+      if(!p.a.paused && performance.now()-(sonAria.get(p.k)||0) >= SES_ARIA_ARALIK_MS) sozlu(p);
     }
     function durum(p, d){
       if(p.k.getAttribute("data-ses-durum")===d) return;
@@ -1898,7 +1911,8 @@ const MODULE_DATA = {
         const p=parcalar(a); if(p) f(p);
       }, true);
     }
-    ["loadedmetadata","durationchange","timeupdate","seeked","emptied"].forEach(function(tur){ medya(tur, guncelle); });
+    ["loadedmetadata","durationchange","seeked","emptied","pause","ended"].forEach(function(tur){ medya(tur, guncelle); });
+    medya("timeupdate", oynarken);
     ["play","pause","ended","volumechange"].forEach(function(tur){ medya(tur, dugmeler); });
     medya("playing", function(p){ durum(p, "hazir"); });
     medya("canplay", function(p){ if(p.k.getAttribute("data-ses-durum")==="yukleniyor" && p.a.paused) durum(p, "hazir"); });
