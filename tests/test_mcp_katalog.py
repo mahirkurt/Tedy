@@ -476,3 +476,35 @@ def test_catalog_writer_okunamayan_katalogu_kendisi_de_reddeder(tmp_path):
         with pytest.raises(KatalogOkunamadi):
             cagri()
     assert path.read_bytes() == b"{bozuk"
+
+
+# ── İnceleme turu 3: okuyucu da okunamayan kataloğu "hiç modül yok" diye göstermez ──────────────
+
+@pytest.mark.parametrize("bozuk", [b'{"surum": 1, "moduller": [{"slug": "fen5-su"', b'{"surum": 1}', b"\xff\xfe bozuk"])
+def test_okunamayan_katalogda_katalog_araci_bos_liste_degil_katalog_okunamadi_doner(env, bozuk):
+    """`edupedia_katalog` okunamayan katalogda `status: ok, sayi: 0` dönüyordu; yazar ajan "hiç modül yok" sanıyordu.
+    Artık yazıcılardaki hata sözlüğüyle `katalog_okunamadi`; her durum değeri için aynı."""
+    tmp_path, _, yayinci = env
+    path = ms.catalog_path(tmp_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(bozuk)
+    for durum in (None, "active", "archived", "removed", "hepsi"):
+        assert yayinci.katalog(durum=durum) == {
+            "status": "katalog_okunamadi", "not": KATALOG_OKUNAMADI_NOTU, "mcp_verified": False}, durum
+    assert yayinci.katalog(ders="fen", sinif="5")["status"] == "katalog_okunamadi"
+    assert path.read_bytes() == bozuk
+
+
+def test_katalog_dosyasi_yoksa_katalog_araci_bos_ve_ok_doner(env):
+    tmp_path, _, yayinci = env
+    assert not ms.catalog_path(tmp_path).exists()
+    assert yayinci.katalog() == {"status": "ok", "sayi": 0, "moduller": [], "mcp_verified": False}
+
+
+def test_catalog_writer_listele_okunamayan_katalogda_yukseltir(tmp_path):
+    from src.mcp_server.katalog import KatalogOkunamadi
+    path = ms.catalog_path(tmp_path)
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"{bozuk")
+    with pytest.raises(KatalogOkunamadi):
+        CatalogWriter(tmp_path, clock=lambda: NOW).listele()

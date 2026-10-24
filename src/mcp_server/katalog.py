@@ -163,9 +163,10 @@ class CatalogWriter:
             fcntl.flock(fd, fcntl.LOCK_UN)
             os.close(fd)
 
-    def _yazilacak_satirlar(self) -> list[dict[str, Any]]:
-        """Kilit altında, yazmadan önce okunan satırlar. Okunamayan katalog boş sayılmaz (`read_catalog` öyle sayar ve
-        bir yazıcı onunla bütün satırları ezerdi): `KatalogOkunamadi`. Dosya yoksa boş katalogla başlanır."""
+    def _okunan_satirlar(self) -> list[dict[str, Any]]:
+        """Katalog satırları; okunamayan katalog boş sayılmaz (`read_catalog` öyle sayar): `KatalogOkunamadi`. Yazıcılar
+        bunu kilit altında, yazmadan önce çağırır (boş sayılsa bütün satırları ezerlerdi); `listele` de çağırır (boş
+        sayılsa yazar ajan "hiç modül yok" sanırdı, inceleme turu 3). Dosya yoksa boş katalogla başlanır."""
         durum, rows = ms.read_catalog_with_status(self.data_dir)
         if durum == ms.CATALOG_UNREADABLE:
             raise KatalogOkunamadi()
@@ -202,7 +203,7 @@ class CatalogWriter:
         if not ms.publishable_slug(slug):
             raise ValueError("gecersiz_slug")
         with self._locked():
-            rows = self._yazilacak_satirlar()
+            rows = self._okunan_satirlar()
             version = self._next_version(rows, slug)
             # Fix round 1, F2: two different failure modes used to share one raw ValueError
             # message. Check the version ceiling explicitly first (a real "no versions left"
@@ -239,7 +240,7 @@ class CatalogWriter:
     def arsivle(self, email: str, slug: str) -> tuple[int | None, int]:
         """En yenisi dışındaki `active` sürümleri arşivler: (güncel sürüm ya da yayında sürüm yoksa None, sayı)."""
         with self._locked():
-            rows = self._yazilacak_satirlar()
+            rows = self._okunan_satirlar()
             yayinda = [r["version"] for r in rows if r.get("slug") == slug and r.get("status") == "active"
                        and ms.valid_version(r.get("version"))]
             if not yayinda:
@@ -252,7 +253,7 @@ class CatalogWriter:
 
     def kaldir(self, email: str, slug: str) -> int:
         with self._locked():
-            rows = self._yazilacak_satirlar()
+            rows = self._okunan_satirlar()
             count = 0
             for row in rows:
                 if row.get("slug") == slug and row.get("status") == "active":
@@ -265,7 +266,7 @@ class CatalogWriter:
     def listele(self, ders: str | None = None, sinif: str | None = None, durum: str = "active") -> list[dict[str, Any]]:
         wanted_grade = re.search(r"\d+", sinif or "")
         out = []
-        for row in ms.read_catalog(self.data_dir):
+        for row in self._okunan_satirlar():
             if durum != "hepsi" and row.get("status") != durum:
                 continue
             if ders and _fold(ders) not in _fold(str(row.get("subject") or "")):
@@ -350,6 +351,8 @@ class Yayinci:
         try:
             rows = self.catalog.listele(ders, sinif, durum)
             cards = [{**{k: row.get(k) for k in _CARD_FIELDS}, "url": self._url(row)} for row in rows]
+        except KatalogOkunamadi:
+            return _katalog_okunamadi({"mcp_verified": False})
         except Exception:
             return _sunucu_hatasi({"mcp_verified": False})
         return {"status": "ok", "sayi": len(cards), "moduller": cards, "mcp_verified": False}
