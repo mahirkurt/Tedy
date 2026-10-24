@@ -116,9 +116,11 @@ def test_ilk_parca_butcesi_kanun_bir_ve_skill_bolumu():
         kalan = rehber.PART_MAX_BYTES - toplam
         assert kalan >= 0, (f"{bolum}: kanun §1 + 1 + SKILL §{no} = {toplam} bayt, sınır {rehber.PART_MAX_BYTES}; "
                             f"{-kalan} bayt fazla")
-        # Formül gerçek parçanın kendisidir: ilk parça tam olarak bu iki bloktur.
+        # SKILL bölümü gerçekten ilk parçada: başlığı oradadır ve parça formülü aşmaz (ikinci inceleme, Küçük 3).
         ilk = rehber.guide(bolum)["metin"]
-        assert len(ilk.encode("utf-8")) == toplam, (f"{bolum}: ilk parça {len(ilk.encode('utf-8'))} bayt, formül {toplam}; "
+        baslik = blok.splitlines()[0]
+        assert baslik in ilk, f"{bolum}: SKILL §{no} ilk parçada değil ({baslik!r}); kalan pay {kalan} bayt"
+        assert len(ilk.encode("utf-8")) <= toplam, (f"{bolum}: ilk parça {len(ilk.encode('utf-8'))} bayt, formül {toplam}; "
                                                   f"kalan pay {kalan} bayt")
 
 

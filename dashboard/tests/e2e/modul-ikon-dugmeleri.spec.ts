@@ -94,22 +94,23 @@ function ihlaller(dugmeler: Dugme[]): string[] {
   })
 }
 
-/** The tooltip of an icon button, measured the review's way: its text (the `::after` content) and its box from the
- * pseudo-element's computed `left`/`top` against the button and its computed size (border-box, so padding included). */
+/** The tooltip of an icon button. Second review round: the tooltip is one separate `role="tooltip"` element at the end
+ * of the body (`#aracIpucu`), outside every button, tied to its owner with `aria-describedby` — a click on it or on its
+ * bridge can no longer activate the button. Its box is the element's own (border-box); it is "open for `secici`" when it
+ * is shown and the button points at it. */
 async function ipucu(f: Frame | Page, secici: string) {
   return f.locator(secici).first().evaluate(b => {
-    const cs = getComputedStyle(b, '::after')
+    const t = document.getElementById('aracIpucu')
     const r = b.getBoundingClientRect()
-    const kenar = cs.boxSizing === 'border-box' ? 0 : 1
-    const en = parseFloat(cs.width) + kenar * (parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight))
-    const boy = parseFloat(cs.height) + kenar * (parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom))
-    const sol = r.left + parseFloat(cs.left)
-    const ust = r.top + parseFloat(cs.top)
-    const icerik = cs.content && cs.content !== 'none' && cs.content !== 'normal' ? cs.content.replace(/^"|"$/g, '') : ''
+    const cs = t ? getComputedStyle(t) : null
+    const k = t ? t.getBoundingClientRect() : new DOMRect()
+    const bagli = (b.getAttribute('aria-describedby') ?? '').split(/\s+/).includes('aracIpucu')
     return {
-      gorunur: cs.display !== 'none' && cs.visibility === 'visible' && parseFloat(cs.opacity) > 0 && icerik !== '',
-      metin: icerik, ad: b.getAttribute('aria-label') ?? '', boxSizing: cs.boxSizing,
-      sol, sag: sol + en, ust, alt: ust + boy, merkezX: sol + en / 2, merkezY: ust + boy / 2,
+      gorunur: !!t && !!cs && !t.hidden && cs.display !== 'none' && cs.visibility === 'visible' && parseFloat(cs.opacity) > 0
+        && bagli,
+      metin: (t?.textContent ?? '').trim(), ad: b.getAttribute('aria-label') ?? '', boxSizing: cs?.boxSizing ?? '',
+      rol: t?.getAttribute('role') ?? '', dugmeninIcinde: !!t && b.contains(t),
+      sol: k.left, sag: k.right, ust: k.top, alt: k.bottom, merkezX: k.left + k.width / 2, merkezY: k.top + k.height / 2,
       dugme: { x: r.left, y: r.top, w: r.width, h: r.height },
       genislik: document.documentElement.clientWidth,
       tasma: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -179,7 +180,11 @@ async function ipucuSozlesmesi(f: Frame | Page, page: Page, ad: string) {
   // Delay, measured inside the page so the timing is deterministic: a check timer due before the 100 ms opening timer
   // runs before it, whatever the load.
   const gecikme = await f.locator('#ttsBtn').evaluate(async b => {
-    const acik = () => b.classList.contains('ipucu-acik')
+    const acik = () => {
+      const t = document.getElementById('aracIpucu')
+      return !!t && !t.hidden && t.classList.contains('arac-ipucu--acik')
+        && (b.getAttribute('aria-describedby') ?? '').split(/\s+/).includes('aracIpucu')
+    }
     b.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body }))
     const hemen = acik()
     const ms60 = await new Promise<boolean>(r => setTimeout(() => r(acik()), 60))
@@ -263,6 +268,8 @@ async function ipucuKutulari(f: Frame | Page, page: Page, ad: string) {
       .toEqual({ secici, sol: true, sag: true, tasma: true })
     expect(k.boxSizing).toBe('border-box')
     expect(k.metin).toBe(k.ad)
+    expect(k.rol).toBe('tooltip')
+    expect(k.dugmeninIcinde, `${ad}: ${secici} ipucu düğmenin içinde (tıklama düğmeye gider)`).toBe(false)
     await page.keyboard.press('Escape')
   }
   for (const secici of ['#pacingDiskDismiss', '#soundBtn', '#ttsBtn']) await olc(secici)
@@ -334,6 +341,55 @@ async function panodaAc(page: Page, genislik: number) {
   return ac(page, genislik, false)
 }
 
+// Second review round (Önemli): the open tooltip and its bridge took hits as their own button, so a click on the
+// concept map's second "remove" button, under the first one's tooltip, removed the first link (measured at 342, 390,
+// 1024), and a click on the content under the sound tooltip toggled the sound. A click there must never activate the
+// tooltip's button.
+for (const genislik of [342, 390, 1024]) {
+  test(`a click under the first remove button's open tooltip leaves the first link — frame ${genislik}`, async ({ page }) => {
+    const f = await ac(page, genislik, true)
+    for (let i = 0; i < segmentSayisi - 1; i++) await f.locator('#nextBtn').click()
+    const dugumler = f.locator('.cmap-node')
+    for (const i of [0, 1, 2, 3]) await dugumler.nth(i).press('Enter')
+    const baglantilar = () => f.locator('.cmap-edge__text').allTextContents()
+    const once = await baglantilar()
+    expect(once.length).toBe(2)
+    const kaldir = f.locator('.cmap-edge__remove')
+    await kaldir.nth(1).scrollIntoViewIfNeeded()
+    const r1 = (await kaldir.nth(0).boundingBox())!, r2 = (await kaldir.nth(1).boundingBox())!
+    const x = r1.x + r1.width / 2
+    // A fixed wait rather than a poll on the tooltip element, so the same steps also run against the earlier
+    // pseudo-element tooltip (the review's reproduction) and fail there for the right reason.
+    await page.mouse.move(x, r1.y + r1.height / 2)
+    await page.waitForTimeout(250)
+    for (let y = r1.y + r1.height / 2; y <= r2.y + 8; y += 2) await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.up()
+    await page.waitForTimeout(250)
+    const sonra = await baglantilar()
+    expect(sonra, `çerçeve ${genislik}: ipucunun altına tıklama 1. bağlantıyı sildi`).toContain(once[0])
+  })
+}
+
+test('a click on the content under the open sound tooltip leaves the sound as it was', async ({ page }) => {
+  const f = await ac(page, 390, true)
+  await expect(f.locator('#soundBtn')).toHaveAttribute('aria-label', 'Sesi kapat')
+  const d = (await f.locator('#soundBtn').boundingBox())!
+  await page.mouse.move(d.x + d.width / 2, d.y + d.height / 2)
+  await page.waitForTimeout(250)
+  // Down through the bridge onto the tooltip (over the content below the button: 8 px gap + half its height), click.
+  const hedefY = d.y + d.height + 8 + 11
+  for (let y = d.y + d.height / 2; y <= hedefY; y += 2) await page.mouse.move(d.x + d.width / 2, y)
+  await page.mouse.down()
+  await page.mouse.up()
+  await page.waitForTimeout(250)
+  await expect(f.locator('#soundBtn')).toHaveAttribute('aria-label', 'Sesi kapat')
+  // Lower, on the content under where the tooltip ends: still no toggle.
+  await page.mouse.click(d.x + d.width / 2, hedefY + 16)
+  await page.waitForTimeout(150)
+  await expect(f.locator('#soundBtn')).toHaveAttribute('aria-label', 'Sesi kapat')
+})
+
 test('the tools are exactly twice as large at 3840 as at 1920 (M5.8)', async ({ page }) => {
   const olc = async (genislik: number) => {
     const f = await panodaAc(page, genislik)
@@ -354,6 +410,7 @@ if (GORUNTU) {
       await arac.scrollIntoViewIfNeeded()
       await page.screenshot({ path: join(GORUNTU, `arac-cubugu-${genislik}.png`) })
       await f.locator('#ttsBtn').hover()
+      await expect.poll(async () => (await ipucu(f, '#ttsBtn')).gorunur).toBe(true)  // 100 ms açılış gecikmesi
       await page.screenshot({ path: join(GORUNTU, `arac-ipucu-${genislik}.png`) })
       await page.mouse.move(1, 1)
       await f.locator('#ttsBtn').click()
@@ -365,8 +422,9 @@ if (GORUNTU) {
 
 // Review fix round (Küçük 12): a hotspot region's accessible name used to be the answer itself (`spots[].label`), so a
 // screen reader announced "Çekirdek, düğme" right under the question "Bul ve tıkla: Çekirdek". WCAG 1.1.1's test
-// exception asks for a descriptive identification, not the answer: "Bölge n / N". The answer enters the name only once
-// the reader has found the region.
+// exception asks for a descriptive identification, not the answer: "Bölge n / N". Second round: n is the region's
+// spatial order (left to right, then top to bottom, by its box centre), not its DOM order — otherwise "question k =
+// region k" would leak the answer — and a found region keeps its found state (name + aria-disabled) in later questions.
 test.describe('hotspot regions', () => {
   let hotspotHtml = ''
   test.beforeAll(() => {
@@ -374,19 +432,21 @@ test.describe('hotspot regions', () => {
     execFileSync(PYTHON, ['-c', [
       'import sys', 'from src.mcp_server import derleme, ornekler',
       "d = ornekler.ornek('MODULE')",
-      "svg = ('<svg viewBox=\"0 0 480 300\" role=\"img\" aria-label=\"Hücre şeması\">'",
-      "       '<g data-spot=\"zar\"><rect x=\"20\" y=\"20\" width=\"440\" height=\"260\" fill=\"none\" stroke=\"var(--viz-axis)\" stroke-width=\"16\"/></g>'",
-      "       '<g data-spot=\"cekirdek\"><circle cx=\"240\" cy=\"150\" r=\"48\" fill=\"var(--viz-2)\"/></g></svg>')",
-      "d['segments'] = [{'type': 'hotspot', 'id': 'h1', 'title': 'Hücreyi Keşfet', 'svg': svg, 'spots': [",
-      "    {'id': 'cekirdek', 'label': 'Çekirdek', 'info': 'Hücrenin yönetim merkezi.'},",
-      "    {'id': 'zar', 'label': 'Hücre zarı', 'info': 'Hücreyi çevreler.'}]}]",
+      // DOM order c, a, b; spatial order (left to right) a, b, c; question order b, c, a.
+      "svg = ('<svg viewBox=\"0 0 480 200\" role=\"img\" aria-label=\"Üç kutu\">'",
+      "       '<g data-spot=\"c\"><rect x=\"360\" y=\"60\" width=\"80\" height=\"80\" fill=\"var(--viz-2)\"/></g>'",
+      "       '<g data-spot=\"a\"><rect x=\"40\" y=\"60\" width=\"80\" height=\"80\" fill=\"var(--viz-2)\"/></g>'",
+      "       '<g data-spot=\"b\"><rect x=\"200\" y=\"60\" width=\"80\" height=\"80\" fill=\"var(--viz-2)\"/></g></svg>')",
+      "d['segments'] = [{'type': 'hotspot', 'id': 'h1', 'title': 'Kutuları Bul', 'svg': svg, 'spots': [",
+      "    {'id': 'b', 'label': 'Orta kutu', 'info': 'Ortada.'}, {'id': 'c', 'label': 'Sağ kutu', 'info': 'Sağda.'},",
+      "    {'id': 'a', 'label': 'Sol kutu', 'info': 'Solda.'}]}]",
       "d['curriculum']['outcomes'][0]['mappedTo'] = ['h1']",
       `open(sys.argv[1], 'w').write(derleme.derle(d, {}, ${JSON.stringify(ORIGIN)}))`,
     ].join('\n'), out], { cwd: REPO })
     hotspotHtml = readFileSync(out, 'utf8')
   })
 
-  test('region names identify the region and never read out the answer', async ({ page }) => {
+  test('region names follow space, never the answer, and a found region stays found', async ({ page }) => {
     await serveModule(page)
     await page.route('https://modul.tedy.online/**', r => r.fulfill({
       status: 200, contentType: 'text/html; charset=utf-8', body: hotspotHtml,
@@ -394,15 +454,26 @@ test.describe('hotspot regions', () => {
     }))
     await page.setViewportSize({ width: 390, height: 900 })
     await page.goto(MODUL)
-    await expect(page.locator('.q-stem')).toContainText('Çekirdek')
-    const adlar = await page.locator('[data-spot]').evaluateAll(rs => rs.map(r => r.getAttribute('aria-label') ?? ''))
-    expect(adlar).toEqual(['Bölge 1 / 2', 'Bölge 2 / 2'])
-    // The region is still a named, focusable button; the answer enters its name once found.
-    await page.locator('[data-spot="zar"]').press('Enter')
+    const ad = (id: string) => page.locator(`[data-spot="${id}"]`)
+    await expect(page.locator('.q-stem')).toContainText('Orta kutu')
+    // Spatial numbering: a (left) 1, b (middle) 2, c (right) 3 — although the DOM holds c, a, b.
+    await expect(ad('a')).toHaveAttribute('aria-label', 'Bölge 1 / 3')
+    await expect(ad('b')).toHaveAttribute('aria-label', 'Bölge 2 / 3')
+    await expect(ad('c')).toHaveAttribute('aria-label', 'Bölge 3 / 3')
+    // A wrong region keeps its neutral name; the right one takes the answer and is no longer an open target.
+    await ad('a').press('Enter')
     await expect(page.locator('#hfb')).toContainText('Burası değil')
-    await expect(page.locator('[data-spot="zar"]')).toHaveAttribute('aria-label', 'Bölge 1 / 2')
-    await page.locator('[data-spot="cekirdek"]').press('Enter')
+    await expect(ad('a')).toHaveAttribute('aria-label', 'Bölge 1 / 3')
+    await ad('b').press('Enter')
     await expect(page.locator('#hfb')).toContainText('Buldun')
-    await expect(page.locator('[data-spot="cekirdek"]')).toHaveAttribute('aria-label', 'Bölge 2 / 2: Çekirdek, bulundu')
+    await expect(ad('b')).toHaveAttribute('aria-label', 'Bölge 2 / 3: Orta kutu, bulundu')
+    await expect(ad('b')).toHaveAttribute('aria-disabled', 'true')
+    // Next question: the found region is still marked found; the others are neutral and open.
+    await page.getByRole('button', { name: /Sonraki/ }).click()
+    await expect(page.locator('.q-stem')).toContainText('Sağ kutu')
+    await expect(ad('b')).toHaveAttribute('aria-label', 'Bölge 2 / 3: Orta kutu, bulundu')
+    await expect(ad('b')).toHaveAttribute('aria-disabled', 'true')
+    await expect(ad('a')).toHaveAttribute('aria-label', 'Bölge 1 / 3')
+    await expect(ad('c')).not.toHaveAttribute('aria-disabled', 'true')
   })
 })

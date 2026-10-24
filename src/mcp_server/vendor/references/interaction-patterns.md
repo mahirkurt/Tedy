@@ -221,7 +221,9 @@ alıştırma sayısı düz metinle, hedefler, tekrar önerisi, öz-değerlendirm
 SVG `icon-pictogram-svg.md` kurallarına uygun ve **metin taşımaz** (Kanun M5.6, KB-48): bölgenin adı
 `spots[].label`'dadır ve soruda yazılır; SVG'ye yazılan ad hem 12 px'in altına düşer hem cevabı gösterir
 (`edupedia_derle` `sema_hatasi`). Her hotspot klavyeyle odaklanabilir (`tabindex`, `role="button"`); erişilebilir adı
-cevap değil "Bölge n / N"dir, cevap bölge bulununca adına girer (WCAG 1.1.1, test için betimleyici tanım).
+cevap değil "Bölge n / N"dir — n uzamsal sıradır (kutu merkezi, soldan sağa, sonra yukarıdan aşağı), DOM sırası değil —;
+cevap bölge bulununca adına girer ve bulunan bölge sonraki sorularda da işaretli ve `aria-disabled` kalır (WCAG 1.1.1,
+test için betimleyici tanım).
 
 > **✓ Motorda uygulandı (v1.2.0).** `renderHotspot`: her `spot` için "Bul ve tıkla:
 > {label}" sorulur; öğrenci SVG içinde `data-spot` taşıyan bölgeyi tıklar (veya Tab +

@@ -461,7 +461,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .pacing-disk__ring{flex:none;width:1.75rem;height:1.75rem}  /* öznitelikte 28 px: CSS boyutu olmadan 4K'da yerinde kalırdı */
 .pacing-disk__track{fill:none;stroke:var(--tedy-brand-rule);stroke-width:3}
 .pacing-disk__arc{fill:none;stroke:var(--cds-text-on-color);stroke-width:3;stroke-linecap:round}
-.pacing-disk__dismiss{position:relative;width:var(--tap);height:var(--tap);border:none;background:transparent;color:var(--cds-text-on-color);
+.pacing-disk__dismiss{width:var(--tap);height:var(--tap);border:none;background:transparent;color:var(--cds-text-on-color);
   cursor:pointer;display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius-btn)}
 .pacing-disk__dismiss:hover{background:var(--tedy-brand)}
 .pacing-disk__dismiss:focus-visible{outline:2px solid var(--cds-text-on-color);outline-offset:2px}
@@ -470,7 +470,7 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
    ikon 20 px, adı araç ipucunda (Kanun M5.14, KB-44; Button — specifications #size). */
 .topbar__tools{display:inline-flex;align-items:center;gap:var(--sp-02);max-width:100%;flex-wrap:wrap;
   padding-left:var(--sp-03);border-left:1px solid var(--tedy-brand-rule)}
-.icon-btn{position:relative;width:var(--tap);height:var(--tap);border:none;background:transparent;cursor:pointer;color:var(--cds-text-on-color);
+.icon-btn{width:var(--tap);height:var(--tap);border:none;background:transparent;cursor:pointer;color:var(--cds-text-on-color);
   display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius-btn);
   transition:background var(--dur-fast) var(--ease-std)}
 .icon-btn:hover,.icon-btn:active{background:var(--tedy-brand-hover)}
@@ -479,24 +479,27 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .topbar .icon-btn--on{background:var(--cds-text-on-color);color:var(--tedy-brand)}
 .topbar .icon-btn--on .cds-icon{color:var(--tedy-brand)}
 /* Araç ipucu (Kanun M5.14, KB-44): çerçevedeki her ikon düğmesinin adı, fareyle üzerine gelince ve klavye odağında
-   düğmenin altında görünür (talimatname §4.3; Tooltip — accessibility #annotate-the-text-for-the-tooltip). Metin düğmenin
-   kendi aria-label'ıdır: ad değişince ("Sesi kapat" ↔ "Sesi aç") ipucu da değişir, ikinci bir kaynak yoktur. Carbon ikon
-   ipucu ölçüsü (@carbon/styles 1.117.0 components/tooltip/_tooltip.scss:26-29, 46-47, 85-104, icon-tooltip): ters
-   yüzey, body-compact-01, dolgu 2 × 16 px, düğmeden 8 px, en çok 18rem (kutu dolgu dahil: border-box). Açıp kapamayı
-   aracIpucu yapar (ipucu-acik): 100 ms gecikmeyle, görünürlükle (yerleşim hep vardır, açılmadan önce çerçeveye
-   kıstırılır: --ipucu-x), etkinleştirmede ve Esc'te kapanır. 8 px'lik boşlukta saydam köprü (::before) vardır: işaretçi
-   ipucuna inerken düğmenin üstünde kalır (WCAG 1.4.13). Ok (caret) yok: ipucu her zaman düğmenin hemen altındadır ve
-   kıstırılınca ok düğmeyi göstermez olurdu; ad düğmenin kendi adıdır, hangi düğmeye ait olduğu bitişiklikten okunur. */
-.icon-btn::after,.pacing-disk__dismiss::after,.cmap-edge__remove::after{content:attr(aria-label);box-sizing:border-box;
-  position:absolute;inset-block-start:calc(100% + var(--sp-03));inset-inline-end:calc(-1 * var(--ipucu-x, 0px));z-index:30;
+   düğmenin altında görünür (talimatname §4.3; Tooltip — accessibility #annotate-the-text-for-the-tooltip). Tek, ayrı bir
+   role="tooltip" öğesidir (#aracIpucu, gövdenin sonunda; aracIpucu kurar): hiçbir düğmenin içinde olmadığı için ona ya da
+   köprüsüne tıklamak düğmeyi etkinleştirmez (ikinci inceleme: düğmenin ::after'ı isabeti düğmeye veriyordu, 2. bağlantının
+   kenarına tıklama 1. bağlantıyı siliyordu). Metin düğmenin kendi aria-label'ıdır; açıkken düğme aria-describedby ile
+   ona bağlanır. Carbon ikon ipucu ölçüsü (@carbon/styles 1.117.0 components/tooltip/_tooltip.scss:26-29, 46-47, 85-104,
+   icon-tooltip): ters yüzey, body-compact-01, dolgu 2 × 16 px, düğmeden 8 px, en çok 18rem (kutu dolgu dahil:
+   border-box). Görünürlükle açılır; açmadan önce JS ölçer ve çerçevenin içine yerleştirir (left/top, hesaplanan
+   geometri). 8 px'lik boşlukta saydam köprü (::before) ipucunun parçasıdır: işaretçi ipucuna inerken açık kalır (WCAG
+   1.4.13). Ok (caret) yok: ipucu her zaman düğmenin hemen altındadır, kıstırılınca ok düğmeyi göstermez olurdu. */
+.arac-ipucu{position:absolute;inset-block-start:0;inset-inline-start:0;z-index:30;box-sizing:border-box;
   inline-size:max-content;max-inline-size:min(18rem,calc(100vw - 1rem));padding:var(--sp-01) var(--sp-05);
   border-radius:var(--cds-border-radius-02);background:var(--cds-background-inverse);color:var(--cds-text-inverse);
   font-family:var(--font-sans);font-size:var(--fs-label);line-height:1.28572;letter-spacing:.16px;font-weight:400;
   text-align:start;white-space:normal;overflow-wrap:anywhere;visibility:hidden;opacity:0}
-.icon-btn.ipucu-acik::after,.pacing-disk__dismiss.ipucu-acik::after,.cmap-edge__remove.ipucu-acik::after{visibility:visible;opacity:1}
-.icon-btn.ipucu-acik::before,.pacing-disk__dismiss.ipucu-acik::before,.cmap-edge__remove.ipucu-acik::before{content:"";
-  position:absolute;inset-block-start:100%;inset-inline-end:calc(-1 * var(--ipucu-x, 0px));block-size:var(--sp-03);
-  inline-size:var(--ipucu-en, 100%)}
+.arac-ipucu[hidden]{display:none}
+.arac-ipucu--acik{visibility:visible;opacity:1}
+.arac-ipucu::before{content:"";position:absolute;inset-block-end:100%;inset-inline-start:var(--kopru-sol, 0px);
+  inline-size:var(--kopru-en, 100%);block-size:var(--sp-03)}
+
+/* bulunan hotspot bölgesi sonraki sorularda da işaretli kalır (renk + aria-disabled + adında "bulundu") */
+.hotspot-bulundu{outline:3px solid var(--cds-support-success);outline-offset:2px}
 
 /* --- KATMAN 2 · Durum şeridi (nötr Carbon layer-01) --- */
 .topbar__status{background:var(--cds-layer-01);padding:var(--sp-05) var(--sp-06);
@@ -931,7 +934,7 @@ figure.viz img,figure.viz video{display:block;max-width:100%;height:auto;margin:
 .cmap-edge--extra{box-shadow:inset 0 0 0 1.5px var(--cds-support-info)}
 .cmap-edge--extra .cmap-edge__mark{color:var(--cds-support-info)}
 .cmap-edge__text{flex:1;font-size:var(--fs-compact);color:var(--cds-text-primary)}
-.cmap-edge__remove{position:relative;flex:none;width:var(--tap);height:var(--tap);border:none;background:transparent;cursor:pointer;
+.cmap-edge__remove{flex:none;width:var(--tap);height:var(--tap);border:none;background:transparent;cursor:pointer;
   color:var(--cds-icon-secondary);display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius-btn);
   transition:background var(--dur-fast) var(--ease-std)}
 .cmap-edge__remove:hover:not([disabled]){background:var(--cds-background-hover);color:var(--cds-support-error)}
@@ -1663,64 +1666,88 @@ const MODULE_DATA = {
       const u=b.querySelector("use"); if(u) u.setAttribute("href", state.sound?"#ic-volume":"#ic-volume-off"); }
     if(state.sound) playSound("notify");
   }
-  /* Kanun M5.14 (KB-44): ikon düğmesinin araç ipucu. İşaretçi gelince ya da klavye odağında 100 ms sonra açılır,
-     işaretçi ya da odak gidince 100 ms sonra kapanır (@carbon/react 1.114.0 IconButton/index.js:36 enterDelayMs/leaveDelayMs,
-     closeOnActivation; gecikme
-     hareket değildir, hareket azaltma dokunmaz). Etkinleştirmede kapanır ve işaretçi gidene dek kapalı kalır (Carbon
-     closeOnActivation); Esc kapatır, odak düğmede kalır (talimatname §4.3). Açılmadan önce çerçeveye kıstırılır: satır
-     sonuna yaslı ipucu soldan ya da sağdan taşacaksa --ipucu-x kadar kaydırılır (satır içi stilde yalnız `--` özelliği,
-     KB-26). Tek, belgeye bağlı dinleyiciler; düğmeler sonradan çizilse de (kavram haritası) çalışır. */
+  /* Kanun M5.14 (KB-44): ikon düğmesinin araç ipucu — tek, ayrı bir role="tooltip" öğesi (#aracIpucu), gövdenin sonunda.
+     İşaretçi gelince ya da klavye odağında 100 ms sonra açılır, işaretçi ya da odak gidince 100 ms sonra kapanır
+     (@carbon/react 1.114.0 IconButton/index.js:36 enterDelayMs/leaveDelayMs, closeOnActivation; gecikme hareket değildir,
+     hareket azaltma dokunmaz). İşaretçi düğmeden ipucuna (köprüsü dahil) geçerken açık kalır; ipucuna tıklamak yalnız
+     ipucunu kapatır, düğmeyi etkinleştirmez. Etkinleştirmede kapanır ve işaretçi gidene dek kapalı kalır; Esc kapatır,
+     odak düğmede kalır (talimatname §4.3). Açmadan önce ölçülür ve çerçevenin içine yerleştirilir: satır sonuna yaslı,
+     soldan ya da sağdan taşacaksa yarım rem içeride (satır içi stilde yalnız left/top ve `--` özelliği, KB-26). */
   (function aracIpucu(){
     const IPUCU=".icon-btn,.pacing-disk__dismiss,.cmap-edge__remove";
     const IPUCU_ACIK_MS=100, IPUCU_KAPA_MS=100;
-    const zaman=new WeakMap();
-    function dugme(ev){ return ev.target && ev.target.closest ? ev.target.closest(IPUCU) : null; }
-    function icinde(b, ev){ return !!(ev.relatedTarget && b.contains(ev.relatedTarget)); }
+    const ipucu=document.createElement("div");
+    ipucu.id="aracIpucu"; ipucu.className="arac-ipucu"; ipucu.setAttribute("role","tooltip"); ipucu.hidden=true;
+    document.body.appendChild(ipucu);
+    let sahip=null, zaman=null;
+    function dugme(n){ return n && n.closest ? n.closest(IPUCU) : null; }
+    function ipucunda(n){ return !!n && (n===ipucu || ipucu.contains(n)); }
+    function icinde(b, n){ return !!n && (n===b || b.contains(n)); }
+    function iptal(){ clearTimeout(zaman); }
     function yerlestir(b){
-      b.style.removeProperty("--ipucu-x");
-      const en=parseFloat(getComputedStyle(b,"::after").width)||0;
-      const r=b.getBoundingClientRect(), sinir=document.documentElement.clientWidth;
-      const pay=(parseFloat(getComputedStyle(document.documentElement).fontSize)||16)/2;
-      const sol=r.right-en;
-      let x=0;
-      if(sol+en>sinir-pay) x=(sinir-pay)-(sol+en);
-      if(sol+x<pay) x=pay-sol;
-      b.style.setProperty("--ipucu-x", x+"px");
-      b.style.setProperty("--ipucu-en", en+"px");
+      ipucu.textContent=b.getAttribute("aria-label")||"";
+      ipucu.hidden=false;
+      const kok=parseFloat(getComputedStyle(document.documentElement).fontSize)||16, pay=kok/2;
+      const r=b.getBoundingClientRect(), en=ipucu.offsetWidth, sinir=document.documentElement.clientWidth;
+      let sol=r.right-en;
+      if(sol+en>sinir-pay) sol=sinir-pay-en;
+      if(sol<pay) sol=pay;
+      ipucu.style.left=(sol+window.scrollX)+"px";
+      ipucu.style.top=(r.bottom+pay+window.scrollY)+"px";
+      const bas=Math.min(r.left, sol), son=Math.max(r.right, sol+en);
+      ipucu.style.setProperty("--kopru-sol", (bas-sol)+"px");
+      ipucu.style.setProperty("--kopru-en", (son-bas)+"px");
     }
-    function iptal(b){ clearTimeout(zaman.get(b)); }
-    function planla(b, ac){
-      iptal(b);
-      zaman.set(b, setTimeout(function(){
-        if(!ac){ b.classList.remove("ipucu-acik"); return; }
-        if(b.classList.contains("ipucu-kapali")) return;
-        yerlestir(b); b.classList.add("ipucu-acik");
-      }, ac?IPUCU_ACIK_MS:IPUCU_KAPA_MS));
+    function kapaHemen(){
+      iptal(); ipucu.classList.remove("arac-ipucu--acik"); ipucu.hidden=true;
+      if(sahip){ sahip.removeAttribute("aria-describedby"); sahip=null; }
     }
-    function kapat(b){ iptal(b); b.classList.remove("ipucu-acik"); b.classList.add("ipucu-kapali"); }
+    function ac(b){
+      if(sahip && sahip!==b) kapaHemen();
+      sahip=b; yerlestir(b); ipucu.classList.add("arac-ipucu--acik"); b.setAttribute("aria-describedby","aracIpucu");
+    }
+    function planla(b, acilsin){
+      iptal();
+      zaman=setTimeout(function(){
+        if(acilsin){ if(!b.classList.contains("ipucu-kapali")) ac(b); }
+        else if(sahip===b) kapaHemen();
+      }, acilsin?IPUCU_ACIK_MS:IPUCU_KAPA_MS);
+    }
+    function kapat(b){ kapaHemen(); if(b) b.classList.add("ipucu-kapali"); }
+    function klavyede(b){ return b===document.activeElement && b.matches(":focus-visible"); }
     document.addEventListener("mouseover", function(ev){
-      const b=dugme(ev); if(b && !icinde(b, ev)) planla(b, true);
+      if(ipucunda(ev.target)){ if(sahip) iptal(); return; }
+      const b=dugme(ev.target); if(!b || icinde(b, ev.relatedTarget)) return;
+      if(sahip===b) iptal(); else planla(b, true);
     });
     document.addEventListener("mouseout", function(ev){
-      const b=dugme(ev); if(!b || icinde(b, ev)) return;
-      if(b===document.activeElement && b.matches(":focus-visible")) return;  // klavye odağı sürüyor
+      if(ipucunda(ev.target)){
+        if(!sahip || ipucunda(ev.relatedTarget) || icinde(sahip, ev.relatedTarget) || klavyede(sahip)) return;
+        sahip.classList.remove("ipucu-kapali"); planla(sahip, false); return;
+      }
+      const b=dugme(ev.target); if(!b || icinde(b, ev.relatedTarget)) return;
+      if(sahip===b && ipucunda(ev.relatedTarget)) return;   // köprüden ipucuna iniyor
+      if(klavyede(b)) return;                                // klavye odağı sürüyor
       b.classList.remove("ipucu-kapali"); planla(b, false);
     });
     document.addEventListener("focusin", function(ev){
-      const b=dugme(ev); if(b && b.matches(":focus-visible")) planla(b, true);
+      const b=dugme(ev.target); if(b && b.matches(":focus-visible")) planla(b, true);
     });
     document.addEventListener("focusout", function(ev){
-      const b=dugme(ev); if(!b) return;
+      const b=dugme(ev.target); if(!b) return;
       b.classList.remove("ipucu-kapali");
-      if(!b.matches(":hover")) planla(b, false);
+      if(!b.matches(":hover") && !ipucu.matches(":hover")) planla(b, false);
     });
     document.addEventListener("keydown", function(ev){
       if(ev.key!=="Escape") return;
-      document.querySelectorAll(IPUCU).forEach(function(b){
-        if(b.classList.contains("ipucu-acik") || b===document.activeElement || b.matches(":hover")) kapat(b);
-      });
+      const b=sahip || dugme(document.activeElement);
+      if(b) kapat(b);
     });
-    document.addEventListener("click", function(ev){ const b=dugme(ev); if(b) kapat(b); }, true);
+    document.addEventListener("click", function(ev){
+      if(ipucunda(ev.target)){ kapaHemen(); return; }
+      const b=dugme(ev.target); if(b) kapat(b);
+    }, true);
+    window.addEventListener("resize", kapaHemen);
   })();
   function reduceMotion(){ return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }
   /* ---- tema: yalnız panonun bildirdiği Carbon teması (Kanun M4.1, M4.2) ----
@@ -3637,6 +3664,7 @@ const MODULE_DATA = {
   /* ---- hotspot (görselde doğru bölgeyi bul ve tıkla) ---- */
   function renderHotspot(stage,s){
     let pi=0;
+    const bulunan=new Set();   // bulunan bölgeler sonraki sorularda da işaretli ve kapalı kalır
     function show(){
       const sp=s.spots[pi];
       let html=segHead(s,"Görseli keşfet")+instr(s);
@@ -3646,15 +3674,25 @@ const MODULE_DATA = {
       stage.innerHTML=html;
       setNav({next:false});
       // Bölgenin adı cevap değildir (WCAG 1.1.1: test için betimleyici tanım): "Bölge n / N"; cevap bulununca girer.
-      const bolgeler=stage.querySelectorAll("[data-spot]"), bolgeSayisi=bolgeler.length;
-      bolgeler.forEach((r,bi)=>{
+      // n uzamsal sıradır — kutu merkezi, soldan sağa, sonra yukarıdan aşağı —, DOM sırası değil: DOM sırası soru
+      // sırasıyla örtüşürse "k. soru = Bölge k" örüntüsü cevabı sızdırırdı.
+      const bolgeler=Array.from(stage.querySelectorAll("[data-spot]")), bolgeSayisi=bolgeler.length;
+      const merkez=new Map(bolgeler.map(r=>{ const k=r.getBoundingClientRect(); return [r, {x:k.left+k.width/2, y:k.top+k.height/2}]; }));
+      const uzamsal=bolgeler.slice().sort((a,b)=>{ const A=merkez.get(a), B=merkez.get(b); return Math.abs(A.x-B.x)>0.5 ? A.x-B.x : A.y-B.y; });
+      function isaretle(r, bi, ad){
+        r.dataset.done="1"; r.classList.add("hotspot-bulundu"); r.setAttribute("aria-disabled","true");
+        r.setAttribute("aria-label", `Bölge ${bi+1} / ${bolgeSayisi}: ${stripTags(ad)}, bulundu`);
+      }
+      bolgeler.forEach(r=>{
+        const bi=uzamsal.indexOf(r);
+        const meta=(s.spots.find(x=>x.id===r.getAttribute("data-spot"))||{});
         r.setAttribute("role","button"); r.setAttribute("tabindex","0");
         r.setAttribute("aria-label", `Bölge ${bi+1} / ${bolgeSayisi}`);
+        if(bulunan.has(r.getAttribute("data-spot"))) isaretle(r, bi, meta.label||"");
         const handler=()=>{
           if(r.dataset.done) return;
           if(r.getAttribute("data-spot")===sp.id){
-            r.dataset.done="1"; r.style.outline="3px solid var(--cds-support-success)"; r.style.outlineOffset="2px";
-            r.setAttribute("aria-label", `Bölge ${bi+1} / ${bolgeSayisi}: ${stripTags(sp.label)}, bulundu`);
+            bulunan.add(sp.id); isaretle(r, bi, sp.label);
             const gk=s.id+"#"+pi;
             if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(ODUL.xpPerCorrect);markMastered();}
             const fb=$("#hfb"); fb.className="feedback feedback--ok";

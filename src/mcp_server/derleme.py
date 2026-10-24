@@ -528,8 +528,8 @@ def varlik_zorunluluk_hatalari(data: Any, varliklar: Mapping[str, GomuluVarlik])
 # (innerHTML onu öğe değil düz yazı olarak çizer). `<textarea>` gibi yalnız adı benzeyen öğe `\b` yüzünden eşleşmez.
 # `title` ve `desc` çizilmez, erişilebilir addır; serbesttir.
 _SVG_METIN_RE = re.compile(r"<(?:[A-Za-z][\w.-]*:)?(?:text|tspan|textPath|foreignObject)\b", re.I)
-# `data:image/svg+xml` ikinci bir yazar SVG'sidir (img src, SVG image href); metni taranamaz ve ölçülemez. Öznitelikteki
-# karakter göndermeleri innerHTML'de çözüldüğü için bu desen göndermeleri çözülmüş metinde de aranır.
+# `data:image/svg+xml` ikinci bir yazar SVG'sidir (img src, SVG image href); metni taranamaz ve ölçülemez. Desen
+# `_normalize_for_scan`'den geçmiş metinde de aranır: göndermeler çözülür, sekme ve satır sonu atılır (tarayıcı gibi).
 _SVG_DATA_RE = re.compile(r"data:\s*image/svg\+xml", re.I)
 _SVG_GEREKCE = "viewBox yazarındır, şablon onu kutunun genişliğine kuramaz ve metin dar ekranda 12 px'in altına düşer"
 YAZAR_SVG_METNI = ("yazar SVG'si metin taşımaz ({oge}): " + _SVG_GEREKCE + " (Kanun M5.6, KB-48). Şekiller SVG'de "
@@ -549,7 +549,8 @@ def yazar_svg_ihlali(metin: str) -> str | None:
     m = _SVG_METIN_RE.search(metin)
     if m:
         return "<" + m.group(0).lstrip("<") + ">"
-    if _SVG_DATA_RE.search(metin) or _SVG_DATA_RE.search(html_lib.unescape(metin)):
+    # URL ayrıştırıcısı sekme ve satır sonunu atar, innerHTML karakter göndermelerini çözer (`_normalize_for_scan`).
+    if _SVG_DATA_RE.search(metin) or _SVG_DATA_RE.search(_normalize_for_scan(metin)):
         return "data:image/svg+xml"
     return None
 

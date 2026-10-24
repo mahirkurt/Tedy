@@ -9,6 +9,7 @@ module without its bridge.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from functools import lru_cache
@@ -170,17 +171,12 @@ PATCHES: tuple[tuple[str, str, str, str], ...] = (
 )
 
 
-PARMAK_IZI_ANAHTARI = "assets/module-template.html"
-
-
 def sablon_parmak_izi() -> str:
-    """Bugünkü şablonun parmak izi: PROVENANCE.json'daki `module-template.html` sha256'sı (vendor_sync --pin yazar).
-    Taslak kaydı bunu taşır; yayın, parmak izi bugünkünden farklı taslağı yeniden derletir (Kanun KB-48)."""
-    kayit = json.loads((VENDOR_DIR / "PROVENANCE.json").read_text(encoding="utf-8"))
-    deger = (kayit.get("files") or {}).get(PARMAK_IZI_ANAHTARI)
-    if not isinstance(deger, str) or len(deger) != 64:
-        raise TemplateDriftError("PROVENANCE.json şablonun parmak izini taşımıyor")
-    return deger
+    """Bugünkü motorun parmak izi: derlemenin kullandığı yamalı şablon metninin (`_patched_with_token`) sha256'sı.
+    Vendored şablon da `PATCHES`/`BRIDGE_JS` da onu değiştirir; diskteki dosya değil sürecin bellekteki metni
+    sayıldığı için `git pull` ile yeniden başlatma arasında derlenen taslak da kendi metninin izini taşır. Taslak kaydı
+    bunu taşır; yayın, parmak izi bugünkünden farklı taslağı yeniden derletir (Kanun KB-48)."""
+    return hashlib.sha256(_patched_with_token().encode("utf-8")).hexdigest()
 
 
 class TemplateDriftError(RuntimeError):

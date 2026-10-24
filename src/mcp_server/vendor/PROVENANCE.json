@@ -5,10 +5,10 @@
     "assets/carbon-v11-authority.json": "d6958862826c8b36adae53781724b0447b06045d7853602984c85a48c32aa5ce",
     "assets/fonts-manifest.json": "23153bf47b3c0b1859eca6ffccae83ff0365e673b2e4f1ad7eb32353af47a7e0",
     "assets/ibm-plex-OFL.txt": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f",
-    "assets/module-template.html": "29b9226a848a530c827dfdf6f87ff8ab6757f08f5198dea884dd77bfe7bd49c7",
+    "assets/module-template.html": "43fd8860b87385fd8c7e286ab9c2ccf6a851a7e6456757c1e07c1de12a64c326",
     "references/adhd-pedagogy.md": "500e62eb5af169a56fe118911ca15b38b92cc5b0286091ce67bf379081aba83d",
     "references/audio-system.md": "3b1d6223d79c013b1a833ab875d8768d006e77f1b8e7ff7da37650de9de4a1a8",
-    "references/carbon-child-system.md": "1870dcf7c782f6eb7a2995efa407512c0907327cd019a99eafa8457d5b7ed27c",
+    "references/carbon-child-system.md": "8dc00963b775bae22d125980065adfd09a7813feaa34e7bda6ab922ebceb8c97",
     "references/carbon-excellence.md": "17f17f5273aae2f97fac2de60d6904b33d174a142a50f49311a655cddfde6438",
     "references/carbon-sources.md": "bcb6c26fc0e38eecf8b0502068987610cfc1b40034b9075765aeaec71b296b0b",
     "references/color-system.md": "6b6cddd4627390eb3053df41e93b0249ba02391d35758f3967ca1a9f01779557",
@@ -18,7 +18,7 @@
     "references/figma-carbon-interop.md": "713091c40e8627e14972fbe66da38c0827128911b1aa6caf6282cb447bc1f4b9",
     "references/gamified-flows.md": "bad436d05a67fd6ec96835ef304b04cfb0102eda765bcadeca066bc182bc364a",
     "references/icon-pictogram-svg.md": "ab50797210fcc73c03cdec70db20f17898b1fdc52d121cf0f260c88748a2203f",
-    "references/interaction-patterns.md": "78a8d0148f18ad8fd18555ab13a2aa53ed1c97eb77a0aa239ccb3aa2baba6c91",
+    "references/interaction-patterns.md": "b344de16c6a411d03c03014009e18edc86c6dde63ba3ddf26e4320ea233e8714",
     "references/module-architecture.md": "c6d748d07e7625dd62920109eadb3fa493d1b9e7f5bc0dad6e00b49ba9868a43",
     "references/newgen-question-design.md": "068243dfe11d052d7570f0201eb79744616072e7d8b2e8ca1bf3848d72db28ba",
     "references/subject-packs.md": "6a7c3347e570e9dcfaa985c7cf66eb9a59f6997c7003d4aabaa735a2767ab95e",
@@ -54,7 +54,7 @@
     "repo": "https://github.com/mahirkurt/CureoPrivate",
     "retired_in": "edupedia 1.0.0"
   },
-  "pinned_at": "2026-10-24T19:03:39+00:00",
+  "pinned_at": "2026-10-24T19:58:20+00:00",
   "source_commit": "1aee3845efffb103a0e4e5b489f4477c0b3017b0",
   "synced_at": "2026-09-18T10:43:35+00:00"
 }

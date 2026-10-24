@@ -160,6 +160,17 @@ def test_data_uri_svg_reddedilir():
         assert "meta.assets" in hatalar[0]
 
 
+def test_data_uri_svg_sekme_satir_sonu_ve_gonderme_ile_de_reddedilir():
+    """Tarayıcı URL'den sekmeyi ve satır sonunu atar, innerHTML karakter göndermelerini çözer: tarama `_normalize_for_scan`
+    ile yapılır (ikinci inceleme, Küçük 4)."""
+    for uri in ("data:image/svg\t+xml,%3Csvg%3E", "data:image/sv\ng+xml,%3Csvg%3E", "data:ima\r\nge/svg+xml,x",
+                "data&colon;image/svg&#43;xml,x", "data:image/svg&#9;+xml,x"):
+        data = ornekler.ornek("MODULE")
+        _teach(data)["body"] = [f"<p><img alt='kutu' src='{uri}'></p>"]
+        hatalar = [h for h in derleme.girdi_hatalari(data) if "KB-48" in h]
+        assert len(hatalar) == 1 and "data:image/svg+xml" in hatalar[0], (repr(uri), hatalar)
+
+
 def test_hotspot_svgsindeki_metin_hotspota_ozgu_iletiyle_reddedilir():
     """Hotspot'ta `labels` yoktur; bölgenin adı `spots[].label`'dadır ve soruda yazılır. SVG'ye yazılan ad hem 12 px'in
     altına düşer hem cevabı gösterir (inceleme, Küçük 8)."""
@@ -195,17 +206,40 @@ def _yayin_ortami(tmp_path):
 
 
 def test_taslak_kaydi_sablonun_parmak_izini_tasir(tmp_path):
-    import json as _json
+    """Parmak izi derlemenin kullandığı yamalı şablon metninin kendisidir (ikinci inceleme, Küçük 1): vendored şablon
+    da, `sablon.py`'nin yamaları da onu değiştirir; diskteki PROVENANCE değil, sürecin bellekteki metni sayılır."""
+    import hashlib
 
     from src.mcp_server import sablon
-    from src.mcp_server.vendor_sync import VENDOR_DIR
 
     drafts, derleyici, _ = _yayin_ortami(tmp_path)
     taslak_id = derleyici.derle("drmahirkurt@gmail.com", "abcdef012345", ornekler.ornek("QUIZ"))["taslak_id"]
-    beklenen = _json.loads((VENDOR_DIR / "PROVENANCE.json").read_text(encoding="utf-8"))["files"][
-        "assets/module-template.html"]
+    beklenen = hashlib.sha256(sablon._patched_with_token().encode("utf-8")).hexdigest()
     assert sablon.sablon_parmak_izi() == beklenen
     assert drafts.load(taslak_id)["sablon_parmak_izi"] == beklenen
+
+
+def test_yama_degisince_eski_taslak_yayinlanmaz(tmp_path, monkeypatch):
+    """`sablon.py`'nin PATCHES/BRIDGE_JS'i değişince (vendored şablon aynı kalsa da) parmak izi değişir ve önceki
+    taslak yeniden derletilir — `git pull` ile yeniden başlatma arasındaki pencere de kapanır: bellekteki metin sayılır."""
+    from src.mcp_server import sablon
+
+    drafts, derleyici, yayinci = _yayin_ortami(tmp_path)
+    taslak_id = derleyici.derle("drmahirkurt@gmail.com", "abcdef012345", ornekler.ornek("QUIZ"))["taslak_id"]
+    once = sablon.sablon_parmak_izi()
+    yamalar = tuple((ad, capa, ek + "  /* yeni yama */\n" if ad == "ready" else ek, yer)
+                    for ad, capa, ek, yer in sablon.PATCHES)
+    monkeypatch.setattr(sablon, "PATCHES", yamalar)
+    sablon._patched_with_token.cache_clear()
+    try:
+        assert sablon.sablon_parmak_izi() != once
+        govde = yayinci.yayinla("drmahirkurt@gmail.com", taslak_id)
+        assert govde["status"] == "sablon_eski", govde
+        yeni = derleyici.derle("drmahirkurt@gmail.com", "abcdef012345", ornekler.ornek("QUIZ"))["taslak_id"]
+        assert yayinci.yayinla("drmahirkurt@gmail.com", yeni)["status"] == "ok"
+    finally:
+        monkeypatch.undo()
+        sablon._patched_with_token.cache_clear()
 
 
 @pytest.mark.parametrize("parmak_izi", [None, "0" * 64])

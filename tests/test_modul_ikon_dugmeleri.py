@@ -28,7 +28,6 @@ def _kural(secici: str) -> str:
 def test_ikon_dugmesi_lg_48_px_ve_ikonu_20_px(secici):
     govde = _kural(secici)
     assert "width:var(--tap)" in govde and "height:var(--tap)" in govde, govde
-    assert "position:relative" in govde  # ipucu düğmeye göre konumlanır
     assert re.search(r"--tap:3rem", SABLON)
     ikon = _kural(f"{secici} .cds-icon")
     assert "width:1.25rem" in ikon and "height:1.25rem" in ikon, ikon
@@ -39,25 +38,28 @@ def test_sesli_okuma_dugmesi_48_px():
 
 
 def test_ikon_dugmesinin_adi_arac_ipucunda_gecikmeli_ve_uzerine_gelinebilir():
-    """İpucu düğmenin `aria-label`'ı; kutusu dolgu dahil ölçülür (border-box), görünürlükle açılıp kapanır (yerleşim
-    hep vardır, böylece açılmadan önce çerçeveye kıstırılabilir); açılış ve kapanış 100 ms gecikmeli (@carbon/react
-    IconButton `enterDelayMs`/`leaveDelayMs`); 8 px'lik boşlukta saydam bir köprü vardır, işaretçi ipucuna inerken
-    ipucu kapanmaz (WCAG 1.4.13); etkinleştirmede kapanır (Carbon `closeOnActivation`), Esc kapatır (inceleme, Önemli 1–2)."""
-    ipucu = re.search(r"\.icon-btn::after,\.pacing-disk__dismiss::after,\.cmap-edge__remove::after\{([^}]*)\}", SABLON)
-    assert ipucu, "araç ipucu kuralı yok"
+    """İpucu düğmenin `aria-label`'ı; tek, ayrı bir `role="tooltip"` öğesidir (`#aracIpucu`, gövdenin sonunda, hiçbir
+    düğmenin içinde değil; düğmeye `aria-describedby` ile bağlanır) — ona ya da köprüsüne tıklamak düğmeyi
+    etkinleştirmez (ikinci inceleme, Önemli). Kutusu border-box; görünürlükle açılıp kapanır; açılış ve kapanış 100 ms
+    gecikmeli; 8 px'lik köprü ipucunun parçasıdır, işaretçi ipucuna inerken kapanmaz (WCAG 1.4.13); etkinleştirmede ve
+    Esc'te kapanır; JS onu çerçevenin içine yerleştirir."""
+    ipucu = re.search(r"(?m)^\.arac-ipucu\{([^}]*)\}", SABLON)
+    assert ipucu, "araç ipucu öğesinin kuralı yok"
     govde = ipucu.group(1)
-    for parca in ("content:attr(aria-label)", "box-sizing:border-box", "visibility:hidden", "opacity:0",
-                  "var(--cds-background-inverse)", "var(--cds-text-inverse)", "var(--ipucu-x"):
+    for parca in ("position:absolute", "box-sizing:border-box", "visibility:hidden", "opacity:0",
+                  "var(--cds-background-inverse)", "var(--cds-text-inverse)", "max-inline-size:min(18rem"):
         assert parca in govde, parca
-    assert "display:none" not in govde
-    acik = re.search(r"\.icon-btn\.ipucu-acik::after,[^{]*\{([^}]*)\}", SABLON)
+    acik = re.search(r"(?m)^\.arac-ipucu--acik\{([^}]*)\}", SABLON)
     assert acik and "visibility:visible" in acik.group(1) and "opacity:1" in acik.group(1)
-    kopru = re.search(r"\.icon-btn\.ipucu-acik::before,[^{]*\{([^}]*)\}", SABLON)
-    assert kopru and "inset-block-start:100%" in kopru.group(1) and "block-size:var(--sp-03)" in kopru.group(1)
-    # Açılış JS'le: :hover kuralı yok (Kanun M2.12'nin dışında kalır), gecikme hareket değildir (reduced-motion dokunmaz).
+    kopru = re.search(r"(?m)^\.arac-ipucu::before\{([^}]*)\}", SABLON)
+    assert kopru and "inset-block-end:100%" in kopru.group(1) and "block-size:var(--sp-03)" in kopru.group(1)
+    # Düğmenin kendi sahte öğesi ipucu taşımaz (isabeti düğmeye giderdi); :hover kuralı yok.
+    for secici in IKON_DUGMELERI:
+        assert not re.search(re.escape(secici) + r"[^{,]*::(?:after|before)", SABLON), secici
     assert not re.search(r"\.icon-btn:hover::after", SABLON)
     for parca in ("const IPUCU_ACIK_MS=100, IPUCU_KAPA_MS=100;", 'ev.key!=="Escape"', 'addEventListener("click"',
-                  'classList.add("ipucu-kapali")', 'style.setProperty("--ipucu-x"'):
+                  'setAttribute("role","tooltip")', '"aria-describedby"', 'document.body.appendChild(ipucu)',
+                  'getAttribute("aria-label")'):
         assert parca in SABLON, parca
 
 
@@ -77,6 +79,10 @@ def test_hotspot_bolgesinin_adi_cevabi_sizdirmaz():
     bulununca o bölgenin adına girer (WCAG 1.1.1: test için betimleyici tanım, cevap değil; inceleme, Küçük 12)."""
     assert 'r.setAttribute("aria-label", meta.label' not in SABLON
     assert re.search(r'setAttribute\("aria-label", ?`Bölge \$\{', SABLON)
+    # İkinci inceleme: numara uzamsal sıradır (kutu merkezi; soldan sağa, sonra yukarıdan aşağı), DOM sırası değil;
+    # bulunan bölge sonraki soruda da işaretli ve devre dışı kalır.
+    assert "getBoundingClientRect" in SABLON[SABLON.index("function renderHotspot"):SABLON.index("function renderTimeline")]
+    assert 'setAttribute("aria-disabled","true")' in SABLON
 
 
 def test_her_ikon_dugmesi_adli():
