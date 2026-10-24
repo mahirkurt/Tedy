@@ -53,12 +53,30 @@ BRIDGE_JS = r"""  /* ---- edupedia köprüsü ve varlıklar (ted-mcp sablon.py y
     const vid = edupediaAssetUri(v.asset, "data:video/");
     return vid ? `<figure class="viz viz--varlik"><video controls preload="none" src="${esc(vid)}" aria-label="${esc(v.alt||v.caption||"Video")}"></video>${cap}</figure>` : "";
   }
-  /* Kanun M5.14 (KB-11): yazarın ses varlığı görünür adlı, Carbon katmanında bir oynatıcıdır. */
+  /* Kanun M5.14 (KB-11, KB-49): yazarın ses varlığı görünür adlı, Carbon katmanında, şablonun kendi oynatıcısıyla çalar.
+     Carbon'da ses oynatıcı yoktur; oynatıcı Carbon bileşenlerinden kurulur (davranış: şablonun sesOynatici'si):
+     oynat/duraklat ve sessiz ghost ikon düğmeleri, konum için Slider anatomisi, mono süre, yükleniyor durumu ve
+     InlineNotification dilinde hata. <audio> denetimsiz ve görünmezdir; ses yalnız okurun eylemiyle başlar. */
   function edupediaAudio(a){
     if(!a) return "";
     const aud = edupediaAssetUri(a.asset, "data:audio/");
+    if(!aud) return "";
     const ad = esc(a.label||"Seslendirme");
-    return aud ? `<div class="edupedia-audio"><span class="edupedia-audio__ad">${icon("ic-headphones")}${ad}</span><audio class="edupedia-audio__oynatici" controls preload="none" src="${esc(aud)}" aria-label="${ad}"></audio></div>` : "";
+    const kim = "ses-" + Math.random().toString(36).slice(2,8);
+    return `<div class="edupedia-audio" role="group" aria-labelledby="${kim}" data-ses-durum="hazir">`
+      + `<span class="edupedia-audio__ad" id="${kim}">${icon("ic-headphones")}${ad}</span>`
+      + `<div class="ses-denetim">`
+      + `<button class="ses-dugme ses-oynat" type="button" aria-label="Oynat">${icon("ic-play")}</button>`
+      + `<div class="ses-kaydirici" role="slider" tabindex="0" aria-label="Konum" aria-valuemin="0" aria-valuemax="0"`
+      + ` aria-valuenow="0" aria-valuetext="0 saniye"><span class="ses-kaydirici__iz"></span>`
+      + `<span class="ses-kaydirici__dolgu"></span><span class="ses-kaydirici__tutamac"></span></div>`
+      + `<span class="ses-sure" aria-hidden="true"><span class="ses-sure__gecen">0:00</span> / <span class="ses-sure__toplam">0:00</span></span>`
+      + `<button class="ses-dugme ses-sessiz" type="button" aria-label="Seslendirmenin sesini kapat">${icon("ic-volume")}</button>`
+      + `</div>`
+      + `<p class="ses-yukleniyor" role="status" hidden><svg class="ses-donen" viewBox="0 0 16 16" aria-hidden="true" focusable="false">`
+      + `<circle cx="8" cy="8" r="6"></circle></svg><span>Yükleniyor</span></p>`
+      + `<div class="ses-hata" role="alert" hidden>${icon("ic-error-filled")}<span>Ses dosyası açılamadı</span></div>`
+      + `<audio class="edupedia-audio__kaynak" preload="metadata" src="${esc(aud)}"></audio></div>`;
   }
   const EDUPEDIA_BRIDGE = (function(){
     const embedded = window.parent !== window;

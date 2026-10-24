@@ -66,15 +66,38 @@ def test_ikon_dugmesinin_adi_arac_ipucunda_gecikmeli_ve_uzerine_gelinebilir():
     assert re.search(r'if\(metin!==ad\) b\.setAttribute\("aria-describedby","aracIpucu"\)', SABLON)
 
 
-def test_ses_oynaticisinin_renk_semasi_tema_tokenindan():
-    """`color-scheme` tema bloklarındaki token'dan gelir; bileşen kuralında `[data-theme]` seçicisi yoktur (KB-22, M4.3)."""
-    assert re.search(r"(?m)^\.edupedia-audio__oynatici\{color-scheme:var\(--tedy-renk-semasi\)\}", SABLON)
-    assert not re.search(r"\[data-theme[^\]]*\][^{]*edupedia-audio", SABLON)
-    for blok, deger in ((':root,[data-theme="g10"]{', "light"), ('[data-theme="white"]{', "light"),
-                        ('[data-theme="g100"]{', "dark")):
+def test_ses_oynaticisi_carbon_bilesenlerinden_kurulur():
+    """Kanun M5.14 (KB-49): yazarın sesi şablonun kendi oynatıcısıyla çalar; Carbon'da oynatıcı yok, bileşenlerinden
+    kurulur: ghost ikon düğmesi (oynat/duraklat, sessiz; KB-44 boyu ve ipucu), Slider anatomisi (iz 2 px
+    `--cds-border-subtle`, dolgu ve tutamaç `--cds-layer-selected-inverse`, tutamaç 14 px, odakta `--cds-interactive`
+    ve 20 px; vuruş alanı 3rem), mono tabular süre, yükleniyor ve InlineNotification dilinde hata. <audio> gizli."""
+    govde = _kural(".ses-dugme")
+    assert "inline-size:var(--tap)" in govde and "block-size:var(--tap)" in govde, govde
+    ikon = _kural(".ses-dugme .cds-icon")
+    assert "inline-size:1.25rem" in ikon and "block-size:1.25rem" in ikon, ikon
+    assert "block-size:var(--tap)" in _kural(".ses-kaydirici")
+    iz = _kural(".ses-kaydirici__iz")
+    assert "var(--cds-border-subtle)" in iz and "block-size:.125rem" in iz
+    tutamac = _kural(".ses-kaydirici__tutamac")
+    assert "var(--cds-layer-selected-inverse)" in tutamac and "inline-size:.875rem" in tutamac
+    assert re.search(r"\.ses-kaydirici:focus-visible \.ses-kaydirici__tutamac\{[^}]*var\(--cds-interactive\)", SABLON)
+    sure = _kural(".ses-sure")
+    assert "var(--font-mono)" in sure and "tabular-nums" in sure
+    hata = _kural(".ses-hata")
+    assert "var(--cds-notification-background-error)" in hata and "3px solid var(--cds-support-error)" in hata
+    assert re.search(r"@media \(forced-colors:active\)\{[^@]*\.ses-kaydirici__tutamac", SABLON)
+    # Slider'ın dolgu ve tutamaç rengi tema bloklarında (@carbon/themes 11.83.0 layerSelectedInverse).
+    for blok, deger in ((':root,[data-theme="g10"]{', "#161616"), ('[data-theme="white"]{', "#161616"),
+                        ('[data-theme="g100"]{', "#f4f4f4")):
         bas = SABLON.index(blok)
-        govde = SABLON[bas:SABLON.index("\n}", bas)]
-        assert f"--tedy-renk-semasi:{deger};" in govde, (blok, deger)
+        assert f"--cds-layer-selected-inverse:{deger};" in SABLON[bas:SABLON.index("\n}", bas)], (blok, deger)
+    # Davranış: ±5 sn, ±%10, Home/End; ipucu sistemi oynatıcı düğmelerini de kapsar; ses yalnız tıklamayla başlar.
+    for parca in ("const SES_ADIM_SN=5, SES_SAYFA_ORAN=.1;", "PageUp:t+top*SES_SAYFA_ORAN", "Home:0", "End:top",
+                  'const IPUCU=".icon-btn,.pacing-disk__dismiss,.cmap-edge__remove,.ses-dugme";'):
+        assert parca in SABLON, parca
+    oynatici = SABLON[SABLON.index("(function sesOynatici(){"):]
+    oynatici = oynatici[:oynatici.index("\n  })();")]
+    assert oynatici.count(".play()") == 1 and "autoplay" not in oynatici
 
 
 def test_hotspot_bolgesinin_adi_cevabi_sizdirmaz():
@@ -103,11 +126,16 @@ def test_her_ikon_dugmesi_adli():
 def test_yazarin_ses_varligi_sinifli_oynaticida_ve_adli():
     data, varliklar = ornekler.arac_ornegi()
     html = derleme.derle(data, varliklar, "https://tedy.online")
-    sesler = re.findall(r"<audio\b[^>]*>", html)
+    sesler = re.findall(r"<audio\b[^>]*\bsrc=[^>]*>", html)  # işaretleme (yorumlardaki <audio> sözü değil)
     assert sesler, "ses oynatıcısı yok"
     for oge in sesler:
         assert re.search(r'class="[^"]+"', oge), f"sınıfsız audio (M5.14): {oge}"
-        assert "aria-label=" in oge and "autoplay" not in oge
-    assert '<audio class="edupedia-audio__oynatici" controls' in html
-    # Denetimleri tarayıcı çizer (Carbon'un ses oynatıcı bileşeni yok); temayı token'dan izler (yukarıdaki test).
-    assert "color-scheme:var(--tedy-renk-semasi)" in SABLON
+        assert "controls" not in oge and "autoplay" not in oge, oge   # tarayıcının oynatıcısı çizilmez (KB-49)
+    assert '<audio class="edupedia-audio__kaynak" preload="metadata"' in html
+    # Oynatıcının işaretlemesi (sablon.py): adlı grup, iki ikon düğmesi, slider, gizli yükleniyor ve hata.
+    for parca in ('class="edupedia-audio" role="group" aria-labelledby="',
+                  'class="ses-dugme ses-oynat" type="button" aria-label="Oynat"',
+                  'class="ses-dugme ses-sessiz" type="button" aria-label="Seslendirmenin sesini kapat"',
+                  'class="ses-kaydirici" role="slider" tabindex="0" aria-label="Konum" aria-valuemin="0"',
+                  'class="ses-yukleniyor" role="status" hidden', 'class="ses-hata" role="alert" hidden'):
+        assert parca in html, parca

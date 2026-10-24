@@ -104,6 +104,16 @@ GORSEL_ORNEGI_ALT = "Kağnıların yanında yürüyen halk toprak bir yolda ceph
 GORSEL_ORNEGI_BASLIK = "Görsel 1.30: İstiklal Yolu yürüyüşü"
 
 
+def sessiz_wav(saniye: float = 20.0, hz: int = 4000) -> bytes:
+    """Sessiz, geçerli bir PCM WAV (8 bit, tek kanal): ses oynatıcısının e2e'sinde süre okunur ve oynatınca ilerler
+    (Kanun M5.14, KB-49). 20 saniye 4 kHz'te 80 KB."""
+    import struct
+
+    n = int(saniye * hz)
+    return (b"RIFF" + struct.pack("<I", 36 + n) + b"WAVE" + b"fmt " + struct.pack("<IHHIIHH", 16, 1, 1, hz, hz, 1, 8)
+            + b"data" + struct.pack("<I", n) + b"\x80" * n)
+
+
 def _ornek_jpeg() -> bytes:
     import io
 
@@ -179,7 +189,7 @@ def gorsel_ornegi() -> tuple[dict[str, Any], dict[str, Any]]:
     ]
     data["curriculum"] = _curriculum(["t1", "c1"])
     gorsel = _ornek_jpeg()
-    ses = b"ID3" + b"\0" * 64
+    ses = sessiz_wav()
     varliklar = {
         "a1b2c3d4e5f60718": GomuluVarlik(
             asset_id="a1b2c3d4e5f60718", tur="image", mime="image/jpeg",
@@ -189,8 +199,8 @@ def gorsel_ornegi() -> tuple[dict[str, Any], dict[str, Any]]:
             betim="Fotoğraf: kağnılarla toprak yolda yürüyen kalabalık.",
             kitap_altyazisi="Görsel 1.30: İstiklal Yolu yürüyüşü", etiket="Görsel 1.30"),
         "0f1e2d3c4b5a6978": GomuluVarlik(
-            asset_id="0f1e2d3c4b5a6978", tur="ses", mime="audio/mpeg",
-            data_uri="data:audio/mpeg;base64," + base64.b64encode(ses).decode("ascii"), bayt=len(ses),
+            asset_id="0f1e2d3c4b5a6978", tur="ses", mime="audio/wav",
+            data_uri="data:audio/wav;base64," + base64.b64encode(ses).decode("ascii"), bayt=len(ses),
             credit="Seslendirme: yapay zekâ ile üretildi (MiniMax speech-2.8-hd)", lisans="MiniMax üretimi",
             alt="", kaynak="minimax"),
     }
@@ -202,10 +212,11 @@ def gorsel_ornegi() -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 def arac_ornegi() -> tuple[dict[str, Any], dict[str, Any]]:
-    """Çerçevenin bütün ikon düğmeleri ve yazarın ses oynatıcısı (Modül Tasarım Kanunu M5.14; KB-44): ses ve sesli
-    okuma araçları, tempo diskinin gizleme düğmesi, kavram haritasında bağlantıyı kaldırma, metinsiz yazar SVG'si
-    (t1) ve etiketli şema (t3). (MODULE_DATA, varlıklar) döner; `dashboard/tests/e2e/modul-ikon-dugmeleri.spec.ts`
-    kullanır."""
+    """Çerçevenin bütün ikon düğmeleri ve yazarın ses oynatıcısı (Modül Tasarım Kanunu M5.14; KB-44, KB-49): ses ve
+    sesli okuma araçları, tempo diskinin gizleme düğmesi, kavram haritasında bağlantıyı kaldırma, metinsiz yazar
+    SVG'si (t1) ve etiketli şema (t3). t1'in sesi 20 saniyelik sessiz, geçerli bir WAV'dır (oynatınca süre ilerler),
+    t3'ünkü açılamayan bir dosyadır (hata durumu). (MODULE_DATA, varlıklar) döner;
+    `dashboard/tests/e2e/modul-ikon-dugmeleri.spec.ts` ve `modul-ses-oynatici.spec.ts` kullanır."""
     import base64
 
     from src.mcp_server.derleme import GomuluVarlik  # derleme bu modülü içe aktarır; döngü olmasın diye burada
@@ -216,13 +227,20 @@ def arac_ornegi() -> tuple[dict[str, Any], dict[str, Any]]:
     data["segments"] = sorted((s for s in data["segments"] if s["id"] in sira), key=lambda s: sira.index(s["id"]))
     data["learner"]["pacingDisk"] = True
     data["curriculum"] = _curriculum(["t1", "cm1"])
-    ses = b"ID3" + b"\0" * 64
+    ses = sessiz_wav()
+    bozuk = b"ID3" + b"\0" * 64
     varliklar = {
         "0f1e2d3c4b5a6978": GomuluVarlik(
-            asset_id="0f1e2d3c4b5a6978", tur="ses", mime="audio/mpeg",
-            data_uri="data:audio/mpeg;base64," + base64.b64encode(ses).decode("ascii"), bayt=len(ses),
+            asset_id="0f1e2d3c4b5a6978", tur="ses", mime="audio/wav",
+            data_uri="data:audio/wav;base64," + base64.b64encode(ses).decode("ascii"), bayt=len(ses),
+            credit="Seslendirme: yapay zekâ ile üretildi (MiniMax speech-2.8-hd)", lisans="MiniMax üretimi",
+            alt="", kaynak="minimax"),
+        "1f2e3d4c5b6a7980": GomuluVarlik(
+            asset_id="1f2e3d4c5b6a7980", tur="ses", mime="audio/mpeg",
+            data_uri="data:audio/mpeg;base64," + base64.b64encode(bozuk).decode("ascii"), bayt=len(bozuk),
             credit="Seslendirme: yapay zekâ ile üretildi (MiniMax speech-2.8-hd)", lisans="MiniMax üretimi",
             alt="", kaynak="minimax"),
     }
-    data["meta"]["assets"] = [{"asset_id": "0f1e2d3c4b5a6978", "slot": "t1.audio"}]
+    data["meta"]["assets"] = [{"asset_id": "0f1e2d3c4b5a6978", "slot": "t1.audio"},
+                              {"asset_id": "1f2e3d4c5b6a7980", "slot": "t3.audio"}]
     return data, varliklar

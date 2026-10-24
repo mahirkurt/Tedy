@@ -90,7 +90,8 @@ erişilebilirliği" sağlar; ikisi farklı amaçlara hizmet eder ve G-AUDIO'da a
 ### 5.1 Tasarım ilkeleri
 - **Varsayılan KAPALI, talep-üzerine.** Kulaklık ikon düğmesi (`#ttsBtn`; Carbon ghost ikon düğmesi,
   lg 48 px, ikon 20 px, araç ipucunda adı — Kanun M5.14, KB-44 kapandı; "Oku" düğmeleri de 48 px; yazarın ses varlığı
-  `<teachId>.audio` yuvasında görünür adlı bir oynatıcıdır, `.edupedia-audio`, 48 px); `data-tts="off"`
+  `<teachId>.audio` yuvasında şablonun Carbon bileşenlerinden kurulmuş oynatıcısıyla çalar — oynat/duraklat ve sessiz
+  ghost ikon düğmesi, Slider anatomisinde konum, süre, yükleniyor ve hata; tarayıcının oynatıcısı çizilmez, KB-49); `data-tts="off"`
   başlangıç değeriyle açılır. **Otomatik okuma yoktur** — hiçbir metin kullanıcı istemeden seslenmez.
 - **"Oku" düğmeleri** yalnız TTS açıkken görünür (`[data-tts="on"] .tts-oku`): `teach` anlatımı,
   soru kökü, `gloss`, `dialogue` ve `flashcard` arkası. Tek bir olay delegasyonu (`[data-speak]`).

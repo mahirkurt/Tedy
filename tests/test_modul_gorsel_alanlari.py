@@ -232,13 +232,13 @@ def test_ses_oynaticisi_carbon_dilinde_gorunur_etiketli():
     ses = _varlik("0f1e2d3c4b5a6978", tur="ses", credit="Seslendirme: yapay zekâ ile üretildi (MiniMax speech-2.8-hd)")
     data["meta"]["assets"] = [{"asset_id": ses.asset_id, "slot": f"{_teach(data)['id']}.audio"}]
     cizim = _gorselleri_ciz(derleme.derle(data, {ses.asset_id: ses}, ORIGIN))
-    assert '<div class="edupedia-audio">' in cizim
+    assert '<div class="edupedia-audio" role="group"' in cizim
     assert re.search(r'<span class="edupedia-audio__ad"[^>]*>.*Seslendirme</span>', cizim)
     sablon_metni = sablon.TEMPLATE_PATH.read_text(encoding="utf-8")
     kural = re.search(r"\.edupedia-audio\{([^}]*)\}", sablon_metni)
     assert kural, ".edupedia-audio stilsiz (M5.14)"
     assert "var(--cds-border-subtle)" in kural.group(1) and "var(--cds-layer-02)" in kural.group(1)
-    assert re.search(r"\.edupedia-audio audio\{[^}]*min-block-size:3rem", sablon_metni)  # 48 px dokunma
+    assert re.search(r"(?m)^\.ses-kaydirici\{[^}]*block-size:var\(--tap\)", sablon_metni)  # 48 px dokunma (KB-49)
 
 
 # ── KB-12 (M3.8): atıf satırı ───────────────────────────────────────────────

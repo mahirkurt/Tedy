@@ -161,16 +161,24 @@ async function herBolumuOlc(f: Frame | Page, ad: string) {
 
 /** The author's audio asset: no classless `audio`, inside the named Carbon layer, ≥ 3rem tall. */
 async function sesOynaticisi(f: Frame | Page) {
-  const sesler = await f.locator('audio').evaluateAll(as => as.map(a => ({
-    sinif: a.getAttribute('class') ?? '', katman: !!a.closest('.edupedia-audio'), ad: a.getAttribute('aria-label') ?? '',
-    gorunurAd: a.closest('.edupedia-audio')?.querySelector('.edupedia-audio__ad')?.textContent?.trim() ?? '',
-    boy: a.getBoundingClientRect().height, kok: parseFloat(getComputedStyle(document.documentElement).fontSize),
-  })))
+  // KB-49 (2026-10-24): the author's audio plays in the template's own Carbon-composed player; the browser's
+  // <audio controls> (32 px controls) is no longer drawn. The full player is measured in modul-ses-oynatici.spec.ts.
+  const sesler = await f.locator('audio').evaluateAll(as => as.map(a => {
+    const k = a.closest('.edupedia-audio')
+    const kay = k?.querySelector('[role="slider"]')?.getBoundingClientRect()
+    return {
+      sinif: a.getAttribute('class') ?? '', denetimli: a.hasAttribute('controls'), gorunur: a.getBoundingClientRect().height > 0,
+      grup: k?.getAttribute('role') ?? '', ad: (k?.getAttribute('aria-labelledby') ?? '').split(/\s+/)
+        .map(id => document.getElementById(id)?.textContent ?? '').join(' ').trim(),
+      kaydirici: kay?.height ?? 0, kok: parseFloat(getComputedStyle(document.documentElement).fontSize),
+    }
+  }))
   expect(sesler.length, 'ses oynatıcısı çizilmedi').toBeGreaterThan(0)
   for (const s of sesler) {
     expect(s.sinif.trim(), 'sınıfsız audio (M5.14)').not.toBe('')
-    expect(s.katman && s.ad !== '' && s.gorunurAd === s.ad, JSON.stringify(s)).toBe(true)
-    expect(s.boy).toBeGreaterThanOrEqual(Math.max(48, 3 * s.kok) - 0.5)
+    expect(s.denetimli || s.gorunur, `tarayıcının oynatıcısı çizildi (KB-49): ${JSON.stringify(s)}`).toBe(false)
+    expect(s.grup === 'group' && s.ad !== '', JSON.stringify(s)).toBe(true)
+    expect(s.kaydirici).toBeGreaterThanOrEqual(Math.max(48, 3 * s.kok) - 0.5)
   }
 }
 
@@ -333,7 +341,7 @@ for (const [genislik, dogrudan, ad] of GENISLIKLER.filter(([g]) => [272, 342, 39
 }
 
 for (const [genislik, dogrudan, ad] of GENISLIKLER.filter(([g]) => [272, 390, 3840].includes(g))) {
-  test(`the author's audio is a classed, named, 3rem player in the Carbon layer — ${ad}`, async ({ page }) => {
+  test(`the author's audio plays in the template's own named 3rem player, not the browser's — ${ad}`, async ({ page }) => {
     await sesOynaticisi(await ac(page, genislik, dogrudan))
   })
 }
