@@ -922,3 +922,68 @@ def test_gozlem_istemcinin_kopusunu_ve_sse_yi_gorur(caplog):
     m = _GOZLEM.match(_gozlem_satirlari(caplog)[0])
     assert (m["yontem"], m["ad"], m["durum"], m["sse"], m["koptu"]) == (
         "tools/call", "'edupedia_kapsam'", "200", "evet", "evet")
+
+
+# -- İkinci düzeltme turu (2026-10-24): 413 gözlemi, initialize kimliği ------------------------------
+
+def _kucuk_tavanli(tmp_path, store, bayrak):
+    env = {"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_MAX_BODY_BYTES": "512", "TED_MCP_PROTOKOL_2026": bayrak}
+    return TestClient(build_app(load_settings(env, project_root=tmp_path), store, _test_mcp(), json_response=True,
+                                form_secret=b"s" * 32), base_url=BASE)
+
+
+@pytest.mark.parametrize("bayrak", ["0", "1"])
+@pytest.mark.parametrize("akis", [False, True])
+def test_govde_tavani_413_gozlem_satirinda_413_yazar(tmp_path, store, caplog, bayrak, akis):
+    """BodyLimit 413 yazınca taşımanın denediği durum değil 413 görünür; akışta koptu=hayır (kopan istemci değil)."""
+    key = store.create_static_key("tavan413", FULL)
+    body, headers = _modern("tools/call", {"name": "kimim", "arguments": {}, "pad": "x" * 600}, ad="kimim")
+    headers = {**headers, "authorization": f"Bearer {key}"}
+
+    def chunks():
+        for _ in range(3):
+            yield b" " * 400
+
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        with _kucuk_tavanli(tmp_path, store, bayrak) as c:
+            r = c.post("/mcp", content=chunks(), headers=headers) if akis else c.post("/mcp", json=body, headers=headers)
+    assert r.status_code == 413
+    lines = _gozlem_satirlari(caplog)
+    assert len(lines) == 1, lines
+    m = _GOZLEM.match(lines[0])
+    assert (m["durum"], m["sse"], m["koptu"]) == ("413", "hayır", "hayır")
+
+
+@pytest.mark.parametrize("kimlik", [None, True, 1.5, [1], {"a": 1}])
+def test_kimligi_str_ya_da_int_olmayan_istek_initialize_sayilmaz(client, store, kimlik):
+    """1.28.1'in JSONRPCRequest doğrulaması gibi: id yalnız str ya da int (bool değil). Sayılmayan istek eski 400'ü alır."""
+    key = store.create_static_key("kimlik", FULL)
+    istek = {"jsonrpc": "2.0", "id": kimlik, "method": "initialize",
+             "params": {"protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}}
+    r = client.post("/mcp", json=istek, headers={**MCP_HEADERS, "authorization": f"Bearer {key}",
+                                                 "mcp-protocol-version": MODERN})
+    assert r.status_code == 400
+    assert r.content == _eski_ret_govdesi(MODERN)
+
+
+@pytest.mark.parametrize("kimlik", [0, 7, "a"])
+def test_kimligi_str_ya_da_int_olan_initialize_gecirilir(client, store, kimlik):
+    key = store.create_static_key("kimlik-ok", FULL)
+    istek = {"jsonrpc": "2.0", "id": kimlik, "method": "initialize",
+             "params": {"protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}}
+    r = client.post("/mcp", json=istek, headers={**MCP_HEADERS, "authorization": f"Bearer {key}",
+                                                 "mcp-protocol-version": MODERN})
+    assert r.status_code == 200 and r.json()["id"] == kimlik
+
+
+def test_bayrak_kapaliyken_gecirilen_initialize_gozlemde_yontemini_soyler(client, store, caplog):
+    """mcp-method başlığı olmasa da kapının geçirdiği initialize gözlem satırında yontem='initialize' yazar:
+    canlıda claude.ai'nin geri düşüş initialize'ının 2026 başlığı taşıyıp taşımadığını bu satır gösterir."""
+    key = store.create_static_key("init-gozlem", FULL)
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        r = client.post("/mcp", json=_rpc("initialize", {"protocolVersion": "2025-11-25", "capabilities": {},
+                                                          "clientInfo": {"name": "t", "version": "0"}}),
+                        headers={**MCP_HEADERS, "authorization": f"Bearer {key}", "mcp-protocol-version": MODERN})
+    assert r.status_code == 200
+    m = _GOZLEM.match(_gozlem_satirlari(caplog)[0])
+    assert (m["yontem"], m["durum"], m["koptu"]) == ("initialize", "200", "hayır")

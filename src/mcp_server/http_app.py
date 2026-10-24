@@ -395,14 +395,33 @@ class TransportRejectLogMiddleware:
                 logger.warning("mcp_reddedildi durum=%s surum=%r mesaj=%r", seen["status"], version,
                                _reject_reason(seen["body"]))
             if modern:
-                # Başlamış ama son parçası yazılmamış yanıt da kopuş sayılır (istemci ya da ara katman kesti).
-                koptu = seen["koptu"] or (seen["status"] is not None and not seen["bitti"])
-                ad = _header_or_none(scope, b"mcp-name")
-                logger.info("mcp_modern yontem=%r ad=%r surum=%r durum=%s sure_ms=%d sse=%s koptu=%s",
-                            _header(scope, b"mcp-method")[:40], ad[:64] if ad else None,
-                            _header(scope, b"mcp-protocol-version"), seen["status"],
-                            int((time.monotonic() - start) * 1000),
-                            "evet" if seen["sse"] else "hayır", "evet" if koptu else "hayır")
+                if (scope.get("state") or {}).get(_GOVDE_TAVANI):
+                    # 413'ü dıştaki BodyLimitMiddleware yazdı; taşımanın denediği yanıt düşürüldü. Akışın
+                    # kesilmesi de onun eseri (yapay http.disconnect), istemcinin kopuşu değil.
+                    _modern_gozlem(scope, 413, start, sse=False, koptu=False)
+                else:
+                    # Başlamış ama son parçası yazılmamış yanıt da kopuş sayılır (istemci ya da ara katman kesti).
+                    _modern_gozlem(scope, seen["status"], start, sse=seen["sse"],
+                                   koptu=seen["koptu"] or (seen["status"] is not None and not seen["bitti"]))
+
+
+# BodyLimitMiddleware 413 yazdığında scope["state"]'e koyduğu işaret (gözlem satırı 413'ü buradan bilir).
+_GOVDE_TAVANI = "ted_govde_tavani"
+# Protokol2026Kapisi bir initialize'ı el sıkışma yoluna geçirdiğinde koyduğu işaret.
+_GECIRILEN_INITIALIZE = "ted_initialize"
+
+
+def _modern_gozlem(scope: Scope, durum: int | None, baslangic: float, sse: bool, koptu: bool) -> None:
+    """2026-07-28 başlıklı isteğin INFO gözlem satırı; başlık modern değilse hiçbir şey yazmaz."""
+    if _header_or_none(scope, b"mcp-protocol-version") not in MODERN_PROTOCOL_VERSIONS:
+        return
+    yontem = _header(scope, b"mcp-method")[:40]
+    if not yontem and (scope.get("state") or {}).get(_GECIRILEN_INITIALIZE):
+        yontem = "initialize"
+    ad = _header_or_none(scope, b"mcp-name")
+    logger.info("mcp_modern yontem=%r ad=%r surum=%r durum=%s sure_ms=%d sse=%s koptu=%s",
+                yontem, ad[:64] if ad else None, _header(scope, b"mcp-protocol-version"), durum,
+                int((time.monotonic() - baslangic) * 1000), "evet" if sse else "hayır", "evet" if koptu else "hayır")
 
 
 def _eski_surum_reddi(surum: str) -> Response:
@@ -420,7 +439,11 @@ def _initialize_mi(govde: bytes) -> bool:
         mesaj = json.loads(govde)
     except (ValueError, RecursionError):
         return False
-    return isinstance(mesaj, dict) and mesaj.get("method") == "initialize" and "id" in mesaj
+    if not (isinstance(mesaj, dict) and mesaj.get("method") == "initialize"):
+        return False
+    # 1.28.1'in JSONRPCRequest doğrulaması gibi: id yalnız str ya da int (bool, null, kesirli sayı değil).
+    kimlik = mesaj.get("id")
+    return isinstance(kimlik, str) or (isinstance(kimlik, int) and not isinstance(kimlik, bool))
 
 
 class Protokol2026Kapisi:
@@ -463,6 +486,8 @@ class Protokol2026Kapisi:
                                 return {"type": "http.request", "body": govde, "more_body": False}
                             return await receive()
 
+                        # İşaret kopyadan önce: sığ kopya aynı state sözlüğünü paylaşır, gözlem satırı görür.
+                        scope.setdefault("state", {})[_GECIRILEN_INITIALIZE] = True
                         basliklar = [(k, v) for k, v in scope["headers"] if k != b"mcp-protocol-version"]
                         await self.app({**scope, "headers": basliklar}, yeniden_oynat, send)
                         return
@@ -498,7 +523,10 @@ class BodyLimitMiddleware:
             return
         declared = _header(scope, b"content-length")
         if declared.isascii() and declared.isdigit() and int(declared) > limit:
+            scope.setdefault("state", {})[_GOVDE_TAVANI] = True
             await _send_too_large(send)
+            # Uygulama (ve içindeki gözlem katmanı) hiç çağrılmadığı için satırı burada yazar.
+            _modern_gozlem(scope, 413, time.monotonic(), sse=False, koptu=False)
             return
 
         received = 0
@@ -515,6 +543,7 @@ class BodyLimitMiddleware:
                 if received > limit:
                     rejected = True
                     if not response_started:
+                        scope.setdefault("state", {})[_GOVDE_TAVANI] = True
                         await _send_too_large(send)
                     return {"type": "http.disconnect"}
             return message
