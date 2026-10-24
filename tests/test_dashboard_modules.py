@@ -305,11 +305,33 @@ def test_arsiv_yaniti_oturum_ve_rol_kapisindan_sonra_gelir(client, tmp_path):
     assert client.get("/api/modules/fen5-su/v1/aciklama").status_code == 403
 
 
-def test_arsivlenmis_surume_ilerleme_yazilmaz_ama_eski_kayit_silinmez(client, tmp_path):
+def test_arsivlenmis_surumun_ilerlemesi_okunur_ve_yazilir_kaldirilmis_ve_bilinmeyen_404(client, tmp_path):
+    """İnceleme turu 1, Önemli: öğrenci v1'deyken v2 yayınlanır ve v1 arşivlenir; açık oturumun ilerleme kaydı sürer
+    (kayıt sürüm başınadır ve arşivlenmiş sürümün kaydı silinmez). Zaman penceresi yok. Kaldırılmış ve bilinmeyen
+    sürüm 404 kalır."""
     sign_in(client, FULL)
-    assert client.post("/api/modules/fen5-su/progress", json=_event(version=1)).status_code == 200
-    _katalog(tmp_path, [_row("fen5-su", 1, "archived"), _row("fen5-su", 2)])
-    assert client.post("/api/modules/fen5-su/progress", json=_event(version=1)).status_code == 404
-    assert client.get("/api/modules/fen5-su/progress?version=1").status_code == 404
+    assert client.post("/api/modules/fen5-su/progress", json=_event(version=1, item=0)).status_code == 200
+    _katalog(tmp_path, [_row("fen5-su", 1, "archived"), _row("fen5-su", 2), _row("fen5-su", 3, "removed")])
+    saved = client.post("/api/modules/fen5-su/progress", json=_event(version=1, item=1))
+    assert saved.status_code == 200
+    assert saved.get_json()["state"] == {"answers": ["q1#0", "q1#1"], "done": [], "xp": 15}
+    got = client.get("/api/modules/fen5-su/progress?version=1")
+    assert got.status_code == 200 and got.get_json() == {"state": {"answers": ["q1#0", "q1#1"], "done": [], "xp": 15}}
+    assert got.headers["Cache-Control"] == "no-store"
     data = json.loads((tmp_path / "module_progress.json").read_text(encoding="utf-8"))
-    assert data["moduller"]["fen5-su"]["v1"]["kisiler"][mt.email_hash(FULL)]["cevaplar"]
+    assert set(data["moduller"]["fen5-su"]["v1"]["kisiler"][mt.email_hash(FULL)]["cevaplar"]) == {"q1#0", "q1#1"}
+    for surum in (3, 9):  # kaldırılmış, bilinmeyen
+        assert client.post("/api/modules/fen5-su/progress", json=_event(version=surum)).status_code == 404
+        assert client.get(f"/api/modules/fen5-su/progress?version={surum}").status_code == 404
+    assert "v3" not in data["moduller"]["fen5-su"] and "v9" not in data["moduller"]["fen5-su"]
+
+
+def test_arsivlenmis_surumun_ilerleme_ucu_oturum_ve_rol_kapisini_korur(client, tmp_path):
+    _katalog(tmp_path, [_row("fen5-su", 1, "archived"), _row("fen5-su", 2)])
+    headers = {"Authorization": "Bearer tdyK_test"}
+    assert client.get("/api/modules/fen5-su/progress?version=1", headers=headers).status_code == 403
+    assert client.post("/api/modules/fen5-su/progress", json=_event(version=1), headers=headers).status_code == 403
+    sign_in(client, READER)
+    assert client.get("/api/modules/fen5-su/progress?version=1").status_code == 403
+    assert client.post("/api/modules/fen5-su/progress", json=_event(version=1)).status_code == 403
+    assert not (tmp_path / "module_progress.json").exists()

@@ -5505,6 +5505,16 @@ def _module_active_record(slug, version):
     return record if record and record.get("status") == "active" else None
 
 
+def _module_progress_record(slug, version):
+    """İlerleme uçlarının kabul ettiği sürüm (inceleme turu 1, 2026-10-24): yayındaki ve arşivlenmiş sürüm. Öğrenci
+    v6'dayken v7 yayınlanıp v6 arşivlenince açık oturumun kaydı sürer; kayıt zaten sürüm başınadır ve arşivlenmiş
+    sürümün kaydı silinmez, bu yüzden zaman penceresi yok. Kaldırılmış ve bilinmeyen sürüm yok sayılır (404)."""
+    if not module_store.valid_slug(slug) or not module_store.valid_version(version):
+        return None
+    record = module_store.find_record(OUTPUT_DIR, slug, version)
+    return record if record and record.get("status") in ("active", "archived") else None
+
+
 def _module_archived_response(slug, version):
     """Arşivlenmiş sürüm (2026-10-24): bilet ve açıklama yerine 410 ve güncel sürümün numarası; yayında
     sürüm kalmadıysa `guncel: null` (sayfa "Bu modül artık yayında değil." der). Arşiv değilse None."""
@@ -5798,7 +5808,7 @@ def module_progress_get(slug):
     version = request.args.get("version", type=int)
     if not module_store.valid_slug(slug) or not module_store.valid_version(version):
         return jsonify({"error": "gecersiz_olay:modul"}), 400
-    if _module_active_record(slug, version) is None:
+    if _module_progress_record(slug, version) is None:
         return jsonify({"error": "not_found"}), 404
     state = _module_progress_store().state_for(module_ticket.email_hash(email), slug, version)
     return _no_store({"state": state})
@@ -5821,7 +5831,7 @@ def module_progress_save(slug):
     version = payload.get("version")
     if not module_store.valid_slug(slug) or not module_store.valid_version(version):
         return jsonify({"error": "gecersiz_olay:modul"}), 400
-    if _module_active_record(slug, version) is None:
+    if _module_progress_record(slug, version) is None:
         return jsonify({"error": "not_found"}), 404
     try:
         event = module_progress.validate_event(payload, slug, version)
