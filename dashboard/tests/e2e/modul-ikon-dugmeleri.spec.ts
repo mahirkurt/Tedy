@@ -235,7 +235,8 @@ async function ipucuSozlesmesi(f: Frame | Page, page: Page, ad: string) {
     await page.mouse.move(ofset.x + Math.min(Math.max(x, hedef.sol + 4), hedef.sag - 4), ofset.y + y)
     if (!(await ipucu(f, '#ttsBtn')).gorunur) kapananlar.push(Math.round(y - kutu.y - kutu.h))
   }
-  await page.waitForTimeout(300)
+  // Past the 100 ms close delay: a close the walk scheduled and nothing cancelled fires now (it would close it).
+  await page.clock.runFor(300)
   expect(kapananlar, `${ad}: işaretçi ipucuna inerken ipucu kapandı (düğmenin altından px)`).toEqual([])
   expect((await ipucu(f, '#ttsBtn')).gorunur, `${ad}: işaretçi ipucunun üstündeyken ipucu kapandı`).toBe(true)
   await page.mouse.move(1, 1)
@@ -246,7 +247,8 @@ async function ipucuSozlesmesi(f: Frame | Page, page: Page, ad: string) {
   await expect.poll(async () => (await ipucu(f, '#soundBtn')).gorunur).toBe(true)
   await f.locator('#soundBtn').click()
   await expect.poll(async () => (await ipucu(f, '#soundBtn')).gorunur, `${ad}: etkinleştirme ipucunu kapatmadı`).toBe(false)
-  await page.waitForTimeout(250)
+  // Past the 100 ms open delay: an opening scheduled around the activation fires now (it would reopen it).
+  await page.clock.runFor(250)
   expect((await ipucu(f, '#soundBtn')).gorunur, `${ad}: etkinleştirmeden sonra ipucu yeniden açıldı`).toBe(false)
   await page.mouse.move(1, 1)
   await f.locator('#soundBtn').hover()
@@ -288,6 +290,39 @@ async function ipucuKutulari(f: Frame | Page, page: Page, ad: string) {
   await dugumler.nth(0).press('Enter')
   await dugumler.nth(1).press('Enter')
   await olc('.cmap-edge__remove')
+}
+
+/** The tooltip's delays are JS timers (100 ms, `aracIpucu`). Tests that must wait past them install Playwright's clock
+ * before the page loads — time still flows, so polls work — and wait with `page.clock.runFor`, which fires every timer
+ * due in that span in the page and in the module's frame at once: "it did not close / did not reopen" becomes a
+ * deterministic statement instead of a guess about load (suite-hygiene: no fixed waits). */
+async function saatliAc(page: Page, genislik: number, dogrudan: boolean): Promise<Frame | Page> {
+  await page.clock.install()
+  return ac(page, genislik, dogrudan)
+}
+
+/** The shared tooltip is open (element shown and marked open). */
+async function ipucuAcik(f: Frame | Page): Promise<boolean> {
+  return f.evaluate(() => {
+    const t = document.getElementById('aracIpucu')
+    return !!t && !t.hidden && t.classList.contains('arac-ipucu--acik')
+  })
+}
+
+/** Counts clicks that reach the module's document, so a test that expects "nothing happened" first proves its click
+ * arrived (a positive signal), and returns what the click actually hit. */
+async function tiklamaSayaci(f: Frame | Page) {
+  await f.evaluate(() => {
+    const w = window as unknown as { tik: { sayi: number; hedef: string } }
+    w.tik = { sayi: 0, hedef: '' }
+    document.addEventListener('click', ev => {
+      if (!ev.isTrusted) return   // the reader's own clicks only, not one a script forwards
+      const h = ev.target as Element
+      w.tik.sayi += 1
+      w.tik.hedef = h.id ? `#${h.id}` : (h.closest('#aracIpucu') ? '#aracIpucu' : h.className?.toString() ?? h.tagName)
+    }, true)
+  })
+  return () => f.evaluate(() => (window as unknown as { tik: { sayi: number; hedef: string } }).tik)
 }
 
 /** Opens the module directly as a frame of `genislik` (`dogrudan`) or in the dashboard's flow layout at screen `genislik`. */
@@ -336,7 +371,7 @@ for (const genislik of [272, 320, 342, 390]) {
 
 for (const [genislik, dogrudan, ad] of GENISLIKLER.filter(([g]) => [272, 342, 390, 1440, 3840].includes(g))) {
   test(`the tools name themselves in a tooltip on hover and focus, Escape closes it — ${ad}`, async ({ page }) => {
-    await ipucuSozlesmesi(await ac(page, genislik, dogrudan), page, ad)
+    await ipucuSozlesmesi(await saatliAc(page, genislik, dogrudan), page, ad)
   })
 }
 
@@ -356,7 +391,7 @@ async function panodaAc(page: Page, genislik: number) {
 // tooltip's button.
 for (const genislik of [342, 390, 1024]) {
   test(`a click under the first remove button's open tooltip leaves the first link — frame ${genislik}`, async ({ page }) => {
-    const f = await ac(page, genislik, true)
+    const f = await saatliAc(page, genislik, true)
     for (let i = 0; i < segmentSayisi - 1; i++) await f.locator('#nextBtn').click()
     const dugumler = f.locator('.cmap-node')
     for (const i of [0, 1, 2, 3]) await dugumler.nth(i).press('Enter')
@@ -367,35 +402,49 @@ for (const genislik of [342, 390, 1024]) {
     await kaldir.nth(1).scrollIntoViewIfNeeded()
     const r1 = (await kaldir.nth(0).boundingBox())!, r2 = (await kaldir.nth(1).boundingBox())!
     const x = r1.x + r1.width / 2
-    // A fixed wait rather than a poll on the tooltip element, so the same steps also run against the earlier
-    // pseudo-element tooltip (the review's reproduction) and fail there for the right reason.
+    // The clock is driven past the 100 ms open delay rather than polling the tooltip element, so the steps do not
+    // depend on how the tooltip is built (the review reproduced the bug against the earlier pseudo-element tooltip).
     await page.mouse.move(x, r1.y + r1.height / 2)
-    await page.waitForTimeout(250)
+    await page.clock.runFor(250)
     for (let y = r1.y + r1.height / 2; y <= r2.y + 8; y += 2) await page.mouse.move(x, y)
+    // Positive signals first: the tooltip is open and the click arrives on it (over the second remove button).
+    expect(await ipucuAcik(f), `çerçeve ${genislik}: ipucu açık değil, tıklama onun üstüne düşmüyor`).toBe(true)
+    const tik = await tiklamaSayaci(f)
     await page.mouse.down()
     await page.mouse.up()
-    await page.waitForTimeout(250)
+    await expect.poll(async () => (await tik()).sayi).toBe(1)
+    expect((await tik()).hedef, `çerçeve ${genislik}: tıklama ipucuna düşmedi`).toBe('#aracIpucu')
+    await expect.poll(() => ipucuAcik(f), `çerçeve ${genislik}: ipucuna tıklama ipucunu kapatmadı`).toBe(false)
+    await page.clock.runFor(250)   // any timer the click scheduled has run
     const sonra = await baglantilar()
     expect(sonra, `çerçeve ${genislik}: ipucunun altına tıklama 1. bağlantıyı sildi`).toContain(once[0])
   })
 }
 
 test('a click on the content under the open sound tooltip leaves the sound as it was', async ({ page }) => {
-  const f = await ac(page, 390, true)
+  const f = await saatliAc(page, 390, true)
   await expect(f.locator('#soundBtn')).toHaveAttribute('aria-label', 'Sesi kapat')
   const d = (await f.locator('#soundBtn').boundingBox())!
   await page.mouse.move(d.x + d.width / 2, d.y + d.height / 2)
-  await page.waitForTimeout(250)
+  await page.clock.runFor(250)   // past the 100 ms open delay
+  expect(await ipucuAcik(f), 'ses ipucu açılmadı').toBe(true)
   // Down through the bridge onto the tooltip (over the content below the button: 8 px gap + half its height), click.
   const hedefY = d.y + d.height + 8 + 11
   for (let y = d.y + d.height / 2; y <= hedefY; y += 2) await page.mouse.move(d.x + d.width / 2, y)
+  const tik = await tiklamaSayaci(f)
   await page.mouse.down()
   await page.mouse.up()
-  await page.waitForTimeout(250)
+  // Positive signals: the click arrived, on the tooltip, and closed it (its only effect); then the clock runs on.
+  await expect.poll(async () => (await tik()).sayi).toBe(1)
+  expect((await tik()).hedef, 'tıklama ipucuna düşmedi').toBe('#aracIpucu')
+  await expect.poll(() => ipucuAcik(f), 'ipucuna tıklama ipucunu kapatmadı').toBe(false)
+  await page.clock.runFor(250)
   await expect(f.locator('#soundBtn')).toHaveAttribute('aria-label', 'Sesi kapat')
   // Lower, on the content under where the tooltip ends: still no toggle.
   await page.mouse.click(d.x + d.width / 2, hedefY + 16)
-  await page.waitForTimeout(150)
+  await expect.poll(async () => (await tik()).sayi).toBe(2)
+  expect((await tik()).hedef).not.toBe('#soundBtn')
+  await page.clock.runFor(150)
   await expect(f.locator('#soundBtn')).toHaveAttribute('aria-label', 'Sesi kapat')
 })
 
