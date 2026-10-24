@@ -396,7 +396,7 @@ HTML/CSS karşılıkları) sadık biçimde uygular. Eşleme:
 | **Tag** | `.def-term` (ders ailesinin tag çifti + `tag-border`, hover `tag-hover`), `.adim-sayaci` (nötr adım etiketi) — `border-radius-max` | `--subject-surface/on-surface/border`, `layer-01` |
 | **Definition tooltip** | `.def-pop` — Carbon ters yüzey popover, `shadow-menu` | `background-inverse`, `text-inverse`, `shadow` |
 | **Button (primary/ghost)** | `.btn--primary` (Blue 60), `.btn--ghost`; kare, lg 48 px, expressive tür, etiket sola yaslı, ikon etiketten sonra, ghost çerçevesiz (Kanun M2.2; ghost'un 1 px kenarı ve soldaki ikon borç KB-19); hover/active `background-hover/active` | `button-primary-*`, `background-*` |
-| **Icon button (ghost)** | `.icon-btn` — kare, lg 48 px, ikon 20 px, araç ipucunda adı (Kanun M5.14; bugün 40 px, borç KB-44); bantta hover `tedy-brand-hover`, açık durum beyaz zemin + lacivert ikon | `tedy-brand-hover`, `text-on-color` |
+| **Icon button (ghost)** | `.icon-btn` — kare, lg 48 px, ikon 20 px, araç ipucunda adı (Kanun M5.14, KB-44 kapandı: `--tap`, ipucu düğmenin `aria-label`'ı, Esc kapatır; tempo kapatma ve kavram haritasında bağlantı kaldırma da); bantta hover `tedy-brand-hover`, açık durum beyaz zemin + lacivert ikon | `tedy-brand-hover`, `text-on-color` |
 | **Data-viz** | `vizChart()` / `vizTable()` — `--viz-1..5` nötr rampa, kategoriyi yerinde etiket taşır (KS-3); özet ekranında halka grafik yok (S43) | `--viz-*` |
 | **Skeleton** | (rezerve) yüklenme iskeleti | `skeleton-*` |
 

@@ -200,6 +200,81 @@ test('a figure laid out wide re-lays its SVG out when the frame narrows', async 
   expect(hatalar).toEqual([])
 })
 
+// Modül Tasarım Kanunu M5.6 (KB-48, 2026-10-24): an author's own SVG keeps the author's viewBox, so the template
+// cannot fit its text to the frame — measured 2026-10-23 on the golden QUIZ example's diagram: 6.1 px at frame 288,
+// 8.3 px at 358. The compiler now refuses SVG text in author markup and the golden examples carry none: the names
+// moved to the caption and body (t1, a text-free `visual.kind:"svg"`) or to the labelled diagram's `labels` (t3, a
+// numbered pin the template sizes ≥ 12 px plus an HTML list). Measured on the goldens' teach segments, the way the
+// law measures, at every phone frame.
+let altinHtml = ''
+let altinSegment = 0
+test.describe('author SVG (KB-48)', () => {
+  test.beforeAll(() => {
+    const out = join(mkdtempSync(join(tmpdir(), 'tedy-yazar-svg-')), 'modul.html')
+    altinSegment = Number(execFileSync(PYTHON, ['-c', [
+      'import sys', 'from src.mcp_server import derleme, ornekler',
+      "d = ornekler.ornek('MODULE')",
+      "d['segments'] = [s for s in d['segments'] if s['type'] == 'teach']",
+      `open(sys.argv[1], 'w').write(derleme.derle(d, {}, ${JSON.stringify(ORIGIN)}))`,
+      "print(len(d['segments']))",
+    ].join('\n'), out], { cwd: REPO, encoding: 'utf8' }).trim())
+    altinHtml = readFileSync(out, 'utf8')
+  })
+
+  for (const genislik of [272, 288, 342, 358]) {
+    test(`the golden examples' author figures draw no SVG text under 12 px in a ${genislik} px frame`, async ({ page }) => {
+      await serveModule(page)
+      await page.route('https://modul.tedy.online/**', r => r.fulfill({
+        status: 200, contentType: 'text/html; charset=utf-8', body: altinHtml,
+        headers: { 'content-security-policy': SPEC_CSP, 'x-content-type-options': 'nosniff', 'cache-control': 'no-store' },
+      }))
+      await page.setViewportSize({ width: genislik, height: 900 })
+      await page.goto(MODUL)
+      let figur = 0
+      for (let i = 0; i < altinSegment; i++) {
+        const bolum = (await page.locator('#stage h2').textContent()) ?? ''
+        figur += await page.locator('#stage figure.viz svg').count()
+        await expect.poll(async () => (await svgMetinleri(page)).filter(o => o.px < 12 - 1e-6), {
+          message: `çerçeve ${genislik}: «${bolum}» yazar figüründe 12 px altında SVG metni`, timeout: 4000,
+        }).toEqual([])
+        expect(await cakisanMetinler(page), `çerçeve ${genislik}: «${bolum}»`).toEqual([])
+        if (i < altinSegment - 1) await page.locator('#nextBtn').click()
+      }
+      expect(figur, 'altın örneklerin yazar figürleri çizilmedi').toBeGreaterThanOrEqual(2)
+      if (GORUNTU && genislik === 288) {
+        mkdirSync(GORUNTU, { recursive: true })
+        await page.screenshot({ path: join(GORUNTU, `yazar-svg-son-288.png`), fullPage: true })
+      }
+    })
+  }
+
+  if (GORUNTU) {
+    for (const genislik of [390, 1440]) {
+      test(`eye check screenshots of the golden author figures at ${genislik} px`, async ({ page }) => {
+        await serveModule(page)
+        await page.route('https://modul.tedy.online/**', r => r.fulfill({
+          status: 200, contentType: 'text/html; charset=utf-8', body: altinHtml,
+          headers: { 'content-security-policy': SPEC_CSP, 'x-content-type-options': 'nosniff', 'cache-control': 'no-store' },
+        }))
+        await page.setViewportSize({ width: genislik, height: 1000 })
+        await page.goto('/moduller/fen5-su/v1')
+        await expect.poll(() => page.frame({ url: /modul\.tedy\.online/ }) !== null).toBe(true)
+        const f = page.frame({ url: /modul\.tedy\.online/ })!
+        await expect(f.locator('html')).toHaveAttribute('data-host-layout', 'flow')
+        mkdirSync(GORUNTU, { recursive: true })
+        for (let i = 0; i < altinSegment; i++) {
+          await expect.poll(async () => (await svgMetinleri(f)).filter(o => o.px < 12 - 1e-6)).toEqual([])
+          if (await f.locator('#stage figure.viz').count()) {
+            await f.locator('#stage figure.viz').first().scrollIntoViewIfNeeded()
+            await page.screenshot({ path: join(GORUNTU, `yazar-svg-${i + 1}-${genislik}.png`), fullPage: true })
+          }
+          if (i < altinSegment - 1) await f.locator('#nextBtn').click()
+        }
+      })
+    }
+  }
+})
+
 test('the raster figure carries a visible caption and the reader-facing alt text', async ({ page }) => {
   await serveModule(page)
   await page.setViewportSize({ width: 390, height: 900 })

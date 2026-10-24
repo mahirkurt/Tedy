@@ -121,6 +121,9 @@ def build_server(tools: Tools) -> FastMCP:
         (kitap_altyazisi), etiket ya da çerçeve sayfaları — yapay zekâ betiminde (betim) geçmek yetmez; geçmiyorsa
         status alt_metin_dayanaksiz döner, nedenini alt_gerekce'ye (en az 20 karakter) yazarsan derleme uyarıyla
         (uyarilar) geçer. Ses yuvası bu alanları almaz.
+        Yazar SVG'si (visual.kind:"svg", şemanın base'i, hotspot svg'si) metin öğesi taşımaz (<text>, <tspan>,
+        <textPath>, <foreignObject>): viewBox yazarındır, metin dar ekranda 12 px'in altına düşer. Adları etiketli
+        şemanın labels'ına (numaralı iğne + liste) ya da gövde metnine ve altyazıya yaz; aksi sema_hatasi.
         Atıf satırını derleyici yazar (baslik — atıf). HTML dönmez; taslak_id, kapı özeti ve FAIL/WARN ayrıntıları
         döner."""
         email = caller_email(ctx)

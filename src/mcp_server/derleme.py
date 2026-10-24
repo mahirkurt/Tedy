@@ -523,12 +523,43 @@ def varlik_zorunluluk_hatalari(data: Any, varliklar: Mapping[str, GomuluVarlik])
     return errors
 
 
+# Kanun M5.6 (KB-48, 2026-10-24): SVG'de yazı çizen öğeler. `svg:` gibi bir ad alanı öneki ve `<` ile ad arasındaki
+# boşluk da sayılır; `&lt;text&gt;` sayılmaz (innerHTML onu öğe değil düz yazı olarak çizer) ve `<textarea>` gibi
+# yalnız adı benzeyen öğe `\b` yüzünden eşleşmez. `title` ve `desc` çizilmez, erişilebilir addır; serbesttir.
+_SVG_METIN_RE = re.compile(r"<\s*(?:[A-Za-z][\w.-]*:)?(?:text|tspan|textPath|foreignObject)\b", re.I)
+YAZAR_SVG_METNI = ("yazar SVG'si metin taşımaz ({oge}): viewBox yazarındır, şablon onu kutunun genişliğine "
+                   "kuramaz ve metin dar ekranda 12 px'in altına düşer (Kanun M5.6, KB-48). Şekiller SVG'de kalır; "
+                   "adları etiketli şemanın `labels`'ına yaz (visual.kind:\"labeled\" ya da diagram segmenti: "
+                   "numaralı iğne + liste) ya da gövde metnine ve altyazıya (caption) taşı")
+
+
+def yazar_svg_hatalari(data: Any) -> list[str]:
+    """Kanun M5.6 (KB-48): MODULE_DATA'nın hiçbir dizgesi SVG metin öğesi taşımaz. Yazarın kendi çizdiği SVG
+    (`visual.kind:"svg"`'nin `ref`'i, etiketli şemanın `base`'i, `hotspot`'un `svg`'si, gövdeye gömülü SVG) kendi
+    viewBox'ında çizilir; şablon onu kutuya göre kuramaz, metni büyütürse yazarın şekilleriyle çakışır. Ad ve
+    etiket şablonun çizdiği yere gider: etiketli şemanın `labels`'ı (iğne numarası ≥ 12 px, ad HTML listede) ya
+    da gövde metni. Dizi öğelerine bölünmüş etiket de yakalanır (motor `body`'yi birleştirip çizer)."""
+    errors = []
+    for path, text in _walk_strings(data):
+        m = _SVG_METIN_RE.search(text)
+        if m:
+            errors.append(f"{path}: " + YAZAR_SVG_METNI.format(oge="<" + m.group(0).lstrip("<").strip() + ">"))
+    yakalanan = {e.split(":", 1)[0] for e in errors}
+    for path, joined in _walk_string_lists(data):
+        m = _SVG_METIN_RE.search(joined)
+        if m and not any(p.startswith(path + "[") for p in yakalanan):
+            errors.append(f"{path}[*]: " + YAZAR_SVG_METNI.format(oge="<" + m.group(0).lstrip("<").strip() + ">"))
+    return errors[:20]
+
+
 def girdi_hatalari(data: Any, varliklar: Mapping[str, GomuluVarlik] | None = None) -> list[str]:
-    """Derlemeden önce MODULE_DATA'nın bütün hataları tek listede: şema, içerik güvenliği, varlık alanları."""
+    """Derlemeden önce MODULE_DATA'nın bütün hataları tek listede: şema, içerik güvenliği, varlık alanları,
+    yazar SVG'sinin metni (Kanun M5.6, KB-48)."""
     errors = sema_dogrula(data)
     if isinstance(data, dict):
         errors += guvenlik_tara(data)
         errors += varlik_zorunluluk_hatalari(data, varliklar or {})
+        errors += yazar_svg_hatalari(data)
     return errors
 
 

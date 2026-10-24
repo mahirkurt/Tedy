@@ -57,7 +57,7 @@ BRIDGE_JS = r"""  /* ---- edupedia köprüsü ve varlıklar (ted-mcp sablon.py y
     if(!a) return "";
     const aud = edupediaAssetUri(a.asset, "data:audio/");
     const ad = esc(a.label||"Seslendirme");
-    return aud ? `<div class="edupedia-audio"><span class="edupedia-audio__ad">${icon("ic-headphones")}${ad}</span><audio controls preload="none" src="${esc(aud)}" aria-label="${ad}"></audio></div>` : "";
+    return aud ? `<div class="edupedia-audio"><span class="edupedia-audio__ad">${icon("ic-headphones")}${ad}</span><audio class="edupedia-audio__oynatici" controls preload="none" src="${esc(aud)}" aria-label="${ad}"></audio></div>` : "";
   }
   const EDUPEDIA_BRIDGE = (function(){
     const embedded = window.parent !== window;

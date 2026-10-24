@@ -109,22 +109,21 @@ Kaynaktaki bir kavram bespoke diyagram gerektirdiğinde (mevcut piktogram yetmez
   girmez (M1.5).
 - **Geometri:** Geometrik, sade, kavramsal — fotogerçekçi değil. Carbon
   pictogram estetiğini taklit et (temiz formlar, yuvarlatılmış köşeler).
-- **Etiketler:** Diyagram parçaları `<text>` ile etiketlenir; yazı tipini ve rengini CSS
-  verir (`.viz text`). Metin ekranda en az 12 px çizilir (Kanun M5.6); etiket çizgileri
-  ince (1px), `var(--viz-axis)`.
+- **Etiketler:** Yazar SVG'si metin taşımaz (Kanun M5.6, KB-48): viewBox yazarındır, şablon onu
+  kutuya göre kuramaz ve `<text>` dar ekranda 12 px'in altına düşer; `edupedia_derle` metin öğesini
+  reddeder. Parça adları etiketli şemanın `labels`'ına gider (`visual.kind:"labeled"` ya da `diagram`:
+  şekil `base`'te, şablon iğneyi ≥ 12 px çizer, adı HTML listede yazar); köşe ve kenar harfleri
+  (A, B, a) `labels[].n` ile iğnenin içine yazılır. Etiket çizgileri ince (1px), `var(--viz-axis)`.
 - **Boşluk:** Ferah; öğeler kalabalık değil (dış yük, ped İlke 5).
 
 **Örnek iskelet (etiketli kavram diyagramı):**
-```html
-<svg class="viz" viewBox="0 0 480 320" role="img" aria-labelledby="t1 d1">
-  <title id="t1">Bitki hücresi</title>
-  <desc id="d1">Hücre duvarı, çekirdek ve kloroplastları gösteren basit şema.</desc>
-  <rect x="40" y="40" width="400" height="240" rx="16"
-        fill="var(--cds-layer-02)" stroke="var(--viz-2)" stroke-width="2"/>
-  <circle cx="240" cy="160" r="44" fill="var(--cds-layer-01)" stroke="var(--cds-text-primary)" stroke-width="2"/>
-  <text x="240" y="166" text-anchor="middle">Çekirdek</text>
-  <!-- ek organeller + etiket çizgileri (1px, var(--viz-axis)) -->
-</svg>
+```js
+visual:{ kind:"labeled", title:"Bitki hücresi", viewBox:"0 0 480 320",
+  desc:"Hücre duvarı, çekirdek ve kloroplastları gösteren basit şema.",
+  base:`<rect x="40" y="40" width="400" height="240" rx="16"
+          fill="var(--cds-layer-02)" stroke="var(--viz-2)" stroke-width="2"/>
+        <circle cx="240" cy="160" r="44" fill="var(--cds-layer-01)" stroke="var(--cds-text-primary)" stroke-width="2"/>`,
+  labels:[ {x:268, y:132, text:"Çekirdek"} ] }   // ek organeller base'te, adları labels'ta
 ```
 **Kural:** Çizilen şema kaynaktaki bilgiyi temsil eder; **kaynakta olmayan yapı/
 etiket eklenmez** (SKILL.md §7). Şema bir "süs" değil, ikili kodlama aracıdır.

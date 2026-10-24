@@ -65,8 +65,8 @@
       ],
       "visual": {
         "kind": "svg",
-        "caption": "Şekil 1 — Maddenin üç hâlinde tanecik düzeni: katıda sıkı ve düzenli, sıvıda gevşek, gazda dağınık.",
-        "ref": "\n<svg viewBox=\"0 0 480 200\" role=\"img\" aria-labelledby=\"v1t v1d\">\n  <title id=\"v1t\">Maddenin üç hâlinde tanecik düzeni</title>\n  <desc id=\"v1d\">Katıda tanecikler sıkı ve düzenli, sıvıda gevşek, gazda dağınıktır.</desc>\n  <g>\n    <rect x=\"20\" y=\"30\" width=\"120\" height=\"120\" rx=\"12\" fill=\"var(--accent-tint)\" stroke=\"var(--accent)\" stroke-width=\"2\"/>\n    <text x=\"80\" y=\"178\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"600\">Katı</text>\n    <circle cx=\"44\" cy=\"54\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"72\" cy=\"54\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"100\" cy=\"54\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"128\" cy=\"54\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"44\" cy=\"82\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"72\" cy=\"82\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"100\" cy=\"82\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"128\" cy=\"82\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"44\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"72\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"100\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"128\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"44\" cy=\"138\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"72\" cy=\"138\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"100\" cy=\"138\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"128\" cy=\"138\" r=\"9\" fill=\"var(--accent)\"/>\n  </g>\n  <g>\n    <rect x=\"180\" y=\"30\" width=\"120\" height=\"120\" rx=\"12\" fill=\"var(--accent-tint)\" stroke=\"var(--accent)\" stroke-width=\"2\"/>\n    <text x=\"240\" y=\"178\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"600\">Sıvı</text>\n    <circle cx=\"200\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"230\" cy=\"120\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"262\" cy=\"108\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"212\" cy=\"80\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"248\" cy=\"86\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"280\" cy=\"118\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"224\" cy=\"98\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"266\" cy=\"76\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"284\" cy=\"90\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"206\" cy=\"134\" r=\"9\" fill=\"var(--accent)\"/>\n  </g>\n  <g>\n    <rect x=\"340\" y=\"30\" width=\"120\" height=\"120\" rx=\"12\" fill=\"var(--accent-tint)\" stroke=\"var(--accent)\" stroke-width=\"2\"/>\n    <text x=\"400\" y=\"178\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"600\">Gaz</text>\n    <circle cx=\"360\" cy=\"60\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"420\" cy=\"52\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"386\" cy=\"96\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"440\" cy=\"90\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"366\" cy=\"130\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"410\" cy=\"128\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"396\" cy=\"72\" r=\"9\" fill=\"var(--accent)\"/>\n  </g>\n</svg>"
+        "caption": "Şekil 1 — Soldan sağa katı, sıvı ve gaz: tanecikler katıda sıkı ve düzenli, sıvıda gevşek, gazda dağınık.",
+        "ref": "\n<svg viewBox=\"0 0 480 180\" role=\"img\" aria-labelledby=\"v1t v1d\">\n  <title id=\"v1t\">Maddenin üç hâlinde tanecik düzeni</title>\n  <desc id=\"v1d\">Soldan sağa katı, sıvı ve gaz: katıda tanecikler sıkı ve düzenli, sıvıda gevşek, gazda dağınıktır.</desc>\n  <g>\n    <rect x=\"20\" y=\"30\" width=\"120\" height=\"120\" rx=\"12\" fill=\"var(--accent-tint)\" stroke=\"var(--accent)\" stroke-width=\"2\"/>\n    <circle cx=\"44\" cy=\"54\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"72\" cy=\"54\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"100\" cy=\"54\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"128\" cy=\"54\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"44\" cy=\"82\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"72\" cy=\"82\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"100\" cy=\"82\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"128\" cy=\"82\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"44\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"72\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"100\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"128\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"44\" cy=\"138\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"72\" cy=\"138\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"100\" cy=\"138\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"128\" cy=\"138\" r=\"9\" fill=\"var(--accent)\"/>\n  </g>\n  <g>\n    <rect x=\"180\" y=\"30\" width=\"120\" height=\"120\" rx=\"12\" fill=\"var(--accent-tint)\" stroke=\"var(--accent)\" stroke-width=\"2\"/>\n    <circle cx=\"200\" cy=\"110\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"230\" cy=\"120\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"262\" cy=\"108\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"212\" cy=\"80\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"248\" cy=\"86\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"280\" cy=\"118\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"224\" cy=\"98\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"266\" cy=\"76\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"284\" cy=\"90\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"206\" cy=\"134\" r=\"9\" fill=\"var(--accent)\"/>\n  </g>\n  <g>\n    <rect x=\"340\" y=\"30\" width=\"120\" height=\"120\" rx=\"12\" fill=\"var(--accent-tint)\" stroke=\"var(--accent)\" stroke-width=\"2\"/>\n    <circle cx=\"360\" cy=\"60\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"420\" cy=\"52\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"386\" cy=\"96\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"440\" cy=\"90\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"366\" cy=\"130\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"410\" cy=\"128\" r=\"9\" fill=\"var(--accent)\"/><circle cx=\"396\" cy=\"72\" r=\"9\" fill=\"var(--accent)\"/>\n  </g>\n</svg>"
       }
     },
     {
@@ -205,9 +205,44 @@
         }
       ],
       "visual": {
-        "kind": "svg",
+        "kind": "labeled",
+        "title": "Su döngüsü şeması",
+        "desc": "Güneş suyu buharlaştırır, buhar bulut olur, yağış düşer, su toplanır.",
         "caption": "Şekil 2 — Su döngüsü: buharlaşma, yoğuşma (bulut), yağış ve toplanma.",
-        "ref": "\n<svg viewBox=\"0 0 480 300\" role=\"img\" aria-labelledby=\"v3t v3d\">\n  <title id=\"v3t\">Su döngüsü şeması</title>\n  <desc id=\"v3d\">Güneş suyu buharlaştırır, buhar bulut olur, yağış düşer, su toplanır.</desc>\n  <circle cx=\"70\" cy=\"55\" r=\"26\" fill=\"var(--viz-sun)\" stroke=\"var(--viz-axis)\" stroke-width=\"2\"/>\n  <text x=\"70\" y=\"60\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"600\">Güneş</text>\n  <path d=\"M300 70 q18 -16 40 0 q22 -6 30 14 q18 4 6 22 h-92 q-14 -16 16 -36 z\" fill=\"var(--viz-cloud)\" stroke=\"var(--viz-axis)\" stroke-width=\"2\"/>\n  <text x=\"330\" y=\"100\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"600\">Bulut</text>\n  <path d=\"M40 250 q120 -28 400 0 v40 h-400 z\" fill=\"var(--accent-tint)\" stroke=\"var(--accent)\" stroke-width=\"2\"/>\n  <text x=\"110\" y=\"278\" font-size=\"14\" font-weight=\"600\">Deniz / Göl</text>\n  <path d=\"M140 240 C150 170 170 150 250 130\" fill=\"none\" stroke=\"var(--accent)\" stroke-width=\"2.4\" stroke-dasharray=\"2 6\" stroke-linecap=\"round\" marker-end=\"url(#vz-arrow)\"/>\n  <text class=\"viz-muted\" x=\"150\" y=\"200\" font-size=\"13\" font-weight=\"600\">buharlaşma</text>\n  <g stroke=\"var(--viz-water)\" stroke-width=\"2.4\" stroke-linecap=\"round\">\n    <line x1=\"320\" y1=\"135\" x2=\"312\" y2=\"160\"/><line x1=\"340\" y1=\"135\" x2=\"332\" y2=\"162\"/><line x1=\"360\" y1=\"135\" x2=\"352\" y2=\"158\"/>\n  </g>\n  <text class=\"viz-muted\" x=\"372\" y=\"150\" font-size=\"13\" font-weight=\"600\">yağış</text>\n  <path d=\"M395 165 C405 200 400 225 360 245\" fill=\"none\" stroke=\"var(--accent)\" stroke-width=\"2.4\" stroke-linecap=\"round\" marker-end=\"url(#vz-arrow)\"/>\n  <text class=\"viz-muted\" x=\"402\" y=\"210\" font-size=\"13\" font-weight=\"600\">toplanma</text>\n</svg>"
+        "viewBox": "0 0 480 300",
+        "base": "\n  <circle cx=\"70\" cy=\"55\" r=\"26\" fill=\"var(--viz-sun)\" stroke=\"var(--viz-axis)\" stroke-width=\"2\"/>\n  <path d=\"M300 70 q18 -16 40 0 q22 -6 30 14 q18 4 6 22 h-92 q-14 -16 16 -36 z\" fill=\"var(--viz-cloud)\" stroke=\"var(--viz-axis)\" stroke-width=\"2\"/>\n  <path d=\"M40 250 q120 -28 400 0 v40 h-400 z\" fill=\"var(--accent-tint)\" stroke=\"var(--accent)\" stroke-width=\"2\"/>\n  <path d=\"M140 240 C150 170 170 150 250 130\" fill=\"none\" stroke=\"var(--accent)\" stroke-width=\"2.4\" stroke-dasharray=\"2 6\" stroke-linecap=\"round\" marker-end=\"url(#vz-arrow)\"/>\n  <g stroke=\"var(--viz-water)\" stroke-width=\"2.4\" stroke-linecap=\"round\">\n    <line x1=\"320\" y1=\"135\" x2=\"312\" y2=\"160\"/><line x1=\"340\" y1=\"135\" x2=\"332\" y2=\"162\"/><line x1=\"360\" y1=\"135\" x2=\"352\" y2=\"158\"/>\n  </g>\n  <path d=\"M395 165 C405 200 400 225 360 245\" fill=\"none\" stroke=\"var(--accent)\" stroke-width=\"2.4\" stroke-linecap=\"round\" marker-end=\"url(#vz-arrow)\"/>",
+        "labels": [
+          {
+            "x": 96,
+            "y": 80,
+            "text": "Güneş"
+          },
+          {
+            "x": 336,
+            "y": 94,
+            "text": "Bulut"
+          },
+          {
+            "x": 120,
+            "y": 272,
+            "text": "Deniz ya da göl"
+          },
+          {
+            "x": 168,
+            "y": 196,
+            "text": "Buharlaşma"
+          },
+          {
+            "x": 382,
+            "y": 146,
+            "text": "Yağış"
+          },
+          {
+            "x": 418,
+            "y": 206,
+            "text": "Toplanma"
+          }
+        ]
       }
     },
     {

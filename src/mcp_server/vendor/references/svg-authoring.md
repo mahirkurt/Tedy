@@ -7,7 +7,9 @@ SVG**'dir (harici kütüphane/CDN bağımlılığı yok). Motor üç yol sunar:
 
 1. **`vizChart(spec)`** — çubuk/çizgi grafik (veri → SVG). Otomatik tema-duyarlı + erişilebilir.
 2. **`svgFigure(inner, caption)`** — herhangi bir özel SVG'yi başlıklı, çerçeveli figüre sarar.
-3. **Ham `visual.kind:"svg"`** — `teach` segmentinde özgün diyagram; aşağıdaki kurallara uymalı.
+3. **Ham `visual.kind:"svg"`** — `teach` segmentinde özgün diyagram; aşağıdaki kurallara uymalı ve **metin taşımaz**
+   (§1, Kanun M5.6, KB-48). Adı şeklin üstünde gereken şema etiketli şemadır (`visual.kind:"labeled"` ya da
+   `diagram` segmenti: `base` yalnız şekil, adlar `labels`'ta).
 
 ---
 
@@ -16,22 +18,31 @@ SVG**'dir (harici kütüphane/CDN bağımlılığı yok). Motor üç yol sunar:
 | Kural | Nasıl |
 | --- | --- |
 | **Responsive** | Sabit `width/height` yerine `viewBox="0 0 W H"`; CSS `max-width:100%`. |
-| **Tema-duyarlı** | Renkleri **asla ham hex** verme. Yalnız `var(--cds-*)` ve `var(--viz-*)` kullan (Kanun §1 madde 1, M4.7): ör. `var(--cds-border-strong)`, nötr rampa `var(--viz-1..5)`, anlamsal `var(--viz-sun/water/cloud)`. Ders rengi (`--accent`) yazar SVG'sine girmez (M1.5). Metin rengini hiç verme — `.viz text` otomatik `--cds-text-primary` yapar; ikincil etiket için `class="viz-muted"`. |
+| **Tema-duyarlı** | Renkleri **asla ham hex** verme. Yalnız `var(--cds-*)` ve `var(--viz-*)` kullan (Kanun §1 madde 1, M4.7): ör. `var(--cds-border-strong)`, nötr rampa `var(--viz-1..5)`, anlamsal `var(--viz-sun/water/cloud)`. Ders rengi (`--accent`) yazar SVG'sine girmez (M1.5). Metin rengi yazarın işi değildir: yazar SVG'si metin taşımaz (aşağıda **Sakin**). |
 | **Erişilebilir** | Bilgi taşıyan SVG: `role="img"` + `<title id>` + (gerekirse) `<desc id>` + `aria-labelledby`. Salt-dekor SVG: `aria-hidden="true"`. |
-| **Sakin** | Animasyon yok; hareket yalnız okurun eylemine cevaptır ve motorun işidir (Kanun M2.10). Metin ekranda en az 12 px çizilir (M5.6): şablonun çizicileri (grafik, sayı doğrusu, kesir, etiketli şema, simülasyon) viewBox'ı kutunun genişliğine kurar; yazar SVG'si kuramaz (KB-48), bu yüzden etiketi SVG'nin içine yazma — `diagram` (numaralı iğne + liste) ya da gövde metni kullan. |
+| **Sakin** | Animasyon yok; hareket yalnız okurun eylemine cevaptır ve motorun işidir (Kanun M2.10). Metin ekranda en az 12 px çizilir (M5.6): şablonun çizicileri (grafik, sayı doğrusu, kesir, etiketli şema, simülasyon) viewBox'ı kutunun genişliğine kurar; yazar SVG'sinde viewBox yazarındır ve kurulamaz. Bu yüzden **yazar SVG'si metin taşımaz** — `visual.kind:"svg"`'nin `ref`'i, etiketli şemanın `base`'i, `hotspot`'un `svg`'si ve gövdeye gömülü SVG'de `<text>`, `<tspan>`, `<textPath>` ya da `<foreignObject>` olursa `edupedia_derle` `sema_hatasi` döner (Kanun M5.6, KB-48). Ad ve etiketi etiketli şemanın `labels`'ına yaz (şablon iğne numarasını kutunun ölçeğinde ≥ 12 px çizer, adı HTML listede yazar) ya da gövde metnine ve altyazıya (`caption`) taşı. `<title>` ve `<desc>` çizilmez, erişilebilir addır; kalır. |
 
 İskelet:
 ```html
 <svg class="viz" viewBox="0 0 480 240" role="img" aria-labelledby="t1 d1">
   <title id="t1">Kısa başlık</title>
   <desc id="d1">Görseli sözle betimleyen bir-iki cümle.</desc>
-  <!-- şekiller: fill="var(--viz-2)" stroke="var(--viz-axis)" ... -->
-  <text x="…" y="…">Etiket</text>            <!-- rengi CSS verir -->
-  <text class="viz-muted" x="…" y="…">alt</text>
+  <!-- yalnız şekil: fill="var(--viz-2)" stroke="var(--viz-axis)" ... ; metin öğesi yok (KB-48) -->
 </svg>
 ```
-`teach` görselinde bunu doğrudan `visual:{ kind:"svg", caption:"Şekil 1 — …", ref:`…` }`
-ile ver; motor `svgFigure` ile başlık/çerçeve/altyazıyı ekler.
+`teach` görselinde bunu doğrudan `visual:{ kind:"svg", caption:"Şekil 1 — Soldan sağa …", ref:`…` }`
+ile ver; motor `svgFigure` ile başlık/çerçeve/altyazıyı ekler. Panellerin adını altyazı ve gövde söyler
+("Soldan sağa katı, sıvı ve gaz: …").
+
+Adı şeklin üstünde gereken şema — hücrenin bölümleri, su döngüsünün aşamaları — etiketli şemadır:
+```js
+visual:{ kind:"labeled", title:"Su döngüsü şeması", desc:"…", caption:"Şekil 2 — …", viewBox:"0 0 480 300",
+  base:`<circle cx="70" cy="55" r="26" fill="var(--viz-sun)" stroke="var(--viz-axis)" stroke-width="2"/>…`,
+  labels:[ {x:96, y:80, text:"Güneş"}, {x:336, y:94, text:"Bulut"}, … ] }
+```
+`base` yalnız şekil taşır; `labels[].x/y` viewBox koordinatıdır ve iğne oraya oturur. Dar ekranda iğne
+büyür (yarıçapı en çok ~26 birim): iki iğne arasında en az 52 birim bırak, iğneyi şeklin kenarına koy ki
+şekli örtmesin. Ayrı bir görüntüleme segmenti olarak `{ type:"diagram", … }` de aynı alanları alır.
 
 ---
 
@@ -53,13 +64,15 @@ motorun çapalarına aittir; yazar SVG'sinde kullanılmaz (Kanun M1.5).
 
 Aşağıdaki desenler `viewBox` koordinatlarıyla, hep token-renkli kurulur.
 
-1. **Etiketli parçalar (labeled parts):** Bir nesne + ok/çizgi ile etiketler. Hücre,
-   çiçek, devre, harita. `line` + `text`; oklar için `marker-end="url(#vz-arrow)"` (bkz. §3.1).
+1. **Etiketli parçalar (labeled parts):** Bir nesne ve parçalarının adları. Hücre,
+   çiçek, devre, harita. Etiketli şema (`visual.kind:"labeled"` / `diagram`): şekil `base`'te, adlar
+   `labels`'ta; oklar için `marker-end="url(#vz-arrow)"` (bkz. §3.1).
 2. **Döngü (cycle):** Dairesel akış (su döngüsü, yaşam döngüsü). Aşama kutuları +
-   eğri `path` oklar + uç için `marker-end="url(#vz-arrow)"` (`stroke-dasharray` ile akış hissi). Örnek: ana modüldeki su döngüsü.
+   eğri `path` oklar + uç için `marker-end="url(#vz-arrow)"` (`stroke-dasharray` ile akış hissi); aşama adları
+   `labels`'ta. Örnek: ana modüldeki su döngüsü (etiketli şema).
 3. **Süreç/akış (process):** Soldan sağa adımlar; kutu → ok → kutu. Düz `path`/`line` + `marker-end="url(#vz-arrow)"`.
 4. **Karşılaştırma (compare):** Yan yana 2–3 panel (katı/sıvı/gaz gibi). Eş ölçekli `rect`
-   çerçeveler + içerik. Örnek: ana modüldeki tanecik düzeni.
+   çerçeveler + içerik; panel adları altyazıda ("Soldan sağa …"). Örnek: ana modüldeki tanecik düzeni.
 5. **Sayı doğrusu (number line):** Yatay eksen + işaretler; kesir/tam sayı/işlem.
 6. **Parça-bütün (part–whole):** Bölünmüş dikdörtgen ya da daire dilimleri (kesir, yüzde).
    Kesir ve oranda daire yerine `fractionBar` çubuk modeli yeğlenir.
@@ -112,7 +125,7 @@ otomatik hizalama, otomatik renk. Eksen/sayı-doğrusu okları da aynı marker'�
 ## 5. Erişilebilirlik ve kontrast
 
 - Renk **tek** ayırt edici olmamalı: etiket/şekil + renk birlikte. CVD güvenli paletten seç.
-- Metin ≥ 11px; ana etiket `--cds-text-primary`, ikincil `--cds-text-secondary` (`viz-muted`).
+- Yazar SVG'si metin taşımaz (§1, KB-48); şablonun çizdiği metin her genişlikte ≥ 12 px'tir (Kanun M5.6).
 - `<title>` kısa ad, `<desc>` görseli sözle anlatır (grafikte veriyi özetler).
 - Dekoratif çizgiler/ızgara için ekran-okuyucuya bilgi taşıma; tek `role="img"` + başlık yeter.
 

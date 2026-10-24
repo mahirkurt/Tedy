@@ -65,11 +65,14 @@ yoksa/`false` ise render **byte-için-byte** değişmez — tam mekanik/erişile
 ayrıntısı `interaction-patterns.md` §14, motor ayrıntısı `module-architecture.md`.
 
 ### c) Geometri SVG (özgün, kurallı)
-`visual:{ kind:"svg", … }` ile `svg-authoring.md` kurallarına göre çiz:
-- Dik açı için **kare işaret**, açı için yay; köşe etiketleri (A/B/C), kenar etiketleri (a/b/c).
+`visual:{ kind:"labeled", … }` (harfli şekil) ya da metinsiz `visual:{ kind:"svg", … }` ile `svg-authoring.md`
+kurallarına göre çiz:
+- Dik açı için **kare işaret**, açı için yay; köşe (A/B/C) ve kenar (a/b/c) harfleri SVG'ye `<text>` ile
+  yazılmaz (Kanun M5.6, KB-48): şekli etiketli şemanın `base`'ine çiz, harfleri `labels[].n` ile iğneye yaz
+  (`{x, y, n:"A", text:"A köşesi"}`; şablon iğneyi her genişlikte ≥ 12 px çizer).
 - Renk: gövde `var(--cds-layer-02)` dolgu + `var(--viz-2)` kenar; yardımcı çizgiler `var(--viz-axis)`.
   Ders rengi (`--accent`) yazar SVG'sine girmez (Kanun §1 madde 1, M1.5).
-- Metin rengini CSS verir; `class="viz"`, `role="img"`, `<title>`/`<desc>` zorunlu.
+- Yazar SVG'si metin taşımaz; `class="viz"`, `role="img"`, `<title>`/`<desc>` zorunlu.
 
 ### d) Değer tablosu
 Doğrusal kural/fonksiyon için `table` segmenti veya `visual.kind:"table"` (Carbon DataTable);

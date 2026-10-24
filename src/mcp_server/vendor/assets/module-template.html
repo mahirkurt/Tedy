@@ -458,15 +458,16 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .pacing-disk__ring{flex:none;width:1.75rem;height:1.75rem}  /* öznitelikte 28 px: CSS boyutu olmadan 4K'da yerinde kalırdı */
 .pacing-disk__track{fill:none;stroke:var(--tedy-brand-rule);stroke-width:3}
 .pacing-disk__arc{fill:none;stroke:var(--cds-text-on-color);stroke-width:3;stroke-linecap:round}
-.pacing-disk__dismiss{width:1.375rem;height:1.375rem;border:none;background:transparent;color:var(--cds-text-on-color);
+.pacing-disk__dismiss{position:relative;width:var(--tap);height:var(--tap);border:none;background:transparent;color:var(--cds-text-on-color);
   cursor:pointer;display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius-btn)}
 .pacing-disk__dismiss:hover{background:var(--tedy-brand)}
 .pacing-disk__dismiss:focus-visible{outline:2px solid var(--cds-text-on-color);outline-offset:2px}
-.pacing-disk__dismiss .cds-icon{width:.8rem;height:.8rem}
-/* yardımcı düğmeler — Carbon ghost ikon düğme dili (kare), ince ayraçla */
+.pacing-disk__dismiss .cds-icon{width:1.25rem;height:1.25rem}
+/* yardımcı düğmeler — Carbon ghost ikon düğmesi (kare), ince ayraçla: lg 48 px = --tap (3rem; 4K'da kökle büyür),
+   ikon 20 px, adı araç ipucunda (Kanun M5.14, KB-44; Button — specifications #size). */
 .topbar__tools{display:inline-flex;align-items:center;gap:var(--sp-02);max-width:100%;flex-wrap:wrap;
   padding-left:var(--sp-03);border-left:1px solid var(--tedy-brand-rule)}
-.icon-btn{width:2.5rem;height:2.5rem;border:none;background:transparent;cursor:pointer;color:var(--cds-text-on-color);
+.icon-btn{position:relative;width:var(--tap);height:var(--tap);border:none;background:transparent;cursor:pointer;color:var(--cds-text-on-color);
   display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius-btn);
   transition:background var(--dur-fast) var(--ease-std)}
 .icon-btn:hover,.icon-btn:active{background:var(--tedy-brand-hover)}
@@ -474,6 +475,23 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .icon-btn .cds-icon{width:1.25rem;height:1.25rem}
 .topbar .icon-btn--on{background:var(--cds-text-on-color);color:var(--tedy-brand)}
 .topbar .icon-btn--on .cds-icon{color:var(--tedy-brand)}
+/* Araç ipucu (Kanun M5.14, KB-44): çerçevedeki her ikon düğmesinin adı, fareyle üzerine gelince ve klavye odağında
+   düğmenin altında görünür, Esc ile kapanır, odak düğmede kalır (talimatname §4.3; Tooltip — accessibility
+   #annotate-the-text-for-the-tooltip). Metin düğmenin kendi aria-label'ıdır: ad değişince ("Sesi kapat" ↔ "Sesi aç")
+   ipucu da değişir, ikinci bir kaynak yoktur. Carbon ikon ipucu ölçüsü (@carbon/styles 1.117.0
+   components/tooltip/_tooltip.scss:26-29, 46-47, 85-104, icon-tooltip): ters yüzey, body-compact-01, dolgu 2 × 16 px, düğmeden 8 px, en çok 18rem. Düğmenin satır sonuna
+   yaslanır (araçlar sağdadır), çerçeveden taşmaz; ipucu düğmenin parçası olduğu için üstüne gelince kapanmaz. */
+.icon-btn::after,.pacing-disk__dismiss::after,.cmap-edge__remove::after{content:attr(aria-label);display:none;
+  position:absolute;inset-block-start:calc(100% + var(--sp-03));inset-inline-end:0;z-index:30;
+  inline-size:max-content;max-inline-size:min(18rem,calc(100vw - 2rem));padding:var(--sp-01) var(--sp-05);
+  border-radius:var(--cds-border-radius-02);background:var(--cds-background-inverse);color:var(--cds-text-inverse);
+  font-family:var(--font-sans);font-size:var(--fs-label);line-height:1.28572;letter-spacing:.16px;font-weight:400;
+  text-align:start;white-space:normal;overflow-wrap:anywhere}
+@media (any-hover:hover){  /* Kanun M2.12: :hover yalnız fareli girişte */
+  .icon-btn:hover::after,.pacing-disk__dismiss:hover::after,.cmap-edge__remove:hover::after{display:block}
+}
+.icon-btn:focus-visible::after,.pacing-disk__dismiss:focus-visible::after,.cmap-edge__remove:focus-visible::after{display:block}
+.icon-btn.ipucu-kapali::after,.pacing-disk__dismiss.ipucu-kapali::after,.cmap-edge__remove.ipucu-kapali::after{display:none}
 
 /* --- KATMAN 2 · Durum şeridi (nötr Carbon layer-01) --- */
 .topbar__status{background:var(--cds-layer-01);padding:var(--sp-05) var(--sp-06);
@@ -618,6 +636,10 @@ figure.viz img,figure.viz video{display:block;max-width:100%;height:auto;margin:
   color:var(--cds-text-secondary)}
 .edupedia-audio__ad .cds-icon{width:1.25rem;height:1.25rem;fill:var(--cds-icon-secondary)}
 .edupedia-audio audio{flex:1 1 16rem;inline-size:100%;min-block-size:3rem}
+/* Carbon'un ses oynatıcı bileşeni yok; denetimleri tarayıcı çizer. color-scheme onları panonun temasına uydurur
+   (g100'de koyu denetimler). */
+.edupedia-audio__oynatici{color-scheme:light}
+:root[data-theme="g100"] .edupedia-audio__oynatici{color-scheme:dark}
 .viz text{fill:var(--cds-text-primary);font-family:var(--font-sans)}
 .viz .viz-muted{fill:var(--cds-text-secondary)}
 .viz .viz-axis{stroke:var(--viz-axis)}
@@ -905,13 +927,13 @@ figure.viz img,figure.viz video{display:block;max-width:100%;height:auto;margin:
 .cmap-edge--extra{box-shadow:inset 0 0 0 1.5px var(--cds-support-info)}
 .cmap-edge--extra .cmap-edge__mark{color:var(--cds-support-info)}
 .cmap-edge__text{flex:1;font-size:var(--fs-compact);color:var(--cds-text-primary)}
-.cmap-edge__remove{flex:none;width:2.5rem;height:2.5rem;border:none;background:transparent;cursor:pointer;
+.cmap-edge__remove{position:relative;flex:none;width:var(--tap);height:var(--tap);border:none;background:transparent;cursor:pointer;
   color:var(--cds-icon-secondary);display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius-btn);
   transition:background var(--dur-fast) var(--ease-std)}
 .cmap-edge__remove:hover:not([disabled]){background:var(--cds-background-hover);color:var(--cds-support-error)}
 .cmap-edge__remove:focus-visible{outline:2px solid var(--cds-focus);outline-offset:2px}
 .cmap-edge__remove[disabled]{cursor:default;color:var(--cds-icon-disabled)}
-.cmap-edge__remove .cds-icon{width:1rem;height:1rem}
+.cmap-edge__remove .cds-icon{width:1.25rem;height:1.25rem}
 .cmap-check{margin:var(--sp-05) 0}
 /* ===== işlevsel renk: etkinlik-tipine göre wayfinding (signaling) — tek modül, tek renk =====
    Etkinlik tipini renk ailesi değil, aynı ders ailesinin TONU imler: "senin sıran" segmentleri
@@ -1045,7 +1067,7 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 .tts-row{margin:var(--sp-04) 0 0}
 [data-tts="off"] .tts-row{display:none}
 .tts-oku{display:none;align-items:center;gap:var(--sp-03);font-family:var(--font-sans);font-size:var(--fs-label);
-  min-height:2.25rem;padding:0 var(--sp-05);border:none;border-radius:var(--radius-btn);cursor:pointer;
+  min-height:var(--tap);padding:0 var(--sp-05);border:none;border-radius:var(--radius-btn);cursor:pointer;
   background:var(--cds-layer-02);box-shadow:inset 0 0 0 1px var(--cds-border-strong);color:var(--cds-text-primary)}
 [data-tts="on"] .tts-oku{display:inline-flex}
 .tts-oku:hover{background:var(--cds-layer-hover-01);box-shadow:inset 0 0 0 1px var(--cds-border-strong-01)}
@@ -1200,23 +1222,22 @@ const MODULE_DATA = {
         {term:"sıvı", def:"Hacmi belli, şekli bulunduğu kaba göre değişen hâl."},
         {term:"gaz", def:"Şekli ve hacmi belli olmayan, her yere yayılan hâl."}
       ],
-      visual:{ kind:"svg", caption:"Şekil 1 — Maddenin üç hâlinde tanecik düzeni: katıda sıkı ve düzenli, sıvıda gevşek, gazda dağınık.", ref:`
-<svg viewBox="0 0 480 200" role="img" aria-labelledby="v1t v1d">
+      // Yazar SVG'si metin taşımaz (Kanun M5.6, KB-48): viewBox yazarındır, metin dar ekranda 12 px'in altına
+      // düşer. Panellerin adı altyazıda ve gövdede; adı şeklin üstünde gereken şema etiketli şemadır (t3).
+      visual:{ kind:"svg", caption:"Şekil 1 — Soldan sağa katı, sıvı ve gaz: tanecikler katıda sıkı ve düzenli, sıvıda gevşek, gazda dağınık.", ref:`
+<svg viewBox="0 0 480 180" role="img" aria-labelledby="v1t v1d">
   <title id="v1t">Maddenin üç hâlinde tanecik düzeni</title>
-  <desc id="v1d">Katıda tanecikler sıkı ve düzenli, sıvıda gevşek, gazda dağınıktır.</desc>
+  <desc id="v1d">Soldan sağa katı, sıvı ve gaz: katıda tanecikler sıkı ve düzenli, sıvıda gevşek, gazda dağınıktır.</desc>
   <g>
     <rect x="20" y="30" width="120" height="120" rx="12" fill="var(--accent-tint)" stroke="var(--accent)" stroke-width="2"/>
-    <text x="80" y="178" text-anchor="middle" font-size="15" font-weight="600">Katı</text>
     ${[...Array(16)].map((_,i)=>`<circle cx="${44+(i%4)*28}" cy="${54+Math.floor(i/4)*28}" r="9" fill="var(--accent)"/>`).join("")}
   </g>
   <g>
     <rect x="180" y="30" width="120" height="120" rx="12" fill="var(--accent-tint)" stroke="var(--accent)" stroke-width="2"/>
-    <text x="240" y="178" text-anchor="middle" font-size="15" font-weight="600">Sıvı</text>
     ${[[200,110],[230,120],[262,108],[212,80],[248,86],[280,118],[224,98],[266,76],[284,90],[206,134]].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="9" fill="var(--accent)"/>`).join("")}
   </g>
   <g>
     <rect x="340" y="30" width="120" height="120" rx="12" fill="var(--accent-tint)" stroke="var(--accent)" stroke-width="2"/>
-    <text x="400" y="178" text-anchor="middle" font-size="15" font-weight="600">Gaz</text>
     ${[[360,60],[420,52],[386,96],[440,90],[366,130],[410,128],[396,72]].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="9" fill="var(--accent)"/>`).join("")}
   </g>
 </svg>` } },
@@ -1278,25 +1299,24 @@ const MODULE_DATA = {
         "<ul><li><b>Buharlaşma:</b> Güneş, deniz ve göllerdeki suyu ısıtır; su buhar olup yükselir.</li><li><b>Yoğuşma:</b> Yükselen buhar soğuyup bulutları oluşturur.</li><li><b>Yağış:</b> Bulutlardan yağmur ya da kar düşer.</li><li><b>Toplanma:</b> Sular tekrar deniz, göl ve yeraltına döner. Döngü baştan başlar.</li></ul>"
       ],
       keyTerms:[{term:"su döngüsü", def:"Suyun buharlaşma, yoğuşma ve yağışla sürekli dolaşması.", icon:"pic-idea", example:"Denizden buharlaşan su, bulutta yoğuşup yağmur olarak geri döner."}],
-      visual:{ kind:"svg", caption:"Şekil 2 — Su döngüsü: buharlaşma, yoğuşma (bulut), yağış ve toplanma.", ref:`
-<svg viewBox="0 0 480 300" role="img" aria-labelledby="v3t v3d">
-  <title id="v3t">Su döngüsü şeması</title>
-  <desc id="v3d">Güneş suyu buharlaştırır, buhar bulut olur, yağış düşer, su toplanır.</desc>
+      // Adları şeklin üstünde gereken şema etiketli şemadır (Kanun M5.6, KB-48): taban yalnız şekil, adlar `labels`'ta;
+      // şablon iğne numarasını kutunun ölçeğinde ≥ 12 px çizer, adları HTML listede yazar.
+      visual:{ kind:"labeled", title:"Su döngüsü şeması",
+        desc:"Güneş suyu buharlaştırır, buhar bulut olur, yağış düşer, su toplanır.",
+        caption:"Şekil 2 — Su döngüsü: buharlaşma, yoğuşma (bulut), yağış ve toplanma.", viewBox:"0 0 480 300",
+        base:`
   <circle cx="70" cy="55" r="26" fill="var(--viz-sun)" stroke="var(--viz-axis)" stroke-width="2"/>
-  <text x="70" y="60" text-anchor="middle" font-size="13" font-weight="600">Güneş</text>
   <path d="M300 70 q18 -16 40 0 q22 -6 30 14 q18 4 6 22 h-92 q-14 -16 16 -36 z" fill="var(--viz-cloud)" stroke="var(--viz-axis)" stroke-width="2"/>
-  <text x="330" y="100" text-anchor="middle" font-size="13" font-weight="600">Bulut</text>
   <path d="M40 250 q120 -28 400 0 v40 h-400 z" fill="var(--accent-tint)" stroke="var(--accent)" stroke-width="2"/>
-  <text x="110" y="278" font-size="14" font-weight="600">Deniz / Göl</text>
   <path d="M140 240 C150 170 170 150 250 130" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-dasharray="2 6" stroke-linecap="round" marker-end="url(#vz-arrow)"/>
-  <text class="viz-muted" x="150" y="200" font-size="13" font-weight="600">buharlaşma</text>
   <g stroke="var(--viz-water)" stroke-width="2.4" stroke-linecap="round">
     <line x1="320" y1="135" x2="312" y2="160"/><line x1="340" y1="135" x2="332" y2="162"/><line x1="360" y1="135" x2="352" y2="158"/>
   </g>
-  <text class="viz-muted" x="372" y="150" font-size="13" font-weight="600">yağış</text>
-  <path d="M395 165 C405 200 400 225 360 245" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" marker-end="url(#vz-arrow)"/>
-  <text class="viz-muted" x="402" y="210" font-size="13" font-weight="600">toplanma</text>
-</svg>` } },
+  <path d="M395 165 C405 200 400 225 360 245" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" marker-end="url(#vz-arrow)"/>`,
+        labels:[
+          {x:96, y:80, text:"Güneş"}, {x:336, y:94, text:"Bulut"}, {x:120, y:272, text:"Deniz ya da göl"},
+          {x:168, y:196, text:"Buharlaşma"}, {x:382, y:146, text:"Yağış"}, {x:418, y:206, text:"Toplanma"}
+        ] } },
 
     { type:"conceptMap", id:"cm1", title:"Su Döngüsü İlişkileri", pictogram:"pic-puzzle",
       instructions:"Bir düğüm seç, sonra bağlamak istediğin ikinci düğümü seç; su döngüsündeki doğru eşleşmeleri kur.",
@@ -1635,6 +1655,26 @@ const MODULE_DATA = {
       const u=b.querySelector("use"); if(u) u.setAttribute("href", state.sound?"#ic-volume":"#ic-volume-off"); }
     if(state.sound) playSound("notify");
   }
+  /* Kanun M5.14 (KB-44): ikon düğmesinin araç ipucu Esc ile kapanır, odak düğmede kalır (talimatname §4.3). Odak
+     ya da fare düğmeden çıkınca ipucu yeniden açılabilir. Tek, belgeye bağlı dinleyiciler; düğmeler sonradan
+     çizilse de (kavram haritası) çalışır. */
+  (function aracIpucu(){
+    const IPUCU=".icon-btn,.pacing-disk__dismiss,.cmap-edge__remove";
+    document.addEventListener("keydown", function(ev){
+      if(ev.key!=="Escape") return;
+      document.querySelectorAll(IPUCU).forEach(function(b){
+        if(b===document.activeElement || b.matches(":hover")) b.classList.add("ipucu-kapali");
+      });
+    });
+    function ac(ev){
+      const b=ev.target && ev.target.closest && ev.target.closest(IPUCU);
+      if(!b || (ev.relatedTarget && b.contains(ev.relatedTarget))) return;
+      if(ev.type==="mouseout" && b===document.activeElement) return;  // odak sürüyorsa Esc'in kapattığı kapalı kalır
+      b.classList.remove("ipucu-kapali");
+    }
+    document.addEventListener("focusout", ac);
+    document.addEventListener("mouseout", ac);
+  })();
   function reduceMotion(){ return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }
   /* ---- tema: yalnız panonun bildirdiği Carbon teması (Kanun M4.1, M4.2) ----
      Pano bugün g10'dur; koyu mod gelirse panonun Profil ayarı olur ve buraya aynı mesajla g100

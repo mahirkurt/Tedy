@@ -397,7 +397,8 @@ Tam rehber: `references/icon-pictogram-svg.md`.
   (Kanun M3.10).
 - **Özgün SVG çizim** — kaynaktaki bir kavram bespoke şema gerektirdiğinde
   (etiketli hücre, su döngüsü, sayı doğrusu), Carbon görsel diline uygun
-  (2px stroke, Carbon paleti, geometrik, gradyansız) elle SVG çizin.
+  (2px stroke, Carbon paleti, geometrik, gradyansız) elle SVG çizin. Şekil SVG'de,
+  ad etiketli şemanın `labels`'ında; yazar SVG'si metin taşımaz (Kanun M5.6, KB-48).
 - **Kural:** Tüm görseller **satır içi** gömülür (çevrimdışı/güvenilir). Emoji
   asla kullanılmaz. Görseller `aria-hidden` veya uygun `role="img"`+`<title>`.
 
@@ -412,7 +413,7 @@ Tam rehber: `references/svg-authoring.md`. Motorun sunduğu en güçlü araçlar
 - **Renk token'ları** — kategorik `--viz-1..5`, anlamsal `--viz-sun/water/cloud`,
   eksen/ızgara `--viz-axis/--viz-grid`; açık+koyu temada tanımlı. **Figür SVG'de ham hex yok;**
   grafik verisinde `color` yazılmaz (Kanun M4.7).
-  Metin rengini CSS verir (`.viz text` → primary; `.viz-muted` → secondary).
+  Yazar SVG'si metin taşımaz (Kanun M5.6, KB-48): adlar etiketli şemanın `labels`'ına ya da gövde metnine.
 - Özet ekranında halka grafik ya da büyük sayı yoktur (S43); özet düz metindir.
 - **`vizTable(spec)`** — Carbon **DataTable** (anlamsal `<table>`: `<caption>`, `<th scope>`,
   zebra `--cds-layer-01/02`, başlık `--cds-layer-accent-01`, sayısal sütun sağa hizalı/tabular,

@@ -199,3 +199,30 @@ def gorsel_ornegi() -> tuple[dict[str, Any], dict[str, Any]]:
         {"asset_id": "0f1e2d3c4b5a6978", "slot": "t2.audio"},
     ]
     return data, varliklar
+
+
+def arac_ornegi() -> tuple[dict[str, Any], dict[str, Any]]:
+    """Çerçevenin bütün ikon düğmeleri ve yazarın ses oynatıcısı (Modül Tasarım Kanunu M5.14; KB-44): ses ve sesli
+    okuma araçları, tempo diskinin gizleme düğmesi, kavram haritasında bağlantıyı kaldırma, metinsiz yazar SVG'si
+    (t1) ve etiketli şema (t3). (MODULE_DATA, varlıklar) döner; `dashboard/tests/e2e/modul-ikon-dugmeleri.spec.ts`
+    kullanır."""
+    import base64
+
+    from src.mcp_server.derleme import GomuluVarlik  # derleme bu modülü içe aktarır; döngü olmasın diye burada
+
+    data = ornek("MODULE")
+    data["meta"]["title"] = "Araçlar ve Ses"
+    sira = ("t1", "t3", "cm1")
+    data["segments"] = sorted((s for s in data["segments"] if s["id"] in sira), key=lambda s: sira.index(s["id"]))
+    data["learner"]["pacingDisk"] = True
+    data["curriculum"] = _curriculum(["t1", "cm1"])
+    ses = b"ID3" + b"\0" * 64
+    varliklar = {
+        "0f1e2d3c4b5a6978": GomuluVarlik(
+            asset_id="0f1e2d3c4b5a6978", tur="ses", mime="audio/mpeg",
+            data_uri="data:audio/mpeg;base64," + base64.b64encode(ses).decode("ascii"), bayt=len(ses),
+            credit="Seslendirme: yapay zekâ ile üretildi (MiniMax speech-2.8-hd)", lisans="MiniMax üretimi",
+            alt="", kaynak="minimax"),
+    }
+    data["meta"]["assets"] = [{"asset_id": "0f1e2d3c4b5a6978", "slot": "t1.audio"}]
+    return data, varliklar
