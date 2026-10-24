@@ -412,7 +412,10 @@ _GECIRILEN_INITIALIZE = "ted_initialize"
 
 
 def _modern_gozlem(scope: Scope, durum: int | None, baslangic: float, sse: bool, koptu: bool) -> None:
-    """2026-07-28 başlıklı isteğin INFO gözlem satırı; başlık modern değilse hiçbir şey yazmaz."""
+    """2026-07-28 başlıklı /mcp isteğinin INFO gözlem satırı; yol /mcp değilse ya da başlık modern değilse
+    hiçbir şey yazmaz (BodyLimitMiddleware /oauth/* için de çağırır)."""
+    if not str(scope.get("path", "")).startswith("/mcp"):
+        return
     if _header_or_none(scope, b"mcp-protocol-version") not in MODERN_PROTOCOL_VERSIONS:
         return
     yontem = _header(scope, b"mcp-method")[:40]

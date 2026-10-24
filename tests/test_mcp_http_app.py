@@ -987,3 +987,19 @@ def test_bayrak_kapaliyken_gecirilen_initialize_gozlemde_yontemini_soyler(client
     assert r.status_code == 200
     m = _GOZLEM.match(_gozlem_satirlari(caplog)[0])
     assert (m["yontem"], m["durum"], m["koptu"]) == ("initialize", "200", "hayır")
+
+
+# -- Üçüncü düzeltme turu (2026-10-24): gözlem yalnız /mcp ---------------------------------------------------
+
+def test_gozlem_yalniz_mcp_yolunda_yazilir(client, caplog):
+    """/oauth/* gövde tavanını (16 KiB) aşan bir istek 2026 başlığı taşısa da mcp_modern satırı yazmaz."""
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        r = client.post("/oauth/token", content=b"a" * 20_000,
+                        headers={"content-type": "application/x-www-form-urlencoded", "mcp-protocol-version": MODERN})
+    assert r.status_code == 413
+    assert _gozlem_satirlari(caplog) == []
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        http_app._modern_gozlem({"type": "http", "path": "/health", "headers": [(b"mcp-protocol-version",
+                                                                                b"2026-07-28")]},
+                                200, 0.0, sse=False, koptu=False)
+    assert _gozlem_satirlari(caplog) == []
