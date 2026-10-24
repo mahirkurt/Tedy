@@ -104,10 +104,12 @@ async function ipucu(f: Frame | Page, secici: string) {
     const r = b.getBoundingClientRect()
     const cs = t ? getComputedStyle(t) : null
     const k = t ? t.getBoundingClientRect() : new DOMRect()
-    const bagli = (b.getAttribute('aria-describedby') ?? '').split(/\s+/).includes('aracIpucu')
+    // Owner: the button carries `ipucu-sahibi` while its tooltip is open (aria-describedby only when the tooltip text
+    // differs from the accessible name — the coordinator's decision, so the name is not read twice).
+    const sahip = b.classList.contains('ipucu-sahibi')
     return {
       gorunur: !!t && !!cs && !t.hidden && cs.display !== 'none' && cs.visibility === 'visible' && parseFloat(cs.opacity) > 0
-        && bagli,
+        && sahip,
       metin: (t?.textContent ?? '').trim(), ad: b.getAttribute('aria-label') ?? '', boxSizing: cs?.boxSizing ?? '',
       rol: t?.getAttribute('role') ?? '', dugmeninIcinde: !!t && b.contains(t),
       sol: k.left, sag: k.right, ust: k.top, alt: k.bottom, merkezX: k.left + k.width / 2, merkezY: k.top + k.height / 2,
@@ -182,8 +184,7 @@ async function ipucuSozlesmesi(f: Frame | Page, page: Page, ad: string) {
   const gecikme = await f.locator('#ttsBtn').evaluate(async b => {
     const acik = () => {
       const t = document.getElementById('aracIpucu')
-      return !!t && !t.hidden && t.classList.contains('arac-ipucu--acik')
-        && (b.getAttribute('aria-describedby') ?? '').split(/\s+/).includes('aracIpucu')
+      return !!t && !t.hidden && t.classList.contains('arac-ipucu--acik') && b.classList.contains('ipucu-sahibi')
     }
     b.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body }))
     const hemen = acik()
@@ -388,6 +389,40 @@ test('a click on the content under the open sound tooltip leaves the sound as it
   await page.mouse.click(d.x + d.width / 2, hedefY + 16)
   await page.waitForTimeout(150)
   await expect(f.locator('#soundBtn')).toHaveAttribute('aria-label', 'Sesi kapat')
+})
+
+// Decision (repeated announcement): when the tooltip text equals the accessible name (`aria-label`), the button is not
+// tied to the tooltip with aria-describedby — the name already carries everything and a screen reader would read it
+// twice. A different tooltip text (`data-ipucu`, for a future descriptive tooltip) is tied, and the name stays the
+// aria-label. Measured in Chromium's accessibility tree (CDP Accessibility.getFullAXTree).
+test('an open tooltip that repeats the name adds no description; a different text does', async ({ page }) => {
+  const f = await ac(page, 390, true)
+  const cdp = await page.context().newCDPSession(page)
+  const dugumu = async (ad: string) => {
+    const { nodes } = await cdp.send('Accessibility.getFullAXTree') as {
+      nodes: { role?: { value: string }; name?: { value: string }; description?: { value: string } }[] }
+    return nodes.find(n => n.role?.value === 'button' && n.name?.value === ad)
+  }
+  await f.locator('#soundBtn').hover()
+  await expect.poll(async () => (await ipucu(f, '#soundBtn')).gorunur).toBe(true)
+  expect((await ipucu(f, '#soundBtn')).metin).toBe('Sesi kapat')
+  await expect(f.locator('#soundBtn')).not.toHaveAttribute('aria-describedby', /./)
+  expect((await dugumu('Sesi kapat'))?.description?.value ?? '', '(a) aynı metin: açıklama boş olmalı').toBe('')
+  await page.mouse.move(1, 1)
+  await expect.poll(async () => (await ipucu(f, '#soundBtn')).gorunur).toBe(false)
+
+  const aciklama = 'Modülün kısa uyarı seslerini susturur'
+  await f.locator('#soundBtn').evaluate((b, m) => b.setAttribute('data-ipucu', m), aciklama)
+  await f.locator('#soundBtn').hover()
+  await expect.poll(async () => (await ipucu(f, '#soundBtn')).gorunur).toBe(true)
+  expect((await ipucu(f, '#soundBtn')).metin).toBe(aciklama)
+  await expect(f.locator('#soundBtn')).toHaveAttribute('aria-describedby', 'aracIpucu')
+  const dugum = await dugumu('Sesi kapat')
+  expect(dugum?.name?.value, 'ad yine aria-label').toBe('Sesi kapat')
+  expect(dugum?.description?.value ?? '', '(b) farklı metin: açıklama dolu olmalı').toBe(aciklama)
+  await page.mouse.move(1, 1)
+  await expect.poll(async () => (await ipucu(f, '#soundBtn')).gorunur).toBe(false)
+  await expect(f.locator('#soundBtn')).not.toHaveAttribute('aria-describedby', /./)
 })
 
 test('the tools are exactly twice as large at 3840 as at 1920 (M5.8)', async ({ page }) => {

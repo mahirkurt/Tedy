@@ -61,6 +61,9 @@ def test_ikon_dugmesinin_adi_arac_ipucunda_gecikmeli_ve_uzerine_gelinebilir():
                   'setAttribute("role","tooltip")', '"aria-describedby"', 'document.body.appendChild(ipucu)',
                   'getAttribute("aria-label")'):
         assert parca in SABLON, parca
+    # Karar: ipucu metni adla aynıysa aria-describedby kurulmaz (ad iki kez okunmaz); farklıysa (data-ipucu) kurulur.
+    assert 'getAttribute("data-ipucu")' in SABLON
+    assert re.search(r'if\(metin!==ad\) b\.setAttribute\("aria-describedby","aracIpucu"\)', SABLON)
 
 
 def test_ses_oynaticisinin_renk_semasi_tema_tokenindan():

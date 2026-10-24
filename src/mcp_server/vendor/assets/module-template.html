@@ -482,9 +482,9 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
    düğmenin altında görünür (talimatname §4.3; Tooltip — accessibility #annotate-the-text-for-the-tooltip). Tek, ayrı bir
    role="tooltip" öğesidir (#aracIpucu, gövdenin sonunda; aracIpucu kurar): hiçbir düğmenin içinde olmadığı için ona ya da
    köprüsüne tıklamak düğmeyi etkinleştirmez (ikinci inceleme: düğmenin ::after'ı isabeti düğmeye veriyordu, 2. bağlantının
-   kenarına tıklama 1. bağlantıyı siliyordu). Metin düğmenin kendi aria-label'ıdır; açıkken düğme aria-describedby ile
-   ona bağlanır. Carbon ikon ipucu ölçüsü (@carbon/styles 1.117.0 components/tooltip/_tooltip.scss:26-29, 46-47, 85-104,
-   icon-tooltip): ters yüzey, body-compact-01, dolgu 2 × 16 px, düğmeden 8 px, en çok 18rem (kutu dolgu dahil:
+   kenarına tıklama 1. bağlantıyı siliyordu). Metin düğmenin kendi aria-label'ıdır; adla aynı olduğu için düğme ona
+   aria-describedby ile bağlanmaz (ad iki kez okunmazdı); farklı bir metin (data-ipucu) verilirse bağlanır. Carbon ikon
+   ipucu ölçüsü (@carbon/styles 1.117.0 components/tooltip/_tooltip.scss:26-29, 46-47, 85-104, icon-tooltip): ters yüzey, body-compact-01, dolgu 2 × 16 px, düğmeden 8 px, en çok 18rem (kutu dolgu dahil:
    border-box). Görünürlükle açılır; açmadan önce JS ölçer ve çerçevenin içine yerleştirir (left/top, hesaplanan
    geometri). 8 px'lik boşlukta saydam köprü (::before) ipucunun parçasıdır: işaretçi ipucuna inerken açık kalır (WCAG
    1.4.13). Ok (caret) yok: ipucu her zaman düğmenin hemen altındadır, kıstırılınca ok düğmeyi göstermez olurdu. */
@@ -1685,7 +1685,7 @@ const MODULE_DATA = {
     function icinde(b, n){ return !!n && (n===b || b.contains(n)); }
     function iptal(){ clearTimeout(zaman); }
     function yerlestir(b){
-      ipucu.textContent=b.getAttribute("aria-label")||"";
+      ipucu.textContent=ipucuMetni(b);
       ipucu.hidden=false;
       const kok=parseFloat(getComputedStyle(document.documentElement).fontSize)||16, pay=kok/2;
       const r=b.getBoundingClientRect(), en=ipucu.offsetWidth, sinir=document.documentElement.clientWidth;
@@ -1698,13 +1698,18 @@ const MODULE_DATA = {
       ipucu.style.setProperty("--kopru-sol", (bas-sol)+"px");
       ipucu.style.setProperty("--kopru-en", (son-bas)+"px");
     }
+    // Metin düğmenin aria-label'ıdır; ileride açıklayıcı bir ipucu gerekirse data-ipucu onu verir.
+    function ipucuMetni(b){ return b.getAttribute("data-ipucu")||b.getAttribute("aria-label")||""; }
     function kapaHemen(){
       iptal(); ipucu.classList.remove("arac-ipucu--acik"); ipucu.hidden=true;
-      if(sahip){ sahip.removeAttribute("aria-describedby"); sahip=null; }
+      if(sahip){ sahip.classList.remove("ipucu-sahibi"); sahip.removeAttribute("aria-describedby"); sahip=null; }
     }
     function ac(b){
       if(sahip && sahip!==b) kapaHemen();
-      sahip=b; yerlestir(b); ipucu.classList.add("arac-ipucu--acik"); b.setAttribute("aria-describedby","aracIpucu");
+      sahip=b; yerlestir(b); ipucu.classList.add("arac-ipucu--acik"); b.classList.add("ipucu-sahibi");
+      // Karar: metin erişilebilir adla aynıysa bağ kurulmaz — ad tam bilgiyi taşır, ekran okuyucu iki kez okumaz.
+      const metin=ipucuMetni(b), ad=b.getAttribute("aria-label")||"";
+      if(metin!==ad) b.setAttribute("aria-describedby","aracIpucu");
     }
     function planla(b, acilsin){
       iptal();
