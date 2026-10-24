@@ -19,10 +19,12 @@ export type ArsivYonu = { tur: 'yonlendir'; yol: string } | { tur: 'yayinda_degi
 
 /** An archived version's ticket answers 410 `{arsivlendi: true, guncel}` (2026-10-24): the page moves to the
  * current version, replacing the old address in history, or says the module is no longer published. Anything
- * else is not an archive answer (null) and keeps the generic error sentence. */
+ * else is not an archive answer (null) and keeps the generic error sentence.
+ * The move only ever goes forward (review round 1): `guncel` must be a number greater than `version`, so a chain
+ * of archived addresses ends and two of them can never send the reader back and forth; otherwise "yayında değil". */
 export function arsivYonu(slug: string, version: number, body: unknown): ArsivYonu | null {
   if (typeof body !== 'object' || body === null || (body as { arsivlendi?: unknown }).arsivlendi !== true) return null
   const guncel = (body as { guncel?: unknown }).guncel
-  const yol = guncel !== version ? moduleRoute({ slug, version: guncel }) : null
+  const yol = typeof guncel === 'number' && guncel > version ? moduleRoute({ slug, version: guncel }) : null
   return yol ? { tur: 'yonlendir', yol } : { tur: 'yayinda_degil' }
 }

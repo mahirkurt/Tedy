@@ -20,6 +20,17 @@ test('kendine ya da geçersiz sürüme yönlenmez: döngü ve uydurma rota yok',
   }
 })
 
+test('yalnız daha yeni sürüme yönlenir: güncel ≤ sürüm ise yayında değil (döngü garantisi, inceleme turu 1)', () => {
+  // Arşivlenmiş v5 eski bir v3'ü "güncel" diye gösterirse v3 de arşivse v5'e geri gönderebilir: iki adres arasında
+  // gidip gelme. Yönlenme yalnız ileri gider; zincir sonlu, döngü imkânsız.
+  assert.deepEqual(arsivYonu('fen5-su', 5, { arsivlendi: true, guncel: 3 }), { tur: 'yayinda_degil' })
+  assert.deepEqual(arsivYonu('fen5-su', 5, { arsivlendi: true, guncel: 4 }), { tur: 'yayinda_degil' })
+  assert.deepEqual(arsivYonu('fen5-su', 5, { arsivlendi: true, guncel: 5 }), { tur: 'yayinda_degil' })
+  assert.deepEqual(arsivYonu('fen5-su', 5, { arsivlendi: true, guncel: 6 }), { tur: 'yonlendir', yol: '/moduller/fen5-su/v6' })
+  assert.deepEqual(arsivYonu('fen5-su', 1, { arsivlendi: true, guncel: 9999 }),
+    { tur: 'yonlendir', yol: '/moduller/fen5-su/v9999' })
+})
+
 test('arşiv gövdesi değilse karar yok (genel hata cümlesi kalır)', () => {
   for (const govde of [null, undefined, 'x', {}, { error: 'not_found' }, { arsivlendi: 'true', guncel: 2 }]) {
     assert.equal(arsivYonu('fen5-su', 1, govde), null)
