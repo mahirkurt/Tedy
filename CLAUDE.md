@@ -349,6 +349,15 @@ unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
   isteğini reddederse günlükte `mcp_reddedildi durum=… surum=… mesaj=…` satırı çıkar (bearer ve gövde yazılmaz).
   Ana checkout'a birleştirmeden sonra `ted-dashboard` ve `ted-mcp` ikisi de yeniden başlatılır (ikisi de
   buradan çalışır; `src/mcp_client.py` ortaktır).
+- MCP SDK 2.x (`mcp==2.3.0`, 2026-10-24 dalı `mcp-sdk-2`): sunucu `MCPServer`'dır (`FastMCP` yok). 2026-07-28 tek
+  istek zarfını (initialize yok, `server/discover`, başlıkta `MCP-Protocol-Version`/`Mcp-Method`/`Mcp-Name`) ve
+  2025 el sıkışmasını (2025-06-18, 2025-11-25) aynı `/mcp`'den sunar; 1.x 2026-07-28'e 400 dönüyordu ve
+  claude.ai her bağlantıda önce onu deniyordu. Ulaşım ayarları kurucuda değil `http_app.build_app`'in
+  `streamable_http_app()` çağrısındadır (stateless, SDK DNS koruması kapalı — işi `HostGuardMiddleware` yapar —,
+  gövde tavanı `TED_MCP_MAX_BODY_BYTES`); `json_response=True` yalnız testlerdir. `subscriptions=False`:
+  `subscriptions/listen` sunulmaz, iki dönem de `listChanged=false` der. 2026-07-28'de `ping` ve `initialize`
+  yoktur (404, `mcp_reddedildi durum=404` satırı normaldir). Beklenmeyen istisnanın metni istemciye gitmez
+  ("Error executing tool <ad>"); `ToolError` metni gider.
 - Ortam: `TED_MCP_FORM_SECRET` (zorunlu, ≥32 bayt, OAuth form imzası), `TED_MCP_PUBLIC_BASE_URL` (varsayılan
   `https://mcp.tedy.online`), `TED_MCP_ALLOWED_HOSTS` (Host başlığı allowlist'i), `TED_MCP_HOST`/`TED_MCP_PORT`
   (yalnız `python -m src.mcp_server.http_app` bind adresi), `TED_MCP_PROJECT_ROOT` (test/servis için proje kökünü
