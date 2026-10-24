@@ -9,7 +9,7 @@ from src import module_ticket as mt
 from src.mcp_server import http_app
 from src.mcp_server.config import load_settings
 from src.mcp_server.federation import Federation
-from src.mcp_server.goruntuleyici import CSP, NOT_FOUND_TEXT, build_viewer
+from src.mcp_server.goruntuleyici import ARCHIVED_TEXT, CSP, NOT_FOUND_TEXT, build_viewer
 from src.mcp_server.katalog import CatalogWriter
 from src.mcp_server.oauth_store import OAuthStore
 from src.mcp_server.server import build_server
@@ -94,6 +94,28 @@ def test_malformed_paths_are_not_found(root, path):
 def test_removed_module_is_not_found_even_with_a_valid_ticket(root):
     r = _request(root, "GET", _module_path(slug="fen5-kaldirilan"))
     assert r.status_code == 404 and r.text == NOT_FOUND_TEXT
+
+
+def test_arsivden_once_alinmis_biletle_arsiv_surumu_sade_bir_cumle_alir(root):
+    """İnceleme turu 1, bulgu 7: arşivlemeden önce alınmış (hâlâ geçerli) biletle çerçeve yeniden yüklenince düz
+    "Modül bulunamadı" değil, ne olduğunu ve ne yapılacağını söyleyen sade cümle: 410, düz metin, içerik ve
+    yönlendirme yok. Kaldırılmış ve bilinmeyen sürüm 404 kalır; geçersiz bilet önce gelir (varlık sızmaz)."""
+    writer = CatalogWriter(root / "output", clock=lambda: NOW)
+    draft = {"taslak_id": TASLAK, "meta": {"title": "t", "subject": "Fen Bilimleri", "gradeLevel": "5. Sınıf",
+                                           "mode": "QUIZ"}, "gates": {"pass": 18, "warn": 0, "fail": 0}}
+    writer.yayinla(FULL, draft, b"<!doctype html><title>v2</title>", "fen5-su", None)
+    assert ms.find_record(root / "output", "fen5-su", 1)["status"] == "archived"
+    r = _request(root, "GET", _module_path(version=1))
+    assert r.status_code == 410
+    assert r.text == ARCHIVED_TEXT == "Bu sürüm arşivlendi; güncel sürüm için sayfayı yenileyin."
+    assert r.headers["content-type"].startswith("text/plain")
+    assert HTML not in r.content and b"<" not in r.content and "location" not in r.headers
+    assert r.headers["content-security-policy"] == SPEC_CSP and r.headers["cache-control"] == "private, no-store"
+    assert _request(root, "GET", _module_path(version=2)).status_code == 200
+    assert _request(root, "GET", _module_path(version=3)).text == NOT_FOUND_TEXT
+    assert _request(root, "GET", _module_path(slug="fen5-kaldirilan")).text == NOT_FOUND_TEXT
+    expired = _request(root, "GET", _module_path(version=1), now=NOW + 601)
+    assert expired.status_code == 403 and expired.text == mt.EXPIRED_TEXT
 
 
 def test_symlinked_version_directory_is_refused(root, tmp_path):
