@@ -365,12 +365,17 @@ unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
   `subscriptions/listen` sunulmaz, iki dönem de `listChanged=false` der. 2026-07-28'de `ping` ve `initialize`
   yoktur (404, `mcp_reddedildi durum=404` satırı normaldir); 15 sn'yi aşan araç SSE'ye geçer, 15 sn'de bir
   `: ping` yazar. Beklenmeyen istisnanın metni istemciye gitmez ("Error executing tool <ad>"); `ToolError` metni
-  gider. Paket geçişi ağsızdır: tekerlekler `.claude/worktrees/mcp-sdk-2-tekerlekler/` (sha256 `SHA256SUMS`);
-  sıra `systemctl --user stop ted-mcp` → `git merge --ff-only` → `.venv/bin/python -m pip install --no-index
-  --find-links <tekerlekler> mcp==2.3.0 mcp-types==2.3.0 opentelemetry-api==1.45.1` → `start`. pip düşerse servis
-  başlatılmaz: birleştirme geri alınır (`git reset --keep <önceki main>`; `--hard` değil, paylaşılan checkout'ta
-  başka oturumun kaydedilmemiş işi olabilir) ve 1.28.1 koduyla `start`. Geri dönüş: kod geri, `pip install --no-index --find-links
-  <tekerlekler> mcp==1.28.1`, restart. Ayrıntı: `.claude/worktrees/mcp-sdk-2-rapor.md`.
+  gider. Geçiş betiği `scripts/ted_mcp_sdk2_gecis.sh` (birleştirmeden önce çalışma ağacındaki kopyadan, kullanıcı
+  onayıyla): ön koşullar (main = `e1ceaf6` sert denetim, izlenen dosyalar temiz, tekerlek sha256'ları, kurulu mcp
+  1.28.1, `pip check` tabanı, `pip install --dry-run` tam üç paket) → `stop` → `git merge --ff-only <dal ucu>` →
+  `pip install --no-index --find-links /home/mahirkurt/tekerlekler/ted-mcp-2026-10` → `pip check` tabana göre →
+  `reset-failed` + `start` → `/health`. Düşen adımda kendisi geri döner; main'i yalnız birleştirme gerçekten olduysa
+  (HEAD = dal ucu) `git reset --keep` ile geri sarar, araya giren başka oturumun commit'ine dokunmaz (çıkış 2:
+  geri dönüldü, 3: elle bakılmalı). Sonradan elle geri dönüş: `stop` → `git revert` (HEAD hâlâ dal ucuysa
+  `git reset --keep e1ceaf6`) → `pip install --no-index --find-links <tekerlekler> mcp==1.28.1` → `reset-failed` +
+  `start`; yalnız 2026-07-28 sorunluysa kod ve paket kalır, bayrak `0` yapılır. Prova: `tests/test_ted_mcp_gecis_betigi.py` (sahte depo ve sahte
+  systemctl/pip/curl). Tekerlekler ve `SHA256SUMS`: `/home/mahirkurt/tekerlekler/ted-mcp-2026-10/` (1.28.1
+  dahil). Ayrıntı: `.claude/worktrees/mcp-sdk-2-rapor.md`.
 - Ortam: `TED_MCP_FORM_SECRET` (zorunlu, ≥32 bayt, OAuth form imzası), `TED_MCP_PUBLIC_BASE_URL` (varsayılan
   `https://mcp.tedy.online`), `TED_MCP_ALLOWED_HOSTS` (Host başlığı allowlist'i), `TED_MCP_HOST`/`TED_MCP_PORT`
   (yalnız `python -m src.mcp_server.http_app` bind adresi), `TED_MCP_PROJECT_ROOT` (test/servis için proje kökünü
