@@ -365,17 +365,21 @@ unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
   `subscriptions/listen` sunulmaz, iki dönem de `listChanged=false` der. 2026-07-28'de `ping` ve `initialize`
   yoktur (404, `mcp_reddedildi durum=404` satırı normaldir); 15 sn'yi aşan araç SSE'ye geçer, 15 sn'de bir
   `: ping` yazar. Beklenmeyen istisnanın metni istemciye gitmez ("Error executing tool <ad>"); `ToolError` metni
-  gider. Geçiş betiği `scripts/ted_mcp_sdk2_gecis.sh` (birleştirmeden önce çalışma ağacındaki kopyadan, kullanıcı
-  onayıyla): ön koşullar (main = `e1ceaf6` sert denetim, izlenen dosyalar temiz, tekerlek sha256'ları, kurulu mcp
-  1.28.1, `pip check` tabanı, `pip install --dry-run` tam üç paket) → `stop` → `git merge --ff-only <dal ucu>` →
-  `pip install --no-index --find-links /home/mahirkurt/tekerlekler/ted-mcp-2026-10` → `pip check` tabana göre →
-  `reset-failed` + `start` → `/health`. Düşen adımda kendisi geri döner; main'i yalnız birleştirme gerçekten olduysa
-  (HEAD = dal ucu) `git reset --keep` ile geri sarar, araya giren başka oturumun commit'ine dokunmaz (çıkış 2:
-  geri dönüldü, 3: elle bakılmalı). Sonradan elle geri dönüş: `stop` → `git revert` (HEAD hâlâ dal ucuysa
-  `git reset --keep e1ceaf6`) → `pip install --no-index --find-links <tekerlekler> mcp==1.28.1` → `reset-failed` +
-  `start`; yalnız 2026-07-28 sorunluysa kod ve paket kalır, bayrak `0` yapılır. Prova: `tests/test_ted_mcp_gecis_betigi.py` (sahte depo ve sahte
-  systemctl/pip/curl). Tekerlekler ve `SHA256SUMS`: `/home/mahirkurt/tekerlekler/ted-mcp-2026-10/` (1.28.1
-  dahil). Ayrıntı: `.claude/worktrees/mcp-sdk-2-rapor.md`.
+  gider. Geçiş betiği `scripts/ted_mcp_sdk2_gecis.sh`: kullanıcı onayıyla, birleştirmeden önce çalışma ağacındaki
+  kopyadan ve terminal kopsa da yarım kalmasın diye ayrı birimde koşulur — `systemd-run --user --wait --collect
+  --unit=ted-mcp-gecis bash <betik>` (çıkış kodu systemd-run'ın kendi çıkışıdır; izleme `journalctl --user -u
+  ted-mcp-gecis -f`). Ön koşullar değişiklik yapmaz: main, izlenen dosyalar temiz, `HEAD` = `e1ceaf6` (sert),
+  kayıtlı dal ucu sha'sı, dizinde yalnız betiğe gömülü sha256'lı dört tekerlek (`/home/mahirkurt/tekerlekler/
+  ted-mcp-2026-10/`, 1.28.1 dahil), kurulu mcp 1.28.1, `pip check` tabanı, `--dry-run` tam üç paket. Sonra `stop` →
+  checkout hâlâ main ve önceki HEAD mi → `merge --ff-only <dal ucu>` → `pip --no-index` → tabana göre `pip check` →
+  `reset-failed` + `start` → `/health` → `git rev-parse main` dal ucunu içeriyor mu. Düşen adım ya da INT/TERM/HUP
+  tek girişli geri dönüşü başlatır; main'e yalnız checkout main iken dokunulur: commit'lerimiz ucuysa `git reset
+  --keep`, üstüne başka commit geldiyse `git revert` (çakışırsa `--abort`, servis kapalı kalır), push yok; başka dal
+  ya da başka oturumun commit'i asla geri sarılmaz. Çıkış: 0 tamam, 1 hiçbir şey değişmedi, 2 geri dönüldü (1.28.1
+  ayakta), 3 elle bakılmalı (servis kapalı olabilir), 4 stop düştü ve kapalı servis geçişsiz yeniden başlatıldı.
+  Prova: `tests/test_ted_mcp_gecis_betigi.py` (sahte depo ve sahte systemctl/pip/curl/journalctl/git, 19 senaryo).
+  Sonradan elle geri dönüş raporun §7'sindedir (günlükteki `dal ucu=` sha'sıyla, dal ve ata denetimiyle); yalnız
+  2026-07-28 sorunluysa kod ve paket kalır, bayrak `0` yapılır. Ayrıntı: `.claude/worktrees/mcp-sdk-2-rapor.md`.
 - Ortam: `TED_MCP_FORM_SECRET` (zorunlu, ≥32 bayt, OAuth form imzası), `TED_MCP_PUBLIC_BASE_URL` (varsayılan
   `https://mcp.tedy.online`), `TED_MCP_ALLOWED_HOSTS` (Host başlığı allowlist'i), `TED_MCP_HOST`/`TED_MCP_PORT`
   (yalnız `python -m src.mcp_server.http_app` bind adresi), `TED_MCP_PROJECT_ROOT` (test/servis için proje kökünü
