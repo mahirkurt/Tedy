@@ -145,6 +145,21 @@ def test_mcp_max_body_bytes_rejects_anything_but_a_positive_integer(tmp_path, ra
         config.load_settings(_env(TED_MCP_MAX_BODY_BYTES=raw), project_root=tmp_path)
 
 
+def test_protokol_2026_bayragi_varsayilan_kapali_ve_yalniz_0_ya_da_1(tmp_path):
+    """2026-07-28 sunumu bilinçli bir adımla açılır: yoksa ya da boşsa kapalı (birim/.env değişmeden)."""
+    assert config.load_settings(_env(), project_root=tmp_path).protokol_2026 is False
+    assert config.load_settings(_env(TED_MCP_PROTOKOL_2026=""), project_root=tmp_path).protokol_2026 is False
+    assert config.load_settings(_env(TED_MCP_PROTOKOL_2026="0"), project_root=tmp_path).protokol_2026 is False
+    assert config.load_settings(_env(TED_MCP_PROTOKOL_2026="1"), project_root=tmp_path).protokol_2026 is True
+    assert config.load_settings(_env(TED_MCP_PROTOKOL_2026=" 1 "), project_root=tmp_path).protokol_2026 is True
+
+
+@pytest.mark.parametrize("raw", ["true", "yes", "on", "2", "01", "1.0", "-1", "evet"])
+def test_protokol_2026_bayragi_gecersiz_degerde_acilisi_durdurur(tmp_path, raw):
+    with pytest.raises(ValueError, match="TED_MCP_PROTOKOL_2026"):
+        config.load_settings(_env(TED_MCP_PROTOKOL_2026=raw), project_root=tmp_path)
+
+
 # -- SP2 final review F1: spec §7 time budget (25 s per call, 60 s per tool) ---------------------
 
 class _Clock:

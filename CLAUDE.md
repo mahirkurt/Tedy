@@ -349,6 +349,37 @@ unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
   isteğini reddederse günlükte `mcp_reddedildi durum=… surum=… mesaj=…` satırı çıkar (bearer ve gövde yazılmaz).
   Ana checkout'a birleştirmeden sonra `ted-dashboard` ve `ted-mcp` ikisi de yeniden başlatılır (ikisi de
   buradan çalışır; `src/mcp_client.py` ortaktır).
+- MCP SDK 2.x (`mcp==2.3.0`, 2026-10-24 dalı `mcp-sdk-2`): sunucu `MCPServer`'dır (`FastMCP` yok). SDK, 2026-07-28
+  tek istek zarfını (initialize yok, `server/discover`, başlıkta `MCP-Protocol-Version`/`Mcp-Method`/`Mcp-Name`) ve
+  initialize el sıkışmasını (2024-11-05, 2025-03-26, 2025-06-18, 2025-11-25) aynı `/mcp`'den sunar. **2026-07-28
+  bayrakla açılır:** `TED_MCP_PROTOKOL_2026` (yalnız `0`/`1`, varsayılan `0`, geçersiz değer açılışı durdurur;
+  `env_prep.UNIT_ONLY`'dedir, `.env`'e yazılmaz). `0` iken `http_app.Protokol2026Kapisi` (SDK'nın hemen önü,
+  BearerGate'in arkası) el sıkışma dışı bir sürüm başlığı taşıyan her `/mcp` isteğine 1.28.1'in 400 gövdesini bayt
+  bayt verir — initialize hariç: 1.28.1 gibi başlığa bakmaz, kapı başlığı düşürüp gövdeyi el sıkışma yoluna
+  oynatır; claude.ai bu yanıttan sonra eski sürüme düşer, yani SDK yükseltmesi tek başına davranış değiştirmez.
+  Açmak: birimde `Environment=TED_MCP_PROTOKOL_2026=1` (ya da drop-in) + `daemon-reload` + restart; kapatmak `0`.
+  Modern her istek bir INFO satırı yazar: `mcp_modern yontem=… ad=… surum=… durum=… sure_ms=… sse=evet|hayır
+  koptu=evet|hayır` (gövde ve bearer yazılmaz). Ulaşım ayarları kurucuda değil `http_app.build_app`'in
+  `streamable_http_app()` çağrısındadır (stateless, SDK DNS koruması kapalı — işi `HostGuardMiddleware` yapar —,
+  gövde tavanı `TED_MCP_MAX_BODY_BYTES`); `json_response=True` yalnız testlerdir. `subscriptions=False`:
+  `subscriptions/listen` sunulmaz, iki dönem de `listChanged=false` der. 2026-07-28'de `ping` ve `initialize`
+  yoktur (404, `mcp_reddedildi durum=404` satırı normaldir); 15 sn'yi aşan araç SSE'ye geçer, 15 sn'de bir
+  `: ping` yazar. Beklenmeyen istisnanın metni istemciye gitmez ("Error executing tool <ad>"); `ToolError` metni
+  gider. Geçiş betiği `scripts/ted_mcp_sdk2_gecis.sh`: kullanıcı onayıyla, birleştirmeden önce çalışma ağacındaki
+  kopyadan ve terminal kopsa da yarım kalmasın diye ayrı birimde koşulur — `systemd-run --user --wait --collect
+  --unit=ted-mcp-gecis bash <betik>` (çıkış kodu systemd-run'ın kendi çıkışıdır; izleme `journalctl --user -u
+  ted-mcp-gecis -f`). Ön koşullar değişiklik yapmaz: main, izlenen dosyalar temiz, `HEAD` = `e1ceaf6` (sert),
+  kayıtlı dal ucu sha'sı, dizinde yalnız betiğe gömülü sha256'lı dört tekerlek (`/home/mahirkurt/tekerlekler/
+  ted-mcp-2026-10/`, 1.28.1 dahil), kurulu mcp 1.28.1, `pip check` tabanı, `--dry-run` tam üç paket. Sonra `stop` →
+  checkout hâlâ main ve önceki HEAD mi → `merge --ff-only <dal ucu>` → `pip --no-index` → tabana göre `pip check` →
+  `reset-failed` + `start` → `/health` → `git rev-parse main` dal ucunu içeriyor mu. Düşen adım ya da INT/TERM/HUP
+  tek girişli geri dönüşü başlatır; main'e yalnız checkout main iken dokunulur: commit'lerimiz ucuysa `git reset
+  --keep`, üstüne başka commit geldiyse `git revert` (çakışırsa `--abort`, servis kapalı kalır), push yok; başka dal
+  ya da başka oturumun commit'i asla geri sarılmaz. Çıkış: 0 tamam, 1 hiçbir şey değişmedi, 2 geri dönüldü (1.28.1
+  ayakta), 3 elle bakılmalı (servis kapalı olabilir), 4 stop düştü ve kapalı servis geçişsiz yeniden başlatıldı.
+  Prova: `tests/test_ted_mcp_gecis_betigi.py` (sahte depo ve sahte systemctl/pip/curl/journalctl/git, 19 senaryo).
+  Sonradan elle geri dönüş raporun §7'sindedir (günlükteki `dal ucu=` sha'sıyla, dal ve ata denetimiyle); yalnız
+  2026-07-28 sorunluysa kod ve paket kalır, bayrak `0` yapılır. Ayrıntı: `.claude/worktrees/mcp-sdk-2-rapor.md`.
 - Ortam: `TED_MCP_FORM_SECRET` (zorunlu, ≥32 bayt, OAuth form imzası), `TED_MCP_PUBLIC_BASE_URL` (varsayılan
   `https://mcp.tedy.online`), `TED_MCP_ALLOWED_HOSTS` (Host başlığı allowlist'i), `TED_MCP_HOST`/`TED_MCP_PORT`
   (yalnız `python -m src.mcp_server.http_app` bind adresi), `TED_MCP_PROJECT_ROOT` (test/servis için proje kökünü

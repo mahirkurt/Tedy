@@ -16,7 +16,10 @@ from typing import Any, Callable, Mapping
 from urllib.parse import urlencode, urlsplit
 
 import anyio
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import INVALID_REQUEST, ErrorData, JSONRPCError
+from mcp.types.version import HANDSHAKE_PROTOCOL_VERSIONS, MODERN_PROTOCOL_VERSIONS
 from starlette.applications import Starlette
 from starlette.datastructures import FormData
 from starlette.middleware import Middleware
@@ -211,10 +214,15 @@ def is_acceptable_client_name(name: object) -> bool:
 
 
 def _header(scope: Scope, name: bytes) -> str:
+    return _header_or_none(scope, name) or ""
+
+
+def _header_or_none(scope: Scope, name: bytes) -> str | None:
+    """İlk eşleşen başlık; hiç yoksa None (boş değerli başlık "" döner, yoklukla karışmaz)."""
     for key, value in scope.get("headers") or []:
         if key == name:
             return value.decode("latin-1")
-    return ""
+    return None
 
 
 async def _send_json(send: Send, status: int, body: dict[str, Any], extra: list[tuple[bytes, bytes]] | None = None) -> None:
@@ -244,7 +252,13 @@ class CorsMiddleware:
         if scope["method"] == "OPTIONS" and _header(scope, b"access-control-request-method"):
             headers = cors + ([
                 (b"access-control-allow-methods", b"GET, POST, DELETE, OPTIONS"),
-                (b"access-control-allow-headers", b"authorization, content-type, mcp-session-id, mcp-protocol-version"),
+                # mcp-method / mcp-name: 2026-07-28 istemcileri her istekte gönderir (SDK bunları gövdeyle
+                # karşılaştırır); listede olmasalar tarayıcıdaki bir 2026 istemcisinin ön uçuşu düşerdi.
+                # Mcp-Param-<Ad> başlıkları bilerek yok: yalnız şemasında x-mcp-header taşıyan araçlar için
+                # gönderilir, adları araca göre değişir ve bizim araçlarımızda hiç yok. Böyle bir araç eklenirse
+                # başlık adları buraya tek tek yazılmalı (kimlik bilgili istekte "*" geçmez).
+                (b"access-control-allow-headers",
+                 b"authorization, content-type, mcp-session-id, mcp-protocol-version, mcp-method, mcp-name"),
                 (b"access-control-max-age", b"600"),
             ] if allowed else [])
             await send({"type": "http.response.start", "status": 204, "headers": headers})
@@ -337,6 +351,10 @@ class TransportRejectLogMiddleware:
 
     Measured 2026-10-03/04: every reconnect from claude.ai began with one unexplained
     "POST /mcp 400" before a normal session; uvicorn's access line alone could not say why.
+
+    2026-07-28 (modern) isteklerine ayrıca bir INFO gözlem satırı yazar: yöntem ve araç adı (başlıklardan;
+    gövde okunmaz), sürüm, durum, süre, SSE'ye geçilip geçilmediği ve yanıt tamamlanmadan istemcinin kopup
+    kopmadığı. Yeni protokolün canlıda ilk günlerini izlemek için; bearer ve gövde yazılmaz.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -346,23 +364,139 @@ class TransportRejectLogMiddleware:
         if scope["type"] != "http" or not scope["path"].startswith("/mcp"):
             await self.app(scope, receive, send)
             return
-        seen: dict[str, Any] = {"status": None, "body": b""}
+        seen: dict[str, Any] = {"status": None, "body": b"", "sse": False, "bitti": False, "koptu": False}
+        modern = _header_or_none(scope, b"mcp-protocol-version") in MODERN_PROTOCOL_VERSIONS
+        start = time.monotonic()
 
         async def capture(message: dict[str, Any]) -> None:
             if message["type"] == "http.response.start":
                 seen["status"] = message["status"]
-            elif (message["type"] == "http.response.body" and seen["status"] in _TRANSPORT_REJECT
-                  and len(seen["body"]) < _REJECT_BODY_CAP):
-                seen["body"] += message.get("body", b"")[:_REJECT_BODY_CAP]
+                seen["sse"] = any(k == b"content-type" and v.startswith(b"text/event-stream")
+                                  for k, v in message.get("headers") or [])
+            elif message["type"] == "http.response.body":
+                if seen["status"] in _TRANSPORT_REJECT and len(seen["body"]) < _REJECT_BODY_CAP:
+                    seen["body"] += message.get("body", b"")[:_REJECT_BODY_CAP]
+                if not message.get("more_body", False):
+                    seen["bitti"] = True
             await send(message)
 
+        # Yalnız modern isteklerde: istemcinin kopuşunu yanıt bitmeden görmek için.
+        async def watch() -> dict[str, Any]:
+            message = await receive()
+            if message["type"] == "http.disconnect" and not seen["bitti"]:
+                seen["koptu"] = True
+            return message
+
         try:
-            await self.app(scope, receive, capture)
+            await self.app(scope, watch if modern else receive, capture)
         finally:
             if seen["status"] in _TRANSPORT_REJECT:
                 version = _header(scope, b"mcp-protocol-version")[:40] or None
                 logger.warning("mcp_reddedildi durum=%s surum=%r mesaj=%r", seen["status"], version,
                                _reject_reason(seen["body"]))
+            if modern:
+                if (scope.get("state") or {}).get(_GOVDE_TAVANI):
+                    # 413'ü dıştaki BodyLimitMiddleware yazdı; taşımanın denediği yanıt düşürüldü. Akışın
+                    # kesilmesi de onun eseri (yapay http.disconnect), istemcinin kopuşu değil.
+                    _modern_gozlem(scope, 413, start, sse=False, koptu=False)
+                else:
+                    # Başlamış ama son parçası yazılmamış yanıt da kopuş sayılır (istemci ya da ara katman kesti).
+                    _modern_gozlem(scope, seen["status"], start, sse=seen["sse"],
+                                   koptu=seen["koptu"] or (seen["status"] is not None and not seen["bitti"]))
+
+
+# BodyLimitMiddleware 413 yazdığında scope["state"]'e koyduğu işaret (gözlem satırı 413'ü buradan bilir).
+_GOVDE_TAVANI = "ted_govde_tavani"
+# Protokol2026Kapisi bir initialize'ı el sıkışma yoluna geçirdiğinde koyduğu işaret.
+_GECIRILEN_INITIALIZE = "ted_initialize"
+
+
+def _modern_gozlem(scope: Scope, durum: int | None, baslangic: float, sse: bool, koptu: bool) -> None:
+    """2026-07-28 başlıklı /mcp isteğinin INFO gözlem satırı; yol /mcp değilse ya da başlık modern değilse
+    hiçbir şey yazmaz (BodyLimitMiddleware /oauth/* için de çağırır)."""
+    if not str(scope.get("path", "")).startswith("/mcp"):
+        return
+    if _header_or_none(scope, b"mcp-protocol-version") not in MODERN_PROTOCOL_VERSIONS:
+        return
+    yontem = _header(scope, b"mcp-method")[:40]
+    if not yontem and (scope.get("state") or {}).get(_GECIRILEN_INITIALIZE):
+        yontem = "initialize"
+    ad = _header_or_none(scope, b"mcp-name")
+    logger.info("mcp_modern yontem=%r ad=%r surum=%r durum=%s sure_ms=%d sse=%s koptu=%s",
+                yontem, ad[:64] if ad else None, _header(scope, b"mcp-protocol-version"), durum,
+                int((time.monotonic() - baslangic) * 1000), "evet" if sse else "hayır", "evet" if koptu else "hayır")
+
+
+def _eski_surum_reddi(surum: str) -> Response:
+    """mcp 1.28.1'in StreamableHTTPServerTransport._create_error_response gövdesi, bayt bayt."""
+    hata = JSONRPCError(jsonrpc="2.0", id="server-error", error=ErrorData(
+        code=INVALID_REQUEST,
+        message=f"Bad Request: Unsupported protocol version: {surum}. "
+                f"Supported versions: {', '.join(HANDSHAKE_PROTOCOL_VERSIONS)}"))
+    return Response(hata.model_dump_json(by_alias=True, exclude_none=True), status_code=400,
+                    headers={"Content-Type": "application/json"})
+
+
+def _initialize_mi(govde: bytes) -> bool:
+    try:
+        mesaj = json.loads(govde)
+    except (ValueError, RecursionError):
+        return False
+    if not (isinstance(mesaj, dict) and mesaj.get("method") == "initialize"):
+        return False
+    # 1.28.1'in JSONRPCRequest doğrulaması gibi: id yalnız str ya da int (bool, null, kesirli sayı değil).
+    kimlik = mesaj.get("id")
+    return isinstance(kimlik, str) or (isinstance(kimlik, int) and not isinstance(kimlik, bool))
+
+
+class Protokol2026Kapisi:
+    """TED_MCP_PROTOKOL_2026=0 iken (varsayılan) SDK'nın hemen önünde durur: el sıkışma sürümleri dışında bir
+    mcp-protocol-version taşıyan /mcp isteğine 1.28.1'in bugün canlıda verdiği 400'ü verir. claude.ai tam
+    bu yanıttan sonra eski sürüme düşüyor; böylece SDK 2.x'e geçiş tek başına davranış değiştirmez ve 2026-07-28
+    ayrı, bilinçli bir adımla (birimde bayrak 1) açılır. BearerGate'in arkasındadır: kimliksiz istek yine 401
+    alır. Ret satırını dıştaki TransportRejectLogMiddleware bugünkü biçimde yazar.
+
+    Tek istisna, 1.28.1'deki gibi initialize: 1.28.1 initialize'da başlığa hiç bakmaz, gövdedeki protocolVersion'u
+    müzakere eder. 2.x ise başlığa göre yönlendirir (2026 başlıklı initialize'a 404 verirdi). Bu yüzden POST
+    gövdesi okunur (dıştaki BodyLimitMiddleware tavanıyla); initialize ise başlık düşürülüp gövde yeniden
+    oynatılarak el sıkışma yoluna gider. Geri düşen bir istemcinin initialize'ı başlığı taşısa bile bağlanır.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope["path"].startswith("/mcp"):
+            surum = _header_or_none(scope, b"mcp-protocol-version")
+            if surum is not None and surum not in HANDSHAKE_PROTOCOL_VERSIONS:
+                if scope["method"] == "POST":
+                    parcalar: list[bytes] = []
+                    while True:
+                        message = await receive()
+                        if message["type"] != "http.request":
+                            return  # istemci gitti ya da gövde tavanı aşıldı (413'ü BodyLimitMiddleware yazdı)
+                        parcalar.append(message.get("body", b""))
+                        if not message.get("more_body", False):
+                            break
+                    govde = b"".join(parcalar)
+                    if _initialize_mi(govde):
+                        oynatildi = False
+
+                        async def yeniden_oynat() -> dict[str, Any]:
+                            nonlocal oynatildi
+                            if not oynatildi:
+                                oynatildi = True
+                                return {"type": "http.request", "body": govde, "more_body": False}
+                            return await receive()
+
+                        # İşaret kopyadan önce: sığ kopya aynı state sözlüğünü paylaşır, gözlem satırı görür.
+                        scope.setdefault("state", {})[_GECIRILEN_INITIALIZE] = True
+                        basliklar = [(k, v) for k, v in scope["headers"] if k != b"mcp-protocol-version"]
+                        await self.app({**scope, "headers": basliklar}, yeniden_oynat, send)
+                        return
+                await _eski_surum_reddi(surum)(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
 
 
 class BodyLimitMiddleware:
@@ -392,7 +526,10 @@ class BodyLimitMiddleware:
             return
         declared = _header(scope, b"content-length")
         if declared.isascii() and declared.isdigit() and int(declared) > limit:
+            scope.setdefault("state", {})[_GOVDE_TAVANI] = True
             await _send_too_large(send)
+            # Uygulama (ve içindeki gözlem katmanı) hiç çağrılmadığı için satırı burada yazar.
+            _modern_gozlem(scope, 413, time.monotonic(), sse=False, koptu=False)
             return
 
         received = 0
@@ -409,6 +546,7 @@ class BodyLimitMiddleware:
                 if received > limit:
                     rejected = True
                     if not response_started:
+                        scope.setdefault("state", {})[_GOVDE_TAVANI] = True
                         await _send_too_large(send)
                     return {"type": "http.disconnect"}
             return message
@@ -440,11 +578,12 @@ async def _limited_form(request: Request) -> FormData:
 def build_app(
     settings: Settings,
     store: OAuthStore,
-    mcp: FastMCP,
+    mcp: MCPServer,
     verify_identity: IdentityVerifier = verify_google_credential,
     form_secret: bytes = b"",
     clock: Callable[[], float] = time.time,
     viewer: ASGIApp | None = None,
+    json_response: bool = False,
 ) -> Starlette:
     from src.mcp_server.goruntuleyici import ViewerHostRouter
 
@@ -668,7 +807,17 @@ def build_app(
                                               str(form.get("refresh_token", "")), client_id)
         return _token_response(pair) if pair else _grant_error("invalid_grant")
 
-    streamable = mcp.streamable_http_app()
+    # mcp 2.x ulaşım ayarlarını kurucudan değil buradan alır. stateless_http: her istek kendi taşımasıyla,
+    # oturum kimliği yok (1.x'teki gibi). SDK'nın DNS-rebinding koruması kapalı: o işi HostGuardMiddleware
+    # yapar ve SDK'nınki açıkken genel adı (mcp.tedy.online) 421 ile reddederdi. Gövde tavanı ayarla aynı:
+    # SDK'nın varsayılan 4 MiB tavanı TED_MCP_MAX_BODY_BYTES'ın altında kalıp kendi 413 biçimini yazmasın;
+    # dıştaki BodyLimitMiddleware her zaman önce keser. json_response yalnız testler içindir (üretim SSE).
+    streamable = mcp.streamable_http_app(
+        stateless_http=True,
+        json_response=json_response,
+        transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+        max_request_body_size=settings.mcp_max_body_bytes,
+    )
 
     @contextlib.asynccontextmanager
     async def lifespan(app: Starlette) -> Any:
@@ -702,6 +851,8 @@ def build_app(
             Middleware(BearerGateMiddleware, store=store, base_url=base),
             Middleware(BodyLimitMiddleware, mcp_max_body_bytes=settings.mcp_max_body_bytes),
             Middleware(TransportRejectLogMiddleware),
+            # En içte, SDK'nın hemen önünde; bayrak açıkken hiç takılmaz.
+            *([] if settings.protokol_2026 else [Middleware(Protokol2026Kapisi)]),
         ],
     )
 

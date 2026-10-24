@@ -9,8 +9,8 @@ from urllib.parse import parse_qs, urlparse
 
 import anyio
 import pytest
-from mcp.server.fastmcp import Context, FastMCP
-from mcp.server.transport_security import TransportSecuritySettings
+from mcp.server.mcpserver import Context, MCPServer
+from mcp.types import CLIENT_CAPABILITIES_META_KEY, PROTOCOL_VERSION_META_KEY
 from starlette.testclient import TestClient
 
 from src.mcp_server import google_identity, http_app
@@ -32,9 +32,9 @@ def _challenge(v: str) -> str:
     return base64.urlsafe_b64encode(hashlib.sha256(v.encode()).digest()).rstrip(b"=").decode()
 
 
-def _test_mcp() -> FastMCP:
-    mcp = FastMCP("test", stateless_http=True, json_response=True,
-                  transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
+def _test_mcp() -> MCPServer:
+    # mcp 2.x: stateless ve DNS-rebinding ayarları build_app'tedir; json_response=True çağrıda verilir.
+    mcp = MCPServer("test")
 
     @mcp.tool()
     def kimim(ctx: Context) -> dict:
@@ -121,7 +121,7 @@ class ParkingStore(OAuthStore):
 def _app(tmp_path, store, verifier, clock, **settings_env):
     settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE, **settings_env}, project_root=tmp_path)
     return http_app.build_app(settings, store, _test_mcp(), verify_identity=verifier,
-                              form_secret=b"s" * 32, clock=clock)
+                              form_secret=b"s" * 32, clock=clock, json_response=True)
 
 
 def _register(client, uris=(REDIRECT, LOOPBACK), name="Claude") -> str:
@@ -135,6 +135,16 @@ def ctx(tmp_path):
     clock, verifier = Clock(), Verifier()
     store = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
     with TestClient(_app(tmp_path, store, verifier, clock), base_url=BASE, follow_redirects=False) as client:
+        yield client, verifier, clock, store, _register(client)
+
+
+@pytest.fixture
+def ctx_2026(tmp_path):
+    """ctx ile aynı, TED_MCP_PROTOKOL_2026=1."""
+    clock, verifier = Clock(), Verifier()
+    store = OAuthStore(tmp_path / "oauth.sqlite3", clock=clock)
+    app = _app(tmp_path, store, verifier, clock, TED_MCP_PROTOKOL_2026="1")
+    with TestClient(app, base_url=BASE, follow_redirects=False) as client:
         yield client, verifier, clock, store, _register(client)
 
 
@@ -180,6 +190,16 @@ def _tool_call(client, access_token):
     return client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
                                      "params": {"name": "kimim", "arguments": {}}},
                        headers={**MCP_HEADERS, "authorization": f"Bearer {access_token}"})
+
+
+def _modern_tool_call(client, access_token):
+    """Aynı çağrı 2026-07-28 zarfıyla: claude.ai'nin önce denediği sürüm (initialize yok)."""
+    meta = {PROTOCOL_VERSION_META_KEY: "2026-07-28", CLIENT_CAPABILITIES_META_KEY: {}}
+    return client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                                     "params": {"name": "kimim", "arguments": {}, "_meta": meta}},
+                       headers={**MCP_HEADERS, "authorization": f"Bearer {access_token}",
+                                "mcp-protocol-version": "2026-07-28", "mcp-method": "tools/call",
+                                "mcp-name": "kimim"})
 
 
 SIGN_IN_CSP = (
@@ -290,8 +310,8 @@ def test_authorize_get_rejects_bad_requests(ctx, over, reason):
     assert "form_state" not in r.text
 
 
-def test_full_round_trip_to_mcp_and_refresh(ctx):
-    client, verifier, _, _, client_id = ctx
+def test_full_round_trip_to_mcp_and_refresh(ctx_2026):
+    client, verifier, _, _, client_id = ctx_2026
     form_state = _start(client, verifier, client_id)
     r = _approve(client, form_state, _credential(FULL))
     assert r.status_code == 302
@@ -309,11 +329,25 @@ def test_full_round_trip_to_mcp_and_refresh(ctx):
     call = _tool_call(client, body["access_token"])
     assert call.status_code == 200
     assert json.loads(call.json()["result"]["content"][0]["text"]) == {"email": FULL}
+    modern = _modern_tool_call(client, body["access_token"])
+    assert modern.status_code == 200
+    assert json.loads(modern.json()["result"]["content"][0]["text"]) == {"email": FULL}
 
     again = client.post("/oauth/token", data={"grant_type": "refresh_token", "refresh_token": body["refresh_token"],
                                               "client_id": client_id})
     assert again.status_code == 200
     assert again.json()["access_token"] != body["access_token"]
+
+
+def test_bayrak_kapaliyken_oauth_jetonuyla_2026_cagrisi_eski_400_alir(ctx):
+    """Varsayılan: OAuth jetonu geçerli ama 2026-07-28 bugünkü 400'ü alır; el sıkışma yolu çalışır."""
+    client, verifier, _, _, client_id = ctx
+    code = _code_from(_approve(client, _start(client, verifier, client_id), _credential(FULL)))
+    token = _redeem(client, client_id, code).json()["access_token"]
+    modern = _modern_tool_call(client, token)
+    assert modern.status_code == 400
+    assert modern.json()["error"]["message"].startswith("Bad Request: Unsupported protocol version: 2026-07-28.")
+    assert _tool_call(client, token).status_code == 200
 
 
 def test_reader_role_is_refused_without_code(ctx):

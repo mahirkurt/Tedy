@@ -35,6 +35,8 @@ TOPOLOGY = ("TED_MCP_HOST", "TED_MCP_PORT", "TED_MCP_PUBLIC_BASE_URL", "TED_MCP_
             "TED_DASHBOARD_API_URL")
 UNIT_ONLY = TOPOLOGY + ("TED_MCP_PROJECT_ROOT", "TED_MCP_MAX_BODY_BYTES", "TED_MCP_EXTRA_REDIRECT_URIS",
                         "TED_MCP_EXTRA_FORM_ACTION_ORIGINS",
+                        # 2026-07-28 anahtarı birimin Environment= satırında ya da drop-in'de açılır/kapanır.
+                        "TED_MCP_PROTOKOL_2026",
                         # Istanbul time for the whole of TEDY (src/env_loader.py); a TZ in .env
                         # would beat the unit and could split the two services onto two clocks.
                         "TZ")

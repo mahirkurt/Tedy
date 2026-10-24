@@ -2,10 +2,11 @@
 import asyncio
 import json
 import logging
+import re
 
 import pytest
-from mcp.server.fastmcp import Context, FastMCP
-from mcp.server.transport_security import TransportSecuritySettings
+from mcp.server.mcpserver import Context, MCPServer
+from mcp.types import CLIENT_CAPABILITIES_META_KEY, CLIENT_INFO_META_KEY, PROTOCOL_VERSION_META_KEY
 from starlette.testclient import TestClient
 
 from src.mcp_server import google_identity, http_app, oauth_store
@@ -17,13 +18,9 @@ BASE = "https://mcp.tedy.online"
 FULL = "drmahirkurt@gmail.com"
 
 
-def _test_mcp() -> FastMCP:
-    mcp = FastMCP(
-        "test",
-        stateless_http=True,
-        json_response=True,
-        transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
-    )
+def _test_mcp() -> MCPServer:
+    # mcp 2.x: stateless ve DNS-rebinding ayarları build_app'tedir; json_response=True çağrıda verilir.
+    mcp = MCPServer("test")
 
     @mcp.tool()
     def kimim(ctx: Context) -> dict:
@@ -40,7 +37,16 @@ def store(tmp_path):
 @pytest.fixture
 def client(tmp_path, store):
     settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
-    app = build_app(settings, store, _test_mcp(), form_secret=b"s" * 32)
+    app = build_app(settings, store, _test_mcp(), json_response=True, form_secret=b"s" * 32)
+    with TestClient(app, base_url=BASE) as c:
+        yield c
+
+
+@pytest.fixture
+def client_2026(tmp_path, store):
+    """TED_MCP_PROTOKOL_2026=1: 2026-07-28 tek istek protokolü açık."""
+    settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_PROTOKOL_2026": "1"}, project_root=tmp_path)
+    app = build_app(settings, store, _test_mcp(), json_response=True, form_secret=b"s" * 32)
     with TestClient(app, base_url=BASE) as c:
         yield c
 
@@ -50,6 +56,17 @@ def _rpc(method, params=None, id_=1):
 
 
 MCP_HEADERS = {"accept": "application/json, text/event-stream", "content-type": "application/json"}
+MODERN = "2026-07-28"
+
+
+def _modern(method, params=None, surum=MODERN, ad=None):
+    """2026-07-28 tek istek zarfı: gövdede _meta, başlıkta sürüm ve yöntem (araç çağrısında adı da)."""
+    meta = {PROTOCOL_VERSION_META_KEY: surum, CLIENT_CAPABILITIES_META_KEY: {},
+            CLIENT_INFO_META_KEY: {"name": "test", "version": "0"}}
+    headers = {**MCP_HEADERS, "mcp-protocol-version": surum, "mcp-method": method}
+    if ad is not None:
+        headers["mcp-name"] = ad
+    return _rpc(method, {**(params or {}), "_meta": meta}), headers
 
 
 def test_health(client):
@@ -182,6 +199,9 @@ def test_preflight_short_circuits_before_auth(client):
     ok = client.options("/mcp", headers={"origin": "https://grok.com", "access-control-request-method": "POST"})
     assert ok.status_code == 204
     assert ok.headers["access-control-allow-origin"] == "https://grok.com"
+    # 2026-07-28 istemcisinin her istekte gönderdiği yönlendirme başlıkları ön uçuşta izinli.
+    allowed = {h.strip() for h in ok.headers["access-control-allow-headers"].split(",")}
+    assert {"authorization", "mcp-protocol-version", "mcp-method", "mcp-name"} <= allowed
     bad = client.options("/mcp", headers={"origin": "https://evil.example", "access-control-request-method": "POST"})
     assert bad.status_code == 204
     assert "access-control-allow-origin" not in bad.headers
@@ -189,7 +209,7 @@ def test_preflight_short_circuits_before_auth(client):
 
 def test_host_guard_rejects_foreign_host(tmp_path, store):
     settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
-    app = build_app(settings, store, _test_mcp(), form_secret=b"s" * 32)
+    app = build_app(settings, store, _test_mcp(), json_response=True, form_secret=b"s" * 32)
     with TestClient(app, base_url="https://evil.example") as c:
         r = c.post("/mcp", json=_rpc("initialize"), headers=MCP_HEADERS)
     assert r.status_code == 400
@@ -203,9 +223,9 @@ def test_well_known_metadata_ignores_the_host_header(tmp_path, store):
     from whatever Host header a client happens to send — otherwise a spoofed or DNS-rebound Host
     could forge the issuer/endpoint URLs a client's authorization flow trusts."""
     settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
-    # Two separate build_app() calls: each FastMCP session manager may only be .run() once, so the
+    # Two separate build_app() calls: each MCPServer session manager may only be .run() once, so the
     # same app instance cannot be entered by two TestClient `with` blocks.
-    evil_app = build_app(settings, store, _test_mcp(), form_secret=b"s" * 32)
+    evil_app = build_app(settings, store, _test_mcp(), json_response=True, form_secret=b"s" * 32)
     with TestClient(evil_app, base_url="https://evil.example") as evil:
         auth_meta = evil.get("/.well-known/oauth-authorization-server").json()
         res_meta = evil.get("/.well-known/oauth-protected-resource").json()
@@ -215,7 +235,7 @@ def test_well_known_metadata_ignores_the_host_header(tmp_path, store):
     assert auth_meta["registration_endpoint"] == f"{BASE}/oauth/register"
     assert res_meta["resource"] == f"{BASE}/mcp"
     assert res_meta["authorization_servers"] == [BASE]
-    allowed_app = build_app(settings, store, _test_mcp(), form_secret=b"s" * 32)
+    allowed_app = build_app(settings, store, _test_mcp(), json_response=True, form_secret=b"s" * 32)
     with TestClient(allowed_app, base_url=BASE) as allowed:
         r = allowed.post("/mcp", json=_rpc("initialize"), headers=MCP_HEADERS)
     assert f'resource_metadata="{BASE}/.well-known/oauth-protected-resource"' in r.headers["www-authenticate"]
@@ -383,7 +403,7 @@ def test_mcp_body_limit_is_read_from_the_environment(tmp_path, store):
     call = _rpc("tools/call", {"name": "kimim", "arguments": {}, "_meta": {"pad": "x" * 600}})
     headers = {**MCP_HEADERS, "authorization": f"Bearer {key}"}
     small = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_MAX_BODY_BYTES": "512"}, project_root=tmp_path)
-    with TestClient(build_app(small, store, _test_mcp(), form_secret=b"s" * 32), base_url=BASE) as c:
+    with TestClient(build_app(small, store, _test_mcp(), json_response=True, form_secret=b"s" * 32), base_url=BASE) as c:
         assert c.post("/mcp", json=call, headers=headers).status_code == 413
 
         def chunks():
@@ -394,7 +414,7 @@ def test_mcp_body_limit_is_read_from_the_environment(tmp_path, store):
         assert streamed.status_code == 413  # not the transport's 500, even though it catches the abort
     default = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
     assert default.mcp_max_body_bytes == 2_097_152
-    with TestClient(build_app(default, store, _test_mcp(), form_secret=b"s" * 32), base_url=BASE) as c:
+    with TestClient(build_app(default, store, _test_mcp(), json_response=True, form_secret=b"s" * 32), base_url=BASE) as c:
         r = c.post("/mcp", json=call, headers=headers)
     assert r.status_code == 200
     assert json.loads(r.json()["result"]["content"][0]["text"]) == {"email": FULL}
@@ -478,7 +498,7 @@ def test_host_guard_compares_configured_hosts_case_insensitively(tmp_path, store
     assert _host_guard_status(b"mcp.tedy.online", allowed=("MCP.TEDY.ONLINE",)) == 204
     settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_ALLOWED_HOSTS": "MCP.Tedy.Online"},
                              project_root=tmp_path)
-    with TestClient(build_app(settings, store, _test_mcp(), form_secret=b"s" * 32), base_url=BASE) as c:
+    with TestClient(build_app(settings, store, _test_mcp(), json_response=True, form_secret=b"s" * 32), base_url=BASE) as c:
         r = c.post("/mcp", json=_rpc("initialize"), headers=MCP_HEADERS)
     assert r.status_code == 401  # passed the host guard, stopped at the bearer gate
 
@@ -512,7 +532,7 @@ def test_startup_purges_expired_rows_in_a_worker_thread(tmp_path):
     clock.now += 2 * 24 * 3600  # the code expired well over a day ago
 
     settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
-    app = build_app(settings, store, _test_mcp(), form_secret=b"s" * 32)
+    app = build_app(settings, store, _test_mcp(), json_response=True, form_secret=b"s" * 32)
     assert purge_threads == []  # building the app does not touch the database
     with TestClient(app, base_url=BASE) as c:
         async def loop_thread():
@@ -541,7 +561,7 @@ def test_vscode_web_redirect_is_accepted_when_listed_in_extra_redirect_uris(tmp_
     extra = ("https://vscode.dev/redirect", "https://insiders.vscode.dev/redirect")
     settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_EXTRA_REDIRECT_URIS": ",".join(extra)},
                              project_root=tmp_path)
-    with TestClient(build_app(settings, store, _test_mcp(), form_secret=b"s" * 32), base_url=BASE) as c:
+    with TestClient(build_app(settings, store, _test_mcp(), json_response=True, form_secret=b"s" * 32), base_url=BASE) as c:
         for uri in extra:
             r = c.post("/oauth/register", json={"redirect_uris": [uri], "client_name": "Visual Studio Code"})
             assert r.status_code == 201, r.text
@@ -573,7 +593,7 @@ def test_a_registration_burst_stops_blocking_new_connectors_after_the_eviction_f
     floor = 2 * http_app.FORM_TTL_SECONDS  # a whole two-step consent
     body = {"redirect_uris": [REDIRECT], "client_name": "Claude"}
     settings = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE}, project_root=tmp_path)
-    with TestClient(build_app(settings, store, _test_mcp(), form_secret=b"s" * 32), base_url=BASE) as c:
+    with TestClient(build_app(settings, store, _test_mcp(), json_response=True, form_secret=b"s" * 32), base_url=BASE) as c:
         # Inside the floor, including past sign-in form + code lifetime: those clients may still be mid-consent.
         for now in (t0, t0 + http_app.FORM_TTL_SECONDS + oauth_store.CODE_TTL_SECONDS + 1, t0 + floor):
             clock.now = now
@@ -688,17 +708,48 @@ def test_successful_register_writes_no_rejection_line(client, caplog):
 
 # -- ted-mcp sağlık (2026-10-04): why the transport refused a request reaches the journal ---------
 
-def test_transport_rejection_logs_the_declared_version_and_reason(client, store, caplog):
+def test_transport_rejection_logs_the_declared_version_and_reason(client_2026, store, caplog):
+    # mcp 2.x 2026-07-28'i sunar; reddi ölçmek için SDK'nın tanımadığı bir sürüm gerekir.
     key = store.create_static_key("surum", FULL)
-    headers = {**MCP_HEADERS, "authorization": f"Bearer {key}", "mcp-protocol-version": "2026-07-28"}
+    body, headers = _modern("tools/list", surum="2099-01-01")
     with caplog.at_level(logging.WARNING, logger="src.mcp_server.http_app"):
-        r = client.post("/mcp", json=_rpc("tools/list"), headers=headers)
+        r = client_2026.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
     assert r.status_code == 400
+    assert r.json()["error"]["data"]["supported"] == [MODERN]
     lines = [rec.getMessage() for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]
     assert len(lines) == 1
-    assert "durum=400" in lines[0] and "'2026-07-28'" in lines[0]
+    assert "durum=400" in lines[0] and "'2099-01-01'" in lines[0]
     assert "Unsupported protocol version" in lines[0]
     assert key not in lines[0]
+
+
+def test_2026_07_28_request_is_served_with_identity_and_no_rejection(client_2026, store, caplog):
+    """claude.ai bağlayıcısı önce 2026-07-28 ister; 1.x bunu 400 ile reddediyordu (günlük 2026-10-23/24)."""
+    key = store.create_static_key("modern", FULL)
+    body, headers = _modern("tools/call", {"name": "kimim", "arguments": {}}, ad="kimim")
+    with caplog.at_level(logging.WARNING, logger="src.mcp_server.http_app"):
+        r = client_2026.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
+    assert r.status_code == 200
+    assert "mcp-session-id" not in r.headers
+    assert json.loads(r.json()["result"]["content"][0]["text"]) == {"email": FULL}
+    assert not [rec for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]
+
+
+def test_2026_07_28_request_without_bearer_is_still_401(client_2026):
+    body, headers = _modern("tools/list")
+    r = client_2026.post("/mcp", json=body, headers=headers)
+    assert r.status_code == 401
+    assert 'realm="ted-mcp"' in r.headers["www-authenticate"]
+
+
+def test_2026_07_28_header_body_mismatch_is_refused_and_logged(client_2026, store, caplog):
+    key = store.create_static_key("uyusmaz", FULL)
+    body, headers = _modern("tools/call", {"name": "kimim", "arguments": {}}, ad="baska_arac")
+    with caplog.at_level(logging.WARNING, logger="src.mcp_server.http_app"):
+        r = client_2026.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
+    assert r.status_code == 400
+    lines = [rec.getMessage() for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]
+    assert len(lines) == 1 and "'2026-07-28'" in lines[0] and "mcp-name" in lines[0]
 
 
 def test_accepted_requests_log_no_rejection(client, store, caplog):
@@ -709,3 +760,246 @@ def test_accepted_requests_log_no_rejection(client, store, caplog):
                         headers={**MCP_HEADERS, "authorization": f"Bearer {key}"})
     assert r.status_code == 200
     assert not [rec for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]
+
+
+# -- Düzeltme turu (2026-10-24): TED_MCP_PROTOKOL_2026 anahtarı ve modern istek gözlemi ---------------
+
+ESKI_RET = ("Bad Request: Unsupported protocol version: {v}. "
+            "Supported versions: 2024-11-05, 2025-03-26, 2025-06-18, 2025-11-25")
+
+
+def _eski_ret_govdesi(v):
+    # mcp 1.28.1 StreamableHTTPServerTransport._create_error_response'un bugün canlıda verdiği gövde.
+    return ('{"jsonrpc":"2.0","id":"server-error","error":{"code":-32600,"message":"'
+            + ESKI_RET.format(v=v) + '"}}').encode()
+
+
+@pytest.mark.parametrize("method", ["server/discover", "tools/list", "tools/call"])
+def test_bayrak_kapaliyken_2026_07_28_bugunku_400_ile_reddedilir(client, store, caplog, method):
+    """Varsayılan (0): claude.ai'nin bugün eski sürüme düştüğü yanıtın aynısı, bayt bayt."""
+    key = store.create_static_key("kapali", FULL)
+    params = {"name": "kimim", "arguments": {}} if method == "tools/call" else None
+    body, headers = _modern(method, params, ad="kimim" if method == "tools/call" else None)
+    with caplog.at_level(logging.WARNING, logger="src.mcp_server.http_app"):
+        r = client.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
+    assert r.status_code == 400
+    assert r.headers["content-type"] == "application/json"
+    assert r.content == _eski_ret_govdesi(MODERN)
+    assert "mcp-session-id" not in r.headers
+    lines = [rec.getMessage() for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]
+    assert lines == ["mcp_reddedildi durum=400 surum='2026-07-28' mesaj=" + repr(ESKI_RET.format(v=MODERN))]
+
+
+def test_bayrak_kapaliyken_taninmayan_surum_de_eski_bicimde_reddedilir(client, store):
+    key = store.create_static_key("taninmayan", FULL)
+    r = client.post("/mcp", json=_rpc("tools/list"),
+                    headers={**MCP_HEADERS, "authorization": f"Bearer {key}", "mcp-protocol-version": "2099-01-01"})
+    assert r.status_code == 400
+    assert r.content == _eski_ret_govdesi("2099-01-01")
+
+
+@pytest.mark.parametrize("surum", ["2025-06-18", "2025-11-25"])
+def test_bayrak_kapaliyken_el_sikisma_surumleri_calisir(client, store, surum):
+    key = store.create_static_key("el-sikisma", FULL)
+    auth = {**MCP_HEADERS, "authorization": f"Bearer {key}"}
+    init = client.post("/mcp", json=_rpc("initialize", {"protocolVersion": surum, "capabilities": {},
+                                                         "clientInfo": {"name": "t", "version": "0"}}), headers=auth)
+    call = client.post("/mcp", json=_rpc("tools/call", {"name": "kimim", "arguments": {}}),
+                       headers={**auth, "mcp-protocol-version": surum})
+    assert init.status_code == 200 and init.json()["result"]["protocolVersion"] == surum
+    assert call.status_code == 200
+    assert json.loads(call.json()["result"]["content"][0]["text"]) == {"email": FULL}
+
+
+@pytest.mark.parametrize("istenen,beklenen", [("2026-07-28", "2025-11-25"), ("2025-06-18", "2025-06-18")])
+def test_bayrak_kapaliyken_2026_basligli_initialize_1x_gibi_el_sikisir(client, store, caplog, istenen, beklenen):
+    """1.28.1 initialize'da sürüm başlığına hiç bakmaz (yalnız gövdedeki protocolVersion'u müzakere eder).
+    claude.ai'nin geri düşüş initialize'ı başlığı taşısa bile bugünkü gibi bağlanmalı."""
+    key = store.create_static_key("init", FULL)
+    with caplog.at_level(logging.WARNING, logger="src.mcp_server.http_app"):
+        r = client.post("/mcp", json=_rpc("initialize", {"protocolVersion": istenen, "capabilities": {},
+                                                          "clientInfo": {"name": "t", "version": "0"}}),
+                        headers={**MCP_HEADERS, "authorization": f"Bearer {key}", "mcp-protocol-version": MODERN})
+    assert r.status_code == 200
+    assert r.json()["result"]["protocolVersion"] == beklenen
+    assert not [rec for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]
+
+
+def test_bayrak_kapaliyken_kapinin_govde_okumasi_tavani_asmaz(tmp_path, store):
+    """Kapı initialize'ı tanımak için gövdeyi okur; tavanı aşan akış yine 413 alır (400 ya da 500 değil)."""
+    key = store.create_static_key("tavan", FULL)
+    small = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_MAX_BODY_BYTES": "512"}, project_root=tmp_path)
+    headers = {**MCP_HEADERS, "authorization": f"Bearer {key}", "mcp-protocol-version": MODERN}
+
+    def chunks():
+        for _ in range(3):
+            yield b" " * 400
+
+    with TestClient(build_app(small, store, _test_mcp(), json_response=True, form_secret=b"s" * 32), base_url=BASE) as c:
+        assert c.post("/mcp", content=chunks(), headers=headers).status_code == 413
+
+
+def test_bayrak_kapaliyken_2026_basligli_get_eski_400_alir(client, store):
+    key = store.create_static_key("get", FULL)
+    r = client.get("/mcp", headers={"accept": "text/event-stream", "authorization": f"Bearer {key}",
+                                    "mcp-protocol-version": MODERN})
+    assert r.status_code == 400
+    assert r.content == _eski_ret_govdesi(MODERN)
+
+
+def test_bayrak_kapaliyken_kimliksiz_2026_istegi_yine_401(client):
+    body, headers = _modern("tools/list")
+    r = client.post("/mcp", json=body, headers=headers)
+    assert r.status_code == 401
+    assert 'realm="ted-mcp"' in r.headers["www-authenticate"]
+
+
+_GOZLEM = re.compile(r"^mcp_modern yontem='(?P<yontem>[^']*)' ad=(?P<ad>'[^']*'|None) surum='(?P<surum>[^']*)' "
+                     r"durum=(?P<durum>\d+|None) sure_ms=(?P<sure>\d+) sse=(?P<sse>evet|hayır) koptu=(?P<koptu>evet|hayır)$")
+
+
+def _gozlem_satirlari(caplog):
+    return [rec.getMessage() for rec in caplog.records if rec.getMessage().startswith("mcp_modern ")]
+
+
+def test_modern_istek_tek_bir_gozlem_satiri_yazar(client_2026, store, caplog):
+    key = store.create_static_key("gozlem", FULL)
+    body, headers = _modern("tools/call", {"name": "kimim", "arguments": {}}, ad="kimim")
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        r = client_2026.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
+    assert r.status_code == 200
+    lines = _gozlem_satirlari(caplog)
+    assert len(lines) == 1
+    m = _GOZLEM.match(lines[0])
+    assert m, lines[0]
+    assert (m["yontem"], m["ad"], m["surum"], m["durum"], m["sse"], m["koptu"]) == (
+        "tools/call", "'kimim'", MODERN, "200", "hayır", "hayır")
+    assert key not in lines[0] and "arguments" not in lines[0]
+    assert [rec.levelno for rec in caplog.records if rec.getMessage().startswith("mcp_modern ")] == [logging.INFO]
+
+
+def test_bayrak_kapaliyken_de_modern_deneme_gozlemlenir(client, store, caplog):
+    key = store.create_static_key("gozlem-kapali", FULL)
+    body, headers = _modern("server/discover")
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        client.post("/mcp", json=body, headers={**headers, "authorization": f"Bearer {key}"})
+    lines = _gozlem_satirlari(caplog)
+    assert len(lines) == 1 and _GOZLEM.match(lines[0])["durum"] == "400"
+
+
+@pytest.mark.parametrize("surum", [None, "2025-06-18", "2025-11-25"])
+def test_el_sikisma_istekleri_gozlem_satiri_yazmaz(client_2026, store, caplog, surum):
+    key = store.create_static_key("eski", FULL)
+    headers = {**MCP_HEADERS, "authorization": f"Bearer {key}", **({"mcp-protocol-version": surum} if surum else {})}
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        r = client_2026.post("/mcp", json=_rpc("tools/call", {"name": "kimim", "arguments": {}}), headers=headers)
+    assert r.status_code == 200
+    assert _gozlem_satirlari(caplog) == []
+
+
+def test_gozlem_istemcinin_kopusunu_ve_sse_yi_gorur(caplog):
+    """İstemci yanıt bitmeden koparsa koptu=evet; text/event-stream başladıysa sse=evet."""
+    async def akis_uygulamasi(scope, receive, send):
+        await receive()  # gövde
+        await send({"type": "http.response.start", "status": 200,
+                    "headers": [(b"content-type", b"text/event-stream")]})
+        await send({"type": "http.response.body", "body": b": ping\r\n\r\n", "more_body": True})
+        assert (await receive())["type"] == "http.disconnect"  # istemci gitti; son olay hiç yazılmadı
+
+    gelenler = [{"type": "http.request", "body": b"{}", "more_body": False}, {"type": "http.disconnect"}]
+
+    async def receive():
+        return gelenler.pop(0)
+
+    async def send(message):
+        pass
+
+    scope = {"type": "http", "method": "POST", "path": "/mcp",
+             "headers": [(b"mcp-protocol-version", b"2026-07-28"), (b"mcp-method", b"tools/call"),
+                         (b"mcp-name", b"edupedia_kapsam")]}
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        asyncio.run(http_app.TransportRejectLogMiddleware(akis_uygulamasi)(scope, receive, send))
+    m = _GOZLEM.match(_gozlem_satirlari(caplog)[0])
+    assert (m["yontem"], m["ad"], m["durum"], m["sse"], m["koptu"]) == (
+        "tools/call", "'edupedia_kapsam'", "200", "evet", "evet")
+
+
+# -- İkinci düzeltme turu (2026-10-24): 413 gözlemi, initialize kimliği ------------------------------
+
+def _kucuk_tavanli(tmp_path, store, bayrak):
+    env = {"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_MAX_BODY_BYTES": "512", "TED_MCP_PROTOKOL_2026": bayrak}
+    return TestClient(build_app(load_settings(env, project_root=tmp_path), store, _test_mcp(), json_response=True,
+                                form_secret=b"s" * 32), base_url=BASE)
+
+
+@pytest.mark.parametrize("bayrak", ["0", "1"])
+@pytest.mark.parametrize("akis", [False, True])
+def test_govde_tavani_413_gozlem_satirinda_413_yazar(tmp_path, store, caplog, bayrak, akis):
+    """BodyLimit 413 yazınca taşımanın denediği durum değil 413 görünür; akışta koptu=hayır (kopan istemci değil)."""
+    key = store.create_static_key("tavan413", FULL)
+    body, headers = _modern("tools/call", {"name": "kimim", "arguments": {}, "pad": "x" * 600}, ad="kimim")
+    headers = {**headers, "authorization": f"Bearer {key}"}
+
+    def chunks():
+        for _ in range(3):
+            yield b" " * 400
+
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        with _kucuk_tavanli(tmp_path, store, bayrak) as c:
+            r = c.post("/mcp", content=chunks(), headers=headers) if akis else c.post("/mcp", json=body, headers=headers)
+    assert r.status_code == 413
+    lines = _gozlem_satirlari(caplog)
+    assert len(lines) == 1, lines
+    m = _GOZLEM.match(lines[0])
+    assert (m["durum"], m["sse"], m["koptu"]) == ("413", "hayır", "hayır")
+
+
+@pytest.mark.parametrize("kimlik", [None, True, 1.5, [1], {"a": 1}])
+def test_kimligi_str_ya_da_int_olmayan_istek_initialize_sayilmaz(client, store, kimlik):
+    """1.28.1'in JSONRPCRequest doğrulaması gibi: id yalnız str ya da int (bool değil). Sayılmayan istek eski 400'ü alır."""
+    key = store.create_static_key("kimlik", FULL)
+    istek = {"jsonrpc": "2.0", "id": kimlik, "method": "initialize",
+             "params": {"protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}}
+    r = client.post("/mcp", json=istek, headers={**MCP_HEADERS, "authorization": f"Bearer {key}",
+                                                 "mcp-protocol-version": MODERN})
+    assert r.status_code == 400
+    assert r.content == _eski_ret_govdesi(MODERN)
+
+
+@pytest.mark.parametrize("kimlik", [0, 7, "a"])
+def test_kimligi_str_ya_da_int_olan_initialize_gecirilir(client, store, kimlik):
+    key = store.create_static_key("kimlik-ok", FULL)
+    istek = {"jsonrpc": "2.0", "id": kimlik, "method": "initialize",
+             "params": {"protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}}
+    r = client.post("/mcp", json=istek, headers={**MCP_HEADERS, "authorization": f"Bearer {key}",
+                                                 "mcp-protocol-version": MODERN})
+    assert r.status_code == 200 and r.json()["id"] == kimlik
+
+
+def test_bayrak_kapaliyken_gecirilen_initialize_gozlemde_yontemini_soyler(client, store, caplog):
+    """mcp-method başlığı olmasa da kapının geçirdiği initialize gözlem satırında yontem='initialize' yazar:
+    canlıda claude.ai'nin geri düşüş initialize'ının 2026 başlığı taşıyıp taşımadığını bu satır gösterir."""
+    key = store.create_static_key("init-gozlem", FULL)
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        r = client.post("/mcp", json=_rpc("initialize", {"protocolVersion": "2025-11-25", "capabilities": {},
+                                                          "clientInfo": {"name": "t", "version": "0"}}),
+                        headers={**MCP_HEADERS, "authorization": f"Bearer {key}", "mcp-protocol-version": MODERN})
+    assert r.status_code == 200
+    m = _GOZLEM.match(_gozlem_satirlari(caplog)[0])
+    assert (m["yontem"], m["durum"], m["koptu"]) == ("initialize", "200", "hayır")
+
+
+# -- Üçüncü düzeltme turu (2026-10-24): gözlem yalnız /mcp ---------------------------------------------------
+
+def test_gozlem_yalniz_mcp_yolunda_yazilir(client, caplog):
+    """/oauth/* gövde tavanını (16 KiB) aşan bir istek 2026 başlığı taşısa da mcp_modern satırı yazmaz."""
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        r = client.post("/oauth/token", content=b"a" * 20_000,
+                        headers={"content-type": "application/x-www-form-urlencoded", "mcp-protocol-version": MODERN})
+    assert r.status_code == 413
+    assert _gozlem_satirlari(caplog) == []
+    with caplog.at_level(logging.INFO, logger="src.mcp_server.http_app"):
+        http_app._modern_gozlem({"type": "http", "path": "/health", "headers": [(b"mcp-protocol-version",
+                                                                                b"2026-07-28")]},
+                                200, 0.0, sse=False, koptu=False)
+    assert _gozlem_satirlari(caplog) == []

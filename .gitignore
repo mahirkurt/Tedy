@@ -11,6 +11,8 @@ build/
 
 # Virtual environments
 .venv/
+# mcp 2.x yükseltme denemesinin ayrı ortamı (ortak .venv'e dokunulmaz)
+.venv-mcp2/
 venv/
 ENV/
 

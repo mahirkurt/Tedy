@@ -70,6 +70,11 @@ def test_rejected_stdin_value_is_never_echoed_in_the_error_message(tmp_path, cap
     assert "SOME_TEST_SECRET" not in path.read_text()
 
 
+def test_protokol_2026_bayragi_yalniz_birimde_yasar():
+    # .env'de olsaydı EnvironmentFile= birimin Environment= satırını ya da drop-in'i ezerdi.
+    assert "TED_MCP_PROTOKOL_2026" in env_prep.UNIT_ONLY
+
+
 @pytest.mark.parametrize("name", env_prep.UNIT_ONLY)
 def test_unit_only_names_are_refused(tmp_path, name):
     path = _env(tmp_path, "")

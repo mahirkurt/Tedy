@@ -308,11 +308,11 @@ class _Fed:
 def test_tools_are_registered_with_honest_annotations(tmp_path):
     mcp = server.build_server(tools.Tools(load_settings({}, project_root=tmp_path), _Fed()))
     listed = {t.name: t for t in anyio.run(mcp.list_tools)}
-    assert listed["edupedia_yayinla"].annotations.readOnlyHint is False
-    assert listed["edupedia_kaldir"].annotations.destructiveHint is True
-    assert listed["edupedia_katalog"].annotations.readOnlyHint is True
+    assert listed["edupedia_yayinla"].annotations.read_only_hint is False
+    assert listed["edupedia_kaldir"].annotations.destructive_hint is True
+    assert listed["edupedia_katalog"].annotations.read_only_hint is True
     arsivle = listed["edupedia_arsivle"].annotations
-    assert arsivle.readOnlyHint is False and arsivle.destructiveHint is False and arsivle.openWorldHint is True
+    assert arsivle.read_only_hint is False and arsivle.destructive_hint is False and arsivle.open_world_hint is True
     assert "arşiv" in listed["edupedia_arsivle"].description
 
 

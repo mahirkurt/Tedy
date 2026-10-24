@@ -1,25 +1,24 @@
-"""FastMCP registration for ted-mcp. Tool bodies live in tools.Tools."""
+"""MCPServer registration for ted-mcp. Tool bodies live in tools.Tools."""
 from __future__ import annotations
 
 import functools
 from typing import Any
 
 import anyio
-from mcp.server.fastmcp import Context, FastMCP
-from mcp.server.fastmcp.exceptions import ToolError
-from mcp.server.transport_security import TransportSecuritySettings
+from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 from src import roles
 from src.mcp_server import __version__
 from src.mcp_server.tools import Tools
 
-_RO = ToolAnnotations(readOnlyHint=True, openWorldHint=True)
-_WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
-_DESTRUCTIVE = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+_RO = ToolAnnotations(read_only_hint=True, open_world_hint=True)
+_WRITE = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
+_DESTRUCTIVE = ToolAnnotations(read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=False)
 # edupedia_gorsel calls out to open, third-party providers (Pexels/MiniMax), unlike the fleet-only
 # _WRITE tools above — openWorldHint=True says so; it still writes a new asset per successful call.
-_OPEN_WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True)
+_OPEN_WRITE = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=True)
 # Tool bodies get their own worker-thread budget (like http_app._VERIFY_LIMITER): slow fleet calls can
 # fill these threads, never the default limiter the bearer gate, OAuth endpoints and store calls use.
 TOOL_THREAD_LIMIT = 16
@@ -47,15 +46,14 @@ def caller_email(ctx: Context) -> str:
     return email
 
 
-def build_server(tools: Tools) -> FastMCP:
-    mcp = FastMCP(
-        "TEDY edupedia",
-        instructions=INSTRUCTIONS,
-        stateless_http=True,
-        transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
-    )
-    # FastMCP drops `version`; without this serverInfo.version reports the SDK version.
-    mcp._mcp_server.version = __version__
+def build_server(tools: Tools) -> MCPServer:
+    # mcp 2.x: ulaşım ayarları (stateless, gövde tavanı, DNS-rebinding) kurucuda değil,
+    # http_app.build_app'in streamable_http_app() çağrısındadır. version kurucuya verilir;
+    # verilmezse serverInfo.version boş döner (1.x'te SDK sürümünü raporluyordu).
+    # subscriptions=False: 2026-07-28'in subscriptions/listen akışı sunulmaz. Araç listesi çalışırken
+    # değişmez ve yayımlayan yok; açık kalsa her dinleyici uzun ömürlü bir SSE bağlantısı tutardı ve
+    # server/discover listChanged=true derdi. Böylece iki dönem de 1.x'teki gibi listChanged=false bildirir.
+    mcp = MCPServer("TEDY edupedia", instructions=INSTRUCTIONS, version=__version__, subscriptions=False)
 
     @mcp.tool(annotations=_RO)
     async def edupedia_durum(ctx: Context, canli: bool = False) -> dict[str, Any]:

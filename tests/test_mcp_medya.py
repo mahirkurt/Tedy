@@ -322,5 +322,5 @@ class _NoFed:
 def test_tool_is_registered(tmp_path):
     mcp = server.build_server(tools.Tools(load_settings({}, project_root=tmp_path), _NoFed()))
     listed = {t.name: t for t in anyio.run(mcp.list_tools)}
-    schema = listed["edupedia_medya"].inputSchema["properties"]
+    schema = listed["edupedia_medya"].input_schema["properties"]
     assert {"run_id", "tur", "istek", "tahmin", "onay_belirteci", "is_kimligi"} <= set(schema)

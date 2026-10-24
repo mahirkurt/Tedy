@@ -278,4 +278,4 @@ def test_tool_is_registered_and_describes_kaynak_verisi(tmp_path):
     mcp = server.build_server(tools.Tools(load_settings({}, project_root=tmp_path), _NoFed()))
     listed = {t.name: t for t in anyio.run(mcp.list_tools)}
     assert "kaynak_verisi" in listed["edupedia_gorsel"].description
-    assert listed["edupedia_gorsel"].annotations.openWorldHint is True
+    assert listed["edupedia_gorsel"].annotations.open_world_hint is True
