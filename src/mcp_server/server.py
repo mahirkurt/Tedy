@@ -174,7 +174,7 @@ def build_server(tools: Tools) -> MCPServer:
         return await anyio.to_thread.run_sync(functools.partial(tools.kaldir, email, slug=slug),
                                               limiter=_TOOL_LIMITER)
 
-    @mcp.tool(annotations=_OPEN_WRITE)
+    @mcp.tool(annotations=_DESTRUCTIVE)  # yerel katalog yazımı; tekrarı zararsız, araçla geri alınamaz
     async def edupedia_arsivle(ctx: Context, slug: str) -> dict[str, Any]:
         """Bir modülün en yeni sürümü dışındaki yayındaki (active) sürümlerini arşivler ve sayısını döner
         (arsivlenen_surum_sayisi, guncel_surum). Dosya ve ilerleme kaydı silinmez; arşivlenmiş sürümün adresi

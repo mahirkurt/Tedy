@@ -312,7 +312,9 @@ def test_tools_are_registered_with_honest_annotations(tmp_path):
     assert listed["edupedia_kaldir"].annotations.destructive_hint is True
     assert listed["edupedia_katalog"].annotations.read_only_hint is True
     arsivle = listed["edupedia_arsivle"].annotations
-    assert arsivle.read_only_hint is False and arsivle.destructive_hint is False and arsivle.open_world_hint is True
+    # Arşivleme yerel (üçüncü taraf çağrısı yok), tekrarı zararsız ve araçla geri alınamaz.
+    assert arsivle.read_only_hint is False and arsivle.destructive_hint is True
+    assert arsivle.idempotent_hint is True and arsivle.open_world_hint is False
     assert "arşiv" in listed["edupedia_arsivle"].description
 
 
