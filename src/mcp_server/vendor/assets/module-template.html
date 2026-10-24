@@ -637,7 +637,7 @@ figure.viz figcaption{margin-top:var(--sp-04);font-size:var(--fs-label);color:va
 /* ted-mcp'nin gömülü varlıkları (sablon.py): raster figür ve video sütunu aşmaz, görünür altyazısı
    figcaption'dır (Kanun M3.7); ses oynatıcısı görünür adlı bir katmandır (M5.14). */
 figure.viz img,figure.viz video{display:block;max-width:100%;height:auto;margin:0 auto}
-.edupedia-audio{container:ses / inline-size;display:flex;flex-direction:column;gap:var(--sp-03);margin:var(--sp-06) 0;
+.edupedia-audio{container:ses / inline-size;display:flex;flex-direction:column;margin:var(--sp-06) 0;
   padding:var(--sp-04) var(--sp-05);background:var(--cds-layer-02);border:1px solid var(--cds-border-subtle);
   border-radius:var(--cds-radius)}
 .edupedia-audio__ad{display:inline-flex;align-items:center;gap:var(--sp-03);font-size:var(--fs-label);
@@ -648,8 +648,10 @@ figure.viz img,figure.viz video{display:block;max-width:100%;height:auto;margin:
    Konum Carbon Slider anatomisidir (@carbon/styles 1.117.0 components/slider/_slider.scss:30-46, 59-99, 187-222):
    iz 2 px $border-subtle, dolgu 2 px ve tutamaç 14 px $layer-selected-inverse; odakta tutamaç $interactive, iç
    halka $layer ve 20 px (×1,4286); Carbon'un dikey dolgusu ($spacing-05) burada 48 px'lik vuruş alanıdır (M5.3).
-   Süre Plex Mono tabular rakamla (talimatname P9). Dar kutuda süre ikinci satıra iner (kapsayıcı "ses", sm 20rem). */
-.ses-denetim{display:grid;grid-template-columns:var(--tap) minmax(0,1fr) var(--tap);
+   Süre Plex Mono tabular rakamla (talimatname P9). Dar kutuda süre ikinci satıra iner (kapsayıcı "ses", sm 20rem).
+   Canlı bölgeler (.ses-duyuru, .ses-uyari) hep çizilir ve boşken yer kaplamaz: kapsayıcıda gap yok, aralığı
+   denetim satırı ve bölgeye yazılan kutu kendisi taşır (inceleme turu 1, bulgu 2). */
+.ses-denetim{margin-block-start:var(--sp-03);display:grid;grid-template-columns:var(--tap) minmax(0,1fr) var(--tap);
   grid-template-areas:"oynat kaydirici sessiz" "sure sure sure";align-items:center;column-gap:var(--sp-03)}
 @container ses (min-width:20rem){
   .ses-denetim{grid-template-columns:var(--tap) minmax(0,1fr) auto var(--tap);grid-template-areas:"oynat kaydirici sure sessiz"}
@@ -682,15 +684,16 @@ figure.viz img,figure.viz video{display:block;max-width:100%;height:auto;margin:
 .ses-kaydirici[aria-disabled="true"] .ses-kaydirici__tutamac{background:var(--cds-border-disabled)}
 .ses-sure{grid-area:sure;font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:var(--fs-label);
   line-height:1.28572;color:var(--cds-text-secondary);white-space:nowrap}
-.ses-yukleniyor{display:flex;align-items:center;gap:var(--sp-03);margin:0;font-size:var(--fs-label);color:var(--cds-text-secondary)}
+.ses-yukleniyor{margin-block-start:var(--sp-03);display:flex;align-items:center;gap:var(--sp-03);margin-block-end:0;
+  font-size:var(--fs-label);color:var(--cds-text-secondary)}
 .ses-donen{inline-size:1rem;block-size:1rem;flex:none;animation:ses-don 690ms linear infinite}
 .ses-donen circle{fill:none;stroke:var(--cds-interactive);stroke-width:2;stroke-dasharray:28 10}
 @keyframes ses-don{to{transform:rotate(360deg)}}
-.ses-hata{display:flex;align-items:flex-start;gap:var(--sp-04);margin:0;padding:var(--sp-04) var(--sp-05);
+.ses-hata{margin-block-start:var(--sp-03);display:flex;align-items:flex-start;gap:var(--sp-04);margin-block-end:0;
+  padding:var(--sp-04) var(--sp-05);
   background:var(--cds-notification-background-error);border-inline-start:3px solid var(--cds-support-error);
   font-size:var(--fs-label);line-height:1.28572;font-weight:600;color:var(--cds-text-primary)}
 .ses-hata .cds-icon{inline-size:1.25rem;block-size:1.25rem;flex:none;fill:var(--cds-support-error)}
-.ses-yukleniyor[hidden],.ses-hata[hidden]{display:none}
 @media (forced-colors:active){
   .ses-kaydirici__iz{background:GrayText}
   .ses-kaydirici__dolgu,.ses-kaydirici__tutamac{background:Highlight;forced-color-adjust:none}
@@ -1808,15 +1811,20 @@ const MODULE_DATA = {
      denetim şablonundur. Ses yalnız okurun eylemiyle başlar (otomatik oynatma yok, G-AUDIO). Konum Carbon Slider
      klavyesiyle sürülür: ← ↓ / → ↑ ±5 sn, PageDown/PageUp ±%10, Home/End başa/sona; işaretçiyle izin üstünde sürüklenir.
      Ad ve değer okunur: aria-valuetext "1 dakika 12 saniye / 3 dakika". Medya olayları köpürmez; belgeye yakalama
-     aşamasında bağlanan dinleyiciler her oynatıcıyı (sonradan çizilenler dahil) tek yerden günceller. */
+     aşamasında bağlanan dinleyiciler her oynatıcıyı (sonradan çizilenler dahil) tek yerden günceller.
+     İnceleme turu 1: canlı bölgeler hep vardır ve boştur; durum metnini durum() yazar, durum bitince boşaltır —
+     hidden açıp kapamak güvenilir duyuru vermez. */
   (function sesOynatici(){
     const KOK=".edupedia-audio";
     const SES_ADIM_SN=5, SES_SAYFA_ORAN=.1;
+    const SES_YUKLENIYOR=`<p class="ses-yukleniyor"><svg class="ses-donen" viewBox="0 0 16 16" aria-hidden="true" focusable="false">`
+      + `<circle cx="8" cy="8" r="6"></circle></svg><span>Yükleniyor</span></p>`;
+    const SES_HATA=`<p class="ses-hata">${icon("ic-error-filled")}<span>Ses dosyası açılamadı</span></p>`;
     function parcalar(n){
       const k=n && n.closest ? n.closest(KOK) : null; if(!k) return null;
       const s=c=>k.querySelector(c);
       return {k, a:s("audio"), oynat:s(".ses-oynat"), sessiz:s(".ses-sessiz"), kay:s(".ses-kaydirici"),
-              gecen:s(".ses-sure__gecen"), toplam:s(".ses-sure__toplam"), yuk:s(".ses-yukleniyor"), hata:s(".ses-hata")};
+              gecen:s(".ses-sure__gecen"), toplam:s(".ses-sure__toplam"), duyuru:s(".ses-duyuru"), uyari:s(".ses-uyari")};
     }
     function sure(sn){ sn=Math.max(0,Math.floor(sn||0)); return Math.floor(sn/60)+":"+String(sn%60).padStart(2,"0"); }
     function sozle(sn){
@@ -1833,8 +1841,10 @@ const MODULE_DATA = {
       p.gecen.textContent=sure(t); p.toplam.textContent=sure(top);
     }
     function durum(p, d){
+      if(p.k.getAttribute("data-ses-durum")===d) return;
       p.k.setAttribute("data-ses-durum", d);
-      p.yuk.hidden = d!=="yukleniyor"; p.hata.hidden = d!=="hata";
+      p.duyuru.innerHTML = d==="yukleniyor" ? SES_YUKLENIYOR : "";
+      p.uyari.innerHTML = d==="hata" ? SES_HATA : "";
       const kapali = d==="hata";
       p.oynat.disabled = kapali; p.sessiz.disabled = kapali;
       p.kay.setAttribute("aria-disabled", kapali ? "true" : "false"); p.kay.tabIndex = kapali ? -1 : 0;
