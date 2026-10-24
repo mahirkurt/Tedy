@@ -123,7 +123,9 @@ def build_server(tools: Tools) -> FastMCP:
         (uyarilar) geçer. Ses yuvası bu alanları almaz.
         Yazar SVG'si (visual.kind:"svg", şemanın base'i, hotspot svg'si) metin öğesi taşımaz (<text>, <tspan>,
         <textPath>, <foreignObject>): viewBox yazarındır, metin dar ekranda 12 px'in altına düşer. Adları etiketli
-        şemanın labels'ına (numaralı iğne + liste) ya da gövde metnine ve altyazıya yaz; aksi sema_hatasi.
+        şemanın labels'ına (numaralı iğne + liste), hotspot'ta spots[].label'a ya da gövde metnine ve altyazıya yaz;
+        data:image/svg+xml de yazılmaz; aksi sema_hatasi. Şablon değiştikten sonra eski taslak yayınlanmaz (sablon_eski):
+        yeniden derle.
         Atıf satırını derleyici yazar (baslik — atıf). HTML dönmez; taslak_id, kapı özeti ve FAIL/WARN ayrıntıları
         döner."""
         email = caller_email(ctx)
@@ -143,8 +145,9 @@ def build_server(tools: Tools) -> FastMCP:
         """FAIL'siz bir taslağı tedy.online kataloğunda değişmez yeni sürüm olarak yayınlar. ted_link
         {kind: exam|homework, id} edupedia_baglam'dan gelir. EXAM modu yayınlanmaz. Yayından önce saklı taslak
         bugünün kapılarından yeniden geçer; derlendikten sonra sıkılaşan bir kapı düşerse durum
-        kapi_fail_guncel döner ve taslak yayınlanmaz — edupedia_derle ile yeniden derle. Bu aracın sonucu
-        olmadan 'yayınlandı' deme."""
+        kapi_fail_guncel döner ve taslak yayınlanmaz — edupedia_derle ile yeniden derle. Taslak bugünkü modül
+        şablonundan önce derlendiyse sablon_eski, MODULE_DATA'sı yazar SVG'sinde metin taşıyorsa yazar_svg_metni
+        döner; ikisinde de yeniden derle. Bu aracın sonucu olmadan 'yayınlandı' deme."""
         email = caller_email(ctx)
         return await anyio.to_thread.run_sync(functools.partial(tools.yayinla, email, taslak_id=taslak_id,
                                                                 ted_link=ted_link, slug=slug), limiter=_TOOL_LIMITER)

@@ -97,6 +97,32 @@ def _guncel_fail_kapilari(html: bytes) -> list[str]:
     return sorted(g for g, v in rapor.items() if v.get("status") == "FAIL")
 
 
+SABLON_ESKI_NOTU = ("Taslak bugünkü modül şablonundan önce derlendi (şablonun parmak izi değişti); modül yayınlanmadı. "
+                    "edupedia_derle ile yeniden derle, yeni taslak_id'yi yayınla.")
+YAZAR_SVG_NOTU = ("Taslağın MODULE_DATA'sı yazar SVG'sinde metin taşıyor ({oge}; Kanun M5.6, KB-48); modül yayınlanmadı. "
+                  "Adları etiketli şemanın labels'ına ya da gövde metnine taşı, edupedia_derle ile yeniden derle.")
+
+
+def _sablon_eski(draft: dict[str, Any]) -> bool:
+    """Kanun KB-48 (inceleme, Önemli 3): taslak bugünkü şablonla derlenmemişse (parmak izi yok ya da farklı) yayın,
+    o günün kurallarıyla derlenmiş HTML'i bugüne taşımaz; yeniden derletir."""
+    from src.mcp_server import sablon
+
+    return draft.get("sablon_parmak_izi") != sablon.sablon_parmak_izi()
+
+
+def _yazar_svg_ihlali(html: bytes) -> str | None:
+    """Saklı taslağın MODULE_DATA'sında yazar SVG'si metni ya da `data:image/svg+xml` (derleme kuralıyla aynı desen)."""
+    from src.mcp_server import derleme, sablon
+
+    metin = html.decode("utf-8")
+    bas = metin.find(sablon.MODULE_DATA_START)
+    son = metin.find(sablon.ENGINE_MARKER, bas)
+    if bas < 0 or son < 0:
+        return "MODULE_DATA bulunamadı"
+    return derleme.yazar_svg_ihlali(metin[bas:son])
+
+
 def _fail_gate_names(draft: dict[str, Any]) -> list[str]:
     kapilar = draft.get("kapilar")
     if not isinstance(kapilar, dict):
@@ -235,6 +261,11 @@ class Yayinci:
             html = self.drafts.html_bytes(taslak_id)
             if html is None or hashlib.sha256(html).hexdigest() != draft.get("sha256"):
                 return {**base, "status": "taslak_bozuk"}
+            if _sablon_eski(draft):
+                return {**base, "status": "sablon_eski", "not": SABLON_ESKI_NOTU}
+            ihlal = _yazar_svg_ihlali(html)
+            if ihlal:
+                return {**base, "status": "yazar_svg_metni", "not": YAZAR_SVG_NOTU.format(oge=ihlal)}
             guncel = _guncel_fail_kapilari(html)
             if guncel:
                 return {**base, "status": "kapi_fail_guncel", "fail_kapilari": guncel,

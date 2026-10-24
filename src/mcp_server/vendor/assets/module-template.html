@@ -213,6 +213,7 @@
    Değerler @carbon/themes g10 ile birebir (G-TOKEN). Tedy katmanı (tedy-*) Carbon
    token'larının hiçbirini değiştirmez; yalnızca üstüne eklenir (references/tedy-integration.md). */
 :root,[data-theme="g10"]{
+  --tedy-renk-semasi:light; /* tarayıcının çizdiği denetimlerin (ses oynatıcısı) renk şeması */
   /* yüzeyler (@carbon/themes g10) */
   --cds-background:#f4f4f4; --cds-layer-01:#ffffff; --cds-layer-02:#f4f4f4; --cds-layer-03:#ffffff;
   /* --viz-*: kategoriyi BİÇİM taşır, hue değil (S19). Ders aileleri ders işaretine, kırmızı/yeşil/
@@ -256,6 +257,7 @@
 }
 /* ===== IBM Carbon v11 — WHITE teması (geriye uyum: eski kayıtlı tercih) ===== */
 [data-theme="white"]{
+  --tedy-renk-semasi:light; /* tarayıcının çizdiği denetimlerin (ses oynatıcısı) renk şeması */
   /* yüzeyler (@carbon/themes white) */
   --cds-background:#ffffff; --cds-layer-01:#f4f4f4; --cds-layer-02:#ffffff; --cds-layer-03:#f4f4f4;
   --viz-1:#161616; --viz-2:#262626; --viz-3:#393939; --viz-4:#525252; --viz-5:#6f6f6f;
@@ -290,6 +292,7 @@
 }
 /* ===== IBM Carbon v11 — GRAY-100 (dark) teması ===== */
 [data-theme="g100"]{
+  --tedy-renk-semasi:dark; /* tarayıcının çizdiği denetimlerin (ses oynatıcısı) renk şeması */
   --cds-background:#161616; --cds-layer-01:#262626; --cds-layer-02:#393939; --cds-layer-03:#525252;
   --cds-layer-hover-01:#333333; --cds-layer-active-01:#525252; --cds-layer-selected-01:#393939;
   --cds-layer-hover-02:#474747; --cds-layer-selected-02:#525252;
@@ -476,22 +479,24 @@ body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:1.6;
 .topbar .icon-btn--on{background:var(--cds-text-on-color);color:var(--tedy-brand)}
 .topbar .icon-btn--on .cds-icon{color:var(--tedy-brand)}
 /* Araç ipucu (Kanun M5.14, KB-44): çerçevedeki her ikon düğmesinin adı, fareyle üzerine gelince ve klavye odağında
-   düğmenin altında görünür, Esc ile kapanır, odak düğmede kalır (talimatname §4.3; Tooltip — accessibility
-   #annotate-the-text-for-the-tooltip). Metin düğmenin kendi aria-label'ıdır: ad değişince ("Sesi kapat" ↔ "Sesi aç")
-   ipucu da değişir, ikinci bir kaynak yoktur. Carbon ikon ipucu ölçüsü (@carbon/styles 1.117.0
-   components/tooltip/_tooltip.scss:26-29, 46-47, 85-104, icon-tooltip): ters yüzey, body-compact-01, dolgu 2 × 16 px, düğmeden 8 px, en çok 18rem. Düğmenin satır sonuna
-   yaslanır (araçlar sağdadır), çerçeveden taşmaz; ipucu düğmenin parçası olduğu için üstüne gelince kapanmaz. */
-.icon-btn::after,.pacing-disk__dismiss::after,.cmap-edge__remove::after{content:attr(aria-label);display:none;
-  position:absolute;inset-block-start:calc(100% + var(--sp-03));inset-inline-end:0;z-index:30;
-  inline-size:max-content;max-inline-size:min(18rem,calc(100vw - 2rem));padding:var(--sp-01) var(--sp-05);
+   düğmenin altında görünür (talimatname §4.3; Tooltip — accessibility #annotate-the-text-for-the-tooltip). Metin düğmenin
+   kendi aria-label'ıdır: ad değişince ("Sesi kapat" ↔ "Sesi aç") ipucu da değişir, ikinci bir kaynak yoktur. Carbon ikon
+   ipucu ölçüsü (@carbon/styles 1.117.0 components/tooltip/_tooltip.scss:26-29, 46-47, 85-104, icon-tooltip): ters
+   yüzey, body-compact-01, dolgu 2 × 16 px, düğmeden 8 px, en çok 18rem (kutu dolgu dahil: border-box). Açıp kapamayı
+   aracIpucu yapar (ipucu-acik): 100 ms gecikmeyle, görünürlükle (yerleşim hep vardır, açılmadan önce çerçeveye
+   kıstırılır: --ipucu-x), etkinleştirmede ve Esc'te kapanır. 8 px'lik boşlukta saydam köprü (::before) vardır: işaretçi
+   ipucuna inerken düğmenin üstünde kalır (WCAG 1.4.13). Ok (caret) yok: ipucu her zaman düğmenin hemen altındadır ve
+   kıstırılınca ok düğmeyi göstermez olurdu; ad düğmenin kendi adıdır, hangi düğmeye ait olduğu bitişiklikten okunur. */
+.icon-btn::after,.pacing-disk__dismiss::after,.cmap-edge__remove::after{content:attr(aria-label);box-sizing:border-box;
+  position:absolute;inset-block-start:calc(100% + var(--sp-03));inset-inline-end:calc(-1 * var(--ipucu-x, 0px));z-index:30;
+  inline-size:max-content;max-inline-size:min(18rem,calc(100vw - 1rem));padding:var(--sp-01) var(--sp-05);
   border-radius:var(--cds-border-radius-02);background:var(--cds-background-inverse);color:var(--cds-text-inverse);
   font-family:var(--font-sans);font-size:var(--fs-label);line-height:1.28572;letter-spacing:.16px;font-weight:400;
-  text-align:start;white-space:normal;overflow-wrap:anywhere}
-@media (any-hover:hover){  /* Kanun M2.12: :hover yalnız fareli girişte */
-  .icon-btn:hover::after,.pacing-disk__dismiss:hover::after,.cmap-edge__remove:hover::after{display:block}
-}
-.icon-btn:focus-visible::after,.pacing-disk__dismiss:focus-visible::after,.cmap-edge__remove:focus-visible::after{display:block}
-.icon-btn.ipucu-kapali::after,.pacing-disk__dismiss.ipucu-kapali::after,.cmap-edge__remove.ipucu-kapali::after{display:none}
+  text-align:start;white-space:normal;overflow-wrap:anywhere;visibility:hidden;opacity:0}
+.icon-btn.ipucu-acik::after,.pacing-disk__dismiss.ipucu-acik::after,.cmap-edge__remove.ipucu-acik::after{visibility:visible;opacity:1}
+.icon-btn.ipucu-acik::before,.pacing-disk__dismiss.ipucu-acik::before,.cmap-edge__remove.ipucu-acik::before{content:"";
+  position:absolute;inset-block-start:100%;inset-inline-end:calc(-1 * var(--ipucu-x, 0px));block-size:var(--sp-03);
+  inline-size:var(--ipucu-en, 100%)}
 
 /* --- KATMAN 2 · Durum şeridi (nötr Carbon layer-01) --- */
 .topbar__status{background:var(--cds-layer-01);padding:var(--sp-05) var(--sp-06);
@@ -637,9 +642,8 @@ figure.viz img,figure.viz video{display:block;max-width:100%;height:auto;margin:
 .edupedia-audio__ad .cds-icon{width:1.25rem;height:1.25rem;fill:var(--cds-icon-secondary)}
 .edupedia-audio audio{flex:1 1 16rem;inline-size:100%;min-block-size:3rem}
 /* Carbon'un ses oynatıcı bileşeni yok; denetimleri tarayıcı çizer. color-scheme onları panonun temasına uydurur
-   (g100'de koyu denetimler). */
-.edupedia-audio__oynatici{color-scheme:light}
-:root[data-theme="g100"] .edupedia-audio__oynatici{color-scheme:dark}
+   (g100'de koyu denetimler); değer tema bloklarındaki --tedy-renk-semasi token'ıdır (KB-22). */
+.edupedia-audio__oynatici{color-scheme:var(--tedy-renk-semasi)}
 .viz text{fill:var(--cds-text-primary);font-family:var(--font-sans)}
 .viz .viz-muted{fill:var(--cds-text-secondary)}
 .viz .viz-axis{stroke:var(--viz-axis)}
@@ -972,9 +976,13 @@ table.viz-table caption{caption-side:top;text-align:left;font-size:var(--fs-labe
 /* etiketli diyagram: numaralı iğneler + sıralı açıklama listesi (Fen/Coğrafya) */
 .viz .pin{fill:var(--accent)}
 .viz .pin-n{fill:var(--cds-text-on-color);font-weight:700}
-.viz-legend-list{margin:var(--sp-05) 0 0;padding-left:1.4rem;display:grid;gap:var(--sp-03);
+.viz-legend-list{margin:var(--sp-05) 0 0;padding-left:1.4rem;display:grid;gap:var(--sp-03);text-align:start;
   font-size:var(--fs-compact);color:var(--cds-text-primary)}
 .viz-legend-list li::marker{color:var(--accent-strong);font-weight:700}
+/* harfli iğne (labels[].n): lejantın işareti de o harftir, numara değil; işaretin yerinde asılı durur */
+.viz-legend-list__harfli{list-style:none}
+.viz-legend-list__n{display:inline-block;min-inline-size:1.4rem;margin-inline-start:-1.4rem;
+  color:var(--accent-strong);font-weight:600}
 /* ilişki akışı: sebep-sonuç / kavram zinciri (Sosyal/Yurttaşlık) */
 .flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:var(--sp-04)}
 .flow-node{flex:1 1 8.75rem;min-width:7.5rem;background:var(--cds-layer-02);
@@ -1229,16 +1237,16 @@ const MODULE_DATA = {
   <title id="v1t">Maddenin üç hâlinde tanecik düzeni</title>
   <desc id="v1d">Soldan sağa katı, sıvı ve gaz: katıda tanecikler sıkı ve düzenli, sıvıda gevşek, gazda dağınıktır.</desc>
   <g>
-    <rect x="20" y="30" width="120" height="120" rx="12" fill="var(--accent-tint)" stroke="var(--accent)" stroke-width="2"/>
-    ${[...Array(16)].map((_,i)=>`<circle cx="${44+(i%4)*28}" cy="${54+Math.floor(i/4)*28}" r="9" fill="var(--accent)"/>`).join("")}
+    <rect x="20" y="30" width="120" height="120" rx="12" fill="var(--cds-layer-accent-01)" stroke="var(--viz-axis)" stroke-width="2"/>
+    ${[...Array(16)].map((_,i)=>`<circle cx="${44+(i%4)*28}" cy="${54+Math.floor(i/4)*28}" r="9" fill="var(--viz-2)"/>`).join("")}
   </g>
   <g>
-    <rect x="180" y="30" width="120" height="120" rx="12" fill="var(--accent-tint)" stroke="var(--accent)" stroke-width="2"/>
-    ${[[200,110],[230,120],[262,108],[212,80],[248,86],[280,118],[224,98],[266,76],[284,90],[206,134]].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="9" fill="var(--accent)"/>`).join("")}
+    <rect x="180" y="30" width="120" height="120" rx="12" fill="var(--cds-layer-accent-01)" stroke="var(--viz-axis)" stroke-width="2"/>
+    ${[[200,110],[230,120],[262,108],[212,80],[248,86],[280,118],[224,98],[266,76],[284,90],[206,134]].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="9" fill="var(--viz-2)"/>`).join("")}
   </g>
   <g>
-    <rect x="340" y="30" width="120" height="120" rx="12" fill="var(--accent-tint)" stroke="var(--accent)" stroke-width="2"/>
-    ${[[360,60],[420,52],[386,96],[440,90],[366,130],[410,128],[396,72]].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="9" fill="var(--accent)"/>`).join("")}
+    <rect x="340" y="30" width="120" height="120" rx="12" fill="var(--cds-layer-accent-01)" stroke="var(--viz-axis)" stroke-width="2"/>
+    ${[[360,60],[420,52],[386,96],[440,90],[366,130],[410,128],[396,72]].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="9" fill="var(--viz-2)"/>`).join("")}
   </g>
 </svg>` } },
 
@@ -1307,15 +1315,15 @@ const MODULE_DATA = {
         base:`
   <circle cx="70" cy="55" r="26" fill="var(--viz-sun)" stroke="var(--viz-axis)" stroke-width="2"/>
   <path d="M300 70 q18 -16 40 0 q22 -6 30 14 q18 4 6 22 h-92 q-14 -16 16 -36 z" fill="var(--viz-cloud)" stroke="var(--viz-axis)" stroke-width="2"/>
-  <path d="M40 250 q120 -28 400 0 v40 h-400 z" fill="var(--accent-tint)" stroke="var(--accent)" stroke-width="2"/>
-  <path d="M140 240 C150 170 170 150 250 130" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-dasharray="2 6" stroke-linecap="round" marker-end="url(#vz-arrow)"/>
+  <path d="M40 250 q120 -28 400 0 v40 h-400 z" fill="var(--cds-layer-accent-01)" stroke="var(--viz-water)" stroke-width="2"/>
+  <path d="M140 240 C150 170 170 150 250 130" fill="none" stroke="var(--viz-2)" stroke-width="2.4" stroke-dasharray="2 6" stroke-linecap="round" marker-end="url(#vz-arrow)"/>
   <g stroke="var(--viz-water)" stroke-width="2.4" stroke-linecap="round">
     <line x1="320" y1="135" x2="312" y2="160"/><line x1="340" y1="135" x2="332" y2="162"/><line x1="360" y1="135" x2="352" y2="158"/>
   </g>
-  <path d="M395 165 C405 200 400 225 360 245" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" marker-end="url(#vz-arrow)"/>`,
+  <path d="M395 165 C405 200 400 225 360 245" fill="none" stroke="var(--viz-2)" stroke-width="2.4" stroke-linecap="round" marker-end="url(#vz-arrow)"/>`,
         labels:[
-          {x:96, y:80, text:"Güneş"}, {x:336, y:94, text:"Bulut"}, {x:120, y:272, text:"Deniz ya da göl"},
-          {x:168, y:196, text:"Buharlaşma"}, {x:382, y:146, text:"Yağış"}, {x:418, y:206, text:"Toplanma"}
+          {x:96, y:80, text:"Güneş"}, {x:372, y:62, text:"Bulut"}, {x:120, y:272, text:"Deniz ya da göl"},
+          {x:190, y:205, text:"Buharlaşma"}, {x:382, y:146, text:"Yağış"}, {x:440, y:205, text:"Toplanma"}
         ] } },
 
     { type:"conceptMap", id:"cm1", title:"Su Döngüsü İlişkileri", pictogram:"pic-puzzle",
@@ -1655,25 +1663,64 @@ const MODULE_DATA = {
       const u=b.querySelector("use"); if(u) u.setAttribute("href", state.sound?"#ic-volume":"#ic-volume-off"); }
     if(state.sound) playSound("notify");
   }
-  /* Kanun M5.14 (KB-44): ikon düğmesinin araç ipucu Esc ile kapanır, odak düğmede kalır (talimatname §4.3). Odak
-     ya da fare düğmeden çıkınca ipucu yeniden açılabilir. Tek, belgeye bağlı dinleyiciler; düğmeler sonradan
-     çizilse de (kavram haritası) çalışır. */
+  /* Kanun M5.14 (KB-44): ikon düğmesinin araç ipucu. İşaretçi gelince ya da klavye odağında 100 ms sonra açılır,
+     işaretçi ya da odak gidince 100 ms sonra kapanır (@carbon/react 1.114.0 IconButton/index.js:36 enterDelayMs/leaveDelayMs,
+     closeOnActivation; gecikme
+     hareket değildir, hareket azaltma dokunmaz). Etkinleştirmede kapanır ve işaretçi gidene dek kapalı kalır (Carbon
+     closeOnActivation); Esc kapatır, odak düğmede kalır (talimatname §4.3). Açılmadan önce çerçeveye kıstırılır: satır
+     sonuna yaslı ipucu soldan ya da sağdan taşacaksa --ipucu-x kadar kaydırılır (satır içi stilde yalnız `--` özelliği,
+     KB-26). Tek, belgeye bağlı dinleyiciler; düğmeler sonradan çizilse de (kavram haritası) çalışır. */
   (function aracIpucu(){
     const IPUCU=".icon-btn,.pacing-disk__dismiss,.cmap-edge__remove";
+    const IPUCU_ACIK_MS=100, IPUCU_KAPA_MS=100;
+    const zaman=new WeakMap();
+    function dugme(ev){ return ev.target && ev.target.closest ? ev.target.closest(IPUCU) : null; }
+    function icinde(b, ev){ return !!(ev.relatedTarget && b.contains(ev.relatedTarget)); }
+    function yerlestir(b){
+      b.style.removeProperty("--ipucu-x");
+      const en=parseFloat(getComputedStyle(b,"::after").width)||0;
+      const r=b.getBoundingClientRect(), sinir=document.documentElement.clientWidth;
+      const pay=(parseFloat(getComputedStyle(document.documentElement).fontSize)||16)/2;
+      const sol=r.right-en;
+      let x=0;
+      if(sol+en>sinir-pay) x=(sinir-pay)-(sol+en);
+      if(sol+x<pay) x=pay-sol;
+      b.style.setProperty("--ipucu-x", x+"px");
+      b.style.setProperty("--ipucu-en", en+"px");
+    }
+    function iptal(b){ clearTimeout(zaman.get(b)); }
+    function planla(b, ac){
+      iptal(b);
+      zaman.set(b, setTimeout(function(){
+        if(!ac){ b.classList.remove("ipucu-acik"); return; }
+        if(b.classList.contains("ipucu-kapali")) return;
+        yerlestir(b); b.classList.add("ipucu-acik");
+      }, ac?IPUCU_ACIK_MS:IPUCU_KAPA_MS));
+    }
+    function kapat(b){ iptal(b); b.classList.remove("ipucu-acik"); b.classList.add("ipucu-kapali"); }
+    document.addEventListener("mouseover", function(ev){
+      const b=dugme(ev); if(b && !icinde(b, ev)) planla(b, true);
+    });
+    document.addEventListener("mouseout", function(ev){
+      const b=dugme(ev); if(!b || icinde(b, ev)) return;
+      if(b===document.activeElement && b.matches(":focus-visible")) return;  // klavye odağı sürüyor
+      b.classList.remove("ipucu-kapali"); planla(b, false);
+    });
+    document.addEventListener("focusin", function(ev){
+      const b=dugme(ev); if(b && b.matches(":focus-visible")) planla(b, true);
+    });
+    document.addEventListener("focusout", function(ev){
+      const b=dugme(ev); if(!b) return;
+      b.classList.remove("ipucu-kapali");
+      if(!b.matches(":hover")) planla(b, false);
+    });
     document.addEventListener("keydown", function(ev){
       if(ev.key!=="Escape") return;
       document.querySelectorAll(IPUCU).forEach(function(b){
-        if(b===document.activeElement || b.matches(":hover")) b.classList.add("ipucu-kapali");
+        if(b.classList.contains("ipucu-acik") || b===document.activeElement || b.matches(":hover")) kapat(b);
       });
     });
-    function ac(ev){
-      const b=ev.target && ev.target.closest && ev.target.closest(IPUCU);
-      if(!b || (ev.relatedTarget && b.contains(ev.relatedTarget))) return;
-      if(ev.type==="mouseout" && b===document.activeElement) return;  // odak sürüyorsa Esc'in kapattığı kapalı kalır
-      b.classList.remove("ipucu-kapali");
-    }
-    document.addEventListener("focusout", ac);
-    document.addEventListener("mouseout", ac);
+    document.addEventListener("click", function(ev){ const b=dugme(ev); if(b) kapat(b); }, true);
   })();
   function reduceMotion(){ return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }
   /* ---- tema: yalnız panonun bildirdiği Carbon teması (Kanun M4.1, M4.2) ----
@@ -3270,7 +3317,9 @@ const MODULE_DATA = {
     vizKaydet(id, (svg,g)=>{ svg.outerHTML=ciz(g); });
     const svg=ciz(G);
     const legend=(spec.labels||[]).length
-      ? `<ol class="viz-legend-list">${(spec.labels||[]).map(L=>`<li>${esc(L.text||"")}</li>`).join("")}</ol>` : "";
+      ? `<ol class="viz-legend-list">${(spec.labels||[]).map(L=>L.n!=null
+          ? `<li class="viz-legend-list__harfli"><b class="viz-legend-list__n">${esc(String(L.n))}</b> ${esc(L.text||"")}</li>`
+          : `<li>${esc(L.text||"")}</li>`).join("")}</ol>` : "";
     return `<figure class="viz">${svg}${legend}${spec.caption?`<figcaption>${esc(spec.caption)}</figcaption>`:""}</figure>`;
   }
 
@@ -3596,14 +3645,16 @@ const MODULE_DATA = {
       html+=`<div class="visual hotspot-wrap">${s.svg}</div><div id="hfb" aria-live="polite"></div>`;
       stage.innerHTML=html;
       setNav({next:false});
-      stage.querySelectorAll("[data-spot]").forEach(r=>{
-        const meta=(s.spots.find(x=>x.id===r.getAttribute("data-spot"))||{});
+      // Bölgenin adı cevap değildir (WCAG 1.1.1: test için betimleyici tanım): "Bölge n / N"; cevap bulununca girer.
+      const bolgeler=stage.querySelectorAll("[data-spot]"), bolgeSayisi=bolgeler.length;
+      bolgeler.forEach((r,bi)=>{
         r.setAttribute("role","button"); r.setAttribute("tabindex","0");
-        r.setAttribute("aria-label", meta.label||"bölge");
+        r.setAttribute("aria-label", `Bölge ${bi+1} / ${bolgeSayisi}`);
         const handler=()=>{
           if(r.dataset.done) return;
           if(r.getAttribute("data-spot")===sp.id){
             r.dataset.done="1"; r.style.outline="3px solid var(--cds-support-success)"; r.style.outlineOffset="2px";
+            r.setAttribute("aria-label", `Bölge ${bi+1} / ${bolgeSayisi}: ${stripTags(sp.label)}, bulundu`);
             const gk=s.id+"#"+pi;
             if(!state.awarded.has(gk)){state.awarded.add(gk);addXP(ODUL.xpPerCorrect);markMastered();}
             const fb=$("#hfb"); fb.className="feedback feedback--ok";

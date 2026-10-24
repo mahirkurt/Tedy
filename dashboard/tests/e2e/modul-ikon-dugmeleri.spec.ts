@@ -94,21 +94,35 @@ function ihlaller(dugmeler: Dugme[]): string[] {
   })
 }
 
-/** The tooltip of an icon button: its text (the `::after` content) and its box, computed from the pseudo-element's
- * used size against the button (it hangs below, aligned to the button's inline end). */
+/** The tooltip of an icon button, measured the review's way: its text (the `::after` content) and its box from the
+ * pseudo-element's computed `left`/`top` against the button and its computed size (border-box, so padding included). */
 async function ipucu(f: Frame | Page, secici: string) {
-  return f.locator(secici).evaluate(b => {
+  return f.locator(secici).first().evaluate(b => {
     const cs = getComputedStyle(b, '::after')
     const r = b.getBoundingClientRect()
-    const en = parseFloat(cs.width) + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)
+    const kenar = cs.boxSizing === 'border-box' ? 0 : 1
+    const en = parseFloat(cs.width) + kenar * (parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight))
+    const boy = parseFloat(cs.height) + kenar * (parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom))
+    const sol = r.left + parseFloat(cs.left)
+    const ust = r.top + parseFloat(cs.top)
     const icerik = cs.content && cs.content !== 'none' && cs.content !== 'normal' ? cs.content.replace(/^"|"$/g, '') : ''
     return {
-      gorunur: cs.display !== 'none' && cs.visibility !== 'hidden' && icerik !== '',
-      metin: icerik, ad: b.getAttribute('aria-label') ?? '',
-      sol: r.right - en, sag: r.right, ust: r.bottom, genislik: document.documentElement.clientWidth,
+      gorunur: cs.display !== 'none' && cs.visibility === 'visible' && parseFloat(cs.opacity) > 0 && icerik !== '',
+      metin: icerik, ad: b.getAttribute('aria-label') ?? '', boxSizing: cs.boxSizing,
+      sol, sag: sol + en, ust, alt: ust + boy, merkezX: sol + en / 2, merkezY: ust + boy / 2,
+      dugme: { x: r.left, y: r.top, w: r.width, h: r.height },
+      genislik: document.documentElement.clientWidth,
       tasma: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     }
   })
+}
+
+/** Keyboard focus on `secici` (focus, then Shift+Tab and Tab back, so the focus is :focus-visible). */
+async function klavyeyleOdakla(f: Frame | Page, page: Page, secici: string) {
+  await f.locator(secici).first().focus()
+  await page.keyboard.press('Shift+Tab')
+  await page.keyboard.press('Tab')
+  await expect(f.locator(secici).first()).toBeFocused()
 }
 
 /** Walks every segment with read-aloud on; on each, every icon button is ≥ 3rem, named and carries a 20 px icon,
@@ -157,33 +171,107 @@ async function sesOynaticisi(f: Frame | Page) {
   }
 }
 
-/** Tooltip contract on the two tools: hover and keyboard focus show the button's own name below it, inside the
- * frame and without sideways scroll; Escape closes it while focus stays; it follows the name when the name changes. */
+/** Tooltip contract on the two tools (talimatname §4.3, WCAG 1.4.13; review fix round): opens 100 ms after the pointer
+ * arrives and closes 100 ms after it leaves (@carbon/react IconButton enterDelayMs / leaveDelayMs); the pointer can move
+ * down onto the tooltip and it stays open; activating the button closes it (Carbon closeOnActivation) and it stays
+ * closed until the pointer leaves; keyboard focus opens it, Escape closes it and focus stays; it reads the live name. */
 async function ipucuSozlesmesi(f: Frame | Page, page: Page, ad: string) {
+  // Delay, measured inside the page so the timing is deterministic: a check timer due before the 100 ms opening timer
+  // runs before it, whatever the load.
+  const gecikme = await f.locator('#ttsBtn').evaluate(async b => {
+    const acik = () => b.classList.contains('ipucu-acik')
+    b.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body }))
+    const hemen = acik()
+    const ms60 = await new Promise<boolean>(r => setTimeout(() => r(acik()), 60))
+    const ms160 = await new Promise<boolean>(r => setTimeout(() => r(acik()), 100))
+    b.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }))
+    const cikisHemen = acik()
+    const cikis160 = await new Promise<boolean>(r => setTimeout(() => r(acik()), 160))
+    return { hemen, ms60, ms160, cikisHemen, cikis160 }
+  })
+  expect(gecikme, `${ad}: ipucu 100 ms gecikmeyle açılıp kapanmıyor`).toEqual(
+    { hemen: false, ms60: false, ms160: true, cikisHemen: true, cikis160: false })
+
   for (const secici of ['#soundBtn', '#ttsBtn']) {
     await expect.poll(async () => (await ipucu(f, secici)).gorunur, `${ad}: ${secici} ipucu kendiliğinden açık`).toBe(false)
     await f.locator(secici).hover()
+    await expect.poll(async () => (await ipucu(f, secici)).gorunur, `${ad}: ${secici} üzerine gelince ipucu yok`).toBe(true)
     const acik = await ipucu(f, secici)
-    expect(acik.gorunur, `${ad}: ${secici} üzerine gelince ipucu yok`).toBe(true)
     expect(acik.metin).toBe(acik.ad)
+    expect(acik.boxSizing).toBe('border-box')
     expect(acik.sol, `${ad}: ${secici} ipucu çerçevenin solundan taşıyor`).toBeGreaterThanOrEqual(0)
-    expect(acik.sag).toBeLessThanOrEqual(acik.genislik + 0.5)
+    expect(acik.sag, `${ad}: ${secici} ipucu çerçevenin sağından taşıyor`).toBeLessThanOrEqual(acik.genislik + 0.5)
     expect(acik.tasma, `${ad}: ${secici} ipucu yatay kaydırma açtı`).toBeLessThanOrEqual(0)
     await page.mouse.move(1, 1)
+    await expect.poll(async () => (await ipucu(f, secici)).gorunur, `${ad}: ${secici} ipucu kapanmadı`).toBe(false)
   }
-  // Keyboard: focus from the sound button to the read-aloud button with Tab; Escape closes, focus stays put.
-  await f.locator('#soundBtn').focus()
+
+  // Hoverable: the pointer walks from the button's centre down onto the tooltip's centre in 2 px steps; the tooltip
+  // never closes on the way, and stays open while the pointer rests on it. The frame's offset is added for the dashboard.
+  // Coordinates are frame-relative (getBoundingClientRect); in the dashboard the iframe's own box is added.
+  const ofset = 'frameElement' in f ? (await (await (f as Frame).frameElement()).boundingBox())! : { x: 0, y: 0 }
+  const once = await ipucu(f, '#ttsBtn')
+  const kutu = once.dugme
+  const x = kutu.x + kutu.w / 2
+  await page.mouse.move(ofset.x + x, ofset.y + kutu.y + kutu.h / 2)
+  await expect.poll(async () => (await ipucu(f, '#ttsBtn')).gorunur).toBe(true)
+  const hedef = await ipucu(f, '#ttsBtn')
+  const kapananlar: number[] = []
+  for (let y = kutu.y + kutu.h / 2; y <= hedef.merkezY; y += 2) {
+    await page.mouse.move(ofset.x + Math.min(Math.max(x, hedef.sol + 4), hedef.sag - 4), ofset.y + y)
+    if (!(await ipucu(f, '#ttsBtn')).gorunur) kapananlar.push(Math.round(y - kutu.y - kutu.h))
+  }
+  await page.waitForTimeout(300)
+  expect(kapananlar, `${ad}: işaretçi ipucuna inerken ipucu kapandı (düğmenin altından px)`).toEqual([])
+  expect((await ipucu(f, '#ttsBtn')).gorunur, `${ad}: işaretçi ipucunun üstündeyken ipucu kapandı`).toBe(true)
+  await page.mouse.move(1, 1)
+  await expect.poll(async () => (await ipucu(f, '#ttsBtn')).gorunur).toBe(false)
+
+  // Activation closes it and it stays closed while the pointer rests; leaving and returning shows the new name.
+  await f.locator('#soundBtn').hover()
+  await expect.poll(async () => (await ipucu(f, '#soundBtn')).gorunur).toBe(true)
+  await f.locator('#soundBtn').click()
+  await expect.poll(async () => (await ipucu(f, '#soundBtn')).gorunur, `${ad}: etkinleştirme ipucunu kapatmadı`).toBe(false)
+  await page.waitForTimeout(250)
+  expect((await ipucu(f, '#soundBtn')).gorunur, `${ad}: etkinleştirmeden sonra ipucu yeniden açıldı`).toBe(false)
+  await page.mouse.move(1, 1)
+  await f.locator('#soundBtn').hover()
+  await expect.poll(async () => (await ipucu(f, '#soundBtn')).gorunur).toBe(true)
+  const sonra = await ipucu(f, '#soundBtn')
+  expect(sonra.metin === 'Sesi aç' && sonra.ad === 'Sesi aç', JSON.stringify(sonra)).toBe(true)
+  await page.mouse.move(1, 1)
+
+  // Keyboard: Tab from the sound button opens the read-aloud tooltip; Escape closes it, focus stays put.
+  await klavyeyleOdakla(f, page, '#soundBtn')
   await page.keyboard.press('Tab')
   await expect(f.locator('#ttsBtn')).toBeFocused()
-  expect((await ipucu(f, '#ttsBtn')).gorunur, `${ad}: odakta ipucu yok`).toBe(true)
+  await expect.poll(async () => (await ipucu(f, '#ttsBtn')).gorunur, `${ad}: odakta ipucu yok`).toBe(true)
   await page.keyboard.press('Escape')
   await expect.poll(async () => (await ipucu(f, '#ttsBtn')).gorunur, `${ad}: Esc ipucunu kapatmadı`).toBe(false)
   await expect(f.locator('#ttsBtn')).toBeFocused()
-  // The name changes with the state ("Sesi kapat" ↔ "Sesi aç"); the tooltip reads the live name.
-  await f.locator('#soundBtn').focus()
-  await page.keyboard.press('Enter')
-  const sonra = await ipucu(f, '#soundBtn')
-  expect(sonra.gorunur && sonra.metin === 'Sesi aç' && sonra.ad === 'Sesi aç', JSON.stringify(sonra)).toBe(true)
+}
+
+/** Every icon button's tooltip opened by keyboard stays inside the frame (left ≥ 0, right ≤ width), no sideways
+ * scroll: the two tools, the pacing disk's hide button and — after a link is made — the concept map's remove button. */
+async function ipucuKutulari(f: Frame | Page, page: Page, ad: string) {
+  const olc = async (secici: string) => {
+    await klavyeyleOdakla(f, page, secici)
+    await expect.poll(async () => (await ipucu(f, secici)).gorunur, `${ad}: ${secici} odakta ipucu yok`).toBe(true)
+    const k = await ipucu(f, secici)
+    expect({ secici, sol: k.sol >= -0.5, sag: k.sag <= k.genislik + 0.5, tasma: k.tasma <= 0 },
+      `${ad}: ${secici} ipucu çerçeveden taşıyor (sol ${k.sol.toFixed(1)}, sağ ${k.sag.toFixed(1)}, çerçeve ${k.genislik})`)
+      .toEqual({ secici, sol: true, sag: true, tasma: true })
+    expect(k.boxSizing).toBe('border-box')
+    expect(k.metin).toBe(k.ad)
+    await page.keyboard.press('Escape')
+  }
+  for (const secici of ['#pacingDiskDismiss', '#soundBtn', '#ttsBtn']) await olc(secici)
+  for (let i = 0; i < segmentSayisi - 1; i++) await f.locator('#nextBtn').click()
+  await expect(f.locator('#stage')).toHaveAttribute('data-seg', 'conceptMap')
+  const dugumler = f.locator('.cmap-node')
+  await dugumler.nth(0).press('Enter')
+  await dugumler.nth(1).press('Enter')
+  await olc('.cmap-edge__remove')
 }
 
 /** Opens the module directly as a frame of `genislik` (`dogrudan`) or in the dashboard's flow layout at screen `genislik`. */
@@ -216,6 +304,18 @@ for (const [genislik, dogrudan, ad] of GENISLIKLER) {
   test(`every icon button is 3rem, named, with a 20 px icon — ${ad}`, async ({ page }) => {
     await herBolumuOlc(await ac(page, genislik, dogrudan), ad)
   })
+}
+
+for (const genislik of [272, 320, 342, 390]) {
+  for (const akis of [false, true]) {
+    const ad = `${akis ? 'akış benzetimi' : 'çerçeve'} ${genislik}`
+    test(`every icon button's tooltip stays inside the frame — ${ad}`, async ({ page }) => {
+      const f = await ac(page, genislik, true)
+      // Flow simulation (the review's probe): the dashboard's layout attribute on a frame of that width.
+      if (akis) await page.evaluate(() => document.documentElement.setAttribute('data-host-layout', 'flow'))
+      await ipucuKutulari(f, page, ad)
+    })
+  }
 }
 
 for (const [genislik, dogrudan, ad] of GENISLIKLER.filter(([g]) => [272, 342, 390, 1440, 3840].includes(g))) {
@@ -262,3 +362,47 @@ if (GORUNTU) {
     })
   }
 }
+
+// Review fix round (Küçük 12): a hotspot region's accessible name used to be the answer itself (`spots[].label`), so a
+// screen reader announced "Çekirdek, düğme" right under the question "Bul ve tıkla: Çekirdek". WCAG 1.1.1's test
+// exception asks for a descriptive identification, not the answer: "Bölge n / N". The answer enters the name only once
+// the reader has found the region.
+test.describe('hotspot regions', () => {
+  let hotspotHtml = ''
+  test.beforeAll(() => {
+    const out = join(mkdtempSync(join(tmpdir(), 'tedy-hotspot-')), 'modul.html')
+    execFileSync(PYTHON, ['-c', [
+      'import sys', 'from src.mcp_server import derleme, ornekler',
+      "d = ornekler.ornek('MODULE')",
+      "svg = ('<svg viewBox=\"0 0 480 300\" role=\"img\" aria-label=\"Hücre şeması\">'",
+      "       '<g data-spot=\"zar\"><rect x=\"20\" y=\"20\" width=\"440\" height=\"260\" fill=\"none\" stroke=\"var(--viz-axis)\" stroke-width=\"16\"/></g>'",
+      "       '<g data-spot=\"cekirdek\"><circle cx=\"240\" cy=\"150\" r=\"48\" fill=\"var(--viz-2)\"/></g></svg>')",
+      "d['segments'] = [{'type': 'hotspot', 'id': 'h1', 'title': 'Hücreyi Keşfet', 'svg': svg, 'spots': [",
+      "    {'id': 'cekirdek', 'label': 'Çekirdek', 'info': 'Hücrenin yönetim merkezi.'},",
+      "    {'id': 'zar', 'label': 'Hücre zarı', 'info': 'Hücreyi çevreler.'}]}]",
+      "d['curriculum']['outcomes'][0]['mappedTo'] = ['h1']",
+      `open(sys.argv[1], 'w').write(derleme.derle(d, {}, ${JSON.stringify(ORIGIN)}))`,
+    ].join('\n'), out], { cwd: REPO })
+    hotspotHtml = readFileSync(out, 'utf8')
+  })
+
+  test('region names identify the region and never read out the answer', async ({ page }) => {
+    await serveModule(page)
+    await page.route('https://modul.tedy.online/**', r => r.fulfill({
+      status: 200, contentType: 'text/html; charset=utf-8', body: hotspotHtml,
+      headers: { 'content-security-policy': SPEC_CSP, 'x-content-type-options': 'nosniff', 'cache-control': 'no-store' },
+    }))
+    await page.setViewportSize({ width: 390, height: 900 })
+    await page.goto(MODUL)
+    await expect(page.locator('.q-stem')).toContainText('Çekirdek')
+    const adlar = await page.locator('[data-spot]').evaluateAll(rs => rs.map(r => r.getAttribute('aria-label') ?? ''))
+    expect(adlar).toEqual(['Bölge 1 / 2', 'Bölge 2 / 2'])
+    // The region is still a named, focusable button; the answer enters its name once found.
+    await page.locator('[data-spot="zar"]').press('Enter')
+    await expect(page.locator('#hfb')).toContainText('Burası değil')
+    await expect(page.locator('[data-spot="zar"]')).toHaveAttribute('aria-label', 'Bölge 1 / 2')
+    await page.locator('[data-spot="cekirdek"]').press('Enter')
+    await expect(page.locator('#hfb')).toContainText('Buldun')
+    await expect(page.locator('[data-spot="cekirdek"]')).toHaveAttribute('aria-label', 'Bölge 2 / 2: Çekirdek, bulundu')
+  })
+})

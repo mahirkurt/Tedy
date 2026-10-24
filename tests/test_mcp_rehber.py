@@ -103,6 +103,25 @@ def test_kanun_rehberin_onunde_okunur():
     assert whole["status"] == "ok" and whole["metin"].startswith(rehber.preamble(kanun).splitlines()[0])
 
 
+def test_ilk_parca_butcesi_kanun_bir_ve_skill_bolumu():
+    """Kanun §0.4 (inceleme, Küçük 10): `akis`'in ilk parçası kanun §1 + satır sonu + `SKILL.md` §8'dir, `carbon`'unki
+    §1 + satır sonu + §10; ikisi de ≤ 8000 bayt (PART_MAX_BYTES). Aşılırsa SKILL bölümü ikinci parçaya düşer ve yazar
+    inşa akışını ilk okumada görmez. Toplam doğrudan ölçülür; ileti kalan payı yazar."""
+    kanun = rehber.read_source(rehber.KANUN)
+    bir = next(f"{h}\n\n{b}\n" for h, b in rehber.split_sections(kanun) if re.match(r"##\s+1\.\s", h))
+    skill = rehber.read_source("SKILL.md")
+    for bolum, no in (("akis", "8"), ("carbon", "10")):
+        blok = next(f"{h}\n\n{b}\n" for h, b in rehber.split_sections(skill) if re.match(rf"##\s+{no}\.\s", h))
+        toplam = len(bir.encode("utf-8")) + 1 + len(blok.encode("utf-8"))
+        kalan = rehber.PART_MAX_BYTES - toplam
+        assert kalan >= 0, (f"{bolum}: kanun §1 + 1 + SKILL §{no} = {toplam} bayt, sınır {rehber.PART_MAX_BYTES}; "
+                            f"{-kalan} bayt fazla")
+        # Formül gerçek parçanın kendisidir: ilk parça tam olarak bu iki bloktur.
+        ilk = rehber.guide(bolum)["metin"]
+        assert len(ilk.encode("utf-8")) == toplam, (f"{bolum}: ilk parça {len(ilk.encode('utf-8'))} bayt, formül {toplam}; "
+                                                  f"kalan pay {kalan} bayt")
+
+
 def test_kanun_vendor_icine_kopyalanmaz():
     """One source: the law lives in docs/ and is served from there, never duplicated into vendor/."""
     assert not list(vendor_sync.VENDOR_DIR.rglob("*kanun*"))

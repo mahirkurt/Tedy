@@ -170,6 +170,19 @@ PATCHES: tuple[tuple[str, str, str, str], ...] = (
 )
 
 
+PARMAK_IZI_ANAHTARI = "assets/module-template.html"
+
+
+def sablon_parmak_izi() -> str:
+    """Bugünkü şablonun parmak izi: PROVENANCE.json'daki `module-template.html` sha256'sı (vendor_sync --pin yazar).
+    Taslak kaydı bunu taşır; yayın, parmak izi bugünkünden farklı taslağı yeniden derletir (Kanun KB-48)."""
+    kayit = json.loads((VENDOR_DIR / "PROVENANCE.json").read_text(encoding="utf-8"))
+    deger = (kayit.get("files") or {}).get(PARMAK_IZI_ANAHTARI)
+    if not isinstance(deger, str) or len(deger) != 64:
+        raise TemplateDriftError("PROVENANCE.json şablonun parmak izini taşımıyor")
+    return deger
+
+
 class TemplateDriftError(RuntimeError):
     """The vendored template no longer matches the anchors ted-mcp patches."""
 

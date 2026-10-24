@@ -70,17 +70,21 @@ Aşağıdaki desenler `viewBox` koordinatlarıyla, hep token-renkli kurulur.
 2. **Döngü (cycle):** Dairesel akış (su döngüsü, yaşam döngüsü). Aşama kutuları +
    eğri `path` oklar + uç için `marker-end="url(#vz-arrow)"` (`stroke-dasharray` ile akış hissi); aşama adları
    `labels`'ta. Örnek: ana modüldeki su döngüsü (etiketli şema).
-3. **Süreç/akış (process):** Soldan sağa adımlar; kutu → ok → kutu. Düz `path`/`line` + `marker-end="url(#vz-arrow)"`.
+3. **Süreç/akış (process):** Soldan sağa adımlar. SVG çizme: `visual:{ kind:"flow", steps:[…] }` (`relationFlow`) adımları
+   HTML kutu → ok → kutu olarak çizer, adım adı gövde boyundadır ve dar ekranda alt alta iner (KB-48).
 4. **Karşılaştırma (compare):** Yan yana 2–3 panel (katı/sıvı/gaz gibi). Eş ölçekli `rect`
    çerçeveler + içerik; panel adları altyazıda ("Soldan sağa …"). Örnek: ana modüldeki tanecik düzeni.
-5. **Sayı doğrusu (number line):** Yatay eksen + işaretler; kesir/tam sayı/işlem.
+5. **Sayı doğrusu (number line):** SVG çizme: `visual:{ kind:"numberline", min, max, step, points:[…] }` (ya da
+   `numberline` segmenti); şablon etiketleri her genişlikte ≥ 12 px ve çakışmasız yazar (KB-5, KB-48).
 6. **Parça-bütün (part–whole):** Bölünmüş dikdörtgen ya da daire dilimleri (kesir, yüzde).
    Kesir ve oranda daire yerine `fractionBar` çubuk modeli yeğlenir.
 7. **Çubuk/çizgi grafik (chart):** **`vizChart` kullan** — elle çizme. Veri okuryazarlığı,
    karşılaştırma, zaman serisi.
 8. **Zaman çizelgesi (timeline):** Olay dizisi — `timeline` segmenti (SVG değil, DOM) yeğlenir.
-9. **Ağaç/hiyerarşi (tree):** Düğüm + bağlantı; şecere, sınıflandırma. `line` + daire/kutu düğüm.
-10. **Venn/küme:** İki-üç yarı-saydam daire (`fill` token + `opacity` veya `fill-opacity`).
+9. **Ağaç/hiyerarşi (tree):** Düğüm + bağlantı; şecere, sınıflandırma. Etiketli şema: `line` + daire/kutu düğüm
+   `base`'te, düğüm adları `labels`'ta (KB-48).
+10. **Venn/küme:** İki-üç daire `base`'te (`fill` token; kalıcı opaklık yok, KB-41), küme ve kesişim adları
+    `labels`'ta (etiketli şema, KB-48).
 
 ### 3.1 Yön okları — `vz-arrow` marker (tek doğru yöntem)
 

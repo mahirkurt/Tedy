@@ -218,8 +218,10 @@ alıştırma sayısı düz metinle, hedefler, tekrar önerisi, öz-değerlendirm
 ```js
 { type: "hotspot", id, title, svg: "<svg>...<g data-spot='cekirdek'>...</g></svg>", spots: [ { id: "cekirdek", label: "Çekirdek", info: "Hücrenin yönetim merkezi" } ] }
 ```
-SVG `icon-pictogram-svg.md` kurallarına uygun; her hotspot klavyeyle odaklanabilir
-(`tabindex`, `role="button"`, `aria-label`).
+SVG `icon-pictogram-svg.md` kurallarına uygun ve **metin taşımaz** (Kanun M5.6, KB-48): bölgenin adı
+`spots[].label`'dadır ve soruda yazılır; SVG'ye yazılan ad hem 12 px'in altına düşer hem cevabı gösterir
+(`edupedia_derle` `sema_hatasi`). Her hotspot klavyeyle odaklanabilir (`tabindex`, `role="button"`); erişilebilir adı
+cevap değil "Bölge n / N"dir, cevap bölge bulununca adına girer (WCAG 1.1.1, test için betimleyici tanım).
 
 > **✓ Motorda uygulandı (v1.2.0).** `renderHotspot`: her `spot` için "Bul ve tıkla:
 > {label}" sorulur; öğrenci SVG içinde `data-spot` taşıyan bölgeyi tıklar (veya Tab +

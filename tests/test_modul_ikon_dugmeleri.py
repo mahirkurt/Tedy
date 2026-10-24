@@ -38,20 +38,45 @@ def test_sesli_okuma_dugmesi_48_px():
     assert "min-height:var(--tap)" in _kural(".tts-oku")
 
 
-def test_ikon_dugmesinin_adi_arac_ipucunda_ve_kosulsuz_hover_yok():
+def test_ikon_dugmesinin_adi_arac_ipucunda_gecikmeli_ve_uzerine_gelinebilir():
+    """İpucu düğmenin `aria-label`'ı; kutusu dolgu dahil ölçülür (border-box), görünürlükle açılıp kapanır (yerleşim
+    hep vardır, böylece açılmadan önce çerçeveye kıstırılabilir); açılış ve kapanış 100 ms gecikmeli (@carbon/react
+    IconButton `enterDelayMs`/`leaveDelayMs`); 8 px'lik boşlukta saydam bir köprü vardır, işaretçi ipucuna inerken
+    ipucu kapanmaz (WCAG 1.4.13); etkinleştirmede kapanır (Carbon `closeOnActivation`), Esc kapatır (inceleme, Önemli 1–2)."""
     ipucu = re.search(r"\.icon-btn::after,\.pacing-disk__dismiss::after,\.cmap-edge__remove::after\{([^}]*)\}", SABLON)
     assert ipucu, "araç ipucu kuralı yok"
     govde = ipucu.group(1)
-    assert "content:attr(aria-label)" in govde and "display:none" in govde
-    assert "var(--cds-background-inverse)" in govde and "var(--cds-text-inverse)" in govde
-    # Fareyle açılış yalnız fareli girişte (Kanun M2.12), odakla açılış her zaman, Esc'in sınıfı en sonda kapatır.
-    assert re.search(r"@media \(any-hover:hover\)\{[^@]*\.icon-btn:hover::after[^{]*\{display:block\}", SABLON)
-    odak = SABLON.index(".icon-btn:focus-visible::after,")
-    kapali = SABLON.index(".icon-btn.ipucu-kapali::after,")
-    assert odak < kapali
-    for secici in IKON_DUGMELERI:
-        assert f"{secici}:focus-visible::after" in SABLON and f"{secici}.ipucu-kapali::after" in SABLON
-    assert re.search(r'ev\.key!=="Escape"', SABLON) and 'classList.add("ipucu-kapali")' in SABLON
+    for parca in ("content:attr(aria-label)", "box-sizing:border-box", "visibility:hidden", "opacity:0",
+                  "var(--cds-background-inverse)", "var(--cds-text-inverse)", "var(--ipucu-x"):
+        assert parca in govde, parca
+    assert "display:none" not in govde
+    acik = re.search(r"\.icon-btn\.ipucu-acik::after,[^{]*\{([^}]*)\}", SABLON)
+    assert acik and "visibility:visible" in acik.group(1) and "opacity:1" in acik.group(1)
+    kopru = re.search(r"\.icon-btn\.ipucu-acik::before,[^{]*\{([^}]*)\}", SABLON)
+    assert kopru and "inset-block-start:100%" in kopru.group(1) and "block-size:var(--sp-03)" in kopru.group(1)
+    # Açılış JS'le: :hover kuralı yok (Kanun M2.12'nin dışında kalır), gecikme hareket değildir (reduced-motion dokunmaz).
+    assert not re.search(r"\.icon-btn:hover::after", SABLON)
+    for parca in ("const IPUCU_ACIK_MS=100, IPUCU_KAPA_MS=100;", 'ev.key!=="Escape"', 'addEventListener("click"',
+                  'classList.add("ipucu-kapali")', 'style.setProperty("--ipucu-x"'):
+        assert parca in SABLON, parca
+
+
+def test_ses_oynaticisinin_renk_semasi_tema_tokenindan():
+    """`color-scheme` tema bloklarındaki token'dan gelir; bileşen kuralında `[data-theme]` seçicisi yoktur (KB-22, M4.3)."""
+    assert re.search(r"(?m)^\.edupedia-audio__oynatici\{color-scheme:var\(--tedy-renk-semasi\)\}", SABLON)
+    assert not re.search(r"\[data-theme[^\]]*\][^{]*edupedia-audio", SABLON)
+    for blok, deger in ((':root,[data-theme="g10"]{', "light"), ('[data-theme="white"]{', "light"),
+                        ('[data-theme="g100"]{', "dark")):
+        bas = SABLON.index(blok)
+        govde = SABLON[bas:SABLON.index("\n}", bas)]
+        assert f"--tedy-renk-semasi:{deger};" in govde, (blok, deger)
+
+
+def test_hotspot_bolgesinin_adi_cevabi_sizdirmaz():
+    """Bölgenin erişilebilir adı sorunun cevabı (`spots[].label`) değildir; "Bölge n / N" der. Cevap ancak doğru bölge
+    bulununca o bölgenin adına girer (WCAG 1.1.1: test için betimleyici tanım, cevap değil; inceleme, Küçük 12)."""
+    assert 'r.setAttribute("aria-label", meta.label' not in SABLON
+    assert re.search(r'setAttribute\("aria-label", ?`Bölge \$\{', SABLON)
 
 
 def test_her_ikon_dugmesi_adli():
@@ -75,5 +100,5 @@ def test_yazarin_ses_varligi_sinifli_oynaticida_ve_adli():
         assert re.search(r'class="[^"]+"', oge), f"sınıfsız audio (M5.14): {oge}"
         assert "aria-label=" in oge and "autoplay" not in oge
     assert '<audio class="edupedia-audio__oynatici" controls' in html
-    # Denetimleri tarayıcı çizer (Carbon'un ses oynatıcı bileşeni yok); temayı izler.
-    assert re.search(r':root\[data-theme="g100"\] \.edupedia-audio__oynatici\{color-scheme:dark\}', SABLON)
+    # Denetimleri tarayıcı çizer (Carbon'un ses oynatıcı bileşeni yok); temayı token'dan izler (yukarıdaki test).
+    assert "color-scheme:var(--tedy-renk-semasi)" in SABLON

@@ -280,3 +280,24 @@ def test_gorsel_ornegi_kapilardan_gecer_ve_her_cizici_turunu_tasir():
     turler = {s["type"] for s in data["segments"]} | {s.get("visual", {}).get("kind") for s in data["segments"]}
     assert {"numberline", "chart", "fraction", "diagram", "sim"} <= turler
     assert {s["simType"] for s in data["segments"] if s["type"] == "sim"} == {"numberScale", "pendulum", "projectile"}
+
+
+def test_harfli_semanin_lejanti_harfi_yazar_ve_sola_yaslanir():
+    """`labels[].n` verilmiş öğede lejantın işareti o harftir (iğnedekiyle aynı), numara değil; liste figürün ortalı
+    hizasını devralmaz (inceleme, Küçük 4). Harfsiz öğe sıra numarasıyla kalır."""
+    cikti = _calistir("""
+const spec = {title:"Üçgen", viewBox:"0 0 480 300", base:"<path d='M40 260 L240 40 L440 260 Z'/>",
+  labels:[{x:40, y:260, n:"A", text:"A köşesi"}, {x:240, y:40, n:"B", text:"B köşesi"}, {x:440, y:260, text:"Üçüncü köşe"}]};
+process.stdout.write(JSON.stringify({html: labeledFigure(spec, 214)}));
+""")
+    html = cikti["html"]
+    ogeler = re.findall(r"<li[^>]*>.*?</li>", html, re.S)
+    assert len(ogeler) == 3, ogeler
+    assert re.search(r'<li class="viz-legend-list__harfli"><b class="viz-legend-list__n">A</b> A köşesi</li>', ogeler[0])
+    assert "<b class=\"viz-legend-list__n\">B</b>" in ogeler[1]
+    assert ogeler[2] == "<li>Üçüncü köşe</li>"
+    # İğnede de aynı harf
+    assert re.search(r'class="pin-n"[^>]*>A</text>', html) and re.search(r'class="pin-n"[^>]*>3</text>', html)
+    kural = re.search(r"\.viz-legend-list\{([^}]*)\}", SABLON).group(1)
+    assert "text-align:start" in kural
+    assert re.search(r"\.viz-legend-list__harfli\{[^}]*list-style:none", SABLON)

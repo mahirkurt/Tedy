@@ -523,32 +523,62 @@ def varlik_zorunluluk_hatalari(data: Any, varliklar: Mapping[str, GomuluVarlik])
     return errors
 
 
-# Kanun M5.6 (KB-48, 2026-10-24): SVG'de yazı çizen öğeler. `svg:` gibi bir ad alanı öneki ve `<` ile ad arasındaki
-# boşluk da sayılır; `&lt;text&gt;` sayılmaz (innerHTML onu öğe değil düz yazı olarak çizer) ve `<textarea>` gibi
-# yalnız adı benzeyen öğe `\b` yüzünden eşleşmez. `title` ve `desc` çizilmez, erişilebilir addır; serbesttir.
-_SVG_METIN_RE = re.compile(r"<\s*(?:[A-Za-z][\w.-]*:)?(?:text|tspan|textPath|foreignObject)\b", re.I)
-YAZAR_SVG_METNI = ("yazar SVG'si metin taşımaz ({oge}): viewBox yazarındır, şablon onu kutunun genişliğine "
-                   "kuramaz ve metin dar ekranda 12 px'in altına düşer (Kanun M5.6, KB-48). Şekiller SVG'de kalır; "
-                   "adları etiketli şemanın `labels`'ına yaz (visual.kind:\"labeled\" ya da diagram segmenti: "
+# Kanun M5.6 (KB-48, 2026-10-24): SVG'de yazı çizen öğeler. `svg:` gibi bir ad alanı öneki sayılır. HTML ayrıştırıcısı
+# `<` ile öğe adı arasında boşluk tanımaz, bu yüzden "a < text" düzyazıdır ve eşleşmez; `&lt;text&gt;` de sayılmaz
+# (innerHTML onu öğe değil düz yazı olarak çizer). `<textarea>` gibi yalnız adı benzeyen öğe `\b` yüzünden eşleşmez.
+# `title` ve `desc` çizilmez, erişilebilir addır; serbesttir.
+_SVG_METIN_RE = re.compile(r"<(?:[A-Za-z][\w.-]*:)?(?:text|tspan|textPath|foreignObject)\b", re.I)
+# `data:image/svg+xml` ikinci bir yazar SVG'sidir (img src, SVG image href); metni taranamaz ve ölçülemez. Öznitelikteki
+# karakter göndermeleri innerHTML'de çözüldüğü için bu desen göndermeleri çözülmüş metinde de aranır.
+_SVG_DATA_RE = re.compile(r"data:\s*image/svg\+xml", re.I)
+_SVG_GEREKCE = "viewBox yazarındır, şablon onu kutunun genişliğine kuramaz ve metin dar ekranda 12 px'in altına düşer"
+YAZAR_SVG_METNI = ("yazar SVG'si metin taşımaz ({oge}): " + _SVG_GEREKCE + " (Kanun M5.6, KB-48). Şekiller SVG'de "
+                   "kalır; adları etiketli şemanın `labels`'ına yaz (visual.kind:\"labeled\" ya da diagram segmenti: "
                    "numaralı iğne + liste) ya da gövde metnine ve altyazıya (caption) taşı")
+HOTSPOT_SVG_METNI = ("hotspot SVG'si metin taşımaz ({oge}): " + _SVG_GEREKCE + " (Kanun M5.6, KB-48) ve bölgenin adını "
+                     "SVG'ye yazmak sorunun cevabını gösterir. Bölgenin adı `spots[].label`'dadır, şablon onu soruda "
+                     "yazar; SVG'de yalnız şekiller ve `data-spot` bölgeleri kalır")
+SVG_DATA_METNI = ("`data:image/svg+xml` yazılmaz: ikinci bir yazar SVG'sidir, metni taranamaz ve ölçülemez (Kanun M5.6, "
+                  "KB-48). Raster görsel `meta.assets` ile gelir (edupedia_gorsel); şema etiketli şemayla ya da metinsiz "
+                  "visual.kind:\"svg\" ile çizilir")
+
+
+def yazar_svg_ihlali(metin: str) -> str | None:
+    """Metindeki ilk yazar SVG'si ihlali (`<text>` gibi bir öğe adı ya da `data:image/svg+xml`), yoksa None. Derleme
+    anında `yazar_svg_hatalari`, yayın anında saklı taslağın MODULE_DATA'sı (`katalog`) bunu kullanır."""
+    m = _SVG_METIN_RE.search(metin)
+    if m:
+        return "<" + m.group(0).lstrip("<") + ">"
+    if _SVG_DATA_RE.search(metin) or _SVG_DATA_RE.search(html_lib.unescape(metin)):
+        return "data:image/svg+xml"
+    return None
 
 
 def yazar_svg_hatalari(data: Any) -> list[str]:
-    """Kanun M5.6 (KB-48): MODULE_DATA'nın hiçbir dizgesi SVG metin öğesi taşımaz. Yazarın kendi çizdiği SVG
-    (`visual.kind:"svg"`'nin `ref`'i, etiketli şemanın `base`'i, `hotspot`'un `svg`'si, gövdeye gömülü SVG) kendi
-    viewBox'ında çizilir; şablon onu kutuya göre kuramaz, metni büyütürse yazarın şekilleriyle çakışır. Ad ve
-    etiket şablonun çizdiği yere gider: etiketli şemanın `labels`'ı (iğne numarası ≥ 12 px, ad HTML listede) ya
-    da gövde metni. Dizi öğelerine bölünmüş etiket de yakalanır (motor `body`'yi birleştirip çizer)."""
+    """Kanun M5.6 (KB-48): MODULE_DATA'nın hiçbir dizgesi SVG metin öğesi ya da `data:image/svg+xml` taşımaz. Yazarın
+    kendi çizdiği SVG (`visual.kind:"svg"`'nin `ref`'i, etiketli şemanın `base`'i, `hotspot`'un `svg`'si, gövdeye gömülü
+    SVG) kendi viewBox'ında çizilir; şablon onu kutuya göre kuramaz, metni büyütürse yazarın şekilleriyle çakışır. Ad
+    ve etiket şablonun çizdiği yere gider: etiketli şemanın `labels`'ı (iğne numarası ≥ 12 px, ad HTML listede), hotspot'ta
+    `spots[].label`, ya da gövde metni. Dizi öğelerine bölünmüş etiket de yakalanır (motor `body`'yi birleştirip çizer)."""
+    segmentler = data.get("segments") if isinstance(data, dict) else None
+    hotspot = {f"MODULE_DATA.segments[{i}].svg" for i, s in enumerate(segmentler if isinstance(segmentler, list) else [])
+               if isinstance(s, dict) and s.get("type") == "hotspot"}
+
+    def ileti(path: str, oge: str) -> str:
+        if oge == "data:image/svg+xml":
+            return f"{path}: " + SVG_DATA_METNI
+        return f"{path}: " + (HOTSPOT_SVG_METNI if path in hotspot else YAZAR_SVG_METNI).format(oge=oge)
+
     errors = []
     for path, text in _walk_strings(data):
-        m = _SVG_METIN_RE.search(text)
-        if m:
-            errors.append(f"{path}: " + YAZAR_SVG_METNI.format(oge="<" + m.group(0).lstrip("<").strip() + ">"))
+        oge = yazar_svg_ihlali(text)
+        if oge:
+            errors.append(ileti(path, oge))
     yakalanan = {e.split(":", 1)[0] for e in errors}
     for path, joined in _walk_string_lists(data):
-        m = _SVG_METIN_RE.search(joined)
-        if m and not any(p.startswith(path + "[") for p in yakalanan):
-            errors.append(f"{path}[*]: " + YAZAR_SVG_METNI.format(oge="<" + m.group(0).lstrip("<").strip() + ">"))
+        oge = yazar_svg_ihlali(joined)
+        if oge and not any(p.startswith(path + "[") for p in yakalanan):
+            errors.append(ileti(f"{path}[*]", oge))
     return errors[:20]
 
 

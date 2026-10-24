@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Mapping
 
 from src import module_store as ms
-from src.mcp_server import alt_metin, derleme, gates
+from src.mcp_server import alt_metin, derleme, gates, sablon
 from src.mcp_server.derleme import DerlemeHatasi, GomuluVarlik
 from src.mcp_server.runs import RUN_ID_RE, RunStore
 from src.mcp_server.taslak import DraftStore
@@ -111,6 +111,8 @@ class Derleyici:
                 "coverage": run.get("coverage") or {},
                 "assets": [ref["asset_id"] for ref in meta.get("assets") or []],
                 "gates": summary, "kapilar": report, "parent_origin": self.parent_origin,
+                # Kanun KB-48: yayın, bugünkü şablondan önce derlenmiş taslağı yeniden derletir.
+                "sablon_parmak_izi": sablon.sablon_parmak_izi(),
                 **({"uyarilar": uyarilar} if uyarilar else {}),
             })
         except Exception:
