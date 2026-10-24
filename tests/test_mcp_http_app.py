@@ -811,6 +811,42 @@ def test_bayrak_kapaliyken_el_sikisma_surumleri_calisir(client, store, surum):
     assert json.loads(call.json()["result"]["content"][0]["text"]) == {"email": FULL}
 
 
+@pytest.mark.parametrize("istenen,beklenen", [("2026-07-28", "2025-11-25"), ("2025-06-18", "2025-06-18")])
+def test_bayrak_kapaliyken_2026_basligli_initialize_1x_gibi_el_sikisir(client, store, caplog, istenen, beklenen):
+    """1.28.1 initialize'da sürüm başlığına hiç bakmaz (yalnız gövdedeki protocolVersion'u müzakere eder).
+    claude.ai'nin geri düşüş initialize'ı başlığı taşısa bile bugünkü gibi bağlanmalı."""
+    key = store.create_static_key("init", FULL)
+    with caplog.at_level(logging.WARNING, logger="src.mcp_server.http_app"):
+        r = client.post("/mcp", json=_rpc("initialize", {"protocolVersion": istenen, "capabilities": {},
+                                                          "clientInfo": {"name": "t", "version": "0"}}),
+                        headers={**MCP_HEADERS, "authorization": f"Bearer {key}", "mcp-protocol-version": MODERN})
+    assert r.status_code == 200
+    assert r.json()["result"]["protocolVersion"] == beklenen
+    assert not [rec for rec in caplog.records if "mcp_reddedildi" in rec.getMessage()]
+
+
+def test_bayrak_kapaliyken_kapinin_govde_okumasi_tavani_asmaz(tmp_path, store):
+    """Kapı initialize'ı tanımak için gövdeyi okur; tavanı aşan akış yine 413 alır (400 ya da 500 değil)."""
+    key = store.create_static_key("tavan", FULL)
+    small = load_settings({"TED_MCP_PUBLIC_BASE_URL": BASE, "TED_MCP_MAX_BODY_BYTES": "512"}, project_root=tmp_path)
+    headers = {**MCP_HEADERS, "authorization": f"Bearer {key}", "mcp-protocol-version": MODERN}
+
+    def chunks():
+        for _ in range(3):
+            yield b" " * 400
+
+    with TestClient(build_app(small, store, _test_mcp(), json_response=True, form_secret=b"s" * 32), base_url=BASE) as c:
+        assert c.post("/mcp", content=chunks(), headers=headers).status_code == 413
+
+
+def test_bayrak_kapaliyken_2026_basligli_get_eski_400_alir(client, store):
+    key = store.create_static_key("get", FULL)
+    r = client.get("/mcp", headers={"accept": "text/event-stream", "authorization": f"Bearer {key}",
+                                    "mcp-protocol-version": MODERN})
+    assert r.status_code == 400
+    assert r.content == _eski_ret_govdesi(MODERN)
+
+
 def test_bayrak_kapaliyken_kimliksiz_2026_istegi_yine_401(client):
     body, headers = _modern("tools/list")
     r = client.post("/mcp", json=body, headers=headers)

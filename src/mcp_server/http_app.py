@@ -415,12 +415,25 @@ def _eski_surum_reddi(surum: str) -> Response:
                     headers={"Content-Type": "application/json"})
 
 
+def _initialize_mi(govde: bytes) -> bool:
+    try:
+        mesaj = json.loads(govde)
+    except (ValueError, RecursionError):
+        return False
+    return isinstance(mesaj, dict) and mesaj.get("method") == "initialize" and "id" in mesaj
+
+
 class Protokol2026Kapisi:
     """TED_MCP_PROTOKOL_2026=0 iken (varsayılan) SDK'nın hemen önünde durur: el sıkışma sürümleri dışında bir
-    mcp-protocol-version taşıyan her /mcp isteğine 1.28.1'in bugün canlıda verdiği 400'ü verir. claude.ai tam
+    mcp-protocol-version taşıyan /mcp isteğine 1.28.1'in bugün canlıda verdiği 400'ü verir. claude.ai tam
     bu yanıttan sonra eski sürüme düşüyor; böylece SDK 2.x'e geçiş tek başına davranış değiştirmez ve 2026-07-28
     ayrı, bilinçli bir adımla (birimde bayrak 1) açılır. BearerGate'in arkasındadır: kimliksiz istek yine 401
-    alır. Gövde okunmaz; ret satırını dıştaki TransportRejectLogMiddleware bugünkü biçimde yazar.
+    alır. Ret satırını dıştaki TransportRejectLogMiddleware bugünkü biçimde yazar.
+
+    Tek istisna, 1.28.1'deki gibi initialize: 1.28.1 initialize'da başlığa hiç bakmaz, gövdedeki protocolVersion'u
+    müzakere eder. 2.x ise başlığa göre yönlendirir (2026 başlıklı initialize'a 404 verirdi). Bu yüzden POST
+    gövdesi okunur (dıştaki BodyLimitMiddleware tavanıyla); initialize ise başlık düşürülüp gövde yeniden
+    oynatılarak el sıkışma yoluna gider. Geri düşen bir istemcinin initialize'ı başlığı taşısa bile bağlanır.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -430,6 +443,29 @@ class Protokol2026Kapisi:
         if scope["type"] == "http" and scope["path"].startswith("/mcp"):
             surum = _header_or_none(scope, b"mcp-protocol-version")
             if surum is not None and surum not in HANDSHAKE_PROTOCOL_VERSIONS:
+                if scope["method"] == "POST":
+                    parcalar: list[bytes] = []
+                    while True:
+                        message = await receive()
+                        if message["type"] != "http.request":
+                            return  # istemci gitti ya da gövde tavanı aşıldı (413'ü BodyLimitMiddleware yazdı)
+                        parcalar.append(message.get("body", b""))
+                        if not message.get("more_body", False):
+                            break
+                    govde = b"".join(parcalar)
+                    if _initialize_mi(govde):
+                        oynatildi = False
+
+                        async def yeniden_oynat() -> dict[str, Any]:
+                            nonlocal oynatildi
+                            if not oynatildi:
+                                oynatildi = True
+                                return {"type": "http.request", "body": govde, "more_body": False}
+                            return await receive()
+
+                        basliklar = [(k, v) for k, v in scope["headers"] if k != b"mcp-protocol-version"]
+                        await self.app({**scope, "headers": basliklar}, yeniden_oynat, send)
+                        return
                 await _eski_surum_reddi(surum)(scope, receive, send)
                 return
         await self.app(scope, receive, send)

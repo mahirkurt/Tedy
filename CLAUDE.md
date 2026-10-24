@@ -355,7 +355,8 @@ unshare -rn .venv/bin/python -m pytest -q               # tüm testler ağsız
   bayrakla açılır:** `TED_MCP_PROTOKOL_2026` (yalnız `0`/`1`, varsayılan `0`, geçersiz değer açılışı durdurur;
   `env_prep.UNIT_ONLY`'dedir, `.env`'e yazılmaz). `0` iken `http_app.Protokol2026Kapisi` (SDK'nın hemen önü,
   BearerGate'in arkası) el sıkışma dışı bir sürüm başlığı taşıyan her `/mcp` isteğine 1.28.1'in 400 gövdesini bayt
-  bayt verir; claude.ai bu yanıttan sonra eski sürüme düşer, yani SDK yükseltmesi tek başına davranış değiştirmez.
+  bayt verir — initialize hariç: 1.28.1 gibi başlığa bakmaz, kapı başlığı düşürüp gövdeyi el sıkışma yoluna
+  oynatır; claude.ai bu yanıttan sonra eski sürüme düşer, yani SDK yükseltmesi tek başına davranış değiştirmez.
   Açmak: birimde `Environment=TED_MCP_PROTOKOL_2026=1` (ya da drop-in) + `daemon-reload` + restart; kapatmak `0`.
   Modern her istek bir INFO satırı yazar: `mcp_modern yontem=… ad=… surum=… durum=… sure_ms=… sse=evet|hayır
   koptu=evet|hayır` (gövde ve bearer yazılmaz). Ulaşım ayarları kurucuda değil `http_app.build_app`'in
