@@ -41,7 +41,8 @@ _SAYI = re.compile(r"^\d+$")
 
 # Ders başına ayar. Ölçüldü (2026-10-25, Fen 7-1): pdftohtml'de başlık size 20 (Arial, beyaz bant), gövde 17, içerik
 # çerçevesi adı Anton; başlıklar sol 107–124 px'te, gövde 119 px'te; kalın tanım başlığı gövde boyunda ve ":" ile biter.
-# "atla": onayda gürültü bulunan başlıklar (s. 49 kavram haritası kutusundaki "Bulutsu").
+# "atla": onayda gürültü bulunan başlıklar (s. 49 kavram haritası kutusundaki "Bulutsu", s. 25'teki altı "… Alanında"
+# şekil etiketi — başlık boyunda ve sarı, +1 punto toleransıyla girer).
 KITAPLAR: dict[str, dict] = {
     "fen-bilimleri": {
         "ders": "Fen Bilimleri",
@@ -55,7 +56,9 @@ KITAPLAR: dict[str, dict] = {
             "sayfa_kaymasi": 1,
             "icindekiler_pdf_sayfalari": (8, 8),
             "duzen": {"baslik_boyu": 20, "govde_boyu": 17, "cerceve_ailesi": "Anton", "baslik_sol_en_cok": 130,
-                      "govde_sol": 119, "tanim": True, "atla": ("Bulutsu",)},
+                      "govde_sol": 119, "tanim": True,
+                      "atla": ("Bulutsu", "Sağlık Alanında", "Enerji Alanında", "İletişim Alanında", "Gıda Alanında",
+                               "Ulaşım Alanında", "Endüstri Alanında")},
         }],
     },
 }
@@ -81,8 +84,8 @@ def _ogeler(xml: str) -> list[dict]:
                 boy, aile = boylar.get(el.get("font"), (0, ""))
                 metin = " ".join("".join(el.itertext()).split())
                 if metin:
-                    out.append({"sayfa": no, "ust": int(el.get("top")), "sol": int(el.get("left")), "boy": boy,
-                                "aile": aile, "kalin": el.find(".//b") is not None, "metin": metin})
+                    out.append({"sayfa": no, "ust": int(el.get("top")), "sol": int(el.get("left")),
+                                "genislik": int(el.get("width") or 0), "boy": boy, "aile": aile, "kalin": el.find(".//b") is not None, "metin": metin})
     out.sort(key=lambda o: (o["sayfa"], o["ust"], o["sol"]))
     return out
 
@@ -91,17 +94,35 @@ def _etiket_turu(katli: str) -> str | None:
     return next((tur for on, tur in ETIKETLER if katli.startswith(on)), None)
 
 
+def _etiket(ogeler: list[dict], baslik: dict) -> tuple[dict, list[dict]] | None:
+    """Başlığın altındaki (≤ 120 px) "Amaç:" etiketi. Poppler etiketi bazen iki kutuya böler ("A" + "maç:", ölçüldü:
+    basılı s. 94); aynı satırdaki (üst farkı ≤ 3) bitişik (aralık ≤ 8 px) kalın parçalar birleştirilip öyle eşleştirilir.
+    Etiketin parçalarıyla birlikte döner."""
+    kalin = sorted((o for o in ogeler if o["sayfa"] == baslik["sayfa"] and o["kalin"]
+                    and 0 < o["ust"] - baslik["ust"] <= 120), key=lambda o: (o["ust"], o["sol"]))
+    for i, ilk in enumerate(kalin):
+        parcalar = [ilk]
+        for o in kalin[i + 1:]:
+            son = parcalar[-1]
+            if abs(o["ust"] - ilk["ust"]) <= 3 and 0 <= o["sol"] - (son["sol"] + son["genislik"]) <= 8:
+                parcalar.append(o)
+        # Bitişik dizinin her ön eki aday: "Amaç:" yanındaki kalın sözcükle ("Amaç: Adımlar") uzamış olabilir.
+        for n in range(1, len(parcalar) + 1):
+            if katla("".join(p["metin"] for p in parcalar[:n])).rstrip(": ") == "amac":
+                return ilk, parcalar[:n]
+    return None
+
+
 def _amac(ogeler: list[dict], baslik: dict) -> str | None:
     """Etkinlik başlığının altındaki "Amaç:" satırı ve hemen alttaki (≤ 26 px, etiketin 15 px'ten fazla solunda — kutunun
     kenarına taşan) en çok iki devam satırı; tireyle bölünen sözcük birleşir. Paragraf gövde kenarında (etiketle aynı
     hizada) başlar, alınmaz (ölçüldü: devam satırı sol 86–95 px, etiket 120–129 px, paragraf 119 px)."""
-    etiketler = [o for o in ogeler if o["sayfa"] == baslik["sayfa"] and o["kalin"]
-                 and 0 < o["ust"] - baslik["ust"] <= 120 and katla(o["metin"]).rstrip(": ") == "amac"]
-    if not etiketler:
+    bulunan = _etiket(ogeler, baslik)
+    if bulunan is None:
         return None
-    e = etiketler[0]
-    ayni = sorted((o for o in ogeler if o["sayfa"] == e["sayfa"] and abs(o["ust"] - e["ust"]) <= 3 and o["sol"] > e["sol"]),
-                  key=lambda o: o["sol"])
+    e, parcalar = bulunan
+    ayni = sorted((o for o in ogeler if o["sayfa"] == e["sayfa"] and abs(o["ust"] - e["ust"]) <= 3 and o["sol"] > e["sol"]
+                   and not any(o is p for p in parcalar)), key=lambda o: o["sol"])
     satirlar = [" ".join(o["metin"] for o in ayni)]
     ust = e["ust"]
     for _ in range(2):
@@ -124,7 +145,11 @@ def basliklari_ayristir(xml: str, duzen: dict) -> list[dict]:
     yazıları ve ":" ile biten liste girişleri atılır; `tanim` açıksa gövde boyunda kalın, ":" ile biten, ≤ 4 sözcüklük, gövde kenarındaki satırlar."""
     ogeler = _ogeler(xml)
     atla = {katla(a) for a in duzen.get("atla", ())}
-    buyuk = [o for o in ogeler if o["boy"] == duzen["baslik_boyu"] and duzen["cerceve_ailesi"] not in o["aile"]]
+    # Başlık boyu ya da bir punto büyüğü: ölçüldü, bir bölüm başlığı 21 punto geliyor ("Takımyıldızlar", s. 43). Bir punto
+    # küçüğü (19) tablo hücresi gürültüsü getirir (s. 97) ve 22 ve üstü şekil yazısıdır; genişliği 0 olan öğe döndürülmüş
+    # şekil etiketidir (s. 122), başlık sayılmaz.
+    buyuk = [o for o in ogeler if 0 <= o["boy"] - duzen["baslik_boyu"] <= 1 and o["genislik"] > 0
+             and duzen["cerceve_ailesi"] not in o["aile"]]
     kullanildi: set[int] = set()
     adaylar = []
     for i, o in enumerate(buyuk):
@@ -323,6 +348,11 @@ def yapi_denetimi(harita: dict, ciktilar: list[dict], beklenen_eslesmeyen=(), ba
                     for b in k["basliklar"]:
                         if not (k["sayfa"] <= b["sayfa"] <= k["son_sayfa"]):
                             hatalar.append(f"başlık konunun dışında: {k['ad']} › {b['ad']} s. {b['sayfa']}")
+                for b in [*f["basliklar"], *(b for k in f["konular"] for b in k["basliklar"])]:
+                    # "Keşif Noktası"nın kitapta amacı yoktur; etkinlik ve performans görevinin amacı olmalı (yoksa etiket
+                    # okunamamıştır, amaç sessizce kaybolur).
+                    if b["tur"] == "etkinlik" and not b["amac"] and katla(b["ad"]).startswith(("etkinlik noktasi", "performans gorevi")):
+                        hatalar.append(f"etkinliğin amacı yok: {b['ad']} s. {b['sayfa']}")
     kodlar = [c["kod"] for c in ciktilar]
     eslesmedi = set(harita["eslesmedi"])
     hatalar += [f"çıktı haritada yok: {kod}" for kod in kodlar if kod not in harita["eslesme"] and kod not in eslesmedi]

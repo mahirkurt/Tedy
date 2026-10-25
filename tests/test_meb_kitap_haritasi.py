@@ -229,3 +229,72 @@ def test_denetle_sha256_degisimini_yazar(tmp_path, capsys):
                                   "sha256": hashlib.sha256(b"%PDF yeni baski").hexdigest()}]
     assert kayit["denetlendi"] == date.today().isoformat()
     assert "değişti: Fen 7" in capsys.readouterr().out
+
+
+# --- 1. düzeltme turu: gerçek Fen 7-1'de ölçülen iki sessiz kaçak (PDF s. 95 ve s. 44) -----------------------------
+
+def _sayfa_xml(*ogeler: str, fontlar: str = "") -> str:
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n<pdf2xml>\n<page number="95" position="absolute" top="0" left="0" '
+            'height="1169" width="829">\n<fontspec id="1" size="17" family="IUJFYC+Arial" color="#231f20"/>\n'
+            '<fontspec id="2" size="17" family="EXFSOK+Arial" color="#231f20"/>\n'
+            '<fontspec id="3" size="17" family="EXFSOK+ArialMT" color="#231f20"/>\n'
+            '<fontspec id="6" size="20" family="EXFSOK+Arial" color="#ffffff"/>\n' + fontlar
+            + "\n".join(ogeler) + "\n</page>\n</pdf2xml>\n")
+
+
+def test_amac_etiketi_iki_kutuya_bolunmusse_okunur():
+    """PDF s. 95: "Amaç:" etiketi "A" (sol 120) ve "maç:" (sol 132) olarak iki kutu gelir; amaç kaybolmamalı."""
+    xml = _sayfa_xml(
+        '<text top="74" left="119" width="300" height="26" font="6"><b>Performans Görevi: Sindirim Sistemini Tanıyalım</b></text>',
+        '<text top="113" left="120" width="12" height="23" font="1"><b>A</b></text>',
+        '<text top="113" left="132" width="43" height="23" font="2"><b>maç: </b></text>',
+        '<text top="113" left="175" width="567" height="22" font="3">Sindirim sistemini oluşturan yapı ve organların '
+        'görevlerine ait verileri açıklama</text>',
+        '<text top="177" left="511" width="61" height="23" font="2"><b>Adımlar</b></text>')
+    adaylar = mkh.basliklari_ayristir(xml, FEN_DUZENI)
+    assert [(a["tur"], a["amac"]) for a in adaylar] == [
+        ("etkinlik", "Sindirim sistemini oluşturan yapı ve organların görevlerine ait verileri açıklama")]
+    # Bölünmüş etiketin "maç:" parçası amaç metnine karışmaz; aynı satırdaki başka kalın sözcük etikete yapışmaz.
+
+
+def test_amac_etiketi_ayrik_kalin_sozcukle_birlesmez():
+    xml = _sayfa_xml(
+        '<text top="74" left="119" width="300" height="26" font="6"><b>Etkinlik Noktası-1</b></text>',
+        '<text top="113" left="120" width="55" height="23" font="2"><b>Adımlar</b></text>',
+        '<text top="113" left="300" width="40" height="23" font="2"><b>Amaç:</b></text>',
+        '<text top="113" left="345" width="300" height="22" font="3">Bir şey yapma</text>')
+    assert [a["amac"] for a in mkh.basliklari_ayristir(xml, FEN_DUZENI)] == ["Bir şey yapma"]
+
+
+def test_baslik_boyu_bir_punto_buyuk_tolerans_gurultu_getirmez():
+    """PDF s. 44: "Takımyıldızlar" size 21. Tolerans yalnız +1: 19 (tablo hücresi, s. 97), 22 (şekil), genişliği 0 olan
+    (döndürülmüş şekil etiketi, s. 122) ve atla listesindeki şekil etiketi ("Sağlık Alanında", s. 25) başlık sayılmaz."""
+    xml = _sayfa_xml(
+        '<text top="79" left="122" width="139" height="29" font="5"><b>Takımyıldızlar</b></text>',
+        '<text top="300" left="122" width="139" height="29" font="7"><b>Büyük Gürültü</b></text>',
+        '<text top="500" left="122" width="139" height="29" font="8"><b>Küçük Gürültü</b></text>',
+        '<text top="600" left="122" width="0" height="29" font="5"><b>Dönük Gürültü</b></text>',
+        '<text top="700" left="110" width="156" height="29" font="5"><b>Sağlık Alanında</b></text>',
+        fontlar='<fontspec id="5" size="21" family="IUJFYC+Arial" color="#fbcc2f"/>\n'
+                '<fontspec id="7" size="22" family="IUJFYC+Arial" color="#fbcc2f"/>\n'
+                '<fontspec id="8" size="19" family="IUJFYC+Arial" color="#231f20"/>\n')
+    assert [(a["tur"], a["metin"]) for a in mkh.basliklari_ayristir(xml, FEN_DUZENI)] == [("diger", "Takımyıldızlar")]
+
+
+def _etkinlikli_harita(*basliklar):
+    harita = _mini_harita(basliklar=[dict(ad=ad, tur="etkinlik", amac=amac, sayfa=11) for ad, amac in basliklar])
+    return harita
+
+
+def test_yapi_denetimi_amacsiz_etkinlik_ve_performans_gorevini_bildirir_kesfi_bildirmez():
+    ciktilar = [{"kod": "X.7.1.1"}]
+    assert mkh.yapi_denetimi(_etkinlikli_harita(("Keşif Noktası: Konu", None), ("Etkinlik Noktası-1", "Bir amaç")), ciktilar) == []
+    assert mkh.yapi_denetimi(_etkinlikli_harita(("Etkinlik Noktası-2", None)), ciktilar) == [
+        "etkinliğin amacı yok: Etkinlik Noktası-2 s. 11"]
+    assert mkh.yapi_denetimi(_etkinlikli_harita(("Performans Görevi: Sindirim Sistemini Tanıyalım", None)), ciktilar) == [
+        "etkinliğin amacı yok: Performans Görevi: Sindirim Sistemini Tanıyalım s. 11"]
+    # Çerçeve düzeyindeki başlıklar da denetlenir.
+    harita = _etkinlikli_harita()
+    harita["kitaplar"][0]["uniteler"][0]["cerceveler"][0]["basliklar"] = [
+        {"ad": "Etkinlik Noktası-3", "tur": "etkinlik", "amac": None, "sayfa": 10}]
+    assert mkh.yapi_denetimi(harita, ciktilar) == ["konunun başlığı yok: Konu A", "etkinliğin amacı yok: Etkinlik Noktası-3 s. 10"]
