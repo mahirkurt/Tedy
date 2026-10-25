@@ -1,10 +1,10 @@
-import { ContainedList, ContainedListItem, InlineNotification, SkeletonText, Tile } from '@carbon/react'
+import { InlineNotification, SkeletonText, Tile } from '@carbon/react'
 import { useApi } from '../hooks/useApi'
 import { apiHataCumlesi } from '../utils/apiHatasi'
 import { subjectClass } from '../utils/subject'
 import IcBaglanti from '../components/patterns/IcBaglanti'
 import DurumGostergesi from './DurumGostergesi'
-import { kalanGunMetni, sayisalTarih, sinavAdi, tarihMetni, yaklasanAyrinti } from './hazirlik'
+import { enYakinYazili, kalanGunMetni, sayisalTarih, sinavAdi, tarihMetni, yaklasanAyrinti } from './hazirlik'
 import type { GenelBakis } from './tipler'
 import './Hazirlik.scss'
 
@@ -31,35 +31,41 @@ export default function HazirlikSayfasi() {
       {data.durum === 'hazir' && (
         <>
           {data.yaklasan.length > 0 && (
-            <ContainedList kind="on-page" size="lg" label="Yaklaşan Ortak Yazılılar" className="hazirlik-yaklasan">
-              {data.yaklasan.map(y => (
-                <ContainedListItem key={`${y.anahtar}-${y.sinav_no}`} className={`hazirlik-yaklasan__oge ${subjectClass(y.ders)}`}>
-                  <span className="hazirlik-yaklasan__ust">
-                    <IcBaglanti href={`/hazirlik/${y.anahtar}?sinav=${y.sinav_no}`}>{`${y.ders} · ${sinavAdi(y.sinav_no)}`}</IcBaglanti>
-                    <span className="hazirlik-yaklasan__kalan">{kalanGunMetni(y.durum.kalan_gun)}</span>
-                  </span>
-                  <span className="hazirlik-yaklasan__ayrinti">{yaklasanAyrinti(y.durum, y.soru)}</span>
-                  <DurumGostergesi durum={y.durum} />
-                </ContainedListItem>
-              ))}
-            </ContainedList>
+            <section aria-labelledby="hazirlik-yaklasan-baslik">
+              <h3 id="hazirlik-yaklasan-baslik" className="hazirlik__bolum-baslik">Yaklaşan Ortak Yazılılar</h3>
+              <ul className="hazirlik-yaklasan">
+                {data.yaklasan.map(y => (
+                  <li key={`${y.anahtar}-${y.sinav_no}`} className={`hazirlik-yaklasan__oge ${subjectClass(y.ders)}`}>
+                    <span className="hazirlik-yaklasan__ust">
+                      <IcBaglanti href={`/hazirlik/${y.anahtar}?sinav=${y.sinav_no}`}>{`${y.ders} · ${sinavAdi(y.sinav_no)}`}</IcBaglanti>
+                      <span className="hazirlik-yaklasan__kalan">{kalanGunMetni(y.durum.kalan_gun)}</span>
+                    </span>
+                    <span className="hazirlik-yaklasan__ayrinti">{yaklasanAyrinti(y.durum, y.soru)}</span>
+                    <DurumGostergesi durum={y.durum} />
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
           <section aria-labelledby="hazirlik-dersler">
             <h3 id="hazirlik-dersler" className="hazirlik__bolum-baslik">Dersler</h3>
             <ul className="hazirlik-dersler">
-              {data.dersler.map(d => (
-                <li key={d.anahtar}>
-                  <Tile className={`hazirlik-karo ${subjectClass(d.ders)}`}>
-                    <IcBaglanti href={`/hazirlik/${d.anahtar}`}>{d.ders}</IcBaglanti>
-                    {d.sinavlar.map(s => (
-                      <span key={s.sinav_no} className="hazirlik-karo__sinav">
-                        <span>{`${sinavAdi(s.sinav_no)} · ${s.durum.tur === 'gecti' ? 'geçti' : tarihMetni(s.durum.tarih, false)}`}</span>
-                        <DurumGostergesi durum={s.durum} />
-                      </span>
-                    ))}
-                  </Tile>
-                </li>
-              ))}
+              {data.dersler.map(d => {
+                const s = enYakinYazili(d.sinavlar)
+                return (
+                  <li key={d.anahtar}>
+                    <Tile className={`hazirlik-karo ${subjectClass(d.ders)}`}>
+                      <IcBaglanti href={`/hazirlik/${d.anahtar}`}>{d.ders}</IcBaglanti>
+                      {s && (
+                        <span className="hazirlik-karo__sinav">
+                          <span>{`${sinavAdi(s.sinav_no)} · ${tarihMetni(s.durum.tarih, false)}`}</span>
+                          <DurumGostergesi durum={s.durum} />
+                        </span>
+                      )}
+                    </Tile>
+                  </li>
+                )
+              })}
             </ul>
           </section>
         </>

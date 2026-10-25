@@ -34,11 +34,23 @@
 .hazirlik-durum--olasi .hazirlik-durum__ikon { fill: var(--cds-support-info); }
 .hazirlik-durum--notr { color: var(--cds-text-secondary); }
 
-// Carbon sarar: içerik `.cds--contained-list-item__content > div` içindedir; sütun düzeni o iç kutuya konur.
-.hazirlik-yaklasan__oge .cds--contained-list-item__content > div {
+.hazirlik-yaklasan {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// Taslak A: beyaz katman kartı, ders rengi yalnız sol kenarda (vurgu, K4).
+.hazirlik-yaklasan__oge {
   display: flex;
   flex-direction: column;
   gap: spacing.$spacing-02;
+  padding: spacing.$spacing-05;
+  background: var(--cds-layer-01);
+  border-inline-start: spacing.$spacing-02 solid var(--ted-subject-accent);
 }
 
 .hazirlik-yaklasan__ust {

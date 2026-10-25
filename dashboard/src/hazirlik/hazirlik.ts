@@ -42,6 +42,12 @@ export function durumEtiketi(d: SinavDurumu): string {
   }
 }
 
+/** Ders karosunun tek yazılısı (spec §3.1, taslak A): ilk geçmemiş yazılı; hepsi geçtiyse sonuncusu. Tarihsiz yazılı
+ *  geçmemiştir. Öteki yazılı ders sayfasında görünür. */
+export function enYakinYazili<T extends { durum: SinavDurumu }>(sinavlar: T[]): T | null {
+  return sinavlar.find(s => s.durum.tur !== 'gecti') ?? sinavlar[sinavlar.length - 1] ?? null
+}
+
 /** Yaklaşan yazılının ikinci satırı: "3 Kasım Salı · 7 soru · 3 konu duyuruldu". */
 export function yaklasanAyrinti(d: SinavDurumu, soru: number | null): string {
   const p = [tarihMetni(d.tarih)]

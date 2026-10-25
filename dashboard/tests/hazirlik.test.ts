@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   baskiAdresi, baslikMetni, ciktiKimligi, dersAnahtari, durumEtiketi, ebeveynCumleleri, kalanGunMetni, kilavuzAdresi,
-  kisaAmac, kitapYoluMetni, pdfAdresi, sayfaMetni, sayisalTarih, secenekleriOku, secenekleriYaz, soruMetni, tarihMetni,
+  enYakinYazili, kisaAmac, kitapYoluMetni, pdfAdresi, sayfaMetni, sayisalTarih, secenekleriOku, secenekleriYaz, soruMetni, tarihMetni,
   yaklasanAyrinti,
 } from '../src/hazirlik/hazirlik.ts'
 import type { KilavuzModeli, SinavDurumu } from '../src/hazirlik/tipler.ts'
@@ -86,4 +86,18 @@ test('ebeveyn cümleleri', () => {
   assert.deepEqual(ebeveynCumleleri(olasi).slice(0, 3), ['Fen Bilimleri 1. yazılı: tarihi henüz belli değil.',
     'Senaryo henüz duyurulmadı; kılavuz bütün senaryoları kapsar.', '4 öğrenme çıktısı; senaryoya göre 6–9 soru.'])
   assert.deepEqual(ebeveynCumleleri({ ...m, ebeveyn: null }), [])
+})
+
+test('enYakinYazili: ilk geçmemiş yazılı; hepsi geçtiyse sonuncusu (spec §3.1)', () => {
+  const y = (no: number, tur: SinavDurumu['tur'], tarih: string | null) => ({ sinav_no: no, durum: { ...DURUM, tur, tarih } })
+  const [a, b] = [y(1, 'gecti', '2026-10-22'), y(2, 'ulke_geneli', '2027-01-05')]
+  assert.equal(enYakinYazili([a, b])?.sinav_no, 2, 'geçmiş + gelecek: gelecek olan')
+  const [c, d] = [y(1, 'kesin', '2026-11-03'), y(2, 'olasi', '2027-01-05')]
+  assert.equal(enYakinYazili([c, d])?.sinav_no, 1, 'ikisi de gelecek: ilki')
+  const [e, f] = [y(1, 'gecti', '2026-10-22'), y(2, 'gecti', '2027-01-05')]
+  assert.equal(enYakinYazili([e, f])?.sinav_no, 2, 'ikisi de geçmiş: sonuncusu')
+  const [g, h] = [y(1, 'olasi', null), y(2, 'olasi', null)]
+  assert.equal(enYakinYazili([g, h])?.sinav_no, 1, 'tarihsiz: geçmemiş sayılır, ilki')
+  assert.equal(enYakinYazili([y(1, 'gecti', '2026-10-22'), y(2, 'olasi', null)])?.sinav_no, 2, 'geçmiş + tarihsiz: tarihsiz')
+  assert.equal(enYakinYazili([]), null)
 })
