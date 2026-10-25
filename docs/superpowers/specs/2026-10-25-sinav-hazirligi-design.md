@@ -125,7 +125,7 @@ Ayrı belge: `docs/sinav-kilavuzu-kanunu.md` (sürümlü, numaralı maddeler; Mo
 | K4 | Renk | Yalnız Carbon belirteçleri; ders rengi yalnız vurgu; durum: yeşil kesin, mavi olası, gri ülke geneli/geçti; mor yalnız YZ; kontrast AA. | var |
 | K5 | Kâğıt | A4 dikey; kenar 18/16/20 mm; üst bilgi ders·sınav·senaryo, alt bilgi damga + "s. n/N"; yetim başlık yok; bölünen blokta "(devam)"; siyah-beyaz baskıda anlam korunur. | var |
 | K6 | Eksiksizlik | Kılavuz kısaltılmaz; bir bölümün bütün başlıkları yazılır. | var |
-| K7 | Dil | Türkçe, cümle düzeninde başlıklar; MEB terimleri birebir; öğrenciye "sen"; sayılar rakamla; başarı vaadi yok. | kısmen |
+| K7 | Dil | Türkçe; ad bildiren başlıklar başlık düzeninde, diğer etiketler cümle düzeninde (panonun S38/B41 kuralı, aile kararı 2026-10-19); MEB terimleri birebir; öğrenciye "sen"; sayılar rakamla; başarı vaadi yok. | kısmen |
 | K8 | Durum dürüstlüğü | Senaryo duyurulmadıysa hiçbir yüzey tek senaryoyu "bu" diye sunmaz. | var |
 | K9 | YZ ayrımı | Carbon AI etiketi, ayrı başlık, cümle başına sayfa atfı, kapatılabilir; modele kişisel veri gitmez. | var |
 | K10 | Erişilebilirlik | WCAG 2.2 AA; axe + IBM Equal Access sıfır ihlal; PDF etiketli, yer imli, dil `tr`. | var |
