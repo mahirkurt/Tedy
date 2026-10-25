@@ -316,3 +316,27 @@ def test_etiketin_iki_satira_bolunmus_adi_birlesir():
         ("etkinlik", "Performans Görevi: Solunum Sisteminin Sağlığı İçin Neler Yapabiliriz?",
          "Solunum sisteminin sağlığını korumak için farkındalık oluşturma"),
         ("baglanti", "Bağlantı Noktası", None)]
+
+
+def test_tek_satirlik_ad_iki_kutuya_bolunse_de_sozcuk_sirasi_korunur():
+    """Adın kutuları aynı satırda ama üstleri 1–3 px farklı olabilir: satır içinde sıra sol'a göredir, üst'e göre değil."""
+    xml = _sayfa_xml(
+        '<text top="146" left="119" width="176" height="26" font="6"><b>Performans Görevi</b></text>',
+        '<text top="149" left="429" width="100" height="26" font="6"><b>Sindirim</b></text>',
+        '<text top="146" left="540" width="80" height="26" font="6"><b>Sistemi</b></text>',
+        '<text top="186" left="120" width="55" height="23" font="2"><b>Amaç:</b></text>',
+        '<text top="186" left="180" width="300" height="22" font="3">Bir şey yapma</text>')
+    assert [a["metin"] for a in mkh.basliklari_ayristir(xml, FEN_DUZENI)] == ["Performans Görevi: Sindirim Sistemi"]
+
+
+def test_etiketten_30_pxden_uzak_komsu_baslik_ada_karismaz():
+    """Etiketin sağında ama üstü 31 px uzaktaki başlık boyu satır adın parçası değildir; ada katılmaz (sol eşiğinin
+    sağında kaldığı için kendisi de başlık olmaz)."""
+    xml = _sayfa_xml(
+        '<text top="146" left="119" width="176" height="26" font="6"><b>Performans Görevi</b></text>',
+        '<text top="146" left="354" width="200" height="26" font="6"><b>Asıl Ad</b></text>',
+        '<text top="177" left="354" width="200" height="26" font="6"><b>Komşu Başlık</b></text>',
+        '<text top="115" left="354" width="200" height="26" font="6"><b>Üst Komşu</b></text>',
+        '<text top="200" left="120" width="55" height="23" font="2"><b>Amaç:</b></text>',
+        '<text top="200" left="180" width="300" height="22" font="3">Bir şey yapma</text>')
+    assert [a["metin"] for a in mkh.basliklari_ayristir(xml, FEN_DUZENI)] == ["Performans Görevi: Asıl Ad"]

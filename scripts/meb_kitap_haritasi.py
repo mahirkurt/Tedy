@@ -142,6 +142,18 @@ def _amac(ogeler: list[dict], baslik: dict) -> str | None:
     return " ".join(metin.split()) or None
 
 
+def _satir_sirasi(parcalar: list[dict]) -> list[dict]:
+    """Okuma sırası: parçalar satırlara gruplanır (üst farkı ≤ 8, başlık satırlarının birleştirme toleransı), satırlar
+    üst'e, satır içi parçalar sol'a göre dizilir — aynı satırın kutuları 1–3 px farklı üstte gelebilir."""
+    satirlar: list[list[dict]] = []
+    for p in sorted(parcalar, key=lambda p: p["ust"]):
+        if satirlar and p["ust"] - satirlar[-1][0]["ust"] <= 8:
+            satirlar[-1].append(p)
+        else:
+            satirlar.append([p])
+    return [p for satir in satirlar for p in sorted(satir, key=lambda p: p["sol"])]
+
+
 def basliklari_ayristir(xml: str, duzen: dict) -> list[dict]:
     """Bölüm içi başlık adayları: başlık boyundaki (çerçeve ailesi dışı) satırlar — aynı satırdaki parçalar birleşir
     ("Performans Görevi" + adı) —, pedagojik etiketler türleriyle; kutu etiketleri, sol kenardan içerideki şekil
@@ -183,8 +195,7 @@ def basliklari_ayristir(xml: str, duzen: dict) -> list[dict]:
             if metin.endswith(":"):
                 continue          # liste girişi ("… hususlar şunlardır:"), başlık değil
         else:
-            ad = sorted([*parcalar[1:], *ad_parcalari.get(id(ilk), [])], key=lambda p: (p["ust"], p["sol"]))
-            ek = " ".join(p["metin"] for p in ad)
+            ek = " ".join(p["metin"] for p in _satir_sirasi([*parcalar[1:], *ad_parcalari.get(id(ilk), [])]))
             metin = f"{ilk['metin']}: {ek}" if ek else ilk["metin"]
         if katla(metin) in atla:
             continue
