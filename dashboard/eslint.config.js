@@ -15,7 +15,7 @@ const STATIK_STIL = 'JSXAttribute[name.name="style"] > JSXExpressionContainer > 
   'Property:not([key.value=/^--/]) > Literal.value'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'src/baski/vendor']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

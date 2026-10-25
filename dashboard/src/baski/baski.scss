@@ -1,0 +1,25 @@
+// A4 kuralları (Kanun K3, K5, K11). Ekran stilleri (hazirlik/Kilavuz.scss) burada da yüklenir; bu dosya yalnız
+// kâğıda özgü olanı taşır. Paged.js @page ve kenar kutularını işler; düz yolda (?duz=1) Chrome @page'i okur,
+// kenar kutularını yok sayar (üst/alt bilgi kilavuz-pdf.mjs şablonundan).
+// ted-theme ilk yüklenir: Carbon'u `with ($css--font-face: false)` ile yapılandırır; başka bir Carbon modülü ondan önce
+// yüklenirse Sass "already loaded, can't be configured" der (plan yazılırken ölçüldü).
+@use '../theme/ted-theme.scss';
+@use '@carbon/react/scss/spacing' as spacing;
+@use '@carbon/react/scss/type' as type;
+@use './plex';
+
+:root {
+  /* stylelint-disable-next-line carbon/type-use -- kâğıt kök ölçeği: body-01 (0.875rem) = 13px ≈ 9,75 pt, label-01 ≈ 8,4 pt (K3) */
+  font-size: 14.857px;
+}
+
+// Düz yol (yedek, ?duz=1): Chrome @page'i buradan okur; Paged.js yolunda sayfa.css (Paged.js'e ham metin olarak) geçerlidir.
+@page {
+  size: A4 portrait;
+  /* stylelint-disable-next-line carbon/layout-use -- A4 kenarları milimetre (K5: 18/16/20 mm) */
+  margin: 18mm 16mm 20mm;
+}
+
+h2, h3, h4, h5 { break-after: avoid; }
+.kilavuz-blok--soluk, .kilavuz-basliklar li, .kilavuz-matris tr { break-inside: avoid; }
+.kilavuz-matris thead { display: table-header-group; }

@@ -1,0 +1,29 @@
+/* Paged.js'e verilen kâğıt kuralları (Kanun K5). Bu dosya Paged.js'in kendi CSS ayrıştırıcısına ham metin olarak
+   verilir (sayfalama.ts): Carbon'un tam stil sayfası Paged.js 0.4.3'ün ayrıştırıcısını düşürür (ölçüldü: "item doesn't
+   belong to list"), bu yüzden Carbon ve uygulama stilleri belgede normal <link> olarak kalır, Paged.js yalnız bunu
+   işler. Sass yok: değerler rem ve Carbon CSS değişkenleri. Yalnız Paged.js yolunda yüklenir; düz yol @page'i
+   baski.scss'ten alır. */
+@page {
+  size: A4 portrait;
+  margin: 18mm 16mm 20mm;
+  @top-left { content: string(ustbilgi); font: 400 8pt 'IBM Plex Sans'; color: var(--cds-text-secondary); }
+  @bottom-left { content: string(damga); font: 400 8pt 'IBM Plex Sans'; color: var(--cds-text-secondary); }
+  @bottom-right { content: 's. ' counter(page) '/' counter(pages); font: 400 8pt 'IBM Plex Mono'; color: var(--cds-text-secondary); }
+}
+/* Adlandırılmış sayfalar (spec §5.2): kapak, içindekiler, gövde, ek. Hepsi varsayılan @page'in kenar kutularını
+   taşır (K12: damga her sayfada); yalnız kapakta üst bilgi yok. */
+@page kapak { @top-left { content: none; } }
+@page icindekiler { size: A4 portrait; }
+@page govde { size: A4 portrait; }
+@page ek { size: A4 portrait; }
+.kilavuz-ozet { page: kapak; }
+.kilavuz-icindekiler { page: icindekiler; }
+.kilavuz-govde { page: govde; }
+.kilavuz-ek { page: ek; }
+.kilavuz-baslik__alt { string-set: ustbilgi content(text); }
+.kilavuz-damga { string-set: damga content(text); }
+.kilavuz-ebeveyn { break-after: page; }
+.kilavuz-icindekiler__baglanti::after { content: target-counter(attr(href), page); float: right; font-family: 'IBM Plex Mono', monospace; }
+h2, h3, h4, h5, .kilavuz-blok__ust { break-after: avoid; }
+.kilavuz-blok--soluk, .kilavuz-basliklar li, .kilavuz-matris tr { break-inside: avoid; }
+.kilavuz-blok[data-split-from]::before { content: attr(data-baslik) ' (devam)'; display: block; font-size: 0.75rem; color: var(--cds-text-secondary); margin-bottom: 0.5rem; }
