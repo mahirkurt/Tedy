@@ -1,0 +1,84 @@
+// Sınav Hazırlığı yüzeyleri (plan Görev 9–11). Yalnız Carbon belirteçleri; ders rengi yalnız vurgu (Kanun K4).
+@use '@carbon/react/scss/spacing' as spacing;
+@use '@carbon/react/scss/type' as type;
+@use '@carbon/react/scss/breakpoint' as bp;
+
+.hazirlik {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-07;
+}
+
+.hazirlik__baslik { @include type.type-style('heading-04'); }
+
+.hazirlik__kaynak {
+  @include type.type-style('helper-text-01');
+  color: var(--cds-text-secondary);
+  margin-block-start: spacing.$spacing-02;
+}
+
+.hazirlik__bolum-baslik {
+  @include type.type-style('heading-03');
+  margin-block-end: spacing.$spacing-04;
+}
+
+.hazirlik-durum {
+  display: inline-flex;
+  align-items: center;
+  gap: spacing.$spacing-02;
+  @include type.type-style('label-01');
+}
+
+.hazirlik-durum__ikon { flex: none; }
+.hazirlik-durum--kesin .hazirlik-durum__ikon { fill: var(--cds-support-success); }
+.hazirlik-durum--olasi .hazirlik-durum__ikon { fill: var(--cds-support-info); }
+.hazirlik-durum--notr { color: var(--cds-text-secondary); }
+
+// Carbon sarar: içerik `.cds--contained-list-item__content > div` içindedir; sütun düzeni o iç kutuya konur.
+.hazirlik-yaklasan__oge .cds--contained-list-item__content > div {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-02;
+}
+
+.hazirlik-yaklasan__ust {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: spacing.$spacing-03;
+}
+
+.hazirlik-yaklasan__kalan {
+  @include type.type-style('heading-03');
+  font-variant-numeric: tabular-nums;
+}
+
+.hazirlik-yaklasan__ayrinti {
+  @include type.type-style('body-compact-01');
+  color: var(--cds-text-secondary);
+}
+
+.hazirlik-dersler {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: spacing.$spacing-05;
+}
+
+@include bp.breakpoint('md') {
+  .hazirlik-dersler { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.hazirlik-karo {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+  block-size: 100%;
+  border-block-start: spacing.$spacing-02 solid var(--ted-subject-accent);
+}
+
+.hazirlik-karo__sinav {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-01;
+  @include type.type-style('body-compact-01');
+}

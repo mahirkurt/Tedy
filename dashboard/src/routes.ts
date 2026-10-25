@@ -45,6 +45,8 @@ export const routes: RouteConfig[] = [
   { path: '/profil',    label: 'Profil',     icon: UserAvatar,        componentName: 'StudentProfile' , secondary: true },
 
   { path: '/moduller',  label: 'Modüller',   icon: Education, componentName: 'Modules', secondary: true, offPortal: true },
+  // Sınav Hazırlığı (spec 2026-10-25 §3): MEB senaryoları, ders sayfası, kapsam kılavuzu. Portal kapalıyken de açılır.
+  { path: '/hazirlik', label: 'Sınav hazırlığı', icon: ExamMode, componentName: 'HazirlikSayfasi', secondary: true, offPortal: true },
   // The phone's fifth tab (D3a): every secondary page on one screen. Off the
   // side nav — on a desktop the nav already lists them under "Daha fazla".
   { path: '/daha-fazla', label: 'Daha fazla', icon: OverflowMenuHorizontal, componentName: 'DahaFazla', showInNav: false, offPortal: true },

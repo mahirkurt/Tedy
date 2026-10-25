@@ -40,6 +40,7 @@ import BookReader from './components/BookReader'
 import Modules, { ModuleViewerRoute, DraftViewerRoute } from './components/Modules'
 import BottomNav from './components/BottomNav'
 import DahaFazla from './components/DahaFazla'
+import HazirlikSayfasi from './hazirlik/HazirlikSayfasi'
 
 function matchRoute(pathname: string, list: ReturnType<typeof routesFor>) {
   const exact = list.find(r => r.path === pathname)
@@ -60,6 +61,7 @@ const COMPONENTS: Record<string, React.ComponentType> = {
   TedyBooks, BookDetail, BookReader,
   Modules, ModuleViewerRoute, DraftViewerRoute,
   DahaFazla,
+  HazirlikSayfasi,
 }
 
 export default function App() {
