@@ -26,3 +26,17 @@ export function apiHataCumlesi(tur: ApiHataTuru, ne: string): { baslik: string; 
     case 'sunucu': return { baslik, ayrinti: 'Sayfayı birkaç dakika sonra yeniden aç.' }
   }
 }
+
+const MESAJ_SINIRI = 200
+
+/** D15: a failed answer may carry the server's own sentence (`{error, mesaj}`, e.g. 409 "Yeni yılın tabloları
+ *  bekleniyor."). Only that sentence reaches the page; a gateway's HTML, a missing field or an overlong text is null. */
+export function sunucuMesaji(govde: string): string | null {
+  try {
+    const v: unknown = JSON.parse(govde)
+    const m = v && typeof v === 'object' ? (v as Record<string, unknown>).mesaj : null
+    return typeof m === 'string' && m.trim() !== '' && m.length <= MESAJ_SINIRI ? m : null
+  } catch {
+    return null
+  }
+}

@@ -55,7 +55,7 @@ export default function HazirlikSayfasi() {
                 return (
                   <li key={d.anahtar}>
                     <Tile className={`hazirlik-karo ${subjectClass(d.ders)}`}>
-                      <IcBaglanti href={`/hazirlik/${d.anahtar}`}>{d.ders}</IcBaglanti>
+                      <IcBaglanti href={`/hazirlik/${d.anahtar}${s ? `?sinav=${s.sinav_no}` : ''}`}>{d.ders}</IcBaglanti>
                       {s && (
                         <span className="hazirlik-karo__sinav">
                           <span>{`${sinavAdi(s.sinav_no)} · ${tarihMetni(s.durum.tarih, false)}`}</span>

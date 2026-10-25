@@ -1,0 +1,58 @@
+// Senaryo karşılaştırması tablosu (spec §3.2): ders sayfası, kılavuz ekranı ve kâğıt aynı stili kullanır (K11).
+@use '@carbon/react/scss/spacing' as spacing;
+@use '@carbon/react/scss/type' as type;
+
+.kilavuz-kod { @include type.type-style('code-02'); }
+
+.kilavuz-matris {
+  font-variant-numeric: tabular-nums;
+
+  td { text-align: center; }
+
+  // Satır başlığı hücresi, öteki hücreler gibi katman zemininde (Carbon başlık hücresini gri çizer).
+  th[scope='row'] {
+    text-align: start;
+    background-color: var(--cds-layer);
+  }
+
+  // Vurgulanan sütun başlığıyla birlikte (başlık hücresinin gri zemini sınıftan güçlüdür).
+  th.kilavuz-matris__vurgu,
+  td.kilavuz-matris__vurgu { background-color: var(--cds-highlight); }
+
+  .kilavuz-matris__secili th[scope='row'] { background-color: var(--cds-layer-selected-01); }
+}
+
+.kilavuz-matris__grup td {
+  @include type.type-style('heading-compact-01');
+  background-color: var(--cds-layer-accent-01);
+}
+
+.kilavuz-matris__toplam th,
+.kilavuz-matris__toplam td { @include type.type-style('heading-compact-01'); }
+
+.kilavuz-matris__dugme {
+  @include type.type-style('body-compact-01');
+  min-block-size: spacing.$spacing-07;
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+  color: var(--cds-text-primary);
+  text-align: start;
+  cursor: pointer;
+
+  &:focus-visible { outline: 2px solid var(--cds-focus); }
+}
+
+@media (any-hover: hover) {
+  .kilavuz-matris__dugme:hover { color: var(--cds-link-primary-hover); }
+}
+
+.kilavuz-matris__her { margin-inline-start: spacing.$spacing-03; }
+
+// Y5: ünite başına ayrı tablolar kâğıtta bölünmez; her biri kendi başlık satırını taşır (Paged.js yinelemez).
+.kilavuz-matris--unite {
+  break-inside: avoid;
+  margin-block-end: spacing.$spacing-05;
+
+  tr { break-inside: avoid; }
+}

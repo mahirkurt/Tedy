@@ -60,7 +60,10 @@ test('ana sayfa: ders bağlantısı klavyeyle odaklanır ve ders sayfasına gide
   // U2: ders sayfası rotası Görev 10'da doğar; burada bağlantının adresi sınanır, gezinme o görevde.
   await expect(bag).toHaveAttribute('href', '/hazirlik/fen-bilimleri?sinav=1')
   await expect(page.locator('.hazirlik-karo').filter({ hasText: 'Fen Bilimleri' }).getByRole('link', { name: 'Fen Bilimleri' }))
-    .toHaveAttribute('href', '/hazirlik/fen-bilimleri')
+    .toHaveAttribute('href', '/hazirlik/fen-bilimleri?sinav=1')
+  // Karo, kartında gösterdiği yazılıyı açar (Türkçe'nin 1. yazılısı geçti, karo 2. yazılıyı gösterir).
+  await expect(page.locator('.hazirlik-karo').filter({ hasText: 'Türkçe' }).getByRole('link', { name: 'Türkçe' }))
+    .toHaveAttribute('href', '/hazirlik/turkce?sinav=2')
   await page.goto('/daha-fazla')
   await expect(page.locator('section.daha-fazla').getByRole('link', { name: 'Sınav hazırlığı' })).toHaveAttribute('href', '/hazirlik')
 })

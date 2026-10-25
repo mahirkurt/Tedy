@@ -94,3 +94,118 @@
   gap: spacing.$spacing-01;
   @include type.type-style('body-compact-01');
 }
+
+// ── Ders sayfası ve karşılaştırma tablosu (plan Görev 10) ──────────────────────────────────────────────
+.hazirlik-ders {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-06;
+}
+
+.hazirlik-ders__baslik {
+  @include type.type-style('heading-04');
+  border-inline-start: spacing.$spacing-02 solid var(--ted-subject-accent);
+  padding-inline-start: spacing.$spacing-04;
+}
+
+.hazirlik-ders__govde {
+  display: grid;
+  gap: spacing.$spacing-06;
+}
+
+@include bp.breakpoint('lg') {
+  .hazirlik-ders__govde--acik { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+}
+
+.hazirlik-ders__tablo { overflow-x: auto; }
+
+.hazirlik-ders__eylemler {
+  display: flex;
+  flex-wrap: wrap;
+  gap: spacing.$spacing-04;
+
+  // Etiket ("Kapsam kılavuzunu aç (3. senaryo, olası)") Carbon'un 20 rem sınırında iki satıra kırılmasın.
+  .cds--btn { max-inline-size: 100%; }
+}
+
+.cikti-ayrinti {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+  padding: spacing.$spacing-05;
+  background-color: var(--cds-layer-01);
+  border: 1px solid var(--cds-border-subtle-01);
+}
+
+.cikti-ayrinti__ust {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: spacing.$spacing-03;
+}
+
+.cikti-ayrinti__baslik { @include type.type-style('heading-02'); }
+.cikti-ayrinti__meb { @include type.type-style('body-01'); }
+
+.cikti-ayrinti__etiket {
+  @include type.type-style('label-01');
+  color: var(--cds-text-secondary);
+}
+
+.cikti-ayrinti__yollar {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+
+  li {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-01;
+  }
+}
+
+// Dokunma hedefi en az 24 px (WCAG 2.5.8): listedeki bağlantılar da, "Kılavuzda aç" da.
+.cikti-ayrinti a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: spacing.$spacing-06;
+}
+
+.cikti-ayrinti > a { align-self: flex-start; }
+
+.cikti-ayrinti__sayfa { color: var(--cds-text-secondary); }
+
+@include bp.breakpoint('lg') {
+  .cikti-ayrinti {
+    position: sticky;
+    inset-block-start: spacing.$spacing-10;
+    align-self: start;
+  }
+}
+
+// Telefonda ve dar ekranda alttan açılan panel (spec §3.2). D20: asistan başlatıcısı ve alt gezinme z 8000'de;
+// panel onların altındadır (aynı katmanda değil), telefonda alt gezinmenin hemen üstünde durur, onu örtmez.
+@include bp.breakpoint-down('lg') {
+  .cikti-ayrinti {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: 0;
+    z-index: 7000;
+    max-block-size: 60vh;
+    overflow-y: auto;
+    // Orta genişlikte sağ alttaki asistan başlatıcısının (48 px, kenardan 32 px) altına içerik girmesin.
+    padding-block-end: spacing.$spacing-10;
+  }
+
+  // Panel açıkken sayfanın son satırları panelin altında kalmasın.
+  .hazirlik-ders__govde--acik { padding-block-end: 60vh; }
+}
+
+@include bp.breakpoint-down('md') {
+  .cikti-ayrinti {
+    // Alt gezinmenin yüksekliği + cihazın kendi alt payı (ted-theme.scss `.app-root` ile aynı hesap).
+    // stylelint-disable-next-line carbon/layout-use -- the bar's height plus the device's own inset
+    inset-block-end: calc(#{spacing.$spacing-09} + env(safe-area-inset-bottom));
+    padding-block-end: spacing.$spacing-05;
+  }
+}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { apiHataTuru, type ApiHataTuru } from '../utils/apiHatasi'
+import { apiHataTuru, sunucuMesaji, type ApiHataTuru } from '../utils/apiHatasi'
 
 const REFRESH_INTERVAL = 5 * 60 * 1000
 const HOMEWORK_UPDATE_EVENT = 'tedy:homework-updated'
@@ -20,6 +20,9 @@ export function useApi<T>(endpoint: string, defaultValue: T): {
   error: string | null
   /** B43: the failure's kind; a surface turns it into a sentence with `apiHataCumlesi`. */
   hataTuru: ApiHataTuru | null
+  /** D15: the HTTP status of a failed answer, and the server's own sentence from its body (`mesaj`) when it sent one. */
+  hataDurumu: number | null
+  hataMesaji: string | null
   refresh: () => void
 } {
   const [data, setData] = useState<T>(defaultValue)
@@ -27,6 +30,8 @@ export function useApi<T>(endpoint: string, defaultValue: T): {
   const [esikGecti, setEsikGecti] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hataTuru, setHataTuru] = useState<ApiHataTuru | null>(null)
+  const [hataDurumu, setHataDurumu] = useState<number | null>(null)
+  const [hataMesaji, setHataMesaji] = useState<string | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setEsikGecti(true), YUKLEME_ESIGI_MS)
@@ -40,10 +45,14 @@ export function useApi<T>(endpoint: string, defaultValue: T): {
         res = await fetch(endpoint, { credentials: 'include' })
       } catch {
         setHataTuru(apiHataTuru(null))
+        setHataDurumu(null)
+        setHataMesaji(null)
         throw new Error('Fetch error')
       }
       if (!res.ok) {
         setHataTuru(apiHataTuru(res.status))
+        setHataDurumu(res.status)
+        setHataMesaji(sunucuMesaji(await res.text().catch(() => '')))
         throw new Error(`HTTP ${res.status}`)
       }
       const text = await res.text()
@@ -62,6 +71,8 @@ export function useApi<T>(endpoint: string, defaultValue: T): {
       setData(json)
       setError(null)
       setHataTuru(null)
+      setHataDurumu(null)
+      setHataMesaji(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Fetch error')
     } finally {
@@ -82,5 +93,5 @@ export function useApi<T>(endpoint: string, defaultValue: T): {
     }
   }, [fetchData])
 
-  return { data, loading, iskelet: loading && esikGecti, error, hataTuru, refresh: fetchData }
+  return { data, loading, iskelet: loading && esikGecti, error, hataTuru, hataDurumu, hataMesaji, refresh: fetchData }
 }
