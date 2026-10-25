@@ -20,6 +20,8 @@ from src.sinav_senaryo import tablo_oku  # noqa: E402
 
 HEDEF = KOK / "dashboard" / "tests" / "e2e" / "fixtures" / "hazirlik"
 BUGUN = date(2026, 10, 25)
+# Kişisel olmayan örnek ad: depoya gerçek çocuk adı girmez (gerçek API oturumdaki kişinin gösterim adını döner).
+ISARET_SAHIBI = "Deneme Öğrenci"
 DUYURU = "Sınav, İstanbul İl MEB tarafından belirlenen 2. senaryoya göre uygulanacaktır."
 
 
@@ -55,7 +57,7 @@ def fiksturler() -> dict[str, dict]:
         _kayit(tablo, "Türkçe", 2, durum="ulke_geneli", senaryo=None, tarih="2027-01-05", status="upcoming", sid="tr12"),
     ]
     taban = dict(tablo=tablo, haritalar={"fen-bilimleri": harita}, sinavlar=sinavlar, bugun=BUGUN,
-                 isaretler={"fen-bilimleri": {"FB.7.2.1": "tekrar"}})
+                 isaretler={"fen-bilimleri": {"FB.7.2.1": "tekrar"}}, isaret_sahibi=ISARET_SAHIBI)
     g = sk.Girdiler(**taban)
     olasi = sk.Girdiler(**{**taban, "sinavlar": sinavlar[1:]})
     k12 = sk.Girdiler(**{**taban, "kitap_denetimi": {"fen-bilimleri": {"denetlendi": "2026-10-25", "kitaplar": [

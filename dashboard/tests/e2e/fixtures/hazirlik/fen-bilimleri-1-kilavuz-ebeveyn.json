@@ -63,7 +63,7 @@
       "FB.7.1.3"
     ],
     "hazirim": 0,
-    "isaret_sahibi": null,
+    "isaret_sahibi": "Deneme Öğrenci",
     "isaretsiz": 3,
     "soru_araligi": null,
     "tekrar": 1,
@@ -74,8 +74,8 @@
     "tablo_degisti": false
   },
   "harita_onayli": true,
-  "icerik_ozeti": "33ee887629e6f54137ee7268525655cbeb20749c479d407fdfe30b9f8231469f",
-  "isaret_sahibi": null,
+  "icerik_ozeti": "b9be5ba5dfdf19149e37b6c099229cc610abe4aec8c89bab6c2a73f4dbe77256",
+  "isaret_sahibi": "Deneme Öğrenci",
   "kaynaklar": [
     {
       "adres": "https://odsgm.meb.gov.tr/www/1donem-konu-soru-dagilim-tablolari-2026-2027/icerik/1724",
