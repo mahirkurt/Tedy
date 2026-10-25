@@ -62,6 +62,11 @@ FORBIDDEN_FILES = (
     "output/page_structure.json",
     "output/sheets_id.txt",
     "output/book_progress.json",
+    # Sınav hazırlığı (Görev 8, düzeltme 1): kişi başı işaretler, üst düzey anahtarlar e-posta; yan dosyalar da
+    # (bozuk dosyanın kenara alınmış kopyası aynı e-postaları taşır, kilit dosyası yan ürün).
+    "output/hazirlik_isaretleri.json",
+    "output/hazirlik_isaretleri.json.bozuk-20261025120000",
+    "output/.hazirlik_isaretleri.json.kilit",
     # B29 (2026-10-11): the household's focus-window setting.
     "output/odak_penceresi.json",
     "output/aksam_duzeni.json",

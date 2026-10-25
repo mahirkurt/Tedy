@@ -11,7 +11,9 @@ from src import sinav_kilavuzu  # noqa: E402
 from src.hazirlik_isaretleri import HazirlikIsaretleri  # noqa: E402
 from tests.hazirlik_fikstur import FEN_KONULARI, fen_haritasi, sinav_kaydi  # noqa: E402
 
-AILE = "drmahirkurt@gmail.com"
+# Kadrodaki tam rollü kişiler listeden türetilir; test dosyasında gerçek ad ya da e-posta yazmaz.
+_TAM_ROLLU = [e for e, r in api.USER_ROLES.items() if r == api.ROLE_FULL and e not in api.OGRENCI_EMAILS]
+AILE, AILE_DIGER = _TAM_ROLLU[0], _TAM_ROLLU[1]
 OGRENCI = next(iter(api.OGRENCI_EMAILS))
 OKUYUCU = next(e for e, r in api.USER_ROLES.items() if r == api.ROLE_READER)
 
@@ -161,18 +163,18 @@ def test_isaret_tablo_yoksa_503(c, monkeypatch):
 def test_isaretler_kisiye_ozel_ekranda(c):
     giris(c, AILE)
     isaret_koy(c, "FB.7.2.1", "tekrar")
-    giris(c, "ozlem.murzoglu@gmail.com")
+    giris(c, AILE_DIGER)
     m = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz").get_json()
     assert all(b["isaret"] is None for u in m["uniteler"] for cer in u["cerceveler"] for b in cer["bloklar"])
 
 
 def test_ebeveyn_ozeti_ogrencinin_isaretlerinden_gelir_ekran_baskasinin(c, monkeypatch):
-    """Ebeveyn kendi işaretiyle ekranı kurar; özetin sayıları yine Işık'ın işaretlerinden gelir."""
-    monkeypatch.setattr(api, "_scraped", lambda: {"ogrenci_profili": {"name": "Işık Kurt"}})
-    giris(c, OGRENCI, "Işık Kurt")
+    """Ebeveyn kendi işaretiyle ekranı kurar; özetin sayıları yine öğrencinin işaretlerinden gelir."""
+    monkeypatch.setattr(api, "_scraped", lambda: {"ogrenci_profili": {"name": "Deneme Öğrenci"}})
+    giris(c, OGRENCI, "Deneme Öğrenci")
     isaret_koy(c, "FB.7.2.1", "tekrar")
     isaret_koy(c, "FB.7.1.1", "hazirim")
-    giris(c, AILE, "Mahir Kurt")
+    giris(c, AILE, "Deneme Veli")
     isaret_koy(c, "FB.7.1.3", "hazirim")
     isaret_koy(c, "FB.7.1.5", "hazirim")
     isaret_koy(c, "FB.7.2.2", "hazirim")
@@ -183,31 +185,31 @@ def test_ebeveyn_ozeti_ogrencinin_isaretlerinden_gelir_ekran_baskasinin(c, monke
     # ekran bloklarında ise bakanın kendi işaretleri
     blok = {b["kod"]: b for u in m["uniteler"] for cer in u["cerceveler"] for b in cer["bloklar"]}
     assert blok["FB.7.1.3"]["isaret"] == "hazirim" and blok["FB.7.2.1"]["isaret"] is None
-    assert m["isaret_sahibi"] == "Mahir Kurt" and eb["isaret_sahibi"] == "Işık Kurt"
+    assert m["isaret_sahibi"] == "Deneme Veli" and eb["isaret_sahibi"] == "Deneme Öğrenci"
     assert m["secenekler"]["ebeveyn"] is True
     # içerik özeti birleşik modelin özeti
     assert m["icerik_ozeti"] == sinav_kilavuzu.icerik_ozeti(m)
 
 
 def test_ebeveyn_ozeti_isaret_kapaliyken_de_ogrencinin_sayilari(c, monkeypatch):
-    monkeypatch.setattr(api, "_scraped", lambda: {"ogrenci_profili": {"name": "Işık Kurt"}})
-    giris(c, OGRENCI, "Işık Kurt")
+    monkeypatch.setattr(api, "_scraped", lambda: {"ogrenci_profili": {"name": "Deneme Öğrenci"}})
+    giris(c, OGRENCI, "Deneme Öğrenci")
     isaret_koy(c, "FB.7.2.1", "tekrar")
-    giris(c, AILE, "Mahir Kurt")
+    giris(c, AILE, "Deneme Veli")
     m = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz?ebeveyn=1&isaret=0").get_json()
     assert m["ebeveyn"]["tekrar"] == 1 and m["isaret_sahibi"] is None
-    assert m["ebeveyn"]["isaret_sahibi"] == "Işık Kurt"
+    assert m["ebeveyn"]["isaret_sahibi"] == "Deneme Öğrenci"
 
 
 def test_ogrencinin_kendi_oturumunda_ebeveyn_ozeti_kendi_isaretleri(c):
-    giris(c, OGRENCI, "Işık Kurt")
+    giris(c, OGRENCI, "Deneme Öğrenci")
     isaret_koy(c, "FB.7.2.1", "tekrar")
     m = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz?ebeveyn=1").get_json()
-    assert m["ebeveyn"]["tekrar"] == 1 and m["ebeveyn"]["isaret_sahibi"] == m["isaret_sahibi"] == "Işık Kurt"
+    assert m["ebeveyn"]["tekrar"] == 1 and m["ebeveyn"]["isaret_sahibi"] == m["isaret_sahibi"] == "Deneme Öğrenci"
 
 
 def test_api_anahtarinda_isaret_yok_ama_ebeveyn_ozeti_ogrencinin(c, monkeypatch):
-    giris(c, OGRENCI, "Işık Kurt")
+    giris(c, OGRENCI, "Deneme Öğrenci")
     isaret_koy(c, "FB.7.2.1", "tekrar")
     with c.session_transaction() as s:
         s.clear()
@@ -221,18 +223,19 @@ def test_isaret_sahibi_gosterim_adidir_eposta_degil(c):
     """PDF'e e-posta girmemeli: ad oturumun görünen adından ya da öğrenci profilinden gelir; yoksa None (uydurma yok)."""
     giris(c, AILE)                                   # oturumda ad yok
     assert c.get("/api/hazirlik/fen-bilimleri/1/kilavuz").get_json()["isaret_sahibi"] is None
-    giris(c, AILE, "Mahir Kurt")
+    giris(c, AILE, "Deneme Veli")
     yanit = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz?ebeveyn=1")
-    assert yanit.get_json()["isaret_sahibi"] == "Mahir Kurt"
-    assert "@" not in yanit.get_data(as_text=True).replace("@gmail", "")  # model metninde e-posta yok
-    assert AILE not in yanit.get_data(as_text=True) and OGRENCI not in yanit.get_data(as_text=True)
+    assert yanit.get_json()["isaret_sahibi"] == "Deneme Veli"
+    metin = yanit.get_data(as_text=True)
+    assert "@" not in metin                                  # model metninde e-posta yok
+    assert AILE not in metin and OGRENCI not in metin
 
 
 def test_ogrenci_adi_profilden(c, monkeypatch):
-    monkeypatch.setattr(api, "_scraped", lambda: {"ogrenci_profili": {"name": "Işık Kurt"}})
-    giris(c, AILE, "Mahir Kurt")
+    monkeypatch.setattr(api, "_scraped", lambda: {"ogrenci_profili": {"name": "Deneme Öğrenci"}})
+    giris(c, AILE, "Deneme Veli")
     m = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz?ebeveyn=1").get_json()
-    assert m["ebeveyn"]["isaret_sahibi"] == "Işık Kurt"
+    assert m["ebeveyn"]["isaret_sahibi"] == "Deneme Öğrenci"
 
 
 def test_kilavuz_isaretleri_yardimcisi(c):
@@ -240,8 +243,8 @@ def test_kilavuz_isaretleri_yardimcisi(c):
     from flask import session as flask_session
     with api.app.test_request_context("/"):
         flask_session["user_email"] = AILE
-        flask_session["user_name"] = "Mahir Kurt"
-        assert api._kilavuz_isaretleri("oturum") == (AILE, "Mahir Kurt")
+        flask_session["user_name"] = "Deneme Veli"
+        assert api._kilavuz_isaretleri("oturum") == (AILE, "Deneme Veli")
         email, ad = api._kilavuz_isaretleri("ogrenci")
         assert email == OGRENCI and ad != OGRENCI and "@" not in (ad or "")
         with pytest.raises(ValueError):

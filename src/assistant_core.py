@@ -288,6 +288,9 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     "sheets_id.txt",
     # Per-person Tedy Books reading position (emails, reading location).
     "book_progress.json",
+    # Per-person exam-readiness marks (Sınav Hazırlığı, Görev 8): top-level keys are e-mail addresses. The glob also
+    # drops the quarantined corrupt copy (".bozuk-<tarih>", same e-mails), the flock sidecar and the atomic-write temp.
+    "*hazirlik_isaretleri.json*",
     # The household's focus-window setting (B29): a dashboard parameter, not school data.
     "odak_penceresi.json",
     "aksam_duzeni.json",

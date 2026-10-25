@@ -181,7 +181,7 @@ Sınavlar → run_sync._sinav_tespiti_adimi (ekten sonra, health'ten önce; 45 s
 Uyarılar → tedy-sinav-uyari.timer (10 dk, TEDY_SINAV_UYARI=1) → sinavlar.json + output/bildirim_abonelikleri.json + output/bildirim_defteri.jsonl → web push (VAPID)
 Akşam planı → run_sync._tahmin_isitma_adimi (TEDY_AKSAM_PLANI=1; ≤ 30 s) → Haiku (önbellek, 2 USD/ay) → output/odev_tahmin_*.json ; /api/plan/* (planı dashboard_api.bugunku_plan kurar, motor aksam_plani.plan_kur) → output/aksam_plani.json + output/calisma_kayitlari.jsonl → Bugün'ün plan kartı, asistan aksam_plani/plani_degistir
 Akşam bildirimi → tedy-aksam-plani.timer (1 dk, TEDY_AKSAM_BILDIRIM=1 + TEDY_AKSAM_PLANI=1) → aksam_plani.json + output/aksam_duzeni.json + abonelikler → output/aksam_bildirim_defteri.jsonl + aksam_bildirim_durumu.json → web push (VAPID)
-Asistan    → BM25 + bge-m3 vector (RRF) index over output/ + content/ (edupedia catalog, drafts, runs and module progress excluded) + in-process module index (modul_ara) + Claude Sonnet 5 (Anthropic Messages API) + MCP (müfredat / OER)
+Asistan    → BM25 + bge-m3 vector (RRF) index over output/ + content/ (edupedia catalog, drafts, runs, module progress and per-person exam-readiness marks `hazirlik_isaretleri.json*` excluded) + in-process module index (modul_ara) + Claude Sonnet 5 (Anthropic Messages API) + MCP (müfredat / OER)
 ```
 
 ### Key Patterns
