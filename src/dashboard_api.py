@@ -3192,6 +3192,180 @@ def exams():
     return jsonify(_sinav_api_listesi(_scraped()))
 
 
+# --- Sınav hazırlığı (spec 2026-10-25 §2.5, plan Görev 8) ---
+# Oturum + tam rol: okuyucu default-deny (READER_ENDPOINTS'e eklenmez). API anahtarı okuyabilir ama işaret koyamaz:
+# anahtarın kişisi yok, işaretler kişi başınadır.
+
+def _hazirlik_bugun():
+    return datetime.now().date()
+
+
+def _hazirlik_sinavlari():
+    return _sinav_api_listesi(_scraped())["exams"]
+
+
+def _hazirlik_isaret_deposu():
+    from src.hazirlik_isaretleri import HazirlikIsaretleri
+    return HazirlikIsaretleri(os.path.join(OUTPUT_DIR, "hazirlik_isaretleri.json"))
+
+
+def _hazirlik_kisisi():
+    """İşaretin sahibi: oturumdaki tam roldeki kişi; API anahtarı ve okuyucu None (bildirim uçlarıyla aynı kural)."""
+    return _bildirim_kisisi()
+
+
+def _ogrenci_epostasi():
+    return sorted(OGRENCI_EMAILS)[0]
+
+
+def _hazirlik_gosterim_adi(email):
+    """İşaret sahibinin gösterim adı (kâğıda e-posta girmez, D16). Öğrenci için profildeki ad (`ogrenci_profili`);
+    profil adı yoksa ve o kişi oturumdaysa girişte Google'ın verdiği görünen ad (diğer kişiler için yalnız o).
+    Kaynak yoksa None — ad uydurulmaz."""
+    if not email:
+        return None
+    ad = None
+    if email in OGRENCI_EMAILS:
+        veri = _scraped()
+        profil = veri.get("ogrenci_profili") if isinstance(veri, dict) else None
+        ad = profil.get("name") if isinstance(profil, dict) else None
+    if not ad and email == str(session.get("user_email", "") or "").lower().strip():
+        ad = session.get("user_name")
+    ad = str(ad or "").strip()
+    return ad if ad and "@" not in ad else None
+
+
+def _kilavuz_isaretleri(kim_icin):
+    """Kılavuzun hangi kişinin işaretiyle kurulacağı, tek yerde (D16): `(email, isaret_sahibi_adı)`.
+
+    "oturum"  — ekran kılavuzu: oturumdaki kişinin kendi işaretleri (herkes kendisi koyar); API anahtarında
+                `(None, None)`.
+    "ogrenci" — PDF ve ebeveyn özeti: öğrencinin işaretleri (`src.roles.OGRENCI_EMAILS`), kim isterse istesin.
+    Görev 14'ün PDF ucu bunu "ogrenci" ile çağırır."""
+    if kim_icin == "oturum":
+        email = _hazirlik_kisisi()
+    elif kim_icin == "ogrenci":
+        email = _ogrenci_epostasi()
+    else:
+        raise ValueError(f"bilinmeyen işaret kaynağı: {kim_icin}")
+    return email, _hazirlik_gosterim_adi(email)
+
+
+def _hazirlik_girdileri(email=None):
+    """Model girdileri; `email` verilirse o kişinin işaretleri ve gösterim adıyla (yoksa işaretsiz, adsız)."""
+    from src import sinav_kilavuzu, sinav_senaryo
+    data = _scraped()
+    try:
+        denetim = _load_json("kitap_denetimi.json")
+    except (OSError, ValueError):
+        denetim = {}
+    haritalar = {}
+    for anahtar in sinav_kilavuzu.ANAHTAR_DERSLERI:
+        harita = sinav_kilavuzu.harita_oku(anahtar)
+        if harita is not None:
+            haritalar[anahtar] = harita
+    return sinav_kilavuzu.Girdiler(
+        tablo=sinav_senaryo.tablo_oku(), haritalar=haritalar, sinavlar=_hazirlik_sinavlari(), bugun=_hazirlik_bugun(),
+        kitap_denetimi=denetim if isinstance(denetim, dict) else {}, haftalar=_icerik_haftalari(data)["weeks"],
+        odevler=_combined_homework_rows(data),
+        moduller=module_store.latest_active(module_store.read_catalog(OUTPUT_DIR)),
+        isaretler=_hazirlik_isaret_deposu().kisi(email) if email else {},
+        isaret_sahibi=_hazirlik_gosterim_adi(email))
+
+
+_HAZIRLIK_HATALARI = {
+    "bilinmeyen_ders": (404, "Bu ders için MEB senaryosu yok."),
+    "bilinmeyen_sinav": (404, "Bu yazılı MEB tablosunda yok."),
+    "bilinmeyen_senaryo": (404, "Bu senaryo MEB tablosunda yok."),
+    "tablo_yok": (503, "MEB konu-soru dağılım tablosu okunamadı."),
+    "tablo_eski": (409, "Yeni yılın tabloları bekleniyor."),
+}
+
+
+def _hazirlik_hatasi(kod):
+    durum, mesaj = _HAZIRLIK_HATALARI.get(kod, (400, "İstek anlaşılamadı."))
+    return jsonify({"error": kod, "mesaj": mesaj}), durum
+
+
+def _hazirlik_modeli(anahtar, sinav_no):
+    """(model, None) ya da (None, hata yanıtı): ?senaryo=N (1–2 rakam; başka değer bilinmeyen senaryo),
+    ?ebeveyn=1, ?isaret=0.
+
+    İşaret kaynağı D16: bloklardaki işaretler ve üst düzey `isaret_sahibi` oturumdaki kişiden; `ebeveyn` özeti
+    (seçenek ekranda açılsa bile) öğrencinin ham işaretlerinden ve adıyla."""
+    import dataclasses
+    from src import sinav_kilavuzu
+    ham = (request.args.get("senaryo") or "").strip()
+    if ham and not re.fullmatch(r"\d{1,2}", ham):
+        return None, _hazirlik_hatasi("bilinmeyen_senaryo")
+    secenekler = {"ebeveyn": request.args.get("ebeveyn") == "1", "isaret": request.args.get("isaret", "1") != "0"}
+    senaryo = int(ham) if ham else None
+    try:
+        email, _ = _kilavuz_isaretleri("oturum")
+        girdi = _hazirlik_girdileri(email)
+        model = sinav_kilavuzu.kilavuz(girdi, anahtar, sinav_no, senaryo, secenekler)
+        ogrenci = _ogrenci_epostasi()
+        if secenekler["ebeveyn"] and email != ogrenci:
+            ogr_girdi = dataclasses.replace(
+                girdi, isaretler=_hazirlik_isaret_deposu().kisi(ogrenci), isaret_sahibi=_hazirlik_gosterim_adi(ogrenci))
+            model["ebeveyn"] = sinav_kilavuzu.kilavuz(ogr_girdi, anahtar, sinav_no, senaryo, secenekler)["ebeveyn"]
+            model["icerik_ozeti"] = sinav_kilavuzu.icerik_ozeti(model)
+        return model, None
+    except sinav_kilavuzu.KilavuzHatasi as hata:
+        return None, _hazirlik_hatasi(hata.kod)
+
+
+@app.route("/api/hazirlik")
+@require_auth
+def hazirlik_genel():
+    from src import sinav_kilavuzu
+    return jsonify(sinav_kilavuzu.genel_bakis(_hazirlik_girdileri()))
+
+
+@app.route("/api/hazirlik/<anahtar>/<int:sinav_no>")
+@require_auth
+def hazirlik_ders(anahtar, sinav_no):
+    from src import sinav_kilavuzu
+    try:
+        return jsonify(sinav_kilavuzu.ders_ozeti(_hazirlik_girdileri(), anahtar, sinav_no))
+    except sinav_kilavuzu.KilavuzHatasi as hata:
+        return _hazirlik_hatasi(hata.kod)
+
+
+@app.route("/api/hazirlik/<anahtar>/<int:sinav_no>/kilavuz")
+@require_auth
+def hazirlik_kilavuz(anahtar, sinav_no):
+    model, hata = _hazirlik_modeli(anahtar, sinav_no)
+    return hata if hata else jsonify(model)
+
+
+@app.route("/api/hazirlik/isaret", methods=["PUT"])
+@require_auth
+def hazirlik_isaret():
+    from src import sinav_kilavuzu, sinav_senaryo
+    email = _hazirlik_kisisi()
+    if not email:
+        return jsonify({"error": "yalnız oturumla", "mesaj": "İşareti yalnız oturum açmış aile üyesi koyabilir."}), 403
+    govde = request.get_json(silent=True)
+    govde = govde if isinstance(govde, dict) else {}
+    anahtar, kod, durum = govde.get("ders"), govde.get("kod"), govde.get("durum")
+    ders = sinav_kilavuzu.ANAHTAR_DERSLERI.get(anahtar) if isinstance(anahtar, str) else None
+    tablo = sinav_senaryo.tablo_oku()
+    if ders and tablo is None:
+        return _hazirlik_hatasi("tablo_yok")
+    kodlar = {c["kod"] for c in tablo["dersler"].get(ders, {}).get("ciktilar", [])} if ders else set()
+    # "durum" anahtarı zorunlu: eksik gövde sessizce işareti kaldırmasın (kaldırmak açıkça null ister).
+    if (not ders or not isinstance(kod, str) or kod not in kodlar or "durum" not in govde
+            or durum not in (None, "hazirim", "tekrar")):
+        return jsonify({"error": "gecersiz", "mesaj": "Ders, çıktı kodu ya da işaret geçersiz."}), 400
+    try:
+        isaretler = _hazirlik_isaret_deposu().yaz(email, anahtar, kod, durum)
+    except OSError:
+        app.logger.warning("hazırlık işareti yazılamadı", exc_info=True)
+        return jsonify({"error": "yazilamadi", "mesaj": "İşaret kaydedilemedi."}), 503
+    return jsonify({"ders": anahtar, "isaretler": isaretler})
+
+
 # --- Sınav uyarıları: web push abonelikleri (spec 2026-10-16 §7) ---
 # Session and full role only: require_auth lets an API key through, so each
 # route also wants a session email — a key has no person and no device.

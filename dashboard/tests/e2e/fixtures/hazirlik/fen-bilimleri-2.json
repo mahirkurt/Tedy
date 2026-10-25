@@ -1,0 +1,315 @@
+{
+  "anahtar": "fen-bilimleri",
+  "ders": "Fen Bilimleri",
+  "durum": {
+    "anilan": [],
+    "duyuru": null,
+    "duyurulan_konu": 0,
+    "kalan_gun": null,
+    "senaryo": null,
+    "senaryo_sayisi": 5,
+    "sinav_id": null,
+    "tarih": null,
+    "tur": "olasi",
+    "uyari": null
+  },
+  "duyurulan": null,
+  "gruplar": [
+    {
+      "baslik": "1. Ünite · Uzay Çağı",
+      "satirlar": [
+        {
+          "her_senaryoda": false,
+          "kisa_ad": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
+          "kitap_durumu": "var",
+          "kitapta": [
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=25",
+              "cerceve": "1. Türkiye ve Uzay Araştırmaları",
+              "cerceve_no": 1,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
+              "sayfa": 24,
+              "son_sayfa": 33,
+              "unite": "1. Ünite",
+              "unite_ad": "Uzay Çağı",
+              "unite_no": 1
+            }
+          ],
+          "kod": "FB.7.1.3",
+          "metin": "Uzay araştırmalarının yol açabileceği problemleri çözebilme",
+          "sayilar": {
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "4": 1,
+            "5": 0
+          }
+        }
+      ]
+    },
+    {
+      "baslik": "2. Ünite · Kuvvet ve Enerjiyi Keşfedelim",
+      "satirlar": [
+        {
+          "her_senaryoda": false,
+          "kisa_ad": "Fiziksel Anlamda İş",
+          "kitap_durumu": "var",
+          "kitapta": [
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=61",
+              "cerceve": "1. Kuvvet, İş ve Enerji İlişkisi",
+              "cerceve_no": 1,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Fiziksel Anlamda İş",
+              "sayfa": 60,
+              "son_sayfa": 63,
+              "unite": "2. Ünite",
+              "unite_ad": "Kuvvet ve Enerjiyi Keşfedelim",
+              "unite_no": 2
+            }
+          ],
+          "kod": "FB.7.2.1",
+          "metin": "Fiziksel anlamda yapılan işin bağlı olduğu faktörlere ilişkin bilimsel çıkarım yapabilme",
+          "sayilar": {
+            "1": 0,
+            "2": 1,
+            "3": 0,
+            "4": 1,
+            "5": 0
+          }
+        },
+        {
+          "her_senaryoda": false,
+          "kisa_ad": "Enerji ve Enerji Çeşitleri",
+          "kitap_durumu": "var",
+          "kitapta": [
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=65",
+              "cerceve": "1. Kuvvet, İş ve Enerji İlişkisi",
+              "cerceve_no": 1,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Enerji ve Enerji Çeşitleri",
+              "sayfa": 64,
+              "son_sayfa": 70,
+              "unite": "2. Ünite",
+              "unite_ad": "Kuvvet ve Enerjiyi Keşfedelim",
+              "unite_no": 2
+            }
+          ],
+          "kod": "FB.7.2.2",
+          "metin": "Enerji çeşitlerinden kinetik ve potansiyel enerjiyi karşılaştırabilme",
+          "sayilar": {
+            "1": 1,
+            "2": 0,
+            "3": 1,
+            "4": 0,
+            "5": 1
+          }
+        },
+        {
+          "her_senaryoda": true,
+          "kisa_ad": "Enerjinin Korunumu",
+          "kitap_durumu": "var",
+          "kitapta": [
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=73",
+              "cerceve": "2. Enerji Dönüşümleri",
+              "cerceve_no": 2,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Enerjinin Korunumu",
+              "sayfa": 72,
+              "son_sayfa": 79,
+              "unite": "2. Ünite",
+              "unite_ad": "Kuvvet ve Enerjiyi Keşfedelim",
+              "unite_no": 2
+            }
+          ],
+          "kod": "FB.7.2.3",
+          "metin": "Enerji dönüşümünden hareketle enerjinin korunduğuna tümevarımsal akıl yürütebilme",
+          "sayilar": {
+            "1": 2,
+            "2": 2,
+            "3": 2,
+            "4": 2,
+            "5": 1
+          }
+        }
+      ]
+    },
+    {
+      "baslik": "3. Ünite · Vücudumuzdaki Sistemler",
+      "satirlar": [
+        {
+          "her_senaryoda": true,
+          "kisa_ad": "Sindirim Sistemini Oluşturan Yapı ve Organlar",
+          "kitap_durumu": "var",
+          "kitapta": [
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=91",
+              "cerceve": "1. Sindirim Sistemi",
+              "cerceve_no": 1,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Sindirim Sistemini Oluşturan Yapı ve Organlar",
+              "sayfa": 90,
+              "son_sayfa": 95,
+              "unite": "3. Ünite",
+              "unite_ad": "Vücudumuzdaki Sistemler",
+              "unite_no": 3
+            }
+          ],
+          "kod": "FB.7.3.1",
+          "metin": "Sindirim sistemini oluşturan yapı ve organların görevlerini model üzerinde gözlemleyebilme",
+          "sayilar": {
+            "1": 2,
+            "2": 2,
+            "3": 1,
+            "4": 2,
+            "5": 2
+          }
+        },
+        {
+          "her_senaryoda": false,
+          "kisa_ad": "Dolaşım Sistemini Oluşturan Yapı ve Organlar",
+          "kitap_durumu": "var",
+          "kitapta": [
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=103",
+              "cerceve": "2. Dolaşım Sistemi",
+              "cerceve_no": 2,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Dolaşım Sistemini Oluşturan Yapı ve Organlar",
+              "sayfa": 102,
+              "son_sayfa": 109,
+              "unite": "3. Ünite",
+              "unite_ad": "Vücudumuzdaki Sistemler",
+              "unite_no": 3
+            }
+          ],
+          "kod": "FB.7.3.3",
+          "metin": "Dolaşım sistemini oluşturan yapı ve organların görevlerini model üzerinde bilimsel olarak gözlemleyebilme",
+          "sayilar": {
+            "1": 1,
+            "2": 2,
+            "3": 0,
+            "4": 2,
+            "5": 2
+          }
+        },
+        {
+          "her_senaryoda": false,
+          "kisa_ad": "Kan Bağışının Toplum Açısından Önemi",
+          "kitap_durumu": "var",
+          "kitapta": [
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=110",
+              "cerceve": "2. Dolaşım Sistemi",
+              "cerceve_no": 2,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Kan Bağışının Toplum Açısından Önemi",
+              "sayfa": 109,
+              "son_sayfa": 112,
+              "unite": "3. Ünite",
+              "unite_ad": "Vücudumuzdaki Sistemler",
+              "unite_no": 3
+            }
+          ],
+          "kod": "FB.7.3.4",
+          "metin": "Kan bağışının toplumsal dayanışma açısından önemini tartışabilme",
+          "sayilar": {
+            "1": 0,
+            "2": 1,
+            "3": 1,
+            "4": 0,
+            "5": 1
+          }
+        },
+        {
+          "her_senaryoda": false,
+          "kisa_ad": "Solunum Sistemini Oluşturan Yapı ve Organlar",
+          "kitap_durumu": "var",
+          "kitapta": [
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=119",
+              "cerceve": "3. Solunum Sistemi",
+              "cerceve_no": 3,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Solunum Sistemini Oluşturan Yapı ve Organlar",
+              "sayfa": 118,
+              "son_sayfa": 122,
+              "unite": "3. Ünite",
+              "unite_ad": "Vücudumuzdaki Sistemler",
+              "unite_no": 3
+            }
+          ],
+          "kod": "FB.7.3.6",
+          "metin": "Solunum sistemini oluşturan yapı ve organların görevlerini model üzerinde bilimsel olarak gözlemleyebilme",
+          "sayilar": {
+            "1": 1,
+            "2": 1,
+            "3": 2,
+            "4": 0,
+            "5": 0
+          }
+        }
+      ]
+    }
+  ],
+  "guncellik": {
+    "kitap_degisti": false,
+    "tablo_degisti": false
+  },
+  "harita_onayli": true,
+  "kitap_bolumleri": true,
+  "not": null,
+  "senaryolar": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "sinav_no": 2,
+  "sinavlar": [
+    {
+      "durum": {
+        "anilan": [
+          2
+        ],
+        "duyuru": "Sınav, İstanbul İl MEB tarafından belirlenen 2. senaryoya göre uygulanacaktır.",
+        "duyurulan_konu": 3,
+        "kalan_gun": 9,
+        "senaryo": 2,
+        "senaryo_sayisi": 4,
+        "sinav_id": "fen11",
+        "tarih": "2026-11-03",
+        "tur": "kesin",
+        "uyari": null
+      },
+      "sinav_no": 1
+    },
+    {
+      "durum": {
+        "anilan": [],
+        "duyuru": null,
+        "duyurulan_konu": 0,
+        "kalan_gun": null,
+        "senaryo": null,
+        "senaryo_sayisi": 5,
+        "sinav_id": null,
+        "tarih": null,
+        "tur": "olasi",
+        "uyari": null
+      },
+      "sinav_no": 2
+    }
+  ],
+  "toplamlar": {
+    "1": 7,
+    "2": 9,
+    "3": 7,
+    "4": 8,
+    "5": 7
+  },
+  "tur": "senaryolu"
+}

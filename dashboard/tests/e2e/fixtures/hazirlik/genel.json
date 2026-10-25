@@ -1,0 +1,291 @@
+{
+  "dersler": [
+    {
+      "anahtar": "turkce",
+      "ders": "Türkçe",
+      "kitap_bolumleri": false,
+      "sinavlar": [
+        {
+          "durum": {
+            "anilan": [
+              4
+            ],
+            "duyuru": "Sınav, İstanbul İl MEB tarafından belirlenen 2. senaryoya göre uygulanacaktır.",
+            "duyurulan_konu": 0,
+            "kalan_gun": null,
+            "senaryo": 4,
+            "senaryo_sayisi": 6,
+            "sinav_id": "tr11",
+            "tarih": "2026-10-22",
+            "tur": "gecti",
+            "uyari": null
+          },
+          "sinav_no": 1,
+          "soru": 7
+        },
+        {
+          "durum": {
+            "anilan": [],
+            "duyuru": null,
+            "duyurulan_konu": 0,
+            "kalan_gun": 72,
+            "senaryo": null,
+            "senaryo_sayisi": 0,
+            "sinav_id": "tr12",
+            "tarih": "2027-01-05",
+            "tur": "ulke_geneli",
+            "uyari": null
+          },
+          "sinav_no": 2,
+          "soru": null
+        }
+      ]
+    },
+    {
+      "anahtar": "matematik",
+      "ders": "Matematik",
+      "kitap_bolumleri": false,
+      "sinavlar": [
+        {
+          "durum": {
+            "anilan": [],
+            "duyuru": null,
+            "duyurulan_konu": 0,
+            "kalan_gun": null,
+            "senaryo": null,
+            "senaryo_sayisi": 4,
+            "sinav_id": null,
+            "tarih": null,
+            "tur": "olasi",
+            "uyari": null
+          },
+          "sinav_no": 1,
+          "soru": null
+        },
+        {
+          "durum": {
+            "anilan": [],
+            "duyuru": null,
+            "duyurulan_konu": 0,
+            "kalan_gun": null,
+            "senaryo": null,
+            "senaryo_sayisi": 5,
+            "sinav_id": null,
+            "tarih": null,
+            "tur": "olasi",
+            "uyari": null
+          },
+          "sinav_no": 2,
+          "soru": null
+        }
+      ]
+    },
+    {
+      "anahtar": "fen-bilimleri",
+      "ders": "Fen Bilimleri",
+      "kitap_bolumleri": true,
+      "sinavlar": [
+        {
+          "durum": {
+            "anilan": [
+              2
+            ],
+            "duyuru": "Sınav, İstanbul İl MEB tarafından belirlenen 2. senaryoya göre uygulanacaktır.",
+            "duyurulan_konu": 3,
+            "kalan_gun": 9,
+            "senaryo": 2,
+            "senaryo_sayisi": 4,
+            "sinav_id": "fen11",
+            "tarih": "2026-11-03",
+            "tur": "kesin",
+            "uyari": null
+          },
+          "sinav_no": 1,
+          "soru": 7
+        },
+        {
+          "durum": {
+            "anilan": [],
+            "duyuru": null,
+            "duyurulan_konu": 0,
+            "kalan_gun": null,
+            "senaryo": null,
+            "senaryo_sayisi": 5,
+            "sinav_id": null,
+            "tarih": null,
+            "tur": "olasi",
+            "uyari": null
+          },
+          "sinav_no": 2,
+          "soru": null
+        }
+      ]
+    },
+    {
+      "anahtar": "sosyal-bilgiler",
+      "ders": "Sosyal Bilgiler",
+      "kitap_bolumleri": false,
+      "sinavlar": [
+        {
+          "durum": {
+            "anilan": [],
+            "duyuru": null,
+            "duyurulan_konu": 0,
+            "kalan_gun": null,
+            "senaryo": null,
+            "senaryo_sayisi": 5,
+            "sinav_id": null,
+            "tarih": null,
+            "tur": "olasi",
+            "uyari": null
+          },
+          "sinav_no": 1,
+          "soru": null
+        },
+        {
+          "durum": {
+            "anilan": [],
+            "duyuru": null,
+            "duyurulan_konu": 0,
+            "kalan_gun": null,
+            "senaryo": null,
+            "senaryo_sayisi": 7,
+            "sinav_id": null,
+            "tarih": null,
+            "tur": "olasi",
+            "uyari": null
+          },
+          "sinav_no": 2,
+          "soru": null
+        }
+      ]
+    },
+    {
+      "anahtar": "ingilizce",
+      "ders": "İngilizce",
+      "kitap_bolumleri": false,
+      "sinavlar": [
+        {
+          "durum": {
+            "anilan": [],
+            "duyuru": null,
+            "duyurulan_konu": 0,
+            "kalan_gun": null,
+            "senaryo": null,
+            "senaryo_sayisi": 5,
+            "sinav_id": null,
+            "tarih": null,
+            "tur": "olasi",
+            "uyari": null
+          },
+          "sinav_no": 1,
+          "soru": null
+        },
+        {
+          "durum": {
+            "anilan": [],
+            "duyuru": null,
+            "duyurulan_konu": 0,
+            "kalan_gun": null,
+            "senaryo": null,
+            "senaryo_sayisi": 5,
+            "sinav_id": null,
+            "tarih": null,
+            "tur": "olasi",
+            "uyari": null
+          },
+          "sinav_no": 2,
+          "soru": null
+        }
+      ]
+    },
+    {
+      "anahtar": "din-kulturu",
+      "ders": "Din Kültürü",
+      "kitap_bolumleri": false,
+      "sinavlar": [
+        {
+          "durum": {
+            "anilan": [],
+            "duyuru": null,
+            "duyurulan_konu": 0,
+            "kalan_gun": null,
+            "senaryo": null,
+            "senaryo_sayisi": 5,
+            "sinav_id": null,
+            "tarih": null,
+            "tur": "olasi",
+            "uyari": null
+          },
+          "sinav_no": 1,
+          "soru": null
+        },
+        {
+          "durum": {
+            "anilan": [],
+            "duyuru": null,
+            "duyurulan_konu": 0,
+            "kalan_gun": null,
+            "senaryo": null,
+            "senaryo_sayisi": 5,
+            "sinav_id": null,
+            "tarih": null,
+            "tur": "olasi",
+            "uyari": null
+          },
+          "sinav_no": 2,
+          "soru": null
+        }
+      ]
+    }
+  ],
+  "durum": "hazir",
+  "kaynak": {
+    "baslik": "1. Dönem Konu Soru Dağılım Tabloları (2026-2027)",
+    "donem": 1,
+    "meb_guncelleme": "2026-09-10T17:27",
+    "ogretim_yili": "2026-2027",
+    "sayfa": "https://odsgm.meb.gov.tr/www/1donem-konu-soru-dagilim-tablolari-2026-2027/icerik/1724",
+    "sinif": 7
+  },
+  "yaklasan": [
+    {
+      "anahtar": "fen-bilimleri",
+      "ders": "Fen Bilimleri",
+      "durum": {
+        "anilan": [
+          2
+        ],
+        "duyuru": "Sınav, İstanbul İl MEB tarafından belirlenen 2. senaryoya göre uygulanacaktır.",
+        "duyurulan_konu": 3,
+        "kalan_gun": 9,
+        "senaryo": 2,
+        "senaryo_sayisi": 4,
+        "sinav_id": "fen11",
+        "tarih": "2026-11-03",
+        "tur": "kesin",
+        "uyari": null
+      },
+      "sinav_no": 1,
+      "soru": 7
+    },
+    {
+      "anahtar": "turkce",
+      "ders": "Türkçe",
+      "durum": {
+        "anilan": [],
+        "duyuru": null,
+        "duyurulan_konu": 0,
+        "kalan_gun": 72,
+        "senaryo": null,
+        "senaryo_sayisi": 0,
+        "sinav_id": "tr12",
+        "tarih": "2027-01-05",
+        "tur": "ulke_geneli",
+        "uyari": null
+      },
+      "sinav_no": 2,
+      "soru": null
+    }
+  ]
+}

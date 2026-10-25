@@ -1,0 +1,244 @@
+{
+  "anahtar": "matematik",
+  "damgalar": {
+    "kitaplar": [],
+    "meb_guncelleme": "2026-09-10T17:27",
+    "tablo_alindi": "2026-10-20",
+    "uretim": "2026-10-25"
+  },
+  "ders": "Matematik",
+  "dogrulama": null,
+  "durum": {
+    "anilan": [],
+    "duyuru": null,
+    "duyurulan_konu": 0,
+    "kalan_gun": null,
+    "senaryo": null,
+    "senaryo_sayisi": 4,
+    "sinav_id": null,
+    "tarih": null,
+    "tur": "olasi",
+    "uyari": null
+  },
+  "duyurulan": null,
+  "ebeveyn": null,
+  "guncellik": {
+    "kitap_degisti": false,
+    "tablo_degisti": false
+  },
+  "harita_onayli": false,
+  "icerik_ozeti": "8724f1c575b461b42c8a247cc3614930ae1df286e52f278d66702f025f7e6206",
+  "isaret_sahibi": null,
+  "kaynaklar": [
+    {
+      "adres": "https://odsgm.meb.gov.tr/www/1donem-konu-soru-dagilim-tablolari-2026-2027/icerik/1724",
+      "etiket": "MEB ÖDSGM · 1. Dönem Konu Soru Dağılım Tabloları (2026-2027)"
+    },
+    {
+      "adres": "https://meb.ai/ankmeb3",
+      "etiket": "Matematik konu-soru dağılım tablosu"
+    }
+  ],
+  "kip": "olasi",
+  "kitap_bolumleri": false,
+  "matris": {
+    "duyurulan": null,
+    "gruplar": [
+      {
+        "baslik": "1. Ünite",
+        "satirlar": [
+          {
+            "her_senaryoda": true,
+            "kisa_ad": "Gerçek yaşam ya da matematiksel durumlarda…",
+            "kitap_durumu": "harita_yok",
+            "kitapta": [],
+            "kod": "MAT.7.1.1",
+            "metin": "Gerçek yaşam ya da matematiksel durumlarda doğal sayı, tam sayı ve rasyonel sayıları yorumlayabilme",
+            "sayilar": {
+              "1": 1,
+              "2": 1,
+              "3": 2,
+              "4": 2
+            }
+          },
+          {
+            "her_senaryoda": true,
+            "kisa_ad": "Gerçek yaşam durumlarında rasyonel sayıların ondalık…",
+            "kitap_durumu": "harita_yok",
+            "kitapta": [],
+            "kod": "MAT.7.1.2",
+            "metin": "Gerçek yaşam durumlarında rasyonel sayıların ondalık gösterimlerini yansıtabilmea) Bölme işlemini kullanarak her rasyonel sayının bir ondalık gösterimi olduğunu inceler..",
+            "sayilar": {
+              "1": 2,
+              "2": 1,
+              "3": 2,
+              "4": 2
+            }
+          },
+          {
+            "her_senaryoda": true,
+            "kisa_ad": "Rasyonel sayıların karşılaştırma ve sıralama ilişkilerini…",
+            "kitap_durumu": "harita_yok",
+            "kitapta": [],
+            "kod": "MAT.7.1.3",
+            "metin": "Rasyonel sayıların karşılaştırma ve sıralama ilişkilerini yorumlayabilme",
+            "sayilar": {
+              "1": 2,
+              "2": 1,
+              "3": 2,
+              "4": 2
+            }
+          },
+          {
+            "her_senaryoda": false,
+            "kisa_ad": "Rasyonel sayılar ve işlemler içeren gerçek…",
+            "kitap_durumu": "harita_yok",
+            "kitapta": [],
+            "kod": "MAT.7.1.4",
+            "metin": "Rasyonel sayılar ve işlemler içeren gerçek yaşam problemlerini çözebilme",
+            "sayilar": {
+              "1": 2,
+              "2": 2,
+              "3": 1,
+              "4": 0
+            }
+          }
+        ]
+      }
+    ],
+    "senaryolar": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "toplamlar": {
+      "1": 7,
+      "2": 5,
+      "3": 7,
+      "4": 6
+    }
+  },
+  "not": null,
+  "ozet": {
+    "cikti_sayisi": 4,
+    "her_senaryoda": [
+      "MAT.7.1.1",
+      "MAT.7.1.2",
+      "MAT.7.1.3"
+    ],
+    "soru_araligi": [
+      5,
+      7
+    ],
+    "toplam_soru": null
+  },
+  "plan": null,
+  "secenekler": {
+    "ebeveyn": false,
+    "isaret": true
+  },
+  "secilen_duyurulan_degil": false,
+  "senaryo": null,
+  "sinav_no": 1,
+  "surum": 1,
+  "uniteler": [
+    {
+      "baslik": "1. Ünite",
+      "cerceveler": [
+        {
+          "baslik": null,
+          "bloklar": [
+            {
+              "aralik": [
+                1,
+                2
+              ],
+              "basliklar": [],
+              "duzey": 2,
+              "her_senaryoda": true,
+              "isaret": null,
+              "kisa_ad": "Gerçek yaşam ya da matematiksel durumlarda…",
+              "kitap_durumu": "harita_yok",
+              "kitapta": [],
+              "kod": "MAT.7.1.1",
+              "metin": "Gerçek yaşam ya da matematiksel durumlarda doğal sayı, tam sayı ve rasyonel sayıları yorumlayabilme",
+              "moduller": [],
+              "odevler": [],
+              "okulda": [],
+              "senaryoda": true,
+              "soru": null
+            },
+            {
+              "aralik": [
+                1,
+                2
+              ],
+              "basliklar": [],
+              "duzey": 2,
+              "her_senaryoda": true,
+              "isaret": null,
+              "kisa_ad": "Gerçek yaşam durumlarında rasyonel sayıların ondalık…",
+              "kitap_durumu": "harita_yok",
+              "kitapta": [],
+              "kod": "MAT.7.1.2",
+              "metin": "Gerçek yaşam durumlarında rasyonel sayıların ondalık gösterimlerini yansıtabilmea) Bölme işlemini kullanarak her rasyonel sayının bir ondalık gösterimi olduğunu inceler..",
+              "moduller": [],
+              "odevler": [],
+              "okulda": [],
+              "senaryoda": true,
+              "soru": null
+            },
+            {
+              "aralik": [
+                1,
+                2
+              ],
+              "basliklar": [],
+              "duzey": 2,
+              "her_senaryoda": true,
+              "isaret": null,
+              "kisa_ad": "Rasyonel sayıların karşılaştırma ve sıralama ilişkilerini…",
+              "kitap_durumu": "harita_yok",
+              "kitapta": [],
+              "kod": "MAT.7.1.3",
+              "metin": "Rasyonel sayıların karşılaştırma ve sıralama ilişkilerini yorumlayabilme",
+              "moduller": [],
+              "odevler": [],
+              "okulda": [],
+              "senaryoda": true,
+              "soru": null
+            },
+            {
+              "aralik": [
+                0,
+                2
+              ],
+              "basliklar": [],
+              "duzey": 2,
+              "her_senaryoda": false,
+              "isaret": null,
+              "kisa_ad": "Rasyonel sayılar ve işlemler içeren gerçek…",
+              "kitap_durumu": "harita_yok",
+              "kitapta": [],
+              "kod": "MAT.7.1.4",
+              "metin": "Rasyonel sayılar ve işlemler içeren gerçek yaşam problemlerini çözebilme",
+              "moduller": [],
+              "odevler": [],
+              "okulda": [],
+              "senaryoda": true,
+              "soru": null
+            }
+          ],
+          "duzey": null,
+          "sayfa": null,
+          "son_sayfa": null
+        }
+      ],
+      "duzey": 1
+    }
+  ],
+  "yz": {
+    "durum": "kapali"
+  }
+}

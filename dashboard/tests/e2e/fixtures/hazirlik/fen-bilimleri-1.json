@@ -1,0 +1,260 @@
+{
+  "anahtar": "fen-bilimleri",
+  "ders": "Fen Bilimleri",
+  "durum": {
+    "anilan": [
+      2
+    ],
+    "duyuru": "Sınav, İstanbul İl MEB tarafından belirlenen 2. senaryoya göre uygulanacaktır.",
+    "duyurulan_konu": 3,
+    "kalan_gun": 9,
+    "senaryo": 2,
+    "senaryo_sayisi": 4,
+    "sinav_id": "fen11",
+    "tarih": "2026-11-03",
+    "tur": "kesin",
+    "uyari": null
+  },
+  "duyurulan": 2,
+  "gruplar": [
+    {
+      "baslik": "1. Ünite · Uzay Çağı",
+      "satirlar": [
+        {
+          "her_senaryoda": false,
+          "kisa_ad": "Uzay araştırmaları için geliştirilen teknolojileri karşılaştırabilme",
+          "kitap_durumu": "var",
+          "kitapta": [
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=17",
+              "cerceve": "1. Türkiye ve Uzay Araştırmaları",
+              "cerceve_no": 1,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Uzay Teknolojileri",
+              "sayfa": 16,
+              "son_sayfa": 24,
+              "unite": "1. Ünite",
+              "unite_ad": "Uzay Çağı",
+              "unite_no": 1
+            },
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=25",
+              "cerceve": "1. Türkiye ve Uzay Araştırmaları",
+              "cerceve_no": 1,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
+              "sayfa": 24,
+              "son_sayfa": 33,
+              "unite": "1. Ünite",
+              "unite_ad": "Uzay Çağı",
+              "unite_no": 1
+            }
+          ],
+          "kod": "FB.7.1.1",
+          "metin": "Uzay araştırmaları için geliştirilen teknolojileri karşılaştırabilme",
+          "sayilar": {
+            "1": 2,
+            "2": 2,
+            "3": 2,
+            "4": 0
+          }
+        },
+        {
+          "her_senaryoda": false,
+          "kisa_ad": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
+          "kitap_durumu": "var",
+          "kitapta": [
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=25",
+              "cerceve": "1. Türkiye ve Uzay Araştırmaları",
+              "cerceve_no": 1,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
+              "sayfa": 24,
+              "son_sayfa": 33,
+              "unite": "1. Ünite",
+              "unite_ad": "Uzay Çağı",
+              "unite_no": 1
+            }
+          ],
+          "kod": "FB.7.1.3",
+          "metin": "Uzay araştırmalarının yol açabileceği problemleri çözebilme",
+          "sayilar": {
+            "1": 0,
+            "2": 1,
+            "3": 1,
+            "4": 1
+          }
+        },
+        {
+          "her_senaryoda": false,
+          "kisa_ad": "Yıldız Oluşumu",
+          "kitap_durumu": "var",
+          "kitapta": [
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=36",
+              "cerceve": "2. Uzayda Neler Var?",
+              "cerceve_no": 2,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Yıldız Oluşumu",
+              "sayfa": 35,
+              "son_sayfa": 49,
+              "unite": "1. Ünite",
+              "unite_ad": "Uzay Çağı",
+              "unite_no": 1
+            }
+          ],
+          "kod": "FB.7.1.4",
+          "metin": "Yıldızların yaşamını açıklayarak yapılandırabilme",
+          "sayilar": {
+            "1": 1,
+            "2": 0,
+            "3": 1,
+            "4": 1
+          }
+        },
+        {
+          "her_senaryoda": false,
+          "kisa_ad": "Yıldız Oluşumu",
+          "kitap_durumu": "var",
+          "kitapta": [
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=36",
+              "cerceve": "2. Uzayda Neler Var?",
+              "cerceve_no": 2,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Yıldız Oluşumu",
+              "sayfa": 35,
+              "son_sayfa": 49,
+              "unite": "1. Ünite",
+              "unite_ad": "Uzay Çağı",
+              "unite_no": 1
+            }
+          ],
+          "kod": "FB.7.1.5",
+          "metin": "Yıldız, galaksi ve evren kavramlarını açıklayarak yapılandırabilme",
+          "sayilar": {
+            "1": 1,
+            "2": 1,
+            "3": 0,
+            "4": 1
+          }
+        }
+      ]
+    },
+    {
+      "baslik": "2. Ünite · Kuvvet ve Enerjiyi Keşfedelim",
+      "satirlar": [
+        {
+          "her_senaryoda": true,
+          "kisa_ad": "Fiziksel Anlamda İş",
+          "kitap_durumu": "var",
+          "kitapta": [
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=61",
+              "cerceve": "1. Kuvvet, İş ve Enerji İlişkisi",
+              "cerceve_no": 1,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Fiziksel Anlamda İş",
+              "sayfa": 60,
+              "son_sayfa": 63,
+              "unite": "2. Ünite",
+              "unite_ad": "Kuvvet ve Enerjiyi Keşfedelim",
+              "unite_no": 2
+            }
+          ],
+          "kod": "FB.7.2.1",
+          "metin": "Fiziksel anlamda yapılan işin bağlı olduğu faktörlere ilişkin bilimsel çıkarım yapabilme",
+          "sayilar": {
+            "1": 3,
+            "2": 3,
+            "3": 2,
+            "4": 2
+          }
+        },
+        {
+          "her_senaryoda": false,
+          "kisa_ad": "Enerji ve Enerji Çeşitleri",
+          "kitap_durumu": "var",
+          "kitapta": [
+            {
+              "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=65",
+              "cerceve": "1. Kuvvet, İş ve Enerji İlişkisi",
+              "cerceve_no": 1,
+              "kitap": "Fen Bilimleri 7 (1. Kitap)",
+              "konu": "Enerji ve Enerji Çeşitleri",
+              "sayfa": 64,
+              "son_sayfa": 70,
+              "unite": "2. Ünite",
+              "unite_ad": "Kuvvet ve Enerjiyi Keşfedelim",
+              "unite_no": 2
+            }
+          ],
+          "kod": "FB.7.2.2",
+          "metin": "Enerji çeşitlerinden kinetik ve potansiyel enerjiyi karşılaştırabilme",
+          "sayilar": {
+            "1": 2,
+            "2": 0,
+            "3": 2,
+            "4": 1
+          }
+        }
+      ]
+    }
+  ],
+  "guncellik": {
+    "kitap_degisti": false,
+    "tablo_degisti": false
+  },
+  "harita_onayli": true,
+  "kitap_bolumleri": true,
+  "not": null,
+  "senaryolar": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "sinav_no": 1,
+  "sinavlar": [
+    {
+      "durum": {
+        "anilan": [
+          2
+        ],
+        "duyuru": "Sınav, İstanbul İl MEB tarafından belirlenen 2. senaryoya göre uygulanacaktır.",
+        "duyurulan_konu": 3,
+        "kalan_gun": 9,
+        "senaryo": 2,
+        "senaryo_sayisi": 4,
+        "sinav_id": "fen11",
+        "tarih": "2026-11-03",
+        "tur": "kesin",
+        "uyari": null
+      },
+      "sinav_no": 1
+    },
+    {
+      "durum": {
+        "anilan": [],
+        "duyuru": null,
+        "duyurulan_konu": 0,
+        "kalan_gun": null,
+        "senaryo": null,
+        "senaryo_sayisi": 5,
+        "sinav_id": null,
+        "tarih": null,
+        "tur": "olasi",
+        "uyari": null
+      },
+      "sinav_no": 2
+    }
+  ],
+  "toplamlar": {
+    "1": 9,
+    "2": 7,
+    "3": 8,
+    "4": 6
+  },
+  "tur": "senaryolu"
+}
