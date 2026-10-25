@@ -22,7 +22,6 @@ SURUM = 1
 HARITA_DIZINI = Path(__file__).with_name("kitap_haritalari")
 ANAHTAR_DERSLERI = {anahtar: ders for ders, anahtar in DERS_ANAHTARLARI.items()}
 KESIN_DURUMLAR = ("dogrulandi", "kismen")
-KISA_AD_SOZCUK = 6
 _UNITE_KODU = re.compile(r"^(?:[A-ZÇĞİÖŞÜ]+\.)+7\.(\d+)\.|^E7\.(\d+)\.")
 
 
@@ -179,11 +178,9 @@ def _kitap_yollari(harita: dict | None, kod: str) -> list[dict]:
 
 
 def _kisa_ad(cikti: dict, yollar: list[dict]) -> str:
-    """Tek bir kitap konusuna bağlıysa konunun kitaptaki adı (K1); değilse MEB metninin ilk altı sözcüğü."""
-    if len(yollar) == 1 and yollar[0]["konu"]:
-        return yollar[0]["konu"]
-    sozcukler = cikti["metin"].split()
-    return " ".join(sozcukler[:KISA_AD_SOZCUK]) + ("…" if len(sozcukler) > KISA_AD_SOZCUK else "")
+    """Satırın etiketi MEB çıktı metninin kendisidir: kısaltılmaz, "…" konmaz (K1, K6). Kitap konusunun adı etikete
+    girmez; yalnız `kitapta` yollarında görünür (yollar parametresi imza uyumu için kalır)."""
+    return cikti["metin"]
 
 
 def _cumle_duzeni(s: str) -> str:

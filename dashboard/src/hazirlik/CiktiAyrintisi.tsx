@@ -7,7 +7,7 @@ import { ciktiKimligi, kitapYoluMetni, sayfaMetni } from './hazirlik'
 import type { MatrisSatiri } from './tipler'
 
 /** Satırın ayrıntısı (spec §3.2): tam MEB metni ve kitap bölümü. Masaüstünde tablonun yanında, telefonda alttan
- *  (Hazirlik.scss). Açılınca odak başlığa gelir; Esc ve "Ayrıntıyı kapat" kapatır, odak satıra döner (çağıran).
+ *  (Hazirlik.scss). Başlık yalnız kodu taşır (S38 başlık düzeni, MEB cümlesi alıntıda bir kez); açılınca odak başlığa gelir; Esc ve "Ayrıntıyı kapat" kapatır, odak satıra döner (çağıran).
  *
  *  D20: Esc yalnız odak panelin içindeyken kapatır (panelin kendi olayı, belgeye dinleyici yok): başka bir katman
  *  (asistan, pencere) üstteyse odak onda olur ve Esc o katmanın işidir. */
@@ -24,7 +24,7 @@ export default function CiktiAyrintisi({ satir, kilavuz, kapat }: { satir: Matri
     <aside className="cikti-ayrinti" aria-labelledby="cikti-ayrinti-baslik" onKeyDown={tus}>
       <div className="cikti-ayrinti__ust">
         <h3 id="cikti-ayrinti-baslik" ref={baslik} tabIndex={-1} className="cikti-ayrinti__baslik">
-          <span className="kilavuz-kod">{satir.kod}</span> {satir.kisa_ad}
+          Öğrenme Çıktısı <span className="kilavuz-kod">{satir.kod}</span>
         </h3>
         <IconButton kind="ghost" size="lg" label="Ayrıntıyı kapat" onClick={kapat}><Close size={20} /></IconButton>
       </div>

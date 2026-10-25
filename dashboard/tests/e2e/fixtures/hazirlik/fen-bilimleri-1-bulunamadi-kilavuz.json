@@ -61,7 +61,7 @@
     "tablo_degisti": false
   },
   "harita_onayli": true,
-  "icerik_ozeti": "eb16694ed92de7eba59480758efbaa606743966864d506465eac001dd6893e35",
+  "icerik_ozeti": "13ca16b2a12825ffe138149bc9f7776b32e5f79149224ac5da14ee7bd2bfcddc",
   "isaret_sahibi": "Deneme Öğrenci",
   "kaynaklar": [
     {
@@ -140,7 +140,7 @@
           },
           {
             "her_senaryoda": false,
-            "kisa_ad": "Yıldız Oluşumu",
+            "kisa_ad": "Yıldızların yaşamını açıklayarak yapılandırabilme",
             "kitap_durumu": "var",
             "kitapta": [
               {
@@ -167,7 +167,7 @@
           },
           {
             "her_senaryoda": false,
-            "kisa_ad": "Yıldız Oluşumu",
+            "kisa_ad": "Yıldız, galaksi ve evren kavramlarını açıklayarak yapılandırabilme",
             "kitap_durumu": "var",
             "kitapta": [
               {
@@ -199,7 +199,7 @@
         "satirlar": [
           {
             "her_senaryoda": true,
-            "kisa_ad": "Fiziksel Anlamda İş",
+            "kisa_ad": "Fiziksel anlamda yapılan işin bağlı olduğu faktörlere ilişkin bilimsel çıkarım yapabilme",
             "kitap_durumu": "var",
             "kitapta": [
               {
@@ -226,7 +226,7 @@
           },
           {
             "her_senaryoda": false,
-            "kisa_ad": "Enerji ve Enerji Çeşitleri",
+            "kisa_ad": "Enerji çeşitlerinden kinetik ve potansiyel enerjiyi karşılaştırabilme",
             "kitap_durumu": "var",
             "kitapta": [
               {
@@ -547,7 +547,7 @@
               "duzey": 3,
               "her_senaryoda": false,
               "isaret": null,
-              "kisa_ad": "Yıldız Oluşumu",
+              "kisa_ad": "Yıldızların yaşamını açıklayarak yapılandırabilme",
               "kitap_durumu": "var",
               "kitapta": [
                 {
@@ -632,7 +632,7 @@
               "duzey": 3,
               "her_senaryoda": false,
               "isaret": null,
-              "kisa_ad": "Yıldız Oluşumu",
+              "kisa_ad": "Yıldız, galaksi ve evren kavramlarını açıklayarak yapılandırabilme",
               "kitap_durumu": "var",
               "kitapta": [
                 {
@@ -726,7 +726,7 @@
               "duzey": 3,
               "her_senaryoda": true,
               "isaret": "tekrar",
-              "kisa_ad": "Fiziksel Anlamda İş",
+              "kisa_ad": "Fiziksel anlamda yapılan işin bağlı olduğu faktörlere ilişkin bilimsel çıkarım yapabilme",
               "kitap_durumu": "var",
               "kitapta": [
                 {
@@ -805,7 +805,7 @@
               "duzey": 3,
               "her_senaryoda": false,
               "isaret": null,
-              "kisa_ad": "Enerji ve Enerji Çeşitleri",
+              "kisa_ad": "Enerji çeşitlerinden kinetik ve potansiyel enerjiyi karşılaştırabilme",
               "kitap_durumu": "var",
               "kitapta": [
                 {

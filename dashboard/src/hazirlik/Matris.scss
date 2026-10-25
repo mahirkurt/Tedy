@@ -1,13 +1,40 @@
 // Senaryo karşılaştırması tablosu (spec §3.2): ders sayfası, kılavuz ekranı ve kâğıt aynı stili kullanır (K11).
 @use '@carbon/react/scss/spacing' as spacing;
 @use '@carbon/react/scss/type' as type;
+@use '@carbon/react/scss/breakpoint' as bp;
 
 .kilavuz-kod { @include type.type-style('code-02'); }
+
+// Tabloda kod ayrı satırda (Plex Mono), altında MEB'in tam metni.
+.kilavuz-matris .kilavuz-kod { display: block; }
+
+.kilavuz-matris__metin {
+  display: block;
+  overflow-wrap: anywhere;
+}
 
 .kilavuz-matris {
   font-variant-numeric: tabular-nums;
 
   td { text-align: center; }
+
+  // Sayısal sütunlar daralıp başlığı ezmesin; birinci sütun (MEB metni) geniş kalır (kırpma yok).
+  th[scope='col']:not(:first-child),
+  td { min-inline-size: spacing.$spacing-10; }
+
+  th[scope='col']:first-child,
+  th[scope='row'] { min-inline-size: 16rem; }
+
+  // Telefonda dört senaryo sütunu da kaydırmadan sığsın: birinci sütun daralır, hücre dolgusu azalır.
+  @include bp.breakpoint-down('md') {
+    th, td { padding-inline: spacing.$spacing-03; }
+
+    th[scope='col']:not(:first-child),
+    td { min-inline-size: spacing.$spacing-09; }
+
+    th[scope='col']:first-child,
+    th[scope='row'] { min-inline-size: 8rem; }
+  }
 
   // Satır başlığı hücresi, öteki hücreler gibi katman zemininde (Carbon başlık hücresini gri çizer).
   th[scope='row'] {
@@ -15,9 +42,15 @@
     background-color: var(--cds-layer);
   }
 
-  // Vurgulanan sütun başlığıyla birlikte (başlık hücresinin gri zemini sınıftan güçlüdür).
+  // Vurgulanan (duyurulan ya da seçilen) sütun ders renginde (K4: mavi "olası" demektir; taslak A ders rengini kullanır).
+  // Başlıkta alt kenar çizgisi ders rengi, zemin ders yüzeyi; metin ("duyurulan", "seçilen") rengin tek taşıyıcısı değildir.
   th.kilavuz-matris__vurgu,
-  td.kilavuz-matris__vurgu { background-color: var(--cds-highlight); }
+  td.kilavuz-matris__vurgu {
+    background-color: var(--ted-subject-surface);
+    color: var(--ted-subject-on-surface);
+  }
+
+  th.kilavuz-matris__vurgu { border-block-end: spacing.$spacing-02 solid var(--ted-subject-accent); }
 
   .kilavuz-matris__secili th[scope='row'] { background-color: var(--cds-layer-selected-01); }
 }
@@ -29,6 +62,9 @@
 
 .kilavuz-matris__toplam th,
 .kilavuz-matris__toplam td { @include type.type-style('heading-compact-01'); }
+
+.kilavuz-matris__cikti > span:first-child,
+.kilavuz-matris__dugme { display: block; }
 
 .kilavuz-matris__dugme {
   @include type.type-style('body-compact-01');

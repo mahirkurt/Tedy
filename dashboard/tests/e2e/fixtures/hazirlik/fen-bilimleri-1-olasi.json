@@ -59,7 +59,7 @@
         },
         {
           "her_senaryoda": false,
-          "kisa_ad": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
+          "kisa_ad": "Uzay araştırmalarının yol açabileceği problemleri çözebilme",
           "kitap_durumu": "var",
           "kitapta": [
             {
@@ -86,7 +86,7 @@
         },
         {
           "her_senaryoda": false,
-          "kisa_ad": "Yıldız Oluşumu",
+          "kisa_ad": "Yıldızların yaşamını açıklayarak yapılandırabilme",
           "kitap_durumu": "var",
           "kitapta": [
             {
@@ -113,7 +113,7 @@
         },
         {
           "her_senaryoda": false,
-          "kisa_ad": "Yıldız Oluşumu",
+          "kisa_ad": "Yıldız, galaksi ve evren kavramlarını açıklayarak yapılandırabilme",
           "kitap_durumu": "var",
           "kitapta": [
             {
@@ -145,7 +145,7 @@
       "satirlar": [
         {
           "her_senaryoda": true,
-          "kisa_ad": "Fiziksel Anlamda İş",
+          "kisa_ad": "Fiziksel anlamda yapılan işin bağlı olduğu faktörlere ilişkin bilimsel çıkarım yapabilme",
           "kitap_durumu": "var",
           "kitapta": [
             {
@@ -172,7 +172,7 @@
         },
         {
           "her_senaryoda": false,
-          "kisa_ad": "Enerji ve Enerji Çeşitleri",
+          "kisa_ad": "Enerji çeşitlerinden kinetik ve potansiyel enerjiyi karşılaştırabilme",
           "kitap_durumu": "var",
           "kitapta": [
             {

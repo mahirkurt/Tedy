@@ -20,7 +20,7 @@
       "satirlar": [
         {
           "her_senaryoda": true,
-          "kisa_ad": "Gerçek yaşam ya da matematiksel durumlarda…",
+          "kisa_ad": "Gerçek yaşam ya da matematiksel durumlarda doğal sayı, tam sayı ve rasyonel sayıları yorumlayabilme",
           "kitap_durumu": "harita_yok",
           "kitapta": [],
           "kod": "MAT.7.1.1",
@@ -34,7 +34,7 @@
         },
         {
           "her_senaryoda": true,
-          "kisa_ad": "Gerçek yaşam durumlarında rasyonel sayıların ondalık…",
+          "kisa_ad": "Gerçek yaşam durumlarında rasyonel sayıların ondalık gösterimlerini yansıtabilmea) Bölme işlemini kullanarak her rasyonel sayının bir ondalık gösterimi olduğunu inceler..",
           "kitap_durumu": "harita_yok",
           "kitapta": [],
           "kod": "MAT.7.1.2",
@@ -48,7 +48,7 @@
         },
         {
           "her_senaryoda": true,
-          "kisa_ad": "Rasyonel sayıların karşılaştırma ve sıralama ilişkilerini…",
+          "kisa_ad": "Rasyonel sayıların karşılaştırma ve sıralama ilişkilerini yorumlayabilme",
           "kitap_durumu": "harita_yok",
           "kitapta": [],
           "kod": "MAT.7.1.3",
@@ -62,7 +62,7 @@
         },
         {
           "her_senaryoda": false,
-          "kisa_ad": "Rasyonel sayılar ve işlemler içeren gerçek…",
+          "kisa_ad": "Rasyonel sayılar ve işlemler içeren gerçek yaşam problemlerini çözebilme",
           "kitap_durumu": "harita_yok",
           "kitapta": [],
           "kod": "MAT.7.1.4",

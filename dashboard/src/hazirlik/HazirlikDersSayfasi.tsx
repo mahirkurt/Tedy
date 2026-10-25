@@ -64,7 +64,7 @@ export default function HazirlikDersSayfasi() {
     <ContentSwitcher key="yazililar" size="lg" selectedIndex={no - 1} onChange={({ index }) => yazili((index ?? 0) + 1)}
       aria-label="Yazılı seçimi" className="hazirlik-ders__yazililar">
       {sinavlar.map(s => (
-        <Switch key={s.sinav_no} name={String(s.sinav_no)} text={`${sinavAdi(s.sinav_no)} · ${s.durum.tur === 'gecti' ? 'geçti' : tarihMetni(s.durum.tarih, false)}`} />
+        <Switch key={s.sinav_no} name={String(s.sinav_no)} text={`${sinavAdi(s.sinav_no)} · ${tarihMetni(s.durum.tarih, false)}`} />
       ))}
     </ContentSwitcher>
   )
@@ -93,11 +93,16 @@ export default function HazirlikDersSayfasi() {
     gezin(kilavuz)
   }
   return (
-    <section className="hazirlik-ders" aria-labelledby="hazirlik-ders-baslik">
+    <section className={`hazirlik-ders ${subjectClass(oz.ders)}`} aria-labelledby="hazirlik-ders-baslik">
       <Breadcrumb aria-label="Konum">
-        <BreadcrumbItem href="/hazirlik" onClick={(e: React.MouseEvent) => { e.preventDefault(); gezin('/hazirlik') }}>Sınav hazırlığı</BreadcrumbItem>
+        <BreadcrumbItem href="/hazirlik" onClick={(e: MouseEvent<HTMLElement>) => {
+          // Ctrl/orta tık/yeni sekme tarayıcıya kalır (C13).
+          if (!uygulamaIcindeAc(e, '/hazirlik', e.currentTarget.getAttribute('target'))) return
+          e.preventDefault()
+          gezin('/hazirlik')
+        }}>Sınav hazırlığı</BreadcrumbItem>
       </Breadcrumb>
-      <h2 id="hazirlik-ders-baslik" className={`hazirlik-ders__baslik ${subjectClass(oz.ders)}`}>{oz.ders}</h2>
+      <h2 id="hazirlik-ders-baslik" className="hazirlik-ders__baslik">{oz.ders}</h2>
       {yazililar}
       <DurumGostergesi durum={oz.durum} />
       <DuyuruBildirimi oz={oz} />

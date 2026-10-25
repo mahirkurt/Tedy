@@ -4,7 +4,8 @@ import { tabloParcalari } from './belge'
 import './Matris.scss'
 
 /** Senaryo karşılaştırması (spec §3.2, taslak A): satırlar ünite gruplu çıktılar, sütunlar senaryolar; vurgulanan
- *  sütun duyurulan (ya da seçilen) senaryodur; sıfır "–"; toplam satırı. Ekranda satırın çıktısı bir düğmedir
+ *  sütun duyurulan (ya da seçilen) senaryodur; sıfır "–"; toplam satırı. Satırın etiketi MEB çıktı metninin kendisidir: kod ayrı satırda, altında tam metin (kırpma yok), "her senaryoda"
+ *  etiketi metnin altında. Ekranda satırın çıktısı bir düğmedir
  *  (ayrıntı paneli), kâğıtta düz metin (K11). Aynı bileşen kılavuzun içinde de kullanılır.
  *
  *  `uniteBasina` (Y5): Paged.js bölünen tabloda başlık satırını yinelemez; bu kipte tablo ünite başına ayrı tablolar
@@ -32,7 +33,10 @@ export default function KarsilastirmaTablosu({ matris, vurgu, kip, secili, sec, 
               <TableRow>
                 <TableHeader scope="col">Öğrenme çıktısı</TableHeader>
                 {matris.senaryolar.map(n => (
-                  <TableHeader key={n} scope="col" className={sutun(n)}>{n === vurgu ? `S${n} · ${vurguEtiketi}` : `S${n}`}</TableHeader>
+                  <TableHeader key={n} scope="col" className={sutun(n)}>
+                    {/* Ekran okuyucu "S1" yerine "Senaryo S1" okur; görünen başlık kısa kalır. */}
+                    <span className="cds--visually-hidden">Senaryo </span>{n === vurgu ? `S${n} · ${vurguEtiketi}` : `S${n}`}
+                  </TableHeader>
                 ))}
               </TableRow>
             </TableHead>
@@ -49,10 +53,10 @@ export default function KarsilastirmaTablosu({ matris, vurgu, kip, secili, sec, 
                         // Yerel düğme: Carbon ghost düğmesinin mavisi tablo hücresinin zemininde AA kontrastı tutmuyor (ölçüldü, axe).
                         <button type="button" className="kilavuz-matris__dugme" aria-expanded={s.kod === secili}
                           onClick={e => sec(s.kod, e.currentTarget)}>
-                          <span className="kilavuz-kod">{s.kod}</span> {s.kisa_ad}
+                          <span className="kilavuz-kod">{s.kod}</span>{' '}<span className="kilavuz-matris__metin">{s.metin}</span>
                         </button>
                       ) : (
-                        <span><span className="kilavuz-kod">{s.kod}</span> {s.kisa_ad}</span>
+                        <span><span className="kilavuz-kod">{s.kod}</span>{' '}<span className="kilavuz-matris__metin">{s.metin}</span></span>
                       )}
                       {s.her_senaryoda && <Tag type="gray" size="sm" className="kilavuz-matris__her">her senaryoda</Tag>}
                     </th>

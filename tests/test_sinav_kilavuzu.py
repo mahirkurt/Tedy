@@ -98,7 +98,8 @@ def test_ders_ozeti_matris_fen_1():
     assert list(satirlar) == ["FB.7.1.1", "FB.7.1.3", "FB.7.1.4", "FB.7.1.5", "FB.7.2.1", "FB.7.2.2"]
     is_ = satirlar["FB.7.2.1"]
     assert (is_["kisa_ad"], is_["sayilar"], is_["her_senaryoda"], is_["kitap_durumu"]) == (
-        "Fiziksel Anlamda İş", {"1": 3, "2": 3, "3": 2, "4": 2}, True, "var")
+        "Fiziksel anlamda yapılan işin bağlı olduğu faktörlere ilişkin bilimsel çıkarım yapabilme",
+        {"1": 3, "2": 3, "3": 2, "4": 2}, True, "var")
     assert is_["kitapta"] == [{
         "kitap": "Fen Bilimleri 7 (1. Kitap)", "unite": "2. Ünite", "unite_no": 2,
         "unite_ad": "Kuvvet ve Enerjiyi Keşfedelim", "cerceve": "1. Kuvvet, İş ve Enerji İlişkisi", "cerceve_no": 1,
@@ -222,7 +223,20 @@ def test_kitapta_konusuz_cerceve_baglantisi_cokmez():
     assert (s["kitapta"][0]["cerceve"], s["kitapta"][0]["sayfa"], s["kitapta"][0]["son_sayfa"]) == (
         "1. Kuvvet, İş ve Enerji İlişkisi", 59, 70)
     assert s["kitapta"][0]["baglanti"].endswith("#page=60")
-    assert s["kisa_ad"].endswith("…")                       # konu adı yok: MEB metninin ilk altı sözcüğü
+    assert s["kisa_ad"] == s["metin"]                       # konu adı yok: yine MEB metninin kendisi
+
+
+def test_cikti_etiketi_meb_metninin_kendisi_kisaltma_ve_konu_adi_yok():
+    """Karar (düzeltme turu 1, K1/K6): satırın etiketi MEB çıktı metni, kısaltmasız ve "…"sız; kitap konusunun adı yalnız
+    `kitapta` yollarında görünür."""
+    oz = sk.ders_ozeti(girdiler(), "fen-bilimleri", 1)
+    satirlar = [s for g in oz["gruplar"] for s in g["satirlar"]]
+    assert satirlar
+    for s in satirlar:
+        assert s["kisa_ad"] == s["metin"], s["kod"]
+        assert "…" not in s["kisa_ad"], s["kod"]
+    is_ = next(s for s in satirlar if s["kod"] == "FB.7.2.1")
+    assert is_["kitapta"][0]["konu"] == "Fiziksel Anlamda İş" and is_["kisa_ad"] != "Fiziksel Anlamda İş"
 
 
 def test_gecti_senaryoyu_tasir_duyurulmamissa_tasimaz():

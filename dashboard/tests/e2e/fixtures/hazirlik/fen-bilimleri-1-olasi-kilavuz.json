@@ -33,7 +33,7 @@
     "tablo_degisti": false
   },
   "harita_onayli": true,
-  "icerik_ozeti": "b7ae1af5f400f856089cc9f1081511a50c4bf4fa9d8fde67727f79bd10a62ea3",
+  "icerik_ozeti": "d1a5b5af95403a9a64b232b9ceee4af579806fc8e91da5c9a3b29419ee3ec42b",
   "isaret_sahibi": "Deneme Öğrenci",
   "kaynaklar": [
     {
@@ -98,7 +98,7 @@
           },
           {
             "her_senaryoda": false,
-            "kisa_ad": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
+            "kisa_ad": "Uzay araştırmalarının yol açabileceği problemleri çözebilme",
             "kitap_durumu": "var",
             "kitapta": [
               {
@@ -125,7 +125,7 @@
           },
           {
             "her_senaryoda": false,
-            "kisa_ad": "Yıldız Oluşumu",
+            "kisa_ad": "Yıldızların yaşamını açıklayarak yapılandırabilme",
             "kitap_durumu": "var",
             "kitapta": [
               {
@@ -152,7 +152,7 @@
           },
           {
             "her_senaryoda": false,
-            "kisa_ad": "Yıldız Oluşumu",
+            "kisa_ad": "Yıldız, galaksi ve evren kavramlarını açıklayarak yapılandırabilme",
             "kitap_durumu": "var",
             "kitapta": [
               {
@@ -184,7 +184,7 @@
         "satirlar": [
           {
             "her_senaryoda": true,
-            "kisa_ad": "Fiziksel Anlamda İş",
+            "kisa_ad": "Fiziksel anlamda yapılan işin bağlı olduğu faktörlere ilişkin bilimsel çıkarım yapabilme",
             "kitap_durumu": "var",
             "kitapta": [
               {
@@ -211,7 +211,7 @@
           },
           {
             "her_senaryoda": false,
-            "kisa_ad": "Enerji ve Enerji Çeşitleri",
+            "kisa_ad": "Enerji çeşitlerinden kinetik ve potansiyel enerjiyi karşılaştırabilme",
             "kitap_durumu": "var",
             "kitapta": [
               {
@@ -492,7 +492,7 @@
               "duzey": 3,
               "her_senaryoda": false,
               "isaret": null,
-              "kisa_ad": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
+              "kisa_ad": "Uzay araştırmalarının yol açabileceği problemleri çözebilme",
               "kitap_durumu": "var",
               "kitapta": [
                 {
@@ -588,7 +588,7 @@
               "duzey": 3,
               "her_senaryoda": false,
               "isaret": null,
-              "kisa_ad": "Yıldız Oluşumu",
+              "kisa_ad": "Yıldızların yaşamını açıklayarak yapılandırabilme",
               "kitap_durumu": "var",
               "kitapta": [
                 {
@@ -676,7 +676,7 @@
               "duzey": 3,
               "her_senaryoda": false,
               "isaret": null,
-              "kisa_ad": "Yıldız Oluşumu",
+              "kisa_ad": "Yıldız, galaksi ve evren kavramlarını açıklayarak yapılandırabilme",
               "kitap_durumu": "var",
               "kitapta": [
                 {
@@ -748,7 +748,7 @@
               "duzey": 3,
               "her_senaryoda": true,
               "isaret": "tekrar",
-              "kisa_ad": "Fiziksel Anlamda İş",
+              "kisa_ad": "Fiziksel anlamda yapılan işin bağlı olduğu faktörlere ilişkin bilimsel çıkarım yapabilme",
               "kitap_durumu": "var",
               "kitapta": [
                 {
@@ -830,7 +830,7 @@
               "duzey": 3,
               "her_senaryoda": false,
               "isaret": null,
-              "kisa_ad": "Enerji ve Enerji Çeşitleri",
+              "kisa_ad": "Enerji çeşitlerinden kinetik ve potansiyel enerjiyi karşılaştırabilme",
               "kitap_durumu": "var",
               "kitapta": [
                 {

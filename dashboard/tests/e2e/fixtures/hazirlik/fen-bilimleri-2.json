@@ -20,7 +20,7 @@
       "satirlar": [
         {
           "her_senaryoda": false,
-          "kisa_ad": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
+          "kisa_ad": "Uzay araştırmalarının yol açabileceği problemleri çözebilme",
           "kitap_durumu": "var",
           "kitapta": [
             {
@@ -53,7 +53,7 @@
       "satirlar": [
         {
           "her_senaryoda": false,
-          "kisa_ad": "Fiziksel Anlamda İş",
+          "kisa_ad": "Fiziksel anlamda yapılan işin bağlı olduğu faktörlere ilişkin bilimsel çıkarım yapabilme",
           "kitap_durumu": "var",
           "kitapta": [
             {
@@ -81,7 +81,7 @@
         },
         {
           "her_senaryoda": false,
-          "kisa_ad": "Enerji ve Enerji Çeşitleri",
+          "kisa_ad": "Enerji çeşitlerinden kinetik ve potansiyel enerjiyi karşılaştırabilme",
           "kitap_durumu": "var",
           "kitapta": [
             {
@@ -109,7 +109,7 @@
         },
         {
           "her_senaryoda": true,
-          "kisa_ad": "Enerjinin Korunumu",
+          "kisa_ad": "Enerji dönüşümünden hareketle enerjinin korunduğuna tümevarımsal akıl yürütebilme",
           "kitap_durumu": "var",
           "kitapta": [
             {
@@ -142,7 +142,7 @@
       "satirlar": [
         {
           "her_senaryoda": true,
-          "kisa_ad": "Sindirim Sistemini Oluşturan Yapı ve Organlar",
+          "kisa_ad": "Sindirim sistemini oluşturan yapı ve organların görevlerini model üzerinde gözlemleyebilme",
           "kitap_durumu": "var",
           "kitapta": [
             {
@@ -170,7 +170,7 @@
         },
         {
           "her_senaryoda": false,
-          "kisa_ad": "Dolaşım Sistemini Oluşturan Yapı ve Organlar",
+          "kisa_ad": "Dolaşım sistemini oluşturan yapı ve organların görevlerini model üzerinde bilimsel olarak gözlemleyebilme",
           "kitap_durumu": "var",
           "kitapta": [
             {
@@ -198,7 +198,7 @@
         },
         {
           "her_senaryoda": false,
-          "kisa_ad": "Kan Bağışının Toplum Açısından Önemi",
+          "kisa_ad": "Kan bağışının toplumsal dayanışma açısından önemini tartışabilme",
           "kitap_durumu": "var",
           "kitapta": [
             {
@@ -226,7 +226,7 @@
         },
         {
           "her_senaryoda": false,
-          "kisa_ad": "Solunum Sistemini Oluşturan Yapı ve Organlar",
+          "kisa_ad": "Solunum sistemini oluşturan yapı ve organların görevlerini model üzerinde bilimsel olarak gözlemleyebilme",
           "kitap_durumu": "var",
           "kitapta": [
             {

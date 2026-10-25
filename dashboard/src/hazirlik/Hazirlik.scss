@@ -102,6 +102,9 @@
   gap: spacing.$spacing-06;
 }
 
+// Bildirimler tablonun sütunuyla aynı genişlikte (Carbon 46 rem'de keser; portal bildirimleriyle aynı desen).
+.hazirlik-ders .cds--inline-notification { max-inline-size: none; }
+
 .hazirlik-ders__baslik {
   @include type.type-style('heading-04');
   border-inline-start: spacing.$spacing-02 solid var(--ted-subject-accent);
@@ -118,6 +121,8 @@
 }
 
 .hazirlik-ders__tablo { overflow-x: auto; }
+
+.hazirlik-ders .kilavuz-matris__her { margin-block-start: spacing.$spacing-02; }
 
 .hazirlik-ders__eylemler {
   display: flex;
