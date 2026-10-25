@@ -14,6 +14,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from src.course_names import normalize_course
+from src.sinav_kaynaklari import on_suzgec
 from src.sinav_senaryo import DERS_ANAHTARLARI, _gun, donem_no, konu_eslestir, ogretim_yili_adi
 from src.sinav_tarihi import katla
 
@@ -304,7 +305,11 @@ def _metinler(deger) -> list[str]:
 
 
 def okulda(haftalar: dict, ders: str, terimler: list[str]) -> list[dict]:
-    """Konunun adı o dersin haftalık kartlarında geçtiği haftalar (spec §4.4 "okulda işlendiği hafta")."""
+    """Konunun adının o dersin haftalık ders kartında geçtiği haftalar (spec §4.4). Alanın anlamı "ders kartında
+    geçtiği hafta"dır, "işlendiği hafta" değil: "Haftaya … konusuna başlayacağız" gibi ileriye dönük bir kart da
+    kendi haftasını döndürür (bunu ayıran basit, yanlış pozitifsiz bir kural yok; yüzeyler "işlendi" demez). Sınav
+    sözcüğü taşıyan kart (`sinav_kaynaklari.on_suzgec`: sınav duyurusu, quiz, yazılı…) hiç sayılmaz — duyurudaki konu
+    listesi konunun o hafta anlatıldığını göstermez."""
     if not terimler or not isinstance(haftalar, dict):
         return []
     out = []
@@ -313,9 +318,8 @@ def okulda(haftalar: dict, ders: str, terimler: list[str]) -> list[dict]:
         for ad, icerik in dersler.items():
             if normalize_course(str(ad)) != ders or not isinstance(icerik, dict):
                 continue
-            metin = katla(" ".join(_metinler(icerik.get("cards")) + _metinler(icerik.get("items"))
-                                   + [str(icerik.get("text") or "")]))
-            if any(t in metin for t in terimler):
+            kartlar = _metinler(icerik.get("cards")) + _metinler(icerik.get("items")) + [str(icerik.get("text") or "")]
+            if any(any(t in katla(k) for t in terimler) for k in kartlar if k and not on_suzgec(k)):
                 out.append({"hafta": etiket})
                 break
     return out
@@ -392,12 +396,15 @@ def _dogrulama(kayit: dict | None, dt: dict) -> dict | None:
             "duyurunun_saymadigi": [d["kod"] for d in blok.get("dagilim") or [] if kesin and not d.get("duyuruda")]}
 
 
-def _ebeveyn(bloklar: list[dict], ozet: dict) -> dict:
+def _ebeveyn(bloklar: list[dict], ozet: dict, isaretler: dict, sahip: str | None) -> dict:
+    """Ebeveyn özeti (D16): sayımlar öğrencinin ham işaretlerindendir ve ekrandaki `isaret` seçeneğinden bağımsızdır;
+    işaretlerin sahibi kapsamda yazılıdır."""
     kapsam = [b for b in bloklar if b["senaryoda"]]
+    ham = [isaretler.get(b["kod"]) if isaretler.get(b["kod"]) in ISARETLER else None for b in kapsam]
     return {"cikti_sayisi": len(kapsam), "toplam_soru": ozet["toplam_soru"], "soru_araligi": ozet["soru_araligi"],
-            "hazirim": sum(b["isaret"] == "hazirim" for b in kapsam), "tekrar": sum(b["isaret"] == "tekrar" for b in kapsam),
-            "isaretsiz": sum(b["isaret"] is None for b in kapsam),
-            "en_agir": [b["kod"] for b in sorted(kapsam, key=lambda b: (-_agirlik(b), _kod_sirasi(b["kod"])))[:3]]}
+            "hazirim": ham.count("hazirim"), "tekrar": ham.count("tekrar"), "isaretsiz": ham.count(None),
+            "en_agir": [b["kod"] for b in sorted(kapsam, key=lambda b: (-_agirlik(b), _kod_sirasi(b["kod"])))[:3]],
+            "isaret_sahibi": sahip}
 
 
 def _kaynaklar(tablo: dict, dt: dict, harita: dict | None, ders: str) -> list[dict]:
@@ -466,7 +473,8 @@ def kilavuz(g: Girdiler, anahtar: str, no: int, senaryo: int | None, secenekler:
         kip = "kesin" if senaryo is not None and senaryo == duyurulan else "olasi"
     isaret_acik = bool(secenekler.get("isaret", True))
     ham_isaretler = g.isaretler.get(anahtar) if isinstance(g.isaretler, dict) else None
-    isaretler = ham_isaretler if isaret_acik and isinstance(ham_isaretler, dict) else {}
+    ogrenci_isaretleri = ham_isaretler if isinstance(ham_isaretler, dict) else {}
+    isaretler = ogrenci_isaretleri if isaret_acik else {}
     dagilim = sinav["senaryolar"][str(senaryo)] if senaryo is not None else None
     bloklar: list[dict] = []
     blok_listesi: list[list[dict]] = []
@@ -502,7 +510,7 @@ def kilavuz(g: Girdiler, anahtar: str, no: int, senaryo: int | None, secenekler:
         "uniteler": uniteler,
         "dogrulama": _dogrulama(_sinav_kaydi(g, ders, no), dt),
         "plan": calisma_plani(bloklar, g.bugun, tarih) if oz["durum"]["tur"] != "gecti" else None,
-        "ebeveyn": _ebeveyn(bloklar, ozet) if secenekler.get("ebeveyn") else None,
+        "ebeveyn": _ebeveyn(bloklar, ozet, ogrenci_isaretleri, g.isaret_sahibi) if secenekler.get("ebeveyn") else None,
         "kaynaklar": _kaynaklar(g.tablo, dt, harita, ders), "damgalar": _damgalar(g, harita),
         "guncellik": oz["guncellik"], "kitap_bolumleri": oz["kitap_bolumleri"], "harita_onayli": oz["harita_onayli"],
         "yz": {"durum": "kapali"},

@@ -133,7 +133,8 @@ def test_ebeveyn_ozeti_ve_isaret_secenegi():
     g = girdiler(isaretler={"fen-bilimleri": {"FB.7.2.1": "tekrar", "FB.7.1.1": "hazirim"}})
     m = sk.kilavuz(g, "fen-bilimleri", 1, None, {"ebeveyn": True, "isaret": True})
     assert m["ebeveyn"] == {"cikti_sayisi": 4, "toplam_soru": 7, "soru_araligi": None, "hazirim": 1, "tekrar": 1,
-                            "isaretsiz": 2, "en_agir": ["FB.7.2.1", "FB.7.1.1", "FB.7.1.3"]}
+                            "isaretsiz": 2, "en_agir": ["FB.7.2.1", "FB.7.1.1", "FB.7.1.3"],
+                            "isaret_sahibi": None}
     assert _bloklar(m)["FB.7.2.1"]["isaret"] == "tekrar"
     kapali = sk.kilavuz(g, "fen-bilimleri", 1, None, {"ebeveyn": False, "isaret": False})
     assert kapali["ebeveyn"] is None and all(b["isaret"] is None for b in _bloklar(kapali).values())
@@ -295,3 +296,48 @@ def test_model_json_uyumlu_ve_degismez_girdiyi_bozmaz():
     m = sk.kilavuz(g, "fen-bilimleri", 1, None, SEC)
     json.dumps(m)
     assert json.dumps(g.haritalar, sort_keys=True) == once
+
+
+# ── Düzeltme turu 1 ────────────────────────────────────────────────────────────────────────────────────────────
+
+def _okulda(haftalar):
+    m = sk.kilavuz(girdiler(haftalar=haftalar), "fen-bilimleri", 1, None, SEC)
+    return {k: [x["hafta"] for x in b["okulda"]] for k, b in _bloklar(m).items()}
+
+
+def test_okulda_sinav_duyurusu_karti_hafta_sayilmaz():
+    """Sınav sözcüğü taşıyan kart (sinav_kaynaklari.on_suzgec) "kartında geçtiği hafta" değildir: duyuru kartı atlanır."""
+    duyuru = "3 Kasım yazılı sınav konuları: Uzay teknolojileri, Fiziksel anlamda iş, Enerji dönüşümleri"
+    haftalar = {"3. Hafta 28 Eyl. - 04 Eki.": {"Fen Bilimleri": {"cards": [duyuru]}},
+                "4. Hafta 05 Eki. - 11 Eki.": {"Fen Bilimleri": {"cards": ["Fiziksel anlamda iş konusunu işledik."]}}}
+    o = _okulda(haftalar)
+    assert o["FB.7.2.1"] == ["4. Hafta 05 Eki. - 11 Eki."] and o["FB.7.1.1"] == []
+
+
+def test_okulda_ayni_haftada_duyuru_ve_ders_karti_ders_kartini_sayar():
+    haftalar = {"4. Hafta 05 Eki. - 11 Eki.": {"Fen Bilimleri": {
+        "cards": ["Quiz var: Fiziksel anlamda iş", "Uzay teknolojileri sunumları"]}}}
+    o = _okulda(haftalar)
+    assert o["FB.7.2.1"] == [] and o["FB.7.1.1"] == ["4. Hafta 05 Eki. - 11 Eki."]
+
+
+def test_okulda_ileriye_donuk_kart_kartin_gectigi_hafta_olarak_kalir():
+    """Karar: "haftaya … başlayacağız" için süzgeç yok (basit, yanlış pozitifsiz kural yok); alan "ders kartında
+    geçtiği hafta"dır, "işlendi" demez. Kartın kendi haftası döner."""
+    haftalar = {"4. Hafta 05 Eki. - 11 Eki.": {"Fen Bilimleri": {"cards": ["Haftaya Fiziksel Anlamda İş konusuna başlayacağız."]}}}
+    assert _okulda(haftalar)["FB.7.2.1"] == ["4. Hafta 05 Eki. - 11 Eki."]
+
+
+def test_okulda_alani_kartta_gectigi_hafta_diye_belgelenmis():
+    assert "kartında geçtiği" in sk.okulda.__doc__
+
+
+def test_ebeveyn_ozeti_isaret_secenegi_kapaliyken_ogrenci_isaretlerini_sayar():
+    """D16: ebeveyn sayımları ham öğrenci işaretlerinden; `isaret` seçeneğinden bağımsız. Sahip kapsamda yazılı."""
+    g = girdiler(isaretler={"fen-bilimleri": {"FB.7.2.1": "tekrar", "FB.7.1.1": "hazirim"}}, isaret_sahibi="Öğrenci")
+    m = sk.kilavuz(g, "fen-bilimleri", 1, None, {"ebeveyn": True, "isaret": False})
+    e = m["ebeveyn"]
+    assert (e["hazirim"], e["tekrar"], e["isaretsiz"], e["isaret_sahibi"]) == (1, 1, 2, "Öğrenci")
+    assert all(b["isaret"] is None for b in _bloklar(m).values()) and m["isaret_sahibi"] is None
+    acik = sk.kilavuz(g, "fen-bilimleri", 1, None, {"ebeveyn": True, "isaret": True})["ebeveyn"]
+    assert acik == e
