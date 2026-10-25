@@ -58,3 +58,174 @@ def test_iki_satira_bolunen_girdi_birlesir():
 def test_bozuk_icindekiler_reddedilir(metin, ileti):
     with pytest.raises(mkh.YapiHatasi, match=ileti):
         mkh.icindekiler_ayristir(metin)
+
+
+import hashlib  # noqa: E402
+import json  # noqa: E402
+from datetime import date  # noqa: E402
+
+from src.sinav_senaryo import tablo_oku  # noqa: E402
+
+DUZEN = (FIKSTUR / "fen7_1_duzen.xml").read_text(encoding="utf-8")
+FEN_DUZENI = mkh.KITAPLAR["fen-bilimleri"]["kitaplar"][0]["duzen"]
+FEN_CIKTILARI = tablo_oku()["dersler"]["Fen Bilimleri"]["ciktilar"]
+
+
+def test_basliklar_etiket_amac_tanim_ve_gurultu():
+    adaylar = [(a["pdf_sayfa"], a["tur"], a["metin"], a["amac"]) for a in mkh.basliklari_ayristir(DUZEN, FEN_DUZENI)]
+    assert adaylar == [
+        (24, "diger", "B- Yer Tabanlı Teleskoplar", None),
+        (24, "etkinlik", "Performans Görevi: Uzay Gözlem Araçları Modeli",
+         "Uzay gözlem araçları ile ilgili bilimsel model oluşturma"),
+        (24, "baglanti", "Bağlantı Noktası", None),
+        (25, "kontrol", "Kontrol Noktası", None),
+        (25, "diger", "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki", None),
+        (60, "baglanti", "Bağlantı Noktası", None),
+        (61, "diger", "Fiziksel Anlamda İş", None),
+        (61, "etkinlik", "Etkinlik Noktası-1", "Fiziksel anlamda yapılan işin niteliklerini tanımlama"),
+        (61, "etkinlik", "Etkinlik Noktası-2", "Fiziksel anlamda iş yapma durumuna göre günlük yaşam örneklerini değerlendirme"),
+        (63, "baglanti", "Bağlantı Noktası", None),
+        (64, "kontrol", "Kontrol Noktası", None),
+        (65, "diger", "Enerji ve Enerji Çeşitleri", None),
+        (66, "etkinlik", "Etkinlik Noktası-3", "Kinetik ve potansiyel enerjiyi karşılaştırma"),
+        (69, "tanim", "Potansiyel Enerji", None),
+        (69, "tanim", "Çekim Potansiyel Enerjisi", None),
+        (69, "tanim", "Esneklik Potansiyel Enerjisi", None),
+        (69, "kontrol", "Kontrol Noktası", None),
+        (70, "etkinlik", "Etkinlik Noktası-4", "Enerji çeşitlerinden kinetik ve potansiyel enerjiyi karşılaştırma"),
+        (71, "ozet", "Neler Öğrendik?", None),
+    ]
+
+
+def test_atla_listesi_basligi_dusurur():
+    duzen = {**FEN_DUZENI, "atla": ("B- Yer Tabanlı Teleskoplar",)}
+    assert "B- Yer Tabanlı Teleskoplar" not in [a["metin"] for a in mkh.basliklari_ayristir(DUZEN, duzen)]
+
+
+def test_basliklar_konu_sinirina_gore_yerlesir_ve_konu_bitisi_uzar():
+    uniteler = mkh.icindekiler_ayristir(ICINDEKILER)
+    mkh.basliklari_yerlestir(uniteler, mkh.basliklari_ayristir(DUZEN, FEN_DUZENI), 1)
+    uzay = uniteler[0]["cerceveler"][0]["konular"]
+    assert [(b["tur"], b["ad"], b["sayfa"]) for b in uzay[0]["basliklar"]] == [
+        ("diger", "B- Yer Tabanlı Teleskoplar", 23), ("etkinlik", "Performans Görevi: Uzay Gözlem Araçları Modeli", 23),
+        ("baglanti", "Bağlantı Noktası", 23), ("kontrol", "Kontrol Noktası", 24)]
+    assert uzay[0]["son_sayfa"] == 24          # İçindekiler 23 der; son blok s. 24'ün üstüne taşar
+    assert uzay[1]["basliklar"] == []          # konunun kendi başlığı listeye girmez
+    kuvvet = uniteler[1]["cerceveler"][0]
+    assert [(b["tur"], b["ad"], b["sayfa"]) for b in kuvvet["basliklar"]] == [("baglanti", "Bağlantı Noktası", 59)]
+    assert [(b["ad"], b["sayfa"]) for b in kuvvet["konular"][0]["basliklar"]] == [
+        ("Etkinlik Noktası-1", 60), ("Etkinlik Noktası-2", 60), ("Bağlantı Noktası", 62), ("Kontrol Noktası", 63)]
+    assert kuvvet["konular"][0]["basliklar"][0]["amac"] == "Fiziksel anlamda yapılan işin niteliklerini tanımlama"
+    assert [(b["tur"], b["ad"], b["sayfa"]) for b in kuvvet["konular"][1]["basliklar"]] == [
+        ("etkinlik", "Etkinlik Noktası-3", 65), ("tanim", "Potansiyel Enerji", 68),
+        ("tanim", "Çekim Potansiyel Enerjisi", 68), ("tanim", "Esneklik Potansiyel Enerjisi", 68),
+        ("kontrol", "Kontrol Noktası", 68), ("etkinlik", "Etkinlik Noktası-4", 69), ("ozet", "Neler Öğrendik?", 70)]
+
+
+def test_cikti_eslemesi_cerceve_adindan_ve_konu_benzerliginden():
+    uniteler = mkh.icindekiler_ayristir(ICINDEKILER)
+    eslesme, eslesmedi = mkh.ciktilari_esle(uniteler, FEN_CIKTILARI, 0)
+    assert eslesmedi == []
+    konular = {kod: [e["konu"] for e in yollar] for kod, yollar in eslesme.items()}
+    assert konular["FB.7.1.1"] == ["Uzay Teknolojileri", "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki"]
+    assert konular["FB.7.1.3"] == ["Teknoloji ile Uzay Araştırmaları Arasındaki İlişki"]
+    assert konular["FB.7.2.1"] == ["Fiziksel Anlamda İş"]
+    assert konular["FB.7.2.2"] == ["Enerji ve Enerji Çeşitleri"]
+    assert konular["FB.7.3.4"] == ["Kan Bağışının Toplum Açısından Önemi"]
+    assert eslesme["FB.7.2.1"] == [{"kitap": 0, "unite": 2, "cerceve": 1, "konu": "Fiziksel Anlamda İş"}]
+    assert uniteler[1]["cerceveler"][0]["ciktilar"] == ["FB.7.2.1", "FB.7.2.2"]
+
+
+def test_konu_adi_cercevede_yoksa_eslesmedi_ve_denetim_reddeder():
+    """Review Focus: kitapta karşılığı bulunamayan çıktı açıkça eslesmedi'ye yazılır; beklenmiyorsa harita yazılmaz."""
+    uniteler = mkh.icindekiler_ayristir(ICINDEKILER)
+    ciktilar = [dict(c, konu="Olmayan Çerçeve") if c["kod"] == "FB.7.1.3" else c for c in FEN_CIKTILARI]
+    eslesme, eslesmedi = mkh.ciktilari_esle(uniteler, ciktilar, 0)
+    assert eslesmedi == ["FB.7.1.3"] and "FB.7.1.3" not in eslesme
+    harita = {"kitaplar": [], "eslesme": eslesme, "eslesmedi": eslesmedi}
+    assert mkh.yapi_denetimi(harita, ciktilar) == ["beklenmeyen eşleşmeyen çıktı: FB.7.1.3"]
+    assert mkh.yapi_denetimi(harita, ciktilar, beklenen_eslesmeyen=("FB.7.1.3",)) == []
+
+
+def _mini_harita(**konu_degisikligi):
+    konu = {"ad": "Konu A", "sayfa": 10, "son_sayfa": 12,
+            "basliklar": [{"ad": "Kontrol Noktası", "tur": "kontrol", "amac": None, "sayfa": 11}], **konu_degisikligi}
+    return {"kitaplar": [{"toplam_sayfa": 100, "sayfa_kaymasi": 1, "uniteler": [{"no": 1, "ad": "Ü", "sayfa": 9, "son_sayfa": 20,
+            "cerceveler": [{"no": 1, "ad": "Ç", "sayfa": 9, "son_sayfa": 20, "ciktilar": ["X.7.1.1"], "basliklar": [],
+                            "konular": [konu]}]}]}],
+            "eslesme": {"X.7.1.1": [{"kitap": 0, "unite": 1, "cerceve": 1, "konu": "Konu A"}]}, "eslesmedi": []}
+
+
+def test_yapi_denetimi_sayfa_baslik_ve_eksik_cikti():
+    ciktilar = [{"kod": "X.7.1.1"}]
+    assert mkh.yapi_denetimi(_mini_harita(), ciktilar) == []
+    assert mkh.yapi_denetimi(_mini_harita(basliklar=[]), ciktilar) == ["konunun başlığı yok: Konu A"]
+    assert mkh.yapi_denetimi(_mini_harita(basliklar=[]), ciktilar, basliksiz_konular=("Konu A",)) == []
+    assert mkh.yapi_denetimi(_mini_harita(son_sayfa=30), ciktilar) == ["konu çerçevenin dışında: Konu A"]
+    assert mkh.yapi_denetimi(_mini_harita(), [{"kod": "X.7.1.1"}, {"kod": "X.7.1.2"}]) == ["çıktı haritada yok: X.7.1.2"]
+    yarim = {**_mini_harita(), "eslesme": {}, "eslesmedi": ["X.7.1.1"]}
+    assert mkh.yapi_denetimi(yarim, ciktilar, beklenen_eslesmeyen=("X.7.1.1",)) == [
+        "çıktıların yarısından çoğu eşleşmedi (1/1)"]
+
+
+MINI_ICINDEKILER = ("İçindekiler\n1. Ünite      Deneme Ünitesi\nÖn Değerlendirme ........ 9\n1. Çerçeve Bir ......... 10\n"
+                    "Konu Bir Anlama ........ 11\nÜnite Sonu Değerlendirme ....... 15\nSözlük ...... 16\n")
+MINI_DUZEN = ('<?xml version="1.0" encoding="UTF-8"?>\n<pdf2xml>\n<page number="12" position="absolute" top="0" left="0" '
+              'height="1169" width="829">\n<fontspec id="3" size="20" family="IUJFYC+Arial" color="#ffffff"/>\n'
+              '<text top="80" left="119" width="200" height="26" font="3"><b>Konu Bir Anlama</b></text>\n'
+              '<text top="400" left="119" width="140" height="26" font="3"><b>Kontrol Noktası</b></text>\n</page>\n</pdf2xml>\n')
+
+
+@pytest.fixture
+def deneme_kitabi(monkeypatch):
+    ayar = {"ders": "Deneme", "beklenen_eslesmeyen": (), "basliksiz_konular": (), "kitaplar": [{
+        "baslik": "Deneme 7", "pdf_url": "https://ornek.invalid/d.pdf", "kaynak_sayfa": None, "baski": "2026-2027",
+        "sayfa_kaymasi": 1, "icindekiler_pdf_sayfalari": (8, 8), "duzen": {**FEN_DUZENI, "atla": ()}}]}
+    monkeypatch.setitem(mkh.KITAPLAR, "deneme", ayar)
+    monkeypatch.setattr(mkh, "tablo_oku", lambda: {
+        "kaynak": {"meb_guncelleme": "2026-09-10T17:27"},
+        "dersler": {"Deneme": {"sha256": "ab" * 32, "ciktilar": [
+            {"kod": "D.7.1.1", "metin": "Konu bir anlama", "alan": None, "konu": "Çerçeve Bir"}]}}})
+    return ayar
+
+
+def test_main_haritayi_yazar_ve_onayi_kaydeder(deneme_kitabi, monkeypatch, tmp_path):
+    monkeypatch.setattr(mkh, "pdf_girdisi", lambda yol, kitap: {
+        "sha256": "f" * 64, "toplam_sayfa": 30, "icindekiler": MINI_ICINDEKILER, "xml": MINI_DUZEN})
+    cikti = tmp_path / "deneme.json"
+    assert mkh.main(["deneme", "--pdf", "1=/yok.pdf", "--cikti", str(cikti), "--denetim-kim", "Test"]) == 0
+    h = json.loads(cikti.read_text(encoding="utf-8"))
+    assert h["surum"] == 1 and h["anahtar"] == "deneme" and h["ders"] == "Deneme"
+    assert h["denetim"] == {"kim": "Test", "tarih": date.today().isoformat()}
+    assert h["senaryo_tablosu"] == {"meb_guncelleme": "2026-09-10T17:27", "ders_sha256": "ab" * 32}
+    assert h["eslesme"] == {"D.7.1.1": [{"kitap": 0, "unite": 1, "cerceve": 1, "konu": "Konu Bir Anlama"}]}
+    kitap = h["kitaplar"][0]
+    assert (kitap["sha256"], kitap["toplam_sayfa"], kitap["sayfa_kaymasi"]) == ("f" * 64, 30, 1)
+    konu = kitap["uniteler"][0]["cerceveler"][0]["konular"][0]
+    assert konu["basliklar"] == [{"ad": "Kontrol Noktası", "tur": "kontrol", "amac": None, "sayfa": 11}]
+
+
+def test_main_yapi_denetiminde_yazmaz(deneme_kitabi, monkeypatch, tmp_path, capsys):
+    bos_duzen = MINI_DUZEN.replace("Kontrol Noktası", "Haber")
+    monkeypatch.setattr(mkh, "pdf_girdisi", lambda yol, kitap: {
+        "sha256": "f" * 64, "toplam_sayfa": 30, "icindekiler": MINI_ICINDEKILER, "xml": bos_duzen})
+    cikti = tmp_path / "deneme.json"
+    assert mkh.main(["deneme", "--pdf", "1=/yok.pdf", "--cikti", str(cikti)]) == 1
+    assert not cikti.exists()
+    assert "konunun başlığı yok: Konu Bir Anlama" in capsys.readouterr().err
+
+
+def test_denetle_sha256_degisimini_yazar(tmp_path, capsys):
+    """Review Focus (K12): MEB kitabı sessizce değişirse denetim dosyası yeni sha256'yı taşır."""
+    pdf = tmp_path / "k.pdf"
+    pdf.write_bytes(b"%PDF yeni baski")
+    harita = tmp_path / "h.json"
+    harita.write_text(json.dumps({"kitaplar": [{"baslik": "Fen 7", "pdf_url": "https://ornek.invalid/fen.pdf",
+                                                "sha256": "0" * 64}]}), encoding="utf-8")
+    denetim = tmp_path / "out" / "kitap_denetimi.json"
+    assert mkh.denetle("fen-bilimleri", [pdf], harita, denetim) == 0
+    kayit = json.loads(denetim.read_text(encoding="utf-8"))["fen-bilimleri"]
+    assert kayit["kitaplar"] == [{"pdf_url": "https://ornek.invalid/fen.pdf",
+                                  "sha256": hashlib.sha256(b"%PDF yeni baski").hexdigest()}]
+    assert kayit["denetlendi"] == date.today().isoformat()
+    assert "değişti: Fen 7" in capsys.readouterr().out
