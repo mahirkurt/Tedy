@@ -25,6 +25,17 @@ _DONEM_SINAV = re.compile(r"(?<![\d.])([12])\s*\.\s*([12])(?![\d.])")
 _SINAV_NO = re.compile(r"\b([12])\s*\.\s*(?:ortak\s+)?(?:yazili|sinav)")
 _SOZCUK_NO = re.compile(r"\b(birinci|ikinci)\s+(?:ortak\s+)?(?:yazili|sinav)")
 _DONEM = re.compile(r"\b([12])\s*\.?\s*donem")
+# Kaynak alıntısında sınav numarası (uygulama kararı 2026-10-25): cümle dönemi, sıra sayısıyla sınav numarasını ve
+# "yazılı"/"sınav" sözcüğünü birlikte, kısa arayla söylemeli ("1.Dönem 1. Fen yazılınız", "1. dönem 2. yazılı",
+# "1. Dönem 1. Ortak Yazılı Sınav"). Arada en çok dört sözcük (ders adı, "ortak") olabilir; senaryo, hafta gibi
+# kendi numarasını taşıyan bir sözcük araya giremez ("1. dönem 2. senaryoya göre yazılı" 2. yazılı değildir).
+# Sınav numarası noktalı sıra sayısı ya da sözcüktür: "1. dönem 2 yazılı" bir adettir.
+_SIRA_12 = {"1": 1, "2": 2, "birinci": 1, "ikinci": 2}
+_ARA_YASAK = r"(?:senaryo|hafta|unite|tema|konu|soru|gun|sinif|kisim|bolum|ders\b|donem)"
+_ALINTI_NO = re.compile(
+    r"(?<![\d.])(?:([12])\s*\.?|\b(birinci|ikinci))\s*donem\w*[\s,]+"
+    r"(?:([12])\s*\.|(birinci|ikinci)\b)\s*"
+    rf"(?:(?!{_ARA_YASAK})[^\W\d_]+\s+){{0,4}}?(?:ortak\s+)?(?:yazili|sinav)")
 _SIRA = {"birinci": 1, "ikinci": 2, "ucuncu": 3, "dorduncu": 4, "besinci": 5, "altinci": 6,
          "yedinci": 7, "sekizinci": 8, "dokuzuncu": 9, "onuncu": 10}
 # "senaryo"dan önce yalnız noktalı sıra sayısı sayılır ("4. senaryo", "3., 4. senaryolar"); "6 senaryo" bir
@@ -97,6 +108,24 @@ def _baslik_coz(baslik: str) -> tuple[int | None, int | None]:
     return (int(d.group(1)) if d else None), no
 
 
+def _alinti_coz(kaynaklar: Any) -> tuple[int | None, int | None]:
+    """Kaydın kaynak alıntılarından (dönem, sınav no). Yalnız dönemi, sınav numarasını ve "yazılı"/"sınav"
+    sözcüğünü tek cümlede birlikte söyleyen alıntı sayılır (_ALINTI_NO). Alıntılar farklı (dönem, no) söylüyorsa
+    ya da hiçbiri söylemiyorsa (None, None): çelişkide kaçırmak güvenli yön. `kaynaklar` sözlük listesi değilse
+    (metin olarak saklanmış eski kayıt) okunmaz — pano da yalnız listeyi okur."""
+    if not isinstance(kaynaklar, list):
+        return None, None
+    bulunan: set[tuple[int, int]] = set()
+    for x in kaynaklar:
+        alinti = x.get("alinti") if isinstance(x, dict) else None
+        if not isinstance(alinti, str):
+            continue
+        for cumle in _cumleler(alinti):
+            for m in _ALINTI_NO.finditer(katla(cumle)):
+                bulunan.add((_SIRA_12[m.group(1) or m.group(2)], _SIRA_12[m.group(3) or m.group(4)]))
+    return next(iter(bulunan)) if len(bulunan) == 1 else (None, None)
+
+
 def sutun_coz(kayit: dict, tablo: dict, bugun: date) -> tuple[str, int] | None:
     if kayit.get("tur") in HARIC_TURLER or kayit.get("sentetik"):
         return None
@@ -104,12 +133,17 @@ def sutun_coz(kayit: dict, tablo: dict, bugun: date) -> tuple[str, int] | None:
     if ders not in tablo["dersler"]:
         return None
     # Önce kaydın temiz başlığı, sonra takvim sınavının ham başlığı (temiz başlık "Ortak", "N. Yazılı" gibi
-    # sözcükleri düşürebilir); numara okunan ilk başlık kazanır. Kaynak alıntılarından numara okunmaz.
+    # sözcükleri düşürebilir); numara okunan ilk başlık kazanır. Başlıklar numara vermezse kaydın kaynak
+    # alıntıları okunur (uygulama kararı 2026-10-25), ama yalnız dönemi, sınav numarasını ve "yazılı"/"sınav"
+    # sözcüğünü birlikte söyleyen cümle sayılır; yalın "2. senaryo" ya da "2. sınav" numara vermez, alıntılar
+    # farklı numara söylüyorsa numara yoktur. Başlık numarası her zaman önce gelir.
     donem = no = None
     for baslik in (kayit.get("baslik"), (kayit.get("taban") or {}).get("rawTitle")):
         donem, no = _baslik_coz(baslik or "")
         if no is not None:
             break
+    if no is None:
+        donem, no = _alinti_coz(kayit.get("kaynaklar"))
     if no is None:
         return None
     k = tablo["kaynak"]

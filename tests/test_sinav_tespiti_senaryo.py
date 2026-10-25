@@ -118,3 +118,21 @@ def test_ozet_hatalari_cikarim_hatasini_senaryo_notlarina_gommez():
     assert ozet_hatalari(tablo_okundu=False, senaryo_hatalari=[], cikarim_hatalari=["x"]) == [
         "senaryo tablosu okunamadı", "x"]
     assert ozet_hatalari(tablo_okundu=True, senaryo_hatalari=senaryo[:1], cikarim_hatalari=[]) == senaryo[:1]
+
+
+def test_alintidan_sinav_no_tespitte_blok_yazar():
+    # Canlı 0e885076d71c: başlık "Fen Bilimleri Yazılı" (numarasız), takvim tabanı yok; "1.Dönem 1. Fen yazılınız"
+    # yalnız ders kartı alıntısında. Uygulama kararı 2026-10-25: numara alıntıdan okunur.
+    alinti = ("1.Dönem 1. Fen yazılınız 3 Kasım 2026 tarihinde İstanbul İl MEB tarafından belirlenen "
+              "2. senaryoya göre uygulanacaktır.")
+    aday = Aday("Sevgili öğrenciler,\n" + alinti + "\nKonular: uzay araştırmaları.", "Fen Bilimleri",
+                date(2026, 10, 19), "ders_karti",
+                [{"bolum": "ders_icerikleri_haftalar", "hafta": "6. Hafta", "ders": "Fen Bilimleri", "sira": 0}])
+    b = Bulgu("Fen Bilimleri", "yazili", "Fen Bilimleri Yazılı", date(2026, 11, 3), None, None,
+              ["Uzay araştırmaları için geliştirilen teknolojiler",
+               "Uzay araştırmalarının yol açabileceği problemler",
+               "Yıldız, galaksi ve evren kavramları"], alinti, aday)
+    kayit = birlestir([], [b], None, SIMDI, senaryolar=TABLO)[0]
+    assert kayit["baslik"] == "Fen Bilimleri Yazılı" and kayit["taban"] is None
+    s = kayit["senaryo"]
+    assert (s["durum"], s["sinav_no"], s["senaryo"], s["toplam"]) == ("dogrulandi", 1, 2, 7)
