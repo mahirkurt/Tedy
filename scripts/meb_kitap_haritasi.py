@@ -42,7 +42,9 @@ _SAYI = re.compile(r"^\d+$")
 # Ders başına ayar. Ölçüldü (2026-10-25, Fen 7-1): pdftohtml'de başlık size 20 (Arial, beyaz bant), gövde 17, içerik
 # çerçevesi adı Anton; başlıklar sol 107–124 px'te, gövde 119 px'te; kalın tanım başlığı gövde boyunda ve ":" ile biter.
 # "atla": onayda gürültü bulunan başlıklar (s. 49 kavram haritası kutusundaki "Bulutsu", s. 25'teki altı "… Alanında"
-# şekil etiketi — başlık boyunda ve sarı, +1 punto toleransıyla girer).
+# şekil etiketi — başlık boyunda ve sarı, +1 punto toleransıyla girer; s. 123 ve s. 135'te konunun kendi başlığı
+# İçindekiler'den farklı yazılmış — "Solunum Sistemi Sağlığı" / "Boşaltım Sistemi Sağlığı" —, konu adı İçindekiler'den
+# gelir ve sayfadaki yazımı konunun altında yinelenen bir başlık olurdu).
 KITAPLAR: dict[str, dict] = {
     "fen-bilimleri": {
         "ders": "Fen Bilimleri",
@@ -58,7 +60,8 @@ KITAPLAR: dict[str, dict] = {
             "duzen": {"baslik_boyu": 20, "govde_boyu": 17, "cerceve_ailesi": "Anton", "baslik_sol_en_cok": 130,
                       "govde_sol": 119, "tanim": True,
                       "atla": ("Bulutsu", "Sağlık Alanında", "Enerji Alanında", "İletişim Alanında", "Gıda Alanında",
-                               "Ulaşım Alanında", "Endüstri Alanında")},
+                               "Ulaşım Alanında", "Endüstri Alanında", "Solunum Sistemi Sağlığı",
+                               "Boşaltım Sistemi Sağlığı")},
         }],
     },
 }
@@ -151,6 +154,18 @@ def basliklari_ayristir(xml: str, duzen: dict) -> list[dict]:
     buyuk = [o for o in ogeler if 0 <= o["boy"] - duzen["baslik_boyu"] <= 1 and o["genislik"] > 0
              and duzen["cerceve_ailesi"] not in o["aile"]]
     kullanildi: set[int] = set()
+    # Ön geçiş: etiketin adı iki satıra bölünebilir (ölçüldü, basılı s. 127: "Performans Görevi" üst 146; adın satırları
+    # üst 128 ve 151, sol 362 ve 429). Etiketin sağında, üstü en çok 30 px uzaktaki başlık boyu parçalar etiketindir; satır
+    # gezintisinde ayrı (ve sol eşiğine takılan) bir aday olmasınlar diye burada kullanıldı sayılır.
+    ad_parcalari: dict[int, list[dict]] = {}          # id(etiket öğesi) → adının parçaları
+    for i, o in enumerate(buyuk):
+        if i in kullanildi or _etiket_turu(katla(o["metin"])) is None:
+            continue
+        sag = o["sol"] + o["genislik"]
+        js = [j for j, p in enumerate(buyuk) if j != i and j not in kullanildi and p["sayfa"] == o["sayfa"]
+              and abs(p["ust"] - o["ust"]) <= 30 and p["sol"] >= sag and _etiket_turu(katla(p["metin"])) is None]
+        kullanildi.update(js)
+        ad_parcalari[id(o)] = [buyuk[j] for j in js]
     adaylar = []
     for i, o in enumerate(buyuk):
         if i in kullanildi:
@@ -168,11 +183,13 @@ def basliklari_ayristir(xml: str, duzen: dict) -> list[dict]:
             if metin.endswith(":"):
                 continue          # liste girişi ("… hususlar şunlardır:"), başlık değil
         else:
-            ek = " ".join(p["metin"] for p in parcalar[1:])
+            ad = sorted([*parcalar[1:], *ad_parcalari.get(id(ilk), [])], key=lambda p: (p["ust"], p["sol"]))
+            ek = " ".join(p["metin"] for p in ad)
             metin = f"{ilk['metin']}: {ek}" if ek else ilk["metin"]
         if katla(metin) in atla:
             continue
-        adaylar.append({"pdf_sayfa": ilk["sayfa"], "ust": min(p["ust"] for p in parcalar), "metin": metin, "tur": tur,
+        ust = min(p["ust"] for p in [*parcalar, *ad_parcalari.get(id(ilk), [])])   # bloğun tepesi, adın üst satırı dahil
+        adaylar.append({"pdf_sayfa": ilk["sayfa"], "ust": ust, "metin": metin, "tur": tur,
                         "amac": _amac(ogeler, ilk) if tur == "etkinlik" else None})
     if duzen.get("tanim"):
         for o in ogeler:

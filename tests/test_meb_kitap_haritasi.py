@@ -298,3 +298,21 @@ def test_yapi_denetimi_amacsiz_etkinlik_ve_performans_gorevini_bildirir_kesfi_bi
     harita["kitaplar"][0]["uniteler"][0]["cerceveler"][0]["basliklar"] = [
         {"ad": "Etkinlik Noktası-3", "tur": "etkinlik", "amac": None, "sayfa": 10}]
     assert mkh.yapi_denetimi(harita, ciktilar) == ["konunun başlığı yok: Konu A", "etkinliğin amacı yok: Etkinlik Noktası-3 s. 10"]
+
+
+def test_etiketin_iki_satira_bolunmus_adi_birlesir():
+    """PDF s. 128 (basılı 127): "Performans Görevi" (üst 146, sol 119) adının ilk satırı etiketin 18 px üstünde
+    ("Solunum Sisteminin Sağlığı İçin", sol 362), ikinci satırı 5 px altında ("Neler Yapabiliriz?", sol 429). Ad kitaptaki
+    satır sırasıyla birleşir; üst satır sol eşiğine takılıp düşmez, ayrı başlık da olmaz (K1)."""
+    xml = _sayfa_xml(
+        '<text top="128" left="362" width="301" height="26" font="6"><b>Solunum Sisteminin Sağlığı İçin</b></text>',
+        '<text top="146" left="119" width="176" height="26" font="6"><b>Performans Görevi</b></text>',
+        '<text top="151" left="429" width="162" height="26" font="6"><b>Neler Yapabiliriz?</b></text>',
+        '<text top="186" left="120" width="55" height="23" font="2"><b>Amaç:</b></text>',
+        '<text top="186" left="180" width="400" height="22" font="3">Solunum sisteminin sağlığını korumak için '
+        'farkındalık oluşturma</text>',
+        '<text top="400" left="119" width="153" height="26" font="6"><b>Bağlantı Noktası</b></text>')
+    assert [(a["tur"], a["metin"], a["amac"]) for a in mkh.basliklari_ayristir(xml, FEN_DUZENI)] == [
+        ("etkinlik", "Performans Görevi: Solunum Sisteminin Sağlığı İçin Neler Yapabiliriz?",
+         "Solunum sisteminin sağlığını korumak için farkındalık oluşturma"),
+        ("baglanti", "Bağlantı Noktası", None)]

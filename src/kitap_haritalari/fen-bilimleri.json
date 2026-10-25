@@ -1,0 +1,955 @@
+{
+  "surum": 1,
+  "ders": "Fen Bilimleri",
+  "anahtar": "fen-bilimleri",
+  "uretildi": "2026-10-25",
+  "senaryo_tablosu": {
+    "meb_guncelleme": "2026-09-10T17:27",
+    "ders_sha256": "c1ec40327eb8712d005553ec3e8510c438712b1c0d051f96956a637970b0bb7a"
+  },
+  "kitaplar": [
+    {
+      "baslik": "Fen Bilimleri 7 (1. Kitap)",
+      "pdf_url": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf",
+      "kaynak_sayfa": null,
+      "sha256": "559b4501c9c90e074344b85fbf116ebc6607fb68a7b628e6af409e50db0a68d2",
+      "baski": "2026-2027",
+      "sayfa_kaymasi": 1,
+      "toplam_sayfa": 153,
+      "uniteler": [
+        {
+          "no": 1,
+          "ad": "Uzay Çağı",
+          "sayfa": 14,
+          "son_sayfa": 57,
+          "cerceveler": [
+            {
+              "no": 1,
+              "ad": "Türkiye ve Uzay Araştırmaları",
+              "sayfa": 15,
+              "son_sayfa": 33,
+              "ciktilar": [
+                "FB.7.1.1",
+                "FB.7.1.2",
+                "FB.7.1.3"
+              ],
+              "basliklar": [
+                {
+                  "ad": "Bağlantı Noktası",
+                  "tur": "baglanti",
+                  "amac": null,
+                  "sayfa": 15
+                }
+              ],
+              "konular": [
+                {
+                  "ad": "Uzay Teknolojileri",
+                  "sayfa": 16,
+                  "son_sayfa": 24,
+                  "basliklar": [
+                    {
+                      "ad": "Keşif Noktası: Uzay Teknolojileri",
+                      "tur": "etkinlik",
+                      "amac": null,
+                      "sayfa": 17
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "tur": "kontrol",
+                      "amac": null,
+                      "sayfa": 19
+                    },
+                    {
+                      "ad": "Türkiye’nin Yapay Uyduları",
+                      "tur": "diger",
+                      "amac": null,
+                      "sayfa": 20
+                    },
+                    {
+                      "ad": "Teleskop Çeşitleri",
+                      "tur": "diger",
+                      "amac": null,
+                      "sayfa": 22
+                    },
+                    {
+                      "ad": "A- Uzay Teleskopları",
+                      "tur": "diger",
+                      "amac": null,
+                      "sayfa": 22
+                    },
+                    {
+                      "ad": "B- Yer Tabanlı Teleskoplar",
+                      "tur": "diger",
+                      "amac": null,
+                      "sayfa": 23
+                    },
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "tur": "baglanti",
+                      "amac": null,
+                      "sayfa": 23
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "tur": "kontrol",
+                      "amac": null,
+                      "sayfa": 24
+                    }
+                  ]
+                },
+                {
+                  "ad": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
+                  "sayfa": 24,
+                  "son_sayfa": 33,
+                  "basliklar": [
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "tur": "baglanti",
+                      "amac": null,
+                      "sayfa": 25
+                    },
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "tur": "baglanti",
+                      "amac": null,
+                      "sayfa": 26
+                    },
+                    {
+                      "ad": "Astronomi (Gök bilimi)",
+                      "tur": "tanim",
+                      "amac": null,
+                      "sayfa": 26
+                    },
+                    {
+                      "ad": "Astronom (Gök bilimci)",
+                      "tur": "tanim",
+                      "amac": null,
+                      "sayfa": 26
+                    },
+                    {
+                      "ad": "Astronot",
+                      "tur": "tanim",
+                      "amac": null,
+                      "sayfa": 26
+                    },
+                    {
+                      "ad": "Performans Görevi: Uzay Gözlem Araçları Modeli",
+                      "tur": "etkinlik",
+                      "amac": "Uzay gözlem araçları ile ilgili bilimsel model oluşturma",
+                      "sayfa": 29
+                    },
+                    {
+                      "ad": "Uzay Kirliliği",
+                      "tur": "diger",
+                      "amac": null,
+                      "sayfa": 30
+                    },
+                    {
+                      "ad": "Performans Görevi: Uzayda Neler Oluyor?",
+                      "tur": "etkinlik",
+                      "amac": "Uzay araştırmalarının yol açabileceği problemlerin çözümüne yönelik rapor oluşturma",
+                      "sayfa": 31
+                    },
+                    {
+                      "ad": "Neler Öğrendik?",
+                      "tur": "ozet",
+                      "amac": null,
+                      "sayfa": 33
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "no": 2,
+              "ad": "Uzayda Neler Var?",
+              "sayfa": 34,
+              "son_sayfa": 49,
+              "ciktilar": [
+                "FB.7.1.4",
+                "FB.7.1.5"
+              ],
+              "basliklar": [
+                {
+                  "ad": "Bağlantı Noktası",
+                  "tur": "baglanti",
+                  "amac": null,
+                  "sayfa": 34
+                }
+              ],
+              "konular": [
+                {
+                  "ad": "Yıldız Oluşumu",
+                  "sayfa": 35,
+                  "son_sayfa": 49,
+                  "basliklar": [
+                    {
+                      "ad": "Keşif Noktası: Yıldızların Oluşumunu Araştıralım",
+                      "tur": "etkinlik",
+                      "amac": null,
+                      "sayfa": 35
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-1",
+                      "tur": "etkinlik",
+                      "amac": "Yıldızların yaşam sürecine ilişkin kavramlar arasındaki ilişkileri açıklama",
+                      "sayfa": 36
+                    },
+                    {
+                      "ad": "Performans Görevi: Yıldızların Yaşam Süreci Posterim",
+                      "tur": "etkinlik",
+                      "amac": "Yıldızların yaşam süreci ve bu süreçteki kavramlar arasında ilişki kurma",
+                      "sayfa": 37
+                    },
+                    {
+                      "ad": "Takımyıldızlar",
+                      "tur": "diger",
+                      "amac": null,
+                      "sayfa": 43
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-2",
+                      "tur": "etkinlik",
+                      "amac": "Yıldız, galaksi ve evren kavramlarını açıklayarak yapılandırma",
+                      "sayfa": 46
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "tur": "kontrol",
+                      "amac": null,
+                      "sayfa": 47
+                    },
+                    {
+                      "ad": "Galaksiler",
+                      "tur": "diger",
+                      "amac": null,
+                      "sayfa": 48
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "tur": "kontrol",
+                      "amac": null,
+                      "sayfa": 48
+                    },
+                    {
+                      "ad": "Neler Öğrendik?",
+                      "tur": "ozet",
+                      "amac": null,
+                      "sayfa": 49
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 2,
+          "ad": "Kuvvet ve Enerjiyi Keşfedelim",
+          "sayfa": 58,
+          "son_sayfa": 87,
+          "cerceveler": [
+            {
+              "no": 1,
+              "ad": "Kuvvet, İş ve Enerji İlişkisi",
+              "sayfa": 59,
+              "son_sayfa": 70,
+              "ciktilar": [
+                "FB.7.2.1",
+                "FB.7.2.2"
+              ],
+              "basliklar": [
+                {
+                  "ad": "Bağlantı Noktası",
+                  "tur": "baglanti",
+                  "amac": null,
+                  "sayfa": 59
+                }
+              ],
+              "konular": [
+                {
+                  "ad": "Fiziksel Anlamda İş",
+                  "sayfa": 60,
+                  "son_sayfa": 63,
+                  "basliklar": [
+                    {
+                      "ad": "Etkinlik Noktası-1",
+                      "tur": "etkinlik",
+                      "amac": "Fiziksel anlamda yapılan işin niteliklerini tanımlama",
+                      "sayfa": 60
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-2",
+                      "tur": "etkinlik",
+                      "amac": "Fiziksel anlamda iş yapma durumuna göre günlük yaşam örneklerini değerlendirme",
+                      "sayfa": 60
+                    },
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "tur": "baglanti",
+                      "amac": null,
+                      "sayfa": 62
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "tur": "kontrol",
+                      "amac": null,
+                      "sayfa": 63
+                    }
+                  ]
+                },
+                {
+                  "ad": "Enerji ve Enerji Çeşitleri",
+                  "sayfa": 64,
+                  "son_sayfa": 70,
+                  "basliklar": [
+                    {
+                      "ad": "Etkinlik Noktası-3",
+                      "tur": "etkinlik",
+                      "amac": "Kinetik ve potansiyel enerjiyi karşılaştırma",
+                      "sayfa": 65
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "tur": "kontrol",
+                      "amac": null,
+                      "sayfa": 67
+                    },
+                    {
+                      "ad": "Potansiyel Enerji",
+                      "tur": "tanim",
+                      "amac": null,
+                      "sayfa": 68
+                    },
+                    {
+                      "ad": "Çekim Potansiyel Enerjisi",
+                      "tur": "tanim",
+                      "amac": null,
+                      "sayfa": 68
+                    },
+                    {
+                      "ad": "Esneklik Potansiyel Enerjisi",
+                      "tur": "tanim",
+                      "amac": null,
+                      "sayfa": 68
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "tur": "kontrol",
+                      "amac": null,
+                      "sayfa": 68
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-4",
+                      "tur": "etkinlik",
+                      "amac": "Enerji çeşitlerinden kinetik ve potansiyel enerjiyi karşılaştırma",
+                      "sayfa": 69
+                    },
+                    {
+                      "ad": "Neler Öğrendik?",
+                      "tur": "ozet",
+                      "amac": null,
+                      "sayfa": 70
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "no": 2,
+              "ad": "Enerji Dönüşümleri",
+              "sayfa": 71,
+              "son_sayfa": 79,
+              "ciktilar": [
+                "FB.7.2.3"
+              ],
+              "basliklar": [],
+              "konular": [
+                {
+                  "ad": "Enerjinin Korunumu",
+                  "sayfa": 72,
+                  "son_sayfa": 79,
+                  "basliklar": [
+                    {
+                      "ad": "Etkinlik Noktası-5",
+                      "tur": "etkinlik",
+                      "amac": "Enerji dönüşümünden hareketle enerjinin korunduğuna dair akıl yürütme",
+                      "sayfa": 72
+                    },
+                    {
+                      "ad": "Performans Görevi: Enerji Dönüşümleri Diyagramım",
+                      "tur": "etkinlik",
+                      "amac": "Enerji dönüşümlerini balık kılçığı diyagramıyla özetleme",
+                      "sayfa": 76
+                    },
+                    {
+                      "ad": "Neler Öğrendik?",
+                      "tur": "ozet",
+                      "amac": null,
+                      "sayfa": 78
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "no": 3,
+          "ad": "Vücudumuzdaki Sistemler",
+          "sayfa": 88,
+          "son_sayfa": 148,
+          "cerceveler": [
+            {
+              "no": 1,
+              "ad": "Sindirim Sistemi",
+              "sayfa": 89,
+              "son_sayfa": 100,
+              "ciktilar": [
+                "FB.7.3.1",
+                "FB.7.3.2"
+              ],
+              "basliklar": [
+                {
+                  "ad": "Bağlantı Noktası",
+                  "tur": "baglanti",
+                  "amac": null,
+                  "sayfa": 89
+                }
+              ],
+              "konular": [
+                {
+                  "ad": "Sindirim Sistemini Oluşturan Yapı ve Organlar",
+                  "sayfa": 90,
+                  "son_sayfa": 95,
+                  "basliklar": [
+                    {
+                      "ad": "Etkinlik Noktası-1",
+                      "tur": "etkinlik",
+                      "amac": "Sindirim sistemini oluşturan yapı ve organların niteliklerini tanımlama",
+                      "sayfa": 90
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-2",
+                      "tur": "etkinlik",
+                      "amac": "Sindirim sistemini oluşturan yapı ve organların görevlerini gözlemleme",
+                      "sayfa": 91
+                    },
+                    {
+                      "ad": "Fiziksel (Mekanik) Sindirim",
+                      "tur": "diger",
+                      "amac": null,
+                      "sayfa": 92
+                    },
+                    {
+                      "ad": "Kimyasal Sindirim",
+                      "tur": "diger",
+                      "amac": null,
+                      "sayfa": 92
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "tur": "kontrol",
+                      "amac": null,
+                      "sayfa": 93
+                    },
+                    {
+                      "ad": "Performans Görevi: Sindirim Sistemini Tanıyalım",
+                      "tur": "etkinlik",
+                      "amac": "Sindirim sistemini oluşturan yapı ve organların görevlerine ait verileri açıklama",
+                      "sayfa": 94
+                    },
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "tur": "baglanti",
+                      "amac": null,
+                      "sayfa": 94
+                    }
+                  ]
+                },
+                {
+                  "ad": "Sindirim Sisteminin Sağlığı",
+                  "sayfa": 96,
+                  "son_sayfa": 100,
+                  "basliklar": [
+                    {
+                      "ad": "Etkinlik Noktası-3",
+                      "tur": "etkinlik",
+                      "amac": "Sindirim sisteminin sağlığı konusunda farkındalık kazanma",
+                      "sayfa": 96
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-4",
+                      "tur": "etkinlik",
+                      "amac": "Yeme alışkanlıklarını gözlemleme ve sağlıklı beslenme konusunda farkındalık geliştirme",
+                      "sayfa": 97
+                    },
+                    {
+                      "ad": "Performans Görevi: Sindirim Sisteminin Sağlığını Koruyalım",
+                      "tur": "etkinlik",
+                      "amac": "Sindirim sisteminin sağlığını korumak için alınması gereken önlemler konusunda bilgi toplama",
+                      "sayfa": 98
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "tur": "kontrol",
+                      "amac": null,
+                      "sayfa": 98
+                    },
+                    {
+                      "ad": "Neler Öğrendik?",
+                      "tur": "ozet",
+                      "amac": null,
+                      "sayfa": 100
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "no": 2,
+              "ad": "Dolaşım Sistemi",
+              "sayfa": 101,
+              "son_sayfa": 116,
+              "ciktilar": [
+                "FB.7.3.3",
+                "FB.7.3.4",
+                "FB.7.3.5"
+              ],
+              "basliklar": [
+                {
+                  "ad": "Bağlantı Noktası",
+                  "tur": "baglanti",
+                  "amac": null,
+                  "sayfa": 101
+                }
+              ],
+              "konular": [
+                {
+                  "ad": "Dolaşım Sistemini Oluşturan Yapı ve Organlar",
+                  "sayfa": 102,
+                  "son_sayfa": 109,
+                  "basliklar": [
+                    {
+                      "ad": "Etkinlik Noktası-5",
+                      "tur": "etkinlik",
+                      "amac": "Dolaşım sistemini oluşturan yapı ve organların niteliklerini tanımlama",
+                      "sayfa": 102
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-6",
+                      "tur": "etkinlik",
+                      "amac": "Dolaşım sistemini oluşturan yapı ve organların görevlerini model, maket, poster vb. üzerinde gözlemleme",
+                      "sayfa": 103
+                    },
+                    {
+                      "ad": "Kanın Yapısı ve Görevleri",
+                      "tur": "diger",
+                      "amac": null,
+                      "sayfa": 107
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-7",
+                      "tur": "etkinlik",
+                      "amac": "Dolaşım sistemini oluşturan yapı ve organlar ile büyük ve küçük kan dolaşımını açıklama",
+                      "sayfa": 108
+                    },
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "tur": "baglanti",
+                      "amac": null,
+                      "sayfa": 109
+                    }
+                  ]
+                },
+                {
+                  "ad": "Kan Bağışının Toplum Açısından Önemi",
+                  "sayfa": 109,
+                  "son_sayfa": 112,
+                  "basliklar": [
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "tur": "baglanti",
+                      "amac": null,
+                      "sayfa": 109
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-8",
+                      "tur": "etkinlik",
+                      "amac": "Kan bağışının toplumsal dayanışma açısından önemini tartışma",
+                      "sayfa": 110
+                    },
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "tur": "baglanti",
+                      "amac": null,
+                      "sayfa": 112
+                    },
+                    {
+                      "ad": "Performans Görevi: Gönüllü Bağışçılar İş Başında",
+                      "tur": "etkinlik",
+                      "amac": "Kan ve organ bağışı konusunda farkındalık oluşturma",
+                      "sayfa": 112
+                    }
+                  ]
+                },
+                {
+                  "ad": "Dolaşım Sisteminin Sağlığı",
+                  "sayfa": 113,
+                  "son_sayfa": 116,
+                  "basliklar": [
+                    {
+                      "ad": "Etkinlik Noktası-9",
+                      "tur": "etkinlik",
+                      "amac": "Dolaşım sistemi sağlığı konusunda farkındalık kazanma",
+                      "sayfa": 113
+                    },
+                    {
+                      "ad": "Performans Görevi: Dolaşım Sisteminin Sağlığını Koruyalım",
+                      "tur": "etkinlik",
+                      "amac": "Dolaşım sisteminin sağlığı için yapılması gerekenlerle ilgili bilgi toplama",
+                      "sayfa": 114
+                    },
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "tur": "baglanti",
+                      "amac": null,
+                      "sayfa": 115
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-10",
+                      "tur": "etkinlik",
+                      "amac": "Dolaşım sisteminin sağlığı konusunda farkındalık kazanma",
+                      "sayfa": 115
+                    },
+                    {
+                      "ad": "Neler Öğrendik?",
+                      "tur": "ozet",
+                      "amac": null,
+                      "sayfa": 116
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "no": 3,
+              "ad": "Solunum Sistemi",
+              "sayfa": 117,
+              "son_sayfa": 128,
+              "ciktilar": [
+                "FB.7.3.6"
+              ],
+              "basliklar": [
+                {
+                  "ad": "Bağlantı Noktası",
+                  "tur": "baglanti",
+                  "amac": null,
+                  "sayfa": 117
+                }
+              ],
+              "konular": [
+                {
+                  "ad": "Solunum Sistemini Oluşturan Yapı ve Organlar",
+                  "sayfa": 118,
+                  "son_sayfa": 122,
+                  "basliklar": [
+                    {
+                      "ad": "Etkinlik Noktası-11",
+                      "tur": "etkinlik",
+                      "amac": "Solunum sistemini oluşturan yapı ve organları model, maket, poster vb. üzerinde gözlemleme",
+                      "sayfa": 118
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-12",
+                      "tur": "etkinlik",
+                      "amac": "Solunum sistemini oluşturan yapı ve organların görevlerini analoji kurarak açıklama",
+                      "sayfa": 119
+                    },
+                    {
+                      "ad": "Performans Görevi: Solunum Sistemi Maketi Yapalım",
+                      "tur": "etkinlik",
+                      "amac": "Solunum sistemini oluşturan yapı ve organları gözlemleme",
+                      "sayfa": 120
+                    },
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "tur": "baglanti",
+                      "amac": null,
+                      "sayfa": 122
+                    }
+                  ]
+                },
+                {
+                  "ad": "Solunum Sisteminin Sağlığı",
+                  "sayfa": 123,
+                  "son_sayfa": 128,
+                  "basliklar": [
+                    {
+                      "ad": "Etkinlik Noktası-13",
+                      "tur": "etkinlik",
+                      "amac": "Solunum sisteminin sağlığı konusunda farkındalık kazanma",
+                      "sayfa": 123
+                    },
+                    {
+                      "ad": "Performans Görevi: Solunum Sisteminin Sağlığını Koruyalım",
+                      "tur": "etkinlik",
+                      "amac": "Solunum sisteminin sağlığı için yapılması gerekenler konusunda bilgi toplama",
+                      "sayfa": 124
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-14",
+                      "tur": "etkinlik",
+                      "amac": "Solunum sisteminin sağlığı konusunda farkındalık kazanma",
+                      "sayfa": 125
+                    },
+                    {
+                      "ad": "Bağımlılığın İnsan Sağlığına Etkisi",
+                      "tur": "diger",
+                      "amac": null,
+                      "sayfa": 125
+                    },
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "tur": "baglanti",
+                      "amac": null,
+                      "sayfa": 126
+                    },
+                    {
+                      "ad": "Performans Görevi: Solunum Sisteminin Sağlığı İçin Neler Yapabiliriz?",
+                      "tur": "etkinlik",
+                      "amac": "Solunum sisteminin sağlığını korumak için farkındalık oluşturma",
+                      "sayfa": 127
+                    },
+                    {
+                      "ad": "Neler Öğrendik?",
+                      "tur": "ozet",
+                      "amac": null,
+                      "sayfa": 128
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "no": 4,
+              "ad": "Boşaltım Sistemi",
+              "sayfa": 129,
+              "son_sayfa": 139,
+              "ciktilar": [],
+              "basliklar": [
+                {
+                  "ad": "Bağlantı Noktası",
+                  "tur": "baglanti",
+                  "amac": null,
+                  "sayfa": 129
+                }
+              ],
+              "konular": [
+                {
+                  "ad": "Boşaltım Sistemini Oluşturan Yapı ve Organlar",
+                  "sayfa": 130,
+                  "son_sayfa": 134,
+                  "basliklar": [
+                    {
+                      "ad": "Etkinlik Noktası-15",
+                      "tur": "etkinlik",
+                      "amac": "Boşaltım sistemini oluşturan yapı ve organları model üzerinde gözlemleme",
+                      "sayfa": 130
+                    },
+                    {
+                      "ad": "Performans Görevi: Boşaltım Sistemi Modeli Yapalım",
+                      "tur": "etkinlik",
+                      "amac": "Boşaltım sistemini oluşturan yapı ve organların görevlerini açıklama",
+                      "sayfa": 133
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "tur": "kontrol",
+                      "amac": null,
+                      "sayfa": 134
+                    },
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "tur": "baglanti",
+                      "amac": null,
+                      "sayfa": 134
+                    }
+                  ]
+                },
+                {
+                  "ad": "Boşaltım Sisteminin Sağlığı",
+                  "sayfa": 135,
+                  "son_sayfa": 139,
+                  "basliklar": [
+                    {
+                      "ad": "Etkinlik Noktası-16",
+                      "tur": "etkinlik",
+                      "amac": "Boşaltım sisteminin sağlığı konusunda farkındalık kazanma",
+                      "sayfa": 135
+                    },
+                    {
+                      "ad": "Performans Görevi: Boşaltım Sisteminin Sağlığını Koruyalım",
+                      "tur": "etkinlik",
+                      "amac": "Boşaltım sisteminin sağlığı için yapılması gerekenler konusunda bilgi toplama",
+                      "sayfa": 136
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-17",
+                      "tur": "etkinlik",
+                      "amac": "Boşaltım sisteminin sağlığı konusunda farkındalık kazanma",
+                      "sayfa": 138
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "tur": "kontrol",
+                      "amac": null,
+                      "sayfa": 138
+                    },
+                    {
+                      "ad": "Neler Öğrendik?",
+                      "tur": "ozet",
+                      "amac": null,
+                      "sayfa": 139
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "eslesme": {
+    "FB.7.1.1": [
+      {
+        "kitap": 0,
+        "unite": 1,
+        "cerceve": 1,
+        "konu": "Uzay Teknolojileri"
+      },
+      {
+        "kitap": 0,
+        "unite": 1,
+        "cerceve": 1,
+        "konu": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki"
+      }
+    ],
+    "FB.7.1.2": [
+      {
+        "kitap": 0,
+        "unite": 1,
+        "cerceve": 1,
+        "konu": "Uzay Teknolojileri"
+      },
+      {
+        "kitap": 0,
+        "unite": 1,
+        "cerceve": 1,
+        "konu": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki"
+      }
+    ],
+    "FB.7.1.3": [
+      {
+        "kitap": 0,
+        "unite": 1,
+        "cerceve": 1,
+        "konu": "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki"
+      }
+    ],
+    "FB.7.1.4": [
+      {
+        "kitap": 0,
+        "unite": 1,
+        "cerceve": 2,
+        "konu": "Yıldız Oluşumu"
+      }
+    ],
+    "FB.7.1.5": [
+      {
+        "kitap": 0,
+        "unite": 1,
+        "cerceve": 2,
+        "konu": "Yıldız Oluşumu"
+      }
+    ],
+    "FB.7.2.1": [
+      {
+        "kitap": 0,
+        "unite": 2,
+        "cerceve": 1,
+        "konu": "Fiziksel Anlamda İş"
+      }
+    ],
+    "FB.7.2.2": [
+      {
+        "kitap": 0,
+        "unite": 2,
+        "cerceve": 1,
+        "konu": "Enerji ve Enerji Çeşitleri"
+      }
+    ],
+    "FB.7.2.3": [
+      {
+        "kitap": 0,
+        "unite": 2,
+        "cerceve": 2,
+        "konu": "Enerjinin Korunumu"
+      }
+    ],
+    "FB.7.3.1": [
+      {
+        "kitap": 0,
+        "unite": 3,
+        "cerceve": 1,
+        "konu": "Sindirim Sistemini Oluşturan Yapı ve Organlar"
+      }
+    ],
+    "FB.7.3.2": [
+      {
+        "kitap": 0,
+        "unite": 3,
+        "cerceve": 1,
+        "konu": "Sindirim Sisteminin Sağlığı"
+      }
+    ],
+    "FB.7.3.3": [
+      {
+        "kitap": 0,
+        "unite": 3,
+        "cerceve": 2,
+        "konu": "Dolaşım Sistemini Oluşturan Yapı ve Organlar"
+      }
+    ],
+    "FB.7.3.4": [
+      {
+        "kitap": 0,
+        "unite": 3,
+        "cerceve": 2,
+        "konu": "Kan Bağışının Toplum Açısından Önemi"
+      }
+    ],
+    "FB.7.3.5": [
+      {
+        "kitap": 0,
+        "unite": 3,
+        "cerceve": 2,
+        "konu": "Dolaşım Sisteminin Sağlığı"
+      }
+    ],
+    "FB.7.3.6": [
+      {
+        "kitap": 0,
+        "unite": 3,
+        "cerceve": 3,
+        "konu": "Solunum Sistemini Oluşturan Yapı ve Organlar"
+      }
+    ]
+  },
+  "eslesmedi": [],
+  "denetim": {
+    "kim": "Claude (asistan) — İçindekiler ve bölüm içi başlıklar Fen 7-1 PDF'iyle sayfa sayfa karşılaştırıldı",
+    "tarih": "2026-10-25"
+  }
+}
