@@ -21,6 +21,11 @@ CUMLE_SINIRI = 300
 ESIK = 0.6
 GOVDE_SINIRI = 3900
 
+# Sınav Hazırlığı yüzeylerinin ders anahtarı: pano adresi (/hazirlik/<anahtar>) ve kitap haritası dosya adı
+# (src/kitap_haritalari/<anahtar>.json). Sıra yüzeylerdeki ders sırasıdır (spec 2026-10-25 §2.2, §3.1).
+DERS_ANAHTARLARI = {"Türkçe": "turkce", "Matematik": "matematik", "Fen Bilimleri": "fen-bilimleri",
+                    "Sosyal Bilgiler": "sosyal-bilgiler", "İngilizce": "ingilizce", "Din Kültürü": "din-kulturu"}
+
 _DONEM_SINAV = re.compile(r"(?<![\d.])([12])\s*\.\s*([12])(?![\d.])")
 _SINAV_NO = re.compile(r"\b([12])\s*\.\s*(?:ortak\s+)?(?:yazili|sinav)")
 _SOZCUK_NO = re.compile(r"\b(birinci|ikinci)\s+(?:ortak\s+)?(?:yazili|sinav)")
