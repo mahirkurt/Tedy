@@ -170,6 +170,30 @@ def test_kapi_bekcisi_kusurlu_basimi_dusurur(dist):
     assert all(g[2] == hp.DENETIM_SURESI for g in gorulen) and gorulen[2][1] is True
 
 
+@pytest.mark.parametrize("hata", [ValueError("qpdf çıktısı anlaşılmadı"), json.JSONDecodeError("beklenmedik", "{", 1)],
+                         ids=["ValueError", "JSONDecodeError"])
+def test_kapi_denetimi_ayristirma_hatasi_basim_hatasina_cevrilir_duz_yol_denenir(tmp_path, dist, monkeypatch, hata):
+    """qpdf/pdftohtml çıktısı ayrışmazsa (ValueError, JSONDecodeError dahil) 500 değil BasimHatasi: ana yol düşer,
+    düz yol denenir (ikisi de düşerse Uretilemedi -> 503)."""
+    def denetle(*a, duz, **k):
+        if not duz:
+            raise hata
+        return {}
+    monkeypatch.setattr(hp.pdf_kapilari, "denetle", denetle)
+    monkeypatch.setattr(hp.pdf_kapilari, "model_basliklari", lambda m: ([], []))
+    monkeypatch.setattr(hp.pdf_kapilari, "kapak_sayfasi", lambda m: None)
+    monkeypatch.setattr(hp.pdf_kapilari, "kusurlar", lambda rapor, **k: [])
+    with pytest.raises(hp.BasimHatasi, match="denetlenemedi"):
+        hp.denetimli_basim(MODEL, SORGU, duz=False, sure=40, dist=dist, basim=lambda *a, **k: b"%PDF-x")
+    cagrilar = []
+
+    def basim(model, sorgu, *, duz, sure, dist):
+        cagrilar.append(duz)
+        return hp.denetimli_basim(model, sorgu, duz=duz, sure=sure, dist=dist, basim=lambda *a, **k: b"%PDF-x")
+    assert hp.pdf_getir(MODEL, SORGU, dizin=tmp_path / "a", dist=dist, calistir=basim).read_bytes() == b"%PDF-x"
+    assert cagrilar == [False, True]
+
+
 def test_basima_kalan_sure_denetimi_dusulmus_butcedir(dist):
     sureler = []
 

@@ -203,7 +203,9 @@ def denetimli_basim(model: dict, sorgu: dict, *, duz: bool, sure: float, dist: P
     veri = basim(model, sorgu, duz=duz, sure=sure - DENETIM_SURESI, dist=dist)
     try:
         kusur = denetci(veri, model, duz=duz, sure=DENETIM_SURESI)
-    except pdf_kapilari.DenetimHatasi as h:
+    except (pdf_kapilari.DenetimHatasi, ValueError) as h:
+        # ValueError (JSONDecodeError dahil): qpdf/pdftohtml çıktısı ayrışmadı — ölçülemeyen geçer sayılmaz ve
+        # 500 olmaz; BasimHatasi ana yolu düşürür, düz yol denenir.
         raise BasimHatasi(f"kapılar: denetlenemedi ({h})") from None
     if kusur:
         raise BasimHatasi("kapılar: " + "; ".join(kusur))
