@@ -383,6 +383,11 @@ p.kilavuz-isaret {
   padding-inline-end: 0;
 }
 
+// Kâğıtta "Kitapta" kutusu gri katmandır (taslak A): beyaz temada --cds-layer-01 = gray-10. Ekranda blok layer-01,
+// kutu layer-02; kâğıtta blok zeminsiz olduğundan kutu bir katman aşağı iner. Metin siyah kalır, siyah-beyazda okunur.
+.kilavuz-belge--baski .kilavuz-blok__etiket,
+.kilavuz-belge--baski .kilavuz-blok > .kilavuz-blok__etiket + * { background-color: var(--cds-layer-01); }
+
 .kilavuz-belge--baski .kilavuz-blok > .kilavuz-blok__soru {
   justify-content: flex-start;
   margin-block-start: spacing.$spacing-03;

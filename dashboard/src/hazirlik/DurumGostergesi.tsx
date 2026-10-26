@@ -1,6 +1,7 @@
 import { CheckmarkFilled, InformationFilled } from '@carbon/icons-react'
 import { durumEtiketi } from './hazirlik'
 import type { SinavDurumu } from './tipler'
+import './DurumGostergesi.scss'
 
 /** Kanun K4, talimatname §5.7: ikon + metin (+ renk). Yeşil kesin, mavi olası; ülke geneli ve geçti eylem istemez,
  *  düz gri metin. Tag değil: Tag'in mavisi derslere ayrılmış (§4.4.2). Metin durumu söylediği için ikon gizlidir. */

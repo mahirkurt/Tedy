@@ -1,0 +1,16 @@
+// Sınav durumu göstergesi (Kanun K4, talimatname §5.7): ikon + metin (+ renk). Bileşenle birlikte yüklenir — baskı
+// görünümü Hazirlik.scss'i yüklemez; kural orada kalınca kâğıtta ikon metne yapışıyor ve renksiz basılıyordu (ölçüldü).
+@use '@carbon/react/scss/spacing' as spacing;
+@use '@carbon/react/scss/type' as type;
+
+.hazirlik-durum {
+  display: inline-flex;
+  align-items: center;
+  gap: spacing.$spacing-02;
+  @include type.type-style('label-01');
+}
+
+.hazirlik-durum__ikon { flex: none; }
+.hazirlik-durum--kesin .hazirlik-durum__ikon { fill: var(--cds-support-success); }
+.hazirlik-durum--olasi .hazirlik-durum__ikon { fill: var(--cds-support-info); }
+.hazirlik-durum--notr { color: var(--cds-text-secondary); }

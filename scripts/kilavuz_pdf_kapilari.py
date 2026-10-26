@@ -35,13 +35,18 @@ YOKLAMA_ICINDEKILER = ["Senaryo Karşılaştırması", "1. Ünite · Uzay Çağ�
                        "Kaynaklar"]
 
 
-def model_basliklari(model: dict) -> tuple[list[str], list[str]]:
-    """Kılavuz modelinden K1 başlıkları (ünite, çerçeve, konu, bölüm başlığı) ve İçindekiler girdileri (bölümler)."""
+def model_basliklari(model: dict) -> tuple[list[str], list]:
+    """Kılavuz modelinden K1 başlıkları (ünite, çerçeve, konu, bölüm başlığı) ve İçindekiler girdileri — panonun
+    `belge.bolumler(m)` listesinin aynısı, sırasıyla. Özet'in sayfasında görünen başlık "Kapsam Kılavuzu"dur."""
     basliklar: list[str] = []
-    icindekiler = ["Senaryo Karşılaştırması"]
+    icindekiler: list = [
+        *(["Ebeveyn Özeti"] if model.get("ebeveyn") else []), ("Özet", "Kapsam Kılavuzu"),
+        *(["Senaryo Karşılaştırması"] if (model.get("matris") or {}).get("senaryolar") else []),
+        *[u["baslik"] for u in model.get("uniteler", [])],
+        *(["Duyuru Doğrulaması"] if model.get("dogrulama") else []),
+        *(["Çalışma Planı"] if model.get("plan") else []), "Kaynaklar"]
     for u in model.get("uniteler", []):
         basliklar.append(u["baslik"])
-        icindekiler.append(u["baslik"])
         for c in u["cerceveler"]:
             if c.get("baslik"):
                 basliklar.append(c["baslik"])
@@ -52,8 +57,12 @@ def model_basliklari(model: dict) -> tuple[list[str], list[str]]:
                     if y.get("konu"):
                         basliklar.append(y["konu"])
                     basliklar += [h["ad"] for h in y.get("basliklar", [])]
-    icindekiler.append("Kaynaklar")
     return list(dict.fromkeys(basliklar)), icindekiler
+
+
+def kapak_sayfasi(model: dict) -> int:
+    """Üst bilgisi olmayan kapak: ebeveyn özeti başa tek sayfa gelirse 2, yoksa 1 (K5)."""
+    return 2 if model.get("ebeveyn") else 1
 
 
 def bas(dist: Path, cikti: Path, sorgu: str, model: Path | None, duz: bool) -> dict:
@@ -87,8 +96,11 @@ def main(argv: list[str] | None = None) -> int:
     g = a.parse_args(argv)
     g.cikti = g.cikti.resolve()          # basım dashboard/ içinde koşar; göreli yol oraya yazmasın
     g.cikti.mkdir(parents=True, exist_ok=True)
+    kapak = 1
     if g.model:
-        basliklar, icindekiler = model_basliklari(json.loads(g.model.read_text(encoding="utf-8")))
+        model = json.loads(g.model.read_text(encoding="utf-8"))
+        basliklar, icindekiler = model_basliklari(model)
+        kapak = kapak_sayfasi(model)
     else:
         basliklar, icindekiler = YOKLAMA_BASLIKLARI, YOKLAMA_ICINDEKILER
     yollar = {"paged": [False], "duz": [True], "ikisi": [False, True]}[g.yol]
@@ -104,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
             sonuc = 1
             continue
         try:
-            rapor = denetle(pdf, basliklar=basliklar, icindekiler=icindekiler, duz=duz)
+            rapor = denetle(pdf, basliklar=basliklar, icindekiler=icindekiler, duz=duz, kapak=kapak)
         except DenetimHatasi as e:
             print(f"| {ad} | 0 | {olcum['sure_sn']} | {olcum['bellek']} | – | – | denetlenemedi: {e} |")
             sonuc = 1

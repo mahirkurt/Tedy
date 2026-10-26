@@ -22,17 +22,6 @@
   margin-block-end: spacing.$spacing-04;
 }
 
-.hazirlik-durum {
-  display: inline-flex;
-  align-items: center;
-  gap: spacing.$spacing-02;
-  @include type.type-style('label-01');
-}
-
-.hazirlik-durum__ikon { flex: none; }
-.hazirlik-durum--kesin .hazirlik-durum__ikon { fill: var(--cds-support-success); }
-.hazirlik-durum--olasi .hazirlik-durum__ikon { fill: var(--cds-support-info); }
-.hazirlik-durum--notr { color: var(--cds-text-secondary); }
 
 .hazirlik-yaklasan {
   display: flex;

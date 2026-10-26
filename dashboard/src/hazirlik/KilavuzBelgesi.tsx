@@ -209,7 +209,8 @@ export default function KilavuzBelgesi({ model: m, kip, isaretler = {}, isaretle
           </>
         )}
         {kip === 'baski' && sahip && <p className="kilavuz-ozet__sahip">{`Hazırlık işaretlerinin sahibi: ${sahip}`}</p>}
-        <p className="kilavuz-damga">{damgaMetni(m)}</p>
+        {/* Kâğıtta damga her sayfanın alt bilgisindedir (K12); içerikte ikinci kez basılmaz. */}
+        {kip === 'ekran' && <p className="kilavuz-damga">{damgaMetni(m)}</p>}
       </section>
       {kip === 'baski' && (
         <nav id="bolum-icindekiler" className="kilavuz-icindekiler" aria-labelledby="baslik-icindekiler">

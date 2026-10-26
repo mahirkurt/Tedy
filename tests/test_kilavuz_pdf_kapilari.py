@@ -1,4 +1,5 @@
 """Kılavuz PDF kapı betiği (scripts/kilavuz_pdf_kapilari.py): basım ortamı, zaman aşımı, çıktı yolu."""
+import json
 import subprocess
 from pathlib import Path
 
@@ -39,3 +40,18 @@ def test_cikti_mutlak_yola_cevrilir(monkeypatch, tmp_path):
     assert kpk.main(["--dist", "d", "--cikti", "goreli/k", "--yol", "paged"]) == 1
     assert gorulen == [tmp_path / "goreli" / "k" / "paged.pdf"]
     assert Path(gorulen[0]).is_absolute()
+
+
+FIKSTUR = Path(__file__).resolve().parents[1] / "dashboard" / "tests" / "e2e" / "fixtures" / "hazirlik"
+
+
+def test_model_icindekiler_bolumlerle_ayni_yedi_girdi():
+    """İçindekiler kapısı `belge.bolumler(m)` ile aynı listeyi denetler; Özet'in sayfasında aranan "Kapsam Kılavuzu"."""
+    m = json.loads((FIKSTUR / "fen-bilimleri-1-kilavuz.json").read_text(encoding="utf-8"))
+    _, icindekiler = kpk.model_basliklari(m)
+    assert icindekiler == [("Özet", "Kapsam Kılavuzu"), "Senaryo Karşılaştırması", "1. Ünite · Uzay Çağı",
+                           "2. Ünite · Kuvvet ve Enerjiyi Keşfedelim", "Duyuru Doğrulaması", "Çalışma Planı",
+                           "Kaynaklar"]
+    e = json.loads((FIKSTUR / "fen-bilimleri-1-kilavuz-ebeveyn.json").read_text(encoding="utf-8"))
+    assert kpk.model_basliklari(e)[1][0] == "Ebeveyn Özeti"
+    assert kpk.kapak_sayfasi(e) == 2 and kpk.kapak_sayfasi(m) == 1

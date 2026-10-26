@@ -1,4 +1,6 @@
 """Kapsam kılavuzu PDF kapıları (Kanun K1, K3, K5, K10): araç çıktısı ayrıştırıcıları, PDF'siz fikstürlerle."""
+import json
+
 from src import pdf_kapilari as pk
 
 PDFFONTS = """name                                 type              encoding         emb sub uni object ID
@@ -120,7 +122,8 @@ def test_en_kucuk_punto_kullanilan_yazi_tiplerinden():
 
 def test_kusurlar_rapordan_okunur():
     temiz = {"sayfa": 4, "yazi_tipleri": ["IBMPlexSans"], "gomulu_degil": [], "yabanci_yazi_tipi": [], "etiketli": True,
-             "dil": "tr", "yer_imi": 3, "yetim": [], "icindekiler": [], "eksik_baslik": [], "en_kucuk_punto": 8}
+             "dil": "tr", "yer_imi": 3, "yetim": [], "icindekiler": [], "eksik_baslik": [], "en_kucuk_punto": 8,
+             "alt_bilgi": [], "ust_bilgi": []}
     assert pk.kusurlar(temiz) == []
     kirli = {**temiz, "gomulu_degil": ["DejaVuSans"], "yabanci_yazi_tipi": ["DejaVuSans"], "etiketli": False,
              "dil": None, "yer_imi": 0, "yetim": [(3, "1. Ünite")], "icindekiler": ["x"], "en_kucuk_punto": 7}
@@ -133,7 +136,8 @@ def test_kusurlar_rapordan_okunur():
 def test_kusurlar_olculemeyen_deger_gecer_sayilmaz():
     """Ölçülemeyen değer kusurdur (Görev 2 ertelemesi): boş pdffonts, okunamayan punto ya da 0 sayfa geçer sayılmaz."""
     temiz = {"sayfa": 4, "yazi_tipleri": ["IBMPlexSans"], "gomulu_degil": [], "yabanci_yazi_tipi": [], "etiketli": True,
-             "dil": "tr", "yer_imi": 3, "yetim": [], "icindekiler": [], "eksik_baslik": [], "en_kucuk_punto": 8}
+             "dil": "tr", "yer_imi": 3, "yetim": [], "icindekiler": [], "eksik_baslik": [], "en_kucuk_punto": 8,
+             "alt_bilgi": [], "ust_bilgi": []}
     assert pk.kusurlar({**temiz, "sayfa": 0, "yazi_tipleri": [], "en_kucuk_punto": None}) == [
         "sayfa sayısı okunamadı", "yazı tipi okunamadı", "en küçük punto ölçülemedi"]
 
@@ -169,3 +173,104 @@ def test_arac_zaman_asimi_anlamli_hata(monkeypatch):
         assert str(e) == "pdftohtml 120 s içinde bitmedi"
     else:
         raise AssertionError("DenetimHatasi bekleniyordu")
+
+
+def test_eksik_baslik_icindekiler_sayfasini_saymaz():
+    """Ünite başlığı İçindekiler'de geçer; gövdede yoksa yine eksiktir (İçindekiler sayfası aramaya girmez)."""
+    sayfalar = pk.sayfa_metinleri(SAYFALAR)
+    assert pk.eksik_basliklar(sayfalar, ["2. Ünite · Kuvvet ve Enerjiyi Keşfedelim"]) == [
+        "2. Ünite · Kuvvet ve Enerjiyi Keşfedelim"]
+    assert pk.eksik_basliklar(sayfalar, ["1. Ünite · Uzay Çağı"]) == []
+
+
+def test_icindekiler_girdisi_tam_satirla_ve_sayfadaki_karsiligiyla():
+    """"Özet" girdisi "Ebeveyn Özeti" satırıyla karışmaz; girdinin sayfada aranan metni ayrı verilebilir (Özet'in
+    sayfasında görünen başlık "Kapsam Kılavuzu"dur)."""
+    sayfalar = pk.sayfa_metinleri(
+        "Ebeveyn Özeti\nTEDY · d      s. 1/4\f"
+        "Kapsam Kılavuzu\nTEDY · d      s. 2/4\f"
+        "İçindekiler\nEbeveyn Özeti        1\nÖzet        2\nKaynaklar        4\nTEDY · d      s. 3/4\f"
+        "Kaynaklar\nTEDY · d      s. 4/4\f")
+    assert pk.icindekiler_hatalari(sayfalar, ["Ebeveyn Özeti", ("Özet", "Kapsam Kılavuzu"), "Kaynaklar"]) == []
+    assert pk.icindekiler_hatalari(sayfalar, ["Özet"]) == ["Özet: İçindekiler s. 2 diyor, başlık o sayfada yok"]
+
+
+def _kenar_xml(*sayfalar: tuple[str, list[str]]) -> str:
+    """Sayfa başına (üst bilgi, alt bilgi parçaları) → pdftohtml -xml; gövdede bir satır metin."""
+    out = ['<fontspec id="0" size="8" family="AAAAAA+IBMPlexSans" color="#525252"/>']
+    for no, (ust, alt) in enumerate(sayfalar, 1):
+        out.append(f'<page number="{no}" position="absolute" top="0" left="0" height="841" width="594">')
+        if ust:
+            out.append(f'<text top="20" left="45" width="122" height="10" font="0">{ust}</text>')
+        out.append('<text top="120" left="45" width="122" height="13" font="0">gövde</text>')
+        out += [f'<text top="809" left="{45 + 400 * i}" width="40" height="10" font="0">{a}</text>' for i, a in enumerate(alt)]
+        out.append("</page>")
+    return "".join(out)
+
+
+UST = "Fen Bilimleri · 1. yazılı · 2. senaryo"
+DAMGA = "TEDY · MEB tablosu 10.09.2026 · üretim 25.10.2026"
+
+
+def test_kenar_metinleri_ust_ve_alt_bilgi_konumdan():
+    xml = _kenar_xml(("", [DAMGA, "s. 1/2"]), (UST, [DAMGA, "s. 2/2"]))
+    assert pk.kenar_metinleri(xml) == [{"ust": "", "alt": f"{DAMGA} s. 1/2"},
+                                       {"ust": UST, "alt": f"{DAMGA} s. 2/2"}]
+
+
+def test_alt_bilgi_her_sayfada_damga_ve_dogru_sayfa_numarasi():
+    """K5, K12: her sayfanın alt bilgisinde damga ("TEDY …") ve "s. n/N"."""
+    temiz = pk.kenar_metinleri(_kenar_xml(("", [DAMGA, "s. 1/3"]), (UST, [DAMGA, "s. 2/3"]), (UST, [DAMGA, "s. 3/3"])))
+    assert pk.alt_bilgi_hatalari(temiz) == []
+    # Düz yolun (B) alt bilgisi yalnız "TEDY" der: damga başlıkta; o da geçer.
+    assert pk.alt_bilgi_hatalari(pk.kenar_metinleri(_kenar_xml((UST, ["TEDY", "s. 1/1"])))) == []
+    kirli = pk.kenar_metinleri(_kenar_xml(("", ["s. 1/3"]), (UST, [DAMGA, "s. 3/3"]), (UST, [DAMGA])))
+    assert pk.alt_bilgi_hatalari(kirli) == [
+        "s. 1: alt bilgide damga yok", "s. 2: alt bilgide sayfa numarası s. 2/3 değil (s. 3/3)",
+        "s. 3: alt bilgide sayfa numarası s. 3/3 değil (yok)"]
+
+
+def test_ust_bilgi_kapakta_yok_diger_her_sayfada_dolu():
+    """K5: kapakta üst bilgi yok; ebeveyn özetli basımda kapak 2. sayfadır ve 1. sayfanın (ebeveyn) üst bilgisi dolu."""
+    duz = pk.kenar_metinleri(_kenar_xml(("", [DAMGA, "s. 1/2"]), (UST, [DAMGA, "s. 2/2"])))
+    assert pk.ust_bilgi_hatalari(duz, kapak=1) == []
+    assert pk.ust_bilgi_hatalari(duz, kapak=2) == ["s. 1: üst bilgi boş", "s. 2: kapakta üst bilgi var"]
+    ebeveyn = pk.kenar_metinleri(_kenar_xml((UST, [DAMGA, "s. 1/3"]), ("", [DAMGA, "s. 2/3"]), (UST, [DAMGA, "s. 3/3"])))
+    assert pk.ust_bilgi_hatalari(ebeveyn, kapak=2) == []
+    # Düz yolda kapak kuralı yok (Chrome başlığı her sayfaya basar): yalnız boş üst bilgi kusurdur.
+    assert pk.ust_bilgi_hatalari(duz, kapak=None) == ["s. 1: üst bilgi boş"]
+
+
+def test_kusurlar_ust_ve_alt_bilgi_hatalarini_tasir():
+    temiz = {"sayfa": 4, "yazi_tipleri": ["IBMPlexSans"], "gomulu_degil": [], "yabanci_yazi_tipi": [], "etiketli": True,
+             "dil": "tr", "yer_imi": 3, "yetim": [], "icindekiler": [], "eksik_baslik": [], "en_kucuk_punto": 8,
+             "alt_bilgi": [], "ust_bilgi": []}
+    assert pk.kusurlar({**temiz, "alt_bilgi": ["s. 1: alt bilgide damga yok"], "ust_bilgi": ["s. 1: kapakta üst bilgi var"]}) == [
+        "s. 1: alt bilgide damga yok", "s. 1: kapakta üst bilgi var"]
+
+
+def test_denetle_k1_aramasi_okuma_sirasindaki_metinde(monkeypatch, tmp_path):
+    """`-layout` sağ sütunu (sayfa numarası) iki satıra bölünen başlığın arasına sokar; K1 araması bu yüzden okuma
+    sırasındaki (layout'suz) metinde yapılır."""
+    baslik = "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki"
+    duzenli = ("Kapsam Kılavuzu\nTEDY · d      s. 1/2\f"
+               "› Teknoloji ile Uzay\n                                   s. 24–33\nAraştırmaları Arasındaki İlişki\n"
+               "TEDY · d      s. 2/2\f")
+    akis = ("Kapsam Kılavuzu\nTEDY · d s. 1/2\f"
+            "› Teknoloji ile Uzay\nAraştırmaları Arasındaki İlişki\n\ns. 24–33\nTEDY · d s. 2/2\f")
+    assert pk.eksik_basliklar(pk.sayfa_metinleri(duzenli), [baslik]) == [baslik]     # layout metninde bulunamazdı
+    ciktilar = {
+        "pdfinfo": PDFINFO.replace("9", "2"), "pdffonts": PDFFONTS, "qpdf": None,
+        "pdftohtml": _kenar_xml(("", [DAMGA, "s. 1/2"]), (UST, [DAMGA, "s. 2/2"])),
+    }
+
+    def calistir(*argv):
+        if argv[0] == "pdftotext":
+            return duzenli if "-layout" in argv else akis
+        if argv[0] == "qpdf":
+            return json.dumps(QPDF if "--json-key=qpdf" in argv else ANAHATLAR)
+        return ciktilar[argv[0]]
+    monkeypatch.setattr(pk, "_calistir", calistir)
+    r = pk.denetle(tmp_path / "k.pdf", basliklar=[baslik], icindekiler=[])
+    assert r["eksik_baslik"] == []
+    assert r["alt_bilgi"] == [] and r["ust_bilgi"] == []

@@ -9,6 +9,7 @@ yer imi gösterdiği sayfayı taşır. Başlık işareti bu yer imleridir (düz 
 satırı, duyuru doğrulaması ya da ebeveyn özeti satırı yer imi değildir, dolayısıyla yetim sayılmaz (kontrolcü kararı D5)."""
 from __future__ import annotations
 
+import html
 import json
 import re
 import subprocess
@@ -111,9 +112,15 @@ def _anlamli_satirlar(sayfa: str) -> list[str]:
     return [s.strip() for s in sayfa.splitlines() if s.strip() and not ALT_BILGI.search(s.strip())]
 
 
+def _icindekiler_sayfasi(sayfalar: list[str]) -> int | None:
+    return next((i for i, s in enumerate(sayfalar) if "icindekiler" in katla(s)), None)
+
+
 def eksik_basliklar(sayfalar: list[str], basliklar: list[str]) -> list[str]:
-    """K1: kitap ve MEB başlıkları PDF metninde birebir (katlanmış) geçmeli."""
-    tum = katla(" ".join(" ".join(s.split()) for s in sayfalar))
+    """K1: kitap ve MEB başlıkları PDF metninde birebir (katlanmış) geçmeli. İçindekiler sayfası aranmaz: ünite
+    başlığı orada geçer, gövdede yoksa yine eksiktir."""
+    t = _icindekiler_sayfasi(sayfalar)
+    tum = katla(" ".join(" ".join(s.split()) for i, s in enumerate(sayfalar) if i != t))
     return [b for b in basliklar if katla(b) not in tum]
 
 
@@ -135,25 +142,73 @@ def yetim_basliklar(sayfalar: list[str], basliklar: list[tuple[int, str]]) -> li
     return sorted(set(out))
 
 
-def icindekiler_hatalari(sayfalar: list[str], girdiler: list[str]) -> list[str]:
-    """K5, spec §4.2: İçindekiler'deki her girdinin gösterdiği sayfada o başlık geçmeli."""
-    t = next((i for i, s in enumerate(sayfalar) if "icindekiler" in katla(s)), None)
+def icindekiler_hatalari(sayfalar: list[str], girdiler: list[str | tuple[str, str]]) -> list[str]:
+    """K5, spec §4.2: İçindekiler'deki her girdinin gösterdiği sayfada o başlık geçmeli. Girdi satırın kendisiyle
+    (sondaki numara hariç) birebir eşleşir ("Özet" "Ebeveyn Özeti" satırını almaz). Girdi `(ad, sayfada_aranan)`
+    olabilir: sayfasındaki başlık İçindekiler adından başkaysa (Özet'in sayfası "Kapsam Kılavuzu" başlığını taşır)."""
+    t = _icindekiler_sayfasi(sayfalar)
     if t is None:
         return ["İçindekiler sayfası yok"]
     satirlar = [" ".join(s.split()) for s in sayfalar[t].splitlines() if s.strip()]
     hatalar = []
-    for g in girdiler:
+    for girdi in girdiler:
+        g, aranan = girdi if isinstance(girdi, tuple) else (girdi, girdi)
         k = katla(g)
         gosterilen = None
         for s in satirlar:
-            m = re.search(r"(\d+)\s*$", s)
-            if m and k in katla(s):
-                gosterilen = int(m.group(1))
+            m = re.fullmatch(r"(.*?)\s*(\d+)", s)
+            if m and katla(m.group(1)) == k:
+                gosterilen = int(m.group(2))
                 break
         if gosterilen is None:
             hatalar.append(f"İçindekiler'de sayfa numarası yok: {g}")
-        elif not (1 <= gosterilen <= len(sayfalar)) or k not in katla(" ".join(sayfalar[gosterilen - 1].split())):
+        elif not (1 <= gosterilen <= len(sayfalar)) or katla(aranan) not in katla(" ".join(sayfalar[gosterilen - 1].split())):
             hatalar.append(f"{g}: İçindekiler s. {gosterilen} diyor, başlık o sayfada yok")
+    return hatalar
+
+
+def kenar_metinleri(xml: str) -> list[dict]:
+    """Sayfa başına üst ve alt bilgi metni, konumdan (pdftohtml `-zoom 1`, punto): üst kenar boşluğunda biten metin
+    üst bilgi, alt kenar boşluğunda başlayan metin alt bilgidir; parçalar akış sırasıyla boşlukla birleşir."""
+    out = []
+    for sayfa in re.finditer(r'<page [^>]*height="(\d+)"[^>]*>(.*?)</page>', xml, re.S):
+        yukseklik, govde = int(sayfa.group(1)), sayfa.group(2)
+        ust: list[str] = []
+        alt: list[str] = []
+        for m in re.finditer(r'<text top="(\d+)" [^>]*height="(\d+)"[^>]*>(.*?)</text>', govde, re.S):
+            u, boy = int(m.group(1)), int(m.group(2))
+            metin = html.unescape(re.sub(r"<[^>]+>", "", m.group(3))).strip()
+            if u + boy <= UST_KENAR_PT:
+                ust.append(metin)
+            elif u >= yukseklik - ALT_KENAR_PT:
+                alt.append(metin)
+        out.append({"ust": " ".join(" ".join(ust).split()), "alt": " ".join(" ".join(alt).split())})
+    return out
+
+
+def alt_bilgi_hatalari(kenarlar: list[dict]) -> list[str]:
+    """K5, K12: her sayfanın alt bilgisinde damga ("TEDY …"; düz yolda yalnız "TEDY", damga başlıkta) ve "s. n/N"."""
+    n = len(kenarlar)
+    hatalar = []
+    for i, k in enumerate(kenarlar, 1):
+        if not re.search(r"(^|\s)TEDY\b", k["alt"]):
+            hatalar.append(f"s. {i}: alt bilgide damga yok")
+        m = re.search(r"s\.\s*(\d+)\s*/\s*(\d+)", k["alt"])
+        if not m or (int(m.group(1)), int(m.group(2))) != (i, n):
+            bulunan = f"s. {m.group(1)}/{m.group(2)}" if m else "yok"
+            hatalar.append(f"s. {i}: alt bilgide sayfa numarası s. {i}/{n} değil ({bulunan})")
+    return hatalar
+
+
+def ust_bilgi_hatalari(kenarlar: list[dict], *, kapak: int | None) -> list[str]:
+    """K5: kapakta (`kapak`: 1, ebeveyn özetli basımda 2) üst bilgi yok, öbür her sayfada dolu. `kapak=None`
+    (düz yol B: Chrome başlığı her sayfaya basar) yalnız boş üst bilgiyi kusur sayar."""
+    hatalar = []
+    for i, k in enumerate(kenarlar, 1):
+        if i == kapak and k["ust"]:
+            hatalar.append(f"s. {i}: kapakta üst bilgi var")
+        elif i != kapak and not k["ust"]:
+            hatalar.append(f"s. {i}: üst bilgi boş")
     return hatalar
 
 
@@ -196,8 +251,9 @@ def _calistir(*argv: str) -> str:
         raise DenetimHatasi(f"{argv[0]} çıkış {e.returncode}: {(e.stderr or '').strip()[-200:]}") from e
 
 
-def denetle(yol: Path, *, basliklar: list[str], icindekiler: list[str], duz: bool = False) -> dict:
-    """Üretilen PDF'in kanun ölçümleri. `duz=True` (yedek yol B): üst/alt bilgideki DejaVu Sans sayılmaz."""
+def denetle(yol: Path, *, basliklar: list[str], icindekiler: list, duz: bool = False, kapak: int = 1) -> dict:
+    """Üretilen PDF'in kanun ölçümleri. `duz=True` (yedek yol B): üst/alt bilgideki DejaVu Sans sayılmaz, kapak
+    kuralı uygulanmaz. `kapak`: üst bilgisi olmayan sayfa (ebeveyn özetli basımda 2)."""
     y = str(yol)
     info = _calistir("pdfinfo", y)
     fontlar = pdffonts_ayristir(_calistir("pdffonts", y))
@@ -208,7 +264,9 @@ def denetle(yol: Path, *, basliklar: list[str], icindekiler: list[str], duz: boo
     qpdf = json.loads(_calistir("qpdf", "--json", "--json-key=qpdf", y))
     anahat = json.loads(_calistir("qpdf", "--json", "--json-key=outlines", y))
     xml = _calistir("pdftohtml", "-xml", "-i", "-q", "-zoom", "1", "-stdout", y)
+    kenarlar = kenar_metinleri(xml)
     return {
+        "alt_bilgi": alt_bilgi_hatalari(kenarlar), "ust_bilgi": ust_bilgi_hatalari(kenarlar, kapak=None if duz else kapak),
         "sayfa": sayfa_sayisi(info), "etiketli": etiketli_mi(info), "dil": pdf_dili(qpdf),
         "yazi_tipleri": sorted({f["ad"] for f in fontlar}),
         "gomulu_degil": sorted({f["ad"] for f in fontlar if not f["gomulu"]}),
@@ -243,6 +301,7 @@ def kusurlar(r: dict, *, icindekiler_beklenir: bool = True) -> list[str]:
     if icindekiler_beklenir:
         k += r["icindekiler"]
     k += [f"başlık PDF metninde yok: {b}" for b in r["eksik_baslik"]]
+    k += r["alt_bilgi"] + r["ust_bilgi"]
     if r["en_kucuk_punto"] is None:
         k.append("en küçük punto ölçülemedi")
     elif r["en_kucuk_punto"] < EN_KUCUK_PUNTO:
