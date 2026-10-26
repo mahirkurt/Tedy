@@ -208,14 +208,22 @@ def test_ogrencinin_kendi_oturumunda_ebeveyn_ozeti_kendi_isaretleri(c):
     assert m["ebeveyn"]["tekrar"] == 1 and m["ebeveyn"]["isaret_sahibi"] == m["isaret_sahibi"] == "Deneme Öğrenci"
 
 
-def test_api_anahtarinda_isaret_yok_ama_ebeveyn_ozeti_ogrencinin(c, monkeypatch):
+def test_api_anahtari_ebeveyn_ozetini_okuyamaz_403(c, monkeypatch):
+    """Ebeveyn özeti öğrencinin adını ve işaret sayılarını taşır: aynı veri /ogrenci, ?isaret_kaynagi=ogrenci ve
+    PDF'te yalnız oturuma açık; API anahtarı da `?ebeveyn=1` ile alamaz. Ebeveynsiz kılavuz anahtara açık, işaretsiz."""
     giris(c, OGRENCI, "Deneme Öğrenci")
     isaret_koy(c, "FB.7.2.1", "tekrar")
     with c.session_transaction() as s:
         s.clear()
     monkeypatch.setattr(api, "API_KEYS", [("test", "tdyK_deneme")])
-    m = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz?ebeveyn=1", headers={"Authorization": "Bearer tdyK_deneme"}).get_json()
-    assert m["isaret_sahibi"] is None and m["ebeveyn"]["tekrar"] == 1
+    baslik = {"Authorization": "Bearer tdyK_deneme"}
+    r = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz?ebeveyn=1", headers=baslik)
+    assert r.status_code == 403 and r.get_json()["error"] == "yalnız oturumla"
+    assert "Deneme Öğrenci" not in r.get_data(as_text=True)
+    r = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz", headers=baslik)
+    assert r.status_code == 200
+    m = r.get_json()
+    assert m["isaret_sahibi"] is None and m["ebeveyn"] is None
     assert all(b["isaret"] is None for u in m["uniteler"] for cer in u["cerceveler"] for b in cer["bloklar"])
 
 

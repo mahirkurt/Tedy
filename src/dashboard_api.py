@@ -3368,7 +3368,7 @@ def _hazirlik_hatasi(kod):
 
 def _hazirlik_modeli(anahtar, sinav_no, kim_icin="oturum"):
     """(model, None) ya da (None, hata yanıtı): ?senaryo=N (1–2 rakam; başka değer bilinmeyen senaryo),
-    ?ebeveyn=1, ?isaret=0.
+    ?ebeveyn=1 (yalnız oturumla: API anahtarı 403), ?isaret=0.
 
     İşaret kaynağı D16 (`_kilavuz_isaretleri`): `kim_icin="oturum"` (ekran) bloklardaki işaretler ve üst düzey
     `isaret_sahibi` oturumdaki kişiden; `"ogrenci"` (PDF, A4 önizleme) öğrencinin işaretleri ve adıyla. `ebeveyn`
@@ -3379,6 +3379,10 @@ def _hazirlik_modeli(anahtar, sinav_no, kim_icin="oturum"):
     if ham and not re.fullmatch(r"\d{1,2}", ham):
         return None, _hazirlik_hatasi("bilinmeyen_senaryo")
     secenekler = {"ebeveyn": request.args.get("ebeveyn") == "1", "isaret": request.args.get("isaret", "1") != "0"}
+    if secenekler["ebeveyn"] and not _hazirlik_kisisi():
+        # Ebeveyn özeti öğrencinin adını ve işaret sayılarını taşır; aynı veri /ogrenci, ?isaret_kaynagi=ogrenci ve
+        # PDF'te yalnız oturuma açık — API anahtarı (ve okuyucu) için burada da 403.
+        return None, _yalniz_oturumla()
     senaryo = int(ham) if ham else None
     try:
         email, _ = _kilavuz_isaretleri(kim_icin)
