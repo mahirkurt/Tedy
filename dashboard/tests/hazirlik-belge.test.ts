@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { bolumler, damgaMetni, tabloParcalari, tumBloklar, ustBilgi } from '../src/hazirlik/belge.ts'
+import { KAGIT_TABLO_SATIRI, bolumler, damgaMetni, tabloParcalari, tumBloklar, ustBilgi } from '../src/hazirlik/belge.ts'
 import type { KilavuzModeli } from '../src/hazirlik/tipler.ts'
 
 // Fikstür modelden üretilmiştir (scripts/hazirlik_fiksturleri.py): şekil varsayılmaz.
@@ -33,6 +33,21 @@ test('olası fikstürde hiçbir blok tek soru sayısı taşımaz (K8)', () => {
   assert.ok(tumBloklar(OLASI).length > 0)
   assert.ok(tumBloklar(OLASI).every(b => b.soru === null && b.aralik !== null))
   assert.deepEqual(tumBloklar(null), [])
+})
+
+test('tablo parçaları: uzun ünite kâğıtta sayfaya sığan parçalara bölünür, her parça kendi başlık satırıyla (Y5, KK-1)', () => {
+  // Bölünmez bir ünite tablosu sayfadan uzunsa Paged.js ya sayfayı taşırır (Chrome bütün belgeyi küçültür: ölçüldü,
+  // 12 satırlık ünitede en küçük punto 5) ya da tabloyu başlık satırsız böler. Parça en çok KAGIT_TABLO_SATIRI satır.
+  const g = KESIN.matris.gruplar[0]
+  const satirlar = Array.from({ length: 2 * KAGIT_TABLO_SATIRI + 1 }, (_, i) => ({ ...g.satirlar[i % g.satirlar.length], kod: `X.${i}` }))
+  const m = { ...KESIN.matris, gruplar: [{ baslik: g.baslik, satirlar }] }
+  const p = tabloParcalari(m, true)
+  assert.deepEqual(p.map(x => [x.gruplar[0]?.baslik ?? null, x.gruplar[0]?.satirlar.length ?? 0, x.toplam]), [
+    [g.baslik, KAGIT_TABLO_SATIRI, false], [`${g.baslik} (devam)`, KAGIT_TABLO_SATIRI, false],
+    [`${g.baslik} (devam)`, 1, false], [null, 0, true]])
+  assert.deepEqual(p.flatMap(x => x.gruplar.flatMap(y => y.satirlar.map(s => s.kod))), satirlar.map(s => s.kod))
+  // Ekranda tek tablo kalır.
+  assert.equal(tabloParcalari(m, false)[0].gruplar[0].satirlar.length, satirlar.length)
 })
 
 test('tablo parçaları: ekranda tek tablo; baskıda ünite başına ayrı tablo ve toplam tek başına (Y5)', () => {

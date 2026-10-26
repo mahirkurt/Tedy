@@ -9,8 +9,8 @@ import './Matris.scss'
  *  (ayrıntı paneli), kâğıtta düz metin (K11). Aynı bileşen kılavuzun içinde de kullanılır.
  *
  *  `uniteBasina` (Y5): Paged.js bölünen tabloda başlık satırını yinelemez; bu kipte tablo ünite başına ayrı tablolar
- *  olarak çizilir (`kilavuz-matris--unite`, her biri bölünmez, kendi başlık satırıyla), toplam satırı sonda tek
- *  başına. Baskı ve kılavuz kâğıdı bu kipi kullanır; ekranda tek tablo kalır. */
+ *  olarak çizilir (`kilavuz-matris--unite`, her biri bölünmez, kendi başlık satırıyla; uzun ünite sayfaya sığan
+ *  parçalara ayrılır), toplam satırı sonda tek başına. Baskı ve kılavuz kâğıdı bu kipi kullanır; ekranda tek tablo kalır. */
 export default function KarsilastirmaTablosu({ matris, vurgu, kip, secili, sec, vurguEtiketi = 'duyurulan', uniteBasina = false }: {
   matris: Matris
   vurgu: number | null
@@ -24,10 +24,10 @@ export default function KarsilastirmaTablosu({ matris, vurgu, kip, secili, sec, 
   const parcalar = tabloParcalari(matris, uniteBasina)
   return (
     <>
-      {parcalar.map(p => {
+      {parcalar.map((p, i) => {
         const ad = p.gruplar.length === 1 ? p.gruplar[0].baslik : 'toplam'
         return (
-          <Table key={ad} size="md" className={`kilavuz-matris${uniteBasina ? ' kilavuz-matris--unite' : ''}`}
+          <Table key={`${i}-${ad}`} size="md" className={`kilavuz-matris${uniteBasina ? ' kilavuz-matris--unite' : ''}`}
             aria-label={uniteBasina ? `Senaryo karşılaştırması · ${ad}` : 'Senaryo karşılaştırması'}>
             <TableHead>
               <TableRow>

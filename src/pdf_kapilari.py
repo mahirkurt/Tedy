@@ -21,6 +21,14 @@ ALT_BILGI = re.compile(r"(^TEDY\b|s\.\s*\d+\s*/\s*\d+\s*$)")
 PLEX_ONEKLERI = ("IBMPlexSans", "IBMPlexMono")
 EN_KUCUK_PUNTO = 8   # K3: 7,5 pt; pdftohtml tamsayıya yuvarlar
 YETIM_SATIR = 3      # iki ya da üç satıra bölünen başlığın sayfa sonunda aranacağı son satır sayısı
+# Kenar boşluğu (K5: üst 18 mm, alt 20 mm) punto olarak; pdftohtml `-zoom 1` konumları puntodur. Üst/alt bilgi buradadır.
+UST_KENAR_PT = 18 / 25.4 * 72
+ALT_KENAR_PT = 20 / 25.4 * 72
+ARAC_SURESI = 120    # saniye; tek bir poppler/qpdf çağrısının üst sınırı
+
+
+class DenetimHatasi(RuntimeError):
+    """Bir ölçüm aracı çalışmadı (zaman aşımı ya da hata); PDF denetlenemedi."""
 
 
 def pdffonts_ayristir(metin: str) -> list[dict]:
@@ -112,9 +120,10 @@ def eksik_basliklar(sayfalar: list[str], basliklar: list[str]) -> list[str]:
 def yetim_basliklar(sayfalar: list[str], basliklar: list[tuple[int, str]]) -> list[tuple[int, str]]:
     """K5: başlık işaretli (sayfa, başlık) çiftlerinden, sayfasının son anlamlı satırlarıyla (alt bilgi hariç; birkaç
     satıra bölünen başlık için son `YETIM_SATIR` satır) biten ve son sayfada olmayanlar yetimdir. `basliklar` yer
-    imlerinden gelir (`yer_imi_sayfalari`); işaretsiz metin hiçbir zaman yetim sayılmaz (D5). Sınır: aynı sayfada hem
-    işaretli bir başlık hem de aynı yazıyla biten düz bir satır varsa ikisi ayırt edilemez (kapı tek yönlü yanılır:
-    yanlış alarm verir, kusur kaçırmaz)."""
+    imlerinden gelir (`yer_imi_sayfalari`); işaretsiz metin hiçbir zaman yetim sayılmaz (D5). Sınırlar (Kanun §3): aynı
+    sayfada hem işaretli bir başlık hem de aynı yazıyla biten düz bir satır varsa ikisi ayırt edilemez (yanlış alarm);
+    başlıkla aynı satırda sağda başka metin varsa satır başlıkla bitmez, yetim kaçabilir. Gerçek modelle yerleştirilen
+    iki yetimi (h3, h5) buldu (Görev 13)."""
     out = []
     for sayfa_no, baslik in basliklar:
         if not 1 <= sayfa_no < len(sayfalar):      # son sayfa ve aralık dışı sayfalar yetim sayılmaz
@@ -148,6 +157,29 @@ def icindekiler_hatalari(sayfalar: list[str], girdiler: list[str]) -> list[str]:
     return hatalar
 
 
+def kenar_disi_yazi_tipleri(xml: str) -> set[str]:
+    """Gövdede (üst ve alt kenar boşluğunun dışında) kullanılan yazı tiplerinin adları (alt küme öneki atılır)."""
+    aile = {m.group(1): m.group(2).split("+", 1)[-1]
+            for m in re.finditer(r'<fontspec id="(\d+)" size="\d+" family="([^"]+)"', xml)}
+    out: set[str] = set()
+    for sayfa in re.finditer(r'<page [^>]*height="(\d+)"[^>]*>(.*?)</page>', xml, re.S):
+        yukseklik, govde = int(sayfa.group(1)), sayfa.group(2)
+        for m in re.finditer(r'<text top="(\d+)" [^>]*height="(\d+)" font="(\d+)"', govde):
+            ust, boy, f = int(m.group(1)), int(m.group(2)), m.group(3)
+            if ust + boy > UST_KENAR_PT and ust < yukseklik - ALT_KENAR_PT and f in aile:
+                out.add(aile[f])
+    return out
+
+
+def yabanci_yazi_tipleri(fontlar: list[dict], xml: str, *, kenarda_izinli: tuple[str, ...] = ()) -> list[str]:
+    """Plex dışı yazı tipleri (K3). `kenarda_izinli` önekli olanlar yalnız üst/alt bilgide kullanılıyorsa sayılmaz:
+    düz yolda (B) Chrome'un üst/alt bilgi şablonu web yazı tipi okuyamaz, DejaVu Sans'a düşer (borç KK-3); gövde
+    metni o yazı tipine düşerse kusurdur."""
+    govde = kenar_disi_yazi_tipleri(xml) if kenarda_izinli else set()
+    return sorted({f["ad"] for f in fontlar if not f["ad"].startswith(PLEX_ONEKLERI)
+                   and not (f["ad"].startswith(kenarda_izinli) and f["ad"] not in govde)})
+
+
 def en_kucuk_punto(xml: str) -> int | None:
     boy = {m.group(1): int(m.group(2)) for m in re.finditer(r'<fontspec id="(\d+)" size="(\d+)"', xml)}
     kullanilan = {m.group(1) for m in re.finditer(r'<text [^>]*font="(\d+)"', xml)}
@@ -156,14 +188,23 @@ def en_kucuk_punto(xml: str) -> int | None:
 
 
 def _calistir(*argv: str) -> str:
-    return subprocess.run(list(argv), capture_output=True, text=True, check=True, timeout=120).stdout
+    try:
+        return subprocess.run(list(argv), capture_output=True, text=True, check=True, timeout=ARAC_SURESI).stdout
+    except subprocess.TimeoutExpired as e:
+        raise DenetimHatasi(f"{argv[0]} {ARAC_SURESI} s içinde bitmedi") from e
+    except subprocess.CalledProcessError as e:
+        raise DenetimHatasi(f"{argv[0]} çıkış {e.returncode}: {(e.stderr or '').strip()[-200:]}") from e
 
 
-def denetle(yol: Path, *, basliklar: list[str], icindekiler: list[str]) -> dict:
+def denetle(yol: Path, *, basliklar: list[str], icindekiler: list[str], duz: bool = False) -> dict:
+    """Üretilen PDF'in kanun ölçümleri. `duz=True` (yedek yol B): üst/alt bilgideki DejaVu Sans sayılmaz."""
     y = str(yol)
     info = _calistir("pdfinfo", y)
     fontlar = pdffonts_ayristir(_calistir("pdffonts", y))
     sayfalar = sayfa_metinleri(_calistir("pdftotext", "-layout", y, "-"))
+    # K1 araması okuma sırasındaki metinde: -layout kırılan bir satırın arasına sağ sütunu (sayfa numarası) sokar
+    # (ölçüldü: "… Teknoloji ile Uzay / s. 24–33 / Araştırmaları Arasındaki İlişki").
+    akis = sayfa_metinleri(_calistir("pdftotext", y, "-"))
     qpdf = json.loads(_calistir("qpdf", "--json", "--json-key=qpdf", y))
     anahat = json.loads(_calistir("qpdf", "--json", "--json-key=outlines", y))
     xml = _calistir("pdftohtml", "-xml", "-i", "-q", "-zoom", "1", "-stdout", y)
@@ -171,10 +212,11 @@ def denetle(yol: Path, *, basliklar: list[str], icindekiler: list[str]) -> dict:
         "sayfa": sayfa_sayisi(info), "etiketli": etiketli_mi(info), "dil": pdf_dili(qpdf),
         "yazi_tipleri": sorted({f["ad"] for f in fontlar}),
         "gomulu_degil": sorted({f["ad"] for f in fontlar if not f["gomulu"]}),
-        "yabanci_yazi_tipi": sorted({f["ad"] for f in fontlar if not f["ad"].startswith(PLEX_ONEKLERI)}),
-        "yer_imi": len(yer_imleri(anahat)), "yetim": yetim_basliklar(sayfalar, yer_imi_sayfalari(anahat)),
+        "yabanci_yazi_tipi": yabanci_yazi_tipleri(fontlar, xml, kenarda_izinli=("DejaVuSans",) if duz else ()),
+        "yer_imi": len(yer_imleri(anahat)),
+        "yetim": yetim_basliklar(sayfalar, yer_imi_sayfalari(anahat)),
         "icindekiler": icindekiler_hatalari(sayfalar, icindekiler) if icindekiler else [],
-        "eksik_baslik": eksik_basliklar(sayfalar, basliklar), "en_kucuk_punto": en_kucuk_punto(xml),
+        "eksik_baslik": eksik_basliklar(akis, basliklar), "en_kucuk_punto": en_kucuk_punto(xml),
     }
 
 
@@ -182,6 +224,11 @@ def kusurlar(r: dict, *, icindekiler_beklenir: bool = True) -> list[str]:
     """Raporun kanun kusurları; boş liste kapıların geçtiği anlamına gelir. Düz yolda (B) İçindekiler sayfa numarası
     taşımadığı için `icindekiler_beklenir=False` verilir."""
     k = []
+    # Ölçülemeyen değer geçer sayılmaz (Görev 2 ertelemesi).
+    if not r["sayfa"]:
+        k.append("sayfa sayısı okunamadı")
+    if not r["yazi_tipleri"]:
+        k.append("yazı tipi okunamadı")
     if r["gomulu_degil"]:
         k.append("gömülmemiş yazı tipi: " + ", ".join(r["gomulu_degil"]))
     if r["yabanci_yazi_tipi"]:
@@ -196,6 +243,8 @@ def kusurlar(r: dict, *, icindekiler_beklenir: bool = True) -> list[str]:
     if icindekiler_beklenir:
         k += r["icindekiler"]
     k += [f"başlık PDF metninde yok: {b}" for b in r["eksik_baslik"]]
-    if r["en_kucuk_punto"] is not None and r["en_kucuk_punto"] < EN_KUCUK_PUNTO:
+    if r["en_kucuk_punto"] is None:
+        k.append("en küçük punto ölçülemedi")
+    elif r["en_kucuk_punto"] < EN_KUCUK_PUNTO:
         k.append(f"en küçük punto {r['en_kucuk_punto']} < 7,5")
     return k

@@ -52,9 +52,21 @@ export function hazirlikUyarilari(g: { guncellik: Guncellik; harita_onayli: bool
 /** Karşılaştırma tablosunun parçası: bir ünite grubu ya da yalnız toplam satırı. */
 export interface TabloParcasi { gruplar: Matris['gruplar']; toplam: boolean }
 
-/** Y5: Paged.js bölünen tabloda başlık satırını yinelemez; baskıda tablo ünite başına ayrı tablolar olarak çizilir
- *  (her biri kendi başlık satırıyla), toplam satırı sonda tek başına. Ekranda tek tablo. */
+/** Kâğıtta bir tablo parçasının en çok satırı: parça A4 gövdesine sığar (ölçüldü: satır ≈ 80 px, gövde 979 px;
+ *  12 satırlık bölünmez ünite tablosu sayfayı 24 px taşırdı ve Chrome bütün belgeyi küçülttü — en küçük punto 5). */
+export const KAGIT_TABLO_SATIRI = 8
+
+/** Y5: Paged.js bölünen tabloda başlık satırını yinelemez; baskıda tablo ünite başına ayrı, bölünmez tablolar olarak
+ *  çizilir (her biri kendi başlık satırıyla), toplam satırı sonda tek başına. Ünite `KAGIT_TABLO_SATIRI`'ndan uzunsa
+ *  parçalara ayrılır, sonraki parçaların grup satırı "(devam)" der (KK-1). Ekranda tek tablo. */
 export function tabloParcalari(m: Matris, uniteBasina: boolean): TabloParcasi[] {
   if (!uniteBasina) return [{ gruplar: m.gruplar, toplam: true }]
-  return [...m.gruplar.map(g => ({ gruplar: [g], toplam: false })), { gruplar: [], toplam: true }]
+  const parcalar: TabloParcasi[] = []
+  for (const g of m.gruplar) {
+    for (let i = 0; i === 0 || i < g.satirlar.length; i += KAGIT_TABLO_SATIRI) {
+      const baslik = i === 0 ? g.baslik : `${g.baslik} (devam)`
+      parcalar.push({ gruplar: [{ ...g, baslik, satirlar: g.satirlar.slice(i, i + KAGIT_TABLO_SATIRI) }], toplam: false })
+    }
+  }
+  return [...parcalar, { gruplar: [], toplam: true }]
 }

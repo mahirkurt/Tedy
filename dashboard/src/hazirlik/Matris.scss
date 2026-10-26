@@ -98,6 +98,11 @@
 .kilavuz-matris--unite {
   break-inside: avoid;
   margin-block-end: spacing.$spacing-05;
+  // Parçalar ayrı tablolardır: sabit düzen ve aynı ilk sütun genişliği senaryo sütunlarını parçalar arasında hizalar
+  // (ölçüldü: içeriğe göre düzende S1 sütunu her parçada başka yerdeydi).
+  table-layout: fixed;
+
+  thead th:first-child { inline-size: 50%; }
 
   tr { break-inside: avoid; }
 }

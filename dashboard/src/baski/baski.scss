@@ -4,11 +4,17 @@
 // ted-theme ilk yüklenir: Carbon'u `with ($css--font-face: false)` ile yapılandırır; başka bir Carbon modülü ondan önce
 // yüklenirse Sass "already loaded, can't be configured" der (plan yazılırken ölçüldü).
 @use '../theme/ted-theme.scss';
-@use '@carbon/react/scss/spacing' as spacing;
-@use '@carbon/react/scss/type' as type;
+@use '@carbon/react/scss/theme' as theme;
+@use '@carbon/react/scss/themes' as themes;
 @use './plex';
 
+// Kâğıt beyaz temadır (taslak A): kökteki g10 belirteçleri ve panonun serin gri zemini kâğıtta beyaza döner; yoksa
+// printBackground sayfanın içerik dışı alanını gri basar (ölçüldü: body rgb(242, 244, 248)).
 :root {
+  @include theme.theme(themes.$white);
+
+  --ted-page-bg: var(--cds-background);
+
   /* stylelint-disable-next-line carbon/type-use -- kâğıt kök ölçeği: body-01 (0.875rem) = 13px ≈ 9,75 pt, label-01 ≈ 8,4 pt (K3) */
   font-size: 14.857px;
 }
@@ -20,6 +26,9 @@
   margin: 18mm 16mm 20mm;
 }
 
-h2, h3, h4, h5 { break-after: avoid; }
+// sayfa.css ile aynı kesme kuralları (tests/baski-kagit-kurallari.test.ts eşitliği sınar, D17).
+.kilavuz-ebeveyn { break-after: page; }
+h2, h3, h4, h5, .kilavuz-blok__ust, .kilavuz-blok__soru, .kilavuz-blok__etiket, .kilavuz-yol__etiket { break-after: avoid; }
+.kilavuz-isaret, .kilavuz-basliklar > li:first-child { break-before: avoid; }
 .kilavuz-blok--soluk, .kilavuz-basliklar li, .kilavuz-matris tr { break-inside: avoid; }
 .kilavuz-matris thead { display: table-header-group; }

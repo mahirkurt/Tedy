@@ -119,8 +119,8 @@ def test_en_kucuk_punto_kullanilan_yazi_tiplerinden():
 
 
 def test_kusurlar_rapordan_okunur():
-    temiz = {"gomulu_degil": [], "yabanci_yazi_tipi": [], "etiketli": True, "dil": "tr", "yer_imi": 3, "yetim": [],
-             "icindekiler": [], "eksik_baslik": [], "en_kucuk_punto": 8}
+    temiz = {"sayfa": 4, "yazi_tipleri": ["IBMPlexSans"], "gomulu_degil": [], "yabanci_yazi_tipi": [], "etiketli": True,
+             "dil": "tr", "yer_imi": 3, "yetim": [], "icindekiler": [], "eksik_baslik": [], "en_kucuk_punto": 8}
     assert pk.kusurlar(temiz) == []
     kirli = {**temiz, "gomulu_degil": ["DejaVuSans"], "yabanci_yazi_tipi": ["DejaVuSans"], "etiketli": False,
              "dil": None, "yer_imi": 0, "yetim": [(3, "1. Ünite")], "icindekiler": ["x"], "en_kucuk_punto": 7}
@@ -128,3 +128,44 @@ def test_kusurlar_rapordan_okunur():
         "gömülmemiş yazı tipi: DejaVuSans", "Plex dışı yazı tipi: DejaVuSans", "PDF etiketli değil",
         "PDF dili tr değil: None", "yer imi yok", "yetim başlık s. 3: 1. Ünite", "x", "en küçük punto 7 < 7,5"]
     assert pk.kusurlar({**temiz, "icindekiler": ["x"]}, icindekiler_beklenir=False) == []
+
+
+def test_kusurlar_olculemeyen_deger_gecer_sayilmaz():
+    """Ölçülemeyen değer kusurdur (Görev 2 ertelemesi): boş pdffonts, okunamayan punto ya da 0 sayfa geçer sayılmaz."""
+    temiz = {"sayfa": 4, "yazi_tipleri": ["IBMPlexSans"], "gomulu_degil": [], "yabanci_yazi_tipi": [], "etiketli": True,
+             "dil": "tr", "yer_imi": 3, "yetim": [], "icindekiler": [], "eksik_baslik": [], "en_kucuk_punto": 8}
+    assert pk.kusurlar({**temiz, "sayfa": 0, "yazi_tipleri": [], "en_kucuk_punto": None}) == [
+        "sayfa sayısı okunamadı", "yazı tipi okunamadı", "en küçük punto ölçülemedi"]
+
+
+# pdftohtml -xml -zoom 1: konumlar punto (A4 = 595 × 842). Kenar boşlukları 18 mm (≈ 51 pt) üstte, 20 mm (≈ 57 pt) altta.
+def _xml(*metinler: tuple[int, str]) -> str:
+    """(üst konum, yazı tipi kimliği) çiftlerinden tek sayfalık pdftohtml çıktısı."""
+    return ('<page number="1" position="absolute" top="0" left="0" height="841" width="594">'
+            '<fontspec id="0" size="10" family="AAAAAA+IBMPlexSans" color="#000"/>'
+            '<fontspec id="1" size="8" family="DejaVuSans" color="#000"/>'
+            + "".join(f'<text top="{t}" left="45" width="40" height="11" font="{f}">x</text>' for t, f in metinler)
+            + "</page>")
+
+
+def test_yabanci_yazi_tipi_kenarda_izinli_olan_yalniz_ust_alt_bilgide():
+    """Düz yolda (B) Chrome'un üst/alt bilgi şablonu DejaVu Sans'a düşer (web yazı tipi okuyamaz); yalnız kenar
+    boşluğundaki metinde izinlidir. Gövde metni DejaVu'ya düşerse kusurdur."""
+    fontlar = [{"ad": "IBMPlexSans", "gomulu": True}, {"ad": "DejaVuSans", "gomulu": True}]
+    kenarda = _xml((20, 1), (400, 0), (815, 1))
+    assert pk.yabanci_yazi_tipleri(fontlar, kenarda) == ["DejaVuSans"]
+    assert pk.yabanci_yazi_tipleri(fontlar, kenarda, kenarda_izinli=("DejaVuSans",)) == []
+    govdede = _xml((20, 1), (400, 1), (815, 1))
+    assert pk.yabanci_yazi_tipleri(fontlar, govdede, kenarda_izinli=("DejaVuSans",)) == ["DejaVuSans"]
+
+
+def test_arac_zaman_asimi_anlamli_hata(monkeypatch):
+    def takil(*a, **k):
+        raise pk.subprocess.TimeoutExpired(cmd=a[0], timeout=k.get("timeout"))
+    monkeypatch.setattr(pk.subprocess, "run", takil)
+    try:
+        pk._calistir("pdftohtml", "/tmp/x.pdf")
+    except pk.DenetimHatasi as e:
+        assert str(e) == "pdftohtml 120 s içinde bitmedi"
+    else:
+        raise AssertionError("DenetimHatasi bekleniyordu")

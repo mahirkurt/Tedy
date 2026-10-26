@@ -1,7 +1,8 @@
 """Kılavuz PDF'ini iki yoldan (A: Paged.js, B: düz Chrome) basar, kanun kapılarını uygular, süre ve belleği ölçer
 (plan 2026-10-25 Görev 2 yoklaması; Görev 13'te gerçek Fen modeliyle). Basım ted-dashboard.service'in ortamıyla koşar
-(`env -i`, PATH=.venv/bin:/usr/bin:/bin, HOME); bellek `/usr/bin/time %M` — beklenen en büyük tek sürecin tepe RSS'i
-(node ve Chrome süreçleri). systemd-run'ın "Memory peak"i bu makinede güvenilmez (ölçüldü: 512K).
+(`env -i`, PATH=.venv/bin:/usr/bin:/bin, HOME, TZ=Europe/Istanbul); bellek `/usr/bin/time %M` — bekleyen süreç
+ağacındaki en büyük TEK sürecin tepe RSS'i (node ya da Chrome süreçlerinden biri; toplam değil). systemd-run'ın
+"Memory peak"i bu makinede güvenilmez (ölçüldü: 512K).
 
     env -u ANTHROPIC_API_KEY .venv/bin/python -I scripts/kilavuz_pdf_kapilari.py --dist dashboard-dist --cikti /tmp/tedy-yoklama-pdf
     env -u ANTHROPIC_API_KEY .venv/bin/python -I scripts/kilavuz_pdf_kapilari.py --dist dashboard-dist --cikti /tmp/k \\
@@ -22,9 +23,10 @@ KOK = Path(__file__).resolve().parents[1]
 if str(KOK) not in sys.path:
     sys.path.insert(0, str(KOK))
 
-from src.pdf_kapilari import denetle, kusurlar  # noqa: E402
+from src.pdf_kapilari import DenetimHatasi, denetle, kusurlar  # noqa: E402
 
 VENV_BIN = "/mnt/thunderbolt/workspaces/TED/.venv/bin"
+BASIM_SURESI = 300   # saniye
 YOKLAMA_BASLIKLARI = [
     "1. Ünite · Uzay Çağı", "2. Ünite · Kuvvet ve Enerjiyi Keşfedelim", "1. Türkiye ve Uzay Araştırmaları",
     "2. Uzayda Neler Var?", "1. Kuvvet, İş ve Enerji İlişkisi", "Senaryo Karşılaştırması", "Kaynaklar",
@@ -61,9 +63,14 @@ def bas(dist: Path, cikti: Path, sorgu: str, model: Path | None, duz: bool) -> d
         komut += ["--model", str(model.resolve())]
     if duz:
         komut.append("--duz")
-    ortam = {"PATH": f"{VENV_BIN}:/usr/bin:/bin", "HOME": os.environ["HOME"]}   # ted-dashboard.service'in ortamı (Y8)
+    # ted-dashboard.service'in ortamı (Y8); TZ: tarih ve "üretim" günü İstanbul'a göre (sunucu UTC olabilir).
+    ortam = {"PATH": f"{VENV_BIN}:/usr/bin:/bin", "HOME": os.environ["HOME"], "TZ": "Europe/Istanbul"}
     bas_an = time.monotonic()
-    p = subprocess.run(komut, capture_output=True, text=True, timeout=300, cwd=KOK / "dashboard", env=ortam)
+    try:
+        p = subprocess.run(komut, capture_output=True, text=True, timeout=BASIM_SURESI, cwd=KOK / "dashboard", env=ortam)
+    except subprocess.TimeoutExpired:
+        return {"cikis": "zaman aşımı", "sure_sn": round(time.monotonic() - bas_an, 1), "bellek": "?",
+                "stderr": f"basım {BASIM_SURESI} s içinde bitmedi"}
     sure = time.monotonic() - bas_an
     m = re.search(r"TEDY_BELLEK_KB=(\d+)", p.stderr)
     return {"cikis": p.returncode, "sure_sn": round(sure, 1), "bellek": f"{int(m.group(1)) // 1024} MB" if m else "?",
@@ -78,6 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--sorgu", default="yoklama=1")
     a.add_argument("--yol", choices=("paged", "duz", "ikisi"), default="ikisi")
     g = a.parse_args(argv)
+    g.cikti = g.cikti.resolve()          # basım dashboard/ içinde koşar; göreli yol oraya yazmasın
     g.cikti.mkdir(parents=True, exist_ok=True)
     if g.model:
         basliklar, icindekiler = model_basliklari(json.loads(g.model.read_text(encoding="utf-8")))
@@ -95,10 +103,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"| {ad} | {olcum['cikis']} | {olcum['sure_sn']} | {olcum['bellek']} | – | – | basılamadı: {olcum['stderr']} |")
             sonuc = 1
             continue
-        rapor = denetle(pdf, basliklar=basliklar, icindekiler=icindekiler)
-        if duz:
-            # Chrome'un üst/alt bilgi şablonu web yazı tipi kullanamaz (ölçüldü): orada DejaVu Sans beklenir (borç KK-3).
-            rapor["yabanci_yazi_tipi"] = [f for f in rapor["yabanci_yazi_tipi"] if not f.startswith("DejaVuSans")]
+        try:
+            rapor = denetle(pdf, basliklar=basliklar, icindekiler=icindekiler, duz=duz)
+        except DenetimHatasi as e:
+            print(f"| {ad} | 0 | {olcum['sure_sn']} | {olcum['bellek']} | – | – | denetlenemedi: {e} |")
+            sonuc = 1
+            continue
         k = kusurlar(rapor, icindekiler_beklenir=not duz)
         sonuc = sonuc or (1 if k else 0)
         print(f"| {ad} | 0 | {olcum['sure_sn']} | {olcum['bellek']} | {rapor['sayfa']} | "

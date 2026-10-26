@@ -374,11 +374,41 @@ p.kilavuz-isaret {
   @include type.type-style('body-compact-01');
 }
 
-// Kâğıtta blok zeminsizdir (beyaz kâğıt), sol çizgi ve gri kutular kalır (taslak A).
+// Kâğıtta blok zeminsizdir (beyaz kâğıt), sol çizgi ve gri kutular kalır (taslak A). Akış düz bloktur (grid değil):
+// Paged.js bölmesi blok kutularında güvenilir; kod satırı ile soru satırı alt alta (kod satırı yalnız başlığı taşır).
 .kilavuz-belge--baski .kilavuz-blok {
+  display: block;
   background-color: transparent;
   padding-block: 0;
   padding-inline-end: 0;
+}
+
+.kilavuz-belge--baski .kilavuz-blok > .kilavuz-blok__soru {
+  justify-content: flex-start;
+  margin-block-start: spacing.$spacing-03;
+}
+
+// Üst bilgi ve damganın kâğıt kaynağı (sayfa.css string-set): görünmez, ekran okuyucuya da kapalı.
+.kilavuz-kagit-bilgi { display: none; }
+
+// Kâğıt İçindekiler: girdi solda, gerçek sayfa numarası (sayfa.css target-counter) sağda; bağlantı rengi yok.
+.kilavuz-belge > .kilavuz-icindekiler > h3 {
+  @include type.type-style('heading-03');
+  padding-block-end: spacing.$spacing-03;
+  border-block-end: 1px solid var(--cds-border-subtle-01);
+  margin-block-end: spacing.$spacing-03;
+}
+
+.kilavuz-icindekiler li {
+  border-block-end: 1px solid var(--cds-border-subtle-01);
+  @include type.type-style('body-compact-01');
+}
+
+.kilavuz-icindekiler__baglanti {
+  display: block;
+  padding-block: spacing.$spacing-03;
+  color: var(--cds-text-primary);
+  text-decoration: none;
 }
 
 // ── Ebeveyn özeti (kâğıtta başa tek sayfa) ───────────────────────────────────────────────────────────

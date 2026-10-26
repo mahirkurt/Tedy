@@ -20,10 +20,17 @@
 .kilavuz-icindekiler { page: icindekiler; }
 .kilavuz-govde { page: govde; }
 .kilavuz-ek { page: ek; }
-.kilavuz-baslik__alt { string-set: ustbilgi content(text); }
-.kilavuz-damga { string-set: damga content(text); }
+/* Üst bilgi ve damga belgenin başındaki görünmez kaynaktan (KilavuzBelgesi .kilavuz-kagit-bilgi): ebeveyn özeti özetten
+   önce gelir; kaynak özetin içinde olsaydı ilk sayfanın üst/alt bilgisi boş kalırdı (G11 devri). */
+.kilavuz-kagit-bilgi__ust { string-set: ustbilgi content(text); }
+.kilavuz-kagit-bilgi__damga { string-set: damga content(text); }
 .kilavuz-ebeveyn { break-after: page; }
 .kilavuz-icindekiler__baglanti::after { content: target-counter(attr(href), page); float: right; font-family: 'IBM Plex Mono', monospace; }
-h2, h3, h4, h5, .kilavuz-blok__ust { break-after: avoid; }
+/* Başlık ve etiket altındakinden ayrılmaz (yetim başlık yok): blok kodu soru satırıyla, "Bu bölümde ele alınanlar" ilk
+   başlığıyla, işaret satırı önceki satırla gider. */
+h2, h3, h4, h5, .kilavuz-blok__ust, .kilavuz-blok__soru, .kilavuz-blok__etiket, .kilavuz-yol__etiket { break-after: avoid; }
+.kilavuz-isaret, .kilavuz-basliklar > li:first-child { break-before: avoid; }
 .kilavuz-blok--soluk, .kilavuz-basliklar li, .kilavuz-matris tr { break-inside: avoid; }
-.kilavuz-blok[data-split-from]::before { content: attr(data-baslik) ' (devam)'; display: block; font-size: 0.75rem; color: var(--cds-text-secondary); margin-bottom: 0.5rem; }
+/* "(devam)": Paged.js'in kendi kuralı bölünen öğenin ::before'unu daha özgül bir seçiciyle siler (content: unset);
+   !important olmadan bu kural hiç görünmez (ölçüldü). */
+.kilavuz-blok[data-split-from]::before { content: attr(data-baslik) ' (devam)' !important; display: block; font-size: 0.75rem; color: var(--cds-text-secondary); margin-bottom: 0.5rem; }

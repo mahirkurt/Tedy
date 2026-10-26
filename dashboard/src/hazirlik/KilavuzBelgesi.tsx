@@ -160,10 +160,19 @@ export default function KilavuzBelgesi({ model: m, kip, isaretler = {}, isaretle
     ? (nitelik !== null ? `${nitelik}. senaryoda toplam ${m.ozet.toplam_soru} soru` : m.ozet.toplam_soru)
     : (m.ozet.soru_araligi ? `senaryoya göre ${m.ozet.soru_araligi[0]}–${m.ozet.soru_araligi[1]}` : '–')
   const sahip = m.secenekler.isaret ? m.isaret_sahibi : null
+  // Kâğıdın üst bilgi ve damga kaynağı (sayfa.css string-set): ilk bölümün (ebeveyn özeti, yoksa özet) ilk öğesi, görünmez.
+  // Bölümlerin dışında dursaydı Paged.js onu adsız bir sayfaya koyar, kapaktan önce boş bir sayfa açılırdı (ölçüldü).
+  const kagitBilgisi = kip === 'baski' && (
+    <div className="kilavuz-kagit-bilgi" aria-hidden="true">
+      <span className="kilavuz-kagit-bilgi__ust">{ustBilgi(m)}</span>
+      <span className="kilavuz-kagit-bilgi__damga">{damgaMetni(m)}</span>
+    </div>
+  )
   return (
     <article className={`kilavuz-belge kilavuz-belge--${kip} ${subjectClass(m.ders)}`} lang="tr">
       {m.ebeveyn && (
         <section id="bolum-ebeveyn" className="kilavuz-ebeveyn" aria-labelledby="baslik-ebeveyn">
+          {kagitBilgisi}
           <h2 id="baslik-ebeveyn" className="kilavuz-ebeveyn__baslik">{BOLUM.ebeveyn}</h2>
           <ul className="kilavuz-liste">{ebeveynCumleleri(m).map(c => <li key={c}>{c}</li>)}</ul>
           {m.ebeveyn.isaret_sahibi && <p className="kilavuz-ebeveyn__sahip">{`İşaretlerin sahibi: ${m.ebeveyn.isaret_sahibi}`}</p>}
@@ -172,6 +181,7 @@ export default function KilavuzBelgesi({ model: m, kip, isaretler = {}, isaretle
         </section>
       )}
       <section id="bolum-ozet" className="kilavuz-ozet" aria-labelledby="baslik-ozet">
+        {!m.ebeveyn && kagitBilgisi}
         <h2 id="baslik-ozet" className="kilavuz-baslik">{BOLUM.kilavuz}</h2>
         <p className="kilavuz-baslik__alt">{ustBilgi(m)}</p>
         {secilen && <p className="kilavuz-ozet__secim">{`Seçtiğin ${m.senaryo}. senaryo (duyurulmadı)`}</p>}
