@@ -44,8 +44,13 @@
 
   // Vurgulanan (duyurulan ya da seçilen) sütun ders renginde (K4: mavi "olası" demektir; taslak A ders rengini kullanır).
   // Başlıkta alt kenar çizgisi ders rengi, zemin ders yüzeyi; metin ("duyurulan", "seçilen") rengin tek taşıyıcısı değildir.
-  th.kilavuz-matris__vurgu,
+  // Gövde hücreleri ders paneli tonunda (10. adım, taslak A'nın #d9fbfb'si); başlık daha koyu yüzey tonunda.
   td.kilavuz-matris__vurgu {
+    background-color: var(--ted-subject-panel);
+    color: var(--ted-subject-text);
+  }
+
+  th.kilavuz-matris__vurgu {
     background-color: var(--ted-subject-surface);
     color: var(--ted-subject-on-surface);
   }
