@@ -4,6 +4,8 @@
 // (makinedeki /usr/bin/google-chrome; Playwright'ın headless-shell indirmesi bu makinede takılıyor).
 // Çıkış: 0 tamam, 2 argüman (dist'te baski.html yoksa da), 3 sayfa hatası, 4 zaman aşımı. Yakalanmayan istisna Node'u
 // 1 ile bitirir; çağıran (src/hazirlik_pdf.py) sıfırdan farklı her çıkışı hata sayar.
+// Çalışma zamanı bağımlılığı: `@playwright/test` package.json'da devDependency'dir ama sunucu PDF basımı ona dayanır.
+// Canlı node_modules `npm install --omit=dev` ile kurulmamalı (kurulursa PDF ucu 503 verir).
 import { statSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
