@@ -262,20 +262,43 @@
   padding-inline: spacing.$spacing-04;
 }
 
-// Kitap yolu ve ele alınan başlıklar içindekiler gibi dizilir: sayfa numarası sağ sütunda, hizalı (taslak A).
+// Kitapta: her yol bir grup — yol satırı (kitap › ünite › çerçeve › konu, sayfası sağ sütunda), altında o konunun
+// başlıkları, içe girintili ve ince bir dikey çizgiyle yola bağlı (liste düzeni, başlık düzeyi değil; düzeltme 1).
 .kilavuz-blok__yollar {
   display: flex;
   flex-direction: column;
-  gap: spacing.$spacing-02;
+  gap: spacing.$spacing-05;
   @include type.type-style('body-compact-01');
-
-  li {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) max-content;
-    column-gap: spacing.$spacing-05;
-    align-items: center;
-  }
 }
+
+.kilavuz-yol + .kilavuz-yol {
+  padding-block-start: spacing.$spacing-05;
+  border-block-start: 1px solid var(--cds-border-subtle-02);
+}
+
+.kilavuz-yol__satir {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  column-gap: spacing.$spacing-05;
+  align-items: center;
+
+  strong { font-weight: 600; }
+}
+
+.kilavuz-yol__etiket {
+  @include type.type-style('label-01');
+  color: var(--cds-text-secondary);
+  margin-block-start: spacing.$spacing-03;
+}
+
+.kilavuz-yol__etiket,
+.kilavuz-yol .kilavuz-basliklar {
+  margin-inline-start: spacing.$spacing-03;
+  padding-inline-start: spacing.$spacing-04;
+  border-inline-start: 1px solid var(--cds-border-subtle-02);
+}
+
+.kilavuz-yol .kilavuz-basliklar { padding-block-start: spacing.$spacing-02; }
 
 .kilavuz-sayfa-no {
   color: var(--cds-text-secondary);
@@ -439,6 +462,24 @@ p.kilavuz-isaret {
 
 @include bp.breakpoint-down('lg') {
   .kilavuz-sayfa__icindekiler { display: none; }
+}
+
+// Telefon ve dar ekran: "Bölümler" menüsü (Carbon Accordion); lg ve üstünde yan içindekiler onun yerini tutar.
+@include bp.breakpoint('lg') {
+  .kilavuz-sayfa__bolumler { display: none; }
+}
+
+.kilavuz-sayfa__bolumler ul {
+  display: flex;
+  flex-direction: column;
+  @include type.type-style('body-compact-01');
+}
+
+.kilavuz-sayfa__bolumler a {
+  display: flex;
+  align-items: center;
+  min-block-size: spacing.$spacing-08;
+  color: var(--cds-link-primary);
 }
 
 // WCAG 2.5.8 / IBM target_spacing_sufficient: alt alta duran bağlantılar en az 24 px (ölçüldü: iki kitap yolu bağlantısı

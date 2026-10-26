@@ -1,13 +1,13 @@
 import { useEffect } from 'react'
 import type { MouseEvent } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Breadcrumb, BreadcrumbItem, Button, InlineNotification, SkeletonText } from '@carbon/react'
+import { Accordion, AccordionItem, Breadcrumb, BreadcrumbItem, Button, InlineNotification, SkeletonText } from '@carbon/react'
 import { useApi } from '../hooks/useApi'
 import { apiHataCumlesi } from '../utils/apiHatasi'
 import { uygulamaIcindeAc } from '../utils/gezinme'
 import { asistanaSor } from '../asistan/sayfaBaglami'
 import KilavuzBelgesi from './KilavuzBelgesi'
-import { bolumler, ustBilgi } from './belge'
+import { BOLUM, bolumler, ustBilgi } from './belge'
 import { modelAdresi } from './hazirlik'
 import { useIsaretler } from './useIsaretler'
 import type { KilavuzModeli } from './tipler'
@@ -61,20 +61,31 @@ export default function KilavuzSayfasi() {
     gezin(yol)
   }
   const dersSayfasi = `/hazirlik/${anahtar}?sinav=${no}`
+  const icindekiler = bolumler(m).map(b => <li key={b.id}><a href={`#${b.id}`}>{b.ad}</a></li>)
   return (
     <div className="kilavuz-sayfa">
       <div className="kilavuz-sayfa__ust">
-        <Breadcrumb aria-label="Konum">
+        <Breadcrumb aria-label="Konum" noTrailingSlash>
           <BreadcrumbItem href="/hazirlik" onClick={icGezinme('/hazirlik')}>Sınav hazırlığı</BreadcrumbItem>
           <BreadcrumbItem href={dersSayfasi} onClick={icGezinme(dersSayfasi)}>{m.ders}</BreadcrumbItem>
+          <BreadcrumbItem isCurrentPage aria-current="page">{BOLUM.kilavuz}</BreadcrumbItem>
         </Breadcrumb>
         <div className="kilavuz-sayfa__eylemler">
           <Button kind="ghost" size="lg" onClick={sor}>Asistana sor</Button>
         </div>
       </div>
+      {/* Telefonda (lg altı) yan içindekiler yok: bölümlere aynı bağlantılarla açılır bir menüden atlanır. Kâğıda
+          girmez — KilavuzBelgesi'nin değil, ekran sayfasının parçasıdır. */}
+      <Accordion className="kilavuz-sayfa__bolumler" size="lg">
+        <AccordionItem title="Bölümler">
+          <nav aria-label="Kılavuzun bölümleri">
+            <ul>{icindekiler}</ul>
+          </nav>
+        </AccordionItem>
+      </Accordion>
       <div className="kilavuz-sayfa__duzen">
         <nav className="kilavuz-sayfa__icindekiler" aria-label="Kılavuzun bölümleri">
-          <ul>{bolumler(m).map(b => <li key={b.id}><a href={`#${b.id}`}>{b.ad}</a></li>)}</ul>
+          <ul>{icindekiler}</ul>
         </nav>
         <KilavuzBelgesi model={m} kip="ekran" isaretler={isaretler} isaretle={isaretle} isaretHatasi={hata} hatayiKapat={hatayiKapat} />
       </div>

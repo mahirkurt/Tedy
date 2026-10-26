@@ -61,7 +61,7 @@
     "tablo_degisti": false
   },
   "harita_onayli": true,
-  "icerik_ozeti": "25a59cc488ea5a8ff2a4b5070b3978009fac722cd0dad4152fbfe9dea836b81c",
+  "icerik_ozeti": "8ae89b9dea551c20a58935cf8af05cfcedcfbdbbd28db1668397e2d089116759",
   "isaret_sahibi": "Deneme Öğrenci",
   "kaynaklar": [
     {
@@ -348,110 +348,6 @@
           "bloklar": [
             {
               "aralik": null,
-              "basliklar": [
-                {
-                  "ad": "Keşif Noktası: Uzay Teknolojileri",
-                  "amac": null,
-                  "sayfa": 17,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Kontrol Noktası",
-                  "amac": null,
-                  "sayfa": 19,
-                  "tur": "kontrol"
-                },
-                {
-                  "ad": "Türkiye’nin Yapay Uyduları",
-                  "amac": null,
-                  "sayfa": 20,
-                  "tur": "diger"
-                },
-                {
-                  "ad": "Teleskop Çeşitleri",
-                  "amac": null,
-                  "sayfa": 22,
-                  "tur": "diger"
-                },
-                {
-                  "ad": "A- Uzay Teleskopları",
-                  "amac": null,
-                  "sayfa": 22,
-                  "tur": "diger"
-                },
-                {
-                  "ad": "B- Yer Tabanlı Teleskoplar",
-                  "amac": null,
-                  "sayfa": 23,
-                  "tur": "diger"
-                },
-                {
-                  "ad": "Bağlantı Noktası",
-                  "amac": null,
-                  "sayfa": 23,
-                  "tur": "baglanti"
-                },
-                {
-                  "ad": "Kontrol Noktası",
-                  "amac": null,
-                  "sayfa": 24,
-                  "tur": "kontrol"
-                },
-                {
-                  "ad": "Bağlantı Noktası",
-                  "amac": null,
-                  "sayfa": 25,
-                  "tur": "baglanti"
-                },
-                {
-                  "ad": "Bağlantı Noktası",
-                  "amac": null,
-                  "sayfa": 26,
-                  "tur": "baglanti"
-                },
-                {
-                  "ad": "Astronomi (Gök bilimi)",
-                  "amac": null,
-                  "sayfa": 26,
-                  "tur": "tanim"
-                },
-                {
-                  "ad": "Astronom (Gök bilimci)",
-                  "amac": null,
-                  "sayfa": 26,
-                  "tur": "tanim"
-                },
-                {
-                  "ad": "Astronot",
-                  "amac": null,
-                  "sayfa": 26,
-                  "tur": "tanim"
-                },
-                {
-                  "ad": "Performans Görevi: Uzay Gözlem Araçları Modeli",
-                  "amac": "Uzay gözlem araçları ile ilgili bilimsel model oluşturma",
-                  "sayfa": 29,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Uzay Kirliliği",
-                  "amac": null,
-                  "sayfa": 30,
-                  "tur": "diger"
-                },
-                {
-                  "ad": "Performans Görevi: Uzayda Neler Oluyor?",
-                  "amac": "Uzay araştırmalarının yol açabileceği problemlerin çözümüne yönelik rapor oluşturma",
-                  "sayfa": 31,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Neler Öğrendik?",
-                  "amac": null,
-                  "sayfa": 33,
-                  "tur": "ozet"
-                }
-              ],
               "duzey": 3,
               "her_senaryoda": false,
               "isaret": null,
@@ -460,6 +356,56 @@
               "kitapta": [
                 {
                   "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=17",
+                  "basliklar": [
+                    {
+                      "ad": "Keşif Noktası: Uzay Teknolojileri",
+                      "amac": null,
+                      "sayfa": 17,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "amac": null,
+                      "sayfa": 19,
+                      "tur": "kontrol"
+                    },
+                    {
+                      "ad": "Türkiye’nin Yapay Uyduları",
+                      "amac": null,
+                      "sayfa": 20,
+                      "tur": "diger"
+                    },
+                    {
+                      "ad": "Teleskop Çeşitleri",
+                      "amac": null,
+                      "sayfa": 22,
+                      "tur": "diger"
+                    },
+                    {
+                      "ad": "A- Uzay Teleskopları",
+                      "amac": null,
+                      "sayfa": 22,
+                      "tur": "diger"
+                    },
+                    {
+                      "ad": "B- Yer Tabanlı Teleskoplar",
+                      "amac": null,
+                      "sayfa": 23,
+                      "tur": "diger"
+                    },
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "amac": null,
+                      "sayfa": 23,
+                      "tur": "baglanti"
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "amac": null,
+                      "sayfa": 24,
+                      "tur": "kontrol"
+                    }
+                  ],
                   "cerceve": "1. Türkiye ve Uzay Araştırmaları",
                   "cerceve_no": 1,
                   "kitap": "Fen Bilimleri 7 (1. Kitap)",
@@ -472,6 +418,62 @@
                 },
                 {
                   "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=25",
+                  "basliklar": [
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "amac": null,
+                      "sayfa": 25,
+                      "tur": "baglanti"
+                    },
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "amac": null,
+                      "sayfa": 26,
+                      "tur": "baglanti"
+                    },
+                    {
+                      "ad": "Astronomi (Gök bilimi)",
+                      "amac": null,
+                      "sayfa": 26,
+                      "tur": "tanim"
+                    },
+                    {
+                      "ad": "Astronom (Gök bilimci)",
+                      "amac": null,
+                      "sayfa": 26,
+                      "tur": "tanim"
+                    },
+                    {
+                      "ad": "Astronot",
+                      "amac": null,
+                      "sayfa": 26,
+                      "tur": "tanim"
+                    },
+                    {
+                      "ad": "Performans Görevi: Uzay Gözlem Araçları Modeli",
+                      "amac": "Uzay gözlem araçları ile ilgili bilimsel model oluşturma",
+                      "sayfa": 29,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Uzay Kirliliği",
+                      "amac": null,
+                      "sayfa": 30,
+                      "tur": "diger"
+                    },
+                    {
+                      "ad": "Performans Görevi: Uzayda Neler Oluyor?",
+                      "amac": "Uzay araştırmalarının yol açabileceği problemlerin çözümüne yönelik rapor oluşturma",
+                      "sayfa": 31,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Neler Öğrendik?",
+                      "amac": null,
+                      "sayfa": 33,
+                      "tur": "ozet"
+                    }
+                  ],
                   "cerceve": "1. Türkiye ve Uzay Araştırmaları",
                   "cerceve_no": 1,
                   "kitap": "Fen Bilimleri 7 (1. Kitap)",
@@ -493,62 +495,6 @@
             },
             {
               "aralik": null,
-              "basliklar": [
-                {
-                  "ad": "Bağlantı Noktası",
-                  "amac": null,
-                  "sayfa": 25,
-                  "tur": "baglanti"
-                },
-                {
-                  "ad": "Bağlantı Noktası",
-                  "amac": null,
-                  "sayfa": 26,
-                  "tur": "baglanti"
-                },
-                {
-                  "ad": "Astronomi (Gök bilimi)",
-                  "amac": null,
-                  "sayfa": 26,
-                  "tur": "tanim"
-                },
-                {
-                  "ad": "Astronom (Gök bilimci)",
-                  "amac": null,
-                  "sayfa": 26,
-                  "tur": "tanim"
-                },
-                {
-                  "ad": "Astronot",
-                  "amac": null,
-                  "sayfa": 26,
-                  "tur": "tanim"
-                },
-                {
-                  "ad": "Performans Görevi: Uzay Gözlem Araçları Modeli",
-                  "amac": "Uzay gözlem araçları ile ilgili bilimsel model oluşturma",
-                  "sayfa": 29,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Uzay Kirliliği",
-                  "amac": null,
-                  "sayfa": 30,
-                  "tur": "diger"
-                },
-                {
-                  "ad": "Performans Görevi: Uzayda Neler Oluyor?",
-                  "amac": "Uzay araştırmalarının yol açabileceği problemlerin çözümüne yönelik rapor oluşturma",
-                  "sayfa": 31,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Neler Öğrendik?",
-                  "amac": null,
-                  "sayfa": 33,
-                  "tur": "ozet"
-                }
-              ],
               "duzey": 3,
               "her_senaryoda": false,
               "isaret": null,
@@ -557,6 +503,62 @@
               "kitapta": [
                 {
                   "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=25",
+                  "basliklar": [
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "amac": null,
+                      "sayfa": 25,
+                      "tur": "baglanti"
+                    },
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "amac": null,
+                      "sayfa": 26,
+                      "tur": "baglanti"
+                    },
+                    {
+                      "ad": "Astronomi (Gök bilimi)",
+                      "amac": null,
+                      "sayfa": 26,
+                      "tur": "tanim"
+                    },
+                    {
+                      "ad": "Astronom (Gök bilimci)",
+                      "amac": null,
+                      "sayfa": 26,
+                      "tur": "tanim"
+                    },
+                    {
+                      "ad": "Astronot",
+                      "amac": null,
+                      "sayfa": 26,
+                      "tur": "tanim"
+                    },
+                    {
+                      "ad": "Performans Görevi: Uzay Gözlem Araçları Modeli",
+                      "amac": "Uzay gözlem araçları ile ilgili bilimsel model oluşturma",
+                      "sayfa": 29,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Uzay Kirliliği",
+                      "amac": null,
+                      "sayfa": 30,
+                      "tur": "diger"
+                    },
+                    {
+                      "ad": "Performans Görevi: Uzayda Neler Oluyor?",
+                      "amac": "Uzay araştırmalarının yol açabileceği problemlerin çözümüne yönelik rapor oluşturma",
+                      "sayfa": 31,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Neler Öğrendik?",
+                      "amac": null,
+                      "sayfa": 33,
+                      "tur": "ozet"
+                    }
+                  ],
                   "cerceve": "1. Türkiye ve Uzay Araştırmaları",
                   "cerceve_no": 1,
                   "kitap": "Fen Bilimleri 7 (1. Kitap)",
@@ -586,62 +588,6 @@
           "bloklar": [
             {
               "aralik": null,
-              "basliklar": [
-                {
-                  "ad": "Keşif Noktası: Yıldızların Oluşumunu Araştıralım",
-                  "amac": null,
-                  "sayfa": 35,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Etkinlik Noktası-1",
-                  "amac": "Yıldızların yaşam sürecine ilişkin kavramlar arasındaki ilişkileri açıklama",
-                  "sayfa": 36,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Performans Görevi: Yıldızların Yaşam Süreci Posterim",
-                  "amac": "Yıldızların yaşam süreci ve bu süreçteki kavramlar arasında ilişki kurma",
-                  "sayfa": 37,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Takımyıldızlar",
-                  "amac": null,
-                  "sayfa": 43,
-                  "tur": "diger"
-                },
-                {
-                  "ad": "Etkinlik Noktası-2",
-                  "amac": "Yıldız, galaksi ve evren kavramlarını açıklayarak yapılandırma",
-                  "sayfa": 46,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Kontrol Noktası",
-                  "amac": null,
-                  "sayfa": 47,
-                  "tur": "kontrol"
-                },
-                {
-                  "ad": "Galaksiler",
-                  "amac": null,
-                  "sayfa": 48,
-                  "tur": "diger"
-                },
-                {
-                  "ad": "Kontrol Noktası",
-                  "amac": null,
-                  "sayfa": 48,
-                  "tur": "kontrol"
-                },
-                {
-                  "ad": "Neler Öğrendik?",
-                  "amac": null,
-                  "sayfa": 49,
-                  "tur": "ozet"
-                }
-              ],
               "duzey": 3,
               "her_senaryoda": false,
               "isaret": null,
@@ -650,6 +596,62 @@
               "kitapta": [
                 {
                   "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=36",
+                  "basliklar": [
+                    {
+                      "ad": "Keşif Noktası: Yıldızların Oluşumunu Araştıralım",
+                      "amac": null,
+                      "sayfa": 35,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-1",
+                      "amac": "Yıldızların yaşam sürecine ilişkin kavramlar arasındaki ilişkileri açıklama",
+                      "sayfa": 36,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Performans Görevi: Yıldızların Yaşam Süreci Posterim",
+                      "amac": "Yıldızların yaşam süreci ve bu süreçteki kavramlar arasında ilişki kurma",
+                      "sayfa": 37,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Takımyıldızlar",
+                      "amac": null,
+                      "sayfa": 43,
+                      "tur": "diger"
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-2",
+                      "amac": "Yıldız, galaksi ve evren kavramlarını açıklayarak yapılandırma",
+                      "sayfa": 46,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "amac": null,
+                      "sayfa": 47,
+                      "tur": "kontrol"
+                    },
+                    {
+                      "ad": "Galaksiler",
+                      "amac": null,
+                      "sayfa": 48,
+                      "tur": "diger"
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "amac": null,
+                      "sayfa": 48,
+                      "tur": "kontrol"
+                    },
+                    {
+                      "ad": "Neler Öğrendik?",
+                      "amac": null,
+                      "sayfa": 49,
+                      "tur": "ozet"
+                    }
+                  ],
                   "cerceve": "2. Uzayda Neler Var?",
                   "cerceve_no": 2,
                   "kitap": "Fen Bilimleri 7 (1. Kitap)",
@@ -671,62 +673,6 @@
             },
             {
               "aralik": null,
-              "basliklar": [
-                {
-                  "ad": "Keşif Noktası: Yıldızların Oluşumunu Araştıralım",
-                  "amac": null,
-                  "sayfa": 35,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Etkinlik Noktası-1",
-                  "amac": "Yıldızların yaşam sürecine ilişkin kavramlar arasındaki ilişkileri açıklama",
-                  "sayfa": 36,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Performans Görevi: Yıldızların Yaşam Süreci Posterim",
-                  "amac": "Yıldızların yaşam süreci ve bu süreçteki kavramlar arasında ilişki kurma",
-                  "sayfa": 37,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Takımyıldızlar",
-                  "amac": null,
-                  "sayfa": 43,
-                  "tur": "diger"
-                },
-                {
-                  "ad": "Etkinlik Noktası-2",
-                  "amac": "Yıldız, galaksi ve evren kavramlarını açıklayarak yapılandırma",
-                  "sayfa": 46,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Kontrol Noktası",
-                  "amac": null,
-                  "sayfa": 47,
-                  "tur": "kontrol"
-                },
-                {
-                  "ad": "Galaksiler",
-                  "amac": null,
-                  "sayfa": 48,
-                  "tur": "diger"
-                },
-                {
-                  "ad": "Kontrol Noktası",
-                  "amac": null,
-                  "sayfa": 48,
-                  "tur": "kontrol"
-                },
-                {
-                  "ad": "Neler Öğrendik?",
-                  "amac": null,
-                  "sayfa": 49,
-                  "tur": "ozet"
-                }
-              ],
               "duzey": 3,
               "her_senaryoda": false,
               "isaret": null,
@@ -735,6 +681,62 @@
               "kitapta": [
                 {
                   "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=36",
+                  "basliklar": [
+                    {
+                      "ad": "Keşif Noktası: Yıldızların Oluşumunu Araştıralım",
+                      "amac": null,
+                      "sayfa": 35,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-1",
+                      "amac": "Yıldızların yaşam sürecine ilişkin kavramlar arasındaki ilişkileri açıklama",
+                      "sayfa": 36,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Performans Görevi: Yıldızların Yaşam Süreci Posterim",
+                      "amac": "Yıldızların yaşam süreci ve bu süreçteki kavramlar arasında ilişki kurma",
+                      "sayfa": 37,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Takımyıldızlar",
+                      "amac": null,
+                      "sayfa": 43,
+                      "tur": "diger"
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-2",
+                      "amac": "Yıldız, galaksi ve evren kavramlarını açıklayarak yapılandırma",
+                      "sayfa": 46,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "amac": null,
+                      "sayfa": 47,
+                      "tur": "kontrol"
+                    },
+                    {
+                      "ad": "Galaksiler",
+                      "amac": null,
+                      "sayfa": 48,
+                      "tur": "diger"
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "amac": null,
+                      "sayfa": 48,
+                      "tur": "kontrol"
+                    },
+                    {
+                      "ad": "Neler Öğrendik?",
+                      "amac": null,
+                      "sayfa": 49,
+                      "tur": "ozet"
+                    }
+                  ],
                   "cerceve": "2. Uzayda Neler Var?",
                   "cerceve_no": 2,
                   "kitap": "Fen Bilimleri 7 (1. Kitap)",
@@ -770,32 +772,6 @@
           "bloklar": [
             {
               "aralik": null,
-              "basliklar": [
-                {
-                  "ad": "Etkinlik Noktası-1",
-                  "amac": "Fiziksel anlamda yapılan işin niteliklerini tanımlama",
-                  "sayfa": 60,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Etkinlik Noktası-2",
-                  "amac": "Fiziksel anlamda iş yapma durumuna göre günlük yaşam örneklerini değerlendirme",
-                  "sayfa": 60,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Bağlantı Noktası",
-                  "amac": null,
-                  "sayfa": 62,
-                  "tur": "baglanti"
-                },
-                {
-                  "ad": "Kontrol Noktası",
-                  "amac": null,
-                  "sayfa": 63,
-                  "tur": "kontrol"
-                }
-              ],
               "duzey": 3,
               "her_senaryoda": true,
               "isaret": "tekrar",
@@ -804,6 +780,32 @@
               "kitapta": [
                 {
                   "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=61",
+                  "basliklar": [
+                    {
+                      "ad": "Etkinlik Noktası-1",
+                      "amac": "Fiziksel anlamda yapılan işin niteliklerini tanımlama",
+                      "sayfa": 60,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-2",
+                      "amac": "Fiziksel anlamda iş yapma durumuna göre günlük yaşam örneklerini değerlendirme",
+                      "sayfa": 60,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Bağlantı Noktası",
+                      "amac": null,
+                      "sayfa": 62,
+                      "tur": "baglanti"
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "amac": null,
+                      "sayfa": 63,
+                      "tur": "kontrol"
+                    }
+                  ],
                   "cerceve": "1. Kuvvet, İş ve Enerji İlişkisi",
                   "cerceve_no": 1,
                   "kitap": "Fen Bilimleri 7 (1. Kitap)",
@@ -825,56 +827,6 @@
             },
             {
               "aralik": null,
-              "basliklar": [
-                {
-                  "ad": "Etkinlik Noktası-3",
-                  "amac": "Kinetik ve potansiyel enerjiyi karşılaştırma",
-                  "sayfa": 65,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Kontrol Noktası",
-                  "amac": null,
-                  "sayfa": 67,
-                  "tur": "kontrol"
-                },
-                {
-                  "ad": "Potansiyel Enerji",
-                  "amac": null,
-                  "sayfa": 68,
-                  "tur": "tanim"
-                },
-                {
-                  "ad": "Çekim Potansiyel Enerjisi",
-                  "amac": null,
-                  "sayfa": 68,
-                  "tur": "tanim"
-                },
-                {
-                  "ad": "Esneklik Potansiyel Enerjisi",
-                  "amac": null,
-                  "sayfa": 68,
-                  "tur": "tanim"
-                },
-                {
-                  "ad": "Kontrol Noktası",
-                  "amac": null,
-                  "sayfa": 68,
-                  "tur": "kontrol"
-                },
-                {
-                  "ad": "Etkinlik Noktası-4",
-                  "amac": "Enerji çeşitlerinden kinetik ve potansiyel enerjiyi karşılaştırma",
-                  "sayfa": 69,
-                  "tur": "etkinlik"
-                },
-                {
-                  "ad": "Neler Öğrendik?",
-                  "amac": null,
-                  "sayfa": 70,
-                  "tur": "ozet"
-                }
-              ],
               "duzey": 3,
               "her_senaryoda": false,
               "isaret": null,
@@ -883,6 +835,56 @@
               "kitapta": [
                 {
                   "baglanti": "https://cdn.eba.gov.tr/temel-egitim/yayin/2026-2027/ktp/fenbilimleri7-1_v3.pdf#page=65",
+                  "basliklar": [
+                    {
+                      "ad": "Etkinlik Noktası-3",
+                      "amac": "Kinetik ve potansiyel enerjiyi karşılaştırma",
+                      "sayfa": 65,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "amac": null,
+                      "sayfa": 67,
+                      "tur": "kontrol"
+                    },
+                    {
+                      "ad": "Potansiyel Enerji",
+                      "amac": null,
+                      "sayfa": 68,
+                      "tur": "tanim"
+                    },
+                    {
+                      "ad": "Çekim Potansiyel Enerjisi",
+                      "amac": null,
+                      "sayfa": 68,
+                      "tur": "tanim"
+                    },
+                    {
+                      "ad": "Esneklik Potansiyel Enerjisi",
+                      "amac": null,
+                      "sayfa": 68,
+                      "tur": "tanim"
+                    },
+                    {
+                      "ad": "Kontrol Noktası",
+                      "amac": null,
+                      "sayfa": 68,
+                      "tur": "kontrol"
+                    },
+                    {
+                      "ad": "Etkinlik Noktası-4",
+                      "amac": "Enerji çeşitlerinden kinetik ve potansiyel enerjiyi karşılaştırma",
+                      "sayfa": 69,
+                      "tur": "etkinlik"
+                    },
+                    {
+                      "ad": "Neler Öğrendik?",
+                      "amac": null,
+                      "sayfa": 70,
+                      "tur": "ozet"
+                    }
+                  ],
                   "cerceve": "1. Kuvvet, İş ve Enerji İlişkisi",
                   "cerceve_no": 1,
                   "kitap": "Fen Bilimleri 7 (1. Kitap)",

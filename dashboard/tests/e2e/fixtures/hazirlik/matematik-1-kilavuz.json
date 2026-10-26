@@ -27,7 +27,7 @@
     "tablo_degisti": false
   },
   "harita_onayli": false,
-  "icerik_ozeti": "a1c3fe50263b6261e301fc17599798fb09eef7d8468faa9a11c41849a2171dcc",
+  "icerik_ozeti": "cae1968b96b0dcf07baabd2ba5c934300cdaa50ad09a654ac20a70926b703023",
   "isaret_sahibi": "Deneme Öğrenci",
   "kaynaklar": [
     {
@@ -154,7 +154,6 @@
                 1,
                 2
               ],
-              "basliklar": [],
               "duzey": 2,
               "her_senaryoda": true,
               "isaret": null,
@@ -174,7 +173,6 @@
                 1,
                 2
               ],
-              "basliklar": [],
               "duzey": 2,
               "her_senaryoda": true,
               "isaret": null,
@@ -194,7 +192,6 @@
                 1,
                 2
               ],
-              "basliklar": [],
               "duzey": 2,
               "her_senaryoda": true,
               "isaret": null,
@@ -214,7 +211,6 @@
                 0,
                 2
               ],
-              "basliklar": [],
               "duzey": 2,
               "her_senaryoda": false,
               "isaret": null,

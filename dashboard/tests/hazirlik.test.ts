@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   baskiAdresi, baslikMetni, ciktiKimligi, dersAnahtari, durumEtiketi, ebeveynCumleleri, kalanGunMetni, kilavuzAdresi,
-  enYakinYazili, kisaAmac, kitapYoluMetni, pdfAdresi, sayfaMetni, sayisalTarih, secenekleriOku, secenekleriYaz, soruMetni, tarihMetni,
+  enYakinYazili, kisaAmac, kitapYoluMetni, pdfAdresi, sayfaMetni, sayisalTarih, secenekleriOku, secenekleriYaz, soruMetni, tarihMetni, BASLIK_TURU,
   yaklasanAyrinti,
 } from '../src/hazirlik/hazirlik.ts'
 import type { KilavuzModeli, SinavDurumu } from '../src/hazirlik/tipler.ts'
@@ -38,6 +38,10 @@ test('soruMetni: kesin tek sayı, olası aralık (K8)', () => {
   assert.equal(soruMetni({ soru: 0, aralik: null }), '0 soru')
   assert.equal(soruMetni({ soru: null, aralik: [0, 2] }), 'senaryoya göre 0–2 soru')
   assert.equal(soruMetni({ soru: null, aralik: [1, 1] }), 'her senaryoda 1 soru')
+  // Olası kipte okurun seçtiği senaryo: tek sayı o senaryoyla nitelenir (K8, düzeltme 2).
+  assert.equal(soruMetni({ soru: 2, aralik: null }, 3), '3. senaryoda 2 soru')
+  assert.equal(soruMetni({ soru: null, aralik: [0, 2] }, 3), 'senaryoya göre 0–2 soru')
+  assert.equal(BASLIK_TURU.diger, 'Alt başlık')
 })
 
 test('kitap yolu, sayfa, amaç ve başlık metni (K1, K6)', () => {
@@ -81,10 +85,14 @@ test('ebeveyn cümleleri', () => {
     ebeveyn: { cikti_sayisi: 4, toplam_soru: 7, soru_araligi: null, hazirim: 1, tekrar: 1, isaretsiz: 2, en_agir: [] } } as unknown as KilavuzModeli
   assert.deepEqual(ebeveynCumleleri(m), ['Fen Bilimleri 1. yazılı: 3 Kasım Salı, 9 gün kaldı.', 'Okul 2. senaryoyu duyurdu.',
     '4 öğrenme çıktısı, toplam 7 soru.', 'Hazırlık işaretleri: 1 hazır, 1 tekrar, 2 işaretsiz.'])
-  const olasi = { ...m, kip: 'olasi', durum: { ...DURUM, tarih: null, kalan_gun: null },
+  const olasi = { ...m, kip: 'olasi', senaryo: null, durum: { ...DURUM, tarih: null, kalan_gun: null },
     ebeveyn: { ...m.ebeveyn!, toplam_soru: null, soru_araligi: [6, 9] } } as KilavuzModeli
   assert.deepEqual(ebeveynCumleleri(olasi).slice(0, 3), ['Fen Bilimleri 1. yazılı: tarihi henüz belli değil.',
     'Senaryo henüz duyurulmadı; kılavuz bütün senaryoları kapsar.', '4 öğrenme çıktısı; senaryoya göre 6–9 soru.'])
+  // Okurun seçtiği (duyurulmamış) senaryo: toplam o senaryoyla nitelenir, "bütün senaryolar" denmez (K8, düzeltme 2).
+  const secilen = { ...m, kip: 'olasi', senaryo: 3, ebeveyn: { ...m.ebeveyn!, toplam_soru: 8 } } as KilavuzModeli
+  assert.deepEqual(ebeveynCumleleri(secilen).slice(1, 3), ['Senaryo henüz duyurulmadı; kılavuz seçilen 3. senaryoya göre.',
+    '4 öğrenme çıktısı; 3. senaryoda toplam 8 soru.'])
   assert.deepEqual(ebeveynCumleleri({ ...m, ebeveyn: null }), [])
 })
 

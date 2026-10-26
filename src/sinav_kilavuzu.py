@@ -165,9 +165,15 @@ def _eslesen_bolumler(harita: dict | None, kod: str):
         yield kitap, unite, cer, konu
 
 
+def _sirali_bolumler(harita: dict | None, kod: str) -> list[tuple]:
+    """`_eslesen_bolumler`, gösterdikleri bölümün (konu ya da çerçeve) basılı sayfasına göre sıralı (düzeltme turu 1:
+    yollar kitaptaki sırayla yazılır, haritadaki eşleşme sırasıyla değil)."""
+    return sorted(_eslesen_bolumler(harita, kod), key=lambda e: ((e[3] or e[2])["sayfa"], (e[3] or e[2])["son_sayfa"]))
+
+
 def _kitap_yollari(harita: dict | None, kod: str) -> list[dict]:
     yollar = []
-    for kitap, unite, cer, konu in _eslesen_bolumler(harita, kod):
+    for kitap, unite, cer, konu in _sirali_bolumler(harita, kod):
         hedef = konu or cer
         pdf = hedef["sayfa"] + int(kitap.get("sayfa_kaymasi") or 0)
         yollar.append({"kitap": kitap["baslik"], "unite": f"{unite['no']}. Ünite", "unite_no": unite["no"],
@@ -271,18 +277,22 @@ ISARETLER = ("hazirim", "tekrar")
 _ISARET_SIRASI = {"tekrar": 0, None: 1, "hazirim": 2}
 
 
-def _bolum_basliklari(harita: dict | None, kod: str) -> list[dict]:
-    """Çıktının kitap bölümlerinde ele alınan başlıklar (K6: hepsi). Konuya bağlıysa konunun, çerçeveye bağlıysa
-    (`konu: None`) çerçevenin ve bütün konularının başlıkları; aynı bölüm iki kez yazılmaz."""
-    out: list[dict] = []
+def _yol_basliklari(harita: dict | None, kod: str) -> list[dict]:
+    """Kılavuz bloğunun kitap yolları; her yol kendi bölümünde ele alınan başlıkları taşır (K6: hepsi; düzeltme turu
+    1: konu sınırı kaybolmasın diye yol başına). Konuya bağlı yol o konunun, çerçeveye bağlı yol (`konu: None`)
+    çerçevenin ve bütün konularının başlıklarını alır; aynı bölüm iki yolda yazılmaz. Yollar ve her yolun başlıkları
+    sayfaya göre sıralıdır (eşit sayfada kitaptaki sıra korunur). Ders sayfasının yolları başlık taşımaz."""
     gorulen: set[int] = set()
-    for _, _, cer, konu in _eslesen_bolumler(harita, kod):
+    out = []
+    for yol, (_, _, cer, konu) in zip(_kitap_yollari(harita, kod), _sirali_bolumler(harita, kod)):
+        basliklar: list[dict] = []
         for bolum in ([konu] if konu else [cer, *cer["konular"]]):
             if id(bolum) in gorulen:
                 continue
             gorulen.add(id(bolum))
-            out += [{"ad": b["ad"], "tur": b["tur"], "amac": b.get("amac"), "sayfa": b["sayfa"]}
-                    for b in bolum.get("basliklar", [])]
+            basliklar += [{"ad": b["ad"], "tur": b["tur"], "amac": b.get("amac"), "sayfa": b["sayfa"]}
+                          for b in bolum.get("basliklar", [])]
+        out.append({**yol, "basliklar": sorted(basliklar, key=lambda b: b["sayfa"])})
     return out
 
 
@@ -482,13 +492,13 @@ def kilavuz(g: Girdiler, anahtar: str, no: int, senaryo: int | None, secenekler:
             sayilar = list(s["sayilar"].values())
             terimler = _terimler(s["kitapta"])
             isaret = isaretler.get(s["kod"])
-            bolum = next(_eslesen_bolumler(harita, s["kod"]), None)
+            bolum = next(iter(_sirali_bolumler(harita, s["kod"])), None)
             b = {"kod": s["kod"], "kisa_ad": s["kisa_ad"], "metin": s["metin"],
                  "senaryoda": dagilim.get(s["kod"], 0) > 0 if dagilim is not None else True,
                  "soru": int(dagilim.get(s["kod"], 0)) if dagilim is not None else None,
                  "aralik": None if dagilim is not None else [min(sayilar), max(sayilar)],
-                 "her_senaryoda": s["her_senaryoda"], "kitapta": s["kitapta"], "kitap_durumu": s["kitap_durumu"],
-                 "basliklar": _bolum_basliklari(harita, s["kod"]),
+                 "her_senaryoda": s["her_senaryoda"], "kitapta": _yol_basliklari(harita, s["kod"]),
+                 "kitap_durumu": s["kitap_durumu"],
                  "okulda": okulda(g.haftalar, ders, terimler), "odevler": ilgili_odevler(g.odevler, ders, terimler),
                  "moduller": ilgili_moduller(g.moduller, s["kod"]), "isaret": isaret if isaret in ISARETLER else None}
             if bolum:

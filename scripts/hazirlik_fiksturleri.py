@@ -75,6 +75,8 @@ def fiksturler() -> dict[str, dict]:
         "fen-bilimleri-1-kilavuz-ebeveyn": sk.kilavuz(g, "fen-bilimleri", 1, None, {"ebeveyn": True, "isaret": True}),
         "fen-bilimleri-1-olasi": sk.ders_ozeti(olasi, "fen-bilimleri", 1),
         "fen-bilimleri-1-olasi-kilavuz": sk.kilavuz(olasi, "fen-bilimleri", 1, None, acik),
+        # Duyuru yokken okurun seçtiği 3. senaryo (K8: sayılar "3. senaryoda" diye nitelenir).
+        "fen-bilimleri-1-secilen-kilavuz": sk.kilavuz(olasi, "fen-bilimleri", 1, 3, acik),
         "fen-bilimleri-1-k12-kilavuz": sk.kilavuz(k12, "fen-bilimleri", 1, None, acik),
         "fen-bilimleri-1-bulunamadi-kilavuz": sk.kilavuz(bulunamadi, "fen-bilimleri", 1, None, acik),
         "matematik-1": sk.ders_ozeti(g, "matematik", 1),

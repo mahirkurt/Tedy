@@ -49,7 +49,7 @@ def model_basliklari(model: dict) -> tuple[list[str], list[str]]:
                 for y in b["kitapta"]:
                     if y.get("konu"):
                         basliklar.append(y["konu"])
-                basliklar += [h["ad"] for h in b["basliklar"]]
+                    basliklar += [h["ad"] for h in y.get("basliklar", [])]
     icindekiler.append("Kaynaklar")
     return list(dict.fromkeys(basliklar)), icindekiler
 

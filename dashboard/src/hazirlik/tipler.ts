@@ -76,6 +76,10 @@ export interface Baslik { ad: string; tur: BaslikTuru; amac: string | null; sayf
 
 export type IsaretDurumu = 'hazirim' | 'tekrar' | null
 
+/** Kılavuz bloğunun kitap yolu: o bölümde ele alınan başlıklar yolun kendisinde, sayfaya göre sıralı (düzeltme 1:
+ *  iki konuya bağlı çıktıda konu sınırı kaybolmaz). Ders sayfasının yolları (`KitapYolu`) başlık taşımaz. */
+export interface KilavuzYolu extends KitapYolu { basliklar: Baslik[] }
+
 export interface Blok {
   kod: string
   kisa_ad: string
@@ -84,9 +88,8 @@ export interface Blok {
   soru: number | null
   aralik: [number, number] | null
   her_senaryoda: boolean
-  kitapta: KitapYolu[]
+  kitapta: KilavuzYolu[]
   kitap_durumu: KitapDurumu
-  basliklar: Baslik[]
   okulda: { hafta: string }[]
   odevler: { baslik: string; teslim: string | null }[]
   moduller: { baslik: string; yol: string }[]

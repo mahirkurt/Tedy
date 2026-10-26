@@ -50,23 +50,48 @@ def test_kilavuz_bilinmeyen_senaryo_hata():
 
 
 def test_kilavuz_kitapta_ve_bolum_basliklari():
+    """Başlıklar kitap yolu başınadır (düzeltme turu 1): iki konuya bağlı çıktıda konu sınırı kaybolmaz."""
     b = _bloklar(sk.kilavuz(girdiler(), "fen-bilimleri", 1, None, SEC))
-    assert b["FB.7.2.1"]["kitapta"][0]["baglanti"].endswith("#page=61")
-    assert [(x["tur"], x["ad"], x["sayfa"]) for x in b["FB.7.2.1"]["basliklar"]] == [
+    yol = b["FB.7.2.1"]["kitapta"]
+    assert len(yol) == 1 and yol[0]["baglanti"].endswith("#page=61")
+    assert [(x["tur"], x["ad"], x["sayfa"]) for x in yol[0]["basliklar"]] == [
         ("etkinlik", "Etkinlik Noktası-1", 60), ("etkinlik", "Etkinlik Noktası-2", 60),
         ("baglanti", "Bağlantı Noktası", 62), ("kontrol", "Kontrol Noktası", 63)]
-    # İki konuya bağlı çıktı: iki konunun başlıkları sırayla.
-    assert [x["ad"] for x in b["FB.7.1.1"]["basliklar"]][:2] == ["Keşif Noktası: Uzay Teknolojileri", "Kontrol Noktası"]
-    assert "Neler Öğrendik?" in [x["ad"] for x in b["FB.7.1.1"]["basliklar"]]
+    assert "basliklar" not in b["FB.7.2.1"]          # düz, konusuz liste yok
+    # İki konuya bağlı çıktı: her yol yalnız kendi konusunun başlıklarını taşır; s. 24'teki Kontrol Noktası ilk konunun.
+    yollar = b["FB.7.1.1"]["kitapta"]
+    assert [(y["konu"], y["sayfa"], y["son_sayfa"]) for y in yollar] == [
+        ("Uzay Teknolojileri", 16, 24), ("Teknoloji ile Uzay Araştırmaları Arasındaki İlişki", 24, 33)]
+    assert [(h["ad"], h["sayfa"]) for h in yollar[0]["basliklar"]] == [
+        ("Keşif Noktası: Uzay Teknolojileri", 17), ("Kontrol Noktası", 19), ("Teleskop Çeşitleri", 22),
+        ("Kontrol Noktası", 24)]
+    assert [h["ad"] for h in yollar[1]["basliklar"]] == [
+        "Bağlantı Noktası", "Astronot", "Performans Görevi: Uzay Gözlem Araçları Modeli", "Neler Öğrendik?"]
+
+
+def test_kitap_yollari_ve_basliklari_sayfaya_gore_sirali():
+    h = fen_haritasi()
+    h["eslesme"]["FB.7.1.1"].reverse()
+    h["kitaplar"][0]["uniteler"][0]["cerceveler"][0]["konular"][0]["basliklar"].reverse()
+    g = girdiler(haritalar={"fen-bilimleri": h})
+    yollar = _bloklar(sk.kilavuz(g, "fen-bilimleri", 1, None, SEC))["FB.7.1.1"]["kitapta"]
+    assert [y["sayfa"] for y in yollar] == [16, 24]
+    assert [x["sayfa"] for x in yollar[0]["basliklar"]] == [17, 19, 22, 24]
+    # Ders sayfası (matris) da aynı yol sırasını görür; orada başlık taşınmaz.
+    satir = next(s for gr in sk.ders_ozeti(g, "fen-bilimleri", 1)["gruplar"] for s in gr["satirlar"] if s["kod"] == "FB.7.1.1")
+    assert [y["sayfa"] for y in satir["kitapta"]] == [16, 24] and all("basliklar" not in y for y in satir["kitapta"])
 
 
 def test_cerceveye_bagli_cikti_cercevenin_butun_basliklarini_alir():
     h = fen_haritasi()
     h["eslesme"]["FB.7.2.1"] = [{"kitap": 0, "unite": 2, "cerceve": 1, "konu": None}]
     b = _bloklar(sk.kilavuz(girdiler(haritalar={"fen-bilimleri": h}), "fen-bilimleri", 1, None, SEC))
-    adlar = [x["ad"] for x in b["FB.7.2.1"]["basliklar"]]
+    yol = b["FB.7.2.1"]["kitapta"][0]
+    adlar = [x["ad"] for x in yol["basliklar"]]
     assert adlar[0] == "Bağlantı Noktası" and "Potansiyel Enerji" in adlar
-    assert b["FB.7.2.1"]["kitapta"][0]["konu"] is None and b["FB.7.2.1"]["kitapta"][0]["sayfa"] == 59
+    sayfalar = [x["sayfa"] for x in yol["basliklar"]]
+    assert sayfalar == sorted(sayfalar)
+    assert yol["konu"] is None and yol["sayfa"] == 59
 
 
 def test_kilavuz_bulunamayan_cikti_blokta_bulunamadi():
@@ -75,7 +100,7 @@ def test_kilavuz_bulunamayan_cikti_blokta_bulunamadi():
     h["eslesmedi"] = ["FB.7.1.3"]
     m = sk.kilavuz(girdiler(haritalar={"fen-bilimleri": h}), "fen-bilimleri", 1, None, SEC)
     b = _bloklar(m)["FB.7.1.3"]
-    assert (b["kitap_durumu"], b["kitapta"], b["basliklar"]) == ("bulunamadi", [], [])
+    assert (b["kitap_durumu"], b["kitapta"]) == ("bulunamadi", []) and "basliklar" not in b
 
 
 def test_kilavuz_haritasiz_ders_kitap_bolumleri_yok():
@@ -170,7 +195,7 @@ def test_gercek_fen_haritasiyla_kilavuz_kurulur():
     assert h is not None
     m = sk.kilavuz(girdiler(haritalar={"fen-bilimleri": h}), "fen-bilimleri", 1, None, SEC)
     b = _bloklar(m)
-    assert all(x["kitap_durumu"] == "var" and x["basliklar"] for x in b.values())
+    assert all(x["kitap_durumu"] == "var" and x["kitapta"] and all(y["basliklar"] for y in x["kitapta"]) for x in b.values())
     assert b["FB.7.2.1"]["kitapta"][0]["konu"] == "Fiziksel Anlamda İş"
 
 

@@ -57,9 +57,10 @@ export function yaklasanAyrinti(d: SinavDurumu, soru: number | null): string {
   return p.join(' · ')
 }
 
-/** K8: tek sayı yalnız senaryo belliyken; olası kipte senaryolar arası aralık. */
-export function soruMetni(b: Pick<Blok, 'soru' | 'aralik'>): string {
-  if (b.soru !== null) return `${b.soru} soru`
+/** K8: tek sayı yalnız senaryo belliyken; olası kipte senaryolar arası aralık. `secilen`: olası kipte okurun seçtiği
+ *  (duyurulmamış) senaryo — tek sayı o senaryoyla nitelenir ("3. senaryoda 2 soru"), "bu senaryo" diye okunmasın. */
+export function soruMetni(b: Pick<Blok, 'soru' | 'aralik'>, secilen: number | null = null): string {
+  if (b.soru !== null) return secilen !== null ? `${secilen}. senaryoda ${b.soru} soru` : `${b.soru} soru`
   const [a, z] = b.aralik ?? [0, 0]
   return a === z ? `her senaryoda ${a} soru` : `senaryoya göre ${a}–${z} soru`
 }
@@ -89,7 +90,7 @@ export function baslikMetni(b: Baslik): string {
 }
 
 export const BASLIK_TURU: Record<Baslik['tur'], string> = {
-  etkinlik: 'Etkinlik', baglanti: 'Bağlantı', kontrol: 'Kontrol', tanim: 'Tanım', ozet: 'Özet', diger: 'Konu',
+  etkinlik: 'Etkinlik', baglanti: 'Bağlantı', kontrol: 'Kontrol', tanim: 'Tanım', ozet: 'Özet', diger: 'Alt başlık',
 }
 
 /** Bloğun çapası: "FB.7.2.1" → "cikti-FB-7-2-1". */
@@ -165,10 +166,13 @@ export function ebeveynCumleleri(m: KilavuzModeli): string[] {
   const zaman = d.tarih === null ? 'tarihi henüz belli değil'
     : `${tarihMetni(d.tarih)}${d.kalan_gun === 0 ? ', bugün' : d.kalan_gun !== null ? `, ${d.kalan_gun} gün kaldı` : ''}`
   const c = [`${m.ders} ${sinavAdi(m.sinav_no)}: ${zaman}.`]
+  const secilen = m.kip === 'olasi' ? m.senaryo : null
   if (m.kip === 'kesin') c.push(`Okul ${m.senaryo}. senaryoyu duyurdu.`)
   else if (m.kip === 'ulke_geneli') c.push('Sınav ülke genelinde ortak yapılır; MEB senaryo vermedi.')
+  else if (secilen !== null) c.push(`Senaryo henüz duyurulmadı; kılavuz seçilen ${secilen}. senaryoya göre.`)
   else c.push('Senaryo henüz duyurulmadı; kılavuz bütün senaryoları kapsar.')
-  if (e.toplam_soru !== null) c.push(`${e.cikti_sayisi} öğrenme çıktısı, toplam ${e.toplam_soru} soru.`)
+  if (e.toplam_soru !== null && secilen !== null) c.push(`${e.cikti_sayisi} öğrenme çıktısı; ${secilen}. senaryoda toplam ${e.toplam_soru} soru.`)
+  else if (e.toplam_soru !== null) c.push(`${e.cikti_sayisi} öğrenme çıktısı, toplam ${e.toplam_soru} soru.`)
   else if (e.soru_araligi) c.push(`${e.cikti_sayisi} öğrenme çıktısı; senaryoya göre ${e.soru_araligi[0]}–${e.soru_araligi[1]} soru.`)
   c.push(`Hazırlık işaretleri: ${e.hazirim} hazır, ${e.tekrar} tekrar, ${e.isaretsiz} işaretsiz.`)
   return c

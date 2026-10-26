@@ -7,9 +7,9 @@ import DurumGostergesi from './DurumGostergesi'
 import KarsilastirmaTablosu from './KarsilastirmaTablosu'
 import Uyarilar from './Uyarilar'
 import { BOLUM, bolumler, damgaMetni, hazirlikUyarilari, ustBilgi } from './belge'
-import { BASLIK_TURU, baslikMetni, ciktiKimligi, ebeveynCumleleri, kalanGunMetni, kitapYoluMetni, sayfaMetni,
+import { BASLIK_TURU, baslikMetni, ciktiKimligi, ebeveynCumleleri, kalanGunMetni, sayfaMetni,
          soruMetni, tarihMetni } from './hazirlik'
-import type { Blok, IsaretDurumu, KilavuzModeli } from './tipler'
+import type { Blok, IsaretDurumu, KilavuzModeli, KitapYolu } from './tipler'
 import type { IsaretHatasi } from './useIsaretler'
 import './Kilavuz.scss'
 
@@ -23,6 +23,13 @@ function KagitKutusu({ dolu, ad }: { dolu: boolean; ad: string }) {
       {ad}{dolu && <span className="cds--visually-hidden"> (işaretli)</span>}
     </span>
   )
+}
+
+/** Kitap yolu, kitaptaki adlarıyla (K1); son öğe (konu, yoksa çerçeve) kalın — metni `kitapYoluMetni` ile aynı. */
+function YolMetni({ y }: { y: KitapYolu }) {
+  const once = y.konu ? [y.kitap, y.unite, y.cerceve] : [y.kitap, y.unite]
+  // Tek kutu: Carbon bağlantısı esnek kutudur; metin ve kalın konu ayrı öğe olursa yan yana iki sütuna bölünür.
+  return <span className="kilavuz-yol__metin">{`${once.join(' › ')} › `}<strong>{y.konu ?? y.cerceve}</strong></span>
 }
 
 /** Hazırlık işareti: ekranda iki Carbon onay kutusu (biri seçilince öteki kalkar), kâğıtta durağan karşılığı (K11).
@@ -69,38 +76,42 @@ function CiktiBlogu({ b, m, kip, duzey, isaret, isaretle, hata, hatayiKapat }: {
         ? <h5 className="kilavuz-blok__ust"><span className="cds--visually-hidden">Öğrenme çıktısı </span><span className="kilavuz-kod">{b.kod}</span></h5>
         : <h4 className="kilavuz-blok__ust"><span className="cds--visually-hidden">Öğrenme Çıktısı </span><span className="kilavuz-kod">{b.kod}</span></h4>}
       <p className="kilavuz-blok__soru">
-        <span className="kilavuz-blok__sayi">{soruMetni(b)}</span>
+        <span className="kilavuz-blok__sayi">{soruMetni(b, m.kip === 'olasi' ? m.senaryo : null)}</span>
         {b.her_senaryoda && <Tag type="gray" size="sm" className="kilavuz-blok__her">her senaryoda</Tag>}
       </p>
       <blockquote className="kilavuz-blok__meb">{`MEB: “${b.metin}”`}</blockquote>
       <p className="kilavuz-blok__etiket">Kitapta</p>
       {b.kitap_durumu === 'var' ? (
+        // Kitapta ve "Bu bölümde ele alınanlar" tek iç içe liste (düzeltme 1): her yol bir satır, hemen altında o
+        // konunun başlıkları. Liste düzenidir, başlık düzeyi değil.
         <ul className="kilavuz-blok__yollar">
           {b.kitapta.map((y, i) => (
-            <li key={`${i}-${y.cerceve}-${y.konu}`}>
-              {kip === 'ekran'
-                ? <CarbonLink href={y.baglanti} target="_blank" rel="noreferrer" renderIcon={Launch}>{kitapYoluMetni(y)}</CarbonLink>
-                : <span>{kitapYoluMetni(y)}</span>}
-              <span className="kilavuz-sayfa-no"><span className="cds--visually-hidden"> · </span>{sayfaMetni(y.sayfa, y.son_sayfa)}</span>
+            <li key={`${i}-${y.cerceve}-${y.konu}`} className="kilavuz-yol">
+              <div className="kilavuz-yol__satir">
+                {kip === 'ekran'
+                  ? <CarbonLink href={y.baglanti} target="_blank" rel="noreferrer" renderIcon={Launch}><YolMetni y={y} /></CarbonLink>
+                  : <span><YolMetni y={y} /></span>}
+                <span className="kilavuz-sayfa-no"><span className="cds--visually-hidden"> · </span>{sayfaMetni(y.sayfa, y.son_sayfa)}</span>
+              </div>
+              {y.basliklar.length > 0 && (
+                <>
+                  <p className="kilavuz-yol__etiket">Bu bölümde ele alınanlar</p>
+                  <ul className="kilavuz-basliklar">
+                    {y.basliklar.map((h, j) => (
+                      <li key={j}>
+                        <span className="kilavuz-basliklar__tur">{BASLIK_TURU[h.tur]}</span>
+                        <span className="kilavuz-basliklar__ad">{` ${baslikMetni(h)}`}</span>
+                        <span className="kilavuz-sayfa-no"><span className="cds--visually-hidden"> · </span>{`s. ${h.sayfa}`}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </li>
           ))}
         </ul>
       ) : (
         <p className="kilavuz-blok__yok">{b.kitap_durumu === 'bulunamadi' ? 'Kitapta karşılığı bulunamadı.' : 'Kitap bölümleri henüz eklenmedi.'}</p>
-      )}
-      {b.basliklar.length > 0 && (
-        <>
-          <p className="kilavuz-blok__etiket">Bu bölümde ele alınanlar</p>
-          <ul className="kilavuz-basliklar">
-            {b.basliklar.map((h, i) => (
-              <li key={i}>
-                <span className="kilavuz-basliklar__tur">{BASLIK_TURU[h.tur]}</span>
-                <span className="kilavuz-basliklar__ad">{` ${baslikMetni(h)}`}</span>
-                <span className="kilavuz-sayfa-no"><span className="cds--visually-hidden"> · </span>{`s. ${h.sayfa}`}</span>
-              </li>
-            ))}
-          </ul>
-        </>
       )}
       {/* Karar: alan "ders kartında geçtiği hafta"dır; "işlendi" denmez, hafta yoksa "işlenmedi" de denmez. */}
       <p className="kilavuz-blok__baglam">{`Ders kartında geçtiği hafta: ${b.okulda.map(h => h.hafta).join(', ') || 'bulunamadı'}`}</p>
@@ -143,7 +154,11 @@ export default function KilavuzBelgesi({ model: m, kip, isaretler = {}, isaretle
     ...hazirlikUyarilari(m),
     ...(m.kip === 'ulke_geneli' && m.not ? [m.not] : []),
   ]
-  const toplam = m.ozet.toplam_soru ?? (m.ozet.soru_araligi ? `senaryoya göre ${m.ozet.soru_araligi[0]}–${m.ozet.soru_araligi[1]}` : '–')
+  // K8: olası kipte seçilen senaryonun sayıları o senaryoyla nitelenir ("3. senaryoda toplam 8 soru").
+  const nitelik = m.kip === 'olasi' ? m.senaryo : null
+  const toplam = m.ozet.toplam_soru !== null
+    ? (nitelik !== null ? `${nitelik}. senaryoda toplam ${m.ozet.toplam_soru} soru` : m.ozet.toplam_soru)
+    : (m.ozet.soru_araligi ? `senaryoya göre ${m.ozet.soru_araligi[0]}–${m.ozet.soru_araligi[1]}` : '–')
   const sahip = m.secenekler.isaret ? m.isaret_sahibi : null
   return (
     <article className={`kilavuz-belge kilavuz-belge--${kip} ${subjectClass(m.ders)}`} lang="tr">
@@ -177,7 +192,7 @@ export default function KilavuzBelgesi({ model: m, kip, isaretler = {}, isaretle
                 <li key={b.kod}>
                   <span className="kilavuz-kod">{b.kod}</span>
                   <span className="kilavuz-ozet__metin">{b.kisa_ad}</span>
-                  <span className="kilavuz-ozet__soru">{soruMetni(b)}</span>
+                  <span className="kilavuz-ozet__soru">{soruMetni(b, nitelik)}</span>
                 </li>
               ))}
             </ul>
