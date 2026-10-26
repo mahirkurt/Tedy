@@ -86,6 +86,14 @@ test('olası kip: tek senaryo sayısı yok (K8)', async ({ page }) => {
   await expect(page.getByText(/Seçtiğin/)).toHaveCount(0)
 })
 
+test('ülke geneli sınav: ?senaryo=2 ile açılsa da sunucu senaryo null döner, sayfa boş kalmaz', async ({ page }) => {
+  // Sunucu ülke geneli kipte istenen senaryoyu yok sayar (senaryo: null); sayfa bunu "bu adresin yanıtı" diye kabul eder.
+  await hazirlikAc(page, '/hazirlik/turkce/2?senaryo=2', [[KILAVUZ('turkce', 2), fikstur('turkce-2-ulke-geneli-kilavuz')]])
+  await expect(page.getByRole('heading', { name: 'Kapsam Kılavuzu', level: 2 })).toBeVisible()
+  await expect(page.locator('.kilavuz-baslik__alt')).toHaveText('Türkçe · 2. yazılı · ülke geneli')
+  await expect(page.locator('.kilavuz-sayfa')).toContainText('Ülke Geneli Ortak Yazılı Sınav şeklinde yapılacaktır')
+})
+
 test('seçilen ama duyurulmamış senaryo öyle etiketlenir; sayılar o senaryoyla nitelenir (K8)', async ({ page }) => {
   await hazirlikAc(page, '/hazirlik/fen-bilimleri/1?senaryo=3', [[KILAVUZ('fen-bilimleri', 1), fikstur('fen-bilimleri-1-secilen-kilavuz')]])
   await expect(page.locator('.kilavuz-baslik__alt')).toHaveText('Fen Bilimleri · 1. yazılı · 3. senaryo (olası)')

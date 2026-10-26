@@ -29,8 +29,10 @@ export default function KilavuzSayfasi() {
   const { data, loading, iskelet, hataTuru, hataDurumu, hataMesaji } = useApi<KilavuzModeli | null>(
     modelAdresi(anahtar, no, senaryo, { ebeveyn: false, isaret: true }), null)
   // useApi uç değişince eski veriyi tutar: başka bir dersin, yazılının ya da istenen senaryonun kılavuzu bu adresin adı
-  // altında çizilmez.
-  const m = data && data.anahtar === anahtar && data.sinav_no === no && (senaryo === null || data.senaryo === senaryo) ? data : null
+  // altında çizilmez. Ülke geneli ortak sınavda sunucu istenen senaryoyu yok sayar (senaryo: null); o kip her
+  // ?senaryo=N adresinin yanıtıdır.
+  const m = data && data.anahtar === anahtar && data.sinav_no === no
+    && (senaryo === null || data.senaryo === senaryo || data.kip === 'ulke_geneli') ? data : null
   const { isaretler, isaretle, hata, hatayiKapat } = useIsaretler(anahtar, m)
   const { acik: pdfAcik, ac: pdfAc, kapat: pdfKapat, dugme: pdfDugmesi } = usePdfPenceresi()
   const pdfSecimi = usePdfSecenekleri(useSession()?.email ?? '')

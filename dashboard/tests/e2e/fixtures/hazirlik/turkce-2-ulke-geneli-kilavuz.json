@@ -1,0 +1,70 @@
+{
+  "anahtar": "turkce",
+  "damgalar": {
+    "kitaplar": [],
+    "meb_guncelleme": "2026-09-10T17:27",
+    "tablo_alindi": "2026-10-20",
+    "uretim": "2026-10-25"
+  },
+  "ders": "Türkçe",
+  "dogrulama": null,
+  "durum": {
+    "anilan": [],
+    "duyuru": null,
+    "duyurulan_konu": 0,
+    "kalan_gun": 72,
+    "senaryo": null,
+    "senaryo_sayisi": 0,
+    "sinav_id": "tr12",
+    "tarih": "2027-01-05",
+    "tur": "ulke_geneli",
+    "uyari": null
+  },
+  "duyurulan": null,
+  "ebeveyn": null,
+  "guncellik": {
+    "kitap_degisti": false,
+    "tablo_degisti": false
+  },
+  "harita_onayli": false,
+  "icerik_ozeti": "3e0afe3364f326beea7ee9d1d8fe3009c064dad89b2e2ba5b22c6b792ba1f8e5",
+  "isaret_sahibi": "Deneme Öğrenci",
+  "kaynaklar": [
+    {
+      "adres": "https://odsgm.meb.gov.tr/www/1donem-konu-soru-dagilim-tablolari-2026-2027/icerik/1724",
+      "etiket": "MEB ÖDSGM · 1. Dönem Konu Soru Dağılım Tabloları (2026-2027)"
+    },
+    {
+      "adres": "https://meb.ai/ankmeb4",
+      "etiket": "Türkçe konu-soru dağılım tablosu"
+    }
+  ],
+  "kip": "ulke_geneli",
+  "kitap_bolumleri": false,
+  "matris": {
+    "duyurulan": null,
+    "gruplar": [],
+    "senaryolar": [],
+    "toplamlar": {}
+  },
+  "not": "1. Dönem 2. Ortak Yazılı Sınav Ülke Geneli Ortak Yazılı Sınav şeklinde yapılacaktır. Konu Soru Dağılım Tablosu sınav öncesi kılavuz ile birlikte yayımlanacaktır.",
+  "ozet": {
+    "cikti_sayisi": 0,
+    "her_senaryoda": [],
+    "soru_araligi": null,
+    "toplam_soru": null
+  },
+  "plan": null,
+  "secenekler": {
+    "ebeveyn": false,
+    "isaret": true
+  },
+  "secilen_duyurulan_degil": false,
+  "senaryo": null,
+  "sinav_no": 2,
+  "surum": 1,
+  "uniteler": [],
+  "yz": {
+    "durum": "kapali"
+  }
+}

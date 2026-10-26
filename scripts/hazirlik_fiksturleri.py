@@ -79,6 +79,8 @@ def fiksturler() -> dict[str, dict]:
         "fen-bilimleri-1-secilen-kilavuz": sk.kilavuz(olasi, "fen-bilimleri", 1, 3, acik),
         "fen-bilimleri-1-k12-kilavuz": sk.kilavuz(k12, "fen-bilimleri", 1, None, acik),
         "fen-bilimleri-1-bulunamadi-kilavuz": sk.kilavuz(bulunamadi, "fen-bilimleri", 1, None, acik),
+        # Ülke geneli ortak sınav: sunucu ?senaryo=2 gelse de senaryo null döner (kip "ulke_geneli"); sayfa bunu bekler.
+        "turkce-2-ulke-geneli-kilavuz": sk.kilavuz(g, "turkce", 2, 2, acik),
         "matematik-1": sk.ders_ozeti(g, "matematik", 1),
         "matematik-1-kilavuz": sk.kilavuz(g, "matematik", 1, None, acik),
     }
