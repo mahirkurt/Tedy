@@ -258,6 +258,9 @@ DEFAULT_EXCLUDED_DIRS = {
     "output/ocr_onbellek",
     # Playwright CLI page snapshots ("- paragraph [ref=e5]: Yükleniyor..."), 2026-10-05.
     "output/playwright",
+    # Sınav hazırlığı PDF önbelleği (src/hazirlik_pdf.py): öğrencinin adı ve işaretleri basılı kâğıtta;
+    # /api/assistant/chat API anahtarını kabul ettiği için bu veri o yoldan sızardı. Yuva kilitleri de burada.
+    "output/hazirlik_pdf",
 }
 
 DEFAULT_EXCLUDED_FILE_PATTERNS = {

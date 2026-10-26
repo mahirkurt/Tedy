@@ -107,6 +107,10 @@ FORBIDDEN_DIRS = (
     "content/pedagoji/woolfolk.md",
     "content/eba_backup/eski.pdf",       # generic 'backup' substring, non-literal dir
     "output/2026_yedek_kopya/eski.json",  # generic 'yedek' substring, non-literal dir
+    # Sınav hazırlığı PDF önbelleği (src/hazirlik_pdf.py): öğrencinin adı ve işaretleri basılı kâğıtta;
+    # /api/assistant/chat API anahtarını kabul ettiği için dizin indekse hiç girmemeli (yuva dosyası dahil).
+    "output/hazirlik_pdf/x.pdf",
+    "output/hazirlik_pdf/.yuva-0",
 )
 
 
