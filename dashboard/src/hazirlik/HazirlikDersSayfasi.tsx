@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MouseEvent } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Breadcrumb, BreadcrumbItem, Button, ContentSwitcher, InlineNotification, RadioButton, RadioButtonGroup,
@@ -13,7 +13,7 @@ import CiktiAyrintisi from './CiktiAyrintisi'
 import DurumGostergesi from './DurumGostergesi'
 import Uyarilar from './Uyarilar'
 import { hazirlikUyarilari } from './belge'
-import { kilavuzAdresi, sinavAdi, tarihMetni } from './hazirlik'
+import { enYakinYazili, kilavuzAdresi, sinavAdi, tarihMetni } from './hazirlik'
 import type { DersOzeti } from './tipler'
 import './Hazirlik.scss'
 
@@ -52,6 +52,17 @@ export default function HazirlikDersSayfasi() {
   const [secim, setSecim] = useState<string>('olasi')
   const satirDugmesi = useRef<HTMLButtonElement | null>(null)
   const kapat = useCallback(() => { setSecili(null); satirDugmesi.current?.focus() }, [])
+  // `?sinav` yoksa dersin en yakın yazılısı açılır (Dersler sekmesi ve doğrudan adres numarasız gelir): yüklenen
+  // yazılı listesinden seçilir, adres yerine yazılır (Geri tuşu numarasız adrese dönüp yeniden yönlendirmez).
+  const sinavParametresiYok = arama.get('sinav') === null
+  const sinavListesi = data && data.anahtar === anahtar ? data.sinavlar : null
+  useEffect(() => {
+    if (!sinavParametresiYok || !sinavListesi) return
+    const yakin = enYakinYazili(sinavListesi)
+    if (yakin && yakin.sinav_no !== 1) {
+      setArama(p => { const q = new URLSearchParams(p); q.set('sinav', String(yakin.sinav_no)); return q }, { replace: true })
+    }
+  }, [sinavParametresiYok, sinavListesi, setArama])
   if (loading) {
     return iskelet ? <section className="hazirlik-ders" aria-busy="true"><SkeletonText heading /><SkeletonText paragraph lineCount={6} /></section> : null
   }

@@ -10,8 +10,7 @@ import { EmptyLine } from './patterns/EmptyLine'
 import { acikOgeAc } from '../asistan/sayfaBaglami'
 import { DERS_AC_OLAYI } from '../utils/dersSecimi'
 import IcBaglanti from './patterns/IcBaglanti'
-import { dersAnahtari, enYakinYazili } from '../hazirlik/hazirlik'
-import type { GenelBakis } from '../hazirlik/tipler'
+import { dersAnahtari } from '../hazirlik/hazirlik'
 
 interface CourseData {
   [course: string]: {
@@ -157,12 +156,6 @@ function DersSecimiUygula({ istenen, var: bulundu, kart, sec }: {
   return null
 }
 
-/** Dersin hazırlık sayfası; hangi yazılının açılacağı ders sayfasında varsayılana (1.) bırakılmaz: en yakın yazılı. */
-function senaryoAdresi(anahtar: string, hazirlik: GenelBakis | null): string {
-  const yazili = enYakinYazili(hazirlik?.dersler.find(d => d.anahtar === anahtar)?.sinavlar ?? [])
-  return `/hazirlik/${anahtar}${yazili ? `?sinav=${yazili.sinav_no}` : ''}`
-}
-
 export default function CourseContent() {
   const { data } = useApi<CourseData>('/api/content', {})
   // The portal fills the year in ahead of time and the cards genuinely differ
@@ -171,9 +164,6 @@ export default function CourseContent() {
   // marker, so grouping would drop most of them into "Diğer". A week is
   // chosen instead.
   const { data: haftalik } = useApi<WeeksData>('/api/content/weeks', { weeks: {}, current: '' })
-  // Sınav Hazırlığı girişi (spec 2026-10-25 §3.4): "MEB senaryoları" dersin en yakın yazılısının sayfasını açar;
-  // genel bakış gelmediyse (tablo yok, ağ hatası) bağlantı yine durur ve ders sayfası 1. yazılıyı açar.
-  const { data: hazirlik } = useApi<GenelBakis | null>('/api/hazirlik', null)
   const { focusMode } = useFocusMode()
   const [searchParams] = useSearchParams()
   const [secilenHafta, setSecilenHafta] = useState<string | null>(() => searchParams.get('hafta'))
@@ -313,9 +303,9 @@ export default function CourseContent() {
 
             return (
               <TabPanel key={name}>
-                {/* Sınav Hazırlığı girişi (spec 2026-10-25 §3.4): dersin MEB senaryoları ve kapsam kılavuzu. */}
+                {/* Sınav Hazırlığı girişi (spec 2026-10-25 §3.4): numarasız; ders sayfası en yakın yazılıyı kendisi seçer. */}
                 {anahtar && (
-                  <p className="course-content__senaryo"><IcBaglanti href={senaryoAdresi(anahtar, hazirlik)} size="sm">MEB senaryoları</IcBaglanti></p>
+                  <p className="course-content__senaryo"><IcBaglanti href={`/hazirlik/${anahtar}`} size="sm">MEB senaryoları</IcBaglanti></p>
                 )}
                 {!hasCards && content.text && (
                   <DersNotu metin={content.text} acik={!focusMode} />

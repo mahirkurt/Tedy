@@ -53,7 +53,10 @@ test('yayında olmayan modülün sayfası başlığını korur ve Modüller sayf
   const baslik = readFileSync(new URL('../src/components/ModulBasligi.tsx', import.meta.url), 'utf8')
   assert.match(baslik, /veri\?\.baslik \? basliga\(veri\.baslik\) : yedekBaslik/)
   const ic = readFileSync(new URL('../src/components/patterns/IcBaglanti.tsx', import.meta.url), 'utf8')
-  assert.match(ic, /uygulamaIcindeAc\(e, href, e\.currentTarget\.getAttribute\('target'\)\)/)
+  // Tıklama mantığı ortak kancadadır (useIcGezinme: kart düğmesiyle paylaşılır); bağlantı onu kullanır.
+  assert.match(ic, /onClick=\{useIcGezinme\(href\)\}/)
+  const kanca = readFileSync(new URL('../src/hooks/useIcGezinme.ts', import.meta.url), 'utf8')
+  assert.match(kanca, /uygulamaIcindeAc\(e, href, e\.currentTarget\.getAttribute\('target'\)\)/)
 })
 
 test('içerik çizilmeyen görünümde AI etiketi yok: yayında değil ve hata dalları (inceleme turu 3)', () => {

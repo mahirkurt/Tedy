@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  baskiAdresi, baslikMetni, ciktiKimligi, dersAnahtari, durumEtiketi, ebeveynCumleleri, kalanGunMetni, kilavuzAdresi,
+  baskiAdresi, baslikMetni, ciktiKimligi, dersAnahtari, durumEtiketi, kilavuzGirisi, ebeveynCumleleri, kalanGunMetni, kilavuzAdresi,
   enYakinYazili, kisaAmac, kitapYoluMetni, pdfAdresi, sayfaMetni, sayisalTarih, secenekleriOku, secenekleriYaz, soruMetni, tarihMetni, BASLIK_TURU,
   yaklasanAyrinti,
 } from '../src/hazirlik/hazirlik.ts'
@@ -69,6 +69,17 @@ test('adresler', () => {
   assert.equal(dersAnahtari(undefined), null)
 })
 
+test('dersAnahtari sunucudaki altı tablo adını ve Dersler sekmelerinin adlarını tanır', () => {
+  const tablo: [string, string][] = [['Türkçe', 'turkce'], ['Matematik', 'matematik'], ['Fen Bilimleri', 'fen-bilimleri'],
+    ['Sosyal Bilgiler', 'sosyal-bilgiler'], ['İngilizce', 'ingilizce'], ['Din Kültürü', 'din-kulturu']]
+  for (const [ad, anahtar] of tablo) assert.equal(dersAnahtari(ad), anahtar, ad)
+  // Dersler sekmelerinde görünen adlar (COURSE_CONTENT_ORDER): Din Kültürü "Din Kültürü ve Ahlak" diye gelir.
+  const sekmeler: [string, string | null][] = [['Matematik', 'matematik'], ['Fen Bilimleri', 'fen-bilimleri'],
+    ['Sosyal Bilgiler', 'sosyal-bilgiler'], ['Türkçe', 'turkce'], ['İngilizce', 'ingilizce'],
+    ['Din Kültürü ve Ahlak', 'din-kulturu'], ['Din Kültürü ve Ahlak Bilgisi', 'din-kulturu'], ['Fransızca', null], ['Genel', null]]
+  for (const [ad, anahtar] of sekmeler) assert.equal(dersAnahtari(ad), anahtar, ad)
+})
+
 test('PDF seçenekleri kişi başına hatırlanır; bozuk kayıt varsayılana düşer', () => {
   const depo = new Map<string, string>()
   const d = { getItem: (k: string) => depo.get(k) ?? null, setItem: (k: string, v: string) => { depo.set(k, v) } }
@@ -108,4 +119,15 @@ test('enYakinYazili: ilk geçmemiş yazılı; hepsi geçtiyse sonuncusu (spec §
   assert.equal(enYakinYazili([g, h])?.sinav_no, 1, 'tarihsiz: geçmemiş sayılır, ilki')
   assert.equal(enYakinYazili([y(1, 'gecti', '2026-10-22'), y(2, 'olasi', null)])?.sinav_no, 2, 'geçmiş + tarihsiz: tarihsiz')
   assert.equal(enYakinYazili([]), null)
+})
+
+test('kilavuzGirisi: kesin senaryo adlanır; olası ve tabloda olmayan senaryo adrese ve etikete girmez; ülke geneli ders sayfası', () => {
+  const blok = (durum: string, senaryo: number | null, ders = 'Fen Bilimleri', sinav_no = 1) =>
+    ({ durum, ders, sinav_no, senaryo }) as Parameters<typeof kilavuzGirisi>[0]
+  assert.deepEqual(kilavuzGirisi(blok('dogrulandi', 2)), { href: '/hazirlik/fen-bilimleri/1?senaryo=2', etiket: 'Kapsam kılavuzunu aç (2. senaryo)' })
+  assert.deepEqual(kilavuzGirisi(blok('kismen', 4)), { href: '/hazirlik/fen-bilimleri/1?senaryo=4', etiket: 'Kapsam kılavuzunu aç (4. senaryo)' })
+  assert.deepEqual(kilavuzGirisi(blok('belirtilmedi', null)), { href: '/hazirlik/fen-bilimleri/1', etiket: 'Kapsam kılavuzunu aç' })
+  assert.deepEqual(kilavuzGirisi(blok('senaryo_yok', null, 'Türkçe', 2)), { href: '/hazirlik/turkce/2', etiket: 'Kapsam kılavuzunu aç' })
+  assert.deepEqual(kilavuzGirisi(blok('ulke_geneli', null, 'Türkçe', 2)), { href: '/hazirlik/turkce?sinav=2', etiket: 'MEB senaryolarını aç' })
+  assert.equal(kilavuzGirisi(blok('dogrulandi', 1, 'Beden Eğitimi')), null)
 })

@@ -533,5 +533,10 @@ def test_arac_metni_kapsam_kilavuzunun_yerini_soyler():
     """Sınav Hazırlığı girişi (spec 2026-10-25 §3.4, plan Görev 12)."""
     govde, _ = ss.arac_metni(TABLO, [], {"ders": "Fen", "sinav_no": 1}, BUGUN)
     assert "Kapsam kılavuzu panoda: Sınav Hazırlığı › Fen Bilimleri › 1. yazılı (/hazirlik/fen-bilimleri/1)." in govde
+    # Ülke geneli yazılının kılavuzu yok: araç ders sayfasını gösterir, boş kılavuza yollamaz.
     govde, _ = ss.arac_metni(TABLO, [], {"ders": "Türkçe", "sinav_no": 2}, BUGUN)
-    assert "(/hazirlik/turkce/2)" in govde
+    assert ("Kapsam kılavuzu panoda: Sınav Hazırlığı › Türkçe › 2. yazılı "
+            "(MEB senaryosu yok, ders sayfası: /hazirlik/turkce?sinav=2).") in govde
+    assert "/hazirlik/turkce/2" not in govde
+    govde, _ = ss.arac_metni(TABLO, [], {"ders": "Türkçe", "sinav_no": 1}, BUGUN)
+    assert "(/hazirlik/turkce/1)" in govde

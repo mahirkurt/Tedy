@@ -150,6 +150,7 @@ def test_cozulemeyen_kilavuz_kimligi_yalniz_sayfa_adi(istemci):
     {"kip": "gizli", "senaryo": 2}, {"kip": ["kesin"], "senaryo": 2}, {"kip": "kesin", "senaryo": "2"},
     {"kip": "kesin", "senaryo": 0}, {"kip": "kesin", "senaryo": 100}, {"kip": "kesin", "senaryo": True},
     {"kip": "kesin", "senaryo": 2.5}, {"senaryo": 2},
+    {"kip": "kesin"}, {"kip": "ulke_geneli", "senaryo": 2},
 ])
 def test_gecersiz_kilavuz_alanlari_400(istemci, ek):
     yanit = istemci.post("/api/assistant/chat", json=_kilavuz(ek, "hazirlik:fen-bilimleri:1:2"))

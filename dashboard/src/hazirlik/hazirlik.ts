@@ -1,5 +1,7 @@
 // Sınav Hazırlığı yüzeylerinin saf yardımcıları (plan Görev 9): metinler, adresler, seçenek deposu.
 // tests/hazirlik.test.ts sınar; ekran ve kâğıt (KilavuzBelgesi, K11) aynı yardımcıları kullanır.
+import { normalizeCourseDisplayName } from '../utils/formatters.ts'
+import type { SinavSenaryosu } from '../types'
 import type { Baslik, Blok, KilavuzModeli, KitapYolu, PdfSecenekleri, SinavDurumu } from './tipler'
 
 const GUNLU = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', weekday: 'long', timeZone: 'Etc/UTC' })
@@ -153,9 +155,15 @@ const ANAHTARLAR: Record<string, string> = {
   'İngilizce': 'ingilizce', 'Din Kültürü': 'din-kulturu',
 }
 
-/** Kanonik ders adı → hazırlık anahtarı (src/sinav_senaryo.DERS_ANAHTARLARI'nın eşi); bilinmeyen ad null. */
+// Alias haritasının kanonik adlarıyla: tablodaki "Din Kültürü" ve sekmedeki "Din Kültürü ve Ahlak" aynı anahtara varır.
+const NORMAL_ANAHTARLAR: Record<string, string> = Object.fromEntries(
+  Object.entries(ANAHTARLAR).map(([ad, anahtar]) => [normalizeCourseDisplayName(ad), anahtar]))
+
+/** Ders adı → hazırlık anahtarı (src/sinav_senaryo.DERS_ANAHTARLARI'nın eşi); bilinmeyen ad null. Tablonun kanonik adı
+ *  ("Din Kültürü") ya da Dersler sekmesinin adı ("Din Kültürü ve Ahlak") olabilir: ikincisi alias haritasından geçer. */
 export function dersAnahtari(ders: string | null | undefined): string | null {
-  return ders ? ANAHTARLAR[ders] ?? null : null
+  if (!ders) return null
+  return ANAHTARLAR[ders] ?? NORMAL_ANAHTARLAR[normalizeCourseDisplayName(ders)] ?? null
 }
 
 /** Ebeveyn özetinin cümleleri (spec §4.8): aileye, üçüncü kişiyle. */
@@ -176,4 +184,17 @@ export function ebeveynCumleleri(m: KilavuzModeli): string[] {
   else if (e.soru_araligi) c.push(`${e.cikti_sayisi} öğrenme çıktısı; senaryoya göre ${e.soru_araligi[0]}–${e.soru_araligi[1]} soru.`)
   c.push(`Hazırlık işaretleri: ${e.hazirim} hazır, ${e.tekrar} tekrar, ${e.isaretsiz} işaretsiz.`)
   return c
+}
+
+/** Sınavlar kartının Sınav Hazırlığı girişi (spec 2026-10-25 §3.4): adres ve düğme etiketi; dersin kılavuzu yoksa null.
+ *  Kesin senaryoda o senaryonun kılavuzu; duyuru yoksa ya da tabloda olmayan senaryo duyurulduysa olası kılavuz
+ *  (hiçbir senaryo adrese girmez, K8); ülke genelinde kılavuz yok, o yazılının ders sayfası (`?sinav=N`). */
+export function kilavuzGirisi(s: SinavSenaryosu): { href: string; etiket: string } | null {
+  const anahtar = dersAnahtari(s.ders)
+  if (anahtar === null) return null
+  if (s.durum === 'ulke_geneli') return { href: `/hazirlik/${anahtar}?sinav=${s.sinav_no}`, etiket: 'MEB senaryolarını aç' }
+  return {
+    href: kilavuzAdresi(anahtar, s.sinav_no, s.senaryo),
+    etiket: s.senaryo !== null ? `Kapsam kılavuzunu aç (${s.senaryo}. senaryo)` : 'Kapsam kılavuzunu aç',
+  }
 }

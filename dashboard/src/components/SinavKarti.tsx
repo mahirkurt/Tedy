@@ -1,9 +1,10 @@
 import { useId, useState } from 'react'
 import { Button, ContainedList, ContainedListItem, Link as CarbonLink, Tag } from '@carbon/react'
-import { CheckmarkFilled, Launch, WarningAltFilled } from '@carbon/icons-react'
+import { ArrowRight, CheckmarkFilled, Launch, WarningAltFilled } from '@carbon/icons-react'
 import { useNavigate } from 'react-router-dom'
+import { useIcGezinme } from '../hooks/useIcGezinme'
 import { asistanaSor } from '../asistan/sayfaBaglami'
-import { dersAnahtari, kilavuzAdresi } from '../hazirlik/hazirlik'
+import { kilavuzGirisi } from '../hazirlik/hazirlik'
 import type { ExamItem } from '../types'
 import { kisaGun, kisaTeslim } from '../utils/formatters'
 import { konuAnahtarlari, konuOzeti, sinavAni, sinavEtiketi, zamanMetni } from '../utils/sinav'
@@ -62,14 +63,11 @@ function MebSenaryoBolumu({ exam }: { exam: ExamItem }) {
   const [acik, setAcik] = useState(false)
   const listeId = useId()
   const gezin = useNavigate()
+  // Sınav Hazırlığı girişi (spec 2026-10-25 §3.4): kartın ana eylemi, kılavuza (ya da ülke genelinde ders sayfasına) gider.
+  const giris = exam.senaryo ? kilavuzGirisi(exam.senaryo) : null
+  const girisTikla = useIcGezinme(giris?.href ?? null)
   if (!exam.senaryo) return null
   const g = senaryoGorunumu(exam.senaryo)
-  // Sınav Hazırlığı girişi (spec 2026-10-25 §3.4): ülke geneli yazılının kılavuzu yok, o yazılının ders sayfası açılır.
-  // Duyurulmamış senaryo (olası) adrese girmez: kılavuz bütün senaryoları gösterir (K8).
-  const anahtar = dersAnahtari(exam.senaryo.ders)
-  const kilavuz = anahtar === null ? null : exam.senaryo.durum === 'ulke_geneli'
-    ? `/hazirlik/${anahtar}?sinav=${exam.senaryo.sinav_no}`
-    : kilavuzAdresi(anahtar, exam.senaryo.sinav_no, exam.senaryo.senaryo)
   const sor = () => {
     const karsilandi = asistanaSor({ tur: 'sinav', id: exam.id, etiket: `${exam.course} — ${exam.title}` })
     if (!karsilandi) gezin('/asistan?sayfa=sinavlar')
@@ -106,7 +104,7 @@ function MebSenaryoBolumu({ exam }: { exam: ExamItem }) {
         {/* B58: a link that leaves the page says so with Carbon's Launch icon. */}
         <CarbonLink href={exam.senaryo.kaynak} target="_blank" rel="noreferrer" size="sm" renderIcon={Launch}>MEB tablosu ({g.kaynak})</CarbonLink>
       </p>
-      {kilavuz && <p className="meb-senaryo__alt"><IcBaglanti href={kilavuz} size="sm">Kapsam kılavuzu</IcBaglanti></p>}
+      {giris && <Button kind="tertiary" size="sm" href={giris.href} renderIcon={ArrowRight} onClick={girisTikla}>{giris.etiket}</Button>}
       <Button kind="ghost" size="sm" onClick={sor}>Örnek sınav için asistana sor</Button>
     </div>
   )
