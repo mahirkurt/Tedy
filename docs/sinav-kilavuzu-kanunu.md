@@ -1,6 +1,6 @@
 # Sınav Kılavuzu Tasarım Kanunu
 
-**Sürüm 1.0 · 2026-10-25**
+**Sürüm 1.0 · 2026-10-26**
 
 Bu kanun Sınav Hazırlığı yüzeylerinin — ana sayfa (`/hazirlik`), ders sayfası (`/hazirlik/:ders`), kapsam kılavuzu
 ekranı (`/hazirlik/:ders/:sinav`), baskı görünümü (`/baski.html`) ve üretilen A4 PDF — nasıl görüneceğini ve neye
@@ -18,23 +18,23 @@ dayanacağını bağlayıcı olarak yazar. Spec: `docs/superpowers/specs/2026-10
 
 ## 1. Maddeler
 
-Kapı sütunundaki her ad gerçek bir testle birebir eşleşir. Henüz yazılmamış testler "(Görev N'de yazılır)" diye
-işaretlidir; Görev 15 bu işaretleri depodaki gerçek adlara karşı doğrular.
+Kapı sütunundaki her ad gerçek bir testle birebir eşleşir; Görev 15 her dosyanın, pytest adının ve e2e/birim test
+başlığının depoda bulunduğunu betikle doğruladı (2026-10-26).
 
 | # | Madde | Hüküm | Kapı |
 |---|---|---|---|
-| K1 | Kaynak dürüstlüğü | Kitap başlıkları yalnız kitap haritasından, birebir yazım; sayfa = basılı sayfa; MEB çıktı metni birebir; bulunamayan "Kitapta karşılığı bulunamadı" ("yok" değil). Harita elle düzenlenmez. | `tests/test_pdf_kapilari.py::test_eksik_baslik_katlamayla_aranir`, `test_eksik_baslik_icindekiler_sayfasini_saymaz`, `test_denetle_k1_aramasi_okuma_sirasindaki_metinde` (PDF metni, İçindekiler sayfası hariç); `tests/test_kitap_haritasi_fen.py` (Görev 5'te yazılır); `tests/test_sinav_kilavuzu.py` (Görev 6'da yazılır) |
+| K1 | Kaynak dürüstlüğü | Kitap başlıkları yalnız kitap haritasından, birebir yazım; sayfa = basılı sayfa; MEB çıktı metni birebir; bulunamayan "Kitapta karşılığı bulunamadı" ("yok" değil). Harita elle düzenlenmez. | `tests/test_pdf_kapilari.py::test_eksik_baslik_katlamayla_aranir`, `test_eksik_baslik_icindekiler_sayfasini_saymaz`, `test_denetle_k1_aramasi_okuma_sirasindaki_metinde` (PDF metni, İçindekiler sayfası hariç); `tests/test_kitap_haritasi_fen.py`; `tests/test_sinav_kilavuzu.py` |
 | K2 | Hiyerarşi | En çok dört düzey: ünite › içerik çerçevesi › çıktı › bölüm başlıkları. Blok iç sırası sabit: kod + kısa ad, soru (ve "her senaryoda"), MEB metni, Kitapta, Bu bölümde ele alınanlar, okulda, ödev/modül, hazırlık işareti. Senaryoda olmayan çıktı tek satır, soluk. | `dashboard/tests/e2e/hazirlik-kilavuz.spec.ts` "blok iç sırası sabit (K2)" |
 | K3 | Tipografi | Carbon üretken tip ölçeği; IBM Plex Sans, kodlar Plex Mono; A4'te kök 14,857 px (body-01 ≈ 9,75 pt), en küçük metin label-01 ≈ 8,4 pt (≥ 7,5 pt). Plex dosyaları depodadır, PDF'e gömülür. | `tests/test_pdf_kapilari.py::test_en_kucuk_punto_kullanilan_yazi_tiplerinden`, `test_pdffonts_gomulu_ve_onek_atilir`, `test_kusurlar_rapordan_okunur`, `test_kusurlar_olculemeyen_deger_gecer_sayilmaz`, `test_yabanci_yazi_tipi_kenarda_izinli_olan_yalniz_ust_alt_bilgide`; sunucu basımında kapı bekçisi: `tests/test_hazirlik_pdf.py::test_kapi_bekcisi_kusurlu_basimi_dusurur`, `test_bekci_ana_yolu_dusurur_duz_denenir_o_da_kusurluysa_uretilemedi`, `test_kapi_bekcisi_uzun_metinli_fikstur_gercek_basim_temiz`, `test_kapi_bekcisi_sigmayan_parcayi_yakalar_duz_yol_basar` |
 | K4 | Renk | Yalnız Carbon belirteçleri; ders rengi yalnız vurgu (karonun üst çizgisi, kılavuz başlığının kenarı). Durum ikon + metin (+ renk): kesin `CheckmarkFilled` + `--cds-support-success`, olası `InformationFilled` + `--cds-support-info`, ülke geneli/geçti düz `--cds-text-secondary`. Tag'de ders aileleri yasak; "her senaryoda" gri Tag. Mor yalnız YZ (Plan 2). Kontrast AA. | `tests/test_pano_tasarim_sistemi.py`; e2e axe + IBM: `hazirlik-kilavuz.spec.ts` "kılavuz ekranı: özet, yan içindekiler, bloklar; axe + IBM sıfır ihlal" |
 | K5 | Kâğıt | A4 dikey; kenar 18/16/20 mm; üst bilgi ders · sınav · senaryo, alt bilgi damga + "s. n/N"; başlıktan sonra sayfa kesilmez (yetim başlık yok); bölünen blokta "(devam)"; İçindekiler gerçek sayfa numaralı; karşılaştırma tablosu bölünürse her parçada başlık satırı; ebeveyn özeti tek sayfa; siyah-beyaz baskıda anlam ikon ve metinle korunur. Ayrıntı: aşağıdaki "K5 — A metni". | Üretilen PDF'te `scripts/kilavuz_pdf_kapilari.py` (`pdf_kapilari.denetle` + `kusurlar`) şunları ölçer: her sayfanın alt bilgisinde damga ("TEDY") ve doğru "s. n/N" (`test_alt_bilgi_her_sayfada_damga_ve_dogru_sayfa_numarasi`); kapakta üst bilgi yok, öbür her sayfada (ebeveyn özetli basımda 1. sayfa dahil) dolu (`test_ust_bilgi_kapakta_yok_diger_her_sayfada_dolu`); İçindekiler'in `bolumler(m)` ile aynı her girdisi gösterdiği sayfada (`test_icindekiler_gosterilen_sayfada_baslik_olmali`, `test_icindekiler_girdisi_tam_satirla_ve_sayfadaki_karsiligiyla`); yer imi olarak işaretli başlık sayfa sonunda yetim değil (`test_yetim_baslik_alt_bilgi_sayilmaz_son_sayfa_yetim_degil`, `test_yetim_baslik_yalniz_baslik_olarak_isaretli_ogeyi_sayar`, `test_yetim_baslik_iki_satira_bolunen_baslik_son_satirlardan_bulunur`). Baskı görünümünde `dashboard/tests/e2e/hazirlik-baski.spec.ts` "Paged.js yolu: sayfalar, gerçek İçindekiler numarası, etkileşimsiz kâğıt (K5, K11)": İçindekiler numarası (`::after` counter-reset) hedef başlığın sayfası, bölünen blokta `::before` "(devam)", kâğıtta içerikte damga yok, "Kitapta" kutusu gray-10. `dashboard/tests/baski-kagit-kurallari.test.ts`: iki kâğıt kopyasında @page boyutu/kenarı ve kesme kuralları eşit (D17); `dashboard/tests/hazirlik-belge.test.ts` "tablo parçaları: uzun ünite kâğıtta sayfaya sığan parçalara bölünür, her parça kendi başlık satırıyla (Y5, KK-1)". Makineyle denetlenmeyenler: kenar ölçüleri (yalnız CSS eşitliği), ebeveyn özetinin tek sayfa olduğu, siyah-beyaz okunurluk ve tablo parçalarında başlık satırının basılı varlığı (Görev 13'te elle ölçüldü) |
-| K6 | Eksiksizlik | Kılavuz kısaltılmaz; bir bölümün haritadaki bütün başlıkları yazılır (etkinlikte amaç 70 karakterde kısaltılır, başlığın kendisi kısaltılmaz). | `tests/test_sinav_kilavuzu_belge.py::test_kilavuz_kitapta_ve_bolum_basliklari` (Görev 7'de yazılır) |
+| K6 | Eksiksizlik | Kılavuz kısaltılmaz; bir bölümün haritadaki bütün başlıkları yazılır (etkinlikte amaç 70 karakterde kısaltılır, başlığın kendisi kısaltılmaz). | `tests/test_sinav_kilavuzu_belge.py::test_kilavuz_kitapta_ve_bolum_basliklari` |
 | K7 | Dil | Türkçe; ad bildiren başlıklar başlık düzeninde, diğer etiketler cümle düzeninde (panonun S38/B41 kuralı, aile kararı 2026-10-19); MEB terimleri birebir; öğrenciye "sen"; sayılar rakamla; başarı vaadi yok. | `tests/test_pano_talimatname_borclari.py` (kısmen: dilbilgisi elle, bkz. KK-0) |
-| K8 | Durum dürüstlüğü | Senaryo duyurulmadıysa hiçbir yüzey tek senaryoyu "bu" diye sunmaz: bloklar "senaryoya göre a–b soru", özet aralık, durum "Olası: N senaryo". Kullanıcının seçtiği senaryo duyurulandan farklıysa bu açıkça yazılır. | `tests/test_sinav_kilavuzu_belge.py::test_kilavuz_olasi_kip_tek_senaryo_sunmaz` (Görev 7'de yazılır); `dashboard/tests/hazirlik.test.ts` "durumEtiketi: dört durum; olası tek senaryo adı taşımaz (K8)" (Görev 9'da yazılır); `hazirlik-kilavuz.spec.ts` "olası kip: tek senaryo sayısı yok (K8)" |
+| K8 | Durum dürüstlüğü | Senaryo duyurulmadıysa hiçbir yüzey tek senaryoyu "bu" diye sunmaz: bloklar "senaryoya göre a–b soru", özet aralık, durum "Olası: N senaryo". Kullanıcının seçtiği senaryo duyurulandan farklıysa bu açıkça yazılır. | `tests/test_sinav_kilavuzu_belge.py::test_kilavuz_olasi_kip_tek_senaryo_sunmaz`; `dashboard/tests/hazirlik.test.ts` "durumEtiketi: dört durum; olası tek senaryo adı taşımaz (K8)"; `hazirlik-kilavuz.spec.ts` "olası kip: tek senaryo sayısı yok (K8)" |
 | K9 | YZ ayrımı | Carbon AI etiketi, ayrı başlık, cümle başına sayfa atfı, kapatılabilir; modele kişisel veri gitmez. Plan 1'de YZ bölümü yoktur (`yz.durum = "kapali"`). | Plan 2 |
 | K10 | Erişilebilirlik | WCAG 2.2 AA; axe + IBM Equal Access sıfır ihlal; PDF etiketli, yer imli, dil `tr`. | e2e: K4'teki axe + IBM testi; `tests/test_pdf_kapilari.py::test_pdfinfo_etiket_ve_sayfa`, `test_qpdf_dil_ve_yer_imleri` |
 | K11 | Ekran–kâğıt eşliği | Ekran ve kâğıt aynı `KilavuzBelgesi` bileşeni, aynı sıra; etkileşimli öğenin durağan karşılığı (işaret onay kutusu → Carbon `Checkbox`/`CheckboxChecked` ikonu; ☐ karakteri Plex'te yok). | `dashboard/tests/e2e/hazirlik-baski.spec.ts` "Paged.js yolu: sayfalar, gerçek İçindekiler numarası, etkileşimsiz kâğıt (K5, K11)" |
-| K12 | Güncellik | Damga (MEB tablosu tarihi, kitap baskısı ve sha256 kısası, üretim tarihi) her sayfada; harita eski bir tabloya göre kurulduysa ya da kitap PDF'i değiştiyse (`--denetle`) "güncel değil" uyarısı. | `tests/test_sinav_kilavuzu.py::test_guncellik_tablo_ve_kitap_degisti` (Görev 6'da yazılır); `tests/test_meb_kitap_haritasi.py::test_denetle_sha256_degisimini_yazar` (Görev 4'te yazılır); `hazirlik-kilavuz.spec.ts` "kitap güncellendi uyarısı (K12)" |
+| K12 | Güncellik | Damga (MEB tablosu tarihi, kitap baskısı ve sha256 kısası, üretim tarihi) her sayfada; harita eski bir tabloya göre kurulduysa ya da kitap PDF'i değiştiyse (`--denetle`) "güncel değil" uyarısı. | `tests/test_sinav_kilavuzu.py::test_guncellik_tablo_ve_kitap_degisti`; `tests/test_meb_kitap_haritasi.py::test_denetle_sha256_degisimini_yazar`; `hazirlik-kilavuz.spec.ts` "kitap güncellendi uyarısı (K12)" |
 
 ### K5 — A metni (ana yol Paged.js)
 
@@ -160,3 +160,27 @@ basım (A) 8 sayfa, kusur yok; ebeveyn sayfasında üst bilgi ve damga dolu. A: 
 - A4 önizleme PDF'in birebir önizlemesidir: baskı görünümü modeli PDF ile aynı işaretlerle (öğrencinin, D16)
   `?isaret_kaynagi=ogrenci` ile ister; parametre yalnız oturumdaki tam roldeki kişiye açıktır (API anahtarı 403,
   okuyucu default-deny) ve yalnız okur. PDF ucu da aynı nedenle API anahtarına kapalıdır.
+
+## 4. Spec'ten bilinçli sapmalar (Plan 1, 2026-10-26)
+
+Spec `docs/superpowers/specs/2026-10-25-sinav-hazirligi-design.md` ile uygulama arasındaki farklar; her biri
+kontrolcü kararıyla alındı ve aşağıda tek yerde durur.
+
+- **Tek dal, tek canlıya alma (D12).** Spec §10 aşamalı teslim ister (4–5. aşamalar önce Fen için, ayrı ayrı
+  birleştirme ve onay). Plan 1 tek dal (`feat/sinav-hazirligi`) olarak yazıldı, tek birleştirmeyle ve kullanıcının
+  açık onayıyla canlıya alınır (Fen 1. yazılısı 3 Kasım takvimi); aşamalar ayrı birleştirilmedi. Aşamalar ayrı
+  istenirse dal bölünür (geri dönüş zaten tek `git revert`).
+- **PDF seçenekleri cihazda (D26).** Spec §5.3 "son seçim kişi başına hatırlanır" der. Seçenekler (senaryo, ebeveyn
+  özeti, işaretler) hesaba değil cihaza bağlıdır: tarayıcı `localStorage`, başka cihazda yeniden seçilir.
+  Hazırlık işaretleri ise kişi başınadır (`output/hazirlik_isaretleri.json`).
+- **Adlı sayfalar sayfa doldurur (D14, spec §5.2).** Kapak, İçindekiler, gövde ve ek `sayfa.css`'te adlı sayfalardır
+  ve her biri yeni sayfada başlar; bu yüzden gerçek Fen basımında 1., 2. ve son sayfa yarı boştur. Bilerek kabul
+  edildi: basılı kılavuz düzeni, İçindekiler gerçek sayfa numaralı kalır.
+- **Ünite tabloları 8 satırlık parçalara bölünür.** Spec §5.2 karşılaştırma tablosunu bölünürse başlık satırıyla
+  ister; Paged.js bölünen tabloda başlık satırını yinelemediği için kâğıtta tablo ünite başına, en çok 8 satırlık
+  parçalardır ve her parça kendi başlık satırını taşır (§3 KK-1; ölçüm: 12 satırlık bölünmez tablo Chrome'u 5
+  puntoya küçülttü). Ekranda tek tablo.
+- **Çıktı etiketi (`kisa_ad`) = MEB metni.** Spec §4.4 "kod + kısa ad" der; `kisa_ad` kitap konusunun adı değil MEB
+  çıktı metninin kendisidir, kısaltılmadan (K1, K6): kitap konusu iki çıktıyı aynı adla etiketlemişti
+  (FB.7.1.4 ve FB.7.1.5 ikisi de "Yıldız Oluşumu"). Kitap konusu yalnız "Kitapta" satırındadır; blok başlığında kod
+  taşınır, tam metin altında yazılır.

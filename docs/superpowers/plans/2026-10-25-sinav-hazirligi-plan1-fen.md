@@ -95,6 +95,7 @@ Yoklama belgesi (Görev 1) iki yoldan basılır: **A = Paged.js** (`kilavuz-pdf.
 - **"Akşam planına ekle"** (spec §4.6) ve asistanın "Kılavuzu aç" öneri çipi (spec §3.4).
 - **Kitap sha256 denetiminin zamanlayıcıya bağlanması**: Plan 1'de `scripts/meb_kitap_haritasi.py --denetle` elle koşar.
 - Spec §11'in kapsam dışı maddeleri.
+- **Veri bulgusu (Plan 2 notu, Plan 1'de düzeltilmedi):** `src/sinav_senaryolari.json`'da MAT.7.1.2'nin `metin` alanına bir alt madde yapışmış: "…ondalık gösterimlerini yansıtabilmea) Bölme işlemini kullanarak her rasyonel sayının bir ondalık gösterimi olduğunu inceler.." (çıktı cümlesinin sonunda boşluksuz "a)", sonda ".."). Nedeni araştırılmadı (ÖDSGM hücresi ya da `scripts/odsgm_senaryo_tablolari.py`'nin ayrıştırması); tablo betikle üretildiği için elle düzenlenmez, kaynakta düzeltilip yeniden üretilmelidir. Kılavuz bu metni K1 gereği birebir basar, yani kâğıtta da görünür.
 
 ## Dosya yapısı
 
