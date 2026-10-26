@@ -105,8 +105,16 @@ test('Dersler sekmesinden gelince 1. yazılı geçmişse ders sayfası 2. yazıl
 
 test('Ders sayfası: ?sinav yoksa ve 1. yazılı geçmemişse 1. yazılıda kalır, adres değişmez', async ({ page }) => {
   await mock(page, LIVE)
-  await page.route(DERS('fen-bilimleri', 1), r => r.fulfill(json(fikstur('fen-bilimleri-1'))))
+  const istekler: string[] = []
+  await page.route(DERS('fen-bilimleri', 1), r => { istekler.push('1'); return r.fulfill(json(fikstur('fen-bilimleri-1'))) })
+  await page.route(DERS('fen-bilimleri', 2), r => { istekler.push('2'); return r.fulfill(json(fikstur('fen-bilimleri-2'))) })
   await page.goto('/hazirlik/fen-bilimleri')
+  // Önce olumlu sinyal: sayfa çizildi ve 1. yazılı seçili (yönlendirme olsaydı 2. yazılı seçili olurdu). Yalnız bundan
+  // sonra "adres değişmedi" iddia edilir: yüklenmeden önceki adres de aynıdır, anlık bir yokluk okuması bir şey kanıtlamaz.
   await expect(page.getByRole('heading', { name: 'Fen Bilimleri' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: /^1\. yazılı/ })).toHaveAttribute('aria-selected', 'true')
+  // Geç gelen bir yönlendirme de yakalansın: ağ sakinleşene kadar beklenir (yönlendirme 2. yazılının isteğini doğurur).
+  await page.waitForLoadState('networkidle')
   await expect(page).toHaveURL(/\/hazirlik\/fen-bilimleri$/)
+  expect(istekler).toEqual(['1'])
 })
