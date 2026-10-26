@@ -420,15 +420,19 @@ def test_i1_temiz_baslik_cozulurse_o_kazanir():
     assert ss.sutun_coz(k, TABLO, BUGUN) == ("Türkçe", 1)
 
 
-def test_i1_alintidan_numara_okunmaz():
+def test_i1_alintidan_yalniz_acik_donem_ve_numara_okunur():
     # Birleşen duyurunun "1.1"i kaynaklar[].alinti'de kalır; oradan sütun seçmek C1 sınıfı yanlış eşleşmedir.
+    # Uygulama kararı 2026-10-25: alıntı ancak dönemi, sınav numarasını ve "yazılı"/"sınav"ı açıkça birlikte
+    # söylüyorsa numara verir; "1.1" ve dönemsiz "2. Ortak Yazılı" vermez.
     k = ef69()
     k["taban"] = None
     k["kaynaklar"] = [{"tur": "ders_karti", "konum": {}, "alinti": "22 Ekim 1.1 Ara Değerlendirme Sınavı"}]
     assert ss.sutun_coz(k, TABLO, BUGUN) is None
-    k = ef69()
-    k["taban"] = {"rawTitle": ""}
+    k["kaynaklar"] = [{"tur": "ders_karti", "konum": {}, "alinti": "5 Ocak 2. Ortak Yazılı Sınavı"}]
     assert ss.sutun_coz(k, TABLO, BUGUN) is None
+    k = ef69()
+    k["taban"] = {"rawTitle": ""}       # takvim kaynağının alıntısı "1. Dönem 2. Ortak Yazılı Sınavı" diyor
+    assert ss.sutun_coz(k, TABLO, BUGUN) == ("Türkçe", 2)
 
 
 # I4: sınav tarihinin (yoksa haftanın, yoksa bugünün) öğretim yılı tablonunkiyle, dönemi tablonun dönemiyle
@@ -540,3 +544,77 @@ def test_arac_metni_kapsam_kilavuzunun_yerini_soyler():
     assert "/hazirlik/turkce/2" not in govde
     govde, _ = ss.arac_metni(TABLO, [], {"ders": "Türkçe", "sinav_no": 1}, BUGUN)
     assert "(/hazirlik/turkce/1)" in govde
+
+
+# --- Sınav numarası kaynak alıntısından (uygulama kararı 2026-10-25) ------------------------------
+
+FEN_ALINTI = ("1.Dönem 1. Fen yazılınız 3 Kasım 2026 tarihinde İstanbul İl MEB tarafından belirlenen "
+              "2. senaryoya göre uygulanacaktır.")
+FEN_KONULAR = ["Uzay araştırmaları için geliştirilen teknolojiler",
+               "Uzay araştırmalarının yol açabileceği problemler",
+               "Yıldız, galaksi ve evren kavramları"]
+
+
+def fen_kaydi(baslik="Fen Bilimleri Yazılı", alintilar=(FEN_ALINTI,), kaynaklar=None):
+    """Canlıdaki 0e885076d71c: başlıkta numara yok, takvim tabanı yok; numara yalnız ders kartı alıntısında."""
+    if kaynaklar is None:
+        kaynaklar = [{"tur": "ders_karti", "konum": {"bolum": "ders_icerikleri", "ders": "Fen Bilimleri", "sira": i},
+                      "alinti": a} for i, a in enumerate(alintilar)]
+    return {"id": "0e885076d71c", "ders": "Fen Bilimleri", "tur": "yazili", "baslik": baslik,
+            "tarih": "2026-11-03", "hafta": None, "konular": list(FEN_KONULAR), "kaynaklar": kaynaklar,
+            "sentetik": False, "taban": None}
+
+
+def test_alinti_gercek_fen_vakasi_dogrulandi():
+    k = fen_kaydi()
+    assert ss.sutun_coz(k, TABLO, BUGUN) == ("Fen Bilimleri", 1)
+    blok = ss.senaryo_blogu(k, [(FEN_ALINTI, FEN_ALINTI, True)], TABLO, BUGUN)
+    assert blok["durum"] == "dogrulandi"
+    assert (blok["sinav_no"], blok["senaryo"], blok["toplam"]) == (1, 2, 7)
+    assert {d["kod"]: d["soru"] for d in blok["dagilim"]} == {"FB.7.1.1": 2, "FB.7.1.3": 1, "FB.7.1.5": 1,
+                                                              "FB.7.2.1": 3}
+    assert {d["kod"] for d in blok["dagilim"] if d["duyuruda"]} == {"FB.7.1.1", "FB.7.1.3", "FB.7.1.5"}
+    assert blok["anilan"] == [2] and blok["cumle"] == FEN_ALINTI
+
+
+def test_alinti_yalin_senaryo_numara_vermez():
+    # Dönem söylemeyen "2. senaryoya göre" senaryo numarasıdır, sınav numarası değil.
+    k = fen_kaydi(alintilar=("Fen yazılınız 3 Kasım 2026 tarihinde 2. senaryoya göre uygulanacaktır.",))
+    assert ss.sutun_coz(k, TABLO, BUGUN) is None
+
+
+@pytest.mark.parametrize("alinti,beklenen", [
+    ("1. dönem 2. yazılı 5 Ocak'ta.", ("Fen Bilimleri", 2)),
+    ("1. Dönem 1. Ortak Yazılı Sınav 3 Kasım'da yapılacak.", ("Fen Bilimleri", 1)),
+    ("Birinci dönem ikinci Fen Bilimleri yazılısı yaklaşıyor.", ("Fen Bilimleri", 2)),
+    ("2. sınav 3 Kasım'da.", None),                                    # dönem yok
+    ("Sınav 2. senaryoya göre yapılacak.", None),                      # dönem yok, senaryo
+    ("1. dönem 2. senaryoya göre yazılı yapılacak.", None),            # "2." senaryonun, sınavın değil
+    ("1. dönem 2 yazılı yapılacak.", None),                            # adet, sıra sayısı değil
+    ("1. dönem sona eriyor. 2. yazılı 5 Ocak'ta.", None),              # ayrı cümleler
+])
+def test_alinti_kaliplari(alinti, beklenen):
+    assert ss.sutun_coz(fen_kaydi(alintilar=(alinti,)), TABLO, BUGUN) == beklenen
+
+
+def test_alinti_celisen_iki_numara_none():
+    k = fen_kaydi(alintilar=(FEN_ALINTI, "1. dönem 2. Fen yazılısı 5 Ocak'ta yapılacak."))
+    assert ss.sutun_coz(k, TABLO, BUGUN) is None
+    assert ss.senaryo_blogu(k, [(FEN_ALINTI, FEN_ALINTI, True)], TABLO, BUGUN) is None
+
+
+def test_baslik_numarasi_alintiyi_yener():
+    k = fen_kaydi(baslik="Fen Bilimleri 1. Yazılı", alintilar=("1. dönem 2. Fen yazılısı yapılacak.",))
+    assert ss.sutun_coz(k, TABLO, BUGUN) == ("Fen Bilimleri", 1)
+
+
+def test_alintidaki_donem_tabloyla_celisirse_none():
+    # Tablo 1. dönemin; alıntı 2. dönemi söylüyor (kayıt tarihi 1. dönemde olsa da).
+    k = fen_kaydi(alintilar=("2. Dönem 1. Fen yazılınız 3 Kasım 2026 tarihinde yapılacak.",))
+    assert ss.sutun_coz(k, TABLO, BUGUN) is None
+
+
+def test_alinti_kaynaklari_bozuksa_numara_yok():
+    # Liste olmayan (eski, metin olarak saklanmış) ya da sözlük olmayan kaynaklar okunmaz: kaçırmak güvenli yön.
+    assert ss.sutun_coz(fen_kaydi(kaynaklar=str([{"alinti": FEN_ALINTI}])), TABLO, BUGUN) is None
+    assert ss.sutun_coz(fen_kaydi(kaynaklar=[FEN_ALINTI, None, {"alinti": None}]), TABLO, BUGUN) is None
