@@ -87,7 +87,7 @@ test('indirmeAdi: önce filename* (RFC 5987), sonra filename; yol taşıyan ad y
 
 test('isaretSahibiMetni: PDF öğrencinin işaretlerini basar; ad ünlü uyumuyla iyelik alır, ad yoksa genel söz', () => {
   assert.equal(isaretSahibiMetni('Deneme Öğrenci'), "Deneme Öğrenci'nin işaretleri")
-  assert.equal(isaretSahibiMetni('Işık'), "Işık'ın işaretleri")
+  assert.equal(isaretSahibiMetni('Ilgın'), "Ilgın'ın işaretleri")
   assert.equal(isaretSahibiMetni('Ayşe'), "Ayşe'nin işaretleri")
   assert.equal(isaretSahibiMetni('Ali Kaya'), "Ali Kaya'nın işaretleri")
   assert.equal(isaretSahibiMetni('Doğu'), "Doğu'nun işaretleri")

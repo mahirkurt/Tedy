@@ -140,7 +140,7 @@ export function indirmeAdi(baslik: string | null): string {
 }
 
 /** PDF penceresinin yardımcı metni: PDF öğrencinin işaretlerini basar (D16). Ad ilgi ekini ünlü uyumuyla alır
- *  ("Işık'ın", "Ayşe'nin", "Doğu'nun", "Bülbül'ün"); ünlüyle bitene kaynaştırma n'si girer. Ad yoksa genel söz. */
+ *  ("Ilgın'ın", "Ayşe'nin", "Doğu'nun", "Bülbül'ün"); ünlüyle bitene kaynaştırma n'si girer. Ad yoksa genel söz. */
 export function isaretSahibiMetni(ad: string | null): string {
   const t = (ad ?? '').trim()
   if (!t) return 'Öğrencinin işaretleri'
