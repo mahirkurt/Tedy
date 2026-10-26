@@ -274,6 +274,52 @@ def test_isaret_deposu_kisi_ayri_ve_bozuk_dosya_kenara_alinir(tmp_path):
     assert json.loads(yol.read_text(encoding="utf-8"))["kisiler"] == {"a@x.com": {"fen-bilimleri": {"FB.7.2.2": "tekrar"}}}
 
 
+def test_isaret_deposu_okunamayan_dosya_bozuk_sayilmaz_oserror_yukari_gecer(tmp_path, monkeypatch):
+    """Geçici G/Ç hatası (izin, NFS...) dosyayı 'bozuk' yapıp kenara aldırmaz: OSError okumada da yazmada da yükselir,
+    dosya yerinde ve bozulmamış kalır. (Yalnız ValueError ve şema hatası 'bozuk' sayılır.)"""
+    from pathlib import Path
+    yol = tmp_path / "hazirlik_isaretleri.json"
+    d = HazirlikIsaretleri(yol)
+    d.yaz("a@x.com", "fen-bilimleri", "FB.7.2.1", "hazirim")
+    onceki = yol.read_text(encoding="utf-8")
+    gercek = Path.read_text
+
+    def okuyamaz(self, *a, **k):
+        if self == yol:
+            raise PermissionError("deneme")
+        return gercek(self, *a, **k)
+
+    monkeypatch.setattr(Path, "read_text", okuyamaz)
+    with pytest.raises(PermissionError):
+        d.kisi("a@x.com")
+    with pytest.raises(PermissionError):
+        d.yaz("a@x.com", "fen-bilimleri", "FB.7.2.2", "tekrar")
+    monkeypatch.setattr(Path, "read_text", gercek)
+    assert yol.read_text(encoding="utf-8") == onceki
+    assert list(tmp_path.glob("hazirlik_isaretleri.json.bozuk-*")) == []
+
+
+def test_isaret_deposu_ayni_saniyedeki_ikinci_bozuk_kopya_birincisini_ezmez(tmp_path, monkeypatch):
+    from datetime import datetime as gercek_dt
+    import src.hazirlik_isaretleri as modul
+
+    class Sabit(gercek_dt):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 10, 25, 12, 0, 0)
+
+    monkeypatch.setattr(modul, "datetime", Sabit)
+    yol = tmp_path / "hazirlik_isaretleri.json"
+    d = HazirlikIsaretleri(yol)
+    yol.write_text("{birinci", encoding="utf-8")
+    d.yaz("a@x.com", "fen-bilimleri", "FB.7.2.1", "hazirim")
+    yol.write_text("{ikinci", encoding="utf-8")
+    d.yaz("a@x.com", "fen-bilimleri", "FB.7.2.2", "tekrar")
+    kopyalar = sorted(tmp_path.glob("hazirlik_isaretleri.json.bozuk-*"))
+    assert sorted(k.read_text(encoding="utf-8") for k in kopyalar) == ["{birinci", "{ikinci"]
+    assert len({k.name for k in kopyalar}) == 2
+
+
 def test_isaret_deposu_eszamanli_yazimlar_kaybolmaz(tmp_path):
     """İki gunicorn işçisi: flock altında okuma-değiştirme-yazma, hiçbir işaret ezilmez."""
     import threading
