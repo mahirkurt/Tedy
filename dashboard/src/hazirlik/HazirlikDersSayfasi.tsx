@@ -11,9 +11,11 @@ import Kaydirilabilir from '../components/Kaydirilabilir'
 import KarsilastirmaTablosu from './KarsilastirmaTablosu'
 import CiktiAyrintisi from './CiktiAyrintisi'
 import DurumGostergesi from './DurumGostergesi'
+import PdfSecenekleri from './PdfSecenekleri'
 import Uyarilar from './Uyarilar'
 import { hazirlikUyarilari } from './belge'
 import { enYakinYazili, kilavuzAdresi, sinavAdi, tarihMetni } from './hazirlik'
+import { usePdfPenceresi } from './usePdfSecenekleri'
 import type { DersOzeti } from './tipler'
 import './Hazirlik.scss'
 
@@ -51,6 +53,7 @@ export default function HazirlikDersSayfasi() {
   const [secili, setSecili] = useState<string | null>(null)
   const [secim, setSecim] = useState<string>('olasi')
   const satirDugmesi = useRef<HTMLButtonElement | null>(null)
+  const { acik: pdfAcik, ac: pdfAc, kapat: pdfKapat, dugme: pdfDugmesi } = usePdfPenceresi()
   const kapat = useCallback(() => { setSecili(null); satirDugmesi.current?.focus() }, [])
   // `?sinav` yoksa dersin en yakın yazılısı açılır (Dersler sekmesi ve doğrudan adres numarasız gelir): yüklenen
   // yazılı listesinden seçilir, adres yerine yazılır (Geri tuşu numarasız adrese dönüp yeniden yönlendirmez).
@@ -141,8 +144,11 @@ export default function HazirlikDersSayfasi() {
         <div className="hazirlik-ders__eylemler">
           {/* Başka sayfaya götürdüğü için bağlantı (adresi var, yeni sekmede açılır); Carbon birincil düğme biçiminde. */}
           <Button kind="primary" size="lg" href={kilavuz} onClick={kilavuzaGit}>{`Kapsam kılavuzunu aç${ek}`}</Button>
+          {/* İkincil eylem (spec §3.2): B58 gereği secondary değil tertiary. Kılavuzla aynı senaryo. */}
+          <Button kind="tertiary" size="lg" ref={pdfDugmesi} onClick={pdfAc}>PDF olarak indir</Button>
         </div>
       )}
+      {pdfAcik && <PdfSecenekleri anahtar={anahtar} no={no} senaryo={duyurulan === null ? secilen : null} kapat={pdfKapat} />}
     </section>
   )
 }

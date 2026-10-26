@@ -2,8 +2,11 @@
 // Kapsam kılavuzunu A4 PDF'e basar (plan 2026-10-25 Görev 1, 14). Ağsız: baski.html ve varlıkları dashboard-dist'ten,
 // /api/hazirlik/** isteği --model dosyasından sahte bir kökte sunulur; başka her istek kesilir. Chrome kanalı
 // (makinedeki /usr/bin/google-chrome; Playwright'ın headless-shell indirmesi bu makinede takılıyor).
-// Çıkış: 0 tamam, 2 argüman, 3 sayfa hatası, 4 zaman aşımı.
+// Çıkış: 0 tamam, 2 argüman (dist'te baski.html yoksa da), 3 sayfa hatası, 4 zaman aşımı. Yakalanmayan istisna Node'u
+// 1 ile bitirir; çağıran (src/hazirlik_pdf.py) sıfırdan farklı her çıkışı hata sayar.
+import { statSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { KOK, argumanlariCoz, baskiAdresi, guvenliYol, mimeTuru } from './kilavuzPdfOrtak.mjs'
 
@@ -12,6 +15,11 @@ try {
   a = argumanlariCoz(process.argv.slice(2))
 } catch (e) {
   console.error(String(e?.message ?? e))
+  process.exit(2)
+}
+// Derlenmemiş dist: hazır sinyalini (--sure, 45 sn'ye kadar) beklemeden açıkça söyle.
+if (!(() => { try { return statSync(join(a.dist, 'baski.html')).isFile() } catch { return false } })()) {
+  console.error(`dist'te baski.html yok: ${join(a.dist, 'baski.html')} (önce npm run build)`)
   process.exit(2)
 }
 const model = a.model ? await readFile(a.model) : null
@@ -43,12 +51,24 @@ try {
       return yol.fulfill({ status: 404, body: '' })
     }
   })
-  await sayfa.goto(baskiAdresi(a.sorgu, a.duz))
+  // Sayfa açılamazsa hazır sinyali beklenmez. Chrome boş gövdeli hata yanıtında goto'yu düşürür (yanıt nesnesi
+  // gelmez): durum kodu ana belgenin yanıt olayından okunur.
+  let anaDurum = null
+  sayfa.on('response', r => { if (r.request().isNavigationRequest() && r.frame() === sayfa.mainFrame()) anaDurum = r.status() })
   try {
-    await sayfa.waitForFunction(() => window.__KILAVUZ_HAZIR__ || window.__KILAVUZ_HATA__, null, { timeout: a.sure })
-  } catch {
-    console.error('zaman aşımı: baskı görünümünün hazır sinyali gelmedi')
-    kod = 4
+    const yanit = await sayfa.goto(baskiAdresi(a.sorgu, a.duz))
+    if (!yanit?.ok()) throw new Error('yanıt başarısız')
+  } catch (e) {
+    console.error(`baskı sayfası açılamadı (HTTP ${anaDurum ?? '?'}): ${String(e?.message ?? e).split('\n')[0]}`)
+    kod = 3
+  }
+  if (kod === 0) {
+    try {
+      await sayfa.waitForFunction(() => window.__KILAVUZ_HAZIR__ || window.__KILAVUZ_HATA__, null, { timeout: a.sure })
+    } catch {
+      console.error('zaman aşımı: baskı görünümünün hazır sinyali gelmedi')
+      kod = 4
+    }
   }
   if (kod === 0) {
     const hata = await sayfa.evaluate(() => window.__KILAVUZ_HATA__ ?? null)

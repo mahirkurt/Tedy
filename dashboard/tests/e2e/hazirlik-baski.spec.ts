@@ -16,10 +16,14 @@ async function bekle(page: import('@playwright/test').Page) {
 }
 
 test('Paged.js yolu: sayfalar, gerçek İçindekiler numarası, etkileşimsiz kâğıt (K5, K11)', async ({ page }) => {
-  await page.route(KILAVUZ('fen-bilimleri', 1), r => r.fulfill(json(fikstur('fen-bilimleri-1-kilavuz'))))
+  const istenen: string[] = []
+  await page.route(KILAVUZ('fen-bilimleri', 1), r => { istenen.push(r.request().url()); return r.fulfill(json(fikstur('fen-bilimleri-1-kilavuz'))) })
   await page.goto('/baski.html?ders=fen-bilimleri&sinav=1')
   const s = await bekle(page)
   expect(s.hata).toBeNull()
+  // A4 önizleme PDF'in birebir önizlemesi: model PDF'teki işaretlerle (öğrencinin, D16) istenir.
+  expect(istenen).toHaveLength(1)
+  expect(istenen[0]).toMatch(/\/kilavuz\?ebeveyn=0&isaret=1&isaret_kaynagi=ogrenci$/)
   expect(s.hazir!.sayfa).toBeGreaterThan(2)
   await expect(page.locator('.pagedjs_page')).toHaveCount(s.hazir!.sayfa)
   await expect(page.locator('.kilavuz-icindekiler__baglanti').first()).toHaveText('Özet')

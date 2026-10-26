@@ -2,13 +2,17 @@ import { useEffect } from 'react'
 import type { MouseEvent } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Accordion, AccordionItem, Breadcrumb, BreadcrumbItem, Button, InlineNotification, SkeletonText } from '@carbon/react'
+import { Launch } from '@carbon/icons-react'
 import { useApi } from '../hooks/useApi'
+import { useSession } from '../contexts/session'
 import { apiHataCumlesi } from '../utils/apiHatasi'
 import { uygulamaIcindeAc } from '../utils/gezinme'
 import { asistanaSor } from '../asistan/sayfaBaglami'
 import KilavuzBelgesi from './KilavuzBelgesi'
+import PdfSecenekleri from './PdfSecenekleri'
 import { BOLUM, bolumler, ustBilgi } from './belge'
-import { modelAdresi } from './hazirlik'
+import { baskiAdresi, modelAdresi } from './hazirlik'
+import { usePdfPenceresi, usePdfSecenekleri } from './usePdfSecenekleri'
 import { useIsaretler } from './useIsaretler'
 import type { KilavuzModeli } from './tipler'
 import './Hazirlik.scss'
@@ -28,6 +32,8 @@ export default function KilavuzSayfasi() {
   // altında çizilmez.
   const m = data && data.anahtar === anahtar && data.sinav_no === no && (senaryo === null || data.senaryo === senaryo) ? data : null
   const { isaretler, isaretle, hata, hatayiKapat } = useIsaretler(anahtar, m)
+  const { acik: pdfAcik, ac: pdfAc, kapat: pdfKapat, dugme: pdfDugmesi } = usePdfPenceresi()
+  const pdfSecimi = usePdfSecenekleri(useSession()?.email ?? '')
   const cizildi = m !== null
   // D21: ders sayfasındaki "Kılavuzda aç" #cikti-… ile gelir; belge çizilince o öğeye kaydırılır.
   useEffect(() => {
@@ -71,9 +77,14 @@ export default function KilavuzSayfasi() {
           <BreadcrumbItem isCurrentPage aria-current="page">{BOLUM.kilavuz}</BreadcrumbItem>
         </Breadcrumb>
         <div className="kilavuz-sayfa__eylemler">
+          <Button kind="primary" size="lg" ref={pdfDugmesi} onClick={pdfAc}>PDF olarak indir</Button>
+          {/* PDF'in birebir önizlemesi: aynı seçimle, baskı görünümü yeni sekmede (sayfadan çıktığını ikon söyler, B58). */}
+          <Button kind="ghost" size="lg" renderIcon={Launch} href={baskiAdresi(anahtar, no, m.senaryo, pdfSecimi)}
+            target="_blank" rel="noreferrer">A4 önizleme</Button>
           <Button kind="ghost" size="lg" onClick={sor}>Asistana sor</Button>
         </div>
       </div>
+      {pdfAcik && <PdfSecenekleri anahtar={anahtar} no={no} senaryo={m.senaryo} kapat={pdfKapat} />}
       {/* Telefonda (lg altı) yan içindekiler yok: bölümlere aynı bağlantılarla açılır bir menüden atlanır. Kâğıda
           girmez — KilavuzBelgesi'nin değil, ekran sayfasının parçasıdır. */}
       <Accordion className="kilavuz-sayfa__bolumler" size="lg">

@@ -3366,12 +3366,13 @@ def _hazirlik_hatasi(kod):
     return jsonify({"error": kod, "mesaj": mesaj}), durum
 
 
-def _hazirlik_modeli(anahtar, sinav_no):
+def _hazirlik_modeli(anahtar, sinav_no, kim_icin="oturum"):
     """(model, None) ya da (None, hata yanıtı): ?senaryo=N (1–2 rakam; başka değer bilinmeyen senaryo),
     ?ebeveyn=1, ?isaret=0.
 
-    İşaret kaynağı D16: bloklardaki işaretler ve üst düzey `isaret_sahibi` oturumdaki kişiden; `ebeveyn` özeti
-    (seçenek ekranda açılsa bile) öğrencinin ham işaretlerinden ve adıyla."""
+    İşaret kaynağı D16 (`_kilavuz_isaretleri`): `kim_icin="oturum"` (ekran) bloklardaki işaretler ve üst düzey
+    `isaret_sahibi` oturumdaki kişiden; `"ogrenci"` (PDF, A4 önizleme) öğrencinin işaretleri ve adıyla. `ebeveyn`
+    özeti her durumda öğrencinin ham işaretlerinden ve adıyla."""
     import dataclasses
     from src import sinav_kilavuzu
     ham = (request.args.get("senaryo") or "").strip()
@@ -3380,7 +3381,7 @@ def _hazirlik_modeli(anahtar, sinav_no):
     secenekler = {"ebeveyn": request.args.get("ebeveyn") == "1", "isaret": request.args.get("isaret", "1") != "0"}
     senaryo = int(ham) if ham else None
     try:
-        email, _ = _kilavuz_isaretleri("oturum")
+        email, _ = _kilavuz_isaretleri(kim_icin)
         girdi = _hazirlik_girdileri(email)
         model = sinav_kilavuzu.kilavuz(girdi, anahtar, sinav_no, senaryo, secenekler)
         ogrenci = _ogrenci_epostasi()
@@ -3411,11 +3412,64 @@ def hazirlik_ders(anahtar, sinav_no):
         return _hazirlik_hatasi(hata.kod)
 
 
+def _yalniz_oturumla():
+    return jsonify({"error": "yalnız oturumla",
+                    "mesaj": "Öğrencinin işaretlerini yalnız oturum açmış aile üyesi görebilir."}), 403
+
+
 @app.route("/api/hazirlik/<anahtar>/<int:sinav_no>/kilavuz")
 @require_auth
 def hazirlik_kilavuz(anahtar, sinav_no):
-    model, hata = _hazirlik_modeli(anahtar, sinav_no)
+    """Ekran kılavuzu oturumdaki kişinin işaretleriyle. `?isaret_kaynagi=ogrenci`: A4 önizleme PDF'in birebir
+    önizlemesidir, aynı işaretlerle (öğrencinin, D16) — yalnız oturumdaki tam roldeki kişiye; API anahtarı 403
+    (okuyucu zaten default-deny). Parametre yalnız okur, işaret deposuna dokunmaz."""
+    kim_icin = "oturum"
+    if request.args.get("isaret_kaynagi") == "ogrenci":
+        if not _hazirlik_kisisi():
+            return _yalniz_oturumla()
+        kim_icin = "ogrenci"
+    model, hata = _hazirlik_modeli(anahtar, sinav_no, kim_icin)
     return hata if hata else jsonify(model)
+
+
+def _pdf_dosya_adi(anahtar, sinav_no, senaryo):
+    """Türkçe ama ASCII'ye güvenli ad: `kapsam-kilavuzu-fen-bilimleri-1-s2.pdf` / `…-1-olasi.pdf`."""
+    govde = re.sub(r"[^a-z0-9-]+", "-", f"kapsam-kilavuzu-{anahtar}-{sinav_no}").strip("-")
+    return f"{govde}-{f's{senaryo}' if senaryo is not None else 'olasi'}.pdf"
+
+
+@app.route("/api/hazirlik/<anahtar>/<int:sinav_no>/kilavuz.pdf")
+@require_auth
+def hazirlik_kilavuz_pdf(anahtar, sinav_no):
+    """A4 PDF (spec §5.3): aynı model öğrencinin işaretleriyle (D16), sunucudaki Chrome; yuva doluysa 429, iki yol da
+    düşerse (ya da Chrome sayfayı küçültmüşse, K3 bekçisi) 503 (spec §7). PDF öğrencinin işaretlerini taşıdığı için
+    yalnız oturumdaki tam roldeki kişiye: API anahtarı 403, okuyucu default-deny."""
+    from src import hazirlik_pdf
+    if not _hazirlik_kisisi():
+        return _yalniz_oturumla()
+    model, hata = _hazirlik_modeli(anahtar, sinav_no, "ogrenci")
+    if hata:
+        return hata
+    sorgu = {"ders": anahtar, "sinav": str(sinav_no), "ebeveyn": "1" if model["secenekler"]["ebeveyn"] else "0",
+             "isaret": "1" if model["secenekler"]["isaret"] else "0"}
+    if model["senaryo"] is not None:
+        sorgu["senaryo"] = str(model["senaryo"])
+    try:
+        yol = hazirlik_pdf.pdf_getir(model, sorgu, dizin=Path(OUTPUT_DIR) / "hazirlik_pdf", dist=Path(DIST_DIR))
+    except hazirlik_pdf.Mesgul:
+        yanit = jsonify({"error": "mesgul", "mesaj": "Şu an başka bir kılavuz hazırlanıyor; bir dakika sonra yeniden dene."})
+        yanit.status_code = 429
+        yanit.headers["Retry-After"] = "30"
+        return yanit
+    except hazirlik_pdf.Uretilemedi:
+        app.logger.warning("kılavuz PDF'i üretilemedi: %s %s", anahtar, sinav_no, exc_info=True)
+        return jsonify({"error": "pdf_uretilemedi",
+                        "mesaj": "PDF hazırlanamadı. Ekrandaki kılavuzu tarayıcının yazdır komutuyla da kaydedebilirsin."}), 503
+    ad = _pdf_dosya_adi(anahtar, sinav_no, model["senaryo"])
+    yanit = send_file(str(yol), mimetype="application/pdf", max_age=0)
+    # RFC 6266 + 5987: düz `filename` ve `filename*` birlikte (ad ASCII'dir; Werkzeug ASCII adda filename* yazmaz).
+    yanit.headers["Content-Disposition"] = f"attachment; filename={ad}; filename*=UTF-8''{quote(ad)}"
+    return yanit
 
 
 @app.route("/api/hazirlik/isaret", methods=["PUT"])

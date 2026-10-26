@@ -120,6 +120,25 @@ export function pdfAdresi(anahtar: string, no: number, senaryo: number | null, s
   return `/api/hazirlik/${anahtar}/${no}/kilavuz.pdf?${secenekSorgusu(senaryo, s)}`
 }
 
+/** Baskı görünümünün model adresi: PDF ile aynı işaretlerle — öğrencinin (D16; A4 önizleme PDF'in birebir
+ *  önizlemesidir). Sunucu `isaret_kaynagi`'nı yalnız oturumdaki tam roldeki kişiye açar; sunucu basımında
+ *  kilavuz-pdf.mjs bu isteği modelden karşılar. */
+export function baskiModelAdresi(anahtar: string, no: number, senaryo: number | null, s: PdfSecenekleri): string {
+  return `${modelAdresi(anahtar, no, senaryo, s)}&isaret_kaynagi=ogrenci`
+}
+
+/** İndirilen dosyanın adı `Content-Disposition`'dan: önce RFC 5987 `filename*` (UTF-8), yoksa `filename`; ikisi de
+ *  yoksa ya da ad yol taşıyorsa genel ad. */
+export function indirmeAdi(baslik: string | null): string {
+  const yildiz = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(baslik ?? '')?.[1]
+  let ad: string | undefined
+  if (yildiz) {
+    try { ad = decodeURIComponent(yildiz.trim()) } catch { ad = undefined }
+  }
+  ad ??= /filename\s*=\s*"?([^";]+)"?/i.exec(baslik ?? '')?.[1]?.trim()
+  return ad && !/[\\/]/.test(ad) ? ad : 'kapsam-kilavuzu.pdf'
+}
+
 /** A4 önizleme (spec §3.3): baskı girişi, aynı seçeneklerle; oturum çereziyle modeli kendisi alır. */
 export function baskiAdresi(anahtar: string, no: number, senaryo: number | null, s: PdfSecenekleri): string {
   const q = secenekSorgusu(senaryo, s)

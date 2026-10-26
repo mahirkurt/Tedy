@@ -210,3 +210,12 @@
     padding-block-end: spacing.$spacing-05;
   }
 }
+
+// PDF seçenekleri penceresi (Görev 14): not satırı ile seçenekler, seçenekler ile hata bildirimi arasında boşluk.
+.hazirlik-pdf__not {
+  margin-block-end: spacing.$spacing-05;
+}
+
+.hazirlik-pdf__hata {
+  margin-block-start: spacing.$spacing-05;
+}

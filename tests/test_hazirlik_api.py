@@ -275,3 +275,142 @@ def test_isaret_deposu_eszamanli_yazimlar_kaybolmaz(tmp_path):
     [t.start() for t in isler]
     [t.join() for t in isler]
     assert set(d.kisi("a@x.com")["fen-bilimleri"]) == set(kodlar)
+
+
+# --- PDF ucu (plan Görev 14) ---
+
+def test_pdf_ucu_dosya_mesgul_429_uretilemedi_503(c, monkeypatch, tmp_path):
+    """Review Focus: PDF zaman aşımı/eşzamanlılık uca açık iletiyle yansır; başarıda indirilen dosya."""
+    from src import hazirlik_pdf
+    giris(c, AILE)
+    pdf = tmp_path / "k.pdf"
+    pdf.write_bytes(b"%PDF-1.7 deneme")
+    gelen = {}
+
+    def basari(model, sorgu, *, dizin, dist):
+        gelen.update(model=model, sorgu=sorgu, dizin=dizin, dist=dist)
+        return pdf
+    monkeypatch.setattr(hazirlik_pdf, "pdf_getir", basari)
+    r = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz.pdf?ebeveyn=1")
+    assert (r.status_code, r.mimetype, r.data) == (200, "application/pdf", b"%PDF-1.7 deneme")
+    cd = r.headers["Content-Disposition"]
+    assert cd.startswith("attachment;") and "filename=kapsam-kilavuzu-fen-bilimleri-1-s2.pdf" in cd
+    assert "filename*=UTF-8''kapsam-kilavuzu-fen-bilimleri-1-s2.pdf" in cd
+    assert gelen["sorgu"] == {"ders": "fen-bilimleri", "sinav": "1", "ebeveyn": "1", "isaret": "1", "senaryo": "2"}
+    assert str(gelen["dizin"]).endswith("hazirlik_pdf") and str(gelen["dist"]) == api.DIST_DIR
+    assert gelen["model"]["icerik_ozeti"] == sinav_kilavuzu.icerik_ozeti(gelen["model"])
+
+    r = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz.pdf?senaryo=3")    # duyurulmamış seçilen senaryo
+    assert "filename=kapsam-kilavuzu-fen-bilimleri-1-s3.pdf" in r.headers["Content-Disposition"]
+
+    def mesgul(*a, **k):
+        raise hazirlik_pdf.Mesgul()
+    monkeypatch.setattr(hazirlik_pdf, "pdf_getir", mesgul)
+    r = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz.pdf")
+    assert (r.status_code, r.headers["Retry-After"], r.get_json()["error"]) == (429, "30", "mesgul")
+    assert r.get_json()["mesaj"] == "Şu an başka bir kılavuz hazırlanıyor; bir dakika sonra yeniden dene."
+
+    def dustu(*a, **k):
+        raise hazirlik_pdf.Uretilemedi("iki yol da düştü")
+    monkeypatch.setattr(hazirlik_pdf, "pdf_getir", dustu)
+    r = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz.pdf")
+    assert (r.status_code, r.get_json()["error"]) == (503, "pdf_uretilemedi")
+    assert "iki yol" not in r.get_data(as_text=True)                       # iç ayrıntı okura gitmez (D4)
+    assert c.get("/api/hazirlik/fen-bilimleri/1/kilavuz.pdf?senaryo=9").status_code == 404
+
+
+def test_pdf_ucu_olasi_kipte_dosya_adi(c, monkeypatch, tmp_path):
+    from src import hazirlik_pdf
+    giris(c, AILE)
+    monkeypatch.setattr(api, "_hazirlik_sinavlari", lambda: [sinav_kaydi(konular=FEN_KONULARI, durum="belirtilmedi", senaryo=None)])
+    pdf = tmp_path / "k.pdf"
+    pdf.write_bytes(b"%PDF")
+    gelen = {}
+
+    def basari(model, sorgu, *, dizin, dist):
+        gelen["sorgu"] = sorgu
+        return pdf
+    monkeypatch.setattr(hazirlik_pdf, "pdf_getir", basari)
+    r = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz.pdf")
+    assert "filename=kapsam-kilavuzu-fen-bilimleri-1-olasi.pdf" in r.headers["Content-Disposition"]
+    assert "senaryo" not in gelen["sorgu"]
+
+
+def test_pdf_ogrencinin_isaretleriyle_basilir(c, monkeypatch, tmp_path):
+    """D16: PDF'i kim isterse istesin bloklarda öğrencinin işaretleri ve adı."""
+    from src import hazirlik_pdf
+    monkeypatch.setattr(api, "_scraped", lambda: {"ogrenci_profili": {"name": "Deneme Öğrenci"}})
+    giris(c, OGRENCI, "Deneme Öğrenci")
+    isaret_koy(c, "FB.7.2.1", "tekrar")
+    giris(c, AILE, "Deneme Veli")
+    isaret_koy(c, "FB.7.1.3", "hazirim")
+    pdf = tmp_path / "k.pdf"
+    pdf.write_bytes(b"%PDF")
+    gelen = {}
+
+    def basari(model, sorgu, *, dizin, dist):
+        gelen["model"] = model
+        return pdf
+    monkeypatch.setattr(hazirlik_pdf, "pdf_getir", basari)
+    assert c.get("/api/hazirlik/fen-bilimleri/1/kilavuz.pdf").status_code == 200
+    m = gelen["model"]
+    blok = {b["kod"]: b for u in m["uniteler"] for cer in u["cerceveler"] for b in cer["bloklar"]}
+    assert blok["FB.7.2.1"]["isaret"] == "tekrar" and blok["FB.7.1.3"]["isaret"] is None
+    assert m["isaret_sahibi"] == "Deneme Öğrenci"
+
+
+def test_okuyucu_pdf_alamaz(c):
+    giris(c, OKUYUCU)
+    assert c.get("/api/hazirlik/fen-bilimleri/1/kilavuz.pdf").status_code == 403
+    assert "hazirlik_kilavuz_pdf" not in api.READER_ENDPOINTS
+
+
+def test_api_anahtari_pdf_alamaz(c, monkeypatch):
+    """PDF öğrencinin işaretlerini taşır (D16); anahtarın kişisi yok, ekranda da işaret göremez — PDF'i de alamaz."""
+    from src import hazirlik_pdf
+    monkeypatch.setattr(api, "API_KEYS", [("test", "tdyK_deneme")])
+
+    def basilmaz(*a, **k):
+        raise AssertionError("anahtarla basım yapılmamalı")
+    monkeypatch.setattr(hazirlik_pdf, "pdf_getir", basilmaz)
+    r = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz.pdf", headers={"Authorization": "Bearer tdyK_deneme"})
+    assert (r.status_code, r.get_json()["error"]) == (403, "yalnız oturumla")
+
+
+# --- A4 önizleme PDF'in birebir önizlemesidir: baskı sayfası öğrencinin işaretleriyle ister (kontrolcü kararı) ---
+
+def test_kilavuz_isaret_kaynagi_ogrenci_tam_rolde_ogrencinin_isaretleri(c, monkeypatch):
+    monkeypatch.setattr(api, "_scraped", lambda: {"ogrenci_profili": {"name": "Deneme Öğrenci"}})
+    giris(c, OGRENCI, "Deneme Öğrenci")
+    isaret_koy(c, "FB.7.2.1", "tekrar")
+    giris(c, AILE, "Deneme Veli")
+    isaret_koy(c, "FB.7.1.3", "hazirim")
+    ekran = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz").get_json()
+    baski = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz?isaret_kaynagi=ogrenci").get_json()
+
+    def isaretler(m):
+        return {b["kod"]: b["isaret"] for u in m["uniteler"] for cer in u["cerceveler"] for b in cer["bloklar"] if b["isaret"]}
+    assert isaretler(ekran) == {"FB.7.1.3": "hazirim"} and ekran["isaret_sahibi"] == "Deneme Veli"
+    assert isaretler(baski) == {"FB.7.2.1": "tekrar"} and baski["isaret_sahibi"] == "Deneme Öğrenci"
+    # parametre yalnız okur: işaret deposu değişmedi
+    assert isaretler(c.get("/api/hazirlik/fen-bilimleri/1/kilavuz").get_json()) == {"FB.7.1.3": "hazirim"}
+
+
+def test_isaret_kaynagi_okuyucu_ve_api_anahtarina_kapali(c, monkeypatch):
+    giris(c, OGRENCI, "Deneme Öğrenci")
+    isaret_koy(c, "FB.7.2.1", "tekrar")
+    giris(c, OKUYUCU)
+    assert c.get("/api/hazirlik/fen-bilimleri/1/kilavuz?isaret_kaynagi=ogrenci").status_code == 403
+    with c.session_transaction() as s:
+        s.clear()
+    monkeypatch.setattr(api, "API_KEYS", [("test", "tdyK_deneme")])
+    baslik = {"Authorization": "Bearer tdyK_deneme"}
+    r = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz?isaret_kaynagi=ogrenci", headers=baslik)
+    assert (r.status_code, r.get_json()["error"]) == (403, "yalnız oturumla")
+    assert "tekrar" not in r.get_data(as_text=True)
+    r = c.put("/api/hazirlik/isaret?isaret_kaynagi=ogrenci", headers=baslik,
+              json={"ders": "fen-bilimleri", "kod": "FB.7.2.1", "durum": None})
+    assert r.status_code == 403                                           # değiştiremez de
+    giris(c, OGRENCI)
+    m = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz").get_json()
+    assert any(b["isaret"] == "tekrar" for u in m["uniteler"] for cer in u["cerceveler"] for b in cer["bloklar"])

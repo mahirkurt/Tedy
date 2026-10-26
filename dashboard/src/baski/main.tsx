@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom'
 import { Theme } from '@carbon/react'
 import KilavuzBelgesi from '../hazirlik/KilavuzBelgesi'
 import { damgaMetni, ustBilgi } from '../hazirlik/belge'
-import { modelAdresi } from '../hazirlik/hazirlik'
+import { baskiModelAdresi } from '../hazirlik/hazirlik'
 import type { KilavuzModeli } from '../hazirlik/tipler'
 import { baskiSorgusuCoz } from './sorgu'
 import { sayfala } from './sayfalama'
@@ -18,7 +18,8 @@ declare global {
 async function baslat(): Promise<void> {
   const s = baskiSorgusuCoz(location.search)
   if (!s) throw new Error('Baskı adresi eksik: ?ders=<ders>&sinav=1|2 gerekli.')
-  const r = await fetch(modelAdresi(s.ders, s.sinav, s.senaryo, s.secenekler), { credentials: 'include' })
+  // PDF ile aynı işaretler (öğrencinin, D16): tarayıcıdaki A4 önizleme PDF'in birebir önizlemesi olsun.
+  const r = await fetch(baskiModelAdresi(s.ders, s.sinav, s.senaryo, s.secenekler), { credentials: 'include' })
   if (!r.ok) throw new Error(`Kılavuz alınamadı (HTTP ${r.status}).`)
   const m = await r.json() as KilavuzModeli
   // Düz yolda (yedek) Chrome'un üst bilgisi belge başlığını basar: damga da başlığa girer (K5 B metni, K12).

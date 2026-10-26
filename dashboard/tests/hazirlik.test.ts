@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  baskiAdresi, baslikMetni, ciktiKimligi, dersAnahtari, durumEtiketi, kilavuzGirisi, ebeveynCumleleri, kalanGunMetni, kilavuzAdresi,
+  baskiAdresi, baskiModelAdresi, baslikMetni, indirmeAdi, ciktiKimligi, dersAnahtari, durumEtiketi, kilavuzGirisi, ebeveynCumleleri, kalanGunMetni, kilavuzAdresi,
   enYakinYazili, kisaAmac, kitapYoluMetni, pdfAdresi, sayfaMetni, sayisalTarih, secenekleriOku, secenekleriYaz, soruMetni, tarihMetni, BASLIK_TURU,
   yaklasanAyrinti,
 } from '../src/hazirlik/hazirlik.ts'
@@ -67,6 +67,22 @@ test('adresler', () => {
   assert.equal(dersAnahtari('Fen Bilimleri'), 'fen-bilimleri')
   assert.equal(dersAnahtari('Beden Eğitimi'), null)
   assert.equal(dersAnahtari(undefined), null)
+})
+
+test('baskı görünümü modeli PDF ile aynı işaretlerle (öğrencinin) ister; A4 önizleme adresi parametresiz', () => {
+  const s = { ebeveyn: false, isaret: true }
+  assert.equal(baskiModelAdresi('fen-bilimleri', 1, 2, s),
+    '/api/hazirlik/fen-bilimleri/1/kilavuz?senaryo=2&ebeveyn=0&isaret=1&isaret_kaynagi=ogrenci')
+  assert.ok(!baskiAdresi('fen-bilimleri', 1, 2, s).includes('isaret_kaynagi'))
+})
+
+test('indirmeAdi: önce filename* (RFC 5987), sonra filename; yol taşıyan ad ya da başlıksız yanıt genel ad', () => {
+  assert.equal(indirmeAdi("attachment; filename=kapsam-kilavuzu-fen-bilimleri-1-s2.pdf; filename*=UTF-8''kapsam-kilavuzu-fen-bilimleri-1-s2.pdf"),
+    'kapsam-kilavuzu-fen-bilimleri-1-s2.pdf')
+  assert.equal(indirmeAdi("attachment; filename=ascii.pdf; filename*=UTF-8''kapsam-k%C4%B1lavuzu.pdf"), 'kapsam-kılavuzu.pdf')
+  assert.equal(indirmeAdi('attachment; filename="kapsam-kilavuzu-fen-bilimleri-1-olasi.pdf"'), 'kapsam-kilavuzu-fen-bilimleri-1-olasi.pdf')
+  assert.equal(indirmeAdi('attachment; filename=../../etc/passwd'), 'kapsam-kilavuzu.pdf')
+  assert.equal(indirmeAdi(null), 'kapsam-kilavuzu.pdf')
 })
 
 test('dersAnahtari sunucudaki altı tablo adını ve Dersler sekmelerinin adlarını tanır', () => {
