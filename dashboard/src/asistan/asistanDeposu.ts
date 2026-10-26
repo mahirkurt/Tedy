@@ -4,7 +4,7 @@ import type { Yukleme } from '../components/YuklenenEk'
 import type { SilmeIstegi } from './SohbetGecmisi.tsx'
 
 export interface Cip { yerel: string; ad: string; tur?: string; id?: string; hata?: string; yukleniyor?: boolean; baglaniyor?: boolean; baglandi?: boolean }
-export interface SayfaIstegi { ad: string; oge?: { tur: string; id: string }; etiket: string; ogeEtiketi?: string }
+export interface SayfaIstegi { ad: string; oge?: { tur: string; id: string; kip?: string; senaryo?: number | null }; etiket: string; ogeEtiketi?: string }
 export interface AsistanDurumu {
   okur: 'ogrenci' | 'aile'; email?: string; ogretmenId: string; saltOkunur: boolean; sohbetId?: string
   odevKey: string; cipler: Cip[]; sayfa: SayfaIstegi | null

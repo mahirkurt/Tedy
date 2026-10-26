@@ -1080,8 +1080,87 @@ def _istek_sayfasi(payload):
     if (not isinstance(oge, dict) or oge.get("tur") not in SAYFA_OGE_TURLERI or not isinstance(kimlik, str)
             or not kimlik.strip() or len(kimlik) > 400 or any(ord(c) < 32 for c in kimlik)):
         return "", hata
-    baslik = " ".join(_sayfa_ogesi_basligi(oge["tur"], kimlik).split())[:160]
+    kilavuz = _kilavuz_alanlari(oge)
+    if kilavuz is False:
+        return "", hata
+    baslik = ""
+    if oge["tur"] == "sinav" and (kilavuz is not None or kimlik.startswith("hazirlik:")):
+        baslik = _kilavuz_basligi(kimlik, *(kilavuz or (None, None)))
+    baslik = " ".join((baslik or _sayfa_ogesi_basligi(oge["tur"], kimlik)).split())[:160]
     return (f"{satir} (açık: {baslik})" if baslik else satir), None
+
+
+# Sınav Hazırlığı kapsam kılavuzu (spec 2026-10-25 §3.3, D11): "Asistana sor" sınavı ve senaryoyu birlikte sabitler.
+# İstemci kimliğin yanında `kip` (kesin | olasi | ulke_geneli) ve `senaryo` (tamsayı | yok) gönderir; sınav kaydı yoksa
+# kimlik `hazirlik:<ders anahtarı>:<yazılı>:<senaryo | olasi>` biçimindedir. Başlık etiketten değil buradan kurulur.
+_KILAVUZ_KIPLERI = ("kesin", "olasi", "ulke_geneli")
+
+
+def _kilavuz_alanlari(oge):
+    """None (alan yok) | (kip, senaryo) | False (geçersiz: tür ya da değer uygunsuz)."""
+    if "kip" not in oge and "senaryo" not in oge:
+        return None
+    kip, senaryo = oge.get("kip"), oge.get("senaryo")
+    if oge["tur"] != "sinav" or not isinstance(kip, str) or kip not in _KILAVUZ_KIPLERI:
+        return False
+    if senaryo is not None and (isinstance(senaryo, bool) or not isinstance(senaryo, int) or not 1 <= senaryo <= 99):
+        return False
+    if kip != "olasi" and (kip == "kesin") != (senaryo is not None):
+        return False  # kesin senaryosuz, ülke geneli senaryolu olamaz; olası ikisini de taşıyabilir
+    return kip, senaryo
+
+
+def _hazirlik_kimligi(kimlik):
+    """`hazirlik:<anahtar>:<no>:<senaryo|olasi>` → (ders, no, kip, senaryo) ya da None."""
+    from src import sinav_kilavuzu
+    parca = kimlik.split(":")
+    if len(parca) != 4 or parca[0] != "hazirlik":
+        return None
+    ders = sinav_kilavuzu.ANAHTAR_DERSLERI.get(parca[1])
+    if ders is None or parca[2] not in ("1", "2"):
+        return None
+    if parca[3] == "olasi":
+        return ders, int(parca[2]), "olasi", None
+    if parca[3].isascii() and parca[3].isdigit() and 1 <= int(parca[3]) <= 99:
+        return ders, int(parca[2]), "kesin", int(parca[3])
+    return None
+
+
+def _kilavuz_basligi(kimlik, kip, senaryo):
+    """"Fen Bilimleri · 1. yazılı · 2. senaryo": ders ve yazılı kimlikten ya da sınav kaydından, senaryo istemcinin
+    doğrulanmış alanlarından. Olası kipte senaryo kesinmiş gibi yazılmaz (K8). Çözülemezse "" (çağıran kayıt
+    başlığına ya da yalnız sayfa adına döner)."""
+    from src import sinav_kilavuzu
+    ders = no = None
+    kayit_basligi = ""
+    hazirlik = _hazirlik_kimligi(kimlik)
+    if hazirlik:
+        ders, no, kimlik_kip, kimlik_senaryo = hazirlik
+        if kip is None:
+            kip, senaryo = kimlik_kip, kimlik_senaryo
+    elif kimlik.startswith("hazirlik:"):
+        return ""
+    else:
+        try:
+            kayit = next((s for s in _canli_sinavlar() if s.get("id") == kimlik), None)
+        except Exception as exc:  # noqa: BLE001 — bağlam satırı hiçbir zaman cevabı düşürmez
+            app.logger.warning("Kılavuz sınavı çözülemedi (%s)", type(exc).__name__)
+            kayit = None
+        if kayit is None or kip is None:
+            return ""
+        blok = kayit.get("senaryo") if isinstance(kayit.get("senaryo"), dict) else {}
+        kayit_basligi = str(kayit.get("title") or "")
+        if blok.get("ders") in sinav_kilavuzu.DERS_ANAHTARLARI and blok.get("sinav_no") in (1, 2):
+            ders, no = blok["ders"], blok["sinav_no"]
+    if kip == "ulke_geneli":
+        sen = "ülke geneli"
+    elif kip == "kesin":
+        sen = f"{senaryo}. senaryo"
+    else:
+        sen = f"{senaryo}. senaryo (olası)" if senaryo is not None else "bütün senaryolar (olası)"
+    if ders is None:
+        return f"{kayit_basligi} · {sen}" if kayit_basligi else ""
+    return f"{ders} · {no}. yazılı · {sen}"
 
 
 # The assistant's live student-data sources (plan Görev 2): each returns what

@@ -71,12 +71,13 @@ export function useAsistanSohbeti(bicim: 'sayfa' | 'panel', sayfa: string | null
   // İlkel bağımlılıklar: aynı öğe yeniden bildirildiğinde (nesne değişse de) okurun kapattığı çip geri gelmez.
   const oge = useAcikOge()
   const ogeTur = oge?.tur, ogeId = oge?.id, ogeEtiket = oge?.etiket
+  const ogeKip = oge?.kilavuz?.kip, ogeSenaryo = oge?.kilavuz?.senaryo
   useLayoutEffect(() => {
     if (baglamiAtla) { baglamiAtla = false; return }
     const etiket = sayfaEtiketi(sayfa)
     asistanDeposu.ayarla({ sayfa: sayfa && etiket ? { ad: sayfa, etiket,
-      ...(ogeTur && ogeId ? { oge: { tur: ogeTur, id: ogeId }, ogeEtiketi: ogeEtiket } : {}) } : null })
-  }, [sayfa, ogeTur, ogeId, ogeEtiket])
+      ...(ogeTur && ogeId ? { oge: { tur: ogeTur, id: ogeId, ...(ogeKip ? { kip: ogeKip, senaryo: ogeSenaryo ?? null } : {}) }, ogeEtiketi: ogeEtiket } : {}) } : null })
+  }, [sayfa, ogeTur, ogeId, ogeEtiket, ogeKip, ogeSenaryo])
   const baglam = useAsistanDurumu(d => d.sayfa?.ad ?? null)
 
   const secili = ogretmen.secili

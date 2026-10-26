@@ -4602,6 +4602,22 @@ html[data-role='reader'] .app-shell-content--reader.cds--content {
   flex-wrap: wrap;
 }
 
+// Sınav Hazırlığı girişi (spec 2026-10-25 §3.4): panelin tepesinde tek satırlık bağlantı. Telefonda dokunma hedefi 44 px
+// (D3b); bağlantı Carbon düzen bileşeni olmadığından yüksekliği burada verilir.
+.course-content__senaryo {
+  margin: 0 0 var(--ted-space-sm);
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 1.5rem;
+  }
+
+  @media (max-width: 671px) {
+    a { min-block-size: 3rem; }
+  }
+}
+
 .course-content__week-picker {
   inline-size: 17rem;
   max-inline-size: 100%;

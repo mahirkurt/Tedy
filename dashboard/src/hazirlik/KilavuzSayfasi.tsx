@@ -52,7 +52,7 @@ export default function KilavuzSayfasi() {
   // Sınav kaydı yoksa aynı bağlam ders + yazılı + senaryo kimliğiyle kurulur.
   const sor = () => {
     const kimlik = m.durum.sinav_id ?? `hazirlik:${anahtar}:${no}:${m.senaryo ?? 'olasi'}`
-    if (!asistanaSor({ tur: 'sinav', id: kimlik, etiket: ustBilgi(m) })) gezin('/asistan?sayfa=sinavlar')
+    if (!asistanaSor({ tur: 'sinav', id: kimlik, etiket: ustBilgi(m), kilavuz: { kip: m.kip, senaryo: m.kip === 'ulke_geneli' ? null : m.senaryo } })) gezin('/asistan?sayfa=sinavlar')
   }
   const icGezinme = (yol: string) => (e: MouseEvent<HTMLElement>) => {
     // Ctrl/orta tık/yeni sekme tarayıcıya kalır (C13).

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { DERS, KILAVUZ, erisilebilirlik, fikstur, hazirlikAc, json } from './_hazirlik'
 import { LIVE, mock } from './_audit-fixtures'
+import { PAYLOAD, cevapla, sor } from './_asistan-carbon'
 
 test.use({ timezoneId: 'Europe/Istanbul', locale: 'tr-TR' })
 
@@ -265,6 +266,18 @@ test('"Asistana sor" sınavı ve senaryoyu bağlam olarak sabitler; sınav kayd�
   await page.getByRole('button', { name: 'Asistana sor' }).click()
   await expect(page).toHaveURL(/\/asistan\?sayfa=sinavlar$/)
   await expect(page.getByText('Bu sayfa: Sınavlar — Fen Bilimleri · 1. yazılı · 2. senaryo')).toBeVisible({ timeout: 15000 })
+})
+
+test('"Asistana sor" isteği sınavı, kipi ve senaryoyu sunucuya taşır (D11 sunucu yarısı)', async ({ page }) => {
+  const istekler = await cevapla(page, PAYLOAD())
+  const m = KESIN() as { durum: Record<string, unknown> }
+  await hazirlikAc(page, '/hazirlik/fen-bilimleri/1', [[KILAVUZ('fen-bilimleri', 1), m]])
+  await page.getByRole('button', { name: 'Asistana sor' }).click()
+  await expect(page).toHaveURL(/\/asistan\?sayfa=sinavlar$/)
+  await expect(page.getByText('Bu sayfa: Sınavlar — Fen Bilimleri · 1. yazılı · 2. senaryo')).toBeVisible({ timeout: 15000 })
+  await sor(page, 'Bu senaryoya göre örnek soru yaz')
+  await expect.poll(() => istekler.length).toBe(1)
+  expect(istekler[0]).toMatchObject({ sayfa: { ad: 'sinavlar', oge: { tur: 'sinav', id: m.durum.sinav_id, kip: 'kesin', senaryo: 2 } } })
 })
 
 test('telefonda belge yatay taşmaz; yan içindekiler masaüstünde yapışkan', async ({ page }) => {

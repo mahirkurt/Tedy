@@ -81,3 +81,82 @@ def test_satir_kullanici_turunda_sistemde_degil(tmp_path):
     son = konusma[-1]
     assert son["role"] == "user" and "Bulunduğu sayfa: İşler\n" in son["content"]
     assert son["content"].endswith("Soru: x")
+
+
+# --- Sınav Hazırlığı kılavuzu (spec 2026-10-25 §3.3, plan Görev 12, D11) ---------------------------------------------
+# Kılavuz "Asistana sor" ile sınavı VE senaryoyu bağlam yapar; model gördüğü satırda senaryoyu okur. Başlık
+# istemcinin etiketinden değil sunucunun kendi verisinden ve doğrulanmış alanlardan kurulur.
+
+def _kilavuz(oge_ek, kimlik="abc123def456"):
+    return {**SORU, "sayfa": {"ad": "sinavlar", "oge": {"tur": "sinav", "id": kimlik, **oge_ek}}}
+
+
+def _satir(istemci, govde):
+    yanit = istemci.post("/api/assistant/chat", json=govde)
+    assert yanit.status_code == 200
+    return istemci.kayit.kwargs["sayfa_satiri"]
+
+
+@pytest.fixture
+def kayitli_sinav(monkeypatch):
+    monkeypatch.setattr(dashboard_api, "_canli_sinavlar", lambda: [
+        {"id": "abc123def456", "title": "1.1 Ara Değerlendirme Sınavı",
+         "senaryo": {"ders": "Fen Bilimleri", "sinav_no": 1}}])
+
+
+def test_kilavuz_senaryosu_sinav_kaydi_varken_satira_girer(istemci, kayitli_sinav):
+    satir = _satir(istemci, _kilavuz({"kip": "kesin", "senaryo": 2}))
+    assert satir == "Bulunduğu sayfa: Sınavlar (açık: Fen Bilimleri · 1. yazılı · 2. senaryo)"
+    # Kayıt başlığı kaybolmaz: senaryosuz istek eskisi gibi kayıt başlığıyla çözülür.
+    assert _satir(istemci, _kilavuz({})) == "Bulunduğu sayfa: Sınavlar (açık: 1.1 Ara Değerlendirme Sınavı)"
+
+
+def test_kilavuz_sinav_kaydi_yokken_ders_yazili_senaryo_kurulur(istemci):
+    satir = _satir(istemci, _kilavuz({"kip": "kesin", "senaryo": 2}, "hazirlik:fen-bilimleri:1:2"))
+    assert satir == "Bulunduğu sayfa: Sınavlar (açık: Fen Bilimleri · 1. yazılı · 2. senaryo)"
+    satir = _satir(istemci, _kilavuz({"kip": "kesin", "senaryo": 4}, "hazirlik:turkce:2:4"))
+    assert satir == "Bulunduğu sayfa: Sınavlar (açık: Türkçe · 2. yazılı · 4. senaryo)"
+
+
+def test_kilavuz_alan_yoksa_kimlikteki_senaryo_okunur(istemci):
+    assert _satir(istemci, _kilavuz({}, "hazirlik:fen-bilimleri:1:3")) \
+        == "Bulunduğu sayfa: Sınavlar (açık: Fen Bilimleri · 1. yazılı · 3. senaryo)"
+    assert _satir(istemci, _kilavuz({}, "hazirlik:fen-bilimleri:1:olasi")) \
+        == "Bulunduğu sayfa: Sınavlar (açık: Fen Bilimleri · 1. yazılı · bütün senaryolar (olası))"
+
+
+def test_olasi_kipte_senaryo_bu_senaryo_diye_sunulmaz(istemci, kayitli_sinav):
+    """K8: duyurulmamış senaryo ("olası") hiçbir zaman kesinmiş gibi yazılmaz."""
+    assert _satir(istemci, _kilavuz({"kip": "olasi", "senaryo": 3})) \
+        == "Bulunduğu sayfa: Sınavlar (açık: Fen Bilimleri · 1. yazılı · 3. senaryo (olası))"
+    assert _satir(istemci, _kilavuz({"kip": "olasi", "senaryo": None})) \
+        == "Bulunduğu sayfa: Sınavlar (açık: Fen Bilimleri · 1. yazılı · bütün senaryolar (olası))"
+    assert _satir(istemci, _kilavuz({"kip": "ulke_geneli"}, "hazirlik:fen-bilimleri:2:olasi")) \
+        == "Bulunduğu sayfa: Sınavlar (açık: Fen Bilimleri · 2. yazılı · ülke geneli)"
+
+
+def test_etiket_sunucuya_guvenilmez(istemci):
+    govde = _kilavuz({"kip": "kesin", "senaryo": 2, "etiket": "Fen Bilimleri · 1. yazılı · 9. senaryo"},
+                     "hazirlik:fen-bilimleri:1:2")
+    assert _satir(istemci, govde).endswith("2. senaryo)")
+
+
+def test_cozulemeyen_kilavuz_kimligi_yalniz_sayfa_adi(istemci):
+    for kimlik in ("hazirlik:yok-ders:1:2", "hazirlik:fen-bilimleri:3:2", "hazirlik:fen-bilimleri:x:2", "hazirlik:fen-bilimleri"):
+        assert _satir(istemci, _kilavuz({}, kimlik)) == "Bulunduğu sayfa: Sınavlar"
+
+
+@pytest.mark.parametrize("ek", [
+    {"kip": "gizli", "senaryo": 2}, {"kip": ["kesin"], "senaryo": 2}, {"kip": "kesin", "senaryo": "2"},
+    {"kip": "kesin", "senaryo": 0}, {"kip": "kesin", "senaryo": 100}, {"kip": "kesin", "senaryo": True},
+    {"kip": "kesin", "senaryo": 2.5}, {"senaryo": 2},
+])
+def test_gecersiz_kilavuz_alanlari_400(istemci, ek):
+    yanit = istemci.post("/api/assistant/chat", json=_kilavuz(ek, "hazirlik:fen-bilimleri:1:2"))
+    assert yanit.status_code == 400 and yanit.get_json()["error"] == "Bilinmeyen sayfa."
+    assert istemci.kayit.kwargs is None
+
+
+def test_kilavuz_alanlari_yalniz_sinav_ogesinde(istemci):
+    govde = {**SORU, "sayfa": {"ad": "isler", "oge": {"tur": "odev", "id": "hw-1", "kip": "kesin", "senaryo": 2}}}
+    assert istemci.post("/api/assistant/chat", json=govde).status_code == 400

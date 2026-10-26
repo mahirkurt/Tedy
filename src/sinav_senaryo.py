@@ -402,6 +402,10 @@ def arac_metni(tablo: dict, sinavlar: list[dict], args: dict, bugun: date | None
     satirlar = [f"{ders} · {k['sinif']}. sınıf · {k['donem']}. Dönem {no}. Ortak Yazılı "
                 f"(MEB konu-soru dağılım tablosu, güncelleme {gun[2]}.{gun[1]}.{gun[0]})",
                 f"Bu tablo {k['ogretim_yili']} {k['donem']}. dönem ortak yazılıları içindir."]
+    if ders in DERS_ANAHTARLARI:
+        # Sınav Hazırlığı girişi (spec 2026-10-25 §3.4): model okura kılavuzun yerini söyleyebilir.
+        satirlar.append(f"Kapsam kılavuzu panoda: Sınav Hazırlığı › {ders} › {no}. yazılı "
+                        f"(/hazirlik/{DERS_ANAHTARLARI[ders]}/{no}).")
     if bugun is not None and donem_no(bugun) != k["donem"]:
         satirlar.append(f"Şu an {donem_no(bugun)}. dönemdeyiz; bu tablo yalnız {k['donem']}. dönem ortak "
                         f"yazılılarını kapsar, bugünkü dönemin sınavları için dağılım vermez.")

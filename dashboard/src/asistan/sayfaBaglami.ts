@@ -33,6 +33,8 @@ export interface AcikOge {
   tur: 'odev' | 'sinav' | 'etkinlik' | 'ders_haftasi' | 'konu'
   id: string
   etiket: string
+  /** Yalnız kapsam kılavuzundan (tur 'sinav'): sunucu senaryoyu etiketten değil bu alanlardan okur (D11). */
+  kilavuz?: { kip: 'kesin' | 'olasi' | 'ulke_geneli'; senaryo: number | null }
 }
 
 // Açık öğeler yığın olarak tutulur: en son açılan bağlamdır; her kayıt yalnız kendi öğesini bırakır (iki sınav kartı

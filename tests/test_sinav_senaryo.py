@@ -527,3 +527,11 @@ def test_i3_konu_kapsami_birlesimdir_en_iyi_kume_degil():
     tr = TABLO["dersler"]["Türkçe"]["ciktilar"]
     assert ss.konu_kapsami("T.O.7.21 söz varlığı", tr) == ["T.O.7.21"]               # kod eşleşmesi daralmaz
     assert ss.konu_kapsami("Osmanlı Devleti'nin kuruluşu", tr) == []
+
+
+def test_arac_metni_kapsam_kilavuzunun_yerini_soyler():
+    """Sınav Hazırlığı girişi (spec 2026-10-25 §3.4, plan Görev 12)."""
+    govde, _ = ss.arac_metni(TABLO, [], {"ders": "Fen", "sinav_no": 1}, BUGUN)
+    assert "Kapsam kılavuzu panoda: Sınav Hazırlığı › Fen Bilimleri › 1. yazılı (/hazirlik/fen-bilimleri/1)." in govde
+    govde, _ = ss.arac_metni(TABLO, [], {"ders": "Türkçe", "sinav_no": 2}, BUGUN)
+    assert "(/hazirlik/turkce/2)" in govde
