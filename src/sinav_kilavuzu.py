@@ -15,7 +15,7 @@ from pathlib import Path
 
 from src.course_names import normalize_course
 from src.sinav_kaynaklari import on_suzgec
-from src.sinav_senaryo import DERS_ANAHTARLARI, _gun, donem_no, konu_eslestir, ogretim_yili_adi
+from src.sinav_senaryo import DERS_ANAHTARLARI, _gun, _kod_sirasi, donem_no, konu_eslestir, ogretim_yili_adi
 from src.sinav_tarihi import katla
 
 SURUM = 1
@@ -144,10 +144,6 @@ def genel_bakis(g: Girdiler) -> dict:
                                  "sinavlar": sinavlar})
     sonuc["yaklasan"].sort(key=lambda y: (y["durum"]["tarih"], y["ders"]))
     return sonuc
-
-
-def _kod_sirasi(kod: str) -> tuple:
-    return tuple((0, int(p), "") if p.isdigit() else (1, 0, p) for p in kod.split("."))
 
 
 def _eslesen_bolumler(harita: dict | None, kod: str):

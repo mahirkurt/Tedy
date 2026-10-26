@@ -75,6 +75,12 @@ def tablo_oku(yol: Path | None = None) -> dict | None:
     return veri
 
 
+def _kod_sirasi(kod: str) -> tuple:
+    """Çıktı kodu sıralama anahtarı: sayısal parçalar sayı gibi (FB.7.2.9 < FB.7.2.10). Kılavuz modeli ve kitap
+    haritası betiği aynı sırayı bundan alır."""
+    return tuple((0, int(p), "") if p.isdigit() else (1, 0, p) for p in kod.split("."))
+
+
 def _gun(deger: Any) -> date | None:
     try:
         return date.fromisoformat(str(deger)[:10]) if deger else None

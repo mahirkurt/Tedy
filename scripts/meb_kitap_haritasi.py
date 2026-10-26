@@ -27,7 +27,7 @@ if str(KOK) not in sys.path:
     sys.path.insert(0, str(KOK))
 
 from src.json_utils import atomic_json_dump  # noqa: E402
-from src.sinav_senaryo import _puan, tablo_oku  # noqa: E402
+from src.sinav_senaryo import _kod_sirasi, _puan, tablo_oku  # noqa: E402
 from src.sinav_tarihi import katla  # noqa: E402
 
 SURUM = 1
@@ -388,10 +388,6 @@ def yapi_denetimi(harita: dict, ciktilar: list[dict], beklenen_eslesmeyen=(), ba
     if kodlar and len(eslesmedi) * 2 > len(kodlar):
         hatalar.append(f"çıktıların yarısından çoğu eşleşmedi ({len(eslesmedi)}/{len(kodlar)})")
     return hatalar
-
-
-def _kod_sirasi(kod: str) -> tuple:
-    return tuple((0, int(p), "") if p.isdigit() else (1, 0, p) for p in kod.split("."))
 
 
 def harita_kur(anahtar: str, ayar: dict, girdiler: list[dict], tablo: dict, bugun: date) -> dict:
