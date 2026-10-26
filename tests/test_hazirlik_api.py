@@ -414,3 +414,20 @@ def test_isaret_kaynagi_okuyucu_ve_api_anahtarina_kapali(c, monkeypatch):
     giris(c, OGRENCI)
     m = c.get("/api/hazirlik/fen-bilimleri/1/kilavuz").get_json()
     assert any(b["isaret"] == "tekrar" for u in m["uniteler"] for cer in u["cerceveler"] for b in cer["bloklar"])
+
+
+def test_ogrenci_gosterim_adi_ucu_yalniz_oturumdaki_tam_role(c, monkeypatch):
+    """PDF penceresinin yardımcı metni ("<ad>'ın işaretleri") için öğrencinin gösterim adı; e-posta değil, yoksa null.
+    API anahtarı 403 (PDF ucuyla aynı), okuyucu default-deny."""
+    giris(c, AILE, "Deneme Veli")
+    assert c.get("/api/hazirlik/ogrenci").get_json() == {"ad": None}
+    monkeypatch.setattr(api, "_scraped", lambda: {"ogrenci_profili": {"name": "Deneme Öğrenci"}})
+    assert c.get("/api/hazirlik/ogrenci").get_json() == {"ad": "Deneme Öğrenci"}
+    giris(c, OKUYUCU)
+    assert c.get("/api/hazirlik/ogrenci").status_code == 403
+    with c.session_transaction() as s:
+        s.clear()
+    monkeypatch.setattr(api, "API_KEYS", [("test", "tdyK_deneme")])
+    r = c.get("/api/hazirlik/ogrenci", headers={"Authorization": "Bearer tdyK_deneme"})
+    assert (r.status_code, r.get_json()["error"]) == (403, "yalnız oturumla")
+    assert "hazirlik_ogrenci" not in api.READER_ENDPOINTS

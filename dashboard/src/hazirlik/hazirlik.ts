@@ -139,6 +139,19 @@ export function indirmeAdi(baslik: string | null): string {
   return ad && !/[\\/]/.test(ad) ? ad : 'kapsam-kilavuzu.pdf'
 }
 
+/** PDF penceresinin yardımcı metni: PDF öğrencinin işaretlerini basar (D16). Ad ilgi ekini ünlü uyumuyla alır
+ *  ("Işık'ın", "Ayşe'nin", "Doğu'nun", "Bülbül'ün"); ünlüyle bitene kaynaştırma n'si girer. Ad yoksa genel söz. */
+export function isaretSahibiMetni(ad: string | null): string {
+  const t = (ad ?? '').trim()
+  if (!t) return 'Öğrencinin işaretleri'
+  const kucuk = t.toLocaleLowerCase('tr-TR')
+  const unluler = kucuk.match(/[aeıioöuü]/g)
+  const son = unluler ? unluler[unluler.length - 1] : 'e'
+  const ek = ({ a: 'ın', ı: 'ın', e: 'in', i: 'in', o: 'un', u: 'un', ö: 'ün', ü: 'ün' } as Record<string, string>)[son]
+  const kaynastirma = /[aeıioöuü]$/.test(kucuk) ? 'n' : ''
+  return `${t}'${kaynastirma}${ek} işaretleri`
+}
+
 /** A4 önizleme (spec §3.3): baskı girişi, aynı seçeneklerle; oturum çereziyle modeli kendisi alır. */
 export function baskiAdresi(anahtar: string, no: number, senaryo: number | null, s: PdfSecenekleri): string {
   const q = secenekSorgusu(senaryo, s)

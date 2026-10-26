@@ -1,14 +1,14 @@
 // Kılavuz PDF'ini indirir (plan Görev 14).
 import { indirmeAdi } from './hazirlik'
 
-/** null: indirildi; dize: okura söylenecek cümle (sunucunun `mesaj`'ı ya da genel cümle; ham HTTP metni okura
- *  gitmez, D4). Ad `Content-Disposition`'dan (`filename*` önce). */
-export async function pdfIndir(adres: string): Promise<string | null> {
+/** null: indirildi ya da `iptal` ile vazgeçildi (indirme olmaz); dize: okura söylenecek cümle (sunucunun `mesaj`'ı ya
+ *  da genel cümle; ham HTTP metni okura gitmez, D4). Ad `Content-Disposition`'dan (`filename*` önce). */
+export async function pdfIndir(adres: string, iptal?: AbortSignal): Promise<string | null> {
   let r: Response
   try {
-    r = await fetch(adres, { credentials: 'include' })
+    r = await fetch(adres, { credentials: 'include', signal: iptal })
   } catch {
-    return 'Bağlantı kurulamadı; yeniden dene.'
+    return iptal?.aborted ? null : 'Bağlantı kurulamadı; yeniden dene.'
   }
   if (!r.ok) {
     try {
@@ -22,8 +22,9 @@ export async function pdfIndir(adres: string): Promise<string | null> {
   try {
     blob = await r.blob()
   } catch {
-    return 'Bağlantı kesildi; yeniden dene.'
+    return iptal?.aborted ? null : 'Bağlantı kesildi; yeniden dene.'
   }
+  if (iptal?.aborted) return null
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

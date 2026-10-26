@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 
 from scripts import kilavuz_pdf_kapilari as kpk
+from src import pdf_kapilari as pk
 
 
 def test_basim_ortami_istanbul_saatiyle(monkeypatch, tmp_path):
@@ -55,3 +56,8 @@ def test_model_icindekiler_bolumlerle_ayni_yedi_girdi():
     e = json.loads((FIKSTUR / "fen-bilimleri-1-kilavuz-ebeveyn.json").read_text(encoding="utf-8"))
     assert kpk.model_basliklari(e)[1][0] == "Ebeveyn Özeti"
     assert kpk.kapak_sayfasi(e) == 2 and kpk.kapak_sayfasi(m) == 1
+
+
+def test_model_basliklari_src_altinda_paylasilir():
+    """Sunucu bekçisi ile betik aynı işlevi kullanır (kopya yok)."""
+    assert kpk.model_basliklari is pk.model_basliklari and kpk.kapak_sayfasi is pk.kapak_sayfasi

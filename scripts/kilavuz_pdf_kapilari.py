@@ -23,7 +23,7 @@ KOK = Path(__file__).resolve().parents[1]
 if str(KOK) not in sys.path:
     sys.path.insert(0, str(KOK))
 
-from src.pdf_kapilari import DenetimHatasi, denetle, kusurlar  # noqa: E402
+from src.pdf_kapilari import DenetimHatasi, denetle, kapak_sayfasi, kusurlar, model_basliklari  # noqa: E402,F401
 
 VENV_BIN = "/mnt/thunderbolt/workspaces/TED/.venv/bin"
 BASIM_SURESI = 300   # saniye
@@ -33,36 +33,6 @@ YOKLAMA_BASLIKLARI = [
     "Fiziksel Anlamda İş", "Uzay Teknolojileri", "Yıldız Oluşumu"]
 YOKLAMA_ICINDEKILER = ["Senaryo Karşılaştırması", "1. Ünite · Uzay Çağı", "2. Ünite · Kuvvet ve Enerjiyi Keşfedelim",
                        "Kaynaklar"]
-
-
-def model_basliklari(model: dict) -> tuple[list[str], list]:
-    """Kılavuz modelinden K1 başlıkları (ünite, çerçeve, konu, bölüm başlığı) ve İçindekiler girdileri — panonun
-    `belge.bolumler(m)` listesinin aynısı, sırasıyla. Özet'in sayfasında görünen başlık "Kapsam Kılavuzu"dur."""
-    basliklar: list[str] = []
-    icindekiler: list = [
-        *(["Ebeveyn Özeti"] if model.get("ebeveyn") else []), ("Özet", "Kapsam Kılavuzu"),
-        *(["Senaryo Karşılaştırması"] if (model.get("matris") or {}).get("senaryolar") else []),
-        *[u["baslik"] for u in model.get("uniteler", [])],
-        *(["Duyuru Doğrulaması"] if model.get("dogrulama") else []),
-        *(["Çalışma Planı"] if model.get("plan") else []), "Kaynaklar"]
-    for u in model.get("uniteler", []):
-        basliklar.append(u["baslik"])
-        for c in u["cerceveler"]:
-            if c.get("baslik"):
-                basliklar.append(c["baslik"])
-            for b in c["bloklar"]:
-                if not b["senaryoda"]:
-                    continue          # senaryoda olmayan çıktı tek satırdır, başlıkları basılmaz (K2)
-                for y in b["kitapta"]:
-                    if y.get("konu"):
-                        basliklar.append(y["konu"])
-                    basliklar += [h["ad"] for h in y.get("basliklar", [])]
-    return list(dict.fromkeys(basliklar)), icindekiler
-
-
-def kapak_sayfasi(model: dict) -> int:
-    """Üst bilgisi olmayan kapak: ebeveyn özeti başa tek sayfa gelirse 2, yoksa 1 (K5)."""
-    return 2 if model.get("ebeveyn") else 1
 
 
 def bas(dist: Path, cikti: Path, sorgu: str, model: Path | None, duz: bool) -> dict:

@@ -3432,6 +3432,16 @@ def hazirlik_kilavuz(anahtar, sinav_no):
     return hata if hata else jsonify(model)
 
 
+@app.route("/api/hazirlik/ogrenci")
+@require_auth
+def hazirlik_ogrenci():
+    """PDF penceresinin yardımcı metni için öğrencinin gösterim adı (PDF öğrencinin işaretlerini basar, D16):
+    `{"ad": str | null}` — e-posta değil, kaynak yoksa null. PDF ucuyla aynı kural: yalnız oturumdaki tam rol."""
+    if not _hazirlik_kisisi():
+        return _yalniz_oturumla()
+    return jsonify({"ad": _kilavuz_isaretleri("ogrenci")[1]})
+
+
 def _pdf_dosya_adi(anahtar, sinav_no, senaryo):
     """Türkçe ama ASCII'ye güvenli ad: `kapsam-kilavuzu-fen-bilimleri-1-s2.pdf` / `…-1-olasi.pdf`."""
     govde = re.sub(r"[^a-z0-9-]+", "-", f"kapsam-kilavuzu-{anahtar}-{sinav_no}").strip("-")
@@ -3442,7 +3452,7 @@ def _pdf_dosya_adi(anahtar, sinav_no, senaryo):
 @require_auth
 def hazirlik_kilavuz_pdf(anahtar, sinav_no):
     """A4 PDF (spec §5.3): aynı model öğrencinin işaretleriyle (D16), sunucudaki Chrome; yuva doluysa 429, iki yol da
-    düşerse (ya da Chrome sayfayı küçültmüşse, K3 bekçisi) 503 (spec §7). PDF öğrencinin işaretlerini taşıdığı için
+    düşerse (ya da basım kanun kapılarından geçmezse, kapı bekçisi) 503 (spec §7). PDF öğrencinin işaretlerini taşıdığı için
     yalnız oturumdaki tam roldeki kişiye: API anahtarı 403, okuyucu default-deny."""
     from src import hazirlik_pdf
     if not _hazirlik_kisisi():

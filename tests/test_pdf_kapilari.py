@@ -274,3 +274,17 @@ def test_denetle_k1_aramasi_okuma_sirasindaki_metinde(monkeypatch, tmp_path):
     r = pk.denetle(tmp_path / "k.pdf", basliklar=[baslik], icindekiler=[])
     assert r["eksik_baslik"] == []
     assert r["alt_bilgi"] == [] and r["ust_bilgi"] == []
+
+
+def test_denetle_sure_butcesi_her_araca_kalan_sure(monkeypatch, tmp_path):
+    """Sunucu bekçisi için: `sure` verilince araç çağrıları ortak bir son ana göre kalan süreyi alır (toplam ≤ sure)."""
+    sureler = []
+
+    def calistir(*argv, sure=pk.ARAC_SURESI):
+        sureler.append(sure)
+        if argv[0] == "qpdf":
+            return json.dumps(QPDF if "--json-key=qpdf" in argv else ANAHATLAR)
+        return {"pdfinfo": PDFINFO, "pdffonts": PDFFONTS, "pdftotext": SAYFALAR, "pdftohtml": "<pdf2xml></pdf2xml>"}[argv[0]]
+    monkeypatch.setattr(pk, "_calistir", calistir)
+    pk.denetle(tmp_path / "k.pdf", basliklar=[], icindekiler=[], sure=8)
+    assert len(sureler) == 7 and all(0 < s <= 8 for s in sureler)

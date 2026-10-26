@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  baskiAdresi, baskiModelAdresi, baslikMetni, indirmeAdi, ciktiKimligi, dersAnahtari, durumEtiketi, kilavuzGirisi, ebeveynCumleleri, kalanGunMetni, kilavuzAdresi,
+  baskiAdresi, baskiModelAdresi, baslikMetni, indirmeAdi, isaretSahibiMetni, ciktiKimligi, dersAnahtari, durumEtiketi, kilavuzGirisi, ebeveynCumleleri, kalanGunMetni, kilavuzAdresi,
   enYakinYazili, kisaAmac, kitapYoluMetni, pdfAdresi, sayfaMetni, sayisalTarih, secenekleriOku, secenekleriYaz, soruMetni, tarihMetni, BASLIK_TURU,
   yaklasanAyrinti,
 } from '../src/hazirlik/hazirlik.ts'
@@ -83,6 +83,18 @@ test('indirmeAdi: önce filename* (RFC 5987), sonra filename; yol taşıyan ad y
   assert.equal(indirmeAdi('attachment; filename="kapsam-kilavuzu-fen-bilimleri-1-olasi.pdf"'), 'kapsam-kilavuzu-fen-bilimleri-1-olasi.pdf')
   assert.equal(indirmeAdi('attachment; filename=../../etc/passwd'), 'kapsam-kilavuzu.pdf')
   assert.equal(indirmeAdi(null), 'kapsam-kilavuzu.pdf')
+})
+
+test('isaretSahibiMetni: PDF öğrencinin işaretlerini basar; ad ünlü uyumuyla iyelik alır, ad yoksa genel söz', () => {
+  assert.equal(isaretSahibiMetni('Deneme Öğrenci'), "Deneme Öğrenci'nin işaretleri")
+  assert.equal(isaretSahibiMetni('Işık'), "Işık'ın işaretleri")
+  assert.equal(isaretSahibiMetni('Ayşe'), "Ayşe'nin işaretleri")
+  assert.equal(isaretSahibiMetni('Ali Kaya'), "Ali Kaya'nın işaretleri")
+  assert.equal(isaretSahibiMetni('Doğu'), "Doğu'nun işaretleri")
+  assert.equal(isaretSahibiMetni('Bülbül'), "Bülbül'ün işaretleri")
+  assert.equal(isaretSahibiMetni('Umut'), "Umut'un işaretleri")
+  assert.equal(isaretSahibiMetni(null), 'Öğrencinin işaretleri')
+  assert.equal(isaretSahibiMetni('  '), 'Öğrencinin işaretleri')
 })
 
 test('dersAnahtari sunucudaki altı tablo adını ve Dersler sekmelerinin adlarını tanır', () => {

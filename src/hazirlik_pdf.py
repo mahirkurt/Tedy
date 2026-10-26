@@ -8,14 +8,17 @@ basar; bu modül yuvayı, zaman aşımını, yedek yolu ve önbelleği yönetir:
   Chrome'u AYRI bir süreç grubunda başlatır (kontrolcü kararı D6): yalnız Node'un grubunu öldürmek Chrome'u yaşatır.
   Ağaç öldürmeden önce /proc'tan çözülür, ağaçtaki her sürecin grubu SIGKILL alır (kendi grubumuz asla).
 - Yedek yol: ana yol (Görev 2 kararı: `ANA_YOL`) düşerse düz Chrome baskısı; o da düşerse `Uretilemedi` (API 503).
-  Basım kusurlu da sayılabilir (K3 bekçisi, kontrolcü kararı): Chrome sayfayı küçültmüşse en küçük punto 7,5'in
-  altına iner; `denetimli_basim` bunu ölçer ve yolu düşürür.
+  Basım kusurlu da sayılabilir (kapı bekçisi, kontrolcü kararı): `denetimli_basim` üretilen PDF'i kanun kapılarının
+  hepsinden geçirir (`pdf_kapilari.denetle` + `kusurlar`: yetim, İçindekiler, K1, alt/üst bilgi, yazı tipi, punto);
+  başlıklar ve İçindekiler girdileri modelden (`pdf_kapilari.model_basliklari`). Kusur yolu düşürür.
+- Bütçe: Cloudflare tünelinin ~100 sn kenar sınırı. Ana yol `ANA_SURE_SN`, düz yol `DUZ_SURE_SN`; her biri basım +
+  denetimdir (`DENETIM_SURESI`). Gerçek basım 2–6 sn, denetim ~1 sn sürüyor.
 - Önbellek: `output/hazirlik_pdf/<sha256>.pdf`; anahtar modelin `icerik_ozeti` + sorgu (seçenekler) + baskı
   paketinin imzası (yeni derleme önbelleği kendiliğinden geçersiz kılar). Özet üretim günü damgasını taşıdığı için
   önbellek günlük ayrışır (kabul edildi). En yeni `ONBELLEK_SINIRI` dosya kalır; isabet dosyayı tazeler.
 - Güvenlik: betik yalnız sabit argümanlarla, kabuksuz çağrılır; model 700 izinli geçici dizinde 600 izinli dosyaya
-  yazılır ve basım bitince silinir; basım ortamı yalnız PATH, HOME ve TZ=Europe/Istanbul taşır (sırlar Chrome'a
-  geçmez)."""
+  yazılır ve basım bitince silinir; basım ortamı yalnız PATH, HOME, TZ=Europe/Istanbul ve TMPDIR (koşunun geçici
+  dizini: Chrome profili orada kalır, zorla öldürmede /tmp'ye sızmaz) taşır (sırlar Chrome'a geçmez)."""
 from __future__ import annotations
 
 import contextlib
@@ -26,6 +29,7 @@ import os
 import signal
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -35,10 +39,12 @@ KOK = Path(__file__).resolve().parents[1]
 DASHBOARD_DIZINI = KOK / "dashboard"
 BETIK = DASHBOARD_DIZINI / "scripts" / "kilavuz-pdf.mjs"
 ESZAMANLI = 2
-SURE_SN = 90
+ANA_SURE_SN = 40           # ana yol: basım + denetim (Cloudflare kenar sınırı ~100 sn; ana + düz ≤ 70)
+DUZ_SURE_SN = 30           # yedek yol: basım + denetim
+DENETIM_SURESI = 8         # her yolun bütçesinden kapı denetimine ayrılan saniye
 ONBELLEK_SINIRI = 60
+YARIM_YAS_SN = 300         # bundan eski `*.pdf.*.tmp` yarım kalmış yazımdır, budanır
 ANA_YOL = "paged"          # Görev 2 yoklamasının kararı: "paged" (A) ya da "duz" (B)
-OLCUM_SURESI = 30          # saniye; K3 bekçisinin pdftohtml çağrısı
 SAAT_DILIMI = "Europe/Istanbul"
 
 
@@ -120,16 +126,20 @@ def _agaci_oldur(kok_pid: int) -> None:
             os.kill(pid, signal.SIGKILL)
 
 
-def _basim_ortami() -> dict[str, str]:
-    return {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": os.environ.get("HOME", str(Path.home())),
-            "TZ": SAAT_DILIMI}
+def _basim_ortami(tmpdir: str | None = None) -> dict[str, str]:
+    ortam = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": os.environ.get("HOME", str(Path.home())),
+             "TZ": SAAT_DILIMI}
+    if tmpdir:
+        ortam["TMPDIR"] = tmpdir
+    return ortam
 
 
 def _betigi_kos(argumanlar: list[str], *, sure: float, cikti: Path, betik: Path = BETIK,
-                yorumlayici: str = "node") -> bytes:
+                yorumlayici: str = "node", ortam: dict[str, str] | None = None) -> bytes:
     """Basım betiğini kabuksuz, kendi süreç grubunda koşar. Süre dolarsa soy ağacını öldürür → `Zamanasimi`; sıfırdan
     farklı HER çıkış kodu (işlenmemiş istisna Node'da 1) ya da yazılmamış çıktı → `BasimHatasi`."""
-    p = subprocess.Popen([yorumlayici, str(betik), *argumanlar], cwd=str(DASHBOARD_DIZINI), env=_basim_ortami(),
+    p = subprocess.Popen([yorumlayici, str(betik), *argumanlar], cwd=str(DASHBOARD_DIZINI),
+                         env=_basim_ortami() if ortam is None else ortam,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                          start_new_session=True)
     try:
@@ -142,7 +152,8 @@ def _betigi_kos(argumanlar: list[str], *, sure: float, cikti: Path, betik: Path 
             p.kill()
             with contextlib.suppress(OSError):
                 p.stderr.close()
-            p.wait(timeout=5)
+            with contextlib.suppress(subprocess.TimeoutExpired):   # yine bitmezse de sonuç zaman aşımıdır
+                p.wait(timeout=5)
         raise Zamanasimi(f"basım {sure} sn'de bitmedi") from None
     ayrinti = (hata or b"").decode("utf-8", "replace").strip()[-500:]
     if p.returncode != 0:
@@ -156,7 +167,8 @@ def node_calistir(model: dict, sorgu: dict, *, duz: bool, sure: float, dist: Pat
                   yorumlayici: str = "node") -> bytes:
     """Modeli 600 izinli geçici dosyaya yazar, basım betiğini koşar, PDF baytlarını döner. Betiğe kendi hazır-sinyali
     süresi toplamın %80'i olarak verilir: önce betik kendisi zaman aşımına düşsün (çıkış 4), takılırsa ağaç öldürülür."""
-    with tempfile.TemporaryDirectory(prefix="tedy-kilavuz-") as d:
+    # Zorla öldürülen Chrome dizine yazarken silinebilir: temizlik hatası basımın sonucunu değiştirmez.
+    with tempfile.TemporaryDirectory(prefix="tedy-kilavuz-", ignore_cleanup_errors=True) as d:
         model_yolu = Path(d) / "model.json"
         fd = os.open(model_yolu, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -166,35 +178,35 @@ def node_calistir(model: dict, sorgu: dict, *, duz: bool, sure: float, dist: Pat
                       "--sorgu", urlencode(sorgu), "--sure", str(max(1000, int(sure * 800)))]
         if duz:
             argumanlar.append("--duz")
-        return _betigi_kos(argumanlar, sure=sure, cikti=cikti, betik=betik, yorumlayici=yorumlayici)
+        return _betigi_kos(argumanlar, sure=sure, cikti=cikti, betik=betik, yorumlayici=yorumlayici,
+                           ortam=_basim_ortami(d))
 
 
-def en_kucuk_punto_olc(veri: bytes) -> int | None:
-    """PDF baytlarındaki en küçük yazı boyu (pdftohtml `-zoom 1`, tamsayı punto; `pdf_kapilari.en_kucuk_punto`).
-    Ölçülemezse None."""
-    with tempfile.TemporaryDirectory(prefix="tedy-kilavuz-olcum-") as d:
+def kapilari_denetle(veri: bytes, model: dict, *, duz: bool, sure: float) -> list[str]:
+    """Üretilen PDF'in kanun kusurları (`pdf_kapilari.denetle` + `kusurlar`); boş liste temiz. Başlıklar ve İçindekiler
+    girdileri modelden; düz yolda İçindekiler sayfa numarası taşımaz, beklenmez. `DenetimHatasi` yükseltebilir."""
+    basliklar, icindekiler = pdf_kapilari.model_basliklari(model)
+    with tempfile.TemporaryDirectory(prefix="tedy-kilavuz-denetim-") as d:
         yol = Path(d) / "k.pdf"
         fd = os.open(yol, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "wb") as f:
             f.write(veri)
-        try:
-            xml = subprocess.run(["pdftohtml", "-xml", "-i", "-q", "-zoom", "1", "-stdout", str(yol)],
-                                 capture_output=True, text=True, check=True, timeout=OLCUM_SURESI).stdout
-        except (OSError, subprocess.SubprocessError):
-            return None
-    return pdf_kapilari.en_kucuk_punto(xml)
+        rapor = pdf_kapilari.denetle(yol, basliklar=basliklar, icindekiler=icindekiler, duz=duz,
+                                     kapak=pdf_kapilari.kapak_sayfasi(model), sure=sure)
+    return pdf_kapilari.kusurlar(rapor, icindekiler_beklenir=not duz)
 
 
 def denetimli_basim(model: dict, sorgu: dict, *, duz: bool, sure: float, dist: Path, basim=node_calistir,
-                    olc=en_kucuk_punto_olc) -> bytes:
-    """Basım + K3 bekçisi (kontrolcü kararı): en küçük punto 7,5'in altındaysa (Chrome sayfayı küçültmüş) ya da
-    ölçülemiyorsa yol kusurludur → `BasimHatasi` (ölçülemeyen değer geçer sayılmaz)."""
-    veri = basim(model, sorgu, duz=duz, sure=sure, dist=dist)
-    punto = olc(veri)
-    if punto is None:
-        raise BasimHatasi("K3: en küçük punto ölçülemedi")
-    if punto < pdf_kapilari.EN_KUCUK_PUNTO:
-        raise BasimHatasi(f"K3: en küçük punto {punto} < 7,5 (Chrome sayfayı küçültmüş)")
+                    denetci=kapilari_denetle) -> bytes:
+    """Basım + kapı bekçisi (kontrolcü kararı): `sure` yolun bütçesidir; basım `sure - DENETIM_SURESI`, denetim
+    `DENETIM_SURESI` alır. Kusur varsa ya da PDF denetlenemezse (ölçülemeyen değer geçer sayılmaz) `BasimHatasi`."""
+    veri = basim(model, sorgu, duz=duz, sure=sure - DENETIM_SURESI, dist=dist)
+    try:
+        kusur = denetci(veri, model, duz=duz, sure=DENETIM_SURESI)
+    except pdf_kapilari.DenetimHatasi as h:
+        raise BasimHatasi(f"kapılar: denetlenemedi ({h})") from None
+    if kusur:
+        raise BasimHatasi("kapılar: " + "; ".join(kusur))
     return veri
 
 
@@ -217,9 +229,21 @@ def _yuva(dizin: Path):
     raise Mesgul("bütün basım yuvaları dolu")
 
 
+def _mtime(p: Path) -> float | None:
+    try:
+        return p.stat().st_mtime
+    except FileNotFoundError:      # başka işçi bu arada sildi
+        return None
+
+
 def _buda(dizin: Path) -> None:
-    pdfler = sorted(dizin.glob("*.pdf"), key=lambda p: p.stat().st_mtime, reverse=True)
-    for p in pdfler[ONBELLEK_SINIRI:]:
+    """En yeni `ONBELLEK_SINIRI` PDF kalır; `YARIM_YAS_SN`'den eski yarım yazımlar (`*.pdf.*.tmp`) silinir."""
+    zamanlar = [(p, m) for p in dizin.glob("*.pdf") if (m := _mtime(p)) is not None]
+    zamanlar.sort(key=lambda pm: pm[1], reverse=True)
+    silinecek = [p for p, _ in zamanlar[ONBELLEK_SINIRI:]]
+    esik = time.time() - YARIM_YAS_SN
+    silinecek += [p for p in dizin.glob("*.pdf.*.tmp") if (m := _mtime(p)) is not None and m < esik]
+    for p in silinecek:
         with contextlib.suppress(OSError):
             p.unlink()
 
@@ -242,18 +266,25 @@ def pdf_getir(model: dict, sorgu: dict, *, dizin: Path, dist: Path, calistir=den
     with _yuva(Path(dizin)):
         if _isabet(yol):
             return yol
-        son_hata: Exception | None = None
         veri = None
+        hatalar = []
         for duz in ([True] if (ana_yol or ANA_YOL) == "duz" else [False, True]):
             try:
-                veri = calistir(model, sorgu, duz=duz, sure=SURE_SN, dist=dist)
+                veri = calistir(model, sorgu, duz=duz, sure=DUZ_SURE_SN if duz else ANA_SURE_SN, dist=dist)
                 break
             except (Zamanasimi, BasimHatasi, OSError) as h:
-                son_hata = h
+                hatalar.append(f"{'düz' if duz else 'ana'} yol: {h}")
         if veri is None:
-            raise Uretilemedi(str(son_hata))
-        gecici = yol.with_name(yol.name + ".tmp")
-        gecici.write_bytes(veri)
-        os.replace(gecici, yol)
+            raise Uretilemedi(" | ".join(hatalar))
+        # Benzersiz geçici ad: iki işçi aynı anahtarı aynı anda yazarsa birbirinin yarım dosyasını taşımaz.
+        fd, gecici = tempfile.mkstemp(dir=str(dizin), prefix=yol.name + ".", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(veri)
+            os.replace(gecici, yol)
+        except BaseException:
+            with contextlib.suppress(OSError):
+                os.unlink(gecici)
+            raise
     _buda(Path(dizin))
     return yol

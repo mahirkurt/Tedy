@@ -113,43 +113,122 @@ def test_onbellek_isabeti_dosyayi_tazeler(tmp_path, dist, monkeypatch):
     assert yol.stat().st_mtime > 1000
 
 
-# --- K3 bekçisi (kontrolcü kararı): Chrome sayfayı küçültmüşse (en küçük punto < 7,5) yol kusurludur ---
+def test_onbellek_yazimi_benzersiz_gecici_adla_ve_yarim_kalanlar_budanir(tmp_path, dist, monkeypatch):
+    """İki işçi aynı anahtarı aynı anda yazarsa geçici dosyalar çakışmasın; kalmış eski `*.pdf.*.tmp` budansın."""
+    adlar = []
+    asil = hp.tempfile.mkstemp
 
-def test_k3_bekcisi_kucultulmus_basimi_kusurlu_sayar(dist):
-    olcumler = []
+    def casus(*a, **k):
+        fd, ad = asil(*a, **k)
+        adlar.append(ad)
+        return fd, ad
+    monkeypatch.setattr(hp.tempfile, "mkstemp", casus)
+    eski = tmp_path / "abc.pdf.x1.tmp"
+    eski.write_bytes(b"yarim")
+    os.utime(eski, (1000, 1000))
+    taze = tmp_path / "def.pdf.x2.tmp"
+    taze.write_bytes(b"yaziliyor")
+    yol = hp.pdf_getir(MODEL, SORGU, dizin=tmp_path, dist=dist, calistir=SahteBasim(b"%PDF"))
+    assert len(adlar) == 1 and Path(adlar[0]).parent == tmp_path and adlar[0].endswith(".tmp")
+    assert Path(adlar[0]).name.startswith(yol.name + ".") and not Path(adlar[0]).exists()
+    assert not eski.exists() and taze.exists()              # yalnız eskimiş yarım dosya
 
-    def olc(veri):
-        olcumler.append(veri)
-        return {b"%PDF-kucuk": 5, b"%PDF-iyi": 8}.get(veri)
-    for veri, beklenen in ((b"%PDF-kucuk", "en küçük punto 5"), (b"%PDF-bozuk", "ölçülemedi")):
+
+def test_buda_silinmis_dosyaya_dayanikli(tmp_path, monkeypatch):
+    monkeypatch.setattr(hp, "ONBELLEK_SINIRI", 1)
+    for i in range(3):
+        (tmp_path / f"{i}.pdf").write_bytes(b"%PDF")
+    asil = Path.stat
+
+    def yaris(self, *a, **k):
+        if self.name == "1.pdf" and os.path.exists(self):
+            os.unlink(self)                     # başka işçi tam bu arada sildi
+        return asil(self, *a, **k)
+    monkeypatch.setattr(Path, "stat", yaris)
+    hp._buda(tmp_path)                          # FileNotFoundError yükseltmez
+    monkeypatch.setattr(Path, "stat", asil)
+    assert len(list(tmp_path.glob("*.pdf"))) == 1
+
+
+# --- Tam kapı bekçisi (kontrolcü kararı, düzeltme turu 1): basımdan sonra kanun kapılarının hepsi ---
+
+def test_kapi_bekcisi_kusurlu_basimi_dusurur(dist):
+    gorulen = []
+
+    def denetci(veri, model, *, duz, sure):
+        gorulen.append((veri, duz, sure))
+        if veri == b"%PDF-bozuk":
+            raise hp.pdf_kapilari.DenetimHatasi("pdftohtml çıkış 1")
+        return {b"%PDF-yetim": ["yetim başlık s. 3: FB.7.1.5"], b"%PDF-iyi": []}[veri]
+    for veri, beklenen in ((b"%PDF-yetim", "yetim başlık s. 3"), (b"%PDF-bozuk", "denetlenemedi")):
         with pytest.raises(hp.BasimHatasi, match=beklenen):
-            hp.denetimli_basim(MODEL, SORGU, duz=False, sure=5, dist=dist,
-                               basim=lambda *a, v=veri, **k: v, olc=olc)
-    assert hp.denetimli_basim(MODEL, SORGU, duz=True, sure=5, dist=dist,
-                              basim=lambda *a, **k: b"%PDF-iyi", olc=olc) == b"%PDF-iyi"
-    assert olcumler == [b"%PDF-kucuk", b"%PDF-bozuk", b"%PDF-iyi"]
+            hp.denetimli_basim(MODEL, SORGU, duz=False, sure=40, dist=dist,
+                               basim=lambda *a, v=veri, **k: v, denetci=denetci)
+    assert hp.denetimli_basim(MODEL, SORGU, duz=True, sure=30, dist=dist,
+                              basim=lambda *a, **k: b"%PDF-iyi", denetci=denetci) == b"%PDF-iyi"
+    assert [g[0] for g in gorulen] == [b"%PDF-yetim", b"%PDF-bozuk", b"%PDF-iyi"]
+    assert all(g[2] == hp.DENETIM_SURESI for g in gorulen) and gorulen[2][1] is True
 
 
-def test_k3_bekcisi_ana_yolu_dusurur_duz_denenir_o_da_kucukse_uretilemedi(tmp_path, dist):
-    """Paged.js basımı küçülmüşse düz yol denenir; düz yol da küçülmüşse Uretilemedi (API: 503 + Türkçe cümle)."""
-    puntolar = {b"%PDF-paged": 5, b"%PDF-duz": 9}
+def test_basima_kalan_sure_denetimi_dusulmus_butcedir(dist):
+    sureler = []
+
+    def basim(model, sorgu, *, duz, sure, dist):
+        sureler.append(sure)
+        return b"%PDF"
+    hp.denetimli_basim(MODEL, SORGU, duz=False, sure=hp.ANA_SURE_SN, dist=dist, basim=basim, denetci=lambda *a, **k: [])
+    assert sureler == [hp.ANA_SURE_SN - hp.DENETIM_SURESI]
+
+
+def test_bekci_ana_yolu_dusurur_duz_denenir_o_da_kusurluysa_uretilemedi(tmp_path, dist):
+    """Paged.js basımı kusurluysa düz yol denenir; düz yol da kusurluysa Uretilemedi (API: 503 + Türkçe cümle)."""
+    kusur = {False: ["Senaryo Karşılaştırması: İçindekiler s. 3 diyor, başlık o sayfada yok"], True: []}
     cagrilar = []
 
     def basim(model, sorgu, *, duz, sure, dist):
-        cagrilar.append(duz)
+        cagrilar.append((duz, sure))
         return hp.denetimli_basim(model, sorgu, duz=duz, sure=sure, dist=dist,
-                                  basim=lambda *a, **k: b"%PDF-duz" if duz else b"%PDF-paged", olc=puntolar.get)
+                                  basim=lambda *a, **k: b"%PDF-duz" if duz else b"%PDF-paged",
+                                  denetci=lambda veri, m, *, duz, sure: kusur[duz])
     assert hp.pdf_getir(MODEL, SORGU, dizin=tmp_path / "a", dist=dist, calistir=basim).read_bytes() == b"%PDF-duz"
-    assert cagrilar == [False, True]
-    puntolar[b"%PDF-duz"] = 6
+    assert cagrilar == [(False, hp.ANA_SURE_SN), (True, hp.DUZ_SURE_SN)]
+    kusur[True] = ["en küçük punto 5 < 7,5"]
     with pytest.raises(hp.Uretilemedi, match="punto"):
         hp.pdf_getir(MODEL, SORGU, dizin=tmp_path / "b", dist=dist, calistir=basim)
     assert list((tmp_path / "b").glob("*.pdf")) == []
 
 
+def test_kapilari_denetle_modelden_baslik_ve_icindekiler_uretir(monkeypatch):
+    """Kapıların başlıkları ve İçindekiler girdileri modelden (`pdf_kapilari.model_basliklari`); düz yolda İçindekiler
+    beklenmez, kapak modelden (ebeveyn özetliyse 2)."""
+    m = json.loads(FIKSTUR.read_text(encoding="utf-8"))
+    gelen = {}
+
+    def denetle(yol, *, basliklar, icindekiler, duz, kapak, sure):
+        gelen.update(veri=Path(yol).read_bytes(), basliklar=basliklar, icindekiler=icindekiler, duz=duz, kapak=kapak,
+                     sure=sure, izin=oct(stat.S_IMODE(os.stat(yol).st_mode)))
+        return {"rapor": True}
+    monkeypatch.setattr(hp.pdf_kapilari, "denetle", denetle)
+    monkeypatch.setattr(hp.pdf_kapilari, "kusurlar", lambda r, *, icindekiler_beklenir: [f"beklenir={icindekiler_beklenir}"])
+    assert hp.kapilari_denetle(b"%PDF-x", m, duz=True, sure=7) == ["beklenir=False"]
+    basliklar, icindekiler = hp.pdf_kapilari.model_basliklari(m)
+    assert (gelen["veri"], gelen["basliklar"], gelen["icindekiler"]) == (b"%PDF-x", basliklar, icindekiler)
+    assert (gelen["duz"], gelen["kapak"], gelen["sure"], gelen["izin"]) == (True, 1, 7, "0o600")
+    assert hp.kapilari_denetle(b"%PDF-x", {**m, "ebeveyn": {"x": 1}}, duz=False, sure=7) == ["beklenir=True"]
+    assert gelen["kapak"] == 2
+
+
 def test_pdf_getirin_varsayilan_basimi_denetimlidir():
     import inspect
     assert inspect.signature(hp.pdf_getir).parameters["calistir"].default is hp.denetimli_basim
+    assert inspect.signature(hp.denetimli_basim).parameters["denetci"].default is hp.kapilari_denetle
+
+
+def test_butce_cloudflare_kenar_sinirinin_altinda():
+    """Tünelin ~100 sn kenar sınırı: ana + düz yol (her biri basım + denetim) toplamı altında kalır; denetim de
+    bütçeye dahildir (kontrolcü kararı)."""
+    assert hp.ANA_SURE_SN + hp.DUZ_SURE_SN <= 70 < 100
+    assert 0 < hp.DENETIM_SURESI < hp.DUZ_SURE_SN < hp.ANA_SURE_SN
 
 
 # --- Basım betiğinin çağrılması: sabit argümanlar, kabuk yok, model 600 izinli geçici dosyada, TZ ---
@@ -176,6 +255,8 @@ if "ortam" in sorgu:
     m = deger("--model")
     open(deger("--cikti"), "wb").write(b"%PDF-sahte " + json.dumps({
         "tz": os.environ.get("TZ"), "anahtar": "ANTHROPIC_API_KEY" in os.environ,
+        "tmpdir": os.environ.get("TMPDIR"),
+        "profil_yazildi": bool(open(os.path.join(os.environ["TMPDIR"], "playwright_chromiumdev_profile-x"), "w")),
         "izin": oct(stat.S_IMODE(os.stat(m).st_mode)), "model": m,
         "dizin_izni": oct(stat.S_IMODE(os.stat(os.path.dirname(m)).st_mode)),
         "icerik": json.load(open(m, encoding="utf-8"))}).encode())
@@ -217,6 +298,41 @@ def test_basim_ortami_tz_istanbul_model_600_ve_silinir(dist, sahte_betik, monkey
     assert (o["tz"], o["anahtar"], o["izin"], o["dizin_izni"]) == ("Europe/Istanbul", False, "0o600", "0o700")
     assert o["icerik"]["ders"] == "Fen Bilimleri"
     assert not Path(o["model"]).exists() and not Path(o["model"]).parent.exists()
+
+
+def test_basim_tmpdiri_kosunun_gecici_dizini_ve_silinir(dist, sahte_betik):
+    """Chrome profili (Playwright `os.tmpdir()` altına yazar) koşunun geçici dizininde kalır, basımdan sonra silinir;
+    zorla öldürmede /tmp'ye sızmaz."""
+    veri = hp.node_calistir(MODEL, {"sorgu": "ortam"}, duz=False, sure=20, dist=dist, betik=sahte_betik,
+                            yorumlayici=sys.executable)
+    o = json.loads(veri[len(b"%PDF-sahte "):])
+    assert o["tmpdir"] == str(Path(o["model"]).parent) and o["profil_yazildi"]
+    assert not Path(o["tmpdir"]).exists()
+
+
+def test_zaman_asiminda_bekleme_de_takilirsa_zamanasimi(monkeypatch, tmp_path):
+    """Öldürmeden sonra süreç bekleme süresinde de bitmezse istisna `Zamanasimi`'dır (yedek yol denenir), ham
+    TimeoutExpired değil."""
+    class Takilan:
+        pid = 999999999
+        returncode = None
+        stderr = open(os.devnull, "rb")
+
+        def __init__(self, *a, **k):
+            pass
+
+        def communicate(self, timeout=None):
+            raise hp.subprocess.TimeoutExpired("node", timeout)
+
+        def kill(self):
+            pass
+
+        def wait(self, timeout=None):
+            raise hp.subprocess.TimeoutExpired("node", timeout)
+    monkeypatch.setattr(hp.subprocess, "Popen", Takilan)
+    monkeypatch.setattr(hp, "_agaci_oldur", lambda pid: None)
+    with pytest.raises(hp.Zamanasimi):
+        hp._betigi_kos([], sure=1, cikti=tmp_path / "k.pdf", ortam={})
 
 
 @pytest.mark.parametrize("kod", [1, 2, 3, 4, 5])
@@ -325,20 +441,39 @@ def _uzun_metinli_model(uzunluk: int) -> dict:
     return m
 
 
-@gercek_basim
-@pytest.mark.skipif(not (GERCEK_DIST / "baski.html").exists(), reason="dashboard-dist yok: önce npm run build")
-def test_k3_bekcisi_uzun_metinli_fikstur_gercek_basim(tmp_path):
-    """Uzun metinli 8 satırlık ünite tablosu gerçek Chrome'la basılır: sunulan PDF K3'ü sağlar (en küçük punto ≥ 7,5)
-    ve bekçi ölçümü yanlış alarm vermez (ana yol kabul edilir)."""
-    yollar = []
+gercek_dist = pytest.mark.skipif(not (GERCEK_DIST / "baski.html").exists(), reason="dashboard-dist yok: önce npm run build")
 
-    def casus(model, sorgu, *, duz, sure, dist):
+
+def _casus_basim(yollar, nedenler):
+    def basim(model, sorgu, *, duz, sure, dist):
         yollar.append(duz)
-        return hp.denetimli_basim(model, sorgu, duz=duz, sure=sure, dist=dist)
+        try:
+            return hp.denetimli_basim(model, sorgu, duz=duz, sure=sure, dist=dist)
+        except hp.BasimHatasi as h:
+            nedenler.append(str(h))
+            raise
+    return basim
+
+
+@gercek_basim
+@gercek_dist
+def test_kapi_bekcisi_uzun_metinli_fikstur_gercek_basim_temiz(tmp_path):
+    """MEB'in en uzun çıktı metniyle (170 karakter) 8 satırlık ünite tablosu: ana yol kapıların hepsinden geçer."""
+    yollar, nedenler = [], []
     yol = hp.pdf_getir(_uzun_metinli_model(170), {"ders": "fen-bilimleri", "sinav": "1", "senaryo": "2"},
-                       dizin=tmp_path, dist=GERCEK_DIST, calistir=casus)
-    veri = yol.read_bytes()
-    assert veri.startswith(b"%PDF-")
-    punto = hp.en_kucuk_punto_olc(veri)
-    assert punto is not None and punto >= 8
-    assert yollar == [False]
+                       dizin=tmp_path, dist=GERCEK_DIST, calistir=_casus_basim(yollar, nedenler))
+    assert yol.read_bytes().startswith(b"%PDF-")
+    assert (yollar, nedenler) == ([False], [])
+
+
+@gercek_basim
+@gercek_dist
+def test_kapi_bekcisi_sigmayan_parcayi_yakalar_duz_yol_basar(tmp_path):
+    """8 × 230 karakter: parça A4 gövdesine sığmaz, Paged.js s. 3'ü boş bırakır ve İçindekiler numarası kayar
+    (ölçüldü). Bekçi ana yolu düşürür, düz yol (İçindekiler numarası taşımaz) kapılardan geçer ve sunulur."""
+    yollar, nedenler = [], []
+    yol = hp.pdf_getir(_uzun_metinli_model(230), {"ders": "fen-bilimleri", "sinav": "1", "senaryo": "2"},
+                       dizin=tmp_path, dist=GERCEK_DIST, calistir=_casus_basim(yollar, nedenler))
+    assert yollar == [False, True]
+    assert len(nedenler) == 1 and "İçindekiler s." in nedenler[0] and "başlık o sayfada yok" in nedenler[0]
+    assert yol.read_bytes().startswith(b"%PDF-")

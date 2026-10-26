@@ -1,11 +1,14 @@
 import { test, expect } from '@playwright/test'
 import { DERS, KILAVUZ, PDF, fikstur, hazirlikAc, json } from './_hazirlik'
 
+const OGRENCI = /\/api\/hazirlik\/ogrenci$/
+
 test.use({ timezoneId: 'Europe/Istanbul', locale: 'tr-TR' })
 
 // PDF seçenekleri (spec §4, plan Görev 14): Carbon Modal; seçim bu cihazda kişi başına (localStorage, D26).
 test('PDF seçenekleri: indirme, seçim kişi başına hatırlanır (spec §4)', async ({ page }) => {
-  await hazirlikAc(page, '/hazirlik/fen-bilimleri/1', [[KILAVUZ('fen-bilimleri', 1), fikstur('fen-bilimleri-1-kilavuz')]])
+  await hazirlikAc(page, '/hazirlik/fen-bilimleri/1', [[KILAVUZ('fen-bilimleri', 1), fikstur('fen-bilimleri-1-kilavuz')],
+    [OGRENCI, { ad: 'Deneme Öğrenci' }]])
   const istekler: string[] = []
   await page.route(PDF('fen-bilimleri', 1), r => {
     istekler.push(r.request().url())
@@ -16,7 +19,11 @@ test('PDF seçenekleri: indirme, seçim kişi başına hatırlanır (spec §4)',
   const pencere = page.getByRole('dialog')
   await expect(pencere.getByRole('heading', { name: 'Kılavuzu PDF olarak indir' })).toBeVisible()
   await expect(pencere.getByRole('checkbox', { name: 'Ebeveyn özetini başa ekle' })).not.toBeChecked()
-  await expect(pencere.getByRole('checkbox', { name: 'Hazırlık işaretlerimi ekle' })).toBeChecked()
+  // PDF öğrencinin işaretlerini basar (D16): etiket "işaretlerimi" değil, kimin işaretleri olduğu yardımcı metinde.
+  const isaret = pencere.getByRole('checkbox', { name: 'Hazırlık işaretlerini ekle' })
+  await expect(isaret).toBeChecked()
+  await expect(pencere.getByText("Deneme Öğrenci'nin işaretleri", { exact: true })).toBeVisible()
+  await expect(pencere.getByText(/işaretlerimi/)).toHaveCount(0)
   await expect(pencere.getByRole('button', { name: 'Kapat' })).toBeVisible()          // B44
   await expect(pencere.getByText(/yapay zekâ|prova/i)).toHaveCount(0)                 // YZ ve prova Plan 2'de (B42)
   await pencere.getByText('Ebeveyn özetini başa ekle').click()
@@ -34,7 +41,8 @@ test('PDF seçenekleri: indirme, seçim kişi başına hatırlanır (spec §4)',
 })
 
 test('PDF hazırlanamazsa sunucunun cümlesi pencerede görünür (429 / 503)', async ({ page }) => {
-  await hazirlikAc(page, '/hazirlik/fen-bilimleri/1', [[KILAVUZ('fen-bilimleri', 1), fikstur('fen-bilimleri-1-kilavuz')]])
+  await hazirlikAc(page, '/hazirlik/fen-bilimleri/1', [[KILAVUZ('fen-bilimleri', 1), fikstur('fen-bilimleri-1-kilavuz')],
+    [OGRENCI, { ad: null }]])
   const yanitlar = [
     json({ error: 'mesgul', mesaj: 'Şu an başka bir kılavuz hazırlanıyor; bir dakika sonra yeniden dene.' }, 429),
     json({ error: 'pdf_uretilemedi', mesaj: 'PDF hazırlanamadı. Ekrandaki kılavuzu tarayıcının yazdır komutuyla da kaydedebilirsin.' }, 503),
@@ -42,11 +50,33 @@ test('PDF hazırlanamazsa sunucunun cümlesi pencerede görünür (429 / 503)', 
   await page.route(PDF('fen-bilimleri', 1), r => r.fulfill(yanitlar.shift()!))
   await page.getByRole('button', { name: 'PDF olarak indir' }).click()
   const pencere = page.getByRole('dialog')
+  await expect(pencere.getByText('Öğrencinin işaretleri', { exact: true })).toBeVisible()     // ad yoksa genel söz
   await pencere.getByRole('button', { name: "PDF'i indir" }).click()
   await expect(pencere).toContainText('Şu an başka bir kılavuz hazırlanıyor; bir dakika sonra yeniden dene.')
   await pencere.getByRole('button', { name: "PDF'i indir" }).click()
   await expect(pencere).toContainText('PDF hazırlanamadı. Ekrandaki kılavuzu tarayıcının yazdır komutuyla da kaydedebilirsin.')
   await expect(pencere).not.toContainText('Şu an başka bir kılavuz')
+})
+
+test('Vazgeç hazırlanırken de çalışır: istek iptal edilir, pencere kapanır, indirme olmaz', async ({ page }) => {
+  await hazirlikAc(page, '/hazirlik/fen-bilimleri/1', [[KILAVUZ('fen-bilimleri', 1), fikstur('fen-bilimleri-1-kilavuz')],
+    [OGRENCI, { ad: 'Deneme Öğrenci' }]])
+  const gelen: string[] = []
+  await page.route(PDF('fen-bilimleri', 1), r => { gelen.push(r.request().url()) })      // yanıt hiç gelmez
+  const iptaller: string[] = []
+  page.on('requestfailed', r => { if (/kilavuz\.pdf/.test(r.url())) iptaller.push(r.failure()?.errorText ?? '') })
+  let indirildi = false
+  page.on('download', () => { indirildi = true })
+  await page.getByRole('button', { name: 'PDF olarak indir' }).click()
+  const pencere = page.getByRole('dialog')
+  await pencere.getByRole('button', { name: "PDF'i indir" }).click()
+  await expect(pencere.getByText('PDF hazırlanıyor…')).toBeVisible()
+  await expect.poll(() => gelen).toHaveLength(1)
+  await pencere.getByRole('button', { name: 'Vazgeç' }).click()
+  await expect(pencere).toHaveCount(0)
+  await expect.poll(() => iptaller).toHaveLength(1)
+  await expect(page.getByRole('button', { name: 'PDF olarak indir' })).toBeFocused()
+  expect(indirildi).toBe(false)
 })
 
 test('A4 önizleme baskı görünümünü yeni sekmede açar; ders sayfasında da PDF düğmesi var', async ({ page }) => {
@@ -55,6 +85,7 @@ test('A4 önizleme baskı görünümünü yeni sekmede açar; ders sayfasında d
   const onizleme = page.getByRole('link', { name: 'A4 önizleme' })
   await expect(onizleme).toHaveAttribute('href', '/baski.html?senaryo=2&ebeveyn=0&isaret=1&ders=fen-bilimleri&sinav=1')
   await expect(onizleme).toHaveAttribute('target', '_blank')
+  await page.route(OGRENCI, r => r.fulfill(json({ ad: 'Deneme Öğrenci' })))
   await page.goto('/hazirlik/fen-bilimleri?sinav=1')
   await expect(page.getByRole('heading', { name: 'Fen Bilimleri' })).toBeVisible()
   await page.getByRole('button', { name: 'PDF olarak indir' }).click()

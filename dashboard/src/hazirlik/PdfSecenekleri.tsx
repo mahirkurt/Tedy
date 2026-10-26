@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Checkbox, InlineNotification, Modal } from '@carbon/react'
 import { useSession } from '../contexts/session'
-import { pdfAdresi } from './hazirlik'
+import { useApi } from '../hooks/useApi'
+import { isaretSahibiMetni, pdfAdresi } from './hazirlik'
 import { pdfIndir } from './pdfIndir'
 import { pdfSecenekleriniKaydet, usePdfSecenekleri } from './usePdfSecenekleri'
 
@@ -16,26 +17,38 @@ export default function PdfSecenekleri({ anahtar, no, senaryo, kapat }: {
   const [s, setS] = useState(kayitli)
   const [hazirlaniyor, setHazirlaniyor] = useState(false)
   const [hata, setHata] = useState<string | null>(null)
+  // PDF öğrencinin işaretlerini basar (D16): kimin işaretleri olduğu yardımcı metinde.
+  const { data: ogrenci } = useApi<{ ad: string | null } | null>('/api/hazirlik/ogrenci', null)
+  const iptal = useRef<AbortController | null>(null)
   const indir = async () => {
     pdfSecenekleriniKaydet(email, s)
+    const denetleyici = new AbortController()
+    iptal.current = denetleyici
     setHazirlaniyor(true)
     setHata(null)
-    const sonuc = await pdfIndir(pdfAdresi(anahtar, no, senaryo, s))
+    const sonuc = await pdfIndir(pdfAdresi(anahtar, no, senaryo, s), denetleyici.signal)
+    if (denetleyici.signal.aborted) return          // Vazgeç: pencere zaten kapandı
     setHazirlaniyor(false)
     if (sonuc === null) kapat()
     else setHata(sonuc)
   }
-  const vazgec = () => { if (!hazirlaniyor) kapat() }
+  // Hazırlanırken de çalışır (Esc, Kapat, Vazgeç): istek iptal edilir, pencere kapanır.
+  const vazgec = () => {
+    iptal.current?.abort()
+    kapat()
+  }
   return (
     <Modal open size="sm" modalHeading="Kılavuzu PDF olarak indir" closeButtonLabel="Kapat"
-      primaryButtonText="PDF'i indir" secondaryButtonText="Vazgeç"
+      // Carbon tek ikincil düğmeyi (secondaryButtonText) yüklenirken kilitler; dizi biçimi kilitlemez.
+      primaryButtonText="PDF'i indir" secondaryButtons={[{ buttonText: 'Vazgeç', onClick: vazgec }]}
       loadingStatus={hazirlaniyor ? 'active' : 'inactive'} loadingDescription="PDF hazırlanıyor…"
       loadingIconDescription="Hazırlanıyor" onRequestClose={vazgec}
       onRequestSubmit={() => { if (!hazirlaniyor) void indir() }}>
       <p className="hazirlik-pdf__not">Seçimin bu cihazda hatırlanır.</p>
       <Checkbox id="pdf-ebeveyn" labelText="Ebeveyn özetini başa ekle" checked={s.ebeveyn}
         onChange={(_, { checked }) => setS({ ...s, ebeveyn: checked })} />
-      <Checkbox id="pdf-isaret" labelText="Hazırlık işaretlerimi ekle" checked={s.isaret}
+      <Checkbox id="pdf-isaret" labelText="Hazırlık işaretlerini ekle" helperText={isaretSahibiMetni(ogrenci?.ad ?? null)}
+        checked={s.isaret}
         onChange={(_, { checked }) => setS({ ...s, isaret: checked })} />
       {hata && <InlineNotification kind="error" lowContrast hideCloseButton role="alert" statusIconDescription="Hata"
         title={hata} className="hazirlik-pdf__hata" />}

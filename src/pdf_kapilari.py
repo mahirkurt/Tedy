@@ -13,6 +13,7 @@ import html
 import json
 import re
 import subprocess
+import time
 from pathlib import Path
 
 from src.sinav_tarihi import katla
@@ -242,28 +243,70 @@ def en_kucuk_punto(xml: str) -> int | None:
     return min(degerler) if degerler else None
 
 
-def _calistir(*argv: str) -> str:
+def model_basliklari(model: dict) -> tuple[list[str], list]:
+    """Kılavuz modelinden K1 başlıkları (ünite, çerçeve, konu, bölüm başlığı) ve İçindekiler girdileri — panonun
+    `belge.bolumler(m)` listesinin aynısı, sırasıyla. Özet'in sayfasında görünen başlık "Kapsam Kılavuzu"dur."""
+    basliklar: list[str] = []
+    icindekiler: list = [
+        *(["Ebeveyn Özeti"] if model.get("ebeveyn") else []), ("Özet", "Kapsam Kılavuzu"),
+        *(["Senaryo Karşılaştırması"] if (model.get("matris") or {}).get("senaryolar") else []),
+        *[u["baslik"] for u in model.get("uniteler", [])],
+        *(["Duyuru Doğrulaması"] if model.get("dogrulama") else []),
+        *(["Çalışma Planı"] if model.get("plan") else []), "Kaynaklar"]
+    for u in model.get("uniteler", []):
+        basliklar.append(u["baslik"])
+        for c in u["cerceveler"]:
+            if c.get("baslik"):
+                basliklar.append(c["baslik"])
+            for b in c["bloklar"]:
+                if not b["senaryoda"]:
+                    continue          # senaryoda olmayan çıktı tek satırdır, başlıkları basılmaz (K2)
+                for y in b["kitapta"]:
+                    if y.get("konu"):
+                        basliklar.append(y["konu"])
+                    basliklar += [h["ad"] for h in y.get("basliklar", [])]
+    return list(dict.fromkeys(basliklar)), icindekiler
+
+
+def kapak_sayfasi(model: dict) -> int:
+    """Üst bilgisi olmayan kapak: ebeveyn özeti başa tek sayfa gelirse 2, yoksa 1 (K5)."""
+    return 2 if model.get("ebeveyn") else 1
+
+
+def _calistir(*argv: str, sure: float = ARAC_SURESI) -> str:
     try:
-        return subprocess.run(list(argv), capture_output=True, text=True, check=True, timeout=ARAC_SURESI).stdout
+        return subprocess.run(list(argv), capture_output=True, text=True, check=True, timeout=sure).stdout
     except subprocess.TimeoutExpired as e:
-        raise DenetimHatasi(f"{argv[0]} {ARAC_SURESI} s içinde bitmedi") from e
+        raise DenetimHatasi(f"{argv[0]} {sure:.0f} s içinde bitmedi") from e
     except subprocess.CalledProcessError as e:
         raise DenetimHatasi(f"{argv[0]} çıkış {e.returncode}: {(e.stderr or '').strip()[-200:]}") from e
 
 
-def denetle(yol: Path, *, basliklar: list[str], icindekiler: list, duz: bool = False, kapak: int = 1) -> dict:
+def denetle(yol: Path, *, basliklar: list[str], icindekiler: list, duz: bool = False, kapak: int = 1,
+            sure: float | None = None) -> dict:
     """Üretilen PDF'in kanun ölçümleri. `duz=True` (yedek yol B): üst/alt bilgideki DejaVu Sans sayılmaz, kapak
-    kuralı uygulanmaz. `kapak`: üst bilgisi olmayan sayfa (ebeveyn özetli basımda 2)."""
+    kuralı uygulanmaz. `kapak`: üst bilgisi olmayan sayfa (ebeveyn özetli basımda 2). `sure` (sunucu bekçisi): bütün
+    araç çağrıları için ortak süre; her çağrı son ana kalan süreyi alır, aşılırsa `DenetimHatasi`."""
     y = str(yol)
-    info = _calistir("pdfinfo", y)
-    fontlar = pdffonts_ayristir(_calistir("pdffonts", y))
-    sayfalar = sayfa_metinleri(_calistir("pdftotext", "-layout", y, "-"))
+    son = None if sure is None else time.monotonic() + sure
+
+    def cal(*argv: str) -> str:
+        if son is None:
+            return _calistir(*argv)
+        kalan = son - time.monotonic()
+        if kalan <= 0:
+            raise DenetimHatasi(f"denetim {sure:.0f} s içinde bitmedi")
+        return _calistir(*argv, sure=kalan)
+
+    info = cal("pdfinfo", y)
+    fontlar = pdffonts_ayristir(cal("pdffonts", y))
+    sayfalar = sayfa_metinleri(cal("pdftotext", "-layout", y, "-"))
     # K1 araması okuma sırasındaki metinde: -layout kırılan bir satırın arasına sağ sütunu (sayfa numarası) sokar
     # (ölçüldü: "… Teknoloji ile Uzay / s. 24–33 / Araştırmaları Arasındaki İlişki").
-    akis = sayfa_metinleri(_calistir("pdftotext", y, "-"))
-    qpdf = json.loads(_calistir("qpdf", "--json", "--json-key=qpdf", y))
-    anahat = json.loads(_calistir("qpdf", "--json", "--json-key=outlines", y))
-    xml = _calistir("pdftohtml", "-xml", "-i", "-q", "-zoom", "1", "-stdout", y)
+    akis = sayfa_metinleri(cal("pdftotext", y, "-"))
+    qpdf = json.loads(cal("qpdf", "--json", "--json-key=qpdf", y))
+    anahat = json.loads(cal("qpdf", "--json", "--json-key=outlines", y))
+    xml = cal("pdftohtml", "-xml", "-i", "-q", "-zoom", "1", "-stdout", y)
     kenarlar = kenar_metinleri(xml)
     return {
         "alt_bilgi": alt_bilgi_hatalari(kenarlar), "ust_bilgi": ust_bilgi_hatalari(kenarlar, kapak=None if duz else kapak),
