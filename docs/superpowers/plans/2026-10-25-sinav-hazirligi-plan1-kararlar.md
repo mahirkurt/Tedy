@@ -1,0 +1,96 @@
+# Sınav Hazırlığı Plan 1 — yürütme sırasında verilen kontrolcü kararları
+
+Subagent-driven yürütme (2026-10-25/26) ilerleme kaydından birebir. Her satır: karar — gerekçe — yanlışsa maliyeti. Plan 2 bu kararlarla başlar.
+
+ 1. U1 görsel taban adları depodaki gerçek adlarla (`daha-fazla-telefon-linux.png`, `daha-fazla-masaustu-linux.png`, `dersler-masaustu-linux.png`, `dersler-telefon-linux.png`) — plan yazım hatası — yanlışsa commit düşer, hemen görülür.
+ 2. U2 G9'un klavye e2e'si gezinmeyi değil bağlantının `href`'ini iddia eder; gezinme iddiası G10'a taşınır — rota G10'da doğuyor — yanlışsa gezinme bir görev geç sınanır.
+ 3. U3 G10'un olası kip e2e'si kılavuz bağlantısının `href`'ini iddia eder; gezinme iddiası G11'e taşınır — aynı gerekçe.
+ 4. U4 kılavuz modeli çıktıları matrisle aynı ünite anahtarıyla gruplar; haritada eşleşmeyen çıktı kendi ünitesinin bölümünde "Kitapta karşılığı bulunamadı" bloğu olur, ikinci bölüm açılmaz; G7 testi ünite başlığının tekil olduğunu, G11 e2e'si yinelenen başlık olmadığını iddia eder; ünite adı haritadan çözülür (D19 da kapanır); çerçeve h4'ü yoksa başlık düzeyi atlanmaz (D4) — spec K2 hiyerarşi — yanlışsa kılavuzda bölüm düzeni yeniden yapılır.
+ 5. D5 yetim başlık kapısı yalnız başlık olarak işaretli öğeleri sayar (h2–h5 / açık işaret), konu adıyla biten düz satırları saymaz; G2'de kural, G13'te gerçek modelle sınanır — kapının amacı başlık yetimi — yanlışsa kapı ya sahte alarm ya kaçak verir, G13 ölçümü gösterir.
+ 6. D1/D2 taban güncelleyen görev ilgili görsel ve ARIA testlerini açıkça koşar, bilinçli değişen her tabanı (masaüstü dahil) commit'ler — taban gerçeği — yanlışsa CI kırmızı.
+ 7. D6 zaman aşımı Chrome'un kendi süreç grubunu/ağacını öldürür; test `setsid` ile ayrı grupta başlayan sahte bir torunla kanıtlar; G14 Step 5 gerçek Chrome ölçümü kalır; Review Focus ifadesi buna göre — risk ayrı gruptaki Chrome — yanlışsa artık Chrome süreçleri birikir.
+ 8. D7 dosyalar adıyla stage edilir (dizin değil) — Global Constraints — maliyet yok.
+ 9. D8 Node şablonlarındaki renk hex'i Carbon gray-70 adını taşıyan yorumla kalır (Chrome üst/alt bilgi şablonu CSS değişkeni okuyamaz) — teknik kısıt — kozmetik.
+10. D9/D23 Kanun'daki test adları gerçek testlerle eşleşir; K6 ve K11 için eksik testler yazılır (G13/G15), G15 Step 2 e2e adlarını da doğrular — K kapıları gerçek olmalı.
+11. D10 Karar 11 "spec ile aynı (11b5cd6)" diye okunur — maliyet yok.
+12. D11 "Asistana sor" sınavı ve senaryoyu sabitler (etiket/bağlamda senaryo); sınav kaydı yoksa ders + yazılı + senaryo bağlamı kurulur — spec §3.3.
+13. D12 tek dal, tek canlıya alma; kullanıcıya G15 sonunda sorulur (Fen 3 Kasım takvimi) — spec §10'dan bilinçli sapma, kullanıcıya bildirilecek — yanlışsa aşamalar ayrı birleştirilir.
+14. D13 yeni yüzeyler için fikstürlü `hazirlik-gorsel.spec.ts` görsel tabanı eklenir (G11 ya da G14) — spec §9.
+15. D14 adlandırılmış sayfalar kapak, içindekiler, gövde, ek `sayfa.css`'te tanımlanır — spec §5.2.
+16. D15 ders ve kılavuz ekranı 409'da sunucunun `mesaj`'ını ("Yeni yılın tabloları bekleniyor") bildirimde gösterir — spec §7.
+17. D16 PDF ve ebeveyn özeti öğrencinin işaretlerini kullanır (`src/roles.OGRENCI_EMAILS`); ekranda herkes kendi işaretini görür ve koyar; basılı kâğıtta işaretlerin kime ait olduğu yazar — kılavuz öğrencinin hazırlığı içindir — yanlışsa ebeveyn kendi işaretini basar.
+18. D26 PDF seçenekleri cihaz başına (localStorage); Kanun/karar listesine "cihazda" yazılır — küçük sapma.
+19. D17 `sayfa.css`↔`baski.scss` kopyası kalır (Paged.js ayrıştırıcı kısıtı, karar 18); ikisinin eşitliğini sınayan bir test eklenir.
+20. D18 `_kokler`/`_kod_sirasi`/`_gun` kopyaları yerine `sinav_senaryo`'dan içe aktarılır (mümkünse) — DRY.
+21. D3 e2e'de gönderilen istek dizisi `expect.poll` ile beklenir — suite-hygiene ruhu.
+22. D20 alt panel z-index'i asistan başlatıcısıyla çakışmaz, alt gezinmeyi örtmez; Esc yalnız en üstteki katmanı kapatır.
+23. D21 kılavuz yüklenince `location.hash` öğesine kaydırılır.
+24. D22 geçmiş sınavın kılavuzu duyurulmuş olan senaryoyla açılır.
+25. D24 React derleyici uyarıları G11/G14 lint'iyle kapatılır (render'da localStorage okuması yok).
+26. D25 kullanılmayan `.kilavuz-yalniz-ekran` kuralı ya kullanılır ya kaldırılır.
+27. Komut sırası her görevde `npm run build` → `npm run test:birim` (paket-telemetri testi dashboard-dist ister) — ölçüldü (G1) — maliyet yok.
+28. D17 sayfa.css↔baski.scss eşitlik testi Görev 13'te — PDF hattı orada — yanlışsa kopya kayar.
+29. Alt ajanın commit imza satırı kendi modelini yazıyorsa düzeltilmez (doğru atıf) — maliyet yok.
+30. Adlı sayfa tetikleyici sınıflar `.kilavuz-govde`, `.kilavuz-ek`, `.kilavuz-icindekiler` (D14, G1 sayfa.css) G11 KilavuzBelgesi ve G13 baskı görünümü tarafından kullanılır; "(devam)" G13'te gerçek modelle ölçülür — G1 inceleme ⚠️ — yanlışsa adlı sayfalar sessizce çalışmaz.
+31. `pdf_kapilari.yetim_basliklar(sayfalar, yer_imleri)` ikinci parametre `yer_imi_sayfalari(...)` çıktısı (D5 gereği başlık = PDF yer imi); G13/G14 bu imzayı kullanır — D5 — yanlışsa G13 kapısı imza hatası verir.
+32. Y5 — Paged.js bölünen tabloda başlık satırını yinelemez; baskıda karşılaştırma tablosu ünite başına ayrı tablolar (`kilavuz-matris--unite`, her biri break-inside: avoid) olarak çizilir; G10/G11 bunu hazırlar, G13 gerçek Fen modeliyle Y5'i yeniden ölçer (Kanun KK-1) — ölçüm — yanlışsa basılı tablonun 2. parçası başlıksız kalır.
+33. Kanun KK-1 ve K5 metni Y5 kararına (baskıda koşulsuz ünite başına tablo) G11/G13'te hizalanır.
+34. "Performans Görevi: <ad>" / "Keşif Noktası: <ad>" birleşimindeki ": " ayracı kalır — etiket ve ad kitapta birebir, ayraç sunum; K1 ihlali değil — yanlışsa kılavuzda tek karakterlik fark.
+35. G4 başlık boyu toleransı yalnız +1 (genişlik>0, "… Alanında" etiketleri atla) — ±1 gerçek PDF'te 10 gürültü satırı getirdi, kabul şartım "yalnız Takımyıldızlar artar" idi ve sağlandı (95→96) — yanlışsa 1 punto küçük başlıklar kaçar; G5 onayı elle okur.
+36. G5 s.127 çok satırlı performans görevi adı ("Solunum Sisteminin Sağlığı İçin / Neler Yapabiliriz?") — seçenek (a): basliklari_ayristir etiketin sağında, üst farkı ≤30 px başlık boyu parçaları (ön geçişte toplanır) ada katar, TDD + Fen değişmezi; brief yalnız KITAPLAR derdi, K1 birebir ağır basar — yanlışsa başka kitapta komşu başlık ada karışır (14 etiket satırı tarandı, yalnız s.127 değişir). atla: "Solunum Sistemi Sağlığı", "Boşaltım Sistemi Sağlığı" (konu başlığının farklı yazımı, yinelenen satır).
+37. Paylaşılan ünite gruplayıcısı `sinav_kilavuzu.unite_grubu(harita, no, ad=None) -> ((0, no, ""), "N. Ünite · <ad>")`; G7 kılavuz bölümleri bununla gruplanır (U4) — G6 — yanlışsa matris ve kılavuz ünite adları ayrışır.
+38. D22 genişlemesi kabul — `DersOzeti.duyurulan = durum["senaryo"]` geçmiş sınavda da dolu (yalnız duyurulmuş ve tabloda var olan) — K8 korunur.
+39. G7–G11 yüzeyleri `olasi`/`senaryo_yok` durumunda `duyuru`/`anilan` alıntısını "bu senaryo" diye sunmaz (K8) — G6 incelemesi ⚠️.
+40. G8 `isaret_sahibi` olarak e-posta değil gösterim adı geçirir (PDF'e e-posta girmez) — gizlilik — yanlışsa kâğıtta e-posta görünür.
+41. `icerik_ozeti` üretim günü damgası yüzünden günlük değişir; PDF önbelleği günlük ayrışır — kabul (damga her sayfada, K12) — maliyet: günde bir yeniden basım.
+42. `dogrulama` duyuruya göredir; yüzeyler "Duyuruya göre" diye etiketler (G11).
+43. `secilen_duyurulan_degil = senaryo is not None and senaryo != duyurulan` sapması kabul.
+44. okul haftası — sınav sözcüğü taşıyan kartlar (`sinav_kaynaklari.on_suzgec`) atlanır VE alanın anlamı/etiketi "Ders kartında geçtiği hafta" olur (yüzeyler "işlendi" demez; "hafta yok" ≠ "işlenmedi") — sezgi tam değil, iki katlı önlem — yanlışsa öğrenci yanlış hafta görür.
+45. ebeveyn özeti sayıları ham öğrenci işaretlerinden (D16), `isaret` seçeneğinden bağımsız; ebeveyn kapsamı `isaret_sahibi`'ni taşır.
+46. G8 `_kilavuz_isaretleri(kim_icin)` → "oturum" (ekran) / "ogrenci" (PDF, ebeveyn özeti); G14 "ogrenci" ile çağırır. Ekranda ebeveyn=1 iken ebeveyn kapsamı öğrencinin işaretleri ve adıyla ikinci model çağrısından — kabul.
+47. Fikstür tabanına kişisel olmayan `isaret_sahibi="Deneme Öğrenci"` eklenir, fikstürler yeniden üretilir (G9–G11 sahip adı çizimini sınayabilsin; depoya gerçek çocuk adı girmez) — maliyet yok.
+48. G8 sıkılaştırmaları (durum yoksa 400, gövde sözlük değilse 400, tablo yoksa 503) kabul.
+49. API anahtarı ebeveyn=1 ile öğrencinin adını ve işaret sayılarını okur — bilinçli (/api/student/profile aynı veriyi zaten verir), yetki yükselmesi yok.
+50. Test sabitlerindeki gerçek adlar (çocuğun ve velinin gerçek adları) "Deneme Öğrenci"/"Deneme Veli" olur — "depoya gerçek çocuk adı girmez" kararının kapsamı; düzeltme turuna katılır.
+51. G9 `Hazirlik.scss` seçici sapması (`.cds--contained-list-item__content > div`) kabul — Carbon iç sarmalayıcı, ölçüldü.
+52. `daha-fazla-masaustu-linux.png` bayat (tolerans altında geçiyor) — bilinçli güncellenmesi G12'ye (giriş noktaları tabanları) bırakılır; G12 masaüstü tabanını da --update-snapshots ile yeniden yazar — yanlışsa taban bir süre bayat kalır.
+53. D15 ana sayfada 200 + durum "tablo_eski" ile karşılanıyor (kabul); G10/G11 409 gövdesindeki `mesaj`'ı okumak için useApi'nin hata gövdesini atmasını aşan bir okuma yapar.
+54. Onaylı taslak A'ya uyulur — yaklaşan her kayıt ders renkli sol kenarlı (`border-inline-start: spacing.$spacing-02 solid var(--ted-subject-accent)`) karttır; K4 "ders rengi yalnız vurgu" bunu kapsar — kullanıcı tasarıma önem veriyor, taslağı onayladı.
+55. Karo yalnız en yakın ilgili yazılıyı gösterir (ilk geçmemiş yazılı; hepsi geçtiyse sonuncusu) — spec §3.1 + taslak A; öteki yazılı ders sayfasında — yanlışsa karoda bilgi azalır.
+56. Masaüstü `daha-fazla` tabanı şimdi `--update-snapshots=all -g "daha-fazla"` ile yeniden yazılır, PNG gözle okunur (G12'ye bırakılmaz; önceki karar geri alındı).
+57. Küçükten iki madde düzeltme turuna katılır: (6) "Yaklaşan Ortak Yazılılar" ile "Dersler" aynı başlık biçiminde (K10 başlıkla gezinme); (8) karoda "Geçti" tekrarı kalkar (K7). Kalan minörler ertelendi.
+58. Çıktı etiketi (`kisa_ad`) kitap konusunun adı DEĞİL, MEB çıktı metninin kendisi, kısaltılmadan (K1, K6) — ekran görüntüsünde FB.7.1.4 ve FB.7.1.5 ikisi de "Yıldız Oluşumu", FB.7.1.3 "Teknoloji ile Uzay Araştırmaları Arasındaki İlişki" diye etiketleniyordu (çıktının kendisi "…problemleri çözebilme"); Matematik'te "…" ile kesik. Kitap konusu yalnız "Kitapta" satırında. `_kisa_ad` (G6, plan-mandated) G10 düzeltme turunda değişir; tablo satırı metni sarar — yanlışsa satırlar uzar.
+59. G10 ana sayfa karo bağlantısına `?sinav=N` eklemesi kabul (karo en yakın yazılıyı gösteriyor, bağlantı da onu açmalı).
+60. Vurgu sütunu ders renginde — `subjectClass` `section.hazirlik-ders`'e taşınır; hücre `--ted-subject-surface` / `--ted-subject-on-surface`, başlık `--ted-subject-accent` (taslak A, K4) — durum metni başlıkta kalır.
+61. Çıktı etiketi uygulaması: tabloda kod ayrı satırda (mono), altında tam MEB metni (kırpma/line-clamp yok, K1), "her senaryoda" metnin altında; sayısal sütunlara min-inline-size; ayrıntı panelinin başlığı yalnız kodu taşır (S38 ile MEB cümlesi çelişmesin), tam metin alıntıda; e2e seçicileri güncellenir; `_kisa_ad` testleri buna göre.
+62. Küçüklerden 4'ü düzeltme turuna katılır (tasarım/erişilebilirlik): kırıntı bağlantısında `uygulamaIcindeAc`; geçmiş yazılı sekmesinde tarih; InlineNotification genişliği tabloyla hizalı (`max-width: none`); "S1" başlığına görünmez "Senaryo " öneki.
+63. Vurgu sütunu hücreleri `--ted-subject-panel` (10 tonu, taslak A #d9fbfb = teal-10) + `--ted-subject-text`; başlık `--ted-subject-surface` + 4 px `--ted-subject-accent` çizgi kalır — teal-20 yüzey fazla doygun (ekran görüntüsü) — yanlışsa vurgu daha zayıf görünür.
+64. D11'in sunucu yarısı (`_istek_sayfasi` senaryoyu ve sınav kaydı yokken `hazirlik:…` kimliğini çözsün; model senaryoyu görsün) G12'ye (asistan girişi) taşınır — dosya G12 kapsamında.
+65. G11 sapmaları kabul — blok başlığında yalnız kod (MEB metni iki kez yazılmasın); ebeveyn özeti başlığı h2 (düzey atlamasın); KilavuzBelgesi'ne isaretHatasi/hatayiKapat; ders sayfası kırıntı ≥24 px; Kanun KK-1 Y5'e hizalandı.
+66. Etkinlik amacının kısaltılması spec §4.4 ("Amaç kısaltılmış") gereği kabul; K6 bölüm başlıklarının eksiksizliğini kapsar.
+67. Model başlıkları kitap yolu başına verir (`kitapta[i].basliklar`, sayfaya göre sıralı); blokta "Kitapta" ile "Bu bölümde ele alınanlar" tek iç içe liste olur: her yol (kitap › ünite › çerçeve › konu · s. a–b) ve altında o konunun başlıkları; `diger` türünün etiketi "Konu" değil "Alt başlık" — K2 dördüncü düzey konunun altında kalır — yanlışsa blok yeniden düzenlenir.
+68. Küçüklerden düzeltme turuna katılanlar: (1) olası kipte seçilen senaryoda sayılar "3. senaryoda 2 soru" diye nitelenir (K8); (5) işaret yarışı — kod başına istek sırası, eski isteğin geri alması yok sayılır; (6) telefonda (<lg) bölümlere atlama menüsü ("Bölümler"); (7) kırıntı sonunda "/" kalmaz (isCurrentPage "Kapsam Kılavuzu").
+69. Sınavlar kartında "Kapsam kılavuzu" küçük meta satırı değil, kartın eylem düzeyinde ("Örnek sınav için asistana sor" ile aynı biçimde) "Kapsam kılavuzunu aç" eylemi olur; MEB tablosu bağlantısı meta satırında kalır — ekran görüntüsünde ana eylem en küçük öğe — G12 düzeltme turu.
+70. Dersler sekmesinde altı dersin hepsi (Din Kültürü dahil) "MEB senaryoları" girişini taşır — ana sayfa altı dersi gösteriyor, giriş eşlemesi ders adı varyantlarını (ör. "Din Kültürü ve Ahlak Bilgisi") tanımalı — G12 düzeltme turu.
+71. Ülke genelinde asistan satırı kılavuza değil ders sayfasına gider ("MEB senaryosu yok, ders sayfası: /hazirlik/turkce?sinav=2"); brief testi buna göre değişir, Fen 1 satırı korunur.
+72. Kart eylemi Carbon ghost Button href + paylaşılan iç gezinme kancası (IcBaglanti mantığı çoğaltılmaz); etiket kesinde "Kapsam kılavuzunu aç (N. senaryo)", olasıda "Kapsam kılavuzunu aç", ülke genelinde "MEB senaryolarını aç" (ders sayfası).
+73. Din Kültürü — `dersAnahtari` `normalizeCourseDisplayName` ile alias'ları tanır; altı tablo adı + beş sekme adı birim testi.
+74. Ders sayfası `?sinav` yoksa `enYakinYazili` ile varsayılanı seçer (replace); Dersler sekmesinin ek `/api/hazirlik` çağrısı kaldırılır (sekme numarasız bağlantı verir) — ağır istek ve hata penceresi kalkar — yanlışsa sekmeden açılan sayfa bir an 1. yazılıyı göstermez, doğrudan doğruyu seçer.
+75. Küçüklerden katılanlar: doğrulama kuralı testleri (kesin+senaryosuz, ulke_geneli+senaryo); e2e yokluk iddiasından önce yüzey kanıtı; SCSS yorum/değer çelişkisi.
+76. Kâğıtta uzun ünite tablosu en çok 8 satırlık parçalara bölünür, her parça kendi başlık satırıyla (Kanun KK-1 güncel) — ölçüm: bölünmez 12 satır Chrome'u 5 puntoya küçültüyor, Türkçe'de 11 çıktılı ünite var — kabul.
+77. Adlı sayfa geçişleri (kapak, içindekiler, ek ayrı sayfada başlar) spec §5.2 gereği kalır; s.1/2/6 yarı boş kabul — basılı kılavuz düzeni.
+78. G13 düzeltme turuna kontrolcü maddeleri: kâğıtta "Kitapta" kutuları taslak A'daki gibi gri katman (Carbon gray-10, belirteçle) — siyah-beyazda da okunur; kapakta damga içerikte ve alt bilgide iki kez — içerikten kalkar (alt bilgide her sayfada var, K12); "Kesin" ikonu ile metin arasında boşluk.
+79. Düzeltme turu: e2e "(devam)" ::before content iddiası; PDF kapısına her sayfada damga + "s. n/N" ve kapakta üst bilgi yok kontrolü; İçindekiler numarası ::after iddiası; model_basliklari İçindekiler'in 7 girdisinin hepsi (bolumler(m)); eksik_basliklar ünite başlığını İçindekiler dışında (gövdede) arar; + üç görsel madde (gri Kitapta kutusu, kapakta tek damga, Kesin ikon boşluğu).
+80. A4 önizleme PDF'in birebir önizlemesidir — baskı sayfası modeli PDF ile aynı işaretlerle (öğrenci, D16) ister; API kılavuz ucuna yalnız tam roller için `isaret=ogrenci` benzeri parametre — G13 incelemesi ⚠️ — yanlışsa önizleme ile PDF'in işaret kutuları ayrışır.
+81. Sunucu basımı sonrası hafif K3 bekçisi: `en_kucuk_punto` < 7,5 ise (Chrome küçültmesi) ana yol kusurlu sayılır → düz yol denenir → o da kusurluysa açık hata — G13 ⚠️ uzun metinli 8 satırlık parça taşması — maliyet ~1 s/basım.
+82. PDF ucu API anahtarına 403 — kabul (PDF öğrencinin işaretlerini taşır).
+83. Sunucu basımı sonrası bekçi yalnız punto değil tam kanun kapılarını (`pdf_kapilari.kusurlar`: yetim, İçindekiler, K1, alt/üst bilgi, yazı tipi, punto) koşar; kusur → düz yol → kusur → 503 — G14 ölçümü: 205+ karakterde boş sayfa/İçindekiler kayması punto bekçisinden kaçıyor — maliyet ~1 s/basım, önbellekle bir kez.
+84. Seçenek penceresinde "Hazırlık işaretlerimi ekle" → "Hazırlık işaretlerini ekle" + yardımcı metin "<öğrencinin gösterim adı>'nın işaretleri" (D16: PDF öğrencinin işaretlerini basar; veli için "işaretlerim" yanlış) — G14 düzeltme turu.
+85. PDF dosya adı `kapsam-kilavuzu-<anahtar>-<no>-s<senaryo>.pdf` / `-olasi.pdf` (kontrolcü dağıtımındaki örnek; brief'in `-1-2.pdf`'inden okunaklı) — kabul.
+86. Cloudflare ~100 sn kenar sınırı: basım bütçeleri toplamı 100 sn'nin altına çekilir (ör. ana yol 40 sn + düz yol 30 sn, ölçüm dahil) — gerçek basım 3,5 sn — yanlışsa çok yavaş durumda istemci 524 alır.
+87. G14 düzeltme turuna inceleme minörleri katılır (seyrek ama gerçek yollar): TMPDIR koşu dizinine (Chrome profili sızmasın) + /tmp'deki artık profil temizlenir; benzersiz geçici önbellek adı (mkstemp) + _buda FileNotFoundError'a dayanıklı + yarım .tmp budanır (anahtar başına flock isteğe bağlı); "Vazgeç" AbortController ile isteği iptal edip pencereyi kapatır; p.wait TimeoutExpired → Zamanasimi.
+88. İlgi eki ünlü uyumuyla ("Ilgın'ın", "Ayşe'nin") — K7 — kabul. Öğrenci adı için yeni `/api/hazirlik/ogrenci` ucu kabul (icerik_ozeti değişmesin) — yetkisi yeniden incelemede denetlenir.
+89. G15'te dal güncel main ile (8e7c69d, fix/senaryo-alinti-no) worktree içinde birleştirilir (yerel dal; paylaşılan main'e dokunulmaz), çakışma (src/sinav_senaryo.py) çözülür, tam doğrulama birleşik ağaçta koşulur.
+90. Son düzeltme dalgası (tek uygulayıcı): (1) output/hazirlik_pdf DEFAULT_EXCLUDED_DIRS + FORBIDDEN_DIRS testi + CLAUDE.md; (2) ülke geneli kılavuz adresi (kip=ulke_geneli) boş kalmasın; (3) API anahtarı ebeveyn=1 isteğinde 403 (oturumsuz öğrenci verisi yok — sonraki kararlarla tutarlı); (4) @playwright/test çalışma zamanı bağımlılığı CLAUDE.md'de ve package.json yakınında not (npm install yasak, taşınmaz); (5) gerçek çocuk adı hazirlik.ts ve testten kalkar; (6) TS ANAHTARLAR ↔ Python DERS_ANAHTARLARI eşitlik testi, _kod_sirasi sinav_senaryo'ya taşınır ve iki yer oradan alır; (7) hazirlik_isaretleri OSError'u "bozuk" saymaz; (8) kapilari_denetle ValueError/JSONDecodeError → düz yol; (9) CLAUDE.md --denetle komutu -I + env -u, /api/hazirlik/ogrenci yetkisi belgelenir; (10) Kanun kapı adlarını depoya karşı tarayan test; (11) G12 anlık yokluk testi sıkılaştırılır. Sonra birleşik ağaçta tam Python süiti (parça) + hazirlik* e2e/görsel.
+91. Final: parked — okuma uçlarında işaret deposu OSError → genel 500 (503 eşlemesi yok) — Ruling: kabul, Plan 2'de 503'e eşlenir; hata artık görünür, sessiz sıfırlama yok — maliyet: kalıcı izin sorununda kılavuz ekranı 500 verir.
+92. Final: parked — plan belgesinde ebeveyn e-postası (docs/superpowers/plans/…plan1-fen.md:3525) — Ruling: kullanıcının kendi adresi, özel depo; Plan 2 plan belgesi yazılırken düzeltilir — maliyet: belge içinde bir e-posta.
