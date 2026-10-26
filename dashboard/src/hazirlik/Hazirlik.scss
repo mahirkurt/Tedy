@@ -102,6 +102,15 @@
   gap: spacing.$spacing-06;
 }
 
+// Kırıntı bağlantıları dokunma hedefi en az 24 px (WCAG 2.5.8; ölçüldü: telefonda axe target-size, IBM
+// target_spacing_sufficient). Ders sayfası ve kılavuz ekranı aynı kırıntıyı taşır.
+.hazirlik-ders .cds--breadcrumb .cds--link,
+.kilavuz-sayfa .cds--breadcrumb .cds--link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: spacing.$spacing-06;
+}
+
 // Bildirimler tablonun sütunuyla aynı genişlikte (Carbon 46 rem'de keser; portal bildirimleriyle aynı desen).
 .hazirlik-ders .cds--inline-notification { max-inline-size: none; }
 
@@ -121,8 +130,6 @@
 }
 
 .hazirlik-ders__tablo { overflow-x: auto; }
-
-.hazirlik-ders .kilavuz-matris__her { margin-block-start: spacing.$spacing-02; }
 
 .hazirlik-ders__eylemler {
   display: flex;

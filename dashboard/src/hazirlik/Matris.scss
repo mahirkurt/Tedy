@@ -88,7 +88,11 @@
   .kilavuz-matris__dugme:hover { color: var(--cds-link-primary-hover); }
 }
 
-.kilavuz-matris__her { margin-inline-start: spacing.$spacing-03; }
+// "her senaryoda" metnin altında, metinle aynı hizada (ders sayfası, kılavuz ve kâğıt aynı kuralı kullanır).
+.kilavuz-matris__her {
+  margin-block: spacing.$spacing-02 0;
+  margin-inline: 0;
+}
 
 // Y5: ünite başına ayrı tablolar kâğıtta bölünmez; her biri kendi başlık satırını taşır (Paged.js yinelemez).
 .kilavuz-matris--unite {

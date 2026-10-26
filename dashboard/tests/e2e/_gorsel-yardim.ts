@@ -31,7 +31,9 @@ async function agSakinlesir(page: Page, acik: Set<unknown>, sakin = 500, sinir =
   throw new Error(`ağ ${sinir} ms içinde sakinleşmedi; açık istek: ${acik.size}`)
 }
 
-export async function sabitAc(page: Page, yol: string, w: number, h: number) {
+/** `rotalar`: GORSEL'in üstüne eklenen uçlar (desen → gövde), taklitten sonra kaydedilir, yani onlar kazanır
+ *  (Playwright en yeni rotayı önce dener). Sınav Hazırlığı tabanları bununla açılır (hazirlik-gorsel.spec.ts). */
+export async function sabitAc(page: Page, yol: string, w: number, h: number, rotalar: [RegExp, unknown][] = []) {
   await page.clock.setFixedTime(new Date(SABIT_SAAT))
   // Sınav uyarıları kartı tarayıcının izin durumunu okur; taban çizgisi ortamdan bağımsız olsun.
   await bildirimTaklidi(page, { izin: 'default', abone: false })
@@ -43,6 +45,9 @@ export async function sabitAc(page: Page, yol: string, w: number, h: number) {
     } catch { /* storage blocked: nothing remembered anyway */ }
   })
   await mock(page, GORSEL)
+  for (const [desen, govde] of rotalar) {
+    await page.route(desen, r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(govde) }))
+  }
   await page.setViewportSize({ width: w, height: h })
   const acik = new Set<unknown>()
   page.on('request', r => { acik.add(r) })

@@ -1,0 +1,453 @@
+// Kapsam kılavuzu belgesi: ekran ve kâğıt (Kanun K2–K5, K11; onaylı A4 taslağı A "Carbon üretken"). Yalnız Carbon
+// belirteçleri; ders rengi yalnız vurgu (K4): özetin ve blokların sol çizgisi, blok soru sayısının zemini.
+// Kâğıda özgü sayfa kuralları src/baski/sayfa.css ve baski.scss'te.
+@use '@carbon/react/scss/spacing' as spacing;
+@use '@carbon/react/scss/type' as type;
+@use '@carbon/react/scss/breakpoint' as bp;
+
+.kilavuz-belge {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-09;
+  min-inline-size: 0;
+
+  // Bölüm ve ünite başlıkları (h3): ince alt çizgiyle bölümü açar.
+  section > h3 {
+    @include type.type-style('heading-03');
+    padding-block-end: spacing.$spacing-03;
+    border-block-end: 1px solid var(--cds-border-subtle-01);
+    margin-block-end: spacing.$spacing-05;
+  }
+
+  .cds--inline-notification { max-inline-size: none; }
+}
+
+.kilavuz-baslik { @include type.type-style('heading-04'); }
+
+.kilavuz-baslik__alt {
+  @include type.type-style('heading-02');
+  color: var(--cds-text-secondary);
+}
+
+.kilavuz-etiket {
+  @include type.type-style('label-01');
+  color: var(--cds-text-secondary);
+}
+
+.kilavuz-etiket + .kilavuz-liste { margin-block-start: spacing.$spacing-03; }
+
+.kilavuz-paragraf {
+  @include type.type-style('body-compact-01');
+  margin-block-start: spacing.$spacing-04;
+}
+
+// ── Özet ──────────────────────────────────────────────────────────────────────────────────────────────
+.kilavuz-ozet {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: spacing.$spacing-04;
+  border-inline-start: spacing.$spacing-02 solid var(--ted-subject-accent);
+  padding-inline-start: spacing.$spacing-05;
+
+  > * { max-inline-size: 100%; }
+}
+
+.kilavuz-ozet__secim { @include type.type-style('body-compact-01'); }
+
+.kilavuz-ozet__zaman {
+  @include type.type-style('body-compact-02');
+  font-variant-numeric: tabular-nums;
+}
+
+.kilavuz-ozet__sayilar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: spacing.$spacing-05;
+  inline-size: 100%;
+  margin-block-start: spacing.$spacing-03;
+
+  dt {
+    @include type.type-style('label-01');
+    color: var(--cds-text-secondary);
+  }
+
+  dd { margin-block-start: spacing.$spacing-02; }
+}
+
+.kilavuz-ozet__sayi dd {
+  @include type.type-style('heading-03');
+  font-variant-numeric: tabular-nums;
+}
+
+.kilavuz-ozet__her { grid-column: 1 / -1; }
+.kilavuz-ozet__her dd { @include type.type-style('body-compact-01'); }
+
+@include bp.breakpoint('md') {
+  .kilavuz-ozet__sayilar {
+    grid-template-columns: max-content max-content minmax(0, 1fr);
+    column-gap: spacing.$spacing-08;
+  }
+
+  .kilavuz-ozet__her { grid-column: auto; }
+}
+
+.kilavuz-ozet__dagilim {
+  display: flex;
+  flex-direction: column;
+  inline-size: 100%;
+  border-block-start: 1px solid var(--cds-border-subtle-01);
+
+  li {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    column-gap: spacing.$spacing-05;
+    align-items: baseline;
+    padding-block: spacing.$spacing-03;
+    border-block-end: 1px solid var(--cds-border-subtle-01);
+    @include type.type-style('body-compact-01');
+  }
+}
+
+.kilavuz-ozet__soru {
+  color: var(--cds-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+// Telefonda satırın soru sayısı kodun yanına, metin altına iner (metin tam genişlikte, kırpılmaz).
+@include bp.breakpoint-down('md') {
+  .kilavuz-ozet__dagilim li {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    row-gap: spacing.$spacing-01;
+  }
+
+  .kilavuz-ozet__dagilim .kilavuz-ozet__metin {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+.kilavuz-ozet__sahip { @include type.type-style('body-compact-01'); }
+
+.kilavuz-damga,
+.kilavuz-uyari {
+  @include type.type-style('helper-text-01');
+  color: var(--cds-text-secondary);
+}
+
+.kilavuz-uyari {
+  border: 1px solid var(--cds-border-strong-01);
+  padding: spacing.$spacing-03;
+}
+
+.kilavuz-belge__tablo { overflow-x: auto; }
+
+// ── Listeler ──────────────────────────────────────────────────────────────────────────────────────────
+.kilavuz-liste {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+  @include type.type-style('body-compact-01');
+}
+
+.kilavuz-plan {
+  display: flex;
+  flex-direction: column;
+  border-block-start: 1px solid var(--cds-border-subtle-01);
+
+  li {
+    display: grid;
+    grid-template-columns: 10rem minmax(0, 1fr);
+    column-gap: spacing.$spacing-05;
+    padding-block: spacing.$spacing-03;
+    border-block-end: 1px solid var(--cds-border-subtle-01);
+    @include type.type-style('body-compact-01');
+  }
+}
+
+.kilavuz-plan__gun { @include type.type-style('heading-compact-01'); }
+
+@include bp.breakpoint-down('md') {
+  .kilavuz-plan li { grid-template-columns: minmax(0, 1fr); }
+}
+
+// ── Ünite › çerçeve › çıktı (K2) ──────────────────────────────────────────────────────────────────────
+.kilavuz-unite {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-07;
+
+}
+
+// Ünitenin iç aralığını boşluk (gap) verir; bölüm başlığının alt boşluğu burada ikinci kez eklenmez.
+.kilavuz-belge .kilavuz-unite > h3 { margin-block-end: 0; }
+
+.kilavuz-cerceve {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-05;
+}
+
+.kilavuz-cerceve__baslik { @include type.type-style('heading-compact-02'); }
+.kilavuz-cerceve__sayfa { color: var(--cds-text-secondary); font-weight: 400; }
+
+// Blok: katman zemininde, sol kenarı ders rengi (taslak A). Çocuklar tek sütunda; yalnız başlık ve soru sayısı
+// aynı satırda (başlık solda, sayı sağda). Satır aralığı kenar boşluğuyla: "Kitapta" ve "Bu bölümde ele alınanlar"
+// etiketi altındaki listeyle tek gri katman kutusu olur (aralarında boşluk yok).
+.kilavuz-blok {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: spacing.$spacing-05;
+  padding: spacing.$spacing-05;
+  background-color: var(--cds-layer-01);
+  border-inline-start: spacing.$spacing-02 solid var(--ted-subject-accent);
+
+  > * {
+    grid-column: 1 / -1;
+    min-inline-size: 0;
+  }
+
+  > * + * { margin-block-start: spacing.$spacing-04; }
+}
+
+.kilavuz-blok__ust {
+  grid-column: 1;
+  align-self: center;
+  @include type.type-style('heading-compact-02');
+
+  .kilavuz-kod { font-weight: 600; }
+}
+
+.kilavuz-blok > .kilavuz-blok__soru {
+  grid-column: 2;
+  grid-row: 1;
+  margin-block-start: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: spacing.$spacing-03;
+}
+
+// Soru sayısı: ders paneli tonunda hap (vurgu, K4); "her senaryoda" gri Tag (K4: Tag'de ders ailesi yok).
+.kilavuz-blok__sayi {
+  @include type.type-style('heading-compact-01');
+  padding-block: spacing.$spacing-01;
+  padding-inline: spacing.$spacing-03;
+  border-radius: var(--ted-radius-pill);
+  background-color: var(--ted-subject-panel);
+  color: var(--ted-subject-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.kilavuz-blok__her { margin: 0; }
+
+.kilavuz-blok__meb { @include type.type-style('body-02'); }
+
+// Gri katman kutusu: etiket + altındaki liste (ya da "bulunamadı" satırı) birlikte.
+.kilavuz-blok__etiket {
+  @include type.type-style('label-01');
+  color: var(--cds-text-secondary);
+  background-color: var(--cds-layer-02);
+  padding-block-start: spacing.$spacing-03;
+  padding-inline: spacing.$spacing-04;
+}
+
+.kilavuz-blok > .kilavuz-blok__etiket + * {
+  margin-block-start: 0;
+  background-color: var(--cds-layer-02);
+  padding-block: spacing.$spacing-02 spacing.$spacing-04;
+  padding-inline: spacing.$spacing-04;
+}
+
+// Kitap yolu ve ele alınan başlıklar içindekiler gibi dizilir: sayfa numarası sağ sütunda, hizalı (taslak A).
+.kilavuz-blok__yollar {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-02;
+  @include type.type-style('body-compact-01');
+
+  li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    column-gap: spacing.$spacing-05;
+    align-items: center;
+  }
+}
+
+.kilavuz-sayfa-no {
+  color: var(--cds-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: end;
+}
+
+.kilavuz-blok__yok { @include type.type-style('body-compact-01'); }
+
+.kilavuz-basliklar {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-02;
+
+  li {
+    display: grid;
+    grid-template-columns: spacing.$spacing-10 minmax(0, 1fr) max-content;
+    column-gap: spacing.$spacing-03;
+    align-items: baseline;
+    @include type.type-style('body-compact-01');
+  }
+}
+
+.kilavuz-basliklar__tur {
+  @include type.type-style('label-01');
+  color: var(--cds-text-secondary);
+}
+
+.kilavuz-basliklar .kilavuz-sayfa-no { padding-inline-start: spacing.$spacing-03; }
+
+.kilavuz-blok__baglam {
+  @include type.type-style('body-compact-01');
+  color: var(--cds-text-secondary);
+}
+
+// Senaryoda olmayan çıktı: tek satır, soluk (K2); kenarı nötr, zemini yok. Soluk olmak opaklık değil, metin rengi.
+.kilavuz-blok--soluk {
+  display: block;
+  @include type.type-style('body-compact-01');
+  color: var(--cds-text-secondary);
+  background-color: transparent;
+  border-inline-start-color: var(--cds-border-subtle-01);
+  padding-block: spacing.$spacing-03;
+}
+
+.kilavuz-isaret {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+}
+
+.kilavuz-isaret__kutular,
+p.kilavuz-isaret {
+  display: flex;
+  flex-flow: row wrap;
+  gap: spacing.$spacing-06;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+// Carbon onay kutusunun form öğesi satırı doldurur; iki kutu yan yana, aralarında yalnız boşluk.
+.kilavuz-isaret__kutular .cds--form-item {
+  flex: none;
+  margin: 0;
+}
+
+.kilavuz-isaret__kutu {
+  display: inline-flex;
+  align-items: center;
+  gap: spacing.$spacing-02;
+  @include type.type-style('body-compact-01');
+}
+
+// Kâğıtta blok zeminsizdir (beyaz kâğıt), sol çizgi ve gri kutular kalır (taslak A).
+.kilavuz-belge--baski .kilavuz-blok {
+  background-color: transparent;
+  padding-block: 0;
+  padding-inline-end: 0;
+}
+
+// ── Ebeveyn özeti (kâğıtta başa tek sayfa) ───────────────────────────────────────────────────────────
+.kilavuz-ebeveyn {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-04;
+  @include type.type-style('body-compact-01');
+}
+
+.kilavuz-ebeveyn__baslik { @include type.type-style('heading-04'); }
+
+// ── Ekran: yan içindekiler ve sayfa düzeni ───────────────────────────────────────────────────────────
+.kilavuz-sayfa {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-06;
+
+  > .cds--inline-notification { max-inline-size: none; }
+}
+
+// Kırıntı solda, sayfanın eylemleri sağda (aynı satır; dar ekranda alt alta).
+.kilavuz-sayfa__ust {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: spacing.$spacing-04;
+}
+
+.kilavuz-sayfa__eylemler {
+  display: flex;
+  flex-wrap: wrap;
+  gap: spacing.$spacing-04;
+}
+
+.kilavuz-sayfa__duzen {
+  display: grid;
+  gap: spacing.$spacing-07;
+}
+
+.kilavuz-sayfa__icindekiler ul {
+  display: flex;
+  flex-direction: column;
+  border-inline-start: 1px solid var(--cds-border-subtle-01);
+  @include type.type-style('body-compact-01');
+}
+
+.kilavuz-sayfa__icindekiler a {
+  padding-block: spacing.$spacing-02;
+  padding-inline-start: spacing.$spacing-04;
+  color: var(--cds-text-secondary);
+  text-decoration: none;
+
+  &:focus-visible {
+    outline: 2px solid var(--cds-focus);
+    outline-offset: -2px;
+    color: var(--cds-text-primary);
+  }
+}
+
+@media (any-hover: hover) {
+  .kilavuz-sayfa__icindekiler a:hover {
+    color: var(--cds-text-primary);
+    background-color: var(--cds-layer-hover-01);
+  }
+}
+
+@include bp.breakpoint('lg') {
+  .kilavuz-sayfa__duzen {
+    /* stylelint-disable-next-line carbon/layout-use -- yan içindekiler sütununun genişliği, aralık değil */
+    grid-template-columns: 12rem minmax(0, 1fr);
+  }
+
+  .kilavuz-sayfa__icindekiler {
+    position: sticky;
+    inset-block-start: spacing.$spacing-10;
+    align-self: start;
+  }
+}
+
+@include bp.breakpoint-down('lg') {
+  .kilavuz-sayfa__icindekiler { display: none; }
+}
+
+// WCAG 2.5.8 / IBM target_spacing_sufficient: alt alta duran bağlantılar en az 24 px (ölçüldü: iki kitap yolu bağlantısı
+// birbirine 12 px'ten yakındı).
+.kilavuz-blok__yollar a,
+.kilavuz-liste a,
+.kilavuz-sayfa__icindekiler a,
+.kilavuz-blok__baglam a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: spacing.$spacing-06;
+}

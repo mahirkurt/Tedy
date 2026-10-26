@@ -91,6 +91,8 @@ export interface Blok {
   odevler: { baslik: string; teslim: string | null }[]
   moduller: { baslik: string; yol: string }[]
   isaret: IsaretDurumu
+  /** Başlık düzeyi, sıçramasız: ünite 1, çerçeve 2, blok 3; çerçevesiz blok 2 (U4). */
+  duzey: number
 }
 
 export interface KilavuzModeli {
@@ -111,7 +113,9 @@ export interface KilavuzModeli {
                duyurunun_saymadigi: string[] } | null
   plan: { gunler: { tarih: string; ciktilar: string[]; genel_tekrar: boolean }[] } | null
   ebeveyn: { cikti_sayisi: number; toplam_soru: number | null; soru_araligi: [number, number] | null; hazirim: number;
-             tekrar: number; isaretsiz: number; en_agir: string[] } | null
+             tekrar: number; isaretsiz: number; en_agir: string[]; isaret_sahibi: string | null } | null
+  /** İşaretlerin sahibinin gösterim adı (D16; e-posta değil). Kâğıtta işaretlerin kime ait olduğu bununla yazılır. */
+  isaret_sahibi: string | null
   kaynaklar: { etiket: string; adres: string }[]
   damgalar: { meb_guncelleme: string; tablo_alindi: string; kitaplar: { baslik: string; baski: string; sha256_kisa: string }[];
               uretim: string }
