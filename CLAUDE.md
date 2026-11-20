@@ -64,7 +64,7 @@ systemctl --user restart ted-dashboard   # Pick up new static files
 
 - **Service file**: `~/.config/systemd/user/ted-dashboard.service`
 - **Gunicorn**: binds `0.0.0.0:8085`, 2 `gthread` workers × 4 threads (see `ted-dashboard.service`), WSGI entry `src.dashboard_api:app`
-- **Public URL**: `tedy.online` via Cloudflare Tunnel (`hp-ai-node` tunnel)
+- **Public URL**: `tedy.online` via Cloudflare Tunnel (its own `ted` tunnel, `ted-cloudflared.service`; moved off `hp-ai-node` 2026-11-17)
 - **Cron**: `*/5 * * * *` runs `run_sync.py --zamanla` under `TZ=Europe/Istanbul timeout -k 30 600`, logs to `output/sync.log`. The code decides whether a tick runs: 15 minutes after the last attempt normally, **5 minutes after a failed portal login — every tick — until a login succeeds** (asked for 2026-09-25, first as 10 minutes, then 5; before, a failed login waited for the next 15-minute tick; a failed login run takes about 30 s, so ticks never meet). A login that raises — the form not loading when the portal is down — counts as failed rather than crashing the run. The record is `output/.sync_zamanlama.json` (`son_deneme`, `giris_basarisiz`, `ardisik_basarisiz`, `ilk_basarisiz`); an unreadable record means "run now", never "stop". A skipped tick prints nothing. A run started by hand (no `--zamanla`) never waits. On a failed login `health.json`'s `login` carries `ardisik_basarisiz`, `ilk_basarisiz` and `sonraki_deneme`. `tests/conftest.py` gives every test its own record: the rollover tests call `main()` and once wrote the live one. The pre-change crontab is backed up in `output/crontab_yedek/`. Portal attachments download inside the same run and under the same lock — after every scraper, before `health.json` and the reindex — in a budget of `min(180 s, start + 600 − 150 − now)` and 250 MB (`TEDY_EK_SURE_BUTCESI`, `TEDY_EK_BAYT_BUTCESI_MB`); under 15 s the step is skipped, and `health.json` carries its summary as `ekler`. Measured 2026-09-28 over 40 runs: p50 244 s, longest 393 s.
 - **Time zone: TEDY runs on Europe/Istanbul; the host is Etc/UTC.** Set in three places so no launch path escapes it: `src/env_loader.py` (`saat_dilimini_kur()`, a `setdefault` — a real `TZ` still wins, and every entry point passes through `load_env()`, so a manual `python src/run_sync.py` is covered and chromedriver/Chrome inherit it), `Environment=TZ=Europe/Istanbul` in both unit files, and the cron line. `TZ` is in `env_prep.UNIT_ONLY`: it must never go in `.env`, which would override the units. Until 2026-09-24 every naive `datetime.now()` was UTC while the family and the portal were Istanbul — a sync seven minutes old read "3 saat önce" on Işık's phone. The switch moved the 153 stored UTC stamps once with `scripts/saat_dilimi_gocu.py` (only `datetime.now()`-shaped values with microseconds, only those not already ahead of UTC now; backup in `output/saat_dilimi_gocu_yedek/`, marker `output/.saat_dilimi_gocu.json` — it refuses to run twice). Sealed archives and append-only logs keep their UTC stamps. The OAuth store is epoch integers and was unaffected. Measured: the timetable page renders byte-identical under either zone.
 - **One sync at a time**: `main()` takes an exclusive `fcntl.flock` on `output/.sync.lock` and skips the tick if another run holds it. Measured 2026-09-21: six `run_sync` processes and 22 Chrome processes were alive together — runs take 190–550s against a 900s tick, but `timeout 600` does not reliably kill a process blocked in Selenium, so each tick stacked another session onto the same portal account. Concurrent sessions read each other's pages: different URLs returned byte-identical text, Drive previews scraped as zero documents, `ders_programi` fell to 0 weeks, and untouched scrapers failed with `'list' object has no attribute 'get'`. **Identical text across different portal pages means concurrency, not a portal change** — check `pgrep -cf '[r]un_sync.py'` (note the bracket: an unbracketed `-f` pattern matches the invoking shell).
@@ -91,7 +91,7 @@ systemctl --user restart ted-dashboard   # Pick up new static files
 
 ### ted-mcp (edupedia orchestrator)
 
-A second systemd user service, loopback only, published as `mcp.tedy.online` on the same `hp-ai-node` tunnel.
+A second systemd user service, loopback only, published as `mcp.tedy.online` on the same `ted` tunnel.
 Runbook and rollback: `docs/superpowers/plans/2026-09-14-ted-mcp-altyapi.md`.
 
 ```bash
@@ -115,7 +115,7 @@ curl -s http://127.0.0.1:8090/health                   # {"status": "ok", "versi
   `CLOUDFLARE_TUNNEL_ID` belong to other resources):
 
   ```bash
-  .venv/bin/python -m src.mcp_server.tunnel_route --bolge tedy.online --tunel hp-ai-node --host mcp.tedy.online \
+  .venv/bin/python -m src.mcp_server.tunnel_route --bolge tedy.online --tunel ted --host mcp.tedy.online \
     dogrula --servis http://127.0.0.1:8090 --durum var      # ingress rule + proxied CNAME
   .venv/bin/python -m src.mcp_server.edge_ratelimit --bolge tedy.online dogrula   # per-IP edge limit on /oauth/* and /mcp
   ```
@@ -415,7 +415,7 @@ Plan: `docs/superpowers/plans/2026-09-14-ted-mcp-derleme-yayin-katalog.md`. Ara�
 ```bash
 .venv/bin/python -m src.mcp_server.derleme --ornek QUIZ --cikti /tmp/quiz.html   # golden modül + 18 kapı özeti
 .venv/bin/python scripts/edupedia_filo_sozlesme.py                               # canlı, ücretsiz tools/list yoklaması
-.venv/bin/python -m src.mcp_server.tunnel_route --bolge tedy.online --tunel hp-ai-node --host modul.tedy.online dogrula --servis http://127.0.0.1:8090 --durum var   # alt proje 3 aracı, salt okuma
+.venv/bin/python -m src.mcp_server.tunnel_route --bolge tedy.online --tunel ted --host modul.tedy.online dogrula --servis http://127.0.0.1:8090 --durum var   # alt proje 3 aracı, salt okuma
 ```
 
 - Motor: vendored şablon değişmez; köprü ve varlık görüntüleme `src/mcp_server/sablon.py` çapa yamalarıdır. Çapa kayarsa `TemplateDriftError`.
