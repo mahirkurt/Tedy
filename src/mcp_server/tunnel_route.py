@@ -1,6 +1,6 @@
 """Add or remove one hostname route on a remotely managed Cloudflare tunnel — merge-only.
 
-    .venv/bin/python -m src.mcp_server.tunnel_route --bolge tedy.online --tunel hp-ai-node \
+    .venv/bin/python -m src.mcp_server.tunnel_route --bolge tedy.online --tunel ted \
         --host mcp.tedy.online ekle --servis http://127.0.0.1:8090 --beklenen-kural 52
     ...  ekle --servis http://127.0.0.1:8090 --beklenen-kural 52 --uygula --yedek-dizini ~/.local/share/ted-backups
     ...  dogrula --servis http://127.0.0.1:8090 --durum var --yedek <yedek.json>
@@ -294,7 +294,7 @@ def main(argv: list[str] | None = None, api: CloudflareApi | None = None, out: T
     out = sys.stdout if out is None else out
     parser = argparse.ArgumentParser(description="Cloudflare tüneline tek hostname rotasını birleştirerek ekle/kaldır")
     parser.add_argument("--bolge", required=True, help="DNS bölgesi adı, örn. tedy.online")
-    parser.add_argument("--tunel", required=True, help="tünel adı, örn. hp-ai-node")
+    parser.add_argument("--tunel", required=True, help="tünel adı, örn. ted")
     parser.add_argument("--host", required=True, help="yayınlanacak hostname")
     sub = parser.add_subparsers(dest="komut", required=True)
     ekle = sub.add_parser("ekle")
